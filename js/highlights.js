@@ -20,16 +20,35 @@ export function getAll() {
   return Storage.get(getKey(), []);
 }
 
-export function add(cfi, text, color, chapter) {
+export function add(cfi, text, color, chapter, note = '') {
   const highlights = getAll();
-  if (highlights.some(h => h.cfi === cfi && h.color === color)) return false;
+  const existing = highlights.find(h => h.cfi === cfi);
+  if (existing) {
+    // Mismo pasaje: actualiza color y nota en vez de duplicar.
+    existing.color = color || existing.color;
+    if (note) existing.note = note;
+    Storage.set(getKey(), highlights);
+    if (onChangeCallback) onChangeCallback();
+    return true;
+  }
   highlights.push({
     cfi,
     text: text || '',
     color: color || '#ffeb3b',
     chapter: chapter || '',
+    note: note || '',
     timestamp: Date.now()
   });
+  Storage.set(getKey(), highlights);
+  if (onChangeCallback) onChangeCallback();
+  return true;
+}
+
+export function setNote(cfi, note) {
+  const highlights = getAll();
+  const h = highlights.find(x => x.cfi === cfi);
+  if (!h) return false;
+  h.note = note;
   Storage.set(getKey(), highlights);
   if (onChangeCallback) onChangeCallback();
   return true;
@@ -58,6 +77,7 @@ export function exportJSON(bookTitle) {
     highlights: highlights.map(h => ({
       text: h.text,
       color: h.color,
+      note: h.note || null,
       chapter: h.chapter || null,
       page: h.page || null,
       cfi: h.cfi || null,

@@ -909,46 +909,68 @@ body.ai-open .reader-main { margin-right: var(--ai-panel-width); }
 .ai-ob-start { width: 100%; }
 
 /* ============ HIGHLIGHT TOOLTIP ============ */
-.highlight-tooltip {
-  position: fixed;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 6px 8px;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  box-shadow: 0 4px 12px var(--shadow);
-  z-index: 200;
+/* Barra de selección de texto (estilo O'Reilly): preguntar al agente arriba;
+   colores + nota + copiar abajo. */
+.sel-toolbar {
+  position: fixed; z-index: 200;
+  display: flex; flex-direction: column;
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: var(--r-md); box-shadow: var(--shadow-3);
+  overflow: hidden;
 }
-
+.sel-ask {
+  display: flex; align-items: center; gap: 8px;
+  padding: 11px 16px; border: none; background: none; cursor: pointer;
+  color: var(--text); font-size: var(--fs-md); font-weight: 600; text-align: left;
+  transition: background var(--transition-fast);
+}
+.sel-ask:hover { background: var(--surface-3); }
+.sel-ask .icon { color: var(--accent); }
+.sel-row {
+  display: flex; align-items: stretch; gap: 0;
+  border-top: 1px solid var(--border-soft);
+}
+.sel-colors { display: flex; align-items: center; gap: 6px; padding: 8px 12px; }
 .highlight-color {
-  width: 24px;
-  height: 24px;
-  border: 2px solid transparent;
-  border-radius: 50%;
-  cursor: pointer;
+  width: 22px; height: 22px; border: 2px solid transparent; border-radius: 50%;
+  cursor: pointer; padding: 0;
   transition: transform var(--transition-fast), border-color var(--transition-fast);
 }
-
-.highlight-color:hover {
-  transform: scale(1.2);
-  border-color: var(--text-primary);
+.highlight-color:hover { transform: scale(1.18); border-color: var(--text); }
+.sel-act {
+  display: flex; align-items: center; gap: 6px;
+  padding: 8px 14px; border: none; border-left: 1px solid var(--border-soft);
+  background: none; cursor: pointer; color: var(--text); font-size: var(--fs-sm); font-weight: 500;
+  transition: background var(--transition-fast);
 }
+.sel-act:hover { background: var(--surface-3); }
+.sel-act .icon { color: var(--text-soft); }
 
-.highlight-remove {
-  background: none;
-  border: none;
-  color: var(--text-muted);
-  cursor: pointer;
-  font-size: 14px;
-  margin-left: 4px;
-  padding: 2px 6px;
+/* Chip de referencia (pasaje adjunto) sobre el compositor del agente. */
+.ai-ref {
+  display: flex; align-items: center; gap: 8px;
+  margin: 0 16px 8px; padding: 8px 10px;
+  background: var(--accent-soft); border-radius: var(--r-sm);
+  border-left: 3px solid var(--accent);
 }
+.ai-ref-ico { display: inline-flex; flex: 0 0 auto; color: var(--accent); }
+.ai-ref-text {
+  flex: 1; min-width: 0; font-size: var(--fs-sm); color: var(--text-soft); font-style: italic;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.ai-ref-clear {
+  flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center;
+  width: 24px; height: 24px; border: none; background: none; cursor: pointer;
+  color: var(--text-faint); border-radius: 50%;
+}
+.ai-ref-clear:hover { color: var(--text); background: var(--surface-3); }
 
-.highlight-remove:hover {
-  color: #e53935;
+/* Nota personal bajo un subrayado en la lista. */
+.highlight-note {
+  display: flex; align-items: flex-start; gap: 6px; margin-top: 6px;
+  font-size: 12px; color: var(--text-soft);
 }
+.highlight-note .icon { color: var(--text-faint); flex: 0 0 auto; margin-top: 1px; }
 
 /* ============================================================================
    FOCO accesible (acento índigo en vez del ring por defecto del navegador)

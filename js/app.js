@@ -512,51 +512,68 @@ let activeSelection = null;
 
 function showHighlightTooltip(cfiRange, text, selection) {
   const tooltip = document.getElementById('highlight-tooltip');
-
-  // Try to position relative to selection
-  let left = window.innerWidth / 2 - 80;
-  let top = 100;
-
-  if (selection && selection.rangeCount > 0) {
-    try {
-      const range = selection.getRangeAt(0);
-      const rect = range.getBoundingClientRect();
-      left = rect.left + (rect.width / 2) - 80;
-      top = rect.top - 50;
-    } catch(e) {}
-  }
-
-  // Keep tooltip in viewport
-  left = Math.max(10, Math.min(left, window.innerWidth - 170));
-  top = Math.max(10, top);
-
-  tooltip.style.display = 'flex';
-  tooltip.style.left = left + 'px';
-  tooltip.style.top = top + 'px';
-
   activeSelection = { cfiRange, text };
 
-  // Color buttons
+  // Render hidden first to measure, then place centered above the selection
+  // (coords del rango son relativas al iframe del libro → sumar su offset).
+  tooltip.style.display = 'flex';
+  tooltip.style.visibility = 'hidden';
+  requestAnimationFrame(() => {
+    let rect = null;
+    if (selection && selection.rangeCount > 0) {
+      try { rect = selection.getRangeAt(0).getBoundingClientRect(); } catch (e) {}
+    }
+    const iframe = document.querySelector('#epub-container iframe');
+    const io = iframe ? iframe.getBoundingClientRect() : { left: 0, top: 0 };
+    const tw = tooltip.offsetWidth, th = tooltip.offsetHeight;
+    let cx = window.innerWidth / 2, top = 100;
+    if (rect) {
+      cx = io.left + rect.left + rect.width / 2;
+      top = io.top + rect.top - th - 10;
+      if (top < 10) top = io.top + rect.bottom + 10;   // debajo si no cabe arriba
+    }
+    let left = Math.max(10, Math.min(cx - tw / 2, window.innerWidth - tw - 10));
+    top = Math.max(10, Math.min(top, window.innerHeight - th - 10));
+    tooltip.style.left = left + 'px';
+    tooltip.style.top = top + 'px';
+    tooltip.style.visibility = 'visible';
+  });
+
+  // Subrayar con color
   tooltip.querySelectorAll('.highlight-color').forEach(btn => {
     btn.onclick = () => {
       const color = btn.dataset.color;
-      const chapter = EpubReader.getCurrentChapterLabel();
-      Highlights.add(cfiRange, text, color, chapter);
-
-      // Apply highlight to rendition
+      Highlights.add(cfiRange, text, color, EpubReader.getCurrentChapterLabel());
       applyHighlightToRendition(cfiRange, color);
-
       hideHighlightTooltip();
       renderHighlights();
     };
   });
 
-  // Remove button
-  document.getElementById('highlight-remove').onclick = () => {
+  // Preguntar al agente con el pasaje como referencia
+  document.getElementById('sel-ask').onclick = () => {
+    AiPanel.quoteSelection(text);
     hideHighlightTooltip();
   };
 
-  // Close on click outside
+  // Añadir nota (subraya y guarda la nota)
+  document.getElementById('sel-note').onclick = () => {
+    const note = prompt('Tu nota sobre este pasaje:');
+    if (note === null) return;
+    const color = '#ffd54f';
+    Highlights.add(cfiRange, text, color, EpubReader.getCurrentChapterLabel(), note.trim());
+    applyHighlightToRendition(cfiRange, color);
+    hideHighlightTooltip();
+    renderHighlights();
+  };
+
+  // Copiar al portapapeles
+  document.getElementById('sel-copy').onclick = async () => {
+    try { await navigator.clipboard.writeText(text); } catch (e) { /* sin clipboard */ }
+    hideHighlightTooltip();
+  };
+
+  // Cerrar al hacer clic fuera
   setTimeout(() => {
     document.addEventListener('click', hideHighlightTooltipOnOutside);
   }, 100);
@@ -607,6 +624,7 @@ function renderHighlights() {
     item.style.borderLeftColor = hl.color;
     item.innerHTML = `
       <div class="highlight-text">"${escapeHtml(hl.text)}"</div>
+      ${hl.note ? `<div class="highlight-note">${icon('note', { size: 13 })}<span>${escapeHtml(hl.note)}</span></div>` : ''}
       <div class="highlight-meta">
         <span>${escapeHtml(hl.chapter)}</span>
         <button class="highlight-delete" title="Eliminar">${icon('xmark', { size: 16 })}</button>

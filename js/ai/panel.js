@@ -27,6 +27,8 @@ let hqaBusy = false;          // generación HQ&A en curso
 let busy = false, abortCtrl = null;
 let onCite = () => {};
 let segReady = false, segBlocks = 0, segCached = false;
+let pendingRef = null;             // pasaje seleccionado adjunto a la próxima pregunta
+let pendingQuoteOnActivate = null; // cola: pasaje a adjuntar tras crear/activar convo
 
 export function init(opts) {
   onCite = opts.onCite || (() => {});
@@ -40,7 +42,9 @@ export function init(opts) {
     messages: $('#ai-messages'), input: $('#ai-input'), send: $('#ai-send'), close: $('#ai-close'),
     auto: $('#ai-auto'),
     convobar: $('#ai-convobar'), convoBtn: $('#ai-convo-btn'), convoLabel: $('#ai-convo-label'), convoNew: $('#ai-convo-new'),
+    ref: $('#ai-ref'), refText: $('#ai-ref-text'),
   });
+  $('#ai-ref-clear').addEventListener('click', clearRef);
 
   els.model.innerHTML = LLM.MODELS.map(m => `<option value="${m.id}">${m.name}</option>`).join('');
   els.key.value = LLM.getKey();
@@ -109,6 +113,11 @@ const TEMPLATE = `
   </div>
   <div id="ai-view-chat" class="ai-view active">
     <div id="ai-messages" class="ai-messages"></div>
+    <div id="ai-ref" class="ai-ref" style="display:none">
+      <span class="ai-ref-ico">${icon('note', { size: 15 })}</span>
+      <span id="ai-ref-text" class="ai-ref-text"></span>
+      <button id="ai-ref-clear" class="ai-ref-clear" title="Quitar referencia">${icon('xmark', { size: 15 })}</button>
+    </div>
     <div class="ai-composer">
       <textarea id="ai-input" rows="2" placeholder="Pregunta sobre el libro..."></textarea>
       <button id="ai-send" class="primary-btn ai-send">Enviar</button>
@@ -124,6 +133,29 @@ export function setOpen(open) {
   else if (convo) els.input?.focus();
 }
 export function isOpen() { return document.body.classList.contains('ai-open'); }
+
+// Adjuntar un pasaje seleccionado en el lector como referencia de la próxima
+// pregunta (botón "Preguntar al agente" de la barra de selección).
+export function quoteSelection(text) {
+  const clean = (text || '').replace(/\s+/g, ' ').trim();
+  if (!clean) return;
+  setOpen(true);
+  showView('chat');
+  if (!convo) { pendingQuoteOnActivate = clean; return; } // se aplica tras el onboarding
+  setRef(clean);
+}
+
+function setRef(text) {
+  pendingRef = text;
+  if (els.refText) els.refText.textContent = text;
+  if (els.ref) els.ref.style.display = 'flex';
+  els.input?.focus();
+}
+
+function clearRef() {
+  pendingRef = null;
+  if (els.ref) els.ref.style.display = 'none';
+}
 
 function showView(view) {
   els.tabs.querySelectorAll('.ai-tab').forEach(b => b.classList.toggle('active', b.dataset.view === view));
@@ -253,10 +285,12 @@ function refreshStatus() {
 async function activateConvo() {
   els.tabs.style.display = 'flex';
   renderConvoBar();
+  clearRef();
   notes = convo ? await DB.getNotes(convo.id) : [];
   renderNotebook();
   await restoreChat();
   refreshStatus();
+  if (pendingQuoteOnActivate) { setRef(pendingQuoteOnActivate); pendingQuoteOnActivate = null; }
 }
 
 // Cambiar a otra conversación del mismo libro.
@@ -571,9 +605,13 @@ async function send() {
   if (!annotatedText) { setStatus('El libro aún no está listo.'); return; }
 
   els.input.value = '';
-  appendBubble('user', q, false);
-  history.push({ role: 'user', content: q });
-  if (convo) DB.addMessage(convo.id, 'user', q);
+  // Si hay un pasaje adjunto (referencia del lector), se incluye en el mensaje.
+  const ref = pendingRef; clearRef();
+  const aug = ref ? `Sobre este fragmento del libro:\n«${ref}»\n\n${q}` : q;
+
+  appendBubble('user', aug, false);
+  history.push({ role: 'user', content: aug });
+  if (convo) DB.addMessage(convo.id, 'user', aug);
 
   const bubble = appendBubble('assistant', '', false);
   const textNode = bubble.querySelector('.ai-bubble-text');
@@ -585,7 +623,7 @@ async function send() {
     { role: 'system', content: systemPrompt() },
     { role: 'user', content: 'LIBRO ANOTADO (cita los pasajes con sus anclas [[aN]]):\n\n' + annotatedText },
     ...history.slice(0, -1),
-    { role: 'user', content: q },
+    { role: 'user', content: aug },
   ];
 
   try {

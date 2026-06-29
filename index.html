@@ -187,12 +187,18 @@
   <button id="ai-fab" class="ai-fab" aria-label="Abrir agente" title="Agente" data-icon="sparkles" data-icon-size="26"></button>
 
   <!-- Highlight tooltip -->
-  <div id="highlight-tooltip" class="highlight-tooltip" style="display:none;">
-    <button class="highlight-color" data-color="#ffeb3b" style="background:#ffeb3b;" title="Amarillo"></button>
-    <button class="highlight-color" data-color="#4caf50" style="background:#4caf50;" title="Verde"></button>
-    <button class="highlight-color" data-color="#2196f3" style="background:#2196f3;" title="Azul"></button>
-    <button class="highlight-color" data-color="#e91e63" style="background:#e91e63;" title="Rosa"></button>
-    <button id="highlight-remove" class="highlight-remove" title="Eliminar subrayado" data-icon="xmark" data-icon-size="16"></button>
+  <div id="highlight-tooltip" class="sel-toolbar" style="display:none;">
+    <button id="sel-ask" class="sel-ask"><span class="sel-ask-ico" data-icon="sparkles" data-icon-size="18"></span>Preguntar al agente</button>
+    <div class="sel-row">
+      <div class="sel-colors">
+        <button class="highlight-color" data-color="#ffd54f" style="background:#ffd54f;" title="Amarillo"></button>
+        <button class="highlight-color" data-color="#81c784" style="background:#81c784;" title="Verde"></button>
+        <button class="highlight-color" data-color="#64b5f6" style="background:#64b5f6;" title="Azul"></button>
+        <button class="highlight-color" data-color="#f06292" style="background:#f06292;" title="Rosa"></button>
+      </div>
+      <button id="sel-note" class="sel-act"><span data-icon="note" data-icon-size="17"></span>Nota</button>
+      <button id="sel-copy" class="sel-act"><span data-icon="copy" data-icon-size="17"></span>Copiar</button>
+    </div>
   </div>
 
   <!-- Scripts -->
