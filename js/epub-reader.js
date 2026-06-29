@@ -212,6 +212,7 @@ function injectThemeIntoContent(contents) {
         font-size: ${settings.fontSize}px !important;
         line-height: ${settings.lineHeight} !important;
         padding: 6px 16px !important;   /* margen mínimo tipo Play Books */
+        -webkit-touch-callout: none;    /* evita el menú nativo de iOS al seleccionar */
       }
       p, div, span, li, h1, h2, h3, h4, h5, h6, a, blockquote, td, th, em, strong, i, b {
         color: ${colors.text} !important;

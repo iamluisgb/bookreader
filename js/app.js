@@ -483,6 +483,8 @@ function initHighlights() {
   });
 }
 
+let tempSelCfi = null;
+
 function setupHighlights() {
   const rendition = EpubReader.getRendition();
   if (!rendition) return;
@@ -491,46 +493,75 @@ function setupHighlights() {
   rendition.on('selected', (cfiRange, contents) => {
     if (!cfiRange) return;
 
-    let text = '';
-    let selection = null;
+    let text = '', selection = null, rect = null;
     try {
       selection = contents.window.getSelection();
       if (selection && !selection.isCollapsed) {
         text = selection.toString().trim();
+        if (selection.rangeCount > 0) {
+          // Rect de la selección en coords de PANTALLA (sumar offset del iframe).
+          const r = selection.getRangeAt(0).getBoundingClientRect();
+          const iframe = document.querySelector('#epub-container iframe');
+          const io = iframe ? iframe.getBoundingClientRect() : { left: 0, top: 0 };
+          rect = { left: io.left + r.left, top: io.top + r.top, width: r.width, height: r.height };
+        }
       }
-    } catch(e) {
+    } catch (e) {
       console.warn('Selection access failed:', e);
     }
 
     if (!text) return;
 
-    showHighlightTooltip(cfiRange, text, selection);
+    showHighlightTooltip(cfiRange, text, rect);
+
+    // Pintar un resaltado temporal nuestro y LIMPIAR la selección nativa: así se
+    // descarta el menú del sistema (Copiar/Compartir) que se solapaba con la barra.
+    drawTempSelection(rendition, cfiRange);
+    try { selection.removeAllRanges(); } catch (e) {}
+
+    // Tocar el libro (dentro del iframe) cierra la barra; el clic en el iframe no
+    // llega al documento principal, así que escuchamos aquí el siguiente toque.
+    try {
+      contents.document.addEventListener('mousedown', hideHighlightTooltip, { once: true });
+    } catch (e) {}
   });
+}
+
+function drawTempSelection(rendition, cfiRange) {
+  removeTempSelection(rendition);
+  tempSelCfi = cfiRange;
+  try {
+    rendition.annotations.highlight(cfiRange, {}, () => {}, 'sel-temp', {
+      'fill': '#64b5f6', 'fill-opacity': '0.4', 'mix-blend-mode': 'multiply'
+    });
+  } catch (e) {}
+}
+
+function removeTempSelection(rendition) {
+  if (!tempSelCfi) return;
+  // epub.js identifica la anotación por (cfi + TIPO); el tipo de highlight() es
+  // "highlight" (no la clase CSS).
+  try { (rendition || EpubReader.getRendition())?.annotations.remove(tempSelCfi, 'highlight'); } catch (e) {}
+  tempSelCfi = null;
 }
 
 let activeSelection = null;
 
-function showHighlightTooltip(cfiRange, text, selection) {
+function showHighlightTooltip(cfiRange, text, rect) {
   const tooltip = document.getElementById('highlight-tooltip');
   activeSelection = { cfiRange, text };
 
   // Render hidden first to measure, then place centered above the selection
-  // (coords del rango son relativas al iframe del libro → sumar su offset).
+  // (rect ya viene en coords de pantalla).
   tooltip.style.display = 'flex';
   tooltip.style.visibility = 'hidden';
   requestAnimationFrame(() => {
-    let rect = null;
-    if (selection && selection.rangeCount > 0) {
-      try { rect = selection.getRangeAt(0).getBoundingClientRect(); } catch (e) {}
-    }
-    const iframe = document.querySelector('#epub-container iframe');
-    const io = iframe ? iframe.getBoundingClientRect() : { left: 0, top: 0 };
     const tw = tooltip.offsetWidth, th = tooltip.offsetHeight;
     let cx = window.innerWidth / 2, top = 100;
     if (rect) {
-      cx = io.left + rect.left + rect.width / 2;
-      top = io.top + rect.top - th - 10;
-      if (top < 10) top = io.top + rect.bottom + 10;   // debajo si no cabe arriba
+      cx = rect.left + rect.width / 2;
+      top = rect.top - th - 10;
+      if (top < 10) top = rect.top + rect.height + 10;   // debajo si no cabe arriba
     }
     let left = Math.max(10, Math.min(cx - tw / 2, window.innerWidth - tw - 10));
     top = Math.max(10, Math.min(top, window.innerHeight - th - 10));
@@ -543,6 +574,7 @@ function showHighlightTooltip(cfiRange, text, selection) {
   tooltip.querySelectorAll('.highlight-color').forEach(btn => {
     btn.onclick = () => {
       const color = btn.dataset.color;
+      removeTempSelection();   // quitar el temporal antes de pintar el definitivo
       Highlights.add(cfiRange, text, color, EpubReader.getCurrentChapterLabel());
       applyHighlightToRendition(cfiRange, color);
       hideHighlightTooltip();
@@ -561,6 +593,7 @@ function showHighlightTooltip(cfiRange, text, selection) {
     const note = prompt('Tu nota sobre este pasaje:');
     if (note === null) return;
     const color = '#ffd54f';
+    removeTempSelection();
     Highlights.add(cfiRange, text, color, EpubReader.getCurrentChapterLabel(), note.trim());
     applyHighlightToRendition(cfiRange, color);
     hideHighlightTooltip();
@@ -582,6 +615,7 @@ function showHighlightTooltip(cfiRange, text, selection) {
 function hideHighlightTooltip() {
   document.getElementById('highlight-tooltip').style.display = 'none';
   document.removeEventListener('click', hideHighlightTooltipOnOutside);
+  removeTempSelection();
   activeSelection = null;
 }
 
