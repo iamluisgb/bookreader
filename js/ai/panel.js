@@ -14,7 +14,7 @@ const act = (name, text, size = 15) => `${icon(name, { size })}<span>${text}</sp
 
 let els = {};
 let book = null, bookId = null, bookTitle = '';
-let session = null;          // { templateId, goal }
+let convo = null;            // conversación activa { id, bookId, templateId, goal, title }
 let template = null;
 let annotatedText = '', anchors = new Map();
 let history = [];            // {role, content}
@@ -39,6 +39,7 @@ export function init(opts) {
     chatView: $('#ai-view-chat'), noteView: $('#ai-view-notebook'),
     messages: $('#ai-messages'), input: $('#ai-input'), send: $('#ai-send'), close: $('#ai-close'),
     auto: $('#ai-auto'),
+    convobar: $('#ai-convobar'), convoBtn: $('#ai-convo-btn'), convoLabel: $('#ai-convo-label'), convoNew: $('#ai-convo-new'),
   });
 
   els.model.innerHTML = LLM.MODELS.map(m => `<option value="${m.id}">${m.name}</option>`).join('');
@@ -67,6 +68,13 @@ export function init(opts) {
   els.messages.addEventListener('click', onMessagesClick);
   els.noteView.addEventListener('click', onNotebookClick);
 
+  // Selector de conversaciones.
+  els.convoBtn.addEventListener('click', (e) => { e.stopPropagation(); openConvoMenu(els.convoBtn); });
+  els.convoNew.addEventListener('click', () => openOnboarding());
+  document.addEventListener('click', (e) => {
+    if (convoMenuEl && !convoMenuEl.contains(e.target) && !e.target.closest('#ai-convo-btn')) closeConvoMenu();
+  });
+
   // Atenuación de capítulos: perezosa, al abrir el índice (el handler de app.js
   // ya alternó la clase 'open' antes de que llegue este listener).
   document.getElementById('sidebar-toggle')?.addEventListener('click', () => {
@@ -89,6 +97,12 @@ const TEMPLATE = `
     <button id="ai-save-cfg" class="primary-btn ai-save">Guardar</button>
   </div>
   <div id="ai-status" class="ai-status">Abre un EPUB para empezar.</div>
+  <div id="ai-convobar" class="ai-convobar" style="display:none">
+    <button id="ai-convo-btn" class="ai-convo-btn" title="Cambiar de conversación">
+      ${icon('bubble', { size: 15 })}<span id="ai-convo-label" class="ai-convo-label">Conversación</span>${icon('chevron-down', { size: 14 })}
+    </button>
+    <button id="ai-convo-new" class="icon-btn" title="Nueva conversación">${icon('plus', { size: 18 })}</button>
+  </div>
   <div id="ai-tabs" class="ai-tabs" style="display:none">
     <button class="ai-tab active" data-view="chat">${icon('bubble', { size: 16 })} Chat</button>
     <button class="ai-tab" data-view="notebook">${icon('note', { size: 16 })} Libreta</button>
@@ -106,8 +120,8 @@ const TEMPLATE = `
 export function setOpen(open) {
   document.body.classList.toggle('ai-open', open);
   if (!open) return;
-  if (book && !session) openOnboarding();   // primer uso del agente con este libro
-  else if (session) els.input?.focus();
+  if (book && !convo) openOnboarding();   // primer uso del agente con este libro
+  else if (convo) els.input?.focus();
 }
 export function isOpen() { return document.body.classList.contains('ai-open'); }
 
@@ -122,22 +136,26 @@ function showView(view) {
 
 export async function setBook(b, id, title) {
   book = b; bookId = id || null; bookTitle = title || 'Libro';
-  session = null; template = null; history = []; notes = [];
+  convo = null; template = null; history = []; notes = [];
   editingId = null; addingField = null; attenuationDone = false;
   clearChapterAttenuation();
   annotatedText = ''; anchors = new Map();
   segReady = false; segBlocks = 0; segCached = false;
   els.messages.innerHTML = '';
   els.tabs.style.display = 'none';
+  if (els.convobar) els.convobar.style.display = 'none';
   showView('chat');
   if (!book) { setStatus('Abre un EPUB para empezar.'); return; }
 
-  // Sesión existente: activar. Si no hay, el onboarding se mostrará al abrir el
-  // panel (no aquí, para no tapar el lector con un modal en cada carga).
-  session = bookId ? await DB.getSession(bookId) : null;
-  if (session) {
-    template = getTemplate(session.templateId);
-    await activateSession();
+  // Migrar conversación antigua (si la hay) y activar la más reciente. Si no hay
+  // ninguna, el onboarding se mostrará al abrir el panel (no aquí, para no tapar
+  // el lector con un modal en cada carga).
+  if (bookId) await DB.migrateBook(bookId);
+  const convos = bookId ? await DB.getConvos(bookId) : [];
+  if (convos.length) {
+    convo = convos[0];                 // getConvos viene ordenado por lastUsedAt desc
+    template = getTemplate(convo.templateId);
+    await activateConvo();
   }
 
   // Segmentar (o cargar de cache) en segundo plano.
@@ -161,7 +179,7 @@ function registerReaderSelection() {
 }
 
 async function onReaderSelection(cfiRange, contents) {
-  if (hqaBusy || !session || template?.id !== 'hqa') return;
+  if (hqaBusy || !convo || template?.id !== 'hqa') return;
   let text = '';
   try { text = (contents?.window?.getSelection()?.toString() || '').trim(); } catch { /* sin acceso */ }
   if (text.length < 8) return;
@@ -180,13 +198,13 @@ del usuario, genera: (1) una PREGUNTA conceptual que ese fragmento responde, ali
 Responde EXACTAMENTE en dos líneas, sin nada más:
 P: <pregunta>
 R: <respuesta>` },
-      { role: 'user', content: `OBJETIVO: ${session.goal}\n\nFRAGMENTO SUBRAYADO:\n"${text}"` },
+      { role: 'user', content: `OBJETIVO: ${convo.goal}\n\nFRAGMENTO SUBRAYADO:\n"${text}"` },
     ];
     const out = await LLM.chatStream({ messages });
     const q = (out.match(/P:\s*(.+)/i)?.[1] || '').trim();
     const a = (out.match(/R:\s*([\s\S]+)/i)?.[1] || '').trim();
     const content = `> ${text}\n\n**P:** ${q || '—'}\n**R:** ${a || '—'}`;
-    const id = bookId ? await DB.addNote(bookId, 'hqa', content, [cfiRange]) : Date.now();
+    const id = convo ? await DB.addNote(convo.id, 'hqa', content, [cfiRange]) : Date.now();
     notes.push({ id, fieldKey: 'hqa', content, sourceCfis: [cfiRange] });
     renderNotebook();
     markNotebookUnread();
@@ -231,13 +249,89 @@ function refreshStatus() {
   setStatus(template ? `${base} · ${template.name}` : base);
 }
 
-async function activateSession() {
+async function activateConvo() {
   els.tabs.style.display = 'flex';
-  notes = bookId ? await DB.getNotes(bookId) : [];
+  renderConvoBar();
+  notes = convo ? await DB.getNotes(convo.id) : [];
   renderNotebook();
   await restoreChat();
   refreshStatus();
 }
+
+// Cambiar a otra conversación del mismo libro.
+async function switchConvo(id) {
+  if (convo && convo.id === id) return;
+  const c = await DB.getConvo(id);
+  if (!c) return;
+  convo = c; template = getTemplate(c.templateId);
+  history = [];
+  attenuationDone = false; clearChapterAttenuation();
+  await DB.touchConvo(id);
+  await activateConvo();
+  showView('chat');
+}
+
+// Barra con la conversación activa + selector + nueva.
+function renderConvoBar() {
+  if (!els.convobar) return;
+  els.convobar.style.display = convo ? 'flex' : 'none';
+  if (!convo) return;
+  const label = template?.name || 'Conversación';
+  els.convoLabel.textContent = label;
+}
+
+async function openConvoMenu(anchor) {
+  closeConvoMenu();
+  const convos = bookId ? await DB.getConvos(bookId) : [];
+  const menu = document.createElement('div');
+  menu.className = 'ai-convo-menu lib-menu';
+  menu.innerHTML = `
+    ${convos.map(c => {
+      const t = getTemplate(c.templateId);
+      const active = convo && c.id === convo.id;
+      return `<button class="lib-menu-item ai-convo-item" data-id="${c.id}">
+        <span class="lib-menu-check">${active ? icon('check', { size: 16 }) : ''}</span>
+        <span class="ai-convo-item-text"><span class="ai-convo-item-name">${escapeHtml(t?.name || 'Conversación')}</span><span class="ai-convo-item-goal">${escapeHtml(c.goal || '')}</span></span>
+        <span class="ai-convo-del" data-del="${c.id}" title="Eliminar">${icon('trash', { size: 15 })}</span>
+      </button>`;
+    }).join('')}
+    <div class="lib-menu-sep"></div>
+    <button class="lib-menu-item" data-act="new">${icon('plus', { size: 16 })}<span>Nueva conversación…</span></button>
+  `;
+  document.body.appendChild(menu);
+  convoMenuEl = menu;
+  const r = anchor.getBoundingClientRect();
+  menu.style.position = 'fixed';
+  menu.style.display = 'block';
+  menu.style.left = Math.max(8, r.left) + 'px';
+  menu.style.top = (r.bottom + 6) + 'px';
+  menu.style.minWidth = Math.max(240, r.width) + 'px';
+
+  menu.addEventListener('click', async (ev) => {
+    const del = ev.target.closest('.ai-convo-del');
+    if (del) {
+      ev.stopPropagation();
+      const id = del.dataset.del;
+      const c = convos.find(x => x.id === id);
+      if (confirm(`¿Eliminar la conversación "${getTemplate(c?.templateId)?.name || ''}"? Se borran su chat y su libreta.`)) {
+        await DB.deleteConvo(id);
+        closeConvoMenu();
+        const rest = await DB.getConvos(bookId);
+        if (convo && convo.id === id) {
+          if (rest.length) await switchConvo(rest[0].id);
+          else { convo = null; template = null; notes = []; history = []; els.messages.innerHTML = ''; renderNotebook(); els.tabs.style.display = 'none'; els.convobar.style.display = 'none'; openOnboarding(); }
+        } else { renderConvoBar(); }
+      }
+      return;
+    }
+    const item = ev.target.closest('.ai-convo-item');
+    if (item) { closeConvoMenu(); await switchConvo(item.dataset.id); return; }
+    if (ev.target.closest('[data-act="new"]')) { closeConvoMenu(); openOnboarding(); return; }
+  });
+}
+
+let convoMenuEl = null;
+function closeConvoMenu() { if (convoMenuEl) { convoMenuEl.remove(); convoMenuEl = null; } }
 
 // ---- Atenuación de capítulos en el índice (E6.4) ---------------------------
 // Puntúa cada capítulo del TOC por relevancia al objetivo y atenúa los flojos.
@@ -245,18 +339,18 @@ async function activateSession() {
 // por etiqueta. Resultados cacheados por libro+objetivo.
 
 async function maybeAttenuate() {
-  if (attenuationDone || !session || !template || !segReady || !book) return;
+  if (attenuationDone || !convo || !template || !segReady || !book) return;
   if (!LLM.hasKey()) return;
   const toc = book.navigation?.toc;
   if (!toc || !toc.length) return;
   attenuationDone = true;
 
   try {
-    let cached = bookId ? await DB.getRatings(bookId) : null;
-    let scores = (cached && cached.goal === session.goal) ? cached.scores : null;
+    let cached = convo ? await DB.getRatings(convo.id) : null;
+    let scores = (cached && cached.goal === convo.goal) ? cached.scores : null;
     if (!scores) {
       scores = await computeChapterRelevance(toc);
-      if (scores && bookId) await DB.saveRatings(bookId, session.goal, scores);
+      if (scores && convo) await DB.saveRatings(convo.id, convo.goal, scores);
     }
     if (scores) applyChapterAttenuation(scores);
   } catch (e) {
@@ -298,7 +392,7 @@ rate_chapters una sola vez, puntuando TODOS los capítulos de la lista de 0 a 1 
 relevancia para el objetivo (1 = central, 0 = paja/introducción/anécdota).` },
     { role: 'user', content: 'LIBRO ANOTADO:\n\n' + annotatedText },
     { role: 'user', content:
-`OBJETIVO: ${session.goal}\n\nCAPÍTULOS A PUNTUAR (usa estos títulos exactos):\n` +
+`OBJETIVO: ${convo.goal}\n\nCAPÍTULOS A PUNTUAR (usa estos títulos exactos):\n` +
       chapters.map(c => `- ${c}`).join('\n') },
   ];
   const { toolCalls } = await LLM.chatTools({ messages, tools, toolChoice: 'auto' });
@@ -336,7 +430,7 @@ function clearChapterAttenuation() {
 
 async function restoreChat() {
   els.messages.innerHTML = '';
-  const msgs = bookId ? await DB.getMessages(bookId) : [];
+  const msgs = convo ? await DB.getMessages(convo.id) : [];
   for (const m of msgs) {
     history.push({ role: m.role, content: m.content });
     appendBubble(m.role, m.content, m.role === 'assistant');
@@ -408,11 +502,13 @@ function openOnboarding() {
     overlay.querySelector('#ai-ob-start').addEventListener('click', async () => {
       const goal = goalEl.value.trim();
       if (!goal) { goalEl.focus(); return; }
-      session = { templateId: chosenTemplate.id, goal };
       template = chosenTemplate;
-      if (bookId) await DB.saveSession(bookId, chosenTemplate.id, goal);
+      convo = bookId
+        ? await DB.createConvo(bookId, chosenTemplate.id, goal)
+        : { id: 'tmp', bookId: null, templateId: chosenTemplate.id, goal };
+      history = []; notes = []; attenuationDone = false; clearChapterAttenuation();
       overlay.remove();
-      await activateSession();
+      await activateConvo();
       setOpen(true);
     });
   };
@@ -427,7 +523,7 @@ function systemPrompt() {
   return `Eres un lector experto que ayuda a sacar provecho de un libro según un OBJETIVO concreto.
 Respondes en español, conciso y sin paja, basándote ÚNICAMENTE en el libro entregado.
 
-OBJETIVO DEL USUARIO: ${session?.goal || '(sin definir)'}
+OBJETIVO DEL USUARIO: ${convo?.goal || '(sin definir)'}
 PLANTILLA: ${template?.name || '—'} — ${template?.agentRole || ''}
 Filtra el contenido hacia ese objetivo: ignora lo anecdótico, resalta lo aplicable.
 
@@ -449,7 +545,7 @@ async function send() {
   els.input.value = '';
   appendBubble('user', q, false);
   history.push({ role: 'user', content: q });
-  if (bookId) DB.addMessage(bookId, 'user', q);
+  if (convo) DB.addMessage(convo.id, 'user', q);
 
   const bubble = appendBubble('assistant', '', false);
   const textNode = bubble.querySelector('.ai-bubble-text');
@@ -476,7 +572,7 @@ async function send() {
     textNode.innerHTML = renderWithCitations(finalText);
     addMessageActions(bubble, finalText, q, { autoRun: LLM.getAutoExtract() });
     history.push({ role: 'assistant', content: finalText });
-    if (bookId) DB.addMessage(bookId, 'assistant', finalText);
+    if (convo) DB.addMessage(convo.id, 'assistant', finalText);
   } catch (e) {
     if (e.name === 'AbortError') textNode.textContent += ' [cancelado]';
     else { console.error(e); textNode.innerHTML = `<span class="ai-error">${escapeHtml(e.message)}</span>`; }
@@ -565,7 +661,7 @@ ${fieldList}
 Escribe content en español, conciso, conservando las citas [[aN]] que aparezcan. Si no hay nada que
 merezca guardarse, no llames a ninguna herramienta.` },
     { role: 'user', content:
-`OBJETIVO: ${session.goal}\n\nPREGUNTA: ${question}\n\nRESPUESTA DEL AGENTE:\n${answerText}` },
+`OBJETIVO: ${convo.goal}\n\nPREGUNTA: ${question}\n\nRESPUESTA DEL AGENTE:\n${answerText}` },
   ];
   try {
     const { toolCalls } = await LLM.chatTools({ messages, tools: notebookTool(), toolChoice: 'auto' });
@@ -575,7 +671,7 @@ merezca guardarse, no llames a ninguna herramienta.` },
       const { fieldKey, content, sourceCfis } = tc.args || {};
       if (!fieldKey || !content || !isValidField(template.id, fieldKey)) continue;
       const cites = extractCites(content, sourceCfis);
-      const id = bookId ? await DB.addNote(bookId, fieldKey, content, cites) : Date.now();
+      const id = convo ? await DB.addNote(convo.id, fieldKey, content, cites) : Date.now();
       notes.push({ id, fieldKey, content, sourceCfis: cites });
       added++;
     }
@@ -642,7 +738,7 @@ function renderNotebook() {
   for (const n of notes) (byField[n.fieldKey] ||= []).push(n);
 
   els.noteView.innerHTML = `
-    <div class="ai-nb-goal"><span class="ai-nb-goal-label">${icon('target', { size: 15 })} Objetivo</span>${escapeHtml(session.goal)}</div>
+    <div class="ai-nb-goal"><span class="ai-nb-goal-label">${icon('target', { size: 15 })} Objetivo</span>${escapeHtml(convo.goal)}</div>
     <div class="ai-nb-tpl">${template.name}</div>
     ${template.fields.map(f => {
       const list = byField[f.key] || [];
@@ -673,12 +769,12 @@ async function onNotebookClick(e) {
     const field = editor.dataset.field || null;
     if (val && id != null) {
       const cites = extractCites(val, []);
-      if (bookId) await DB.updateNote(id, { content: val, sourceCfis: cites });
+      if (convo) await DB.updateNote(id, { content: val, sourceCfis: cites });
       const note = notes.find(n => n.id === id);
       if (note) { note.content = val; note.sourceCfis = cites; }
     } else if (val && field) {
       const cites = extractCites(val, []);
-      const newId = bookId ? await DB.addNote(bookId, field, val, cites) : Date.now();
+      const newId = convo ? await DB.addNote(convo.id, field, val, cites) : Date.now();
       notes.push({ id: newId, fieldKey: field, content: val, sourceCfis: cites });
     }
     editingId = null; addingField = null;
@@ -700,7 +796,7 @@ async function onNotebookClick(e) {
   if (del) {
     const id = Number(del.dataset.id);
     notes = notes.filter(n => n.id !== id);
-    if (bookId) DB.deleteNote(id);
+    if (convo) DB.deleteNote(id);
     renderNotebook();
     return;
   }

@@ -5,13 +5,18 @@
 //   books    (keyPath id)      -> { id, title, addedAt }
 //   bookText (keyPath bookId)  -> { bookId, annotatedText, tokenEstimate, blockCount }
 //   anchors  (keyPath bookId)  -> { bookId, entries: [ [id, {cfi, chapter}], ... ] }
-//   messages (keyPath id, ++)  -> { id, bookId, role, content, ts }  [index: bookId]
-//   sessions (keyPath bookId)  -> { bookId, templateId, goal, createdAt }
-//   notes    (keyPath id, ++)  -> { id, bookId, fieldKey, content, sourceCfis, ts } [index: bookId]
-//   ratings  (keyPath bookId)  -> { bookId, goal, scores: {chapterLabel: 0..1} }
+//   convos   (keyPath id)      -> { id, bookId, templateId, goal, title, createdAt, lastUsedAt } [index: bookId]
+//   messages (keyPath id, ++)  -> { id, convoId, bookId?, role, content, ts }  [index: bookId, convoId]
+//   notes    (keyPath id, ++)  -> { id, convoId, bookId?, fieldKey, content, sourceCfis, ts } [index: bookId, convoId]
+//   sessions (keyPath bookId)  -> LEGACY (v<=3): { bookId, templateId, goal, createdAt } — solo para migrar
+//   ratings  (keyPath bookId)  -> { bookId, goal, scores }  (la clave ahora es convoId)
+//
+// v4: una conversación (convo) por objetivo; varias por libro. messages/notes
+// se indexan por convoId. Las conversaciones antiguas (sessions, una por libro)
+// se migran a una convo en migrateBook().
 
 const DB_NAME = 'bookreader_ai';
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 
 let dbPromise = null;
 
@@ -21,19 +26,31 @@ function open() {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
     req.onupgradeneeded = () => {
       const db = req.result;
+      const t = req.transaction; // transacción versionchange (acceso a stores existentes)
       if (!db.objectStoreNames.contains('books'))    db.createObjectStore('books',    { keyPath: 'id' });
       if (!db.objectStoreNames.contains('bookText')) db.createObjectStore('bookText', { keyPath: 'bookId' });
       if (!db.objectStoreNames.contains('anchors'))  db.createObjectStore('anchors',  { keyPath: 'bookId' });
+
+      let messages;
       if (!db.objectStoreNames.contains('messages')) {
-        const s = db.createObjectStore('messages', { keyPath: 'id', autoIncrement: true });
-        s.createIndex('bookId', 'bookId', { unique: false });
-      }
-      if (!db.objectStoreNames.contains('sessions')) db.createObjectStore('sessions', { keyPath: 'bookId' });
+        messages = db.createObjectStore('messages', { keyPath: 'id', autoIncrement: true });
+        messages.createIndex('bookId', 'bookId', { unique: false });
+      } else messages = t.objectStore('messages');
+      if (!messages.indexNames.contains('convoId')) messages.createIndex('convoId', 'convoId', { unique: false });
+
+      let notes;
       if (!db.objectStoreNames.contains('notes')) {
-        const s = db.createObjectStore('notes', { keyPath: 'id', autoIncrement: true });
-        s.createIndex('bookId', 'bookId', { unique: false });
+        notes = db.createObjectStore('notes', { keyPath: 'id', autoIncrement: true });
+        notes.createIndex('bookId', 'bookId', { unique: false });
+      } else notes = t.objectStore('notes');
+      if (!notes.indexNames.contains('convoId')) notes.createIndex('convoId', 'convoId', { unique: false });
+
+      if (!db.objectStoreNames.contains('sessions')) db.createObjectStore('sessions', { keyPath: 'bookId' });
+      if (!db.objectStoreNames.contains('ratings'))  db.createObjectStore('ratings',  { keyPath: 'bookId' });
+      if (!db.objectStoreNames.contains('convos')) {
+        const c = db.createObjectStore('convos', { keyPath: 'id' });
+        c.createIndex('bookId', 'bookId', { unique: false });
       }
-      if (!db.objectStoreNames.contains('ratings')) db.createObjectStore('ratings', { keyPath: 'bookId' });
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
@@ -66,46 +83,99 @@ export function put(store, value) {
   return tx(store, 'readwrite', s => reqP(s.put(value)));
 }
 
-// Mensajes de chat por libro -------------------------------------------------
+// Mensajes de chat por conversación ------------------------------------------
 
-export function getMessages(bookId) {
-  return tx('messages', 'readonly', s => reqP(s.index('bookId').getAll(bookId)));
+export function getMessages(convoId) {
+  return tx('messages', 'readonly', s => reqP(s.index('convoId').getAll(convoId)));
 }
 
-export function addMessage(bookId, role, content) {
-  return put('messages', { bookId, role, content, ts: Date.now() });
+export function addMessage(convoId, role, content) {
+  return put('messages', { convoId, role, content, ts: Date.now() });
 }
 
-export function clearMessages(bookId) {
-  return tx('messages', 'readwrite', s => new Promise((resolve, reject) => {
-    const idx = s.index('bookId');
-    const cur = idx.openCursor(IDBKeyRange.only(bookId));
+function clearByIndex(store, index, key) {
+  return tx(store, 'readwrite', s => new Promise((resolve, reject) => {
+    const cur = s.index(index).openCursor(IDBKeyRange.only(key));
+    cur.onsuccess = () => { const c = cur.result; if (c) { c.delete(); c.continue(); } else resolve(); };
+    cur.onerror = () => reject(cur.error);
+  }));
+}
+
+export function clearMessages(convoId) {
+  return clearByIndex('messages', 'convoId', convoId);
+}
+
+// Conversaciones (objetivo + plantilla); varias por libro --------------------
+
+export function getConvos(bookId) {
+  return tx('convos', 'readonly', s => reqP(s.index('bookId').getAll(bookId)))
+    .then(list => (list || []).sort((a, b) => (b.lastUsedAt || b.createdAt || 0) - (a.lastUsedAt || a.createdAt || 0)));
+}
+
+export function getConvo(id) {
+  return get('convos', id);
+}
+
+export async function createConvo(bookId, templateId, goal, title = null, createdAt = null) {
+  const now = Date.now();
+  const convo = { id: 'cv_' + now.toString(36) + Math.random().toString(36).slice(2, 6),
+    bookId, templateId, goal, title, createdAt: createdAt || now, lastUsedAt: now };
+  await put('convos', convo);
+  return convo;
+}
+
+export async function updateConvo(id, patch) {
+  const cur = await getConvo(id);
+  if (!cur) return null;
+  const next = { ...cur, ...patch };
+  await put('convos', next);
+  return next;
+}
+
+export function touchConvo(id) {
+  return updateConvo(id, { lastUsedAt: Date.now() });
+}
+
+// Borra la conversación y todo lo suyo (mensajes, notas, relevancia).
+export async function deleteConvo(id) {
+  await tx('convos', 'readwrite', s => reqP(s.delete(id)));
+  await clearByIndex('messages', 'convoId', id);
+  await clearByIndex('notes', 'convoId', id);
+  await tx('ratings', 'readwrite', s => reqP(s.delete(id)));
+}
+
+// Migra la sesión antigua (una por libro) a una conversación, reasignando sus
+// mensajes y notas. Idempotente: si el libro ya tiene conversaciones, no hace nada.
+export async function migrateBook(bookId) {
+  const convos = await getConvos(bookId);
+  if (convos.length) return;
+  const ses = await get('sessions', bookId);
+  if (!ses) return;
+  const convo = await createConvo(bookId, ses.templateId, ses.goal, null, ses.createdAt);
+  await reassign('messages', bookId, convo.id);
+  await reassign('notes', bookId, convo.id);
+}
+
+function reassign(store, bookId, convoId) {
+  return tx(store, 'readwrite', s => new Promise((resolve, reject) => {
+    const cur = s.index('bookId').openCursor(IDBKeyRange.only(bookId));
     cur.onsuccess = () => {
       const c = cur.result;
-      if (c) { c.delete(); c.continue(); } else resolve();
+      if (c) { const v = c.value; if (!v.convoId) { v.convoId = convoId; c.update(v); } c.continue(); }
+      else resolve();
     };
     cur.onerror = () => reject(cur.error);
   }));
 }
 
-// Sesión (objetivo + plantilla) por libro ------------------------------------
+// Notas de la libreta por conversación --------------------------------------
 
-export function getSession(bookId) {
-  return get('sessions', bookId);
+export function getNotes(convoId) {
+  return tx('notes', 'readonly', s => reqP(s.index('convoId').getAll(convoId)));
 }
 
-export function saveSession(bookId, templateId, goal) {
-  return put('sessions', { bookId, templateId, goal, createdAt: Date.now() });
-}
-
-// Notas de la libreta por libro ---------------------------------------------
-
-export function getNotes(bookId) {
-  return tx('notes', 'readonly', s => reqP(s.index('bookId').getAll(bookId)));
-}
-
-export function addNote(bookId, fieldKey, content, sourceCfis = []) {
-  return put('notes', { bookId, fieldKey, content, sourceCfis, ts: Date.now() });
+export function addNote(convoId, fieldKey, content, sourceCfis = []) {
+  return put('notes', { convoId, fieldKey, content, sourceCfis, ts: Date.now() });
 }
 
 export function updateNote(id, patch) {
