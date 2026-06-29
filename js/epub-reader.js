@@ -23,6 +23,12 @@ function resizeToContainer() {
   rendition.resize(container.clientWidth, container.clientHeight);
 }
 
+// Re-paginar al cambiar el tamaño del área de lectura (p. ej. al entrar/salir
+// del modo inmersivo, que libera el alto de la cabecera y el pie).
+export function resize() {
+  resizeToContainer();
+}
+
 export function init() {
   if (settingsListenerRegistered) return;
   settingsListenerRegistered = true;

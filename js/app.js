@@ -99,16 +99,21 @@ function saveProgress(pct) {
 }
 
 // ============ MODO LECTURA INMERSIVO ============
+function setImmersive(on) {
+  document.body.classList.toggle('immersive', on);
+  // La cabecera y el pie salen del flujo en inmersivo, así que el área de
+  // lectura crece: re-paginar para usar toda la altura (tras aplicar el layout).
+  requestAnimationFrame(() => { if (EpubReader.isLoaded()) EpubReader.resize(); });
+}
+
 function initImmersive() {
-  document.getElementById('immersive-toggle')?.addEventListener('click', () => {
-    document.body.classList.add('immersive');
-  });
+  document.getElementById('immersive-toggle')?.addEventListener('click', () => setImmersive(true));
   // Zonas táctiles activas solo en inmersivo: pasar página o salir.
   document.getElementById('reader-taps')?.addEventListener('click', (e) => {
     const zone = e.target.closest('.tap-zone')?.dataset.tap;
     if (zone === 'prev') { EpubReader.isLoaded() ? EpubReader.prev() : PdfReader.prev(); }
     else if (zone === 'next') { EpubReader.isLoaded() ? EpubReader.next() : PdfReader.next(); }
-    else if (zone === 'center') { document.body.classList.remove('immersive'); }
+    else if (zone === 'center') { setImmersive(false); }
   });
 }
 

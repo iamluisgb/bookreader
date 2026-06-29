@@ -1131,8 +1131,12 @@ select:focus {
    F4 · Modo lectura inmersivo
    ========================================================================== */
 .reader-header, .reader-footer { transition: transform var(--transition-normal); }
-body.immersive .reader-header { transform: translateY(-100%); }
-body.immersive .reader-footer { transform: translateY(100%); }
+/* En inmersivo, la cabecera y el pie salen del flujo (position:absolute) para que
+   el área de lectura ocupe toda la altura; el transform los desliza fuera. */
+body.immersive .reader-header,
+body.immersive .reader-footer { position: absolute; left: 0; right: 0; z-index: 60; }
+body.immersive .reader-header { top: 0; transform: translateY(-100%); }
+body.immersive .reader-footer { bottom: 0; transform: translateY(100%); }
 body.immersive .ai-fab { transform: scale(0); }
 
 .reader-taps {
