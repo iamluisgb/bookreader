@@ -12,10 +12,6 @@ let settingsListenerRegistered = false;
 
 let resizeTimer = null;
 
-// Upper bound on the single-column reading width so lines stay legible on large
-// desktop screens; smaller viewports (incl. phones in landscape) fill fully.
-const MAX_READING_WIDTH = 960;
-
 // Re-apply the container width and re-fit. Width/height both track the
 // container (rendered at '100%'), so this mainly re-applies the max-width cap;
 // epub.js itself re-fits on viewport changes (rotation, URL-bar, PWA resize).
@@ -46,12 +42,13 @@ export function init() {
   window.addEventListener('orientationchange', scheduleResize);
 }
 
-// Single column that fills the viewport width (so landscape uses the whole
-// screen instead of a narrow centered column), capped at a legible max on large
-// screens and centered with side margins.
+// Single column that fills the viewport width up to the user's column-width
+// setting (the "Ancho de columna" slider), centered with side margins. On
+// screens narrower than the setting (e.g. a phone) it just fills the width.
 function sizeContainer(container) {
+  const maxWidth = Settings.getAll().columnWidth;
   container.style.width = '100%';
-  container.style.maxWidth = MAX_READING_WIDTH + 'px';
+  container.style.maxWidth = maxWidth + 'px';
   container.style.margin = '0 auto';
 }
 

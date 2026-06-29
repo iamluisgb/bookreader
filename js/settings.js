@@ -6,7 +6,7 @@ const defaults = {
   theme: 'system',
   fontSize: 16,
   fontFamily: 'serif',
-  columnWidth: 600,
+  columnWidth: 720,
   lineHeight: 1.6,
 };
 
