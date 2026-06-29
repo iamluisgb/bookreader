@@ -46,7 +46,12 @@ export function init() {
 // setting (the "Ancho de columna" slider), centered with side margins. On
 // screens narrower than the setting (e.g. a phone) it just fills the width.
 function sizeContainer(container) {
-  const maxWidth = Settings.getAll().columnWidth;
+  const cols = Settings.getAll().columnWidth;
+  // Como Play Books: en móvil (incl. horizontal) la página llena el ancho con un
+  // margen mínimo; el "Ancho de columna" solo limita la longitud de línea en
+  // pantallas grandes (escritorio / tablet ancha), donde las líneas largas cansan.
+  const vw = window.innerWidth;
+  const maxWidth = vw > 1000 ? cols : Math.max(cols, vw);
   container.style.width = '100%';
   container.style.maxWidth = maxWidth + 'px';
   container.style.margin = '0 auto';
@@ -200,8 +205,7 @@ function injectThemeIntoContent(contents) {
         font-family: ${fontFamily} !important;
         font-size: ${settings.fontSize}px !important;
         line-height: ${settings.lineHeight} !important;
-        padding-top: 6px !important;
-        padding-bottom: 6px !important;
+        padding: 6px 16px !important;   /* margen mínimo tipo Play Books */
       }
       p, div, span, li, h1, h2, h3, h4, h5, h6, a, blockquote, td, th, em, strong, i, b {
         color: ${colors.text} !important;
