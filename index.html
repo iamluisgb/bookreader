@@ -110,6 +110,7 @@
     <!-- Top bar -->
     <header id="reader-header" class="reader-header">
       <button id="sidebar-toggle" class="icon-btn" aria-label="Abrir sidebar" data-icon="menu"></button>
+      <button id="library-btn" class="icon-btn" aria-label="Biblioteca" title="Biblioteca" data-icon="books" style="display:none;"></button>
       <div id="reader-title" class="reader-title">BookReader</div>
       <div class="header-actions">
         <button id="immersive-toggle" class="icon-btn" aria-label="Modo lectura" title="Modo lectura" data-icon="expand" disabled></button>
@@ -131,6 +132,9 @@
           <input type="file" id="file-input" accept=".epub,.pdf" hidden>
         </div>
       </div>
+
+      <!-- Library (home) -->
+      <div id="library" class="library" style="display:none;"></div>
 
       <!-- EPUB container -->
       <div id="epub-container" class="epub-container" style="display:none;"></div>

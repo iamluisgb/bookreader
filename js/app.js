@@ -7,6 +7,8 @@ import * as Storage from './storage.js';
 import * as AiPanel from './ai/panel.js';
 import * as AiDB from './ai/db.js';
 import { hydrateIcons, icon } from './ui/icons.js';
+import * as Library from './library/view.js';
+import * as LibStore from './library/store.js';
 
 // ============ INIT ============
 document.addEventListener('DOMContentLoaded', () => {
@@ -21,7 +23,80 @@ document.addEventListener('DOMContentLoaded', () => {
   initDragDrop();
   initAiPanel();
   initImmersive();
+  initLibrary();
 });
+
+// ============ BIBLIOTECA ============
+let currentBook = null;        // { id, fileBaseId, format } del libro abierto
+let progressTimer = null;
+
+function initLibrary() {
+  Library.init({ onOpenBook: openLibraryBook, onAddBook: () => document.getElementById('file-input').click() });
+  document.getElementById('library-btn')?.addEventListener('click', goToLibrary);
+  // Pantalla inicial: biblioteca si ya hay libros guardados, si no el landing.
+  Library.hasBooks().then(has => { if (has) { Library.render(); Library.show(); } });
+}
+
+async function goToLibrary() {
+  document.getElementById('library-btn').style.display = 'none';
+  document.getElementById('reader-title').textContent = 'BookReader';
+  await Library.render();
+  Library.show();
+}
+
+// Abrir un libro ya guardado en la biblioteca (reconstruye el archivo).
+async function openLibraryBook(record) {
+  try {
+    Library.hide();
+    const buffer = record.file instanceof ArrayBuffer ? record.file.slice(0) : await record.file.arrayBuffer();
+    Bookmarks.setBook(record.fileBaseId || record.id);
+    Highlights.setBook(record.fileBaseId || record.id);
+    currentBook = { id: record.id, fileBaseId: record.fileBaseId || record.id, format: record.format };
+    if (record.format === 'pdf') {
+      await loadPdf(buffer, record.fileBaseId || record.id);
+    } else {
+      await loadEpub(buffer, record.fileBaseId || record.id, record.id);
+      if (record.lastCfi) { try { await EpubReader.goTo(record.lastCfi); } catch (e) { /* posición no válida */ } }
+    }
+    await LibStore.updateBook(record.id, { lastOpenedAt: Date.now() });
+    document.getElementById('library-btn').style.display = '';
+  } catch (e) {
+    console.error('No se pudo abrir el libro de la biblioteca:', e);
+    alert('No se pudo abrir el libro guardado.');
+  }
+}
+
+// Guardar/actualizar un libro recién abierto desde un archivo (con portada).
+async function persistToLibrary(id, buffer, format, fileName, fileBaseId) {
+  try {
+    const existing = await LibStore.getBook(id);
+    const title = format === 'pdf' ? (fileName.replace(/\.[^.]+$/, '')) : EpubReader.getTitle();
+    const author = format === 'pdf' ? '' : EpubReader.getAuthor();
+    const cover = (format === 'pdf') ? '' : await EpubReader.getCoverDataUrl();
+    const base = existing || { id, addedAt: Date.now(), progress: 0, lastCfi: null, status: 'unread', shelfIds: [] };
+    await LibStore.putBook({
+      ...base, id, title, author, cover: cover || base.cover || '',
+      format, fileName, fileBaseId, file: buffer.slice(0), size: buffer.byteLength,
+      lastOpenedAt: Date.now(),
+    });
+  } catch (e) {
+    console.warn('No se pudo guardar en la biblioteca (¿espacio?):', e);
+  }
+}
+
+// Persistir progreso del libro abierto (con rebote).
+function saveProgress(pct) {
+  if (!currentBook) return;
+  clearTimeout(progressTimer);
+  progressTimer = setTimeout(async () => {
+    try {
+      const cfi = EpubReader.getCurrentCfi();
+      const prev = await LibStore.getBook(currentBook.id);
+      const status = LibStore.statusFor(pct, prev?.status);
+      await LibStore.updateBook(currentBook.id, { progress: pct, lastCfi: cfi || prev?.lastCfi || null, status });
+    } catch (e) { /* sin persistencia */ }
+  }, 800);
+}
 
 // ============ MODO LECTURA INMERSIVO ============
 function initImmersive() {
@@ -128,34 +203,48 @@ async function loadFile(file) {
   const buffer = await file.arrayBuffer();
   const ext = file.name.split('.').pop().toLowerCase();
 
-  // Set book ID for storage
-  const bookId = file.name.replace(/\.[^.]+$/, '');
-  Bookmarks.setBook(bookId);
-  Highlights.setBook(bookId);
+  if (ext !== 'epub' && ext !== 'pdf') {
+    alert('Formato no soportado. Usa archivos .epub o .pdf');
+    return;
+  }
+
+  // Set book ID for storage (marcadores/subrayados siguen usando el nombre).
+  const fileBaseId = file.name.replace(/\.[^.]+$/, '');
+  Bookmarks.setBook(fileBaseId);
+  Highlights.setBook(fileBaseId);
+
+  // Hash estable del contenido: id canónico para biblioteca + agente.
+  const id = await AiDB.hashBuffer(buffer.slice(0));
+  currentBook = { id, fileBaseId, format: ext };
+  Library.hide();
 
   if (ext === 'epub') {
-    await loadEpub(buffer, bookId);
-  } else if (ext === 'pdf') {
-    await loadPdf(buffer, bookId);
+    await loadEpub(buffer, fileBaseId, id);
   } else {
-    alert('Formato no soportado. Usa archivos .epub o .pdf');
+    await loadPdf(buffer, fileBaseId);
   }
+
+  // Guardar en la biblioteca (con portada/metadatos ya disponibles) y mostrar
+  // el acceso a la biblioteca en la cabecera.
+  await persistToLibrary(id, buffer, ext, file.name, fileBaseId);
+  document.getElementById('library-btn').style.display = '';
+  Library.render();
 }
 
 let totalWords = 0;
 
-async function loadEpub(buffer, bookId) {
+async function loadEpub(buffer, bookId, aiBookId) {
   try {
     console.log('Loading EPUB, buffer size:', buffer.byteLength);
 
-    // Hash estable del fichero para la persistencia del agente (antes de que
-    // epub.js consuma el buffer).
-    const aiBookId = await AiDB.hashBuffer(buffer.slice(0));
+    // Hash estable del fichero (id canónico). Se reutiliza si ya viene calculado.
+    if (!aiBookId) aiBookId = await AiDB.hashBuffer(buffer.slice(0));
 
     // Setup callbacks BEFORE load so we don't miss first events
     EpubReader.onProgress((pct) => {
       updateBookmarkButton();
       updateProgressDetail(pct);
+      saveProgress(pct);
     });
 
     EpubReader.onChapter((label) => {

@@ -1241,3 +1241,138 @@ body.immersive .reader-taps { display: flex; }
 
 .ai-nb-goal-label .icon { color: var(--accent); }
 .ai-title .icon { color: var(--accent); }
+
+/* ============================================================================
+   F6 · Biblioteca (estanterías + rejilla de portadas, estilo Apple Books)
+   ========================================================================== */
+
+/* La biblioteca cubre el área de lectura; en su pantalla se oculta la cabecera
+   y el FAB del agente (no hay libro abierto). */
+body.in-library .reader-header { display: none; }
+body.in-library .ai-fab { display: none; }
+
+.library {
+  position: absolute; inset: 0; z-index: 20;
+  overflow-y: auto; -webkit-overflow-scrolling: touch;
+  background: var(--surface-0);
+  padding: calc(var(--s-6) + env(safe-area-inset-top)) var(--s-6)
+           calc(var(--s-8) + env(safe-area-inset-bottom));
+}
+
+.lib-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--s-4); margin-bottom: var(--s-5);
+}
+.lib-h1 { font-size: var(--fs-2xl); font-weight: 700; letter-spacing: -0.02em; }
+.lib-add { display: inline-flex; align-items: center; gap: 6px; }
+
+/* Estanterías: tira horizontal de segmentos desplazable. */
+.lib-shelves {
+  display: flex; gap: var(--s-2); align-items: center;
+  overflow-x: auto; padding-bottom: var(--s-3); margin-bottom: var(--s-4);
+  scrollbar-width: none;
+}
+.lib-shelves::-webkit-scrollbar { display: none; }
+.lib-shelf-tab {
+  flex: 0 0 auto; border: none; cursor: pointer;
+  background: var(--surface-3); color: var(--text-soft);
+  padding: 7px 14px; border-radius: var(--r-pill);
+  font-size: var(--fs-sm); font-weight: 550;
+  transition: background var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
+}
+.lib-shelf-tab:active { transform: scale(0.96); }
+.lib-shelf-tab.active { background: var(--accent); color: var(--on-accent); }
+.lib-newshelf {
+  flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center;
+  width: 32px; height: 32px; border-radius: 50%;
+  border: 1px dashed var(--border); background: none; color: var(--text-soft); cursor: pointer;
+}
+.lib-newshelf:hover { color: var(--accent); border-color: var(--accent); }
+
+/* Rejilla de portadas. */
+.lib-grid {
+  display: grid; gap: var(--s-5) var(--s-4);
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+}
+.lib-card { cursor: pointer; }
+.lib-cover {
+  position: relative; aspect-ratio: 2 / 3; border-radius: var(--r-md);
+  overflow: hidden; background: var(--surface-3); box-shadow: var(--shadow-2);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+.lib-card:hover .lib-cover { transform: translateY(-3px); box-shadow: var(--shadow-3); }
+.lib-card:active .lib-cover { transform: scale(0.98); }
+.lib-cover-img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.lib-cover-fallback {
+  width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(150deg, var(--accent), var(--accent-hover));
+  color: #fff; font-size: 30px; font-weight: 700; letter-spacing: 0.02em;
+}
+.lib-badge {
+  position: absolute; top: 8px; left: 8px; width: 22px; height: 22px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 50%; background: #34c759; color: #fff;   /* systemGreen */
+  box-shadow: var(--shadow-1);
+}
+.lib-menu-btn {
+  position: absolute; top: 6px; right: 6px;
+  width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center;
+  border: none; border-radius: 50%; cursor: pointer; color: #fff;
+  background: rgba(0, 0, 0, 0.42); backdrop-filter: blur(4px);
+  opacity: 0; transition: opacity var(--transition-fast);
+}
+.lib-card:hover .lib-menu-btn, .lib-menu-btn:focus-visible { opacity: 1; }
+@media (hover: none) { .lib-menu-btn { opacity: 1; } }
+
+.lib-bar {
+  height: 3px; border-radius: var(--r-pill); background: var(--surface-3);
+  margin: 10px 0 7px; overflow: hidden;
+}
+.lib-bar-fill { display: block; height: 100%; background: var(--accent); border-radius: inherit; }
+.lib-title {
+  font-size: var(--fs-sm); font-weight: 600; line-height: 1.3; color: var(--text);
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.lib-author {
+  font-size: var(--fs-xs); color: var(--text-faint); margin-top: 2px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* Estado vacío. */
+.lib-empty {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: var(--s-3); text-align: center; color: var(--text-soft);
+  padding: 14vh var(--s-4);
+}
+.lib-empty-icon { color: var(--text-faint); }
+.lib-empty .lib-add { margin-top: var(--s-2); }
+
+/* Menú contextual por libro. */
+.lib-menu {
+  position: fixed; z-index: 200; min-width: 220px;
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: var(--r-md); box-shadow: var(--shadow-3);
+  padding: 6px; display: none;
+}
+.lib-menu-item {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  padding: 9px 10px; border: none; background: none; cursor: pointer;
+  border-radius: var(--r-sm); color: var(--text); font-size: var(--fs-md); text-align: left;
+}
+.lib-menu-item:hover { background: var(--surface-3); }
+.lib-menu-item .icon { color: var(--text-soft); flex: 0 0 auto; }
+.lib-menu-item.danger, .lib-menu-item.danger .icon { color: #ff3b30; }
+.lib-menu-check { width: 16px; display: inline-flex; flex: 0 0 auto; }
+.lib-menu-check .icon { color: var(--accent); }
+.lib-menu-sep { height: 1px; background: var(--border-soft); margin: 6px 4px; }
+.lib-menu-label {
+  font-size: var(--fs-xs); color: var(--text-faint); font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.04em; padding: 6px 10px 2px;
+}
+.lib-menu-empty { font-size: var(--fs-sm); color: var(--text-faint); padding: 4px 10px 8px; }
+
+@media (max-width: 767px) {
+  .library { padding-left: var(--s-4); padding-right: var(--s-4); }
+  .lib-grid { grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: var(--s-4) var(--s-3); }
+  .lib-h1 { font-size: var(--fs-xl); }
+}

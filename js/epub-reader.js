@@ -283,6 +283,26 @@ export function getTitle() {
   return book?.packaging?.metadata?.title || 'Sin título';
 }
 
+export function getAuthor() {
+  return book?.packaging?.metadata?.creator || '';
+}
+
+// Portada del epub como dataURL (para guardarla en la biblioteca). '' si no hay.
+export async function getCoverDataUrl() {
+  try {
+    if (!book) return '';
+    const url = await book.coverUrl();
+    if (!url) return '';
+    const blob = await fetch(url).then(r => r.blob());
+    return await new Promise((resolve) => {
+      const fr = new FileReader();
+      fr.onload = () => resolve(fr.result);
+      fr.onerror = () => resolve('');
+      fr.readAsDataURL(blob);
+    });
+  } catch { return ''; }
+}
+
 export function onProgress(cb) {
   onProgressCallback = cb;
 }
