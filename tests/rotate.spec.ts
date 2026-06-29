@@ -58,6 +58,18 @@ test('epub re-paginates on rotation (no cut-off)', async ({ page }) => {
   // Y la altura realmente cambió respecto al modo vertical.
   expect(landscape.fh).toBeLessThan(portrait.fh - 50);
 
+  // En horizontal: UNA sola columna que aprovecha el ancho de la pantalla.
+  // El contenedor debe llenar casi todo el viewport (no una columna estrecha
+  // centrada) y la columna del contenido ocupa prácticamente todo el ancho.
+  expect(landscape.cw).toBeGreaterThan(700); // llena los ~844 disponibles
+  const colW = await page.evaluate(() => {
+    const f = document.querySelector('#epub-container iframe') as HTMLIFrameElement;
+    const body = f.contentDocument?.body;
+    return body ? parseFloat(getComputedStyle(body).columnWidth) : 0;
+  });
+  console.log('LANDSCAPE columnWidth', colW);
+  expect(colW).toBeGreaterThan(landscape.cw * 0.6); // una sola columna ancha
+
   // Volver a vertical y comprobar que también se re-ajusta.
   await page.setViewportSize({ width: 390, height: 844 });
   await page.waitForTimeout(500);

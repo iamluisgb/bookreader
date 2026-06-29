@@ -12,20 +12,18 @@ let settingsListenerRegistered = false;
 
 let resizeTimer = null;
 
-// Re-measure the container and re-paginate. The height tracks the container
-// (rendered at '100%'), but the width is pinned to the column width and must be
-// re-applied so the page stays centered and capped on viewport changes:
-// rotation, mobile URL-bar show/hide, PWA window resize, column-width setting.
+// Upper bound on the single-column reading width so lines stay legible on large
+// desktop screens; smaller viewports (incl. phones in landscape) fill fully.
+const MAX_READING_WIDTH = 960;
+
+// Re-apply the container width and re-fit. Width/height both track the
+// container (rendered at '100%'), so this mainly re-applies the max-width cap;
+// epub.js itself re-fits on viewport changes (rotation, URL-bar, PWA resize).
 function resizeToContainer() {
   if (!rendition) return;
   const container = document.getElementById('epub-container');
   if (!container) return;
-  const s = Settings.getAll();
-  const viewWidth = s.columnWidth + 60;
-  sizeContainer(container, viewWidth);
-  // Use the actual (possibly capped at 100%) width so the rendition matches the
-  // container exactly on narrow screens — otherwise epub.js paginates wider than
-  // the visible area and the page is cut off horizontally.
+  sizeContainer(container);
   rendition.resize(container.clientWidth, container.clientHeight);
 }
 
@@ -48,11 +46,12 @@ export function init() {
   window.addEventListener('orientationchange', scheduleResize);
 }
 
-// Pin the epub container to the exact rendition width and center it, capping at
-// the available viewport so it never overflows on narrow screens.
-function sizeContainer(container, viewWidth) {
-  container.style.width = viewWidth + 'px';
-  container.style.maxWidth = '100%';
+// Single column that fills the viewport width (so landscape uses the whole
+// screen instead of a narrow centered column), capped at a legible max on large
+// screens and centered with side margins.
+function sizeContainer(container) {
+  container.style.width = '100%';
+  container.style.maxWidth = MAX_READING_WIDTH + 'px';
   container.style.margin = '0 auto';
 }
 
@@ -86,22 +85,13 @@ export async function load(arrayBuffer, onProgress) {
 
   console.log('Rendering book...');
 
-  const settings = Settings.getAll();
-  const viewWidth = settings.columnWidth + 60;
+  sizeContainer(container);
 
-  // The container MUST be exactly as wide as the rendition. epub.js positions
-  // each paginated page by translating the iframe; if the container is wider
-  // than the view width, the page offset no longer lands on a column boundary
-  // and a sliver of the adjacent page leaks in (the "2 columns" bug). On narrow
-  // screens the container caps at 100%, so read the rendered width back.
-  sizeContainer(container, viewWidth);
-  const renderWidth = container.clientWidth;
-
-  // Height as a percentage so epub.js tracks the container: a fixed pixel height
-  // gets baked into the view and never re-fits (resize/re-display won't change
-  // it in 0.3.93), so the page is cut off when the viewport height changes.
+  // Width AND height as percentages so epub.js tracks the container and re-fits
+  // on viewport changes (rotation, URL-bar, resize). spread:'none' keeps a
+  // single column; the container fills the width so landscape uses the screen.
   rendition = book.renderTo(container, {
-    width: renderWidth,
+    width: '100%',
     height: '100%',
     spread: 'none',
     flow: 'paginated'
