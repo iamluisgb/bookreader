@@ -41,7 +41,7 @@ export function applySettings() {
     if (!resolved || resolved === 'system') {
       resolved = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
     }
-    const bar = { light: '#fbfbfd', dark: '#0f1117', sepia: '#f7f1e3' };
+    const bar = { light: '#ffffff', dark: '#1c1c1e', sepia: '#f1e9d6' };
     meta.setAttribute('content', bar[resolved] || bar.light);
   }
 

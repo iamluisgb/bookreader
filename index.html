@@ -22,7 +22,7 @@
   <aside id="sidebar" class="sidebar">
     <div class="sidebar-header">
       <h2>BookReader</h2>
-      <button id="sidebar-close" class="icon-btn" aria-label="Cerrar sidebar">✕</button>
+      <button id="sidebar-close" class="icon-btn" aria-label="Cerrar sidebar" data-icon="xmark"></button>
     </div>
 
     <!-- Tabs -->
@@ -50,7 +50,7 @@
     <!-- Tab: Highlights -->
     <div id="tab-highlights" class="tab-content">
       <div class="highlights-header">
-        <button id="export-highlights-btn" class="export-btn" disabled>📥 Exportar JSON</button>
+        <button id="export-highlights-btn" class="export-btn" disabled><span class="btn-icon" data-icon="share" data-icon-size="17"></span>Exportar JSON</button>
       </div>
       <div id="highlights-list" class="highlights-list">
         <p class="empty-state">No hay subrayados aún</p>
@@ -62,10 +62,10 @@
       <div class="settings-group">
         <label>Tema</label>
         <div class="theme-selector">
-          <button class="theme-btn" data-theme="system" title="Auto (sistema)">🖥️</button>
-          <button class="theme-btn" data-theme="light" title="Claro">☀️</button>
-          <button class="theme-btn" data-theme="sepia" title="Sepia">📜</button>
-          <button class="theme-btn" data-theme="dark" title="Oscuro">🌙</button>
+          <button class="theme-btn theme-swatch swatch-system" data-theme="system" title="Auto (sistema)" aria-label="Auto (sistema)"></button>
+          <button class="theme-btn theme-swatch swatch-light" data-theme="light" title="Claro" aria-label="Claro"></button>
+          <button class="theme-btn theme-swatch swatch-sepia" data-theme="sepia" title="Sepia" aria-label="Sepia"></button>
+          <button class="theme-btn theme-swatch swatch-dark" data-theme="dark" title="Oscuro" aria-label="Oscuro"></button>
         </div>
       </div>
 
@@ -109,12 +109,12 @@
   <main id="reader-main" class="reader-main">
     <!-- Top bar -->
     <header id="reader-header" class="reader-header">
-      <button id="sidebar-toggle" class="icon-btn" aria-label="Abrir sidebar">☰</button>
+      <button id="sidebar-toggle" class="icon-btn" aria-label="Abrir sidebar" data-icon="menu"></button>
       <div id="reader-title" class="reader-title">BookReader</div>
       <div class="header-actions">
-        <button id="immersive-toggle" class="icon-btn" aria-label="Modo lectura" title="Modo lectura" disabled>⤢</button>
-        <button id="ai-toggle" class="icon-btn" aria-label="Agente de IA" title="Agente de IA" disabled>🤖</button>
-        <button id="bookmark-toggle" class="icon-btn" aria-label="Marcar página" disabled>🔖</button>
+        <button id="immersive-toggle" class="icon-btn" aria-label="Modo lectura" title="Modo lectura" data-icon="expand" disabled></button>
+        <button id="ai-toggle" class="icon-btn" aria-label="Agente de IA" title="Agente de IA" data-icon="sparkles" disabled></button>
+        <button id="bookmark-toggle" class="icon-btn" aria-label="Marcar página" data-icon="bookmark" disabled></button>
       </div>
     </header>
 
@@ -123,7 +123,7 @@
       <!-- Landing screen -->
       <div id="landing" class="landing">
         <div class="landing-content">
-          <div class="landing-icon">📚</div>
+          <div class="landing-icon" data-icon="book" data-icon-size="56"></div>
           <h1>BookReader</h1>
           <p>Lector de EPUB y PDF</p>
           <button id="open-file-btn" class="primary-btn">Abrir archivo</button>
@@ -150,12 +150,12 @@
 
     <!-- Bottom bar: navigation -->
     <footer id="reader-footer" class="reader-footer" style="display:none;">
-      <button id="prev-btn" class="nav-btn" aria-label="Página anterior">◀</button>
+      <button id="prev-btn" class="nav-btn" aria-label="Página anterior" data-icon="chevron-left"></button>
       <div class="progress-container">
         <div id="progress-bar" class="progress-bar"></div>
         <span id="progress-text" class="progress-text">0%</span>
       </div>
-      <button id="next-btn" class="nav-btn" aria-label="Página siguiente">▶</button>
+      <button id="next-btn" class="nav-btn" aria-label="Página siguiente" data-icon="chevron-right"></button>
     </footer>
 
     <!-- Detailed progress panel -->
@@ -180,7 +180,7 @@
   <aside id="ai-panel" class="ai-panel"></aside>
 
   <!-- FAB del agente (solo móvil) -->
-  <button id="ai-fab" class="ai-fab" aria-label="Abrir agente" title="Agente">🤖</button>
+  <button id="ai-fab" class="ai-fab" aria-label="Abrir agente" title="Agente" data-icon="sparkles" data-icon-size="26"></button>
 
   <!-- Highlight tooltip -->
   <div id="highlight-tooltip" class="highlight-tooltip" style="display:none;">
@@ -188,7 +188,7 @@
     <button class="highlight-color" data-color="#4caf50" style="background:#4caf50;" title="Verde"></button>
     <button class="highlight-color" data-color="#2196f3" style="background:#2196f3;" title="Azul"></button>
     <button class="highlight-color" data-color="#e91e63" style="background:#e91e63;" title="Rosa"></button>
-    <button id="highlight-remove" class="highlight-remove" title="Eliminar subrayado">✕</button>
+    <button id="highlight-remove" class="highlight-remove" title="Eliminar subrayado" data-icon="xmark" data-icon-size="16"></button>
   </div>
 
   <!-- Scripts -->

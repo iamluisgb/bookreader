@@ -7,6 +7,10 @@ import * as DB from './db.js';
 import * as EpubReader from '../epub-reader.js';
 import { BLOCKS, TEMPLATES, getTemplate, templatesByBlock, isValidField } from './templates.js';
 import { mdToHtml } from './markdown.js';
+import { icon } from '../ui/icons.js';
+
+// Icon + label markup for the small inline action buttons.
+const act = (name, text, size = 15) => `${icon(name, { size })}<span>${text}</span>`;
 
 let els = {};
 let book = null, bookId = null, bookTitle = '';
@@ -72,9 +76,9 @@ export function init(opts) {
 
 const TEMPLATE = `
   <div class="ai-header">
-    <span class="ai-title">🤖 Agente</span>
-    <button id="ai-edit-cfg" class="icon-btn" title="Configuración">⚙️</button>
-    <button id="ai-close" class="icon-btn" title="Cerrar">✕</button>
+    <span class="ai-title">${icon('sparkles', { size: 19 })} Agente</span>
+    <button id="ai-edit-cfg" class="icon-btn" title="Configuración">${icon('gear')}</button>
+    <button id="ai-close" class="icon-btn" title="Cerrar">${icon('xmark')}</button>
   </div>
   <div id="ai-config" class="ai-config">
     <label>API key de nan</label>
@@ -86,8 +90,8 @@ const TEMPLATE = `
   </div>
   <div id="ai-status" class="ai-status">Abre un EPUB para empezar.</div>
   <div id="ai-tabs" class="ai-tabs" style="display:none">
-    <button class="ai-tab active" data-view="chat">💬 Chat</button>
-    <button class="ai-tab" data-view="notebook">📓 Libreta</button>
+    <button class="ai-tab active" data-view="chat">${icon('bubble', { size: 16 })} Chat</button>
+    <button class="ai-tab" data-view="notebook">${icon('note', { size: 16 })} Libreta</button>
   </div>
   <div id="ai-view-chat" class="ai-view active">
     <div id="ai-messages" class="ai-messages"></div>
@@ -166,7 +170,7 @@ async function onReaderSelection(cfiRange, contents) {
 
 async function generateHQA(text, cfiRange) {
   hqaBusy = true;
-  setStatus('✍️ Generando HQ&A del subrayado…');
+  setStatus('Generando HQ&A del subrayado…');
   try {
     const messages = [
       { role: 'system', content:
@@ -186,7 +190,7 @@ R: <respuesta>` },
     notes.push({ id, fieldKey: 'hqa', content, sourceCfis: [cfiRange] });
     renderNotebook();
     markNotebookUnread();
-    setStatus('📓 HQ&A añadido a la libreta');
+    setStatus('HQ&A añadido a la libreta');
   } catch (e) {
     console.error('HQ&A falló:', e);
     setStatus('No se pudo generar HQ&A: ' + e.message);
@@ -360,6 +364,7 @@ function openOnboarding() {
         <div class="ai-ob-blocks">
           ${Object.values(BLOCKS).map(bl => `
             <button class="ai-ob-block" data-block="${bl.id}">
+              <span class="ai-ob-block-icon">${icon(bl.icon, { size: 24 })}</span>
               <span class="ai-ob-block-label">${bl.label}</span>
               <span class="ai-ob-block-hint">${bl.hint}</span>
             </button>`).join('')}
@@ -373,7 +378,7 @@ function openOnboarding() {
     const list = templatesByBlock(chosenBlock);
     overlay.innerHTML = `
       <div class="ai-ob-card">
-        <button class="ai-ob-back">← volver</button>
+        <button class="ai-ob-back">${icon('chevron-left', { size: 16 })}<span>Volver</span></button>
         <h2>Elige una plantilla</h2>
         <div class="ai-ob-templates">
           ${list.map(t => `
@@ -391,7 +396,7 @@ function openOnboarding() {
   const renderGoal = () => {
     overlay.innerHTML = `
       <div class="ai-ob-card">
-        <button class="ai-ob-back">← volver</button>
+        <button class="ai-ob-back">${icon('chevron-left', { size: 16 })}<span>Volver</span></button>
         <h2>${chosenTemplate.name}</h2>
         <p class="ai-ob-sub">${chosenTemplate.goalPrompt}</p>
         <textarea id="ai-ob-goal" class="ai-ob-goal" rows="3" placeholder="Tu objetivo..."></textarea>
@@ -488,20 +493,20 @@ function addMessageActions(bubble, answerText, question, { autoRun = false } = {
 
   const copyBtn = document.createElement('button');
   copyBtn.className = 'ai-act ai-copy';
-  copyBtn.textContent = '⧉ Copiar';
+  copyBtn.innerHTML = act('copy', 'Copiar');
   copyBtn.addEventListener('click', async () => {
     try {
       await navigator.clipboard.writeText(answerText);
-      copyBtn.textContent = '✓ Copiado';
+      copyBtn.innerHTML = act('check', 'Copiado');
     } catch {
       // Fallback para contextos sin Clipboard API.
       const ta = document.createElement('textarea');
       ta.value = answerText; document.body.appendChild(ta); ta.select();
-      try { document.execCommand('copy'); copyBtn.textContent = '✓ Copiado'; }
-      catch { copyBtn.textContent = 'error'; }
+      try { document.execCommand('copy'); copyBtn.innerHTML = act('check', 'Copiado'); }
+      catch { copyBtn.innerHTML = act('xmark', 'Error'); }
       ta.remove();
     }
-    setTimeout(() => { copyBtn.textContent = '⧉ Copiar'; }, 1500);
+    setTimeout(() => { copyBtn.innerHTML = act('copy', 'Copiar'); }, 1500);
   });
   bar.appendChild(copyBtn);
 
@@ -517,7 +522,7 @@ function addMessageActions(bubble, answerText, question, { autoRun = false } = {
     }
     const ex = document.createElement('button');
     ex.className = 'ai-act ai-extract';
-    ex.textContent = '📓 A la libreta';
+    ex.innerHTML = act('note', 'A la libreta');
     ex.addEventListener('click', () => extractToNotebook(answerText, question, ex));
     bar.appendChild(ex);
   }
@@ -549,7 +554,7 @@ async function extractToNotebook(answerText, question, el) {
   if (!template) return;
   const isBtn = el.tagName === 'BUTTON';
   if (isBtn) el.disabled = true;
-  el.textContent = '📓 apuntando…';
+  el.innerHTML = act('note', 'Apuntando…');
   const fieldList = template.fields.map(f => `- ${f.key}: ${f.label}`).join('\n');
   const messages = [
     { role: 'system', content:
@@ -575,17 +580,17 @@ merezca guardarse, no llames a ninguna herramienta.` },
       added++;
     }
     renderNotebook();
-    el.textContent = added ? `📓 ${added} a la libreta` : '📓 nada que guardar';
+    el.innerHTML = added ? act('check', `${added} a la libreta`) : act('note', 'Nada que guardar');
     if (added) {
       if (isBtn) showView('notebook');         // manual: el usuario lo pidió → mostrar
       else markNotebookUnread();               // auto: avisar sin interrumpir el chat
     }
   } catch (e) {
     console.error('Extracción falló:', e);
-    el.textContent = '📓 error al apuntar';
+    el.innerHTML = act('xmark', 'Error al apuntar');
   } finally {
     // Solo el botón se restaura para poder reintentar; el indicador auto se queda.
-    if (isBtn) setTimeout(() => { el.disabled = false; el.textContent = '📓 A la libreta'; }, 2500);
+    if (isBtn) setTimeout(() => { el.disabled = false; el.innerHTML = act('note', 'A la libreta'); }, 2500);
   }
 }
 
@@ -618,15 +623,15 @@ function noteHtml(n) {
   if (n.id === editingId) return editorHtml(`data-id="${n.id}"`, n.content);
   const navCfi = (n.sourceCfis || []).find(c => typeof c === 'string' && c.startsWith('epubcfi'));
   const gotoBtn = navCfi
-    ? `<button class="ai-nb-goto" data-cfi="${escapeHtml(navCfi)}" title="Ir al subrayado">↗</button>`
+    ? `<button class="ai-nb-goto" data-cfi="${escapeHtml(navCfi)}" title="Ir al subrayado">${icon('arrow-up-right', { size: 15 })}</button>`
     : '';
   return `
     <div class="ai-nb-note" data-id="${n.id}">
       <div class="ai-nb-note-text">${renderWithCitations(n.content)}</div>
       <div class="ai-nb-note-tools">
         ${gotoBtn}
-        <button class="ai-nb-edit" data-id="${n.id}" title="Editar">✎</button>
-        <button class="ai-nb-del" data-id="${n.id}" title="Eliminar">✕</button>
+        <button class="ai-nb-edit" data-id="${n.id}" title="Editar">${icon('pencil', { size: 15 })}</button>
+        <button class="ai-nb-del" data-id="${n.id}" title="Eliminar">${icon('trash', { size: 15 })}</button>
       </div>
     </div>`;
 }
@@ -637,7 +642,7 @@ function renderNotebook() {
   for (const n of notes) (byField[n.fieldKey] ||= []).push(n);
 
   els.noteView.innerHTML = `
-    <div class="ai-nb-goal"><span class="ai-nb-goal-label">🎯 Objetivo</span>${escapeHtml(session.goal)}</div>
+    <div class="ai-nb-goal"><span class="ai-nb-goal-label">${icon('target', { size: 15 })} Objetivo</span>${escapeHtml(session.goal)}</div>
     <div class="ai-nb-tpl">${template.name}</div>
     ${template.fields.map(f => {
       const list = byField[f.key] || [];

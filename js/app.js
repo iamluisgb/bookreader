@@ -6,9 +6,11 @@ import * as PdfReader from './pdf-reader.js';
 import * as Storage from './storage.js';
 import * as AiPanel from './ai/panel.js';
 import * as AiDB from './ai/db.js';
+import { hydrateIcons, icon } from './ui/icons.js';
 
 // ============ INIT ============
 document.addEventListener('DOMContentLoaded', () => {
+  hydrateIcons();
   Settings.init();
   EpubReader.init();
   initSidebar();
@@ -332,7 +334,8 @@ function updateBookmarkButton() {
   if (!cfi) return;
 
   const isBookmarked = Bookmarks.has(cfi);
-  btn.textContent = isBookmarked ? '🔖' : '🏷️';
+  btn.innerHTML = icon('bookmark', { filled: isBookmarked });
+  btn.classList.toggle('is-active', isBookmarked);
   btn.title = isBookmarked ? 'Quitar marcador' : 'Marcar página';
 }
 
@@ -354,7 +357,7 @@ function renderBookmarks() {
         <div class="bookmark-title">${escapeHtml(bm.title)}</div>
         <div class="bookmark-chapter">${escapeHtml(bm.chapter)}</div>
       </div>
-      <button class="bookmark-delete" title="Eliminar">✕</button>
+      <button class="bookmark-delete" title="Eliminar">${icon('xmark', { size: 16 })}</button>
     `;
 
     item.querySelector('.bookmark-info').addEventListener('click', async () => {
@@ -512,7 +515,7 @@ function renderHighlights() {
       <div class="highlight-text">"${escapeHtml(hl.text)}"</div>
       <div class="highlight-meta">
         <span>${escapeHtml(hl.chapter)}</span>
-        <button class="highlight-delete" title="Eliminar">✕</button>
+        <button class="highlight-delete" title="Eliminar">${icon('xmark', { size: 16 })}</button>
       </div>
     `;
 

@@ -138,6 +138,16 @@ Detalles técnicos móviles: `100dvh` (no `100vh`), `env(safe-area-inset-*)` par
   iconos. **Modo lectura inmersivo**: botón ⤢ oculta header/footer; overlay de zonas táctiles
   (izq/centro/der = anterior/salir/siguiente). 18/18 verde; verificado en móvil + oscuro.
 
+- **F5 · Estilo Apple + iconos SF Symbols** ✅ HECHO (2026-06-29) — se eliminan TODOS
+  los emojis. Nuevo sistema de iconos de línea SVG (`js/ui/icons.js`, ~24 glifos,
+  `currentColor`, trazo 1.7, hidratados vía `[data-icon]` + `hydrateIcons`). Tokens
+  reescritos a paleta del sistema iOS: acento **azul de Apple** (#007AFF claro / #0A84FF
+  oscuro), grises systemGray, oscuro casi-negro con "página flotante". Texto del libro en
+  **serif New York** (`ui-serif`). Selector de tema como **muestras de color** (estilo Apple
+  Books). Botones con pulsado sutil (scale), discos de acento en el onboarding, papelera roja
+  systemRed. `theme-color`/manifest actualizados. 19/19 verde; verificado en claro, oscuro y
+  móvil.
+
 Verificación visual con Playwright en dos viewports; los selectores/IDs existentes se
 conservan para no romper tests ni la lógica.
 

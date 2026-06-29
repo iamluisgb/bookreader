@@ -144,9 +144,9 @@ function getThemeColors() {
     theme = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
   }
   const themes = {
-    light:  { bg: '#ffffff', text: '#1c1d22' },
-    sepia:  { bg: '#f7f1e3', text: '#4a3f33' },
-    dark:   { bg: '#0f1117', text: '#e6e8ec' },
+    light:  { bg: '#ffffff', text: '#1c1c1e' },
+    sepia:  { bg: '#fbf6ea', text: '#4a3f33' },
+    dark:   { bg: '#1c1c1e', text: '#f2f2f7' },
   };
   return themes[theme] || themes.light;
 }

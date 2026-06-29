@@ -1138,3 +1138,106 @@ body.immersive .reader-taps { display: flex; }
 .reader-taps .tap-prev { width: 32%; cursor: w-resize; }
 .reader-taps .tap-center { flex: 1; cursor: pointer; }
 .reader-taps .tap-next { width: 32%; cursor: e-resize; }
+
+/* ============================================================================
+   F5 · Sistema de iconos (SF Symbols) + refinado de controles estilo Apple
+   ========================================================================== */
+
+/* Glifo base: hereda el color del texto, alineado al texto que lo acompaña. */
+.icon { display: inline-block; vertical-align: -0.18em; flex: 0 0 auto; }
+
+/* Botones de icono: caja cuadrada, glifo centrado, pulsado sutil. */
+.icon-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  color: var(--text-soft);
+}
+.icon-btn .icon { vertical-align: middle; }
+.icon-btn:active:not(:disabled) { transform: scale(0.92); }
+.icon-btn.is-active { color: var(--accent); }
+
+.nav-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 40px; height: 40px; color: var(--text-soft);
+}
+.nav-btn:active { transform: scale(0.92); }
+
+/* Botones con icono + texto (acciones, pestañas, volver, exportar). */
+.ai-title, .ai-tab, .ai-act, .ai-ob-back, .export-btn,
+.ai-nb-goal-label, .ai-extract-status {
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.ai-tab { justify-content: center; }
+.export-btn { justify-content: center; }
+
+/* Acento del lustre Apple: transiciones y pulsado en botones primarios/píldora. */
+.primary-btn, .ai-act, .export-btn {
+  transition: background var(--transition-fast), color var(--transition-fast),
+              transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+.primary-btn:active, .ai-act:active:not(:disabled),
+.export-btn:active:not(:disabled) { transform: scale(0.97); }
+
+/* Acciones bajo una respuesta: píldoras tenues con icono. */
+.ai-act {
+  border-radius: var(--r-pill);
+  border-color: var(--border-soft);
+  background: var(--surface-1);
+  padding: 4px 11px 4px 9px;
+  font-weight: 500;
+}
+.ai-act .icon { color: var(--text-faint); }
+.ai-act:hover:not(:disabled) { background: var(--surface-3); color: var(--text); }
+
+/* Landing: icono de libro en color de acento, sin caja. */
+.landing-icon {
+  display: inline-flex; color: var(--accent);
+  margin-bottom: var(--s-3);
+}
+
+/* Selector de tema como muestras de color (estilo Apple Books). */
+.theme-selector { gap: 12px; }
+.theme-selector .theme-swatch {
+  width: 30px; height: 30px; border-radius: 50%;
+  border: 1px solid var(--border); padding: 0; font-size: 0;
+  box-shadow: var(--shadow-1);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+.theme-selector .swatch-light  { background: #ffffff; }
+.theme-selector .swatch-sepia  { background: #f3ead4; }
+.theme-selector .swatch-dark   { background: #1c1c1e; }
+.theme-selector .swatch-system { background: linear-gradient(110deg, #ffffff 0 50%, #1c1c1e 50% 100%); }
+.theme-selector .theme-swatch:hover { transform: scale(1.08); }
+.theme-selector .theme-swatch.active {
+  border-color: transparent;
+  box-shadow: 0 0 0 2px var(--surface-1), 0 0 0 4px var(--accent);
+}
+
+/* Onboarding: icono del bloque dentro de un disco de acento tenue. */
+.ai-ob-block { position: relative; }
+.ai-ob-block-icon {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 44px; height: 44px; border-radius: 50%;
+  background: var(--accent-soft); color: var(--accent);
+  margin-bottom: var(--s-2);
+}
+
+/* Botones de herramienta de la libreta: cuadrados de icono. */
+.ai-nb-note-tools button,
+.ai-nb-goto {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; border: none; background: none;
+  color: var(--text-faint); border-radius: var(--r-sm); cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+.ai-nb-note-tools button:hover, .ai-nb-goto:hover {
+  background: var(--surface-3); color: var(--text);
+}
+.ai-nb-del:hover { color: #ff3b30; }   /* systemRed */
+
+/* "Volver" del onboarding como enlace de acento con chevron. */
+.ai-ob-back { color: var(--accent); background: none; border: none;
+  font-size: var(--fs-md); cursor: pointer; padding: 4px 2px; }
+.ai-ob-back .icon { color: var(--accent); }
+
+.ai-nb-goal-label .icon { color: var(--accent); }
+.ai-title .icon { color: var(--accent); }

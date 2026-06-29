@@ -4,8 +4,8 @@
 // E5.1 del backlog.
 
 export const BLOCKS = {
-  tecnico:   { id: 'tecnico',   label: '🧠 Técnico / Práctico', hint: 'Negocios, software, ciencia, ensayo metodológico' },
-  humanista: { id: 'humanista', label: '🏛️ Humanista / Creativo', hint: 'Biografías, historia, filosofía, ficción' },
+  tecnico:   { id: 'tecnico',   icon: 'chart',   label: 'Técnico / Práctico', hint: 'Negocios, software, ciencia, ensayo metodológico' },
+  humanista: { id: 'humanista', icon: 'columns', label: 'Humanista / Creativo', hint: 'Biografías, historia, filosofía, ficción' },
 };
 
 export const TEMPLATES = [
