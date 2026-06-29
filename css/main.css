@@ -1243,60 +1243,121 @@ body.immersive .reader-taps { display: flex; }
 .ai-title .icon { color: var(--accent); }
 
 /* ============================================================================
-   F6 · Biblioteca (estanterías + rejilla de portadas, estilo Apple Books)
+   F6 · Biblioteca — estilo Google Play Books (rail + orden/filtro + rejilla)
    ========================================================================== */
 
-/* La biblioteca cubre el área de lectura; en su pantalla se oculta la cabecera
-   y el FAB del agente (no hay libro abierto). */
+/* En la biblioteca se ocultan la cabecera del lector y el FAB del agente. */
 body.in-library .reader-header { display: none; }
 body.in-library .ai-fab { display: none; }
 
 .library {
   position: absolute; inset: 0; z-index: 20;
-  overflow-y: auto; -webkit-overflow-scrolling: touch;
-  background: var(--surface-0);
-  padding: calc(var(--s-6) + env(safe-area-inset-top)) var(--s-6)
+  overflow: hidden; background: var(--surface-1);
+}
+.lib-layout { display: flex; height: 100%; }
+
+/* ---- Rail izquierdo ---- */
+.lib-rail {
+  flex: 0 0 264px; width: 264px; height: 100%;
+  overflow-y: auto; border-right: 1px solid var(--border-soft);
+  background: var(--surface-1);
+  padding: calc(var(--s-4) + env(safe-area-inset-top)) var(--s-3) var(--s-5);
+}
+.lib-rail-item {
+  display: flex; align-items: center; gap: var(--s-3); width: 100%;
+  padding: 9px 12px; border: none; background: none; cursor: pointer;
+  border-radius: var(--r-pill); color: var(--text); font-size: var(--fs-md);
+  text-align: left; transition: background var(--transition-fast), color var(--transition-fast);
+}
+.lib-rail-item:hover { background: var(--surface-3); }
+.lib-rail-item.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.lib-rail-item.active .lib-rail-ico .icon { color: var(--accent); }
+.lib-rail-ico { display: inline-flex; flex: 0 0 auto; color: var(--text-soft); }
+.lib-rail-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lib-rail-count { color: var(--text-faint); font-size: var(--fs-sm); flex: 0 0 auto; }
+.lib-rail-section {
+  font-size: var(--fs-xs); font-weight: 600; color: var(--text-faint);
+  text-transform: uppercase; letter-spacing: 0.04em;
+  padding: var(--s-4) 12px var(--s-2);
+}
+.lib-rail-thumb {
+  flex: 0 0 auto; width: 28px; height: 28px; border-radius: 5px; overflow: hidden;
+  background: var(--surface-3); display: inline-flex; align-items: center; justify-content: center;
+}
+.lib-rail-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.lib-rail-thumb-ph { color: var(--text-faint); display: inline-flex; }
+.lib-rail-kebab {
+  flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; border-radius: 50%; color: var(--text-faint);
+  opacity: 0; transition: opacity var(--transition-fast), background var(--transition-fast);
+}
+.lib-rail-shelf:hover .lib-rail-kebab { opacity: 1; }
+.lib-rail-kebab:hover { background: var(--surface-2); color: var(--text); }
+@media (hover: none) { .lib-rail-kebab { opacity: 1; } }
+.lib-rail-create {
+  display: inline-flex; align-items: center; gap: var(--s-3);
+  margin: var(--s-3) 0 0; padding: 9px 12px; width: 100%;
+  border: none; background: none; cursor: pointer;
+  color: var(--accent); font-size: var(--fs-md); font-weight: 550;
+}
+.lib-rail-create .icon { color: var(--accent); }
+.lib-rail-create:hover { text-decoration: underline; }
+
+/* ---- Panel principal ---- */
+.lib-main {
+  flex: 1; min-width: 0; height: 100%; overflow-y: auto; background: var(--surface-0);
+  padding: calc(var(--s-5) + env(safe-area-inset-top)) var(--s-6)
            calc(var(--s-8) + env(safe-area-inset-bottom));
 }
+.lib-h1 { font-size: var(--fs-2xl); font-weight: 700; letter-spacing: -0.02em; margin-bottom: var(--s-4); }
 
-.lib-head {
-  display: flex; align-items: center; justify-content: space-between;
-  gap: var(--s-4); margin-bottom: var(--s-5);
-}
-.lib-h1 { font-size: var(--fs-2xl); font-weight: 700; letter-spacing: -0.02em; }
-.lib-add { display: inline-flex; align-items: center; gap: 6px; }
+.lib-toolbar { display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap; margin-bottom: var(--s-5); }
 
-/* Estanterías: tira horizontal de segmentos desplazable. */
-.lib-shelves {
-  display: flex; gap: var(--s-2); align-items: center;
-  overflow-x: auto; padding-bottom: var(--s-3); margin-bottom: var(--s-4);
-  scrollbar-width: none;
+/* Desplegables (orden / progreso) */
+.lib-dd { position: relative; }
+.lib-dd-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 14px; border: 1px solid var(--border); border-radius: var(--r-pill);
+  background: var(--surface-2); color: var(--text); font-size: var(--fs-sm); font-weight: 550;
+  cursor: pointer; transition: background var(--transition-fast), border-color var(--transition-fast);
 }
-.lib-shelves::-webkit-scrollbar { display: none; }
-.lib-shelf-tab {
-  flex: 0 0 auto; border: none; cursor: pointer;
-  background: var(--surface-3); color: var(--text-soft);
-  padding: 7px 14px; border-radius: var(--r-pill);
-  font-size: var(--fs-sm); font-weight: 550;
-  transition: background var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
+.lib-dd-btn:hover { background: var(--surface-3); }
+.lib-dd.open .lib-dd-btn { border-color: var(--accent); color: var(--accent); }
+.lib-dd.open .lib-dd-btn .icon { color: var(--accent); }
+.lib-dd-menu {
+  display: none; position: absolute; top: calc(100% + 6px); left: 0; z-index: 60;
+  min-width: 180px; background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: var(--r-md); box-shadow: var(--shadow-3); padding: 6px;
 }
-.lib-shelf-tab:active { transform: scale(0.96); }
-.lib-shelf-tab.active { background: var(--accent); color: var(--on-accent); }
-.lib-newshelf {
-  flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center;
-  width: 32px; height: 32px; border-radius: 50%;
-  border: 1px dashed var(--border); background: none; color: var(--text-soft); cursor: pointer;
+.lib-dd.open .lib-dd-menu { display: block; }
+.lib-dd-opt {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  padding: 8px 10px; border: none; background: none; cursor: pointer;
+  border-radius: var(--r-sm); color: var(--text); font-size: var(--fs-md); text-align: left;
 }
-.lib-newshelf:hover { color: var(--accent); border-color: var(--accent); }
+.lib-dd-opt:hover { background: var(--surface-3); }
+.lib-dd-opt.active { color: var(--accent); font-weight: 600; }
+.lib-dd-check { width: 16px; flex: 0 0 auto; display: inline-flex; }
+.lib-dd-check .icon { color: var(--accent); }
 
-/* Rejilla de portadas. */
+.lib-upload {
+  display: inline-flex; align-items: center; gap: 6px; margin-left: auto;
+  padding: 8px 16px; border: none; border-radius: var(--r-pill);
+  background: var(--accent); color: var(--on-accent); font-size: var(--fs-sm); font-weight: 600;
+  cursor: pointer; box-shadow: var(--shadow-1);
+  transition: background var(--transition-fast), transform var(--transition-fast);
+}
+.lib-upload:hover { background: var(--accent-hover); }
+.lib-upload:active { transform: scale(0.97); }
+
+/* ---- Rejilla de portadas ---- */
 .lib-grid {
   display: grid; gap: var(--s-5) var(--s-4);
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
 }
 .lib-card { cursor: pointer; }
 .lib-cover {
-  position: relative; aspect-ratio: 2 / 3; border-radius: var(--r-md);
+  position: relative; aspect-ratio: 2 / 3; border-radius: var(--r-sm);
   overflow: hidden; background: var(--surface-3); box-shadow: var(--shadow-2);
   transition: transform var(--transition-fast), box-shadow var(--transition-fast);
 }
@@ -1306,53 +1367,41 @@ body.in-library .ai-fab { display: none; }
 .lib-cover-fallback {
   width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;
   background: linear-gradient(150deg, var(--accent), var(--accent-hover));
-  color: #fff; font-size: 30px; font-weight: 700; letter-spacing: 0.02em;
+  color: #fff; font-size: 30px; font-weight: 700;
 }
 .lib-badge {
   position: absolute; top: 8px; left: 8px; width: 22px; height: 22px;
   display: inline-flex; align-items: center; justify-content: center;
-  border-radius: 50%; background: #34c759; color: #fff;   /* systemGreen */
-  box-shadow: var(--shadow-1);
+  border-radius: 50%; background: #34c759; color: #fff; box-shadow: var(--shadow-1);
 }
-.lib-menu-btn {
+.lib-kebab {
   position: absolute; top: 6px; right: 6px;
   width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center;
   border: none; border-radius: 50%; cursor: pointer; color: #fff;
   background: rgba(0, 0, 0, 0.42); backdrop-filter: blur(4px);
   opacity: 0; transition: opacity var(--transition-fast);
 }
-.lib-card:hover .lib-menu-btn, .lib-menu-btn:focus-visible { opacity: 1; }
-@media (hover: none) { .lib-menu-btn { opacity: 1; } }
-
-.lib-bar {
-  height: 3px; border-radius: var(--r-pill); background: var(--surface-3);
-  margin: 10px 0 7px; overflow: hidden;
-}
-.lib-bar-fill { display: block; height: 100%; background: var(--accent); border-radius: inherit; }
+.lib-card:hover .lib-kebab, .lib-kebab:focus-visible { opacity: 1; }
+@media (hover: none) { .lib-kebab { opacity: 1; } }
+.lib-progressbar { height: 3px; border-radius: var(--r-pill); background: var(--surface-3); margin: 10px 0 7px; overflow: hidden; }
+.lib-progressbar span { display: block; height: 100%; background: var(--accent); border-radius: inherit; }
 .lib-title {
   font-size: var(--fs-sm); font-weight: 600; line-height: 1.3; color: var(--text);
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
-.lib-author {
-  font-size: var(--fs-xs); color: var(--text-faint); margin-top: 2px;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
+.lib-author { font-size: var(--fs-xs); color: var(--text-faint); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-/* Estado vacío. */
 .lib-empty {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: var(--s-3); text-align: center; color: var(--text-soft);
-  padding: 14vh var(--s-4);
+  gap: var(--s-3); text-align: center; color: var(--text-soft); padding: 12vh var(--s-4);
 }
 .lib-empty-icon { color: var(--text-faint); }
-.lib-empty .lib-add { margin-top: var(--s-2); }
 
-/* Menú contextual por libro. */
+/* Menú contextual (libro / estantería) */
 .lib-menu {
-  position: fixed; z-index: 200; min-width: 220px;
+  position: fixed; z-index: 200; min-width: 220px; display: none;
   background: var(--surface-2); border: 1px solid var(--border);
-  border-radius: var(--r-md); box-shadow: var(--shadow-3);
-  padding: 6px; display: none;
+  border-radius: var(--r-md); box-shadow: var(--shadow-3); padding: 6px;
 }
 .lib-menu-item {
   display: flex; align-items: center; gap: 10px; width: 100%;
@@ -1371,8 +1420,27 @@ body.in-library .ai-fab { display: none; }
 }
 .lib-menu-empty { font-size: var(--fs-sm); color: var(--text-faint); padding: 4px 10px 8px; }
 
+/* ---- Móvil: el rail pasa a tira horizontal de chips ---- */
 @media (max-width: 767px) {
-  .library { padding-left: var(--s-4); padding-right: var(--s-4); }
+  .lib-layout { flex-direction: column; }
+  .lib-rail {
+    flex: 0 0 auto; width: 100%; height: auto; display: flex; gap: var(--s-2);
+    overflow-x: auto; overflow-y: hidden; border-right: none;
+    border-bottom: 1px solid var(--border-soft); scrollbar-width: none;
+    padding: calc(var(--s-3) + env(safe-area-inset-top)) var(--s-3) var(--s-3);
+  }
+  .lib-rail::-webkit-scrollbar { display: none; }
+  .lib-rail-section { display: none; }
+  .lib-rail-item {
+    flex: 0 0 auto; width: auto; background: var(--surface-3);
+    padding: 7px 12px; gap: var(--s-2);
+  }
+  .lib-rail-ico, .lib-rail-thumb { display: none; }
+  .lib-rail-create { width: auto; flex: 0 0 auto; margin: 0; padding: 7px 12px; }
+  .lib-rail-create span { display: none; }
+  .lib-main { padding-left: var(--s-4); padding-right: var(--s-4); padding-top: var(--s-4); }
   .lib-grid { grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: var(--s-4) var(--s-3); }
   .lib-h1 { font-size: var(--fs-xl); }
+  .lib-upload span { display: none; }
+  .lib-upload { padding: 8px 12px; }
 }
