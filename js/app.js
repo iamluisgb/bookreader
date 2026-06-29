@@ -161,12 +161,16 @@ async function loadEpub(buffer, bookId) {
       updateProgressDetail();
     });
 
+    // Reveal the footer BEFORE rendering so the epub container is measured at
+    // its final height — otherwise epub.js bakes in the taller (footer-hidden)
+    // height and the last lines are cut off on the first book.
+    document.getElementById('reader-footer').style.display = 'flex';
+
     await EpubReader.load(buffer);
     console.log('EPUB loaded successfully');
 
     // Update UI
     document.getElementById('reader-title').textContent = EpubReader.getTitle();
-    document.getElementById('reader-footer').style.display = 'flex';
     document.getElementById('bookmark-toggle').disabled = false;
     document.getElementById('ai-toggle').disabled = false;
     document.getElementById('immersive-toggle').disabled = false;

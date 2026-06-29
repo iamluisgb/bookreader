@@ -10,22 +10,42 @@ let onProgressCallback = null;
 let onChapterCallback = null;
 let settingsListenerRegistered = false;
 
+let resizeTimer = null;
+
+// Re-measure the container and re-paginate. The height tracks the container
+// (rendered at '100%'), but the width is pinned to the column width and must be
+// re-applied so the page stays centered and capped on viewport changes:
+// rotation, mobile URL-bar show/hide, PWA window resize, column-width setting.
+function resizeToContainer() {
+  if (!rendition) return;
+  const container = document.getElementById('epub-container');
+  if (!container) return;
+  const s = Settings.getAll();
+  const viewWidth = s.columnWidth + 60;
+  sizeContainer(container, viewWidth);
+  // Use the actual (possibly capped at 100%) width so the rendition matches the
+  // container exactly on narrow screens — otherwise epub.js paginates wider than
+  // the visible area and the page is cut off horizontally.
+  rendition.resize(container.clientWidth, container.clientHeight);
+}
+
 export function init() {
   if (settingsListenerRegistered) return;
   settingsListenerRegistered = true;
   window.addEventListener('settings:changed', (e) => {
     // Resize first so epub.js re-paginates, then re-apply theme to the new frames
-    if (rendition) {
-      const container = document.getElementById('epub-container');
-      if (container) {
-        const s = Settings.getAll();
-        const viewWidth = s.columnWidth + 60;
-        sizeContainer(container, viewWidth);
-        rendition.resize(viewWidth, container.clientHeight);
-      }
-    }
+    resizeToContainer();
     applyTheme();
   });
+
+  // Re-paginate on any viewport change (debounced). Covers rotation, the mobile
+  // browser chrome collapsing/expanding, and resizing the standalone PWA window.
+  const scheduleResize = () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(resizeToContainer, 150);
+  };
+  window.addEventListener('resize', scheduleResize);
+  window.addEventListener('orientationchange', scheduleResize);
 }
 
 // Pin the epub container to the exact rendition width and center it, capping at
@@ -67,18 +87,22 @@ export async function load(arrayBuffer, onProgress) {
   console.log('Rendering book...');
 
   const settings = Settings.getAll();
-  const viewHeight = container.clientHeight;
   const viewWidth = settings.columnWidth + 60;
 
   // The container MUST be exactly as wide as the rendition. epub.js positions
   // each paginated page by translating the iframe; if the container is wider
   // than the view width, the page offset no longer lands on a column boundary
-  // and a sliver of the adjacent page leaks in (the "2 columns" bug).
+  // and a sliver of the adjacent page leaks in (the "2 columns" bug). On narrow
+  // screens the container caps at 100%, so read the rendered width back.
   sizeContainer(container, viewWidth);
+  const renderWidth = container.clientWidth;
 
+  // Height as a percentage so epub.js tracks the container: a fixed pixel height
+  // gets baked into the view and never re-fits (resize/re-display won't change
+  // it in 0.3.93), so the page is cut off when the viewport height changes.
   rendition = book.renderTo(container, {
-    width: viewWidth,
-    height: viewHeight,
+    width: renderWidth,
+    height: '100%',
     spread: 'none',
     flow: 'paginated'
   });

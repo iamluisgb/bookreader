@@ -7,7 +7,7 @@
   "start_url": ".",
   "scope": ".",
   "display": "standalone",
-  "orientation": "portrait-primary",
+  "orientation": "any",
   "background_color": "#fbfbfd",
   "theme_color": "#5b6cff",
   "categories": ["books", "education", "productivity"],
