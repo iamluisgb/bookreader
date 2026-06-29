@@ -69,7 +69,7 @@ export function init(opts) {
   els.noteView.addEventListener('click', onNotebookClick);
 
   // Selector de conversaciones.
-  els.convoBtn.addEventListener('click', (e) => { e.stopPropagation(); openConvoMenu(els.convoBtn); });
+  els.convoBtn.addEventListener('click', (e) => { e.stopPropagation(); if (convo) openConvoMenu(els.convoBtn); else openOnboarding(); });
   els.convoNew.addEventListener('click', () => openOnboarding());
   document.addEventListener('click', (e) => {
     if (convoMenuEl && !convoMenuEl.contains(e.target) && !e.target.closest('#ai-convo-btn')) closeConvoMenu();
@@ -247,6 +247,7 @@ function refreshStatus() {
   if (!segReady) { setStatus(template ? `Plantilla: ${template.name} · leyendo…` : 'Leyendo el libro…'); return; }
   const base = `${segCached ? 'Listo (cacheado)' : 'Listo'} · ${segBlocks} pasajes`;
   setStatus(template ? `${base} · ${template.name}` : base);
+  renderConvoBar();
 }
 
 async function activateConvo() {
@@ -271,13 +272,17 @@ async function switchConvo(id) {
   showView('chat');
 }
 
-// Barra con la conversación activa + selector + nueva.
+// Barra con la conversación activa + selector + nueva. Si no hay conversación
+// pero sí libro, muestra una entrada para elegir objetivo (reabrir onboarding).
 function renderConvoBar() {
   if (!els.convobar) return;
-  els.convobar.style.display = convo ? 'flex' : 'none';
-  if (!convo) return;
-  const label = template?.name || 'Conversación';
-  els.convoLabel.textContent = label;
+  if (!book) { els.convobar.style.display = 'none'; return; }
+  els.convobar.style.display = 'flex';
+  els.convobar.classList.toggle('no-convo', !convo);
+  els.convoNew.style.display = convo ? '' : 'none';
+  els.convoLabel.textContent = convo
+    ? (convo.title || template?.name || 'Conversación')
+    : 'Elegir objetivo de lectura';
 }
 
 async function openConvoMenu(anchor) {
@@ -291,7 +296,8 @@ async function openConvoMenu(anchor) {
       const active = convo && c.id === convo.id;
       return `<button class="lib-menu-item ai-convo-item" data-id="${c.id}">
         <span class="lib-menu-check">${active ? icon('check', { size: 16 }) : ''}</span>
-        <span class="ai-convo-item-text"><span class="ai-convo-item-name">${escapeHtml(t?.name || 'Conversación')}</span><span class="ai-convo-item-goal">${escapeHtml(c.goal || '')}</span></span>
+        <span class="ai-convo-item-text"><span class="ai-convo-item-name">${escapeHtml(c.title || t?.name || 'Conversación')}</span><span class="ai-convo-item-goal">${escapeHtml(c.goal || '')}</span></span>
+        <span class="ai-convo-rename" data-rename="${c.id}" title="Renombrar">${icon('pencil', { size: 15 })}</span>
         <span class="ai-convo-del" data-del="${c.id}" title="Eliminar">${icon('trash', { size: 15 })}</span>
       </button>`;
     }).join('')}
@@ -308,6 +314,21 @@ async function openConvoMenu(anchor) {
   menu.style.minWidth = Math.max(240, r.width) + 'px';
 
   menu.addEventListener('click', async (ev) => {
+    const ren = ev.target.closest('.ai-convo-rename');
+    if (ren) {
+      ev.stopPropagation();
+      const id = ren.dataset.rename;
+      const c = convos.find(x => x.id === id);
+      const cur = c?.title || getTemplate(c?.templateId)?.name || '';
+      const name = (prompt('Nombre de la conversación:', cur) || '').trim();
+      closeConvoMenu();
+      if (name) {
+        await DB.updateConvo(id, { title: name });
+        if (convo && convo.id === id) convo.title = name;
+        renderConvoBar();
+      }
+      return;
+    }
     const del = ev.target.closest('.ai-convo-del');
     if (del) {
       ev.stopPropagation();
@@ -446,60 +467,66 @@ function openOnboarding() {
   overlay = document.createElement('div');
   overlay.id = 'ai-onboarding';
   overlay.className = 'ai-onboarding';
+  overlay.innerHTML = `
+    <div class="ai-ob-card">
+      <button class="ai-ob-close" title="Cerrar" aria-label="Cerrar">${icon('xmark', { size: 18 })}</button>
+      <div class="ai-ob-body"></div>
+    </div>`;
   document.body.appendChild(overlay);
+  const body = overlay.querySelector('.ai-ob-body');
+
+  const dismiss = () => { overlay.remove(); document.removeEventListener('keydown', onKey); };
+  const onKey = (e) => { if (e.key === 'Escape') dismiss(); };
+  document.addEventListener('keydown', onKey);
+  overlay.addEventListener('mousedown', (e) => { if (e.target === overlay) dismiss(); }); // clic fuera de la tarjeta
+  overlay.querySelector('.ai-ob-close').addEventListener('click', dismiss);
 
   let chosenBlock = null, chosenTemplate = null;
 
   const renderBlocks = () => {
-    overlay.innerHTML = `
-      <div class="ai-ob-card">
-        <h2>¿Cuál es tu objetivo con este libro?</h2>
-        <p class="ai-ob-sub">Elige un enfoque de lectura.</p>
-        <div class="ai-ob-blocks">
-          ${Object.values(BLOCKS).map(bl => `
-            <button class="ai-ob-block" data-block="${bl.id}">
-              <span class="ai-ob-block-icon">${icon(bl.icon, { size: 24 })}</span>
-              <span class="ai-ob-block-label">${bl.label}</span>
-              <span class="ai-ob-block-hint">${bl.hint}</span>
-            </button>`).join('')}
-        </div>
+    body.innerHTML = `
+      <h2>¿Cuál es tu objetivo con este libro?</h2>
+      <p class="ai-ob-sub">Elige un enfoque de lectura.</p>
+      <div class="ai-ob-blocks">
+        ${Object.values(BLOCKS).map(bl => `
+          <button class="ai-ob-block" data-block="${bl.id}">
+            <span class="ai-ob-block-icon">${icon(bl.icon, { size: 24 })}</span>
+            <span class="ai-ob-block-label">${bl.label}</span>
+            <span class="ai-ob-block-hint">${bl.hint}</span>
+          </button>`).join('')}
       </div>`;
-    overlay.querySelectorAll('.ai-ob-block').forEach(btn =>
+    body.querySelectorAll('.ai-ob-block').forEach(btn =>
       btn.addEventListener('click', () => { chosenBlock = btn.dataset.block; renderTemplates(); }));
   };
 
   const renderTemplates = () => {
     const list = templatesByBlock(chosenBlock);
-    overlay.innerHTML = `
-      <div class="ai-ob-card">
-        <button class="ai-ob-back">${icon('chevron-left', { size: 16 })}<span>Volver</span></button>
-        <h2>Elige una plantilla</h2>
-        <div class="ai-ob-templates">
-          ${list.map(t => `
-            <button class="ai-ob-tpl" data-tpl="${t.id}">
-              <span class="ai-ob-tpl-name">${t.name}</span>
-              <span class="ai-ob-tpl-ideal">${t.ideal}</span>
-            </button>`).join('')}
-        </div>
+    body.innerHTML = `
+      <button class="ai-ob-back">${icon('chevron-left', { size: 16 })}<span>Volver</span></button>
+      <h2>Elige una plantilla</h2>
+      <div class="ai-ob-templates">
+        ${list.map(t => `
+          <button class="ai-ob-tpl" data-tpl="${t.id}">
+            <span class="ai-ob-tpl-name">${t.name}</span>
+            <span class="ai-ob-tpl-ideal">${t.ideal}</span>
+          </button>`).join('')}
       </div>`;
-    overlay.querySelector('.ai-ob-back').addEventListener('click', renderBlocks);
-    overlay.querySelectorAll('.ai-ob-tpl').forEach(btn =>
+    body.querySelector('.ai-ob-back').addEventListener('click', renderBlocks);
+    body.querySelectorAll('.ai-ob-tpl').forEach(btn =>
       btn.addEventListener('click', () => { chosenTemplate = getTemplate(btn.dataset.tpl); renderGoal(); }));
   };
 
   const renderGoal = () => {
-    overlay.innerHTML = `
-      <div class="ai-ob-card">
-        <button class="ai-ob-back">${icon('chevron-left', { size: 16 })}<span>Volver</span></button>
-        <h2>${chosenTemplate.name}</h2>
-        <p class="ai-ob-sub">${chosenTemplate.goalPrompt}</p>
-        <textarea id="ai-ob-goal" class="ai-ob-goal" rows="3" placeholder="Tu objetivo..."></textarea>
-        <button id="ai-ob-start" class="primary-btn ai-ob-start">Empezar a leer con objetivo</button>
-      </div>`;
-    overlay.querySelector('.ai-ob-back').addEventListener('click', renderTemplates);
-    const goalEl = overlay.querySelector('#ai-ob-goal');
+    body.innerHTML = `
+      <button class="ai-ob-back">${icon('chevron-left', { size: 16 })}<span>Volver</span></button>
+      <h2>${chosenTemplate.name}</h2>
+      <p class="ai-ob-sub">${chosenTemplate.goalPrompt}</p>
+      <textarea id="ai-ob-goal" class="ai-ob-goal" rows="3" placeholder="Tu objetivo..."></textarea>
+      <button id="ai-ob-start" class="primary-btn ai-ob-start">Empezar a leer con objetivo</button>`;
+    body.querySelector('.ai-ob-back').addEventListener('click', renderTemplates);
+    const goalEl = body.querySelector('#ai-ob-goal');
     goalEl.focus();
-    overlay.querySelector('#ai-ob-start').addEventListener('click', async () => {
+    body.querySelector('#ai-ob-start').addEventListener('click', async () => {
       const goal = goalEl.value.trim();
       if (!goal) { goalEl.focus(); return; }
       template = chosenTemplate;
@@ -507,7 +534,7 @@ function openOnboarding() {
         ? await DB.createConvo(bookId, chosenTemplate.id, goal)
         : { id: 'tmp', bookId: null, templateId: chosenTemplate.id, goal };
       history = []; notes = []; attenuationDone = false; clearChapterAttenuation();
-      overlay.remove();
+      dismiss();
       await activateConvo();
       setOpen(true);
     });
@@ -539,6 +566,7 @@ async function send() {
   if (busy) return;
   const q = els.input.value.trim();
   if (!q) return;
+  if (!convo) { setStatus('Elige un objetivo de lectura primero.'); openOnboarding(); return; }
   if (!LLM.hasKey()) { toggleConfig(true); setStatus('Introduce tu API key primero.'); return; }
   if (!annotatedText) { setStatus('El libro aún no está listo.'); return; }
 

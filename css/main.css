@@ -875,9 +875,17 @@ body.ai-open .reader-main { margin-right: var(--ai-panel-width); }
   padding: 20px;
 }
 .ai-ob-card {
+  position: relative;
   background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 14px;
   padding: 28px; width: 100%; max-width: 560px; box-shadow: 0 10px 40px var(--shadow);
 }
+.ai-ob-close {
+  position: absolute; top: 14px; right: 14px;
+  width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center;
+  border: none; border-radius: 50%; background: var(--surface-3); color: var(--text-soft);
+  cursor: pointer; transition: background var(--transition-fast), color var(--transition-fast);
+}
+.ai-ob-close:hover { background: var(--border); color: var(--text); }
 .ai-ob-card h2 { font-size: 20px; margin-bottom: 6px; }
 .ai-ob-sub { color: var(--text-secondary); font-size: 14px; margin-bottom: 18px; }
 .ai-ob-back {
@@ -1474,3 +1482,18 @@ body.in-library .ai-fab { display: none; }
 }
 .ai-convo-del .icon { color: inherit; }
 .ai-convo-del:hover { color: #ff3b30; background: var(--surface-3); }
+
+/* Estado "sin conversación": invita a elegir objetivo (reabre el onboarding). */
+.ai-convobar.no-convo .ai-convo-btn {
+  border-style: dashed; border-color: var(--accent); color: var(--accent);
+}
+.ai-convobar.no-convo .ai-convo-btn .icon { color: var(--accent); }
+.ai-convobar.no-convo .ai-convo-btn .icon:last-child { display: none; }
+
+/* Botón de renombrar conversación en el menú. */
+.ai-convo-rename {
+  flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center;
+  width: 24px; height: 24px; border-radius: 6px; color: var(--text-faint); margin-left: 4px;
+}
+.ai-convo-rename .icon { color: inherit; }
+.ai-convo-rename:hover { color: var(--accent); background: var(--surface-3); }
