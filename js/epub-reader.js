@@ -162,10 +162,10 @@ function applyTheme() {
 
 function getFontFamily(settings) {
   return settings.fontFamily === 'serif'
-    ? 'Georgia, serif'
+    ? "'Literata', ui-serif, Georgia, serif"   // misma serif que Google Play Books
     : settings.fontFamily === 'sans-serif'
       ? '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-      : 'monospace';
+      : 'ui-monospace, Menlo, monospace';
 }
 
 function injectThemeIntoContent(contents) {
@@ -183,11 +183,15 @@ function injectThemeIntoContent(contents) {
 
     const style = doc.createElement('style');
     style.id = 'bookreader-theme';
-    // Typography + colors only. Do NOT set max-width / margin / padding on
-    // body: epub.js drives the CSS multi-column pagination off the body
-    // dimensions, and overriding them misaligns the page offset so a sliver
-    // of the next page leaks in (the "2 columns" bug).
+    const isSerif = settings.fontFamily === 'serif';
+    // No tocar el ancho ni el padding HORIZONTAL del body: epub.js calcula la
+    // paginación multi-columna a partir del ancho del body y alterarlo deja
+    // colarse una franja de la página siguiente (el bug de "2 columnas"). Sí
+    // reducimos el padding VERTICAL para aprovechar la altura (sobre todo en
+    // horizontal). line-height y font-family se fuerzan también en los párrafos
+    // porque muchos EPUB los fijan en su propio CSS y ganarían al de body.
     style.textContent = `
+      ${isSerif ? "@import url('https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,600;1,7..72,400;1,7..72,600&display=swap');" : ''}
       html, body {
         background: ${colors.bg} !important;
         color: ${colors.text} !important;
@@ -196,9 +200,13 @@ function injectThemeIntoContent(contents) {
         font-family: ${fontFamily} !important;
         font-size: ${settings.fontSize}px !important;
         line-height: ${settings.lineHeight} !important;
+        padding-top: 6px !important;
+        padding-bottom: 6px !important;
       }
-      p, div, span, li, h1, h2, h3, h4, h5, h6, a, blockquote, td, th {
+      p, div, span, li, h1, h2, h3, h4, h5, h6, a, blockquote, td, th, em, strong, i, b {
         color: ${colors.text} !important;
+        font-family: ${fontFamily} !important;
+        line-height: ${settings.lineHeight} !important;
       }
       p { margin-bottom: 0.8em !important; }
     `;
