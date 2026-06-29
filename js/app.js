@@ -108,12 +108,17 @@ function setImmersive(on) {
 
 function initImmersive() {
   document.getElementById('immersive-toggle')?.addEventListener('click', () => setImmersive(true));
-  // Zonas táctiles activas solo en inmersivo: pasar página o salir.
-  document.getElementById('reader-taps')?.addEventListener('click', (e) => {
-    const zone = e.target.closest('.tap-zone')?.dataset.tap;
-    if (zone === 'prev') { EpubReader.isLoaded() ? EpubReader.prev() : PdfReader.prev(); }
-    else if (zone === 'next') { EpubReader.isLoaded() ? EpubReader.next() : PdfReader.next(); }
-    else if (zone === 'center') { setImmersive(false); }
+
+  // Toques sobre el contenido del libro (sin capa que bloquee la selección):
+  // bordes = pasar página, centro = alternar pantalla completa. Si la barra de
+  // selección está abierta, el toque solo la cierra.
+  EpubReader.onTap((zone) => {
+    const tip = document.getElementById('highlight-tooltip');
+    if (tip && tip.style.display !== 'none') { hideHighlightTooltip(); return; }
+    if (zone === 'prev') EpubReader.prev();
+    else if (zone === 'next') EpubReader.next();
+    else if (zone === 'center') setImmersive(!document.body.classList.contains('immersive'));
+    // 'click' (escritorio, sin barra abierta) → no hace nada
   });
 }
 
@@ -516,14 +521,9 @@ function setupHighlights() {
 
     // Pintar un resaltado temporal nuestro y LIMPIAR la selección nativa: así se
     // descarta el menú del sistema (Copiar/Compartir) que se solapaba con la barra.
+    // (Un toque posterior en el libro cierra la barra vía EpubReader.onTap.)
     drawTempSelection(rendition, cfiRange);
     try { selection.removeAllRanges(); } catch (e) {}
-
-    // Tocar el libro (dentro del iframe) cierra la barra; el clic en el iframe no
-    // llega al documento principal, así que escuchamos aquí el siguiente toque.
-    try {
-      contents.document.addEventListener('mousedown', hideHighlightTooltip, { once: true });
-    } catch (e) {}
   });
 }
 

@@ -1161,18 +1161,6 @@ body.immersive .reader-header { top: 0; transform: translateY(-100%); }
 body.immersive .reader-footer { bottom: 0; transform: translateY(100%); }
 body.immersive .ai-fab { transform: scale(0); }
 
-.reader-taps {
-  position: absolute;
-  inset: 0;
-  z-index: 50;
-  display: none;
-}
-body.immersive .reader-taps { display: flex; }
-.reader-taps .tap-zone { height: 100%; }
-.reader-taps .tap-prev { width: 32%; cursor: w-resize; }
-.reader-taps .tap-center { flex: 1; cursor: pointer; }
-.reader-taps .tap-next { width: 32%; cursor: e-resize; }
-
 /* ============================================================================
    F5 · Sistema de iconos (SF Symbols) + refinado de controles estilo Apple
    ========================================================================== */

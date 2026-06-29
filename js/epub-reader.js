@@ -29,6 +29,58 @@ export function resize() {
   resizeToContainer();
 }
 
+// ---- Navegación táctil sobre el contenido ---------------------------------
+let onTapCb = () => {};
+export function onTap(cb) { onTapCb = cb || (() => {}); }
+
+function hasSelection(win) {
+  try { return !!(win.getSelection && win.getSelection().toString().trim()); } catch (e) { return false; }
+}
+function tapZone(x) {
+  // epub.js dispone las páginas en una tira horizontal y traslada el contenido,
+  // así que clientX incluye el desplazamiento de la página (p. ej. 2*ancho + x).
+  // La posición DENTRO de la página visible es clientX % anchoPágina, y el ancho
+  // de página = ancho del contenedor (estable, leído desde el documento padre).
+  const cont = document.getElementById('epub-container');
+  const w = (cont && cont.clientWidth) || window.innerWidth || 1;
+  const within = ((x % w) + w) % w;
+  const f = within / w;
+  return f < 0.28 ? 'prev' : f > 0.72 ? 'next' : 'center';
+}
+
+// Distingue un toque (navegar) de una selección (mantener pulsado / arrastrar)
+// y de un scroll. Se registra en cada iframe de contenido que crea epub.js.
+function registerTapHandler(contents) {
+  const doc = contents.document, win = contents.window;
+  let sx = 0, sy = 0, st = 0, moved = false, lastTouchEnd = 0;
+
+  doc.addEventListener('touchstart', (e) => {
+    if (e.touches.length !== 1) { moved = true; return; }
+    const t = e.touches[0]; sx = t.clientX; sy = t.clientY; st = Date.now(); moved = false;
+  }, { passive: true });
+
+  doc.addEventListener('touchmove', (e) => {
+    const t = e.touches[0]; if (!t) return;
+    if (Math.abs(t.clientX - sx) > 10 || Math.abs(t.clientY - sy) > 10) moved = true;
+  }, { passive: true });
+
+  doc.addEventListener('touchend', (e) => {
+    lastTouchEnd = Date.now();
+    if (moved || Date.now() - st > 500) return;     // arrastre o pulsación larga
+    if (hasSelection(win)) return;                  // hubo selección → no navegar
+    const t = e.changedTouches[0]; if (!t) return;
+    onTapCb(tapZone(t.clientX));
+  }, { passive: true });
+
+  // Escritorio: un clic en el libro (no sintetizado por un toque) solo sirve
+  // para cerrar la barra de selección, no para navegar.
+  doc.addEventListener('click', () => {
+    if (Date.now() - lastTouchEnd < 700) return;    // clic sintetizado por touch
+    if (hasSelection(win)) return;
+    onTapCb('click');
+  });
+}
+
 export function init() {
   if (settingsListenerRegistered) return;
   settingsListenerRegistered = true;
@@ -117,6 +169,10 @@ export async function load(arrayBuffer, onProgress) {
     }
     // Also inject theme directly into the content document
     injectThemeIntoContent(contents);
+    // Navegación táctil sobre el propio contenido (sin capa que bloquee la
+    // selección): toque rápido en bordes = pasar página, centro = pantalla
+    // completa; mantener pulsado / arrastrar = seleccionar.
+    registerTapHandler(contents);
   });
 
   await rendition.display();
