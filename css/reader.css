@@ -1,0 +1,16 @@
+/* ============ EPUB READER STYLES ============ */
+
+/* Override epub.js iframe styles */
+#epub-container iframe {
+  border: none !important;
+}
+
+/* Highlight annotations */
+.highlight {
+  cursor: pointer;
+  transition: opacity var(--transition-fast);
+}
+
+.highlight:hover {
+  opacity: 0.8;
+}

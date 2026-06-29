@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>BookReader</title>
+  <link rel="stylesheet" href="css/themes.css">
+  <link rel="stylesheet" href="css/main.css">
+  <link rel="stylesheet" href="css/reader.css">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" id="meta-theme-color" content="#fbfbfd">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="BookReader">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="icon" type="image/svg+xml" href="icons/icon.svg">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/epubjs@0.3.93/dist/epub.min.css">
+</head>
+<body>
+  <!-- Sidebar -->
+  <aside id="sidebar" class="sidebar">
+    <div class="sidebar-header">
+      <h2>BookReader</h2>
+      <button id="sidebar-close" class="icon-btn" aria-label="Cerrar sidebar">✕</button>
+    </div>
+
+    <!-- Tabs -->
+    <div class="sidebar-tabs">
+      <button class="tab-btn active" data-tab="contents">Contenido</button>
+      <button class="tab-btn" data-tab="bookmarks">Marcadores</button>
+      <button class="tab-btn" data-tab="highlights">Subrayados</button>
+      <button class="tab-btn" data-tab="settings">Ajustes</button>
+    </div>
+
+    <!-- Tab: Contents -->
+    <div id="tab-contents" class="tab-content active">
+      <div id="toc-list" class="toc-list">
+        <p class="empty-state">Abre un libro para ver el índice</p>
+      </div>
+    </div>
+
+    <!-- Tab: Bookmarks -->
+    <div id="tab-bookmarks" class="tab-content">
+      <div id="bookmarks-list" class="bookmarks-list">
+        <p class="empty-state">No hay marcadores aún</p>
+      </div>
+    </div>
+
+    <!-- Tab: Highlights -->
+    <div id="tab-highlights" class="tab-content">
+      <div class="highlights-header">
+        <button id="export-highlights-btn" class="export-btn" disabled>📥 Exportar JSON</button>
+      </div>
+      <div id="highlights-list" class="highlights-list">
+        <p class="empty-state">No hay subrayados aún</p>
+      </div>
+    </div>
+
+    <!-- Tab: Settings -->
+    <div id="tab-settings" class="tab-content">
+      <div class="settings-group">
+        <label>Tema</label>
+        <div class="theme-selector">
+          <button class="theme-btn" data-theme="system" title="Auto (sistema)">🖥️</button>
+          <button class="theme-btn" data-theme="light" title="Claro">☀️</button>
+          <button class="theme-btn" data-theme="sepia" title="Sepia">📜</button>
+          <button class="theme-btn" data-theme="dark" title="Oscuro">🌙</button>
+        </div>
+      </div>
+
+      <div class="settings-group">
+        <label>Tamaño de fuente</label>
+        <div class="font-size-control">
+          <button id="font-decrease" class="icon-btn">A-</button>
+          <span id="font-size-value">16px</span>
+          <button id="font-increase" class="icon-btn">A+</button>
+        </div>
+      </div>
+
+      <div class="settings-group">
+        <label>Fuente</label>
+        <select id="font-family-select">
+          <option value="serif">Serif</option>
+          <option value="sans-serif">Sans-serif</option>
+          <option value="monospace">Monospace</option>
+        </select>
+      </div>
+
+      <div class="settings-group">
+        <label>Ancho de columna</label>
+        <div class="column-width-control">
+          <input type="range" id="column-width" min="400" max="900" value="600" step="50">
+          <span id="column-width-value">600px</span>
+        </div>
+      </div>
+
+      <div class="settings-group">
+        <label>Espaciado de líneas</label>
+        <div class="line-height-control">
+          <input type="range" id="line-height" min="1.2" max="2.2" value="1.6" step="0.1">
+          <span id="line-height-value">1.6</span>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main reader area -->
+  <main id="reader-main" class="reader-main">
+    <!-- Top bar -->
+    <header id="reader-header" class="reader-header">
+      <button id="sidebar-toggle" class="icon-btn" aria-label="Abrir sidebar">☰</button>
+      <div id="reader-title" class="reader-title">BookReader</div>
+      <div class="header-actions">
+        <button id="immersive-toggle" class="icon-btn" aria-label="Modo lectura" title="Modo lectura" disabled>⤢</button>
+        <button id="ai-toggle" class="icon-btn" aria-label="Agente de IA" title="Agente de IA" disabled>🤖</button>
+        <button id="bookmark-toggle" class="icon-btn" aria-label="Marcar página" disabled>🔖</button>
+      </div>
+    </header>
+
+    <!-- Reader viewport -->
+    <div id="reader-viewport" class="reader-viewport">
+      <!-- Landing screen -->
+      <div id="landing" class="landing">
+        <div class="landing-content">
+          <div class="landing-icon">📚</div>
+          <h1>BookReader</h1>
+          <p>Lector de EPUB y PDF</p>
+          <button id="open-file-btn" class="primary-btn">Abrir archivo</button>
+          <p class="landing-hint">o arrastra un archivo aquí</p>
+          <input type="file" id="file-input" accept=".epub,.pdf" hidden>
+        </div>
+      </div>
+
+      <!-- EPUB container -->
+      <div id="epub-container" class="epub-container" style="display:none;"></div>
+
+      <!-- PDF container -->
+      <div id="pdf-container" class="pdf-container" style="display:none;">
+        <canvas id="pdf-canvas"></canvas>
+      </div>
+
+      <!-- Zonas táctiles (solo en modo lectura inmersivo) -->
+      <div id="reader-taps" class="reader-taps" aria-hidden="true">
+        <div class="tap-zone tap-prev" data-tap="prev"></div>
+        <div class="tap-zone tap-center" data-tap="center"></div>
+        <div class="tap-zone tap-next" data-tap="next"></div>
+      </div>
+    </div>
+
+    <!-- Bottom bar: navigation -->
+    <footer id="reader-footer" class="reader-footer" style="display:none;">
+      <button id="prev-btn" class="nav-btn" aria-label="Página anterior">◀</button>
+      <div class="progress-container">
+        <div id="progress-bar" class="progress-bar"></div>
+        <span id="progress-text" class="progress-text">0%</span>
+      </div>
+      <button id="next-btn" class="nav-btn" aria-label="Página siguiente">▶</button>
+    </footer>
+
+    <!-- Detailed progress panel -->
+    <div id="progress-detail" class="progress-detail" style="display:none;">
+      <div class="progress-detail-row">
+        <span class="progress-detail-pct" id="progress-detail-pct">0% complete</span>
+      </div>
+      <div class="progress-detail-bar-wrap">
+        <div class="progress-detail-bar"><div id="progress-detail-fill" class="progress-detail-fill"></div></div>
+      </div>
+      <div class="progress-detail-meta">
+        <span id="progress-detail-label">Content Progress</span>
+        <span id="progress-detail-time">Approx. — left</span>
+      </div>
+    </div>
+  </main>
+
+  <!-- Backdrop para drawers en pantallas pequeñas -->
+  <div id="scrim" class="scrim"></div>
+
+  <!-- AI agent panel -->
+  <aside id="ai-panel" class="ai-panel"></aside>
+
+  <!-- FAB del agente (solo móvil) -->
+  <button id="ai-fab" class="ai-fab" aria-label="Abrir agente" title="Agente">🤖</button>
+
+  <!-- Highlight tooltip -->
+  <div id="highlight-tooltip" class="highlight-tooltip" style="display:none;">
+    <button class="highlight-color" data-color="#ffeb3b" style="background:#ffeb3b;" title="Amarillo"></button>
+    <button class="highlight-color" data-color="#4caf50" style="background:#4caf50;" title="Verde"></button>
+    <button class="highlight-color" data-color="#2196f3" style="background:#2196f3;" title="Azul"></button>
+    <button class="highlight-color" data-color="#e91e63" style="background:#e91e63;" title="Rosa"></button>
+    <button id="highlight-remove" class="highlight-remove" title="Eliminar subrayado">✕</button>
+  </div>
+
+  <!-- Scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/epubjs@0.3.93/dist/epub.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,16 @@
+{
+  "name": "bookreader",
+  "version": "1.0.0",
+  "main": "sw.js",
+  "scripts": {
+    "test": "playwright test --grep-invert @live",
+    "test:ai": "playwright test --grep @live"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "devDependencies": {
+    "@playwright/test": "^1.61.1"
+  }
+}

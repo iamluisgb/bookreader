@@ -1,0 +1,10 @@
+# Secrets — nunca commitear
+.env
+.env.*
+!.env.example
+
+# Dependencias y artefactos
+node_modules/
+test-results/
+playwright-report/
+playwright/.cache/
