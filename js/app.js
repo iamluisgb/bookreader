@@ -6,10 +6,10 @@ import * as PdfReader from './pdf-reader.js';
 import * as Storage from './storage.js';
 import * as AiPanel from './ai/panel.js';
 import * as AiDB from './ai/db.js';
-import { hydrateIcons, icon } from './ui/icons.js';
-import { escapeHtml } from './ui/escape.js';
+import { hydrateIcons } from './ui/icons.js';
 import { countBookWords, updateProgressDetail } from './progress.js';
 import { initHighlights, setupHighlights, renderHighlights, hideHighlightTooltip } from './highlights-ui.js';
+import { initBookmarkButton, updateBookmarkButton, renderBookmarks } from './bookmarks-ui.js';
 import * as Library from './library/view.js';
 import * as LibStore from './library/store.js';
 
@@ -447,72 +447,5 @@ function initNavigation() {
       if (EpubReader.isLoaded()) EpubReader.next();
       else if (PdfReader.isLoaded()) PdfReader.next();
     }
-  });
-}
-
-// ============ BOOKMARKS ============
-function initBookmarkButton() {
-  document.getElementById('bookmark-toggle').addEventListener('click', () => {
-    if (!EpubReader.isLoaded()) return;
-
-    const cfi = EpubReader.getCurrentCfi();
-    if (!cfi) return;
-
-    const chapter = EpubReader.getCurrentChapterLabel();
-    const title = document.getElementById('reader-title').textContent;
-
-    Bookmarks.toggle(cfi, title, chapter);
-    updateBookmarkButton();
-  });
-
-  Bookmarks.setOnChange(() => renderBookmarks());
-}
-
-function updateBookmarkButton() {
-  if (!EpubReader.isLoaded()) return;
-
-  const btn = document.getElementById('bookmark-toggle');
-  const cfi = EpubReader.getCurrentCfi();
-  if (!cfi) return;
-
-  const isBookmarked = Bookmarks.has(cfi);
-  btn.innerHTML = icon('bookmark', { filled: isBookmarked });
-  btn.classList.toggle('is-active', isBookmarked);
-  btn.title = isBookmarked ? 'Quitar marcador' : 'Marcar página';
-}
-
-function renderBookmarks() {
-  const list = document.getElementById('bookmarks-list');
-  const bookmarks = Bookmarks.getAll();
-
-  if (bookmarks.length === 0) {
-    list.innerHTML = '<p class="empty-state">No hay marcadores aún</p>';
-    return;
-  }
-
-  list.innerHTML = '';
-  bookmarks.sort((a, b) => b.timestamp - a.timestamp).forEach(bm => {
-    const item = document.createElement('div');
-    item.className = 'bookmark-item';
-    item.innerHTML = `
-      <div class="bookmark-info">
-        <div class="bookmark-title">${escapeHtml(bm.title)}</div>
-        <div class="bookmark-chapter">${escapeHtml(bm.chapter)}</div>
-      </div>
-      <button class="bookmark-delete" title="Eliminar">${icon('xmark', { size: 16 })}</button>
-    `;
-
-    item.querySelector('.bookmark-info').addEventListener('click', async () => {
-      await EpubReader.goTo(bm.cfi);
-      document.getElementById('sidebar').classList.remove('open');
-    });
-
-    item.querySelector('.bookmark-delete').addEventListener('click', (e) => {
-      e.stopPropagation();
-      Bookmarks.remove(bm.cfi);
-      updateBookmarkButton();
-    });
-
-    list.appendChild(item);
   });
 }

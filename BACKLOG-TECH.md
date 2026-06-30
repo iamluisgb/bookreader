@@ -85,26 +85,41 @@ lento en *cada* turno; escala con el tamaño del libro.
 - Restringido a GET http(s) del mismo origen; el POST al LLM, los `blob:` del lector y los
   terceros pasan directos.
 
-### T8 — Trocear `app.js` y `panel.js` · `M`–`L` 🟡 PARCIAL (2026-06-30)
-Extracciones por responsabilidad, cada una verificada (19/19 E2E + lint 0 errores):
+### T8 — Trocear `app.js` y `panel.js` · `M`–`L` ✅ HECHO (2026-06-30)
+Extracciones por responsabilidad, cada una verificada (19/19 E2E + lint 0 errores).
+Resultado: **`app.js` 848 → 451** · **`panel.js` 920 → 782**.
 - [`js/progress.js`](js/progress.js): progreso detallado + estimación de palabras, extraído
   de `app.js`. `totalWords` se pasa por parámetro; se eliminó el muerto `estimateWords`.
 - [`js/ai/render.js`](js/ai/render.js): `renderWithCitations`/`citeReplace` (Markdown +
   chips de cita), extraído de `panel.js` (920 → 907); `anchors` se pasa por parámetro.
 - [`js/highlights-ui.js`](js/highlights-ui.js): **toda la selección/barra de acciones/lista
-  de subrayados**, extraída de `app.js` (**848 → 517 líneas**). Público: `initHighlights`,
-  `setupHighlights`, `renderHighlights`, `hideHighlightTooltip`. El estado de selección es
-  local al módulo; sin ciclos de import (panel.js no importa app.js). *Move* puro.
+  de subrayados**, extraída de `app.js`. Público: `initHighlights`, `setupHighlights`,
+  `renderHighlights`, `hideHighlightTooltip`. El estado de selección es local al módulo; sin
+  ciclos de import (panel.js no importa app.js). *Move* puro.
+- [`js/bookmarks-ui.js`](js/bookmarks-ui.js): botón de marcar + lista de marcadores, extraído
+  de `app.js`. Público: `initBookmarkButton`, `updateBookmarkButton`, `renderBookmarks`. Bien
+  cubierto por E2E ("bookmark button toggles").
+- [`js/ai/attenuation.js`](js/ai/attenuation.js): atenuación de capítulos por relevancia
+  (`computeChapterRelevance`/`applyChapterAttenuation`/`clearChapterAttenuation`), extraída de
+  `panel.js`. Parametrizada (`annotatedText`, `goal` por argumento); el orquestador
+  `maybeAttenuate` (flag + caché en DB) se queda en `panel.js`.
+- [`js/ai/panel-template.js`](js/ai/panel-template.js): el HTML del panel (`TEMPLATE`) y el
+  prompt de sistema (`systemPrompt(goal, template)`), solo strings sin estado.
+- **Código muerto eliminado** de `highlights-ui.js`: `finalizeSelection`, `drawTempSelection`,
+  `pendingSel`, `selFinalizeTimer`, `activeSelection` (restos de un enfoque de selección
+  anterior, ya muertos antes de extraer). `tempSelCfi`/`removeTempSelection` se mantienen
+  porque los handlers vivos aún los llaman (quedan como no-op inofensivo).
 
-**Pendiente (deferido a propósito):**
-- **Descomponer `panel.js`** (onboarding/chat/libreta): bloqueado por el alto acoplamiento
-  — **19 variables de estado a nivel de módulo** + un cache `els` compartido entre ~40
-  funciones. Hacerlo limpio requiere primero un refactor de **estado compartido** (un
-  `state.js` o pasar contexto) y **más cobertura de tests del panel IA**. No forzarlo sin eso.
-- **Código muerto en [`highlights-ui.js`](js/highlights-ui.js)** (heredado, ya muerto antes
-  de extraer): `finalizeSelection`/`drawTempSelection`/`pendingSel`/`selFinalizeTimer` y
-  `activeSelection` son restos de un enfoque de selección anterior (lint los marca como
-  unused). Limpieza segura pero en cascada; hacer en un pase aparte.
+**Decisión arquitectónica — NO descomponer más `panel.js`:**
+Lo que queda en `panel.js` (onboarding/chat/libreta/convos) es el **núcleo cohesionado** de
+una sola feature: `convo` se usa 75×, `els` 65×, `template` 26×, repartidos por ~64 funciones.
+Eso es **cohesión, no deuda**. Partirlo obligaría a un **objeto de estado mutable compartido
+entre varios archivos** → cambia "un archivo grande pero legible" por "estado mutado desde N
+sitios" (*spooky action at a distance*), normalmente **peor** de razonar. LOC no es la métrica.
+- **Si algún día hace falta** (la feature crece mucho o hay que reutilizar el chat): el corte
+  correcto **no** es trocear la UI compartiendo estado, sino extraer un **store/controlador con
+  API explícita y eventos** (vista tonta). Y **solo tras** añadir *characterization tests* del
+  panel IA (hoy 0 cobertura). No se refactoriza a ciegas un core de 75 usos sin red.
 
 ### T11 — Revisar las funciones del lector PDF · `M` ⬜ PENDIENTE
 Repaso de [`js/pdf-reader.js`](js/pdf-reader.js) (193 líneas): el camino PDF tiene **0
@@ -153,11 +168,16 @@ es decisión del propietario).
 
 ## Estado (2026-06-30)
 
-✅ Hechos: T1, T2, T3, T4, T6, T7, T9, T10. 🟡 Parcial: T8 (extraídas las piezas seguras;
-queda la descomposición de selección/highlights y de la UI del agente).
+✅ Hechos: T1, T2, T3, T4, T6, T7, T8, T9, T10. ⬜ Pendientes: T5, T11.
+
+T8 cerrado: extraídos 6 módulos de bajo acoplamiento (app.js 848→451, panel.js 920→782). El
+núcleo de `panel.js` se deja entero **por decisión arquitectónica** (cohesión, no deuda; ver T8).
 
 **Pendiente principal:** **T5** (recorte de contexto al LLM) — el mayor coste recurrente; lo
-revisa el propietario por separado.
+revisa el propietario por separado. Y **T11** (lector PDF).
+
+**Mayor ROI de refactor ahora (recomendación staff):** *characterization tests del panel IA*
+(0 cobertura hoy) — habilitan cualquier cambio futuro del core con red — y **T5**.
 
 **Revisión PDF:** al verificar el PDF a mano salió un bug preexistente (ArrayBuffer
 *detached* al guardar en la biblioteca) y otros puntos del lector PDF → recogidos en

@@ -24,8 +24,6 @@ export function initHighlights() {
 }
 
 let tempSelCfi = null;
-let selFinalizeTimer = null;
-let pendingSel = null;
 let lastSelWin = null;   // ventana del iframe de la última selección (escritorio)
 
 export function setupHighlights() {
@@ -81,25 +79,6 @@ export function setupHighlights() {
   });
 }
 
-function finalizeSelection(rendition) {
-  if (!pendingSel) return;
-  const { cfiRange, text, rect, win } = pendingSel;
-  pendingSel = null;
-  drawTempSelection(rendition, cfiRange);            // resaltado propio visible
-  try { win.getSelection().removeAllRanges(); } catch (e) {}  // descarta menús del SO
-  showHighlightTooltip(cfiRange, text, rect);
-}
-
-function drawTempSelection(rendition, cfiRange) {
-  removeTempSelection(rendition);
-  tempSelCfi = cfiRange;
-  try {
-    rendition.annotations.highlight(cfiRange, {}, () => {}, 'sel-temp', {
-      'fill': '#64b5f6', 'fill-opacity': '0.4', 'mix-blend-mode': 'multiply'
-    });
-  } catch (e) {}
-}
-
 function removeTempSelection(rendition) {
   if (!tempSelCfi) return;
   // epub.js identifica la anotación por (cfi + TIPO); el tipo de highlight() es
@@ -108,11 +87,8 @@ function removeTempSelection(rendition) {
   tempSelCfi = null;
 }
 
-let activeSelection = null;
-
 function showHighlightTooltip(cfiRange, text, rect) {
   const tooltip = document.getElementById('highlight-tooltip');
-  activeSelection = { cfiRange, text };
 
   // Ya hemos borrado la selección nativa (finalizeSelection), así que no hay
   // menús del SO con los que chocar: colocamos la barra junto a la selección.
@@ -176,15 +152,12 @@ function showHighlightTooltip(cfiRange, text, rect) {
 }
 
 export function hideHighlightTooltip() {
-  clearTimeout(selFinalizeTimer);
-  pendingSel = null;
   document.getElementById('highlight-tooltip').style.display = 'none';
   document.removeEventListener('click', hideHighlightTooltipOnOutside);
   removeTempSelection();
   try { EpubReader.clearSelection(); } catch (e) {}   // overlay táctil, si lo hay
   try { lastSelWin && lastSelWin.getSelection().removeAllRanges(); } catch (e) {}  // selección nativa (escritorio)
   lastSelWin = null;
-  activeSelection = null;
 }
 
 function hideHighlightTooltipOnOutside(e) {

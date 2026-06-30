@@ -9,6 +9,8 @@ import { BLOCKS, TEMPLATES, getTemplate, templatesByBlock, isValidField } from '
 import { icon } from '../ui/icons.js';
 import { escapeHtml } from '../ui/escape.js';
 import { renderWithCitations } from './render.js';
+import { computeChapterRelevance, applyChapterAttenuation, clearChapterAttenuation } from './attenuation.js';
+import { TEMPLATE, systemPrompt } from './panel-template.js';
 
 // Icon + label markup for the small inline action buttons.
 const act = (name, text, size = 15) => `${icon(name, { size })}<span>${text}</span>`;
@@ -86,47 +88,6 @@ export function init(opts) {
     if (document.getElementById('sidebar')?.classList.contains('open')) maybeAttenuate();
   });
 }
-
-const TEMPLATE = `
-  <div class="ai-header">
-    <span class="ai-title">${icon('sparkles', { size: 19 })} Agente</span>
-    <button id="ai-edit-cfg" class="icon-btn" title="Configuración">${icon('gear')}</button>
-    <button id="ai-close" class="icon-btn" title="Cerrar">${icon('xmark')}</button>
-  </div>
-  <div id="ai-config" class="ai-config">
-    <label>API key de nan</label>
-    <input id="ai-key" type="password" placeholder="sk-..." autocomplete="off" />
-    <label>Modelo</label>
-    <select id="ai-model"></select>
-    <label class="ai-check"><input type="checkbox" id="ai-auto" /> Rellenar la libreta automáticamente</label>
-    <button id="ai-save-cfg" class="primary-btn ai-save">Guardar</button>
-    <p class="ai-privacy">${icon('shield', { size: 13 })} Tu API key se guarda solo en este navegador. Para responder, el contenido del libro se envía al proveedor del modelo (nan).</p>
-  </div>
-  <div id="ai-status" class="ai-status">Abre un EPUB para empezar.</div>
-  <div id="ai-convobar" class="ai-convobar" style="display:none">
-    <button id="ai-convo-btn" class="ai-convo-btn" title="Cambiar de conversación">
-      ${icon('bubble', { size: 15 })}<span id="ai-convo-label" class="ai-convo-label">Conversación</span>${icon('chevron-down', { size: 14 })}
-    </button>
-    <button id="ai-convo-new" class="icon-btn" title="Nueva conversación">${icon('plus', { size: 18 })}</button>
-  </div>
-  <div id="ai-tabs" class="ai-tabs" style="display:none">
-    <button class="ai-tab active" data-view="chat">${icon('bubble', { size: 16 })} Chat</button>
-    <button class="ai-tab" data-view="notebook">${icon('note', { size: 16 })} Libreta</button>
-  </div>
-  <div id="ai-view-chat" class="ai-view active">
-    <div id="ai-messages" class="ai-messages"></div>
-    <div id="ai-ref" class="ai-ref" style="display:none">
-      <span class="ai-ref-ico">${icon('note', { size: 15 })}</span>
-      <span id="ai-ref-text" class="ai-ref-text"></span>
-      <button id="ai-ref-clear" class="ai-ref-clear" title="Quitar referencia">${icon('xmark', { size: 15 })}</button>
-    </div>
-    <div class="ai-composer">
-      <textarea id="ai-input" rows="2" placeholder="Pregunta sobre el libro..."></textarea>
-      <button id="ai-send" class="primary-btn ai-send">Enviar</button>
-    </div>
-  </div>
-  <div id="ai-view-notebook" class="ai-view"></div>
-`;
 
 export function setOpen(open) {
   document.body.classList.toggle('ai-open', open);
@@ -406,7 +367,7 @@ async function maybeAttenuate() {
     let cached = convo ? await DB.getRatings(convo.id) : null;
     let scores = (cached && cached.goal === convo.goal) ? cached.scores : null;
     if (!scores) {
-      scores = await computeChapterRelevance(toc);
+      scores = await computeChapterRelevance(toc, annotatedText, convo.goal);
       if (scores && convo) await DB.saveRatings(convo.id, convo.goal, scores);
     }
     if (scores) applyChapterAttenuation(scores);
@@ -414,75 +375,6 @@ async function maybeAttenuate() {
     console.warn('Atenuación de capítulos falló:', e);
     attenuationDone = false; // permitir reintento en otra carga
   }
-}
-
-async function computeChapterRelevance(toc) {
-  const chapters = toc.map(t => t.label.trim()).filter(Boolean);
-  const tools = [{
-    type: 'function',
-    function: {
-      name: 'rate_chapters',
-      description: 'Puntúa la relevancia de cada capítulo para el objetivo del usuario.',
-      parameters: {
-        type: 'object',
-        properties: {
-          ratings: {
-            type: 'array',
-            items: {
-              type: 'object',
-              properties: {
-                chapter: { type: 'string', description: 'Título exacto del capítulo.' },
-                score: { type: 'number', description: 'Relevancia 0 (irrelevante) a 1 (muy relevante).' },
-              },
-              required: ['chapter', 'score'],
-            },
-          },
-        },
-        required: ['ratings'],
-      },
-    },
-  }];
-  const messages = [
-    { role: 'system', content:
-`Evalúas qué capítulos de un libro sirven al OBJETIVO del usuario. Usa la herramienta
-rate_chapters una sola vez, puntuando TODOS los capítulos de la lista de 0 a 1 según su
-relevancia para el objetivo (1 = central, 0 = paja/introducción/anécdota).` },
-    { role: 'user', content: 'LIBRO ANOTADO:\n\n' + annotatedText },
-    { role: 'user', content:
-`OBJETIVO: ${convo.goal}\n\nCAPÍTULOS A PUNTUAR (usa estos títulos exactos):\n` +
-      chapters.map(c => `- ${c}`).join('\n') },
-  ];
-  const { toolCalls } = await LLM.chatTools({ messages, tools, toolChoice: 'auto' });
-  const call = toolCalls.find(t => t.name === 'rate_chapters');
-  if (!call || !Array.isArray(call.args.ratings)) return null;
-  const scores = {};
-  for (const r of call.args.ratings) {
-    if (typeof r.chapter === 'string' && typeof r.score === 'number') {
-      scores[r.chapter.trim()] = Math.max(0, Math.min(1, r.score));
-    }
-  }
-  return Object.keys(scores).length ? scores : null;
-}
-
-function applyChapterAttenuation(scores) {
-  const links = document.querySelectorAll('#toc-list a');
-  links.forEach(a => {
-    const label = a.textContent.trim();
-    if (!(label in scores)) return;
-    const s = scores[label];
-    a.classList.remove('ai-toc-low', 'ai-toc-mid', 'ai-toc-high');
-    if (s >= 0.66) a.classList.add('ai-toc-high');
-    else if (s >= 0.33) a.classList.add('ai-toc-mid');
-    else a.classList.add('ai-toc-low');
-    a.title = `Relevancia para tu objetivo: ${Math.round(s * 100)}%`;
-  });
-}
-
-function clearChapterAttenuation() {
-  document.querySelectorAll('#toc-list a').forEach(a => {
-    a.classList.remove('ai-toc-low', 'ai-toc-mid', 'ai-toc-high');
-    a.removeAttribute('title');
-  });
 }
 
 async function restoreChat() {
@@ -581,23 +473,6 @@ function openOnboarding() {
 
 // ---- Chat ------------------------------------------------------------------
 
-function systemPrompt() {
-  const fields = template ? template.fields.map(f => `- ${f.key}: ${f.label}`).join('\n') : '';
-  return `Eres un lector experto que ayuda a sacar provecho de un libro según un OBJETIVO concreto.
-Respondes en español, conciso y sin paja, basándote ÚNICAMENTE en el libro entregado.
-
-OBJETIVO DEL USUARIO: ${convo?.goal || '(sin definir)'}
-PLANTILLA: ${template?.name || '—'} — ${template?.agentRole || ''}
-Filtra el contenido hacia ese objetivo: ignora lo anecdótico, resalta lo aplicable.
-
-CITAS (obligatorio): el libro viene troceado en pasajes precedidos por anclas [[aN]].
-Cada afirmación basada en el libro debe llevar su cita [[aN]] usando identificadores reales del texto.
-Incluye al menos una cita por respuesta sobre el contenido. No inventes anclas.
-
-La libreta del usuario tiene estos campos (no los rellenas tú aquí, solo respondes):
-${fields}`;
-}
-
 async function send() {
   if (busy) return;
   const q = els.input.value.trim();
@@ -622,7 +497,7 @@ async function send() {
   let thinking = true, raw;
 
   const messages = [
-    { role: 'system', content: systemPrompt() },
+    { role: 'system', content: systemPrompt(convo?.goal, template) },
     { role: 'user', content: 'LIBRO ANOTADO (cita los pasajes con sus anclas [[aN]]):\n\n' + annotatedText },
     ...history.slice(0, -1),
     { role: 'user', content: aug },
