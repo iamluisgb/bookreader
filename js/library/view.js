@@ -3,6 +3,7 @@
 // herramientas con orden (Recientes) y filtro (Progreso), y rejilla de portadas.
 import * as Store from './store.js';
 import { icon } from '../ui/icons.js';
+import { escapeHtml } from '../ui/escape.js';
 
 let host = null;                 // #library
 let onOpenBook = () => {};
@@ -62,7 +63,7 @@ export async function render() {
   const noShelfCount = books.filter(b => !(b.shelfIds && b.shelfIds.length)).length;
   const shelfThumb = (id) => {
     const b = books.find(x => (x.shelfIds || []).includes(id));
-    return b && b.cover ? `<img src="${b.cover}" alt="">` : `<span class="lib-rail-thumb-ph">${icon('book', { size: 14 })}</span>`;
+    return b && b.cover ? `<img src="${escapeHtml(b.cover)}" alt="">` : `<span class="lib-rail-thumb-ph">${icon('book', { size: 14 })}</span>`;
   };
 
   let list = books.filter(matchShelf).filter(matchFilter);
@@ -130,7 +131,7 @@ function dropdownHtml(key, label, options, current) {
 function cardHtml(b) {
   const pct = Math.max(0, Math.min(100, Math.round(b.progress || 0)));
   const cover = b.cover
-    ? `<img class="lib-cover-img" src="${b.cover}" alt="">`
+    ? `<img class="lib-cover-img" src="${escapeHtml(b.cover)}" alt="">`
     : `<div class="lib-cover-fallback"><span>${escapeHtml(initials(b.title))}</span></div>`;
   const badge = (b.status === 'finished') ? `<span class="lib-badge">${icon('check', { size: 13 })}</span>` : '';
   return `
@@ -322,7 +323,4 @@ function closeMenu() {
 
 function initials(title) {
   return (title || '?').trim().split(/\s+/).slice(0, 2).map(w => w[0] || '').join('').toUpperCase();
-}
-function escapeHtml(s) {
-  return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }

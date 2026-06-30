@@ -8,6 +8,7 @@ import * as EpubReader from '../epub-reader.js';
 import { BLOCKS, TEMPLATES, getTemplate, templatesByBlock, isValidField } from './templates.js';
 import { mdToHtml } from './markdown.js';
 import { icon } from '../ui/icons.js';
+import { escapeHtml } from '../ui/escape.js';
 
 // Icon + label markup for the small inline action buttons.
 const act = (name, text, size = 15) => `${icon(name, { size })}<span>${text}</span>`;
@@ -917,4 +918,3 @@ function setStatus(s) {
 }
 function scrollDown() { if (els.messages) els.messages.scrollTop = els.messages.scrollHeight; }
 function toggleConfig(show) { els.panel.querySelector('#ai-config').style.display = show ? 'block' : 'none'; }
-function escapeHtml(str) { const d = document.createElement('div'); d.textContent = str; return d.innerHTML; }

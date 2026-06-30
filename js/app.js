@@ -7,6 +7,7 @@ import * as Storage from './storage.js';
 import * as AiPanel from './ai/panel.js';
 import * as AiDB from './ai/db.js';
 import { hydrateIcons, icon } from './ui/icons.js';
+import { escapeHtml } from './ui/escape.js';
 import * as Library from './library/view.js';
 import * as LibStore from './library/store.js';
 
@@ -753,13 +754,6 @@ function renderHighlights() {
 
     list.appendChild(item);
   });
-}
-
-// ============ HELPERS ============
-function escapeHtml(str) {
-  const div = document.createElement('div');
-  div.textContent = str;
-  return div.innerHTML;
 }
 
 // ============ PROGRESS DETAIL ============
