@@ -6,9 +6,9 @@ import { segmentBook } from './segment.js';
 import * as DB from './db.js';
 import * as EpubReader from '../epub-reader.js';
 import { BLOCKS, TEMPLATES, getTemplate, templatesByBlock, isValidField } from './templates.js';
-import { mdToHtml } from './markdown.js';
 import { icon } from '../ui/icons.js';
 import { escapeHtml } from '../ui/escape.js';
+import { renderWithCitations } from './render.js';
 
 // Icon + label markup for the small inline action buttons.
 const act = (name, text, size = 15) => `${icon(name, { size })}<span>${text}</span>`;
@@ -100,6 +100,7 @@ const TEMPLATE = `
     <select id="ai-model"></select>
     <label class="ai-check"><input type="checkbox" id="ai-auto" /> Rellenar la libreta automáticamente</label>
     <button id="ai-save-cfg" class="primary-btn ai-save">Guardar</button>
+    <p class="ai-privacy">${icon('shield', { size: 13 })} Tu API key se guarda solo en este navegador. Para responder, el contenido del libro se envía al proveedor del modelo (nan).</p>
   </div>
   <div id="ai-status" class="ai-status">Abre un EPUB para empezar.</div>
   <div id="ai-convobar" class="ai-convobar" style="display:none">
@@ -618,7 +619,7 @@ async function send() {
   const textNode = bubble.querySelector('.ai-bubble-text');
   textNode.innerHTML = '<span class="ai-typing">pensando…</span>';
   busy = true; els.send.disabled = true; abortCtrl = new AbortController();
-  let thinking = true, raw = '';
+  let thinking = true, raw;
 
   const messages = [
     { role: 'system', content: systemPrompt() },
@@ -636,7 +637,7 @@ async function send() {
       },
     });
     const finalText = raw || textNode.textContent;
-    textNode.innerHTML = renderWithCitations(finalText);
+    textNode.innerHTML = renderWithCitations(finalText, anchors);
     addMessageActions(bubble, finalText, q, { autoRun: LLM.getAutoExtract() });
     history.push({ role: 'assistant', content: finalText });
     if (convo) DB.addMessage(convo.id, 'assistant', finalText);
@@ -790,7 +791,7 @@ function noteHtml(n) {
     : '';
   return `
     <div class="ai-nb-note" data-id="${n.id}">
-      <div class="ai-nb-note-text">${renderWithCitations(n.content)}</div>
+      <div class="ai-nb-note-text">${renderWithCitations(n.content, anchors)}</div>
       <div class="ai-nb-note-tools">
         ${gotoBtn}
         <button class="ai-nb-edit" data-id="${n.id}" title="Editar">${icon('pencil', { size: 15 })}</button>
@@ -888,26 +889,12 @@ function appendBubble(role, text, asHtml) {
   div.className = 'ai-msg ai-msg-' + role;
   div.innerHTML = `<div class="ai-bubble"><div class="ai-bubble-text"></div></div>`;
   const node = div.querySelector('.ai-bubble-text');
-  if (asHtml) node.innerHTML = renderWithCitations(text);
+  if (asHtml) node.innerHTML = renderWithCitations(text, anchors);
   else node.textContent = text;
   els.messages.appendChild(div);
   if (asHtml && role === 'assistant' && text) addMessageActions(div, text, '');
   scrollDown();
   return div;
-}
-
-// Markdown -> HTML (seguro) y luego anclas [[aN]]/aN -> chips clicables.
-function renderWithCitations(text) {
-  return citeReplace(mdToHtml(text));
-}
-
-function citeReplace(html) {
-  return html.replace(/\[\[(a\d+)\]\]|\b(a\d+)\b/g, (m, p1, p2) => {
-    const id = p1 || p2;
-    return anchors.has(id)
-      ? `<button class="ai-cite" data-id="${id}" title="Ir al pasaje">${id}</button>`
-      : m;
-  });
 }
 
 function setStatus(s) {

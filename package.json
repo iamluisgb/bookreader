@@ -1,16 +1,35 @@
 {
   "name": "bookreader",
   "version": "1.0.0",
+  "private": true,
+  "description": "Lector web de EPUB/PDF (PWA, 100% frontend) con agente de IA BYOK. Sin build step.",
   "main": "sw.js",
+  "homepage": "https://github.com/iamluisgb/bookreader",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/iamluisgb/bookreader.git"
+  },
   "scripts": {
     "test": "playwright test --grep-invert @live",
-    "test:ai": "playwright test --grep @live"
+    "test:ai": "playwright test --grep @live",
+    "lint": "eslint js sw.js",
+    "format": "prettier --write \"**/*.{js,css,html,json,md}\"",
+    "format:check": "prettier --check \"**/*.{js,css,html,json,md}\""
   },
-  "keywords": [],
-  "author": "",
+  "keywords": [
+    "epub",
+    "pdf",
+    "reader",
+    "pwa",
+    "ai"
+  ],
+  "author": "iamluisgb",
   "license": "ISC",
-  "description": "",
   "devDependencies": {
-    "@playwright/test": "^1.61.1"
+    "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.61.1",
+    "eslint": "^10.6.0",
+    "globals": "^17.7.0",
+    "prettier": "^3.9.4"
   }
 }

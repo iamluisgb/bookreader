@@ -8,12 +8,12 @@ let onPageCallback = null;
 
 function getPdfjs() {
   if (pdfjsLib) return pdfjsLib;
-  // CDN exposes it as window.pdfjsLib or window["pdfjs-dist/build/pdf"]
+  // El bundle (vendorizado) lo expone como window.pdfjsLib o window["pdfjs-dist/build/pdf"]
   pdfjsLib = window.pdfjsLib || window['pdfjs-dist/build/pdf'] || window['pdfjsLib'];
   if (pdfjsLib) {
     try {
-      pdfjsLib.GlobalWorkerOptions.workerSrc =
-        'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      // Worker local (mismo origen): funciona offline y bajo CSP worker-src 'self'.
+      pdfjsLib.GlobalWorkerOptions.workerSrc = 'vendor/pdf.worker-3.11.174.min.js';
     } catch(e) {
       console.warn('pdf.js worker setup error:', e);
     }

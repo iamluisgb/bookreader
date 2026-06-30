@@ -86,6 +86,8 @@ function caretAt(doc, x, y) {
   return null;
 }
 
+// Char-class de limites de palabra con unicode intencionado para la seleccion.
+// eslint-disable-next-line no-irregular-whitespace, no-useless-escape
 const WORD_RE = /[^\s .,;:!?¡¿"'«»()\[\]{}—–\-]/;
 
 function expandToWord(doc, node, offset) {

@@ -25,12 +25,17 @@ contenido de los libros**.
 - **Pendiente futuro (Opción B, recomendada a medio plazo):** vendorizar las libs a `vendor/`
   para no depender de CDN y resolver además [T6](#t6) (offline).
 
-### T2 — Content-Security-Policy · `S`–`M` ⬜ PENDIENTE
-No hay CSP. Dado el uso intensivo de `innerHTML`, una CSP da defensa en profundidad.
-- Meta `Content-Security-Policy` en [`index.html`](index.html): restringir `script-src`
-  a `self` + las CDN concretas (o solo `self` si se vendoriza en [T1](#t1)), `connect-src`
-  a `self` + `https://api.nan.builders`, `img-src 'self' data:` (covers son data URLs).
-- Mejor combinarlo con [T1](#t1): con libs vendorizadas la CSP queda mucho más estricta.
+### T2 — Content-Security-Policy · `S`–`M` ✅ HECHO (2026-06-30)
+Meta `Content-Security-Policy` en [`index.html`](index.html).
+- **Protección clave:** `script-src 'self'` (gracias a vendorizar en [T6](#t6)) bloquea JS
+  inyectado — lo que protege la API key en localStorage. `connect-src 'self' blob:
+  https://api.nan.builders`: el contenido del libro no puede exfiltrar a hosts arbitrarios.
+- Estilos/fuentes/imágenes permisivos (`https:`, `data:`, `blob:`) para que los EPUB
+  rendericen fieles; `worker-src`/`frame-src` con `blob:` por el iframe del lector y el
+  worker de pdf.js; `object-src 'none'`, `base-uri 'self'`, `form-action 'none'`.
+- **Verificado:** los tests detectaron que el contenido del EPUB carga CSS/fuentes/`blob:`
+  propios; la política se afinó hasta 19/19 en verde. PDF verificado a mano (worker local
+  arranca y renderiza bajo la CSP).
 
 ### T3 — Escapar `img src` del cover y unificar escapado · `S` ✅ HECHO (2026-06-30)
 - **Util compartido:** nuevo [`js/ui/escape.js`](js/ui/escape.js) con `escapeHtml` (escapa
@@ -44,11 +49,12 @@ No hay CSP. Dado el uso intensivo de `innerHTML`, una CSP da defensa en profundi
 - **Nota:** `esc` en [`js/ai/markdown.js`](js/ai/markdown.js) se deja intacto a propósito: ese
   módulo es un renderer Markdown deliberadamente autocontenido y sin dependencias.
 
-### T4 — Aviso de privacidad la primera vez que se usa el agente · `S` ⬜ PENDIENTE
-Cada consulta envía el **texto completo del libro** a `api.nan.builders`
-([`js/ai/panel.js`](js/ai/panel.js) ~L624). Es BYOK y opt-in, pero no hay aviso.
-- Mostrar una nota la primera vez: "tu key vive solo en este navegador; el contenido del
-  libro se envía al proveedor que elijas para responder".
+### T4 — Aviso de privacidad la primera vez que se usa el agente · `S` ✅ HECHO (2026-06-30)
+- Nota fija en el bloque de configuración del agente ([`js/ai/panel.js`](js/ai/panel.js)),
+  visible al abrir la config (primer uso): "Tu API key se guarda solo en este navegador.
+  Para responder, el contenido del libro se envía al proveedor del modelo (nan)."
+- Icono `shield` nuevo en [`js/ui/icons.js`](js/ui/icons.js) y estilo `.ai-privacy` en
+  [`css/main.css`](css/main.css).
 
 ---
 
@@ -65,44 +71,85 @@ lento en *cada* turno; escala con el tamaño del libro.
 - Aprovechar **prompt caching**: poner el prefijo estable (persona/perfil + libro) primero
   para maximizar reutilización entre turnos.
 
-### T6 — PWA realmente offline: precachear las libs core · `S`–`M` ⬜ PENDIENTE
-El service worker ([`sw.js`](sw.js) L2-31) precachea el código propio pero **no**
-jszip/epub.js/pdf.js (vienen de CDN) → sin red no se puede abrir ningún libro, lo que
-contradice la promesa PWA.
-- Si se vendoriza en [T1](#t1), añadir `vendor/*` a `ASSETS`.
-- Si se sigue usando CDN, cachearlas explícitamente (con cuidado por CORS/opacas).
+### T6 — PWA realmente offline: vendorizar las libs core · `S`–`M` ✅ HECHO (2026-06-30)
+- **Vendorizadas** a [`vendor/`](vendor/): jszip, epub.js, pdf.js y **el worker de pdf.js**
+  (este último también venía de CDN en runtime). `index.html` y `js/pdf-reader.js`
+  (`workerSrc`) apuntan a local; el SRI/crossorigin de [T1](#t1) ya no aplica (mismo origen).
+- Los 4 archivos añadidos al precache del SW → sin red se abren EPUB y PDF.
+- Habilita además la CSP estricta de [T2](#t2) (`script-src 'self'`).
 
-### T7 — Estrategia de caché del service worker · `S` ⬜ PENDIENTE
-`fetch` es cache-first puro ([`sw.js`](sw.js) L49-53): los assets propios quedan congelados
-hasta bumpear `CACHE_NAME` a mano (vamos por v25).
-- Pasar a **stale-while-revalidate** para los assets propios: sirve de caché y refresca en
-  segundo plano, eliminando el baile manual de versión.
+### T7 — Estrategia de caché del service worker · `S` ✅ HECHO (2026-06-30)
+- `fetch` ahora es **stale-while-revalidate** ([`sw.js`](sw.js)): sirve de caché al instante
+  y refresca en segundo plano; ya no hace falta bumpear `CACHE_NAME` para propagar cambios
+  (solo al añadir/quitar archivos del precache).
+- Restringido a GET http(s) del mismo origen; el POST al LLM, los `blob:` del lector y los
+  terceros pasan directos.
 
-### T8 — Trocear `app.js` y `panel.js` · `M`–`L` ⬜ PENDIENTE
-[`js/app.js`](js/app.js) (~848 líneas) mezcla bookmarks, highlights, selección y progreso;
-[`js/ai/panel.js`](js/ai/panel.js) (~920) concentra toda la UI del agente.
-- No urgente. Trocear por responsabilidad si siguen creciendo (p.ej. `js/highlights-ui.js`,
-  `js/progress.js`; separar onboarding/chat/notebook en la capa IA).
+### T8 — Trocear `app.js` y `panel.js` · `M`–`L` 🟡 PARCIAL (2026-06-30)
+Extracción **conservadora** de las piezas más autocontenidas (sin tocar la lógica frágil
+de selección/highlights, mal cubierta por tests):
+- [`js/progress.js`](js/progress.js): progreso detallado + estimación de palabras, extraído
+  de `app.js` (842 → 758 líneas). `totalWords` se pasa por parámetro; se eliminó el muerto
+  `estimateWords`.
+- [`js/ai/render.js`](js/ai/render.js): `renderWithCitations`/`citeReplace` (Markdown +
+  chips de cita), extraído de `panel.js` (920 → 907); `anchors` se pasa por parámetro.
+- **Pendiente (deferido a propósito):** descomponer la selección táctil/highlights de
+  `app.js` y separar onboarding/chat/libreta en `panel.js`. Es la parte con más estado
+  compartido y más riesgo de regresión; hacer con cuidado y, si acaso, con más tests antes.
+
+### T11 — Revisar las funciones del lector PDF · `M` ⬜ PENDIENTE
+Repaso de [`js/pdf-reader.js`](js/pdf-reader.js) (193 líneas): el camino PDF tiene **0
+cobertura E2E** y arrastra varios puntos a revisar/decidir:
+- **Bug del ArrayBuffer *detached*** (ya detectado): `getDocument({ data: arrayBuffer })`
+  transfiere/detacha el buffer, así que `persistToLibrary` ([`js/app.js`](js/app.js) ~L82)
+  falla al hacer `slice` → **el PDF no se guarda en la biblioteca**. Clonar el buffer antes
+  de pasarlo a pdf.js (o copiar para la librería antes de `getDocument`).
+- **Nitidez en pantallas HiDPI/retina:** `scale = 1.5` fijo ([L79](js/pdf-reader.js)) ignora
+  `devicePixelRatio`; el canvas se ve borroso en retina. Renderizar a `scale * dpr` y
+  escalar por CSS. Sin zoom configurable tampoco.
+- **El agente de IA no soporta PDF:** la segmentación ([`js/ai/segment.js`](js/ai/segment.js))
+  usa el spine de epub.js; con PDF el botón del agente queda deshabilitado. Decidir si se
+  quiere (extraer texto por página con `getTextContent`).
+- **Highlights/marcadores en PDF:** ya hay text layer seleccionable
+  ([`renderTextLayer`](js/pdf-reader.js#L122)) pero no se persiste nada (ver también
+  [`BACKLOG.md`](BACKLOG.md) / [`AGENTS.md`](AGENTS.md)).
+- **Navegación por teclado** en PDF (flechas/AvPág) — pendiente como en EPUB.
+- **Manejo de errores/UX:** `catch(e) {}` vacíos que se tragan fallos; sin UI de error si el
+  PDF está corrupto o `getDocument` rechaza; el parámetro `onProgress` de `load()` está sin
+  usar.
+- **Acoplamiento a pdf.js 3.11:** `renderTextLayer(...)` cambia de API en 4.x (clase
+  `TextLayer`); tenerlo en cuenta si se actualiza la versión vendorizada.
 
 ---
 
 ## ✨ Buenas prácticas
 
-### T9 — Linter + formatter · `S` ⬜ PENDIENTE
-No hay eslint/prettier. Útil para mantener la convención (funciones nombradas, sin arrow
-anónimas en módulos públicos) conforme crece el código.
-- ESLint flat config mínima + Prettier; opcional un check en CI / pre-commit.
+### T9 — Linter + formatter · `S` ✅ HECHO (2026-06-30)
+- ESLint flat config ([`eslint.config.mjs`](eslint.config.mjs)) con globals de browser +
+  service worker y `ePub`; Prettier ([`.prettierrc.json`](.prettierrc.json) +
+  `.prettierignore`). Scripts `lint`, `format`, `format:check` en `package.json`.
+- `npm run lint` pasa con **0 errores** (quedan 7 warnings de variables/imports sin usar,
+  código muerto preexistente que el linter ahora señala). Se corrigieron de paso un
+  `no-useless-assignment` en `panel.js` y se documentaron patrones intencionados (NUL
+  centinela en `markdown.js`, char-class unicode en `touch-select.js`).
+- No se corrió `prettier --write` sobre el código existente (evitar un diff masivo); la
+  herramienta queda lista para usar.
 
-### T10 — Metadatos de `package.json` · `S` ⬜ PENDIENTE
-`description`, `author` vacíos y `license` ISC por defecto en
-[`package.json`](package.json). Cosmético; rellenar o fijar la licencia real.
+### T10 — Metadatos de `package.json` · `S` ✅ HECHO (2026-06-30)
+[`package.json`](package.json): `description`, `author`, `homepage`, `repository`,
+`keywords`, y `"private": true` (no se publica a npm). Licencia ISC sin cambiar (cambiarla
+es decisión del propietario).
 
 ---
 
-## Orden sugerido
+## Estado (2026-06-30)
 
-1. **T1** (SRI/vendorizar) — cierra el riesgo supply-chain; si vendorizas, habilita T6.
-2. **T5** (recorte de contexto al LLM) — el mayor coste recurrente.
-3. **T6** (precache de libs) — PWA offline de verdad.
-4. **T2 + T3** (CSP + cover/escapado) — defensa en profundidad de bajo esfuerzo.
-5. Resto (T4, T7–T10) según oportunidad.
+✅ Hechos: T1, T2, T3, T4, T6, T7, T9, T10. 🟡 Parcial: T8 (extraídas las piezas seguras;
+queda la descomposición de selección/highlights y de la UI del agente).
+
+**Pendiente principal:** **T5** (recorte de contexto al LLM) — el mayor coste recurrente; lo
+revisa el propietario por separado.
+
+**Revisión PDF:** al verificar el PDF a mano salió un bug preexistente (ArrayBuffer
+*detached* al guardar en la biblioteca) y otros puntos del lector PDF → recogidos en
+[T11](#t11--revisar-las-funciones-del-lector-pdf--m--pendiente).

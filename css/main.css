@@ -662,6 +662,16 @@ body:has(#sidebar.open) .reader-main { margin-left: var(--sidebar-width); }
   font-size: 13px;
 }
 .ai-save { width: 100%; margin-top: 12px; padding: 8px; font-size: 14px; }
+.ai-privacy {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 12px 0 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+.ai-privacy .icon { flex: none; margin-top: 1px; }
 
 .ai-status {
   padding: 8px 16px;

@@ -40,6 +40,7 @@ const ICONS = {
   bubble: '<path d="M21 11.5a8.5 8.5 0 0 1-12.4 7.5L4 20.5l1.2-4.3A8.5 8.5 0 1 1 21 11.5Z"/>',
   note: '<rect x="5" y="3.5" width="14" height="17" rx="2.2"/><line x1="8.5" y1="9" x2="15.5" y2="9"/><line x1="8.5" y1="12.5" x2="15.5" y2="12.5"/><line x1="8.5" y1="16" x2="12.5" y2="16"/>',
   target: '<circle cx="12" cy="12" r="7.5"/><circle cx="12" cy="12" r="3.6"/><circle cx="12" cy="12" r="0.6" fill="currentColor" stroke="none"/>',
+  shield: '<path d="M12 3.5l6.5 2.3v5.2c0 4-2.8 6.8-6.5 8-3.7-1.2-6.5-4-6.5-8V5.8L12 3.5Z"/>',
 
   // ——— content / blocks ———
   book: '<path d="M5 4.5h7a2 2 0 0 1 2 2V20a2.5 2.5 0 0 0-2.5-2H5V4.5Z"/><path d="M19 4.5h-3a2 2 0 0 0-2 2V20a2.5 2.5 0 0 1 2.5-2H19V4.5Z"/>',
