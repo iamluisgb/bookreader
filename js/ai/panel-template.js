@@ -11,6 +11,7 @@ export const TEMPLATE = `
     <button id="ai-close" class="icon-btn" title="Cerrar">${icon('xmark')}</button>
   </div>
   <div id="ai-status" class="ai-status">Abre un EPUB para empezar.</div>
+  <div id="ai-profile-chip" class="ai-profile-chip" style="display:none"></div>
   <div id="ai-convobar" class="ai-convobar" style="display:none">
     <button id="ai-convo-btn" class="ai-convo-btn" title="Cambiar de conversación">
       ${icon('bubble', { size: 15 })}<span id="ai-convo-label" class="ai-convo-label">Conversación</span>${icon('chevron-down', { size: 14 })}

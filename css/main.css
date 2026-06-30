@@ -693,6 +693,20 @@ body:has(#sidebar.open) .reader-main { margin-left: var(--sidebar-width); }
   border-bottom: 1px solid var(--border);
 }
 
+/* Chip del perfil de agente activo (P1): pequeño, clicable, abre Ajustes → Perfiles. */
+.ai-profile-chip {
+  display: flex; align-items: center; gap: 6px;
+  margin: 8px 16px 0; padding: 4px 10px;
+  width: max-content; max-width: calc(100% - 32px);
+  border: 1px solid var(--border); border-radius: 999px;
+  background: var(--surface-2);
+  font-size: 12px; color: var(--text-secondary); cursor: pointer;
+  transition: border-color var(--transition-fast), color var(--transition-fast);
+}
+.ai-profile-chip:hover { border-color: var(--accent); color: var(--text-primary); }
+.ai-profile-chip .icon { flex: none; color: var(--accent); }
+.ai-profile-chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
 .ai-messages {
   flex: 1;
   overflow-y: auto;

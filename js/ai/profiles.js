@@ -73,6 +73,7 @@ export function validate(raw) {
 export function promptBlock(profile) {
   if (!profile) return '';
   const parts = [];
+  if (profile.name) parts.push(`Te llamas ${profile.name}; preséntate por ese nombre si te lo preguntan.`);
   if (profile.soul) parts.push(`Personalidad y rol del agente: ${profile.soul}`);
   if (profile.userProfile) parts.push(`Sobre el usuario: ${profile.userProfile}`);
   if (profile.notes) parts.push(`Notas permanentes a tener siempre en cuenta: ${profile.notes}`);

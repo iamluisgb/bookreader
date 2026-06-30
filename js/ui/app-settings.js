@@ -275,6 +275,10 @@ function profilesListHtml() {
   </div>`;
 }
 
+function notifyProfileChange() {
+  window.dispatchEvent(new CustomEvent('appsettings:profile-changed'));
+}
+
 function wireProfilesList(content) {
   content.querySelector('#appset-prof-new').addEventListener('click', () => {
     profDraft = Profiles.blank(); renderProfiles(content);
@@ -283,6 +287,7 @@ function wireProfilesList(content) {
     b.addEventListener('click', () => {
       // Toggle: si ya es el activo, lo desactiva (queda sin perfil).
       Profiles.setActiveId(Profiles.getActiveId() === b.dataset.id ? null : b.dataset.id);
+      notifyProfileChange();
       renderProfiles(content);
     }));
   content.querySelectorAll('.appset-prof-edit').forEach(b =>
@@ -290,7 +295,7 @@ function wireProfilesList(content) {
   content.querySelectorAll('.appset-prof-del').forEach(b =>
     b.addEventListener('click', () => {
       if (confirm('¿Eliminar este perfil? Si estaba activo, el agente quedará sin perfil.')) {
-        Profiles.remove(b.dataset.id); renderProfiles(content);
+        Profiles.remove(b.dataset.id); notifyProfileChange(); renderProfiles(content);
       }
     }));
 }
@@ -336,6 +341,7 @@ function wireProfileForm(content) {
     const saved = Profiles.save(profDraft);
     // Primer perfil creado: actívalo automáticamente (atajo razonable).
     if (!Profiles.getActiveId() && Profiles.getAll().length === 1) Profiles.setActiveId(saved.id);
+    notifyProfileChange();   // refresca el chip (p. ej. si se renombró el activo)
     profDraft = null; renderProfiles(content);
   });
 }

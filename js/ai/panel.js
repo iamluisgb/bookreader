@@ -45,7 +45,7 @@ export function init(opts) {
     chatView: $('#ai-view-chat'), noteView: $('#ai-view-notebook'),
     messages: $('#ai-messages'), input: $('#ai-input'), send: $('#ai-send'), close: $('#ai-close'),
     convobar: $('#ai-convobar'), convoBtn: $('#ai-convo-btn'), convoLabel: $('#ai-convo-label'), convoNew: $('#ai-convo-new'),
-    ref: $('#ai-ref'), refText: $('#ai-ref-text'),
+    ref: $('#ai-ref'), refText: $('#ai-ref-text'), profileChip: $('#ai-profile-chip'),
   });
   $('#ai-ref-clear').addEventListener('click', clearRef);
 
@@ -53,6 +53,11 @@ export function init(opts) {
   $('#ai-edit-cfg').addEventListener('click', () => AppSettings.open('agent'));
   // Al guardarla allí, refrescar el estado del panel (p. ej. tras introducir la key).
   window.addEventListener('appsettings:agent-saved', refreshStatus);
+  // Reflejar el perfil activo (chip) cuando se active/edite en Ajustes generales.
+  window.addEventListener('appsettings:profile-changed', updateProfileChip);
+  updateProfileChip();
+  // Abrir Ajustes en la sección Perfiles al tocar el chip.
+  els.profileChip.addEventListener('click', () => AppSettings.open('profiles'));
   els.send.addEventListener('click', send);
   els.input.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
@@ -234,6 +239,19 @@ function refreshStatus() {
   const base = `${segCached ? 'Listo (cacheado)' : 'Listo'} · ${segBlocks} pasajes`;
   setStatus(template ? `${base} · ${template.name}` : base);
   renderConvoBar();
+}
+
+// Chip del perfil de agente activo (P1): muestra su nombre y abre Ajustes → Perfiles.
+// Oculto si no hay perfil activo.
+function updateProfileChip() {
+  if (!els.profileChip) return;
+  const p = Profiles.getActive();
+  if (p) {
+    els.profileChip.innerHTML = `${icon('user', { size: 13 })}<span>${escapeHtml(p.name)}</span>`;
+    els.profileChip.style.display = 'flex';
+  } else {
+    els.profileChip.style.display = 'none';
+  }
 }
 
 async function activateConvo() {

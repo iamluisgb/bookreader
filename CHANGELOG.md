@@ -5,6 +5,22 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-06-30 — Perfil de agente: nombre en el prompt + chip visible (P1)
+
+Dos retoques sobre los perfiles (P1) para que el perfil activo sea visible y coherente:
+
+- **El agente conoce su nombre:** `promptBlock` ([`js/ai/profiles.js`](js/ai/profiles.js)) antepone
+  ahora *"Te llamas {nombre}; preséntate por ese nombre si te lo preguntan."* Sigue siendo prefijo
+  estable (no rompe el prompt caching).
+- **Chip del perfil activo en el panel:** bajo la barra de estado, un chip clicable con icono +
+  nombre del perfil (nuevo icono `user` en [`js/ui/icons.js`](js/ui/icons.js)). Solo visible si hay
+  perfil activo; al tocarlo abre *Ajustes → Perfiles*. Se actualiza en vivo: activar/desactivar/editar
+  un perfil emite `appsettings:profile-changed` y el panel refresca el chip.
+- Verificado: lint 0 errores · 19/19 E2E · prueba manual (nombre en `systemPrompt`, chip con el
+  nombre, ocultar/mostrar en vivo al desactivar/reactivar) sin errores de consola.
+
+---
+
 ## 2026-06-30 — Modo inmersivo estilo Play Books (las barras no mueven el texto)
 
 Al tocar el centro en modo lectura para mostrar/ocultar las barras, el texto **ya no salta**.
