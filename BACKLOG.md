@@ -33,20 +33,37 @@ No urgente (el caching funciona, ver CHANGELOG E0.1). Palanca para libros enorme
 
 ## 🎨 Producto / UX
 
+> **Decisión de diseño — "Ajustes generales" (hogar de P1–P3).** P1, P2 y P3 son config
+> **global de la app** (no dependen del libro abierto), así que NO van en la sidebar *Ajustes*
+> (que es contextual de lectura: tema/fuente/ancho). Su hogar es un **overlay de ajustes
+> generales** —como el patrón ya existente `#ai-onboarding`— anclado a la **estantería**
+> (`#library`, el estado *home* sin libro), con dos puntos de entrada: un engranaje en la
+> cabecera de la estantería **y** otro en el pie de la sidebar mientras se lee (accesible desde
+> ambos contextos sin acoplarlo al DOM de `#library`).
+>
+> Estructura: **Agente** (mover aquí key/modelo/auto-rellenar de `#ai-config`) · **Perfiles**
+> (P1) · **Plantillas** (P2) · **Datos** (P3). Principio clave: **definir vs usar** — en
+> Ajustes generales se *gestiona* el catálogo (CRUD de perfiles y plantillas); en el
+> **onboarding del panel se sigue *eligiendo*** cuál usar para cada conversación (no duplicar
+> la elección). Implementarlo primero (overlay + entradas + mover `#ai-config`); luego P1/P2/P3
+> cuelgan de él.
+
 ### P1 — Perfiles de agente estilo Hermes · `L` _(ex B1)_
-**agent soul** (personalidad/system) + **user profile** (quién es el usuario) + **my notes**
-(notas persistentes que el agente siempre tiene en cuenta). Varios perfiles **reutilizables
-entre libros** (a diferencia de las `convos`, por libro). Se inyecta en `systemPrompt()` como
-prefijo cacheable. Nuevo store `profiles` en IndexedDB.
+CRUD en *Ajustes generales → Perfiles* (ver decisión arriba). **agent soul** (personalidad/system)
++ **user profile** (quién es el usuario) + **my notes** (notas persistentes que el agente siempre
+tiene en cuenta). Varios perfiles **reutilizables entre libros** (a diferencia de las `convos`, por
+libro). Se inyecta en `systemPrompt()` como prefijo cacheable. Nuevo store `profiles` en IndexedDB.
 
 ### P2 — Plantillas de libreta propias · `M`–`L` _(ex B2)_
-Permitir crear/editar tipos de libreta (campos, prompt de objetivo, rol del agente), no solo
-las 6 de fábrica. Persistir en IndexedDB y mostrarlas junto a las de fábrica en el onboarding.
+CRUD en *Ajustes generales → Plantillas* (ver decisión arriba). Permitir crear/editar tipos de
+libreta (campos, prompt de objetivo, rol del agente), no solo las 6 de fábrica. Persistir en
+IndexedDB y mostrarlas junto a las de fábrica (solo lectura) en el onboarding.
 
 ### P3 — Export / import global · `M` _(ex B3)_
-Hoy solo se exportan los subrayados. Export **global** (subrayados, libretas/notas, perfiles,
-conversaciones, ajustes) en JSON (backup round-trip) + Markdown legible. **Importar** el mismo
-JSON para migrar entre dispositivos (la PWA es local-first, sin servidor).
+En *Ajustes generales → Datos* (ver decisión arriba). Hoy solo se exportan los subrayados. Export
+**global** (subrayados, libretas/notas, perfiles, conversaciones, ajustes) en JSON (backup
+round-trip) + Markdown legible. **Importar** el mismo JSON para migrar entre dispositivos (la PWA
+es local-first, sin servidor).
 
 ### P5 — Búsqueda de texto en el libro · `M`
 Buscar y saltar a coincidencias dentro del EPUB.
