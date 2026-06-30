@@ -496,7 +496,20 @@ function setupHighlights() {
   const rendition = EpubReader.getRendition();
   if (!rendition) return;
 
-  // Listen for text selection
+  // Táctil: la selección la gestiona el módulo touch-select (mantener pulsado +
+  // tiradores propios). Al terminar nos entrega cfi/texto/rect ya listos; el
+  // propio módulo pinta el resaltado y los tiradores, así que aquí solo
+  // mostramos la barra de acciones.
+  if (EpubReader.isCoarsePointer && EpubReader.isCoarsePointer()) {
+    EpubReader.onSelect(({ cfiRange, text, rect }) => {
+      if (!cfiRange || !text) return;
+      showHighlightTooltip(cfiRange, text, rect);
+    });
+    EpubReader.onSelectionDismiss(() => hideHighlightTooltip());
+    return;
+  }
+
+  // Escritorio: selección nativa del navegador.
   rendition.on('selected', (cfiRange, contents) => {
     if (!cfiRange) return;
 
@@ -634,6 +647,7 @@ function hideHighlightTooltip() {
   document.getElementById('highlight-tooltip').style.display = 'none';
   document.removeEventListener('click', hideHighlightTooltipOnOutside);
   removeTempSelection();
+  try { EpubReader.clearSelection(); } catch (e) {}   // overlay táctil, si lo hay
   activeSelection = null;
 }
 

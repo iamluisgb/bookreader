@@ -2,6 +2,11 @@ import * as Settings from './settings.js';
 import * as Bookmarks from './bookmarks.js';
 import * as Highlights from './highlights.js';
 import * as Storage from './storage.js';
+import * as TouchSelect from './touch-select.js';
+
+// En táctil reimplementamos la selección de texto (los tiradores nativos de
+// epub.js están rotos en columnas). En escritorio usamos la selección nativa.
+const COARSE = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
 
 let book = null;
 let rendition = null;
@@ -32,6 +37,22 @@ export function resize() {
 // ---- Navegación táctil sobre el contenido ---------------------------------
 let onTapCb = () => {};
 export function onTap(cb) { onTapCb = cb || (() => {}); }
+
+// ---- Selección de texto (táctil) ------------------------------------------
+let onSelectCb = () => {};
+let onSelectDismissCb = () => {};
+export function onSelect(cb) { onSelectCb = cb || (() => {}); }
+export function onSelectionDismiss(cb) { onSelectDismissCb = cb || (() => {}); }
+export function clearSelection() { try { TouchSelect.dismiss(); } catch (e) {} }
+export function isCoarsePointer() { return COARSE; }
+
+if (COARSE) {
+  TouchSelect.configure({
+    onTap: (zone) => onTapCb(zone),
+    onSelect: (sel) => onSelectCb(sel),
+    onDismiss: () => onSelectDismissCb(),
+  });
+}
 
 function hasSelection(win) {
   try { return !!(win.getSelection && win.getSelection().toString().trim()); } catch (e) { return false; }
@@ -169,10 +190,11 @@ export async function load(arrayBuffer, onProgress) {
     }
     // Also inject theme directly into the content document
     injectThemeIntoContent(contents);
-    // Navegación táctil sobre el propio contenido (sin capa que bloquee la
-    // selección): toque rápido en bordes = pasar página, centro = pantalla
-    // completa; mantener pulsado / arrastrar = seleccionar.
-    registerTapHandler(contents);
+    // Táctil: módulo de selección propia (mantener pulsado = palabra, arrastrar
+    // tiradores = extender) que además gestiona los toques de navegación.
+    // Escritorio: selección nativa + toques/clics para navegar.
+    if (COARSE) TouchSelect.attach(contents);
+    else registerTapHandler(contents);
   });
 
   await rendition.display();
