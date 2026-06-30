@@ -48,6 +48,7 @@ function initLibrary() {
 }
 
 async function goToLibrary() {
+  document.body.classList.remove('reading', 'immersive');   // salir del modo lectura
   document.getElementById('library-btn').style.display = 'none';
   document.getElementById('reader-title').textContent = 'BookReader';
   await Library.render();
@@ -144,11 +145,11 @@ function initReaderReflow() {
 }
 
 // ============ MODO LECTURA INMERSIVO ============
+// Estilo Play Books: las barras son un overlay sobre un área de lectura de altura
+// fija (ver CSS de `body.reading`), así mostrarlas/ocultarlas NO re-pagina el EPUB
+// ni mueve el texto. Por eso aquí solo alternamos la clase, sin resize.
 function setImmersive(on) {
   document.body.classList.toggle('immersive', on);
-  // La cabecera y el pie salen del flujo en inmersivo, así que el área de
-  // lectura crece: re-paginar para usar toda la altura (tras aplicar el layout).
-  requestAnimationFrame(() => { if (EpubReader.isLoaded()) EpubReader.resize(); });
 }
 
 function initImmersive() {
@@ -307,9 +308,9 @@ async function loadEpub(buffer, bookId, aiBookId) {
       updateProgressDetail(undefined, totalWords);
     });
 
-    // Reveal the footer BEFORE rendering so the epub container is measured at
-    // its final height — otherwise epub.js bakes in the taller (footer-hidden)
-    // height and the last lines are cut off on the first book.
+    // Reading mode: barras como overlay (ver CSS de `body.reading`); el área de
+    // lectura ocupa toda la altura, así inmersivo no re-pagina.
+    document.body.classList.add('reading');
     document.getElementById('reader-footer').style.display = 'flex';
 
     await EpubReader.load(buffer);
@@ -364,6 +365,7 @@ async function loadPdf(buffer, bookId) {
     await PdfReader.load(buffer);
 
     document.getElementById('reader-title').textContent = 'PDF';
+    document.body.classList.add('reading');
     document.getElementById('reader-footer').style.display = 'flex';
     document.getElementById('bookmark-toggle').disabled = true;
   } catch (err) {

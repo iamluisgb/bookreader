@@ -5,6 +5,26 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-06-30 — Modo inmersivo estilo Play Books (las barras no mueven el texto)
+
+Al tocar el centro en modo lectura para mostrar/ocultar las barras, el texto **ya no salta**.
+Antes, el inmersivo sacaba cabecera y pie del flujo → el área de lectura crecía → epub.js
+re-paginaba → el texto se recolocaba.
+
+- Las barras pasan a ser un **overlay** (`position:absolute`) sobre un área de lectura que ocupa
+  **siempre toda la altura**, pero solo con un libro abierto (nueva clase `body.reading`, para no
+  afectar a biblioteca/landing). Mostrar/ocultar las barras ya no cambia el tamaño del contenedor,
+  así que epub.js no re-pagina y el texto permanece fijo.
+- `setImmersive()` ([`js/app.js`](js/app.js)) ya no llama a `resize()` (la geometría no cambia al
+  alternar). `body.reading` se añade al abrir EPUB/PDF y se quita al volver a la biblioteca.
+- Contrapartida (como en Play Books): mientras las barras están visibles tapan una franja fina del
+  texto en el borde superior/inferior; al ocultarlas se ve a altura completa. El re-paginado por
+  cambio de ancho (sidebar/panel) y por rotación sigue igual.
+- Verificado: lint 0 errores · 19/19 E2E · prueba manual en viewport móvil (altura del contenedor y
+  posición del texto idénticas al alternar; capturas con/sin barras) sin errores de consola.
+
+---
+
 ## 2026-06-30 — Perfiles de agente (P1, ex B1) — overlay completo
 
 Sección **Perfiles** de *Ajustes generales* funcional: persona del agente reutilizable **entre

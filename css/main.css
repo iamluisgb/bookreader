@@ -1312,12 +1312,18 @@ select:focus {
    F4 · Modo lectura inmersivo
    ========================================================================== */
 .reader-header, .reader-footer { transition: transform var(--transition-normal); }
-/* En inmersivo, la cabecera y el pie salen del flujo (position:absolute) para que
-   el área de lectura ocupe toda la altura; el transform los desliza fuera. */
-body.immersive .reader-header,
-body.immersive .reader-footer { position: absolute; left: 0; right: 0; z-index: 60; }
-body.immersive .reader-header { top: 0; transform: translateY(-100%); }
-body.immersive .reader-footer { bottom: 0; transform: translateY(100%); }
+/* Modo lectura (estilo Play Books): con un libro abierto, cabecera y pie son un
+   OVERLAY (position:absolute) sobre un área de lectura que ocupa SIEMPRE toda la
+   altura. Así mostrar/ocultar las barras (toque central) no cambia el tamaño del
+   contenedor y epub.js NO re-pagina: el texto nunca se mueve. En biblioteca/landing
+   (sin `reading`) las barras siguen en el flujo normal. */
+body.reading .reader-header,
+body.reading .reader-footer { position: absolute; left: 0; right: 0; z-index: 60; }
+body.reading .reader-header { top: 0; }
+body.reading .reader-footer { bottom: 0; }
+/* Inmersivo = barras ocultas: se deslizan fuera (el área de lectura no cambia). */
+body.reading.immersive .reader-header { transform: translateY(-100%); }
+body.reading.immersive .reader-footer { transform: translateY(100%); }
 body.immersive .ai-fab { transform: scale(0); }
 
 /* ============================================================================
