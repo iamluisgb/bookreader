@@ -23,6 +23,8 @@ const LONGPRESS_MS = 380;   // pulsación larga que inicia la selección
 const MOVE_CANCEL = 10;     // px de movimiento que cancela la pulsación (=scroll)
 const HANDLE_HIT = 26;      // radio de toque para agarrar un tirador (px)
 const HANDLE_OFFSET = 14;   // separación del círculo del tirador respecto a la línea
+const SWIPE_MIN = 45;       // px horizontales que cuentan como swipe de página
+const SWIPE_RATIO = 1.2;    // dominancia horizontal mínima frente a la vertical
 
 // Estado de la selección activa (una a la vez).
 let active = null;  // { contents, doc, range, anchor }
@@ -279,11 +281,21 @@ export function attach(contents) {
     clearLP();
     if (dragging || lpStarted) { dragging = null; lpStarted = false; finalize(); return; }
 
+    const t = e.changedTouches[0];
+    const dx = t ? t.clientX - downX : 0;
+    const dy = t ? t.clientY - downY : 0;
     const quick = !moved && Date.now() - downT < 500;
     if (active && active.range) { if (quick) dismiss(); return; }  // tocar fuera cierra
-    if (quick) {
-      const t = e.changedTouches[0];
-      if (t) callbacks.onTap(tapZone(t.clientX));
+
+    // Swipe horizontal sin long-press = pasar página (como Play Books): el
+    // long-press intercepta antes los "mantener pulsado", así que aquí solo
+    // llegan arrastres de navegación. Exigimos dominancia horizontal para no
+    // confundir un scroll/desliz vertical con un cambio de página.
+    if (Math.abs(dx) >= SWIPE_MIN && Math.abs(dx) > Math.abs(dy) * SWIPE_RATIO) {
+      callbacks.onTap(dx < 0 ? 'next' : 'prev');
+      return;
     }
+
+    if (quick && t) callbacks.onTap(tapZone(t.clientX));
   }, { passive: true });
 }

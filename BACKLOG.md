@@ -48,11 +48,6 @@ Hoy solo se exportan los subrayados. Export **global** (subrayados, libretas/not
 conversaciones, ajustes) en JSON (backup round-trip) + Markdown legible. **Importar** el mismo
 JSON para migrar entre dispositivos (la PWA es local-first, sin servidor).
 
-### P4 — Swipe para pasar página en móvil · `M` _(ex B5)_
-Como Play Books: swipe horizontal → `prev`/`next`. Hoy se pasa con toque en los bordes
-([`js/touch-select.js`](js/touch-select.js)). **Cuidado con la coexistencia de gestos**:
-long-press = seleccionar, swipe sin long-press = pasar, toque corto = navegar/inmersivo.
-
 ### P5 — Búsqueda de texto en el libro · `M`
 Buscar y saltar a coincidencias dentro del EPUB.
 

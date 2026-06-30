@@ -5,6 +5,18 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-06-30 — Swipe para pasar página en móvil (P4, ex B5)
+
+Gesto de swipe horizontal en el lector táctil ([`js/touch-select.js`](js/touch-select.js)),
+estilo Play Books: deslizar a la izquierda = página siguiente, a la derecha = anterior.
+Reutiliza el callback `onTap` (`prev`/`next`), sin tocar `app.js`. Coexistencia de gestos
+resuelta por el long-press existente (380 ms), que intercepta los "mantener pulsado" antes de
+que un arrastre llegue a contarse como swipe; además se exige dominancia horizontal
+(`|dx| ≥ 45px` y `|dx| > 1.2·|dy|`) para no confundir un scroll vertical con un cambio de
+página. Los toques cortos en los bordes y el toque central (inmersivo) siguen igual.
+
+---
+
 ## 2026-06-30 — Endurecimiento técnico y refactor (T1–T10, T8)
 
 Auditoría de buenas prácticas, seguridad, performance y arquitectura → backlog técnico
