@@ -86,16 +86,25 @@ lento en *cada* turno; escala con el tamaño del libro.
   terceros pasan directos.
 
 ### T8 — Trocear `app.js` y `panel.js` · `M`–`L` 🟡 PARCIAL (2026-06-30)
-Extracción **conservadora** de las piezas más autocontenidas (sin tocar la lógica frágil
-de selección/highlights, mal cubierta por tests):
+Extracciones por responsabilidad, cada una verificada (19/19 E2E + lint 0 errores):
 - [`js/progress.js`](js/progress.js): progreso detallado + estimación de palabras, extraído
-  de `app.js` (842 → 758 líneas). `totalWords` se pasa por parámetro; se eliminó el muerto
-  `estimateWords`.
+  de `app.js`. `totalWords` se pasa por parámetro; se eliminó el muerto `estimateWords`.
 - [`js/ai/render.js`](js/ai/render.js): `renderWithCitations`/`citeReplace` (Markdown +
   chips de cita), extraído de `panel.js` (920 → 907); `anchors` se pasa por parámetro.
-- **Pendiente (deferido a propósito):** descomponer la selección táctil/highlights de
-  `app.js` y separar onboarding/chat/libreta en `panel.js`. Es la parte con más estado
-  compartido y más riesgo de regresión; hacer con cuidado y, si acaso, con más tests antes.
+- [`js/highlights-ui.js`](js/highlights-ui.js): **toda la selección/barra de acciones/lista
+  de subrayados**, extraída de `app.js` (**848 → 517 líneas**). Público: `initHighlights`,
+  `setupHighlights`, `renderHighlights`, `hideHighlightTooltip`. El estado de selección es
+  local al módulo; sin ciclos de import (panel.js no importa app.js). *Move* puro.
+
+**Pendiente (deferido a propósito):**
+- **Descomponer `panel.js`** (onboarding/chat/libreta): bloqueado por el alto acoplamiento
+  — **19 variables de estado a nivel de módulo** + un cache `els` compartido entre ~40
+  funciones. Hacerlo limpio requiere primero un refactor de **estado compartido** (un
+  `state.js` o pasar contexto) y **más cobertura de tests del panel IA**. No forzarlo sin eso.
+- **Código muerto en [`highlights-ui.js`](js/highlights-ui.js)** (heredado, ya muerto antes
+  de extraer): `finalizeSelection`/`drawTempSelection`/`pendingSel`/`selFinalizeTimer` y
+  `activeSelection` son restos de un enfoque de selección anterior (lint los marca como
+  unused). Limpieza segura pero en cascada; hacer en un pase aparte.
 
 ### T11 — Revisar las funciones del lector PDF · `M` ⬜ PENDIENTE
 Repaso de [`js/pdf-reader.js`](js/pdf-reader.js) (193 líneas): el camino PDF tiene **0
