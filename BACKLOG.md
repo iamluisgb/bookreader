@@ -41,12 +41,15 @@ No urgente (el caching funciona, ver CHANGELOG E0.1). Palanca para libros enorme
 > cabecera de la estantería **y** otro en el pie de la sidebar mientras se lee (accesible desde
 > ambos contextos sin acoplarlo al DOM de `#library`).
 >
-> Estructura: **Agente** (mover aquí key/modelo/auto-rellenar de `#ai-config`) · **Perfiles**
-> (P1) · **Plantillas** (P2) · **Datos** (P3). Principio clave: **definir vs usar** — en
-> Ajustes generales se *gestiona* el catálogo (CRUD de perfiles y plantillas); en el
-> **onboarding del panel se sigue *eligiendo*** cuál usar para cada conversación (no duplicar
-> la elección). Implementarlo primero (overlay + entradas + mover `#ai-config`); luego P1/P2/P3
-> cuelgan de él.
+> Estructura: **Agente** · **Perfiles** (P1) · **Plantillas** (P2) · **Datos** (P3). Principio
+> clave: **definir vs usar** — en Ajustes generales se *gestiona* el catálogo (CRUD de perfiles y
+> plantillas); en el **onboarding del panel se sigue *eligiendo*** cuál usar para cada conversación
+> (no duplicar la elección).
+>
+> **✅ Base implementada** (ver CHANGELOG): existe el overlay [`js/ui/app-settings.js`](js/ui/app-settings.js)
+> con las 4 secciones, entradas desde estantería + pie de la sidebar, y la sección **Agente** ya
+> funcional (la config key/modelo/auto se movió aquí desde `#ai-config`). **Perfiles/Plantillas/Datos**
+> son placeholders: P1/P2/P3 solo tienen que rellenar su sección (`renderSection`/`wire*`).
 
 ### P1 — Perfiles de agente estilo Hermes · `L` _(ex B1)_
 CRUD en *Ajustes generales → Perfiles* (ver decisión arriba). **agent soul** (personalidad/system)

@@ -6,17 +6,8 @@ import { icon } from '../ui/icons.js';
 export const TEMPLATE = `
   <div class="ai-header">
     <span class="ai-title">${icon('sparkles', { size: 19 })} Agente</span>
-    <button id="ai-edit-cfg" class="icon-btn" title="Configuración">${icon('gear')}</button>
+    <button id="ai-edit-cfg" class="icon-btn" title="Ajustes del agente">${icon('gear')}</button>
     <button id="ai-close" class="icon-btn" title="Cerrar">${icon('xmark')}</button>
-  </div>
-  <div id="ai-config" class="ai-config">
-    <label>API key de nan</label>
-    <input id="ai-key" type="password" placeholder="sk-..." autocomplete="off" />
-    <label>Modelo</label>
-    <select id="ai-model"></select>
-    <label class="ai-check"><input type="checkbox" id="ai-auto" /> Rellenar la libreta automáticamente</label>
-    <button id="ai-save-cfg" class="primary-btn ai-save">Guardar</button>
-    <p class="ai-privacy">${icon('shield', { size: 13 })} Tu API key se guarda solo en este navegador. Para responder, el contenido del libro se envía al proveedor del modelo (nan).</p>
   </div>
   <div id="ai-status" class="ai-status">Abre un EPUB para empezar.</div>
   <div id="ai-convobar" class="ai-convobar" style="display:none">

@@ -12,6 +12,7 @@ import { initHighlights, setupHighlights, renderHighlights, hideHighlightTooltip
 import { initBookmarkButton, updateBookmarkButton, renderBookmarks } from './bookmarks-ui.js';
 import * as Library from './library/view.js';
 import * as LibStore from './library/store.js';
+import * as AppSettings from './ui/app-settings.js';
 
 // ============ INIT ============
 document.addEventListener('DOMContentLoaded', () => {
@@ -35,7 +36,12 @@ let currentBook = null;        // { id, fileBaseId, format } del libro abierto
 let progressTimer = null;
 
 function initLibrary() {
-  Library.init({ onOpenBook: openLibraryBook, onAddBook: () => document.getElementById('file-input').click() });
+  Library.init({
+    onOpenBook: openLibraryBook,
+    onAddBook: () => document.getElementById('file-input').click(),
+    onOpenSettings: () => AppSettings.open(),
+  });
+  document.getElementById('open-app-settings')?.addEventListener('click', () => AppSettings.open('agent'));
   document.getElementById('library-btn')?.addEventListener('click', goToLibrary);
   // Pantalla inicial: biblioteca si ya hay libros guardados, si no el landing.
   Library.hasBooks().then(has => { if (has) { Library.render(); Library.show(); } });

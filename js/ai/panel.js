@@ -8,6 +8,7 @@ import * as EpubReader from '../epub-reader.js';
 import { BLOCKS, TEMPLATES, getTemplate, templatesByBlock, isValidField } from './templates.js';
 import { icon } from '../ui/icons.js';
 import { escapeHtml } from '../ui/escape.js';
+import * as AppSettings from '../ui/app-settings.js';
 import { renderWithCitations } from './render.js';
 import { computeChapterRelevance, applyChapterAttenuation, clearChapterAttenuation } from './attenuation.js';
 import { TEMPLATE, systemPrompt } from './panel-template.js';
@@ -39,29 +40,18 @@ export function init(opts) {
   els.panel.innerHTML = TEMPLATE;
   const $ = (s) => els.panel.querySelector(s);
   Object.assign(els, {
-    key: $('#ai-key'), model: $('#ai-model'), saveCfg: $('#ai-save-cfg'),
     status: $('#ai-status'), tabs: $('#ai-tabs'),
     chatView: $('#ai-view-chat'), noteView: $('#ai-view-notebook'),
     messages: $('#ai-messages'), input: $('#ai-input'), send: $('#ai-send'), close: $('#ai-close'),
-    auto: $('#ai-auto'),
     convobar: $('#ai-convobar'), convoBtn: $('#ai-convo-btn'), convoLabel: $('#ai-convo-label'), convoNew: $('#ai-convo-new'),
     ref: $('#ai-ref'), refText: $('#ai-ref-text'),
   });
   $('#ai-ref-clear').addEventListener('click', clearRef);
 
-  els.model.innerHTML = LLM.MODELS.map(m => `<option value="${m.id}">${m.name}</option>`).join('');
-  els.key.value = LLM.getKey();
-  els.model.value = LLM.getModel();
-  els.auto.checked = LLM.getAutoExtract();
-  toggleConfig(!LLM.hasKey());
-
-  els.saveCfg.addEventListener('click', () => {
-    LLM.setKey(els.key.value.trim());
-    LLM.setModel(els.model.value);
-    LLM.setAutoExtract(els.auto.checked);
-    toggleConfig(false);
-  });
-  $('#ai-edit-cfg').addEventListener('click', () => toggleConfig(true));
+  // La config del agente (key/modelo/auto) vive ahora en Ajustes generales.
+  $('#ai-edit-cfg').addEventListener('click', () => AppSettings.open('agent'));
+  // Al guardarla allí, refrescar el estado del panel (p. ej. tras introducir la key).
+  window.addEventListener('appsettings:agent-saved', refreshStatus);
   els.send.addEventListener('click', send);
   els.input.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
@@ -478,7 +468,7 @@ async function send() {
   const q = els.input.value.trim();
   if (!q) return;
   if (!convo) { setStatus('Elige un objetivo de lectura primero.'); openOnboarding(); return; }
-  if (!LLM.hasKey()) { toggleConfig(true); setStatus('Introduce tu API key primero.'); return; }
+  if (!LLM.hasKey()) { AppSettings.open('agent'); setStatus('Introduce tu API key primero.'); return; }
   if (!annotatedText) { setStatus('El libro aún no está listo.'); return; }
 
   els.input.value = '';
@@ -779,4 +769,3 @@ function setStatus(s) {
   els.status.classList.toggle('ai-status--busy', /…\s*$/.test(s));
 }
 function scrollDown() { if (els.messages) els.messages.scrollTop = els.messages.scrollHeight; }
-function toggleConfig(show) { els.panel.querySelector('#ai-config').style.display = show ? 'block' : 'none'; }

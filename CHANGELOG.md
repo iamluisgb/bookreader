@@ -5,6 +5,28 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-06-30 — Base de "Ajustes generales" (overlay global, hogar de P1–P3)
+
+Fundación de la decisión de diseño homónima del BACKLOG. Nuevo overlay global
+[`js/ui/app-settings.js`](js/ui/app-settings.js) (`#app-settings`), mismo patrón modal que el
+onboarding, montado en `<body>` bajo demanda. Cuatro secciones: **Agente**, **Perfiles** (P1),
+**Plantillas** (P2), **Datos** (P3); las tres últimas son placeholders a la espera de su feature.
+
+- **Config del agente movida** fuera del panel: key/modelo/auto-rellenar salen de `#ai-config`
+  ([`js/ai/panel-template.js`](js/ai/panel-template.js)) a la sección *Agente*. Sigue respaldada
+  por el módulo `LLM` (localStorage), así que es la **misma fuente de verdad**, sin duplicar estado.
+  Al guardar se emite `appsettings:agent-saved` y el panel refresca su estado.
+- **Entradas:** rail de la estantería ([`js/library/view.js`](js/library/view.js)) y pie de la
+  sidebar (`#open-app-settings`). El engranaje del panel del agente ahora también abre aquí.
+- **Separación de ámbitos respetada:** las settings de *lectura* (tema/fuente/ancho) siguen en la
+  sidebar (contextual del libro); las *globales* viven en este overlay.
+- Cierre por botón, click en el fondo y `Escape`. SW: `app-settings.js` al precache, `CACHE_NAME` → v33.
+- Verificado: lint 0 errores · 19/19 E2E (los selectores `name: 'Ajustes'` de los tests pasan a
+  `exact: true` por el nuevo botón "Ajustes generales") · prueba manual del overlay (abrir, guardar
+  + persistencia + evento, cambiar de sección, cerrar) sin errores de consola.
+
+---
+
 ## 2026-06-30 — Swipe para pasar página en móvil (P4, ex B5)
 
 Gesto de swipe horizontal en el lector táctil ([`js/touch-select.js`](js/touch-select.js)),

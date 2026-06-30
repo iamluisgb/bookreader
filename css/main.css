@@ -85,6 +85,19 @@ html, body {
   display: block;
 }
 
+.sidebar-footer {
+  flex: none;
+  border-top: 1px solid var(--border);
+  padding: 8px;
+}
+.sidebar-footer-btn {
+  display: flex; align-items: center; gap: 9px; width: 100%;
+  padding: 9px 12px; border: none; border-radius: 9px; background: none;
+  color: var(--text-secondary); font-size: 14px; text-align: left; cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+.sidebar-footer-btn:hover { background: var(--surface-3); color: var(--text-primary); }
+
 /* ============ BUTTONS ============ */
 .icon-btn {
   background: none;
@@ -923,6 +936,68 @@ body:has(#sidebar.open) .reader-main { margin-left: var(--sidebar-width); }
   resize: vertical; margin-bottom: 16px;
 }
 .ai-ob-start { width: 100%; }
+
+/* ============ AJUSTES GENERALES (overlay global) ============ */
+/* Hogar de la config global de la app (agente + P1/P2/P3). Mismo patrón modal que
+   el onboarding; settings de LECTURA siguen en la sidebar. */
+.appset {
+  position: fixed; inset: 0; z-index: 300;
+  background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+}
+.appset-card {
+  position: relative;
+  background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 14px;
+  padding: 24px 26px; width: 100%; max-width: 640px; box-shadow: 0 10px 40px var(--shadow);
+}
+.appset-close {
+  position: absolute; top: 14px; right: 14px;
+  width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center;
+  border: none; border-radius: 50%; background: var(--surface-3); color: var(--text-soft);
+  cursor: pointer; transition: background var(--transition-fast), color var(--transition-fast);
+}
+.appset-close:hover { background: var(--border); color: var(--text); }
+.appset-h2 {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 19px; margin-bottom: 18px;
+}
+.appset-body { display: flex; gap: 20px; }
+.appset-nav { flex: none; width: 160px; display: flex; flex-direction: column; gap: 4px; }
+.appset-nav-item {
+  display: flex; align-items: center; gap: 9px;
+  padding: 9px 12px; border: none; border-radius: 9px; background: none;
+  color: var(--text-secondary); font-size: 14px; text-align: left; cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+.appset-nav-item:hover { background: var(--surface-3); }
+.appset-nav-item.active { background: var(--surface-3); color: var(--text-primary); font-weight: 600; }
+.appset-content { flex: 1; min-width: 0; }
+.appset-section { display: flex; flex-direction: column; }
+.appset-h3 { font-size: 16px; margin-bottom: 10px; }
+.appset-label { display: block; font-size: 12px; color: var(--text-secondary); margin: 10px 0 4px; }
+.appset-input {
+  width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px;
+  background: var(--bg-primary); color: var(--text-primary); font-size: 13px;
+}
+.appset-check { display: flex; align-items: center; gap: 8px; margin-top: 14px; font-size: 13px; color: var(--text-secondary); }
+.appset-save { width: 100%; margin-top: 16px; padding: 8px; font-size: 14px; }
+.appset-saved { display: flex; align-items: center; gap: 5px; margin: 8px 0 0; font-size: 12px; color: var(--accent); }
+.appset-privacy {
+  display: flex; align-items: flex-start; gap: 6px; margin: 14px 0 0;
+  font-size: 11px; line-height: 1.5; color: var(--text-muted);
+}
+.appset-privacy .icon { flex: none; margin-top: 1px; }
+.appset-muted { color: var(--text-secondary); font-size: 13px; line-height: 1.6; margin-bottom: 10px; }
+.appset-soon { font-size: 12px; color: var(--text-muted); }
+.appset-soon code { background: var(--surface-3); border-radius: 4px; padding: 1px 6px; }
+
+@media (max-width: 560px) {
+  .appset { padding: 0; align-items: flex-end; }
+  .appset-card { max-width: 100%; border-radius: 16px 16px 0 0; max-height: 90vh; overflow-y: auto; }
+  .appset-body { flex-direction: column; gap: 14px; }
+  .appset-nav { width: 100%; flex-direction: row; flex-wrap: wrap; }
+  .appset-nav-item { flex: 1; justify-content: center; }
+}
 
 /* ============ HIGHLIGHT TOOLTIP ============ */
 /* Barra de selección de texto (estilo O'Reilly): preguntar al agente arriba;

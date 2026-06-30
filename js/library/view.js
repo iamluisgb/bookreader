@@ -8,6 +8,7 @@ import { escapeHtml } from '../ui/escape.js';
 let host = null;                 // #library
 let onOpenBook = () => {};
 let onAddBook = () => {};
+let onOpenSettings = () => {};
 
 let currentShelf = 'all';        // 'all' | 'none' | <shelfId>
 let sortBy = 'recent';           // 'recent' | 'title' | 'author'
@@ -21,6 +22,7 @@ export function init(opts = {}) {
   host = document.getElementById('library');
   onOpenBook = opts.onOpenBook || (() => {});
   onAddBook = opts.onAddBook || (() => {});
+  onOpenSettings = opts.onOpenSettings || (() => {});
   host.addEventListener('click', onClick);
   document.addEventListener('click', (e) => {
     if (menuEl && !menuEl.contains(e.target) && !e.target.closest('.lib-kebab, .lib-rail-kebab')) closeMenu();
@@ -99,6 +101,7 @@ export async function render() {
         </button>
 
         <button class="lib-rail-create" data-act="newshelf">${icon('pencil', { size: 16 })}<span>Crear estantería</span></button>
+        <button class="lib-rail-create lib-rail-settings" data-act="settings">${icon('gear', { size: 16 })}<span>Ajustes generales</span></button>
       </aside>
 
       <section class="lib-main">
@@ -193,6 +196,8 @@ async function onClick(e) {
     await render();
     return;
   }
+
+  if (e.target.closest('[data-act="settings"]')) { onOpenSettings(); return; }
 
   if (e.target.closest('[data-act="newshelf"]')) { await createShelf(); return; }
 
