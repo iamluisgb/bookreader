@@ -10,6 +10,7 @@
 import * as LLM from '../ai/llm.js';
 import { BLOCKS, allTemplates } from '../ai/templates.js';
 import * as CustomTpl from '../ai/custom-templates.js';
+import * as Backup from '../backup.js';
 import { icon } from './icons.js';
 import { escapeHtml } from './escape.js';
 
@@ -63,13 +64,14 @@ function selectSection(id) {
   if (id === 'templates') { tplDraft = null; renderTemplates(content); return; }
   content.innerHTML = renderSection(id);
   if (id === 'agent') wireAgent(content);
+  if (id === 'data') wireData(content);
 }
 
 function renderSection(id) {
   if (id === 'agent') return agentHtml();
+  if (id === 'data') return dataHtml();
   const stub = {
-    profiles:  ['Perfiles del agente', 'Personalidad, perfil de usuario y notas persistentes reutilizables entre libros.', 'P1'],
-    data:      ['Datos', 'Exportar e importar todo (subrayados, libretas, perfiles, conversaciones, ajustes).', 'P3'],
+    profiles: ['Perfiles del agente', 'Personalidad, perfil de usuario y notas persistentes reutilizables entre libros.', 'P1'],
   }[id];
   return `<div class="appset-section">
     <h3 class="appset-h3">${stub[0]}</h3>
@@ -237,6 +239,55 @@ function wireTemplateForm(content) {
     }
     CustomTpl.save(tplDraft);
     tplDraft = null; renderTemplates(content);
+  });
+}
+
+// ---- Sección Datos (P3) ----------------------------------------------------
+
+function dataHtml() {
+  return `<div class="appset-section">
+    <h3 class="appset-h3">Datos</h3>
+    <p class="appset-muted">Copia de seguridad de tus datos para guardarla o migrar a otro dispositivo:
+      ajustes, subrayados, marcadores, plantillas propias, conversaciones y libretas.
+      <strong>No</strong> incluye la API key ni los archivos de los libros.</p>
+    <button id="appset-export-json" class="primary-btn appset-save">${icon('share', { size: 15 })} Descargar backup (JSON)</button>
+    <button id="appset-export-md" class="appset-tpl-cancel appset-data-md">${icon('note', { size: 15 })} Descargar resumen (Markdown)</button>
+
+    <label class="appset-label" style="margin-top:18px">Importar backup</label>
+    <p class="appset-muted">Restaura desde un JSON. Fusiona: sobrescribe lo que coincida, no borra el resto.</p>
+    <input type="file" id="appset-import-file" class="appset-input" accept="application/json,.json" />
+    <p class="appset-data-msg" id="appset-data-msg" hidden></p>
+  </div>`;
+}
+
+function wireData(content) {
+  const msg = content.querySelector('#appset-data-msg');
+  const show = (html, error = false) => {
+    msg.innerHTML = html;
+    msg.classList.toggle('is-error', error);
+    msg.hidden = false;
+  };
+
+  content.querySelector('#appset-export-json').addEventListener('click', () => {
+    Backup.downloadBackup().catch(e => show('No se pudo exportar: ' + e.message, true));
+  });
+  content.querySelector('#appset-export-md').addEventListener('click', () => {
+    Backup.downloadMarkdown().catch(e => show('No se pudo exportar: ' + e.message, true));
+  });
+
+  content.querySelector('#appset-import-file').addEventListener('change', async (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    try {
+      const obj = JSON.parse(await file.text());
+      const r = await Backup.importBackup(obj);
+      show(`${icon('check', { size: 14 })} Importado: ${r.localKeys} ajustes y ${r.aiRecords} registros. <button id="appset-reload" class="appset-data-reload">Recargar para aplicar</button>`);
+      content.querySelector('#appset-reload').addEventListener('click', () => location.reload());
+    } catch (err) {
+      show('No se pudo importar: ' + err.message, true);
+    } finally {
+      e.target.value = '';   // permitir reimportar el mismo archivo
+    }
   });
 }
 

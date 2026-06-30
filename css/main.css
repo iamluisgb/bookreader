@@ -1032,6 +1032,20 @@ body:has(#sidebar.open) .reader-main { margin-left: var(--sidebar-width); }
 }
 .appset-tpl-cancel:hover { background: var(--surface-3); color: var(--text-primary); }
 
+/* Sección Datos (P3) */
+.appset-data-md {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  width: 100%; margin-top: 8px;
+}
+.appset-data-msg { margin: 12px 0 0; font-size: 13px; color: var(--text-secondary); line-height: 1.6; }
+.appset-data-msg.is-error { color: var(--danger, #e5484d); }
+.appset-data-msg .icon { vertical-align: -2px; color: var(--accent); }
+.appset-data-reload {
+  margin-left: 8px; background: none; border: 1px solid var(--border); border-radius: 6px;
+  padding: 3px 10px; color: var(--accent); cursor: pointer; font-size: 12px;
+}
+.appset-data-reload:hover { background: var(--surface-3); }
+
 @media (max-width: 560px) {
   .appset { padding: 0; align-items: flex-end; }
   .appset-card { max-width: 100%; border-radius: 16px 16px 0 0; max-height: 90vh; overflow-y: auto; }

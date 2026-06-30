@@ -46,11 +46,11 @@ No urgente (el caching funciona, ver CHANGELOG E0.1). Palanca para libros enorme
 > plantillas); en el **onboarding del panel se sigue *eligiendo*** cuál usar para cada conversación
 > (no duplicar la elección).
 >
-> **✅ Base + Plantillas implementadas** (ver CHANGELOG): existe el overlay
-> [`js/ui/app-settings.js`](js/ui/app-settings.js) con las 4 secciones, entradas desde estantería +
-> pie de la sidebar. Funcionales: **Agente** (key/modelo/auto, movido desde `#ai-config`) y
-> **Plantillas** (P2 ✓, CRUD de plantillas propias). **Perfiles (P1)** y **Datos (P3)** siguen como
-> placeholders: solo tienen que rellenar su sección (`renderSection`/`wire*`).
+> **✅ Casi completo** (ver CHANGELOG): existe el overlay [`js/ui/app-settings.js`](js/ui/app-settings.js)
+> con las 4 secciones, entradas desde estantería + pie de la sidebar. Funcionales: **Agente**
+> (key/modelo/auto, movido desde `#ai-config`), **Plantillas** (P2 ✓, CRUD propias) y **Datos**
+> (P3 ✓, export/import global). Solo queda **Perfiles (P1)** como placeholder: rellenar su sección
+> (`renderSection`/`wire*`).
 
 ### P1 — Perfiles de agente estilo Hermes · `L` _(ex B1)_
 CRUD en *Ajustes generales → Perfiles* (ver decisión arriba). **agent soul** (personalidad/system)
@@ -58,19 +58,13 @@ CRUD en *Ajustes generales → Perfiles* (ver decisión arriba). **agent soul** 
 tiene en cuenta). Varios perfiles **reutilizables entre libros** (a diferencia de las `convos`, por
 libro). Se inyecta en `systemPrompt()` como prefijo cacheable. Nuevo store `profiles` en IndexedDB.
 
-### P3 — Export / import global · `M` _(ex B3)_
-En *Ajustes generales → Datos* (ver decisión arriba). Hoy solo se exportan los subrayados. Export
-**global** (subrayados, libretas/notas, perfiles, conversaciones, ajustes) en JSON (backup
-round-trip) + Markdown legible. **Importar** el mismo JSON para migrar entre dispositivos (la PWA
-es local-first, sin servidor).
-
 ### P5 — Búsqueda de texto en el libro · `M`
 Buscar y saltar a coincidencias dentro del EPUB.
 
 ### P6 — Mejoras de subrayados · `S`–`M`
-- Importar JSON de highlights (restaurar), exportar también los bookmarks en el JSON.
 - Exportar por color (solo amarillos, etc.); copiar el texto de un highlight al portapapeles.
 - Confirmación al borrar y borrar desde el propio resaltado en el lector.
+- _(El backup/restore de highlights y bookmarks ya lo cubre P3, ver CHANGELOG.)_
 
 ### P7 — Sync entre dispositivos · `L`
 Requiere backend (hoy todo es local-first: IndexedDB + localStorage).

@@ -5,6 +5,29 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-06-30 — Export / import global (P3, ex B3)
+
+Sección **Datos** de *Ajustes generales* funcional: backup round-trip de los datos del usuario
+para guardarlos o migrar entre dispositivos (la PWA es local-first, sin servidor). Cierra la última
+sección pendiente del overlay salvo Perfiles (P1).
+
+- Nuevo módulo [`js/backup.js`](js/backup.js): `buildBackup`/`importBackup` (JSON round-trip),
+  `buildMarkdown` (resumen legible) y descargas (mismo patrón CSP-safe que la exportación de
+  subrayados). `getAll(store)` genérico añadido a [`js/ai/db.js`](js/ai/db.js).
+- **Incluye:** todo `localStorage` (ajustes, subrayados, marcadores, plantillas propias, posiciones,
+  modelo/auto) + IndexedDB IA (conversaciones, mensajes, notas, relevancia, metadatos de libros).
+- **Excluye a propósito:** la **API key** (`ai_key`, secreto — no se escribe a un fichero descargable),
+  el texto segmentado/anclas (`bookText`/`anchors`, voluminoso y regenerable) y los archivos de los
+  libros (binarios fuera de alcance).
+- **Import** fusiona (sobrescribe lo que coincida, no borra el resto); valida el `format` y avisa con
+  un botón de recarga para aplicar. Markdown: libretas por conversación/campo + subrayados por libro.
+- SW: `backup.js` al precache, `CACHE_NAME` → v35.
+- Verificado: lint 0 errores · 19/19 E2E · prueba manual del round-trip (exportar JSON+MD con
+  descargas reales, comprobar que la key se excluye, mutar estado, reimportar y verificar restauración
+  de ajuste/convo/nota, y archivo inválido → error controlado) sin errores de consola.
+
+---
+
 ## 2026-06-30 — Plantillas de libreta propias (P2, ex B2)
 
 Sección **Plantillas** de *Ajustes generales* ya funcional: CRUD de plantillas de libreta del

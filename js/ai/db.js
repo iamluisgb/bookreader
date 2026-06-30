@@ -79,6 +79,11 @@ export function get(store, key) {
   return tx(store, 'readonly', s => reqP(s.get(key)));
 }
 
+// Todos los registros de un store (para export/backup global, P3).
+export function getAll(store) {
+  return tx(store, 'readonly', s => reqP(s.getAll()));
+}
+
 export function put(store, value) {
   return tx(store, 'readwrite', s => reqP(s.put(value)));
 }
