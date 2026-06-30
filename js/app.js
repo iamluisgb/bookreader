@@ -517,13 +517,11 @@ function setupHighlights() {
 
     if (!text) return;
 
+    // NO tocamos la selección nativa: así conserva sus tiradores y el usuario
+    // puede arrastrar por los extremos para extenderla. epub.js re-emite
+    // "selected" en cada cambio, de modo que la barra se reposiciona sola
+    // siguiendo a la selección mientras crece.
     showHighlightTooltip(cfiRange, text, rect);
-
-    // Pintar un resaltado temporal nuestro y LIMPIAR la selección nativa: así se
-    // descarta el menú del sistema (Copiar/Compartir) que se solapaba con la barra.
-    // (Un toque posterior en el libro cierra la barra vía EpubReader.onTap.)
-    drawTempSelection(rendition, cfiRange);
-    try { selection.removeAllRanges(); } catch (e) {}
   });
 }
 
