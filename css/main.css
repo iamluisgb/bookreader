@@ -1032,6 +1032,17 @@ body:has(#sidebar.open) .reader-main { margin-left: var(--sidebar-width); }
 }
 .appset-tpl-cancel:hover { background: var(--surface-3); color: var(--text-primary); }
 
+/* Sección Perfiles (P1) */
+.appset-prof-active { font-size: 13px; color: var(--text-secondary); margin: 4px 0 12px; }
+.appset-tpl-row.is-active { border-color: var(--accent); }
+.appset-prof-activate {
+  flex: none; background: none; border: 1px solid var(--border); border-radius: 7px;
+  padding: 4px 10px; color: var(--text-secondary); font-size: 12px; cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+}
+.appset-prof-activate:hover { background: var(--surface-3); color: var(--text-primary); }
+.appset-tpl-row.is-active .appset-prof-activate { border-color: var(--accent); color: var(--accent); }
+
 /* Sección Datos (P3) */
 .appset-data-md {
   display: flex; align-items: center; justify-content: center; gap: 6px;

@@ -5,6 +5,32 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-06-30 — Perfiles de agente (P1, ex B1) — overlay completo
+
+Sección **Perfiles** de *Ajustes generales* funcional: persona del agente reutilizable **entre
+libros** (a diferencia de las convos, que son por libro). Con esto el overlay de Ajustes generales
+queda completo (Agente · Perfiles · Plantillas · Datos).
+
+- Nuevo módulo [`js/ai/profiles.js`](js/ai/profiles.js): un perfil = `soul` (personalidad/rol) +
+  `userProfile` (quién es el usuario) + `notes` (notas permanentes). CRUD + un perfil **activo**
+  (puntero `active_profile`). Persistencia en **localStorage** (no IndexedDB): `systemPrompt()` se
+  construye de forma **síncrona**, así que un store síncrono evita caché en memoria y carreras de
+  arranque; además el backup global (P3) lo incluye sin tocar nada.
+- **Inyección en el prompt:** el bloque del perfil activo se antepone al system prompt
+  ([`js/ai/panel-template.js`](js/ai/panel-template.js), `systemPrompt(goal, template, profile)`),
+  **primero** por ser lo más estable (reutilizable entre libros/convos) → mejor prefijo para el
+  prompt caching del proveedor. Único call site en [`js/ai/panel.js`](js/ai/panel.js) pasa
+  `Profiles.getActive()`.
+- UI en [`js/ui/app-settings.js`](js/ui/app-settings.js): lista con perfil activo, botón
+  activar/desactivar (toggle), editar/borrar, y formulario (nombre + 3 campos). El primer perfil
+  creado se activa solo; borrar el activo deja al agente sin perfil. Validación (nombre + ≥1 campo).
+- SW: `profiles.js` al precache, `CACHE_NAME` → v36.
+- Verificado: lint 0 errores · 19/19 E2E · prueba manual (crear/auto-activar/persistir, **inyección
+  real en `systemPrompt`** con soul/usuario/notas, toggle off lo quita, editar, validar, borrar →
+  limpia el activo) sin errores de consola.
+
+---
+
 ## 2026-06-30 — Export / import global (P3, ex B3)
 
 Sección **Datos** de *Ajustes generales* funcional: backup round-trip de los datos del usuario

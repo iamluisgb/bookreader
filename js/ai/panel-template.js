@@ -2,6 +2,7 @@
 // sistema (systemPrompt). Extraído de panel.js (T8, ver CHANGELOG) — solo strings,
 // sin estado: el prompt recibe goal/template por parámetro.
 import { icon } from '../ui/icons.js';
+import { promptBlock } from './profiles.js';
 
 export const TEMPLATE = `
   <div class="ai-header">
@@ -35,11 +36,13 @@ export const TEMPLATE = `
   <div id="ai-view-notebook" class="ai-view"></div>
 `;
 
-// Prompt de sistema del agente. `goal` es el objetivo de la conversación y
-// `template` la plantilla de libreta activa (ambos pueden ser null/undefined).
-export function systemPrompt(goal, template) {
+// Prompt de sistema del agente. `goal` es el objetivo de la conversación, `template`
+// la plantilla de libreta activa y `profile` el perfil de agente activo (P1). Todos
+// pueden ser null/undefined. El bloque del perfil va PRIMERO: es lo más estable
+// (reutilizable entre libros/convos), buen prefijo para el prompt caching.
+export function systemPrompt(goal, template, profile) {
   const fields = template ? template.fields.map(f => `- ${f.key}: ${f.label}`).join('\n') : '';
-  return `Eres un lector experto que ayuda a sacar provecho de un libro según un OBJETIVO concreto.
+  return `${promptBlock(profile)}Eres un lector experto que ayuda a sacar provecho de un libro según un OBJETIVO concreto.
 Respondes en español, conciso y sin paja, basándote ÚNICAMENTE en el libro entregado.
 
 OBJETIVO DEL USUARIO: ${goal || '(sin definir)'}

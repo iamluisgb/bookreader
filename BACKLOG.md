@@ -46,17 +46,11 @@ No urgente (el caching funciona, ver CHANGELOG E0.1). Palanca para libros enorme
 > plantillas); en el **onboarding del panel se sigue *eligiendo*** cuál usar para cada conversación
 > (no duplicar la elección).
 >
-> **✅ Casi completo** (ver CHANGELOG): existe el overlay [`js/ui/app-settings.js`](js/ui/app-settings.js)
-> con las 4 secciones, entradas desde estantería + pie de la sidebar. Funcionales: **Agente**
-> (key/modelo/auto, movido desde `#ai-config`), **Plantillas** (P2 ✓, CRUD propias) y **Datos**
-> (P3 ✓, export/import global). Solo queda **Perfiles (P1)** como placeholder: rellenar su sección
-> (`renderSection`/`wire*`).
-
-### P1 — Perfiles de agente estilo Hermes · `L` _(ex B1)_
-CRUD en *Ajustes generales → Perfiles* (ver decisión arriba). **agent soul** (personalidad/system)
-+ **user profile** (quién es el usuario) + **my notes** (notas persistentes que el agente siempre
-tiene en cuenta). Varios perfiles **reutilizables entre libros** (a diferencia de las `convos`, por
-libro). Se inyecta en `systemPrompt()` como prefijo cacheable. Nuevo store `profiles` en IndexedDB.
+> **✅ Completo** (ver CHANGELOG): existe el overlay [`js/ui/app-settings.js`](js/ui/app-settings.js)
+> con las 4 secciones funcionales, entradas desde estantería + pie de la sidebar: **Agente**
+> (key/modelo/auto, movido desde `#ai-config`), **Perfiles** (P1 ✓), **Plantillas** (P2 ✓) y **Datos**
+> (P3 ✓). El principio *definir-vs-usar* se cumple: el catálogo se gestiona aquí y se elige en el
+> onboarding/runtime.
 
 ### P5 — Búsqueda de texto en el libro · `M`
 Buscar y saltar a coincidencias dentro del EPUB.

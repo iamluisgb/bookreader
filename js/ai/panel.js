@@ -12,6 +12,7 @@ import * as AppSettings from '../ui/app-settings.js';
 import { renderWithCitations } from './render.js';
 import { computeChapterRelevance, applyChapterAttenuation, clearChapterAttenuation } from './attenuation.js';
 import { TEMPLATE, systemPrompt } from './panel-template.js';
+import * as Profiles from './profiles.js';
 
 // Icon + label markup for the small inline action buttons.
 const act = (name, text, size = 15) => `${icon(name, { size })}<span>${text}</span>`;
@@ -487,7 +488,7 @@ async function send() {
   let thinking = true, raw;
 
   const messages = [
-    { role: 'system', content: systemPrompt(convo?.goal, template) },
+    { role: 'system', content: systemPrompt(convo?.goal, template, Profiles.getActive()) },
     { role: 'user', content: 'LIBRO ANOTADO (cita los pasajes con sus anclas [[aN]]):\n\n' + annotatedText },
     ...history.slice(0, -1),
     { role: 'user', content: aug },

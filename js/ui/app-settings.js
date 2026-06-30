@@ -10,6 +10,7 @@
 import * as LLM from '../ai/llm.js';
 import { BLOCKS, allTemplates } from '../ai/templates.js';
 import * as CustomTpl from '../ai/custom-templates.js';
+import * as Profiles from '../ai/profiles.js';
 import * as Backup from '../backup.js';
 import { icon } from './icons.js';
 import { escapeHtml } from './escape.js';
@@ -22,7 +23,10 @@ const SECTIONS = [
 ];
 
 let overlay = null;
-let tplDraft = null;   // borrador en edición de la sección Plantillas (null = lista)
+let tplDraft = null;    // borrador en edición de la sección Plantillas (null = lista)
+let profDraft = null;   // borrador en edición de la sección Perfiles (null = lista)
+
+const oneLine = (s) => (s || '').replace(/\s+/g, ' ').trim();
 
 function ensureOverlay() {
   if (overlay) return overlay;
@@ -62,6 +66,7 @@ function selectSection(id) {
     b.classList.toggle('active', b.dataset.section === id));
   const content = overlay.querySelector('.appset-content');
   if (id === 'templates') { tplDraft = null; renderTemplates(content); return; }
+  if (id === 'profiles') { profDraft = null; renderProfiles(content); return; }
   content.innerHTML = renderSection(id);
   if (id === 'agent') wireAgent(content);
   if (id === 'data') wireData(content);
@@ -70,14 +75,7 @@ function selectSection(id) {
 function renderSection(id) {
   if (id === 'agent') return agentHtml();
   if (id === 'data') return dataHtml();
-  const stub = {
-    profiles: ['Perfiles del agente', 'Personalidad, perfil de usuario y notas persistentes reutilizables entre libros.', 'P1'],
-  }[id];
-  return `<div class="appset-section">
-    <h3 class="appset-h3">${stub[0]}</h3>
-    <p class="appset-muted">${stub[1]}</p>
-    <p class="appset-soon">Próximamente · <code>${stub[2]}</code></p>
-  </div>`;
+  return '';
 }
 
 function agentHtml() {
@@ -239,6 +237,106 @@ function wireTemplateForm(content) {
     }
     CustomTpl.save(tplDraft);
     tplDraft = null; renderTemplates(content);
+  });
+}
+
+// ---- Sección Perfiles (P1) -------------------------------------------------
+// Lista de perfiles reutilizables (persona + contexto del usuario + notas) con uno
+// activo, y formulario de crear/editar. `profDraft`: null = lista, objeto = formulario.
+
+function renderProfiles(content) {
+  if (profDraft) { content.innerHTML = profileFormHtml(profDraft); wireProfileForm(content); }
+  else { content.innerHTML = profilesListHtml(); wireProfilesList(content); }
+}
+
+function profilesListHtml() {
+  const profiles = Profiles.getAll();
+  const activeId = Profiles.getActiveId();
+  const active = profiles.find(p => p.id === activeId);
+  const snippet = (p) => oneLine([p.soul, p.userProfile, p.notes].filter(Boolean).join(' · '));
+  return `<div class="appset-section">
+    <h3 class="appset-h3">Perfiles del agente</h3>
+    <p class="appset-muted">Persona del agente + quién eres + notas permanentes, reutilizables entre libros.
+      El perfil activo se antepone al prompt en cada respuesta.</p>
+    <p class="appset-prof-active">Activo: <strong>${active ? escapeHtml(active.name) : 'ninguno'}</strong></p>
+    ${profiles.length ? profiles.map(p => `
+      <div class="appset-tpl-row${p.id === activeId ? ' is-active' : ''}">
+        <div class="appset-tpl-meta">
+          <span class="appset-tpl-name">${escapeHtml(p.name)}</span>
+          <span class="appset-tpl-ideal">${escapeHtml(snippet(p)) || 'Sin contenido'}</span>
+        </div>
+        <div class="appset-tpl-acts">
+          <button class="appset-prof-activate" data-id="${p.id}">${p.id === activeId ? 'Activo ✓' : 'Activar'}</button>
+          <button class="icon-btn appset-prof-edit" data-id="${p.id}" title="Editar">${icon('pencil', { size: 15 })}</button>
+          <button class="icon-btn appset-prof-del" data-id="${p.id}" title="Eliminar">${icon('trash', { size: 15 })}</button>
+        </div>
+      </div>`).join('') : '<p class="appset-muted">Aún no hay perfiles.</p>'}
+    <button id="appset-prof-new" class="primary-btn appset-save">${icon('plus', { size: 15 })} Crear perfil</button>
+  </div>`;
+}
+
+function wireProfilesList(content) {
+  content.querySelector('#appset-prof-new').addEventListener('click', () => {
+    profDraft = Profiles.blank(); renderProfiles(content);
+  });
+  content.querySelectorAll('.appset-prof-activate').forEach(b =>
+    b.addEventListener('click', () => {
+      // Toggle: si ya es el activo, lo desactiva (queda sin perfil).
+      Profiles.setActiveId(Profiles.getActiveId() === b.dataset.id ? null : b.dataset.id);
+      renderProfiles(content);
+    }));
+  content.querySelectorAll('.appset-prof-edit').forEach(b =>
+    b.addEventListener('click', () => { profDraft = Profiles.get(b.dataset.id) || Profiles.blank(); renderProfiles(content); }));
+  content.querySelectorAll('.appset-prof-del').forEach(b =>
+    b.addEventListener('click', () => {
+      if (confirm('¿Eliminar este perfil? Si estaba activo, el agente quedará sin perfil.')) {
+        Profiles.remove(b.dataset.id); renderProfiles(content);
+      }
+    }));
+}
+
+function profileFormHtml(p) {
+  return `<div class="appset-section">
+    <h3 class="appset-h3">${p.id ? 'Editar perfil' : 'Nuevo perfil'}</h3>
+    <label class="appset-label" for="prof-name">Nombre</label>
+    <input id="prof-name" class="appset-input" value="${escapeHtml(p.name)}" placeholder="Mi perfil de lectura" />
+    <label class="appset-label" for="prof-soul">Personalidad y rol del agente</label>
+    <textarea id="prof-soul" class="appset-input" rows="3" placeholder="Cómo debe comportarse y con qué tono">${escapeHtml(p.soul)}</textarea>
+    <label class="appset-label" for="prof-user">Sobre ti (perfil de usuario)</label>
+    <textarea id="prof-user" class="appset-input" rows="3" placeholder="Quién eres, tu nivel, tus intereses">${escapeHtml(p.userProfile)}</textarea>
+    <label class="appset-label" for="prof-notes">Notas permanentes</label>
+    <textarea id="prof-notes" class="appset-input" rows="3" placeholder="Algo que el agente deba tener siempre en cuenta">${escapeHtml(p.notes)}</textarea>
+    <p class="appset-err" id="prof-err" hidden></p>
+    <div class="appset-tpl-formacts">
+      <button id="prof-cancel" class="appset-tpl-cancel">Cancelar</button>
+      <button id="prof-save" class="primary-btn">Guardar perfil</button>
+    </div>
+  </div>`;
+}
+
+function readProfileForm(content) {
+  profDraft.name = content.querySelector('#prof-name').value;
+  profDraft.soul = content.querySelector('#prof-soul').value;
+  profDraft.userProfile = content.querySelector('#prof-user').value;
+  profDraft.notes = content.querySelector('#prof-notes').value;
+}
+
+function wireProfileForm(content) {
+  content.querySelector('#prof-cancel').addEventListener('click', () => {
+    profDraft = null; renderProfiles(content);
+  });
+  content.querySelector('#prof-save').addEventListener('click', () => {
+    readProfileForm(content);
+    const err = Profiles.validate(profDraft);
+    if (err) {
+      const el = content.querySelector('#prof-err');
+      el.textContent = err; el.hidden = false;
+      return;
+    }
+    const saved = Profiles.save(profDraft);
+    // Primer perfil creado: actívalo automáticamente (atajo razonable).
+    if (!Profiles.getActiveId() && Profiles.getAll().length === 1) Profiles.setActiveId(saved.id);
+    profDraft = null; renderProfiles(content);
   });
 }
 
