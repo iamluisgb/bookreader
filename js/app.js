@@ -706,6 +706,8 @@ function escapeHtml(str) {
 
 // ============ PROGRESS DETAIL ============
 const WORDS_PER_MINUTE = 250;
+// Debe coincidir con el valor de book.locations.generate() en epub-reader.js.
+const CHARS_PER_LOCATION = 1024;
 
 function updateProgressDetail(pct) {
   const detailPct = document.getElementById('progress-detail-pct');
@@ -743,10 +745,25 @@ function updateProgressDetail(pct) {
 
 function countBookWords() {
   const book = EpubReader.getBook();
-  if (!book?.spine) return 80000;
+  if (!book) return 80000;
 
+  // Preferimos las localizaciones de epub.js: generateLocations() divide el
+  // libro ENTERO en tramos de ~CHARS_PER_LOCATION caracteres, así que
+  // nºtramos × CHARS_PER_LOCATION ≈ caracteres totales, y /5 ≈ palabras. Es
+  // fiable porque NO depende de que las secciones estén cargadas (el bug
+  // anterior: section.document solo existe para las secciones ya renderizadas,
+  // por eso contaba casi 0 palabras → "1 min left").
+  try {
+    const loc = book.locations;
+    const total = loc ? (typeof loc.length === 'function' ? loc.length() : loc.total) : 0;
+    if (total > 1) {
+      return Math.round((total * CHARS_PER_LOCATION) / 5);
+    }
+  } catch { /* sin localizaciones */ }
+
+  // Fallback: sumar el texto de las secciones que SÍ estén cargadas.
   let totalChars = 0;
-  const len = book.spine.length || 0;
+  const len = book.spine?.length || 0;
   for (let i = 0; i < len; i++) {
     try {
       const section = book.spine.get(i);
@@ -755,10 +772,9 @@ function countBookWords() {
       }
     } catch { /* section not loaded */ }
   }
-
   if (totalChars > 0) return Math.round(totalChars / 5);
 
-  // Fallback: a typical novel is ~80,000 words
+  // Último recurso: una novela típica ronda las 80 000 palabras.
   return 80000;
 }
 
