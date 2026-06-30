@@ -489,6 +489,8 @@ function initHighlights() {
 }
 
 let tempSelCfi = null;
+let selFinalizeTimer = null;
+let pendingSel = null;
 
 function setupHighlights() {
   const rendition = EpubReader.getRendition();
@@ -498,9 +500,10 @@ function setupHighlights() {
   rendition.on('selected', (cfiRange, contents) => {
     if (!cfiRange) return;
 
-    let text = '', selection = null, rect = null;
+    let text = '', rect = null;
+    const win = contents.window;
     try {
-      selection = contents.window.getSelection();
+      const selection = win.getSelection();
       if (selection && !selection.isCollapsed) {
         text = selection.toString().trim();
         if (selection.rangeCount > 0) {
@@ -517,12 +520,27 @@ function setupHighlights() {
 
     if (!text) return;
 
-    // NO tocamos la selección nativa: así conserva sus tiradores y el usuario
-    // puede arrastrar por los extremos para extenderla. epub.js re-emite
-    // "selected" en cada cambio, de modo que la barra se reposiciona sola
-    // siguiendo a la selección mientras crece.
-    showHighlightTooltip(cfiRange, text, rect);
+    // epub.js re-emite "selected" en cada cambio de la selección (con un
+    // antirrebote interno de ~250 ms). Mientras el usuario arrastra los
+    // tiradores para EXTENDER la selección, la dejamos viva (puede extenderla)
+    // y NO mostramos nada nuestro. Cuando deja de cambiar, la damos por
+    // terminada: pintamos nuestro resaltado, BORRAMOS la selección nativa —lo
+    // que descarta los menús del SO (la barra Copiar/Compartir arriba y el
+    // buscador de Google abajo)— y mostramos nuestra barra. Así el usuario
+    // extiende con la UI nativa y al soltar obtiene solo NUESTRAS opciones.
+    pendingSel = { cfiRange, text, rect, win };
+    clearTimeout(selFinalizeTimer);
+    selFinalizeTimer = setTimeout(() => finalizeSelection(rendition), 250);
   });
+}
+
+function finalizeSelection(rendition) {
+  if (!pendingSel) return;
+  const { cfiRange, text, rect, win } = pendingSel;
+  pendingSel = null;
+  drawTempSelection(rendition, cfiRange);            // resaltado propio visible
+  try { win.getSelection().removeAllRanges(); } catch (e) {}  // descarta menús del SO
+  showHighlightTooltip(cfiRange, text, rect);
 }
 
 function drawTempSelection(rendition, cfiRange) {
@@ -549,35 +567,24 @@ function showHighlightTooltip(cfiRange, text, rect) {
   const tooltip = document.getElementById('highlight-tooltip');
   activeSelection = { cfiRange, text };
 
-  // En táctil el menú nativo del SO sale pegado a la selección (capa del
-  // sistema, no del DOM → ningún z-index lo tapa). Anclamos la barra abajo
-  // para no competir por el mismo sitio. En escritorio (ratón, sin menú
-  // nativo) la colocamos junto a la selección.
-  const dock = window.matchMedia('(pointer: coarse)').matches || window.innerWidth <= 768;
-  tooltip.classList.toggle('docked', dock);
+  // Ya hemos borrado la selección nativa (finalizeSelection), así que no hay
+  // menús del SO con los que chocar: colocamos la barra junto a la selección.
   tooltip.style.display = 'flex';
-
-  if (dock) {
-    tooltip.style.left = '';
-    tooltip.style.top = '';
+  tooltip.style.visibility = 'hidden';
+  requestAnimationFrame(() => {
+    const tw = tooltip.offsetWidth, th = tooltip.offsetHeight;
+    let cx = window.innerWidth / 2, top = 100;
+    if (rect) {
+      cx = rect.left + rect.width / 2;
+      top = rect.top - th - 10;
+      if (top < 10) top = rect.top + rect.height + 10;   // debajo si no cabe arriba
+    }
+    let left = Math.max(10, Math.min(cx - tw / 2, window.innerWidth - tw - 10));
+    top = Math.max(10, Math.min(top, window.innerHeight - th - 10));
+    tooltip.style.left = left + 'px';
+    tooltip.style.top = top + 'px';
     tooltip.style.visibility = 'visible';
-  } else {
-    tooltip.style.visibility = 'hidden';
-    requestAnimationFrame(() => {
-      const tw = tooltip.offsetWidth, th = tooltip.offsetHeight;
-      let cx = window.innerWidth / 2, top = 100;
-      if (rect) {
-        cx = rect.left + rect.width / 2;
-        top = rect.top - th - 10;
-        if (top < 10) top = rect.top + rect.height + 10;   // debajo si no cabe arriba
-      }
-      let left = Math.max(10, Math.min(cx - tw / 2, window.innerWidth - tw - 10));
-      top = Math.max(10, Math.min(top, window.innerHeight - th - 10));
-      tooltip.style.left = left + 'px';
-      tooltip.style.top = top + 'px';
-      tooltip.style.visibility = 'visible';
-    });
-  }
+  });
 
   // Subrayar con color
   tooltip.querySelectorAll('.highlight-color').forEach(btn => {
@@ -622,6 +629,8 @@ function showHighlightTooltip(cfiRange, text, rect) {
 }
 
 function hideHighlightTooltip() {
+  clearTimeout(selFinalizeTimer);
+  pendingSel = null;
   document.getElementById('highlight-tooltip').style.display = 'none';
   document.removeEventListener('click', hideHighlightTooltipOnOutside);
   removeTempSelection();

@@ -918,23 +918,6 @@ body.ai-open .reader-main { margin-right: var(--ai-panel-width); }
   border-radius: var(--r-md); box-shadow: var(--shadow-3);
   overflow: hidden;
 }
-/* En táctil el menú nativo del SO (Copiar/Compartir) sale pegado a la
-   selección y es una capa del sistema: ningún z-index lo tapa. Por eso
-   anclamos NUESTRA barra abajo, lejos de él, como Kindle / Play Books. */
-.sel-toolbar.docked {
-  left: 50%; right: auto; top: auto;
-  bottom: calc(70px + env(safe-area-inset-bottom, 0px));
-  transform: translateX(-50%);
-  width: auto; max-width: calc(100vw - 24px);
-  animation: sel-dock-in 0.16s ease-out;
-}
-body.immersive .sel-toolbar.docked {
-  bottom: calc(20px + env(safe-area-inset-bottom, 0px));
-}
-@keyframes sel-dock-in {
-  from { opacity: 0; transform: translateX(-50%) translateY(8px); }
-  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
-}
 .sel-ask {
   display: flex; align-items: center; gap: 8px;
   padding: 11px 16px; border: none; background: none; cursor: pointer;
