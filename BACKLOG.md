@@ -35,14 +35,12 @@ Hoy solo se exportan los **subrayados** a JSON (botón en la pestaña Subrayados
 - Considerar **importar** el mismo JSON para restaurar/migrar entre dispositivos (la PWA es
   local-first: IndexedDB + localStorage, sin servidor).
 
-### B4 — Borrar un subrayado (rematar) · `S` ⬜ PENDIENTE (casi hecho)
-Ya existe `Highlights.remove(cfi)` y un botón ✕ en la lista
-([`js/app.js`](js/app.js) ~L746), **pero el borrado no se ve**:
-- No llama a `renderHighlights()` → el item sigue en la lista hasta recargar.
-- No quita el resaltado pintado en la página (`rendition.annotations.remove(cfi, 'highlight')`).
-- Falta confirmación y, opcional, borrar desde el propio resaltado en el lector (barra de
+### B4 — Borrar un subrayado · `S` ✅ HECHO (2026-06-30)
+El botón ✕ de la lista ahora **refresca la lista** (`renderHighlights()`) y **quita el
+resaltado pintado** en la página (`rendition.annotations.remove(cfi, 'highlight')`).
+Verificado E2E: subrayar → borrar → lista vacía + botón Exportar deshabilitado.
+- Opcional pendiente: confirmación y borrar desde el propio resaltado en el lector (barra de
   selección al tocar un subrayado existente).
-→ **Quick win**: refrescar lista + quitar la anotación al borrar.
 
 ### B5 — Pasar de página deslizando el dedo en móvil (swipe) · `M` ⬜ PENDIENTE
 Como Play Books: **swipe horizontal** para anterior/siguiente. Hoy en móvil se pasa página

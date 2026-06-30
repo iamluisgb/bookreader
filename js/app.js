@@ -746,6 +746,9 @@ function renderHighlights() {
     item.querySelector('.highlight-delete').addEventListener('click', (e) => {
       e.stopPropagation();
       Highlights.remove(hl.cfi);
+      // Quitar el resaltado pintado en la página (tipo 'highlight' de epub.js).
+      try { EpubReader.getRendition()?.annotations.remove(hl.cfi, 'highlight'); } catch (err) {}
+      renderHighlights();   // refrescar la lista y el estado del botón de exportar
     });
 
     list.appendChild(item);
