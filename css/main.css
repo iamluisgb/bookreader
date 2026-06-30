@@ -990,6 +990,47 @@ body:has(#sidebar.open) .reader-main { margin-left: var(--sidebar-width); }
 .appset-muted { color: var(--text-secondary); font-size: 13px; line-height: 1.6; margin-bottom: 10px; }
 .appset-soon { font-size: 12px; color: var(--text-muted); }
 .appset-soon code { background: var(--surface-3); border-radius: 4px; padding: 1px 6px; }
+.appset-err { margin: 10px 0 0; font-size: 12px; color: var(--danger, #e5484d); }
+
+/* Sección Plantillas (P2) */
+.appset-tpl-block { margin-top: 14px; }
+.appset-tpl-block-h {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 12px; font-weight: 600; color: var(--text-secondary);
+  margin-bottom: 6px; text-transform: uppercase; letter-spacing: .02em;
+}
+.appset-tpl-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 11px; border: 1px solid var(--border); border-radius: 9px; margin-bottom: 6px;
+}
+.appset-tpl-meta { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.appset-tpl-name { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+.appset-tpl-ideal {
+  font-size: 12px; color: var(--text-secondary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.appset-tpl-acts { flex: none; display: flex; gap: 2px; }
+.appset-tpl-tag {
+  flex: none; font-size: 11px; color: var(--text-muted);
+  background: var(--surface-3); border-radius: 5px; padding: 2px 7px;
+}
+.appset-tpl-fields { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+.appset-tpl-field-row { display: flex; align-items: center; gap: 8px; }
+.appset-tpl-field-label { flex: 1; }
+.appset-tpl-field-type { flex: none; width: 110px; }
+.appset-tpl-addfield {
+  margin-top: 10px; display: inline-flex; align-items: center; gap: 6px;
+  background: none; border: 1px dashed var(--border); border-radius: 8px;
+  padding: 7px 12px; color: var(--text-secondary); font-size: 13px; cursor: pointer;
+  transition: border-color var(--transition-fast), color var(--transition-fast);
+}
+.appset-tpl-addfield:hover { border-color: var(--accent); color: var(--text-primary); }
+.appset-tpl-formacts { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
+.appset-tpl-cancel {
+  background: none; border: 1px solid var(--border); border-radius: 8px;
+  padding: 8px 16px; color: var(--text-secondary); font-size: 14px; cursor: pointer;
+}
+.appset-tpl-cancel:hover { background: var(--surface-3); color: var(--text-primary); }
 
 @media (max-width: 560px) {
   .appset { padding: 0; align-items: flex-end; }

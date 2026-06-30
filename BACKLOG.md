@@ -46,21 +46,17 @@ No urgente (el caching funciona, ver CHANGELOG E0.1). Palanca para libros enorme
 > plantillas); en el **onboarding del panel se sigue *eligiendo*** cuál usar para cada conversación
 > (no duplicar la elección).
 >
-> **✅ Base implementada** (ver CHANGELOG): existe el overlay [`js/ui/app-settings.js`](js/ui/app-settings.js)
-> con las 4 secciones, entradas desde estantería + pie de la sidebar, y la sección **Agente** ya
-> funcional (la config key/modelo/auto se movió aquí desde `#ai-config`). **Perfiles/Plantillas/Datos**
-> son placeholders: P1/P2/P3 solo tienen que rellenar su sección (`renderSection`/`wire*`).
+> **✅ Base + Plantillas implementadas** (ver CHANGELOG): existe el overlay
+> [`js/ui/app-settings.js`](js/ui/app-settings.js) con las 4 secciones, entradas desde estantería +
+> pie de la sidebar. Funcionales: **Agente** (key/modelo/auto, movido desde `#ai-config`) y
+> **Plantillas** (P2 ✓, CRUD de plantillas propias). **Perfiles (P1)** y **Datos (P3)** siguen como
+> placeholders: solo tienen que rellenar su sección (`renderSection`/`wire*`).
 
 ### P1 — Perfiles de agente estilo Hermes · `L` _(ex B1)_
 CRUD en *Ajustes generales → Perfiles* (ver decisión arriba). **agent soul** (personalidad/system)
 + **user profile** (quién es el usuario) + **my notes** (notas persistentes que el agente siempre
 tiene en cuenta). Varios perfiles **reutilizables entre libros** (a diferencia de las `convos`, por
 libro). Se inyecta en `systemPrompt()` como prefijo cacheable. Nuevo store `profiles` en IndexedDB.
-
-### P2 — Plantillas de libreta propias · `M`–`L` _(ex B2)_
-CRUD en *Ajustes generales → Plantillas* (ver decisión arriba). Permitir crear/editar tipos de
-libreta (campos, prompt de objetivo, rol del agente), no solo las 6 de fábrica. Persistir en
-IndexedDB y mostrarlas junto a las de fábrica (solo lectura) en el onboarding.
 
 ### P3 — Export / import global · `M` _(ex B3)_
 En *Ajustes generales → Datos* (ver decisión arriba). Hoy solo se exportan los subrayados. Export

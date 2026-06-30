@@ -1,7 +1,8 @@
 // Las 6 plantillas de lectura orientada a objetivos (templates.md), declarativas.
 // Cada plantilla: bloque, nombre, para quién, rol del agente, pregunta de objetivo y
 // los campos de la libreta. type: 'text' (un valor) | 'list' (varias entradas).
-// E5.1 del backlog.
+// E5.1 del backlog. Las plantillas propias del usuario (P2) se fusionan aquí.
+import * as Custom from './custom-templates.js';
 
 export const BLOCKS = {
   tecnico:   { id: 'tecnico',   icon: 'chart',   label: 'Técnico / Práctico', hint: 'Negocios, software, ciencia, ensayo metodológico' },
@@ -97,12 +98,18 @@ export const TEMPLATES = [
   },
 ];
 
+// Fábrica + plantillas propias del usuario (P2). Las custom viven en localStorage
+// (síncrono), así que la API de plantillas sigue siendo síncrona como antes.
+export function allTemplates() {
+  return [...TEMPLATES, ...Custom.getAll()];
+}
+
 export function getTemplate(id) {
-  return TEMPLATES.find(t => t.id === id) || null;
+  return allTemplates().find(t => t.id === id) || null;
 }
 
 export function templatesByBlock(block) {
-  return TEMPLATES.filter(t => t.block === block);
+  return allTemplates().filter(t => t.block === block);
 }
 
 export function fieldLabel(templateId, fieldKey) {

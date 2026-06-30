@@ -5,6 +5,31 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-06-30 — Plantillas de libreta propias (P2, ex B2)
+
+Sección **Plantillas** de *Ajustes generales* ya funcional: CRUD de plantillas de libreta del
+usuario, además de las 6 de fábrica.
+
+- Nuevo módulo [`js/ai/custom-templates.js`](js/ai/custom-templates.js): persistencia en
+  **localStorage** (no IndexedDB) — la API de plantillas es **síncrona** (`getTemplate`/`isValidField`
+  se llaman en caliente durante el streaming), así que un store síncrono encaja sin caché en memoria
+  ni carrera de arranque; el payload es diminuto. Normaliza el borrador (bloque válido, defaults) y
+  genera **claves de campo únicas** slugificando la etiqueta (preserva la clave al editar para no
+  huérfanar notas).
+- [`js/ai/templates.js`](js/ai/templates.js) fusiona fábrica + propias vía `allTemplates()`;
+  `getTemplate`/`templatesByBlock` (y, colgando de ellas, `isValidField`/`fieldLabel`) las incluyen.
+  **El onboarding del agente las muestra automáticamente** junto a las de fábrica, sin tocarlo
+  (definir-vs-usar: se crean en Ajustes, se eligen en el onboarding).
+- UI en [`js/ui/app-settings.js`](js/ui/app-settings.js): lista por enfoque (fábrica con etiqueta
+  *de fábrica* de solo lectura; propias con editar/borrar) + formulario (nombre, enfoque, ideal,
+  pregunta de objetivo, rol del agente y campos dinámicos texto/lista con añadir/quitar). Validación
+  (nombre + ≥1 campo) y aviso al borrar (las convos que la usen pierden su estructura).
+- SW: `custom-templates.js` al precache, `CACHE_NAME` → v34.
+- Verificado: lint 0 errores · 19/19 E2E · prueba manual (crear con 2 campos, persistencia, presencia
+  en `getTemplate`/`templatesByBlock`, editar, validación, borrar) sin errores de consola.
+
+---
+
 ## 2026-06-30 — Base de "Ajustes generales" (overlay global, hogar de P1–P3)
 
 Fundación de la decisión de diseño homónima del BACKLOG. Nuevo overlay global
