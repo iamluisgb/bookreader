@@ -1,5 +1,5 @@
 // Render de las respuestas del agente: Markdown -> HTML (seguro) y luego las
-// anclas [[aN]]/aN -> chips clicables. Extraído de panel.js (BACKLOG-TECH T8).
+// anclas [[aN]]/aN -> chips clicables. Extraído de panel.js (T8, ver CHANGELOG).
 // `anchors` es el Map<id,{cfi,chapter}> de la conversación; solo se convierten en
 // chip las anclas que existen, para no inventar citas.
 import { mdToHtml } from './markdown.js';

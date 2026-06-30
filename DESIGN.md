@@ -1,6 +1,9 @@
-# DESIGN-PLAN — Rediseño visual de BookReader
+# DESIGN — Lenguaje visual de BookReader
 
-Objetivo: elevar la app a un "compañero de estudio" calmado y enfocado, inspirado en
+Referencia viva del sistema de diseño (principios, tokens, componentes). El rediseño que lo
+implantó (fases F1–F5, todas hechas) está en [`CHANGELOG.md`](CHANGELOG.md).
+
+Objetivo: una app "compañero de estudio" calmado y enfocado, inspirado en
 **NotebookLM** (superficies tonales, tarjetas redondeadas, chips, jerarquía tipográfica
 clara, citas como ciudadanas de primera clase) y **Playbook/Play Books** (lectura inmersiva,
 poco cromo, foco en el contenido). **Mobile-first / PWA** como requisito de primera clase.
@@ -112,48 +115,7 @@ Detalles técnicos móviles: `100dvh` (no `100vh`), `env(safe-area-inset-*)` par
 
 ---
 
-## 6. Plan de ejecución por fases (sin romper los 18 tests deterministas)
-
-> Cada fase: implementar → `npm test` (18 verdes) → screenshots **desktop + móvil** (viewport
-> 390×844) → ajustar.
-
-- **F1 · Tokens y primitivas** ✅ HECHO (2026-06-29) — `themes.css` reescrito (paleta neutra
-  NotebookLM + acento índigo, oscuro rediseñado, sepia; escalas de radio/espaciado/sombra/
-  tipografía; alias antiguos conservados). **Tema por defecto = sistema** (`prefers-color-
-  scheme`) con botón Auto + override claro/oscuro/sepia; lector resuelve el tema del sistema.
-  18/18 verde; verificado en claro y oscuro.
-- **F2 · Responsive / móvil** ✅ HECHO (2026-06-29) — breakpoints (≥1024 empuja, <1024
-  superpone, <768 sheets). Agente y onboarding como **bottom sheets** (grabber, esquinas
-  redondeadas); índice como drawer; **scrim** (`:has`) que cierra al tocar; **FAB 🤖** por
-  encima del footer; `#ai-toggle` oculto en móvil; safe-areas (`env(...)`) + `100dvh`; foco
-  accesible índigo. 18/18 verde; verificado a 390×844 (lector, onboarding, sheet, drawer).
-- **F3 · Restyle de componentes** ✅ HECHO (2026-06-29) — chat estilo NotebookLM (mensaje
-  del agente como bloque limpio sin caja; usuario como burbuja de acento), **chips de cita
-  pill** `--accent-soft`, pestañas **segmented control**, header translúcido (blur), botones
-  **pill**, progreso fino, libreta con **eyebrow** + tarjetas suaves, foco índigo, **shimmer**
-  de estado mientras el agente trabaja. 18/18 verde; verificado.
-- **F4 · PWA + lector inmersivo** ✅ HECHO (2026-06-29) — `manifest.json` completo + iconos
-  192/512/maskable/apple (placeholder libro-índigo, **sustituibles**), metas Apple/`theme-color`,
-  **theme-color dinámico** por tema (barra de estado), `sw.js` v2 cachea los módulos IA +
-  iconos. **Modo lectura inmersivo**: botón ⤢ oculta header/footer; overlay de zonas táctiles
-  (izq/centro/der = anterior/salir/siguiente). 18/18 verde; verificado en móvil + oscuro.
-
-- **F5 · Estilo Apple + iconos SF Symbols** ✅ HECHO (2026-06-29) — se eliminan TODOS
-  los emojis. Nuevo sistema de iconos de línea SVG (`js/ui/icons.js`, ~24 glifos,
-  `currentColor`, trazo 1.7, hidratados vía `[data-icon]` + `hydrateIcons`). Tokens
-  reescritos a paleta del sistema iOS: acento **azul de Apple** (#007AFF claro / #0A84FF
-  oscuro), grises systemGray, oscuro casi-negro con "página flotante". Texto del libro en
-  **serif New York** (`ui-serif`). Selector de tema como **muestras de color** (estilo Apple
-  Books). Botones con pulsado sutil (scale), discos de acento en el onboarding, papelera roja
-  systemRed. `theme-color`/manifest actualizados. 19/19 verde; verificado en claro, oscuro y
-  móvil.
-
-Verificación visual con Playwright en dos viewports; los selectores/IDs existentes se
-conservan para no romper tests ni la lógica.
-
----
-
-## 7. Decisiones tomadas (2026-06-29)
+## 6. Decisiones tomadas (2026-06-29)
 
 1. **Estética:** NotebookLM — neutro calmado. Superficies blancas/grises sutiles, acento
    **índigo `#5B6CFF`**, tarjetas redondeadas, mucho aire.

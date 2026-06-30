@@ -6,7 +6,7 @@
        inyectado, que es lo que protege la API key en localStorage. 'connect-src' se
        limita a 'self', blob: (mecánica de epub.js) y el LLM, así que el contenido del
        libro no puede exfiltrar a hosts arbitrarios. Estilos/fuentes/imágenes se dejan
-       permisivos (recursos pasivos) para que los EPUB rendericen fieles. Ver BACKLOG-TECH T2. -->
+       permisivos (recursos pasivos) para que los EPUB rendericen fieles. Ver CHANGELOG (T2). -->
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' blob: https:; font-src 'self' data: https:; img-src 'self' data: blob: https:; connect-src 'self' blob: https://api.nan.builders; worker-src 'self' blob:; frame-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'none'">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>BookReader</title>
@@ -201,7 +201,7 @@
 
   <!-- Scripts -->
   <!-- Libs vendorizadas (mismo origen): sin dependencia de CDN, funcionan offline
-       y permiten una CSP estricta (script-src 'self'). Ver BACKLOG-TECH T1/T2/T6. -->
+       y permiten una CSP estricta (script-src 'self'). Ver CHANGELOG (T1/T2/T6). -->
   <script src="vendor/jszip-3.10.1.min.js"></script>
   <script src="vendor/epub-0.3.93.min.js"></script>
   <script src="vendor/pdf-3.11.174.min.js"></script>

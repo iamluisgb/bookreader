@@ -1,6 +1,6 @@
 // Atenuación de capítulos según el objetivo: puntúa cada capítulo del TOC (0..1)
 // con el modelo y tiñe los enlaces del índice (alto/medio/bajo). Extraído de
-// panel.js (BACKLOG-TECH T8). Funciones puras/parametrizadas: el orquestador
+// panel.js (T8, ver CHANGELOG). Funciones puras/parametrizadas: el orquestador
 // (maybeAttenuate, con su flag y caché en DB) se queda en panel.js.
 import * as LLM from './llm.js';
 

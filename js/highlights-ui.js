@@ -1,5 +1,5 @@
 // UI de subrayados y barra de selección del lector EPUB. Extraído de app.js
-// (BACKLOG-TECH T8). Gestiona: la selección (táctil vía touch-select / nativa en
+// (T8, ver CHANGELOG). Gestiona: la selección (táctil vía touch-select / nativa en
 // escritorio), la barra de acciones (color, nota, copiar, preguntar al agente) y
 // la lista de subrayados de la sidebar. El estado de selección es local a este
 // módulo. Público: initHighlights, setupHighlights, renderHighlights,

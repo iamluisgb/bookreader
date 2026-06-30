@@ -1,5 +1,5 @@
 // Progreso detallado del lector (panel inferior): % completado y tiempo restante
-// estimado. Extraído de app.js (BACKLOG-TECH T8). Las funciones reciben totalWords
+// estimado. Extraído de app.js (T8, ver CHANGELOG). Las funciones reciben totalWords
 // por parámetro en vez de leer estado global del módulo principal.
 import * as EpubReader from './epub-reader.js';
 

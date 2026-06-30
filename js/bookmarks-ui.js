@@ -1,5 +1,5 @@
 // UI de marcadores: botón de marcar página (cabecera) y lista de marcadores de la
-// sidebar. Extraído de app.js (BACKLOG-TECH T8). La persistencia vive en
+// sidebar. Extraído de app.js (T8, ver CHANGELOG). La persistencia vive en
 // bookmarks.js; aquí solo el DOM. Público: initBookmarkButton, updateBookmarkButton,
 // renderBookmarks.
 import * as EpubReader from './epub-reader.js';

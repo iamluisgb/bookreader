@@ -1,5 +1,5 @@
 // Plantillas del panel del agente: el HTML del panel (TEMPLATE) y el prompt de
-// sistema (systemPrompt). Extraído de panel.js (BACKLOG-TECH T8) — solo strings,
+// sistema (systemPrompt). Extraído de panel.js (T8, ver CHANGELOG) — solo strings,
 // sin estado: el prompt recibe goal/template por parámetro.
 import { icon } from '../ui/icons.js';
 
