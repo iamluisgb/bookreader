@@ -23,6 +23,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initDragDrop();
   initAiPanel();
   initImmersive();
+  initReaderReflow();
   initLibrary();
 });
 
@@ -96,6 +97,41 @@ function saveProgress(pct) {
       await LibStore.updateBook(currentBook.id, { progress: pct, lastCfi: cfi || prev?.lastCfi || null, status });
     } catch (e) { /* sin persistencia */ }
   }, 800);
+}
+
+// ============ RE-PAGINADO AL PLEGAR/DESPLEGAR PANELES ============
+// Al abrir/cerrar la barra lateral o el panel del agente, el área de lectura
+// cambia de ancho (en escritorio empujan el contenido). Re-paginamos el EPUB al
+// terminar la transición de márgenes para que el texto se adapte. Observamos el
+// estado real de ambos paneles, así cubrimos cualquier vía de apertura/cierre.
+function reflowReaderAfterTransition() {
+  const main = document.getElementById('reader-main');
+  if (!main) return;
+  let fired = false;
+  const done = (e) => {
+    if (e && (e.target !== main || !/^margin/.test(e.propertyName))) return;
+    if (fired) return;
+    fired = true;
+    main.removeEventListener('transitionend', done);
+    clearTimeout(t);
+    if (EpubReader.isLoaded()) EpubReader.resize();
+  };
+  const t = setTimeout(done, 350);   // respaldo si no llega transitionend
+  main.addEventListener('transitionend', done);
+}
+
+function initReaderReflow() {
+  let last = '';
+  const check = () => {
+    const s = (document.getElementById('sidebar')?.classList.contains('open') ? 'S' : '') +
+              (document.body.classList.contains('ai-open') ? 'A' : '');
+    if (s === last) return;
+    last = s;
+    reflowReaderAfterTransition();
+  };
+  const sidebar = document.getElementById('sidebar');
+  if (sidebar) new MutationObserver(check).observe(sidebar, { attributes: true, attributeFilter: ['class'] });
+  new MutationObserver(check).observe(document.body, { attributes: true, attributeFilter: ['class'] });
 }
 
 // ============ MODO LECTURA INMERSIVO ============

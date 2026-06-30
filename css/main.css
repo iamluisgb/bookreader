@@ -626,6 +626,12 @@ input[type="range"] {
 body.ai-open #ai-panel { transform: translateX(0); }
 body.ai-open .reader-main { margin-right: var(--ai-panel-width); }
 
+/* En escritorio, abrir la barra lateral izquierda EMPUJA el contenido (el texto
+   se re-pagina al nuevo ancho), igual que el panel del agente a la derecha —al
+   estilo de NotebookLM. En tablet/móvil se superpone como drawer (media query
+   de abajo lo revierte a margin 0). */
+body:has(#sidebar.open) .reader-main { margin-left: var(--sidebar-width); }
+
 .ai-header {
   display: flex;
   align-items: center;
@@ -1028,6 +1034,8 @@ select:focus {
 /* ---- Tablet y móvil (<1024): el agente se superpone, no empuja el lector ---- */
 @media (max-width: 1023px) {
   body.ai-open .reader-main { margin-right: 0; }
+  body:has(#sidebar.open) .reader-main { margin-left: 0; }   /* drawer overlay, no empuja */
+  .sidebar { box-shadow: var(--shadow-3); }
   #ai-panel { width: min(440px, 100%); box-shadow: var(--shadow-3); }
   body.ai-open .scrim,
   body:has(#sidebar.open) .scrim { opacity: 1; pointer-events: auto; }
@@ -1176,6 +1184,9 @@ body.immersive .ai-fab { transform: scale(0); }
 .icon-btn .icon { vertical-align: middle; }
 .icon-btn:active:not(:disabled) { transform: scale(0.92); }
 .icon-btn.is-active { color: var(--accent); }
+/* Toggle en acento cuando su panel está abierto (afordancia de estado). */
+body:has(#sidebar.open) #sidebar-toggle,
+body.ai-open #ai-toggle { color: var(--accent); }
 
 .nav-btn {
   display: inline-flex; align-items: center; justify-content: center;
