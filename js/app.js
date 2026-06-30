@@ -491,6 +491,7 @@ function initHighlights() {
 let tempSelCfi = null;
 let selFinalizeTimer = null;
 let pendingSel = null;
+let lastSelWin = null;   // ventana del iframe de la última selección (escritorio)
 
 function setupHighlights() {
   const rendition = EpubReader.getRendition();
@@ -533,17 +534,15 @@ function setupHighlights() {
 
     if (!text) return;
 
-    // epub.js re-emite "selected" en cada cambio de la selección (con un
-    // antirrebote interno de ~250 ms). Mientras el usuario arrastra los
-    // tiradores para EXTENDER la selección, la dejamos viva (puede extenderla)
-    // y NO mostramos nada nuestro. Cuando deja de cambiar, la damos por
-    // terminada: pintamos nuestro resaltado, BORRAMOS la selección nativa —lo
-    // que descarta los menús del SO (la barra Copiar/Compartir arriba y el
-    // buscador de Google abajo)— y mostramos nuestra barra. Así el usuario
-    // extiende con la UI nativa y al soltar obtiene solo NUESTRAS opciones.
-    pendingSel = { cfiRange, text, rect, win };
-    clearTimeout(selFinalizeTimer);
-    selFinalizeTimer = setTimeout(() => finalizeSelection(rendition), 250);
+    // En escritorio la selección nativa funciona bien y no hay menús del SO que
+    // esquivar, así que NO la tocamos: la dejamos viva (el usuario puede
+    // extenderla sin límite) y solo mostramos nuestra barra junto a ella. La
+    // selección nativa se limpia al cerrar la barra (hideHighlightTooltip).
+    lastSelWin = win;
+    showHighlightTooltip(cfiRange, text, rect);
+    // Cerrar la barra al pulsar en el texto (los clics del iframe no llegan al
+    // documento padre). addEventListener deduplica por referencia de función.
+    try { win.document.addEventListener('mousedown', hideHighlightTooltip); } catch (e) {}
   });
 }
 
@@ -648,6 +647,8 @@ function hideHighlightTooltip() {
   document.removeEventListener('click', hideHighlightTooltipOnOutside);
   removeTempSelection();
   try { EpubReader.clearSelection(); } catch (e) {}   // overlay táctil, si lo hay
+  try { lastSelWin && lastSelWin.getSelection().removeAllRanges(); } catch (e) {}  // selección nativa (escritorio)
+  lastSelWin = null;
   activeSelection = null;
 }
 
