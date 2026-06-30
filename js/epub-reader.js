@@ -197,7 +197,21 @@ export async function load(arrayBuffer, onProgress) {
     else registerTapHandler(contents);
   });
 
-  await rendition.display();
+  // Restaurar la última posición de ESTE libro (guardada en cada 'relocated'
+  // bajo lastPosition_<book.key()>, estable entre sesiones). Así recordamos
+  // dónde íbamos abramos como abramos (archivo, arrastrar o biblioteca). Si el
+  // CFI guardado ya no es válido, abrimos por el principio.
+  let startCfi = null;
+  try {
+    const key = book.key ? book.key() : 'default';
+    startCfi = Storage.get('lastPosition_' + key) || null;
+  } catch (e) { /* sin posición guardada */ }
+  try {
+    await rendition.display(startCfi || undefined);
+  } catch (e) {
+    console.warn('CFI guardado no válido, abriendo al principio:', e);
+    await rendition.display();
+  }
   console.log('Book displayed');
 
   // Track location changes
@@ -425,4 +439,15 @@ export async function generateLocations() {
   if (book) {
     await book.locations.generate(1024);
   }
+}
+
+// Recalcula el progreso desde la posición actual. Necesario tras restaurar la
+// posición al abrir: el display() ocurre antes de generar las localizaciones,
+// así que el % saldría 0 hasta moverse; lo refrescamos una vez generadas.
+export function refreshProgress() {
+  if (!rendition) return;
+  try {
+    const loc = rendition.currentLocation();
+    if (loc && loc.start) updateProgress(loc);
+  } catch (e) { /* currentLocation no lista */ }
 }

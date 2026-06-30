@@ -286,6 +286,10 @@ async function loadEpub(buffer, bookId, aiBookId) {
     try {
       await EpubReader.generateLocations();
       totalWords = countBookWords();
+      // Las localizaciones se generan tras restaurar la posición, así que el %
+      // mostraba 0 hasta moverse: lo refrescamos ya con las localizaciones.
+      EpubReader.refreshProgress();
+      updateProgressDetail();
     } catch (locErr) {
       console.warn('Could not generate locations:', locErr);
       totalWords = countBookWords();
