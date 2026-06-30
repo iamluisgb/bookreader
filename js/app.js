@@ -549,24 +549,35 @@ function showHighlightTooltip(cfiRange, text, rect) {
   const tooltip = document.getElementById('highlight-tooltip');
   activeSelection = { cfiRange, text };
 
-  // Render hidden first to measure, then place centered above the selection
-  // (rect ya viene en coords de pantalla).
+  // En táctil el menú nativo del SO sale pegado a la selección (capa del
+  // sistema, no del DOM → ningún z-index lo tapa). Anclamos la barra abajo
+  // para no competir por el mismo sitio. En escritorio (ratón, sin menú
+  // nativo) la colocamos junto a la selección.
+  const dock = window.matchMedia('(pointer: coarse)').matches || window.innerWidth <= 768;
+  tooltip.classList.toggle('docked', dock);
   tooltip.style.display = 'flex';
-  tooltip.style.visibility = 'hidden';
-  requestAnimationFrame(() => {
-    const tw = tooltip.offsetWidth, th = tooltip.offsetHeight;
-    let cx = window.innerWidth / 2, top = 100;
-    if (rect) {
-      cx = rect.left + rect.width / 2;
-      top = rect.top - th - 10;
-      if (top < 10) top = rect.top + rect.height + 10;   // debajo si no cabe arriba
-    }
-    let left = Math.max(10, Math.min(cx - tw / 2, window.innerWidth - tw - 10));
-    top = Math.max(10, Math.min(top, window.innerHeight - th - 10));
-    tooltip.style.left = left + 'px';
-    tooltip.style.top = top + 'px';
+
+  if (dock) {
+    tooltip.style.left = '';
+    tooltip.style.top = '';
     tooltip.style.visibility = 'visible';
-  });
+  } else {
+    tooltip.style.visibility = 'hidden';
+    requestAnimationFrame(() => {
+      const tw = tooltip.offsetWidth, th = tooltip.offsetHeight;
+      let cx = window.innerWidth / 2, top = 100;
+      if (rect) {
+        cx = rect.left + rect.width / 2;
+        top = rect.top - th - 10;
+        if (top < 10) top = rect.top + rect.height + 10;   // debajo si no cabe arriba
+      }
+      let left = Math.max(10, Math.min(cx - tw / 2, window.innerWidth - tw - 10));
+      top = Math.max(10, Math.min(top, window.innerHeight - th - 10));
+      tooltip.style.left = left + 'px';
+      tooltip.style.top = top + 'px';
+      tooltip.style.visibility = 'visible';
+    });
+  }
 
   // Subrayar con color
   tooltip.querySelectorAll('.highlight-color').forEach(btn => {
