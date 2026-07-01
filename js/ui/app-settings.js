@@ -78,26 +78,54 @@ function renderSection(id) {
   return '';
 }
 
+function modelDatalist(models) {
+  return models.map(m => `<option value="${escapeHtml(m)}"></option>`).join('');
+}
+
 function agentHtml() {
-  const opts = LLM.MODELS.map(m =>
-    `<option value="${m.id}"${m.id === LLM.getModel() ? ' selected' : ''}>${m.name}</option>`).join('');
+  const cur = LLM.currentProvider();
+  const provOpts = LLM.PROVIDERS.map(p =>
+    `<option value="${p.id}"${cur && cur.id === p.id ? ' selected' : ''}>${escapeHtml(p.name)}</option>`).join('')
+    + `<option value="custom"${cur ? '' : ' selected'}>Personalizado</option>`;
+  const suggested = (cur || LLM.PROVIDERS[0]).models;
   return `<div class="appset-section">
     <h3 class="appset-h3">Agente</h3>
-    <label class="appset-label" for="appset-key">API key de nan</label>
-    <input id="appset-key" class="appset-input" type="password" placeholder="sk-..." autocomplete="off" value="${LLM.getKey()}" />
+    <label class="appset-label" for="appset-provider">Proveedor</label>
+    <select id="appset-provider" class="appset-input">${provOpts}</select>
+    <label class="appset-label" for="appset-baseurl">Base URL (endpoint OpenAI-compatible)</label>
+    <input id="appset-baseurl" class="appset-input" value="${escapeHtml(LLM.getBaseUrl())}" placeholder="https://…/v1" autocomplete="off" spellcheck="false" />
     <label class="appset-label" for="appset-model">Modelo</label>
-    <select id="appset-model" class="appset-input">${opts}</select>
+    <input id="appset-model" class="appset-input" list="appset-model-list" value="${escapeHtml(LLM.getModel())}" placeholder="id-del-modelo" autocomplete="off" spellcheck="false" />
+    <datalist id="appset-model-list">${modelDatalist(suggested)}</datalist>
+    <label class="appset-label" for="appset-key">API key</label>
+    <input id="appset-key" class="appset-input" type="password" placeholder="sk-..." autocomplete="off" value="${escapeHtml(LLM.getKey())}" />
     <label class="appset-check"><input type="checkbox" id="appset-auto"${LLM.getAutoExtract() ? ' checked' : ''} /> Rellenar la libreta automáticamente</label>
     <button id="appset-save" class="primary-btn appset-save">Guardar</button>
     <p class="appset-saved" id="appset-saved" hidden>${icon('check', { size: 14 })} Guardado</p>
-    <p class="appset-privacy">${icon('shield', { size: 13 })} Tu API key se guarda solo en este navegador. Para responder, el contenido del libro se envía al proveedor del modelo (nan).</p>
+    <p class="appset-privacy">${icon('shield', { size: 13 })} Tu API key se guarda solo en este navegador. Para responder, el contenido del libro se envía al proveedor que configures.</p>
   </div>`;
 }
 
 function wireAgent(content) {
+  const prov = content.querySelector('#appset-provider');
+  const baseUrl = content.querySelector('#appset-baseurl');
+  const model = content.querySelector('#appset-model');
+  const dl = content.querySelector('#appset-model-list');
+
+  // Al elegir un preset: rellena Base URL + sugerencias de modelo. "Personalizado"
+  // deja ambos campos como están para editarlos a mano.
+  prov.addEventListener('change', () => {
+    const p = LLM.PROVIDERS.find(x => x.id === prov.value);
+    if (!p) return;
+    baseUrl.value = p.baseUrl;
+    dl.innerHTML = modelDatalist(p.models);
+    if (!p.models.includes(model.value.trim())) model.value = p.models[0];
+  });
+
   content.querySelector('#appset-save').addEventListener('click', () => {
     LLM.setKey(content.querySelector('#appset-key').value.trim());
-    LLM.setModel(content.querySelector('#appset-model').value);
+    LLM.setBaseUrl(baseUrl.value);
+    LLM.setModel(model.value);
     LLM.setAutoExtract(content.querySelector('#appset-auto').checked);
     const ok = content.querySelector('#appset-saved');
     if (ok) { ok.hidden = false; setTimeout(() => { ok.hidden = true; }, 1800); }

@@ -5,6 +5,29 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-01 — Proveedor de LLM configurable (BYOK a cualquier OpenAI-compatible) (TEC3, ex E1.2)
+
+El agente deja de estar atado a nan: el usuario puede apuntar a **cualquier proveedor
+OpenAI-compatible** (OpenAI, OpenRouter, Groq, un endpoint propio…) desde *Ajustes → Agente*.
+
+- [`js/ai/llm.js`](js/ai/llm.js): `getBaseUrl/setBaseUrl` (default nan, se normaliza sin barra
+  final), el modelo pasa a **texto libre** (cada proveedor usa IDs distintos), `PROVIDERS` con
+  presets (nan, OpenAI, OpenRouter, Groq) y `currentProvider()`. Errores genéricos (ya no dicen
+  "nan"). El resto ya era OpenAI-compatible.
+- UI *Agente* ([`js/ui/app-settings.js`](js/ui/app-settings.js)): selector **Proveedor** (presets +
+  *Personalizado*) que prefija Base URL + sugerencias de modelo (datalist), con **Base URL y Modelo
+  editables** y la API key. La base URL se incluye en el backup global (P3); la key no.
+- **CSP:** `connect-src` pasa de `… https://api.nan.builders` a `'self' blob: https:` para permitir
+  cualquier endpoint HTTPS. La protección clave (`script-src 'self'`, que impide scripts inyectados
+  y por tanto la exfiltración de la key) **se mantiene intacta**. Decisión de seguridad tomada por el
+  usuario. Los modelos locales (Ollama/LM Studio) por `http://localhost` no funcionan desde una PWA
+  servida por HTTPS (mixed-content del navegador), aparte del CSP.
+- Verificado: lint 0 errores · 19/19 E2E · prueba manual (defaults nan, preset OpenAI prefija
+  baseURL/modelo, config personalizada round-trip, `currentProvider()=null` en personalizado, y que
+  el CSP **no bloquea** un host HTTPS distinto de nan) sin errores de consola.
+
+---
+
 ## 2026-07-01 — Deslizamiento al pasar página en móvil (efecto tipo Kindle)
 
 Al arrastrar con el dedo para pasar página, la página ahora **sigue al dedo** y **gira con una

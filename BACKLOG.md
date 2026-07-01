@@ -84,5 +84,3 @@ El panel IA tiene **0 cobertura** determinista (solo `@live` no determinista). A
 fijen el comportamiento actual → red para cualquier refactor futuro del core (prerequisito para
 un eventual store con API, ver decisión de T8 en el CHANGELOG).
 
-### TEC3 — `baseURL` del LLM editable en UI · `S` _(ex E1.2 🟡)_
-Hoy `https://api.nan.builders/v1` está fijo en [`js/ai/llm.js`](js/ai/llm.js).

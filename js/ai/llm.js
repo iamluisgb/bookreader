@@ -1,23 +1,42 @@
-// LLMProvider — cliente OpenAI-compatible con streaming contra nan (BYOK).
-// La key vive solo en el navegador (localStorage vía Storage). E1.1 + E1.2 del backlog.
+// LLMProvider — cliente OpenAI-compatible con streaming (BYOK). Funciona con
+// cualquier proveedor OpenAI-compatible: base URL, modelo y key son configurables
+// (Ajustes → Agente). Por defecto, nan. La key vive solo en el navegador
+// (localStorage vía Storage). E1.1 + E1.2 (TEC3) del backlog.
+//
+// Nota CSP: `connect-src 'self' blob: https:` permite llamar a cualquier endpoint
+// HTTPS. `script-src 'self'` sigue intacto, así que la key no es exfiltrable por
+// scripts inyectados.
 import * as Storage from '../storage.js';
 
-const BASE_URL = 'https://api.nan.builders/v1';
-
-export const MODELS = [
-  { id: 'deepseek-v4-flash', name: 'DeepSeek V4 Flash (1M, rápido)' },
-  { id: 'mimo-v2.5',         name: 'MiMo V2.5 (1M, multimodal)' },
-  { id: 'qwen3.6',           name: 'Qwen 3.6 (256k)' },
-  { id: 'gemma4',            name: 'Gemma 4 (256k)' },
-];
-
+const DEFAULT_BASE_URL = 'https://api.nan.builders/v1';
 const DEFAULT_MODEL = 'deepseek-v4-flash';
 
-export function getKey()       { return Storage.get('ai_key', '') || ''; }
-export function setKey(k)       { Storage.set('ai_key', k || ''); }
-export function getModel()     { return Storage.get('ai_model', DEFAULT_MODEL) || DEFAULT_MODEL; }
-export function setModel(m)      { Storage.set('ai_model', m || DEFAULT_MODEL); }
-export function hasKey()        { return getKey().trim().length > 0; }
+// Presets para prefijar base URL + modelos sugeridos en la UI. `id: 'custom'` es
+// implícito (cualquier base URL fuera de estos). No son exhaustivos: el usuario
+// puede escribir su propia base URL y su propio modelo.
+export const PROVIDERS = [
+  { id: 'nan',        name: 'nan',        baseUrl: 'https://api.nan.builders/v1',   models: ['deepseek-v4-flash', 'mimo-v2.5', 'qwen3.6', 'gemma4'] },
+  { id: 'openai',     name: 'OpenAI',     baseUrl: 'https://api.openai.com/v1',     models: ['gpt-4o', 'gpt-4o-mini', 'o4-mini'] },
+  { id: 'openrouter', name: 'OpenRouter', baseUrl: 'https://openrouter.ai/api/v1',  models: ['deepseek/deepseek-chat', 'anthropic/claude-3.7-sonnet', 'google/gemini-2.0-flash-001'] },
+  { id: 'groq',       name: 'Groq',       baseUrl: 'https://api.groq.com/openai/v1', models: ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant'] },
+];
+
+export function getKey()        { return Storage.get('ai_key', '') || ''; }
+export function setKey(k)        { Storage.set('ai_key', k || ''); }
+export function getModel()      { return Storage.get('ai_model', DEFAULT_MODEL) || DEFAULT_MODEL; }
+export function setModel(m)      { Storage.set('ai_model', (m || '').trim() || DEFAULT_MODEL); }
+export function hasKey()         { return getKey().trim().length > 0; }
+
+// Base URL del proveedor (sin barra final). Debe ser el endpoint OpenAI-compatible
+// que expone /chat/completions.
+export function getBaseUrl()    { return (Storage.get('ai_base_url', DEFAULT_BASE_URL) || DEFAULT_BASE_URL).trim().replace(/\/+$/, ''); }
+export function setBaseUrl(u)    { Storage.set('ai_base_url', ((u || '').trim() || DEFAULT_BASE_URL).replace(/\/+$/, '')); }
+
+// Preset que coincide con la base URL actual, o null si es personalizada.
+export function currentProvider() {
+  const b = getBaseUrl();
+  return PROVIDERS.find(p => p.baseUrl.replace(/\/+$/, '') === b) || null;
+}
 
 // Auto-extracción a la libreta tras cada respuesta (por defecto activada).
 export function getAutoExtract() { return Storage.get('ai_auto_extract', true); }
@@ -39,9 +58,9 @@ export function chatTools(opts)   { return serialize(() => _chatTools(opts)); }
 
 async function _chatStream({ messages, onToken, onReasoning, signal }) {
   const key = getKey().trim();
-  if (!key) throw new Error('Falta la API key de nan.');
+  if (!key) throw new Error('Falta la API key.');
 
-  const res = await fetch(`${BASE_URL}/chat/completions`, {
+  const res = await fetch(`${getBaseUrl()}/chat/completions`, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${key}`,
@@ -100,9 +119,9 @@ async function _chatStream({ messages, onToken, onReasoning, signal }) {
 // fiable solo sin streaming (verificado en spike E5). Devuelve { content, toolCalls }.
 async function _chatTools({ messages, tools, toolChoice = 'auto', signal }) {
   const key = getKey().trim();
-  if (!key) throw new Error('Falta la API key de nan.');
+  if (!key) throw new Error('Falta la API key.');
 
-  const res = await fetch(`${BASE_URL}/chat/completions`, {
+  const res = await fetch(`${getBaseUrl()}/chat/completions`, {
     method: 'POST',
     headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
