@@ -23,17 +23,22 @@ altura completa (para no re-paginar al ocultarlas), pero en escritorio nunca se 
 - **Escritorio → pantalla completa nativa.** El botón ⤢ usa la **Fullscreen API** (`requestFullscreen`
   /`exitFullscreen`, con fallback `webkit*`): llena el monitor y oculta el chrome del navegador/SO. Se
   **sale con `Esc`/F11**; un listener de `fullscreenchange` sincroniza icono (⤢ ⇄ ⤡) y estado.
-- **Auto-ocultar en fullscreen (Play Books).** En pantalla completa las barras arrancan ocultas (página
-  completa) y **reaparecen al mover el ratón**, escondiéndose tras ~2,5 s de inactividad. Como el texto
-  vive en un iframe (sus `mousemove` no llegan al document padre), `EpubReader.onActivity` reemite el
-  movimiento sobre el texto para que el reveal funcione también encima de la página.
+- **Auto-ocultar en fullscreen (Play Books), sin tapar texto.** En pantalla completa las barras
+  arrancan ocultas y **reaparecen solo al llevar el ratón al borde superior/inferior** (no con
+  cualquier movimiento). Además el texto **reserva la franja** de las barras (`padding` = alto de
+  cabecera/pie), de modo que la barra revelada nunca se dibuja sobre el texto: así se puede
+  **seleccionar/subrayar también la 1ª y la última línea**. Como el texto vive en un iframe (sus
+  `mousemove` no llegan al document), `EpubReader.onActivity` reemite la actividad sobre la página para
+  ocultar las barras cuando lees.
 - **Móvil:** sin cambios (overlay + toque central).
 
 **Decisiones:** ventana de escritorio con barras fijas (acceso a menús sin gestos, esperado en una
-ventana) y fullscreen con auto-ocultar (máxima lectura) — elegido por el usuario. Sin bump de `sw.js`
-(cambio de contenido, sin ficheros nuevos). Verificado con Playwright (Fullscreen API stubbeada:
-ventana → barras en flujo y viewport con hueco; fullscreen → oculto, ratón sobre el texto revela,
-inactividad re-oculta, Esc sale al flujo; 0 errores) y 19/19 E2E.
+ventana) y fullscreen con auto-ocultar por borde (máxima lectura sin perder acceso a menús ni a la
+selección en los bordes) — elegido por el usuario. Reveal **por borde** en vez de por cualquier
+movimiento tras detectar que este último hacía imposible subrayar la 1ª/última línea. Sin bump de
+`sw.js` (cambio de contenido, sin ficheros nuevos). Verificado con Playwright (Fullscreen API
+stubbeada: ventana → barras en flujo con hueco; fullscreen → oculto con franja reservada de 52px, ratón
+al borde revela sin pisar texto, ratón sobre el texto oculta, Esc sale al flujo; 0 errores) y 19/19 E2E.
 
 ---
 

@@ -172,26 +172,31 @@ function initImmersive() {
       else reqFS.call(el).catch(() => {});
     });
 
-    let hideTimer = null;
+    const inFs = () => document.body.classList.contains('fs');
+    const showBars = () => document.body.classList.remove('immersive');
     const hideBars = () => document.body.classList.add('immersive');
-    const revealBars = () => {
-      if (!document.body.classList.contains('fs')) return;   // solo en pantalla completa
-      document.body.classList.remove('immersive');
-      clearTimeout(hideTimer);
-      hideTimer = setTimeout(hideBars, 2500);
+    const barPx = (name) => parseInt(getComputedStyle(document.documentElement).getPropertyValue(name), 10) || 52;
+    // Las barras reaparecen SOLO al llevar el ratón a la franja superior/inferior (no
+    // con cualquier movimiento): así seleccionar/subrayar la 1ª o última línea no
+    // invoca la barra. El texto reserva esa franja en fullscreen (CSS), de modo que la
+    // barra revelada nunca tapa texto.
+    const onEdge = (e) => {
+      if (!inFs()) return;
+      const nearTop = e.clientY <= barPx('--header-height');
+      const nearBot = e.clientY >= window.innerHeight - barPx('--footer-height');
+      if (nearTop || nearBot) showBars(); else hideBars();
     };
-    // Reaparecer al mover el ratón: en los márgenes (document padre) y sobre el texto
-    // (reemitido desde el iframe por EpubReader). El guard `fs` los hace inocuos fuera
-    // de pantalla completa, así que se registran una sola vez.
-    document.addEventListener('mousemove', revealBars);
-    EpubReader.onActivity(revealBars);
+    document.addEventListener('mousemove', onEdge);
+    // El ratón sobre el texto vive en el iframe (sus eventos no llegan al document):
+    // cualquier actividad ahí = estás leyendo → ocultar las barras.
+    EpubReader.onActivity(() => { if (inFs()) hideBars(); });
 
     // Sincroniza clase/estado/icono con el estado real de fullscreen (clic, Esc, F11).
     const syncFs = () => {
       const on = !!fsElement();
       document.body.classList.toggle('fs', on);
-      if (on) hideBars();                              // arranca oculto → página completa
-      else { clearTimeout(hideTimer); document.body.classList.remove('immersive'); }
+      if (on) hideBars();                              // arranca oculto → página limpia
+      else document.body.classList.remove('immersive');
       if (btn) {
         btn.setAttribute('data-icon', on ? 'compress' : 'expand');
         btn.title = on ? 'Salir de pantalla completa' : 'Pantalla completa';
