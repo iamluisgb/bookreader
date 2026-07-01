@@ -16,15 +16,14 @@
 // los toques, caretRangeFromPoint y getClientRects). Solo al DIBUJAR sumamos el
 // desplazamiento del iframe para pasar a coordenadas de pantalla.
 
-let callbacks = { onTap: () => {}, onSelect: () => {}, onDismiss: () => {} };
+let callbacks = { onTap: () => {}, onSelect: () => {}, onDismiss: () => {}, onSwipeMove: () => {}, onSwipeEnd: () => {} };
 export function configure(c) { callbacks = { ...callbacks, ...c }; }
 
 const LONGPRESS_MS = 380;   // pulsación larga que inicia la selección
 const MOVE_CANCEL = 10;     // px de movimiento que cancela la pulsación (=scroll)
 const HANDLE_HIT = 26;      // radio de toque para agarrar un tirador (px)
 const HANDLE_OFFSET = 14;   // separación del círculo del tirador respecto a la línea
-const SWIPE_MIN = 45;       // px horizontales que cuentan como swipe de página
-const SWIPE_RATIO = 1.2;    // dominancia horizontal mínima frente a la vertical
+const SWIPE_START = 10;     // px horizontales que inician el arrastre de página
 
 // Estado de la selección activa (una a la vez).
 let active = null;  // { contents, doc, range, anchor }
@@ -229,14 +228,14 @@ export function attach(contents) {
   injectStyles(doc);
 
   let downX = 0, downY = 0, downT = 0, moved = false;
-  let lpTimer = null, lpStarted = false, dragging = null;
+  let lpTimer = null, lpStarted = false, dragging = null, swiping = false;
   const clearLP = () => { clearTimeout(lpTimer); lpTimer = null; };
 
   doc.addEventListener('touchstart', (e) => {
     if (e.touches.length !== 1) { clearLP(); moved = true; return; }
     const t = e.touches[0];
     downX = t.clientX; downY = t.clientY; downT = Date.now();
-    moved = false; lpStarted = false; dragging = null;
+    moved = false; lpStarted = false; dragging = null; swiping = false;
 
     // ¿hay selección y el toque agarra un tirador? → arrastrar ese extremo
     if (active && active.range) {
@@ -270,11 +269,20 @@ export function attach(contents) {
 
   doc.addEventListener('touchmove', (e) => {
     const t = e.touches[0]; if (!t) return;
-    if (Math.abs(t.clientX - downX) > MOVE_CANCEL || Math.abs(t.clientY - downY) > MOVE_CANCEL) moved = true;
+    const adx = Math.abs(t.clientX - downX), ady = Math.abs(t.clientY - downY);
+    if (adx > MOVE_CANCEL || ady > MOVE_CANCEL) moved = true;
 
     if (dragging) { e.preventDefault(); updateEndpoint(dragging, t.clientX, t.clientY); return; }
     if (lpStarted) { e.preventDefault(); updateEndpoint('end', t.clientX, t.clientY); return; }
     if (lpTimer && moved) clearLP();   // se movió antes del long-press → es scroll
+
+    // Arrastre de página (swipe): horizontal dominante y sin selección en curso.
+    // La página sigue al dedo; el efecto de giro lo hace el consumidor (epub-reader).
+    if (!(active && active.range) && (swiping || (adx > SWIPE_START && adx > ady))) {
+      swiping = true;
+      e.preventDefault();
+      callbacks.onSwipeMove(t.clientX - downX);
+    }
   }, { passive: false });
 
   doc.addEventListener('touchend', (e) => {
@@ -283,18 +291,12 @@ export function attach(contents) {
 
     const t = e.changedTouches[0];
     const dx = t ? t.clientX - downX : 0;
-    const dy = t ? t.clientY - downY : 0;
     const quick = !moved && Date.now() - downT < 500;
     if (active && active.range) { if (quick) dismiss(); return; }  // tocar fuera cierra
 
-    // Swipe horizontal sin long-press = pasar página (como Play Books): el
-    // long-press intercepta antes los "mantener pulsado", así que aquí solo
-    // llegan arrastres de navegación. Exigimos dominancia horizontal para no
-    // confundir un scroll/desliz vertical con un cambio de página.
-    if (Math.abs(dx) >= SWIPE_MIN && Math.abs(dx) > Math.abs(dy) * SWIPE_RATIO) {
-      callbacks.onTap(dx < 0 ? 'next' : 'prev');
-      return;
-    }
+    // Fin del arrastre de página: el consumidor decide girar o volver (bounce)
+    // según el umbral. El long-press ya separó antes los "mantener pulsado".
+    if (swiping) { swiping = false; callbacks.onSwipeEnd(dx); return; }
 
     if (quick && t) callbacks.onTap(tapZone(t.clientX));
   }, { passive: true });

@@ -51,7 +51,66 @@ if (COARSE) {
     onTap: (zone) => onTapCb(zone),
     onSelect: (sel) => onSelectCb(sel),
     onDismiss: () => onSelectDismissCb(),
+    onSwipeMove: (dx) => swipeMove(dx),
+    onSwipeEnd: (dx) => swipeEnd(dx),
   });
+}
+
+// ---- Deslizamiento de página (táctil) --------------------------------------
+// La página sigue al dedo (translateX de #epub-container, que es nuestro; epub.js
+// pinta dentro). Al soltar: si se pasa el umbral, la página termina de salir, se
+// cambia con epub.js (con la página fuera de pantalla) y la nueva entra desde el
+// lado contrario; si no, vuelve (bounce). El hueco que se revela usa --page-bg
+// (fondo real de la página) para que no se vea una franja de otro color.
+let swipeBusy = false;
+const SWIPE_TURN_MS = 190;
+
+function swipeBox() { return document.getElementById('epub-container'); }
+
+function swipeMove(dx) {
+  if (swipeBusy) return;
+  const c = swipeBox(); if (!c) return;
+  c.style.transition = 'none';
+  c.style.transform = `translateX(${dx}px)`;
+  c.style.willChange = 'transform';
+}
+
+async function swipeEnd(dx) {
+  const c = swipeBox();
+  if (!c || swipeBusy) { swipeReset(c); return; }
+  const w = c.clientWidth || window.innerWidth || 1;
+  const threshold = Math.min(90, w * 0.18);
+  if (Math.abs(dx) < threshold || !rendition) {   // no llega → vuelve
+    await swipeAnimate(c, 0);
+    swipeReset(c);
+    return;
+  }
+  swipeBusy = true;
+  const dir = dx < 0 ? 'next' : 'prev';
+  await swipeAnimate(c, dir === 'next' ? -w : w);   // la actual termina de salir
+  try { await (dir === 'next' ? rendition.next() : rendition.prev()); } catch (e) { /* fin del libro */ }
+  swipeSet(c, dir === 'next' ? w : -w);             // la nueva se coloca al otro lado
+  void c.offsetWidth;                               // reflow para que anime
+  await swipeAnimate(c, 0);                          // y entra
+  swipeReset(c);
+  swipeBusy = false;
+}
+
+function swipeSet(c, x) { if (c) { c.style.transition = 'none'; c.style.transform = `translateX(${x}px)`; } }
+function swipeReset(c) { if (c) { c.style.transition = 'none'; c.style.transform = ''; c.style.willChange = ''; } }
+function swipeAnimate(c, x) {
+  return new Promise(res => {
+    if (!c) { res(); return; }
+    c.style.transition = `transform ${SWIPE_TURN_MS}ms cubic-bezier(.22,.61,.36,1)`;
+    requestAnimationFrame(() => { c.style.transform = x ? `translateX(${x}px)` : 'translateX(0)'; });
+    setTimeout(res, SWIPE_TURN_MS + 20);
+  });
+}
+
+// Expone el fondo real de la página como variable CSS para que el hueco que se
+// revela al arrastrar no muestre una franja de otro color (ver CSS de body.reading).
+function syncPageBg() {
+  try { document.documentElement.style.setProperty('--page-bg', getThemeColors().bg); } catch (e) { /* sin tema */ }
 }
 
 function hasSelection(win) {
@@ -167,6 +226,7 @@ export async function load(arrayBuffer, onProgress) {
   console.log('Rendering book...');
 
   sizeContainer(container);
+  syncPageBg();
 
   // Width AND height as percentages so epub.js tracks the container and re-fits
   // on viewport changes (rotation, URL-bar, resize). spread:'none' keeps a
@@ -256,6 +316,7 @@ function getThemeColors() {
 // rendition.hooks.content registration in load().
 function applyTheme() {
   if (!rendition) return;
+  syncPageBg();
   try {
     rendition.getContents().forEach((contents) => injectThemeIntoContent(contents));
   } catch (e) {

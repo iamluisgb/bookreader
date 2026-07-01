@@ -5,6 +5,29 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-01 — Deslizamiento al pasar página en móvil (efecto tipo Kindle)
+
+Al arrastrar con el dedo para pasar página, la página ahora **sigue al dedo** y **gira con una
+animación de deslizamiento** (no el curl 3D de Play Books —inviable sobre epub.js porque no se puede
+"fotografiar" el contenido de sus iframes a una textura sin *tainting* del canvas— pero sí un
+deslizamiento tipo Kindle, robusto).
+
+- [`js/touch-select.js`](js/touch-select.js): el arrastre horizontal dominante (sin selección en
+  curso) emite `onSwipeMove(dx)` en vivo y `onSwipeEnd(dx)` al soltar. Sigue coexistiendo con el
+  long-press (selección) y con los toques de navegación por zonas.
+- [`js/epub-reader.js`](js/epub-reader.js): traslada `#epub-container` (nuestro; epub.js pinta
+  dentro) siguiendo al dedo. Al soltar, si se supera el umbral (~18% del ancho) la página termina de
+  salir, se cambia con epub.js **fuera de pantalla** y la nueva **entra desde el lado contrario**; si
+  no, vuelve (*bounce*). Guard `swipeBusy` contra swipes solapados.
+- **Sin franja de color:** el fondo del viewport en modo lectura usa `--page-bg` (fondo real de la
+  página según el tema, fijado por epub-reader), así el hueco que se revela al arrastrar no muestra
+  otro color (importaba en oscuro/sepia). Los toques en los bordes siguen pasando página al instante.
+- Verificado: lint 0 errores · 19/19 E2E · prueba manual con emulación táctil (sigue el dedo, giro al
+  superar el umbral en ambos sentidos, *bounce* por debajo, transform reseteado, `--page-bg` fijado)
+  sin errores de consola.
+
+---
+
 ## 2026-06-30 — Perfil de agente: nombre en el prompt + chip visible (P1)
 
 Dos retoques sobre los perfiles (P1) para que el perfil activo sea visible y coherente:

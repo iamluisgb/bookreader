@@ -406,6 +406,10 @@ input[type="range"] {
   justify-content: center;
   background: var(--bg-primary);
 }
+/* Con un libro abierto, el fondo del viewport iguala al de la página (--page-bg,
+   fijado por epub-reader según el tema). Así, al arrastrar para pasar página, el
+   hueco que se revela no muestra una franja de otro color. */
+body.reading .reader-viewport { background: var(--page-bg, var(--bg-primary)); }
 
 /* ============ LANDING ============ */
 .landing {
