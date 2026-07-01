@@ -10,6 +10,11 @@ import * as Storage from '../storage.js';
 
 const DEFAULT_BASE_URL = 'https://api.nan.builders/v1';
 const DEFAULT_MODEL = 'deepseek-v4-flash';
+// Tope de tokens de salida por respuesta. Antes era 2048 (~1500 palabras), que
+// cortaba en seco las respuestas largas (análisis del Artesano del Texto, etc.). Con
+// 4096 cabe casi todo; si aun así el proveedor corta por longitud (finish_reason
+// 'length'), el panel ofrece "Continuar" (ver onDone).
+const MAX_TOKENS = 4096;
 
 // Presets para prefijar base URL + modelos sugeridos en la UI. `id: 'custom'` es
 // implícito (cualquier base URL fuera de estos). No son exhaustivos: el usuario
@@ -75,7 +80,7 @@ function serialize(task) {
 export function chatStream(opts)  { return serialize(() => _chatStream(opts)); }
 export function chatTools(opts)   { return serialize(() => _chatTools(opts)); }
 
-async function _chatStream({ messages, onToken, onReasoning, signal }) {
+async function _chatStream({ messages, onToken, onReasoning, onDone, signal }) {
   const key = getKey().trim();
   if (!key) throw new Error('Falta la API key.');
 
@@ -89,7 +94,7 @@ async function _chatStream({ messages, onToken, onReasoning, signal }) {
       model: getModel(),
       messages,
       stream: true,
-      max_tokens: 2048,
+      max_tokens: MAX_TOKENS,
     }),
     signal,
   });
@@ -105,6 +110,7 @@ async function _chatStream({ messages, onToken, onReasoning, signal }) {
   const decoder = new TextDecoder();
   let buffer = '';
   let full = '';
+  let finishReason = null;
 
   while (true) {
     const { done, value } = await reader.read();
@@ -122,7 +128,9 @@ async function _chatStream({ messages, onToken, onReasoning, signal }) {
         if (payload === '[DONE]') continue;
         let json;
         try { json = JSON.parse(payload); } catch { continue; }
-        const delta = json.choices?.[0]?.delta || {};
+        const choice = json.choices?.[0] || {};
+        if (choice.finish_reason) finishReason = choice.finish_reason;
+        const delta = choice.delta || {};
         if (delta.reasoning_content && onReasoning) onReasoning(delta.reasoning_content);
         if (delta.content) {
           full += delta.content;
@@ -131,6 +139,9 @@ async function _chatStream({ messages, onToken, onReasoning, signal }) {
       }
     }
   }
+  // finish_reason 'length' = el proveedor cortó por el tope de tokens (respuesta
+  // incompleta). El llamante puede ofrecer "Continuar".
+  if (onDone) onDone({ finishReason, truncated: finishReason === 'length' });
   return full;
 }
 

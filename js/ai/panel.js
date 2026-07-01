@@ -512,6 +512,18 @@ async function send() {
   const ref = pendingRef;
   const aug = ref ? `Sobre este fragmento del libro:\n«${ref}»\n\n${q}` : q;
 
+  els.input.value = '';
+  clearRef();
+  await deliver(aug, q, { showUser: true });
+}
+
+// Un turno con el LLM: construye el contexto (IA1), lo streamea y pinta la respuesta.
+// `showUser` false = continuación (no se pinta ni persiste una burbuja de usuario; el
+// mensaje va igualmente al modelo como último turno). Reutilizado por send() y por el
+// botón "Continuar" que aparece si el proveedor corta la respuesta por longitud.
+async function deliver(aug, question, { showUser = true } = {}) {
+  if (busy) return;
+
   // IA1 · Recorte de contexto: en vez del libro entero, solo los capítulos
   // relevantes al objetivo (relevancia ya cacheada por conversación). Si aún no
   // hay puntuaciones, selectContext devuelve el libro entero (sin regresión).
@@ -538,18 +550,18 @@ async function send() {
     return;   // se conservan input y referencia adjunta
   }
 
-  els.input.value = '';
-  clearRef();
-  appendBubble('user', aug, false);
-  history.push({ role: 'user', content: aug });
-  if (convo) DB.addMessage(convo.id, 'user', aug);
+  if (showUser) {
+    appendBubble('user', aug, false);
+    history.push({ role: 'user', content: aug });
+    if (convo) DB.addMessage(convo.id, 'user', aug);
+  }
 
   const bubble = appendBubble('assistant', '', false);
   const textNode = bubble.querySelector('.ai-bubble-text');
   textNode.innerHTML = '<span class="ai-typing">pensando…</span>';
   busy = true; els.send.disabled = true; abortCtrl = new AbortController();
   agentUnread = false; applyAgentBadge();   // si el panel está cerrado, muestra "generando"
-  let thinking = true, raw;
+  let thinking = true, raw, truncated = false;
 
   const messages = [
     { role: 'system', content: systemPrompt(convo?.goal, template, Profiles.getActive()) },
@@ -565,10 +577,11 @@ async function send() {
         if (thinking) { thinking = false; textNode.textContent = ''; }
         textNode.textContent += t; scrollDown();
       },
+      onDone: (info) => { truncated = info.truncated; },
     });
     const finalText = raw || textNode.textContent;
     textNode.innerHTML = renderWithCitations(finalText, anchors);
-    addMessageActions(bubble, finalText, q, { autoRun: LLM.getAutoExtract() });
+    addMessageActions(bubble, finalText, question, { autoRun: LLM.getAutoExtract(), truncated });
     history.push({ role: 'assistant', content: finalText });
     if (convo) DB.addMessage(convo.id, 'assistant', finalText);
   } catch (e) {
@@ -581,11 +594,31 @@ async function send() {
   }
 }
 
+// Continúa una respuesta que el proveedor cortó por longitud: reusa deliver() con una
+// instrucción de continuación, sin pintar/persistir una burbuja de usuario (el modelo
+// ya ve su parte previa en el historial). La continuación llega como nueva burbuja.
+function continueResponse(question) {
+  const prompt = 'Continúa tu respuesta anterior EXACTAMENTE desde donde se cortó, '
+    + 'sin repetir nada de lo ya escrito, sin saludar y sin reintroducir. Sigue el hilo.';
+  return deliver(prompt, question, { showUser: false });
+}
+
 // ---- Extracción a la libreta (tool-use, no-streaming) ----------------------
 
-function addMessageActions(bubble, answerText, question, { autoRun = false } = {}) {
+function addMessageActions(bubble, answerText, question, { autoRun = false, truncated = false } = {}) {
   const bar = document.createElement('div');
   bar.className = 'ai-bubble-actions';
+
+  // El proveedor cortó por longitud: ofrecer continuar (streamea el resto en una
+  // nueva burbuja). Se deshabilita al pulsar para no lanzar continuaciones dobles.
+  if (truncated) {
+    const cont = document.createElement('button');
+    cont.className = 'ai-act ai-continue';
+    cont.innerHTML = act('arrow-up-right', 'Continuar');
+    cont.title = 'La respuesta se cortó por longitud';
+    cont.addEventListener('click', () => { cont.disabled = true; continueResponse(question); });
+    bar.appendChild(cont);
+  }
 
   const copyBtn = document.createElement('button');
   copyBtn.className = 'ai-act ai-copy';

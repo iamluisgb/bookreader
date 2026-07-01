@@ -5,7 +5,25 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
-## 2026-07-01 — Descubrir modelos del proveedor + elegirlos con chips
+## 2026-07-01 — Respuestas ya no se cortan a medias (tope de tokens + Continuar)
+
+Las respuestas largas del agente (análisis del Artesano del Texto, etc.) se cortaban en mitad de una
+frase. Causa: `max_tokens: 2048` (~1500 palabras) y, peor, el parser **ni miraba `finish_reason`**, así
+que el corte por longitud era **silencioso** (sin aviso ni recurso).
+
+**Qué se hizo** ([`js/ai/llm.js`](js/ai/llm.js), [`js/ai/panel.js`](js/ai/panel.js)):
+- **Tope subido a 4096** tokens (~3000 palabras): cabe casi cualquier respuesta.
+- **Detección del corte:** `_chatStream` captura `finish_reason` y lo emite por `onDone({ truncated })`.
+- **Botón "Continuar":** si el proveedor cortó por longitud (`finish_reason: 'length'`), la respuesta
+  muestra un botón que **retoma exactamente donde se cortó** y streamea el resto en una nueva burbuja.
+  No añade una burbuja de usuario (el modelo ya ve su parte previa en el historial); el botón se
+  deshabilita al pulsarlo. El núcleo del turno se extrajo a `deliver()`, reutilizado por `send()` y por
+  la continuación.
+
+**Decisión:** botón manual en vez de auto-continuar sin límite — respeta el coste (BYOK) y evita bucles;
+el usuario decide si quiere el resto. Sin bump de `sw.js`. Verificado con Playwright (stream mockeado con
+`finish_reason: 'length'` → aparece "Continuar"; al pulsarlo, continuación en burbuja nueva sin turno de
+usuario, botón deshabilitado, la parte con `stop` no reofrece continuar; 0 errores) y 19/19 E2E.
 
 En escritorio el campo Modelo era un `<input list=datalist>`, y el datalist **no se despliega si el
 input ya tiene valor**: parecía que "no dejaba cambiar el modelo" (en móvil el navegador sí lo muestra
