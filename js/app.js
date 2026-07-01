@@ -154,24 +154,11 @@ function initReaderReflow() {
 // Estilo Play Books: las barras son un overlay sobre un área de lectura de altura
 // fija (ver CSS de `body.reading`), así mostrarlas/ocultarlas NO re-pagina el EPUB
 // ni mueve el texto. Por eso aquí solo alternamos la clase, sin resize.
+// Solo alterna las barras (overlay). La pantalla completa NATIVA del sistema se
+// gestiona en initImmersive con el botón ⤢, porque un toque dentro del iframe de
+// lectura (origen opaco por el sandbox que protege la key) NO puede iniciar fullscreen.
 function setImmersive(on) {
   document.body.classList.toggle('immersive', on);
-  // MÓVIL: además del overlay de barras, pantalla completa NATIVA del navegador para
-  // ocultar la barra de estado y la de gestos del sistema y dibujar de borde a borde
-  // (incluido el recorte de cámara, con `viewport-fit=cover`). En escritorio el
-  // fullscreen lo gestiona initImmersive aparte. iOS puede no soportarlo → se ignora.
-  if (!EpubReader.isCoarsePointer()) return;
-  try {
-    const el = document.documentElement;
-    const inFs = document.fullscreenElement || document.webkitFullscreenElement;
-    if (on && !inFs) {
-      const req = el.requestFullscreen || el.webkitRequestFullscreen;
-      if (req) req.call(el).catch(() => {});
-    } else if (!on && inFs) {
-      const exit = document.exitFullscreen || document.webkitExitFullscreen;
-      if (exit) exit.call(document);
-    }
-  } catch (e) { /* Fullscreen API no soportada */ }
 }
 
 function initImmersive() {
@@ -228,19 +215,31 @@ function initImmersive() {
     };
     document.addEventListener('fullscreenchange', syncFs);
     document.addEventListener('webkitfullscreenchange', syncFs);
-  } else {
-    // Móvil: overlay inmersivo propio (las barras deslizan) + pantalla completa nativa
-    // (ver setImmersive). Se entra con el botón y se alterna tocando el centro del texto.
-    btn?.addEventListener('click', () => setImmersive(true));
-    // Si el sistema sale de fullscreen (p. ej. gesto de deslizar del usuario),
-    // reflejarlo mostrando de nuevo las barras para no quedar en un estado incoherente.
+  } else if (reqFS && exitFS) {
+    // MÓVIL con Fullscreen API. El botón ⤢ alterna PANTALLA COMPLETA NATIVA del
+    // navegador (oculta la barra de estado y la de gestos del sistema y dibuja de
+    // borde a borde). Debe dispararse desde ESTE gesto del document padre: un toque
+    // dentro del iframe de lectura no puede iniciar fullscreen (sandbox de origen
+    // opaco que protege la key). Tocar el centro del texto alterna solo las barras.
+    btn?.addEventListener('click', () => {
+      if (fsElement()) exitFS.call(document);
+      else reqFS.call(el).catch(() => {});
+    });
+    // En pantalla completa ocultamos las barras (lectura limpia); al salir —incluido
+    // el gesto del sistema— vuelven. Sincroniza también el icono ⤢/⤡.
     const onFsChange = () => {
-      if (!(document.fullscreenElement || document.webkitFullscreenElement)) {
-        document.body.classList.remove('immersive');
+      const on = !!fsElement();
+      document.body.classList.toggle('immersive', on);
+      if (btn) {
+        btn.setAttribute('data-icon', on ? 'compress' : 'expand');
+        hydrateIcons(btn.parentElement || document);
       }
     };
     document.addEventListener('fullscreenchange', onFsChange);
     document.addEventListener('webkitfullscreenchange', onFsChange);
+  } else {
+    // Sin Fullscreen API (p. ej. iOS Safari): overlay de barras como hasta ahora.
+    btn?.addEventListener('click', () => setImmersive(true));
   }
 
   // Toques sobre el contenido del libro (sin capa que bloquee la selección):
