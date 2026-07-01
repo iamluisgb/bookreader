@@ -1367,6 +1367,17 @@ body.reading.immersive .reader-header { transform: translateY(-100%); }
 body.reading.immersive .reader-footer { transform: translateY(100%); }
 body.immersive .ai-fab { transform: scale(0); }
 
+/* Móvil: al dibujar de borde a borde (fullscreen inmersivo + viewport-fit=cover), el
+   área de lectura reserva el safe-area izquierdo/derecho (recorte de cámara en
+   landscape). El fondo de página rellena esa franja (adiós al borde negro) y el texto
+   queda inset, sin quedar bajo la cámara. En portrait los insets son 0 → sin efecto. */
+@media (pointer: coarse) {
+  body.reading .reader-viewport {
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+}
+
 /* ============================================================================
    F5 · Sistema de iconos (SF Symbols) + refinado de controles estilo Apple
    ========================================================================== */

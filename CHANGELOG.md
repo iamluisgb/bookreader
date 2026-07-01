@@ -5,7 +5,25 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
-## 2026-07-01 — Flechas ←/→ pasan página también con el foco en el texto
+## 2026-07-01 — Inmersivo en móvil: pantalla completa real + borde a borde
+
+En móvil, el modo inmersivo solo ocultaba nuestras barras (CSS), no las del sistema: quedaban la
+**barra de estado** arriba y franjas negras en el **recorte de cámara** (izquierda en landscape) y en
+la **barra de gestos** (abajo).
+
+**Qué se hizo** ([`js/app.js`](js/app.js) `setImmersive`, [`css/main.css`](css/main.css)):
+- **Pantalla completa nativa en el inmersivo móvil:** `setImmersive` ahora, en punteros *coarse*,
+  también entra/sale de `requestFullscreen`/`exitFullscreen`, ocultando la barra de estado y la de
+  gestos del sistema y dibujando de borde a borde (con `viewport-fit=cover`). Se sincroniza si el
+  usuario sale con un gesto del sistema (vuelven las barras) y se cierra al volver a la biblioteca. iOS
+  Safari puede no soportarlo → se ignora en silencio.
+- **Safe-area izquierdo/derecho:** el área de lectura reserva `env(safe-area-inset-left/right)` en
+  móvil, así el fondo de página rellena la franja del recorte de cámara (adiós al borde negro) y el
+  texto no queda debajo de la cámara. En portrait los insets son 0 → sin efecto.
+
+Sin bump de `sw.js`. Verificado con Playwright (contexto móvil *coarse*, Fullscreen API stubbeada:
+entrar → `requestFullscreen`; salir del sistema → barras vuelven; reentrar → vuelve a pedirlo; ir a la
+biblioteca → `exitFullscreen`; 0 errores) y 19/19 E2E.
 
 Había un handler de teclado en el `document`, pero al leer el **foco está dentro del iframe** de
 epub.js, cuyas teclas no llegan al documento padre, así que las flechas no pasaban página (mismo motivo

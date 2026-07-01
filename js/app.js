@@ -49,6 +49,12 @@ function initLibrary() {
 
 async function goToLibrary() {
   document.body.classList.remove('reading', 'immersive', 'fs');   // salir del modo lectura
+  // Salir de pantalla completa nativa si estábamos en ella (inmersivo móvil).
+  try {
+    if (document.fullscreenElement || document.webkitFullscreenElement) {
+      (document.exitFullscreen || document.webkitExitFullscreen)?.call(document);
+    }
+  } catch (e) { /* Fullscreen API no soportada */ }
   document.getElementById('library-btn').style.display = 'none';
   document.getElementById('reader-title').textContent = 'BookReader';
   await Library.render();
@@ -150,6 +156,22 @@ function initReaderReflow() {
 // ni mueve el texto. Por eso aquí solo alternamos la clase, sin resize.
 function setImmersive(on) {
   document.body.classList.toggle('immersive', on);
+  // MÓVIL: además del overlay de barras, pantalla completa NATIVA del navegador para
+  // ocultar la barra de estado y la de gestos del sistema y dibujar de borde a borde
+  // (incluido el recorte de cámara, con `viewport-fit=cover`). En escritorio el
+  // fullscreen lo gestiona initImmersive aparte. iOS puede no soportarlo → se ignora.
+  if (!EpubReader.isCoarsePointer()) return;
+  try {
+    const el = document.documentElement;
+    const inFs = document.fullscreenElement || document.webkitFullscreenElement;
+    if (on && !inFs) {
+      const req = el.requestFullscreen || el.webkitRequestFullscreen;
+      if (req) req.call(el).catch(() => {});
+    } else if (!on && inFs) {
+      const exit = document.exitFullscreen || document.webkitExitFullscreen;
+      if (exit) exit.call(document);
+    }
+  } catch (e) { /* Fullscreen API no soportada */ }
 }
 
 function initImmersive() {
@@ -207,9 +229,18 @@ function initImmersive() {
     document.addEventListener('fullscreenchange', syncFs);
     document.addEventListener('webkitfullscreenchange', syncFs);
   } else {
-    // Móvil / sin Fullscreen API: overlay inmersivo propio (las barras deslizan
-    // fuera). Se entra con el botón y se alterna tocando el centro del texto.
+    // Móvil: overlay inmersivo propio (las barras deslizan) + pantalla completa nativa
+    // (ver setImmersive). Se entra con el botón y se alterna tocando el centro del texto.
     btn?.addEventListener('click', () => setImmersive(true));
+    // Si el sistema sale de fullscreen (p. ej. gesto de deslizar del usuario),
+    // reflejarlo mostrando de nuevo las barras para no quedar en un estado incoherente.
+    const onFsChange = () => {
+      if (!(document.fullscreenElement || document.webkitFullscreenElement)) {
+        document.body.classList.remove('immersive');
+      }
+    };
+    document.addEventListener('fullscreenchange', onFsChange);
+    document.addEventListener('webkitfullscreenchange', onFsChange);
   }
 
   // Toques sobre el contenido del libro (sin capa que bloquee la selección):
