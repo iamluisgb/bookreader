@@ -180,6 +180,17 @@ function applyHighlightToRendition(cfiRange, color) {
   });
 }
 
+// Re-dibuja en el rendition todos los subrayados guardados de este libro. epub.js
+// recrea el rendition al reabrir con el set de anotaciones vacío, así que si no se
+// vuelven a añadir no se ven sobre el texto (aunque sigan guardados y en la lista).
+// Se llama una vez tras cargar el libro.
+export function applyStoredHighlights() {
+  if (!EpubReader.getRendition()) return;
+  for (const hl of Highlights.getAll()) {
+    if (hl && hl.cfi) applyHighlightToRendition(hl.cfi, hl.color);
+  }
+}
+
 export function renderHighlights() {
   const list = document.getElementById('highlights-list');
   const highlights = Highlights.getAll();

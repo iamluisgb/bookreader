@@ -5,7 +5,20 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
-## 2026-07-01 — Respuestas ya no se cortan a medias (tope de tokens + Continuar)
+## 2026-07-01 — Los subrayados vuelven a verse al reabrir el libro
+
+Al subrayar, salir del libro y volver a entrar, el resaltado **no se veía sobre el texto** (aunque
+seguía guardado y en la lista "Subrayados"). Causa: `applyHighlightToRendition` solo se llamaba al
+**crear** un subrayado; al reabrir, epub.js crea un `rendition` nuevo con el set de anotaciones vacío y
+**nada volvía a añadir** los guardados.
+
+**Qué se hizo** ([`js/highlights-ui.js`](js/highlights-ui.js), [`js/app.js`](js/app.js)):
+- Nueva **`applyStoredHighlights()`**: recorre `Highlights.getAll()` y re-dibuja cada uno en el
+  rendition (`annotations.highlight`). Se llama en `loadEpub()` tras `setupHighlights()`, así cubre
+  tanto abrir como reabrir desde la biblioteca (ambos pasan por `loadEpub`).
+
+Sin bump de `sw.js`. Verificado con Playwright (creando un subrayado real con CFI válido: se dibuja en
+la sesión y **sigue dibujado tras salir a la biblioteca y reabrir**; 0 errores) y 19/19 E2E.
 
 Las respuestas largas del agente (análisis del Artesano del Texto, etc.) se cortaban en mitad de una
 frase. Causa: `max_tokens: 2048` (~1500 palabras) y, peor, el parser **ni miraba `finish_reason`**, así

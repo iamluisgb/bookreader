@@ -8,7 +8,7 @@ import * as AiPanel from './ai/panel.js';
 import * as AiDB from './ai/db.js';
 import { hydrateIcons } from './ui/icons.js';
 import { countBookWords, updateProgressDetail } from './progress.js';
-import { initHighlights, setupHighlights, renderHighlights, hideHighlightTooltip } from './highlights-ui.js';
+import { initHighlights, setupHighlights, renderHighlights, applyStoredHighlights, hideHighlightTooltip } from './highlights-ui.js';
 import { initBookmarkButton, updateBookmarkButton, renderBookmarks } from './bookmarks-ui.js';
 import * as Library from './library/view.js';
 import * as LibStore from './library/store.js';
@@ -400,6 +400,8 @@ async function loadEpub(buffer, bookId, aiBookId) {
 
     // Setup highlights with rendition
     setupHighlights();
+    // Re-dibujar los subrayados guardados sobre el texto (el rendition es nuevo).
+    applyStoredHighlights();
 
     // Render bookmark and highlight lists
     renderBookmarks();
