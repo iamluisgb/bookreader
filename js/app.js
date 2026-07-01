@@ -495,7 +495,8 @@ function initNavigation() {
 
   // Keyboard navigation
   document.addEventListener('keydown', (e) => {
-    if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return;
+    if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
     if (e.key === 'ArrowLeft') {
       if (EpubReader.isLoaded()) EpubReader.prev();
       else if (PdfReader.isLoaded()) PdfReader.prev();

@@ -5,7 +5,20 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
-## 2026-07-01 — Barra de progreso: página, tiempo restante y salto al pulsar
+## 2026-07-01 — Flechas ←/→ pasan página también con el foco en el texto
+
+Había un handler de teclado en el `document`, pero al leer el **foco está dentro del iframe** de
+epub.js, cuyas teclas no llegan al documento padre, así que las flechas no pasaban página (mismo motivo
+que el `mousemove` del auto-ocultar).
+
+**Qué se hizo** ([`js/epub-reader.js`](js/epub-reader.js), [`js/app.js`](js/app.js)):
+- Listener `keydown` dentro de cada iframe de sección (hook de contenido) que reenvía **←/→** a
+  `prev()`/`next()`. Se ignora con modificadores (Alt+← = atrás del navegador, Shift+← = selección).
+- El handler del `document` padre (que cubre foco fuera del iframe y el PDF) gana el mismo guard de
+  modificadores y también ignora `TEXTAREA`.
+
+Sin bump de `sw.js`. Verificado con Playwright (foco dentro del iframe: `→→→` avanza de página y `←←`
+retrocede; 0 errores) y 19/19 E2E.
 
 El pie del lector solo mostraba el %; el tiempo restante estaba escondido en un popup que se abría al
 pulsar la barra, y no había forma de saltar a una parte del libro desde ahí.

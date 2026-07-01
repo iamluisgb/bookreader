@@ -271,6 +271,15 @@ export async function load(arrayBuffer, onProgress) {
     // Escritorio: selección nativa + toques/clics para navegar.
     if (COARSE) TouchSelect.attach(contents);
     else registerTapHandler(contents);
+
+    // Flechas ←/→ para pasar página TAMBIÉN cuando el foco está dentro del iframe
+    // de lectura (sus teclas no llegan al document padre, donde también se escuchan).
+    // Se ignoran con modificadores (Alt+← = atrás del navegador, Shift+← = selección).
+    doc.addEventListener('keydown', (e) => {
+      if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
+      if (e.key === 'ArrowLeft') { e.preventDefault(); prev(); }
+      else if (e.key === 'ArrowRight') { e.preventDefault(); next(); }
+    });
   });
 
   // Restaurar la última posición de ESTE libro (guardada en cada 'relocated'
