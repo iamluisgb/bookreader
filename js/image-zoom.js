@@ -7,12 +7,12 @@
 import { icon } from './ui/icons.js';
 
 let overlay = null, imgEl = null;
-let scale = 1, tx = 0, ty = 0;
+let scale = 1, tx = 0, ty = 0, openedAt = 0;
 const MIN = 1, MAX = 6, ZOOM_STEP = 2.5;
 
 const pointers = new Map();
 let startDist = 0, startScale = 1, lastMid = null, panStart = null;
-let lastTap = 0, movedSincePress = false, downPos = null;
+let lastTap = 0, movedSincePress = false, downPos = null, lastTouchUp = 0;
 
 function apply() { imgEl.style.transform = `translate(${tx}px, ${ty}px) scale(${scale})`; }
 function reset() { scale = 1; tx = 0; ty = 0; apply(); }
@@ -29,6 +29,7 @@ export function openImageZoom(srcOrImg) {
   imgEl.src = src;
   reset();
   overlay.style.display = 'flex';
+  openedAt = Date.now();   // ignora el "click fantasma" del toque que abre (ver más abajo)
 }
 
 function close() {
@@ -51,9 +52,16 @@ function ensureOverlay() {
   imgEl = overlay.querySelector('.img-zoom-img');
 
   overlay.querySelector('.img-zoom-close').addEventListener('click', (e) => { e.stopPropagation(); close(); });
-  overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });   // fondo → cerrar
+  // Fondo → cerrar. En móvil, al abrir desde un TOQUE, el navegador sintetiza un
+  // "click fantasma" ~300 ms después; como la imagen aún no ha cargado (sin tamaño),
+  // ese click cae en el fondo y cerraría el visor recién abierto. Lo ignoramos.
+  overlay.addEventListener('click', (e) => {
+    if (Date.now() - openedAt < 450) return;
+    if (e.target === overlay) close();
+  });
   overlay.addEventListener('dblclick', (e) => {                                        // ratón → alternar zoom
     if (e.target.closest('.img-zoom-close')) return;
+    if (Date.now() - lastTouchUp < 600) return;   // dblclick fantasma de un doble-TOQUE: ya lo gestionó onUp
     e.preventDefault();
     if (scale > 1) reset(); else { scale = ZOOM_STEP; apply(); }
   });
@@ -108,6 +116,7 @@ function onUp(e) {
     const p = [...pointers.values()][0];
     panStart = { x: p.x, y: p.y, tx, ty };
   }
+  if (e.pointerType === 'touch') lastTouchUp = Date.now();   // marca para ignorar el dblclick fantasma
   // Doble TOQUE (táctil) → alternar zoom. En ratón lo hace el evento 'dblclick'.
   if (pointers.size === 0 && e.pointerType === 'touch' && !movedSincePress) {
     const now = Date.now();

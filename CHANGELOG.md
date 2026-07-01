@@ -49,6 +49,13 @@ inmersivo: tocar la imagen solo pasaba página o alternaba barras.
 el lightbox; doble clic → 2.5×; rueda → reduce; doble clic → 1×; ✕ → cierra; 0 errores), captura visual
 y 19/19 E2E.
 
+**Fix móvil (mismo día):** en táctil el visor abría y se cerraba solo. Dos causas de los eventos
+sintéticos del toque: (1) el **click "fantasma"** ~300 ms tras el toque caía en el fondo (imagen aún
+sin cargar) y cerraba el visor → se ignora un breve margen tras abrir (`openedAt`); (2) el **dblclick
+fantasma** del doble-toque deshacía el zoom que ya había aplicado `onUp` → se ignora el `dblclick` si
+viene justo tras un toque (`lastTouchUp`). Verificado en contexto móvil *coarse* (abre y se queda;
+doble-toque → 2.5×; ✕ cierra; 0 errores).
+
 ---
 
 ## 2026-07-01 — Inmersivo en móvil: pantalla completa real + borde a borde
