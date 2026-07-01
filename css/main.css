@@ -1330,16 +1330,29 @@ select:focus {
    F4 · Modo lectura inmersivo
    ========================================================================== */
 .reader-header, .reader-footer { transition: transform var(--transition-normal); }
-/* Modo lectura (estilo Play Books): con un libro abierto, cabecera y pie son un
-   OVERLAY (position:absolute) sobre un área de lectura que ocupa SIEMPRE toda la
-   altura. Así mostrar/ocultar las barras (toque central) no cambia el tamaño del
-   contenedor y epub.js NO re-pagina: el texto nunca se mueve. En biblioteca/landing
-   (sin `reading`) las barras siguen en el flujo normal. */
-body.reading .reader-header,
-body.reading .reader-footer { position: absolute; left: 0; right: 0; z-index: 60; }
-body.reading .reader-header { top: 0; }
-body.reading .reader-footer { bottom: 0; }
-/* Inmersivo = barras ocultas: se deslizan fuera (el área de lectura no cambia). */
+/* Overlay de barras (estilo Play Books): cabecera y pie flotan (position:absolute)
+   sobre un área de lectura que ocupa toda la altura, así ocultarlas/mostrarlas NO
+   re-pagina el EPUB. Pero, como flotan, TAPAN la 1ª/última línea si no se ocultan —
+   por eso el overlay solo se activa donde SÍ se ocultan:
+     · MÓVIL (pointer coarse): siempre en lectura; se ocultan tocando el centro.
+     · ESCRITORIO (pointer fine): SOLO en pantalla completa (`body.fs`), donde se
+       auto-ocultan y reaparecen al mover el ratón.
+   En ventana de escritorio las barras se quedan en el flujo normal (flex): el área
+   de lectura se ajusta entre ellas y se ve TODO el texto sin gestos. */
+@media (pointer: coarse) {
+  body.reading .reader-header,
+  body.reading .reader-footer { position: absolute; left: 0; right: 0; z-index: 60; }
+  body.reading .reader-header { top: 0; }
+  body.reading .reader-footer { bottom: 0; }
+}
+@media (pointer: fine) {
+  body.reading.fs .reader-header,
+  body.reading.fs .reader-footer { position: absolute; left: 0; right: 0; z-index: 60; }
+  body.reading.fs .reader-header { top: 0; }
+  body.reading.fs .reader-footer { bottom: 0; }
+}
+/* Inmersivo = barras ocultas: se deslizan fuera (el área de lectura no cambia).
+   Solo tiene efecto cuando las barras son overlay (móvil, o escritorio en `fs`). */
 body.reading.immersive .reader-header { transform: translateY(-100%); }
 body.reading.immersive .reader-footer { transform: translateY(100%); }
 body.immersive .ai-fab { transform: scale(0); }

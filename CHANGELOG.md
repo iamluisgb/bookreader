@@ -5,26 +5,35 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
-## 2026-07-01 — Pantalla completa real en escritorio (estilo Play Books)
+## 2026-07-01 — Pantalla completa en escritorio + barras que no tapan texto (estilo Play Books)
 
-En PC el botón ⤢ ("Modo lectura") entraba en el overlay inmersivo propio (barras deslizadas fuera)
-pero **no había forma de salir**: el propio botón se ocultaba con las barras, el toque-al-centro solo
-está cableado para pantalla táctil y `Esc` no gestionaba ese modo. El único recurso era recargar.
+Dos problemas relacionados en PC. (1) El botón ⤢ entraba en el overlay inmersivo propio pero **no
+había forma de salir** (el botón se ocultaba con las barras, el toque-al-centro es solo táctil, `Esc`
+no lo gestionaba). (2) Más de fondo: en modo lectura las barras son un **overlay** sobre un área a
+altura completa (para no re-paginar al ocultarlas), pero en escritorio nunca se ocultaban, así que
+**tapaban siempre la 1ª/última línea** — nunca se veía la página entera, ni en ventana ni en fullscreen.
 
-**Qué se hizo** ([`js/app.js`](js/app.js) `initImmersive`, icono nuevo en
-[`js/ui/icons.js`](js/ui/icons.js)):
-- **Escritorio:** el botón ⤢ ahora usa la **Fullscreen API nativa** del navegador
-  (`requestFullscreen`/`exitFullscreen`, con fallback `webkit*` para Safari antiguo): llena el monitor
-  y oculta el chrome del navegador y del SO. Al ser nativa, **se sale con `Esc`** (o F11). Un listener
-  de `fullscreenchange` sincroniza el icono (⤢ ⇄ ⤡ `expand`/`compress`) sea cual sea la vía de salida.
-- **Móvil / sin Fullscreen API:** sin cambios — sigue el overlay inmersivo propio (barras que deslizan,
-  alternado tocando el centro del texto).
+**Qué se hizo** ([`js/app.js`](js/app.js) `initImmersive`, [`css/main.css`](css/main.css),
+[`js/epub-reader.js`](js/epub-reader.js), icono `compress` en [`js/ui/icons.js`](js/ui/icons.js)):
+- **Overlay de barras solo donde SÍ se ocultan.** El `position:absolute` de cabecera/pie pasa a
+  depender del puntero: en **móvil** (`pointer: coarse`) siempre (se ocultan tocando el centro); en
+  **escritorio** (`pointer: fine`) **solo en pantalla completa** (`body.fs`). En **ventana de
+  escritorio** las barras vuelven al **flujo normal** (flex) y el área de lectura se ajusta entre
+  ellas → se ve **todo el texto** sin gestos.
+- **Escritorio → pantalla completa nativa.** El botón ⤢ usa la **Fullscreen API** (`requestFullscreen`
+  /`exitFullscreen`, con fallback `webkit*`): llena el monitor y oculta el chrome del navegador/SO. Se
+  **sale con `Esc`/F11**; un listener de `fullscreenchange` sincroniza icono (⤢ ⇄ ⤡) y estado.
+- **Auto-ocultar en fullscreen (Play Books).** En pantalla completa las barras arrancan ocultas (página
+  completa) y **reaparecen al mover el ratón**, escondiéndose tras ~2,5 s de inactividad. Como el texto
+  vive en un iframe (sus `mousemove` no llegan al document padre), `EpubReader.onActivity` reemite el
+  movimiento sobre el texto para que el reveal funcione también encima de la página.
+- **Móvil:** sin cambios (overlay + toque central).
 
-**Decisión:** se mantienen las barras visibles en pantalla completa (se "copia la vista" de Play Books)
-en lugar de ocultarlas, que era el comportamiento roto anterior. Sin bump de `sw.js` (cambio de
-contenido, sin ficheros nuevos en el precache). Verificado con Playwright (Fullscreen API stubbeada:
-clic → `requestFullscreen` + icono `compress`; reclic → `exitFullscreen` + icono `expand`; 0 errores)
-y 19/19 E2E.
+**Decisiones:** ventana de escritorio con barras fijas (acceso a menús sin gestos, esperado en una
+ventana) y fullscreen con auto-ocultar (máxima lectura) — elegido por el usuario. Sin bump de `sw.js`
+(cambio de contenido, sin ficheros nuevos). Verificado con Playwright (Fullscreen API stubbeada:
+ventana → barras en flujo y viewport con hueco; fullscreen → oculto, ratón sobre el texto revela,
+inactividad re-oculta, Esc sale al flujo; 0 errores) y 19/19 E2E.
 
 ---
 

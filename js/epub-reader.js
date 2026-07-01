@@ -38,6 +38,12 @@ export function resize() {
 let onTapCb = () => {};
 export function onTap(cb) { onTapCb = cb || (() => {}); }
 
+// Actividad de puntero DENTRO del iframe de lectura. Los eventos de ratón sobre el
+// texto no llegan al document padre (iframe), así que los reemitimos para que el
+// auto-ocultar de pantalla completa (escritorio) reaparezca al mover el ratón.
+let onActivityCb = () => {};
+export function onActivity(cb) { onActivityCb = cb || (() => {}); }
+
 // ---- Selección de texto (táctil) ------------------------------------------
 let onSelectCb = () => {};
 let onSelectDismissCb = () => {};
@@ -166,6 +172,9 @@ function registerTapHandler(contents) {
     if (hasSelection(win)) return;
     onTapCb('click');
   });
+
+  // Mover el ratón sobre el texto = actividad → reaparecen las barras en fullscreen.
+  doc.addEventListener('mousemove', () => onActivityCb(), { passive: true });
 }
 
 export function init() {

@@ -48,7 +48,7 @@ function initLibrary() {
 }
 
 async function goToLibrary() {
-  document.body.classList.remove('reading', 'immersive');   // salir del modo lectura
+  document.body.classList.remove('reading', 'immersive', 'fs');   // salir del modo lectura
   document.getElementById('library-btn').style.display = 'none';
   document.getElementById('reader-title').textContent = 'BookReader';
   await Library.render();
@@ -161,24 +161,46 @@ function initImmersive() {
   const fsElement = () => document.fullscreenElement || document.webkitFullscreenElement;
 
   if (!EpubReader.isCoarsePointer() && reqFS && exitFS) {
-    // Escritorio (estilo Play Books): el botón ⤢ va a PANTALLA COMPLETA REAL del
-    // navegador (llena el monitor, oculta el chrome del navegador y el SO). Como es
-    // nativa, se sale con Esc; mantenemos las barras visibles ("copiar esta vista").
+    // Escritorio. En ventana normal las barras van en el flujo (CSS) y el texto se ve
+    // entero. El botón ⤢ va a PANTALLA COMPLETA REAL del navegador (llena el monitor,
+    // oculta su chrome y el del SO); como es nativa, se sale con Esc/F11. En ese modo
+    // las barras pasan a overlay (clase `fs`) y se AUTO-OCULTAN estilo Play Books:
+    // arrancan escondidas para leer la página entera y reaparecen al mover el ratón,
+    // volviéndose a esconder tras unos segundos de inactividad.
     btn?.addEventListener('click', () => {
       if (fsElement()) exitFS.call(document);
       else reqFS.call(el).catch(() => {});
     });
-    // Sincroniza el icono/label con el estado real (Esc, F11 y clic entran aquí).
-    const syncFsIcon = () => {
-      const on = !!fsElement();
-      if (!btn) return;
-      btn.setAttribute('data-icon', on ? 'compress' : 'expand');
-      btn.title = on ? 'Salir de pantalla completa' : 'Pantalla completa';
-      btn.setAttribute('aria-label', btn.title);
-      hydrateIcons(btn.parentElement || document);
+
+    let hideTimer = null;
+    const hideBars = () => document.body.classList.add('immersive');
+    const revealBars = () => {
+      if (!document.body.classList.contains('fs')) return;   // solo en pantalla completa
+      document.body.classList.remove('immersive');
+      clearTimeout(hideTimer);
+      hideTimer = setTimeout(hideBars, 2500);
     };
-    document.addEventListener('fullscreenchange', syncFsIcon);
-    document.addEventListener('webkitfullscreenchange', syncFsIcon);
+    // Reaparecer al mover el ratón: en los márgenes (document padre) y sobre el texto
+    // (reemitido desde el iframe por EpubReader). El guard `fs` los hace inocuos fuera
+    // de pantalla completa, así que se registran una sola vez.
+    document.addEventListener('mousemove', revealBars);
+    EpubReader.onActivity(revealBars);
+
+    // Sincroniza clase/estado/icono con el estado real de fullscreen (clic, Esc, F11).
+    const syncFs = () => {
+      const on = !!fsElement();
+      document.body.classList.toggle('fs', on);
+      if (on) hideBars();                              // arranca oculto → página completa
+      else { clearTimeout(hideTimer); document.body.classList.remove('immersive'); }
+      if (btn) {
+        btn.setAttribute('data-icon', on ? 'compress' : 'expand');
+        btn.title = on ? 'Salir de pantalla completa' : 'Pantalla completa';
+        btn.setAttribute('aria-label', btn.title);
+        hydrateIcons(btn.parentElement || document);
+      }
+    };
+    document.addEventListener('fullscreenchange', syncFs);
+    document.addEventListener('webkitfullscreenchange', syncFs);
   } else {
     // Móvil / sin Fullscreen API: overlay inmersivo propio (las barras deslizan
     // fuera). Se entra con el botón y se alterna tocando el centro del texto.
