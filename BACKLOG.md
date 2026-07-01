@@ -11,14 +11,16 @@ históricos que cada ítem absorbe (trazabilidad con git).
 
 ## 🤖 IA / Agente
 
-### IA1 — Recorte de contexto y de historial al LLM · `L` · **prioridad alta (coste)** _(ex T5, E3.2, E3.3)_
-Hoy cada mensaje manda system prompt + **libro anotado completo** + **todo el historial**
-([`js/ai/panel.js`](js/ai/panel.js), `history` sin recorte). Caro y lento en *cada* turno.
-- Usar la relevancia por capítulo que ya existe (`saveRatings`/`getRatings` en
-  [`js/ai/db.js`](js/ai/db.js)) para enviar **solo los capítulos relevantes**.
-- **Resumen rodante** del historial (ventana de N turnos o resumen de lo viejo).
-- **Guard por `tokenEstimate`**: avisar/confirmar antes de mandar libros enormes _(absorbe E2.3)_.
-- Aprovechar **prompt caching**: prefijo estable (perfil + libro) primero.
+### IA1 — Recorte de contexto y de historial al LLM · **fase 1+2 ✓** _(ex T5, E3.2, E3.3)_
+**Hecho (ver CHANGELOG):** retrieval por capítulo con presupuesto de tokens (60k), ventana de
+historial (6 mensajes), guard de tokens (~120k), fallback a libro entero sin ratings, prefijo estable
+para caching. Módulo [`js/ai/context.js`](js/ai/context.js) + integración en `send()`.
+
+Pendiente (fases futuras, menor prioridad):
+- **Fase 3 — resumen rodante del historial:** resumir los turnos que salen de la ventana (1 llamada
+  extra por turno) en vez de descartarlos, para conversaciones muy largas.
+- **Retrieval por pregunta con embeddings:** si algún proveedor BYOK expone `/embeddings`, pasar de
+  selección por *objetivo* a por *pregunta* (estilo NotebookLM). Convergería con IA4.
 
 ### IA2 — Interrupción "Pepito Grillo" (Modelado de Comportamiento) · `M` _(ex E5.2)_
 Con la plantilla correspondiente, que el agente interrumpa en puntos de quiebre del libro.
@@ -26,8 +28,10 @@ Con la plantilla correspondiente, que el agente interrumpa en puntos de quiebre 
 ### IA3 — Reintentos automáticos en errores transitorios · `S` _(ex E7.1)_
 Reintentar 429/5xx con backoff; hoy solo se muestra el error.
 
-### IA4 — Retrieval a nivel de capítulo (plan B) · `M` _(ex E7.2)_
-No urgente (el caching funciona, ver CHANGELOG E0.1). Palanca para libros enormes / sin caching.
+### IA4 — Retrieval por pregunta con embeddings · `M` _(ex E7.2)_
+El retrieval **a nivel de capítulo** ya lo entregó IA1 (fase 1). Lo que queda como palanca extra para
+libros enormes es el retrieval **por pregunta** con embeddings (si un proveedor BYOK expone
+`/embeddings`) — ver nota en IA1.
 
 ---
 

@@ -5,6 +5,51 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-01 — Recorte de contexto e historial al LLM (IA1, fase 1+2, ex T5/E3.2/E3.3)
+
+El agente dejaba de mandar el **libro anotado entero + todo el historial** en *cada* turno (caro y
+lento; un libro de ~100k palabras ≈ ~125k tokens de input por mensaje). Ahora manda solo los
+**capítulos relevantes** al objetivo y una **ventana de historial**.
+
+**Qué se hizo** (nuevo [`js/ai/context.js`](js/ai/context.js), integrado en `send()` de
+[`js/ai/panel.js`](js/ai/panel.js)):
+- **Retrieval por capítulo:** reusa la relevancia por capítulo que ya se calcula y cachea por
+  conversación (`DB.getRatings(convo.id)`, la misma que atenúa el índice). `selectContext` trocea el
+  libro por sus marcadores `## capítulo` y selecciona por **presupuesto de tokens** (60k), añadiendo
+  capítulos de mayor a menor relevancia hasta el tope.
+- **Ventana de historial:** solo se reenvían los **últimos 6 mensajes** (el chat completo sigue
+  guardado y visible; solo no se manda entero cada turno).
+- **Guard de tokens:** si el prompt final supera **~120k tokens**, se avisa/confirma antes de enviar
+  (absorbe E2.3) en vez de fallar de forma opaca.
+
+**Decisiones y porqué:**
+- **Por objetivo, no por pregunta.** NotebookLM hace retrieval por *pregunta* con embeddings; aquí se
+  hace por *objetivo* (una selección por conversación) reusando los ratings existentes. Da ~80% del
+  beneficio **sin necesidad de un endpoint de embeddings** (el BYOK actual solo asume chat). El
+  retrieval por pregunta con `/embeddings` queda como fase futura opcional.
+- **Presupuesto de tokens, no umbral fijo.** Con un umbral duro, un rating malo dejaría fuera algo
+  útil; con presupuesto, si "sobra sitio" entran más capítulos igualmente. Degradación amable.
+- **Inclusiones forzadas:** el **capítulo actual** (donde está el lector) y el **front matter** van
+  siempre, aunque puntúen bajo, para no perder el contexto inmediato. Los subtítulos que no están en
+  el TOC se **pliegan a su capítulo** (heredan su relevancia), no se tratan como capítulos sueltos.
+- **Sin regresión:** si aún no hay puntuaciones (conversación recién creada; el rating es asíncrono),
+  `selectContext` devuelve el **libro entero** —comportamiento anterior— y el siguiente turno ya
+  filtra. Un capítulo del TOC que el modelo no llegó a puntuar también se conserva (no se descarta lo
+  que no se puede juzgar).
+- **Orden y caching intactos:** los capítulos se reensamblan en su orden original (anclas `[[aN]]`
+  intactas) y el prompt mantiene el prefijo estable `[system][libro]` primero para el prompt caching.
+- **Historial: ventana, no resumen (aún).** La ventana de N mensajes es gratis y sin coste extra; el
+  **resumen rodante** (fase 3) añadiría una llamada por turno, así que se deja para después.
+- Impacto esperado: reducción típica **~2–3×** de tokens de input por turno en objetivos enfocados,
+  y respuestas más rápidas. SW: `context.js` al precache, `CACHE_NAME` → v37.
+- Verificado: lint 0 errores · 19/19 E2E · **11/11** casos de `selectContext` (sin scores→libro
+  entero, presupuesto amplio/medio/0, capítulo actual forzado, front matter, subtítulos plegados,
+  capítulo sin puntuar conservado, orden y anclas) · integración en la app (petición de chat con
+  `[system, libro, …, pregunta]`, fallback a libro completo sin ratings, historial acotado ≤6) sin
+  errores de consola.
+
+---
+
 ## 2026-07-01 — Proveedor de LLM configurable (BYOK a cualquier OpenAI-compatible) (TEC3, ex E1.2)
 
 El agente deja de estar atado a nan: el usuario puede apuntar a **cualquier proveedor

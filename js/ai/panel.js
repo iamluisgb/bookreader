@@ -11,11 +11,17 @@ import { escapeHtml } from '../ui/escape.js';
 import * as AppSettings from '../ui/app-settings.js';
 import { renderWithCitations } from './render.js';
 import { computeChapterRelevance, applyChapterAttenuation, clearChapterAttenuation } from './attenuation.js';
+import { selectContext, estimateTokens } from './context.js';
 import { TEMPLATE, systemPrompt } from './panel-template.js';
 import * as Profiles from './profiles.js';
 
 // Icon + label markup for the small inline action buttons.
 const act = (name, text, size = 15) => `${icon(name, { size })}<span>${text}</span>`;
+
+// IA1 — recorte de contexto/historial (ver decisión en el CHANGELOG):
+const CTX_BUDGET = 60000;    // tope de tokens de libro por turno (capítulos relevantes)
+const HISTORY_MSGS = 6;      // mensajes de historial verbatim que se reenvían (ventana)
+const TOKEN_GUARD = 120000;  // por encima de esto, avisar antes de enviar
 
 let els = {};
 let book = null, bookId = null, bookTitle = '';
@@ -490,11 +496,38 @@ async function send() {
   if (!LLM.hasKey()) { AppSettings.open('agent'); setStatus('Introduce tu API key primero.'); return; }
   if (!annotatedText) { setStatus('El libro aún no está listo.'); return; }
 
-  els.input.value = '';
   // Si hay un pasaje adjunto (referencia del lector), se incluye en el mensaje.
-  const ref = pendingRef; clearRef();
+  const ref = pendingRef;
   const aug = ref ? `Sobre este fragmento del libro:\n«${ref}»\n\n${q}` : q;
 
+  // IA1 · Recorte de contexto: en vez del libro entero, solo los capítulos
+  // relevantes al objetivo (relevancia ya cacheada por conversación). Si aún no
+  // hay puntuaciones, selectContext devuelve el libro entero (sin regresión).
+  const rated = convo ? await DB.getRatings(convo.id) : null;
+  const scores = (rated && rated.goal === convo.goal) ? rated.scores : null;
+  const tocLabels = (book?.navigation?.toc || []).map(t => t.label.trim());
+  const ctx = selectContext(annotatedText, scores, {
+    tocLabels,
+    currentChapter: EpubReader.getCurrentChapterLabel(),
+    budgetTokens: CTX_BUDGET,
+  });
+
+  // IA1 · Ventana de historial: solo se reenvían los últimos N mensajes (el chat
+  // completo sigue guardado y visible; solo no se manda entero en cada turno).
+  const priorWindow = history.slice(-HISTORY_MSGS);
+
+  // IA1 · Guard de tokens: si el prompt final es enorme (típico: libro grande sin
+  // puntuaciones todavía), avisar antes de enviar en vez de fallar de forma opaca.
+  const estTokens = estimateTokens(ctx.text)
+    + priorWindow.reduce((n, m) => n + estimateTokens(m.content), 0)
+    + estimateTokens(aug) + 400;
+  if (estTokens > TOKEN_GUARD &&
+      !confirm(`El contexto es grande (~${Math.round(estTokens / 1000)}k tokens): puede ser lento o caro. ¿Enviar igualmente?`)) {
+    return;   // se conservan input y referencia adjunta
+  }
+
+  els.input.value = '';
+  clearRef();
   appendBubble('user', aug, false);
   history.push({ role: 'user', content: aug });
   if (convo) DB.addMessage(convo.id, 'user', aug);
@@ -507,8 +540,8 @@ async function send() {
 
   const messages = [
     { role: 'system', content: systemPrompt(convo?.goal, template, Profiles.getActive()) },
-    { role: 'user', content: 'LIBRO ANOTADO (cita los pasajes con sus anclas [[aN]]):\n\n' + annotatedText },
-    ...history.slice(0, -1),
+    { role: 'user', content: 'LIBRO ANOTADO (cita los pasajes con sus anclas [[aN]]):\n\n' + ctx.text },
+    ...priorWindow,
     { role: 'user', content: aug },
   ];
 
