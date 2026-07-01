@@ -45,6 +45,10 @@ deslizamiento tipo Kindle, robusto).
 - **Sin franja de color:** el fondo del viewport en modo lectura usa `--page-bg` (fondo real de la
   página según el tema, fijado por epub-reader), así el hueco que se revela al arrastrar no muestra
   otro color (importaba en oscuro/sepia). Los toques en los bordes siguen pasando página al instante.
+- **Fix parpadeo:** con el dedo quieto a media transición, los micro-`touchmove` (jitter sub-píxel)
+  repintaban el iframe cada frame → el texto parpadeaba. Ahora se traslada con `translate3d` (capa
+  GPU) redondeando a píxeles enteros y con *dedupe* (si el entero no cambia, no se repinta); además
+  una animación en curso ya no se interrumpe por un segundo gesto.
 - Verificado: lint 0 errores · 19/19 E2E · prueba manual con emulación táctil (sigue el dedo, giro al
   superar el umbral en ambos sentidos, *bounce* por debajo, transform reseteado, `--page-bg` fijado)
   sin errores de consola.

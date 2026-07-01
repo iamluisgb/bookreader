@@ -63,21 +63,28 @@ if (COARSE) {
 // lado contrario; si no, vuelve (bounce). El hueco que se revela usa --page-bg
 // (fondo real de la página) para que no se vea una franja de otro color.
 let swipeBusy = false;
+let lastSwipeX = null;   // último translate aplicado (px enteros)
 const SWIPE_TURN_MS = 190;
 
 function swipeBox() { return document.getElementById('epub-container'); }
+// translate3d (no translateX): fuerza capa de composición en la GPU, así el iframe
+// no se repinta en cada frame; clave para que el texto no parpadee al arrastrar.
+function tx(x) { return `translate3d(${x}px,0,0)`; }
 
 function swipeMove(dx) {
   if (swipeBusy) return;
   const c = swipeBox(); if (!c) return;
+  const x = Math.round(dx);        // enteros: sin sub-píxel que tiemble
+  if (x === lastSwipeX) return;    // dedo quieto (micro-jitter) → no repintar → sin parpadeo
+  lastSwipeX = x;
   c.style.transition = 'none';
-  c.style.transform = `translateX(${dx}px)`;
+  c.style.transform = tx(x);
   c.style.willChange = 'transform';
 }
 
 async function swipeEnd(dx) {
-  const c = swipeBox();
-  if (!c || swipeBusy) { swipeReset(c); return; }
+  if (swipeBusy) return;           // animación en curso: ignora, no la interrumpas
+  const c = swipeBox(); if (!c) return;
   const w = c.clientWidth || window.innerWidth || 1;
   const threshold = Math.min(90, w * 0.18);
   if (Math.abs(dx) < threshold || !rendition) {   // no llega → vuelve
@@ -96,13 +103,13 @@ async function swipeEnd(dx) {
   swipeBusy = false;
 }
 
-function swipeSet(c, x) { if (c) { c.style.transition = 'none'; c.style.transform = `translateX(${x}px)`; } }
-function swipeReset(c) { if (c) { c.style.transition = 'none'; c.style.transform = ''; c.style.willChange = ''; } }
+function swipeSet(c, x) { if (c) { c.style.transition = 'none'; c.style.transform = tx(x); } }
+function swipeReset(c) { lastSwipeX = null; if (c) { c.style.transition = 'none'; c.style.transform = ''; c.style.willChange = ''; } }
 function swipeAnimate(c, x) {
   return new Promise(res => {
     if (!c) { res(); return; }
     c.style.transition = `transform ${SWIPE_TURN_MS}ms cubic-bezier(.22,.61,.36,1)`;
-    requestAnimationFrame(() => { c.style.transform = x ? `translateX(${x}px)` : 'translateX(0)'; });
+    requestAnimationFrame(() => { c.style.transform = tx(x); });
     setTimeout(res, SWIPE_TURN_MS + 20);
   });
 }
