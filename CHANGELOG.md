@@ -5,6 +5,29 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-01 — Pantalla completa real en escritorio (estilo Play Books)
+
+En PC el botón ⤢ ("Modo lectura") entraba en el overlay inmersivo propio (barras deslizadas fuera)
+pero **no había forma de salir**: el propio botón se ocultaba con las barras, el toque-al-centro solo
+está cableado para pantalla táctil y `Esc` no gestionaba ese modo. El único recurso era recargar.
+
+**Qué se hizo** ([`js/app.js`](js/app.js) `initImmersive`, icono nuevo en
+[`js/ui/icons.js`](js/ui/icons.js)):
+- **Escritorio:** el botón ⤢ ahora usa la **Fullscreen API nativa** del navegador
+  (`requestFullscreen`/`exitFullscreen`, con fallback `webkit*` para Safari antiguo): llena el monitor
+  y oculta el chrome del navegador y del SO. Al ser nativa, **se sale con `Esc`** (o F11). Un listener
+  de `fullscreenchange` sincroniza el icono (⤢ ⇄ ⤡ `expand`/`compress`) sea cual sea la vía de salida.
+- **Móvil / sin Fullscreen API:** sin cambios — sigue el overlay inmersivo propio (barras que deslizan,
+  alternado tocando el centro del texto).
+
+**Decisión:** se mantienen las barras visibles en pantalla completa (se "copia la vista" de Play Books)
+en lugar de ocultarlas, que era el comportamiento roto anterior. Sin bump de `sw.js` (cambio de
+contenido, sin ficheros nuevos en el precache). Verificado con Playwright (Fullscreen API stubbeada:
+clic → `requestFullscreen` + icono `compress`; reclic → `exitFullscreen` + icono `expand`; 0 errores)
+y 19/19 E2E.
+
+---
+
 ## 2026-07-01 — Recorte de contexto e historial al LLM (IA1, fase 1+2, ex T5/E3.2/E3.3)
 
 El agente dejaba de mandar el **libro anotado entero + todo el historial** en *cada* turno (caro y

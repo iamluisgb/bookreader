@@ -18,6 +18,7 @@ const ICONS = {
   upload: '<path d="M12 15V4.5"/><polyline points="7.5 9 12 4.5 16.5 9"/><path d="M5 14v3.5A1.5 1.5 0 0 0 6.5 19h11a1.5 1.5 0 0 0 1.5-1.5V14"/>',
   sort: '<line x1="5" y1="7" x2="19" y2="7"/><line x1="7" y1="12" x2="17" y2="12"/><line x1="10" y1="17" x2="14" y2="17"/>',
   expand: '<polyline points="9 4 4 4 4 9"/><polyline points="15 4 20 4 20 9"/><polyline points="20 15 20 20 15 20"/><polyline points="4 15 4 20 9 20"/>',
+  compress: '<polyline points="4 9 9 9 9 4"/><polyline points="20 9 15 9 15 4"/><polyline points="15 20 15 15 20 15"/><polyline points="9 20 9 15 4 15"/>',
   // Toggles de panel lateral (estilo NotebookLM): marco + divisor del lado.
   'panel-left': '<rect x="3.5" y="4" width="17" height="16" rx="2.3"/><line x1="9.5" y1="4" x2="9.5" y2="20"/>',
   'panel-right': '<rect x="3.5" y="4" width="17" height="16" rx="2.3"/><line x1="14.5" y1="4" x2="14.5" y2="20"/>',

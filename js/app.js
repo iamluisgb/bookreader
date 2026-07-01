@@ -153,7 +153,37 @@ function setImmersive(on) {
 }
 
 function initImmersive() {
-  document.getElementById('immersive-toggle')?.addEventListener('click', () => setImmersive(true));
+  const btn = document.getElementById('immersive-toggle');
+  // Fullscreen nativo (con fallback webkit para Safari antiguo).
+  const el = document.documentElement;
+  const reqFS = el.requestFullscreen || el.webkitRequestFullscreen;
+  const exitFS = document.exitFullscreen || document.webkitExitFullscreen;
+  const fsElement = () => document.fullscreenElement || document.webkitFullscreenElement;
+
+  if (!EpubReader.isCoarsePointer() && reqFS && exitFS) {
+    // Escritorio (estilo Play Books): el botón ⤢ va a PANTALLA COMPLETA REAL del
+    // navegador (llena el monitor, oculta el chrome del navegador y el SO). Como es
+    // nativa, se sale con Esc; mantenemos las barras visibles ("copiar esta vista").
+    btn?.addEventListener('click', () => {
+      if (fsElement()) exitFS.call(document);
+      else reqFS.call(el).catch(() => {});
+    });
+    // Sincroniza el icono/label con el estado real (Esc, F11 y clic entran aquí).
+    const syncFsIcon = () => {
+      const on = !!fsElement();
+      if (!btn) return;
+      btn.setAttribute('data-icon', on ? 'compress' : 'expand');
+      btn.title = on ? 'Salir de pantalla completa' : 'Pantalla completa';
+      btn.setAttribute('aria-label', btn.title);
+      hydrateIcons(btn.parentElement || document);
+    };
+    document.addEventListener('fullscreenchange', syncFsIcon);
+    document.addEventListener('webkitfullscreenchange', syncFsIcon);
+  } else {
+    // Móvil / sin Fullscreen API: overlay inmersivo propio (las barras deslizan
+    // fuera). Se entra con el botón y se alterna tocando el centro del texto.
+    btn?.addEventListener('click', () => setImmersive(true));
+  }
 
   // Toques sobre el contenido del libro (sin capa que bloquee la selección):
   // bordes = pasar página, centro = alternar pantalla completa. Si la barra de
