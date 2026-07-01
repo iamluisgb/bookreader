@@ -93,11 +93,23 @@ export function init(opts) {
 
 export function setOpen(open) {
   document.body.classList.toggle('ai-open', open);
+  if (open) agentUnread = false;          // al abrir se da por leído
+  applyAgentBadge();
   if (!open) return;
   if (book && !convo) openOnboarding();   // primer uso del agente con este libro
   else if (convo) els.input?.focus();
 }
 export function isOpen() { return document.body.classList.contains('ai-open'); }
+
+// Aviso del agente cuando la respuesta llega con el panel cerrado: un punto en el
+// punto de entrada visible (#ai-toggle en escritorio, .ai-fab en móvil). `ai-busy`
+// = generando; `ai-unread` = respuesta lista. Solo se pintan con el panel cerrado.
+let agentUnread = false;
+function applyAgentBadge() {
+  const closed = !isOpen();
+  document.body.classList.toggle('ai-busy', busy && closed);
+  document.body.classList.toggle('ai-unread', agentUnread && closed);
+}
 
 // Adjuntar un pasaje seleccionado en el lector como referencia de la próxima
 // pregunta (botón "Preguntar al agente" de la barra de selección).
@@ -536,6 +548,7 @@ async function send() {
   const textNode = bubble.querySelector('.ai-bubble-text');
   textNode.innerHTML = '<span class="ai-typing">pensando…</span>';
   busy = true; els.send.disabled = true; abortCtrl = new AbortController();
+  agentUnread = false; applyAgentBadge();   // si el panel está cerrado, muestra "generando"
   let thinking = true, raw;
 
   const messages = [
@@ -563,6 +576,8 @@ async function send() {
     else { console.error(e); textNode.innerHTML = `<span class="ai-error">${escapeHtml(e.message)}</span>`; }
   } finally {
     busy = false; els.send.disabled = false; abortCtrl = null; scrollDown();
+    if (!isOpen()) agentUnread = true;      // llegó con el panel cerrado → no-leído
+    applyAgentBadge();
   }
 }
 

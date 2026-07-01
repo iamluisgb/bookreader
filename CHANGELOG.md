@@ -5,7 +5,26 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
-## 2026-07-01 — Pantalla completa en escritorio + barras que no tapan texto (estilo Play Books)
+## 2026-07-01 — Aviso del agente al responder con el panel cerrado
+
+Ahora puedes **enviar una pregunta al agente, cerrar el panel y seguir leyendo**: cuando llega la
+respuesta, un **punto** en el botón del agente te avisa. (El stream ya sobrevivía al cierre del panel
+—`abortCtrl.abort()` no se llama en ningún sitio—, así que la respuesta se completaba y guardaba en
+segundo plano; solo faltaba el aviso.)
+
+**Qué se hizo** ([`js/ai/panel.js`](js/ai/panel.js) + [`css/main.css`](css/main.css)):
+- Dos clases en `body`: **`ai-busy`** (generando) y **`ai-unread`** (respuesta lista), aplicadas solo
+  con el panel **cerrado**. Pintan un punto sobre el **punto de entrada visible**: `#ai-toggle` (header,
+  escritorio) o `.ai-fab` (móvil) — el otro es `display:none` y no pinta.
+- **`ai-busy`**: punto en color de acento con **pulso** mientras el agente genera. **`ai-unread`**:
+  punto rojo fijo al terminar. Se **limpia al abrir** el panel (`setOpen`), como el patrón `ai-tab-unread`.
+
+**Decisión:** aviso **in-app** (punto en el botón), no notificación del sistema. Es una app de lectura
+que tienes en la misma ventana, las respuestas son rápidas (streaming), y evita el permiso de
+notificaciones (que muchos navegadores limitan). Además, en pantalla completa el panel del agente no
+es accesible, así que el chat ocurre en modo ventana, donde el botón —y su punto— sí se ven; no hay
+hueco. Sin bump de `sw.js`. Verificado con Playwright (LLM mockeado: cerrar mientras genera → `ai-busy`;
+al terminar → `ai-unread`; reabrir → limpio; 0 errores) y 19/19 E2E.
 
 Dos problemas relacionados en PC. (1) El botón ⤢ entraba en el overlay inmersivo propio pero **no
 había forma de salir** (el botón se ocultaba con las barras, el toque-al-centro es solo táctil, `Esc`
