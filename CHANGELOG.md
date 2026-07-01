@@ -5,6 +5,30 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-01 — Móvil: barras que encogen el texto en vez de taparlo (estilo Play Books)
+
+En móvil, con las barras visibles (no inmersivo), el overlay **tapaba las primeras/últimas líneas**. En
+escritorio se resolvió con barras en flujo, pero en móvil eso re-paginaría en cada toque (y el usuario
+pierde por dónde iba). Solución fiel a Play Books: **al mostrar las barras, el texto se ENCOGE para
+caber** (misma página, mismas palabras) en vez de taparse o reflujar.
+
+**Qué se hizo** ([`js/epub-reader.js`](js/epub-reader.js) `updateReaderScale`, [`js/app.js`](js/app.js),
+[`css/main.css`](css/main.css)):
+- **`updateReaderScale()`**: en móvil, cuando las barras están visibles, aplica un `transform: scale`
+  (con `translateY` del alto de cabecera) al **`#reader-viewport`** para que la página quepa entre las
+  barras. Al ser **solo transform**, epub.js **NO re-pagina** → el texto de la página no cambia y no se
+  pierde la posición. Va en el viewport (ancestro), no en `#epub-container`, para no chocar con la
+  animación de swipe. Se recalcula al alternar barras, al cargar y al rotar/redimensionar.
+- **Por defecto sin barras en móvil:** al abrir un libro en punteros *coarse* se arranca en `immersive`
+  (texto a pantalla completa). Tocar el centro las muestra (encogiendo) y vuelve a ocultarlas.
+- Transición suave del encogido (solo `transform`, sin reflujo). Escritorio sin cambios (allí no aplica).
+
+Sin bump de `sw.js`. Verificado con Playwright (contexto móvil *coarse*: por defecto `immersive` y sin
+transform; tocar el centro → barras + `scale(0.88)` con `#epub-container` a **850px constante en todos
+los estados = sin re-paginar**; volver a tocar → pantalla completa; 0 errores), capturas y 19/19 E2E.
+
+---
+
 ## 2026-07-01 — Zoom en imágenes del libro (lightbox)
 
 En libros técnicos (diagramas, tablas como imagen…) no se podía ampliar una figura, y menos en

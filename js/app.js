@@ -50,6 +50,7 @@ function initLibrary() {
 
 async function goToLibrary() {
   document.body.classList.remove('reading', 'immersive', 'fs');   // salir del modo lectura
+  EpubReader.updateReaderScale();   // quita la escala del viewport (vuelve a 1)
   // Salir de pantalla completa nativa si estábamos en ella (inmersivo móvil).
   try {
     if (document.fullscreenElement || document.webkitFullscreenElement) {
@@ -160,6 +161,7 @@ function initReaderReflow() {
 // lectura (origen opaco por el sandbox que protege la key) NO puede iniciar fullscreen.
 function setImmersive(on) {
   document.body.classList.toggle('immersive', on);
+  EpubReader.updateReaderScale();   // móvil: al mostrar barras, encoge el texto para que quepa
 }
 
 function initImmersive() {
@@ -231,6 +233,7 @@ function initImmersive() {
     const onFsChange = () => {
       const on = !!fsElement();
       document.body.classList.toggle('immersive', on);
+      EpubReader.updateReaderScale();
       if (btn) {
         btn.setAttribute('data-icon', on ? 'compress' : 'expand');
         hydrateIcons(btn.parentElement || document);
@@ -402,6 +405,9 @@ async function loadEpub(buffer, bookId, aiBookId) {
     // Reading mode: barras como overlay (ver CSS de `body.reading`); el área de
     // lectura ocupa toda la altura, así inmersivo no re-pagina.
     document.body.classList.add('reading');
+    // Móvil (estilo Play Books): arrancar SIN barras (texto a pantalla completa). Se
+    // muestran tocando el centro, encogiendo el texto para que quepa (updateReaderScale).
+    if (EpubReader.isCoarsePointer()) document.body.classList.add('immersive');
     document.getElementById('reader-footer').style.display = 'flex';
 
     await EpubReader.load(buffer);

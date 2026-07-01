@@ -197,10 +197,33 @@ export function init() {
   // browser chrome collapsing/expanding, and resizing the standalone PWA window.
   const scheduleResize = () => {
     clearTimeout(resizeTimer);
-    resizeTimer = setTimeout(resizeToContainer, 150);
+    resizeTimer = setTimeout(() => { resizeToContainer(); updateReaderScale(); }, 150);
   };
   window.addEventListener('resize', scheduleResize);
   window.addEventListener('orientationchange', scheduleResize);
+}
+
+// MÓVIL (estilo Play Books): las barras son overlay y por defecto están ocultas
+// (texto a pantalla completa). Al MOSTRARLAS no tapamos ni re-paginamos el texto:
+// ENCOGEMOS visualmente el área de lectura (transform scale sobre #reader-viewport)
+// para que la MISMA página quepa entre las barras. Como es solo transform, epub.js NO
+// re-pagina → el texto de la página no cambia y no se pierde la posición. La escala va
+// en el viewport (ancestro), no en #epub-container, para no chocar con el swipe. En
+// escritorio no aplica (allí las barras van en flujo / fullscreen).
+export function updateReaderScale() {
+  const vp = document.getElementById('reader-viewport');
+  if (!vp) return;
+  const b = document.body.classList;
+  const barsShown = COARSE && b.contains('reading') && !b.contains('immersive');
+  if (!barsShown) { vp.style.transform = ''; vp.style.transformOrigin = ''; return; }
+  const header = document.getElementById('reader-header');
+  const footer = document.getElementById('reader-footer');
+  const H = vp.clientHeight || window.innerHeight || 1;
+  const hH = header ? header.offsetHeight : 0;
+  const fH = footer ? footer.offsetHeight : 0;
+  const s = Math.max(0.5, (H - hH - fH) / H);
+  vp.style.transformOrigin = '50% 0';
+  vp.style.transform = `translateY(${hH}px) scale(${s})`;
 }
 
 // Single column that fills the viewport width up to the user's column-width

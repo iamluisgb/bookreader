@@ -1396,6 +1396,9 @@ body.immersive .ai-fab { transform: scale(0); }
   body.reading .reader-viewport {
     padding-left: env(safe-area-inset-left);
     padding-right: env(safe-area-inset-right);
+    /* Encogido suave al mostrar/ocultar barras (estilo Play Books, ver
+       updateReaderScale). Solo transform: no re-pagina, el texto no se mueve. */
+    transition: transform var(--transition-normal);
   }
 }
 
