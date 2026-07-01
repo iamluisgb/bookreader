@@ -44,6 +44,10 @@ export function onTap(cb) { onTapCb = cb || (() => {}); }
 let onActivityCb = () => {};
 export function onActivity(cb) { onActivityCb = cb || (() => {}); }
 
+// ---- Toque sobre una imagen (abrir zoom) ----------------------------------
+let onImageTapCb = () => {};
+export function onImageTap(cb) { onImageTapCb = cb || (() => {}); }
+
 // ---- Selección de texto (táctil) ------------------------------------------
 let onSelectCb = () => {};
 let onSelectDismissCb = () => {};
@@ -55,6 +59,7 @@ export function isCoarsePointer() { return COARSE; }
 if (COARSE) {
   TouchSelect.configure({
     onTap: (zone) => onTapCb(zone),
+    onImageTap: (img) => onImageTapCb(img),
     onSelect: (sel) => onSelectCb(sel),
     onDismiss: () => onSelectDismissCb(),
     onSwipeMove: (dx) => swipeMove(dx),
@@ -167,9 +172,11 @@ function registerTapHandler(contents) {
 
   // Escritorio: un clic en el libro (no sintetizado por un toque) solo sirve
   // para cerrar la barra de selección, no para navegar.
-  doc.addEventListener('click', () => {
+  doc.addEventListener('click', (e) => {
     if (Date.now() - lastTouchEnd < 700) return;    // clic sintetizado por touch
     if (hasSelection(win)) return;
+    const img = e.target && e.target.closest && e.target.closest('img');
+    if (img) { onImageTapCb(img); return; }         // clic en imagen → zoom
     onTapCb('click');
   });
 

@@ -5,6 +5,28 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-01 — Zoom en imágenes del libro (lightbox)
+
+En libros técnicos (diagramas, tablas como imagen…) no se podía ampliar una figura, y menos en
+inmersivo: tocar la imagen solo pasaba página o alternaba barras.
+
+**Qué se hizo** (nuevo [`js/image-zoom.js`](js/image-zoom.js) + integración):
+- **Tocar/clicar una imagen abre un lightbox** a pantalla completa. Zoom con **pinch** (táctil),
+  **rueda** (escritorio) y **doble toque/clic** (alterna 1×↔2.5×); se **desplaza arrastrando** al estar
+  ampliada; se cierra con la **✕**, **Escape** o tocando el fondo.
+- **Detección del toque:** en móvil, un toque en la **zona central** sobre una `<img>` abre el zoom
+  ([`js/touch-select.js`](js/touch-select.js)); los toques en los bordes siguen pasando página (para
+  páginas que son una imagen a sangre completa). En escritorio, clic sobre la imagen
+  ([`js/epub-reader.js`](js/epub-reader.js) `registerTapHandler`). Nuevo `EpubReader.onImageTap`.
+- La imagen del iframe de lectura es same-origin (el lector le inyecta estilos), así que el lightbox
+  reutiliza su `src` (blob:) directamente.
+
+`sw.js` → **v38** (nuevo fichero en el precache). Verificado con Playwright (clic en la portada → abre
+el lightbox; doble clic → 2.5×; rueda → reduce; doble clic → 1×; ✕ → cierra; 0 errores), captura visual
+y 19/19 E2E.
+
+---
+
 ## 2026-07-01 — Inmersivo en móvil: pantalla completa real + borde a borde
 
 En móvil, el modo inmersivo solo ocultaba nuestras barras (CSS), no las del sistema: quedaban la

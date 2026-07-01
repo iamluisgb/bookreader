@@ -13,6 +13,7 @@ import { initBookmarkButton, updateBookmarkButton, renderBookmarks } from './boo
 import * as Library from './library/view.js';
 import * as LibStore from './library/store.js';
 import * as AppSettings from './ui/app-settings.js';
+import { openImageZoom } from './image-zoom.js';
 
 // ============ INIT ============
 document.addEventListener('DOMContentLoaded', () => {
@@ -253,6 +254,9 @@ function initImmersive() {
     else if (zone === 'center') setImmersive(!document.body.classList.contains('immersive'));
     // 'click' (escritorio, sin barra abierta) → no hace nada
   });
+
+  // Tocar/clicar una imagen del libro → abrir zoom (lightbox).
+  EpubReader.onImageTap((img) => openImageZoom(img));
 }
 
 // ============ AI PANEL ============

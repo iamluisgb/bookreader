@@ -16,7 +16,7 @@
 // los toques, caretRangeFromPoint y getClientRects). Solo al DIBUJAR sumamos el
 // desplazamiento del iframe para pasar a coordenadas de pantalla.
 
-let callbacks = { onTap: () => {}, onSelect: () => {}, onDismiss: () => {}, onSwipeMove: () => {}, onSwipeEnd: () => {} };
+let callbacks = { onTap: () => {}, onImageTap: () => {}, onSelect: () => {}, onDismiss: () => {}, onSwipeMove: () => {}, onSwipeEnd: () => {} };
 export function configure(c) { callbacks = { ...callbacks, ...c }; }
 
 const LONGPRESS_MS = 380;   // pulsación larga que inicia la selección
@@ -298,6 +298,16 @@ export function attach(contents) {
     // según el umbral. El long-press ya separó antes los "mantener pulsado".
     if (swiping) { swiping = false; callbacks.onSwipeEnd(dx); return; }
 
-    if (quick && t) callbacks.onTap(tapZone(t.clientX));
+    if (quick && t) {
+      const zone = tapZone(t.clientX);
+      // Toque central sobre una imagen → abrir zoom. En los bordes se pasa página
+      // igualmente (para páginas que son una imagen a sangre completa).
+      if (zone === 'center') {
+        const el = doc.elementFromPoint(t.clientX, t.clientY);
+        const img = el && el.closest && el.closest('img');
+        if (img) { callbacks.onImageTap(img); return; }
+      }
+      callbacks.onTap(zone);
+    }
   }, { passive: true });
 }
