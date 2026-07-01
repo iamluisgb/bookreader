@@ -5,6 +5,20 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-01 — Móvil: el agente no abre el teclado al abrirlo
+
+Al abrir el panel del agente (o al llegar al paso de objetivo del onboarding) se auto-enfocaba el campo
+de texto, y en móvil eso **abría el teclado** sin que el usuario lo pidiera.
+
+**Qué se hizo** ([`js/ai/panel.js`](js/ai/panel.js)): nuevo `focusInput()` que solo enfoca en punteros
+**no táctiles**; aplicado en `setOpen` (abrir panel), `setRef` (adjuntar cita) y el textarea de objetivo
+del onboarding. En móvil el teclado sale solo al tocar el campo para escribir; en escritorio, sin cambios.
+
+Sin bump de `sw.js`. Verificado con Playwright (escritorio: se enfoca objetivo e input; móvil: no se
+enfoca ninguno) y 19/19 E2E.
+
+---
+
 ## 2026-07-01 — Móvil: barras que encogen el texto en vez de taparlo (estilo Play Books)
 
 En móvil, con las barras visibles (no inmersivo), el overlay **tapaba las primeras/últimas líneas**. En

@@ -97,9 +97,13 @@ export function setOpen(open) {
   applyAgentBadge();
   if (!open) return;
   if (book && !convo) openOnboarding();   // primer uso del agente con este libro
-  else if (convo) els.input?.focus();
+  else if (convo) focusInput();
 }
 export function isOpen() { return document.body.classList.contains('ai-open'); }
+
+// En MÓVIL (puntero táctil) NO auto-enfocamos el input: abriría el teclado sin que el
+// usuario lo pida. El teclado sale solo cuando toca el campo para escribir.
+function focusInput() { if (!EpubReader.isCoarsePointer()) els.input?.focus(); }
 
 // Aviso del agente cuando la respuesta llega con el panel cerrado: un punto en el
 // punto de entrada visible (#ai-toggle en escritorio, .ai-fab en móvil). `ai-busy`
@@ -126,7 +130,7 @@ function setRef(text) {
   pendingRef = text;
   if (els.refText) els.refText.textContent = text;
   if (els.ref) els.ref.style.display = 'flex';
-  els.input?.focus();
+  focusInput();
 }
 
 function clearRef() {
@@ -480,7 +484,7 @@ function openOnboarding() {
       <button id="ai-ob-start" class="primary-btn ai-ob-start">Empezar a leer con objetivo</button>`;
     body.querySelector('.ai-ob-back').addEventListener('click', renderTemplates);
     const goalEl = body.querySelector('#ai-ob-goal');
-    goalEl.focus();
+    if (!EpubReader.isCoarsePointer()) goalEl.focus();   // móvil: sin teclado hasta que toque
     body.querySelector('#ai-ob-start').addEventListener('click', async () => {
       const goal = goalEl.value.trim();
       if (!goal) { goalEl.focus(); return; }
