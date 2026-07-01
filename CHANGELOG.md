@@ -5,7 +5,29 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
-## 2026-07-01 — Aviso del agente al responder con el panel cerrado
+## 2026-07-01 — Descubrir modelos del proveedor + elegirlos con chips
+
+En escritorio el campo Modelo era un `<input list=datalist>`, y el datalist **no se despliega si el
+input ya tiene valor**: parecía que "no dejaba cambiar el modelo" (en móvil el navegador sí lo muestra
+como selector, de ahí que allí funcionara). Además no había forma de saber **qué modelos** ofrece el
+proveedor.
+
+**Qué se hizo** ([`js/ai/llm.js`](js/ai/llm.js), [`js/ui/app-settings.js`](js/ui/app-settings.js),
+[`css/main.css`](css/main.css)):
+- **`LLM.listModels({ baseUrl, key })`**: `GET /models` (OpenAI-compatible, `{ data: [{ id }] }`),
+  devuelve los ids ordenados. Acepta base URL/key sueltos para consultarlos con lo que hay en el
+  formulario **antes de guardar**. Misma política CORS que `/chat/completions`.
+- **Botón "Descubrir"** junto al campo Modelo: consulta `/models` del proveedor y rellena la lista.
+- **Chips de modelos** clicables debajo del campo (el activo, resaltado): modo fiable de ver y elegir
+  el modelo en escritorio y móvil, sin depender del datalist. Al cambiar de proveedor se actualizan a
+  sus modelos sugeridos; "Descubrir" los reemplaza por los reales.
+
+**Decisión:** no forzar un `<select>` cerrado (rompería modelos personalizados): se mantiene el input
+libre para escribir cualquier id, y los chips + Descubrir aportan la parte de descubrimiento. Errores
+de `/models` se muestran como pista (algunos proveedores requieren key o no permiten `/models` desde el
+navegador). Sin bump de `sw.js`. Verificado con Playwright (`/models` mockeado: chips iniciales y activo,
+clic de chip cambia el modelo, Descubrir repuebla con los reales, cambio de proveedor actualiza; 0
+errores) y 19/19 E2E.
 
 Ahora puedes **enviar una pregunta al agente, cerrar el panel y seguir leyendo**: cuando llega la
 respuesta, un **punto** en el botón del agente te avisa. (El stream ya sobrevivía al cierre del panel

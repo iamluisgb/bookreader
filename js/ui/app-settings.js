@@ -95,8 +95,13 @@ function agentHtml() {
     <label class="appset-label" for="appset-baseurl">Base URL (endpoint OpenAI-compatible)</label>
     <input id="appset-baseurl" class="appset-input" value="${escapeHtml(LLM.getBaseUrl())}" placeholder="https://…/v1" autocomplete="off" spellcheck="false" />
     <label class="appset-label" for="appset-model">Modelo</label>
-    <input id="appset-model" class="appset-input" list="appset-model-list" value="${escapeHtml(LLM.getModel())}" placeholder="id-del-modelo" autocomplete="off" spellcheck="false" />
+    <div class="appset-model-row">
+      <input id="appset-model" class="appset-input" list="appset-model-list" value="${escapeHtml(LLM.getModel())}" placeholder="id-del-modelo" autocomplete="off" spellcheck="false" />
+      <button type="button" id="appset-model-discover" class="appset-discover">Descubrir</button>
+    </div>
     <datalist id="appset-model-list">${modelDatalist(suggested)}</datalist>
+    <div id="appset-model-chips" class="appset-chips"></div>
+    <p id="appset-model-hint" class="appset-model-hint" hidden></p>
     <label class="appset-label" for="appset-key">API key</label>
     <input id="appset-key" class="appset-input" type="password" placeholder="sk-..." autocomplete="off" value="${escapeHtml(LLM.getKey())}" />
     <label class="appset-check"><input type="checkbox" id="appset-auto"${LLM.getAutoExtract() ? ' checked' : ''} /> Rellenar la libreta automáticamente</label>
@@ -111,15 +116,62 @@ function wireAgent(content) {
   const baseUrl = content.querySelector('#appset-baseurl');
   const model = content.querySelector('#appset-model');
   const dl = content.querySelector('#appset-model-list');
+  const chips = content.querySelector('#appset-model-chips');
+  const hint = content.querySelector('#appset-model-hint');
+  const discover = content.querySelector('#appset-model-discover');
+  const keyEl = content.querySelector('#appset-key');
 
-  // Al elegir un preset: rellena Base URL + sugerencias de modelo. "Personalizado"
-  // deja ambos campos como están para editarlos a mano.
+  // Lista visible de modelos (chips clicables). En escritorio el datalist no se
+  // despliega si el input ya tiene valor, así que estos chips son el modo fiable de
+  // ver y elegir modelos. El activo se marca según el valor del input.
+  const markActiveChip = () => {
+    const v = model.value.trim();
+    chips.querySelectorAll('.appset-chip').forEach(c =>
+      c.classList.toggle('active', c.dataset.model === v));
+  };
+  const renderChips = (list) => {
+    chips.innerHTML = (list || []).map(m =>
+      `<button type="button" class="appset-chip" data-model="${escapeHtml(m)}">${escapeHtml(m)}</button>`).join('');
+    markActiveChip();
+  };
+  chips.addEventListener('click', (e) => {
+    const c = e.target.closest('.appset-chip');
+    if (!c) return;
+    model.value = c.dataset.model;
+    markActiveChip();
+  });
+  model.addEventListener('input', markActiveChip);
+
+  const suggested = (LLM.currentProvider() || LLM.PROVIDERS[0]).models;
+  renderChips(suggested);
+
+  // Al elegir un preset: rellena Base URL + sugerencias de modelo (chips + datalist).
+  // "Personalizado" deja los campos como están para editarlos a mano.
   prov.addEventListener('change', () => {
     const p = LLM.PROVIDERS.find(x => x.id === prov.value);
     if (!p) return;
     baseUrl.value = p.baseUrl;
     dl.innerHTML = modelDatalist(p.models);
-    if (!p.models.includes(model.value.trim())) model.value = p.models[0];
+    renderChips(p.models);
+    hint.hidden = true;
+    if (!p.models.includes(model.value.trim())) { model.value = p.models[0]; markActiveChip(); }
+  });
+
+  // Descubrir modelos reales del proveedor (GET /models) con los valores actuales del
+  // formulario (aún sin guardar), y rellenar los chips + el datalist.
+  discover.addEventListener('click', async () => {
+    hint.hidden = false; hint.textContent = 'Buscando modelos…'; discover.disabled = true;
+    try {
+      const models = await LLM.listModels({ baseUrl: baseUrl.value, key: keyEl.value });
+      if (!models.length) { hint.textContent = 'El proveedor no devolvió modelos.'; return; }
+      dl.innerHTML = modelDatalist(models);
+      renderChips(models);
+      hint.textContent = `${models.length} modelos disponibles — pulsa uno para elegirlo.`;
+    } catch (e) {
+      hint.textContent = `No se pudieron descubrir los modelos: ${e.message} (el proveedor puede requerir key o no permitir /models desde el navegador).`;
+    } finally {
+      discover.disabled = false;
+    }
   });
 
   content.querySelector('#appset-save').addEventListener('click', () => {

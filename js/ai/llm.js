@@ -38,6 +38,25 @@ export function currentProvider() {
   return PROVIDERS.find(p => p.baseUrl.replace(/\/+$/, '') === b) || null;
 }
 
+// Descubre los modelos que ofrece el proveedor: GET /models (OpenAI-compatible,
+// devuelve `{ data: [{ id }] }`). Acepta baseUrl/key sueltos para poder consultarlos
+// con lo que hay en el formulario antes de guardar. Devuelve ids ordenados; lanza si
+// la respuesta no es OK. Sujeto a la misma política CORS que /chat/completions.
+export async function listModels({ baseUrl, key, signal } = {}) {
+  const b = (baseUrl != null ? baseUrl : getBaseUrl()).trim().replace(/\/+$/, '');
+  const k = (key != null ? key : getKey()).trim();
+  if (!b) throw new Error('Falta la Base URL.');
+  const res = await fetch(`${b}/models`, {
+    headers: k ? { 'Authorization': `Bearer ${k}` } : {},
+    signal,
+  });
+  if (!res.ok) throw new Error(`el proveedor respondió ${res.status}.`);
+  const data = await res.json().catch(() => null);
+  const list = Array.isArray(data?.data) ? data.data : (Array.isArray(data) ? data : []);
+  const ids = list.map(m => (typeof m === 'string' ? m : m && m.id)).filter(Boolean);
+  return [...new Set(ids)].sort((a, b) => a.localeCompare(b));
+}
+
 // Auto-extracción a la libreta tras cada respuesta (por defecto activada).
 export function getAutoExtract() { return Storage.get('ai_auto_extract', true); }
 export function setAutoExtract(v) { Storage.set('ai_auto_extract', !!v); }

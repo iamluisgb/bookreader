@@ -997,6 +997,27 @@ body:has(#sidebar.open) .reader-main { margin-left: var(--sidebar-width); }
   width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px;
   background: var(--bg-primary); color: var(--text-primary); font-size: 13px;
 }
+/* Fila del modelo: input + botón "Descubrir", y lista de chips clicables debajo. */
+.appset-model-row { display: flex; gap: 8px; align-items: stretch; }
+.appset-model-row .appset-input { flex: 1; }
+.appset-discover {
+  flex: none; padding: 0 12px; border: 1px solid var(--border); border-radius: 6px;
+  background: var(--surface-3); color: var(--text-primary); font-size: 13px; cursor: pointer;
+  white-space: nowrap; transition: border-color var(--transition-fast), background var(--transition-fast);
+}
+.appset-discover:hover { border-color: var(--accent); }
+.appset-discover:disabled { opacity: .6; cursor: default; }
+.appset-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.appset-chip {
+  padding: 4px 10px; border: 1px solid var(--border); border-radius: var(--r-pill);
+  background: var(--bg-primary); color: var(--text-secondary); font-size: 12px; cursor: pointer;
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  transition: border-color var(--transition-fast), color var(--transition-fast), background var(--transition-fast);
+}
+.appset-chip:hover { border-color: var(--accent); color: var(--text-primary); }
+.appset-chip.active { border-color: var(--accent); background: var(--accent); color: var(--on-accent); }
+.appset-model-hint { margin: 8px 0 0; font-size: 12px; color: var(--text-secondary); line-height: 1.5; }
+
 .appset-check { display: flex; align-items: center; gap: 8px; margin-top: 14px; font-size: 13px; color: var(--text-secondary); }
 .appset-save { width: 100%; margin-top: 16px; padding: 8px; font-size: 14px; }
 .appset-saved { display: flex; align-items: center; gap: 5px; margin: 8px 0 0; font-size: 12px; color: var(--accent); }
