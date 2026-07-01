@@ -483,25 +483,14 @@ function initNavigation() {
     else if (PdfReader.isLoaded()) PdfReader.next();
   });
 
-  // Progress detail toggle
-  const progressContainer = document.querySelector('.progress-container');
-  const progressDetail = document.getElementById('progress-detail');
+  // Pulsar la barra de progreso = saltar a esa parte del libro (por fracción).
+  const progressContainer = document.getElementById('progress-container');
   progressContainer.addEventListener('click', (e) => {
-    if (progressDetail.style.display === 'none') {
-      updateProgressDetail(undefined, totalWords);
-      progressDetail.style.display = 'block';
-    } else {
-      progressDetail.style.display = 'none';
-    }
-  });
-
-  // Close detail on click outside
-  document.addEventListener('click', (e) => {
-    if (progressDetail.style.display !== 'none' &&
-        !progressDetail.contains(e.target) &&
-        !progressContainer.contains(e.target)) {
-      progressDetail.style.display = 'none';
-    }
+    const rect = progressContainer.getBoundingClientRect();
+    if (!rect.width) return;
+    const f = (e.clientX - rect.left) / rect.width;
+    if (EpubReader.isLoaded()) EpubReader.seekToFraction(f);
+    else if (PdfReader.isLoaded()) PdfReader.seekToFraction(f);
   });
 
   // Keyboard navigation

@@ -411,10 +411,32 @@ function updateProgress(location) {
 
   const bar = document.getElementById('progress-bar');
   const text = document.getElementById('progress-text');
+  const pageEl = document.getElementById('progress-page');
   if (bar) bar.style.width = pct + '%';
   if (text) text.textContent = pct + '%';
+  if (pageEl) {
+    // "Página" por localizaciones de epub.js (~1024 chars cada una). Si el índice no
+    // viene en la ubicación, se estima desde el porcentaje. Sin localizaciones aún: —.
+    let total = 0;
+    try { total = book.locations && book.locations.length ? book.locations.length() : 0; } catch (e) { /* sin locs */ }
+    let cur = location.start.location || 0;
+    if (!cur && total) cur = Math.max(1, Math.round((pct / 100) * total));
+    pageEl.textContent = total ? `Pág. ${cur} / ${total}` : '—';
+  }
 
   if (onProgressCallback) onProgressCallback(pct);
+}
+
+// Salto por fracción [0..1] de la barra de progreso: convierte a CFI con las
+// localizaciones y muestra esa parte del libro. No-op si aún no hay localizaciones.
+export async function seekToFraction(f) {
+  if (!rendition || !book) return;
+  const frac = Math.min(1, Math.max(0, f));
+  let cfi = null;
+  try {
+    if (book.locations && book.locations.cfiFromPercentage) cfi = book.locations.cfiFromPercentage(frac);
+  } catch (e) { /* sin localizaciones */ }
+  if (cfi) { try { await rendition.display(cfi); } catch (e) { /* CFI no válido */ } }
 }
 
 function updateChapterInfo() {

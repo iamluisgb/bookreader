@@ -7,37 +7,31 @@ const WORDS_PER_MINUTE = 250;
 // Debe coincidir con el valor de book.locations.generate() en epub-reader.js.
 const CHARS_PER_LOCATION = 1024;
 
+// Actualiza el tiempo de lectura restante mostrado en el pie (#progress-time), a
+// partir del % de progreso y las palabras totales estimadas. (Antes vivía en un
+// popup de detalle; ahora está siempre visible en la barra.)
 export function updateProgressDetail(pct, totalWords = 0) {
-  const detailPct = document.getElementById('progress-detail-pct');
-  const detailFill = document.getElementById('progress-detail-fill');
-  const detailLabel = document.getElementById('progress-detail-label');
-  const detailTime = document.getElementById('progress-detail-time');
+  const timeEl = document.getElementById('progress-time');
+  if (!timeEl) return;
 
   if (pct === undefined) pct = getCurrentPct();
   const pctNum = Math.round(pct);
   const remaining = 100 - pctNum;
 
-  detailPct.textContent = pctNum + '% complete';
-  detailFill.style.width = pctNum + '%';
-
   if (remaining <= 0) {
-    detailLabel.textContent = 'Content Progress — finished';
-    detailTime.textContent = '';
+    timeEl.textContent = 'Terminado';
+    return;
+  }
+
+  const wordsLeft = Math.round(totalWords * (remaining / 100));
+  const minutesLeft = Math.max(1, Math.round(wordsLeft / WORDS_PER_MINUTE));
+
+  if (minutesLeft < 60) {
+    timeEl.textContent = `~${minutesLeft} min`;
   } else {
-    detailLabel.textContent = `Content Progress — ${pctNum}% completed`;
-
-    const wordsLeft = Math.round(totalWords * (remaining / 100));
-    const minutesLeft = Math.max(1, Math.round(wordsLeft / WORDS_PER_MINUTE));
-
-    if (minutesLeft < 60) {
-      detailTime.textContent = `Approx. ${minutesLeft} min left`;
-    } else {
-      const hours = Math.floor(minutesLeft / 60);
-      const mins = minutesLeft % 60;
-      detailTime.textContent = mins > 0
-        ? `Approx. ${hours}h ${mins}m left`
-        : `Approx. ${hours}h left`;
-    }
+    const hours = Math.floor(minutesLeft / 60);
+    const mins = minutesLeft % 60;
+    timeEl.textContent = mins > 0 ? `~${hours} h ${mins} min` : `~${hours} h`;
   }
 }
 

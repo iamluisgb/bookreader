@@ -162,8 +162,17 @@ function updateProgress() {
 
   const bar = document.getElementById('progress-bar');
   const text = document.getElementById('progress-text');
+  const pageEl = document.getElementById('progress-page');
   if (bar) bar.style.width = pct + '%';
-  if (text) text.textContent = `${currentPage}/${totalPages}`;
+  if (text) text.textContent = pct + '%';
+  if (pageEl) pageEl.textContent = `Pág. ${currentPage} / ${totalPages}`;
+}
+
+// Salto por fracción [0..1] de la barra de progreso → página correspondiente.
+export async function seekToFraction(f) {
+  if (!totalPages) return;
+  const p = Math.min(totalPages, Math.max(1, Math.round(f * totalPages)));
+  await goTo(p);
 }
 
 export async function prev() {

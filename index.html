@@ -158,29 +158,21 @@
       </div>
     </div>
 
-    <!-- Bottom bar: navigation -->
+    <!-- Bottom bar: navigation + progreso (página · % · tiempo restante) -->
     <footer id="reader-footer" class="reader-footer" style="display:none;">
       <button id="prev-btn" class="nav-btn" aria-label="Página anterior" data-icon="chevron-left"></button>
-      <div class="progress-container">
-        <div id="progress-bar" class="progress-bar"></div>
-        <span id="progress-text" class="progress-text">0%</span>
+      <div class="progress-wrap">
+        <div class="progress-info">
+          <span id="progress-page" class="progress-page">—</span>
+          <span id="progress-text" class="progress-text">0%</span>
+          <span id="progress-time" class="progress-time" title="Tiempo de lectura restante"></span>
+        </div>
+        <div id="progress-container" class="progress-container" title="Pulsa para saltar a esa parte del libro">
+          <div id="progress-bar" class="progress-bar"></div>
+        </div>
       </div>
       <button id="next-btn" class="nav-btn" aria-label="Página siguiente" data-icon="chevron-right"></button>
     </footer>
-
-    <!-- Detailed progress panel -->
-    <div id="progress-detail" class="progress-detail" style="display:none;">
-      <div class="progress-detail-row">
-        <span class="progress-detail-pct" id="progress-detail-pct">0% complete</span>
-      </div>
-      <div class="progress-detail-bar-wrap">
-        <div class="progress-detail-bar"><div id="progress-detail-fill" class="progress-detail-fill"></div></div>
-      </div>
-      <div class="progress-detail-meta">
-        <span id="progress-detail-label">Content Progress</span>
-        <span id="progress-detail-time">Approx. — left</span>
-      </div>
-    </div>
   </main>
 
   <!-- Backdrop para drawers en pantallas pequeñas -->

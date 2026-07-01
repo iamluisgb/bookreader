@@ -473,13 +473,40 @@ body.reading .reader-viewport { background: var(--page-bg, var(--bg-primary)); }
   background: var(--bg-tertiary);
 }
 
-.progress-container {
+/* Pie del lector: info (página · % · tiempo restante) sobre una barra clicable. */
+.progress-wrap {
   flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.progress-info {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11px;
+  line-height: 1;
+  color: var(--text-muted);
+}
+.progress-info > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.progress-time { text-align: right; }
+
+.progress-container {
   height: 6px;
   background: var(--bg-tertiary);
   border-radius: 3px;
   position: relative;
-  overflow: visible;
+  cursor: pointer;
+}
+/* Zona de pulsación más alta que los 6px visibles: es más fácil acertar el salto
+   (el clic sobre el pseudo-elemento se atribuye al contenedor). */
+.progress-container::before {
+  content: '';
+  position: absolute;
+  left: 0; right: 0; top: -8px; bottom: -8px;
 }
 
 .progress-bar {
@@ -488,70 +515,7 @@ body.reading .reader-viewport { background: var(--page-bg, var(--bg-primary)); }
   border-radius: 3px;
   width: 0%;
   transition: width var(--transition-fast);
-}
-
-.progress-text {
-  position: absolute;
-  right: 0;
-  top: -20px;
-  font-size: 11px;
-  color: var(--text-muted);
-}
-
-/* ============ PROGRESS DETAIL ============ */
-.progress-detail {
-  position: fixed;
-  bottom: var(--footer-height);
-  left: 50%;
-  transform: translateX(-50%);
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 16px 24px;
-  width: 320px;
-  box-shadow: 0 4px 20px var(--shadow);
-  z-index: 50;
-  text-align: center;
-}
-
-.progress-detail-row {
-  margin-bottom: 10px;
-}
-
-.progress-detail-pct {
-  font-size: 28px;
-  font-weight: 700;
-  color: var(--text-primary);
-}
-
-.progress-detail-bar-wrap {
-  margin-bottom: 10px;
-}
-
-.progress-detail-bar {
-  height: 6px;
-  background: var(--bg-tertiary);
-  border-radius: 3px;
-  overflow: hidden;
-}
-
-.progress-detail-fill {
-  height: 100%;
-  background: var(--accent);
-  border-radius: 3px;
-  width: 0%;
-  transition: width 0.3s ease;
-}
-
-.progress-detail-meta {
-  display: flex;
-  justify-content: space-between;
-  font-size: 12px;
-  color: var(--text-muted);
-}
-
-.progress-container {
-  cursor: pointer;
+  pointer-events: none;
 }
 
 /* ============ EPUB CONTAINER ============ */

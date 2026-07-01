@@ -5,7 +5,25 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
-## 2026-07-01 — Los subrayados vuelven a verse al reabrir el libro
+## 2026-07-01 — Barra de progreso: página, tiempo restante y salto al pulsar
+
+El pie del lector solo mostraba el %; el tiempo restante estaba escondido en un popup que se abría al
+pulsar la barra, y no había forma de saltar a una parte del libro desde ahí.
+
+**Qué se hizo** ([`index.html`](index.html), [`css/main.css`](css/main.css),
+[`js/epub-reader.js`](js/epub-reader.js), [`js/pdf-reader.js`](js/pdf-reader.js),
+[`js/progress.js`](js/progress.js), [`js/app.js`](js/app.js)):
+- **Info siempre visible** sobre la barra: **página** (izq.) · **%** (centro) · **tiempo restante**
+  (der.). En EPUB la página sale de las localizaciones de epub.js (`location.start.location` /
+  `locations.length()`); en PDF, de `currentPage/totalPages`.
+- **Tiempo restante movido del popup a la barra**: `updateProgressDetail` ahora escribe en
+  `#progress-time` y se actualiza en cada `relocated`. Se eliminó el panel `#progress-detail`.
+- **Pulsar la barra salta** a esa parte del libro: se calcula la fracción del clic y se convierte a
+  posición — EPUB `seekToFraction` (`locations.cfiFromPercentage` → `display`), PDF `seekToFraction`
+  (fracción → `goTo(página)`). La zona de pulsación se amplía con un `::before` para acertar fácil.
+
+Sin bump de `sw.js`. Verificado con Playwright (EPUB: "Pág. 1/191 · 0% · ~2 h 36 min"; clic al 75% de la
+barra → salta a "Pág. 129/191 · 68%"; 0 errores) y 19/19 E2E.
 
 Al subrayar, salir del libro y volver a entrar, el resaltado **no se veía sobre el texto** (aunque
 seguía guardado y en la lista "Subrayados"). Causa: `applyHighlightToRendition` solo se llamaba al
