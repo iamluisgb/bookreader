@@ -5,6 +5,29 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-02 — Agente: descubrir modelos falla en nan (CORS) → modo manual claro
+
+«Descubrir» (Ajustes → Agente) no listaba modelos con el proveedor **nan**.
+
+**Causa**: el endpoint `GET /models` de nan **no envía cabeceras CORS** (a diferencia de
+`/chat/completions`, que sí trae `access-control-allow-origin: *`). El navegador hace preflight por la
+cabecera `Authorization`, no encuentra `Access-Control-Allow-Origin` y **bloquea** la petición. No es
+arreglable desde el cliente: depende del servidor del proveedor.
+
+**Qué se hizo**:
+- [`js/ai/llm.js`](js/ai/llm.js): `listModels` distingue el fallo de red/CORS (marca `err.cors`) y el
+  401/403 (key inválida) de un error genérico, con mensajes específicos.
+- [`js/ui/app-settings.js`](js/ui/app-settings.js): al fallar el descubrimiento se explica que ese
+  proveedor no lo permite desde el navegador y se **guía al modo manual** (mensaje en rojo, se
+  reponen los chips sugeridos y se enfoca el campo de modelo). Ayuda **siempre visible** bajo el campo:
+  se puede escribir el id del modelo a mano o elegir un sugerido.
+- [`css/main.css`](css/main.css): estilo del hint de error y del texto de ayuda.
+
+Sin bump de `sw.js`. Verificado con Playwright (discovery abortado → mensaje de modo manual + chips
+sugeridos; escribir un modelo a mano y guardar lo persiste) y 19/19 E2E.
+
+---
+
 ## 2026-07-02 — Móvil: al girar la pantalla ya no salta de página
 
 Al cambiar entre vertical y horizontal, a veces la lectura **saltaba varias páginas atrás**.

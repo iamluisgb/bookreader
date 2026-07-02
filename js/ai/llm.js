@@ -51,10 +51,22 @@ export async function listModels({ baseUrl, key, signal } = {}) {
   const b = (baseUrl != null ? baseUrl : getBaseUrl()).trim().replace(/\/+$/, '');
   const k = (key != null ? key : getKey()).trim();
   if (!b) throw new Error('Falta la Base URL.');
-  const res = await fetch(`${b}/models`, {
-    headers: k ? { 'Authorization': `Bearer ${k}` } : {},
-    signal,
-  });
+  let res;
+  try {
+    res = await fetch(`${b}/models`, {
+      headers: k ? { 'Authorization': `Bearer ${k}` } : {},
+      signal,
+    });
+  } catch (e) {
+    // TypeError de fetch = fallo de red o, muy habitual aquí, bloqueo CORS: el
+    // endpoint /models de algunos proveedores (p. ej. nan) no envía cabeceras CORS,
+    // así que el navegador rechaza la respuesta aunque el servidor exista. No hay
+    // arreglo posible desde el cliente; lo señalamos para que la UI ofrezca el modo manual.
+    const err = new Error('el proveedor no permite consultar /models desde el navegador (CORS).');
+    err.cors = true;
+    throw err;
+  }
+  if (res.status === 401 || res.status === 403) throw new Error('la API key es inválida o falta.');
   if (!res.ok) throw new Error(`el proveedor respondió ${res.status}.`);
   const data = await res.json().catch(() => null);
   const list = Array.isArray(data?.data) ? data.data : (Array.isArray(data) ? data : []);

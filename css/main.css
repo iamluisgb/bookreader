@@ -1002,6 +1002,8 @@ body:has(#sidebar.open) .reader-main { margin-left: var(--sidebar-width); }
 .appset-chip:hover { border-color: var(--accent); color: var(--text-primary); }
 .appset-chip.active { border-color: var(--accent); background: var(--accent); color: var(--on-accent); }
 .appset-model-hint { margin: 8px 0 0; font-size: 12px; color: var(--text-secondary); line-height: 1.5; }
+.appset-model-hint.is-error { color: var(--danger, #e5484d); }
+.appset-model-manual { margin: 8px 0 0; font-size: 12px; }
 
 .appset-check { display: flex; align-items: center; gap: 8px; margin-top: 14px; font-size: 13px; color: var(--text-secondary); }
 .appset-save { width: 100%; margin-top: 16px; padding: 8px; font-size: 14px; }

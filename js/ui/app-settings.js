@@ -101,6 +101,7 @@ function agentHtml() {
     </div>
     <datalist id="appset-model-list">${modelDatalist(suggested)}</datalist>
     <div id="appset-model-chips" class="appset-chips"></div>
+    <p class="appset-muted appset-model-manual">Escribe el id del modelo a mano o elige uno de los sugeridos. «Descubrir» los lista automáticamente si el proveedor lo permite (nan no lo permite desde el navegador).</p>
     <p id="appset-model-hint" class="appset-model-hint" hidden></p>
     <label class="appset-label" for="appset-key">API key</label>
     <input id="appset-key" class="appset-input" type="password" placeholder="sk-..." autocomplete="off" value="${escapeHtml(LLM.getKey())}" />
@@ -160,15 +161,24 @@ function wireAgent(content) {
   // Descubrir modelos reales del proveedor (GET /models) con los valores actuales del
   // formulario (aún sin guardar), y rellenar los chips + el datalist.
   discover.addEventListener('click', async () => {
-    hint.hidden = false; hint.textContent = 'Buscando modelos…'; discover.disabled = true;
+    hint.hidden = false; hint.classList.remove('is-error');
+    hint.textContent = 'Buscando modelos…'; discover.disabled = true;
     try {
       const models = await LLM.listModels({ baseUrl: baseUrl.value, key: keyEl.value });
-      if (!models.length) { hint.textContent = 'El proveedor no devolvió modelos.'; return; }
+      if (!models.length) { hint.textContent = 'El proveedor no devolvió modelos. Escribe el id del modelo a mano.'; return; }
       dl.innerHTML = modelDatalist(models);
       renderChips(models);
       hint.textContent = `${models.length} modelos disponibles — pulsa uno para elegirlo.`;
     } catch (e) {
-      hint.textContent = `No se pudieron descubrir los modelos: ${e.message} (el proveedor puede requerir key o no permitir /models desde el navegador).`;
+      // El discovery puede fallar por CORS (el proveedor no expone /models al navegador)
+      // o por key inválida. En ambos casos el camino es escribir el modelo a mano: lo
+      // decimos claramente y dejamos los chips sugeridos para elegir con un toque.
+      hint.classList.add('is-error');
+      hint.textContent = e.cors
+        ? 'Este proveedor no permite descubrir modelos desde el navegador. Escribe el id del modelo a mano o elige uno de los sugeridos abajo.'
+        : `No se pudieron descubrir los modelos: ${e.message} Escribe el id a mano o elige uno de los sugeridos.`;
+      renderChips((LLM.PROVIDERS.find(p => p.baseUrl.replace(/\/+$/, '') === baseUrl.value.trim().replace(/\/+$/, '')) || LLM.PROVIDERS[0]).models);
+      model.focus();
     } finally {
       discover.disabled = false;
     }
