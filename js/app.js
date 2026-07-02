@@ -234,6 +234,10 @@ async function goToLibrary({ fromRoute = false } = {}) {
   if (!fromRoute) writeRoute(null, null);   // entra en el historial: atrás vuelve aquí
   currentBook = null;                       // ya no hay libro abierto (para el router)
   document.body.classList.remove('reading', 'immersive', 'fs', 'scroll-mode');   // salir del modo lectura
+  // Cerrar las sidebars de la vista de libro (índice + agente): no deben verse sobre
+  // la biblioteca (van en z-index alto, por encima de la vista de estantería).
+  document.getElementById('sidebar')?.classList.remove('open');
+  AiPanel.setOpen(false);
   EpubReader.updateReaderScale();   // quita la escala del viewport (vuelve a 1)
   // Salir de pantalla completa nativa si estábamos en ella (inmersivo móvil).
   try {

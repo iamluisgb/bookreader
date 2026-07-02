@@ -5,6 +5,21 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-02 — Fix: las sidebars de lectura se veían sobre la biblioteca
+
+Al volver a la estantería con el índice o el panel del agente abiertos, esos paneles seguían visibles
+por encima de la biblioteca (van en z-index alto).
+
+**Qué se hizo**: `goToLibrary()` ([`js/app.js`](js/app.js)) ahora cierra ambas sidebars al entrar en la
+biblioteca (`#sidebar.open` y `AiPanel.setOpen(false)`), y un respaldo en CSS
+([`css/main.css`](css/main.css)) las mantiene fuera de pantalla en `body.in-library` (el id gana en
+especificidad a `.open`/`.ai-open`).
+
+Sin bump de `sw.js`. Verificado con Playwright (abrir ambas sidebars leyendo → ir a biblioteca: quedan
+cerradas y fuera de pantalla) y 19/19 E2E.
+
+---
+
 ## 2026-07-02 — URLs tipo Play Books (deep-links a libro + posición)
 
 La URL refleja ahora **qué libro** y **en qué posición** estás: `#book=<id>&loc=<cfi|página>`. Recargar

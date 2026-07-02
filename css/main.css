@@ -669,6 +669,11 @@ body.ai-open .reader-main { margin-right: var(--ai-panel-width); }
    de abajo lo revierte a margin 0). */
 body:has(#sidebar.open) .reader-main { margin-left: var(--sidebar-width); }
 
+/* En la biblioteca, las sidebars de la vista de libro nunca deben verse (van por encima
+   de la estantería). El id en el selector gana en especificidad a .open/.ai-open. */
+body.in-library #sidebar { transform: translateX(-100%); }
+body.in-library #ai-panel { transform: translateX(100%); }
+
 /* ---- Tiradores para redimensionar los paneles (solo escritorio) ----
    Ambos paneles EMPUJAN el lector con un margen = su anchura (variable CSS). Arrastrar
    el tirador actualiza esa variable y el texto reflowea. En móvil (drawer/overlay) se
