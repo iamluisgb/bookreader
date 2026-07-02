@@ -69,17 +69,76 @@ Requiere backend (hoy todo es local-first: IndexedDB + localStorage).
 
 ---
 
+## 📄 PDF — paridad de features con EPUB
+
+> **Contexto.** Hoy el PDF es solo *visor*: navega, guarda página, progreso, marcadores con nº de
+> página y deep-links por URL. Todo lo que da valor a BookReader —**IA/chat, subrayados,
+> selección→agente, modo scroll, tipografía**— es hoy **solo-EPUB** porque se construye sobre epub.js
+> (`book.spine`, CFIs, `rendition.annotations`). El PDF es raster fijo (`<canvas>`) con una capa de
+> texto invisible encima ([`js/pdf-reader.js`](js/pdf-reader.js)).
+>
+> **Raíz del problema:** el modelo de ancla es `cfi` (EPUB). Para PDF hay que anclar por
+> `{página, rects}`. Ese es el cambio transversal que habilita subrayados e IA con enlace al pasaje.
+>
+> **Prueba real** (Michael Albada, *Building Applications with AI Agents*, O'Reilly, 355 pág.):
+> PDF **digital, no escaneado** (0/12 páginas sin texto), con **outline completo** (capítulos +
+> subsecciones vía `getOutline()`) y extracción de prosa **limpia y en orden** (código incluido,
+> legible). Conclusión: para un PDF así el agente leería con **calidad equivalente a EPUB**,
+> capítulos incluidos. La estructura NO se pierde cuando hay outline → el recorte de contexto de IA1
+> funciona igual. Artefactos menores: guiones de corte de línea (`over‐ all`) y código aplanado sin
+> saltos.
+>
+> **Prerrequisito:** los bugs de bajo nivel de **TEC1** (ArrayBuffer *detached* al guardar, HiDPI,
+> teclado, errores). Conviene cerrar TEC1 antes o a la par de PDF1.
+
+### PDF1 — IA/agente sobre PDF (fase 1, mayor impacto) · `L`
+Es el salto de "visor de PDF" a "BookReader con PDF". Alimentar el pipeline de IA con el texto del PDF
+en vez del `spine` de epub.js:
+- Extraer texto por página con `page.getTextContent()` (ya se usa para la capa de texto).
+- **Detección de PDF escaneado:** si las primeras páginas no tienen texto, avisar («este PDF no tiene
+  texto seleccionable; el agente no puede leerlo») en vez de fallar en silencio. (Sin OCR; fuera de
+  alcance.)
+- Reconstruir estructura de capítulos con `pdf.getOutline()` cuando exista → mantener el `## capítulo`
+  y que el recorte por relevancia de **IA1** funcione (no troceo tosco por página).
+- Limpieza de extracción: unir palabras partidas por guión de justificación (`over‐ all` → `overall`).
+- Generalizar `js/ai/segment.js` (hoy epub-only) tras una interfaz por formato.
+
+### PDF2 — Selección→agente en PDF · `M`
+Conectar la capa de texto **ya seleccionable** del PDF al panel IA y al tooltip de subrayar (hoy
+dependen del evento `selected` de la `rendition` de epub.js, [`panel.js`](js/ai/panel.js) L190,
+[`highlights-ui.js`](js/highlights-ui.js) L47). Habilita también HQ&A al subrayar en PDF.
+
+### PDF3 — Subrayados/anotaciones en PDF · `L`
+- **Modelo de ancla nuevo:** `{página, rects}` en vez de `cfi` (afecta a `js/highlights.js`, que hoy
+  es cfi-only; el export ya contempla `page`).
+- Dibujar los subrayados como **capa `<div>` overlay** sobre el canvas (no `rendition.annotations`,
+  que es epub-only).
+- Persistir y re-pintar al volver a la página.
+
+### PDF4 — Modo scroll (capítulo continuo) en PDF · `M`
+Renderizar páginas en continuo en vez de reutilizar un solo wrapper
+([`renderPage`](js/pdf-reader.js) reusa `.pdf-page`). Equivalente al `scrolled-doc` de EPUB ya
+entregado.
+
+### PDF5 — Tipografía / tema en PDF · límite de formato
+**No portable de raíz:** el texto del PDF es layout fijo (imagen), no reflowable. No hay tamaño de
+fuente, ni reflow, ni recolorear texto. Máximo alcanzable: **zoom** y, para modo oscuro, un filtro
+`invert` sobre el canvas (funciona pero degrada figuras/colores). Reflow real exigiría reconvertir el
+PDF a HTML → **fuera de alcance**. Documentado aquí para no reabrir el debate.
+
+---
+
 ## 🔧 Técnico (calidad / seguridad / perf / bugs)
 
 ### TEC1 — Revisar el lector PDF · `M` _(ex T11)_
+Bugs de bajo nivel del visor. **Prerrequisito de la épica [PDF — paridad de features](#-pdf--paridad-de-features-con-epub)** (los ítems PDF1–PDF4 asumen un visor sólido).
 [`js/pdf-reader.js`](js/pdf-reader.js) tiene **0 cobertura E2E**. Puntos:
 - **Bug del ArrayBuffer *detached*:** al guardar un PDF en la biblioteca, `persistToLibrary`
   ([`js/app.js`](js/app.js) ~L82) hace `slice` sobre un buffer ya transferido a pdf.js → el
   PDF no se guarda. Clonar el buffer antes de `getDocument`.
 - **Nitidez HiDPI:** `scale = 1.5` fijo ignora `devicePixelRatio` (canvas borroso); sin zoom.
-- **El agente IA no soporta PDF** (segmentación usa el spine de epub.js).
-- **Highlights/marcadores en PDF:** hay text layer seleccionable pero no se persiste nada.
 - **Navegación por teclado** en PDF.
+- _(IA y subrayados/selección en PDF → ahora en la épica [PDF — paridad de features](#-pdf--paridad-de-features-con-epub), PDF1–PDF3.)_
 - **Errores/UX:** `catch(e){}` vacíos; sin UI de error; param `onProgress` de `load()` sin usar.
 - **Acoplamiento a pdf.js 3.11** (`renderTextLayer` cambia de API en 4.x).
 
