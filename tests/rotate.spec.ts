@@ -77,3 +77,59 @@ test('epub re-paginates on rotation (no cut-off)', async ({ page }) => {
   console.log('PORTRAIT2', portrait2);
   expect(Math.abs(portrait2.fh - portrait2.ch)).toBeLessThanOrEqual(4);
 });
+
+// La posición de lectura NO se debe perder al girar (regresión histórica: al re-paginar,
+// epub.js reporta el inicio de página y "caminaba hacia atrás" giro tras giro). Se fija
+// un PIN al CFI real que dura hasta la próxima navegación del usuario.
+test('rotation preserves reading position (no walk-back)', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/');
+  const fc = page.waitForEvent('filechooser');
+  await page.click('#open-file-btn');
+  await (await fc).setFiles(EPUB_PATH);
+  await page.waitForSelector('#epub-container iframe', { timeout: 15000 });
+  await page.waitForFunction(() => {
+    const f = document.querySelector('#epub-container iframe') as HTMLIFrameElement;
+    return f && f.clientHeight > 100;
+  });
+  await page.waitForTimeout(500);
+
+  const cfi = () => page.evaluate(async () => (await import('/js/epub-reader.js')).getCurrentCfi());
+  const next = async () => {
+    await page.evaluate(async () => (await import('/js/epub-reader.js')).next());
+    await page.waitForTimeout(300);
+  };
+  // Avanzar a una posición a mitad de párrafo (offset != 0, donde la deriva se manifiesta).
+  for (let i = 0; i < 14; i++) await next();
+  const before = await cfi();
+
+  // Varias rotaciones seguidas.
+  for (const [w, h] of [[844, 390], [390, 844], [844, 390], [390, 844]] as const) {
+    await page.setViewportSize({ width: w, height: h });
+    await page.waitForTimeout(700);
+  }
+  expect(await cfi()).toBe(before);   // posición intacta tras 4 giros
+
+  // Navegar tras girar debe AVANZAR (el pin se libera con next/prev/goTo). Cruzar un
+  // límite de sección de spine puede requerir 2 pasos en epub.js (carga + avance), así
+  // que probamos hasta dos: lo que se comprueba es que el pin NO congela la navegación.
+  await next();
+  if (await cfi() === before) await next();
+  const advanced = await cfi();
+  expect(advanced).not.toBe(before);
+
+  // La nueva posición también se conserva al volver a girar.
+  await page.setViewportSize({ width: 844, height: 390 });
+  await page.waitForTimeout(700);
+  expect(await cfi()).toBe(advanced);
+
+  // Caso duro: un 'relocated' TARDÍO (el reflow que asienta en un móvil lento, pasado el
+  // antiguo margen de 800 ms) NO debe mover la posición mientras el pin siga puesto.
+  const afterLate = await page.evaluate(async () => {
+    const R = await import('/js/epub-reader.js');
+    R.getRendition().emit('relocated', { start: { cfi: 'epubcfi(/6/2!/4/1:0)' }, end: { cfi: 'epubcfi(/6/2!/4/1:0)' } });
+    await new Promise(r => setTimeout(r, 100));
+    return R.getCurrentCfi();
+  });
+  expect(afterLate).toBe(advanced);
+});

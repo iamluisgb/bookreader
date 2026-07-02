@@ -5,6 +5,27 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-02 — Fix (definitivo): la posición se perdía al girar el móvil
+
+**Síntoma.** Al rotar horizontal↔vertical, el libro "caminaba hacia atrás" varias páginas. Fixes
+previos lo mitigaron con una ventana temporal de 800 ms que ignoraba las `relocated` del re-anclaje,
+pero en móviles lentos el reflow asienta MÁS TARDE: un `relocated` que llega pasado ese margen reporta
+el inicio de página y arrastraba la posición atrás, giro tras giro. **Reproducido** con Playwright
+(emitiendo un `relocated` tardío tras el giro: `…/20/1:175` → `…/2/1:0`).
+
+**Fix.** Se sustituye la supresión por TIEMPO por un **PIN de posición** en
+[`js/epub-reader.js`](js/epub-reader.js): al empezar un giro se fija el CFI real y, mientras el pin
+esté puesto, el handler `relocated` NO mueve `currentCfi` (ni el `rendered`). El pin se libera solo
+cuando el usuario NAVEGA de verdad (`next`/`prev`/`goTo` y el swipe) — en paginado, entre giros la
+posición no cambia por ninguna otra vía. Al ser un estado (no un plazo fijo), es inmune a la latencia
+del dispositivo. El cambio de modo de lectura usa el mismo pin.
+
+**Verificado.** Nuevo test en [`tests/rotate.spec.ts`](tests/rotate.spec.ts) que asserta la POSICIÓN
+(no solo dimensiones): 4 giros seguidos la conservan, un `relocated` tardío no la mueve, y la
+navegación tras girar sigue avanzando (el pin no la congela). 20/20 E2E. Bump `sw.js` v39→v40.
+
+---
+
 ## 2026-07-02 — IA5 Fase 1a: retrieval por pregunta a nivel de pasaje (RAG)
 
 **Motivación (caso real).** Con *Designing Data-Intensive Applications* y el objetivo "System Design para

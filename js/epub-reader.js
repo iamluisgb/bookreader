@@ -16,8 +16,18 @@ let onChapterCallback = null;
 let settingsListenerRegistered = false;
 
 let resizeTimer = null;
-let resizeAnchor = null;         // CFI fijado al inicio de una ráfaga de resize (giro de pantalla)
-let suppressRelocateUntil = 0;   // ventana en la que ignoramos las relocations del re-anclaje (giro)
+// PIN de posición durante un giro/reflow. Mientras `pinnedCfi` no sea null, el handler
+// 'relocated' NO mueve currentCfi: al re-paginar (giro de pantalla, cambio de modo de
+// lectura) epub.js reporta el INICIO de página, que está ANTES de donde estabas, y eso
+// arrastraría la posición atrás giro tras giro. El pin se fija en el CFI real y se
+// mantiene hasta que el usuario NAVEGA de verdad (next/prev/goTo) — en paginado, entre
+// giros la posición no cambia por ninguna otra vía. Sustituye a la antigua ventana
+// temporal de 800 ms, que fallaba si el 'relocated' tardío llegaba pasado ese margen
+// (típico en móviles lentos: el reflow asienta más tarde). Ver rotate.spec.ts.
+let pinnedCfi = null;
+
+// Libera el pin de posición (lo llama toda navegación real del usuario).
+function releasePin() { pinnedCfi = null; clearTimeout(resizeTimer); resizeTimer = null; }
 
 // Re-apply the container width and re-fit. Width/height both track the
 // container (rendered at '100%'), so this mainly re-applies the max-width cap;
@@ -110,6 +120,7 @@ async function swipeEnd(dx) {
   swipeBusy = true;
   const dir = dx < 0 ? 'next' : 'prev';
   await swipeAnimate(c, dir === 'next' ? -w : w);   // la actual termina de salir
+  releasePin();   // navegación real del usuario: suelta el pin de giro para volver a seguir la posición
   try { await (dir === 'next' ? rendition.next() : rendition.prev()); } catch (e) { /* fin del libro */ }
   swipeSet(c, dir === 'next' ? w : -w);             // la nueva se coloca al otro lado
   void c.offsetWidth;                               // reflow para que anime
@@ -205,26 +216,22 @@ export function init() {
     // OFFSET visual, no la posición: a otro ancho ese mismo offset cae en otro punto
     // del texto (casi siempre antes) → parece que "salta varias páginas atrás".
     // Un giro real dispara una RÁFAGA de 'resize' (la animación, la barra del navegador),
-    // así que fijamos el ancla al CFI del INICIO de la ráfaga y lo mantenemos hasta que
-    // se estabiliza; si no, un reflow intermedio dejaría currentCfi ya derivado y la
-    // deriva se acumularía. Al terminar, re-anclamos a esa posición original.
-    if (resizeAnchor == null) resizeAnchor = currentCfi;
+    // así que fijamos el PIN al CFI del INICIO de la ráfaga (solo el primer evento) y lo
+    // mantenemos hasta que el usuario navegue. Así ni los reflows intermedios ni un
+    // 'relocated' tardío (que llega tras asentar, a veces mucho después en móviles
+    // lentos) pueden mover currentCfi hacia atrás.
+    if (pinnedCfi == null) pinnedCfi = currentCfi;
     resizeTimer = setTimeout(async () => {
-      const anchor = resizeAnchor;
-      resizeAnchor = null;
+      resizeTimer = null;
       resizeToContainer();
       updateReaderScale();
-      if (anchor && rendition) {
-        // display(anchor) muestra la página que CONTIENE el ancla, pero su relocated
-        // reporta el INICIO de esa página (antes del ancla). Si dejáramos que eso
-        // sobrescribiera currentCfi, el siguiente giro partiría de una posición ya
-        // retrasada y "caminaría hacia atrás" giro tras giro. El relocated puede llegar
-        // DESPUÉS de que resuelva el display, así que lo silenciamos con una ventana
-        // temporal (no con un flag que limpiaríamos demasiado pronto) y fijamos el ancla.
-        suppressRelocateUntil = Date.now() + 800;
-        try { await rendition.display(anchor); }
+      if (pinnedCfi && rendition) {
+        // display(pinnedCfi) muestra la página que CONTIENE el pin. Su 'relocated' (y
+        // cualquiera posterior por el reflow) queda IGNORADO mientras el pin siga puesto,
+        // así que currentCfi no deriva. El pin se libera en la próxima navegación real.
+        try { await rendition.display(pinnedCfi); }
         catch (e) { /* CFI inválido tras el reflow */ }
-        currentCfi = anchor;
+        currentCfi = pinnedCfi;
         saveLastPosition();
       }
     }, 250);
@@ -286,7 +293,7 @@ export function applyReadingMode() {
   try { rendition.flow(mode === 'scroll' ? 'scrolled-doc' : 'paginated'); } catch (e) { /* flow no disponible */ }
   updateReaderScale();
   if (cfi) {
-    suppressRelocateUntil = Date.now() + 800;   // ignora el relocated del re-display
+    pinnedCfi = cfi;   // fija hasta la próxima navegación (ignora el relocated del re-display)
     Promise.resolve(rendition.display(cfi)).catch(() => {});
   }
   window.dispatchEvent(new CustomEvent('reader:flow-changed'));
@@ -401,9 +408,9 @@ export async function load(arrayBuffer, onProgress) {
   // Track location changes
   rendition.on('relocated', (location) => {
     if (location && location.start) {
-      // Durante un re-anclaje por giro NO movemos currentCfi (ver scheduleResize):
-      // la relocation reporta el inicio de página y arrastraría la posición atrás.
-      if (Date.now() >= suppressRelocateUntil) { currentCfi = location.start.cfi; saveLastPosition(); }
+      // Con el PIN puesto (giro/reflow en curso) NO movemos currentCfi: la relocation
+      // reporta el inicio de página y arrastraría la posición atrás (ver scheduleResize).
+      if (pinnedCfi == null) { currentCfi = location.start.cfi; saveLastPosition(); }
       updateProgress(location);
     }
   });
@@ -412,7 +419,7 @@ export async function load(arrayBuffer, onProgress) {
   // fired yet when returning to an already-rendered (e.g. bookmarked) page,
   // so the bookmark button can read a stale CFI without this.
   rendition.on('rendered', () => {
-    if (Date.now() >= suppressRelocateUntil) {
+    if (pinnedCfi == null) {
       try {
         const loc = rendition.currentLocation();
         if (loc && loc.start) currentCfi = loc.start.cfi;
@@ -577,14 +584,17 @@ function saveLastPosition() {
 }
 
 export function prev() {
+  releasePin();
   if (rendition) rendition.prev();
 }
 
 export function next() {
+  releasePin();
   if (rendition) rendition.next();
 }
 
 export async function goTo(cfi) {
+  releasePin();
   if (rendition) await rendition.display(cfi);
 }
 
