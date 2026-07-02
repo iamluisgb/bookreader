@@ -5,6 +5,31 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-02 — Lectura: modo scroll continuo (mejor para libros técnicos)
+
+Nuevo **modo de lectura scroll** conmutable (Ajustes → Modo de lectura: Páginas / Scroll), además del
+paginado. En scroll se recorre todo el capítulo de un tirón — mejor para técnico (code blocks, tablas,
+figuras sin cortes de página). Se **recuerda por libro** (`readingMode_<book.key()>`, como la posición
+y los marcadores); default Páginas.
+
+**Qué se hizo**:
+- [`js/epub-reader.js`](js/epub-reader.js): `getReadingMode`/`setReadingMode`/`applyReadingMode`. El
+  cambio es **en caliente** con `rendition.flow('scrolled-doc'|'paginated')` (epub.js 0.3.93): se
+  conserva el rendition, sus listeners y los subrayados; se re-ancla al CFI actual. La rendition se crea
+  ya con el flujo guardado del libro. El swipe horizontal y la escala móvil (`updateReaderScale`) se
+  desactivan en scroll (mandan el desplazamiento vertical nativo).
+- [`js/app.js`](js/app.js): cableado del toggle Páginas/Scroll, reflejo del modo al abrir el libro, y
+  redibujo de subrayados al cambiar de flujo (`reader:flow-changed`).
+- [`index.html`](index.html): grupo "Modo de lectura" en Ajustes.
+- [`css/main.css`](css/main.css): control segmentado; en scroll el viewport alinea arriba y, con barras
+  overlay visibles (móvil no inmersivo), reserva su alto para no ocultar la primera/última línea.
+
+Solo afecta al EPUB (en PDF es no-op). Sin bump de `sw.js`. Verificado con Playwright (el flujo cambia
+paginated→scrolled-doc→paginated en caliente, posición conservada, persistencia por libro, 0 errores de
+consola) y 19/19 E2E.
+
+---
+
 ## 2026-07-02 — Plantillas: 5 por objetivo + onboarding de una pregunta (fase 2)
 
 Consolidación de **6 plantillas en 2 bloques (técnico/humanista)** → **5 plantillas por objetivo**

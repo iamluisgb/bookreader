@@ -86,6 +86,7 @@ function tx(x) { return `translate3d(${x}px,0,0)`; }
 
 function swipeMove(dx) {
   if (swipeBusy) return;
+  if (getReadingMode() === 'scroll') return;   // en scroll manda el desplazamiento vertical nativo
   const c = swipeBox(); if (!c) return;
   const x = Math.round(dx);        // enteros: sin sub-píxel que tiemble
   if (x === lastSwipeX) return;    // dedo quieto (micro-jitter) → no repintar → sin parpadeo
@@ -97,6 +98,7 @@ function swipeMove(dx) {
 
 async function swipeEnd(dx) {
   if (swipeBusy) return;           // animación en curso: ignora, no la interrumpas
+  if (getReadingMode() === 'scroll') return;   // sin pasar página con swipe en modo scroll
   const c = swipeBox(); if (!c) return;
   const w = c.clientWidth || window.innerWidth || 1;
   const threshold = Math.min(90, w * 0.18);
@@ -242,7 +244,9 @@ export function updateReaderScale() {
   const vp = document.getElementById('reader-viewport');
   if (!vp) return;
   const b = document.body.classList;
-  const barsShown = COARSE && b.contains('reading') && !b.contains('immersive');
+  // En modo scroll no encogemos el texto: el contenido se desplaza en vertical y las barras
+  // (si se muestran) reservan hueco por CSS. Encoger rompería las métricas de scroll.
+  const barsShown = COARSE && b.contains('reading') && !b.contains('immersive') && getReadingMode() !== 'scroll';
   if (!barsShown) { vp.style.transform = ''; vp.style.transformOrigin = ''; return; }
   const header = document.getElementById('reader-header');
   const footer = document.getElementById('reader-footer');
@@ -252,6 +256,40 @@ export function updateReaderScale() {
   const s = Math.max(0.5, (H - hH - fH) / H);
   vp.style.transformOrigin = '50% 0';
   vp.style.transform = `translateY(${hH}px) scale(${s})`;
+}
+
+// ---- Modo de lectura: paginado vs scroll continuo -------------------------
+// Se recuerda POR LIBRO (mismo id que lastPosition_), default 'paginated'. El scroll
+// continuo es mejor para libros técnicos (code blocks, tablas, figuras sin cortes).
+function bookKey() {
+  try { return (book && book.key) ? book.key() : 'default'; } catch (e) { return 'default'; }
+}
+
+export function getReadingMode() {
+  return Storage.get('readingMode_' + bookKey(), 'paginated') === 'scroll' ? 'scroll' : 'paginated';
+}
+
+export function setReadingMode(mode) {
+  const m = mode === 'scroll' ? 'scroll' : 'paginated';
+  Storage.set('readingMode_' + bookKey(), m);
+  applyReadingMode();
+}
+
+// Aplica el modo al rendition EN CALIENTE: epub.js 0.3.93 permite cambiar el flujo sin
+// recrear el rendition, así que se conservan listeners (selected/relocated/rendered) y
+// anotaciones. Re-anclamos al CFI actual (el cambio de flujo resetea el scroll).
+export function applyReadingMode() {
+  const mode = getReadingMode();
+  document.body.classList.toggle('scroll-mode', mode === 'scroll');
+  if (!rendition) return;
+  const cfi = currentCfi;
+  try { rendition.flow(mode === 'scroll' ? 'scrolled-doc' : 'paginated'); } catch (e) { /* flow no disponible */ }
+  updateReaderScale();
+  if (cfi) {
+    suppressRelocateUntil = Date.now() + 800;   // ignora el relocated del re-display
+    Promise.resolve(rendition.display(cfi)).catch(() => {});
+  }
+  window.dispatchEvent(new CustomEvent('reader:flow-changed'));
 }
 
 // Single column that fills the viewport width up to the user's column-width
@@ -305,11 +343,14 @@ export async function load(arrayBuffer, onProgress) {
   // Width AND height as percentages so epub.js tracks the container and re-fits
   // on viewport changes (rotation, URL-bar, resize). spread:'none' keeps a
   // single column; the container fills the width so landscape uses the screen.
+  // Modo de lectura recordado para ESTE libro (paginado por defecto; scroll para técnicos).
+  const readingMode = getReadingMode();
+  document.body.classList.toggle('scroll-mode', readingMode === 'scroll');
   rendition = book.renderTo(container, {
     width: '100%',
     height: '100%',
     spread: 'none',
-    flow: 'paginated'
+    flow: readingMode === 'scroll' ? 'scrolled-doc' : 'paginated'
   });
 
   // Fix sandbox on every new content iframe epub.js creates

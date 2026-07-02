@@ -44,12 +44,34 @@ function initLibrary() {
   });
   document.getElementById('open-app-settings')?.addEventListener('click', () => AppSettings.open('agent'));
   document.getElementById('library-btn')?.addEventListener('click', goToLibrary);
+  initReadingMode();
   // Pantalla inicial: biblioteca si ya hay libros guardados, si no el landing.
   Library.hasBooks().then(has => { if (has) { Library.render(); Library.show(); } });
 }
 
+// Toggle Páginas/Scroll (Ajustes de lectura). El modo se recuerda por libro en
+// EpubReader; aquí solo cableamos los botones y reflejamos el activo.
+function initReadingMode() {
+  const btns = [...document.querySelectorAll('.reading-mode-btn')];
+  if (!btns.length) return;
+  btns.forEach(btn => btn.addEventListener('click', () => {
+    if (!EpubReader.isLoaded()) return;
+    EpubReader.setReadingMode(btn.dataset.mode);
+    updateReadingModeToggle();
+  }));
+  // Al cambiar el flujo (o al recrearse el rendition) los subrayados pueden quedar sin
+  // dibujar: los repintamos. Idempotente.
+  window.addEventListener('reader:flow-changed', () => { renderHighlights(); });
+}
+
+function updateReadingModeToggle() {
+  const mode = EpubReader.isLoaded() ? EpubReader.getReadingMode() : 'paginated';
+  document.querySelectorAll('.reading-mode-btn').forEach(btn =>
+    btn.classList.toggle('active', btn.dataset.mode === mode));
+}
+
 async function goToLibrary() {
-  document.body.classList.remove('reading', 'immersive', 'fs');   // salir del modo lectura
+  document.body.classList.remove('reading', 'immersive', 'fs', 'scroll-mode');   // salir del modo lectura
   EpubReader.updateReaderScale();   // quita la escala del viewport (vuelve a 1)
   // Salir de pantalla completa nativa si estábamos en ella (inmersivo móvil).
   try {
@@ -448,6 +470,7 @@ async function loadEpub(buffer, bookId, aiBookId) {
     renderHighlights();
 
     updateBookmarkButton();
+    updateReadingModeToggle();   // reflejar el modo (paginado/scroll) guardado del libro
   } catch (err) {
     console.error('Error loading EPUB:', err);
     alert('Error al cargar el archivo EPUB: ' + err.message);
