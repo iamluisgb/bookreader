@@ -5,6 +5,24 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-02 — Marcadores: muestran el número de página
+
+Cada marcador de la sidebar muestra ahora **«Pág. X / Y»** (misma numeración que la barra de progreso,
+por localizaciones de epub.js).
+
+**Qué se hizo**:
+- [`js/epub-reader.js`](js/epub-reader.js): nuevo `getPageInfo(cfi)` → `{ page, total }` desde un CFI
+  (`locations.locationFromCfi`, con estimación por porcentaje si no hay índice directo).
+- [`js/bookmarks.js`](js/bookmarks.js): se guarda `page`/`total` al crear el marcador.
+- [`js/bookmarks-ui.js`](js/bookmarks-ui.js): se muestra la página; para marcadores antiguos sin ella se
+  calcula al vuelo desde el CFI.
+- [`css/main.css`](css/main.css): estilo `.bookmark-page`.
+
+Sin bump de `sw.js`. Verificado con Playwright (la página del marcador coincide con la barra de
+progreso) y 19/19 E2E.
+
+---
+
 ## 2026-07-02 — Agente: descubrir modelos falla en nan (CORS) → modo manual claro
 
 «Descubrir» (Ajustes → Agente) no listaba modelos con el proveedor **nan**.

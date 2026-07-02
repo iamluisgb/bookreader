@@ -20,13 +20,15 @@ export function getAll() {
   return Storage.get(getKey(), []);
 }
 
-export function add(cfi, title, chapter) {
+export function add(cfi, title, chapter, page) {
   const bookmarks = getAll();
   if (bookmarks.some(b => b.cfi === cfi)) return false;
   bookmarks.push({
     cfi,
     title: title || '',
     chapter: chapter || '',
+    page: page && page.page ? page.page : null,
+    total: page && page.total ? page.total : null,
     timestamp: Date.now()
   });
   Storage.set(getKey(), bookmarks);
@@ -45,12 +47,12 @@ export function has(cfi) {
   return getAll().some(b => b.cfi === cfi);
 }
 
-export function toggle(cfi, title, chapter) {
+export function toggle(cfi, title, chapter, page) {
   if (has(cfi)) {
     remove(cfi);
     return false;
   } else {
-    add(cfi, title, chapter);
+    add(cfi, title, chapter, page);
     return true;
   }
 }

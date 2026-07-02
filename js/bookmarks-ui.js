@@ -16,8 +16,9 @@ export function initBookmarkButton() {
 
     const chapter = EpubReader.getCurrentChapterLabel();
     const title = document.getElementById('reader-title').textContent;
+    const page = EpubReader.getPageInfo(cfi);
 
-    Bookmarks.toggle(cfi, title, chapter);
+    Bookmarks.toggle(cfi, title, chapter, page);
     updateBookmarkButton();
   });
 
@@ -50,10 +51,15 @@ export function renderBookmarks() {
   bookmarks.sort((a, b) => b.timestamp - a.timestamp).forEach(bm => {
     const item = document.createElement('div');
     item.className = 'bookmark-item';
+    // Página: la guardada al crear el marcador o, para marcadores antiguos sin ella,
+    // calculada ahora desde el CFI (ya hay localizaciones cuando la sidebar se abre).
+    const pi = (bm.page && bm.total) ? { page: bm.page, total: bm.total } : EpubReader.getPageInfo(bm.cfi);
+    const pageLabel = pi ? `Pág. ${pi.page} / ${pi.total}` : '';
     item.innerHTML = `
       <div class="bookmark-info">
         <div class="bookmark-title">${escapeHtml(bm.title)}</div>
         <div class="bookmark-chapter">${escapeHtml(bm.chapter)}</div>
+        ${pageLabel ? `<div class="bookmark-page">${escapeHtml(pageLabel)}</div>` : ''}
       </div>
       <button class="bookmark-delete" title="Eliminar">${icon('xmark', { size: 16 })}</button>
     `;

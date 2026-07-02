@@ -197,6 +197,12 @@ html, body {
   color: var(--text-muted);
 }
 
+.bookmark-item .bookmark-page {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
 .bookmark-item .bookmark-delete {
   background: none;
   border: none;

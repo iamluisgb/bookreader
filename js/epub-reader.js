@@ -559,6 +559,26 @@ export function getNavigation() {
   return book?.navigation || null;
 }
 
+// Nº de página (índice de localización de epub.js, ~1024 chars) y total, a partir de
+// un CFI. Sirve para mostrar la página de un marcador. Devuelve null si aún no hay
+// localizaciones generadas o el CFI no es resoluble.
+export function getPageInfo(cfi) {
+  try {
+    if (!book || !book.locations || !book.locations.length) return null;
+    const total = book.locations.length();
+    if (!total) return null;
+    let page = book.locations.locationFromCfi(cfi);
+    if (page == null || page < 0) {
+      // Sin índice directo: estimar por porcentaje.
+      const pct = book.locations.percentageFromCfi(cfi);
+      page = Math.max(1, Math.round(pct * total));
+    }
+    return { page: page || 1, total };
+  } catch (e) {
+    return null;
+  }
+}
+
 export function getTitle() {
   return book?.packaging?.metadata?.title || 'Sin título';
 }
