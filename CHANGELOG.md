@@ -5,6 +5,33 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-02 — URLs tipo Play Books (deep-links a libro + posición)
+
+La URL refleja ahora **qué libro** y **en qué posición** estás: `#book=<id>&loc=<cfi|página>`. Recargar
+o relanzar la PWA reabre el libro donde ibas, y el enlace sirve de marcador.
+
+**Diferencia con Play Books**: allí el libro vive en servidores; aquí vive en IndexedDB (local). Por eso
+los deep-links funcionan **en este navegador**: si el `id` no está en tu biblioteca, se avisa y se abre
+la biblioteca. Compartir entre dispositivos exigiría alojar los libros (fuera de alcance).
+
+**Qué se hizo** (todo en [`js/app.js`](js/app.js), sin archivos nuevos):
+- Router por hash: `parseRoute` / `writeRoute` (push vs replace) / `applyRoute` / `seekTo`. `id` =
+  hash de contenido del libro (`record.id`); `loc` = CFI (epub, URL-encoded) o página (pdf).
+- Abrir un libro (biblioteca o archivo) hace `pushState` (atrás → biblioteca). La posición se
+  actualiza mientras lees con `replaceState` (no ensucia el historial), enganchado a los callbacks de
+  progreso ya existentes (`onProgress`/`onPage`).
+- Al arrancar, `applyRoute()` resuelve la URL: abre el libro del enlace o muestra la biblioteca. En
+  `popstate`/`hashchange` reconcilia estado ↔ URL (mismo libro → solo salta de posición; otro →
+  abre; sin `id` → biblioteca; `id` inexistente → aviso + biblioteca).
+- Refactor menor: `openLibraryBook` → `openBookRecord(record, { fromRoute, loc })`; `goToLibrary`
+  acepta `{ fromRoute }` y limpia `currentBook`.
+
+Sin bump de `sw.js`. Verificado con Playwright (la URL refleja libro+posición y se actualiza con
+replaceState sin crecer el historial; recargar restaura la posición exacta; atrás→biblioteca,
+adelante→reabre; `id` inexistente→aviso+biblioteca; 0 errores de consola) y 19/19 E2E.
+
+---
+
 ## 2026-07-02 — Fixes: pestañas de la sidebar al estrechar + objetivo de la libreta
 
 Dos ajustes visuales tras hacer las sidebars redimensionables:

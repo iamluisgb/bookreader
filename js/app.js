@@ -31,7 +31,95 @@ document.addEventListener('DOMContentLoaded', () => {
   initReaderReflow();
   initPanelResize();
   initLibrary();
+  initRouter();
 });
+
+// ============ ROUTER · deep-links tipo Play Books ============
+// La URL refleja qué libro y en qué posición: `#book=<id>&loc=<cfi|página>`. Recargar o
+// relanzar la PWA reabre el libro donde ibas; el enlace sirve de marcador. Los libros
+// viven en IndexedDB (local), así que el deep-link funciona en ESTE navegador: si el id
+// no está en la biblioteca, se avisa y se abre la biblioteca. Historial: abrir un libro
+// entra como una parada (atrás → biblioteca); la posición se actualiza con replaceState.
+let routeTimer = null;
+let applyingRoute = false;
+
+function currentLoc() {
+  if (!currentBook) return '';
+  if (currentBook.format === 'pdf') return String(PdfReader.getCurrentPage() || 1);
+  return EpubReader.getCurrentCfi() || '';
+}
+
+function parseRoute() {
+  const p = new URLSearchParams(location.hash.replace(/^#/, ''));
+  return { id: p.get('book'), loc: p.get('loc') };
+}
+
+// Escribe la ruta en la barra de direcciones. pushState/replaceState NO disparan
+// hashchange/popstate, así que no hay bucle con applyRoute.
+function writeRoute(id, loc, { replace = false } = {}) {
+  let hash = '';
+  if (id) {
+    const p = new URLSearchParams();
+    p.set('book', id);
+    if (loc) p.set('loc', loc);
+    hash = '#' + p.toString();
+  }
+  const url = location.pathname + location.search + hash;
+  if (url === location.pathname + location.search + location.hash) return;  // sin cambios
+  history[replace ? 'replaceState' : 'pushState']({}, '', url);
+}
+
+// Actualiza la posición en la URL con rebote (replaceState, no ensucia el historial).
+function syncRouteSoon() {
+  if (!currentBook) return;
+  clearTimeout(routeTimer);
+  routeTimer = setTimeout(() => writeRoute(currentBook.id, currentLoc(), { replace: true }), 600);
+}
+
+async function seekTo(loc) {
+  if (!loc) return;   // `loc` ya viene decodificado por URLSearchParams (no re-decodificar)
+  try {
+    if (currentBook?.format === 'pdf') await PdfReader.goTo(parseInt(loc, 10));
+    else await EpubReader.goTo(loc);
+  } catch (e) { /* locator no válido */ }
+}
+
+// Reconcilia el estado de la app con la URL (arranque, back/forward, edición manual).
+async function applyRoute() {
+  if (applyingRoute) return;
+  const { id, loc } = parseRoute();
+
+  if (!id) {
+    if (currentBook || document.body.classList.contains('reading')) {
+      await goToLibrary({ fromRoute: true });          // volver a biblioteca (sin re-empujar)
+    } else {
+      const has = await Library.hasBooks();            // arranque sin libro: comportamiento normal
+      if (has) { await Library.render(); Library.show(); }
+    }
+    return;
+  }
+
+  if (currentBook && currentBook.id === id) { await seekTo(loc); return; }  // mismo libro, otra posición
+
+  applyingRoute = true;
+  try {
+    const record = await LibStore.getBook(id);
+    if (!record) {
+      alert('Este libro no está en tu biblioteca en este dispositivo.');
+      await goToLibrary({ fromRoute: true });
+      return;
+    }
+    await openBookRecord(record, { fromRoute: true, loc });
+  } finally {
+    applyingRoute = false;
+  }
+}
+
+function initRouter() {
+  window.addEventListener('popstate', applyRoute);
+  window.addEventListener('hashchange', applyRoute);
+  applyRoute();   // resolver la URL inicial (abre el libro del enlace o muestra biblioteca)
+}
 
 // ============ REDIMENSIONADO DE PANELES (solo escritorio) ============
 // Ambos paneles empujan el lector con un margen = su anchura (variable CSS). Arrastrar
@@ -116,10 +204,9 @@ function initLibrary() {
     onOpenSettings: () => AppSettings.open(),
   });
   document.getElementById('open-app-settings')?.addEventListener('click', () => AppSettings.open('agent'));
-  document.getElementById('library-btn')?.addEventListener('click', goToLibrary);
+  document.getElementById('library-btn')?.addEventListener('click', () => goToLibrary());
   initReadingMode();
-  // Pantalla inicial: biblioteca si ya hay libros guardados, si no el landing.
-  Library.hasBooks().then(has => { if (has) { Library.render(); Library.show(); } });
+  // La pantalla inicial (biblioteca/landing o el libro del enlace) la resuelve initRouter().
 }
 
 // Toggle Páginas/Scroll (Ajustes de lectura). El modo se recuerda por libro en
@@ -143,7 +230,9 @@ function updateReadingModeToggle() {
     btn.classList.toggle('active', btn.dataset.mode === mode));
 }
 
-async function goToLibrary() {
+async function goToLibrary({ fromRoute = false } = {}) {
+  if (!fromRoute) writeRoute(null, null);   // entra en el historial: atrás vuelve aquí
+  currentBook = null;                       // ya no hay libro abierto (para el router)
   document.body.classList.remove('reading', 'immersive', 'fs', 'scroll-mode');   // salir del modo lectura
   EpubReader.updateReaderScale();   // quita la escala del viewport (vuelve a 1)
   // Salir de pantalla completa nativa si estábamos en ella (inmersivo móvil).
@@ -159,7 +248,14 @@ async function goToLibrary() {
 }
 
 // Abrir un libro ya guardado en la biblioteca (reconstruye el archivo).
-async function openLibraryBook(record) {
+// Apertura iniciada por el usuario desde la biblioteca → entra en el historial (pushState).
+function openLibraryBook(record) {
+  return openBookRecord(record, { fromRoute: false });
+}
+
+// Abre un libro de la biblioteca. `fromRoute`: la apertura viene de resolver la URL, así
+// que NO se re-escribe la ruta. `loc`: posición de la URL (tiene prioridad sobre lastCfi).
+async function openBookRecord(record, { fromRoute = false, loc = null } = {}) {
   try {
     Library.hide();
     const buffer = record.file instanceof ArrayBuffer ? record.file.slice(0) : await record.file.arrayBuffer();
@@ -168,12 +264,16 @@ async function openLibraryBook(record) {
     currentBook = { id: record.id, fileBaseId: record.fileBaseId || record.id, format: record.format };
     if (record.format === 'pdf') {
       await loadPdf(buffer, record.fileBaseId || record.id);
+      if (loc) await seekTo(loc);
     } else {
       await loadEpub(buffer, record.fileBaseId || record.id, record.id);
-      if (record.lastCfi) { try { await EpubReader.goTo(record.lastCfi); } catch (e) { /* posición no válida */ } }
+      // La posición de la URL manda; si no, la última guardada del libro.
+      if (loc) await seekTo(loc);
+      else if (record.lastCfi) { try { await EpubReader.goTo(record.lastCfi); } catch (e) { /* posición no válida */ } }
     }
     await LibStore.updateBook(record.id, { lastOpenedAt: Date.now() });
     document.getElementById('library-btn').style.display = '';
+    if (!fromRoute) writeRoute(record.id, currentLoc());   // pushState: atrás → biblioteca
   } catch (e) {
     console.error('No se pudo abrir el libro de la biblioteca:', e);
     alert('No se pudo abrir el libro guardado.');
@@ -474,6 +574,7 @@ async function loadFile(file) {
   await persistToLibrary(id, buffer, ext, file.name, fileBaseId);
   document.getElementById('library-btn').style.display = '';
   Library.render();
+  writeRoute(id, currentLoc());   // deep-link del libro recién abierto (pushState)
 }
 
 let totalWords = 0;
@@ -490,6 +591,7 @@ async function loadEpub(buffer, bookId, aiBookId) {
       updateBookmarkButton();
       updateProgressDetail(pct, totalWords);
       saveProgress(pct);
+      syncRouteSoon();               // reflejar la posición en la URL (deep-link)
     });
 
     EpubReader.onChapter((label) => {
@@ -555,6 +657,7 @@ async function loadPdf(buffer, bookId) {
     // Setup callback BEFORE load
     PdfReader.onPage((page, total) => {
       document.getElementById('reader-title').textContent = `PDF - Página ${page} de ${total}`;
+      syncRouteSoon();               // reflejar la página en la URL (deep-link)
     });
 
     await PdfReader.load(buffer);
