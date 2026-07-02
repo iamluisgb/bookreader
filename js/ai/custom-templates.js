@@ -44,7 +44,7 @@ export function makeId() {
 // Borrador vacío para el formulario de creación.
 export function blank() {
   return { id: null, custom: true, block: 'tecnico', name: '', ideal: '',
-    goalPrompt: '', agentRole: '', fields: [{ key: '', label: '', type: 'text' }] };
+    goalPrompt: '', agentRole: '', fields: [{ key: '', label: '', type: 'text', fill: 'agent' }] };
 }
 
 // Devuelve un mensaje de error si el borrador no es válido, o null si lo es.
@@ -67,7 +67,8 @@ function normalize(raw) {
       let k = base, i = 2;
       while (used.has(k)) k = `${base}_${i++}`;
       used.add(k);
-      return { key: k, label: f.label.trim(), type: f.type === 'list' ? 'list' : 'text' };
+      // fill: 'user' = cognición (lo genera el usuario); cualquier otro valor = INFO.
+      return { key: k, label: f.label.trim(), type: f.type === 'list' ? 'list' : 'text', fill: f.fill === 'user' ? 'user' : 'agent' };
     });
   return {
     id: raw.id || makeId(),

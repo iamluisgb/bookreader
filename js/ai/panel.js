@@ -5,7 +5,7 @@ import * as LLM from './llm.js';
 import { segmentBook } from './segment.js';
 import * as DB from './db.js';
 import * as EpubReader from '../epub-reader.js';
-import { BLOCKS, TEMPLATES, getTemplate, templatesByBlock, isValidField } from './templates.js';
+import { BLOCKS, TEMPLATES, getTemplate, templatesByBlock, isValidField, isAgentFillable, agentFields, isCognitionField } from './templates.js';
 import { icon } from '../ui/icons.js';
 import { escapeHtml } from '../ui/escape.js';
 import * as AppSettings from '../ui/app-settings.js';
@@ -201,27 +201,29 @@ async function onReaderSelection(cfiRange, contents) {
 
 async function generateHQA(text, cfiRange) {
   hqaBusy = true;
-  setStatus('Generando HQ&A del subrayado…');
+  setStatus('Generando la pregunta del subrayado…');
   try {
+    // INFO/COGNICIÓN: la IA genera el Highlight y la Question (recuperación), pero NO la
+    // Answer: responderla con tus palabras es lo que fija el aprendizaje (efecto de
+    // generación). Guardamos la R vacía para que la escribas tú (editando la nota); luego
+    // puedes pedir al agente en el chat que la revise.
     const messages = [
       { role: 'system', content:
 `Aplicas el método HQ&A (Highlight–Question–Answer). Dado un FRAGMENTO subrayado y el OBJETIVO
-del usuario, genera: (1) una PREGUNTA conceptual que ese fragmento responde, alineada al objetivo;
-(2) una RESPUESTA breve con palabras propias, sin copiar el fragmento.
-Responde EXACTAMENTE en dos líneas, sin nada más:
-P: <pregunta>
-R: <respuesta>` },
+del usuario, genera SOLO una PREGUNTA conceptual que ese fragmento responde, alineada al objetivo.
+NO escribas la respuesta: la respuesta la redacta el usuario con sus propias palabras.
+Responde EXACTAMENTE en una línea, sin nada más:
+P: <pregunta>` },
       { role: 'user', content: `OBJETIVO: ${convo.goal}\n\nFRAGMENTO SUBRAYADO:\n"${text}"` },
     ];
     const out = await LLM.chatStream({ messages });
     const q = (out.match(/P:\s*(.+)/i)?.[1] || '').trim();
-    const a = (out.match(/R:\s*([\s\S]+)/i)?.[1] || '').trim();
-    const content = `> ${text}\n\n**P:** ${q || '—'}\n**R:** ${a || '—'}`;
+    const content = `> ${text}\n\n**P:** ${q || '—'}\n**R:** _(escribe tu respuesta)_`;
     const id = convo ? await DB.addNote(convo.id, 'hqa', content, [cfiRange]) : Date.now();
     notes.push({ id, fieldKey: 'hqa', content, sourceCfis: [cfiRange] });
     renderNotebook();
     markNotebookUnread();
-    setStatus('HQ&A añadido a la libreta');
+    setStatus('Pregunta añadida — escribe tu respuesta en la libreta');
   } catch (e) {
     console.error('HQ&A falló:', e);
     setStatus('No se pudo generar HQ&A: ' + e.message);
@@ -664,7 +666,9 @@ function addMessageActions(bubble, answerText, question, { autoRun = false, trun
 }
 
 function notebookTool() {
-  const keys = template.fields.map(f => f.key);
+  // Solo campos INFO (fill:'agent'). Los de cognición los genera el usuario: la IA no
+  // puede dirigirse a ellos (ni siquiera aparecen como enum válido en la herramienta).
+  const keys = agentFields(template).map(f => f.key);
   return [{
     type: 'function',
     function: {
@@ -688,7 +692,14 @@ async function extractToNotebook(answerText, question, el) {
   const isBtn = el.tagName === 'BUTTON';
   if (isBtn) el.disabled = true;
   el.innerHTML = act('note', 'Apuntando…');
-  const fieldList = template.fields.map(f => `- ${f.key}: ${f.label}`).join('\n');
+  // Solo campos INFO: los de cognición (fill:'user') los genera el usuario, no la IA.
+  const fillable = agentFields(template);
+  if (!fillable.length) {                       // plantilla 100% cognición (p. ej. HQ&A)
+    el.innerHTML = act('note', 'Nada que guardar');
+    if (isBtn) setTimeout(() => { el.disabled = false; el.innerHTML = act('note', 'A la libreta'); }, 2500);
+    return;
+  }
+  const fieldList = fillable.map(f => `- ${f.key}: ${f.label}`).join('\n');
   const messages = [
     { role: 'system', content:
 `Eres un extractor de notas para la plantilla "${template.name}".
@@ -706,7 +717,9 @@ merezca guardarse, no llames a ninguna herramienta.` },
     for (const tc of toolCalls) {
       if (tc.name !== 'upsert_note') continue;
       const { fieldKey, content, sourceCfis } = tc.args || {};
-      if (!fieldKey || !content || !isValidField(template.id, fieldKey)) continue;
+      // isAgentFillable: existe Y es INFO. Blinda contra que el modelo intente escribir
+      // en un campo de cognición aunque no esté en el enum de la herramienta.
+      if (!fieldKey || !content || !isAgentFillable(template.id, fieldKey)) continue;
       const cites = extractCites(content, sourceCfis);
       const id = convo ? await DB.addNote(convo.id, fieldKey, content, cites) : Date.now();
       notes.push({ id, fieldKey, content, sourceCfis: cites });
@@ -782,10 +795,17 @@ function renderNotebook() {
       const notesHtml = list.map(noteHtml).join('');
       const adding = addingField === f.key ? editorHtml(`data-field="${f.key}"`, '') : '';
       const addBtn = addingField === f.key ? '' : `<button class="ai-nb-add" data-field="${f.key}">+ nota</button>`;
+      // INFO (IA) vs COGNICIÓN (tú): la etiqueta hace explícito quién rellena cada campo.
+      const cog = isCognitionField(f);
+      const tag = `<span class="ai-nb-fill ${cog ? 'is-user' : 'is-agent'}">${cog ? 'tú' : 'IA'}</span>`;
+      const hint = cog && !list.length && !adding
+        ? '<div class="ai-nb-cog-hint">Escríbela tú; luego pide al agente en el chat que la revise.</div>'
+        : '';
       return `
-      <div class="ai-nb-field">
-        <div class="ai-nb-field-label">${escapeHtml(f.label)}</div>
+      <div class="ai-nb-field${cog ? ' is-cognition' : ''}">
+        <div class="ai-nb-field-label">${escapeHtml(f.label)}${tag}</div>
         ${notesHtml || (adding ? '' : '<div class="ai-nb-empty">—</div>')}
+        ${hint}
         ${adding}
         ${addBtn}
       </div>`;

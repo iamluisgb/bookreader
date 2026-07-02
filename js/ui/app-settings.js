@@ -274,12 +274,17 @@ function templateFormHtml(t) {
   </div>`;
 }
 
-function templateFieldRow(f = { key: '', label: '', type: 'text' }) {
+function templateFieldRow(f = { key: '', label: '', type: 'text', fill: 'agent' }) {
+  const cog = f.fill === 'user';
   return `<div class="appset-tpl-field-row" data-key="${escapeHtml(f.key || '')}">
     <input class="appset-input appset-tpl-field-label" value="${escapeHtml(f.label || '')}" placeholder="Etiqueta del campo" />
     <select class="appset-input appset-tpl-field-type">
       <option value="text"${f.type !== 'list' ? ' selected' : ''}>Texto</option>
       <option value="list"${f.type === 'list' ? ' selected' : ''}>Lista</option>
+    </select>
+    <select class="appset-input appset-tpl-field-fill" title="Quién rellena el campo">
+      <option value="agent"${!cog ? ' selected' : ''}>IA (info)</option>
+      <option value="user"${cog ? ' selected' : ''}>Tú (cognición)</option>
     </select>
     <button class="icon-btn appset-tpl-field-del" title="Quitar campo">${icon('xmark', { size: 15 })}</button>
   </div>`;
@@ -296,6 +301,7 @@ function readTemplateForm(content) {
     key: row.dataset.key || '',
     label: row.querySelector('.appset-tpl-field-label').value,
     type: row.querySelector('.appset-tpl-field-type').value,
+    fill: row.querySelector('.appset-tpl-field-fill').value,
   }));
 }
 

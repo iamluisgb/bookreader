@@ -5,6 +5,34 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-02 — Agente: distinción INFO / COGNICIÓN en la libreta (fase 1)
+
+Principio rector: el agente debe **ayudar a aprender, no sustituir el aprendizaje**. Hasta ahora el
+auto-relleno de la libreta y el flujo HQ&A escribían **todos** los campos, incluidos los que dan
+retención solo si los generas tú (la «Answer», el «espejo», el «experimento»).
+
+**Modelo de datos**: cada campo de plantilla gana `fill: 'agent' | 'user'` — INFO (lo rellena la IA)
+vs COGNICIÓN (lo genera el usuario). Un campo sin `fill` se trata como `'agent'` (compatibilidad).
+
+**Qué se hizo**:
+- [`js/ai/templates.js`](js/ai/templates.js): `fill` en las 6 plantillas (cognición = Answer, espejo,
+  experimento(s), juicio, «¿y qué?», plan de acción, problema/artefacto) + helpers `agentFields`,
+  `isAgentFillable`, `isCognitionField`.
+- [`js/ai/panel.js`](js/ai/panel.js): `notebookTool` y `extractToNotebook` solo operan sobre campos
+  INFO (la IA ni siquiera puede dirigirse a los de cognición); `generateHQA` genera solo la Pregunta y
+  deja la Respuesta para el usuario; la libreta marca cada campo con «IA» o «tú» y añade microcopy en
+  los de cognición.
+- [`js/ai/panel-template.js`](js/ai/panel-template.js): el `systemPrompt` separa campos INFO de
+  COGNICIÓN e instruye al agente a **no escribir** los de cognición (pregunta socrática + revisión).
+- [`js/ai/custom-templates.js`](js/ai/custom-templates.js) + [`js/ui/app-settings.js`](js/ui/app-settings.js):
+  el editor de plantillas propias permite marcar cada campo como IA (info) o Tú (cognición).
+- [`css/main.css`](css/main.css): distintivo INFO/COGNICIÓN y microcopy.
+
+Sin bump de `sw.js`. Verificado con Playwright (la IA no puede rellenar campos de cognición; el
+`systemPrompt` los lista aparte con la instrucción de no escribirlos) y 19/19 E2E.
+
+---
+
 ## 2026-07-02 — Marcadores: muestran el número de página
 
 Cada marcador de la sidebar muestra ahora **«Pág. X / Y»** (misma numeración que la barra de progreso,

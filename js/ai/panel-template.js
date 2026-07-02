@@ -3,6 +3,7 @@
 // sin estado: el prompt recibe goal/template por parámetro.
 import { icon } from '../ui/icons.js';
 import { promptBlock } from './profiles.js';
+import { isCognitionField } from './templates.js';
 
 export const TEMPLATE = `
   <div class="ai-header">
@@ -42,7 +43,16 @@ export const TEMPLATE = `
 // pueden ser null/undefined. El bloque del perfil va PRIMERO: es lo más estable
 // (reutilizable entre libros/convos), buen prefijo para el prompt caching.
 export function systemPrompt(goal, template, profile) {
-  const fields = template ? template.fields.map(f => `- ${f.key}: ${f.label}`).join('\n') : '';
+  const info = template ? template.fields.filter(f => !isCognitionField(f)) : [];
+  const cog  = template ? template.fields.filter(f =>  isCognitionField(f)) : [];
+  const fmt = (arr) => arr.map(f => `- ${f.key}: ${f.label}`).join('\n');
+  // INFO vs COGNICIÓN: la libreta se auto-rellena solo en los campos INFO. Los de
+  // cognición los genera el usuario (efecto de generación); ahí el agente NO escribe la
+  // respuesta: pregunta al estilo socrático y, si el usuario aporta la suya, la revisa.
+  const notebook = [
+    info.length ? `Campos INFO (recuperación; se rellenan aparte, no en el chat):\n${fmt(info)}` : '',
+    cog.length ? `Campos de COGNICIÓN (los genera el USUARIO; TÚ NO los escribes):\n${fmt(cog)}\nEn estos campos no des la respuesta hecha: haz preguntas socráticas que ayuden al usuario a generarla, y cuando la escriba, revísala y señala huecos o errores.` : '',
+  ].filter(Boolean).join('\n\n');
   return `${promptBlock(profile)}Eres un lector experto que ayuda a sacar provecho de un libro según un OBJETIVO concreto.
 Respondes en español, conciso y sin paja, basándote ÚNICAMENTE en el libro entregado.
 
@@ -54,6 +64,7 @@ CITAS (obligatorio): el libro viene troceado en pasajes precedidos por anclas [[
 Cada afirmación basada en el libro debe llevar su cita [[aN]] usando identificadores reales del texto.
 Incluye al menos una cita por respuesta sobre el contenido. No inventes anclas.
 
-La libreta del usuario tiene estos campos (no los rellenas tú aquí, solo respondes):
-${fields}`;
+Principio rector — información ≠ cognición. Ayuda a APRENDER, no sustituyas el aprendizaje.
+La libreta del usuario tiene estos campos:
+${notebook}`;
 }
