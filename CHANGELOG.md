@@ -5,6 +5,24 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-02 — Fix: los bordes con `var(--border)` desaparecían en tema claro
+
+Las sidebars (índice y agente) no mostraban su borde separador en tema claro (y sistema-claro).
+
+**Causa** ([`css/themes.css`](css/themes.css)): en el bloque de alias del `:root` había
+`--border: var(--border);` — una **autorreferencia cíclica**. Eso deja `--border` **inválido** en el
+tema claro, así que **cualquier** `border: … var(--border)` computa a ancho 0 (y color `currentColor`).
+No afectaba solo a las sidebars: era un bug latente en todos los bordes que usan `var(--border)` en
+claro (los headers se salvaban porque usan `var(--border-soft)`, que sí es válido).
+
+**Qué se hizo**: eliminar esa línea espuria; el valor real de `--border` ya está definido antes en el
+mismo `:root` (`#d1d1d6`). Con eso vuelven los bordes en toda la app.
+
+Sin bump de `sw.js`. Verificado con Playwright (en claro `--border` = `#d1d1d6` y las tres superficies
+—`.sidebar`, `.sidebar-header`, `#ai-panel`— con borde de 1px; en oscuro `#38383a`, intactos) y 19/19 E2E.
+
+---
+
 ## 2026-07-02 — Paneles redimensionables + cabeceras alineadas
 
 Las dos sidebars (índice y agente) ahora se pueden **redimensionar** en escritorio, útil para leer

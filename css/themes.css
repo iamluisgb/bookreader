@@ -67,7 +67,10 @@
   --text-primary: var(--text);
   --text-secondary: var(--text-soft);
   --text-muted: var(--text-faint);
-  --border: var(--border);
+  /* (Antes había aquí `--border: var(--border)`: una autorreferencia cíclica que dejaba
+     --border INVÁLIDO en el tema claro, así que todo `border: … var(--border)` se
+     renderizaba con ancho 0 —p. ej. los bordes de las sidebars desaparecían—. El valor
+     real ya está definido arriba, así que basta con no volver a declararlo aquí.) */
   --shadow: rgba(var(--shadow-color), 0.10);
   --highlight-bg: var(--accent-soft);
 }
