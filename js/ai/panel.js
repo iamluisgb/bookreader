@@ -11,7 +11,8 @@ import { escapeHtml } from '../ui/escape.js';
 import * as AppSettings from '../ui/app-settings.js';
 import { renderWithCitations } from './render.js';
 import { computeChapterRelevance, applyChapterAttenuation, clearChapterAttenuation } from './attenuation.js';
-import { selectContext, estimateTokens } from './context.js';
+import { estimateTokens } from './context.js';
+import * as Retrieval from './retrieval.js';
 import { TEMPLATE, systemPrompt } from './panel-template.js';
 import * as Profiles from './profiles.js';
 
@@ -516,24 +517,65 @@ async function send() {
   await deliver(aug, q, { showUser: true });
 }
 
-// Un turno con el LLM: construye el contexto (IA1), lo streamea y pinta la respuesta.
+// IA5 · Índice de pasajes (BM25) del libro para retrieval por pregunta. Se construye
+// una vez por libro (barato) sobre las anclas ya segmentadas; se reconstruye al cambiar.
+function ensureIndex() {
+  const key = bookId || bookTitle || 'mem';
+  if (!Retrieval.hasIndex(key)) {
+    Retrieval.buildIndex(key, Retrieval.parsePassages(annotatedText, anchors));
+  }
+}
+
+// IA5 · Contexto por PREGUNTA a nivel de pasaje. Prioridad de relleno hasta el
+// presupuesto: (1) capítulos que la pregunta NOMBRA explícitamente (router — intención
+// directa, p. ej. "flashcards del capítulo 9"), (2) los mejores pasajes BM25 de TODO el
+// libro, (3) el capítulo donde está el lector. Luego se reordena en orden de lectura
+// para que el modelo lo lea coherente. Devuelve también las etiquetas del TOC (mapa del
+// libro) para el system prompt.
+function buildContext(question) {
+  ensureIndex();
+  const tocLabels = (book?.navigation?.toc || []).map(t => t.label.trim()).filter(Boolean);
+  const chosen = new Map();     // id -> pasaje (dedup, preserva)
+  let used = 0;
+  const tryAdd = (p) => {
+    if (!p || chosen.has(p.id)) return;
+    const t = estimateTokens(p.text) + 4;
+    if (used + t > CTX_BUDGET) return;
+    chosen.set(p.id, p); used += t;
+  };
+  for (const ch of Retrieval.matchChapters(question, tocLabels))   // (1) capítulos nombrados
+    for (const p of Retrieval.passagesByChapter(ch)) tryAdd(p);
+  for (const p of Retrieval.search(question, 60)) tryAdd(p);       // (2) BM25 de todo el libro
+  const cur = EpubReader.getCurrentChapterLabel?.() || '';         // (3) capítulo del lector
+  for (const p of Retrieval.passagesByChapter(cur)) tryAdd(p);
+
+  const picked = [...chosen.values()].sort((a, b) => Retrieval.anchorNum(a.id) - Retrieval.anchorNum(b.id));
+  // Fallback de seguridad: si no se pudo parsear/indexar (libro atípico), usar el
+  // anotado recortado, como hacía IA1 — cero regresión.
+  if (!picked.length) {
+    return { text: annotatedText.slice(0, CTX_BUDGET * 4), tocLabels, passages: 0, chapters: [] };
+  }
+  const out = [];
+  let curCh = null;
+  for (const p of picked) {
+    if (p.chapter && p.chapter !== curCh) { out.push(`\n## ${p.chapter}`); curCh = p.chapter; }
+    out.push(`[[${p.id}]] ${p.text}`);
+  }
+  const chapters = [...new Set(picked.map(p => p.chapter).filter(Boolean))];
+  return { text: out.join('\n').trim(), tocLabels, passages: picked.length, chapters };
+}
+
+// Un turno con el LLM: construye el contexto (IA5), lo streamea y pinta la respuesta.
 // `showUser` false = continuación (no se pinta ni persiste una burbuja de usuario; el
 // mensaje va igualmente al modelo como último turno). Reutilizado por send() y por el
 // botón "Continuar" que aparece si el proveedor corta la respuesta por longitud.
 async function deliver(aug, question, { showUser = true } = {}) {
   if (busy) return;
 
-  // IA1 · Recorte de contexto: en vez del libro entero, solo los capítulos
-  // relevantes al objetivo (relevancia ya cacheada por conversación). Si aún no
-  // hay puntuaciones, selectContext devuelve el libro entero (sin regresión).
-  const rated = convo ? await DB.getRatings(convo.id) : null;
-  const scores = (rated && rated.goal === convo.goal) ? rated.scores : null;
-  const tocLabels = (book?.navigation?.toc || []).map(t => t.label.trim());
-  const ctx = selectContext(annotatedText, scores, {
-    tocLabels,
-    currentChapter: EpubReader.getCurrentChapterLabel(),
-    budgetTokens: CTX_BUDGET,
-  });
+  // IA5 · Retrieval por PREGUNTA a nivel de pasaje (reemplaza al recorte por objetivo
+  // de IA1, que era ciego a la query y descartaba capítulos relevantes enteros por
+  // presupuesto). Ver decisión IA5 en el BACKLOG.
+  const ctx = buildContext(question);
 
   // IA1 · Ventana de historial: solo se reenvían los últimos N mensajes (el chat
   // completo sigue guardado y visible; solo no se manda entero en cada turno).
@@ -563,8 +605,8 @@ async function deliver(aug, question, { showUser = true } = {}) {
   let thinking = true, raw, truncated = false;
 
   const messages = [
-    { role: 'system', content: systemPrompt(convo?.goal, template, Profiles.getActive()) },
-    { role: 'user', content: 'LIBRO ANOTADO (cita los pasajes con sus anclas [[aN]]):\n\n' + ctx.text },
+    { role: 'system', content: systemPrompt(convo?.goal, template, Profiles.getActive(), { tocLabels: ctx.tocLabels }) },
+    { role: 'user', content: 'EXTRACTO DEL LIBRO recuperado por relevancia para esta pregunta (cita los pasajes con sus anclas [[aN]]):\n\n' + ctx.text },
     ...priorWindow,
     { role: 'user', content: aug },
   ];

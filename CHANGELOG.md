@@ -5,6 +5,36 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-02 — IA5 Fase 1a: retrieval por pregunta a nivel de pasaje (RAG)
+
+**Motivación (caso real).** Con *Designing Data-Intensive Applications* y el objetivo "System Design para
+entrevistas MAANG", el agente negó tener el Capítulo 9 y pidió al usuario que se lo pegara — cuando ese
+capítulo tenía la relevancia MÁS ALTA del libro (0.95, verificado en backup). Lo expulsó el recorte por
+objetivo/capítulo de IA1: ciego a la pregunta, con granularidad de capítulo y empaquetado codicioso que
+descarta un capítulo grande y relevante en favor de otros más pequeños.
+
+**Qué se hizo.** Nuevo módulo [`js/ai/retrieval.js`](js/ai/retrieval.js): índice **BM25** en el navegador
+sobre los pasajes `[[aN]]` que ya produce [`segment.js`](js/ai/segment.js) (cero API, cero coste, sirve a
+cualquier proveedor BYOK). En cada turno, `buildContext(question)` en [`js/ai/panel.js`](js/ai/panel.js)
+recupera **por pregunta y a nivel de pasaje** con esta prioridad hasta el presupuesto: (1) capítulos que la
+pregunta NOMBRA explícitamente (router determinista por número/título — "capítulo 9" / "chapter 9" / el
+título), (2) mejores pasajes BM25 de TODO el libro, (3) capítulo donde está el lector; luego reordena en
+orden de lectura. Sustituye a `selectContext` (IA1) en el `send()`.
+
+El **system prompt** ([`js/ai/panel-template.js`](js/ai/panel-template.js)) ahora recibe el **mapa del
+libro** (TOC completo) y se le dice que el texto es un EXTRACTO recuperado (no el libro entero): si le
+falta un capítulo, que lo diga y sugiera abrirlo/nombrarlo — **nunca** pedir que peguen texto, porque el
+libro completo ya está en la app.
+
+**Verificado.** Test de escenario DDIA: "flashcards del capítulo 9" ahora incluye los pasajes del cap. 9
+(router) más los de consenso (BM25). 19/19 E2E; `retrieval.js` carga sin errores de consola. Bump
+`sw.js` v38→v39.
+
+Pendiente en IA5: Fase 1b (retrieval como herramienta agéntica `search_book`/`read_chapter`), Fase 2
+(embeddings híbridos), Fase 3 (sentence-window + evaluación recall@k). Ver [`BACKLOG.md`](BACKLOG.md).
+
+---
+
 ## 2026-07-02 — Fix: las sidebars de lectura se veían sobre la biblioteca
 
 Al volver a la estantería con el índice o el panel del agente abiertos, esos paneles seguían visibles

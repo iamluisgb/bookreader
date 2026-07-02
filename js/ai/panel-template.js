@@ -42,7 +42,8 @@ export const TEMPLATE = `
 // la plantilla de libreta activa y `profile` el perfil de agente activo (P1). Todos
 // pueden ser null/undefined. El bloque del perfil va PRIMERO: es lo más estable
 // (reutilizable entre libros/convos), buen prefijo para el prompt caching.
-export function systemPrompt(goal, template, profile) {
+export function systemPrompt(goal, template, profile, opts = {}) {
+  const tocLabels = Array.isArray(opts.tocLabels) ? opts.tocLabels.filter(Boolean) : [];
   const info = template ? template.fields.filter(f => !isCognitionField(f)) : [];
   const cog  = template ? template.fields.filter(f =>  isCognitionField(f)) : [];
   const fmt = (arr) => arr.map(f => `- ${f.key}: ${f.label}`).join('\n');
@@ -53,14 +54,27 @@ export function systemPrompt(goal, template, profile) {
     info.length ? `Campos INFO (recuperación; se rellenan aparte, no en el chat):\n${fmt(info)}` : '',
     cog.length ? `Campos de COGNICIÓN (los genera el USUARIO; TÚ NO los escribes):\n${fmt(cog)}\nEn estos campos no des la respuesta hecha: haz preguntas socráticas que ayuden al usuario a generarla, y cuando la escriba, revísala y señala huecos o errores.` : '',
   ].filter(Boolean).join('\n\n');
+  // MAPA DEL LIBRO: el índice completo de capítulos (TOC). Sirve para que el modelo sepa
+  // que el libro SÍ tiene un capítulo aunque no esté en el extracto de este turno, y así
+  // no niegue su existencia ni pida que se lo peguen.
+  const bookMap = tocLabels.length
+    ? `\nMAPA DEL LIBRO (índice completo de capítulos):\n${tocLabels.map(t => `- ${t}`).join('\n')}\n`
+    : '';
   return `${promptBlock(profile)}Eres un lector experto que ayuda a sacar provecho de un libro según un OBJETIVO concreto.
-Respondes en español, conciso y sin paja, basándote ÚNICAMENTE en el libro entregado.
+Respondes en español, conciso y sin paja, basándote ÚNICAMENTE en el EXTRACTO del libro que se te entrega en cada turno.
 
 OBJETIVO DEL USUARIO: ${goal || '(sin definir)'}
 PLANTILLA: ${template?.name || '—'} — ${template?.agentRole || ''}
 Filtra el contenido hacia ese objetivo: ignora lo anecdótico, resalta lo aplicable.
+${bookMap}
+CONTEXTO RECUPERADO (importante): el texto que recibes NO es el libro entero, sino un EXTRACTO
+seleccionado automáticamente por relevancia para la pregunta actual; puede no incluir todos los
+capítulos. El usuario está leyendo el libro completo DENTRO de la app: nunca le pidas que copie ni
+pegue texto. Si para responder te falta un capítulo o pasaje que no está en el extracto, dilo con
+naturalidad y sugiere abrir/nombrar ese capítulo (aparece en el mapa de arriba) o reformular la
+pregunta para traerlo — pero no afirmes que el capítulo "no existe" o "no te lo han dado".
 
-CITAS (obligatorio): el libro viene troceado en pasajes precedidos por anclas [[aN]].
+CITAS (obligatorio): el extracto viene troceado en pasajes precedidos por anclas [[aN]].
 Cada afirmación basada en el libro debe llevar su cita [[aN]] usando identificadores reales del texto.
 Incluye al menos una cita por respuesta sobre el contenido. No inventes anclas.
 

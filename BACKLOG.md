@@ -72,9 +72,13 @@ para indexar y citar, y el function-calling (`chatTools`, ya usado en
   *recall@k*. Sin eso, "mejoré el retrieval" es fe.
 
 **Fases (por ROI):**
-- **Fase 1** `M` — sin dependencias, sirve a todo proveedor: capítulo → **pasaje**, retrieval **por
-  pregunta** con BM25, expuesto como tool (`search_book` + `read_chapter`) + prompt honesto con TOC.
-  **Ya arregla el bug reportado.**
+- **Fase 1a ✓** _(entregada, ver CHANGELOG 2026-07-02)_ — retrieval **por pregunta** a nivel de **pasaje**
+  con BM25 ([`js/ai/retrieval.js`](js/ai/retrieval.js)) + router de capítulo (número/título) + prompt
+  honesto con mapa TOC. Inyección (mantiene streaming), sin bucle de herramientas. **Arregla el bug
+  reportado.**
+- **Fase 1b** `M` — exponer el retrieval como **herramienta agéntica** (`search_book` + `read_chapter`):
+  requiere bucle multi-turno de tool-use en [`js/ai/llm.js`](js/ai/llm.js) (`_chatTools` hoy hace una sola
+  ronda, sin streaming, `max_tokens:1024`). Deja que el modelo pida más contexto por sí mismo.
 - **Fase 2** `M` — embeddings cacheados (si hay `/embeddings`), fusión híbrida BM25+semántica, rerank LLM
   opcional del top-30.
 - **Fase 3** `S`-`M` — *sentence-window* (expandir vecinos del pasaje para coherencia) + set de evaluación.

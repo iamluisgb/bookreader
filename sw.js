@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bookreader-v38';
+const CACHE_NAME = 'bookreader-v39';
 const ASSETS = [
   './',
   './index.html',
@@ -28,6 +28,7 @@ const ASSETS = [
   './js/ai/render.js',
   './js/ai/attenuation.js',
   './js/ai/context.js',
+  './js/ai/retrieval.js',
   './js/ai/panel-template.js',
   './js/ai/panel.js',
   './js/ui/icons.js',
