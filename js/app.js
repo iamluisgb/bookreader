@@ -29,8 +29,81 @@ document.addEventListener('DOMContentLoaded', () => {
   initAiPanel();
   initImmersive();
   initReaderReflow();
+  initPanelResize();
   initLibrary();
 });
+
+// ============ REDIMENSIONADO DE PANELES (solo escritorio) ============
+// Ambos paneles empujan el lector con un margen = su anchura (variable CSS). Arrastrar
+// el tirador del borde interior actualiza esa variable (y el texto reflowea). Anchura
+// persistida como preferencia global de UI. En móvil (drawer/overlay) no aplica.
+const PANEL_LIMITS = {
+  ai:      { cssVar: '--ai-panel-width', key: 'ui_ai_panel_width', min: 320, maxVw: 0.6, maxPx: 760 },
+  sidebar: { cssVar: '--sidebar-width',  key: 'ui_sidebar_width',  min: 240, maxVw: 0.5, maxPx: 560 },
+};
+
+function clampPanel(cfg, w) {
+  const max = Math.min(cfg.maxPx, Math.round(window.innerWidth * cfg.maxVw));
+  return Math.max(cfg.min, Math.min(max, Math.round(w)));
+}
+
+function initPanelResize() {
+  // Restaurar anchuras guardadas.
+  for (const cfg of Object.values(PANEL_LIMITS)) {
+    const saved = Storage.get(cfg.key, null);
+    if (saved) document.documentElement.style.setProperty(cfg.cssVar, clampPanel(cfg, saved) + 'px');
+  }
+  addResizer(document.getElementById('ai-panel'), 'ai-resizer', PANEL_LIMITS.ai,
+    (e) => window.innerWidth - e.clientX);       // panel derecho: ancho = distancia al borde derecho
+  addResizer(document.getElementById('sidebar'), 'sidebar-resizer', PANEL_LIMITS.sidebar,
+    (e) => e.clientX);                            // panel izquierdo: ancho = posición del cursor
+}
+
+function addResizer(panel, cls, cfg, widthFromEvent) {
+  if (!panel) return;
+  const handle = document.createElement('div');
+  handle.className = 'panel-resizer ' + cls;
+  handle.title = 'Arrastra para ajustar el ancho · doble clic: restablecer';
+  panel.appendChild(handle);
+
+  let raf = 0;
+  const apply = (e) => {
+    const w = clampPanel(cfg, widthFromEvent(e));
+    document.documentElement.style.setProperty(cfg.cssVar, w + 'px');
+    return w;
+  };
+  const onMove = (e) => {
+    apply(e);
+    // Reflow del EPUB acompasado a rAF (no en cada pointermove) para que el texto siga
+    // al tirador sin saturar. La captura de puntero garantiza eventos aun sobre el iframe.
+    if (!raf) raf = requestAnimationFrame(() => { raf = 0; if (EpubReader.isLoaded()) EpubReader.resize(); });
+  };
+  const end = (e) => {
+    try { handle.releasePointerCapture(e.pointerId); } catch (_) {}
+    handle.removeEventListener('pointermove', onMove);
+    handle.removeEventListener('pointerup', end);
+    handle.removeEventListener('pointercancel', end);
+    document.body.classList.remove('resizing-panel');
+    if (raf) { cancelAnimationFrame(raf); raf = 0; }
+    Storage.set(cfg.key, apply(e));
+    if (EpubReader.isLoaded()) EpubReader.resize();
+  };
+  handle.addEventListener('pointerdown', (e) => {
+    if (!window.matchMedia('(min-width: 1024px)').matches) return;   // solo escritorio
+    e.preventDefault();
+    try { handle.setPointerCapture(e.pointerId); } catch (_) {}
+    document.body.classList.add('resizing-panel');
+    handle.addEventListener('pointermove', onMove);
+    handle.addEventListener('pointerup', end);
+    handle.addEventListener('pointercancel', end);
+  });
+  // Doble clic en el tirador: restablecer el ancho por defecto.
+  handle.addEventListener('dblclick', () => {
+    document.documentElement.style.removeProperty(cfg.cssVar);
+    Storage.remove(cfg.key);
+    if (EpubReader.isLoaded()) EpubReader.resize();
+  });
+}
 
 // ============ BIBLIOTECA ============
 let currentBook = null;        // { id, fileBaseId, format } del libro abierto

@@ -5,6 +5,31 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-02 — Paneles redimensionables + cabeceras alineadas
+
+Las dos sidebars (índice y agente) ahora se pueden **redimensionar** en escritorio, útil para leer
+técnico con el chat abierto al lado y ajustar cuánto sitio le das a cada uno.
+
+**Qué se hizo**:
+- [`js/app.js`](js/app.js): `initPanelResize()` añade un tirador (`.panel-resizer`) en el borde interior
+  de cada panel. Arrastrar actualiza la variable CSS de anchura (`--ai-panel-width` / `--sidebar-width`);
+  como el margen del lector usa esa misma variable, el texto **reflowea** en vivo (acompasado a rAF). La
+  anchura se **persiste** (preferencia global de UI) con límites (agente 320–760px/60vw, índice
+  240–560px/50vw). Captura de puntero para arrastrar aunque el cursor pase sobre el iframe. Doble clic en
+  el tirador restablece el ancho por defecto.
+- [`css/main.css`](css/main.css): estilo del tirador (`col-resize`, línea acento al hover/arrastre); solo
+  escritorio (oculto en ≤1023px, donde los paneles son drawers). Durante el arrastre se desactiva la
+  transición de márgenes y la selección de texto.
+- **Cabeceras alineadas**: la del índice y la del agente usaban `padding` sin altura fija (~44px) y no
+  cuadraban con la del lector (52px). Ahora las tres usan `height: var(--header-height)`, así el borde
+  inferior queda a la misma altura.
+
+Solo escritorio (en móvil los paneles siguen como drawers/bottom sheet). Sin bump de `sw.js`. Verificado
+con Playwright (las 3 cabeceras a 52px con el borde alineado; ambos paneles crecen al arrastrar con el
+margen del lector siguiéndolos; anchura persistida; 0 errores de consola) y 19/19 E2E.
+
+---
+
 ## 2026-07-02 — Lectura: modo scroll continuo (mejor para libros técnicos)
 
 Nuevo **modo de lectura scroll** conmutable (Ajustes → Modo de lectura: Páginas / Scroll), además del

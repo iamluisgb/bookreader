@@ -38,7 +38,11 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 16px;
+  /* Misma altura que la cabecera del lector y la del agente (borde inferior alineado). */
+  height: var(--header-height);
+  flex-shrink: 0;
+  box-sizing: border-box;
+  padding: 0 16px;
   border-bottom: 1px solid var(--border);
 }
 
@@ -663,11 +667,49 @@ body.ai-open .reader-main { margin-right: var(--ai-panel-width); }
    de abajo lo revierte a margin 0). */
 body:has(#sidebar.open) .reader-main { margin-left: var(--sidebar-width); }
 
+/* ---- Tiradores para redimensionar los paneles (solo escritorio) ----
+   Ambos paneles EMPUJAN el lector con un margen = su anchura (variable CSS). Arrastrar
+   el tirador actualiza esa variable y el texto reflowea. En móvil (drawer/overlay) se
+   ocultan. */
+.panel-resizer {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 10px;
+  z-index: 110;
+  cursor: col-resize;
+  touch-action: none;
+}
+.ai-resizer { left: -5px; }          /* borde interior del panel del agente (izquierda) */
+.sidebar-resizer { right: -5px; }    /* borde interior de la sidebar (derecha) */
+.panel-resizer::before {
+  content: '';
+  position: absolute;
+  top: 0; bottom: 0; left: 50%;
+  width: 2px;
+  transform: translateX(-50%);
+  background: transparent;
+  transition: background var(--transition-fast);
+}
+.panel-resizer:hover::before,
+body.resizing-panel .panel-resizer::before { background: var(--accent); }
+/* Durante el arrastre: sin selección de texto, cursor global y sin transición de márgenes
+   (para que el texto siga el tirador sin retardo). */
+body.resizing-panel { cursor: col-resize; user-select: none; }
+body.resizing-panel #ai-panel,
+body.resizing-panel #sidebar,
+body.resizing-panel .reader-main { transition: none !important; }
+@media (max-width: 1023px) { .panel-resizer { display: none; } }
+
 .ai-header {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 12px 16px;
+  /* Misma altura que la cabecera del lector y la de la sidebar (borde alineado). */
+  height: var(--header-height);
+  flex-shrink: 0;
+  box-sizing: border-box;
+  padding: 0 16px;
   border-bottom: 1px solid var(--border);
 }
 .ai-title { flex: 1; font-weight: 600; font-size: 15px; }
