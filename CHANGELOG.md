@@ -5,6 +5,23 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-02 — Fixes: pestañas de la sidebar al estrechar + objetivo de la libreta
+
+Dos ajustes visuales tras hacer las sidebars redimensionables:
+- **Pestañas de la sidebar** ([`css/main.css`](css/main.css)): al estrechar la sidebar, la fila
+  «Contenido · Marcadores · Subrayados · Ajustes» se salía por el borde. Ahora `flex-wrap: wrap` +
+  `.tab-btn { flex: 1 0 auto; white-space: nowrap }`: las pestañas pasan a 2 filas en vez de
+  desbordarse, cada etiqueta entera.
+- **Objetivo en la libreta** ([`js/ai/panel.js`](js/ai/panel.js), [`css/main.css`](css/main.css)): la
+  etiqueta «Objetivo» quedaba pegada al valor («Objetivotest») porque una regla agrupada la ponía en
+  `inline-flex`. El valor va ahora en su propio `.ai-nb-goal-value` y `.ai-nb-goal` es columna
+  (etiqueta arriba, valor debajo).
+
+Sin bump de `sw.js`. Verificado con Playwright (a 240px las 4 pestañas en 2 filas sin desbordar; el
+objetivo apilado y legible; 0 errores de consola) y 19/19 E2E.
+
+---
+
 ## 2026-07-02 — Fix: los bordes con `var(--border)` desaparecían en tema claro
 
 Las sidebars (índice y agente) no mostraban su borde separador en tema claro (y sistema-claro).

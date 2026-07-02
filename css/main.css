@@ -54,12 +54,14 @@ html, body {
 /* Tabs */
 .sidebar-tabs {
   display: flex;
+  flex-wrap: wrap;   /* al estrechar la sidebar, las pestañas pasan a 2 filas en vez de salirse */
   border-bottom: 1px solid var(--border);
 }
 
 .tab-btn {
-  flex: 1;
-  padding: 10px 4px;
+  flex: 1 0 auto;            /* crece para llenar la fila, pero no encoge por debajo de su texto (→ envuelve) */
+  white-space: nowrap;      /* cada etiqueta se mantiene entera */
+  padding: 10px 8px;
   background: none;
   border: none;
   border-bottom: 2px solid transparent;
@@ -927,10 +929,12 @@ body.resizing-panel .reader-main { transition: none !important; }
 
 /* Libreta */
 .ai-nb-goal {
+  display: flex; flex-direction: column; gap: 3px;   /* etiqueta arriba, valor debajo (no pegados) */
   background: var(--bg-tertiary); border-radius: 8px; padding: 10px 12px;
   font-size: 13px; line-height: 1.4; margin-bottom: 6px;
 }
 .ai-nb-goal-label { display: block; font-size: 11px; color: var(--text-muted); margin-bottom: 4px; }
+.ai-nb-goal-value { word-break: break-word; }
 .ai-nb-tpl { font-size: 12px; color: var(--text-muted); margin-bottom: 16px; }
 .ai-nb-field { margin-bottom: 16px; }
 .ai-nb-field-label {

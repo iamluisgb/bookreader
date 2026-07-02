@@ -792,7 +792,7 @@ function renderNotebook() {
   for (const n of notes) (byField[n.fieldKey] ||= []).push(n);
 
   els.noteView.innerHTML = `
-    <div class="ai-nb-goal"><span class="ai-nb-goal-label">${icon('target', { size: 15 })} Objetivo</span>${escapeHtml(convo.goal)}</div>
+    <div class="ai-nb-goal"><span class="ai-nb-goal-label">${icon('target', { size: 15 })} Objetivo</span><span class="ai-nb-goal-value">${escapeHtml(convo.goal)}</span></div>
     <div class="ai-nb-tpl">${template.name}</div>
     ${template.fields.map(f => {
       const list = byField[f.key] || [];
