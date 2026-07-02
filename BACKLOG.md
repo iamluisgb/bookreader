@@ -19,8 +19,8 @@ para caching. Módulo [`js/ai/context.js`](js/ai/context.js) + integración en `
 Pendiente (fases futuras, menor prioridad):
 - **Fase 3 — resumen rodante del historial:** resumir los turnos que salen de la ventana (1 llamada
   extra por turno) en vez de descartarlos, para conversaciones muy largas.
-- **Retrieval por pregunta con embeddings:** si algún proveedor BYOK expone `/embeddings`, pasar de
-  selección por *objetivo* a por *pregunta* (estilo NotebookLM). Convergería con IA4.
+- **El retrieval de contenido (por objetivo, a nivel de capítulo) se rehace en [IA5](#ia5--retrieval-profesional-rag-por-pasaje-agéntico--l--sustituye-a-ia4).** La
+  selección de historial de IA1 se mantiene; IA5 sustituye la selección de *libro*.
 
 ### IA2 — Interrupción "Pepito Grillo" (Modelado de Comportamiento) · `M` _(ex E5.2)_
 Con la plantilla correspondiente, que el agente interrumpa en puntos de quiebre del libro.
@@ -28,10 +28,60 @@ Con la plantilla correspondiente, que el agente interrumpa en puntos de quiebre 
 ### IA3 — Reintentos automáticos en errores transitorios · `S` _(ex E7.1)_
 Reintentar 429/5xx con backoff; hoy solo se muestra el error.
 
-### IA4 — Retrieval por pregunta con embeddings · `M` _(ex E7.2)_
-El retrieval **a nivel de capítulo** ya lo entregó IA1 (fase 1). Lo que queda como palanca extra para
-libros enormes es el retrieval **por pregunta** con embeddings (si un proveedor BYOK expone
-`/embeddings`) — ver nota en IA1.
+### IA4 — Retrieval por pregunta con embeddings · ~~`M`~~ · **absorbido por [IA5](#ia5--retrieval-profesional-rag-por-pasaje-agéntico--l--sustituye-a-ia4)** _(ex E7.2)_
+Era "añadir embeddings al retrieval por capítulo". El rediseño correcto no es *añadir embeddings* sino
+*cambiar de granularidad y de disparo* (pasaje + por pregunta + agéntico); los embeddings son la Fase 2
+de IA5, no una feature suelta.
+
+### IA5 — Retrieval profesional (RAG por pasaje, agéntico) · `L` · **sustituye a IA4**
+**Motivación (caso real, verificado en backup del 2026-07-02).** Con DDIA y el objetivo *"System Design
+senior-staff para entrevistas MAANG"*, el agente dijo no tener el Capítulo 9 y **pidió al usuario que se
+lo pegara**. Pero en las puntuaciones guardadas, *"9. Consistency and Consensus"* tenía **0.95 — la
+relevancia MÁS ALTA de todo el libro**. No se descartó por irrelevante: lo expulsó el empaquetado.
+
+**Diagnóstico — 3 pecados del retrieval actual** ([`js/ai/context.js`](js/ai/context.js)):
+1. **Ciego a la query:** selecciona una vez por conversación contra el *objetivo*, no por cada pregunta.
+   Preguntar por el cap. 9 no lo trae al contexto (solo se fuerza el capítulo donde está el lector).
+2. **Granularidad tosca:** la unidad es el *capítulo* (~30k tokens → entra entero o nada). Con el
+   presupuesto de 60k y el empaquetado codicioso ([context.js L68-72](js/ai/context.js#L68-L72), `continue`
+   en vez de `break`), un capítulo grande y muy relevante pierde frente a varios pequeños y menos
+   relevantes → justo lo que pasó con el 9.
+3. **Framing deshonesto:** al modelo se le entrega el recorte como *"LIBRO ANOTADO"*
+   ([panel.js L567](js/ai/panel.js#L567)) sin decirle que es parcial → inventa que el usuario pegó un texto
+   incompleto y pide que pegue más. Sin sentido en una app donde el libro entero ya está cargado.
+
+**Solución — RAG por pasaje, agéntico, cacheado en el cliente.** Aprovecha dos activos ya montados:
+las anclas `[[aN]]` a nivel de bloque ([`js/ai/segment.js`](js/ai/segment.js)) = pasajes con CFI listos
+para indexar y citar, y el function-calling (`chatTools`, ya usado en
+[`attenuation.js`](js/ai/attenuation.js)).
+
+- **Índice de pasajes por libro** (keyed por hash, en IndexedDB):
+  - **BM25 léxico** siempre (índice invertido en el navegador; cero API, cero coste). Fuerte en nombres
+    propios y locators ("capítulo 9", "Raft", "consensus").
+  - **Embeddings** cuando el proveedor BYOK expone `/embeddings`: se calculan una vez, se cachean, y la
+    similitud coseno se hace en JS (miles de vectores → ms, sin servidor).
+- **Retrieval como herramienta del agente** (no pre-inyección fija):
+  `search_book(query)` (top-k híbrido, fusión RRF) y `read_chapter(n|título)` (filtro por metadato del
+  TOC). Así *"flashcards del capítulo 9"* dispara `read_chapter(9)` automáticamente.
+- **Router de query:** referencia estructural → `read_chapter`; conceptual → `search_book`. Resuelve el
+  caso reportado de forma determinista.
+- **Grounding honesto:** pasar el **TOC completo como mapa** + decirle que el texto es un extracto
+  recuperado; si le falta algo, que llame a la herramienta o pida abrir el capítulo, **nunca** que peguen
+  texto. (Toca [`js/ai/panel-template.js`](js/ai/panel-template.js) `systemPrompt`.)
+- **Evaluación (no opcional):** ~15-20 preguntas doradas por libro (pregunta → ancla esperada) y medir
+  *recall@k*. Sin eso, "mejoré el retrieval" es fe.
+
+**Fases (por ROI):**
+- **Fase 1** `M` — sin dependencias, sirve a todo proveedor: capítulo → **pasaje**, retrieval **por
+  pregunta** con BM25, expuesto como tool (`search_book` + `read_chapter`) + prompt honesto con TOC.
+  **Ya arregla el bug reportado.**
+- **Fase 2** `M` — embeddings cacheados (si hay `/embeddings`), fusión híbrida BM25+semántica, rerank LLM
+  opcional del top-30.
+- **Fase 3** `S`-`M` — *sentence-window* (expandir vecinos del pasaje para coherencia) + set de evaluación.
+
+**Prerrequisito a verificar:** que la segmentación emite el marcador `## 9. Consistency and Consensus`
+(si el TOC del EPUB no casa por `href`, el texto del cap. 9 podría estar plegado en el 8 —
+[segment.js L67](js/ai/segment.js#L67)). Comprobar en vivo antes de la Fase 1.
 
 ---
 
