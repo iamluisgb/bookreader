@@ -38,14 +38,26 @@ function norm(s) {
 // construir el índice de un libro entero es de milisegundos.
 let index = null; // { key, passages:[{id,text,chapter,cfi,len,tf:Map}], df:Map, avgLen, N }
 
-// Extrae los pasajes del libro anotado. Cada línea `[[aN]] texto` es un pasaje; los
-// marcadores `## X` fijan el capítulo en curso (mismo formato que segment.js).
-export function parsePassages(annotatedText, anchors = new Map()) {
+// Extrae los pasajes del libro anotado. Cada línea `[[aN]] texto` es un pasaje.
+//
+// OJO con los marcadores `## X`: segment.js emite uno por CADA encabezado (H1–H6), no
+// solo por capítulo. Si tratáramos todos como frontera de capítulo, los pasajes del
+// Cap. 9 quedarían atribuidos a sus SUBTÍTULOS ("Linearizability", "Total Order
+// Broadcast"…) y `passagesByChapter("9. Consistency and Consensus")` devolvería casi
+// nada. Por eso, igual que context.js, un `## X` solo ABRE capítulo si X es una etiqueta
+// del TOC; los demás son subtítulos internos y heredan el capítulo en curso. Sin
+// tocLabels (fallback) se comporta como antes (cada `## ` abre capítulo).
+export function parsePassages(annotatedText, anchors = new Map(), tocLabels = null) {
+  const tocSet = tocLabels ? new Set(tocLabels.map(norm).filter(Boolean)) : null;
   const passages = [];
   let chapter = '';
   for (const line of (annotatedText || '').split('\n')) {
     const h = /^##\s+(.*)$/.exec(line);
-    if (h) { chapter = h[1].trim(); continue; }
+    if (h) {
+      const label = h[1].trim();
+      if (!tocSet || tocSet.has(norm(label))) chapter = label;   // solo el TOC abre capítulo
+      continue;
+    }
     const m = /^\[\[(a\d+)\]\]\s*(.*)$/.exec(line);
     if (m) {
       passages.push({ id: m[1], text: m[2], chapter, cfi: anchors.get(m[1])?.cfi || null });
@@ -93,11 +105,33 @@ export function search(query, k = 40) {
   return out.slice(0, k).map(x => ({ ...x.p, score: x.score }));
 }
 
-// Todos los pasajes de un capítulo (por etiqueta), en orden de lectura.
+// Núcleo del título de un capítulo, sin el "9." ni el numeral romano/parte inicial.
+// "9. Consistency and Consensus" → "consistency and consensus".
+export function chapterCore(label) {
+  return norm(label).replace(/^(?:chapter|cap(?:itulo|\.)?|parte|part)?\s*[ivxlcdm\d]+[.\-)\s]+/i, '').trim();
+}
+
+function leadingNum(s) {
+  const m = norm(s).match(/^(?:chapter|cap(?:itulo|\.)?)?\s*(\d+)\b/);
+  return m ? m[1] : null;
+}
+
+// Todos los pasajes de un capítulo, en orden de lectura. Matching TOLERANTE a variaciones
+// de etiqueta (igualdad normalizada | mismo número inicial | contención del núcleo del
+// título), por si el marcador de segmentación difiere del label del TOC.
 export function passagesByChapter(chapterLabel) {
   if (!index || !chapterLabel) return [];
   const target = norm(chapterLabel);
-  return index.passages.filter(p => norm(p.chapter) === target);
+  const core = chapterCore(chapterLabel);
+  const num = leadingNum(chapterLabel);
+  return index.passages.filter(p => {
+    const pc = norm(p.chapter);
+    if (!pc) return false;
+    if (pc === target) return true;
+    if (num && leadingNum(p.chapter) === num) return true;
+    if (core && core.length >= 6 && (pc.includes(core) || core.includes(pc))) return true;
+    return false;
+  });
 }
 
 // Router de capítulo: detecta en la pregunta referencias estructurales explícitas y

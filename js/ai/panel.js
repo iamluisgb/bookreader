@@ -522,7 +522,10 @@ async function send() {
 function ensureIndex() {
   const key = bookId || bookTitle || 'mem';
   if (!Retrieval.hasIndex(key)) {
-    Retrieval.buildIndex(key, Retrieval.parsePassages(annotatedText, anchors));
+    const tocLabels = (book?.navigation?.toc || []).map(t => t.label.trim()).filter(Boolean);
+    // tocLabels es clave: sin él, los subtítulos (H2/H3) romperían la atribución de
+    // capítulo de cada pasaje (ver parsePassages).
+    Retrieval.buildIndex(key, Retrieval.parsePassages(annotatedText, anchors, tocLabels));
   }
 }
 
@@ -543,8 +546,13 @@ function buildContext(question) {
     if (used + t > CTX_BUDGET) return;
     chosen.set(p.id, p); used += t;
   };
-  for (const ch of Retrieval.matchChapters(question, tocLabels))   // (1) capítulos nombrados
+  for (const ch of Retrieval.matchChapters(question, tocLabels)) { // (1) capítulos nombrados
     for (const p of Retrieval.passagesByChapter(ch)) tryAdd(p);
+    // (1b) además, BM25 por el TÍTULO del capítulo: recupera su contenido por tema aunque
+    // la atribución por etiqueta fallara ("capítulo 9" no tiene palabras de contenido).
+    const core = Retrieval.chapterCore(ch);
+    if (core) for (const p of Retrieval.search(core, 40)) tryAdd(p);
+  }
   for (const p of Retrieval.search(question, 60)) tryAdd(p);       // (2) BM25 de todo el libro
   const cur = EpubReader.getCurrentChapterLabel?.() || '';         // (3) capítulo del lector
   for (const p of Retrieval.passagesByChapter(cur)) tryAdd(p);

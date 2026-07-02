@@ -5,6 +5,30 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-03 — IA5 Fase 1a (fix): la atribución de capítulo por pasaje era errónea
+
+**Síntoma.** Tras desplegar IA5, el agente seguía diciendo que no tenía el Capítulo 9 (pese al prompt
+honesto ya activo). Reproducido con el EPUB real de DDIA.
+
+**Causa.** `segment.js` emite un marcador `## ` por CADA encabezado (H1–H6), no solo por capítulo.
+`parsePassages` trataba todos como frontera de capítulo, así que los pasajes del Cap. 9 quedaban
+atribuidos a sus SUBTÍTULOS ("Linearizability", "Total Order Broadcast"…) y
+`passagesByChapter("9. Consistency and Consensus")` devolvía casi nada → el router no aportaba el
+capítulo y, como "capítulo 9" no tiene palabras de contenido, BM25 tampoco.
+
+**Fix.** ([`js/ai/retrieval.js`](js/ai/retrieval.js)) `parsePassages` recibe ahora `tocLabels` y solo
+ABRE capítulo cuando la etiqueta está en el TOC (los subtítulos heredan el capítulo en curso), igual
+que hace `context.js`. Además: `passagesByChapter` con matching tolerante (por número o núcleo del
+título) y una expansión de query — al nombrar un capítulo se busca también por su TÍTULO en BM25, para
+recuperar su contenido por tema aunque la etiqueta variara.
+
+**Verificado.** Sobre el DDIA real, "flashcards del capítulo 9" ahora mete **543 pasajes del Cap. 9**
+en el contexto (Linearizability, consenso, Paxos/Raft/2PC) — antes, un puñado. Nuevo test determinista
+[`tests/retrieval.spec.ts`](tests/retrieval.spec.ts) que fija la atribución por TOC y el router. 21/21
+E2E. Bump `sw.js` v40→v41.
+
+---
+
 ## 2026-07-02 — Fix (definitivo): la posición se perdía al girar el móvil
 
 **Síntoma.** Al rotar horizontal↔vertical, el libro "caminaba hacia atrás" varias páginas. Fixes
