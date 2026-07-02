@@ -16,6 +16,7 @@ let onChapterCallback = null;
 let settingsListenerRegistered = false;
 
 let resizeTimer = null;
+let resizeAnchor = null;  // CFI fijado al inicio de una ráfaga de resize (giro de pantalla)
 
 // Re-apply the container width and re-fit. Width/height both track the
 // container (rendered at '100%'), so this mainly re-applies the max-width cap;
@@ -197,7 +198,23 @@ export function init() {
   // browser chrome collapsing/expanding, and resizing the standalone PWA window.
   const scheduleResize = () => {
     clearTimeout(resizeTimer);
-    resizeTimer = setTimeout(() => { resizeToContainer(); updateReaderScale(); }, 150);
+    // Al girar la pantalla, rendition.resize() re-pagina pero epub.js conserva el
+    // OFFSET visual, no la posición: a otro ancho ese mismo offset cae en otro punto
+    // del texto (casi siempre antes) → parece que "salta varias páginas atrás".
+    // Un giro real dispara una RÁFAGA de 'resize' (la animación, la barra del navegador),
+    // así que fijamos el ancla al CFI del INICIO de la ráfaga y lo mantenemos hasta que
+    // se estabiliza; si no, un reflow intermedio dejaría currentCfi ya derivado y la
+    // deriva se acumularía. Al terminar, re-anclamos a esa posición original.
+    if (resizeAnchor == null) resizeAnchor = currentCfi;
+    resizeTimer = setTimeout(async () => {
+      const anchor = resizeAnchor;
+      resizeAnchor = null;
+      resizeToContainer();
+      updateReaderScale();
+      if (anchor && rendition) {
+        try { await rendition.display(anchor); } catch (e) { /* CFI inválido tras el reflow */ }
+      }
+    }, 250);
   };
   window.addEventListener('resize', scheduleResize);
   window.addEventListener('orientationchange', scheduleResize);

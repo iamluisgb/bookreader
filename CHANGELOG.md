@@ -5,6 +5,25 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-02 — Móvil: al girar la pantalla ya no salta de página
+
+Al cambiar entre vertical y horizontal, a veces la lectura **saltaba varias páginas atrás**.
+
+**Causa** ([`js/epub-reader.js`](js/epub-reader.js)): en modo paginado, `rendition.resize()` re-pagina
+pero epub.js conserva el *offset visual*, no la posición; a otro ancho ese mismo offset cae en otro
+punto del texto. Además, un giro real dispara una **ráfaga** de eventos `resize`/`orientationchange`
+(animación + barra del navegador), y cada reflow intermedio dejaba `currentCfi` ya derivado, por lo que
+la deriva se **acumulaba** giro a giro.
+
+**Qué se hizo**: fijamos el CFI al **inicio** de la ráfaga (`resizeAnchor`) y, cuando se estabiliza el
+tamaño (debounce 250 ms), re-anclamos con `rendition.display(anchor)` a esa posición original. Así el
+texto se re-pagina para el nuevo ancho pero te quedas donde estabas.
+
+Sin bump de `sw.js`. Verificado con Playwright simulando una ráfaga de giro (con arreglo: deriva 0–2
+localizaciones; control sin arreglo: deriva creciente 2→3…) y 19/19 E2E.
+
+---
+
 ## 2026-07-01 — Móvil: el agente no abre el teclado al abrirlo
 
 Al abrir el panel del agente (o al llegar al paso de objetivo del onboarding) se auto-enfocaba el campo
