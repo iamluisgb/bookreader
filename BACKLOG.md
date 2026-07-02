@@ -117,6 +117,27 @@ Buscar y saltar a coincidencias dentro del EPUB.
 ### P7 — Sync entre dispositivos · `L`
 Requiere backend (hoy todo es local-first: IndexedDB + localStorage).
 
+### P8 — Exportar libretas y conversaciones · `M`
+**Qué falta hoy.** El único export "legible" es [`buildMarkdown()`](js/backup.js) en Ajustes → Datos
+(P3): un **volcado global** de TODAS las libretas + subrayados que, además, **omite el chat** (nunca lee
+el store `messages`) y aplana las notas con `oneLine()` (pierde el formato/markdown). No hay forma de
+exportar **una** conversación o **una** libreta concreta, ni desde donde se usan (el panel).
+
+Distinguir de lo existente: **P3 = backup/restore** (JSON completo, cifra-nada, para *migrar* de
+dispositivo, ida y vuelta). **P8 = export legible y selectivo** (para *compartir/archivar/estudiar*, solo
+salida). No lo reinventa: reutiliza el patrón `download()` CSP-safe de backup.js.
+
+- **Export por conversación desde el panel** (botón en la cabecera de Chat/Libreta), no solo el volcado
+  global de Ajustes.
+- **Incluir el chat:** transcripción de `messages` (rol + contenido), que hoy no se exporta. Opción de
+  exportar *solo libreta*, *solo chat* o *ambos*.
+- **Preservar formato:** no aplanar con `oneLine()`; respetar markdown de notas y las citas `[[aN]]`
+  (idealmente resueltas a "cap. · pág." con `EpubReader.getPageInfo`).
+- **Formatos:** Markdown de serie; valorar **PDF** (print-to-PDF del navegador, sin dependencias) y
+  copia al portapapeles.
+- Refactor menor: generalizar `buildMarkdown()` para aceptar un scope (`{ convoId }` | global) y una
+  opción `includeChat`, en vez de duplicar lógica.
+
 ---
 
 ## 📄 PDF — paridad de features con EPUB
