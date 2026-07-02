@@ -572,7 +572,11 @@ body.scroll-mode .reader-viewport { align-items: stretch; justify-content: flex-
   overflow: hidden;
 }
 
-.epub-container > div {
+/* En PAGINADO la vista debe llenar el viewport (altura fija). En SCROLL debe conservar
+   su altura de contenido (la que epub.js pone inline, p. ej. 1229px) para que el
+   contenedor de epub.js (overflow:auto) tenga algo que desplazar; por eso gateamos estas
+   alturas fijas a :not(.scroll-mode). */
+body:not(.scroll-mode) .epub-container > div {
   height: 100% !important;
 }
 
@@ -580,7 +584,7 @@ body.scroll-mode .reader-viewport { align-items: stretch; justify-content: flex-
   border: none !important;
 }
 
-.epub-container .epub-view {
+body:not(.scroll-mode) .epub-container .epub-view {
   overflow: hidden !important;
   height: 100% !important;
 }

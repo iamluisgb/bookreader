@@ -28,6 +28,13 @@ Solo afecta al EPUB (en PDF es no-op). Sin bump de `sw.js`. Verificado con Playw
 paginated→scrolled-doc→paginated en caliente, posición conservada, persistencia por libro, 0 errores de
 consola) y 19/19 E2E.
 
+**Corrección (mismo día):** el scroll no se movía en escritorio. Causa: las reglas
+`.epub-container > div` y `.epub-container .epub-view` con `height: 100% !important` (necesarias en
+paginado para llenar el viewport) aplastaban la vista a la altura del viewport, así que el contenedor
+scrollable de epub.js no tenía nada que desplazar. Se gatean a `body:not(.scroll-mode)`; en scroll la
+vista conserva su altura de contenido. Verificado que la rueda del ratón desplaza de verdad
+(scrollHeight 1229 > 596, scrollTop responde).
+
 ---
 
 ## 2026-07-02 — Plantillas: 5 por objetivo + onboarding de una pregunta (fase 2)
