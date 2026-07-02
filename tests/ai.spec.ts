@@ -34,10 +34,9 @@ test.describe('BookReader - Agente IA', () => {
     await page.waitForSelector('#ai-toggle:not([disabled])', { timeout: 15000 });
     await page.click('#ai-toggle');
 
-    // Onboarding: bloque -> plantilla -> objetivo.
+    // Onboarding: una sola pregunta (objetivo) -> meta.
     await page.waitForSelector('.ai-onboarding', { timeout: 5000 });
-    await page.click('.ai-ob-block[data-block="tecnico"]');
-    await page.click('.ai-ob-tpl[data-tpl="adler"]');
+    await page.click('.ai-ob-tpl[data-tpl="t3-juicio"]');
     await page.fill('#ai-ob-goal', 'Comprender la obra a fondo.');
     await page.click('#ai-ob-start');
 

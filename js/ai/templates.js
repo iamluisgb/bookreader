@@ -9,76 +9,100 @@
 // como 'agent' (compatibilidad).
 import * as Custom from './custom-templates.js';
 
+// Los bloques (técnico/humanista) ya no organizan el onboarding —ahora es por objetivo—,
+// pero se conservan para agrupar la lista de plantillas en Ajustes y en las propias.
 export const BLOCKS = {
   tecnico:   { id: 'tecnico',   icon: 'chart',   label: 'Técnico / Práctico', hint: 'Negocios, software, ciencia, ensayo metodológico' },
   humanista: { id: 'humanista', icon: 'columns', label: 'Humanista / Creativo', hint: 'Biografías, historia, filosofía, ficción' },
 };
 
+// 5 plantillas por OBJETIVO (T1–T5). `objective` es la respuesta a "¿qué quieres conseguir
+// con este libro?" que se muestra en el onboarding. El Artesano (más abajo) no es un
+// objetivo: es un modo opt-in dentro de la Lectura Inmersiva (leer ficción como escritor).
 export const TEMPLATES = [
   {
-    id: 'extraccion-sintopica',
+    id: 't1-extraccion',
     block: 'tecnico',
-    name: 'Extracción Sintópica',
-    ideal: 'Resolver un problema inmediato de tu trabajo o proyecto.',
-    goalPrompt: '¿Qué problema o cuello de botella tienes hoy que te hizo abrir este libro?',
-    agentRole: 'Filtra el libro hacia el problema del usuario: atenúa lo introductorio/anecdótico y resalta metodologías directamente aplicables.',
+    objective: 'Resolver un problema concreto que tengo ahora',
+    name: 'T1 · Extracción para Proyectos',
+    ideal: 'Libros técnicos, de negocio o metodológicos. Lectura de minería.',
+    goalPrompt: '¿Qué problema o cuello de botella te hizo abrir este libro?',
+    agentRole: 'Filtra el libro hacia el problema del usuario: atenúa lo introductorio/anecdótico y resalta métodos directamente aplicables.',
     fields: [
-      { key: 'problema_actual',  label: 'Problema actual', type: 'text', fill: 'user' },
-      { key: 'artefacto_salida', label: 'Artefacto de salida esperado', type: 'text', fill: 'user' },
-      { key: 'conceptos_clave',  label: 'Conceptos clave para el objetivo', type: 'list', fill: 'agent' },
-      { key: 'frameworks_autor', label: 'Modelos mentales / frameworks del autor', type: 'list', fill: 'agent' },
-      { key: 'accion_inmediata', label: 'Plan de acción · próximos 3 días', type: 'list', fill: 'user' },
-      { key: 'accion_medio',     label: 'Plan de acción · próximas 2 semanas', type: 'list', fill: 'user' },
+      { key: 'problema_actual',      label: 'Problema actual', type: 'text', fill: 'user' },
+      { key: 'artefacto_salida',     label: 'Artefacto de salida esperado (checklist / plan / arquitectura)', type: 'text', fill: 'user' },
+      { key: 'conceptos_frameworks', label: 'Conceptos y frameworks del autor (relevantes al problema)', type: 'list', fill: 'agent' },
+      { key: 'por_que_importa',      label: 'Por qué importa para MI problema', type: 'text', fill: 'user' },
+      { key: 'plan_accion',          label: 'Plan de acción (3 días + 2 semanas)', type: 'list', fill: 'user' },
     ],
   },
   {
     id: 'hqa',
     block: 'tecnico',
-    name: 'Método HQ&A',
-    ideal: 'Estudiar documentación o conceptos técnicos a fondo y memorizarlos.',
+    objective: 'Dominar y memorizar el material a fondo',
+    name: 'T2 · HQ&A',
+    ideal: 'Documentación, libros de texto, conceptos complejos.',
     goalPrompt: '¿Qué concepto o tema necesitas comprender y memorizar?',
-    agentRole: 'Cuando el usuario subraya un dato, genera la Pregunta conceptual que responde y un borrador de Respuesta con sus propias palabras (Highlight → Question → Answer).',
+    agentRole: 'Cuando el usuario subraya un dato, genera la Pregunta conceptual que responde; la Respuesta la escribe el usuario con sus palabras.',
     fields: [
-      { key: 'hqa', label: 'Highlight → Question → Answer', type: 'list', fill: 'user' },
+      // Un solo campo por par: el Highlight y la Question las pone la IA, la Answer la
+      // escribes tú (fill:'user'). Mantenerlo en un campo conserva el emparejamiento H-Q-A.
+      { key: 'hqa', label: 'Highlight → Question → Answer (tú escribes la respuesta)', type: 'list', fill: 'user' },
     ],
   },
   {
-    id: 'adler',
-    block: 'tecnico',
-    name: '4 Preguntas de Adler',
-    ideal: 'Comprensión holística y crítica de un ensayo o no-ficción.',
-    goalPrompt: '¿Qué quieres obtener de una lectura crítica de este libro?',
-    agentRole: 'Guía al usuario por las 4 preguntas de Adler para una comprensión completa y crítica.',
-    fields: [
-      { key: 'mapa_global',    label: '1. Mapa global (tesis central en 3 frases)', type: 'text', fill: 'agent' },
-      { key: 'anatomia',       label: '2. Anatomía del argumento (pilares)', type: 'text', fill: 'agent' },
-      { key: 'juicio_critico', label: '3. Juicio crítico (¿dónde flaquea?)', type: 'text', fill: 'user' },
-      { key: 'y_que',          label: '4. El "¿y qué?" para mi objetivo', type: 'text', fill: 'user' },
-    ],
-  },
-  {
-    id: 'modelado-comportamiento',
+    id: 't3-juicio',
     block: 'humanista',
-    name: 'Modelado de Comportamiento',
-    ideal: 'Analizar la mentalidad de personajes históricos ante decisiones difíciles.',
-    goalPrompt: '¿Qué quieres aprender de la mentalidad de este personaje? (p.ej. "cómo mantenía la calma")',
-    agentRole: 'Actúa como Pepito Grillo histórico: en los puntos de quiebre, frena y debate qué debió evaluar el personaje, según el objetivo de aprendizaje.',
+    objective: 'Entender y juzgar la tesis del autor',
+    name: 'T3 · Juicio Analítico',
+    ideal: 'Cierre de un ensayo o no-ficción argumentativa. Síntesis final.',
+    goalPrompt: '¿Qué quieres obtener de una lectura crítica de este libro?',
+    agentRole: 'Guía las 4 preguntas de Adler. En el juicio actúa como sparring (aporta contraargumentos), no des veredictos: el juicio es del lector.',
     fields: [
-      { key: 'personaje',           label: 'Personaje focus', type: 'text', fill: 'agent' },
-      { key: 'objetivo_aprendizaje',label: 'Mi objetivo de aprendizaje', type: 'text', fill: 'user' },
-      { key: 'crisis',              label: 'El crisol · la crisis', type: 'list', fill: 'agent' },
-      { key: 'decision',            label: 'El crisol · la decisión', type: 'list', fill: 'agent' },
-      { key: 'asimetria_riesgo',    label: 'Asimetría del riesgo (skin in the game)', type: 'list', fill: 'agent' },
-      { key: 'espejo',              label: 'El espejo · aplicación personal', type: 'text', fill: 'user' },
+      { key: 'mapa_global',    label: 'Mapa global (tesis central en 3 frases)', type: 'text', fill: 'agent' },
+      { key: 'anatomia',       label: 'Anatomía del argumento (pilares y sub-argumentos)', type: 'text', fill: 'agent' },
+      { key: 'juicio_critico', label: 'Juicio crítico (¿dónde flaquea la lógica? sesgos, datos)', type: 'text', fill: 'user' },
+      { key: 'y_que',          label: '¿Y qué? (qué cambia en cómo pienso o actúo)', type: 'text', fill: 'user' },
     ],
   },
   {
+    id: 't4-sabiduria',
+    block: 'humanista',
+    objective: 'Cambiar cómo pienso o cómo actúo',
+    name: 'T4 · Sabiduría Aplicada',
+    ideal: 'Biografía, historia, filosofía, estoicismo, crecimiento.',
+    goalPrompt: '¿Qué patrón o área de tu vida quieres transformar? / ¿qué quieres aprender de este personaje?',
+    agentRole: 'Localiza y resume el crisol (el momento de máxima tensión o la idea que desafía). El espejo y el experimento los genera el usuario: confróntalo, no los escribas.',
+    fields: [
+      { key: 'proposito',    label: 'Propósito (qué quiero transformar / aprender)', type: 'text', fill: 'user' },
+      { key: 'crisol',       label: 'El crisol (momento de tensión o idea que incomoda)', type: 'list', fill: 'agent' },
+      { key: 'espejo',       label: 'El espejo (qué haría yo en una encrucijada equivalente)', type: 'text', fill: 'user' },
+      { key: 'experimento',  label: 'El experimento (el cambio concreto que hago mañana)', type: 'text', fill: 'user' },
+    ],
+  },
+  {
+    id: 't5-inmersiva',
+    block: 'humanista',
+    objective: 'Solo disfrutar / leer del tirón',
+    name: 'T5 · Lectura Inmersiva',
+    ideal: 'Ficción y cualquier lectura por placer. Fricción cero.',
+    goalPrompt: '¿Qué esperas de esta lectura? (opcional)',
+    agentRole: 'Acompaña sin interrumpir. La síntesis es opcional y siempre posterior: resúmenes solo al terminar o por sesión, si se piden.',
+    fields: [
+      { key: 'highlights', label: 'Highlights sueltos', type: 'list', fill: 'agent' },
+      { key: 'resumen',    label: 'Resumen al terminar (opcional)', type: 'text', fill: 'agent' },
+      { key: 'nota_libre', label: 'Nota libre (opcional)', type: 'list', fill: 'user' },
+    ],
+  },
+  {
+    // Modo avanzado "Artesano": opt-in dentro de T5 (leo para aprender a escribir). No se
+    // muestra como objetivo en el onboarding; se selecciona con la casilla de la pantalla T5.
     id: 'artesano',
     block: 'humanista',
-    name: 'El Artesano del Texto',
-    ideal: 'Leer ficción para aprender a escribir mejor.',
+    name: 'Artesano del Texto',
+    ideal: 'Leer ficción como escritor: estructura, ritmo, estilo.',
     goalPrompt: '¿Qué quieres "robarle" al autor? (ritmo, personajes, worldbuilding...)',
-    agentRole: 'Analiza la técnica del autor (estructura, ritmo, gestión de información, estilo) para que el usuario la imite.',
+    agentRole: 'Analiza la técnica del autor (estructura, ritmo, gestión de la información, estilo) para que el usuario la imite.',
     fields: [
       { key: 'objetivo_artesanal',  label: 'Objetivo artesanal', type: 'text', fill: 'user' },
       { key: 'estructura_ritmo',    label: 'Estructura y ritmo', type: 'list', fill: 'agent' },
@@ -87,21 +111,11 @@ export const TEMPLATES = [
       { key: 'experimento',         label: 'Mi propio experimento', type: 'text', fill: 'user' },
     ],
   },
-  {
-    id: 'compas-filosofico',
-    block: 'humanista',
-    name: 'El Compás Filosófico',
-    ideal: 'Lecturas de filosofía/estoicismo para transformación interior.',
-    goalPrompt: '¿Qué área de tu vida quieres transformar con esta lectura?',
-    agentRole: 'Confronta al usuario con las ideas que desafían sus creencias y le propone experimentos prácticos.',
-    fields: [
-      { key: 'proposito_interior',  label: 'Propósito interior', type: 'text', fill: 'user' },
-      { key: 'demolicion',          label: 'La demolición (creencias desafiadas)', type: 'list', fill: 'agent' },
-      { key: 'cita_faro',           label: 'La cita faro', type: 'text', fill: 'agent' },
-      { key: 'experimento_estoico', label: 'El experimento estoico / práctico', type: 'text', fill: 'user' },
-    ],
-  },
 ];
+
+// Id del modo avanzado Artesano y de la Lectura Inmersiva (la que lo ofrece como opt-in).
+export const ARTESANO_ID = 'artesano';
+export const INMERSIVA_ID = 't5-inmersiva';
 
 // Fábrica + plantillas propias del usuario (P2). Las custom viven en localStorage
 // (síncrono), así que la API de plantillas sigue siendo síncrona como antes.
@@ -111,6 +125,12 @@ export function allTemplates() {
 
 export function getTemplate(id) {
   return allTemplates().find(t => t.id === id) || null;
+}
+
+// Plantillas que se ofrecen como OBJETIVO en el onboarding: las 5 de fábrica (excluye el
+// Artesano, que es opt-in dentro de T5) más las propias del usuario.
+export function objectiveTemplates() {
+  return [...TEMPLATES.filter(t => t.id !== ARTESANO_ID), ...Custom.getAll()];
 }
 
 export function templatesByBlock(block) {

@@ -5,7 +5,7 @@ import * as LLM from './llm.js';
 import { segmentBook } from './segment.js';
 import * as DB from './db.js';
 import * as EpubReader from '../epub-reader.js';
-import { BLOCKS, TEMPLATES, getTemplate, templatesByBlock, isValidField, isAgentFillable, agentFields, isCognitionField } from './templates.js';
+import { getTemplate, objectiveTemplates, isValidField, isAgentFillable, agentFields, isCognitionField, ARTESANO_ID, INMERSIVA_ID } from './templates.js';
 import { icon } from '../ui/icons.js';
 import { escapeHtml } from '../ui/escape.js';
 import * as AppSettings from '../ui/app-settings.js';
@@ -442,58 +442,51 @@ function openOnboarding() {
   overlay.addEventListener('mousedown', (e) => { if (e.target === overlay) dismiss(); }); // clic fuera de la tarjeta
   overlay.querySelector('.ai-ob-close').addEventListener('click', dismiss);
 
-  let chosenBlock = null, chosenTemplate = null;
+  let chosenTemplate = null;
 
-  const renderBlocks = () => {
+  // Una sola pregunta: elige el OBJETIVO. Las 5 plantillas por objetivo + las propias.
+  const renderObjectives = () => {
+    const list = objectiveTemplates();
     body.innerHTML = `
-      <h2>¿Cuál es tu objetivo con este libro?</h2>
-      <p class="ai-ob-sub">Elige un enfoque de lectura.</p>
-      <div class="ai-ob-blocks">
-        ${Object.values(BLOCKS).map(bl => `
-          <button class="ai-ob-block" data-block="${bl.id}">
-            <span class="ai-ob-block-icon">${icon(bl.icon, { size: 24 })}</span>
-            <span class="ai-ob-block-label">${bl.label}</span>
-            <span class="ai-ob-block-hint">${bl.hint}</span>
-          </button>`).join('')}
-      </div>`;
-    body.querySelectorAll('.ai-ob-block').forEach(btn =>
-      btn.addEventListener('click', () => { chosenBlock = btn.dataset.block; renderTemplates(); }));
-  };
-
-  const renderTemplates = () => {
-    const list = templatesByBlock(chosenBlock);
-    body.innerHTML = `
-      <button class="ai-ob-back">${icon('chevron-left', { size: 16 })}<span>Volver</span></button>
-      <h2>Elige una plantilla</h2>
+      <h2>¿Qué quieres conseguir con este libro?</h2>
+      <p class="ai-ob-sub">Elige un objetivo de lectura.</p>
       <div class="ai-ob-templates">
         ${list.map(t => `
           <button class="ai-ob-tpl" data-tpl="${t.id}">
-            <span class="ai-ob-tpl-name">${t.name}</span>
-            <span class="ai-ob-tpl-ideal">${t.ideal}</span>
+            <span class="ai-ob-tpl-name">${t.objective || t.name}</span>
+            <span class="ai-ob-tpl-ideal">${t.name}${t.ideal ? ' · ' + t.ideal : ''}</span>
           </button>`).join('')}
       </div>`;
-    body.querySelector('.ai-ob-back').addEventListener('click', renderBlocks);
     body.querySelectorAll('.ai-ob-tpl').forEach(btn =>
       btn.addEventListener('click', () => { chosenTemplate = getTemplate(btn.dataset.tpl); renderGoal(); }));
   };
 
   const renderGoal = () => {
+    // Opt-in Artesano: solo en la Lectura Inmersiva (leer ficción como escritor).
+    const artesanoOptIn = chosenTemplate.id === INMERSIVA_ID
+      ? `<label class="ai-ob-check"><input type="checkbox" id="ai-ob-artesano" /> Leo para aprender a escribir (modo Artesano)</label>`
+      : '';
     body.innerHTML = `
       <button class="ai-ob-back">${icon('chevron-left', { size: 16 })}<span>Volver</span></button>
       <h2>${chosenTemplate.name}</h2>
       <p class="ai-ob-sub">${chosenTemplate.goalPrompt}</p>
       <textarea id="ai-ob-goal" class="ai-ob-goal" rows="3" placeholder="Tu objetivo..."></textarea>
+      ${artesanoOptIn}
       <button id="ai-ob-start" class="primary-btn ai-ob-start">Empezar a leer con objetivo</button>`;
-    body.querySelector('.ai-ob-back').addEventListener('click', renderTemplates);
+    body.querySelector('.ai-ob-back').addEventListener('click', renderObjectives);
     const goalEl = body.querySelector('#ai-ob-goal');
     if (!EpubReader.isCoarsePointer()) goalEl.focus();   // móvil: sin teclado hasta que toque
     body.querySelector('#ai-ob-start').addEventListener('click', async () => {
       const goal = goalEl.value.trim();
-      if (!goal) { goalEl.focus(); return; }
-      template = chosenTemplate;
+      // T5 (placer) no exige objetivo; el resto sí (es el ancla de la relevancia y la libreta).
+      if (!goal && chosenTemplate.id !== INMERSIVA_ID) { goalEl.focus(); return; }
+      // Si marcó el opt-in, la plantilla real pasa a ser el Artesano.
+      const artesano = body.querySelector('#ai-ob-artesano')?.checked;
+      const finalTemplate = artesano ? getTemplate(ARTESANO_ID) : chosenTemplate;
+      template = finalTemplate;
       convo = bookId
-        ? await DB.createConvo(bookId, chosenTemplate.id, goal)
-        : { id: 'tmp', bookId: null, templateId: chosenTemplate.id, goal };
+        ? await DB.createConvo(bookId, finalTemplate.id, goal)
+        : { id: 'tmp', bookId: null, templateId: finalTemplate.id, goal };
       history = []; notes = []; attenuationDone = false; clearChapterAttenuation();
       dismiss();
       await activateConvo();
@@ -501,7 +494,7 @@ function openOnboarding() {
     });
   };
 
-  renderBlocks();
+  renderObjectives();
 }
 
 // ---- Chat ------------------------------------------------------------------
@@ -783,6 +776,17 @@ function noteHtml(n) {
 }
 
 function renderNotebook() {
+  // Conversación huérfana: su plantilla ya no existe (p. ej. tras consolidar a T1–T5).
+  // No rompemos: avisamos y ofrecemos elegir un objetivo nuevo.
+  if (convo && !template) {
+    els.noteView.innerHTML = `
+      <div class="ai-nb-orphan">
+        <p>Esta conversación usa una plantilla que ya no existe.</p>
+        <button id="ai-nb-neworb" class="primary-btn">Elegir un objetivo</button>
+      </div>`;
+    els.noteView.querySelector('#ai-nb-neworb')?.addEventListener('click', openOnboarding);
+    return;
+  }
   if (!template) { els.noteView.innerHTML = ''; return; }
   const byField = {};
   for (const n of notes) (byField[n.fieldKey] ||= []).push(n);

@@ -5,6 +5,32 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-02 — Plantillas: 5 por objetivo + onboarding de una pregunta (fase 2)
+
+Consolidación de **6 plantillas en 2 bloques (técnico/humanista)** → **5 plantillas por objetivo**
+(T1–T5), con un onboarding de **una sola pregunta**: «¿Qué quieres conseguir con este libro?».
+
+**Qué se hizo**:
+- [`js/ai/templates.js`](js/ai/templates.js): nuevo array T1–T5 (Extracción para Proyectos · HQ&A ·
+  Juicio Analítico · Sabiduría Aplicada [fusión de biografías + filosofía] · Lectura Inmersiva), cada
+  campo con su `fill`. El **Artesano** se conserva como modo opt-in (no como objetivo). Nuevo
+  `objectiveTemplates()`; `objective` por plantilla para el onboarding.
+- [`js/ai/panel.js`](js/ai/panel.js): onboarding de un paso (`renderObjectives`) en vez de bloque →
+  plantilla → meta; casilla **«Leo para aprender a escribir (modo Artesano)»** solo en la Lectura
+  Inmersiva; T5 no exige objetivo (es lectura por placer). Degradación elegante: una conversación con
+  una plantilla ya inexistente no rompe, muestra un aviso para elegir un objetivo nuevo.
+- [`css/main.css`](css/main.css): estilos de la casilla Artesano y del aviso de conversación huérfana.
+- [`tests/ai.spec.ts`](tests/ai.spec.ts): flujo `@live` actualizado al onboarding de una pregunta.
+
+**Datos**: borrón y cuenta nueva — solo existen T1–T5; las conversaciones antiguas no rompen la app
+(degradación elegante), pero su libreta con la plantilla vieja ya no se renderiza.
+
+Sin bump de `sw.js`. Verificado con Playwright (5 objetivos en un paso, opt-in Artesano solo en T5,
+la libreta pasa al Artesano al marcarlo, distintivos INFO/COGNICIÓN visibles, 0 errores de consola) y
+19/19 E2E.
+
+---
+
 ## 2026-07-02 — Agente: distinción INFO / COGNICIÓN en la libreta (fase 1)
 
 Principio rector: el agente debe **ayudar a aprender, no sustituir el aprendizaje**. Hasta ahora el
