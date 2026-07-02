@@ -19,8 +19,14 @@ la deriva se **acumulaba** giro a giro.
 tamaño (debounce 250 ms), re-anclamos con `rendition.display(anchor)` a esa posición original. Así el
 texto se re-pagina para el nuevo ancho pero te quedas donde estabas.
 
-Sin bump de `sw.js`. Verificado con Playwright simulando una ráfaga de giro (con arreglo: deriva 0–2
-localizaciones; control sin arreglo: deriva creciente 2→3…) y 19/19 E2E.
+Faltaba un detalle clave del arrastre: `display(anchor)` muestra la página que contiene el ancla, pero
+su `relocated` reporta el **inicio de esa página** (antes del ancla), y ese evento llega *después* de
+que resuelve `display`. Si lo dejábamos sobrescribir `currentCfi`, cada giro partía de una posición ya
+retrasada y la lectura **caminaba hacia atrás** giro tras giro. Se silencian esas relocations con una
+**ventana temporal** (`suppressRelocateUntil`, 800 ms) y se fija `currentCfi` al ancla.
+
+Sin bump de `sw.js`. Verificado con Playwright: 6 giros seguidos mantienen la posición constante
+(deriva 0; control sin arreglo: 33→31→30→29, arrastre acumulativo) y 19/19 E2E.
 
 ---
 

@@ -16,7 +16,8 @@ let onChapterCallback = null;
 let settingsListenerRegistered = false;
 
 let resizeTimer = null;
-let resizeAnchor = null;  // CFI fijado al inicio de una ráfaga de resize (giro de pantalla)
+let resizeAnchor = null;         // CFI fijado al inicio de una ráfaga de resize (giro de pantalla)
+let suppressRelocateUntil = 0;   // ventana en la que ignoramos las relocations del re-anclaje (giro)
 
 // Re-apply the container width and re-fit. Width/height both track the
 // container (rendered at '100%'), so this mainly re-applies the max-width cap;
@@ -212,7 +213,17 @@ export function init() {
       resizeToContainer();
       updateReaderScale();
       if (anchor && rendition) {
-        try { await rendition.display(anchor); } catch (e) { /* CFI inválido tras el reflow */ }
+        // display(anchor) muestra la página que CONTIENE el ancla, pero su relocated
+        // reporta el INICIO de esa página (antes del ancla). Si dejáramos que eso
+        // sobrescribiera currentCfi, el siguiente giro partiría de una posición ya
+        // retrasada y "caminaría hacia atrás" giro tras giro. El relocated puede llegar
+        // DESPUÉS de que resuelva el display, así que lo silenciamos con una ventana
+        // temporal (no con un flag que limpiaríamos demasiado pronto) y fijamos el ancla.
+        suppressRelocateUntil = Date.now() + 800;
+        try { await rendition.display(anchor); }
+        catch (e) { /* CFI inválido tras el reflow */ }
+        currentCfi = anchor;
+        saveLastPosition();
       }
     }, 250);
   };
@@ -349,9 +360,10 @@ export async function load(arrayBuffer, onProgress) {
   // Track location changes
   rendition.on('relocated', (location) => {
     if (location && location.start) {
-      currentCfi = location.start.cfi;
+      // Durante un re-anclaje por giro NO movemos currentCfi (ver scheduleResize):
+      // la relocation reporta el inicio de página y arrastraría la posición atrás.
+      if (Date.now() >= suppressRelocateUntil) { currentCfi = location.start.cfi; saveLastPosition(); }
       updateProgress(location);
-      saveLastPosition();
     }
   });
 
@@ -359,10 +371,12 @@ export async function load(arrayBuffer, onProgress) {
   // fired yet when returning to an already-rendered (e.g. bookmarked) page,
   // so the bookmark button can read a stale CFI without this.
   rendition.on('rendered', () => {
-    try {
-      const loc = rendition.currentLocation();
-      if (loc && loc.start) currentCfi = loc.start.cfi;
-    } catch (e) { /* currentLocation not ready yet */ }
+    if (Date.now() >= suppressRelocateUntil) {
+      try {
+        const loc = rendition.currentLocation();
+        if (loc && loc.start) currentCfi = loc.start.cfi;
+      } catch (e) { /* currentLocation not ready yet */ }
+    }
     updateChapterInfo();
   });
 
