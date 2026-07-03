@@ -178,17 +178,19 @@ salida). No lo reinventa: reutiliza el patrón `download()` CSP-safe de backup.j
 > **Prerrequisito:** los bugs de bajo nivel de **TEC1** (ArrayBuffer *detached* al guardar, HiDPI,
 > teclado, errores). Conviene cerrar TEC1 antes o a la par de PDF1.
 
-### PDF1 — IA/agente sobre PDF (fase 1, mayor impacto) · `L`
-Es el salto de "visor de PDF" a "BookReader con PDF". Alimentar el pipeline de IA con el texto del PDF
-en vez del `spine` de epub.js:
-- Extraer texto por página con `page.getTextContent()` (ya se usa para la capa de texto).
-- **Detección de PDF escaneado:** si las primeras páginas no tienen texto, avisar («este PDF no tiene
-  texto seleccionable; el agente no puede leerlo») en vez de fallar en silencio. (Sin OCR; fuera de
-  alcance.)
-- Reconstruir estructura de capítulos con `pdf.getOutline()` cuando exista → mantener el `## capítulo`
-  y que el recorte por relevancia de **IA1** funcione (no troceo tosco por página).
-- Limpieza de extracción: unir palabras partidas por guión de justificación (`over‐ all` → `overall`).
-- Generalizar `js/ai/segment.js` (hoy epub-only) tras una interfaz por formato.
+### PDF1 — IA/agente sobre PDF (fase 1, mayor impacto) · **✓** `L`
+Es el salto de "visor de PDF" a "BookReader con PDF". El agente lee los PDF con **el mismo pipeline de
+retrieval** que los EPUB (BM25 + router + vecinos + agéntico). Entregado (ver ADR-015):
+- ✓ Extracción por página con `page.getTextContent()` → `js/ai/segment-pdf.js` produce el mismo "libro
+  anotado" (`[[aN]]`) que el EPUB, pero con locator de **página** (la cita salta a la página).
+- ✓ **Detección de PDF escaneado:** media de caracteres/página en la muestra inicial; si es ~0 se avisa
+  («este PDF no tiene texto seleccionable…») y no se indexa. (Sin OCR; fuera de alcance.)
+- ✓ Capítulos por `pdf.getOutline()`: `## capítulo` con **solo el nivel superior abriendo capítulo**
+  (subsecciones heredan → evita el bug de atribución tipo "capítulo 9"). Verificado sobre PDF real
+  (Albada, 355 pág, 1505 pasajes, 13 capítulos).
+- ✓ De-hyphenation de guiones de corte de línea (`over-\nall` → `overall`).
+- ✓ Segmentador por formato: `setBook(doc, id, title, {format:'pdf'})` ramifica a `segmentPdf` sin
+  tocar el camino EPUB. Tests: [`tests/segment-pdf.spec.ts`](tests/segment-pdf.spec.ts).
 
 ### PDF2 — Selección→agente en PDF · `M`
 Conectar la capa de texto **ya seleccionable** del PDF al panel IA y al tooltip de subrayar (hoy

@@ -25,6 +25,11 @@ export function isLoaded() {
   return pdfDoc !== null;
 }
 
+// Documento pdf.js cargado (para el agente: segment-pdf lo recorre con getTextContent/getOutline).
+export function getDocument() {
+  return pdfDoc;
+}
+
 export function getCurrentPage() {
   return currentPage;
 }

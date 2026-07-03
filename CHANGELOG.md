@@ -5,6 +5,26 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-03 — PDF1: el agente lee PDFs (mismo pipeline de retrieval)
+
+El salto de "visor de PDF" a "BookReader con PDF": el agente lee los PDF con **el mismo motor** que
+los EPUB (BM25 + router + sentence-window + agéntico). Ver [`DECISIONS.md`](DECISIONS.md) · ADR-015.
+
+- **`js/ai/segment-pdf.js` (nuevo):** recorre el PDF con `getTextContent()` por página y produce el
+  mismo "libro anotado" que el EPUB (`## capítulo` + `[[aN]] texto`), pero con **locator de página**.
+  Trocea en pasajes de ~400 caracteres cortando en fin de frase.
+- **Capítulos por `getOutline()`:** solo el **nivel superior abre capítulo**; las subsecciones son
+  marcadores `##` que heredan el padre (mismo criterio que el TOC del EPUB → evita el bug de
+  atribución "capítulo 9"). Verificado sobre un PDF real (Albada: 355 pág → 13 capítulos, 1505 pasajes).
+- **PDF escaneado:** se detecta por la media de caracteres/página; si no hay texto seleccionable se
+  avisa y no se indexa (sin OCR).
+- **De-hyphenation:** une los guiones de corte de línea (`over-\nall` → `overall`).
+- **Citas navegables en PDF:** al pulsar `[[aN]]`, `onCite` salta a la página con `PdfReader.goTo`.
+- **Cableado:** `AiPanel.setBook(doc, id, title, {format:'pdf'})` ramifica el segmentador sin tocar el
+  camino EPUB; `loadPdf` habilita el panel del agente y `PdfReader.getDocument()` expone el documento.
+- Tests deterministas: [`tests/segment-pdf.spec.ts`](tests/segment-pdf.spec.ts) (atribución, herencia
+  de subsección, escaneado, de-hyphenation). `sw.js` v47→v48 (nuevo módulo en el precache).
+
 ## 2026-07-03 — TEC1: revisión del lector PDF (arranca el track PDF)
 
 Prerrequisito de la épica PDF. El visor pasa de **0 cobertura E2E** a tener tests con fixture propia

@@ -3,6 +3,7 @@
 // E1/E2/E3/E5/E6 del backlog. Estado persistido en IndexedDB (E4).
 import * as LLM from './llm.js';
 import { segmentBook } from './segment.js';
+import { segmentPdf } from './segment-pdf.js';
 import * as DB from './db.js';
 import * as EpubReader from '../epub-reader.js';
 import { getTemplate, objectiveTemplates, isValidField, isAgentFillable, agentFields, isCognitionField, ARTESANO_ID, INMERSIVA_ID } from './templates.js';
@@ -30,6 +31,8 @@ let book = null, bookId = null, bookTitle = '';
 let convo = null;            // conversación activa { id, bookId, templateId, goal, title }
 let template = null;
 let annotatedText = '', anchors = new Map();
+let bookFormat = 'epub';     // 'epub' | 'pdf' — decide segmentador y tipo de locator de citas
+let tocLabels = [];          // etiquetas de capítulo del libro (TOC epub / outline pdf)
 let history = [];            // {role, content}
 let notes = [];              // {id, fieldKey, content, sourceCfis}
 let editingId = null;        // nota en edición
@@ -154,8 +157,9 @@ function showView(view) {
 
 // ---- Carga de libro --------------------------------------------------------
 
-export async function setBook(b, id, title) {
+export async function setBook(b, id, title, opts = {}) {
   book = b; bookId = id || null; bookTitle = title || 'Libro';
+  bookFormat = opts.format || 'epub'; tocLabels = [];
   convo = null; template = null; history = []; notes = [];
   ia2LastChapter = null; ia2Seen = new Set();   // IA2: reinicia el repaso por libro
   editingId = null; addingField = null; attenuationDone = false;
@@ -247,13 +251,35 @@ async function prepareBook() {
     if (seg) {
       segCached = true;
     } else {
+      const unit = bookFormat === 'pdf' ? 'páginas' : 'secciones';
       setStatus('Leyendo el libro…');
-      seg = await segmentBook(book, (d, t) => setStatus(`Leyendo el libro… ${d}/${t} secciones`));
+      const segmenter = bookFormat === 'pdf' ? segmentPdf : segmentBook;
+      seg = await segmenter(book, (d, t) => setStatus(`Leyendo el libro… ${d}/${t} ${unit}`));
       if (bookId) await DB.saveSegmented(bookId, bookTitle, seg);
       segCached = false;
     }
     annotatedText = seg.annotatedText;
     anchors = seg.anchors;
+
+    // Etiquetas de capítulo: en PDF salen del outline (segmenter) o, si la caché no las
+    // trae, se derivan de los capítulos ya atribuidos a las anclas (en PDF cada `##` es un
+    // capítulo real). En EPUB salen del TOC del propio libro.
+    if (bookFormat === 'pdf') {
+      tocLabels = (seg.tocLabels && seg.tocLabels.length)
+        ? seg.tocLabels
+        : [...new Set([...anchors.values()].map(a => a.chapter).filter(Boolean))];
+    } else {
+      tocLabels = (book?.navigation?.toc || []).map(t => t.label.trim()).filter(Boolean);
+    }
+
+    // PDF escaneado (sin texto seleccionable): el agente no puede leerlo. No dejamos
+    // segReady para que el chat no pretenda tener el contenido del libro.
+    if (bookFormat === 'pdf' && (seg.scanned || seg.blockCount === 0 || !annotatedText)) {
+      segReady = false; segBlocks = 0;
+      setStatus('Este PDF no tiene texto seleccionable (parece escaneado); el agente no puede leer su contenido.');
+      return;
+    }
+
     segReady = true; segBlocks = seg.blockCount;
     refreshStatus();
     if (document.getElementById('sidebar')?.classList.contains('open')) maybeAttenuate();
@@ -529,9 +555,8 @@ async function send() {
 function ensureIndex() {
   const key = bookId || bookTitle || 'mem';
   if (!Retrieval.hasIndex(key)) {
-    const tocLabels = (book?.navigation?.toc || []).map(t => t.label.trim()).filter(Boolean);
     // tocLabels es clave: sin él, los subtítulos (H2/H3) romperían la atribución de
-    // capítulo de cada pasaje (ver parsePassages).
+    // capítulo de cada pasaje (ver parsePassages). Se calcula al segmentar (TOC/outline).
     Retrieval.buildIndex(key, Retrieval.parsePassages(annotatedText, anchors, tocLabels));
   }
 }
@@ -544,7 +569,6 @@ function ensureIndex() {
 // libro) para el system prompt.
 function buildContext(question) {
   ensureIndex();
-  const tocLabels = (book?.navigation?.toc || []).map(t => t.label.trim()).filter(Boolean);
   const routed = Retrieval.matchChapters(question, tocLabels);     // capítulos nombrados
   // ADR-007 · Presupuesto adaptativo: turnos normales van lean (60k, baratos); si el
   // usuario NOMBRA un capítulo (intención de leerlo entero) se amplía el margen para que
@@ -1094,7 +1118,7 @@ function onMessagesClick(e) {
 
 function navigateCite(id) {
   const a = anchors.get(id);
-  if (a) onCite(a.cfi);
+  if (a) onCite(a.cfi ?? a.page);   // EPUB → CFI; PDF → nº de página
 }
 
 function appendBubble(role, text, asHtml) {

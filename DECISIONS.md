@@ -298,3 +298,33 @@ marginal hoy. Decidido con el usuario.
 **Consecuencias.** Queda documentado en el [`BACKLOG.md`](BACKLOG.md) como IA5 Fase 2. Cuando se
 retome: calcular embeddings una vez por libro, cachear en IndexedDB, coseno en JS, fusión RRF
 con BM25, y medir con el arné de ADR-012 (BM25 vs híbrido) para justificar el cambio.
+
+---
+
+## ADR-015 — PDF: mismo pipeline de retrieval, locator de página · `ACEPTADA`
+
+**Contexto.** El agente ya leía EPUB (segmentación → anclas `[[aN]]`→CFI → BM25/router/vecinos). Para
+que lea PDF (los O'Reilly del usuario) había dos caminos: (a) un pipeline nuevo específico de PDF, o
+(b) reusar el existente produciendo el mismo "libro anotado" desde el PDF.
+
+**Decisión.** (b). `js/ai/segment-pdf.js` emite el **mismo formato** que `segment.js` (`## capítulo` +
+`[[aN]] texto`), cambiando solo el **locator de la ancla: número de página** en vez de CFI. `setBook`
+recibe `{format}` y ramifica el segmentador; el resto del pipeline (BM25, router, sentence-window,
+agéntico, MAPA, grounding) es idéntico. La cita clicable navega con `PdfReader.goTo(page)`.
+
+**Porqué.**
+1. **Una sola fuente de verdad de retrieval.** Todo lo probado y afinado para EPUB (ADR-002..012)
+   aplica tal cual; no se duplica lógica ni tests.
+2. **Página como locator es lo honesto en PDF.** El PDF no tiene DOM estable ni CFIs; la página es la
+   unidad navegable real. Basta para citar y saltar.
+3. **Capítulos por `getOutline()` con solo nivel superior abriendo capítulo.** Mismo criterio que el
+   TOC del EPUB: las subsecciones son marcadores `##` que **heredan** el capítulo padre, evitando el
+   bug de atribución que ya nos mordió con "capítulo 9" en DDIA (ADR-006). Verificado sobre el PDF de
+   Albada (355 pág → 13 capítulos limpios, 1505 pasajes).
+4. **PDF escaneado se detecta, no se finge.** Si la muestra inicial no tiene texto, se avisa y no se
+   indexa (coherente con ADR-005: no inventar contexto). OCR queda fuera de alcance.
+
+**Consecuencias.** La caché de segmentación (`db.js`) es agnóstica (`entries` genéricos), así que el
+`{page,chapter}` persiste sin cambios de esquema. La atenuación por capítulo (ADR-oriented a EPUB)
+degrada limpia en PDF (sin `navigation.toc` → no-op). PDF2/PDF3 (selección→agente, subrayados)
+construirán sobre esto.

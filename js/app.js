@@ -267,7 +267,7 @@ async function openBookRecord(record, { fromRoute = false, loc = null } = {}) {
     Highlights.setBook(record.fileBaseId || record.id);
     currentBook = { id: record.id, fileBaseId: record.fileBaseId || record.id, format: record.format };
     if (record.format === 'pdf') {
-      await loadPdf(buffer, record.fileBaseId || record.id);
+      await loadPdf(buffer, record.fileBaseId || record.id, record.id);
       if (loc) await seekTo(loc);
     } else {
       await loadEpub(buffer, record.fileBaseId || record.id, record.id);
@@ -464,7 +464,14 @@ function initImmersive() {
 // ============ AI PANEL ============
 function initAiPanel() {
   AiPanel.init({
-    onCite: async (cfi) => {
+    onCite: async (loc) => {
+      // PDF: el locator es un número de página → saltar a ella. EPUB: es un CFI.
+      if (currentBook?.format === 'pdf') {
+        const page = parseInt(loc, 10);
+        if (page) await PdfReader.goTo(page);
+        return;
+      }
+      const cfi = loc;
       await EpubReader.goTo(cfi);
       try {
         const rendition = EpubReader.getRendition();
@@ -570,7 +577,7 @@ async function loadFile(file) {
   if (ext === 'epub') {
     await loadEpub(buffer, fileBaseId, id);
   } else {
-    await loadPdf(buffer, fileBaseId);
+    await loadPdf(buffer, fileBaseId, id);
   }
 
   // Guardar en la biblioteca (con portada/metadatos ya disponibles) y mostrar
@@ -656,8 +663,11 @@ async function loadEpub(buffer, bookId, aiBookId) {
   }
 }
 
-async function loadPdf(buffer, bookId) {
+async function loadPdf(buffer, bookId, aiBookId) {
   try {
+    // Hash estable del contenido (id canónico para el agente). Se reutiliza si ya viene dado.
+    if (!aiBookId) aiBookId = await AiDB.hashBuffer(buffer.slice(0));
+
     // Setup callback BEFORE load
     PdfReader.onPage((page, total) => {
       document.getElementById('reader-title').textContent = `PDF - Página ${page} de ${total}`;
@@ -670,6 +680,9 @@ async function loadPdf(buffer, bookId) {
     document.body.classList.add('reading');
     document.getElementById('reader-footer').style.display = 'flex';
     document.getElementById('bookmark-toggle').disabled = true;
+    // PDF1: el agente puede leer el PDF (texto extraído por página). Habilitar el panel.
+    document.getElementById('ai-toggle').disabled = false;
+    AiPanel.setBook(PdfReader.getDocument(), aiBookId, bookId || 'PDF', { format: 'pdf' });
   } catch (err) {
     console.error('Error loading PDF:', err);
     alert('Error al cargar el archivo PDF');
