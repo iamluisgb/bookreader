@@ -92,11 +92,65 @@ function serialize(task) {
 export function chatStream(opts)  { return serialize(() => _chatStream(opts)); }
 export function chatTools(opts)   { return serialize(() => _chatTools(opts)); }
 
+// ---- IA3 · Reintentos con backoff en errores transitorios --------------------
+// Ver ADR-008 en DECISIONS.md. Los proveedores BYOK dan 429/5xx transitorios; casi
+// todos se resuelven en segundos. Reintentamos ANTES de consumir el stream (no se
+// re-emiten tokens ya mostrados). Helpers puros exportados para poder testarlos.
+
+const RETRYABLE_STATUS = new Set([408, 425, 429, 500, 502, 503, 504]);
+export function isRetryableStatus(status) { return RETRYABLE_STATUS.has(status); }
+
+// Cabecera Retry-After: segundos (número) o fecha HTTP. Devuelve ms o null.
+export function parseRetryAfter(value) {
+  if (!value) return null;
+  const secs = Number(value);
+  if (Number.isFinite(secs)) return Math.max(0, secs * 1000);
+  const when = Date.parse(value);
+  return Number.isFinite(when) ? Math.max(0, when - Date.now()) : null;
+}
+
+// Backoff exponencial con jitter, con techo. i = 0,1,2… → ~700, 1400, 2800 ms (+jitter).
+export function backoffDelay(i, rnd = Math.random) {
+  return Math.min(700 * 2 ** i + rnd() * 300, 8000);
+}
+
+function sleep(ms, signal) {
+  return new Promise((resolve, reject) => {
+    const t = setTimeout(resolve, ms);
+    if (signal) signal.addEventListener('abort', () => {
+      clearTimeout(t); reject(new DOMException('Aborted', 'AbortError'));
+    }, { once: true });
+  });
+}
+
+// fetch con reintentos. Reintenta ante red caída y estados retryables; honra Retry-After.
+// Devuelve la respuesta final (aunque siga siendo un error tras agotar): el llamante ya
+// tiene su manejo de status. Respeta AbortSignal.
+async function fetchRetrying(url, opts, { retries = 3 } = {}) {
+  const signal = opts.signal;
+  let lastErr;
+  for (let i = 0; i <= retries; i++) {
+    if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
+    try {
+      const res = await fetch(url, opts);
+      if (res.ok || !isRetryableStatus(res.status) || i === retries) return res;
+      const wait = parseRetryAfter(res.headers.get('retry-after')) ?? backoffDelay(i);
+      await sleep(wait, signal);
+    } catch (e) {
+      if (e.name === 'AbortError') throw e;   // abort del usuario: no reintentar
+      lastErr = e;
+      if (i === retries) throw e;             // agotados: propaga el error de red
+      await sleep(backoffDelay(i), signal);
+    }
+  }
+  throw lastErr;
+}
+
 async function _chatStream({ messages, onToken, onReasoning, onDone, signal }) {
   const key = getKey().trim();
   if (!key) throw new Error('Falta la API key.');
 
-  const res = await fetch(`${getBaseUrl()}/chat/completions`, {
+  const res = await fetchRetrying(`${getBaseUrl()}/chat/completions`, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${key}`,
@@ -163,7 +217,7 @@ async function _chatTools({ messages, tools, toolChoice = 'auto', signal }) {
   const key = getKey().trim();
   if (!key) throw new Error('Falta la API key.');
 
-  const res = await fetch(`${getBaseUrl()}/chat/completions`, {
+  const res = await fetchRetrying(`${getBaseUrl()}/chat/completions`, {
     method: 'POST',
     headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({

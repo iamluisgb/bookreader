@@ -5,6 +5,31 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-03 — IA/Agente: robustez + decisiones documentadas (ADR)
+
+Lote de la sección IA del backlog, con el _porqué_ de cada decisión documentado en el nuevo
+[`DECISIONS.md`](DECISIONS.md) (ADR ligero, enlazado desde `AGENTS.md`).
+
+- **DECISIONS.md** — registro de decisiones del agente (ADR-001…010): retrieval por pasaje, por
+  pregunta, BM25-antes-de-embeddings, router de capítulo, grounding honesto, atribución por TOC,
+  presupuesto adaptativo, reintentos, retrieval agéntico (diferido) y ventana de historial. El objetivo
+  es no re-litigar decisiones ni perder el razonamiento que llevó a ellas.
+
+- **IA3 — Reintentos con backoff** ([`llm.js`](js/ai/llm.js), ADR-008). `fetchRetrying` reintenta ante
+  red caída y estados transitorios (408/425/429/5xx) con backoff exponencial + jitter, honrando
+  `Retry-After`. Respeta `AbortSignal` y reintenta ANTES de consumir el stream (no re-emite tokens).
+  Usado por `chatStream` y `chatTools`. Helpers puros testados en [`tests/llm.spec.ts`](tests/llm.spec.ts)
+  (+ test funcional: 503 ×2 → éxito).
+
+- **Presupuesto de contexto adaptativo** ([`panel.js`](js/ai/panel.js), ADR-007). Turnos normales van
+  lean (60k, baratos); si el usuario NOMBRA un capítulo (intención de leerlo entero), el margen sube a
+  ~110k para que quepa completo, sin encarecer cada pregunta. Guard de tokens subido a 180k.
+
+23/23 E2E. Bump `sw.js` v41→v42. Pendiente en la sección IA (siguiente lote): IA5 Fase 1b (retrieval
+agéntico, ADR-009), Fase 2 (embeddings), IA2 (interrupción), IA1 Fase 3 (resumen rodante).
+
+---
+
 ## 2026-07-03 — IA5 Fase 1a (fix): la atribución de capítulo por pasaje era errónea
 
 **Síntoma.** Tras desplegar IA5, el agente seguía diciendo que no tenía el Capítulo 9 (pese al prompt

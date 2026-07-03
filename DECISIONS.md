@@ -1,0 +1,212 @@
+# DECISIONS.md — BookReader (IA / Agente)
+
+Registro de decisiones de arquitectura (ADR ligero) del **agente de IA**: el _qué_ y,
+sobre todo, el _porqué_. Lo pendiente vive en [`BACKLOG.md`](BACKLOG.md); lo entregado, en
+[`CHANGELOG.md`](CHANGELOG.md). Aquí se documenta el razonamiento para no re-litigar
+decisiones ni perder el contexto que llevó a ellas.
+
+Formato de cada entrada: **Contexto → Decisión → Porqué → Consecuencias**. Estado:
+`ACEPTADA` · `SUPERADA por ADR-N` · `PENDIENTE` (decidida pero no implementada).
+
+---
+
+## ADR-001 — Retrieval a nivel de PASAJE, no de capítulo · `ACEPTADA`
+
+**Contexto.** La primera versión (IA1) recortaba el contexto por **capítulo**: puntuaba
+cada capítulo del TOC contra el _objetivo_ de la conversación y metía capítulos enteros
+hasta un presupuesto de tokens. Falló en un caso real (DDIA, "flashcards del capítulo 9"):
+el capítulo más relevante del libro (0.95) quedó fuera porque, siendo grande, el
+empaquetado codicioso metió varios capítulos pequeños en su lugar.
+
+**Decisión.** Recuperar **pasajes** (los bloques `[[aN]]` que ya produce
+[`segment.js`](js/ai/segment.js)), no capítulos.
+
+**Porqué.** El capítulo (~30k tokens) es una unidad demasiado gruesa: entra entero o no
+entra. A nivel de pasaje nunca "no cabe un capítulo"; se meten los N mejores párrafos de
+donde sea, con recall mucho mayor y sin que un capítulo grande expulse a otros. Es la
+granularidad estándar de cualquier RAG serio.
+
+**Consecuencias.** Índice por pasaje ([`js/ai/retrieval.js`](js/ai/retrieval.js)). Cada
+pasaje conserva su CFI (cita) y su capítulo (metadato). Ver ADR-006 para la atribución de
+capítulo. IA1/[`context.js`](js/ai/context.js) queda superado para la selección de _libro_
+(la selección de _historial_ de IA1 se mantiene).
+
+---
+
+## ADR-002 — Recuperar por PREGUNTA, no una vez por objetivo · `ACEPTADA`
+
+**Contexto.** IA1 seleccionaba el contexto **una sola vez por conversación** contra el
+objetivo. Preguntar por el capítulo 9 no lo traía: solo se forzaba el capítulo donde estaba
+el lector.
+
+**Decisión.** Recuperar en **cada turno**, con la pregunta como query.
+
+**Porqué.** El objetivo es estable pero cada pregunta pide cosas distintas. Un sistema
+ciego a la query no puede servir "explícame el consenso" si el objetivo no lo priorizó.
+Recuperar por pregunta es el comportamiento esperable de un asistente sobre un documento.
+
+**Consecuencias.** `buildContext(question)` en [`js/ai/panel.js`](js/ai/panel.js) corre en
+cada `deliver()`. Coste: un pase BM25 en memoria por turno (milisegundos, sin red).
+
+---
+
+## ADR-003 — BM25 primero; embeddings después · `ACEPTADA` (embeddings `PENDIENTE`, Fase 2)
+
+**Contexto.** El retrieval semántico "de libro" usa embeddings. Pero somos **BYOK**: no
+todos los proveedores exponen `/embeddings`, y no queremos un backend (la app es
+local-first, GitHub Pages).
+
+**Decisión.** Empezar con **BM25 léxico** en el navegador. Los embeddings (+ fusión híbrida)
+son una **fase posterior**, activada solo si el proveedor los expone.
+
+**Porqué.**
+- BM25 sirve a **cualquier** proveedor, es determinista, gratis y sin dependencias.
+- Es **fuerte justo donde fallaba** el recorte por objetivo: nombres propios y locators
+  ("capítulo 9", "Raft", "consensus", "linearizability").
+- Los embeddings mejoran el _recall_ semántico (paráfrasis), pero es un refinamiento, no un
+  prerrequisito: entregan ~20% extra sobre el 80% que ya da BM25 + router.
+
+**Consecuencias.** Cero coste/latencia añadidos hoy. Cuando lleguen embeddings: calcular una
+vez por libro, cachear en IndexedDB, coseno en JS, fusión RRF con BM25. Ver IA5 Fase 2 en el
+[`BACKLOG.md`](BACKLOG.md).
+
+---
+
+## ADR-004 — Router de capítulo determinista · `ACEPTADA`
+
+**Contexto.** "flashcards del capítulo 9" no tiene palabras de contenido: BM25 no encuentra
+nada relevante con esa query. La intención es estructural, no semántica.
+
+**Decisión.** Un **router** ([`retrieval.js`](js/ai/retrieval.js) `matchChapters`) detecta
+referencias estructurales explícitas (número: "capítulo 9"/"chapter 9"; o título) y trae ese
+capítulo entero, además de expandir la query BM25 con el **título** del capítulo.
+
+**Porqué.** Resolver el caso reportado de forma **determinista** (no dependiente del azar
+léxico). La expansión por título recupera el contenido del capítulo por tema aunque la
+etiqueta variara.
+
+**Consecuencias.** El caso "dame el capítulo N" funciona siempre que el capítulo esté bien
+atribuido (ADR-006). Prioridad de relleno en `buildContext`: (1) capítulos nombrados →
+(2) BM25 de todo el libro → (3) capítulo del lector.
+
+---
+
+## ADR-005 — Grounding honesto: el modelo sabe que ve un EXTRACTO · `ACEPTADA`
+
+**Contexto.** Con el recorte, al modelo se le entregaba el texto como "LIBRO ANOTADO" sin
+avisar de que era parcial. Ante una pregunta cuyo capítulo no estaba en el recorte, el modelo
+**inventaba** que el usuario le había pegado un texto incompleto y **pedía que pegara más** —
+absurdo en una app donde el libro entero ya está cargado.
+
+**Decisión.** El system prompt ([`panel-template.js`](js/ai/panel-template.js)) recibe el
+**TOC completo como mapa** y declara explícitamente que el texto es un **extracto recuperado**.
+Si falta algo: que lo diga y sugiera abrir/nombrar el capítulo — **nunca** pedir que peguen
+texto.
+
+**Porqué.** Un modelo que no sabe que su contexto está filtrado alucina explicaciones
+falsas. Darle el mapa del libro le permite saber que el capítulo _existe_ aunque no esté en
+el extracto, y comportarse con coherencia con el producto.
+
+**Consecuencias.** Requiere pasar `tocLabels` al prompt en cada turno (barato).
+
+---
+
+## ADR-006 — La atribución de capítulo usa SOLO etiquetas del TOC · `ACEPTADA`
+
+**Contexto.** `segment.js` emite un marcador `## X` por **cada encabezado** (H1–H6), no solo
+por capítulo. La primera versión de `parsePassages` tomaba todo `## ` como frontera de
+capítulo, así que los pasajes del cap. 9 quedaban atribuidos a sus **subtítulos**
+("Linearizability", "Total Order Broadcast"…) y `passagesByChapter("9. …")` devolvía casi
+nada. Este fue el bug que hizo que el agente siguiera "sin ver" el capítulo 9 tras el fix
+inicial.
+
+**Decisión.** `parsePassages(annotated, anchors, tocLabels)` solo **abre capítulo** cuando la
+etiqueta está en el TOC; los subtítulos heredan el capítulo en curso (igual que ya hacía
+[`context.js`](js/ai/context.js)). Complemento: `passagesByChapter` con matching tolerante
+(por número o núcleo del título).
+
+**Porqué.** El "capítulo" de un pasaje debe ser su capítulo del TOC, no el subtítulo más
+cercano. Sin esto, todo el retrieval por capítulo (ADR-004) es inútil en libros con muchos
+encabezados.
+
+**Consecuencias.** Verificado sobre el DDIA real: el cap. 9 pasa de un puñado de pasajes a
+543. Test de regresión determinista en [`tests/retrieval.spec.ts`](tests/retrieval.spec.ts).
+
+---
+
+## ADR-007 — Presupuesto de contexto adaptativo · `ACEPTADA`
+
+**Contexto.** Presupuesto fijo de 60k tokens de libro por turno. Un capítulo grande (DDIA
+cap. 9 ≈ 60k) lo llena entero, sin margen; capítulos aún más largos se truncarían al pedir
+"dame el capítulo entero".
+
+**Decisión.** Presupuesto **por turno según la intención**: turnos normales mantienen el
+límite lean (60k, baratos); cuando el usuario **nombra un capítulo** (intención de leerlo
+entero) se amplía el margen hasta un techo (~110k) para que quepa completo. El guard de
+tokens (aviso "esto es grande/caro") se mantiene como red para casos patológicos.
+
+**Porqué.** No inflar el coste de cada pregunta por un caso minoritario. El coste extra solo
+se paga cuando el usuario pide explícitamente un capítulo completo, que es cuando lo vale.
+
+**Consecuencias.** Constantes `CTX_BUDGET` / `CTX_BUDGET_CHAPTER` en
+[`panel.js`](js/ai/panel.js). Alternativa descartada: subir el base a 100k para todos
+(encarece cada turno sin necesidad).
+
+---
+
+## ADR-008 — Reintentos con backoff en errores transitorios (IA3) · `ACEPTADA`
+
+**Contexto.** Ante 429 (rate limit) o 5xx del proveedor, o un fallo de red puntual, la app
+solo mostraba el error. Los proveedores BYOK (nan, OpenRouter…) dan 429/503 transitorios con
+frecuencia.
+
+**Decisión.** `fetchRetrying` en [`llm.js`](js/ai/llm.js): reintenta ante red caída y estados
+retryables (408, 425, 429, 500, 502, 503, 504) con **backoff exponencial + jitter**,
+honrando la cabecera **`Retry-After`** cuando viene. 3 reintentos. Respeta `AbortSignal`. El
+reintento ocurre **antes** de empezar a consumir el stream (no se re-emiten tokens ya
+mostrados).
+
+**Porqué.** La mayoría de estos fallos se resuelven solos en segundos; reintentar con backoff
+es el patrón estándar y evita que un hipo del proveedor rompa la conversación. Honrar
+`Retry-After` es cortés con el rate limit y más efectivo que un backoff ciego.
+
+**Consecuencias.** Helpers puros y testables (`isRetryableStatus`, `parseRetryAfter`,
+`backoffDelay`). Usado por `chatStream` y `chatTools`. Las llamadas ya estaban serializadas
+(nan rechaza concurrencia), así que el backoff no solapa peticiones.
+
+---
+
+## ADR-009 — Retrieval agéntico (herramientas) como evolución, no reemplazo · `PENDIENTE` (Fase 1b)
+
+**Contexto.** Hoy el retrieval es **pre-inyección**: `buildContext` decide el contexto y se
+streamea la respuesta. La alternativa es **agéntica**: exponer `search_book`/`read_chapter`
+como herramientas y dejar que el modelo pida lo que necesita.
+
+**Decisión.** Mantener la pre-inyección como **camino por defecto** (rápido, con streaming) y
+**añadir** las herramientas para que el agente expanda contexto cuando le falte — no
+sustituir una por otra.
+
+**Porqué.** El bucle agéntico añade round-trips y latencia, y `_chatTools` hoy hace una sola
+ronda sin streaming (`max_tokens:1024`). La pre-inyección resuelve ya el 90% de los casos con
+la mejor UX (streaming). Las herramientas son la palanca para lo que la pre-inyección no
+cubre (p. ej. el modelo se da cuenta a mitad de que necesita otro capítulo). Requiere un bucle
+multi-turno de tool-use en `llm.js`.
+
+**Consecuencias.** Ver IA5 Fase 1b en el [`BACKLOG.md`](BACKLOG.md). Prerrequisito técnico:
+bucle de tool-use que preserve `tool_call_id` y permita varias rondas + respuesta final
+(idealmente en streaming).
+
+---
+
+## ADR-010 — Ventana de historial fija; resumen rodante diferido · `ACEPTADA` (resumen `PENDIENTE`)
+
+**Contexto.** El chat completo puede crecer mucho; reenviarlo entero cada turno es caro.
+
+**Decisión.** Reenviar solo los **últimos N mensajes** (ventana, hoy 6). El resumen rodante
+de lo que sale de la ventana queda **diferido** (IA1 Fase 3).
+
+**Porqué.** La ventana da el 90% del beneficio con cero coste extra. El resumen rodante añade
+una llamada LLM por turno; solo compensa en conversaciones muy largas, que son minoría.
+
+**Consecuencias.** `HISTORY_MSGS` en [`panel.js`](js/ai/panel.js). El chat completo sigue
+guardado y visible; solo no se manda entero al modelo.

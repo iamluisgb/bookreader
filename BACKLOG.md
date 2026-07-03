@@ -25,8 +25,10 @@ Pendiente (fases futuras, menor prioridad):
 ### IA2 — Interrupción "Pepito Grillo" (Modelado de Comportamiento) · `M` _(ex E5.2)_
 Con la plantilla correspondiente, que el agente interrumpa en puntos de quiebre del libro.
 
-### IA3 — Reintentos automáticos en errores transitorios · `S` _(ex E7.1)_
-Reintentar 429/5xx con backoff; hoy solo se muestra el error.
+### IA3 — Reintentos automáticos en errores transitorios · **✓** _(ex E7.1)_
+**Hecho** (ver CHANGELOG · [DECISIONS.md ADR-008](DECISIONS.md)): `fetchRetrying` en
+[`llm.js`](js/ai/llm.js) reintenta ante red caída y 408/425/429/5xx con backoff exponencial + jitter,
+honrando `Retry-After`. Usado por `chatStream` y `chatTools`. Tests en [`tests/llm.spec.ts`](tests/llm.spec.ts).
 
 ### IA4 — Retrieval por pregunta con embeddings · ~~`M`~~ · **absorbido por [IA5](#ia5--retrieval-profesional-rag-por-pasaje-agéntico--l--sustituye-a-ia4)** _(ex E7.2)_
 Era "añadir embeddings al retrieval por capítulo". El rediseño correcto no es *añadir embeddings* sino
@@ -83,9 +85,10 @@ para indexar y citar, y el function-calling (`chatTools`, ya usado en
   opcional del top-30.
 - **Fase 3** `S`-`M` — *sentence-window* (expandir vecinos del pasaje para coherencia) + set de evaluación.
 
-**Prerrequisito a verificar:** que la segmentación emite el marcador `## 9. Consistency and Consensus`
-(si el TOC del EPUB no casa por `href`, el texto del cap. 9 podría estar plegado en el 8 —
-[segment.js L67](js/ai/segment.js#L67)). Comprobar en vivo antes de la Fase 1.
+**Prerrequisito — ✓ verificado** (2026-07-03, sobre el EPUB real de DDIA): la segmentación **sí** emite
+`## 9. Consistency and Consensus` idéntico al TOC. El bug real era otro (atribución por subtítulos, ver
+[DECISIONS.md ADR-006](DECISIONS.md) y CHANGELOG), ya corregido. Presupuesto de contexto ahora adaptativo
+([ADR-007](DECISIONS.md)): 60k normal, ~110k al nombrar un capítulo.
 
 ---
 

@@ -19,10 +19,11 @@ import * as Profiles from './profiles.js';
 // Icon + label markup for the small inline action buttons.
 const act = (name, text, size = 15) => `${icon(name, { size })}<span>${text}</span>`;
 
-// IA1 — recorte de contexto/historial (ver decisión en el CHANGELOG):
-const CTX_BUDGET = 60000;    // tope de tokens de libro por turno (capítulos relevantes)
-const HISTORY_MSGS = 6;      // mensajes de historial verbatim que se reenvían (ventana)
-const TOKEN_GUARD = 120000;  // por encima de esto, avisar antes de enviar
+// Contexto/historial al LLM (ver DECISIONS.md · ADR-007, ADR-010):
+const CTX_BUDGET = 60000;          // tope de tokens de libro por turno normal (lean, barato)
+const CTX_BUDGET_CHAPTER = 110000; // techo cuando el usuario NOMBRA un capítulo (que quepa entero)
+const HISTORY_MSGS = 6;            // mensajes de historial verbatim que se reenvían (ventana)
+const TOKEN_GUARD = 180000;        // por encima de esto, avisar antes de enviar (caso patológico)
 
 let els = {};
 let book = null, bookId = null, bookTitle = '';
@@ -538,15 +539,20 @@ function ensureIndex() {
 function buildContext(question) {
   ensureIndex();
   const tocLabels = (book?.navigation?.toc || []).map(t => t.label.trim()).filter(Boolean);
+  const routed = Retrieval.matchChapters(question, tocLabels);     // capítulos nombrados
+  // ADR-007 · Presupuesto adaptativo: turnos normales van lean (60k, baratos); si el
+  // usuario NOMBRA un capítulo (intención de leerlo entero) se amplía el margen para que
+  // quepa completo, sin encarecer cada pregunta.
+  const budget = routed.length ? CTX_BUDGET_CHAPTER : CTX_BUDGET;
   const chosen = new Map();     // id -> pasaje (dedup, preserva)
   let used = 0;
   const tryAdd = (p) => {
     if (!p || chosen.has(p.id)) return;
     const t = estimateTokens(p.text) + 4;
-    if (used + t > CTX_BUDGET) return;
+    if (used + t > budget) return;
     chosen.set(p.id, p); used += t;
   };
-  for (const ch of Retrieval.matchChapters(question, tocLabels)) { // (1) capítulos nombrados
+  for (const ch of routed) {                                      // (1) capítulos nombrados
     for (const p of Retrieval.passagesByChapter(ch)) tryAdd(p);
     // (1b) además, BM25 por el TÍTULO del capítulo: recupera su contenido por tema aunque
     // la atribución por etiqueta fallara ("capítulo 9" no tiene palabras de contenido).

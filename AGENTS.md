@@ -11,6 +11,7 @@ offline con un agente de IA (BYOK) que lee el libro completo según un objetivo.
 ## Documentación
 - [`BACKLOG.md`](BACKLOG.md) — lo pendiente (única fuente).
 - [`CHANGELOG.md`](CHANGELOG.md) — lo entregado (histórico).
+- [`DECISIONS.md`](DECISIONS.md) — decisiones de arquitectura del agente IA (ADR: el _porqué_).
 - [`DESIGN.md`](DESIGN.md) — lenguaje visual (principios + tokens).
 - [`templates.md`](templates.md) — spec de las 6 plantillas de libreta.
 
