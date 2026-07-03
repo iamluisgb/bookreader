@@ -361,6 +361,26 @@ export function capturePageImage(maxPx = 1024) {
   return off.toDataURL('image/jpeg', 0.85);
 }
 
+// Portada para la estantería: renderiza la PÁGINA 1 en un canvas propio (fuera de pantalla)
+// y devuelve un data URL JPEG reescalado (lado largo ≈ maxPx). '' si no se puede.
+export async function renderCoverDataUrl(maxPx = 400) {
+  if (!pdfDoc) return '';
+  try {
+    const page = await pdfDoc.getPage(1);
+    const base = page.getViewport({ scale: 1 });
+    const scale = maxPx / Math.max(base.width, base.height);
+    const viewport = page.getViewport({ scale });
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.floor(viewport.width));
+    canvas.height = Math.max(1, Math.floor(viewport.height));
+    await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+    return canvas.toDataURL('image/jpeg', 0.8);
+  } catch (e) {
+    console.warn('pdf cover render error:', e);
+    return '';
+  }
+}
+
 // Índice del PDF para el sidebar: outline anidado con la página de inicio ya resuelta.
 // Devuelve [{ label, page, subitems: [...] }] (vacío si el PDF no trae outline).
 export async function getOutlineItems() {

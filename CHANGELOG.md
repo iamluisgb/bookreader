@@ -5,6 +5,17 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-03 — Estantería: portada real de los PDF (página 1)
+
+Los PDF mostraban una portada genérica; ahora se ve su **página 1** como el EPUB muestra la suya.
+
+- `PdfReader.renderCoverDataUrl()` renderiza la página 1 en un canvas propio y devuelve un JPEG
+  reescalado (lado largo ~400px). `persistToLibrary` la guarda al abrir un PDF desde archivo.
+- **Backfill:** los PDF ya guardados sin portada la generan al reabrirlos desde la estantería
+  (`updateBook` + re-render de la biblioteca), así que no hay que re-importarlos.
+- Test: [`tests/pdf.spec.ts`](tests/pdf.spec.ts) (la portada guardada es un `data:image/…`). Sin
+  archivos nuevos → sin bump de `sw.js`.
+
 ## 2026-07-03 — Visión: "Explicar lo que veo" (figuras/diagramas de un PDF)
 
 El agente ya puede **ver** una página del PDF, no solo su texto. Resuelve el caso "explícame la Figure

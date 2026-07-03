@@ -244,6 +244,19 @@ test('VISIÓN: "Ver" envía la imagen de la página al modelo de visión', async
   expect(vis.model).toBe('vision-model');
 });
 
+test('PDF-portada: se guarda la miniatura de la página 1 como portada', async ({ page }) => {
+  await openPdf(page);
+  await page.waitForTimeout(600);   // persistToLibrary es async tras la carga
+  const cover = await page.evaluate(async () => {
+    const Store = await import('/js/library/store.js');
+    const books = await Store.getAllBooks();
+    const pdf = (books || []).find((b: any) => b.format === 'pdf');
+    return pdf ? pdf.cover : null;
+  });
+  expect(cover).toBeTruthy();
+  expect(cover.startsWith('data:image/')).toBe(true);   // no la imagen genérica
+});
+
 test.describe('PDF HiDPI', () => {
   test.use({ deviceScaleFactor: 2 });
   test('el canvas se pinta a más resolución que su tamaño CSS (nitidez retina)', async ({ page }) => {

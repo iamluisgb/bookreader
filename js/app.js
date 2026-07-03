@@ -272,6 +272,11 @@ async function openBookRecord(record, { fromRoute = false, loc = null } = {}) {
     currentBook = { id: record.id, fileBaseId: record.fileBaseId || record.id, format: record.format };
     if (record.format === 'pdf') {
       await loadPdf(buffer, record.fileBaseId || record.id, record.id);
+      // Backfill de portada para PDFs guardados antes de tenerla (imagen genérica → página 1).
+      if (!record.cover) {
+        const cover = await PdfReader.renderCoverDataUrl();
+        if (cover) { await LibStore.updateBook(record.id, { cover }); Library.render(); }
+      }
       if (loc) await seekTo(loc);
     } else {
       await loadEpub(buffer, record.fileBaseId || record.id, record.id);
@@ -294,7 +299,8 @@ async function persistToLibrary(id, buffer, format, fileName, fileBaseId) {
     const existing = await LibStore.getBook(id);
     const title = format === 'pdf' ? (fileName.replace(/\.[^.]+$/, '')) : EpubReader.getTitle();
     const author = format === 'pdf' ? '' : EpubReader.getAuthor();
-    const cover = (format === 'pdf') ? '' : await EpubReader.getCoverDataUrl();
+    // Portada: EPUB de sus metadatos; PDF renderizando su página 1 (ya está cargado).
+    const cover = (format === 'pdf') ? await PdfReader.renderCoverDataUrl() : await EpubReader.getCoverDataUrl();
     const base = existing || { id, addedAt: Date.now(), progress: 0, lastCfi: null, status: 'unread', shelfIds: [] };
     await LibStore.putBook({
       ...base, id, title, author, cover: cover || base.cover || '',
