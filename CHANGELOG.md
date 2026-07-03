@@ -5,6 +5,21 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-03 — IA5 Fase 3: sentence-window + evaluación (recall@k)
+
+- **Sentence-window** ([`retrieval.js`](js/ai/retrieval.js) `withNeighbors`, ADR-011): cada acierto BM25
+  arrastra sus **vecinos inmediatos** en orden de lectura (mismo capítulo) antes del empaquetado, para
+  que el modelo lea contexto coherente alrededor de cada pasaje en vez de fragmentos sueltos. `buildIndex`
+  guarda un mapa de posiciones; radio 1.
+- **Evaluación recall@k** ([`tests/retrieval.spec.ts`](tests/retrieval.spec.ts), ADR-012): arné mínimo
+  con conjunto dorado (pregunta → pasaje esperado) y la métrica recall@k como **suelo de regresión**
+  (hoy sobre corpus sintético; ampliable a libros reales con la Fase 2). recall@3 = 1 en el corpus actual.
+
+26/26 E2E. Bump `sw.js` v43→v44. Con esto IA5 queda en Fase 1a+1b+3; pendiente Fase 2 (embeddings, solo
+con proveedor que exponga `/embeddings`).
+
+---
+
 ## 2026-07-03 — IA5 Fase 1b: retrieval agéntico (herramientas)
 
 El agente puede ahora **reunir contexto por sí mismo** con herramientas cuando el retrieval por pregunta

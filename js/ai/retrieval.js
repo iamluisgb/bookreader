@@ -79,8 +79,30 @@ export function buildIndex(key, passages) {
     totalLen += toks.length;
     return { ...p, len: toks.length, tf };
   });
-  index = { key, passages: docs, df, avgLen: docs.length ? totalLen / docs.length : 0, N: docs.length };
+  const pos = new Map(docs.map((p, i) => [p.id, i]));   // id → posición en orden de lectura
+  index = { key, passages: docs, df, avgLen: docs.length ? totalLen / docs.length : 0, N: docs.length, pos };
   return index;
+}
+
+// Sentence-window (IA5 Fase 3, ver DECISIONS.md · ADR-011): expande cada pasaje con sus
+// VECINOS inmediatos en orden de lectura (mismo capítulo), para que el modelo lea contexto
+// coherente alrededor de cada acierto en vez de fragmentos sueltos. Deduplica.
+export function withNeighbors(passages, radius = 1) {
+  if (!index) return passages;
+  const byId = new Map();
+  const add = (p) => { if (p && !byId.has(p.id)) byId.set(p.id, p); };
+  for (const p of passages) {
+    add(p);
+    const i = index.pos.get(p.id);
+    if (i == null) continue;
+    for (let d = 1; d <= radius; d++) {
+      for (const j of [i - d, i + d]) {
+        const n = index.passages[j];
+        if (n && n.chapter === p.chapter) add(n);   // no cruzar frontera de capítulo
+      }
+    }
+  }
+  return [...byId.values()];
 }
 
 // BM25 clásico. Devuelve los top-k pasajes (con su score) para la query.

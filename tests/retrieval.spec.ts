@@ -55,3 +55,39 @@ test('retrieval attributes sub-heading passages to their TOC chapter', async ({ 
   // BM25 recupera el pasaje de consenso por contenido.
   expect(r.bm25).toContain('a5');
 });
+
+test('sentence-window: cada acierto arrastra sus vecinos del mismo capítulo', async ({ page }) => {
+  await page.goto('/');
+  const r = await page.evaluate(async ({ annotated, toc }) => {
+    const R = await import('/js/ai/retrieval.js');
+    R.buildIndex('t', R.parsePassages(annotated, new Map(), toc));
+    const hit = R.search('raft paxos consensus', 1);                 // → a5 (Fault-Tolerant Consensus)
+    const expanded = R.withNeighbors(hit, 1).map((p: any) => p.id).sort();
+    return { hit: hit.map((p: any) => p.id), expanded };
+  }, { annotated: ANNOTATED, toc: TOC });
+  // a5 arrastra a4 (vecino, mismo Cap. 9); NO arrastra a6 (Cap. 10, otra frontera).
+  expect(r.hit).toEqual(['a5']);
+  expect(r.expanded).toEqual(['a4', 'a5']);
+});
+
+test('eval recall@k del retrieval sobre corpus sintético', async ({ page }) => {
+  await page.goto('/');
+  const golden = [
+    { q: 'raft paxos consensus agree on a value', expect: 'a5' },
+    { q: 'linearizability strongest consistency model', expect: 'a3' },
+    { q: 'networks unreliable messages lost delayed', expect: 'a0' },
+    { q: 'mapreduce batch large datasets machines', expect: 'a6' },
+  ];
+  const recall = await page.evaluate(async ({ annotated, toc, golden }) => {
+    const R = await import('/js/ai/retrieval.js');
+    R.buildIndex('t', R.parsePassages(annotated, new Map(), toc));
+    let hits = 0;
+    for (const g of golden) {
+      const top = R.search(g.q, 3).map((p: any) => p.id);
+      if (top.includes(g.expect)) hits++;
+    }
+    return hits / golden.length;   // recall@3
+  }, { annotated: ANNOTATED, toc: TOC, golden });
+  console.log('recall@3 =', recall);
+  expect(recall).toBe(1);          // el arnés: floor de recall (regresión si baja)
+});

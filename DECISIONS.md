@@ -218,3 +218,40 @@ una llamada LLM por turno; solo compensa en conversaciones muy largas, que son m
 
 **Consecuencias.** `HISTORY_MSGS` en [`panel.js`](js/ai/panel.js). El chat completo sigue
 guardado y visible; solo no se manda entero al modelo.
+
+---
+
+## ADR-011 — Sentence-window: expandir vecinos del pasaje · `ACEPTADA`
+
+**Contexto.** El retrieval por pasaje puede devolver fragmentos **sueltos** (un párrafo cuyo
+sentido depende del anterior/siguiente), lo que degrada la coherencia de lo que lee el modelo.
+
+**Decisión.** Cada acierto BM25 arrastra sus **vecinos inmediatos** en orden de lectura (±1,
+mismo capítulo) antes del empaquetado por presupuesto. `withNeighbors` en
+[`retrieval.js`](js/ai/retrieval.js).
+
+**Porqué.** Es el patrón _sentence-window / small-to-big_ de RAG: recuperar preciso (el pasaje
+relevante) pero **entregar con contexto** (sus vecinos). Barato (un `Map` de posiciones) y
+mejora la coherencia sin inflar demasiado el presupuesto. No cruza frontera de capítulo (un
+vecino de otro capítulo no aporta contexto local).
+
+**Consecuencias.** `buildIndex` guarda `pos` (id → índice). Solo se aplica a los aciertos BM25
+(los capítulos nombrados ya vienen enteros). Radio 1 por defecto.
+
+---
+
+## ADR-012 — Evaluación del retrieval (recall@k) · `ACEPTADA`
+
+**Contexto.** "Mejoré el retrieval" sin medir es fe. Cada cambio (BM25, router, vecinos,
+futuros embeddings) puede subir o bajar la calidad sin que se note.
+
+**Decisión.** Un arné de evaluación mínimo: un conjunto **dorado** (pregunta → pasaje esperado)
+y la métrica **recall@k** (¿está el pasaje esperado en el top-k?). Hoy sobre corpus sintético
+en [`tests/retrieval.spec.ts`](tests/retrieval.spec.ts), como **suelo de regresión** (falla el
+test si el recall baja).
+
+**Porqué.** Convierte la calidad del retrieval en un número reproducible y en una red de
+seguridad. Es el paso que separa ingeniería de tuneo a ojo (lo que ya avisaba ADR-003).
+
+**Consecuencias.** Ampliable a conjuntos dorados por libro real cuando haya embeddings (Fase 2)
+para comparar BM25 vs híbrido con la misma vara.

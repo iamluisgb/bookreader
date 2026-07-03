@@ -560,7 +560,9 @@ function buildContext(question) {
     if (core) for (const p of Retrieval.search(core, 40)) tryAdd(p);
   }
   const bm25 = Retrieval.search(question, 60);
-  for (const p of bm25) tryAdd(p);                                 // (2) BM25 de todo el libro
+  // (2) BM25 de todo el libro, con sentence-window: cada acierto arrastra sus vecinos
+  // inmediatos (mismo capítulo) para dar coherencia. Ver DECISIONS.md · ADR-011.
+  for (const p of Retrieval.withNeighbors(bm25, 1)) tryAdd(p);
   const cur = EpubReader.getCurrentChapterLabel?.() || '';         // (3) capítulo del lector
   for (const p of Retrieval.passagesByChapter(cur)) tryAdd(p);
 

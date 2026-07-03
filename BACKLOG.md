@@ -84,7 +84,9 @@ para indexar y citar, y el function-calling (`chatTools`, ya usado en
   débil), fusión con el contexto inicial y respuesta en streaming. Degrada con gracia si falla.
 - **Fase 2** `M` — embeddings cacheados (si hay `/embeddings`), fusión híbrida BM25+semántica, rerank LLM
   opcional del top-30.
-- **Fase 3** `S`-`M` — *sentence-window* (expandir vecinos del pasaje para coherencia) + set de evaluación.
+- **Fase 3 ✓** _(entregada, ver CHANGELOG · [DECISIONS.md ADR-011/012](DECISIONS.md))_ — *sentence-window*
+  (`withNeighbors`, cada acierto arrastra sus vecinos del mismo capítulo) + arné de **evaluación recall@k**
+  ([`tests/retrieval.spec.ts`](tests/retrieval.spec.ts)) como suelo de regresión.
 
 **Prerrequisito — ✓ verificado** (2026-07-03, sobre el EPUB real de DDIA): la segmentación **sí** emite
 `## 9. Consistency and Consensus` idéntico al TOC. El bug real era otro (atribución por subtítulos, ver
