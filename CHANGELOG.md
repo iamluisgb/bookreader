@@ -5,6 +5,25 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-03 — TEC1: revisión del lector PDF (arranca el track PDF)
+
+Prerrequisito de la épica PDF. El visor pasa de **0 cobertura E2E** a tener tests con fixture propia
+([`tests/pdf.spec.ts`](tests/pdf.spec.ts), `tests/test.pdf`).
+
+- **Bug crítico del ArrayBuffer *detached* (pérdida de datos):** pdf.js **transfiere** (detacha) el
+  buffer que le pasas a `getDocument`; luego `persistToLibrary` hacía `buffer.slice(0)` sobre el buffer
+  ya detached → excepción → **el PDF no se guardaba en la biblioteca**. Fix: `PdfReader.load`
+  ([`pdf-reader.js`](js/pdf-reader.js)) clona el buffer antes de `getDocument`, dejando intacto el del
+  llamador. Verificado con un test que **falla sin el fix**.
+- **Nitidez HiDPI/retina:** el canvas se pinta a `scale · devicePixelRatio` (píxeles reales) y se muestra
+  al tamaño lógico vía CSS; antes salía borroso en pantallas 2×. Test con `deviceScaleFactor:2`.
+- **Limpieza:** `onProgress` de `load()` (antes muerto) cableado al `loadingTask`; catch del `destroy`
+  con `warn`. La navegación por teclado/botones/barra ya estaba cableada para PDF.
+
+34/34 E2E. Bump `sw.js` v46→v47. Con TEC1 cerrado, siguiente en la épica: **PDF1** (IA/agente sobre PDF).
+
+---
+
 ## 2026-07-03 — TEC2: tests deterministas del panel IA (+ fix de gating)
 
 El panel IA solo tenía cobertura `@live` (no determinista). Se añaden tests deterministas que fijan su

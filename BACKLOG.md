@@ -217,17 +217,18 @@ PDF a HTML → **fuera de alcance**. Documentado aquí para no reabrir el debate
 
 ## 🔧 Técnico (calidad / seguridad / perf / bugs)
 
-### TEC1 — Revisar el lector PDF · `M` _(ex T11)_
-Bugs de bajo nivel del visor. **Prerrequisito de la épica [PDF — paridad de features](#-pdf--paridad-de-features-con-epub)** (los ítems PDF1–PDF4 asumen un visor sólido).
-[`js/pdf-reader.js`](js/pdf-reader.js) tiene **0 cobertura E2E**. Puntos:
-- **Bug del ArrayBuffer *detached*:** al guardar un PDF en la biblioteca, `persistToLibrary`
-  ([`js/app.js`](js/app.js) ~L82) hace `slice` sobre un buffer ya transferido a pdf.js → el
-  PDF no se guarda. Clonar el buffer antes de `getDocument`.
-- **Nitidez HiDPI:** `scale = 1.5` fijo ignora `devicePixelRatio` (canvas borroso); sin zoom.
-- **Navegación por teclado** en PDF.
-- _(IA y subrayados/selección en PDF → ahora en la épica [PDF — paridad de features](#-pdf--paridad-de-features-con-epub), PDF1–PDF3.)_
-- **Errores/UX:** `catch(e){}` vacíos; sin UI de error; param `onProgress` de `load()` sin usar.
-- **Acoplamiento a pdf.js 3.11** (`renderTextLayer` cambia de API en 4.x).
+### TEC1 — Revisar el lector PDF · **✓** _(ex T11)_
+**Hecho** (ver CHANGELOG). Desbloquea la épica [PDF — paridad de features](#-pdf--paridad-de-features-con-epub).
+Antes 0 cobertura E2E; ahora [`tests/pdf.spec.ts`](tests/pdf.spec.ts) con fixture propia (`tests/test.pdf`).
+- **✓ Bug del ArrayBuffer *detached*** (crítico, pérdida de datos): pdf.js transfería el buffer y
+  `persistToLibrary` petaba en `slice` → el PDF **no se guardaba**. Fix: `PdfReader.load` clona el buffer
+  antes de `getDocument`. Test que **falla sin el fix**.
+- **✓ Nitidez HiDPI:** el canvas se pinta a `scale·devicePixelRatio` y se muestra al tamaño lógico → nítido
+  en retina. Test con `deviceScaleFactor:2`.
+- **✓ Navegación por teclado / botones / barra de progreso** en PDF: ya estaba cableada en `app.js`.
+- **✓ Limpieza:** `onProgress` de `load()` cableado al `loadingTask`; catch del `destroy` con `warn`;
+  `loadPdf` ya surface error (alert). _(Subrayados/selección/IA en PDF → épica PDF1–PDF3.)_
+- _Nota:_ **acoplamiento a pdf.js 3.11** (`renderTextLayer` cambia en 4.x) se documenta; no bloquea.
 
 ### TEC2 — Tests del panel IA (characterization) · **✓** _(recomendación staff)_
 **Hecho** (ver CHANGELOG): tests deterministas del panel con `fetch` stubbeado

@@ -40,7 +40,7 @@ export async function load(arrayBuffer, onProgress) {
   }
 
   if (pdfDoc) {
-    try { pdfDoc.destroy(); } catch(e) {}
+    try { pdfDoc.destroy(); } catch(e) { console.warn('pdf destroy error:', e); }
     pdfDoc = null;
   }
 
@@ -52,7 +52,16 @@ export async function load(arrayBuffer, onProgress) {
   document.getElementById('landing').style.display = 'none';
   document.getElementById('epub-container').style.display = 'none';
 
-  const loadingTask = lib.getDocument({ data: arrayBuffer });
+  // TEC1 · pdf.js TRANSFIERE (detacha) el ArrayBuffer que le pasas a getDocument. Si el
+  // llamador lo reutiliza después (p. ej. app.js lo guarda en la biblioteca con
+  // buffer.slice(0)), petaría sobre un buffer detached y el PDF NO se guardaría. Le
+  // pasamos SIEMPRE una copia para que el original del llamador quede intacto.
+  const data = arrayBuffer.slice(0);
+  const loadingTask = lib.getDocument({ data });
+  // TEC1 · Callback de progreso de carga (antes el parámetro estaba sin usar).
+  if (typeof onProgress === 'function') {
+    loadingTask.onProgress = ({ loaded, total }) => onProgress(total ? loaded / total : 0);
+  }
   pdfDoc = await loadingTask.promise;
   totalPages = pdfDoc.numPages;
 
@@ -77,7 +86,13 @@ async function renderPage(num) {
 
   const page = await pdfDoc.getPage(num);
   const scale = 1.5;
-  const viewport = page.getViewport({ scale });
+  // TEC1 · Nitidez en pantallas HiDPI/retina: el canvas se PINTA a `scale * dpr` (más
+  // píxeles reales) pero se MUESTRA al tamaño lógico (`scale`) vía CSS. Sin esto, en un
+  // display 2x el canvas se escalaba y salía borroso. El text layer usa el tamaño lógico
+  // para alinear con lo mostrado.
+  const dpr = window.devicePixelRatio || 1;
+  const viewport = page.getViewport({ scale });               // tamaño lógico (CSS)
+  const renderViewport = page.getViewport({ scale: scale * dpr }); // backing store real
 
   const container = document.getElementById('pdf-container');
   if (!container) return;
@@ -91,7 +106,7 @@ async function renderPage(num) {
   }
   wrapper.style.width = viewport.width + 'px';
   wrapper.style.height = viewport.height + 'px';
-  // pdf.js text layer positions glyphs relative to this custom property.
+  // pdf.js text layer positions glyphs relative to este custom property (escala lógica).
   wrapper.style.setProperty('--scale-factor', String(scale));
 
   let canvas = wrapper.querySelector('canvas');
@@ -102,10 +117,12 @@ async function renderPage(num) {
   }
 
   const ctx = canvas.getContext('2d');
-  canvas.height = viewport.height;
-  canvas.width = viewport.width;
+  canvas.width = Math.floor(renderViewport.width);    // píxeles reales (nítido en retina)
+  canvas.height = Math.floor(renderViewport.height);
+  canvas.style.width = Math.floor(viewport.width) + 'px';   // tamaño mostrado (lógico)
+  canvas.style.height = Math.floor(viewport.height) + 'px';
 
-  await page.render({ canvasContext: ctx, viewport }).promise;
+  await page.render({ canvasContext: ctx, viewport: renderViewport }).promise;
 
   await renderTextLayer(page, viewport, wrapper);
 
