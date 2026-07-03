@@ -78,9 +78,10 @@ para indexar y citar, y el function-calling (`chatTools`, ya usado en
   con BM25 ([`js/ai/retrieval.js`](js/ai/retrieval.js)) + router de capítulo (número/título) + prompt
   honesto con mapa TOC. Inyección (mantiene streaming), sin bucle de herramientas. **Arregla el bug
   reportado.**
-- **Fase 1b** `M` — exponer el retrieval como **herramienta agéntica** (`search_book` + `read_chapter`):
-  requiere bucle multi-turno de tool-use en [`js/ai/llm.js`](js/ai/llm.js) (`_chatTools` hoy hace una sola
-  ronda, sin streaming, `max_tokens:1024`). Deja que el modelo pida más contexto por sí mismo.
+- **Fase 1b ✓** _(entregada, ver CHANGELOG · [DECISIONS.md ADR-009](DECISIONS.md))_ — retrieval como
+  **herramienta agéntica** (`search_book` + `read_chapter`) vía `chatToolsLoop` (bucle multi-turno en
+  [`llm.js`](js/ai/llm.js)). Recolección gateada (solo turnos difíciles: sin capítulo nombrado + BM25
+  débil), fusión con el contexto inicial y respuesta en streaming. Degrada con gracia si falla.
 - **Fase 2** `M` — embeddings cacheados (si hay `/embeddings`), fusión híbrida BM25+semántica, rerank LLM
   opcional del top-30.
 - **Fase 3** `S`-`M` — *sentence-window* (expandir vecinos del pasaje para coherencia) + set de evaluación.

@@ -5,6 +5,26 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-03 — IA5 Fase 1b: retrieval agéntico (herramientas)
+
+El agente puede ahora **reunir contexto por sí mismo** con herramientas cuando el retrieval por pregunta
+es débil. Diseño y razonamiento en [`DECISIONS.md`](DECISIONS.md) · ADR-009.
+
+- **`chatToolsLoop`** ([`llm.js`](js/ai/llm.js)) — bucle multi-turno de tool-use (no-streaming, fiable en
+  BYOK): ejecuta las herramientas vía callback preservando `tool_call_id`, hasta que el modelo deja de
+  pedirlas o se agotan las rondas (la última fuerza `tool_choice:'none'`).
+- **Herramientas** ([`panel.js`](js/ai/panel.js)): `search_book(query)` (BM25 en todo el libro) y
+  `read_chapter(nº|título)` (pasajes de un capítulo). Ejecutor local que acumula los pasajes hallados.
+- **Gateado + streaming preservado:** la recolección agéntica **solo** corre en turnos difíciles (sin
+  capítulo nombrado por el router y con pocos aciertos BM25). Los turnos normales van directos a
+  streaming. Tras recolectar, se **fusiona** con el contexto inicial y se **streamea** la respuesta.
+  Degrada con gracia: si la recolección falla, responde con el contexto inicial.
+
+24/24 E2E (nuevo test del bucle de herramientas en [`tests/llm.spec.ts`](tests/llm.spec.ts)). Bump
+`sw.js` v42→v43. Cierra IA5 Fase 1a+1b; quedan Fase 2 (embeddings) y Fase 3 (eval) en el BACKLOG.
+
+---
+
 ## 2026-07-03 — IA/Agente: robustez + decisiones documentadas (ADR)
 
 Lote de la sección IA del backlog, con el _porqué_ de cada decisión documentado en el nuevo

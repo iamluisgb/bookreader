@@ -66,3 +66,36 @@ test('chatStream retries on 503 then succeeds', async ({ page }) => {
   expect(r.full).toBe('hola');
   expect(r.out).toBe('hola');
 });
+
+test('chatToolsLoop ejecuta herramientas y cierra al no pedir más', async ({ page }) => {
+  await page.goto('/');
+  const r = await page.evaluate(async () => {
+    const L = await import('/js/ai/llm.js');
+    L.setKey('test-key');
+    let round = 0;
+    const realFetch = window.fetch;
+    window.fetch = async () => {
+      round++;
+      const msg = round === 1
+        ? { content: null, tool_calls: [{ id: 'c1', function: { name: 'search_book', arguments: '{"query":"consensus"}' } }] }
+        : { content: 'LISTO' };   // 2ª ronda: sin tool_calls → cierra
+      return new Response(JSON.stringify({ choices: [{ message: msg }] }), { status: 200 });
+    };
+    try {
+      const executed: any[] = [];
+      const out = await L.chatToolsLoop({
+        messages: [{ role: 'user', content: 'q' }],
+        tools: [{ type: 'function', function: { name: 'search_book', parameters: {} } }],
+        execute: async (name: string, args: any) => { executed.push({ name, args }); return 'pasajes...'; },
+        maxRounds: 3,
+      });
+      return { rounds: out.rounds, content: out.content, executed, callsCount: out.calls.length };
+    } finally {
+      window.fetch = realFetch;
+    }
+  });
+  expect(r.rounds).toBe(2);
+  expect(r.content).toBe('LISTO');
+  expect(r.executed).toEqual([{ name: 'search_book', args: { query: 'consensus' } }]);
+  expect(r.callsCount).toBe(1);
+});

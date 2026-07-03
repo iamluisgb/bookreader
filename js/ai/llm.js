@@ -91,6 +91,7 @@ function serialize(task) {
 
 export function chatStream(opts)  { return serialize(() => _chatStream(opts)); }
 export function chatTools(opts)   { return serialize(() => _chatTools(opts)); }
+export function chatToolsLoop(opts) { return serialize(() => _chatToolsLoop(opts)); }
 
 // ---- IA3 · Reintentos con backoff en errores transitorios --------------------
 // Ver ADR-008 en DECISIONS.md. Los proveedores BYOK dan 429/5xx transitorios; casi
@@ -242,4 +243,47 @@ async function _chatTools({ messages, tools, toolChoice = 'auto', signal }) {
     return { name: tc.function?.name, args };
   });
   return { content: msg.content || '', toolCalls };
+}
+
+// Bucle multi-turno de tool-use (IA5 Fase 1b, ver DECISIONS.md · ADR-009). No-streaming
+// (nan/DeepSeek solo emiten tool_calls fiables sin streaming). En cada ronda el modelo
+// puede pedir herramientas; ejecutamos `execute(name, args)` (async → string) y le
+// devolvemos el resultado como mensaje `tool` (preservando tool_call_id), hasta que deje
+// de pedir herramientas o se agoten las rondas. Devuelve { content, rounds, calls }.
+async function _chatToolsLoop({ messages, tools, execute, maxRounds = 3, signal }) {
+  const key = getKey().trim();
+  if (!key) throw new Error('Falta la API key.');
+  const convo = [...messages];
+  const calls = [];
+  for (let round = 1; round <= maxRounds; round++) {
+    const res = await fetchRetrying(`${getBaseUrl()}/chat/completions`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: getModel(), messages: convo, tools,
+        tool_choice: round < maxRounds ? 'auto' : 'none',   // última ronda: obliga a cerrar
+        stream: false, max_tokens: 1024,
+      }),
+      signal,
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      throw new Error(`Error del modelo (${res.status}). ${body.slice(0, 200)}`);
+    }
+    const msg = (await res.json()).choices?.[0]?.message || {};
+    const toolCalls = msg.tool_calls || [];
+    if (!toolCalls.length) return { content: msg.content || '', rounds: round, calls };
+    // El proveedor exige devolver el mensaje del asistente (con sus tool_calls) antes que
+    // los resultados de herramienta.
+    convo.push({ role: 'assistant', content: msg.content || null, tool_calls: toolCalls });
+    for (const tc of toolCalls) {
+      let args = {};
+      try { args = JSON.parse(tc.function?.arguments || '{}'); } catch { /* args inválidos */ }
+      let result = '';
+      try { result = await execute(tc.function?.name, args); } catch (e) { result = 'ERROR: ' + e.message; }
+      calls.push({ name: tc.function?.name, args });
+      convo.push({ role: 'tool', tool_call_id: tc.id, name: tc.function?.name, content: String(result ?? '') });
+    }
+  }
+  return { content: '', rounds: maxRounds, calls, exhausted: true };
 }

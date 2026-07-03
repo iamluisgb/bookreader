@@ -176,25 +176,33 @@ es el patrón estándar y evita que un hipo del proveedor rompa la conversación
 
 ---
 
-## ADR-009 — Retrieval agéntico (herramientas) como evolución, no reemplazo · `PENDIENTE` (Fase 1b)
+## ADR-009 — Retrieval agéntico (herramientas), gateado, sin perder streaming · `ACEPTADA`
 
-**Contexto.** Hoy el retrieval es **pre-inyección**: `buildContext` decide el contexto y se
-streamea la respuesta. La alternativa es **agéntica**: exponer `search_book`/`read_chapter`
-como herramientas y dejar que el modelo pida lo que necesita.
+**Contexto.** El retrieval por defecto es **pre-inyección**: `buildContext` decide el contexto
+y se streamea la respuesta. La alternativa **agéntica** expone `search_book`/`read_chapter` y
+deja que el modelo pida lo que necesita — pero añade round-trips/latencia y, en BYOK, los
+`tool_calls` solo son fiables **sin streaming** (nan/DeepSeek).
 
-**Decisión.** Mantener la pre-inyección como **camino por defecto** (rápido, con streaming) y
-**añadir** las herramientas para que el agente expanda contexto cuando le falte — no
-sustituir una por otra.
+**Decisión (diseño final).** Recolección agéntica **en dos fases, gateada**:
+1. **Fase de recolección** (no-streaming, `chatToolsLoop` en [`llm.js`](js/ai/llm.js)): el
+   modelo llama a `search_book`/`read_chapter`; ejecutamos el retrieval local y le devolvemos
+   pasajes citables. Su único trabajo es **reunir contexto**, no responder.
+2. **Fase de respuesta** (streaming, como siempre): se streamea la respuesta con el contexto
+   inicial **fusionado** con lo que el agente recolectó.
+   
+   La Fase 1 **solo se activa en turnos difíciles**: sin capítulo nombrado (router) y con pocos
+   aciertos BM25 (`bm25Count < AGENTIC_MIN_HITS`). Los turnos normales van directos a streaming.
 
-**Porqué.** El bucle agéntico añade round-trips y latencia, y `_chatTools` hoy hace una sola
-ronda sin streaming (`max_tokens:1024`). La pre-inyección resuelve ya el 90% de los casos con
-la mejor UX (streaming). Las herramientas son la palanca para lo que la pre-inyección no
-cubre (p. ej. el modelo se da cuenta a mitad de que necesita otro capítulo). Requiere un bucle
-multi-turno de tool-use en `llm.js`.
+**Porqué.** Este diseño concilia las tres restricciones: (a) **preserva el streaming** en el
+90% de turnos (los normales); (b) respeta que los `tool_calls` BYOK van sin streaming (la fase
+de recolección lo es); (c) solo paga la latencia extra cuando el retrieval léxico es débil, que
+es justo cuando aporta. Se descartó "tools siempre en cada turno" (rompería el streaming en
+todos) y "un único paso streaming con tools" (no fiable en BYOK).
 
-**Consecuencias.** Ver IA5 Fase 1b en el [`BACKLOG.md`](BACKLOG.md). Prerrequisito técnico:
-bucle de tool-use que preserve `tool_call_id` y permita varias rondas + respuesta final
-(idealmente en streaming).
+**Consecuencias.** `chatToolsLoop` preserva `tool_call_id` y hace hasta N rondas; la última
+fuerza `tool_choice:'none'` para cerrar. Degrada con gracia: si la recolección falla, se
+responde con el contexto inicial. Constantes `AGENTIC_MIN_HITS`, `AGENTIC_MAX_ROUNDS` en
+[`panel.js`](js/ai/panel.js). Tests en [`tests/llm.spec.ts`](tests/llm.spec.ts).
 
 ---
 

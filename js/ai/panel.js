@@ -559,24 +559,116 @@ function buildContext(question) {
     const core = Retrieval.chapterCore(ch);
     if (core) for (const p of Retrieval.search(core, 40)) tryAdd(p);
   }
-  for (const p of Retrieval.search(question, 60)) tryAdd(p);       // (2) BM25 de todo el libro
+  const bm25 = Retrieval.search(question, 60);
+  for (const p of bm25) tryAdd(p);                                 // (2) BM25 de todo el libro
   const cur = EpubReader.getCurrentChapterLabel?.() || '';         // (3) capítulo del lector
   for (const p of Retrieval.passagesByChapter(cur)) tryAdd(p);
 
-  const picked = [...chosen.values()].sort((a, b) => Retrieval.anchorNum(a.id) - Retrieval.anchorNum(b.id));
+  const picked = [...chosen.values()];
   // Fallback de seguridad: si no se pudo parsear/indexar (libro atípico), usar el
   // anotado recortado, como hacía IA1 — cero regresión.
   if (!picked.length) {
-    return { text: annotatedText.slice(0, CTX_BUDGET * 4), tocLabels, passages: 0, chapters: [] };
+    return { text: annotatedText.slice(0, budget * 4), tocLabels, passages: 0, chapters: [], routed, bm25Count: 0, picked: [] };
   }
+  const chapters = [...new Set(picked.map(p => p.chapter).filter(Boolean))];
+  // routed = capítulos nombrados; bm25Count = fuerza del match léxico de la pregunta.
+  // Ambos alimentan la decisión de retrieval agéntico (Fase 1b, ver deliver()).
+  return { text: formatPassages(picked), tocLabels, passages: picked.length, chapters, routed, bm25Count: bm25.length, picked };
+}
+
+// Ensambla una lista de pasajes en texto para el prompt: cabecera `## capítulo` + `[[aN]]`
+// por pasaje, en orden de lectura (para que el modelo lo lea coherente).
+function formatPassages(list) {
   const out = [];
   let curCh = null;
-  for (const p of picked) {
+  for (const p of [...list].sort((a, b) => Retrieval.anchorNum(a.id) - Retrieval.anchorNum(b.id))) {
     if (p.chapter && p.chapter !== curCh) { out.push(`\n## ${p.chapter}`); curCh = p.chapter; }
     out.push(`[[${p.id}]] ${p.text}`);
   }
-  const chapters = [...new Set(picked.map(p => p.chapter).filter(Boolean))];
-  return { text: out.join('\n').trim(), tocLabels, passages: picked.length, chapters };
+  return out.join('\n').trim();
+}
+
+// ---- IA5 Fase 1b · Retrieval agéntico (herramientas) -----------------------
+// Ver DECISIONS.md · ADR-009. Solo se activa en turnos con retrieval DÉBIL (sin capítulo
+// nombrado y pocos aciertos BM25): el agente busca más contexto con estas herramientas y
+// luego se streamea la respuesta con el contexto aumentado. Los turnos normales van
+// directos a streaming (sin coste ni latencia extra).
+const AGENTIC_MIN_HITS = 6;    // menos aciertos BM25 (y sin capítulo nombrado) → débil
+const AGENTIC_MAX_ROUNDS = 3;
+
+const RETRIEVAL_TOOLS = [
+  { type: 'function', function: {
+    name: 'search_book',
+    description: 'Busca en TODO el libro y devuelve los pasajes más relevantes (con sus anclas [[aN]]) para una consulta por tema o palabras clave.',
+    parameters: { type: 'object', properties: { query: { type: 'string', description: 'Tema o palabras clave a buscar.' } }, required: ['query'] },
+  } },
+  { type: 'function', function: {
+    name: 'read_chapter',
+    description: 'Devuelve los pasajes de un capítulo concreto (por número o por título del índice).',
+    parameters: { type: 'object', properties: { chapter: { type: 'string', description: 'Número ("9") o título del capítulo tal como aparece en el índice.' } }, required: ['chapter'] },
+  } },
+];
+
+// Recorta una lista de pasajes a un tope de tokens (para el texto devuelto al modelo).
+function capPassages(list, maxTokens) {
+  const out = []; let used = 0;
+  for (const p of list) { const t = estimateTokens(p.text) + 4; if (used + t > maxTokens) break; out.push(p); used += t; }
+  return out;
+}
+
+// Ejecutor de las herramientas: corre el retrieval local y acumula los pasajes hallados en
+// `extra` (para fusionarlos luego al contexto final). Devuelve texto citable al modelo.
+function makeRetrievalExecutor(extra, tocLabels) {
+  return async (name, args) => {
+    if (name === 'search_book') {
+      const hits = Retrieval.search(String(args?.query || ''), 12);
+      for (const p of hits) extra.set(p.id, p);
+      return hits.length ? formatPassages(hits) : 'Sin resultados para esa consulta.';
+    }
+    if (name === 'read_chapter') {
+      const ref = String(args?.chapter || '').trim();
+      const labels = Retrieval.matchChapters('capítulo ' + ref + ' ' + ref, tocLabels);
+      const ps = [];
+      for (const l of labels) for (const p of Retrieval.passagesByChapter(l)) ps.push(p);
+      const capped = capPassages(ps, CTX_BUDGET_CHAPTER);
+      for (const p of capped) extra.set(p.id, p);
+      if (!capped.length) return `No encontré el capítulo "${ref}" en el índice.`;
+      return formatPassages(capPassages(capped, 6000));   // al modelo, una muestra acotada
+    }
+    return 'Herramienta desconocida.';
+  };
+}
+
+// Fase de recolección: deja que el agente pida más contexto y fusiona lo hallado con el
+// contexto inicial (dentro del techo de capítulo). Degrada con gracia si algo falla.
+async function agenticGather(question, ctx, signal) {
+  const extra = new Map();
+  const messages = [
+    { role: 'system', content:
+`Antes de responder, REÚNE el contexto necesario del libro con las herramientas. El extracto inicial
+de abajo puede ser insuficiente. Llama a search_book (por tema) o read_chapter (por número/título del
+índice) las veces que haga falta. Cuando tengas material suficiente, responde solo "LISTO". NO
+respondas aún a la pregunta.
+MAPA DEL LIBRO (índice de capítulos):
+${ctx.tocLabels.map(t => '- ' + t).join('\n')}` },
+    { role: 'user', content: 'EXTRACTO INICIAL:\n\n' + ctx.text },
+    { role: 'user', content: 'PREGUNTA DEL USUARIO: ' + question },
+  ];
+  try {
+    await LLM.chatToolsLoop({ messages, tools: RETRIEVAL_TOOLS, execute: makeRetrievalExecutor(extra, ctx.tocLabels), maxRounds: AGENTIC_MAX_ROUNDS, signal });
+  } catch (e) {
+    if (e.name === 'AbortError') throw e;
+    console.warn('Recolección agéntica falló; sigo con el contexto inicial:', e);
+    return ctx;
+  }
+  if (!extra.size) return ctx;
+  const merged = new Map(ctx.picked.map(p => [p.id, p]));
+  for (const [id, p] of extra) merged.set(id, p);
+  const final = capPassages(
+    [...merged.values()].sort((a, b) => Retrieval.anchorNum(a.id) - Retrieval.anchorNum(b.id)),
+    CTX_BUDGET_CHAPTER,
+  );
+  return { ...ctx, picked: final, text: formatPassages(final), passages: final.length };
 }
 
 // Un turno con el LLM: construye el contexto (IA5), lo streamea y pinta la respuesta.
@@ -588,8 +680,8 @@ async function deliver(aug, question, { showUser = true } = {}) {
 
   // IA5 · Retrieval por PREGUNTA a nivel de pasaje (reemplaza al recorte por objetivo
   // de IA1, que era ciego a la query y descartaba capítulos relevantes enteros por
-  // presupuesto). Ver decisión IA5 en el BACKLOG.
-  const ctx = buildContext(question);
+  // presupuesto). Ver DECISIONS.md · ADR-001..007. `let`: la Fase 1b puede aumentarlo.
+  let ctx = buildContext(question);
 
   // IA1 · Ventana de historial: solo se reenvían los últimos N mensajes (el chat
   // completo sigue guardado y visible; solo no se manda entero en cada turno).
@@ -618,14 +710,22 @@ async function deliver(aug, question, { showUser = true } = {}) {
   agentUnread = false; applyAgentBadge();   // si el panel está cerrado, muestra "generando"
   let thinking = true, raw, truncated = false;
 
-  const messages = [
-    { role: 'system', content: systemPrompt(convo?.goal, template, Profiles.getActive(), { tocLabels: ctx.tocLabels }) },
-    { role: 'user', content: 'EXTRACTO DEL LIBRO recuperado por relevancia para esta pregunta (cita los pasajes con sus anclas [[aN]]):\n\n' + ctx.text },
-    ...priorWindow,
-    { role: 'user', content: aug },
-  ];
-
   try {
+    // IA5 Fase 1b · Retrieval agéntico SOLO en turnos difíciles (sin capítulo nombrado y
+    // pocos aciertos BM25): el agente reúne más contexto con herramientas antes de
+    // responder; los turnos normales van directos a streaming. Ver DECISIONS.md · ADR-009.
+    if (LLM.hasKey() && !ctx.routed?.length && ctx.bm25Count < AGENTIC_MIN_HITS && ctx.picked?.length) {
+      textNode.innerHTML = '<span class="ai-typing">buscando en el libro…</span>';
+      ctx = await agenticGather(question, ctx, abortCtrl.signal);
+    }
+
+    const messages = [
+      { role: 'system', content: systemPrompt(convo?.goal, template, Profiles.getActive(), { tocLabels: ctx.tocLabels }) },
+      { role: 'user', content: 'EXTRACTO DEL LIBRO recuperado por relevancia para esta pregunta (cita los pasajes con sus anclas [[aN]]):\n\n' + ctx.text },
+      ...priorWindow,
+      { role: 'user', content: aug },
+    ];
+
     raw = await LLM.chatStream({
       messages, signal: abortCtrl.signal,
       onToken: (t) => {
