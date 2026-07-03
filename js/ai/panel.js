@@ -46,6 +46,7 @@ let busy = false, abortCtrl = null;
 let onCite = () => {};
 let segReady = false, segBlocks = 0, segCached = false;
 let pendingRef = null;             // pasaje seleccionado adjunto a la próxima pregunta
+let pendingImage = null;           // { dataUrl, page } captura adjunta (botón "Ver") para visión
 let pendingQuoteOnActivate = null; // cola: pasaje a adjuntar tras crear/activar convo
 // IA2 · Repaso al terminar capítulo ("Pepito Grillo"). Ver DECISIONS.md · ADR-013.
 let ia2LastChapter = null;
@@ -62,8 +63,10 @@ export function init(opts) {
     messages: $('#ai-messages'), input: $('#ai-input'), send: $('#ai-send'), see: $('#ai-see'), close: $('#ai-close'),
     convobar: $('#ai-convobar'), convoBtn: $('#ai-convo-btn'), convoLabel: $('#ai-convo-label'), convoNew: $('#ai-convo-new'), convoExport: $('#ai-convo-export'),
     ref: $('#ai-ref'), refText: $('#ai-ref-text'), profileChip: $('#ai-profile-chip'),
+    imgref: $('#ai-imgref'), imgrefText: $('#ai-imgref-text'),
   });
   $('#ai-ref-clear').addEventListener('click', clearRef);
+  $('#ai-imgref-clear').addEventListener('click', clearImageRef);
 
   // La config del agente (key/modelo/auto) vive ahora en Ajustes generales.
   $('#ai-edit-cfg').addEventListener('click', () => AppSettings.open('agent'));
@@ -184,6 +187,7 @@ export async function setBook(b, id, title, opts = {}) {
   bookFormat = opts.format || 'epub'; tocLabels = [];
   // "Explicar lo que veo" (visión) solo tiene sentido en PDF (renderizamos su canvas).
   if (els.see) els.see.style.display = bookFormat === 'pdf' ? '' : 'none';
+  clearImageRef();
   convo = null; template = null; history = []; notes = [];
   ia2LastChapter = null; ia2Seen = new Set();   // IA2: reinicia el repaso por libro
   editingId = null; addingField = null; attenuationDone = false;
@@ -560,9 +564,21 @@ function openOnboarding() {
 async function send() {
   if (busy) return;
   const q = els.input.value.trim();
-  if (!q) return;
+  if (!q && !pendingImage) return;
   if (!convo) { setStatus('Elige un objetivo de lectura primero.'); openOnboarding(); return; }
   if (!LLM.hasKey()) { AppSettings.open('agent'); setStatus('Introduce tu API key primero.'); return; }
+
+  // VISIÓN · si hay una captura de página adjunta (botón "Ver"), este turno va con imagen al
+  // modelo de visión, con el texto del usuario como petición.
+  if (pendingImage) {
+    const image = pendingImage;
+    els.input.value = '';
+    clearImageRef();
+    clearRef();
+    await deliverVision(q, image);
+    return;
+  }
+
   if (!annotatedText) { setStatus('El libro aún no está listo.'); return; }
 
   // Si hay un pasaje adjunto (referencia del lector), se incluye en el mensaje.
@@ -574,9 +590,9 @@ async function send() {
   await deliver(aug, q, { showUser: true });
 }
 
-// VISIÓN · "Explicar lo que veo": captura la página ACTUAL del PDF y la manda al modelo de
-// visión (independiente del de texto, ADR-018). Usa lo que haya en el input como petición.
-// Fallback honesto: sin modelo de visión, no fingimos ver la figura → guiamos a configurarlo.
+// VISIÓN · Botón "Ver": ADJUNTA la captura de la página actual al composer (no envía). Así el
+// usuario escribe/personaliza su pregunta y, al enviar, ese turno va con imagen al modelo de
+// visión (ADR-018). Fallback honesto: sin modelo de visión, guiamos a configurarlo.
 async function explainView() {
   if (busy) return;
   if (bookFormat !== 'pdf' || !PdfReader.isLoaded()) { setStatus('Disponible al leer un PDF.'); return; }
@@ -587,10 +603,19 @@ async function explainView() {
     AppSettings.open('agent');
     return;
   }
-  const userText = els.input.value.trim();
+  const page = PdfReader.getCurrentPage();
+  const dataUrl = PdfReader.capturePageImage(1024);
+  if (!dataUrl) { setStatus('Espera a que la página termine de renderizarse.'); return; }
+  pendingImage = { dataUrl, page };
+  if (els.imgref) { els.imgref.style.display = 'flex'; els.imgrefText.textContent = `Página ${page}`; }
   setOpen(true); showView('chat');
-  els.input.value = '';
-  await deliverVision(userText);
+  focusInput();
+  setStatus('Imagen de la página adjunta — escribe tu pregunta y pulsa Enviar.');
+}
+
+function clearImageRef() {
+  pendingImage = null;
+  if (els.imgref) els.imgref.style.display = 'none';
 }
 
 // Texto ya extraído de una página (para dar contexto textual al turno de visión).
@@ -603,11 +628,10 @@ function pageText(page) {
   return out.join(' ').slice(0, 4000);
 }
 
-async function deliverVision(userText) {
-  if (busy) return;
-  const page = PdfReader.getCurrentPage();
-  const img = PdfReader.capturePageImage(1024);
-  if (!img) { setStatus('Espera a que la página termine de renderizarse.'); return; }
+async function deliverVision(userText, image) {
+  if (busy || !image) return;
+  const page = image.page;
+  const img = image.dataUrl;
 
   const instruction = userText ||
     'Explícame el contenido de esta página, en especial las figuras, diagramas o tablas que aparezcan.';
@@ -629,16 +653,17 @@ async function deliverVision(userText) {
     const textBlock = ctxText ? `TEXTO EXTRAÍDO DE LA PÁGINA ${page} (para contexto):\n${ctxText}\n\n` : '';
     const messages = [
       { role: 'system', content:
-`Eres un tutor de lectura. Te doy la IMAGEN de una página del libro "${bookTitle}" y su texto extraído.
-Explica su contenido —sobre todo las figuras, diagramas o tablas— con claridad y en el idioma del
-usuario, conectándolo con su objetivo de lectura. Describe lo que REALMENTE se ve; no inventes.` },
+`Eres un tutor de lectura. Te doy la IMAGEN de la PÁGINA ${page} del libro "${bookTitle}" y su texto
+extraído. Explica su contenido —sobre todo las figuras, diagramas o tablas— con claridad y en el idioma
+del usuario, conectándolo con su objetivo de lectura. Describe lo que REALMENTE se ve en la imagen; no
+inventes ni cambies el número de página.` },
       { role: 'user', content: [
-        { type: 'text', text: `${goalLine}${textBlock}PETICIÓN: ${instruction}` },
+        { type: 'text', text: `${goalLine}${textBlock}(Es la página ${page}.) PETICIÓN: ${instruction}` },
         { type: 'image_url', image_url: { url: img } },
       ] },
     ];
 
-    const raw = await LLM.chatVision({ messages, signal: abortCtrl.signal });
+    const raw = await LLM.chatVision({ messages, signal: abortCtrl.signal, maxTokens: 2048 });
     const finalText = raw || '(sin respuesta del modelo de visión)';
     textNode.innerHTML = renderWithCitations(finalText, anchors);
     addMessageActions(bubble, finalText, instruction, { autoRun: false });

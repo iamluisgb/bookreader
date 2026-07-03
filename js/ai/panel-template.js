@@ -31,6 +31,11 @@ export const TEMPLATE = `
       <span id="ai-ref-text" class="ai-ref-text"></span>
       <button id="ai-ref-clear" class="ai-ref-clear" title="Quitar referencia">${icon('xmark', { size: 15 })}</button>
     </div>
+    <div id="ai-imgref" class="ai-ref ai-imgref" style="display:none">
+      <span class="ai-ref-ico">📷</span>
+      <span id="ai-imgref-text" class="ai-ref-text"></span>
+      <button id="ai-imgref-clear" class="ai-ref-clear" title="Quitar imagen">${icon('xmark', { size: 15 })}</button>
+    </div>
     <div class="ai-composer">
       <textarea id="ai-input" rows="2" placeholder="Pregunta sobre el libro..."></textarea>
       <div class="ai-composer-btns">

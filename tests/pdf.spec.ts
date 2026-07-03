@@ -233,11 +233,18 @@ test('VISIÓN: "Ver" envía la imagen de la página al modelo de visión', async
   // El botón "Ver" es visible en PDF.
   await expect(page.locator('#ai-see')).toBeVisible();
 
+  // "Ver" ADJUNTA la captura (no envía): aparece el chip de imagen y el usuario personaliza.
   await page.fill('#ai-input', 'explica la figura');
   await page.click('#ai-see');
+  await expect(page.locator('#ai-imgref')).toBeVisible();
+  const visBefore = await page.evaluate(() => (window as any).__vis.imageSent);
+  expect(visBefore).toBe(false);   // aún no se ha enviado nada
 
+  // Al Enviar, el turno va con imagen al modelo de visión.
+  await page.click('#ai-send');
   await expect(page.locator('.ai-msg-assistant .ai-bubble-text').last())
     .toContainText('grafo', { timeout: 15000 });
+  await expect(page.locator('#ai-imgref')).toBeHidden();   // el chip se limpia tras enviar
 
   const vis = await page.evaluate(() => (window as any).__vis);
   expect(vis.imageSent).toBe(true);

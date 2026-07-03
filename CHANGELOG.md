@@ -5,6 +5,22 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-03 — Visión: "Ver" adjunta la página y tú personalizas el mensaje
+
+Refinamiento de la visión (ADR-018) a partir de uso real. Antes "Ver" enviaba de inmediato con el texto
+del input, y si la respuesta se cortaba, pedir "continúa" caía en el modelo de texto (sin imagen) → "no
+tengo el extracto". Ahora:
+
+- **"Ver" ADJUNTA la captura** de la página actual al composer (chip "📷 Página N"), **no envía**. Escribes
+  o ajustas tu pregunta y, al pulsar **Enviar**, ese turno va con imagen al modelo de visión. Control
+  total del mensaje.
+- **Menos cortes:** el turno de visión sube a `max_tokens` 2048 (antes 1024). El prompt fija el número de
+  página correcto (el modelo ya no lo cambia).
+- El chip se limpia al enviar o con su ✕, y al cambiar de libro.
+- Verificado en vivo (mimo-v2.5): adjuntar la pág. 151 + pregunta propia → describe la Figura 6.3 real
+  (nodos, entidades, relaciones) en ~2k caracteres, sin cortarse. Test E2E actualizado
+  ([`tests/pdf.spec.ts`](tests/pdf.spec.ts)). Sin archivos nuevos → sin bump de `sw.js`.
+
 ## 2026-07-03 — P5: búsqueda de texto en el libro (EPUB y PDF)
 
 Nueva pestaña **Buscar** en el sidebar. Un solo camino para ambos formatos.
