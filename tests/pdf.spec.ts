@@ -45,6 +45,37 @@ test('un PDF SÍ se guarda en la biblioteca (buffer no detached)', async ({ page
   expect(rec!.fileBytes).toBeGreaterThan(0); // el contenido real quedó guardado
 });
 
+// PDF2 · Seleccionar texto en el PDF debe ofrecer "Preguntar al agente" y abrir el panel.
+// El subrayado real (color/nota) es PDF3, así que en modo PDF esas acciones se ocultan.
+test('PDF2: seleccionar texto muestra "Preguntar al agente" y abre el panel', async ({ page }) => {
+  await openPdf(page);
+  await page.waitForFunction(() => {
+    const l = document.querySelector('#pdf-container .textLayer');
+    return !!l && l.textContent!.trim().length > 0;
+  }, { timeout: 15000 });
+
+  // Seleccionar el texto de la capa y simular el fin de selección (mouseup).
+  await page.evaluate(() => {
+    const layer = document.querySelector('#pdf-container .textLayer')!;
+    const range = document.createRange();
+    range.selectNodeContents(layer);
+    const sel = window.getSelection()!;
+    sel.removeAllRanges();
+    sel.addRange(range);
+    document.getElementById('pdf-container')!.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+  });
+
+  await expect(page.locator('#highlight-tooltip')).toBeVisible();
+  await expect(page.locator('#highlight-tooltip .sel-colors')).toBeHidden();  // subrayar → PDF3
+  await expect(page.locator('#sel-note')).toBeHidden();
+  await expect(page.locator('#sel-ask')).toBeVisible();
+
+  await page.locator('#sel-ask').click();
+  await expect
+    .poll(() => page.evaluate(() => document.body.classList.contains('ai-open')))
+    .toBe(true);
+});
+
 test.describe('PDF HiDPI', () => {
   test.use({ deviceScaleFactor: 2 });
   test('el canvas se pinta a más resolución que su tamaño CSS (nitidez retina)', async ({ page }) => {

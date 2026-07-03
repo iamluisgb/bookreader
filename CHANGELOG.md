@@ -5,6 +5,22 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-03 — PDF2: selección→agente en PDF
+
+Seleccionar texto en un PDF ahora ofrece **"Preguntar al agente"** (y "Copiar"), reutilizando la misma
+barra de selección del EPUB.
+
+- **`setupPdfSelection()` en [`highlights-ui.js`](js/highlights-ui.js):** escucha `mouseup`/`touchend`
+  sobre `#pdf-container`; si la selección cae en la capa de texto del PDF, muestra `#highlight-tooltip`
+  en **modo PDF**. La capa de texto vive en el documento padre (sin iframe), así que se usa
+  `window.getSelection()` directo.
+- **Modo PDF del tooltip:** se ocultan Subrayar (colores) y Nota —dependen del ancla CFI del EPUB— y se
+  dejan solo "Preguntar al agente" (`AiPanel.quoteSelection`) y "Copiar". El subrayado real llega en PDF3.
+- Refactor: posicionamiento del tooltip extraído a `positionTooltip()` (compartido EPUB/PDF); la
+  selección nativa del PDF se limpia al ocultar la barra.
+- Cableado en `loadPdf`. Test: [`tests/pdf.spec.ts`](tests/pdf.spec.ts) (selección → barra en modo PDF →
+  abre el panel). Sin archivos nuevos → sin bump de `sw.js`.
+
 ## 2026-07-03 — PDF1: el agente lee PDFs (mismo pipeline de retrieval)
 
 El salto de "visor de PDF" a "BookReader con PDF": el agente lee los PDF con **el mismo motor** que

@@ -192,10 +192,12 @@ retrieval** que los EPUB (BM25 + router + vecinos + agéntico). Entregado (ver A
 - ✓ Segmentador por formato: `setBook(doc, id, title, {format:'pdf'})` ramifica a `segmentPdf` sin
   tocar el camino EPUB. Tests: [`tests/segment-pdf.spec.ts`](tests/segment-pdf.spec.ts).
 
-### PDF2 — Selección→agente en PDF · `M`
-Conectar la capa de texto **ya seleccionable** del PDF al panel IA y al tooltip de subrayar (hoy
-dependen del evento `selected` de la `rendition` de epub.js, [`panel.js`](js/ai/panel.js) L190,
-[`highlights-ui.js`](js/highlights-ui.js) L47). Habilita también HQ&A al subrayar en PDF.
+### PDF2 — Selección→agente en PDF · **✓** `M`
+Seleccionar texto en la capa del PDF (documento padre, sin iframe) muestra la barra de selección en
+**modo PDF**: solo "Preguntar al agente" (`AiPanel.quoteSelection`) y "Copiar". Subrayar/Nota se ocultan
+porque dependen del modelo de ancla CFI (llegan en PDF3). Reutiliza el mismo `#highlight-tooltip` y su
+posicionamiento; wiring en [`highlights-ui.js`](js/highlights-ui.js) (`setupPdfSelection`) llamado desde
+`loadPdf`. Test en [`tests/pdf.spec.ts`](tests/pdf.spec.ts). _(HQ&A al subrayar en PDF → depende de PDF3.)_
 
 ### PDF3 — Subrayados/anotaciones en PDF · `L`
 - **Modelo de ancla nuevo:** `{página, rects}` en vez de `cfi` (afecta a `js/highlights.js`, que hoy

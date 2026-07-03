@@ -87,11 +87,9 @@ function removeTempSelection(rendition) {
   tempSelCfi = null;
 }
 
-function showHighlightTooltip(cfiRange, text, rect) {
-  const tooltip = document.getElementById('highlight-tooltip');
-
-  // Ya hemos borrado la selección nativa (finalizeSelection), así que no hay
-  // menús del SO con los que chocar: colocamos la barra junto a la selección.
+// Coloca la barra de selección junto al rect de la selección (coords de pantalla).
+// Compartido por EPUB y PDF.
+function positionTooltip(tooltip, rect) {
   tooltip.style.display = 'flex';
   tooltip.style.visibility = 'hidden';
   requestAnimationFrame(() => {
@@ -108,6 +106,26 @@ function showHighlightTooltip(cfiRange, text, rect) {
     tooltip.style.top = top + 'px';
     tooltip.style.visibility = 'visible';
   });
+}
+
+// Subrayar (color) y Nota dependen del modelo de ancla CFI del EPUB. En PDF aún no hay
+// modelo de subrayado (llega en PDF3), así que en modo 'pdf' ocultamos esas acciones y
+// dejamos solo "Preguntar al agente" y "Copiar".
+function setTooltipMode(mode) {
+  const showHl = mode === 'epub';
+  const colors = document.querySelector('#highlight-tooltip .sel-colors');
+  const note = document.getElementById('sel-note');
+  if (colors) colors.style.display = showHl ? '' : 'none';
+  if (note) note.style.display = showHl ? '' : 'none';
+}
+
+function showHighlightTooltip(cfiRange, text, rect) {
+  const tooltip = document.getElementById('highlight-tooltip');
+  setTooltipMode('epub');
+
+  // Ya hemos borrado la selección nativa (finalizeSelection), así que no hay
+  // menús del SO con los que chocar: colocamos la barra junto a la selección.
+  positionTooltip(tooltip, rect);
 
   // Subrayar con color
   tooltip.querySelectorAll('.highlight-color').forEach(btn => {
@@ -157,7 +175,50 @@ export function hideHighlightTooltip() {
   removeTempSelection();
   try { EpubReader.clearSelection(); } catch (e) {}   // overlay táctil, si lo hay
   try { lastSelWin && lastSelWin.getSelection().removeAllRanges(); } catch (e) {}  // selección nativa (escritorio)
+  try { window.getSelection().removeAllRanges(); } catch (e) {}  // selección nativa del PDF (documento padre)
   lastSelWin = null;
+}
+
+// PDF2 · Selección→agente en PDF. La capa de texto del PDF ya es seleccionable (vive en el
+// documento padre, sin iframe). Al soltar la selección mostramos la barra en modo 'pdf'
+// (solo "Preguntar al agente" y "Copiar"). El subrayado real llega en PDF3.
+export function setupPdfSelection() {
+  const container = document.getElementById('pdf-container');
+  if (!container || container.dataset.selWired) return;
+  container.dataset.selWired = '1';   // no re-atar en cada render/página
+
+  const onSelectEnd = () => setTimeout(() => {
+    const sel = window.getSelection();
+    const text = sel && !sel.isCollapsed ? sel.toString().replace(/\s+/g, ' ').trim() : '';
+    if (!text || text.length < 2) return;
+    // Solo si la selección cae dentro de la capa de texto del PDF.
+    const node = sel.anchorNode;
+    const host = node && (node.nodeType === 1 ? node : node.parentElement);
+    if (!host || !host.closest('#pdf-container .textLayer')) return;
+    let rect = null;
+    try { rect = sel.getRangeAt(0).getBoundingClientRect(); } catch (e) {}
+    showPdfSelectionTooltip(text, rect);
+  }, 0);
+
+  container.addEventListener('mouseup', onSelectEnd);
+  container.addEventListener('touchend', onSelectEnd);
+}
+
+function showPdfSelectionTooltip(text, rect) {
+  const tooltip = document.getElementById('highlight-tooltip');
+  setTooltipMode('pdf');
+  positionTooltip(tooltip, rect);
+
+  document.getElementById('sel-ask').onclick = () => {
+    AiPanel.quoteSelection(text);
+    hideHighlightTooltip();
+  };
+  document.getElementById('sel-copy').onclick = async () => {
+    try { await navigator.clipboard.writeText(text); } catch (e) { /* sin clipboard */ }
+    hideHighlightTooltip();
+  };
+
+  setTimeout(() => document.addEventListener('click', hideHighlightTooltipOnOutside), 100);
 }
 
 function hideHighlightTooltipOnOutside(e) {
