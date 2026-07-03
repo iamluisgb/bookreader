@@ -184,13 +184,17 @@ export function setupPdfSelection() {
     const node = sel.anchorNode;
     const host = node && (node.nodeType === 1 ? node : node.parentElement);
     if (!host || !host.closest('#pdf-container .textLayer')) return;
+    // La página del subrayado es la del wrapper que contiene la selección (clave en modo
+    // scroll, donde hay varias páginas montadas a la vez).
+    const wrapper = host.closest('#pdf-container .pdf-page');
+    const page = wrapper ? (+wrapper.dataset.page || PdfReader.getCurrentPage()) : PdfReader.getCurrentPage();
     let rect = null, rects = [];
     try {
       const range = sel.getRangeAt(0);
       rect = range.getBoundingClientRect();
-      rects = pdfFractionalRects(range);
+      rects = pdfFractionalRects(range, wrapper);
     } catch (e) {}
-    showPdfSelectionTooltip(text, rect, rects);
+    showPdfSelectionTooltip(text, rect, rects, page);
   }, 0);
 
   container.addEventListener('mouseup', onSelectEnd);
@@ -199,8 +203,8 @@ export function setupPdfSelection() {
 
 // Rectángulos de la selección en coordenadas FRACCIONALES (0..1) de la página del PDF, para
 // re-pintarlos nítidos a cualquier escala/HiDPI (el canvas se re-renderiza al cambiar zoom).
-function pdfFractionalRects(range) {
-  const wrapper = document.querySelector('#pdf-container .pdf-page');
+function pdfFractionalRects(range, wrapper) {
+  wrapper = wrapper || document.querySelector('#pdf-container .pdf-page');
   if (!wrapper) return [];
   const wr = wrapper.getBoundingClientRect();
   if (!wr.width || !wr.height) return [];
@@ -214,10 +218,9 @@ function pdfFractionalRects(range) {
     .filter(r => r.width > 0.001 && r.height > 0.001);
 }
 
-function showPdfSelectionTooltip(text, rect, rects) {
+function showPdfSelectionTooltip(text, rect, rects, page) {
   const tooltip = document.getElementById('highlight-tooltip');
   positionTooltip(tooltip, rect);
-  const page = PdfReader.getCurrentPage();
 
   const saveHighlight = (color, note = '') => {
     Highlights.addPdf(page, rects, text, color, `Pág. ${page}`, note);
@@ -252,7 +255,9 @@ function showPdfSelectionTooltip(text, rect, rects) {
 // render de página (onPage) y al crear/borrar un subrayado. Los rects son fraccionales, así
 // que se escalan al tamaño actual del wrapper.
 export function drawPdfHighlights(page) {
-  const wrapper = document.querySelector('#pdf-container .pdf-page');
+  // El wrapper de esa página (en scroll hay varios; en paginado, el único).
+  const wrapper = document.querySelector(`#pdf-container .pdf-page[data-page="${page}"]`)
+    || document.querySelector('#pdf-container .pdf-page');
   if (!wrapper) return;
   let layer = wrapper.querySelector('.pdf-hl-layer');
   if (!layer) {

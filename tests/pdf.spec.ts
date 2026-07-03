@@ -121,6 +121,36 @@ test('PDF3: subrayar en PDF crea overlay, lo persiste y lo re-pinta', async ({ p
   await expect(page.locator('#pdf-container .pdf-hl').first()).toBeVisible();
 });
 
+// PDF4 · Modo scroll continuo: alternar monta las páginas apiladas (con data-page), las
+// renderiza (lazy) y recuerda el modo; volver a paginado quita la clase.
+test('PDF4: alternar a scroll monta y renderiza páginas, y persiste el modo', async ({ page }) => {
+  await openPdf(page);
+
+  await page.evaluate(async () => { const P = await import('/js/pdf-reader.js'); await P.setReadingMode('scroll'); });
+  await expect(page.locator('#pdf-container.pdf-scroll')).toBeVisible();
+  await expect(page.locator('#pdf-container .pdf-page[data-page="1"]')).toBeVisible();
+
+  // El observer perezoso pinta la página visible.
+  await expect
+    .poll(() => page.evaluate(() => {
+      const c = document.querySelector('#pdf-container .pdf-page[data-page="1"] canvas') as HTMLCanvasElement;
+      return c ? c.width : 0;
+    }))
+    .toBeGreaterThan(0);
+
+  const mode = await page.evaluate(async () => { const P = await import('/js/pdf-reader.js'); return P.getReadingMode(); });
+  expect(mode).toBe('scroll');
+
+  // Subrayar sigue funcionando en scroll (usa el data-page del wrapper).
+  await selectPdfText(page);
+  await page.locator('#highlight-tooltip .highlight-color').first().click();
+  await expect(page.locator('#pdf-container .pdf-page[data-page="1"] .pdf-hl').first()).toBeVisible();
+
+  // Volver a paginado quita la clase de scroll.
+  await page.evaluate(async () => { const P = await import('/js/pdf-reader.js'); await P.setReadingMode('paginated'); });
+  await expect(page.locator('#pdf-container.pdf-scroll')).toHaveCount(0);
+});
+
 test.describe('PDF HiDPI', () => {
   test.use({ deviceScaleFactor: 2 });
   test('el canvas se pinta a más resolución que su tamaño CSS (nitidez retina)', async ({ page }) => {

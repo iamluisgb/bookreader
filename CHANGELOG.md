@@ -5,6 +5,22 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-03 — PDF4: modo scroll continuo en PDF
+
+El toggle **Páginas/Scroll** (pestaña Ajustes del lector) ya funciona en PDF, no solo en EPUB. Ver
+[`DECISIONS.md`](DECISIONS.md) · ADR-017.
+
+- **Render por-wrapper con `data-page`** común a ambos modos (`renderInto`): en paginado se reutiliza un
+  wrapper; en scroll se apilan todas las páginas. Conserva PDF3 (los subrayados se anclan y re-pintan
+  por página).
+- **Scroll con render perezoso:** un `IntersectionObserver` pinta solo las páginas cercanas al viewport
+  y **libera** las lejanas (canvas a 0, capas limpias) → memoria acotada. Verificado sobre un PDF de 355
+  páginas: ~2-3 canvas vivos a la vez. La página actual se deriva de la posición de scroll.
+- **Modo recordado por libro** (`Storage` por fingerprint), como en EPUB. Navegación (`prev/next/goTo`,
+  barra de progreso) unificada: en scroll desplaza, en paginado re-renderiza.
+- **Robustez:** la cancelación del `RenderTask` pasa a ser **por wrapper** (varios renders en vuelo en
+  scroll no chocan). Test: [`tests/pdf.spec.ts`](tests/pdf.spec.ts). Sin archivos nuevos → sin bump de `sw.js`.
+
 ## 2026-07-03 — PDF3: subrayados/anotaciones en PDF
 
 Subrayar en un PDF ahora funciona como en el EPUB: seleccionar → color/nota, se pinta sobre la página,

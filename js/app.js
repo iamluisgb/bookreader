@@ -214,7 +214,8 @@ function initLibrary() {
 function initReadingMode() {
   const btns = [...document.querySelectorAll('.reading-mode-btn')];
   if (!btns.length) return;
-  btns.forEach(btn => btn.addEventListener('click', () => {
+  btns.forEach(btn => btn.addEventListener('click', async () => {
+    if (PdfReader.isLoaded()) { await PdfReader.setReadingMode(btn.dataset.mode); updateReadingModeToggle(); return; }
     if (!EpubReader.isLoaded()) return;
     EpubReader.setReadingMode(btn.dataset.mode);
     updateReadingModeToggle();
@@ -222,10 +223,13 @@ function initReadingMode() {
   // Al cambiar el flujo (o al recrearse el rendition) los subrayados pueden quedar sin
   // dibujar: los repintamos. Idempotente.
   window.addEventListener('reader:flow-changed', () => { renderHighlights(); });
+  // PDF: cada vez que una página se (re)pinta, redibujar sus subrayados encima.
+  window.addEventListener('reader:pdf-page-rendered', (e) => { drawPdfHighlights(e.detail?.page); });
 }
 
 function updateReadingModeToggle() {
-  const mode = EpubReader.isLoaded() ? EpubReader.getReadingMode() : 'paginated';
+  const mode = PdfReader.isLoaded() ? PdfReader.getReadingMode()
+    : EpubReader.isLoaded() ? EpubReader.getReadingMode() : 'paginated';
   document.querySelectorAll('.reading-mode-btn').forEach(btn =>
     btn.classList.toggle('active', btn.dataset.mode === mode));
 }
@@ -687,6 +691,7 @@ async function loadPdf(buffer, bookId, aiBookId) {
     // PDF2/PDF3: seleccionar texto en el PDF → barra (preguntar/subrayar/nota/copiar).
     setupPdfSelection();
     renderHighlights();              // poblar la lista lateral con los subrayados guardados
+    updateReadingModeToggle();       // PDF4: reflejar el modo (paginado/scroll) recordado
   } catch (err) {
     console.error('Error loading PDF:', err);
     alert('Error al cargar el archivo PDF');

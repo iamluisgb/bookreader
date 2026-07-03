@@ -612,6 +612,18 @@ body:not(.scroll-mode) .epub-container .epub-view {
   box-shadow: 0 2px 8px var(--shadow);
 }
 
+/* PDF4 · Modo scroll continuo: páginas apiladas en vertical. */
+.pdf-container.pdf-scroll {
+  align-items: center;
+  justify-content: flex-start;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.pdf-container.pdf-scroll .pdf-page {
+  flex: none;   /* no encoger la altura fija en el flex column */
+}
+
 #pdf-canvas {
   display: block;
   max-width: 100%;

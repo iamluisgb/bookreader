@@ -356,3 +356,32 @@ gana `addPdf/getByPage/removeById` sin tocar el camino EPUB.
 evento `selected` de epub.js (mejora futura para PDF). **Efecto colateral positivo:** al probar el
 re-pintado se destapó una re-entrancia de `renderPage` (dos `render()` sobre el mismo canvas al pasar
 páginas rápido); se arregla cancelando el `RenderTask` en curso antes de iniciar otro.
+
+---
+
+## ADR-017 — Modo scroll de PDF: render por-wrapper + lazy con IntersectionObserver · `ACEPTADA`
+
+**Contexto.** El EPUB ya tiene modo scroll (epub.js `scrolled-doc`). El PDF renderizaba una sola página
+reutilizando un `.pdf-page`. Para el modo continuo hay que montar muchas páginas; un PDF de O'Reilly
+ronda las 300-500. Pintarlas todas a la vez (canvas HiDPI) reventaría la memoria del navegador.
+
+**Decisión.** Render **por wrapper** con `data-page` (común a paginado y scroll: `renderInto(wrapper,
+n)`). En scroll se crean N placeholders dimensionados con el aspecto de la página 1, y un
+**IntersectionObserver** (root = contenedor, `rootMargin` amplio) pinta las páginas al acercarse al
+viewport y **libera** (canvas 0×0, capas vacías) las que se alejan. La página actual se deriva de la
+posición de scroll (la más centrada). El modo se recuerda por libro.
+
+**Porqué.**
+1. **Memoria acotada.** Solo ~2-3 canvas vivos a la vez, sin importar el nº de páginas (verificado:
+   355 páginas → 2-3 renderizadas). Es la única forma sostenible de scroll continuo en PDF.
+2. **Placeholders dimensionados por adelantado.** Da la altura total correcta (scroll y observer
+   funcionan) sin cargar las N páginas; se asume aspecto uniforme (cierto en la práctica; si una
+   difiere, se re-dimensiona al pintarse).
+3. **Un solo camino de render (`renderInto`).** Paginado y scroll comparten HiDPI, capa de texto y la
+   cancelación de `RenderTask` —ahora **por wrapper**— así que PDF3 (subrayados por `data-page`) y el
+   fix de re-entrancia (ADR-016) siguen valiendo en ambos modos sin duplicar lógica.
+
+**Consecuencias.** La selección/subrayado usa el `data-page` del wrapper que contiene la selección
+(correcto con varias páginas montadas). Zoom por pinch/tipografía siguen fuera de alcance (PDF5, límite
+de formato). Si aparecieran PDFs con páginas de tamaños muy dispares, habría que medir cada página para
+el placeholder (hoy no compensa).

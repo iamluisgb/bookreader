@@ -5,7 +5,9 @@ let pdfDoc = null;
 let currentPage = 1;
 let totalPages = 0;
 let onPageCallback = null;
-let renderTask = null;   // render en curso (para cancelarlo si llega otra navegación)
+let readingMode = 'paginated';   // 'paginated' | 'scroll' (continuo), recordado por libro
+let lazyObserver = null;         // observer del render perezoso en modo scroll
+let scrollRaf = 0;
 
 function getPdfjs() {
   if (pdfjsLib) return pdfjsLib;
@@ -82,76 +84,182 @@ export async function load(arrayBuffer, onProgress) {
     }
   } catch(e) {}
 
-  await renderPage(currentPage);
+  // Modo de lectura recordado por libro (paginado por defecto).
+  try {
+    const fp = fpKey();
+    const m = fp ? Storage.get('pdfMode_' + fp) : null;
+    if (m === 'scroll' || m === 'paginated') readingMode = m;
+  } catch (e) {}
+
+  await rerender();
 
   return pdfDoc;
 }
 
-async function renderPage(num) {
+// ---- Modo de lectura: paginado vs scroll continuo -------------------------
+export function getReadingMode() { return readingMode; }
+
+export async function setReadingMode(mode) {
+  if ((mode !== 'scroll' && mode !== 'paginated') || mode === readingMode) return;
+  readingMode = mode;
+  try { const fp = fpKey(); if (fp) Storage.set('pdfMode_' + fp, mode); } catch (e) {}
+  await rerender();
+  window.dispatchEvent(new CustomEvent('reader:flow-changed'));
+}
+
+function fpKey() { try { return pdfDoc && pdfDoc.fingerprints ? pdfDoc.fingerprints[0] : null; } catch { return null; } }
+
+// Reconstruye el contenedor según el modo actual (paginado o scroll).
+async function rerender() {
   if (!pdfDoc) return;
-
-  // Re-entrancia: si hay un render en curso, cancelarlo antes de empezar otro sobre el
-  // MISMO canvas (pasar páginas rápido lanzaba "Cannot use the same canvas during multiple
-  // render()"). pdf.js rechaza la promesa con RenderingCancelledException al cancelar.
-  if (renderTask) { try { renderTask.cancel(); } catch (e) {} renderTask = null; }
-
-  const page = await pdfDoc.getPage(num);
-  const scale = 1.5;
-  // TEC1 · Nitidez en pantallas HiDPI/retina: el canvas se PINTA a `scale * dpr` (más
-  // píxeles reales) pero se MUESTRA al tamaño lógico (`scale`) vía CSS. Sin esto, en un
-  // display 2x el canvas se escalaba y salía borroso. El text layer usa el tamaño lógico
-  // para alinear con lo mostrado.
-  const dpr = window.devicePixelRatio || 1;
-  const viewport = page.getViewport({ scale });               // tamaño lógico (CSS)
-  const renderViewport = page.getViewport({ scale: scale * dpr }); // backing store real
-
+  teardownScroll();
   const container = document.getElementById('pdf-container');
   if (!container) return;
+  container.innerHTML = '';
+  container.classList.toggle('pdf-scroll', readingMode === 'scroll');
+  if (readingMode === 'scroll') await renderScroll();
+  else await renderPaginated(currentPage);
+}
 
-  // Page wrapper stacks the canvas and the selectable text layer on top.
+// Modo paginado: un único wrapper reutilizado (comportamiento clásico).
+async function renderPaginated(num) {
+  const container = document.getElementById('pdf-container');
   let wrapper = container.querySelector('.pdf-page');
   if (!wrapper) {
     wrapper = document.createElement('div');
     wrapper.className = 'pdf-page';
     container.appendChild(wrapper);
   }
+  await renderInto(wrapper, num);
+  setCurrentPage(num);
+}
+
+// Modo scroll: todas las páginas apiladas en vertical, con render PEREZOSO (solo las
+// cercanas al viewport se pintan; las lejanas se liberan) para no reventar memoria con
+// cientos de canvas HiDPI.
+async function renderScroll() {
+  const container = document.getElementById('pdf-container');
+  // Aspecto de la página 1 para dimensionar los placeholders (evita cargar las N páginas).
+  const scale = 1.5;
+  let w = 600, h = 800;
+  try {
+    const p1 = await pdfDoc.getPage(1);
+    const vp = p1.getViewport({ scale });
+    w = vp.width; h = vp.height;
+  } catch (e) {}
+
+  for (let n = 1; n <= totalPages; n++) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'pdf-page';
+    wrapper.dataset.page = String(n);
+    wrapper.style.width = w + 'px';
+    wrapper.style.height = h + 'px';
+    container.appendChild(wrapper);
+  }
+
+  lazyObserver = new IntersectionObserver((entries) => {
+    for (const e of entries) {
+      const wrapper = e.target;
+      const n = +wrapper.dataset.page;
+      if (e.isIntersecting) {
+        if (!wrapper.dataset.rendered) renderInto(wrapper, n);
+      } else if (wrapper.dataset.rendered) {
+        freeWrapper(wrapper);
+      }
+    }
+  }, { root: container, rootMargin: '150% 0px' });
+  container.querySelectorAll('.pdf-page').forEach(el => lazyObserver.observe(el));
+
+  container.addEventListener('scroll', onScroll, { passive: true });
+
+  // Posicionar en la última página vista y refrescar UI.
+  const target = container.querySelector(`.pdf-page[data-page="${currentPage}"]`);
+  if (target) container.scrollTop = target.offsetTop;
+  setCurrentPage(currentPage);
+}
+
+// Página actual en modo scroll = la más centrada en el viewport (throttle con rAF).
+function onScroll() {
+  if (scrollRaf) return;
+  scrollRaf = requestAnimationFrame(() => {
+    scrollRaf = 0;
+    const container = document.getElementById('pdf-container');
+    if (!container) return;
+    const mid = container.scrollTop + container.clientHeight / 2;
+    let best = currentPage, bestD = Infinity;
+    container.querySelectorAll('.pdf-page').forEach(el => {
+      const c = el.offsetTop + el.offsetHeight / 2;
+      const d = Math.abs(c - mid);
+      if (d < bestD) { bestD = d; best = +el.dataset.page; }
+    });
+    if (best !== currentPage) setCurrentPage(best);
+  });
+}
+
+function teardownScroll() {
+  const container = document.getElementById('pdf-container');
+  if (lazyObserver) { try { lazyObserver.disconnect(); } catch (e) {} lazyObserver = null; }
+  if (container) container.removeEventListener('scroll', onScroll);
+}
+
+// Libera el canvas/capas de una página fuera de vista (memoria acotada en scroll).
+function freeWrapper(wrapper) {
+  if (wrapper._renderTask) { try { wrapper._renderTask.cancel(); } catch (e) {} wrapper._renderTask = null; }
+  const canvas = wrapper.querySelector('canvas');
+  if (canvas) { canvas.width = 0; canvas.height = 0; }
+  const tl = wrapper.querySelector('.textLayer'); if (tl) tl.innerHTML = '';
+  const hl = wrapper.querySelector('.pdf-hl-layer'); if (hl) hl.innerHTML = '';
+  wrapper.dataset.rendered = '';
+}
+
+// Renderiza una página (canvas HiDPI + capa de texto) en un wrapper dado. Común a ambos
+// modos. Cancela el render en curso DEL PROPIO wrapper (evita el crash de doble render()).
+async function renderInto(wrapper, num) {
+  if (!pdfDoc) return;
+  const page = await pdfDoc.getPage(num);
+  const scale = 1.5;
+  // TEC1 · Nitidez HiDPI: el canvas se PINTA a scale*dpr y se MUESTRA al tamaño lógico.
+  const dpr = window.devicePixelRatio || 1;
+  const viewport = page.getViewport({ scale });
+  const renderViewport = page.getViewport({ scale: scale * dpr });
+
+  wrapper.dataset.page = String(num);
   wrapper.style.width = viewport.width + 'px';
   wrapper.style.height = viewport.height + 'px';
-  // pdf.js text layer positions glyphs relative to este custom property (escala lógica).
   wrapper.style.setProperty('--scale-factor', String(scale));
 
   let canvas = wrapper.querySelector('canvas');
-  if (!canvas) {
-    canvas = document.createElement('canvas');
-    canvas.id = 'pdf-canvas';
-    wrapper.appendChild(canvas);
-  }
-
+  if (!canvas) { canvas = document.createElement('canvas'); wrapper.appendChild(canvas); }
   const ctx = canvas.getContext('2d');
-  canvas.width = Math.floor(renderViewport.width);    // píxeles reales (nítido en retina)
+  canvas.width = Math.floor(renderViewport.width);
   canvas.height = Math.floor(renderViewport.height);
-  canvas.style.width = Math.floor(viewport.width) + 'px';   // tamaño mostrado (lógico)
+  canvas.style.width = Math.floor(viewport.width) + 'px';
   canvas.style.height = Math.floor(viewport.height) + 'px';
 
-  const myTask = page.render({ canvasContext: ctx, viewport: renderViewport });
-  renderTask = myTask;
+  if (wrapper._renderTask) { try { wrapper._renderTask.cancel(); } catch (e) {} }
+  const task = page.render({ canvasContext: ctx, viewport: renderViewport });
+  wrapper._renderTask = task;
   try {
-    await myTask.promise;
+    await task.promise;
   } catch (e) {
-    // Cancelado por una navegación más reciente: ese render se encarga del resto.
-    if (e && e.name === 'RenderingCancelledException') return;
+    if (e && e.name === 'RenderingCancelledException') return;   // lo reemplaza un render posterior
     throw e;
   }
-  if (renderTask === myTask) renderTask = null;
+  if (wrapper._renderTask === task) wrapper._renderTask = null;
 
   await renderTextLayer(page, viewport, wrapper);
+  wrapper.dataset.rendered = '1';
 
+  // Re-pintar los subrayados de esta página (app.js escucha este evento).
+  window.dispatchEvent(new CustomEvent('reader:pdf-page-rendered', { detail: { page: num } }));
+}
+
+// Fija la página actual y refresca progreso/almacenamiento/callback (ambos modos).
+function setCurrentPage(num) {
+  currentPage = num;
   saveLastPage();
   updateProgress();
-
-  if (onPageCallback) {
-    onPageCallback(currentPage, totalPages);
-  }
+  if (onPageCallback) onPageCallback(currentPage, totalPages);
 }
 
 // Overlay an invisible, selectable text layer on top of the rendered canvas
@@ -213,23 +321,23 @@ export async function seekToFraction(f) {
 }
 
 export async function prev() {
-  if (currentPage > 1) {
-    currentPage--;
-    await renderPage(currentPage);
-  }
+  if (currentPage > 1) await goTo(currentPage - 1);
 }
 
 export async function next() {
-  if (currentPage < totalPages) {
-    currentPage++;
-    await renderPage(currentPage);
-  }
+  if (currentPage < totalPages) await goTo(currentPage + 1);
 }
 
 export async function goTo(page) {
-  if (page >= 1 && page <= totalPages) {
-    currentPage = page;
-    await renderPage(currentPage);
+  if (page < 1 || page > totalPages) return;
+  if (readingMode === 'scroll') {
+    // Desplazar hasta la página; el observer la pinta si aún no lo estaba.
+    const container = document.getElementById('pdf-container');
+    const target = container?.querySelector(`.pdf-page[data-page="${page}"]`);
+    if (target) container.scrollTo({ top: target.offsetTop, behavior: 'auto' });
+    setCurrentPage(page);
+  } else {
+    await renderPaginated(page);
   }
 }
 

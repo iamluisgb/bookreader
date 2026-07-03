@@ -212,10 +212,13 @@ posicionamiento; wiring en [`highlights-ui.js`](js/highlights-ui.js) (`setupPdfS
 - Tests: [`tests/pdf.spec.ts`](tests/pdf.spec.ts) (crear/persistir/re-pintar). _(HQ&A al subrayar en PDF
   queda como mejora futura: hoy HQ&A está atado al evento `selected` de epub.js.)_
 
-### PDF4 — Modo scroll (capítulo continuo) en PDF · `M`
-Renderizar páginas en continuo en vez de reutilizar un solo wrapper
-([`renderPage`](js/pdf-reader.js) reusa `.pdf-page`). Equivalente al `scrolled-doc` de EPUB ya
-entregado.
+### PDF4 — Modo scroll (capítulo continuo) en PDF · **✓** `M`
+Toggle **Páginas/Scroll** (pestaña Ajustes del lector) ahora también en PDF. En scroll se apilan
+todas las páginas con **render perezoso** (IntersectionObserver: solo se pintan las cercanas al
+viewport, las lejanas se liberan → memoria acotada; verificado con Albada: ~2-3 canvas vivos de 355).
+La página actual se deriva del scroll; el modo se recuerda por libro. Render por-wrapper con `data-page`
+(común a ambos modos) que conserva PDF3 (subrayados por página). Ver ADR-017. Test en
+[`tests/pdf.spec.ts`](tests/pdf.spec.ts).
 
 ### PDF5 — Tipografía / tema en PDF · límite de formato
 **No portable de raíz:** el texto del PDF es layout fijo (imagen), no reflowable. No hay tamaño de
