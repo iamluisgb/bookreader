@@ -104,8 +104,8 @@ function agentHtml() {
     <p class="appset-muted appset-model-manual">Escribe el id del modelo a mano o elige uno de los sugeridos. «Descubrir» los lista automáticamente si el proveedor lo permite (nan no lo permite desde el navegador).</p>
     <p id="appset-model-hint" class="appset-model-hint" hidden></p>
     <label class="appset-label" for="appset-vmodel">Modelo de visión (opcional)</label>
-    <input id="appset-vmodel" class="appset-input" value="${escapeHtml(LLM.getVisionModel())}" placeholder="id de un modelo con visión" autocomplete="off" spellcheck="false" />
-    <p class="appset-muted">Para explicar figuras y páginas de un libro (multimodal). Déjalo vacío si tu modelo no interpreta imágenes; entonces "Explicar lo que veo" quedará desactivado.</p>
+    <input id="appset-vmodel" class="appset-input" value="${escapeHtml(LLM.getVisionModel())}" placeholder="p. ej. mimo-v2.5" autocomplete="off" spellcheck="false" />
+    <p class="appset-muted">Para explicar figuras y páginas de un libro (multimodal). En nan, <code>mimo-v2.5</code> funciona. Déjalo vacío si tu modelo no interpreta imágenes; entonces "Explicar lo que veo" queda desactivado.</p>
     <label class="appset-label" for="appset-key">API key</label>
     <input id="appset-key" class="appset-input" type="password" placeholder="sk-..." autocomplete="off" value="${escapeHtml(LLM.getKey())}" />
     <label class="appset-check"><input type="checkbox" id="appset-auto"${LLM.getAutoExtract() ? ' checked' : ''} /> Rellenar la libreta automáticamente</label>
