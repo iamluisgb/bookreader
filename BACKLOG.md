@@ -144,7 +144,13 @@ Buscar y saltar a coincidencias dentro del EPUB.
 ### P7 — Sync entre dispositivos · `L`
 Requiere backend (hoy todo es local-first: IndexedDB + localStorage).
 
-### P8 — Exportar libretas y conversaciones · `M`
+### P8 — Exportar libretas y conversaciones · **fase 1 ✓** `M`
+**Fase 1 hecha** (ver CHANGELOG): botón "Exportar" en el panel → `.md` de la conversación activa
+(`buildConvoMarkdown`), **incluye el chat**, preserva formato y resuelve citas a pág./capítulo.
+**v2 pendiente:** elegir *solo libreta / solo chat / ambos* desde un menú; formato **PDF** (print) y
+copia al portapapeles; export desde la lista de conversaciones (no solo la activa).
+
+<details><summary>Spec original</summary>
 **Qué falta hoy.** El único export "legible" es [`buildMarkdown()`](js/backup.js) en Ajustes → Datos
 (P3): un **volcado global** de TODAS las libretas + subrayados que, además, **omite el chat** (nunca lee
 el store `messages`) y aplana las notas con `oneLine()` (pierde el formato/markdown). No hay forma de
@@ -164,6 +170,7 @@ salida). No lo reinventa: reutiliza el patrón `download()` CSP-safe de backup.j
   copia al portapapeles.
 - Refactor menor: generalizar `buildMarkdown()` para aceptar un scope (`{ convoId }` | global) y una
   opción `includeChat`, en vez de duplicar lógica.
+</details>
 
 ---
 

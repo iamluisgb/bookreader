@@ -17,6 +17,7 @@ export const TEMPLATE = `
     <button id="ai-convo-btn" class="ai-convo-btn" title="Cambiar de conversación">
       ${icon('bubble', { size: 15 })}<span id="ai-convo-label" class="ai-convo-label">Conversación</span>${icon('chevron-down', { size: 14 })}
     </button>
+    <button id="ai-convo-export" class="icon-btn" title="Exportar esta conversación (libreta + chat) a Markdown">${icon('share', { size: 17 })}</button>
     <button id="ai-convo-new" class="icon-btn" title="Nueva conversación">${icon('plus', { size: 18 })}</button>
   </div>
   <div id="ai-tabs" class="ai-tabs" style="display:none">

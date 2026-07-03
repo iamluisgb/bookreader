@@ -5,6 +5,21 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-03 — P8: exportar una conversación (libreta + chat) a Markdown
+
+Antes solo existía un volcado global (Ajustes → Datos) que **omitía el chat** y aplanaba las notas.
+Ahora se exporta **una** conversación concreta **desde el panel**, legible y con formato.
+
+- **Botón "Exportar"** en la barra de conversación del panel → descarga un `.md` de la conversación
+  activa (`backup.js · buildConvoMarkdown`). Nombre con libro + sesión + fecha.
+- **Incluye el chat:** transcripción de los mensajes (🧑 Tú / 🤖 Agente), que el volcado global no tenía.
+  La función admite `includeChat`/`includeNotebook` por separado.
+- **Preserva el formato** de notas y mensajes (sin aplanar con `oneLine`) y **resuelve las citas**
+  `[[aN]]` a `(pág. N)`/`(capítulo)` usando las anclas del libro segmentado (best-effort).
+- Reutiliza el `download()` CSP-safe (nuevo `downloadText` exportado). Tests:
+  [`tests/export.spec.ts`](tests/export.spec.ts) (contenido, solo-libreta, y descarga E2E). Sin archivos
+  nuevos → sin bump de `sw.js`.
+
 ## 2026-07-03 — Estantería: portada real de los PDF (página 1)
 
 Los PDF mostraban una portada genérica; ahora se ve su **página 1** como el EPUB muestra la suya.

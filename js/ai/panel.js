@@ -17,6 +17,7 @@ import { estimateTokens } from './context.js';
 import * as Retrieval from './retrieval.js';
 import { TEMPLATE, systemPrompt } from './panel-template.js';
 import * as Profiles from './profiles.js';
+import * as Backup from '../backup.js';
 
 // Icon + label markup for the small inline action buttons.
 const act = (name, text, size = 15) => `${icon(name, { size })}<span>${text}</span>`;
@@ -59,7 +60,7 @@ export function init(opts) {
     status: $('#ai-status'), tabs: $('#ai-tabs'),
     chatView: $('#ai-view-chat'), noteView: $('#ai-view-notebook'),
     messages: $('#ai-messages'), input: $('#ai-input'), send: $('#ai-send'), see: $('#ai-see'), close: $('#ai-close'),
-    convobar: $('#ai-convobar'), convoBtn: $('#ai-convo-btn'), convoLabel: $('#ai-convo-label'), convoNew: $('#ai-convo-new'),
+    convobar: $('#ai-convobar'), convoBtn: $('#ai-convo-btn'), convoLabel: $('#ai-convo-label'), convoNew: $('#ai-convo-new'), convoExport: $('#ai-convo-export'),
     ref: $('#ai-ref'), refText: $('#ai-ref-text'), profileChip: $('#ai-profile-chip'),
   });
   $('#ai-ref-clear').addEventListener('click', clearRef);
@@ -92,6 +93,7 @@ export function init(opts) {
   // Selector de conversaciones.
   els.convoBtn.addEventListener('click', (e) => { e.stopPropagation(); if (convo) openConvoMenu(els.convoBtn); else openOnboarding(); });
   els.convoNew.addEventListener('click', () => openOnboarding());
+  els.convoExport.addEventListener('click', exportConvo);
   document.addEventListener('click', (e) => {
     if (convoMenuEl && !convoMenuEl.contains(e.target) && !e.target.closest('#ai-convo-btn')) closeConvoMenu();
   });
@@ -136,6 +138,24 @@ export function quoteSelection(text) {
   showView('chat');
   if (!convo) { pendingQuoteOnActivate = clean; return; } // se aplica tras el onboarding
   setRef(clean);
+}
+
+// P8 · Exporta la conversación ACTIVA (libreta + chat) a Markdown, con formato preservado y
+// citas resueltas a pág./capítulo. A diferencia del volcado global de Ajustes → Datos, es por
+// conversación y desde donde se usa (el panel).
+async function exportConvo() {
+  if (!convo) { setStatus('Abre o crea una conversación para exportarla.'); return; }
+  try {
+    const md = await Backup.buildConvoMarkdown(convo.id, { includeChat: true, includeNotebook: true });
+    const slug = (s) => (s || '').replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'conversacion';
+    const stamp = new Date().toISOString().slice(0, 10);
+    Backup.downloadText(`bookreader-${slug(bookTitle)}-${slug(convo.title || convo.goal)}-${stamp}.md`, md);
+    setStatus('Conversación exportada (Markdown).');
+    setTimeout(refreshStatus, 2500);
+  } catch (e) {
+    console.error('Export de conversación falló:', e);
+    setStatus('No se pudo exportar: ' + e.message);
+  }
 }
 
 function setRef(text) {

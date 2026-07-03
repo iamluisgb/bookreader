@@ -127,7 +127,74 @@ export async function buildMarkdown() {
   return out.join('\n');
 }
 
+// P8 · Export LEGIBLE y SELECTIVO de UNA conversación (libreta + chat), a diferencia del
+// volcado global de arriba. Preserva el formato de las notas/mensajes (sin aplanar) e incluye
+// la transcripción del chat. Resuelve las citas [[aN]] a "(pág. N)"/"(capítulo)" si el libro
+// está segmentado. Reutiliza el `download()` CSP-safe. Ver BACKLOG · P8.
+export async function buildConvoMarkdown(convoId, { includeChat = true, includeNotebook = true } = {}) {
+  const convo = await DB.getConvo(convoId);
+  if (!convo) return '# Conversación no encontrada';
+  const [notes, messages, books, seg] = await Promise.all([
+    DB.getNotes(convoId),
+    DB.getMessages(convoId),
+    DB.getAll('books'),
+    DB.loadSegmented(convo.bookId).catch(() => null),
+  ]);
+  const bookTitle = (books || []).find(b => b.id === convo.bookId)?.title || 'Libro';
+  const anchors = seg?.anchors || new Map();
+  const tpl = getTemplate(convo.templateId);
+
+  const out = [];
+  out.push(`# ${[tpl?.name || 'Conversación', bookTitle].filter(Boolean).join(' — ')}`, '');
+  if (convo.goal) out.push(`*Objetivo:* ${(convo.goal || '').replace(/\s+/g, ' ').trim()}`, '');
+  out.push(`_Exportado: ${new Date().toLocaleString('es')}_`, '');
+
+  if (includeNotebook) {
+    const fields = tpl?.fields || [];
+    const byField = {};
+    for (const n of (notes || [])) (byField[n.fieldKey] = byField[n.fieldKey] || []).push(n);
+    const order = [...new Set([...fields.map(f => f.key), ...Object.keys(byField)])];
+    if (order.some(k => byField[k]?.length)) {
+      out.push('## Libreta', '');
+      for (const k of order) {
+        const arr = byField[k];
+        if (!arr || !arr.length) continue;
+        out.push(`### ${fields.find(f => f.key === k)?.label || k}`, '');
+        for (const n of arr) out.push(resolveCites(n.content, anchors).trim(), '');
+      }
+    }
+  }
+
+  if (includeChat && messages && messages.length) {
+    out.push('## Conversación', '');
+    for (const m of messages) {
+      out.push(`**${m.role === 'user' ? '🧑 Tú' : '🤖 Agente'}:**`, '', resolveCites(m.content, anchors).trim(), '');
+    }
+  }
+
+  if ((!notes || !notes.length) && (!messages || !messages.length)) out.push('_(Conversación vacía.)_');
+  return out.join('\n');
+}
+
+// Sustituye las anclas [[aN]]/aN por una referencia legible (pág./capítulo) usando el mapa
+// de anclas del libro. Si no hay anclas (libro sin segmentar) deja el texto tal cual.
+function resolveCites(text, anchors) {
+  if (!anchors || !anchors.size) return text || '';
+  return (text || '').replace(/\[\[(a\d+)\]\]|\b(a\d+)\b/g, (m, p1, p2) => {
+    const a = anchors.get(p1 || p2);
+    if (!a) return m;
+    if (a.page != null) return `(pág. ${a.page})`;
+    if (a.chapter) return `(${a.chapter})`;
+    return '';
+  });
+}
+
 // ---- Descargas (mismo patrón CSP-safe que la exportación de subrayados) -----
+
+// Descarga pública (para el botón de exportar del panel).
+export function downloadText(filename, content, mime = 'text/markdown') {
+  download(filename, content, mime);
+}
 
 function download(filename, content, mime) {
   const blob = new Blob([content], { type: mime });
