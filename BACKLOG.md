@@ -229,8 +229,11 @@ Bugs de bajo nivel del visor. **Prerrequisito de la épica [PDF — paridad de f
 - **Errores/UX:** `catch(e){}` vacíos; sin UI de error; param `onProgress` de `load()` sin usar.
 - **Acoplamiento a pdf.js 3.11** (`renderTextLayer` cambia de API en 4.x).
 
-### TEC2 — Tests del panel IA (characterization) · `M` · **recomendación staff**
-El panel IA tiene **0 cobertura** determinista (solo `@live` no determinista). Añadir tests que
-fijen el comportamiento actual → red para cualquier refactor futuro del core (prerequisito para
-un eventual store con API, ver decisión de T8 en el CHANGELOG).
+### TEC2 — Tests del panel IA (characterization) · **✓** _(recomendación staff)_
+**Hecho** (ver CHANGELOG): tests deterministas del panel con `fetch` stubbeado
+([`tests/panel.spec.ts`](tests/panel.spec.ts)): onboarding→sesión lista, envío→respuesta, y el **gating
+del retrieval agéntico** (pregunta con match no dispara herramientas; pregunta vaga sí). Unit de citas en
+[`tests/render.spec.ts`](tests/render.spec.ts). Escribir los tests **destapó y corrigió** un fallo del
+gating (el retrieval vacío no disparaba el agéntico). Complementan a los ya existentes de `llm.spec.ts`,
+`retrieval.spec.ts` y `chapter-event.spec.ts`.
 

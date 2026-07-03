@@ -776,7 +776,9 @@ async function deliver(aug, question, { showUser = true } = {}) {
     // IA5 Fase 1b · Retrieval agéntico SOLO en turnos difíciles (sin capítulo nombrado y
     // pocos aciertos BM25): el agente reúne más contexto con herramientas antes de
     // responder; los turnos normales van directos a streaming. Ver DECISIONS.md · ADR-009.
-    if (LLM.hasKey() && !ctx.routed?.length && ctx.bm25Count < AGENTIC_MIN_HITS && ctx.picked?.length) {
+    // Guard: libro indexado (segReady). Un retrieval DÉBIL —incluido el vacío (0 aciertos)—
+    // es justo cuando el agente debe buscar por su cuenta; por eso NO exigimos picked>0.
+    if (LLM.hasKey() && segReady && !ctx.routed?.length && ctx.bm25Count < AGENTIC_MIN_HITS) {
       textNode.innerHTML = '<span class="ai-typing">buscando en el libro…</span>';
       ctx = await agenticGather(question, ctx, abortCtrl.signal);
     }

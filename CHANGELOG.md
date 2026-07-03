@@ -5,6 +5,24 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-03 — TEC2: tests deterministas del panel IA (+ fix de gating)
+
+El panel IA solo tenía cobertura `@live` (no determinista). Se añaden tests deterministas que fijan su
+comportamiento como red de regresión — y escribirlos **destapó un bug** que se corrige.
+
+- **[`tests/panel.spec.ts`](tests/panel.spec.ts)** (integración con `fetch` stubbeado): onboarding →
+  sesión lista; envío → respuesta pintada; y el **gating del retrieval agéntico** (Fase 1b): una pregunta
+  con buen match léxico NO dispara herramientas; una pregunta vaga (sin match) SÍ activa `search_book`.
+- **[`tests/render.spec.ts`](tests/render.spec.ts)** (unit): `renderWithCitations` solo convierte en chip
+  las anclas que existen (no inventa citas).
+- **Fix de gating** ([`panel.js`](js/ai/panel.js)): la recolección agéntica se gateaba con `picked>0`, así
+  que el retrieval **vacío** (0 aciertos) —el caso más débil, donde el agente MÁS debe buscar— no la
+  disparaba. Ahora se gatea con `segReady` (libro indexado). Lo detectó el test de la pregunta vaga.
+
+31/31 E2E. Bump `sw.js` v45→v46. Cierra TEC2 del backlog.
+
+---
+
 ## 2026-07-03 — IA2: interrupción de repaso al terminar capítulo
 
 Con la plantilla **HQ&A** activa, al entrar en un capítulo nuevo el agente **interrumpe** con una
