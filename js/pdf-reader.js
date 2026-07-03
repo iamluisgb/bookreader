@@ -5,6 +5,7 @@ let pdfDoc = null;
 let currentPage = 1;
 let totalPages = 0;
 let onPageCallback = null;
+let renderTask = null;   // render en curso (para cancelarlo si llega otra navegación)
 
 function getPdfjs() {
   if (pdfjsLib) return pdfjsLib;
@@ -89,6 +90,11 @@ export async function load(arrayBuffer, onProgress) {
 async function renderPage(num) {
   if (!pdfDoc) return;
 
+  // Re-entrancia: si hay un render en curso, cancelarlo antes de empezar otro sobre el
+  // MISMO canvas (pasar páginas rápido lanzaba "Cannot use the same canvas during multiple
+  // render()"). pdf.js rechaza la promesa con RenderingCancelledException al cancelar.
+  if (renderTask) { try { renderTask.cancel(); } catch (e) {} renderTask = null; }
+
   const page = await pdfDoc.getPage(num);
   const scale = 1.5;
   // TEC1 · Nitidez en pantallas HiDPI/retina: el canvas se PINTA a `scale * dpr` (más
@@ -127,7 +133,16 @@ async function renderPage(num) {
   canvas.style.width = Math.floor(viewport.width) + 'px';   // tamaño mostrado (lógico)
   canvas.style.height = Math.floor(viewport.height) + 'px';
 
-  await page.render({ canvasContext: ctx, viewport: renderViewport }).promise;
+  const myTask = page.render({ canvasContext: ctx, viewport: renderViewport });
+  renderTask = myTask;
+  try {
+    await myTask.promise;
+  } catch (e) {
+    // Cancelado por una navegación más reciente: ese render se encarga del resto.
+    if (e && e.name === 'RenderingCancelledException') return;
+    throw e;
+  }
+  if (renderTask === myTask) renderTask = null;
 
   await renderTextLayer(page, viewport, wrapper);
 

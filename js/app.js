@@ -8,7 +8,7 @@ import * as AiPanel from './ai/panel.js';
 import * as AiDB from './ai/db.js';
 import { hydrateIcons } from './ui/icons.js';
 import { countBookWords, updateProgressDetail } from './progress.js';
-import { initHighlights, setupHighlights, setupPdfSelection, renderHighlights, applyStoredHighlights, hideHighlightTooltip } from './highlights-ui.js';
+import { initHighlights, setupHighlights, setupPdfSelection, drawPdfHighlights, renderHighlights, applyStoredHighlights, hideHighlightTooltip } from './highlights-ui.js';
 import { initBookmarkButton, updateBookmarkButton, renderBookmarks } from './bookmarks-ui.js';
 import * as Library from './library/view.js';
 import * as LibStore from './library/store.js';
@@ -672,6 +672,7 @@ async function loadPdf(buffer, bookId, aiBookId) {
     PdfReader.onPage((page, total) => {
       document.getElementById('reader-title').textContent = `PDF - Página ${page} de ${total}`;
       syncRouteSoon();               // reflejar la página en la URL (deep-link)
+      drawPdfHighlights(page);       // PDF3: re-pintar los subrayados de la página
     });
 
     await PdfReader.load(buffer);
@@ -683,8 +684,9 @@ async function loadPdf(buffer, bookId, aiBookId) {
     // PDF1: el agente puede leer el PDF (texto extraído por página). Habilitar el panel.
     document.getElementById('ai-toggle').disabled = false;
     AiPanel.setBook(PdfReader.getDocument(), aiBookId, bookId || 'PDF', { format: 'pdf' });
-    // PDF2: seleccionar texto en el PDF → barra con "Preguntar al agente".
+    // PDF2/PDF3: seleccionar texto en el PDF → barra (preguntar/subrayar/nota/copiar).
     setupPdfSelection();
+    renderHighlights();              // poblar la lista lateral con los subrayados guardados
   } catch (err) {
     console.error('Error loading PDF:', err);
     alert('Error al cargar el archivo PDF');

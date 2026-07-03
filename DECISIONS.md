@@ -328,3 +328,31 @@ agéntico, MAPA, grounding) es idéntico. La cita clicable navega con `PdfReader
 `{page,chapter}` persiste sin cambios de esquema. La atenuación por capítulo (ADR-oriented a EPUB)
 degrada limpia en PDF (sin `navigation.toc` → no-op). PDF2/PDF3 (selección→agente, subrayados)
 construirán sobre esto.
+
+---
+
+## ADR-016 — Subrayados de PDF: ancla `{página, rects}` en coords fraccionales · `ACEPTADA`
+
+**Contexto.** Los subrayados del EPUB se anclan por CFI y se pintan con `rendition.annotations`
+(epub.js). El PDF no tiene ni CFI ni ese sistema de anotaciones: es un canvas rasterizado con una capa
+de texto transparente encima.
+
+**Decisión.** Modelo de ancla propio para PDF: `{page, rects}`, donde `rects` son los rectángulos de la
+selección en **coordenadas fraccionales (0..1)** relativas a la página. Se dibujan como un overlay de
+`<div>`s (`.pdf-hl-layer`, `mix-blend-mode: multiply`, `pointer-events:none`) sobre el canvas, re-pintado
+en cada render de página. Conviven con el modelo CFI: identidad genérica `id ?? cfi`; `highlights.js`
+gana `addPdf/getByPage/removeById` sin tocar el camino EPUB.
+
+**Porqué.**
+1. **Fraccional, no píxeles.** El canvas se re-renderiza a distinto tamaño según zoom/HiDPI (ADR-oriented
+   a TEC1). Guardar píxeles ataría el subrayado a una escala concreta; las fracciones se re-escalan al
+   tamaño actual del wrapper y quedan siempre nítidas y alineadas.
+2. **Overlay propio, no `annotations`.** `rendition.annotations` es de epub.js; el PDF necesita su
+   propia capa. `pointer-events:none` mantiene la capa de texto de encima seleccionable.
+3. **Convivencia sin refactor arriesgado.** El EPUB (muy probado) no se toca; solo se generaliza la
+   identidad y el render de la lista.
+
+**Consecuencias.** El export ya contemplaba `page`, así que sale gratis. HQ&A al subrayar sigue atado al
+evento `selected` de epub.js (mejora futura para PDF). **Efecto colateral positivo:** al probar el
+re-pintado se destapó una re-entrancia de `renderPage` (dos `render()` sobre el mismo canvas al pasar
+páginas rápido); se arregla cancelando el `RenderTask` en curso antes de iniciar otro.

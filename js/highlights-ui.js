@@ -5,6 +5,7 @@
 // módulo. Público: initHighlights, setupHighlights, renderHighlights,
 // hideHighlightTooltip.
 import * as EpubReader from './epub-reader.js';
+import * as PdfReader from './pdf-reader.js';
 import * as Highlights from './highlights.js';
 import * as AiPanel from './ai/panel.js';
 import { icon } from './ui/icons.js';
@@ -108,20 +109,8 @@ function positionTooltip(tooltip, rect) {
   });
 }
 
-// Subrayar (color) y Nota dependen del modelo de ancla CFI del EPUB. En PDF aún no hay
-// modelo de subrayado (llega en PDF3), así que en modo 'pdf' ocultamos esas acciones y
-// dejamos solo "Preguntar al agente" y "Copiar".
-function setTooltipMode(mode) {
-  const showHl = mode === 'epub';
-  const colors = document.querySelector('#highlight-tooltip .sel-colors');
-  const note = document.getElementById('sel-note');
-  if (colors) colors.style.display = showHl ? '' : 'none';
-  if (note) note.style.display = showHl ? '' : 'none';
-}
-
 function showHighlightTooltip(cfiRange, text, rect) {
   const tooltip = document.getElementById('highlight-tooltip');
-  setTooltipMode('epub');
 
   // Ya hemos borrado la selección nativa (finalizeSelection), así que no hay
   // menús del SO con los que chocar: colocamos la barra junto a la selección.
@@ -179,9 +168,9 @@ export function hideHighlightTooltip() {
   lastSelWin = null;
 }
 
-// PDF2 · Selección→agente en PDF. La capa de texto del PDF ya es seleccionable (vive en el
-// documento padre, sin iframe). Al soltar la selección mostramos la barra en modo 'pdf'
-// (solo "Preguntar al agente" y "Copiar"). El subrayado real llega en PDF3.
+// PDF2/PDF3 · Selección en PDF. La capa de texto del PDF ya es seleccionable (vive en el
+// documento padre, sin iframe). Al soltar la selección mostramos la barra: subrayar (con
+// ancla {página, rects}), nota, preguntar al agente y copiar.
 export function setupPdfSelection() {
   const container = document.getElementById('pdf-container');
   if (!container || container.dataset.selWired) return;
@@ -195,19 +184,57 @@ export function setupPdfSelection() {
     const node = sel.anchorNode;
     const host = node && (node.nodeType === 1 ? node : node.parentElement);
     if (!host || !host.closest('#pdf-container .textLayer')) return;
-    let rect = null;
-    try { rect = sel.getRangeAt(0).getBoundingClientRect(); } catch (e) {}
-    showPdfSelectionTooltip(text, rect);
+    let rect = null, rects = [];
+    try {
+      const range = sel.getRangeAt(0);
+      rect = range.getBoundingClientRect();
+      rects = pdfFractionalRects(range);
+    } catch (e) {}
+    showPdfSelectionTooltip(text, rect, rects);
   }, 0);
 
   container.addEventListener('mouseup', onSelectEnd);
   container.addEventListener('touchend', onSelectEnd);
 }
 
-function showPdfSelectionTooltip(text, rect) {
+// Rectángulos de la selección en coordenadas FRACCIONALES (0..1) de la página del PDF, para
+// re-pintarlos nítidos a cualquier escala/HiDPI (el canvas se re-renderiza al cambiar zoom).
+function pdfFractionalRects(range) {
+  const wrapper = document.querySelector('#pdf-container .pdf-page');
+  if (!wrapper) return [];
+  const wr = wrapper.getBoundingClientRect();
+  if (!wr.width || !wr.height) return [];
+  return [...range.getClientRects()]
+    .map(r => ({
+      left: (r.left - wr.left) / wr.width,
+      top: (r.top - wr.top) / wr.height,
+      width: r.width / wr.width,
+      height: r.height / wr.height,
+    }))
+    .filter(r => r.width > 0.001 && r.height > 0.001);
+}
+
+function showPdfSelectionTooltip(text, rect, rects) {
   const tooltip = document.getElementById('highlight-tooltip');
-  setTooltipMode('pdf');
   positionTooltip(tooltip, rect);
+  const page = PdfReader.getCurrentPage();
+
+  const saveHighlight = (color, note = '') => {
+    Highlights.addPdf(page, rects, text, color, `Pág. ${page}`, note);
+    drawPdfHighlights(page);
+    hideHighlightTooltip();
+    renderHighlights();
+  };
+
+  tooltip.querySelectorAll('.highlight-color').forEach(btn => {
+    btn.onclick = () => saveHighlight(btn.dataset.color);
+  });
+
+  document.getElementById('sel-note').onclick = () => {
+    const note = prompt('Tu nota sobre este pasaje:');
+    if (note === null) return;
+    saveHighlight('#ffd54f', note.trim());
+  };
 
   document.getElementById('sel-ask').onclick = () => {
     AiPanel.quoteSelection(text);
@@ -219,6 +246,35 @@ function showPdfSelectionTooltip(text, rect) {
   };
 
   setTimeout(() => document.addEventListener('click', hideHighlightTooltipOnOutside), 100);
+}
+
+// PDF3 · Pinta el overlay de subrayados de una página sobre el canvas. Se llama tras cada
+// render de página (onPage) y al crear/borrar un subrayado. Los rects son fraccionales, así
+// que se escalan al tamaño actual del wrapper.
+export function drawPdfHighlights(page) {
+  const wrapper = document.querySelector('#pdf-container .pdf-page');
+  if (!wrapper) return;
+  let layer = wrapper.querySelector('.pdf-hl-layer');
+  if (!layer) {
+    layer = document.createElement('div');
+    layer.className = 'pdf-hl-layer';
+    wrapper.appendChild(layer);
+  }
+  layer.innerHTML = '';
+  const W = wrapper.clientWidth, H = wrapper.clientHeight;
+  for (const hl of Highlights.getByPage(page)) {
+    for (const r of (hl.rects || [])) {
+      const d = document.createElement('div');
+      d.className = 'pdf-hl';
+      d.style.left = (r.left * W) + 'px';
+      d.style.top = (r.top * H) + 'px';
+      d.style.width = (r.width * W) + 'px';
+      d.style.height = (r.height * H) + 'px';
+      d.style.background = hl.color;
+      if (hl.note) d.title = hl.note;
+      layer.appendChild(d);
+    }
+  }
 }
 
 function hideHighlightTooltipOnOutside(e) {
@@ -279,15 +335,24 @@ export function renderHighlights() {
     `;
 
     item.addEventListener('click', async () => {
-      await EpubReader.goTo(hl.cfi);
+      if (hl.page != null) {                 // PDF: navegar a la página y re-pintar
+        await PdfReader.goTo(hl.page);
+        drawPdfHighlights(hl.page);
+      } else {
+        await EpubReader.goTo(hl.cfi);
+      }
       document.getElementById('sidebar').classList.remove('open');
     });
 
     item.querySelector('.highlight-delete').addEventListener('click', (e) => {
       e.stopPropagation();
-      Highlights.remove(hl.cfi);
-      // Quitar el resaltado pintado en la página (tipo 'highlight' de epub.js).
-      try { EpubReader.getRendition()?.annotations.remove(hl.cfi, 'highlight'); } catch (err) {}
+      Highlights.removeById(hl.id ?? hl.cfi);
+      if (hl.page != null) {
+        drawPdfHighlights(hl.page);          // quitar el overlay de la página del PDF
+      } else {
+        // Quitar el resaltado pintado en la página (tipo 'highlight' de epub.js).
+        try { EpubReader.getRendition()?.annotations.remove(hl.cfi, 'highlight'); } catch (err) {}
+      }
       renderHighlights();   // refrescar la lista y el estado del botón de exportar
     });
 

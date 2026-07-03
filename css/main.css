@@ -642,6 +642,22 @@ body:not(.scroll-mode) .epub-container .epub-view {
   background: rgba(79, 140, 255, 0.35);
 }
 
+/* PDF3 · Overlay de subrayados: rectángulos (coords fraccionales → px) sobre el canvas.
+   Multiply para que se vea como un marcador sobre el texto. No captura eventos: la capa de
+   texto de encima sigue siendo seleccionable. */
+.pdf-hl-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.pdf-hl {
+  position: absolute;
+  border-radius: 2px;
+  mix-blend-mode: multiply;
+  opacity: 0.4;
+}
+
 /* ============ AI PANEL ============ */
 :root { --ai-panel-width: 380px; }
 

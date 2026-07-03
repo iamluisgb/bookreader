@@ -32,6 +32,7 @@ export function add(cfi, text, color, chapter, note = '') {
     return true;
   }
   highlights.push({
+    id: cfi,                 // en EPUB el propio CFI es la identidad
     cfi,
     text: text || '',
     color: color || '#ffeb3b',
@@ -42,6 +43,40 @@ export function add(cfi, text, color, chapter, note = '') {
   Storage.set(getKey(), highlights);
   if (onChangeCallback) onChangeCallback();
   return true;
+}
+
+// PDF3 · Subrayado de PDF. El ancla es {page, rects}, donde rects son rectángulos en
+// coordenadas FRACCIONALES (0..1) de la página, para re-pintarse nítido a cualquier
+// escala/HiDPI. No hay CFI. Identidad = id generado.
+export function addPdf(page, rects, text, color, chapter, note = '') {
+  const highlights = getAll();
+  const id = 'pdf-' + page + '-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7);
+  highlights.push({
+    id,
+    page,
+    rects: rects || [],
+    text: text || '',
+    color: color || '#ffeb3b',
+    chapter: chapter || `Pág. ${page}`,
+    note: note || '',
+    timestamp: Date.now()
+  });
+  Storage.set(getKey(), highlights);
+  if (onChangeCallback) onChangeCallback();
+  return id;
+}
+
+// Subrayados de una página concreta (para pintar el overlay al renderizarla).
+export function getByPage(page) {
+  return getAll().filter(h => h.page === page);
+}
+
+// Borra por identidad genérica (id de PDF o CFI de EPUB).
+export function removeById(id) {
+  let highlights = getAll();
+  highlights = highlights.filter(h => (h.id ?? h.cfi) !== id);
+  Storage.set(getKey(), highlights);
+  if (onChangeCallback) onChangeCallback();
 }
 
 export function setNote(cfi, note) {

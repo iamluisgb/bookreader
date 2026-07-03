@@ -5,6 +5,24 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-03 — PDF3: subrayados/anotaciones en PDF
+
+Subrayar en un PDF ahora funciona como en el EPUB: seleccionar → color/nota, se pinta sobre la página,
+se guarda y se re-pinta al volver. Ver [`DECISIONS.md`](DECISIONS.md) · ADR-016.
+
+- **Modelo de ancla `{página, rects}`** en [`highlights.js`](js/highlights.js) (`addPdf`, `getByPage`,
+  `removeById`), conviviendo con el modelo CFI del EPUB (identidad genérica `id ?? cfi`). Los `rects`
+  se guardan en **coordenadas fraccionales (0..1)** de la página, así se re-pintan nítidos a cualquier
+  escala/HiDPI (el canvas se re-renderiza al cambiar de zoom/página).
+- **Overlay `.pdf-hl-layer`** (multiply, `pointer-events:none`) sobre el canvas; se re-pinta en cada
+  `onPage` y al crear/borrar. La lista lateral y el borrado se generalizan a PDF (navegan a la página).
+- La barra de selección del PDF recupera Subrayar y Nota (PDF2 solo dejaba Preguntar/Copiar).
+- **Robustez:** `renderPage` cancela el `RenderTask` en curso antes de empezar otro → se elimina el
+  crash *"Cannot use the same canvas during multiple render()"* al pasar páginas rápido (lo destapó el
+  test de aislamiento sobre PDF real).
+- Tests: [`tests/pdf.spec.ts`](tests/pdf.spec.ts) (subrayar → overlay → persistir → re-pintar).
+  Sin archivos nuevos → sin bump de `sw.js`.
+
 ## 2026-07-03 — PDF2: selección→agente en PDF
 
 Seleccionar texto en un PDF ahora ofrece **"Preguntar al agente"** (y "Copiar"), reutilizando la misma

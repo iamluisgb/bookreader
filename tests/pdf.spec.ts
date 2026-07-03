@@ -66,14 +66,59 @@ test('PDF2: seleccionar texto muestra "Preguntar al agente" y abre el panel', as
   });
 
   await expect(page.locator('#highlight-tooltip')).toBeVisible();
-  await expect(page.locator('#highlight-tooltip .sel-colors')).toBeHidden();  // subrayar → PDF3
-  await expect(page.locator('#sel-note')).toBeHidden();
+  await expect(page.locator('#highlight-tooltip .sel-colors')).toBeVisible();  // subrayar (PDF3)
+  await expect(page.locator('#sel-note')).toBeVisible();
   await expect(page.locator('#sel-ask')).toBeVisible();
 
   await page.locator('#sel-ask').click();
   await expect
     .poll(() => page.evaluate(() => document.body.classList.contains('ai-open')))
     .toBe(true);
+});
+
+// PDF3 · Subrayar en PDF: crea un ancla {página, rects}, pinta el overlay sobre el canvas,
+// lo persiste y lo re-pinta al re-renderizar la página.
+async function selectPdfText(page) {
+  await page.waitForFunction(() => {
+    const l = document.querySelector('#pdf-container .textLayer');
+    return !!l && l.textContent!.trim().length > 0;
+  }, { timeout: 15000 });
+  await page.evaluate(() => {
+    const layer = document.querySelector('#pdf-container .textLayer')!;
+    const range = document.createRange();
+    range.selectNodeContents(layer);
+    const sel = window.getSelection()!;
+    sel.removeAllRanges();
+    sel.addRange(range);
+    document.getElementById('pdf-container')!.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+  });
+}
+
+test('PDF3: subrayar en PDF crea overlay, lo persiste y lo re-pinta', async ({ page }) => {
+  await openPdf(page);
+  await selectPdfText(page);
+  await expect(page.locator('#highlight-tooltip')).toBeVisible();
+
+  // Subrayar en el primer color.
+  await page.locator('#highlight-tooltip .highlight-color').first().click();
+
+  // Overlay pintado sobre el canvas.
+  await expect(page.locator('#pdf-container .pdf-hl').first()).toBeVisible();
+
+  // Persistido con ancla de página + rects.
+  const stored = await page.evaluate(async () => {
+    const H = await import('/js/highlights.js');
+    const all = H.getAll();
+    return all.map((h: any) => ({ page: h.page, rects: (h.rects || []).length, hasId: !!h.id }));
+  });
+  expect(stored.length).toBeGreaterThan(0);
+  expect(stored[0].page).toBe(1);
+  expect(stored[0].rects).toBeGreaterThan(0);
+  expect(stored[0].hasId).toBe(true);
+
+  // Re-render de la misma página → el overlay se vuelve a pintar (no se pierde).
+  await page.evaluate(async () => { const P = await import('/js/pdf-reader.js'); await P.goTo(1); });
+  await expect(page.locator('#pdf-container .pdf-hl').first()).toBeVisible();
 });
 
 test.describe('PDF HiDPI', () => {

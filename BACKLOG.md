@@ -199,12 +199,18 @@ porque dependen del modelo de ancla CFI (llegan en PDF3). Reutiliza el mismo `#h
 posicionamiento; wiring en [`highlights-ui.js`](js/highlights-ui.js) (`setupPdfSelection`) llamado desde
 `loadPdf`. Test en [`tests/pdf.spec.ts`](tests/pdf.spec.ts). _(HQ&A al subrayar en PDF → depende de PDF3.)_
 
-### PDF3 — Subrayados/anotaciones en PDF · `L`
-- **Modelo de ancla nuevo:** `{página, rects}` en vez de `cfi` (afecta a `js/highlights.js`, que hoy
-  es cfi-only; el export ya contempla `page`).
-- Dibujar los subrayados como **capa `<div>` overlay** sobre el canvas (no `rendition.annotations`,
-  que es epub-only).
-- Persistir y re-pintar al volver a la página.
+### PDF3 — Subrayados/anotaciones en PDF · **✓** `L`
+- ✓ **Modelo de ancla nuevo `{página, rects}`** en `js/highlights.js` (`addPdf`, `getByPage`,
+  `removeById`) conviviendo con el modelo CFI del EPUB (identidad genérica `id ?? cfi`). Los `rects`
+  se guardan en **coordenadas fraccionales (0..1)** de la página → nítidos a cualquier escala/HiDPI.
+- ✓ Overlay `<div>` (`.pdf-hl-layer` con multiply) sobre el canvas, `pointer-events:none` para no
+  romper la selección de texto. Se re-pinta en cada `onPage` y al crear/borrar.
+- ✓ Persistencia + re-pintado al volver a la página; lista lateral y borrado generalizados a PDF/EPUB.
+- ✓ Barra de selección con Subrayar/Nota/Preguntar/Copiar (completa lo que PDF2 dejó a medias).
+- ✓ **Bonus (robustez):** `renderPage` cancela el `RenderTask` en curso → arreglado el crash "Cannot
+  use the same canvas during multiple render()" al pasar páginas rápido. Ver ADR-016.
+- Tests: [`tests/pdf.spec.ts`](tests/pdf.spec.ts) (crear/persistir/re-pintar). _(HQ&A al subrayar en PDF
+  queda como mejora futura: hoy HQ&A está atado al evento `selected` de epub.js.)_
 
 ### PDF4 — Modo scroll (capítulo continuo) en PDF · `M`
 Renderizar páginas en continuo en vez de reutilizar un solo wrapper
