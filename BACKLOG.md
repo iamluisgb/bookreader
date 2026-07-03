@@ -133,8 +133,12 @@ para indexar y citar, y el function-calling (`chatTools`, ya usado en
 > (P3 ✓). El principio *definir-vs-usar* se cumple: el catálogo se gestiona aquí y se elige en el
 > onboarding/runtime.
 
-### P5 — Búsqueda de texto en el libro · `M`
-Buscar y saltar a coincidencias dentro del EPUB.
+### P5 — Búsqueda de texto en el libro · **✓** `M`
+**Hecho** (ver CHANGELOG): pestaña "Buscar" en el sidebar sobre el corpus segmentado del agente
+(pasajes `[[aN]]` + anclas) → EPUB por CFI, PDF por página, un solo camino ([`js/search.js`](js/search.js)).
+Insensible a acentos/mayúsculas, fragmento con match resaltado, clic → navega.
+_(v2 posible: match exacto a nivel de palabra con `section.find` de epub.js, y navegación entre
+resultados con ↑/↓.)_
 
 ### P6 — Mejoras de subrayados · `S`–`M`
 - Exportar por color (solo amarillos, etc.); copiar el texto de un highlight al portapapeles.

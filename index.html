@@ -34,9 +34,18 @@
     <!-- Tabs -->
     <div class="sidebar-tabs">
       <button class="tab-btn active" data-tab="contents">Contenido</button>
+      <button class="tab-btn" data-tab="search">Buscar</button>
       <button class="tab-btn" data-tab="bookmarks">Marcadores</button>
       <button class="tab-btn" data-tab="highlights">Subrayados</button>
       <button class="tab-btn" data-tab="settings">Ajustes</button>
+    </div>
+
+    <!-- Tab: Search -->
+    <div id="tab-search" class="tab-content">
+      <div class="search-box">
+        <input id="search-input" class="search-input" type="search" placeholder="Buscar en el libro…" autocomplete="off" spellcheck="false" />
+      </div>
+      <div id="search-results" class="search-results"></div>
     </div>
 
     <!-- Tab: Contents -->

@@ -13,6 +13,8 @@ import { initBookmarkButton, updateBookmarkButton, renderBookmarks } from './boo
 import * as Library from './library/view.js';
 import * as LibStore from './library/store.js';
 import * as AppSettings from './ui/app-settings.js';
+import * as Search from './search.js';
+import { escapeHtml } from './ui/escape.js';
 import { openImageZoom } from './image-zoom.js';
 
 // ============ INIT ============
@@ -21,6 +23,7 @@ document.addEventListener('DOMContentLoaded', () => {
   Settings.init();
   EpubReader.init();
   initSidebar();
+  initSearch();
   initFileHandling();
   initNavigation();
   initBookmarkButton();
@@ -474,22 +477,7 @@ function initImmersive() {
 // ============ AI PANEL ============
 function initAiPanel() {
   AiPanel.init({
-    onCite: async (loc) => {
-      // PDF: el locator es un número de página → saltar a ella. EPUB: es un CFI.
-      if (currentBook?.format === 'pdf') {
-        const page = parseInt(loc, 10);
-        if (page) await PdfReader.goTo(page);
-        return;
-      }
-      const cfi = loc;
-      await EpubReader.goTo(cfi);
-      try {
-        const rendition = EpubReader.getRendition();
-        rendition?.annotations.highlight(cfi, {}, () => {}, 'ai-cite-hl', {
-          'fill': 'var(--accent)', 'fill-opacity': '0.25', 'mix-blend-mode': 'multiply'
-        });
-      } catch (e) { /* cita sin highlight */ }
-    },
+    onCite: goToLocator,
   });
 
   document.getElementById('ai-toggle').addEventListener('click', () => {
@@ -504,6 +492,82 @@ function initAiPanel() {
     document.getElementById('sidebar')?.classList.remove('open');
     AiPanel.setOpen(false);
   });
+}
+
+// Navega a un locator del libro (CFI en EPUB, nº de página en PDF). Compartido por las citas
+// del agente (onCite) y la búsqueda (P5).
+async function goToLocator(loc) {
+  if (currentBook?.format === 'pdf') {
+    const page = parseInt(loc, 10);
+    if (page) await PdfReader.goTo(page);
+    return;
+  }
+  const cfi = loc;
+  await EpubReader.goTo(cfi);
+  try {
+    const rendition = EpubReader.getRendition();
+    rendition?.annotations.highlight(cfi, {}, () => {}, 'ai-cite-hl', {
+      'fill': 'var(--accent)', 'fill-opacity': '0.25', 'mix-blend-mode': 'multiply'
+    });
+  } catch (e) { /* cita sin highlight */ }
+}
+
+// ============ BÚSQUEDA (P5) ============
+// Busca sobre el corpus segmentado del libro (el mismo que usa el agente): pasajes `[[aN]]`
+// + anclas. Un solo camino para EPUB (ancla→CFI) y PDF (ancla→página).
+let searchCorpus = null;   // { annotatedText, anchors } del libro abierto; se carga al buscar
+
+async function ensureSearchCorpus() {
+  if (searchCorpus) return searchCorpus;
+  if (!currentBook) return null;
+  const seg = await AiDB.loadSegmented(currentBook.id);   // lo produce la segmentación del agente
+  if (seg) searchCorpus = { annotatedText: seg.annotatedText, anchors: seg.anchors };
+  return searchCorpus;
+}
+
+function initSearch() {
+  const input = document.getElementById('search-input');
+  if (!input) return;
+  let t;
+  const run = async () => {
+    const q = input.value.trim();
+    const box = document.getElementById('search-results');
+    if (q.length < 2) { box.innerHTML = ''; return; }
+    const corpus = await ensureSearchCorpus();
+    if (!corpus) { box.innerHTML = '<p class="empty-state">Preparando el libro para búsqueda…</p>'; return; }
+    renderSearchResults(Search.searchPassages(corpus.annotatedText, corpus.anchors, q, { limit: 120 }), q);
+  };
+  input.addEventListener('input', () => { clearTimeout(t); t = setTimeout(run, 200); });
+  // Al abrir la pestaña Buscar, enfocar el campo.
+  document.querySelector('.tab-btn[data-tab="search"]')?.addEventListener('click', () => setTimeout(() => input.focus(), 50));
+}
+
+function renderSearchResults(results, query) {
+  const box = document.getElementById('search-results');
+  if (!results.length) { box.innerHTML = `<p class="empty-state">Sin resultados para «${escapeHtml(query)}»</p>`; return; }
+  box.innerHTML = `<p class="search-count">${results.length} resultado${results.length === 1 ? '' : 's'}</p>`;
+  for (const r of results) {
+    const item = document.createElement('button');
+    item.className = 'search-hit';
+    const meta = [r.chapter, r.page != null ? `pág. ${r.page}` : ''].filter(Boolean).join(' · ');
+    item.innerHTML =
+      `<span class="search-hit-ctx">${escapeHtml(r.before)}<mark>${escapeHtml(r.match)}</mark>${escapeHtml(r.after)}</span>` +
+      (meta ? `<span class="search-hit-meta">${escapeHtml(meta)}</span>` : '');
+    item.addEventListener('click', async () => {
+      if (r.loc != null) await goToLocator(r.loc);
+      document.getElementById('sidebar').classList.remove('open');
+    });
+    box.appendChild(item);
+  }
+}
+
+// Reinicia el corpus y limpia la caja al abrir otro libro.
+function resetSearch() {
+  searchCorpus = null;
+  const input = document.getElementById('search-input');
+  const box = document.getElementById('search-results');
+  if (input) input.value = '';
+  if (box) box.innerHTML = '';
 }
 
 // ============ SIDEBAR ============
@@ -602,6 +666,7 @@ let totalWords = 0;
 
 async function loadEpub(buffer, bookId, aiBookId) {
   try {
+    resetSearch();
     console.log('Loading EPUB, buffer size:', buffer.byteLength);
 
     // Hash estable del fichero (id canónico). Se reutiliza si ya viene calculado.
@@ -675,6 +740,7 @@ async function loadEpub(buffer, bookId, aiBookId) {
 
 async function loadPdf(buffer, bookId, aiBookId) {
   try {
+    resetSearch();
     // Hash estable del contenido (id canónico para el agente). Se reutiliza si ya viene dado.
     if (!aiBookId) aiBookId = await AiDB.hashBuffer(buffer.slice(0));
 

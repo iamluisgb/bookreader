@@ -5,6 +5,21 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-03 — P5: búsqueda de texto en el libro (EPUB y PDF)
+
+Nueva pestaña **Buscar** en el sidebar. Un solo camino para ambos formatos.
+
+- **Reutiliza el corpus segmentado del agente** (`annotatedText` con pasajes `[[aN]]` + anclas), así
+  que no re-indexa nada: EPUB salta por **CFI**, PDF por **página**, con la misma función pura
+  ([`js/search.js`](js/search.js) · `searchPassages`).
+- Insensible a **acentos y mayúsculas**; muestra un fragmento con el match resaltado + capítulo/página;
+  clic → navega a la coincidencia (reutiliza `goToLocator`, compartido con las citas del agente).
+- El corpus se carga de IndexedDB al buscar (`AiDB.loadSegmented`); si el libro aún se está segmentando,
+  avisa. Debounce de 200ms.
+- Nuevo archivo `js/search.js` → `sw.js` v48→v49. Tests: [`tests/search.spec.ts`](tests/search.spec.ts)
+  (unidad EPUB/PDF, acentos, y E2E que teclea y navega). Verificado sobre PDF real (120 hits de
+  "knowledge" → salto a su página).
+
 ## 2026-07-03 — P8: exportar una conversación (libreta + chat) a Markdown
 
 Antes solo existía un volcado global (Ajustes → Datos) que **omitía el chat** y aplanaba las notas.

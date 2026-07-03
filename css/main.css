@@ -170,6 +170,37 @@ html, body {
   color: var(--text-secondary);
 }
 
+/* ============ BÚSQUEDA (P5) ============ */
+.search-box { padding: 8px 12px; }
+.search-input {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 14px;
+}
+.search-count { color: var(--text-muted); font-size: 12px; padding: 4px 12px; }
+.search-results { display: flex; flex-direction: column; }
+.search-hit {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 8px 12px;
+  border: none;
+  border-bottom: 1px solid var(--border-soft, var(--border));
+  background: none;
+  color: var(--text-primary);
+  cursor: pointer;
+  font: inherit;
+}
+.search-hit:hover { background: var(--bg-tertiary); }
+.search-hit-ctx { display: block; font-size: 13px; line-height: 1.45; }
+.search-hit-ctx mark { background: var(--accent); color: #fff; border-radius: 2px; padding: 0 1px; }
+.search-hit-meta { display: block; margin-top: 3px; font-size: 11px; color: var(--text-muted); }
+
 /* ============ BOOKMARKS ============ */
 .bookmark-item {
   display: flex;
