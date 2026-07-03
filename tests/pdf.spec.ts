@@ -151,6 +151,38 @@ test('PDF4: alternar a scroll monta y renderiza páginas, y persiste el modo', a
   await expect(page.locator('#pdf-container.pdf-scroll')).toHaveCount(0);
 });
 
+// Índice y marcadores del PDF (paridad con EPUB).
+test('PDF-TOC: el índice se rellena para PDF (aquí, sin outline → estado vacío)', async ({ page }) => {
+  await openPdf(page);
+  // La fixture no trae outline: debe mostrarse el estado propio de PDF, no el placeholder inicial.
+  await expect(page.locator('#toc-list')).toContainText('Este PDF no tiene índice');
+});
+
+test('PDF-bookmarks: marcar/desmarcar la página y verla en la lista', async ({ page }) => {
+  await openPdf(page);
+  const btn = page.locator('#bookmark-toggle');
+  await expect(btn).toBeEnabled();
+
+  await btn.click();
+  await expect(btn).toHaveClass(/is-active/);
+  await expect(page.locator('#bookmarks-list .bookmark-item')).toHaveCount(1);
+  await expect(page.locator('#bookmarks-list')).toContainText('Página 1');
+
+  // Persistido con id sintético de página.
+  const ids = await page.evaluate(async () => {
+    const B = await import('/js/bookmarks.js');
+    return B.getAll().map((b: any) => ({ cfi: b.cfi, page: b.page }));
+  });
+  expect(ids.length).toBe(1);
+  expect(ids[0].cfi).toBe('page:1');
+  expect(ids[0].page).toBe(1);
+
+  // Desmarcar.
+  await btn.click();
+  await expect(btn).not.toHaveClass(/is-active/);
+  await expect(page.locator('#bookmarks-list .bookmark-item')).toHaveCount(0);
+});
+
 test.describe('PDF HiDPI', () => {
   test.use({ deviceScaleFactor: 2 });
   test('el canvas se pinta a más resolución que su tamaño CSS (nitidez retina)', async ({ page }) => {

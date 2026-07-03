@@ -5,6 +5,21 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-03 — PDF: índice (TOC) y marcadores en el sidebar
+
+Cierra dos huecos de paridad PDF↔EPUB (los otros dos, tipografía y modo oscuro del contenido, son
+límites de formato — PDF5).
+
+- **Índice del PDF en el sidebar:** `PdfReader.getOutlineItems()` resuelve el `getOutline()` a
+  `[{label, page, subitems}]` (páginas ya resueltas vía `getPageIndex`); `loadPdfTOC()` lo pinta con
+  las subentradas indentadas (p. ej. capítulos dentro de una *Part*). Cada entrada salta a su página.
+  Si el PDF no trae outline, se muestra "Este PDF no tiene índice".
+- **Marcadores en PDF:** el botón de marcar (antes deshabilitado en PDF) ahora marca la **página
+  actual** con un id sintético `page:N`, reutilizando la API de `bookmarks.js` sin tocar el modelo. La
+  lista lateral y el estado del botón se actualizan al cambiar de página.
+- Tests: [`tests/pdf.spec.ts`](tests/pdf.spec.ts) (marcadores; estado vacío del índice). Sin archivos
+  nuevos → sin bump de `sw.js`.
+
 ## 2026-07-03 — PDF4: modo scroll continuo en PDF
 
 El toggle **Páginas/Scroll** (pestaña Ajustes del lector) ya funciona en PDF, no solo en EPUB. Ver

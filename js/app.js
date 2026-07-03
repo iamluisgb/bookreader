@@ -677,6 +677,7 @@ async function loadPdf(buffer, bookId, aiBookId) {
       document.getElementById('reader-title').textContent = `PDF - Página ${page} de ${total}`;
       syncRouteSoon();               // reflejar la página en la URL (deep-link)
       drawPdfHighlights(page);       // PDF3: re-pintar los subrayados de la página
+      updateBookmarkButton();        // reflejar si la página actual está marcada
     });
 
     await PdfReader.load(buffer);
@@ -684,13 +685,17 @@ async function loadPdf(buffer, bookId, aiBookId) {
     document.getElementById('reader-title').textContent = 'PDF';
     document.body.classList.add('reading');
     document.getElementById('reader-footer').style.display = 'flex';
-    document.getElementById('bookmark-toggle').disabled = true;
+    // Marcadores por página (id sintético `page:N`).
+    document.getElementById('bookmark-toggle').disabled = false;
     // PDF1: el agente puede leer el PDF (texto extraído por página). Habilitar el panel.
     document.getElementById('ai-toggle').disabled = false;
     AiPanel.setBook(PdfReader.getDocument(), aiBookId, bookId || 'PDF', { format: 'pdf' });
     // PDF2/PDF3: seleccionar texto en el PDF → barra (preguntar/subrayar/nota/copiar).
     setupPdfSelection();
     renderHighlights();              // poblar la lista lateral con los subrayados guardados
+    renderBookmarks();               // poblar la lista de marcadores del PDF
+    updateBookmarkButton();          // estado del botón para la página inicial
+    loadPdfTOC();                    // índice del PDF (outline) en el sidebar
     updateReadingModeToggle();       // PDF4: reflejar el modo (paginado/scroll) recordado
   } catch (err) {
     console.error('Error loading PDF:', err);
@@ -699,6 +704,38 @@ async function loadPdf(buffer, bookId, aiBookId) {
 }
 
 // ============ TOC ============
+// Índice del PDF: outline (con páginas ya resueltas) en el sidebar. Cada entrada salta a su
+// página; las subentradas (p. ej. capítulos dentro de una Parte) van indentadas.
+async function loadPdfTOC() {
+  const tocList = document.getElementById('toc-list');
+  const items = await PdfReader.getOutlineItems();
+  if (!items.length) {
+    tocList.innerHTML = '<p class="empty-state">Este PDF no tiene índice</p>';
+    return;
+  }
+  tocList.innerHTML = '';
+  const addLink = (it, isSub) => {
+    const a = document.createElement('a');
+    a.href = '#';
+    a.textContent = it.label;
+    if (isSub) a.classList.add('subitem');
+    if (it.page != null) {
+      a.addEventListener('click', async (e) => {
+        e.preventDefault();
+        await PdfReader.goTo(it.page);
+        document.getElementById('sidebar').classList.remove('open');
+      });
+    } else {
+      a.style.opacity = '0.6';   // entrada sin destino resoluble
+    }
+    tocList.appendChild(a);
+  };
+  items.forEach(it => {
+    addLink(it, false);
+    (it.subitems || []).forEach(sub => addLink(sub, true));
+  });
+}
+
 function loadTOC() {
   const nav = EpubReader.getNavigation();
   const tocList = document.getElementById('toc-list');

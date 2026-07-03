@@ -344,3 +344,36 @@ export async function goTo(page) {
 export function onPage(cb) {
   onPageCallback = cb;
 }
+
+// Índice del PDF para el sidebar: outline anidado con la página de inicio ya resuelta.
+// Devuelve [{ label, page, subitems: [...] }] (vacío si el PDF no trae outline).
+export async function getOutlineItems() {
+  if (!pdfDoc) return [];
+  let outline = null;
+  try { outline = await pdfDoc.getOutline(); } catch { return []; }
+  if (!outline || !outline.length) return [];
+  const build = async (items) => {
+    const out = [];
+    for (const it of items) {
+      const label = (it.title || '').replace(/\s+/g, ' ').trim();
+      if (!label) continue;
+      const page = await destToPage(it.dest);
+      const subitems = (it.items && it.items.length) ? await build(it.items) : [];
+      out.push({ label, page, subitems });
+    }
+    return out;
+  };
+  return build(outline);
+}
+
+async function destToPage(dest) {
+  try {
+    let explicit = dest;
+    if (typeof dest === 'string') explicit = await pdfDoc.getDestination(dest);
+    if (!Array.isArray(explicit) || !explicit.length) return null;
+    const idx = await pdfDoc.getPageIndex(explicit[0]);   // 0-based
+    return idx + 1;
+  } catch {
+    return null;
+  }
+}

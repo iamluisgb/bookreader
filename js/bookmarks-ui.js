@@ -3,12 +3,25 @@
 // bookmarks.js; aquí solo el DOM. Público: initBookmarkButton, updateBookmarkButton,
 // renderBookmarks.
 import * as EpubReader from './epub-reader.js';
+import * as PdfReader from './pdf-reader.js';
 import * as Bookmarks from './bookmarks.js';
 import { icon } from './ui/icons.js';
 import { escapeHtml } from './ui/escape.js';
 
+// Identidad de un marcador de PDF: reutiliza la API cfi-keyed de bookmarks.js con un id
+// sintético por página (`page:N`), sin tocar el modelo.
+const pdfBookmarkId = (n) => 'page:' + n;
+const isPdfBookmark = (id) => typeof id === 'string' && id.startsWith('page:');
+
 export function initBookmarkButton() {
   document.getElementById('bookmark-toggle').addEventListener('click', () => {
+    if (PdfReader.isLoaded()) {
+      const n = PdfReader.getCurrentPage();
+      if (!n) return;
+      Bookmarks.toggle(pdfBookmarkId(n), `Página ${n}`, '', { page: n, total: PdfReader.getTotalPages() });
+      updateBookmarkButton();
+      return;
+    }
     if (!EpubReader.isLoaded()) return;
 
     const cfi = EpubReader.getCurrentCfi();
@@ -26,13 +39,13 @@ export function initBookmarkButton() {
 }
 
 export function updateBookmarkButton() {
-  if (!EpubReader.isLoaded()) return;
-
   const btn = document.getElementById('bookmark-toggle');
-  const cfi = EpubReader.getCurrentCfi();
-  if (!cfi) return;
+  let id = null;
+  if (PdfReader.isLoaded()) id = pdfBookmarkId(PdfReader.getCurrentPage());
+  else if (EpubReader.isLoaded()) id = EpubReader.getCurrentCfi();
+  if (!id) return;
 
-  const isBookmarked = Bookmarks.has(cfi);
+  const isBookmarked = Bookmarks.has(id);
   btn.innerHTML = icon('bookmark', { filled: isBookmarked });
   btn.classList.toggle('is-active', isBookmarked);
   btn.title = isBookmarked ? 'Quitar marcador' : 'Marcar página';
@@ -53,7 +66,8 @@ export function renderBookmarks() {
     item.className = 'bookmark-item';
     // Página: la guardada al crear el marcador o, para marcadores antiguos sin ella,
     // calculada ahora desde el CFI (ya hay localizaciones cuando la sidebar se abre).
-    const pi = (bm.page && bm.total) ? { page: bm.page, total: bm.total } : EpubReader.getPageInfo(bm.cfi);
+    const pi = (bm.page && bm.total) ? { page: bm.page, total: bm.total }
+      : (EpubReader.isLoaded() ? EpubReader.getPageInfo(bm.cfi) : null);
     const pageLabel = pi ? `Pág. ${pi.page} / ${pi.total}` : '';
     item.innerHTML = `
       <div class="bookmark-info">
@@ -65,7 +79,8 @@ export function renderBookmarks() {
     `;
 
     item.querySelector('.bookmark-info').addEventListener('click', async () => {
-      await EpubReader.goTo(bm.cfi);
+      if (isPdfBookmark(bm.cfi)) await PdfReader.goTo(bm.page || parseInt(bm.cfi.slice(5), 10));
+      else await EpubReader.goTo(bm.cfi);
       document.getElementById('sidebar').classList.remove('open');
     });
 
