@@ -5,6 +5,24 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-03 — IA2: interrupción de repaso al terminar capítulo
+
+Con la plantilla **HQ&A** activa, al entrar en un capítulo nuevo el agente **interrumpe** con una
+pregunta de recuerdo activo sobre el capítulo recién terminado (sin dar la respuesta — la escribe el
+lector). Diseño y alternativas en [`DECISIONS.md`](DECISIONS.md) · ADR-013.
+
+- **Disparador** ([`epub-reader.js`](js/epub-reader.js)): evento `reader:chapter-changed` emitido **solo
+  en cambio real** de capítulo (no en cada render).
+- **Repaso** ([`panel.js`](js/ai/panel.js)): gateado por plantilla HQ&A + key + no-ocupado; una pregunta
+  por capítulo, solo hacia delante (no al volver atrás). Respeta INFO/COGNICIÓN (no responde).
+- Test de emisión del evento en [`tests/chapter-event.spec.ts`](tests/chapter-event.spec.ts). 27/27 E2E.
+  Bump `sw.js` v44→v45.
+
+Cierra la sección **IA / Agente** del backlog salvo lo aplazado por decisión: IA5 Fase 2 (embeddings,
+[ADR-014](DECISIONS.md)) e IA1 Fase 3 (resumen rodante, bajo ROI, [ADR-010](DECISIONS.md)).
+
+---
+
 ## 2026-07-03 — IA5 Fase 3: sentence-window + evaluación (recall@k)
 
 - **Sentence-window** ([`retrieval.js`](js/ai/retrieval.js) `withNeighbors`, ADR-011): cada acierto BM25

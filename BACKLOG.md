@@ -17,13 +17,17 @@ historial (6 mensajes), guard de tokens (~120k), fallback a libro entero sin rat
 para caching. Módulo [`js/ai/context.js`](js/ai/context.js) + integración en `send()`.
 
 Pendiente (fases futuras, menor prioridad):
-- **Fase 3 — resumen rodante del historial:** resumir los turnos que salen de la ventana (1 llamada
-  extra por turno) en vez de descartarlos, para conversaciones muy largas.
+- **Fase 3 — resumen rodante del historial · _no planificado (bajo ROI)_:** resumir los turnos que salen
+  de la ventana añade una llamada LLM por turno y solo aporta en conversaciones larguísimas (minoría).
+  Ver [DECISIONS.md ADR-010](DECISIONS.md). Se retomará solo si aparece la necesidad real.
 - **El retrieval de contenido (por objetivo, a nivel de capítulo) se rehace en [IA5](#ia5--retrieval-profesional-rag-por-pasaje-agéntico--l--sustituye-a-ia4).** La
   selección de historial de IA1 se mantiene; IA5 sustituye la selección de *libro*.
 
-### IA2 — Interrupción "Pepito Grillo" (Modelado de Comportamiento) · `M` _(ex E5.2)_
-Con la plantilla correspondiente, que el agente interrumpa en puntos de quiebre del libro.
+### IA2 — Interrupción "Pepito Grillo" · **✓** _(ex E5.2)_
+**Hecho** (ver CHANGELOG · [DECISIONS.md ADR-013](DECISIONS.md)): repaso **al terminar capítulo** — con
+la plantilla HQ&A activa, al entrar en un capítulo nuevo el agente interrumpe con una pregunta de
+recuerdo sobre el anterior (sin darla respuesta; solo hacia delante; una vez por capítulo). Se descartó
+"puntos de quiebre" (difuso/caro) frente al fin de capítulo (frontera natural y barata).
 
 ### IA3 — Reintentos automáticos en errores transitorios · **✓** _(ex E7.1)_
 **Hecho** (ver CHANGELOG · [DECISIONS.md ADR-008](DECISIONS.md)): `fetchRetrying` en
@@ -82,8 +86,10 @@ para indexar y citar, y el function-calling (`chatTools`, ya usado en
   **herramienta agéntica** (`search_book` + `read_chapter`) vía `chatToolsLoop` (bucle multi-turno en
   [`llm.js`](js/ai/llm.js)). Recolección gateada (solo turnos difíciles: sin capítulo nombrado + BM25
   débil), fusión con el contexto inicial y respuesta en streaming. Degrada con gracia si falla.
-- **Fase 2** `M` — embeddings cacheados (si hay `/embeddings`), fusión híbrida BM25+semántica, rerank LLM
-  opcional del top-30.
+- **Fase 2** `M` · **aplazada** _(decisión, [DECISIONS.md ADR-014](DECISIONS.md))_ — embeddings cacheados
+  (si hay `/embeddings`), fusión híbrida BM25+semántica, rerank LLM opcional. Se aplaza: BM25+router+vecinos
+  ya cubren la mayoría, depende del proveedor y no es verificable end-to-end aquí. Se retoma midiendo con
+  el arné de ADR-012.
 - **Fase 3 ✓** _(entregada, ver CHANGELOG · [DECISIONS.md ADR-011/012](DECISIONS.md))_ — *sentence-window*
   (`withNeighbors`, cada acierto arrastra sus vecinos del mismo capítulo) + arné de **evaluación recall@k**
   ([`tests/retrieval.spec.ts`](tests/retrieval.spec.ts)) como suelo de regresión.

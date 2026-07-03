@@ -13,6 +13,7 @@ let rendition = null;
 let currentCfi = null;
 let onProgressCallback = null;
 let onChapterCallback = null;
+let lastChapterLabel = null;   // IA2: último capítulo emitido (para detectar cambio real)
 let settingsListenerRegistered = false;
 
 let resizeTimer = null;
@@ -328,6 +329,8 @@ export async function load(arrayBuffer, onProgress) {
     book = null;
     rendition = null;
   }
+  lastChapterLabel = null;   // IA2: nuevo libro → reinicia el seguimiento de capítulo
+  pinnedCfi = null;
 
   console.log('Creating ePub book from ArrayBuffer...');
   book = ePub(arrayBuffer);
@@ -567,8 +570,13 @@ function updateChapterInfo() {
 
   const href = location.start.href;
   const chapter = nav.toc.find(t => t.href.includes(href));
-  if (chapter && onChapterCallback) {
-    onChapterCallback(chapter.label.trim());
+  const label = chapter?.label?.trim();
+  if (label && onChapterCallback) onChapterCallback(label);
+  // IA2 · Emitir SOLO en cambio real de capítulo (updateChapterInfo se llama en cada
+  // render). Lo escucha el panel para el repaso al terminar capítulo (Pepito Grillo).
+  if (label && label !== lastChapterLabel) {
+    lastChapterLabel = label;
+    window.dispatchEvent(new CustomEvent('reader:chapter-changed', { detail: { label } }));
   }
 }
 

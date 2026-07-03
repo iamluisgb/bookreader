@@ -255,3 +255,46 @@ seguridad. Es el paso que separa ingeniería de tuneo a ojo (lo que ya avisaba A
 
 **Consecuencias.** Ampliable a conjuntos dorados por libro real cuando haya embeddings (Fase 2)
 para comparar BM25 vs híbrido con la misma vara.
+
+---
+
+## ADR-013 — IA2: interrupción al TERMINAR capítulo (no en "puntos de quiebre") · `ACEPTADA`
+
+**Contexto.** IA2 ("Pepito Grillo", modelado de comportamiento) quería que el agente interrumpa
+para forzar recuerdo activo. El backlog lo planteaba como "puntos de quiebre" del libro.
+
+**Decisión.** El disparador es **el fin de capítulo**: al ENTRAR en un capítulo nuevo (no
+visto), el anterior se da por terminado y, **con la plantilla HQ&A activa**, el agente
+interrumpe con **UNA** pregunta de recuerdo sobre ese capítulo (sin dar la respuesta). Solo
+hacia delante (no al volver atrás) y una vez por capítulo.
+
+**Porqué.** "Punto de quiebre" es difuso, caro (requiere análisis semántico continuo) y
+propenso a interrumpir de más. El fin de capítulo es una frontera **natural, barata y
+predecible** (ya tenemos el evento de capítulo), y es justo el momento pedagógico para
+consolidar (efecto de test). Se ata a **HQ&A** porque es la plantilla de recuerdo activo; en
+otras no encaja. Elegido por el usuario frente a "puntos de quiebre" / "solo a petición".
+
+**Consecuencias.** epub-reader emite `reader:chapter-changed` solo en cambio real; el panel
+([`panel.js`](js/ai/panel.js)) gatea por plantilla HQ&A + key + no-ocupado y genera la pregunta
+con los pasajes del capítulo. Respeta INFO/COGNICIÓN (no responde). Test de emisión en
+[`tests/chapter-event.spec.ts`](tests/chapter-event.spec.ts). Extensible a otras plantillas o
+a un modo "solo a petición" si se pide.
+
+---
+
+## ADR-014 — Embeddings (Fase 2) aplazados · `PENDIENTE` (decisión: no ahora)
+
+**Contexto.** La Fase 2 de IA5 añadiría retrieval semántico (embeddings) + fusión híbrida con
+BM25.
+
+**Decisión.** **Aplazar.** No se construye por ahora.
+
+**Porqué.** (1) BM25 + router + sentence-window ya cubren la mayoría de casos (ADR-003 lo
+estimaba en ~80%); (2) depende de que el proveedor BYOK exponga `/embeddings`, que no está
+garantizado; (3) no es verificable de extremo a extremo sin un proveedor real, así que
+entregarlo sería enviar código no probado del todo. El coste/riesgo supera al beneficio
+marginal hoy. Decidido con el usuario.
+
+**Consecuencias.** Queda documentado en el [`BACKLOG.md`](BACKLOG.md) como IA5 Fase 2. Cuando se
+retome: calcular embeddings una vez por libro, cachear en IndexedDB, coseno en JS, fusión RRF
+con BM25, y medir con el arné de ADR-012 (BM25 vs híbrido) para justificar el cambio.

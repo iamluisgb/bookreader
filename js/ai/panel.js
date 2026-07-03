@@ -42,6 +42,9 @@ let onCite = () => {};
 let segReady = false, segBlocks = 0, segCached = false;
 let pendingRef = null;             // pasaje seleccionado adjunto a la próxima pregunta
 let pendingQuoteOnActivate = null; // cola: pasaje a adjuntar tras crear/activar convo
+// IA2 · Repaso al terminar capítulo ("Pepito Grillo"). Ver DECISIONS.md · ADR-013.
+let ia2LastChapter = null;
+let ia2Seen = new Set();
 
 export function init(opts) {
   onCite = opts.onCite || (() => {});
@@ -63,6 +66,8 @@ export function init(opts) {
   window.addEventListener('appsettings:agent-saved', refreshStatus);
   // Reflejar el perfil activo (chip) cuando se active/edite en Ajustes generales.
   window.addEventListener('appsettings:profile-changed', updateProfileChip);
+  // IA2 · Repaso al terminar capítulo (solo con la plantilla HQ&A).
+  window.addEventListener('reader:chapter-changed', (e) => onChapterChanged(e.detail?.label));
   updateProfileChip();
   // Abrir Ajustes en la sección Perfiles al tocar el chip.
   els.profileChip.addEventListener('click', () => AppSettings.open('profiles'));
@@ -152,6 +157,7 @@ function showView(view) {
 export async function setBook(b, id, title) {
   book = b; bookId = id || null; bookTitle = title || 'Libro';
   convo = null; template = null; history = []; notes = [];
+  ia2LastChapter = null; ia2Seen = new Set();   // IA2: reinicia el repaso por libro
   editingId = null; addingField = null; attenuationDone = false;
   clearChapterAttenuation();
   annotatedText = ''; anchors = new Map();
@@ -671,6 +677,60 @@ ${ctx.tocLabels.map(t => '- ' + t).join('\n')}` },
     CTX_BUDGET_CHAPTER,
   );
   return { ...ctx, picked: final, text: formatPassages(final), passages: final.length };
+}
+
+// ---- IA2 · Repaso al terminar capítulo ("Pepito Grillo") -------------------
+// Ver DECISIONS.md · ADR-013. Al ENTRAR en un capítulo nuevo (no visto), el capítulo
+// ANTERIOR se da por terminado: con la plantilla HQ&A, el agente interrumpe con UNA
+// pregunta de recuerdo activo sobre él. Solo hacia delante (no al volver atrás) y una vez
+// por capítulo.
+function onChapterChanged(label) {
+  if (!label) return;
+  const prev = ia2LastChapter;
+  ia2LastChapter = label;
+  if (ia2Seen.has(label)) return;       // ya visto (volver atrás): no repasar
+  ia2Seen.add(label);
+  if (!prev) return;                     // primer capítulo del libro: nada que repasar aún
+  if (template?.id !== 'hqa') return;    // IA2 solo con la plantilla de recuerdo activo
+  if (!convo || !LLM.hasKey() || busy || !segReady) return;
+  quizChapter(prev);
+}
+
+async function quizChapter(chapterLabel) {
+  if (busy) return;
+  ensureIndex();
+  const passages = capPassages(Retrieval.passagesByChapter(chapterLabel), 12000);
+  if (!passages.length) return;
+  busy = true; els.send.disabled = true;
+  const bubble = appendBubble('assistant', '', false);
+  const textNode = bubble.querySelector('.ai-bubble-text');
+  textNode.innerHTML = '<span class="ai-typing">repaso del capítulo…</span>';
+  try {
+    const messages = [
+      { role: 'system', content:
+`El lector acaba de TERMINAR el capítulo «${chapterLabel}». Eres su tutor de recuerdo activo (método
+HQ&A). Formula UNA sola pregunta breve y conceptual que le haga recuperar la idea principal de ese
+capítulo, alineada a su OBJETIVO. NO des la respuesta: la escribe él. Empieza el mensaje con
+"🔔 Repaso — ". Apóyate en un pasaje citándolo con su ancla [[aN]].
+OBJETIVO: ${convo?.goal || '(sin definir)'}` },
+      { role: 'user', content: 'PASAJES DEL CAPÍTULO:\n\n' + formatPassages(passages) },
+    ];
+    let thinking = true;
+    const raw = await LLM.chatStream({ messages, onToken: (t) => {
+      if (thinking) { thinking = false; textNode.textContent = ''; }
+      textNode.textContent += t; scrollDown();
+    } });
+    const finalText = raw || textNode.textContent;
+    textNode.innerHTML = renderWithCitations(finalText, anchors);
+    history.push({ role: 'assistant', content: finalText });
+    if (convo) DB.addMessage(convo.id, 'assistant', finalText);
+    if (!isOpen()) { agentUnread = true; applyAgentBadge(); }
+  } catch (e) {
+    console.warn('IA2 repaso de capítulo falló:', e);
+    bubble.remove();
+  } finally {
+    busy = false; els.send.disabled = false; scrollDown();
+  }
 }
 
 // Un turno con el LLM: construye el contexto (IA5), lo streamea y pinta la respuesta.
