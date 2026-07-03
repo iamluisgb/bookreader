@@ -5,6 +5,24 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-03 — Visión: "Explicar lo que veo" (figuras/diagramas de un PDF)
+
+El agente ya puede **ver** una página del PDF, no solo su texto. Resuelve el caso "explícame la Figure
+6.2" (una figura son píxeles, no está en el extracto). Ver [`DECISIONS.md`](DECISIONS.md) · ADR-018.
+
+- **Modelo de visión configurable e independiente** del de texto (Ajustes → Agente → «Modelo de visión»,
+  `ai_vision_model`). El RAG/chat sigue en el modelo de texto barato; solo el turno que necesita ver una
+  página escala al de visión (enrutado por capacidad).
+- **Acción "Ver"** en el composer del panel (solo PDF): captura la **página actual** del canvas ya
+  renderizado (`PdfReader.capturePageImage`, reescalada a ~1024px JPEG), adjunta el texto extraído de esa
+  página como contexto y hace **un turno multimodal** (`content` con `image_url`, OpenAI-compatible vía
+  `LLM.chatVision`). Usa lo que haya en el input como petición; la respuesta cae en el mismo chat.
+- **Degradación honesta:** sin modelo de visión configurado, guía a configurarlo en vez de fingir que ve
+  la figura (coherente con el grounding existente).
+- Es también el camino natural para **PDFs escaneados** (sin texto, la visión es la única vía).
+- Test determinista: [`tests/pdf.spec.ts`](tests/pdf.spec.ts) (verifica que "Ver" envía la imagen al
+  modelo de visión). Sin archivos nuevos → sin bump de `sw.js`.
+
 ## 2026-07-03 — PDF: índice (TOC) y marcadores en el sidebar
 
 Cierra dos huecos de paridad PDF↔EPUB (los otros dos, tipografía y modo oscuro del contenido, son

@@ -30,6 +30,11 @@ export function getKey()        { return Storage.get('ai_key', '') || ''; }
 export function setKey(k)        { Storage.set('ai_key', k || ''); }
 export function getModel()      { return Storage.get('ai_model', DEFAULT_MODEL) || DEFAULT_MODEL; }
 export function setModel(m)      { Storage.set('ai_model', (m || '').trim() || DEFAULT_MODEL); }
+// Modelo de VISIÓN (opcional, independiente del de texto): se usa solo en los turnos que
+// necesitan "ver" una página (figuras/diagramas). Vacío = no configurado → sin visión.
+export function getVisionModel() { return (Storage.get('ai_vision_model', '') || '').trim(); }
+export function setVisionModel(m) { Storage.set('ai_vision_model', (m || '').trim()); }
+export function hasVision()      { return getVisionModel().length > 0; }
 export function hasKey()         { return getKey().trim().length > 0; }
 
 // Base URL del proveedor (sin barra final). Debe ser el endpoint OpenAI-compatible
@@ -92,6 +97,7 @@ function serialize(task) {
 export function chatStream(opts)  { return serialize(() => _chatStream(opts)); }
 export function chatTools(opts)   { return serialize(() => _chatTools(opts)); }
 export function chatToolsLoop(opts) { return serialize(() => _chatToolsLoop(opts)); }
+export function chatVision(opts)  { return serialize(() => _chatVision(opts)); }
 
 // ---- IA3 · Reintentos con backoff en errores transitorios --------------------
 // Ver ADR-008 en DECISIONS.md. Los proveedores BYOK dan 429/5xx transitorios; casi
@@ -243,6 +249,29 @@ async function _chatTools({ messages, tools, toolChoice = 'auto', signal }) {
     return { name: tc.function?.name, args };
   });
   return { content: msg.content || '', toolCalls };
+}
+
+// Llamada MULTIMODAL (texto + imagen) al MODELO DE VISIÓN. `messages` ya trae el contenido
+// en formato OpenAI-compatible (content puede ser un array con {type:'text'} y
+// {type:'image_url'}). No streaming (más simple y suficiente para un turno de visión).
+async function _chatVision({ messages, signal, maxTokens = 1024 }) {
+  const key = getKey().trim();
+  if (!key) throw new Error('Falta la API key.');
+  const model = getVisionModel();
+  if (!model) throw new Error('No hay modelo de visión configurado.');
+
+  const res = await fetchRetrying(`${getBaseUrl()}/chat/completions`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model, messages, stream: false, max_tokens: maxTokens }),
+    signal,
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`Error del modelo de visión (${res.status}). ${body.slice(0, 200)}`);
+  }
+  const json = await res.json();
+  return json.choices?.[0]?.message?.content || '';
 }
 
 // Bucle multi-turno de tool-use (IA5 Fase 1b, ver DECISIONS.md · ADR-009). No-streaming

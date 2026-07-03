@@ -39,6 +39,17 @@ Era "añadir embeddings al retrieval por capítulo". El rediseño correcto no es
 *cambiar de granularidad y de disparo* (pasaje + por pregunta + agéntico); los embeddings son la Fase 2
 de IA5, no una feature suelta.
 
+### IA6 — Visión: "Explicar lo que veo" (figuras) · **fase 1 ✓** `M`
+Fase 1 hecha (ver CHANGELOG · ADR-018): modelo de visión configurable e independiente + acción "Ver" que
+manda la **página actual del PDF** (imagen reescalada + texto de la página) al modelo de visión, con
+degradación honesta si no hay VL configurado.
+- **v2 pendiente:**
+  - Auto-detectar "Figure/Figura N.M" en la pregunta y **localizar su página por el índice BM25** →
+    mandar esa página aunque no estés en ella (sin acción manual).
+  - Recorte de la **región de la figura** (no toda la página) para bajar tokens y mejorar el foco.
+  - "Explicar lo que veo" en **EPUB** (requiere rasterizar el iframe de contenido).
+  - **PDF escaneado:** usar el modelo de visión como lector cuando no hay capa de texto (OCR-por-VLM).
+
 ### IA5 — Retrieval profesional (RAG por pasaje, agéntico) · `L` · **sustituye a IA4**
 **Motivación (caso real, verificado en backup del 2026-07-02).** Con DDIA y el objetivo *"System Design
 senior-staff para entrevistas MAANG"*, el agente dijo no tener el Capítulo 9 y **pidió al usuario que se

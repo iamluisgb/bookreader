@@ -385,3 +385,36 @@ posición de scroll (la más centrada). El modo se recuerda por libro.
 (correcto con varias páginas montadas). Zoom por pinch/tipografía siguen fuera de alcance (PDF5, límite
 de formato). Si aparecieran PDFs con páginas de tamaños muy dispares, habría que medir cada página para
 el placeholder (hoy no compensa).
+
+---
+
+## ADR-018 — Visión: enrutado por capacidad (modelo de texto + modelo de visión) · `ACEPTADA`
+
+**Contexto.** El agente lee el PDF por su TEXTO (`getTextContent`), pero una **figura/diagrama es
+píxeles**: no está en el extracto y el modelo por defecto (`deepseek-v4-flash`) es solo-texto. Ante
+"explícame la Figure 6.2" lo honesto era decir "no la veo" (grounding, ADR-005), pero el usuario quiere
+una respuesta. nan ofrece modelos con visión, así que la capacidad está disponible en el mismo BYOK.
+
+**Decisión.** **Enrutado por capacidad, no un único modelo multimodal para todo.** Se añade un
+**modelo de visión configurable e independiente** (`ai_vision_model`) del modelo de texto. El RAG/chat
+sigue en el modelo de texto barato; **solo el turno que necesita ver una página** se manda al modelo de
+visión. Disparador explícito: acción **"Explicar lo que veo"** en el composer (solo PDF) que captura la
+**página actual** del canvas ya renderizado (`capturePageImage`, reescalada a ~1024px JPEG), adjunta el
+texto extraído de esa página como contexto, y hace **un** turno multimodal (`content` con `image_url`,
+formato OpenAI-compatible). La respuesta cae en el mismo chat/libreta.
+
+**Porqué.**
+1. **Coste/latencia acotados.** El 95% de turnos son texto; pagar visión en todos (modelo único
+   multimodal) sería más caro y lento sin beneficio. Se escala solo cuando hay una figura de por medio.
+2. **Separación de capacidades y agnosticismo.** Texto y visión son ejes independientes; cualquier VL
+   OpenAI-compatible (nan, gpt-4o, gemini…) encaja sin tocar el RAG ya afinado (capa aditiva).
+3. **Explícito antes que mágico.** Un botón discoverable, el usuario controla cuándo se envía la imagen
+   (coste/privacidad). La localización automática por "Figure N.M" queda como v2.
+4. **Se descarta la visión como *tool* del bucle agéntico:** los `role:'tool'` de la API OpenAI son
+   solo-texto; devolver una imagen como resultado de tool no es portable → inyectamos la imagen en el
+   turno de usuario.
+
+**Consecuencias.** Sin modelo de visión configurado, la acción **degrada honesto** (guía a configurarlo,
+no finge ver). Reescalar la imagen acota tokens. **Bonus:** es el camino natural para leer **PDFs
+escaneados** (sin texto, la visión es la única vía). Pendiente v2: auto-detectar "Figure N.M" y localizar
+su página por el índice BM25; y "explicar lo que veo" en EPUB (necesitaría rasterizar el iframe).

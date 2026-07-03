@@ -183,6 +183,67 @@ test('PDF-bookmarks: marcar/desmarcar la página y verla en la lista', async ({ 
   await expect(page.locator('#bookmarks-list .bookmark-item')).toHaveCount(0);
 });
 
+// VISIÓN · "Explicar lo que veo": captura la página actual y la manda al MODELO DE VISIÓN
+// (multimodal, independiente del de texto). Stub de fetch para verificar que el turno lleva
+// la imagen (content con image_url) y usa el modelo de visión configurado.
+test('VISIÓN: "Ver" envía la imagen de la página al modelo de visión', async ({ page }) => {
+  await page.goto('/index.html');
+  await page.evaluate((k) => localStorage.setItem('bookreader_ai_key', JSON.stringify(k)), 'test-key');
+  await page.evaluate((m) => localStorage.setItem('bookreader_ai_vision_model', JSON.stringify(m)), 'vision-model');
+  await page.reload();
+
+  await page.evaluate(() => {
+    const real = window.fetch.bind(window);
+    (window as any).__vis = { imageSent: false, model: null };
+    window.fetch = async (url: any, opts: any) => {
+      const u = typeof url === 'string' ? url : url?.url || '';
+      if (u.includes('/chat/completions') && opts?.body) {
+        const body = JSON.parse(opts.body);
+        const msgs = body.messages || [];
+        const hasImg = msgs.some((m: any) => Array.isArray(m.content) && m.content.some((c: any) => c.type === 'image_url'));
+        if (hasImg) { (window as any).__vis.imageSent = true; (window as any).__vis.model = body.model; }
+        if (body.stream) {
+          const chunks = [
+            'data: {"choices":[{"delta":{"content":"ok"},"finish_reason":null}]}\n\n',
+            'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n\n',
+            'data: [DONE]\n\n',
+          ];
+          const s = new ReadableStream({ start(c) { const e = new TextEncoder(); chunks.forEach(x => c.enqueue(e.encode(x))); c.close(); } });
+          return new Response(s, { status: 200, headers: { 'Content-Type': 'text/event-stream' } });
+        }
+        return new Response(JSON.stringify({ choices: [{ message: { content: hasImg ? 'La figura muestra un grafo.' : 'LISTO' } }] }), { status: 200 });
+      }
+      return real(url, opts);
+    };
+  });
+
+  const fc = page.waitForEvent('filechooser');
+  await page.click('#open-file-btn');
+  await (await fc).setFiles(PDF_PATH);
+  await page.waitForSelector('#pdf-container canvas', { timeout: 15000 });
+
+  await page.waitForSelector('#ai-toggle:not([disabled])', { timeout: 15000 });
+  await page.click('#ai-toggle');
+  await page.waitForSelector('.ai-onboarding', { timeout: 5000 });
+  await page.click('.ai-ob-tpl[data-tpl="t3-juicio"]');
+  await page.fill('#ai-ob-goal', 'entender las figuras');
+  await page.click('#ai-ob-start');
+  await expect(page.locator('#ai-tabs')).toBeVisible({ timeout: 5000 });
+
+  // El botón "Ver" es visible en PDF.
+  await expect(page.locator('#ai-see')).toBeVisible();
+
+  await page.fill('#ai-input', 'explica la figura');
+  await page.click('#ai-see');
+
+  await expect(page.locator('.ai-msg-assistant .ai-bubble-text').last())
+    .toContainText('grafo', { timeout: 15000 });
+
+  const vis = await page.evaluate(() => (window as any).__vis);
+  expect(vis.imageSent).toBe(true);
+  expect(vis.model).toBe('vision-model');
+});
+
 test.describe('PDF HiDPI', () => {
   test.use({ deviceScaleFactor: 2 });
   test('el canvas se pinta a más resolución que su tamaño CSS (nitidez retina)', async ({ page }) => {

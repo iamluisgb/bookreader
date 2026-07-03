@@ -871,6 +871,23 @@ body.resizing-panel .reader-main { transition: none !important; }
 }
 .ai-send { padding: 8px 16px; font-size: 14px; align-self: stretch; }
 
+/* Botonera del composer: "Ver" (visión) + Enviar, apiladas a la derecha del textarea. */
+.ai-composer-btns { display: flex; flex-direction: column; gap: 6px; }
+.ai-composer-btns .ai-send { flex: 1; }
+.ai-see {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 10px;
+  font-size: 13px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-primary);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.ai-see:hover { color: var(--accent); border-color: var(--accent); }
+
 /* Tabs como segmented control */
 .ai-tabs {
   display: flex;

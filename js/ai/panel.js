@@ -6,6 +6,7 @@ import { segmentBook } from './segment.js';
 import { segmentPdf } from './segment-pdf.js';
 import * as DB from './db.js';
 import * as EpubReader from '../epub-reader.js';
+import * as PdfReader from '../pdf-reader.js';
 import { getTemplate, objectiveTemplates, isValidField, isAgentFillable, agentFields, isCognitionField, ARTESANO_ID, INMERSIVA_ID } from './templates.js';
 import { icon } from '../ui/icons.js';
 import { escapeHtml } from '../ui/escape.js';
@@ -57,7 +58,7 @@ export function init(opts) {
   Object.assign(els, {
     status: $('#ai-status'), tabs: $('#ai-tabs'),
     chatView: $('#ai-view-chat'), noteView: $('#ai-view-notebook'),
-    messages: $('#ai-messages'), input: $('#ai-input'), send: $('#ai-send'), close: $('#ai-close'),
+    messages: $('#ai-messages'), input: $('#ai-input'), send: $('#ai-send'), see: $('#ai-see'), close: $('#ai-close'),
     convobar: $('#ai-convobar'), convoBtn: $('#ai-convo-btn'), convoLabel: $('#ai-convo-label'), convoNew: $('#ai-convo-new'),
     ref: $('#ai-ref'), refText: $('#ai-ref-text'), profileChip: $('#ai-profile-chip'),
   });
@@ -75,6 +76,7 @@ export function init(opts) {
   // Abrir Ajustes en la sección Perfiles al tocar el chip.
   els.profileChip.addEventListener('click', () => AppSettings.open('profiles'));
   els.send.addEventListener('click', send);
+  els.see.addEventListener('click', explainView);
   els.input.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
   });
@@ -160,6 +162,8 @@ function showView(view) {
 export async function setBook(b, id, title, opts = {}) {
   book = b; bookId = id || null; bookTitle = title || 'Libro';
   bookFormat = opts.format || 'epub'; tocLabels = [];
+  // "Explicar lo que veo" (visión) solo tiene sentido en PDF (renderizamos su canvas).
+  if (els.see) els.see.style.display = bookFormat === 'pdf' ? '' : 'none';
   convo = null; template = null; history = []; notes = [];
   ia2LastChapter = null; ia2Seen = new Set();   // IA2: reinicia el repaso por libro
   editingId = null; addingField = null; attenuationDone = false;
@@ -548,6 +552,86 @@ async function send() {
   els.input.value = '';
   clearRef();
   await deliver(aug, q, { showUser: true });
+}
+
+// VISIÓN · "Explicar lo que veo": captura la página ACTUAL del PDF y la manda al modelo de
+// visión (independiente del de texto, ADR-018). Usa lo que haya en el input como petición.
+// Fallback honesto: sin modelo de visión, no fingimos ver la figura → guiamos a configurarlo.
+async function explainView() {
+  if (busy) return;
+  if (bookFormat !== 'pdf' || !PdfReader.isLoaded()) { setStatus('Disponible al leer un PDF.'); return; }
+  if (!convo) { setStatus('Elige un objetivo de lectura primero.'); openOnboarding(); return; }
+  if (!LLM.hasKey()) { AppSettings.open('agent'); setStatus('Introduce tu API key primero.'); return; }
+  if (!LLM.hasVision()) {
+    setStatus('Configura un modelo con visión en Ajustes para explicar figuras.');
+    AppSettings.open('agent');
+    return;
+  }
+  const userText = els.input.value.trim();
+  setOpen(true); showView('chat');
+  els.input.value = '';
+  await deliverVision(userText);
+}
+
+// Texto ya extraído de una página (para dar contexto textual al turno de visión).
+function pageText(page) {
+  const out = [];
+  for (const line of (annotatedText || '').split('\n')) {
+    const m = /^\[\[(a\d+)\]\]\s*(.*)$/.exec(line);
+    if (m && anchors.get(m[1])?.page === page) out.push(m[2]);
+  }
+  return out.join(' ').slice(0, 4000);
+}
+
+async function deliverVision(userText) {
+  if (busy) return;
+  const page = PdfReader.getCurrentPage();
+  const img = PdfReader.capturePageImage(1024);
+  if (!img) { setStatus('Espera a que la página termine de renderizarse.'); return; }
+
+  const instruction = userText ||
+    'Explícame el contenido de esta página, en especial las figuras, diagramas o tablas que aparezcan.';
+  const userLabel = `📷 Página ${page} · ${instruction}`;
+
+  appendBubble('user', userLabel, false);
+  history.push({ role: 'user', content: userLabel });
+  if (convo) DB.addMessage(convo.id, 'user', userLabel);
+
+  const bubble = appendBubble('assistant', '', false);
+  const textNode = bubble.querySelector('.ai-bubble-text');
+  textNode.innerHTML = '<span class="ai-typing">mirando la página…</span>';
+  busy = true; els.send.disabled = true; abortCtrl = new AbortController();
+  agentUnread = false; applyAgentBadge();
+
+  try {
+    const goalLine = convo?.goal ? `OBJETIVO DE LECTURA: ${convo.goal}\n\n` : '';
+    const ctxText = pageText(page);
+    const textBlock = ctxText ? `TEXTO EXTRAÍDO DE LA PÁGINA ${page} (para contexto):\n${ctxText}\n\n` : '';
+    const messages = [
+      { role: 'system', content:
+`Eres un tutor de lectura. Te doy la IMAGEN de una página del libro "${bookTitle}" y su texto extraído.
+Explica su contenido —sobre todo las figuras, diagramas o tablas— con claridad y en el idioma del
+usuario, conectándolo con su objetivo de lectura. Describe lo que REALMENTE se ve; no inventes.` },
+      { role: 'user', content: [
+        { type: 'text', text: `${goalLine}${textBlock}PETICIÓN: ${instruction}` },
+        { type: 'image_url', image_url: { url: img } },
+      ] },
+    ];
+
+    const raw = await LLM.chatVision({ messages, signal: abortCtrl.signal });
+    const finalText = raw || '(sin respuesta del modelo de visión)';
+    textNode.innerHTML = renderWithCitations(finalText, anchors);
+    addMessageActions(bubble, finalText, instruction, { autoRun: false });
+    history.push({ role: 'assistant', content: finalText });
+    if (convo) DB.addMessage(convo.id, 'assistant', finalText);
+  } catch (e) {
+    if (e.name === 'AbortError') textNode.textContent += ' [cancelado]';
+    else { console.error(e); textNode.innerHTML = `<span class="ai-error">${escapeHtml(e.message)}</span>`; }
+  } finally {
+    busy = false; els.send.disabled = false; abortCtrl = null; scrollDown();
+    if (!isOpen()) agentUnread = true;
+    applyAgentBadge();
+  }
 }
 
 // IA5 · Índice de pasajes (BM25) del libro para retrieval por pregunta. Se construye

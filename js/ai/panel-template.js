@@ -32,7 +32,10 @@ export const TEMPLATE = `
     </div>
     <div class="ai-composer">
       <textarea id="ai-input" rows="2" placeholder="Pregunta sobre el libro..."></textarea>
-      <button id="ai-send" class="primary-btn ai-send">Enviar</button>
+      <div class="ai-composer-btns">
+        <button id="ai-see" class="ai-see" title="Explicar lo que veo en la página (figuras, diagramas)" style="display:none">${icon('sparkles', { size: 15 })}<span>Ver</span></button>
+        <button id="ai-send" class="primary-btn ai-send">Enviar</button>
+      </div>
     </div>
   </div>
   <div id="ai-view-notebook" class="ai-view"></div>

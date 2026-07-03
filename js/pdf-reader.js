@@ -345,6 +345,22 @@ export function onPage(cb) {
   onPageCallback = cb;
 }
 
+// Captura la página ACTUAL renderizada como data URL (JPEG), reescalada al lado largo
+// `maxPx` para acotar tokens/coste del turno de visión. Devuelve null si aún no está
+// pintada (canvas sin tamaño). Reusa el canvas que ya renderizamos.
+export function capturePageImage(maxPx = 1024) {
+  const canvas = document.querySelector(`#pdf-container .pdf-page[data-page="${currentPage}"] canvas`)
+    || document.querySelector('#pdf-container canvas');
+  if (!canvas || !canvas.width || !canvas.height) return null;
+  const scale = Math.min(1, maxPx / Math.max(canvas.width, canvas.height));
+  if (scale >= 1) return canvas.toDataURL('image/jpeg', 0.85);
+  const off = document.createElement('canvas');
+  off.width = Math.round(canvas.width * scale);
+  off.height = Math.round(canvas.height * scale);
+  off.getContext('2d').drawImage(canvas, 0, 0, off.width, off.height);
+  return off.toDataURL('image/jpeg', 0.85);
+}
+
 // Índice del PDF para el sidebar: outline anidado con la página de inicio ya resuelta.
 // Devuelve [{ label, page, subitems: [...] }] (vacío si el PDF no trae outline).
 export async function getOutlineItems() {
