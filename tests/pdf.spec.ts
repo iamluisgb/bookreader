@@ -276,3 +276,29 @@ test.describe('PDF HiDPI', () => {
     expect(r.backing).toBeGreaterThan(r.css * 1.5);   // backing ≈ 2× el tamaño mostrado
   });
 });
+
+// Zoom/ajuste (móvil): la página debe caber a lo ancho (antes se pintaba a scale
+// fijo 1.5 y se salía de pantalla) y el pinch/zoom debe agrandarla para ver detalle.
+test.describe('PDF fit-to-width + zoom', () => {
+  test.use({ viewport: { width: 390, height: 780 } });
+  test('la página se ajusta al ancho en móvil y el zoom la agranda', async ({ page }) => {
+    await openPdf(page);
+    await page.waitForTimeout(300);
+    const fit = await page.evaluate(() => {
+      const c = document.querySelector('#pdf-container') as HTMLElement;
+      const w = c.querySelector('.pdf-page') as HTMLElement;
+      return { container: c.clientWidth, page: parseFloat(w.style.width) };
+    });
+    // Cabe dentro del contenedor (padding 20px por lado → 40px).
+    expect(fit.page).toBeLessThanOrEqual(fit.container - 39);
+    expect(fit.page).toBeGreaterThan(0);
+    // Zoom 2× agranda la página (para hacer zoom en detalles y panear).
+    const zoomed = await page.evaluate(async () => {
+      const P: any = await import('/js/pdf-reader.js');
+      P.setZoom(2);
+      await new Promise((r) => setTimeout(r, 450));
+      return parseFloat((document.querySelector('#pdf-container .pdf-page') as HTMLElement).style.width);
+    });
+    expect(zoomed).toBeGreaterThan(fit.page * 1.5);
+  });
+});

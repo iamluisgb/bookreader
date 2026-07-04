@@ -5,6 +5,21 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-04 — PDF en móvil: ajuste a ancho + pinch-zoom
+
+El PDF se pintaba a un `scale` **fijo de 1.5**, así que en móvil la página se salía de pantalla
+(no cabía) y no había forma de hacer zoom. Ahora:
+
+- **Ajuste a ancho:** el scale se calcula del ancho del contenedor (`computeScale`), con tope 1.5 para
+  que en escritorio conserve el tamaño de lectura de antes. En móvil la **página cabe entera**.
+- **Zoom:** **pinch** con dos dedos (preview con transform CSS en vivo + **re-render nítido** al soltar,
+  no borroso) y **Ctrl/⌘ + rueda** en escritorio (incluye el pinch de trackpad). Rango 1×–5×.
+- **Paneo:** contenedor `overflow: auto` + `justify/align: safe center` → con zoom se puede desplazar a
+  cualquier borde. `touch-action: pan-x pan-y` (el paneo de 1 dedo es nativo; el pinch lo gestiona el JS).
+- **Re-fit** automático al rotar/redimensionar. El zoom se resetea a "ajuste" al abrir otro libro.
+- Funciona en ambos modos (paginado y scroll). Test:
+  [`tests/pdf.spec.ts`](tests/pdf.spec.ts) (la página cabe a lo ancho en móvil; el zoom la agranda).
+
 ## 2026-07-04 — Cabecera estilo Play Books: buscador + logo como "inicio"
 
 - **Título del libro centrado** en la cabecera (antes pegado a la izquierda flotando en un hueco),

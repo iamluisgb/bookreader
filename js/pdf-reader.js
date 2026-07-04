@@ -9,6 +9,66 @@ let readingMode = 'paginated';   // 'paginated' | 'scroll' (continuo), recordado
 let lazyObserver = null;         // observer del render perezoso en modo scroll
 let scrollRaf = 0;
 
+// ---- Zoom (ajuste-a-ancho + pinch) ---------------------------------------
+// `zoom` = factor del usuario (1 = ajustar la página al ancho disponible). El scale
+// real de render = fit(ancho) · zoom. Durante el pinch mostramos un preview con
+// transform CSS (barato y fluido) y RE-RENDERIZAMOS nítido al soltar.
+let zoom = 1;
+let renderedZoom = 1;            // zoom al que están pintadas las páginas ahora mismo
+let commitTimer = 0;
+let zoomHandlersReady = false;
+const PDF_PAD = 20;             // padding del contenedor (coincide con el CSS)
+const ZOOM_MIN = 1, ZOOM_MAX = 5;
+
+// Scale de render para una página de ancho `baseWidth` (a scale 1). Ajusta al ancho
+// del contenedor; el tope 1.5 evita agigantar la página en pantallas anchas
+// (escritorio conserva el tamaño de lectura previo). Se multiplica por el zoom.
+function computeScale(baseWidth) {
+  const container = document.getElementById('pdf-container');
+  const avail = (container ? container.clientWidth : 800) - PDF_PAD * 2;
+  const fit = avail > 0 && baseWidth > 0 ? avail / baseWidth : 1.5;
+  return Math.min(fit, 1.5) * zoom;
+}
+
+export function getZoom() { return zoom; }
+
+// Fija el zoom: muestra preview inmediato y confirma (re-render) tras un pequeño
+// debounce para no repintar en cada tick de rueda/pinch.
+export function setZoom(z) {
+  zoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, z));
+  applyZoomPreview();
+  scheduleZoomCommit();
+}
+export function resetZoom() { setZoom(1); }
+
+function pdfPages() {
+  const c = document.getElementById('pdf-container');
+  return c ? Array.from(c.querySelectorAll('.pdf-page')) : [];
+}
+function applyZoomPreview() {
+  const f = renderedZoom ? zoom / renderedZoom : 1;
+  for (const w of pdfPages()) {
+    w.style.transformOrigin = 'center top';
+    w.style.transform = Math.abs(f - 1) < 0.001 ? '' : `scale(${f})`;
+  }
+}
+function clearZoomPreview() {
+  for (const w of pdfPages()) w.style.transform = '';
+}
+async function commitZoom() {
+  clearTimeout(commitTimer); commitTimer = 0;
+  if (Math.abs(renderedZoom - zoom) < 0.001) return;
+  const keep = currentPage;
+  renderedZoom = zoom;
+  await rerender();               // re-pinta nítido al scale = fit · zoom
+  clearZoomPreview();
+  if (readingMode === 'scroll') goTo(keep);
+}
+function scheduleZoomCommit(delay = 150) {
+  clearTimeout(commitTimer);
+  commitTimer = setTimeout(commitZoom, delay);
+}
+
 function getPdfjs() {
   if (pdfjsLib) return pdfjsLib;
   // El bundle (vendorizado) lo expone como window.pdfjsLib o window["pdfjs-dist/build/pdf"]
@@ -53,6 +113,7 @@ export async function load(arrayBuffer, onProgress) {
   }
 
   currentPage = 1;
+  zoom = 1; renderedZoom = 1;   // cada libro empieza ajustado a ancho
 
   const container = document.getElementById('pdf-container');
   container.innerHTML = '';
@@ -117,8 +178,51 @@ async function rerender() {
   if (!container) return;
   container.innerHTML = '';
   container.classList.toggle('pdf-scroll', readingMode === 'scroll');
+  ensureZoomHandlers();
   if (readingMode === 'scroll') await renderScroll();
   else await renderPaginated(currentPage);
+}
+
+// Gestos de zoom sobre el contenedor del PDF (una sola vez). Pinch en móvil +
+// Ctrl/⌘+rueda en escritorio (el pinch de trackpad llega como wheel+ctrlKey).
+function ensureZoomHandlers() {
+  if (zoomHandlersReady) return;
+  const container = document.getElementById('pdf-container');
+  if (!container) return;
+  zoomHandlersReady = true;
+
+  const dist = (t) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+  let pinching = false, startDist = 0, baseZoom = 1;
+
+  container.addEventListener('touchstart', (e) => {
+    if (e.touches.length === 2) { pinching = true; startDist = dist(e.touches); baseZoom = zoom; }
+  }, { passive: true });
+
+  container.addEventListener('touchmove', (e) => {
+    if (!pinching || e.touches.length !== 2) return;
+    e.preventDefault();            // corta el zoom nativo de la página
+    const ratio = dist(e.touches) / (startDist || 1);
+    zoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, baseZoom * ratio));
+    applyZoomPreview();            // feedback en vivo (sin re-render)
+  }, { passive: false });
+
+  const endPinch = () => { if (pinching) { pinching = false; commitZoom(); } };
+  container.addEventListener('touchend', endPinch);
+  container.addEventListener('touchcancel', endPinch);
+
+  // Escritorio: Ctrl/⌘ + rueda (incluye el pinch de trackpad en macOS).
+  container.addEventListener('wheel', (e) => {
+    if (!e.ctrlKey && !e.metaKey) return;
+    e.preventDefault();
+    setZoom(zoom * (e.deltaY < 0 ? 1.12 : 1 / 1.12));
+  }, { passive: false });
+
+  // Al rotar/redimensionar cambia el ancho disponible → recomputar el ajuste.
+  let rt = 0;
+  window.addEventListener('resize', () => {
+    clearTimeout(rt);
+    rt = setTimeout(() => { if (pdfDoc) { const k = currentPage; rerender().then(() => { if (readingMode === 'scroll') goTo(k); }); } }, 200);
+  });
 }
 
 // Modo paginado: un único wrapper reutilizado (comportamiento clásico).
@@ -140,10 +244,10 @@ async function renderPaginated(num) {
 async function renderScroll() {
   const container = document.getElementById('pdf-container');
   // Aspecto de la página 1 para dimensionar los placeholders (evita cargar las N páginas).
-  const scale = 1.5;
   let w = 600, h = 800;
   try {
     const p1 = await pdfDoc.getPage(1);
+    const scale = computeScale(p1.getViewport({ scale: 1 }).width);
     const vp = p1.getViewport({ scale });
     w = vp.width; h = vp.height;
   } catch (e) {}
@@ -217,7 +321,7 @@ function freeWrapper(wrapper) {
 async function renderInto(wrapper, num) {
   if (!pdfDoc) return;
   const page = await pdfDoc.getPage(num);
-  const scale = 1.5;
+  const scale = computeScale(page.getViewport({ scale: 1 }).width);
   // TEC1 · Nitidez HiDPI: el canvas se PINTA a scale*dpr y se MUESTRA al tamaño lógico.
   const dpr = window.devicePixelRatio || 1;
   const viewport = page.getViewport({ scale });
