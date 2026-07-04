@@ -126,6 +126,11 @@ html, body {
   cursor: default;
 }
 
+/* Botón-marca (logo → volver a la biblioteca): teñido de acento como identidad,
+   igual que el logo coloreado de Play Books entre iconos neutros. Mantiene el
+   emerald también en hover (solo cambia el fondo). */
+.icon-btn.brand-btn, .icon-btn.brand-btn:hover { color: var(--accent); }
+
 .primary-btn {
   background: var(--accent);
   color: var(--on-accent);

@@ -22,6 +22,10 @@ const ICONS = {
   // Toggles de panel lateral (estilo NotebookLM): marco + divisor del lado.
   'panel-left': '<rect x="3.5" y="4" width="17" height="16" rx="2.3"/><line x1="9.5" y1="4" x2="9.5" y2="20"/>',
   'panel-right': '<rect x="3.5" y="4" width="17" height="16" rx="2.3"/><line x1="14.5" y1="4" x2="14.5" y2="20"/>',
+  search: '<circle cx="11" cy="11" r="6.5"/><line x1="15.8" y1="15.8" x2="20.5" y2="20.5"/>',
+  // Imagotipo de la app (página con esquina doblada + prompt >_): botón "volver a
+  // la biblioteca". Adaptado a la rejilla 24×24; se tiñe con currentColor (emerald).
+  logo: '<path d="M8 3.5 L14 3.5 L17.5 7 L17.5 19 Q17.5 20.5 16 20.5 L8 20.5 Q6.5 20.5 6.5 19 L6.5 5 Q6.5 3.5 8 3.5 Z"/><path d="M14 3.5 L14 7 L17.5 7"/><path d="M9.8 10 L12 12 L9.8 14"/><path d="M13 14 L15 14"/>',
 
   // ——— actions ———
   bookmark: '<path d="M6.5 4.5h11a1 1 0 0 1 1 1V20l-6.5-4.3L5.5 20V5.5a1 1 0 0 1 1-1Z"/>',

@@ -5,6 +5,18 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-04 — Cabecera estilo Play Books: buscador + logo como "inicio"
+
+- **Título del libro centrado** en la cabecera (antes pegado a la izquierda flotando en un hueco),
+  15px/600, con las dos islas de iconos balanceadas a los lados y ancho a prueba de solapes
+  (`min(calc(100% - 260px), 460px)`; trunca con elipsis en móvil).
+- **Buscador en la cabecera** (icono lupa, `#header-search`): abre la sidebar en la pestaña *Buscar* y
+  enfoca el campo, reutilizando el corpus de búsqueda existente (EPUB y PDF). Nuevo glifo `search`.
+- **El botón de biblioteca es el imagotipo** de la app (nuevo glifo `logo` en la rejilla 24×24), teñido
+  de **emerald** (`.brand-btn`) como marca/inicio —igual que el logo coloreado de Play Books entre iconos
+  neutros— y movido al extremo izquierdo. Vuelve a la biblioteca al pulsarlo.
+- Sin archivos nuevos en el precache → sin bump de `sw.js`.
+
 ## 2026-07-04 — Identidad Fase 3: componentes + imagotipo
 
 Cierre de la identidad visual (dirección "herramienta de ingeniería, silenciosa y precisa";

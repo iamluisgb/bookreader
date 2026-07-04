@@ -540,6 +540,12 @@ function initSearch() {
   input.addEventListener('input', () => { clearTimeout(t); t = setTimeout(run, 200); });
   // Al abrir la pestaña Buscar, enfocar el campo.
   document.querySelector('.tab-btn[data-tab="search"]')?.addEventListener('click', () => setTimeout(() => input.focus(), 50));
+  // Buscador en la cabecera (estilo Play Books): abre la sidebar en la pestaña
+  // Buscar y enfoca el campo, reutilizando el handler de la pestaña.
+  document.getElementById('header-search')?.addEventListener('click', () => {
+    document.getElementById('sidebar').classList.add('open');
+    document.querySelector('.tab-btn[data-tab="search"]')?.click();
+  });
 }
 
 function renderSearchResults(results, query) {
@@ -701,6 +707,7 @@ async function loadEpub(buffer, bookId, aiBookId) {
     document.getElementById('bookmark-toggle').disabled = false;
     document.getElementById('ai-toggle').disabled = false;
     document.getElementById('immersive-toggle').disabled = false;
+    document.getElementById('header-search').disabled = false;
 
     // Feed the book to the AI agent (uses cache if already segmented).
     AiPanel.setBook(EpubReader.getBook(), aiBookId, EpubReader.getTitle());
@@ -761,6 +768,7 @@ async function loadPdf(buffer, bookId, aiBookId) {
     document.getElementById('bookmark-toggle').disabled = false;
     // PDF1: el agente puede leer el PDF (texto extraído por página). Habilitar el panel.
     document.getElementById('ai-toggle').disabled = false;
+    document.getElementById('header-search').disabled = false;
     AiPanel.setBook(PdfReader.getDocument(), aiBookId, bookId || 'PDF', { format: 'pdf' });
     // PDF2/PDF3: seleccionar texto en el PDF → barra (preguntar/subrayar/nota/copiar).
     setupPdfSelection();
