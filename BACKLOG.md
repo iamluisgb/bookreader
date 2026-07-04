@@ -181,6 +181,85 @@ salida). No lo reinventa: reutiliza el patrón `download()` CSP-safe de backup.j
   opción `includeChat`, en vez de duplicar lógica.
 </details>
 
+### P9 — Skills + Artefactos (plataforma extensible de salidas del agente) · `L` · **futuro**
+> **Estado: idea en discusión (2026-07-04).** Capturada para abordarla más adelante. Las decisiones
+> abiertas están al final, sin resolver.
+
+**Visión.** Pasar de "ofrecer N artefactos sueltos" a **una plataforma de _skills_**: una primitiva que
+**unifica plantilla + artefacto + formato de salida**, con skills de fábrica y **creados/compartidos por
+el usuario**, y un **visor de artefactos** (al estilo de los *Artifacts* de Claude). Construye sobre lo que
+ya existe: [`custom-templates.js`](js/ai/custom-templates.js) (plantillas del usuario) y el hogar
+*definir-vs-usar* de Ajustes generales.
+
+**Qué artefactos pide la gente** (catálogo de la ideación, por intención de lectura):
+- **Comprender/estudiar:** resumen progresivo (1 línea → detallado), **flashcards**, **quiz/autoevaluación**,
+  guía de estudio / chuleta, esquema del argumento.
+- **Referencia:** **glosario citado**, índice temático, **mapa de personajes** (ficción),
+  **cronología/timeline** (historia/biografía/novela).
+- **Análisis:** mapa del argumento (tesis→evidencia→contra), supuestos del autor + crítica, comparación con
+  otras obras.
+- **Acción (no ficción):** **takeaways/checklist** (el "artefacto de salida" que T1 ya nombra), frameworks y
+  modelos extraídos, ejercicios resueltos (técnico).
+- **Compartir:** borrador de **reseña**, digest de subrayados, preguntas de club de lectura, ELI5.
+- **Meta/decisión:** **"¿me interesa este libro?"** (en la estantería, antes de abrir), **plan de lectura**
+  según objetivo+tiempo, **recap desde la última sesión**.
+- **Visual:** **mapa mental** (jerarquía radial), luego mapa conceptual (grafo) y timeline visual.
+
+**La primitiva _skill_ (dato declarativo, NUNCA código):**
+```
+{ name, icon, whenToUse,                 // el agente lo autosugiere por género/objetivo
+  scope: book|chapter|here|selection,
+  spoilerSafe: true,
+  prompt,                                // instrucciones curadas
+  output: 'markdown'|'html'|'flashcards'|'svg',
+  cite: true }                           // exige anclas [[aN]]
+```
+Que el skill sea **datos** (no JS) es lo que hace **seguro compartirlo**: importar un skill ajeno = importar
+un JSON, no ejecutar código.
+
+**Decisión de arquitectura crítica — output HTML = seguridad.** La CSP actual (`script-src 'self'`) existe
+para proteger la **API key BYOK** en localStorage; renderizar HTML del LLM en la app la rompería. Modelo
+(como los Artifacts de Claude):
+- El artefacto HTML se pinta en un **`<iframe sandbox>`** con `allow-scripts` pero **sin `allow-same-origin`**
+  → no accede a localStorage/key ni al DOM padre.
+- **CSP del iframe sin red** (`default-src 'none'; connect-src 'none'`) → aunque el LLM emita HTML malicioso,
+  no exfiltra ni llama a casa. Contenido **autocontenido** (CSS/JS inline).
+- **Dos fronteras de confianza:** (1) *definición del skill* = datos → importar es seguro; (2) *artefacto
+  generado* = sandbox aislado → seguro aunque el prompt sea malicioso.
+- **Interactividad citada a través del sandbox:** canal **`postMessage` mínimo** — el artefacto solo emite
+  intenciones `{navigate:{page|cfi}}`, el host **valida** y navega. Nada más cruza. Así los mapas/glosarios
+  siguen siendo clicables→saltan a la página sin abrir el sandbox. **Requerirá su propio ADR de seguridad.**
+
+**Compartir sin backend (local-first):** v1 = **export/import de un skill como JSON** (archivo o pega-enlace),
+offline, cero servidor. Galería pública de descubrimiento = necesita backend (ligado a [P7](#p7--sync-entre-dispositivos--l)), fase posterior.
+
+**Visor de artefactos:** galería en IndexedDB (por libro o global): miniatura, tipo, fecha, libro; reabrir ·
+regenerar · exportar (reusa [P8](#p8--exportar-libretas-y-conversaciones--fase-1--m)) · borrar. Superficie nueva (¿pestaña "Artefactos" en la sidebar o
+sección por-libro en la estantería? → pregunta abierta).
+
+**Género-consciente:** el agente **sugiere** 2-3 skills pertinentes según género (técnico/humanista, ya en
+las plantillas) + objetivo, en vez de un menú plano.
+
+**Fases (épica muy derisk-able):**
+- **F1 — Runtime + skills de fábrica (texto):** motor "correr skill" (prompt+scope → retrieval → bloque en la
+  libreta), 5-6 skills built-in en markdown (resumen sin spoilers, flashcards, glosario citado, quiz,
+  takeaways, "¿me interesa?"). Reusa casi todo lo existente. **Alcance común:** selector libro/capítulo/hasta
+  aquí/selección + política de spoilers (por defecto: hasta donde voy).
+- **F2 — Skills editables por el usuario:** CRUD en Ajustes generales (evolución de `custom-templates`),
+  autosugeridos por género/objetivo.
+- **F3 — Artefactos HTML sandbox + visor:** el iframe seguro + CSP sin red + canal `postMessage` de
+  navegación + la galería. El **mapa mental** cae aquí (`output: html|svg`; o renderer JSON→SVG citado como
+  caso especial, reutilizando el rasterizado SVG→PNG del pipeline de iconos).
+- **F4 — Compartir:** export/import JSON de skills.
+- **F5 — Galería remota (descubrir skills de otros):** requiere backend → fuera de alcance inicial.
+
+**❓ Preguntas abiertas (a resolver antes de arrancar):**
+1. **¿El HTML sandbox (F3) entra en esta épica o se separa como épica propia** por su peso de seguridad?
+   _(voto inicial: misma épica, pero F3 con su ADR de seguridad explícito.)_
+2. **¿El visor de artefactos es pestaña en la sidebar o vive en la estantería (por libro)?**
+3. ¿La salida de un skill es **un formato** (md|html|svg|flashcards) o puede declarar varios?
+4. ¿Los artefactos generados viven **en la libreta** como bloques o en un **espacio propio** ("Artefactos")?
+
 ---
 
 ## 📄 PDF — paridad de features con EPUB
