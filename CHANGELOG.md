@@ -5,6 +5,17 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-04 — Identidad Fase 2: tipografía (Inter en la UI; Source Serif 4 opcional)
+
+- **Inter** como fuente de la **UI** (`--font-ui`), self-hosted y subsetada (latin, pesos 400/500/600).
+- **Source Serif 4** para **lectura**, pero **como OPCIÓN, no por defecto**: se añade al selector de
+  fuente (Ajustes → Fuente) y la lectura por defecto **sigue siendo la serif actual** (`'Literata',
+  ui-serif, Georgia`), por preferencia expresa.
+- Fuentes servidas desde el propio origen (`css/fonts.css` + `fonts/*.woff2`), cumpliendo la CSP
+  (`font-src 'self'`) y funcionando **offline**; `font-display: swap`. Peso total ~116KB.
+- `sw.js` v49→v50 (nuevos assets en el precache). Tests:
+  [`tests/fonts.spec.ts`](tests/fonts.spec.ts) (las fuentes cargan; el default de lectura no cambia).
+
 ## 2026-07-03 — Visión: "Ver" adjunta la página y tú personalizas el mensaje
 
 Refinamiento de la visión (ADR-018) a partir de uso real. Antes "Ver" enviaba de inmediato con el texto

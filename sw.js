@@ -1,10 +1,16 @@
-const CACHE_NAME = 'bookreader-v49';
+const CACHE_NAME = 'bookreader-v50';
 const ASSETS = [
   './',
   './index.html',
   './css/main.css',
   './css/reader.css',
   './css/themes.css',
+  './css/fonts.css',
+  './fonts/inter-400.woff2',
+  './fonts/inter-500.woff2',
+  './fonts/inter-600.woff2',
+  './fonts/source-serif-4-400.woff2',
+  './fonts/source-serif-4-600.woff2',
   './js/app.js',
   './js/storage.js',
   './js/backup.js',

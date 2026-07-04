@@ -462,11 +462,17 @@ function applyTheme() {
 }
 
 function getFontFamily(settings) {
-  return settings.fontFamily === 'serif'
-    ? "'Literata', ui-serif, Georgia, serif"   // misma serif que Google Play Books
-    : settings.fontFamily === 'sans-serif'
-      ? '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-      : 'ui-monospace, Menlo, monospace';
+  switch (settings.fontFamily) {
+    case 'source-serif':                          // opción de lectura (Fase 2), no por defecto
+      return "'Source Serif 4', Georgia, ui-serif, serif";
+    case 'sans-serif':
+      return '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+    case 'monospace':
+      return 'ui-monospace, Menlo, monospace';
+    case 'serif':
+    default:
+      return "'Literata', ui-serif, Georgia, serif";   // por defecto (misma serif que hoy)
+  }
 }
 
 function injectThemeIntoContent(contents) {
