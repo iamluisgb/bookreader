@@ -49,6 +49,11 @@ degradación honesta si no hay VL configurado.
   - Recorte de la **región de la figura** (no toda la página) para bajar tokens y mejorar el foco.
   - "Explicar lo que veo" en **EPUB** (requiere rasterizar el iframe de contenido).
   - **PDF escaneado:** usar el modelo de visión como lector cuando no hay capa de texto (OCR-por-VLM).
+  - **Seleccionar el pie de una figura → botón "Ver figura":** al seleccionar texto tipo "Figure/Figura
+    N.M …" en la barra de selección, ofrecer una acción que **adjunte la página de esa figura** (la
+    actual, o la localizada por el pie) al composer —reutilizando el flujo "Ver" ya existente
+    (`pendingImage`)— para que preguntes por la figura sin buscar el botón. Evita el camino solo-texto
+    que hoy responde a ciegas al preguntar por una figura desde la selección.
 
 ### IA5 — Retrieval profesional (RAG por pasaje, agéntico) · `L` · **sustituye a IA4**
 **Motivación (caso real, verificado en backup del 2026-07-02).** Con DDIA y el objetivo *"System Design
