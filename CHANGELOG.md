@@ -5,6 +5,31 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-04 — Identidad Fase 3: componentes + imagotipo
+
+Cierre de la identidad visual (dirección "herramienta de ingeniería, silenciosa y precisa";
+referencias Linear/GitHub/Warp/Ghostty).
+
+- **Imagotipo nuevo** (`icons/icon.svg`): página con esquina doblada + prompt `>_` (lectura +
+  ingeniería), line-art **emerald** sobre **charcoal**. Reemplaza el icono azul iOS. La marca se
+  usa también inline en el **landing** (en emerald, sin recuadro, adaptándose al tema).
+- **Iconos PWA regenerados** desde el SVG con Chromium
+  ([`scripts/rasterize-icons.mjs`](scripts/rasterize-icons.mjs), sin depender de rsvg/magick):
+  `icon-192`, `icon-512`, `maskable-512` (a sangre, safe-zone) y `apple-touch-icon` (180). `manifest.json`
+  `theme_color`/`background_color` → `#111418` (splash cohesionado con el icono).
+- **Radios a 8px**: se elimina el look "píldora/iOS". `.primary-btn`, `.icon-btn` y `.nav-btn` pasan de
+  `--r-pill` a `--r-sm` (8px); normalizados también `select`, `.toc-list a`, footer de sidebar. Chips y
+  FAB siguen redondos (intencional).
+- **Foco = borde verde, sin glow**: se quita el `box-shadow` de halo en inputs/textarea/select; el foco
+  es un borde de acento limpio.
+- **Tooltips propios** (`[data-tip]`, CSS puro sin JS): fondo charcoal `#232A31`, radio 8px, aparición
+  con leve retardo, variantes de alineación (izq/dcha) para botones pegados al borde; ocultos en táctil.
+  Aplicados a los botones de la cabecera (sustituyen al `title` nativo; se conserva `aria-label`). La
+  cabecera sube a `z-index: 40` (su `backdrop-filter` crea contexto de apilamiento) para que el tooltip
+  se pinte sobre el viewport.
+- **Barra de progreso** más fina y redondeada (4px, radio pill).
+- Sin archivos nuevos en el precache → sin bump de `sw.js` (los cambios de contenido propagan por SWR).
+
 ## 2026-07-04 — Identidad Fase 2: tipografía (Inter en la UI; Source Serif 4 opcional)
 
 - **Inter** como fuente de la **UI** (`--font-ui`), self-hosted y subsetada (latin, pesos 400/500/600).

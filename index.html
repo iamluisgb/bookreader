@@ -141,13 +141,13 @@
   <main id="reader-main" class="reader-main">
     <!-- Top bar -->
     <header id="reader-header" class="reader-header">
-      <button id="sidebar-toggle" class="icon-btn" aria-label="Abrir sidebar" title="Panel" data-icon="panel-left"></button>
-      <button id="library-btn" class="icon-btn" aria-label="Biblioteca" title="Biblioteca" data-icon="books" style="display:none;"></button>
+      <button id="sidebar-toggle" class="icon-btn" aria-label="Abrir sidebar" data-tip="Panel" data-tip-align="left" data-icon="panel-left"></button>
+      <button id="library-btn" class="icon-btn" aria-label="Biblioteca" data-tip="Biblioteca" data-tip-align="left" data-icon="books" style="display:none;"></button>
       <div id="reader-title" class="reader-title">BookReader</div>
       <div class="header-actions">
-        <button id="immersive-toggle" class="icon-btn" aria-label="Modo lectura" title="Modo lectura" data-icon="expand" disabled></button>
-        <button id="ai-toggle" class="icon-btn" aria-label="Agente de IA" title="Agente de IA" data-icon="sparkles" disabled></button>
-        <button id="bookmark-toggle" class="icon-btn" aria-label="Marcar página" data-icon="bookmark" disabled></button>
+        <button id="immersive-toggle" class="icon-btn" aria-label="Modo lectura" data-tip="Modo lectura" data-icon="expand" disabled></button>
+        <button id="ai-toggle" class="icon-btn" aria-label="Agente de IA" data-tip="Agente de IA" data-icon="sparkles" disabled></button>
+        <button id="bookmark-toggle" class="icon-btn" aria-label="Marcar página" data-tip="Marcar página" data-tip-align="right" data-icon="bookmark" disabled></button>
       </div>
     </header>
 
@@ -156,7 +156,14 @@
       <!-- Landing screen -->
       <div id="landing" class="landing">
         <div class="landing-content">
-          <div class="landing-icon" data-icon="book" data-icon-size="56"></div>
+          <div class="landing-icon">
+            <svg viewBox="0 0 512 512" width="72" height="72" fill="none" stroke="var(--accent)" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true">
+              <path d="M166 116 L300 116 L364 180 L364 378 Q364 396 346 396 L166 396 Q148 396 148 378 L148 134 Q148 116 166 116 Z" stroke-width="18"/>
+              <path d="M300 116 L300 180 L364 180" stroke-width="18"/>
+              <path d="M210 224 L250 256 L210 288" stroke-width="22"/>
+              <path d="M268 288 L308 288" stroke-width="22"/>
+            </svg>
+          </div>
           <h1>BookReader</h1>
           <p>Lector de EPUB y PDF</p>
           <button id="open-file-btn" class="primary-btn">Abrir archivo</button>

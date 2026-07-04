@@ -98,7 +98,7 @@ html, body {
 }
 .sidebar-footer-btn {
   display: flex; align-items: center; gap: 9px; width: 100%;
-  padding: 9px 12px; border: none; border-radius: 9px; background: none;
+  padding: 9px 12px; border: none; border-radius: var(--r-sm); background: none;
   color: var(--text-secondary); font-size: 14px; text-align: left; cursor: pointer;
   transition: background var(--transition-fast), color var(--transition-fast);
 }
@@ -112,7 +112,7 @@ html, body {
   font-size: 18px;
   cursor: pointer;
   padding: 4px 8px;
-  border-radius: 4px;
+  border-radius: var(--r-sm);
   transition: background var(--transition-fast), color var(--transition-fast);
 }
 
@@ -155,7 +155,7 @@ html, body {
   padding: 8px 12px;
   color: var(--text-primary);
   text-decoration: none;
-  border-radius: 4px;
+  border-radius: var(--r-sm);
   font-size: 14px;
   transition: background var(--transition-fast);
 }
@@ -394,7 +394,7 @@ select {
   width: 100%;
   padding: 8px 12px;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--r-sm);
   background: var(--bg-primary);
   color: var(--text-primary);
   font-size: 14px;
@@ -557,9 +557,9 @@ body.scroll-mode .reader-viewport { align-items: stretch; justify-content: flex-
 .progress-time { text-align: right; }
 
 .progress-container {
-  height: 6px;
+  height: 4px;
   background: var(--bg-tertiary);
-  border-radius: 3px;
+  border-radius: var(--r-pill);
   position: relative;
   cursor: pointer;
 }
@@ -574,7 +574,7 @@ body.scroll-mode .reader-viewport { align-items: stretch; justify-content: flex-
 .progress-bar {
   height: 100%;
   background: var(--accent);
-  border-radius: 3px;
+  border-radius: var(--r-pill);
   width: 0%;
   transition: width var(--transition-fast);
   pointer-events: none;
@@ -1322,7 +1322,8 @@ body.resizing-panel .reader-main { transition: none !important; }
 .highlight-note .icon { color: var(--text-faint); flex: 0 0 auto; margin-top: 1px; }
 
 /* ============================================================================
-   FOCO accesible (acento índigo en vez del ring por defecto del navegador)
+   FOCO accesible (Fase 3): borde verde limpio, sin halo/glow. Coherente con la
+   dirección "silenciosa y precisa": el foco es un borde de acento, no un resplandor.
    ========================================================================== */
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 textarea:focus,
@@ -1330,7 +1331,53 @@ input:not([type="range"]):not([type="checkbox"]):focus,
 select:focus {
   outline: none;
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-soft);
+  box-shadow: none;
+}
+
+/* ============================================================================
+   TOOLTIPS (Fase 3) — componente CSS puro, sin JS. Cualquier elemento con
+   [data-tip] muestra su texto debajo al hover/foco. Fondo charcoal fijo
+   (#232A31) coherente en los tres temas, radio 8px, aparición con leve retardo.
+   Se prefiere a `title` nativo (no estilable). Deja `aria-label` para a11y.
+   ========================================================================== */
+[data-tip] { position: relative; }
+[data-tip]::after {
+  content: attr(data-tip);
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%) translateY(-2px);
+  background: #232a31;
+  color: #f2f3f5;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  padding: 6px 9px;
+  border-radius: var(--r-sm);
+  box-shadow: var(--shadow-2);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--transition-fast), transform var(--transition-fast);
+  z-index: 500;
+}
+[data-tip]:hover::after,
+[data-tip]:focus-visible::after {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+  transition-delay: 0.35s;
+}
+/* Anclajes para botones pegados a un borde (evita que el globo se salga). */
+[data-tip][data-tip-align="left"]::after { left: 0; transform: translateX(0) translateY(-2px); }
+[data-tip][data-tip-align="left"]:hover::after,
+[data-tip][data-tip-align="left"]:focus-visible::after { transform: translateX(0) translateY(0); }
+[data-tip][data-tip-align="right"]::after { left: auto; right: 0; transform: translateX(0) translateY(-2px); }
+[data-tip][data-tip-align="right"]:hover::after,
+[data-tip][data-tip-align="right"]:focus-visible::after { transform: translateX(0) translateY(0); }
+/* En pantallas táctiles los tooltips estorban (no hay hover real): se ocultan. */
+@media (hover: none) {
+  [data-tip]::after { display: none; }
 }
 
 /* ============================================================================
@@ -1461,8 +1508,13 @@ body.ai-busy #ai-toggle::after, body.ai-busy .ai-fab::after {
    F3 · Pulido de componentes (estilo NotebookLM)
    ========================================================================== */
 
-/* Cabecera del lector: translúcida sobre el contenido */
+/* Cabecera del lector: translúcida sobre el contenido. El backdrop-filter crea un
+   contexto de apilamiento propio, así que la elevamos (z-index) para que los tooltips
+   de sus botones, que sobresalen hacia abajo, se pinten por encima del viewport
+   (queda por debajo de scrim/sidebar/paneles, que van a 90+). */
 .reader-header {
+  position: relative;
+  z-index: 40;
   background: color-mix(in srgb, var(--surface-1) 82%, transparent);
   -webkit-backdrop-filter: saturate(180%) blur(12px);
   backdrop-filter: saturate(180%) blur(12px);
@@ -1471,10 +1523,12 @@ body.ai-busy #ai-toggle::after, body.ai-busy .ai-fab::after {
 .ai-header { padding: 14px 16px; border-bottom: 1px solid var(--border-soft); }
 .ai-status { border-bottom: 1px solid var(--border-soft); }
 
-/* Botones unificados */
-.primary-btn { border-radius: var(--r-pill); box-shadow: var(--shadow-1); }
-.icon-btn { border-radius: var(--r-pill); width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; }
-.nav-btn { border-radius: var(--r-pill); }
+/* Botones unificados (Fase 3): radios a 8px, no píldora. La dirección es
+   "herramienta de ingeniería" (Linear/GitHub/Warp), no iOS: esquinas contenidas,
+   no cápsulas ni círculos. */
+.primary-btn { border-radius: var(--r-sm); box-shadow: var(--shadow-1); }
+.icon-btn { border-radius: var(--r-sm); width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; }
+.nav-btn { border-radius: var(--r-sm); }
 
 /* Barra de progreso más fina y redondeada */
 .progress-container { height: 4px; border-radius: var(--r-pill); }
