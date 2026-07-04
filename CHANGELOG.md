@@ -5,6 +5,13 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-04 — Buscar libro en la estantería
+
+- Buscador en la barra de la biblioteca que **filtra por título y autor** (insensible a acentos/mayúsculas,
+  mismo `norm` que [`js/search.js`](js/search.js)). Refiltra **en vivo** re-pintando solo la rejilla
+  (`.lib-results`) para no perder el foco del input al teclear; estado vacío contextual si no hay match.
+  Toca [`js/library/view.js`](js/library/view.js) + estilo pill coherente con la toolbar.
+
 ## 2026-07-04 — PDF en móvil: ajuste a ancho + pinch-zoom
 
 El PDF se pintaba a un `scale` **fijo de 1.5**, así que en móvil la página se salía de pantalla

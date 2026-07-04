@@ -13,6 +13,8 @@ let onOpenSettings = () => {};
 let currentShelf = 'all';        // 'all' | 'none' | <shelfId>
 let sortBy = 'recent';           // 'recent' | 'title' | 'author'
 let filterProgress = 'all';      // 'all' | 'unread' | 'reading' | 'finished'
+let query = '';                  // texto del buscador de la estantería (título/autor)
+let allBooks = [];               // caché del último render (para refiltrar sin re-fetch)
 let menuEl = null;
 
 const SORT_LABELS = { recent: 'Recientes', title: 'Título', author: 'Autor' };
@@ -24,6 +26,7 @@ export function init(opts = {}) {
   onAddBook = opts.onAddBook || (() => {});
   onOpenSettings = opts.onOpenSettings || (() => {});
   host.addEventListener('click', onClick);
+  host.addEventListener('input', onInput);
   document.addEventListener('click', (e) => {
     if (menuEl && !menuEl.contains(e.target) && !e.target.closest('.lib-kebab, .lib-rail-kebab')) closeMenu();
     if (!e.target.closest('.lib-dd')) host.querySelectorAll('.lib-dd.open').forEach(d => d.classList.remove('open'));
@@ -57,6 +60,7 @@ export async function hasBooks() {
 export async function render() {
   if (!host) return;
   const [books, shelves] = await Promise.all([Store.getAllBooks(), Store.getShelves()]);
+  allBooks = books;
 
   if (currentShelf !== 'all' && currentShelf !== 'none' && !shelves.some(s => s.id === currentShelf)) {
     currentShelf = 'all';
@@ -68,8 +72,7 @@ export async function render() {
     return b && b.cover ? `<img src="${escapeHtml(b.cover)}" alt="">` : `<span class="lib-rail-thumb-ph">${icon('book', { size: 14 })}</span>`;
   };
 
-  let list = books.filter(matchShelf).filter(matchFilter);
-  list = sortBooks(list);
+  const list = computeList();
 
   const title = currentShelf === 'all' ? 'Libros'
     : currentShelf === 'none' ? 'Sin estantería'
@@ -107,13 +110,16 @@ export async function render() {
       <section class="lib-main">
         <h1 class="lib-h1">${escapeHtml(title)}</h1>
         <div class="lib-toolbar">
+          <div class="lib-search-box">
+            ${icon('search', { size: 16 })}
+            <input type="search" class="lib-search" placeholder="Buscar libro…" value="${escapeHtml(query)}"
+              autocomplete="off" spellcheck="false" aria-label="Buscar libro por título o autor">
+          </div>
           ${dropdownHtml('sort', icon('sort', { size: 16 }) + SORT_LABELS[sortBy], SORT_LABELS, sortBy)}
           ${dropdownHtml('progress', PROG_LABELS[filterProgress], PROG_LABELS, filterProgress)}
           <button class="lib-upload" data-act="add">${icon('upload', { size: 18 })}<span>Subir archivos</span></button>
         </div>
-        ${list.length
-          ? `<div class="lib-grid">${list.map(cardHtml).join('')}</div>`
-          : emptyHtml(books.length === 0)}
+        <div class="lib-results">${resultsHtml(list)}</div>
       </section>
     </div>
   `;
@@ -169,6 +175,32 @@ function matchFilter(b) {
   if (filterProgress === 'all') return true;
   return (b.status || 'unread') === filterProgress;
 }
+// Normaliza para buscar sin acentos/mayúsculas (mismo criterio que js/search.js).
+function norm(s) { return (s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, ''); }
+function matchQuery(b) {
+  const q = norm(query.trim());
+  if (!q) return true;
+  return norm(b.title).includes(q) || norm(b.author).includes(q);
+}
+// Lista visible = estantería · progreso · búsqueda, ordenada. Compartida por el
+// render completo y el refiltrado en vivo del buscador.
+function computeList() {
+  return sortBooks(allBooks.filter(matchShelf).filter(matchFilter).filter(matchQuery));
+}
+// Rejilla (o estado vacío contextual) para la lista dada.
+function resultsHtml(list) {
+  if (list.length) return `<div class="lib-grid">${list.map(cardHtml).join('')}</div>`;
+  if (query.trim()) {
+    return `<div class="lib-empty"><div class="lib-empty-icon">${icon('search', { size: 56 })}</div>
+      <p>Ningún libro coincide con “${escapeHtml(query.trim())}”.</p></div>`;
+  }
+  return emptyHtml(allBooks.length === 0);
+}
+// Re-pinta SOLO la rejilla (el input vive en la toolbar, intacto → no pierde el foco).
+function paintResults() {
+  const wrap = host && host.querySelector('.lib-results');
+  if (wrap) wrap.innerHTML = resultsHtml(computeList());
+}
 function sortBooks(list) {
   if (sortBy === 'title') return list.sort((a, b) => (a.title || '').localeCompare(b.title || '', 'es'));
   if (sortBy === 'author') return list.sort((a, b) => (a.author || '').localeCompare(b.author || '', 'es'));
@@ -176,6 +208,13 @@ function sortBooks(list) {
 }
 
 // ---- eventos ---------------------------------------------------------------
+
+// Buscador de la estantería: refiltra en vivo sin re-render completo (mantiene el foco).
+function onInput(e) {
+  if (!e.target.closest('.lib-search')) return;
+  query = e.target.value;
+  paintResults();
+}
 
 async function onClick(e) {
   if (e.target.closest('.lib-upload, [data-act="add"]')) { onAddBook(); return; }
