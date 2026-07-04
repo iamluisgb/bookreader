@@ -5,6 +5,21 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-04 — Bug crítico: el agente respondía de OTRO libro (carrera al segmentar)
+
+Con un libro abierto, el agente contestaba con contenido de otro (citas de otro libro incluidas). Causa:
+`prepareBook()` en [`panel.js`](js/ai/panel.js) segmenta de forma **asíncrona** (lenta si no está cacheado)
+y al terminar asignaba `annotatedText`/`anchors` **sin comprobar que el libro no había cambiado**. Si abrías
+el libro A (arranca su segmentación), cambiabas al B, y la de A terminaba **después**, sobrescribía el
+contexto de B → el agente respondía de A. El bump de `segVersion` (fix anterior de citas) forzó
+re-segmentar todos los libros → **ensanchó justo esa ventana**, por eso saltó ahora.
+
+- **Guard de libro en `prepareBook`:** captura `bookId`/`book`/formato al empezar y descarta el resultado
+  (sin tocar `annotatedText`/`anchors`/estado) si el usuario cambió de libro mientras segmentaba. Los
+  `setStatus` de progreso también se silencian si ya no es el libro actual.
+- **Guard de secuencia en `setBook`:** nº de apertura incremental; la cola asíncrona (migrar/cargar
+  conversaciones) aborta si otra apertura la adelanta → evita mezclar conversaciones entre libros.
+
 ## 2026-07-04 — Citas del chat: arreglo de enlaces huérfanos + señalar el pasaje
 
 **Bug — citas que salían crudas `[[aN]]`.** En EPUB, el ancla solo se registraba en el mapa si

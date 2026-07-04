@@ -182,7 +182,9 @@ function showView(view) {
 
 // ---- Carga de libro --------------------------------------------------------
 
+let bookSeq = 0;   // nº de secuencia de apertura: si otra apertura lo adelanta, esta se cancela
 export async function setBook(b, id, title, opts = {}) {
+  const mySeq = ++bookSeq;
   book = b; bookId = id || null; bookTitle = title || 'Libro';
   bookFormat = opts.format || 'epub'; tocLabels = [];
   // "Explicar lo que veo" (visión) solo tiene sentido en PDF (renderizamos su canvas).
@@ -204,11 +206,14 @@ export async function setBook(b, id, title, opts = {}) {
   // ninguna, el onboarding se mostrará al abrir el panel (no aquí, para no tapar
   // el lector con un modal en cada carga).
   if (bookId) await DB.migrateBook(bookId);
+  if (mySeq !== bookSeq) return;       // otra apertura nos adelantó → abortar
   const convos = bookId ? await DB.getConvos(bookId) : [];
+  if (mySeq !== bookSeq) return;
   if (convos.length) {
     convo = convos[0];                 // getConvos viene ordenado por lastUsedAt desc
     template = getTemplate(convo.templateId);
     await activateConvo();
+    if (mySeq !== bookSeq) return;
   }
 
   // Segmentar (o cargar de cache) en segundo plano.
@@ -274,35 +279,45 @@ P: <pregunta>` },
 }
 
 async function prepareBook() {
+  // Capturamos el libro para el que preparamos. La segmentación es asíncrona (y lenta si
+  // no está cacheada), así que el usuario puede cambiar de libro por el medio. Sin este
+  // guard, una segmentación tardía del libro ANTERIOR sobrescribía annotatedText/anchors
+  // del libro ACTUAL → el agente respondía de otro libro. (Bug real; agravado al forzar
+  // re-segmentación con el bump de segVersion.)
+  const myBookId = bookId, myBook = book, myFormat = bookFormat;
+  const stale = () => myBookId !== bookId || myBook !== book;   // ¿cambió el libro?
   try {
-    let seg = bookId ? await DB.loadSegmented(bookId) : null;
+    let seg = myBookId ? await DB.loadSegmented(myBookId) : null;
     if (seg) {
+      if (stale()) return;
       segCached = true;
     } else {
-      const unit = bookFormat === 'pdf' ? 'páginas' : 'secciones';
-      setStatus('Leyendo el libro…');
-      const segmenter = bookFormat === 'pdf' ? segmentPdf : segmentBook;
-      seg = await segmenter(book, (d, t) => setStatus(`Leyendo el libro… ${d}/${t} ${unit}`));
-      if (bookId) await DB.saveSegmented(bookId, bookTitle, seg);
+      const unit = myFormat === 'pdf' ? 'páginas' : 'secciones';
+      if (!stale()) setStatus('Leyendo el libro…');
+      const segmenter = myFormat === 'pdf' ? segmentPdf : segmentBook;
+      seg = await segmenter(myBook, (d, t) => { if (!stale()) setStatus(`Leyendo el libro… ${d}/${t} ${unit}`); });
+      if (myBookId) await DB.saveSegmented(myBookId, bookTitle, seg);
+      if (stale()) return;         // el usuario cambió de libro mientras segmentábamos → descartar
       segCached = false;
     }
+    if (stale()) return;
     annotatedText = seg.annotatedText;
     anchors = seg.anchors;
 
     // Etiquetas de capítulo: en PDF salen del outline (segmenter) o, si la caché no las
     // trae, se derivan de los capítulos ya atribuidos a las anclas (en PDF cada `##` es un
     // capítulo real). En EPUB salen del TOC del propio libro.
-    if (bookFormat === 'pdf') {
+    if (myFormat === 'pdf') {
       tocLabels = (seg.tocLabels && seg.tocLabels.length)
         ? seg.tocLabels
         : [...new Set([...anchors.values()].map(a => a.chapter).filter(Boolean))];
     } else {
-      tocLabels = (book?.navigation?.toc || []).map(t => t.label.trim()).filter(Boolean);
+      tocLabels = (myBook?.navigation?.toc || []).map(t => t.label.trim()).filter(Boolean);
     }
 
     // PDF escaneado (sin texto seleccionable): el agente no puede leerlo. No dejamos
     // segReady para que el chat no pretenda tener el contenido del libro.
-    if (bookFormat === 'pdf' && (seg.scanned || seg.blockCount === 0 || !annotatedText)) {
+    if (myFormat === 'pdf' && (seg.scanned || seg.blockCount === 0 || !annotatedText)) {
       segReady = false; segBlocks = 0;
       setStatus('Este PDF no tiene texto seleccionable (parece escaneado); el agente no puede leer su contenido.');
       return;
@@ -313,7 +328,7 @@ async function prepareBook() {
     if (document.getElementById('sidebar')?.classList.contains('open')) maybeAttenuate();
   } catch (e) {
     console.error('Preparación del agente falló:', e);
-    setStatus('No se pudo preparar el libro: ' + e.message);
+    if (!stale()) setStatus('No se pudo preparar el libro: ' + e.message);
   }
 }
 
