@@ -441,18 +441,31 @@ input[type="range"] {
   flex-shrink: 0;
 }
 
+/* Título del libro: centrado en la cabecera (estilo Apple Books/Kindle), con
+   presencia tipográfica y truncado elegante. Al ir en position:absolute no
+   "empuja" el layout, así que las dos islas de iconos quedan balanceadas a los
+   lados y el hueco central se llena con el título en vez de aire. */
 .reader-title {
-  flex: 1;
-  font-size: 14px;
-  font-weight: 500;
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  /* Ancho limitado a lo que queda libre entre las dos islas de iconos, para que el
+     título centrado NUNCA se solape con ellas (crítico en móvil). */
+  max-width: min(calc(100% - 260px), 460px);
+  text-align: center;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  pointer-events: none;   /* no interfiere con los clics de los iconos */
 }
 
 .header-actions {
   display: flex;
   gap: 4px;
+  margin-left: auto;      /* empuja las acciones a la derecha (el título ya no ocupa flujo) */
 }
 
 /* ============ READER VIEWPORT ============ */
