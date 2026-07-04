@@ -40,7 +40,11 @@ export async function segmentBook(book, onProgress) {
         let cfi = null;
         try { cfi = section.cfiFromElement(el); } catch { /* sin cfi para este nodo */ }
         const id = 'a' + (n++);
-        if (cfi) anchors.set(id, { cfi, chapter: currentChapter });
+        // Registrar SIEMPRE el ancla: si el CFI falla (ocurre en algunos EPUB, a veces
+        // en TODOS los bloques), antes el id quedaba en el texto pero NO en el mapa →
+        // el agente lo citaba y salía crudo «[[aN]]». Con href/capítulo la cita al menos
+        // navega al capítulo aunque no haya CFI puntual.
+        anchors.set(id, { cfi: cfi || null, chapter: currentChapter, href: section.href });
         lines.push(`[[${id}]] ${text}`);
       }
       section.unload?.();

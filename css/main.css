@@ -663,6 +663,13 @@ body:not(.scroll-mode) .epub-container .epub-view {
   box-shadow: 0 2px 8px var(--shadow);
 }
 
+/* Flash al saltar a una página desde una cita del agente (señala el destino). */
+@keyframes pdfCiteFlash {
+  0%, 100% { box-shadow: 0 2px 8px var(--shadow); }
+  20%, 60% { box-shadow: 0 0 0 3px var(--accent), 0 2px 12px var(--shadow); }
+}
+.pdf-page.pdf-cite-flash { animation: pdfCiteFlash 1.5s var(--ease); }
+
 /* PDF4 · Modo scroll continuo: páginas apiladas en vertical. */
 .pdf-container.pdf-scroll {
   align-items: safe center;       /* centradas; con zoom, bordes laterales alcanzables */

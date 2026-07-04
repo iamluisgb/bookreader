@@ -11,8 +11,12 @@ export function renderWithCitations(text, anchors) {
 function citeReplace(html, anchors) {
   return html.replace(/\[\[(a\d+)\]\]|\b(a\d+)\b/g, (m, p1, p2) => {
     const id = p1 || p2;
-    return anchors.has(id)
-      ? `<button class="ai-cite" data-id="${id}" title="Ir al pasaje">${id}</button>`
-      : m;
+    if (anchors.has(id)) {
+      return `<button class="ai-cite" data-id="${id}" title="Ir al pasaje">${id}</button>`;
+    }
+    // No mapeado: si venía entre corchetes «[[aN]]» era una cita fallida/inventada →
+    // se elimina (no ensuciamos la respuesta con marcado crudo). Un `aN` suelto en
+    // prosa (sin corchetes) se respeta tal cual.
+    return p1 ? '' : m;
   });
 }

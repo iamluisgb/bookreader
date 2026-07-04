@@ -496,20 +496,45 @@ function initAiPanel() {
 
 // Navega a un locator del libro (CFI en EPUB, nº de página en PDF). Compartido por las citas
 // del agente (onCite) y la búsqueda (P5).
+let lastCiteCfi = null;   // resaltado de cita EPUB en curso (para retirarlo)
 async function goToLocator(loc) {
   if (currentBook?.format === 'pdf') {
     const page = parseInt(loc, 10);
-    if (page) await PdfReader.goTo(page);
+    if (page) { await PdfReader.goTo(page); flashPdfPage(page); }
     return;
   }
-  const cfi = loc;
-  await EpubReader.goTo(cfi);
+  await EpubReader.goTo(loc);   // CFI puntual o href de capítulo (fallback sin CFI)
+  // Señalar el pasaje citado con un resaltado TRANSITORIO que se retira solo (antes
+  // se acumulaban indefinidamente). Solo se marca si es un CFI puntual; un href de
+  // capítulo no delimita un rango.
   try {
     const rendition = EpubReader.getRendition();
-    rendition?.annotations.highlight(cfi, {}, () => {}, 'ai-cite-hl', {
-      'fill': 'var(--accent)', 'fill-opacity': '0.25', 'mix-blend-mode': 'multiply'
-    });
+    if (!rendition) return;
+    if (lastCiteCfi) { try { rendition.annotations.remove(lastCiteCfi, 'highlight'); } catch (e) {} }
+    lastCiteCfi = null;
+    if (typeof loc === 'string' && loc.startsWith('epubcfi(')) {
+      const cfi = loc;
+      rendition.annotations.highlight(cfi, {}, () => {}, 'ai-cite-hl', {
+        'fill': 'var(--accent)', 'fill-opacity': '0.3', 'mix-blend-mode': 'multiply'
+      });
+      lastCiteCfi = cfi;
+      setTimeout(() => {
+        try { rendition.annotations.remove(cfi, 'highlight'); } catch (e) {}
+        if (lastCiteCfi === cfi) lastCiteCfi = null;
+      }, 2800);
+    }
   } catch (e) { /* cita sin highlight */ }
+}
+
+// Destella la página de destino de una cita en PDF (no tenemos los rects del pasaje,
+// así que señalamos la página completa un instante).
+function flashPdfPage(page) {
+  const el = document.querySelector(`#pdf-container .pdf-page[data-page="${page}"]`);
+  if (!el) return;
+  el.classList.remove('pdf-cite-flash');
+  void el.offsetWidth;                 // reinicia la animación si se repite la misma página
+  el.classList.add('pdf-cite-flash');
+  setTimeout(() => el.classList.remove('pdf-cite-flash'), 1600);
 }
 
 // ============ BÚSQUEDA (P5) ============

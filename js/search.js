@@ -31,7 +31,7 @@ export function searchPassages(annotatedText, anchors, query, { limit = 100 } = 
     results.push({
       id,
       chapter,
-      loc: a ? (a.cfi ?? a.page ?? null) : null,
+      loc: a ? (a.cfi ?? a.href ?? a.page ?? null) : null,   // href = fallback a capítulo (EPUB sin CFI)
       page: a?.page ?? null,
       before: (start > 0 ? '…' : '') + text.slice(start, idx),
       match: text.slice(idx, idx + query.length),

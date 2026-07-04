@@ -207,9 +207,15 @@ export function saveRatings(bookId, goal, scores) {
 
 // Libro segmentado ----------------------------------------------------------
 
+// Versión del esquema de segmentación. Al subirla, las segmentaciones cacheadas
+// con una versión anterior se ignoran y el libro se re-segmenta. v2: las anclas
+// EPUB se registran SIEMPRE (antes solo si había CFI → citas huérfanas que salían
+// crudas); ahora llevan href/capítulo de fallback.
+const SEG_VERSION = 2;
+
 export async function loadSegmented(bookId) {
   const [text, anch] = await Promise.all([get('bookText', bookId), get('anchors', bookId)]);
-  if (!text || !anch) return null;
+  if (!text || !anch || text.segVersion !== SEG_VERSION) return null;   // stale → re-segmentar
   return {
     annotatedText: text.annotatedText,
     tokenEstimate: text.tokenEstimate,
@@ -222,6 +228,7 @@ export async function saveSegmented(bookId, title, seg) {
   await put('books', { id: bookId, title, addedAt: Date.now() });
   await put('bookText', {
     bookId,
+    segVersion: SEG_VERSION,
     annotatedText: seg.annotatedText,
     tokenEstimate: seg.tokenEstimate,
     blockCount: seg.blockCount,

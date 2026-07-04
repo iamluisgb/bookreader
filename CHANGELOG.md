@@ -5,6 +5,25 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-04 — Citas del chat: arreglo de enlaces huérfanos + señalar el pasaje
+
+**Bug — citas que salían crudas `[[aN]]`.** En EPUB, el ancla solo se registraba en el mapa si
+`cfiFromElement` devolvía un CFI; cuando fallaba (en algunos libros, hasta en TODOS los bloques), el id
+quedaba en el texto pero no en el mapa → el agente lo citaba y se pintaba el marcado crudo.
+- [`segment.js`](js/ai/segment.js): el ancla se registra **siempre**, con `href`/capítulo de fallback
+  (`cfi` opcional). La cita navega al menos al **capítulo** aunque no haya CFI puntual.
+- [`db.js`](js/ai/db.js): **versión de segmentación** (`segVersion`), las cacheadas antiguas se ignoran →
+  los libros ya abiertos se **re-segmentan** con el mapa arreglado.
+- [`render.js`](js/ai/render.js): una cita entre corchetes inexistente/inventada ahora **se elimina**
+  (no se deja `[[aN]]` crudo); un `aN` suelto en prosa se respeta. [`panel.js`](js/ai/panel.js)/
+  [`search.js`](js/search.js) usan el fallback `cfi ?? href ?? page`. Test en
+  [`tests/render.spec.ts`](tests/render.spec.ts).
+
+**Señalar el pasaje citado.** Al pulsar una cita:
+- EPUB: resaltado **transitorio** del pasaje (emerald, se retira solo ~2.8 s). Antes se acumulaban
+  indefinidamente; ahora se limpia el anterior.
+- PDF: **flash** de la página de destino (no tenemos los rects del pasaje, así que se señala la página).
+
 ## 2026-07-04 — Buscar libro en la estantería
 
 - Buscador en la barra de la biblioteca que **filtra por título y autor** (insensible a acentos/mayúsculas,

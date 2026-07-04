@@ -1247,7 +1247,8 @@ function onMessagesClick(e) {
 
 function navigateCite(id) {
   const a = anchors.get(id);
-  if (a) onCite(a.cfi ?? a.page);   // EPUB → CFI; PDF → nº de página
+  // EPUB → CFI (o href del capítulo si el CFI puntual falló); PDF → nº de página.
+  if (a) onCite(a.cfi ?? a.href ?? a.page);
 }
 
 function appendBubble(role, text, asHtml) {
