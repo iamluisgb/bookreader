@@ -210,8 +210,10 @@ export function saveRatings(bookId, goal, scores) {
 // Versión del esquema de segmentación. Al subirla, las segmentaciones cacheadas
 // con una versión anterior se ignoran y el libro se re-segmenta. v2: las anclas
 // EPUB se registran SIEMPRE (antes solo si había CFI → citas huérfanas que salían
-// crudas); ahora llevan href/capítulo de fallback.
-const SEG_VERSION = 2;
+// crudas); ahora llevan href/capítulo de fallback. v3: purga cachés ENVENENADAS por
+// la carrera al segmentar (el saveSegmented viejo pudo guardar el contenido de un
+// libro bajo el id de otro); el guard de prepareBook ya evita nuevas contaminaciones.
+const SEG_VERSION = 3;
 
 export async function loadSegmented(bookId) {
   const [text, anch] = await Promise.all([get('bookText', bookId), get('anchors', bookId)]);

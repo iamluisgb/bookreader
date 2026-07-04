@@ -284,7 +284,7 @@ async function prepareBook() {
   // guard, una segmentación tardía del libro ANTERIOR sobrescribía annotatedText/anchors
   // del libro ACTUAL → el agente respondía de otro libro. (Bug real; agravado al forzar
   // re-segmentación con el bump de segVersion.)
-  const myBookId = bookId, myBook = book, myFormat = bookFormat;
+  const myBookId = bookId, myBook = book, myFormat = bookFormat, myTitle = bookTitle;
   const stale = () => myBookId !== bookId || myBook !== book;   // ¿cambió el libro?
   try {
     let seg = myBookId ? await DB.loadSegmented(myBookId) : null;
@@ -296,7 +296,7 @@ async function prepareBook() {
       if (!stale()) setStatus('Leyendo el libro…');
       const segmenter = myFormat === 'pdf' ? segmentPdf : segmentBook;
       seg = await segmenter(myBook, (d, t) => { if (!stale()) setStatus(`Leyendo el libro… ${d}/${t} ${unit}`); });
-      if (myBookId) await DB.saveSegmented(myBookId, bookTitle, seg);
+      if (myBookId) await DB.saveSegmented(myBookId, myTitle, seg);
       if (stale()) return;         // el usuario cambió de libro mientras segmentábamos → descartar
       segCached = false;
     }

@@ -19,6 +19,12 @@ re-segmentar todos los libros → **ensanchó justo esa ventana**, por eso salt�
   `setStatus` de progreso también se silencian si ya no es el libro actual.
 - **Guard de secuencia en `setBook`:** nº de apertura incremental; la cola asíncrona (migrar/cargar
   conversaciones) aborta si otra apertura la adelanta → evita mezclar conversaciones entre libros.
+- **Purga de la caché envenenada (`segVersion` 2→3):** el guard evita NUEVAS contaminaciones, pero la
+  re-segmentación disparada por el fix anterior (sin el guard aún) pudo **guardar contenido cruzado bajo
+  el id equivocado**; esa caché mala persistía («sigue el error»). Subir la versión la descarta → los
+  libros se re-segmentan y ahora se guardan bien (con el guard). Tests deterministas en
+  [`tests/book-switch.spec.ts`](tests/book-switch.spec.ts): el solape no cruza cachés y una entrada de
+  versión anterior se descarta.
 
 ## 2026-07-04 — Citas del chat: arreglo de enlaces huérfanos + señalar el pasaje
 
