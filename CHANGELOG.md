@@ -5,6 +5,15 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-05 — Fix: chat del agente ilegible en móvil horizontal
+
+En horizontal el ancho supera el breakpoint del bottom-sheet (<768px), así que el panel volvía a
+drawer lateral pero con muy poca ALTURA: el "cromo" (línea de estado, chip de perfil, selector de
+conversación, pestañas y composer) se comía casi todo el alto y apenas cabía un mensaje ("no se ve
+nada"). Nueva media query `max-height: 480px` que comprime ese cromo (oculta estado y chip, encoge
+cabecera/composer, recorta márgenes) → los mensajes recuperan altura (~107px → ~266px). No afecta a
+tablets en horizontal (≥768px de alto).
+
 ## 2026-07-05 — Fix: subrayado de PDF invisible en modo scroll
 
 En modo scroll el subrayado se guardaba pero **no se veía sobre el texto**. Causa: la capa de

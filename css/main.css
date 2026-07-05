@@ -1561,6 +1561,24 @@ body.ai-busy #ai-toggle::after, body.ai-busy .ai-fab::after {
   }
 }
 
+/* ---- Móvil en HORIZONTAL / pantallas muy bajas: comprimir el panel del agente ----
+   El breakpoint de bottom-sheet es por ANCHO (<768), pero en horizontal el ancho supera ese
+   umbral y el panel vuelve a drawer lateral con muy poca ALTURA. El "cromo" (línea de estado,
+   chip de perfil, selector de conversación, pestañas y composer) se comía casi todo el alto y
+   no cabían mensajes ("no se ve nada"). Recortamos ese cromo para devolverle altura a
+   .ai-messages. Umbral 480px: no afecta a tablets en horizontal (iPad ≥768px de alto). */
+@media (max-height: 480px) {
+  #ai-panel { width: min(560px, 82%); }
+  .ai-header { height: 40px; }
+  .ai-status { display: none; }              /* redundante con el selector de conversación */
+  .ai-profile-chip { display: none; }        /* el perfil se ve/gestiona en vertical o Ajustes */
+  .ai-convobar { margin-top: 8px; }
+  .ai-tabs { margin-top: 8px; }
+  .ai-messages { padding-top: 8px; padding-bottom: 8px; gap: 8px; }
+  .ai-composer { padding: 8px 12px; }
+  .ai-composer textarea { min-height: 38px; }
+}
+
 /* ============================================================================
    F3 · Pulido de componentes (estilo NotebookLM)
    ========================================================================== */
