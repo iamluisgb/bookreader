@@ -266,10 +266,17 @@ export function drawPdfHighlights(page) {
     wrapper.appendChild(layer);
   }
   layer.innerHTML = '';
-  // En porcentaje (no px): así el overlay escala solo con la caja fit·zoom, sin recalcular
-  // al hacer zoom (los rects son fraccionales 0..1).
+  // Cada subrayado va en su propio GRUPO, con el blend/opacidad aplicados al grupo (ver CSS):
+  // así los rects de líneas contiguas que se solapan no se multiplican dos veces (evita las
+  // bandas oscuras). En porcentaje (no px): el overlay escala solo con la caja fit·zoom, sin
+  // recalcular al hacer zoom (los rects son fraccionales 0..1).
   for (const hl of Highlights.getByPage(page)) {
-    for (const r of (hl.rects || [])) {
+    const rects = hl.rects || [];
+    if (!rects.length) continue;
+    const group = document.createElement('div');
+    group.className = 'pdf-hl-group';
+    if (hl.note) group.title = hl.note;
+    for (const r of rects) {
       const d = document.createElement('div');
       d.className = 'pdf-hl';
       d.style.left = (r.left * 100) + '%';
@@ -277,9 +284,9 @@ export function drawPdfHighlights(page) {
       d.style.width = (r.width * 100) + '%';
       d.style.height = (r.height * 100) + '%';
       d.style.background = hl.color;
-      if (hl.note) d.title = hl.note;
-      layer.appendChild(d);
+      group.appendChild(d);
     }
+    layer.appendChild(group);
   }
 }
 

@@ -5,6 +5,14 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-05 — Fix: bandas oscuras en subrayados de PDF multilínea
+
+Al subrayar varias líneas, las zonas de solape entre rects contiguos se veían más oscuras: cada
+`.pdf-hl` llevaba `mix-blend-mode: multiply` + `opacity: 0.4`, así que donde dos rects se solapaban
+(por el alto de línea) se multiplicaba dos veces. Ahora cada subrayado va en un `.pdf-hl-group` y el
+blend/opacidad se aplican UNA vez al grupo: los rects sólidos del mismo color se funden en un bloque
+uniforme antes de mezclarse. Verificado: color idéntico en solape y zona simple.
+
 ## 2026-07-05 — Tema "Claro" ahora es blanco neutro (no sepia)
 
 El tema Claro caía en el `:root` por defecto, cuyas superficies eran "papel premium" cálido

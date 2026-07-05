@@ -751,11 +751,20 @@ body:not(.scroll-mode) .epub-container .epub-view {
   z-index: 2;
 }
 
+/* Un subrayado = un GRUPO. El blend/opacidad se aplican UNA sola vez al grupo (que crea su
+   propio contexto de composición): así los rects de líneas contiguas —que se solapan un poco
+   por el alto de línea— se funden en un color sólido uniforme antes de mezclarse, sin las
+   bandas más oscuras que salían al multiplicar dos veces en cada solape. */
+.pdf-hl-group {
+  position: absolute;
+  inset: 0;
+  mix-blend-mode: multiply;
+  opacity: 0.4;
+}
+/* Rects individuales: color sólido, SIN blend ni opacidad propios (los pone el grupo). */
 .pdf-hl {
   position: absolute;
   border-radius: 2px;
-  mix-blend-mode: multiply;
-  opacity: 0.4;
 }
 
 /* ============ AI PANEL ============ */
