@@ -1,12 +1,8 @@
 /* ============================================================================
-   Design tokens — bookreader
-   Dirección (Fase 1 de la identidad visual): "herramienta de ingeniería, silenciosa
-   y precisa" · acento EMERALD (#22c55e) · claro = papel premium, oscuro = charcoal
-   tipo terminal. Referencias: Linear, GitHub, Warp, Ghostty.
-   Tema por defecto: seguir el sistema (prefers-color-scheme); override con
-   [data-theme="light|dark|sepia"]. Los nombres antiguos (--bg-primary, etc.) se
-   conservan como alias para no romper componentes existentes.
-   Nota de contraste: el emerald exige texto OSCURO encima (--on-accent), no blanco.
+   Design tokens — bookreader v2
+   Un solo acento: #22c55e (emerald) en TODOS los componentes.
+   Hover: #16a34a · Soft: rgba(34,197,94,0.14) · Superficies: #faf8f3/#fdfbf6/#efeae0.
+   Referencias: NotebookLM (superficies tonales), Apple Books (lectura inmersiva).
    ========================================================================== */
 
 :root {
@@ -44,21 +40,23 @@
   --transition-fast: 0.15s var(--ease);
   --transition-normal: 0.25s var(--ease);
 
-  /* ---- Paleta CLARA (por defecto) — papel premium (guía de marca) ---- */
-  --surface-0: #faf8f3;  /* fondo de la app (papel) */
-  --surface-1: #fdfbf6;  /* barras / paneles */
-  --surface-2: #fdfbf6;  /* tarjetas */
-  --surface-3: #efeae0;  /* hover / activo */
-  --text: #222222;
+  /* ---- Paleta CLARA (por defecto) — BLANCO neutro (no sepia) ----
+     El tono cálido "papel" vive ahora en el tema Sepia; "Claro" es blanco puro con grises
+     neutros (fríos) para bordes/hover/sombra. Así "Claro" = blanco de verdad. */
+  --surface-0: #ffffff;  /* fondo de la app */
+  --surface-1: #ffffff;  /* barras / paneles */
+  --surface-2: #ffffff;  /* tarjetas */
+  --surface-3: #eef0f2;  /* hover / activo (gris neutro claro) */
+  --text: #1f2328;
   --text-soft: #6b7280;
   --text-faint: #9aa1ab;
   --accent: #22c55e;     /* emerald */
   --accent-hover: #16a34a;
   --accent-soft: rgba(34, 197, 94, 0.14);
   --on-accent: #111418;  /* texto OSCURO sobre emerald (contraste) */
-  --border: #ddd8ce;
-  --border-soft: #e8e3d8;
-  --shadow-color: 60, 50, 30;
+  --border: #e3e6ea;
+  --border-soft: #eef0f2;
+  --shadow-color: 20, 28, 40;
   --shadow-1: 0 1px 2px rgba(var(--shadow-color), 0.05), 0 1px 3px rgba(var(--shadow-color), 0.04);
   --shadow-2: 0 4px 16px rgba(var(--shadow-color), 0.07);
   --shadow-3: 0 12px 40px rgba(var(--shadow-color), 0.12);

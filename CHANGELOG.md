@@ -5,6 +5,14 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-05 — Tema "Claro" ahora es blanco neutro (no sepia)
+
+El tema Claro caía en el `:root` por defecto, cuyas superficies eran "papel premium" cálido
+(`#faf8f3`/`#fdfbf6`, borde `#ddd8ce`, fondo del PDF beige `#efeae0`) → se veía sepia. Ahora la paleta
+Claro es **blanco puro con grises neutros/fríos** (superficies `#ffffff`, hover `#eef0f2`, borde
+`#e3e6ea`, sombra neutra). El tono cálido "papel" queda reservado al tema **Sepia** (sin cambios). El
+texto ya era neutro; solo cambiaban superficies, bordes y sombra.
+
 ## 2026-07-05 — Fix: chat del agente ilegible en móvil horizontal
 
 En horizontal el ancho supera el breakpoint del bottom-sheet (<768px), así que el panel volvía a
