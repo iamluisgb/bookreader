@@ -5,6 +5,17 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-05 — Brillo y luz nocturna (ajustes de pantalla, tipo Play Books)
+
+Dos controles nuevos en Ajustes (pestaña de lectura), como en Play Books. La web no puede tocar el brillo
+ni la temperatura reales del dispositivo, así que se emulan con overlays a pantalla completa que **no
+capturan eventos** (`pointer-events:none`):
+- **Brillo:** slider que atenúa con una capa negra (0.35–1.0).
+- **Luz nocturna:** slider que aplica un filtro **cálido ámbar** en `multiply` (reduce la luz azul).
+  Es distinto del tema oscuro: entibia la pantalla sin invertir colores.
+- Persisten en `settings` y se reaplican al cargar. Nuevos `brightness`/`nightLight` en
+  [`js/settings.js`](js/settings.js). Test en [`tests/display.spec.ts`](tests/display.spec.ts).
+
 ## 2026-07-05 — PDF: el pinch-zoom se ancla al punto focal (ya no salta)
 
 En móvil, al hacer pinch sobre una zona, el PDF re-renderizaba al nuevo tamaño pero **saltaba a otra

@@ -8,6 +8,8 @@ const defaults = {
   fontFamily: 'serif',
   columnWidth: 720,
   lineHeight: 1.6,
+  brightness: 1,      // 1 = sin atenuar; < 1 oscurece con un overlay (brillo tipo Play Books)
+  nightLight: 0,      // 0 = off; > 0 aplica un filtro cálido ámbar (reduce luz azul)
 };
 
 let current = { ...defaults, ...Storage.get(SETTINGS_KEY, {}) };
@@ -62,6 +64,18 @@ export function applySettings() {
   const lhValue = document.getElementById('line-height-value');
   if (lhValue) lhValue.textContent = current.lineHeight;
 
+  // Brillo y luz nocturna (overlays de pantalla; la web no controla el brillo/temperatura
+  // reales del dispositivo). Brillo = capa negra atenuante; luz nocturna = capa ámbar en
+  // multiply que entibia y reduce la luz azul. Ambas con pointer-events:none.
+  const dim = document.getElementById('screen-dim');
+  if (dim) dim.style.opacity = String(Math.max(0, Math.min(0.7, 1 - (current.brightness ?? 1))));
+  const warm = document.getElementById('night-warm');
+  if (warm) warm.style.opacity = String(Math.max(0, Math.min(0.75, (current.nightLight ?? 0) * 0.75)));
+  const brVal = document.getElementById('brightness-value');
+  if (brVal) brVal.textContent = Math.round((current.brightness ?? 1) * 100) + '%';
+  const nlVal = document.getElementById('night-light-value');
+  if (nlVal) nlVal.textContent = Math.round((current.nightLight ?? 0) * 100) + '%';
+
   // Apply to reader
   document.documentElement.style.setProperty('--reader-max-width', current.columnWidth + 'px');
 
@@ -103,6 +117,14 @@ export function init() {
     set('lineHeight', parseFloat(e.target.value));
   });
 
+  // Brillo / Luz nocturna
+  document.getElementById('brightness')?.addEventListener('input', (e) => {
+    set('brightness', parseFloat(e.target.value));
+  });
+  document.getElementById('night-light')?.addEventListener('input', (e) => {
+    set('nightLight', parseFloat(e.target.value));
+  });
+
   // Set initial values on controls
   document.querySelectorAll('.theme-btn').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.theme === current.theme);
@@ -119,6 +141,12 @@ export function init() {
 
   const lhSlider = document.getElementById('line-height');
   if (lhSlider) lhSlider.value = current.lineHeight;
+
+  const brSlider = document.getElementById('brightness');
+  if (brSlider) brSlider.value = current.brightness ?? 1;
+
+  const nlSlider = document.getElementById('night-light');
+  if (nlSlider) nlSlider.value = current.nightLight ?? 0;
 
   applySettings();
 }

@@ -146,6 +146,27 @@ html, body {
   background: var(--accent-hover);
 }
 
+/* ============ FILTROS DE PANTALLA (brillo / luz nocturna, tipo Play Books) ============ */
+/* Overlays a pantalla completa que NO capturan eventos. Brillo = capa negra que atenúa;
+   luz nocturna = capa ámbar en `multiply` que entibia y recorta la luz azul. La web no
+   puede tocar el brillo/temperatura reales del dispositivo, así que se emula en pantalla. */
+.screen-filter {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  z-index: 9000;
+  transition: opacity 0.15s var(--ease);
+}
+#screen-dim { background: #000; z-index: 9001; }
+#night-warm { background: #ff8a2b; mix-blend-mode: multiply; }
+
+/* Controles deslizantes con icono + valor (brillo, luz nocturna). */
+.slider-control { display: flex; align-items: center; gap: 10px; }
+.slider-control input[type="range"] { flex: 1; min-width: 0; }
+.slider-ico { color: var(--text-faint); flex: 0 0 auto; display: inline-flex; }
+.slider-value { min-width: 42px; text-align: right; font-size: 14px; color: var(--text-soft); }
+
 /* ============ EMPTY STATES ============ */
 .empty-state {
   color: var(--text-muted);

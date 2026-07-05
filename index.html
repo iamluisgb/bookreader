@@ -86,6 +86,24 @@
       </div>
 
       <div class="settings-group">
+        <label>Brillo</label>
+        <div class="slider-control">
+          <span class="slider-ico" data-icon="sun" data-icon-size="16"></span>
+          <input type="range" id="brightness" min="0.35" max="1" value="1" step="0.05">
+          <span id="brightness-value" class="slider-value">100%</span>
+        </div>
+      </div>
+
+      <div class="settings-group">
+        <label>Luz nocturna</label>
+        <div class="slider-control">
+          <span class="slider-ico" data-icon="moon" data-icon-size="16"></span>
+          <input type="range" id="night-light" min="0" max="1" value="0" step="0.05">
+          <span id="night-light-value" class="slider-value">0%</span>
+        </div>
+      </div>
+
+      <div class="settings-group">
         <label>Tamaño de fuente</label>
         <div class="font-size-control">
           <button id="font-decrease" class="icon-btn">A-</button>
@@ -201,6 +219,10 @@
       <button id="next-btn" class="nav-btn" aria-label="Página siguiente" data-icon="chevron-right"></button>
     </footer>
   </main>
+
+  <!-- Filtros de pantalla (brillo / luz nocturna), tipo Play Books. No capturan eventos. -->
+  <div id="night-warm" class="screen-filter"></div>
+  <div id="screen-dim" class="screen-filter"></div>
 
   <!-- Backdrop para drawers en pantallas pequeñas -->
   <div id="scrim" class="scrim"></div>
