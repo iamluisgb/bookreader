@@ -341,4 +341,56 @@ test.describe('PDF fit-to-width + zoom', () => {
 
     expect(Math.abs(after - before)).toBeLessThan(0.05);   // el punto focal se mantiene (no salta)
   });
+
+  // Zoom fluido tipo Adobe: el canvas está OVERSAMPLEADO y ampliar NO re-renderiza (mismo
+  // canvas, backing sin cambiar) — solo crece la caja y su scaler. Sin "recarga".
+  test('el zoom no re-renderiza el canvas (oversample + escala por CSS)', async ({ page }) => {
+    await openPdf(page);
+    await page.waitForTimeout(300);
+    const before = await page.evaluate(() => {
+      const cv = document.querySelector('#pdf-container canvas') as HTMLCanvasElement;
+      cv.dataset.mark = 'orig';
+      const box = document.querySelector('#pdf-container .pdf-page') as HTMLElement;
+      return { backing: cv.width, css: parseFloat(cv.style.width), box: parseFloat(box.style.width) };
+    });
+    // Oversampleado: el backing es bastante mayor que el tamaño mostrado.
+    expect(before.backing).toBeGreaterThan(before.css * 2);
+
+    const after = await page.evaluate(async () => {
+      const P: any = await import('/js/pdf-reader.js');
+      P.setZoom(2.5, { x: 195, y: 390 });
+      await new Promise((r) => setTimeout(r, 300));
+      const cv = document.querySelector('#pdf-container canvas') as HTMLCanvasElement;
+      const box = document.querySelector('#pdf-container .pdf-page') as HTMLElement;
+      const scaler = document.querySelector('#pdf-container .pdf-scaler') as HTMLElement;
+      return { sameCanvas: cv.dataset.mark === 'orig', backing: cv.width, css: parseFloat(cv.style.width),
+               box: parseFloat(box.style.width), scaler: scaler.style.transform };
+    });
+    expect(after.sameCanvas).toBe(true);          // el canvas NO se recrea
+    expect(after.backing).toBe(before.backing);   // no se re-renderiza (backing intacto)
+    expect(after.css).toBe(before.css);           // el canvas se muestra igual; escala el scaler
+    expect(after.scaler).toContain('scale(2.5)');
+    expect(Math.abs(after.box - before.box * 2.5)).toBeLessThan(2);   // la caja crece a fit·2.5
+  });
+
+  // Modo scroll: el zoom también funciona (leer PDFs técnicos en móvil/tablet).
+  test('el zoom funciona en modo scroll continuo', async ({ page }) => {
+    await openPdf(page);
+    await page.waitForTimeout(300);
+    const r = await page.evaluate(async () => {
+      const P: any = await import('/js/pdf-reader.js');
+      await P.setReadingMode('scroll');
+      await new Promise((res) => setTimeout(res, 400));
+      const box0 = parseFloat((document.querySelector('#pdf-container .pdf-page') as HTMLElement).style.width);
+      const backing0 = (document.querySelector('#pdf-container canvas') as HTMLCanvasElement).width;
+      P.setZoom(2, { x: 195, y: 390 });
+      await new Promise((res) => setTimeout(res, 300));
+      const box1 = parseFloat((document.querySelector('#pdf-container .pdf-page') as HTMLElement).style.width);
+      const backing1 = (document.querySelector('#pdf-container canvas') as HTMLCanvasElement).width;
+      return { box0, box1, backing0, backing1, hasLayer: !!document.getElementById('pdf-zoom-layer') };
+    });
+    expect(r.hasLayer).toBe(true);
+    expect(Math.abs(r.box1 - r.box0 * 2)).toBeLessThan(2);   // caja ×2 en scroll
+    expect(r.backing1).toBe(r.backing0);                     // sin re-render también en scroll
+  });
 });

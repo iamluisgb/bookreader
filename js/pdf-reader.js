@@ -9,86 +9,68 @@ let readingMode = 'paginated';   // 'paginated' | 'scroll' (continuo), recordado
 let lazyObserver = null;         // observer del render perezoso en modo scroll
 let scrollRaf = 0;
 
-// ---- Zoom (ajuste-a-ancho + pinch) ---------------------------------------
-// `zoom` = factor del usuario (1 = ajustar la página al ancho disponible). El scale
-// real de render = fit(ancho) · zoom. Durante el pinch mostramos un preview con
-// transform CSS (barato y fluido) y RE-RENDERIZAMOS nítido al soltar.
+// ---- Zoom fluido (tipo Adobe): sin re-render ------------------------------
+// Cada página se pinta OVERSAMPLEADA (canvas a ~OVERSAMPLE× su tamaño mostrado), así
+// ampliar hasta ~OVERSAMPLE× sigue nítido sin re-rasterizar. El zoom vive en el layout:
+//   .pdf-page  → caja de tamaño fit·zoom (define el área de scroll → paneo NATIVO)
+//   .pdf-scaler→ contenido a tamaño fit con transform: scale(zoom) (canvas + capa de texto)
+// Durante el pinch escalamos en vivo el #pdf-zoom-layer (GPU, mantecoso) y al soltar
+// "horneamos" (redimensionar cajas + scaler), anclando el scroll al punto focal. No se
+// llama a pdf.js en todo el gesto.
 let zoom = 1;
-let renderedZoom = 1;            // zoom al que están pintadas las páginas ahora mismo
-let commitTimer = 0;
 let zoomHandlersReady = false;
-let zoomFocal = null;           // punto de anclaje del zoom, relativo al viewport del contenedor {x,y}
 const PDF_PAD = 20;             // padding del contenedor (coincide con el CSS)
-const ZOOM_MIN = 1, ZOOM_MAX = 5;
+const OVERSAMPLE = 2.5;         // el canvas se pinta 2.5× → nítido al ampliar sin re-render
+const MAX_BACKING_PX = 3800;    // tope del lado mayor del canvas (memoria)
+const ZOOM_MIN = 1, ZOOM_MAX = 6;
 
-// Scale de render para una página de ancho `baseWidth` (a scale 1). Ajusta al ancho
-// del contenedor; el tope 1.5 evita agigantar la página en pantallas anchas
-// (escritorio conserva el tamaño de lectura previo). Se multiplica por el zoom.
-function computeScale(baseWidth) {
-  const container = document.getElementById('pdf-container');
-  const avail = (container ? container.clientWidth : 800) - PDF_PAD * 2;
-  const fit = avail > 0 && baseWidth > 0 ? avail / baseWidth : 1.5;
-  return Math.min(fit, 1.5) * zoom;
+const clampZoom = (z) => Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, z));
+
+// Ajuste a ancho (a zoom 1): la página cabe en el ancho disponible; tope 1.5 para no
+// agigantar en pantallas anchas. El zoom se aplica aparte (layout), no aquí.
+function fitScale(baseWidth) {
+  const c = document.getElementById('pdf-container');
+  const avail = (c ? c.clientWidth : 800) - PDF_PAD * 2;
+  return Math.min(avail > 0 && baseWidth > 0 ? avail / baseWidth : 1.5, 1.5);
 }
-
-export function getZoom() { return zoom; }
-
-// Fija el zoom: muestra preview inmediato y confirma (re-render) tras un pequeño
-// debounce para no repintar en cada tick de rueda/pinch.
-export function setZoom(z) {
-  zoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, z));
-  applyZoomPreview();
-  scheduleZoomCommit();
-}
-export function resetZoom() { setZoom(1); }
 
 function pdfPages() {
   const c = document.getElementById('pdf-container');
   return c ? Array.from(c.querySelectorAll('.pdf-page')) : [];
 }
-// Fija el origen de transformación de cada página en el punto focal (coords de pantalla),
-// de modo que el preview con scale() se ancle ahí. Debe llamarse con transform IDENTIDAD
-// (al inicio del gesto) para que getBoundingClientRect mida la caja sin escalar.
-function setZoomOrigins(focalClientX, focalClientY) {
+function zoomLayer() { return document.getElementById('pdf-zoom-layer'); }
+
+export function getZoom() { return zoom; }
+
+// "Hornea" el zoom en el layout: cada caja pasa a fit·zoom y su scaler a scale(zoom).
+// El canvas (oversampleado) se re-escala por CSS → nítido, SIN volver a pdf.js.
+function applyCommittedZoom() {
   for (const w of pdfPages()) {
-    const r = w.getBoundingClientRect();
-    w.style.transformOrigin = `${focalClientX - r.left}px ${focalClientY - r.top}px`;
+    const fw = parseFloat(w.dataset.fitw || '0'), fh = parseFloat(w.dataset.fith || '0');
+    if (fw && fh) { w.style.width = (fw * zoom) + 'px'; w.style.height = (fh * zoom) + 'px'; }
+    const s = w.querySelector('.pdf-scaler');
+    if (s) s.style.transform = zoom === 1 ? '' : `scale(${zoom})`;
   }
 }
-function applyZoomPreview() {
-  const f = renderedZoom ? zoom / renderedZoom : 1;
-  const s = Math.abs(f - 1) < 0.001 ? '' : `scale(${f})`;
-  for (const w of pdfPages()) w.style.transform = s;
-}
-function clearZoomPreview() {
-  for (const w of pdfPages()) w.style.transform = '';
-}
-async function commitZoom() {
-  clearTimeout(commitTimer); commitTimer = 0;
-  if (Math.abs(renderedZoom - zoom) < 0.001) return;
+
+// Fija el zoom anclado a un punto de pantalla (client coords). Reposiciona el scroll para
+// que ese punto del contenido siga bajo el foco. Sin re-render.
+export function setZoom(z, focalClient) {
+  const nz = clampZoom(z);
   const container = document.getElementById('pdf-container');
-  // Anclaje zoom-a-punto: mantener bajo el foco el mismo punto del contenido tras el
-  // re-render. El contenido escala por `ratio`; el padding del contenedor NO escala.
-  const oldZoom = renderedZoom;
-  const ratio = zoom / oldZoom;
-  const focal = zoomFocal || (container ? { x: container.clientWidth / 2, y: container.clientHeight / 2 } : { x: 0, y: 0 });
-  let newLeft = 0, newTop = 0;
-  if (container) {
-    newLeft = (container.scrollLeft + focal.x - PDF_PAD) * ratio + PDF_PAD - focal.x;
-    newTop  = (container.scrollTop  + focal.y - PDF_PAD) * ratio + PDF_PAD - focal.y;
-  }
-  renderedZoom = zoom;
-  await rerender();               // re-pinta nítido al scale = fit · zoom
-  clearZoomPreview();
-  if (container) {
-    container.scrollLeft = Math.max(0, newLeft);
-    container.scrollTop  = Math.max(0, newTop);
-  }
+  if (Math.abs(nz - zoom) < 0.0005 || !container) { zoom = nz; applyCommittedZoom(); return; }
+  const ratio = nz / zoom;
+  const cr = container.getBoundingClientRect();
+  const fx = focalClient ? focalClient.x - cr.left : container.clientWidth / 2;
+  const fy = focalClient ? focalClient.y - cr.top : container.clientHeight / 2;
+  const sl = container.scrollLeft, stp = container.scrollTop;
+  zoom = nz;
+  applyCommittedZoom();
+  // El contenido escaló por `ratio`; el padding del contenedor NO escala.
+  container.scrollLeft = Math.max(0, (sl + fx - PDF_PAD) * ratio + PDF_PAD - fx);
+  container.scrollTop  = Math.max(0, (stp + fy - PDF_PAD) * ratio + PDF_PAD - fy);
 }
-function scheduleZoomCommit(delay = 150) {
-  clearTimeout(commitTimer);
-  commitTimer = setTimeout(commitZoom, delay);
-}
+export function resetZoom() { setZoom(1); }
 
 function getPdfjs() {
   if (pdfjsLib) return pdfjsLib;
@@ -134,7 +116,7 @@ export async function load(arrayBuffer, onProgress) {
   }
 
   currentPage = 1;
-  zoom = 1; renderedZoom = 1;   // cada libro empieza ajustado a ancho
+  zoom = 1;                     // cada libro empieza ajustado a ancho
 
   const container = document.getElementById('pdf-container');
   container.innerHTML = '';
@@ -191,7 +173,8 @@ export async function setReadingMode(mode) {
 
 function fpKey() { try { return pdfDoc && pdfDoc.fingerprints ? pdfDoc.fingerprints[0] : null; } catch { return null; } }
 
-// Reconstruye el contenedor según el modo actual (paginado o scroll).
+// Reconstruye el contenedor según el modo actual (paginado o scroll). Las páginas viven
+// dentro de #pdf-zoom-layer (lo que escalamos EN VIVO durante el pinch).
 async function rerender() {
   if (!pdfDoc) return;
   teardownScroll();
@@ -199,13 +182,17 @@ async function rerender() {
   if (!container) return;
   container.innerHTML = '';
   container.classList.toggle('pdf-scroll', readingMode === 'scroll');
+  const layer = document.createElement('div');
+  layer.id = 'pdf-zoom-layer';
+  container.appendChild(layer);
   ensureZoomHandlers();
   if (readingMode === 'scroll') await renderScroll();
   else await renderPaginated(currentPage);
 }
 
-// Gestos de zoom sobre el contenedor del PDF (una sola vez). Pinch en móvil +
-// Ctrl/⌘+rueda en escritorio (el pinch de trackpad llega como wheel+ctrlKey).
+// Gestos de zoom. Pinch (2 dedos) en móvil: escalamos EN VIVO el layer (GPU, fluido) y al
+// soltar horneamos en el layout sin re-render. 1 dedo = scroll/selección NATIVOS (no se
+// tocan). Escritorio: Ctrl/⌘+rueda (incluye el pinch de trackpad).
 function ensureZoomHandlers() {
   if (zoomHandlersReady) return;
   const container = document.getElementById('pdf-container');
@@ -213,44 +200,53 @@ function ensureZoomHandlers() {
   zoomHandlersReady = true;
 
   const dist = (t) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
-  let pinching = false, startDist = 0, baseZoom = 1;
+  let pinching = false, startDist = 0, startZoom = 1, fx = 0, fy = 0;
 
   container.addEventListener('touchstart', (e) => {
     if (e.touches.length === 2) {
-      pinching = true; startDist = dist(e.touches); baseZoom = zoom;
-      // Foco = punto medio de los dedos. Se fija al INICIO (transform aún identidad) y se
-      // usa como anclaje tanto del preview como del reposicionado en el commit.
-      const cr = container.getBoundingClientRect();
-      const mx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
-      const my = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-      zoomFocal = { x: mx - cr.left, y: my - cr.top };
-      setZoomOrigins(mx, my);
+      pinching = true; startDist = dist(e.touches); startZoom = zoom;
+      fx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+      fy = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+      const layer = zoomLayer();
+      if (layer) {                       // origen del preview en el foco (layer aún en identidad)
+        const r = layer.getBoundingClientRect();
+        layer.style.transformOrigin = `${fx - r.left}px ${fy - r.top}px`;
+        layer.style.willChange = 'transform';
+      }
     }
   }, { passive: true });
 
   container.addEventListener('touchmove', (e) => {
     if (!pinching || e.touches.length !== 2) return;
-    e.preventDefault();            // corta el zoom nativo de la página
-    const ratio = dist(e.touches) / (startDist || 1);
-    zoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, baseZoom * ratio));
-    applyZoomPreview();            // feedback en vivo anclado al foco (sin re-render)
+    e.preventDefault();                  // corta el paneo/zoom nativo de 2 dedos
+    const live = clampZoom(startZoom * (dist(e.touches) / (startDist || 1)));
+    const layer = zoomLayer();
+    if (layer) layer.style.transform = `scale(${live / zoom})`;   // relativo al zoom horneado
   }, { passive: false });
 
-  const endPinch = () => { if (pinching) { pinching = false; commitZoom(); } };
+  const endPinch = () => {
+    if (!pinching) return;
+    pinching = false;
+    const layer = zoomLayer();
+    let live = zoom;
+    if (layer) {
+      const m = /scale\(([-\d.]+)\)/.exec(layer.style.transform);
+      if (m) live = zoom * parseFloat(m[1]);
+      layer.style.transform = '';
+      layer.style.willChange = '';
+    }
+    setZoom(live, { x: fx, y: fy });     // hornea + ancla el scroll al foco
+  };
   container.addEventListener('touchend', endPinch);
   container.addEventListener('touchcancel', endPinch);
 
-  // Escritorio: Ctrl/⌘ + rueda (incluye el pinch de trackpad en macOS). Ancla al cursor.
   container.addEventListener('wheel', (e) => {
     if (!e.ctrlKey && !e.metaKey) return;
     e.preventDefault();
-    const cr = container.getBoundingClientRect();
-    zoomFocal = { x: e.clientX - cr.left, y: e.clientY - cr.top };
-    if (Math.abs(renderedZoom - zoom) < 0.001) setZoomOrigins(e.clientX, e.clientY);  // fija origen si estamos en identidad
-    setZoom(zoom * (e.deltaY < 0 ? 1.12 : 1 / 1.12));
+    setZoom(zoom * (e.deltaY < 0 ? 1.12 : 1 / 1.12), { x: e.clientX, y: e.clientY });
   }, { passive: false });
 
-  // Al rotar/redimensionar cambia el ancho disponible → recomputar el ajuste.
+  // Al rotar/redimensionar cambia el ancho disponible → recomputar el ajuste (re-fit).
   let rt = 0;
   window.addEventListener('resize', () => {
     clearTimeout(rt);
@@ -260,12 +256,12 @@ function ensureZoomHandlers() {
 
 // Modo paginado: un único wrapper reutilizado (comportamiento clásico).
 async function renderPaginated(num) {
-  const container = document.getElementById('pdf-container');
-  let wrapper = container.querySelector('.pdf-page');
+  const layer = zoomLayer();
+  let wrapper = layer.querySelector('.pdf-page');
   if (!wrapper) {
     wrapper = document.createElement('div');
     wrapper.className = 'pdf-page';
-    container.appendChild(wrapper);
+    layer.appendChild(wrapper);
   }
   await renderInto(wrapper, num);
   setCurrentPage(num);
@@ -276,12 +272,12 @@ async function renderPaginated(num) {
 // cientos de canvas HiDPI.
 async function renderScroll() {
   const container = document.getElementById('pdf-container');
-  // Aspecto de la página 1 para dimensionar los placeholders (evita cargar las N páginas).
+  const layer = zoomLayer();
+  // Aspecto FIT (a zoom 1) de la página 1 para dimensionar los placeholders.
   let w = 600, h = 800;
   try {
     const p1 = await pdfDoc.getPage(1);
-    const scale = computeScale(p1.getViewport({ scale: 1 }).width);
-    const vp = p1.getViewport({ scale });
+    const vp = p1.getViewport({ scale: fitScale(p1.getViewport({ scale: 1 }).width) });
     w = vp.width; h = vp.height;
   } catch (e) {}
 
@@ -289,9 +285,11 @@ async function renderScroll() {
     const wrapper = document.createElement('div');
     wrapper.className = 'pdf-page';
     wrapper.dataset.page = String(n);
-    wrapper.style.width = w + 'px';
-    wrapper.style.height = h + 'px';
-    container.appendChild(wrapper);
+    wrapper.dataset.fitw = String(w);
+    wrapper.dataset.fith = String(h);
+    wrapper.style.width = (w * zoom) + 'px';
+    wrapper.style.height = (h * zoom) + 'px';
+    layer.appendChild(wrapper);
   }
 
   lazyObserver = new IntersectionObserver((entries) => {
@@ -310,8 +308,8 @@ async function renderScroll() {
   container.addEventListener('scroll', onScroll, { passive: true });
 
   // Posicionar en la última página vista y refrescar UI.
-  const target = container.querySelector(`.pdf-page[data-page="${currentPage}"]`);
-  if (target) container.scrollTop = target.offsetTop;
+  const target = layer.querySelector(`.pdf-page[data-page="${currentPage}"]`);
+  if (target) { const cr = container.getBoundingClientRect(), tr = target.getBoundingClientRect(); container.scrollTop += tr.top - cr.top; }
   setCurrentPage(currentPage);
 }
 
@@ -322,11 +320,13 @@ function onScroll() {
     scrollRaf = 0;
     const container = document.getElementById('pdf-container');
     if (!container) return;
-    const mid = container.scrollTop + container.clientHeight / 2;
+    const cr = container.getBoundingClientRect();
+    const midY = cr.top + container.clientHeight / 2;
     let best = currentPage, bestD = Infinity;
     container.querySelectorAll('.pdf-page').forEach(el => {
-      const c = el.offsetTop + el.offsetHeight / 2;
-      const d = Math.abs(c - mid);
+      const r = el.getBoundingClientRect();
+      const c = r.top + r.height / 2;
+      const d = Math.abs(c - midY);
       if (d < bestD) { bestD = d; best = +el.dataset.page; }
     });
     if (best !== currentPage) setCurrentPage(best);
@@ -354,19 +354,33 @@ function freeWrapper(wrapper) {
 async function renderInto(wrapper, num) {
   if (!pdfDoc) return;
   const page = await pdfDoc.getPage(num);
-  const scale = computeScale(page.getViewport({ scale: 1 }).width);
-  // TEC1 · Nitidez HiDPI: el canvas se PINTA a scale*dpr y se MUESTRA al tamaño lógico.
+  const base = page.getViewport({ scale: 1 });
+  const fit = fitScale(base.width);
+  const viewport = page.getViewport({ scale: fit });          // tamaño FIT (a zoom 1)
+  // El canvas se pinta OVERSAMPLEADO (fit·OVERSAMPLE·dpr), con tope del lado mayor, para
+  // que al ampliar por CSS siga nítido sin re-render. Se MUESTRA a tamaño fit.
   const dpr = window.devicePixelRatio || 1;
-  const viewport = page.getViewport({ scale });
-  const renderViewport = page.getViewport({ scale: scale * dpr });
+  let renderScale = fit * OVERSAMPLE * dpr;
+  const longest = Math.max(base.width, base.height) * renderScale;
+  if (longest > MAX_BACKING_PX) renderScale *= MAX_BACKING_PX / longest;
+  const renderViewport = page.getViewport({ scale: renderScale });
 
   wrapper.dataset.page = String(num);
-  wrapper.style.width = viewport.width + 'px';
-  wrapper.style.height = viewport.height + 'px';
-  wrapper.style.setProperty('--scale-factor', String(scale));
+  wrapper.dataset.fitw = String(viewport.width);
+  wrapper.dataset.fith = String(viewport.height);
+  wrapper.style.width = (viewport.width * zoom) + 'px';       // caja = fit·zoom (área de scroll)
+  wrapper.style.height = (viewport.height * zoom) + 'px';
+  wrapper.style.setProperty('--scale-factor', String(fit));
 
-  let canvas = wrapper.querySelector('canvas');
-  if (!canvas) { canvas = document.createElement('canvas'); wrapper.appendChild(canvas); }
+  // Contenedor interno que escala todo junto (canvas + capa de texto) al zoom actual.
+  let scaler = wrapper.querySelector('.pdf-scaler');
+  if (!scaler) { scaler = document.createElement('div'); scaler.className = 'pdf-scaler'; wrapper.appendChild(scaler); }
+  scaler.style.width = viewport.width + 'px';
+  scaler.style.height = viewport.height + 'px';
+  scaler.style.transform = zoom === 1 ? '' : `scale(${zoom})`;
+
+  let canvas = scaler.querySelector('canvas');
+  if (!canvas) { canvas = document.createElement('canvas'); scaler.appendChild(canvas); }
   const ctx = canvas.getContext('2d');
   canvas.width = Math.floor(renderViewport.width);
   canvas.height = Math.floor(renderViewport.height);
@@ -384,7 +398,7 @@ async function renderInto(wrapper, num) {
   }
   if (wrapper._renderTask === task) wrapper._renderTask = null;
 
-  await renderTextLayer(page, viewport, wrapper);
+  await renderTextLayer(page, viewport, scaler);
   wrapper.dataset.rendered = '1';
 
   // Re-pintar los subrayados de esta página (app.js escucha este evento).
@@ -471,7 +485,7 @@ export async function goTo(page) {
     // Desplazar hasta la página; el observer la pinta si aún no lo estaba.
     const container = document.getElementById('pdf-container');
     const target = container?.querySelector(`.pdf-page[data-page="${page}"]`);
-    if (target) container.scrollTo({ top: target.offsetTop, behavior: 'auto' });
+    if (target) { const cr = container.getBoundingClientRect(), tr = target.getBoundingClientRect(); container.scrollTop += tr.top - cr.top; }
     setCurrentPage(page);
   } else {
     await renderPaginated(page);

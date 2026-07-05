@@ -5,6 +5,21 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-05 — Zoom de PDF fluido tipo Adobe (sin re-render, paginado + scroll)
+
+El pinch re-renderizaba el canvas al soltar (la "recarga") y el preview salía borroso. Rework del zoom
+(ver [DECISIONS.md ADR-019](DECISIONS.md)):
+- **Oversample:** el canvas se pinta ~2.5× su tamaño (con tope de memoria) → ampliar sigue nítido
+  **sin re-rasterizar**.
+- **Zoom en el layout:** `.pdf-page` es una caja de tamaño `fit·zoom` (→ **paneo nativo**) con un
+  `.pdf-scaler` que escala canvas + capa de texto. Las páginas viven en `#pdf-zoom-layer`.
+- **Pinch (2 dedos):** transform en vivo del layer (GPU, mantecoso), anclado al punto focal; **al soltar
+  se "hornea"** en el layout y se ancla el scroll. **1 dedo = scroll/selección nativos**. Ctrl/⌘+rueda en
+  escritorio.
+- Funciona en **paginado y scroll** (leer PDFs técnicos en móvil/tablet). Subrayados en % (escalan solos).
+- Verificado: **cero re-render** (mismo canvas, backing intacto), nítido a 2×, anclaje focal, ambos modos.
+  Tests en [`tests/pdf.spec.ts`](tests/pdf.spec.ts).
+
 ## 2026-07-05 — Brillo y luz nocturna (ajustes de pantalla, tipo Play Books)
 
 Dos controles nuevos en Ajustes (pestaña de lectura), como en Play Books. La web no puede tocar el brillo

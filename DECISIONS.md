@@ -418,3 +418,38 @@ formato OpenAI-compatible). La respuesta cae en el mismo chat/libreta.
 no finge ver). Reescalar la imagen acota tokens. **Bonus:** es el camino natural para leer **PDFs
 escaneados** (sin texto, la visión es la única vía). Pendiente v2: auto-detectar "Figure N.M" y localizar
 su página por el índice BM25; y "explicar lo que veo" en EPUB (necesitaría rasterizar el iframe).
+
+---
+
+## ADR-019 — Zoom fluido de PDF: oversample + transform, sin re-render · `ACEPTADA`
+
+**Contexto.** El pinch-zoom en móvil re-renderizaba el canvas con pdf.js al soltar (la "recarga" que
+notaba el usuario) y el preview salía borroso (el canvas estaba pintado solo al zoom actual). Se pedía
+fluidez tipo Adobe —zoom sin re-rasterizar— y en **ambos modos** (paginado y scroll), porque el scroll
+continuo es la forma natural de leer PDFs técnicos en móvil/tablet.
+
+**Decisión.** **El zoom vive en el layout, no en pdf.js.** El canvas se pinta **oversampleado**
+(`fit·OVERSAMPLE·dpr`, con tope `MAX_BACKING_PX`), así ampliar hasta ~OVERSAMPLE× sigue nítido escalando
+el bitmap por CSS, **sin volver a rasterizar**. Estructura por página:
+`.pdf-page` = caja de tamaño **fit·zoom** (define el área de scroll → **paneo nativo**) que contiene un
+`.pdf-scaler` (tamaño fit, `transform: scale(zoom)`) con el canvas + la capa de texto. Las páginas viven
+dentro de `#pdf-zoom-layer`.
+- **Durante el pinch** (2 dedos, touch events): escalamos EN VIVO el `#pdf-zoom-layer` (`transform`, GPU,
+  mantecoso), anclado al punto medio de los dedos. **1 dedo = scroll/selección nativos** (no se tocan).
+- **Al soltar, "horneo":** cada caja pasa a fit·zoom y su scaler a `scale(zoom)` (una operación de layout),
+  y se reposiciona el scroll para mantener el foco bajo los dedos. **Cero llamadas a pdf.js.**
+- Subrayados PDF pasan a **porcentajes** → escalan solos con la caja, sin recalcular.
+
+**Porqué.**
+1. **Fluidez real.** El zoom/paneo es compositor puro (transform + scroll nativo); nunca toca CPU/render.
+2. **Sin "recarga".** El canvas no se recrea ni se re-rasteriza al hacer zoom (verificado: mismo canvas,
+   `backing` intacto).
+3. **Unificado.** Mismo modelo en paginado y scroll; el paneo es siempre scroll nativo → **conserva
+   selección de texto, subrayados e inercia** sin lógica de paneo propia.
+4. **Nitidez acotada por memoria.** Oversample con tope del lado mayor del canvas; el lazy de scroll
+   (ADR-017) mantiene ~2-3 canvas vivos.
+
+**Consecuencias.** Más allá de ~OVERSAMPLE× el bitmap se ablanda (aceptable en el rango de lectura); un
+**re-render progresivo** al quedarse quieto a zoom alto queda como mejora futura (F4). Tests en
+[`tests/pdf.spec.ts`](tests/pdf.spec.ts): anclaje focal, cero re-render (canvas/backing intactos) y zoom
+en modo scroll.

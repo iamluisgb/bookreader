@@ -266,15 +266,16 @@ export function drawPdfHighlights(page) {
     wrapper.appendChild(layer);
   }
   layer.innerHTML = '';
-  const W = wrapper.clientWidth, H = wrapper.clientHeight;
+  // En porcentaje (no px): así el overlay escala solo con la caja fit·zoom, sin recalcular
+  // al hacer zoom (los rects son fraccionales 0..1).
   for (const hl of Highlights.getByPage(page)) {
     for (const r of (hl.rects || [])) {
       const d = document.createElement('div');
       d.className = 'pdf-hl';
-      d.style.left = (r.left * W) + 'px';
-      d.style.top = (r.top * H) + 'px';
-      d.style.width = (r.width * W) + 'px';
-      d.style.height = (r.height * H) + 'px';
+      d.style.left = (r.left * 100) + '%';
+      d.style.top = (r.top * 100) + '%';
+      d.style.width = (r.width * 100) + '%';
+      d.style.height = (r.height * 100) + '%';
       d.style.background = hl.color;
       if (hl.note) d.title = hl.note;
       layer.appendChild(d);

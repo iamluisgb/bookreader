@@ -665,24 +665,46 @@ body:not(.scroll-mode) .epub-container .epub-view {
   height: 100% !important;
 }
 
-/* ============ PDF CONTAINER ============ */
+/* ============ PDF CONTAINER (zoom fluido) ============ */
+/* El contenedor es el área de SCROLL (paneo nativo, 1 dedo). Dentro, #pdf-zoom-layer
+   agrupa las páginas y es lo que escalamos EN VIVO durante el pinch (2 dedos, por JS).
+   El zoom "horneado" vive en el layout: cada .pdf-page es una caja de tamaño fit·zoom y
+   su .pdf-scaler escala el contenido — así el scroll nativo abarca el contenido ampliado
+   y la selección de texto sigue funcionando. */
 .pdf-container {
   width: 100%;
   height: 100%;
-  overflow: auto;                 /* con zoom la página puede exceder ancho y alto → paneo */
-  display: flex;
-  justify-content: safe center;   /* centrada si cabe; al desbordar, bordes alcanzables */
-  align-items: flex-start;
+  overflow: auto;
+  position: relative;
   padding: 20px;
   background: var(--bg-tertiary);
-  /* Permitimos paneo nativo (1 dedo); el pinch (2 dedos) lo gestiona el JS. */
-  touch-action: pan-x pan-y;
+  touch-action: pan-x pan-y;      /* 1 dedo = scroll/selección nativos; pinch lo gestiona el JS */
+  -webkit-overflow-scrolling: touch;
 }
+
+#pdf-zoom-layer {
+  display: flex;
+  flex-direction: column;
+  align-items: safe center;       /* centra horizontalmente */
+  justify-content: safe center;   /* centra verticalmente si la página cabe (paginado) */
+  min-height: 100%;
+}
+.pdf-container.pdf-scroll #pdf-zoom-layer { justify-content: flex-start; gap: 12px; }
 
 .pdf-page {
   position: relative;
+  flex: none;
   box-shadow: 0 2px 8px var(--shadow);
 }
+
+/* Contenido de la página (canvas + capa de texto) a tamaño fit; se escala al zoom actual. */
+.pdf-scaler {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform-origin: 0 0;
+}
+.pdf-scaler canvas, #pdf-canvas { display: block; }
 
 /* Flash al saltar a una página desde una cita del agente (señala el destino). */
 @keyframes pdfCiteFlash {
@@ -690,23 +712,6 @@ body:not(.scroll-mode) .epub-container .epub-view {
   20%, 60% { box-shadow: 0 0 0 3px var(--accent), 0 2px 12px var(--shadow); }
 }
 .pdf-page.pdf-cite-flash { animation: pdfCiteFlash 1.5s var(--ease); }
-
-/* PDF4 · Modo scroll continuo: páginas apiladas en vertical. */
-.pdf-container.pdf-scroll {
-  align-items: safe center;       /* centradas; con zoom, bordes laterales alcanzables */
-  justify-content: flex-start;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.pdf-container.pdf-scroll .pdf-page {
-  flex: none;   /* no encoger la altura fija en el flex column */
-}
-
-#pdf-canvas {
-  display: block;
-  max-width: 100%;
-}
 
 /* pdf.js selectable text layer overlaid on the canvas */
 .textLayer {
