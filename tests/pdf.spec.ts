@@ -121,6 +121,24 @@ test('PDF3: subrayar en PDF crea overlay, lo persiste y lo re-pinta', async ({ p
   await expect(page.locator('#pdf-container .pdf-hl').first()).toBeVisible();
 });
 
+// PDF3-scroll · En modo scroll el subrayado se creaba sobre el placeholder ANTES de que el
+// observer perezoso añadiera el .pdf-scaler → el canvas opaco quedaba encima y TAPABA el
+// subrayado (se guardaba pero no se veía). La capa de subrayados debe ir por z-index encima.
+test('PDF3-scroll: el subrayado en modo scroll queda por encima del canvas (no lo tapa)', async ({ page }) => {
+  await openPdf(page);
+  await page.evaluate(async () => { const P: any = await import('/js/pdf-reader.js'); await P.setReadingMode('scroll'); await new Promise(r => setTimeout(r, 500)); });
+  await selectPdfText(page);
+  await page.locator('#highlight-tooltip .highlight-color').first().click();
+  await expect(page.locator('#pdf-container .pdf-hl').first()).toBeVisible();
+  // Invariante del fix: la capa de subrayados se apila por ENCIMA del scaler (canvas),
+  // pase lo que pase con el orden en el DOM.
+  const z = await page.evaluate(() => {
+    const layer = document.querySelector('#pdf-container .pdf-hl-layer') as HTMLElement;
+    return getComputedStyle(layer).zIndex;
+  });
+  expect(Number(z)).toBeGreaterThanOrEqual(1);
+});
+
 // PDF4 · Modo scroll continuo: alternar monta las páginas apiladas (con data-page), las
 // renderiza (lazy) y recuerda el modo; volver a paginado quita la clase.
 test('PDF4: alternar a scroll monta y renderiza páginas, y persiste el modo', async ({ page }) => {

@@ -745,6 +745,10 @@ body:not(.scroll-mode) .epub-container .epub-view {
   position: absolute;
   inset: 0;
   pointer-events: none;
+  /* Por ENCIMA del .pdf-scaler (canvas) pase lo que pase con el orden del DOM: en modo
+     scroll el subrayado se crea sobre el placeholder ANTES de que el observer perezoso
+     añada el scaler, así que sin z-index el canvas opaco lo tapaba. */
+  z-index: 2;
 }
 
 .pdf-hl {

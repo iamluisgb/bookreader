@@ -5,6 +5,14 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-05 — Fix: subrayado de PDF invisible en modo scroll
+
+En modo scroll el subrayado se guardaba pero **no se veía sobre el texto**. Causa: la capa de
+subrayados (`.pdf-hl-layer`) se creaba sobre el placeholder de la página ANTES de que el observer
+perezoso añadiera el `.pdf-scaler`; al ir ambos `position:absolute`, el canvas (opaco) quedaba
+**después en el DOM y lo tapaba**. Fix: `z-index` a `.pdf-hl-layer` para que quede por encima del
+canvas pase lo que pase con el orden de creación. Test en [`tests/pdf.spec.ts`](tests/pdf.spec.ts).
+
 ## 2026-07-05 — PDF móvil: márgenes centrados + ocultar barras (inmersivo)
 
 Dos arreglos sobre el lector PDF en móvil reportados por el usuario:
