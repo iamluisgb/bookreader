@@ -17,6 +17,7 @@ let zoom = 1;
 let renderedZoom = 1;            // zoom al que están pintadas las páginas ahora mismo
 let commitTimer = 0;
 let zoomHandlersReady = false;
+let zoomFocal = null;           // punto de anclaje del zoom, relativo al viewport del contenedor {x,y}
 const PDF_PAD = 20;             // padding del contenedor (coincide con el CSS)
 const ZOOM_MIN = 1, ZOOM_MAX = 5;
 
@@ -45,12 +46,19 @@ function pdfPages() {
   const c = document.getElementById('pdf-container');
   return c ? Array.from(c.querySelectorAll('.pdf-page')) : [];
 }
+// Fija el origen de transformación de cada página en el punto focal (coords de pantalla),
+// de modo que el preview con scale() se ancle ahí. Debe llamarse con transform IDENTIDAD
+// (al inicio del gesto) para que getBoundingClientRect mida la caja sin escalar.
+function setZoomOrigins(focalClientX, focalClientY) {
+  for (const w of pdfPages()) {
+    const r = w.getBoundingClientRect();
+    w.style.transformOrigin = `${focalClientX - r.left}px ${focalClientY - r.top}px`;
+  }
+}
 function applyZoomPreview() {
   const f = renderedZoom ? zoom / renderedZoom : 1;
-  for (const w of pdfPages()) {
-    w.style.transformOrigin = 'center top';
-    w.style.transform = Math.abs(f - 1) < 0.001 ? '' : `scale(${f})`;
-  }
+  const s = Math.abs(f - 1) < 0.001 ? '' : `scale(${f})`;
+  for (const w of pdfPages()) w.style.transform = s;
 }
 function clearZoomPreview() {
   for (const w of pdfPages()) w.style.transform = '';
@@ -58,11 +66,24 @@ function clearZoomPreview() {
 async function commitZoom() {
   clearTimeout(commitTimer); commitTimer = 0;
   if (Math.abs(renderedZoom - zoom) < 0.001) return;
-  const keep = currentPage;
+  const container = document.getElementById('pdf-container');
+  // Anclaje zoom-a-punto: mantener bajo el foco el mismo punto del contenido tras el
+  // re-render. El contenido escala por `ratio`; el padding del contenedor NO escala.
+  const oldZoom = renderedZoom;
+  const ratio = zoom / oldZoom;
+  const focal = zoomFocal || (container ? { x: container.clientWidth / 2, y: container.clientHeight / 2 } : { x: 0, y: 0 });
+  let newLeft = 0, newTop = 0;
+  if (container) {
+    newLeft = (container.scrollLeft + focal.x - PDF_PAD) * ratio + PDF_PAD - focal.x;
+    newTop  = (container.scrollTop  + focal.y - PDF_PAD) * ratio + PDF_PAD - focal.y;
+  }
   renderedZoom = zoom;
   await rerender();               // re-pinta nítido al scale = fit · zoom
   clearZoomPreview();
-  if (readingMode === 'scroll') goTo(keep);
+  if (container) {
+    container.scrollLeft = Math.max(0, newLeft);
+    container.scrollTop  = Math.max(0, newTop);
+  }
 }
 function scheduleZoomCommit(delay = 150) {
   clearTimeout(commitTimer);
@@ -195,7 +216,16 @@ function ensureZoomHandlers() {
   let pinching = false, startDist = 0, baseZoom = 1;
 
   container.addEventListener('touchstart', (e) => {
-    if (e.touches.length === 2) { pinching = true; startDist = dist(e.touches); baseZoom = zoom; }
+    if (e.touches.length === 2) {
+      pinching = true; startDist = dist(e.touches); baseZoom = zoom;
+      // Foco = punto medio de los dedos. Se fija al INICIO (transform aún identidad) y se
+      // usa como anclaje tanto del preview como del reposicionado en el commit.
+      const cr = container.getBoundingClientRect();
+      const mx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+      const my = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+      zoomFocal = { x: mx - cr.left, y: my - cr.top };
+      setZoomOrigins(mx, my);
+    }
   }, { passive: true });
 
   container.addEventListener('touchmove', (e) => {
@@ -203,17 +233,20 @@ function ensureZoomHandlers() {
     e.preventDefault();            // corta el zoom nativo de la página
     const ratio = dist(e.touches) / (startDist || 1);
     zoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, baseZoom * ratio));
-    applyZoomPreview();            // feedback en vivo (sin re-render)
+    applyZoomPreview();            // feedback en vivo anclado al foco (sin re-render)
   }, { passive: false });
 
   const endPinch = () => { if (pinching) { pinching = false; commitZoom(); } };
   container.addEventListener('touchend', endPinch);
   container.addEventListener('touchcancel', endPinch);
 
-  // Escritorio: Ctrl/⌘ + rueda (incluye el pinch de trackpad en macOS).
+  // Escritorio: Ctrl/⌘ + rueda (incluye el pinch de trackpad en macOS). Ancla al cursor.
   container.addEventListener('wheel', (e) => {
     if (!e.ctrlKey && !e.metaKey) return;
     e.preventDefault();
+    const cr = container.getBoundingClientRect();
+    zoomFocal = { x: e.clientX - cr.left, y: e.clientY - cr.top };
+    if (Math.abs(renderedZoom - zoom) < 0.001) setZoomOrigins(e.clientX, e.clientY);  // fija origen si estamos en identidad
     setZoom(zoom * (e.deltaY < 0 ? 1.12 : 1 / 1.12));
   }, { passive: false });
 

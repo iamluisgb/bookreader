@@ -5,6 +5,16 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-05 — PDF: el pinch-zoom se ancla al punto focal (ya no salta)
+
+En móvil, al hacer pinch sobre una zona, el PDF re-renderizaba al nuevo tamaño pero **saltaba a otra
+parte** de la página: el zoom no se anclaba al punto entre los dedos y el commit no ajustaba el scroll.
+- **Zoom-a-punto** ([`pdf-reader.js`](js/pdf-reader.js)): se captura el foco (punto medio de los dedos, o
+  el cursor en Ctrl/⌘+rueda); el preview escala con `transform-origin` en ese foco y, tras el re-render,
+  el scroll se reposiciona para mantener bajo el foco el mismo punto del contenido (el padding no escala).
+- Test en [`tests/pdf.spec.ts`](tests/pdf.spec.ts): tras un pinch anclado, la fracción del canvas bajo el
+  foco se conserva (no salta). Verificado además con un pinch simulado (invariante Δ≈0).
+
 ## 2026-07-05 — Retrieval: capítulos en números romanos ("capítulo 3" → "III")
 
 Pedir "resumen del capítulo 3" en un libro con capítulos en **romanos** (Lituma: I, II, III…) fallaba:

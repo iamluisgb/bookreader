@@ -301,4 +301,44 @@ test.describe('PDF fit-to-width + zoom', () => {
     });
     expect(zoomed).toBeGreaterThan(fit.page * 1.5);
   });
+
+  // El pinch debe ANCLARSE al punto entre los dedos: el punto del contenido bajo el foco
+  // debe seguir bajo el foco tras el re-render (antes saltaba a otra parte de la página).
+  test('el pinch-zoom se ancla al punto focal (no salta)', async ({ page }) => {
+    await openPdf(page);
+    await page.waitForTimeout(300);
+
+    // Helper: dispara un pinch (dos dedos) sobre el contenedor del PDF.
+    const pinch = (a: any) => page.evaluate((a) => {
+      const el = document.getElementById('pdf-container')!;
+      const mk = (id: number, x: number, y: number) => new Touch({ identifier: id, target: el, clientX: x, clientY: y });
+      const ev = (type: string, ts: Touch[]) => el.dispatchEvent(new TouchEvent(type, { bubbles: true, cancelable: true, touches: ts, targetTouches: ts, changedTouches: ts } as any));
+      ev('touchstart', [mk(1, a.x0, a.y0), mk(2, a.x1, a.y1)]);
+      ev('touchmove', [mk(1, a.x0b, a.y0b), mk(2, a.x1b, a.y1b)]);
+      ev('touchend', []);
+    }, a);
+
+    // 1) Ampliar para desbordar el contenedor (así hay scroll donde "saltar").
+    await pinch({ x0: 150, y0: 300, x1: 240, y1: 340, x0b: 40, y0b: 200, x1b: 340, y1b: 440 });
+    await page.waitForTimeout(500);
+
+    // 2) Anotar qué fracción del canvas cae bajo un foco concreto.
+    const focal = { x: 300, y: 250 };
+    const before = await page.evaluate((f) => {
+      const c = document.querySelector('#pdf-container canvas')!.getBoundingClientRect();
+      return (f.x - c.left) / c.width;
+    }, focal);
+
+    // 3) Pinch anclado en ese foco.
+    await pinch({ x0: focal.x - 20, y0: focal.y, x1: focal.x + 20, y1: focal.y, x0b: focal.x - 40, y0b: focal.y, x1b: focal.x + 40, y1b: focal.y });
+    await page.waitForTimeout(500);
+
+    // 4) La misma fracción del canvas debe seguir bajo el foco (± pequeño margen).
+    const after = await page.evaluate((f) => {
+      const c = document.querySelector('#pdf-container canvas')!.getBoundingClientRect();
+      return (f.x - c.left) / c.width;
+    }, focal);
+
+    expect(Math.abs(after - before)).toBeLessThan(0.05);   // el punto focal se mantiene (no salta)
+  });
 });
