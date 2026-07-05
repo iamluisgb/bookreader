@@ -133,9 +133,39 @@ export function chapterCore(label) {
   return norm(label).replace(/^(?:chapter|cap(?:itulo|\.)?|parte|part)?\s*[ivxlcdm\d]+[.\-)\s]+/i, '').trim();
 }
 
+// Romano → entero (0 si no es válido). Muchos libros numeran los capítulos en
+// romanos (Lituma: I, II, III…), así que "capítulo 3" debe casar con "III".
+function romanToInt(r) {
+  const map = { i: 1, v: 5, x: 10, l: 50, c: 100, d: 500, m: 1000 };
+  const s = r.toLowerCase();
+  let total = 0, prev = 0;
+  for (let i = s.length - 1; i >= 0; i--) {
+    const v = map[s[i]];
+    if (!v) return 0;
+    if (v < prev) total -= v; else { total += v; prev = v; }
+  }
+  return total;
+}
+function isValidRoman(s) {
+  return /^m{0,4}(cm|cd|d?c{0,3})(xc|xl|l?x{0,3})(ix|iv|v?i{0,3})$/i.test(s);
+}
+// Número inicial de una etiqueta de capítulo, sea árabe ("9. …") o romano ("III").
+// Devuelve un ENTERO (o null), de modo que romano y árabe se comparen entre sí.
 function leadingNum(s) {
-  const m = norm(s).match(/^(?:chapter|cap(?:itulo|\.)?)?\s*(\d+)\b/);
-  return m ? m[1] : null;
+  const n = norm(s);
+  const a = n.match(/^(?:chapter|cap(?:itulo|\.)?)?\s*(\d+)\b/);
+  if (a) return parseInt(a[1], 10);
+  const r = n.match(/^(?:chapter|cap(?:itulo|\.)?)?\s*([ivxlcdm]+)\b/);
+  if (r && isValidRoman(r[1])) return romanToInt(r[1]);
+  return null;
+}
+// Número de capítulo referido en la pregunta ("capítulo 3" | "capítulo III"), árabe o romano.
+function queryChapterNum(qn) {
+  const a = qn.match(/\b(?:cap(?:itulo|\.)?|chapter|chap)\s*(\d+)\b/);
+  if (a) return parseInt(a[1], 10);
+  const r = qn.match(/\b(?:cap(?:itulo|\.)?|chapter|chap)\s*([ivxlcdm]+)\b/);
+  if (r && isValidRoman(r[1])) return romanToInt(r[1]);
+  return 0;
 }
 
 // Todos los pasajes de un capítulo, en orden de lectura. Matching TOLERANTE a variaciones
@@ -162,15 +192,12 @@ export function passagesByChapter(chapterLabel) {
 export function matchChapters(query, tocLabels = []) {
   const qn = norm(query);
   const hits = new Set();
-  const numMatch = qn.match(/\b(?:cap(?:itulo|\.)?|chapter|chap)\s*(\d+)\b/);
+  const qNum = queryChapterNum(qn);   // nº del capítulo pedido (árabe o romano), 0 si ninguno
   for (const label of tocLabels) {
     const nl = norm(label);
     if (!nl) continue;
-    // 1) por número: "capitulo 9" / "chapter 9" casa con "9. Consistency..."
-    if (numMatch) {
-      const ln = nl.match(/^(\d+)\b/);
-      if (ln && ln[1] === numMatch[1]) { hits.add(label); continue; }
-    }
+    // 1) por número: "capitulo 9"→"9. Consistency…"; "capitulo 3"→"III" (romano).
+    if (qNum && leadingNum(label) === qNum) { hits.add(label); continue; }
     // 2) por título: el núcleo del título (sin el "9." o numeral romano) aparece literal.
     const core = nl.replace(/^[ivxlcdm\d]+[.\-)\s]+/i, '').trim();
     if (core.length >= 6 && qn.includes(core)) hits.add(label);

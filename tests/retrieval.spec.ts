@@ -56,6 +56,33 @@ test('retrieval attributes sub-heading passages to their TOC chapter', async ({ 
   expect(r.bm25).toContain('a5');
 });
 
+// Muchos libros numeran los capítulos en ROMANOS (Lituma: I, II, III…). "capítulo 3"
+// debe casar con "III" y recuperar sus pasajes; antes solo se entendían números árabes.
+test('el router casa capítulos en números romanos ("capítulo 3" → "III")', async ({ page }) => {
+  await page.goto('/');
+  const r = await page.evaluate(async () => {
+    const R: any = await import('/js/ai/retrieval.js');
+    const annotated = [
+      '## II', '[[a0]] Segundo capítulo sobre pishtacos.',
+      '## III', '[[a1]] Tercer capítulo: Casimiro Huarcaya en la cantina.',
+      '## IV', '[[a2]] Cuarto capítulo.',
+    ].join('\n');
+    const toc = ['Primera parte', 'I', 'II', 'III', 'IV', 'Segunda parte'];
+    R.buildIndex('roman', R.parsePassages(annotated, new Map(), toc));
+    return {
+      routed3: R.matchChapters('hazme un resumen del capítulo 3', toc),
+      routedRoman: R.matchChapters('resume el capítulo III', toc),
+      ch3: R.passagesByChapter('III').map((p: any) => p.id),
+      // Un capítulo árabe sigue funcionando (no regresión).
+      arabic: R.matchChapters('capítulo 9', ['8. Foo', '9. Bar']),
+    };
+  });
+  expect(r.routed3).toEqual(['III']);        // "3" → "III"
+  expect(r.routedRoman).toEqual(['III']);    // "III" en la pregunta también
+  expect(r.ch3).toEqual(['a1']);             // recupera los pasajes del capítulo III
+  expect(r.arabic).toContain('9. Bar');      // los árabes siguen casando
+});
+
 test('sentence-window: cada acierto arrastra sus vecinos del mismo capítulo', async ({ page }) => {
   await page.goto('/');
   const r = await page.evaluate(async ({ annotated, toc }) => {

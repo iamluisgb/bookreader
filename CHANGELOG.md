@@ -5,6 +5,16 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-05 — Retrieval: capítulos en números romanos ("capítulo 3" → "III")
+
+Pedir "resumen del capítulo 3" en un libro con capítulos en **romanos** (Lituma: I, II, III…) fallaba:
+el agente decía no tener ese capítulo y pedía abrirlo. Causa: el router de capítulos
+([`retrieval.js`](js/ai/retrieval.js)) solo entendía números **árabes**, así que "3" no casaba con "III".
+- `leadingNum` y el router (`matchChapters`) ahora convierten **romano↔árabe** (`romanToInt` +
+  validación), tanto en la etiqueta del TOC como en la pregunta ("capítulo 3" o "capítulo III").
+- Arregla el router inicial y la herramienta agéntica `read_chapter`. Los capítulos árabes siguen igual.
+- Test en [`tests/retrieval.spec.ts`](tests/retrieval.spec.ts).
+
 ## 2026-07-04 — Bug crítico: el agente respondía de OTRO libro (carrera al segmentar)
 
 Con un libro abierto, el agente contestaba con contenido de otro (citas de otro libro incluidas). Causa:
