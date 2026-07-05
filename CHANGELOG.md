@@ -5,6 +5,20 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-05 — Pulido de UI (cherry-pick del rediseño Stitch)
+
+Se extrae SOLO la capa de "polish" del rediseño Stitch (rama `feat/stitch-ui-redesign`), dejando fuera
+lo decorativo o inerte:
+- **Consolidación de tokens:** valores hardcodeados → tokens (`--bg-tertiary`→`--surface-3`,
+  `--border`→`--border-soft`, px sueltos → `--r-sm/md/pill`).
+- **Estados de foco** en search / select / textarea (`border-color: var(--accent)`).
+- **Bordes `--border-soft`** por defecto (look más calmado) y **más aire** (paddings/gaps/márgenes).
+- **Landing más expresiva** (icono 72px, h1 32px bold con tracking negativo) y anillo `accent-soft` en el
+  tema activo; sombra sutil en la burbuja del usuario; chips de cita un poco más visibles.
+- **Descartado** (no entra): drop caps, relevancia con 5 estrellas y barra `.ai-stats` (CSS sin cablear
+  en JS; los drop caps además vivían en el documento padre, no en el iframe del EPUB), y el coloreado de
+  la Libreta en verde/`accent-soft` (se mantiene neutro).
+
 ## 2026-07-05 — Fix: bandas oscuras en subrayados de PDF multilínea
 
 Al subrayar varias líneas, las zonas de solape entre rects contiguos se veían más oscuras: cada
