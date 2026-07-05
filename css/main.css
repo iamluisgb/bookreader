@@ -1667,10 +1667,10 @@ body.ai-busy #ai-toggle::after, body.ai-busy .ai-fab::after {
   body.reading.fs .reader-footer { position: absolute; left: 0; right: 0; z-index: 60; }
   body.reading.fs .reader-header { top: 0; }
   body.reading.fs .reader-footer { bottom: 0; }
-  /* El texto reserva la franja de las barras aunque estén ocultas, para que al
-     revelarlas (llevar el ratón al borde) NUNCA se dibujen sobre el texto. Así se
-     puede seleccionar/subrayar también la 1ª y la última línea. */
-  body.reading.fs .reader-viewport { padding-top: var(--header-height); padding-bottom: var(--footer-height); }
+  /* En pantalla completa el área de lectura usa TODA la altura (sin reservar la franja de
+     las barras): las barras están ocultas y son overlay. Al auto-revelarse (ratón al borde)
+     tapan un instante la línea del borde, pero justo entonces vas a por la barra, no leyendo.
+     Así se aprovecha la pantalla entera (antes se perdían ~104px arriba+abajo). */
 }
 /* Inmersivo = barras ocultas: se deslizan fuera (el área de lectura no cambia).
    Solo tiene efecto cuando las barras son overlay (móvil, o escritorio en `fs`). */
