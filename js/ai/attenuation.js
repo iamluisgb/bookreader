@@ -42,7 +42,11 @@ relevancia para el objetivo (1 = central, 0 = paja/introducción/anécdota).` },
 `OBJETIVO: ${goal}\n\nCAPÍTULOS A PUNTUAR (usa estos títulos exactos):\n` +
       chapters.map(c => `- ${c}`).join('\n') },
   ];
-  const { toolCalls } = await LLM.chatTools({ messages, tools, toolChoice: 'auto' });
+  // maxTokens holgado: rate_chapters devuelve una entrada por capítulo en una sola tool-call;
+  // con el tope por defecto (1024) un libro con muchos capítulos truncaba la lista → los
+  // últimos capítulos quedaban sin puntuar (atenuación incompleta). ~120 tok/capítulo de margen.
+  const maxTokens = Math.min(8192, 512 + chapters.length * 120);
+  const { toolCalls } = await LLM.chatTools({ messages, tools, toolChoice: 'auto', maxTokens });
   const call = toolCalls.find(t => t.name === 'rate_chapters');
   if (!call || !Array.isArray(call.args.ratings)) return null;
   const scores = {};

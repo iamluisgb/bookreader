@@ -10,6 +10,7 @@ import * as Highlights from './highlights.js';
 import * as AiPanel from './ai/panel.js';
 import { icon } from './ui/icons.js';
 import { escapeHtml } from './ui/escape.js';
+import { alertBox, promptBox } from './ui/dialog.js';
 
 export function initHighlights() {
   Highlights.setOnChange(() => renderHighlights());
@@ -19,7 +20,7 @@ export function initHighlights() {
     const title = EpubReader.isLoaded() ? EpubReader.getTitle() : 'PDF';
     const result = Highlights.exportJSON(title);
     if (!result) {
-      alert('No hay subrayados para exportar');
+      alertBox('No hay subrayados para exportar');
     }
   });
 }
@@ -135,8 +136,8 @@ function showHighlightTooltip(cfiRange, text, rect) {
   };
 
   // Añadir nota (subraya y guarda la nota)
-  document.getElementById('sel-note').onclick = () => {
-    const note = prompt('Tu nota sobre este pasaje:');
+  document.getElementById('sel-note').onclick = async () => {
+    const note = await promptBox('Tu nota sobre este pasaje:', { title: 'Nota' });
     if (note === null) return;
     const color = '#ffd54f';
     removeTempSelection();
@@ -233,8 +234,8 @@ function showPdfSelectionTooltip(text, rect, rects, page) {
     btn.onclick = () => saveHighlight(btn.dataset.color);
   });
 
-  document.getElementById('sel-note').onclick = () => {
-    const note = prompt('Tu nota sobre este pasaje:');
+  document.getElementById('sel-note').onclick = async () => {
+    const note = await promptBox('Tu nota sobre este pasaje:', { title: 'Nota' });
     if (note === null) return;
     saveHighlight('#ffd54f', note.trim());
   };

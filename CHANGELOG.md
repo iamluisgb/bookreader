@@ -5,6 +5,55 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-05 — Auditoría: correcciones de seguridad, offline, RAG, a11y y UX
+
+Lote de mejoras a partir de una auditoría técnica independiente. Suite: 66/66 E2E (antes 64;
++`security.spec.ts` y +`retrieval-golden.spec.ts`). Lint sin nuevos problemas.
+
+### Crítico / Seguridad
+- **PWA offline reactivada:** `sw.js` existía y se versionaba, pero **nunca se registraba** (no había
+  `navigator.serviceWorker.register` en todo el histórico) → la app no funcionaba offline y la estrategia
+  SWR estaba inerte. Añadido el registro en [`js/app.js`](js/app.js) (`registerServiceWorker`, tras `load`,
+  falla en silencio donde no aplica). Bump de `sw.js` a `v51` (se añade `dialog.js` al precache).
+- **Sandbox del iframe EPUB — se retira `allow-scripts`:** el iframe de lectura corría con
+  `allow-same-origin allow-scripts`, combo que permitiría a un `<script>` de un EPUB malicioso leer
+  `parent.localStorage` (la API key). Ahora `allow-same-origin` solo (epub.js lo necesita para paginar);
+  los scripts del propio EPUB no corren. La paginación de texto reflowable no usa scripts, sin regresión.
+  Se **rectifica** la nota anterior del CHANGELOG (afirmaba "origen opaco sin allow-same-origin", falso).
+  Regresión en [`tests/security.spec.ts`](tests/security.spec.ts): falla si la key vuelve a ser legible.
+
+### Robustez / RAG
+- **Guard de secuencia de libro en el chat:** `deliver`/`deliverVision`/`quizChapter` persistían la
+  respuesta aunque el usuario cambiara de libro mid-turno (misma clase de carrera que la de segmentación,
+  pero en la ruta de respuesta). Ahora capturan `bookSeq` y no pintan/persisten si cambió; `setBook`
+  aborta la petición en vuelo. Ver [`js/ai/panel.js`](js/ai/panel.js).
+- **BM25 Unicode:** el tokenizador dividía por `[^a-z0-9]`, así que libros en cirílico/griego/CJK
+  quedaban con cero tokens (retrieval desactivado). Ahora `[^\p{L}\p{N}]+/u`. Ver
+  [`js/ai/retrieval.js`](js/ai/retrieval.js).
+- **Atenuación de capítulos completa en libros grandes:** `rate_chapters` iba con `max_tokens:1024` y
+  truncaba la lista en libros con muchos capítulos (últimos sin puntuar). `chatTools` acepta `maxTokens`
+  y la atenuación pide margen `~120 tok/capítulo`. Ver [`js/ai/llm.js`](js/ai/llm.js),
+  [`js/ai/attenuation.js`](js/ai/attenuation.js).
+- **Golden set de recall** sobre un EPUB real ("Pedro Páramo") en
+  [`tests/retrieval-golden.spec.ts`](tests/retrieval-golden.spec.ts): recall@5 end-to-end como red de
+  regresión, además del corpus sintético existente.
+
+### Accesibilidad / UX
+- **Diálogos propios** ([`js/ui/dialog.js`](js/ui/dialog.js)): `alertBox`/`confirmBox`/`promptBox`
+  modales, theme-aware, con foco atrapado y Escape/backdrop, reemplazan a los `alert`/`confirm`/`prompt`
+  nativos (18 usos en app, panel, biblioteca, ajustes, subrayados).
+- **A11y del panel IA:** onboarding con `role="dialog"`, `aria-modal`, focus-trap y restauración de foco;
+  `#ai-messages` con `role="log"` + `aria-live="polite"` (el lector de pantalla anuncia la respuesta).
+- **Carga robusta:** si `loadEpub`/`loadPdf` fallan, no se deja `currentBook` apuntando a un libro no
+  renderizado ni se persiste en la biblioteca ([`js/app.js`](js/app.js)).
+
+### Mantenibilidad
+- **Tokens CSS:** migrados los alias legacy (`--bg-*`, `--text-primary/secondary/muted`, `--highlight-bg`)
+  a los nuevos (`--surface-*`, `--text`/`--text-soft`/`--text-faint`) y eliminados de `themes.css`
+  (se conserva `--shadow`, que no tiene equivalente 1:1).
+
+---
+
 ## 2026-07-05 — Fix: el pinch-zoom del trackpad ya no cambia de página
 
 Al hacer pinch-zoom en el PDF con el trackpad en PC, el componente horizontal del gesto se
@@ -917,10 +966,19 @@ la **barra de gestos** (abajo).
   texto no queda debajo de la cámara. En portrait los insets son 0 → sin efecto.
 
 **Por qué desde el botón y no desde el toque central** (corrige el primer intento, que no funcionaba):
-el toque en el texto ocurre DENTRO del iframe de lectura, que es *sandbox* de **origen opaco** (sin
-`allow-same-origin`, para que el libro no lea la API key del localStorage). Chrome/Android **rechaza
-`requestFullscreen()` iniciado por un gesto de un iframe cross-origin así**, y el rechazo era silencioso
-→ "no funcionaba". El botón ⤢ vive en el documento padre, así que su gesto sí puede iniciar fullscreen.
+el toque en el texto ocurre DENTRO del iframe de lectura. Ese iframe es **same-origin** (epub.js lo
+necesita para paginar y para que inyectemos tema/selección/teclado), pero **sin `allow-scripts`**: un
+`<script>` de un EPUB malicioso no corre, así que no puede leer la API key del `localStorage` del padre
+(defensa reforzada además por la CSP `script-src 'self'`, que la srcdoc hereda). Aun siendo same-origin,
+el iframe de contenido de epub.js **no puede iniciar `requestFullscreen()`** de forma fiable desde un
+gesto suyo en todos los navegadores, y el rechazo era silencioso → "no funcionaba". El botón ⤢ vive en
+el documento padre, así que su gesto sí puede iniciar fullscreen.
+
+_Nota de seguridad (rectificación):_ una versión anterior de esta entrada afirmaba que el iframe era de
+**origen opaco sin `allow-same-origin`**. Es incorrecto: epub.js requiere `allow-same-origin`. La key se
+protege quitando `allow-scripts` (ningún script del EPUB corre) + la CSP heredada, no por aislamiento de
+origen. Ver [`tests/security.spec.ts`](tests/security.spec.ts) (regresión que falla si la key se vuelve
+legible desde el contenido del libro).
 
 Sin bump de `sw.js`. Verificado con Playwright (contexto móvil *coarse*, Fullscreen API stubbeada: botón
 → `requestFullscreen` + barras ocultas + icono ⤡; salir del sistema → barras vuelven; reentrar → vuelve

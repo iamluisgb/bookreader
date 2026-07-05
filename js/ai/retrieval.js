@@ -21,12 +21,14 @@ const STOP = new Set((
   'after also did many before must through back where much your way well down should because each just those'
 ).split(/\s+/).filter(Boolean));
 
-// Tokeniza: minúsculas, sin acentos, solo alfanumérico, sin stopwords ni tokens de 1 char.
+// Tokeniza: minúsculas, sin acentos, letras/números de cualquier alfabeto, sin stopwords ni tokens de 1 char.
 function tokenize(s) {
   return (s || '')
     .toLowerCase()
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '')   // quitar diacríticos (café→cafe)
-    .split(/[^a-z0-9]+/)
+    // Unicode-aware: los libros en cirílico, griego, CJK… también producen tokens (antes,
+    // con `[^a-z0-9]+`, quedaban con CERO tokens → BM25 no recuperaba nada).
+    .split(/[^\p{L}\p{N}]+/u)
     .filter(t => t.length > 1 && !STOP.has(t));
 }
 

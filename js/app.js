@@ -16,6 +16,7 @@ import * as AppSettings from './ui/app-settings.js';
 import * as Search from './search.js';
 import { escapeHtml } from './ui/escape.js';
 import { openImageZoom } from './image-zoom.js';
+import { alertBox } from './ui/dialog.js';
 
 // ============ INIT ============
 document.addEventListener('DOMContentLoaded', () => {
@@ -35,7 +36,21 @@ document.addEventListener('DOMContentLoaded', () => {
   initPanelResize();
   initLibrary();
   initRouter();
+  registerServiceWorker();
 });
+
+// PWA offline: registra el Service Worker (precache + stale-while-revalidate, ver sw.js).
+// Sin este registro el navegador nunca instala sw.js y la app no funciona offline. Se hace
+// tras el arranque (no bloquea el primer render) y falla en silencio donde no esté disponible
+// (p. ej. contexto no seguro): la app sigue funcionando online igual.
+function registerServiceWorker() {
+  if (!('serviceWorker' in navigator)) return;
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch((e) => {
+      console.warn('No se pudo registrar el Service Worker (offline no disponible):', e);
+    });
+  });
+}
 
 // ============ ROUTER · deep-links tipo Play Books ============
 // La URL refleja qué libro y en qué posición: `#book=<id>&loc=<cfi|página>`. Recargar o
@@ -108,7 +123,7 @@ async function applyRoute() {
   try {
     const record = await LibStore.getBook(id);
     if (!record) {
-      alert('Este libro no está en tu biblioteca en este dispositivo.');
+      await alertBox('Este libro no está en tu biblioteca en este dispositivo.');
       await goToLibrary({ fromRoute: true });
       return;
     }
@@ -274,7 +289,8 @@ async function openBookRecord(record, { fromRoute = false, loc = null } = {}) {
     Highlights.setBook(record.fileBaseId || record.id);
     currentBook = { id: record.id, fileBaseId: record.fileBaseId || record.id, format: record.format };
     if (record.format === 'pdf') {
-      await loadPdf(buffer, record.fileBaseId || record.id, record.id);
+      const ok = await loadPdf(buffer, record.fileBaseId || record.id, record.id);
+      if (!ok) { currentBook = null; await goToLibrary({ fromRoute: true }); return; }
       // Backfill de portada para PDFs guardados antes de tenerla (imagen genérica → página 1).
       if (!record.cover) {
         const cover = await PdfReader.renderCoverDataUrl();
@@ -282,7 +298,8 @@ async function openBookRecord(record, { fromRoute = false, loc = null } = {}) {
       }
       if (loc) await seekTo(loc);
     } else {
-      await loadEpub(buffer, record.fileBaseId || record.id, record.id);
+      const ok = await loadEpub(buffer, record.fileBaseId || record.id, record.id);
+      if (!ok) { currentBook = null; await goToLibrary({ fromRoute: true }); return; }
       // La posición de la URL manda; si no, la última guardada del libro.
       if (loc) await seekTo(loc);
       else if (record.lastCfi) { try { await EpubReader.goTo(record.lastCfi); } catch (e) { /* posición no válida */ } }
@@ -292,7 +309,8 @@ async function openBookRecord(record, { fromRoute = false, loc = null } = {}) {
     if (!fromRoute) writeRoute(record.id, currentLoc());   // pushState: atrás → biblioteca
   } catch (e) {
     console.error('No se pudo abrir el libro de la biblioteca:', e);
-    alert('No se pudo abrir el libro guardado.');
+    await alertBox('No se pudo abrir el libro guardado.');
+    currentBook = null;
   }
 }
 
@@ -699,7 +717,7 @@ async function loadFile(file) {
   const ext = file.name.split('.').pop().toLowerCase();
 
   if (ext !== 'epub' && ext !== 'pdf') {
-    alert('Formato no soportado. Usa archivos .epub o .pdf');
+    await alertBox('Formato no soportado. Usa archivos .epub o .pdf');
     return;
   }
 
@@ -713,11 +731,12 @@ async function loadFile(file) {
   currentBook = { id, fileBaseId, format: ext };
   Library.hide();
 
-  if (ext === 'epub') {
-    await loadEpub(buffer, fileBaseId, id);
-  } else {
-    await loadPdf(buffer, fileBaseId, id);
-  }
+  const ok = ext === 'epub'
+    ? await loadEpub(buffer, fileBaseId, id)
+    : await loadPdf(buffer, fileBaseId, id);
+  // Si la carga falló (loadEpub/loadPdf ya avisaron), no dejamos currentBook apuntando a un
+  // libro no renderizado ni lo persistimos en la biblioteca.
+  if (!ok) { currentBook = null; return; }
 
   // Guardar en la biblioteca (con portada/metadatos ya disponibles) y mostrar
   // el acceso a la biblioteca en la cabecera.
@@ -798,9 +817,11 @@ async function loadEpub(buffer, bookId, aiBookId) {
 
     updateBookmarkButton();
     updateReadingModeToggle();   // reflejar el modo (paginado/scroll) guardado del libro
+    return true;
   } catch (err) {
     console.error('Error loading EPUB:', err);
-    alert('Error al cargar el archivo EPUB: ' + err.message);
+    await alertBox('Error al cargar el archivo EPUB: ' + err.message);
+    return false;
   }
 }
 
@@ -840,9 +861,11 @@ async function loadPdf(buffer, bookId, aiBookId) {
     updateBookmarkButton();          // estado del botón para la página inicial
     loadPdfTOC();                    // índice del PDF (outline) en el sidebar
     updateReadingModeToggle();       // PDF4: reflejar el modo (paginado/scroll) recordado
+    return true;
   } catch (err) {
     console.error('Error loading PDF:', err);
-    alert('Error al cargar el archivo PDF');
+    await alertBox('Error al cargar el archivo PDF');
+    return false;
   }
 }
 

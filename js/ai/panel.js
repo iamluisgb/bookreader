@@ -10,6 +10,7 @@ import * as PdfReader from '../pdf-reader.js';
 import { getTemplate, objectiveTemplates, isValidField, isAgentFillable, agentFields, isCognitionField, ARTESANO_ID, INMERSIVA_ID } from './templates.js';
 import { icon } from '../ui/icons.js';
 import { escapeHtml } from '../ui/escape.js';
+import { confirmBox, promptBox } from '../ui/dialog.js';
 import * as AppSettings from '../ui/app-settings.js';
 import { renderWithCitations } from './render.js';
 import { computeChapterRelevance, applyChapterAttenuation, clearChapterAttenuation } from './attenuation.js';
@@ -185,6 +186,10 @@ function showView(view) {
 let bookSeq = 0;   // nº de secuencia de apertura: si otra apertura lo adelanta, esta se cancela
 export async function setBook(b, id, title, opts = {}) {
   const mySeq = ++bookSeq;
+  // Aborta cualquier turno del agente en vuelo del libro anterior: su respuesta ya no
+  // aplica al libro que abrimos. El guard `bookSeq` (abajo) evita además que persista.
+  try { abortCtrl?.abort(); } catch (e) { /* sin petición en curso */ }
+  busy = false;
   book = b; bookId = id || null; bookTitle = title || 'Libro';
   bookFormat = opts.format || 'epub'; tocLabels = [];
   // "Explicar lo que veo" (visión) solo tiene sentido en PDF (renderizamos su canvas).
@@ -427,7 +432,7 @@ async function openConvoMenu(anchor) {
       const id = ren.dataset.rename;
       const c = convos.find(x => x.id === id);
       const cur = c?.title || getTemplate(c?.templateId)?.name || '';
-      const name = (prompt('Nombre de la conversación:', cur) || '').trim();
+      const name = (await promptBox('Nombre de la conversación:', { title: 'Renombrar conversación', value: cur }) || '').trim();
       closeConvoMenu();
       if (name) {
         await DB.updateConvo(id, { title: name });
@@ -441,7 +446,8 @@ async function openConvoMenu(anchor) {
       ev.stopPropagation();
       const id = del.dataset.del;
       const c = convos.find(x => x.id === id);
-      if (confirm(`¿Eliminar la conversación "${getTemplate(c?.templateId)?.name || ''}"? Se borran su chat y su libreta.`)) {
+      if (await confirmBox(`¿Eliminar la conversación "${getTemplate(c?.templateId)?.name || ''}"? Se borran su chat y su libreta.`,
+          { title: 'Eliminar conversación', okText: 'Eliminar', danger: true })) {
         await DB.deleteConvo(id);
         closeConvoMenu();
         const rest = await DB.getConvos(bookId);
@@ -506,15 +512,31 @@ function openOnboarding() {
   overlay.id = 'ai-onboarding';
   overlay.className = 'ai-onboarding';
   overlay.innerHTML = `
-    <div class="ai-ob-card">
+    <div class="ai-ob-card" role="dialog" aria-modal="true" aria-label="Elegir objetivo de lectura">
       <button class="ai-ob-close" title="Cerrar" aria-label="Cerrar">${icon('xmark', { size: 18 })}</button>
       <div class="ai-ob-body"></div>
     </div>`;
   document.body.appendChild(overlay);
   const body = overlay.querySelector('.ai-ob-body');
+  const card = overlay.querySelector('.ai-ob-card');
+  const prevFocus = document.activeElement;   // para restaurar el foco al cerrar
 
-  const dismiss = () => { overlay.remove(); document.removeEventListener('keydown', onKey); };
-  const onKey = (e) => { if (e.key === 'Escape') dismiss(); };
+  const dismiss = () => {
+    overlay.remove();
+    document.removeEventListener('keydown', onKey);
+    try { prevFocus?.focus?.(); } catch (e) { /* elemento ya no existe */ }
+  };
+  // Escape cierra; Tab queda ATRAPADO dentro de la tarjeta (diálogo modal accesible).
+  const onKey = (e) => {
+    if (e.key === 'Escape') { dismiss(); return; }
+    if (e.key !== 'Tab') return;
+    const focusables = card.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+    const visible = [...focusables].filter(el => el.offsetParent !== null || el === document.activeElement);
+    if (!visible.length) return;
+    const first = visible[0], last = visible[visible.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  };
   document.addEventListener('keydown', onKey);
   overlay.addEventListener('mousedown', (e) => { if (e.target === overlay) dismiss(); }); // clic fuera de la tarjeta
   overlay.querySelector('.ai-ob-close').addEventListener('click', dismiss);
@@ -645,6 +667,7 @@ function pageText(page) {
 
 async function deliverVision(userText, image) {
   if (busy || !image) return;
+  const mySeq = bookSeq;   // guard: no persistir si el usuario cambia de libro mid-turno
   const page = image.page;
   const img = image.dataUrl;
 
@@ -679,6 +702,7 @@ inventes ni cambies el número de página.` },
     ];
 
     const raw = await LLM.chatVision({ messages, signal: abortCtrl.signal, maxTokens: 2048 });
+    if (mySeq !== bookSeq) return;   // cambió de libro → no persistir en el convo equivocado
     const finalText = raw || '(sin respuesta del modelo de visión)';
     textNode.innerHTML = renderWithCitations(finalText, anchors);
     addMessageActions(bubble, finalText, instruction, { autoRun: false });
@@ -866,6 +890,7 @@ function onChapterChanged(label) {
 
 async function quizChapter(chapterLabel) {
   if (busy) return;
+  const mySeq = bookSeq;   // guard: no persistir el repaso si el usuario cambia de libro
   ensureIndex();
   const passages = capPassages(Retrieval.passagesByChapter(chapterLabel), 12000);
   if (!passages.length) return;
@@ -888,6 +913,7 @@ OBJETIVO: ${convo?.goal || '(sin definir)'}` },
       if (thinking) { thinking = false; textNode.textContent = ''; }
       textNode.textContent += t; scrollDown();
     } });
+    if (mySeq !== bookSeq) { bubble.remove(); return; }   // cambió de libro → descartar el repaso
     const finalText = raw || textNode.textContent;
     textNode.innerHTML = renderWithCitations(finalText, anchors);
     history.push({ role: 'assistant', content: finalText });
@@ -907,6 +933,7 @@ OBJETIVO: ${convo?.goal || '(sin definir)'}` },
 // botón "Continuar" que aparece si el proveedor corta la respuesta por longitud.
 async function deliver(aug, question, { showUser = true } = {}) {
   if (busy) return;
+  const mySeq = bookSeq;   // guard: si el usuario cambia de libro mid-turno, no persistir aquí
 
   // IA5 · Retrieval por PREGUNTA a nivel de pasaje (reemplaza al recorte por objetivo
   // de IA1, que era ciego a la query y descartaba capítulos relevantes enteros por
@@ -923,7 +950,8 @@ async function deliver(aug, question, { showUser = true } = {}) {
     + priorWindow.reduce((n, m) => n + estimateTokens(m.content), 0)
     + estimateTokens(aug) + 400;
   if (estTokens > TOKEN_GUARD &&
-      !confirm(`El contexto es grande (~${Math.round(estTokens / 1000)}k tokens): puede ser lento o caro. ¿Enviar igualmente?`)) {
+      !(await confirmBox(`El contexto es grande (~${Math.round(estTokens / 1000)}k tokens): puede ser lento o caro. ¿Enviar igualmente?`,
+        { title: 'Contexto grande', okText: 'Enviar igualmente' }))) {
     return;   // se conservan input y referencia adjunta
   }
 
@@ -966,6 +994,7 @@ async function deliver(aug, question, { showUser = true } = {}) {
       },
       onDone: (info) => { truncated = info.truncated; },
     });
+    if (mySeq !== bookSeq) return;   // el usuario cambió de libro → no pintar/persistir en el convo equivocado
     const finalText = raw || textNode.textContent;
     textNode.innerHTML = renderWithCitations(finalText, anchors);
     addMessageActions(bubble, finalText, question, { autoRun: LLM.getAutoExtract(), truncated });

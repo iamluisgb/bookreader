@@ -370,14 +370,21 @@ export async function load(arrayBuffer, onProgress) {
     flow: readingMode === 'scroll' ? 'scrolled-doc' : 'paginated'
   });
 
-  // Fix sandbox on every new content iframe epub.js creates
+  // Sandbox del iframe de contenido (defensa de la API key BYOK, ver DECISIONS/CHANGELOG).
+  // epub.js necesita `allow-same-origin` para paginar y para que nosotros inyectemos tema,
+  // selección y navegación por teclado desde el documento padre. NO añadimos `allow-scripts`:
+  // el combo `allow-same-origin allow-scripts` permitiría a un <script> DENTRO de un EPUB
+  // malicioso leer `parent.localStorage` (la key) y, con connect-src abierto, exfiltrarla.
+  // Sin `allow-scripts` ese script simplemente no corre. La paginación de texto reflowable no
+  // usa scripts del propio EPUB, así que no perdemos funcionalidad (verificado en la suite).
+  // Si algún día se soportan EPUB fixed-layout con JS, hacerlo opt-in explícito por libro.
   rendition.hooks.content.register((contents) => {
     const doc = contents.document;
     if (doc && doc.defaultView && doc.defaultView.frameElement) {
       const iframe = doc.defaultView.frameElement;
       const current = iframe.getAttribute('sandbox') || '';
-      if (!current.includes('allow-scripts')) {
-        iframe.setAttribute('sandbox', current + ' allow-scripts');
+      if (current.includes('allow-scripts')) {
+        iframe.setAttribute('sandbox', current.replace(/\s*allow-scripts/g, '').trim());
       }
     }
     // Also inject theme directly into the content document

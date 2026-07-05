@@ -61,19 +61,11 @@
   --shadow-2: 0 4px 16px rgba(var(--shadow-color), 0.07);
   --shadow-3: 0 12px 40px rgba(var(--shadow-color), 0.12);
 
-  /* ---- Alias de compatibilidad (nombres antiguos) ---- */
-  --bg-primary: var(--surface-0);
-  --bg-secondary: var(--surface-1);
-  --bg-tertiary: var(--surface-3);
-  --text-primary: var(--text);
-  --text-secondary: var(--text-soft);
-  --text-muted: var(--text-faint);
-  /* (Antes había aquí `--border: var(--border)`: una autorreferencia cíclica que dejaba
-     --border INVÁLIDO en el tema claro, así que todo `border: … var(--border)` se
-     renderizaba con ancho 0 —p. ej. los bordes de las sidebars desaparecían—. El valor
-     real ya está definido arriba, así que basta con no volver a declararlo aquí.) */
+  /* Color de sombra suelto (no hay equivalente 1:1 entre los tokens --shadow-1/2/3, que son
+     box-shadows completos). Se conserva como token propio. Nota histórica: aquí hubo una
+     autorreferencia cíclica `--border: var(--border)` que dejaba --border inválido en claro
+     (bordes con ancho 0); no volver a declarar --border en este bloque. */
   --shadow: rgba(var(--shadow-color), 0.10);
-  --highlight-bg: var(--accent-soft);
 }
 
 /* ---- Tokens del tema OSCURO (rediseñado, menos saturado) ---- */

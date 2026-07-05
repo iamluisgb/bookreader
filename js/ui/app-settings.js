@@ -14,6 +14,7 @@ import * as Profiles from '../ai/profiles.js';
 import * as Backup from '../backup.js';
 import { icon } from './icons.js';
 import { escapeHtml } from './escape.js';
+import { confirmBox } from './dialog.js';
 
 const SECTIONS = [
   { id: 'agent',     label: 'Agente',     ico: 'sparkles' },
@@ -243,8 +244,9 @@ function wireTemplatesList(content) {
   content.querySelectorAll('.appset-tpl-edit').forEach(b =>
     b.addEventListener('click', () => { tplDraft = CustomTpl.get(b.dataset.id) || CustomTpl.blank(); renderTemplates(content); }));
   content.querySelectorAll('.appset-tpl-del').forEach(b =>
-    b.addEventListener('click', () => {
-      if (confirm('¿Eliminar esta plantilla? Las conversaciones que la usen perderán su estructura de libreta.')) {
+    b.addEventListener('click', async () => {
+      if (await confirmBox('¿Eliminar esta plantilla? Las conversaciones que la usen perderán su estructura de libreta.',
+          { title: 'Eliminar plantilla', okText: 'Eliminar', danger: true })) {
         CustomTpl.remove(b.dataset.id); renderTemplates(content);
       }
     }));
@@ -393,8 +395,9 @@ function wireProfilesList(content) {
   content.querySelectorAll('.appset-prof-edit').forEach(b =>
     b.addEventListener('click', () => { profDraft = Profiles.get(b.dataset.id) || Profiles.blank(); renderProfiles(content); }));
   content.querySelectorAll('.appset-prof-del').forEach(b =>
-    b.addEventListener('click', () => {
-      if (confirm('¿Eliminar este perfil? Si estaba activo, el agente quedará sin perfil.')) {
+    b.addEventListener('click', async () => {
+      if (await confirmBox('¿Eliminar este perfil? Si estaba activo, el agente quedará sin perfil.',
+          { title: 'Eliminar perfil', okText: 'Eliminar', danger: true })) {
         Profiles.remove(b.dataset.id); notifyProfileChange(); renderProfiles(content);
       }
     }));

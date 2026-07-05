@@ -4,6 +4,7 @@
 import * as Store from './store.js';
 import { icon } from '../ui/icons.js';
 import { escapeHtml } from '../ui/escape.js';
+import { confirmBox, promptBox } from '../ui/dialog.js';
 
 let host = null;                 // #library
 let onOpenBook = () => {};
@@ -259,7 +260,7 @@ async function onClick(e) {
 }
 
 async function createShelf() {
-  const name = (prompt('Nombre de la nueva estantería:') || '').trim();
+  const name = (await promptBox('Nombre de la nueva estantería:', { title: 'Nueva estantería' }) || '').trim();
   if (!name) return;
   const sh = await Store.addShelf(name);
   currentShelf = sh.id;
@@ -278,10 +279,11 @@ async function openShelfMenu(id, anchor) {
     <button class="lib-menu-item danger" data-act="delete">${icon('trash', { size: 16 })}<span>Eliminar estantería</span></button>
   `, async (act) => {
     if (act === 'rename') {
-      const name = (prompt('Nuevo nombre:', shelf.name) || '').trim();
+      const name = (await promptBox('Nuevo nombre:', { title: 'Renombrar estantería', value: shelf.name }) || '').trim();
       if (name) await Store.renameShelf(id, name);
     } else if (act === 'delete') {
-      if (confirm(`¿Eliminar la estantería "${shelf.name}"? Los libros no se borran.`)) {
+      if (await confirmBox(`¿Eliminar la estantería "${shelf.name}"? Los libros no se borran.`,
+          { title: 'Eliminar estantería', okText: 'Eliminar', danger: true })) {
         await Store.deleteShelf(id);
         if (currentShelf === id) currentShelf = 'all';
       }
@@ -318,10 +320,11 @@ async function openBookMenu(id, anchor) {
     } else if (act === 'shelf') {
       await Store.toggleBookShelf(id, item.dataset.shelf, !inShelf.has(item.dataset.shelf));
     } else if (act === 'newshelf') {
-      const name = (prompt('Nombre de la nueva estantería:') || '').trim();
+      const name = (await promptBox('Nombre de la nueva estantería:', { title: 'Nueva estantería' }) || '').trim();
       if (name) { const sh = await Store.addShelf(name); await Store.toggleBookShelf(id, sh.id, true); }
     } else if (act === 'delete') {
-      if (!confirm(`¿Eliminar "${book.title}" de la biblioteca? Esto borra el archivo guardado.`)) return;
+      if (!(await confirmBox(`¿Eliminar "${book.title}" de la biblioteca? Esto borra el archivo guardado.`,
+          { title: 'Eliminar libro', okText: 'Eliminar', danger: true }))) return;
       await Store.deleteBook(id);
     }
     await render();

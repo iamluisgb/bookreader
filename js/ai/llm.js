@@ -220,7 +220,7 @@ async function _chatStream({ messages, onToken, onReasoning, onDone, signal }) {
 
 // Llamada NO-streaming con herramientas. nan/DeepSeek emite tool_calls de forma
 // fiable solo sin streaming (verificado en spike E5). Devuelve { content, toolCalls }.
-async function _chatTools({ messages, tools, toolChoice = 'auto', signal }) {
+async function _chatTools({ messages, tools, toolChoice = 'auto', maxTokens = 1024, signal }) {
   const key = getKey().trim();
   if (!key) throw new Error('Falta la API key.');
 
@@ -233,7 +233,7 @@ async function _chatTools({ messages, tools, toolChoice = 'auto', signal }) {
       tools,
       tool_choice: toolChoice,
       stream: false,
-      max_tokens: 1024,
+      max_tokens: maxTokens,
     }),
     signal,
   });

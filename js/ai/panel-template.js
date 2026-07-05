@@ -25,7 +25,7 @@ export const TEMPLATE = `
     <button class="ai-tab" data-view="notebook">${icon('note', { size: 16 })} Libreta</button>
   </div>
   <div id="ai-view-chat" class="ai-view active">
-    <div id="ai-messages" class="ai-messages"></div>
+    <div id="ai-messages" class="ai-messages" role="log" aria-live="polite" aria-relevant="additions text" aria-label="Conversación con el agente"></div>
     <div id="ai-ref" class="ai-ref" style="display:none">
       <span class="ai-ref-ico">${icon('note', { size: 15 })}</span>
       <span id="ai-ref-text" class="ai-ref-text"></span>
