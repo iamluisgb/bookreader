@@ -7,6 +7,11 @@
 html, body {
   height: 100%;
   overflow: hidden;
+  /* Evita que el swipe horizontal de dos dedos (trackpad) dispare atrás/adelante del
+     navegador. Al hacer pinch-zoom en el PDF, el componente horizontal del gesto se
+     interpretaba como swipe-atrás y te sacaba del libro a la biblioteca. El botón atrás y
+     el logo→biblioteca siguen funcionando; solo se desactiva la navegación por GESTO. */
+  overscroll-behavior-x: none;
   font-family: var(--font-ui);
   font-size: var(--font-size-base);
   background: var(--bg-primary);
@@ -700,6 +705,7 @@ body:not(.scroll-mode) .epub-container .epub-view {
   padding: 20px;
   background: var(--bg-tertiary);
   touch-action: pan-x pan-y;      /* 1 dedo = scroll/selección nativos; pinch lo gestiona el JS */
+  overscroll-behavior: contain;   /* al panear a zoom>1, el rebote en el borde no navega ni mueve el body */
   -webkit-overflow-scrolling: touch;
 }
 

@@ -5,6 +5,14 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-05 — Fix: el pinch-zoom del trackpad ya no cambia de página
+
+Al hacer pinch-zoom en el PDF con el trackpad en PC, el componente horizontal del gesto se
+interpretaba como swipe atrás/adelante del navegador, que con los deep-links por URL te sacaba del
+libro a la biblioteca ("cambia de página"). Fix: `overscroll-behavior-x: none` en `html, body` (y
+`overscroll-behavior: contain` en el contenedor del PDF) para desactivar la navegación por GESTO. El
+botón atrás del navegador y el logo→biblioteca siguen funcionando.
+
 ## 2026-07-05 — Pulido de UI (cherry-pick del rediseño Stitch)
 
 Se extrae SOLO la capa de "polish" del rediseño Stitch (rama `feat/stitch-ui-redesign`), dejando fuera
