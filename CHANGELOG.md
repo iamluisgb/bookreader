@@ -5,6 +5,19 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-05 — PDF móvil: márgenes centrados + ocultar barras (inmersivo)
+
+Dos arreglos sobre el lector PDF en móvil reportados por el usuario:
+- **Márgenes raros (franja gris asimétrica):** el contenedor se ponía en `display:flex`, lo que hacía que
+  `#pdf-zoom-layer` encogiera a su contenido y se pegara a la izquierda → todo el hueco gris a la derecha
+  en pantallas anchas (landscape). Ahora el contenedor es `block` (área de scroll) y el layer centra la
+  página con **margen simétrico**; en portrait/landscape estrechos la página llena el ancho como antes.
+- **No se podían ocultar los menús:** en PDF el botón ⤢ estaba deshabilitado y no había gesto. Ahora el
+  botón se habilita, el PDF **arranca inmersivo en móvil** (estilo Play Books) y **tocar el centro alterna
+  las barras** (tap limpio de 1 dedo; scroll, pinch y selección de texto no cuentan). `updateReaderScale`
+  es no-op con un PDF a la vista (el encogido del viewport es solo para el texto EPUB).
+- Tests en [`tests/pdf.spec.ts`](tests/pdf.spec.ts) (margen simétrico en landscape + toggle del inmersivo).
+
 ## 2026-07-05 — Zoom de PDF fluido tipo Adobe (sin re-render, paginado + scroll)
 
 El pinch re-renderizaba el canvas al soltar (la "recarga") y el preview salía borroso. Rework del zoom

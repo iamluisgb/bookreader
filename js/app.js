@@ -472,6 +472,40 @@ function initImmersive() {
 
   // Tocar/clicar una imagen del libro → abrir zoom (lightbox).
   EpubReader.onImageTap((img) => openImageZoom(img));
+
+  initPdfTap();
+}
+
+// PDF: tocar el centro alterna las barras (estilo Play Books), como el center-tap del EPUB.
+// El pdf-container tiene scroll y selección nativos, así que solo cuenta como "tap" un toque
+// de 1 dedo, breve y sin desplazamiento, que no haya seleccionado texto. Un scroll (hay
+// movimiento), un pinch (2 dedos) o una selección (no colapsada) NO alternan las barras.
+function initPdfTap() {
+  const container = document.getElementById('pdf-container');
+  if (!container || container.dataset.tapWired) return;
+  container.dataset.tapWired = '1';
+
+  let sx = 0, sy = 0, st = 0, valid = false;
+  container.addEventListener('touchstart', (e) => {
+    if (e.touches.length !== 1) { valid = false; return; }
+    valid = true; st = Date.now();
+    sx = e.touches[0].clientX; sy = e.touches[0].clientY;
+  }, { passive: true });
+  container.addEventListener('touchmove', (e) => {
+    if (!valid) return;
+    if (e.touches.length !== 1) { valid = false; return; }
+    if (Math.hypot(e.touches[0].clientX - sx, e.touches[0].clientY - sy) > 10) valid = false;
+  }, { passive: true });
+  container.addEventListener('touchend', () => {
+    if (!valid) return;
+    valid = false;
+    if (Date.now() - st > 300) return;                 // pulsación larga (selección) → no
+    const tip = document.getElementById('highlight-tooltip');
+    if (tip && tip.style.display !== 'none') { hideHighlightTooltip(); return; }
+    const sel = window.getSelection();
+    if (sel && !sel.isCollapsed) return;               // se acaba de seleccionar texto → no
+    setImmersive(!document.body.classList.contains('immersive'));
+  }, { passive: true });
 }
 
 // ============ AI PANEL ============
@@ -788,11 +822,15 @@ async function loadPdf(buffer, bookId, aiBookId) {
 
     document.getElementById('reader-title').textContent = 'PDF';
     document.body.classList.add('reading');
+    // Móvil (estilo Play Books): arrancar SIN barras (PDF a pantalla completa). Se
+    // muestran/ocultan tocando el centro o con el botón ⤢. Las barras son overlay.
+    if (EpubReader.isCoarsePointer()) document.body.classList.add('immersive');
     document.getElementById('reader-footer').style.display = 'flex';
     // Marcadores por página (id sintético `page:N`).
     document.getElementById('bookmark-toggle').disabled = false;
     // PDF1: el agente puede leer el PDF (texto extraído por página). Habilitar el panel.
     document.getElementById('ai-toggle').disabled = false;
+    document.getElementById('immersive-toggle').disabled = false;
     document.getElementById('header-search').disabled = false;
     AiPanel.setBook(PdfReader.getDocument(), aiBookId, bookId || 'PDF', { format: 'pdf' });
     // PDF2/PDF3: seleccionar texto en el PDF → barra (preguntar/subrayar/nota/copiar).

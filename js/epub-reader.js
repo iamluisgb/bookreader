@@ -251,6 +251,13 @@ export function init() {
 export function updateReaderScale() {
   const vp = document.getElementById('reader-viewport');
   if (!vp) return;
+  // El encogido del viewport es un truco SOLO para el texto EPUB paginado (que quepa entre
+  // las barras). Con un PDF a la vista, el pdf-container es hijo del viewport: escalarlo
+  // deformaría/encogería el PDF. En PDF no se toca el viewport (las barras son overlay).
+  const pdf = document.getElementById('pdf-container');
+  if (pdf && pdf.style.display && pdf.style.display !== 'none') {
+    vp.style.transform = ''; vp.style.transformOrigin = ''; return;
+  }
   const b = document.body.classList;
   // En modo scroll no encogemos el texto: el contenido se desplaza en vertical y las barras
   // (si se muestran) reservan hueco por CSS. Encoger rompería las métricas de scroll.

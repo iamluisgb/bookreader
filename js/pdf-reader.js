@@ -120,7 +120,11 @@ export async function load(arrayBuffer, onProgress) {
 
   const container = document.getElementById('pdf-container');
   container.innerHTML = '';
-  container.style.display = 'flex';
+  // El contenedor es el ÁREA DE SCROLL (block). El centrado y el llenado de ancho los hace
+  // #pdf-zoom-layer (flex column, align-items:center). Ponerlo en `flex` aquí lo convertía en
+  // flex-item que encogía a su contenido y se pegaba a la izquierda → margen gris a la derecha
+  // en pantallas anchas (landscape). Ver CSS de .pdf-container.
+  container.style.display = 'block';
   document.getElementById('landing').style.display = 'none';
   document.getElementById('epub-container').style.display = 'none';
 

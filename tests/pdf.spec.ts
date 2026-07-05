@@ -394,3 +394,42 @@ test.describe('PDF fit-to-width + zoom', () => {
     expect(r.backing1).toBe(r.backing0);                     // sin re-render también en scroll
   });
 });
+
+// Márgenes: en una pantalla ANCHA (landscape) la página se centra con margen simétrico. Antes
+// el contenedor estaba en display:flex, lo que encogía #pdf-zoom-layer a su contenido y lo
+// pegaba a la izquierda → toda la franja gris a la derecha ("márgenes raros" del usuario).
+test.describe('PDF márgenes centrados', () => {
+  test.use({ viewport: { width: 900, height: 420 } });
+  test('la página va centrada (margen izq ≈ der) en landscape, sin franja gris', async ({ page }) => {
+    await openPdf(page);
+    await page.waitForTimeout(400);
+    const g = await page.evaluate(() => {
+      const c = document.getElementById('pdf-container')!;
+      const p = document.querySelector('#pdf-container .pdf-page')!;
+      const cb = c.getBoundingClientRect(), pb = p.getBoundingClientRect();
+      return { display: c.style.display, left: pb.left - cb.left, right: cb.right - pb.right };
+    });
+    expect(g.display).toBe('block');                 // NO flex (evita el pegado a la izquierda)
+    expect(Math.abs(g.left - g.right)).toBeLessThan(3);   // centrado: márgenes simétricos
+  });
+});
+
+// Inmersivo en PDF (móvil): el botón ⤢ queda habilitado y tocar el centro alterna las barras
+// (estilo Play Books), igual que en EPUB. Antes en PDF no había forma de ocultar los menús.
+test.describe('PDF inmersivo (ocultar barras)', () => {
+  test.use({ viewport: { width: 390, height: 780 }, hasTouch: true, isMobile: true });
+  test('el botón ⤢ se habilita y el tap central alterna las barras', async ({ page }) => {
+    await openPdf(page);
+    await page.waitForTimeout(300);
+    expect(await page.locator('#immersive-toggle').isDisabled()).toBe(false);
+    const a = await page.evaluate(() => document.body.classList.contains('immersive'));
+    await page.touchscreen.tap(195, 390);
+    await page.waitForTimeout(200);
+    const b = await page.evaluate(() => document.body.classList.contains('immersive'));
+    expect(b).toBe(!a);                              // el tap alterna
+    await page.touchscreen.tap(195, 390);
+    await page.waitForTimeout(200);
+    const c = await page.evaluate(() => document.body.classList.contains('immersive'));
+    expect(c).toBe(a);                               // y vuelve
+  });
+});
