@@ -18,8 +18,10 @@ const SCAN_MIN_CHARS_PER_PAGE = 40;
 export async function segmentPdf(pdfDoc, onProgress) {
   const total = pdfDoc.numPages;
   const boundaries = await outlineBoundaries(pdfDoc);   // [{page, title, top}] por página
-  // tocLabels = solo capítulos de nivel superior (los que abren capítulo y salen en el
-  // router/MAPA); las subsecciones son marcadores `##` que heredan, no etiquetas de TOC.
+  // tocLabels = solo CAPÍTULOS (los que abren capítulo y salen en el router/MAPA); las
+  // subsecciones son marcadores `##` que heredan, no etiquetas de TOC. Qué es "capítulo"
+  // lo decide outlineBoundaries: nivel superior, salvo en libros "Part → Chapter", donde
+  // las Parts son contenedores y los capítulos reales son sus hijos.
   const tocLabels = boundaries.filter(b => b.top).map(b => b.title);
 
   const anchors = new Map();
@@ -118,31 +120,48 @@ function* chunk(text) {
   if (buf.trim()) yield buf.trim();
 }
 
-// Aplana el outline (2 niveles) y resuelve cada entrada a su página de inicio (1-based).
-// Devuelve boundaries ordenadas y deduplicadas por página (la primera etiqueta gana).
+// Contenedor organizativo del outline ("Part 2 …", "Parte III …", "Section 1 …"): agrupa
+// capítulos pero NO es un capítulo. Sin esta distinción, en libros "Part → Chapter" todo
+// el contenido quedaría atribuido a la Part: el router perdería los capítulos ("flashcards
+// del capítulo 12" no casaría) y el selector de flashcards solo ofrecería Parts.
+function isContainer(title) {
+  return /^(part|parte|section|sección|unit|unidad)\s+(\d+|[ivxlcdm]+)\b/i.test((title || '').trim());
+}
+
+// Aplana el outline (2 niveles; 3 bajo contenedores) y resuelve cada entrada a su página
+// de inicio (1-based). `top` marca las entradas que ABREN capítulo: las de nivel superior,
+// salvo los contenedores tipo "Part N", cuyos hijos directos son los capítulos reales.
+// Devuelve boundaries ordenadas y deduplicadas por página (a igual página gana el capítulo).
 async function outlineBoundaries(pdfDoc) {
   let outline = null;
   try { outline = await pdfDoc.getOutline(); } catch { /* sin outline */ }
   if (!outline || !outline.length) return [];
 
   const flat = [];
-  const walk = (items, depth) => {
+  const walk = (items, depth, parentContainer) => {
     for (const it of items) {
-      flat.push({ it, depth });
-      if (depth < 1 && it.items && it.items.length) walk(it.items, depth + 1);
+      const container = depth === 0 && isContainer(it.title);
+      const top = depth === 0 ? !container : (depth === 1 && parentContainer);
+      flat.push({ it, top });
+      // Bajo un contenedor se desciende un nivel más de lo normal, para conservar las
+      // subsecciones de los capítulos como marcadores ## (paridad con libros sin Parts).
+      if (it.items && it.items.length && (depth < 1 || (depth === 1 && parentContainer))) {
+        walk(it.items, depth + 1, container);
+      }
     }
   };
-  walk(outline, 0);
+  walk(outline, 0, false);
 
   const out = [];
-  for (const { it, depth } of flat) {
+  for (const { it, top } of flat) {
     const title = (it.title || '').replace(/\s+/g, ' ').trim();
     if (!title) continue;
     const page = await destToPage(pdfDoc, it.dest);
-    if (page) out.push({ page, title, top: depth === 0 });
+    if (page) out.push({ page, title, top });
   }
-  out.sort((a, b) => a.page - b.page);
-  // Dedup por página: si dos entradas apuntan a la misma página, nos quedamos la primera.
+  // A igual página, el capítulo (top) va antes que el contenedor/subsección → el dedup
+  // conserva la etiqueta que abre capítulo (una Part suele empezar donde su capítulo 1).
+  out.sort((a, b) => a.page - b.page || Number(b.top) - Number(a.top));
   const seen = new Set();
   return out.filter(b => (seen.has(b.page) ? false : seen.add(b.page)));
 }

@@ -98,6 +98,44 @@ test('las subsecciones del outline heredan el capítulo padre (no lo roban)', as
   expect(byPage[3]).toBe('Chapter Two');
 });
 
+test('las "Parts" son contenedores: los capítulos reales son sus hijos', async ({ page }) => {
+  await page.goto('/index.html');
+  const seg = await run(page, {
+    pages: [
+      [line('Front matter with acknowledgments and prefaces occupying this page fully.')],
+      [line('Part one opens and chapter one immediately explains graphs in detail here.')],
+      [line('Chapter two continues the first part with large language models content.')],
+      [line('Part two starts with chapter three about building knowledge graphs today.')],
+    ],
+    outline: {
+      entries: [
+        { title: 'acknowledgments', dest: 'ack' },
+        { title: 'Part 1 Foundations', dest: 'p1', items: [
+          { title: '1 Knowledge graphs', dest: 'c1', items: [{ title: '1.1 Basics', dest: 's11' }] },
+          { title: '2 LLMs', dest: 'c2' },
+        ] },
+        { title: 'Part 2 Building', dest: 'p2', items: [
+          { title: '3 Structured sources', dest: 'c3' },
+        ] },
+      ],
+      dests: {
+        ack: [{ page: 1 }], p1: [{ page: 2 }], c1: [{ page: 2 }], s11: [{ page: 3 }],
+        c2: [{ page: 3 }], p2: [{ page: 4 }], c3: [{ page: 4 }],
+      },
+    },
+  });
+
+  // Los capítulos del TOC/router son los HIJOS de las Parts (más el front matter);
+  // las Parts NO aparecen como capítulo.
+  expect(seg.tocLabels).toEqual(['acknowledgments', '1 Knowledge graphs', '2 LLMs', '3 Structured sources']);
+
+  // Atribución por página: los capítulos ganan a la Part que empieza en la misma página.
+  const byPage = Object.fromEntries(seg.anchors.map(([, a]) => [a.page, a.chapter]));
+  expect(byPage[2]).toBe('1 Knowledge graphs');
+  expect(byPage[3]).toBe('2 LLMs');           // '1.1 Basics' (subsección) no roba el capítulo
+  expect(byPage[4]).toBe('3 Structured sources');
+});
+
 test('detecta PDF escaneado (páginas sin texto seleccionable)', async ({ page }) => {
   await page.goto('/index.html');
   const seg = await run(page, {
