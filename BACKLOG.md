@@ -263,6 +263,45 @@ las plantillas) + objetivo, en vez de un menú plano.
 3. ¿La salida de un skill es **un formato** (md|html|svg|flashcards) o puede declarar varios?
 4. ¿Los artefactos generados viven **en la libreta** como bloques o en un **espacio propio** ("Artefactos")?
 
+### P10 — Modo Estudiar (repetición espaciada in-app) · `M`–`L` · **alto impacto**
+
+> **Estado: propuesto (2026-07-06).** La feature nueva de mayor impacto tras las flashcards: convertir
+> las tarjetas que ya se generan en un **hábito de repaso dentro de la app**, no solo un export a Anki.
+
+**Problema que resuelve.** Un lector con IA es intrínsecamente de *uso único por libro* (abres, preguntas,
+no vuelves): **no hay bucle de retención**, hoy el punto más débil del producto. Y el export a Anki, aunque
+es la feature estrella para ese nicho, **deja fuera a la mayoría** (no usa Anki ni quiere su curva) y saca
+al usuario de BookReader en vez de retenerlo.
+
+**Qué es.** Un modo **"Estudiar"** sobre los mazos que ya viven en IndexedDB (`decks`, ver
+[`flashcards.js`](js/ai/flashcards.js)/[`db.js`](js/ai/db.js)): voltear tarjeta, autoevaluación
+(otra vez / difícil / bien / fácil) y **agendado por repetición espaciada** (SM-2 o FSRS, ~100 líneas,
+**sin backend** — el estado de scheduling vive en IndexedDB junto a cada tarjeta). Cola diaria de repaso
+("tienes N tarjetas hoy") como bucle de retorno.
+
+**Por qué impacta (en orden):**
+1. **Retención** — crea el hábito diario que hoy no existe; es lo más difícil de conseguir para este tipo
+   de herramienta.
+2. **Amplía el mercado** más allá del nicho Anki (estudiantes/oposiciones/certificaciones que no usan Anki):
+   un botón "Estudiar" elimina la barrera de instalar y configurar otra app.
+3. **Sostiene la monetización**: uso diario > compra de una vez. Gates Pro naturales (repaso ilimitado,
+   todos los mazos, estadísticas/racha).
+4. **On-brand**: 100% local, sin backend, privacy-first.
+
+**El moat (lo que ni Anki ni ChatGPT+PDF ni Readwise pueden):** **repaso citado**. Las tarjetas salen del
+libro y la capa de retrieval tiene anclas a página/CFI; al repasar, **"saltar a la fuente"** reabre la
+página exacta de origen. Hoy la tarjeta guarda solo el capítulo (en la generación se quitaron las anclas
+para ahorrar tokens): incluir el ancla de origen al generar es un cambio pequeño y es lo que lo vuelve
+único. Reusa la navegación de citas que ya existe en el panel.
+
+**Fases:**
+- **F1 — Repaso básico:** UI de estudio (voltear, autoevaluar) + SM-2 + cola diaria por mazo. Reusa `decks`.
+- **F2 — Fuente citada:** guardar ancla de origen en la tarjeta (generación) → botón "ir a la página".
+- **F3 — Retención/monetización:** racha, estadísticas, gate Pro (ilimitado / todos los mazos).
+
+**❓ Abiertas:** ¿SM-2 (simple) o FSRS (mejor, más código)? · ¿"Estudiar" es pestaña propia en la sidebar o
+vive dentro del panel de flashcards? · ¿repaso por-libro o global (todos los mazos juntos)?
+
 ---
 
 ## 📄 PDF — paridad de features con EPUB
