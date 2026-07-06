@@ -5,6 +5,16 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-06 — Fix: las tablas del agente se renderizan como tabla (no texto crudo)
+
+El renderizador de Markdown del chat ([`js/ai/markdown.js`](js/ai/markdown.js)) no soportaba tablas:
+una tabla del modelo salía como texto crudo con pipes y una fila `|---|---|` suelta, ilegible en el
+panel. Añadido soporte de **tablas GFM** (cabecera + fila separadora → `<table class="ai-md-table">`),
+con contenedor de scroll horizontal (`.ai-md-tablewrap`) porque el panel es estrecho. Regresión en
+[`tests/render.spec.ts`](tests/render.spec.ts). Sin bump de `sw.js` (SWR propaga el cambio).
+
+---
+
 ## 2026-07-05 — Auditoría: correcciones de seguridad, offline, RAG, a11y y UX
 
 Lote de mejoras a partir de una auditoría técnica independiente. Suite: 66/66 E2E (antes 64;

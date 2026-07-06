@@ -1107,6 +1107,16 @@ body.resizing-panel .reader-main { transition: none !important; }
 .ai-bubble-text hr, .ai-nb-note-text hr { border: none; border-top: 1px solid var(--border); margin: 10px 0; }
 .ai-bubble-text a, .ai-nb-note-text a { color: var(--accent); }
 
+/* Tablas del Markdown del agente. El panel es estrecho → el contenedor hace scroll
+   horizontal en vez de desbordar; ver mdToHtml (js/ai/markdown.js). */
+.ai-md-tablewrap { overflow-x: auto; margin: 0 0 8px; }
+.ai-md-table { border-collapse: collapse; width: 100%; font-size: 13px; }
+.ai-md-table th, .ai-md-table td {
+  border: 1px solid var(--border); padding: 5px 9px; text-align: left; vertical-align: top;
+}
+.ai-md-table th { background: var(--surface-3); font-weight: 600; }
+.ai-md-table tbody tr:nth-child(even) td { background: var(--surface-1); }
+
 /* Libreta (v2) */
 .ai-nb-goal {
   display: flex; flex-direction: column; gap: 4px;
