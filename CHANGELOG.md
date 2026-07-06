@@ -5,6 +5,21 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-06 — UX (3ª pasada): cabecera del panel a un único toolbar
+
+La cabecera aún apilaba 5 filas (título "Agente", estado, perfil, selector, pestañas). Recomendación
+UX aplicada: **toolbar único**.
+- **Se elimina la fila de título "Agente"** (redundante: el panel ya se sabe qué es). El selector de
+  conversación, el chip de perfil, `＋`/`⤴` y `⚙`/`✕` viven ahora en **una sola fila** (`.ai-toolbar`).
+  Chrome de ~200px → ~90px (unas 3-4 líneas más de chat).
+- **Estado realmente efímero:** además de en táctil, el estado en reposo se colapsa en **modo hoja**
+  (ancho < 768, p. ej. una ventana estrecha de escritorio) — antes seguía mostrándose ahí. Reaparece
+  solo al segmentar/generar/errar.
+- Limpieza de CSS muerto (`.ai-header`, `.ai-title`). Ver [`panel-template.js`](js/ai/panel-template.js)
+  y [`css/main.css`](css/main.css).
+
+---
+
 ## 2026-07-06 — UX (2ª pasada): el estado en reposo se colapsa y el selector muestra el objetivo
 
 Crítica UX/UI: la parte superior del panel estaba dominada por **chrome de sistema** (un readout

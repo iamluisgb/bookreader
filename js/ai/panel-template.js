@@ -6,22 +6,23 @@ import { promptBlock } from './profiles.js';
 import { isCognitionField } from './templates.js';
 
 export const TEMPLATE = `
-  <div class="ai-header">
-    <span class="ai-title">${icon('sparkles', { size: 19 })} Agente</span>
-    <button id="ai-edit-cfg" class="icon-btn" title="Ajustes del agente">${icon('gear')}</button>
+  <!-- Toolbar único (una sola fila de chrome): selector de conversación + perfil + acciones +
+       ajustes/cerrar. Sustituye a la antigua cabecera "Agente" (redundante) para dar el máximo
+       alto al chat. El grupo de conversación (#ai-convobar) se oculta sin libro; ⚙ y ✕ siempre
+       visibles (por eso ⚙ lleva margin-left:auto para quedar a la derecha cuando el grupo falta). -->
+  <div class="ai-toolbar">
+    <div id="ai-convobar" class="ai-convobar" style="display:none">
+      <button id="ai-profile-chip" class="ai-profile-chip" style="display:none" title="Perfil del agente"></button>
+      <button id="ai-convo-btn" class="ai-convo-btn" title="Cambiar de conversación">
+        ${icon('bubble', { size: 15 })}<span id="ai-convo-label" class="ai-convo-label">Conversación</span>${icon('chevron-down', { size: 14 })}
+      </button>
+      <button id="ai-convo-new" class="icon-btn" title="Nueva conversación">${icon('plus', { size: 18 })}</button>
+      <button id="ai-convo-export" class="icon-btn" title="Exportar esta conversación (libreta + chat) a Markdown">${icon('share', { size: 17 })}</button>
+    </div>
+    <button id="ai-edit-cfg" class="icon-btn ai-toolbar-cfg" title="Ajustes del agente">${icon('gear')}</button>
     <button id="ai-close" class="icon-btn" title="Cerrar">${icon('xmark')}</button>
   </div>
   <div id="ai-status" class="ai-status">Abre un EPUB para empezar.</div>
-  <div id="ai-convobar" class="ai-convobar" style="display:none">
-    <!-- El chip del perfil vive EN esta fila (no en una propia): ahorra una fila de chrome
-         y deja más alto para el chat, sobre todo en móvil/tablet vertical. -->
-    <button id="ai-profile-chip" class="ai-profile-chip" style="display:none" title="Perfil del agente"></button>
-    <button id="ai-convo-btn" class="ai-convo-btn" title="Cambiar de conversación">
-      ${icon('bubble', { size: 15 })}<span id="ai-convo-label" class="ai-convo-label">Conversación</span>${icon('chevron-down', { size: 14 })}
-    </button>
-    <button id="ai-convo-export" class="icon-btn" title="Exportar esta conversación (libreta + chat) a Markdown">${icon('share', { size: 17 })}</button>
-    <button id="ai-convo-new" class="icon-btn" title="Nueva conversación">${icon('plus', { size: 18 })}</button>
-  </div>
   <div id="ai-tabs" class="ai-tabs" style="display:none">
     <button class="ai-tab active" data-view="chat">${icon('bubble', { size: 16 })} Chat</button>
     <button class="ai-tab" data-view="notebook">${icon('note', { size: 16 })} Libreta</button>

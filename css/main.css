@@ -860,18 +860,19 @@ body.resizing-panel #sidebar,
 body.resizing-panel .reader-main { transition: none !important; }
 @media (max-width: 1023px) { .panel-resizer { display: none; } }
 
-.ai-header {
+/* Toolbar único del panel: una sola fila con el selector de conversación + perfil +
+   acciones + ajustes/cerrar. Sustituye a la antigua .ai-header ("Agente"). */
+.ai-toolbar {
   display: flex;
   align-items: center;
-  gap: 10px;
-  /* Misma altura que la cabecera del lector y la de la sidebar (borde alineado). */
-  height: var(--header-height);
+  gap: 8px;
   flex-shrink: 0;
   box-sizing: border-box;
-  padding: 0 18px;
+  padding: 10px 14px;
   border-bottom: 1px solid var(--border-soft);
 }
-.ai-title { flex: 1; font-weight: 600; font-size: 16px; }
+/* ⚙ (y ✕ a su lado) quedan a la derecha aunque el grupo de conversación esté oculto. */
+.ai-toolbar-cfg { margin-left: auto; }
 
 .ai-config {
   padding: 12px 16px;
@@ -1627,11 +1628,9 @@ body.ai-busy #ai-toggle::after, body.ai-busy .ai-fab::after {
    .ai-messages. Umbral 480px: no afecta a tablets en horizontal (iPad ≥768px de alto). */
 @media (max-height: 480px) {
   #ai-panel { width: min(560px, 82%); }
-  .ai-header { height: 40px; }
+  .ai-toolbar { padding: 6px 12px; }
   .ai-status { display: none; }              /* redundante con el selector de conversación */
-  .ai-profile-chip { display: none; }        /* el perfil se ve/gestiona en vertical o Ajustes */
-  .ai-convobar { margin-top: 8px; }
-  .ai-tabs { margin-top: 8px; }
+  .ai-tabs { margin-top: 6px; }
   .ai-messages { padding-top: 8px; padding-bottom: 8px; gap: 8px; }
   .ai-composer { padding: 8px 12px; }
   .ai-composer textarea { min-height: 38px; }
@@ -1644,12 +1643,15 @@ body.ai-busy #ai-toggle::after, body.ai-busy .ai-fab::after {
    perfil ya no ocupa fila propia (va en la barra de conversación, ver panel-template.js). */
 @media (pointer: coarse) {
   .ai-status { padding: 6px 18px; font-size: 12px; }
-  /* En reposo el estado es un readout técnico sin acción → se colapsa para dar todo el alto
-     al chat. Los estados transitorios (leyendo/generando/error) quitan 'idle' y reaparecen. */
-  .ai-status.ai-status--idle { display: none; }
-  .ai-convobar { margin-top: 10px; }
   .ai-tabs { margin-top: 8px; }
   .ai-messages { padding: 12px 16px; }
+}
+/* Estado EFÍMERO: en reposo es un readout técnico sin acción. Se colapsa cuando el espacio
+   escasea —táctil o panel en modo hoja (ancho < 768, p. ej. una ventana estrecha de
+   escritorio)— para dar todo el alto al chat. Los estados transitorios (leyendo/generando/
+   error) quitan la clase 'idle' y reaparecen. */
+@media (pointer: coarse), (max-width: 767px) {
+  .ai-status.ai-status--idle { display: none; }
 }
 
 /* ============================================================================
@@ -1668,7 +1670,6 @@ body.ai-busy #ai-toggle::after, body.ai-busy .ai-fab::after {
   backdrop-filter: saturate(180%) blur(12px);
   border-bottom: 1px solid var(--border-soft);
 }
-.ai-header { padding: 14px 16px; border-bottom: 1px solid var(--border-soft); }
 .ai-status { border-bottom: 1px solid var(--border-soft); }
 
 /* Botones unificados (Fase 3): radios a 8px, no píldora. La dirección es
@@ -1820,7 +1821,7 @@ body.ai-open #ai-toggle { color: var(--accent); }
 .nav-btn:active { transform: scale(0.92); }
 
 /* Botones con icono + texto (acciones, pestañas, volver, exportar). */
-.ai-title, .ai-tab, .ai-act, .ai-ob-back, .export-btn,
+.ai-tab, .ai-act, .ai-ob-back, .export-btn,
 .ai-nb-goal-label, .ai-extract-status {
   display: inline-flex; align-items: center; gap: 6px;
 }
@@ -1898,7 +1899,6 @@ body.ai-open #ai-toggle { color: var(--accent); }
 .ai-ob-back .icon { color: var(--accent); }
 
 .ai-nb-goal-label .icon { color: var(--accent); }
-.ai-title .icon { color: var(--accent); }
 
 /* ============================================================================
    F6 · Biblioteca — estilo Google Play Books (rail + orden/filtro + rejilla)
@@ -2168,7 +2168,7 @@ body.in-library .ai-fab { display: none; }
 /* ============================================================================
    F7 · Selector de conversaciones (varias por libro) — v2
    ========================================================================== */
-.ai-convobar { display: flex; align-items: center; gap: 8px; margin: 12px 18px 0; }
+.ai-convobar { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; margin: 0; }
 .ai-convo-btn {
   flex: 1; min-width: 0; display: inline-flex; align-items: center; gap: 8px;
   padding: 8px 14px; border: 1px solid var(--border); border-radius: var(--r-pill);
