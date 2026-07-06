@@ -14,9 +14,9 @@ let scrollRaf = 0;
 // ampliar hasta ~OVERSAMPLE× sigue nítido sin re-rasterizar. El zoom vive en el layout:
 //   .pdf-page  → caja de tamaño fit·zoom (define el área de scroll → paneo NATIVO)
 //   .pdf-scaler→ contenido a tamaño fit con transform: scale(zoom) (canvas + capa de texto)
-// Durante el pinch escalamos en vivo el #pdf-zoom-layer (GPU, mantecoso) y al soltar
-// "horneamos" (redimensionar cajas + scaler), anclando el scroll al punto focal. No se
-// llama a pdf.js en todo el gesto.
+// Durante el gesto (pinch táctil, pinch de trackpad o Ctrl+rueda) escalamos en vivo el
+// #pdf-zoom-layer (GPU, mantecoso) y al terminar "horneamos" (redimensionar cajas +
+// scaler), anclando el scroll al punto focal. No se llama a pdf.js en todo el gesto.
 let zoom = 1;
 let zoomHandlersReady = false;
 const PDF_PAD = 20;             // padding del contenedor (coincide con el CSS)
@@ -194,61 +194,116 @@ async function rerender() {
   else await renderPaginated(currentPage);
 }
 
-// Gestos de zoom. Pinch (2 dedos) en móvil: escalamos EN VIVO el layer (GPU, fluido) y al
-// soltar horneamos en el layout sin re-render. 1 dedo = scroll/selección NATIVOS (no se
-// tocan). Escritorio: Ctrl/⌘+rueda (incluye el pinch de trackpad).
+// Gestos de zoom. Todas las rutas comparten el mismo preview EN VIVO: durante el gesto
+// solo se escala #pdf-zoom-layer con transform (GPU, sin reflow) y al terminar se hornea
+// con setZoom (cajas + scroll anclado al foco). Rutas:
+//   - Pinch de 2 dedos (táctil). 1 dedo = scroll/selección NATIVOS (no se tocan).
+//   - Ctrl/⌘+rueda y pinch de trackpad (Chrome/Edge/Firefox lo emiten como wheel con
+//     ctrlKey): factor exponencial proporcional a deltaY, horneado al acabar la ráfaga.
+//   - Pinch de trackpad en Safari (no emite wheel+ctrlKey; usa gesturestart/change/end).
 function ensureZoomHandlers() {
   if (zoomHandlersReady) return;
   const container = document.getElementById('pdf-container');
   if (!container) return;
   zoomHandlersReady = true;
 
+  // ---- Preview en vivo compartido -----------------------------------------
+  // preview.target = zoom objetivo acumulado; el layer muestra target/zoom (relativo
+  // al horneado). El foco (fx,fy) se fija al empezar el gesto.
+  let preview = null;                    // { target, fx, fy }
+  let wheelTimer = 0;
+
+  const startPreview = (fx, fy) => {
+    if (preview) return;
+    const layer = zoomLayer();
+    if (layer) {                         // origen del preview en el foco (layer aún en identidad)
+      const r = layer.getBoundingClientRect();
+      layer.style.transformOrigin = `${fx - r.left}px ${fy - r.top}px`;
+      layer.style.willChange = 'transform';
+    }
+    preview = { target: zoom, fx, fy };
+  };
+  const updatePreview = (target) => {
+    if (!preview) return;
+    preview.target = clampZoom(target);
+    const layer = zoomLayer();
+    if (layer) layer.style.transform = `scale(${preview.target / zoom})`;
+  };
+  const commitPreview = () => {
+    clearTimeout(wheelTimer);
+    if (!preview) return;
+    const { target, fx, fy } = preview;
+    preview = null;
+    const layer = zoomLayer();
+    if (layer) { layer.style.transform = ''; layer.style.willChange = ''; }
+    setZoom(target, { x: fx, y: fy });   // hornea + ancla el scroll al foco
+  };
+
+  // ---- Pinch táctil (2 dedos) ----------------------------------------------
   const dist = (t) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
-  let pinching = false, startDist = 0, startZoom = 1, fx = 0, fy = 0;
+  let pinching = false, startDist = 0, startZoom = 1;
 
   container.addEventListener('touchstart', (e) => {
     if (e.touches.length === 2) {
+      commitPreview();                   // cierra una ráfaga de rueda a medias, si la había
       pinching = true; startDist = dist(e.touches); startZoom = zoom;
-      fx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
-      fy = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-      const layer = zoomLayer();
-      if (layer) {                       // origen del preview en el foco (layer aún en identidad)
-        const r = layer.getBoundingClientRect();
-        layer.style.transformOrigin = `${fx - r.left}px ${fy - r.top}px`;
-        layer.style.willChange = 'transform';
-      }
+      startPreview((e.touches[0].clientX + e.touches[1].clientX) / 2,
+                   (e.touches[0].clientY + e.touches[1].clientY) / 2);
     }
   }, { passive: true });
 
   container.addEventListener('touchmove', (e) => {
     if (!pinching || e.touches.length !== 2) return;
     e.preventDefault();                  // corta el paneo/zoom nativo de 2 dedos
-    const live = clampZoom(startZoom * (dist(e.touches) / (startDist || 1)));
-    const layer = zoomLayer();
-    if (layer) layer.style.transform = `scale(${live / zoom})`;   // relativo al zoom horneado
+    updatePreview(startZoom * (dist(e.touches) / (startDist || 1)));
   }, { passive: false });
 
   const endPinch = () => {
     if (!pinching) return;
     pinching = false;
-    const layer = zoomLayer();
-    let live = zoom;
-    if (layer) {
-      const m = /scale\(([-\d.]+)\)/.exec(layer.style.transform);
-      if (m) live = zoom * parseFloat(m[1]);
-      layer.style.transform = '';
-      layer.style.willChange = '';
-    }
-    setZoom(live, { x: fx, y: fy });     // hornea + ancla el scroll al foco
+    commitPreview();
   };
   container.addEventListener('touchend', endPinch);
   container.addEventListener('touchcancel', endPinch);
 
+  // ---- Rueda / pinch de trackpad (wheel con ctrlKey) ------------------------
+  const WHEEL_IDLE_MS = 140;             // sin eventos este tiempo → fin de ráfaga, hornear
   container.addEventListener('wheel', (e) => {
-    if (!e.ctrlKey && !e.metaKey) return;
+    if ((!e.ctrlKey && !e.metaKey) || pinching) return;
     e.preventDefault();
-    setZoom(zoom * (e.deltaY < 0 ? 1.12 : 1 / 1.12), { x: e.clientX, y: e.clientY });
+    // deltaMode: 0 = píxeles (trackpad y Chrome), 1 = líneas (Firefox + ratón), 2 = páginas.
+    // Normalizado a píxeles, el factor exponencial es proporcional al gesto: el pinch de
+    // trackpad (ráfagas de Δ pequeños) queda suave y dosificable, y una muesca de rueda
+    // clásica (|Δ|≈100 px) da ~1.28×.
+    const dy = e.deltaY * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 100 : 1);
+    if (!dy) return;
+    if (!preview) startPreview(e.clientX, e.clientY);
+    updatePreview(preview.target * Math.exp(-dy * 0.0025));
+    clearTimeout(wheelTimer);
+    wheelTimer = setTimeout(commitPreview, WHEEL_IDLE_MS);
   }, { passive: false });
+
+  // ---- Pinch de trackpad en Safari ------------------------------------------
+  // e.scale es el factor acumulado del gesto. En iOS estos eventos disparan ADEMÁS de los
+  // touch events: el guard `pinching` evita manejar el gesto dos veces.
+  let gestureBase = 1;
+  container.addEventListener('gesturestart', (e) => {
+    if (pinching) return;
+    e.preventDefault();                  // corta el zoom nativo de página completa
+    commitPreview();
+    gestureBase = zoom;
+    startPreview(e.clientX, e.clientY);
+  });
+  container.addEventListener('gesturechange', (e) => {
+    if (pinching || !preview) return;
+    e.preventDefault();
+    updatePreview(gestureBase * e.scale);
+  });
+  container.addEventListener('gestureend', (e) => {
+    if (pinching) return;
+    e.preventDefault();
+    commitPreview();
+  });
 
   // Al rotar/redimensionar cambia el ancho disponible → recomputar el ajuste (re-fit).
   let rt = 0;
@@ -540,7 +595,7 @@ export async function renderCoverDataUrl(maxPx = 400) {
 // Devuelve [{ label, page, subitems: [...] }] (vacío si el PDF no trae outline).
 export async function getOutlineItems() {
   if (!pdfDoc) return [];
-  let outline = null;
+  let outline;
   try { outline = await pdfDoc.getOutline(); } catch { return []; }
   if (!outline || !outline.length) return [];
   const build = async (items) => {

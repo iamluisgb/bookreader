@@ -411,6 +411,65 @@ test.describe('PDF fit-to-width + zoom', () => {
     expect(Math.abs(r.box1 - r.box0 * 2)).toBeLessThan(2);   // caja ×2 en scroll
     expect(r.backing1).toBe(r.backing0);                     // sin re-render también en scroll
   });
+
+  // Pinch de trackpad en escritorio (llega como ráfaga de wheel con ctrlKey y Δ pequeños):
+  // el zoom debe ser PROPORCIONAL al gesto (antes: paso fijo 1.12 por evento → 20 eventos
+  // suaves disparaban el zoom a ~6.7×) y durante la ráfaga solo escala el layer (preview
+  // GPU, sin reflow); se hornea al acabar la ráfaga.
+  test('el pinch de trackpad (wheel+ctrlKey) es proporcional y hornea al acabar la ráfaga', async ({ page }) => {
+    await openPdf(page);
+    await page.waitForTimeout(300);
+    const r = await page.evaluate(async () => {
+      const P: any = await import('/js/pdf-reader.js');
+      const el = document.getElementById('pdf-container')!;
+      const box = () => parseFloat((document.querySelector('#pdf-container .pdf-page') as HTMLElement).style.width);
+      const fit = box();
+      for (let i = 0; i < 20; i++) {   // ráfaga tipo trackpad: 20 eventos de Δ-10
+        el.dispatchEvent(new WheelEvent('wheel', { bubbles: true, cancelable: true, ctrlKey: true, deltaY: -10, clientX: 195, clientY: 390 }));
+      }
+      const layer = document.getElementById('pdf-zoom-layer') as HTMLElement;
+      const during = { transform: layer.style.transform, box: box() };
+      await new Promise((res) => setTimeout(res, 350));      // > WHEEL_IDLE_MS → hornea
+      return { fit, during, boxAfter: box(), layerAfter: layer.style.transform, zoom: P.getZoom() };
+    });
+    expect(r.during.transform).toContain('scale(');   // durante la ráfaga: preview en el layer...
+    expect(r.during.box).toBe(r.fit);                 // ...sin tocar el layout de las páginas
+    // 20 eventos de Δ-10 → zoom = e^(200·0.0025) ≈ 1.65: dosificable, no saturado al máximo.
+    expect(r.zoom).toBeGreaterThan(1.5);
+    expect(r.zoom).toBeLessThan(2);
+    expect(r.layerAfter).toBe('');                    // horneado: layer en identidad...
+    expect(Math.abs(r.boxAfter - r.fit * r.zoom)).toBeLessThan(2);   // ...y caja a fit·zoom
+  });
+
+  // Safari (macOS) no emite wheel+ctrlKey para el pinch de trackpad: usa gesturestart/
+  // gesturechange/gestureend con e.scale acumulado. Antes esta ruta no existía → el pinch
+  // hacía el zoom nativo de página completa en vez de ampliar el PDF.
+  test('el pinch de Safari (gesture events) hace zoom y hornea al soltar', async ({ page }) => {
+    await openPdf(page);
+    await page.waitForTimeout(300);
+    const r = await page.evaluate(async () => {
+      const P: any = await import('/js/pdf-reader.js');
+      const el = document.getElementById('pdf-container')!;
+      const ev = (type: string, scale: number) => {
+        const e: any = new Event(type, { bubbles: true, cancelable: true });
+        e.scale = scale; e.clientX = 195; e.clientY = 390;
+        el.dispatchEvent(e);
+      };
+      const box = () => parseFloat((document.querySelector('#pdf-container .pdf-page') as HTMLElement).style.width);
+      const fit = box();
+      ev('gesturestart', 1);
+      ev('gesturechange', 1.6);
+      ev('gesturechange', 2.2);
+      const layer = document.getElementById('pdf-zoom-layer') as HTMLElement;
+      const during = layer.style.transform;
+      ev('gestureend', 2.2);
+      await new Promise((res) => setTimeout(res, 100));
+      return { fit, during, boxAfter: box(), zoom: P.getZoom() };
+    });
+    expect(r.during).toContain('scale(2.2)');         // preview en vivo con e.scale
+    expect(r.zoom).toBeCloseTo(2.2, 1);
+    expect(Math.abs(r.boxAfter - r.fit * 2.2)).toBeLessThan(2);   // horneado al soltar
+  });
 });
 
 // Márgenes: en una pantalla ANCHA (landscape) la página se centra con margen simétrico. Antes
