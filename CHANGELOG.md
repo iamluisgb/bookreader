@@ -5,6 +5,19 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-06 — UX: más alto para el chat del agente (menos chrome en la cabecera)
+
+El panel apilaba cinco filas (título, estado, chip de perfil, selector de conversación, pestañas)
+antes del chat; en móvil/tablet **vertical** eso dejaba el área de mensajes en ~3 líneas. En un iPad en
+vertical no aplicaba ni el bottom-sheet (<768px) ni la compresión de horizontal (max-height 480), así
+que se veía el chrome completo.
+- **El chip de perfil pasa a la fila del selector de conversación** ([`panel-template.js`](js/ai/panel-template.js)),
+  eliminando una fila entera en todas las vistas (encoge con ellipsis para no empujar al selector).
+- **Compactación en táctil** (`@media (pointer: coarse)`): menos padding/márgenes en estado, barra de
+  conversación, pestañas y lista de mensajes. Ver [`css/main.css`](css/main.css).
+
+---
+
 ## 2026-07-06 — Fix: las tablas del agente se renderizan como tabla (no texto crudo)
 
 El renderizador de Markdown del chat ([`js/ai/markdown.js`](js/ai/markdown.js)) no soportaba tablas:
