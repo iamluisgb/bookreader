@@ -914,13 +914,15 @@ capítulo, alineada a su OBJETIVO. NO des la respuesta: la escribe él. Empieza 
 OBJETIVO: ${convo?.goal || '(sin definir)'}` },
       { role: 'user', content: 'PASAJES DEL CAPÍTULO:\n\n' + formatPassages(passages) },
     ];
-    let thinking = true;
+    let thinking = true, acc = '';
     const raw = await LLM.chatStream({ messages, onToken: (t) => {
       if (thinking) { thinking = false; textNode.textContent = ''; }
-      textNode.textContent += t; scrollDown();
+      acc += t;
+      renderStreaming(textNode, acc);
     } });
+    cancelStreamingRender();
     if (mySeq !== bookSeq) { bubble.remove(); return; }   // cambió de libro → descartar el repaso
-    const finalText = raw || textNode.textContent;
+    const finalText = raw || acc;
     textNode.innerHTML = renderWithCitations(finalText, anchors);
     history.push({ role: 'assistant', content: finalText });
     if (convo) DB.addMessage(convo.id, 'assistant', finalText);
@@ -972,7 +974,7 @@ async function deliver(aug, question, { showUser = true } = {}) {
   textNode.innerHTML = '<span class="ai-typing">pensando…</span>';
   busy = true; els.send.disabled = true; abortCtrl = new AbortController();
   agentUnread = false; applyAgentBadge();   // si el panel está cerrado, muestra "generando"
-  let thinking = true, raw, truncated = false;
+  let thinking = true, raw, truncated = false, acc = '';
 
   try {
     // IA5 Fase 1b · Retrieval agéntico SOLO en turnos difíciles (sin capítulo nombrado y
@@ -996,12 +998,14 @@ async function deliver(aug, question, { showUser = true } = {}) {
       messages, signal: abortCtrl.signal,
       onToken: (t) => {
         if (thinking) { thinking = false; textNode.textContent = ''; }
-        textNode.textContent += t; scrollDown();
+        acc += t;
+        renderStreaming(textNode, acc);   // Markdown ya formateado mientras llega (throttle a 1 frame)
       },
       onDone: (info) => { truncated = info.truncated; },
     });
+    cancelStreamingRender();
     if (mySeq !== bookSeq) return;   // el usuario cambió de libro → no pintar/persistir en el convo equivocado
-    const finalText = raw || textNode.textContent;
+    const finalText = raw || acc;
     textNode.innerHTML = renderWithCitations(finalText, anchors);
     addMessageActions(bubble, finalText, question, { autoRun: LLM.getAutoExtract(), truncated });
     history.push({ role: 'assistant', content: finalText });
@@ -1323,3 +1327,19 @@ function setStatus(s) {
   els.status.classList.toggle('ai-status--busy', /…\s*$/.test(s));
 }
 function scrollDown() { if (els.messages) els.messages.scrollTop = els.messages.scrollHeight; }
+
+// Render del Markdown EN VIVO durante el streaming: la respuesta se ve ya formateada (negritas,
+// listas, tablas, citas) antes de completarse, en vez de texto crudo hasta el final. Se coalesce
+// a un frame (rAF) para no re-parsear en cada token; el Markdown incompleto (una tabla a medio
+// construir, un bloque de código sin cerrar) se renderiza best-effort y se asienta al llegar el
+// resto. El render final tras el streaming fija el texto completo.
+let liveRaf = 0;
+function renderStreaming(node, text) {
+  if (liveRaf) return;
+  liveRaf = requestAnimationFrame(() => {
+    liveRaf = 0;
+    node.innerHTML = renderWithCitations(text, anchors);
+    scrollDown();
+  });
+}
+function cancelStreamingRender() { if (liveRaf) { cancelAnimationFrame(liveRaf); liveRaf = 0; } }

@@ -5,6 +5,17 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-06 — UX: Markdown formateado EN VIVO durante el streaming
+
+Antes, mientras la respuesta se streameaba, el chat mostraba el texto **en crudo** (con `**`, `|`,
+`#`… a la vista) y solo lo formateaba al terminar. Ahora se renderiza el Markdown **en vivo** a medida
+que llega (negritas, listas, tablas, citas), con throttle a un frame (`requestAnimationFrame`) para no
+re-parsear en cada token; el Markdown incompleto se pinta best-effort y se asienta al llegar el resto.
+Aplica al chat y al repaso de capítulo. Ver [`js/ai/panel.js`](js/ai/panel.js) (`renderStreaming`) y la
+regresión en [`tests/stream-format.spec.ts`](tests/stream-format.spec.ts).
+
+---
+
 ## 2026-07-06 — UX (3ª pasada): cabecera del panel a un único toolbar
 
 La cabecera aún apilaba 5 filas (título "Agente", estado, perfil, selector, pestañas). Recomendación
