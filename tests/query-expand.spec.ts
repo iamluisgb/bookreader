@@ -15,8 +15,10 @@ test('parseExpansion es tolerante y expansionQuery combina términos + hipótesi
     const valid = Q.parseExpansion('{"terms":["Raft","consenso"],"hypothetical":"Raft elige un líder."}');
     const fenced = Q.parseExpansion('```json\n{"terms":["Comala"],"hypothetical":"un pueblo de muertos"}\n```');
     const noisy = Q.parseExpansion('Claro, aquí tienes: {"terms":["x"],"hypothetical":"y"} ¡listo!');
+    // Modelo reasoning: razonamiento (con llaves) ANTES del JSON real → toma el objeto real.
+    const reasoning = Q.parseExpansion('<think>quizá {esto} confunda</think>\n{"terms":["consensus"],"hypothetical":"nodes agree"}');
     return {
-      valid, fenced,
+      valid, fenced, reasoning,
       garbage: Q.parseExpansion('no hay json aquí'),
       empty: Q.parseExpansion('{"terms":[],"hypothetical":""}'),
       nullish: Q.parseExpansion(''),
@@ -27,6 +29,7 @@ test('parseExpansion es tolerante y expansionQuery combina términos + hipótesi
   });
   expect(r.valid).toEqual({ terms: ['Raft', 'consenso'], hypothetical: 'Raft elige un líder.' });
   expect(r.fenced.terms).toEqual(['Comala']);          // quita fences ```json
+  expect(r.reasoning.terms).toEqual(['consensus']);    // ignora <think> y toma el JSON real
   expect(r.noisyOk).toBe(true);                         // extrae el objeto entre texto
   expect(r.garbage).toBeNull();                         // sin JSON → null (fallback)
   expect(r.empty).toBeNull();                           // vacío → null

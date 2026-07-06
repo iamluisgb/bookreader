@@ -5,6 +5,21 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-06 — IA7 · fase 2: golden @live medido (el valor está en cross-lingüe)
+
+Golden de retrieval sobre **DDIA real** con la API real ([`tests/retrieval-hyde.spec.ts`](tests/retrieval-hyde.spec.ts),
+`npm run test:ai`), midiendo si el retrieval encuentra el pasaje correcto con la pregunta cruda vs. con la
+expansión (unión). Resultado, honesto:
+- **Mismo idioma (EN):** BM25 crudo ya recupera **6/6** a top-40 → la expansión **no mejora el recall**
+  (coherente con [ADR-014](DECISIONS.md)) pero **nunca empeora** (invariante de la unión, verificado).
+- **Cross-lingüe (ES→EN):** crudo **0/5** → con expansión **4/5**. Aquí HyDE **mueve la aguja**: es el
+  caso real (leer libros técnicos en inglés preguntando en español); sin expansión BM25 no cruza el idioma.
+
+Además, `parseExpansion` ahora ignora bloques `<think>…</think>` y prueba los objetos JSON balanceados
+(reduce los `null` con modelos *reasoning*). Ver BACKLOG · IA7.
+
+---
+
 ## 2026-07-06 — IA7 · Reescritura de consulta por defecto (HyDE-lite) · fase 1
 
 La mejora de retrieval de mayor ROI **sin embeddings**: entender la pregunta **antes** de buscar.

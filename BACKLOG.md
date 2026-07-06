@@ -137,10 +137,21 @@ con **gate** (solo si hay key, libro listo y NO se nombró capítulo — ahí la
 **timeout + fallback** a la pregunta cruda ante cualquier fallo. El router y el capítulo actual siguen
 sobre la pregunta cruda; solo el paso BM25 usa la unión.
 
-**Fases:** F1 (módulo + integración con unión y fallback) · F2 (golden de preguntas parafraseadas como
-prueba de que mueve la aguja + regresión) · F3 opcional (caché por pregunta, afinar el gate del agéntico
-ahora que la 1ª recuperación es mejor). **Abiertas:** ¿gate por defecto salvo capítulo (elegido) vs
-siempre? · presupuesto de latencia (max_tokens/timeout de la expansión).
+**Fases:** F1 ✓ (módulo + integración con unión y fallback) · F2 ✓ (golden @live sobre DDIA real,
+[`tests/retrieval-hyde.spec.ts`](tests/retrieval-hyde.spec.ts)) · F3 opcional (caché por pregunta, afinar
+el gate del agéntico ahora que la 1ª recuperación es mejor).
+
+**Hallazgo de F2 (medido, DDIA real, `npm run test:ai`):**
+- **Mismo idioma (EN):** BM25 crudo ya recupera **6/6** a top-40; la expansión **no mejora el recall**
+  (coherente con [ADR-014](DECISIONS.md): BM25 es fuerte en consultas léxicas) pero **nunca empeora**
+  (invariante de la unión, verificado).
+- **Cross-lingüe (ES→EN, el caso real del usuario):** crudo **0/5** → con expansión **4/5**. Aquí HyDE
+  **mueve la aguja de verdad**: el usuario lee libros técnicos en inglés preguntando en español, y sin la
+  expansión BM25 no cruza la barrera del idioma. Este es el valor principal de IA7, no el mismo-idioma.
+
+**Abiertas:** ¿subir el gate al idioma (activar siempre que la pregunta no coincida con el idioma del
+libro)? · reducir los `null` de expansión (variación del modelo reasoning; el fallback ya lo cubre) ·
+presupuesto de latencia (max_tokens/timeout).
 
 ---
 

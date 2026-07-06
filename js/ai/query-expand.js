@@ -26,21 +26,41 @@ NO respondas la pregunta. Devuelve SOLO un objeto JSON compacto (sin markdown, s
 Ejemplo de forma: {"terms":["...","..."],"hypothetical":"..."}${hint}`;
 }
 
-// Extrae {terms, hypothetical} de la respuesta del modelo, tolerante a fences y ruido.
-// Devuelve null si no hay nada aprovechable (→ el retrieval usa solo la pregunta cruda).
+// Objetos JSON balanceados de un texto (respeta llaves dentro de strings). Devuelve las
+// subcadenas `{...}` de nivel superior, en orden. Robusto ante prosa y llaves anidadas.
+function balancedObjects(text) {
+  const out = [];
+  let depth = 0, start = -1, inStr = false, esc = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inStr) { if (esc) esc = false; else if (c === '\\') esc = true; else if (c === '"') inStr = false; continue; }
+    if (c === '"') { inStr = true; continue; }
+    if (c === '{') { if (depth === 0) start = i; depth++; }
+    else if (c === '}' && depth > 0) { depth--; if (depth === 0 && start >= 0) { out.push(text.slice(start, i + 1)); start = -1; } }
+  }
+  return out;
+}
+
+// Extrae {terms, hypothetical} de la respuesta del modelo. Tolerante a fences, bloques de
+// razonamiento (<think>…</think> de modelos reasoning) y prosa alrededor: prueba los objetos
+// JSON balanceados (el real suele ir el ÚLTIMO, tras el razonamiento). Devuelve null si no
+// hay nada aprovechable (→ el retrieval usa solo la pregunta cruda).
 export function parseExpansion(raw) {
-  const text = String(raw || '').replace(/```(?:json)?/gi, '');
-  const start = text.indexOf('{'), end = text.lastIndexOf('}');
-  if (start === -1 || end <= start) return null;
-  let obj;
-  try { obj = JSON.parse(text.slice(start, end + 1)); } catch { return null; }
-  if (!obj || typeof obj !== 'object') return null;
-  const terms = Array.isArray(obj.terms)
-    ? obj.terms.map(t => String(t || '').trim()).filter(Boolean).slice(0, 8)
-    : [];
-  const hypothetical = typeof obj.hypothetical === 'string' ? obj.hypothetical.trim() : '';
-  if (!terms.length && !hypothetical) return null;
-  return { terms, hypothetical };
+  const text = String(raw || '')
+    .replace(/```(?:json)?/gi, '')
+    .replace(/<think>[\s\S]*?<\/think>/gi, ' ');   // descarta el razonamiento de modelos reasoning
+  const candidates = balancedObjects(text);
+  for (let i = candidates.length - 1; i >= 0; i--) {   // del último al primero
+    let obj;
+    try { obj = JSON.parse(candidates[i]); } catch { continue; }
+    if (!obj || typeof obj !== 'object') continue;
+    const terms = Array.isArray(obj.terms)
+      ? obj.terms.map(t => String(t || '').trim()).filter(Boolean).slice(0, 8)
+      : [];
+    const hypothetical = typeof obj.hypothetical === 'string' ? obj.hypothetical.trim() : '';
+    if (terms.length || hypothetical) return { terms, hypothetical };
+  }
+  return null;
 }
 
 // Cadena de búsqueda combinada (términos + hipótesis) para pasar a Retrieval.search.
