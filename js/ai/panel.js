@@ -20,6 +20,7 @@ import { TEMPLATE, systemPrompt } from './panel-template.js';
 import * as Profiles from './profiles.js';
 import * as Backup from '../backup.js';
 import * as Flashcards from './flashcards.js';
+import * as Storage from '../storage.js';
 
 // Icon + label markup for the small inline action buttons.
 const act = (name, text, size = 15) => `${icon(name, { size })}<span>${text}</span>`;
@@ -117,7 +118,7 @@ export function setOpen(open) {
   applyAgentBadge();
   if (!open) return;
   if (book && !convo) openOnboarding();   // primer uso del agente con este libro
-  else if (convo) focusInput();
+  else if (convo) { focusInput(); if (segReady) maybeHintFlashcards(); }
 }
 export function isOpen() { return document.body.classList.contains('ai-open'); }
 
@@ -164,9 +165,72 @@ async function exportConvo() {
   }
 }
 
+// Coach mark de una sola vez: la primera vez que un libro queda listo, señalamos el botón
+// de Flashcards (feature clave que, siendo un icono más, pasaba desapercibida). Se muestra
+// solo con el panel abierto, y se marca visto para no repetir.
+const FLASHCARDS_HINT_KEY = 'flashcards_hint_seen';
+let flashcardsHintEl = null;
+
+function maybeHintFlashcards() {
+  if (!isOpen() || Storage.get(FLASHCARDS_HINT_KEY, false)) return;
+  if (flashcardsHintEl) return;
+  const btn = els.panel?.querySelector('#ai-convo-cards');
+  if (!btn || btn.offsetParent === null) return;   // botón no visible (sin convo aún)
+  Storage.set(FLASHCARDS_HINT_KEY, true);          // se enseña UNA vez, aunque lo ignoren
+  const hint = document.createElement('div');
+  hint.className = 'ai-coachmark';
+  hint.innerHTML = `
+    <span>Convierte este libro en <b>flashcards para Anki</b> desde aquí.</span>
+    <button class="ai-coachmark-x" aria-label="Entendido">${icon('xmark', { size: 14 })}</button>`;
+  document.body.appendChild(hint);
+  flashcardsHintEl = hint;
+  const r = btn.getBoundingClientRect();
+  // Anclado bajo el botón, con la flecha apuntándolo; clamp al viewport por si va justo al borde.
+  hint.style.top = `${r.bottom + 10}px`;
+  const left = Math.min(r.left + r.width / 2 - 130, window.innerWidth - 270);
+  hint.style.left = `${Math.max(10, left)}px`;
+  hint.style.setProperty('--arrow-x', `${r.left + r.width / 2 - Math.max(10, left)}px`);
+  requestAnimationFrame(() => hint.classList.add('is-in'));
+  hint.querySelector('.ai-coachmark-x').addEventListener('click', dismissFlashcardsHint);
+  // Cualquier interacción fuera lo cierra (se arma en el próximo tick para no auto-cerrarse).
+  setTimeout(() => document.addEventListener('click', onHintOutside, { once: false }), 0);
+}
+
+function onHintOutside(e) {
+  if (flashcardsHintEl && !flashcardsHintEl.contains(e.target)) dismissFlashcardsHint();
+}
+
+function dismissFlashcardsHint() {
+  Storage.set(FLASHCARDS_HINT_KEY, true);
+  document.removeEventListener('click', onHintOutside);
+  if (flashcardsHintEl) { flashcardsHintEl.remove(); flashcardsHintEl = null; }
+}
+
+// Tras la 1ª respuesta de un chat libre (sin objetivo), ofrecer "subir" a un objetivo de
+// lectura — activa libreta y repaso sin perder el chat. Una vez por conversación.
+const objectiveOffered = new Set();
+function maybeOfferObjective() {
+  if (template || !convo || objectiveOffered.has(convo.id)) return;
+  if (history.filter(m => m.role === 'assistant').length !== 1) return;   // solo tras la 1ª
+  objectiveOffered.add(convo.id);
+  const nudge = document.createElement('div');
+  nudge.className = 'ai-objnudge';
+  nudge.innerHTML = `
+    <span>¿Estudiando este libro? Elige un <b>objetivo de lectura</b> para activar la libreta y el repaso.</span>
+    <div class="ai-objnudge-btns">
+      <button class="ai-objnudge-go">Elegir objetivo</button>
+      <button class="ai-objnudge-x" aria-label="Ahora no">${icon('xmark', { size: 14 })}</button>
+    </div>`;
+  nudge.querySelector('.ai-objnudge-go').addEventListener('click', () => { nudge.remove(); openOnboarding({ upgrade: true }); });
+  nudge.querySelector('.ai-objnudge-x').addEventListener('click', () => nudge.remove());
+  els.messages.appendChild(nudge);
+  scrollDown();
+}
+
 // Flashcards para Anki: abre el modal de generación/export con el contexto del libro
 // activo. Necesita el libro segmentado (el índice BM25 se construye desde el anotado).
 function openFlashcards() {
+  dismissFlashcardsHint();
   if (!book && !bookId) { setStatus('Abre un libro para crear flashcards.'); return; }
   if (!segReady) { setStatus('Preparando el libro… inténtalo en unos segundos.'); return; }
   Flashcards.open({
@@ -358,12 +422,16 @@ async function prepareBook() {
 function refreshStatus() {
   if (!book) { setStatus('Abre un EPUB para empezar.'); return; }
   if (!segReady) { setStatus(template ? `Plantilla: ${template.name} · leyendo…` : 'Leyendo el libro…'); return; }
-  // El template ya se ve en el selector de conversación (no lo repetimos aquí). En reposo el
-  // estado es puro readout técnico sin acción → se marca 'idle' para colapsarlo en táctil,
-  // donde el alto es escaso. Los estados transitorios (leyendo/generando/error) sí se ven.
-  setStatus(`${segCached ? 'Listo (cacheado)' : 'Listo'} · ${segBlocks} pasajes`);
+  // Estado de cara al usuario: "Listo para preguntar" (nada de jerga del pipeline —
+  // "pasajes", "cacheado" son conceptos internos que no significan nada para quien lee).
+  // El detalle técnico queda en el title, por si hace falta depurar. En reposo el estado
+  // es un readout sin acción → 'idle' para colapsarlo en táctil (alto escaso). Los estados
+  // transitorios (leyendo/generando/error) sí se ven.
+  setStatus('Listo para preguntar');
+  if (els.status) els.status.title = `${segBlocks} pasajes indexados${segCached ? ' · desde caché' : ''}`;
   els.status.classList.add('ai-status--idle');
   renderConvoBar();
+  maybeHintFlashcards();
 }
 
 // Chip del perfil de agente activo (P1): muestra su nombre y abre Ajustes → Perfiles.
@@ -415,7 +483,7 @@ function renderConvoBar() {
   // OBJETIVO de lectura (lo que el usuario escribió), no el código interno de la plantilla
   // ("T2 · HQ&A"), que no significa nada para quien lee y ya no aporta aquí.
   els.convoLabel.textContent = convo
-    ? (convo.title || convo.goal || template?.name || 'Conversación')
+    ? (convo.title || convo.goal || template?.name || 'Chat libre')
     : 'Elegir objetivo de lectura';
 }
 
@@ -527,7 +595,10 @@ async function restoreChat() {
 
 // ---- Onboarding ------------------------------------------------------------
 
-function openOnboarding() {
+// `opts.upgrade` = ya hay una conversación (chat libre) y el usuario le AÑADE un objetivo:
+// se actualiza la conversación en sitio (conserva el chat), en vez de crear una nueva.
+function openOnboarding(opts = {}) {
+  const upgrade = !!opts.upgrade && !!convo;
   let overlay = document.getElementById('ai-onboarding');
   if (overlay) overlay.remove();
   overlay = document.createElement('div');
@@ -566,20 +637,28 @@ function openOnboarding() {
   let chosenTemplate = null;
 
   // Una sola pregunta: elige el OBJETIVO. Las 5 plantillas por objetivo + las propias.
+  // "Solo chatear" (sin objetivo) queda como atajo de baja fricción: el valor primero,
+  // la estructura (libreta/repaso) como mejora opcional después. No se ofrece en upgrade
+  // (ahí el usuario ya está pidiendo explícitamente un objetivo).
   const renderObjectives = () => {
     const list = objectiveTemplates();
     body.innerHTML = `
       <h2>¿Qué quieres conseguir con este libro?</h2>
-      <p class="ai-ob-sub">Elige un objetivo de lectura.</p>
+      <p class="ai-ob-sub">Elige un objetivo de lectura${upgrade ? '' : ', o empieza a preguntar sin más'}.</p>
       <div class="ai-ob-templates">
         ${list.map(t => `
           <button class="ai-ob-tpl" data-tpl="${t.id}">
             <span class="ai-ob-tpl-name">${t.objective || t.name}</span>
             <span class="ai-ob-tpl-ideal">${t.name}${t.ideal ? ' · ' + t.ideal : ''}</span>
           </button>`).join('')}
-      </div>`;
+      </div>
+      ${upgrade ? '' : `<button class="ai-ob-quickchat">${icon('bubble', { size: 15 })}<span>Prefiero solo chatear con el libro</span></button>`}`;
     body.querySelectorAll('.ai-ob-tpl').forEach(btn =>
       btn.addEventListener('click', () => { chosenTemplate = getTemplate(btn.dataset.tpl); renderGoal(); }));
+    body.querySelector('.ai-ob-quickchat')?.addEventListener('click', async () => {
+      dismiss();
+      await startQuickChat();
+    });
   };
 
   const renderGoal = () => {
@@ -605,17 +684,41 @@ function openOnboarding() {
       const artesano = body.querySelector('#ai-ob-artesano')?.checked;
       const finalTemplate = artesano ? getTemplate(ARTESANO_ID) : chosenTemplate;
       template = finalTemplate;
-      convo = bookId
-        ? await DB.createConvo(bookId, finalTemplate.id, goal)
-        : { id: 'tmp', bookId: null, templateId: finalTemplate.id, goal };
-      history = []; notes = []; attenuationDone = false; clearChapterAttenuation();
-      dismiss();
-      await activateConvo();
+      if (upgrade && convo) {
+        // Añadir objetivo a la conversación existente SIN perder el chat: actualiza en sitio.
+        if (convo.id !== 'tmp' && bookId) {
+          convo = (await DB.updateConvo(convo.id, { templateId: finalTemplate.id, goal })) || convo;
+        } else { convo.templateId = finalTemplate.id; convo.goal = goal; }
+        notes = convo ? await DB.getNotes(convo.id) : [];
+        attenuationDone = false; clearChapterAttenuation();
+        dismiss();
+        renderConvoBar(); renderNotebook(); refreshStatus();   // el historial se conserva
+      } else {
+        convo = bookId
+          ? await DB.createConvo(bookId, finalTemplate.id, goal)
+          : { id: 'tmp', bookId: null, templateId: finalTemplate.id, goal };
+        history = []; notes = []; attenuationDone = false; clearChapterAttenuation();
+        dismiss();
+        await activateConvo();
+      }
       setOpen(true);
     });
   };
 
   renderObjectives();
+}
+
+// Chat libre (sin objetivo/plantilla): la vía de mínima fricción para empezar a preguntar.
+// La conversación se crea con templateId null; la libreta queda vacía y el agente responde
+// como asistente general. Tras la primera respuesta se ofrece "subir" a un objetivo.
+async function startQuickChat() {
+  template = null;
+  convo = bookId
+    ? await DB.createConvo(bookId, null, '')
+    : { id: 'tmp', bookId: null, templateId: null, goal: '' };
+  history = []; notes = []; attenuationDone = false; clearChapterAttenuation();
+  await activateConvo();
+  setOpen(true);
 }
 
 // ---- Chat ------------------------------------------------------------------
@@ -1026,6 +1129,7 @@ async function deliver(aug, question, { showUser = true } = {}) {
     addMessageActions(bubble, finalText, question, { autoRun: LLM.getAutoExtract(), truncated });
     history.push({ role: 'assistant', content: finalText });
     if (convo) DB.addMessage(convo.id, 'assistant', finalText);
+    maybeOfferObjective();
   } catch (e) {
     if (e.name === 'AbortError') textNode.textContent += ' [cancelado]';
     else { console.error(e); textNode.innerHTML = `<span class="ai-error">${escapeHtml(e.message)}</span>`; }

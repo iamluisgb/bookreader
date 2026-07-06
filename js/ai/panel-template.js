@@ -18,7 +18,7 @@ export const TEMPLATE = `
       </button>
       <button id="ai-convo-new" class="icon-btn" title="Nueva conversación">${icon('plus', { size: 18 })}</button>
       <button id="ai-convo-export" class="icon-btn" title="Exportar esta conversación (libreta + chat) a Markdown">${icon('share', { size: 17 })}</button>
-      <button id="ai-convo-cards" class="icon-btn" title="Flashcards para Anki">${icon('cards', { size: 17 })}</button>
+      <button id="ai-convo-cards" class="icon-btn ai-cards-btn" title="Crear flashcards para Anki">${icon('cards', { size: 17 })}</button>
     </div>
     <button id="ai-edit-cfg" class="icon-btn ai-toolbar-cfg" title="Ajustes del agente">${icon('gear')}</button>
     <button id="ai-close" class="icon-btn" title="Cerrar">${icon('xmark')}</button>
@@ -90,6 +90,11 @@ pregunta para traerlo — pero no afirmes que el capítulo "no existe" o "no te 
 CITAS (obligatorio): el extracto viene troceado en pasajes precedidos por anclas [[aN]].
 Cada afirmación basada en el libro debe llevar su cita [[aN]] usando identificadores reales del texto.
 Incluye al menos una cita por respuesta sobre el contenido. No inventes anclas.
+
+FORMATO: usa Markdown (negritas, listas, tablas, encabezados) — se renderiza con estilo en la app.
+Para comparar o estructurar, usa TABLAS o listas Markdown. NUNCA dibujes diagramas, cajas, flechas ni
+árboles con caracteres ASCII (│ ┌ └ → ---): se ven crudos y rompen la lectura. Un flujo o jerarquía se
+expresa mejor como lista anidada o pasos numerados.
 
 Principio rector — información ≠ cognición. Ayuda a APRENDER, no sustituyas el aprendizaje.
 La libreta del usuario tiene estos campos:

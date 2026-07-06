@@ -41,7 +41,10 @@ async function stubLLM(page, content: string) {
 // Abre el epub, pasa el onboarding y deja el panel listo (patrón de panel.spec.ts).
 async function setup(page, canned = JSON.stringify(CANNED_CARDS)) {
   await page.goto('/index.html');
-  await page.evaluate((k) => localStorage.setItem('bookreader_ai_key', JSON.stringify(k)), 'test-key');
+  await page.evaluate((k) => {
+    localStorage.setItem('bookreader_ai_key', JSON.stringify(k));
+    localStorage.setItem('bookreader_flashcards_hint_seen', 'true');   // coach mark aparte
+  }, 'test-key');
   await page.reload();
   await stubLLM(page, canned);
 
@@ -71,6 +74,26 @@ test('generar muestra la revisión con las tarjetas del modelo', async ({ page }
   await expect(page.locator('.fc-item')).toHaveCount(3);
   await expect(page.locator('#ai-flashcards h2')).toHaveText('3 tarjetas');
   await expect(page.locator('.fc-front').first()).toContainText('Juan Preciado');
+});
+
+// UX #3 · El alcance es un desplegable PROPIO (no <select> nativo): abre, lista opciones y
+// deja elegir un capítulo, que se refleja en el botón.
+test('el alcance usa un combobox propio y permite elegir capítulo', async ({ page }) => {
+  await setup(page);
+  await page.click('#ai-convo-cards');
+  await page.waitForSelector('#ai-flashcards', { timeout: 5000 });
+  // No hay <select> nativo para el alcance; es un combo propio.
+  await expect(page.locator('#fc-scope select')).toHaveCount(0);
+  const combo = page.locator('#fc-scope .fc-combo-btn');
+  await expect(combo).toContainText('Libro entero');           // por defecto
+  await combo.click();
+  const opts = page.locator('#fc-scope .fc-combo-list li');
+  expect(await opts.count()).toBeGreaterThan(1);               // libro entero + capítulos
+  // Elegimos la primera opción de capítulo (índice 1; la 0 es "Libro entero").
+  const chapter = await opts.nth(1).textContent();
+  await opts.nth(1).click();
+  await expect(combo).toContainText((chapter || '').trim());
+  await expect(page.locator('#fc-scope .fc-combo-pop')).toBeHidden();
 });
 
 test('la respuesta con fences y texto alrededor también se parsea', async ({ page }) => {

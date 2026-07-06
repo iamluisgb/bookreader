@@ -35,9 +35,15 @@ async function stubLLM(page) {
   });
 }
 
+// Abre el epub y deja el panel listo. Con `template=null` toma la vía de CHAT LIBRE
+// (botón "solo chatear"); si no, pasa el onboarding con esa plantilla. El coach mark de
+// flashcards se marca visto para que no aparezca sobre las aserciones (test propio aparte).
 async function setup(page, { template = 't3-juicio', goal = 'probar el panel' } = {}) {
   await page.goto('/index.html');
-  await page.evaluate((k) => localStorage.setItem('bookreader_ai_key', JSON.stringify(k)), 'test-key');
+  await page.evaluate((k) => {
+    localStorage.setItem('bookreader_ai_key', JSON.stringify(k));
+    localStorage.setItem('bookreader_flashcards_hint_seen', 'true');
+  }, 'test-key');
   await page.reload();
   await stubLLM(page);
 
@@ -48,9 +54,13 @@ async function setup(page, { template = 't3-juicio', goal = 'probar el panel' } 
   await page.waitForSelector('#ai-toggle:not([disabled])', { timeout: 15000 });
   await page.click('#ai-toggle');
   await page.waitForSelector('.ai-onboarding', { timeout: 5000 });
-  await page.click(`.ai-ob-tpl[data-tpl="${template}"]`);
-  await page.fill('#ai-ob-goal', goal);
-  await page.click('#ai-ob-start');
+  if (template === null) {
+    await page.click('.ai-ob-quickchat');
+  } else {
+    await page.click(`.ai-ob-tpl[data-tpl="${template}"]`);
+    await page.fill('#ai-ob-goal', goal);
+    await page.click('#ai-ob-start');
+  }
   await expect(page.locator('#ai-tabs')).toBeVisible({ timeout: 5000 });
   await expect(page.locator('#ai-status')).toContainText('Listo', { timeout: 30000 });
 }
@@ -85,4 +95,73 @@ test('pregunta vaga (sin match léxico) dispara retrieval agéntico', async ({ p
   const calls = await page.evaluate(() => (window as any).__llm.calls);
   const agentic = calls.filter((c: any) => (c.tools || []).includes('search_book'));
   expect(agentic.length).toBeGreaterThan(0);                 // sí hubo recolección agéntica
+});
+
+// UX #2 · El estado en reposo es de cara al usuario, sin jerga del pipeline.
+test('el estado listo no filtra jerga interna ("pasajes"/"cacheado")', async ({ page }) => {
+  await setup(page);
+  const txt = await page.locator('#ai-status').textContent();
+  expect(txt).toContain('Listo');
+  expect(txt).not.toMatch(/pasaj|cachead/i);                 // jerga interna → fuera de la UI
+});
+
+// UX #4 · Chat libre: se puede preguntar SIN elegir objetivo, y tras la 1ª respuesta se
+// ofrece subir a un objetivo conservando el chat (upgrade en sitio, no una convo nueva).
+test('chat libre permite preguntar sin objetivo y luego ofrece activarlo sin perder el chat', async ({ page }) => {
+  await setup(page, { template: null });
+  // Sin plantilla, la libreta no muestra campos de objetivo.
+  await ask(page, '¿de qué trata el libro?');
+  await expect(answerBubble(page)).toContainText('Respuesta de prueba');
+
+  // Aparece el aviso para activar un objetivo.
+  const nudge = page.locator('.ai-objnudge');
+  await expect(nudge).toBeVisible();
+  await nudge.locator('.ai-objnudge-go').click();
+
+  // Se reabre el picker en modo "upgrade": elegimos objetivo…
+  await page.waitForSelector('.ai-onboarding', { timeout: 5000 });
+  await page.click('.ai-ob-tpl[data-tpl="hqa"]');
+  await page.fill('#ai-ob-goal', 'memorizar el libro');
+  await page.click('#ai-ob-start');
+
+  // …y el chat previo SE CONSERVA (la respuesta sigue en pantalla) y ahora hay plantilla
+  // (el selector de conversación muestra el objetivo escrito).
+  await expect(answerBubble(page)).toContainText('Respuesta de prueba');
+  await expect(page.locator('#ai-convo-label')).toContainText('memorizar el libro');
+});
+
+// UX #4 · El aviso de objetivo NO aparece cuando ya se eligió uno en el onboarding.
+test('con objetivo elegido no se muestra el aviso de chat libre', async ({ page }) => {
+  await setup(page, { template: 'hqa', goal: 'dominar el material' });
+  await ask(page, 'una pregunta cualquiera');
+  await expect(page.locator('.ai-objnudge')).toHaveCount(0);
+});
+
+// UX #1 · Coach mark: la primera vez que un libro queda listo, señala el botón de
+// flashcards; se muestra una sola vez (persiste "visto").
+test('el coach mark de flashcards aparece una vez y no reaparece', async ({ page }) => {
+  await page.goto('/index.html');
+  await page.evaluate((k) => localStorage.setItem('bookreader_ai_key', JSON.stringify(k)), 'test-key');
+  await page.reload();
+  await stubLLM(page);
+  const fc = page.waitForEvent('filechooser');
+  await page.click('#open-file-btn');
+  await (await fc).setFiles(EPUB_PATH);
+  await page.waitForSelector('#ai-toggle:not([disabled])', { timeout: 15000 });
+  await page.click('#ai-toggle');
+  await page.waitForSelector('.ai-onboarding', { timeout: 5000 });
+  await page.click('.ai-ob-quickchat');
+  await expect(page.locator('#ai-status')).toContainText('Listo', { timeout: 30000 });
+
+  // Aparece señalando el botón de flashcards y marca "visto" (una vez, aunque lo ignoren).
+  await expect(page.locator('.ai-coachmark')).toBeVisible({ timeout: 5000 });
+  expect(await page.evaluate(() => localStorage.getItem('bookreader_flashcards_hint_seen'))).toBe('true');
+  await page.locator('.ai-coachmark-x').click();
+  await expect(page.locator('.ai-coachmark')).toHaveCount(0);
+
+  // Cerrar y reabrir el panel (mismo perfil, flag ya puesto) → no reaparece.
+  await page.click('#ai-close');
+  await page.click('#ai-toggle');
+  await page.waitForTimeout(400);
+  await expect(page.locator('.ai-coachmark')).toHaveCount(0);
 });

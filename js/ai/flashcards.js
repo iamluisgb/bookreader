@@ -25,6 +25,9 @@ const COUNTS = [10, 15, 20, 30];
 let ctx = null;        // { bookId, bookTitle, goal, tocLabels, currentChapter, ensureIndex }
 let overlay = null;
 let generating = false, abortCtrl = null;
+let scopeValue = '';   // alcance elegido: '' = libro entero, o la etiqueta del capítulo
+// Umbral a partir del cual el desplegable de alcance muestra buscador (índices largos).
+const SCOPE_SEARCH_MIN = 8;
 
 export function open(context) {
   ctx = context;
@@ -65,15 +68,14 @@ async function renderSetup() {
   // preselecciona solo si tiene contenido — si no, "Libro entero".
   ctx.ensureIndex();
   const chapters = (ctx.tocLabels || []).filter(c => c && Retrieval.passagesByChapter(c).length);
-  const cur = chapters.includes(ctx.currentChapter) ? ctx.currentChapter : '';
+  // Alcance por defecto: el capítulo que se lee (si tiene contenido), si no el libro entero.
+  scopeValue = chapters.includes(ctx.currentChapter) ? ctx.currentChapter : '';
+  const options = [{ value: '', label: 'Libro entero' }, ...chapters.map(c => ({ value: c, label: c }))];
   b.innerHTML = `
     <h2>Flashcards para Anki</h2>
     <p class="ai-ob-sub">El agente crea tarjetas de estudio desde el libro; revísalas y expórtalas a Anki.</p>
-    <label class="fc-label" for="fc-scope">Contenido</label>
-    <select id="fc-scope" class="fc-select">
-      <option value="">Libro entero</option>
-      ${chapters.map(c => `<option value="${escapeHtml(c)}" ${c === cur ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('')}
-    </select>
+    <label class="fc-label" id="fc-scope-label">Contenido</label>
+    <div id="fc-scope"></div>
     <label class="fc-label">Tipo de tarjeta</label>
     <div class="fc-types">
       <label class="fc-type"><input type="radio" name="fc-type" value="basic" checked>
@@ -86,8 +88,63 @@ async function renderSetup() {
     <button id="fc-generate" class="primary-btn ai-ob-start">${icon('sparkles', { size: 16 })} Generar tarjetas</button>
     <div id="fc-error" class="fc-error" style="display:none"></div>
     <div id="fc-decks"></div>`;
+  mountScopeCombo(b.querySelector('#fc-scope'), options, scopeValue, (v) => { scopeValue = v; });
   b.querySelector('#fc-generate').addEventListener('click', onGenerate);
   renderDeckList();
+}
+
+// Desplegable propio para el alcance (sustituye al <select> nativo, que ignoraba el tema y
+// no permitía buscar). Botón + popover con buscador (si hay muchos capítulos) y lista
+// filtrable. Cohesión con el lenguaje visual y usable en índices largos.
+function mountScopeCombo(host, options, selected, onChange) {
+  const withSearch = options.length > SCOPE_SEARCH_MIN;
+  const labelOf = (v) => (options.find(o => o.value === v) || options[0]).label;
+  host.className = 'fc-combo';
+  host.innerHTML = `
+    <button type="button" class="fc-combo-btn" aria-haspopup="listbox" aria-expanded="false">
+      <span class="fc-combo-val">${escapeHtml(labelOf(selected))}</span>
+      ${icon('chevron-down', { size: 16 })}
+    </button>
+    <div class="fc-combo-pop" hidden>
+      ${withSearch ? `<input class="fc-combo-search" type="text" placeholder="Buscar capítulo…" aria-label="Buscar capítulo">` : ''}
+      <ul class="fc-combo-list" role="listbox"></ul>
+    </div>`;
+  const btn = host.querySelector('.fc-combo-btn');
+  const pop = host.querySelector('.fc-combo-pop');
+  const valEl = host.querySelector('.fc-combo-val');
+  const list = host.querySelector('.fc-combo-list');
+  const search = host.querySelector('.fc-combo-search');
+  let cur = selected;
+
+  const renderList = (filter = '') => {
+    const f = filter.trim().toLowerCase();
+    const items = options.filter(o => !f || o.label.toLowerCase().includes(f));
+    list.innerHTML = items.length
+      ? items.map(o => `<li role="option" data-value="${escapeHtml(o.value)}" class="${o.value === cur ? 'is-sel' : ''}" aria-selected="${o.value === cur}">${escapeHtml(o.label)}</li>`).join('')
+      : `<li class="fc-combo-empty" aria-disabled="true">Sin resultados</li>`;
+  };
+  const close = () => {
+    pop.hidden = true; btn.setAttribute('aria-expanded', 'false');
+    document.removeEventListener('click', onOutside, true);
+  };
+  const onOutside = (e) => { if (!host.contains(e.target)) close(); };
+  const openPop = () => {
+    renderList();
+    pop.hidden = false; btn.setAttribute('aria-expanded', 'true');
+    if (search) { search.value = ''; search.focus(); }
+    document.addEventListener('click', onOutside, true);
+  };
+
+  btn.addEventListener('click', (e) => { e.stopPropagation(); pop.hidden ? openPop() : close(); });
+  if (search) search.addEventListener('input', () => renderList(search.value));
+  list.addEventListener('click', (e) => {
+    const li = e.target.closest('li[data-value]');
+    if (!li) return;
+    cur = li.dataset.value;
+    valEl.textContent = labelOf(cur);
+    onChange(cur);
+    close();
+  });
 }
 
 // Mazos ya generados de este libro: re-exportar o borrar sin regenerar.
@@ -214,7 +271,7 @@ async function onGenerate() {
   if (generating) return;
   const b = body();
   if (!LLM.hasKey()) { showError('Configura tu API key en Ajustes → Agente para generar tarjetas.'); return; }
-  const scopeLabel = b.querySelector('#fc-scope').value;
+  const scopeLabel = scopeValue;
   const type = b.querySelector('input[name="fc-type"]:checked').value;
   const count = parseInt(b.querySelector('#fc-count').value, 10);
 

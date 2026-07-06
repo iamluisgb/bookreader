@@ -5,6 +5,30 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-06 — UX/UI: 5 mejoras (descubribilidad, fricción y pulido)
+
+Ronda de UX a partir de una crítica del propio panel:
+
+1. **Descubribilidad de Flashcards** (la feature de pago pasaba desapercibida como un icono más):
+   el botón se tiñe con el color de acento para destacar entre los iconos grises, y la **primera vez**
+   que un libro queda listo aparece un **coach mark** que lo señala (una sola vez; persiste "visto" en
+   localStorage). Ver [`panel.js`](js/ai/panel.js) (`maybeHintFlashcards`).
+2. **Fuga de telemetría en el estado**: `"Listo (cacheado) · 1974 pasajes"` → **"Listo para preguntar"**
+   (el detalle técnico queda en el `title`). Nada de jerga del pipeline en la UI.
+3. **Desplegable propio para el alcance de flashcards** (antes un `<select>` nativo que ignoraba el tema):
+   combobox con los tokens de la app, **buscador** cuando el índice es largo y lista filtrable. Ver
+   [`flashcards.js`](js/ai/flashcards.js) (`mountScopeCombo`).
+4. **Menos fricción en el onboarding**: botón **"Prefiero solo chatear con el libro"** para preguntar
+   **sin** elegir objetivo; tras la 1ª respuesta, un aviso ofrece **activar un objetivo sin perder el
+   chat** (upgrade en sitio de la conversación). El valor primero, la estructura después.
+5. **Salida del agente sin arte ASCII**: el system prompt pide **tablas/listas Markdown** en vez de
+   diagramas con caracteres (│ ┌ → ), que se veían crudos. Ver [`panel-template.js`](js/ai/panel-template.js).
+
+Tests en [`tests/panel.spec.ts`](tests/panel.spec.ts) (chat libre + upgrade, coach mark de una vez,
+estado sin jerga) y [`tests/flashcards.spec.ts`](tests/flashcards.spec.ts) (combobox de alcance).
+
+---
+
 ## 2026-07-06 — Fix: la posición de lectura ya no se pierde al salir del libro en móvil
 
 Al salir del libro (volver a la biblioteca o cerrar la PWA) y reabrirlo, aterrizaba en otro lugar.

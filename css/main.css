@@ -874,6 +874,37 @@ body.resizing-panel .reader-main { transition: none !important; }
 /* ⚙ (y ✕ a su lado) quedan a la derecha aunque el grupo de conversación esté oculto. */
 .ai-toolbar-cfg { margin-left: auto; }
 
+/* Flashcards = acción de valor (monetización): tinte de acento para que NO se funda con la
+   fila de iconos grises (exportar, ⚙, ✕). El color es la señal, sin ensanchar el toolbar. */
+.ai-cards-btn { color: var(--accent); background: var(--accent-soft); }
+.ai-cards-btn:hover { background: var(--accent); color: var(--on-accent); }
+.ai-cards-btn .icon { color: inherit; }
+
+/* Coach mark de una sola vez que señala el botón de Flashcards. */
+.ai-coachmark {
+  position: fixed; z-index: 400; max-width: 260px;
+  display: flex; align-items: flex-start; gap: 8px;
+  background: var(--accent); color: var(--on-accent);
+  border-radius: var(--r-md); padding: 10px 12px;
+  font-size: 13px; line-height: 1.4; box-shadow: var(--shadow-3);
+  opacity: 0; transform: translateY(-4px); transition: opacity var(--transition-fast), transform var(--transition-fast);
+  pointer-events: none;   /* no intercepta clics; solo su ✕ es interactivo */
+}
+.ai-coachmark .ai-coachmark-x { pointer-events: auto; }
+.ai-coachmark.is-in { opacity: 1; transform: translateY(0); }
+.ai-coachmark b { font-weight: 700; }
+.ai-coachmark::before {
+  content: ''; position: absolute; top: -6px; left: var(--arrow-x, 130px);
+  width: 12px; height: 12px; background: var(--accent);
+  transform: translateX(-50%) rotate(45deg);
+}
+.ai-coachmark-x {
+  flex: none; background: rgba(255,255,255,0.2); border: none; color: var(--on-accent);
+  width: 22px; height: 22px; border-radius: 50%; display: inline-flex; align-items: center;
+  justify-content: center; cursor: pointer; position: relative;
+}
+.ai-coachmark-x:hover { background: rgba(255,255,255,0.35); }
+
 .ai-config {
   padding: 12px 16px;
   border-bottom: 1px solid var(--border);
@@ -1215,6 +1246,37 @@ body.resizing-panel .reader-main { transition: none !important; }
   font-size: 14px; color: var(--text-soft);
   margin: -8px 0 20px; cursor: pointer;
 }
+/* Atajo de baja fricción: "solo chatear" bajo la lista de objetivos. */
+.ai-ob-quickchat {
+  display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%;
+  margin-top: 14px; padding: 12px; cursor: pointer;
+  background: none; border: 1px dashed var(--border); border-radius: var(--r-md);
+  color: var(--text-soft); font-size: 14px; font-family: inherit;
+  transition: border-color var(--transition-fast), color var(--transition-fast);
+}
+.ai-ob-quickchat:hover { border-color: var(--accent); color: var(--accent); }
+.ai-ob-quickchat .icon { color: var(--accent); }
+
+/* Aviso, tras la 1ª respuesta en chat libre, para activar un objetivo (sin perder el chat). */
+.ai-objnudge {
+  margin: 8px 0; padding: 12px 14px; border-radius: var(--r-md);
+  background: var(--accent-soft); border: 1px solid var(--border-soft);
+  font-size: 13px; line-height: 1.45; color: var(--text);
+  display: flex; flex-direction: column; gap: 10px;
+}
+.ai-objnudge b { font-weight: 700; }
+.ai-objnudge-btns { display: flex; align-items: center; gap: 8px; }
+.ai-objnudge-go {
+  background: var(--accent); color: var(--on-accent); border: none; border-radius: var(--r-sm);
+  padding: 7px 14px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit;
+}
+.ai-objnudge-go:hover { background: var(--accent-hover); }
+.ai-objnudge-x {
+  background: none; border: none; color: var(--text-soft); cursor: pointer;
+  width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+}
+.ai-objnudge-x:hover { background: var(--surface-3); color: var(--text); }
 /* Conversación huérfana (plantilla eliminada tras consolidar a T1–T5). */
 .ai-nb-orphan { text-align: center; color: var(--text-soft); font-size: 14px; padding: 24px 12px; }
 .ai-nb-orphan p { margin-bottom: 14px; }
@@ -1227,6 +1289,39 @@ body.resizing-panel .reader-main { transition: none !important; }
   background: var(--surface-0); color: var(--text); font-family: inherit; font-size: 14px;
 }
 .fc-select:focus { outline: none; border-color: var(--accent); }
+
+/* Desplegable propio del alcance (combobox con buscador) */
+.fc-combo { position: relative; }
+.fc-combo-btn {
+  width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  border: 1px solid var(--border); border-radius: var(--r-md); padding: 10px 12px;
+  background: var(--surface-0); color: var(--text); font-family: inherit; font-size: 14px; cursor: pointer;
+}
+.fc-combo-btn:hover { border-color: var(--accent); }
+.fc-combo-btn[aria-expanded="true"] { border-color: var(--accent); }
+.fc-combo-btn .icon { color: var(--text-soft); flex: none; }
+.fc-combo-val { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
+.fc-combo-pop {
+  position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 10;
+  background: var(--surface-1); border: 1px solid var(--border); border-radius: var(--r-md);
+  box-shadow: var(--shadow-3); padding: 6px; max-height: 300px; display: flex; flex-direction: column;
+}
+.fc-combo-pop[hidden] { display: none; }
+.fc-combo-search {
+  width: 100%; box-sizing: border-box; border: 1px solid var(--border); border-radius: var(--r-sm);
+  padding: 8px 10px; background: var(--surface-0); color: var(--text); font-family: inherit; font-size: 14px;
+  margin-bottom: 6px;
+}
+.fc-combo-search:focus { outline: none; border-color: var(--accent); }
+.fc-combo-list { list-style: none; margin: 0; padding: 0; overflow-y: auto; }
+.fc-combo-list li {
+  padding: 9px 10px; border-radius: var(--r-sm); cursor: pointer; font-size: 14px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.fc-combo-list li:hover { background: var(--surface-3); }
+.fc-combo-list li.is-sel { color: var(--accent); font-weight: 600; }
+.fc-combo-empty { color: var(--text-soft); cursor: default; }
+.fc-combo-empty:hover { background: none; }
 .fc-types { display: flex; gap: 10px; }
 .fc-type {
   flex: 1; display: flex; gap: 10px; align-items: flex-start; cursor: pointer;
