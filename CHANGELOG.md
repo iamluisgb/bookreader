@@ -5,6 +5,29 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-06 — Fix: la posición de lectura ya no se pierde al salir del libro en móvil
+
+Al salir del libro (volver a la biblioteca o cerrar la PWA) y reabrirlo, aterrizaba en otro lugar.
+Causa: dos almacenes de posición compitiendo y el rancio ganaba al reabrir.
+- `lastPosition_<key>` (localStorage) se guarda **en síncrono** en cada `relocated` → siempre fresco.
+  Pero `record.lastCfi` (biblioteca, IndexedDB) se guardaba con **rebote de 800 ms** que en móvil moría
+  al cerrar/cambiar de app, y al reabrir `openBookRecord` **pisaba** la posición fresca con ese `lastCfi`
+  rancio (`goTo` incondicional).
+- **Prioridad invertida al restaurar:** la `lastPosition_` que el lector ya restauró manda;
+  `record.lastCfi` queda solo como fallback si no existe (`restoredSavedPosition()` en
+  [`js/epub-reader.js`](js/epub-reader.js)).
+- **Flush del progreso pendiente** al salir a la biblioteca y en `visibilitychange: hidden`
+  (`flushProgress` en [`js/app.js`](js/app.js)): el rebote ya no pierde el último cambio cuando el
+  móvil congela la PWA. Lo pendiente captura el `bookId` → se arregla también el `TypeError` latente
+  (`currentBook.id` con `currentBook` ya null) que silenciaba el guardado al salir.
+- **Mismo guard en `syncRouteSoon`**: el rebote de 600 ms de la URL lanzaba el mismo `TypeError`
+  (visto en consola durante la verificación) si salías a la biblioteca antes de que disparase.
+
+Verificado end-to-end con Playwright sobre la app real: pasar páginas a ritmo rápido (<800 ms) y salir
+→ `lastCfi` coherente con la posición fresca; `lastCfi` rancio plantado a mano → al reabrir gana la
+fresca; `visibilitychange: hidden` con rebote pendiente → flush inmediato; consola sin errores.
+Suite 77/77 E2E. PDF no afectado (usa `pdfLastPage_` síncrono, sin override).
+
 ## 2026-07-06 — Flashcards con export a Anki (.apkg y .txt) — feature estrella del lanzamiento
 
 El agente **genera flashcards del libro y las exporta a Anki**, 100% en el navegador (sin backend), la

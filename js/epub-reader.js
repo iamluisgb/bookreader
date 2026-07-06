@@ -11,6 +11,7 @@ const COARSE = window.matchMedia && window.matchMedia('(pointer: coarse)').match
 let book = null;
 let rendition = null;
 let currentCfi = null;
+let restoredSaved = false;  // el open restauró lastPosition_ (manda sobre lastCfi de la biblioteca)
 let onProgressCallback = null;
 let onChapterCallback = null;
 let lastChapterLabel = null;   // IA2: último capítulo emitido (para detectar cambio real)
@@ -330,6 +331,13 @@ export function getCurrentCfi() {
   return currentCfi;
 }
 
+// ¿El open restauró la posición guardada (lastPosition_)? La usa openBookRecord para
+// NO pisarla con el lastCfi de la biblioteca, que va con rebote y puede estar rancio
+// (en móvil el rebote muere al cerrar la PWA). lastCfi queda solo como fallback.
+export function restoredSavedPosition() {
+  return restoredSaved;
+}
+
 export async function load(arrayBuffer, onProgress) {
   if (book) {
     try { await book.destroy(); } catch(e) { console.warn('Destroy error:', e); }
@@ -338,6 +346,7 @@ export async function load(arrayBuffer, onProgress) {
   }
   lastChapterLabel = null;   // IA2: nuevo libro → reinicia el seguimiento de capítulo
   pinnedCfi = null;
+  restoredSaved = false;
 
   console.log('Creating ePub book from ArrayBuffer...');
   book = ePub(arrayBuffer);
@@ -418,8 +427,10 @@ export async function load(arrayBuffer, onProgress) {
     await rendition.display(startCfi || undefined);
   } catch (e) {
     console.warn('CFI guardado no válido, abriendo al principio:', e);
+    startCfi = null;
     await rendition.display();
   }
+  restoredSaved = !!startCfi;
   console.log('Book displayed');
 
   // Track location changes

@@ -88,10 +88,14 @@ function writeRoute(id, loc, { replace = false } = {}) {
 }
 
 // Actualiza la posición en la URL con rebote (replaceState, no ensucia el historial).
+// El timer re-comprueba currentBook: si el usuario salió a la biblioteca durante el
+// rebote, ya no hay libro que reflejar (misma carrera que flushProgress).
 function syncRouteSoon() {
   if (!currentBook) return;
   clearTimeout(routeTimer);
-  routeTimer = setTimeout(() => writeRoute(currentBook.id, currentLoc(), { replace: true }), 600);
+  routeTimer = setTimeout(() => {
+    if (currentBook) writeRoute(currentBook.id, currentLoc(), { replace: true });
+  }, 600);
 }
 
 async function seekTo(loc) {
@@ -224,6 +228,11 @@ function initLibrary() {
   document.getElementById('open-app-settings')?.addEventListener('click', () => AppSettings.open('agent'));
   document.getElementById('library-btn')?.addEventListener('click', () => goToLibrary());
   initReadingMode();
+  // En móvil, cerrar o cambiar de app congela la PWA sin avisar: volcar el progreso
+  // pendiente al ocultarse la pestaña, o el rebote de saveProgress no llega a escribir.
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') flushProgress();
+  });
   // La pantalla inicial (biblioteca/landing o el libro del enlace) la resuelve initRouter().
 }
 
@@ -254,6 +263,7 @@ function updateReadingModeToggle() {
 
 async function goToLibrary({ fromRoute = false } = {}) {
   if (!fromRoute) writeRoute(null, null);   // entra en el historial: atrás vuelve aquí
+  await flushProgress();                    // progreso pendiente antes de soltar el libro
   currentBook = null;                       // ya no hay libro abierto (para el router)
   document.body.classList.remove('reading', 'immersive', 'fs', 'scroll-mode');   // salir del modo lectura
   // Cerrar las sidebars de la vista de libro (índice + agente): no deben verse sobre
@@ -300,9 +310,13 @@ async function openBookRecord(record, { fromRoute = false, loc = null } = {}) {
     } else {
       const ok = await loadEpub(buffer, record.fileBaseId || record.id, record.id);
       if (!ok) { currentBook = null; await goToLibrary({ fromRoute: true }); return; }
-      // La posición de la URL manda; si no, la última guardada del libro.
+      // La posición de la URL manda; si no, la lastPosition_ que el lector ya restauró
+      // (se guarda en síncrono en cada relocated → siempre fresca). El lastCfi de la
+      // biblioteca va con rebote y puede estar rancio: solo como fallback.
       if (loc) await seekTo(loc);
-      else if (record.lastCfi) { try { await EpubReader.goTo(record.lastCfi); } catch (e) { /* posición no válida */ } }
+      else if (!EpubReader.restoredSavedPosition() && record.lastCfi) {
+        try { await EpubReader.goTo(record.lastCfi); } catch (e) { /* posición no válida */ }
+      }
     }
     await LibStore.updateBook(record.id, { lastOpenedAt: Date.now() });
     document.getElementById('library-btn').style.display = '';
@@ -333,18 +347,31 @@ async function persistToLibrary(id, buffer, format, fileName, fileBaseId) {
   }
 }
 
-// Persistir progreso del libro abierto (con rebote).
+// Persistir progreso del libro abierto (con rebote). Lo pendiente captura el id del
+// libro para que el flush funcione aunque currentBook ya sea null (salida a biblioteca).
+let pendingProgress = null;   // { bookId, pct } aún no escrito
+
 function saveProgress(pct) {
   if (!currentBook) return;
+  pendingProgress = { bookId: currentBook.id, pct };
   clearTimeout(progressTimer);
-  progressTimer = setTimeout(async () => {
-    try {
-      const cfi = EpubReader.getCurrentCfi();
-      const prev = await LibStore.getBook(currentBook.id);
-      const status = LibStore.statusFor(pct, prev?.status);
-      await LibStore.updateBook(currentBook.id, { progress: pct, lastCfi: cfi || prev?.lastCfi || null, status });
-    } catch (e) { /* sin persistencia */ }
-  }, 800);
+  progressTimer = setTimeout(flushProgress, 800);
+}
+
+// Escribe YA el progreso pendiente. Además del timer, se llama al salir a la biblioteca
+// y al ocultarse la pestaña (en móvil la PWA muere sin avisar y el rebote de 800 ms se
+// perdía → lastCfi rancio). El CFI se lee aquí, con el lector aún vivo.
+async function flushProgress() {
+  clearTimeout(progressTimer);
+  const pending = pendingProgress;
+  pendingProgress = null;
+  if (!pending) return;
+  try {
+    const cfi = EpubReader.getCurrentCfi();
+    const prev = await LibStore.getBook(pending.bookId);
+    const status = LibStore.statusFor(pending.pct, prev?.status);
+    await LibStore.updateBook(pending.bookId, { progress: pending.pct, lastCfi: cfi || prev?.lastCfi || null, status });
+  } catch (e) { /* sin persistencia */ }
 }
 
 // ============ RE-PAGINADO AL PLEGAR/DESPLEGAR PANELES ============
