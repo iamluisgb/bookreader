@@ -115,6 +115,33 @@ para indexar y citar, y el function-calling (`chatTools`, ya usado en
 [DECISIONS.md ADR-006](DECISIONS.md) y CHANGELOG), ya corregido. Presupuesto de contexto ahora adaptativo
 ([ADR-007](DECISIONS.md)): 60k normal, ~110k al nombrar un capítulo.
 
+### IA7 — Reescritura de consulta por defecto (HyDE-lite) · `M` · **en curso**
+
+> **Estado: en implementación (2026-07-06).** La mejora de retrieval de mayor ROI sin embeddings (que se
+> aplazaron en [ADR-014](DECISIONS.md)): entender la pregunta **antes** de buscar, no como fallback.
+
+**Problema.** BM25 falla en preguntas **conceptuales/parafraseadas** (las palabras de la pregunta no están
+en el texto) y devuelve pasajes de alta coincidencia léxica pero sentido equivocado. La expansión agéntica
+(Fase 1b de [IA5](#ia5--retrieval-profesional-rag-por-pasaje-agéntico--l--sustituye-a-ia4)) solo salta en
+retrieval débil (sin capítulo nombrado + pocos aciertos BM25), así que ese caso se cuela.
+
+**Solución — unión, no sustitución.** Una llamada barata al LLM (BYOK, sin infra nueva) genera una
+**expansión** de la pregunta: `{ terms: [palabras clave en el idioma del libro], hypothetical: "respuesta
+plausible de 1-2 frases" }` (HyDE). El retrieval hace BM25 sobre la pregunta **cruda ∪ la expansión** y
+une (dedup) los aciertos. La unión conserva la precisión léxica de BM25 en nombres/términos y **suma**
+recall conceptual → riesgo de regresión mínimo (en el peor caso no ayuda, nunca quita).
+
+**Integración** ([`js/ai/query-expand.js`](js/ai/query-expand.js) nuevo + `deliver`/`buildContext` en
+[`panel.js`](js/ai/panel.js)): la expansión se genera en `deliver` (estado "entendiendo la pregunta…"),
+con **gate** (solo si hay key, libro listo y NO se nombró capítulo — ahí la intención ya es explícita),
+**timeout + fallback** a la pregunta cruda ante cualquier fallo. El router y el capítulo actual siguen
+sobre la pregunta cruda; solo el paso BM25 usa la unión.
+
+**Fases:** F1 (módulo + integración con unión y fallback) · F2 (golden de preguntas parafraseadas como
+prueba de que mueve la aguja + regresión) · F3 opcional (caché por pregunta, afinar el gate del agéntico
+ahora que la 1ª recuperación es mejor). **Abiertas:** ¿gate por defecto salvo capítulo (elegido) vs
+siempre? · presupuesto de latencia (max_tokens/timeout de la expansión).
+
 ---
 
 ## 🎨 Producto / UX

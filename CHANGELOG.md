@@ -5,6 +5,28 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-06 — IA7 · Reescritura de consulta por defecto (HyDE-lite) · fase 1
+
+La mejora de retrieval de mayor ROI **sin embeddings**: entender la pregunta **antes** de buscar.
+BM25 falla en preguntas conceptuales/parafraseadas (las palabras de la pregunta no están en el texto).
+Ahora, en turnos normales, una llamada barata al LLM (BYOK, sin infra nueva) expande la pregunta en
+`{ terms, hypothetical }` (HyDE) y el retrieval hace BM25 sobre la pregunta **cruda ∪ la expansión** →
+**unión, no sustitución**: conserva la precisión léxica en nombres/términos y suma recall conceptual.
+
+- Nuevo [`js/ai/query-expand.js`](js/ai/query-expand.js): `expandQuery` con **timeout + fallback**
+  (nunca lanza; ante cualquier fallo → `null` → retrieval con la pregunta cruda, cero regresión) y
+  parseo JSON tolerante (`parseExpansion`).
+- Integración en [`panel.js`](js/ai/panel.js) (`deliver`/`buildContext`): **gate** (solo con key, libro
+  listo y SIN capítulo nombrado — ahí la intención ya es explícita); el router y el capítulo actual
+  siguen sobre la pregunta cruda, solo el paso BM25 usa la unión. Estado "Entendiendo la pregunta…".
+- El `bm25Count` que alimenta el gate del retrieval agéntico (Fase 1b de IA5) se conserva sobre la
+  pregunta cruda a propósito.
+
+Tests en [`tests/query-expand.spec.ts`](tests/query-expand.spec.ts): parseo/fallback (funciones puras) e
+integración (una pregunta conceptual dispara la expansión y responde igual). Ver BACKLOG · IA7. sw v56.
+
+---
+
 ## 2026-07-06 — Fix (SW): despliegues coherentes; no más "se rompió tras actualizar"
 
 Síntoma reportado: tras varios despliegues seguidos, paginación y scroll "dejaban de funcionar".

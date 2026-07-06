@@ -21,6 +21,7 @@ import * as Profiles from './profiles.js';
 import * as Backup from '../backup.js';
 import * as Flashcards from './flashcards.js';
 import * as Storage from '../storage.js';
+import * as QueryExpand from './query-expand.js';
 
 // Icon + label markup for the small inline action buttons.
 const act = (name, text, size = 15) => `${icon(name, { size })}<span>${text}</span>`;
@@ -860,7 +861,11 @@ function ensureIndex() {
 // libro, (3) el capítulo donde está el lector. Luego se reordena en orden de lectura
 // para que el modelo lo lea coherente. Devuelve también las etiquetas del TOC (mapa del
 // libro) para el system prompt.
-function buildContext(question) {
+// `expansion` (IA7, opcional) = { terms, hypothetical } de la reescritura HyDE-lite. Si
+// viene, el paso BM25 busca sobre la pregunta CRUDA ∪ la expansión (unión, no sustitución):
+// suma recall conceptual sin perder la precisión léxica. El router y el capítulo actual
+// siguen sobre la pregunta cruda.
+function buildContext(question, expansion = null) {
   ensureIndex();
   const routed = Retrieval.matchChapters(question, tocLabels);     // capítulos nombrados
   // ADR-007 · Presupuesto adaptativo: turnos normales van lean (60k, baratos); si el
@@ -885,7 +890,16 @@ function buildContext(question) {
   const bm25 = Retrieval.search(question, 60);
   // (2) BM25 de todo el libro, con sentence-window: cada acierto arrastra sus vecinos
   // inmediatos (mismo capítulo) para dar coherencia. Ver DECISIONS.md · ADR-011.
-  for (const p of Retrieval.withNeighbors(bm25, 1)) tryAdd(p);
+  // IA7 · Unión con la búsqueda por la expansión HyDE-lite: los aciertos de la pregunta
+  // cruda van PRIMERO (prioridad léxica) y luego se suman los conceptuales (dedup en tryAdd).
+  let hits = bm25;
+  const expQuery = QueryExpand.expansionQuery(expansion);
+  if (expQuery) {
+    const seen = new Set(bm25.map(p => p.id));
+    const extra = Retrieval.search(expQuery, 60).filter(p => !seen.has(p.id));
+    hits = bm25.concat(extra);
+  }
+  for (const p of Retrieval.withNeighbors(hits, 1)) tryAdd(p);
   const cur = EpubReader.getCurrentChapterLabel?.() || '';         // (3) capítulo del lector
   for (const p of Retrieval.passagesByChapter(cur)) tryAdd(p);
 
@@ -896,9 +910,10 @@ function buildContext(question) {
     return { text: annotatedText.slice(0, budget * 4), tocLabels, passages: 0, chapters: [], routed, bm25Count: 0, picked: [] };
   }
   const chapters = [...new Set(picked.map(p => p.chapter).filter(Boolean))];
-  // routed = capítulos nombrados; bm25Count = fuerza del match léxico de la pregunta.
-  // Ambos alimentan la decisión de retrieval agéntico (Fase 1b, ver deliver()).
-  return { text: formatPassages(picked), tocLabels, passages: picked.length, chapters, routed, bm25Count: bm25.length, picked };
+  // routed = capítulos nombrados; bm25Count = fuerza del match léxico de la pregunta CRUDA
+  // (se conserva a propósito: alimenta el gate del retrieval agéntico de la Fase 1b sin que
+  // la expansión IA7 lo altere). `expanded` es solo observabilidad.
+  return { text: formatPassages(picked), tocLabels, passages: picked.length, chapters, routed, bm25Count: bm25.length, picked, expanded: !!expQuery };
 }
 
 // Ensambla una lista de pasajes en texto para el prompt: cabecera `## capítulo` + `[[aN]]`
@@ -1061,11 +1076,24 @@ OBJETIVO: ${convo?.goal || '(sin definir)'}` },
 async function deliver(aug, question, { showUser = true } = {}) {
   if (busy) return;
   const mySeq = bookSeq;   // guard: si el usuario cambia de libro mid-turno, no persistir aquí
+  // Reservamos el turno YA (antes de la reescritura de consulta, que hace un await): evita
+  // un segundo envío concurrente durante ese hueco y da la señal de aborto a la expansión.
+  busy = true; els.send.disabled = true; abortCtrl = new AbortController();
+
+  // IA7 · Reescritura de consulta por defecto (HyDE-lite): en preguntas conceptuales, expande
+  // la query para mejorar el recall BM25. Gate: solo turnos normales (showUser), con key,
+  // libro listo y SIN capítulo nombrado (ahí la intención ya es explícita). Nunca bloquea:
+  // ante fallo/timeout, expansion=null → retrieval con la pregunta cruda (cero regresión).
+  let expansion = null;
+  if (showUser && LLM.hasKey() && segReady && !Retrieval.matchChapters(question, tocLabels).length) {
+    setStatus('Entendiendo la pregunta…');
+    expansion = await QueryExpand.expandQuery(question, { tocLabels, signal: abortCtrl.signal });
+  }
 
   // IA5 · Retrieval por PREGUNTA a nivel de pasaje (reemplaza al recorte por objetivo
   // de IA1, que era ciego a la query y descartaba capítulos relevantes enteros por
   // presupuesto). Ver DECISIONS.md · ADR-001..007. `let`: la Fase 1b puede aumentarlo.
-  let ctx = buildContext(question);
+  let ctx = buildContext(question, expansion);
 
   // IA1 · Ventana de historial: solo se reenvían los últimos N mensajes (el chat
   // completo sigue guardado y visible; solo no se manda entero en cada turno).
@@ -1079,6 +1107,8 @@ async function deliver(aug, question, { showUser = true } = {}) {
   if (estTokens > TOKEN_GUARD &&
       !(await confirmBox(`El contexto es grande (~${Math.round(estTokens / 1000)}k tokens): puede ser lento o caro. ¿Enviar igualmente?`,
         { title: 'Contexto grande', okText: 'Enviar igualmente' }))) {
+    busy = false; els.send.disabled = false; abortCtrl = null;   // liberar el turno reservado
+    refreshStatus();
     return;   // se conservan input y referencia adjunta
   }
 
@@ -1091,7 +1121,6 @@ async function deliver(aug, question, { showUser = true } = {}) {
   const bubble = appendBubble('assistant', '', false);
   const textNode = bubble.querySelector('.ai-bubble-text');
   textNode.innerHTML = '<span class="ai-typing">pensando…</span>';
-  busy = true; els.send.disabled = true; abortCtrl = new AbortController();
   agentUnread = false; applyAgentBadge();   // si el panel está cerrado, muestra "generando"
   let thinking = true, raw, truncated = false, acc = '';
 
@@ -1135,6 +1164,7 @@ async function deliver(aug, question, { showUser = true } = {}) {
     else { console.error(e); textNode.innerHTML = `<span class="ai-error">${escapeHtml(e.message)}</span>`; }
   } finally {
     busy = false; els.send.disabled = false; abortCtrl = null; scrollDown();
+    refreshStatus();                        // limpia el estado transitorio ("Entendiendo…")
     if (!isOpen()) agentUnread = true;      // llegó con el panel cerrado → no-leído
     applyAgentBadge();
   }
