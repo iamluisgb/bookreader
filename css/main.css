@@ -1644,7 +1644,10 @@ body.ai-busy #ai-toggle::after, body.ai-busy .ai-fab::after {
    perfil ya no ocupa fila propia (va en la barra de conversación, ver panel-template.js). */
 @media (pointer: coarse) {
   .ai-status { padding: 6px 18px; font-size: 12px; }
-  .ai-convobar { margin-top: 8px; }
+  /* En reposo el estado es un readout técnico sin acción → se colapsa para dar todo el alto
+     al chat. Los estados transitorios (leyendo/generando/error) quitan 'idle' y reaparecen. */
+  .ai-status.ai-status--idle { display: none; }
+  .ai-convobar { margin-top: 10px; }
   .ai-tabs { margin-top: 8px; }
   .ai-messages { padding: 12px 16px; }
 }

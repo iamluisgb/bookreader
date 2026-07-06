@@ -342,8 +342,11 @@ async function prepareBook() {
 function refreshStatus() {
   if (!book) { setStatus('Abre un EPUB para empezar.'); return; }
   if (!segReady) { setStatus(template ? `Plantilla: ${template.name} · leyendo…` : 'Leyendo el libro…'); return; }
-  const base = `${segCached ? 'Listo (cacheado)' : 'Listo'} · ${segBlocks} pasajes`;
-  setStatus(template ? `${base} · ${template.name}` : base);
+  // El template ya se ve en el selector de conversación (no lo repetimos aquí). En reposo el
+  // estado es puro readout técnico sin acción → se marca 'idle' para colapsarlo en táctil,
+  // donde el alto es escaso. Los estados transitorios (leyendo/generando/error) sí se ven.
+  setStatus(`${segCached ? 'Listo (cacheado)' : 'Listo'} · ${segBlocks} pasajes`);
+  els.status.classList.add('ai-status--idle');
   renderConvoBar();
 }
 
@@ -392,8 +395,11 @@ function renderConvoBar() {
   els.convobar.style.display = 'flex';
   els.convobar.classList.toggle('no-convo', !convo);
   els.convoNew.style.display = convo ? '' : 'none';
+  // Mostramos la identidad HUMANA de la conversación: su nombre propio si lo tiene, si no el
+  // OBJETIVO de lectura (lo que el usuario escribió), no el código interno de la plantilla
+  // ("T2 · HQ&A"), que no significa nada para quien lee y ya no aporta aquí.
   els.convoLabel.textContent = convo
-    ? (convo.title || template?.name || 'Conversación')
+    ? (convo.title || convo.goal || template?.name || 'Conversación')
     : 'Elegir objetivo de lectura';
 }
 
@@ -1311,6 +1317,8 @@ function appendBubble(role, text, asHtml) {
 function setStatus(s) {
   if (!els.status) return;
   els.status.textContent = s;
+  // Cualquier mensaje transitorio (leyendo/generando/error) deja de ser 'idle' → visible.
+  els.status.classList.remove('ai-status--idle');
   // Shimmer mientras el agente trabaja (mensajes que terminan en "…").
   els.status.classList.toggle('ai-status--busy', /…\s*$/.test(s));
 }

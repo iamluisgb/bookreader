@@ -5,6 +5,20 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-06 — UX (2ª pasada): el estado en reposo se colapsa y el selector muestra el objetivo
+
+Crítica UX/UI: la parte superior del panel estaba dominada por **chrome de sistema** (un readout
+técnico) y **taxonomía interna**, no por contenido ni controles útiles.
+- **Estado efímero:** la línea "Listo (cacheado) · N pasajes · T2 · HQ&A" era un readout permanente
+  sin acción y con el template **duplicado** respecto al selector. Ahora en reposo se marca `idle` y se
+  **colapsa en táctil** (se recupera todo el alto para el chat); los estados transitorios
+  (leyendo/generando/error) quitan `idle` y reaparecen. Se quita además el template del texto (redundante).
+- **Selector con identidad humana:** el botón de conversación mostraba el código interno "T2 · HQ&A";
+  ahora muestra el **nombre propio o el OBJETIVO** de lectura que escribió el usuario. Ver
+  [`js/ai/panel.js`](js/ai/panel.js) (`refreshStatus`, `setStatus`, `renderConvoBar`) y `@media (pointer: coarse)`.
+
+---
+
 ## 2026-07-06 — UX: más alto para el chat del agente (menos chrome en la cabecera)
 
 El panel apilaba cinco filas (título, estado, chip de perfil, selector de conversación, pestañas)
