@@ -184,6 +184,9 @@ salida). No lo reinventa: reutiliza el patrón `download()` CSP-safe de backup.j
 ### P9 — Skills + Artefactos (plataforma extensible de salidas del agente) · `L` · **futuro**
 > **Estado: idea en discusión (2026-07-04).** Capturada para abordarla más adelante. Las decisiones
 > abiertas están al final, sin resolver.
+> **Nota (2026-07-06):** las **flashcards** ya se entregaron como feature dedicada con export a Anki
+> (.apkg/.txt) — ver CHANGELOG y [ADR-020](DECISIONS.md); cuando esta épica arranque, el skill de
+> flashcards debería absorber/reusar [`js/ai/flashcards.js`](js/ai/flashcards.js) en vez de duplicarlo.
 
 **Visión.** Pasar de "ofrecer N artefactos sueltos" a **una plataforma de _skills_**: una primitiva que
 **unifica plantilla + artefacto + formato de salida**, con skills de fábrica y **creados/compartidos por

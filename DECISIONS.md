@@ -453,3 +453,29 @@ dentro de `#pdf-zoom-layer`.
 **re-render progresivo** al quedarse quieto a zoom alto queda como mejora futura (F4). Tests en
 [`tests/pdf.spec.ts`](tests/pdf.spec.ts): anclaje focal, cero re-render (canvas/backing intactos) y zoom
 en modo scroll.
+
+## ADR-020 — Export a Anki: .apkg client-side con sql.js (+ 'wasm-unsafe-eval' en CSP) · `ACEPTADA`
+
+**Contexto.** La feature estrella del plan de lanzamiento es exportar flashcards a Anki. El formato
+nativo `.apkg` (un zip con una SQLite `collection.anki2`) es lo que da la experiencia "doble clic y
+las tarjetas aparecen en Anki" en Desktop/AnkiDroid/AnkiMobile; el import de texto exige pasos manuales.
+Generar una SQLite en el navegador requiere WebAssembly (sql.js) y la CSP era `script-src 'self'` a secas.
+
+**Decisión.** **Builder propio de `.apkg` (esquema legacy v11, el que siguen genanki y aceptan todos los
+clientes) sobre sql.js vendorizado** (`vendor/sql-wasm-1.13.0.*`), cargado **perezosamente** solo al
+exportar (660 KB de wasm fuera del arranque). El zip lo hace JSZip (ya vendorizado). Se añade
+**`'wasm-unsafe-eval'` a `script-src`**: permite únicamente compilar wasm **de mismo origen**, no habilita
+`eval()` de JS — la protección de la API key (bloquear JS inyectado) queda intacta. Modelos propios con
+id fijo ("BookReader Basic"/"BookReader Cloze") para no chocar con los del usuario y que re-importar
+actualice en vez de duplicar. Se ofrece además **`.txt`** (cabeceras `#separator/#notetype column/#deck`)
+como fallback sin wasm.
+
+**Porqué.** (1) Sin backend: todo local, coherente con el posicionamiento privacy-first. (2) Escribir el
+esquema a mano (~150 líneas) evita depender de genanki-js (licencia/peso) manteniendo compatibilidad
+verificada: el paquete se valida en tests con un round-trip real (unzip + abrir la SQLite + consultas)
+y con `sqlite3` nativo (integrity_check ok). (3) La carga perezosa mantiene el TTI y el precache PWA
+sirve el wasm offline.
+
+**Consecuencias.** El esquema legacy no incluye scheduling moderno (irrelevante: se exportan tarjetas
+nuevas). Si Anki retirase el import legacy (no anunciado), habría que emitir `collection.anki21b`.
+Tests en [`tests/flashcards.spec.ts`](tests/flashcards.spec.ts).

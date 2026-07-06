@@ -3,12 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <!-- CSP. La protección clave es 'script-src self' (libs vendorizadas): bloquea JS
-       inyectado, que es lo que protege la API key en localStorage. 'connect-src' se abre
+       inyectado, que es lo que protege la API key en localStorage. 'wasm-unsafe-eval'
+       solo permite COMPILAR WebAssembly de mismo origen (sql.js, para el export .apkg
+       de flashcards); NO habilita eval() de JS. 'connect-src' se abre
        a cualquier HTTPS (además de 'self' y blob:) porque el proveedor del LLM es
        configurable por el usuario (BYOK, Ajustes → Agente); como no hay scripts
        inyectables, la key no es exfiltrable a otro host. Estilos/fuentes/imágenes se
        dejan permisivos (recursos pasivos) para que los EPUB rendericen fieles. Ver CHANGELOG (T2, TEC3). -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' blob: https:; font-src 'self' data: https:; img-src 'self' data: blob: https:; connect-src 'self' blob: https:; worker-src 'self' blob:; frame-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline' blob: https:; font-src 'self' data: https:; img-src 'self' data: blob: https:; connect-src 'self' blob: https:; worker-src 'self' blob:; frame-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'none'">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>BookReader</title>
   <link rel="stylesheet" href="css/fonts.css">

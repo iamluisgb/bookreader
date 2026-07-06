@@ -308,7 +308,7 @@ async function _chatToolsLoop({ messages, tools, execute, maxRounds = 3, signal 
     for (const tc of toolCalls) {
       let args = {};
       try { args = JSON.parse(tc.function?.arguments || '{}'); } catch { /* args inválidos */ }
-      let result = '';
+      let result;
       try { result = await execute(tc.function?.name, args); } catch (e) { result = 'ERROR: ' + e.message; }
       calls.push({ name: tc.function?.name, args });
       convo.push({ role: 'tool', tool_call_id: tc.id, name: tc.function?.name, content: String(result ?? '') });

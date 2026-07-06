@@ -1219,6 +1219,49 @@ body.resizing-panel .reader-main { transition: none !important; }
 .ai-nb-orphan { text-align: center; color: var(--text-soft); font-size: 14px; padding: 24px 12px; }
 .ai-nb-orphan p { margin-bottom: 14px; }
 
+/* ---- Flashcards para Anki (modal, reusa el patrón del onboarding) ---- */
+.fc-card { max-width: 640px; max-height: 90vh; overflow-y: auto; }
+.fc-label { display: block; font-size: 13px; font-weight: 600; color: var(--text-soft); margin: 16px 0 6px; }
+.fc-select {
+  width: 100%; border: 1px solid var(--border); border-radius: var(--r-md); padding: 10px 12px;
+  background: var(--surface-0); color: var(--text); font-family: inherit; font-size: 14px;
+}
+.fc-select:focus { outline: none; border-color: var(--accent); }
+.fc-types { display: flex; gap: 10px; }
+.fc-type {
+  flex: 1; display: flex; gap: 10px; align-items: flex-start; cursor: pointer;
+  background: var(--surface-0); border: 1px solid var(--border); border-radius: var(--r-md); padding: 12px;
+  transition: border-color var(--transition-fast);
+}
+.fc-type:has(input:checked) { border-color: var(--accent); background: var(--surface-3); }
+.fc-type input { margin-top: 3px; accent-color: var(--accent); }
+.fc-type b { display: block; font-size: 14px; }
+.fc-type small { display: block; font-size: 12px; color: var(--text-soft); line-height: 1.35; margin-top: 2px; }
+#fc-generate { width: 100%; margin-top: 20px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+.fc-error { color: var(--danger, #e5484d); font-size: 13px; margin-top: 12px; }
+.fc-deck {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--surface-0); border: 1px solid var(--border); border-radius: var(--r-md);
+  padding: 10px 12px; margin-bottom: 8px;
+}
+.fc-deck-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.fc-deck-name { font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fc-deck-meta { font-size: 12px; color: var(--text-soft); }
+.fc-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
+.fc-item {
+  display: flex; gap: 8px; align-items: flex-start;
+  background: var(--surface-0); border: 1px solid var(--border); border-radius: var(--r-md); padding: 12px;
+}
+.fc-item-fields { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.fc-front, .fc-back { font-size: 14px; line-height: 1.45; border-radius: var(--r-sm); padding: 2px 4px; }
+.fc-front { font-weight: 600; }
+.fc-back { color: var(--text-soft); }
+.fc-front:focus, .fc-back:focus { outline: 1px solid var(--accent); background: var(--surface-0); }
+.fc-back:empty::before { content: attr(data-ph); color: var(--text-faint); }
+.fc-export { display: flex; align-items: center; gap: 14px; }
+.fc-export .primary-btn { display: inline-flex; align-items: center; gap: 8px; }
+.fc-txt-btn { margin-bottom: 0; }
+
 /* ============ AJUSTES GENERALES (overlay global) ============ */
 /* Hogar de la config global de la app (agente + P1/P2/P3). Mismo patrón modal que
    el onboarding; settings de LECTURA siguen en la sidebar. */

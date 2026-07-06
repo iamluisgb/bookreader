@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bookreader-v51';
+const CACHE_NAME = 'bookreader-v52';
 const ASSETS = [
   './',
   './index.html',
@@ -39,6 +39,8 @@ const ASSETS = [
   './js/ai/retrieval.js',
   './js/ai/panel-template.js',
   './js/ai/panel.js',
+  './js/ai/flashcards.js',
+  './js/ai/anki-export.js',
   './js/ui/icons.js',
   './js/ui/escape.js',
   './js/ui/dialog.js',
@@ -49,6 +51,8 @@ const ASSETS = [
   './vendor/epub-0.3.93.min.js',
   './vendor/pdf-3.11.174.min.js',
   './vendor/pdf.worker-3.11.174.min.js',
+  './vendor/sql-wasm-1.13.0.min.js',
+  './vendor/sql-wasm-1.13.0.wasm',
   './manifest.json',
   './icons/icon.svg',
   './icons/icon-192.png',

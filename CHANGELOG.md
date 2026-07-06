@@ -5,6 +5,32 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-06 — Flashcards con export a Anki (.apkg y .txt) — feature estrella del lanzamiento
+
+El agente **genera flashcards del libro y las exporta a Anki**, 100% en el navegador (sin backend), la
+feature ganadora del [`LAUNCH_PLAN.md`](LAUNCH_PLAN.md). Botón de tarjetas en el toolbar del panel →
+modal con:
+- **Generación**: alcance (capítulo con contenido o libro entero — muestreo round-robin por capítulo
+  hasta 40k tokens para cubrirlo uniforme), tipo (**Pregunta→Respuesta** o **cloze** `{{c1::…}}`) y
+  cantidad (10-30). Prompt con reglas de calidad (atómicas, autocontenidas, mismo idioma del libro,
+  alineadas al objetivo de la conversación); salida JSON parseada tolerante. Progreso en vivo (N/M).
+- **Revisión**: tarjetas editables inline (front/back), quitar tarjetas; los cambios persisten.
+- **Export**: **.apkg nativo de Anki** — SQLite `collection.anki2` (esquema v11 estilo genanki) generada
+  con **sql.js vendorizado y de carga perezosa** + zip con JSZip (ver
+  [DECISIONS.md ADR-020](DECISIONS.md)) — o **.txt** de import de texto (cabeceras
+  `#separator/#html/#notetype column/#deck/#tags column`). Tags `bookreader` + capítulo de origen.
+- **Mazos persistentes** (IndexedDB `decks`, DB v5): re-exportar/revisar/borrar sin regenerar (sin
+  re-gastar tokens).
+
+CSP: `script-src` gana `'wasm-unsafe-eval'` (solo compilación de wasm de mismo origen; no habilita
+`eval`). Nuevos [`js/ai/flashcards.js`](js/ai/flashcards.js) y
+[`js/ai/anki-export.js`](js/ai/anki-export.js); botón en [`panel-template.js`](js/ai/panel-template.js).
+Tests deterministas en [`tests/flashcards.spec.ts`](tests/flashcards.spec.ts), incluido un **round-trip
+real del .apkg** (unzip + abrir la SQLite con sql.js + consultas) y validación externa con `sqlite3`
+(integrity ok).
+
+---
+
 ## 2026-07-06 — UX: Markdown formateado EN VIVO durante el streaming
 
 Antes, mientras la respuesta se streameaba, el chat mostraba el texto **en crudo** (con `**`, `|`,

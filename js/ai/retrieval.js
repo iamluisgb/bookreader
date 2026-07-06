@@ -70,6 +70,12 @@ export function parsePassages(annotatedText, anchors = new Map(), tocLabels = nu
 
 export function hasIndex(key) { return !!(index && index.key === key); }
 
+// Todos los pasajes del libro en orden de lectura (para features que recorren el libro
+// entero, p. ej. la generación de flashcards con muestreo por capítulo).
+export function allPassages() {
+  return index ? index.passages : [];
+}
+
 export function buildIndex(key, passages) {
   const df = new Map();
   let totalLen = 0;

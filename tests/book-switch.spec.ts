@@ -53,7 +53,8 @@ test('una segmentación cacheada con versión anterior se descarta (purga la cac
     await M.loadSegmented('__init__');
     // Escribe a mano una entrada con una versión ANTERIOR y contenido de OTRO libro.
     await new Promise<void>((res, rej) => {
-      const req = indexedDB.open('bookreader_ai', 4);
+      // Sin versión: abre en la versión actual del esquema (pinnarla rompería al migrar).
+      const req = indexedDB.open('bookreader_ai');
       req.onsuccess = () => {
         const db = req.result;
         const tx = db.transaction(['bookText', 'anchors'], 'readwrite');

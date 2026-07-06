@@ -10,13 +10,15 @@
 //   notes    (keyPath id, ++)  -> { id, convoId, bookId?, fieldKey, content, sourceCfis, ts } [index: bookId, convoId]
 //   sessions (keyPath bookId)  -> LEGACY (v<=3): { bookId, templateId, goal, createdAt } — solo para migrar
 //   ratings  (keyPath bookId)  -> { bookId, goal, scores }  (la clave ahora es convoId)
+//   decks    (keyPath id, ++)  -> { id, bookId, name, cardType, scope, cards, createdAt } [index: bookId]
 //
 // v4: una conversación (convo) por objetivo; varias por libro. messages/notes
 // se indexan por convoId. Las conversaciones antiguas (sessions, una por libro)
 // se migran a una convo en migrateBook().
+// v5: decks — mazos de flashcards generados (feature de export a Anki).
 
 const DB_NAME = 'bookreader_ai';
-const DB_VERSION = 4;
+const DB_VERSION = 5;
 
 let dbPromise = null;
 
@@ -50,6 +52,10 @@ function open() {
       if (!db.objectStoreNames.contains('convos')) {
         const c = db.createObjectStore('convos', { keyPath: 'id' });
         c.createIndex('bookId', 'bookId', { unique: false });
+      }
+      if (!db.objectStoreNames.contains('decks')) {
+        const d = db.createObjectStore('decks', { keyPath: 'id', autoIncrement: true });
+        d.createIndex('bookId', 'bookId', { unique: false });
       }
     };
     req.onsuccess = () => resolve(req.result);
@@ -193,6 +199,29 @@ export function updateNote(id, patch) {
 
 export function deleteNote(id) {
   return tx('notes', 'readwrite', s => reqP(s.delete(id)));
+}
+
+// Mazos de flashcards (export a Anki) ----------------------------------------
+
+export function getDecks(bookId) {
+  return tx('decks', 'readonly', s => reqP(s.index('bookId').getAll(bookId)))
+    .then(list => (list || []).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)));
+}
+
+export function addDeck(deck) {
+  return tx('decks', 'readwrite', s => reqP(s.put({ ...deck, createdAt: Date.now() })));
+}
+
+export function updateDeck(id, patch) {
+  return tx('decks', 'readwrite', async s => {
+    const cur = await reqP(s.get(id));
+    if (!cur) return;
+    return reqP(s.put({ ...cur, ...patch, id }));
+  });
+}
+
+export function deleteDeck(id) {
+  return tx('decks', 'readwrite', s => reqP(s.delete(id)));
 }
 
 // Relevancia de capítulos vs objetivo ---------------------------------------

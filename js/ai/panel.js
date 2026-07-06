@@ -19,6 +19,7 @@ import * as Retrieval from './retrieval.js';
 import { TEMPLATE, systemPrompt } from './panel-template.js';
 import * as Profiles from './profiles.js';
 import * as Backup from '../backup.js';
+import * as Flashcards from './flashcards.js';
 
 // Icon + label markup for the small inline action buttons.
 const act = (name, text, size = 15) => `${icon(name, { size })}<span>${text}</span>`;
@@ -98,6 +99,7 @@ export function init(opts) {
   els.convoBtn.addEventListener('click', (e) => { e.stopPropagation(); if (convo) openConvoMenu(els.convoBtn); else openOnboarding(); });
   els.convoNew.addEventListener('click', () => openOnboarding());
   els.convoExport.addEventListener('click', exportConvo);
+  els.panel.querySelector('#ai-convo-cards').addEventListener('click', openFlashcards);
   document.addEventListener('click', (e) => {
     if (convoMenuEl && !convoMenuEl.contains(e.target) && !e.target.closest('#ai-convo-btn')) closeConvoMenu();
   });
@@ -160,6 +162,20 @@ async function exportConvo() {
     console.error('Export de conversación falló:', e);
     setStatus('No se pudo exportar: ' + e.message);
   }
+}
+
+// Flashcards para Anki: abre el modal de generación/export con el contexto del libro
+// activo. Necesita el libro segmentado (el índice BM25 se construye desde el anotado).
+function openFlashcards() {
+  if (!book && !bookId) { setStatus('Abre un libro para crear flashcards.'); return; }
+  if (!segReady) { setStatus('Preparando el libro… inténtalo en unos segundos.'); return; }
+  Flashcards.open({
+    bookId, bookTitle,
+    goal: convo?.goal || '',
+    tocLabels,
+    currentChapter: EpubReader.getCurrentChapterLabel?.() || '',
+    ensureIndex,
+  });
 }
 
 function setRef(text) {
