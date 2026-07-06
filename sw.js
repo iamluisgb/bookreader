@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bookreader-v54';
+const CACHE_NAME = 'bookreader-v55';
 const ASSETS = [
   './',
   './index.html',
@@ -77,11 +77,42 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// Stale-while-revalidate para los assets propios: sirve de caché al instante y
-// refresca en segundo plano, así que ya no hay que bumpear CACHE_NAME a mano para
-// propagar cambios (el bump solo hace falta al añadir/quitar archivos del precache).
-// Solo gestionamos GET http(s) del mismo origen; el POST al LLM, los blob: del
-// lector y cualquier tercero pasan directos al navegador.
+// Estrategia por tipo de recurso (solo GET http(s) del mismo origen; el POST al LLM, los
+// blob: del lector y cualquier tercero pasan directos al navegador):
+//
+//  - CÓDIGO DE LA APP (navegaciones + HTML/JS/CSS propios): NETWORK-FIRST con fallback a
+//    caché. Antes con stale-while-revalidate un despliegue podía servir una MEZCLA de
+//    módulos de dos generaciones (unos revalidados, otros no) → la app quedaba medio rota
+//    tras actualizar (p. ej. paginación/scroll sin responder). Network-first garantiza que,
+//    estando online, se sirve SIEMPRE la última versión y COHERENTE; offline sigue desde caché.
+//  - LIBS Y ASSETS INMUTABLES (vendor/, fuentes, iconos, wasm): CACHE-FIRST. Van versionados
+//    por nombre de archivo (p. ej. pdf-3.11.174.min.js): solo cambian al añadir uno nuevo, lo
+//    que ya obliga a bumpear CACHE_NAME. Cache-first = arranque rápido y offline.
+function isImmutableAsset(pathname) {
+  return /\/(?:vendor|fonts|icons)\//.test(pathname) || /\.(?:woff2?|wasm|png|svg|json)$/.test(pathname);
+}
+
+async function networkFirst(req, cache) {
+  try {
+    const res = await fetch(req);
+    if (res && res.ok) cache.put(req, res.clone());
+    return res;
+  } catch {
+    // Sin red: caché exacta, y para navegaciones el fallback al shell (index.html).
+    return (await cache.match(req)) || (req.mode === 'navigate'
+      ? (await cache.match('./index.html')) || (await cache.match('./'))
+      : undefined) || Response.error();
+  }
+}
+
+async function cacheFirst(req, cache) {
+  const cached = await cache.match(req);
+  if (cached) return cached;
+  const res = await fetch(req);
+  if (res && res.ok) cache.put(req, res.clone());
+  return res;
+}
+
 self.addEventListener('fetch', (event) => {
   const req = event.request;
   let url;
@@ -89,15 +120,10 @@ self.addEventListener('fetch', (event) => {
   if (req.method !== 'GET' || url.origin !== self.location.origin || !url.protocol.startsWith('http')) {
     return;
   }
-
+  const p = url.pathname;
+  const isAppCode = !isImmutableAsset(p) &&
+    (req.mode === 'navigate' || p.endsWith('/') || /\.(?:html|js|css)$/.test(p));
   event.respondWith(
-    caches.open(CACHE_NAME).then(async (cache) => {
-      const cached = await cache.match(req);
-      const network = fetch(req).then((res) => {
-        if (res && res.ok) cache.put(req, res.clone());
-        return res;
-      }).catch(() => cached);
-      return cached || network;
-    })
+    caches.open(CACHE_NAME).then(cache => isAppCode ? networkFirst(req, cache) : cacheFirst(req, cache)),
   );
 });

@@ -5,6 +5,26 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-06 — Fix (SW): despliegues coherentes; no más "se rompió tras actualizar"
+
+Síntoma reportado: tras varios despliegues seguidos, paginación y scroll "dejaban de funcionar".
+Diagnóstico: **no era un bug del lector** (verificado E2E en local y en producción con un PDF
+multipágina: paginación, scroll, zoom y navegación tras zoom funcionan, cero errores de consola). La
+causa era el **service worker**: con *stale-while-revalidate* (`return cached || network`) un despliegue
+podía servir una **mezcla de módulos de dos generaciones** (unos revalidados, otros no) → la app quedaba
+medio rota hasta recargar varias veces.
+
+Estrategia nueva del [`sw.js`](sw.js) (v55):
+- **Código de la app** (navegaciones + HTML/JS/CSS propios): **network-first** con fallback a caché.
+  Estando online se sirve siempre la última versión y **coherente**; offline sigue desde caché (shell +
+  módulos), verificado con Playwright (recarga offline mantiene la UI y sirve los módulos).
+- **Libs y assets inmutables** (`vendor/`, fuentes, iconos, wasm): **cache-first** (versionados por nombre
+  de archivo → arranque rápido y offline intactos).
+
+Con esto, cada actualización se propaga entera de una vez en la siguiente carga, sin estados a medias.
+
+---
+
 ## 2026-07-06 — UX/UI: 5 mejoras (descubribilidad, fricción y pulido)
 
 Ronda de UX a partir de una crítica del propio panel:
