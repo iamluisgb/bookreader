@@ -9,8 +9,12 @@
 // cerrar a media sesión no pierde nada.
 import * as DB from './db.js';
 import * as Srs from './srs.js';
+import * as Storage from '../storage.js';
 import { icon } from '../ui/icons.js';
 import { escapeHtml } from '../ui/escape.js';
+
+// Racha de estudio (F3): {count, lastDay}, global de la app (no por libro).
+const STREAK_KEY = 'study_streak';
 
 let overlay = null;
 let onCloseCb = null;
@@ -206,6 +210,7 @@ function gradeCurrent(rating) {
   const { deck, idx } = entry;
   deck.cards[idx] = { ...deck.cards[idx], srs: Srs.grade(deck.cards[idx].srs, rating) };
   if (deck.id) DB.updateDeck(deck.id, { cards: deck.cards });   // persistir TRAS CADA tarjeta
+  Storage.set(STREAK_KEY, Srs.bumpStreak(Storage.get(STREAK_KEY)));   // repaso de hoy → racha
   if (rating === 'again') queue.push(entry);                    // se repite al final de la sesión
   else done++;
   renderCard();
@@ -213,6 +218,7 @@ function gradeCurrent(rating) {
 
 function renderDone(b, f, left) {
   if (left) left.textContent = '';
+  const streak = Srs.currentStreak(Storage.get(STREAK_KEY));
   b.innerHTML = `
     <div class="study-end">
       <div class="study-end-icon">${icon('check', { size: 40 })}</div>
@@ -220,6 +226,7 @@ function renderDone(b, f, left) {
       <p>${done
         ? `Has repasado <b>${done}</b> tarjeta${done === 1 ? '' : 's'}. La repetición espaciada hará el resto.`
         : 'No hay tarjetas vencidas ahora mismo. Vuelve mañana.'}</p>
+      ${done && streak ? `<div class="study-streak">🔥 Racha de <b>${streak}</b> día${streak === 1 ? '' : 's'} estudiando</div>` : ''}
     </div>`;
   f.innerHTML = `<button class="primary-btn study-flip">Cerrar</button>`;
   f.querySelector('.study-flip').addEventListener('click', close);

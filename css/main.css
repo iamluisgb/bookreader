@@ -1429,6 +1429,10 @@ body.resizing-panel .reader-main { transition: none !important; }
 }
 .study-end h2 { font-size: 20px; }
 .study-end p { font-size: 14px; color: var(--text-soft); max-width: 380px; }
+.study-streak {
+  margin-top: 6px; padding: 8px 16px; border-radius: 999px;
+  background: var(--accent-soft); color: var(--accent); font-size: 14px;
+}
 
 /* Chip de la estantería: la cola diaria de repaso (bucle de retorno de P10). */
 .lib-study-chip {

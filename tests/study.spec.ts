@@ -55,9 +55,10 @@ test('estantería → chip Repasar hoy → sesión completa con persistencia SRS
   await page.keyboard.press(' ');
   await page.keyboard.press('3');
 
-  // Fin de sesión: 2 superadas (el "otra vez" no cuenta doble).
+  // Fin de sesión: 2 superadas (el "otra vez" no cuenta doble) y la racha arranca (F3).
   await expect(overlay.locator('.study-end h2')).toHaveText('¡Repaso completado!');
   await expect(overlay.locator('.study-end p')).toContainText('2');
+  await expect(overlay.locator('.study-streak')).toContainText('Racha de 1 día');
   await overlay.locator('.study-flip').click();
   await expect(overlay).toHaveCount(0);
 

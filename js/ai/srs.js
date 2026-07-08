@@ -89,6 +89,23 @@ export function intervalLabel(days) {
   return `${(days / 365).toFixed(1).replace('.0', '')}a`;
 }
 
+// ---- Racha de estudio (F3): días consecutivos con al menos un repaso ---------------
+
+// Actualiza la racha al repasar. Idempotente dentro del mismo día; si el último repaso
+// fue ayer, suma; si hubo hueco, reinicia a 1.
+export function bumpStreak(streak, now = Date.now()) {
+  const today = dayOf(now);
+  const s = streak && streak.lastDay ? streak : { count: 0, lastDay: 0 };
+  if (s.lastDay === today) return s;
+  return { count: s.lastDay === today - 1 ? s.count + 1 : 1, lastDay: today };
+}
+
+// Racha vigente para MOSTRAR: si el último repaso fue antes de ayer, ya se rompió (0).
+export function currentStreak(streak, now = Date.now()) {
+  if (!streak || !streak.lastDay) return 0;
+  return streak.lastDay >= dayOf(now) - 1 ? streak.count : 0;
+}
+
 // Desglose nuevas / aprendiendo / maduras (madura = intervalo ≥ 21d, criterio Anki).
 export function deckStats(cards, now = Date.now()) {
   const st = { total: 0, nuevas: 0, aprendiendo: 0, maduras: 0, due: 0 };

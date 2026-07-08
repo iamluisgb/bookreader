@@ -5,6 +5,16 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-08 — P10 · Modo Estudiar · fase 3: racha y mini-stats
+
+El refuerzo del hábito: **racha de días** estudiando (🔥 en la pantalla final; `bumpStreak`/
+`currentStreak` puros en [`srs.js`](js/ai/srs.js), idempotentes por día, persistidos en
+localStorage) y **mini-stats por mazo** en el modal (nuevas · aprendiendo · maduras, criterio
+Anki: madura = intervalo ≥ 21d). El gate Pro del backlog queda fuera a propósito: no existe
+infra de licencias y no es parte de esta feature.
+
+---
+
 ## 2026-07-08 — P10 · Modo Estudiar · fase 2: fuente citada ("ver en el libro")
 
 El moat del repaso: cada tarjeta guarda su **ancla de origen** y al repasar puedes saltar a la

@@ -189,7 +189,9 @@ test('los mazos persisten y se pueden reabrir desde el modal', async ({ page }) 
   await page.click('#ai-flashcards .ai-ob-close');
   await page.click('#ai-convo-cards');
   await expect(page.locator('.fc-deck')).toHaveCount(1);
-  await expect(page.locator('.fc-deck-meta')).toContainText('3 tarjetas');
+  await expect(page.locator('.fc-deck-meta').first()).toContainText('3 tarjetas');
+  // F3: mini-stats del mazo (todas nuevas: aún sin repasar).
+  await expect(page.locator('.fc-deck-meta').nth(1)).toHaveText('3 nuevas · 0 aprendiendo · 0 maduras');
   await page.click('.fc-deck [data-act="review"]');
   await expect(page.locator('.fc-item')).toHaveCount(3);
 });

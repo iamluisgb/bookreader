@@ -301,11 +301,11 @@ las plantillas) + objetivo, en vez de un menú plano.
 3. ¿La salida de un skill es **un formato** (md|html|svg|flashcards) o puede declarar varios?
 4. ¿Los artefactos generados viven **en la libreta** como bloques o en un **espacio propio** ("Artefactos")?
 
-### P10 — Modo Estudiar (repetición espaciada in-app) · `M`–`L` · **en curso**
+### P10 — Modo Estudiar (repetición espaciada in-app) · `M`–`L` · **✓ (F1–F3)**
 
-> **Estado: en implementación (2026-07-08).** La feature nueva de mayor impacto tras las flashcards:
-> convertir las tarjetas que ya se generan en un **hábito de repaso dentro de la app**, no solo un
-> export a Anki.
+> **Estado: entregado (2026-07-08, F1–F3; ver CHANGELOG).** La feature nueva de mayor impacto tras
+> las flashcards: convertir las tarjetas que ya se generan en un **hábito de repaso dentro de la
+> app**, no solo un export a Anki.
 
 **Problema que resuelve.** Un lector con IA es intrínsecamente de *uso único por libro* (abres, preguntas,
 no vuelves): **no hay bucle de retención**, hoy el punto más débil del producto. Y el export a Anki, aunque
@@ -333,10 +333,11 @@ página exacta de origen. Hoy la tarjeta guarda solo el capítulo (en la generac
 para ahorrar tokens): incluir el ancla de origen al generar es un cambio pequeño y es lo que lo vuelve
 único. Reusa la navegación de citas que ya existe en el panel.
 
-**Fases:**
-- **F1 — Repaso básico:** UI de estudio (voltear, autoevaluar) + SM-2 + cola diaria por mazo. Reusa `decks`.
-- **F2 — Fuente citada:** guardar ancla de origen en la tarjeta (generación) → botón "ir a la página".
-- **F3 — Retención/monetización:** racha, estadísticas, gate Pro (ilimitado / todos los mazos).
+**Fases:** F1 ✓ (repaso básico: [`srs.js`](js/ai/srs.js) SM-2 + [`study.js`](js/ai/study.js) overlay +
+botón por mazo + chip estantería) · F2 ✓ (fuente citada: ancla `src` en generación + "Ver en el libro"
+vía deep-link) · F3 ✓ (racha + mini-stats por mazo). Ver CHANGELOG 2026-07-08.
+- **Pendiente (fuera de alcance de F3):** gate Pro (repaso ilimitado / todos los mazos / estadísticas)
+  — requiere infra de licencias/monetización que hoy no existe; retomar cuando esa infra llegue.
 
 **Decisiones (2026-07-08, resueltas al planificar):**
 - **SM-2, no FSRS.** ~40 líneas puras y testables; FSRS solo rinde con historial largo que nadie tendrá

@@ -97,3 +97,26 @@ test('SM-2: isDue/dueCount/deckStats y previews de intervalo', async ({ page }) 
   expect(r.easeFloor).toBeCloseTo(1.3);                   // el ease nunca baja del suelo
   expect(r.capped).toBe(365);                             // techo de un año
 });
+
+test('racha: suma en días consecutivos, es idempotente hoy y se rompe con hueco', async ({ page }) => {
+  await page.goto('/index.html');
+  const r = await page.evaluate(async (t0) => {
+    const S: any = await import('/js/ai/srs.js');
+    const day = 86400000;
+    let s = S.bumpStreak(null, t0);                       // primer repaso → racha 1
+    const first = s.count;
+    const sameDay = S.bumpStreak(s, t0 + 3600000);        // segundo repaso del MISMO día
+    s = S.bumpStreak(s, t0 + day);                        // al día siguiente → 2
+    s = S.bumpStreak(s, t0 + 2 * day);                    // y otro → 3
+    const alive = S.currentStreak(s, t0 + 3 * day);       // aún mostrable al día siguiente
+    const broken = S.currentStreak(s, t0 + 5 * day);      // con hueco → 0
+    const restart = S.bumpStreak(s, t0 + 5 * day);        // repasar tras el hueco → reinicia a 1
+    return { first, sameDay: sameDay.count, count: s.count, alive, broken, restart: restart.count };
+  }, new Date('2026-07-08T12:00:00').getTime());
+  expect(r.first).toBe(1);
+  expect(r.sameDay).toBe(1);
+  expect(r.count).toBe(3);
+  expect(r.alive).toBe(3);
+  expect(r.broken).toBe(0);
+  expect(r.restart).toBe(1);
+});

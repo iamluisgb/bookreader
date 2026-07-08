@@ -159,12 +159,14 @@ async function renderDeckList() {
   holder.innerHTML = `
     <div class="fc-label">Mazos generados</div>
     ${decks.map(d => {
-      const due = Srs.dueCount(d.cards);
+      const st = Srs.deckStats(d.cards);
+      const due = st.due;
       return `
       <div class="fc-deck" data-id="${d.id}">
         <div class="fc-deck-info">
           <span class="fc-deck-name">${escapeHtml(d.scope || 'Libro entero')}</span>
           <span class="fc-deck-meta">${d.cards.length} tarjetas · ${d.cardType === 'cloze' ? 'cloze' : 'P→R'} · ${new Date(d.createdAt).toLocaleDateString()}</span>
+          <span class="fc-deck-meta">${st.nuevas} nuevas · ${st.aprendiendo} aprendiendo · ${st.maduras} maduras</span>
         </div>
         <button class="fc-deck-study" data-act="study" title="Repasar con repetición espaciada">
           ${icon('cards', { size: 14 })} Estudiar${due ? ` <span class="fc-deck-due">${due}</span>` : ''}
