@@ -15,6 +15,8 @@ import { escapeHtml } from '../ui/escape.js';
 import { confirmBox } from '../ui/dialog.js';
 import { buildApkg, buildAnkiTxt } from './anki-export.js';
 import { downloadText } from '../backup.js';
+import * as Srs from './srs.js';
+import * as Study from './study.js';
 
 // Presupuesto de pasajes al LLM: un capítulo cabe entero; el libro entero se muestrea
 // por capítulos (cobertura uniforme) hasta este tope — coste por generación acotado.
@@ -48,6 +50,7 @@ export function open(context) {
 }
 
 function onKey(e) {
+  if (Study.isOpen()) return;   // el overlay de estudio va encima: su ESC no cierra este modal
   if (e.key === 'Escape' && overlay) { abortCtrl?.abort(); closeModal(); }
 }
 
@@ -155,21 +158,32 @@ async function renderDeckList() {
   if (!overlay || !decks.length) { if (holder) holder.innerHTML = ''; return; }
   holder.innerHTML = `
     <div class="fc-label">Mazos generados</div>
-    ${decks.map(d => `
+    ${decks.map(d => {
+      const due = Srs.dueCount(d.cards);
+      return `
       <div class="fc-deck" data-id="${d.id}">
         <div class="fc-deck-info">
           <span class="fc-deck-name">${escapeHtml(d.scope || 'Libro entero')}</span>
           <span class="fc-deck-meta">${d.cards.length} tarjetas · ${d.cardType === 'cloze' ? 'cloze' : 'P→R'} · ${new Date(d.createdAt).toLocaleDateString()}</span>
         </div>
+        <button class="fc-deck-study" data-act="study" title="Repasar con repetición espaciada">
+          ${icon('cards', { size: 14 })} Estudiar${due ? ` <span class="fc-deck-due">${due}</span>` : ''}
+        </button>
         <button class="icon-btn" data-act="review" title="Revisar y exportar">${icon('pencil', { size: 15 })}</button>
         <button class="icon-btn" data-act="delete" title="Borrar mazo">${icon('trash', { size: 15 })}</button>
-      </div>`).join('')}`;
+      </div>`;
+    }).join('')}`;
   holder.onclick = async (e) => {
     const btn = e.target.closest('[data-act]');
     if (!btn) return;
     const id = parseInt(btn.closest('.fc-deck').dataset.id, 10);
     const deck = (await DB.getDecks(ctx.bookId)).find(d => d.id === id);
     if (!deck) return;
+    if (btn.dataset.act === 'study') {
+      // El overlay de estudio se pinta ENCIMA del modal; al cerrarlo, el badge de
+      // vencidas del mazo se refresca.
+      Study.open({ decks: [deck], title: deck.name || 'Estudiar', onClose: () => renderDeckList() });
+    }
     if (btn.dataset.act === 'review') renderReview(deck);
     if (btn.dataset.act === 'delete' &&
         await confirmBox('¿Borrar este mazo de flashcards?', { title: 'Borrar mazo', okText: 'Borrar' })) {

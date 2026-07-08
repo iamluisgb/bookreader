@@ -1356,6 +1356,81 @@ body.resizing-panel .reader-main { transition: none !important; }
 .fc-export { display: flex; align-items: center; gap: 14px; }
 .fc-export .primary-btn { display: inline-flex; align-items: center; gap: 8px; }
 .fc-txt-btn { margin-bottom: 0; }
+.fc-deck-study {
+  display: inline-flex; align-items: center; gap: 6px;
+  border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--surface-1);
+  color: var(--text); padding: 6px 10px; font-size: 13px; font-weight: 600; cursor: pointer;
+  font-family: inherit; white-space: nowrap;
+}
+.fc-deck-study:hover { border-color: var(--accent); color: var(--accent); }
+.fc-deck-due {
+  min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px;
+  background: var(--accent); color: var(--on-accent);
+  font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center;
+}
+
+/* ---- Modo Estudiar (P10): sesión de repaso con repetición espaciada ---- */
+.study-card {
+  max-width: 680px; width: 100%; min-height: 460px; max-height: 92vh;
+  display: flex; flex-direction: column;
+}
+.study-head { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; padding-right: 44px; }
+.study-title { font-size: 15px; font-weight: 700; }
+.study-left { font-size: 13px; color: var(--text-soft); }
+.study-body {
+  flex: 1; min-height: 0; overflow-y: auto;
+  display: flex; flex-direction: column; justify-content: center; gap: 14px;
+  padding: 18px 4px; text-align: center;
+}
+.study-deckname {
+  font-size: 12px; font-weight: 600; color: var(--text-soft); text-transform: uppercase;
+  letter-spacing: 0.04em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.study-q, .study-a { font-size: 19px; line-height: 1.5; overflow-wrap: break-word; }
+.study-q { font-weight: 600; }
+.study-a { color: var(--text); border-top: 1px solid var(--border); padding-top: 16px; }
+.study-a[hidden] { display: none; }
+.study-cloze {
+  background: var(--accent-soft); color: var(--accent);
+  border-radius: var(--r-sm); padding: 0 6px; font-weight: 700;
+}
+.study-cloze.is-revealed { background: var(--accent-soft); }
+.study-extra { font-size: 14px; color: var(--text-soft); margin-top: 12px; }
+.study-foot { padding-top: 14px; }
+.study-foot .study-flip {
+  width: 100%; display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+}
+.study-flip kbd {
+  font-family: inherit; font-size: 11px; font-weight: 600; opacity: 0.75;
+  border: 1px solid currentColor; border-radius: 4px; padding: 1px 6px;
+}
+.study-grades { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.study-grade {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface-0);
+  color: var(--text); padding: 10px 6px; cursor: pointer; font-family: inherit;
+  font-size: 14px; font-weight: 600; transition: border-color var(--transition-fast);
+}
+.study-grade small { font-size: 11px; font-weight: 500; color: var(--text-soft); }
+.study-grade.is-again:hover { border-color: var(--danger, #e5484d); color: var(--danger, #e5484d); }
+.study-grade.is-hard:hover { border-color: #d97706; color: #d97706; }
+.study-grade.is-good:hover, .study-grade.is-easy:hover { border-color: var(--accent); color: var(--accent); }
+.study-end { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.study-end-icon {
+  width: 72px; height: 72px; border-radius: 50%; background: var(--accent-soft); color: var(--accent);
+  display: flex; align-items: center; justify-content: center;
+}
+.study-end h2 { font-size: 20px; }
+.study-end p { font-size: 14px; color: var(--text-soft); max-width: 380px; }
+
+/* Chip de la estantería: la cola diaria de repaso (bucle de retorno de P10). */
+.lib-study-chip {
+  display: inline-flex; align-items: center; gap: 8px;
+  border: 1px solid var(--accent); border-radius: 999px; background: var(--accent-soft);
+  color: var(--accent); padding: 7px 14px; font-size: 13px; font-weight: 600;
+  cursor: pointer; font-family: inherit; white-space: nowrap;
+}
+.lib-study-chip:hover { background: var(--accent); color: var(--on-accent); }
 
 /* ============ AJUSTES GENERALES (overlay global) ============ */
 /* Hogar de la config global de la app (agente + P1/P2/P3). Mismo patrón modal que

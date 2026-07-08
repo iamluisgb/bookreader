@@ -2,6 +2,7 @@
 // "Libros" + estanterías (miniatura, contador, renombrar/borrar), barra de
 // herramientas con orden (Recientes) y filtro (Progreso), y rejilla de portadas.
 import * as Store from './store.js';
+import * as Study from '../ai/study.js';
 import { icon } from '../ui/icons.js';
 import { escapeHtml } from '../ui/escape.js';
 import { confirmBox, promptBox } from '../ui/dialog.js';
@@ -124,6 +125,23 @@ export async function render() {
       </section>
     </div>
   `;
+  paintStudyChip();   // async, no bloquea el render de la rejilla
+}
+
+// Chip "Repasar hoy · N" (P10): la cola diaria de repetición espaciada, el bucle de
+// retorno de la app. Solo aparece si hay tarjetas vencidas; al cerrar la sesión se
+// re-pinta (el contador baja o el chip desaparece).
+async function paintStudyChip() {
+  const bar = host && host.querySelector('.lib-toolbar');
+  if (!bar) return;
+  const { cards } = await Study.dueToday();
+  bar.querySelector('.lib-study-chip')?.remove();
+  if (!cards || !bar.isConnected) return;
+  const chip = document.createElement('button');
+  chip.className = 'lib-study-chip';
+  chip.innerHTML = `${icon('cards', { size: 16 })}<span>Repasar hoy · ${cards}</span>`;
+  chip.addEventListener('click', () => Study.openToday({ onClose: paintStudyChip }));
+  bar.insertBefore(chip, bar.querySelector('.lib-upload'));
 }
 
 function dropdownHtml(key, label, options, current) {

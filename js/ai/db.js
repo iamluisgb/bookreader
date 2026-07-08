@@ -208,6 +208,11 @@ export function getDecks(bookId) {
     .then(list => (list || []).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)));
 }
 
+// Todos los mazos (la cola diaria del modo Estudiar cruza todos los libros).
+export function getAllDecks() {
+  return getAll('decks').then(list => (list || []).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)));
+}
+
 export function addDeck(deck) {
   return tx('decks', 'readwrite', s => reqP(s.put({ ...deck, createdAt: Date.now() })));
 }

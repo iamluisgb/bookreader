@@ -5,6 +5,27 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-08 — P10 · Modo Estudiar · fase 1: repetición espaciada in-app
+
+Las flashcards dejan de ser solo un export a Anki: ahora se **repasan dentro de la app** con
+repetición espaciada (SM-2), creando el bucle de retorno diario que faltaba. Decisiones en
+BACKLOG · P10 (SM-2 sobre FSRS; overlay, no pestaña; por-mazo Y cola global).
+
+- Nuevo [`js/ai/srs.js`](js/ai/srs.js): scheduler **SM-2 puro** (sin DOM/DB) — `grade` con 4 notas
+  (otra vez/difícil/bien/fácil), `isDue`/`dueCount`/`deckStats` y previews de intervalo para los
+  botones. `due` en días de calendario local. Estado `card.srs` **inline en el mazo** (sin bump de
+  esquema; migrable a FSRS: guarda reps/lapses/ease/interval/due/lastReview).
+- Nuevo [`js/ai/study.js`](js/ai/study.js): overlay de sesión — voltear (espacio), autoevaluar
+  (teclas 1-4), re-encolado de "otra vez" en la misma sesión, cloze con huecos `[…]`/`[pista]` y
+  revelado resaltado. **Persiste tras cada tarjeta** (cerrar a medias no pierde nada).
+- Dos puertas: botón **"Estudiar"** con badge de vencidas por mazo (modal de flashcards) y chip
+  **"Repasar hoy · N"** en la estantería (cola global: une lo vencido de todos los mazos).
+
+Tests: [`tests/srs.spec.ts`](tests/srs.spec.ts) (unit del scheduler, fechas inyectadas) y
+[`tests/study.spec.ts`](tests/study.spec.ts) (E2E: chip → sesión → persistencia → cloze → cola global).
+
+---
+
 ## 2026-07-06 — IA7 · fase 2: golden @live medido (el valor está en cross-lingüe)
 
 Golden de retrieval sobre **DDIA real** con la API real ([`tests/retrieval-hyde.spec.ts`](tests/retrieval-hyde.spec.ts),

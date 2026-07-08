@@ -301,10 +301,11 @@ las plantillas) + objetivo, en vez de un menú plano.
 3. ¿La salida de un skill es **un formato** (md|html|svg|flashcards) o puede declarar varios?
 4. ¿Los artefactos generados viven **en la libreta** como bloques o en un **espacio propio** ("Artefactos")?
 
-### P10 — Modo Estudiar (repetición espaciada in-app) · `M`–`L` · **alto impacto**
+### P10 — Modo Estudiar (repetición espaciada in-app) · `M`–`L` · **en curso**
 
-> **Estado: propuesto (2026-07-06).** La feature nueva de mayor impacto tras las flashcards: convertir
-> las tarjetas que ya se generan en un **hábito de repaso dentro de la app**, no solo un export a Anki.
+> **Estado: en implementación (2026-07-08).** La feature nueva de mayor impacto tras las flashcards:
+> convertir las tarjetas que ya se generan en un **hábito de repaso dentro de la app**, no solo un
+> export a Anki.
 
 **Problema que resuelve.** Un lector con IA es intrínsecamente de *uso único por libro* (abres, preguntas,
 no vuelves): **no hay bucle de retención**, hoy el punto más débil del producto. Y el export a Anki, aunque
@@ -337,8 +338,17 @@ para ahorrar tokens): incluir el ancla de origen al generar es un cambio pequeñ
 - **F2 — Fuente citada:** guardar ancla de origen en la tarjeta (generación) → botón "ir a la página".
 - **F3 — Retención/monetización:** racha, estadísticas, gate Pro (ilimitado / todos los mazos).
 
-**❓ Abiertas:** ¿SM-2 (simple) o FSRS (mejor, más código)? · ¿"Estudiar" es pestaña propia en la sidebar o
-vive dentro del panel de flashcards? · ¿repaso por-libro o global (todos los mazos juntos)?
+**Decisiones (2026-07-08, resueltas al planificar):**
+- **SM-2, no FSRS.** ~40 líneas puras y testables; FSRS solo rinde con historial largo que nadie tendrá
+  en meses. El estado `srs` por tarjeta guarda `reps/lapses/ease/interval/due/lastReview` → migrable a
+  FSRS después sin romper.
+- **Overlay a pantalla completa, no pestaña de sidebar.** La sidebar es contextual de lectura; el hábito
+  empieza SIN libro abierto. Dos puertas: botón "Estudiar" por mazo (modal de flashcards) + chip
+  "Repasar hoy (N)" en la estantería (el bucle de retorno).
+- **Por-libro Y global, misma UI.** Desde el modal se estudia ese mazo; desde la estantería, la cola une
+  lo vencido de todos los mazos.
+- **Datos sin bump de esquema:** `card.srs` inline en `deck.cards` (sin `srs` = nueva); `updateDeck` ya
+  persiste y el editor conserva el campo (spread). `due` en días (medianoche local).
 
 ---
 
