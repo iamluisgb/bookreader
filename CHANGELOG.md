@@ -5,6 +5,21 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-08 — P10 · Modo Estudiar · fase 2: fuente citada ("ver en el libro")
+
+El moat del repaso: cada tarjeta guarda su **ancla de origen** y al repasar puedes saltar a la
+página/CFI exacta de donde salió — lo que ni Anki ni ChatGPT+PDF pueden hacer.
+- Generación ([`flashcards.js`](js/ai/flashcards.js)): los pasajes van al LLM **con su marcador
+  `[[aN]]`** (~5% más tokens) y se pide `"src"` por tarjeta; `attachSources` **valida** el id
+  (los modelos los inventan) y si falta/no existe lo **repesca por BM25** con el contenido de la
+  tarjeta, prefiriendo su capítulo declarado. Best-effort: sin acierto, la tarjeta queda sin salto.
+- Repaso ([`study.js`](js/ai/study.js)): botón **"Ver en el libro"** al voltear → navega por el
+  **deep-link del router** (`#book=<id>&loc=<cfi|página>`): reposiciona si el libro está abierto
+  o **lo abre de cero** (la cola global cruza libros; el id del mazo y el de la biblioteca son el
+  mismo hash). El modal de flashcards se cierra al saltar (`onNavigate`).
+
+---
+
 ## 2026-07-08 — P10 · Modo Estudiar · fase 1: repetición espaciada in-app
 
 Las flashcards dejan de ser solo un export a Anki: ahora se **repasan dentro de la app** con

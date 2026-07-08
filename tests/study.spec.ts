@@ -108,3 +108,52 @@ test('la cola diaria une mazos y el botón Estudiar del modal muestra el badge d
   expect(due.cards).toBe(3);
   expect(due.decks.length).toBe(2);
 });
+
+// ---- P10 F2 · "Ver en el libro": salto a la fuente vía deep-link del router ----
+
+test('al voltear, "Ver en el libro" abre el libro de origen por deep-link', async ({ page }) => {
+  await page.goto('/index.html');
+  await page.evaluate(async () => {
+    const DB: any = await import('/js/ai/db.js');
+    const Lib: any = await import('/js/library/store.js');
+    // Libro REAL en la biblioteca (el deep-link tiene que poder abrirlo de cero).
+    const buf = await (await fetch('/tests/test.epub')).arrayBuffer();
+    await Lib.putBook({
+      id: 'bk-src', title: 'Libro fuente', format: 'epub', fileName: 'test.epub',
+      file: buf, size: buf.byteLength, addedAt: Date.now(), lastOpenedAt: Date.now(),
+      progress: 0, status: 'unread', shelfIds: [],
+    });
+    // Ancla de origen y mazo cuya tarjeta la referencia.
+    await DB.put('anchors', { bookId: 'bk-src', entries: [['a7', { cfi: null, href: 'cap1.xhtml', chapter: 'I' }]] });
+    await DB.addDeck({
+      bookId: 'bk-src', name: 'Libro fuente', cardType: 'basic', scope: '',
+      cards: [
+        { type: 'basic', front: 'con fuente', back: 'r', chapter: 'I', src: 'a7' },
+        { type: 'basic', front: 'sin fuente', back: 'r', chapter: '' },
+      ],
+    });
+  });
+  await page.reload();
+  await page.locator('.lib-study-chip').click();
+
+  const overlay = page.locator('#ai-study');
+  await overlay.locator('.study-flip').click();
+  await expect(overlay.locator('.study-src')).toBeVisible();
+  await overlay.locator('.study-src').click();
+
+  // El overlay se cierra y el router abre el libro en modo lectura con la ruta correcta.
+  await expect(overlay).toHaveCount(0);
+  await expect(page.locator('body')).toHaveClass(/reading/, { timeout: 20000 });
+  expect(page.url()).toContain('book=bk-src');
+
+  // La tarjeta SIN src no ofrece el salto. (La primera sigue vencida: saltar al libro
+  // no la evalúa; se supera con "bien" para llegar a la segunda.)
+  await page.evaluate(async () => (await import('/js/ai/study.js') as any).openToday());
+  const again = page.locator('#ai-study');
+  await expect(again.locator('.study-q')).toHaveText('con fuente');
+  await page.keyboard.press(' ');
+  await page.keyboard.press('3');
+  await expect(again.locator('.study-q')).toHaveText('sin fuente');
+  await again.locator('.study-flip').click();
+  await expect(again.locator('.study-src')).toHaveCount(0);
+});

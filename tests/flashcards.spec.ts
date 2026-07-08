@@ -193,3 +193,40 @@ test('los mazos persisten y se pueden reabrir desde el modal', async ({ page }) 
   await page.click('.fc-deck [data-act="review"]');
   await expect(page.locator('.fc-item')).toHaveCount(3);
 });
+
+// ---- P10 F2 · Fuente citada: cada tarjeta guarda su ancla [[aN]] de origen ----
+
+test('parseCards extrae src y attachSources valida o repesca por BM25', async ({ page }) => {
+  await page.goto('/index.html');
+  const r = await page.evaluate(async () => {
+    const F: any = await import('/js/ai/flashcards.js');
+    const cards = F.parseCards(JSON.stringify([
+      { front: 'q1', back: 'r1', chapter: 'I', src: 'a3' },        // válido tal cual
+      { front: 'q2', back: 'r2', chapter: 'I', src: '[[a9]]' },    // con corchetes → se limpia
+      { front: 'q3', back: 'r3', chapter: 'II', src: 'zeta' },     // inventado → se descarta
+      { front: 'q4', back: 'r4', chapter: '' },                    // sin src
+    ]), 'basic');
+    // Repesca: BM25 stubbeado; q3 debe preferir el pasaje de SU capítulo (II), no el top-1.
+    const attached = F.attachSources(cards, {
+      validIds: new Set(['a3', 'a9']),
+      search: () => [{ id: 'a50', chapter: 'X' }, { id: 'a60', chapter: 'II' }],
+    });
+    return { parsed: cards.map((c: any) => c.src), attached: attached.map((c: any) => c.src) };
+  });
+  expect(r.parsed).toEqual(['a3', 'a9', '', '']);
+  expect(r.attached).toEqual(['a3', 'a9', 'a60', 'a50']);
+});
+
+test('el mazo generado persiste con ancla de origen por tarjeta (repesca real)', async ({ page }) => {
+  // Las tarjetas del stub NO traen src → la repesca BM25 sobre el índice real del epub
+  // debe asignar un ancla existente a cada una (pipeline completo de generación).
+  await setup(page);
+  await generate(page);
+  const srcs = await page.evaluate(async () => {
+    const DB: any = await import('/js/ai/db.js');
+    const decks = await DB.getAllDecks();
+    return decks[0].cards.map((c: any) => c.src);
+  });
+  expect(srcs).toHaveLength(3);
+  for (const s of srcs) expect(s).toMatch(/^a\d+$/);
+});

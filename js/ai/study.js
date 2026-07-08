@@ -14,9 +14,11 @@ import { escapeHtml } from '../ui/escape.js';
 
 let overlay = null;
 let onCloseCb = null;
+let onNavigateCb = null;
 let queue = [];          // [{deck, idx}] pendientes de la sesión (los "otra vez" se re-encolan)
 let done = 0;            // tarjetas superadas en la sesión (no cuenta los "otra vez")
 let flipped = false;
+const anchorsCache = new Map();   // bookId → Map(aN → {cfi, href, page, chapter})
 
 // ---- Cola diaria (para el chip de la estantería) -----------------------------
 
@@ -40,9 +42,12 @@ export async function openToday({ onClose } = {}) {
 // ---- Sesión -------------------------------------------------------------------
 
 // `decks`: mazos a repasar (solo entran sus tarjetas vencidas, en orden de mazo).
-export function open({ decks, title = 'Estudiar', onClose } = {}) {
+// `onNavigate`: se llama al saltar a la fuente ("ver en el libro") para que quien abrió
+// la sesión cierre lo suyo (p. ej. el modal de flashcards) antes de mostrar el libro.
+export function open({ decks, title = 'Estudiar', onClose, onNavigate } = {}) {
   close();
   onCloseCb = onClose || null;
+  onNavigateCb = onNavigate || null;
   const now = Date.now();
   queue = [];
   done = 0;
@@ -154,6 +159,7 @@ function flip() {
     </button>`;
   const f = overlay.querySelector('.study-foot');
   f.innerHTML = `
+    ${card.src ? `<button class="study-src">${icon('book', { size: 15 })} Ver en el libro</button>` : ''}
     <div class="study-grades">
       ${btn('again', 'Otra vez', 'is-again')}${btn('hard', 'Difícil', 'is-hard')}
       ${btn('good', 'Bien', 'is-good')}${btn('easy', 'Fácil', 'is-easy')}
@@ -162,6 +168,36 @@ function flip() {
     const g = e.target.closest('[data-rate]');
     if (g) gradeCurrent(g.dataset.rate);
   });
+  f.querySelector('.study-src')?.addEventListener('click', () => goToSource(deck, card));
+}
+
+// ---- Fuente citada (P10 F2): "ver en el libro" ----------------------------------
+
+// Anclas [[aN]] del libro (store `anchors` de la BD del agente), cacheadas por sesión.
+async function anchorsFor(bookId) {
+  if (!anchorsCache.has(bookId)) {
+    const rec = await DB.get('anchors', bookId);
+    anchorsCache.set(bookId, new Map(rec?.entries || []));
+  }
+  return anchorsCache.get(bookId);
+}
+
+// Salta a la página/CFI de origen de la tarjeta vía el deep-link del router
+// (`#book=<id>&loc=<cfi|página>`): el mismo camino abre el libro si no está abierto
+// (la cola global cruza libros) o solo reposiciona si ya lo está. El id del mazo y el
+// de la biblioteca son el mismo hash del archivo.
+async function goToSource(deck, card) {
+  const a = (await anchorsFor(deck.bookId)).get(card.src);
+  const loc = a ? (a.cfi ?? a.href ?? a.page) : null;
+  if (loc == null || !deck.bookId) return;
+  const p = new URLSearchParams();
+  p.set('book', deck.bookId);
+  p.set('loc', String(loc));
+  const cb = onNavigateCb;
+  onNavigateCb = null;
+  close();                                  // el progreso ya está persistido tarjeta a tarjeta
+  if (cb) cb();
+  location.hash = p.toString();             // dispara hashchange → el router abre/reposiciona
 }
 
 function gradeCurrent(rating) {

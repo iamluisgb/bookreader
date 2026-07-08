@@ -181,8 +181,13 @@ async function renderDeckList() {
     if (!deck) return;
     if (btn.dataset.act === 'study') {
       // El overlay de estudio se pinta ENCIMA del modal; al cerrarlo, el badge de
-      // vencidas del mazo se refresca.
-      Study.open({ decks: [deck], title: deck.name || 'Estudiar', onClose: () => renderDeckList() });
+      // vencidas del mazo se refresca. Si el usuario salta a la fuente ("ver en el
+      // libro"), este modal también se cierra para dejar ver el lector.
+      Study.open({
+        decks: [deck], title: deck.name || 'Estudiar',
+        onClose: () => renderDeckList(),
+        onNavigate: () => closeModal(),
+      });
     }
     if (btn.dataset.act === 'review') renderReview(deck);
     if (btn.dataset.act === 'delete' &&
@@ -195,9 +200,10 @@ async function renderDeckList() {
 
 // ---- Generación con el LLM ---------------------------------------------------
 
-// Pasajes del alcance elegido, como texto plano con encabezados de capítulo (sin
-// anclas [[aN]]: aquí no hay citas y ahorra tokens). Libro entero: round-robin por
-// capítulo para cubrirlo uniformemente (no solo el principio) hasta el presupuesto.
+// Pasajes del alcance elegido, con encabezados de capítulo y su marcador [[aN]]
+// delante (P10 F2: la tarjeta guarda su ancla de origen → "ver en el libro" al
+// repasar; cuesta ~5% de tokens). Libro entero: round-robin por capítulo para
+// cubrirlo uniformemente (no solo el principio) hasta el presupuesto.
 function gatherPassages(scopeLabel) {
   ctx.ensureIndex();
   let picked;
@@ -228,7 +234,7 @@ function gatherPassages(scopeLabel) {
   let curCh = null;
   for (const p of picked) {
     if (p.chapter && p.chapter !== curCh) { out.push(`\n## ${p.chapter}`); curCh = p.chapter; }
-    out.push(p.text);
+    out.push(`[[${p.id}]] ${p.text}`);
   }
   return out.join('\n').trim();
 }
@@ -257,9 +263,10 @@ REGLAS DE CALIDAD (obligatorias):
 - Cuando sea posible, alinéalas al objetivo del lector: «${goal}».` : ''}
 
 FORMATO (obligatorio): responde SOLO con un array JSON válido, sin markdown ni texto alrededor.
-Cada tarjeta es {"front": "...", "back": "...", "chapter": "..."}:
+Cada tarjeta es {"front": "...", "back": "...", "chapter": "...", "src": "..."}:
 ${shape}
 - "chapter": el encabezado ## del pasaje de origen, o "" si no lo hay.
+- "src": el marcador [[aN]] del pasaje del que sale la tarjeta, solo el id (p. ej. "a42"), o "" si dudas.
 
 Genera EXACTAMENTE ${count} tarjetas (menos SOLO si el material no da para más).`;
 }
@@ -273,12 +280,30 @@ export function parseCards(raw, type) {
   if (!Array.isArray(arr)) throw new Error('La respuesta no es una lista de tarjetas');
   return arr
     .filter(c => c && typeof c.front === 'string' && c.front.trim())
-    .map(c => ({
-      type,
-      front: c.front.trim(),
-      back: typeof c.back === 'string' ? c.back.trim() : '',
-      chapter: typeof c.chapter === 'string' ? c.chapter.trim() : '',
-    }));
+    .map(c => {
+      // src: acepta "a42" o "[[a42]]"; cualquier otra cosa se descarta (se valida después).
+      const src = typeof c.src === 'string' ? (c.src.match(/^\[*\s*(a\d+)\s*\]*$/) || [])[1] || '' : '';
+      return {
+        type,
+        front: c.front.trim(),
+        back: typeof c.back === 'string' ? c.back.trim() : '',
+        chapter: typeof c.chapter === 'string' ? c.chapter.trim() : '',
+        src,
+      };
+    });
+}
+
+// P10 F2 — asegura el ancla de origen de cada tarjeta: si el modelo no dio "src" (o dio
+// uno que no existe: los LLM inventan ids), se busca el mejor pasaje por BM25 con el
+// contenido de la tarjeta, prefiriendo su capítulo declarado. Best-effort: sin acierto,
+// la tarjeta queda sin fuente (el modo Estudiar simplemente no ofrece el salto).
+export function attachSources(cards, { validIds, search }) {
+  return cards.map(c => {
+    if (c.src && validIds.has(c.src)) return c;
+    const hits = search(`${c.front} ${c.back}`.trim(), 5) || [];
+    const best = hits.find(h => c.chapter && h.chapter === c.chapter) || hits[0];
+    return { ...c, src: best ? best.id : '' };
+  });
 }
 
 async function onGenerate() {
@@ -312,8 +337,12 @@ async function onGenerate() {
       },
     });
     if (!overlay) return;                       // el usuario cerró el modal: no seguir
-    const cards = parseCards(raw || acc, type);
+    let cards = parseCards(raw || acc, type);
     if (!cards.length) throw new Error('El modelo no devolvió tarjetas válidas. Vuelve a intentarlo.');
+    cards = attachSources(cards, {
+      validIds: new Set(Retrieval.allPassages().map(p => p.id)),
+      search: (q, k) => Retrieval.search(q, k),
+    });
     const deck = {
       bookId: ctx.bookId, name: deckName(scopeLabel), cardType: type,
       scope: scopeLabel, cards,
