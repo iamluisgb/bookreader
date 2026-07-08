@@ -219,6 +219,30 @@ test('parseCards extrae src y attachSources valida o repesca por BM25', async ({
   expect(r.attached).toEqual(['a3', 'a9', 'a60', 'a50']);
 });
 
+test('parseCards tolera razonamiento con [[aN]] y rescata tarjetas de una respuesta truncada', async ({ page }) => {
+  await page.goto('/index.html');
+  const r = await page.evaluate(async () => {
+    const F: any = await import('/js/ai/flashcards.js');
+    // Modelo reasoning: <think> con corchetes [[a5]] ANTES del array real. El parser ingenuo
+    // (indexOf('[')) cogería desde dentro del razonamiento → basura; el nuevo se ancla a "front".
+    const reasoned = '<think>Miraré los pasajes [[a5]] y [[a9]] para decidir…</think>\n' +
+      '[{"front":"q1","back":"r1","chapter":"I","src":"a5"},{"front":"q2","back":"r2","chapter":"I","src":"a9"}]';
+    // Truncada: 2 objetos completos + un tercero cortado a media cadena (sin cerrar). Se salvan 2.
+    const truncated = '[{"front":"c1","back":"r1"},{"front":"c2","back":"r2"},{"front":"c3","ba';
+    // Sin nada aprovechable → [] (no lanza).
+    return {
+      reasoned: F.parseCards(reasoned, 'basic').map((c: any) => [c.front, c.src]),
+      truncated: F.parseCards(truncated, 'basic').map((c: any) => c.front),
+      empty: F.parseCards('Lo siento, no puedo generar tarjetas.', 'basic'),
+      nullish: F.parseCards('', 'basic'),
+    };
+  });
+  expect(r.reasoned).toEqual([['q1', 'a5'], ['q2', 'a9']]);
+  expect(r.truncated).toEqual(['c1', 'c2']);       // el tercero, cortado, se descarta
+  expect(r.empty).toEqual([]);
+  expect(r.nullish).toEqual([]);
+});
+
 test('el mazo generado persiste con ancla de origen por tarjeta (repesca real)', async ({ page }) => {
   // Las tarjetas del stub NO traen src → la repesca BM25 sobre el índice real del epub
   // debe asignar un ancla existente a cada una (pipeline completo de generación).

@@ -17,6 +17,7 @@ import { buildApkg, buildAnkiTxt } from './anki-export.js';
 import { downloadText } from '../backup.js';
 import * as Srs from './srs.js';
 import * as Study from './study.js';
+import { balancedObjects } from './query-expand.js';
 
 // Presupuesto de pasajes al LLM: un capítulo cabe entero; el libro entero se muestrea
 // por capítulos (cobertura uniforme) hasta este tope — coste por generación acotado.
@@ -273,26 +274,32 @@ ${shape}
 Genera EXACTAMENTE ${count} tarjetas (menos SOLO si el material no da para más).`;
 }
 
-// Extrae el array JSON de la respuesta (tolerante a fences y texto alrededor).
+// Extrae las tarjetas de la respuesta del modelo. Tolerante por diseño (como parseExpansion
+// de IA7): no busca el array con indexOf('[')/lastIndexOf(']') —frágil ahora que el prompt y
+// los pasajes llevan marcadores [[aN]], y que un modelo reasoning envuelve el JSON en prosa o
+// <think>—, sino que extrae los OBJETOS balanceados `{...}` y se queda con los que tienen un
+// "front" de texto. Así ignora las llaves del razonamiento y SALVA una respuesta truncada
+// (cada objeto completo cuenta; solo se pierde la cola incompleta). Nunca lanza: [] = nada.
 export function parseCards(raw, type) {
-  const text = String(raw || '').replace(/```(?:json)?/g, '');
-  const start = text.indexOf('['), end = text.lastIndexOf(']');
-  if (start === -1 || end <= start) throw new Error('La respuesta no contiene tarjetas (JSON no encontrado)');
-  const arr = JSON.parse(text.slice(start, end + 1));
-  if (!Array.isArray(arr)) throw new Error('La respuesta no es una lista de tarjetas');
-  return arr
-    .filter(c => c && typeof c.front === 'string' && c.front.trim())
-    .map(c => {
-      // src: acepta "a42" o "[[a42]]"; cualquier otra cosa se descarta (se valida después).
-      const src = typeof c.src === 'string' ? (c.src.match(/^\[*\s*(a\d+)\s*\]*$/) || [])[1] || '' : '';
-      return {
-        type,
-        front: c.front.trim(),
-        back: typeof c.back === 'string' ? c.back.trim() : '',
-        chapter: typeof c.chapter === 'string' ? c.chapter.trim() : '',
-        src,
-      };
+  const text = String(raw || '')
+    .replace(/```(?:json)?/gi, '')
+    .replace(/<think>[\s\S]*?<\/think>/gi, ' ');   // descarta el razonamiento inline
+  const out = [];
+  for (const chunk of balancedObjects(text)) {
+    let c;
+    try { c = JSON.parse(chunk); } catch { continue; }   // objeto incompleto/roto → se ignora
+    if (!c || typeof c.front !== 'string' || !c.front.trim()) continue;   // no es una tarjeta
+    // src: acepta "a42" o "[[a42]]"; cualquier otra cosa se descarta (se valida después).
+    const src = typeof c.src === 'string' ? (c.src.match(/^\[*\s*(a\d+)\s*\]*$/) || [])[1] || '' : '';
+    out.push({
+      type,
+      front: c.front.trim(),
+      back: typeof c.back === 'string' ? c.back.trim() : '',
+      chapter: typeof c.chapter === 'string' ? c.chapter.trim() : '',
+      src,
     });
+  }
+  return out;
 }
 
 // P10 F2 — asegura el ancla de origen de cada tarjeta: si el modelo no dio "src" (o dio
@@ -325,22 +332,38 @@ async function onGenerate() {
   btn.innerHTML = `<span class="ai-typing">Generando tarjetas…</span>`;
   showError('');
   try {
-    let acc = '';
+    // Presupuesto de tokens escalado al nº de tarjetas: el modelo por defecto es reasoning
+    // y su razonamiento consume el mismo cupo que la salida; con el tope global (4096) el
+    // array se cortaba —a veces antes del primer '['— y saltaba "JSON no encontrado".
+    let acc = '', reasoning = '', truncated = false;
     const raw = await LLM.chatStream({
       messages: [
         { role: 'system', content: cardsPrompt(count, type, ctx.goal) },
         { role: 'user', content: 'PASAJES DEL LIBRO:\n\n' + passages },
       ],
+      maxTokens: Math.min(8192, 2500 + count * 220),
       signal: abortCtrl.signal,
       onToken: (t) => {
         acc += t;
         const n = (acc.match(/"front"/g) || []).length;
         if (n && overlay) btn.innerHTML = `<span class="ai-typing">Generando… ${Math.min(n, count)}/${count}</span>`;
       },
+      onReasoning: (t) => { reasoning += t; },     // algunos modelos vuelcan el JSON aquí
+      onDone: ({ truncated: cut }) => { truncated = cut; },
     });
     if (!overlay) return;                       // el usuario cerró el modal: no seguir
+    // Rescata también del canal de razonamiento (por si el content vino vacío) y salva las
+    // tarjetas completas de una respuesta truncada.
     let cards = parseCards(raw || acc, type);
-    if (!cards.length) throw new Error('El modelo no devolvió tarjetas válidas. Vuelve a intentarlo.');
+    if (!cards.length) cards = parseCards(reasoning, type);
+    if (!cards.length) {
+      throw new Error(truncated
+        ? 'La respuesta se cortó antes de completar ninguna tarjeta. Prueba con menos tarjetas.'
+        : 'El modelo no devolvió tarjetas válidas. Vuelve a intentarlo.');
+    }
+    if (truncated && overlay) {                 // truncada pero con tarjetas: avisa, no descarta
+      showError(`La respuesta se cortó: se recuperaron ${cards.length} de ${count} tarjetas.`);
+    }
     cards = attachSources(cards, {
       validIds: new Set(Retrieval.allPassages().map(p => p.id)),
       search: (q, k) => Retrieval.search(q, k),

@@ -153,7 +153,7 @@ async function fetchRetrying(url, opts, { retries = 3 } = {}) {
   throw lastErr;
 }
 
-async function _chatStream({ messages, onToken, onReasoning, onDone, signal }) {
+async function _chatStream({ messages, onToken, onReasoning, onDone, signal, maxTokens = MAX_TOKENS }) {
   const key = getKey().trim();
   if (!key) throw new Error('Falta la API key.');
 
@@ -167,7 +167,7 @@ async function _chatStream({ messages, onToken, onReasoning, onDone, signal }) {
       model: getModel(),
       messages,
       stream: true,
-      max_tokens: MAX_TOKENS,
+      max_tokens: maxTokens,
     }),
     signal,
   });

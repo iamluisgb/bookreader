@@ -28,7 +28,8 @@ Ejemplo de forma: {"terms":["...","..."],"hypothetical":"..."}${hint}`;
 
 // Objetos JSON balanceados de un texto (respeta llaves dentro de strings). Devuelve las
 // subcadenas `{...}` de nivel superior, en orden. Robusto ante prosa y llaves anidadas.
-function balancedObjects(text) {
+// Exportado: lo reutiliza flashcards.js para rescatar tarjetas de respuestas truncadas.
+export function balancedObjects(text) {
   const out = [];
   let depth = 0, start = -1, inStr = false, esc = false;
   for (let i = 0; i < text.length; i++) {

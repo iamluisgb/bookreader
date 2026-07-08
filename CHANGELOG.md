@@ -5,6 +5,24 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-08 — Fix · Flashcards: "JSON no encontrado" con modelos reasoning
+
+El modelo por defecto (`deepseek-v4-flash`) es *reasoning* y su razonamiento consume el mismo
+cupo de `max_tokens` (4096 global) que la salida: pidiendo 15-30 tarjetas, el array JSON se
+cortaba —a veces antes del primer `[`— y `parseCards` lanzaba *"La respuesta no contiene tarjetas"*.
+Tres arreglos que atacan las tres causas:
+- **Presupuesto escalado** ([`flashcards.js`](js/ai/flashcards.js)): `maxTokens = min(8192, 2500 + count·220)`
+  para la generación; `chatStream` ([`llm.js`](js/ai/llm.js)) ahora acepta `maxTokens` (antes fijo).
+- **Parser robusto** (como `parseExpansion` de IA7): `parseCards` deja de usar `indexOf('[')`
+  —frágil ahora que el prompt y los pasajes llevan marcadores `[[aN]]`— y extrae los objetos JSON
+  **balanceados** con `"front"` (reusa `balancedObjects`), ignorando `<think>…</think>` y las llaves
+  del razonamiento. **Salva las tarjetas completas de una respuesta truncada** (mejor N que un error).
+- **Rescate del canal de razonamiento:** si el `content` viene vacío, se intenta parsear el
+  `reasoning_content` (algunos modelos vuelcan ahí el JSON); y si la respuesta se truncó, se avisa
+  cuántas tarjetas se recuperaron en vez de descartarlas.
+
+---
+
 ## 2026-07-08 — P10 · Modo Estudiar · fase 3: racha y mini-stats
 
 El refuerzo del hábito: **racha de días** estudiando (🔥 en la pantalla final; `bumpStreak`/
