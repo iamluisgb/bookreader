@@ -14,22 +14,46 @@ const CANNED_CARDS = [
   { front: '¿Qué promesa hace Juan a su madre?', back: 'Ir a Comala a reclamar lo suyo.', chapter: 'II' },
 ];
 
-// Stub del endpoint del LLM: cualquier petición de streaming devuelve las tarjetas.
+// Stub del endpoint del LLM. Simula los dos caminos de la generación por trozos, con una
+// semántica realista para el map-reduce: SOLO el primer trozo produce tarjetas — los
+// siguientes (su prompt lleva el anti-duplicados "YA EXISTEN") devuelven vacío, como un
+// modelo que respeta la consigna de no repetir. Así los tests son deterministas aunque el
+// libro se trocee en N llamadas.
+// - tools de create_flashcards (no-stream): payload parseable como array → tool_call con
+//   las tarjetas (o cards:[] en trozos con "YA EXISTEN"); payload no parseable → respuesta
+//   SIN tool_call (proveedor sin function calling → fuerza la escalera al fallback).
+// - stream: el payload como texto ('[]' en trozos con "YA EXISTEN").
+// Contadores en window.__fc para asertar qué camino se usó.
 async function stubLLM(page, content: string) {
   await page.evaluate((payload) => {
     const real = window.fetch.bind(window);
+    (window as any).__fc = { tool: 0, stream: 0 };
     window.fetch = async (url: any, opts: any) => {
       const u = typeof url === 'string' ? url : url?.url || '';
       if (u.includes('/chat/completions') && opts?.body) {
         const body = JSON.parse(opts.body);
+        const sys = (body.messages || []).find((m: any) => m.role === 'system')?.content || '';
+        const later = /YA EXISTEN/.test(sys);   // trozo 2+ del map-reduce
         if (body.stream) {
+          (window as any).__fc.stream++;
+          const out = later ? '[]' : payload;
           const chunks = [
-            `data: ${JSON.stringify({ choices: [{ delta: { content: payload }, finish_reason: null }] })}\n\n`,
+            `data: ${JSON.stringify({ choices: [{ delta: { content: out }, finish_reason: null }] })}\n\n`,
             'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n\n',
             'data: [DONE]\n\n',
           ];
           const s = new ReadableStream({ start(c) { const e = new TextEncoder(); chunks.forEach(x => c.enqueue(e.encode(x))); c.close(); } });
           return new Response(s, { status: 200, headers: { 'Content-Type': 'text/event-stream' } });
+        }
+        const isCards = (body.tools || []).some((t: any) => t.function?.name === 'create_flashcards');
+        if (isCards) {
+          (window as any).__fc.tool++;
+          let cards: any = null;
+          try { const p = JSON.parse(payload); if (Array.isArray(p)) cards = p; } catch { /* no-array → sin tool_call */ }
+          const message = cards
+            ? { content: '', tool_calls: [{ id: 'tc1', function: { name: 'create_flashcards', arguments: JSON.stringify({ cards: later ? [] : cards }) } }] }
+            : { content: payload };
+          return new Response(JSON.stringify({ choices: [{ message }] }), { status: 200 });
         }
         return new Response(JSON.stringify({ choices: [{ message: { content: 'LISTO' } }] }), { status: 200 });
       }
@@ -68,12 +92,16 @@ async function generate(page) {
   await expect(page.locator('#ai-flashcards h2')).toContainText('tarjetas', { timeout: 15000 });
 }
 
-test('generar muestra la revisión con las tarjetas del modelo', async ({ page }) => {
+test('generar muestra la revisión con las tarjetas del modelo (vía function calling)', async ({ page }) => {
   await setup(page);
   await generate(page);
   await expect(page.locator('.fc-item')).toHaveCount(3);
   await expect(page.locator('#ai-flashcards h2')).toHaveText('3 tarjetas');
   await expect(page.locator('.fc-front').first()).toContainText('Juan Preciado');
+  // El camino preferente es function calling: hubo tool_calls y CERO llamadas de texto.
+  const fc = await page.evaluate(() => (window as any).__fc);
+  expect(fc.tool).toBeGreaterThanOrEqual(1);
+  expect(fc.stream).toBe(0);
 });
 
 // UX #3 · El alcance es un desplegable PROPIO (no <select> nativo): abre, lista opciones y
@@ -96,11 +124,57 @@ test('el alcance usa un combobox propio y permite elegir capítulo', async ({ pa
   await expect(page.locator('#fc-scope .fc-combo-pop')).toBeHidden();
 });
 
-test('la respuesta con fences y texto alrededor también se parsea', async ({ page }) => {
+// El payload no es un array parseable → el stub responde a tools SIN tool_call (como un
+// proveedor sin function calling) → la escalera baja al fallback de texto, cuyo parser
+// tolera fences y prosa. Cubre la degradación completa: forzado → auto → texto.
+test('proveedor sin tools: la escalera degrada al camino de texto y aún parsea', async ({ page }) => {
   const wrapped = 'Aquí tienes:\n```json\n' + JSON.stringify(CANNED_CARDS.slice(0, 2)) + '\n```\n¡Listo!';
   await setup(page, wrapped);
   await generate(page);
   await expect(page.locator('.fc-item')).toHaveCount(2);
+  const fc = await page.evaluate(() => (window as any).__fc);
+  expect(fc.tool).toBeGreaterThanOrEqual(1);   // se intentó tools…
+  expect(fc.stream).toBeGreaterThanOrEqual(1); // …y se cayó al texto
+});
+
+// Funciones puras del map-reduce: troceo por presupuesto y reparto proporcional exacto.
+test('buildChunks trocea por presupuesto y allocateCounts reparte con suma exacta', async ({ page }) => {
+  await page.goto('/index.html');
+  const r = await page.evaluate(async () => {
+    const F: any = await import('/js/ai/flashcards.js');
+    const mk = (i: number, ch: string, words: number) =>
+      ({ id: 'a' + i, chapter: ch, text: Array(words).fill('palabra').join(' ') });
+    // 5 pasajes de ~100 tokens con presupuesto de 120 → un pasaje por trozo.
+    const passages = [mk(1, 'I', 50), mk(2, 'I', 50), mk(3, 'II', 50), mk(4, 'II', 50), mk(5, 'III', 50)];
+    const chunks = F.buildChunks(passages, 120);
+    const one = F.buildChunks(passages, 100000);            // presupuesto holgado → 1 trozo
+    const c10 = F.allocateCounts(chunks, 10);
+    const c2 = F.allocateCounts(chunks, 2);                 // menos tarjetas que trozos
+    return {
+      n: chunks.length,
+      oneN: one.length,
+      // El trozo que abre capítulo lleva su encabezado y todo pasaje su marcador [[aN]].
+      firstHasHeader: chunks[0].text.startsWith('## I'),
+      firstHasAnchor: chunks[0].text.includes('[[a1]]'),
+      // Un capítulo partido repite su encabezado en la continuación.
+      contHasHeader: chunks[1].text.startsWith('## I'),
+      sum10: c10.reduce((s: number, x: number) => s + x, 0),
+      min10: Math.min(...c10),
+      sum2: c2.reduce((s: number, x: number) => s + x, 0),
+      max2: Math.max(...c2),
+      zeroTotal: F.allocateCounts(chunks, 0),
+    };
+  });
+  expect(r.n).toBe(5);
+  expect(r.oneN).toBe(1);
+  expect(r.firstHasHeader).toBe(true);
+  expect(r.firstHasAnchor).toBe(true);
+  expect(r.contHasHeader).toBe(true);
+  expect(r.sum10).toBe(10);
+  expect(r.min10).toBeGreaterThanOrEqual(1);   // con total ≥ trozos, ninguno queda a 0
+  expect(r.sum2).toBe(2);
+  expect(r.max2).toBe(1);                       // 1 a los más grandes, 0 al resto
+  expect(r.zeroTotal).toEqual([0, 0, 0, 0, 0]);
 });
 
 test('quitar una tarjeta y exportar .txt produce el formato de import de Anki', async ({ page }) => {

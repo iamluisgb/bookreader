@@ -19,11 +19,18 @@ import * as Srs from './srs.js';
 import * as Study from './study.js';
 import { balancedObjects } from './query-expand.js';
 
-// Presupuesto de pasajes al LLM: un capítulo cabe entero; el libro entero se muestrea
-// por capítulos (cobertura uniforme) hasta este tope — coste por generación acotado.
-const CHAPTER_TOKENS = 12000;
+// Generación por TROZOS (map-reduce): el material se divide en trozos de ~CHUNK_TOKENS
+// y cada llamada produce SOLO las tarjetas de su trozo (cupo proporcional). Así ninguna
+// llamada puede truncarse (entrada y salida acotadas por diseño, clave con modelos
+// reasoning cuyo razonamiento consume el mismo cupo de tokens que la salida), hay éxito
+// parcial (un trozo fallido no tira el mazo) y el progreso es real.
+// - Capítulo: se cubre ENTERO (antes se cortaba a 12k tokens).
+// - Libro entero: muestra round-robin por capítulo hasta BOOK_TOKENS (coste acotado y
+//   cobertura uniforme; cubrir 100% un libro de 200k tokens para 30 tarjetas es gastar de más).
+const CHUNK_TOKENS = 10000;
 const BOOK_TOKENS = 40000;
 const COUNTS = [10, 15, 20, 30];
+const MAX_PREV_FRONTS = 40;   // nº de frentes previos que se pasan al siguiente trozo (anti-duplicados)
 
 let ctx = null;        // { bookId, bookTitle, goal, tocLabels, currentChapter, ensureIndex }
 let overlay = null;
@@ -203,58 +210,97 @@ async function renderDeckList() {
 
 // ---- Generación con el LLM ---------------------------------------------------
 
-// Pasajes del alcance elegido, con encabezados de capítulo y su marcador [[aN]]
-// delante (P10 F2: la tarjeta guarda su ancla de origen → "ver en el libro" al
-// repasar; cuesta ~5% de tokens). Libro entero: round-robin por capítulo para
-// cubrirlo uniformemente (no solo el principio) hasta el presupuesto.
-function gatherPassages(scopeLabel) {
+// Pasajes del alcance elegido, en orden de lectura. Capítulo: ENTERO (el troceo permite
+// cubrirlo completo). Libro entero: round-robin por capítulo hasta BOOK_TOKENS.
+function gatherScope(scopeLabel) {
   ctx.ensureIndex();
-  let picked;
-  if (scopeLabel) {
-    picked = cap(Retrieval.passagesByChapter(scopeLabel), CHAPTER_TOKENS);
-  } else {
-    const byChapter = new Map();
-    for (const p of Retrieval.allPassages()) {
-      const k = p.chapter || '';
-      if (!byChapter.has(k)) byChapter.set(k, []);
-      byChapter.get(k).push(p);
-    }
-    const lists = [...byChapter.values()];
-    picked = []; let used = 0, added = true;
-    for (let i = 0; added && used < BOOK_TOKENS; i++) {
-      added = false;
-      for (const list of lists) {
-        const p = list[i];
-        if (!p) continue;
-        const t = estimateTokens(p.text) + 4;
-        if (used + t > BOOK_TOKENS) continue;
-        picked.push(p); used += t; added = true;
-      }
-    }
-    picked.sort((a, b) => Retrieval.anchorNum(a.id) - Retrieval.anchorNum(b.id));
+  if (scopeLabel) return Retrieval.passagesByChapter(scopeLabel);
+  const byChapter = new Map();
+  for (const p of Retrieval.allPassages()) {
+    const k = p.chapter || '';
+    if (!byChapter.has(k)) byChapter.set(k, []);
+    byChapter.get(k).push(p);
   }
-  const out = [];
-  let curCh = null;
-  for (const p of picked) {
-    if (p.chapter && p.chapter !== curCh) { out.push(`\n## ${p.chapter}`); curCh = p.chapter; }
-    out.push(`[[${p.id}]] ${p.text}`);
+  const lists = [...byChapter.values()];
+  const picked = []; let used = 0, added = true;
+  for (let i = 0; added && used < BOOK_TOKENS; i++) {
+    added = false;
+    for (const list of lists) {
+      const p = list[i];
+      if (!p) continue;
+      const t = estimateTokens(p.text) + 4;
+      if (used + t > BOOK_TOKENS) continue;
+      picked.push(p); used += t; added = true;
+    }
   }
-  return out.join('\n').trim();
+  return picked.sort((a, b) => Retrieval.anchorNum(a.id) - Retrieval.anchorNum(b.id));
 }
 
-function cap(list, maxTokens) {
-  const out = []; let used = 0;
-  for (const p of list) { const t = estimateTokens(p.text) + 4; if (used + t > maxTokens) break; out.push(p); used += t; }
-  return out;
+// Trozos de ~chunkTokens con el texto anotado (encabezados ## + marcadores [[aN]], que
+// alimentan el "src" de P10 F2). Pura (recibe pasajes) para poder testearla. Un capítulo
+// mayor que el trozo se parte; al continuar en el trozo siguiente se repite su encabezado.
+export function buildChunks(passages, chunkTokens = CHUNK_TOKENS) {
+  const chunks = [];
+  let lines = [], tokens = 0, curCh = undefined;
+  const flush = () => {
+    if (lines.length) chunks.push({ text: lines.join('\n').trim(), tokens });
+    lines = []; tokens = 0; curCh = undefined;
+  };
+  for (const p of passages || []) {
+    const t = estimateTokens(p.text) + 4;
+    if (tokens && tokens + t > chunkTokens) flush();
+    if (p.chapter !== curCh) {
+      if (p.chapter) lines.push(`\n## ${p.chapter}`);
+      curCh = p.chapter;
+    }
+    lines.push(`[[${p.id}]] ${p.text}`);
+    tokens += t;
+  }
+  flush();
+  return chunks;
 }
 
-function cardsPrompt(count, type, goal) {
+// Reparte el total de tarjetas entre trozos, proporcional a su tamaño y con suma EXACTA
+// (resto mayor / Hamilton). Si hay más trozos que tarjetas, 1 a los más grandes y 0 al
+// resto (los trozos a 0 no generan llamada). Pura, testeable.
+export function allocateCounts(chunks, total) {
+  const n = (chunks || []).length;
+  if (!n || total <= 0) return (chunks || []).map(() => 0);
+  if (total < n) {
+    const counts = chunks.map(() => 0);
+    [...chunks.keys()].sort((a, b) => chunks[b].tokens - chunks[a].tokens)
+      .slice(0, total).forEach(i => { counts[i] = 1; });
+    return counts;
+  }
+  const rest = total - n;                                   // mínimo 1 por trozo
+  const totalTokens = chunks.reduce((s, c) => s + c.tokens, 0) || 1;
+  const quotas = chunks.map(c => rest * c.tokens / totalTokens);
+  const counts = quotas.map(q => 1 + Math.floor(q));
+  let left = total - counts.reduce((s, x) => s + x, 0);
+  const order = quotas.map((q, i) => [q - Math.floor(q), i]).sort((a, b) => b[0] - a[0]);
+  for (const [, i] of order) { if (left <= 0) break; counts[i]++; left--; }
+  return counts;
+}
+
+function cardsPrompt(count, type, goal, { viaTool = false, prevFronts = [] } = {}) {
   const shape = type === 'cloze'
     ? `- "front": una frase con el dato CLAVE oculto en sintaxis cloze de Anki: {{c1::texto oculto}}
   (máximo 2 huecos por tarjeta, {{c1::..}} y {{c2::..}}). Oculta términos/datos importantes, no palabras triviales.
 - "back": aclaración o contexto extra, opcional (puede ser "").`
     : `- "front": una pregunta clara y AUTOCONTENIDA (se entiende sin tener el libro delante).
 - "back": la respuesta, concisa (1-3 frases).`;
+  // Entrega: por herramienta (salida con forma garantizada) o como texto JSON (fallback
+  // para proveedores BYOK sin function calling).
+  const format = viaTool
+    ? `ENTREGA (obligatorio): llama a la herramienta "create_flashcards" con el parámetro "cards".
+Cada tarjeta es {"front": "...", "back": "...", "chapter": "...", "src": "..."}:`
+    : `FORMATO (obligatorio): responde SOLO con un array JSON válido, sin markdown ni texto alrededor.
+Cada tarjeta es {"front": "...", "back": "...", "chapter": "...", "src": "..."}:`;
+  // Anti-duplicados entre trozos: los frentes ya generados en trozos anteriores.
+  const dedup = prevFronts.length ? `
+
+YA EXISTEN estas tarjetas de otros pasajes del libro (NO repitas su contenido):
+${prevFronts.map(f => '- ' + f).join('\n')}` : '';
   return `Eres un experto en repetición espaciada creando flashcards de Anki de máxima calidad a partir de pasajes de un libro.
 
 REGLAS DE CALIDAD (obligatorias):
@@ -265,31 +311,53 @@ REGLAS DE CALIDAD (obligatorias):
 - Escribe las tarjetas EN EL MISMO IDIOMA que los pasajes.${goal ? `
 - Cuando sea posible, alinéalas al objetivo del lector: «${goal}».` : ''}
 
-FORMATO (obligatorio): responde SOLO con un array JSON válido, sin markdown ni texto alrededor.
-Cada tarjeta es {"front": "...", "back": "...", "chapter": "...", "src": "..."}:
+${format}
 ${shape}
 - "chapter": el encabezado ## del pasaje de origen, o "" si no lo hay.
-- "src": el marcador [[aN]] del pasaje del que sale la tarjeta, solo el id (p. ej. "a42"), o "" si dudas.
+- "src": el marcador [[aN]] del pasaje del que sale la tarjeta, solo el id (p. ej. "a42"), o "" si dudas.${dedup}
 
-Genera EXACTAMENTE ${count} tarjetas (menos SOLO si el material no da para más).`;
+Genera EXACTAMENTE ${count} tarjetas de los pasajes dados (menos SOLO si el material no da para más).`;
 }
 
-// Extrae las tarjetas de la respuesta del modelo. Tolerante por diseño (como parseExpansion
-// de IA7): no busca el array con indexOf('[')/lastIndexOf(']') —frágil ahora que el prompt y
-// los pasajes llevan marcadores [[aN]], y que un modelo reasoning envuelve el JSON en prosa o
-// <think>—, sino que extrae los OBJETOS balanceados `{...}` y se queda con los que tienen un
-// "front" de texto. Así ignora las llaves del razonamiento y SALVA una respuesta truncada
-// (cada objeto completo cuenta; solo se pierde la cola incompleta). Nunca lanza: [] = nada.
-export function parseCards(raw, type) {
-  const text = String(raw || '')
-    .replace(/```(?:json)?/gi, '')
-    .replace(/<think>[\s\S]*?<\/think>/gi, ' ');   // descarta el razonamiento inline
+// Schema de la herramienta: el modelo entrega las tarjetas como ARGUMENTOS con forma
+// garantizada (function calling) en vez de prosa que parsear. nan/DeepSeek emite
+// tool_calls fiables sin streaming (spike E5); el razonamiento queda interno.
+function cardsTool() {
+  return [{
+    type: 'function',
+    function: {
+      name: 'create_flashcards',
+      description: 'Entrega las flashcards generadas a partir de los pasajes del libro.',
+      parameters: {
+        type: 'object',
+        properties: {
+          cards: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                front: { type: 'string', description: 'Pregunta autocontenida (o frase cloze con {{c1::...}})' },
+                back: { type: 'string', description: 'Respuesta concisa (o aclaración extra, en cloze)' },
+                chapter: { type: 'string', description: 'Encabezado ## del pasaje de origen, o ""' },
+                src: { type: 'string', description: 'Id del marcador [[aN]] del pasaje de origen (p. ej. "a42"), o ""' },
+              },
+              required: ['front', 'back'],
+            },
+          },
+        },
+        required: ['cards'],
+      },
+    },
+  }];
+}
+
+// Normaliza tarjetas crudas (de los argumentos de la herramienta o del texto parseado):
+// descarta lo que no tenga "front", limpia campos y valida la forma del "src" ("a42" o
+// "[[a42]]"; su existencia real la comprueba attachSources).
+export function sanitizeCards(arr, type) {
   const out = [];
-  for (const chunk of balancedObjects(text)) {
-    let c;
-    try { c = JSON.parse(chunk); } catch { continue; }   // objeto incompleto/roto → se ignora
-    if (!c || typeof c.front !== 'string' || !c.front.trim()) continue;   // no es una tarjeta
-    // src: acepta "a42" o "[[a42]]"; cualquier otra cosa se descarta (se valida después).
+  for (const c of Array.isArray(arr) ? arr : []) {
+    if (!c || typeof c.front !== 'string' || !c.front.trim()) continue;
     const src = typeof c.src === 'string' ? (c.src.match(/^\[*\s*(a\d+)\s*\]*$/) || [])[1] || '' : '';
     out.push({
       type,
@@ -300,6 +368,23 @@ export function parseCards(raw, type) {
     });
   }
   return out;
+}
+
+// Extrae las tarjetas de una respuesta de TEXTO (fallback sin function calling). Tolerante
+// por diseño (como parseExpansion de IA7): no busca el array con indexOf('[') —frágil con
+// los marcadores [[aN]] y con modelos reasoning que envuelven el JSON en prosa o <think>—,
+// sino que extrae los OBJETOS balanceados `{...}` con "front". Así ignora las llaves del
+// razonamiento y SALVA una respuesta truncada (cada objeto completo cuenta; solo se pierde
+// la cola incompleta). Nunca lanza: [] = nada.
+export function parseCards(raw, type) {
+  const text = String(raw || '')
+    .replace(/```(?:json)?/gi, '')
+    .replace(/<think>[\s\S]*?<\/think>/gi, ' ');   // descarta el razonamiento inline
+  const objs = [];
+  for (const chunk of balancedObjects(text)) {
+    try { objs.push(JSON.parse(chunk)); } catch { /* objeto incompleto/roto → se ignora */ }
+  }
+  return sanitizeCards(objs, type);
 }
 
 // P10 F2 — asegura el ancla de origen de cada tarjeta: si el modelo no dio "src" (o dio
@@ -315,6 +400,57 @@ export function attachSources(cards, { validIds, search }) {
   });
 }
 
+// Genera las tarjetas de UN trozo con una escalera de robustez:
+//   1) function calling FORZADO — la salida son argumentos con schema, no prosa que parsear;
+//   2) reparación: tools en 'auto' + recordatorio (proveedores que rechazan tool_choice
+//      forzado o que respondieron sin llamar a la herramienta);
+//   3) fallback a texto + parser tolerante (proveedores BYOK sin function calling).
+// Devuelve { cards, mode } con el escalón que funcionó: los trozos siguientes entran
+// directos por ahí (no se re-prueba un camino roto en cada trozo).
+async function generateChunk({ text, ask, type, prevFronts, mode, signal }) {
+  const user = { role: 'user', content: 'PASAJES DEL LIBRO:\n\n' + text };
+  // Cupo holgado por trozo: la salida es pequeña (≤ ask tarjetas) pero el razonamiento
+  // de un modelo reasoning consume el mismo cupo.
+  const maxTokens = Math.min(8192, 1500 + ask * 220);
+
+  // null = el modelo NO llamó a la herramienta (proveedor/camino roto → seguir la escalera);
+  // array (incluso vacío) = llamada válida — [] significa "este trozo no da más tarjetas"
+  // (p. ej. todo duplicado de trozos previos) y NO es un fallo: el déficit lo compensan
+  // los trozos siguientes.
+  const attempt = async (toolChoice, extra = []) => {
+    const { toolCalls } = await LLM.chatTools({
+      messages: [
+        { role: 'system', content: cardsPrompt(ask, type, ctx.goal, { viaTool: true, prevFronts }) },
+        user, ...extra,
+      ],
+      tools: cardsTool(), toolChoice, maxTokens, signal,
+    });
+    const call = toolCalls.find(t => t.name === 'create_flashcards');
+    return call ? sanitizeCards(call.args?.cards, type) : null;
+  };
+
+  if (mode !== 'text') {
+    if (mode !== 'auto') {
+      try {
+        const cards = await attempt({ type: 'function', function: { name: 'create_flashcards' } });
+        if (cards) return { cards, mode: 'forced' };
+      } catch (e) { if (e.name === 'AbortError') throw e; }
+    }
+    try {
+      const cards = await attempt('auto', [{
+        role: 'user',
+        content: 'Recuerda: entrega las tarjetas llamando a la herramienta "create_flashcards" con el parámetro "cards".',
+      }]);
+      if (cards) return { cards, mode: 'auto' };
+    } catch (e) { if (e.name === 'AbortError') throw e; }
+  }
+  const raw = await LLM.chatStream({
+    messages: [{ role: 'system', content: cardsPrompt(ask, type, ctx.goal, { prevFronts }) }, user],
+    maxTokens, signal,
+  });
+  return { cards: parseCards(raw, type), mode: 'text' };
+}
+
 async function onGenerate() {
   if (generating) return;
   const b = body();
@@ -323,8 +459,9 @@ async function onGenerate() {
   const type = b.querySelector('input[name="fc-type"]:checked').value;
   const count = parseInt(b.querySelector('#fc-count').value, 10);
 
-  const passages = gatherPassages(scopeLabel);
-  if (!passages) { showError('Ese contenido no tiene texto indexado; prueba con otro capítulo o con el libro entero.'); return; }
+  const chunks = buildChunks(gatherScope(scopeLabel));
+  if (!chunks.length) { showError('Ese contenido no tiene texto indexado; prueba con otro capítulo o con el libro entero.'); return; }
+  const counts = allocateCounts(chunks, count);
 
   generating = true; abortCtrl = new AbortController();
   const btn = b.querySelector('#fc-generate');
@@ -332,39 +469,31 @@ async function onGenerate() {
   btn.innerHTML = `<span class="ai-typing">Generando tarjetas…</span>`;
   showError('');
   try {
-    // Presupuesto de tokens escalado al nº de tarjetas: el modelo por defecto es reasoning
-    // y su razonamiento consume el mismo cupo que la salida; con el tope global (4096) el
-    // array se cortaba —a veces antes del primer '['— y saltaba "JSON no encontrado".
-    let acc = '', reasoning = '', truncated = false;
-    const raw = await LLM.chatStream({
-      messages: [
-        { role: 'system', content: cardsPrompt(count, type, ctx.goal) },
-        { role: 'user', content: 'PASAJES DEL LIBRO:\n\n' + passages },
-      ],
-      maxTokens: Math.min(8192, 2500 + count * 220),
-      signal: abortCtrl.signal,
-      onToken: (t) => {
-        acc += t;
-        const n = (acc.match(/"front"/g) || []).length;
-        if (n && overlay) btn.innerHTML = `<span class="ai-typing">Generando… ${Math.min(n, count)}/${count}</span>`;
-      },
-      onReasoning: (t) => { reasoning += t; },     // algunos modelos vuelcan el JSON aquí
-      onDone: ({ truncated: cut }) => { truncated = cut; },
-    });
-    if (!overlay) return;                       // el usuario cerró el modal: no seguir
-    // Rescata también del canal de razonamiento (por si el content vino vacío) y salva las
-    // tarjetas completas de una respuesta truncada.
-    let cards = parseCards(raw || acc, type);
-    if (!cards.length) cards = parseCards(reasoning, type);
-    if (!cards.length) {
-      throw new Error(truncated
-        ? 'La respuesta se cortó antes de completar ninguna tarjeta. Prueba con menos tarjetas.'
-        : 'El modelo no devolvió tarjetas válidas. Vuelve a intentarlo.');
+    // Map-reduce sobre los trozos: cada uno aporta su cupo (+ el déficit arrastrado de
+    // trozos anteriores que dieron de menos). Un trozo fallido no tira el mazo.
+    let cards = [], expected = 0, failed = 0, mode = 'forced';
+    for (let i = 0; i < chunks.length; i++) {
+      if (!counts[i]) continue;
+      const deficit = Math.max(0, expected - cards.length);
+      expected += counts[i];
+      try {
+        const res = await generateChunk({
+          text: chunks[i].text, ask: counts[i] + deficit, type,
+          prevFronts: cards.slice(-MAX_PREV_FRONTS).map(c => c.front),
+          mode, signal: abortCtrl.signal,
+        });
+        mode = res.mode;
+        cards = cards.concat(res.cards.slice(0, counts[i] + deficit));
+      } catch (e) {
+        if (e.name === 'AbortError') throw e;
+        console.warn(`Flashcards: el trozo ${i + 1}/${chunks.length} falló:`, e);
+        failed++;
+      }
+      if (!overlay) return;                     // el usuario cerró el modal: no seguir
+      btn.innerHTML = `<span class="ai-typing">Generando… ${Math.min(cards.length, count)}/${count}</span>`;
     }
-    if (truncated && overlay) {                 // truncada pero con tarjetas: avisa, no descarta
-      showError(`La respuesta se cortó: se recuperaron ${cards.length} de ${count} tarjetas.`);
-    }
-    cards = attachSources(cards, {
+    if (!cards.length) throw new Error('El modelo no devolvió tarjetas válidas. Vuelve a intentarlo.');
+    cards = attachSources(cards.slice(0, count), {
       validIds: new Set(Retrieval.allPassages().map(p => p.id)),
       search: (q, k) => Retrieval.search(q, k),
     });
@@ -375,6 +504,9 @@ async function onGenerate() {
     if (ctx.bookId) deck.id = await DB.addDeck(deck);
     deck.createdAt = deck.createdAt || Date.now();
     renderReview(deck);
+    if (cards.length < count) {                 // éxito parcial: avisa en la revisión, no descarta
+      showError(`Se generaron ${cards.length} de ${count} tarjetas${failed ? ` (fallaron ${failed} de ${chunks.length} bloques)` : ''}.`);
+    }
   } catch (e) {
     if (e.name !== 'AbortError') {
       console.error('Generación de flashcards falló:', e);

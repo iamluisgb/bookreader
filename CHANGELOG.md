@@ -5,6 +5,29 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-08 — Flashcards: generación por trozos con function calling (map-reduce)
+
+Rediseño del pipeline de generación al patrón profesional **restringir > presupuestar >
+validar > degradar** (la iteración anterior solo endurecía el parser):
+- **Troceo de entrada** ([`buildChunks`](js/ai/flashcards.js), pura): el material se divide en
+  trozos de ~10k tokens y cada llamada produce SOLO las tarjetas de su trozo, con **cupo
+  proporcional de suma exacta** (`allocateCounts`, resto mayor) y arrastre de déficit. El
+  truncado se vuelve **imposible por diseño** (entrada y salida acotadas — clave con modelos
+  reasoning), hay éxito parcial (un trozo fallido no tira el mazo, se avisa) y el progreso es
+  real. Además el **capítulo ahora se cubre ENTERO** (antes se cortaba a 12k tokens); el libro
+  entero mantiene su muestra de 40k (coste acotado).
+- **Function calling en vez de JSON-en-prosa**: las tarjetas llegan como argumentos del tool
+  `create_flashcards` con schema (reusa `chatTools`, fiable en nan/DeepSeek sin streaming —
+  spike E5). **Escalera de robustez** por trozo: tool forzado → tools `auto` + recordatorio →
+  fallback a texto con el parser tolerante (proveedores BYOK sin tools); el escalón que
+  funciona se recuerda para los trozos siguientes. Un tool_call con `cards:[]` es válido
+  ("este trozo no da más"), no un fallo.
+- **Anti-duplicados entre trozos**: cada llamada recibe los frentes ya generados.
+- **Verificado en vivo** (DDIA real, API nan): 2 trozos × tool forzado → 15/15 tarjetas, sin
+  tocar el fallback.
+
+---
+
 ## 2026-07-08 — Fix · Flashcards: "JSON no encontrado" con modelos reasoning
 
 El modelo por defecto (`deepseek-v4-flash`) es *reasoning* y su razonamiento consume el mismo
