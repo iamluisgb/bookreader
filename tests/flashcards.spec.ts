@@ -196,6 +196,20 @@ test('los mazos persisten y se pueden reabrir desde el modal', async ({ page }) 
   await expect(page.locator('.fc-item')).toHaveCount(3);
 });
 
+// Regresión: generar un SEGUNDO mazo tras "Volver" desde la revisión del primero (la
+// reentrada del modal no debe romperse; se comprobó que el fallo real era del modelo
+// reasoning truncando por tokens, no de esta lógica).
+test('dos mazos seguidos: Volver desde la revisión y generar otra vez', async ({ page }) => {
+  await setup(page);
+  await generate(page);
+  await expect(page.locator('.fc-item')).toHaveCount(3);
+  await page.locator('#ai-flashcards .ai-ob-back').first().click();   // Volver al setup
+  await page.waitForSelector('#fc-generate');
+  await page.click('#fc-generate');                                    // segundo mazo
+  await expect(page.locator('#ai-flashcards h2')).toContainText('tarjetas', { timeout: 15000 });
+  await expect(page.locator('.fc-item')).toHaveCount(3);
+});
+
 // ---- P10 F2 · Fuente citada: cada tarjeta guarda su ancla [[aN]] de origen ----
 
 test('parseCards extrae src y attachSources valida o repesca por BM25', async ({ page }) => {
