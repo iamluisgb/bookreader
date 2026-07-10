@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <!-- CSP. La protección clave es 'script-src self' (libs vendorizadas): bloquea JS
+       inyectado, que es lo que protege la API key en localStorage. 'wasm-unsafe-eval'
+       solo permite COMPILAR WebAssembly de mismo origen (sql.js, para el export .apkg
+       de flashcards); NO habilita eval() de JS. 'connect-src' se abre
+       a cualquier HTTPS (además de 'self' y blob:) porque el proveedor del LLM es
+       configurable por el usuario (BYOK, Ajustes → Agente); como no hay scripts
+       inyectables, la key no es exfiltrable a otro host. Estilos/fuentes/imágenes se
+       dejan permisivos (recursos pasivos) para que los EPUB rendericen fieles. Ver CHANGELOG (T2, TEC3). -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline' blob: https:; font-src 'self' data: https:; img-src 'self' data: blob: https:; connect-src 'self' blob: https:; worker-src 'self' blob:; frame-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'none'">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>BookReader</title>
+  <link rel="stylesheet" href="css/fonts.css">
+  <link rel="stylesheet" href="css/themes.css">
+  <link rel="stylesheet" href="css/main.css">
+  <link rel="stylesheet" href="css/reader.css">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" id="meta-theme-color" content="#fbfbfd">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="BookReader">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="icon" type="image/svg+xml" href="icons/icon.svg">
+</head>
+<body>
+  <!-- Sidebar -->
+  <aside id="sidebar" class="sidebar">
+    <div class="sidebar-header">
+      <h2>BookReader</h2>
+      <button id="sidebar-close" class="icon-btn" aria-label="Cerrar sidebar" data-icon="xmark"></button>
+    </div>
+
+    <!-- Tabs -->
+    <div class="sidebar-tabs">
+      <button class="tab-btn active" data-tab="contents">Contenido</button>
+      <button class="tab-btn" data-tab="search">Buscar</button>
+      <button class="tab-btn" data-tab="bookmarks">Marcadores</button>
+      <button class="tab-btn" data-tab="highlights">Subrayados</button>
+      <button class="tab-btn" data-tab="settings">Ajustes</button>
+    </div>
+
+    <!-- Tab: Search -->
+    <div id="tab-search" class="tab-content">
+      <div class="search-box">
+        <input id="search-input" class="search-input" type="search" placeholder="Buscar en el libro…" autocomplete="off" spellcheck="false" />
+      </div>
+      <div id="search-results" class="search-results"></div>
+    </div>
+
+    <!-- Tab: Contents -->
+    <div id="tab-contents" class="tab-content active">
+      <div id="toc-list" class="toc-list">
+        <p class="empty-state">Abre un libro para ver el índice</p>
+      </div>
+    </div>
+
+    <!-- Tab: Bookmarks -->
+    <div id="tab-bookmarks" class="tab-content">
+      <div id="bookmarks-list" class="bookmarks-list">
+        <p class="empty-state">No hay marcadores aún</p>
+      </div>
+    </div>
+
+    <!-- Tab: Highlights -->
+    <div id="tab-highlights" class="tab-content">
+      <div class="highlights-header">
+        <button id="export-highlights-btn" class="export-btn" disabled><span class="btn-icon" data-icon="share" data-icon-size="17"></span>Exportar JSON</button>
+      </div>
+      <div id="highlights-list" class="highlights-list">
+        <p class="empty-state">No hay subrayados aún</p>
+      </div>
+    </div>
+
+    <!-- Tab: Settings -->
+    <div id="tab-settings" class="tab-content">
+      <div class="settings-group">
+        <label>Tema</label>
+        <div class="theme-selector">
+          <button class="theme-btn theme-swatch swatch-system" data-theme="system" title="Auto (sistema)" aria-label="Auto (sistema)"></button>
+          <button class="theme-btn theme-swatch swatch-light" data-theme="light" title="Claro" aria-label="Claro"></button>
+          <button class="theme-btn theme-swatch swatch-sepia" data-theme="sepia" title="Sepia" aria-label="Sepia"></button>
+          <button class="theme-btn theme-swatch swatch-dark" data-theme="dark" title="Oscuro" aria-label="Oscuro"></button>
+        </div>
+      </div>
+
+      <div class="settings-group">
+        <label>Brillo</label>
+        <div class="slider-control">
+          <span class="slider-ico" data-icon="sun" data-icon-size="16"></span>
+          <input type="range" id="brightness" min="0.35" max="1" value="1" step="0.05">
+          <span id="brightness-value" class="slider-value">100%</span>
+        </div>
+      </div>
+
+      <div class="settings-group">
+        <label>Luz nocturna</label>
+        <div class="slider-control">
+          <span class="slider-ico" data-icon="moon" data-icon-size="16"></span>
+          <input type="range" id="night-light" min="0" max="1" value="0" step="0.05">
+          <span id="night-light-value" class="slider-value">0%</span>
+        </div>
+      </div>
+
+      <div class="settings-group">
+        <label>Tamaño de fuente</label>
+        <div class="font-size-control">
+          <button id="font-decrease" class="icon-btn">A-</button>
+          <span id="font-size-value">16px</span>
+          <button id="font-increase" class="icon-btn">A+</button>
+        </div>
+      </div>
+
+      <div class="settings-group">
+        <label>Fuente</label>
+        <select id="font-family-select">
+          <option value="serif">Serif</option>
+          <option value="source-serif">Source Serif 4</option>
+          <option value="sans-serif">Sans-serif</option>
+          <option value="monospace">Monospace</option>
+        </select>
+      </div>
+
+      <div class="settings-group">
+        <label>Ancho de columna</label>
+        <div class="column-width-control">
+          <input type="range" id="column-width" min="480" max="1120" value="720" step="40">
+          <span id="column-width-value">720px</span>
+        </div>
+      </div>
+
+      <div class="settings-group">
+        <label>Espaciado de líneas</label>
+        <div class="line-height-control">
+          <input type="range" id="line-height" min="1.2" max="2.2" value="1.6" step="0.1">
+          <span id="line-height-value">1.6</span>
+        </div>
+      </div>
+
+      <div class="settings-group">
+        <label>Modo de lectura</label>
+        <div class="reading-mode-selector">
+          <button class="reading-mode-btn active" data-mode="paginated">Páginas</button>
+          <button class="reading-mode-btn" data-mode="scroll">Scroll</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pie: acceso a ajustes generales (config global de la app, no de lectura) -->
+    <div class="sidebar-footer">
+      <button id="open-app-settings" class="sidebar-footer-btn">
+        <span data-icon="gear" data-icon-size="17"></span>Ajustes generales
+      </button>
+    </div>
+  </aside>
+
+  <!-- Main reader area -->
+  <main id="reader-main" class="reader-main">
+    <!-- Top bar -->
+    <header id="reader-header" class="reader-header">
+      <button id="library-btn" class="icon-btn brand-btn" aria-label="Volver a la biblioteca" data-tip="Biblioteca" data-tip-align="left" data-icon="logo" style="display:none;"></button>
+      <button id="sidebar-toggle" class="icon-btn" aria-label="Abrir sidebar" data-tip="Panel" data-tip-align="left" data-icon="panel-left"></button>
+      <div id="reader-title" class="reader-title">BookReader</div>
+      <div class="header-actions">
+        <button id="immersive-toggle" class="icon-btn" aria-label="Modo lectura" data-tip="Modo lectura" data-icon="expand" disabled></button>
+        <button id="header-search" class="icon-btn" aria-label="Buscar en el libro" data-tip="Buscar" data-icon="search" disabled></button>
+        <button id="ai-toggle" class="icon-btn" aria-label="Agente de IA" data-tip="Agente de IA" data-icon="sparkles" disabled></button>
+        <button id="bookmark-toggle" class="icon-btn" aria-label="Marcar página" data-tip="Marcar página" data-tip-align="right" data-icon="bookmark" disabled></button>
+      </div>
+    </header>
+
+    <!-- Reader viewport -->
+    <div id="reader-viewport" class="reader-viewport">
+      <!-- Landing screen -->
+      <div id="landing" class="landing">
+        <div class="landing-content">
+          <div class="landing-icon">
+            <svg viewBox="0 0 512 512" width="72" height="72" fill="none" stroke="var(--accent)" stroke-linejoin="round" stroke-linecap="round" aria-hidden="true">
+              <path d="M166 116 L300 116 L364 180 L364 378 Q364 396 346 396 L166 396 Q148 396 148 378 L148 134 Q148 116 166 116 Z" stroke-width="18"/>
+              <path d="M300 116 L300 180 L364 180" stroke-width="18"/>
+              <path d="M210 224 L250 256 L210 288" stroke-width="22"/>
+              <path d="M268 288 L308 288" stroke-width="22"/>
+            </svg>
+          </div>
+          <h1>BookReader</h1>
+          <p>Lector de EPUB y PDF</p>
+          <button id="open-file-btn" class="primary-btn">Abrir archivo</button>
+          <p class="landing-hint">o arrastra un archivo aquí</p>
+          <input type="file" id="file-input" accept=".epub,.pdf" hidden>
+        </div>
+      </div>
+
+      <!-- Library (home) -->
+      <div id="library" class="library" style="display:none;"></div>
+
+      <!-- EPUB container -->
+      <div id="epub-container" class="epub-container" style="display:none;"></div>
+
+      <!-- PDF container -->
+      <div id="pdf-container" class="pdf-container" style="display:none;">
+        <canvas id="pdf-canvas"></canvas>
+      </div>
+    </div>
+
+    <!-- Bottom bar: navigation + progreso (página · % · tiempo restante) -->
+    <footer id="reader-footer" class="reader-footer" style="display:none;">
+      <button id="prev-btn" class="nav-btn" aria-label="Página anterior" data-icon="chevron-left"></button>
+      <div class="progress-wrap">
+        <div class="progress-info">
+          <span id="progress-page" class="progress-page">—</span>
+          <span id="progress-text" class="progress-text">0%</span>
+          <span id="progress-time" class="progress-time" title="Tiempo de lectura restante"></span>
+        </div>
+        <div id="progress-container" class="progress-container" title="Pulsa para saltar a esa parte del libro">
+          <div id="progress-bar" class="progress-bar"></div>
+        </div>
+      </div>
+      <button id="next-btn" class="nav-btn" aria-label="Página siguiente" data-icon="chevron-right"></button>
+    </footer>
+  </main>
+
+  <!-- Filtros de pantalla (brillo / luz nocturna), tipo Play Books. No capturan eventos. -->
+  <div id="night-warm" class="screen-filter"></div>
+  <div id="screen-dim" class="screen-filter"></div>
+
+  <!-- Backdrop para drawers en pantallas pequeñas -->
+  <div id="scrim" class="scrim"></div>
+
+  <!-- AI agent panel -->
+  <aside id="ai-panel" class="ai-panel"></aside>
+
+  <!-- FAB del agente (solo móvil) -->
+  <button id="ai-fab" class="ai-fab" aria-label="Abrir agente" title="Agente" data-icon="sparkles" data-icon-size="26"></button>
+
+  <!-- Highlight tooltip -->
+  <div id="highlight-tooltip" class="sel-toolbar" style="display:none;">
+    <button id="sel-ask" class="sel-ask"><span class="sel-ask-ico" data-icon="sparkles" data-icon-size="18"></span>Preguntar al agente</button>
+    <div class="sel-row">
+      <div class="sel-colors">
+        <button class="highlight-color" data-color="#ffd54f" style="background:#ffd54f;" title="Amarillo"></button>
+        <button class="highlight-color" data-color="#81c784" style="background:#81c784;" title="Verde"></button>
+        <button class="highlight-color" data-color="#64b5f6" style="background:#64b5f6;" title="Azul"></button>
+        <button class="highlight-color" data-color="#f06292" style="background:#f06292;" title="Rosa"></button>
+      </div>
+      <button id="sel-note" class="sel-act"><span data-icon="note" data-icon-size="17"></span>Nota</button>
+      <button id="sel-copy" class="sel-act"><span data-icon="copy" data-icon-size="17"></span>Copiar</button>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <!-- Libs vendorizadas (mismo origen): sin dependencia de CDN, funcionan offline
+       y permiten una CSP estricta (script-src 'self'). Ver CHANGELOG (T1/T2/T6). -->
+  <script src="vendor/jszip-3.10.1.min.js"></script>
+  <script src="vendor/epub-0.3.93.min.js"></script>
+  <script src="vendor/pdf-3.11.174.min.js"></script>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

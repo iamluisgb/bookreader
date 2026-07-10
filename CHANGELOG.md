@@ -5,6 +5,20 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-09 — Reorganización de URLs: landing en la raíz, app en /app/
+
+El landing pasa a ser la portada (`/bookreader/`) y la app se muda a `/bookreader/app/`.
+Como toda la app usa **rutas relativas** (`js/…`, `sw.js`, manifest `start_url: "."`), el
+árbol se movió a `app/` sin tocar una sola ruta interna; solo se ajustaron los ficheros que
+nombran `js/`/`sw.js` (eslint, `package.json`, `playwright.config.ts` sirve `app/` como raíz).
+- Datos del usuario **intactos**: IndexedDB/localStorage son por-origen, no por-ruta.
+- **SW auto-destructor** en la raíz (`sw.js`): los clientes que instalaron la app cuando vivía
+  en `/bookreader/` limpian su registro y cachés viejas (sin tocar IndexedDB) y recargan al
+  landing. La app nueva registra su propio SW con scope `/bookreader/app/` (CACHE `v60`).
+- El landing referencia las fuentes/iconos de la app (`app/fonts`, `app/icons`) y su CTA lleva a `app/`.
+
+---
+
 ## 2026-07-08 — Flashcards: generación por trozos con function calling (map-reduce)
 
 Rediseño del pipeline de generación al patrón profesional **restringir > presupuestar >

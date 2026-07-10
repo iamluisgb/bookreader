@@ -20,7 +20,9 @@ export default defineConfig({
     headless: true,
   },
   webServer: {
-    command: 'python3 -m http.server 8888',
+    // La app vive en app/; se sirve como raíz para que los tests sigan usando
+    // rutas absolutas (/index.html, /js/…) sin cambios tras la reorganización.
+    command: 'python3 -m http.server 8888 --directory app',
     port: 8888,
     reuseExistingServer: true,
   },

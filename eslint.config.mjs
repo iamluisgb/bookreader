@@ -6,11 +6,11 @@ import globals from 'globals';
 
 export default [
   {
-    ignores: ['vendor/**', 'node_modules/**', 'test-results/**', 'playwright-report/**'],
+    ignores: ['app/vendor/**', 'node_modules/**', 'test-results/**', 'playwright-report/**'],
   },
   js.configs.recommended,
   {
-    files: ['js/**/*.js'],
+    files: ['app/js/**/*.js'],
     languageOptions: {
       ecmaVersion: 2022,
       sourceType: 'module',
@@ -27,7 +27,7 @@ export default [
     },
   },
   {
-    files: ['sw.js'],
+    files: ['sw.js', 'app/sw.js'],
     languageOptions: {
       ecmaVersion: 2022,
       sourceType: 'script',

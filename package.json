@@ -12,7 +12,7 @@
   "scripts": {
     "test": "playwright test --grep-invert @live",
     "test:ai": "playwright test --grep @live",
-    "lint": "eslint js sw.js",
+    "lint": "eslint app/js app/sw.js sw.js",
     "format": "prettier --write \"**/*.{js,css,html,json,md}\"",
     "format:check": "prettier --check \"**/*.{js,css,html,json,md}\""
   },

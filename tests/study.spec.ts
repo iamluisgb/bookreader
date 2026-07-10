@@ -1,4 +1,6 @@
 import { test, expect } from '@playwright/test';
+import fs from 'fs';
+import path from 'path';
 
 // P10 · Modo Estudiar — E2E determinista (sin LLM): siembra un mazo en IndexedDB y un
 // libro en la biblioteca, y recorre el bucle completo: chip "Repasar hoy" en la
@@ -113,12 +115,14 @@ test('la cola diaria une mazos y el botón Estudiar del modal muestra el badge d
 // ---- P10 F2 · "Ver en el libro": salto a la fuente vía deep-link del router ----
 
 test('al voltear, "Ver en el libro" abre el libro de origen por deep-link', async ({ page }) => {
+  // El fixture se inyecta desde Node (el server sirve app/, no la carpeta tests/).
+  const epubBytes = Array.from(fs.readFileSync(path.join(__dirname, 'test.epub')));
   await page.goto('/index.html');
-  await page.evaluate(async () => {
+  await page.evaluate(async (bytes) => {
     const DB: any = await import('/js/ai/db.js');
     const Lib: any = await import('/js/library/store.js');
     // Libro REAL en la biblioteca (el deep-link tiene que poder abrirlo de cero).
-    const buf = await (await fetch('/tests/test.epub')).arrayBuffer();
+    const buf = new Uint8Array(bytes).buffer;
     await Lib.putBook({
       id: 'bk-src', title: 'Libro fuente', format: 'epub', fileName: 'test.epub',
       file: buf, size: buf.byteLength, addedAt: Date.now(), lastOpenedAt: Date.now(),
@@ -133,7 +137,7 @@ test('al voltear, "Ver en el libro" abre el libro de origen por deep-link', asyn
         { type: 'basic', front: 'sin fuente', back: 'r', chapter: '' },
       ],
     });
-  });
+  }, epubBytes);
   await page.reload();
   await page.locator('.lib-study-chip').click();
 
