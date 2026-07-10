@@ -444,8 +444,9 @@ PDF a HTML → **fuera de alcance**. Documentado aquí para no reabrir el debate
 
 **Arquitectura — proxy OpenAI-compatible (Cloudflare Worker + D1):**
 ```
-bookreader ──Bearer br-demo-x8f──▶ gateway ──Bearer <KEY_NAN>──▶ api.nan.builders/v1
-                                   valida token · cuota · CORS
+bookreader ──Bearer br-demo-x8f──▶ gateway ──routing──▶ nan / opencode / <proveedor N>
+           model: bookreader-fast  valida token · cuota · CORS
+                                   alias → {proveedor, modelo, key}
                                    decrementa contador (D1)
                                    passthrough del stream SSE
 ```
@@ -457,10 +458,27 @@ bookreader ──Bearer br-demo-x8f──▶ gateway ──Bearer <KEY_NAN>─�
 - **Bonus CORS:** controlamos las cabeceras → `/models` funciona desde el navegador, arreglando la
   limitación documentada en [llm.js L66-70](js/ai/llm.js#L66-L70) para quien use el gateway.
 
+**Propiedad de diseño — routing multi-proveedor con alias propios (desde F1).** El gateway NO expone
+nombres de modelos del proveedor: expone **alias nuestros** (`bookreader-fast`, `bookreader-smart`,
+`bookreader-vision`) que una **tabla de routing** traduce a `{proveedor, modelo, key, capacidades}`.
+Mismo modelo que OpenRouter, en miniatura. Consecuencias:
+- **Proveedor intercambiable sin que el usuario note nada**: si nan sube precios o se cae, se cambia una
+  fila (→ opencode o quien convenga) y nadie reconfigura. `/v1/models` devuelve los alias, así que la UI
+  los lista sola.
+- **Routing por regla**: por tier del token (demo → proveedor barato, Pro → el bueno), por fallback ante
+  5xx del primario, o por coste.
+- **La tabla existe desde el día uno aunque solo tenga una fila (nan)**: barato ahora, caro de
+  retrofitear si los usuarios ya vieron nombres de modelos del proveedor en su config.
+- **Caveats**: la tabla debe declarar **capacidades** por backend (function calling —lo usa el retrieval
+  agéntico vía `chatTools`—, visión, `/embeddings`) para no rutar una llamada con tools a un modelo que
+  no las soporta; y para tokens de pago, los alias deben apuntar a modelos de nivel equivalente (cambiar
+  la inferencia cambia la calidad de las respuestas — en demo da igual, en Pro no).
+
 **Punto de diseño delicado — concurrencia sobre una sola key.** nan rechaza peticiones concurrentes a
 la misma key ([llm.js L88-89](js/ai/llm.js#L88-L89)); hoy se serializa **en el cliente**, pero tras el
 gateway todos los usuarios comparten la key → dos usuarios simultáneos colisionan. Opciones: cola global
-con **Durable Object** (serializa; añade latencia bajo carga) o **pool de N keys** de nan (round-robin).
+con **Durable Object** (serializa; añade latencia bajo carga), **pool de N keys** de nan (round-robin),
+o **desbordar al segundo proveedor** de la tabla de routing (el multi-proveedor relaja el problema).
 F1 lo asume como riesgo aceptado (tráfico demo bajo + los reintentos de IA3 en el cliente absorben
 transitorios); F2 lo resuelve de verdad **si la medición lo pide**.
 
@@ -469,8 +487,8 @@ self-service (F3), Turnstile si hiciera falta, allowlist de modelos y tope de `m
 
 **Fases:**
 - **F1 — Worker MVP** `M`: passthrough streaming + validación de token + contador atómico en D1 +
-  emisión/revocación por CLI (`wrangler d1 execute` o script). Verificar end-to-end con bookreader
-  apuntando la base URL al gateway.
+  **tabla de routing con alias** (una fila: nan) + emisión/revocación por CLI (`wrangler d1 execute` o
+  script). Verificar end-to-end con bookreader apuntando la base URL al gateway.
 - **F2 — Concurrencia** `S`–`M`: cola (Durable Object) o pool de keys. Solo si F1 muestra colisiones
   reales.
 - **F3 — Demo self-service** `M`: botón "Probar la demo" en el onboarding del panel → `POST /demo-token`
