@@ -425,6 +425,69 @@ PDF a HTML → **fuera de alcance**. Documentado aquí para no reabrir el debate
 
 ---
 
+## 💰 Monetización / Infra
+
+### MON1 — Gateway de tokens propios (proxy OpenAI-compatible sobre nan) · `M`–`L` · **planificado**
+
+> **Estado: planificado (2026-07-10).** Primera pieza con **backend** del proyecto. No rompe el
+> posicionamiento local-first: el cliente sigue siendo 100% estático (GitHub Pages); el gateway es un
+> servicio aparte con su propio repo/despliegue, y **BYOK sigue existiendo tal cual** — esto es una
+> *tercera vía* (demo/tokens gestionados), no un sustituto.
+
+**Motivación (3 en 1):**
+1. **Demo sin fricción** — [LAUNCH_PLAN](LAUNCH_PLAN.md): *"la fricción 'sube un EPUB + pon tu key' mata
+   la conversión"*. Un token demo de ~100 llamadas elimina la barrera de conseguir una API key para
+   probar el agente.
+2. **Control de límites** — tokens emitidos por nosotros, con cuota, revocables, con allowlist de modelos
+   y tope de `max_tokens` para acotar coste.
+3. **Seguridad** — la key real de nan vive como secret del gateway; **nunca llega al navegador**.
+
+**Arquitectura — proxy OpenAI-compatible (Cloudflare Worker + D1):**
+```
+bookreader ──Bearer br-demo-x8f──▶ gateway ──Bearer <KEY_NAN>──▶ api.nan.builders/v1
+                                   valida token · cuota · CORS
+                                   decrementa contador (D1)
+                                   passthrough del stream SSE
+```
+- Endpoints: `/v1/chat/completions` y `/v1/models` (passthrough transparente, streaming incluido).
+- Tokens `br-…` en D1: `{ token, remaining, active, created, note }`. Decremento atómico por petición;
+  a 0 → `429` con mensaje claro ("demo agotada" + CTA a conseguir su propia key / Pro).
+- **Cero cambios necesarios en el cliente**: base URL y key ya son configurables
+  ([llm.js](js/ai/llm.js)). Opcional: preset en `PROVIDERS` (F3).
+- **Bonus CORS:** controlamos las cabeceras → `/models` funciona desde el navegador, arreglando la
+  limitación documentada en [llm.js L66-70](js/ai/llm.js#L66-L70) para quien use el gateway.
+
+**Punto de diseño delicado — concurrencia sobre una sola key.** nan rechaza peticiones concurrentes a
+la misma key ([llm.js L88-89](js/ai/llm.js#L88-L89)); hoy se serializa **en el cliente**, pero tras el
+gateway todos los usuarios comparten la key → dos usuarios simultáneos colisionan. Opciones: cola global
+con **Durable Object** (serializa; añade latencia bajo carga) o **pool de N keys** de nan (round-robin).
+F1 lo asume como riesgo aceptado (tráfico demo bajo + los reintentos de IA3 en el cliente absorben
+transitorios); F2 lo resuelve de verdad **si la medición lo pide**.
+
+**Anti-abuso:** además del contador por token — rate-limit por token (rpm), límite por IP en la emisión
+self-service (F3), Turnstile si hiciera falta, allowlist de modelos y tope de `max_tokens` server-side.
+
+**Fases:**
+- **F1 — Worker MVP** `M`: passthrough streaming + validación de token + contador atómico en D1 +
+  emisión/revocación por CLI (`wrangler d1 execute` o script). Verificar end-to-end con bookreader
+  apuntando la base URL al gateway.
+- **F2 — Concurrencia** `S`–`M`: cola (Durable Object) o pool de keys. Solo si F1 muestra colisiones
+  reales.
+- **F3 — Demo self-service** `M`: botón "Probar la demo" en el onboarding del panel → `POST /demo-token`
+  (limitado por IP) → autoconfigura base URL + token sin que el usuario vea nada. Preset en `PROVIDERS`.
+  Este es el que mueve la métrica de activación del LAUNCH_PLAN.
+- **F4 — Gestión** `S`: listar tokens, uso, revocar (CLI ampliada o mini-admin).
+
+**Requiere ADR al arrancar:** primer backend del proyecto (dónde vive, repo propio vs `gateway/` aquí),
+esquema de contadores (D1 vs Durable Object), política de límites y de datos (el gateway ve los prompts →
+declarar retención cero y logging mínimo, coherente con el posicionamiento privacy-first).
+
+**❓ Abiertas:** ¿cuota total (100 llamadas) o diaria? · ¿tokens de pago post-demo ligados a Pro/Lemon
+Squeezy o solo demo? · ¿cuenta de Cloudflare disponible (si no: Deno Deploy / VPS)? · medir el coste por
+llamada real en nan para dimensionar la demo sin sustos.
+
+---
+
 ## 🔧 Técnico (calidad / seguridad / perf / bugs)
 
 ### TEC1 — Revisar el lector PDF · **✓** _(ex T11)_
