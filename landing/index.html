@@ -3,28 +3,24 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>BookReader — Lee con un agente que se sabe el libro</title>
-<meta name="description" content="Lector EPUB y PDF con agente de IA que responde citando la página exacta, crea flashcards y las repasa con repetición espaciada. 100% local: tus libros nunca salen de tu dispositivo.">
+<title>BookReader — Lo que lees se queda contigo</title>
+<meta name="description" content="El lector EPUB y PDF con un agente que te explica lo que no entiendes, te enseña la página para que lo compruebes y convierte lo importante en repaso para que no se te olvide. Todo en tu navegador.">
 <meta property="og:type" content="website">
-<meta property="og:title" content="BookReader — Lee con un agente que se sabe el libro">
-<meta property="og:description" content="Pregunta al libro y te responde con la página. Flashcards, repetición espaciada y privacidad por arquitectura: sin cuenta, sin servidor, tu propia API key.">
+<meta property="og:title" content="BookReader — Lo que lees, por fin, se queda contigo">
+<meta property="og:description" content="Pregunta lo que no entiendes y te lo explica hasta que hace clic. No te pide fe: te enseña la página. Y lo importante vuelve a ti antes de que lo olvides.">
 <meta property="og:url" content="https://luisgonzalezbernal.com/bookreader/landing/">
 <meta property="og:image" content="https://luisgonzalezbernal.com/bookreader/icons/icon-512.png">
 <meta name="theme-color" content="#22c55e">
 <link rel="canonical" href="https://luisgonzalezbernal.com/bookreader/landing/">
 <link rel="icon" href="../icons/icon.svg" type="image/svg+xml">
 <style>
-  @font-face { font-family: 'Inter'; font-weight: 400; font-display: swap;
-    src: url(../fonts/inter-400.woff2) format('woff2'); }
-  @font-face { font-family: 'Inter'; font-weight: 600; font-display: swap;
-    src: url(../fonts/inter-600.woff2) format('woff2'); }
-  @font-face { font-family: 'Source Serif 4'; font-weight: 400; font-display: swap;
-    src: url(../fonts/source-serif-4-400.woff2) format('woff2'); }
-  @font-face { font-family: 'Source Serif 4'; font-weight: 600; font-display: swap;
-    src: url(../fonts/source-serif-4-600.woff2) format('woff2'); }
+  @font-face { font-family: 'Inter'; font-weight: 400; font-display: swap; src: url(../fonts/inter-400.woff2) format('woff2'); }
+  @font-face { font-family: 'Inter'; font-weight: 600; font-display: swap; src: url(../fonts/inter-600.woff2) format('woff2'); }
+  @font-face { font-family: 'Source Serif 4'; font-weight: 400; font-display: swap; src: url(../fonts/source-serif-4-400.woff2) format('woff2'); }
+  @font-face { font-family: 'Source Serif 4'; font-weight: 600; font-display: swap; src: url(../fonts/source-serif-4-600.woff2) format('woff2'); }
 
-  /* ---- Tokens (identidad real de la app: emerald + blanco/charcoal; el papel
-         cálido vive SOLO dentro del libro) ---- */
+  /* ---- Tokens (identidad de la app: emerald + blanco/charcoal; el papel cálido
+         vive SOLO dentro del libro) ---- */
   :root {
     --bg: #ffffff;
     --bg-soft: #f5f6f7;
@@ -32,17 +28,16 @@
     --ink-soft: #5d6570;
     --ink-faint: #9aa1ab;
     --line: #e3e6ea;
-    --accent: #1f9d54;            /* emerald legible sobre blanco */
-    --accent-bright: #22c55e;     /* emerald de la app (botones) */
+    --accent: #1f9d54;
+    --accent-bright: #22c55e;
     --accent-soft: rgba(34, 197, 94, 0.14);
-    --on-accent: #111418;         /* texto OSCURO sobre emerald, como en la app */
-    --paper: #fdfbf6;             /* sepia de la app: la página del libro */
+    --on-accent: #111418;
+    --paper: #fdfbf6;
     --paper-edge: #efe9db;
     --paper-ink: #2b2517;
-    --band-bg: #111418;           /* banda de privacidad: charcoal de la app */
+    --band-bg: #111418;
     --band-ink: #f2f3f5;
     --band-soft: #a8b0b8;
-    --band-line: #2b333b;
     --card: #ffffff;
     --shadow-2: 0 4px 16px rgba(20, 28, 40, 0.07);
     --shadow-3: 0 18px 50px rgba(20, 28, 40, 0.16);
@@ -56,7 +51,7 @@
       --line: #2b333b;
       --accent: #22c55e; --accent-soft: rgba(34, 197, 94, 0.16);
       --paper: #f7f2e4; --paper-edge: #e8e0cc; --paper-ink: #26200f;
-      --band-bg: #1a1f24; --band-ink: #f2f3f5; --band-soft: #a8b0b8; --band-line: #2b333b;
+      --band-bg: #0b0e11; --band-ink: #f2f3f5; --band-soft: #a8b0b8;
       --card: #1a1f24;
       --shadow-2: 0 4px 16px rgba(0, 0, 0, 0.3);
       --shadow-3: 0 18px 50px rgba(0, 0, 0, 0.5);
@@ -68,7 +63,7 @@
     --line: #2b333b;
     --accent: #22c55e; --accent-soft: rgba(34, 197, 94, 0.16);
     --paper: #f7f2e4; --paper-edge: #e8e0cc; --paper-ink: #26200f;
-    --band-bg: #1a1f24; --band-ink: #f2f3f5; --band-soft: #a8b0b8; --band-line: #2b333b;
+    --band-bg: #0b0e11; --band-ink: #f2f3f5; --band-soft: #a8b0b8;
     --card: #1a1f24;
     --shadow-2: 0 4px 16px rgba(0, 0, 0, 0.3);
     --shadow-3: 0 18px 50px rgba(0, 0, 0, 0.5);
@@ -79,7 +74,7 @@
     --line: #e3e6ea;
     --accent: #1f9d54; --accent-soft: rgba(34, 197, 94, 0.14);
     --paper: #fdfbf6; --paper-edge: #efe9db; --paper-ink: #2b2517;
-    --band-bg: #111418; --band-ink: #f2f3f5; --band-soft: #a8b0b8; --band-line: #2b333b;
+    --band-bg: #111418; --band-ink: #f2f3f5; --band-soft: #a8b0b8;
     --card: #ffffff;
     --shadow-2: 0 4px 16px rgba(20, 28, 40, 0.07);
     --shadow-3: 0 18px 50px rgba(20, 28, 40, 0.16);
@@ -89,23 +84,12 @@
   html { scroll-behavior: smooth; }
   body {
     margin: 0; background: var(--bg); color: var(--ink);
-    font-family: var(--sans); font-size: 16.5px; line-height: 1.65;
+    font-family: var(--sans); font-size: 17px; line-height: 1.65;
     -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
   }
-  .wrap { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
+  .wrap { max-width: 1060px; margin: 0 auto; padding: 0 24px; }
   a { color: var(--accent); text-decoration: none; }
   :is(a, button, summary):focus-visible { outline: 2px solid var(--accent-bright); outline-offset: 3px; border-radius: 4px; }
-
-  /* ---- Voces tipográficas ---- */
-  .eyebrow {
-    font: 600 11.5px/1 var(--sans); letter-spacing: 0.14em; text-transform: uppercase;
-    color: var(--accent); display: flex; align-items: center; gap: 10px; margin: 0 0 18px;
-  }
-  .eyebrow::before { content: ""; width: 26px; height: 2px; background: var(--accent-bright); }
-  h1, h2 { font-family: var(--serif); font-weight: 600; text-wrap: balance; margin: 0; }
-  h1 { font-size: clamp(2.5rem, 5.4vw, 3.8rem); line-height: 1.06; letter-spacing: -0.015em; }
-  h2 { font-size: clamp(1.65rem, 3vw, 2.25rem); line-height: 1.15; letter-spacing: -0.01em; }
-  .lead { font-size: 17.5px; color: var(--ink-soft); max-width: 58ch; }
   p { margin: 0; }
 
   /* ---- Nav ---- */
@@ -113,115 +97,93 @@
   .nav-in { display: flex; align-items: center; justify-content: space-between; height: 60px; }
   .brand { display: flex; align-items: center; gap: 9px; font: 600 16.5px var(--sans); color: var(--ink); }
   .brand svg { color: var(--accent-bright); }
-  .nav-cta {
-    font: 600 14px var(--sans); background: var(--accent-bright); color: var(--on-accent);
-    padding: 9px 16px; border-radius: 999px; transition: transform 0.15s ease, box-shadow 0.15s ease;
-  }
+  .nav-cta { font: 600 14px var(--sans); background: var(--accent-bright); color: var(--on-accent); padding: 9px 16px; border-radius: 999px; transition: transform 0.15s ease, box-shadow 0.15s ease; }
   .nav-cta:hover { transform: translateY(-1px); box-shadow: var(--shadow-2); }
 
-  /* ---- Hero ---- */
-  .hero { padding: clamp(56px, 9vh, 104px) 0 72px; }
-  .hero-grid { display: grid; grid-template-columns: minmax(0, 10fr) minmax(0, 11fr); gap: clamp(32px, 5vw, 72px); align-items: center; }
-  .hero h1 em { font-style: normal; color: var(--accent); }
-  .hero .lead { margin-top: 22px; }
-  .cta-row { display: flex; align-items: center; gap: 16px; margin-top: 34px; flex-wrap: wrap; }
+  /* ---- Beats: una idea por pantalla ---- */
+  .beat { padding: clamp(88px, 13vh, 150px) 0; text-align: center; }
+  .beat-copy { max-width: 680px; margin: 0 auto; }
+  .product-name { font: 600 14px var(--sans); letter-spacing: 0.16em; text-transform: uppercase; color: var(--accent); margin-bottom: 22px; }
+  h1, h2 { font-family: var(--serif); font-weight: 600; text-wrap: balance; margin: 0; letter-spacing: -0.015em; }
+  h1 { font-size: clamp(2.6rem, 6vw, 4.2rem); line-height: 1.05; }
+  h2 { font-size: clamp(2rem, 4.4vw, 3.1rem); line-height: 1.1; }
+  .support { font-size: clamp(17px, 1.6vw, 19.5px); color: var(--ink-soft); max-width: 54ch; margin: 22px auto 0; }
+  .support b { color: var(--ink); font-weight: 600; }
+  .cta-row { display: flex; align-items: center; justify-content: center; gap: 18px; margin-top: 36px; flex-wrap: wrap; }
   .btn-primary {
     display: inline-flex; align-items: center; gap: 9px;
-    font: 600 15.5px var(--sans); background: var(--accent-bright); color: var(--on-accent);
-    padding: 14px 24px; border-radius: 999px; transition: transform 0.15s ease, box-shadow 0.15s ease;
+    font: 600 16px var(--sans); background: var(--accent-bright); color: var(--on-accent);
+    padding: 15px 28px; border-radius: 999px; transition: transform 0.15s ease, box-shadow 0.15s ease;
   }
   .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 10px 26px rgba(34, 197, 94, 0.35); }
-  .btn-ghost { font: 600 15px var(--sans); color: var(--ink-soft); display: inline-flex; align-items: center; gap: 7px; }
-  .btn-ghost:hover { color: var(--ink); }
-  .hero-note { margin-top: 16px; font-size: 13.5px; color: var(--ink-faint); }
-  .hero-note b { color: var(--ink-soft); font-weight: 600; }
+  .cta-note { margin-top: 15px; font-size: 13.5px; color: var(--ink-faint); }
 
-  /* ---- Mock del producto (lector + agente) ---- */
-  .demo { position: relative; }
-  .device {
-    background: var(--bg-soft); border: 1px solid var(--line); border-radius: 18px;
-    box-shadow: var(--shadow-3); overflow: hidden;
-  }
-  .device-bar { display: flex; align-items: center; gap: 7px; padding: 11px 14px; border-bottom: 1px solid var(--line); }
+  .beat-visual { margin: clamp(44px, 7vh, 72px) auto 0; }
+  .alt { background: var(--bg-soft); border-block: 1px solid var(--line); }
+
+  /* ---- Beat 1 · el producto (lector + agente) ---- */
+  .device { max-width: 880px; margin-inline: auto; background: var(--bg-soft); border: 1px solid var(--line); border-radius: 20px; box-shadow: var(--shadow-3); overflow: hidden; text-align: left; }
+  .alt .device { background: var(--card); }
+  .device-bar { display: flex; align-items: center; gap: 7px; padding: 12px 15px; border-bottom: 1px solid var(--line); }
   .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--line); }
-  .device-title { margin-left: 8px; font: 600 11.5px var(--sans); color: var(--ink-faint); letter-spacing: 0.02em; }
+  .device-title { margin-left: 8px; font: 600 11.5px var(--sans); color: var(--ink-faint); }
   .device-body { display: grid; grid-template-columns: 11fr 10fr; }
-
-  .page { background: var(--paper); color: var(--paper-ink); padding: 26px 24px 30px; border-right: 1px solid var(--paper-edge); }
+  .page { background: var(--paper); color: var(--paper-ink); padding: 28px 26px 30px; border-right: 1px solid var(--paper-edge); }
   .page-ch { font: 600 10px var(--sans); letter-spacing: 0.12em; text-transform: uppercase; color: #8a7f68; margin-bottom: 14px; }
-  .page-text { font: 400 13.5px/1.75 var(--serif); }
+  .page-text { font: 400 14px/1.75 var(--serif); }
   .page-text p + p { margin-top: 10px; }
-  .page mark {
-    background: var(--accent-soft); color: inherit; padding: 1px 2px; border-radius: 3px;
-    box-shadow: 0 1.5px 0 var(--accent-bright); box-decoration-break: clone; -webkit-box-decoration-break: clone;
-  }
+  .page mark { background: var(--accent-soft); color: inherit; padding: 1px 2px; border-radius: 3px; box-shadow: 0 1.5px 0 var(--accent-bright); box-decoration-break: clone; -webkit-box-decoration-break: clone; }
   .page-num { margin-top: 18px; font: 400 10.5px var(--sans); color: #a89c82; text-align: center; }
-
   .panel { background: var(--card); display: flex; flex-direction: column; }
-  .panel-head { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--line); font: 600 12.5px var(--sans); }
+  .panel-head { display: flex; align-items: center; gap: 8px; padding: 13px 16px; border-bottom: 1px solid var(--line); font: 600 12.5px var(--sans); }
   .panel-head svg { color: var(--accent-bright); }
   .panel-status { margin-left: auto; font: 400 10.5px var(--sans); color: var(--ink-faint); }
-  .chat { padding: 16px; display: flex; flex-direction: column; gap: 12px; flex: 1; }
-  .bubble { max-width: 92%; font: 400 12.5px/1.55 var(--sans); padding: 9px 13px; border-radius: 14px; }
+  .chat { padding: 18px 16px; display: flex; flex-direction: column; gap: 12px; flex: 1; }
+  .bubble { max-width: 92%; font: 400 13px/1.55 var(--sans); padding: 10px 14px; border-radius: 14px; text-align: left; }
   .bubble.q { align-self: flex-end; background: var(--ink); color: var(--bg); border-bottom-right-radius: 4px; }
-  .bubble.a { align-self: flex-start; background: transparent; border: 1px solid var(--line); border-bottom-left-radius: 4px; color: var(--ink); }
-  .cite {
-    display: inline-flex; align-items: center; gap: 6px; margin-top: 9px;
-    font: 600 10.5px var(--sans); color: var(--accent); background: var(--accent-soft);
-    border-radius: 999px; padding: 4px 10px; white-space: nowrap;
-  }
+  .bubble.a { align-self: flex-start; border: 1px solid var(--line); border-bottom-left-radius: 4px; color: var(--ink); }
+  .cite { display: inline-flex; align-items: center; gap: 6px; margin-top: 9px; font: 600 10.5px var(--sans); color: var(--accent); background: var(--accent-soft); border-radius: 999px; padding: 4px 10px; white-space: nowrap; }
   .cite svg { flex: none; }
-  .composer { margin: 0 16px 16px; border: 1px solid var(--line); border-radius: 12px; padding: 9px 12px; display: flex; align-items: center; gap: 8px; }
-  .composer span { font: 400 12px var(--sans); color: var(--ink-faint); flex: 1; }
+  .composer { margin: 0 16px 16px; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; display: flex; align-items: center; gap: 8px; }
+  .composer span { font: 400 12.5px var(--sans); color: var(--ink-faint); flex: 1; text-align: left; }
   .composer i { width: 26px; height: 26px; border-radius: 8px; background: var(--accent-bright); display: grid; place-items: center; color: var(--on-accent); }
-  .demo-caption { margin-top: 14px; font: 400 13px var(--sans); color: var(--ink-faint); text-align: center; }
-  .demo-caption b { color: var(--accent); font-weight: 600; }
 
-  @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  @keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
   .anim-1, .anim-2, .anim-3 { animation: rise 0.5s ease both; }
-  .anim-1 { animation-delay: 0.5s; }
-  .anim-2 { animation-delay: 1.3s; }
-  .anim-3 { animation-delay: 2s; }
+  .anim-1 { animation-delay: 0.6s; }
+  .anim-2 { animation-delay: 1.5s; }
+  .anim-3 { animation-delay: 2.2s; }
   @media (prefers-reduced-motion: reduce) {
     .anim-1, .anim-2, .anim-3 { animation: none; }
     html { scroll-behavior: auto; }
     .fcard { transition: none !important; }
   }
 
-  /* ---- Secciones ---- */
-  section { padding: clamp(60px, 9vh, 104px) 0; }
-  .sec-head { max-width: 640px; margin-bottom: clamp(36px, 5vh, 56px); }
-  .sec-head .lead { margin-top: 16px; }
-
-  .truths { border-top: 1px solid var(--line); }
-  .truth-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: clamp(28px, 4vw, 56px); }
-  .truth h3 { font: 600 17.5px var(--sans); margin: 0 0 10px; display: flex; align-items: center; gap: 10px; }
-  .truth svg { color: var(--accent-bright); flex: none; }
-  .truth p { font-size: 15px; color: var(--ink-soft); }
-
-  /* Cómo funciona: secuencia real → numeración con significado */
-  .how { background: var(--bg-soft); border-block: 1px solid var(--line); }
-  .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: clamp(24px, 3.5vw, 44px); counter-reset: step; }
-  .step { counter-increment: step; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 26px 24px 28px; box-shadow: var(--shadow-2); }
-  .step::before {
-    content: counter(step); display: inline-grid; place-items: center;
-    width: 32px; height: 32px; border-radius: 10px; background: var(--accent-soft);
-    font: 600 15px var(--serif); color: var(--accent); margin-bottom: 16px;
+  /* ---- Beat 2 · el párrafo que no entra ---- */
+  .dense {
+    max-width: 520px; margin-inline: auto; background: var(--paper); color: var(--paper-ink);
+    border: 1px solid var(--paper-edge); border-radius: 14px; box-shadow: var(--shadow-2);
+    padding: 30px 32px; font: 400 14.5px/1.8 var(--serif); text-align: left;
+    transform: rotate(-0.6deg);
   }
-  .step h3 { font: 600 16.5px var(--sans); margin: 0 0 8px; }
-  .step p { font-size: 14.5px; color: var(--ink-soft); }
-  .step code { font: 500 12.5px ui-monospace, Menlo, monospace; background: var(--bg-soft); border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px; }
+  .dense .fade { opacity: 0.45; }
 
-  /* Estudiar: tarjeta interactiva */
-  .study-grid { display: grid; grid-template-columns: minmax(0, 11fr) minmax(0, 9fr); gap: clamp(36px, 5vw, 72px); align-items: center; }
-  .study-points { margin: 26px 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 16px; }
-  .study-points li { display: flex; gap: 13px; font-size: 15.5px; color: var(--ink-soft); }
-  .study-points svg { color: var(--accent-bright); flex: none; margin-top: 2px; }
-  .study-points b { color: var(--ink); font-weight: 600; }
+  /* ---- Beat 4 · la cita como gesto ---- */
+  .proof { position: relative; max-width: 560px; margin-inline: auto; padding-bottom: 22px; }
+  .proof .page { border: 1px solid var(--paper-edge); border-radius: 14px; box-shadow: var(--shadow-2); }
+  .proof .cite-big {
+    position: absolute; left: 50%; bottom: 0; transform: translateX(-50%);
+    display: inline-flex; align-items: center; gap: 8px; font: 600 14px var(--sans);
+    color: var(--accent); background: var(--card); border: 1px solid var(--line);
+    border-radius: 999px; padding: 11px 20px; box-shadow: var(--shadow-3); white-space: nowrap;
+  }
+  .proof .cite-big svg { color: var(--accent-bright); flex: none; }
 
-  .fcard-zone { perspective: 1200px; }
+  /* ---- Beat 5 · la tarjeta (Repaso citado) ---- */
+  .feature-name { font: 600 12px var(--sans); letter-spacing: 0.16em; text-transform: uppercase; color: var(--accent); margin-bottom: 16px; }
+  .fcard-zone { perspective: 1200px; max-width: 480px; margin-inline: auto; }
   .fcard {
-    position: relative; width: 100%; aspect-ratio: 8 / 5.4; cursor: pointer; border: 0; padding: 0;
+    position: relative; width: 100%; aspect-ratio: 8 / 5.6; cursor: pointer; border: 0; padding: 0;
     background: none; font-family: inherit; transform-style: preserve-3d;
     transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1); text-align: left; display: block;
   }
@@ -233,68 +195,42 @@
   }
   .face.back { transform: rotateY(180deg); }
   .face-tag { font: 600 10.5px var(--sans); letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-faint); }
-  .face-q { font: 600 clamp(17px, 1.8vw, 21px)/1.35 var(--serif); margin: auto 0; }
+  .face-q { font: 600 clamp(17px, 2vw, 21px)/1.35 var(--serif); margin: auto 0; }
   .face-hint { font: 400 12.5px var(--sans); color: var(--ink-faint); }
-  .face-a { font: 400 15px/1.55 var(--sans); color: var(--ink-soft); margin: 14px 0 auto; }
+  .face-a { font: 400 14.5px/1.55 var(--sans); color: var(--ink-soft); margin: 14px 0 auto; }
   .grade-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; margin-top: 16px; }
   .grade { border: 1px solid var(--line); border-radius: 10px; padding: 7px 4px; text-align: center; font: 600 11px var(--sans); }
   .grade small { display: block; font-weight: 400; color: var(--ink-faint); margin-top: 2px; }
   .grade.g3 { border-color: var(--accent-bright); color: var(--accent); }
   .src-chip { display: inline-flex; align-items: center; gap: 7px; align-self: flex-start; font: 600 12px var(--sans); color: var(--accent); background: var(--accent-soft); border-radius: 999px; padding: 6px 13px; }
-  .fcard-note { margin-top: 16px; text-align: center; font: 400 13px var(--sans); color: var(--ink-faint); }
+  .fcard-note { margin-top: 18px; font: 400 13px var(--sans); color: var(--ink-faint); }
 
-  /* Privacidad: banda charcoal (la app en oscuro) */
-  .privacy { background: var(--band-bg); color: var(--band-ink); }
-  .privacy .eyebrow { color: var(--accent-bright); }
-  .privacy .lead { color: var(--band-soft); }
-  .ledger { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0; border-top: 1px solid var(--band-line); }
-  .ledger article { padding: 26px 28px 30px; border-bottom: 1px solid var(--band-line); }
-  .ledger article:nth-child(odd) { border-right: 1px solid var(--band-line); padding-left: 0; }
-  .ledger article:nth-child(even) { padding-right: 0; }
-  .ledger h3 { font: 600 17px var(--serif); margin: 0 0 8px; color: var(--band-ink); }
-  .ledger h3 span { color: var(--accent-bright); }
-  .ledger p { font-size: 14.5px; color: var(--band-soft); max-width: 46ch; }
+  /* ---- Beat 6 · privacidad (valores) ---- */
+  .values { background: var(--band-bg); color: var(--band-ink); }
+  .values .support { color: var(--band-soft); }
+  .values .seal { margin-top: 34px; font: 600 clamp(17px, 2vw, 21px) var(--serif); color: var(--band-ink); }
+  .values .seal span { color: var(--accent-bright); }
 
-  /* Lector completo */
-  .feat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
-  .feat { border: 1px solid var(--line); border-radius: 14px; padding: 20px; transition: border-color 0.15s ease, transform 0.15s ease; }
-  .feat:hover { border-color: var(--accent-bright); transform: translateY(-2px); }
-  .feat svg { color: var(--accent); margin-bottom: 12px; }
-  .feat h3 { font: 600 14.5px var(--sans); margin: 0 0 5px; }
-  .feat p { font-size: 13px; color: var(--ink-soft); line-height: 1.5; }
-
-  /* FAQ */
-  .faq { max-width: 760px; }
+  /* ---- "Y además" + FAQ ---- */
+  .etc { font-size: 15px; color: var(--ink-soft); max-width: 60ch; margin: 0 auto; }
+  .etc b { color: var(--ink); font-weight: 600; }
+  .faq { max-width: 720px; margin: clamp(40px, 6vh, 60px) auto 0; text-align: left; }
   .faq details { border-top: 1px solid var(--line); }
   .faq details:last-of-type { border-bottom: 1px solid var(--line); }
-  .faq summary {
-    cursor: pointer; list-style: none; display: flex; align-items: center; justify-content: space-between;
-    gap: 16px; padding: 19px 2px; font: 600 15.5px var(--sans);
-  }
+  .faq summary { cursor: pointer; list-style: none; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 19px 2px; font: 600 15.5px var(--sans); }
   .faq summary::-webkit-details-marker { display: none; }
   .faq summary::after { content: "+"; font: 400 22px var(--serif); color: var(--accent); transition: transform 0.2s ease; flex: none; }
   .faq details[open] summary::after { transform: rotate(45deg); }
   .faq .ans { padding: 0 2px 20px; font-size: 15px; color: var(--ink-soft); max-width: 62ch; }
 
-  /* CTA final */
-  .cta-final { text-align: center; padding-bottom: clamp(80px, 12vh, 130px); }
-  .cta-final h2 { font-size: clamp(2rem, 4vw, 3rem); }
-  .cta-final .lead { margin: 18px auto 0; }
-  .cta-final .cta-row { justify-content: center; }
-
   footer { border-top: 1px solid var(--line); padding: 28px 0 36px; }
   .foot-in { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; font: 400 13px var(--sans); color: var(--ink-faint); }
   .foot-in .brand { font-size: 14.5px; }
 
-  @media (max-width: 900px) {
-    .hero-grid, .study-grid { grid-template-columns: 1fr; }
-    .truth-grid, .steps { grid-template-columns: 1fr; }
-    .feat-grid { grid-template-columns: repeat(2, 1fr); }
-    .ledger { grid-template-columns: 1fr; }
-    .ledger article:nth-child(odd) { border-right: 0; }
-    .ledger article { padding-inline: 0; }
+  @media (max-width: 760px) {
     .device-body { grid-template-columns: 1fr; }
     .page { border-right: 0; border-bottom: 1px solid var(--paper-edge); }
+    .proof .cite-big { white-space: normal; width: max-content; max-width: 92%; text-align: center; }
   }
 </style>
 </head>
@@ -310,30 +246,29 @@
   </div>
 </nav>
 
-<header class="hero">
-  <div class="wrap hero-grid">
-    <div>
-      <p class="eyebrow">Lector EPUB · PDF con agente de lectura</p>
-      <h1>Pregunta al libro. Te responde <em>con la página</em>.</h1>
-      <p class="lead">BookReader es un lector con un agente de IA que se sabe el libro que estás leyendo: responde citando el pasaje exacto, convierte capítulos en flashcards y te las repasa con repetición espaciada. Todo en tu navegador — tus libros nunca salen de tu dispositivo.</p>
+<!-- Beat 1 · La promesa -->
+<header class="beat">
+  <div class="wrap">
+    <div class="beat-copy">
+      <p class="product-name">BookReader</p>
+      <h1>Lo que lees, por fin, se queda contigo.</h1>
       <div class="cta-row">
         <a class="btn-primary" href="../">Abrir BookReader
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg>
         </a>
-        <a class="btn-ghost" href="#estudiar">Ver cómo funciona</a>
       </div>
-      <p class="hero-note"><b>Gratis y sin cuenta.</b> El agente funciona con tu propia API key (BYOK).</p>
+      <p class="cta-note">Gratis. Sin cuenta. En tu navegador.</p>
     </div>
 
-    <div class="demo" aria-label="Demostración: el lector con el agente respondiendo con una cita">
+    <div class="beat-visual" aria-label="BookReader: el lector con el agente explicando un concepto">
       <div class="device">
-        <div class="device-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="device-title">BookReader — Designing Data-Intensive Applications</span></div>
+        <div class="device-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="device-title">Designing Data-Intensive Applications</span></div>
         <div class="device-body">
           <div class="page">
             <div class="page-ch">9 · Consistency and Consensus</div>
             <div class="page-text">
               <p>In an eventually consistent database, if you ask two different replicas the same question at the same time, you may get two different answers.</p>
-              <p><mark>Linearizability is the idea of making a system appear as if there were only one copy of the data, and all operations on it are atomic.</mark> With this guarantee, applications don't need to worry about replicas.</p>
+              <p><mark>Linearizability is the idea of making a system appear as if there were only one copy of the data, and all operations on it are atomic.</mark></p>
             </div>
             <div class="page-num">324</div>
           </div>
@@ -341,11 +276,11 @@
             <div class="panel-head">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.5l1.5 4.2 4.2 1.5-4.2 1.5L12 14.9l-1.5-4.2L6.3 9.2l4.2-1.5L12 3.5Z"/><path d="M18.5 14l.7 1.9 1.9.7-1.9.7-.7 1.9-.7-1.9-1.9-.7 1.9-.7.7-1.9Z"/></svg>
               Agente
-              <span class="panel-status">Listo · cap. 9 indexado</span>
+              <span class="panel-status">se sabe el libro entero</span>
             </div>
             <div class="chat">
-              <div class="bubble q anim-1">¿Qué garantiza exactamente la linealizabilidad?</div>
-              <div class="bubble a anim-2">Que el sistema se comporte como si existiera <b>una sola copia del dato</b> y cada operación fuera atómica: tras una escritura, toda lectura ve el valor nuevo, da igual la réplica.
+              <div class="bubble q anim-1">No termino de entender la linealizabilidad. ¿Me lo explicas de forma sencilla?</div>
+              <div class="bubble a anim-2">Imagina que solo existiera <b>una copia del dato</b> y nadie pudiera pillarla a medio cambio. Eso promete: escribes, y cualquiera que lea después ve el valor nuevo — da igual a qué réplica pregunte.
                 <br><span class="cite anim-3">
                   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4.5h7a2 2 0 0 1 2 2V20a2.5 2.5 0 0 0-2.5-2H5V4.5Z"/><path d="M19 4.5h-3a2 2 0 0 0-2 2V20a2.5 2.5 0 0 1 2.5-2H19V4.5Z"/></svg>
                   p. 324 · Consistency and Consensus</span>
@@ -355,66 +290,69 @@
           </div>
         </div>
       </div>
-      <p class="demo-caption">Pregunta <b>en tu idioma</b>, aunque el libro esté en otro. Toca la cita y el lector salta a la página.</p>
     </div>
   </div>
 </header>
 
-<section class="truths">
+<!-- Beat 2 · La empatía -->
+<section class="beat alt">
   <div class="wrap">
-    <div class="truth-grid">
-      <div class="truth">
-        <h3><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4.5h7a2 2 0 0 1 2 2V20a2.5 2.5 0 0 0-2.5-2H5V4.5Z"/><path d="M19 4.5h-3a2 2 0 0 0-2 2V20a2.5 2.5 0 0 1 2.5-2H19V4.5Z"/></svg>Respuestas con cita</h3>
-        <p>Cada afirmación llega anclada a su pasaje. No te fíes del modelo: toca la cita y compruébalo en la página exacta. Si el libro no lo cubre, el agente te lo dice.</p>
-      </div>
-      <div class="truth">
-        <h3><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.5l6.5 2.3v5.2c0 4-2.8 6.8-6.5 8-3.7-1.2-6.5-4-6.5-8V5.8L12 3.5Z"/></svg>Todo en tu dispositivo</h3>
-        <p>Sin cuenta y sin servidor: biblioteca, subrayados y conversaciones viven en tu navegador. La IA es la tuya — hablas directo con tu proveedor, nadie en medio.</p>
-      </div>
-      <div class="truth">
-        <h3><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="7" y="7.5" width="13" height="12" rx="2"/><path d="M4 15V6a2 2 0 0 1 2-2h9"/><line x1="10" y1="12" x2="17" y2="12"/><line x1="10" y1="15.5" x2="14.5" y2="15.5"/></svg>De leer a recordar</h3>
-        <p>Flashcards del capítulo o del libro, repaso diario con repetición espaciada y salto a la página de origen de cada tarjeta. Leer deja huella.</p>
+    <div class="beat-copy">
+      <h2>Todos nos hemos quedado mirando un párrafo.</h2>
+      <p class="support">Leyéndolo por tercera vez. Entendiendo cada palabra y ninguna idea.</p>
+    </div>
+    <div class="beat-visual">
+      <div class="dense" aria-hidden="true">
+        A subtle consequence of quorum consistency is that, even with w + r &gt; n, there are edge cases where stale values are returned: if a sloppy quorum is used, the w writes may end up on <span class="fade">different nodes than the r reads, so there is no longer a guaranteed overlap between the read nodes and the write nodes, and therefore…</span>
       </div>
     </div>
   </div>
 </section>
 
-<section class="how" id="como">
+<!-- Beat 3 · La magia -->
+<section class="beat">
   <div class="wrap">
-    <div class="sec-head">
-      <p class="eyebrow">Cómo funciona</p>
-      <h2>Tres pasos y estás leyendo con agente.</h2>
+    <div class="beat-copy">
+      <h2>Ahora la página responde.</h2>
+      <p class="support">Pregunta lo que no entiendes, como lo preguntarías tú — <b>en tu idioma</b>, aunque el libro esté en otro. El agente se sabe el libro entero, conoce tu objetivo, y te lo explica <b>a tu nivel</b>, hasta que hace clic.</p>
     </div>
-    <div class="steps">
-      <div class="step">
-        <h3>Abre un libro</h3>
-        <p>Arrastra un <code>.epub</code> o <code>.pdf</code>. Se guarda en tu biblioteca local con portada, progreso y estanterías — y funciona offline.</p>
-      </div>
-      <div class="step">
-        <h3>Conecta tu clave</h3>
-        <p>Pega la API key de tu proveedor de IA (cualquier endpoint OpenAI-compatible) y elige modelo. La clave se guarda solo en tu navegador.</p>
-      </div>
-      <div class="step">
-        <h3>Lee, pregunta, estudia</h3>
-        <p>Subraya y toma notas, pregunta con citas verificables, genera flashcards y repásalas cada día desde la estantería.</p>
+  </div>
+</section>
+
+<!-- Beat 4 · La confianza -->
+<section class="beat alt">
+  <div class="wrap">
+    <div class="beat-copy">
+      <h2>No te pide fe. Te enseña la página.</h2>
+      <p class="support">Cada explicación lleva su cita. Tócala y compruébalo en el libro, palabra por palabra.</p>
+    </div>
+    <div class="beat-visual">
+      <div class="proof">
+        <div class="page">
+          <div class="page-ch">7 · Transactions</div>
+          <div class="page-text">
+            <p>This pattern of read-modify-write can cause lost updates. <mark>An atomic compare-and-set operation avoids the lost update by only allowing the write if the value has not changed since you last read it.</mark></p>
+          </div>
+          <div class="page-num">243</div>
+        </div>
+        <span class="cite-big">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4.5h7a2 2 0 0 1 2 2V20a2.5 2.5 0 0 0-2.5-2H5V4.5Z"/><path d="M19 4.5h-3a2 2 0 0 0-2 2V20a2.5 2.5 0 0 1 2.5-2H19V4.5Z"/></svg>
+          p. 243 · Transactions — toca y compruébalo
+        </span>
       </div>
     </div>
   </div>
 </section>
 
-<section id="estudiar">
-  <div class="wrap study-grid">
-    <div>
-      <p class="eyebrow">Modo Estudiar</p>
-      <h2>Lo que lees, lo recuerdas.</h2>
-      <p class="lead" style="margin-top:16px">El agente convierte cualquier capítulo en tarjetas de estudio de calidad Anki. Repásalas dentro de la app, sin instalar nada más.</p>
-      <ul class="study-points">
-        <li><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="5 12.5 10 17.5 19 7"/></svg><span><b>Repetición espaciada</b> — el algoritmo agenda cada tarjeta; la estantería te espera con «Repasar hoy · N».</span></li>
-        <li><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="5 12.5 10 17.5 19 7"/></svg><span><b>«Ver en el libro»</b> — cada tarjeta recuerda de qué página salió y la reabre al instante. Esto no lo hace ni Anki ni un chat con PDF.</span></li>
-        <li><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="5 12.5 10 17.5 19 7"/></svg><span><b>Export a Anki real</b> — <code style="font:500 13px ui-monospace,Menlo,monospace">.apkg</code> nativo con mazos por libro y capítulo, si prefieres tu flujo de siempre.</span></li>
-      </ul>
+<!-- Beat 5 · La memoria -->
+<section class="beat">
+  <div class="wrap">
+    <div class="beat-copy">
+      <p class="feature-name">Repaso citado</p>
+      <h2>Leer es la mitad.</h2>
+      <p class="support">Lo importante se convierte en tarjetas. Vuelven a ti justo antes de que lo olvides. Y cada una recuerda de qué página salió — por si quieres releerla.</p>
     </div>
-    <div>
+    <div class="beat-visual">
       <div class="fcard-zone">
         <button class="fcard" id="fcard" type="button" aria-label="Flashcard de ejemplo: toca para voltear">
           <span class="face">
@@ -437,95 +375,68 @@
           </span>
         </button>
       </div>
-      <p class="fcard-note">Tarjeta real del modo Estudiar — pruébala.</p>
+      <p class="fcard-note">Es una tarjeta de verdad. Pruébala.</p>
     </div>
   </div>
 </section>
 
-<section class="privacy">
+<!-- Beat 6 · Los valores -->
+<section class="beat values">
   <div class="wrap">
-    <div class="sec-head">
-      <p class="eyebrow">Privacidad</p>
-      <h2>Privado por arquitectura, no por promesa.</h2>
-      <p class="lead">No es una política de privacidad generosa: es que no existe el servidor al que mandar tus datos.</p>
-    </div>
-    <div class="ledger">
-      <article>
-        <h3><span>Sin</span> cuenta</h3>
-        <p>Nada que registrar, ningún email que pedir. Abres la app y lees.</p>
-      </article>
-      <article>
-        <h3><span>Sin</span> servidor</h3>
-        <p>La app es estática. Tu biblioteca, subrayados y conversaciones viven en el almacenamiento de tu navegador, con copia de seguridad exportable.</p>
-      </article>
-      <article>
-        <h3><span>Tu</span> IA</h3>
-        <p>Bring Your Own Key: el navegador habla directamente con tu proveedor de IA. Tu clave no pasa por terceros — se queda en tu dispositivo.</p>
-      </article>
-      <article>
-        <h3><span>Tuyo</span> de verdad</h3>
-        <p>Exporta las notas a Markdown, los mazos a Anki y el backup completo a un archivo. Si un día te vas, te lo llevas todo.</p>
-      </article>
+    <div class="beat-copy">
+      <h2>Tus libros son tuyos. Tus preguntas, también.</h2>
+      <p class="support">Sin cuenta. Sin servidor. Sin nadie en medio. Todo vive en tu dispositivo, y te lo puedes llevar cuando quieras.</p>
+      <p class="seal">Privacidad. <span>Así es BookReader.</span></p>
     </div>
   </div>
 </section>
 
-<section>
+<!-- Y además + FAQ -->
+<section class="beat alt">
   <div class="wrap">
-    <div class="sec-head">
-      <p class="eyebrow">El lector, completo</p>
-      <h2>Primero un gran lector. Después, todo lo demás.</h2>
+    <div class="beat-copy">
+      <p class="etc"><b>Y además:</b> subrayados y notas, búsqueda en el libro, marcadores, páginas o scroll, tres temas de lectura, export a Anki y Markdown, y funciona sin conexión.</p>
     </div>
-    <div class="feat-grid">
-      <div class="feat"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 5.5A1.5 1.5 0 0 1 6.5 4H10a1.5 1.5 0 0 1 1.5 1.5V20a2 2 0 0 0-2-2H5V5.5Z"/><path d="M19 5.5A1.5 1.5 0 0 0 17.5 4H14a1.5 1.5 0 0 0-1.5 1.5V20a2 2 0 0 1 2-2H19V5.5Z"/></svg><h3>EPUB y PDF</h3><p>El agente lee ambos: mismo chat, mismas citas, misma calidad.</p></div>
-      <div class="feat"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L18.5 9.5a2 2 0 0 0 0-2.8l-1.2-1.2a2 2 0 0 0-2.8 0L4 16v4Z"/><line x1="13" y1="7" x2="17" y2="11"/></svg><h3>Subrayados y notas</h3><p>Cuatro colores, notas al margen y pregunta al agente desde la selección.</p></div>
-      <div class="feat"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><line x1="15.8" y1="15.8" x2="20.5" y2="20.5"/></svg><h3>Búsqueda</h3><p>Busca en todo el libro, sin acentos ni mayúsculas, y salta al resultado.</p></div>
-      <div class="feat"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 4.5h11a1 1 0 0 1 1 1V20l-6.5-4.3L5.5 20V5.5a1 1 0 0 1 1-1Z"/></svg><h3>Marcadores</h3><p>Guarda posiciones y compártelas como enlace directo a la página.</p></div>
-      <div class="feat"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="5" y1="7" x2="19" y2="7"/><line x1="7" y1="12" x2="17" y2="12"/><line x1="10" y1="17" x2="14" y2="17"/></svg><h3>Páginas o scroll</h3><p>Pasa páginas como en papel o lee en continuo. La app recuerda tu modo.</p></div>
-      <div class="feat"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 13.5A8 8 0 1 1 10.5 4 6.4 6.4 0 0 0 20 13.5Z"/></svg><h3>Claro · sepia · oscuro</h3><p>Tres temas de lectura, tipografía y ancho de línea a tu gusto.</p></div>
-      <div class="feat"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4.5V15"/><polyline points="7.5 10.5 12 15 16.5 10.5"/><path d="M5 14v3.5A1.5 1.5 0 0 0 6.5 19h11a1.5 1.5 0 0 0 1.5-1.5V14"/></svg><h3>Exporta todo</h3><p>Conversaciones a Markdown, mazos a .apkg, backup completo a un archivo.</p></div>
-      <div class="feat"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.5l6.5 2.3v5.2c0 4-2.8 6.8-6.5 8-3.7-1.2-6.5-4-6.5-8V5.8L12 3.5Z"/></svg><h3>Offline (PWA)</h3><p>Instálala y lee sin conexión. El agente vuelve cuando vuelve tu red.</p></div>
+    <div class="faq">
+      <details>
+        <summary>¿Cuánto cuesta?</summary>
+        <p class="ans">La app es gratuita. El agente funciona con tu propia clave de IA (BYOK): pagas a tu proveedor solo lo que uses, sin intermediarios ni suscripción.</p>
+      </details>
+      <details>
+        <summary>¿Qué formatos lee?</summary>
+        <p class="ans">EPUB y PDF. El agente lee ambos igual de bien: mismo chat, mismas citas, mismas flashcards.</p>
+      </details>
+      <details>
+        <summary>¿Qué IA puedo usar?</summary>
+        <p class="ans">Cualquier proveedor con API OpenAI-compatible: configuras la URL, tu clave y el modelo que quieras. Sin el agente, BookReader sigue siendo un lector completo.</p>
+      </details>
+      <details>
+        <summary>¿Dónde se guardan mis libros?</summary>
+        <p class="ans">En el almacenamiento de tu navegador, en tu dispositivo. No se suben a ningún sitio — por eso no hay sincronización entre dispositivos, de momento. Puedes exportar un backup completo cuando quieras.</p>
+      </details>
+      <details>
+        <summary>¿Las respuestas del agente son fiables?</summary>
+        <p class="ans">El agente responde a partir de pasajes del libro y cita cada afirmación. La cita es tu botón de verificar: un toque y estás en la página. Si el libro no cubre algo, lo reconoce en lugar de rellenar.</p>
+      </details>
+      <details>
+        <summary>¿Funciona sin conexión?</summary>
+        <p class="ans">Leer, subrayar y repasar tarjetas: sí, es una PWA instalable. El agente necesita conexión para hablar con tu proveedor de IA.</p>
+      </details>
     </div>
   </div>
 </section>
 
-<section>
-  <div class="wrap faq">
-    <div class="sec-head">
-      <p class="eyebrow">Preguntas</p>
-      <h2>Lo que preguntarías tú.</h2>
-    </div>
-    <details>
-      <summary>¿Cuánto cuesta?</summary>
-      <p class="ans">La app es gratuita. El agente funciona con tu propia API key: pagas a tu proveedor de IA solo lo que uses, sin intermediarios ni suscripción.</p>
-    </details>
-    <details>
-      <summary>¿Qué IA puedo usar?</summary>
-      <p class="ans">Cualquier proveedor con API OpenAI-compatible: configuras la URL, tu clave y el modelo que quieras. Sin el agente, BookReader sigue siendo un lector completo.</p>
-    </details>
-    <details>
-      <summary>¿Dónde se guardan mis libros?</summary>
-      <p class="ans">En el almacenamiento de tu navegador (IndexedDB), en tu dispositivo. No se suben a ningún sitio — por eso no hay sincronización entre dispositivos, de momento. Puedes exportar un backup completo cuando quieras.</p>
-    </details>
-    <details>
-      <summary>¿Las respuestas del agente son fiables?</summary>
-      <p class="ans">El agente responde a partir de pasajes recuperados del libro y cita cada afirmación. La cita es tu botón de verificar: un toque y estás en la página. Y si el libro no cubre algo, el agente lo reconoce en lugar de rellenar.</p>
-    </details>
-    <details>
-      <summary>¿Funciona sin conexión?</summary>
-      <p class="ans">Leer, subrayar y repasar tarjetas: sí, es una PWA instalable. El agente necesita conexión para hablar con tu proveedor de IA.</p>
-    </details>
-  </div>
-</section>
-
-<section class="cta-final">
+<!-- Beat 7 · El cierre -->
+<section class="beat">
   <div class="wrap">
-    <h2>Tu próxima lectura, con memoria.</h2>
-    <p class="lead">Sin registro, sin instalación, sin subir nada. Abre un libro y compruébalo.</p>
-    <div class="cta-row">
-      <a class="btn-primary" href="../">Abrir BookReader
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg>
-      </a>
+    <div class="beat-copy">
+      <h2>El próximo libro que leas, te lo quedas.</h2>
+      <div class="cta-row">
+        <a class="btn-primary" href="../">Abrir BookReader
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg>
+        </a>
+      </div>
+      <p class="cta-note">Gratis. Sin cuenta. En tu navegador.</p>
     </div>
   </div>
 </section>
@@ -536,7 +447,7 @@
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3.5 L14 3.5 L17.5 7 L17.5 19 Q17.5 20.5 16 20.5 L8 20.5 Q6.5 20.5 6.5 19 L6.5 5 Q6.5 3.5 8 3.5 Z"/><path d="M14 3.5 L14 7 L17.5 7"/><path d="M9.8 10 L12 12 L9.8 14"/><path d="M13 14 L15 14"/></svg>
       BookReader
     </span>
-    <span>Local-first · BYOK · Hecho para leer mejor — © 2026 Luis González</span>
+    <span>Lector EPUB · PDF con agente de lectura — local-first, BYOK · © 2026 Luis González</span>
   </div>
 </footer>
 
@@ -544,6 +455,5 @@
   const card = document.getElementById('fcard');
   card.addEventListener('click', () => card.classList.toggle('flip'));
 </script>
-
 </body>
 </html>
