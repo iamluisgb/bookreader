@@ -17,9 +17,15 @@ import * as Search from './search.js';
 import { escapeHtml } from './ui/escape.js';
 import { openImageZoom } from './image-zoom.js';
 import { alertBox } from './ui/dialog.js';
+import { migrateSchema, purgeExpiredTombstones } from './sync/schema.js';
 
 // ============ INIT ============
 document.addEventListener('DOMContentLoaded', () => {
+  // Fase 0 sync: backfill de uid/updatedAt en datos previos + purga de
+  // tombstones caducados. Asíncrono y no bloqueante; idempotente.
+  migrateSchema()
+    .then(() => purgeExpiredTombstones())
+    .catch(e => console.warn('sync schema migration:', e));
   hydrateIcons();
   Settings.init();
   EpubReader.init();

@@ -15,6 +15,7 @@
 import * as Storage from './storage.js';
 import * as DB from './ai/db.js';
 import { getTemplate } from './ai/templates.js';
+import { backfillAll } from './sync/schema.js';
 
 const FORMAT = 'bookreader-backup';
 const VERSION = 1;
@@ -72,6 +73,9 @@ export async function importBackup(obj) {
   }
   const localKeys = importLocal(obj.localStorage);
   const aiRecords = await importAi(obj.ai);
+  // Backups anteriores a la Fase 0 de sync no traen uid/updatedAt: normalizar
+  // lo importado para que sea mergeable (idempotente, no toca lo ya migrado).
+  await backfillAll();
   return { localKeys, aiRecords };
 }
 
@@ -93,7 +97,7 @@ export async function buildMarkdown() {
       out.push(`### ${[tpl?.name || 'Conversación', title[c.bookId]].filter(Boolean).join(' — ')}`);
       if (c.goal) out.push(`*Objetivo:* ${oneLine(c.goal)}`);
       out.push('');
-      const mine = (notes || []).filter(n => n.convoId === c.id);
+      const mine = (notes || []).filter(n => n.convoId === c.id && !n.deleted);
       const fields = tpl?.fields || [];
       const byField = {};
       for (const n of mine) (byField[n.fieldKey] = byField[n.fieldKey] || []).push(n);
@@ -108,8 +112,13 @@ export async function buildMarkdown() {
     }
   }
 
-  const highlights = Storage.getAll('highlights_');
-  const hKeys = Object.keys(highlights).filter(k => Array.isArray(highlights[k]) && highlights[k].length);
+  const rawHighlights = Storage.getAll('highlights_');
+  const highlights = Object.fromEntries(
+    Object.entries(rawHighlights)
+      .filter(([, v]) => Array.isArray(v))
+      .map(([k, v]) => [k, v.filter(h => !h.deleted)])
+  );
+  const hKeys = Object.keys(highlights).filter(k => highlights[k].length);
   if (hKeys.length) {
     out.push('## Subrayados', '');
     for (const k of hKeys) {

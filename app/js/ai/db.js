@@ -101,7 +101,10 @@ export function getMessages(convoId) {
 }
 
 export function addMessage(convoId, role, content) {
-  return put('messages', { convoId, role, content, ts: Date.now() });
+  const now = Date.now();
+  // uid: identidad global para el merge entre dispositivos (el id autoincremental
+  // colisiona entre equipos; sigue siendo solo la clave local). Ver SYNC_PLAN.md.
+  return put('messages', { uid: crypto.randomUUID(), convoId, role, content, ts: now, updatedAt: now });
 }
 
 function clearByIndex(store, index, key) {
@@ -182,23 +185,67 @@ function reassign(store, bookId, convoId) {
 // Notas de la libreta por conversación --------------------------------------
 
 export function getNotes(convoId) {
-  return tx('notes', 'readonly', s => reqP(s.index('convoId').getAll(convoId)));
+  return tx('notes', 'readonly', s => reqP(s.index('convoId').getAll(convoId)))
+    .then(list => (list || []).filter(n => !n.deleted));
 }
 
 export function addNote(convoId, fieldKey, content, sourceCfis = []) {
-  return put('notes', { convoId, fieldKey, content, sourceCfis, ts: Date.now() });
+  const now = Date.now();
+  return put('notes', { uid: crypto.randomUUID(), convoId, fieldKey, content, sourceCfis, ts: now, updatedAt: now });
 }
 
 export function updateNote(id, patch) {
   return tx('notes', 'readwrite', async s => {
     const cur = await reqP(s.get(id));
     if (!cur) return;
-    return reqP(s.put({ ...cur, ...patch, id }));
+    return reqP(s.put({ ...cur, ...patch, id, updatedAt: Date.now() }));
   });
 }
 
+// Borrado lógico (tombstone): el borrado se propaga en el sync en vez de
+// resucitar en la unión. La purga física la hace purgeDeletedNotes().
 export function deleteNote(id) {
-  return tx('notes', 'readwrite', s => reqP(s.delete(id)));
+  return tx('notes', 'readwrite', async s => {
+    const cur = await reqP(s.get(id));
+    if (!cur) return;
+    const now = Date.now();
+    return reqP(s.put({ ...cur, deleted: true, deletedAt: now, updatedAt: now }));
+  });
+}
+
+// Purga física de tombstones de notas anteriores a `olderThan` (ms epoch).
+export function purgeDeletedNotes(olderThan) {
+  return tx('notes', 'readwrite', s => new Promise((resolve, reject) => {
+    const cur = s.openCursor();
+    cur.onsuccess = () => {
+      const c = cur.result;
+      if (!c) return resolve();
+      if (c.value.deleted && (c.value.deletedAt || 0) < olderThan) c.delete();
+      c.continue();
+    };
+    cur.onerror = () => reject(cur.error);
+  }));
+}
+
+// Sync Fase 0 · Backfill de uid/updatedAt en los stores con id autoincremental
+// (messages, notes, decks): el id entero colisiona entre dispositivos, el merge
+// va por uid. Idempotente: solo escribe campos ausentes.
+export function backfillSyncFields(now = Date.now()) {
+  const backfill = (store) => tx(store, 'readwrite', s => new Promise((resolve, reject) => {
+    const cur = s.openCursor();
+    cur.onsuccess = () => {
+      const c = cur.result;
+      if (!c) return resolve();
+      const v = c.value;
+      let changed = false;
+      if (!v.uid) { v.uid = crypto.randomUUID(); changed = true; }
+      if (!v.updatedAt) { v.updatedAt = v.ts || v.createdAt || now; changed = true; }
+      if (changed) c.update(v);
+      c.continue();
+    };
+    cur.onerror = () => reject(cur.error);
+  }));
+  return Promise.all(['messages', 'notes', 'decks'].map(backfill));
 }
 
 // Mazos de flashcards (export a Anki) ----------------------------------------
@@ -214,14 +261,15 @@ export function getAllDecks() {
 }
 
 export function addDeck(deck) {
-  return tx('decks', 'readwrite', s => reqP(s.put({ ...deck, createdAt: Date.now() })));
+  const now = Date.now();
+  return tx('decks', 'readwrite', s => reqP(s.put({ uid: crypto.randomUUID(), ...deck, createdAt: now, updatedAt: now })));
 }
 
 export function updateDeck(id, patch) {
   return tx('decks', 'readwrite', async s => {
     const cur = await reqP(s.get(id));
     if (!cur) return;
-    return reqP(s.put({ ...cur, ...patch, id }));
+    return reqP(s.put({ ...cur, ...patch, id, updatedAt: Date.now() }));
   });
 }
 

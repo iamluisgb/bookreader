@@ -5,6 +5,30 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-12 — Sync Fase 0: modelo de datos mergeable + Worker de auth (P7)
+
+Base del sync multi-dispositivo según [`SYNC_PLAN.md`](SYNC_PLAN.md). Shippeable sola:
+mejora también el backup (los borrados ya no "resucitan" al restaurar sobre datos vivos).
+
+- **Identidad estable por item** (`js/sync/schema.js`): subrayados, marcadores, mensajes,
+  notas y decks llevan `uid` global (EPUB/bookmarks: el CFI — mismo pasaje → mismo uid en
+  cualquier dispositivo; PDF/IDB: UUID) + `updatedAt` (LWW por item en el merge futuro).
+- **Tombstones**: borrar subrayados/marcadores/notas marca `deleted/deletedAt` en vez de
+  filtrar el array — el borrado podrá propagarse entre dispositivos. `getAll()`/`getNotes()`
+  ocultan tombstones (la UI no cambia); `getAllRaw()` los expone para sync/backup. Re-crear
+  un item borrado (mismo CFI) lo resucita conservando el uid. Purga física a los 30 días.
+- **Migración idempotente al arrancar**: backfill de `uid`/`updatedAt` en datos existentes
+  (localStorage por prefijo + cursor sobre `messages`/`notes`/`decks` en IDB), marca
+  `sync_schema_migrated`. `importBackup()` re-aplica el backfill (backups antiguos sin uid).
+- **Infra de auth Drive** (`workers/auth/`): Cloudflare Worker stateless desplegado
+  (`bookreader-auth.luisgonzalezb93.workers.dev`) con `/auth/exchange` y `/auth/refresh` —
+  custodia el `client_secret` de Google (secret de wrangler), CORS a localhost:8000 +
+  luisgonzalezbernal.com, PKCE. Guías en `docs/GUIA_CLOUDFLARE.md` y `docs/GUIA_MONETIZACION.md`.
+- Tests: `tests/sync-schema.spec.ts` (6) — backfill idempotente, tombstone+resurrección en
+  highlights/bookmarks, uid estable en IDB, tombstone de notas, purga por TTL. Suite: 102 ✓.
+
+---
+
 ## 2026-07-09 — Reorganización de URLs: landing en la raíz, app en /app/
 
 El landing pasa a ser la portada (`/bookreader/`) y la app se muda a `/bookreader/app/`.

@@ -1,4 +1,5 @@
 import * as Storage from './storage.js';
+import { newUid, tombstone, revive } from './sync/schema.js';
 
 const HIGHLIGHTS_KEY = 'highlights';
 let currentBookId = null;
@@ -16,29 +17,43 @@ function getKey() {
   return HIGHLIGHTS_KEY + '_' + currentBookId;
 }
 
-export function getAll() {
+// Lista cruda, tombstones incluidos. Los mutadores operan SIEMPRE sobre esta
+// (si trabajaran sobre la filtrada, cada guardado purgaría los tombstones).
+// El sync y el backup también la necesitan para propagar borrados.
+export function getAllRaw() {
   return Storage.get(getKey(), []);
 }
 
+// Solo los subrayados vivos: lo que consume la UI y el export.
+export function getAll() {
+  return getAllRaw().filter(h => !h.deleted);
+}
+
 export function add(cfi, text, color, chapter, note = '') {
-  const highlights = getAll();
+  const highlights = getAllRaw();
   const existing = highlights.find(h => h.cfi === cfi);
+  const now = Date.now();
   if (existing) {
-    // Mismo pasaje: actualiza color y nota en vez de duplicar.
+    // Mismo pasaje: actualiza color y nota en vez de duplicar. Si estaba
+    // borrado, re-subrayarlo lo resucita conservando el uid (CFI).
     existing.color = color || existing.color;
     if (note) existing.note = note;
+    if (existing.deleted) revive(existing, now);
+    existing.updatedAt = now;
     Storage.set(getKey(), highlights);
     if (onChangeCallback) onChangeCallback();
     return true;
   }
   highlights.push({
+    uid: cfi,                // identidad global: mismo pasaje → mismo uid en todo dispositivo
     id: cfi,                 // en EPUB el propio CFI es la identidad
     cfi,
     text: text || '',
     color: color || '#ffeb3b',
     chapter: chapter || '',
     note: note || '',
-    timestamp: Date.now()
+    timestamp: now,
+    updatedAt: now
   });
   Storage.set(getKey(), highlights);
   if (onChangeCallback) onChangeCallback();
@@ -49,9 +64,11 @@ export function add(cfi, text, color, chapter, note = '') {
 // coordenadas FRACCIONALES (0..1) de la página, para re-pintarse nítido a cualquier
 // escala/HiDPI. No hay CFI. Identidad = id generado.
 export function addPdf(page, rects, text, color, chapter, note = '') {
-  const highlights = getAll();
+  const highlights = getAllRaw();
   const id = 'pdf-' + page + '-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7);
+  const now = Date.now();
   highlights.push({
+    uid: newUid(),           // en PDF no hay clave natural → UUID
     id,
     page,
     rects: rects || [],
@@ -59,7 +76,8 @@ export function addPdf(page, rects, text, color, chapter, note = '') {
     color: color || '#ffeb3b',
     chapter: chapter || `Pág. ${page}`,
     note: note || '',
-    timestamp: Date.now()
+    timestamp: now,
+    updatedAt: now
   });
   Storage.set(getKey(), highlights);
   if (onChangeCallback) onChangeCallback();
@@ -71,27 +89,33 @@ export function getByPage(page) {
   return getAll().filter(h => h.page === page);
 }
 
-// Borra por identidad genérica (id de PDF o CFI de EPUB).
+// Borra por identidad genérica (id de PDF o CFI de EPUB). Deja tombstone para
+// que el borrado se propague en el sync en vez de resucitar en la unión.
 export function removeById(id) {
-  let highlights = getAll();
-  highlights = highlights.filter(h => (h.id ?? h.cfi) !== id);
+  const highlights = getAllRaw();
+  const h = highlights.find(x => !x.deleted && (x.id ?? x.cfi) === id);
+  if (!h) return;
+  tombstone(h);
   Storage.set(getKey(), highlights);
   if (onChangeCallback) onChangeCallback();
 }
 
 export function setNote(cfi, note) {
-  const highlights = getAll();
-  const h = highlights.find(x => x.cfi === cfi);
+  const highlights = getAllRaw();
+  const h = highlights.find(x => !x.deleted && x.cfi === cfi);
   if (!h) return false;
   h.note = note;
+  h.updatedAt = Date.now();
   Storage.set(getKey(), highlights);
   if (onChangeCallback) onChangeCallback();
   return true;
 }
 
 export function remove(cfi) {
-  let highlights = getAll();
-  highlights = highlights.filter(h => h.cfi !== cfi);
+  const highlights = getAllRaw();
+  const h = highlights.find(x => !x.deleted && x.cfi === cfi);
+  if (!h) return;
+  tombstone(h);
   Storage.set(getKey(), highlights);
   if (onChangeCallback) onChangeCallback();
 }

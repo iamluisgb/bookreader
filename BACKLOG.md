@@ -188,8 +188,13 @@ resultados con ↑/↓.)_
 - Confirmación al borrar y borrar desde el propio resaltado en el lector.
 - _(El backup/restore de highlights y bookmarks ya lo cubre P3, ver CHANGELOG.)_
 
-### P7 — Sync entre dispositivos · `L`
-Requiere backend (hoy todo es local-first: IndexedDB + localStorage).
+### P7 — Sync entre dispositivos · **fase 0 ✓** `L`
+Plan completo en [`SYNC_PLAN.md`](SYNC_PLAN.md). **Fase 0 hecha** (ver CHANGELOG): modelo de
+datos mergeable (uid/updatedAt/tombstones) + migración idempotente. **Infra lista**: Worker de
+refresh de tokens desplegado (`workers/auth/`, `bookreader-auth.luisgonzalezb93.workers.dev`) y
+OAuth client de Google creado. **Pendiente**: Fase 1 (DriveProvider + backup/restore manual a
+Drive), Fase 2 (SyncEngine automático), Fase 3 (WebDAV). Antes de dar sync a usuarios: pasar el
+consent screen de Google a producción (en Testing los refresh tokens caducan a los 7 días).
 
 ### P8 — Exportar libretas y conversaciones · **fase 1 ✓** `M`
 **Fase 1 hecha** (ver CHANGELOG): botón "Exportar" en el panel → `.md` de la conversación activa
