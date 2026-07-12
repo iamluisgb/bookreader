@@ -194,9 +194,10 @@ Plan completo en [`SYNC_PLAN.md`](SYNC_PLAN.md). **Fase 0 hecha**: modelo de dat
 DriveProvider (PKCE + Worker + appDataFolder + etag/412) y Guardar/Restaurar manual en
 Ajustes → Datos sobre el layout por-libro. **Infra**: Worker desplegado (`workers/auth/`,
 `bookreader-auth.luisgonzalezb93.workers.dev`), OAuth client de Google configurado.
+Consent screen de Google **publicado a producción** (2026-07-12): sin caducidad de refresh
+tokens ni lista de testers. Flujo real verificado: conectar → guardar en Drive OK.
 **Pendiente**: Fase 2 (SyncEngine automático: pull→merge→push, triggers, multi-pestaña),
-Fase 3 (WebDAV + recovery de revisiones desde la UI). Antes de dar sync a usuarios: pasar el
-consent screen de Google a producción (en Testing los refresh tokens caducan a los 7 días).
+Fase 3 (WebDAV + recovery de revisiones desde la UI).
 
 ### P8 — Exportar libretas y conversaciones · **fase 1 ✓** `M`
 **Fase 1 hecha** (ver CHANGELOG): botón "Exportar" en el panel → `.md` de la conversación activa
