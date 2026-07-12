@@ -5,6 +5,28 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-12 — Sync Fase 2a: merge por item — restaurar ya no pisa, fusiona (P7)
+
+Primer tramo del SyncEngine: el merge determinista del plan, adelantado al Restaurar
+manual. Caso cubierto: el mismo libro con notas distintas en dos dispositivos.
+
+- **`js/sync/merge.js`**: unión por `uid`, LWW por item (`updatedAt` mayor gana),
+  tombstones se propagan (y una edición posterior al borrado resucita). En empate
+  exacto gana el borrado (determinista). Conmutativo e idempotente (A⊕B == B⊕A,
+  A⊕A == A) — verificado por test.
+- **`restoreSnapshot()` fusiona**: subrayados/marcadores por item; mensajes/notas
+  (IDB) casan por `uid` **conservando el id local** (el id autoincremental jamás se
+  importa crudo: mismo id ≠ mismo registro entre dispositivos); convos por id global
+  con LWW por `lastUsedAt`; escalares sin `updatedAt` (posición, ajustes) gana remoto
+  en un Restaurar explícito. Nunca borra datos locales que el remoto no conozca.
+- Tests: `tests/merge.spec.ts` (3) — propiedades algebraicas del merge, escenario
+  dos-dispositivos end-to-end (A guarda, B con notas propias restaura → unión sin
+  pérdidas, LWW en el pasaje compartido), remapeo de ids en IDB. Suite: 109 ✓. SW `v62`.
+- Falta de la Fase 2: SyncEngine (pull→merge→push con reintento en 412), triggers
+  automáticos (arranque/debounce/periódico/visibilitychange), lock multi-pestaña, badge.
+
+---
+
 ## 2026-07-12 — Sync Fase 1: DriveProvider + Guardar/Restaurar en Drive (P7)
 
 Primer proveedor de almacenamiento sobre la interfaz `StorageProvider` del plan

@@ -9,6 +9,7 @@
 
 import * as Storage from '../storage.js';
 import * as DB from '../ai/db.js';
+import { mergeCollections } from './merge.js';
 
 export const SCHEMA_VERSION = 1;
 export const BASE = 'bookreader/';
@@ -86,9 +87,18 @@ export async function buildSnapshot() {
   return { manifest, settings, books };
 }
 
-// Aplica un snapshot remoto encima del estado local. Fusiona clave a clave
-// (sobrescribe lo que coincide, no borra el resto) — misma semántica que el
-// import de backup. El merge fino por item llega con el SyncEngine (Fase 2).
+// Colecciones por-item dentro de las claves por-libro: se fusionan con
+// mergeCollections; el resto de claves por-libro (posición, modo) y los
+// ajustes son escalares sin updatedAt → en un Restaurar explícito gana remoto.
+const MERGE_PREFIXES = ['highlights_', 'bookmarks_'];
+
+// Aplica un snapshot remoto FUSIONANDO con lo local (Fase 2 · merge):
+//   - subrayados/marcadores: unión por uid, LWW por item, tombstones se propagan
+//   - mensajes/notas (IDB): casan por uid conservando el id local (el id
+//     autoincremental colisiona entre dispositivos y jamás se importa crudo)
+//   - convos: unión por id global; gana el lastUsedAt mayor
+//   - escalares (ajustes, posición de lectura): gana remoto en un Restaurar
+// Nunca borra datos locales que el remoto no conozca.
 export async function restoreSnapshot({ settings = {}, books = {} }) {
   let keys = 0;
   let records = 0;
@@ -99,12 +109,22 @@ export async function restoreSnapshot({ settings = {}, books = {} }) {
   }
   for (const b of Object.values(books)) {
     for (const [k, v] of Object.entries(b.local || {})) {
-      Storage.set(k, v);
+      if (MERGE_PREFIXES.some(p => k.startsWith(p)) && Array.isArray(v)) {
+        Storage.set(k, mergeCollections(Storage.get(k, []), v));
+      } else {
+        Storage.set(k, v);
+      }
       keys++;
     }
-    for (const c of b.convos || []) { await DB.put('convos', c); records++; }
-    for (const m of b.messages || []) { await DB.put('messages', m); records++; }
-    for (const n of b.notes || []) { await DB.put('notes', n); records++; }
+    for (const c of b.convos || []) {
+      const cur = await DB.get('convos', c.id);
+      if (!cur || (c.lastUsedAt || 0) > (cur.lastUsedAt || 0)) {
+        await DB.put('convos', { ...cur, ...c });
+        records++;
+      }
+    }
+    records += await DB.mergeRecords('messages', b.messages);
+    records += await DB.mergeRecords('notes', b.notes);
     for (const r of b.ratings || []) { await DB.put('ratings', r); records++; }
     if (b.meta) { await DB.put('books', b.meta); records++; }
   }

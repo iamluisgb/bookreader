@@ -227,6 +227,37 @@ export function purgeDeletedNotes(olderThan) {
   }));
 }
 
+// Sync · Fusiona registros remotos en un store con id autoincremental, casando
+// por uid (el id numérico local NO viaja entre dispositivos): mismo uid → gana
+// el updatedAt mayor conservando el id LOCAL; uid nuevo → inserta con id nuevo.
+export function mergeRecords(store, records) {
+  if (!records || !records.length) return Promise.resolve(0);
+  return tx(store, 'readwrite', async s => {
+    const existing = await reqP(s.getAll());
+    const byUid = new Map();
+    for (const e of existing) if (e.uid) byUid.set(e.uid, e);
+    let written = 0;
+    for (const r of records) {
+      if (!r || !r.uid) continue; // registros pre-Fase 0: no mergeables
+      const l = byUid.get(r.uid);
+      if (l) {
+        const ru = r.updatedAt || 0;
+        const lu = l.updatedAt || 0;
+        if (ru > lu || (ru === lu && r.deleted && !l.deleted)) {
+          await reqP(s.put({ ...r, id: l.id }));
+          written++;
+        }
+      } else {
+        const rest = { ...r };
+        delete rest.id; // el id remoto no vale aquí: autoincrement asigna uno local
+        await reqP(s.put(rest));
+        written++;
+      }
+    }
+    return written;
+  });
+}
+
 // Sync Fase 0 · Backfill de uid/updatedAt en los stores con id autoincremental
 // (messages, notes, decks): el id entero colisiona entre dispositivos, el merge
 // va por uid. Idempotente: solo escribe campos ausentes.
