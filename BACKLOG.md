@@ -188,12 +188,14 @@ resultados con ↑/↓.)_
 - Confirmación al borrar y borrar desde el propio resaltado en el lector.
 - _(El backup/restore de highlights y bookmarks ya lo cubre P3, ver CHANGELOG.)_
 
-### P7 — Sync entre dispositivos · **fase 0 ✓** `L`
-Plan completo en [`SYNC_PLAN.md`](SYNC_PLAN.md). **Fase 0 hecha** (ver CHANGELOG): modelo de
-datos mergeable (uid/updatedAt/tombstones) + migración idempotente. **Infra lista**: Worker de
-refresh de tokens desplegado (`workers/auth/`, `bookreader-auth.luisgonzalezb93.workers.dev`) y
-OAuth client de Google creado. **Pendiente**: Fase 1 (DriveProvider + backup/restore manual a
-Drive), Fase 2 (SyncEngine automático), Fase 3 (WebDAV). Antes de dar sync a usuarios: pasar el
+### P7 — Sync entre dispositivos · **fases 0-1 ✓** `L`
+Plan completo en [`SYNC_PLAN.md`](SYNC_PLAN.md). **Fase 0 hecha**: modelo de datos mergeable
+(uid/updatedAt/tombstones) + migración idempotente. **Fase 1 hecha** (ver CHANGELOG):
+DriveProvider (PKCE + Worker + appDataFolder + etag/412) y Guardar/Restaurar manual en
+Ajustes → Datos sobre el layout por-libro. **Infra**: Worker desplegado (`workers/auth/`,
+`bookreader-auth.luisgonzalezb93.workers.dev`), OAuth client de Google configurado.
+**Pendiente**: Fase 2 (SyncEngine automático: pull→merge→push, triggers, multi-pestaña),
+Fase 3 (WebDAV + recovery de revisiones desde la UI). Antes de dar sync a usuarios: pasar el
 consent screen de Google a producción (en Testing los refresh tokens caducan a los 7 días).
 
 ### P8 — Exportar libretas y conversaciones · **fase 1 ✓** `M`

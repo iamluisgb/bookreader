@@ -5,6 +5,34 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-12 — Sync Fase 1: DriveProvider + Guardar/Restaurar en Drive (P7)
+
+Primer proveedor de almacenamiento sobre la interfaz `StorageProvider` del plan
+([`SYNC_PLAN.md`](SYNC_PLAN.md)). Hito verificado por test: guardar en Drive, borrar
+datos locales, restaurar → todo vuelve (tombstones incluidos).
+
+- **Auth** (`js/sync/drive-auth.js`): authorization-code + PKCE en popup
+  (`auth/callback.html` reenvía el code por BroadcastChannel); intercambio y refresh
+  vía Worker de Cloudflare. El `refresh_token` vive en localStorage **excluido del
+  backup** (SECRET_KEYS); el access token solo en memoria. Token revocado → estado
+  "reconectar", sin bucles de error.
+- **Provider** (`js/sync/drive-provider.js`): `list/read/write/remove` sobre
+  `appDataFolder` (REST v3, multipart, portado de arete), 401 → refresh + un reintento.
+  Concurrencia optimista con `version` como etag: `write(..., {ifMatch})` falla con
+  `err.code=412` si el remoto cambió (mejor esfuerzo; el retry-loop llega en Fase 2).
+  API de revisiones lista para el recovery de Fase 3.
+- **Layout por-libro** (`js/sync/layout.js`): `bookreader/manifest.json` +
+  `settings.json` + `books/<id>.json` (subrayados/marcadores crudos con tombstones,
+  posición, convos, mensajes, notas, ratings). El manifest se sube el último para no
+  indexar estados a medias. Secretos (`ai_key`, `drive_refresh_token`) jamás viajan.
+- **UI** en Ajustes → Datos: Conectar/Desconectar Drive, Guardar y Restaurar con
+  progreso; restaurar fusiona (semántica del import de backup).
+- Tests: `tests/drive-sync.spec.ts` (4) con Drive y Worker mockeados por interceptación
+  de red — hito completo, layout, exclusión de secretos, 412, reconectar. Suite: 106 ✓.
+- SW `v61`: precache de `js/sync/*` y `auth/callback.*`.
+
+---
+
 ## 2026-07-12 — Sync Fase 0: modelo de datos mergeable + Worker de auth (P7)
 
 Base del sync multi-dispositivo según [`SYNC_PLAN.md`](SYNC_PLAN.md). Shippeable sola:

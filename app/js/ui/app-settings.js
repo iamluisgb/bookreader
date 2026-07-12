@@ -10,6 +10,8 @@
 import * as LLM from '../ai/llm.js';
 import { BLOCKS, allTemplates } from '../ai/templates.js';
 import * as CustomTpl from '../ai/custom-templates.js';
+import * as DriveAuth from '../sync/drive-auth.js';
+import * as DriveSync from '../sync/drive-sync.js';
 import * as Profiles from '../ai/profiles.js';
 import * as Backup from '../backup.js';
 import { icon } from './icons.js';
@@ -463,6 +465,18 @@ function dataHtml() {
     <label class="appset-label" style="margin-top:18px">Importar backup</label>
     <p class="appset-muted">Restaura desde un JSON. Fusiona: sobrescribe lo que coincida, no borra el resto.</p>
     <input type="file" id="appset-import-file" class="appset-input" accept="application/json,.json" />
+
+    <label class="appset-label" style="margin-top:18px">Google Drive</label>
+    <p class="appset-muted">Guarda tus datos en una carpeta privada de tu propio Drive. El único servidor
+      implicado solo renueva tu permiso de Google: tus libros y notas van directos de tu navegador a tu Drive.</p>
+    <div id="appset-drive-off">
+      <button id="appset-drive-connect" class="primary-btn appset-save">${icon('upload', { size: 15 })} Conectar con Google Drive</button>
+    </div>
+    <div id="appset-drive-on" hidden>
+      <button id="appset-drive-save" class="primary-btn appset-save">${icon('upload', { size: 15 })} Guardar en Drive</button>
+      <button id="appset-drive-restore" class="appset-tpl-cancel appset-data-md">${icon('download', { size: 15 })} Restaurar desde Drive</button>
+      <button id="appset-drive-disconnect" class="appset-tpl-cancel appset-data-md">Desconectar</button>
+    </div>
     <p class="appset-data-msg" id="appset-data-msg" hidden></p>
   </div>`;
 }
@@ -495,6 +509,62 @@ function wireData(content) {
     } finally {
       e.target.value = '';   // permitir reimportar el mismo archivo
     }
+  });
+
+  wireDrive(content, show);
+}
+
+// ---- Google Drive (sync Fase 1: guardar/restaurar manual) -------------------
+
+function wireDrive(content, show) {
+  const offBlock = content.querySelector('#appset-drive-off');
+  const onBlock = content.querySelector('#appset-drive-on');
+  const refresh = () => {
+    const on = DriveAuth.isConnected();
+    offBlock.hidden = on;
+    onBlock.hidden = !on;
+  };
+  refresh();
+
+  // El error 'reconnect' (token revocado/caducado) degrada a "conectar de nuevo".
+  const fail = (prefix) => (err) => {
+    if (err.message === 'reconnect') {
+      refresh();
+      show('El permiso de Google caducó o fue revocado. Vuelve a conectar con Drive.', true);
+    } else {
+      show(prefix + ': ' + err.message, true);
+    }
+  };
+
+  content.querySelector('#appset-drive-connect').addEventListener('click', () => {
+    show('Abriendo la ventana de Google…');
+    DriveAuth.connect()
+      .then(() => { refresh(); show(`${icon('check', { size: 14 })} Drive conectado.`); })
+      .catch(fail('No se pudo conectar'));
+  });
+
+  content.querySelector('#appset-drive-disconnect').addEventListener('click', () => {
+    DriveAuth.disconnect();
+    refresh();
+    show('Drive desconectado. Tus datos siguen en tu Drive y en este dispositivo.');
+  });
+
+  content.querySelector('#appset-drive-save').addEventListener('click', () => {
+    show('Guardando en Drive…');
+    DriveSync.saveToDrive((done, total) => show(`Guardando en Drive… ${done}/${total}`))
+      .then(r => show(`${icon('check', { size: 14 })} Guardado en Drive (${r.books} ${r.books === 1 ? 'libro' : 'libros'}).`))
+      .catch(fail('No se pudo guardar'));
+  });
+
+  content.querySelector('#appset-drive-restore').addEventListener('click', () => {
+    show('Restaurando desde Drive…');
+    DriveSync.restoreFromDrive((done, total) => show(`Restaurando… ${done}/${total}`))
+      .then(r => {
+        if (!r) return show('No hay nada guardado en Drive todavía.', true);
+        show(`${icon('check', { size: 14 })} Restaurado: ${r.keys} ajustes y ${r.records} registros. <button id="appset-drive-reload" class="appset-data-reload">Recargar para aplicar</button>`);
+        content.querySelector('#appset-drive-reload').addEventListener('click', () => location.reload());
+      })
+      .catch(fail('No se pudo restaurar'));
   });
 }
 

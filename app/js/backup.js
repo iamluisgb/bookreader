@@ -19,7 +19,7 @@ import { backfillAll } from './sync/schema.js';
 
 const FORMAT = 'bookreader-backup';
 const VERSION = 1;
-const SECRET_KEYS = ['ai_key'];                 // nunca exportar la API key
+const SECRET_KEYS = ['ai_key', 'drive_refresh_token'];  // secretos: jamás a un fichero descargable
 const AI_STORES = ['convos', 'messages', 'notes', 'ratings', 'books'];
 
 // ---- Export ----------------------------------------------------------------

@@ -1,7 +1,14 @@
-const CACHE_NAME = 'bookreader-v60';
+const CACHE_NAME = 'bookreader-v61';
 const ASSETS = [
   './',
   './index.html',
+  './auth/callback.html',
+  './auth/callback.js',
+  './js/sync/schema.js',
+  './js/sync/drive-auth.js',
+  './js/sync/drive-provider.js',
+  './js/sync/layout.js',
+  './js/sync/drive-sync.js',
   './css/main.css',
   './css/reader.css',
   './css/themes.css',
