@@ -190,9 +190,17 @@ trimestral, y el 303/390 de IVA si el alta lo incluye). No presentar una
 declaración obligatoria, aunque sea a cero, son ~200 € de multa por modelo
 (100 € si se regulariza fuera de plazo sin requerimiento). Por tanto:
 
-- **No darse de alta "por si acaso" con meses de antelación**: presentar el 036
-  con fecha de inicio justo antes de activar el checkout, para minimizar
-  trimestres vacíos que declarar.
+- **No darse de alta "por si acaso" con meses de antelación**: minimizar los
+  trimestres vacíos que declarar. Dos timings posibles:
+  - *Estricto (riesgo cero)*: 036 con fecha de inicio justo antes de activar el
+    checkout — la lectura literal es que "poner el producto a la venta" ya es
+    inicio de actividad.
+  - *Pragmático (lo habitual en indie)*: activar el checkout y presentar el 036
+    **el mismo día de la primera venta**, con esa fecha de inicio. Polar no
+    exige ser autónomo ni empresa para el alta (KYC de particular: DNI + IBAN
+    personal), y el payout llega días después de la venta, así que el alta
+    siempre puede preceder al cobro. La exposición real de esta ventana es
+    mínima: si no hay ventas, no hay hecho imponible que inspeccionar.
 - Si el lanzamiento no arranca, se presenta la **baja censal** (otro 036/037,
   también gratis) y se acaban las obligaciones.
 - Pedir al gestor que configure el alta con las mínimas obligaciones posibles
