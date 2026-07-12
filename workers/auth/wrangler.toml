@@ -1,0 +1,12 @@
+name = "bookreader-auth"
+main = "src/index.js"
+compatibility_date = "2026-07-01"
+
+# account_id no es necesario si has hecho `wrangler login` con una sola cuenta;
+# si wrangler lo pide, sale de `npx wrangler whoami`.
+
+[vars]
+# Client ID público del OAuth client de Google (paso 4 de docs/GUIA_CLOUDFLARE.md)
+GOOGLE_CLIENT_ID = "PENDIENTE.apps.googleusercontent.com"
+# Dominio exacto de la app (origen permitido por CORS)
+ALLOWED_ORIGIN = "http://localhost:5173"
