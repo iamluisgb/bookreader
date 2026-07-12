@@ -150,6 +150,61 @@ Solo cuando todo esto pasa en sandbox, repetir producto+discount en producción.
 - [ ] Los 7 puntos de verificación en sandbox pasan
 - [ ] Gestor consultado sobre la declaración de los payouts de Polar (MoR)
 
+## Situación fiscal en España (sin estar dado de alta como autónomo)
+
+> Orientación, no asesoría. Confirmar con gestor antes de activar ventas reales.
+
+"Darse de alta" son **dos organismos distintos** con costes y reglas diferentes:
+
+### 1. Hacienda — alta censal (modelo 036/037): obligatoria y gratis
+
+- Para ejercer actividad económica (aunque sea una venta de $19) la ley exige
+  estar en el censo de empresarios **antes de empezar**. Se presenta online con
+  Cl@ve/certificado digital en ~10 minutos. **No tiene coste ni cuota mensual**
+  (el IAE está exento para personas físicas).
+- Sin alta censal y con ventas: sanción típica de ~400 € si hay inspección, más
+  recargos por lo no declarado.
+- Los payouts de Polar se declaran en el **IRPF** siempre (rendimientos de
+  actividad económica), estés de alta o no. Con alta, toca además el **modelo
+  130** trimestral (pagos fraccionados; trámite, no coste extra).
+- Ventaja del modelo MoR: el cliente le compra a Polar → **no gestionas IVA de
+  compradores ni OSS**. Tu única relación fiscal es con Polar (servicio a
+  empresa de EE. UU., sin IVA español).
+
+### 2. Seguridad Social — RETA (la cuota de ~200-300 €/mes): depende de la habitualidad
+
+- La ley exige RETA cuando la actividad es *habitual*, sin definirlo con cifras.
+  La jurisprudencia acepta que ingresos **esporádicos y bajos** (el SMI anual se
+  usa como referencia orientativa, no es regla escrita) no obligan al alta.
+- Con un puñado de ventas sueltas, riesgo real muy bajo. Con ventas continuadas
+  mes a mes deja de haber debate: es habitual aunque el importe sea modesto.
+- **Cuándo darse de alta**: con tracción real (el objetivo del plan, 55-60
+  ventas, ya lo es). La **tarifa plana** (~87 €/mes el primer año) se paga con
+  5-6 ventas/mes a ~$17 netos.
+
+### El alta censal crea obligaciones aunque no vendas nada
+
+Presentar el 036/037 no cuesta dinero, pero desde la fecha de alta **hay que
+presentar las declaraciones periódicas aunque salgan a cero** (el 130
+trimestral, y el 303/390 de IVA si el alta lo incluye). No presentar una
+declaración obligatoria, aunque sea a cero, son ~200 € de multa por modelo
+(100 € si se regulariza fuera de plazo sin requerimiento). Por tanto:
+
+- **No darse de alta "por si acaso" con meses de antelación**: presentar el 036
+  con fecha de inicio justo antes de activar el checkout, para minimizar
+  trimestres vacíos que declarar.
+- Si el lanzamiento no arranca, se presenta la **baja censal** (otro 036/037,
+  también gratis) y se acaban las obligaciones.
+- Pedir al gestor que configure el alta con las mínimas obligaciones posibles
+  para este caso (servicios a empresa no establecida en la UE).
+
+### Plan de acción resumido
+
+1. Justo antes de activar el checkout de Polar → alta censal 036/037 (gratis).
+2. Presentar los trimestrales (130 y, si aplica, 303) aunque sean a cero, y
+   declarar los ingresos en la renta.
+3. RETA con tarifa plana en cuanto haya ventas recurrentes.
+
 ## Apéndice — por qué no las otras
 
 | Plataforma | Estado 2026-07 | Por qué no |
