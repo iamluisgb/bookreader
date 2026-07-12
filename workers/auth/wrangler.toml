@@ -8,5 +8,5 @@ compatibility_date = "2026-07-01"
 [vars]
 # Client ID público del OAuth client de Google (paso 4 de docs/GUIA_CLOUDFLARE.md)
 GOOGLE_CLIENT_ID = "1075634570118-8ipsh5pn768rof3u0mq5rhqv2pp2dgqm.apps.googleusercontent.com"
-# Dominio exacto de la app (origen permitido por CORS)
-ALLOWED_ORIGIN = "http://localhost:5173"
+# Orígenes permitidos por CORS, separados por comas (dev + producción)
+ALLOWED_ORIGINS = "http://localhost:8000,https://luisgonzalezbernal.com"
