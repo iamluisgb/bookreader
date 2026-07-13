@@ -361,6 +361,33 @@ vía deep-link) · F3 ✓ (racha + mini-stats por mazo). Ver CHANGELOG 2026-07-0
 - **Datos sin bump de esquema:** `card.srs` inline en `deck.cards` (sin `srs` = nueva); `updateDeck` ya
   persiste y el editor conserva el campo (spread). `due` en días (medianoche local).
 
+### P11 — Compartir frase subrayada en redes (tarjeta-cita) · `M` · **distribución**
+Al subrayar (o desde un highlight existente), botón "Compartir" que genera una **tarjeta-cita**
+(imagen PNG, canvas, CSP-safe) con la frase + título/autor + marca discreta "hecho con BookReader",
+para postear en redes. Reusar el enfoque del **content-engine**. Temas claro/oscuro.
+- **Por qué:** acción viral natural (la gente comparte citas de libros) → marketing gratis, ataca la
+  debilidad de distribución. Coherente con privacy: la imagen se genera en local, el usuario elige
+  compartir, nada se sube solo.
+- Prioridad alta como jugada de distribución. Ver también [P6](#p6--mejoras-de-subrayados--sm).
+
+### P12 — Flashcards por libro y por estantería (selector de repaso) · `S`–`M` · **victoria rápida**
+Hoy "Repasar hoy" mezcla los mazos de todos los libros. Añadir un **selector**: repasar todo / este
+libro / esta estantería. Quita la fricción ("está todo mezclado") que **bloquea el hábito de repaso**.
+- **Infra casi toda existe:** mazos ya son por `bookId`; las **estanterías ya existen**
+  ([`library/store.js`](js/library/store.js): `shelves` + `shelfIds`); el modo Estudiar ya acepta un
+  subconjunto (`Study.open({ decks })`). Falta sobre todo el **selector** (UI) que filtre los mazos por
+  libro/estantería antes de pasarlos a `Study.open`.
+- Habilita gate Pro natural (repaso por estantería). Empezar por aquí (mejor ratio esfuerzo/valor).
+
+### P13 — Resumen elegante citado · `M` · **artefacto (concreta [P9](#p9--skills--artefactos-plataforma-extensible-de-salidas-del-agente--l--futuro))**
+Resumen del libro/capítulo bonito y **citado** (cada punto enlaza a su pasaje `[[aN]]`), compartible.
+Sirve al pitch "entender más rápido" y explota el foso citado (Atlas no puede saltar a la frase exacta).
+
+### P14 — Mapa mental · `L` · **artefacto de marketing (concreta [P9](#p9--skills--artefactos-plataforma-extensible-de-salidas-del-agente--l--futuro))**
+Mapa mental (jerarquía radial, render SVG/HTML) del libro/capítulo, exportable/compartible. El artefacto
+con mayor techo de marketing (la gente postea mapas mentales), pero el más caro (layout + render). Hacer
+**después** de las victorias baratas (P11/P12/P13).
+
 ---
 
 ## 📄 PDF — paridad de features con EPUB
