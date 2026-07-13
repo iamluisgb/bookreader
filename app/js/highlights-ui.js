@@ -11,6 +11,24 @@ import * as AiPanel from './ai/panel.js';
 import { icon } from './ui/icons.js';
 import { escapeHtml } from './ui/escape.js';
 import { alertBox, promptBox } from './ui/dialog.js';
+import { shareQuote } from './share-card.js';
+
+// Título/autor del libro abierto, para la tarjeta-cita al compartir (P11). Lo fija
+// app.js al abrir (biblioteca o archivo); degrada a vacío si no se conoce.
+let bookMeta = { title: '', author: '', cover: '' };
+export function setBookMeta(m) {
+  bookMeta = { title: (m && m.title) || '', author: (m && m.author) || '', cover: (m && m.cover) || '' };
+}
+
+// Compartir un pasaje como tarjeta-cita PNG (Web Share o descarga).
+async function shareHighlight(text) {
+  try {
+    await shareQuote({ quote: text, title: bookMeta.title, author: bookMeta.author, cover: bookMeta.cover });
+  } catch (e) {
+    console.warn('No se pudo compartir la cita:', e);
+    try { alertBox('No se pudo generar la imagen para compartir.'); } catch (_) {}
+  }
+}
 
 export function initHighlights() {
   Highlights.setOnChange(() => renderHighlights());
@@ -153,6 +171,12 @@ function showHighlightTooltip(cfiRange, text, rect) {
     hideHighlightTooltip();
   };
 
+  // Compartir como tarjeta-cita
+  document.getElementById('sel-share').onclick = () => {
+    hideHighlightTooltip();
+    shareHighlight(text);
+  };
+
   // Cerrar al hacer clic fuera
   setTimeout(() => {
     document.addEventListener('click', hideHighlightTooltipOnOutside);
@@ -247,6 +271,10 @@ function showPdfSelectionTooltip(text, rect, rects, page) {
   document.getElementById('sel-copy').onclick = async () => {
     try { await navigator.clipboard.writeText(text); } catch (e) { /* sin clipboard */ }
     hideHighlightTooltip();
+  };
+  document.getElementById('sel-share').onclick = () => {
+    hideHighlightTooltip();
+    shareHighlight(text);
   };
 
   setTimeout(() => document.addEventListener('click', hideHighlightTooltipOnOutside), 100);
@@ -344,6 +372,7 @@ export function renderHighlights() {
       ${hl.note ? `<div class="highlight-note">${icon('note', { size: 13 })}<span>${escapeHtml(hl.note)}</span></div>` : ''}
       <div class="highlight-meta">
         <span>${escapeHtml(hl.chapter)}</span>
+        <button class="highlight-share" title="Compartir">${icon('share', { size: 15 })}</button>
         <button class="highlight-delete" title="Eliminar">${icon('xmark', { size: 16 })}</button>
       </div>
     `;
@@ -356,6 +385,11 @@ export function renderHighlights() {
         await EpubReader.goTo(hl.cfi);
       }
       document.getElementById('sidebar').classList.remove('open');
+    });
+
+    item.querySelector('.highlight-share').addEventListener('click', (e) => {
+      e.stopPropagation();
+      shareHighlight(hl.text);
     });
 
     item.querySelector('.highlight-delete').addEventListener('click', (e) => {

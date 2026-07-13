@@ -349,17 +349,23 @@ html, body {
   color: var(--text-faint);
   margin-top: 6px;
   display: flex;
-  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
 }
+.highlight-item .highlight-meta > span { margin-right: auto; }
 
+.highlight-item .highlight-share,
 .highlight-item .highlight-delete {
   background: none;
   border: none;
   color: var(--text-faint);
   cursor: pointer;
   font-size: 12px;
+  display: inline-flex;
+  align-items: center;
 }
 
+.highlight-item .highlight-share:hover { color: var(--accent); }
 .highlight-item .highlight-delete:hover {
   color: #e53935;
 }

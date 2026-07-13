@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bookreader-v65';
+const CACHE_NAME = 'bookreader-v66';
 const ASSETS = [
   './',
   './index.html',
@@ -29,6 +29,7 @@ const ASSETS = [
   './js/bookmarks.js',
   './js/highlights.js',
   './js/highlights-ui.js',
+  './js/share-card.js',
   './js/search.js',
   './js/bookmarks-ui.js',
   './js/progress.js',

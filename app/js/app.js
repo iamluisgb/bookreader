@@ -8,7 +8,7 @@ import * as AiPanel from './ai/panel.js';
 import * as AiDB from './ai/db.js';
 import { hydrateIcons } from './ui/icons.js';
 import { countBookWords, updateProgressDetail } from './progress.js';
-import { initHighlights, setupHighlights, setupPdfSelection, drawPdfHighlights, renderHighlights, applyStoredHighlights, hideHighlightTooltip, pdfFractionalRects } from './highlights-ui.js';
+import { initHighlights, setupHighlights, setupPdfSelection, drawPdfHighlights, renderHighlights, applyStoredHighlights, hideHighlightTooltip, pdfFractionalRects, setBookMeta } from './highlights-ui.js';
 import { initBookmarkButton, updateBookmarkButton, renderBookmarks } from './bookmarks-ui.js';
 import * as Library from './library/view.js';
 import * as LibStore from './library/store.js';
@@ -337,6 +337,7 @@ async function openBookRecord(record, { fromRoute = false, loc = null } = {}) {
     const buffer = record.file instanceof ArrayBuffer ? record.file.slice(0) : await record.file.arrayBuffer();
     Bookmarks.setBook(record.fileBaseId || record.id);
     Highlights.setBook(record.fileBaseId || record.id);
+    setBookMeta({ title: record.title, author: record.author, cover: record.cover });
     currentBook = { id: record.id, fileBaseId: record.fileBaseId || record.id, format: record.format };
     if (record.format === 'pdf') {
       const ok = await loadPdf(buffer, record.fileBaseId || record.id, record.id);
@@ -376,6 +377,7 @@ async function persistToLibrary(id, buffer, format, fileName, fileBaseId) {
     const author = format === 'pdf' ? '' : EpubReader.getAuthor();
     // Portada: EPUB de sus metadatos; PDF renderizando su página 1 (ya está cargado).
     const cover = (format === 'pdf') ? await PdfReader.renderCoverDataUrl() : await EpubReader.getCoverDataUrl();
+    setBookMeta({ title, author, cover });   // para la tarjeta-cita al compartir (P11)
     const base = existing || { id, addedAt: Date.now(), progress: 0, lastCfi: null, status: 'unread', shelfIds: [] };
     await LibStore.putBook({
       ...base, id, title, author, cover: cover || base.cover || '',

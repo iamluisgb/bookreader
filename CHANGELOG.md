@@ -5,6 +5,25 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-13 — P11: compartir una frase subrayada como tarjeta-cita
+
+Botón "Compartir" en un subrayado → genera una imagen PNG con la cita para redes.
+
+- **`js/share-card.js`**: renderiza la cita en un canvas con las **proporciones de la
+  skill libro-quote del content-engine** —1080×1080, 2 columnas (portada prominente ~40% /
+  cita ~60%)— y tokens de marca (papel cálido `#faf8f3`, cita en serif Source Serif 4,
+  chip emerald "BookReader"). La **portada** sale de la biblioteca local (la del libro
+  leído: EPUB embebido o 1ª página del PDF), no de Open Library → sin llamada externa,
+  coherente con la privacidad. Auto-ajuste de tamaño de fuente y word-wrap; sin portada,
+  la cita ocupa todo el ancho. `shareQuote` usa **Web Share** con ficheros si el navegador
+  lo soporta; si no, descarga el PNG. Todo en local, la imagen se genera en el dispositivo.
+- Botón en el **tooltip de selección** (EPUB y PDF) y en cada **subrayado del sidebar**.
+  `app.js` fija título/autor del libro (`setBookMeta`) al abrir para la atribución.
+- Tests: `tests/share-card.spec.ts` (3) — PNG válido 1080², cita larga sin romper,
+  fallback a descarga sin Web Share. Verificado visualmente en navegador. SW `v66`.
+
+---
+
 ## 2026-07-13 — Citas del agente: resaltan el TROZO exacto, no la página entera
 
 Al pulsar una referencia del agente, además de navegar, se señala el pasaje exacto.
