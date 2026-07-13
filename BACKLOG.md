@@ -196,8 +196,10 @@ item (unión por uid + LWW + tombstones) y **SyncEngine automático** — pull�
 triggers (arranque/debounce/periódico/visibilitychange), 412-retry, multi-pestaña (Web
 Locks), badge de estado, posición de lectura sincronizada. Sync sin botones al conectar Drive.
 **Infra**: Worker desplegado, OAuth de Google en producción (sin caducidad de tokens).
-Flujo real verificado. **Pendiente**: Fase 3 (WebDAV como 2º proveedor + recovery de
-revisiones desde la UI; opcional: sincronizar los ficheros de libro).
+**Fase 3 en curso**: recuperación de versiones ✓ (`recovery.js` + Ajustes → Datos →
+Historial). **Pendiente de Fase 3**: WebDAV como 2º proveedor (sync sin Worker, público
+r/selfhosted); manejo fino de errores de usuario (sin conexión, cuota llena); opcional:
+sincronizar los ficheros de libro.
 
 ### P8 — Exportar libretas y conversaciones · **fase 1 ✓** `M`
 **Fase 1 hecha** (ver CHANGELOG): botón "Exportar" en el panel → `.md` de la conversación activa

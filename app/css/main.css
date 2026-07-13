@@ -2500,3 +2500,43 @@ body.in-library .ai-fab { display: none; }
   cursor: pointer;
   pointer-events: auto;
 }
+
+/* ==== Historial de versiones (Fase 3: recuperación) ==== */
+.appset-history {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-secondary);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.appset-history-book {
+  text-align: left;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+.appset-history-book:hover { border-color: var(--accent); }
+.appset-history-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 4px;
+  font-size: 13px;
+  border-bottom: 1px solid var(--border);
+}
+.appset-history-restore {
+  padding: 4px 12px;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--accent);
+  cursor: pointer;
+}
+.appset-history-restore:disabled { opacity: 0.4; cursor: default; border-color: var(--border); color: var(--text-secondary); }

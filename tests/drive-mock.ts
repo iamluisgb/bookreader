@@ -4,7 +4,8 @@ import { Page } from '@playwright/test';
 // (appDataFolder) en memoria. El "Drive" vive en el proceso del test (Node), así
 // que sobrevive a recargas de página y sirve para simular varios dispositivos.
 
-export type DriveFile = { id: string; name: string; content: string; version: number };
+export type DriveRevision = { id: string; content: string; modifiedTime: string; size: number };
+export type DriveFile = { id: string; name: string; content: string; version: number; revisions: DriveRevision[] };
 
 export type DriveMock = {
   store: Map<string, DriveFile>;
@@ -19,6 +20,7 @@ export type DriveMock = {
 export async function installDriveMocks(page: Page): Promise<DriveMock> {
   const store = new Map<string, DriveFile>();
   let nextId = 1;
+  let revId = 1;
   const counters = { refresh: 0, manifestFinds: 0 };
   let bumpAt = -1;
   let revoked = false;
@@ -69,13 +71,28 @@ export async function installDriveMocks(page: Page): Promise<DriveMock> {
       const f = [...store.values()].find((x) => x.id === dl[1]);
       return f ? route.fulfill({ body: f.content }) : route.fulfill({ status: 404, body: '' });
     }
+    // Revisiones (recovery, Fase 3)
+    const revList = url.pathname.match(/^\/drive\/v3\/files\/([^/]+)\/revisions$/);
+    if (revList && method === 'GET') {
+      const f = [...store.values()].find((x) => x.id === revList[1]);
+      const revisions = (f?.revisions || []).map((r) => ({ id: r.id, modifiedTime: r.modifiedTime, size: String(r.size) }));
+      return route.fulfill({ json: { revisions } });
+    }
+    const revGet = url.pathname.match(/^\/drive\/v3\/files\/([^/]+)\/revisions\/([^/]+)$/);
+    if (revGet && method === 'GET' && url.searchParams.get('alt') === 'media') {
+      const f = [...store.values()].find((x) => x.id === revGet[1]);
+      const r = f?.revisions.find((x) => x.id === revGet[2]);
+      return r ? route.fulfill({ body: r.content }) : route.fulfill({ status: 404, body: '' });
+    }
     if (dl && method === 'DELETE') {
       for (const [k, f] of store) if (f.id === dl[1]) store.delete(k);
       return route.fulfill({ status: 204, body: '' });
     }
+    const mkRev = (content: string): DriveRevision =>
+      ({ id: 'r' + revId++, content, modifiedTime: new Date(Date.now() + revId * 1000).toISOString(), size: content.length });
     if (url.pathname === '/upload/drive/v3/files' && method === 'POST') {
       const { metadata, content } = parseMultipart(req.postData() || '');
-      const f: DriveFile = { id: 'f' + nextId++, name: metadata.name, content, version: 1 };
+      const f: DriveFile = { id: 'f' + nextId++, name: metadata.name, content, version: 1, revisions: [mkRev(content)] };
       store.set(f.name, f);
       return route.fulfill({ json: asMeta(f) });
     }
@@ -85,6 +102,7 @@ export async function installDriveMocks(page: Page): Promise<DriveMock> {
       if (!f) return route.fulfill({ status: 404, body: '' });
       f.content = parseMultipart(req.postData() || '').content;
       f.version++;
+      f.revisions.push(mkRev(f.content));
       return route.fulfill({ json: asMeta(f) });
     }
     return route.fulfill({ status: 500, body: 'mock: ruta no soportada ' + method + ' ' + url.pathname });
@@ -96,7 +114,8 @@ export async function installDriveMocks(page: Page): Promise<DriveMock> {
     bumpManifestAtFind: (n) => { bumpAt = n; },
     revokeToken: () => { revoked = true; },
     seedFile: (name, content) => {
-      store.set(name, { id: 'f' + nextId++, name, content, version: 1 });
+      const rev = { id: 'r' + revId++, content, modifiedTime: new Date().toISOString(), size: content.length };
+      store.set(name, { id: 'f' + nextId++, name, content, version: 1, revisions: [rev] });
     },
   };
 }

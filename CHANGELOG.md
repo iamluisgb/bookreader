@@ -5,6 +5,29 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-13 — Sync Fase 3 (parte 1): recuperación de versiones anteriores (P7)
+
+Red de seguridad del sync: recuperar datos borrados o perdidos desde el historial
+que Drive conserva de cada fichero. Reduce el miedo a activar el sync automático.
+
+- **`js/sync/recovery.js`**: `listBooks` (libros con datos, del manifest),
+  `listVersions(bookId)` (revisiones del fichero del libro, recientes primero),
+  `previewVersion` (resumen de items vivos sin aplicar) y `restoreVersion`. Semántica
+  de recuperación, no reversión ciega: re-afirma los items **vivos** de la versión
+  elegida (updatedAt = ahora, sin tombstone) y los fusiona → recupera lo borrado tras
+  esa fecha, gana el próximo sync (se propaga a los otros dispositivos) y conserva lo
+  más nuevo. Reversible. Usa la API de revisiones de Drive ya existente (Fase 1).
+- **UI** en Ajustes → Datos → "Historial de versiones": elegir libro → lista de
+  versiones por fecha (la actual marcada, no restaurable) → Restaurar → recarga.
+- Tests: `tests/recovery.spec.ts` (4), incl. el caso central (borrar un subrayado,
+  sincronizar, recuperarlo de una versión previa conservando lo añadido después).
+  `drive-mock.ts` gana soporte de revisiones. Suite: 120 ✓. SW `v64`.
+- Verificado en navegador real: clic en Restaurar → el subrayado borrado vuelve con su nota.
+- Pendiente de Fase 3: WebDAV (2º proveedor), manejo fino de errores de usuario,
+  y (opcional) sincronizar los ficheros de libro.
+
+---
+
 ## 2026-07-13 — Sync Fase 2b: SyncEngine automático — sync sin botones (P7)
 
 El motor que cierra la Fase 2: pull→merge→push automático, sin que el usuario

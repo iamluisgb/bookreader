@@ -13,6 +13,7 @@ import * as CustomTpl from '../ai/custom-templates.js';
 import * as DriveAuth from '../sync/drive-auth.js';
 import * as DriveSync from '../sync/drive-sync.js';
 import * as SyncEngine from '../sync/engine.js';
+import * as Recovery from '../sync/recovery.js';
 import * as Profiles from '../ai/profiles.js';
 import * as Backup from '../backup.js';
 import { icon } from './icons.js';
@@ -476,7 +477,9 @@ function dataHtml() {
     <div id="appset-drive-on" hidden>
       <button id="appset-drive-save" class="primary-btn appset-save">${icon('upload', { size: 15 })} Guardar en Drive</button>
       <button id="appset-drive-restore" class="appset-tpl-cancel appset-data-md">${icon('download', { size: 15 })} Restaurar desde Drive</button>
+      <button id="appset-drive-history" class="appset-tpl-cancel appset-data-md">${icon('sort', { size: 15 })} Historial de versiones</button>
       <button id="appset-drive-disconnect" class="appset-tpl-cancel appset-data-md">Desconectar</button>
+      <div id="appset-history" class="appset-history" hidden></div>
     </div>
     <p class="appset-data-msg" id="appset-data-msg" hidden></p>
   </div>`;
@@ -572,6 +575,63 @@ function wireDrive(content, show) {
       })
       .catch(fail('No se pudo restaurar'));
   });
+
+  wireRecovery(content, show, fail);
+}
+
+// ---- Historial de versiones (Fase 3: recuperación) --------------------------
+
+function fmtDate(iso) {
+  try { return new Date(iso).toLocaleString('es'); } catch { return iso; }
+}
+
+function wireRecovery(content, show, fail) {
+  const panel = content.querySelector('#appset-history');
+  const btn = content.querySelector('#appset-drive-history');
+
+  btn.addEventListener('click', async () => {
+    if (!panel.hidden) { panel.hidden = true; return; }
+    panel.hidden = false;
+    panel.innerHTML = '<p class="appset-muted">Cargando libros…</p>';
+    try {
+      const books = await Recovery.listBooks();
+      if (!books.length) { panel.innerHTML = '<p class="appset-muted">No hay nada guardado en Drive todavía.</p>'; return; }
+      panel.innerHTML = `<p class="appset-muted">Elige un libro para ver sus versiones anteriores:</p>` +
+        books.map(b => `<button class="appset-history-book" data-id="${escapeHtml(b.id)}">${escapeHtml(b.title)}</button>`).join('');
+      panel.querySelectorAll('.appset-history-book').forEach(el =>
+        el.addEventListener('click', () => showVersions(el.dataset.id, el.textContent)));
+    } catch (e) { fail('No se pudo cargar el historial')(e); panel.hidden = true; }
+  });
+
+  async function showVersions(bookId, title) {
+    panel.innerHTML = `<p class="appset-muted">Versiones de <strong>${escapeHtml(title)}</strong>:</p><p class="appset-muted">Cargando…</p>`;
+    try {
+      const versions = await Recovery.listVersions(bookId);
+      if (!versions.length) { panel.innerHTML = '<p class="appset-muted">Este libro no tiene versiones anteriores.</p>'; return; }
+      panel.innerHTML = `<p class="appset-muted">Versiones de <strong>${escapeHtml(title)}</strong> (recupera lo borrado tras esa fecha, conserva lo más nuevo):</p>` +
+        versions.map((v, i) =>
+          `<div class="appset-history-row" data-file="${escapeHtml(v.fileId)}" data-rev="${escapeHtml(v.id)}">
+            <span>${fmtDate(v.modifiedTime)}${i === 0 ? ' · actual' : ''}</span>
+            <button class="appset-history-restore" ${i === 0 ? 'disabled' : ''}>Restaurar</button>
+          </div>`).join('');
+      panel.querySelectorAll('.appset-history-row').forEach(row => {
+        const rbtn = row.querySelector('.appset-history-restore');
+        if (rbtn.disabled) return;
+        rbtn.addEventListener('click', () => restore(bookId, row.dataset.file, row.dataset.rev));
+      });
+    } catch (e) { fail('No se pudieron cargar las versiones')(e); }
+  }
+
+  async function restore(bookId, fileId, revisionId) {
+    show('Recuperando versión…');
+    try {
+      const r = await Recovery.restoreVersion(bookId, fileId, revisionId);
+      SyncEngine.syncNow(); // propaga la recuperación al resto de dispositivos
+      panel.hidden = true;
+      show(`${icon('check', { size: 14 })} Recuperados ${r.recovered} elementos. <button id="appset-rec-reload" class="appset-data-reload">Recargar para aplicar</button>`);
+      content.querySelector('#appset-rec-reload').addEventListener('click', () => location.reload());
+    } catch (e) { fail('No se pudo recuperar')(e); }
+  }
 }
 
 export function open(section = 'agent') {

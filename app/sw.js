@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bookreader-v63';
+const CACHE_NAME = 'bookreader-v64';
 const ASSETS = [
   './',
   './index.html',
@@ -7,6 +7,7 @@ const ASSETS = [
   './js/sync/schema.js',
   './js/sync/merge.js',
   './js/sync/engine.js',
+  './js/sync/recovery.js',
   './js/sync/drive-auth.js',
   './js/sync/drive-provider.js',
   './js/sync/layout.js',
