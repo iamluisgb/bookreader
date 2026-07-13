@@ -2476,3 +2476,27 @@ body.in-library .ai-fab { display: none; }
 .dlg-ok:focus-visible, .dlg-cancel:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .dlg-danger { background: #dc2626; border-color: #dc2626; color: #fff; }
 .dlg-danger:hover { background: #b91c1c; border-color: #b91c1c; }
+
+/* ==== Badge de estado del sync (Fase 2) ==== */
+#sync-badge {
+  position: fixed;
+  bottom: 14px;
+  right: 14px;
+  z-index: 900;
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  pointer-events: none;
+}
+#sync-badge[data-state='error'] { color: #dc2626; border-color: #dc2626; }
+#sync-badge[data-state='reconnect'] {
+  color: var(--accent);
+  border-color: var(--accent);
+  cursor: pointer;
+  pointer-events: auto;
+}

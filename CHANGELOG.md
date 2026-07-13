@@ -5,6 +5,35 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-13 — Sync Fase 2b: SyncEngine automático — sync sin botones (P7)
+
+El motor que cierra la Fase 2: pull→merge→push automático, sin que el usuario
+toque "Guardar"/"Restaurar". Conectar Drive en Ajustes ya activa el sync continuo.
+
+- **`js/sync/engine.js`**: ciclo `pull → merge → push`. Pull lee el manifest y solo
+  los libros con etag remoto nuevo (guardado en `sync_state`), fusionándolos por uid.
+  Push sube los libros con `updatedAt` local mayor que el remoto, `ifMatch` por etag,
+  manifest el último. **412** (otro dispositivo escribió) → reintenta el ciclo con
+  backoff+jitter (máx. 3); `sync_state` se persiste tras cada escritura para no
+  rebotar contra los propios etags. Token revocado → estado `reconnect` sin bucle.
+- **Triggers**: al arrancar (`syncOnLoad`), tras cambios locales (debounce 4s), cada
+  90s con la pestaña visible, y flush al ocultar la pestaña. **Multi-pestaña**: Web
+  Locks (`bookreader-sync`, `ifAvailable`) → solo una pestaña sincroniza a la vez.
+- **Posición de lectura sincronizada**: `saveLastPosition`/`saveLastPage` sellan el
+  valor con `*At` (LWW de escalares) y emiten `bookreader:data-changed`. En el sync
+  automático (`mode:'merge'`) los escalares solo ganan si su sello es más reciente;
+  en un Restaurar explícito (`mode:'restore'`) gana remoto.
+- **Sin `location.reload()`** (el error de arete): un merge remoto emite
+  `bookreader:remote-applied` y la sidebar re-renderiza subrayados/marcadores en sitio.
+- **Badge** de estado (abajo-derecha): `syncing | error | reconnect` (clic en
+  reconnect abre Ajustes → Datos). `setOnChange` de highlights/bookmarks pasa a lista
+  (UI + engine conviven). Escrituras del propio merge no re-disparan push.
+- Tests: `tests/sync-engine.spec.ts` (7) + `tests/drive-mock.ts` compartido — primer
+  push, pull+re-render, 412-retry, posición por LWW, reconnect, no-op sin token, ida y
+  vuelta A↔B. Suite: 116 ✓. SW `v63`.
+
+---
+
 ## 2026-07-12 — Sync Fase 2a: merge por item — restaurar ya no pisa, fusiona (P7)
 
 Primer tramo del SyncEngine: el merge determinista del plan, adelantado al Restaurar

@@ -18,6 +18,7 @@ import { escapeHtml } from './ui/escape.js';
 import { openImageZoom } from './image-zoom.js';
 import { alertBox } from './ui/dialog.js';
 import { migrateSchema, purgeExpiredTombstones } from './sync/schema.js';
+import * as SyncEngine from './sync/engine.js';
 
 // ============ INIT ============
 document.addEventListener('DOMContentLoaded', () => {
@@ -26,6 +27,7 @@ document.addEventListener('DOMContentLoaded', () => {
   migrateSchema()
     .then(() => purgeExpiredTombstones())
     .catch(e => console.warn('sync schema migration:', e));
+  initSyncEngine();
   hydrateIcons();
   Settings.init();
   EpubReader.init();
@@ -44,6 +46,37 @@ document.addEventListener('DOMContentLoaded', () => {
   initRouter();
   registerServiceWorker();
 });
+
+// Sync Fase 2: motor automático (pull→merge→push) + badge de estado + re-render
+// en sitio cuando llega un merge remoto (sin location.reload — el error de arete).
+function initSyncEngine() {
+  const badge = document.createElement('div');
+  badge.id = 'sync-badge';
+  badge.hidden = true;
+  document.body.appendChild(badge);
+
+  window.addEventListener('bookreader:sync-status', (e) => {
+    const s = e.detail;
+    const labels = { syncing: 'Sincronizando…', error: 'Sync: error', reconnect: 'Reconectar Drive' };
+    badge.dataset.state = s;
+    badge.textContent = labels[s] || '';
+    badge.hidden = !(s in labels);
+  });
+  // Token revocado: el badge lleva directo a Ajustes → Datos para reconectar.
+  badge.addEventListener('click', () => {
+    if (badge.dataset.state === 'reconnect') AppSettings.open('data');
+  });
+
+  // Un merge remoto cambió datos: refrescar las listas de la sidebar en sitio.
+  window.addEventListener('bookreader:remote-applied', () => {
+    try {
+      renderHighlights();
+      renderBookmarks();
+    } catch (e) { console.warn('sync re-render:', e); }
+  });
+
+  SyncEngine.start();
+}
 
 // PWA offline: registra el Service Worker (precache + stale-while-revalidate, ver sw.js).
 // Sin este registro el navegador nunca instala sw.js y la app no funciona offline. Se hace

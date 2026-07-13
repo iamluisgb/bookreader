@@ -15,11 +15,16 @@ export const SCHEMA_VERSION = 1;
 export const BASE = 'bookreader/';
 
 // Claves de localStorage particionadas por libro: `<prefijo>_<bookId>`.
-const BOOK_PREFIXES = ['highlights', 'bookmarks', 'lastPosition', 'pdfLastPage', 'readingMode', 'pdfMode'];
+// lastPositionAt/pdfLastPageAt son los sellos de tiempo de la posición de
+// lectura (escalares LWW): viajan junto a su valor.
+const BOOK_PREFIXES = ['highlights', 'bookmarks', 'lastPosition', 'lastPositionAt', 'pdfLastPage', 'pdfLastPageAt', 'readingMode', 'pdfMode'];
+// Pareja valor → sello de tiempo, para el LWW de escalares.
+const SCALAR_AT = { lastPosition: 'lastPositionAt', pdfLastPage: 'pdfLastPageAt' };
+const AT_PREFIXES = Object.values(SCALAR_AT);
 // Secretos que jamás salen del dispositivo (mismo criterio que backup.js).
 const SECRET_KEYS = ['ai_key', 'drive_refresh_token'];
 // Estado puramente local, sin sentido en otro dispositivo.
-const SKIP_KEYS = ['sync_schema_migrated'];
+const SKIP_KEYS = ['sync_schema_migrated', 'sync_state'];
 
 function splitKey(key) {
   for (const p of BOOK_PREFIXES) {
@@ -78,44 +83,77 @@ export async function buildSnapshot() {
   const now = Date.now();
   const manifest = { schemaVersion: SCHEMA_VERSION, updatedAt: now, settingsUpdatedAt: now, books: {} };
   for (const [id, b] of Object.entries(books)) {
+    // La posición de lectura también cuenta como "cambio" del libro (sus sellos *At).
+    const positionStamps = Object.entries(b.local)
+      .filter(([k]) => AT_PREFIXES.some(p => k.startsWith(p + '_')))
+      .map(([, at]) => ({ updatedAt: at }));
     manifest.books[id] = {
       file: 'books/' + id + '.json',
       title: titles[id] || null,
-      updatedAt: maxUpdatedAt(b.local['highlights_' + id], b.local['bookmarks_' + id], b.messages, b.notes) || now,
+      updatedAt: maxUpdatedAt(b.local['highlights_' + id], b.local['bookmarks_' + id], b.messages, b.notes, positionStamps) || now,
     };
   }
   return { manifest, settings, books };
 }
 
 // Colecciones por-item dentro de las claves por-libro: se fusionan con
-// mergeCollections; el resto de claves por-libro (posición, modo) y los
-// ajustes son escalares sin updatedAt → en un Restaurar explícito gana remoto.
+// mergeCollections; los escalares dependen del modo (ver restoreSnapshot).
 const MERGE_PREFIXES = ['highlights_', 'bookmarks_'];
+
+// Aplica las claves por-libro de un snapshot remoto.
+//   - Colecciones: siempre mergeCollections (unión por uid + LWW + tombstones).
+//   - Posición de lectura (valor + sello *At): LWW por sello; en modo 'restore'
+//     gana remoto aunque el sello local sea más nuevo (es la orden explícita).
+//   - Escalares sin sello (readingMode/pdfMode): 'restore' → remoto;
+//     'merge' (sync automático) → solo si falta en local (no pisar al usuario).
+function applyBookLocal(local, mode) {
+  let keys = 0;
+  for (const [k, v] of Object.entries(local || {})) {
+    const bk = splitKey(k);
+    if (MERGE_PREFIXES.some(p => k.startsWith(p)) && Array.isArray(v)) {
+      Storage.set(k, mergeCollections(Storage.get(k, []), v));
+      keys++;
+      continue;
+    }
+    if (bk && AT_PREFIXES.includes(bk.prefix)) continue; // los sellos van con su valor
+    if (bk && SCALAR_AT[bk.prefix]) {
+      const atKey = SCALAR_AT[bk.prefix] + '_' + bk.bookId;
+      const remoteAt = local[atKey] || 0;
+      const localAt = Storage.get(atKey, 0);
+      if (mode === 'restore' || remoteAt > localAt) {
+        Storage.set(k, v);
+        Storage.set(atKey, remoteAt || Date.now());
+        keys++;
+      }
+      continue;
+    }
+    if (mode === 'restore' || Storage.get(k, null) === null) {
+      Storage.set(k, v);
+      keys++;
+    }
+  }
+  return keys;
+}
 
 // Aplica un snapshot remoto FUSIONANDO con lo local (Fase 2 · merge):
 //   - subrayados/marcadores: unión por uid, LWW por item, tombstones se propagan
 //   - mensajes/notas (IDB): casan por uid conservando el id local (el id
 //     autoincremental colisiona entre dispositivos y jamás se importa crudo)
 //   - convos: unión por id global; gana el lastUsedAt mayor
-//   - escalares (ajustes, posición de lectura): gana remoto en un Restaurar
+//   - escalares: según mode ('restore' explícito | 'merge' del sync automático)
 // Nunca borra datos locales que el remoto no conozca.
-export async function restoreSnapshot({ settings = {}, books = {} }) {
+export async function restoreSnapshot({ settings = {}, books = {} }, { mode = 'restore' } = {}) {
   let keys = 0;
   let records = 0;
   for (const [k, v] of Object.entries(settings)) {
     if (SECRET_KEYS.includes(k) || SKIP_KEYS.includes(k)) continue;
-    Storage.set(k, v);
-    keys++;
-  }
-  for (const b of Object.values(books)) {
-    for (const [k, v] of Object.entries(b.local || {})) {
-      if (MERGE_PREFIXES.some(p => k.startsWith(p)) && Array.isArray(v)) {
-        Storage.set(k, mergeCollections(Storage.get(k, []), v));
-      } else {
-        Storage.set(k, v);
-      }
+    if (mode === 'restore' || Storage.get(k, null) === null) {
+      Storage.set(k, v);
       keys++;
     }
+  }
+  for (const b of Object.values(books)) {
+    keys += applyBookLocal(b.local, mode);
     for (const c of b.convos || []) {
       const cur = await DB.get('convos', c.id);
       if (!cur || (c.lastUsedAt || 0) > (cur.lastUsedAt || 0)) {

@@ -506,7 +506,12 @@ function saveLastPage() {
   if (pdfDoc) {
     try {
       const fp = pdfDoc.fingerprints ? pdfDoc.fingerprints[0] : null;
-      if (fp) Storage.set('pdfLastPage_' + fp, currentPage);
+      if (fp) {
+        Storage.set('pdfLastPage_' + fp, currentPage);
+        // Sello para el LWW del sync (la posición es un escalar sin updatedAt propio)
+        Storage.set('pdfLastPageAt_' + fp, Date.now());
+        window.dispatchEvent(new CustomEvent('bookreader:data-changed'));
+      }
     } catch(e) {}
   }
 }

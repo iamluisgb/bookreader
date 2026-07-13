@@ -188,16 +188,16 @@ resultados con ↑/↓.)_
 - Confirmación al borrar y borrar desde el propio resaltado en el lector.
 - _(El backup/restore de highlights y bookmarks ya lo cubre P3, ver CHANGELOG.)_
 
-### P7 — Sync entre dispositivos · **fases 0-1 ✓** `L`
-Plan completo en [`SYNC_PLAN.md`](SYNC_PLAN.md). **Fase 0 hecha**: modelo de datos mergeable
-(uid/updatedAt/tombstones) + migración idempotente. **Fase 1 hecha** (ver CHANGELOG):
-DriveProvider (PKCE + Worker + appDataFolder + etag/412) y Guardar/Restaurar manual en
-Ajustes → Datos sobre el layout por-libro. **Infra**: Worker desplegado (`workers/auth/`,
-`bookreader-auth.luisgonzalezb93.workers.dev`), OAuth client de Google configurado.
-Consent screen de Google **publicado a producción** (2026-07-12): sin caducidad de refresh
-tokens ni lista de testers. Flujo real verificado: conectar → guardar en Drive OK.
-**Pendiente**: Fase 2 (SyncEngine automático: pull→merge→push, triggers, multi-pestaña),
-Fase 3 (WebDAV + recovery de revisiones desde la UI).
+### P7 — Sync entre dispositivos · **fases 0-2 ✓** `L`
+Plan completo en [`SYNC_PLAN.md`](SYNC_PLAN.md). **Fase 0**: modelo mergeable
+(uid/updatedAt/tombstones) + migración. **Fase 1**: DriveProvider (PKCE + Worker +
+appDataFolder + etag/412) y Guardar/Restaurar manual. **Fase 2** (ver CHANGELOG): merge por
+item (unión por uid + LWW + tombstones) y **SyncEngine automático** — pull→merge→push con
+triggers (arranque/debounce/periódico/visibilitychange), 412-retry, multi-pestaña (Web
+Locks), badge de estado, posición de lectura sincronizada. Sync sin botones al conectar Drive.
+**Infra**: Worker desplegado, OAuth de Google en producción (sin caducidad de tokens).
+Flujo real verificado. **Pendiente**: Fase 3 (WebDAV como 2º proveedor + recovery de
+revisiones desde la UI; opcional: sincronizar los ficheros de libro).
 
 ### P8 — Exportar libretas y conversaciones · **fase 1 ✓** `M`
 **Fase 1 hecha** (ver CHANGELOG): botón "Exportar" en el panel → `.md` de la conversación activa

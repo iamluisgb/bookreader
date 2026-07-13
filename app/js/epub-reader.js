@@ -616,6 +616,9 @@ function saveLastPosition() {
     try {
       const key = book.key ? book.key() : 'default';
       Storage.set('lastPosition_' + key, currentCfi);
+      // Sello para el LWW del sync (la posición es un escalar sin updatedAt propio)
+      Storage.set('lastPositionAt_' + key, Date.now());
+      window.dispatchEvent(new CustomEvent('bookreader:data-changed'));
     } catch(e) {
       console.warn('Could not save position:', e);
     }

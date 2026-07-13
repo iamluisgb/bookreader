@@ -3,14 +3,19 @@ import { newUid, tombstone, revive } from './sync/schema.js';
 
 const HIGHLIGHTS_KEY = 'highlights';
 let currentBookId = null;
-let onChangeCallback = null;
+const onChangeCallbacks = [];
 
 export function setBook(bookId) {
   currentBookId = bookId;
 }
 
+// Aditivo: la UI y el SyncEngine registran cada uno el suyo.
 export function setOnChange(cb) {
-  onChangeCallback = cb;
+  onChangeCallbacks.push(cb);
+}
+
+function onChangeCallback() {
+  for (const cb of onChangeCallbacks) cb();
 }
 
 function getKey() {

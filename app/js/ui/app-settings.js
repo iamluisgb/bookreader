@@ -12,6 +12,7 @@ import { BLOCKS, allTemplates } from '../ai/templates.js';
 import * as CustomTpl from '../ai/custom-templates.js';
 import * as DriveAuth from '../sync/drive-auth.js';
 import * as DriveSync from '../sync/drive-sync.js';
+import * as SyncEngine from '../sync/engine.js';
 import * as Profiles from '../ai/profiles.js';
 import * as Backup from '../backup.js';
 import { icon } from './icons.js';
@@ -539,12 +540,17 @@ function wireDrive(content, show) {
   content.querySelector('#appset-drive-connect').addEventListener('click', () => {
     show('Abriendo la ventana de Google…');
     DriveAuth.connect()
-      .then(() => { refresh(); show(`${icon('check', { size: 14 })} Drive conectado.`); })
+      .then(() => {
+        refresh();
+        show(`${icon('check', { size: 14 })} Drive conectado. La sincronización automática queda activada.`);
+        SyncEngine.refreshConnection(); // primer sync inmediato
+      })
       .catch(fail('No se pudo conectar'));
   });
 
   content.querySelector('#appset-drive-disconnect').addEventListener('click', () => {
     DriveAuth.disconnect();
+    SyncEngine.refreshConnection();
     refresh();
     show('Drive desconectado. Tus datos siguen en tu Drive y en este dispositivo.');
   });

@@ -81,6 +81,16 @@ const reqP = (request) => new Promise((resolve, reject) => {
   request.onerror = () => reject(request.error);
 });
 
+// Stores que participan en el sync: sus escrituras de usuario avisan al
+// SyncEngine (que hace push con debounce). Las escrituras del propio sync
+// (mergeRecords) NO avisan — evita el bucle push→pull→push.
+const SYNCED_STORES = ['messages', 'notes', 'convos', 'ratings'];
+
+function notifySync(store) {
+  if (!SYNCED_STORES.includes(store)) return;
+  try { window.dispatchEvent(new CustomEvent('bookreader:data-changed')); } catch { /* SSR/tests */ }
+}
+
 export function get(store, key) {
   return tx(store, 'readonly', s => reqP(s.get(key)));
 }
@@ -91,7 +101,10 @@ export function getAll(store) {
 }
 
 export function put(store, value) {
-  return tx(store, 'readwrite', s => reqP(s.put(value)));
+  return tx(store, 'readwrite', s => reqP(s.put(value))).then(r => {
+    notifySync(store);
+    return r;
+  });
 }
 
 // Mensajes de chat por conversación ------------------------------------------
@@ -199,7 +212,7 @@ export function updateNote(id, patch) {
     const cur = await reqP(s.get(id));
     if (!cur) return;
     return reqP(s.put({ ...cur, ...patch, id, updatedAt: Date.now() }));
-  });
+  }).then(r => { notifySync('notes'); return r; });
 }
 
 // Borrado lógico (tombstone): el borrado se propaga en el sync en vez de
@@ -210,7 +223,7 @@ export function deleteNote(id) {
     if (!cur) return;
     const now = Date.now();
     return reqP(s.put({ ...cur, deleted: true, deletedAt: now, updatedAt: now }));
-  });
+  }).then(r => { notifySync('notes'); return r; });
 }
 
 // Purga física de tombstones de notas anteriores a `olderThan` (ms epoch).
