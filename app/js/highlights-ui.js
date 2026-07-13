@@ -204,7 +204,7 @@ export function setupPdfSelection() {
 
 // Rectángulos de la selección en coordenadas FRACCIONALES (0..1) de la página del PDF, para
 // re-pintarlos nítidos a cualquier escala/HiDPI (el canvas se re-renderiza al cambiar zoom).
-function pdfFractionalRects(range, wrapper) {
+export function pdfFractionalRects(range, wrapper) {
   wrapper = wrapper || document.querySelector('#pdf-container .pdf-page');
   if (!wrapper) return [];
   const wr = wrapper.getBoundingClientRect();

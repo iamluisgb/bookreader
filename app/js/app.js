@@ -8,7 +8,7 @@ import * as AiPanel from './ai/panel.js';
 import * as AiDB from './ai/db.js';
 import { hydrateIcons } from './ui/icons.js';
 import { countBookWords, updateProgressDetail } from './progress.js';
-import { initHighlights, setupHighlights, setupPdfSelection, drawPdfHighlights, renderHighlights, applyStoredHighlights, hideHighlightTooltip } from './highlights-ui.js';
+import { initHighlights, setupHighlights, setupPdfSelection, drawPdfHighlights, renderHighlights, applyStoredHighlights, hideHighlightTooltip, pdfFractionalRects } from './highlights-ui.js';
 import { initBookmarkButton, updateBookmarkButton, renderBookmarks } from './bookmarks-ui.js';
 import * as Library from './library/view.js';
 import * as LibStore from './library/store.js';
@@ -17,6 +17,7 @@ import * as Search from './search.js';
 import { escapeHtml } from './ui/escape.js';
 import { openImageZoom } from './image-zoom.js';
 import { alertBox } from './ui/dialog.js';
+import { rangeForText } from './pdf-locate.js';
 import { migrateSchema, purgeExpiredTombstones } from './sync/schema.js';
 import * as SyncEngine from './sync/engine.js';
 
@@ -615,10 +616,16 @@ function initAiPanel() {
 // Navega a un locator del libro (CFI en EPUB, nº de página en PDF). Compartido por las citas
 // del agente (onCite) y la búsqueda (P5).
 let lastCiteCfi = null;   // resaltado de cita EPUB en curso (para retirarlo)
-async function goToLocator(loc) {
+async function goToLocator(loc, passageText) {
   if (currentBook?.format === 'pdf') {
     const page = parseInt(loc, 10);
-    if (page) { await PdfReader.goTo(page); flashPdfPage(page); }
+    if (page) {
+      await PdfReader.goTo(page);
+      // Resaltar el TROZO exacto en la página buscándolo en la capa de texto; si no
+      // se localiza (o no tenemos el texto), destellar la página entera como fallback.
+      const marked = passageText ? await highlightPdfPassage(page, passageText) : false;
+      if (!marked) flashPdfPage(page);
+    }
     return;
   }
   await EpubReader.goTo(loc);   // CFI puntual o href de capítulo (fallback sin CFI)
@@ -644,8 +651,59 @@ async function goToLocator(loc) {
   } catch (e) { /* cita sin highlight */ }
 }
 
-// Destella la página de destino de una cita en PDF (no tenemos los rects del pasaje,
-// así que señalamos la página completa un instante).
+// Resalta el TROZO exacto de un pasaje citado en una página PDF: busca su texto en la
+// capa de texto de pdf.js, construye un rango DOM y pinta un overlay transitorio con los
+// rects fraccionales (misma técnica que los subrayados). Devuelve false si no lo localiza.
+async function highlightPdfPassage(page, passageText) {
+  const wrapper = await waitForPdfTextLayer(page);
+  const layer = wrapper?.querySelector('.textLayer');
+  if (!layer) return false;
+  const range = rangeForText(layer, passageText);
+  if (!range) return false;
+  const rects = pdfFractionalRects(range, wrapper);
+  if (!rects.length) return false;
+  drawTransientPdfHighlight(wrapper, rects);
+  return true;
+}
+
+// Espera a que la capa de texto de la página esté renderizada (pdf.js la pinta de forma
+// perezosa tras navegar). Sondea hasta ~1.5s; null si no llega.
+function waitForPdfTextLayer(page, timeout = 1500) {
+  const sel = `#pdf-container .pdf-page[data-page="${page}"]`;
+  return new Promise(resolve => {
+    const t0 = Date.now();
+    const tick = () => {
+      const wrapper = document.querySelector(sel);
+      const layer = wrapper?.querySelector('.textLayer');
+      if (layer && layer.childElementCount > 0) return resolve(wrapper);
+      if (Date.now() - t0 > timeout) return resolve(wrapper || null);
+      requestAnimationFrame(tick);
+    };
+    tick();
+  });
+}
+
+// Overlay transitorio del pasaje citado (se retira solo a los 2.8s).
+let citeHlTimer = null;
+function drawTransientPdfHighlight(wrapper, rects) {
+  let layer = wrapper.querySelector('.pdf-cite-layer');
+  if (!layer) { layer = document.createElement('div'); layer.className = 'pdf-cite-layer'; wrapper.appendChild(layer); }
+  layer.innerHTML = '';
+  for (const r of rects) {
+    const d = document.createElement('div');
+    d.className = 'pdf-cite-hl';
+    d.style.left = (r.left * 100) + '%';
+    d.style.top = (r.top * 100) + '%';
+    d.style.width = (r.width * 100) + '%';
+    d.style.height = (r.height * 100) + '%';
+    layer.appendChild(d);
+  }
+  clearTimeout(citeHlTimer);
+  citeHlTimer = setTimeout(() => { if (layer) layer.innerHTML = ''; }, 2800);
+}
+
+// Destella la página de destino de una cita en PDF cuando NO se pudo localizar el pasaje
+// (fallback): señala la página completa un instante.
 function flashPdfPage(page) {
   const el = document.querySelector(`#pdf-container .pdf-page[data-page="${page}"]`);
   if (!el) return;

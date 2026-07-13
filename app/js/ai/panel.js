@@ -1451,8 +1451,11 @@ function onMessagesClick(e) {
 
 function navigateCite(id) {
   const a = anchors.get(id);
+  if (!a) return;
   // EPUB → CFI (o href del capítulo si el CFI puntual falló); PDF → nº de página.
-  if (a) onCite(a.cfi ?? a.href ?? a.page);
+  // El texto del pasaje (del corpus indexado) permite resaltar el trozo exacto en PDF.
+  const text = Retrieval.allPassages().find(p => p.id === id)?.text;
+  onCite(a.cfi ?? a.href ?? a.page, text);
 }
 
 function appendBubble(role, text, asHtml) {

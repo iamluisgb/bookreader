@@ -37,8 +37,16 @@ export async function segmentBook(book, onProgress) {
           continue;
         }
 
+        // CFI de RANGO sobre el texto del bloque (no de elemento): así la cita
+        // resalta el TROZO exacto, no solo navega al bloque. Fallback al CFI de
+        // elemento si el rango falla (algunos EPUB no lo permiten).
         let cfi = null;
-        try { cfi = section.cfiFromElement(el); } catch { /* sin cfi para este nodo */ }
+        try {
+          const range = doc.createRange();
+          range.selectNodeContents(el);
+          cfi = section.cfiFromRange(range);
+        } catch { /* rango sin cfi */ }
+        if (!cfi) { try { cfi = section.cfiFromElement(el); } catch { /* sin cfi para este nodo */ } }
         const id = 'a' + (n++);
         // Registrar SIEMPRE el ancla: si el CFI falla (ocurre en algunos EPUB, a veces
         // en TODOS los bloques), antes el id quedaba en el texto pero NO en el mapa →

@@ -341,7 +341,8 @@ export function saveRatings(bookId, goal, scores) {
 // libro bajo el id de otro); el guard de prepareBook ya evita nuevas contaminaciones.
 // v4: en PDFs "Part → Chapter" los capítulos reales son los hijos de la Part (antes
 // todo se atribuía a la Part) → re-segmentar para recuperar la granularidad de capítulo.
-const SEG_VERSION = 4;
+// v5: anclas EPUB con CFI de RANGO (no de elemento) → la cita resalta el trozo exacto.
+const SEG_VERSION = 5;
 
 export async function loadSegmented(bookId) {
   const [text, anch] = await Promise.all([get('bookText', bookId), get('anchors', bookId)]);

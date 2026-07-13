@@ -740,6 +740,18 @@ body:not(.scroll-mode) .epub-container .epub-view {
 }
 .pdf-page.pdf-cite-flash { animation: pdfCiteFlash 1.5s var(--ease); }
 
+/* Resaltado transitorio del TROZO citado (cuando sí localizamos el pasaje en la página). */
+.pdf-cite-layer { position: absolute; inset: 0; pointer-events: none; z-index: 3; }
+.pdf-cite-hl {
+  position: absolute;
+  border-radius: 2px;
+  background: var(--accent);
+  opacity: 0.35;
+  mix-blend-mode: multiply;
+  animation: pdfCiteHlIn 0.18s var(--ease);
+}
+@keyframes pdfCiteHlIn { from { opacity: 0; } to { opacity: 0.35; } }
+
 /* pdf.js selectable text layer overlaid on the canvas */
 .textLayer {
   position: absolute;

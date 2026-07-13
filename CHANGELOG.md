@@ -5,6 +5,25 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-13 — Citas del agente: resaltan el TROZO exacto, no la página entera
+
+Al pulsar una referencia del agente, además de navegar, se señala el pasaje exacto.
+
+- **EPUB**: el ancla pasa de CFI de **elemento** a CFI de **RANGO** sobre el texto del
+  bloque (`segment.js`: `cfiFromRange(selectNodeContents(el))`, fallback a `cfiFromElement`).
+  El resaltado transitorio que ya existía (`annotations.highlight`, app.js) ahora marca el
+  fragmento en vez de fallar. Requiere re-segmentar → **SEG_VERSION 4→5** (automático al abrir).
+- **PDF**: antes destellaba la página entera ("no teníamos los rects del pasaje"). Ahora se
+  **localiza el texto del pasaje en la capa de texto de pdf.js** (`pdf-locate.js` ·
+  `rangeForText`: tolera texto partido en muchos `<span>` y blancos irregulares, con fallback
+  al prefijo), se convierte a rects fraccionales (`pdfFractionalRects`, ahora exportada) y se
+  pinta un overlay transitorio (`.pdf-cite-hl`, 2.8s). Si no se localiza → destello de página
+  (sin regresión). `panel.js` pasa el texto del pasaje (del corpus indexado) a `onCite`.
+- Tests: `tests/pdf-locate.spec.ts` (2) — match cruzando spans, offset correcto, blancos y
+  prefijo. EPUB verificado en navegador real (1495/1495 anclas con CFI de rango). SW `v65`.
+
+---
+
 ## 2026-07-13 — Sync Fase 3 (parte 1): recuperación de versiones anteriores (P7)
 
 Red de seguridad del sync: recuperar datos borrados o perdidos desde el historial
