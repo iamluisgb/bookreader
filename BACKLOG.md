@@ -200,6 +200,12 @@ Locks), badge de estado, posición de lectura sincronizada. Sync sin botones al 
 Historial). **Pendiente de Fase 3**: WebDAV como 2º proveedor (sync sin Worker, público
 r/selfhosted); manejo fino de errores de usuario (sin conexión, cuota llena); opcional:
 sincronizar los ficheros de libro.
+- **Pulir la vista de histórico de versiones (`recovery.js` · `listBooks`):** hoy la lista de
+  libros sale fea — **nombres repetidos** (mismo título en varios `id`, p. ej. re-importados o
+  datos de prueba) y **algunos son solo el hash/UUID** (cuando el libro no tiene título en los
+  metadatos, cae a `info.title || id` → muestra el SHA-256). Mejoras: agrupar/deduplicar por
+  título, mostrar el título real (buscar en la biblioteca local si el manifest no lo trae),
+  y para los sin título usar un nombre legible + fecha en vez del hash crudo.
 
 ### P8 — Exportar libretas y conversaciones · **fase 1 ✓** `M`
 **Fase 1 hecha** (ver CHANGELOG): botón "Exportar" en el panel → `.md` de la conversación activa
