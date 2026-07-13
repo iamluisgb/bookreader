@@ -1461,6 +1461,33 @@ body.resizing-panel .reader-main { transition: none !important; }
 }
 .lib-study-chip:hover { background: var(--accent); color: var(--on-accent); }
 
+/* P12 · Selector de ámbito de repaso (Todo / estanterías) */
+.lib-toolbar { position: relative; }
+.lib-study-menu {
+  position: absolute;
+  z-index: 50;
+  min-width: 220px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 8px 28px var(--shadow);
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.lib-study-opt {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  width: 100%; padding: 9px 12px; border: none; border-radius: 8px;
+  background: none; color: var(--text-primary); font: inherit; font-size: 14px;
+  cursor: pointer; text-align: left;
+}
+.lib-study-opt:hover { background: var(--bg-secondary); }
+.lib-study-opt-n {
+  font-size: 12px; font-weight: 600; color: var(--accent);
+  background: var(--accent-soft); border-radius: 999px; padding: 2px 9px;
+}
+
 /* ============ AJUSTES GENERALES (overlay global) ============ */
 /* Hogar de la config global de la app (agente + P1/P2/P3). Mismo patrón modal que
    el onboarding; settings de LECTURA siguen en la sidebar. */

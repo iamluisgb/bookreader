@@ -140,8 +140,45 @@ async function paintStudyChip() {
   const chip = document.createElement('button');
   chip.className = 'lib-study-chip';
   chip.innerHTML = `${icon('cards', { size: 16 })}<span>Repasar hoy · ${cards}</span>`;
-  chip.addEventListener('click', () => Study.openToday({ onClose: paintStudyChip }));
+  // P12 · Si hay estanterías con vencidas, el chip abre un selector de ámbito
+  // (Todo / cada estantería). Si no, repasa todo directo (flujo rápido de siempre).
+  chip.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    const scopes = await Study.studyScopes();
+    if (!scopes.shelves.length) { Study.openToday({ onClose: paintStudyChip }); return; }
+    showStudyChooser(chip, scopes);
+  });
   bar.insertBefore(chip, bar.querySelector('.lib-upload'));
+}
+
+// Selector de ámbito de repaso (P12): popover anclado al chip con "Todo" + una fila
+// por estantería con tarjetas vencidas. Al elegir, abre la sesión de ese ámbito.
+function showStudyChooser(chip, scopes) {
+  document.querySelector('.lib-study-menu')?.remove();
+  const menu = document.createElement('div');
+  menu.className = 'lib-study-menu';
+  const row = (label, count, scope) =>
+    `<button class="lib-study-opt" data-scope='${escapeHtml(JSON.stringify(scope))}'>
+      <span>${escapeHtml(label)}</span><span class="lib-study-opt-n">${count}</span>
+    </button>`;
+  menu.innerHTML =
+    row('Todo', scopes.total, { type: 'all' }) +
+    scopes.shelves.map(s => row(s.name, s.cards, { type: 'shelf', shelfId: s.id })).join('');
+  chip.parentElement.appendChild(menu);
+  const r = chip.getBoundingClientRect();
+  const pr = chip.parentElement.getBoundingClientRect();
+  menu.style.left = (r.left - pr.left) + 'px';
+  menu.style.top = (r.bottom - pr.top + 6) + 'px';
+
+  const close = () => { menu.remove(); document.removeEventListener('click', onOutside, true); };
+  const onOutside = (ev) => { if (!menu.contains(ev.target)) close(); };
+  setTimeout(() => document.addEventListener('click', onOutside, true), 0);
+  menu.addEventListener('click', (ev) => {
+    const opt = ev.target.closest('.lib-study-opt');
+    if (!opt) return;
+    close();
+    Study.openToday({ scope: JSON.parse(opt.dataset.scope), onClose: paintStudyChip });
+  });
 }
 
 function dropdownHtml(key, label, options, current) {

@@ -10,6 +10,7 @@
 import * as DB from './db.js';
 import * as Srs from './srs.js';
 import * as Storage from '../storage.js';
+import * as Store from '../library/store.js';
 import { icon } from '../ui/icons.js';
 import { escapeHtml } from '../ui/escape.js';
 
@@ -26,9 +27,24 @@ const anchorsCache = new Map();   // bookId → Map(aN → {cfi, href, page, cha
 
 // ---- Cola diaria (para el chip de la estantería) -----------------------------
 
-// Vencidas hoy en todos los mazos: total y mazos implicados.
-export async function dueToday(now = Date.now()) {
+// P12 · Mazos de un ÁMBITO de repaso: todo | un libro | una estantería. Sin ámbito
+// (o 'all') son todos los mazos; el filtro por libro/estantería permite repasar solo
+// lo de un contexto en vez del revoltijo global.
+async function decksForScope(scope) {
   const decks = await DB.getAllDecks();
+  if (!scope || scope.type === 'all') return decks;
+  if (scope.type === 'book') return decks.filter(d => d.bookId === scope.bookId);
+  if (scope.type === 'shelf') {
+    const books = await Store.getAllBooks();
+    const inShelf = new Set(books.filter(b => (b.shelfIds || []).includes(scope.shelfId)).map(b => b.id));
+    return decks.filter(d => inShelf.has(d.bookId));
+  }
+  return decks;
+}
+
+// Vencidas hoy en el ámbito dado (por defecto, todo): total y mazos implicados.
+export async function dueToday(scope, now = Date.now()) {
+  const decks = await decksForScope(scope);
   let cards = 0, withDue = [];
   for (const d of decks) {
     const n = Srs.dueCount(d.cards, now);
@@ -37,10 +53,33 @@ export async function dueToday(now = Date.now()) {
   return { cards, decks: withDue };
 }
 
-// Abre la sesión global del día (todo lo vencido, de todos los mazos).
-export async function openToday({ onClose } = {}) {
-  const { decks } = await dueToday();
-  open({ decks, title: 'Repaso de hoy', onClose });
+// Abre la sesión del día para un ámbito (por defecto, todo lo vencido).
+export async function openToday({ scope, title, onClose } = {}) {
+  const { decks } = await dueToday(scope);
+  open({ decks, title: title || 'Repaso de hoy', onClose });
+}
+
+// Ámbitos de repaso con tarjetas vencidas hoy (para el selector): total global +
+// una entrada por estantería que tenga vencidas. Los libros sin estantería solo
+// cuentan en el total (se repasan desde "Todo" o desde su mazo en el modal).
+export async function studyScopes(now = Date.now()) {
+  const [decks, books, shelves] = await Promise.all([
+    DB.getAllDecks(), Store.getAllBooks(), Store.getShelves(),
+  ]);
+  const dueByBook = new Map();
+  let total = 0;
+  for (const d of decks) {
+    const n = Srs.dueCount(d.cards, now);
+    if (n) { dueByBook.set(d.bookId, (dueByBook.get(d.bookId) || 0) + n); total += n; }
+  }
+  const shelfScopes = [];
+  for (const sh of shelves) {
+    const n = books
+      .filter(b => (b.shelfIds || []).includes(sh.id))
+      .reduce((sum, b) => sum + (dueByBook.get(b.id) || 0), 0);
+    if (n) shelfScopes.push({ id: sh.id, name: sh.name, cards: n });
+  }
+  return { total, shelves: shelfScopes };
 }
 
 // ---- Sesión -------------------------------------------------------------------

@@ -5,6 +5,24 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-13 — P12: repasar flashcards por libro y por estantería
+
+Antes "Repasar hoy" mezclaba los mazos de todos los libros; ahora se puede acotar.
+
+- **`study.js`**: `dueToday(scope)` y `openToday({scope})` aceptan un ámbito
+  `{type:'all'|'book'|'shelf', …}`; `decksForScope` filtra los mazos (por `bookId`, o
+  por los libros de una estantería vía `shelfIds`). Nuevo `studyScopes()` devuelve el
+  total global + una entrada por estantería con vencidas (para el selector).
+- **Selector en la biblioteca**: el chip "Repasar hoy · N" abre un popover con "Todo · N"
+  y una fila por estantería con vencidas; elegir una abre el modo Estudiar de ese ámbito.
+  Si no hay estanterías con vencidas, repasa todo directo (flujo rápido de siempre). El
+  repaso "por libro" ya existía desde el mazo del modal de flashcards.
+- Reusa infra existente: mazos por `bookId`, estanterías (`library/store.js`), y
+  `Study.open({decks})` que ya aceptaba un subconjunto. Habilita gate Pro futuro
+  (repaso por estantería). Tests: `tests/study-scope.spec.ts` (3, incl. UI del selector). SW `v67`.
+
+---
+
 ## 2026-07-13 — P11: compartir una frase subrayada como tarjeta-cita
 
 Botón "Compartir" en un subrayado → genera una imagen PNG con la cita para redes.
