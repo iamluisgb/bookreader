@@ -69,6 +69,7 @@ function gatherScope(label) {
   if (label) return Retrieval.passagesByChapter(label);
   const byChapter = new Map();
   for (const p of Retrieval.allPassages()) {
+    if (Retrieval.isFrontMatter(p.chapter)) continue;   // fuera cubierta/índice/prólogo…
     const k = p.chapter || '';
     if (!byChapter.has(k)) byChapter.set(k, []);
     byChapter.get(k).push(p);
@@ -134,19 +135,26 @@ function repairJson(s) {
 }
 
 function mapPrompt(goal) {
-  return `Resume estos pasajes de un libro en 3-6 viñetas Markdown ("- ..."), una idea por viñeta,
-cada una TERMINANDO con el marcador de su pasaje [[aN]].${goal ? ` Prioriza lo relevante para: «${goal}».` : ''}
+  return `De estos pasajes de un libro, extrae 3-6 CONCEPTOS o ideas clave como ETIQUETAS CORTAS para un mapa mental.
+REGLAS:
+- Cada etiqueta es un sintagma nominal de 2 a 6 palabras. NUNCA una frase u oración completa.
+  Ej.: "- Desambiguación de entidades [[a12]]", NO "- La desambiguación de entidades requiere un contexto rico [[a12]]".
+- Formato: viñeta Markdown "- ..." TERMINADA con el marcador de su pasaje [[aN]].
+- Mismo idioma que los pasajes.${goal ? `\n- Prioriza lo relevante para: «${goal}».` : ''}
 Responde solo las viñetas.`;
 }
 
 function treePrompt(title, goal) {
   return `Organiza estos puntos de un libro en un MAPA MENTAL jerárquico.
 Devuelve SOLO un objeto JSON válido con esta forma:
-{"title": "tema central (2-4 palabras)", "branches": [{"label": "rama (1-3 palabras)", "children": [{"label": "idea concisa", "src": "aN"}]}]}
+{"title": "tema central (2-4 palabras)", "branches": [{"label": "rama (1-3 palabras)", "children": [{"label": "concepto (2-5 palabras)", "src": "aN"}]}]}
 REGLAS:
 - 3 a 6 ramas; 2 a 5 hijos por rama.
-- "src" = el id [[aN]] del punto original (solo "aN", sin corchetes); si no lo sabes, "".
-- Etiquetas BREVES (el mapa es visual). Mismo idioma que los puntos.${goal ? `\n- Enfoca el mapa en: «${goal}».` : ''}
+- Las etiquetas son de MAPA MENTAL: rótulos CORTOS de concepto (2-5 palabras), sintagmas
+  nominales, NUNCA frases ni oraciones. Ej.: "Desambiguación de entidades", NO "La
+  desambiguación de entidades requiere un contexto rico".
+- "src" = el id [[aN]] del punto de origen (solo "aN", sin corchetes) para ampliar el detalle; si no lo sabes, "".
+- Mismo idioma que los puntos.${goal ? `\n- Enfoca el mapa en: «${goal}».` : ''}
 - Título tentativo: «${title}».`;
 }
 
@@ -218,21 +226,48 @@ async function onGenerate() {
 
 // Valida/normaliza el árbol temático del modelo; si falta o es inválido, cae a un mapa
 // por capítulos (nunca a ramas anónimas "Ideas N", que vacían de sentido el mapa).
+// Recorta a `maxChars` por FRONTERA DE PALABRA (sin "…"): garantiza que la etiqueta quepa en
+// la píldora sin que wrapLabel la trunque con puntos suspensivos. El texto completo va al tooltip.
+function clampWords(s, maxChars) {
+  s = String(s || '').trim();
+  if (s.length <= maxChars) return s;
+  const cut = s.slice(0, maxChars);
+  const sp = cut.lastIndexOf(' ');
+  return (sp > 6 ? cut.slice(0, sp) : cut).trim();
+}
+
 function normalizeTree(tree, bullets, scopeName) {
   const cleanSrc = (s) => (typeof s === 'string' && (s.match(/a\d+/) || [])[0]) || '';
-  const asLeaf = (raw) => ({ label: String(raw.label || raw).replace(/\s*\[\[a\d+\]\]\s*$/, '').trim().slice(0, 80), src: cleanSrc(raw.src) });
+  // Cada hoja guarda una etiqueta CORTA visible + el texto completo (`full`) para el tooltip.
+  const asLeaf = (raw) => {
+    const full = String(raw.label ?? raw).replace(/\s*\[\[a\d+\]\]\s*$/, '').trim();
+    return { label: clampWords(full, 42), src: cleanSrc(raw.src), full };
+  };
   if (tree && Array.isArray(tree.branches) && tree.branches.length) {
-    const branches = tree.branches.slice(0, 8).map((br, i) => ({
-      label: String(br.label || `Rama ${i + 1}`).slice(0, 34),
-      children: (Array.isArray(br.children) ? br.children : []).slice(0, 6).map(asLeaf).filter(c => c.label),
-    })).filter(br => br.children.length);
+    const branches = tree.branches.slice(0, 8).map((br, i) => {
+      const label = String(br.label || `Rama ${i + 1}`).trim();
+      return {
+        label: clampWords(label, 32), full: label,
+        children: (Array.isArray(br.children) ? br.children : []).slice(0, 6).map(asLeaf).filter(c => c.label),
+      };
+    }).filter(br => br.children.length);
     if (branches.length) return { title: String(tree.title || scopeName).slice(0, 44), branches };
   }
   return chapterFallback(bullets, scopeName);
 }
 
-// Fallback fiel al libro: agrupa cada viñeta bajo el CAPÍTULO de su ancla [[aN]], usando los
-// títulos reales del TOC como ramas. Legible y estructurado aunque el modelo no devuelva árbol.
+// Acorta un título de capítulo para usarlo como rótulo de rama: quita el numeral inicial
+// ("1 ", "9. ", "III. "), corta subtítulos tras ":" y limita a ~5 palabras, conservando
+// mayúsculas. "1 Knowledge graphs and LLMs: A kind of…" → "Knowledge graphs and LLMs".
+function tidyChapter(label) {
+  let s = String(label || '').replace(/^\s*(chapter|cap[íi]tulo|part[e]?|appendix|ap[ée]ndice|anexo)?\s*[\divxlcdm]+[.)\-:\s]+/i, '');
+  s = s.split(':')[0].trim();
+  const words = s.split(/\s+/).filter(Boolean);
+  return words.slice(0, 5).join(' ') || String(label || '').trim();
+}
+
+// Fallback fiel al libro: agrupa cada viñeta bajo el CAPÍTULO de su ancla [[aN]]. La rama
+// muestra el capítulo acortado (tooltip con el título completo); cada hoja, su texto corto.
 function chapterFallback(bullets, scopeName) {
   const p2ch = new Map(Retrieval.allPassages().map(p => [p.id, (p.chapter || '').trim()]));
   const order = [], groups = new Map();
@@ -240,9 +275,12 @@ function chapterFallback(bullets, scopeName) {
     const src = (t.match(/\[\[(a\d+)\]\]/) || [])[1] || '';
     const ch = p2ch.get(src) || 'General';
     if (!groups.has(ch)) { groups.set(ch, []); order.push(ch); }
-    groups.get(ch).push({ label: t.replace(/\s*\[\[a\d+\]\]\s*$/, '').trim().slice(0, 80), src });
+    const full = t.replace(/\s*\[\[a\d+\]\]\s*$/, '').trim();
+    groups.get(ch).push({ label: clampWords(full, 42), src, full });
   }
-  const branches = order.slice(0, 8).map(ch => ({ label: ch.slice(0, 34), children: groups.get(ch).slice(0, 6) }));
+  const branches = order.slice(0, 8).map(ch => ({
+    label: clampWords(tidyChapter(ch), 32), full: ch, children: groups.get(ch).slice(0, 6),
+  }));
   return { title: scopeName.slice(0, 44), branches };
 }
 
@@ -288,9 +326,11 @@ function pillSize(lines) {
   return { w: Math.max(58, maxLen * CHARW + PILL_PADX), h: lines.length * LINEH + PILL_PADY };
 }
 
-function pill(parent, x, y, lines, { fill, stroke, color, id, bold }) {
+function pill(parent, x, y, lines, { fill, stroke, color, id, bold, tooltip }) {
   const { w, h } = pillSize(lines);
   const g = svgEl('g', id ? { class: 'mm-cite', 'data-id': id, style: 'cursor:pointer' } : {});
+  // <title> = tooltip nativo al pasar el ratón: el texto completo / la cita real del libro.
+  if (tooltip) { const ti = svgEl('title'); ti.textContent = tooltip; g.appendChild(ti); }
   g.appendChild(svgEl('rect', { x: x - w / 2, y: y - h / 2, width: w, height: h, rx: Math.min(16, h / 2), fill, stroke: stroke || 'none', 'stroke-width': 1.5 }));
   const t = svgEl('text', { x, 'text-anchor': 'middle', 'font-size': 14, 'font-family': 'Inter, system-ui, sans-serif', 'font-weight': bold ? 600 : 400, fill: color });
   const y0 = y - (lines.length - 1) * LINEH / 2 + 5;
@@ -308,6 +348,9 @@ function pill(parent, x, y, lines, { fill, stroke, color, id, bold }) {
 // contenido real de las píldoras, así nada se recorta ni se solapa.
 function buildSvg(tree) {
   const branches = tree.branches;
+  // Texto real de cada pasaje (por ancla) para el tooltip de las hojas: al pasar el ratón se
+  // ve la CITA del libro, no una paráfrasis recortada (lección de NotebookLM).
+  const p2text = new Map(Retrieval.allPassages().map(p => [p.id, p.text]));
   const leaves = [];
   branches.forEach((br, bi) => br.children.forEach(ch => leaves.push({ ch, bi })));
   const M = Math.max(1, leaves.length);
@@ -337,7 +380,7 @@ function buildSvg(tree) {
     const col = PALETTE[bi % PALETTE.length];
     const bx = R1 * Math.cos(ang), by = R1 * Math.sin(ang);
     edges.push({ x1: 0, y1: 0, x2: bx, y2: by, col, w: 3, op: 0.5 });
-    nodes.push({ x: bx, y: by, lines: wrapLabel(branches[bi].label, 18, 2), style: { fill: col, color: '#fff', bold: true } });
+    nodes.push({ x: bx, y: by, lines: wrapLabel(branches[bi].label, 18, 2), style: { fill: col, color: '#fff', bold: true, tooltip: branches[bi].full || branches[bi].label } });
   });
   leaves.forEach((lf) => {
     const col = PALETTE[lf.bi % PALETTE.length];
@@ -345,9 +388,10 @@ function buildSvg(tree) {
     const lx = lf.r * Math.cos(lf.ang), ly = lf.r * Math.sin(lf.ang);
     edges.push({ x1: bx, y1: by, x2: lx, y2: ly, col, w: 1.5, op: 0.38 });
     const id = (lf.ch.src && ctx.anchors?.has(lf.ch.src)) ? lf.ch.src : null;
-    nodes.push({ x: lx, y: ly, lines: wrapLabel(lf.ch.label, LEAF_MAXCH, LEAF_MAXLINES), style: { fill: '#fff', stroke: col, color: '#2b2b2b', id } });
+    const tip = ((lf.ch.src && p2text.get(lf.ch.src)) || lf.ch.full || lf.ch.label || '').trim().slice(0, 500);
+    nodes.push({ x: lx, y: ly, lines: wrapLabel(lf.ch.label, LEAF_MAXCH, LEAF_MAXLINES), style: { fill: '#fff', stroke: col, color: '#2b2b2b', id, tooltip: tip } });
   });
-  nodes.push({ x: 0, y: 0, lines: wrapLabel(tree.title, 20, 2), style: { fill: '#2b2b2b', color: '#fff', bold: true } });
+  nodes.push({ x: 0, y: 0, lines: wrapLabel(tree.title, 20, 2), style: { fill: '#2b2b2b', color: '#fff', bold: true, tooltip: tree.title } });
 
   // Bounding box de todas las píldoras → viewBox ajustado.
   let minX = 0, minY = 0, maxX = 0, maxY = 0;

@@ -67,6 +67,8 @@ test('genera un mapa radial SVG con ramas y hojas citadas', async ({ page }) => 
   // Las hojas con src mapeado a anclas reales (a0/a1) son clicables (.mm-cite).
   const cites = page.locator('.mm-canvas .mm-cite');
   expect(await cites.count()).toBeGreaterThanOrEqual(1);
+  // Hover: cada nodo lleva <title> nativo con el detalle completo (modelo NotebookLM).
+  expect(await page.locator('.mm-canvas svg title').count()).toBeGreaterThan(0);
   await expect(page.locator('#mm-png')).toBeVisible();
 });
 

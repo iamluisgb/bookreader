@@ -135,6 +135,16 @@ export function search(query, k = 40) {
   return out.slice(0, k).map(x => ({ ...x.p, score: x.score }));
 }
 
+// "Material accesorio" (cubierta, índice, créditos, prólogo, sobre el autor…): no es
+// contenido del libro. Resúmenes y mapas lo excluyen para no ensuciarse con secciones
+// como "Cover", "Index" o "about the cover illustration". Conservador a propósito: solo
+// etiquetas claramente accesorias, nunca capítulos numerados ni "Introduction".
+const FRONT_MATTER_RE = /^(cover|portada|title\s*page|copyright|creditos|contents|table of contents|indice|index|preface|prefacio|foreword|prologo|acknowledge?ments?|agradecimientos|dedicat(ion|oria)|colophon|about (the )?(author|cover|book|illustration)|bibliograf|references|glossary|glosario|half[-\s]?title|frontispiece|epigraph)\b/;
+export function isFrontMatter(label) {
+  const n = norm(label);
+  return !!n && FRONT_MATTER_RE.test(n);
+}
+
 // Núcleo del título de un capítulo, sin el "9." ni el numeral romano/parte inicial.
 // "9. Consistency and Consensus" → "consistency and consensus".
 export function chapterCore(label) {

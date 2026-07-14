@@ -5,6 +5,29 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-14 — P14.2: mapa mental estilo NotebookLM (etiquetas cortas + hover)
+
+Con frases enteras en cada hoja, el mapa se cortaba entero ("…"). Lección de NotebookLM: el
+mapa es de NAVEGACIÓN, no un volcado de texto → **rótulos cortos de concepto** en los nodos y
+el **detalle detrás de la interacción**.
+
+- **Etiquetas cortas**: el `map` del mapa (`mapPrompt`) ahora extrae CONCEPTOS (2-6 palabras),
+  no frases; el `reduce` (`treePrompt`) pide rótulos de 2-5 palabras. Como bonus, inputs cortos
+  → el JSON del reduce ya no se trunca → el árbol temático sale mucho más a menudo (antes caía
+  al fallback por capítulos). `clampWords` garantiza que ninguna etiqueta se recorte con "…"
+  (recorte por palabra completa; el texto va al tooltip).
+- **Hover = cita real**: cada nodo lleva un `<title>` SVG con el texto del pasaje (por su ancla,
+  vía retrieval) — al pasar el ratón se ve la frase del libro, no una paráfrasis. Clic sigue
+  saltando al pasaje.
+- **Fallback pulido**: los rótulos de rama del fallback se acortan (`tidyChapter`: quita "1 ",
+  "Part 2", "appendix C", subtítulos tras ":") y también usan conceptos cortos como hojas.
+- **Filtro de front-matter** (`retrieval.isFrontMatter`, compartido con el resumen): fuera
+  "Cover", "Index", "Preface", "about the cover illustration"… de mapas y resúmenes.
+- Verificado con generación real (mimo-v2.5) del libro *Knowledge Graphs and LLMs in Action*:
+  mapa temático en español, 0 etiquetas cortadas, 16 hojas clicables con tooltip. SW `v72`.
+
+---
+
 ## 2026-07-14 — P13.1: resumen estructurado, más rico y multi-idioma correcto
 
 El resumen se veía corto y con defectos: TL;DR cortado a media palabra, viñetas coladas en

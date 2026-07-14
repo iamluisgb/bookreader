@@ -92,6 +92,7 @@ function gatherScope(label, budget = BOOK_TOKENS) {
   if (label) return Retrieval.passagesByChapter(label);
   const byChapter = new Map();
   for (const p of Retrieval.allPassages()) {
+    if (Retrieval.isFrontMatter(p.chapter)) continue;   // fuera cubierta/índice/prólogo…
     const k = p.chapter || '';
     if (!byChapter.has(k)) byChapter.set(k, []);
     byChapter.get(k).push(p);
