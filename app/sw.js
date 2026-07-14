@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bookreader-v81';
+const CACHE_NAME = 'bookreader-v82';
 const ASSETS = [
   './',
   './index.html',
@@ -11,6 +11,7 @@ const ASSETS = [
   './js/sync/recovery.js',
   './js/sync/drive-auth.js',
   './js/sync/drive-provider.js',
+  './js/sync/net.js',
   './js/sync/layout.js',
   './js/sync/drive-sync.js',
   './css/main.css',
@@ -57,6 +58,7 @@ const ASSETS = [
   './js/ai/mindmap.js',
   './js/ai/jobs.js',
   './js/ai/jobs-ui.js',
+  './js/ai/studio.js',
   './js/ai/toast.js',
   './js/ai/anki-export.js',
   './js/ai/srs.js',

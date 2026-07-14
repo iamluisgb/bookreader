@@ -5,6 +5,26 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-14 — Studio: galería per-libro de artefactos (guiado por UX, estilo NotebookLM)
+
+Nueva pestaña **"Studio"** en el panel de IA con la galería de artefactos del libro abierto —
+resumen, mapa mental y flashcards—, dándoles una casa visible y navegable (antes solo se lanzaban
+desde iconos sueltos). Diseño guiado por auditoría UX/UI, inspirado en el panel Studio de NotebookLM.
+
+- **`studio.js`** (nuevo): tarjetas de **tipo fijo** siempre visibles. Los generados muestran
+  metadatos (ámbito · nº de citas · antigüedad) + **Abrir** + kebab (**Regenerar** con confirmación
+  que reabre el setup, **Borrar** con confirmación). Los no generados aparecen como **invitación**
+  (+ Generar). Estados en vivo en la propia tarjeta: **generando** (progreso + cancelar), **error**
+  (reintentar), vacío. Reusa el job runner y la persistencia en IndexedDB; sin modelo de datos nuevo.
+- **`jobs.js`**: `remove(bookId, kind)` (borra espejo en memoria + IndexedDB, aborta si en curso).
+- **`summary.js` / `mindmap.js`**: `open({ mode:'setup' })` fuerza el setup (para "Regenerar").
+- Se mantienen los iconos de lanzamiento rápido del toolbar (evitar romper tests/coach mark); el
+  "punto único de entrada" que sugiere el agente queda como follow-up.
+- **`tests/studio.spec.ts`** (nuevo): vacío → generar → generado → abrir → borrar (+ persistencia).
+  SW `v82`.
+
+---
+
 ## 2026-07-14 — Fix: "Sincronizando…" eterno (segundo agujero, en el auth)
 
 El timeout por petición anterior solo cubría `drive-provider.js`. Quedaba un `fetch` **sin abort**

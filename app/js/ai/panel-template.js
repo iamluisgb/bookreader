@@ -29,6 +29,7 @@ export const TEMPLATE = `
   <div id="ai-tabs" class="ai-tabs" style="display:none">
     <button class="ai-tab active" data-view="chat">${icon('bubble', { size: 16 })} Chat</button>
     <button class="ai-tab" data-view="notebook">${icon('note', { size: 16 })} Libreta</button>
+    <button class="ai-tab" data-view="studio">${icon('sparkles', { size: 16 })} Studio</button>
   </div>
   <div id="ai-view-chat" class="ai-view active">
     <div id="ai-messages" class="ai-messages" role="log" aria-live="polite" aria-relevant="additions text" aria-label="Conversación con el agente"></div>
@@ -51,6 +52,7 @@ export const TEMPLATE = `
     </div>
   </div>
   <div id="ai-view-notebook" class="ai-view"></div>
+  <div id="ai-view-studio" class="ai-view"></div>
 `;
 
 // Prompt de sistema del agente. `goal` es el objetivo de la conversación, `template`

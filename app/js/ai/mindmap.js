@@ -19,9 +19,11 @@ const PALETTE = ['#22c55e', '#3b82f6', '#f59e0b', '#ec4899', '#8b5cf6', '#14b8a6
 let ctx = null;
 let overlay = null, scopeValue = '', runUnsub = null;
 let lastTree = null, lastSvg = null, lastDims = { width: 1200, height: 1000 };
+let forceSetup = false;      // abrir directo en el setup aunque haya caché (Regenerar desde Studio)
 
 export function open(context) {
   ctx = context;
+  forceSetup = context && context.mode === 'setup';
   closeModal();
   overlay = document.createElement('div');
   overlay.id = 'ai-mindmap';
@@ -52,6 +54,7 @@ const body = () => overlay?.querySelector('.ai-ob-body');
 function route() {
   const a = Jobs.activeJob();
   if (a && a.kind === KIND && a.bookId === ctx.bookId && a.status === 'running') { renderRunning(a); return; }
+  if (forceSetup) { forceSetup = false; renderSetup(); return; }
   const c = Jobs.cached(ctx.bookId, KIND);
   if (c) { renderResult(c.result, c.params.scopeName); return; }
   renderSetup();

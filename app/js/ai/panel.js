@@ -24,6 +24,7 @@ import * as Summary from './summary.js';
 import * as MindMap from './mindmap.js';
 import * as Jobs from './jobs.js';
 import * as JobsUI from './jobs-ui.js';
+import * as Studio from './studio.js';
 import * as Storage from '../storage.js';
 import * as QueryExpand from './query-expand.js';
 
@@ -67,7 +68,7 @@ export function init(opts) {
   const $ = (s) => els.panel.querySelector(s);
   Object.assign(els, {
     status: $('#ai-status'), tabs: $('#ai-tabs'),
-    chatView: $('#ai-view-chat'), noteView: $('#ai-view-notebook'),
+    chatView: $('#ai-view-chat'), noteView: $('#ai-view-notebook'), studioView: $('#ai-view-studio'),
     messages: $('#ai-messages'), input: $('#ai-input'), send: $('#ai-send'), see: $('#ai-see'), close: $('#ai-close'),
     convobar: $('#ai-convobar'), convoBtn: $('#ai-convo-btn'), convoLabel: $('#ai-convo-label'), convoNew: $('#ai-convo-new'), convoExport: $('#ai-convo-export'),
     ref: $('#ai-ref'), refText: $('#ai-ref-text'), profileChip: $('#ai-profile-chip'),
@@ -113,6 +114,15 @@ export function init(opts) {
   JobsUI.setOpener('summary', openSummary);
   JobsUI.setOpener('mindmap', openMindMap);
   JobsUI.init();
+  // Studio: galería per-libro de artefactos (resumen/mapa) + invitación a los no generados.
+  Studio.mount(els.studioView, {
+    open: (kind, opts) => {
+      if (kind === 'summary') openSummary(opts);
+      else if (kind === 'mindmap') openMindMap(opts);
+      else if (kind === 'flashcards') openFlashcards();
+    },
+    getContext: () => ({ bookId, bookTitle, segReady }),
+  });
   document.addEventListener('click', (e) => {
     if (convoMenuEl && !convoMenuEl.contains(e.target) && !e.target.closest('#ai-convo-btn')) closeConvoMenu();
   });
@@ -256,7 +266,7 @@ function openFlashcards() {
 
 // P13 · Resumen citado del ámbito elegido. Mismo ctx que flashcards + las anclas y el
 // navegador de citas (para que un clic en [[aN]] salte al libro).
-function openSummary() {
+function openSummary(opts) {
   if (!book && !bookId) { setStatus('Abre un libro para generar el resumen.'); return; }
   if (!segReady) { setStatus('Preparando el libro… inténtalo en unos segundos.'); return; }
   Summary.open({
@@ -267,11 +277,12 @@ function openSummary() {
     ensureIndex,
     anchors,
     onCite: navigateCite,
+    mode: opts && opts.mode,   // 'setup' desde Studio → Regenerar (salta el resultado cacheado)
   });
 }
 
 // P14 · Mapa mental radial del ámbito elegido (mismo ctx que el resumen).
-function openMindMap() {
+function openMindMap(opts) {
   if (!book && !bookId) { setStatus('Abre un libro para generar el mapa mental.'); return; }
   if (!segReady) { setStatus('Preparando el libro… inténtalo en unos segundos.'); return; }
   MindMap.open({
@@ -282,6 +293,7 @@ function openMindMap() {
     ensureIndex,
     anchors,
     onCite: navigateCite,
+    mode: opts && opts.mode,
   });
 }
 
@@ -301,7 +313,9 @@ function showView(view) {
   els.tabs.querySelectorAll('.ai-tab').forEach(b => b.classList.toggle('active', b.dataset.view === view));
   els.chatView.classList.toggle('active', view === 'chat');
   els.noteView.classList.toggle('active', view === 'notebook');
+  els.studioView.classList.toggle('active', view === 'studio');
   if (view === 'notebook') els.tabs.querySelector('.ai-tab[data-view="notebook"]')?.classList.remove('ai-tab-unread');
+  if (view === 'studio') Studio.render();
 }
 
 // ---- Carga de libro --------------------------------------------------------

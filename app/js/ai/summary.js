@@ -33,9 +33,11 @@ let scopeValue = '';
 let depthValue = 'estandar'; // profundidad por defecto
 let lastMarkdown = '';       // último resumen mostrado (para exportar/copiar)
 let runUnsub = null;         // baja de la suscripción a Jobs mientras se muestra "en curso"
+let forceSetup = false;      // abrir directo en el setup aunque haya caché (Regenerar)
 
 export function open(context) {
   ctx = context;
+  forceSetup = context && context.mode === 'setup';   // "Regenerar" desde Studio: salta el resultado cacheado
   closeModal();
   overlay = document.createElement('div');
   overlay.id = 'ai-summary';
@@ -67,6 +69,7 @@ const body = () => overlay?.querySelector('.ai-ob-body');
 function route() {
   const a = Jobs.activeJob();
   if (a && a.kind === KIND && a.bookId === ctx.bookId && a.status === 'running') { renderRunning(a); return; }
+  if (forceSetup) { forceSetup = false; renderSetup(); return; }
   const c = Jobs.cached(ctx.bookId, KIND);
   if (c) { renderResult(c.result, c.params.scopeName); return; }
   renderSetup();

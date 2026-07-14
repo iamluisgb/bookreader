@@ -79,6 +79,18 @@ export function cancel() {
   active = null; emit();
 }
 
+// Borra un artefacto generado (Studio): quita el espejo en memoria y la copia de IndexedDB,
+// aborta su job si estuviera en curso, y notifica para que el Studio se repinte.
+export function remove(bookId, kind) {
+  cache.delete(`${bookId}:${kind}`);
+  DB.deleteArtifact(bookId, kind).catch(() => { /* IDB no disponible: bastó con la memoria */ });
+  if (active && active.bookId === bookId && active.kind === kind) {
+    if (active.status === 'running') active.abortCtrl.abort();
+    active = null;
+  }
+  emit();
+}
+
 // El usuario consumió el aviso (abrió el resultado o descartó el chip): limpia el job activo.
 export function clearActive(id) {
   if (active && active.status !== 'running' && (id == null || active.id === id)) { active = null; emit(); }
