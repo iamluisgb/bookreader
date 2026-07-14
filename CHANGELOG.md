@@ -5,6 +5,18 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-14 — Mapa mental: el setup ya no sale estirado (ancho como el resumen)
+
+El modal del mapa mental usaba 900px de ancho SIEMPRE (dimensionado para el SVG del resultado),
+así que la pantalla de configuración —solo un selector y un botón— salía estirada y vacía, distinta
+de la del resumen. Ahora la tarjeta arranca cómoda (680px, igual que `sum-card`) y **solo se ensancha
+a 900px para el resultado** (donde el SVG lo pide).
+
+- **`mindmap.js`**: `setWide(false)` en setup y "en curso"; `setWide(true)` en el resultado.
+- **`main.css`**: `.mm-card` por defecto 680px; `.mm-card--wide` para el resultado. SW `v87`.
+
+---
+
 ## 2026-07-14 — Recuperación: purga de entradas huérfanas del manifest de Drive
 
 Las entradas “Sin título” del historial de Drive eran restos de esquemas de identidad viejos:

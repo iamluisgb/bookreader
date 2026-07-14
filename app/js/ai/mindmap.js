@@ -48,6 +48,9 @@ function closeModal() {
   if (overlay) { overlay.remove(); overlay = null; }
 }
 const body = () => overlay?.querySelector('.ai-ob-body');
+// La tarjeta se ensancha SOLO para el resultado (el SVG grande); en setup/en curso queda
+// cómoda como la del resumen.
+const setWide = (on) => overlay?.querySelector('.mm-card')?.classList.toggle('mm-card--wide', on);
 
 // Al abrir: mapa en curso → vista "en curso"; mapa ya generado en caché → muéstralo directo
 // (reabrir instantáneo); si no → setup.
@@ -64,6 +67,7 @@ function route() {
 function renderSetup() {
   const b = body();
   if (!b) return;
+  setWide(false);
   ctx.ensureIndex();
   const chapters = (ctx.tocLabels || []).filter(c => c && Retrieval.passagesByChapter(c).length);
   scopeValue = chapters.includes(ctx.currentChapter) ? ctx.currentChapter : '';
@@ -239,6 +243,7 @@ async function runMindmap({ chunks, goal, scopeName, signal, progress }) {
 function renderRunning(job) {
   const b = body();
   if (!b || !job) { renderSetup(); return; }
+  setWide(false);
   b.innerHTML = `
     <h2>Generando mapa mental…</h2>
     <p class="ai-run-status" id="mm-run-status" role="status"></p>
@@ -466,6 +471,7 @@ function buildSvg(tree) {
 function renderResult(tree, scopeName) {
   const b = body();
   if (!b) return;
+  setWide(true);
   lastTree = tree;
   Jobs.clearActive();          // el usuario está viendo el resultado → retira chip/aviso
   b.innerHTML = `
