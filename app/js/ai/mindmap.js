@@ -55,6 +55,7 @@ function route() {
   const a = Jobs.activeJob();
   if (a && a.kind === KIND && a.bookId === ctx.bookId && a.status === 'running') { renderRunning(a); return; }
   if (forceSetup) { forceSetup = false; renderSetup(); return; }
+  if (ctx.viewArtifact) { renderResult(ctx.viewArtifact.result, ctx.viewArtifact.params?.scopeName); return; }
   const c = Jobs.cached(ctx.bookId, KIND);
   if (c) { renderResult(c.result, c.params.scopeName); return; }
   renderSetup();

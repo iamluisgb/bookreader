@@ -1,8 +1,8 @@
 import { test, expect } from '@playwright/test';
 import path from 'path';
 
-// Studio: galería per-libro de artefactos. Estados vacío → generar → generado (Abrir) → borrar.
-// LLM stubbeado (mismo patrón que jobs.spec).
+// Studio: galería per-libro con HISTORIAL. Generar NO sobrescribe: cada resumen/mapa se conserva
+// hasta que el usuario lo borra. LLM stubbeado (mismo patrón que jobs.spec).
 
 const EPUB_PATH = path.join(__dirname, 'test.epub');
 
@@ -49,54 +49,61 @@ async function setup(page) {
   await expect(page.locator('#ai-status')).toContainText('Listo', { timeout: 30000 });
 }
 
-test('Studio: vacío → generar → generado → abrir → borrar', async ({ page }) => {
-  await setup(page);
-
-  // Abre la pestaña Studio.
-  await page.click('.ai-tab[data-view="studio"]');
-  const studio = page.locator('#ai-view-studio');
-  await expect(studio).toBeVisible();
-
-  // Los tres tipos aparecen; resumen y mapa como invitación vacía.
-  await expect(studio).toContainText('Resumen');
-  await expect(studio).toContainText('Mapa mental');
-  await expect(studio).toContainText('Flashcards');
-  await expect(studio.locator('.studio-card[data-kind="summary"], .studio-empty')).not.toHaveCount(0);
-  const genSummary = studio.locator('.studio-empty:has-text("Resumen") [data-act="gen"]');
-  await expect(genSummary).toBeVisible();
-
-  // Generar resumen desde Studio → abre el modal en setup → generar.
-  await genSummary.click();
+async function generateSummary(page) {
   await page.waitForSelector('#ai-summary #sum-generate', { timeout: 5000 });
   await page.click('#sum-generate');
   await expect(page.locator('#ai-summary .sum-doc')).toContainText('pueblo de muertos', { timeout: 15000 });
   await page.locator('#ai-summary .ai-ob-close').click();
+  await expect(page.locator('#ai-summary')).toHaveCount(0);
+}
 
-  // De vuelta en Studio: el resumen es ahora un artefacto GENERADO con "Abrir" y kebab.
+test('Studio conserva el historial: generar dos no sobrescribe; borrar uno deja el otro', async ({ page }) => {
+  await setup(page);
+  const studio = page.locator('#ai-view-studio');
+  const summaryCards = studio.locator('.studio-card.studio-generated:has([data-kind="summary"])');
+
+  // Studio con el resumen como invitación vacía.
   await page.click('.ai-tab[data-view="studio"]');
-  const card = studio.locator('.studio-generated:has-text("Resumen")');
-  await expect(card).toBeVisible();
-  await expect(card.locator('[data-act="open"]')).toBeVisible();
-  await expect(card).toContainText('citas');   // metadatos: cuenta de citas
+  await expect(studio).toBeVisible();
+  await expect(studio.locator('.studio-empty [data-act="gen"][data-kind="summary"]')).toBeVisible();
 
-  // Abrir desde Studio → resultado cacheado directo (sin setup).
-  await card.locator('[data-act="open"]').click();
+  // Genera el PRIMER resumen desde Studio.
+  await studio.locator('.studio-empty [data-act="gen"][data-kind="summary"]').click();
+  await generateSummary(page);
+
+  // Vuelve: 1 artefacto + botón "Nuevo".
+  await page.click('.ai-tab[data-view="studio"]');
+  await expect(summaryCards).toHaveCount(1);
+  await expect(studio.locator('.studio-new[data-kind="summary"]')).toBeVisible();
+
+  // Genera un SEGUNDO resumen con "Nuevo" → NO sobrescribe: ahora hay 2.
+  await studio.locator('.studio-new[data-kind="summary"]').click();
+  await generateSummary(page);
+  await page.click('.ai-tab[data-view="studio"]');
+  await expect(summaryCards).toHaveCount(2);
+
+  // Persistidos los dos en IndexedDB.
+  const persisted = await page.evaluate(async () => {
+    const DB: any = await import('/js/ai/db.js');
+    return (await DB.getAll('artifacts')).filter((a: any) => a.kind === 'summary').length;
+  });
+  expect(persisted).toBe(2);
+
+  // Abrir uno → resultado cacheado directo (sin setup).
+  await summaryCards.first().locator('[data-act="open"]').click();
   await expect(page.locator('#ai-summary .sum-doc')).toContainText('pueblo de muertos', { timeout: 5000 });
   await expect(page.locator('#ai-summary #sum-generate')).toHaveCount(0);
   await page.locator('#ai-summary .ai-ob-close').click();
 
-  // Borrar desde el kebab → confirmar → vuelve a estar vacío.
+  // Borrar UNO → confirmar → queda el otro (no desaparecen todos).
   await page.click('.ai-tab[data-view="studio"]');
-  await studio.locator('.studio-generated:has-text("Resumen") [data-act="kebab"]').click();
-  await studio.locator('[data-act="del"]').click();
+  await summaryCards.first().locator('.studio-del').click();
   await page.locator('.dlg-ok').click();
-  await expect(studio.locator('.studio-empty:has-text("Resumen") [data-act="gen"]')).toBeVisible({ timeout: 5000 });
+  await expect(summaryCards).toHaveCount(1);
 
-  // Y persistió el borrado en IndexedDB.
-  const stillThere = await page.evaluate(async () => {
+  const left = await page.evaluate(async () => {
     const DB: any = await import('/js/ai/db.js');
-    const arts = await DB.getAll('artifacts');
-    return arts.some((a: any) => a.kind === 'summary');
+    return (await DB.getAll('artifacts')).filter((a: any) => a.kind === 'summary').length;
   });
-  expect(stillThere).toBe(false);
+  expect(left).toBe(1);
 });

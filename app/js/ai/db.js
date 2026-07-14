@@ -375,26 +375,33 @@ export async function saveSegmented(bookId, title, seg) {
 }
 
 // Artefactos generados (resumen, mapa mental) --------------------------------
-// Cacheados para no re-generar (coste LLM) al reabrir el modal o recargar la app. Clave
-// `${bookId}:${kind}`. Se validan contra SEG_VERSION: si el libro se re-segmentó (anclas
-// nuevas), las citas del artefacto viejo ya no casan → se ignora (y se re-generará).
+// Persistidos para no re-generar (coste LLM) al reabrir el modal o recargar la app, y para
+// conservar el HISTORIAL: cada generación es un artefacto propio con clave única
+// `${bookId}:${kind}:${id}` (antes `${bookId}:${kind}`, que se sobrescribía). Se conservan hasta
+// que el usuario los borra. Se validan contra SEG_VERSION: si el libro se re-segmentó (anclas
+// nuevas), las citas del artefacto viejo ya no casan → se ignora (y se podrá re-generar).
 
 export function getArtifacts(bookId) {
   return tx('artifacts', 'readonly', s => reqP(s.index('bookId').getAll(bookId)))
     .then(list => (list || []).filter(a => a.segVersion === SEG_VERSION));
 }
 
-export function putArtifact({ bookId, kind, result, params }) {
+// Devuelve la clave del artefacto guardado (el handle para borrarlo). `id` opcional: si no
+// viene, se genera → cada llamada crea un artefacto NUEVO (no sobrescribe: historial).
+export function putArtifact({ bookId, kind, result, params, id }) {
   const now = Date.now();
+  const aid = id || crypto.randomUUID();
+  const key = `${bookId}:${kind}:${aid}`;
   return put('artifacts', {
-    key: `${bookId}:${kind}`, uid: crypto.randomUUID(),
+    key, id: aid, uid: crypto.randomUUID(),
     bookId, kind, result, params: params || {}, segVersion: SEG_VERSION,
     createdAt: now, updatedAt: now,
-  });
+  }).then(() => key);
 }
 
-export function deleteArtifact(bookId, kind) {
-  return tx('artifacts', 'readwrite', s => reqP(s.delete(`${bookId}:${kind}`)));
+// Borra por clave completa (soporta también las claves legacy `${bookId}:${kind}` sin id).
+export function deleteArtifact(key) {
+  return tx('artifacts', 'readwrite', s => reqP(s.delete(key)));
 }
 
 // Utilidad: SHA-256 del arrayBuffer del fichero -> id estable del libro.

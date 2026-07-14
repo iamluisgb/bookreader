@@ -5,6 +5,25 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-14 — Artefactos: historial (dejan de sobrescribirse)
+
+Generar un resumen (o mapa) ya **no borra el anterior**: cada generación es un artefacto propio y
+se conservan todos hasta que el usuario los borra. Antes la clave era `${bookId}:${kind}` (uno por
+tipo, se sobrescribía); ahora `${bookId}:${kind}:${id}` (la "puerta de escape" que dejó la auditoría
+UX). Los artefactos son locales (no van al sync de Drive).
+
+- **`db.js`**: `putArtifact` genera una clave única por generación (no sobrescribe) y devuelve la
+  clave; `deleteArtifact(key)` borra por clave (soporta las legacy sin id).
+- **`jobs.js`**: la caché por tipo pasa de un valor a una **lista** (más reciente primero);
+  `list(bookId, kind)` / `latest(...)`; `remove(key)` borra un artefacto concreto sin tocar los demás.
+- **`summary.js` / `mindmap.js`**: `open({ viewArtifact })` abre un artefacto CONCRETO del historial.
+- **`studio.js`**: cada tipo muestra su **historial** de tarjetas (ámbito · citas · fecha), con
+  **+ Nuevo** por tipo y **borrar** por artefacto; invitación cuando no hay ninguno.
+- **`tests/studio.spec.ts`**: generar dos no sobrescribe; borrar uno deja el otro (+ persistencia).
+  SW `v83`.
+
+---
+
 ## 2026-07-14 — Studio: galería per-libro de artefactos (guiado por UX, estilo NotebookLM)
 
 Nueva pestaña **"Studio"** en el panel de IA con la galería de artefactos del libro abierto —

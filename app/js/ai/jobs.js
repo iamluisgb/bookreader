@@ -11,7 +11,9 @@ import * as DB from './db.js';
 
 const listeners = new Set();
 let active = null;              // job en curso o recién terminado, hasta que el usuario lo consume
-const cache = new Map();        // `${bookId}:${kind}` -> { result, params, at }  (espejo en memoria de IndexedDB)
+// `${bookId}:${kind}` -> Array<{ key, id, result, params, at }> (más reciente primero). HISTORIAL:
+// cada generación añade una entrada; no se sobrescribe. Espejo en memoria de IndexedDB.
+const cache = new Map();
 let seq = 0;
 
 // job = { id, bookId, kind, label, params, run, status, progress:{i,n,phase}, result, error, abortCtrl }
@@ -20,20 +22,28 @@ function emit() { for (const fn of listeners) { try { fn(active); } catch { /* n
 
 export function subscribe(fn) { listeners.add(fn); fn(active); return () => listeners.delete(fn); }
 export function activeJob() { return active; }
-export function cached(bookId, kind) { return cache.get(`${bookId}:${kind}`) || null; }
 
-// Al abrir un libro: trae de IndexedDB sus artefactos ya generados (resumen/mapa) al espejo en
-// memoria, para que `cached()` los sirva al instante en la apertura del modal. No pisa un
-// resultado más reciente que ya esté en memoria (recién generado en esta sesión).
+// Historial completo de un tipo (más reciente primero) y el más reciente (para reabrir directo).
+export function list(bookId, kind) { return cache.get(`${bookId}:${kind}`) || []; }
+export function latest(bookId, kind) { return (cache.get(`${bookId}:${kind}`) || [])[0] || null; }
+export function cached(bookId, kind) { return latest(bookId, kind); }   // compat: el más reciente
+
+// Al abrir un libro: trae de IndexedDB TODOS sus artefactos (resúmenes/mapas) al espejo en
+// memoria, agrupados por tipo y ordenados por fecha. Mezcla por clave con lo que ya haya en
+// memoria (recién generado esta sesión, aún no releído) para no perderlo.
 export async function loadForBook(bookId) {
   if (!bookId) return;
   try {
     const arts = await DB.getArtifacts(bookId);
+    const byKind = new Map();
     for (const a of arts) {
       const k = `${a.bookId}:${a.kind}`;
-      const at = a.updatedAt || a.createdAt || 0;
-      const ex = cache.get(k);
-      if (!ex || (ex.at || 0) < at) cache.set(k, { result: a.result, params: a.params, at });
+      if (!byKind.has(k)) byKind.set(k, new Map());
+      byKind.get(k).set(a.key, { key: a.key, id: a.id, result: a.result, params: a.params, at: a.createdAt || a.updatedAt || 0 });
+    }
+    for (const [k, m] of byKind) {
+      for (const e of (cache.get(k) || [])) if (!m.has(e.key)) m.set(e.key, e);
+      cache.set(k, [...m.values()].sort((a, b) => (b.at || 0) - (a.at || 0)));
     }
   } catch { /* IDB no disponible */ }
 }
@@ -55,8 +65,12 @@ export function start({ bookId, kind, label, params, run }) {
       if (active !== job) return;                       // superado por otro job → descartar
       if (job.abortCtrl.signal.aborted) { active = null; emit(); return; }
       job.status = 'done'; job.result = result;
-      cache.set(`${bookId}:${kind}`, { result, params, at: Date.now() });
-      DB.putArtifact({ bookId, kind, result, params }).catch(() => { /* IDB no disponible: queda en memoria */ });
+      // Historial: AÑADE un artefacto nuevo (no sobrescribe el anterior).
+      const id = (crypto.randomUUID && crypto.randomUUID()) || String(Date.now()) + Math.random().toString(36).slice(2);
+      const k = `${bookId}:${kind}`;
+      const entry = { key: `${k}:${id}`, id, result, params, at: Date.now() };
+      cache.set(k, [entry, ...(cache.get(k) || [])]);
+      DB.putArtifact({ bookId, kind, result, params, id }).catch(() => { /* IDB no disponible: queda en memoria */ });
       emit();
     } catch (e) {
       if (active !== job) return;
@@ -79,15 +93,14 @@ export function cancel() {
   active = null; emit();
 }
 
-// Borra un artefacto generado (Studio): quita el espejo en memoria y la copia de IndexedDB,
-// aborta su job si estuviera en curso, y notifica para que el Studio se repinte.
-export function remove(bookId, kind) {
-  cache.delete(`${bookId}:${kind}`);
-  DB.deleteArtifact(bookId, kind).catch(() => { /* IDB no disponible: bastó con la memoria */ });
-  if (active && active.bookId === bookId && active.kind === kind) {
-    if (active.status === 'running') active.abortCtrl.abort();
-    active = null;
+// Borra UN artefacto del historial por su clave (Studio): lo quita del espejo en memoria y de
+// IndexedDB, y notifica para que el Studio se repinte. No toca los demás del mismo tipo.
+export function remove(key) {
+  for (const [k, arr] of cache) {
+    const i = arr.findIndex(e => e.key === key);
+    if (i >= 0) { arr.splice(i, 1); if (!arr.length) cache.delete(k); break; }
   }
+  DB.deleteArtifact(key).catch(() => { /* IDB no disponible: bastó con la memoria */ });
   emit();
 }
 

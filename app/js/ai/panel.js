@@ -277,7 +277,8 @@ function openSummary(opts) {
     ensureIndex,
     anchors,
     onCite: navigateCite,
-    mode: opts && opts.mode,   // 'setup' desde Studio → Regenerar (salta el resultado cacheado)
+    mode: opts && opts.mode,   // 'setup' desde Studio → generar uno nuevo (salta el cacheado)
+    viewArtifact: opts && opts.artifact,   // abrir un artefacto concreto del historial
   });
 }
 
@@ -294,6 +295,7 @@ function openMindMap(opts) {
     anchors,
     onCite: navigateCite,
     mode: opts && opts.mode,
+    viewArtifact: opts && opts.artifact,
   });
 }
 
