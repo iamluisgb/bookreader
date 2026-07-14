@@ -37,8 +37,8 @@ function render(job) {
 }
 
 function renderChip(job) {
-  if (!job) { chip?.remove(); chip = null; return; }
-  if (!chip) { chip = document.createElement('div'); document.body.appendChild(chip); }
+  if (!job) { chip?.remove(); chip = null; document.body.classList.remove('has-taskchip'); return; }
+  if (!chip) { chip = document.createElement('div'); document.body.appendChild(chip); document.body.classList.add('has-taskchip'); }
   const name = NAMES[job.kind] || 'IA';
   chip.className = `ai-taskchip is-${job.status}`;
   if (job.status === 'running') {

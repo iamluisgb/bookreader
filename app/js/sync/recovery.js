@@ -25,9 +25,12 @@ export async function listBooks() {
   const m = await Drive.read(BASE + 'manifest.json');
   if (!m) return [];
   const manifest = JSON.parse(m.content);
+  // title = null cuando el manifest no lo trae (libros que solo tienen subrayados/marcadores,
+  // keyed por book.key() de epub.js, sin metadatos de título). La vista los marca "sin título"
+  // en vez de mostrar el id crudo. Los identificables van primero.
   return Object.entries(manifest.books || {})
-    .map(([id, info]) => ({ id, title: info.title || id, updatedAt: info.updatedAt || 0 }))
-    .sort((a, b) => b.updatedAt - a.updatedAt);
+    .map(([id, info]) => ({ id, title: info.title || null, updatedAt: info.updatedAt || 0 }))
+    .sort((a, b) => (b.title ? 1 : 0) - (a.title ? 1 : 0) || b.updatedAt - a.updatedAt);
 }
 
 // Versiones de un libro, más recientes primero.

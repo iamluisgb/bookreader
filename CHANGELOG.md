@@ -5,6 +5,24 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-14 — Vista de recuperación usable + chip/badge sin solaparse
+
+Arreglos de UX sobre problemas observados (no tocan la identidad de libros, causa de fondo).
+
+- **Vista de recuperación (Ajustes → Datos)**: la lista de libros no tenía scroll y mostraba
+  ids crudos. Ahora tiene **scroll** (`max-height`), los libros **identificables van primero**,
+  y los que no tienen título (solo subrayados/marcadores, keyed por `book.key()` de epub.js) se
+  marcan **"Sin título · <id corto>"** en vez del hash entero.
+- **Chip de trabajos vs badge de sync**: ambos vivían abajo-derecha y se solapaban. Con un chip
+  activo, el badge `#sync-badge` sube (`body.has-taskchip`).
+- SW `v75`.
+
+> Nota (backlog): la raíz de los "registros imposibles de identificar" es que subrayados/marcadores
+> se keyean con `book.key()` de epub.js mientras biblioteca/IA usan el hash del fichero → el manifest
+> de sync mezcla dos espacios de id. Unificar la identidad es un cambio con migración (pendiente).
+
+---
+
 ## 2026-07-14 — Persistencia de resúmenes y mapas mentales (IndexedDB)
 
 El caché de resúmenes/mapas era solo en memoria → se perdía al recargar o cerrar (y había que

@@ -2611,6 +2611,8 @@ body.in-library .ai-fab { display: none; }
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
   pointer-events: none;
 }
+/* Cuando hay un chip de trabajo de IA (mismo rincón), sube el badge de sync para no solaparse. */
+body.has-taskchip #sync-badge { bottom: 68px; }
 #sync-badge[data-state='error'] { color: #dc2626; border-color: #dc2626; }
 #sync-badge[data-state='reconnect'] {
   color: var(--accent);
@@ -2640,6 +2642,9 @@ body.in-library .ai-fab { display: none; }
   cursor: pointer;
 }
 .appset-history-book:hover { border-color: var(--accent); }
+.appset-history-list { display: flex; flex-direction: column; gap: 6px; max-height: 44vh; overflow-y: auto; }
+.appset-history-untitled { color: var(--text-secondary); font-style: italic; }
+.appset-history-id { color: var(--text-faint); font-family: ui-monospace, SFMono-Regular, monospace; font-size: 11px; }
 .appset-history-row {
   display: flex;
   align-items: center;

@@ -596,10 +596,15 @@ function wireRecovery(content, show, fail) {
     try {
       const books = await Recovery.listBooks();
       if (!books.length) { panel.innerHTML = '<p class="appset-muted">No hay nada guardado en Drive todavía.</p>'; return; }
+      const label = (b) => b.title
+        ? escapeHtml(b.title)
+        : `<span class="appset-history-untitled">Sin título</span> <span class="appset-history-id">${escapeHtml(b.id.slice(0, 14))}…</span>`;
       panel.innerHTML = `<p class="appset-muted">Elige un libro para ver sus versiones anteriores:</p>` +
-        books.map(b => `<button class="appset-history-book" data-id="${escapeHtml(b.id)}">${escapeHtml(b.title)}</button>`).join('');
+        `<div class="appset-history-list">` +
+        books.map(b => `<button class="appset-history-book" data-id="${escapeHtml(b.id)}" data-title="${escapeHtml(b.title || '')}">${label(b)}</button>`).join('') +
+        `</div>`;
       panel.querySelectorAll('.appset-history-book').forEach(el =>
-        el.addEventListener('click', () => showVersions(el.dataset.id, el.textContent)));
+        el.addEventListener('click', () => showVersions(el.dataset.id, el.dataset.title || 'Sin título')));
     } catch (e) { fail('No se pudo cargar el historial')(e); panel.hidden = true; }
   });
 
