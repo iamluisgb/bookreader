@@ -1617,6 +1617,12 @@ body.ai-open .ai-taskchip { right: calc(var(--ai-panel-width) + 20px); }
   flex: none; font-size: 12px; font-weight: 600; color: var(--accent);
   background: var(--accent-soft); border-radius: 999px; padding: 2px 9px;
 }
+/* Árbol: estantería = categoría padre (negrita); libro = hijo (sangrado, con guía). */
+.lib-study-opt--shelf { font-weight: 600; }
+.lib-study-opt--shelf .lib-study-opt-lbl::before { content: '▸ '; color: var(--text-faint); font-weight: 400; }
+.lib-study-opt--book { padding-left: 30px; position: relative; color: var(--text-soft); }
+.lib-study-opt--book .lib-study-opt-lbl::before { content: '└ '; color: var(--text-faint); }
+.lib-study-opt--book .lib-study-opt-n { color: var(--text-soft); background: var(--surface-3); }
 
 /* ============ AJUSTES GENERALES (overlay global) ============ */
 /* Hogar de la config global de la app (agente + P1/P2/P3). Mismo patrón modal que

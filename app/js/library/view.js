@@ -145,28 +145,35 @@ async function paintStudyChip() {
   chip.addEventListener('click', async (e) => {
     e.stopPropagation();
     const scopes = await Study.studyScopes();
-    // Sin elección real (un solo libro, sin estanterías) → repasa todo directo, sin selector.
-    if (!scopes.shelves.length && scopes.books.length <= 1) { Study.openToday({ onClose: paintStudyChip }); return; }
+    // Sin elección real (un solo libro suelto, sin estanterías) → repasa todo directo.
+    const nBooks = scopes.shelves.reduce((n, s) => n + s.books.length, 0) + scopes.looseBooks.length;
+    if (!scopes.shelves.length && nBooks <= 1) { Study.openToday({ onClose: paintStudyChip }); return; }
     showStudyChooser(chip, scopes);
   });
   bar.insertBefore(chip, bar.querySelector('.lib-upload'));
 }
 
-// Selector de ámbito de repaso (P12, estilo Anki): popover anclado al chip con "Todo" +
-// una sección de LIBROS y otra de ESTANTERÍAS con vencidas. Se repasa a cualquier nivel.
+// Selector de ámbito de repaso (P12, árbol estilo Anki): "Todo" + cada estantería como
+// categoría PADRE (suma de sus libros) con sus LIBROS anidados debajo, y los sueltos aparte.
+// Se repasa a cualquier nivel (estantería o libro).
 function showStudyChooser(chip, scopes) {
   document.querySelector('.lib-study-menu')?.remove();
   const menu = document.createElement('div');
   menu.className = 'lib-study-menu';
-  const row = (label, count, scope) =>
-    `<button class="lib-study-opt" data-scope='${escapeHtml(JSON.stringify(scope))}'>
+  const row = (label, count, scope, kind = '') =>
+    `<button class="lib-study-opt${kind ? ' lib-study-opt--' + kind : ''}" data-scope='${escapeHtml(JSON.stringify(scope))}'>
       <span class="lib-study-opt-lbl">${escapeHtml(label)}</span><span class="lib-study-opt-n">${count}</span>
     </button>`;
   const section = (title, rows) => rows ? `<div class="lib-study-sec">${title}</div>${rows}` : '';
+  const shelfTree = scopes.shelves.map(s =>
+    row(s.name, s.cards, { type: 'shelf', shelfId: s.id }, 'shelf') +
+    s.books.map(b => row(b.title, b.cards, { type: 'book', bookId: b.id }, 'book')).join('')
+  ).join('');
+  const loose = scopes.looseBooks.map(b => row(b.title, b.cards, { type: 'book', bookId: b.id }, 'book')).join('');
   menu.innerHTML =
     row('Todo', scopes.total, { type: 'all' }) +
-    section('Libros', (scopes.books || []).map(b => row(b.title, b.cards, { type: 'book', bookId: b.id })).join('')) +
-    section('Estanterías', scopes.shelves.map(s => row(s.name, s.cards, { type: 'shelf', shelfId: s.id })).join(''));
+    shelfTree +
+    section('Sin estantería', loose);
   chip.parentElement.appendChild(menu);
   const r = chip.getBoundingClientRect();
   const pr = chip.parentElement.getBoundingClientRect();

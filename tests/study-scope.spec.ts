@@ -27,7 +27,7 @@ async function seed(page) {
 }
 
 test.describe('P12 · ámbitos de repaso', () => {
-  test('studyScopes: total global + estanterías con vencidas', async ({ page }) => {
+  test('studyScopes: árbol estantería→libros + sueltos', async ({ page }) => {
     await page.goto('/');
     await seed(page);
     const scopes = await page.evaluate(async () => {
@@ -36,18 +36,15 @@ test.describe('P12 · ámbitos de repaso', () => {
     });
     // bA(2)+bB(1)+bC(1)+bD(1) = 5 vencidas en total.
     expect(scopes.total).toBe(5);
-    const byShelf = Object.fromEntries(scopes.shelves.map((s: any) => [s.name, s.cards]));
-    expect(byShelf['Medicina']).toBe(3);   // bA(2) + bB(1)
-    expect(byShelf['Idiomas']).toBe(1);    // bC(1)
-    expect(scopes.shelves).toHaveLength(2); // "Suelto" no está en ninguna estantería
-    // Nivel LIBRO: todos los libros con vencidas, incluido el suelto.
-    const byBook = Object.fromEntries(scopes.books.map((b: any) => [b.title, b.cards]));
-    expect(byBook['Anatomía']).toBe(2);
-    expect(byBook['Fisiología']).toBe(1);
-    expect(byBook['Inglés']).toBe(1);
-    expect(byBook['Suelto']).toBe(1);      // sin estantería, pero sí a nivel libro
-    expect(scopes.books).toHaveLength(4);
-    expect(scopes.books[0].title).toBe('Anatomía'); // ordenado por nº de vencidas desc
+    // Estantería = categoría padre con la SUMA de sus libros y estos anidados dentro.
+    const byShelf = Object.fromEntries(scopes.shelves.map((s: any) => [s.name, s]));
+    expect(byShelf['Medicina'].cards).toBe(3);   // bA(2) + bB(1)
+    expect(byShelf['Medicina'].books.map((b: any) => `${b.title}:${b.cards}`)).toEqual(['Anatomía:2', 'Fisiología:1']);
+    expect(byShelf['Idiomas'].cards).toBe(1);
+    expect(byShelf['Idiomas'].books.map((b: any) => b.title)).toEqual(['Inglés']);
+    expect(scopes.shelves).toHaveLength(2);
+    // "Suelto" no está en ninguna estantería → aparece como libro suelto.
+    expect(scopes.looseBooks.map((b: any) => `${b.title}:${b.cards}`)).toEqual(['Suelto:1']);
   });
 
   test('dueToday por estantería y por libro filtra los mazos', async ({ page }) => {
@@ -71,7 +68,7 @@ test.describe('P12 · ámbitos de repaso', () => {
     expect(res.soloA).toBe(2);
   });
 
-  test('el chip "Repasar hoy" abre el selector con Todo + libros + estanterías', async ({ page }) => {
+  test('el chip "Repasar hoy" abre el árbol estantería→libros', async ({ page }) => {
     await page.goto('/');
     await seed(page);
     await page.goto('/');   // re-render de la biblioteca → pinta el chip con el total
@@ -81,14 +78,15 @@ test.describe('P12 · ámbitos de repaso', () => {
     await chip.click();
     const menu = page.locator('.lib-study-menu');
     await expect(menu).toBeVisible();
-    const opts = menu.locator('.lib-study-opt');
-    await expect(opts).toHaveCount(7);            // Todo + 4 libros + 2 estanterías
-    await expect(opts.nth(0)).toContainText('Todo');
-    await expect(menu.locator('.lib-study-sec')).toContainText(['Libros', 'Estanterías']);
-    await expect(menu).toContainText('Anatomía');   // nivel libro
-    await expect(menu).toContainText('Medicina');   // nivel estantería
-    await expect(menu).toContainText('Idiomas');
-    // Elegir un LIBRO abre el modo Estudiar de ese ámbito (2 pendientes en Anatomía).
+    // Todo(1) + 2 estanterías (padre) + 3 libros anidados + 1 suelto = 7 opciones.
+    await expect(menu.locator('.lib-study-opt')).toHaveCount(7);
+    await expect(menu.locator('.lib-study-opt').nth(0)).toContainText('Todo');
+    await expect(menu.locator('.lib-study-opt--shelf')).toHaveCount(2);   // Medicina, Idiomas
+    await expect(menu.locator('.lib-study-opt--book')).toHaveCount(4);    // Anatomía, Fisiología, Inglés, Suelto
+    await expect(menu.locator('.lib-study-sec')).toHaveText('Sin estantería');
+    // La estantería padre "Medicina" precede a sus libros anidados.
+    await expect(menu.locator('.lib-study-opt--shelf').first()).toContainText('Medicina');
+    // Elegir un LIBRO anidado abre el modo Estudiar de ese ámbito (2 pendientes en Anatomía).
     await menu.getByText('Anatomía').click();
     await expect(page.getByText('pendientes')).toBeVisible({ timeout: 10000 });
   });

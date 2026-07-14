@@ -5,18 +5,18 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
-## 2026-07-14 — Repaso: ámbito por LIBRO además de por estantería (estilo Anki)
+## 2026-07-14 — Repaso: árbol estantería→libros (estilo Anki)
 
-El selector de "Repasar hoy" solo dejaba elegir estantería (o Todo). Ahora, como Anki, se puede
-repasar a nivel de **libro** o de **estantería**. El backend (`dueToday`/`decksForScope`) ya
-soportaba `scope.type === 'book'`; faltaba exponerlo.
+El selector de "Repasar hoy" solo dejaba elegir estantería (o Todo). Ahora es un **árbol** como
+el de mazos de Anki: cada **estantería** es la categoría padre (con la **suma** de las vencidas de
+sus libros) y sus **libros** cuelgan anidados debajo; los libros sin estantería van como "sueltos".
+Se repasa a cualquier nivel. El backend (`dueToday`/`decksForScope`) ya soportaba `scope.type==='book'`.
 
-- **`study.js`**: `studyScopes()` devuelve también `books` (los libros con vencidas hoy, ordenados
-  por nº de vencidas). Los libros sueltos —sin estantería— aparecen igual a nivel libro.
-- **`library/view.js`**: el selector muestra **Todo** + sección **Libros** + sección **Estanterías**;
-  el chip abre el selector si hay elección real (≥1 estantería o >1 libro).
-- **`tests/study-scope.spec.ts`**: cubre el desglose por libro y la selección a nivel de libro.
-  SW `v84`.
+- **`study.js`**: `studyScopes()` devuelve `{ total, shelves:[{name,cards,books:[...] }], looseBooks }`.
+- **`library/view.js`**: el selector pinta el árbol (estantería padre en negrita + libros sangrados);
+  el chip lo abre si hay elección real (≥1 estantería o >1 libro).
+- **`tests/study-scope.spec.ts`**: árbol estantería→libros anidados + sueltos, y selección de libro.
+  SW `v85`.
 
 ---
 
