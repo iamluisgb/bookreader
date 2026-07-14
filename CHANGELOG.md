@@ -5,6 +5,23 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-14 — Fix: variables CSS inexistentes (menú de repaso invisible)
+
+El selector de ámbito de repaso ("Repasar hoy" → Todo / estanterías) se veía transparente, con
+los contadores flotando sobre las portadas y sin poder distinguir qué era qué. Causa: `.lib-study-menu`
+—y varios sitios más— usaban custom properties que **no existen** en el tema (`--bg-primary`,
+`--bg-secondary`, `--text-primary`, `--text-secondary`), que resuelven a "sin valor" → fondo
+transparente y texto invisible, sin error en consola.
+
+- **`main.css`**: mapeadas a las variables reales del tema (`--surface-1/2/3`, `--text`, `--text-soft`).
+  Afectaba también al chip de trabajos en segundo plano (`.ai-taskchip`), el documento de resumen
+  (`.sum-doc`), el estado de ejecución (`.ai-run-status`) y el propio **`#sync-badge`** (que llevaba
+  renderizándose sin fondo).
+- **`tests/css-vars.spec.ts`** (nuevo): red de seguridad — falla si cualquier `var(--x)` sin fallback
+  no está definida en el CSS. Previene toda esta clase de bug. SW `v79`.
+
+---
+
 ## 2026-07-14 — Historial de versiones: overlay dedicado (fin del scroll anidado)
 
 Rediseño guiado por auditoría UX. El historial era un panel inline al **fondo** del modal de

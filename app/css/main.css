@@ -1306,14 +1306,14 @@ body.resizing-panel .reader-main { transition: none !important; }
 .sum-card { max-width: 680px; max-height: 90vh; overflow-y: auto; }
 .sum-depth-hint { font-size: 12px; color: var(--text-soft); margin: 6px 0 2px; line-height: 1.45; }
 /* Documento del resumen (markdown → HTML): portada, secciones por capítulo y cierre. */
-.sum-doc { font-size: 15px; line-height: 1.65; color: var(--text-primary); }
+.sum-doc { font-size: 15px; line-height: 1.65; color: var(--text); }
 .sum-doc h1 { font-size: 20px; margin: 4px 0 10px; }
 .sum-doc h2 {
   font-size: 15px; font-weight: 600; color: var(--text-soft);
   margin: 22px 0 8px; padding-bottom: 4px; border-bottom: 1px solid var(--border);
 }
 .sum-doc h1 + p {   /* TL;DR: primer párrafo tras el título → tarjeta destacada */
-  font-size: 16px; background: var(--bg-secondary); border-radius: 12px;
+  font-size: 16px; background: var(--surface-2); border-radius: 12px;
   padding: 14px 16px; margin: 8px 0 4px;
 }
 .sum-doc p { margin: 8px 0; }
@@ -1328,7 +1328,7 @@ body.resizing-panel .reader-main { transition: none !important; }
 
 /* Trabajos de IA en segundo plano: vista "en curso", chip flotante y toast de aviso */
 @keyframes ai-spin { to { transform: rotate(360deg); } }
-.ai-run-status { font-size: 15px; color: var(--text-primary); margin: 8px 0 18px; min-height: 1.4em; }
+.ai-run-status { font-size: 15px; color: var(--text); margin: 8px 0 18px; min-height: 1.4em; }
 .ai-run-actions { display: flex; gap: 10px; align-items: center; }
 .sum-resulthead { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .fc-txt-btn { background: none; border: none; color: var(--text-soft); font: inherit; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; padding: 4px 6px; border-radius: var(--r-md); }
@@ -1338,9 +1338,9 @@ body.resizing-panel .reader-main { transition: none !important; }
 .ai-taskchip {
   position: fixed; right: 20px; bottom: 20px; z-index: 250;
   display: flex; align-items: center; gap: 9px;
-  background: var(--bg-primary, #fff); border: 1px solid var(--border); border-radius: var(--r-pill, 999px);
+  background: var(--surface-1); border: 1px solid var(--border); border-radius: var(--r-pill, 999px);
   padding: 9px 14px; box-shadow: var(--shadow, 0 6px 24px rgba(0,0,0,.14));
-  font-size: 13px; font-weight: 600; color: var(--text-primary); cursor: pointer; max-width: 260px;
+  font-size: 13px; font-weight: 600; color: var(--text); cursor: pointer; max-width: 260px;
 }
 .ai-taskchip.is-done { border-color: var(--accent); }
 .ai-taskchip.is-error { border-color: #ef4444; }
@@ -1353,7 +1353,7 @@ body.resizing-panel .reader-main { transition: none !important; }
 .ai-taskchip-dot { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; flex: none; border-radius: 50%; background: var(--accent); color: var(--on-accent, #fff); font-weight: 700; font-size: 12px; }
 .ai-taskchip.is-error .ai-taskchip-dot { background: #ef4444; }
 .ai-taskchip-x { background: none; border: none; color: var(--text-faint, #999); cursor: pointer; padding: 0 0 0 2px; display: inline-flex; }
-.ai-taskchip-x:hover { color: var(--text-primary); }
+.ai-taskchip-x:hover { color: var(--text); }
 /* Con el panel de IA abierto, aparta el chip a su izquierda para no tapar el input del chat. */
 body.ai-open .ai-taskchip { right: calc(var(--ai-panel-width) + 20px); }
 
@@ -1540,10 +1540,10 @@ body.ai-open .ai-taskchip { right: calc(var(--ai-panel-width) + 20px); }
   position: absolute;
   z-index: 50;
   min-width: 220px;
-  background: var(--bg-primary);
+  background: var(--surface-2);
   border: 1px solid var(--border);
   border-radius: 12px;
-  box-shadow: 0 8px 28px var(--shadow);
+  box-shadow: var(--shadow-3);
   padding: 6px;
   display: flex;
   flex-direction: column;
@@ -1552,10 +1552,10 @@ body.ai-open .ai-taskchip { right: calc(var(--ai-panel-width) + 20px); }
 .lib-study-opt {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
   width: 100%; padding: 9px 12px; border: none; border-radius: 8px;
-  background: none; color: var(--text-primary); font: inherit; font-size: 14px;
+  background: none; color: var(--text); font: inherit; font-size: 14px;
   cursor: pointer; text-align: left;
 }
-.lib-study-opt:hover { background: var(--bg-secondary); }
+.lib-study-opt:hover { background: var(--surface-3); }
 .lib-study-opt-n {
   font-size: 12px; font-weight: 600; color: var(--accent);
   background: var(--accent-soft); border-radius: 999px; padding: 2px 9px;
@@ -2605,8 +2605,8 @@ body.in-library .ai-fab { display: none; }
   border-radius: 999px;
   font-size: 12px;
   font-weight: 500;
-  background: var(--bg-secondary);
-  color: var(--text-secondary);
+  background: var(--surface-2);
+  color: var(--text-soft);
   border: 1px solid var(--border);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
   pointer-events: none;
