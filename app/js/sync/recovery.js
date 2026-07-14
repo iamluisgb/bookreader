@@ -20,6 +20,16 @@ import { BASE } from './layout.js';
 const bookPath = (id) => BASE + 'books/' + id + '.json';
 const MERGE_PREFIXES = ['highlights_', 'bookmarks_'];
 
+// Título de display: los libros bajados de z-library traen sufijos-basura de dominio
+// —"(z-library.sk, 1lib.sk, z-lib.sk)", "(z-lib.org)", "(Anna's Archive)"— que ensucian
+// la lista de recuperación. Quita SOLO los paréntesis que contengan esos marcadores de
+// mirror/dominio; conserva el paréntesis de autores. Pura e idempotente.
+const NOISE_PAREN = /\s*\([^()]*(?:z-?lib(?:rary)?|1lib|libgen|anna'?s?[- ]?archive|\.(?:sk|org|se|st|is|gs|li|fun))[^()]*\)/gi;
+export function cleanTitle(raw) {
+  if (!raw) return '';
+  return String(raw).replace(NOISE_PAREN, '').replace(/\s+/g, ' ').trim();
+}
+
 // Libros con datos en Drive (título + id), leído del manifest.
 export async function listBooks() {
   const m = await Drive.read(BASE + 'manifest.json');

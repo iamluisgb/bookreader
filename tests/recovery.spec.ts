@@ -103,6 +103,24 @@ test.describe('Sync Fase 3 — recuperación de versiones', () => {
     expect(res.rec.recovered).toBeGreaterThanOrEqual(2);
   });
 
+  test('cleanTitle quita el ruido de z-library y conserva autores', async ({ page }) => {
+    await page.goto('/');
+    const out = await page.evaluate(async () => {
+      const R = await import('/js/sync/recovery.js');
+      return {
+        zlib: R.cleanTitle('Knowledge Graphs and LLMs in Action (Alessandro Negro, Vlastimil Kus etc.) (z-library.sk, 1lib.sk, z-lib.sk)'),
+        org: R.cleanTitle('Designing Data-Intensive Applications (z-lib.org)'),
+        clean: R.cleanTitle('Crónica del Perú (Pedro Cieza de León)'),
+        empty: R.cleanTitle(null),
+      };
+    });
+    // Se quita solo el paréntesis de dominios; el de autores permanece.
+    expect(out.zlib).toBe('Knowledge Graphs and LLMs in Action (Alessandro Negro, Vlastimil Kus etc.)');
+    expect(out.org).toBe('Designing Data-Intensive Applications');
+    expect(out.clean).toBe('Crónica del Perú (Pedro Cieza de León)');
+    expect(out.empty).toBe('');
+  });
+
   test('sin nada en Drive, listBooks devuelve vacío', async ({ page }) => {
     await installDriveMocks(page);
     await seedDriveToken(page);

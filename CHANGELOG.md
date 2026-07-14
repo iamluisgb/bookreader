@@ -5,6 +5,26 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-14 — Historial de versiones: overlay dedicado (fin del scroll anidado)
+
+Rediseño guiado por auditoría UX. El historial era un panel inline al **fondo** del modal de
+Ajustes → un scroll anidado (lista `max-height:50vh`) dentro de otro scroll: para llegar había
+que agotar el scroll del modal y luego pelear con un rectángulo minúsculo. Ahora es un **overlay
+propio a pantalla completa** con una **única zona scrollable de altura completa**:
+
+- **`app-settings.js`**: nuevo `#appset-history-overlay` (se apila sobre Ajustes). Tres bandas:
+  cabecera sticky (`← Volver` / título / `✕`), buscador sticky y lista `flex:1; min-height:0;
+  overflow-y:auto` (sin `max-height`). Drill-down libros→versiones que **reemplaza** el contenido
+  en vez de anexarlo. Buscador en vivo (aparece con ≥8 libros). Foco al abrir, `Esc` retrocede un
+  nivel o cierra, y al cerrar devuelve el foco al botón que lo abrió. Confirmación antes de
+  restaurar.
+- **`recovery.js`**: `cleanTitle(raw)` quita el ruido de dominio de z-library
+  (`(z-library.sk, 1lib.sk…)`, `(z-lib.org)`) conservando el paréntesis de autores; título con
+  `line-clamp:2`.
+- Tests: `recovery.spec.ts` cubre `cleanTitle`. SW `v78`.
+
+---
+
 ## 2026-07-14 — Sync: timeout por petición + historial navegable
 
 Dos defectos reportados en la vista de Datos → Google Drive:

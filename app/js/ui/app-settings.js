@@ -56,7 +56,8 @@ function ensureOverlay() {
   overlay.querySelector('.appset-close').addEventListener('click', close);
   overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && overlay.style.display !== 'none') close();
+    // El historial se apila encima y gestiona su propio Escape (retroceder/cerrar).
+    if (e.key === 'Escape' && overlay.style.display !== 'none' && !historyIsOpen()) close();
   });
 
   overlay.querySelector('.appset-nav').addEventListener('click', (e) => {
@@ -479,7 +480,6 @@ function dataHtml() {
       <button id="appset-drive-restore" class="appset-tpl-cancel appset-data-md">${icon('download', { size: 15 })} Restaurar desde Drive</button>
       <button id="appset-drive-history" class="appset-tpl-cancel appset-data-md">${icon('sort', { size: 15 })} Historial de versiones</button>
       <button id="appset-drive-disconnect" class="appset-tpl-cancel appset-data-md">Desconectar</button>
-      <div id="appset-history" class="appset-history" hidden></div>
     </div>
     <p class="appset-data-msg" id="appset-data-msg" hidden></p>
   </div>`;
@@ -580,87 +580,176 @@ function wireDrive(content, show) {
 }
 
 // ---- Historial de versiones (Fase 3: recuperación) --------------------------
+//
+// Overlay DEDICADO a pantalla completa (no un panel inline al fondo de Ajustes: eso
+// enterraba un scroll anidado dentro de otro scroll — la queja del usuario). Una sola
+// zona scrollable de altura completa (flex:1), cabecera sticky, buscador en vivo y
+// drill-down libros→versiones que REEMPLAZA el contenido en vez de anexarlo. Se apila
+// encima del overlay de Ajustes; al cerrar devuelve el foco al botón que lo abrió.
 
 function fmtDate(iso) {
   try { return new Date(iso).toLocaleString('es'); } catch { return iso; }
 }
 
-function wireRecovery(content, show, fail) {
-  const panel = content.querySelector('#appset-history');
-  const btn = content.querySelector('#appset-drive-history');
+let histOverlay = null;
+let histReturnFocus = null;
 
-  // Cabecera reutilizable: título + acción a la izquierda (Cerrar o ← Volver).
-  const head = (backLabel, title) =>
-    `<div class="appset-history-head">
-      <button class="appset-history-back" type="button">${escapeHtml(backLabel)}</button>
-      <span class="appset-history-title">${title}</span>
+function historyIsOpen() {
+  return histOverlay && histOverlay.style.display !== 'none';
+}
+
+function ensureHistoryOverlay() {
+  if (histOverlay) return histOverlay;
+  histOverlay = document.createElement('div');
+  histOverlay.id = 'appset-history-overlay';
+  histOverlay.className = 'appset histov';
+  histOverlay.style.display = 'none';
+  histOverlay.innerHTML = `
+    <div class="histov-card" role="dialog" aria-modal="true" aria-labelledby="histov-title">
+      <div class="histov-head">
+        <button class="histov-back" type="button" hidden>${icon('chevron-left', { size: 16 })}<span>Volver</span></button>
+        <div class="histov-titles">
+          <h2 class="histov-title" id="histov-title">Historial de versiones</h2>
+          <p class="histov-sub"></p>
+        </div>
+        <button class="histov-close" type="button" title="Cerrar" aria-label="Cerrar">${icon('xmark')}</button>
+      </div>
+      <div class="histov-search-wrap"><input type="search" class="histov-search" placeholder="Buscar libro…" aria-label="Buscar libro" /></div>
+      <div class="histov-list"></div>
+      <p class="histov-foot appset-muted">Drive conserva las copias de cada libro unos 30 días.</p>
     </div>`;
+  document.body.appendChild(histOverlay);
+  histOverlay.querySelector('.histov-close').addEventListener('click', closeHistory);
+  histOverlay.addEventListener('click', (e) => { if (e.target === histOverlay) closeHistory(); });
+  return histOverlay;
+}
 
-  btn.addEventListener('click', () => {
-    if (!panel.hidden) { panel.hidden = true; return; }
-    panel.hidden = false;
-    renderBooks();
-  });
+function closeHistory() {
+  if (histOverlay) histOverlay.style.display = 'none';
+  const el = histReturnFocus; histReturnFocus = null;
+  if (el && el.focus) el.focus();
+}
 
+function wireRecovery(content, show, fail) {
+  const btn = content.querySelector('#appset-drive-history');
+  btn.addEventListener('click', () => openHistory(btn, show, fail));
+}
+
+function openHistory(trigger, show, fail) {
+  const ov = ensureHistoryOverlay();
+  histReturnFocus = trigger || null;
+  ov.style.display = 'flex';
+
+  const backBtn = ov.querySelector('.histov-back');
+  const titleEl = ov.querySelector('.histov-title');
+  const subEl = ov.querySelector('.histov-sub');
+  const searchWrap = ov.querySelector('.histov-search-wrap');
+  const search = ov.querySelector('.histov-search');
+  const list = ov.querySelector('.histov-list');
+  let books = [];               // {id, title(raw|null), clean}
+  let onBack = null;            // handler del nivel actual (null en el nivel raíz)
+
+  // Esc: primero retrocede un nivel; si ya estás en la raíz, cierra.
+  const onKey = (e) => {
+    if (e.key !== 'Escape' || !historyIsOpen()) return;
+    e.stopPropagation();        // que Ajustes no se cierre por debajo
+    if (onBack) onBack(); else closeHistory();
+  };
+  ov.onkeydown = onKey;
+
+  const setHead = (title, sub, back) => {
+    titleEl.textContent = title;
+    subEl.textContent = sub || '';
+    onBack = back || null;
+    backBtn.hidden = !back;
+  };
+  backBtn.onclick = () => { if (onBack) onBack(); };
+
+  // --- Nivel 1: libros ---
   async function renderBooks() {
-    panel.innerHTML = '<p class="appset-muted">Cargando libros…</p>';
+    setHead('Historial de versiones', '', null);
+    searchWrap.hidden = true;
+    search.value = '';
+    list.innerHTML = '<p class="appset-muted histov-pad">Cargando libros…</p>';
     try {
-      const books = await Recovery.listBooks();
-      if (!books.length) { panel.innerHTML = '<p class="appset-muted">No hay nada guardado en Drive todavía.</p>'; return; }
-      const label = (b) => b.title
-        ? escapeHtml(b.title)
-        : `<span class="appset-history-untitled">Sin título</span> <span class="appset-history-id">${escapeHtml(b.id.slice(0, 14))}…</span>`;
-      panel.innerHTML =
-        head('Cerrar', 'Historial de versiones') +
-        `<p class="appset-muted">Elige un libro para ver sus versiones anteriores:</p>` +
-        `<div class="appset-history-list">` +
-        books.map(b => `<button class="appset-history-book" data-id="${escapeHtml(b.id)}" data-title="${escapeHtml(b.title || '')}">${label(b)}</button>`).join('') +
-        `</div>`;
-      panel.querySelector('.appset-history-back').addEventListener('click', () => { panel.hidden = true; });
-      panel.querySelectorAll('.appset-history-book').forEach(el =>
-        el.addEventListener('click', () => showVersions(el.dataset.id, el.dataset.title || 'Sin título')));
-    } catch (e) { fail('No se pudo cargar el historial')(e); panel.hidden = true; }
-  }
-
-  async function showVersions(bookId, title) {
-    panel.innerHTML = head('← Volver', escapeHtml(title)) + '<p class="appset-muted">Cargando…</p>';
-    panel.querySelector('.appset-history-back').addEventListener('click', renderBooks);
-    try {
-      const versions = await Recovery.listVersions(bookId);
-      const backBar = head('← Volver', escapeHtml(title));
-      if (!versions.length) {
-        panel.innerHTML = backBar + '<p class="appset-muted">Este libro no tiene versiones anteriores.</p>';
-        panel.querySelector('.appset-history-back').addEventListener('click', renderBooks);
+      books = (await Recovery.listBooks()).map(b => ({ ...b, clean: Recovery.cleanTitle(b.title) }));
+      if (!books.length) {
+        list.innerHTML = '<p class="appset-muted histov-empty">Aún no hay copias en Drive. Pulsa “Guardar en Drive” para empezar a tener historial.</p>';
         return;
       }
-      panel.innerHTML = backBar +
-        `<p class="appset-muted">Recupera lo borrado tras esa fecha (conserva lo más nuevo):</p>` +
-        `<div class="appset-history-list">` +
-        versions.map((v, i) =>
-          `<div class="appset-history-row" data-file="${escapeHtml(v.fileId)}" data-rev="${escapeHtml(v.id)}">
-            <span>${fmtDate(v.modifiedTime)}${i === 0 ? ' · actual' : ''}</span>
-            <button class="appset-history-restore" ${i === 0 ? 'disabled' : ''}>Restaurar</button>
-          </div>`).join('') +
-        `</div>`;
-      panel.querySelector('.appset-history-back').addEventListener('click', renderBooks);
-      panel.querySelectorAll('.appset-history-row').forEach(row => {
-        const rbtn = row.querySelector('.appset-history-restore');
+      searchWrap.hidden = books.length < 8;   // buscador solo cuando de verdad hace falta
+      subEl.textContent = `${books.length} ${books.length === 1 ? 'libro' : 'libros'} con copias en Drive`;
+      paintBooks('');
+      (searchWrap.hidden ? list.querySelector('.histov-book') : search)?.focus();
+    } catch (e) { fail('No se pudo cargar el historial')(e); closeHistory(); }
+  }
+
+  function paintBooks(q) {
+    const needle = q.trim().toLowerCase();
+    const shown = needle
+      ? books.filter(b => (b.clean + ' ' + (b.title || '') + ' ' + b.id).toLowerCase().includes(needle))
+      : books;
+    if (!shown.length) {
+      list.innerHTML = `<p class="appset-muted histov-empty">Ningún libro coincide con «${escapeHtml(q.trim())}».</p>`;
+      return;
+    }
+    const label = (b) => b.clean
+      ? `<span class="histov-book-title">${escapeHtml(b.clean)}</span>`
+      : `<span class="histov-book-title histov-untitled">Sin título</span><span class="histov-book-id">${escapeHtml(b.id.slice(0, 16))}…</span>`;
+    list.innerHTML = shown.map(b =>
+      `<button class="histov-book" type="button" data-id="${escapeHtml(b.id)}" data-title="${escapeHtml(b.clean || 'Sin título')}" title="${escapeHtml(b.clean || b.id)}">${label(b)}</button>`
+    ).join('');
+    list.querySelectorAll('.histov-book').forEach(el =>
+      el.addEventListener('click', () => renderVersions(el.dataset.id, el.dataset.title)));
+  }
+
+  search.oninput = () => { if (!searchWrap.hidden) paintBooks(search.value); };
+
+  // --- Nivel 2: versiones de un libro ---
+  async function renderVersions(bookId, title) {
+    setHead(title, 'Cargando…', renderBooks);
+    searchWrap.hidden = true;
+    list.innerHTML = '<p class="appset-muted histov-pad">Cargando versiones…</p>';
+    backBtn.focus();
+    try {
+      const versions = await Recovery.listVersions(bookId);
+      if (!versions.length) {
+        subEl.textContent = '';
+        list.innerHTML = '<p class="appset-muted histov-empty">Este libro solo tiene la versión actual.</p>';
+        return;
+      }
+      subEl.textContent = `${versions.length} ${versions.length === 1 ? 'versión guardada' : 'versiones guardadas'}`;
+      list.innerHTML = versions.map((v, i) =>
+        `<div class="histov-ver" data-file="${escapeHtml(v.fileId)}" data-rev="${escapeHtml(v.id)}">
+          <div class="histov-ver-info">
+            <span class="histov-ver-date">${fmtDate(v.modifiedTime)}${i === 0 ? ' · actual' : ''}</span>
+          </div>
+          <button class="histov-ver-btn" type="button" ${i === 0 ? 'disabled' : ''}>Restaurar</button>
+        </div>`).join('');
+      list.querySelectorAll('.histov-ver').forEach(row => {
+        const rbtn = row.querySelector('.histov-ver-btn');
         if (rbtn.disabled) return;
-        rbtn.addEventListener('click', () => restore(bookId, row.dataset.file, row.dataset.rev));
+        rbtn.addEventListener('click', () => restore(bookId, row.dataset.file, row.dataset.rev, title));
       });
     } catch (e) { fail('No se pudieron cargar las versiones')(e); }
   }
 
-  async function restore(bookId, fileId, revisionId) {
-    show('Recuperando versión…');
+  async function restore(bookId, fileId, revisionId, title) {
+    const yes = await confirmBox(
+      `Se re-añadirán los subrayados y marcadores de «${title}» que se hubieran borrado tras esa fecha. Lo que hayas añadido después se conserva.`,
+      { title: 'Recuperar esta versión', okText: 'Recuperar', cancelText: 'Cancelar' }
+    );
+    if (!yes) return;
     try {
       const r = await Recovery.restoreVersion(bookId, fileId, revisionId);
       SyncEngine.syncNow(); // propaga la recuperación al resto de dispositivos
-      panel.hidden = true;
+      closeHistory();
       show(`${icon('check', { size: 14 })} Recuperados ${r.recovered} elementos. <button id="appset-rec-reload" class="appset-data-reload">Recargar para aplicar</button>`);
-      content.querySelector('#appset-rec-reload').addEventListener('click', () => location.reload());
+      document.querySelector('#appset-rec-reload')?.addEventListener('click', () => location.reload());
     } catch (e) { fail('No se pudo recuperar')(e); }
   }
+
+  renderBooks();
 }
 
 export function open(section = 'agent') {
