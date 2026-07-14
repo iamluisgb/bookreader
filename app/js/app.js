@@ -335,8 +335,9 @@ async function openBookRecord(record, { fromRoute = false, loc = null } = {}) {
   try {
     Library.hide();
     const buffer = record.file instanceof ArrayBuffer ? record.file.slice(0) : await record.file.arrayBuffer();
-    Bookmarks.setBook(record.fileBaseId || record.id);
-    Highlights.setBook(record.fileBaseId || record.id);
+    // Identidad unificada: migra subrayados/marcadores del id antiguo (nombre de fichero) al hash.
+    Bookmarks.migrateBook([record.fileBaseId], record.id); Bookmarks.setBook(record.id);
+    Highlights.migrateBook([record.fileBaseId], record.id); Highlights.setBook(record.id);
     setBookMeta({ title: record.title, author: record.author, cover: record.cover });
     currentBook = { id: record.id, fileBaseId: record.fileBaseId || record.id, format: record.format };
     if (record.format === 'pdf') {
@@ -847,13 +848,12 @@ async function loadFile(file) {
     return;
   }
 
-  // Set book ID for storage (marcadores/subrayados siguen usando el nombre).
   const fileBaseId = file.name.replace(/\.[^.]+$/, '');
-  Bookmarks.setBook(fileBaseId);
-  Highlights.setBook(fileBaseId);
-
-  // Hash estable del contenido: id canónico para biblioteca + agente.
+  // Hash estable del contenido: id canónico para biblioteca, agente Y subrayados/marcadores.
   const id = await AiDB.hashBuffer(buffer.slice(0));
+  // Identidad unificada: migra subrayados/marcadores guardados con el nombre del fichero al hash.
+  Bookmarks.migrateBook([fileBaseId], id); Bookmarks.setBook(id);
+  Highlights.migrateBook([fileBaseId], id); Highlights.setBook(id);
   currentBook = { id, fileBaseId, format: ext };
   Library.hide();
 

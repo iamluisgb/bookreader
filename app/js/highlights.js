@@ -1,5 +1,6 @@
 import * as Storage from './storage.js';
 import { newUid, tombstone, revive } from './sync/schema.js';
+import { mergeCollections } from './sync/merge.js';
 
 const HIGHLIGHTS_KEY = 'highlights';
 let currentBookId = null;
@@ -7,6 +8,32 @@ const onChangeCallbacks = [];
 
 export function setBook(bookId) {
   currentBookId = bookId;
+}
+
+// Unifica la identidad del libro: fusiona los subrayados guardados bajo ids ANTIGUOS (el
+// nombre del fichero, o el book.key() de epub.js de versiones viejas) en el id canónico
+// `newId` (hash del contenido, el mismo que usan biblioteca/agente/sync), sin duplicar (merge
+// por uid) y borrando las claves viejas. Idempotente; corre al abrir cada libro. Devuelve
+// cuántos items se fusionaron.
+export function migrateBook(oldIds, newId) {
+  if (!newId) return 0;
+  let moved = 0;
+  for (const oldId of oldIds || []) {
+    if (!oldId || oldId === newId) continue;
+    const oldKey = HIGHLIGHTS_KEY + '_' + oldId;
+    const old = Storage.get(oldKey, null);
+    if (!Array.isArray(old)) continue;
+    if (old.length) {
+      // Backfill de uid antes de fusionar: mergeCollections descarta items sin uid, y los datos
+      // viejos (o importados) pueden no tenerlo aún. uid = cfi (estable) | id previo | UUID.
+      const withUid = old.map(it => (it && it.uid) ? it : { ...it, uid: (it && (it.cfi || it.id)) || newUid() });
+      const targetKey = HIGHLIGHTS_KEY + '_' + newId;
+      Storage.set(targetKey, mergeCollections(Storage.get(targetKey, []), withUid));
+      moved += old.length;
+    }
+    Storage.remove(oldKey);
+  }
+  return moved;
 }
 
 // Aditivo: la UI y el SyncEngine registran cada uno el suyo.

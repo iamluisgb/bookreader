@@ -1,5 +1,6 @@
 import * as Storage from './storage.js';
-import { tombstone, revive } from './sync/schema.js';
+import { newUid, tombstone, revive } from './sync/schema.js';
+import { mergeCollections } from './sync/merge.js';
 
 const BOOKMARKS_KEY = 'bookmarks';
 let currentBookId = null;
@@ -7,6 +8,29 @@ const onChangeCallbacks = [];
 
 export function setBook(bookId) {
   currentBookId = bookId;
+}
+
+// Unifica la identidad del libro: fusiona los marcadores guardados bajo ids ANTIGUOS (nombre
+// de fichero / book.key() de epub.js) en el id canónico `newId` (hash), sin duplicar (merge
+// por uid) y borrando las claves viejas. Idempotente; corre al abrir cada libro.
+export function migrateBook(oldIds, newId) {
+  if (!newId) return 0;
+  let moved = 0;
+  for (const oldId of oldIds || []) {
+    if (!oldId || oldId === newId) continue;
+    const oldKey = BOOKMARKS_KEY + '_' + oldId;
+    const old = Storage.get(oldKey, null);
+    if (!Array.isArray(old)) continue;
+    if (old.length) {
+      // Backfill de uid antes de fusionar (mergeCollections descarta los que no lo tengan).
+      const withUid = old.map(it => (it && it.uid) ? it : { ...it, uid: (it && (it.cfi || it.id)) || newUid() });
+      const targetKey = BOOKMARKS_KEY + '_' + newId;
+      Storage.set(targetKey, mergeCollections(Storage.get(targetKey, []), withUid));
+      moved += old.length;
+    }
+    Storage.remove(oldKey);
+  }
+  return moved;
 }
 
 // Aditivo: la UI y el SyncEngine registran cada uno el suyo.

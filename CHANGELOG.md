@@ -5,6 +5,27 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-14 — Identidad de libro unificada (subrayados/marcadores → hash)
+
+Causa de fondo del manifest de sync ensuciado: subrayados y marcadores se keyeaban con el
+**nombre del fichero** (`fileBaseId`) —y en versiones viejas con `book.key()` de epub.js—
+mientras biblioteca, agente y artefactos usan el **hash SHA-256** del contenido. El mismo libro
+aparecía bajo varios ids → duplicados y entradas sin título.
+
+- **`highlights.js` / `bookmarks.js`**: nueva `migrateBook(oldIds, newId)` que fusiona (merge por
+  uid, LWW, sin duplicar) los datos guardados bajo ids antiguos en el id canónico (hash) y borra
+  las claves viejas. Idempotente.
+- **`app.js`**: al abrir un libro (fichero nuevo o desde la biblioteca) se calcula el hash primero,
+  se **migra** `nombre-fichero → hash` y se keyean subrayados/marcadores **por el hash**. Los
+  datos existentes se consolidan al abrir cada libro, sin pérdida.
+- Tests: `tests/book-identity.spec.ts` (fusión por uid, borrado de clave vieja, idempotencia). SW `v76`.
+
+> Nota: las entradas viejas del manifest en Drive (nombre/epubjs) persisten hasta que se limpien;
+> ahora salen claramente marcadas "Sin título" en Recuperación. Una purga del manifest en Drive es
+> un paso aparte (destructivo) si se quiere el borrón y cuenta nueva.
+
+---
+
 ## 2026-07-14 — Vista de recuperación usable + chip/badge sin solaparse
 
 Arreglos de UX sobre problemas observados (no tocan la identidad de libros, causa de fondo).
