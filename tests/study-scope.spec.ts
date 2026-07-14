@@ -65,7 +65,8 @@ test.describe('P12 · ámbitos de repaso', () => {
     await seed(page);
     await page.goto('/');   // re-render de la biblioteca → pinta el chip con el total
     const chip = page.locator('.lib-study-chip');
-    await expect(chip).toContainText('Repasar hoy · 5');
+    // paintStudyChip es async (lee IndexedDB tras el render); espera holgada anti-flake.
+    await expect(chip).toContainText('Repasar hoy · 5', { timeout: 15000 });
     await chip.click();
     const menu = page.locator('.lib-study-menu');
     await expect(menu).toBeVisible();

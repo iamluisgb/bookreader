@@ -5,6 +5,22 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-13 — P13: resumen elegante citado del libro/capítulo
+
+Botón "Resumen" en la barra del agente → TL;DR + puntos clave, cada uno citando su
+pasaje [[aN]] (clic → salta al libro). El pitch "entender más rápido" con el foso citado.
+
+- **`js/ai/summary.js`**: modal con selector de ámbito (capítulo / libro entero, muestreo
+  round-robin hasta 36k tokens). Map-reduce: cada trozo → viñetas Markdown citadas; una
+  llamada final → TL;DR. Render con `renderWithCitations` (las [[aN]] se vuelven botones
+  `.ai-cite` clicables); el clic delega en `navigateCite` del panel → salta al pasaje y
+  cierra el modal. Exportar a Markdown y copiar. Reutiliza `buildChunks` de flashcards,
+  el retrieval del agente y el render de citas del chat.
+- Botón `#ai-convo-summary` en la barra del panel, junto a flashcards.
+- Tests: `tests/summary.spec.ts` (2) — TL;DR + puntos citados clicables, y clic→navega. SW `v68`.
+
+---
+
 ## 2026-07-13 — P12: repasar flashcards por libro y por estantería
 
 Antes "Repasar hoy" mezclaba los mazos de todos los libros; ahora se puede acotar.

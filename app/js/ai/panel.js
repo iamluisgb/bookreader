@@ -20,6 +20,7 @@ import { TEMPLATE, systemPrompt } from './panel-template.js';
 import * as Profiles from './profiles.js';
 import * as Backup from '../backup.js';
 import * as Flashcards from './flashcards.js';
+import * as Summary from './summary.js';
 import * as Storage from '../storage.js';
 import * as QueryExpand from './query-expand.js';
 
@@ -102,6 +103,7 @@ export function init(opts) {
   els.convoNew.addEventListener('click', () => openOnboarding());
   els.convoExport.addEventListener('click', exportConvo);
   els.panel.querySelector('#ai-convo-cards').addEventListener('click', openFlashcards);
+  els.panel.querySelector('#ai-convo-summary').addEventListener('click', openSummary);
   document.addEventListener('click', (e) => {
     if (convoMenuEl && !convoMenuEl.contains(e.target) && !e.target.closest('#ai-convo-btn')) closeConvoMenu();
   });
@@ -240,6 +242,22 @@ function openFlashcards() {
     tocLabels,
     currentChapter: EpubReader.getCurrentChapterLabel?.() || '',
     ensureIndex,
+  });
+}
+
+// P13 · Resumen citado del ámbito elegido. Mismo ctx que flashcards + las anclas y el
+// navegador de citas (para que un clic en [[aN]] salte al libro).
+function openSummary() {
+  if (!book && !bookId) { setStatus('Abre un libro para generar el resumen.'); return; }
+  if (!segReady) { setStatus('Preparando el libro… inténtalo en unos segundos.'); return; }
+  Summary.open({
+    bookId, bookTitle,
+    goal: convo?.goal || '',
+    tocLabels,
+    currentChapter: EpubReader.getCurrentChapterLabel?.() || '',
+    ensureIndex,
+    anchors,
+    onCite: navigateCite,
   });
 }
 
