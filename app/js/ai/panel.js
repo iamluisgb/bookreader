@@ -21,6 +21,7 @@ import * as Profiles from './profiles.js';
 import * as Backup from '../backup.js';
 import * as Flashcards from './flashcards.js';
 import * as Summary from './summary.js';
+import * as MindMap from './mindmap.js';
 import * as Storage from '../storage.js';
 import * as QueryExpand from './query-expand.js';
 
@@ -104,6 +105,7 @@ export function init(opts) {
   els.convoExport.addEventListener('click', exportConvo);
   els.panel.querySelector('#ai-convo-cards').addEventListener('click', openFlashcards);
   els.panel.querySelector('#ai-convo-summary').addEventListener('click', openSummary);
+  els.panel.querySelector('#ai-convo-mindmap').addEventListener('click', openMindMap);
   document.addEventListener('click', (e) => {
     if (convoMenuEl && !convoMenuEl.contains(e.target) && !e.target.closest('#ai-convo-btn')) closeConvoMenu();
   });
@@ -251,6 +253,21 @@ function openSummary() {
   if (!book && !bookId) { setStatus('Abre un libro para generar el resumen.'); return; }
   if (!segReady) { setStatus('Preparando el libro… inténtalo en unos segundos.'); return; }
   Summary.open({
+    bookId, bookTitle,
+    goal: convo?.goal || '',
+    tocLabels,
+    currentChapter: EpubReader.getCurrentChapterLabel?.() || '',
+    ensureIndex,
+    anchors,
+    onCite: navigateCite,
+  });
+}
+
+// P14 · Mapa mental radial del ámbito elegido (mismo ctx que el resumen).
+function openMindMap() {
+  if (!book && !bookId) { setStatus('Abre un libro para generar el mapa mental.'); return; }
+  if (!segReady) { setStatus('Preparando el libro… inténtalo en unos segundos.'); return; }
+  MindMap.open({
     bookId, bookTitle,
     goal: convo?.goal || '',
     tocLabels,

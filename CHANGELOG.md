@@ -5,6 +5,24 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-14 — P14: mapa mental radial del libro/capítulo
+
+Botón "Mapa mental" en la barra del agente → un mapa radial SVG del contenido, con las
+hojas citando su pasaje. El artefacto compartible (PNG para redes) que hace marketing.
+
+- **`js/ai/mindmap.js`**: selector de ámbito + map (viñetas citadas por trozo) + reduce
+  (una llamada → árbol JSON `{title, branches:[{label, children:[{label, src}]}]}`, con
+  parseo tolerante y fallback a mapa plano si no parsea). Render **radial SVG** (nodo
+  central → ramas de colores de marca → hojas), curvas de Bézier, pills. Hojas con `src`
+  mapeado a ancla real son clicables (`.mm-cite`) → saltan al pasaje y cierran el modal.
+  Export a **PNG** (rasteriza el SVG en canvas, para compartir) y a **SVG**.
+- Botón `#ai-convo-mindmap` en la barra del panel. Reutiliza el troceado y el map de
+  summary/flashcards; el retrieval del agente da los pasajes citados.
+- Tests: `tests/mindmap.spec.ts` (2) — mapa con ramas/hojas citadas, y clic→navega.
+  Verificado visualmente en navegador (radial coherente con la marca). SW `v69`.
+
+---
+
 ## 2026-07-13 — P13: resumen elegante citado del libro/capítulo
 
 Botón "Resumen" en la barra del agente → TL;DR + puntos clave, cada uno citando su

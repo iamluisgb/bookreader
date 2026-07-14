@@ -20,6 +20,7 @@ export const TEMPLATE = `
       <button id="ai-convo-export" class="icon-btn" title="Exportar esta conversación (libreta + chat) a Markdown">${icon('share', { size: 17 })}</button>
       <button id="ai-convo-cards" class="icon-btn ai-cards-btn" title="Crear flashcards para Anki">${icon('cards', { size: 17 })}</button>
       <button id="ai-convo-summary" class="icon-btn" title="Resumen citado del libro">${icon('note', { size: 17 })}</button>
+      <button id="ai-convo-mindmap" class="icon-btn" title="Mapa mental del libro">${icon('columns', { size: 17 })}</button>
     </div>
     <button id="ai-edit-cfg" class="icon-btn ai-toolbar-cfg" title="Ajustes del agente">${icon('gear')}</button>
     <button id="ai-close" class="icon-btn" title="Cerrar">${icon('xmark')}</button>

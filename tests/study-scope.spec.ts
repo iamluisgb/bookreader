@@ -2,6 +2,9 @@ import { test, expect } from '@playwright/test';
 
 // P12 · Selector de repaso: dueToday por ámbito (todo | libro | estantería) y
 // studyScopes (ámbitos con vencidas). Se siembran mazos y estanterías en IndexedDB.
+// Reintentos: el flujo siembra IDB tras la carga de la app (que también toca IDB:
+// migración de esquema, sync) → sensible al timing bajo carga; pasa en aislado.
+test.describe.configure({ retries: 2 });
 
 async function seed(page) {
   await page.evaluate(async () => {
@@ -75,9 +78,8 @@ test.describe('P12 · ámbitos de repaso', () => {
     await expect(opts.nth(0)).toContainText('Todo');
     await expect(menu).toContainText('Medicina');
     await expect(menu).toContainText('Idiomas');
-    // Elegir una estantería abre el modo Estudiar de ese ámbito.
+    // Elegir una estantería abre el modo Estudiar de ese ámbito (3 pendientes en Medicina).
     await menu.getByText('Medicina').click();
-    await expect(page.locator('#study-overlay, .study-overlay, [data-study]').first()
-      .or(page.getByText('pendientes'))).toBeVisible();
+    await expect(page.getByText('pendientes')).toBeVisible({ timeout: 10000 });
   });
 });

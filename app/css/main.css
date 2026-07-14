@@ -1312,6 +1312,12 @@ body.resizing-panel .reader-main { transition: none !important; }
 .sum-points { font-size: 15px; line-height: 1.65; color: var(--text-primary); }
 .sum-points ul { margin: 0; padding-left: 20px; }
 .sum-points li { margin-bottom: 10px; }
+
+/* P14 · Mapa mental */
+.mm-card { max-width: 92vw; width: 900px; max-height: 92vh; overflow: auto; }
+.mm-canvas { margin: 8px 0; border: 1px solid var(--border); border-radius: 12px; overflow: auto; background: #faf8f3; }
+.mm-canvas svg { display: block; width: 100%; height: auto; }
+.mm-cite:hover rect { stroke-width: 2.5; }
 .fc-label { display: block; font-size: 13px; font-weight: 600; color: var(--text-soft); margin: 16px 0 6px; }
 .fc-select {
   width: 100%; border: 1px solid var(--border); border-radius: var(--r-md); padding: 10px 12px;
