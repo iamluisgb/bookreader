@@ -1304,14 +1304,21 @@ body.resizing-panel .reader-main { transition: none !important; }
 
 /* P13 · Resumen citado */
 .sum-card { max-width: 680px; max-height: 90vh; overflow-y: auto; }
-.sum-tldr {
-  font-size: 16px; line-height: 1.6; color: var(--text-primary);
-  background: var(--bg-secondary); border-radius: 12px; padding: 16px 18px; margin: 8px 0 4px;
+.sum-depth-hint { font-size: 12px; color: var(--text-soft); margin: 6px 0 2px; line-height: 1.45; }
+/* Documento del resumen (markdown → HTML): portada, secciones por capítulo y cierre. */
+.sum-doc { font-size: 15px; line-height: 1.65; color: var(--text-primary); }
+.sum-doc h1 { font-size: 20px; margin: 4px 0 10px; }
+.sum-doc h2 {
+  font-size: 15px; font-weight: 600; color: var(--text-soft);
+  margin: 22px 0 8px; padding-bottom: 4px; border-bottom: 1px solid var(--border);
 }
-.sum-label { font-size: 13px; font-weight: 600; color: var(--text-soft); margin: 20px 0 6px; }
-.sum-points { font-size: 15px; line-height: 1.65; color: var(--text-primary); }
-.sum-points ul { margin: 0; padding-left: 20px; }
-.sum-points li { margin-bottom: 10px; }
+.sum-doc h1 + p {   /* TL;DR: primer párrafo tras el título → tarjeta destacada */
+  font-size: 16px; background: var(--bg-secondary); border-radius: 12px;
+  padding: 14px 16px; margin: 8px 0 4px;
+}
+.sum-doc p { margin: 8px 0; }
+.sum-doc ul { margin: 6px 0; padding-left: 20px; }
+.sum-doc li { margin-bottom: 8px; }
 
 /* P14 · Mapa mental */
 .mm-card { max-width: 92vw; width: 900px; max-height: 92vh; overflow: auto; }

@@ -1,13 +1,14 @@
 import { test, expect } from '@playwright/test';
 import path from 'path';
 
-// P13 · Resumen citado: map-reduce (viñetas citadas por trozo + TL;DR) y render con
-// citas [[aN]] clicables. LLM stubbeado (determinista, sin API).
+// P13 · Resumen citado estructurado: map (viñetas citadas por trozo) + framing (TL;DR +
+// Ideas principales + Qué llevarte) + secciones por capítulo, render con citas [[aN]]
+// clicables. LLM stubbeado (determinista, sin API).
 
 const EPUB_PATH = path.join(__dirname, 'test.epub');
 
-// Stub: las llamadas del MAP (prompt con "PUNTOS CLAVE") devuelven viñetas citadas;
-// la del REDUCE (prompt con "TL;DR") devuelve el párrafo resumen.
+// Stub por tipo de prompt: MAP ("PUNTOS CLAVE") → viñetas citadas; FRAMING ("Ideas
+// principales") → marco estructurado; TL;DR breve → párrafo suelto.
 async function stubLLM(page) {
   await page.evaluate(() => {
     const real = window.fetch.bind(window);
@@ -16,9 +17,11 @@ async function stubLLM(page) {
       if (u.includes('/chat/completions') && opts?.body) {
         const body = JSON.parse(opts.body);
         const sys = (body.messages || []).find((m: any) => m.role === 'system')?.content || '';
-        const out = /TL;DR/.test(sys)
-          ? 'La novela retrata un pueblo de muertos que hablan.'
-          : '- Juan Preciado llega a Comala buscando a su padre [[a0]]\n- El pueblo está poblado de ánimas [[a1]]';
+        const out = /PUNTOS CLAVE/.test(sys)
+          ? '- Juan Preciado llega a Comala buscando a su padre [[a0]]\n- El pueblo está poblado de ánimas [[a1]]'
+          : /Ideas principales/.test(sys)
+            ? 'TL;DR: La novela retrata un pueblo de muertos que hablan.\n\n## Ideas principales\nComala es un pueblo habitado por ánimas.\n\n## Qué llevarte\n- Los muertos también hablan'
+            : 'La novela retrata un pueblo de muertos que hablan.';
         const chunks = [
           `data: ${JSON.stringify({ choices: [{ delta: { content: out }, finish_reason: null }] })}\n\n`,
           'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n\n',
@@ -49,20 +52,31 @@ async function setup(page) {
   await expect(page.locator('#ai-status')).toContainText('Listo', { timeout: 30000 });
 }
 
-test('genera un resumen con TL;DR y puntos clave citados y clicables', async ({ page }) => {
+test('genera un resumen estructurado (TL;DR + marco + puntos citados y clicables)', async ({ page }) => {
   await setup(page);
   await page.click('#ai-convo-summary');
   await page.waitForSelector('#ai-summary', { timeout: 5000 });
-  await page.click('#sum-generate');
+  await page.click('#sum-generate');   // profundidad por defecto: Estándar (estructurado)
 
-  // Resultado: TL;DR + puntos clave con citas .ai-cite (las [[aN]] mapeadas a anclas reales).
-  await expect(page.locator('.sum-tldr')).toContainText('pueblo de muertos', { timeout: 20000 });
-  await expect(page.locator('.sum-points')).toContainText('Juan Preciado');
-  const cites = page.locator('.sum-points .ai-cite');
+  // El documento reúne portada (TL;DR), marco y secciones, todo bajo .sum-doc.
+  await expect(page.locator('.sum-doc')).toContainText('pueblo de muertos', { timeout: 20000 });
+  await expect(page.locator('.sum-doc')).toContainText('Ideas principales');   // del framing
+  await expect(page.locator('.sum-doc')).toContainText('Juan Preciado');       // de las secciones
+  const cites = page.locator('.sum-doc .ai-cite');
   expect(await cites.count()).toBeGreaterThanOrEqual(1);   // [[a0]]/[[a1]] existen → clicables
 
-  // Exportar Markdown está disponible.
-  await expect(page.locator('#sum-md')).toBeVisible();
+  await expect(page.locator('#sum-md')).toBeVisible();     // exportar Markdown disponible
+});
+
+test('el modo Breve produce lista plana sin secciones de marco', async ({ page }) => {
+  await setup(page);
+  await page.click('#ai-convo-summary');
+  await page.waitForSelector('#ai-summary', { timeout: 5000 });
+  await page.selectOption('#sum-depth', 'breve');
+  await page.click('#sum-generate');
+  await expect(page.locator('.sum-doc')).toContainText('pueblo de muertos', { timeout: 20000 });
+  await expect(page.locator('.sum-doc')).toContainText('Puntos clave');
+  await expect(page.locator('.sum-doc')).not.toContainText('Ideas principales');   // Breve no usa framing
 });
 
 test('clic en una cita del resumen salta al libro y cierra el modal', async ({ page }) => {
@@ -70,7 +84,7 @@ test('clic en una cita del resumen salta al libro y cierra el modal', async ({ p
   await page.click('#ai-convo-summary');
   await page.waitForSelector('#ai-summary', { timeout: 5000 });
   await page.click('#sum-generate');
-  await page.waitForSelector('.sum-points .ai-cite', { timeout: 20000 });
-  await page.locator('.sum-points .ai-cite').first().click();
+  await page.waitForSelector('.sum-doc .ai-cite', { timeout: 20000 });
+  await page.locator('.sum-doc .ai-cite').first().click();
   await expect(page.locator('#ai-summary')).toHaveCount(0);   // el modal se cierra al navegar
 });

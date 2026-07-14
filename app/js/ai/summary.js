@@ -12,12 +12,23 @@ import { downloadText } from '../backup.js';
 import { icon } from '../ui/icons.js';
 import { escapeHtml } from '../ui/escape.js';
 
-const BOOK_TOKENS = 36000;   // techo de cobertura para "libro entero" (coste acotado)
+const BOOK_TOKENS = 36000;   // techo por defecto de cobertura para "libro entero"
+
+// Profundidad del resumen: cuánto cubrir (tokens) y cuánto detallar. Es un dial
+// coste-vs-riqueza —más cobertura = más trozos = más llamadas al modelo—, elegible en la
+// UI. `prose` activa el formato estructurado (portada + secciones por capítulo + cierre);
+// sin `prose` es una lista plana breve. `perCap` acota viñetas por sección.
+const DEPTH = {
+  breve:     { label: 'Breve',     coverage: 24000, bullets: 'entre 2 y 3', perCap: 3, prose: false },
+  estandar:  { label: 'Estándar',  coverage: 48000, bullets: 'entre 3 y 5', perCap: 4, prose: true },
+  detallado: { label: 'Detallado', coverage: 80000, bullets: 'entre 5 y 7', perCap: 6, prose: true },
+};
 
 let ctx = null;              // { bookId, bookTitle, goal, tocLabels, currentChapter, ensureIndex, anchors, onCite }
 let overlay = null;
 let generating = false, abortCtrl = null;
 let scopeValue = '';
+let depthValue = 'estandar'; // profundidad por defecto
 let lastMarkdown = '';       // último resumen generado (para exportar/copiar)
 
 export function open(context) {
@@ -62,15 +73,21 @@ function renderSetup() {
       <option value="">Libro entero</option>
       ${chapters.map(c => `<option value="${escapeHtml(c)}"${c === scopeValue ? ' selected' : ''}>${escapeHtml(c)}</option>`).join('')}
     </select>
+    <label class="fc-label">Profundidad</label>
+    <select id="sum-depth" class="fc-select">
+      ${Object.entries(DEPTH).map(([k, d]) => `<option value="${k}"${k === depthValue ? ' selected' : ''}>${d.label}</option>`).join('')}
+    </select>
+    <p class="sum-depth-hint">Estándar y Detallado organizan el resumen por capítulos, con introducción y cierre. Más profundidad = más cobertura y más llamadas al modelo.</p>
     <button id="sum-generate" class="primary-btn ai-ob-start">${icon('sparkles', { size: 16 })} Generar resumen</button>
     <div id="sum-error" class="fc-error" style="display:none"></div>`;
   b.querySelector('#sum-scope').addEventListener('change', (e) => { scopeValue = e.target.value; });
+  b.querySelector('#sum-depth').addEventListener('change', (e) => { depthValue = e.target.value; });
   b.querySelector('#sum-generate').addEventListener('click', onGenerate);
 }
 
 // Pasajes del ámbito. Capítulo: enteros. Libro: muestreo round-robin por capítulo
 // hasta BOOK_TOKENS (cobertura uniforme y coste acotado, igual que flashcards).
-function gatherScope(label) {
+function gatherScope(label, budget = BOOK_TOKENS) {
   ctx.ensureIndex();
   if (label) return Retrieval.passagesByChapter(label);
   const byChapter = new Map();
@@ -81,13 +98,13 @@ function gatherScope(label) {
   }
   const lists = [...byChapter.values()];
   const picked = []; let used = 0, added = true;
-  for (let i = 0; added && used < BOOK_TOKENS; i++) {
+  for (let i = 0; added && used < budget; i++) {
     added = false;
     for (const list of lists) {
       const p = list[i];
       if (!p) continue;
       const t = estimateTokens(p.text) + 4;
-      if (used + t > BOOK_TOKENS) continue;
+      if (used + t > budget) continue;
       picked.push(p); used += t; added = true;
     }
   }
@@ -96,25 +113,55 @@ function gatherScope(label) {
 
 // ---- Generación (map-reduce) --------------------------------------------------
 
-function pointsPrompt(goal) {
+// Regla de idioma: se ancla al idioma del OBJETIVO del lector (o español por defecto), NO al
+// de los pasajes. Antes decía "mismo idioma que los pasajes" → en libros en inglés colaba
+// viñetas en inglés dentro de un resumen en español.
+function langRule(goal) {
+  return goal
+    ? `- Escribe SIEMPRE en el mismo idioma que este objetivo del lector: «${goal}» (aunque los pasajes estén en otro idioma).`
+    : `- Escribe SIEMPRE en español (aunque los pasajes estén en otro idioma).`;
+}
+
+function pointsPrompt(goal, bulletsRange) {
   return `Eres un lector experto que resume pasajes de un libro en PUNTOS CLAVE.
 REGLAS:
-- Devuelve entre 2 y 5 viñetas Markdown ("- ..."), una idea por viñeta.
+- Devuelve ${bulletsRange} viñetas Markdown ("- ..."), una idea por viñeta.
 - Cada viñeta TERMINA con el marcador del pasaje del que sale, entre dobles corchetes: [[aN]] (usa el id que precede a cada pasaje).
 - Autocontenidas y concretas; nada de "según el texto" ni relleno.
-- Escribe en el MISMO idioma que los pasajes.${goal ? `\n- Prioriza lo relevante para: «${goal}».` : ''}
+${langRule(goal)}${goal ? `\n- Prioriza lo relevante para: «${goal}».` : ''}
 Responde SOLO con las viñetas, sin encabezados ni texto alrededor.`;
 }
 
+// "Reduce" único que redacta el MARCO: portada (TL;DR + Ideas principales) y cierre (Qué
+// llevarte). Se parsea por sus encabezados literales.
+function framingPrompt(goal) {
+  return `A partir de estos puntos clave de un libro, redacta el marco de un resumen.
+Devuelve EXACTAMENTE, en este orden y con estos encabezados literales:
+
+TL;DR: (2-4 frases de síntesis global, claras y sin jerga)
+
+## Ideas principales
+(1-2 párrafos que hilen las ideas centrales del libro)
+
+## Qué llevarte
+(3-5 viñetas "- ..." accionables o memorables)
+
+REGLAS:
+${langRule(goal)}${goal ? `\n- Enfoca todo en: «${goal}».` : ''}`;
+}
+
 function tldrPrompt(goal) {
-  return `Resume estos puntos clave de un libro en un TL;DR de 2-3 frases, claro y sin jerga.${goal ? ` Enfócalo en: «${goal}».` : ''} Responde solo el párrafo.`;
+  return `Resume estos puntos clave de un libro en un TL;DR de 2-4 frases, claro y sin jerga.${goal ? ` Enfócalo en: «${goal}».` : ''}
+${langRule(goal)}
+Responde solo el párrafo.`;
 }
 
 async function onGenerate() {
   if (generating) return;
   const b = body();
   if (!LLM.hasKey()) { showError('Configura tu API key en Ajustes → Agente para generar el resumen.'); return; }
-  const passages = gatherScope(scopeValue);
+  const depth = DEPTH[depthValue] || DEPTH.estandar;
+  const passages = gatherScope(scopeValue, depth.coverage);
   if (!passages.length) { showError('Ese contenido no tiene texto indexado; prueba con otro capítulo o el libro entero.'); return; }
   const chunks = buildChunks(passages);
 
@@ -124,15 +171,15 @@ async function onGenerate() {
   btn.innerHTML = `<span class="ai-typing">Resumiendo…</span>`;
   showError('');
   try {
-    // Map: puntos citados por trozo.
+    // Map: puntos citados por trozo (cantidad según la profundidad).
     const bullets = [];
     for (let i = 0; i < chunks.length; i++) {
       const raw = await LLM.chatStream({
         messages: [
-          { role: 'system', content: pointsPrompt(ctx.goal) },
+          { role: 'system', content: pointsPrompt(ctx.goal, depth.bullets) },
           { role: 'user', content: 'PASAJES DEL LIBRO:\n\n' + chunks[i].text },
         ],
-        maxTokens: 900, signal: abortCtrl.signal,
+        maxTokens: 1500, signal: abortCtrl.signal,   // holgura para modelos de razonamiento
       });
       for (const line of String(raw || '').split('\n')) {
         const t = line.trim();
@@ -143,21 +190,29 @@ async function onGenerate() {
     }
     if (!bullets.length) throw new Error('El modelo no devolvió puntos. Vuelve a intentarlo.');
 
-    // Reduce: TL;DR a partir de los puntos (sin citas; es la síntesis).
-    let tldr = '';
-    try {
-      tldr = (await LLM.chatStream({
-        messages: [
-          { role: 'system', content: tldrPrompt(ctx.goal) },
-          { role: 'user', content: bullets.join('\n') },
-        ],
-        maxTokens: 300, signal: abortCtrl.signal,
-      }) || '').trim();
-    } catch (e) { if (e.name === 'AbortError') throw e; }
-
     const scopeName = scopeValue || ctx.bookTitle || 'Libro';
-    lastMarkdown = `# Resumen — ${scopeName}\n\n${tldr ? `${tldr}\n\n` : ''}## Puntos clave\n\n${bullets.join('\n')}\n`;
-    renderResult(tldr, bullets, scopeName);
+    let md;
+    if (depth.prose) {
+      // Estructurado: marco (1 llamada) + secciones por capítulo a partir de los puntos.
+      btn.innerHTML = `<span class="ai-typing">Redactando el resumen…</span>`;
+      const framing = await runFraming(bullets, ctx.goal);
+      md = assembleStructured(scopeName, framing, bullets, depth.perCap);
+    } else {
+      // Breve: TL;DR + lista plana.
+      let tldr = '';
+      try {
+        tldr = (await LLM.chatStream({
+          messages: [
+            { role: 'system', content: tldrPrompt(ctx.goal) },
+            { role: 'user', content: bullets.join('\n') },
+          ],
+          maxTokens: 1500, signal: abortCtrl.signal,
+        }) || '').trim();
+      } catch (e) { if (e.name === 'AbortError') throw e; }
+      md = `# Resumen — ${scopeName}\n\n${tldr ? `${tldr}\n\n` : ''}## Puntos clave\n\n${bullets.join('\n')}\n`;
+    }
+    lastMarkdown = md;
+    renderResult(md, scopeName);
   } catch (e) {
     if (e.name !== 'AbortError') { console.error('Resumen falló:', e); showError(e.message); }
   } finally {
@@ -165,6 +220,66 @@ async function onGenerate() {
     const b2 = body()?.querySelector('#sum-generate');
     if (b2) { b2.disabled = false; b2.innerHTML = `${icon('sparkles', { size: 16 })} Generar resumen`; }
   }
+}
+
+// Marco del resumen estructurado en UNA llamada; devuelve { tldr, ideas, llevar }.
+async function runFraming(bullets, goal) {
+  try {
+    const raw = (await LLM.chatStream({
+      messages: [
+        { role: 'system', content: framingPrompt(goal) },
+        { role: 'user', content: bullets.join('\n') },
+      ],
+      maxTokens: 1600, signal: abortCtrl.signal,
+    }) || '').trim();
+    return parseFraming(raw);
+  } catch (e) {
+    if (e.name === 'AbortError') throw e;
+    return { tldr: '', ideas: '', llevar: '' };   // sin marco: el resumen sigue con sus secciones
+  }
+}
+
+// Separa el marco en TL;DR (portada), "## Ideas principales" y "## Qué llevarte" (cierre).
+function parseFraming(fr) {
+  const tldr = (fr.match(/TL;DR:\s*([\s\S]*?)(?=\n\s*#|$)/i)?.[1] || '').trim();
+  const ideas = (fr.match(/##\s*Ideas principales[\s\S]*?(?=\n\s*##\s*Qu[eé]\s+llevarte|$)/i)?.[0] || '').trim();
+  const llevar = (fr.match(/##\s*Qu[eé]\s+llevarte[\s\S]*$/i)?.[0] || '').trim();
+  // Si no vino con el formato esperado, todo el texto va como TL;DR (no perder el trabajo).
+  if (!tldr && !ideas && !llevar) return { tldr: fr, ideas: '', llevar: '' };
+  return { tldr, ideas, llevar };
+}
+
+// Agrupa las viñetas por CAPÍTULO real (vía la anchor de su cita) y arma el markdown final:
+// portada → secciones por capítulo en orden de lectura → cierre. Descarta viñetas sin cita
+// válida (integridad del "foso citado": cada punto debe ser clicable).
+function assembleStructured(scopeName, framing, bullets, perCap) {
+  const p2ch = new Map(Retrieval.allPassages().map(p => [p.id, (p.chapter || '').trim()]));
+  const firstNum = new Map(), groups = new Map();
+  let kept = 0;
+  for (const bl of bullets) {
+    const id = (bl.match(/\[\[(a\d+)\]\]/) || [])[1] || '';
+    if (!id || !p2ch.has(id)) continue;              // sin cita válida → fuera
+    const ch = p2ch.get(id) || 'General';
+    if (!groups.has(ch)) groups.set(ch, []);
+    if (groups.get(ch).length >= perCap) continue;   // tope de viñetas por sección
+    groups.get(ch).push(bl); kept++;
+    const n = Retrieval.anchorNum(id);
+    if (!firstNum.has(ch) || n < firstNum.get(ch)) firstNum.set(ch, n);
+  }
+  // Libro sin capítulos etiquetados (o casi todo filtrado): cae a lista plana.
+  let sections;
+  if (kept < 3) {
+    sections = `## Puntos clave\n\n${bullets.join('\n')}`;
+  } else {
+    const order = [...groups.keys()].sort((a, b) => (firstNum.get(a) ?? 0) - (firstNum.get(b) ?? 0));
+    sections = order.map(ch => `## ${ch || 'General'}\n\n${groups.get(ch).join('\n')}`).join('\n\n');
+  }
+  const parts = [`# Resumen — ${scopeName}`];
+  if (framing.tldr) parts.push(framing.tldr);
+  if (framing.ideas) parts.push(framing.ideas);
+  parts.push(sections);
+  if (framing.llevar) parts.push(framing.llevar);
+  return parts.join('\n\n') + '\n';
 }
 
 function showError(msg) {
@@ -176,16 +291,13 @@ function showError(msg) {
 
 // ---- Vista 2: resultado citado ------------------------------------------------
 
-function renderResult(tldr, bullets, scopeName) {
+function renderResult(md, scopeName) {
   const b = body();
   if (!b) return;
   const anchors = ctx.anchors || new Map();
   b.innerHTML = `
     <button class="ai-ob-back">${icon('chevron-left', { size: 16 })}<span>Volver</span></button>
-    <h2>Resumen — ${escapeHtml(scopeName)}</h2>
-    ${tldr ? `<div class="sum-tldr">${renderWithCitations(tldr, anchors)}</div>` : ''}
-    <div class="sum-label">Puntos clave</div>
-    <div class="sum-points">${renderWithCitations(bullets.join('\n'), anchors)}</div>
+    <div class="sum-doc">${renderWithCitations(md, anchors)}</div>
     <div class="fc-export">
       <button id="sum-copy" class="primary-btn">${icon('copy', { size: 16 })} Copiar</button>
       <button id="sum-md" class="ai-ob-back fc-txt-btn">${icon('download', { size: 15 })} Markdown</button>

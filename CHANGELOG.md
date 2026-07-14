@@ -5,6 +5,29 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-14 — P13.1: resumen estructurado, más rico y multi-idioma correcto
+
+El resumen se veía corto y con defectos: TL;DR cortado a media palabra, viñetas coladas en
+inglés dentro de un resumen en español, y una viñeta sin cita. Rediseño a **resumen
+estructurado** con **selector de profundidad** (Breve / Estándar / Detallado), verificado
+generando resúmenes **reales** (mimo-v2.5) de DDIA (de ~2.000 → ~9.100 caracteres en Estándar).
+
+- **Formato estructurado** (`js/ai/summary.js`): portada (**TL;DR** + **Ideas principales** en
+  prosa) → **secciones por capítulo** con viñetas citadas (agrupadas por el capítulo real de
+  cada ancla, en orden de lectura) → cierre (**Qué llevarte**, accionable). Todo se arma como
+  un markdown y se renderiza de una (`mdToHtml` ya soporta encabezados/listas).
+- **Selector de profundidad**: Breve (lista plana, ~24k tokens de cobertura), Estándar
+  (estructurado, 48k, por defecto), Detallado (estructurado, 80k, más viñetas por sección).
+  Más profundidad = más cobertura y más llamadas.
+- **Tres bugs corregidos**: (1) el TL;DR se truncaba porque el reduce tenía `maxTokens: 300` y
+  los modelos de razonamiento lo agotaban pensando → subido a 1500-1600 (map 900→1500); (2)
+  la regla de idioma decía "mismo idioma que los pasajes" (inglés en libros en inglés) → ahora
+  se ancla al idioma del **objetivo** del lector; (3) las viñetas sin cita válida se descartan
+  (integridad del foso citado).
+- Tests: `tests/summary.spec.ts` actualizado (estructura `.sum-doc`) + caso de modo Breve. SW `v71`.
+
+---
+
 ## 2026-07-14 — P14.1: el mapa mental, legible y sin solapes (calidad)
 
 El primer mapa real (DDIA) salía inservible: ramas anónimas "Ideas 1…5", hojas cortadas a
