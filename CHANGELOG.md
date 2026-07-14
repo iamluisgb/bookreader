@@ -5,6 +5,23 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-14 — Fix: "Sincronizando…" eterno (segundo agujero, en el auth)
+
+El timeout por petición anterior solo cubría `drive-provider.js`. Quedaba un `fetch` **sin abort**
+en `drive-auth.js` (`tokenRequest`, la renovación del token contra el Worker de Cloudflare): si
+esa renovación se colgaba, el ciclo quedaba colgado en `getAccessToken()` **antes** de cualquier
+petición a Drive → "Sincronizando…" para siempre y Web Lock retenido.
+
+- **`net.js`** (nuevo): `fetchWithTimeout(url, opts, ms=30000)` con `AbortController`, compartido.
+- **`drive-auth.js`** y **`drive-provider.js`**: ambos usan ahora el helper. Cero fetch sin techo
+  en el camino de sync.
+- **CSS**: con el panel de IA abierto, `#sync-badge` tapaba el botón "Ver" y el input del chat;
+  se aparta a la izquierda del panel (`body.ai-open`), como el task-chip.
+- **`tests/sync-timeout.spec.ts`** (nuevo): un fetch estancado aborta con `code:'timeout'` pronto,
+  no cuelga. SW `v81`.
+
+---
+
 ## 2026-07-14 — Fix: las citas del agente no llevaban al pasaje correcto
 
 Al pinchar un chip de cita `[[aN]]` (resumen/chat), la navegación caía en otra página. Diagnóstico

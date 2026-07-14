@@ -9,6 +9,7 @@
 // con access_type=offline. Ver LAUNCH_PLAN.md · "Auto-sync con Drive".
 
 import * as Storage from '../storage.js';
+import { fetchWithTimeout } from './net.js';
 
 const WORKER_URL = 'https://bookreader-auth.luisgonzalezb93.workers.dev';
 const CLIENT_ID = '1075634570118-8ipsh5pn768rof3u0mq5rhqv2pp2dgqm.apps.googleusercontent.com';
@@ -50,7 +51,7 @@ export function disconnect() {
 }
 
 async function tokenRequest(path, params) {
-  const res = await fetch(WORKER_URL + path, {
+  const res = await fetchWithTimeout(WORKER_URL + path, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(params),

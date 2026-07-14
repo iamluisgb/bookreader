@@ -2613,6 +2613,9 @@ body.in-library .ai-fab { display: none; }
 }
 /* Cuando hay un chip de trabajo de IA (mismo rincón), sube el badge de sync para no solaparse. */
 body.has-taskchip #sync-badge { bottom: 68px; }
+/* Con el panel de IA abierto, el badge (fijo abajo-derecha) tapaba el botón "Ver" y el input
+   del chat: apártalo a la izquierda del panel, igual que el task-chip. */
+body.ai-open #sync-badge { right: calc(var(--ai-panel-width) + 14px); }
 #sync-badge[data-state='error'] { color: #dc2626; border-color: #dc2626; }
 #sync-badge[data-state='reconnect'] {
   color: var(--accent);
