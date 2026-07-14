@@ -5,6 +5,29 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-14 — P14.1: el mapa mental, legible y sin solapes (calidad)
+
+El primer mapa real (DDIA) salía inservible: ramas anónimas "Ideas 1…5", hojas cortadas a
+21 caracteres e ilegibles, y nodos amontonados. Tres arreglos, verificados generando mapas
+**reales** (mimo-v2.5) de un libro técnico (DDIA) y uno de ficción (Lituma en los Andes).
+
+- **Reduce robusto (la raíz de "Ideas N")**: los modelos de razonamiento gastan miles de
+  tokens "pensando" antes del JSON; con el cupo antiguo (1400) agotaban el presupuesto y
+  emitían JSON vacío/truncado → el mapa temático caía siempre al fallback. Ahora: `maxTokens`
+  del reduce 1400→**5000** (y map 900→1500), `extractJson` **repara JSON truncado** (cierra
+  cadenas/objetos abiertos), y el fallback agrupa por **capítulo real** del pasaje (nunca más
+  ramas anónimas "Ideas N"). Además se acotan las viñetas a 20 (muestreo uniforme) para que
+  el JSON quepa holgado y el mapa no se sature.
+- **Legibilidad**: las etiquetas se **envuelven en 2 líneas** (`wrapLabel`) en vez de
+  truncarse a 21 car.; hojas hasta ~44 car. legibles.
+- **Anticolisión**: layout radial que reparte todo el círculo **proporcional al nº de hojas**
+  (densidad angular constante) y **alterna el radio par/impar** de hojas contiguas, resolviendo
+  el solape cerca del eje vertical (donde manda el ANCHO de la píldora, no el alto). El lienzo
+  **se auto-ajusta** al contenido (viewBox por bounding box), así nada se recorta. PNG a **2×**.
+- SW `v70`.
+
+---
+
 ## 2026-07-14 — P14: mapa mental radial del libro/capítulo
 
 Botón "Mapa mental" en la barra del agente → un mapa radial SVG del contenido, con las

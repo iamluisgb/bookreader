@@ -16,7 +16,7 @@ const PALETTE = ['#22c55e', '#3b82f6', '#f59e0b', '#ec4899', '#8b5cf6', '#14b8a6
 
 let ctx = null;
 let overlay = null, generating = false, abortCtrl = null, scopeValue = '';
-let lastTree = null, lastSvg = null;
+let lastTree = null, lastSvg = null, lastDims = { width: 1200, height: 1000 };
 
 export function open(context) {
   ctx = context;
@@ -88,7 +88,17 @@ function gatherScope(label) {
   return picked.sort((a, b) => Retrieval.anchorNum(a.id) - Retrieval.anchorNum(b.id));
 }
 
-// Extrae el primer objeto JSON balanceado de un texto (tolerante a prosa/```).
+// Muestreo uniforme para no pasar de `max` viñetas al reduce (conserva el orden de lectura).
+function capBullets(bullets, max) {
+  if (bullets.length <= max) return bullets;
+  const step = bullets.length / max, out = [];
+  for (let i = 0; i < max; i++) out.push(bullets[Math.floor(i * step)]);
+  return out;
+}
+
+// Extrae el primer objeto JSON balanceado (tolerante a prosa/``` y a TRUNCACIÓN: si el
+// modelo corta el JSON a media —el fallo típico de "Ideas N"— lo repara para rescatar las
+// ramas completas en vez de descartarlo entero).
 function extractJson(raw) {
   const s = String(raw || '').replace(/```(?:json)?/gi, '');
   const start = s.indexOf('{');
@@ -101,7 +111,26 @@ function extractJson(raw) {
     else if (c === '{') depth++;
     else if (c === '}') { if (--depth === 0) { try { return JSON.parse(s.slice(start, i + 1)); } catch { return null; } } }
   }
-  return null;
+  return repairJson(s.slice(start));   // llegó al final con estructuras abiertas → truncado
+}
+
+// Cierra un JSON truncado (cadena/objeto/array abiertos) para recuperar lo parseable.
+function repairJson(s) {
+  let inStr = false, esc = false; const stack = [];
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    if (inStr) { if (esc) esc = false; else if (c === '\\') esc = true; else if (c === '"') inStr = false; continue; }
+    if (c === '"') inStr = true;
+    else if (c === '{') stack.push('}');
+    else if (c === '[') stack.push(']');
+    else if (c === '}' || c === ']') stack.pop();
+  }
+  let out = s;
+  if (inStr) out += '"';                         // cadena a medias → ciérrala
+  out = out.replace(/,\s*$/, '').replace(/:\s*$/, '');   // coma o dos-puntos colgando
+  out = out.replace(/,\s*"[^"]*"\s*$/, '');       // clave sin valor al final
+  while (stack.length) out += stack.pop();        // cierra objetos/arrays abiertos
+  try { return JSON.parse(out); } catch { return null; }
 }
 
 function mapPrompt(goal) {
@@ -143,7 +172,7 @@ async function onGenerate() {
           { role: 'system', content: mapPrompt(ctx.goal) },
           { role: 'user', content: 'PASAJES DEL LIBRO:\n\n' + chunks[i].text },
         ],
-        maxTokens: 900, signal: abortCtrl.signal,
+        maxTokens: 1500, signal: abortCtrl.signal,   // holgura para modelos de razonamiento
       });
       for (const line of String(raw || '').split('\n')) {
         const t = line.trim();
@@ -153,21 +182,29 @@ async function onGenerate() {
       btn.innerHTML = `<span class="ai-typing">Trazando el mapa… ${i + 1}/${chunks.length}</span>`;
     }
     if (!bullets.length) throw new Error('El modelo no devolvió contenido. Vuelve a intentarlo.');
+    // Un buen mapa mental es conciso: acota las viñetas (muestreo uniforme si sobran) para
+    // que el JSON del reduce quepa holgado —no se trunca ni cae al fallback— y el mapa no
+    // se sature de hojas ilegibles.
+    const capped = capBullets(bullets, 20);
 
-    // Reduce: jerarquía JSON. Fallback a un mapa plano si el JSON no parsea.
+    // Reduce: jerarquía JSON temática. Fallback por CAPÍTULOS si el JSON no parsea.
     const scopeName = scopeValue || ctx.bookTitle || 'Libro';
     let tree = null;
     try {
       const raw = await LLM.chatStream({
         messages: [
           { role: 'system', content: treePrompt(scopeName, ctx.goal) },
-          { role: 'user', content: bullets.join('\n') },
+          { role: 'user', content: capped.join('\n') },
         ],
-        maxTokens: 1400, signal: abortCtrl.signal,
+        // Alto a propósito: los modelos de razonamiento (mimo, etc.) gastan miles de tokens
+        // "pensando" ANTES del JSON; con poco cupo agotaban el presupuesto razonando y emitían
+        // JSON vacío/truncado → el mapa temático caía siempre al fallback. Es solo un tope: los
+        // modelos sin razonamiento paran al terminar, así que no encarece.
+        maxTokens: 5000, signal: abortCtrl.signal,
       });
       tree = extractJson(raw);
     } catch (e) { if (e.name === 'AbortError') throw e; }
-    tree = normalizeTree(tree, bullets, scopeName);
+    tree = normalizeTree(tree, capped, scopeName);
     lastTree = tree;
     renderResult(tree, scopeName);
   } catch (e) {
@@ -179,31 +216,34 @@ async function onGenerate() {
   }
 }
 
-// Valida/normaliza el árbol; si falta o es inválido, arma uno plano con las viñetas.
+// Valida/normaliza el árbol temático del modelo; si falta o es inválido, cae a un mapa
+// por capítulos (nunca a ramas anónimas "Ideas N", que vacían de sentido el mapa).
 function normalizeTree(tree, bullets, scopeName) {
   const cleanSrc = (s) => (typeof s === 'string' && (s.match(/a\d+/) || [])[0]) || '';
-  const asLeaf = (raw) => ({ label: String(raw.label || raw).replace(/\s*\[\[a\d+\]\]\s*$/, '').trim().slice(0, 60), src: cleanSrc(raw.src) });
+  const asLeaf = (raw) => ({ label: String(raw.label || raw).replace(/\s*\[\[a\d+\]\]\s*$/, '').trim().slice(0, 80), src: cleanSrc(raw.src) });
   if (tree && Array.isArray(tree.branches) && tree.branches.length) {
-    return {
-      title: String(tree.title || scopeName).slice(0, 40),
-      branches: tree.branches.slice(0, 8).map((br, i) => ({
-        label: String(br.label || `Rama ${i + 1}`).slice(0, 28),
-        children: (Array.isArray(br.children) ? br.children : []).slice(0, 6).map(asLeaf).filter(c => c.label),
-      })).filter(br => br.children.length),
-    };
+    const branches = tree.branches.slice(0, 8).map((br, i) => ({
+      label: String(br.label || `Rama ${i + 1}`).slice(0, 34),
+      children: (Array.isArray(br.children) ? br.children : []).slice(0, 6).map(asLeaf).filter(c => c.label),
+    })).filter(br => br.children.length);
+    if (branches.length) return { title: String(tree.title || scopeName).slice(0, 44), branches };
   }
-  // Fallback: agrupar las viñetas de 5 en 5 como ramas anónimas.
-  const branches = [];
-  for (let i = 0; i < bullets.length && branches.length < 6; i += 5) {
-    branches.push({
-      label: 'Ideas ' + (branches.length + 1),
-      children: bullets.slice(i, i + 5).map(t => ({
-        label: t.replace(/\s*\[\[a\d+\]\]\s*$/, '').trim().slice(0, 60),
-        src: (t.match(/\[\[(a\d+)\]\]/) || [])[1] || '',
-      })),
-    });
+  return chapterFallback(bullets, scopeName);
+}
+
+// Fallback fiel al libro: agrupa cada viñeta bajo el CAPÍTULO de su ancla [[aN]], usando los
+// títulos reales del TOC como ramas. Legible y estructurado aunque el modelo no devuelva árbol.
+function chapterFallback(bullets, scopeName) {
+  const p2ch = new Map(Retrieval.allPassages().map(p => [p.id, (p.chapter || '').trim()]));
+  const order = [], groups = new Map();
+  for (const t of bullets) {
+    const src = (t.match(/\[\[(a\d+)\]\]/) || [])[1] || '';
+    const ch = p2ch.get(src) || 'General';
+    if (!groups.has(ch)) { groups.set(ch, []); order.push(ch); }
+    groups.get(ch).push({ label: t.replace(/\s*\[\[a\d+\]\]\s*$/, '').trim().slice(0, 80), src });
   }
-  return { title: scopeName.slice(0, 40), branches };
+  const branches = order.slice(0, 8).map(ch => ({ label: ch.slice(0, 34), children: groups.get(ch).slice(0, 6) }));
+  return { title: scopeName.slice(0, 44), branches };
 }
 
 function showError(msg) {
@@ -215,7 +255,8 @@ function showError(msg) {
 
 // ---- Render radial en SVG -----------------------------------------------------
 
-const W = 1200, H = 1000, CX = W / 2, CY = H / 2;
+const CHARW = 8, PILL_PADX = 22, LINEH = 19, PILL_PADY = 12;   // métricas de píldora (font 14)
+const LEAF_MAXCH = 22, LEAF_MAXLINES = 2;                       // hojas: hasta ~44 car. legibles
 
 function svgEl(name, attrs = {}) {
   const el = document.createElementNS(SVG_NS, name);
@@ -223,45 +264,111 @@ function svgEl(name, attrs = {}) {
   return el;
 }
 
-function pill(svg, x, y, text, { fill, stroke, color, id }) {
-  const w = Math.max(60, text.length * 8.4 + 22), h = 30;
-  const g = svgEl('g', id ? { class: 'mm-cite', 'data-id': id, style: 'cursor:pointer' } : {});
-  g.appendChild(svgEl('rect', { x: x - w / 2, y: y - h / 2, width: w, height: h, rx: 15, fill, stroke: stroke || 'none', 'stroke-width': 1.5 }));
-  const t = svgEl('text', { x, y: y + 5, 'text-anchor': 'middle', 'font-size': 14, 'font-family': 'Inter, sans-serif', fill: color });
-  t.textContent = text;
-  g.appendChild(t);
-  svg.appendChild(g);
-  return { w, h };
+// Parte una etiqueta en líneas por palabras (máx maxLines; … si se pasa). Reemplaza al
+// truncado a 21 car., que dejaba las hojas ilegibles.
+function wrapLabel(text, maxChars, maxLines) {
+  const clean = String(text || '').replace(/\s+/g, ' ').trim();
+  if (!clean) return [''];
+  const lines = []; let cur = '';
+  for (const raw of clean.split(' ')) {
+    const w = raw.length > maxChars ? raw.slice(0, maxChars - 1) + '…' : raw;
+    const cand = cur ? cur + ' ' + w : w;
+    if (cand.length <= maxChars) cur = cand;
+    else { lines.push(cur); cur = w; }
+  }
+  if (cur) lines.push(cur);
+  if (lines.length <= maxLines) return lines;
+  const kept = lines.slice(0, maxLines);
+  kept[maxLines - 1] = kept[maxLines - 1].slice(0, maxChars - 1).replace(/[\s…]+$/, '') + '…';
+  return kept;
 }
 
-function buildSvg(tree) {
-  const svg = svgEl('svg', { xmlns: SVG_NS, viewBox: `0 0 ${W} ${H}`, width: W, height: H });
-  svg.appendChild(svgEl('rect', { x: 0, y: 0, width: W, height: H, fill: '#faf8f3' }));
-  const branches = tree.branches;
-  const n = branches.length || 1;
-  const R1 = 220, R2 = 380;
+function pillSize(lines) {
+  const maxLen = Math.max(...lines.map(l => l.length));
+  return { w: Math.max(58, maxLen * CHARW + PILL_PADX), h: lines.length * LINEH + PILL_PADY };
+}
 
-  branches.forEach((br, i) => {
-    const col = PALETTE[i % PALETTE.length];
-    const ang = (-90 + i * 360 / n) * Math.PI / 180;
-    const bx = CX + R1 * Math.cos(ang), by = CY + R1 * Math.sin(ang);
-    // Curva centro → rama.
-    svg.appendChild(svgEl('path', { d: `M ${CX} ${CY} Q ${(CX + bx) / 2} ${(CY + by) / 2} ${bx} ${by}`, fill: 'none', stroke: col, 'stroke-width': 3, opacity: 0.55 }));
-    // Hijos en abanico alrededor del ángulo de la rama.
-    const m = br.children.length;
-    const spread = Math.min(46, 300 / n) * Math.PI / 180;
-    br.children.forEach((ch, j) => {
-      const a = ang + (m > 1 ? (j - (m - 1) / 2) * spread / Math.max(1, m - 1) : 0);
-      const cx2 = CX + R2 * Math.cos(a), cy2 = CY + R2 * Math.sin(a);
-      svg.appendChild(svgEl('path', { d: `M ${bx} ${by} Q ${(bx + cx2) / 2} ${(by + cy2) / 2} ${cx2} ${cy2}`, fill: 'none', stroke: col, 'stroke-width': 1.5, opacity: 0.4 }));
-      pill(svg, cx2, cy2, ch.label.length > 22 ? ch.label.slice(0, 21) + '…' : ch.label,
-        { fill: '#fff', stroke: col, color: '#2b2b2b', id: (ch.src && ctx.anchors?.has(ch.src)) ? ch.src : null });
-    });
-    pill(svg, bx, by, br.label, { fill: col, color: '#fff' });
+function pill(parent, x, y, lines, { fill, stroke, color, id, bold }) {
+  const { w, h } = pillSize(lines);
+  const g = svgEl('g', id ? { class: 'mm-cite', 'data-id': id, style: 'cursor:pointer' } : {});
+  g.appendChild(svgEl('rect', { x: x - w / 2, y: y - h / 2, width: w, height: h, rx: Math.min(16, h / 2), fill, stroke: stroke || 'none', 'stroke-width': 1.5 }));
+  const t = svgEl('text', { x, 'text-anchor': 'middle', 'font-size': 14, 'font-family': 'Inter, system-ui, sans-serif', 'font-weight': bold ? 600 : 400, fill: color });
+  const y0 = y - (lines.length - 1) * LINEH / 2 + 5;
+  lines.forEach((ln, i) => {
+    const ts = svgEl('tspan', { x, y: y0 + i * LINEH });
+    ts.textContent = ln;
+    t.appendChild(ts);
   });
-  // Nodo central.
-  pill(svg, CX, CY, tree.title, { fill: '#2b2b2b', color: '#fff' });
-  return svg;
+  g.appendChild(t);
+  parent.appendChild(g);
+}
+
+// Layout radial que reparte TODO el círculo proporcionalmente al nº de hojas (densidad
+// angular constante ⇒ una rama con muchas hojas no las amontona). Auto-ajusta el lienzo al
+// contenido real de las píldoras, así nada se recorta ni se solapa.
+function buildSvg(tree) {
+  const branches = tree.branches;
+  const leaves = [];
+  branches.forEach((br, bi) => br.children.forEach(ch => leaves.push({ ch, bi })));
+  const M = Math.max(1, leaves.length);
+  const step = 360 / M;                                   // grados por hoja
+  const stepRad = step * Math.PI / 180;
+  const R1 = 210;
+  // Anticolisión: alterno el radio de las hojas contiguas (par/impar). Así las del MISMO
+  // radio distan 2 pasos angulares —cuerda holgada frente al ANCHO de la píldora, no solo el
+  // alto, que era el fallo cerca del eje vertical— y las contiguas se separan radialmente por
+  // `stagger` (≥ alto de píldora). El lienzo se auto-ajusta, así que crecer el radio no recorta.
+  const WEST = 150;                                       // ancho típico de píldora de hoja
+  const stagger = 2 * LINEH + PILL_PADY + 6;              // ~56 px
+  let R2 = M <= 1 ? 360 : Math.min(860, Math.max(360, WEST / (2 * Math.sin(stepRad))));
+
+  const start = -90;
+  leaves.forEach((lf, k) => {
+    lf.ang = (start + (k + 0.5) * step) * Math.PI / 180;
+    lf.r = R2 + (k % 2) * stagger;
+  });
+  const branchAng = branches.map((_, bi) => {
+    const own = leaves.filter(l => l.bi === bi);
+    return own.reduce((s, l) => s + l.ang, 0) / (own.length || 1);
+  });
+
+  const nodes = [], edges = [];
+  branchAng.forEach((ang, bi) => {
+    const col = PALETTE[bi % PALETTE.length];
+    const bx = R1 * Math.cos(ang), by = R1 * Math.sin(ang);
+    edges.push({ x1: 0, y1: 0, x2: bx, y2: by, col, w: 3, op: 0.5 });
+    nodes.push({ x: bx, y: by, lines: wrapLabel(branches[bi].label, 18, 2), style: { fill: col, color: '#fff', bold: true } });
+  });
+  leaves.forEach((lf) => {
+    const col = PALETTE[lf.bi % PALETTE.length];
+    const bx = R1 * Math.cos(branchAng[lf.bi]), by = R1 * Math.sin(branchAng[lf.bi]);
+    const lx = lf.r * Math.cos(lf.ang), ly = lf.r * Math.sin(lf.ang);
+    edges.push({ x1: bx, y1: by, x2: lx, y2: ly, col, w: 1.5, op: 0.38 });
+    const id = (lf.ch.src && ctx.anchors?.has(lf.ch.src)) ? lf.ch.src : null;
+    nodes.push({ x: lx, y: ly, lines: wrapLabel(lf.ch.label, LEAF_MAXCH, LEAF_MAXLINES), style: { fill: '#fff', stroke: col, color: '#2b2b2b', id } });
+  });
+  nodes.push({ x: 0, y: 0, lines: wrapLabel(tree.title, 20, 2), style: { fill: '#2b2b2b', color: '#fff', bold: true } });
+
+  // Bounding box de todas las píldoras → viewBox ajustado.
+  let minX = 0, minY = 0, maxX = 0, maxY = 0;
+  nodes.forEach(nd => {
+    const { w, h } = pillSize(nd.lines);
+    minX = Math.min(minX, nd.x - w / 2); maxX = Math.max(maxX, nd.x + w / 2);
+    minY = Math.min(minY, nd.y - h / 2); maxY = Math.max(maxY, nd.y + h / 2);
+  });
+  const pad = 40;
+  const width = Math.round(maxX - minX + pad * 2), height = Math.round(maxY - minY + pad * 2);
+  const ox = -minX + pad, oy = -minY + pad;
+
+  const svg = svgEl('svg', { xmlns: SVG_NS, viewBox: `0 0 ${width} ${height}`, width, height, style: 'max-width:100%;height:auto;display:block;margin:0 auto' });
+  svg.appendChild(svgEl('rect', { x: 0, y: 0, width, height, fill: '#faf8f3' }));
+  const root = svgEl('g', { transform: `translate(${ox} ${oy})` });
+  svg.appendChild(root);
+  edges.forEach(e => root.appendChild(svgEl('path', {
+    d: `M ${e.x1} ${e.y1} L ${e.x2} ${e.y2}`, fill: 'none', stroke: e.col, 'stroke-width': e.w, opacity: e.op,
+  })));
+  nodes.forEach(nd => pill(root, nd.x, nd.y, nd.lines, nd.style));
+  return { svg, width, height };
 }
 
 function renderResult(tree, scopeName) {
@@ -277,7 +384,8 @@ function renderResult(tree, scopeName) {
     </div>`;
   b.querySelector('.ai-ob-back').addEventListener('click', renderSetup);
   const holder = b.querySelector('#mm-canvas');
-  lastSvg = buildSvg(tree);
+  const built = buildSvg(tree);
+  lastSvg = built.svg; lastDims = { width: built.width, height: built.height };
   holder.appendChild(lastSvg);
 
   // Clic en una hoja citada → navegar en el libro.
@@ -289,7 +397,7 @@ function renderResult(tree, scopeName) {
   const slug = (s) => (s || 'mapa').replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '').slice(0, 50);
   b.querySelector('#mm-svg').addEventListener('click', () => download(`bookreader-mapa-${slug(scopeName)}.svg`, serializeSvg(lastSvg), 'image/svg+xml'));
   b.querySelector('#mm-png').addEventListener('click', async () => {
-    try { download(`bookreader-mapa-${slug(scopeName)}.png`, await svgToPngBlob(lastSvg), 'image/png'); }
+    try { download(`bookreader-mapa-${slug(scopeName)}.png`, await svgToPngBlob(lastSvg, lastDims), 'image/png'); }
     catch (err) { console.warn('PNG del mapa falló:', err); }
   });
 }
@@ -298,14 +406,15 @@ function serializeSvg(svg) {
   return new XMLSerializer().serializeToString(svg);
 }
 
-async function svgToPngBlob(svg) {
+async function svgToPngBlob(svg, dims) {
   const url = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(serializeSvg(svg))));
   const img = new Image();
   img.src = url;
   await img.decode();
+  const scale = 2;   // 2× para una imagen nítida al compartir en redes
   const canvas = document.createElement('canvas');
-  canvas.width = W; canvas.height = H;
-  canvas.getContext('2d').drawImage(img, 0, 0, W, H);
+  canvas.width = dims.width * scale; canvas.height = dims.height * scale;
+  canvas.getContext('2d').drawImage(img, 0, 0, dims.width * scale, dims.height * scale);
   return new Promise((res, rej) => canvas.toBlob(b => b ? res(b) : rej(new Error('toBlob null')), 'image/png'));
 }
 
