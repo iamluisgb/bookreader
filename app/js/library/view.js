@@ -145,25 +145,28 @@ async function paintStudyChip() {
   chip.addEventListener('click', async (e) => {
     e.stopPropagation();
     const scopes = await Study.studyScopes();
-    if (!scopes.shelves.length) { Study.openToday({ onClose: paintStudyChip }); return; }
+    // Sin elección real (un solo libro, sin estanterías) → repasa todo directo, sin selector.
+    if (!scopes.shelves.length && scopes.books.length <= 1) { Study.openToday({ onClose: paintStudyChip }); return; }
     showStudyChooser(chip, scopes);
   });
   bar.insertBefore(chip, bar.querySelector('.lib-upload'));
 }
 
-// Selector de ámbito de repaso (P12): popover anclado al chip con "Todo" + una fila
-// por estantería con tarjetas vencidas. Al elegir, abre la sesión de ese ámbito.
+// Selector de ámbito de repaso (P12, estilo Anki): popover anclado al chip con "Todo" +
+// una sección de LIBROS y otra de ESTANTERÍAS con vencidas. Se repasa a cualquier nivel.
 function showStudyChooser(chip, scopes) {
   document.querySelector('.lib-study-menu')?.remove();
   const menu = document.createElement('div');
   menu.className = 'lib-study-menu';
   const row = (label, count, scope) =>
     `<button class="lib-study-opt" data-scope='${escapeHtml(JSON.stringify(scope))}'>
-      <span>${escapeHtml(label)}</span><span class="lib-study-opt-n">${count}</span>
+      <span class="lib-study-opt-lbl">${escapeHtml(label)}</span><span class="lib-study-opt-n">${count}</span>
     </button>`;
+  const section = (title, rows) => rows ? `<div class="lib-study-sec">${title}</div>${rows}` : '';
   menu.innerHTML =
     row('Todo', scopes.total, { type: 'all' }) +
-    scopes.shelves.map(s => row(s.name, s.cards, { type: 'shelf', shelfId: s.id })).join('');
+    section('Libros', (scopes.books || []).map(b => row(b.title, b.cards, { type: 'book', bookId: b.id })).join('')) +
+    section('Estanterías', scopes.shelves.map(s => row(s.name, s.cards, { type: 'shelf', shelfId: s.id })).join(''));
   chip.parentElement.appendChild(menu);
   const r = chip.getBoundingClientRect();
   const pr = chip.parentElement.getBoundingClientRect();

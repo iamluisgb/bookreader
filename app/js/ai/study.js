@@ -59,9 +59,9 @@ export async function openToday({ scope, title, onClose } = {}) {
   open({ decks, title: title || 'Repaso de hoy', onClose });
 }
 
-// Ámbitos de repaso con tarjetas vencidas hoy (para el selector): total global +
-// una entrada por estantería que tenga vencidas. Los libros sin estantería solo
-// cuentan en el total (se repasan desde "Todo" o desde su mazo en el modal).
+// Ámbitos de repaso con tarjetas vencidas hoy (para el selector, estilo Anki): total global +
+// una entrada por LIBRO con vencidas + una por ESTANTERÍA con vencidas. Se puede repasar a
+// cualquiera de los dos niveles. Los libros sin estantería aparecen igual (nivel libro).
 export async function studyScopes(now = Date.now()) {
   const [decks, books, shelves] = await Promise.all([
     DB.getAllDecks(), Store.getAllBooks(), Store.getShelves(),
@@ -72,6 +72,10 @@ export async function studyScopes(now = Date.now()) {
     const n = Srs.dueCount(d.cards, now);
     if (n) { dueByBook.set(d.bookId, (dueByBook.get(d.bookId) || 0) + n); total += n; }
   }
+  const titleById = new Map(books.map(b => [b.id, b.title]));
+  const bookScopes = [...dueByBook.entries()]
+    .map(([id, cards]) => ({ id, title: titleById.get(id) || 'Sin título', cards }))
+    .sort((a, b) => b.cards - a.cards || a.title.localeCompare(b.title));
   const shelfScopes = [];
   for (const sh of shelves) {
     const n = books
@@ -79,7 +83,7 @@ export async function studyScopes(now = Date.now()) {
       .reduce((sum, b) => sum + (dueByBook.get(b.id) || 0), 0);
     if (n) shelfScopes.push({ id: sh.id, name: sh.name, cards: n });
   }
-  return { total, shelves: shelfScopes };
+  return { total, books: bookScopes, shelves: shelfScopes };
 }
 
 // ---- Sesión -------------------------------------------------------------------

@@ -36,10 +36,18 @@ test.describe('P12 · ámbitos de repaso', () => {
     });
     // bA(2)+bB(1)+bC(1)+bD(1) = 5 vencidas en total.
     expect(scopes.total).toBe(5);
-    const byName = Object.fromEntries(scopes.shelves.map((s: any) => [s.name, s.cards]));
-    expect(byName['Medicina']).toBe(3);   // bA(2) + bB(1)
-    expect(byName['Idiomas']).toBe(1);    // bC(1)
+    const byShelf = Object.fromEntries(scopes.shelves.map((s: any) => [s.name, s.cards]));
+    expect(byShelf['Medicina']).toBe(3);   // bA(2) + bB(1)
+    expect(byShelf['Idiomas']).toBe(1);    // bC(1)
     expect(scopes.shelves).toHaveLength(2); // "Suelto" no está en ninguna estantería
+    // Nivel LIBRO: todos los libros con vencidas, incluido el suelto.
+    const byBook = Object.fromEntries(scopes.books.map((b: any) => [b.title, b.cards]));
+    expect(byBook['Anatomía']).toBe(2);
+    expect(byBook['Fisiología']).toBe(1);
+    expect(byBook['Inglés']).toBe(1);
+    expect(byBook['Suelto']).toBe(1);      // sin estantería, pero sí a nivel libro
+    expect(scopes.books).toHaveLength(4);
+    expect(scopes.books[0].title).toBe('Anatomía'); // ordenado por nº de vencidas desc
   });
 
   test('dueToday por estantería y por libro filtra los mazos', async ({ page }) => {
@@ -63,7 +71,7 @@ test.describe('P12 · ámbitos de repaso', () => {
     expect(res.soloA).toBe(2);
   });
 
-  test('el chip "Repasar hoy" abre el selector con Todo + estanterías', async ({ page }) => {
+  test('el chip "Repasar hoy" abre el selector con Todo + libros + estanterías', async ({ page }) => {
     await page.goto('/');
     await seed(page);
     await page.goto('/');   // re-render de la biblioteca → pinta el chip con el total
@@ -74,12 +82,14 @@ test.describe('P12 · ámbitos de repaso', () => {
     const menu = page.locator('.lib-study-menu');
     await expect(menu).toBeVisible();
     const opts = menu.locator('.lib-study-opt');
-    await expect(opts).toHaveCount(3);            // Todo + Medicina + Oposiciones
+    await expect(opts).toHaveCount(7);            // Todo + 4 libros + 2 estanterías
     await expect(opts.nth(0)).toContainText('Todo');
-    await expect(menu).toContainText('Medicina');
+    await expect(menu.locator('.lib-study-sec')).toContainText(['Libros', 'Estanterías']);
+    await expect(menu).toContainText('Anatomía');   // nivel libro
+    await expect(menu).toContainText('Medicina');   // nivel estantería
     await expect(menu).toContainText('Idiomas');
-    // Elegir una estantería abre el modo Estudiar de ese ámbito (3 pendientes en Medicina).
-    await menu.getByText('Medicina').click();
+    // Elegir un LIBRO abre el modo Estudiar de ese ámbito (2 pendientes en Anatomía).
+    await menu.getByText('Anatomía').click();
     await expect(page.getByText('pendientes')).toBeVisible({ timeout: 10000 });
   });
 });

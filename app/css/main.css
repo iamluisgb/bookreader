@@ -1590,7 +1590,8 @@ body.ai-open .ai-taskchip { right: calc(var(--ai-panel-width) + 20px); }
 .lib-study-menu {
   position: absolute;
   z-index: 50;
-  min-width: 220px;
+  min-width: 240px; max-width: 320px;
+  max-height: 60vh; overflow-y: auto;
   background: var(--surface-2);
   border: 1px solid var(--border);
   border-radius: 12px;
@@ -1600,6 +1601,10 @@ body.ai-open .ai-taskchip { right: calc(var(--ai-panel-width) + 20px); }
   flex-direction: column;
   gap: 2px;
 }
+.lib-study-sec {
+  font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
+  color: var(--text-faint); padding: 8px 12px 4px;
+}
 .lib-study-opt {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
   width: 100%; padding: 9px 12px; border: none; border-radius: 8px;
@@ -1607,8 +1612,9 @@ body.ai-open .ai-taskchip { right: calc(var(--ai-panel-width) + 20px); }
   cursor: pointer; text-align: left;
 }
 .lib-study-opt:hover { background: var(--surface-3); }
+.lib-study-opt-lbl { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lib-study-opt-n {
-  font-size: 12px; font-weight: 600; color: var(--accent);
+  flex: none; font-size: 12px; font-weight: 600; color: var(--accent);
   background: var(--accent-soft); border-radius: 999px; padding: 2px 9px;
 }
 
