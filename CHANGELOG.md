@@ -5,6 +5,30 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-14 — Resumen y mapa mental NO BLOQUEANTES ("sigue leyendo, te aviso")
+
+Generar un resumen/mapa (1-4 min, varias llamadas al LLM) bloqueaba: había que mirar el modal
+sin poder leer. Como en el chat, ahora la generación va en segundo plano y avisa al terminar.
+
+- **`js/ai/jobs.js`** (nuevo): runner de trabajos pesados de IA. Un trabajo a la vez (las
+  llamadas ya se serializan en llm.js), estado (running/done/error/cancelled) con progreso,
+  **caché de resultado por libro+tipo**, y cancelación al cambiar de libro. Los modales aportan
+  la función `run` (el bucle map-reduce, ahora desacoplado del DOM).
+- **Vista "en curso"**: al Generar, el modal ofrece **"Seguir leyendo"** (suelta el modal, el
+  trabajo sigue) y "Cancelar". Cerrar (X/Escape/clic-fuera) ya **no** cancela: solo suelta.
+- **`js/ai/jobs-ui.js`** (nuevo): **chip flotante** de progreso ("Resumen 3/6" con anillo) que
+  persiste mientras lees y sirve para reabrir; al terminar, se convierte en "Ver resumen".
+- **`js/ai/toast.js`** (nuevo): aviso no intrusivo abajo. Al terminar → toast **"Resumen listo ·
+  Ver resumen"** (acción reabre el resultado); en error → "Reintentar". Vibración PWA opcional.
+- **Reabrir = instantáneo desde caché** (y arregla el coste oculto: antes, clicar una cita
+  cerraba el modal y reabrir **regeneraba** 1-4 min; ahora se restaura al instante). Botón
+  **"Regenerar"** en el resultado para rehacerlo. Feedback **"Copiado ✓"** al copiar.
+- Panel: `JobsUI.init()` + openers, y `Jobs.cancelForBookChange` en `setBook`.
+- Tests: `tests/jobs.spec.ts` (flujo en segundo plano + aviso + reabrir; cancelar desde chip).
+  SW `v73`.
+
+---
+
 ## 2026-07-14 — P14.2: mapa mental estilo NotebookLM (etiquetas cortas + hover)
 
 Con frases enteras en cada hoja, el mapa se cortaba entero ("…"). Lección de NotebookLM: el

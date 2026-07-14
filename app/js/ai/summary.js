@@ -5,12 +5,15 @@
 // retrieval del agente y el render de citas del chat.
 import * as LLM from './llm.js';
 import * as Retrieval from './retrieval.js';
+import * as Jobs from './jobs.js';
 import { estimateTokens } from './context.js';
 import { buildChunks } from './flashcards.js';
 import { renderWithCitations } from './render.js';
 import { downloadText } from '../backup.js';
 import { icon } from '../ui/icons.js';
 import { escapeHtml } from '../ui/escape.js';
+
+const KIND = 'summary';
 
 const BOOK_TOKENS = 36000;   // techo por defecto de cobertura para "libro entero"
 
@@ -26,10 +29,10 @@ const DEPTH = {
 
 let ctx = null;              // { bookId, bookTitle, goal, tocLabels, currentChapter, ensureIndex, anchors, onCite }
 let overlay = null;
-let generating = false, abortCtrl = null;
 let scopeValue = '';
 let depthValue = 'estandar'; // profundidad por defecto
-let lastMarkdown = '';       // último resumen generado (para exportar/copiar)
+let lastMarkdown = '';       // último resumen mostrado (para exportar/copiar)
+let runUnsub = null;         // baja de la suscripción a Jobs mientras se muestra "en curso"
 
 export function open(context) {
   ctx = context;
@@ -43,19 +46,31 @@ export function open(context) {
       <div class="ai-ob-body"></div>
     </div>`;
   document.body.appendChild(overlay);
-  overlay.addEventListener('mousedown', (e) => { if (e.target === overlay && !generating) closeModal(); });
-  overlay.querySelector('.ai-ob-close').addEventListener('click', () => { abortCtrl?.abort(); closeModal(); });
+  // Cerrar NO cancela: solo suelta el modal (el trabajo sigue en segundo plano). Cancelar es
+  // explícito (botón en la vista "en curso").
+  overlay.addEventListener('mousedown', (e) => { if (e.target === overlay) closeModal(); });
+  overlay.querySelector('.ai-ob-close').addEventListener('click', () => closeModal());
   document.addEventListener('keydown', onKey);
-  renderSetup();
+  route();
 }
 
-function onKey(e) { if (e.key === 'Escape' && overlay) { abortCtrl?.abort(); closeModal(); } }
+function onKey(e) { if (e.key === 'Escape' && overlay) closeModal(); }
 function closeModal() {
   document.removeEventListener('keydown', onKey);
+  if (runUnsub) { runUnsub(); runUnsub = null; }
   if (overlay) { overlay.remove(); overlay = null; }
-  generating = false;
 }
 const body = () => overlay?.querySelector('.ai-ob-body');
+
+// Al abrir: si hay un resumen en curso para este libro → vista "en curso"; si hay uno ya
+// generado en caché → muéstralo directo (reabrir instantáneo, sin re-generar); si no → setup.
+function route() {
+  const a = Jobs.activeJob();
+  if (a && a.kind === KIND && a.bookId === ctx.bookId && a.status === 'running') { renderRunning(a); return; }
+  const c = Jobs.cached(ctx.bookId, KIND);
+  if (c) { renderResult(c.result, c.params.scopeName); return; }
+  renderSetup();
+}
 
 // ---- Vista 1: elegir ámbito ---------------------------------------------------
 
@@ -157,81 +172,115 @@ ${langRule(goal)}
 Responde solo el párrafo.`;
 }
 
-async function onGenerate() {
-  if (generating) return;
-  const b = body();
+function onGenerate() {
   if (!LLM.hasKey()) { showError('Configura tu API key en Ajustes → Agente para generar el resumen.'); return; }
   const depth = DEPTH[depthValue] || DEPTH.estandar;
   const passages = gatherScope(scopeValue, depth.coverage);
   if (!passages.length) { showError('Ese contenido no tiene texto indexado; prueba con otro capítulo o el libro entero.'); return; }
   const chunks = buildChunks(passages);
+  const scopeName = scopeValue || ctx.bookTitle || 'Libro';
+  const goal = ctx.goal;
 
-  generating = true; abortCtrl = new AbortController();
-  const btn = b.querySelector('#sum-generate');
-  btn.disabled = true;
-  btn.innerHTML = `<span class="ai-typing">Resumiendo…</span>`;
-  showError('');
-  try {
-    // Map: puntos citados por trozo (cantidad según la profundidad).
-    const bullets = [];
-    for (let i = 0; i < chunks.length; i++) {
-      const raw = await LLM.chatStream({
-        messages: [
-          { role: 'system', content: pointsPrompt(ctx.goal, depth.bullets) },
-          { role: 'user', content: 'PASAJES DEL LIBRO:\n\n' + chunks[i].text },
-        ],
-        maxTokens: 1500, signal: abortCtrl.signal,   // holgura para modelos de razonamiento
-      });
-      for (const line of String(raw || '').split('\n')) {
-        const t = line.trim();
-        if (t.startsWith('- ') || t.startsWith('* ')) bullets.push('- ' + t.slice(2).trim());
-      }
-      if (!overlay) return;
-      btn.innerHTML = `<span class="ai-typing">Resumiendo… ${i + 1}/${chunks.length}</span>`;
-    }
-    if (!bullets.length) throw new Error('El modelo no devolvió puntos. Vuelve a intentarlo.');
-
-    const scopeName = scopeValue || ctx.bookTitle || 'Libro';
-    let md;
-    if (depth.prose) {
-      // Estructurado: marco (1 llamada) + secciones por capítulo a partir de los puntos.
-      btn.innerHTML = `<span class="ai-typing">Redactando el resumen…</span>`;
-      const framing = await runFraming(bullets, ctx.goal);
-      md = assembleStructured(scopeName, framing, bullets, depth.perCap);
-    } else {
-      // Breve: TL;DR + lista plana.
-      let tldr = '';
-      try {
-        tldr = (await LLM.chatStream({
-          messages: [
-            { role: 'system', content: tldrPrompt(ctx.goal) },
-            { role: 'user', content: bullets.join('\n') },
-          ],
-          maxTokens: 1500, signal: abortCtrl.signal,
-        }) || '').trim();
-      } catch (e) { if (e.name === 'AbortError') throw e; }
-      md = `# Resumen — ${scopeName}\n\n${tldr ? `${tldr}\n\n` : ''}## Puntos clave\n\n${bullets.join('\n')}\n`;
-    }
-    lastMarkdown = md;
-    renderResult(md, scopeName);
-  } catch (e) {
-    if (e.name !== 'AbortError') { console.error('Resumen falló:', e); showError(e.message); }
-  } finally {
-    generating = false; abortCtrl = null;
-    const b2 = body()?.querySelector('#sum-generate');
-    if (b2) { b2.disabled = false; b2.innerHTML = `${icon('sparkles', { size: 16 })} Generar resumen`; }
+  // Exclusividad: si hay otro trabajo pesado en curso, confirma antes de reemplazarlo.
+  const act = Jobs.activeJob();
+  if (act && act.status === 'running' && !(act.kind === KIND && act.bookId === ctx.bookId)) {
+    if (!window.confirm(`Ya se está generando ${act.label}. ¿Cancelarlo y empezar el resumen?`)) return;
   }
+  showError('');
+  Jobs.start({
+    bookId: ctx.bookId, kind: KIND, label: 'el resumen',
+    params: { scopeName },
+    run: ({ signal, progress }) => runSummary({ chunks, depth, goal, scopeName, signal, progress }),
+  });
+  renderRunning(Jobs.activeJob());
+}
+
+// El bucle map-reduce, desacoplado del modal: recibe `signal` y `progress(i,n,phase)`.
+async function runSummary({ chunks, depth, goal, scopeName, signal, progress }) {
+  const bullets = [];
+  for (let i = 0; i < chunks.length; i++) {
+    const raw = await LLM.chatStream({
+      messages: [
+        { role: 'system', content: pointsPrompt(goal, depth.bullets) },
+        { role: 'user', content: 'PASAJES DEL LIBRO:\n\n' + chunks[i].text },
+      ],
+      maxTokens: 1500, signal,   // holgura para modelos de razonamiento
+    });
+    for (const line of String(raw || '').split('\n')) {
+      const t = line.trim();
+      if (t.startsWith('- ') || t.startsWith('* ')) bullets.push('- ' + t.slice(2).trim());
+    }
+    progress(i + 1, chunks.length, 'map');
+  }
+  if (!bullets.length) throw new Error('El modelo no devolvió puntos. Vuelve a intentarlo.');
+
+  progress(chunks.length, chunks.length, 'reduce');
+  if (depth.prose) {
+    // Estructurado: marco (1 llamada) + secciones por capítulo a partir de los puntos.
+    const framing = await runFraming(bullets, goal, signal);
+    return assembleStructured(scopeName, framing, bullets, depth.perCap);
+  }
+  // Breve: TL;DR + lista plana.
+  let tldr = '';
+  try {
+    tldr = (await LLM.chatStream({
+      messages: [
+        { role: 'system', content: tldrPrompt(goal) },
+        { role: 'user', content: bullets.join('\n') },
+      ],
+      maxTokens: 1500, signal,
+    }) || '').trim();
+  } catch (e) { if (e.name === 'AbortError') throw e; }
+  return `# Resumen — ${scopeName}\n\n${tldr ? `${tldr}\n\n` : ''}## Puntos clave\n\n${bullets.join('\n')}\n`;
+}
+
+// Vista "en curso": progreso + "Seguir leyendo" (suelta el modal, el trabajo sigue) y
+// "Cancelar". Se suscribe a Jobs para refrescar el progreso y saltar al resultado al terminar.
+function renderRunning(job) {
+  const b = body();
+  if (!b || !job) { renderSetup(); return; }
+  b.innerHTML = `
+    <h2>Generando resumen…</h2>
+    <p class="ai-run-status" id="sum-run-status" role="status"></p>
+    <div class="ai-run-actions">
+      <button id="sum-keep" class="primary-btn">${icon('book', { size: 16 })} Seguir leyendo</button>
+      <button id="sum-cancel" class="ai-ob-back fc-txt-btn">Cancelar</button>
+    </div>
+    <p class="sum-depth-hint">Puedes cerrar esta ventana y seguir leyendo: te avisaremos cuando el resumen esté listo.</p>`;
+  const status = b.querySelector('#sum-run-status');
+  const paint = (j) => {
+    if (!overlay) return;
+    if (!j || j.status === 'cancelled') { if (runUnsub) { runUnsub(); runUnsub = null; } renderSetup(); return; }
+    if (j.kind !== KIND) return;
+    if (j.status === 'running') {
+      status.textContent = j.progress.phase === 'reduce'
+        ? 'Redactando el resumen…'
+        : `Resumiendo… ${j.progress.i}/${j.progress.n || '·'}`;
+    } else if (j.status === 'done') {
+      if (runUnsub) { runUnsub(); runUnsub = null; }
+      const c = Jobs.cached(ctx.bookId, KIND);
+      renderResult(c ? c.result : j.result, c ? c.params.scopeName : (j.params?.scopeName || 'Libro'));
+    } else if (j.status === 'error') {
+      if (runUnsub) { runUnsub(); runUnsub = null; }
+      renderSetup();
+      showError(j.error?.message || 'No se pudo generar el resumen.');
+    }
+  };
+  b.querySelector('#sum-keep').addEventListener('click', () => closeModal());
+  b.querySelector('#sum-cancel').addEventListener('click', () => Jobs.cancel());
+  if (runUnsub) runUnsub();
+  runUnsub = Jobs.subscribe(paint);
 }
 
 // Marco del resumen estructurado en UNA llamada; devuelve { tldr, ideas, llevar }.
-async function runFraming(bullets, goal) {
+async function runFraming(bullets, goal, signal) {
   try {
     const raw = (await LLM.chatStream({
       messages: [
         { role: 'system', content: framingPrompt(goal) },
         { role: 'user', content: bullets.join('\n') },
       ],
-      maxTokens: 1600, signal: abortCtrl.signal,
+      maxTokens: 1600, signal,
     }) || '').trim();
     return parseFraming(raw);
   } catch (e) {
@@ -295,15 +344,21 @@ function showError(msg) {
 function renderResult(md, scopeName) {
   const b = body();
   if (!b) return;
+  lastMarkdown = md;
+  Jobs.clearActive();          // el usuario está viendo el resultado → retira chip/aviso
   const anchors = ctx.anchors || new Map();
   b.innerHTML = `
-    <button class="ai-ob-back">${icon('chevron-left', { size: 16 })}<span>Volver</span></button>
+    <div class="sum-resulthead">
+      <button class="ai-ob-back">${icon('chevron-left', { size: 16 })}<span>Volver</span></button>
+      <button id="sum-regen" class="fc-txt-btn">${icon('sparkles', { size: 14 })} Regenerar</button>
+    </div>
     <div class="sum-doc">${renderWithCitations(md, anchors)}</div>
     <div class="fc-export">
       <button id="sum-copy" class="primary-btn">${icon('copy', { size: 16 })} Copiar</button>
       <button id="sum-md" class="ai-ob-back fc-txt-btn">${icon('download', { size: 15 })} Markdown</button>
     </div>`;
   b.querySelector('.ai-ob-back').addEventListener('click', renderSetup);
+  b.querySelector('#sum-regen').addEventListener('click', renderSetup);
 
   // Clic en una cita [[aN]] → navegar en el libro (delegado a quien abrió el modal).
   b.addEventListener('click', (e) => {
@@ -312,8 +367,13 @@ function renderResult(md, scopeName) {
   });
 
   const slug = (s) => (s || 'resumen').replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '').slice(0, 50);
-  b.querySelector('#sum-copy').addEventListener('click', async () => {
-    try { await navigator.clipboard.writeText(lastMarkdown); } catch (e) { /* sin clipboard */ }
+  const copyBtn = b.querySelector('#sum-copy');
+  copyBtn.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(lastMarkdown);
+      copyBtn.innerHTML = `${icon('check', { size: 16 })} Copiado`;
+      setTimeout(() => { copyBtn.innerHTML = `${icon('copy', { size: 16 })} Copiar`; }, 1500);
+    } catch (e) { /* sin clipboard */ }
   });
   b.querySelector('#sum-md').addEventListener('click', () => {
     downloadText(`bookreader-resumen-${slug(scopeName)}.md`, lastMarkdown, 'text/markdown');

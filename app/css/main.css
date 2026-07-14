@@ -1325,6 +1325,55 @@ body.resizing-panel .reader-main { transition: none !important; }
 .mm-canvas { margin: 8px 0; border: 1px solid var(--border); border-radius: 12px; overflow: auto; background: #faf8f3; }
 .mm-canvas svg { display: block; width: 100%; height: auto; }
 .mm-cite:hover rect { stroke-width: 2.5; }
+
+/* Trabajos de IA en segundo plano: vista "en curso", chip flotante y toast de aviso */
+@keyframes ai-spin { to { transform: rotate(360deg); } }
+.ai-run-status { font-size: 15px; color: var(--text-primary); margin: 8px 0 18px; min-height: 1.4em; }
+.ai-run-actions { display: flex; gap: 10px; align-items: center; }
+.sum-resulthead { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.fc-txt-btn { background: none; border: none; color: var(--text-soft); font: inherit; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; padding: 4px 6px; border-radius: var(--r-md); }
+.fc-txt-btn:hover { color: var(--accent); }
+
+/* Chip flotante de progreso/reapertura (bajo el modal, sobre el lector) */
+.ai-taskchip {
+  position: fixed; right: 20px; bottom: 20px; z-index: 250;
+  display: flex; align-items: center; gap: 9px;
+  background: var(--bg-primary, #fff); border: 1px solid var(--border); border-radius: var(--r-pill, 999px);
+  padding: 9px 14px; box-shadow: var(--shadow, 0 6px 24px rgba(0,0,0,.14));
+  font-size: 13px; font-weight: 600; color: var(--text-primary); cursor: pointer; max-width: 260px;
+}
+.ai-taskchip.is-done { border-color: var(--accent); }
+.ai-taskchip.is-error { border-color: #ef4444; }
+.ai-taskchip-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ai-taskchip-spin {
+  width: 15px; height: 15px; flex: none; border-radius: 50%;
+  border: 2px solid var(--accent-soft, #cdefd8); border-top-color: var(--accent);
+  animation: ai-spin .7s linear infinite;
+}
+.ai-taskchip-dot { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; flex: none; border-radius: 50%; background: var(--accent); color: var(--on-accent, #fff); font-weight: 700; font-size: 12px; }
+.ai-taskchip.is-error .ai-taskchip-dot { background: #ef4444; }
+.ai-taskchip-x { background: none; border: none; color: var(--text-faint, #999); cursor: pointer; padding: 0 0 0 2px; display: inline-flex; }
+.ai-taskchip-x:hover { color: var(--text-primary); }
+/* Con el panel de IA abierto, aparta el chip a su izquierda para no tapar el input del chat. */
+body.ai-open .ai-taskchip { right: calc(var(--ai-panel-width) + 20px); }
+
+/* Toast de aviso (encima de todo) */
+.ai-toast-host { position: fixed; left: 0; right: 0; bottom: 20px; z-index: 600; display: flex; flex-direction: column; align-items: center; gap: 8px; pointer-events: none; }
+.ai-toast {
+  pointer-events: auto; display: flex; align-items: center; gap: 12px;
+  background: #23232a; color: #fff; border-radius: var(--r-md, 10px); padding: 11px 12px 11px 16px;
+  box-shadow: 0 8px 30px rgba(0,0,0,.28); font-size: 14px; max-width: min(92vw, 440px);
+  opacity: 0; transform: translateY(12px); transition: opacity .2s var(--ease, ease), transform .2s var(--ease, ease);
+}
+.ai-toast.show { opacity: 1; transform: translateY(0); }
+.ai-toast-msg { flex: 1; }
+.ai-toast--success { border-left: 3px solid var(--accent); }
+.ai-toast--error { border-left: 3px solid #ef4444; }
+.ai-toast-action { background: var(--accent); color: var(--on-accent, #fff); border: none; border-radius: var(--r-md, 8px); padding: 6px 12px; font: inherit; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.ai-toast-action:hover { background: var(--accent-hover); }
+.ai-toast-close { background: none; border: none; color: rgba(255,255,255,.6); cursor: pointer; display: inline-flex; padding: 2px; }
+.ai-toast-close:hover { color: #fff; }
+@media (max-width: 600px) { .ai-taskchip, body.ai-open .ai-taskchip { right: 12px; bottom: 12px; } }
 .fc-label { display: block; font-size: 13px; font-weight: 600; color: var(--text-soft); margin: 16px 0 6px; }
 .fc-select {
   width: 100%; border: 1px solid var(--border); border-radius: var(--r-md); padding: 10px 12px;

@@ -4,18 +4,20 @@
 // export a PNG para redes y a SVG. Reutiliza el troceado y el map de summary/flashcards.
 import * as LLM from './llm.js';
 import * as Retrieval from './retrieval.js';
+import * as Jobs from './jobs.js';
 import { estimateTokens } from './context.js';
 import { buildChunks } from './flashcards.js';
 import { icon } from '../ui/icons.js';
 import { escapeHtml } from '../ui/escape.js';
 
+const KIND = 'mindmap';
 const BOOK_TOKENS = 36000;
 const SVG_NS = 'http://www.w3.org/2000/svg';
 // Paleta de ramas (una por rama, tono suave de marca).
 const PALETTE = ['#22c55e', '#3b82f6', '#f59e0b', '#ec4899', '#8b5cf6', '#14b8a6', '#ef4444', '#0ea5e9'];
 
 let ctx = null;
-let overlay = null, generating = false, abortCtrl = null, scopeValue = '';
+let overlay = null, scopeValue = '', runUnsub = null;
 let lastTree = null, lastSvg = null, lastDims = { width: 1200, height: 1000 };
 
 export function open(context) {
@@ -30,19 +32,30 @@ export function open(context) {
       <div class="ai-ob-body"></div>
     </div>`;
   document.body.appendChild(overlay);
-  overlay.addEventListener('mousedown', (e) => { if (e.target === overlay && !generating) closeModal(); });
-  overlay.querySelector('.ai-ob-close').addEventListener('click', () => { abortCtrl?.abort(); closeModal(); });
+  // Cerrar NO cancela: suelta el modal (el trabajo sigue). Cancelar es explícito.
+  overlay.addEventListener('mousedown', (e) => { if (e.target === overlay) closeModal(); });
+  overlay.querySelector('.ai-ob-close').addEventListener('click', () => closeModal());
   document.addEventListener('keydown', onKey);
-  renderSetup();
+  route();
 }
 
-function onKey(e) { if (e.key === 'Escape' && overlay) { abortCtrl?.abort(); closeModal(); } }
+function onKey(e) { if (e.key === 'Escape' && overlay) closeModal(); }
 function closeModal() {
   document.removeEventListener('keydown', onKey);
+  if (runUnsub) { runUnsub(); runUnsub = null; }
   if (overlay) { overlay.remove(); overlay = null; }
-  generating = false;
 }
 const body = () => overlay?.querySelector('.ai-ob-body');
+
+// Al abrir: mapa en curso → vista "en curso"; mapa ya generado en caché → muéstralo directo
+// (reabrir instantáneo); si no → setup.
+function route() {
+  const a = Jobs.activeJob();
+  if (a && a.kind === KIND && a.bookId === ctx.bookId && a.status === 'running') { renderRunning(a); return; }
+  const c = Jobs.cached(ctx.bookId, KIND);
+  if (c) { renderResult(c.result, c.params.scopeName); return; }
+  renderSetup();
+}
 
 function renderSetup() {
   const b = body();
@@ -158,70 +171,101 @@ REGLAS:
 - Título tentativo: «${title}».`;
 }
 
-async function onGenerate() {
-  if (generating) return;
-  const b = body();
+function onGenerate() {
   if (!LLM.hasKey()) { showError('Configura tu API key en Ajustes → Agente para generar el mapa.'); return; }
   const passages = gatherScope(scopeValue);
   if (!passages.length) { showError('Ese contenido no tiene texto indexado; prueba con otro capítulo o el libro entero.'); return; }
   const chunks = buildChunks(passages);
+  const scopeName = scopeValue || ctx.bookTitle || 'Libro';
+  const goal = ctx.goal;
 
-  generating = true; abortCtrl = new AbortController();
-  const btn = b.querySelector('#mm-generate');
-  btn.disabled = true;
-  btn.innerHTML = `<span class="ai-typing">Trazando el mapa…</span>`;
-  showError('');
-  try {
-    // Map: puntos citados por trozo.
-    const bullets = [];
-    for (let i = 0; i < chunks.length; i++) {
-      const raw = await LLM.chatStream({
-        messages: [
-          { role: 'system', content: mapPrompt(ctx.goal) },
-          { role: 'user', content: 'PASAJES DEL LIBRO:\n\n' + chunks[i].text },
-        ],
-        maxTokens: 1500, signal: abortCtrl.signal,   // holgura para modelos de razonamiento
-      });
-      for (const line of String(raw || '').split('\n')) {
-        const t = line.trim();
-        if (t.startsWith('- ') || t.startsWith('* ')) bullets.push(t.slice(2).trim());
-      }
-      if (!overlay) return;
-      btn.innerHTML = `<span class="ai-typing">Trazando el mapa… ${i + 1}/${chunks.length}</span>`;
-    }
-    if (!bullets.length) throw new Error('El modelo no devolvió contenido. Vuelve a intentarlo.');
-    // Un buen mapa mental es conciso: acota las viñetas (muestreo uniforme si sobran) para
-    // que el JSON del reduce quepa holgado —no se trunca ni cae al fallback— y el mapa no
-    // se sature de hojas ilegibles.
-    const capped = capBullets(bullets, 20);
-
-    // Reduce: jerarquía JSON temática. Fallback por CAPÍTULOS si el JSON no parsea.
-    const scopeName = scopeValue || ctx.bookTitle || 'Libro';
-    let tree = null;
-    try {
-      const raw = await LLM.chatStream({
-        messages: [
-          { role: 'system', content: treePrompt(scopeName, ctx.goal) },
-          { role: 'user', content: capped.join('\n') },
-        ],
-        // Alto a propósito: los modelos de razonamiento (mimo, etc.) gastan miles de tokens
-        // "pensando" ANTES del JSON; con poco cupo agotaban el presupuesto razonando y emitían
-        // JSON vacío/truncado → el mapa temático caía siempre al fallback. Es solo un tope: los
-        // modelos sin razonamiento paran al terminar, así que no encarece.
-        maxTokens: 5000, signal: abortCtrl.signal,
-      });
-      tree = extractJson(raw);
-    } catch (e) { if (e.name === 'AbortError') throw e; }
-    tree = normalizeTree(tree, capped, scopeName);
-    lastTree = tree;
-    renderResult(tree, scopeName);
-  } catch (e) {
-    if (e.name !== 'AbortError') { console.error('Mapa mental falló:', e); showError(e.message); }
-  } finally {
-    generating = false; abortCtrl = null;
-    const b2 = body()?.querySelector('#mm-generate');
-    if (b2) { b2.disabled = false; b2.innerHTML = `${icon('sparkles', { size: 16 })} Generar mapa`; }
+  const act = Jobs.activeJob();
+  if (act && act.status === 'running' && !(act.kind === KIND && act.bookId === ctx.bookId)) {
+    if (!window.confirm(`Ya se está generando ${act.label}. ¿Cancelarlo y empezar el mapa?`)) return;
   }
+  showError('');
+  Jobs.start({
+    bookId: ctx.bookId, kind: KIND, label: 'el mapa mental',
+    params: { scopeName },
+    run: ({ signal, progress }) => runMindmap({ chunks, goal, scopeName, signal, progress }),
+  });
+  renderRunning(Jobs.activeJob());
+}
+
+// Map (conceptos citados por trozo) + reduce (árbol JSON), desacoplado del modal.
+async function runMindmap({ chunks, goal, scopeName, signal, progress }) {
+  const bullets = [];
+  for (let i = 0; i < chunks.length; i++) {
+    const raw = await LLM.chatStream({
+      messages: [
+        { role: 'system', content: mapPrompt(goal) },
+        { role: 'user', content: 'PASAJES DEL LIBRO:\n\n' + chunks[i].text },
+      ],
+      maxTokens: 1500, signal,   // holgura para modelos de razonamiento
+    });
+    for (const line of String(raw || '').split('\n')) {
+      const t = line.trim();
+      if (t.startsWith('- ') || t.startsWith('* ')) bullets.push(t.slice(2).trim());
+    }
+    progress(i + 1, chunks.length, 'map');
+  }
+  if (!bullets.length) throw new Error('El modelo no devolvió contenido. Vuelve a intentarlo.');
+  // Un buen mapa es conciso: acota las viñetas (muestreo uniforme) para que el JSON del reduce
+  // quepa holgado —no se trunca ni cae al fallback— y el mapa no se sature de hojas.
+  const capped = capBullets(bullets, 20);
+
+  progress(chunks.length, chunks.length, 'reduce');
+  let tree = null;
+  try {
+    const raw = await LLM.chatStream({
+      messages: [
+        { role: 'system', content: treePrompt(scopeName, goal) },
+        { role: 'user', content: capped.join('\n') },
+      ],
+      // Alto a propósito: los modelos de razonamiento gastan miles de tokens "pensando" antes
+      // del JSON; con poco cupo emitían JSON vacío/truncado → el mapa temático caía al fallback.
+      maxTokens: 5000, signal,
+    });
+    tree = extractJson(raw);
+  } catch (e) { if (e.name === 'AbortError') throw e; }
+  return normalizeTree(tree, capped, scopeName);
+}
+
+// Vista "en curso": progreso + "Seguir leyendo" / "Cancelar", suscrita a Jobs.
+function renderRunning(job) {
+  const b = body();
+  if (!b || !job) { renderSetup(); return; }
+  b.innerHTML = `
+    <h2>Generando mapa mental…</h2>
+    <p class="ai-run-status" id="mm-run-status" role="status"></p>
+    <div class="ai-run-actions">
+      <button id="mm-keep" class="primary-btn">${icon('book', { size: 16 })} Seguir leyendo</button>
+      <button id="mm-cancel" class="ai-ob-back fc-txt-btn">Cancelar</button>
+    </div>
+    <p class="sum-depth-hint">Puedes cerrar esta ventana y seguir leyendo: te avisaremos cuando el mapa esté listo.</p>`;
+  const status = b.querySelector('#mm-run-status');
+  const paint = (j) => {
+    if (!overlay) return;
+    if (!j || j.status === 'cancelled') { if (runUnsub) { runUnsub(); runUnsub = null; } renderSetup(); return; }
+    if (j.kind !== KIND) return;
+    if (j.status === 'running') {
+      status.textContent = j.progress.phase === 'reduce'
+        ? 'Organizando el mapa…'
+        : `Trazando el mapa… ${j.progress.i}/${j.progress.n || '·'}`;
+    } else if (j.status === 'done') {
+      if (runUnsub) { runUnsub(); runUnsub = null; }
+      const c = Jobs.cached(ctx.bookId, KIND);
+      renderResult(c ? c.result : j.result, c ? c.params.scopeName : (j.params?.scopeName || 'Libro'));
+    } else if (j.status === 'error') {
+      if (runUnsub) { runUnsub(); runUnsub = null; }
+      renderSetup();
+      showError(j.error?.message || 'No se pudo generar el mapa.');
+    }
+  };
+  b.querySelector('#mm-keep').addEventListener('click', () => closeModal());
+  b.querySelector('#mm-cancel').addEventListener('click', () => Jobs.cancel());
+  if (runUnsub) runUnsub();
+  runUnsub = Jobs.subscribe(paint);
 }
 
 // Valida/normaliza el árbol temático del modelo; si falta o es inválido, cae a un mapa
@@ -418,8 +462,13 @@ function buildSvg(tree) {
 function renderResult(tree, scopeName) {
   const b = body();
   if (!b) return;
+  lastTree = tree;
+  Jobs.clearActive();          // el usuario está viendo el resultado → retira chip/aviso
   b.innerHTML = `
-    <button class="ai-ob-back">${icon('chevron-left', { size: 16 })}<span>Volver</span></button>
+    <div class="sum-resulthead">
+      <button class="ai-ob-back">${icon('chevron-left', { size: 16 })}<span>Volver</span></button>
+      <button id="mm-regen" class="fc-txt-btn">${icon('sparkles', { size: 14 })} Regenerar</button>
+    </div>
     <h2>Mapa mental — ${escapeHtml(scopeName)}</h2>
     <div class="mm-canvas" id="mm-canvas"></div>
     <div class="fc-export">
@@ -427,6 +476,7 @@ function renderResult(tree, scopeName) {
       <button id="mm-svg" class="ai-ob-back fc-txt-btn">SVG</button>
     </div>`;
   b.querySelector('.ai-ob-back').addEventListener('click', renderSetup);
+  b.querySelector('#mm-regen').addEventListener('click', renderSetup);
   const holder = b.querySelector('#mm-canvas');
   const built = buildSvg(tree);
   lastSvg = built.svg; lastDims = { width: built.width, height: built.height };

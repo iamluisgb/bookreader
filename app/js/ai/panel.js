@@ -22,6 +22,8 @@ import * as Backup from '../backup.js';
 import * as Flashcards from './flashcards.js';
 import * as Summary from './summary.js';
 import * as MindMap from './mindmap.js';
+import * as Jobs from './jobs.js';
+import * as JobsUI from './jobs-ui.js';
 import * as Storage from '../storage.js';
 import * as QueryExpand from './query-expand.js';
 
@@ -106,6 +108,11 @@ export function init(opts) {
   els.panel.querySelector('#ai-convo-cards').addEventListener('click', openFlashcards);
   els.panel.querySelector('#ai-convo-summary').addEventListener('click', openSummary);
   els.panel.querySelector('#ai-convo-mindmap').addEventListener('click', openMindMap);
+  // Trabajos de IA en segundo plano (resumen/mapa): chip flotante + toast de aviso. Los
+  // "openers" reabren el modal reconstruyendo el contexto del libro actual.
+  JobsUI.setOpener('summary', openSummary);
+  JobsUI.setOpener('mindmap', openMindMap);
+  JobsUI.init();
   document.addEventListener('click', (e) => {
     if (convoMenuEl && !convoMenuEl.contains(e.target) && !e.target.closest('#ai-convo-btn')) closeConvoMenu();
   });
@@ -305,6 +312,8 @@ export async function setBook(b, id, title, opts = {}) {
   // Aborta cualquier turno del agente en vuelo del libro anterior: su respuesta ya no
   // aplica al libro que abrimos. El guard `bookSeq` (abajo) evita además que persista.
   try { abortCtrl?.abort(); } catch (e) { /* sin petición en curso */ }
+  // Cancela un resumen/mapa en segundo plano del libro anterior: su índice ya no aplica.
+  Jobs.cancelForBookChange(id || null);
   busy = false;
   book = b; bookId = id || null; bookTitle = title || 'Libro';
   bookFormat = opts.format || 'epub'; tocLabels = [];
