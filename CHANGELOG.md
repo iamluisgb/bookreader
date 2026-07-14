@@ -13,7 +13,9 @@ de la del resumen. Ahora la tarjeta arranca cómoda (680px, igual que `sum-card`
 a 900px para el resultado** (donde el SVG lo pide).
 
 - **`mindmap.js`**: `setWide(false)` en setup y "en curso"; `setWide(true)` en el resultado.
-- **`main.css`**: `.mm-card` por defecto 680px; `.mm-card--wide` para el resultado. SW `v87`.
+- **`main.css`**: `.mm-card` por defecto 680px; `.mm-card--wide` para el resultado. Además, aire
+  entre el selector y el botón "Generar mapa" (`.mm-card .ai-ob-start { margin-top }`), que en el
+  resumen daba el texto de ayuda y el mapa no tenía → salían pegados. SW `v88`.
 
 ---
 

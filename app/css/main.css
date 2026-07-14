@@ -1375,6 +1375,8 @@ body.resizing-panel .reader-main { transition: none !important; }
 /* Setup/en curso: tarjeta cómoda como la del resumen. El resultado (SVG grande) la ensancha. */
 .mm-card { max-width: 680px; max-height: 92vh; overflow: auto; }
 .mm-card.mm-card--wide { max-width: 92vw; width: 900px; }
+/* El mapa no tiene el texto de ayuda que en el resumen separa el select del botón: dale aire. */
+.mm-card .ai-ob-start { margin-top: 20px; }
 .mm-canvas { margin: 8px 0; border: 1px solid var(--border); border-radius: 12px; overflow: auto; background: #faf8f3; }
 .mm-canvas svg { display: block; width: 100%; height: auto; }
 .mm-cite:hover rect { stroke-width: 2.5; }
