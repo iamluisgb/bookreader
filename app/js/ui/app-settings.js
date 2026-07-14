@@ -479,6 +479,7 @@ function dataHtml() {
       <button id="appset-drive-save" class="primary-btn appset-save">${icon('upload', { size: 15 })} Guardar en Drive</button>
       <button id="appset-drive-restore" class="appset-tpl-cancel appset-data-md">${icon('download', { size: 15 })} Restaurar desde Drive</button>
       <button id="appset-drive-history" class="appset-tpl-cancel appset-data-md">${icon('sort', { size: 15 })} Historial de versiones</button>
+      <button id="appset-drive-purge" class="appset-tpl-cancel appset-data-md">${icon('trash', { size: 15 })} Limpiar entradas huérfanas</button>
       <button id="appset-drive-disconnect" class="appset-tpl-cancel appset-data-md">Desconectar</button>
     </div>
     <p class="appset-data-msg" id="appset-data-msg" hidden></p>
@@ -574,6 +575,20 @@ function wireDrive(content, show) {
         content.querySelector('#appset-drive-reload').addEventListener('click', () => location.reload());
       })
       .catch(fail('No se pudo restaurar'));
+  });
+
+  content.querySelector('#appset-drive-purge').addEventListener('click', async () => {
+    const yes = await confirmBox(
+      'Quita del historial de Drive las entradas “Sin título” bajo identidades viejas (de epub.js o del nombre de fichero), restos de versiones anteriores. No toca tus libros actuales. Es irreversible y puede perder subrayados muy antiguos que nunca se migraron. Te recomiendo “Descargar backup (JSON)” antes.',
+      { title: 'Limpiar entradas huérfanas', okText: 'Limpiar', cancelText: 'Cancelar', danger: true }
+    );
+    if (!yes) return;
+    show('Limpiando…');
+    try {
+      const r = await Recovery.purgeOrphans();
+      SyncEngine.syncNow();   // propaga el manifest limpio al resto de dispositivos
+      show(`${icon('check', { size: 14 })} Limpieza hecha: ${r.removed} ${r.removed === 1 ? 'entrada quitada' : 'entradas quitadas'}.`);
+    } catch (e) { fail('No se pudo limpiar')(e); }
   });
 
   wireRecovery(content, show, fail);

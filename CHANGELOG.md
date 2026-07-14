@@ -5,6 +5,24 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-14 — Recuperación: purga de entradas huérfanas del manifest de Drive
+
+Las entradas “Sin título” del historial de Drive eran restos de esquemas de identidad viejos:
+claves `highlights_`/`bookmarks_` bajo ids **no canónicos** —`epubjs:0.3:…` (book.key() de epub.js)
+o el **nombre de fichero**— que `buildSnapshot` convierte en “libros” del manifest, sin título
+(el título solo lo pone la biblioteca). Persistían porque la migración a hash solo corre al abrir
+un libro (y solo migraba el nombre de fichero) y el sync nunca poda entradas remotas.
+
+- **`recovery.js`**: `purgeOrphans()` borra de Drive (manifest + fichero) y de localStorage las
+  entradas bajo ids no canónicos. **Solo** ids no-hash (epubjs/nombre): **nunca** los hash de 64
+  hex (canónicos → posible data de otro dispositivo). Destructivo (pierde subrayados viejos no
+  migrados que colgaran de esos ids).
+- **`app-settings.js`**: botón **“Limpiar entradas huérfanas”** en Datos → Google Drive, con
+  confirmación destructiva y recordatorio de backup; tras limpiar, sincroniza el manifest limpio.
+- **`tests/purge-orphans.spec.ts`** (nuevo): quita epubjs/nombre, conserva el hash. SW `v86`.
+
+---
+
 ## 2026-07-14 — Repaso: árbol estantería→libros (estilo Anki)
 
 El selector de "Repasar hoy" solo dejaba elegir estantería (o Todo). Ahora es un **árbol** como

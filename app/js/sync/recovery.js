@@ -43,6 +43,44 @@ export async function listBooks() {
     .sort((a, b) => (b.title ? 1 : 0) - (a.title ? 1 : 0) || b.updatedAt - a.updatedAt);
 }
 
+// Un id canónico de libro es el hash SHA-256 (64 hex) del contenido. Todo lo demás
+// (`epubjs:0.3:…` de epub.js, nombres de fichero) son ids de esquemas de identidad viejos.
+const isCanonicalId = (id) => /^[0-9a-f]{64}$/i.test(id);
+
+// Purga de mantenimiento: elimina de Drive (manifest + fichero de libro) y de localStorage las
+// entradas de "libro" bajo ids NO canónicos —restos de esquemas viejos (epubjs:…, nombre de
+// fichero) que ensucian Recuperación con "Sin título". NO toca los ids hash (canónicos: podrían
+// ser datos reales de otro dispositivo). Destructivo: pierde subrayados/marcadores viejos que
+// nunca se migraron y colgaran de esos ids. Devuelve cuántas entradas se quitaron.
+export async function purgeOrphans() {
+  const m = await Drive.read(BASE + 'manifest.json');
+  const manifest = m ? JSON.parse(m.content) : { books: {} };
+  const remoteOrphans = Object.keys(manifest.books || {}).filter(id => !isCanonicalId(id));
+
+  // Reúne también las claves locales huérfanas (aunque no estén en el manifest remoto).
+  const ids = new Set(remoteOrphans);
+  for (const key of Object.keys(Storage.getAll(''))) {
+    const mk = key.match(/^(?:highlights|bookmarks)_(.+)$/);
+    if (mk && !isCanonicalId(mk[1])) ids.add(mk[1]);
+  }
+
+  // 1) Borra las claves locales para que buildSnapshot no las vuelva a subir.
+  for (const id of ids) { Storage.remove('highlights_' + id); Storage.remove('bookmarks_' + id); }
+
+  // 2) Borra de Drive los ficheros de libro huérfanos y quítalos del manifest.
+  for (const id of remoteOrphans) {
+    try { await Drive.remove(bookPath(id)); } catch { /* puede no existir ya */ }
+    delete manifest.books[id];
+  }
+
+  // 3) Reescribe el manifest sin los huérfanos (ifMatch: si un sync escribió en medio, falla y se
+  //    reintenta en vez de pisarlo).
+  if (m && remoteOrphans.length) {
+    await Drive.write(BASE + 'manifest.json', JSON.stringify(manifest), { ifMatch: m.etag });
+  }
+  return { removed: ids.size, ids: [...ids] };
+}
+
 // Versiones de un libro, más recientes primero.
 export async function listVersions(bookId) {
   const r = await Drive.listRevisions(bookPath(bookId));
