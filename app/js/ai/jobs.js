@@ -7,9 +7,11 @@
 // La UI (chip flotante + toast) vive en jobs-ui.js; los modales (summary/mindmap) aportan la
 // función `run` (el bucle map-reduce) y reabren su resultado desde la caché.
 
+import * as DB from './db.js';
+
 const listeners = new Set();
 let active = null;              // job en curso o recién terminado, hasta que el usuario lo consume
-const cache = new Map();        // `${bookId}:${kind}` -> { result, params, at }
+const cache = new Map();        // `${bookId}:${kind}` -> { result, params, at }  (espejo en memoria de IndexedDB)
 let seq = 0;
 
 // job = { id, bookId, kind, label, params, run, status, progress:{i,n,phase}, result, error, abortCtrl }
@@ -19,6 +21,22 @@ function emit() { for (const fn of listeners) { try { fn(active); } catch { /* n
 export function subscribe(fn) { listeners.add(fn); fn(active); return () => listeners.delete(fn); }
 export function activeJob() { return active; }
 export function cached(bookId, kind) { return cache.get(`${bookId}:${kind}`) || null; }
+
+// Al abrir un libro: trae de IndexedDB sus artefactos ya generados (resumen/mapa) al espejo en
+// memoria, para que `cached()` los sirva al instante en la apertura del modal. No pisa un
+// resultado más reciente que ya esté en memoria (recién generado en esta sesión).
+export async function loadForBook(bookId) {
+  if (!bookId) return;
+  try {
+    const arts = await DB.getArtifacts(bookId);
+    for (const a of arts) {
+      const k = `${a.bookId}:${a.kind}`;
+      const at = a.updatedAt || a.createdAt || 0;
+      const ex = cache.get(k);
+      if (!ex || (ex.at || 0) < at) cache.set(k, { result: a.result, params: a.params, at });
+    }
+  } catch { /* IDB no disponible */ }
+}
 
 export function start({ bookId, kind, label, params, run }) {
   if (active && active.status === 'running') active.abortCtrl.abort();   // exclusividad: uno a la vez
@@ -38,6 +56,7 @@ export function start({ bookId, kind, label, params, run }) {
       if (job.abortCtrl.signal.aborted) { active = null; emit(); return; }
       job.status = 'done'; job.result = result;
       cache.set(`${bookId}:${kind}`, { result, params, at: Date.now() });
+      DB.putArtifact({ bookId, kind, result, params }).catch(() => { /* IDB no disponible: queda en memoria */ });
       emit();
     } catch (e) {
       if (active !== job) return;

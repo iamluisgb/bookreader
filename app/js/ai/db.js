@@ -11,14 +11,17 @@
 //   sessions (keyPath bookId)  -> LEGACY (v<=3): { bookId, templateId, goal, createdAt } — solo para migrar
 //   ratings  (keyPath bookId)  -> { bookId, goal, scores }  (la clave ahora es convoId)
 //   decks    (keyPath id, ++)  -> { id, bookId, name, cardType, scope, cards, createdAt } [index: bookId]
+//   artifacts(keyPath key)     -> { key:`${bookId}:${kind}`, bookId, kind, result, params, segVersion, createdAt } [index: bookId]
 //
 // v4: una conversación (convo) por objetivo; varias por libro. messages/notes
 // se indexan por convoId. Las conversaciones antiguas (sessions, una por libro)
 // se migran a una convo en migrateBook().
 // v5: decks — mazos de flashcards generados (feature de export a Anki).
+// v6: artifacts — resúmenes y mapas mentales generados, cacheados para no re-generar
+// (coste LLM) al reabrir o recargar. Se validan contra SEG_VERSION.
 
 const DB_NAME = 'bookreader_ai';
-const DB_VERSION = 5;
+const DB_VERSION = 6;
 
 let dbPromise = null;
 
@@ -56,6 +59,10 @@ function open() {
       if (!db.objectStoreNames.contains('decks')) {
         const d = db.createObjectStore('decks', { keyPath: 'id', autoIncrement: true });
         d.createIndex('bookId', 'bookId', { unique: false });
+      }
+      if (!db.objectStoreNames.contains('artifacts')) {
+        const a = db.createObjectStore('artifacts', { keyPath: 'key' });
+        a.createIndex('bookId', 'bookId', { unique: false });
       }
     };
     req.onsuccess = () => resolve(req.result);
@@ -365,6 +372,29 @@ export async function saveSegmented(bookId, title, seg) {
     blockCount: seg.blockCount,
   });
   await put('anchors', { bookId, entries: [...seg.anchors.entries()] });
+}
+
+// Artefactos generados (resumen, mapa mental) --------------------------------
+// Cacheados para no re-generar (coste LLM) al reabrir el modal o recargar la app. Clave
+// `${bookId}:${kind}`. Se validan contra SEG_VERSION: si el libro se re-segmentó (anclas
+// nuevas), las citas del artefacto viejo ya no casan → se ignora (y se re-generará).
+
+export function getArtifacts(bookId) {
+  return tx('artifacts', 'readonly', s => reqP(s.index('bookId').getAll(bookId)))
+    .then(list => (list || []).filter(a => a.segVersion === SEG_VERSION));
+}
+
+export function putArtifact({ bookId, kind, result, params }) {
+  const now = Date.now();
+  return put('artifacts', {
+    key: `${bookId}:${kind}`, uid: crypto.randomUUID(),
+    bookId, kind, result, params: params || {}, segVersion: SEG_VERSION,
+    createdAt: now, updatedAt: now,
+  });
+}
+
+export function deleteArtifact(bookId, kind) {
+  return tx('artifacts', 'readwrite', s => reqP(s.delete(`${bookId}:${kind}`)));
 }
 
 // Utilidad: SHA-256 del arrayBuffer del fichero -> id estable del libro.

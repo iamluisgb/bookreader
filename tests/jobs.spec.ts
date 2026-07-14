@@ -81,6 +81,30 @@ test('seguir leyendo mientras genera, aviso al terminar y reabrir', async ({ pag
   await expect(page.locator('#ai-summary #sum-generate')).toHaveCount(0);   // no es la vista de setup
 });
 
+test('el resumen se persiste en IndexedDB y se restaura al reabrir el libro', async ({ page }) => {
+  await setup(page);
+  await page.click('#ai-convo-summary');
+  await page.waitForSelector('#ai-summary', { timeout: 5000 });
+  await page.click('#sum-generate');
+  await expect(page.locator('#ai-summary .sum-doc')).toContainText('pueblo de muertos', { timeout: 15000 });
+
+  // Está escrito en el store `artifacts` (sobrevive a recargas/cierres).
+  const persisted = await page.evaluate(async () => {
+    const DB: any = await import('/js/ai/db.js');
+    const arts = await DB.getAll('artifacts');
+    return arts.map((a: any) => ({ kind: a.kind, has: String(a.result).includes('pueblo de muertos'), bookId: a.bookId }));
+  });
+  expect(persisted.some((a: any) => a.kind === 'summary' && a.has)).toBe(true);
+
+  // loadForBook (que corre al abrir un libro) rellena el caché desde IndexedDB → reabrir instantáneo.
+  const restored = await page.evaluate(async (bookId: string) => {
+    const Jobs: any = await import('/js/ai/jobs.js');
+    await Jobs.loadForBook(bookId);
+    return !!Jobs.cached(bookId, 'summary');
+  }, persisted.find((a: any) => a.kind === 'summary').bookId);
+  expect(restored).toBe(true);
+});
+
 test('cancelar desde el chip detiene la generación', async ({ page }) => {
   await setup(page);
   await page.click('#ai-convo-summary');

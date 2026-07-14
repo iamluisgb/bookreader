@@ -5,6 +5,22 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-14 — Persistencia de resúmenes y mapas mentales (IndexedDB)
+
+El caché de resúmenes/mapas era solo en memoria → se perdía al recargar o cerrar (y había que
+re-generar, pagando LLM). Ahora se persisten en IndexedDB y sobreviven a cierres/recargas.
+
+- **`db.js` v6**: nuevo store **`artifacts`** (keyPath `${bookId}:${kind}`, índice `bookId`) con
+  `getArtifacts` / `putArtifact` / `deleteArtifact`. Se validan contra **`SEG_VERSION`**: si el
+  libro se re-segmenta (anclas nuevas), el artefacto viejo se descarta (evita citas rotas).
+- **`jobs.js`**: al terminar un trabajo escribe el resultado en `artifacts`; `loadForBook(bookId)`
+  trae los ya generados al espejo en memoria (sin pisar uno más reciente de la sesión).
+- **`panel.js`**: `Jobs.loadForBook(bookId)` en `setBook` → al abrir un libro, sus resúmenes/mapas
+  ya generados están disponibles para reabrir al instante.
+- Tests: persistencia en `artifacts` + restauración vía `loadForBook`. SW `v74`.
+
+---
+
 ## 2026-07-14 — Resumen y mapa mental NO BLOQUEANTES ("sigue leyendo, te aviso")
 
 Generar un resumen/mapa (1-4 min, varias llamadas al LLM) bloqueaba: había que mirar el modal

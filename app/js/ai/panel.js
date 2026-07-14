@@ -316,6 +316,7 @@ export async function setBook(b, id, title, opts = {}) {
   Jobs.cancelForBookChange(id || null);
   busy = false;
   book = b; bookId = id || null; bookTitle = title || 'Libro';
+  Jobs.loadForBook(bookId);   // trae resúmenes/mapas ya generados de IndexedDB (reabrir instantáneo)
   bookFormat = opts.format || 'epub'; tocLabels = [];
   // "Explicar lo que veo" (visión) solo tiene sentido en PDF (renderizamos su canvas).
   if (els.see) els.see.style.display = bookFormat === 'pdf' ? '' : 'none';
