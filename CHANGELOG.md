@@ -5,6 +5,23 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-14 — Sync: timeout por petición + historial navegable
+
+Dos defectos reportados en la vista de Datos → Google Drive:
+
+- **"Sincronizando…" que nunca acaba.** Los `fetch` a Drive no tenían timeout ni abort: una
+  petición estancada (red inestable, portal cautivo, Drive lento) dejaba el ciclo colgado para
+  siempre, el badge no se limpiaba y —lo peor— el **Web Lock quedaba retenido**, así que ninguna
+  pestaña podía volver a sincronizar hasta recargar. `drive-provider.js`: cada petición lleva ahora
+  un `AbortController` con techo de **30 s**; al abortar, el ciclo lanza error → `syncNow` pasa a
+  `'error'`, libera el lock y el intervalo reintenta a los 90 s.
+- **Historial de versiones sin salida y con scroll minúsculo.** `app-settings.js`: cabecera con
+  botón **← Volver** (versiones → libros) y **Cerrar** (libros → oculto); las filas de versiones se
+  contienen ahora en `.appset-history-list` con scroll propio (antes solo scrolleaba la lista de
+  libros, y las versiones desbordaban el modal). SW `v77`.
+
+---
+
 ## 2026-07-14 — Identidad de libro unificada (subrayados/marcadores → hash)
 
 Causa de fondo del manifest de sync ensuciado: subrayados y marcadores se keyeaban con el

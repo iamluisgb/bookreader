@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BookReader — Importar notas O'Reilly</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, system-ui, sans-serif; background: #0d1117; color: #c9d1d9;
+         padding: 2rem; max-width: 900px; margin: 0 auto; line-height: 1.5; }
+  h1 { color: #58a6ff; margin-bottom: 0.5rem; font-size: 1.4rem; }
+  .subtitle { color: #8b949e; margin-bottom: 1.5rem; font-size: 0.9rem; }
+  .upload-row { display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
+  .upload-box { flex: 1; min-width: 200px; border: 2px dashed #30363d; border-radius: 8px;
+                padding: 1.2rem; text-align: center; cursor: pointer; transition: border-color 0.2s; }
+  .upload-box:hover { border-color: #58a6ff; }
+  .upload-box input[type=file] { display: none; }
+  .upload-box .label { font-size: 0.9rem; color: #8b949e; }
+  .upload-box .filename { color: #58a6ff; font-weight: 600; margin-top: 0.3rem; }
+  #book-id-input { width: 100%; padding: 0.6rem; border: 1px solid #30363d; border-radius: 6px;
+                   background: #161b22; color: #c9d1d9; font-size: 0.9rem; margin-bottom: 1rem; }
+  #book-id-input:focus { outline: none; border-color: #58a6ff; }
+  button { padding: 0.6rem 1.2rem; border: none; border-radius: 6px; cursor: pointer;
+           font-size: 0.9rem; font-weight: 600; transition: background 0.2s; }
+  .btn-primary { background: #238636; color: #fff; }
+  .btn-primary:hover { background: #2ea043; }
+  .btn-primary:disabled { background: #21262d; color: #484f58; cursor: not-allowed; }
+  .btn-import { background: #1f6feb; color: #fff; margin-top: 0.5rem; }
+  .btn-import:hover { background: #388bfd; }
+  .btn-import:disabled { background: #21262d; color: #484f58; cursor: not-allowed; }
+  #status { margin-top: 1rem; padding: 0.8rem; background: #161b22; border-radius: 6px;
+            font-size: 0.85rem; display: none; }
+  #status.show { display: block; }
+  #status.error { color: #f85149; }
+  #status.success { color: #3fb950; }
+  #status.info { color: #58a6ff; }
+  #progress-bar { width: 100%; height: 6px; background: #21262d; border-radius: 3px;
+                  margin-top: 0.5rem; overflow: hidden; display: none; }
+  #progress-bar.show { display: block; }
+  #progress-fill { height: 100%; background: #58a6ff; width: 0%; transition: width 0.3s; }
+  #results { margin-top: 1.5rem; display: none; }
+  #results.show { display: block; }
+  #summary { padding: 1rem; background: #161b22; border-radius: 6px; margin-bottom: 1rem; font-size: 0.9rem; }
+  #summary .count { font-weight: 700; color: #3fb950; }
+  #summary .missing-count { font-weight: 700; color: #f85149; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+  th { text-align: left; padding: 0.5rem; background: #161b22; color: #8b949e;
+       border-bottom: 1px solid #30363d; position: sticky; top: 0; }
+  td { padding: 0.5rem; border-bottom: 1px solid #21262d; vertical-align: top; }
+  tr.found td:first-child { border-left: 3px solid #3fb950; }
+  tr.missing td:first-child { border-left: 3px solid #f85149; }
+  .hl-text { max-width: 350px; overflow: hidden; text-overflow: ellipsis;
+             white-space: nowrap; color: #c9d1d9; }
+  .hl-text.expanded { white-space: normal; }
+  .color-dot { display: inline-block; width: 14px; height: 14px; border-radius: 3px;
+               vertical-align: middle; border: 1px solid #30363d; }
+  .page-badge { background: #21262d; padding: 2px 6px; border-radius: 4px; font-weight: 600; }
+  .note-text { color: #8b949e; font-style: italic; }
+  #btn-expand-all { font-size: 0.8rem; padding: 0.3rem 0.6rem; margin-bottom: 0.5rem;
+                    background: #21262d; color: #8b949e; border: 1px solid #30363d; }
+  #btn-expand-all:hover { color: #c9d1d9; background: #30363d; }
+  .code-block { background: #161b22; padding: 1rem; border-radius: 6px;
+                font-family: monospace; font-size: 0.8rem; white-space: pre-wrap;
+                color: #c9d1d9; max-height: 300px; overflow-y: auto;
+                border: 1px solid #30363d; margin-top: 0.5rem; }
+  #import-code { display: none; margin-top: 1rem; }
+  #import-code.show { display: block; }
+  .hint { color: #8b949e; font-size: 0.8rem; margin-top: 0.3rem; }
+  .color-map { font-size: 0.8rem; color: #8b949e; margin-top: 0.3rem; }
+</style>
+</head>
+<body>
+
+<h1>Importar notas de O'Reilly a BookReader</h1>
+<p class="subtitle">Busca cada highlight del CSV en el PDF y crea subrayados nativos con página y posición.</p>
+
+<div class="upload-row">
+  <div class="upload-box" id="csv-drop">
+    <input type="file" id="csv-file" accept=".csv">
+    <div class="label">CSV de O'Reilly</div>
+    <div class="filename" id="csv-name">Ninguno seleccionado</div>
+  </div>
+  <div class="upload-box" id="pdf-drop">
+    <input type="file" id="pdf-file" accept=".pdf">
+    <div class="label">PDF del libro</div>
+    <div class="filename" id="pdf-name">Ninguno seleccionado</div>
+  </div>
+</div>
+
+<label style="font-size:0.85rem;color:#8b949e;">Book ID de BookReader (lo que aparece en localStorage):</label>
+<input type="text" id="book-id-input" placeholder="ej: knowledge-graphs-and-llms" spellcheck="false">
+<p class="hint">En BookReader, el bookId se muestra en el título de la pestaña o en la clave <code>bookreader_highlights_*</code> de localStorage.</p>
+<p class="hint color-map">Colores O'Reilly → BookReader: YELLOW=#ffeb3b RED=#ff5252 BLUE=#42a5f5 GREEN=#66bb6a PINK=#f06292 ORANGE=#ffa726</p>
+
+<button class="btn-primary" id="btn-search" disabled>Buscar highlights en el PDF</button>
+
+<div id="status"></div>
+<div id="progress-bar"><div id="progress-fill"></div></div>
+
+<div id="results">
+  <div id="summary"></div>
+  <button id="btn-expand-all">Expandir todo</button>
+  <div style="max-height:500px;overflow-y:auto;">
+    <table>
+      <thead><tr><th>Texto</th><th>Color</th><th>Pág</th><th>Capítulo</th><th>Nota</th></tr></thead>
+      <tbody id="results-body"></tbody>
+    </table>
+  </div>
+</div>
+
+<div id="import-code">
+  <button class="btn-import" id="btn-import" disabled>Copiar y ejecutar en consola de BookReader</button>
+  <p class="hint">Abre BookReader con el libro cargado, abre la consola del navegador (F12), pega el código y ejecútalo.</p>
+  <div class="code-block" id="import-block"></div>
+</div>
+
+<script src="../vendor/pdf-3.11.174.min.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  // --- pdf.js worker setup (must be before any getDocument call) ---
+  if (typeof pdfjsLib !== 'undefined') {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = '../vendor/pdf.worker-3.11.174.min.js';
+  }
+
+  // --- State ---
+  let csvData = null;
+  let pdfBuffer = null;
+  let results = [];
+
+  // --- DOM ---
+  const csvFile = document.getElementById('csv-file');
+  const pdfFile = document.getElementById('pdf-file');
+  const csvDrop = document.getElementById('csv-drop');
+  const pdfDrop = document.getElementById('pdf-drop');
+  const csvName = document.getElementById('csv-name');
+  const pdfName = document.getElementById('pdf-name');
+  const bookIdInput = document.getElementById('book-id-input');
+  const btnSearch = document.getElementById('btn-search');
+  const btnImport = document.getElementById('btn-import');
+  const statusEl = document.getElementById('status');
+  const progressBar = document.getElementById('progress-bar');
+  const progressFill = document.getElementById('progress-fill');
+  const resultsEl = document.getElementById('results');
+  const summaryEl = document.getElementById('summary');
+  const tbody = document.getElementById('results-body');
+  const importCode = document.getElementById('import-code');
+  const importBlock = document.getElementById('import-block');
+  const btnExpandAll = document.getElementById('btn-expand-all');
+
+  // --- Color mapping ---
+  const COLOR_MAP = {
+    YELLOW: '#ffeb3b', RED: '#ff5252', BLUE: '#42a5f5',
+    GREEN: '#66bb6a', PINK: '#f06292', ORANGE: '#ffa726',
+    '#ffeb3b': '#ffeb3b', '#ff5252': '#ff5252', '#42a5f5': '#42a5f5',
+    '#66bb6a': '#66bb6a', '#f06292': '#f06292', '#ffa726': '#ffa726',
+  };
+
+  function mapColor(c) { return COLOR_MAP[(c || '').toUpperCase().trim()] || '#ffeb3b'; }
+
+  // --- CSV Parser (handles quoted fields with newlines) ---
+  function parseCSV(text) {
+    const rows = [];
+    let row = [], field = '', inQ = false;
+    for (let i = 0; i < text.length; i++) {
+      const ch = text[i];
+      if (inQ) {
+        if (ch === '"' && text[i + 1] === '"') { field += '"'; i++; }
+        else if (ch === '"') inQ = false;
+        else field += ch;
+      } else {
+        if (ch === '"') inQ = true;
+        else if (ch === ',') { row.push(field); field = ''; }
+        else if (ch === '\n' || (ch === '\r' && text[i + 1] === '\n')) {
+          if (ch === '\r') i++;
+          row.push(field); field = '';
+          if (row.length > 1 && row.some(f => f.trim())) rows.push(row);
+          row = [];
+        } else field += ch;
+      }
+    }
+    row.push(field);
+    if (row.length > 1 && row.some(f => f.trim())) rows.push(row);
+    return rows;
+  }
+
+  // --- Unicode normalization for text matching ---
+  function normText(s) {
+    return (s || '')
+      .replace(/[\u2018\u2019\u201A\uFFFD]/g, "'")
+      .replace(/[\u201C\u201D\u201E\u00AB\u00BB\u201F]/g, '"')
+      .replace(/[\u2013\u2014\u2012\u2015]/g, '-')
+      .replace(/\u2026/g, '...')
+      .replace(/\u00A0/g, ' ')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[\u2022\u25AA\u25AB\u25E6\u2023\u2043\u2219\uF0A7\u204B]/g, '') // bullets & list markers
+      .replace(/-\s+/g, '')       // 1. dehyphenate line-break hyphens ("struc- tures" → "structures")
+      .replace(/\s*-\s*/g, '-')   // 2. normalize spaces around remaining hyphens ("reduction —They" → "reduction-They")
+      .replace(/\s+/g, ' ').trim().toLowerCase();
+  }
+
+  // --- File upload handlers ---
+  function setupUpload(dropEl, fileEl, nameEl, onFile) {
+    dropEl.addEventListener('click', () => fileEl.click());
+    dropEl.addEventListener('dragover', e => { e.preventDefault(); dropEl.style.borderColor = '#58a6ff'; });
+    dropEl.addEventListener('dragleave', () => { dropEl.style.borderColor = '#30363d'; });
+    dropEl.addEventListener('drop', e => {
+      e.preventDefault(); dropEl.style.borderColor = '#30363d';
+      const f = e.dataTransfer.files[0]; if (f) { fileEl.files = [f]; onFile(f); }
+    });
+    fileEl.addEventListener('change', () => { if (fileEl.files[0]) onFile(fileEl.files[0]); });
+  }
+
+  setupUpload(csvDrop, csvFile, csvName, f => {
+    csvName.textContent = f.name;
+    const r = new FileReader();
+    r.onload = () => { csvData = parseCSV(r.result); checkReady(); };
+    r.readAsText(f);
+  });
+
+  setupUpload(pdfDrop, pdfFile, pdfName, f => {
+    pdfName.textContent = f.name;
+    const r = new FileReader();
+    r.onload = () => { pdfBuffer = r.result; checkReady(); };
+    r.readAsArrayBuffer(f);
+  });
+
+  function checkReady() {
+    btnSearch.disabled = !(csvData && pdfBuffer && bookIdInput.value.trim());
+  }
+  bookIdInput.addEventListener('input', checkReady);
+
+  // --- PDF text extraction ---
+  // Extracts text + positions from each page. Returns {pages, searchIndex}.
+  // searchIndex = [{page, normText, items}] for fast substring search.
+  async function extractText(buffer) {
+    const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(buffer) }).promise;
+    const pages = [];
+    for (let p = 1; p <= pdf.numPages; p++) {
+      const page = await pdf.getPage(p);
+      const tc = await page.getTextContent();
+      const vp = page.getViewport({ scale: 1 });
+      // Build items with bounding boxes (y converted to screen coords: y=0 at top)
+      const items = tc.items.map(item => {
+        const t = item.transform;
+        const x = t[4], yPdf = t[5];
+        // PDF y=0 is at bottom; screen y=0 is at top
+        const y = vp.height - yPdf - item.height;
+        return {
+          str: item.str || '',
+          x1: x, y1: y,
+          x2: x + item.width, y2: y + item.height,
+          width: item.width, height: item.height,
+          hasEOL: item.hasEOL,
+        };
+      });
+      // Joined text for search (items separated by space or newline)
+      const joined = items.map(i => i.str).join(' ');
+      const normalizedText = normText(joined);
+      pages.push({ num: p, width: vp.width, height: vp.height, items, joined, normalizedText });
+    }
+    return pages;
+  }
+
+  // --- Compute fractional rects from text items on a page ---
+  function computeRects(pg, startChar, endChar) {
+    // Map character positions back to text items using the joined text
+    const items = pg.items;
+    // Build character-to-item mapping
+    let charPos = 0;
+    const charToItem = [];
+    for (let ii = 0; ii < items.length; ii++) {
+      for (let c = 0; c < items[ii].str.length; c++) {
+        charToItem.push(ii);
+        charPos++;
+      }
+      charToItem.push(-1); // space between items
+      charPos++;
+    }
+
+    // Find which items are touched by the match range
+    const touched = new Set();
+    for (let i = startChar; i <= endChar && i < charToItem.length; i++) {
+      const itemIdx = charToItem[i];
+      if (itemIdx >= 0) touched.add(itemIdx);
+    }
+
+    // Group items by Y coordinate (line)
+    const byY = {};
+    for (const ii of touched) {
+      const it = items[ii];
+      const key = Math.round(it.y1 * 10);
+      if (!byY[key]) byY[key] = [];
+      byY[key].push(it);
+    }
+
+    // One rect per line
+    const rects = [];
+    for (const arr of Object.values(byY)) {
+      let lx1 = Infinity, ly1 = Infinity, lx2 = -Infinity, ly2 = -Infinity;
+      for (const it of arr) {
+        lx1 = Math.min(lx1, it.x1); ly1 = Math.min(ly1, it.y1);
+        lx2 = Math.max(lx2, it.x2); ly2 = Math.max(ly2, it.y2);
+      }
+      rects.push({
+        left: +(lx1 / pg.width).toFixed(6),
+        top: +(ly1 / pg.height).toFixed(6),
+        width: +((lx2 - lx1) / pg.width).toFixed(6),
+        height: +((ly2 - ly1) / pg.height).toFixed(6),
+      });
+    }
+    return rects;
+  }
+
+  // --- Search one highlight in all pages ---
+  // Strategy: match ~50 chars of the highlight. Try single pages first,
+  // then consecutive page pairs for cross-page highlights.
+  function searchHL(pages, text) {
+    const full = normText(text);
+    if (!full || full.length < 10) return null;
+
+    const needle = full.length > 50 ? full.slice(0, 50) : full;
+
+    // Single page search
+    for (const pg of pages) {
+      const idx = pg.normalizedText.indexOf(needle);
+      if (idx >= 0) {
+        const scale = pg.joined.length / pg.normalizedText.length;
+        const origStart = denormalizePos(pg.joined, idx);
+        const origEnd = denormalizePos(pg.joined, idx + Math.ceil(needle.length * scale));
+        const rects = computeRects(pg, origStart, origEnd);
+        return { page: pg.num, rects };
+      }
+    }
+
+    // Cross-page search: try joining consecutive pages
+    for (let i = 0; i < pages.length - 1; i++) {
+      const combined = pages[i].normalizedText + ' ' + pages[i + 1].normalizedText;
+      const idx = combined.indexOf(needle);
+      if (idx >= 0) {
+        // The match starts on page i or i+1
+        const pgLen = pages[i].normalizedText.length;
+        if (idx < pgLen) {
+          // Starts on page i
+          const scale = pages[i].joined.length / pages[i].normalizedText.length;
+          const origStart = denormalizePos(pages[i].joined, idx);
+          const remaining = Math.ceil(needle.length * scale);
+          const origEnd = Math.min(pages[i].joined.length - 1, denormalizePos(pages[i].joined, idx + remaining));
+          const rects = computeRects(pages[i], origStart, origEnd);
+          return { page: pages[i].num, rects };
+        } else {
+          // Starts on page i+1
+          const localIdx = idx - pgLen - 1;
+          const scale = pages[i + 1].joined.length / pages[i + 1].normalizedText.length;
+          const origStart = denormalizePos(pages[i + 1].joined, localIdx);
+          const origEnd = denormalizePos(pages[i + 1].joined, localIdx + Math.ceil(needle.length * scale));
+          const rects = computeRects(pages[i + 1], origStart, origEnd);
+          return { page: pages[i + 1].num, rects };
+        }
+      }
+    }
+
+    return null;
+  }
+
+  // Map a position in normalized text back to position in original text
+  function denormalizePos(orig, normPos) {
+    let ni = 0, oi = 0;
+    while (oi < orig.length && ni < normPos) {
+      if (orig[oi] === '-' && oi + 1 < orig.length && /\s/.test(orig[oi + 1])) {
+        // Dehyphenated: skip "-" + whitespace, one normalized char
+        oi += 2;
+        while (oi < orig.length && /\s/.test(orig[oi])) oi++;
+        ni++;
+      } else if (/\s/.test(orig[oi])) {
+        // Collapsed whitespace: advance orig past all whitespace
+        while (oi < orig.length && /\s/.test(orig[oi])) oi++;
+        ni++; // one space in normalized
+      } else {
+        oi++; ni++;
+      }
+    }
+    return oi;
+  }
+
+  // --- Main search ---
+  async function doSearch() {
+    if (!csvData || !pdfBuffer) return;
+    btnSearch.disabled = true;
+    status('Extrayendo texto del PDF...', 'info');
+    showProgress(true, 0);
+
+    let pages;
+    try { pages = await extractText(pdfBuffer); }
+    catch (e) { status('Error cargando PDF: ' + e.message, 'error'); btnSearch.disabled = false; return; }
+
+    status(`Buscando ${csvData.length - 1} highlights en ${pages.length} páginas...`, 'info');
+    showProgress(true, 10);
+
+    const total = csvData.length - 1;
+    results = [];
+    for (let i = 1; i <= total; i++) {
+      const row = csvData[i];
+      if (!row || row.length < 8) continue;
+      const [bookTitle, chapter, date, bookUrl, chapUrl, annUrl, highlight, color, ...noteArr] = row;
+      const note = noteArr.join(',').trim();
+      if (!highlight || !highlight.trim()) continue;
+
+      showProgress(true, 10 + Math.round((i / total) * 85));
+      if (i % 20 === 0) await new Promise(r => setTimeout(r, 0));
+
+      const hit = searchHL(pages, highlight);
+      results.push({
+        text: highlight.trim(), color: mapColor(color), colorName: (color || '').trim(),
+        chapter: chapter.trim(), note, date: date.trim(),
+        page: hit ? hit.page : null, rects: hit ? hit.rects : [],
+        found: !!hit
+      });
+    }
+
+    showProgress(false);
+    const found = results.filter(r => r.found).length;
+    const missing = results.length - found;
+    status(`Completado: ${found} encontrados, ${missing} no encontrados de ${results.length} totales.`, found === results.length ? 'success' : 'info');
+    btnSearch.disabled = false;
+
+    renderResults(found, missing);
+    generateImportCode();
+  }
+
+  // --- UI ---
+  function status(msg, type) {
+    statusEl.textContent = msg;
+    statusEl.className = 'show ' + type;
+  }
+  function showProgress(show, pct) {
+    progressBar.className = show ? 'show' : '';
+    if (show) progressFill.style.width = pct + '%';
+  }
+
+  function renderResults(found, missing) {
+    resultsEl.className = 'show';
+    summaryEl.innerHTML =
+      `<span class="count">${found}</span> de <span>${results.length}</span> highlights encontrados en el PDF.` +
+      (missing ? ` <span class="missing-count">${missing}</span> no encontrados.` : '');
+    tbody.innerHTML = '';
+    for (const r of results) {
+      const tr = document.createElement('tr');
+      tr.className = r.found ? 'found' : 'missing';
+      tr.innerHTML =
+        `<td class="hl-text" title="${esc(r.text)}">${esc(r.text.slice(0, 120))}${r.text.length > 120 ? '…' : ''}</td>` +
+        `<td><span class="color-dot" style="background:${r.color}"></span> ${esc(r.colorName)}</td>` +
+        `<td>${r.found ? '<span class="page-badge">' + r.page + '</span>' : '<span style="color:#484f58">—</span>'}</td>` +
+        `<td style="color:#8b949e">${esc(r.chapter.split(':').pop().trim())}</td>` +
+        `<td class="note-text">${r.note ? esc(r.note.slice(0, 80)) : ''}</td>`;
+      tr.addEventListener('click', () => {
+        const td = tr.querySelector('.hl-text');
+        td.classList.toggle('expanded');
+      });
+      tbody.appendChild(tr);
+    }
+  }
+
+  function esc(s) {
+    const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML;
+  }
+
+  btnExpandAll.addEventListener('click', () => {
+    const all = tbody.querySelectorAll('.hl-text');
+    const expand = !all[0]?.classList.contains('expanded');
+    all.forEach(td => td.classList.toggle('expanded', expand));
+    btnExpandAll.textContent = expand ? 'Colapsar todo' : 'Expandir todo';
+  });
+
+  // --- Generate import code ---
+  function generateImportCode() {
+    if (!results.length) return;
+    const bookId = bookIdInput.value.trim();
+    const now = Date.now();
+    const highlights = results
+      .filter(r => r.found)
+      .map((r, i) => ({
+        id: `pdf-${r.page}-${now + i}-${Math.random().toString(36).slice(2,7)}`,
+        page: r.page,
+        rects: r.rects,
+        text: r.text,
+        color: r.color,
+        chapter: r.chapter || 'Pág. ' + r.page,
+        note: r.note || '',
+        timestamp: now + i,
+        _oreillyDate: r.date,
+        _oreillyColor: r.colorName,
+      }));
+
+    const json = JSON.stringify(highlights, null, 2);
+    const code =
+`// === BookReader: importar highlights de O'Reilly ===
+// bookId: ${bookId}
+// highlights: ${highlights.length}
+// Ejecuta esto en la consola del navegador con el libro abierto en BookReader.
+(function () {
+  const bookId = ${JSON.stringify(bookId)};
+  const key = 'bookreader_highlights_' + bookId;
+  const existing = JSON.parse(localStorage.getItem(key) || '[]');
+  const incoming = ${json};
+  // Evitar duplicados por texto + página
+  const existSet = new Set(existing.map(h => h.text.slice(0, 80) + '|' + (h.page ?? 'epub')));
+  let added = 0;
+  for (const h of incoming) {
+    const sig = h.text.slice(0, 80) + '|' + (h.page ?? 'epub');
+    if (!existSet.has(sig)) { existing.push(h); added++; }
+  }
+  localStorage.setItem(key, JSON.stringify(existing));
+  console.log('✅ Importados ' + added + ' highlights de O'Reilly (' + existing.length + ' total en el libro).');
+  console.log('Recarga la página para verlos en la sidebar.');
+})();`;
+
+    importCode.className = 'show';
+    importBlock.textContent = code;
+    btnImport.disabled = false;
+  }
+
+  btnImport.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(importBlock.textContent);
+      btnImport.textContent = 'Copiado al portapapeles';
+      setTimeout(() => { btnImport.textContent = 'Copiar y ejecutar en consola de BookReader'; }, 2000);
+    } catch (e) {
+      const range = document.createRange();
+      range.selectNodeContents(importBlock);
+      window.getSelection().removeAllRanges();
+      window.getSelection().addRange(range);
+      btnImport.textContent = 'Selecciona el código y copia con Cmd+C';
+      setTimeout(() => { btnImport.textContent = 'Copiar y ejecutar en consola de BookReader'; }, 2000);
+    }
+  });
+
+  btnSearch.addEventListener('click', doSearch);
+})();
+</script>
+</body>
+</html>

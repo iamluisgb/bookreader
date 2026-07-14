@@ -2642,7 +2642,27 @@ body.has-taskchip #sync-badge { bottom: 68px; }
   cursor: pointer;
 }
 .appset-history-book:hover { border-color: var(--accent); }
-.appset-history-list { display: flex; flex-direction: column; gap: 6px; max-height: 44vh; overflow-y: auto; }
+.appset-history-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-bottom: 8px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+}
+.appset-history-back {
+  flex: none;
+  padding: 5px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  cursor: pointer;
+  font-size: 13px;
+}
+.appset-history-back:hover { border-color: var(--accent); }
+.appset-history-title { font-weight: 600; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.appset-history-list { display: flex; flex-direction: column; gap: 6px; max-height: 50vh; overflow-y: auto; padding-right: 4px; }
 .appset-history-untitled { color: var(--text-secondary); font-style: italic; }
 .appset-history-id { color: var(--text-faint); font-family: ui-monospace, SFMono-Regular, monospace; font-size: 11px; }
 .appset-history-row {

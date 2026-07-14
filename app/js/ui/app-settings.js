@@ -589,9 +589,20 @@ function wireRecovery(content, show, fail) {
   const panel = content.querySelector('#appset-history');
   const btn = content.querySelector('#appset-drive-history');
 
-  btn.addEventListener('click', async () => {
+  // Cabecera reutilizable: título + acción a la izquierda (Cerrar o ← Volver).
+  const head = (backLabel, title) =>
+    `<div class="appset-history-head">
+      <button class="appset-history-back" type="button">${escapeHtml(backLabel)}</button>
+      <span class="appset-history-title">${title}</span>
+    </div>`;
+
+  btn.addEventListener('click', () => {
     if (!panel.hidden) { panel.hidden = true; return; }
     panel.hidden = false;
+    renderBooks();
+  });
+
+  async function renderBooks() {
     panel.innerHTML = '<p class="appset-muted">Cargando libros…</p>';
     try {
       const books = await Recovery.listBooks();
@@ -599,26 +610,39 @@ function wireRecovery(content, show, fail) {
       const label = (b) => b.title
         ? escapeHtml(b.title)
         : `<span class="appset-history-untitled">Sin título</span> <span class="appset-history-id">${escapeHtml(b.id.slice(0, 14))}…</span>`;
-      panel.innerHTML = `<p class="appset-muted">Elige un libro para ver sus versiones anteriores:</p>` +
+      panel.innerHTML =
+        head('Cerrar', 'Historial de versiones') +
+        `<p class="appset-muted">Elige un libro para ver sus versiones anteriores:</p>` +
         `<div class="appset-history-list">` +
         books.map(b => `<button class="appset-history-book" data-id="${escapeHtml(b.id)}" data-title="${escapeHtml(b.title || '')}">${label(b)}</button>`).join('') +
         `</div>`;
+      panel.querySelector('.appset-history-back').addEventListener('click', () => { panel.hidden = true; });
       panel.querySelectorAll('.appset-history-book').forEach(el =>
         el.addEventListener('click', () => showVersions(el.dataset.id, el.dataset.title || 'Sin título')));
     } catch (e) { fail('No se pudo cargar el historial')(e); panel.hidden = true; }
-  });
+  }
 
   async function showVersions(bookId, title) {
-    panel.innerHTML = `<p class="appset-muted">Versiones de <strong>${escapeHtml(title)}</strong>:</p><p class="appset-muted">Cargando…</p>`;
+    panel.innerHTML = head('← Volver', escapeHtml(title)) + '<p class="appset-muted">Cargando…</p>';
+    panel.querySelector('.appset-history-back').addEventListener('click', renderBooks);
     try {
       const versions = await Recovery.listVersions(bookId);
-      if (!versions.length) { panel.innerHTML = '<p class="appset-muted">Este libro no tiene versiones anteriores.</p>'; return; }
-      panel.innerHTML = `<p class="appset-muted">Versiones de <strong>${escapeHtml(title)}</strong> (recupera lo borrado tras esa fecha, conserva lo más nuevo):</p>` +
+      const backBar = head('← Volver', escapeHtml(title));
+      if (!versions.length) {
+        panel.innerHTML = backBar + '<p class="appset-muted">Este libro no tiene versiones anteriores.</p>';
+        panel.querySelector('.appset-history-back').addEventListener('click', renderBooks);
+        return;
+      }
+      panel.innerHTML = backBar +
+        `<p class="appset-muted">Recupera lo borrado tras esa fecha (conserva lo más nuevo):</p>` +
+        `<div class="appset-history-list">` +
         versions.map((v, i) =>
           `<div class="appset-history-row" data-file="${escapeHtml(v.fileId)}" data-rev="${escapeHtml(v.id)}">
             <span>${fmtDate(v.modifiedTime)}${i === 0 ? ' · actual' : ''}</span>
             <button class="appset-history-restore" ${i === 0 ? 'disabled' : ''}>Restaurar</button>
-          </div>`).join('');
+          </div>`).join('') +
+        `</div>`;
+      panel.querySelector('.appset-history-back').addEventListener('click', renderBooks);
       panel.querySelectorAll('.appset-history-row').forEach(row => {
         const rbtn = row.querySelector('.appset-history-restore');
         if (rbtn.disabled) return;

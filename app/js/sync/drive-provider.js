@@ -16,12 +16,35 @@ import { getAccessToken } from './drive-auth.js';
 const API = 'https://www.googleapis.com/drive/v3';
 const UPLOAD = 'https://www.googleapis.com/upload/drive/v3';
 
+// Techo por petición: un fetch sin timeout que se cuelga (red inestable, portal
+// cautivo, Drive lento) dejaba el ciclo de sync colgado para siempre → el badge
+// "Sincronizando…" no se limpiaba nunca y el Web Lock quedaba retenido, de modo
+// que ninguna pestaña podía volver a sincronizar hasta recargar. Con abort, una
+// petición estancada falla → el ciclo lanza error → syncNow pasa a 'error',
+// libera el lock y el intervalo reintenta a los 90 s.
+const REQUEST_TIMEOUT_MS = 30000;
+
 async function driveFetch(url, options = {}, retry = true) {
   const token = await getAccessToken();
-  const res = await fetch(url, {
-    ...options,
-    headers: { ...(options.headers || {}), Authorization: 'Bearer ' + token },
-  });
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), REQUEST_TIMEOUT_MS);
+  let res;
+  try {
+    res = await fetch(url, {
+      ...options,
+      signal: ctrl.signal,
+      headers: { ...(options.headers || {}), Authorization: 'Bearer ' + token },
+    });
+  } catch (e) {
+    if (e && e.name === 'AbortError') {
+      const err = new Error('Drive: tiempo de espera agotado');
+      err.code = 'timeout';
+      throw err;
+    }
+    throw e;
+  } finally {
+    clearTimeout(timer);
+  }
   if (res.status === 401 && retry) {
     await getAccessToken(true); // caducó en vuelo → renovar y un solo reintento
     return driveFetch(url, options, false);
