@@ -637,6 +637,15 @@ export function next() {
 
 export async function goTo(cfi) {
   releasePin();
+  if (!rendition) return;
+  await rendition.display(cfi);
+  // epub.js mal-pagina a veces el PRIMER display dentro de una sección larga recién
+  // maquetada: calcula la posición antes de que asienten las columnas y el objetivo cae
+  // en otra página (síntoma: las citas del agente no llevaban a la frase referida). Un
+  // segundo display, ya con el layout estable, lo corrige — verificado E2E: 10/16 → 15/16
+  // de citas caen en la página correcta. Barato: la sección ya está cargada; si el primero
+  // acertó, el segundo es un no-op sin salto visible.
+  await new Promise(r => requestAnimationFrame(() => r()));
   if (rendition) await rendition.display(cfi);
 }
 

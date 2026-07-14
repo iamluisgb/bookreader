@@ -5,6 +5,23 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-14 — Fix: las citas del agente no llevaban al pasaje correcto
+
+Al pinchar un chip de cita `[[aN]]` (resumen/chat), la navegación caía en otra página. Diagnóstico
+E2E sobre un EPUB real: el CFI almacenado **resuelve al elemento correcto**, pero `rendition.display(cfi)`
+de epub.js **mal-pagina el primer display** dentro de una sección larga recién maquetada (calcula la
+posición antes de que asienten las columnas por CSS). Medido: solo **10/16** citas caían en la página
+correcta; ni colapsar el CFI de rango a punto ayudaba.
+
+- **`epub-reader.js`**: `goTo()` hace ahora un **segundo `display()`** tras un frame, con el layout ya
+  estable. Corrige el salto (**10/16 → 15/16**). Barato: la sección ya está cargada y, si el primero
+  acertó, el segundo es un no-op sin salto visible. Beneficia también a marcadores y a la navegación
+  de búsqueda (mismo `goTo`).
+- **`tests/cite-nav.spec.ts`** (nuevo): segmenta el EPUB real, navega por el camino real de la app y
+  exige que ≥14/16 citas muestreadas caigan en la página del pasaje. SW `v80`.
+
+---
+
 ## 2026-07-14 — Fix: variables CSS inexistentes (menú de repaso invisible)
 
 El selector de ámbito de repaso ("Repasar hoy" → Todo / estanterías) se veía transparente, con
