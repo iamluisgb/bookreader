@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import path from 'path';
+import { seedProLicense } from './pro-license';
 test.use({ locale: 'en-US' });
 
 const EPUB_PATH = path.join(__dirname, 'test.epub');
@@ -73,6 +74,28 @@ test('auditoría EN: lector + sidebar + biblioteca + panel + modales sin españo
   await page.locator('.lib-card .lib-kebab').first().click({ force: true });
   found.push(...leaks(await dumpUiText(page)).map(x => 'book-menu: ' + x));
   await page.keyboard.press('Escape');
+
+  // 6) modo Estudiar (Pro): sembrar licencia mock + un mazo con una tarjeta vencida
+  await seedProLicense(page);
+  await page.evaluate(async () => {
+    const DB = await import('/js/ai/db.js');
+    await DB.addDeck({
+      bookId: 'test', name: 'Deck EN', scope: '', cardType: 'basic',
+      createdAt: Date.now(),
+      cards: [{ type: 'basic', front: 'Q1', back: 'A1', chapter: '', src: '' }],
+    });
+  });
+  await page.reload();
+  await expect(page.locator('.lib-h1')).toBeVisible();
+  const chip = page.locator('.lib-study-chip');
+  await expect(chip).toBeVisible();
+  found.push(...leaks(await dumpUiText(page)).map(x => 'library+chip: ' + x));
+  await chip.click();
+  await expect(page.locator('#ai-study .study-flip')).toBeVisible();
+  found.push(...leaks(await dumpUiText(page)).map(x => 'study-front: ' + x));
+  await page.locator('#ai-study .study-flip').click();
+  await expect(page.locator('#ai-study .study-grades')).toBeVisible();
+  found.push(...leaks(await dumpUiText(page)).map(x => 'study-back: ' + x));
 
   const uniq = [...new Set(found)];
   expect(uniq, 'Cadenas españolas en UI inglesa:\n' + uniq.join('\n')).toHaveLength(0);

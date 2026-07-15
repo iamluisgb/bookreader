@@ -107,7 +107,7 @@ export async function studyScopes(now = Date.now()) {
 // `decks`: mazos a repasar (solo entran sus tarjetas vencidas, en orden de mazo).
 // `onNavigate`: se llama al saltar a la fuente ("ver en el libro") para que quien abrió
 // la sesión cierre lo suyo (p. ej. el modal de flashcards) antes de mostrar el libro.
-export function open({ decks, title = 'Estudiar', onClose, onNavigate } = {}) {
+export function open({ decks, title = t('Estudiar'), onClose, onNavigate } = {}) {
   close();
   onCloseCb = onClose || null;
   onNavigateCb = onNavigate || null;
@@ -192,7 +192,7 @@ function renderCard() {
   if (!b || !f) return;
 
   if (!queue.length) { renderDone(b, f, left); return; }
-  left.textContent = `${queue.length} pendiente${queue.length === 1 ? '' : 's'}`;
+  left.textContent = t('{n} pendiente{s}', { n: queue.length, s: queue.length === 1 ? '' : 's' });
 
   const { deck, idx } = queue[0];
   const card = deck.cards[idx];
@@ -201,7 +201,7 @@ function renderCard() {
     <div class="study-deckname">${escapeHtml(deck.name || deck.scope || t('Mazo'))}</div>
     <div class="study-q">${frontHtml(card)}</div>
     <div class="study-a" hidden></div>`;
-  f.innerHTML = `<button class="primary-btn study-flip">Mostrar respuesta <kbd>espacio</kbd></button>`;
+  f.innerHTML = `<button class="primary-btn study-flip">${t('Mostrar respuesta')} <kbd>${t('espacio')}</kbd></button>`;
   f.querySelector('.study-flip').addEventListener('click', flip);
 }
 

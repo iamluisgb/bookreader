@@ -9,6 +9,8 @@
 // `due` e `interval` se miden en DÍAS (medianoche local): "vence hoy" significa hoy de
 // calendario, no "hace 24h exactas" — el repaso es un hábito diario, no un cronómetro.
 
+import { t } from '../i18n.js';
+
 export const RATINGS = ['again', 'hard', 'good', 'easy'];
 
 const EASE_START = 2.5;
@@ -86,7 +88,7 @@ export function intervalLabel(days) {
   if (!days) return '<10m';
   if (days < 30) return `${days}d`;
   if (days < 365) return `${Math.round(days / 30)}m`;
-  return `${(days / 365).toFixed(1).replace('.0', '')}a`;
+  return t('{n}a', { n: (days / 365).toFixed(1).replace('.0', '') });
 }
 
 // ---- Racha de estudio (F3): días consecutivos con al menos un repaso ---------------
