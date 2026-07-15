@@ -5,6 +5,31 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-15 — MON2 · BookReader Pro: licencias Polar + gate de features (modo simulado)
+
+Contraparte de código de [docs/GUIA_MONETIZACION.md](docs/GUIA_MONETIZACION.md). La API de Polar
+va **simulada** mientras no existe la cuenta (cualquier key `BKRD-…` activa Pro; `-REVOKED`/`-LIMIT`
+reproducen los errores reales); pasar a producción = rellenar `CONFIG` en `license.js`.
+
+- **`js/license.js`** (nuevo): activate/validate contra el customer portal de Polar (CORS abierto,
+  verificado — sin backend), ventana offline de **30 días**, degradación a Free sin tocar datos,
+  label de activación legible («Chrome · Mac»), evento `license:changed`. El estado viaja en el
+  backup y en el sync de Drive **a propósito**: restaurar no quema otra activación (mitiga la
+  purga de storage de Safari/ITP).
+- **`js/ui/paywall.js`** (nuevo): `ensurePro()` — gate en el momento de intención, modal con la
+  familia visual de los diálogos propios.
+- **Gates Pro**: flashcards/Anki, mapa mental (solo generar: ver artefactos existentes sigue
+  libre), repaso diario (quizzes), plantilla HQ&A y crear perfiles. El chat con el libro y el
+  resumen quedan gratis — son la demo (LAUNCH_PLAN).
+- **Ajustes → Licencia**: activar key, estado con key enmascarada, portal de cliente, quitar
+  licencia local. El error de límite de activaciones enlaza al portal para liberar huecos fantasma.
+- **`app.js`**: validación en background al arrancar; toast solo en revocación remota.
+- **Tests**: `license.spec.ts` (9 casos: mock, API real stubbeada, ventana 30d, revocación,
+  paywall, round-trip de backup, sección de Ajustes) + `seedProLicense()` en los specs de
+  features gateadas. 153/153. SW `v89` (precache de los módulos nuevos).
+
+---
+
 ## 2026-07-14 — Mapa mental: el setup ya no sale estirado (ancho como el resumen)
 
 El modal del mapa mental usaba 900px de ancho SIEMPRE (dimensionado para el SVG del resultado),

@@ -555,13 +555,18 @@ gateway (job o check perezoso al validar el token).
 esquema de contadores (D1 vs Durable Object), política de límites y de datos (el gateway ve los prompts →
 declarar retención cero y logging mínimo, coherente con el posicionamiento privacy-first).
 
-### MON2 — BookReader Pro: licencias Polar + gate de features · `M` · **planificado**
+### MON2 — BookReader Pro: licencias Polar + gate de features · `M` · **hecho (modo simulado)**
 
-> **Estado: planificado (2026-07-15).** Contraparte de código de
-> [docs/GUIA_MONETIZACION.md](docs/GUIA_MONETIZACION.md) (plataforma: Polar, MoR + license keys).
-> **Sin backend**: los endpoints de license keys del customer portal de Polar tienen CORS abierto
-> (verificado 2026-07-15: `access-control-allow-origin: *` en `api.polar.sh`) → llamables desde
-> GitHub Pages. Sandbox: `sandbox-api.polar.sh` (elegir base URL por config, no hardcodear).
+> **Estado: código entregado (2026-07-15, ver CHANGELOG)** con la API de Polar **simulada**
+> (`CONFIG.organizationId` vacío → keys `BKRD-…` activan Pro localmente; `-REVOKED`/`-LIMIT`
+> reproducen los errores reales). **Pendiente para producción:** crear cuenta/producto en Polar
+> (guía, pasos 1-5), rellenar `CONFIG` (organizationId, checkoutUrl, portalUrl, sandbox),
+> pasar la verificación end-to-end en sandbox (guía, paso 7) y el empujón de instalación PWA
+> al activar Pro (mitigación nº 3 de la purga).
+> Contraparte de código de [docs/GUIA_MONETIZACION.md](docs/GUIA_MONETIZACION.md) (Polar, MoR +
+> license keys). **Sin backend**: los endpoints de license keys del customer portal de Polar
+> tienen CORS abierto (verificado 2026-07-15: `access-control-allow-origin: *` en `api.polar.sh`)
+> → llamables desde GitHub Pages. Sandbox: `sandbox-api.polar.sh` (base URL por config).
 
 **Piezas:**
 1. **`js/license.js`** — módulo único dueño del estado de licencia:

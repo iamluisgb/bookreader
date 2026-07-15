@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bookreader-v88';
+const CACHE_NAME = 'bookreader-v89';
 const ASSETS = [
   './',
   './index.html',
@@ -25,6 +25,7 @@ const ASSETS = [
   './fonts/source-serif-4-600.woff2',
   './js/app.js',
   './js/storage.js',
+  './js/license.js',
   './js/backup.js',
   './js/settings.js',
   './js/bookmarks.js',
@@ -66,6 +67,7 @@ const ASSETS = [
   './js/ui/icons.js',
   './js/ui/escape.js',
   './js/ui/dialog.js',
+  './js/ui/paywall.js',
   './js/ui/app-settings.js',
   './js/library/store.js',
   './js/library/view.js',
