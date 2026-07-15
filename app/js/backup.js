@@ -5,6 +5,10 @@
 // Qué incluye:
 //   - localStorage (todo `bookreader_*`): ajustes, subrayados, marcadores, plantillas
 //     propias, posiciones de lectura, modelo/auto del agente.
+//   - La licencia Pro (`license`: key + activationId) — A PROPÓSITO, no es un secreto
+//     como la API key: restaurar el backup restaura la licencia con su activación, sin
+//     quemar un hueco de dispositivo nuevo (mitiga la purga de storage de Safari/ITP;
+//     ver docs/GUIA_MONETIZACION.md, paso 6).
 //   - IndexedDB IA: conversaciones, mensajes, notas de libreta, relevancia, metadatos
 //     de libros.
 // Qué NO incluye (a propósito):

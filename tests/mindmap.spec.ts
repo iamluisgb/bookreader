@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { seedProLicense } from './pro-license';
 import path from 'path';
 
 // P14 · Mapa mental: map (viñetas citadas) + reduce (árbol JSON) → SVG radial con hojas
@@ -38,6 +39,7 @@ async function stubLLM(page) {
 
 async function setup(page) {
   await page.goto('/index.html');
+  await seedProLicense(page);   // features Pro gateadas (MON2): el test ejercita la feature
   await page.evaluate((k) => localStorage.setItem('bookreader_ai_key', JSON.stringify(k)), 'test-key');
   await page.reload();
   await stubLLM(page);

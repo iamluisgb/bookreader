@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { seedProLicense } from './pro-license';
 import fs from 'fs';
 import path from 'path';
 
@@ -21,6 +22,7 @@ async function seed(page, cards, extraDeck?: any) {
 
 test('estantería → chip Repasar hoy → sesión completa con persistencia SRS', async ({ page }) => {
   await page.goto('/index.html');
+  await seedProLicense(page);   // features Pro gateadas (MON2): el test ejercita la feature
   const today = await page.evaluate(async () => (await import('/js/ai/srs.js') as any).dayOf(Date.now()));
   await seed(page, [
     { type: 'basic', front: '¿Qué es Raft?', back: 'Un algoritmo de consenso.', chapter: '' },
@@ -80,6 +82,7 @@ test('estantería → chip Repasar hoy → sesión completa con persistencia SRS
 
 test('cloze: el frente oculta la respuesta y el volteo la revela resaltada', async ({ page }) => {
   await page.goto('/index.html');
+  await seedProLicense(page);   // features Pro gateadas (MON2): el test ejercita la feature
   await seed(page, [
     { type: 'cloze', front: 'Raft elige un {{c1::líder}} por {{c2::mayoría::cómo}}.', back: 'Extra.', chapter: '' },
   ]);
@@ -97,6 +100,7 @@ test('cloze: el frente oculta la respuesta y el volteo la revela resaltada', asy
 
 test('la cola diaria une mazos y el botón Estudiar del modal muestra el badge de vencidas', async ({ page }) => {
   await page.goto('/index.html');
+  await seedProLicense(page);   // features Pro gateadas (MON2): el test ejercita la feature
   await seed(page,
     [{ type: 'basic', front: 'a', back: 'b', chapter: '' }],
     { bookId: 'bk-2', name: 'Otro libro', cardType: 'basic', scope: '', cards: [
@@ -118,6 +122,7 @@ test('al voltear, "Ver en el libro" abre el libro de origen por deep-link', asyn
   // El fixture se inyecta desde Node (el server sirve app/, no la carpeta tests/).
   const epubBytes = Array.from(fs.readFileSync(path.join(__dirname, 'test.epub')));
   await page.goto('/index.html');
+  await seedProLicense(page);   // features Pro gateadas (MON2): el test ejercita la feature
   await page.evaluate(async (bytes) => {
     const DB: any = await import('/js/ai/db.js');
     const Lib: any = await import('/js/library/store.js');

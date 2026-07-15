@@ -20,6 +20,8 @@ import { alertBox } from './ui/dialog.js';
 import { rangeForText } from './pdf-locate.js';
 import { migrateSchema, purgeExpiredTombstones } from './sync/schema.js';
 import * as SyncEngine from './sync/engine.js';
+import * as License from './license.js';
+import { toast } from './ai/toast.js';
 
 // ============ INIT ============
 document.addEventListener('DOMContentLoaded', () => {
@@ -29,6 +31,7 @@ document.addEventListener('DOMContentLoaded', () => {
     .then(() => purgeExpiredTombstones())
     .catch(e => console.warn('sync schema migration:', e));
   initSyncEngine();
+  initLicense();
   hydrateIcons();
   Settings.init();
   EpubReader.init();
@@ -77,6 +80,25 @@ function initSyncEngine() {
   });
 
   SyncEngine.start();
+}
+
+// Licencia Pro (MON2): revalida en background al arrancar — nunca bloquea (offline, la
+// última validación buena vale 30 días). Si el servidor la da por revocada (reembolso),
+// se avisa una vez y la app degrada a Free sin tocar ningún dato.
+function initLicense() {
+  window.addEventListener('license:changed', (e) => {
+    // Solo la revocación remota avisa (quitar la licencia a mano ya es acción del usuario).
+    if (!e.detail.pro && License.getState()?.revoked) {
+      toast({
+        message: 'Tu licencia Pro dejó de ser válida. Tus datos siguen intactos.',
+        actionLabel: 'Ver licencia',
+        onAction: () => AppSettings.open('license'),
+        kind: 'error',
+        timeout: 12000,
+      });
+    }
+  });
+  License.validateOnStartup();
 }
 
 // PWA offline: registra el Service Worker (precache + stale-while-revalidate, ver sw.js).

@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { seedProLicense } from './pro-license';
 import path from 'path';
 
 const EPUB_PATH = path.join(__dirname, 'test.epub');
@@ -40,6 +41,7 @@ async function stubLLM(page) {
 // flashcards se marca visto para que no aparezca sobre las aserciones (test propio aparte).
 async function setup(page, { template = 't3-juicio', goal = 'probar el panel' } = {}) {
   await page.goto('/index.html');
+  await seedProLicense(page);   // features Pro gateadas (MON2): el test ejercita la feature
   await page.evaluate((k) => {
     localStorage.setItem('bookreader_ai_key', JSON.stringify(k));
     localStorage.setItem('bookreader_flashcards_hint_seen', 'true');

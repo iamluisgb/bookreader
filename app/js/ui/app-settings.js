@@ -16,6 +16,8 @@ import * as SyncEngine from '../sync/engine.js';
 import * as Recovery from '../sync/recovery.js';
 import * as Profiles from '../ai/profiles.js';
 import * as Backup from '../backup.js';
+import * as License from '../license.js';
+import { ensurePro } from './paywall.js';
 import { icon } from './icons.js';
 import { escapeHtml } from './escape.js';
 import { confirmBox } from './dialog.js';
@@ -25,6 +27,7 @@ const SECTIONS = [
   { id: 'profiles',  label: 'Perfiles',   ico: 'note' },
   { id: 'templates', label: 'Plantillas', ico: 'note' },
   { id: 'data',      label: 'Datos',      ico: 'share' },
+  { id: 'license',   label: 'Licencia',   ico: 'shield' },
 ];
 
 let overlay = null;
@@ -76,11 +79,13 @@ function selectSection(id) {
   content.innerHTML = renderSection(id);
   if (id === 'agent') wireAgent(content);
   if (id === 'data') wireData(content);
+  if (id === 'license') wireLicense(content);
 }
 
 function renderSection(id) {
   if (id === 'agent') return agentHtml();
   if (id === 'data') return dataHtml();
+  if (id === 'license') return licenseHtml();
   return '';
 }
 
@@ -387,7 +392,10 @@ function notifyProfileChange() {
 }
 
 function wireProfilesList(content) {
-  content.querySelector('#appset-prof-new').addEventListener('click', () => {
+  content.querySelector('#appset-prof-new').addEventListener('click', async () => {
+    // Gate Pro (MON2): crear perfiles es Pro; usar/activar los ya existentes sigue libre
+    // (nadie pierde lo que ya tenía si su licencia caduca).
+    if (!(await ensurePro('profiles'))) return;
     profDraft = Profiles.blank(); renderProfiles(content);
   });
   content.querySelectorAll('.appset-prof-activate').forEach(b =>
@@ -592,6 +600,91 @@ function wireDrive(content, show) {
   });
 
   wireRecovery(content, show, fail);
+}
+
+// ---- Sección Licencia (MON2: BookReader Pro vía Polar) ----------------------
+// Estados: Free (input para activar + compra), Pro (key enmascarada + gestión de
+// dispositivos en el portal), revocada (aviso + reactivar). Los datos nunca se tocan.
+
+function maskKey(key) {
+  return key.length > 9 ? `${key.slice(0, 5)}…${key.slice(-4)}` : key;
+}
+
+function licenseHtml() {
+  const s = License.getState();
+  const mockNote = License.isMock()
+    ? `<p class="appset-muted appset-lic-mock">${icon('shield', { size: 13 })} Modo simulado (aún sin plataforma de pagos): cualquier clave <code>BKRD-…</code> activa Pro para probar.</p>`
+    : '';
+
+  if (s && s.key && !s.revoked) {
+    const since = s.validatedAt ? new Date(s.validatedAt).toLocaleDateString('es') : '';
+    return `<div class="appset-section">
+      <h3 class="appset-h3">Licencia</h3>
+      <p class="appset-lic-state is-pro">${icon('check', { size: 15 })} BookReader Pro activo</p>
+      <p class="appset-muted">Clave ${escapeHtml(maskKey(s.key))} · última verificación: ${escapeHtml(since)}.
+        Sin conexión, tu licencia sigue activa hasta 30 días.</p>
+      <button id="appset-lic-portal" class="primary-btn appset-save">${icon('user', { size: 15 })} Gestionar dispositivos y recibos</button>
+      <button id="appset-lic-remove" class="appset-tpl-cancel appset-data-md">Quitar la licencia de este navegador</button>
+      <p class="appset-muted">Quitar la licencia aquí no libera el hueco de dispositivo: eso se hace en el portal.</p>
+      ${mockNote}
+    </div>`;
+  }
+
+  const revokedNote = s && s.revoked
+    ? `<p class="appset-err">Tu licencia dejó de ser válida (¿reembolso o revocación?). Tus datos siguen intactos; la app vuelve al plan Free.</p>`
+    : '';
+  return `<div class="appset-section">
+    <h3 class="appset-h3">Licencia</h3>
+    ${revokedNote}
+    <p class="appset-muted">BookReader Pro desbloquea flashcards con export a Anki, repaso espaciado,
+      mapas mentales, plantillas avanzadas y perfiles. ${escapeHtml(License.CONFIG.price)}, sin suscripción.</p>
+    <label class="appset-label" for="appset-lic-key">Clave de licencia</label>
+    <input id="appset-lic-key" class="appset-input" placeholder="BKRD-XXXX-XXXX-XXXX" autocomplete="off" spellcheck="false" />
+    <button id="appset-lic-activate" class="primary-btn appset-save">Activar en este dispositivo</button>
+    ${License.CONFIG.checkoutUrl ? `<button id="appset-lic-buy" class="appset-tpl-cancel appset-data-md">Conseguir BookReader Pro</button>` : ''}
+    <p class="appset-err" id="appset-lic-err" hidden></p>
+    <p class="appset-muted">La clave llega por email al comprar y siempre puedes recuperarla en el portal de cliente.</p>
+    ${mockNote}
+  </div>`;
+}
+
+function wireLicense(content) {
+  const portal = content.querySelector('#appset-lic-portal');
+  if (portal) {
+    portal.addEventListener('click', () => window.open(License.CONFIG.portalUrl, '_blank', 'noopener'));
+    content.querySelector('#appset-lic-remove').addEventListener('click', async () => {
+      if (await confirmBox(
+        'La app volverá al plan Free en este navegador. Tus datos no se tocan y podrás reactivar con la misma clave.',
+        { title: 'Quitar licencia', okText: 'Quitar' })) {
+        License.removeLocal();
+        selectSection('license');
+      }
+    });
+    return;
+  }
+
+  const keyEl = content.querySelector('#appset-lic-key');
+  const err = content.querySelector('#appset-lic-err');
+  const btn = content.querySelector('#appset-lic-activate');
+  btn.addEventListener('click', async () => {
+    err.hidden = true;
+    btn.disabled = true; btn.textContent = 'Activando…';
+    try {
+      await License.activate(keyEl.value);
+      selectSection('license');
+    } catch (e) {
+      // El límite de activaciones nunca es un callejón sin salida: la causa típica es
+      // una purga de storage del navegador; el portal libera el hueco fantasma.
+      err.innerHTML = e.code === 'limit'
+        ? `${escapeHtml(e.message)} ¿Borraste datos de navegación o reinstalaste? Libera un dispositivo en
+           <a href="${escapeHtml(License.CONFIG.portalUrl)}" target="_blank" rel="noopener">el portal de cliente</a> y reintenta.`
+        : escapeHtml(e.message);
+      err.hidden = false;
+      btn.disabled = false; btn.textContent = 'Activar en este dispositivo';
+    }
+  });
+  content.querySelector('#appset-lic-buy')?.addEventListener('click', () =>
+    window.open(License.CONFIG.checkoutUrl, '_blank', 'noopener'));
 }
 
 // ---- Historial de versiones (Fase 3: recuperación) --------------------------

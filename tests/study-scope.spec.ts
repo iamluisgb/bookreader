@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { seedProLicense } from './pro-license';
 
 // P12 · Selector de repaso: dueToday por ámbito (todo | libro | estantería) y
 // studyScopes (ámbitos con vencidas). Se siembran mazos y estanterías en IndexedDB.
@@ -70,6 +71,7 @@ test.describe('P12 · ámbitos de repaso', () => {
 
   test('el chip "Repasar hoy" abre el árbol estantería→libros', async ({ page }) => {
     await page.goto('/');
+    await seedProLicense(page);   // features Pro gateadas (MON2): el test ejercita la feature
     await seed(page);
     await page.goto('/');   // re-render de la biblioteca → pinta el chip con el total
     const chip = page.locator('.lib-study-chip');

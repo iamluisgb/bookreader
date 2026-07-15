@@ -13,6 +13,7 @@ import * as Storage from '../storage.js';
 import * as Store from '../library/store.js';
 import { icon } from '../ui/icons.js';
 import { escapeHtml } from '../ui/escape.js';
+import { ensurePro } from '../ui/paywall.js';
 
 // Racha de estudio (F3): {count, lastDay}, global de la app (no por libro).
 const STREAK_KEY = 'study_streak';
@@ -54,7 +55,10 @@ export async function dueToday(scope, now = Date.now()) {
 }
 
 // Abre la sesión del día para un ámbito (por defecto, todo lo vencido).
+// Gate Pro (MON2): el repaso espaciado (quizzes) es Pro. `open()` directo no se gatea:
+// se llega desde el modal de flashcards, que ya pasó su propio gate.
 export async function openToday({ scope, title, onClose } = {}) {
+  if (!(await ensurePro('study'))) return;
   const { decks } = await dueToday(scope);
   open({ decks, title: title || 'Repaso de hoy', onClose });
 }

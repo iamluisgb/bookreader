@@ -27,6 +27,7 @@ import * as JobsUI from './jobs-ui.js';
 import * as Studio from './studio.js';
 import * as Storage from '../storage.js';
 import * as QueryExpand from './query-expand.js';
+import { ensurePro } from '../ui/paywall.js';
 
 // Icon + label markup for the small inline action buttons.
 const act = (name, text, size = 15) => `${icon(name, { size })}<span>${text}</span>`;
@@ -251,10 +252,11 @@ function maybeOfferObjective() {
 
 // Flashcards para Anki: abre el modal de generación/export con el contexto del libro
 // activo. Necesita el libro segmentado (el índice BM25 se construye desde el anotado).
-function openFlashcards() {
+async function openFlashcards() {
   dismissFlashcardsHint();
   if (!book && !bookId) { setStatus('Abre un libro para crear flashcards.'); return; }
   if (!segReady) { setStatus('Preparando el libro… inténtalo en unos segundos.'); return; }
+  if (!(await ensurePro('flashcards'))) return;   // gate Pro (MON2)
   Flashcards.open({
     bookId, bookTitle,
     goal: convo?.goal || '',
@@ -283,9 +285,12 @@ function openSummary(opts) {
 }
 
 // P14 · Mapa mental radial del ámbito elegido (mismo ctx que el resumen).
-function openMindMap(opts) {
+async function openMindMap(opts) {
   if (!book && !bookId) { setStatus('Abre un libro para generar el mapa mental.'); return; }
   if (!segReady) { setStatus('Preparando el libro… inténtalo en unos segundos.'); return; }
+  // Gate Pro (MON2): generar es Pro; abrir un artefacto YA generado sigue libre
+  // (si la licencia caduca nadie pierde lo que ya tenía).
+  if (!(opts && opts.artifact) && !(await ensurePro('mindmap'))) return;
   MindMap.open({
     bookId, bookTitle,
     goal: convo?.goal || '',
@@ -745,6 +750,8 @@ function openOnboarding(opts = {}) {
       // Si marcó el opt-in, la plantilla real pasa a ser el Artesano.
       const artesano = body.querySelector('#ai-ob-artesano')?.checked;
       const finalTemplate = artesano ? getTemplate(ARTESANO_ID) : chosenTemplate;
+      // Gate Pro (MON2): HQ&A es la plantilla avanzada de pago; las demás siguen libres.
+      if (finalTemplate.id === 'hqa' && !(await ensurePro('hqa'))) return;
       template = finalTemplate;
       if (upgrade && convo) {
         // Añadir objetivo a la conversación existente SIN perder el chat: actualiza en sitio.

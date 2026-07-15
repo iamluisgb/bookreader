@@ -2662,6 +2662,25 @@ body.in-library .ai-fab { display: none; }
 .dlg-danger { background: #dc2626; border-color: #dc2626; color: #fff; }
 .dlg-danger:hover { background: #b91c1c; border-color: #b91c1c; }
 
+/* ==== Paywall Pro (ui/paywall.js) — misma familia visual que los diálogos ==== */
+.pw-card { max-width: 460px; }
+.pw-list { list-style: none; margin: var(--s-4) 0 0; padding: 0; display: grid; gap: 8px; }
+.pw-feat {
+  display: flex; align-items: center; gap: 8px;
+  font-size: var(--fs-md); color: var(--text-soft);
+}
+.pw-feat svg { color: var(--accent); flex: none; }
+.pw-feat-hot { color: var(--text); font-weight: 600; }
+.pw-price { margin-top: var(--s-4); font-size: var(--fs-sm); color: var(--text-soft); }
+
+/* ==== Ajustes → Licencia (MON2) ==== */
+.appset-lic-state {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: var(--fs-md); font-weight: 600; margin-bottom: var(--s-2);
+}
+.appset-lic-state.is-pro { color: var(--accent); }
+.appset-lic-mock { margin-top: var(--s-4); opacity: 0.8; }
+
 /* ==== Badge de estado del sync (Fase 2) ==== */
 #sync-badge {
   position: fixed;
