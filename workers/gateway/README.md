@@ -34,6 +34,18 @@ npx wrangler d1 execute bookreader-gateway --remote --command \
 npx wrangler tail
 ```
 
+## Demo self-service (F3)
+
+`POST /demo-token` emite un token de `DEMO_QUOTA` llamadas (30). Guardas: 1 demo por IP
+(hasheada con `IP_HASH_SALT`) y día → 429 `demo_already_granted`; tope de emisión diaria
+`MAX_DAILY_TOKENS` → 429 `demo_sold_out`; tope de llamadas demo/día `MAX_DAILY_CALLS` →
+403 `demo_paused` en el chat. Los topes son vars de `wrangler.jsonc`. Consumo del día:
+
+```bash
+npx wrangler d1 execute bookreader-gateway --remote --command \
+  "SELECT * FROM daily_stats ORDER BY day DESC LIMIT 7"
+```
+
 ## Test end-to-end
 
 `tests/gateway.spec.ts` (@live) conduce la app real contra el gateway. Necesita

@@ -103,8 +103,15 @@ function agentHtml() {
     `<option value="${p.id}"${cur && cur.id === p.id ? ' selected' : ''}>${escapeHtml(p.name)}</option>`).join('')
     + `<option value="custom"${cur ? '' : ' selected'}>${t('Personalizado')}</option>`;
   const suggested = (cur || LLM.PROVIDERS[0]).models;
+  const demoBlock = LLM.hasKey() ? '' : `
+    <div class="appset-demo">
+      <button id="appset-demo-btn" class="primary-btn appset-save">${icon('sparkles', { size: 15 })} ${t('Probar la demo (sin API key)')}</button>
+      <p class="appset-muted">${t('Un cupo de llamadas de prueba con el modelo de la casa, sin registro. Cuando se acabe, pon tu propia key (BYOK) — o configúrala ya abajo.')}</p>
+      <p class="appset-model-hint" id="appset-demo-hint" hidden></p>
+    </div>`;
   return `<div class="appset-section">
     <h3 class="appset-h3">${t('Agente')}</h3>
+    ${demoBlock}
     <label class="appset-label" for="appset-provider">${t('Proveedor')}</label>
     <select id="appset-provider" class="appset-input">${provOpts}</select>
     <label class="appset-label" for="appset-baseurl">Base URL (endpoint OpenAI-compatible)</label>
@@ -131,6 +138,27 @@ function agentHtml() {
 }
 
 function wireAgent(content) {
+  // F3 · demo self-service: pide token al gateway, autoconfigura y refresca la sección.
+  const demoBtn = content.querySelector('#appset-demo-btn');
+  if (demoBtn) demoBtn.addEventListener('click', async () => {
+    const hint = content.querySelector('#appset-demo-hint');
+    demoBtn.disabled = true;
+    hint.hidden = false; hint.classList.remove('is-error');
+    hint.textContent = t('Creando tu demo…');
+    try {
+      const r = await LLM.requestDemoToken();
+      window.dispatchEvent(new CustomEvent('appsettings:agent-saved'));
+      selectSection('agent');   // re-render: campos rellenos, botón fuera
+      const ok = overlay.querySelector('#appset-saved');
+      if (ok) { ok.hidden = false; setTimeout(() => { ok.hidden = true; }, 2500); }
+      void r;
+    } catch (e) {
+      hint.classList.add('is-error');
+      hint.textContent = t('No se pudo activar la demo: {msg}', { msg: e.message });
+      demoBtn.disabled = false;
+    }
+  });
+
   const prov = content.querySelector('#appset-provider');
   const baseUrl = content.querySelector('#appset-baseurl');
   const model = content.querySelector('#appset-model');

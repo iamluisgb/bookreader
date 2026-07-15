@@ -591,9 +591,14 @@ self-service (F3), Turnstile si hiciera falta, allowlist de modelos y tope de `m
   429) porque IA3 reintenta los 429 — ver ADR-021.
 - **F2 — Concurrencia** `S`–`M`: cola (Durable Object) o pool de keys. Solo si F1 muestra colisiones
   reales.
-- **F3 — Demo self-service** `M`: botón "Probar la demo" en el onboarding del panel → `POST /demo-token`
-  (limitado por IP) → autoconfigura base URL + token sin que el usuario vea nada. Preset en `PROVIDERS`.
-  Este es el que mueve la métrica de activación del LAUNCH_PLAN.
+- **F3 — Demo self-service** `M` · **✓** _(2026-07-15, ver CHANGELOG)_: `POST /demo-token` con
+  guardas en capas — 1 demo por IP (SHA-256 con salt secreto, sin IPs crudas) y día, disyuntor de
+  emisión diaria (`MAX_DAILY_TOKENS`) y disyuntor de llamadas demo/día (`MAX_DAILY_CALLS`) que
+  acota el gasto máximo aunque el abuso sea distribuido. Botón "Probar la demo (sin API key)" en
+  Ajustes → Agente (visible solo sin key): autoconfigura base URL + token + alias sin que el
+  usuario vea nada. Cuota por token: 30 llamadas (`DEMO_QUOTA`). Pendiente de F3: el botón en el
+  onboarding del propio panel (hoy el flujo sin key ya desemboca en Ajustes → Agente) y Turnstile
+  si aparece abuso con scripts.
 - **F4 — Gestión** `S`: listar tokens, uso, revocar (CLI ampliada o mini-admin).
 
 **Enlace con MON2 (licencias Polar) — los tokens Pro no se emiten a mano.** El flujo natural:

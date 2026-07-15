@@ -5,6 +5,27 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-15 — MON1 F3 · Demo self-service ("Probar la demo sin API key")
+
+La fase que ataca la métrica de activación del LAUNCH_PLAN: probar el agente sin conseguir
+una API key. Verificado end-to-end (emisión real, límite de IP, token funcionando, contadores).
+
+- **Gateway — `POST /demo-token`**: emite `br-demo-…` con 30 llamadas (`DEMO_QUOTA`). Guardas
+  en capas (ver conversación de diseño en MON1): 1 demo por **IP hasheada** (SHA-256 + salt
+  secreto `IP_HASH_SALT`; nunca se almacenan IPs) y día · **disyuntor de emisión**
+  (`MAX_DAILY_TOKENS`, 200/día) · **disyuntor de consumo** del tier demo
+  (`MAX_DAILY_CALLS`, 2000/día) que acota el gasto máximo diario aunque el abuso sea
+  distribuido. Migración `0002_demo_selfservice.sql` (`demo_grants`, `daily_stats`).
+- **Cliente — botón "Probar la demo (sin API key)"** en Ajustes → Agente, visible solo sin key:
+  llama a `/demo-token` y **autoconfigura** base URL + token + modelo alias (`requestDemoToken`
+  en [`js/ai/llm.js`](app/js/ai/llm.js)); el usuario no ve token ni URLs. Errores del gateway
+  (agotado del día, red) se muestran en sitio con reintento.
+- **Mensajes de error limpios**: los bodies con forma OpenAI (`{error:{message}}`) ahora
+  muestran solo el mensaje (`apiErrMsg`), no el JSON crudo — aplica al gateway y a cualquier
+  proveedor BYOK.
+- Tests: 2 deterministas (stub del endpoint: autoconfiguración y 429 mostrado) en
+  [`tests/gateway.spec.ts`](tests/gateway.spec.ts) + el @live existente. Suite completa verde (163).
+
 ## 2026-07-15 — MON1 F1 · Gateway de tokens propios (Cloudflare Worker + D1)
 
 Primer backend del proyecto (ADR-021). Proxy OpenAI-compatible desplegado en

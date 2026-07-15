@@ -8,7 +8,11 @@
   "observability": { "enabled": true, "head_sampling_rate": 1 },
   "vars": {
     // Orígenes permitidos por CORS (dev + producción), separados por comas.
-    "ALLOWED_ORIGINS": "http://localhost:8000,http://localhost:8888,https://luisgonzalezbernal.com"
+    "ALLOWED_ORIGINS": "http://localhost:8000,http://localhost:8888,https://luisgonzalezbernal.com",
+    // F3 · demo self-service: cuota por token y disyuntores globales diarios
+    "DEMO_QUOTA": "30",
+    "MAX_DAILY_TOKENS": "200",
+    "MAX_DAILY_CALLS": "2000"
   },
   "d1_databases": [
     {

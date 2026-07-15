@@ -647,6 +647,10 @@ const EN = {
   'Perfiles': 'Profiles',
   'Plantillas': 'Templates',
   'Sync: error': 'Sync: error',
+  'Probar la demo (sin API key)': 'Try the demo (no API key)',
+  'Un cupo de llamadas de prueba con el modelo de la casa, sin registro. Cuando se acabe, pon tu propia key (BYOK) — o configúrala ya abajo.': 'A quota of trial calls with the house model, no sign-up. When it runs out, add your own key (BYOK) — or set it up below right away.',
+  'Creando tu demo…': 'Creating your demo…',
+  'No se pudo activar la demo: {msg}': 'Could not enable the demo: {msg}',
   'Reconectar Drive': 'Reconnect Drive',
   // biblioteca (2ª pasada) / studio / panel onboarding
   'Libros': 'Books',

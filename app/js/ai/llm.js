@@ -10,6 +10,10 @@ import * as Storage from '../storage.js';
 import { t } from '../i18n.js';
 
 const DEFAULT_BASE_URL = 'https://api.nan.builders/v1';
+
+// MON1 F3 · Gateway propio para la demo sin API key (ver workers/gateway y ADR-021).
+// El botón "Probar la demo" pide un token self-service y autoconfigura el proveedor.
+const GATEWAY_BASE_URL = 'https://bookreader-gateway.luisgonzalezb93.workers.dev/v1';
 const DEFAULT_MODEL = 'deepseek-v4-flash';
 // Tope de tokens de salida por respuesta. Antes era 2048 (~1500 palabras), que
 // cortaba en seco las respuestas largas (análisis del Artesano del Texto, etc.). Con
@@ -177,7 +181,9 @@ async function _chatStream({ messages, onToken, onReasoning, onDone, signal, max
     const body = await res.text().catch(() => '');
     if (res.status === 401) throw new Error(t('API key inválida (401).'));
     if (res.status === 429) throw new Error(t('Límite de uso alcanzado (429). Reintenta en un momento.'));
-    throw new Error(`Error del modelo (${res.status}). ${body.slice(0, 200)}`);
+    // Si el body tiene forma OpenAI ({error:{message}}), mostrar SOLO el mensaje
+    // (el gateway y muchos proveedores la usan); si no, el texto crudo recortado.
+    throw new Error(`Error del modelo (${res.status}). ${apiErrMsg(body)}`);
   }
 
   const reader = res.body.getReader();
@@ -316,4 +322,25 @@ async function _chatToolsLoop({ messages, tools, execute, maxRounds = 3, signal 
     }
   }
   return { content: '', rounds: maxRounds, calls, exhausted: true };
+}
+
+// Extrae el `error.message` de un body con forma OpenAI; si no la tiene, recorta el texto.
+function apiErrMsg(bodyText) {
+  try {
+    const m = JSON.parse(bodyText)?.error?.message;
+    if (m) return String(m).slice(0, 300);
+  } catch (e) { /* no era JSON */ }
+  return String(bodyText || '').slice(0, 200);
+}
+
+// MON1 F3 · Pide un token demo al gateway y AUTOCONFIGURA el proveedor (base URL +
+// key + modelo alias). El usuario no ve token ni URLs: pulsa un botón y pregunta.
+export async function requestDemoToken() {
+  const res = await fetch(GATEWAY_BASE_URL.replace(/\/v1$/, '') + '/demo-token', { method: 'POST' });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body?.error?.message || `HTTP ${res.status}`);
+  setBaseUrl(GATEWAY_BASE_URL);
+  setKey(body.token);
+  setModel(body.model || 'bookreader-fast');
+  return body; // { token, remaining, model }
 }
