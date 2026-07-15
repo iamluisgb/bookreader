@@ -60,11 +60,11 @@ function metaLine(kind, e) {
   if (e.params && e.params.scopeName) bits.push(escapeHtml(e.params.scopeName));
   if (kind === 'summary') {
     const cites = (String(e.result || '').match(/\[\[a\d+\]\]/g) || []).length;
-    if (cites) bits.push(`${cites} citas`);
+    if (cites) bits.push(t('{n} citas', { n: cites }));
   }
   const when = ago(e.at);
   if (when) bits.push(when);
-  return bits.join(' · ') || 'Generado';
+  return bits.join(' · ') || t('Generado');
 }
 
 function runningCard(job) {
@@ -72,49 +72,49 @@ function runningCard(job) {
   const pct = p.n ? Math.round((p.i / p.n) * 100) : 0;
   return `<div class="studio-card studio-running">
     <div class="studio-progress"><div class="studio-bar" style="width:${pct}%"></div></div>
-    <p class="studio-meta">${escapeHtml(p.phase || 'Generando…')} <button class="studio-link" data-act="cancel">Cancelar</button></p>
+    <p class="studio-meta">${escapeHtml(p.phase || t('Generando…'))} <button class="studio-link" data-act="cancel">${t('Cancelar')}</button></p>
   </div>`;
 }
 
-function errorCard(t) {
+function errorCard() {
   return `<div class="studio-card studio-error">
-    <p class="studio-meta studio-errmsg">⚠ No se pudo generar. <button class="studio-link" data-act="retry">Reintentar</button></p>
+    <p class="studio-meta studio-errmsg">⚠ ${t('No se pudo generar.')} <button class="studio-link" data-act="retry">${t('Reintentar')}</button></p>
   </div>`;
 }
 
-function artifactCard(t, e) {
+function artifactCard(ty, e) {
   return `<div class="studio-card studio-generated">
-    <button class="studio-card-main" data-act="open" data-kind="${t.kind}" data-key="${escapeHtml(e.key)}">
-      <span class="studio-meta">${metaLine(t.kind, e)}</span>
+    <button class="studio-card-main" data-act="open" data-kind="${ty.kind}" data-key="${escapeHtml(e.key)}">
+      <span class="studio-meta">${metaLine(ty.kind, e)}</span>
     </button>
-    <button class="studio-del" data-act="del" data-key="${escapeHtml(e.key)}" title="Borrar" aria-label="Borrar este artefacto">${icon('trash', { size: 15 })}</button>
+    <button class="studio-del" data-act="del" data-key="${escapeHtml(e.key)}" title="${t('Borrar')}" aria-label="${t('Borrar este artefacto')}">${icon('trash', { size: 15 })}</button>
   </div>`;
 }
 
-function emptyCard(t) {
+function emptyCard(ty) {
   return `<div class="studio-card studio-empty">
-    <p class="studio-value">${escapeHtml(t.value)}</p>
-    <button class="studio-gen" data-act="gen" data-kind="${t.kind}">${icon('plus', { size: 15 })} ${t.stateful ? 'Generar' : 'Crear'}</button>
+    <p class="studio-value">${escapeHtml(ty.value)}</p>
+    <button class="studio-gen" data-act="gen" data-kind="${ty.kind}">${icon('plus', { size: 15 })} ${ty.stateful ? t('Generar') : t('Crear')}</button>
   </div>`;
 }
 
-function group(t, ctx, job) {
-  const mine = job && job.kind === t.kind && job.bookId === ctx.bookId;
+function group(ty, ctx, job) {
+  const mine = job && job.kind === ty.kind && job.bookId === ctx.bookId;
   const running = mine && job.status === 'running';
   const errored = mine && job.status === 'error';
-  const items = t.stateful ? Jobs.list(ctx.bookId, t.kind) : [];
+  const items = ty.stateful ? Jobs.list(ctx.bookId, ty.kind) : [];
 
   const head = `<div class="studio-group-head">
-    <span class="studio-ico">${icon(t.ico, { size: 16 })}</span>
-    <span class="studio-group-name">${escapeHtml(t.name)}</span>
-    ${t.stateful && (items.length || running) ? `<button class="studio-new" data-act="gen" data-kind="${t.kind}">${icon('plus', { size: 13 })} Nuevo</button>` : ''}
+    <span class="studio-ico">${icon(ty.ico, { size: 16 })}</span>
+    <span class="studio-group-name">${escapeHtml(ty.name)}</span>
+    ${ty.stateful && (items.length || running) ? `<button class="studio-new" data-act="gen" data-kind="${ty.kind}">${icon('plus', { size: 13 })} ${t('Nuevo')}</button>` : ''}
   </div>`;
 
   let bodyHtml = '';
   if (running) bodyHtml += runningCard(job);
-  else if (errored) bodyHtml += errorCard(t);
-  if (items.length) bodyHtml += items.map(e => artifactCard(t, e)).join('');
-  else if (!running && !errored) bodyHtml += emptyCard(t);
+  else if (errored) bodyHtml += errorCard();
+  if (items.length) bodyHtml += items.map(e => artifactCard(ty, e)).join('');
+  else if (!running && !errored) bodyHtml += emptyCard(ty);
 
   return `<div class="studio-group">${head}${bodyHtml}</div>`;
 }
@@ -123,14 +123,14 @@ export function render() {
   if (!container) return;
   const ctx = getCtx();
   if (!ctx.bookId && !ctx.bookTitle) {
-    container.innerHTML = `<p class="studio-hint">Abre un libro para generar y ver sus artefactos.</p>`;
+    container.innerHTML = `<p class="studio-hint">${t('Abre un libro para generar y ver sus artefactos.')}</p>`;
     return;
   }
   const job = Jobs.activeJob();
   container.innerHTML =
-    `<div class="studio-book">${escapeHtml(ctx.bookTitle || 'Libro')}</div>` +
+    `<div class="studio-book">${escapeHtml(ctx.bookTitle || t('Libro'))}</div>` +
     (ctx.segReady ? '' : `<p class="studio-hint">${t('Preparando el libro… la generación estará lista en unos segundos.')}</p>`) +
-    TYPES.map(t => group(t, ctx, job)).join('');
+    TYPES.map(ty => group(ty, ctx, job)).join('');
 }
 
 async function onClick(e) {

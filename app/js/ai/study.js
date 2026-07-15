@@ -123,7 +123,7 @@ export function open({ decks, title = 'Estudiar', onClose, onNavigate } = {}) {
   overlay.id = 'ai-study';
   overlay.className = 'ai-onboarding';
   overlay.innerHTML = `
-    <div class="ai-ob-card study-card" role="dialog" aria-modal="true" aria-label="Modo Estudiar">
+    <div class="ai-ob-card study-card" role="dialog" aria-modal="true" aria-label="${t('Modo Estudiar')}">
       <div class="study-head">
         <span class="study-title">${escapeHtml(title)}</span>
         <span class="study-left" aria-live="polite"></span>
@@ -198,7 +198,7 @@ function renderCard() {
   const card = deck.cards[idx];
   flipped = false;
   b.innerHTML = `
-    <div class="study-deckname">${escapeHtml(deck.name || deck.scope || 'Mazo')}</div>
+    <div class="study-deckname">${escapeHtml(deck.name || deck.scope || t('Mazo'))}</div>
     <div class="study-q">${frontHtml(card)}</div>
     <div class="study-a" hidden></div>`;
   f.innerHTML = `<button class="primary-btn study-flip">Mostrar respuesta <kbd>espacio</kbd></button>`;

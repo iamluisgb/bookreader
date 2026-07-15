@@ -242,8 +242,8 @@ function maybeOfferObjective() {
   nudge.innerHTML = `
     <span>${t('¿Estudiando este libro? Elige un <b>objetivo de lectura</b> para activar la libreta y el repaso.')}</span>
     <div class="ai-objnudge-btns">
-      <button class="ai-objnudge-go">Elegir objetivo</button>
-      <button class="ai-objnudge-x" aria-label="Ahora no">${icon('xmark', { size: 14 })}</button>
+      <button class="ai-objnudge-go">${t('Elegir objetivo')}</button>
+      <button class="ai-objnudge-x" aria-label="${t('Ahora no')}">${icon('xmark', { size: 14 })}</button>
     </div>`;
   nudge.querySelector('.ai-objnudge-go').addEventListener('click', () => { nudge.remove(); openOnboarding({ upgrade: true }); });
   nudge.querySelector('.ai-objnudge-x').addEventListener('click', () => nudge.remove());
@@ -674,7 +674,7 @@ function openOnboarding(opts = {}) {
   overlay.id = 'ai-onboarding';
   overlay.className = 'ai-onboarding';
   overlay.innerHTML = `
-    <div class="ai-ob-card" role="dialog" aria-modal="true" aria-label="Elegir objetivo de lectura">
+    <div class="ai-ob-card" role="dialog" aria-modal="true" aria-label="${t('Elegir objetivo de lectura')}">
       <button class="ai-ob-close" title="${t('Cerrar')}" aria-label="${t('Cerrar')}">${icon('xmark', { size: 18 })}</button>
       <div class="ai-ob-body"></div>
     </div>`;
@@ -721,7 +721,7 @@ function openOnboarding(opts = {}) {
             <span class="ai-ob-tpl-ideal">${t.name}${t.ideal ? ' · ' + t.ideal : ''}</span>
           </button>`).join('')}
       </div>
-      ${upgrade ? '' : `<button class="ai-ob-quickchat">${icon('bubble', { size: 15 })}<span>Prefiero solo chatear con el libro</span></button>`}`;
+      ${upgrade ? '' : `<button class="ai-ob-quickchat">${icon('bubble', { size: 15 })}<span>${t('Prefiero solo chatear con el libro')}</span></button>`}`;
     body.querySelectorAll('.ai-ob-tpl').forEach(btn =>
       btn.addEventListener('click', () => { chosenTemplate = getTemplate(btn.dataset.tpl); renderGoal(); }));
     body.querySelector('.ai-ob-quickchat')?.addEventListener('click', async () => {
@@ -733,15 +733,15 @@ function openOnboarding(opts = {}) {
   const renderGoal = () => {
     // Opt-in Artesano: solo en la Lectura Inmersiva (leer ficción como escritor).
     const artesanoOptIn = chosenTemplate.id === INMERSIVA_ID
-      ? `<label class="ai-ob-check"><input type="checkbox" id="ai-ob-artesano" /> Leo para aprender a escribir (modo Artesano)</label>`
+      ? `<label class="ai-ob-check"><input type="checkbox" id="ai-ob-artesano" /> ${t('Leo para aprender a escribir (modo Artesano)')}</label>`
       : '';
     body.innerHTML = `
-      <button class="ai-ob-back">${icon('chevron-left', { size: 16 })}<span>Volver</span></button>
+      <button class="ai-ob-back">${icon('chevron-left', { size: 16 })}<span>${t('Volver')}</span></button>
       <h2>${chosenTemplate.name}</h2>
       <p class="ai-ob-sub">${chosenTemplate.goalPrompt}</p>
-      <textarea id="ai-ob-goal" class="ai-ob-goal" rows="3" placeholder="Tu objetivo..."></textarea>
+      <textarea id="ai-ob-goal" class="ai-ob-goal" rows="3" placeholder="${t('Tu objetivo...')}"></textarea>
       ${artesanoOptIn}
-      <button id="ai-ob-start" class="primary-btn ai-ob-start">Empezar a leer con objetivo</button>`;
+      <button id="ai-ob-start" class="primary-btn ai-ob-start">${t('Empezar a leer con objetivo')}</button>`;
     body.querySelector('.ai-ob-back').addEventListener('click', renderObjectives);
     const goalEl = body.querySelector('#ai-ob-goal');
     if (!EpubReader.isCoarsePointer()) goalEl.focus();   // móvil: sin teclado hasta que toque
@@ -1427,8 +1427,8 @@ function renderNotebook() {
   if (convo && !template) {
     els.noteView.innerHTML = `
       <div class="ai-nb-orphan">
-        <p>Esta conversación usa una plantilla que ya no existe.</p>
-        <button id="ai-nb-neworb" class="primary-btn">Elegir un objetivo</button>
+        <p>${t('Esta conversación usa una plantilla que ya no existe.')}</p>
+        <button id="ai-nb-neworb" class="primary-btn">${t('Elegir un objetivo')}</button>
       </div>`;
     els.noteView.querySelector('#ai-nb-neworb')?.addEventListener('click', openOnboarding);
     return;

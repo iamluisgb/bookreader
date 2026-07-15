@@ -44,7 +44,7 @@ export function open(context) {
   overlay.id = 'ai-summary';
   overlay.className = 'ai-onboarding';
   overlay.innerHTML = `
-    <div class="ai-ob-card sum-card" role="dialog" aria-modal="true" aria-label="Resumen del libro">
+    <div class="ai-ob-card sum-card" role="dialog" aria-modal="true" aria-label="${t('Resumen del libro')}">
       <button class="ai-ob-close" title="${t('Cerrar')}" aria-label="${t('Cerrar')}">${icon('xmark', { size: 18 })}</button>
       <div class="ai-ob-body"></div>
     </div>`;

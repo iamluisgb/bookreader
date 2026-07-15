@@ -47,7 +47,7 @@ export function open(context) {
   overlay.id = 'ai-flashcards';
   overlay.className = 'ai-onboarding';
   overlay.innerHTML = `
-    <div class="ai-ob-card fc-card" role="dialog" aria-modal="true" aria-label="Flashcards para Anki">
+    <div class="ai-ob-card fc-card" role="dialog" aria-modal="true" aria-label="${t('Flashcards para Anki')}">
       <button class="ai-ob-close" title="${t('Cerrar')}" aria-label="${t('Cerrar')}">${icon('xmark', { size: 18 })}</button>
       <div class="ai-ob-body"></div>
     </div>`;
@@ -133,7 +133,7 @@ function mountScopeCombo(host, options, selected, onChange) {
     const items = options.filter(o => !f || o.label.toLowerCase().includes(f));
     list.innerHTML = items.length
       ? items.map(o => `<li role="option" data-value="${escapeHtml(o.value)}" class="${o.value === cur ? 'is-sel' : ''}" aria-selected="${o.value === cur}">${escapeHtml(o.label)}</li>`).join('')
-      : `<li class="fc-combo-empty" aria-disabled="true">Sin resultados</li>`;
+      : `<li class="fc-combo-empty" aria-disabled="true">${t('Sin resultados')}</li>`;
   };
   const close = () => {
     pop.hidden = true; btn.setAttribute('aria-expanded', 'false');

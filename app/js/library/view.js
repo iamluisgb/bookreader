@@ -4,7 +4,7 @@
 import * as Store from './store.js';
 import * as Study from '../ai/study.js';
 import { icon } from '../ui/icons.js';
-import { t } from '../i18n.js';
+import { t, getLang } from '../i18n.js';
 import { escapeHtml } from '../ui/escape.js';
 import { confirmBox, promptBox } from '../ui/dialog.js';
 
@@ -77,7 +77,7 @@ export async function render() {
 
   const list = computeList();
 
-  const title = currentShelf === 'all' ? 'Libros'
+  const title = currentShelf === 'all' ? t('Libros')
     : currentShelf === 'none' ? t('Sin estantería')
     : (shelves.find(s => s.id === currentShelf)?.name || t('Estantería'));
 
@@ -86,28 +86,28 @@ export async function render() {
       <aside class="lib-rail">
         <button class="lib-rail-item${currentShelf === 'all' ? ' active' : ''}" data-shelf="all">
           <span class="lib-rail-ico">${icon('books', { size: 20 })}</span>
-          <span class="lib-rail-name">Libros</span>
+          <span class="lib-rail-name">${t('Libros')}</span>
           <span class="lib-rail-count">${books.length}</span>
         </button>
 
-        <div class="lib-rail-section">Estanterías</div>
+        <div class="lib-rail-section">${t('Estanterías')}</div>
         ${shelves.map(s => {
           const count = books.filter(b => (b.shelfIds || []).includes(s.id)).length;
           return `<button class="lib-rail-item lib-rail-shelf${currentShelf === s.id ? ' active' : ''}" data-shelf="${s.id}">
             <span class="lib-rail-thumb">${shelfThumb(s.id)}</span>
             <span class="lib-rail-name">${escapeHtml(s.name)}</span>
             <span class="lib-rail-count">${count}</span>
-            <span class="lib-rail-kebab" data-shelf-menu="${s.id}" title="Opciones">${icon('ellipsis', { size: 18 })}</span>
+            <span class="lib-rail-kebab" data-shelf-menu="${s.id}" title="${t('Opciones')}">${icon('ellipsis', { size: 18 })}</span>
           </button>`;
         }).join('')}
         <button class="lib-rail-item lib-rail-shelf${currentShelf === 'none' ? ' active' : ''}" data-shelf="none">
           <span class="lib-rail-thumb"><span class="lib-rail-thumb-ph">${icon('book', { size: 14 })}</span></span>
-          <span class="lib-rail-name">Sin estantería</span>
+          <span class="lib-rail-name">${t('Sin estantería')}</span>
           <span class="lib-rail-count">${noShelfCount}</span>
         </button>
 
-        <button class="lib-rail-create" data-act="newshelf">${icon('pencil', { size: 16 })}<span>Crear estantería</span></button>
-        <button class="lib-rail-create lib-rail-settings" data-act="settings">${icon('gear', { size: 16 })}<span>Ajustes generales</span></button>
+        <button class="lib-rail-create" data-act="newshelf">${icon('pencil', { size: 16 })}<span>${t('Crear estantería')}</span></button>
+        <button class="lib-rail-create lib-rail-settings" data-act="settings">${icon('gear', { size: 16 })}<span>${t('Ajustes generales')}</span></button>
       </aside>
 
       <section class="lib-main">
@@ -115,7 +115,7 @@ export async function render() {
         <div class="lib-toolbar">
           <div class="lib-search-box">
             ${icon('search', { size: 16 })}
-            <input type="search" class="lib-search" placeholder="Buscar libro…" value="${escapeHtml(query)}"
+            <input type="search" class="lib-search" placeholder="${t('Buscar libro…')}" value="${escapeHtml(query)}"
               autocomplete="off" spellcheck="false" aria-label="${t('Buscar libro por título o autor')}">
           </div>
           ${dropdownHtml('sort', icon('sort', { size: 16 }) + SORT_LABELS[sortBy], SORT_LABELS, sortBy)}
@@ -140,7 +140,7 @@ async function paintStudyChip() {
   if (!cards || !bar.isConnected) return;
   const chip = document.createElement('button');
   chip.className = 'lib-study-chip';
-  chip.innerHTML = `${icon('cards', { size: 16 })}<span>Repasar hoy · ${cards}</span>`;
+  chip.innerHTML = `${icon('cards', { size: 16 })}<span>${t('Repasar hoy · {n}', { n: cards })}</span>`;
   // P12 · Si hay estanterías con vencidas, el chip abre un selector de ámbito
   // (Todo / cada estantería). Si no, repasa todo directo (flujo rápido de siempre).
   chip.addEventListener('click', async (e) => {
@@ -172,7 +172,7 @@ function showStudyChooser(chip, scopes) {
   ).join('');
   const loose = scopes.looseBooks.map(b => row(b.title, b.cards, { type: 'book', bookId: b.id }, 'book')).join('');
   menu.innerHTML =
-    row('Todo', scopes.total, { type: 'all' }) +
+    row(t('Todo'), scopes.total, { type: 'all' }) +
     shelfTree +
     section(t('Sin estantería'), loose);
   chip.parentElement.appendChild(menu);
@@ -198,7 +198,7 @@ function dropdownHtml(key, label, options, current) {
     <div class="lib-dd-menu">
       ${Object.entries(options).filter(([v]) => !(key === 'progress' && v === 'all') || true).map(([v, lbl]) =>
         `<button class="lib-dd-opt${v === current ? ' active' : ''}" data-dd-val="${v}">
-          <span class="lib-dd-check">${v === current ? icon('check', { size: 15 }) : ''}</span>${escapeHtml(key === 'progress' && v === 'all' ? 'Todos' : lbl)}
+          <span class="lib-dd-check">${v === current ? icon('check', { size: 15 }) : ''}</span>${escapeHtml(key === 'progress' && v === 'all' ? t('Todos') : lbl)}
         </button>`).join('')}
     </div>
   </div>`;
@@ -259,7 +259,7 @@ function resultsHtml(list) {
   if (list.length) return `<div class="lib-grid">${list.map(cardHtml).join('')}</div>`;
   if (query.trim()) {
     return `<div class="lib-empty"><div class="lib-empty-icon">${icon('search', { size: 56 })}</div>
-      <p>Ningún libro coincide con “${escapeHtml(query.trim())}”.</p></div>`;
+      <p>${t('Ningún libro coincide con «{q}».', { q: escapeHtml(query.trim()) })}</p></div>`;
   }
   return emptyHtml(allBooks.length === 0);
 }
@@ -269,8 +269,8 @@ function paintResults() {
   if (wrap) wrap.innerHTML = resultsHtml(computeList());
 }
 function sortBooks(list) {
-  if (sortBy === 'title') return list.sort((a, b) => (a.title || '').localeCompare(b.title || '', 'es'));
-  if (sortBy === 'author') return list.sort((a, b) => (a.author || '').localeCompare(b.author || '', 'es'));
+  if (sortBy === 'title') return list.sort((a, b) => (a.title || '').localeCompare(b.title || '', getLang()));
+  if (sortBy === 'author') return list.sort((a, b) => (a.author || '').localeCompare(b.author || '', getLang()));
   return list; // 'recent': ya viene ordenado por lastOpenedAt desc
 }
 
@@ -341,8 +341,8 @@ async function openShelfMenu(id, anchor) {
   const shelf = shelves.find(s => s.id === id);
   if (!shelf) return;
   buildMenu(anchor, `
-    <button class="lib-menu-item" data-act="rename">${icon('pencil', { size: 16 })}<span>Renombrar</span></button>
-    <button class="lib-menu-item danger" data-act="delete">${icon('trash', { size: 16 })}<span>Eliminar estantería</span></button>
+    <button class="lib-menu-item" data-act="rename">${icon('pencil', { size: 16 })}<span>${t('Renombrar')}</span></button>
+    <button class="lib-menu-item danger" data-act="delete">${icon('trash', { size: 16 })}<span>${t('Eliminar estantería')}</span></button>
   `, async (act) => {
     if (act === 'rename') {
       const name = (await promptBox('Nuevo nombre:', { title: 'Renombrar estantería', value: shelf.name }) || '').trim();
@@ -368,17 +368,17 @@ async function openBookMenu(id, anchor) {
   const finished = book.status === 'finished';
 
   buildMenu(anchor, `
-    <button class="lib-menu-item" data-act="open">${icon('book', { size: 16 })}<span>Abrir</span></button>
+    <button class="lib-menu-item" data-act="open">${icon('book', { size: 16 })}<span>${t('Abrir')}</span></button>
     <button class="lib-menu-item" data-act="finish">${icon('check', { size: 16 })}<span>${finished ? t('Marcar como no leído') : t('Marcar como terminado')}</span></button>
     <div class="lib-menu-sep"></div>
-    <div class="lib-menu-label">Estanterías</div>
+    <div class="lib-menu-label">${t('Estanterías')}</div>
     ${shelves.length
       ? shelves.map(s => `<button class="lib-menu-item" data-act="shelf" data-shelf="${s.id}">
           <span class="lib-menu-check">${inShelf.has(s.id) ? icon('check', { size: 16 }) : ''}</span><span>${escapeHtml(s.name)}</span></button>`).join('')
       : `<div class="lib-menu-empty">${t('Aún no hay estanterías')}</div>`}
-    <button class="lib-menu-item" data-act="newshelf">${icon('plus', { size: 16 })}<span>Nueva estantería…</span></button>
+    <button class="lib-menu-item" data-act="newshelf">${icon('plus', { size: 16 })}<span>${t('Nueva estantería…')}</span></button>
     <div class="lib-menu-sep"></div>
-    <button class="lib-menu-item danger" data-act="delete">${icon('trash', { size: 16 })}<span>Eliminar</span></button>
+    <button class="lib-menu-item danger" data-act="delete">${icon('trash', { size: 16 })}<span>${t('Eliminar')}</span></button>
   `, async (act, item) => {
     if (act === 'open') { const b = await Store.getBook(id); if (b) onOpenBook(b); return; }
     if (act === 'finish') {
