@@ -479,3 +479,34 @@ sirve el wasm offline.
 **Consecuencias.** El esquema legacy no incluye scheduling moderno (irrelevante: se exportan tarjetas
 nuevas). Si Anki retirase el import legacy (no anunciado), habría que emitir `collection.anki21b`.
 Tests en [`tests/flashcards.spec.ts`](tests/flashcards.spec.ts).
+
+## ADR-021 — Gateway de tokens propios: Worker+D1, alias de modelos, 403 al agotar · `ACEPTADA`
+
+**Contexto.** MON1 F1: primer backend del proyecto — un proxy OpenAI-compatible para la demo sin
+fricción del LAUNCH_PLAN (probar el agente sin conseguir API key). El cliente no cambia: base URL
+y key ya son configurables.
+
+**Decisiones.**
+1. **Vive en `workers/gateway/` de este repo** (no repo propio): mismo patrón que `workers/auth`
+   (sync). Un solo repo mientras una sola persona lo opere; separarlo es barato después.
+2. **Contadores en D1, no Durable Objects.** El decremento atómico con
+   `UPDATE … WHERE remaining > 0 RETURNING` elimina la carrera leer-escribir sin serializar
+   nada; a escala demo, D1 sobra y es más simple de inspeccionar (SQL directo por CLI).
+3. **Alias propios desde el día uno** (`bookreader-fast`, `bookreader-vision`) con tabla de
+   routing de una fila por alias → `{provider, model, caps}`. El usuario nunca ve nombres del
+   proveedor: cambiar de proveedor no rompe ninguna config guardada. Barato ahora, caro de
+   retrofitear.
+4. **Demo agotada → HTTP 403, no 429** (desviación consciente de la spec del BACKLOG): el
+   cliente (IA3, `fetchRetrying`) reintenta los 429 con backoff — reintentar una cuota agotada
+   solo quema tiempo; el 403 aflora el mensaje ("añade tu propia key, BYOK") a la primera.
+5. **Retención cero**: el body upstream se devuelve en streaming sin parsearlo ni registrarlo;
+   observability solo captura errores del propio Worker. Coherente con el posicionamiento
+   privacy-first (y con lo que promete la landing).
+6. **Riesgo aceptado F1 — key única compartida**: nan rechaza concurrencia por key; los
+   reintentos del cliente absorben transitorios a tráfico demo. Pool de keys / cola (F2) solo
+   si la telemetría muestra colisiones reales.
+
+**Consecuencias.** MON2 puede emitir tokens Pro contra esta misma tabla (columna `license_key`
+ya existe). El `X-Quota-Remaining` habilita UI de "te quedan N" en F3 (demo self-service).
+Verificado end-to-end el 2026-07-15: modelos, chat, streaming SSE, agotamiento, revocación y
+la app real respondiendo vía gateway (tests/gateway.spec.ts @live).

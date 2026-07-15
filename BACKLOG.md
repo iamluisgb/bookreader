@@ -525,9 +525,10 @@ PDF a HTML → **fuera de alcance**. Documentado aquí para no reabrir el debate
 
 ## 💰 Monetización / Infra
 
-### MON1 — Gateway de tokens propios (proxy OpenAI-compatible sobre nan) · `M`–`L` · **planificado**
+### MON1 — Gateway de tokens propios (proxy OpenAI-compatible sobre nan) · `M`–`L` · **F1 ✓**
 
-> **Estado: planificado (2026-07-10).** Primera pieza con **backend** del proyecto. No rompe el
+> **Estado: F1 entregada (2026-07-15, ver CHANGELOG y ADR-021); F2–F4 pendientes.**
+> Primera pieza con **backend** del proyecto. No rompe el
 > posicionamiento local-first: el cliente sigue siendo 100% estático (GitHub Pages); el gateway es un
 > servicio aparte con su propio repo/despliegue, y **BYOK sigue existiendo tal cual** — esto es una
 > *tercera vía* (demo/tokens gestionados), no un sustituto.
@@ -584,9 +585,10 @@ transitorios); F2 lo resuelve de verdad **si la medición lo pide**.
 self-service (F3), Turnstile si hiciera falta, allowlist de modelos y tope de `max_tokens` server-side.
 
 **Fases:**
-- **F1 — Worker MVP** `M`: passthrough streaming + validación de token + contador atómico en D1 +
-  **tabla de routing con alias** (una fila: nan) + emisión/revocación por CLI (`wrangler d1 execute` o
-  script). Verificar end-to-end con bookreader apuntando la base URL al gateway.
+- **F1 — Worker MVP** `M` · **✓** _(2026-07-15, ver CHANGELOG · ADR-021)_: `workers/gateway/`
+  desplegado (D1 + secret + alias `bookreader-fast`/`bookreader-vision`), verificado end-to-end
+  incluida la app real (`tests/gateway.spec.ts` @live). Nota: demo agotada devuelve **403** (no
+  429) porque IA3 reintenta los 429 — ver ADR-021.
 - **F2 — Concurrencia** `S`–`M`: cola (Durable Object) o pool de keys. Solo si F1 muestra colisiones
   reales.
 - **F3 — Demo self-service** `M`: botón "Probar la demo" en el onboarding del panel → `POST /demo-token`

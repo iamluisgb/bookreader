@@ -1,0 +1,21 @@
+// MON1 · Gateway de tokens propios: proxy OpenAI-compatible sobre nan.
+// Ver BACKLOG (MON1) y DECISIONS.md ADR-021. Deploy: `npx wrangler deploy` desde
+// este directorio. Secret: `npx wrangler secret put NAN_API_KEY`.
+{
+  "name": "bookreader-gateway",
+  "main": "src/index.js",
+  "compatibility_date": "2026-07-01",
+  "observability": { "enabled": true, "head_sampling_rate": 1 },
+  "vars": {
+    // Orígenes permitidos por CORS (dev + producción), separados por comas.
+    "ALLOWED_ORIGINS": "http://localhost:8000,http://localhost:8888,https://luisgonzalezbernal.com"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "bookreader-gateway",
+      "database_id": "6ef5cac4-61c0-4623-be3f-2ff96550e746",
+      "migrations_dir": "./migrations"
+    }
+  ]
+}

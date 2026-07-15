@@ -5,6 +5,26 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-15 — MON1 F1 · Gateway de tokens propios (Cloudflare Worker + D1)
+
+Primer backend del proyecto (ADR-021). Proxy OpenAI-compatible desplegado en
+`bookreader-gateway.luisgonzalezb93.workers.dev`: la app apunta su Base URL ahí con un token
+`br-…` como key y **cero cambios de código** (verificado con la app real, `tests/gateway.spec.ts`
+@live).
+
+- **[`workers/gateway/`](workers/gateway/)**: `/v1/models` + `/v1/chat/completions` con
+  passthrough SSE, validación de token en D1 y **decremento atómico** de cuota
+  (`RETURNING`), cabecera `X-Quota-Remaining`, CORS restringido, tope server-side de
+  `max_tokens`, retención cero de prompts.
+- **Alias propios** (`bookreader-fast` → deepseek-v4-flash · `bookreader-vision` → mimo-v2.5):
+  el proveedor es intercambiable sin tocar configs de usuarios (ADR-021).
+- **Demo agotada → 403** con CTA a BYOK (no 429: el cliente lo reintentaría, ADR-021).
+- Operación por CLI (emitir/ver/revocar tokens) documentada en
+  [`workers/gateway/README.md`](workers/gateway/README.md). Token demo inicial emitido
+  (100 llamadas; `GW_TOKEN` en `.env` para el test @live).
+- Verificado end-to-end: modelos, chat, streaming, alias→modelo real, cuota 100→99,
+  agotamiento (403), revocación (401), app real respondiendo vía gateway.
+
 ## 2026-07-15 — P15 · i18n EN/ES (inglés por defecto) + P16 · landing EN y landings por nicho
 
 Prerrequisito del [LAUNCH_PLAN](LAUNCH_PLAN.md): todos los canales de lanzamiento son
