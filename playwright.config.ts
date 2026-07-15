@@ -23,11 +23,19 @@ export default defineConfig({
     // tests/i18n.spec.ts fuerza en-US en sus propios contextos para cubrir el inglés.
     locale: 'es-ES',
   },
-  webServer: {
-    // La app vive en app/; se sirve como raíz para que los tests sigan usando
-    // rutas absolutas (/index.html, /js/…) sin cambios tras la reorganización.
-    command: 'python3 -m http.server 8888 --directory app',
-    port: 8888,
-    reuseExistingServer: true,
-  },
+  webServer: [
+    {
+      // La app vive en app/; se sirve como raíz para que los tests sigan usando
+      // rutas absolutas (/index.html, /js/…) sin cambios tras la reorganización.
+      command: 'python3 -m http.server 8888 --directory app',
+      port: 8888,
+      reuseExistingServer: true,
+    },
+    {
+      // Raíz del repo (landings /, /es/, /anki/, /privacy/) para landing-lang.spec.ts.
+      command: 'python3 -m http.server 8899',
+      port: 8899,
+      reuseExistingServer: true,
+    },
+  ],
 });

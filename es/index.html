@@ -3,6 +3,16 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<script>
+// Conmutador (P16): ?lang=es (viene de elegir "Español" en la landing EN)
+// persiste la preferencia con la misma clave que usa la app.
+(function () {
+  try {
+    var q = new URLSearchParams(location.search).get('lang');
+    if (q === 'en' || q === 'es') localStorage.setItem('bookreader_lang', q);
+  } catch (e) {}
+})();
+</script>
 <title>BookReader — Lo que lees se queda contigo</title>
 <meta name="description" content="El lector EPUB y PDF con un agente que te explica lo que no entiendes, te enseña la página para que lo compruebes y convierte lo importante en repaso para que no se te olvide. Todo en tu navegador.">
 <meta property="og:type" content="website">
@@ -245,7 +255,10 @@
       <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3.5 L14 3.5 L17.5 7 L17.5 19 Q17.5 20.5 16 20.5 L8 20.5 Q6.5 20.5 6.5 19 L6.5 5 Q6.5 3.5 8 3.5 Z"/><path d="M14 3.5 L14 7 L17.5 7"/><path d="M9.8 10 L12 12 L9.8 14"/><path d="M13 14 L15 14"/></svg>
       BookReader
     </span>
-    <a class="nav-cta" href="../app/">Abrir la app</a>
+    <span style="display:flex;align-items:center;gap:18px">
+      <a class="nav-lang" href="../?lang=en" style="font:600 13.5px var(--sans);color:var(--ink-soft)">English</a>
+      <a class="nav-cta" href="../app/">Abrir la app</a>
+    </span>
   </div>
 </nav>
 
@@ -454,7 +467,7 @@
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3.5 L14 3.5 L17.5 7 L17.5 19 Q17.5 20.5 16 20.5 L8 20.5 Q6.5 20.5 6.5 19 L6.5 5 Q6.5 3.5 8 3.5 Z"/><path d="M14 3.5 L14 7 L17.5 7"/><path d="M9.8 10 L12 12 L9.8 14"/><path d="M13 14 L15 14"/></svg>
       BookReader
     </span>
-    <span>Lector EPUB · PDF con agente de lectura — local-first, BYOK · © 2026 Luis González</span>
+    <span>Lector EPUB · PDF con agente de lectura — local-first, BYOK · © 2026 Luis González · <a href="../?lang=en">English</a></span>
   </div>
 </footer>
 

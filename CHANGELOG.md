@@ -36,6 +36,13 @@ angloparlantes y la app/landing estaban 100% en español. Ver P15/P16 en BACKLOG
   remembers its page") y [`privacy/`](privacy/index.html) (local-first verificable, BYOK, BYOS,
   self-host). CTAs → `app/`.
 - `sw.js` de la app: `js/i18n.js` al precache (bump a v90).
+- **Detección de idioma en la landing** (patrón "grandes empresas" sin servidor): script inline
+  en la raíz — la **preferencia explícita** (`bookreader_lang`, la misma clave que la app) siempre
+  gana; sin preferencia, `navigator.language` es\* redirige a `/es/` una vez. Conmutador
+  Español/English visible en el nav de ambas landings (`?lang=` fija la preferencia, compartida
+  con la app). El SEO ya lo cubría `hreflang`; esto cubre el tráfico directo.
+  Test permanente [`tests/landing-lang.spec.ts`](tests/landing-lang.spec.ts) (2º webServer en
+  Playwright sirviendo la raíz del repo).
 
 ## 2026-07-15 — MON2 · BookReader Pro: licencias Polar + gate de features (modo simulado)
 

@@ -3,6 +3,21 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<script>
+// Idioma (P16): mismo criterio y misma clave que la app (bookreader_lang).
+// La preferencia explícita del usuario SIEMPRE gana sobre la detección; sin
+// preferencia, navigator.language decide una vez. ?lang= fija la preferencia
+// (lo usan los conmutadores del nav, y sirve para forzar en un enlace).
+(function () {
+  try {
+    var q = new URLSearchParams(location.search).get('lang');
+    if (q === 'en' || q === 'es') localStorage.setItem('bookreader_lang', q);
+    var pref = localStorage.getItem('bookreader_lang');
+    if (pref === 'en') return;
+    if (pref === 'es' || (!pref && /^es(-|_|$)/i.test(navigator.language || ''))) location.replace('es/');
+  } catch (e) { /* sin storage: se queda en inglés */ }
+})();
+</script>
 <title>BookReader — What you read finally stays with you</title>
 <meta name="description" content="The EPUB & PDF reader with an AI agent that explains what you don't understand, shows you the page so you can verify it, and turns what matters into spaced review so you don't forget. All in your browser.">
 <meta property="og:type" content="website">
@@ -245,7 +260,10 @@
       <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3.5 L14 3.5 L17.5 7 L17.5 19 Q17.5 20.5 16 20.5 L8 20.5 Q6.5 20.5 6.5 19 L6.5 5 Q6.5 3.5 8 3.5 Z"/><path d="M14 3.5 L14 7 L17.5 7"/><path d="M9.8 10 L12 12 L9.8 14"/><path d="M13 14 L15 14"/></svg>
       BookReader
     </span>
-    <a class="nav-cta" href="app/">Open the app</a>
+    <span style="display:flex;align-items:center;gap:18px">
+      <a class="nav-lang" href="es/?lang=es" style="font:600 13.5px var(--sans);color:var(--ink-soft)">Español</a>
+      <a class="nav-cta" href="app/">Open the app</a>
+    </span>
   </div>
 </nav>
 
