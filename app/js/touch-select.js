@@ -217,7 +217,8 @@ function tapZone(x) {
   const w = (cont && cont.clientWidth) || window.innerWidth || 1;
   const within = ((x % w) + w) % w;
   const f = within / w;
-  return f < 0.28 ? 'prev' : f > 0.72 ? 'next' : 'center';
+  // Bordes del 20%: tocar por el centro no debe pasar página (solo alternar barras).
+  return f < 0.2 ? 'prev' : f > 0.8 ? 'next' : 'center';
 }
 
 // Reposiciona la capa si cambia el viewport mientras hay selección.

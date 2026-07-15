@@ -90,7 +90,13 @@ if (COARSE) {
 // (fondo real de la página) para que no se vea una franja de otro color.
 let swipeBusy = false;
 let lastSwipeX = null;   // último translate aplicado (px enteros)
+let swipeRaf = 0;        // rAF pendiente (se pinta 1 vez por frame como mucho)
+let swipePendingX = null;
+let swipeTrail = [];     // muestras {x,t} recientes para detectar el flick al soltar
 const SWIPE_TURN_MS = 190;
+const SWIPE_JITTER = 3;      // px: temblor del dedo quieto que NO se repinta (anti-parpadeo)
+const FLICK_VELOCITY = 0.35; // px/ms (~350 px/s): deslizamiento rápido que pasa página aunque sea corto
+const FLICK_MIN_DX = 24;     // px mínimos para que un flick cuente como intención
 
 function swipeBox() { return document.getElementById('epub-container'); }
 // translate3d (no translateX): fuerza capa de composición en la GPU, así el iframe
@@ -100,22 +106,58 @@ function tx(x) { return `translate3d(${x}px,0,0)`; }
 function swipeMove(dx) {
   if (swipeBusy) return;
   if (getReadingMode() === 'scroll') return;   // en scroll manda el desplazamiento vertical nativo
-  const c = swipeBox(); if (!c) return;
   const x = Math.round(dx);        // enteros: sin sub-píxel que tiemble
-  if (x === lastSwipeX) return;    // dedo quieto (micro-jitter) → no repintar → sin parpadeo
-  lastSwipeX = x;
-  c.style.transition = 'none';
-  c.style.transform = tx(x);
-  c.style.willChange = 'transform';
+  trackSwipe(x);
+  // Dedo (casi) quieto: el jitter de ±1-2px del sensor táctil alternaría el
+  // transform en cada evento (hasta 120/s) y el texto parpadea. Banda muerta.
+  if (lastSwipeX !== null && Math.abs(x - lastSwipeX) < SWIPE_JITTER) return;
+  // Coalescer a 1 repintado por frame: touchmove dispara más rápido que el refresco.
+  swipePendingX = x;
+  if (swipeRaf) return;
+  swipeRaf = requestAnimationFrame(() => {
+    swipeRaf = 0;
+    if (swipePendingX === null || swipeBusy) return;
+    const c = swipeBox(); if (!c) return;
+    lastSwipeX = swipePendingX;
+    c.style.transition = 'none';
+    c.style.transform = tx(swipePendingX);
+    c.style.willChange = 'transform';
+  });
+}
+
+// Ventana corta de muestras del arrastre: al soltar, la pendiente de la ventana
+// da la velocidad (flick). Si el dedo se paró antes de soltar, la ventana queda
+// vacía y la velocidad es 0 → decide solo la distancia.
+function trackSwipe(x) {
+  const t = performance.now();
+  swipeTrail.push({ x, t });
+  while (swipeTrail.length && t - swipeTrail[0].t > 160) swipeTrail.shift();
+}
+
+function swipeVelocity(xEnd) {
+  const t = performance.now();
+  const s = swipeTrail.find((p) => t - p.t <= 200);
+  if (!s || t - s.t <= 0) return 0;
+  return (xEnd - s.x) / (t - s.t);   // px/ms
+}
+
+function swipeCancelPending() {
+  if (swipeRaf) { cancelAnimationFrame(swipeRaf); swipeRaf = 0; }
+  swipePendingX = null;
 }
 
 async function swipeEnd(dx) {
   if (swipeBusy) return;           // animación en curso: ignora, no la interrumpas
   if (getReadingMode() === 'scroll') return;   // sin pasar página con swipe en modo scroll
   const c = swipeBox(); if (!c) return;
+  swipeCancelPending();            // que un rAF rezagado no pise la animación de salida
   const w = c.clientWidth || window.innerWidth || 1;
-  const threshold = Math.min(90, w * 0.18);
-  if (Math.abs(dx) < threshold || !rendition) {   // no llega → vuelve
+  // Pasa página por DISTANCIA (recorrido corto, estilo Play Books) o por FLICK
+  // (deslizamiento rápido aunque corto, en el mismo sentido que el recorrido).
+  const v = swipeVelocity(Math.round(dx));
+  const byDistance = Math.abs(dx) >= Math.min(60, w * 0.15);
+  const byFlick = Math.abs(dx) >= FLICK_MIN_DX && Math.abs(v) >= FLICK_VELOCITY && (v < 0) === (dx < 0);
+  if ((!byDistance && !byFlick) || !rendition) {   // no llega → vuelve
     await swipeAnimate(c, 0);
     swipeReset(c);
     return;
@@ -133,7 +175,12 @@ async function swipeEnd(dx) {
 }
 
 function swipeSet(c, x) { if (c) { c.style.transition = 'none'; c.style.transform = tx(x); } }
-function swipeReset(c) { lastSwipeX = null; if (c) { c.style.transition = 'none'; c.style.transform = ''; c.style.willChange = ''; } }
+function swipeReset(c) {
+  swipeCancelPending();
+  lastSwipeX = null;
+  swipeTrail = [];
+  if (c) { c.style.transition = 'none'; c.style.transform = ''; c.style.willChange = ''; }
+}
 function swipeAnimate(c, x) {
   return new Promise(res => {
     if (!c) { res(); return; }
@@ -161,7 +208,7 @@ function tapZone(x) {
   const w = (cont && cont.clientWidth) || window.innerWidth || 1;
   const within = ((x % w) + w) % w;
   const f = within / w;
-  return f < 0.28 ? 'prev' : f > 0.72 ? 'next' : 'center';
+  return f < 0.2 ? 'prev' : f > 0.8 ? 'next' : 'center';
 }
 
 // Distingue un toque (navegar) de una selección (mantener pulsado / arrastrar)

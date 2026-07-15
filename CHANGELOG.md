@@ -5,6 +5,24 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-15 — Gestos de página en móvil: sin parpadeo, flick y zonas de toque más estrechas
+
+Tres mejoras del paso de página táctil en EPUB (feedback de uso real en móvil):
+
+- **Anti-parpadeo al parar el dedo a mitad de arrastre**: banda muerta de 3 px (el jitter
+  de ±1-2 px del sensor táctil ya no repinta el transform hasta 120 veces/s) + coalescencia
+  a 1 repintado por frame con `requestAnimationFrame` (con cancelación del rAF rezagado al
+  soltar, para que no pise la animación de giro). En [`js/epub-reader.js`](app/js/epub-reader.js).
+- **Menos recorrido para pasar página (estilo Play Books)**: umbral de distancia de
+  `min(90px, 18%)` → `min(60px, 15%)` del ancho, y nuevo **flick por velocidad** — un
+  deslizamiento rápido (≥0,35 px/ms con ≥24 px en el mismo sentido) pasa página aunque el
+  recorrido sea corto. La velocidad sale de una ventana de muestras de 160 ms; si el dedo
+  se paró antes de soltar, decide solo la distancia.
+- **Zonas de toque de bordes más estrechas**: pasar página por toque baja del 28% al **20%**
+  de cada borde (el 60% central alterna las barras) — tocar cerca de la mitad ya no cambia
+  de página. Aplicado en las dos copias de `tapZone` ([`js/touch-select.js`](app/js/touch-select.js)
+  para táctil y `js/epub-reader.js` para escritorio).
+
 ## 2026-07-15 — MON1 F3 · Demo self-service ("Probar la demo sin API key")
 
 La fase que ataca la métrica de activación del LAUNCH_PLAN: probar el agente sin conseguir
