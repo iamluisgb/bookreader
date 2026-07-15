@@ -68,9 +68,15 @@ En *Products → New product*:
 - **Pricing**: **One-time purchase**, **$29 USD**.
 - **Precio de lanzamiento $19**: crea un **Discount** (*Products → Discounts*):
   tipo fixed amount −$10 (o percentage ~34%), con **fecha de expiración a las
-  72h del lanzamiento** y aplicado automáticamente vía URL de checkout
-  (`?discount_code=LAUNCH`). Mejor cupón visible que bajar el precio: el tachado
+  72h del lanzamiento**. Mejor cupón visible que bajar el precio: el tachado
   `$29 → $19` es parte del empuje de urgencia.
+- **El cupón va pre-aplicado en el propio Checkout Link** (al crear el link en
+  el dashboard, asóciale el discount; si la UI no lo permitiera, genera el link
+  ya con `?discount_code=LAUNCH` y usa **siempre ese URL canónico**). No
+  depender de que el tráfico lleve el parámetro: durante el lanzamiento la
+  mayoría de visitas llegan por enlaces que no controlamos (HN, Reddit, boca a
+  boca) y cualquier enlace desnudo mostraría $29 en plena ventana de $19. Al
+  expirar las 72h, el mismo link vuelve solo a $29 — sin tocar nada.
 
 ## Paso 4 — Benefit: license key
 
@@ -81,8 +87,12 @@ En el producto → *Benefits → Add benefit → License Keys*:
 - **Activations limit**: **5** — es el "número de dispositivos". Cada navegador
   del usuario registra una activación; 5 cubre móvil+portátil+tablet con margen
   y frena el compartir la key en masa.
+- **Cuenta con activaciones "fantasma"**: si el navegador purga el storage (ver
+  paso 6), el usuario re-activa sin haber cambiado de dispositivo y consume un
+  slot nuevo. Por eso el límite es 5 y no 3, y por eso la desactivación
+  self-service **no es opcional**.
 - Deja habilitado que el usuario pueda **desactivar instancias** desde el portal
-  de cliente (libera hueco si cambia de máquina).
+  de cliente (libera hueco si cambia de máquina o si una purga le quemó un slot).
 
 El comprador recibe la key por email automáticamente y puede recuperarla siempre
 en el portal de cliente de Polar (menos tickets de "he perdido mi licencia").
@@ -103,7 +113,10 @@ escuchar**; el gate se resuelve 100% con la validación de license key del paso 
 ## Paso 6 — Validar la key desde el frontend (sin backend)
 
 Polar expone endpoints **públicos** (pensados para clientes sin servidor) en el
-customer portal API:
+customer portal API. **CORS verificado (2026-07-15)**: el preflight contra
+`api.polar.sh` responde `access-control-allow-origin: *`, así que son llamables
+desde GitHub Pages sin proxy — el supuesto arquitectónico central del plan se
+sostiene.
 
 - `POST https://api.polar.sh/v1/customer-portal/license-keys/activate`
   — primera vez en un dispositivo: `{ key, organization_id, label }` →
@@ -116,13 +129,51 @@ Reglas para BookReader (coherentes con local-first/offline):
 
 - Validar **en background al arrancar**, no bloquear la app: si no hay red,
   **la última validación buena vale** (cachear `validatedAt` y aceptar hasta
-  ~14-30 días offline). Un lector offline que se bloquea sin red mataría el pitch.
+  **30 días** offline — ventana única y fija; 14 días rozaría el pitch de
+  lector offline). Un lector que se bloquea sin red mataría el posicionamiento.
+- **`label` de activación legible**: `<navegador> · <SO>` (p.ej.
+  `Safari · iPhone`). Es lo que el usuario ve en el portal de cliente al
+  desactivar instancias — un label opaco convierte "libera un hueco" en un
+  ticket de soporte.
 - Si la validación devuelve inválida/revocada → degradar a Free con aviso, no
   borrar datos.
 - El `organization_id` es público (va en el frontend sin problema). No hay
   secretos de Polar en el cliente.
 - Que alguien técnico lo crackee es irrelevante a esta escala (decisión ya
   tomada en `LAUNCH_PLAN.md`).
+
+### La purga de storage quema activaciones — mitigación en 3 frentes
+
+Safari (ITP) borra IndexedDB/localStorage de webs **no instaladas** tras ~7 días
+sin uso; otros navegadores purgan bajo presión de disco. La key y el
+`activation_id` se pierden **juntos**, así que el usuario re-introduce la key y
+consume un slot nuevo sin haber cambiado de dispositivo. Con límite 5, un lector
+de iPhone que deja la app unas semanas puede agotarlos. Mitigación:
+
+1. **El error de límite de activaciones nunca es un callejón sin salida**: el
+   mensaje explica el porqué ("¿has borrado datos de navegación o reinstalado?")
+   y enlaza **directamente al portal de cliente de Polar** para desactivar la
+   instancia vieja y reintentar.
+2. **La key + `activation_id` entran en el export/import de backup** (`.json`
+   del LAUNCH_PLAN): restaurar un backup restaura la licencia **sin quemar
+   activación** (validate con el `activation_id` restaurado, no re-activate).
+3. **Empujar la instalación como PWA al activar Pro** ("instala BookReader para
+   que tu licencia y tus libros no dependan de la limpieza del navegador"):
+   una PWA instalada queda exenta de la purga de ITP y de paso mejora retención.
+
+## Paso 6b — El trabajo de código tiene ticket propio: MON2
+
+Esta guía cubre la plataforma; la contraparte en la app (módulo de licencia, UI
+en Settings, puntos de gate por feature, paywall en momento de intención,
+backup de la key, tests) está despiezada en **[BACKLOG.md → MON2](../BACKLOG.md)**
+(`M`, ~1 día, coherente con la estimación del LAUNCH_PLAN). Nada de esto se
+improvisa durante la semana de lanzamiento.
+
+> **Enlace con el gateway (MON1):** cuando exista el gateway de tokens, los
+> tokens Pro se emitirán contra la license key de Polar (el gateway la valida
+> server-side y emite el token con routing al modelo bueno). MON2 no lo
+> implementa, pero su módulo de licencia debe **exponer la key** para ese flujo
+> futuro. Detalle en la ficha de MON1.
 
 ## Paso 7 — Verificación end-to-end (en sandbox)
 
@@ -131,8 +182,10 @@ En `sandbox.polar.sh` con el producto replicado:
 1. Compra con tarjeta de test de Stripe (`4242 4242 4242 4242`).
 2. Llega el email con la license key.
 3. `activate` desde la app → `validate` en recarga → gate Pro abierto.
-4. Sexta activación (límite 5) → error controlado y mensaje claro en la UI.
-5. Desactivar una instancia desde el portal de cliente → la activación 6 ya entra.
+4. Sexta activación (límite 5) → error controlado con enlace al portal de
+   cliente; desactivar una instancia desde ahí y reintentar debe funcionar.
+5. Simular purga de storage (borrar IndexedDB a mano) → restaurar backup
+   `.json` → la licencia vuelve **sin** consumir activación nueva.
 6. Revocar la key en el dashboard → la app degrada a Free sin romper.
 7. Reembolso de la compra de test → comprobar qué pasa con la key (debe quedar
    revocada) y que la app lo maneja.
@@ -144,10 +197,12 @@ Solo cuando todo esto pasa en sandbox, repetir producto+discount en producción.
 - [ ] Cuenta y organización creadas en polar.sh (y en sandbox)
 - [ ] Payout account (Stripe Express, España, IBAN) verificada
 - [ ] Producto BookReader Pro one-time $29 + discount LAUNCH −$10 con expiración 72h
+- [ ] Discount **pre-aplicado en el Checkout Link** (no depender de `?discount_code=` en la URL)
 - [ ] Benefit license key: prefijo, sin expiración, 5 activaciones
 - [ ] Checkout link en la landing (embed/overlay después, con el gate)
-- [ ] Validación de key integrada: activate/validate + tolerancia offline
-- [ ] Los 7 puntos de verificación en sandbox pasan
+- [ ] MON2 implementado (BACKLOG): módulo licencia + gate + paywall + key en backup
+- [ ] Validación de key integrada: activate/validate + ventana offline 30 días
+- [ ] Los 7 puntos de verificación en sandbox pasan (incluida purga + restore de backup)
 - [ ] Gestor consultado sobre la declaración de los payouts de Polar (MoR)
 
 ## Situación fiscal en España (sin estar dado de alta como autónomo)

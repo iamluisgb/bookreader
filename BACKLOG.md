@@ -543,9 +543,53 @@ self-service (F3), Turnstile si hiciera falta, allowlist de modelos y tope de `m
   Este es el que mueve la métrica de activación del LAUNCH_PLAN.
 - **F4 — Gestión** `S`: listar tokens, uso, revocar (CLI ampliada o mini-admin).
 
+**Enlace con MON2 (licencias Polar) — los tokens Pro no se emiten a mano.** El flujo natural:
+`license key válida → POST /pro-token` — el gateway valida la key contra la API de Polar **server-side**
+(sin depender del cliente) y emite/renueva un token con routing de tier Pro (→ el modelo bueno). Dos
+consecuencias de diseño *baratas ahora, caras después*: (1) la tabla de tokens en D1 lleva campo
+`license_key` **desde F1** aunque vaya vacío (evita migración); (2) el módulo de licencia de MON2
+expone la key para este flujo. Revocación de key en Polar (reembolso) → revocar sus tokens en el
+gateway (job o check perezoso al validar el token).
+
 **Requiere ADR al arrancar:** primer backend del proyecto (dónde vive, repo propio vs `gateway/` aquí),
 esquema de contadores (D1 vs Durable Object), política de límites y de datos (el gateway ve los prompts →
 declarar retención cero y logging mínimo, coherente con el posicionamiento privacy-first).
+
+### MON2 — BookReader Pro: licencias Polar + gate de features · `M` · **planificado**
+
+> **Estado: planificado (2026-07-15).** Contraparte de código de
+> [docs/GUIA_MONETIZACION.md](docs/GUIA_MONETIZACION.md) (plataforma: Polar, MoR + license keys).
+> **Sin backend**: los endpoints de license keys del customer portal de Polar tienen CORS abierto
+> (verificado 2026-07-15: `access-control-allow-origin: *` en `api.polar.sh`) → llamables desde
+> GitHub Pages. Sandbox: `sandbox-api.polar.sh` (elegir base URL por config, no hardcodear).
+
+**Piezas:**
+1. **`js/license.js`** — módulo único dueño del estado de licencia:
+   - `activate(key)` → `POST /v1/customer-portal/license-keys/activate` `{key, organization_id,
+     label}` → persiste `{key, activationId, validatedAt, status}` vía [storage.js](js/storage.js).
+     `label` legible: `<navegador> · <SO>` (es lo que el usuario ve en el portal al liberar huecos).
+   - `validate()` al arrancar, **en background, nunca bloquea**: 200 → refresca `validatedAt`;
+     inválida/revocada → `status: 'free'` con aviso (**no borrar datos**); sin red/error de red →
+     Pro sigue válido si `validatedAt` < **30 días** (ventana offline fija).
+   - Evento `license:changed` para que la UI reaccione sin acoplarse al módulo.
+   - `organization_id` es público: va en el frontend sin problema, no hay secretos de Polar.
+2. **UI en Settings** — sección "Licencia": input de key, estado (Pro activo / Free), botón
+   "gestionar dispositivos" → portal de cliente de Polar.
+3. **Gate `isPro()` en los puntos de intención** (paywall al usar la feature, no antes): export
+   Anki/Markdown/Obsidian · templates avanzadas (HQ&A, resumen progresivo) · mapas mentales ·
+   quizzes · perfiles. Paywall = modal con pitch + botón de checkout (link primero; embed/overlay
+   de Polar en v2). Free nunca pierde lo que ya tenía gratis.
+4. **Error de límite de activaciones (5) con salida**: mensaje que explica la causa probable
+   ("¿datos de navegación borrados?") + enlace directo al portal para desactivar una instancia
+   y reintentar.
+5. **Key + `activationId` en el export/import de backup** ([backup.js](js/backup.js)): restaurar
+   backup restaura la licencia **sin quemar activación** (mitiga la purga de storage de Safari/ITP;
+   ver guía, paso 6). Al activar Pro, empujar instalación PWA (exenta de purga).
+6. **Tests**: unit de `license.js` con fetch mockeado (activa OK, revocada, offline dentro/fuera de
+   la ventana de 30 días, límite de activaciones) + e2e del gate (Free ve paywall, Pro no).
+
+**Fuera de alcance:** emisión de tokens Pro del gateway (ver enlace en MON1), checkout embebido
+(v2), tier Supporter $49 (LAUNCH_PLAN, decisión de pricing aparte).
 
 **❓ Abiertas:** ¿cuota total (100 llamadas) o diaria? · ¿tokens de pago post-demo ligados a Pro/Lemon
 Squeezy o solo demo? · ¿cuenta de Cloudflare disponible (si no: Deno Deploy / VPS)? · medir el coste por
