@@ -9,6 +9,7 @@ import * as EpubReader from '../epub-reader.js';
 import * as PdfReader from '../pdf-reader.js';
 import { getTemplate, objectiveTemplates, isValidField, isAgentFillable, agentFields, isCognitionField, ARTESANO_ID, INMERSIVA_ID } from './templates.js';
 import { icon } from '../ui/icons.js';
+import { t } from '../i18n.js';
 import { escapeHtml } from '../ui/escape.js';
 import { confirmBox, promptBox } from '../ui/dialog.js';
 import * as AppSettings from '../ui/app-settings.js';
@@ -65,7 +66,7 @@ let ia2Seen = new Set();
 export function init(opts) {
   onCite = opts.onCite || (() => {});
   els.panel = document.getElementById('ai-panel');
-  els.panel.innerHTML = TEMPLATE;
+  els.panel.innerHTML = TEMPLATE();
   const $ = (s) => els.panel.querySelector(s);
   Object.assign(els, {
     status: $('#ai-status'), tabs: $('#ai-tabs'),
@@ -203,7 +204,7 @@ function maybeHintFlashcards() {
   const hint = document.createElement('div');
   hint.className = 'ai-coachmark';
   hint.innerHTML = `
-    <span>Convierte este libro en <b>flashcards para Anki</b> desde aquí.</span>
+    <span>${t('Convierte este libro en <b>flashcards para Anki</b> desde aquí.')}</span>
     <button class="ai-coachmark-x" aria-label="Entendido">${icon('xmark', { size: 14 })}</button>`;
   document.body.appendChild(hint);
   flashcardsHintEl = hint;
@@ -239,7 +240,7 @@ function maybeOfferObjective() {
   const nudge = document.createElement('div');
   nudge.className = 'ai-objnudge';
   nudge.innerHTML = `
-    <span>¿Estudiando este libro? Elige un <b>objetivo de lectura</b> para activar la libreta y el repaso.</span>
+    <span>${t('¿Estudiando este libro? Elige un <b>objetivo de lectura</b> para activar la libreta y el repaso.')}</span>
     <div class="ai-objnudge-btns">
       <button class="ai-objnudge-go">Elegir objetivo</button>
       <button class="ai-objnudge-x" aria-label="Ahora no">${icon('xmark', { size: 14 })}</button>
@@ -409,13 +410,14 @@ async function generateHQA(text, cfiRange) {
 `Aplicas el método HQ&A (Highlight–Question–Answer). Dado un FRAGMENTO subrayado y el OBJETIVO
 del usuario, genera SOLO una PREGUNTA conceptual que ese fragmento responde, alineada al objetivo.
 NO escribas la respuesta: la respuesta la redacta el usuario con sus propias palabras.
+Escribe la pregunta en el idioma del FRAGMENTO subrayado.
 Responde EXACTAMENTE en una línea, sin nada más:
 P: <pregunta>` },
       { role: 'user', content: `OBJETIVO: ${convo.goal}\n\nFRAGMENTO SUBRAYADO:\n"${text}"` },
     ];
     const out = await LLM.chatStream({ messages });
     const q = (out.match(/P:\s*(.+)/i)?.[1] || '').trim();
-    const content = `> ${text}\n\n**P:** ${q || '—'}\n**R:** _(escribe tu respuesta)_`;
+    const content = `> ${text}\n\n**P:** ${q || '—'}\n**R:** _(${t('escribe tu respuesta')})_`;
     const id = convo ? await DB.addNote(convo.id, 'hqa', content, [cfiRange]) : Date.now();
     notes.push({ id, fieldKey: 'hqa', content, sourceCfis: [cfiRange] });
     renderNotebook();
@@ -444,10 +446,10 @@ async function prepareBook() {
       if (stale()) return;
       segCached = true;
     } else {
-      const unit = myFormat === 'pdf' ? 'páginas' : 'secciones';
+      const unit = myFormat === 'pdf' ? t('páginas') : t('secciones');
       if (!stale()) setStatus('Leyendo el libro…');
       const segmenter = myFormat === 'pdf' ? segmentPdf : segmentBook;
-      seg = await segmenter(myBook, (d, t) => { if (!stale()) setStatus(`Leyendo el libro… ${d}/${t} ${unit}`); });
+      seg = await segmenter(myBook, (d, n) => { if (!stale()) setStatus(`${t('Leyendo el libro…')} ${d}/${n} ${unit}`); });
       if (myBookId) await DB.saveSegmented(myBookId, myTitle, seg);
       if (stale()) return;         // el usuario cambió de libro mientras segmentábamos → descartar
       segCached = false;
@@ -480,7 +482,7 @@ async function prepareBook() {
     if (document.getElementById('sidebar')?.classList.contains('open')) maybeAttenuate();
   } catch (e) {
     console.error('Preparación del agente falló:', e);
-    if (!stale()) setStatus('No se pudo preparar el libro: ' + e.message);
+    if (!stale()) setStatus(t('No se pudo preparar el libro: {msg}', { msg: e.message }));
   }
 }
 
@@ -488,14 +490,14 @@ async function prepareBook() {
 // onboarding pise el "Listo" o viceversa según el orden en que terminen.
 function refreshStatus() {
   if (!book) { setStatus('Abre un EPUB para empezar.'); return; }
-  if (!segReady) { setStatus(template ? `Plantilla: ${template.name} · leyendo…` : 'Leyendo el libro…'); return; }
+  if (!segReady) { setStatus(template ? t('Plantilla: {name} · leyendo…', { name: template.name }) : 'Leyendo el libro…'); return; }
   // Estado de cara al usuario: "Listo para preguntar" (nada de jerga del pipeline —
   // "pasajes", "cacheado" son conceptos internos que no significan nada para quien lee).
   // El detalle técnico queda en el title, por si hace falta depurar. En reposo el estado
   // es un readout sin acción → 'idle' para colapsarlo en táctil (alto escaso). Los estados
   // transitorios (leyendo/generando/error) sí se ven.
   setStatus('Listo para preguntar');
-  if (els.status) els.status.title = `${segBlocks} pasajes indexados${segCached ? ' · desde caché' : ''}`;
+  if (els.status) els.status.title = t('{n} pasajes indexados', { n: segBlocks }) + (segCached ? t(' · desde caché') : '');
   els.status.classList.add('ai-status--idle');
   renderConvoBar();
   maybeHintFlashcards();
@@ -550,8 +552,8 @@ function renderConvoBar() {
   // OBJETIVO de lectura (lo que el usuario escribió), no el código interno de la plantilla
   // ("T2 · HQ&A"), que no significa nada para quien lee y ya no aporta aquí.
   els.convoLabel.textContent = convo
-    ? (convo.title || convo.goal || template?.name || 'Chat libre')
-    : 'Elegir objetivo de lectura';
+    ? (convo.title || convo.goal || template?.name || t('Chat libre'))
+    : t('Elegir objetivo de lectura');
 }
 
 async function openConvoMenu(anchor) {
@@ -561,17 +563,17 @@ async function openConvoMenu(anchor) {
   menu.className = 'ai-convo-menu lib-menu';
   menu.innerHTML = `
     ${convos.map(c => {
-      const t = getTemplate(c.templateId);
+      const tpl = getTemplate(c.templateId);
       const active = convo && c.id === convo.id;
       return `<button class="lib-menu-item ai-convo-item" data-id="${c.id}">
         <span class="lib-menu-check">${active ? icon('check', { size: 16 }) : ''}</span>
-        <span class="ai-convo-item-text"><span class="ai-convo-item-name">${escapeHtml(c.title || t?.name || 'Conversación')}</span><span class="ai-convo-item-goal">${escapeHtml(c.goal || '')}</span></span>
-        <span class="ai-convo-rename" data-rename="${c.id}" title="Renombrar">${icon('pencil', { size: 15 })}</span>
-        <span class="ai-convo-del" data-del="${c.id}" title="Eliminar">${icon('trash', { size: 15 })}</span>
+        <span class="ai-convo-item-text"><span class="ai-convo-item-name">${escapeHtml(c.title || tpl?.name || t('Conversación'))}</span><span class="ai-convo-item-goal">${escapeHtml(c.goal || '')}</span></span>
+        <span class="ai-convo-rename" data-rename="${c.id}" title="${t('Renombrar')}">${icon('pencil', { size: 15 })}</span>
+        <span class="ai-convo-del" data-del="${c.id}" title="${t('Eliminar')}">${icon('trash', { size: 15 })}</span>
       </button>`;
     }).join('')}
     <div class="lib-menu-sep"></div>
-    <button class="lib-menu-item" data-act="new">${icon('plus', { size: 16 })}<span>Nueva conversación…</span></button>
+    <button class="lib-menu-item" data-act="new">${icon('plus', { size: 16 })}<span>${t('Nueva conversación…')}</span></button>
   `;
   document.body.appendChild(menu);
   convoMenuEl = menu;
@@ -603,7 +605,7 @@ async function openConvoMenu(anchor) {
       ev.stopPropagation();
       const id = del.dataset.del;
       const c = convos.find(x => x.id === id);
-      if (await confirmBox(`¿Eliminar la conversación "${getTemplate(c?.templateId)?.name || ''}"? Se borran su chat y su libreta.`,
+      if (await confirmBox(t('¿Eliminar la conversación "{name}"? Se borran su chat y su libreta.', { name: getTemplate(c?.templateId)?.name || '' }),
           { title: 'Eliminar conversación', okText: 'Eliminar', danger: true })) {
         await DB.deleteConvo(id);
         closeConvoMenu();
@@ -673,7 +675,7 @@ function openOnboarding(opts = {}) {
   overlay.className = 'ai-onboarding';
   overlay.innerHTML = `
     <div class="ai-ob-card" role="dialog" aria-modal="true" aria-label="Elegir objetivo de lectura">
-      <button class="ai-ob-close" title="Cerrar" aria-label="Cerrar">${icon('xmark', { size: 18 })}</button>
+      <button class="ai-ob-close" title="${t('Cerrar')}" aria-label="${t('Cerrar')}">${icon('xmark', { size: 18 })}</button>
       <div class="ai-ob-body"></div>
     </div>`;
   document.body.appendChild(overlay);
@@ -710,8 +712,8 @@ function openOnboarding(opts = {}) {
   const renderObjectives = () => {
     const list = objectiveTemplates();
     body.innerHTML = `
-      <h2>¿Qué quieres conseguir con este libro?</h2>
-      <p class="ai-ob-sub">Elige un objetivo de lectura${upgrade ? '' : ', o empieza a preguntar sin más'}.</p>
+      <h2>${t('¿Qué quieres conseguir con este libro?')}</h2>
+      <p class="ai-ob-sub">${t('Elige un objetivo de lectura')}${upgrade ? '' : t(', o empieza a preguntar sin más')}.</p>
       <div class="ai-ob-templates">
         ${list.map(t => `
           <button class="ai-ob-tpl" data-tpl="${t.id}">
@@ -838,7 +840,7 @@ async function explainView() {
   const dataUrl = PdfReader.capturePageImage(1024);
   if (!dataUrl) { setStatus('Espera a que la página termine de renderizarse.'); return; }
   pendingImage = { dataUrl, page };
-  if (els.imgref) { els.imgref.style.display = 'flex'; els.imgrefText.textContent = `Página ${page}`; }
+  if (els.imgref) { els.imgref.style.display = 'flex'; els.imgrefText.textContent = t('Página {n}', { n: page }); }
   setOpen(true); showView('chat');
   focusInput();
   setStatus('Imagen de la página adjunta — escribe tu pregunta y pulsa Enviar.');
@@ -866,8 +868,8 @@ async function deliverVision(userText, image) {
   const img = image.dataUrl;
 
   const instruction = userText ||
-    'Explícame el contenido de esta página, en especial las figuras, diagramas o tablas que aparezcan.';
-  const userLabel = `📷 Página ${page} · ${instruction}`;
+    t('Explícame el contenido de esta página, en especial las figuras, diagramas o tablas que aparezcan.');
+  const userLabel = `📷 ${t('Página {n}', { n: page })} · ${instruction}`;
 
   appendBubble('user', userLabel, false);
   history.push({ role: 'user', content: userLabel });
@@ -875,7 +877,7 @@ async function deliverVision(userText, image) {
 
   const bubble = appendBubble('assistant', '', false);
   const textNode = bubble.querySelector('.ai-bubble-text');
-  textNode.innerHTML = '<span class="ai-typing">mirando la página…</span>';
+  textNode.innerHTML = `<span class="ai-typing">${t('mirando la página…')}</span>`;
   busy = true; els.send.disabled = true; abortCtrl = new AbortController();
   agentUnread = false; applyAgentBadge();
 
@@ -897,13 +899,13 @@ inventes ni cambies el número de página.` },
 
     const raw = await LLM.chatVision({ messages, signal: abortCtrl.signal, maxTokens: 2048 });
     if (mySeq !== bookSeq) return;   // cambió de libro → no persistir en el convo equivocado
-    const finalText = raw || '(sin respuesta del modelo de visión)';
+    const finalText = raw || t('(sin respuesta del modelo de visión)');
     textNode.innerHTML = renderWithCitations(finalText, anchors);
     addMessageActions(bubble, finalText, instruction, { autoRun: false });
     history.push({ role: 'assistant', content: finalText });
     if (convo) DB.addMessage(convo.id, 'assistant', finalText);
   } catch (e) {
-    if (e.name === 'AbortError') textNode.textContent += ' [cancelado]';
+    if (e.name === 'AbortError') textNode.textContent += t(' [cancelado]');
     else { console.error(e); textNode.innerHTML = `<span class="ai-error">${escapeHtml(e.message)}</span>`; }
   } finally {
     busy = false; els.send.disabled = false; abortCtrl = null; scrollDown();
@@ -1105,7 +1107,7 @@ async function quizChapter(chapterLabel) {
   busy = true; els.send.disabled = true;
   const bubble = appendBubble('assistant', '', false);
   const textNode = bubble.querySelector('.ai-bubble-text');
-  textNode.innerHTML = '<span class="ai-typing">repaso del capítulo…</span>';
+  textNode.innerHTML = `<span class="ai-typing">${t('repaso del capítulo…')}</span>`;
   try {
     const messages = [
       { role: 'system', content:
@@ -1173,7 +1175,7 @@ async function deliver(aug, question, { showUser = true } = {}) {
     + priorWindow.reduce((n, m) => n + estimateTokens(m.content), 0)
     + estimateTokens(aug) + 400;
   if (estTokens > TOKEN_GUARD &&
-      !(await confirmBox(`El contexto es grande (~${Math.round(estTokens / 1000)}k tokens): puede ser lento o caro. ¿Enviar igualmente?`,
+      !(await confirmBox(t('El contexto es grande (~{n}k tokens): puede ser lento o caro. ¿Enviar igualmente?', { n: Math.round(estTokens / 1000) }),
         { title: 'Contexto grande', okText: 'Enviar igualmente' }))) {
     busy = false; els.send.disabled = false; abortCtrl = null;   // liberar el turno reservado
     refreshStatus();
@@ -1188,7 +1190,7 @@ async function deliver(aug, question, { showUser = true } = {}) {
 
   const bubble = appendBubble('assistant', '', false);
   const textNode = bubble.querySelector('.ai-bubble-text');
-  textNode.innerHTML = '<span class="ai-typing">pensando…</span>';
+  textNode.innerHTML = `<span class="ai-typing">${t('pensando…')}</span>`;
   agentUnread = false; applyAgentBadge();   // si el panel está cerrado, muestra "generando"
   let thinking = true, raw, truncated = false, acc = '';
 
@@ -1199,7 +1201,7 @@ async function deliver(aug, question, { showUser = true } = {}) {
     // Guard: libro indexado (segReady). Un retrieval DÉBIL —incluido el vacío (0 aciertos)—
     // es justo cuando el agente debe buscar por su cuenta; por eso NO exigimos picked>0.
     if (LLM.hasKey() && segReady && !ctx.routed?.length && ctx.bm25Count < AGENTIC_MIN_HITS) {
-      textNode.innerHTML = '<span class="ai-typing">buscando en el libro…</span>';
+      textNode.innerHTML = `<span class="ai-typing">${t('buscando en el libro…')}</span>`;
       ctx = await agenticGather(question, ctx, abortCtrl.signal);
     }
 
@@ -1242,8 +1244,7 @@ async function deliver(aug, question, { showUser = true } = {}) {
 // instrucción de continuación, sin pintar/persistir una burbuja de usuario (el modelo
 // ya ve su parte previa en el historial). La continuación llega como nueva burbuja.
 function continueResponse(question) {
-  const prompt = 'Continúa tu respuesta anterior EXACTAMENTE desde donde se cortó, '
-    + 'sin repetir nada de lo ya escrito, sin saludar y sin reintroducir. Sigue el hilo.';
+  const prompt = t('Continúa tu respuesta anterior EXACTAMENTE desde donde se cortó, sin repetir nada de lo ya escrito, sin saludar y sin reintroducir. Sigue el hilo.');
   return deliver(prompt, question, { showUser: false });
 }
 
@@ -1258,28 +1259,28 @@ function addMessageActions(bubble, answerText, question, { autoRun = false, trun
   if (truncated) {
     const cont = document.createElement('button');
     cont.className = 'ai-act ai-continue';
-    cont.innerHTML = act('arrow-up-right', 'Continuar');
-    cont.title = 'La respuesta se cortó por longitud';
+    cont.innerHTML = act('arrow-up-right', t('Continuar'));
+    cont.title = t('La respuesta se cortó por longitud');
     cont.addEventListener('click', () => { cont.disabled = true; continueResponse(question); });
     bar.appendChild(cont);
   }
 
   const copyBtn = document.createElement('button');
   copyBtn.className = 'ai-act ai-copy';
-  copyBtn.innerHTML = act('copy', 'Copiar');
+  copyBtn.innerHTML = act('copy', t('Copiar'));
   copyBtn.addEventListener('click', async () => {
     try {
       await navigator.clipboard.writeText(answerText);
-      copyBtn.innerHTML = act('check', 'Copiado');
+      copyBtn.innerHTML = act('check', t('Copiado'));
     } catch {
       // Fallback para contextos sin Clipboard API.
       const ta = document.createElement('textarea');
       ta.value = answerText; document.body.appendChild(ta); ta.select();
-      try { document.execCommand('copy'); copyBtn.innerHTML = act('check', 'Copiado'); }
-      catch { copyBtn.innerHTML = act('xmark', 'Error'); }
+      try { document.execCommand('copy'); copyBtn.innerHTML = act('check', t('Copiado')); }
+      catch { copyBtn.innerHTML = act('xmark', t('Error')); }
       ta.remove();
     }
-    setTimeout(() => { copyBtn.innerHTML = act('copy', 'Copiar'); }, 1500);
+    setTimeout(() => { copyBtn.innerHTML = act('copy', t('Copiar')); }, 1500);
   });
   bar.appendChild(copyBtn);
 
@@ -1295,7 +1296,7 @@ function addMessageActions(bubble, answerText, question, { autoRun = false, trun
     }
     const ex = document.createElement('button');
     ex.className = 'ai-act ai-extract';
-    ex.innerHTML = act('note', 'A la libreta');
+    ex.innerHTML = act('note', t('A la libreta'));
     ex.addEventListener('click', () => extractToNotebook(answerText, question, ex));
     bar.appendChild(ex);
   }
@@ -1316,7 +1317,7 @@ function notebookTool() {
         type: 'object',
         properties: {
           fieldKey: { type: 'string', enum: keys, description: 'Campo de la plantilla.' },
-          content: { type: 'string', description: 'Nota concisa en español, con cita [[aN]] si procede.' },
+          content: { type: 'string', description: 'Nota concisa en el idioma de la conversación, con cita [[aN]] si procede.' },
           sourceCfis: { type: 'array', items: { type: 'string' }, description: 'Anclas [[aN]] de origen.' },
         },
         required: ['fieldKey', 'content'],
@@ -1397,8 +1398,8 @@ function editorHtml(attr, value) {
     <div class="ai-nb-editor" ${attr}>
       <textarea class="ai-nb-input" placeholder="Escribe tu nota...">${escapeHtml(value)}</textarea>
       <div class="ai-nb-editor-actions">
-        <button class="ai-nb-save">Guardar</button>
-        <button class="ai-nb-cancel">Cancelar</button>
+        <button class="ai-nb-save">${t('Guardar')}</button>
+        <button class="ai-nb-cancel">${t('Cancelar')}</button>
       </div>
     </div>`;
 }
@@ -1437,18 +1438,18 @@ function renderNotebook() {
   for (const n of notes) (byField[n.fieldKey] ||= []).push(n);
 
   els.noteView.innerHTML = `
-    <div class="ai-nb-goal"><span class="ai-nb-goal-label">${icon('target', { size: 15 })} Objetivo</span><span class="ai-nb-goal-value">${escapeHtml(convo.goal)}</span></div>
+    <div class="ai-nb-goal"><span class="ai-nb-goal-label">${icon('target', { size: 15 })} ${t('Objetivo')}</span><span class="ai-nb-goal-value">${escapeHtml(convo.goal)}</span></div>
     <div class="ai-nb-tpl">${template.name}</div>
     ${template.fields.map(f => {
       const list = byField[f.key] || [];
       const notesHtml = list.map(noteHtml).join('');
       const adding = addingField === f.key ? editorHtml(`data-field="${f.key}"`, '') : '';
-      const addBtn = addingField === f.key ? '' : `<button class="ai-nb-add" data-field="${f.key}">+ nota</button>`;
+      const addBtn = addingField === f.key ? '' : `<button class="ai-nb-add" data-field="${f.key}">${t('+ nota')}</button>`;
       // INFO (IA) vs COGNICIÓN (tú): la etiqueta hace explícito quién rellena cada campo.
       const cog = isCognitionField(f);
-      const tag = `<span class="ai-nb-fill ${cog ? 'is-user' : 'is-agent'}">${cog ? 'tú' : 'IA'}</span>`;
+      const tag = `<span class="ai-nb-fill ${cog ? 'is-user' : 'is-agent'}">${cog ? t('tú') : t('IA')}</span>`;
       const hint = cog && !list.length && !adding
-        ? '<div class="ai-nb-cog-hint">Escríbela tú; luego pide al agente en el chat que la revise.</div>'
+        ? `<div class="ai-nb-cog-hint">${t('Escríbela tú; luego pide al agente en el chat que la revise.')}</div>`
         : '';
       return `
       <div class="ai-nb-field${cog ? ' is-cognition' : ''}">
@@ -1541,7 +1542,7 @@ function appendBubble(role, text, asHtml) {
 
 function setStatus(s) {
   if (!els.status) return;
-  els.status.textContent = s;
+  els.status.textContent = t(s);
   // Cualquier mensaje transitorio (leyendo/generando/error) deja de ser 'idle' → visible.
   els.status.classList.remove('ai-status--idle');
   // Shimmer mientras el agente trabaja (mensajes que terminan en "…").

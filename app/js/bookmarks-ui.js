@@ -2,6 +2,7 @@
 // sidebar. Extraído de app.js (T8, ver CHANGELOG). La persistencia vive en
 // bookmarks.js; aquí solo el DOM. Público: initBookmarkButton, updateBookmarkButton,
 // renderBookmarks.
+import { t } from './i18n.js';
 import * as EpubReader from './epub-reader.js';
 import * as PdfReader from './pdf-reader.js';
 import * as Bookmarks from './bookmarks.js';
@@ -18,7 +19,7 @@ export function initBookmarkButton() {
     if (PdfReader.isLoaded()) {
       const n = PdfReader.getCurrentPage();
       if (!n) return;
-      Bookmarks.toggle(pdfBookmarkId(n), `Página ${n}`, '', { page: n, total: PdfReader.getTotalPages() });
+      Bookmarks.toggle(pdfBookmarkId(n), t('Página {n}', { n }), '', { page: n, total: PdfReader.getTotalPages() });
       updateBookmarkButton();
       return;
     }
@@ -48,7 +49,7 @@ export function updateBookmarkButton() {
   const isBookmarked = Bookmarks.has(id);
   btn.innerHTML = icon('bookmark', { filled: isBookmarked });
   btn.classList.toggle('is-active', isBookmarked);
-  btn.title = isBookmarked ? 'Quitar marcador' : 'Marcar página';
+  btn.title = isBookmarked ? t('Quitar marcador') : t('Marcar página');
 }
 
 export function renderBookmarks() {
@@ -56,7 +57,7 @@ export function renderBookmarks() {
   const bookmarks = Bookmarks.getAll();
 
   if (bookmarks.length === 0) {
-    list.innerHTML = '<p class="empty-state">No hay marcadores aún</p>';
+    list.innerHTML = `<p class="empty-state">${t('No hay marcadores aún')}</p>`;
     return;
   }
 
@@ -68,7 +69,7 @@ export function renderBookmarks() {
     // calculada ahora desde el CFI (ya hay localizaciones cuando la sidebar se abre).
     const pi = (bm.page && bm.total) ? { page: bm.page, total: bm.total }
       : (EpubReader.isLoaded() ? EpubReader.getPageInfo(bm.cfi) : null);
-    const pageLabel = pi ? `Pág. ${pi.page} / ${pi.total}` : '';
+    const pageLabel = pi ? t('Pág. {n} / {total}', { n: pi.page, total: pi.total }) : '';
     item.innerHTML = `
       <div class="bookmark-info">
         <div class="bookmark-title">${escapeHtml(bm.title)}</div>

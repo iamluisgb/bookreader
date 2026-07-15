@@ -398,6 +398,57 @@ Mapa mental (jerarquía radial, render SVG/HTML) del libro/capítulo, exportable
 con mayor techo de marketing (la gente postea mapas mentales), pero el más caro (layout + render). Hacer
 **después** de las victorias baratas (P11/P12/P13).
 
+### P15 — Internacionalización EN/ES (UI + prompts) · `L` · **F1+F2 ✓** · **lanzamiento**
+
+> **Estado: F1+F2 entregadas (2026-07-15, ver CHANGELOG); queda F3 (opcional, post-lanzamiento).**
+> Prerrequisito del [LAUNCH_PLAN](LAUNCH_PLAN.md), no
+> expansión: todos los canales del plan (Show HN, Product Hunt, r/Anki, r/selfhosted) son
+> angloparlantes y las plantillas de posts ya están en inglés, pero la UI (~180 cadenas) y los
+> prompts del agente están 100% en español (el system prompt dice literalmente *"Respondes en
+> español"*, [panel-template.js](app/js/ai/panel-template.js)). Un visitante de HN hoy rebota.
+
+**Decisiones de diseño:**
+- **Inglés por defecto, español secundario.** El mercado de lanzamiento es EN; `navigator.language`
+  decide la primera vez (es\* → es, resto → en), persistido en localStorage `bookreader_lang`,
+  selector en Ajustes generales (cambiar = reload, sin re-render en caliente).
+- **Sin framework, estilo gettext:** módulo [`js/i18n.js`](app/js/i18n.js) con `t(cadena, params)`
+  donde la **clave es la cadena española original** (fuente) y el diccionario EN traduce. Falta de
+  traducción → cae al español (nunca muestra una key). Interpolación `{x}`. Coherente con
+  "sin build, sin dependencias".
+- **HTML estático** ([app/index.html](app/index.html)): atributos `data-i18n` (textContent) y
+  `data-i18n-attrs="aria-label,title,placeholder"`; `translateDom()` en el arranque usa el valor
+  actual (español) como clave. También fija `<html lang>`.
+- **Prompts del LLM (los "artefactos" salen de aquí):** NO se reescriben al inglés en esta fase
+  (riesgo de regresión de comportamiento afinado); se sustituye *"Respondes en español"* por una
+  directiva de idioma: **responde en el idioma en que escribe el usuario; por defecto, el idioma
+  de la UI**. Misma directiva en los generadores (flashcards, resumen, mapa mental, quiz). Los
+  labels de campos de plantilla son UI+prompt → van por `t()`.
+- **Tests:** `locale: 'es-ES'` en [playwright.config.ts](playwright.config.ts) mantiene verdes los
+  E2E existentes (asertan texto español); nuevo `tests/i18n.spec.ts` cubre default EN, toggle y
+  persistencia.
+
+**Fases:** F1 — módulo + chrome principal (sidebar, header, panel del agente, ajustes) · F2 —
+resto de superficies (biblioteca, flashcards/estudio, sync, licencia, errores de llm.js) + selector
+de idioma · F3 *(post-lanzamiento, opcional)* — reescribir prompts a inglés con eval del arné de
+retrieval (ADR-012) para medir que no regresa.
+
+### P16 — Landing EN + landings por nicho · `M` · **✓** · **distribución**
+
+> **Estado: entregado (2026-07-15, ver CHANGELOG).** Complemento de P15 para el lanzamiento; la idea ya
+> estaba latente en el LAUNCH_PLAN ("A quién", pivotada nº3, SEO programático W3-4).
+
+- **Raíz = inglés** (mercado de lanzamiento), **`/es/` = la landing española actual**, con
+  `hreflang` cruzado y canonical propio. Misma estructura/CSS (beats), solo copy.
+- **Dos landings de nicho** (inglés), apuntadas cada una desde su canal en la ola de Reddit:
+  - **`/anki/`** — ángulo flashcards/estudio: *"Turn any EPUB/PDF into Anki flashcards"*
+    (r/Anki, r/GetStudying, r/medicalschool). Hero = tarjeta volteable + export .apkg.
+  - **`/privacy/`** — ángulo privacidad/selfhosted: *"Your books never leave your machine"*
+    (r/privacy, r/selfhosted, HN). Hero = valores (sin cuenta, sin servidor, BYOK).
+- **No más variantes antes de lanzar**: multiplicar landings sin señal = multiplicar hipótesis sin
+  poder distinguir cuál funciona. Con analytics por landing (Plausible/GoatCounter, pendiente en
+  LAUNCH_PLAN) se decide cuáles escalar (oposiciones/medicina/ES, SEO programático).
+- Los CTA de todas apuntan a `app/` (demo instantánea, prioridad nº1 del plan).
+
 ---
 
 ## 📄 PDF — paridad de features con EPUB

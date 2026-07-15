@@ -6,6 +6,7 @@
 //
 // Reusa las clases .dlg-* de dialog.js (mismo lenguaje visual); solo añade la lista
 // de features y el precio (.pw-*).
+import { t } from '../i18n.js';
 import * as License from '../license.js';
 import { icon } from './icons.js';
 import { escapeHtml } from './escape.js';
@@ -14,11 +15,11 @@ import { escapeHtml } from './escape.js';
 // demo. Se cobra el "convertir el libro en conocimiento": tarjetas, repaso, mapas,
 // plantillas avanzadas y perfiles.
 const FEATURES = {
-  flashcards: 'Flashcards con export a Anki',
-  study: 'Repaso espaciado (quizzes)',
-  mindmap: 'Mapas mentales navegables',
-  hqa: 'Plantilla HQ&A y plantillas avanzadas',
-  profiles: 'Perfiles del agente reutilizables',
+  flashcards: () => t('Flashcards con export a Anki'),
+  study: () => t('Repaso espaciado (quizzes)'),
+  mindmap: () => t('Mapas mentales navegables'),
+  hqa: () => t('Plantilla HQ&A y plantillas avanzadas'),
+  profiles: () => t('Perfiles del agente reutilizables'),
 };
 
 export async function ensurePro(feature) {
@@ -31,15 +32,15 @@ function openPaywall(feature) {
     const overlay = document.createElement('div');
     overlay.className = 'dlg-overlay pw-overlay';
     const rows = Object.entries(FEATURES).map(([id, label]) =>
-      `<li class="pw-feat${id === feature ? ' pw-feat-hot' : ''}">${icon('check', { size: 14 })}<span>${escapeHtml(label)}</span></li>`).join('');
+      `<li class="pw-feat${id === feature ? ' pw-feat-hot' : ''}">${icon('check', { size: 14 })}<span>${escapeHtml(label())}</span></li>`).join('');
     overlay.innerHTML = `
       <div class="dlg-card pw-card" role="dialog" aria-modal="true" aria-label="BookReader Pro">
-        <h2 class="dlg-title">${escapeHtml(FEATURES[feature] || 'Esta función')} es de BookReader Pro</h2>
+        <h2 class="dlg-title">${t('{feature} es de BookReader Pro', { feature: escapeHtml(FEATURES[feature] ? FEATURES[feature]() : t('Esta función')) })}</h2>
         <ul class="pw-list">${rows}</ul>
-        <p class="pw-price">${escapeHtml(License.CONFIG.price)} — sin suscripción, tus datos siguen en tu máquina.</p>
+        <p class="pw-price">${t('{price} — sin suscripción, tus datos siguen en tu máquina.', { price: escapeHtml(t(License.CONFIG.price)) })}</p>
         <div class="dlg-actions">
-          <button class="dlg-btn dlg-cancel pw-havekey">Ya tengo una licencia</button>
-          <button class="dlg-btn dlg-ok pw-buy">Conseguir Pro</button>
+          <button class="dlg-btn dlg-cancel pw-havekey">${t('Ya tengo una licencia')}</button>
+          <button class="dlg-btn dlg-ok pw-buy">${t('Conseguir Pro')}</button>
         </div>
       </div>`;
     document.body.appendChild(overlay);

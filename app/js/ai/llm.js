@@ -7,6 +7,7 @@
 // HTTPS. `script-src 'self'` sigue intacto, así que la key no es exfiltrable por
 // scripts inyectados.
 import * as Storage from '../storage.js';
+import { t } from '../i18n.js';
 
 const DEFAULT_BASE_URL = 'https://api.nan.builders/v1';
 const DEFAULT_MODEL = 'deepseek-v4-flash';
@@ -55,7 +56,7 @@ export function currentProvider() {
 export async function listModels({ baseUrl, key, signal } = {}) {
   const b = (baseUrl != null ? baseUrl : getBaseUrl()).trim().replace(/\/+$/, '');
   const k = (key != null ? key : getKey()).trim();
-  if (!b) throw new Error('Falta la Base URL.');
+  if (!b) throw new Error(t('Falta la Base URL.'));
   let res;
   try {
     res = await fetch(`${b}/models`, {
@@ -67,12 +68,12 @@ export async function listModels({ baseUrl, key, signal } = {}) {
     // endpoint /models de algunos proveedores (p. ej. nan) no envía cabeceras CORS,
     // así que el navegador rechaza la respuesta aunque el servidor exista. No hay
     // arreglo posible desde el cliente; lo señalamos para que la UI ofrezca el modo manual.
-    const err = new Error('el proveedor no permite consultar /models desde el navegador (CORS).');
+    const err = new Error(t('el proveedor no permite consultar /models desde el navegador (CORS).'));
     err.cors = true;
     throw err;
   }
-  if (res.status === 401 || res.status === 403) throw new Error('la API key es inválida o falta.');
-  if (!res.ok) throw new Error(`el proveedor respondió ${res.status}.`);
+  if (res.status === 401 || res.status === 403) throw new Error(t('la API key es inválida o falta.'));
+  if (!res.ok) throw new Error(t('el proveedor respondió {status}.', { status: res.status }));
   const data = await res.json().catch(() => null);
   const list = Array.isArray(data?.data) ? data.data : (Array.isArray(data) ? data : []);
   const ids = list.map(m => (typeof m === 'string' ? m : m && m.id)).filter(Boolean);
@@ -155,7 +156,7 @@ async function fetchRetrying(url, opts, { retries = 3 } = {}) {
 
 async function _chatStream({ messages, onToken, onReasoning, onDone, signal, maxTokens = MAX_TOKENS }) {
   const key = getKey().trim();
-  if (!key) throw new Error('Falta la API key.');
+  if (!key) throw new Error(t('Falta la API key.'));
 
   const res = await fetchRetrying(`${getBaseUrl()}/chat/completions`, {
     method: 'POST',
@@ -174,8 +175,8 @@ async function _chatStream({ messages, onToken, onReasoning, onDone, signal, max
 
   if (!res.ok) {
     const body = await res.text().catch(() => '');
-    if (res.status === 401) throw new Error('API key inválida (401).');
-    if (res.status === 429) throw new Error('Límite de uso alcanzado (429). Reintenta en un momento.');
+    if (res.status === 401) throw new Error(t('API key inválida (401).'));
+    if (res.status === 429) throw new Error(t('Límite de uso alcanzado (429). Reintenta en un momento.'));
     throw new Error(`Error del modelo (${res.status}). ${body.slice(0, 200)}`);
   }
 
@@ -222,7 +223,7 @@ async function _chatStream({ messages, onToken, onReasoning, onDone, signal, max
 // fiable solo sin streaming (verificado en spike E5). Devuelve { content, toolCalls }.
 async function _chatTools({ messages, tools, toolChoice = 'auto', maxTokens = 1024, signal }) {
   const key = getKey().trim();
-  if (!key) throw new Error('Falta la API key.');
+  if (!key) throw new Error(t('Falta la API key.'));
 
   const res = await fetchRetrying(`${getBaseUrl()}/chat/completions`, {
     method: 'POST',
@@ -256,9 +257,9 @@ async function _chatTools({ messages, tools, toolChoice = 'auto', maxTokens = 10
 // {type:'image_url'}). No streaming (más simple y suficiente para un turno de visión).
 async function _chatVision({ messages, signal, maxTokens = 1024 }) {
   const key = getKey().trim();
-  if (!key) throw new Error('Falta la API key.');
+  if (!key) throw new Error(t('Falta la API key.'));
   const model = getVisionModel();
-  if (!model) throw new Error('No hay modelo de visión configurado.');
+  if (!model) throw new Error(t('No hay modelo de visión configurado.'));
 
   const res = await fetchRetrying(`${getBaseUrl()}/chat/completions`, {
     method: 'POST',
@@ -268,7 +269,7 @@ async function _chatVision({ messages, signal, maxTokens = 1024 }) {
   });
   if (!res.ok) {
     const body = await res.text().catch(() => '');
-    throw new Error(`Error del modelo de visión (${res.status}). ${body.slice(0, 200)}`);
+    throw new Error(t('Error del modelo de visión ({status}). {body}', { status: res.status, body: body.slice(0, 200) }));
   }
   const json = await res.json();
   return json.choices?.[0]?.message?.content || '';
@@ -281,7 +282,7 @@ async function _chatVision({ messages, signal, maxTokens = 1024 }) {
 // de pedir herramientas o se agoten las rondas. Devuelve { content, rounds, calls }.
 async function _chatToolsLoop({ messages, tools, execute, maxRounds = 3, signal }) {
   const key = getKey().trim();
-  if (!key) throw new Error('Falta la API key.');
+  if (!key) throw new Error(t('Falta la API key.'));
   const convo = [...messages];
   const calls = [];
   for (let round = 1; round <= maxRounds; round++) {

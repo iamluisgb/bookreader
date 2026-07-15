@@ -4,6 +4,7 @@
 // desplaza arrastrando cuando está ampliada. Se cierra con la ✕, Escape o tocando el
 // fondo. La imagen del iframe de lectura es same-origin (el lector le inyecta estilos),
 // así que reutilizamos su `src` (normalmente un blob:) directamente aquí.
+import { t } from './i18n.js';
 import { icon } from './ui/icons.js';
 
 let overlay = null, imgEl = null;
@@ -46,7 +47,7 @@ function ensureOverlay() {
   overlay.className = 'img-zoom';
   overlay.style.display = 'none';
   overlay.innerHTML = `
-    <button class="img-zoom-close" aria-label="Cerrar">${icon('xmark', { size: 22 })}</button>
+    <button class="img-zoom-close" aria-label="${t('Cerrar')}">${icon('xmark', { size: 22 })}</button>
     <img class="img-zoom-img" alt="Imagen del libro" draggable="false">`;
   document.body.appendChild(overlay);
   imgEl = overlay.querySelector('.img-zoom-img');

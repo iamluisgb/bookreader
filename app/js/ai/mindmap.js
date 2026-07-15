@@ -2,6 +2,7 @@
 // (tema central → ramas → puntos), con las hojas citando su pasaje [[aN]] (clic → salta
 // al libro). Es el artefacto compartible por excelencia (la gente postea mapas mentales):
 // export a PNG para redes y a SVG. Reutiliza el troceado y el map de summary/flashcards.
+import { t } from '../i18n.js';
 import * as LLM from './llm.js';
 import * as Retrieval from './retrieval.js';
 import * as Jobs from './jobs.js';
@@ -29,8 +30,8 @@ export function open(context) {
   overlay.id = 'ai-mindmap';
   overlay.className = 'ai-onboarding';
   overlay.innerHTML = `
-    <div class="ai-ob-card mm-card" role="dialog" aria-modal="true" aria-label="Mapa mental">
-      <button class="ai-ob-close" title="Cerrar" aria-label="Cerrar">${icon('xmark', { size: 18 })}</button>
+    <div class="ai-ob-card mm-card" role="dialog" aria-modal="true" aria-label="${t('Mapa mental')}">
+      <button class="ai-ob-close" title="${t('Cerrar')}" aria-label="${t('Cerrar')}">${icon('xmark', { size: 18 })}</button>
       <div class="ai-ob-body"></div>
     </div>`;
   document.body.appendChild(overlay);
@@ -72,14 +73,14 @@ function renderSetup() {
   const chapters = (ctx.tocLabels || []).filter(c => c && Retrieval.passagesByChapter(c).length);
   scopeValue = chapters.includes(ctx.currentChapter) ? ctx.currentChapter : '';
   b.innerHTML = `
-    <h2>Mapa mental</h2>
-    <p class="ai-ob-sub">El agente organiza el contenido en un mapa radial; cada punto cita su pasaje. Clic en una cita para saltar al libro.</p>
-    <label class="fc-label">Contenido</label>
+    <h2>${t('Mapa mental')}</h2>
+    <p class="ai-ob-sub">${t('El agente organiza el contenido en un mapa radial; cada punto cita su pasaje. Clic en una cita para saltar al libro.')}</p>
+    <label class="fc-label">${t('Contenido')}</label>
     <select id="mm-scope" class="fc-select">
-      <option value="">Libro entero</option>
+      <option value="">${t('Libro entero')}</option>
       ${chapters.map(c => `<option value="${escapeHtml(c)}"${c === scopeValue ? ' selected' : ''}>${escapeHtml(c)}</option>`).join('')}
     </select>
-    <button id="mm-generate" class="primary-btn ai-ob-start">${icon('sparkles', { size: 16 })} Generar mapa</button>
+    <button id="mm-generate" class="primary-btn ai-ob-start">${icon('sparkles', { size: 16 })} ${t('Generar mapa')}</button>
     <div id="mm-error" class="fc-error" style="display:none"></div>`;
   b.querySelector('#mm-scope').addEventListener('change', (e) => { scopeValue = e.target.value; });
   b.querySelector('#mm-generate').addEventListener('click', onGenerate);
@@ -180,20 +181,20 @@ REGLAS:
 }
 
 function onGenerate() {
-  if (!LLM.hasKey()) { showError('Configura tu API key en Ajustes → Agente para generar el mapa.'); return; }
+  if (!LLM.hasKey()) { showError(t('Configura tu API key en Ajustes → Agente para generar el mapa.')); return; }
   const passages = gatherScope(scopeValue);
-  if (!passages.length) { showError('Ese contenido no tiene texto indexado; prueba con otro capítulo o el libro entero.'); return; }
+  if (!passages.length) { showError(t('Ese contenido no tiene texto indexado; prueba con otro capítulo o el libro entero.')); return; }
   const chunks = buildChunks(passages);
   const scopeName = scopeValue || ctx.bookTitle || 'Libro';
   const goal = ctx.goal;
 
   const act = Jobs.activeJob();
   if (act && act.status === 'running' && !(act.kind === KIND && act.bookId === ctx.bookId)) {
-    if (!window.confirm(`Ya se está generando ${act.label}. ¿Cancelarlo y empezar el mapa?`)) return;
+    if (!window.confirm(t('Ya se está generando {label}. ¿Cancelarlo y empezar el mapa?', { label: act.label }))) return;
   }
   showError('');
   Jobs.start({
-    bookId: ctx.bookId, kind: KIND, label: 'el mapa mental',
+    bookId: ctx.bookId, kind: KIND, label: t('el mapa mental'),
     params: { scopeName },
     run: ({ signal, progress }) => runMindmap({ chunks, goal, scopeName, signal, progress }),
   });
@@ -217,7 +218,7 @@ async function runMindmap({ chunks, goal, scopeName, signal, progress }) {
     }
     progress(i + 1, chunks.length, 'map');
   }
-  if (!bullets.length) throw new Error('El modelo no devolvió contenido. Vuelve a intentarlo.');
+  if (!bullets.length) throw new Error(t('El modelo no devolvió contenido. Vuelve a intentarlo.'));
   // Un buen mapa es conciso: acota las viñetas (muestreo uniforme) para que el JSON del reduce
   // quepa holgado —no se trunca ni cae al fallback— y el mapa no se sature de hojas.
   const capped = capBullets(bullets, 20);
@@ -245,13 +246,13 @@ function renderRunning(job) {
   if (!b || !job) { renderSetup(); return; }
   setWide(false);
   b.innerHTML = `
-    <h2>Generando mapa mental…</h2>
+    <h2>${t('Generando mapa mental…')}</h2>
     <p class="ai-run-status" id="mm-run-status" role="status"></p>
     <div class="ai-run-actions">
-      <button id="mm-keep" class="primary-btn">${icon('book', { size: 16 })} Seguir leyendo</button>
-      <button id="mm-cancel" class="ai-ob-back fc-txt-btn">Cancelar</button>
+      <button id="mm-keep" class="primary-btn">${icon('book', { size: 16 })} ${t('Seguir leyendo')}</button>
+      <button id="mm-cancel" class="ai-ob-back fc-txt-btn">${t('Cancelar')}</button>
     </div>
-    <p class="sum-depth-hint">Puedes cerrar esta ventana y seguir leyendo: te avisaremos cuando el mapa esté listo.</p>`;
+    <p class="sum-depth-hint">${t('Puedes cerrar esta ventana y seguir leyendo: te avisaremos cuando el mapa esté listo.')}</p>`;
   const status = b.querySelector('#mm-run-status');
   const paint = (j) => {
     if (!overlay) return;
@@ -259,7 +260,7 @@ function renderRunning(job) {
     if (j.kind !== KIND) return;
     if (j.status === 'running') {
       status.textContent = j.progress.phase === 'reduce'
-        ? 'Organizando el mapa…'
+        ? t('Organizando el mapa…')
         : `Trazando el mapa… ${j.progress.i}/${j.progress.n || '·'}`;
     } else if (j.status === 'done') {
       if (runUnsub) { runUnsub(); runUnsub = null; }
@@ -268,7 +269,7 @@ function renderRunning(job) {
     } else if (j.status === 'error') {
       if (runUnsub) { runUnsub(); runUnsub = null; }
       renderSetup();
-      showError(j.error?.message || 'No se pudo generar el mapa.');
+      showError(j.error?.message || t('No se pudo generar el mapa.'));
     }
   };
   b.querySelector('#mm-keep').addEventListener('click', () => closeModal());
@@ -298,7 +299,7 @@ function normalizeTree(tree, bullets, scopeName) {
   };
   if (tree && Array.isArray(tree.branches) && tree.branches.length) {
     const branches = tree.branches.slice(0, 8).map((br, i) => {
-      const label = String(br.label || `Rama ${i + 1}`).trim();
+      const label = String(br.label || t('Rama {n}', { n: i + 1 })).trim();
       return {
         label: clampWords(label, 32), full: label,
         children: (Array.isArray(br.children) ? br.children : []).slice(0, 6).map(asLeaf).filter(c => c.label),
@@ -476,13 +477,13 @@ function renderResult(tree, scopeName) {
   Jobs.clearActive();          // el usuario está viendo el resultado → retira chip/aviso
   b.innerHTML = `
     <div class="sum-resulthead">
-      <button class="ai-ob-back">${icon('chevron-left', { size: 16 })}<span>Volver</span></button>
-      <button id="mm-regen" class="fc-txt-btn">${icon('sparkles', { size: 14 })} Regenerar</button>
+      <button class="ai-ob-back">${icon('chevron-left', { size: 16 })}<span>${t('Volver')}</span></button>
+      <button id="mm-regen" class="fc-txt-btn">${icon('sparkles', { size: 14 })} ${t('Regenerar')}</button>
     </div>
     <h2>Mapa mental — ${escapeHtml(scopeName)}</h2>
     <div class="mm-canvas" id="mm-canvas"></div>
     <div class="fc-export">
-      <button id="mm-png" class="primary-btn">${icon('download', { size: 16 })} Descargar PNG</button>
+      <button id="mm-png" class="primary-btn">${icon('download', { size: 16 })} ${t('Descargar PNG')}</button>
       <button id="mm-svg" class="ai-ob-back fc-txt-btn">SVG</button>
     </div>`;
   b.querySelector('.ai-ob-back').addEventListener('click', renderSetup);

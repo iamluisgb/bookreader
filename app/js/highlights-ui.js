@@ -4,6 +4,7 @@
 // la lista de subrayados de la sidebar. El estado de selección es local a este
 // módulo. Público: initHighlights, setupHighlights, renderHighlights,
 // hideHighlightTooltip.
+import { t } from './i18n.js';
 import * as EpubReader from './epub-reader.js';
 import * as PdfReader from './pdf-reader.js';
 import * as Highlights from './highlights.js';
@@ -248,7 +249,7 @@ function showPdfSelectionTooltip(text, rect, rects, page) {
   positionTooltip(tooltip, rect);
 
   const saveHighlight = (color, note = '') => {
-    Highlights.addPdf(page, rects, text, color, `Pág. ${page}`, note);
+    Highlights.addPdf(page, rects, text, color, t('Pág. {n}', { n: page }), note);
     drawPdfHighlights(page);
     hideHighlightTooltip();
     renderHighlights();
@@ -358,7 +359,7 @@ export function renderHighlights() {
   if (exportBtn) exportBtn.disabled = highlights.length === 0;
 
   if (highlights.length === 0) {
-    list.innerHTML = '<p class="empty-state">No hay subrayados aún</p>';
+    list.innerHTML = `<p class="empty-state">${t('No hay subrayados aún')}</p>`;
     return;
   }
 

@@ -3,24 +3,21 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>BookReader — What you read finally stays with you</title>
-<meta name="description" content="The EPUB & PDF reader with an AI agent that explains what you don't understand, shows you the page so you can verify it, and turns what matters into spaced review so you don't forget. All in your browser.">
+<title>BookReader — A private, local-first EPUB & PDF reader with AI</title>
+<meta name="description" content="Read EPUB and PDF with an AI agent that runs 100% client-side. No backend, no account, no tracking. Your own AI key, your own storage, works offline.">
 <meta property="og:type" content="website">
-<meta property="og:title" content="BookReader — What you read finally stays with you">
-<meta property="og:description" content="Ask about anything you don't understand and it explains until it clicks. It makes nothing up: every answer comes from the book and you can verify it. And what matters comes back to you before you forget it.">
-<meta property="og:url" content="https://luisgonzalezbernal.com/bookreader/">
+<meta property="og:title" content="BookReader — A private, local-first EPUB & PDF reader with AI">
+<meta property="og:description" content="Read EPUB and PDF with an AI agent that runs 100% client-side. No backend, no account, no tracking. Your own AI key, your own storage, works offline.">
+<meta property="og:url" content="https://luisgonzalezbernal.com/bookreader/privacy/">
 <meta property="og:image" content="https://luisgonzalezbernal.com/bookreader/app/icons/icon-512.png">
 <meta name="theme-color" content="#22c55e">
-<link rel="canonical" href="https://luisgonzalezbernal.com/bookreader/">
-<link rel="alternate" hreflang="en" href="https://luisgonzalezbernal.com/bookreader/">
-<link rel="alternate" hreflang="es" href="https://luisgonzalezbernal.com/bookreader/es/">
-<link rel="alternate" hreflang="x-default" href="https://luisgonzalezbernal.com/bookreader/">
-<link rel="icon" href="app/icons/icon.svg" type="image/svg+xml">
+<link rel="canonical" href="https://luisgonzalezbernal.com/bookreader/privacy/">
+<link rel="icon" href="../app/icons/icon.svg" type="image/svg+xml">
 <style>
-  @font-face { font-family: 'Inter'; font-weight: 400; font-display: swap; src: url(app/fonts/inter-400.woff2) format('woff2'); }
-  @font-face { font-family: 'Inter'; font-weight: 600; font-display: swap; src: url(app/fonts/inter-600.woff2) format('woff2'); }
-  @font-face { font-family: 'Source Serif 4'; font-weight: 400; font-display: swap; src: url(app/fonts/source-serif-4-400.woff2) format('woff2'); }
-  @font-face { font-family: 'Source Serif 4'; font-weight: 600; font-display: swap; src: url(app/fonts/source-serif-4-600.woff2) format('woff2'); }
+  @font-face { font-family: 'Inter'; font-weight: 400; font-display: swap; src: url(../app/fonts/inter-400.woff2) format('woff2'); }
+  @font-face { font-family: 'Inter'; font-weight: 600; font-display: swap; src: url(../app/fonts/inter-600.woff2) format('woff2'); }
+  @font-face { font-family: 'Source Serif 4'; font-weight: 400; font-display: swap; src: url(../app/fonts/source-serif-4-400.woff2) format('woff2'); }
+  @font-face { font-family: 'Source Serif 4'; font-weight: 600; font-display: swap; src: url(../app/fonts/source-serif-4-600.woff2) format('woff2'); }
 
   /* ---- Tokens (identidad de la app: emerald + blanco/charcoal; el papel cálido
          vive SOLO dentro del libro) ---- */
@@ -241,205 +238,101 @@
 
 <nav>
   <div class="wrap nav-in">
-    <span class="brand">
+    <a class="brand" href="../" style="text-decoration:none">
       <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3.5 L14 3.5 L17.5 7 L17.5 19 Q17.5 20.5 16 20.5 L8 20.5 Q6.5 20.5 6.5 19 L6.5 5 Q6.5 3.5 8 3.5 Z"/><path d="M14 3.5 L14 7 L17.5 7"/><path d="M9.8 10 L12 12 L9.8 14"/><path d="M13 14 L15 14"/></svg>
       BookReader
-    </span>
-    <a class="nav-cta" href="app/">Open the app</a>
+    </a>
+    <a class="nav-cta" href="../app/">Open the app</a>
   </div>
 </nav>
 
-<!-- Beat 1 · La promesa -->
-<header class="beat">
+<!-- Hero -->
+<header class="beat values">
   <div class="wrap">
     <div class="beat-copy">
       <p class="product-name">BookReader</p>
-      <h1>What you read finally stays with you.</h1>
+      <h1>Your books never leave your machine.</h1>
+      <p class="support">A 100% client-side EPUB &amp; PDF reader with an AI reading agent. <b>No backend. No account. No tracking.</b> Just static files and your browser.</p>
       <div class="cta-row">
-        <a class="btn-primary" href="app/">Open BookReader
+        <a class="btn-primary" href="../app/">Open BookReader
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg>
         </a>
       </div>
-      <p class="cta-note">Free. No account. In your browser.</p>
-    </div>
-
-    <div class="beat-visual" aria-label="BookReader: the reader with the agent explaining a concept">
-      <div class="device">
-        <div class="device-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="device-title">Designing Data-Intensive Applications</span></div>
-        <div class="device-body">
-          <div class="page">
-            <div class="page-ch">9 · Consistency and Consensus</div>
-            <div class="page-text">
-              <p>In an eventually consistent database, if you ask two different replicas the same question at the same time, you may get two different answers.</p>
-              <p><mark>Linearizability is the idea of making a system appear as if there were only one copy of the data, and all operations on it are atomic.</mark></p>
-            </div>
-            <div class="page-num">324</div>
-          </div>
-          <div class="panel">
-            <div class="panel-head">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.5l1.5 4.2 4.2 1.5-4.2 1.5L12 14.9l-1.5-4.2L6.3 9.2l4.2-1.5L12 3.5Z"/><path d="M18.5 14l.7 1.9 1.9.7-1.9.7-.7 1.9-.7-1.9-1.9-.7 1.9-.7.7-1.9Z"/></svg>
-              Agent
-              <span class="panel-status">knows the whole book</span>
-            </div>
-            <div class="chat">
-              <div class="bubble q anim-1">I don't quite get linearizability. Can you explain it simply?</div>
-              <div class="bubble a anim-2">Imagine there were only <b>one copy of the data</b> and nobody could ever catch it mid-change. That's the promise: you write, and anyone reading afterwards sees the new value — no matter which replica they ask.
-                <br><span class="cite anim-3">
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4.5h7a2 2 0 0 1 2 2V20a2.5 2.5 0 0 0-2.5-2H5V4.5Z"/><path d="M19 4.5h-3a2 2 0 0 0-2 2V20a2.5 2.5 0 0 1 2.5-2H19V4.5Z"/></svg>
-                  p. 324 · Consistency and Consensus</span>
-              </div>
-            </div>
-            <div class="composer"><span>Ask about the book…</span><i><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5"/><path d="m6 11 6-6 6 6"/></svg></i></div>
-          </div>
-        </div>
-      </div>
+      <p class="cta-note">Free. Works offline as a PWA.</p>
     </div>
   </div>
 </header>
 
-<!-- Beat 2 · La empatía -->
-<section class="beat alt">
-  <div class="wrap">
-    <div class="beat-copy">
-      <h2>We've all found ourselves staring at a paragraph.</h2>
-      <p class="support">Reading it for the third time. Understanding every word and none of the ideas.</p>
-    </div>
-    <div class="beat-visual">
-      <div class="dense" aria-hidden="true">
-        A subtle consequence of quorum consistency is that, even with w + r &gt; n, there are edge cases where stale values are returned: if a sloppy quorum is used, the w writes may end up on <span class="fade">different nodes than the r reads, so there is no longer a guaranteed overlap between the read nodes and the write nodes, and therefore…</span>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- Beat 3 · La magia -->
+<!-- Beat: cómo funciona -->
 <section class="beat">
   <div class="wrap">
     <div class="beat-copy">
-      <h2>Now the page answers back.</h2>
-      <p class="support">Ask about whatever you don't understand, the way you'd actually ask. The agent knows the whole book, knows your goal, and explains it <b>at your level</b>, until it clicks.</p>
+      <h2>Local-first, verifiably.</h2>
+      <p class="support">Books and annotations live in <b>IndexedDB and localStorage</b>, on your device. The reader libraries are vendored (no CDNs), the CSP is <b>script-src 'self'</b>, and the whole app deploys as static files. Open DevTools and watch the network tab: nothing phones home.</p>
     </div>
   </div>
 </section>
 
-<!-- Beat 4 · La confianza -->
+<!-- Beat: BYOK -->
 <section class="beat alt">
   <div class="wrap">
     <div class="beat-copy">
-      <h2>It makes nothing up. Everything comes from the book.</h2>
-      <p class="support">Every explanation carries its citation. Tap it and verify it in the book, word for word.</p>
-    </div>
-    <div class="beat-visual">
-      <div class="proof">
-        <div class="page">
-          <div class="page-ch">7 · Transactions</div>
-          <div class="page-text">
-            <p>This pattern of read-modify-write can cause lost updates. <mark>An atomic compare-and-set operation avoids the lost update by only allowing the write if the value has not changed since you last read it.</mark></p>
-          </div>
-          <div class="page-num">243</div>
-        </div>
-        <span class="cite-big">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4.5h7a2 2 0 0 1 2 2V20a2.5 2.5 0 0 0-2.5-2H5V4.5Z"/><path d="M19 4.5h-3a2 2 0 0 0-2 2V20a2.5 2.5 0 0 1 2.5-2H19V4.5Z"/></svg>
-          p. 243 · Transactions — tap and verify
-        </span>
-      </div>
+      <p class="feature-name">Bring your own key</p>
+      <h2>The AI is yours too.</h2>
+      <p class="support">The reading agent runs on <b>your API key against the provider you choose</b> — any OpenAI-compatible endpoint, including a local one. Passages go straight from your browser to your provider when you ask a question. No proxy, no markup, no subscription. Without a key, BookReader is still a complete reader.</p>
     </div>
   </div>
 </section>
 
-<!-- Beat 5 · La memoria -->
+<!-- Beat: BYOS -->
 <section class="beat">
   <div class="wrap">
     <div class="beat-copy">
-      <p class="feature-name">Cited review</p>
-      <h2>Reading is half of it.</h2>
-      <p class="support">What matters becomes flashcards. They come back to you right before you'd forget. And each one remembers which page it came from — in case you want to reread it.</p>
-    </div>
-    <div class="beat-visual">
-      <div class="fcard-zone">
-        <button class="fcard" id="fcard" type="button" aria-label="Example flashcard: tap to flip">
-          <span class="face">
-            <span class="face-tag">DDIA · Ch. 7 — Transactions</span>
-            <span class="face-q">What problem does a compare-and-set operation avoid?</span>
-            <span class="face-hint">Tap the card to flip it</span>
-          </span>
-          <span class="face back">
-            <span class="face-tag">Answer</span>
-            <span class="face-a"><b>Lost updates</b>: two clients read the same value, modify it, and overwrite each other on write. CAS only writes if the value hasn't changed.</span>
-            <span class="src-chip">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4.5h7a2 2 0 0 1 2 2V20a2.5 2.5 0 0 0-2.5-2H5V4.5Z"/><path d="M19 4.5h-3a2 2 0 0 0-2 2V20a2.5 2.5 0 0 1 2.5-2H19V4.5Z"/></svg>
-              See it in the book · p. 243</span>
-            <span class="grade-row" aria-hidden="true">
-              <span class="grade">Again<small>&lt;10m</small></span>
-              <span class="grade">Hard<small>3d</small></span>
-              <span class="grade g3">Good<small>6d</small></span>
-              <span class="grade">Easy<small>13d</small></span>
-            </span>
-          </span>
-        </button>
-      </div>
-      <p class="fcard-note">It's a real card. Try it.</p>
+      <p class="feature-name">Bring your own storage</p>
+      <h2>Sync through your own cloud, or not at all.</h2>
+      <p class="support">Cross-device sync uses a private folder in <b>your own Google Drive</b>: data goes browser → your Drive, directly. The only server involved is a stateless token-refresh worker that never sees your books or notes. Prefer zero cloud? Export a full <b>JSON backup</b> anytime.</p>
     </div>
   </div>
 </section>
 
-<!-- Beat 6 · Los valores -->
-<section class="beat values">
-  <div class="wrap">
-    <div class="beat-copy">
-      <h2>Your books are yours. So are your questions.</h2>
-      <p class="support">No account. No server. Nobody in between. Everything lives on your device, and you can take it with you anytime.</p>
-      <p class="seal">Private by design. <span>That's BookReader.</span></p>
-    </div>
-  </div>
-</section>
-
-<!-- Y además + FAQ -->
+<!-- FAQ -->
 <section class="beat alt">
   <div class="wrap">
     <div class="beat-copy">
-      <p class="etc"><b>And also:</b> highlights and notes, in-book search, bookmarks, pages or scroll, three reading themes, Anki and Markdown export, and it works offline.</p>
+      <h2>The fine print, up front.</h2>
     </div>
     <div class="faq">
       <details>
-        <summary>How much does it cost?</summary>
-        <p class="ans">The app is free. The agent runs on your own AI key (BYOK): you pay your provider only for what you use — no middleman, no subscription.</p>
+        <summary>What exactly leaves my device?</summary>
+        <p class="ans">Only what you send to the AI provider you configured, when you use the agent: the relevant book passages and your question. Reading, highlighting, searching and reviewing cards are fully local.</p>
       </details>
       <details>
-        <summary>What formats does it read?</summary>
-        <p class="ans">EPUB and PDF. The agent reads both equally well: same chat, same citations, same flashcards.</p>
+        <summary>Can I self-host it?</summary>
+        <p class="ans">Yes. It's a static site — no build step, no database. Serve the files from any web server, GitHub Pages, or your homelab.</p>
       </details>
       <details>
-        <summary>Can I ask in a different language than the book?</summary>
-        <p class="ans">Yes. Read in English and ask in Spanish, or the other way around: the agent understands your question, searches the book and answers in your language, citing the original passage.</p>
-      </details>
-      <details>
-        <summary>Which AI can I use?</summary>
-        <p class="ans">Any provider with an OpenAI-compatible API: set the URL, your key and whichever model you want. Without the agent, BookReader is still a complete reader.</p>
-      </details>
-      <details>
-        <summary>Where are my books stored?</summary>
-        <p class="ans">In your browser's storage, on your device. They are never uploaded anywhere. You can sync annotations through your own Google Drive and export a full backup anytime.</p>
-      </details>
-      <details>
-        <summary>Are the agent's answers reliable?</summary>
-        <p class="ans">The agent answers from passages of the book and cites every claim. The citation is your verify button: one tap and you're on the page. If the book doesn't cover something, it says so instead of filling in.</p>
+        <summary>Can I use a local LLM?</summary>
+        <p class="ans">Yes. Point the agent at any OpenAI-compatible endpoint — including llama.cpp, Ollama or vLLM running on your own hardware. Then nothing leaves your network at all.</p>
       </details>
       <details>
         <summary>Does it work offline?</summary>
-        <p class="ans">Reading, highlighting and reviewing cards: yes, it's an installable PWA. The agent needs a connection to talk to your AI provider.</p>
+        <p class="ans">Reading, highlighting and reviewing flashcards: yes, it's an installable PWA. The agent needs a connection to reach your AI provider (unless it's local).</p>
+      </details>
+      <details>
+        <summary>Where's the code?</summary>
+        <p class="ans">The reader is open source — vanilla JS, no framework, auditable in an afternoon.</p>
       </details>
     </div>
   </div>
 </section>
 
-<!-- Beat 7 · El cierre -->
-<section class="beat">
+<!-- Cierre -->
+<section class="beat values">
   <div class="wrap">
     <div class="beat-copy">
-      <h2>The next book you read, you keep.</h2>
+      <h2>Read like nobody's watching. Because nobody is.</h2>
       <div class="cta-row">
-        <a class="btn-primary" href="app/">Open BookReader
+        <a class="btn-primary" href="../app/">Open BookReader
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg>
         </a>
       </div>
@@ -450,17 +343,13 @@
 
 <footer>
   <div class="wrap foot-in">
-    <span class="brand">
-      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3.5 L14 3.5 L17.5 7 L17.5 19 Q17.5 20.5 16 20.5 L8 20.5 Q6.5 20.5 6.5 19 L6.5 5 Q6.5 3.5 8 3.5 Z"/><path d="M14 3.5 L14 7 L17.5 7"/><path d="M9.8 10 L12 12 L9.8 14"/><path d="M13 14 L15 14"/></svg>
+    <a class="brand" href="../" style="text-decoration:none">
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3.5 L14 3.5 L17.5 7 L17.5 19 Q17.5 20.5 16 20.5 L8 20.5 Q6.5 20.5 6.5 19 L6.5 5 Q6.5 3.5 8 3.5 Z"/><path d="M14 3.5 L14 7 L17.5 7"/><path d="M9.8 10 L12 12 L9.8 14"/><path d="M13 14 L15 14"/></svg>
       BookReader
-    </span>
-    <span>EPUB · PDF reader with a reading agent — local-first, BYOK · © 2026 Luis González · <a href="es/">Español</a></span>
+    </a>
+    <span>EPUB · PDF reader with a reading agent — local-first, BYOK · © 2026 Luis González · <a href="../">Home</a> · <a href="../es/">Español</a></span>
   </div>
 </footer>
 
-<script>
-  const card = document.getElementById('fcard');
-  card.addEventListener('click', () => card.classList.toggle('flip'));
-</script>
 </body>
 </html>

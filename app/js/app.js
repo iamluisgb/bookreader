@@ -22,9 +22,12 @@ import { migrateSchema, purgeExpiredTombstones } from './sync/schema.js';
 import * as SyncEngine from './sync/engine.js';
 import * as License from './license.js';
 import { toast } from './ai/toast.js';
+import { t, translateDom } from './i18n.js';
 
 // ============ INIT ============
 document.addEventListener('DOMContentLoaded', () => {
+  // i18n (P15): traduce el chrome estático ANTES de cualquier init que lea/pinte el DOM.
+  translateDom();
   // Fase 0 sync: backfill de uid/updatedAt en datos previos + purga de
   // tombstones caducados. Asíncrono y no bloqueante; idempotente.
   migrateSchema()
@@ -61,7 +64,7 @@ function initSyncEngine() {
 
   window.addEventListener('bookreader:sync-status', (e) => {
     const s = e.detail;
-    const labels = { syncing: 'Sincronizando…', error: 'Sync: error', reconnect: 'Reconectar Drive' };
+    const labels = { syncing: t('Sincronizando…'), error: t('Sync: error'), reconnect: t('Reconectar Drive') };
     badge.dataset.state = s;
     badge.textContent = labels[s] || '';
     badge.hidden = !(s in labels);
@@ -90,8 +93,8 @@ function initLicense() {
     // Solo la revocación remota avisa (quitar la licencia a mano ya es acción del usuario).
     if (!e.detail.pro && License.getState()?.revoked) {
       toast({
-        message: 'Tu licencia Pro dejó de ser válida. Tus datos siguen intactos.',
-        actionLabel: 'Ver licencia',
+        message: t('Tu licencia Pro dejó de ser válida. Tus datos siguen intactos.'),
+        actionLabel: t('Ver licencia'),
         onAction: () => AppSettings.open('license'),
         kind: 'error',
         timeout: 12000,
@@ -235,7 +238,7 @@ function addResizer(panel, cls, cfg, widthFromEvent) {
   if (!panel) return;
   const handle = document.createElement('div');
   handle.className = 'panel-resizer ' + cls;
-  handle.title = 'Arrastra para ajustar el ancho · doble clic: restablecer';
+  handle.title = t('Arrastra para ajustar el ancho · doble clic: restablecer');
   panel.appendChild(handle);
 
   let raf = 0;
@@ -533,7 +536,7 @@ function initImmersive() {
       else document.body.classList.remove('immersive');
       if (btn) {
         btn.setAttribute('data-icon', on ? 'compress' : 'expand');
-        btn.title = on ? 'Salir de pantalla completa' : 'Pantalla completa';
+        btn.title = on ? t('Salir de pantalla completa') : t('Pantalla completa');
         btn.setAttribute('aria-label', btn.title);
         hydrateIcons(btn.parentElement || document);
       }
@@ -754,16 +757,16 @@ async function ensureSearchCorpus() {
 function initSearch() {
   const input = document.getElementById('search-input');
   if (!input) return;
-  let t;
+  let timer;
   const run = async () => {
     const q = input.value.trim();
     const box = document.getElementById('search-results');
     if (q.length < 2) { box.innerHTML = ''; return; }
     const corpus = await ensureSearchCorpus();
-    if (!corpus) { box.innerHTML = '<p class="empty-state">Preparando el libro para búsqueda…</p>'; return; }
+    if (!corpus) { box.innerHTML = `<p class="empty-state">${t('Preparando el libro para búsqueda…')}</p>`; return; }
     renderSearchResults(Search.searchPassages(corpus.annotatedText, corpus.anchors, q, { limit: 120 }), q);
   };
-  input.addEventListener('input', () => { clearTimeout(t); t = setTimeout(run, 200); });
+  input.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(run, 200); });
   // Al abrir la pestaña Buscar, enfocar el campo.
   document.querySelector('.tab-btn[data-tab="search"]')?.addEventListener('click', () => setTimeout(() => input.focus(), 50));
   // Buscador en la cabecera (estilo Play Books): abre la sidebar en la pestaña
@@ -776,12 +779,12 @@ function initSearch() {
 
 function renderSearchResults(results, query) {
   const box = document.getElementById('search-results');
-  if (!results.length) { box.innerHTML = `<p class="empty-state">Sin resultados para «${escapeHtml(query)}»</p>`; return; }
-  box.innerHTML = `<p class="search-count">${results.length} resultado${results.length === 1 ? '' : 's'}</p>`;
+  if (!results.length) { box.innerHTML = `<p class="empty-state">${t('Sin resultados para «{q}»', { q: escapeHtml(query) })}</p>`; return; }
+  box.innerHTML = `<p class="search-count">${t('{n} resultado{s}', { n: results.length, s: results.length === 1 ? '' : 's' })}</p>`;
   for (const r of results) {
     const item = document.createElement('button');
     item.className = 'search-hit';
-    const meta = [r.chapter, r.page != null ? `pág. ${r.page}` : ''].filter(Boolean).join(' · ');
+    const meta = [r.chapter, r.page != null ? t('pág. {n}', { n: r.page }) : ''].filter(Boolean).join(' · ');
     item.innerHTML =
       `<span class="search-hit-ctx">${escapeHtml(r.before)}<mark>${escapeHtml(r.match)}</mark>${escapeHtml(r.after)}</span>` +
       (meta ? `<span class="search-hit-meta">${escapeHtml(meta)}</span>` : '');
@@ -968,7 +971,7 @@ async function loadEpub(buffer, bookId, aiBookId) {
     return true;
   } catch (err) {
     console.error('Error loading EPUB:', err);
-    await alertBox('Error al cargar el archivo EPUB: ' + err.message);
+    await alertBox(t('Error al cargar el archivo EPUB: {msg}', { msg: err.message }));
     return false;
   }
 }
@@ -981,7 +984,7 @@ async function loadPdf(buffer, bookId, aiBookId) {
 
     // Setup callback BEFORE load
     PdfReader.onPage((page, total) => {
-      document.getElementById('reader-title').textContent = `PDF - Página ${page} de ${total}`;
+      document.getElementById('reader-title').textContent = t('PDF - Página {n} de {total}', { n: page, total });
       syncRouteSoon();               // reflejar la página en la URL (deep-link)
       drawPdfHighlights(page);       // PDF3: re-pintar los subrayados de la página
       updateBookmarkButton();        // reflejar si la página actual está marcada
@@ -1024,7 +1027,7 @@ async function loadPdfTOC() {
   const tocList = document.getElementById('toc-list');
   const items = await PdfReader.getOutlineItems();
   if (!items.length) {
-    tocList.innerHTML = '<p class="empty-state">Este PDF no tiene índice</p>';
+    tocList.innerHTML = `<p class="empty-state">${t('Este PDF no tiene índice')}</p>`;
     return;
   }
   tocList.innerHTML = '';
@@ -1055,7 +1058,7 @@ function loadTOC() {
   const tocList = document.getElementById('toc-list');
 
   if (!nav || !nav.toc || nav.toc.length === 0) {
-    tocList.innerHTML = '<p class="empty-state">No hay índice disponible</p>';
+    tocList.innerHTML = `<p class="empty-state">${t('No hay índice disponible')}</p>`;
     return;
   }
 

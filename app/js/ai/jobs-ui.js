@@ -4,9 +4,10 @@
 import * as Jobs from './jobs.js';
 import { toast } from './toast.js';
 import { icon } from '../ui/icons.js';
+import { t } from '../i18n.js';
 
 const openers = {};                                         // kind -> fn() que reabre el modal
-const NAMES = { summary: 'Resumen', mindmap: 'Mapa mental' };
+const NAMES = { summary: t('Resumen'), mindmap: t('Mapa mental') };
 let chip = null, lastNotifiedId = 0, started = false;
 
 export function setOpener(kind, fn) { openers[kind] = fn; }
@@ -27,12 +28,12 @@ function render(job) {
   // Aviso una sola vez por job. Si su modal ya está abierto, él mismo muestra el resultado.
   lastNotifiedId = job.id;
   if (modalOpen(job.kind)) return;
-  const name = NAMES[job.kind] || 'Documento';
+  const name = NAMES[job.kind] || t('Documento');
   if (job.status === 'done') {
-    toast({ message: `${name} listo`, actionLabel: `Ver ${name.toLowerCase()}`, kind: 'success', onAction: () => openers[job.kind]?.() });
+    toast({ message: t('{name} listo', { name }), actionLabel: `${t('Ver')} ${name.toLowerCase()}`, kind: 'success', onAction: () => openers[job.kind]?.() });
     try { navigator.vibrate?.(30); } catch { /* sin soporte */ }
   } else if (job.status === 'error') {
-    toast({ message: `No se pudo generar ${name.toLowerCase()}`, actionLabel: 'Reintentar', kind: 'error', onAction: () => Jobs.retry(job) });
+    toast({ message: t('No se pudo generar {name}', { name: name.toLowerCase() }), actionLabel: t('Reintentar'), kind: 'error', onAction: () => Jobs.retry(job) });
   }
 }
 
@@ -43,18 +44,18 @@ function renderChip(job) {
   chip.className = `ai-taskchip is-${job.status}`;
   if (job.status === 'running') {
     const p = job.progress;
-    const label = p.phase === 'reduce' ? `${name} · redactando…` : (p.n ? `${name} ${p.i}/${p.n}` : `${name}…`);
-    chip.innerHTML = `<span class="ai-taskchip-spin" aria-hidden="true"></span><span class="ai-taskchip-label"></span><button class="ai-taskchip-x" title="Cancelar" aria-label="Cancelar">${icon('xmark', { size: 14 })}</button>`;
+    const label = p.phase === 'reduce' ? `${name} · ${t('redactando…')}` : (p.n ? `${name} ${p.i}/${p.n}` : `${name}…`);
+    chip.innerHTML = `<span class="ai-taskchip-spin" aria-hidden="true"></span><span class="ai-taskchip-label"></span><button class="ai-taskchip-x" title="${t('Cancelar')}" aria-label="${t('Cancelar')}">${icon('xmark', { size: 14 })}</button>`;
     chip.querySelector('.ai-taskchip-label').textContent = label;
     chip.querySelector('.ai-taskchip-x').onclick = (e) => { e.stopPropagation(); Jobs.cancel(); };
     chip.onclick = () => openers[job.kind]?.();
   } else if (job.status === 'done') {
     chip.innerHTML = `<span class="ai-taskchip-dot" aria-hidden="true">${icon('check', { size: 13 })}</span><span class="ai-taskchip-label"></span>`;
-    chip.querySelector('.ai-taskchip-label').textContent = `Ver ${name.toLowerCase()}`;
+    chip.querySelector('.ai-taskchip-label').textContent = `${t('Ver')} ${name.toLowerCase()}`;
     chip.onclick = () => openers[job.kind]?.();
   } else if (job.status === 'error') {
     chip.innerHTML = `<span class="ai-taskchip-dot" aria-hidden="true">!</span><span class="ai-taskchip-label"></span>`;
-    chip.querySelector('.ai-taskchip-label').textContent = `${name}: reintentar`;
+    chip.querySelector('.ai-taskchip-label').textContent = `${name}: ${t('reintentar')}`;
     chip.onclick = () => Jobs.retry(job);
   }
 }

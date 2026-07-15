@@ -1,5 +1,6 @@
 // ai/toast.js — Aviso breve no intrusivo (abajo, auto-dismiss) con una acción opcional.
 // Pieza de plataforma reutilizable; el primer uso es "resumen/mapa listo · Ver".
+import { t } from '../i18n.js';
 import { icon } from '../ui/icons.js';
 
 let host = null;
@@ -19,7 +20,7 @@ export function toast({ message, actionLabel, onAction, kind = 'info', timeout =
   el.innerHTML =
     `<span class="ai-toast-msg"></span>` +
     (actionLabel ? `<button class="ai-toast-action"></button>` : '') +
-    `<button class="ai-toast-close" aria-label="Cerrar">${icon('xmark', { size: 14 })}</button>`;
+    `<button class="ai-toast-close" aria-label="${t('Cerrar')}">${icon('xmark', { size: 14 })}</button>`;
   el.querySelector('.ai-toast-msg').textContent = message;
   if (actionLabel) el.querySelector('.ai-toast-action').textContent = actionLabel;
   h.appendChild(el);

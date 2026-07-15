@@ -21,6 +21,7 @@
 //   BKRD-…-REVOKED → se comporta como key revocada (reembolso)
 //   BKRD-…-LIMIT   → activate devuelve "límite de activaciones alcanzado"
 // Pasar a producción = rellenar organizationId/checkoutUrl/portalUrl. Nada más.
+import { t } from './i18n.js';
 import * as Storage from './storage.js';
 
 export const CONFIG = {
@@ -98,16 +99,16 @@ async function classify4xx(res) {
   let detail = '';
   try { detail = JSON.stringify(await res.json()); } catch { /* sin cuerpo JSON */ }
   if (/activation/i.test(detail) && /limit|maximum|exceed/i.test(detail)) {
-    return licError('limit', 'Esta licencia ya está activa en el máximo de dispositivos.');
+    return licError('limit', t('Esta licencia ya está activa en el máximo de dispositivos.'));
   }
-  return licError('invalid', 'La licencia no es válida o fue revocada.');
+  return licError('invalid', t('La licencia no es válida o fue revocada.'));
 }
 
 // ---- Activate / Validate -------------------------------------------------------
 
 export async function activate(rawKey) {
   const key = (rawKey || '').trim();
-  if (!key) throw licError('invalid', 'Introduce tu clave de licencia.');
+  if (!key) throw licError('invalid', t('Introduce tu clave de licencia.'));
 
   if (isMock()) {
     const r = await mockCall('activate', key);
@@ -123,7 +124,7 @@ export async function activate(rawKey) {
       body: JSON.stringify({ key, organization_id: CONFIG.organizationId, label: deviceLabel() }),
     });
   } catch {
-    throw licError('network', 'Sin conexión. Inténtalo cuando tengas red.');
+    throw licError('network', t('Sin conexión. Inténtalo cuando tengas red.'));
   }
   if (res.ok) {
     const data = await res.json();
@@ -131,7 +132,7 @@ export async function activate(rawKey) {
     return;
   }
   if (res.status >= 400 && res.status < 500) throw await classify4xx(res);
-  throw licError('network', 'El servidor de licencias no responde. Inténtalo en un rato.');
+  throw licError('network', t('El servidor de licencias no responde. Inténtalo en un rato.'));
 }
 
 // Validación de arranque: en background, nunca lanza, nunca bloquea. Solo degrada a
@@ -177,10 +178,10 @@ export function removeLocal() {
 function mockCall(op, key) {
   return new Promise((resolve, reject) => {
     setTimeout(() => {   // latencia pequeña: que la UI ejercite sus estados de espera
-      if (!MOCK_RE.test(key)) return reject(licError('invalid', 'La licencia no es válida o fue revocada.'));
-      if (/-REVOKED$/i.test(key)) return reject(licError('invalid', 'La licencia no es válida o fue revocada.'));
+      if (!MOCK_RE.test(key)) return reject(licError('invalid', t('La licencia no es válida o fue revocada.')));
+      if (/-REVOKED$/i.test(key)) return reject(licError('invalid', t('La licencia no es válida o fue revocada.')));
       if (op === 'activate' && /-LIMIT$/i.test(key)) {
-        return reject(licError('limit', 'Esta licencia ya está activa en el máximo de dispositivos.'));
+        return reject(licError('limit', t('Esta licencia ya está activa en el máximo de dispositivos.')));
       }
       resolve({ activationId: 'mock-' + Math.random().toString(36).slice(2, 10) });
     }, 150);

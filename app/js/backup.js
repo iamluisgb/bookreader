@@ -16,6 +16,7 @@
 //   - El texto segmentado/anclas (`bookText`/`anchors`): voluminoso y regenerable al
 //     reabrir el libro.
 //   - Los archivos de los libros (EPUB/PDF): binarios fuera de alcance del backup.
+import { t } from './i18n.js';
 import * as Storage from './storage.js';
 import * as DB from './ai/db.js';
 import { getTemplate } from './ai/templates.js';
@@ -73,7 +74,7 @@ async function importAi(ai) {
 
 export async function importBackup(obj) {
   if (!obj || obj.format !== FORMAT) {
-    throw new Error('Archivo no reconocido (no es un backup de BookReader).');
+    throw new Error(t('Archivo no reconocido (no es un backup de BookReader).'));
   }
   const localKeys = importLocal(obj.localStorage);
   const aiRecords = await importAi(obj.ai);
@@ -98,7 +99,7 @@ export async function buildMarkdown() {
     out.push('## Libretas', '');
     for (const c of convos) {
       const tpl = getTemplate(c.templateId);
-      out.push(`### ${[tpl?.name || 'Conversación', title[c.bookId]].filter(Boolean).join(' — ')}`);
+      out.push(`### ${[tpl?.name || t('Conversación'), title[c.bookId]].filter(Boolean).join(' — ')}`);
       if (c.goal) out.push(`*Objetivo:* ${oneLine(c.goal)}`);
       out.push('');
       const mine = (notes || []).filter(n => n.convoId === c.id && !n.deleted);
@@ -136,7 +137,7 @@ export async function buildMarkdown() {
     }
   }
 
-  if (out.length <= 4) out.push('_(Aún no hay libretas ni subrayados.)_');
+  if (out.length <= 4) out.push(t('_(Aún no hay libretas ni subrayados.)_'));
   return out.join('\n');
 }
 
@@ -146,7 +147,7 @@ export async function buildMarkdown() {
 // está segmentado. Reutiliza el `download()` CSP-safe. Ver BACKLOG · P8.
 export async function buildConvoMarkdown(convoId, { includeChat = true, includeNotebook = true } = {}) {
   const convo = await DB.getConvo(convoId);
-  if (!convo) return '# Conversación no encontrada';
+  if (!convo) return t('# Conversación no encontrada');
   const [notes, messages, books, seg] = await Promise.all([
     DB.getNotes(convoId),
     DB.getMessages(convoId),
@@ -158,7 +159,7 @@ export async function buildConvoMarkdown(convoId, { includeChat = true, includeN
   const tpl = getTemplate(convo.templateId);
 
   const out = [];
-  out.push(`# ${[tpl?.name || 'Conversación', bookTitle].filter(Boolean).join(' — ')}`, '');
+  out.push(`# ${[tpl?.name || t('Conversación'), bookTitle].filter(Boolean).join(' — ')}`, '');
   if (convo.goal) out.push(`*Objetivo:* ${(convo.goal || '').replace(/\s+/g, ' ').trim()}`, '');
   out.push(`_Exportado: ${new Date().toLocaleString('es')}_`, '');
 
@@ -179,13 +180,13 @@ export async function buildConvoMarkdown(convoId, { includeChat = true, includeN
   }
 
   if (includeChat && messages && messages.length) {
-    out.push('## Conversación', '');
+    out.push(t('## Conversación'), '');
     for (const m of messages) {
-      out.push(`**${m.role === 'user' ? '🧑 Tú' : '🤖 Agente'}:**`, '', resolveCites(m.content, anchors).trim(), '');
+      out.push(`**${m.role === 'user' ? t('🧑 Tú') : t('🤖 Agente')}:**`, '', resolveCites(m.content, anchors).trim(), '');
     }
   }
 
-  if ((!notes || !notes.length) && (!messages || !messages.length)) out.push('_(Conversación vacía.)_');
+  if ((!notes || !notes.length) && (!messages || !messages.length)) out.push(t('_(Conversación vacía.)_'));
   return out.join('\n');
 }
 
@@ -196,7 +197,7 @@ function resolveCites(text, anchors) {
   return (text || '').replace(/\[\[(a\d+)\]\]|\b(a\d+)\b/g, (m, p1, p2) => {
     const a = anchors.get(p1 || p2);
     if (!a) return m;
-    if (a.page != null) return `(pág. ${a.page})`;
+    if (a.page != null) return t('(pág. {n})', { n: a.page });
     if (a.chapter) return `(${a.chapter})`;
     return '';
   });

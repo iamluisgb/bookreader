@@ -21,13 +21,15 @@ import { ensurePro } from './paywall.js';
 import { icon } from './icons.js';
 import { escapeHtml } from './escape.js';
 import { confirmBox } from './dialog.js';
+import { t, getLang, setLang } from '../i18n.js';
 
 const SECTIONS = [
-  { id: 'agent',     label: 'Agente',     ico: 'sparkles' },
-  { id: 'profiles',  label: 'Perfiles',   ico: 'note' },
-  { id: 'templates', label: 'Plantillas', ico: 'note' },
-  { id: 'data',      label: 'Datos',      ico: 'share' },
-  { id: 'license',   label: 'Licencia',   ico: 'shield' },
+  { id: 'agent',     label: () => t('Agente'),     ico: 'sparkles' },
+  { id: 'app',       label: () => t('Aplicación'), ico: 'gear' },
+  { id: 'profiles',  label: () => t('Perfiles'),   ico: 'note' },
+  { id: 'templates', label: () => t('Plantillas'), ico: 'note' },
+  { id: 'data',      label: () => t('Datos'),      ico: 'share' },
+  { id: 'license',   label: () => t('Licencia'),   ico: 'shield' },
 ];
 
 let overlay = null;
@@ -43,12 +45,12 @@ function ensureOverlay() {
   overlay.className = 'appset';
   overlay.style.display = 'none';
   overlay.innerHTML = `
-    <div class="appset-card" role="dialog" aria-modal="true" aria-label="Ajustes generales">
-      <button class="appset-close" title="Cerrar" aria-label="Cerrar">${icon('xmark')}</button>
-      <h2 class="appset-h2">${icon('gear', { size: 20 })} Ajustes generales</h2>
+    <div class="appset-card" role="dialog" aria-modal="true" aria-label="${t('Ajustes generales')}">
+      <button class="appset-close" title="${t('Cerrar')}" aria-label="${t('Cerrar')}">${icon('xmark')}</button>
+      <h2 class="appset-h2">${icon('gear', { size: 20 })} ${t('Ajustes generales')}</h2>
       <div class="appset-body">
         <nav class="appset-nav">
-          ${SECTIONS.map(s => `<button class="appset-nav-item" data-section="${s.id}">${icon(s.ico, { size: 16 })}<span>${s.label}</span></button>`).join('')}
+          ${SECTIONS.map(s => `<button class="appset-nav-item" data-section="${s.id}">${icon(s.ico, { size: 16 })}<span>${s.label()}</span></button>`).join('')}
         </nav>
         <div class="appset-content"></div>
       </div>
@@ -78,12 +80,14 @@ function selectSection(id) {
   if (id === 'profiles') { profDraft = null; renderProfiles(content); return; }
   content.innerHTML = renderSection(id);
   if (id === 'agent') wireAgent(content);
+  if (id === 'app') wireApp(content);
   if (id === 'data') wireData(content);
   if (id === 'license') wireLicense(content);
 }
 
 function renderSection(id) {
   if (id === 'agent') return agentHtml();
+  if (id === 'app') return appHtml();
   if (id === 'data') return dataHtml();
   if (id === 'license') return licenseHtml();
   return '';
@@ -97,32 +101,32 @@ function agentHtml() {
   const cur = LLM.currentProvider();
   const provOpts = LLM.PROVIDERS.map(p =>
     `<option value="${p.id}"${cur && cur.id === p.id ? ' selected' : ''}>${escapeHtml(p.name)}</option>`).join('')
-    + `<option value="custom"${cur ? '' : ' selected'}>Personalizado</option>`;
+    + `<option value="custom"${cur ? '' : ' selected'}>${t('Personalizado')}</option>`;
   const suggested = (cur || LLM.PROVIDERS[0]).models;
   return `<div class="appset-section">
-    <h3 class="appset-h3">Agente</h3>
-    <label class="appset-label" for="appset-provider">Proveedor</label>
+    <h3 class="appset-h3">${t('Agente')}</h3>
+    <label class="appset-label" for="appset-provider">${t('Proveedor')}</label>
     <select id="appset-provider" class="appset-input">${provOpts}</select>
     <label class="appset-label" for="appset-baseurl">Base URL (endpoint OpenAI-compatible)</label>
     <input id="appset-baseurl" class="appset-input" value="${escapeHtml(LLM.getBaseUrl())}" placeholder="https://…/v1" autocomplete="off" spellcheck="false" />
-    <label class="appset-label" for="appset-model">Modelo</label>
+    <label class="appset-label" for="appset-model">${t('Modelo')}</label>
     <div class="appset-model-row">
       <input id="appset-model" class="appset-input" list="appset-model-list" value="${escapeHtml(LLM.getModel())}" placeholder="id-del-modelo" autocomplete="off" spellcheck="false" />
-      <button type="button" id="appset-model-discover" class="appset-discover">Descubrir</button>
+      <button type="button" id="appset-model-discover" class="appset-discover">${t('Descubrir')}</button>
     </div>
     <datalist id="appset-model-list">${modelDatalist(suggested)}</datalist>
     <div id="appset-model-chips" class="appset-chips"></div>
-    <p class="appset-muted appset-model-manual">Escribe el id del modelo a mano o elige uno de los sugeridos. «Descubrir» los lista automáticamente si el proveedor lo permite (nan no lo permite desde el navegador).</p>
+    <p class="appset-muted appset-model-manual">${t('Escribe el id del modelo a mano o elige uno de los sugeridos. «Descubrir» los lista automáticamente si el proveedor lo permite (nan no lo permite desde el navegador).')}</p>
     <p id="appset-model-hint" class="appset-model-hint" hidden></p>
-    <label class="appset-label" for="appset-vmodel">Modelo de visión (opcional)</label>
+    <label class="appset-label" for="appset-vmodel">${t('Modelo de visión (opcional)')}</label>
     <input id="appset-vmodel" class="appset-input" value="${escapeHtml(LLM.getVisionModel())}" placeholder="p. ej. mimo-v2.5" autocomplete="off" spellcheck="false" />
-    <p class="appset-muted">Para explicar figuras y páginas de un libro (multimodal). En nan, <code>mimo-v2.5</code> funciona. Déjalo vacío si tu modelo no interpreta imágenes; entonces "Explicar lo que veo" queda desactivado.</p>
+    <p class="appset-muted">${t('Para explicar figuras y páginas de un libro (multimodal). En nan, <code>mimo-v2.5</code> funciona. Déjalo vacío si tu modelo no interpreta imágenes; entonces "Explicar lo que veo" queda desactivado.')}</p>
     <label class="appset-label" for="appset-key">API key</label>
     <input id="appset-key" class="appset-input" type="password" placeholder="sk-..." autocomplete="off" value="${escapeHtml(LLM.getKey())}" />
-    <label class="appset-check"><input type="checkbox" id="appset-auto"${LLM.getAutoExtract() ? ' checked' : ''} /> Rellenar la libreta automáticamente</label>
-    <button id="appset-save" class="primary-btn appset-save">Guardar</button>
-    <p class="appset-saved" id="appset-saved" hidden>${icon('check', { size: 14 })} Guardado</p>
-    <p class="appset-privacy">${icon('shield', { size: 13 })} Tu API key se guarda solo en este navegador. Para responder, el contenido del libro se envía al proveedor que configures.</p>
+    <label class="appset-check"><input type="checkbox" id="appset-auto"${LLM.getAutoExtract() ? ' checked' : ''} /> ${t('Rellenar la libreta automáticamente')}</label>
+    <button id="appset-save" class="primary-btn appset-save">${t('Guardar')}</button>
+    <p class="appset-saved" id="appset-saved" hidden>${icon('check', { size: 14 })} ${t('Guardado')}</p>
+    <p class="appset-privacy">${icon('shield', { size: 13 })} ${t('Tu API key se guarda solo en este navegador. Para responder, el contenido del libro se envía al proveedor que configures.')}</p>
   </div>`;
 }
 
@@ -176,21 +180,21 @@ function wireAgent(content) {
   // formulario (aún sin guardar), y rellenar los chips + el datalist.
   discover.addEventListener('click', async () => {
     hint.hidden = false; hint.classList.remove('is-error');
-    hint.textContent = 'Buscando modelos…'; discover.disabled = true;
+    hint.textContent = t('Buscando modelos…'); discover.disabled = true;
     try {
       const models = await LLM.listModels({ baseUrl: baseUrl.value, key: keyEl.value });
-      if (!models.length) { hint.textContent = 'El proveedor no devolvió modelos. Escribe el id del modelo a mano.'; return; }
+      if (!models.length) { hint.textContent = t('El proveedor no devolvió modelos. Escribe el id del modelo a mano.'); return; }
       dl.innerHTML = modelDatalist(models);
       renderChips(models);
-      hint.textContent = `${models.length} modelos disponibles — pulsa uno para elegirlo.`;
+      hint.textContent = t('{n} modelos disponibles — pulsa uno para elegirlo.', { n: models.length });
     } catch (e) {
       // El discovery puede fallar por CORS (el proveedor no expone /models al navegador)
       // o por key inválida. En ambos casos el camino es escribir el modelo a mano: lo
       // decimos claramente y dejamos los chips sugeridos para elegir con un toque.
       hint.classList.add('is-error');
       hint.textContent = e.cors
-        ? 'Este proveedor no permite descubrir modelos desde el navegador. Escribe el id del modelo a mano o elige uno de los sugeridos abajo.'
-        : `No se pudieron descubrir los modelos: ${e.message} Escribe el id a mano o elige uno de los sugeridos.`;
+        ? t('Este proveedor no permite descubrir modelos desde el navegador. Escribe el id del modelo a mano o elige uno de los sugeridos abajo.')
+        : t('No se pudieron descubrir los modelos: {msg} Escribe el id a mano o elige uno de los sugeridos.', { msg: e.message });
       renderChips((LLM.PROVIDERS.find(p => p.baseUrl.replace(/\/+$/, '') === baseUrl.value.trim().replace(/\/+$/, '')) || LLM.PROVIDERS[0]).models);
       model.focus();
     } finally {
@@ -210,6 +214,30 @@ function wireAgent(content) {
   });
 }
 
+// ---- Sección Aplicación (P15: idioma) ---------------------------------------
+// El idioma vive en localStorage ('bookreader_lang'); cambiarlo recarga la app para
+// re-evaluar todo el chrome (los módulos leen t() al renderizar; sin re-render en caliente).
+
+function appHtml() {
+  const lang = getLang();
+  return `<div class="appset-section">
+    <h3 class="appset-h3">${t('Aplicación')}</h3>
+    <label class="appset-label" for="appset-lang">${t('Idioma')} · Language</label>
+    <select id="appset-lang" class="appset-input">
+      <option value="en"${lang === 'en' ? ' selected' : ''}>English</option>
+      <option value="es"${lang === 'es' ? ' selected' : ''}>Español</option>
+    </select>
+    <p class="appset-muted">${t('Idioma de la interfaz. El agente responde en el idioma en el que le escribas. Cambiarlo recarga la app.')}</p>
+  </div>`;
+}
+
+function wireApp(content) {
+  content.querySelector('#appset-lang').addEventListener('change', (e) => {
+    setLang(e.target.value);
+    location.reload();
+  });
+}
+
 // ---- Sección Plantillas (P2) ----------------------------------------------
 // Lista (fábrica de solo lectura + propias editables) y formulario de crear/editar.
 // `tplDraft` distingue el modo: null = lista, objeto = formulario.
@@ -221,29 +249,29 @@ function renderTemplates(content) {
 
 function templatesListHtml() {
   const byBlock = Object.values(BLOCKS).map(bl => {
-    const items = allTemplates().filter(t => t.block === bl.id);
+    const items = allTemplates().filter(x => x.block === bl.id);
     return `<div class="appset-tpl-block">
       <div class="appset-tpl-block-h">${icon(bl.icon, { size: 15 })} ${escapeHtml(bl.label)}</div>
-      ${items.map(t => `
+      ${items.map(tp => `
         <div class="appset-tpl-row">
           <div class="appset-tpl-meta">
-            <span class="appset-tpl-name">${escapeHtml(t.name)}</span>
-            <span class="appset-tpl-ideal">${escapeHtml(t.ideal || '')}</span>
+            <span class="appset-tpl-name">${escapeHtml(tp.name)}</span>
+            <span class="appset-tpl-ideal">${escapeHtml(tp.ideal || '')}</span>
           </div>
-          ${t.custom
+          ${tp.custom
             ? `<div class="appset-tpl-acts">
-                 <button class="icon-btn appset-tpl-edit" data-id="${t.id}" title="Editar">${icon('pencil', { size: 15 })}</button>
-                 <button class="icon-btn appset-tpl-del" data-id="${t.id}" title="Eliminar">${icon('trash', { size: 15 })}</button>
+                 <button class="icon-btn appset-tpl-edit" data-id="${tp.id}" title="${t('Editar')}">${icon('pencil', { size: 15 })}</button>
+                 <button class="icon-btn appset-tpl-del" data-id="${tp.id}" title="${t('Eliminar')}">${icon('trash', { size: 15 })}</button>
                </div>`
-            : '<span class="appset-tpl-tag">de fábrica</span>'}
+            : `<span class="appset-tpl-tag">${t('de fábrica')}</span>`}
         </div>`).join('')}
     </div>`;
   }).join('');
   return `<div class="appset-section">
-    <h3 class="appset-h3">Plantillas de libreta</h3>
-    <p class="appset-muted">Las plantillas de fábrica no se editan. Crea las tuyas: aparecerán en el onboarding del agente junto a ellas.</p>
+    <h3 class="appset-h3">${t('Plantillas de libreta')}</h3>
+    <p class="appset-muted">${t('Las plantillas de fábrica no se editan. Crea las tuyas: aparecerán en el onboarding del agente junto a ellas.')}</p>
     ${byBlock}
-    <button id="appset-tpl-new" class="primary-btn appset-save">${icon('plus', { size: 15 })} Crear plantilla</button>
+    <button id="appset-tpl-new" class="primary-btn appset-save">${icon('plus', { size: 15 })} ${t('Crear plantilla')}</button>
   </div>`;
 }
 
@@ -262,30 +290,30 @@ function wireTemplatesList(content) {
     }));
 }
 
-function templateFormHtml(t) {
+function templateFormHtml(tp) {
   const blockOpts = Object.values(BLOCKS).map(bl =>
-    `<option value="${bl.id}"${t.block === bl.id ? ' selected' : ''}>${escapeHtml(bl.label)}</option>`).join('');
+    `<option value="${bl.id}"${tp.block === bl.id ? ' selected' : ''}>${escapeHtml(bl.label)}</option>`).join('');
   return `<div class="appset-section">
-    <h3 class="appset-h3">${t.id ? 'Editar plantilla' : 'Nueva plantilla'}</h3>
-    <label class="appset-label" for="tpl-name">Nombre</label>
-    <input id="tpl-name" class="appset-input" value="${escapeHtml(t.name)}" placeholder="Mi plantilla" />
-    <label class="appset-label" for="tpl-block">Enfoque</label>
+    <h3 class="appset-h3">${tp.id ? t('Editar plantilla') : t('Nueva plantilla')}</h3>
+    <label class="appset-label" for="tpl-name">${t('Nombre')}</label>
+    <input id="tpl-name" class="appset-input" value="${escapeHtml(tp.name)}" placeholder="${t('Mi plantilla')}" />
+    <label class="appset-label" for="tpl-block">${t('Enfoque')}</label>
     <select id="tpl-block" class="appset-input">${blockOpts}</select>
-    <label class="appset-label" for="tpl-ideal">Ideal para</label>
-    <input id="tpl-ideal" class="appset-input" value="${escapeHtml(t.ideal)}" placeholder="Para qué sirve esta lectura" />
-    <label class="appset-label" for="tpl-goal">Pregunta de objetivo</label>
-    <input id="tpl-goal" class="appset-input" value="${escapeHtml(t.goalPrompt)}" placeholder="¿Qué quieres lograr con este libro?" />
-    <label class="appset-label" for="tpl-role">Rol del agente</label>
-    <textarea id="tpl-role" class="appset-input" rows="3" placeholder="Cómo debe ayudarte el agente con esta plantilla">${escapeHtml(t.agentRole)}</textarea>
-    <label class="appset-label">Campos de la libreta</label>
+    <label class="appset-label" for="tpl-ideal">${t('Ideal para')}</label>
+    <input id="tpl-ideal" class="appset-input" value="${escapeHtml(tp.ideal)}" placeholder="${t('Para qué sirve esta lectura')}" />
+    <label class="appset-label" for="tpl-goal">${t('Pregunta de objetivo')}</label>
+    <input id="tpl-goal" class="appset-input" value="${escapeHtml(tp.goalPrompt)}" placeholder="${t('¿Qué quieres lograr con este libro?')}" />
+    <label class="appset-label" for="tpl-role">${t('Rol del agente')}</label>
+    <textarea id="tpl-role" class="appset-input" rows="3" placeholder="${t('Cómo debe ayudarte el agente con esta plantilla')}">${escapeHtml(tp.agentRole)}</textarea>
+    <label class="appset-label">${t('Campos de la libreta')}</label>
     <div class="appset-tpl-fields">
-      ${t.fields.map(f => templateFieldRow(f)).join('')}
+      ${tp.fields.map(f => templateFieldRow(f)).join('')}
     </div>
-    <button id="tpl-add-field" class="appset-tpl-addfield">${icon('plus', { size: 14 })} Añadir campo</button>
+    <button id="tpl-add-field" class="appset-tpl-addfield">${icon('plus', { size: 14 })} ${t('Añadir campo')}</button>
     <p class="appset-err" id="tpl-err" hidden></p>
     <div class="appset-tpl-formacts">
-      <button id="tpl-cancel" class="appset-tpl-cancel">Cancelar</button>
-      <button id="tpl-save" class="primary-btn">Guardar plantilla</button>
+      <button id="tpl-cancel" class="appset-tpl-cancel">${t('Cancelar')}</button>
+      <button id="tpl-save" class="primary-btn">${t('Guardar plantilla')}</button>
     </div>
   </div>`;
 }
@@ -293,16 +321,16 @@ function templateFormHtml(t) {
 function templateFieldRow(f = { key: '', label: '', type: 'text', fill: 'agent' }) {
   const cog = f.fill === 'user';
   return `<div class="appset-tpl-field-row" data-key="${escapeHtml(f.key || '')}">
-    <input class="appset-input appset-tpl-field-label" value="${escapeHtml(f.label || '')}" placeholder="Etiqueta del campo" />
+    <input class="appset-input appset-tpl-field-label" value="${escapeHtml(f.label || '')}" placeholder="${t('Etiqueta del campo')}" />
     <select class="appset-input appset-tpl-field-type">
-      <option value="text"${f.type !== 'list' ? ' selected' : ''}>Texto</option>
-      <option value="list"${f.type === 'list' ? ' selected' : ''}>Lista</option>
+      <option value="text"${f.type !== 'list' ? ' selected' : ''}>${t('Texto')}</option>
+      <option value="list"${f.type === 'list' ? ' selected' : ''}>${t('Lista')}</option>
     </select>
-    <select class="appset-input appset-tpl-field-fill" title="Quién rellena el campo">
-      <option value="agent"${!cog ? ' selected' : ''}>IA (info)</option>
-      <option value="user"${cog ? ' selected' : ''}>Tú (cognición)</option>
+    <select class="appset-input appset-tpl-field-fill" title="${t('Quién rellena el campo')}">
+      <option value="agent"${!cog ? ' selected' : ''}>${t('IA (info)')}</option>
+      <option value="user"${cog ? ' selected' : ''}>${t('Tú (cognición)')}</option>
     </select>
-    <button class="icon-btn appset-tpl-field-del" title="Quitar campo">${icon('xmark', { size: 15 })}</button>
+    <button class="icon-btn appset-tpl-field-del" title="${t('Quitar campo')}">${icon('xmark', { size: 15 })}</button>
   </div>`;
 }
 
@@ -367,23 +395,22 @@ function profilesListHtml() {
   const active = profiles.find(p => p.id === activeId);
   const snippet = (p) => oneLine([p.soul, p.userProfile, p.notes].filter(Boolean).join(' · '));
   return `<div class="appset-section">
-    <h3 class="appset-h3">Perfiles del agente</h3>
-    <p class="appset-muted">Persona del agente + quién eres + notas permanentes, reutilizables entre libros.
-      El perfil activo se antepone al prompt en cada respuesta.</p>
-    <p class="appset-prof-active">Activo: <strong>${active ? escapeHtml(active.name) : 'ninguno'}</strong></p>
+    <h3 class="appset-h3">${t('Perfiles del agente')}</h3>
+    <p class="appset-muted">${t('Persona del agente + quién eres + notas permanentes, reutilizables entre libros. El perfil activo se antepone al prompt en cada respuesta.')}</p>
+    <p class="appset-prof-active">${t('Activo:')} <strong>${active ? escapeHtml(active.name) : t('ninguno')}</strong></p>
     ${profiles.length ? profiles.map(p => `
       <div class="appset-tpl-row${p.id === activeId ? ' is-active' : ''}">
         <div class="appset-tpl-meta">
           <span class="appset-tpl-name">${escapeHtml(p.name)}</span>
-          <span class="appset-tpl-ideal">${escapeHtml(snippet(p)) || 'Sin contenido'}</span>
+          <span class="appset-tpl-ideal">${escapeHtml(snippet(p)) || t('Sin contenido')}</span>
         </div>
         <div class="appset-tpl-acts">
-          <button class="appset-prof-activate" data-id="${p.id}">${p.id === activeId ? 'Activo ✓' : 'Activar'}</button>
-          <button class="icon-btn appset-prof-edit" data-id="${p.id}" title="Editar">${icon('pencil', { size: 15 })}</button>
-          <button class="icon-btn appset-prof-del" data-id="${p.id}" title="Eliminar">${icon('trash', { size: 15 })}</button>
+          <button class="appset-prof-activate" data-id="${p.id}">${p.id === activeId ? t('Activo ✓') : t('Activar')}</button>
+          <button class="icon-btn appset-prof-edit" data-id="${p.id}" title="${t('Editar')}">${icon('pencil', { size: 15 })}</button>
+          <button class="icon-btn appset-prof-del" data-id="${p.id}" title="${t('Eliminar')}">${icon('trash', { size: 15 })}</button>
         </div>
-      </div>`).join('') : '<p class="appset-muted">Aún no hay perfiles.</p>'}
-    <button id="appset-prof-new" class="primary-btn appset-save">${icon('plus', { size: 15 })} Crear perfil</button>
+      </div>`).join('') : `<p class="appset-muted">${t('Aún no hay perfiles.')}</p>`}
+    <button id="appset-prof-new" class="primary-btn appset-save">${icon('plus', { size: 15 })} ${t('Crear perfil')}</button>
   </div>`;
 }
 
@@ -418,19 +445,19 @@ function wireProfilesList(content) {
 
 function profileFormHtml(p) {
   return `<div class="appset-section">
-    <h3 class="appset-h3">${p.id ? 'Editar perfil' : 'Nuevo perfil'}</h3>
-    <label class="appset-label" for="prof-name">Nombre</label>
-    <input id="prof-name" class="appset-input" value="${escapeHtml(p.name)}" placeholder="Mi perfil de lectura" />
-    <label class="appset-label" for="prof-soul">Personalidad y rol del agente</label>
-    <textarea id="prof-soul" class="appset-input" rows="3" placeholder="Cómo debe comportarse y con qué tono">${escapeHtml(p.soul)}</textarea>
-    <label class="appset-label" for="prof-user">Sobre ti (perfil de usuario)</label>
-    <textarea id="prof-user" class="appset-input" rows="3" placeholder="Quién eres, tu nivel, tus intereses">${escapeHtml(p.userProfile)}</textarea>
-    <label class="appset-label" for="prof-notes">Notas permanentes</label>
-    <textarea id="prof-notes" class="appset-input" rows="3" placeholder="Algo que el agente deba tener siempre en cuenta">${escapeHtml(p.notes)}</textarea>
+    <h3 class="appset-h3">${p.id ? t('Editar perfil') : t('Nuevo perfil')}</h3>
+    <label class="appset-label" for="prof-name">${t('Nombre')}</label>
+    <input id="prof-name" class="appset-input" value="${escapeHtml(p.name)}" placeholder="${t('Mi perfil de lectura')}" />
+    <label class="appset-label" for="prof-soul">${t('Personalidad y rol del agente')}</label>
+    <textarea id="prof-soul" class="appset-input" rows="3" placeholder="${t('Cómo debe comportarse y con qué tono')}">${escapeHtml(p.soul)}</textarea>
+    <label class="appset-label" for="prof-user">${t('Sobre ti (perfil de usuario)')}</label>
+    <textarea id="prof-user" class="appset-input" rows="3" placeholder="${t('Quién eres, tu nivel, tus intereses')}">${escapeHtml(p.userProfile)}</textarea>
+    <label class="appset-label" for="prof-notes">${t('Notas permanentes')}</label>
+    <textarea id="prof-notes" class="appset-input" rows="3" placeholder="${t('Algo que el agente deba tener siempre en cuenta')}">${escapeHtml(p.notes)}</textarea>
     <p class="appset-err" id="prof-err" hidden></p>
     <div class="appset-tpl-formacts">
-      <button id="prof-cancel" class="appset-tpl-cancel">Cancelar</button>
-      <button id="prof-save" class="primary-btn">Guardar perfil</button>
+      <button id="prof-cancel" class="appset-tpl-cancel">${t('Cancelar')}</button>
+      <button id="prof-save" class="primary-btn">${t('Guardar perfil')}</button>
     </div>
   </div>`;
 }
@@ -466,29 +493,26 @@ function wireProfileForm(content) {
 
 function dataHtml() {
   return `<div class="appset-section">
-    <h3 class="appset-h3">Datos</h3>
-    <p class="appset-muted">Copia de seguridad de tus datos para guardarla o migrar a otro dispositivo:
-      ajustes, subrayados, marcadores, plantillas propias, conversaciones y libretas.
-      <strong>No</strong> incluye la API key ni los archivos de los libros.</p>
-    <button id="appset-export-json" class="primary-btn appset-save">${icon('share', { size: 15 })} Descargar backup (JSON)</button>
-    <button id="appset-export-md" class="appset-tpl-cancel appset-data-md">${icon('note', { size: 15 })} Descargar resumen (Markdown)</button>
+    <h3 class="appset-h3">${t('Datos')}</h3>
+    <p class="appset-muted">${t('Copia de seguridad de tus datos para guardarla o migrar a otro dispositivo: ajustes, subrayados, marcadores, plantillas propias, conversaciones y libretas. <strong>No</strong> incluye la API key ni los archivos de los libros.')}</p>
+    <button id="appset-export-json" class="primary-btn appset-save">${icon('share', { size: 15 })} ${t('Descargar backup (JSON)')}</button>
+    <button id="appset-export-md" class="appset-tpl-cancel appset-data-md">${icon('note', { size: 15 })} ${t('Descargar resumen (Markdown)')}</button>
 
-    <label class="appset-label" style="margin-top:18px">Importar backup</label>
-    <p class="appset-muted">Restaura desde un JSON. Fusiona: sobrescribe lo que coincida, no borra el resto.</p>
+    <label class="appset-label" style="margin-top:18px">${t('Importar backup')}</label>
+    <p class="appset-muted">${t('Restaura desde un JSON. Fusiona: sobrescribe lo que coincida, no borra el resto.')}</p>
     <input type="file" id="appset-import-file" class="appset-input" accept="application/json,.json" />
 
     <label class="appset-label" style="margin-top:18px">Google Drive</label>
-    <p class="appset-muted">Guarda tus datos en una carpeta privada de tu propio Drive. El único servidor
-      implicado solo renueva tu permiso de Google: tus libros y notas van directos de tu navegador a tu Drive.</p>
+    <p class="appset-muted">${t('Guarda tus datos en una carpeta privada de tu propio Drive. El único servidor implicado solo renueva tu permiso de Google: tus libros y notas van directos de tu navegador a tu Drive.')}</p>
     <div id="appset-drive-off">
-      <button id="appset-drive-connect" class="primary-btn appset-save">${icon('upload', { size: 15 })} Conectar con Google Drive</button>
+      <button id="appset-drive-connect" class="primary-btn appset-save">${icon('upload', { size: 15 })} ${t('Conectar con Google Drive')}</button>
     </div>
     <div id="appset-drive-on" hidden>
-      <button id="appset-drive-save" class="primary-btn appset-save">${icon('upload', { size: 15 })} Guardar en Drive</button>
-      <button id="appset-drive-restore" class="appset-tpl-cancel appset-data-md">${icon('download', { size: 15 })} Restaurar desde Drive</button>
-      <button id="appset-drive-history" class="appset-tpl-cancel appset-data-md">${icon('sort', { size: 15 })} Historial de versiones</button>
-      <button id="appset-drive-purge" class="appset-tpl-cancel appset-data-md">${icon('trash', { size: 15 })} Limpiar entradas huérfanas</button>
-      <button id="appset-drive-disconnect" class="appset-tpl-cancel appset-data-md">Desconectar</button>
+      <button id="appset-drive-save" class="primary-btn appset-save">${icon('upload', { size: 15 })} ${t('Guardar en Drive')}</button>
+      <button id="appset-drive-restore" class="appset-tpl-cancel appset-data-md">${icon('download', { size: 15 })} ${t('Restaurar desde Drive')}</button>
+      <button id="appset-drive-history" class="appset-tpl-cancel appset-data-md">${icon('sort', { size: 15 })} ${t('Historial de versiones')}</button>
+      <button id="appset-drive-purge" class="appset-tpl-cancel appset-data-md">${icon('trash', { size: 15 })} ${t('Limpiar entradas huérfanas')}</button>
+      <button id="appset-drive-disconnect" class="appset-tpl-cancel appset-data-md">${t('Desconectar')}</button>
     </div>
     <p class="appset-data-msg" id="appset-data-msg" hidden></p>
   </div>`;
@@ -503,10 +527,10 @@ function wireData(content) {
   };
 
   content.querySelector('#appset-export-json').addEventListener('click', () => {
-    Backup.downloadBackup().catch(e => show('No se pudo exportar: ' + e.message, true));
+    Backup.downloadBackup().catch(e => show(t('No se pudo exportar: {msg}', { msg: e.message }), true));
   });
   content.querySelector('#appset-export-md').addEventListener('click', () => {
-    Backup.downloadMarkdown().catch(e => show('No se pudo exportar: ' + e.message, true));
+    Backup.downloadMarkdown().catch(e => show(t('No se pudo exportar: {msg}', { msg: e.message }), true));
   });
 
   content.querySelector('#appset-import-file').addEventListener('change', async (e) => {
@@ -515,10 +539,10 @@ function wireData(content) {
     try {
       const obj = JSON.parse(await file.text());
       const r = await Backup.importBackup(obj);
-      show(`${icon('check', { size: 14 })} Importado: ${r.localKeys} ajustes y ${r.aiRecords} registros. <button id="appset-reload" class="appset-data-reload">Recargar para aplicar</button>`);
+      show(`${icon('check', { size: 14 })} ${t('Importado: {a} ajustes y {b} registros.', { a: r.localKeys, b: r.aiRecords })} <button id="appset-reload" class="appset-data-reload">${t('Recargar para aplicar')}</button>`);
       content.querySelector('#appset-reload').addEventListener('click', () => location.reload());
     } catch (err) {
-      show('No se pudo importar: ' + err.message, true);
+      show(t('No se pudo importar: {msg}', { msg: err.message }), true);
     } finally {
       e.target.value = '';   // permitir reimportar el mismo archivo
     }
@@ -543,18 +567,18 @@ function wireDrive(content, show) {
   const fail = (prefix) => (err) => {
     if (err.message === 'reconnect') {
       refresh();
-      show('El permiso de Google caducó o fue revocado. Vuelve a conectar con Drive.', true);
+      show(t('El permiso de Google caducó o fue revocado. Vuelve a conectar con Drive.'), true);
     } else {
-      show(prefix + ': ' + err.message, true);
+      show(t(prefix) + ': ' + err.message, true);
     }
   };
 
   content.querySelector('#appset-drive-connect').addEventListener('click', () => {
-    show('Abriendo la ventana de Google…');
+    show(t('Abriendo la ventana de Google…'));
     DriveAuth.connect()
       .then(() => {
         refresh();
-        show(`${icon('check', { size: 14 })} Drive conectado. La sincronización automática queda activada.`);
+        show(`${icon('check', { size: 14 })} ${t('Drive conectado. La sincronización automática queda activada.')}`);
         SyncEngine.refreshConnection(); // primer sync inmediato
       })
       .catch(fail('No se pudo conectar'));
@@ -564,22 +588,22 @@ function wireDrive(content, show) {
     DriveAuth.disconnect();
     SyncEngine.refreshConnection();
     refresh();
-    show('Drive desconectado. Tus datos siguen en tu Drive y en este dispositivo.');
+    show(t('Drive desconectado. Tus datos siguen en tu Drive y en este dispositivo.'));
   });
 
   content.querySelector('#appset-drive-save').addEventListener('click', () => {
-    show('Guardando en Drive…');
-    DriveSync.saveToDrive((done, total) => show(`Guardando en Drive… ${done}/${total}`))
-      .then(r => show(`${icon('check', { size: 14 })} Guardado en Drive (${r.books} ${r.books === 1 ? 'libro' : 'libros'}).`))
+    show(t('Guardando en Drive…'));
+    DriveSync.saveToDrive((done, total) => show(`${t('Guardando en Drive…')} ${done}/${total}`))
+      .then(r => show(`${icon('check', { size: 14 })} ${t('Guardado en Drive ({n} {libros}).', { n: r.books, libros: r.books === 1 ? t('libro') : t('libros') })}`))
       .catch(fail('No se pudo guardar'));
   });
 
   content.querySelector('#appset-drive-restore').addEventListener('click', () => {
-    show('Restaurando desde Drive…');
-    DriveSync.restoreFromDrive((done, total) => show(`Restaurando… ${done}/${total}`))
+    show(t('Restaurando desde Drive…'));
+    DriveSync.restoreFromDrive((done, total) => show(`${t('Restaurando…')} ${done}/${total}`))
       .then(r => {
-        if (!r) return show('No hay nada guardado en Drive todavía.', true);
-        show(`${icon('check', { size: 14 })} Restaurado: ${r.keys} ajustes y ${r.records} registros. <button id="appset-drive-reload" class="appset-data-reload">Recargar para aplicar</button>`);
+        if (!r) return show(t('No hay nada guardado en Drive todavía.'), true);
+        show(`${icon('check', { size: 14 })} ${t('Restaurado: {a} ajustes y {b} registros.', { a: r.keys, b: r.records })} <button id="appset-drive-reload" class="appset-data-reload">${t('Recargar para aplicar')}</button>`);
         content.querySelector('#appset-drive-reload').addEventListener('click', () => location.reload());
       })
       .catch(fail('No se pudo restaurar'));
@@ -591,11 +615,11 @@ function wireDrive(content, show) {
       { title: 'Limpiar entradas huérfanas', okText: 'Limpiar', cancelText: 'Cancelar', danger: true }
     );
     if (!yes) return;
-    show('Limpiando…');
+    show(t('Limpiando…'));
     try {
       const r = await Recovery.purgeOrphans();
       SyncEngine.syncNow();   // propaga el manifest limpio al resto de dispositivos
-      show(`${icon('check', { size: 14 })} Limpieza hecha: ${r.removed} ${r.removed === 1 ? 'entrada quitada' : 'entradas quitadas'}.`);
+      show(`${icon('check', { size: 14 })} ${t('Limpieza hecha: {n} {entradas}.', { n: r.removed, entradas: r.removed === 1 ? t('entrada quitada') : t('entradas quitadas') })}`);
     } catch (e) { fail('No se pudo limpiar')(e); }
   });
 
@@ -613,37 +637,35 @@ function maskKey(key) {
 function licenseHtml() {
   const s = License.getState();
   const mockNote = License.isMock()
-    ? `<p class="appset-muted appset-lic-mock">${icon('shield', { size: 13 })} Modo simulado (aún sin plataforma de pagos): cualquier clave <code>BKRD-…</code> activa Pro para probar.</p>`
+    ? `<p class="appset-muted appset-lic-mock">${icon('shield', { size: 13 })} ${t('Modo simulado (aún sin plataforma de pagos): cualquier clave <code>BKRD-…</code> activa Pro para probar.')}</p>`
     : '';
 
   if (s && s.key && !s.revoked) {
-    const since = s.validatedAt ? new Date(s.validatedAt).toLocaleDateString('es') : '';
+    const since = s.validatedAt ? new Date(s.validatedAt).toLocaleDateString(getLang()) : '';
     return `<div class="appset-section">
-      <h3 class="appset-h3">Licencia</h3>
-      <p class="appset-lic-state is-pro">${icon('check', { size: 15 })} BookReader Pro activo</p>
-      <p class="appset-muted">Clave ${escapeHtml(maskKey(s.key))} · última verificación: ${escapeHtml(since)}.
-        Sin conexión, tu licencia sigue activa hasta 30 días.</p>
-      <button id="appset-lic-portal" class="primary-btn appset-save">${icon('user', { size: 15 })} Gestionar dispositivos y recibos</button>
-      <button id="appset-lic-remove" class="appset-tpl-cancel appset-data-md">Quitar la licencia de este navegador</button>
-      <p class="appset-muted">Quitar la licencia aquí no libera el hueco de dispositivo: eso se hace en el portal.</p>
+      <h3 class="appset-h3">${t('Licencia')}</h3>
+      <p class="appset-lic-state is-pro">${icon('check', { size: 15 })} ${t('BookReader Pro activo')}</p>
+      <p class="appset-muted">${t('Clave {key} · última verificación: {date}. Sin conexión, tu licencia sigue activa hasta 30 días.', { key: escapeHtml(maskKey(s.key)), date: escapeHtml(since) })}</p>
+      <button id="appset-lic-portal" class="primary-btn appset-save">${icon('user', { size: 15 })} ${t('Gestionar dispositivos y recibos')}</button>
+      <button id="appset-lic-remove" class="appset-tpl-cancel appset-data-md">${t('Quitar la licencia de este navegador')}</button>
+      <p class="appset-muted">${t('Quitar la licencia aquí no libera el hueco de dispositivo: eso se hace en el portal.')}</p>
       ${mockNote}
     </div>`;
   }
 
   const revokedNote = s && s.revoked
-    ? `<p class="appset-err">Tu licencia dejó de ser válida (¿reembolso o revocación?). Tus datos siguen intactos; la app vuelve al plan Free.</p>`
+    ? `<p class="appset-err">${t('Tu licencia dejó de ser válida (¿reembolso o revocación?). Tus datos siguen intactos; la app vuelve al plan Free.')}</p>`
     : '';
   return `<div class="appset-section">
-    <h3 class="appset-h3">Licencia</h3>
+    <h3 class="appset-h3">${t('Licencia')}</h3>
     ${revokedNote}
-    <p class="appset-muted">BookReader Pro desbloquea flashcards con export a Anki, repaso espaciado,
-      mapas mentales, plantillas avanzadas y perfiles. ${escapeHtml(License.CONFIG.price)}, sin suscripción.</p>
-    <label class="appset-label" for="appset-lic-key">Clave de licencia</label>
+    <p class="appset-muted">${t('BookReader Pro desbloquea flashcards con export a Anki, repaso espaciado, mapas mentales, plantillas avanzadas y perfiles. {price}, sin suscripción.', { price: escapeHtml(License.CONFIG.price) })}</p>
+    <label class="appset-label" for="appset-lic-key">${t('Clave de licencia')}</label>
     <input id="appset-lic-key" class="appset-input" placeholder="BKRD-XXXX-XXXX-XXXX" autocomplete="off" spellcheck="false" />
-    <button id="appset-lic-activate" class="primary-btn appset-save">Activar en este dispositivo</button>
-    ${License.CONFIG.checkoutUrl ? `<button id="appset-lic-buy" class="appset-tpl-cancel appset-data-md">Conseguir BookReader Pro</button>` : ''}
+    <button id="appset-lic-activate" class="primary-btn appset-save">${t('Activar en este dispositivo')}</button>
+    ${License.CONFIG.checkoutUrl ? `<button id="appset-lic-buy" class="appset-tpl-cancel appset-data-md">${t('Conseguir BookReader Pro')}</button>` : ''}
     <p class="appset-err" id="appset-lic-err" hidden></p>
-    <p class="appset-muted">La clave llega por email al comprar y siempre puedes recuperarla en el portal de cliente.</p>
+    <p class="appset-muted">${t('La clave llega por email al comprar y siempre puedes recuperarla en el portal de cliente.')}</p>
     ${mockNote}
   </div>`;
 }
@@ -668,7 +690,7 @@ function wireLicense(content) {
   const btn = content.querySelector('#appset-lic-activate');
   btn.addEventListener('click', async () => {
     err.hidden = true;
-    btn.disabled = true; btn.textContent = 'Activando…';
+    btn.disabled = true; btn.textContent = t('Activando…');
     try {
       await License.activate(keyEl.value);
       selectSection('license');
@@ -676,11 +698,11 @@ function wireLicense(content) {
       // El límite de activaciones nunca es un callejón sin salida: la causa típica es
       // una purga de storage del navegador; el portal libera el hueco fantasma.
       err.innerHTML = e.code === 'limit'
-        ? `${escapeHtml(e.message)} ¿Borraste datos de navegación o reinstalaste? Libera un dispositivo en
-           <a href="${escapeHtml(License.CONFIG.portalUrl)}" target="_blank" rel="noopener">el portal de cliente</a> y reintenta.`
+        ? `${escapeHtml(e.message)} ${t('¿Borraste datos de navegación o reinstalaste? Libera un dispositivo en')}
+           <a href="${escapeHtml(License.CONFIG.portalUrl)}" target="_blank" rel="noopener">${t('el portal de cliente')}</a> ${t('y reintenta')}.`
         : escapeHtml(e.message);
       err.hidden = false;
-      btn.disabled = false; btn.textContent = 'Activar en este dispositivo';
+      btn.disabled = false; btn.textContent = t('Activar en este dispositivo');
     }
   });
   content.querySelector('#appset-lic-buy')?.addEventListener('click', () =>
@@ -696,7 +718,7 @@ function wireLicense(content) {
 // encima del overlay de Ajustes; al cerrar devuelve el foco al botón que lo abrió.
 
 function fmtDate(iso) {
-  try { return new Date(iso).toLocaleString('es'); } catch { return iso; }
+  try { return new Date(iso).toLocaleString(getLang()); } catch { return iso; }
 }
 
 let histOverlay = null;
@@ -715,16 +737,16 @@ function ensureHistoryOverlay() {
   histOverlay.innerHTML = `
     <div class="histov-card" role="dialog" aria-modal="true" aria-labelledby="histov-title">
       <div class="histov-head">
-        <button class="histov-back" type="button" hidden>${icon('chevron-left', { size: 16 })}<span>Volver</span></button>
+        <button class="histov-back" type="button" hidden>${icon('chevron-left', { size: 16 })}<span>${t('Volver')}</span></button>
         <div class="histov-titles">
-          <h2 class="histov-title" id="histov-title">Historial de versiones</h2>
+          <h2 class="histov-title" id="histov-title">${t('Historial de versiones')}</h2>
           <p class="histov-sub"></p>
         </div>
-        <button class="histov-close" type="button" title="Cerrar" aria-label="Cerrar">${icon('xmark')}</button>
+        <button class="histov-close" type="button" title="${t('Cerrar')}" aria-label="${t('Cerrar')}">${icon('xmark')}</button>
       </div>
-      <div class="histov-search-wrap"><input type="search" class="histov-search" placeholder="Buscar libro…" aria-label="Buscar libro" /></div>
+      <div class="histov-search-wrap"><input type="search" class="histov-search" placeholder="${t('Buscar libro…')}" aria-label="${t('Buscar libro')}" /></div>
       <div class="histov-list"></div>
-      <p class="histov-foot appset-muted">Drive conserva las copias de cada libro unos 30 días.</p>
+      <p class="histov-foot appset-muted">${t('Drive conserva las copias de cada libro unos 30 días.')}</p>
     </div>`;
   document.body.appendChild(histOverlay);
   histOverlay.querySelector('.histov-close').addEventListener('click', closeHistory);
@@ -775,18 +797,18 @@ function openHistory(trigger, show, fail) {
 
   // --- Nivel 1: libros ---
   async function renderBooks() {
-    setHead('Historial de versiones', '', null);
+    setHead(t('Historial de versiones'), '', null);
     searchWrap.hidden = true;
     search.value = '';
-    list.innerHTML = '<p class="appset-muted histov-pad">Cargando libros…</p>';
+    list.innerHTML = `<p class="appset-muted histov-pad">${t('Cargando libros…')}</p>`;
     try {
       books = (await Recovery.listBooks()).map(b => ({ ...b, clean: Recovery.cleanTitle(b.title) }));
       if (!books.length) {
-        list.innerHTML = '<p class="appset-muted histov-empty">Aún no hay copias en Drive. Pulsa “Guardar en Drive” para empezar a tener historial.</p>';
+        list.innerHTML = `<p class="appset-muted histov-empty">${t('Aún no hay copias en Drive. Pulsa “Guardar en Drive” para empezar a tener historial.')}</p>`;
         return;
       }
       searchWrap.hidden = books.length < 8;   // buscador solo cuando de verdad hace falta
-      subEl.textContent = `${books.length} ${books.length === 1 ? 'libro' : 'libros'} con copias en Drive`;
+      subEl.textContent = t('{n} {libros} con copias en Drive', { n: books.length, libros: books.length === 1 ? t('libro') : t('libros') });
       paintBooks('');
       (searchWrap.hidden ? list.querySelector('.histov-book') : search)?.focus();
     } catch (e) { fail('No se pudo cargar el historial')(e); closeHistory(); }
@@ -798,14 +820,14 @@ function openHistory(trigger, show, fail) {
       ? books.filter(b => (b.clean + ' ' + (b.title || '') + ' ' + b.id).toLowerCase().includes(needle))
       : books;
     if (!shown.length) {
-      list.innerHTML = `<p class="appset-muted histov-empty">Ningún libro coincide con «${escapeHtml(q.trim())}».</p>`;
+      list.innerHTML = `<p class="appset-muted histov-empty">${t('Ningún libro coincide con «{q}».', { q: escapeHtml(q.trim()) })}</p>`;
       return;
     }
     const label = (b) => b.clean
       ? `<span class="histov-book-title">${escapeHtml(b.clean)}</span>`
-      : `<span class="histov-book-title histov-untitled">Sin título</span><span class="histov-book-id">${escapeHtml(b.id.slice(0, 16))}…</span>`;
+      : `<span class="histov-book-title histov-untitled">${t('Sin título')}</span><span class="histov-book-id">${escapeHtml(b.id.slice(0, 16))}…</span>`;
     list.innerHTML = shown.map(b =>
-      `<button class="histov-book" type="button" data-id="${escapeHtml(b.id)}" data-title="${escapeHtml(b.clean || 'Sin título')}" title="${escapeHtml(b.clean || b.id)}">${label(b)}</button>`
+      `<button class="histov-book" type="button" data-id="${escapeHtml(b.id)}" data-title="${escapeHtml(b.clean || t('Sin título'))}" title="${escapeHtml(b.clean || b.id)}">${label(b)}</button>`
     ).join('');
     list.querySelectorAll('.histov-book').forEach(el =>
       el.addEventListener('click', () => renderVersions(el.dataset.id, el.dataset.title)));
@@ -815,24 +837,24 @@ function openHistory(trigger, show, fail) {
 
   // --- Nivel 2: versiones de un libro ---
   async function renderVersions(bookId, title) {
-    setHead(title, 'Cargando…', renderBooks);
+    setHead(title, t('Cargando…'), renderBooks);
     searchWrap.hidden = true;
-    list.innerHTML = '<p class="appset-muted histov-pad">Cargando versiones…</p>';
+    list.innerHTML = `<p class="appset-muted histov-pad">${t('Cargando versiones…')}</p>`;
     backBtn.focus();
     try {
       const versions = await Recovery.listVersions(bookId);
       if (!versions.length) {
         subEl.textContent = '';
-        list.innerHTML = '<p class="appset-muted histov-empty">Este libro solo tiene la versión actual.</p>';
+        list.innerHTML = `<p class="appset-muted histov-empty">${t('Este libro solo tiene la versión actual.')}</p>`;
         return;
       }
-      subEl.textContent = `${versions.length} ${versions.length === 1 ? 'versión guardada' : 'versiones guardadas'}`;
+      subEl.textContent = t('{n} {versiones}', { n: versions.length, versiones: versions.length === 1 ? t('versión guardada') : t('versiones guardadas') });
       list.innerHTML = versions.map((v, i) =>
         `<div class="histov-ver" data-file="${escapeHtml(v.fileId)}" data-rev="${escapeHtml(v.id)}">
           <div class="histov-ver-info">
-            <span class="histov-ver-date">${fmtDate(v.modifiedTime)}${i === 0 ? ' · actual' : ''}</span>
+            <span class="histov-ver-date">${fmtDate(v.modifiedTime)}${i === 0 ? t(' · actual') : ''}</span>
           </div>
-          <button class="histov-ver-btn" type="button" ${i === 0 ? 'disabled' : ''}>Restaurar</button>
+          <button class="histov-ver-btn" type="button" ${i === 0 ? 'disabled' : ''}>${t('Restaurar')}</button>
         </div>`).join('');
       list.querySelectorAll('.histov-ver').forEach(row => {
         const rbtn = row.querySelector('.histov-ver-btn');
@@ -844,7 +866,7 @@ function openHistory(trigger, show, fail) {
 
   async function restore(bookId, fileId, revisionId, title) {
     const yes = await confirmBox(
-      `Se re-añadirán los subrayados y marcadores de «${title}» que se hubieran borrado tras esa fecha. Lo que hayas añadido después se conserva.`,
+      t('Se re-añadirán los subrayados y marcadores de «{title}» que se hubieran borrado tras esa fecha. Lo que hayas añadido después se conserva.', { title }),
       { title: 'Recuperar esta versión', okText: 'Recuperar', cancelText: 'Cancelar' }
     );
     if (!yes) return;
@@ -852,7 +874,7 @@ function openHistory(trigger, show, fail) {
       const r = await Recovery.restoreVersion(bookId, fileId, revisionId);
       SyncEngine.syncNow(); // propaga la recuperación al resto de dispositivos
       closeHistory();
-      show(`${icon('check', { size: 14 })} Recuperados ${r.recovered} elementos. <button id="appset-rec-reload" class="appset-data-reload">Recargar para aplicar</button>`);
+      show(`${icon('check', { size: 14 })} ${t('Recuperados {n} elementos.', { n: r.recovered })} <button id="appset-rec-reload" class="appset-data-reload">${t('Recargar para aplicar')}</button>`);
       document.querySelector('#appset-rec-reload')?.addEventListener('click', () => location.reload());
     } catch (e) { fail('No se pudo recuperar')(e); }
   }

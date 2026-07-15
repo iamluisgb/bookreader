@@ -6,6 +6,7 @@
 //
 // No importa templates.js para evitar dependencia circular (templates.js sí fusiona
 // estas). Solo depende de Storage.
+import { t } from '../i18n.js';
 import * as Storage from '../storage.js';
 
 const KEY = 'custom_templates';
@@ -49,9 +50,9 @@ export function blank() {
 
 // Devuelve un mensaje de error si el borrador no es válido, o null si lo es.
 export function validate(raw) {
-  if (!(raw.name || '').trim()) return 'Ponle un nombre a la plantilla.';
+  if (!(raw.name || '').trim()) return t('Ponle un nombre a la plantilla.');
   const fields = (raw.fields || []).filter(f => (f.label || '').trim());
-  if (!fields.length) return 'Añade al menos un campo a la libreta.';
+  if (!fields.length) return t('Añade al menos un campo a la libreta.');
   return null;
 }
 
@@ -74,9 +75,9 @@ function normalize(raw) {
     id: raw.id || makeId(),
     custom: true,
     block: raw.block === 'humanista' ? 'humanista' : 'tecnico',
-    name: (raw.name || '').trim() || 'Plantilla sin nombre',
+    name: (raw.name || '').trim() || t('Plantilla sin nombre'),
     ideal: (raw.ideal || '').trim() || 'Plantilla personalizada.',
-    goalPrompt: (raw.goalPrompt || '').trim() || '¿Cuál es tu objetivo con este libro?',
+    goalPrompt: (raw.goalPrompt || '').trim() || t('¿Cuál es tu objetivo con este libro?'),
     agentRole: (raw.agentRole || '').trim(),
     fields,
   };

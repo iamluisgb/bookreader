@@ -12,6 +12,7 @@
 //                       (generar uno NUEVO); opts.artifact abre un artefacto CONCRETO del historial.
 //   getContext()      → { bookId, bookTitle, segReady }  (el libro abierto ahora mismo).
 
+import { t } from '../i18n.js';
 import * as Jobs from './jobs.js';
 import { icon } from '../ui/icons.js';
 import { escapeHtml } from '../ui/escape.js';
@@ -20,9 +21,9 @@ import { confirmBox } from '../ui/dialog.js';
 // Tipos de artefacto. `stateful` = participa del historial de jobs (resumen/mapa). Flashcards no
 // es un artefacto persistido: es una acción (genera un mazo Anki), así que va como invitación.
 const TYPES = [
-  { kind: 'summary',    ico: 'note',    name: 'Resumen',      value: 'TL;DR e ideas clave por capítulo, cada una con su cita al pasaje.', stateful: true },
-  { kind: 'mindmap',    ico: 'columns', name: 'Mapa mental',  value: 'Mapa radial navegable de los conceptos del libro.',              stateful: true },
-  { kind: 'flashcards', ico: 'cards',   name: 'Flashcards',   value: 'Tarjetas de repaso espaciado para exportar a Anki.',              stateful: false },
+  { kind: 'summary',    ico: 'note',    name: t('Resumen'),      value: t('TL;DR e ideas clave por capítulo, cada una con su cita al pasaje.'), stateful: true },
+  { kind: 'mindmap',    ico: 'columns', name: t('Mapa mental'),  value: t('Mapa radial navegable de los conceptos del libro.'),              stateful: true },
+  { kind: 'flashcards', ico: 'cards',   name: t('Flashcards'),   value: t('Tarjetas de repaso espaciado para exportar a Anki.'),              stateful: false },
 ];
 
 let container = null;
@@ -45,11 +46,11 @@ function isVisible() {
 function ago(ts) {
   if (!ts) return '';
   const s = (Date.now() - ts) / 1000;
-  if (s < 60) return 'hace un momento';
-  if (s < 3600) return `hace ${Math.round(s / 60)} min`;
-  if (s < 86400) return `hace ${Math.round(s / 3600)} h`;
+  if (s < 60) return t('hace un momento');
+  if (s < 3600) return t('hace {n} min', { n: Math.round(s / 60) });
+  if (s < 86400) return t('hace {n} h', { n: Math.round(s / 3600) });
   const d = Math.round(s / 86400);
-  return `hace ${d} ${d === 1 ? 'día' : 'días'}`;
+  return d === 1 ? t('hace {n} día', { n: d }) : t('hace {n} días', { n: d });
 }
 
 // Metadatos de un artefacto: ámbito + (citas, solo resumen) + antigüedad. Distingue los del
@@ -128,7 +129,7 @@ export function render() {
   const job = Jobs.activeJob();
   container.innerHTML =
     `<div class="studio-book">${escapeHtml(ctx.bookTitle || 'Libro')}</div>` +
-    (ctx.segReady ? '' : `<p class="studio-hint">Preparando el libro… la generación estará lista en unos segundos.</p>`) +
+    (ctx.segReady ? '' : `<p class="studio-hint">${t('Preparando el libro… la generación estará lista en unos segundos.')}</p>`) +
     TYPES.map(t => group(t, ctx, job)).join('');
 }
 

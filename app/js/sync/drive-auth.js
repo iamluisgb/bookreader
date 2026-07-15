@@ -8,6 +8,7 @@
 // sync automático hace falta refresh_token, que solo entrega el auth-code flow
 // con access_type=offline. Ver LAUNCH_PLAN.md · "Auto-sync con Drive".
 
+import { t } from '../i18n.js';
 import * as Storage from '../storage.js';
 import { fetchWithTimeout } from './net.js';
 
@@ -91,17 +92,17 @@ export async function connect() {
     state,
   });
   const popup = window.open(url, 'bookreader-drive-auth', 'width=500,height=650');
-  if (!popup) throw new Error('El navegador bloqueó la ventana de Google. Permite popups e inténtalo de nuevo.');
+  if (!popup) throw new Error(t('El navegador bloqueó la ventana de Google. Permite popups e inténtalo de nuevo.'));
 
   const code = await new Promise((resolve, reject) => {
     const bc = new BroadcastChannel(CHANNEL);
-    const timer = setTimeout(() => { cleanup(); reject(new Error('Tiempo de espera agotado.')); }, 180000);
+    const timer = setTimeout(() => { cleanup(); reject(new Error(t('Tiempo de espera agotado.'))); }, 180000);
     function cleanup() { clearTimeout(timer); bc.close(); }
     bc.onmessage = (e) => {
       const m = e.data || {};
       if (m.state !== state) return; // otro intento u otra pestaña
       cleanup();
-      if (m.error || !m.code) reject(new Error(m.error || 'Google no devolvió el código.'));
+      if (m.error || !m.code) reject(new Error(m.error || t('Google no devolvió el código.')));
       else resolve(m.code);
     };
   });
@@ -112,7 +113,7 @@ export async function connect() {
     code_verifier: verifier,
   });
   if (!data.refresh_token) {
-    throw new Error('Google no entregó permiso permanente. Revoca el acceso de BookReader en myaccount.google.com/permissions y vuelve a conectar.');
+    throw new Error(t('Google no entregó permiso permanente. Revoca el acceso de BookReader en myaccount.google.com/permissions y vuelve a conectar.'));
   }
   Storage.set(REFRESH_KEY, data.refresh_token);
   storeAccessToken(data);

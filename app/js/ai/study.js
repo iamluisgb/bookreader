@@ -7,6 +7,7 @@
 //
 // El estado de scheduling (`card.srs`) se persiste TRAS CADA tarjeta, no al final:
 // cerrar a media sesión no pierde nada.
+import { t } from '../i18n.js';
 import * as DB from './db.js';
 import * as Srs from './srs.js';
 import * as Storage from '../storage.js';
@@ -60,7 +61,7 @@ export async function dueToday(scope, now = Date.now()) {
 export async function openToday({ scope, title, onClose } = {}) {
   if (!(await ensurePro('study'))) return;
   const { decks } = await dueToday(scope);
-  open({ decks, title: title || 'Repaso de hoy', onClose });
+  open({ decks, title: title || t('Repaso de hoy'), onClose });
 }
 
 // Ámbitos de repaso con tarjetas vencidas hoy (para el selector, árbol estilo Anki): total
@@ -79,7 +80,7 @@ export async function studyScopes(now = Date.now()) {
   const byCardsThenTitle = (a, b) => b.cards - a.cards || a.title.localeCompare(b.title);
   const dueBooks = books
     .filter(b => dueByBook.get(b.id))
-    .map(b => ({ id: b.id, title: b.title || 'Sin título', cards: dueByBook.get(b.id), shelfIds: b.shelfIds || [] }));
+    .map(b => ({ id: b.id, title: b.title || t('Sin título'), cards: dueByBook.get(b.id), shelfIds: b.shelfIds || [] }));
 
   const placed = new Set();
   const shelfScopes = [];
@@ -126,7 +127,7 @@ export function open({ decks, title = 'Estudiar', onClose, onNavigate } = {}) {
       <div class="study-head">
         <span class="study-title">${escapeHtml(title)}</span>
         <span class="study-left" aria-live="polite"></span>
-        <button class="ai-ob-close" title="Cerrar" aria-label="Cerrar">${icon('xmark', { size: 18 })}</button>
+        <button class="ai-ob-close" title="${t('Cerrar')}" aria-label="${t('Cerrar')}">${icon('xmark', { size: 18 })}</button>
       </div>
       <div class="study-body"></div>
       <div class="study-foot"></div>
@@ -221,10 +222,10 @@ function flip() {
     </button>`;
   const f = overlay.querySelector('.study-foot');
   f.innerHTML = `
-    ${card.src ? `<button class="study-src">${icon('book', { size: 15 })} Ver en el libro</button>` : ''}
+    ${card.src ? `<button class="study-src">${icon('book', { size: 15 })} ${t('Ver en el libro')}</button>` : ''}
     <div class="study-grades">
-      ${btn('again', 'Otra vez', 'is-again')}${btn('hard', 'Difícil', 'is-hard')}
-      ${btn('good', 'Bien', 'is-good')}${btn('easy', 'Fácil', 'is-easy')}
+      ${btn('again', t('Otra vez'), 'is-again')}${btn('hard', t('Difícil'), 'is-hard')}
+      ${btn('good', t('Bien'), 'is-good')}${btn('easy', t('Fácil'), 'is-easy')}
     </div>`;
   f.querySelector('.study-grades').addEventListener('click', (e) => {
     const g = e.target.closest('[data-rate]');
@@ -280,12 +281,12 @@ function renderDone(b, f, left) {
   b.innerHTML = `
     <div class="study-end">
       <div class="study-end-icon">${icon('check', { size: 40 })}</div>
-      <h2>${done ? '¡Repaso completado!' : 'Nada que repasar'}</h2>
+      <h2>${done ? t('¡Repaso completado!') : t('Nada que repasar')}</h2>
       <p>${done
-        ? `Has repasado <b>${done}</b> tarjeta${done === 1 ? '' : 's'}. La repetición espaciada hará el resto.`
-        : 'No hay tarjetas vencidas ahora mismo. Vuelve mañana.'}</p>
-      ${done && streak ? `<div class="study-streak">🔥 Racha de <b>${streak}</b> día${streak === 1 ? '' : 's'} estudiando</div>` : ''}
+        ? t('Has repasado <b>{n}</b> tarjeta{s}. La repetición espaciada hará el resto.', { n: done, s: done === 1 ? '' : 's' })
+        : t('No hay tarjetas vencidas ahora mismo. Vuelve mañana.')}</p>
+      ${done && streak ? `<div class="study-streak">${t('🔥 Racha de <b>{n}</b> día{s} estudiando', { n: streak, s: streak === 1 ? '' : 's' })}</div>` : ''}
     </div>`;
-  f.innerHTML = `<button class="primary-btn study-flip">Cerrar</button>`;
+  f.innerHTML = `<button class="primary-btn study-flip">${t('Cerrar')}</button>`;
   f.querySelector('.study-flip').addEventListener('click', close);
 }

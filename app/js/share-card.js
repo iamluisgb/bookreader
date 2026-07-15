@@ -6,6 +6,7 @@
 // del PDF); no se pide a Open Library como en el content-engine, así no hay llamada
 // externa y se respeta la privacidad (todo se genera en el dispositivo).
 
+import { t } from './i18n.js';
 const W = 1080, H = 1080;
 const PAPER = '#faf8f3';
 const INK = '#2b2b2b';
@@ -161,7 +162,7 @@ export async function buildQuoteCard({ quote, title, author, cover }) {
   ctx.fillText(chipText, quoteX + 21, y + chipH / 2 + 1);
 
   return new Promise((resolve, reject) =>
-    canvas.toBlob(b => (b ? resolve(b) : reject(new Error('No se pudo generar la imagen'))), 'image/png'));
+    canvas.toBlob(b => (b ? resolve(b) : reject(new Error(t('No se pudo generar la imagen')))), 'image/png'));
 }
 
 // Genera la tarjeta y la comparte (Web Share con ficheros si el navegador lo soporta;

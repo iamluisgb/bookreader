@@ -4,6 +4,7 @@
 import * as Store from './store.js';
 import * as Study from '../ai/study.js';
 import { icon } from '../ui/icons.js';
+import { t } from '../i18n.js';
 import { escapeHtml } from '../ui/escape.js';
 import { confirmBox, promptBox } from '../ui/dialog.js';
 
@@ -19,8 +20,8 @@ let query = '';                  // texto del buscador de la estantería (títul
 let allBooks = [];               // caché del último render (para refiltrar sin re-fetch)
 let menuEl = null;
 
-const SORT_LABELS = { recent: 'Recientes', title: 'Título', author: 'Autor' };
-const PROG_LABELS = { all: 'Progreso', unread: 'Sin empezar', reading: 'Leyendo', finished: 'Terminados' };
+const SORT_LABELS = { recent: t('Recientes'), title: t('Título'), author: t('Autor') };
+const PROG_LABELS = { all: t('Progreso'), unread: t('Sin empezar'), reading: t('Leyendo'), finished: t('Terminados') };
 
 export function init(opts = {}) {
   host = document.getElementById('library');
@@ -77,8 +78,8 @@ export async function render() {
   const list = computeList();
 
   const title = currentShelf === 'all' ? 'Libros'
-    : currentShelf === 'none' ? 'Sin estantería'
-    : (shelves.find(s => s.id === currentShelf)?.name || 'Estantería');
+    : currentShelf === 'none' ? t('Sin estantería')
+    : (shelves.find(s => s.id === currentShelf)?.name || t('Estantería'));
 
   host.innerHTML = `
     <div class="lib-layout">
@@ -115,11 +116,11 @@ export async function render() {
           <div class="lib-search-box">
             ${icon('search', { size: 16 })}
             <input type="search" class="lib-search" placeholder="Buscar libro…" value="${escapeHtml(query)}"
-              autocomplete="off" spellcheck="false" aria-label="Buscar libro por título o autor">
+              autocomplete="off" spellcheck="false" aria-label="${t('Buscar libro por título o autor')}">
           </div>
           ${dropdownHtml('sort', icon('sort', { size: 16 }) + SORT_LABELS[sortBy], SORT_LABELS, sortBy)}
           ${dropdownHtml('progress', PROG_LABELS[filterProgress], PROG_LABELS, filterProgress)}
-          <button class="lib-upload" data-act="add">${icon('upload', { size: 18 })}<span>Subir archivos</span></button>
+          <button class="lib-upload" data-act="add">${icon('upload', { size: 18 })}<span>${t('Subir archivos')}</span></button>
         </div>
         <div class="lib-results">${resultsHtml(list)}</div>
       </section>
@@ -173,7 +174,7 @@ function showStudyChooser(chip, scopes) {
   menu.innerHTML =
     row('Todo', scopes.total, { type: 'all' }) +
     shelfTree +
-    section('Sin estantería', loose);
+    section(t('Sin estantería'), loose);
   chip.parentElement.appendChild(menu);
   const r = chip.getBoundingClientRect();
   const pr = chip.parentElement.getBoundingClientRect();
@@ -214,10 +215,10 @@ function cardHtml(b) {
       <div class="lib-cover">
         ${cover}
         ${badge}
-        <button class="lib-kebab" data-id="${b.id}" title="Más" aria-label="Más opciones">${icon('ellipsis', { size: 20 })}</button>
+        <button class="lib-kebab" data-id="${b.id}" title="${t('Más')}" aria-label="${t('Más opciones')}">${icon('ellipsis', { size: 20 })}</button>
       </div>
       <div class="lib-progressbar"><span style="width:${pct}%"></span></div>
-      <div class="lib-title">${escapeHtml(b.title || 'Sin título')}</div>
+      <div class="lib-title">${escapeHtml(b.title || t('Sin título'))}</div>
       <div class="lib-author">${escapeHtml(b.author || '')}</div>
     </div>`;
 }
@@ -225,8 +226,8 @@ function cardHtml(b) {
 function emptyHtml(noBooksAtAll) {
   return `<div class="lib-empty">
     <div class="lib-empty-icon">${icon('books', { size: 56 })}</div>
-    <p>${noBooksAtAll ? 'Tu biblioteca está vacía.' : 'No hay libros aquí.'}</p>
-    ${noBooksAtAll ? `<button class="lib-upload" data-act="add">${icon('upload', { size: 18 })}<span>Subir tu primer libro</span></button>` : ''}
+    <p>${noBooksAtAll ? t('Tu biblioteca está vacía.') : t('No hay libros aquí.')}</p>
+    ${noBooksAtAll ? `<button class="lib-upload" data-act="add">${icon('upload', { size: 18 })}<span>${t('Subir tu primer libro')}</span></button>` : ''}
   </div>`;
 }
 
@@ -347,7 +348,7 @@ async function openShelfMenu(id, anchor) {
       const name = (await promptBox('Nuevo nombre:', { title: 'Renombrar estantería', value: shelf.name }) || '').trim();
       if (name) await Store.renameShelf(id, name);
     } else if (act === 'delete') {
-      if (await confirmBox(`¿Eliminar la estantería "${shelf.name}"? Los libros no se borran.`,
+      if (await confirmBox(t('¿Eliminar la estantería "{name}"? Los libros no se borran.', { name: shelf.name }),
           { title: 'Eliminar estantería', okText: 'Eliminar', danger: true })) {
         await Store.deleteShelf(id);
         if (currentShelf === id) currentShelf = 'all';
@@ -368,13 +369,13 @@ async function openBookMenu(id, anchor) {
 
   buildMenu(anchor, `
     <button class="lib-menu-item" data-act="open">${icon('book', { size: 16 })}<span>Abrir</span></button>
-    <button class="lib-menu-item" data-act="finish">${icon('check', { size: 16 })}<span>${finished ? 'Marcar como no leído' : 'Marcar como terminado'}</span></button>
+    <button class="lib-menu-item" data-act="finish">${icon('check', { size: 16 })}<span>${finished ? t('Marcar como no leído') : t('Marcar como terminado')}</span></button>
     <div class="lib-menu-sep"></div>
     <div class="lib-menu-label">Estanterías</div>
     ${shelves.length
       ? shelves.map(s => `<button class="lib-menu-item" data-act="shelf" data-shelf="${s.id}">
           <span class="lib-menu-check">${inShelf.has(s.id) ? icon('check', { size: 16 }) : ''}</span><span>${escapeHtml(s.name)}</span></button>`).join('')
-      : '<div class="lib-menu-empty">Aún no hay estanterías</div>'}
+      : `<div class="lib-menu-empty">${t('Aún no hay estanterías')}</div>`}
     <button class="lib-menu-item" data-act="newshelf">${icon('plus', { size: 16 })}<span>Nueva estantería…</span></button>
     <div class="lib-menu-sep"></div>
     <button class="lib-menu-item danger" data-act="delete">${icon('trash', { size: 16 })}<span>Eliminar</span></button>
@@ -388,7 +389,7 @@ async function openBookMenu(id, anchor) {
       const name = (await promptBox('Nombre de la nueva estantería:', { title: 'Nueva estantería' }) || '').trim();
       if (name) { const sh = await Store.addShelf(name); await Store.toggleBookShelf(id, sh.id, true); }
     } else if (act === 'delete') {
-      if (!(await confirmBox(`¿Eliminar "${book.title}" de la biblioteca? Esto borra el archivo guardado.`,
+      if (!(await confirmBox(t('¿Eliminar "{title}" de la biblioteca? Esto borra el archivo guardado.', { title: book.title }),
           { title: 'Eliminar libro', okText: 'Eliminar', danger: true }))) return;
       await Store.deleteBook(id);
     }

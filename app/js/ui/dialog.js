@@ -9,10 +9,16 @@
 //   await confirmBox(message, { title?, okText?, cancelText?, danger? }) -> boolean
 //   await promptBox(message, { value?, title?, okText?, cancelText?, placeholder? }) -> string|null
 import { escapeHtml } from './escape.js';
+import { t } from '../i18n.js';
 
 let openDialog = null;   // solo un diálogo a la vez
 
 function build({ kind, title, message, value, placeholder, okText, cancelText, danger }) {
+  // i18n (P15): las cadenas constantes de los llamadores se traducen aquí (la clave es el
+  // propio texto español); los mensajes interpolados llegan ya traducidos con t(..., params).
+  title = title && t(title); message = message && t(message);
+  okText = okText && t(okText); cancelText = cancelText && t(cancelText);
+  placeholder = placeholder && t(placeholder);
   return new Promise((resolve) => {
     // Si ya hay uno abierto, ciérralo cancelando (evita apilar overlays).
     if (openDialog) { try { openDialog(); } catch (e) {} openDialog = null; }
@@ -23,13 +29,13 @@ function build({ kind, title, message, value, placeholder, okText, cancelText, d
     const isPrompt = kind === 'prompt';
     const isAlert = kind === 'alert';
     overlay.innerHTML = `
-      <div class="dlg-card" role="${isAlert ? 'alertdialog' : 'dialog'}" aria-modal="true" aria-label="${escapeHtml(title || 'Aviso')}">
+      <div class="dlg-card" role="${isAlert ? 'alertdialog' : 'dialog'}" aria-modal="true" aria-label="${escapeHtml(title || t('Aviso'))}">
         ${title ? `<h2 class="dlg-title">${escapeHtml(title)}</h2>` : ''}
         <div class="dlg-msg">${escapeHtml(message || '')}</div>
         ${isPrompt ? `<input class="dlg-input" type="text" value="${escapeHtml(value || '')}" placeholder="${escapeHtml(placeholder || '')}" />` : ''}
         <div class="dlg-actions">
-          ${isAlert ? '' : `<button class="dlg-btn dlg-cancel">${escapeHtml(cancelText || 'Cancelar')}</button>`}
-          <button class="dlg-btn dlg-ok${danger ? ' dlg-danger' : ''}">${escapeHtml(okText || 'Aceptar')}</button>
+          ${isAlert ? '' : `<button class="dlg-btn dlg-cancel">${escapeHtml(cancelText || t('Cancelar'))}</button>`}
+          <button class="dlg-btn dlg-ok${danger ? ' dlg-danger' : ''}">${escapeHtml(okText || t('Aceptar'))}</button>
         </div>
       </div>`;
     document.body.appendChild(overlay);

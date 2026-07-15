@@ -14,6 +14,7 @@
 // Multi-pestaña: Web Locks — solo una pestaña sincroniza a la vez.
 // Estado: evento 'bookreader:sync-status' con 'off|syncing|ok|error|reconnect'.
 
+import { t } from '../i18n.js';
 import * as Drive from './drive-provider.js';
 import * as DriveAuth from './drive-auth.js';
 import * as Highlights from '../highlights.js';
@@ -72,7 +73,7 @@ async function cycle() {
   if (m) {
     remoteManifest = JSON.parse(m.content);
     if ((remoteManifest.schemaVersion || 0) > SCHEMA_VERSION) {
-      throw new Error('Lo guardado en Drive es de una versión más nueva de BookReader.');
+      throw new Error(t('Lo guardado en Drive es de una versión más nueva de BookReader.'));
     }
     const remoteFiles = await Drive.list(BASE + 'books/');
     let merged = 0;

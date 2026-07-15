@@ -2,6 +2,7 @@
 // estimado. Extraído de app.js (T8, ver CHANGELOG). Las funciones reciben totalWords
 // por parámetro en vez de leer estado global del módulo principal.
 import * as EpubReader from './epub-reader.js';
+import { t } from './i18n.js';
 
 const WORDS_PER_MINUTE = 250;
 // Debe coincidir con el valor de book.locations.generate() en epub-reader.js.
@@ -19,7 +20,7 @@ export function updateProgressDetail(pct, totalWords = 0) {
   const remaining = 100 - pctNum;
 
   if (remaining <= 0) {
-    timeEl.textContent = 'Terminado';
+    timeEl.textContent = t('Terminado');
     return;
   }
 

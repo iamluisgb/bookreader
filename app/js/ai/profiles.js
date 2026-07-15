@@ -10,6 +10,7 @@
 // systemPrompt() se construye de forma SÍNCRONA, así que un store síncrono evita
 // caché en memoria y carreras de arranque; el payload es diminuto y, de paso, el
 // backup global (P3) lo incluye sin tocar nada. Solo depende de Storage.
+import { t } from '../i18n.js';
 import * as Storage from '../storage.js';
 
 const KEY = 'profiles';
@@ -62,9 +63,9 @@ export function blank() {
 }
 
 export function validate(raw) {
-  if (!(raw.name || '').trim()) return 'Ponle un nombre al perfil.';
+  if (!(raw.name || '').trim()) return t('Ponle un nombre al perfil.');
   if (!((raw.soul || '').trim() || (raw.userProfile || '').trim() || (raw.notes || '').trim())) {
-    return 'Rellena al menos uno de los campos (personalidad, usuario o notas).';
+    return t('Rellena al menos uno de los campos (personalidad, usuario o notas).');
   }
   return null;
 }

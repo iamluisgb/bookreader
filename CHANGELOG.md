@@ -5,6 +5,38 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-15 — P15 · i18n EN/ES (inglés por defecto) + P16 · landing EN y landings por nicho
+
+Prerrequisito del [LAUNCH_PLAN](LAUNCH_PLAN.md): todos los canales de lanzamiento son
+angloparlantes y la app/landing estaban 100% en español. Ver P15/P16 en BACKLOG.
+
+- **[`js/i18n.js`](app/js/i18n.js)** (nuevo): i18n estilo gettext sin build — la clave es la
+  cadena española original, diccionario EN (~540 entradas), fallback al español, interpolación
+  `{x}`. Idioma: localStorage `bookreader_lang`; primera vez `navigator.language` (es\* → es,
+  resto → **en**, el idioma de lanzamiento). `translateDom()` traduce el HTML estático
+  (`data-i18n` / `data-i18n-attrs`) en el arranque y fija `<html lang>`.
+- **~35 módulos cableados a `t()`**: chrome del lector, biblioteca, panel del agente,
+  flashcards/estudio/resumen/mapa mental/studio, ajustes generales, licencia/paywall, sync/Drive,
+  historial de versiones, backup y errores de `llm.js`. Los helpers comunes traducen en un solo
+  punto (`setStatus`, `dialog.js`, `showError`). Plantillas de libreta (nombres+campos) traducidas
+  — son UI y prompt a la vez.
+- **Selector de idioma** en Ajustes generales → sección nueva "Aplicación" (cambiar = reload).
+- **Prompts del agente conscientes del idioma** (sin reescribirlos, riesgo mínimo): el system
+  prompt pasa de *"Respondes en español"* a *responde en el idioma del usuario (default: idioma
+  de la UI)*; misma directiva en resumen (langRule), HQ&A (idioma del fragmento) y extracción a
+  libreta. Los encabezados del resumen estructurado se generan y parsean en ambos idiomas.
+- **Tests**: `locale: 'es-ES'` global en Playwright (los 155 E2E históricos siguen verdes tal
+  cual) + [`tests/i18n.spec.ts`](tests/i18n.spec.ts) (default EN, interpolación, fallback,
+  override por localStorage, camino es-ES). Verificación extra: cobertura del diccionario
+  contra todas las llamadas `t()`/`data-i18n` (script ad-hoc, 0 claves huérfanas) y smoke EN
+  de ajustes+panel sin errores de consola.
+- **Landing (P16)**: raíz [`index.html`](index.html) reescrita en **inglés** con `hreflang`;
+  la española vive en [`es/`](es/index.html). Dos landings de nicho en inglés para la ola de
+  Reddit: [`anki/`](anki/index.html) (flashcards/estudio, tarjeta interactiva + "every card
+  remembers its page") y [`privacy/`](privacy/index.html) (local-first verificable, BYOK, BYOS,
+  self-host). CTAs → `app/`.
+- `sw.js` de la app: `js/i18n.js` al precache (bump a v90).
+
 ## 2026-07-15 — MON2 · BookReader Pro: licencias Polar + gate de features (modo simulado)
 
 Contraparte de código de [docs/GUIA_MONETIZACION.md](docs/GUIA_MONETIZACION.md). La API de Polar

@@ -3,6 +3,7 @@
 // libro). Es el pitch "entender más rápido" explotando el foso citado: ni Atlas ni
 // ChatGPT+PDF pueden llevarte a la frase exacta. Reutiliza el troceado de flashcards, el
 // retrieval del agente y el render de citas del chat.
+import { t, uiLangName } from '../i18n.js';
 import * as LLM from './llm.js';
 import * as Retrieval from './retrieval.js';
 import * as Jobs from './jobs.js';
@@ -22,9 +23,9 @@ const BOOK_TOKENS = 36000;   // techo por defecto de cobertura para "libro enter
 // UI. `prose` activa el formato estructurado (portada + secciones por capítulo + cierre);
 // sin `prose` es una lista plana breve. `perCap` acota viñetas por sección.
 const DEPTH = {
-  breve:     { label: 'Breve',     coverage: 24000, bullets: 'entre 2 y 3', perCap: 3, prose: false },
-  estandar:  { label: 'Estándar',  coverage: 48000, bullets: 'entre 3 y 5', perCap: 4, prose: true },
-  detallado: { label: 'Detallado', coverage: 80000, bullets: 'entre 5 y 7', perCap: 6, prose: true },
+  breve:     { label: t('Breve'),     coverage: 24000, bullets: 'entre 2 y 3', perCap: 3, prose: false },
+  estandar:  { label: t('Estándar'),  coverage: 48000, bullets: 'entre 3 y 5', perCap: 4, prose: true },
+  detallado: { label: t('Detallado'), coverage: 80000, bullets: 'entre 5 y 7', perCap: 6, prose: true },
 };
 
 let ctx = null;              // { bookId, bookTitle, goal, tocLabels, currentChapter, ensureIndex, anchors, onCite }
@@ -44,7 +45,7 @@ export function open(context) {
   overlay.className = 'ai-onboarding';
   overlay.innerHTML = `
     <div class="ai-ob-card sum-card" role="dialog" aria-modal="true" aria-label="Resumen del libro">
-      <button class="ai-ob-close" title="Cerrar" aria-label="Cerrar">${icon('xmark', { size: 18 })}</button>
+      <button class="ai-ob-close" title="${t('Cerrar')}" aria-label="${t('Cerrar')}">${icon('xmark', { size: 18 })}</button>
       <div class="ai-ob-body"></div>
     </div>`;
   document.body.appendChild(overlay);
@@ -86,19 +87,19 @@ function renderSetup() {
   const chapters = (ctx.tocLabels || []).filter(c => c && Retrieval.passagesByChapter(c).length);
   scopeValue = chapters.includes(ctx.currentChapter) ? ctx.currentChapter : '';
   b.innerHTML = `
-    <h2>Resumen del libro</h2>
-    <p class="ai-ob-sub">El agente resume el contenido en puntos clave, cada uno citando su pasaje. Clic en una cita para saltar al libro.</p>
-    <label class="fc-label">Contenido</label>
+    <h2>${t('Resumen del libro')}</h2>
+    <p class="ai-ob-sub">${t('El agente resume el contenido en puntos clave, cada uno citando su pasaje. Clic en una cita para saltar al libro.')}</p>
+    <label class="fc-label">${t('Contenido')}</label>
     <select id="sum-scope" class="fc-select">
-      <option value="">Libro entero</option>
+      <option value="">${t('Libro entero')}</option>
       ${chapters.map(c => `<option value="${escapeHtml(c)}"${c === scopeValue ? ' selected' : ''}>${escapeHtml(c)}</option>`).join('')}
     </select>
-    <label class="fc-label">Profundidad</label>
+    <label class="fc-label">${t('Profundidad')}</label>
     <select id="sum-depth" class="fc-select">
       ${Object.entries(DEPTH).map(([k, d]) => `<option value="${k}"${k === depthValue ? ' selected' : ''}>${d.label}</option>`).join('')}
     </select>
-    <p class="sum-depth-hint">Estándar y Detallado organizan el resumen por capítulos, con introducción y cierre. Más profundidad = más cobertura y más llamadas al modelo.</p>
-    <button id="sum-generate" class="primary-btn ai-ob-start">${icon('sparkles', { size: 16 })} Generar resumen</button>
+    <p class="sum-depth-hint">${t('Estándar y Detallado organizan el resumen por capítulos, con introducción y cierre. Más profundidad = más cobertura y más llamadas al modelo.')}</p>
+    <button id="sum-generate" class="primary-btn ai-ob-start">${icon('sparkles', { size: 16 })} ${t('Generar resumen')}</button>
     <div id="sum-error" class="fc-error" style="display:none"></div>`;
   b.querySelector('#sum-scope').addEventListener('change', (e) => { scopeValue = e.target.value; });
   b.querySelector('#sum-depth').addEventListener('change', (e) => { depthValue = e.target.value; });
@@ -140,7 +141,7 @@ function gatherScope(label, budget = BOOK_TOKENS) {
 function langRule(goal) {
   return goal
     ? `- Escribe SIEMPRE en el mismo idioma que este objetivo del lector: «${goal}» (aunque los pasajes estén en otro idioma).`
-    : `- Escribe SIEMPRE en español (aunque los pasajes estén en otro idioma).`;
+    : `- Escribe SIEMPRE en ${uiLangName()} (aunque los pasajes estén en otro idioma).`;
 }
 
 function pointsPrompt(goal, bulletsRange) {
@@ -161,10 +162,10 @@ Devuelve EXACTAMENTE, en este orden y con estos encabezados literales:
 
 TL;DR: (2-4 frases de síntesis global, claras y sin jerga)
 
-## Ideas principales
+## ${t('Ideas principales')}
 (1-2 párrafos que hilen las ideas centrales del libro)
 
-## Qué llevarte
+## ${t('Qué llevarte')}
 (3-5 viñetas "- ..." accionables o memorables)
 
 REGLAS:
@@ -178,10 +179,10 @@ Responde solo el párrafo.`;
 }
 
 function onGenerate() {
-  if (!LLM.hasKey()) { showError('Configura tu API key en Ajustes → Agente para generar el resumen.'); return; }
+  if (!LLM.hasKey()) { showError(t('Configura tu API key en Ajustes → Agente para generar el resumen.')); return; }
   const depth = DEPTH[depthValue] || DEPTH.estandar;
   const passages = gatherScope(scopeValue, depth.coverage);
-  if (!passages.length) { showError('Ese contenido no tiene texto indexado; prueba con otro capítulo o el libro entero.'); return; }
+  if (!passages.length) { showError(t('Ese contenido no tiene texto indexado; prueba con otro capítulo o el libro entero.')); return; }
   const chunks = buildChunks(passages);
   const scopeName = scopeValue || ctx.bookTitle || 'Libro';
   const goal = ctx.goal;
@@ -189,11 +190,11 @@ function onGenerate() {
   // Exclusividad: si hay otro trabajo pesado en curso, confirma antes de reemplazarlo.
   const act = Jobs.activeJob();
   if (act && act.status === 'running' && !(act.kind === KIND && act.bookId === ctx.bookId)) {
-    if (!window.confirm(`Ya se está generando ${act.label}. ¿Cancelarlo y empezar el resumen?`)) return;
+    if (!window.confirm(t('Ya se está generando {label}. ¿Cancelarlo y empezar el resumen?', { label: act.label }))) return;
   }
   showError('');
   Jobs.start({
-    bookId: ctx.bookId, kind: KIND, label: 'el resumen',
+    bookId: ctx.bookId, kind: KIND, label: t('el resumen'),
     params: { scopeName },
     run: ({ signal, progress }) => runSummary({ chunks, depth, goal, scopeName, signal, progress }),
   });
@@ -217,7 +218,7 @@ async function runSummary({ chunks, depth, goal, scopeName, signal, progress }) 
     }
     progress(i + 1, chunks.length, 'map');
   }
-  if (!bullets.length) throw new Error('El modelo no devolvió puntos. Vuelve a intentarlo.');
+  if (!bullets.length) throw new Error(t('El modelo no devolvió puntos. Vuelve a intentarlo.'));
 
   progress(chunks.length, chunks.length, 'reduce');
   if (depth.prose) {
@@ -245,13 +246,13 @@ function renderRunning(job) {
   const b = body();
   if (!b || !job) { renderSetup(); return; }
   b.innerHTML = `
-    <h2>Generando resumen…</h2>
+    <h2>${t('Generando resumen…')}</h2>
     <p class="ai-run-status" id="sum-run-status" role="status"></p>
     <div class="ai-run-actions">
-      <button id="sum-keep" class="primary-btn">${icon('book', { size: 16 })} Seguir leyendo</button>
-      <button id="sum-cancel" class="ai-ob-back fc-txt-btn">Cancelar</button>
+      <button id="sum-keep" class="primary-btn">${icon('book', { size: 16 })} ${t('Seguir leyendo')}</button>
+      <button id="sum-cancel" class="ai-ob-back fc-txt-btn">${t('Cancelar')}</button>
     </div>
-    <p class="sum-depth-hint">Puedes cerrar esta ventana y seguir leyendo: te avisaremos cuando el resumen esté listo.</p>`;
+    <p class="sum-depth-hint">${t('Puedes cerrar esta ventana y seguir leyendo: te avisaremos cuando el resumen esté listo.')}</p>`;
   const status = b.querySelector('#sum-run-status');
   const paint = (j) => {
     if (!overlay) return;
@@ -259,16 +260,16 @@ function renderRunning(job) {
     if (j.kind !== KIND) return;
     if (j.status === 'running') {
       status.textContent = j.progress.phase === 'reduce'
-        ? 'Redactando el resumen…'
-        : `Resumiendo… ${j.progress.i}/${j.progress.n || '·'}`;
+        ? t('Redactando el resumen…')
+        : t('Resumiendo… {i}/{n}', { i: j.progress.i, n: j.progress.n || '·' });
     } else if (j.status === 'done') {
       if (runUnsub) { runUnsub(); runUnsub = null; }
       const c = Jobs.cached(ctx.bookId, KIND);
-      renderResult(c ? c.result : j.result, c ? c.params.scopeName : (j.params?.scopeName || 'Libro'));
+      renderResult(c ? c.result : j.result, c ? c.params.scopeName : (j.params?.scopeName || t('Libro')));
     } else if (j.status === 'error') {
       if (runUnsub) { runUnsub(); runUnsub = null; }
       renderSetup();
-      showError(j.error?.message || 'No se pudo generar el resumen.');
+      showError(j.error?.message || t('No se pudo generar el resumen.'));
     }
   };
   b.querySelector('#sum-keep').addEventListener('click', () => closeModal());
@@ -297,8 +298,8 @@ async function runFraming(bullets, goal, signal) {
 // Separa el marco en TL;DR (portada), "## Ideas principales" y "## Qué llevarte" (cierre).
 function parseFraming(fr) {
   const tldr = (fr.match(/TL;DR:\s*([\s\S]*?)(?=\n\s*#|$)/i)?.[1] || '').trim();
-  const ideas = (fr.match(/##\s*Ideas principales[\s\S]*?(?=\n\s*##\s*Qu[eé]\s+llevarte|$)/i)?.[0] || '').trim();
-  const llevar = (fr.match(/##\s*Qu[eé]\s+llevarte[\s\S]*$/i)?.[0] || '').trim();
+  const ideas = (fr.match(/##\s*(?:Ideas principales|Main ideas)[\s\S]*?(?=\n\s*##\s*(?:Qu[eé]\s+llevarte|Takeaways)|$)/i)?.[0] || '').trim();
+  const llevar = (fr.match(/##\s*(?:Qu[eé]\s+llevarte|Takeaways)[\s\S]*$/i)?.[0] || '').trim();
   // Si no vino con el formato esperado, todo el texto va como TL;DR (no perder el trabajo).
   if (!tldr && !ideas && !llevar) return { tldr: fr, ideas: '', llevar: '' };
   return { tldr, ideas, llevar };
@@ -324,12 +325,12 @@ function assembleStructured(scopeName, framing, bullets, perCap) {
   // Libro sin capítulos etiquetados (o casi todo filtrado): cae a lista plana.
   let sections;
   if (kept < 3) {
-    sections = `## Puntos clave\n\n${bullets.join('\n')}`;
+    sections = `## ${t('Puntos clave')}\n\n${bullets.join('\n')}`;
   } else {
     const order = [...groups.keys()].sort((a, b) => (firstNum.get(a) ?? 0) - (firstNum.get(b) ?? 0));
     sections = order.map(ch => `## ${ch || 'General'}\n\n${groups.get(ch).join('\n')}`).join('\n\n');
   }
-  const parts = [`# Resumen — ${scopeName}`];
+  const parts = [`# ${t('Resumen')} — ${scopeName}`];
   if (framing.tldr) parts.push(framing.tldr);
   if (framing.ideas) parts.push(framing.ideas);
   parts.push(sections);
@@ -354,12 +355,12 @@ function renderResult(md, scopeName) {
   const anchors = ctx.anchors || new Map();
   b.innerHTML = `
     <div class="sum-resulthead">
-      <button class="ai-ob-back">${icon('chevron-left', { size: 16 })}<span>Volver</span></button>
-      <button id="sum-regen" class="fc-txt-btn">${icon('sparkles', { size: 14 })} Regenerar</button>
+      <button class="ai-ob-back">${icon('chevron-left', { size: 16 })}<span>${t('Volver')}</span></button>
+      <button id="sum-regen" class="fc-txt-btn">${icon('sparkles', { size: 14 })} ${t('Regenerar')}</button>
     </div>
     <div class="sum-doc">${renderWithCitations(md, anchors)}</div>
     <div class="fc-export">
-      <button id="sum-copy" class="primary-btn">${icon('copy', { size: 16 })} Copiar</button>
+      <button id="sum-copy" class="primary-btn">${icon('copy', { size: 16 })} ${t('Copiar')}</button>
       <button id="sum-md" class="ai-ob-back fc-txt-btn">${icon('download', { size: 15 })} Markdown</button>
     </div>`;
   b.querySelector('.ai-ob-back').addEventListener('click', renderSetup);
@@ -376,8 +377,8 @@ function renderResult(md, scopeName) {
   copyBtn.addEventListener('click', async () => {
     try {
       await navigator.clipboard.writeText(lastMarkdown);
-      copyBtn.innerHTML = `${icon('check', { size: 16 })} Copiado`;
-      setTimeout(() => { copyBtn.innerHTML = `${icon('copy', { size: 16 })} Copiar`; }, 1500);
+      copyBtn.innerHTML = `${icon('check', { size: 16 })} ${t('Copiado')}`;
+      setTimeout(() => { copyBtn.innerHTML = `${icon('copy', { size: 16 })} ${t('Copiar')}`; }, 1500);
     } catch (e) { /* sin clipboard */ }
   });
   b.querySelector('#sum-md').addEventListener('click', () => {

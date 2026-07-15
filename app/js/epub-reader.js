@@ -1,3 +1,4 @@
+import { t } from './i18n.js';
 import * as Settings from './settings.js';
 import * as Bookmarks from './bookmarks.js';
 import * as Highlights from './highlights.js';
@@ -573,7 +574,7 @@ function updateProgress(location) {
     try { total = book.locations && book.locations.length ? book.locations.length() : 0; } catch (e) { /* sin locs */ }
     let cur = location.start.location || 0;
     if (!cur && total) cur = Math.max(1, Math.round((pct / 100) * total));
-    pageEl.textContent = total ? `Pág. ${cur} / ${total}` : '—';
+    pageEl.textContent = total ? t('Pág. {n} / {total}', { n: cur, total }) : '—';
   }
 
   if (onProgressCallback) onProgressCallback(pct);
@@ -682,7 +683,7 @@ export function getPageInfo(cfi) {
 }
 
 export function getTitle() {
-  return book?.packaging?.metadata?.title || 'Sin título';
+  return book?.packaging?.metadata?.title || t('Sin título');
 }
 
 export function getAuthor() {

@@ -6,6 +6,7 @@
 //
 // El panel abre el modal con `open(ctx)`; este módulo no guarda estado del libro entre
 // aperturas: todo llega en ctx (bookId, título, objetivo, TOC, ensureIndex del panel).
+import { t } from '../i18n.js';
 import * as LLM from './llm.js';
 import * as DB from './db.js';
 import * as Retrieval from './retrieval.js';
@@ -47,7 +48,7 @@ export function open(context) {
   overlay.className = 'ai-onboarding';
   overlay.innerHTML = `
     <div class="ai-ob-card fc-card" role="dialog" aria-modal="true" aria-label="Flashcards para Anki">
-      <button class="ai-ob-close" title="Cerrar" aria-label="Cerrar">${icon('xmark', { size: 18 })}</button>
+      <button class="ai-ob-close" title="${t('Cerrar')}" aria-label="${t('Cerrar')}">${icon('xmark', { size: 18 })}</button>
       <div class="ai-ob-body"></div>
     </div>`;
   document.body.appendChild(overlay);
@@ -81,22 +82,22 @@ async function renderSetup() {
   const chapters = (ctx.tocLabels || []).filter(c => c && Retrieval.passagesByChapter(c).length);
   // Alcance por defecto: el capítulo que se lee (si tiene contenido), si no el libro entero.
   scopeValue = chapters.includes(ctx.currentChapter) ? ctx.currentChapter : '';
-  const options = [{ value: '', label: 'Libro entero' }, ...chapters.map(c => ({ value: c, label: c }))];
+  const options = [{ value: '', label: t('Libro entero') }, ...chapters.map(c => ({ value: c, label: c }))];
   b.innerHTML = `
-    <h2>Flashcards para Anki</h2>
-    <p class="ai-ob-sub">El agente crea tarjetas de estudio desde el libro; revísalas y expórtalas a Anki.</p>
-    <label class="fc-label" id="fc-scope-label">Contenido</label>
+    <h2>${t('Flashcards para Anki')}</h2>
+    <p class="ai-ob-sub">${t('El agente crea tarjetas de estudio desde el libro; revísalas y expórtalas a Anki.')}</p>
+    <label class="fc-label" id="fc-scope-label">${t('Contenido')}</label>
     <div id="fc-scope"></div>
-    <label class="fc-label">Tipo de tarjeta</label>
+    <label class="fc-label">${t('Tipo de tarjeta')}</label>
     <div class="fc-types">
       <label class="fc-type"><input type="radio" name="fc-type" value="basic" checked>
-        <span><b>Pregunta → Respuesta</b><small>Clásicas. Para conceptos y definiciones.</small></span></label>
+        <span><b>${t('Pregunta → Respuesta')}</b><small>${t('Clásicas. Para conceptos y definiciones.')}</small></span></label>
       <label class="fc-type"><input type="radio" name="fc-type" value="cloze">
-        <span><b>Cloze (huecos)</b><small>Frases con el dato clave oculto {{c1::así}}.</small></span></label>
+        <span><b>${t('Cloze (huecos)')}</b><small>${t('Frases con el dato clave oculto {{c1::así}}.')}</small></span></label>
     </div>
-    <label class="fc-label" for="fc-count">Cantidad</label>
+    <label class="fc-label" for="fc-count">${t('Cantidad')}</label>
     <select id="fc-count" class="fc-select">${COUNTS.map(n => `<option ${n === 15 ? 'selected' : ''}>${n}</option>`).join('')}</select>
-    <button id="fc-generate" class="primary-btn ai-ob-start">${icon('sparkles', { size: 16 })} Generar tarjetas</button>
+    <button id="fc-generate" class="primary-btn ai-ob-start">${icon('sparkles', { size: 16 })} ${t('Generar tarjetas')}</button>
     <div id="fc-error" class="fc-error" style="display:none"></div>
     <div id="fc-decks"></div>`;
   mountScopeCombo(b.querySelector('#fc-scope'), options, scopeValue, (v) => { scopeValue = v; });
@@ -117,7 +118,7 @@ function mountScopeCombo(host, options, selected, onChange) {
       ${icon('chevron-down', { size: 16 })}
     </button>
     <div class="fc-combo-pop" hidden>
-      ${withSearch ? `<input class="fc-combo-search" type="text" placeholder="Buscar capítulo…" aria-label="Buscar capítulo">` : ''}
+      ${withSearch ? `<input class="fc-combo-search" type="text" placeholder="${t('Buscar capítulo…')}" aria-label="${t('Buscar capítulo')}">` : ''}
       <ul class="fc-combo-list" role="listbox"></ul>
     </div>`;
   const btn = host.querySelector('.fc-combo-btn');
@@ -165,22 +166,22 @@ async function renderDeckList() {
   const decks = await DB.getDecks(ctx.bookId);
   if (!overlay || !decks.length) { if (holder) holder.innerHTML = ''; return; }
   holder.innerHTML = `
-    <div class="fc-label">Mazos generados</div>
+    <div class="fc-label">${t('Mazos generados')}</div>
     ${decks.map(d => {
       const st = Srs.deckStats(d.cards);
       const due = st.due;
       return `
       <div class="fc-deck" data-id="${d.id}">
         <div class="fc-deck-info">
-          <span class="fc-deck-name">${escapeHtml(d.scope || 'Libro entero')}</span>
-          <span class="fc-deck-meta">${d.cards.length} tarjetas · ${d.cardType === 'cloze' ? 'cloze' : 'P→R'} · ${new Date(d.createdAt).toLocaleDateString()}</span>
-          <span class="fc-deck-meta">${st.nuevas} nuevas · ${st.aprendiendo} aprendiendo · ${st.maduras} maduras</span>
+          <span class="fc-deck-name">${escapeHtml(d.scope || t('Libro entero'))}</span>
+          <span class="fc-deck-meta">${t('{n} tarjetas', { n: d.cards.length })} · ${d.cardType === 'cloze' ? 'cloze' : 'P→R'} · ${new Date(d.createdAt).toLocaleDateString()}</span>
+          <span class="fc-deck-meta">${t('{a} nuevas · {b} aprendiendo · {c} maduras', { a: st.nuevas, b: st.aprendiendo, c: st.maduras })}</span>
         </div>
-        <button class="fc-deck-study" data-act="study" title="Repasar con repetición espaciada">
-          ${icon('cards', { size: 14 })} Estudiar${due ? ` <span class="fc-deck-due">${due}</span>` : ''}
+        <button class="fc-deck-study" data-act="study" title="${t('Repasar con repetición espaciada')}">
+          ${icon('cards', { size: 14 })} ${t('Estudiar')}${due ? ` <span class="fc-deck-due">${due}</span>` : ''}
         </button>
-        <button class="icon-btn" data-act="review" title="Revisar y exportar">${icon('pencil', { size: 15 })}</button>
-        <button class="icon-btn" data-act="delete" title="Borrar mazo">${icon('trash', { size: 15 })}</button>
+        <button class="icon-btn" data-act="review" title="${t('Revisar y exportar')}">${icon('pencil', { size: 15 })}</button>
+        <button class="icon-btn" data-act="delete" title="${t('Borrar mazo')}">${icon('trash', { size: 15 })}</button>
       </div>`;
     }).join('')}`;
   holder.onclick = async (e) => {
@@ -194,7 +195,7 @@ async function renderDeckList() {
       // vencidas del mazo se refresca. Si el usuario salta a la fuente ("ver en el
       // libro"), este modal también se cierra para dejar ver el lector.
       Study.open({
-        decks: [deck], title: deck.name || 'Estudiar',
+        decks: [deck], title: deck.name || t('Estudiar'),
         onClose: () => renderDeckList(),
         onNavigate: () => closeModal(),
       });
@@ -454,13 +455,13 @@ async function generateChunk({ text, ask, type, prevFronts, mode, signal }) {
 async function onGenerate() {
   if (generating) return;
   const b = body();
-  if (!LLM.hasKey()) { showError('Configura tu API key en Ajustes → Agente para generar tarjetas.'); return; }
+  if (!LLM.hasKey()) { showError(t('Configura tu API key en Ajustes → Agente para generar tarjetas.')); return; }
   const scopeLabel = scopeValue;
   const type = b.querySelector('input[name="fc-type"]:checked').value;
   const count = parseInt(b.querySelector('#fc-count').value, 10);
 
   const chunks = buildChunks(gatherScope(scopeLabel));
-  if (!chunks.length) { showError('Ese contenido no tiene texto indexado; prueba con otro capítulo o con el libro entero.'); return; }
+  if (!chunks.length) { showError(t('Ese contenido no tiene texto indexado; prueba con otro capítulo o con el libro entero.')); return; }
   const counts = allocateCounts(chunks, count);
 
   generating = true; abortCtrl = new AbortController();
@@ -492,7 +493,7 @@ async function onGenerate() {
       if (!overlay) return;                     // el usuario cerró el modal: no seguir
       btn.innerHTML = `<span class="ai-typing">Generando… ${Math.min(cards.length, count)}/${count}</span>`;
     }
-    if (!cards.length) throw new Error('El modelo no devolvió tarjetas válidas. Vuelve a intentarlo.');
+    if (!cards.length) throw new Error(t('El modelo no devolvió tarjetas válidas. Vuelve a intentarlo.'));
     cards = attachSources(cards.slice(0, count), {
       validIds: new Set(Retrieval.allPassages().map(p => p.id)),
       search: (q, k) => Retrieval.search(q, k),
@@ -529,7 +530,7 @@ function showError(msg) {
 // Nombre del mazo en Anki: subdeck por libro (— separa el alcance para no crear
 // jerarquías :: inesperadas con títulos que lleven dos puntos).
 function deckName(scopeLabel) {
-  const book = (ctx.bookTitle || 'Libro').replace(/::/g, ':');
+  const book = (ctx.bookTitle || t('Libro')).replace(/::/g, ':');
   return scopeLabel ? `${book} — ${scopeLabel.replace(/::/g, ':')}` : book;
 }
 
@@ -542,18 +543,18 @@ function renderReview(deck) {
     <div class="fc-item" data-i="${i}">
       <div class="fc-item-fields">
         <div class="fc-front" contenteditable="true" spellcheck="false">${escapeHtml(c.front)}</div>
-        <div class="fc-back" contenteditable="true" spellcheck="false" data-ph="${deck.cardType === 'cloze' ? 'Extra (opcional)' : 'Respuesta'}">${escapeHtml(c.back)}</div>
+        <div class="fc-back" contenteditable="true" spellcheck="false" data-ph="${deck.cardType === 'cloze' ? t('Extra (opcional)') : t('Respuesta')}">${escapeHtml(c.back)}</div>
       </div>
-      <button class="icon-btn fc-del" title="Quitar tarjeta">${icon('xmark', { size: 15 })}</button>
+      <button class="icon-btn fc-del" title="${t('Quitar tarjeta')}">${icon('xmark', { size: 15 })}</button>
     </div>`;
   b.innerHTML = `
-    <button class="ai-ob-back">${icon('chevron-left', { size: 16 })}<span>Volver</span></button>
-    <h2>${deck.cards.length} tarjetas</h2>
-    <p class="ai-ob-sub">Revisa y edita antes de exportar. Mazo en Anki: <b>${escapeHtml(deck.name)}</b></p>
+    <button class="ai-ob-back">${icon('chevron-left', { size: 16 })}<span>${t('Volver')}</span></button>
+    <h2>${t('{n} tarjetas', { n: deck.cards.length })}</h2>
+    <p class="ai-ob-sub">${t('Revisa y edita antes de exportar. Mazo en Anki:')} <b>${escapeHtml(deck.name)}</b></p>
     <div class="fc-list">${deck.cards.map(cardRow).join('')}</div>
     <div class="fc-export">
-      <button id="fc-apkg" class="primary-btn">${icon('download', { size: 16 })} Exportar .apkg</button>
-      <button id="fc-txt" class="ai-ob-back fc-txt-btn" title="Formato de texto que Anki importa (Archivo → Importar)">.txt para Anki</button>
+      <button id="fc-apkg" class="primary-btn">${icon('download', { size: 16 })} ${t('Exportar .apkg')}</button>
+      <button id="fc-txt" class="ai-ob-back fc-txt-btn" title="${t('Formato de texto que Anki importa (Archivo → Importar)')}">.txt para Anki</button>
     </div>
     <div id="fc-error" class="fc-error" style="display:none"></div>`;
   b.querySelector('.ai-ob-back').addEventListener('click', renderSetup);
@@ -576,7 +577,7 @@ function renderReview(deck) {
     del.closest('.fc-item').remove();
     syncFromDom();
     const h2 = b.querySelector('h2');
-    if (h2) h2.textContent = `${deck.cards.length} tarjetas`;
+    if (h2) h2.textContent = t('{n} tarjetas', { n: deck.cards.length });
   });
   b.querySelector('.fc-list').addEventListener('focusout', syncFromDom);
 
@@ -587,10 +588,10 @@ function renderReview(deck) {
   const exporting = async (btn, fn) => {
     syncFromDom();
     deck.cards = deck.cards.filter(c => c.front);
-    if (!deck.cards.length) { showError('No queda ninguna tarjeta que exportar.'); return; }
+    if (!deck.cards.length) { showError(t('No queda ninguna tarjeta que exportar.')); return; }
     btn.disabled = true;
     try { await fn(); showError(''); }
-    catch (e) { console.error('Export de flashcards falló:', e); showError('No se pudo exportar: ' + e.message); }
+    catch (e) { console.error('Export de flashcards falló:', e); showError(t('No se pudo exportar: {msg}', { msg: e.message })); }
     finally { btn.disabled = false; }
   };
   b.querySelector('#fc-apkg').addEventListener('click', (e) => exporting(e.currentTarget, async () => {

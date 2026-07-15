@@ -18,6 +18,10 @@ export default defineConfig({
   use: {
     baseURL: 'http://localhost:8888',
     headless: true,
+    // i18n (P15): la app arranca en el idioma de navigator.language (default EN). Los
+    // tests históricos asertan texto español, así que el navegador de test es es-ES;
+    // tests/i18n.spec.ts fuerza en-US en sus propios contextos para cubrir el inglés.
+    locale: 'es-ES',
   },
   webServer: {
     // La app vive en app/; se sirve como raíz para que los tests sigan usando
