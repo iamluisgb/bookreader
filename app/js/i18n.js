@@ -678,5 +678,7 @@ const EN = {
   'Elegir un objetivo': 'Choose a goal',
   'Sin resultados': 'No results',
   'Modo Estudiar': 'Study mode',
+  '> {text}\n\n**P:** {q}\n**R:** _(escribe tu respuesta)_': '> {text}\n\n**Q:** {q}\n**A:** _(write your answer)_',
+  'Sobre este fragmento del libro:\n«{ref}»\n\n{q}': 'About this passage from the book:\n“{ref}”\n\n{q}',
   'Prefiero solo chatear con el libro': 'I\'d rather just chat with the book',
 };

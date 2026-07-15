@@ -417,7 +417,7 @@ P: <pregunta>` },
     ];
     const out = await LLM.chatStream({ messages });
     const q = (out.match(/P:\s*(.+)/i)?.[1] || '').trim();
-    const content = `> ${text}\n\n**P:** ${q || '—'}\n**R:** _(${t('escribe tu respuesta')})_`;
+    const content = t('> {text}\n\n**P:** {q}\n**R:** _(escribe tu respuesta)_', { text, q: q || '—' });
     const id = convo ? await DB.addNote(convo.id, 'hqa', content, [cfiRange]) : Date.now();
     notes.push({ id, fieldKey: 'hqa', content, sourceCfis: [cfiRange] });
     renderNotebook();
@@ -816,7 +816,7 @@ async function send() {
 
   // Si hay un pasaje adjunto (referencia del lector), se incluye en el mensaje.
   const ref = pendingRef;
-  const aug = ref ? `Sobre este fragmento del libro:\n«${ref}»\n\n${q}` : q;
+  const aug = ref ? t('Sobre este fragmento del libro:\n«{ref}»\n\n{q}', { ref, q }) : q;
 
   els.input.value = '';
   clearRef();
