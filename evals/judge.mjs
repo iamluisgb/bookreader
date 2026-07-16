@@ -4,26 +4,28 @@
 // pasaje fuente delante. Juez de OTRA familia que el generador (sesgo de auto-
 // preferencia); temperature 0. Los checks duros ya los hizo check.mjs.
 //
-// Uso: node evals/judge.mjs [run]   · Env: EVAL_JUDGE (default mimo-v2.5)
+// Uso: node evals/judge.mjs [run]
+// Env: EVAL_JUDGE (default mimo-v2.5) · EVAL_JUDGE2 (opcional, EV2: segundo juez —
+// se juzga todo dos veces y se mide el ACUERDO; |Δ|≥1.5 en un criterio = desacuerdo
+// fuerte, no te fíes de ese número con un solo juez).
 import fs from 'node:fs';
 import path from 'node:path';
 import { loadEnv, resolveRunDir, loadBatteries, summaryOf, cardsOf, citesOf, nanChat, lastJsonObject, avg } from './lib.mjs';
 
 loadEnv();
 const JUDGE = process.env.EVAL_JUDGE || 'mimo-v2.5';
+const JUDGE2 = process.env.EVAL_JUDGE2 || '';
 const MAX_CARDS = 12;      // muestra de tarjetas juzgadas una a una (coste/estabilidad)
 const MAX_CITES = 15;      // puntos citados del resumen que se verifican contra su pasaje
 
 const runDir = resolveRunDir();
-const out = { judge: JUDGE, date: new Date().toISOString(), batteries: {} };
 
-for (const b of loadBatteries(runDir)) {
+async function judgeBattery(b, JUDGE) {
   const id = b.battery.id;
   if (b.meta?.model === JUDGE) console.warn(`⚠ ${id}: juez y generador son el mismo modelo (${JUDGE}) — sesgo de auto-preferencia`);
   const byId = new Map((b.passages || []).map(p => [p.id, p]));
   // El resumen sigue el idioma de la UI (P15); las tarjetas, el del libro.
   const langName = (b.meta?.uiLang || 'es') === 'es' ? 'español' : 'inglés';
-  console.log(`\n${id} — juzgando con ${JUDGE}…`);
 
   // ---- Tarjetas: fidelidad/atomicidad/utilidad, cada una CON su pasaje fuente ----
   const cards = cardsOf(b).slice(0, MAX_CARDS);
@@ -146,7 +148,7 @@ Sé exigente. Responde SOLO JSON: {"jerarquia":N,"cobertura":N,"no_invencion":N,
 
   const cardScores = cardsRes?.cards || [];
   const covered = (coverRes?.conceptos || []).filter(c => c.cubierto).length;
-  out.batteries[id] = {
+  const entry = {
     cards: cardScores,
     cards_avg: {
       fidelidad: avg(cardScores.map(c => c.fidelidad)),
@@ -164,13 +166,71 @@ Sé exigente. Responde SOLO JSON: {"jerarquia":N,"cobertura":N,"no_invencion":N,
     } : null,
     mindmap: mmRes,
   };
-  const j = out.batteries[id];
+  const j = entry;
   console.log(`  tarjetas (${cardScores.length} juzgadas): fidelidad ${j.cards_avg.fidelidad?.toFixed(1)}, `
     + `atomicidad ${j.cards_avg.atomicidad?.toFixed(1)}, utilidad ${j.cards_avg.utilidad?.toFixed(1)}`
     + ` · cobertura ${covered}/${b.battery.goldenConcepts.length}`
     + (sumRes ? ` · resumen: fidelidad ${sumRes.fidelidad}, citas ${sumRes.pertinencia_citas}, cobertura ${sumRes.cobertura}` : '')
     + (j.chat_avg ? ` · chat: fundamento ${j.chat_avg.fundamento?.toFixed(1)}, honestidad ${Number.isFinite(j.chat_avg.honestidad) ? j.chat_avg.honestidad.toFixed(1) : 'n/a'}` : '')
     + (mmRes ? ` · mindmap: ${mmRes.jerarquia}/${mmRes.cobertura}/${mmRes.no_invencion}` : ''));
+  return entry;
+}
+
+// Criterios numéricos comparables de una entrada de juez (para medir acuerdo entre jueces).
+function numericScores(e) {
+  return {
+    'tarjetas.fidelidad': e.cards_avg?.fidelidad, 'tarjetas.atomicidad': e.cards_avg?.atomicidad,
+    'tarjetas.utilidad': e.cards_avg?.utilidad,
+    'cobertura': e.coverage_ratio != null ? 1 + 4 * e.coverage_ratio : NaN,
+    'resumen.fidelidad': e.summary?.fidelidad, 'resumen.citas': e.summary?.pertinencia_citas,
+    'resumen.cobertura': e.summary?.cobertura, 'resumen.concision': e.summary?.concision,
+    'chat.fundamento': e.chat_avg?.fundamento, 'chat.honestidad': e.chat_avg?.honestidad,
+    'chat.claridad': e.chat_avg?.claridad,
+    'mindmap.jerarquia': e.mindmap?.jerarquia, 'mindmap.cobertura': e.mindmap?.cobertura,
+    'mindmap.no_invencion': e.mindmap?.no_invencion,
+  };
+}
+
+function agreement(a, b) {
+  const disagreements = {};
+  const deltas = [];
+  for (const id of Object.keys(a)) {
+    if (!b[id]) continue;
+    const xa = numericScores(a[id]), xb = numericScores(b[id]);
+    for (const k of Object.keys(xa)) {
+      if (!Number.isFinite(xa[k]) || !Number.isFinite(xb[k])) continue;
+      const d = Math.abs(xa[k] - xb[k]);
+      deltas.push(d);
+      if (d >= 1.5) (disagreements[id] ||= []).push(`${k}: ${xa[k].toFixed(1)} vs ${xb[k].toFixed(1)}`);
+    }
+  }
+  return {
+    criteria: deltas.length,
+    mean_abs_delta: deltas.length ? +avg(deltas).toFixed(2) : null,
+    max_abs_delta: deltas.length ? +Math.max(...deltas).toFixed(2) : null,
+    disagreements,
+  };
+}
+
+const batteries = loadBatteries(runDir);
+const out = { judge: JUDGE, date: new Date().toISOString(), batteries: {} };
+for (const b of batteries) {
+  console.log(`\n${b.battery.id} — juzgando con ${JUDGE}…`);
+  out.batteries[b.battery.id] = await judgeBattery(b, JUDGE);
+}
+if (JUDGE2) {
+  out.judge2 = JUDGE2;
+  out.batteries2 = {};
+  for (const b of batteries) {
+    console.log(`\n${b.battery.id} — segundo juez ${JUDGE2}…`);
+    out.batteries2[b.battery.id] = await judgeBattery(b, JUDGE2);
+  }
+  out.agreement = agreement(out.batteries, out.batteries2);
+  const A = out.agreement;
+  console.log(`\nAcuerdo entre jueces: |Δ| medio ${A.mean_abs_delta} (máx ${A.max_abs_delta}, ${A.criteria} criterios)`);
+  for (const [id, list] of Object.entries(A.disagreements)) {
+    console.log(`  ⚠ desacuerdo fuerte en ${id}: ${list.join(' · ')}`);
+  }
 }
 
 fs.writeFileSync(path.join(runDir, 'judge.json'), JSON.stringify(out, null, 1));

@@ -15,6 +15,7 @@
     "eval:fixtures": "node evals/fetch-fixtures.mjs",
     "eval:gen": "playwright test --grep @eval",
     "eval:score": "node evals/check.mjs && node evals/judge.mjs && node evals/report.mjs",
+    "eval:smoke": "EVAL_SMOKE=1 playwright test --grep @eval && npm run eval:score",
     "eval": "npm run eval:gen && npm run eval:score",
     "lint": "eslint app/js app/sw.js sw.js",
     "format": "prettier --write \"**/*.{js,css,html,json,md}\"",

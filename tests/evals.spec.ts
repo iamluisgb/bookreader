@@ -18,8 +18,13 @@ import { execSync } from 'child_process';
 const KEY = process.env.NAN_API_KEY;
 const MODEL = process.env.EVAL_MODEL || 'deepseek-v4-flash';
 const PHASE = Number(process.env.EVAL_PHASE || 1);
+// EV2 · Modo SMOKE (npm run eval:smoke): 1 batería (P4, el fixture pequeño del repo),
+// 10 tarjetas, resumen breve, sin mindmap/chat/atenuación. ~2 min por ciclo, para
+// iterar prompts sin pagar el run completo. Se puntúa igual (evalVersion 1: los gates
+// de F2 no aplican).
+const SMOKE = process.env.EVAL_SMOKE === '1';
 const RUN = process.env.EVAL_RUN
-  || `${new Date().toISOString().slice(0, 16).replace(/[T:]/g, '-')}-${MODEL.replace(/[^\w.-]+/g, '_')}`;
+  || `${new Date().toISOString().slice(0, 16).replace(/[T:]/g, '-')}${SMOKE ? '-smoke' : ''}-${MODEL.replace(/[^\w.-]+/g, '_')}`;
 const RUN_DIR = path.resolve(__dirname, '..', 'evals', 'runs', RUN);
 
 // Las llamadas van serializadas contra nan (misma key): mismo fichero = mismo worker,
@@ -31,7 +36,9 @@ test.describe('EV1 · generación de artefactos @eval', () => {
   // llevan su timeout explícito y no se ven afectados.
   test.use({ actionTimeout: 30000 });
 
-  for (const battery of BATTERIES.filter(b => b.phase <= PHASE)) {
+  const selected = SMOKE ? BATTERIES.filter(b => b.id === 'p4-noficcion')
+    : BATTERIES.filter(b => b.phase <= PHASE);
+  for (const battery of selected) {
     test(`batería ${battery.id}: flashcards + resumen @eval`, async ({ page }) => {
       test.setTimeout(1800000);  // API real sobre un libro real, 6 artefactos: minutos, no segundos
 
@@ -70,18 +77,21 @@ test.describe('EV1 · generación de artefactos @eval', () => {
       // índice). Corre con el modelo LITE (ADR-022). Best-effort: sin TOC (PDF plano)
       // no hay ratings y no es fallo.
       const tAtt = Date.now();
-      await page.click('#sidebar-toggle');
-      await page.waitForFunction(async () => {
-        const DB = await import('/js/ai/db.js');
-        return (await DB.getAll('ratings')).length > 0;
-      }, undefined, { timeout: 120000 }).catch(() => console.warn(`[eval] ${battery.id}: sin atenuación (¿sin TOC?)`));
+      if (!SMOKE) {
+        await page.click('#sidebar-toggle');
+        await page.waitForFunction(async () => {
+          const DB = await import('/js/ai/db.js');
+          return (await DB.getAll('ratings')).length > 0;
+        }, undefined, { timeout: 120000 }).catch(() => console.warn(`[eval] ${battery.id}: sin atenuación (¿sin TOC?)`));
+        await page.click('#sidebar-toggle');   // cerrar: que no tape el panel
+      }
       timings.attenuation = Date.now() - tAtt;
-      await page.click('#sidebar-toggle');   // cerrar: que no tape el panel
 
-      // Flashcards (alcance y nº por defecto de la UI — lo que vería el usuario).
+      // Flashcards (alcance y nº por defecto de la UI — lo que vería el usuario; smoke: 10).
       const tCards = Date.now();
       await page.click('#ai-convo-cards');
       await page.waitForSelector('#ai-flashcards', { timeout: 10000 });
+      if (SMOKE) await page.selectOption('#fc-count', '10');
       await page.click('#fc-generate');
       await expect(page.locator('#ai-flashcards h2')).toContainText('tarjetas', { timeout: 420000 });
       timings.flashcards = Date.now() - tCards;
@@ -95,6 +105,7 @@ test.describe('EV1 · generación de artefactos @eval', () => {
       let summaryError = '';
       await page.click('#ai-convo-summary');
       await page.waitForSelector('#ai-summary', { timeout: 10000 });
+      if (SMOKE) await page.selectOption('#sum-depth', 'breve');
       await page.click('#sum-generate');
       try {
         await expect(page.locator('#ai-summary .sum-doc')).toBeVisible({ timeout: 420000 });
@@ -111,23 +122,25 @@ test.describe('EV1 · generación de artefactos @eval', () => {
       // Mindmap (F2), mismo trato tolerante que el resumen.
       const tMm = Date.now();
       let mindmapError = '';
-      await page.click('#ai-convo-mindmap');
-      await page.click('#mm-generate');
-      try {
-        await expect(page.locator('#mm-png')).toBeVisible({ timeout: 420000 });
-      } catch {
-        mindmapError = (await page.locator('#ai-mindmap, .ai-onboarding').last().innerText().catch(() => ''))
-          .split('\n').map(s => s.trim()).filter(Boolean).slice(0, 4).join(' · ').slice(0, 300) || 'timeout sin error visible';
-        console.warn(`[eval] ${battery.id}: el mindmap NO se generó — ${mindmapError}`);
+      if (!SMOKE) {
+        await page.click('#ai-convo-mindmap');
+        await page.click('#mm-generate');
+        try {
+          await expect(page.locator('#mm-png')).toBeVisible({ timeout: 420000 });
+        } catch {
+          mindmapError = (await page.locator('#ai-mindmap, .ai-onboarding').last().innerText().catch(() => ''))
+            .split('\n').map(s => s.trim()).filter(Boolean).slice(0, 4).join(' · ').slice(0, 300) || 'timeout sin error visible';
+          console.warn(`[eval] ${battery.id}: el mindmap NO se generó — ${mindmapError}`);
+        }
+        await page.click('#ai-mindmap .ai-ob-close');   // cerrar: el overlay taparía el chat
       }
       timings.mindmap = Date.now() - tMm;
-      await page.click('#ai-mindmap .ai-ob-close');   // cerrar: el overlay taparía el chat
 
       // Chat (F2): 2 preguntas con respuesta en el libro + 1 trampa (no está en el
       // libro; responderla "de memoria" es el fallo que mide la rúbrica de honestidad).
       const tChat = Date.now();
       const chat: any[] = [];
-      for (const { q, trap } of battery.questions || []) {
+      for (const { q, trap } of SMOKE ? [] : (battery.questions || [])) {
         const before = await page.locator('.ai-msg-assistant .ai-bubble-text').count();
         await page.fill('#ai-input', q);
         await page.click('#ai-send');
@@ -172,7 +185,8 @@ test.describe('EV1 · generación de artefactos @eval', () => {
         // evalVersion 2 = F2 (mindmap + chat + atenuación); el scoring salta lo nuevo en runs viejos.
         meta: {
           model: MODEL, sha, date: new Date().toISOString(), fixture: battery.fixture, timings,
-          uiLang: 'es', evalVersion: 2,
+          // Smoke = evalVersion 1: solo tarjetas+resumen, los gates de F2 no aplican.
+          uiLang: 'es', evalVersion: SMOKE ? 1 : 2, smoke: SMOKE || undefined,
           summaryError: summaryError || undefined, mindmapError: mindmapError || undefined,
         },
         chat,

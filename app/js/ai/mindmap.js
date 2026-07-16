@@ -12,7 +12,11 @@ import { icon } from '../ui/icons.js';
 import { escapeHtml } from '../ui/escape.js';
 
 const KIND = 'mindmap';
-const BOOK_TOKENS = 36000;
+const BOOK_TOKENS = 30000;
+// P14 F2 · Tope de llamadas del map: en libros grandes, 4+ llamadas de ~90s con modelo
+// reasoning superaban el presupuesto de paciencia (el eval lo cazó: DNF a los 7 min en
+// Pro Git). Trozos más grandes, menos llamadas: ≤3 de map + 1 de reduce.
+const MAX_MAP_CALLS = 3;
 const SVG_NS = 'http://www.w3.org/2000/svg';
 // Paleta de ramas (una por rama, tono suave de marca).
 const PALETTE = ['#22c55e', '#3b82f6', '#f59e0b', '#ec4899', '#8b5cf6', '#14b8a6', '#ef4444', '#0ea5e9'];
@@ -111,11 +115,30 @@ function gatherScope(label) {
   return picked.sort((a, b) => Retrieval.anchorNum(a.id) - Retrieval.anchorNum(b.id));
 }
 
-// Muestreo uniforme para no pasar de `max` viñetas al reduce (conserva el orden de lectura).
-function capBullets(bullets, max) {
+// Cap de viñetas para el reduce, JUSTO por capítulo (P14 F2): el muestreo uniforme podía
+// dejar capítulos enteros sin representación (cobertura 2/5 en el eval). Round-robin por
+// capítulo del ancla [[aN]] hasta `max`, conservando el orden dentro de cada capítulo.
+// Pura y testeable: `chapterOf(id)` se inyecta.
+export function capBulletsFair(bullets, max, chapterOf) {
   if (bullets.length <= max) return bullets;
-  const step = bullets.length / max, out = [];
-  for (let i = 0; i < max; i++) out.push(bullets[Math.floor(i * step)]);
+  const order = [], groups = new Map();
+  for (const b of bullets) {
+    const src = (b.match(/\[\[(a\d+)\]\]/) || [])[1] || '';
+    const ch = chapterOf(src) || 'General';
+    if (!groups.has(ch)) { groups.set(ch, []); order.push(ch); }
+    groups.get(ch).push(b);
+  }
+  const out = [];
+  for (let i = 0; out.length < max; i++) {
+    let added = false;
+    for (const ch of order) {
+      const b = groups.get(ch)[i];
+      if (!b) continue;
+      out.push(b); added = true;
+      if (out.length >= max) break;
+    }
+    if (!added) break;
+  }
   return out;
 }
 
@@ -166,12 +189,17 @@ REGLAS:
 Responde solo las viñetas.`;
 }
 
-function treePrompt(title, goal) {
+function treePrompt(title, goal, chapterHints = []) {
+  // P14 F2 · Esqueleto desde el TOC: anclar las ramas en la estructura real del libro
+  // sube jerarquía y cobertura (el modelo tiende a inventarse taxonomías propias).
+  const skeleton = chapterHints.length ? `
+- RAMAS DE PARTIDA (capítulos reales del libro): ${chapterHints.join(' · ')}. Úsalas como
+  base de las ramas; puedes fusionar dos afines o renombrar, pero no ignores la estructura.` : '';
   return `Organiza estos puntos de un libro en un MAPA MENTAL jerárquico.
 Devuelve SOLO un objeto JSON válido con esta forma:
 {"title": "tema central (2-4 palabras)", "branches": [{"label": "rama (1-3 palabras)", "children": [{"label": "concepto (2-5 palabras)", "src": "aN"}]}]}
 REGLAS:
-- 3 a 6 ramas; 2 a 5 hijos por rama.
+- 3 a 6 ramas; 2 a 5 hijos por rama.${skeleton}
 - Las etiquetas son de MAPA MENTAL: rótulos CORTOS de concepto (2-5 palabras), sintagmas
   nominales, NUNCA frases ni oraciones. Ej.: "Desambiguación de entidades", NO "La
   desambiguación de entidades requiere un contexto rico".
@@ -184,9 +212,13 @@ function onGenerate() {
   if (!LLM.hasKey()) { showError(t('Configura tu API key en Ajustes → Agente para generar el mapa.')); return; }
   const passages = gatherScope(scopeValue);
   if (!passages.length) { showError(t('Ese contenido no tiene texto indexado; prueba con otro capítulo o el libro entero.')); return; }
-  const chunks = buildChunks(passages);
+  const totalTokens = passages.reduce((n, p) => n + estimateTokens(p.text) + 4, 0);
+  const chunks = buildChunks(passages, Math.max(10000, Math.ceil(totalTokens / MAX_MAP_CALLS)));
   const scopeName = scopeValue || ctx.bookTitle || 'Libro';
   const goal = ctx.goal;
+  // Esqueleto para el árbol: los capítulos reales del ámbito (≤8, sin accesorios) anclan
+  // la jerarquía en la estructura del libro (cobertura/jerarquía medían 2/5 sin esto).
+  const chapterHints = scopeValue ? [] : [...new Set(passages.map(p => tidyChapter(p.chapter)).filter(Boolean))].slice(0, 8);
 
   const act = Jobs.activeJob();
   if (act && act.status === 'running' && !(act.kind === KIND && act.bookId === ctx.bookId)) {
@@ -196,13 +228,13 @@ function onGenerate() {
   Jobs.start({
     bookId: ctx.bookId, kind: KIND, label: t('el mapa mental'),
     params: { scopeName },
-    run: ({ signal, progress }) => runMindmap({ chunks, goal, scopeName, signal, progress }),
+    run: ({ signal, progress }) => runMindmap({ chunks, goal, scopeName, chapterHints, signal, progress }),
   });
   renderRunning(Jobs.activeJob());
 }
 
 // Map (conceptos citados por trozo) + reduce (árbol JSON), desacoplado del modal.
-async function runMindmap({ chunks, goal, scopeName, signal, progress }) {
+async function runMindmap({ chunks, goal, scopeName, chapterHints = [], signal, progress }) {
   const bullets = [];
   for (let i = 0; i < chunks.length; i++) {
     const raw = await LLM.chatStream({
@@ -221,14 +253,15 @@ async function runMindmap({ chunks, goal, scopeName, signal, progress }) {
   if (!bullets.length) throw new Error(t('El modelo no devolvió contenido. Vuelve a intentarlo.'));
   // Un buen mapa es conciso: acota las viñetas (muestreo uniforme) para que el JSON del reduce
   // quepa holgado —no se trunca ni cae al fallback— y el mapa no se sature de hojas.
-  const capped = capBullets(bullets, 20);
+  const p2ch = new Map(Retrieval.allPassages().map(p => [p.id, (p.chapter || '').trim()]));
+  const capped = capBulletsFair(bullets, 24, (id) => p2ch.get(id));
 
   progress(chunks.length, chunks.length, 'reduce');
   let tree = null;
   try {
     const raw = await LLM.chatStream({
       messages: [
-        { role: 'system', content: treePrompt(scopeName, goal) },
+        { role: 'system', content: treePrompt(scopeName, goal, chapterHints) },
         { role: 'user', content: capped.join('\n') },
       ],
       // Alto a propósito: los modelos de razonamiento gastan miles de tokens "pensando" antes
@@ -305,7 +338,9 @@ function normalizeTree(tree, bullets, scopeName) {
         children: (Array.isArray(br.children) ? br.children : []).slice(0, 6).map(asLeaf).filter(c => c.label),
       };
     }).filter(br => br.children.length);
-    if (branches.length) return { title: String(tree.title || scopeName).slice(0, 44), branches };
+    // P14 F2 · Un árbol de UNA rama no es un mapa (el eval lo cazó en el PDF): mejor el
+    // fallback por capítulos, que garantiza estructura fiel al libro.
+    if (branches.length >= 2) return { title: String(tree.title || scopeName).slice(0, 44), branches };
   }
   return chapterFallback(bullets, scopeName);
 }

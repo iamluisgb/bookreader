@@ -83,3 +83,27 @@ test('clic en una hoja citada salta al libro y cierra el modal', async ({ page }
   await page.locator('.mm-canvas .mm-cite').first().click();
   await expect(page.locator('#ai-mindmap')).toHaveCount(0);
 });
+
+// P14 F2 · El cap de viñetas reparte por capítulo (antes un muestreo uniforme podía
+// dejar capítulos sin representación) y el árbol de 1 rama cae al fallback por capítulos.
+test('capBulletsFair reparte el cupo entre capítulos', async ({ page }) => {
+  await page.goto('/');
+  const r = await page.evaluate(async () => {
+    const M: any = await import('/js/ai/mindmap.js');
+    const chapterOf = (id: string) => (id && Number(id.slice(1)) < 10 ? 'A' : 'B');
+    // 12 viñetas de A (a0..a9 + 2 extra) y 3 de B: el cap a 6 debe incluir B.
+    const bullets = [
+      ...Array.from({ length: 9 }, (_, i) => `- idea A${i} [[a${i}]]`),
+      '- idea B1 [[a20]]', '- idea B2 [[a21]]', '- idea B3 [[a22]]',
+    ];
+    const capped = M.capBulletsFair(bullets, 6, chapterOf);
+    return {
+      total: capped.length,
+      deB: capped.filter((b: string) => b.includes('B')).length,
+      sinCap: M.capBulletsFair(bullets.slice(0, 4), 6, chapterOf).length,   // ≤max → tal cual
+    };
+  });
+  expect(r.total).toBe(6);
+  expect(r.deB).toBeGreaterThanOrEqual(2);   // B no desaparece
+  expect(r.sinCap).toBe(4);
+});

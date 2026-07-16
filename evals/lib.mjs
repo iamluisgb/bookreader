@@ -23,9 +23,16 @@ export function resolveRunDir(arg = process.argv[2]) {
     if (!fs.existsSync(dir)) throw new Error(`no existe el run ${dir}`);
     return dir;
   }
-  const runs = fs.existsSync(RUNS) ? fs.readdirSync(RUNS).filter(d => fs.statSync(path.join(RUNS, d)).isDirectory()).sort() : [];
+  // Por mtime, no alfabético: los runs con nombre ("post-mejoras", "f2-…") rompen el
+  // orden por fecha del nombre y el scoring puntuaba el run equivocado.
+  const runs = fs.existsSync(RUNS)
+    ? fs.readdirSync(RUNS)
+      .map(d => ({ d, st: fs.statSync(path.join(RUNS, d)) }))
+      .filter(x => x.st.isDirectory())
+      .sort((a, b) => a.st.mtimeMs - b.st.mtimeMs)
+    : [];
   if (!runs.length) throw new Error('no hay runs en evals/runs/ — genera uno con: npm run eval:gen');
-  return path.join(RUNS, runs[runs.length - 1]);
+  return path.join(RUNS, runs[runs.length - 1].d);
 }
 
 // Los JSON de batería de un run (los produce tests/evals.spec.ts).

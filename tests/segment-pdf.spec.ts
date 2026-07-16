@@ -158,3 +158,31 @@ test('une los guiones de corte de línea (de-hyphenation)', async ({ page }) => 
   expect(seg.annotatedText).toContain('overall architecture');
   expect(seg.annotatedText).not.toContain('over- all');
 });
+
+// PDF6 · Detección de encabezados estructurales en PDFs planos (temarios/legales).
+test('detectHeading: TÍTULO/TEMA abren capítulo, CAPÍTULO es subsección, el índice se descarta', async ({ page }) => {
+  await page.goto('/');
+  const r = await page.evaluate(async () => {
+    const S: any = await import('/js/ai/segment-pdf.js');
+    return {
+      titulo: S.detectHeading('TÍTULO III. De las Cortes Generales'),
+      preliminar: S.detectHeading('TÍTULO PRELIMINAR'),
+      tema: S.detectHeading('Tema 5. La Constitución Española de 1978'),
+      disp: S.detectHeading('Disposiciones transitorias'),
+      capitulo: S.detectHeading('CAPÍTULO II. Derechos y libertades'),
+      indice: S.detectHeading('TÍTULO I. De los derechos fundamentales . . . . . . 25'),
+      articulo: S.detectHeading('Artículo 168.'),        // demasiado granular: no es capítulo
+      prosa: S.detectHeading('En el título de la novela ya se anuncia el tema'),
+      larga: S.detectHeading('TÍTULO I ' + 'x'.repeat(100)),
+    };
+  });
+  expect(r.titulo).toEqual({ title: 'TÍTULO III. De las Cortes Generales', top: true });
+  expect(r.preliminar?.top).toBe(true);
+  expect(r.tema?.top).toBe(true);
+  expect(r.disp?.top).toBe(true);
+  expect(r.capitulo).toEqual({ title: 'CAPÍTULO II. Derechos y libertades', top: false });
+  expect(r.indice).toBeNull();
+  expect(r.articulo).toBeNull();
+  expect(r.prosa).toBeNull();
+  expect(r.larga).toBeNull();
+});

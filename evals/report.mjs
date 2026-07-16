@@ -48,6 +48,15 @@ for (const b of batteries) {
 
 md += `\nEscala 1-5 (juez exigente; 5 = excepcional). La nota se CAPA a 2 si falla un gate determinista.\n`;
 
+if (judge.agreement) {
+  const A = judge.agreement;
+  md += `\n**Doble juez** (\`${judge.judge}\` vs \`${judge.judge2}\`): |Δ| medio ${A.mean_abs_delta} sobre ${A.criteria} criterios (máx ${A.max_abs_delta}).`;
+  const strong = Object.entries(A.disagreements || {});
+  md += strong.length
+    ? ` Desacuerdos fuertes (no te fíes de estos números): ${strong.map(([id, l]) => `${id} — ${l.join(', ')}`).join(' · ')}\n`
+    : ` Sin desacuerdos fuertes (≥1.5).\n`;
+}
+
 for (const b of batteries) {
   const id = b.battery.id;
   const c = checks[id] || {}, j = judge.batteries[id] || {};

@@ -82,6 +82,10 @@ async function renderSetup() {
   const chapters = (ctx.tocLabels || []).filter(c => c && Retrieval.passagesByChapter(c).length);
   // Alcance por defecto: el capítulo que se lee (si tiene contenido), si no el libro entero.
   scopeValue = chapters.includes(ctx.currentChapter) ? ctx.currentChapter : '';
+  // IA8 · En libros grandes (el muestreo cubre <50% del texto), 15 tarjetas dejan fuera
+  // conceptos centrales (medido: cobertura 1/8 en Pro Git). Sugerimos 30 por defecto.
+  const totalTokens = Retrieval.allPassages().reduce((n, p) => n + estimateTokens(p.text), 0);
+  const defaultCount = totalTokens > BOOK_TOKENS * 2 ? 30 : 15;
   const options = [{ value: '', label: t('Libro entero') }, ...chapters.map(c => ({ value: c, label: c }))];
   b.innerHTML = `
     <h2>${t('Flashcards para Anki')}</h2>
@@ -96,7 +100,7 @@ async function renderSetup() {
         <span><b>${t('Cloze (huecos)')}</b><small>${t('Frases con el dato clave oculto {{c1::así}}.')}</small></span></label>
     </div>
     <label class="fc-label" for="fc-count">${t('Cantidad')}</label>
-    <select id="fc-count" class="fc-select">${COUNTS.map(n => `<option ${n === 15 ? 'selected' : ''}>${n}</option>`).join('')}</select>
+    <select id="fc-count" class="fc-select">${COUNTS.map(n => `<option ${n === defaultCount ? 'selected' : ''}>${n}</option>`).join('')}</select>
     <button id="fc-generate" class="primary-btn ai-ob-start">${icon('sparkles', { size: 16 })} ${t('Generar tarjetas')}</button>
     <div id="fc-error" class="fc-error" style="display:none"></div>
     <div id="fc-decks"></div>`;
@@ -213,6 +217,23 @@ async function renderDeckList() {
 
 // Pasajes del alcance elegido, en orden de lectura. Capítulo: ENTERO (el troceo permite
 // cubrirlo completo). Libro entero: round-robin por capítulo hasta BOOK_TOKENS.
+// IA8 · Rotación de muestreo ponderada por relevancia al objetivo: con los scores de la
+// atenuación (0..1 por capítulo), los capítulos MUY relevantes (≥0.66) muestrean al DOBLE
+// de ritmo (dos turnos por ronda sobre el mismo cursor). Sin scores → round-robin uniforme
+// de siempre. Pura y testeable: recibe [{ch, passages}] y devuelve la rotación (entradas
+// duplicadas COMPARTEN estado, así el doble turno avanza el mismo cursor).
+export function scopeRotation(lists, scores) {
+  const states = lists.map(l => ({ ch: l.ch, passages: l.passages, i: 0 }));
+  if (!scores) return states;
+  const rot = [];
+  for (const st of states) {
+    rot.push(st);
+    const sc = scores[(st.ch || '').trim()];
+    if (typeof sc === 'number' && sc >= 0.66) rot.push(st);
+  }
+  return rot;
+}
+
 function gatherScope(scopeLabel) {
   ctx.ensureIndex();
   if (scopeLabel) return Retrieval.passagesByChapter(scopeLabel);
@@ -225,13 +246,15 @@ function gatherScope(scopeLabel) {
     if (!byChapter.has(k)) byChapter.set(k, []);
     byChapter.get(k).push(p);
   }
-  const lists = [...byChapter.values()];
+  const lists = [...byChapter.entries()].map(([ch, passages]) => ({ ch, passages }));
+  const rotation = scopeRotation(lists, ctx.chapterScores || null);
   const picked = []; let used = 0, added = true;
-  for (let i = 0; added && used < BOOK_TOKENS; i++) {
+  while (added && used < BOOK_TOKENS) {
     added = false;
-    for (const list of lists) {
-      const p = list[i];
+    for (const st of rotation) {
+      const p = st.passages[st.i];
       if (!p) continue;
+      st.i++;
       const t = estimateTokens(p.text) + 4;
       if (used + t > BOOK_TOKENS) continue;
       picked.push(p); used += t; added = true;

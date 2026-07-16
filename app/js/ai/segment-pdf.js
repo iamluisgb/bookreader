@@ -15,9 +15,32 @@ const PASSAGE_TARGET = 400;
 const SCAN_SAMPLE_PAGES = 10;
 const SCAN_MIN_CHARS_PER_PAGE = 40;
 
+// PDF6 · Encabezados estructurales de documentos "planos" (temarios, textos legales, BOE):
+// cuando el PDF no trae outline, se sintetiza el TOC detectándolos en el texto. `top`
+// abre capítulo (TÍTULO/TEMA/PARTE/ANEXO/DISPOSICIONES…); CAPÍTULO/SECCIÓN son marcadores
+// ## que heredan capítulo — salvo antes del primer top, donde se promocionan (documentos
+// solo-CAPÍTULOS). Conservador: línea corta, patrón al inicio, y se descartan las líneas
+// de índice (acaban en número de página). Pura y testeable.
+const TOP_RE = /^(t[íi]tulo|libro|parte|tema|anexo|ap[ée]ndice)\s+(preliminar|\d+|[ivxlcdm]+)\b/i;
+const TOP_DISP_RE = /^disposiciones?\s+(adicionales?|transitorias?|derogatorias?|finales?)\b/i;
+const SUB_RE = /^(cap[íi]tulo|secci[óo]n)\s+(preliminar|\d+|[ivxlcdm]+)\b/i;
+export function detectHeading(line) {
+  const s = (line || '').replace(/\s+/g, ' ').trim();
+  if (!s || s.length > 90) return null;
+  if (/[.·]\s*\d+$/.test(s)) return null;   // línea de índice con nº de página ("… 25")
+  if (TOP_RE.test(s) || TOP_DISP_RE.test(s)) return { title: s, top: true };
+  if (SUB_RE.test(s)) return { title: s, top: false };
+  return null;
+}
+
 export async function segmentPdf(pdfDoc, onProgress) {
   const total = pdfDoc.numPages;
   const boundaries = await outlineBoundaries(pdfDoc);   // [{page, title, top}] por página
+  // PDF6 · Sin outline → TOC sintético desde los encabezados del propio texto. Con él
+  // funcionan resumen (trozos coherentes), atenuación, y el ámbito de flashcards/mapa.
+  const synthetic = boundaries.length === 0;
+  const synthToc = [];
+  let sawTop = false;
   // tocLabels = solo CAPÍTULOS (los que abren capítulo y salen en el router/MAPA); las
   // subsecciones son marcadores `##` que heredan, no etiquetas de TOC. Qué es "capítulo"
   // lo decide outlineBoundaries: nivel superior, salvo en libros "Part → Chapter", donde
@@ -43,14 +66,27 @@ export async function segmentPdf(pdfDoc, onProgress) {
       bi++;
     }
 
-    let pageText = '';
+    let pageText = '', pageLines = [];
     try {
       const page = await pdfDoc.getPage(p);
       const content = await page.getTextContent();
-      pageText = reconstruct(content.items);
+      ({ text: pageText, lines: pageLines } = reconstruct(content.items));
       page.cleanup?.();
     } catch (e) {
       console.warn('segmentPdf: fallo en página', p, e);
+    }
+
+    // PDF6 · Encabezados sintéticos (solo sin outline). Granularidad de página, como el
+    // camino con outline: el encabezado abre al inicio de su página.
+    if (synthetic) {
+      for (const ln of pageLines) {
+        const h = detectHeading(ln);
+        if (!h) continue;
+        const opens = h.top || !sawTop;   // CAPÍTULO sin TÍTULO previo se promociona
+        if (h.top) sawTop = true;
+        if (opens) { currentChapter = h.title; synthToc.push(h.title); }
+        lines.push(`\n## ${h.title}`);
+      }
     }
 
     if (p <= SCAN_SAMPLE_PAGES) sampleChars += pageText.length;
@@ -72,7 +108,7 @@ export async function segmentPdf(pdfDoc, onProgress) {
   return {
     annotatedText,
     anchors,
-    tocLabels,
+    tocLabels: tocLabels.length ? tocLabels : synthToc,
     blockCount: n,
     tokenEstimate: Math.round(annotatedText.length / 4),
     scanned,
@@ -83,12 +119,16 @@ export async function segmentPdf(pdfDoc, onProgress) {
 // Reconstruye el texto de una página a partir de los items de getTextContent(): une por
 // líneas (hasEOL), corrige los guiones de corte de línea ("over-\nall" -> "overall") y
 // colapsa espacios. No dependemos de coordenadas: hasEOL es fiable en pdf.js 3.x.
+// Devuelve también las LÍNEAS lógicas crudas (antes de fusionar): PDF6 detecta en ellas
+// los encabezados estructurales ("TÍTULO III…"), que fusionadas se perderían en el párrafo.
 function reconstruct(items) {
   let out = '';
   let line = '';
+  const rawLines = [];
   const flush = () => {
     line = line.replace(/\s+/g, ' ').trim();
     if (!line) return;
+    rawLines.push(line);
     // Guión de corte: si la línea acumulada termina en "-" y la palabra continúa en minúscula,
     // se unen sin el guión ni espacio. Si no, se añade un espacio de separación.
     if (/[\p{L}]-$/u.test(out.trimEnd()) && /^[\p{Ll}]/u.test(line)) {
@@ -103,7 +143,7 @@ function reconstruct(items) {
     if (it.hasEOL) flush();
   }
   flush();
-  return out.replace(/\s+/g, ' ').trim();
+  return { text: out.replace(/\s+/g, ' ').trim(), lines: rawLines };
 }
 
 // Trocea un texto largo en pasajes de ~PASSAGE_TARGET caracteres cortando en fin de frase.

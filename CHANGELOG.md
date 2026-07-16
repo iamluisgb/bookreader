@@ -5,6 +5,29 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-16 — Plan de evals, prioridades 1-4: smoke+doble juez, flashcards por objetivo, mindmap F2, PDFs planos
+
+Cuatro items del plan del BACKLOG en un ciclo (cada uno con su evidencia de eval detrás):
+
+- **EV2 · Smoke + doble juez** — `npm run eval:smoke` (1 batería, 10 tarjetas, resumen
+  breve, ~5 min con scoring) para iterar prompts barato; `EVAL_JUDGE2=<modelo>` juzga todo
+  dos veces y mide el ACUERDO (|Δ| medio/máx + desacuerdos fuertes ≥1.5 en judge.json y el
+  informe). Primer uso ya cazó uno real: fidelidad del resumen P4, 4 (mimo) vs 2 (deepseek).
+  Fix de `resolveRunDir`: por mtime, no alfabético (los runs con nombre rompían "el último").
+- **IA8 · Flashcards guiadas por objetivo** — los scores de ATENUACIÓN (cacheados por
+  convo) ponderan el muestreo del libro entero: capítulos ≥0.66 muestrean al doble de ritmo
+  (`scopeRotation`, pura). En libros grandes (muestreo <50% del texto) el selector sugiere
+  30 tarjetas. Evidencia: cobertura 1/8 en Pro Git con reparto ciego.
+- **P14 F2 · Mindmap** — map con tope de 3 llamadas (trozos más grandes: el DNF de Pro Git
+  eran 4+ llamadas de ~90s), esqueleto de RAMAS desde los capítulos reales en el prompt del
+  árbol, cap de viñetas JUSTO por capítulo (`capBulletsFair`: el uniforme dejaba capítulos
+  sin representar) y árbol de 1 rama → fallback por capítulos (nunca un "mapa" de una rama).
+- **PDF6 · PDFs planos** — sin outline, TOC SINTÉTICO detectando encabezados estructurales
+  en el texto (`detectHeading`: TÍTULO/TEMA/PARTE/ANEXO/DISPOSICIONES abren capítulo;
+  CAPÍTULO/SECCIÓN heredan salvo sin TÍTULO previo; las líneas de índice con nº de página
+  se descartan). Desbloquea resumen coherente, atenuación y ámbito por tema en temarios
+  BOE-style — el nicho opositor.
+
 ## 2026-07-16 — EV1 F2: chat con preguntas trampa, mindmap y atenuación en la batería; P2/P3 con libros reales
 
 Fase 2 del arnés de [`docs/EVALS.md`](docs/EVALS.md) (`evalVersion: 2`, retrocompatible):

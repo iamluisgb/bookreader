@@ -185,7 +185,7 @@ ponderada, y un informe por run con deltas. Primer uso: validar [ADR-022](DECISI
 > **6** prompts de fidelidad/pertinencia (dentro de EV2) ·
 > **7** [IA5 Fase 2](#ia5--retrieval-profesional-rag-por-pasaje-agéntico--l--sustituye-a-ia4) embeddings activables.
 
-### EV2 — Batería smoke + doble juez (F3) · `S` · **prioridad 1**
+### EV2 — Batería smoke + doble juez (F3) · `S` · **✓ (2026-07-16)**
 
 El multiplicador del resto del plan. Dos piezas:
 - **Smoke**: 1 fixture pequeño, 5 tarjetas, 1 trozo, resumen breve (~90s por ciclo) para iterar
@@ -196,7 +196,7 @@ El multiplicador del resto del plan. Dos piezas:
   (medido: el mismo artefacto puntuó 4.2 y 3.7). Dos jueces + flag de desacuerdo convierten
   "creo que mejoró" en "mejoró". El código del juez ya está parametrizado (`EVAL_JUDGE`).
 
-### IA8 — Flashcards guiadas por objetivo en libros grandes · `M` · **prioridad 2**
+### IA8 — Flashcards guiadas por objetivo en libros grandes · `M` · **✓ (2026-07-16)**
 
 **Evidencia (EVALS.md §F2):** cobertura de conceptos 1/8 en Pro Git y 3/8 en la Constitución —
 15 tarjetas repartidas a ciegas (round-robin uniforme) sobre 40k tokens muestreados.
@@ -458,7 +458,7 @@ Mapa mental (jerarquía radial, render SVG/HTML) del libro/capítulo, exportable
 con mayor techo de marketing (la gente postea mapas mentales), pero el más caro (layout + render). Hacer
 **después** de las victorias baratas (P11/P12/P13).
 
-- **F2 — map-reduce con presupuesto** `M` · **prioridad 3 del plan de evals**. Evidencia
+- **F2 — map-reduce con presupuesto** `M` · **✓ (2026-07-16)**. Evidencia
   (EVALS.md §F2): es el artefacto peor medido — no terminó en 7 min con Pro Git (14MB), 1 rama
   en el PDF de la Constitución, cobertura 2/5 incluso cuando sale. Feature Pro que falla justo
   en los libros gordos por los que la gente paga. Diseño: el mismo patrón que salvó al resumen —
@@ -589,7 +589,7 @@ fuente, ni reflow, ni recolorear texto. Máximo alcanzable: **zoom** y, para mod
 `invert` sobre el canvas (funciona pero degrada figuras/colores). Reflow real exigiría reconvertir el
 PDF a HTML → **fuera de alcance**. Documentado aquí para no reabrir el debate.
 
-### PDF6 — Segmentación estructural de PDFs planos (temarios/legales) · `M` · **prioridad 4**
+### PDF6 — Segmentación estructural de PDFs planos (temarios/legales) · `M` · **✓ (2026-07-16)**
 
 **Evidencia (EVALS.md §F2):** con la Constitución del BOE (PDF sin TOC) el resumen rindió 3/3/3
 con solo 7 citas, y sin TOC no hay atenuación ni selector de capítulos útil. Es EXACTAMENTE el

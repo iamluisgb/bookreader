@@ -258,12 +258,20 @@ async function openFlashcards() {
   if (!book && !bookId) { setStatus('Abre un libro para crear flashcards.'); return; }
   if (!segReady) { setStatus('Preparando el libro… inténtalo en unos segundos.'); return; }
   if (!(await ensurePro('flashcards'))) return;   // gate Pro (MON2)
+  // IA8 · Los scores de atenuación (si el objetivo ya puntuó el TOC) guían el muestreo
+  // del libro entero: más cupo a capítulos relevantes al objetivo. Best-effort.
+  let chapterScores = null;
+  try {
+    const cached = convo ? await DB.getRatings(convo.id) : null;
+    if (cached && cached.goal === convo.goal) chapterScores = cached.scores;
+  } catch { /* sin ratings: muestreo uniforme */ }
   Flashcards.open({
     bookId, bookTitle,
     goal: convo?.goal || '',
     tocLabels,
     currentChapter: EpubReader.getCurrentChapterLabel?.() || '',
     ensureIndex,
+    chapterScores,
   });
 }
 

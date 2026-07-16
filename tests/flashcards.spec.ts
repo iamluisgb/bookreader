@@ -386,3 +386,33 @@ test('anchorSupported y attachSources con textOf: vetan anclas que no respaldan 
   expect(r.rescued).toBe('a1');
   expect(r.honest).toBe('');
 });
+
+// IA8 · Rotación ponderada por relevancia al objetivo (scores de atenuación).
+test('scopeRotation: capítulos relevantes muestrean al doble; sin scores, uniforme', async ({ page }) => {
+  await page.goto('/index.html');
+  const r = await page.evaluate(async () => {
+    const F: any = await import('/js/ai/flashcards.js');
+    const lists = [
+      { ch: 'Relevante', passages: ['r1', 'r2', 'r3', 'r4'] },
+      { ch: 'Paja', passages: ['p1', 'p2', 'p3', 'p4'] },
+    ];
+    const uniform = F.scopeRotation(lists, null);
+    const weighted = F.scopeRotation(lists, { 'Relevante': 0.9, 'Paja': 0.1 });
+    // Simular 1 ronda de la rotación: qué pasajes entran.
+    const round = (rot: any[]) => {
+      const picked: string[] = [];
+      for (const st of rot) { const p = st.passages[st.i]; if (p) { st.i++; picked.push(p); } }
+      return picked;
+    };
+    return {
+      uniformLen: uniform.length,
+      weightedLen: weighted.length,
+      round1: round(weighted),           // Relevante avanza 2 por ronda (cursor compartido)
+      sharedCursor: weighted[0] === weighted[1],   // las dos entradas son el MISMO estado
+    };
+  });
+  expect(r.uniformLen).toBe(2);
+  expect(r.weightedLen).toBe(3);
+  expect(r.round1).toEqual(['r1', 'r2', 'p1']);
+  expect(r.sharedCursor).toBe(true);
+});
