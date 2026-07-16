@@ -11,6 +11,7 @@ import * as Highlights from './highlights.js';
 import * as AiPanel from './ai/panel.js';
 import { icon } from './ui/icons.js';
 import { escapeHtml } from './ui/escape.js';
+import { dehyphenate } from './ui/text.js';
 import { alertBox, promptBox } from './ui/dialog.js';
 import { shareQuote } from './share-card.js';
 
@@ -24,7 +25,7 @@ export function setBookMeta(m) {
 // Compartir un pasaje como tarjeta-cita PNG (Web Share o descarga).
 async function shareHighlight(text) {
   try {
-    await shareQuote({ quote: text, title: bookMeta.title, author: bookMeta.author, cover: bookMeta.cover });
+    await shareQuote({ quote: dehyphenate(text), title: bookMeta.title, author: bookMeta.author, cover: bookMeta.cover });
   } catch (e) {
     console.warn('No se pudo compartir la cita:', e);
     try { alertBox('No se pudo generar la imagen para compartir.'); } catch (_) {}
@@ -204,7 +205,7 @@ export function setupPdfSelection() {
 
   const onSelectEnd = () => setTimeout(() => {
     const sel = window.getSelection();
-    const text = sel && !sel.isCollapsed ? sel.toString().replace(/\s+/g, ' ').trim() : '';
+    const text = sel && !sel.isCollapsed ? dehyphenate(sel.toString().replace(/\s+/g, ' ').trim()) : '';
     if (!text || text.length < 2) return;
     // Solo si la selección cae dentro de la capa de texto del PDF.
     const node = sel.anchorNode;
@@ -369,7 +370,7 @@ export function renderHighlights() {
     item.className = 'highlight-item';
     item.style.borderLeftColor = hl.color;
     item.innerHTML = `
-      <div class="highlight-text">"${escapeHtml(hl.text)}"</div>
+      <div class="highlight-text">"${escapeHtml(dehyphenate(hl.text))}"</div>
       ${hl.note ? `<div class="highlight-note">${icon('note', { size: 13 })}<span>${escapeHtml(hl.note)}</span></div>` : ''}
       <div class="highlight-meta">
         <span>${escapeHtml(hl.chapter)}</span>

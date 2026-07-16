@@ -1,7 +1,7 @@
 // P11 · Tarjeta-cita: renderiza una frase subrayada como imagen PNG para compartir en
 // redes. Proporciones alineadas con la skill libro-quote del content-engine —lienzo
 // 1080×1080, 2 columnas (portada ~40% / cita ~60%)— y tokens de marca BookReader:
-// papel cálido, cita en serif Source Serif 4, chip emerald. La PORTADA sale de la
+// papel cálido, cita en serif Source Serif 4. La PORTADA sale de la
 // biblioteca local (la del libro que se está leyendo, embebida en el EPUB o la 1ª página
 // del PDF); no se pide a Open Library como en el content-engine, así no hay llamada
 // externa y se respeta la privacidad (todo se genera en el dispositivo).
@@ -116,13 +116,12 @@ export async function buildQuoteCard({ quote, title, author, cover }) {
     quoteMax = 46;
   }
 
-  // Bloque derecho: comilla + cita + atribución + chip, centrado en vertical.
+  // Bloque derecho: comilla + cita + atribución, centrado en vertical.
   const markH = coverImg ? 84 : 104;
   // Con portada, el título ya se ve en ella → la atribución muestra solo el autor
   // (evita cortar «Mario Var…»); sin portada, título · autor.
   const attribution = (coverImg ? [author] : [title, author]).filter(Boolean).join('   ·   ');
-  const chipH = 56;
-  const footH = (attribution ? 44 : 0) + 28 + chipH;
+  const footH = attribution ? 44 : 0;
   const { size, lh, lines } = fitQuote(ctx, quote, quoteW, innerH - markH - footH - 60, quoteMax);
   const blockH = markH + lines.length * lh + 44 + footH;
   let y = PADY + Math.max(0, (innerH - blockH) / 2);
@@ -147,19 +146,7 @@ export async function buildQuoteCard({ quote, title, author, cover }) {
     ctx.fillStyle = MUTED;
     y += 30;
     ctx.fillText(ellipsize(ctx, '— ' + attribution, quoteW), quoteX, y);
-    y += 14;
   }
-
-  // Chip de marca emerald.
-  const chipText = 'BookReader';
-  ctx.font = `600 27px 'Inter', sans-serif`;
-  const chipW = ctx.measureText(chipText).width + 42;
-  ctx.fillStyle = 'rgba(34,197,94,0.14)';
-  roundRect(ctx, quoteX, y, chipW, chipH, chipH / 2);
-  ctx.fill();
-  ctx.fillStyle = ACCENT;
-  ctx.textBaseline = 'middle';
-  ctx.fillText(chipText, quoteX + 21, y + chipH / 2 + 1);
 
   return new Promise((resolve, reject) =>
     canvas.toBlob(b => (b ? resolve(b) : reject(new Error(t('No se pudo generar la imagen')))), 'image/png'));
