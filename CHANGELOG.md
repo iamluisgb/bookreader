@@ -5,6 +5,23 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-16 — El botón de volver a la biblioteca es visible durante toda la carga
+
+Antes solo aparecía al TERMINAR la carga completa (render + locations + portada +
+persistencia): en libros grandes tardaba, y si algo se colgaba no había forma de salir.
+
+- **Visible desde el primer instante** de la apertura (desde biblioteca o desde archivo),
+  en [`js/app.js`](app/js/app.js). `goToLibrary` lo oculta, como siempre.
+- **Salir a mitad de carga es seguro**: guardas de aborto tras cada paso lento
+  (`EpubReader.load`, `generateLocations`, `PdfReader.load`) — una carga abandonada no
+  re-monta la UI de lectura sobre la biblioteca ni pisa al libro abierto después
+  (contadores de generación `epubLoadSeq`/`pdfLoadSeq` + identidad de `currentBook`).
+- **El libro queda guardado y segmentado aunque salgas a mitad**: la persistencia en
+  biblioteca y el `AiPanel.setBook` se ejecutan nada más renderizar, ANTES del guard
+  (el panel ya aísla segmentaciones tardías — cubierto por `book-switch.spec.ts`).
+- **Carga fallida desde archivo** → se restaura la biblioteca (antes quedaba una vista
+  de lectura vacía sin salida).
+
 ## 2026-07-15 — Gestos de página en móvil: sin parpadeo, flick y zonas de toque más estrechas
 
 Tres mejoras del paso de página táctil en EPUB (feedback de uso real en móvil):

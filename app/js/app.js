@@ -359,6 +359,10 @@ function openLibraryBook(record) {
 async function openBookRecord(record, { fromRoute = false, loc = null } = {}) {
   try {
     Library.hide();
+    // El botón de volver a la biblioteca es visible desde YA, no al acabar la carga:
+    // locations/portada/persistencia pueden tardar (o colgarse) en libros grandes y
+    // el usuario tiene que poder salir siempre. goToLibrary lo vuelve a ocultar.
+    document.getElementById('library-btn').style.display = '';
     const buffer = record.file instanceof ArrayBuffer ? record.file.slice(0) : await record.file.arrayBuffer();
     // Identidad unificada: migra subrayados/marcadores del id antiguo (nombre de fichero) al hash.
     Bookmarks.migrateBook([record.fileBaseId], record.id); Bookmarks.setBook(record.id);
@@ -367,7 +371,14 @@ async function openBookRecord(record, { fromRoute = false, loc = null } = {}) {
     currentBook = { id: record.id, fileBaseId: record.fileBaseId || record.id, format: record.format };
     if (record.format === 'pdf') {
       const ok = await loadPdf(buffer, record.fileBaseId || record.id, record.id);
-      if (!ok) { currentBook = null; await goToLibrary({ fromRoute: true }); return; }
+      // Fallo real → limpiar y volver a la biblioteca; pero SOLO si este libro sigue
+      // siendo el actual (una carga abortada que resuelve tarde no debe pisar al
+      // libro que el usuario abrió después ni a la biblioteca ya mostrada).
+      if (!ok) {
+        if (currentBook && currentBook.id === record.id) { currentBook = null; await goToLibrary({ fromRoute: true }); }
+        return;
+      }
+      if (!currentBook || currentBook.id !== record.id) return;   // salió durante la carga
       // Backfill de portada para PDFs guardados antes de tenerla (imagen genérica → página 1).
       if (!record.cover) {
         const cover = await PdfReader.renderCoverDataUrl();
@@ -376,7 +387,12 @@ async function openBookRecord(record, { fromRoute = false, loc = null } = {}) {
       if (loc) await seekTo(loc);
     } else {
       const ok = await loadEpub(buffer, record.fileBaseId || record.id, record.id);
-      if (!ok) { currentBook = null; await goToLibrary({ fromRoute: true }); return; }
+      // Mismo criterio que en PDF: solo limpiar si este libro sigue siendo el actual.
+      if (!ok) {
+        if (currentBook && currentBook.id === record.id) { currentBook = null; await goToLibrary({ fromRoute: true }); }
+        return;
+      }
+      if (!currentBook || currentBook.id !== record.id) return;   // salió durante la carga
       // La posición de la URL manda; si no, la lastPosition_ que el lector ya restauró
       // (se guarda en síncrono en cada relocated → siempre fresca). El lastCfi de la
       // biblioteca va con rebote y puede estar rancio: solo como fallback.
@@ -385,8 +401,9 @@ async function openBookRecord(record, { fromRoute = false, loc = null } = {}) {
         try { await EpubReader.goTo(record.lastCfi); } catch (e) { /* posición no válida */ }
       }
     }
+    // Si el usuario salió a la biblioteca a mitad de carga, no tocar la ruta ni la UI.
+    if (!currentBook || currentBook.id !== record.id) return;
     await LibStore.updateBook(record.id, { lastOpenedAt: Date.now() });
-    document.getElementById('library-btn').style.display = '';
     if (!fromRoute) writeRoute(record.id, currentLoc());   // pushState: atrás → biblioteca
   } catch (e) {
     console.error('No se pudo abrir el libro de la biblioteca:', e);
@@ -403,7 +420,9 @@ async function persistToLibrary(id, buffer, format, fileName, fileBaseId) {
     const author = format === 'pdf' ? '' : EpubReader.getAuthor();
     // Portada: EPUB de sus metadatos; PDF renderizando su página 1 (ya está cargado).
     const cover = (format === 'pdf') ? await PdfReader.renderCoverDataUrl() : await EpubReader.getCoverDataUrl();
-    setBookMeta({ title, author, cover });   // para la tarjeta-cita al compartir (P11)
+    // Meta para la tarjeta-cita (P11) — solo si este libro sigue siendo el actual
+    // (una persistencia de un libro superado no debe pisar la del activo).
+    if (currentBook && currentBook.id === id) setBookMeta({ title, author, cover });
     const base = existing || { id, addedAt: Date.now(), progress: 0, lastCfi: null, status: 'unread', shelfIds: [] };
     await LibStore.putBook({
       ...base, id, title, author, cover: cover || base.cover || '',
@@ -881,25 +900,35 @@ async function loadFile(file) {
   Highlights.migrateBook([fileBaseId], id); Highlights.setBook(id);
   currentBook = { id, fileBaseId, format: ext };
   Library.hide();
-
-  const ok = ext === 'epub'
-    ? await loadEpub(buffer, fileBaseId, id)
-    : await loadPdf(buffer, fileBaseId, id);
-  // Si la carga falló (loadEpub/loadPdf ya avisaron), no dejamos currentBook apuntando a un
-  // libro no renderizado ni lo persistimos en la biblioteca.
-  if (!ok) { currentBook = null; return; }
-
-  // Guardar en la biblioteca (con portada/metadatos ya disponibles) y mostrar
-  // el acceso a la biblioteca en la cabecera.
-  await persistToLibrary(id, buffer, ext, file.name, fileBaseId);
+  // Botón de volver a la biblioteca visible desde YA (la carga puede tardar y el
+  // usuario tiene que poder salir siempre). goToLibrary lo vuelve a ocultar.
   document.getElementById('library-btn').style.display = '';
-  Library.render();
+
+  // La persistencia en biblioteca ocurre DENTRO de loadEpub/loadPdf, justo tras el
+  // render (con los metadatos ya disponibles): así el libro queda guardado y su
+  // segmentación cacheada aunque el usuario salga o abra otro libro a mitad de carga.
+  const ok = ext === 'epub'
+    ? await loadEpub(buffer, fileBaseId, id, { fileName: file.name })
+    : await loadPdf(buffer, fileBaseId, id, { fileName: file.name });
+  // Si la carga falló (loadEpub/loadPdf ya avisaron), restaurar la biblioteca para no
+  // quedar en una vista de lectura vacía — pero SOLO si este libro sigue siendo el
+  // actual (una carga abortada que resuelve tarde no debe pisar lo que vino después).
+  if (!ok) {
+    if (currentBook && currentBook.id === id) { currentBook = null; await goToLibrary({ fromRoute: true }); }
+    return;
+  }
+  if (!currentBook || currentBook.id !== id) return;   // salió durante la carga
   writeRoute(id, currentLoc());   // deep-link del libro recién abierto (pushState)
 }
 
 let totalWords = 0;
+// Generación de cada carga: una carga superada por otra posterior del mismo formato
+// aborta sus pasos de UI (el rendition/documento del singleton ya no es el suyo).
+let epubLoadSeq = 0;
+let pdfLoadSeq = 0;
 
-async function loadEpub(buffer, bookId, aiBookId) {
+async function loadEpub(buffer, bookId, aiBookId, persist = null) {
+  const seq = ++epubLoadSeq;
   try {
     resetSearch();
     console.log('Loading EPUB, buffer size:', buffer.byteLength);
@@ -931,15 +960,27 @@ async function loadEpub(buffer, bookId, aiBookId) {
     await EpubReader.load(buffer);
     console.log('EPUB loaded successfully');
 
+    // Alimentar al agente y (si la apertura viene de un archivo) guardar en la
+    // biblioteca ANTES del guard de aborto: aunque el usuario salga o abra otro
+    // libro a mitad de carga, este queda guardado y su segmentación cacheada bajo
+    // SU id (el panel aísla segmentaciones tardías; ver book-switch.spec.ts).
+    AiPanel.setBook(EpubReader.getBook(), aiBookId, EpubReader.getTitle());
+    if (persist) {
+      await persistToLibrary(aiBookId, buffer, 'epub', persist.fileName, bookId);
+      Library.render();
+    }
+
+    // El usuario pudo salir a la biblioteca durante la carga (el botón de volver ya
+    // es visible mientras se carga) o empezar a cargar OTRO epub (seq): no montar
+    // la UI de lectura sobre la biblioteca ni sobre el rendition del otro libro.
+    if (seq !== epubLoadSeq || !currentBook || currentBook.id !== aiBookId) return false;
+
     // Update UI
     document.getElementById('reader-title').textContent = EpubReader.getTitle();
     document.getElementById('bookmark-toggle').disabled = false;
     document.getElementById('ai-toggle').disabled = false;
     document.getElementById('immersive-toggle').disabled = false;
     document.getElementById('header-search').disabled = false;
-
-    // Feed the book to the AI agent (uses cache if already segmented).
-    AiPanel.setBook(EpubReader.getBook(), aiBookId, EpubReader.getTitle());
 
     // Load TOC
     loadTOC();
@@ -956,6 +997,10 @@ async function loadEpub(buffer, bookId, aiBookId) {
       console.warn('Could not generate locations:', locErr);
       totalWords = countBookWords();
     }
+
+    // Salida (o cambio de libro) durante generateLocations: el rendition actual ya
+    // puede ser de otro libro; no cablear subrayados/listas sobre él.
+    if (seq !== epubLoadSeq || !currentBook || currentBook.id !== aiBookId) return false;
 
     // Setup highlights with rendition
     setupHighlights();
@@ -976,7 +1021,8 @@ async function loadEpub(buffer, bookId, aiBookId) {
   }
 }
 
-async function loadPdf(buffer, bookId, aiBookId) {
+async function loadPdf(buffer, bookId, aiBookId, persist = null) {
+  const seq = ++pdfLoadSeq;
   try {
     resetSearch();
     // Hash estable del contenido (id canónico para el agente). Se reutiliza si ya viene dado.
@@ -992,6 +1038,20 @@ async function loadPdf(buffer, bookId, aiBookId) {
 
     await PdfReader.load(buffer);
 
+    // Alimentar al agente y (si viene de un archivo) guardar en biblioteca ANTES del
+    // guard de aborto: aunque el usuario salga o abra otro libro a mitad de carga,
+    // este queda guardado y su segmentación cacheada bajo SU id.
+    AiPanel.setBook(PdfReader.getDocument(), aiBookId, bookId || 'PDF', { format: 'pdf' });
+    if (persist) {
+      await persistToLibrary(aiBookId, buffer, 'pdf', persist.fileName, bookId);
+      Library.render();
+    }
+
+    // El usuario pudo salir a la biblioteca durante la carga (el botón de volver ya
+    // es visible mientras se carga) o empezar a cargar OTRO pdf (seq): no montar la
+    // UI de lectura sobre la biblioteca ni sobre el documento del otro.
+    if (seq !== pdfLoadSeq || !currentBook || currentBook.id !== aiBookId) return false;
+
     document.getElementById('reader-title').textContent = 'PDF';
     document.body.classList.add('reading');
     // Móvil (estilo Play Books): arrancar SIN barras (PDF a pantalla completa). Se
@@ -1004,7 +1064,6 @@ async function loadPdf(buffer, bookId, aiBookId) {
     document.getElementById('ai-toggle').disabled = false;
     document.getElementById('immersive-toggle').disabled = false;
     document.getElementById('header-search').disabled = false;
-    AiPanel.setBook(PdfReader.getDocument(), aiBookId, bookId || 'PDF', { format: 'pdf' });
     // PDF2/PDF3: seleccionar texto en el PDF → barra (preguntar/subrayar/nota/copiar).
     setupPdfSelection();
     renderHighlights();              // poblar la lista lateral con los subrayados guardados
