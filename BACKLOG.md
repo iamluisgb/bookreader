@@ -102,10 +102,22 @@ para indexar y citar, y el function-calling (`chatTools`, ya usado en
   **herramienta agéntica** (`search_book` + `read_chapter`) vía `chatToolsLoop` (bucle multi-turno en
   [`llm.js`](js/ai/llm.js)). Recolección gateada (solo turnos difíciles: sin capítulo nombrado + BM25
   débil), fusión con el contexto inicial y respuesta en streaming. Degrada con gracia si falla.
-- **Fase 2** `M` · **aplazada** _(decisión, [DECISIONS.md ADR-014](DECISIONS.md))_ — embeddings cacheados
-  (si hay `/embeddings`), fusión híbrida BM25+semántica, rerank LLM opcional. Se aplaza: BM25+router+vecinos
-  ya cubren la mayoría, depende del proveedor y no es verificable end-to-end aquí. Se retoma midiendo con
-  el arné de ADR-012.
+- **Fase 2** `L` · **en estudio** · **prioridad 7 del plan de evals** _(reabre lo aplazado en
+  [ADR-014](DECISIONS.md); el bloqueo original —"no todos los BYOK exponen `/embeddings`"— se
+  resuelve con diseño ACTIVABLE/DESACTIVABLE por capacidades, no asumiendo el endpoint)_:
+  - **Detección de capacidad, no configuración**: al guardar proveedor (o al primer uso), un
+    probe único a `/embeddings` (y al modelo `rerank` si existe); resultado cacheado por base
+    URL. Con nan hay ambos (`qwen3-embedding`, `rerank`); con un BYOK sin ellos, la app ni lo
+    intenta.
+  - **Encendido/apagado limpio**: activado → índice semántico por libro (embeddings una vez,
+    cacheados en IndexedDB, coseno en JS) + fusión híbrida RRF con BM25 (+ rerank opcional).
+    Desactivado o fallo en runtime (endpoint caído, key sin cupo) → **BM25 puro, el
+    comportamiento actual, sin regresión** — la fusión es unión, como IA7. Toggle visible en
+    Ajustes → Agente ("Retrieval semántico, si tu proveedor lo soporta") para poder apagarlo
+    aunque la capacidad exista.
+  - **Qué desbloquea**: anclas de tarjeta semánticas (el fallo nº1 del primer run de evals),
+    recall en paráfrasis/cross-lingüe sin depender de HyDE, rerank del contexto. Cierre:
+    re-run de la batería completa + el golden de recall@k (ADR-012), comparando ON vs OFF.
 - **Fase 3 ✓** _(entregada, ver CHANGELOG · [DECISIONS.md ADR-011/012](DECISIONS.md))_ — *sentence-window*
   (`withNeighbors`, cada acierto arrastra sus vecinos del mismo capítulo) + arné de **evaluación recall@k**
   ([`tests/retrieval.spec.ts`](tests/retrieval.spec.ts)) como suelo de regresión.
@@ -163,6 +175,43 @@ LAUNCH_PLAN** (estudiante Anki, lector técnico, opositor PDF, no-ficción), con
 libre, checks deterministas (anclas `[[aN]]`, cloze, dedupe) + juez LLM de otra familia con rúbrica
 ponderada, y un informe por run con deltas. Primer uso: validar [ADR-022](DECISIONS.md) comparando
 `deepseek-v4-flash` vs `qwen3.6` vs `mimo-v2.5` como modelo principal. Fases F1-F3 en el doc.
+
+> **Plan de mejora derivado de los evals (2026-07-16), por prioridad:**
+> **1** [EV2](#ev2--batería-smoke--doble-juez-f3--s--prioridad-1) smoke+doble juez ·
+> **2** [IA8](#ia8--flashcards-guiadas-por-objetivo-en-libros-grandes--m--prioridad-2) flashcards por objetivo ·
+> **3** [P14 F2](#p14--mapa-mental----l--artefacto-de-marketing) mindmap map-reduce ·
+> **4** [PDF6](#pdf6--segmentación-estructural-de-pdfs-planos-temarioslegales--m--prioridad-4) PDFs planos ·
+> **5** [EV3](#ev3--re-candidatear-mimo-v25-como-modelo-principal--s--prioridad-5) mimo principal ·
+> **6** prompts de fidelidad/pertinencia (dentro de EV2) ·
+> **7** [IA5 Fase 2](#ia5--retrieval-profesional-rag-por-pasaje-agéntico--l--sustituye-a-ia4) embeddings activables.
+
+### EV2 — Batería smoke + doble juez (F3) · `S` · **prioridad 1**
+
+El multiplicador del resto del plan. Dos piezas:
+- **Smoke**: 1 fixture pequeño, 5 tarjetas, 1 trozo, resumen breve (~90s por ciclo) para iterar
+  prompts sin pagar los ~35 min del run completo. Primeros usos: fidelidad en literatura (P4
+  estancada en ~3.8 — las tarjetas extrapolan al parafrasear narrativa) y pertinencia de citas
+  del resumen (3-4/5 persistente).
+- **Doble juez con medición de acuerdo** (F3 de EVALS.md): un juez solo tiene ruido de ±0.5
+  (medido: el mismo artefacto puntuó 4.2 y 3.7). Dos jueces + flag de desacuerdo convierten
+  "creo que mejoró" en "mejoró". El código del juez ya está parametrizado (`EVAL_JUDGE`).
+
+### IA8 — Flashcards guiadas por objetivo en libros grandes · `M` · **prioridad 2**
+
+**Evidencia (EVALS.md §F2):** cobertura de conceptos 1/8 en Pro Git y 3/8 en la Constitución —
+15 tarjetas repartidas a ciegas (round-robin uniforme) sobre 40k tokens muestreados.
+**Diseño:** conectar dos sistemas que ya existen — los **ratings de atenuación** (cacheados en
+DB, discriminan Δ+0.65) ponderan el muestreo `BOOK_TOKENS` de `gatherScope`: más cupo a los
+capítulos relevantes al objetivo, menos a la paja. Sin ratings (sin objetivo/TOC), round-robin
+actual. Además: sugerir 30 tarjetas en la UI cuando el libro es grande. Cierre: re-run de P2/P3.
+
+### EV3 — Re-candidatear mimo-v2.5 como modelo principal · `S` · **prioridad 5**
+
+En el comparativo, mimo empató con deepseek en tarjetas (4.8/4.8/4.8, juez cruzado) siendo el
+más rápido (64-121s vs 110-167s); su pecado —mezclar idiomas— ya se corrigió para todos con
+`detectLang` (prompt con idioma nombrado). Un run de batería con `EVAL_MODEL=mimo-v2.5`
+confirma o descarta: si pasa gates y empata, toda la app gana ~2x de latencia cambiando el
+default. Riesgo conocido a vigilar: su resumen de P4 fue débil (fid 2 según juez deepseek).
 
 ---
 
@@ -409,6 +458,14 @@ Mapa mental (jerarquía radial, render SVG/HTML) del libro/capítulo, exportable
 con mayor techo de marketing (la gente postea mapas mentales), pero el más caro (layout + render). Hacer
 **después** de las victorias baratas (P11/P12/P13).
 
+- **F2 — map-reduce con presupuesto** `M` · **prioridad 3 del plan de evals**. Evidencia
+  (EVALS.md §F2): es el artefacto peor medido — no terminó en 7 min con Pro Git (14MB), 1 rama
+  en el PDF de la Constitución, cobertura 2/5 incluso cuando sale. Feature Pro que falla justo
+  en los libros gordos por los que la gente paga. Diseño: el mismo patrón que salvó al resumen —
+  puntos por trozo con presupuesto acotado + un reduce que arma el árbol, con **esqueleto
+  inicial desde el TOC** (gratis, garantiza ramas y jerarquía). El gate del eval ("mindmap
+  generado con ramas") ya existe: el ciclo se mide solo.
+
 ### P15 — Internacionalización EN/ES (UI + prompts) · `L` · **F1+F2 ✓** · **lanzamiento**
 
 > **Estado: F1+F2 entregadas (2026-07-15, ver CHANGELOG); queda F3 (opcional, post-lanzamiento).**
@@ -531,6 +588,17 @@ La página actual se deriva del scroll; el modo se recuerda por libro. Render po
 fuente, ni reflow, ni recolorear texto. Máximo alcanzable: **zoom** y, para modo oscuro, un filtro
 `invert` sobre el canvas (funciona pero degrada figuras/colores). Reflow real exigiría reconvertir el
 PDF a HTML → **fuera de alcance**. Documentado aquí para no reabrir el debate.
+
+### PDF6 — Segmentación estructural de PDFs planos (temarios/legales) · `M` · **prioridad 4**
+
+**Evidencia (EVALS.md §F2):** con la Constitución del BOE (PDF sin TOC) el resumen rindió 3/3/3
+con solo 7 citas, y sin TOC no hay atenuación ni selector de capítulos útil. Es EXACTAMENTE el
+material del nicho opositor — el pivot que el LAUNCH_PLAN señala como el que "paga más y más
+rápido". **Diseño:** detectar encabezados estructurales en el texto extraído (`TÍTULO`,
+`CAPÍTULO`, `Artículo N.`, `Tema N` — los temarios y textos legales son regularísimos) y usarlos
+como capítulos sintéticos del TOC. De golpe mejoran: resumen (trozos coherentes), atenuación
+(hay capítulos que puntuar), flashcards (ámbito por tema) y anclas. Bonus opositor: cloze sobre
+literales ("Artículo {{c1::168}}"). Cierre: re-run de la batería P3, que ya existe.
 
 ---
 
