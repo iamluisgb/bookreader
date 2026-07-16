@@ -820,7 +820,9 @@ async function send() {
 
   els.input.value = '';
   clearRef();
-  await deliver(aug, q, { showUser: true });
+  // `ref` también guía el retrieval: localiza el pasaje del fragmento en el índice para
+  // que entre ANCLADO en el extracto (sin esto, "¿qué significa esto?" no lo recuperaba).
+  await deliver(aug, q, { showUser: true, ref });
 }
 
 // VISIÓN · Botón "Ver": ADJUNTA la captura de la página actual al composer (no envía). Así el
@@ -935,7 +937,7 @@ function ensureIndex() {
 // viene, el paso BM25 busca sobre la pregunta CRUDA ∪ la expansión (unión, no sustitución):
 // suma recall conceptual sin perder la precisión léxica. El router y el capítulo actual
 // siguen sobre la pregunta cruda.
-function buildContext(question, expansion = null) {
+function buildContext(question, expansion = null, ref = null) {
   ensureIndex();
   const routed = Retrieval.matchChapters(question, tocLabels);     // capítulos nombrados
   // ADR-007 · Presupuesto adaptativo: turnos normales van lean (60k, baratos); si el
@@ -950,6 +952,17 @@ function buildContext(question, expansion = null) {
     if (used + t > budget) return;
     chosen.set(p.id, p); used += t;
   };
+  // (0) Fragmento adjunto (botón "Preguntar al agente" sobre una selección): es texto
+  // LITERAL del libro, así que BM25 con el propio fragmento localiza su(s) pasaje(s)
+  // anclado(s) con casi total certeza — y con sus vecinos son el contexto más relevante
+  // posible. Entran PRIMERO. Sin esto, una pregunta deíctica ("¿qué significa esto?")
+  // recuperaba pasajes al azar, el fragmento no estaba en el EXTRACTO y el modelo —que
+  // tiene orden de responder solo desde el extracto— decía que no podía ver el contexto.
+  let refHits = [];
+  if (ref) {
+    refHits = Retrieval.search(ref.slice(0, 600), 8);
+    for (const p of Retrieval.withNeighbors(refHits, 1)) tryAdd(p);
+  }
   for (const ch of routed) {                                      // (1) capítulos nombrados
     for (const p of Retrieval.passagesByChapter(ch)) tryAdd(p);
     // (1b) además, BM25 por el TÍTULO del capítulo: recupera su contenido por tema aunque
@@ -977,13 +990,14 @@ function buildContext(question, expansion = null) {
   // Fallback de seguridad: si no se pudo parsear/indexar (libro atípico), usar el
   // anotado recortado, como hacía IA1 — cero regresión.
   if (!picked.length) {
-    return { text: annotatedText.slice(0, budget * 4), tocLabels, passages: 0, chapters: [], routed, bm25Count: 0, picked: [] };
+    return { text: annotatedText.slice(0, budget * 4), tocLabels, passages: 0, chapters: [], routed, bm25Count: 0, refCount: refHits.length, picked: [] };
   }
   const chapters = [...new Set(picked.map(p => p.chapter).filter(Boolean))];
   // routed = capítulos nombrados; bm25Count = fuerza del match léxico de la pregunta CRUDA
   // (se conserva a propósito: alimenta el gate del retrieval agéntico de la Fase 1b sin que
-  // la expansión IA7 lo altere). `expanded` es solo observabilidad.
-  return { text: formatPassages(picked), tocLabels, passages: picked.length, chapters, routed, bm25Count: bm25.length, picked, expanded: !!expQuery };
+  // la expansión IA7 lo altere). refCount = pasajes localizados del fragmento adjunto.
+  // `expanded` es solo observabilidad.
+  return { text: formatPassages(picked), tocLabels, passages: picked.length, chapters, routed, bm25Count: bm25.length, refCount: refHits.length, picked, expanded: !!expQuery };
 }
 
 // Ensambla una lista de pasajes en texto para el prompt: cabecera `## capítulo` + `[[aN]]`
@@ -1143,7 +1157,7 @@ OBJETIVO: ${convo?.goal || '(sin definir)'}` },
 // `showUser` false = continuación (no se pinta ni persiste una burbuja de usuario; el
 // mensaje va igualmente al modelo como último turno). Reutilizado por send() y por el
 // botón "Continuar" que aparece si el proveedor corta la respuesta por longitud.
-async function deliver(aug, question, { showUser = true } = {}) {
+async function deliver(aug, question, { showUser = true, ref = null } = {}) {
   if (busy) return;
   const mySeq = bookSeq;   // guard: si el usuario cambia de libro mid-turno, no persistir aquí
   // Reservamos el turno YA (antes de la reescritura de consulta, que hace un await): evita
@@ -1154,8 +1168,9 @@ async function deliver(aug, question, { showUser = true } = {}) {
   // la query para mejorar el recall BM25. Gate: solo turnos normales (showUser), con key,
   // libro listo y SIN capítulo nombrado (ahí la intención ya es explícita). Nunca bloquea:
   // ante fallo/timeout, expansion=null → retrieval con la pregunta cruda (cero regresión).
+  // Con fragmento adjunto la intención ya es explícita (el pasaje manda): sin expansión.
   let expansion = null;
-  if (showUser && LLM.hasKey() && segReady && !Retrieval.matchChapters(question, tocLabels).length) {
+  if (showUser && !ref && LLM.hasKey() && segReady && !Retrieval.matchChapters(question, tocLabels).length) {
     setStatus('Entendiendo la pregunta…');
     expansion = await QueryExpand.expandQuery(question, { tocLabels, signal: abortCtrl.signal });
   }
@@ -1163,7 +1178,7 @@ async function deliver(aug, question, { showUser = true } = {}) {
   // IA5 · Retrieval por PREGUNTA a nivel de pasaje (reemplaza al recorte por objetivo
   // de IA1, que era ciego a la query y descartaba capítulos relevantes enteros por
   // presupuesto). Ver DECISIONS.md · ADR-001..007. `let`: la Fase 1b puede aumentarlo.
-  let ctx = buildContext(question, expansion);
+  let ctx = buildContext(question, expansion, ref);
 
   // IA1 · Ventana de historial: solo se reenvían los últimos N mensajes (el chat
   // completo sigue guardado y visible; solo no se manda entero en cada turno).
@@ -1200,7 +1215,8 @@ async function deliver(aug, question, { showUser = true } = {}) {
     // responder; los turnos normales van directos a streaming. Ver DECISIONS.md · ADR-009.
     // Guard: libro indexado (segReady). Un retrieval DÉBIL —incluido el vacío (0 aciertos)—
     // es justo cuando el agente debe buscar por su cuenta; por eso NO exigimos picked>0.
-    if (LLM.hasKey() && segReady && !ctx.routed?.length && ctx.bm25Count < AGENTIC_MIN_HITS) {
+    // Con fragmento localizado (refCount) el contexto ya es el correcto: sin ronda agéntica.
+    if (LLM.hasKey() && segReady && !ctx.routed?.length && !ctx.refCount && ctx.bm25Count < AGENTIC_MIN_HITS) {
       textNode.innerHTML = `<span class="ai-typing">${t('buscando en el libro…')}</span>`;
       ctx = await agenticGather(question, ctx, abortCtrl.signal);
     }

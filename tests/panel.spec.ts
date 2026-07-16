@@ -18,7 +18,7 @@ async function stubLLM(page) {
       const u = typeof url === 'string' ? url : url?.url || '';
       if (u.includes('/chat/completions') && opts?.body) {
         const body = JSON.parse(opts.body);
-        (window as any).__llm.calls.push({ stream: !!body.stream, tools: (body.tools || []).map((t: any) => t.function?.name) });
+        (window as any).__llm.calls.push({ stream: !!body.stream, tools: (body.tools || []).map((t: any) => t.function?.name), messages: body.messages });
         if (body.stream) {
           const chunks = [
             'data: {"choices":[{"delta":{"content":"Respuesta de prueba."},"finish_reason":null}]}\n\n',
@@ -166,4 +166,51 @@ test('el coach mark de flashcards aparece una vez y no reaparece', async ({ page
   await page.click('#ai-toggle');
   await page.waitForTimeout(400);
   await expect(page.locator('.ai-coachmark')).toHaveCount(0);
+});
+
+// Regresión: "subrayo → Preguntar al agente → '¿qué significa esto?'" decía a veces que no
+// veía el contexto. Causa: el retrieval buscaba solo con la pregunta cruda (deíctica: cero
+// aciertos útiles), el pasaje del fragmento no entraba en el EXTRACTO, y el system prompt
+// exige responder SOLO desde el extracto. El fix usa el fragmento (texto literal del libro)
+// para localizar su pasaje anclado y meterlo primero en el contexto.
+test('el fragmento adjunto entra ANCLADO en el extracto aunque la pregunta sea deíctica', async ({ page }) => {
+  await setup(page);
+  await ask(page, 'Comala Pedro Páramo pueblo');   // fuerza ensureIndex (el índice es perezoso)
+
+  // Fragmento literal de un pasaje "profundo" (fuera del capítulo actual del lector y sin
+  // las palabras de la pregunta): antes del fix, nada lo recuperaba.
+  const frag = await page.evaluate(async () => {
+    const R: any = await import('/js/ai/retrieval.js');
+    const all = R.allPassages();
+    const p = all.slice(Math.floor(all.length / 2)).find((x: any) => x.text.length > 150);
+    return { id: p.id, text: p.text.slice(0, 200) };
+  });
+
+  await page.evaluate(async (t) => {
+    const P: any = await import('/js/ai/panel.js');
+    P.quoteSelection(t);
+  }, frag.text);
+  await expect(page.locator('#ai-ref')).toBeVisible();   // chip de referencia adjunta
+
+  await page.evaluate(() => { (window as any).__llm.calls = []; });
+  await page.fill('#ai-input', '¿qué significa esto?');
+  await page.click('#ai-send');
+  await expect(page.locator('.ai-msg-assistant .ai-bubble-text').last()).toContainText('Respuesta de prueba', { timeout: 15000 });
+
+  const r = await page.evaluate((fid) => {
+    const calls = (window as any).__llm.calls;
+    const stream = calls.filter((c: any) => c.stream);
+    const last = stream[stream.length - 1];
+    const extract = (last?.messages || []).find((m: any) =>
+      m.role === 'user' && typeof m.content === 'string' && m.content.startsWith('EXTRACTO'))?.content || '';
+    return {
+      anchored: extract.includes(`[[${fid}]]`),                       // el pasaje del fragmento, anclado
+      agentic: calls.some((c: any) => (c.tools || []).includes('search_book')),   // no hace falta ronda agéntica
+      expansion: calls.some((c: any) => c.stream && (c.messages || []).some((m: any) =>
+        m.role === 'system' && /BÚSQUEDA por palabras clave/i.test(m.content))),  // ni expansión HyDE
+    };
+  }, frag.id);
+  expect(r.anchored).toBe(true);
+  expect(r.agentic).toBe(false);
+  expect(r.expansion).toBe(false);
 });
