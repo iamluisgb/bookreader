@@ -73,11 +73,21 @@ test.describe('EV1 · generación de artefactos @eval', () => {
       await page.click('#ai-flashcards .ai-ob-close');
 
       // Resumen (profundidad por defecto: Estándar).
+      // Un artefacto que falla en vivo es un RESULTADO del eval (gate 'resumen generado'
+      // en rojo → capa la nota), no un crash del arnés: se registra el error visible y
+      // se sigue, para no perder las tarjetas ya generadas de la batería.
       const tSum = Date.now();
+      let summaryError = '';
       await page.click('#ai-convo-summary');
       await page.waitForSelector('#ai-summary', { timeout: 10000 });
       await page.click('#sum-generate');
-      await expect(page.locator('#ai-summary .sum-doc')).toBeVisible({ timeout: 420000 });
+      try {
+        await expect(page.locator('#ai-summary .sum-doc')).toBeVisible({ timeout: 420000 });
+      } catch {
+        summaryError = (await page.locator('#ai-summary').innerText().catch(() => ''))
+          .split('\n').map(s => s.trim()).filter(Boolean).slice(0, 4).join(' · ').slice(0, 300) || 'timeout sin error visible';
+        console.warn(`[eval] ${battery.id}: el resumen NO se generó — ${summaryError}`);
+      }
       timings.summary = Date.now() - tSum;
 
       // Captura: artefactos persistidos + pasajes fuente (anclas [[aN]] → texto).
@@ -91,7 +101,7 @@ test.describe('EV1 · generación de artefactos @eval', () => {
         return { decks, artifacts, ratings, passages };
       });
       expect(data.decks.length, 'debe haber un mazo generado').toBeGreaterThan(0);
-      expect(data.artifacts.some((a: any) => a.kind === 'summary'), 'debe haber un resumen').toBe(true);
+      if (!summaryError) expect(data.artifacts.some((a: any) => a.kind === 'summary'), 'debe haber un resumen').toBe(true);
       expect(data.passages.length, 'el índice de pasajes debe estar poblado').toBeGreaterThan(10);
 
       fs.mkdirSync(RUN_DIR, { recursive: true });
@@ -101,7 +111,7 @@ test.describe('EV1 · generación de artefactos @eval', () => {
         battery: { id: battery.id, persona: battery.persona, goal: battery.goal, lang: battery.lang, goldenConcepts: battery.goldenConcepts },
         // uiLang: los prompts del RESUMEN siguen el idioma de la UI (P15), no el del libro;
         // las tarjetas salen en el idioma del libro. El scoring compara cada cosa con lo suyo.
-        meta: { model: MODEL, sha, date: new Date().toISOString(), fixture: battery.fixture, timings, uiLang: 'es' },
+        meta: { model: MODEL, sha, date: new Date().toISOString(), fixture: battery.fixture, timings, uiLang: 'es', summaryError: summaryError || undefined },
         ...data,
       }, null, 1));
       console.log(`[eval] ${battery.id} → ${path.relative(process.cwd(), RUN_DIR)}/${battery.id}.json`

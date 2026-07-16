@@ -5,6 +5,24 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-16 — EV1: comparativo de modelos con la batería — deepseek confirma, qwen descartado para artefactos
+
+Primer uso real del arnés ([resultados en `docs/EVALS.md`](docs/EVALS.md)): la misma
+batería (P1+P4) con `deepseek-v4-flash`, `qwen3.6` y `mimo-v2.5` como modelo principal.
+
+- **deepseek 4.4/4.0, sin incidencias** — sigue de principal (hipótesis ADR-022 ✓).
+- **qwen descartado para artefactos de valor**: generó las 15 tarjetas de Relativity
+  sobre la LICENCIA de Gutenberg (utilidad 1.0, cobertura 0/9 — la rúbrica multicriterio
+  lo cazó; una media simple lo tapaba) y el resumen le falló 2 de 3 intentos. En su
+  papel de modelo lite (ADR-022) funcionó bien en los 3 runs.
+- **mimo, la sorpresa**: tarjetas 4.8/4.8/4.8 con juez cruzado y el más rápido, pero
+  mezcla idiomas (gate rojo) y resumen débil en P4. Se queda en visión.
+- Arnés: `evals/compare.mjs` (tabla entre runs), runner tolerante a artefactos fallidos
+  (el fallo queda como gate rojo + `summaryError`, no como crash), reintento de red en
+  el cliente del juez y muestreo repartido de citas.
+- Derivados a investigar: reparto de cupo por chunks en flashcards.js ante bloques
+  fallidos; excluir back matter (licencia Gutenberg) del muestreo.
+
 ## 2026-07-16 — EV1 F1: batería de evals por persona, con fixtures reales y juez LLM
 
 Primera fase del plan de [`docs/EVALS.md`](docs/EVALS.md): medir la calidad REAL de los

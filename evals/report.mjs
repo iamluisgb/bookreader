@@ -54,6 +54,7 @@ for (const b of batteries) {
     + `${c.cards_dupes} duplicadas · resumen ${c.summary_chars} chars, ${c.summary_cites} citas (${c.summary_cites_valid} válidas)\n`;
   const failed = Object.entries(c.gates || {}).filter(([, ok]) => !ok).map(([k]) => k);
   if (failed.length) md += `\n**✗ Gates fallidos:** ${failed.join(' · ')}\n`;
+  if (b.meta?.summaryError) md += `\n**✗ El resumen no se generó:** ${b.meta.summaryError}\n`;
   md += `**Tiempos** (ms): ${JSON.stringify(b.meta?.timings || {})}\n`;
 
   const worst = (j.cards || []).filter(x => Math.min(x.fidelidad, x.atomicidad, x.utilidad) <= 2)

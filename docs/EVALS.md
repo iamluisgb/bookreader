@@ -7,7 +7,8 @@
 > ```
 > Piezas: `evals/batteries.mjs` (personas/objetivos/conceptos dorados) ·
 > `tests/evals.spec.ts` (generación con la app real) · `evals/check.mjs` (deterministas) ·
-> `evals/judge.mjs` (juez, `EVAL_JUDGE`, default mimo-v2.5) · `evals/report.mjs` (REPORT.md).
+> `evals/judge.mjs` (juez, `EVAL_JUDGE`, default mimo-v2.5) · `evals/report.mjs` (REPORT.md) ·
+> `evals/compare.mjs` (tabla entre runs, p. ej. comparativo de modelos).
 > Variables: `EVAL_MODEL` (modelo a evaluar), `EVAL_PHASE` (1|2), `EVAL_RUN` (nombre del run).
 > Salidas en `evals/runs/<run>/` (gitignored).
 
@@ -123,6 +124,36 @@ Validar ADR-022 y la propuesta de modelos: correr la batería completa con
 `deepseek-v4-flash` vs `qwen3.6` vs `mimo-v2.5` como modelo principal. Hipótesis a
 confirmar: (1) deepseek gana en flashcards/resumen (las tareas de valor), (2) qwen
 empata en expansión/atenuación siendo 3-4x más rápido, (3) dónde queda mimo en texto puro.
+
+### Resultado del comparativo (2026-07-16, 1 run/modelo, P1+P4; `node evals/compare.mjs`)
+
+| Modelo principal | Juez | P1 | P4 | Incidencias |
+|---|---|---|---|---|
+| `deepseek-v4-flash` | mimo | **4.4** | **4.0** | ninguna — el único consistente |
+| `qwen3.6` | mimo | 3.5* | 3.4 | ver abajo: el * es un deck inútil con nota inflada |
+| `mimo-v2.5` | deepseek | 2.0† | 3.6 | † capada por gate de idioma; sin capar ~4.6 |
+
+- **`deepseek-v4-flash` confirma la hipótesis (1):** decks temáticos repartidos por
+  capítulos, resúmenes fiables, cero incidencias en 2 baterías. Sigue de principal.
+- **`qwen3.6` queda descartado para artefactos de valor** (confirma la (2) por el lado
+  malo): en P1 generó **las 15 tarjetas sobre la licencia de Project Gutenberg**
+  (fidelidad 5.0 — ¡bien ancladas a la licencia! — utilidad 1.0, cobertura 0/9: la
+  rúbrica cazó exactamente esto, una media simple lo habría tapado); y el resumen de P4
+  falló 2 de 3 intentos con "El modelo no devolvió puntos". En su papel ADR-022
+  (expansión/atenuación) funcionó sin incidencias en los 3 runs.
+- **`mimo-v2.5`, la sorpresa:** tarjetas al nivel de deepseek según el juez cruzado
+  (4.8/4.8/4.8) y **el más rápido** (64-121s vs 110-133s), pero indisciplinado: mezcló
+  idiomas (4/14 tarjetas en español en un libro EN → gate rojo) y el resumen de P4 salió
+  débil (fidelidad 2, citas 2). Candidato a principal SI se le fija el idioma por prompt;
+  de momento se queda en visión.
+- **Derivados para el producto:** (a) el colapso de qwen sugiere que el reparto de cupo
+  por chunks no es robusto cuando un modelo responde mal en bloques intermedios —
+  revisar `allocateCounts`/reasignación en flashcards.js; (b) la licencia Gutenberg es
+  back matter y el muestreo la trata como capítulo — extender `isFrontMatter` o filtrar
+  back matter al trocear.
+- **Caveats:** 1 run por modelo (variancia del juez ±0.4), mimo juzgado por otro juez
+  (cross-familia obliga), 2 de 4 baterías. Filas de jueces distintos no se comparan
+  directamente.
 
 ## Fases
 
