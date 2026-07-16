@@ -145,6 +145,20 @@ export function isFrontMatter(label) {
   return !!n && FRONT_MATTER_RE.test(n);
 }
 
+// Back matter: licencias, notas del transcriptor, promoción ("elogios para…", "obras del
+// autor")… El eval EV1 destapó el caso real: en un EPUB de Gutenberg, el muestreo trató
+// "THE FULL PROJECT GUTENBERG™ LICENSE" como un capítulo más y un modelo generó el mazo
+// ENTERO sobre royalties. Misma filosofía conservadora que FRONT_MATTER_RE.
+const BACK_MATTER_RE = /^((the\s+)?full\s+project\s+gutenberg|project\s+gutenberg|licen(se|cia|cias)\b|legalese|transcriber|notas?\s+del?\s+transcriptor|elogios\s+(a|para)|praise\s+for|acerca\s+del?\s+(autor|autora|libro)|sobre\s+(el\s+autor|la\s+autora)|(otros|otras)\s+(titulos|obras|libros)|obras\s+del?\s+(mismo\s+)?autor|also\s+by\b)/;
+export function isBackMatter(label) {
+  const n = norm(label);
+  return !!n && BACK_MATTER_RE.test(n);
+}
+
+// Accesorio por delante o por detrás: lo que el muestreo de artefactos (flashcards,
+// resumen, mindmap) debe saltarse cuando el ámbito es el libro entero.
+export function isBoilerplate(label) { return isFrontMatter(label) || isBackMatter(label); }
+
 // Núcleo del título de un capítulo, sin el "9." ni el numeral romano/parte inicial.
 // "9. Consistency and Consensus" → "consistency and consensus".
 export function chapterCore(label) {

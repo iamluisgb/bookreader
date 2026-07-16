@@ -218,6 +218,9 @@ function gatherScope(scopeLabel) {
   if (scopeLabel) return Retrieval.passagesByChapter(scopeLabel);
   const byChapter = new Map();
   for (const p of Retrieval.allPassages()) {
+    // Libro entero: fuera accesorios (licencias, créditos, "elogios"…). El eval EV1 cazó
+    // un mazo ENTERO sobre la licencia de Gutenberg. Un capítulo elegido a mano se respeta.
+    if (Retrieval.isBoilerplate(p.chapter)) continue;
     const k = p.chapter || '';
     if (!byChapter.has(k)) byChapter.set(k, []);
     byChapter.get(k).push(p);
@@ -283,7 +286,16 @@ export function allocateCounts(chunks, total) {
   return counts;
 }
 
-function cardsPrompt(count, type, goal, { viaTool = false, prevFronts = [] } = {}) {
+// Idioma del material (es/en) por stopwords. La instrucción relativa ("el idioma de los
+// pasajes") no basta: con el objetivo del lector en español y un libro en inglés, el
+// modelo derivaba al español (regresión cazada por EV1) — nombrar el idioma la ancla.
+export function detectLang(text) {
+  const es = (String(text).match(/\b(el|la|los|las|de|del|que|una?|es|por|para|con)\b/gi) || []).length;
+  const en = (String(text).match(/\b(the|of|and|to|is|in|that|for|with|as)\b/gi) || []).length;
+  return es >= en ? 'es' : 'en';
+}
+
+function cardsPrompt(count, type, goal, { viaTool = false, prevFronts = [], lang = '' } = {}) {
   const shape = type === 'cloze'
     ? `- "front": una frase con el dato CLAVE oculto en sintaxis cloze de Anki: {{c1::texto oculto}}
   (máximo 2 huecos por tarjeta, {{c1::..}} y {{c2::..}}). Oculta términos/datos importantes, no palabras triviales.
@@ -307,10 +319,14 @@ ${prevFronts.map(f => '- ' + f).join('\n')}` : '';
 REGLAS DE CALIDAD (obligatorias):
 - Atómicas: UNA idea o hecho por tarjeta.
 - Autocontenidas: prohibido "según el texto", "en este capítulo" o "el autor" sin nombrarlo.
-- Prioriza conceptos, definiciones, relaciones causa-efecto y datos concretos; evita trivialidades.
+- Prioriza conceptos, definiciones, relaciones causa-efecto y datos concretos; evita trivialidades.${goal ? `
+- OBJETIVO DEL LECTOR: «${goal}». Pregunta primero lo que un examen sobre ese objetivo
+  preguntaría; descarta lo que no ayude a ese objetivo aunque esté en los pasajes.` : ''}
 - Sin tarjetas duplicadas ni casi iguales.
-- Escribe las tarjetas EN EL MISMO IDIOMA que los pasajes.${goal ? `
-- Cuando sea posible, alinéalas al objetivo del lector: «${goal}».` : ''}
+- IDIOMA: TODAS las tarjetas ${lang ? `en ${lang === 'es' ? 'ESPAÑOL' : 'INGLÉS'} (el idioma de los pasajes)` : 'en el idioma de los PASAJES'} —
+  no el de estas instrucciones ni el del objetivo del lector. Nunca mezcles idiomas entre tarjetas.
+- Material administrativo (licencias, copyright, créditos, índices, promoción) NO da
+  tarjetas: si los pasajes son solo eso, devuelve menos tarjetas o ninguna.
 
 ${format}
 ${shape}
@@ -388,14 +404,40 @@ export function parseCards(raw, type) {
   return sanitizeCards(objs, type);
 }
 
+// ¿El pasaje RESPALDA la tarjeta? Solapamiento de términos significativos (≥4 letras o
+// números, normalizados sin acentos) entre tarjeta y pasaje. El eval EV1 cazó anclas
+// léxicamente plausibles que apuntaban a otra escena: "clic → salta a la fuente" es el
+// foso del producto, así que un ancla equivocada es peor que ninguna. Umbral progresivo
+// (tarjetas cortas exigen menos) y conservador: sin texto no veta. Pura, testeable.
+const sigTerms = (s) => new Set(
+  String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .match(/[a-z]{4,}|\d{2,}/g) || []
+);
+export function anchorSupported(card, passageText) {
+  if (!passageText) return true;   // sin texto que juzgar: no vetar (compat/best-effort)
+  const want = sigTerms(`${card.front} ${card.back}`);
+  if (want.size < 2) return true;  // tarjeta casi sin términos: no hay señal para vetar
+  const have = sigTerms(passageText);
+  const hitsIn = (set) => { let n = 0; for (const t of set) if (have.has(t)) n++; return n; };
+  if (hitsIn(want) >= (want.size >= 8 ? 3 : 2)) return true;
+  // Tarjetas cortas ("¿A qué pueblo viaja? → A Comala"): las palabras de la PREGUNTA no
+  // suelen estar literales en el texto, pero la RESPUESTA es el dato — si el pasaje
+  // contiene todos sus términos, respalda la tarjeta.
+  const back = sigTerms(card.back);
+  return back.size > 0 && back.size <= 4 && hitsIn(back) === back.size;
+}
+
 // P10 F2 — asegura el ancla de origen de cada tarjeta: si el modelo no dio "src" (o dio
 // uno que no existe: los LLM inventan ids), se busca el mejor pasaje por BM25 con el
-// contenido de la tarjeta, prefiriendo su capítulo declarado. Best-effort: sin acierto,
-// la tarjeta queda sin fuente (el modo Estudiar simplemente no ofrece el salto).
-export function attachSources(cards, { validIds, search }) {
+// contenido de la tarjeta, prefiriendo su capítulo declarado. Con `textOf(id)` (opcional)
+// se valida además que el pasaje RESPALDE la tarjeta (anchorSupported) — también el src
+// que declaró el modelo, que puede existir y aun así ser de otra escena. Best-effort: sin
+// acierto, la tarjeta queda sin fuente (el modo Estudiar simplemente no ofrece el salto).
+export function attachSources(cards, { validIds, search, textOf }) {
+  const ok = (c, id) => !textOf || anchorSupported(c, textOf(id) || '');
   return cards.map(c => {
-    if (c.src && validIds.has(c.src)) return c;
-    const hits = search(`${c.front} ${c.back}`.trim(), 5) || [];
+    if (c.src && validIds.has(c.src) && ok(c, c.src)) return c;
+    const hits = (search(`${c.front} ${c.back}`.trim(), 5) || []).filter(h => ok(c, h.id));
     const best = hits.find(h => c.chapter && h.chapter === c.chapter) || hits[0];
     return { ...c, src: best ? best.id : '' };
   });
@@ -410,6 +452,7 @@ export function attachSources(cards, { validIds, search }) {
 // directos por ahí (no se re-prueba un camino roto en cada trozo).
 async function generateChunk({ text, ask, type, prevFronts, mode, signal }) {
   const user = { role: 'user', content: 'PASAJES DEL LIBRO:\n\n' + text };
+  const lang = detectLang(text);   // el prompt nombra el idioma del material (ver detectLang)
   // Cupo holgado por trozo: la salida es pequeña (≤ ask tarjetas) pero el razonamiento
   // de un modelo reasoning consume el mismo cupo.
   const maxTokens = Math.min(8192, 1500 + ask * 220);
@@ -421,7 +464,7 @@ async function generateChunk({ text, ask, type, prevFronts, mode, signal }) {
   const attempt = async (toolChoice, extra = []) => {
     const { toolCalls } = await LLM.chatTools({
       messages: [
-        { role: 'system', content: cardsPrompt(ask, type, ctx.goal, { viaTool: true, prevFronts }) },
+        { role: 'system', content: cardsPrompt(ask, type, ctx.goal, { viaTool: true, prevFronts, lang }) },
         user, ...extra,
       ],
       tools: cardsTool(), toolChoice, maxTokens, signal,
@@ -446,7 +489,7 @@ async function generateChunk({ text, ask, type, prevFronts, mode, signal }) {
     } catch (e) { if (e.name === 'AbortError') throw e; }
   }
   const raw = await LLM.chatStream({
-    messages: [{ role: 'system', content: cardsPrompt(ask, type, ctx.goal, { prevFronts }) }, user],
+    messages: [{ role: 'system', content: cardsPrompt(ask, type, ctx.goal, { prevFronts, lang }) }, user],
     maxTokens, signal,
   });
   return { cards: parseCards(raw, type), mode: 'text' };
@@ -475,7 +518,11 @@ async function onGenerate() {
     let cards = [], expected = 0, failed = 0, mode = 'forced';
     for (let i = 0; i < chunks.length; i++) {
       if (!counts[i]) continue;
-      const deficit = Math.max(0, expected - cards.length);
+      // Déficit arrastrado con TOPE: si varios trozos anteriores dieron poco (modelo con
+      // mal día), sin tope el último trozo absorbía el cupo entero — el eval EV1 cazó un
+      // mazo completo salido de un único capítulo. Mejor un mazo corto y repartido
+      // ("éxito parcial", ya avisado abajo) que uno completo y monotema.
+      const deficit = Math.min(Math.max(0, expected - cards.length), counts[i] + 2);
       expected += counts[i];
       try {
         const res = await generateChunk({
@@ -494,9 +541,11 @@ async function onGenerate() {
       btn.innerHTML = `<span class="ai-typing">Generando… ${Math.min(cards.length, count)}/${count}</span>`;
     }
     if (!cards.length) throw new Error(t('El modelo no devolvió tarjetas válidas. Vuelve a intentarlo.'));
+    const byId = new Map(Retrieval.allPassages().map(p => [p.id, p.text]));
     cards = attachSources(cards.slice(0, count), {
-      validIds: new Set(Retrieval.allPassages().map(p => p.id)),
+      validIds: new Set(byId.keys()),
       search: (q, k) => Retrieval.search(q, k),
+      textOf: (id) => byId.get(id),   // valida que el pasaje respalde la tarjeta (EV1)
     });
     const deck = {
       bookId: ctx.bookId, name: deckName(scopeLabel), cardType: type,

@@ -53,9 +53,15 @@ for (const b of loadBatteries(runDir)) {
     summary_lang_ok: !summary || langOf(summary.replace(/\[\[a\d+\]\]/g, '')) !== ((b.meta?.uiLang || 'es') === 'es' ? 'en' : 'es'),
   };
   // Gates: fallar cualquiera capa la nota del artefacto en el informe.
+  // Tras la validación semántica de anclas (EV1), una tarjeta puede quedar SIN ancla
+  // honestamente. Dos gates: toda ancla presente debe existir (100%) y la mayoría de
+  // tarjetas deben seguir ancladas (≥70% — si cae, la validación está vetando de más
+  // o el modelo declara src inservibles).
+  const withSrc = cards.filter(c => c.src);
   checks.gates = {
     'tarjetas generadas': checks.cards_total > 0,
-    'anclas de tarjeta válidas ≥90%': pct(checks.cards_src_valid, checks.cards_total) >= 90,
+    'anclas presentes 100% válidas': withSrc.every(c => ids.has(c.src)),
+    'tarjetas con ancla ≥70%': pct(withSrc.length, checks.cards_total) >= 70,
     'cloze bien formado': checks.cards_cloze_total === checks.cards_cloze_ok,
     'sin tarjetas duplicadas': checks.cards_dupes === 0,
     'idioma de tarjetas correcto ≥90%': pct(checks.cards_total - checks.cards_lang_bad, checks.cards_total) >= 90,

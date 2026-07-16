@@ -346,3 +346,43 @@ test('el mazo generado persiste con ancla de origen por tarjeta (repesca real)',
   expect(srcs).toHaveLength(3);
   for (const s of srcs) expect(s).toMatch(/^a\d+$/);
 });
+
+test('anchorSupported y attachSources con textOf: vetan anclas que no respaldan la tarjeta', async ({ page }) => {
+  await page.goto('/index.html');
+  const r = await page.evaluate(async () => {
+    const F: any = await import('/js/ai/flashcards.js');
+    const P: Record<string, string> = {
+      a1: 'Pedro Páramo le dijo a Fulgor Sedano que la tierra de Galileo pronto sería suya, con deuda o sin ella.',
+      a2: 'Me volverás a ver, ya lo verás. Por mí no tengas cuidado; mi madre me curtió bien el pellejo.',
+    };
+    const card = {
+      front: '¿Qué advertencia recibe Galileo sobre su tierra?',
+      back: 'Que aunque la crea suya, todo será de Pedro Páramo; Fulgor irá a cobrar.',
+      chapter: 'Pedro Páramo', src: 'a2',   // ancla VÁLIDA pero de otra escena
+    };
+    const textOf = (id: string) => P[id];
+    const attached = F.attachSources([card], {
+      validIds: new Set(['a1', 'a2']),
+      // BM25 stubbeado: devuelve primero la escena equivocada, luego la buena.
+      search: () => [{ id: 'a2', chapter: 'Pedro Páramo' }, { id: 'a1', chapter: 'Pedro Páramo' }],
+      textOf,
+    });
+    const none = F.attachSources([card], {
+      validIds: new Set(['a2']),
+      search: () => [{ id: 'a2', chapter: 'Pedro Páramo' }],   // solo hay pasajes que NO respaldan
+      textOf,
+    });
+    return {
+      supportedGood: F.anchorSupported(card, P.a1),
+      supportedBad: F.anchorSupported(card, P.a2),
+      neutralNoText: F.anchorSupported(card, ''),          // sin texto: no veta
+      rescued: attached[0].src,                             // veta a2 y repesca a1
+      honest: none[0].src,                                  // sin pasaje que respalde → sin ancla
+    };
+  });
+  expect(r.supportedGood).toBe(true);
+  expect(r.supportedBad).toBe(false);
+  expect(r.neutralNoText).toBe(true);
+  expect(r.rescued).toBe('a1');
+  expect(r.honest).toBe('');
+});

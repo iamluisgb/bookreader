@@ -113,7 +113,7 @@ function gatherScope(label, budget = BOOK_TOKENS) {
   if (label) return Retrieval.passagesByChapter(label);
   const byChapter = new Map();
   for (const p of Retrieval.allPassages()) {
-    if (Retrieval.isFrontMatter(p.chapter)) continue;   // fuera cubierta/índice/prólogo…
+    if (Retrieval.isBoilerplate(p.chapter)) continue;   // fuera cubierta/índice/prólogo/licencias…
     const k = p.chapter || '';
     if (!byChapter.has(k)) byChapter.set(k, []);
     byChapter.get(k).push(p);
@@ -149,6 +149,9 @@ function pointsPrompt(goal, bulletsRange) {
 REGLAS:
 - Devuelve ${bulletsRange} viñetas Markdown ("- ..."), una idea por viñeta.
 - Cada viñeta TERMINA con el marcador del pasaje del que sale, entre dobles corchetes: [[aN]] (usa el id que precede a cada pasaje).
+- La cita debe ser el pasaje que CONTIENE la afirmación (quien lo abra debe poder leer ese
+  dato ahí), no uno meramente relacionado con el tema. Si ningún pasaje respalda un punto,
+  NO incluyas ese punto.
 - Autocontenidas y concretas; nada de "según el texto" ni relleno.
 ${langRule(goal)}${goal ? `\n- Prioriza lo relevante para: «${goal}».` : ''}
 Responde SOLO con las viñetas, sin encabezados ni texto alrededor.`;
@@ -204,18 +207,28 @@ function onGenerate() {
 // El bucle map-reduce, desacoplado del modal: recibe `signal` y `progress(i,n,phase)`.
 async function runSummary({ chunks, depth, goal, scopeName, signal, progress }) {
   const bullets = [];
-  for (let i = 0; i < chunks.length; i++) {
+  // Un trozo que no produce viñetas se reintenta UNA vez antes de darlo por perdido:
+  // algunos modelos fallan el formato de forma intermitente (EV1: "no devolvió puntos"
+  // 2 de 3 intentos con el mismo libro) y un segundo tiro suele bastar.
+  const mapChunk = async (chunk) => {
     const raw = await LLM.chatStream({
       messages: [
         { role: 'system', content: pointsPrompt(goal, depth.bullets) },
-        { role: 'user', content: 'PASAJES DEL LIBRO:\n\n' + chunks[i].text },
+        { role: 'user', content: 'PASAJES DEL LIBRO:\n\n' + chunk.text },
       ],
       maxTokens: 1500, signal,   // holgura para modelos de razonamiento
     });
+    const out = [];
     for (const line of String(raw || '').split('\n')) {
       const t = line.trim();
-      if (t.startsWith('- ') || t.startsWith('* ')) bullets.push('- ' + t.slice(2).trim());
+      if (t.startsWith('- ') || t.startsWith('* ')) out.push('- ' + t.slice(2).trim());
     }
+    return out;
+  };
+  for (let i = 0; i < chunks.length; i++) {
+    let out = await mapChunk(chunks[i]);
+    if (!out.length) out = await mapChunk(chunks[i]);
+    bullets.push(...out);
     progress(i + 1, chunks.length, 'map');
   }
   if (!bullets.length) throw new Error(t('El modelo no devolvió puntos. Vuelve a intentarlo.'));

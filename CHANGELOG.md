@@ -5,6 +5,42 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-16 — Las 7 mejoras que destapó la batería de evals (anclaje, muestreo, prompts, reintentos)
+
+Primer ciclo completo del bucle de mejora de [`docs/EVALS.md`](docs/EVALS.md): fallo
+detectado → arreglo → re-run de la batería.
+
+- **Validación semántica de anclas** ([`js/ai/flashcards.js`](app/js/ai/flashcards.js)):
+  `anchorSupported` veta anclas que no RESPALDAN la tarjeta (solapamiento de términos
+  significativos, con vía corta si el pasaje contiene la respuesta entera); se valida
+  también el `src` que declaró el modelo, no solo la repesca BM25. Una tarjeta sin
+  pasaje que la respalde queda SIN ancla (honesto) en vez de con ancla equivocada —
+  "clic → salta a la fuente" es el foso; el eval cazó anclas de otra escena.
+- **Back matter fuera del muestreo** ([`js/ai/retrieval.js`](app/js/ai/retrieval.js)):
+  `isBackMatter`/`isBoilerplate` (licencias, notas del transcriptor, "elogios", "acerca
+  del autor"…); flashcards, resumen y mindmap lo excluyen en ámbito libro. Caso real:
+  un mazo entero sobre la licencia de Gutenberg. Conservador: apéndices y capítulos
+  numerados NUNCA se vetan.
+- **Tope al déficit arrastrado** entre trozos de flashcards: sin tope, varios trozos
+  flojos volcaban el cupo entero en el último (así salió el mazo-licencia). Mejor mazo
+  corto y repartido que completo y monotema.
+- **Prompt de tarjetas**: el objetivo del lector pasa de sugerencia a criterio rector
+  ("pregunta lo que un examen sobre ese objetivo preguntaría"), idioma como regla dura
+  (nunca mezclar — mimo mezcló ES/EN), y veto explícito a material administrativo.
+- **Prompt de puntos del resumen**: la cita debe CONTENER la afirmación, no ser del
+  tema; un punto sin pasaje que lo respalde no se incluye (pertinencia 3-4/5 en evals).
+- **Reintento del trozo de puntos vacío** en el resumen (1 reintento): "El modelo no
+  devolvió puntos" era intermitente (2 de 3 con qwen).
+- Checks del eval recalibrados: anclas presentes 100% válidas + tarjetas con ancla ≥70%
+  (la validación puede dejar tarjetas sin ancla a propósito).
+- Tests: `isBackMatter`/`isBoilerplate` (retrieval.spec) y `anchorSupported`/
+  `attachSources` con veto y repesca (flashcards.spec).
+- **Resultado del re-run** (deepseek): p1-estudiante **4.4 → 4.8** (cobertura 5/9 → 7/9,
+  citas 4 → 5, anclas validadas); p4 dentro del ruido del juez (±0.5). **Y el bucle cazó
+  una regresión de este mismo cambio**: el objetivo (en ES) prominente arrastró las
+  tarjetas al español en un libro EN — dos gates en rojo. Fix: `detectLang` nombra el
+  idioma del material en el prompt. Detalle en [`docs/EVALS.md`](docs/EVALS.md) §Primer ciclo.
+
 ## 2026-07-16 — EV1: comparativo de modelos con la batería — deepseek confirma, qwen descartado para artefactos
 
 Primer uso real del arnés ([resultados en `docs/EVALS.md`](docs/EVALS.md)): la misma

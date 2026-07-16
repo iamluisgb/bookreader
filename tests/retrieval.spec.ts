@@ -118,3 +118,38 @@ test('eval recall@k del retrieval sobre corpus sintético', async ({ page }) => 
   console.log('recall@3 =', recall);
   expect(recall).toBe(1);          // el arnés: floor de recall (regresión si baja)
 });
+
+test('isBackMatter/isBoilerplate: licencias y promo fuera; capítulos y apéndices dentro', async ({ page }) => {
+  await page.goto('/');
+  const r = await page.evaluate(async () => {
+    const R = await import('/js/ai/retrieval.js');
+    return {
+      license: R.isBackMatter('THE FULL PROJECT GUTENBERG™ LICENSE'),
+      licencia: R.isBackMatter('Licencia'),
+      transcriber: R.isBackMatter("Transcriber's Notes"),
+      elogios: R.isBackMatter('Elogios para Pedro Páramo'),
+      acerca: R.isBackMatter('Acerca del autor'),
+      alsoBy: R.isBackMatter('Also by Juan Rulfo'),
+      // Contenido REAL que no debe vetarse (conservador a propósito):
+      appendix: R.isBackMatter('APPENDIX III THE EXPERIMENTAL CONFIRMATION'),
+      chapter: R.isBackMatter('XI. THE LORENTZ TRANSFORMATION'),
+      novela: R.isBackMatter('Pedro Páramo'),
+      // isBoilerplate = unión con el front matter existente:
+      boilerCover: R.isBoilerplate('Cover'),
+      boilerLicense: R.isBoilerplate('License'),
+      boilerChapter: R.isBoilerplate('9. Consistency and Consensus'),
+    };
+  });
+  expect(r.license).toBe(true);
+  expect(r.licencia).toBe(true);
+  expect(r.transcriber).toBe(true);
+  expect(r.elogios).toBe(true);
+  expect(r.acerca).toBe(true);
+  expect(r.alsoBy).toBe(true);
+  expect(r.appendix).toBe(false);
+  expect(r.chapter).toBe(false);
+  expect(r.novela).toBe(false);
+  expect(r.boilerCover).toBe(true);
+  expect(r.boilerLicense).toBe(true);
+  expect(r.boilerChapter).toBe(false);
+});

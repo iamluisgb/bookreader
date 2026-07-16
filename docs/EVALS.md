@@ -194,3 +194,21 @@ fallo detectado → clasificar (prompt / retrieval / modelo / parsing) → arreg
 de SU batería → si mejora sin degradar el resto, entra; el ejemplo que falló se queda en
 la batería como caso de regresión. Las listas doradas crecen con los fallos reales de
 usuarios (cuando haya feedback), no especulando.
+
+### Primer ciclo completado (2026-07-16): 7 mejoras + 1 regresión cazada
+
+Se implementaron las mejoras de §Primeros hallazgos (validación semántica de anclas,
+back matter fuera del muestreo, tope al déficit por chunk, objetivo e idioma en el
+prompt de tarjetas, pertinencia de citas en el de puntos, reintento del chunk vacío) y
+se re-corrió la batería con deepseek:
+
+- **p1-estudiante: 4.4 → 4.8** — cobertura dorada 5/9 → 7/9, pertinencia de citas 4 → 5,
+  anclas 15/15 y ahora validadas semánticamente. Con soporte determinista, no solo juez.
+- **p4-noficcion: sin cambio medible** — el MISMO artefacto puntuó 4.2 y 3.7 en dos
+  pasadas del juez; su cobertura también subió (4/8 → 5-7/8). Deltas < ±0.5 no son señal
+  con un solo juez: refuerza el doble juez de F3.
+- **La regresión que el bucle cazó:** el objetivo del lector (en español) prominente en
+  el prompt arrastró a deepseek a escribir tarjetas en ESPAÑOL sobre el libro inglés; la
+  validación de anclas las vetó (3/15) y saltaron DOS gates. Fix: `detectLang` nombra el
+  idioma del material en el prompt (la instrucción relativa "el idioma de los pasajes"
+  no bastaba). Sin la batería, esa regresión llegaba a producción invisible.
