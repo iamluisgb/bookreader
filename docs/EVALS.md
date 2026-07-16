@@ -1,5 +1,16 @@
 # EVALS — Batería de calidad por persona (LLM-as-judge)
 
+> **F1 implementada (2026-07-16).** Cómo se usa:
+> ```
+> npm run eval:fixtures   # descarga los libros (evals/fetch-fixtures.mjs)
+> npm run eval            # genera (@eval, Playwright + API real) y puntúa (checks + juez + informe)
+> ```
+> Piezas: `evals/batteries.mjs` (personas/objetivos/conceptos dorados) ·
+> `tests/evals.spec.ts` (generación con la app real) · `evals/check.mjs` (deterministas) ·
+> `evals/judge.mjs` (juez, `EVAL_JUDGE`, default mimo-v2.5) · `evals/report.mjs` (REPORT.md).
+> Variables: `EVAL_MODEL` (modelo a evaluar), `EVAL_PHASE` (1|2), `EVAL_RUN` (nombre del run).
+> Salidas en `evals/runs/<run>/` (gitignored).
+
 > Plan (2026-07-16). Objetivo: medir la calidad REAL de los artefactos del agente
 > (flashcards, resumen citado, mapa mental, chat) por **caso de uso/cliente ideal**, con
 > rúbricas y juez LLM — para decidir mejoras de prompt/modelo con datos y detectar
@@ -121,6 +132,30 @@ empata en expansión/atenuación siendo 3-4x más rápido, (3) dónde queda mimo
   trampa, listas doradas de conceptos y ranking dorado de TOC por fixture.
 - **F3** `S` — Informe comparativo de modelos (el "primer uso" de arriba), doble juez y
   medición de acuerdo, deltas entre runs.
+
+## Primeros hallazgos (run F1, 2026-07-16, `deepseek-v4-flash` + juez `mimo-v2.5`)
+
+Notas: p1-estudiante **4.4** · p4-noficcion **4.0** (entre pasadas del juez la media por
+criterio varía ±0.4 — la medición de acuerdo entre jueces de F3 pondrá barras de error).
+Todos los gates deterministas pasan (anclas 100% válidas, 0 duplicados, citas del resumen
+100% resolubles). Lo accionable:
+
+1. **Anclaje de tarjetas, el fallo nº1.** Las anclas son *válidas* pero a veces apuntan a
+   un pasaje que NO respalda la tarjeta (p. ej. la tarjeta sobre Galileo/el cuñado en
+   Pedro Páramo ancla a un pasaje de otra escena). Es el fallback BM25 de
+   `attachSources` (P10 F2) eligiendo el mejor *léxico*, no el mejor *semántico*. Las
+   fidelidades bajas del juez son en parte esto (ancla equivocada) y en parte
+   extrapolación real del modelo — la taxonomía del bucle debe separar ambos.
+2. **Cobertura floja (5/9 y 4/8 conceptos dorados).** El muestreo por capítulos trata
+   igual el prólogo ("Asombro por Juan Rulfo") que el texto, y nada orienta las tarjetas
+   al objetivo declarado. Mejora candidata: pasar el objetivo/conceptos al prompt de
+   flashcards y saltar front matter (`isFrontMatter` ya existe en retrieval.js).
+3. **Pertinencia de citas del resumen: 3-4/5.** Válidas pero no siempre respaldan *ese*
+   punto. Es el foso del producto: subir esto es prioridad de prompt (pedir cita que
+   contenga la afirmación, no el tema).
+4. **Del arnés:** el idioma esperado difiere por artefacto (resumen = idioma UI por P15;
+   tarjetas = idioma del libro) — ya calibrado. El juez recibe una muestra repartida de
+   pasajes citados y no penaliza los no incluidos.
 
 ## Mejora continua (el bucle)
 

@@ -34,4 +34,13 @@ export default [
       globals: { ...globals.serviceworker },
     },
   },
+  {
+    // Scripts de evals (EV1) y utilidades: Node ESM.
+    files: ['evals/**/*.mjs', 'scripts/**/*.mjs'],
+    languageOptions: {
+      ecmaVersion: 2022,
+      sourceType: 'module',
+      globals: { ...globals.node },
+    },
+  },
 ];

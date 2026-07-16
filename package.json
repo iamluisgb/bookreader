@@ -10,8 +10,12 @@
     "url": "https://github.com/iamluisgb/bookreader.git"
   },
   "scripts": {
-    "test": "playwright test --grep-invert @live",
+    "test": "playwright test --grep-invert \"@live|@eval\"",
     "test:ai": "playwright test --grep @live",
+    "eval:fixtures": "node evals/fetch-fixtures.mjs",
+    "eval:gen": "playwright test --grep @eval",
+    "eval:score": "node evals/check.mjs && node evals/judge.mjs && node evals/report.mjs",
+    "eval": "npm run eval:gen && npm run eval:score",
     "lint": "eslint app/js app/sw.js sw.js",
     "format": "prettier --write \"**/*.{js,css,html,json,md}\"",
     "format:check": "prettier --check \"**/*.{js,css,html,json,md}\""

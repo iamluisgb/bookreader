@@ -8,3 +8,9 @@ node_modules/
 test-results/
 playwright-report/
 playwright/.cache/
+
+# Evals (docs/EVALS.md): los libros fixture se descargan (evals/fetch-fixtures.mjs)
+# y los runs son salidas locales — solo se versionan los scripts y el README.
+evals/fixtures/*
+!evals/fixtures/README.md
+evals/runs/

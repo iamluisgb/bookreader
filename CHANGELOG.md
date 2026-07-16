@@ -5,6 +5,29 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-16 — EV1 F1: batería de evals por persona, con fixtures reales y juez LLM
+
+Primera fase del plan de [`docs/EVALS.md`](docs/EVALS.md): medir la calidad REAL de los
+artefactos por persona del LAUNCH_PLAN, con libros de verdad y la app de verdad.
+
+- **Fixtures con licencia libre** (`npm run eval:fixtures`): Einstein *Relativity*
+  (Gutenberg, P1 estudiante), *Pro Git 2* (CC, P2 técnico), Constitución BOE en PDF
+  (P3 opositor) y el Pedro Páramo del repo (P4). Fuentes/licencias en
+  [`evals/fixtures/README.md`](evals/fixtures/README.md); no se versionan.
+- **Runner de generación** ([`tests/evals.spec.ts`](tests/evals.spec.ts), tag `@eval`,
+  fuera de `npm test`): recorre la app REAL contra la API real — onboarding con el
+  objetivo de la persona, flashcards y resumen por la UI de producción — y vuelca
+  artefactos + pasajes fuente a `evals/runs/<run>/`.
+- **Scoring en dos capas** (`npm run eval:score`): checks deterministas que CAPAN la
+  nota ([`evals/check.mjs`](evals/check.mjs): anclas, cloze, duplicados, idioma, citas)
+  y juez LLM de otra familia con rúbrica por persona ([`evals/judge.mjs`](evals/judge.mjs):
+  fidelidad/atomicidad/utilidad por tarjeta con su pasaje delante, cobertura contra
+  conceptos dorados, pertinencia de citas del resumen).
+- **Informe** ([`evals/report.mjs`](evals/report.mjs)): REPORT.md con nota por batería,
+  gates y los peores ejemplos (el material de mejora).
+- `npm run eval` = generar + puntuar. `EVAL_MODEL`/`EVAL_JUDGE`/`EVAL_PHASE` para el
+  comparativo de modelos (primer uso previsto del arnés, ver EVALS.md).
+
 ## 2026-07-16 — Modelo lite para llamadas auxiliares (routing por tarea, ADR-022)
 
 Las llamadas auxiliares del agente —expansión de consulta (IA7) y atenuación del TOC (T8)—
