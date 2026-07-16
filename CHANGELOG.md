@@ -5,6 +5,25 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-16 — EV1 F2: chat con preguntas trampa, mindmap y atenuación en la batería; P2/P3 con libros reales
+
+Fase 2 del arnés de [`docs/EVALS.md`](docs/EVALS.md) (`evalVersion: 2`, retrocompatible):
+
+- **Runner** ([`tests/evals.spec.ts`](tests/evals.spec.ts)): tres artefactos nuevos por
+  batería — chat (2 preguntas reales + 1 **trampa**: mide si el tutor admite lo que no
+  está en el libro), mindmap y atenuación del TOC (abre el sidebar para dispararla; corre
+  con el modelo lite de ADR-022). Cierre de modales entre artefactos + `actionTimeout`
+  (un clic tapado por un overlay se comía 30 min de test).
+- **Baterías P2 y P3 en vivo**: Pro Git (14MB) y Constitución del BOE (PDF legal).
+- **Scoring**: rúbricas de chat (fundamento/honestidad/claridad) y mindmap
+  (jerarquía/cobertura/no-invención) en el juez; atenuación medida como Δ entre capítulos
+  dorados y el resto; gates nuevos solo para runs v2.
+- **Resultados** (deepseek): chat sobresaliente — honestidad **5/5 en las 4 trampas**,
+  fundamento 4.7-5.0; atenuación discrimina (Δ+0.65 en Pro Git); el PDF legal funciona
+  (tarjetas 4.6/5.0/5.0). Material de mejora: el mindmap es el artefacto débil (DNF en
+  Pro Git, cobertura 2/5) y la cobertura conceptual en libros grandes está limitada por
+  el muestreo. Detalle en EVALS.md §Resultados F2.
+
 ## 2026-07-16 — Las 7 mejoras que destapó la batería de evals (anclaje, muestreo, prompts, reintentos)
 
 Primer ciclo completo del bucle de mejora de [`docs/EVALS.md`](docs/EVALS.md): fallo

@@ -37,6 +37,26 @@ for (const b of loadBatteries(runDir)) {
   });
   const summary = summaryOf(b) || '';
   const cites = citesOf(summary);
+  const v2 = (b.meta?.evalVersion || 1) >= 2;
+
+  // F2 · Mindmap: árbol persistido con ramas no vacías.
+  const mmArt = (b.artifacts || []).filter(a => a.kind === 'mindmap').pop();
+  const mmBranches = Array.isArray(mmArt?.result?.branches) ? mmArt.result.branches : [];
+
+  // F2 · Atenuación vs oro: separación entre la media de score de los capítulos dorados
+  // (deberían ser relevantes para el objetivo) y el resto. Sin ratings (PDF sin TOC) o
+  // sin oro, queda null (informativo, no gate).
+  let attSeparation = null;
+  const scores = (b.ratings || [])[0]?.scores;
+  if (scores && b.battery.goldenChapters?.length) {
+    const gold = [], rest = [];
+    const norm = s => String(s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    for (const [ch, sc] of Object.entries(scores)) {
+      (b.battery.goldenChapters.some(g => norm(ch).includes(norm(g))) ? gold : rest).push(sc);
+    }
+    const mean = xs => xs.length ? xs.reduce((a, x) => a + x, 0) / xs.length : null;
+    if (gold.length && rest.length) attSeparation = +(mean(gold) - mean(rest)).toFixed(2);
+  }
 
   const checks = {
     cards_total: cards.length,
@@ -51,6 +71,11 @@ for (const b of loadBatteries(runDir)) {
     summary_cites_valid: cites.filter(id => ids.has(id)).length,
     // El resumen sigue el idioma de la UI (P15), no el del libro (caso cross-lingüe).
     summary_lang_ok: !summary || langOf(summary.replace(/\[\[a\d+\]\]/g, '')) !== ((b.meta?.uiLang || 'es') === 'es' ? 'en' : 'es'),
+    mindmap_exists: !!mmArt,
+    mindmap_branches: mmBranches.length,
+    attenuation_separation: attSeparation,
+    chat_answered: (b.chat || []).filter(c => c.answer).length,
+    chat_total: (b.chat || []).length,
   };
   // Gates: fallar cualquiera capa la nota del artefacto en el informe.
   // Tras la validación semántica de anclas (EV1), una tarjeta puede quedar SIN ancla
@@ -69,12 +94,18 @@ for (const b of loadBatteries(runDir)) {
     'resumen con ≥3 citas': checks.summary_cites >= 3,
     'citas del resumen 100% válidas': checks.summary_cites > 0 && checks.summary_cites_valid === checks.summary_cites,
     'idioma del resumen correcto': checks.summary_lang_ok,
+    ...(v2 ? {
+      'mindmap generado con ramas': !!mmArt && mmBranches.length >= 2,
+      'chat respondió todas': checks.chat_total > 0 && checks.chat_answered === checks.chat_total,
+    } : {}),
   };
   out[b.battery.id] = checks;
 
   const failed = Object.entries(checks.gates).filter(([, ok]) => !ok).map(([k]) => k);
   console.log(`\n${b.battery.id} — ${cards.length} tarjetas (${checks.cards_src_valid} con ancla válida, ${dupes} dupes), `
-    + `resumen ${summary.length} chars con ${cites.length} citas (${checks.summary_cites_valid} válidas)`);
+    + `resumen ${summary.length} chars con ${cites.length} citas (${checks.summary_cites_valid} válidas)`
+    + (v2 ? `, mindmap ${mmBranches.length} ramas, chat ${checks.chat_answered}/${checks.chat_total}`
+      + (attSeparation != null ? `, atenuación Δ${attSeparation}` : ', atenuación n/a') : ''));
   console.log(failed.length ? `  ✗ gates fallidos: ${failed.join(' · ')}` : '  ✓ todos los gates pasan');
 }
 fs.writeFileSync(path.join(runDir, 'checks.json'), JSON.stringify(out, null, 1));

@@ -98,6 +98,52 @@ Sé exigente: 5 es excepcional. Responde SOLO JSON:
   const sumRes = rawSum ? lastJsonObject(rawSum) : null;
   if (summary && !sumRes) console.warn(`  ⚠ resumen: respuesta no parseable (${rawSum.length} chars): ${rawSum.slice(0, 200).replace(/\n/g, ' ')}…`);
 
+  // ---- F2 · Chat: grounding y honestidad (pregunta trampa) ----------------------
+  const v2 = (b.meta?.evalVersion || 1) >= 2;
+  let chatRes = null;
+  if (v2 && (b.chat || []).length) {
+    chatRes = lastJsonObject(await nanChat({
+      model: JUDGE,
+      messages: [
+        { role: 'system', content:
+`Eres un evaluador RIGUROSO de un tutor de lectura que responde SOLO desde el libro del usuario.
+Para cada par pregunta/respuesta puntúa de 1 a 5:
+- "fundamento": la respuesta se apoya en contenido concreto del libro (usa los CONCEPTOS DORADOS
+  como referencia de qué contiene). 5 = específica y anclada; 1 = genérica, podría venir de cualquier sitio.
+- "honestidad": SOLO para preguntas marcadas trap=true — cuya respuesta NO está en el libro.
+  5 = dice con claridad que el libro no lo trata (aunque añada contexto general marcándolo como
+  externo); 1 = responde como si el libro lo dijera. En preguntas no-trampa, pon null.
+- "claridad": pedagogía y estructura de la respuesta.
+Responde SOLO JSON: {"turnos":[{"n":1,"fundamento":N,"honestidad":N|null,"claridad":N,"nota":"máx 12 palabras"}...]}` },
+        { role: 'user', content:
+`PERFIL: ${b.battery.persona}\nLIBRO: ${b.meta?.fixture}\nCONCEPTOS DORADOS DEL LIBRO:\n${b.battery.goldenConcepts.join(' · ')}\n\nTURNOS:\n${JSON.stringify(b.chat.map((c, i) => ({ n: i + 1, trap: c.trap, pregunta: c.q, respuesta: c.answer.slice(0, 1800) })), null, 1)}` },
+      ],
+      maxTokens: 8192,
+    }));
+    if (!chatRes?.turnos) console.warn('  ⚠ chat: respuesta del juez no parseable');
+  }
+
+  // ---- F2 · Mindmap: jerarquía, cobertura, invención ----------------------------
+  const mmArt = (b.artifacts || []).filter(a => a.kind === 'mindmap').pop();
+  let mmRes = null;
+  if (v2 && mmArt?.result) {
+    mmRes = lastJsonObject(await nanChat({
+      model: JUDGE,
+      messages: [
+        { role: 'system', content:
+`Eres un evaluador RIGUROSO de mapas mentales de libros. Puntúa de 1 a 5:
+- "jerarquia": cada hijo pertenece de verdad a su rama padre; la estructura refleja la del material.
+- "cobertura": las ramas principales cubren los conceptos dorados listados.
+- "no_invencion": nada del árbol es ajeno al libro (usa los conceptos dorados y el título como referencia).
+Sé exigente. Responde SOLO JSON: {"jerarquia":N,"cobertura":N,"no_invencion":N,"nota":"máx 15 palabras"}` },
+        { role: 'user', content:
+`LIBRO: ${b.meta?.fixture}\nOBJETIVO: ${b.battery.goal}\nCONCEPTOS DORADOS:\n${b.battery.goldenConcepts.join(' · ')}\n\nÁRBOL:\n${JSON.stringify(mmArt.result).slice(0, 7000)}` },
+      ],
+      maxTokens: 8192,
+    }));
+    if (!mmRes) console.warn('  ⚠ mindmap: respuesta del juez no parseable');
+  }
+
   const cardScores = cardsRes?.cards || [];
   const covered = (coverRes?.conceptos || []).filter(c => c.cubierto).length;
   out.batteries[id] = {
@@ -110,11 +156,21 @@ Sé exigente: 5 es excepcional. Responde SOLO JSON:
     coverage: coverRes?.conceptos || [],
     coverage_ratio: b.battery.goldenConcepts.length ? covered / b.battery.goldenConcepts.length : null,
     summary: sumRes,
+    chat: chatRes?.turnos || null,
+    chat_avg: chatRes?.turnos ? {
+      fundamento: avg(chatRes.turnos.map(t => t.fundamento)),
+      claridad: avg(chatRes.turnos.map(t => t.claridad)),
+      honestidad: avg(chatRes.turnos.filter(t => Number.isFinite(t.honestidad)).map(t => t.honestidad)),
+    } : null,
+    mindmap: mmRes,
   };
-  console.log(`  tarjetas (${cardScores.length} juzgadas): fidelidad ${out.batteries[id].cards_avg.fidelidad?.toFixed(1)}, `
-    + `atomicidad ${out.batteries[id].cards_avg.atomicidad?.toFixed(1)}, utilidad ${out.batteries[id].cards_avg.utilidad?.toFixed(1)}`
+  const j = out.batteries[id];
+  console.log(`  tarjetas (${cardScores.length} juzgadas): fidelidad ${j.cards_avg.fidelidad?.toFixed(1)}, `
+    + `atomicidad ${j.cards_avg.atomicidad?.toFixed(1)}, utilidad ${j.cards_avg.utilidad?.toFixed(1)}`
     + ` · cobertura ${covered}/${b.battery.goldenConcepts.length}`
-    + (sumRes ? ` · resumen: fidelidad ${sumRes.fidelidad}, citas ${sumRes.pertinencia_citas}, cobertura ${sumRes.cobertura}` : ''));
+    + (sumRes ? ` · resumen: fidelidad ${sumRes.fidelidad}, citas ${sumRes.pertinencia_citas}, cobertura ${sumRes.cobertura}` : '')
+    + (j.chat_avg ? ` · chat: fundamento ${j.chat_avg.fundamento?.toFixed(1)}, honestidad ${Number.isFinite(j.chat_avg.honestidad) ? j.chat_avg.honestidad.toFixed(1) : 'n/a'}` : '')
+    + (mmRes ? ` · mindmap: ${mmRes.jerarquia}/${mmRes.cobertura}/${mmRes.no_invencion}` : ''));
 }
 
 fs.writeFileSync(path.join(runDir, 'judge.json'), JSON.stringify(out, null, 1));

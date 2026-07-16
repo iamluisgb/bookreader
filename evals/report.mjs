@@ -35,6 +35,8 @@ for (const b of batteries) {
     j.cards_avg?.fidelidad, j.cards_avg?.atomicidad, j.cards_avg?.utilidad,
     j.coverage_ratio != null ? 1 + 4 * j.coverage_ratio : NaN,   // ratio 0..1 → escala 1..5
     s.fidelidad, s.pertinencia_citas, s.cobertura, s.concision,
+    j.chat_avg?.fundamento, j.chat_avg?.honestidad, j.chat_avg?.claridad,
+    j.mindmap?.jerarquia, j.mindmap?.cobertura, j.mindmap?.no_invencion,
   ];
   let nota = avg(scores);
   if (gatesFailed.length) nota = Math.min(nota, 2);   // gate duro fallido capa la nota
@@ -70,6 +72,21 @@ for (const b of batteries) {
   const missing = (j.coverage || []).filter(x => !x.cubierto).map(x => x.concepto);
   if (missing.length) md += `\n**Conceptos dorados sin cubrir:** ${missing.join(' · ')}\n`;
   if (j.summary?.peores_puntos?.length) md += `\n**Puntos débiles del resumen:** ${j.summary.peores_puntos.map(p => `«${p}»`).join(' · ')}\n`;
+
+  // F2 · chat, mindmap y atenuación
+  if (j.chat_avg) {
+    md += `\n**Chat:** fundamento ${f1(j.chat_avg.fundamento)} · claridad ${f1(j.chat_avg.claridad)}`
+      + ` · honestidad ante trampa ${f1(j.chat_avg.honestidad)}\n`;
+    for (const [i, turno] of (j.chat || []).entries()) {
+      const q = (b.chat || [])[i] || {};
+      if (q.trap || Math.min(turno.fundamento || 5, turno.claridad || 5) <= 2) {
+        md += `- ${q.trap ? '🪤 ' : ''}«${(q.q || '').slice(0, 90)}» — fund ${turno.fundamento}`
+          + `${q.trap ? ` · honestidad ${turno.honestidad}` : ''} — ${turno.nota || ''}\n`;
+      }
+    }
+  }
+  if (j.mindmap) md += `\n**Mindmap:** jerarquía ${j.mindmap.jerarquia} · cobertura ${j.mindmap.cobertura} · no-invención ${j.mindmap.no_invencion} — ${j.mindmap.nota || ''}\n`;
+  if (c.attenuation_separation != null) md += `\n**Atenuación (Δ oro − resto):** ${c.attenuation_separation} (positivo = distingue los capítulos relevantes)\n`;
 }
 
 fs.writeFileSync(path.join(runDir, 'REPORT.md'), md);

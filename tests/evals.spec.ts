@@ -26,10 +26,14 @@ const RUN_DIR = path.resolve(__dirname, '..', 'evals', 'runs', RUN);
 // y cada batería es un test que corre tras el anterior.
 test.describe('EV1 · generación de artefactos @eval', () => {
   test.skip(!KEY, 'NAN_API_KEY no definido (crea .env a partir de .env.example)');
+  // Un clic bloqueado (p. ej. un modal sin cerrar tapando el toolbar) debe fallar en
+  // segundos, no comerse el timeout del test entero. Los waits largos de generación
+  // llevan su timeout explícito y no se ven afectados.
+  test.use({ actionTimeout: 30000 });
 
   for (const battery of BATTERIES.filter(b => b.phase <= PHASE)) {
     test(`batería ${battery.id}: flashcards + resumen @eval`, async ({ page }) => {
-      test.setTimeout(900000);   // API real sobre un libro real: minutos, no segundos
+      test.setTimeout(1800000);  // API real sobre un libro real, 6 artefactos: minutos, no segundos
 
       const fixture = path.resolve(__dirname, '..', battery.fixture);
       test.skip(!fs.existsSync(fixture), `falta ${battery.fixture} — ejecuta: node evals/fetch-fixtures.mjs`);
@@ -59,9 +63,20 @@ test.describe('EV1 · generación de artefactos @eval', () => {
       await page.fill('#ai-ob-goal', battery.goal);
       const tOb = Date.now();
       await page.click('#ai-ob-start');
-      // 'Listo' incluye segmentación y, en vivo, la atenuación del TOC (modelo lite).
       await expect(page.locator('#ai-status')).toContainText('Listo', { timeout: 240000 });
       timings.onboarding = Date.now() - tOb;
+
+      // Atenuación del TOC (F2): solo se dispara con el sidebar abierto (ahí vive el
+      // índice). Corre con el modelo LITE (ADR-022). Best-effort: sin TOC (PDF plano)
+      // no hay ratings y no es fallo.
+      const tAtt = Date.now();
+      await page.click('#sidebar-toggle');
+      await page.waitForFunction(async () => {
+        const DB = await import('/js/ai/db.js');
+        return (await DB.getAll('ratings')).length > 0;
+      }, undefined, { timeout: 120000 }).catch(() => console.warn(`[eval] ${battery.id}: sin atenuación (¿sin TOC?)`));
+      timings.attenuation = Date.now() - tAtt;
+      await page.click('#sidebar-toggle');   // cerrar: que no tape el panel
 
       // Flashcards (alcance y nº por defecto de la UI — lo que vería el usuario).
       const tCards = Date.now();
@@ -89,6 +104,46 @@ test.describe('EV1 · generación de artefactos @eval', () => {
         console.warn(`[eval] ${battery.id}: el resumen NO se generó — ${summaryError}`);
       }
       timings.summary = Date.now() - tSum;
+      // Cerrar el modal del resumen: si queda abierto, el overlay tapa el toolbar y el
+      // siguiente clic espera para siempre (F2 se comió 30 min por esto).
+      await page.click('#ai-summary .ai-ob-close');
+
+      // Mindmap (F2), mismo trato tolerante que el resumen.
+      const tMm = Date.now();
+      let mindmapError = '';
+      await page.click('#ai-convo-mindmap');
+      await page.click('#mm-generate');
+      try {
+        await expect(page.locator('#mm-png')).toBeVisible({ timeout: 420000 });
+      } catch {
+        mindmapError = (await page.locator('#ai-mindmap, .ai-onboarding').last().innerText().catch(() => ''))
+          .split('\n').map(s => s.trim()).filter(Boolean).slice(0, 4).join(' · ').slice(0, 300) || 'timeout sin error visible';
+        console.warn(`[eval] ${battery.id}: el mindmap NO se generó — ${mindmapError}`);
+      }
+      timings.mindmap = Date.now() - tMm;
+      await page.click('#ai-mindmap .ai-ob-close');   // cerrar: el overlay taparía el chat
+
+      // Chat (F2): 2 preguntas con respuesta en el libro + 1 trampa (no está en el
+      // libro; responderla "de memoria" es el fallo que mide la rúbrica de honestidad).
+      const tChat = Date.now();
+      const chat: any[] = [];
+      for (const { q, trap } of battery.questions || []) {
+        const before = await page.locator('.ai-msg-assistant .ai-bubble-text').count();
+        await page.fill('#ai-input', q);
+        await page.click('#ai-send');
+        try {
+          // El botón se deshabilita durante el turno y se re-habilita al terminar.
+          await expect(page.locator('#ai-send')).toBeDisabled({ timeout: 10000 });
+          await expect(page.locator('#ai-send')).toBeEnabled({ timeout: 300000 });
+          await expect(page.locator('.ai-msg-assistant .ai-bubble-text')).toHaveCount(before + 1, { timeout: 10000 });
+          const answer = (await page.locator('.ai-msg-assistant .ai-bubble-text').last().innerText()).slice(0, 4000);
+          chat.push({ q, trap: !!trap, answer });
+        } catch {
+          chat.push({ q, trap: !!trap, answer: '', error: 'el turno no terminó' });
+          console.warn(`[eval] ${battery.id}: turno de chat fallido — ${q.slice(0, 60)}…`);
+        }
+      }
+      timings.chat = Date.now() - tChat;
 
       // Captura: artefactos persistidos + pasajes fuente (anclas [[aN]] → texto).
       const data = await page.evaluate(async () => {
@@ -108,10 +163,19 @@ test.describe('EV1 · generación de artefactos @eval', () => {
       let sha = '';
       try { sha = execSync('git rev-parse --short HEAD', { cwd: path.resolve(__dirname, '..') }).toString().trim(); } catch { /* sin git */ }
       fs.writeFileSync(path.join(RUN_DIR, `${battery.id}.json`), JSON.stringify({
-        battery: { id: battery.id, persona: battery.persona, goal: battery.goal, lang: battery.lang, goldenConcepts: battery.goldenConcepts },
+        battery: {
+          id: battery.id, persona: battery.persona, goal: battery.goal, lang: battery.lang,
+          goldenConcepts: battery.goldenConcepts, goldenChapters: battery.goldenChapters,
+        },
         // uiLang: los prompts del RESUMEN siguen el idioma de la UI (P15), no el del libro;
         // las tarjetas salen en el idioma del libro. El scoring compara cada cosa con lo suyo.
-        meta: { model: MODEL, sha, date: new Date().toISOString(), fixture: battery.fixture, timings, uiLang: 'es', summaryError: summaryError || undefined },
+        // evalVersion 2 = F2 (mindmap + chat + atenuación); el scoring salta lo nuevo en runs viejos.
+        meta: {
+          model: MODEL, sha, date: new Date().toISOString(), fixture: battery.fixture, timings,
+          uiLang: 'es', evalVersion: 2,
+          summaryError: summaryError || undefined, mindmapError: mindmapError || undefined,
+        },
+        chat,
         ...data,
       }, null, 1));
       console.log(`[eval] ${battery.id} → ${path.relative(process.cwd(), RUN_DIR)}/${battery.id}.json`

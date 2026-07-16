@@ -15,8 +15,8 @@ const f1 = n => Number.isFinite(n) ? n.toFixed(1) : '—';
 const secs = ms => Number.isFinite(ms) ? `${Math.round(ms / 1000)}s` : '—';
 
 let md = `# Comparativo de runs — ${new Date().toISOString().slice(0, 10)}\n\n`
-  + `| Run | Juez | Batería | Nota | Tarjetas fid/atom/util | Cobertura | Resumen fid/citas/cob/conc | Gates | t·cards | t·resumen |\n`
-  + `|---|---|---|---|---|---|---|---|---|---|\n`;
+  + `| Run | Juez | Batería | Nota | Tarjetas fid/atom/util | Cobertura | Resumen fid/citas/cob/conc | Chat fund/hon | MM jer/cob/inv | Gates | t·cards | t·resumen |\n`
+  + `|---|---|---|---|---|---|---|---|---|---|---|---|\n`;
 
 for (const name of names) {
   const dir = path.join(RUNS, name);
@@ -30,12 +30,16 @@ for (const name of names) {
       j.cards_avg?.fidelidad, j.cards_avg?.atomicidad, j.cards_avg?.utilidad,
       j.coverage_ratio != null ? 1 + 4 * j.coverage_ratio : NaN,
       s.fidelidad, s.pertinencia_citas, s.cobertura, s.concision,
+      j.chat_avg?.fundamento, j.chat_avg?.honestidad, j.chat_avg?.claridad,
+      j.mindmap?.jerarquia, j.mindmap?.cobertura, j.mindmap?.no_invencion,
     ]);
     if (gatesFailed) nota = Math.min(nota, 2);
     md += `| \`${b.meta?.model}\` | \`${judge.judge}\` | ${id} | **${f1(nota)}** `
       + `| ${f1(j.cards_avg?.fidelidad)} / ${f1(j.cards_avg?.atomicidad)} / ${f1(j.cards_avg?.utilidad)} `
       + `| ${(j.coverage || []).filter(x => x.cubierto).length}/${b.battery.goldenConcepts?.length} `
       + `| ${f1(s.fidelidad)} / ${f1(s.pertinencia_citas)} / ${f1(s.cobertura)} / ${f1(s.concision)} `
+      + `| ${j.chat_avg ? `${f1(j.chat_avg.fundamento)} / ${f1(j.chat_avg.honestidad)}` : '—'} `
+      + `| ${j.mindmap ? `${f1(j.mindmap.jerarquia)} / ${f1(j.mindmap.cobertura)} / ${f1(j.mindmap.no_invencion)}` : '—'} `
       + `| ${gatesFailed ? `✗ ${gatesFailed}` : '✓'} | ${secs(b.meta?.timings?.flashcards)} | ${secs(b.meta?.timings?.summary)} |\n`;
   }
 }

@@ -159,8 +159,13 @@ empata en expansión/atenuación siendo 3-4x más rápido, (3) dónde queda mimo
 
 - **F1** `S` — Fixtures P1+P4 (OpenStax + Pedro Páramo), runner `@eval` para flashcards
   y resumen, checks deterministas, juez simple, primer REPORT.
-- **F2** `M` — P2+P3 (Pro Git + PDF de temario), mindmap/chat/atenuación, preguntas
-  trampa, listas doradas de conceptos y ranking dorado de TOC por fixture.
+- **F2** `M` — **implementada (2026-07-16)** — P2+P3 (Pro Git + Constitución PDF) y tres
+  artefactos nuevos en el runner (`evalVersion: 2`): **chat** con 2 preguntas reales + 1
+  trampa por batería (rúbrica: fundamento/honestidad/claridad — la honestidad mide si el
+  tutor admite que algo NO está en el libro), **mindmap** (jerarquía/cobertura/no-invención)
+  y **atenuación** contra capítulos dorados (métrica Δ = media de score de capítulos oro −
+  resto; el runner abre el sidebar para dispararla, y corre con el modelo lite de ADR-022).
+  El scoring es retrocompatible: los runs v1 se puntúan sin los criterios nuevos.
 - **F3** `S` — Informe comparativo de modelos (el "primer uso" de arriba), doble juez y
   medición de acuerdo, deltas entre runs.
 
@@ -187,6 +192,37 @@ Todos los gates deterministas pasan (anclas 100% válidas, 0 duplicados, citas d
 4. **Del arnés:** el idioma esperado difiere por artefacto (resumen = idioma UI por P15;
    tarjetas = idioma del libro) — ya calibrado. El juez recibe una muestra repartida de
    pasajes citados y no penaliza los no incluidos.
+
+## Resultados F2 (run `f2-deepseek`, 2026-07-16, 4 baterías × 6 artefactos)
+
+| Batería | Nota | Tarjetas | Cobertura | Resumen | Chat fund/hon | Mindmap | Atenuación Δ |
+|---|---|---|---|---|---|---|---|
+| p1-estudiante | **4.4** | 4.5/4.7/4.9 | 7/9 | 5/4/5/4 | 4.7/**5.0** | 4/2/5 | +0.23 |
+| p2-tecnico | 2.0† | 4.4/4.3/5.0 | **1/8** | 4/4/2/3 | 5.0/**5.0** | DNF | **+0.65** |
+| p3-opositor | 2.0† | 4.6/5.0/5.0 | 3/8 | 3/3/3/4 | 4.7/**5.0** | 1 rama | n/a (PDF sin TOC) |
+| p4-noficcion | 3.8 | 3.8/4.5/4.6 | 5/8 | 4/3/3/5 | 5.0/**5.0** | 2/2/3 | +0.37 |
+
+† capadas por el gate del mindmap; sin ese artefacto rondarían 3.9-4.2.
+
+**Lo que salió fuerte:**
+- **El chat es el artefacto estrella**: fundamento 4.7-5.0 y **honestidad 5/5 en las 4
+  preguntas trampa** — el tutor admite explícitamente lo que el libro no trata (incluso
+  sugiere fuentes externas marcándolas como tales). Argumento de producto directo.
+- **La atenuación discrimina de verdad**: Δ+0.65 en Pro Git (los capítulos de
+  branching/basics puntúan muy por encima del resto para el objetivo). Y corre con el
+  modelo lite (ADR-022) sin fallos en todo el run.
+- **El PDF de la Constitución (el caso duro) funciona**: 263 pasajes indexados, tarjetas
+  4.6/5.0/5.0, anclas 15/15. La segmentación de PDF aguanta texto legal.
+
+**El material de mejora que deja F2:**
+1. **El mindmap es el artefacto débil en libros grandes/planos**: DNF a los 7 min en Pro
+   Git (14MB), 1 rama en el PDF, y cobertura 2/5 incluso cuando sale. Candidato a su
+   propio ciclo de mejora (map-reduce con presupuesto, como el resumen).
+2. **Cobertura conceptual limitada por diseño en libros grandes**: 15 tarjetas para Pro
+   Git entero = 1/8 conceptos. No es (solo) el modelo: es el muestreo BOOK_TOKENS + cupo.
+   Posible: sugerir en la UI más tarjetas para libros grandes, o muestreo guiado por objetivo.
+3. **El resumen del PDF sin estructura** rinde peor (7 citas, 3/3/3): sin TOC real el
+   troceado pierde coherencia. Ligado a mejorar la segmentación de PDFs planos.
 
 ## Mejora continua (el bucle)
 

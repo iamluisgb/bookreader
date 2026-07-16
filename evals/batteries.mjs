@@ -8,6 +8,12 @@
 export const BATTERIES = [
   {
     id: 'p1-estudiante',
+    questions: [
+      { q: '¿Por qué la simultaneidad de dos sucesos depende del sistema de referencia? Explícalo con el ejemplo del libro.' },
+      { q: '¿Qué papel juega el experimento mental del tren y el terraplén en el argumento del libro?' },
+      { q: '¿Qué dice Einstein en este libro sobre la mecánica cuántica y el entrelazamiento?', trap: true },
+    ],
+    goldenChapters: ['simultan', 'lorentz', 'gravitation', 'space-time', 'mass'],
     phase: 1,
     fixture: 'evals/fixtures/p1-relativity.epub',
     lang: 'en',
@@ -27,6 +33,12 @@ export const BATTERIES = [
   },
   {
     id: 'p4-noficcion',
+    questions: [
+      { q: '¿Por qué viaja Juan Preciado a Comala y qué encuentra al llegar?' },
+      { q: '¿Qué relación tiene Susana San Juan con Pedro Páramo y por qué importa en la novela?' },
+      { q: '¿Qué papel juega el terremoto que destruye Comala al final de la novela?', trap: true },
+    ],
+    goldenChapters: ['pedro paramo'],
     phase: 1,
     fixture: 'tests/test.epub',
     lang: 'es',
@@ -45,6 +57,12 @@ export const BATTERIES = [
   },
   {
     id: 'p2-tecnico',
+    questions: [
+      { q: '¿Qué diferencia hay entre merge y rebase, y cuándo desaconseja el libro rebasar?' },
+      { q: '¿Cuáles son los tres estados de un fichero en Git y cómo se pasa de uno a otro?' },
+      { q: '¿Qué recomienda el libro sobre el comando "git undo" para deshacer commits?', trap: true },
+    ],
+    goldenChapters: ['branch', 'basics', 'distributed', 'tools'],
     phase: 2,
     fixture: 'evals/fixtures/p2-progit.epub',
     lang: 'en',
@@ -63,6 +81,12 @@ export const BATTERIES = [
   },
   {
     id: 'p3-opositor',
+    questions: [
+      { q: '¿Qué procedimiento y mayorías exige la reforma constitucional agravada del artículo 168?' },
+      { q: '¿Cuál es la duración del mandato del Congreso de los Diputados y cuántos miembros puede tener?' },
+      { q: '¿Qué dice la Constitución sobre la prisión permanente revisable?', trap: true },
+    ],
+    goldenChapters: ['derechos', 'cortes', 'reforma', 'tribunal constitucional', 'corona'],
     phase: 2,
     fixture: 'evals/fixtures/p3-constitucion.pdf',
     lang: 'es',
