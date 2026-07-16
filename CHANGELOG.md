@@ -5,6 +5,25 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-16 — Modelo lite para llamadas auxiliares (routing por tarea, ADR-022)
+
+Las llamadas auxiliares del agente —expansión de consulta (IA7) y atenuación del TOC (T8)—
+ya no usan el modelo principal: en nan van a `qwen3.6` (~0.8s con tools vs ~2-4s de
+`deepseek-v4-flash`, que "razona" donde no aporta). Chat, resumen, flashcards y mindmap
+siguen con el modelo principal. Ver [`DECISIONS.md` · ADR-022](DECISIONS.md).
+
+- **`model` opcional** en `chatStream`/`chatTools` ([`js/ai/llm.js`](app/js/ai/llm.js));
+  `getLiteModel()` resuelve: ajuste explícito → `liteModel` del preset (solo nan, verificado)
+  → alias del gateway → modelo principal. En proveedores no verificados nada cambia.
+- **Nuevo ajuste opcional** "Modelo rápido" en Ajustes → Agente
+  ([`js/ui/app-settings.js`](app/js/ui/app-settings.js)), con i18n.
+- **Alias `bookreader-lite`** (→ `qwen3.6`, tools) en el gateway de la demo
+  ([`workers/gateway`](workers/gateway/src/index.js)).
+- **Fix aparte que esto destapó**: `.appset-card` sin `max-height` en escritorio — si la
+  sección crecía más que el viewport, el tope del modal (botón de demo incluido) quedaba
+  inalcanzable. Ahora scroll interno ([`css/main.css`](app/css/main.css)).
+- Tests: override de modelo y resolución del lite en [`tests/llm.spec.ts`](tests/llm.spec.ts).
+
 ## 2026-07-16 — El botón de volver a la biblioteca es visible durante toda la carga
 
 Antes solo aparecía al TERMINAR la carga completa (render + locations + portada +

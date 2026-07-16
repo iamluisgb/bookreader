@@ -151,7 +151,18 @@ el gate del agéntico ahora que la 1ª recuperación es mejor).
 
 **Abiertas:** ¿subir el gate al idioma (activar siempre que la pregunta no coincida con el idioma del
 libro)? · reducir los `null` de expansión (variación del modelo reasoning; el fallback ya lo cubre) ·
-presupuesto de latencia (max_tokens/timeout).
+presupuesto de latencia (max_tokens/timeout). Nota 2026-07-16: la expansión (y la atenuación) ya van
+con el **modelo lite** ([ADR-022](DECISIONS.md)) — el presupuesto de latencia mejora ~3-4x en nan.
+
+### EV1 — Batería de evals por persona (LLM-as-judge) · `M` · **plan escrito**
+
+> Plan completo en [`docs/EVALS.md`](docs/EVALS.md) (2026-07-16).
+
+Medir la calidad de los artefactos (flashcards, resumen citado, mindmap, chat) por **persona del
+LAUNCH_PLAN** (estudiante Anki, lector técnico, opositor PDF, no-ficción), con fixtures con licencia
+libre, checks deterministas (anclas `[[aN]]`, cloze, dedupe) + juez LLM de otra familia con rúbrica
+ponderada, y un informe por run con deltas. Primer uso: validar [ADR-022](DECISIONS.md) comparando
+`deepseek-v4-flash` vs `qwen3.6` vs `mimo-v2.5` como modelo principal. Fases F1-F3 en el doc.
 
 ---
 

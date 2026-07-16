@@ -1640,6 +1640,9 @@ body.ai-open .ai-taskchip { right: calc(var(--ai-panel-width) + 20px); }
   position: relative;
   background: var(--surface-1); border: 1px solid var(--border); border-radius: 16px;
   padding: 28px 30px; width: 100%; max-width: 640px; box-shadow: var(--shadow-3);
+  /* Si la sección crece más que el viewport (p. ej. Agente en pantallas bajas), scroll
+     interno: con el centrado flex, sin esto el TOPE de la tarjeta queda inalcanzable. */
+  max-height: calc(100vh - 40px); overflow-y: auto;
 }
 .appset-close {
   position: absolute; top: 16px; right: 16px;

@@ -510,3 +510,33 @@ y key ya son configurables.
 ya existe). El `X-Quota-Remaining` habilita UI de "te quedan N" en F3 (demo self-service).
 Verificado end-to-end el 2026-07-15: modelos, chat, streaming SSE, agotamiento, revocación y
 la app real respondiendo vía gateway (tests/gateway.spec.ts @live).
+
+## ADR-022 — Routing de modelo por tarea: modelo lite para llamadas auxiliares · `ACEPTADA`
+
+**Contexto.** Todas las llamadas de texto usaban UN modelo global (`ai_model`). Pero hay dos
+clases de llamada con necesidades opuestas: las de **valor** (chat, resumen, flashcards,
+mindmap — la calidad se nota y se cita) y las **auxiliares** (query-expand/HyDE y atenuación
+del TOC — baratas, estructuradas y sensibles a latencia). Sondeo sobre nan (2026-07-16):
+`deepseek-v4-flash` tarda ~2-4s porque razona incluso en tareas triviales; `qwen3.6` responde
+en ~0.8s y soporta tools. La expansión además compite contra su propio timeout de 7s: cada
+segundo de "pensar" es recall perdido.
+
+**Decisiones.**
+1. **`model` opcional en `chatStream`/`chatTools`** (fallback: `getModel()`). Las tareas de
+   valor no pasan nada — siguen con el modelo principal.
+2. **Resolución del modelo lite** (`getLiteModel()`): ajuste explícito del usuario
+   (`ai_model_lite`, campo opcional en Ajustes) → `liteModel` del preset del proveedor →
+   alias `bookreader-lite` si la base URL es el gateway → modelo principal. Solo el preset
+   de nan declara `liteModel` (`qwen3.6`, verificado); en proveedores no verificados el
+   comportamiento no cambia (cero regresión BYOK).
+3. **Alias `bookreader-lite` en el gateway** (→ `qwen3.6`), siguiendo ADR-021: el cliente
+   demo nunca ve nombres del proveedor.
+4. **Fallo blando ya cubierto**: si un lite mal configurado no soporta tools o falla,
+   query-expand devuelve `null` (búsqueda cruda) y attenuation devuelve `null` (sin teñir) —
+   los dos caminos ya eran tolerantes a fallo por diseño (IA7, T8).
+
+**Consecuencias.** Expansión y atenuación ~3-4x más rápidas en nan sin tocar la calidad de los
+artefactos. Nuevo ajuste opcional "Modelo rápido" en Ajustes → Agente. La misma palanca sirve
+para futuros usos auxiliares (rerank LLM, clasificar intención). De paso, `.appset-card` gana
+`max-height` + scroll en escritorio: la sección Agente ya superaba la altura de viewports bajos
+y el tope del modal quedaba inalcanzable (lo destapó gateway.spec.ts).

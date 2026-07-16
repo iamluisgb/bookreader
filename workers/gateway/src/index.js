@@ -27,6 +27,13 @@ const ROUTING = {
     model: 'mimo-v2.5',
     caps: { tools: false, vision: true },
   },
+  // Llamadas auxiliares del cliente (query-expand, attenuation): modelo pequeño y
+  // rápido (~0.8s vs ~3s del fast, que gasta tokens razonando donde no aporta).
+  'bookreader-lite': {
+    provider: 'nan',
+    model: 'qwen3.6',
+    caps: { tools: true, vision: false },
+  },
 };
 
 const PROVIDERS = {

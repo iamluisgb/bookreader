@@ -88,6 +88,7 @@ export async function expandQuery(question, { tocLabels = [], signal } = {}) {
         { role: 'system', content: systemPrompt(tocLabels) },
         { role: 'user', content: 'PREGUNTA: ' + q },
       ],
+      model: LLM.getLiteModel(),   // auxiliar: modelo rápido (la latencia compite con el timeout)
       signal: ctrl.signal,
       onToken: (t) => { acc += t; },
     });

@@ -24,8 +24,12 @@ const MAX_TOKENS = 4096;
 // Presets para prefijar base URL + modelos sugeridos en la UI. `id: 'custom'` es
 // implícito (cualquier base URL fuera de estos). No son exhaustivos: el usuario
 // puede escribir su propia base URL y su propio modelo.
+// `liteModel` (opcional): modelo por defecto para las llamadas AUXILIARES (expansión de
+// consulta, atenuación del TOC) — tareas baratas y sensibles a latencia donde un modelo
+// pequeño rinde igual. Solo se declara donde está verificado (nan: qwen3.6 responde en
+// <1s y soporta tools); en el resto, las auxiliares usan el modelo principal.
 export const PROVIDERS = [
-  { id: 'nan',        name: 'nan',        baseUrl: 'https://api.nan.builders/v1',   models: ['deepseek-v4-flash', 'mimo-v2.5', 'qwen3.6', 'gemma4'] },
+  { id: 'nan',        name: 'nan',        baseUrl: 'https://api.nan.builders/v1',   models: ['deepseek-v4-flash', 'mimo-v2.5', 'qwen3.6', 'gemma4'], liteModel: 'qwen3.6' },
   { id: 'openai',     name: 'OpenAI',     baseUrl: 'https://api.openai.com/v1',     models: ['gpt-4o', 'gpt-4o-mini', 'o4-mini'] },
   { id: 'openrouter', name: 'OpenRouter', baseUrl: 'https://openrouter.ai/api/v1',  models: ['deepseek/deepseek-chat', 'anthropic/claude-3.7-sonnet', 'google/gemini-2.0-flash-001'] },
   { id: 'groq',       name: 'Groq',       baseUrl: 'https://api.groq.com/openai/v1', models: ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant'] },
@@ -35,6 +39,20 @@ export function getKey()        { return Storage.get('ai_key', '') || ''; }
 export function setKey(k)        { Storage.set('ai_key', k || ''); }
 export function getModel()      { return Storage.get('ai_model', DEFAULT_MODEL) || DEFAULT_MODEL; }
 export function setModel(m)      { Storage.set('ai_model', (m || '').trim() || DEFAULT_MODEL); }
+// Modelo LITE (opcional): para llamadas auxiliares baratas/sensibles a latencia
+// (query-expand, attenuation). Resolución: ajuste explícito del usuario → liteModel del
+// preset del proveedor → alias lite del gateway (demo) → modelo principal. Las tareas
+// que importan (chat, resumen, flashcards, mindmap) NUNCA pasan por aquí.
+export function getLiteModelSetting() { return (Storage.get('ai_model_lite', '') || '').trim(); }
+export function setLiteModel(m)  { Storage.set('ai_model_lite', (m || '').trim()); }
+export function getLiteModel() {
+  const explicit = getLiteModelSetting();
+  if (explicit) return explicit;
+  const preset = currentProvider();
+  if (preset && preset.liteModel) return preset.liteModel;
+  if (getBaseUrl() === GATEWAY_BASE_URL) return 'bookreader-lite';
+  return getModel();
+}
 // Modelo de VISIÓN (opcional, independiente del de texto): se usa solo en los turnos que
 // necesitan "ver" una página (figuras/diagramas). Vacío = no configurado → sin visión.
 export function getVisionModel() { return (Storage.get('ai_vision_model', '') || '').trim(); }
@@ -158,7 +176,9 @@ async function fetchRetrying(url, opts, { retries = 3 } = {}) {
   throw lastErr;
 }
 
-async function _chatStream({ messages, onToken, onReasoning, onDone, signal, maxTokens = MAX_TOKENS }) {
+// `model` (opcional) permite a una tarea concreta usar otro modelo (p. ej. el lite en
+// query-expand/attenuation); sin él, el modelo principal de Ajustes.
+async function _chatStream({ messages, onToken, onReasoning, onDone, signal, maxTokens = MAX_TOKENS, model }) {
   const key = getKey().trim();
   if (!key) throw new Error(t('Falta la API key.'));
 
@@ -169,7 +189,7 @@ async function _chatStream({ messages, onToken, onReasoning, onDone, signal, max
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: getModel(),
+      model: model || getModel(),
       messages,
       stream: true,
       max_tokens: maxTokens,
@@ -227,7 +247,7 @@ async function _chatStream({ messages, onToken, onReasoning, onDone, signal, max
 
 // Llamada NO-streaming con herramientas. nan/DeepSeek emite tool_calls de forma
 // fiable solo sin streaming (verificado en spike E5). Devuelve { content, toolCalls }.
-async function _chatTools({ messages, tools, toolChoice = 'auto', maxTokens = 1024, signal }) {
+async function _chatTools({ messages, tools, toolChoice = 'auto', maxTokens = 1024, signal, model }) {
   const key = getKey().trim();
   if (!key) throw new Error(t('Falta la API key.'));
 
@@ -235,7 +255,7 @@ async function _chatTools({ messages, tools, toolChoice = 'auto', maxTokens = 10
     method: 'POST',
     headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: getModel(),
+      model: model || getModel(),
       messages,
       tools,
       tool_choice: toolChoice,

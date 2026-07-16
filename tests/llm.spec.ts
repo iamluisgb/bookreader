@@ -99,3 +99,67 @@ test('chatToolsLoop ejecuta herramientas y cierra al no pedir más', async ({ pa
   expect(r.executed).toEqual([{ name: 'search_book', args: { query: 'consensus' } }]);
   expect(r.callsCount).toBe(1);
 });
+
+// Routing por tarea (ADR-022): `model` opcional en chatStream/chatTools y resolución
+// del modelo lite (ajuste explícito → liteModel del preset → modelo principal).
+
+test('chatStream y chatTools honran el override de modelo', async ({ page }) => {
+  await page.goto('/');
+  const r = await page.evaluate(async () => {
+    const L = await import('/js/ai/llm.js');
+    L.setKey('test-key');
+    L.setModel('modelo-principal');
+    const sent: string[] = [];
+    const realFetch = window.fetch;
+    window.fetch = async (_url: any, opts: any) => {
+      const body = JSON.parse(opts.body);
+      sent.push(body.model);
+      if (body.stream) {
+        const s = new ReadableStream({
+          start(c) {
+            const e = new TextEncoder();
+            c.enqueue(e.encode('data: {"choices":[{"delta":{"content":"ok"},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n'));
+            c.close();
+          },
+        });
+        return new Response(s, { status: 200, headers: { 'Content-Type': 'text/event-stream' } });
+      }
+      return new Response(JSON.stringify({ choices: [{ message: { content: 'ok' } }] }), { status: 200 });
+    };
+    try {
+      await L.chatStream({ messages: [{ role: 'user', content: 'q' }] });                          // sin override
+      await L.chatStream({ messages: [{ role: 'user', content: 'q' }], model: 'modelo-lite' });    // con override
+      await L.chatTools({ messages: [{ role: 'user', content: 'q' }], tools: [] });                // sin override
+      await L.chatTools({ messages: [{ role: 'user', content: 'q' }], tools: [], model: 'modelo-lite' });
+      return sent;
+    } finally {
+      window.fetch = realFetch;
+    }
+  });
+  expect(r).toEqual(['modelo-principal', 'modelo-lite', 'modelo-principal', 'modelo-lite']);
+});
+
+test('getLiteModel resuelve: explícito → preset del proveedor → modelo principal', async ({ page }) => {
+  await page.goto('/');
+  const r = await page.evaluate(async () => {
+    const L = await import('/js/ai/llm.js');
+    L.setModel('modelo-principal');
+    const out: Record<string, string> = {};
+    // Base URL por defecto = preset nan, que declara liteModel.
+    out.nanDefault = L.getLiteModel();
+    // El ajuste explícito del usuario gana al preset.
+    L.setLiteModel('mi-lite');
+    out.explicit = L.getLiteModel();
+    L.setLiteModel('');
+    // Proveedor sin liteModel (OpenAI) y URL personalizada → modelo principal.
+    L.setBaseUrl('https://api.openai.com/v1');
+    out.openai = L.getLiteModel();
+    L.setBaseUrl('https://ejemplo.com/v1');
+    out.custom = L.getLiteModel();
+    return out;
+  });
+  expect(r.nanDefault).toBe('qwen3.6');
+  expect(r.explicit).toBe('mi-lite');
+  expect(r.openai).toBe('modelo-principal');
+  expect(r.custom).toBe('modelo-principal');
+});
