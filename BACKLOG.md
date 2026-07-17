@@ -60,6 +60,9 @@ degradación honesta si no hay VL configurado.
 senior-staff para entrevistas MAANG"*, el agente dijo no tener el Capítulo 9 y **pidió al usuario que se
 lo pegara**. Pero en las puntuaciones guardadas, *"9. Consistency and Consensus"* tenía **0.95 — la
 relevancia MÁS ALTA de todo el libro**. No se descartó por irrelevante: lo expulsó el empaquetado.
+**Evidencia adicional (evals, 2026-07-17):** la `pertinencia_citas` del resumen en P4 quedó plana
+en ~3/5 tras 3 ciclos de prompt (EVALS.md §Segundo ciclo): el muestreo cuela el aparato crítico de
+la edición (prólogos/cronologías, que `isBoilerplate` no caza) — es selección de contenido, no prompt.
 
 **Diagnóstico — 3 pecados del retrieval actual** ([`js/ai/context.js`](js/ai/context.js)):
 1. **Ciego a la query:** selecciona una vez por conversación contra el *objetivo*, no por cada pregunta.
@@ -182,7 +185,9 @@ ponderada, y un informe por run con deltas. Primer uso: validar [ADR-022](DECISI
 > **3** [P14 F2](#p14--mapa-mental----l--artefacto-de-marketing) mindmap map-reduce ✓ ·
 > **4** [PDF6](#pdf6--segmentación-estructural-de-pdfs-planos-temarioslegales--m--prioridad-4) PDFs planos ✓ ·
 > **5** [EV3](#ev3--re-candidatear-mimo-v25-como-modelo-principal--s--prioridad-5) mimo principal ✓ (veredicto: deepseek se queda) ·
-> **6** prompts de fidelidad/pertinencia (dentro de EV2) ·
+> **6** prompts de fidelidad/pertinencia (dentro de EV2) ✓ (2026-07-17: tarjetas 3.6→3.9
+> con atom/util 4.8/4.8 vía prompt procedimental; pertinencia de citas NO se mueve por
+> prompt — es retrieval del aparato crítico → insumo de IA5 Fase 2; EVALS.md §Segundo ciclo) ·
 > **7** [IA5 Fase 2](#ia5--retrieval-profesional-rag-por-pasaje-agéntico--l--sustituye-a-ia4) embeddings activables.
 
 ### EV2 — Batería smoke + doble juez (F3) · `S` · **✓ (2026-07-16)**

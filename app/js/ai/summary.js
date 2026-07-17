@@ -150,9 +150,14 @@ REGLAS:
 - Devuelve ${bulletsRange} viñetas Markdown ("- ..."), una idea por viñeta.
 - Cada viñeta TERMINA con el marcador del pasaje del que sale, entre dobles corchetes: [[aN]] (usa el id que precede a cada pasaje).
 - La cita debe ser el pasaje que CONTIENE la afirmación (quien lo abra debe poder leer ese
-  dato ahí), no uno meramente relacionado con el tema. Si ningún pasaje respalda un punto,
-  NO incluyas ese punto.
+  dato ahí), no uno meramente relacionado con el tema. TODO dato concreto de la viñeta
+  (nombres propios, causas, cifras) debe estar en el pasaje citado; si la idea sale de
+  varios pasajes, cítalos todos ([[aN]] [[aM]]) o divídela en varias viñetas. Aunque
+  conozcas la obra de memoria, no afirmes nada que los pasajes no digan. Si ningún pasaje
+  respalda un punto, NO lo incluyas.
 - Autocontenidas y concretas; nada de "según el texto" ni relleno.
+- REVISIÓN FINAL: antes de responder, comprueba viñeta a viñeta que el pasaje citado contiene
+  la afirmación (¿podrías subrayarla ahí?); si no, corrige la cita o elimina la viñeta.
 ${langRule(goal)}${goal ? `\n- Prioriza lo relevante para: «${goal}».` : ''}
 Responde SOLO con las viñetas, sin encabezados ni texto alrededor.`;
 }

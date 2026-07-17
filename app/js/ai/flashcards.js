@@ -342,7 +342,14 @@ ${prevFronts.map(f => '- ' + f).join('\n')}` : '';
 REGLAS DE CALIDAD (obligatorias):
 - Atómicas: UNA idea o hecho por tarjeta.
 - Autocontenidas: prohibido "según el texto", "en este capítulo" o "el autor" sin nombrarlo.
-- Prioriza conceptos, definiciones, relaciones causa-efecto y datos concretos; evita trivialidades.${goal ? `
+- Prioriza conceptos, definiciones, relaciones causa-efecto y datos concretos; evita trivialidades.
+- FIDELIDAD ESTRICTA (el criterio nº 1): trabaja pasaje → dato → tarjeta, nunca al revés.
+  Extrae de un pasaje un dato que ese pasaje AFIRME explícitamente y conviértelo en tarjeta:
+  el "back" debe poder SUBRAYARSE en el pasaje "src". Aunque conozcas la obra de memoria, NO
+  completes con nombres, lugares, causas o hechos que el pasaje no diga — eso invalida la
+  tarjeta aunque sea cierto en la obra.
+- REVISIÓN FINAL: antes de entregar, relee cada tarjeta contra su pasaje "src" y elimina o
+  corrige toda tarjeta cuyo "back" no se pueda subrayar ahí.${goal ? `
 - OBJETIVO DEL LECTOR: «${goal}». Pregunta primero lo que un examen sobre ese objetivo
   preguntaría; descarta lo que no ayude a ese objetivo aunque esté en los pasajes.` : ''}
 - Sin tarjetas duplicadas ni casi iguales.

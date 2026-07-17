@@ -271,3 +271,39 @@ se re-corrió la batería con deepseek:
   validación de anclas las vetó (3/15) y saltaron DOS gates. Fix: `detectLang` nombra el
   idioma del material en el prompt (la instrucción relativa "el idioma de los pasajes"
   no bastaba). Sin la batería, esa regresión llegaba a producción invisible.
+
+### Segundo ciclo (2026-07-17): prompts de fidelidad/pertinencia vía smoke (punto 6 del plan)
+
+Primer uso real del modo smoke como banco de iteración: 3 ciclos sobre P4 (literatura, el
+caso duro), ~6 min por ciclo (generación + juez `mimo-v2.5`), time-box acordado de 2-3
+ciclos y parar.
+
+| Run (smoke P4) | Tarjetas fid/atom/util | Resumen fid/citas/cob | Cambio probado |
+|---|---|---|---|
+| baseline 06:44 | 3.6 / 4.1 / 4.2 | 3 / 3 / 3 | — |
+| `p6-c1` | 2.9 / 4.5 / 3.8 | 4 / 3 / 3 | regla declarativa ("no extrapoles") + citas múltiples |
+| `p6-c2` | 3.9 / 4.8 / 4.2 | 3 / 3 / 3 | orden **procedimental** (pasaje → dato → tarjeta) + revisión final |
+| `p6-c3` | 3.9 / 4.8 / 4.8 | 2 / 2 / 2 | + regla anti-material editorial (revertida) |
+
+**Qué entra (verificado):**
+- **Tarjetas**: el prompt procedimental del c2 — la regla declarativa del c1 no movió nada
+  (2.9), imponer el *orden de trabajo* ("el back debe poder SUBRAYARSE en el pasaje src")
+  sí: fidelidad 3.6→3.9 estable en dos runs, atomicidad 4.1→4.8, utilidad 4.2→4.8, y el
+  modo de fallo pasó de "inventado" a "respaldo parcial".
+- **Resumen**: la regla de citas reforzada del c1 (todo dato concreto en el pasaje citado;
+  citar varios pasajes o dividir la viñeta) + revisión final. Neutras en nota pero
+  principiadas y sin coste.
+
+**Qué NO se arregla por prompt (el hallazgo del ciclo):** `pertinencia_citas` del resumen
+quedó plana en ~3 los 4 runs. Las notas del juez apuntan siempre a lo mismo: el retrieval
+muestrea el **aparato crítico** del fixture (prólogo de García Márquez, cronología,
+análisis) y el resumen le dedica viñetas con citas débiles — `isBoilerplate` caza
+copyright/índices pero no prólogos de terceros. La regla de prompt del c3 ni siquiera
+evitó la viñeta del prólogo y coincidió con el peor run: revertida. **Clasificación:
+retrieval/selección de contenido → insumo para IA5 Fase 2** (o un filtro de aparato
+crítico en la segmentación), no más prompt.
+
+**Ruido del juez, otra vez:** penalizó una cita porque "[[a453]] se refiere a Lola, no a
+Dolores" — la Lola ES Dolores Preciado. Y la cobertura del mazo smoke osciló 5/8 → 4/8 →
+2/8 con el mismo prompt: en mazos de 10 tarjetas la cobertura dorada no es señal, solo
+tendencia.

@@ -5,6 +5,22 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-17 — Punto 6 del plan: iteración de prompts vía smoke (3 ciclos, time-box)
+
+Primer uso del modo smoke como banco de iteración (~6 min/ciclo, P4 literatura — el caso
+duro). Resultados en [`docs/EVALS.md`](docs/EVALS.md) §Segundo ciclo:
+
+- **Prompt de tarjetas** ([`js/ai/flashcards.js`](app/js/ai/flashcards.js)): la regla
+  declarativa ("no extrapoles") no movió nada; imponer el **orden de trabajo** (pasaje →
+  dato → tarjeta, "el back debe poder SUBRAYARSE en el pasaje src") + revisión final sí:
+  fidelidad 3.6→3.9 estable, atomicidad 4.1→4.8, utilidad 4.2→4.8.
+- **Prompt del resumen** ([`js/ai/summary.js`](app/js/ai/summary.js)): regla de citas
+  reforzada (todo dato en su pasaje citado; varias citas o dividir la viñeta) + revisión
+  final. Una tercera regla (anti-material editorial) no funcionó y se revirtió.
+- **Hallazgo del ciclo:** la `pertinencia_citas` del resumen (~3/5 plana en 4 runs) NO es
+  un problema de prompt — el retrieval muestrea el aparato crítico del libro (prólogos de
+  terceros). Clasificado como insumo de IA5 Fase 2 (BACKLOG).
+
 ## 2026-07-17 — Verificación del plan 1-5 + dos fixes de PDF que destapó (outline raíz única, atenuación)
 
 Re-runs de batería tras las mejoras ([resultados en `docs/EVALS.md`](docs/EVALS.md) §Verificación):
