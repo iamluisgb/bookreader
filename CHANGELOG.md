@@ -5,6 +5,14 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-17 — Umami Analytics en landings y app (solo producción)
+
+Loader condicional en `index.html`, `es/index.html` y `app/index.html`: solo carga si
+`location.hostname === 'luisgonzalezbernal.com'` (el dominio sirve `/u/s.js` self-hosteado
+y reporta a cloud.umami.is; mismo website-id que el resto del dominio, segmentado por ruta
+`/bookreader/*`). En localhost/tests no hay ni petición — el tag plano rompía el test de
+"cero errores de consola" por el 404 de `/u/s.js`.
+
 ## 2026-07-17 — Punto 6 del plan: iteración de prompts vía smoke (3 ciclos, time-box)
 
 Primer uso del modo smoke como banco de iteración (~6 min/ciclo, P4 literatura — el caso

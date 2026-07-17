@@ -1,7 +1,8 @@
-const CACHE_NAME = 'bookreader-v90';
+const CACHE_NAME = 'bookreader-v91';
 const ASSETS = [
   './',
   './index.html',
+  './js/analytics.js',
   './auth/callback.html',
   './auth/callback.js',
   './js/sync/schema.js',
