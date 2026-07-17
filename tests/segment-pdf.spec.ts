@@ -1,4 +1,6 @@
 import { test, expect } from '@playwright/test';
+import path from 'path';
+import * as fs from 'fs';
 
 // PDF1 · Segmentador de PDF: produce el mismo "libro anotado" que el EPUB ([[aN]] + anclas)
 // pero con locator de PÁGINA y capítulos por getOutline(). Probamos la lógica real con un
@@ -185,4 +187,38 @@ test('detectHeading: TÍTULO/TEMA abren capítulo, CAPÍTULO es subsección, el 
   expect(r.articulo).toBeNull();
   expect(r.prosa).toBeNull();
   expect(r.larga).toBeNull();
+});
+
+// PDF6 · Ordinales en palabra y el patrón BOE de outline (raíz única + niveles mezclados)
+// se comprueban contra el PDF REAL de la Constitución si está descargado.
+test('detectHeading acepta ordinales en palabra (CAPÍTULO PRIMERO)', async ({ page }) => {
+  await page.goto('/');
+  const r = await page.evaluate(async () => {
+    const S: any = await import('/js/ai/segment-pdf.js');
+    return {
+      primero: S.detectHeading('CAPÍTULO PRIMERO. De los españoles y los extranjeros'),
+      seccion: S.detectHeading('Sección 2.ª De los derechos y deberes de los ciudadanos'),
+      temaSegundo: S.detectHeading('Tema segundo. El Gobierno'),
+    };
+  });
+  expect(r.primero?.top).toBe(false);
+  expect(r.seccion?.top).toBe(false);
+  expect(r.temaSegundo?.top).toBe(true);
+});
+
+test('el outline de raíz única del BOE produce capítulos por TÍTULO (PDF real) @live', async ({ page }) => {
+  const fixture = path.join(__dirname, '..', 'evals', 'fixtures', 'p3-constitucion.pdf');
+  test.skip(!fs.existsSync(fixture), 'falta el fixture — node evals/fetch-fixtures.mjs');
+  test.setTimeout(180000);
+  await page.goto('/index.html');
+  const fc = page.waitForEvent('filechooser');
+  await page.click('#open-file-btn');
+  await (await fc).setFiles(fixture);
+  await page.waitForSelector('#ai-toggle:not([disabled])', { timeout: 120000 });
+  const r = await page.evaluate(async () => {
+    const rows: any[] = await (await import('/js/ai/db.js')).getAll('bookText');
+    const txt = String(rows[0]?.annotatedText || '');
+    return { titulos: (txt.match(/^## TÍTULO /gm) || []).length };
+  });
+  expect(r.titulos).toBeGreaterThanOrEqual(8);   // Preliminar + I..X aparecen como ##
 });

@@ -224,6 +224,29 @@ Todos los gates deterministas pasan (anclas 100% válidas, 0 duplicados, citas d
 3. **El resumen del PDF sin estructura** rinde peor (7 citas, 3/3/3): sin TOC real el
    troceado pierde coherencia. Ligado a mejorar la segmentación de PDFs planos.
 
+## Verificación del plan 1-5 (runs `verif-prio-deepseek` y `ev3-mimo`, 2026-07-17)
+
+Mismo juez (mimo) que el baseline F2 para comparar limpio; 1 run por batería (ruido ±0.5):
+
+| Batería | F2 (antes) | Verificación (después) | Qué lo movió |
+|---|---|---|---|
+| p2-tecnico | 2.0 (gate mindmap) | **4.0-4.5**, gates ✓ | 30 tarjetas (5.0/5.0/5.0, 30/30 ancladas), mindmap 8 ramas (era DNF), cobertura 1/8→3/8 |
+| p3-opositor | 2.0 (gate mindmap) | **3.9**, gates ✓ | 12 capítulos por TÍTULO (era 1), **resumen fid/citas 3/3 → 5/5**, mindmap 8 ramas (era 1) |
+
+- **PDF6 destapó y arregló dos bugs más de los previstos**: el outline del BOE es una
+  RAÍZ ÚNICA con TÍTULOs/CAPÍTULOs/Secciones como hermanos planos (la raíz se tragaba
+  todo como un solo capítulo → fix: raíz única = contenedor + reclasificación por
+  `detectHeading`, y ordinales en palabra "CAPÍTULO PRIMERO"); y la ATENUACIÓN nunca
+  corría en PDFs (`book.navigation` es EPUB-only → fix: cae a `tocLabels`, verificado
+  con ratings reales sobre la Constitución).
+- **La cobertura dorada sigue siendo el criterio más ruidoso del juez** (P3: 3/8, 1/8 y
+  0/8 sobre artefactos comparables) — tratarla como tendencia, no como número.
+- **EV3 (mimo como principal): deepseek se queda.** El fix de idioma funcionó (cero
+  gates, tarjetas fid 4.9) y mimo es ~30-40% más rápido, pero su pertinencia de citas
+  del resumen es 3/5 persistente — y las citas son el foso. Veredicto en BACKLOG · EV3.
+- Del arnés: timeout de tarjetas 420→600s (nan tiene ventanas lentas que confundimos
+  con fallos: un "DNF" del eval siempre merece un re-run antes de concluir).
+
 ## Mejora continua (el bucle)
 
 fallo detectado → clasificar (prompt / retrieval / modelo / parsing) → arreglo → re-run

@@ -93,7 +93,7 @@ test.describe('EV1 · generación de artefactos @eval', () => {
       await page.waitForSelector('#ai-flashcards', { timeout: 10000 });
       if (SMOKE) await page.selectOption('#fc-count', '10');
       await page.click('#fc-generate');
-      await expect(page.locator('#ai-flashcards h2')).toContainText('tarjetas', { timeout: 420000 });
+      await expect(page.locator('#ai-flashcards h2')).toContainText('tarjetas', { timeout: 600000 });   // nan tiene ventanas lentas: 420s se quedaba corto
       timings.flashcards = Date.now() - tCards;
       await page.click('#ai-flashcards .ai-ob-close');
 

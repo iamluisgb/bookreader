@@ -177,11 +177,11 @@ ponderada, y un informe por run con deltas. Primer uso: validar [ADR-022](DECISI
 `deepseek-v4-flash` vs `qwen3.6` vs `mimo-v2.5` como modelo principal. Fases F1-F3 en el doc.
 
 > **Plan de mejora derivado de los evals (2026-07-16), por prioridad:**
-> **1** [EV2](#ev2--batería-smoke--doble-juez-f3--s--prioridad-1) smoke+doble juez ·
-> **2** [IA8](#ia8--flashcards-guiadas-por-objetivo-en-libros-grandes--m--prioridad-2) flashcards por objetivo ·
-> **3** [P14 F2](#p14--mapa-mental----l--artefacto-de-marketing) mindmap map-reduce ·
-> **4** [PDF6](#pdf6--segmentación-estructural-de-pdfs-planos-temarioslegales--m--prioridad-4) PDFs planos ·
-> **5** [EV3](#ev3--re-candidatear-mimo-v25-como-modelo-principal--s--prioridad-5) mimo principal ·
+> **1** [EV2](#ev2--batería-smoke--doble-juez-f3--s--prioridad-1) smoke+doble juez ✓ ·
+> **2** [IA8](#ia8--flashcards-guiadas-por-objetivo-en-libros-grandes--m--prioridad-2) flashcards por objetivo ✓ ·
+> **3** [P14 F2](#p14--mapa-mental----l--artefacto-de-marketing) mindmap map-reduce ✓ ·
+> **4** [PDF6](#pdf6--segmentación-estructural-de-pdfs-planos-temarioslegales--m--prioridad-4) PDFs planos ✓ ·
+> **5** [EV3](#ev3--re-candidatear-mimo-v25-como-modelo-principal--s--prioridad-5) mimo principal ✓ (veredicto: deepseek se queda) ·
 > **6** prompts de fidelidad/pertinencia (dentro de EV2) ·
 > **7** [IA5 Fase 2](#ia5--retrieval-profesional-rag-por-pasaje-agéntico--l--sustituye-a-ia4) embeddings activables.
 
@@ -205,13 +205,15 @@ DB, discriminan Δ+0.65) ponderan el muestreo `BOOK_TOKENS` de `gatherScope`: m�
 capítulos relevantes al objetivo, menos a la paja. Sin ratings (sin objetivo/TOC), round-robin
 actual. Además: sugerir 30 tarjetas en la UI cuando el libro es grande. Cierre: re-run de P2/P3.
 
-### EV3 — Re-candidatear mimo-v2.5 como modelo principal · `S` · **prioridad 5**
+### EV3 — Re-candidatear mimo-v2.5 como modelo principal · `S` · **✓ evaluado (2026-07-17): deepseek se queda**
 
-En el comparativo, mimo empató con deepseek en tarjetas (4.8/4.8/4.8, juez cruzado) siendo el
-más rápido (64-121s vs 110-167s); su pecado —mezclar idiomas— ya se corrigió para todos con
-`detectLang` (prompt con idioma nombrado). Un run de batería con `EVAL_MODEL=mimo-v2.5`
-confirma o descarta: si pasa gates y empata, toda la app gana ~2x de latencia cambiando el
-default. Riesgo conocido a vigilar: su resumen de P4 fue débil (fid 2 según juez deepseek).
+Run `ev3-mimo` (P1+P4, flujo completo, juez deepseek): **el fix de idioma funcionó** (cero
+gates de idioma, tarjetas fid 4.9) y es ~30-40% más rápido (tarjetas 94-125s vs 115-167s;
+resumen 72-78s vs 102-148s). PERO la **pertinencia de citas del resumen es su punto débil
+persistente (3/5 en ambas baterías**, vs 4-5 de deepseek) — y las citas son el foso del
+producto. **Veredicto: deepseek sigue de principal**; mimo queda como visión (donde es el
+único fiable) y como alternativa documentada para quien priorice velocidad sobre citas.
+Se re-evalúa si mimo mejora o si la pertinencia se arregla por prompt (EV2/smoke).
 
 ---
 

@@ -21,9 +21,12 @@ const SCAN_MIN_CHARS_PER_PAGE = 40;
 // ## que heredan capítulo — salvo antes del primer top, donde se promocionan (documentos
 // solo-CAPÍTULOS). Conservador: línea corta, patrón al inicio, y se descartan las líneas
 // de índice (acaban en número de página). Pura y testeable.
-const TOP_RE = /^(t[íi]tulo|libro|parte|tema|anexo|ap[ée]ndice)\s+(preliminar|\d+|[ivxlcdm]+)\b/i;
+// Numerales: dígitos, romanos u ORDINALES EN PALABRA (la Constitución usa "CAPÍTULO
+// PRIMERO/SEGUNDO/TERCERO…"; los temarios también).
+const NUM = String.raw`\d+|[ivxlcdm]+|primer[oa]?|segund[oa]|tercer[oa]?|cuart[oa]|quint[oa]|sext[oa]|s[ée]ptim[oa]|octav[oa]|noven[oa]|d[ée]cim[oa]\w*`;
+const TOP_RE = new RegExp(`^(t[íi]tulo|libro|parte|tema|anexo|ap[ée]ndice)\\s+(preliminar|${NUM})\\b`, 'i');
 const TOP_DISP_RE = /^disposiciones?\s+(adicionales?|transitorias?|derogatorias?|finales?)\b/i;
-const SUB_RE = /^(cap[íi]tulo|secci[óo]n)\s+(preliminar|\d+|[ivxlcdm]+)\b/i;
+const SUB_RE = new RegExp(`^(cap[íi]tulo|secci[óo]n)\\s+(preliminar|${NUM})\\b|^secci[óo]n\\s+\\d+\\.ª`, 'i');
 export function detectHeading(line) {
   const s = (line || '').replace(/\s+/g, ' ').trim();
   if (!s || s.length > 90) return null;
@@ -177,10 +180,15 @@ async function outlineBoundaries(pdfDoc) {
   try { outline = await pdfDoc.getOutline(); } catch { /* sin outline */ }
   if (!outline || !outline.length) return [];
 
+  // PDF6 · Raíz ÚNICA con hijos (patrón BOE: "Constitución Española." → 30 hijos): la
+  // raíz es el contenedor del documento, no un capítulo. Sin esto, todo el libro quedaba
+  // atribuido a un solo capítulo (sin atenuación, sin ámbitos, resumen sin estructura).
+  const singleRoot = outline.length === 1 && (outline[0].items || []).length > 0;
+
   const flat = [];
   const walk = (items, depth, parentContainer) => {
     for (const it of items) {
-      const container = depth === 0 && isContainer(it.title);
+      const container = depth === 0 && (isContainer(it.title) || singleRoot);
       const top = depth === 0 ? !container : (depth === 1 && parentContainer);
       flat.push({ it, top });
       // Bajo un contenedor se desciende un nivel más de lo normal, para conservar las
@@ -191,6 +199,14 @@ async function outlineBoundaries(pdfDoc) {
     }
   };
   walk(outline, 0, false);
+
+  // PDF6 · Con raíz única, los hijos promocionados pueden mezclar NIVELES legales como
+  // hermanos (TÍTULO/CAPÍTULO/Sección planos, patrón BOE). Si alguno casa la jerarquía
+  // de detectHeading, se reclasifica: TÍTULO/TEMA/DISPOSICIONES abren capítulo;
+  // CAPÍTULO/Sección (y lo no clasificable, como "[Preámbulo]") quedan de marcadores.
+  if (singleRoot && flat.some(f => detectHeading(f.it.title || '')?.top)) {
+    for (const f of flat) f.top = detectHeading(f.it.title || '')?.top || false;
+  }
 
   const out = [];
   for (const { it, top } of flat) {

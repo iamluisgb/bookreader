@@ -5,6 +5,25 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-17 — Verificación del plan 1-5 + dos fixes de PDF que destapó (outline raíz única, atenuación)
+
+Re-runs de batería tras las mejoras ([resultados en `docs/EVALS.md`](docs/EVALS.md) §Verificación):
+**P2 2.0 → 4.0-4.5** (30 tarjetas ancladas, mindmap 8 ramas donde antes DNF) y
+**P3 2.0 → 3.9** (12 capítulos por TÍTULO, resumen fid/citas 3/3 → 5/5). Y de propina:
+
+- **Outline de raíz única (BOE)**: el PDF de la Constitución trae UN nodo raíz con
+  TÍTULOs/CAPÍTULOs/Secciones como hermanos planos — todo el libro quedaba atribuido a
+  un solo capítulo. Fix en [`js/ai/segment-pdf.js`](app/js/ai/segment-pdf.js): raíz única
+  = contenedor + reclasificación de hijos con `detectHeading` (+ ordinales en palabra:
+  "CAPÍTULO PRIMERO"). Test con el PDF real (@live).
+- **La atenuación nunca corría en PDFs**: el guard `book.navigation?.toc` es EPUB-only.
+  Fix en [`js/ai/panel.js`](app/js/ai/panel.js): cae a los `tocLabels` de la segmentación
+  (con PDF6, los PDFs estructurados ya los tienen). Verificado con ratings reales.
+- **EV3 cerrado: deepseek sigue de principal** — mimo ya no mezcla idiomas y es ~30-40%
+  más rápido, pero su pertinencia de citas (3/5) no está a la altura del foso del
+  producto. Veredicto y condiciones de revisión en BACKLOG · EV3.
+- Runner: timeout de tarjetas 420→600s (las ventanas lentas de nan parecían DNF).
+
 ## 2026-07-16 — Plan de evals, prioridades 1-4: smoke+doble juez, flashcards por objetivo, mindmap F2, PDFs planos
 
 Cuatro items del plan del BACKLOG en un ciclo (cada uno con su evidencia de eval detrás):

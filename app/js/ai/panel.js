@@ -640,10 +640,14 @@ function closeConvoMenu() { if (convoMenuEl) { convoMenuEl.remove(); convoMenuEl
 // por etiqueta. Resultados cacheados por libro+objetivo.
 
 async function maybeAttenuate() {
-  if (attenuationDone || !convo || !template || !segReady || !book) return;
+  if (attenuationDone || !convo || !template || !segReady) return;
   if (!LLM.hasKey()) return;
-  const toc = book.navigation?.toc;
-  if (!toc || !toc.length) return;
+  // TOC: el del EPUB si existe; si no, las etiquetas de la segmentación (PDF6: los PDFs
+  // con TÍTULOs/outline también tienen capítulos que puntuar — antes el guard
+  // `book.navigation` era EPUB-only y la atenuación nunca corría en PDF).
+  const toc = (book?.navigation?.toc?.length ? book.navigation.toc : null)
+    || (tocLabels || []).map(l => ({ label: l }));
+  if (!toc.length) return;
   attenuationDone = true;
 
   try {
