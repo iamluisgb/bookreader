@@ -5,6 +5,20 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-18 — Sync: título pegajoso en el manifest (deja de pisarse a null)
+
+Con el manifest ya llevando el título, faltaba un fallo que impedía converger en Drives con
+historial: un dispositivo que tiene datos de un libro que **bajó por sync** (no lo importó) no
+conoce su título, así que en cada push ponía `title: null` y **pisaba** el que el otro dispositivo
+sí conocía. Resultado: el manifest nunca tenía los dos títulos a la vez → `aliases.js` no podía
+agrupar → los subrayados no se cruzaban. Ahora el título es **pegajoso**: si el remoto lo sabe y
+el local no, se conserva; y si este dispositivo aporta un título que faltaba en el manifest remoto,
+se **re-sube el manifest aunque no cambie ningún libro**, para sanar el Drive viejo donde los
+títulos iban a null. `js/sync/engine.js`. Dos tests nuevos (solo-móvil converge; título no se
+pisa). SW `v95`.
+
+---
+
 ## 2026-07-18 — Sync: el manifest ahora lleva el título real (reconciliación entre dispositivos)
 
 Segundo fallo de "subrayo en el móvil y el PC no lo ve", más profundo que el timing: `buildSnapshot`

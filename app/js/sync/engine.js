@@ -113,9 +113,23 @@ async function cycle() {
 
   // 2) PUSH — libros locales más nuevos que el manifest remoto.
   const snap = await buildSnapshot();
+  const remoteBooks = (remoteManifest && remoteManifest.books) || {};
+  // Título PEGAJOSO: un dispositivo que tiene datos de un libro que bajó por sync
+  // (no lo importó) no conoce su título y lo pondría a null, pisando el que otro
+  // dispositivo sí conocía → aliases.js dejaría de poder agrupar (mismo libro,
+  // distinto hash) y los subrayados nunca se cruzarían. Si el remoto sabe el
+  // título y el local no, se conserva. Y si ESTE dispositivo aporta un título que
+  // el manifest remoto no tenía (o tenía a null), hay que re-subir el manifest
+  // aunque no cambie ningún libro, para sanar el Drive viejo donde iban a null.
+  let titleHealed = false;
+  for (const [id, info] of Object.entries(snap.manifest.books)) {
+    const remoteTitle = remoteBooks[id] && remoteBooks[id].title;
+    if (!info.title && remoteTitle) info.title = remoteTitle;
+    if (info.title && info.title !== remoteTitle) titleHealed = true;
+  }
   let pushed = 0;
   for (const [id, info] of Object.entries(snap.manifest.books)) {
-    const remoteAt = (remoteManifest && remoteManifest.books && remoteManifest.books[id] && remoteManifest.books[id].updatedAt) || 0;
+    const remoteAt = (remoteBooks[id] && remoteBooks[id].updatedAt) || 0;
     if (info.updatedAt <= remoteAt) continue;
     const path = BASE + info.file;
     const w = await Drive.write(path, JSON.stringify(snap.books[id]), { ifMatch: st.books[path] });
@@ -123,7 +137,7 @@ async function cycle() {
     save();
     pushed++;
   }
-  if (pushed || !m) {
+  if (pushed || titleHealed || !m) {
     if (!m) await Drive.write(BASE + 'settings.json', JSON.stringify(snap.settings));
     const w = await Drive.write(BASE + 'manifest.json', JSON.stringify(snap.manifest), { ifMatch: m ? m.etag : undefined });
     st.manifestEtag = w.etag;

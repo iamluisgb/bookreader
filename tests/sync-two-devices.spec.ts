@@ -113,4 +113,64 @@ test.describe('Sync end-to-end · dos dispositivos, mismo Drive', () => {
       await pc.close(); await movil.close();
     }
   });
+
+  // El flujo REAL reportado: el usuario subraya SOLO en el móvil; el PC nunca
+  // subraya (solo tiene el libro abierto en su biblioteca). El PC debe acabar
+  // viéndolo sin intervención manual.
+  test('hash distinto y subrayado SOLO en el móvil: el PC lo ve', async ({ browser }) => {
+    const drive = createDriveState();
+    const pc = await browser.newContext();
+    const movil = await browser.newContext();
+    try {
+      const pcPage = await bootDevice(pc, drive);
+      const mvPage = await bootDevice(movil, drive);
+
+      // El PC tiene el libro en su biblioteca (hash A) pero NO subraya. Sincroniza.
+      await openBook(pcPage, A, 'Lituma en los Andes');
+      await sync(pcPage);
+
+      // El móvil (hash B) subraya y sincroniza.
+      await openBook(mvPage, B, 'Lituma en los Andes (z-lib.org)');
+      await addHighlight(mvPage, 'epubcfi(/6/8!/4/2)', 'pasaje del móvil');
+      await sync(mvPage);
+
+      // El PC sincroniza (pull) y al abrir su libro (A) debe ver el del móvil.
+      await sync(pcPage);
+      expect(await highlightsOf(pcPage, A)).toEqual(['pasaje del móvil']);
+    } finally {
+      await pc.close(); await movil.close();
+    }
+  });
+
+  // Tras converger, el móvil vuelve a subrayar VARIAS veces. Cada push suyo NO
+  // debe borrar el título del libro del PC en el manifest (el móvil no conoce el
+  // título del hash A: lo bajó por sync, no lo importó). Si lo pisara a null, un
+  // tercer dispositivo —o una reinstalación— ya no podría reconciliar.
+  test('el título del manifest es pegajoso: un push del móvil no lo pone a null', async ({ browser }) => {
+    const drive = createDriveState();
+    const pc = await browser.newContext();
+    const movil = await browser.newContext();
+    try {
+      const pcPage = await bootDevice(pc, drive);
+      const mvPage = await bootDevice(movil, drive);
+
+      await openBook(pcPage, A, 'Lituma en los Andes');
+      await addHighlight(pcPage, 'epubcfi(/6/2!/4/2)', 'pasaje del PC');
+      await sync(pcPage);
+
+      await openBook(mvPage, B, 'Lituma en los Andes (z-lib.org)');
+      await addHighlight(mvPage, 'epubcfi(/6/8!/4/2)', 'del móvil 1');
+      await sync(mvPage);
+      // Segundo subrayado del móvil → otro push suyo del libro ya canónico (A).
+      await addHighlight(mvPage, 'epubcfi(/6/10!/4/2)', 'del móvil 2');
+      await sync(mvPage);
+
+      const manifest = JSON.parse(drive.store.get('bookreader/manifest.json')!.content);
+      // El id canónico (A) sigue con su título, pese a los push del móvil.
+      const canonId = Object.keys(manifest.books).find(id => id === A);
+      expect(manifest.books[canonId!].title).toBeTruthy();
+    } finally {
+      await pc.close(); await movil.close();
+    }
+  });
 });
