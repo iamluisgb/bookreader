@@ -65,7 +65,11 @@ function initSyncEngine() {
 
   window.addEventListener('bookreader:sync-status', (e) => {
     const s = e.detail;
-    const labels = { syncing: t('Sincronizando…'), error: t('Sync: error'), reconnect: t('Reconectar Drive') };
+    // Sync invisible (estilo Play Books): ni "Sincronizando…" en cada ciclo ni errores
+    // transitorios (el motor reintenta solo cada 90 s y al volver la conexión). Solo
+    // asoma lo que exige acción del usuario: el token revocado, que sin reconectar
+    // dejaría el sync muerto en silencio.
+    const labels = { reconnect: t('Reconectar Drive') };
     badge.dataset.state = s;
     badge.textContent = labels[s] || '';
     badge.hidden = !(s in labels);

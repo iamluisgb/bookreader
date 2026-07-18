@@ -5,6 +5,17 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-18 — Sync invisible (estilo Play Books)
+
+El badge "Sincronizando…" aparecía en cada ciclo (cada 90 s) y tras CADA subrayado (debounce
+4 s) — ruido constante durante la lectura. Ahora el sync es silencioso: ni el estado `syncing`
+ni los errores transitorios se muestran (el motor ya reintenta solo, cada 90 s y al recuperar
+la conexión). Solo asoma el único estado que exige acción del usuario: **`reconnect`** (token
+de Drive revocado), porque sin reconectar el sync quedaría muerto en silencio. `app.js`
+(labels del badge), SW `v93`.
+
+---
+
 ## 2026-07-18 — Sync: reconciliación de identidad entre dispositivos (mismo libro, distinto hash)
 
 Causa real de "subrayo en el móvil y el PC no lo ve" (confirmada en el Drive del usuario: el
