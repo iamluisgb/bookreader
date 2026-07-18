@@ -5,6 +5,29 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-18 — Agente: alcance de LIBRO ENTERO con permiso (deja de disculparse por "solo tener extractos")
+
+El agente responde por RAG: recibe un extracto recuperado por relevancia, no el libro entero. Para
+preguntas de conjunto ("¿lo más importante?", "¿la tesis?", "resúmelo") eso le forzaba a abrir con
+"solo tengo extractos y no toda la obra" — honesto, pero deflactante y fuera de lugar. El arreglo no
+es callar el aviso (sería "seguro pero ciego"), sino **darle vista global cuando la pregunta la pide**:
+
+- **`js/ai/panel.js`**: nueva herramienta `consult_book_summary` en la ronda agéntica. El MODELO
+  decide invocarla cuando la pregunta es de libro entero y los pasajes son muestra insuficiente
+  (sin heurística de palabras clave, robusto ES/EN). Al pedirla:
+  - si hay **resumen en caché** (`Jobs.cached`), se usa sin preguntar;
+  - si no, se pide **PERMISO** al usuario (tiene coste LLM) antes de generarlo — cero coste silencioso;
+  - si **declina**, cae a un **skim transversal** (round-robin por capítulo, coste 0) para hablar del
+    conjunto igualmente.
+- **`js/ai/summary.js`**: `ensureBookSummary()` (generación headless, reutiliza la caché del botón de
+  resumen) y `bookScopePassages()` (el muestreo transversal, extraído de `gatherScope`).
+- **`js/ai/panel-template.js`**: el framing del prompt cambia según el alcance — con síntesis o con
+  muestra transversal ya NO abre disculpándose; con extracto local mantiene el aviso honesto.
+- Solo se activa en turnos de retrieval DÉBIL (donde ya corría la ronda agéntica): las preguntas
+  normales van directas, sin coste ni tarjetas de permiso. 3 tests deterministas nuevos. SW `v96`.
+
+---
+
 ## 2026-07-18 — Sync: título pegajoso en el manifest (deja de pisarse a null)
 
 Con el manifest ya llevando el título, faltaba un fallo que impedía converger en Drives con

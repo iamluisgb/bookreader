@@ -106,11 +106,12 @@ function renderSetup() {
   b.querySelector('#sum-generate').addEventListener('click', onGenerate);
 }
 
-// Pasajes del ámbito. Capítulo: enteros. Libro: muestreo round-robin por capítulo
-// hasta BOOK_TOKENS (cobertura uniforme y coste acotado, igual que flashcards).
-function gatherScope(label, budget = BOOK_TOKENS) {
-  ctx.ensureIndex();
-  if (label) return Retrieval.passagesByChapter(label);
+// Muestreo round-robin por capítulo hasta `budget` tokens: cobertura uniforme del
+// LIBRO ENTERO con coste acotado (igual que flashcards). Recibe `ensureIdx` para no
+// depender del `ctx` de módulo → lo reutiliza el agente (panel.js) como "skim
+// transversal" cuando el usuario NO autoriza generar el resumen completo.
+export function bookScopePassages(ensureIdx, budget = BOOK_TOKENS) {
+  if (ensureIdx) ensureIdx();
   const byChapter = new Map();
   for (const p of Retrieval.allPassages()) {
     if (Retrieval.isBoilerplate(p.chapter)) continue;   // fuera cubierta/índice/prólogo/licencias…
@@ -131,6 +132,57 @@ function gatherScope(label, budget = BOOK_TOKENS) {
     }
   }
   return picked.sort((a, b) => Retrieval.anchorNum(a.id) - Retrieval.anchorNum(b.id));
+}
+
+// Pasajes del ámbito. Capítulo: enteros. Libro: muestreo round-robin (arriba).
+function gatherScope(label, budget = BOOK_TOKENS) {
+  ctx.ensureIndex();
+  if (label) return Retrieval.passagesByChapter(label);
+  return bookScopePassages(ctx.ensureIndex, budget);
+}
+
+// Genera (o reutiliza de caché) el resumen de LIBRO ENTERO en HEADLESS: sin modal,
+// para que el agente lo pida cuando una pregunta es de alcance global. Muestra el
+// chip de Jobs como cualquier trabajo pesado. Resuelve con el markdown citado, o
+// null si el trabajo se canceló (p. ej. el usuario cambió de libro). El resultado
+// queda en la MISMA caché que usa el botón de resumen (bookId+'summary').
+export async function ensureBookSummary(context, { depth = 'estandar' } = {}) {
+  const hit = Jobs.cached(context.bookId, KIND);
+  if (hit) return hit.result;
+
+  // Vigila UN job por su id: al terminar devuelve su resultado; si deja de ser el
+  // activo (cancelado, reemplazado por otro trabajo, o cambio de libro) abandona
+  // sin colgar la promesa —recuperando el resultado de caché si acabó bien—.
+  const watch = (job) => new Promise((resolve, reject) => {
+    const unsub = Jobs.subscribe((j) => {
+      if (!j || j.id !== job.id) {
+        const c = Jobs.cached(job.bookId, KIND);
+        unsub(); resolve(c ? c.result : null); return;
+      }
+      if (j.status === 'done') { unsub(); resolve(j.result); }
+      else if (j.status === 'error') { unsub(); reject(j.error || new Error(t('No se pudo generar el resumen.'))); }
+    });
+  });
+
+  // ¿Ya se está generando este mismo resumen (el usuario pulsó el botón)? Engánchate.
+  const act = Jobs.activeJob();
+  if (act && act.kind === KIND && act.bookId === context.bookId && act.status === 'running') {
+    return watch(act);
+  }
+
+  const d = DEPTH[depth] || DEPTH.estandar;
+  context.ensureIndex();
+  const passages = bookScopePassages(context.ensureIndex, d.coverage);
+  if (!passages.length) throw new Error(t('El libro no tiene texto indexado todavía.'));
+  const chunks = buildChunks(passages);
+  const scopeName = context.bookTitle || 'Libro';
+  const goal = context.goal;
+  const job = Jobs.start({
+    bookId: context.bookId, kind: KIND, label: t('el resumen'),
+    params: { scopeName },
+    run: ({ signal, progress }) => runSummary({ chunks, depth: d, goal, scopeName, signal, progress }),
+  });
+  return watch(job);
 }
 
 // ---- Generación (map-reduce) --------------------------------------------------

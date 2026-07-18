@@ -1045,6 +1045,17 @@ const RETRIEVAL_TOOLS = [
   } },
 ];
 
+// Herramienta de ALCANCE GLOBAL: el modelo la llama cuando la pregunta es sobre el
+// LIBRO EN CONJUNTO (su tesis, lo más importante, un resumen, cómo se estructura) y
+// los pasajes recuperados por relevancia son una muestra sesgada/insuficiente para
+// responderla. No trae pasajes: señala que hace falta una síntesis del libro entero;
+// el sistema la aporta (de caché, o pidiendo permiso al usuario para generarla).
+const SUMMARY_TOOL = { type: 'function', function: {
+  name: 'consult_book_summary',
+  description: 'Úsala SOLO cuando la pregunta es sobre el libro EN SU CONJUNTO (idea principal, tesis, "lo más importante", resumen, estructura general) y los pasajes recuperados no bastan para responder con visión global. NO la uses para preguntas sobre un pasaje, tema o capítulo concreto.',
+  parameters: { type: 'object', properties: {}, required: [] },
+} };
+
 // Recorta una lista de pasajes a un tope de tokens (para el texto devuelto al modelo).
 function capPassages(list, maxTokens) {
   const out = []; let used = 0;
@@ -1079,11 +1090,21 @@ function makeRetrievalExecutor(extra, tocLabels) {
 // contexto inicial (dentro del techo de capítulo). Degrada con gracia si algo falla.
 async function agenticGather(question, ctx, signal) {
   const extra = new Map();
+  let wantsSummary = false;
+  const retrieve = makeRetrievalExecutor(extra, ctx.tocLabels);
+  // El modelo puede pedir la síntesis del libro entero (consult_book_summary): aquí
+  // solo lo APUNTAMOS y le decimos que ya está —el sistema la resuelve fuera del bucle
+  // (caché o permiso del usuario)—, para no gastar tokens generándola sin autorización.
+  const execute = async (name, args) => {
+    if (name === 'consult_book_summary') { wantsSummary = true; return t('De acuerdo. El sistema aportará la síntesis del libro completo; responde "LISTO".'); }
+    return retrieve(name, args);
+  };
   const messages = [
     { role: 'system', content:
 `Antes de responder, REÚNE el contexto necesario del libro con las herramientas. El extracto inicial
 de abajo puede ser insuficiente. Llama a search_book (por tema) o read_chapter (por número/título del
-índice) las veces que haga falta. Cuando tengas material suficiente, responde solo "LISTO". NO
+índice) las veces que haga falta. Si la pregunta es sobre el LIBRO EN SU CONJUNTO y los pasajes no
+bastan, llama a consult_book_summary. Cuando tengas material suficiente, responde solo "LISTO". NO
 respondas aún a la pregunta.
 MAPA DEL LIBRO (índice de capítulos):
 ${ctx.tocLabels.map(t => '- ' + t).join('\n')}` },
@@ -1091,20 +1112,65 @@ ${ctx.tocLabels.map(t => '- ' + t).join('\n')}` },
     { role: 'user', content: 'PREGUNTA DEL USUARIO: ' + question },
   ];
   try {
-    await LLM.chatToolsLoop({ messages, tools: RETRIEVAL_TOOLS, execute: makeRetrievalExecutor(extra, ctx.tocLabels), maxRounds: AGENTIC_MAX_ROUNDS, signal });
+    await LLM.chatToolsLoop({ messages, tools: [...RETRIEVAL_TOOLS, SUMMARY_TOOL], execute, maxRounds: AGENTIC_MAX_ROUNDS, signal });
   } catch (e) {
     if (e.name === 'AbortError') throw e;
     console.warn('Recolección agéntica falló; sigo con el contexto inicial:', e);
-    return ctx;
+    return { ...ctx, wantsSummary };
   }
-  if (!extra.size) return ctx;
+  if (!extra.size) return { ...ctx, wantsSummary };
   const merged = new Map(ctx.picked.map(p => [p.id, p]));
   for (const [id, p] of extra) merged.set(id, p);
   const final = capPassages(
     [...merged.values()].sort((a, b) => Retrieval.anchorNum(a.id) - Retrieval.anchorNum(b.id)),
     CTX_BUDGET_CHAPTER,
   );
-  return { ...ctx, picked: final, text: formatPassages(final), passages: final.length };
+  return { ...ctx, picked: final, text: formatPassages(final), passages: final.length, wantsSummary };
+}
+
+// Contexto para generar/consultar el resumen (mismo shape que openSummary).
+function bookSummaryContext() {
+  return {
+    bookId, bookTitle, goal: convo?.goal || '', tocLabels,
+    currentChapter: EpubReader.getCurrentChapterLabel?.() || '',
+    ensureIndex, anchors, onCite: navigateCite,
+  };
+}
+
+// El agente pidió alcance de LIBRO ENTERO (consult_book_summary). Lo resuelve así:
+//   caché de resumen → úsala (sin preguntar);
+//   si no hay → pide PERMISO (coste LLM). Si acepta, lo genera; si no, cae a un
+//   "skim transversal" (round-robin por capítulo, coste 0) para que al menos hable
+//   del conjunto en vez de disculparse por tener solo unos extractos sueltos.
+// Devuelve { summaryMd, ctx } (ctx puede venir aumentado con el skim).
+async function resolveBookScope(ctx, textNode) {
+  const cached = Jobs.cached(bookId, 'summary');
+  if (cached) return { summaryMd: cached.result, ctx };
+
+  const ok = await confirmBox(
+    t('Para responder bien sobre el libro entero necesito una síntesis del libro completo, y aún no está generada. Generarla tiene un coste (varias llamadas al modelo). ¿La genero?'),
+    { title: t('Resumen del libro'), okText: t('Generar resumen'), cancelText: t('Responder con lo que tengo') });
+  if (ok) {
+    if (textNode) textNode.innerHTML = `<span class="ai-typing">${t('generando el resumen del libro…')}</span>`;
+    try {
+      const md = await Summary.ensureBookSummary(bookSummaryContext());
+      if (md) return { summaryMd: md, ctx };
+    } catch (e) {
+      console.warn('No se pudo generar el resumen para el agente:', e);
+    }
+  }
+  // Declina (o falla la generación) → skim transversal del libro, sin coste extra.
+  const skim = Summary.bookScopePassages(ensureIndex, CTX_BUDGET);
+  if (skim.length) {
+    const merged = new Map(ctx.picked.map(p => [p.id, p]));
+    for (const p of skim) if (!merged.has(p.id)) merged.set(p.id, p);
+    const final = capPassages(
+      [...merged.values()].sort((a, b) => Retrieval.anchorNum(a.id) - Retrieval.anchorNum(b.id)),
+      CTX_BUDGET_CHAPTER,
+    );
+    ctx = { ...ctx, picked: final, text: formatPassages(final), passages: final.length, transversal: true };
+  }
+  return { summaryMd: null, ctx };
 }
 
 // ---- IA2 · Repaso al terminar capítulo ("Pepito Grillo") -------------------
@@ -1233,12 +1299,29 @@ async function deliver(aug, question, { showUser = true, ref = null } = {}) {
       ctx = await agenticGather(question, ctx, abortCtrl.signal);
     }
 
+    // El agente pidió visión de LIBRO ENTERO: resuélvela (caché / permiso / skim) e
+    // inyecta la síntesis citada. Cambia el framing para que hable del conjunto con
+    // criterio en vez de disculparse por tener solo un extracto.
+    let bookSummaryMd = null;
+    if (ctx.wantsSummary) {
+      const r = await resolveBookScope(ctx, textNode);
+      bookSummaryMd = r.summaryMd; ctx = r.ctx;
+      if (mySeq !== bookSeq) return;
+      textNode.innerHTML = `<span class="ai-typing">${t('pensando…')}</span>`;
+    }
+
     const messages = [
-      { role: 'system', content: systemPrompt(convo?.goal, template, Profiles.getActive(), { tocLabels: ctx.tocLabels }) },
+      { role: 'system', content: systemPrompt(convo?.goal, template, Profiles.getActive(), { tocLabels: ctx.tocLabels, hasBookSummary: !!bookSummaryMd, transversal: !!ctx.transversal }) },
+    ];
+    if (bookSummaryMd) {
+      messages.push({ role: 'user', content:
+        'SÍNTESIS DEL LIBRO COMPLETO (resumen citado del libro entero; sus [[aN]] son anclas reales). Úsala para la visión de conjunto y ánclate en los pasajes de abajo para el detalle:\n\n' + bookSummaryMd });
+    }
+    messages.push(
       { role: 'user', content: 'EXTRACTO DEL LIBRO recuperado por relevancia para esta pregunta (cita los pasajes con sus anclas [[aN]]):\n\n' + ctx.text },
       ...priorWindow,
       { role: 'user', content: aug },
-    ];
+    );
 
     raw = await LLM.chatStream({
       messages, signal: abortCtrl.signal,

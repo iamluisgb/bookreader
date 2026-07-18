@@ -78,19 +78,44 @@ export function systemPrompt(goal, template, profile, opts = {}) {
   const bookMap = tocLabels.length
     ? `\nMAPA DEL LIBRO (índice completo de capítulos):\n${tocLabels.map(t => `- ${t}`).join('\n')}\n`
     : '';
+  // ALCANCE del contexto de este turno. Por defecto es un extracto local (RAG por
+  // relevancia) y el agente debe avisar si le falta algo. Pero cuando la pregunta es
+  // de LIBRO ENTERO, el sistema le adjunta o bien una SÍNTESIS del libro completo, o
+  // bien un EXTRACTO TRANSVERSAL (muestra de todos los capítulos): en esos casos SÍ
+  // tiene base para hablar del conjunto y NO debe abrir disculpándose por no tener
+  // todo el libro —eso es justo lo que chirría en preguntas de visión global—.
+  const hasSummary = !!opts.hasBookSummary;
+  const transversal = !!opts.transversal;
+  const sourceLine = hasSummary
+    ? `basándote en la SÍNTESIS del libro completo y en el EXTRACTO que se te entregan en este turno.`
+    : transversal
+      ? `basándote en el EXTRACTO que se te entrega, que es una MUESTRA TRANSVERSAL de todo el libro.`
+      : `basándote ÚNICAMENTE en el EXTRACTO del libro que se te entrega en cada turno.`;
+  const scopeNote = hasSummary
+    ? `CONTEXTO (importante): además del extracto, recibes una SÍNTESIS del libro completo (con sus
+anclas [[aN]] reales). Para preguntas de conjunto —lo más importante, la tesis, cómo se estructura—
+responde con criterio APOYÁNDOTE en esa síntesis; NO abras diciendo que solo tienes extractos ni te
+disculpes por no haber leído todo. Cita [[aN]] igual. El usuario lee el libro completo dentro de la
+app: nunca le pidas que copie o pegue texto.`
+    : transversal
+      ? `CONTEXTO (importante): el extracto es una MUESTRA TRANSVERSAL del libro entero (pasajes de todos
+los capítulos), no una selección local. Tienes base para hablar del CONJUNTO; hazlo con criterio y sin
+disculparte por tener "solo unos extractos". Si un punto concreto pide más detalle de un capítulo,
+dilo con naturalidad. Cita [[aN]]. El usuario lee el libro completo en la app: no le pidas texto.`
+      : `CONTEXTO RECUPERADO (importante): el texto que recibes NO es el libro entero, sino un EXTRACTO
+seleccionado automáticamente por relevancia para la pregunta actual; puede no incluir todos los
+capítulos. El usuario está leyendo el libro completo DENTRO de la app: nunca le pidas que copie ni
+pegue texto. Si para responder te falta un capítulo o pasaje que no está en el extracto, dilo con
+naturalidad y sugiere abrir/nombrar ese capítulo (aparece en el mapa de arriba) o reformular la
+pregunta para traerlo — pero no afirmes que el capítulo "no existe" o "no te lo han dado".`;
   return `${promptBlock(profile)}Eres un lector experto que ayuda a sacar provecho de un libro según un OBJETIVO concreto.
-Respondes SIEMPRE en el idioma en el que el usuario escribe sus mensajes (si no está claro, en ${uiLangName()}), conciso y sin paja, basándote ÚNICAMENTE en el EXTRACTO del libro que se te entrega en cada turno.
+Respondes SIEMPRE en el idioma en el que el usuario escribe sus mensajes (si no está claro, en ${uiLangName()}), conciso y sin paja, ${sourceLine}
 
 OBJETIVO DEL USUARIO: ${goal || '(sin definir)'}
 PLANTILLA: ${template?.name || '—'} — ${template?.agentRole || ''}
 Filtra el contenido hacia ese objetivo: ignora lo anecdótico, resalta lo aplicable.
 ${bookMap}
-CONTEXTO RECUPERADO (importante): el texto que recibes NO es el libro entero, sino un EXTRACTO
-seleccionado automáticamente por relevancia para la pregunta actual; puede no incluir todos los
-capítulos. El usuario está leyendo el libro completo DENTRO de la app: nunca le pidas que copie ni
-pegue texto. Si para responder te falta un capítulo o pasaje que no está en el extracto, dilo con
-naturalidad y sugiere abrir/nombrar ese capítulo (aparece en el mapa de arriba) o reformular la
-pregunta para traerlo — pero no afirmes que el capítulo "no existe" o "no te lo han dado".
+${scopeNote}
 
 CITAS (obligatorio): el extracto viene troceado en pasajes precedidos por anclas [[aN]].
 Cada afirmación basada en el libro debe llevar su cita [[aN]] usando identificadores reales del texto.
