@@ -540,3 +540,44 @@ artefactos. Nuevo ajuste opcional "Modelo rápido" en Ajustes → Agente. La mis
 para futuros usos auxiliares (rerank LLM, clasificar intención). De paso, `.appset-card` gana
 `max-height` + scroll en escritorio: la sección Agente ya superaba la altura de viewports bajos
 y el tope del modal quedaba inalcanzable (lo destapó gateway.spec.ts).
+
+---
+
+## ADR-023 — No adoptar LangGraph: la orquestación se mantiene hand-rolled · `ACEPTADA`
+
+**Contexto.** El agente no usa ningún framework: la orquestación es control de flujo en
+`panel.js` (contexto → ronda agéntica condicional con `chatToolsLoop` → streaming) sobre un
+endpoint OpenAI-compatible vía `llm.js`. Recurrente la pregunta de si deberíamos montarlo sobre
+**LangGraph**. Aclaración técnica primero: **LangGraph (Python) no corre en el navegador**;
+**LangGraph.js** (`@langchain/langgraph`) sí —es JS, agnóstico del entorno—, así que "sin
+backend" es viable. Pero orquestar no es llamar al modelo: la llamada al LLM seguiría saliendo
+por `fetch` con la **key en el navegador**, igual que ahora (LangGraph no cambia ese perfil).
+
+**Decisión.** **No adoptar LangGraph** por ahora; la orquestación sigue hand-rolled. Si en algún
+momento se quiere más estructura sin la dependencia, adoptar el **patrón `StateGraph`** (estado
+explícito + nodos + transiciones) en código propio, no la librería.
+
+**Porqué.**
+- **El flujo actual ya *es* el grafo, y más ligero.** Es casi lineal con una sola bifurcación
+  (la puerta de retrieval débil, ADR-009) y una ronda de herramientas. LangGraph brilla en
+  grafos de verdad —multi-agente, ciclos de auto-corrección, ramas densas— que hoy no tenemos.
+- **Choca con la línea "lean, cero build".** Servimos **ES modules planos sin bundler**;
+  LangChain.js + LangGraph.js pesa y obligaría a un pipeline de build. Cambiaríamos simplicidad
+  por una abstracción que no explotamos.
+- **Persistencia = trabajo extra.** El core corre en navegador, pero los checkpointers con
+  estado (SQLite/Postgres) son solo-Node; `MemorySaver` no persiste. Para sobrevivir a recargas
+  habría que escribir un checkpointer propio sobre IndexedDB.
+- **Reconocer dónde SÍ pagaría** (para no re-litigar a ciegas): su `interrupt()` + checkpointer
+  es exactamente el patrón human-in-the-loop que montamos a mano en `resolveBookScope` (pausar →
+  pedir permiso con `confirmBox` → reanudar). Con UN solo punto de interrupción y sin necesidad
+  de persistirlo entre sesiones, hacerlo a pelo es más barato que traer el framework.
+
+**Reconsiderar si** el agente evoluciona hacia: varios sub-agentes coordinados, ciclos de
+auto-corrección, o human-in-the-loop **con estado que deba sobrevivir a recargas**. En ese
+escenario, el `interrupt`/checkpointing de LangGraph.js ahorra código real y justificaría montar
+el bundler + un checkpointer sobre IndexedDB.
+
+**Consecuencias.** El agente permanece sin dependencias de framework, en ES modules planos y sin
+build step. La deuda que asumimos es que cualquier orquestación nueva (p. ej. el human-in-the-loop
+de ADR sobre `resolveBookScope`) se implementa a mano; si se acumulan varios de esos patrones, se
+reevalúa `StateGraph` propio antes que LangGraph.
