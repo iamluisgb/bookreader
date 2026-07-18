@@ -201,10 +201,12 @@ export function start(options = {}) {
   Bookmarks.setOnChange(notifyLocalChange);
   window.addEventListener('bookreader:data-changed', notifyLocalChange);
 
-  // Al ocultar la pestaña: flush del push pendiente (no esperar al debounce).
+  // Al ocultar/mostrar pestaña: flush al ocultarse, sync inmediato al mostrarse.
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden' && debounceTimer) {
       clearTimeout(debounceTimer);
+      syncNow();
+    } else if (document.visibilityState === 'visible') {
       syncNow();
     }
   });

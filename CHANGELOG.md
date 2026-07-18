@@ -5,6 +5,14 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-18 — Sync inmediato al abrir la pestaña
+
+Si cerrás BookReader y volvés horas después, el pull automático tardaba hasta 90 segundos. Ahora
+dispara un sync inmediato en `visibilitychange` → `visible`. Tiempo de ciclo completo (subrayado
+PC → visible en móvil): **~5 segundos** (debounce 4s + red <1s + pull inmediato).
+
+---
+
 ## 2026-07-18 — Sync invisible (estilo Play Books)
 
 El badge "Sincronizando…" aparecía en cada ciclo (cada 90 s) y tras CADA subrayado (debounce
