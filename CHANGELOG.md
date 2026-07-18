@@ -5,6 +5,26 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-18 — Sync: el manifest ahora lleva el título real (reconciliación entre dispositivos)
+
+Segundo fallo de "subrayo en el móvil y el PC no lo ve", más profundo que el timing: `buildSnapshot`
+sacaba el título del manifest SOLO del meta del agente (`ai/db.js`), que únicamente existe si el
+libro se segmentó para IA. Un libro solo-subrayado (lo normal) viajaba con `title: null` → el otro
+dispositivo no tenía forma de saber que su hash `B` y el hash `A` del primero eran el mismo libro
+→ `aliases.js` no podía agrupar → cada uno sincronizaba "su" copia sin cruzarse jamás. Ahora el
+título sale de la **biblioteca** (`library/store.js`, siempre presente al importar), con el meta
+del agente como complemento. SW `v94`.
+
+- **`js/sync/layout.js`**: título del manifest desde `LibStore.getAllBooks()` + meta del agente.
+- **`tests/sync-two-devices.spec.ts`** (nuevo): end-to-end con DOS dispositivos reales (contextos
+  aislados, mismo Drive en memoria) — cubre el caso que los tests de un solo contexto no podían
+  (comparten IndexedDB). Reproduce y fija el bug: mismo libro con hash distinto converge y el
+  subrayado del móvil aparece en el PC.
+- **`tests/drive-mock.ts`**: el mock admite instalarse en varias páginas/contextos compartiendo un
+  `DriveState`, para simular varios dispositivos contra el mismo Drive.
+
+---
+
 ## 2026-07-18 — Sync inmediato al abrir la pestaña
 
 Si cerrás BookReader y volvés horas después, el pull automático tardaba hasta 90 segundos. Ahora

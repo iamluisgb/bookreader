@@ -9,6 +9,7 @@
 
 import * as Storage from '../storage.js';
 import * as DB from '../ai/db.js';
+import * as LibStore from '../library/store.js';
 import { mergeCollections } from './merge.js';
 
 export const SCHEMA_VERSION = 1;
@@ -74,9 +75,17 @@ export async function buildSnapshot() {
     const b = convoBook[r.bookId] || (books[r.bookId] ? r.bookId : null);
     if (b) bookOf(b).ratings.push(r);
   }
+  // Título de cada libro para el manifest. Fuente principal: la BIBLIOTECA
+  // (siempre tiene título al importar). El meta del agente (ai/db.js) solo existe
+  // si el libro se segmentó para IA, así que como ÚNICA fuente dejaba title:null
+  // en libros solo-subrayados → el otro dispositivo no podía reconciliar
+  // identidad (mismo libro, distinto hash) y los subrayados no se cruzaban.
   const titles = {};
+  try {
+    for (const b of (await LibStore.getAllBooks()) || []) if (b && b.id && b.title) titles[b.id] = b.title;
+  } catch (e) { /* IDB no disponible */ }
   for (const b of meta || []) {
-    titles[b.id] = b.title;
+    if (b.title) titles[b.id] = b.title;
     if (books[b.id]) books[b.id].meta = b;
   }
 
