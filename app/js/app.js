@@ -8,7 +8,7 @@ import * as AiPanel from './ai/panel.js';
 import * as AiDB from './ai/db.js';
 import { hydrateIcons } from './ui/icons.js';
 import { countBookWords, updateProgressDetail } from './progress.js';
-import { initHighlights, setupHighlights, setupPdfSelection, drawPdfHighlights, renderHighlights, applyStoredHighlights, hideHighlightTooltip, pdfFractionalRects, setBookMeta } from './highlights-ui.js';
+import { initHighlights, setupHighlights, setupPdfSelection, drawPdfHighlights, renderHighlights, applyStoredHighlights, repaintStoredHighlights, hideHighlightTooltip, pdfFractionalRects, setBookMeta } from './highlights-ui.js';
 import { initBookmarkButton, updateBookmarkButton, renderBookmarks } from './bookmarks-ui.js';
 import * as Library from './library/view.js';
 import * as LibStore from './library/store.js';
@@ -20,6 +20,7 @@ import { alertBox } from './ui/dialog.js';
 import { rangeForText } from './pdf-locate.js';
 import { migrateSchema, purgeExpiredTombstones } from './sync/schema.js';
 import * as SyncEngine from './sync/engine.js';
+import * as Aliases from './sync/aliases.js';
 import * as License from './license.js';
 import { toast } from './ai/toast.js';
 import { t, translateDom } from './i18n.js';
@@ -74,11 +75,21 @@ function initSyncEngine() {
     if (badge.dataset.state === 'reconnect') AppSettings.open('data');
   });
 
-  // Un merge remoto cambió datos: refrescar las listas de la sidebar en sitio.
+  // Un merge remoto cambió datos: refrescar las listas de la sidebar en sitio y
+  // repintar las anotaciones sobre la página (nuevas y borradas). Si la
+  // reconciliación acaba de aliasar el libro abierto a otro id canónico,
+  // re-apuntar los módulos antes de renderizar (si no, leerían la clave vieja,
+  // que la migración acaba de vaciar).
   window.addEventListener('bookreader:remote-applied', () => {
     try {
+      if (currentBook) {
+        const annotId = Aliases.canonicalOf(currentBook.id);
+        Bookmarks.migrateBook([currentBook.id], annotId); Bookmarks.setBook(annotId);
+        Highlights.migrateBook([currentBook.id], annotId); Highlights.setBook(annotId);
+      }
       renderHighlights();
       renderBookmarks();
+      repaintStoredHighlights();
     } catch (e) { console.warn('sync re-render:', e); }
   });
 
@@ -364,9 +375,11 @@ async function openBookRecord(record, { fromRoute = false, loc = null } = {}) {
     // el usuario tiene que poder salir siempre. goToLibrary lo vuelve a ocultar.
     document.getElementById('library-btn').style.display = '';
     const buffer = record.file instanceof ArrayBuffer ? record.file.slice(0) : await record.file.arrayBuffer();
-    // Identidad unificada: migra subrayados/marcadores del id antiguo (nombre de fichero) al hash.
-    Bookmarks.migrateBook([record.fileBaseId], record.id); Bookmarks.setBook(record.id);
-    Highlights.migrateBook([record.fileBaseId], record.id); Highlights.setBook(record.id);
+    // Identidad unificada: migra subrayados/marcadores del id antiguo (nombre de fichero) al
+    // hash, y de ahí al canónico si el sync aliasó este libro con la copia de otro dispositivo.
+    const annotId = Aliases.canonicalOf(record.id);
+    Bookmarks.migrateBook([record.fileBaseId, record.id], annotId); Bookmarks.setBook(annotId);
+    Highlights.migrateBook([record.fileBaseId, record.id], annotId); Highlights.setBook(annotId);
     setBookMeta({ title: record.title, author: record.author, cover: record.cover });
     currentBook = { id: record.id, fileBaseId: record.fileBaseId || record.id, format: record.format };
     if (record.format === 'pdf') {
@@ -895,9 +908,11 @@ async function loadFile(file) {
   const fileBaseId = file.name.replace(/\.[^.]+$/, '');
   // Hash estable del contenido: id canónico para biblioteca, agente Y subrayados/marcadores.
   const id = await AiDB.hashBuffer(buffer.slice(0));
-  // Identidad unificada: migra subrayados/marcadores guardados con el nombre del fichero al hash.
-  Bookmarks.migrateBook([fileBaseId], id); Bookmarks.setBook(id);
-  Highlights.migrateBook([fileBaseId], id); Highlights.setBook(id);
+  // Identidad unificada: migra subrayados/marcadores guardados con el nombre del fichero al
+  // hash, y de ahí al canónico si el sync aliasó este libro con la copia de otro dispositivo.
+  const annotId = Aliases.canonicalOf(id);
+  Bookmarks.migrateBook([fileBaseId, id], annotId); Bookmarks.setBook(annotId);
+  Highlights.migrateBook([fileBaseId, id], annotId); Highlights.setBook(annotId);
   currentBook = { id, fileBaseId, format: ext };
   Library.hide();
   // Botón de volver a la biblioteca visible desde YA (la carga puede tardar y el

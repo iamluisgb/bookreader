@@ -5,6 +5,39 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-18 — Sync: reconciliación de identidad entre dispositivos (mismo libro, distinto hash)
+
+Causa real de "subrayo en el móvil y el PC no lo ve" (confirmada en el Drive del usuario: el
+mismo título aparecía DOS veces en Recuperación): el id de libro es el SHA-256 del fichero, y
+dos descargas no byte-idénticas del mismo título (mirrors de z-lib que estampan metadatos)
+producen dos ids → cada dispositivo sincronizaba "su" libro, sin cruzarse jamás. Era el caso
+límite documentado en `SYNC_PLAN.md` ("mismo libro con distinto bookId").
+
+- **`js/sync/aliases.js`** (nuevo): agrupa los ids canónicos (64 hex) por **título normalizado**
+  (cleanTitle + sin tildes/puntuación); en un grupo con >1 id, todos son alias del **menor
+  lexicográfico**. Regla determinista: cada dispositivo la computa por su cuenta (manifest
+  remoto + metadatos locales de agente/biblioteca) y converge al mismo canónico sin
+  coordinación. `reconcile()` fusiona las claves del alias en el canónico (migrateBook: unión
+  por uid, LWW, tombstones) y guarda el mapa en `book_aliases`; `canonicalOf()` redirige.
+- **`js/sync/engine.js`**: paso 1b del ciclo, tras el pull y ANTES del push — así el libro
+  unificado se sube ya bajo el id canónico y el otro dispositivo lo baja fusionado. Corre con
+  `applyingRemote` (no re-dispara push por el propio merge) y emite `remote-applied` si movió algo.
+- **`js/app.js`**: al abrir un libro (biblioteca o fichero), subrayados/marcadores se keyean por
+  `canonicalOf(hash)`; el handler de `remote-applied` re-apunta el libro abierto si la
+  reconciliación lo aliasó en caliente (si no, leería la clave que la migración acaba de vaciar).
+- **`js/highlights-ui.js`**: `repaintStoredHighlights()` — repintado **idempotente** tras un merge
+  remoto (quita y re-pinta cada anotación; los tombstones recién llegados desaparecen). Cierra
+  además el hueco de que un subrayado llegado en caliente solo se veía en la sidebar hasta
+  reabrir el libro. En PDF redibuja las capas por página (ya limpiaban antes de pintar).
+- Tests: `tests/book-aliases.spec.ts` (3) — agrupación y elección del menor, fusión + idempotencia
+  + `canonicalOf`, títulos distintos no se aliasan y `normTitle` ignora tildes/mirror. SW `v92`.
+
+> Convergencia: basta con que ambos dispositivos carguen esta versión (el SW se actualiza al
+> visitar la app). Las entradas del id perdedor perduran en Drive sin efecto; se podrán plegar
+> en una futura extensión de `purgeOrphans`.
+
+---
+
 ## 2026-07-17 — Umami Analytics en landings y app (solo producción)
 
 Loader condicional en `index.html`, `es/index.html` y `app/index.html`: solo carga si

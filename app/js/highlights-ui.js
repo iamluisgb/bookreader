@@ -352,6 +352,26 @@ export function applyStoredHighlights() {
   }
 }
 
+// Repintado tras un merge remoto, con anotaciones YA pintadas: primero quita
+// cada una (incluidos los tombstones recién llegados, que deben desaparecer) y
+// vuelve a poner solo las vivas — applyStoredHighlights a secas las apilaría.
+// Las capas de PDF se redibujan enteras desde el store (drawPdfHighlights ya
+// limpia la capa antes de pintar).
+export function repaintStoredHighlights() {
+  const rendition = EpubReader.getRendition();
+  if (rendition) {
+    for (const hl of Highlights.getAllRaw()) {
+      if (hl && hl.cfi) { try { rendition.annotations.remove(hl.cfi, 'highlight'); } catch (e) { /* no estaba pintada */ } }
+    }
+    for (const hl of Highlights.getAll()) {
+      if (hl && hl.cfi) applyHighlightToRendition(hl.cfi, hl.color);
+    }
+  }
+  document.querySelectorAll('#pdf-container .pdf-page[data-page]').forEach(w => {
+    drawPdfHighlights(Number(w.dataset.page));
+  });
+}
+
 export function renderHighlights() {
   const list = document.getElementById('highlights-list');
   const highlights = Highlights.getAll();

@@ -20,6 +20,7 @@ import * as DriveAuth from './drive-auth.js';
 import * as Highlights from '../highlights.js';
 import * as Bookmarks from '../bookmarks.js';
 import * as Storage from '../storage.js';
+import * as Aliases from './aliases.js';
 import { buildSnapshot, restoreSnapshot, BASE, SCHEMA_VERSION } from './layout.js';
 
 const STATE_KEY = 'sync_state'; // { manifestEtag, books: { <path>: etag } } — último remoto visto
@@ -96,6 +97,19 @@ async function cycle() {
     save();
     if (merged) window.dispatchEvent(new CustomEvent('bookreader:remote-applied'));
   }
+
+  // 1b) Reconciliación de identidad: el mismo título bajo dos hashes (descargas
+  // no byte-idénticas del mismo libro en cada dispositivo) se fusiona en el id
+  // canónico ANTES del push, así ambos lados convergen al mismo fichero remoto
+  // en vez de sincronizar cada uno "su" libro sin cruzarse jamás.
+  applyingRemote = true;
+  let reconciled;
+  try {
+    reconciled = Aliases.reconcile(await Aliases.collectTitles(remoteManifest && remoteManifest.books));
+  } finally {
+    applyingRemote = false;
+  }
+  if (reconciled) window.dispatchEvent(new CustomEvent('bookreader:remote-applied'));
 
   // 2) PUSH — libros locales más nuevos que el manifest remoto.
   const snap = await buildSnapshot();
