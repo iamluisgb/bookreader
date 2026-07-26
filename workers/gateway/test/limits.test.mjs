@@ -6,7 +6,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { pick, measureInput, ipBucket } from '../src/index.js';
+import { pick, measureInput, ipBucket, extractUsage } from '../src/index.js';
 
 test('pick: solo copia las claves permitidas y omite las ausentes', () => {
   const body = { messages: [], stream: true, n: 20, best_of: 5, logprobs: true, model: 'x' };
@@ -42,6 +42,25 @@ test('measureInput: tolera entradas ausentes o malformadas sin lanzar', () => {
   assert.deepEqual(measureInput(undefined), { tokens: 0, images: 0 });
   assert.deepEqual(measureInput('no soy un array'), { tokens: 0, images: 0 });
   assert.deepEqual(measureInput([null, {}, { content: 42 }]), { tokens: 0, images: 0 });
+});
+
+test('extractUsage: saca prompt/completion tokens de una respuesta OpenAI', () => {
+  const body = JSON.stringify({
+    choices: [{ message: { content: 'secreto del usuario' } }],
+    usage: { prompt_tokens: 1234, completion_tokens: 56, total_tokens: 1290 },
+  });
+  assert.deepEqual(extractUsage(body), { input: 1234, output: 56 });
+});
+
+test('extractUsage: null si no hay usage, o si el cuerpo no es JSON', () => {
+  assert.equal(extractUsage('data: [DONE]'), null);
+  assert.equal(extractUsage('{"choices":[]}'), null);
+  assert.equal(extractUsage(''), null);
+  assert.equal(extractUsage('{"usage":{}}'), null);
+});
+
+test('extractUsage: tolera que falte uno de los dos contadores', () => {
+  assert.deepEqual(extractUsage('{"usage":{"prompt_tokens":10}}'), { input: 10, output: 0 });
 });
 
 test('ipBucket: IPv4 agrupa por /24', () => {

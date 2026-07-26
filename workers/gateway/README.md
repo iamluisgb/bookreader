@@ -34,12 +34,41 @@ npx wrangler d1 execute bookreader-gateway --remote --command \
 npx wrangler tail
 ```
 
+## Cuánto cuesta la demo (F1.2)
+
+El gateway contaba llamadas pero no lo que cuesta una. Ahora `daily_stats` acumula
+tokens por día — **contadores agregados, nunca contenido**: la retención cero sigue
+intacta. Dos series a propósito:
+
+- `est_input_tokens` — la estimación del propio gateway (~4 chars/token), en **todas**
+  las llamadas.
+- `real_input_tokens` / `real_output_tokens` / `measured_calls` — el `usage` que
+  devuelve el proveedor. Solo llega en las llamadas **no streaming** (tools y visión):
+  el stream se reenvía sin parsear (ADR-021 §5). Sirven para **calibrar** la estimación
+  y extrapolarla al total.
+
+```bash
+# Coste por llamada y desviación de la estimación (últimos 7 días)
+npx wrangler d1 execute bookreader-gateway --remote --command \
+  "SELECT day, calls, demo_calls,
+          real_input_tokens / NULLIF(measured_calls,0)  AS in_por_llamada,
+          real_output_tokens / NULLIF(measured_calls,0) AS out_por_llamada,
+          ROUND(1.0 * est_input_tokens / NULLIF(real_input_tokens,0), 2) AS factor_estimacion
+   FROM daily_stats ORDER BY day DESC LIMIT 7"
+```
+
+`factor_estimacion` > 1 significa que sobreestimamos la entrada (los techos de
+`LIMITS` son entonces más conservadores de lo que parecen). Con una semana de datos,
+`DEMO_QUOTA` y `MAX_DAILY_CALLS` dejan de ser números inventados.
+
 ## Demo self-service (F3)
 
 `POST /demo-token` emite un token de `DEMO_QUOTA` llamadas (30). Guardas: 1 demo por IP
 (hasheada con `IP_HASH_SALT`) y día → 429 `demo_already_granted`; tope de emisión diaria
 `MAX_DAILY_TOKENS` → 429 `demo_sold_out`; tope de llamadas demo/día `MAX_DAILY_CALLS` →
-403 `demo_paused` en el chat. Los topes son vars de `wrangler.jsonc`. Consumo del día:
+403 `demo_paused` en el chat. Los topes son vars de `wrangler.jsonc`. Las concesiones de
+más de 30 días se barren al emitir (el límite es por día: guardarlas no sirve de nada).
+Consumo del día:
 
 ```bash
 npx wrangler d1 execute bookreader-gateway --remote --command \

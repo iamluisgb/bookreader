@@ -690,6 +690,11 @@ self-service (F3), Turnstile si hiciera falta, allowlist de modelos y tope de `m
 - **F1.1 — Techos de entrada** `S` · **✓** _(2026-07-26)_: límites de body/contexto/imágenes,
   allowlist de parámetros al proveedor, bucket de red en la emisión de demos y devolución de cuota
   ante 5xx del upstream. Helpers puros con tests (`npm run test:gateway`).
+- **F1.2 — Medición de coste** `S` · **✓** _(2026-07-26)_: `daily_stats` acumula tokens por día
+  (agregados, nunca contenido). Estimación propia en todas las llamadas + `usage` real del proveedor
+  en las no-streaming, para calibrar. **Responde la pregunta abierta de abajo**: con una semana de
+  datos, `DEMO_QUOTA` y `MAX_DAILY_CALLS` dejan de ser números inventados (consulta en el README).
+  Incluye barrido de `demo_grants` de más de 30 días.
 - **F2 — Concurrencia** `S`–`M`: cola (Durable Object) o pool de keys. Solo si F1 muestra colisiones
   reales.
 - **F3 — Demo self-service** `M` · **✓** _(2026-07-15, ver CHANGELOG)_: `POST /demo-token` con
@@ -756,9 +761,10 @@ declarar retención cero y logging mínimo, coherente con el posicionamiento pri
 **Fuera de alcance:** emisión de tokens Pro del gateway (ver enlace en MON1), checkout embebido
 (v2), tier Supporter $49 (LAUNCH_PLAN, decisión de pricing aparte).
 
-**❓ Abiertas:** ¿cuota total (100 llamadas) o diaria? · ¿tokens de pago post-demo ligados a Pro/Lemon
-Squeezy o solo demo? · ¿cuenta de Cloudflare disponible (si no: Deno Deploy / VPS)? · medir el coste por
-llamada real en nan para dimensionar la demo sin sustos.
+**❓ Abiertas:** ¿cuota total (100 llamadas) o diaria? · ¿tokens de pago post-demo ligados a Pro/Polar
+o solo demo? · ~~¿cuenta de Cloudflare disponible?~~ (sí: desplegado) · ~~medir el coste por llamada real
+en nan~~ → **instrumentado en F1.2**; queda *leer* los datos tras unos días de tráfico y ajustar
+`DEMO_QUOTA`/`MAX_DAILY_CALLS` con ellos.
 
 ---
 

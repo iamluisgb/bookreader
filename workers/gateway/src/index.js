@@ -72,7 +72,7 @@ const PASSTHROUGH = [
 const num = (v, d) => Number.isFinite(Number(v)) ? Number(v) : d;
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
     const cors = corsHeaders(request, env);
 
@@ -83,7 +83,7 @@ export default {
         return withCors(await handleModels(request, env), cors);
       }
       if (url.pathname === '/v1/chat/completions' && request.method === 'POST') {
-        return withCors(await handleChat(request, env), cors);
+        return withCors(await handleChat(request, env, ctx), cors);
       }
       if (url.pathname === '/demo-token' && request.method === 'POST') {
         return withCors(await handleDemoToken(request, env), cors);
@@ -110,7 +110,7 @@ async function handleModels(request, env) {
 
 // POST /v1/chat/completions — valida, decrementa, enruta y hace passthrough
 // (streaming incluido: se devuelve el body upstream sin tocarlo).
-async function handleChat(request, env) {
+async function handleChat(request, env, ctx) {
   const tok = await getToken(request, env);
   if (!tok.ok) return tok.response;
 
@@ -193,15 +193,35 @@ async function handleChat(request, env) {
     if (back) remaining = back.remaining;
   }
 
-  // Passthrough del body (SSE o JSON) con las cabeceras que importan. Las CORS
-  // las añade withCors; el resto de cabeceras upstream no se filtran.
-  return new Response(upstream.body, {
-    status: upstream.status,
-    headers: {
-      'Content-Type': upstream.headers.get('Content-Type') || 'application/json',
-      'X-Quota-Remaining': String(remaining),
-    },
-  });
+  const headers = {
+    'Content-Type': upstream.headers.get('Content-Type') || 'application/json',
+    'X-Quota-Remaining': String(remaining),
+  };
+
+  // MEDICIÓN (F1.2). Contadores agregados por día, jamás contenido: retención cero
+  // intacta. La estimación de entrada se registra siempre; el `usage` real solo se
+  // puede leer en las respuestas NO streaming (las de tools y visión) — el stream se
+  // reenvía sin parsear, como manda ADR-021 §5. Con las dos series se calibra la
+  // estimación y se extrapola al total.
+  const stats = { calls: 1, est_input_tokens: size.tokens };
+
+  if (body.stream === true || !upstream.ok) {
+    // Passthrough intacto del stream (o del error): no se toca el body.
+    ctx?.waitUntil(addStats(env, stats));
+    return new Response(upstream.body, { status: upstream.status, headers });
+  }
+
+  // No streaming: la respuesta es un JSON pequeño que hay que leer entero de todas
+  // formas para reenviarlo, así que leer `usage` de paso no cuesta nada.
+  const text = await upstream.text();
+  const usage = extractUsage(text);
+  if (usage) {
+    stats.measured_calls = 1;
+    stats.real_input_tokens = usage.input;
+    stats.real_output_tokens = usage.output;
+  }
+  ctx?.waitUntil(addStats(env, stats));
+  return new Response(text, { status: upstream.status, headers });
 }
 
 // POST /demo-token — emite un token demo self-service (F3). Guardas, en orden:
@@ -224,6 +244,10 @@ async function handleDemoToken(request, env) {
       'This network already got a demo today. Try again tomorrow, or add your own API key (BYOK).');
   }
 
+  // Higiene: las concesiones viejas ya no sirven para nada (el límite es por día).
+  // Se barren aquí y no en un cron para no añadir otra pieza que operar.
+  await env.DB.prepare("DELETE FROM demo_grants WHERE day < date('now', '-30 day')").run();
+
   const token = 'br-demo-' + randomHex(12);
   const quota = num(env.DEMO_QUOTA, 30);
   await env.DB
@@ -232,13 +256,46 @@ async function handleDemoToken(request, env) {
   return json(200, { token, remaining: quota, model: 'bookreader-fast' });
 }
 
+// Columnas de daily_stats que se pueden incrementar. Los nombres se interpolan en
+// el SQL (D1 no parametriza identificadores), así que la allowlist es lo que evita
+// que un nombre inesperado acabe en la sentencia.
+const STAT_COLS = [
+  'tokens_issued', 'demo_calls', 'calls',
+  'est_input_tokens', 'measured_calls', 'real_input_tokens', 'real_output_tokens',
+];
+
 // Incrementa (y crea si no existe) el contador diario indicado; devuelve el valor.
 async function bumpStat(env, col) {
-  const row = await env.DB
-    .prepare(`INSERT INTO daily_stats (day, ${col}) VALUES (date('now'), 1)
-              ON CONFLICT(day) DO UPDATE SET ${col} = ${col} + 1 RETURNING ${col}`)
-    .first();
+  const row = await addStats(env, { [col]: 1 }, col);
   return row ? row[col] : 0;
+}
+
+// Suma varios contadores del día en una sola sentencia atómica. `returning` pide
+// de vuelta una columna (la usa el disyuntor para decidir en el acto).
+async function addStats(env, deltas, returning) {
+  const cols = Object.keys(deltas).filter((c) => STAT_COLS.includes(c));
+  if (!cols.length) return null;
+  const vals = cols.map((c) => Number(deltas[c]) || 0);
+  const params = cols.map((_, i) => `?${i + 1}`);
+  const sets = cols.map((c, i) => `${c} = ${c} + ?${i + 1}`);
+  const tail = returning && STAT_COLS.includes(returning) ? ` RETURNING ${returning}` : '';
+  return env.DB
+    .prepare(`INSERT INTO daily_stats (day, ${cols.join(', ')}) VALUES (date('now'), ${params.join(', ')})
+              ON CONFLICT(day) DO UPDATE SET ${sets.join(', ')}${tail}`)
+    .bind(...vals)
+    .first();
+}
+
+// Saca {input, output} del `usage` de una respuesta OpenAI-compatible. Solo mira
+// esos dos números: el resto del cuerpo ni se guarda ni se registra.
+export function extractUsage(text) {
+  let u;
+  try { u = JSON.parse(text)?.usage; } catch { return null; }
+  if (!u) return null;
+  const input = Number(u.prompt_tokens);
+  const output = Number(u.completion_tokens);
+  if (!Number.isFinite(input) && !Number.isFinite(output)) return null;
+  return { input: input || 0, output: output || 0 };
 }
 
 // ---- límites de entrada (puros: testeados en test/limits.test.mjs) --------------

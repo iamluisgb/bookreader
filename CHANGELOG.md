@@ -5,6 +5,24 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-26 — Gateway F1.2: saber lo que cuesta una llamada (sin romper la retención cero)
+
+`DEMO_QUOTA=30` y `MAX_DAILY_CALLS=2000` eran números inventados: el gateway contaba llamadas pero
+no medía ninguna. Era una pregunta abierta del propio BACKLOG desde F1 ("medir el coste por llamada
+real en nan para dimensionar la demo sin sustos").
+
+- **`daily_stats` acumula tokens por día** (migración `0003`). Son **contadores agregados, nunca
+  contenido ni nada ligado a un usuario**: la retención cero de ADR-021 §5 sigue intacta.
+- **Dos series, a propósito**: `est_input_tokens` es la estimación del gateway (~4 chars/token) en
+  todas las llamadas; `real_input_tokens`/`real_output_tokens`/`measured_calls` es el `usage` del
+  proveedor, que solo llega en las llamadas **no streaming** (tools y visión) porque el stream se
+  reenvía sin parsear. La segunda calibra la primera y se extrapola al total — medir sin tocar el
+  passthrough, que es lo que protege la privacidad.
+- La escritura va en `ctx.waitUntil`, fuera del camino de la respuesta.
+- Consulta lista en el README: coste por llamada y `factor_estimacion` (cuánto sobreestimamos).
+- **Higiene**: las concesiones de `demo_grants` de más de 30 días se barren al emitir. El límite es
+  por día; guardarlas no servía para nada.
+
 ## 2026-07-26 — Gateway F1.1: el presupuesto diario de la demo ahora es un presupuesto de verdad
 
 El gateway topaba `max_tokens` (**salida**) y contaba llamadas, pero no medía la **entrada**. Como
