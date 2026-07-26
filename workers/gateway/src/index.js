@@ -217,6 +217,11 @@ async function handleChat(request, env, ctx) {
   const usage = extractUsage(text);
   if (usage) {
     stats.measured_calls = 1;
+    // La estimación de ESTA llamada, aparte: es el término comparable con
+    // real_input_tokens. Contra `est_input_tokens` (que incluye las de streaming,
+    // sin `usage`) el cociente no mide el error de la estimación sino el mix de
+    // tráfico.
+    stats.est_input_measured = size.tokens;
     stats.real_input_tokens = usage.input;
     stats.real_output_tokens = usage.output;
   }
@@ -261,7 +266,8 @@ async function handleDemoToken(request, env) {
 // que un nombre inesperado acabe en la sentencia.
 const STAT_COLS = [
   'tokens_issued', 'demo_calls', 'calls',
-  'est_input_tokens', 'measured_calls', 'real_input_tokens', 'real_output_tokens',
+  'est_input_tokens', 'measured_calls', 'est_input_measured',
+  'real_input_tokens', 'real_output_tokens',
 ];
 
 // Incrementa (y crea si no existe) el contador diario indicado; devuelve el valor.

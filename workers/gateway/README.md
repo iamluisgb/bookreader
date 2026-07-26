@@ -44,8 +44,10 @@ intacta. Dos series a propósito:
   las llamadas.
 - `real_input_tokens` / `real_output_tokens` / `measured_calls` — el `usage` que
   devuelve el proveedor. Solo llega en las llamadas **no streaming** (tools y visión):
-  el stream se reenvía sin parsear (ADR-021 §5). Sirven para **calibrar** la estimación
-  y extrapolarla al total.
+  el stream se reenvía sin parsear (ADR-021 §5).
+- `est_input_measured` — la estimación **de esas mismas llamadas medidas**. Es el único
+  término comparable con `real_input_tokens`: dividir por `est_input_tokens` mediría el
+  mix streaming/no-streaming, no el error de la estimación.
 
 ```bash
 # Coste por llamada y desviación de la estimación (últimos 7 días)
@@ -53,13 +55,19 @@ npx wrangler d1 execute bookreader-gateway --remote --command \
   "SELECT day, calls, demo_calls,
           real_input_tokens / NULLIF(measured_calls,0)  AS in_por_llamada,
           real_output_tokens / NULLIF(measured_calls,0) AS out_por_llamada,
-          ROUND(1.0 * est_input_tokens / NULLIF(real_input_tokens,0), 2) AS factor_estimacion
+          ROUND(1.0 * est_input_measured / NULLIF(real_input_tokens,0), 2) AS factor_estimacion,
+          ROUND(1.0 * est_input_tokens / NULLIF(measured_calls,0) * calls, 0) AS entrada_total_estimada
    FROM daily_stats ORDER BY day DESC LIMIT 7"
 ```
 
-`factor_estimacion` > 1 significa que sobreestimamos la entrada (los techos de
-`LIMITS` son entonces más conservadores de lo que parecen). Con una semana de datos,
-`DEMO_QUOTA` y `MAX_DAILY_CALLS` dejan de ser números inventados.
+`factor_estimacion` > 1 significa que sobreestimamos la entrada (los techos de `LIMITS`
+son entonces más conservadores de lo que parecen); se usa para convertir
+`est_input_tokens` en tokens reales y así estimar el gasto **del total**, incluidas las
+llamadas en streaming que nunca se miden. Con una semana de datos, `DEMO_QUOTA` y
+`MAX_DAILY_CALLS` dejan de ser números inventados.
+
+> Ojo al leer los primeros días: con pocas llamadas medidas el factor baila mucho.
+> Fíate cuando `measured_calls` pase de unas decenas.
 
 ## Demo self-service (F3)
 

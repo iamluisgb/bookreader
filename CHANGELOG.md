@@ -18,6 +18,11 @@ real en nan para dimensionar la demo sin sustos").
   proveedor, que solo llega en las llamadas **no streaming** (tools y visión) porque el stream se
   reenvía sin parsear. La segunda calibra la primera y se extrapola al total — medir sin tocar el
   passthrough, que es lo que protege la privacidad.
+- **`est_input_measured`** (migración `0004`): la estimación de *las llamadas medidas*, que es el
+  único término comparable con `real_input_tokens`. Dividir por `est_input_tokens` —que incluye las
+  de streaming, sin `usage`— medía el mix de tráfico, no el error de la estimación: la primera
+  lectura en producción dio un "factor" de 3892. Con la columna correcta: **1,19** (sobreestimamos
+  la entrada un 19%, razonable para la heurística de ~4 chars/token).
 - La escritura va en `ctx.waitUntil`, fuera del camino de la respuesta.
 - Consulta lista en el README: coste por llamada y `factor_estimacion` (cuánto sobreestimamos).
 - **Higiene**: las concesiones de `demo_grants` de más de 30 días se barren al emitir. El límite es
