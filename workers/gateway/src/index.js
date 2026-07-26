@@ -36,11 +36,36 @@ const ROUTING = {
   },
 };
 
+// `urlEnv` permite apuntar el proveedor a otro sitio sin tocar código: un mock en
+// `wrangler dev` (así se verifican allowlist y devolución de cuota sin gastar
+// llamadas reales) o un endpoint de staging. En producción no está definido.
 const PROVIDERS = {
-  nan: { baseUrl: 'https://api.nan.builders/v1', keyEnv: 'NAN_API_KEY' },
+  nan: { baseUrl: 'https://api.nan.builders/v1', keyEnv: 'NAN_API_KEY', urlEnv: 'NAN_BASE_URL' },
 };
 
 const MAX_TOKENS_CAP = 8192; // mismo techo que usa el cliente; nadie lo sube desde fuera
+
+// Techos de ENTRADA. `MAX_TOKENS_CAP` solo acota la salida: sin esto, una llamada
+// puede llevar megas de mensajes y sigue contando **1** contra la cuota y contra
+// MAX_DAILY_CALLS — es decir, los disyuntores diarios no acotarían el gasto real.
+// El cliente presupuesta 60K tokens de libro por turno (`context.js`
+// DEFAULT_BUDGET_TOKENS) + historial + system: 90K deja margen holgado sin dejar
+// hueco al abuso. Las imágenes van aparte porque una captura de página (1024px,
+// JPEG q0.85) son ~350 KB de data URI y no son "texto" que estimar.
+const LIMITS = {
+  bodyChars: 1_048_576,  // 1 MB; el peor caso legítimo (visión: imagen + texto) ronda 500 KB
+  inputTokens: 90_000,   // solo texto, misma estimación de ~4 chars/token que context.js
+  images: 2,             // el cliente adjunta 1 página por turno
+};
+
+// Parámetros que se reenvían al proveedor. Allowlist y no `...body` a propósito:
+// campos como `n` o `best_of` multiplican el coste de una llamada que la cuota
+// sigue contando como una. Lo que el cliente usa (llm.js): messages, stream,
+// max_tokens, tools, tool_choice; el resto son estándar e inocuos en coste.
+const PASSTHROUGH = [
+  'messages', 'stream', 'max_tokens', 'tools', 'tool_choice',
+  'temperature', 'top_p', 'stop', 'response_format', 'seed',
+];
 
 // F3 · Demo self-service (los topes viven en vars de wrangler.jsonc para ajustarlos
 // sin tocar código): cuota por token, tokens emitidos/día e llamadas demo/día.
@@ -89,9 +114,26 @@ async function handleChat(request, env) {
   const tok = await getToken(request, env);
   if (!tok.ok) return tok.response;
 
+  // Se lee como texto para poder medir ANTES de parsear: un JSON.parse de 100 MB
+  // ya es trabajo (y memoria) hecho a cuenta de quien abusa.
+  const raw = await request.text();
+  if (raw.length > LIMITS.bodyChars) {
+    return oaiError(413, 'request_too_large',
+      `Request body too large (max ${Math.round(LIMITS.bodyChars / 1024)} KB).`);
+  }
+
   let body;
-  try { body = await request.json(); } catch {
+  try { body = JSON.parse(raw); } catch {
     return oaiError(400, 'invalid_request', 'Body must be JSON.');
+  }
+
+  const size = measureInput(body.messages);
+  if (size.images > LIMITS.images) {
+    return oaiError(400, 'too_many_images', `At most ${LIMITS.images} images per request.`);
+  }
+  if (size.tokens > LIMITS.inputTokens) {
+    return oaiError(413, 'context_too_large',
+      `Input context too large (~${size.tokens} tokens, max ${LIMITS.inputTokens}).`);
   }
 
   const route = ROUTING[body.model];
@@ -125,18 +167,31 @@ async function handleChat(request, env) {
   }
 
   const provider = PROVIDERS[route.provider];
-  const upstream = await fetch(`${provider.baseUrl}/chat/completions`, {
+  const baseUrl = env[provider.urlEnv] || provider.baseUrl;
+  const upstream = await fetch(`${baseUrl}/chat/completions`, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${env[provider.keyEnv]}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      ...body,
+      ...pick(body, PASSTHROUGH),
       model: route.model,
       max_tokens: Math.min(Number(body.max_tokens) || MAX_TOKENS_CAP, MAX_TOKENS_CAP),
     }),
   });
+
+  // El fallo del proveedor no lo paga el usuario: si el upstream se cae (o rechaza
+  // por concurrencia sobre la key compartida — riesgo aceptado en ADR-021 §6), se
+  // devuelve la llamada a la cuota. Perder llamadas de la demo sin recibir nada es
+  // la peor primera impresión posible justo donde queremos convertir.
+  let remaining = dec.remaining;
+  if (upstream.status >= 500) {
+    const back = await env.DB
+      .prepare('UPDATE tokens SET remaining = remaining + 1 WHERE token = ?1 RETURNING remaining')
+      .bind(tok.token).first();
+    if (back) remaining = back.remaining;
+  }
 
   // Passthrough del body (SSE o JSON) con las cabeceras que importan. Las CORS
   // las añade withCors; el resto de cabeceras upstream no se filtran.
@@ -144,7 +199,7 @@ async function handleChat(request, env) {
     status: upstream.status,
     headers: {
       'Content-Type': upstream.headers.get('Content-Type') || 'application/json',
-      'X-Quota-Remaining': String(dec.remaining),
+      'X-Quota-Remaining': String(remaining),
     },
   });
 }
@@ -160,7 +215,7 @@ async function handleDemoToken(request, env) {
   }
 
   const ip = request.headers.get('CF-Connecting-IP') || '0.0.0.0';
-  const ipHash = await sha256Hex(`${env.IP_HASH_SALT || ''}|${ip}`);
+  const ipHash = await sha256Hex(`${env.IP_HASH_SALT || ''}|${ipBucket(ip)}`);
   const grant = await env.DB
     .prepare("INSERT INTO demo_grants (ip_hash, day) VALUES (?1, date('now')) ON CONFLICT DO NOTHING RETURNING ip_hash")
     .bind(ipHash).first();
@@ -184,6 +239,53 @@ async function bumpStat(env, col) {
               ON CONFLICT(day) DO UPDATE SET ${col} = ${col} + 1 RETURNING ${col}`)
     .first();
   return row ? row[col] : 0;
+}
+
+// ---- límites de entrada (puros: testeados en test/limits.test.mjs) --------------
+
+// Copia solo las claves permitidas (ver PASSTHROUGH).
+export function pick(obj, keys) {
+  const out = {};
+  for (const k of keys) if (obj[k] !== undefined) out[k] = obj[k];
+  return out;
+}
+
+// Estima el tamaño de entrada de `messages` (formato OpenAI). Devuelve tokens de
+// TEXTO (~4 chars/token, igual que context.js) e imágenes contadas aparte: un data
+// URI de imagen son cientos de KB que no tiene sentido medir como texto.
+export function measureInput(messages) {
+  let chars = 0, images = 0;
+  for (const m of Array.isArray(messages) ? messages : []) {
+    const c = m?.content;
+    if (typeof c === 'string') { chars += c.length; continue; }
+    for (const part of Array.isArray(c) ? c : []) {
+      if (part?.type === 'image_url') images++;
+      else if (typeof part?.text === 'string') chars += part.text.length;
+    }
+    // tool_calls: los argumentos son JSON y también ocupan contexto.
+    for (const tc of Array.isArray(m?.tool_calls) ? m.tool_calls : []) {
+      chars += (tc?.function?.arguments || '').length;
+    }
+  }
+  return { tokens: Math.round(chars / 4), images };
+}
+
+// Agrupa la IP en su bloque de red antes de hashearla. Con la IP exacta, "1 demo
+// por IP y día" no frena nada en IPv6: a un usuario doméstico le sobran direcciones
+// dentro de su propia /64 para pedir tokens indefinidamente y vaciar la demo del
+// día (MAX_DAILY_TOKENS) para todos. /64 en IPv6 y /24 en IPv4 (que además agrupa
+// el CGNAT móvil). Coste: vecinos de la misma red comparten cupo — aceptable para
+// una demo de 30 llamadas, y `MAX_DAILY_TOKENS` sigue siendo el techo global.
+export function ipBucket(ip) {
+  if (!ip.includes(':')) return ip.split('.').slice(0, 3).concat('0/24').join('.');
+  // Expandir `::` para que 2001:db8::1 y 2001:db8:0:0:0:0:0:1 caigan en el mismo bucket.
+  const [head, tail = ''] = ip.split('::');
+  const h = head ? head.split(':') : [];
+  const t = tail ? tail.split(':') : [];
+  const groups = ip.includes('::')
+    ? [...h, ...Array(Math.max(0, 8 - h.length - t.length)).fill('0'), ...t]
+    : ip.split(':');
+  return groups.slice(0, 4).map((g) => (g || '0').replace(/^0+(?=.)/, '')).join(':') + '::/64';
 }
 
 async function sha256Hex(s) {

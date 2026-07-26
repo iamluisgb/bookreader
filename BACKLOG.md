@@ -674,11 +674,22 @@ transitorios); F2 lo resuelve de verdad **si la medición lo pide**.
 **Anti-abuso:** además del contador por token — rate-limit por token (rpm), límite por IP en la emisión
 self-service (F3), Turnstile si hiciera falta, allowlist de modelos y tope de `max_tokens` server-side.
 
+> **Corregido en F1.1 (2026-07-26)** — el `max_tokens` server-side solo acotaba la SALIDA, así que
+> los disyuntores diarios no acotaban el gasto: **todo límite cuenta llamadas, y una llamada tenía
+> coste ilimitado por el lado de la entrada**. Ahora hay techos de entrada (1 MB de body, 90K tokens
+> de texto, 2 imágenes; rechazan antes de gastar cuota), **allowlist de parámetros** al proveedor (`n`
+> y `best_of` multiplicaban el coste de una llamada contada como una), **bucket de red /64+/24** en la
+> emisión de demos (con la IP exacta, IPv6 hacía inútil el "1 por IP y día") y **devolución de cuota
+> si el upstream da 5xx**. Detalle en `workers/gateway/README.md`.
+
 **Fases:**
 - **F1 — Worker MVP** `M` · **✓** _(2026-07-15, ver CHANGELOG · ADR-021)_: `workers/gateway/`
   desplegado (D1 + secret + alias `bookreader-fast`/`bookreader-vision`), verificado end-to-end
   incluida la app real (`tests/gateway.spec.ts` @live). Nota: demo agotada devuelve **403** (no
   429) porque IA3 reintenta los 429 — ver ADR-021.
+- **F1.1 — Techos de entrada** `S` · **✓** _(2026-07-26)_: límites de body/contexto/imágenes,
+  allowlist de parámetros al proveedor, bucket de red en la emisión de demos y devolución de cuota
+  ante 5xx del upstream. Helpers puros con tests (`npm run test:gateway`).
 - **F2 — Concurrencia** `S`–`M`: cola (Durable Object) o pool de keys. Solo si F1 muestra colisiones
   reales.
 - **F3 — Demo self-service** `M` · **✓** _(2026-07-15, ver CHANGELOG)_: `POST /demo-token` con

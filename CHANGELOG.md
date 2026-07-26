@@ -5,6 +5,28 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-26 — Gateway F1.1: el presupuesto diario de la demo ahora es un presupuesto de verdad
+
+El gateway topaba `max_tokens` (**salida**) y contaba llamadas, pero no medía la **entrada**. Como
+todos los límites —cuota del token, `MAX_DAILY_CALLS`— cuentan llamadas, y una llamada podía llevar
+megas de mensajes, "2000 llamadas/día" no acotaba el gasto: bastaba `curl` con un body enorme, y el
+presupuesto de contexto del cliente (`context.js`) no pinta nada porque quien abusa no usa el cliente.
+
+- **Techos de entrada** en `handleChat`: 1 MB de body (se mide antes de `JSON.parse`), 90 000 tokens
+  de texto y 2 imágenes por petición. Los tres rechazan **antes** del decremento, así que una
+  petición inválida no gasta cuota. Margen sobre el peor caso legítimo: visión (captura de 1024px +
+  texto) ronda 500 KB, y el cliente presupuesta 60K tokens de libro por turno.
+- **Allowlist de parámetros** al proveedor en vez de `...body`: `n`, `best_of`, `logprobs` y demás
+  multiplicaban el coste de una llamada que la cuota seguía contando como una.
+- **1 demo por red y día, no por IP** (`ipBucket()`: /64 en IPv6, /24 en IPv4 — que de paso agrupa el
+  CGNAT móvil). Con la IP exacta, a un usuario con IPv6 le sobraban direcciones dentro de su propia
+  /64 para pedir tokens hasta vaciar `MAX_DAILY_TOKENS` para todos.
+- **El fallo del proveedor no lo paga el usuario**: un 5xx del upstream devuelve la llamada a la
+  cuota. Perder llamadas de la demo sin recibir nada era la peor primera impresión posible justo
+  donde el LAUNCH_PLAN quiere convertir.
+- **Testeable sin gastar**: los helpers son puros (`npm run test:gateway`, 7 tests) y `NAN_BASE_URL`
+  apunta el proveedor a un mock para el humo local con `wrangler dev`.
+
 ## 2026-07-26 — Sync de BIBLIOTECA y de ARCHIVOS: tus libros en todos tus dispositivos (estilo Play Books)
 
 Hasta ahora el sync llevaba las **anotaciones** pero no la biblioteca. El resultado era un agujero

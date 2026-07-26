@@ -1,0 +1,5 @@
+{
+  "name": "bookreader-gateway",
+  "private": true,
+  "type": "module"
+}
