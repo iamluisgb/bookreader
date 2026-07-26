@@ -192,6 +192,44 @@ En `sandbox.polar.sh` con el producto replicado:
 
 Solo cuando todo esto pasa en sandbox, repetir producto+discount en producción.
 
+## Paso 7b — Humo en producción con una compra de $0
+
+El sandbox valida la lógica, pero no la **configuración de producción**: el
+`organization_id` real, el Checkout Link real, la plantilla de email real. Ahí es
+donde aparecen los fallos tontos que cuestan una venta. Polar permite ejercitar
+todo eso sin gastar dinero: **los pedidos con total cero se marcan como pagados
+de inmediato, sin paso de pago** — no pide tarjeta, y al no haber importe tampoco
+hay fee (5% + $0.50 sobre $0 = $0).
+
+Dos vías; usar la primera:
+
+1. **Discount del 100%** (recomendado): *Products → Discounts* → percentage 100%,
+   código `TESTFLOW`, **límite de usos 1-2** y expiración corta. Se aplica con
+   `?discount_code=TESTFLOW` sobre el Checkout Link. Ventaja: pruebas **el
+   producto real de $29**, no una copia que puede divergir.
+2. **Producto con pricing "Free"**: soportado y los benefits funcionan igual,
+   pero obliga a mantener un producto duplicado. Solo si el descuento fallara.
+
+Qué verifica (todo lo que hasta ahora estaba mockeado en `js/license.js`):
+
+- Checkout real con tu branding → orden creada.
+- Benefit concedido → **email automático con la key `BKRD-…`**.
+- `activate`/`validate` contra `api.polar.sh` con el `organization_id` de
+  producción → gate Pro abierto en la app desplegada (no en localhost).
+- Portal de cliente accesible desde el error de límite de activaciones.
+
+**Qué NO cubre** (por eso no sustituye al sandbox): el cobro en sí (tarjeta, 3DS,
+IVA del MoR, payout al IBAN) y el **reembolso** — no se puede reembolsar $0, así
+que el punto 7 del sandbox sigue siendo el único sitio donde se prueba que una
+key revocada degrada la app a Free.
+
+**Cuándo**: el día antes del lanzamiento, con la landing ya desplegada. Después,
+**borrar o agotar el código `TESTFLOW`** para que no circule un 100% de descuento
+durante el lanzamiento.
+
+> Ojo con el orden: `CONFIG` en `js/license.js` (organizationId, checkoutUrl,
+> portalUrl) debe estar ya relleno y desplegado, o este humo prueba el mock.
+
 ## Checklist final
 
 - [ ] Cuenta y organización creadas en polar.sh (y en sandbox)
@@ -203,6 +241,9 @@ Solo cuando todo esto pasa en sandbox, repetir producto+discount en producción.
 - [ ] MON2 implementado (BACKLOG): módulo licencia + gate + paywall + key en backup
 - [ ] Validación de key integrada: activate/validate + ventana offline 30 días
 - [ ] Los 7 puntos de verificación en sandbox pasan (incluida purga + restore de backup)
+- [ ] `CONFIG` de `js/license.js` relleno con los valores de producción y desplegado
+- [ ] Humo en producción con discount 100% (paso 7b): email + key + gate en la app desplegada
+- [ ] Código `TESTFLOW` borrado/agotado antes de abrir el lanzamiento
 - [ ] Gestor consultado sobre la declaración de los payouts de Polar (MoR)
 
 ## Situación fiscal en España (sin estar dado de alta como autónomo)

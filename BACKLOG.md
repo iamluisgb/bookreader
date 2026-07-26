@@ -709,7 +709,8 @@ declarar retención cero y logging mínimo, coherente con el posicionamiento pri
 > (`CONFIG.organizationId` vacío → keys `BKRD-…` activan Pro localmente; `-REVOKED`/`-LIMIT`
 > reproducen los errores reales). **Pendiente para producción:** crear cuenta/producto en Polar
 > (guía, pasos 1-5), rellenar `CONFIG` (organizationId, checkoutUrl, portalUrl, sandbox),
-> pasar la verificación end-to-end en sandbox (guía, paso 7) y el empujón de instalación PWA
+> pasar la verificación end-to-end en sandbox (guía, paso 7), el humo en producción con
+> compra de $0 vía discount 100% (guía, paso 7b) y el empujón de instalación PWA
 > al activar Pro (mitigación nº 3 de la purga).
 > Contraparte de código de [docs/GUIA_MONETIZACION.md](docs/GUIA_MONETIZACION.md) (Polar, MoR +
 > license keys). **Sin backend**: los endpoints de license keys del customer portal de Polar
