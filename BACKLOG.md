@@ -255,7 +255,7 @@ resultados con ↑/↓.)_
 - Confirmación al borrar y borrar desde el propio resaltado en el lector.
 - _(El backup/restore de highlights y bookmarks ya lo cubre P3, ver CHANGELOG.)_
 
-### P7 — Sync entre dispositivos · **fases 0-2 ✓** `L`
+### P7 — Sync entre dispositivos · **fases 0-2 y A-C ✓** `L`
 Plan completo en [`SYNC_PLAN.md`](SYNC_PLAN.md). **Fase 0**: modelo mergeable
 (uid/updatedAt/tombstones) + migración. **Fase 1**: DriveProvider (PKCE + Worker +
 appDataFolder + etag/412) y Guardar/Restaurar manual. **Fase 2** (ver CHANGELOG): merge por
@@ -263,10 +263,14 @@ item (unión por uid + LWW + tombstones) y **SyncEngine automático** — pull�
 triggers (arranque/debounce/periódico/visibilitychange), 412-retry, multi-pestaña (Web
 Locks), badge de estado, posición de lectura sincronizada. Sync sin botones al conectar Drive.
 **Infra**: Worker desplegado, OAuth de Google en producción (sin caducidad de tokens).
+**Fases A-C ✓** (ver CHANGELOG · [DECISIONS.md ADR-024](DECISIONS.md)): la **biblioteca entera**
+sincroniza (fichas, portadas, estanterías, tombstones) y los **ficheros de libro** se suben a Drive
+y se descargan bajo demanda en otro dispositivo, estilo Play Books. Metadatos gratis, binarios Pro;
+subida automática hasta 50 MB, panel de cuota en Ajustes.
 **Fase 3 en curso**: recuperación de versiones ✓ (`recovery.js` + Ajustes → Datos →
 Historial). **Pendiente de Fase 3**: WebDAV como 2º proveedor (sync sin Worker, público
-r/selfhosted); manejo fino de errores de usuario (sin conexión, cuota llena); opcional:
-sincronizar los ficheros de libro.
+r/selfhosted) — nótese que `WebDavProvider` tendrá que implementar también `readBinary`/
+`writeBinary`, no solo los 4 métodos de texto.
 - **Pulir la vista de histórico de versiones (`recovery.js` · `listBooks`):** hoy la lista de
   libros sale fea — **nombres repetidos** (mismo título en varios `id`, p. ej. re-importados o
   datos de prueba) y **algunos son solo el hash/UUID** (cuando el libro no tiene título en los

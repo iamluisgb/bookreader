@@ -4,18 +4,27 @@
 // clave, no borra lo local que no coincida).
 
 import * as Drive from './drive-provider.js';
+import * as LibrarySync from './library-sync.js';
 import { buildSnapshot, restoreSnapshot, BASE, SCHEMA_VERSION } from './layout.js';
 import { backfillAll } from './schema.js';
 
 export async function saveToDrive(onProgress = () => {}) {
   const snap = await buildSnapshot();
-  const total = Object.keys(snap.books).length + 2;
+  const total = Object.keys(snap.books).length + 4;
   let done = 0;
   const step = async (path, obj) => {
     await Drive.write(path, JSON.stringify(obj));
     onProgress(++done, total);
   };
   await step(BASE + 'settings.json', snap.settings);
+  // La biblioteca (fichas y estanterías) va en la copia manual igual que en el
+  // sync automático: sin ella, restaurar en un equipo limpio devolvía los
+  // subrayados de libros que no aparecían por ninguna parte.
+  const now = Date.now();
+  snap.manifest.libraryUpdatedAt = now;
+  snap.manifest.coversUpdatedAt = now;
+  await step(BASE + LibrarySync.LIBRARY_FILE, await LibrarySync.buildLibrary());
+  await step(BASE + LibrarySync.COVERS_FILE, await LibrarySync.buildCovers());
   for (const [id, book] of Object.entries(snap.books)) {
     await step(BASE + 'books/' + id + '.json', book);
   }
@@ -39,6 +48,11 @@ export async function restoreFromDrive(onProgress = () => {}) {
 
   const settingsFile = await Drive.read(BASE + 'settings.json');
   onProgress(++done, total);
+
+  const libraryFile = await Drive.read(BASE + LibrarySync.LIBRARY_FILE);
+  if (libraryFile) await LibrarySync.applyLibrary(JSON.parse(libraryFile.content));
+  const coversFile = await Drive.read(BASE + LibrarySync.COVERS_FILE);
+  if (coversFile) await LibrarySync.applyCovers(JSON.parse(coversFile.content));
 
   const books = {};
   for (const [id, info] of entries) {

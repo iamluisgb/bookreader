@@ -211,6 +211,13 @@ async function applyRoute() {
       await goToLibrary({ fromRoute: true });
       return;
     }
+    // Enlace a un libro que sí es tuyo pero cuyo archivo aún no está aquí (llegó
+    // por sync de biblioteca desde otro dispositivo): la biblioteca es quien
+    // sabe descargarlo y pedir Pro, así que se delega en ella en vez de fallar.
+    if (!LibStore.hasFile(record)) {
+      await goToLibrary({ fromRoute: true });
+      return;
+    }
     await openBookRecord(record, { fromRoute: true, loc });
   } finally {
     applyingRoute = false;
@@ -378,6 +385,7 @@ async function openBookRecord(record, { fromRoute = false, loc = null } = {}) {
     // locations/portada/persistencia pueden tardar (o colgarse) en libros grandes y
     // el usuario tiene que poder salir siempre. goToLibrary lo vuelve a ocultar.
     document.getElementById('library-btn').style.display = '';
+    if (!LibStore.hasFile(record)) throw new Error('ghost');
     const buffer = record.file instanceof ArrayBuffer ? record.file.slice(0) : await record.file.arrayBuffer();
     // Identidad unificada: migra subrayados/marcadores del id antiguo (nombre de fichero) al
     // hash, y de ahí al canónico si el sync aliasó este libro con la copia de otro dispositivo.
@@ -432,7 +440,12 @@ async function openBookRecord(record, { fromRoute = false, loc = null } = {}) {
 // Guardar/actualizar un libro recién abierto desde un archivo (con portada).
 async function persistToLibrary(id, buffer, format, fileName, fileBaseId) {
   try {
-    const existing = await LibStore.getBook(id);
+    // getRaw y no getBook: si el libro estaba borrado, su tombstone sigue ahí y
+    // hay que resucitarlo explícitamente. Con getBook (que filtra borrados) se
+    // creaba un registro nuevo con `deleted` heredado del que quedaba en la
+    // base, y el libro recién importado desaparecía en el siguiente render.
+    const raw = await LibStore.getRaw(id);
+    const existing = raw && !raw.deleted ? raw : null;
     const title = format === 'pdf' ? (fileName.replace(/\.[^.]+$/, '')) : EpubReader.getTitle();
     const author = format === 'pdf' ? '' : EpubReader.getAuthor();
     // Portada: EPUB de sus metadatos; PDF renderizando su página 1 (ya está cargado).
@@ -445,6 +458,12 @@ async function persistToLibrary(id, buffer, format, fileName, fileBaseId) {
       ...base, id, title, author, cover: cover || base.cover || '',
       format, fileName, fileBaseId, file: buffer.slice(0), size: buffer.byteLength,
       lastOpenedAt: Date.now(),
+      // Reimportar a mano un libro borrado lo revive (y con updatedAt de ahora,
+      // así el tombstone que sigue vivo en los otros dispositivos pierde el LWW
+      // y no vuelve a borrarlo en cuanto sincronicen).
+      deleted: false, deletedAt: 0,
+      // La miniatura se recalcula: la portada puede haber cambiado.
+      coverThumb: cover ? null : (base.coverThumb || null),
     });
   } catch (e) {
     console.warn('No se pudo guardar en la biblioteca (¿espacio?):', e);

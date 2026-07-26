@@ -5,12 +5,33 @@
 //
 // Stores:
 //   books   (keyPath id)  -> { id, title, author, format, cover (dataURL),
-//                              file (ArrayBuffer), size, addedAt, lastOpenedAt,
-//                              progress (0..100), lastCfi, status, shelfIds: [] }
-//   shelves (keyPath id)  -> { id, name, createdAt }
+//                              file (ArrayBuffer|null), size, addedAt, lastOpenedAt,
+//                              progress (0..100), lastCfi, status, shelfIds: [],
+//                              blob, updatedAt, deleted, deletedAt }
+//   shelves (keyPath id)  -> { id, name, createdAt, updatedAt, deleted, deletedAt }
+//
+// Sync de biblioteca (Fase A): los metadatos viajan entre dispositivos, el
+// fichero no necesariamente. De ahí tres cambios sobre el modelo original:
+//
+//   `file` puede faltar → FICHA FANTASMA: el libro existe en tu biblioteca (lo
+//   importaste en otro dispositivo) pero su binario no está aquí. Se descarga
+//   bajo demanda (sync/blobs.js). `hasFile()` distingue los dos casos.
+//
+//   `deleted`/`deletedAt` → tombstone en vez de borrado físico. Sin él, borrar
+//   un libro en un dispositivo no se propagaba: el siguiente sync se lo volvía
+//   a bajar del remoto (donde seguía vivo) y el libro "resucitaba".
+//
+//   `updatedAt` → LWW por registro en el merge. Solo lo bumpean los campos
+//   SINCRONIZABLES: `lastOpenedAt` o tener o no el fichero descargado son
+//   decisiones de ESTE dispositivo y no deben provocar tráfico ni ganar merges.
 
 const DB_NAME = 'bookreader_library';
 const DB_VERSION = 1;
+
+// Campos que viajan en library.json. Un cambio en cualquiera de ellos bumpea
+// `updatedAt`; un cambio en el resto (lastOpenedAt, lastCfi, file…) no.
+const SYNCED_FIELDS = ['title', 'author', 'format', 'fileName', 'fileBaseId', 'size',
+  'addedAt', 'status', 'progress', 'shelfIds', 'blob', 'deleted', 'deletedAt'];
 
 let dbPromise = null;
 
@@ -48,31 +69,139 @@ const reqP = (request) => new Promise((resolve, reject) => {
 
 // ---- Libros ----------------------------------------------------------------
 
-export function getBook(id) {
+// ¿El binario está en ESTE dispositivo? Un registro sin `file` es una ficha
+// fantasma: se ve en la rejilla, pero hay que descargarlo para leerlo.
+// Los registros que vienen de getAllBooks/getAllRecords traen `hasLocalFile` en
+// vez del binario (ver más abajo), y ambos casos se responden igual.
+export function hasFile(record) {
+  if (!record) return false;
+  if (typeof record.hasLocalFile === 'boolean') return record.hasLocalFile;
+  return !!(record.file && (record.file.byteLength || record.file.size));
+}
+
+export function isGhost(record) {
+  return !!record && !record.deleted && !hasFile(record);
+}
+
+// Registro COMPLETO (con el binario), tombstones incluidos. Para abrir un libro
+// o subirlo: nunca para listar.
+export function getRaw(id) {
   return tx('books', 'readonly', s => reqP(s.get(id)));
 }
 
+export function getBook(id) {
+  return getRaw(id).then(r => (r && r.deleted ? null : r));
+}
+
+const byRecent = (a, b) => (b.lastOpenedAt || b.addedAt || 0) - (a.lastOpenedAt || a.addedAt || 0);
+
 export function getAllBooks() {
-  return tx('books', 'readonly', s => reqP(s.getAll()))
-    .then(list => (list || []).sort((a, b) => (b.lastOpenedAt || b.addedAt || 0) - (a.lastOpenedAt || a.addedAt || 0)));
+  return getAllRecords().then(list => list.filter(b => !b.deleted).sort(byRecent));
 }
 
-// Inserta o actualiza el registro completo de un libro.
-export function putBook(record) {
-  return tx('books', 'readwrite', s => reqP(s.put(record)));
+// TODOS los registros SIN el binario, tombstones incluidos.
+//
+// Va con cursor y suelta `file` en cuanto lee cada registro, en vez de
+// `getAll()`: getAll deserializa la tabla entera de golpe, así que pintar la
+// rejilla metía en memoria el ArrayBuffer de CADA libro de la biblioteca —
+// cientos de MB para mostrar unas portadas. Con cursor solo hay un binario vivo
+// a la vez, y se descarta al momento.
+export function getAllRecords() {
+  return tx('books', 'readonly', s => new Promise((resolve, reject) => {
+    const out = [];
+    const req = s.openCursor();
+    req.onsuccess = () => {
+      const cur = req.result;
+      if (!cur) return resolve(out);
+      const { file, ...meta } = cur.value;
+      meta.hasLocalFile = !!(file && (file.byteLength || file.size));
+      out.push(meta);
+      cur.continue();
+    };
+    req.onerror = () => reject(req.error);
+  }));
 }
 
-// Aplica un parche parcial a un libro existente (progreso, estado, estanterías…).
-export async function updateBook(id, patch) {
-  const cur = await getBook(id);
-  if (!cur) return null;
-  const next = { ...cur, ...patch };
-  await putBook(next);
+function syncedChanged(prev, next) {
+  if (!prev) return true;
+  return SYNCED_FIELDS.some(f => JSON.stringify(prev[f]) !== JSON.stringify(next[f]));
+}
+
+// Avisa al SyncEngine de que hay algo que subir. Se emite desde AQUÍ, el único
+// punto de escritura, en vez de desde cada pantalla que toca la biblioteca:
+// así ninguna acción nueva se olvida de sincronizar. El engine ignora el evento
+// mientras está aplicando datos remotos (applyingRemote), que es lo que evita
+// el eco de un merge convertido en push.
+function notifyChanged() {
+  try {
+    window.dispatchEvent(new Event('bookreader:data-changed'));
+  } catch (e) { /* sin DOM (tests unitarios) */ }
+}
+
+// Inserta o actualiza el registro completo de un libro. Sella `updatedAt` solo
+// si cambió algo sincronizable (o si viene impuesto por el merge remoto).
+//
+// Guarda contra un pie en el que es fácil dispararse: los registros de
+// getAllRecords() vienen SIN binario y marcados con `hasLocalFile`. Reescribir
+// uno de ellos tal cual (lo hace el merge de biblioteca al aplicar metadatos
+// remotos) habría borrado el fichero del libro. Si el registro viene marcado y
+// no trae `file` explícito, se conserva el que ya estaba guardado.
+export async function putBook(record, { stamp = true } = {}) {
+  const next = { ...record };
+  const stripped = typeof next.hasLocalFile === 'boolean';
+  delete next.hasLocalFile;
+
+  const prev = (stamp || stripped) ? await getRaw(next.id) : null;
+  if (stripped && next.file === undefined && prev) next.file = prev.file;
+  let changed = false;
+  if (stamp) {
+    changed = syncedChanged(prev, next);
+    if (changed) next.updatedAt = Date.now();
+    else if (prev && !next.updatedAt) next.updatedAt = prev.updatedAt;
+  }
+  await tx('books', 'readwrite', s => reqP(s.put(next)));
+  if (changed) notifyChanged();
   return next;
 }
 
-export function deleteBook(id) {
-  return tx('books', 'readwrite', s => reqP(s.delete(id)));
+// Aplica un parche parcial a un libro existente (progreso, estado, estanterías…).
+export async function updateBook(id, patch, opts) {
+  const cur = await getRaw(id);
+  if (!cur) return null;
+  return putBook({ ...cur, ...patch }, opts);
+}
+
+// Borrado LÓGICO: el registro sobrevive como tombstone para que el borrado se
+// propague al resto de dispositivos. Suelta el binario y la portada (que es lo
+// que ocupa) y conserva solo lo justo para identificarlo. La purga física la
+// hace purgeDeleted() pasado el TTL, cuando todos han visto el borrado.
+export async function deleteBook(id) {
+  const cur = await getRaw(id);
+  if (!cur) return null;
+  const now = Date.now();
+  const rec = await putBook({
+    id, title: cur.title || '', format: cur.format || '',
+    blob: cur.blob || null,       // lo necesita blobs.js para borrarlo del remoto
+    deleted: true, deletedAt: now, updatedAt: now,
+  }, { stamp: false });
+  notifyChanged();   // stamp:false no lo emite, pero borrar SÍ es un cambio a propagar
+  return rec;
+}
+
+// Libera el binario de ESTE dispositivo dejando la ficha fantasma. Es una
+// decisión local: no toca `updatedAt` ni viaja en el sync (si lo hiciera, el
+// resto de dispositivos perderían su copia descargada).
+export async function removeDownload(id) {
+  const cur = await getRaw(id);
+  if (!cur || !hasFile(cur)) return null;
+  return putBook({ ...cur, file: null }, { stamp: false });
+}
+
+// Purga física de tombstones ya propagados (mismo TTL que sync/schema.js).
+export async function purgeDeleted(before) {
+  const gone = (await getAllRecords()).filter(b => b.deleted && (b.deletedAt || 0) < before);
+  await Promise.all(gone.map(b => tx('books', 'readwrite', s => reqP(s.delete(b.id)))));
+  return gone.length;
 }
 
 // Estado de lectura derivado del progreso, sin pisar "finished" manual.
@@ -86,30 +215,53 @@ export function statusFor(progress, prev) {
 // ---- Estanterías -----------------------------------------------------------
 
 export function getShelves() {
-  return tx('shelves', 'readonly', s => reqP(s.getAll()))
-    .then(list => (list || []).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)));
+  return getAllShelfRecords()
+    .then(list => list.filter(s => !s.deleted).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)));
+}
+
+export function getAllShelfRecords() {
+  return tx('shelves', 'readonly', s => reqP(s.getAll())).then(list => list || []);
+}
+
+export async function putShelf(shelf) {
+  const r = await tx('shelves', 'readwrite', s => reqP(s.put(shelf)));
+  notifyChanged();
+  return r;
 }
 
 export async function addShelf(name) {
-  const shelf = { id: 'sh_' + Date.now().toString(36), name: name.trim(), createdAt: Date.now() };
-  await tx('shelves', 'readwrite', s => reqP(s.put(shelf)));
+  const now = Date.now();
+  // El id lleva sufijo aleatorio: dos dispositivos creando una estantería en el
+  // mismo milisegundo generaban el MISMO id y el merge las fusionaba en una.
+  const shelf = {
+    id: 'sh_' + now.toString(36) + Math.random().toString(36).slice(2, 6),
+    name: name.trim(), createdAt: now, updatedAt: now,
+  };
+  await putShelf(shelf);
   return shelf;
 }
 
-export function renameShelf(id, name) {
-  return tx('shelves', 'readwrite', async s => {
-    const sh = await reqP(s.get(id));
-    if (sh) { sh.name = name.trim(); await reqP(s.put(sh)); }
-  });
+export async function renameShelf(id, name) {
+  const sh = await tx('shelves', 'readonly', s => reqP(s.get(id)));
+  if (!sh) return null;
+  return putShelf({ ...sh, name: name.trim(), updatedAt: Date.now() });
 }
 
-// Borra la estantería y la quita de todos los libros (no borra los libros).
+// Borra la estantería (tombstone) y la quita de todos los libros (no borra los libros).
 export async function deleteShelf(id) {
-  await tx('shelves', 'readwrite', s => reqP(s.delete(id)));
+  const sh = await tx('shelves', 'readonly', s => reqP(s.get(id)));
+  const now = Date.now();
+  if (sh) await putShelf({ ...sh, deleted: true, deletedAt: now, updatedAt: now });
   const books = await getAllBooks();
   await Promise.all(books
     .filter(b => (b.shelfIds || []).includes(id))
     .map(b => updateBook(b.id, { shelfIds: b.shelfIds.filter(x => x !== id) })));
+}
+
+export async function purgeDeletedShelves(before) {
+  const gone = (await getAllShelfRecords()).filter(s => s.deleted && (s.deletedAt || 0) < before);
+  await Promise.all(gone.map(s => tx('shelves', 'readwrite', st => reqP(st.delete(s.id)))));
+  return gone.length;
 }
 
 export async function toggleBookShelf(bookId, shelfId, on) {

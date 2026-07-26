@@ -12,6 +12,8 @@ import { BLOCKS, allTemplates } from '../ai/templates.js';
 import * as CustomTpl from '../ai/custom-templates.js';
 import * as DriveAuth from '../sync/drive-auth.js';
 import * as DriveSync from '../sync/drive-sync.js';
+import * as Drive from '../sync/drive-provider.js';
+import * as Blobs from '../sync/blobs.js';
 import * as SyncEngine from '../sync/engine.js';
 import * as Recovery from '../sync/recovery.js';
 import * as Profiles from '../ai/profiles.js';
@@ -540,6 +542,10 @@ function dataHtml() {
       <button id="appset-drive-connect" class="primary-btn appset-save">${icon('upload', { size: 15 })} ${t('Conectar con Google Drive')}</button>
     </div>
     <div id="appset-drive-on" hidden>
+      <label class="appset-check"><input type="checkbox" id="appset-drive-files">
+        <span>${t('Sincronizar también los archivos de los libros')}</span></label>
+      <p class="appset-muted">${t('Tus libros se suben a esa misma carpeta privada y aparecen en el resto de dispositivos listos para descargar. Los de más de {n} MB no se suben solos: se piden desde el menú del libro.', { n: 50 })}</p>
+      <p class="appset-muted" id="appset-drive-quota">${t('Consultando espacio…')}</p>
       <button id="appset-drive-save" class="primary-btn appset-save">${icon('upload', { size: 15 })} ${t('Guardar en Drive')}</button>
       <button id="appset-drive-restore" class="appset-tpl-cancel appset-data-md">${icon('download', { size: 15 })} ${t('Restaurar desde Drive')}</button>
       <button id="appset-drive-history" class="appset-tpl-cancel appset-data-md">${icon('sort', { size: 15 })} ${t('Historial de versiones')}</button>
@@ -588,11 +594,55 @@ function wireData(content) {
 function wireDrive(content, show) {
   const offBlock = content.querySelector('#appset-drive-off');
   const onBlock = content.querySelector('#appset-drive-on');
+  const filesCheck = content.querySelector('#appset-drive-files');
+  const quotaEl = content.querySelector('#appset-drive-quota');
   const refresh = () => {
     const on = DriveAuth.isConnected();
     offBlock.hidden = on;
     onBlock.hidden = !on;
+    filesCheck.checked = Blobs.isEnabled();
+    if (on) paintQuota();
   };
+
+  const mb = (n) => (n / (1024 * 1024)).toFixed(1) + ' MB';
+  const gb = (n) => (n / (1024 * 1024 * 1024)).toFixed(1) + ' GB';
+
+  // La carpeta de la app NO se ve en drive.google.com pero consume los 15 GB de
+  // la cuenta. Sin enseñarlo, quedarse sin espacio por culpa de los libros es un
+  // misterio que el usuario no puede diagnosticar desde ninguna parte.
+  async function paintQuota() {
+    quotaEl.textContent = t('Consultando espacio…');
+    try {
+      const [info, used] = await Promise.all([Drive.storageInfo(), Drive.appUsage('bookreader/')]);
+      const local = await Blobs.localEstimate();
+      const drive = info.limit
+        ? t('BookReader ocupa {used} de los {limit} de tu Drive ({usage} usados en total).',
+          { used: mb(used), limit: gb(info.limit), usage: gb(info.usage) })
+        : t('BookReader ocupa {used} en tu Drive.', { used: mb(used) });
+      quotaEl.textContent = local
+        ? drive + ' ' + t('En este dispositivo: {used}.', { used: mb(local.usage) })
+        : drive;
+    } catch (e) {
+      quotaEl.textContent = e && e.message === 'reconnect'
+        ? t('El permiso de Google caducó o fue revocado. Vuelve a conectar con Drive.')
+        : t('No se pudo consultar el espacio de Drive.');
+    }
+  }
+
+  filesCheck.addEventListener('change', async () => {
+    // Activarlo es empezar a consumir cuota de Drive del usuario: se pide Pro en
+    // el momento de la intención, no al primer fallo silencioso de subida.
+    if (filesCheck.checked && !(await ensurePro('files'))) {
+      filesCheck.checked = false;
+      return;
+    }
+    Blobs.setEnabled(filesCheck.checked);
+    show(filesCheck.checked
+      ? t('Los archivos de tus libros se subirán a Drive en segundo plano.')
+      : t('Se dejarán de subir archivos. Los que ya están en Drive siguen ahí.'));
+    if (filesCheck.checked) Blobs.schedule();
+  });
+
   refresh();
 
   // El error 'reconnect' (token revocado/caducado) degrada a "conectar de nuevo".

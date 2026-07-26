@@ -5,6 +5,60 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-26 — Sync de BIBLIOTECA y de ARCHIVOS: tus libros en todos tus dispositivos (estilo Play Books)
+
+Hasta ahora el sync llevaba las **anotaciones** pero no la biblioteca. El resultado era un agujero
+visible: subrayabas en el portátil, abrías el móvil y los subrayados llegaban a un libro **que no
+existía en su biblioteca**. Datos huérfanos sin nada a lo que engancharse. Los ficheros EPUB/PDF
+estaban excluidos por diseño ([`SYNC_PLAN.md`](SYNC_PLAN.md): "binarios; opcional en fase futura").
+
+Ahora la biblioteca entera viaja, y el fichero se descarga bajo demanda:
+
+- **Fase A · metadatos (gratis)** — `js/sync/library-sync.js`. Dos ficheros nuevos en Drive, separados
+  **por su ritmo de escritura**: `library.json` (título, autor, progreso, estado, estanterías,
+  puntero al binario) cambia sin parar porque el progreso se mueve al leer; `covers.json` (las
+  portadas, ~90% del peso) solo cambia al añadir o quitar libros. Juntos, cada avance de página
+  habría reescrito cientos de KB. El manifest lleva `libraryUpdatedAt`/`coversUpdatedAt` para no
+  descargarlos en cada ciclo. **Las estanterías sincronizan por primera vez.**
+- **Fase B · ficheros (Pro)** — `js/sync/blobs.js`. Cola de transferencias con **lock propio**
+  (`bookreader-blobs`): bajar un EPUB de 50 MB dentro del lock del sync habría dejado a todas las
+  pestañas sin sincronizar durante minutos. Subida automática hasta **50 MB**; por encima, a mano
+  desde el menú del libro. `js/sync/drive-provider.js` gana `readBinary`/`writeBinary` (multipart
+  hasta 5 MB, **resumable en trozos de 8 MB** por encima — el límite de Drive) y `storageInfo`.
+- **Fase C · espacio** — panel de cuota en Ajustes. `appDataFolder` **no se ve en drive.google.com
+  pero consume los 15 GB** de la cuenta: sin enseñarlo, quedarse sin espacio era indiagnosticable.
+  Más `navigator.storage.persist()` (sin él, el navegador podía desalojar la biblioteca entera).
+
+**El binario es inmutable y direccionable por contenido** — el `bookId` ya era el SHA-256 del
+fichero. De ahí tres regalos: no hay merge ni etags ni 412 para los blobs (write-once, si ya está
+no se re-sube); al descargar se re-hashea y se verifica; y el dispositivo que descarga obtiene
+**bytes idénticos** → mismo hash → las anotaciones enganchan solas, sin pasar por `aliases.js`.
+
+En la UI (`js/library/view.js`): **ficha fantasma** con portada atenuada y botón de descarga con el
+tamaño, barra de progreso por tarjeta, y en el menú **"Quitar descarga de este dispositivo"** —
+separado de **"Eliminar"**, que ahora borra en todos los dispositivos y libera la copia de Drive.
+
+Tres arreglos de fondo que salieron por el camino:
+- **`getAllBooks()` cargaba en memoria el binario de TODOS los libros** solo para pintar la rejilla
+  (cientos de MB). Ahora va con cursor y suelta `file` al leer cada registro: `hasLocalFile` en el
+  listado, `getRaw(id)` para el fichero.
+- **Borrar era físico y no se propagaba**: el siguiente sync se bajaba el libro del remoto (donde
+  seguía vivo) y "resucitaba". Ahora hay tombstone con el mismo TTL que el resto.
+- **`syncNow()` devolvía `'busy'` al instante** si había un ciclo en vuelo, así que `await syncNow()`
+  era una promesa mentirosa: resolvía sin haber sincronizado nada. Ahora encadena; los disparadores
+  automáticos usan `syncSoon()`, que sí no-opera. Lo mismo en `Blobs.flush()`/`requestDownload()`,
+  donde además rompía el flujo real de "descargar y abrir" (abría un libro sin fichero).
+
+13 tests nuevos, incluidos dos de subida resumable con un fichero de 17 MB: uno de camino feliz
+(3 trozos, reensamblado verificado por SHA-256) y otro donde el mock **acepta un trozo a medias**
+y obliga a reanudar desde el `Range` que reporta el servidor. Ese segundo es el que tiene dientes:
+un cliente que reanude desde su propio offset sube un fichero del tamaño correcto con los bytes
+desplazados, y solo el hash lo delata. El mock deja explícito el
+`Access-Control-Expose-Headers: Location, Range` que la API real tiene que devolver — sin él el
+navegador oculta esas cabeceras al JS y no hay subida grande posible. SW `v97`.
+
+---
+
 ## 2026-07-18 — Agente: alcance de LIBRO ENTERO con permiso (deja de disculparse por "solo tener extractos")
 
 El agente responde por RAG: recibe un extracto recuperado por relevancia, no el libro entero. Para

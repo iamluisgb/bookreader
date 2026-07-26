@@ -581,3 +581,59 @@ el bundler + un checkpointer sobre IndexedDB.
 build step. La deuda que asumimos es que cualquier orquestación nueva (p. ej. el human-in-the-loop
 de ADR sobre `resolveBookScope`) se implementa a mano; si se acumulan varios de esos patrones, se
 reevalúa `StateGraph` propio antes que LangGraph.
+
+---
+
+## ADR-024 — Sync de biblioteca en dos ficheros y de binarios write-once, fuera del lock de sync · `ACEPTADA`
+
+**Contexto.** El sync (Fases 0-2) llevaba anotaciones pero no la biblioteca ni los ficheros. Eso
+producía un estado sin sentido: en el segundo dispositivo llegaban subrayados de libros que no
+existían allí. Faltaba decidir tres cosas: qué estructura tiene la biblioteca en el proveedor, cómo
+se sincronizan binarios de decenas de MB, y dónde va la línea de Pro.
+
+**Decisión.**
+
+1. **Dos ficheros para la biblioteca, separados por ritmo de escritura, no por tipo de dato.**
+   `library.json` (fichas + estanterías) es ligero y se reescribe constantemente porque el progreso
+   de lectura cambia mientras lees. `covers.json` (portadas en miniatura, JPEG a 200px) es ~90% del
+   peso y solo cambia al añadir o quitar libros. En un único fichero, cada avance de página habría
+   subido cientos de KB. El manifest lleva `libraryUpdatedAt`/`coversUpdatedAt` para no descargar
+   ninguno de los dos cuando no han cambiado.
+
+2. **Los binarios son write-once, sin merge ni concurrencia.** El `bookId` ya era el SHA-256 del
+   fichero, así que `files/<bookId>` es contenido direccionable: si existe en remoto, es byte a byte
+   el que subiríamos. Eso elimina etags, `ifMatch` y el bucle de 412 para los blobs, permite
+   verificar la descarga re-hasheando, y hace que las anotaciones enganchen solas —el dispositivo
+   que descarga obtiene el mismo hash, sin pasar por la reconciliación por título de `aliases.js`.
+
+3. **Cola de ficheros con lock propio, fuera del ciclo de sync.** El ciclo corre bajo el Web Lock
+   `bookreader-sync`; una descarga de 50 MB dentro de él dejaría a todas las pestañas sin
+   sincronizar anotaciones durante minutos. `js/sync/blobs.js` tiene su propio lock
+   (`bookreader-blobs`), es serie, prioriza descargas (el usuario las está esperando) sobre subidas
+   (trabajo de fondo), y el engine solo la despierta al terminar.
+
+4. **La línea de Pro va entre metadatos y bytes.** La Fase A (biblioteca, estanterías, portadas) es
+   gratis: es barata y sin ella el sync de anotaciones está roto. Los ficheros son Pro: son lo que
+   consume cuota de Drive y ancho de banda, y "tu biblioteca en todos tus dispositivos" es un
+   argumento de compra más fuerte que "tus subrayados sincronizados".
+
+5. **Techo de subida automática en 50 MB.** Por encima, el libro se sube solo si el usuario lo pide
+   desde su menú. Gastar varios cientos de MB de la cuenta de Google de alguien sin que lo haya
+   pedido no es una decisión que nos corresponda tomar por defecto.
+
+**Alternativas descartadas.**
+- *Un solo blob de biblioteca con las portadas dentro*: simple, pero convierte cada avance de página
+  en una subida de cientos de KB. Es el error que ya cometía arete a otra escala.
+- *Portadas como ficheros sueltos (`covers/<id>.jpg`)*: el ritmo de escritura sería óptimo, pero un
+  dispositivo nuevo con 100 libros necesitaría 200 peticiones (buscar + descargar por portada) solo
+  para pintar la rejilla. Un único `covers.json` cuesta una.
+- *Subir los binarios dentro del ciclo de sync*: menos código, pero bloquea el sync de anotaciones
+  de todas las pestañas durante toda la transferencia.
+- *Sync de ficheros gratis y solo la IA de pago*: deja fuera el argumento de conversión más claro y
+  regala la parte que cuesta ancho de banda.
+
+**Consecuencias.** Aparece el estado "ficha fantasma" (libro en la biblioteca sin binario local),
+que la UI tiene que representar y todo el código que abre libros tiene que contemplar
+(`LibStore.hasFile`). El borrado pasa a ser lógico (tombstone) porque ahora se propaga. Y
+`getAllBooks()` deja de devolver el binario —cargaba en memoria el de todos los libros para pintar
+la rejilla—, así que quien necesite el fichero pide `getRaw(id)` explícitamente.

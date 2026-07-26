@@ -33,16 +33,21 @@ test('un PDF SÍ se guarda en la biblioteca (buffer no detached)', async ({ page
   await page.waitForTimeout(500);
   const rec = await page.evaluate(async () => {
     const Store = await import('/js/library/store.js');
+    // getAllBooks() ya no devuelve el binario (cargaba en memoria el de TODOS
+    // los libros solo para pintar la rejilla): trae `hasLocalFile` y el fichero
+    // se pide por id con getRaw.
     const books = await Store.getAllBooks();
-    const pdf = (books || []).find((b: any) => b.format === 'pdf');
-    if (!pdf) return null;
+    const meta = (books || []).find((b: any) => b.format === 'pdf');
+    if (!meta) return null;
+    const pdf: any = await Store.getRaw(meta.id);
     const bytes = pdf.file instanceof ArrayBuffer ? pdf.file.byteLength : (pdf.file?.size ?? 0);
-    return { format: pdf.format, size: pdf.size, fileBytes: bytes };
+    return { format: pdf.format, size: pdf.size, fileBytes: bytes, hasLocalFile: meta.hasLocalFile };
   });
   expect(rec).not.toBeNull();
   expect(rec!.format).toBe('pdf');
   expect(rec!.size).toBeGreaterThan(0);      // antes del fix: 0 o no se guardaba
   expect(rec!.fileBytes).toBeGreaterThan(0); // el contenido real quedó guardado
+  expect(rec!.hasLocalFile).toBe(true);      // y el listado lo refleja sin cargarlo
 });
 
 // PDF2 · Seleccionar texto en el PDF debe ofrecer "Preguntar al agente" y abrir el panel.

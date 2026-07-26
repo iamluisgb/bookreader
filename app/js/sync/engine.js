@@ -21,15 +21,43 @@ import * as Highlights from '../highlights.js';
 import * as Bookmarks from '../bookmarks.js';
 import * as Storage from '../storage.js';
 import * as Aliases from './aliases.js';
+import * as LibrarySync from './library-sync.js';
+import * as Blobs from './blobs.js';
+import * as LibStore from '../library/store.js';
+import { TOMBSTONE_TTL_MS } from './schema.js';
 import { buildSnapshot, restoreSnapshot, BASE, SCHEMA_VERSION } from './layout.js';
 
-const STATE_KEY = 'sync_state'; // { manifestEtag, books: { <path>: etag } } — último remoto visto
+const STATE_KEY = 'sync_state'; // { manifestEtag, books: { <path>: etag }, libraryAt, libraryHash, … }
 const RETRIES = 3;
+
+const LIBRARY_PATH = BASE + LibrarySync.LIBRARY_FILE;
+const COVERS_PATH = BASE + LibrarySync.COVERS_FILE;
+
+// Serialización con claves ordenadas: el "¿cambió la biblioteca?" se decide
+// comparando huellas, y con JSON.stringify normal dos objetos idénticos con las
+// claves en distinto orden dan huellas distintas → push infinito entre
+// dispositivos, cada uno "corrigiendo" al otro sin que nada cambie.
+function stable(value) {
+  if (Array.isArray(value)) return '[' + value.map(stable).join(',') + ']';
+  if (value && typeof value === 'object') {
+    return '{' + Object.keys(value).sort().map(k => JSON.stringify(k) + ':' + stable(value[k])).join(',') + '}';
+  }
+  return JSON.stringify(value === undefined ? null : value);
+}
+
+// Huella corta (djb2) de un objeto, para guardarla en localStorage sin coste.
+function fingerprint(obj) {
+  const s = stable(obj);
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
+  return String(h >>> 0) + ':' + s.length;
+}
 
 const cfg = { debounceMs: 4000, intervalMs: 90000, startDelayMs: 1500 };
 let debounceTimer = null;
 let intervalTimer = null;
 let running = false;
+let inFlight = null;       // promesa del ciclo en curso (null si no hay ninguno)
 let pendingChange = false; // hubo cambios locales mientras sincronizábamos
 let applyingRemote = false; // las escrituras del propio merge no re-disparan push
 let started = false;
@@ -58,7 +86,7 @@ export function notifyLocalChange() {
     return;
   }
   clearTimeout(debounceTimer);
-  debounceTimer = setTimeout(() => syncNow(), cfg.debounceMs);
+  debounceTimer = setTimeout(() => syncSoon(), cfg.debounceMs);
 }
 
 async function cycle() {
@@ -97,6 +125,50 @@ async function cycle() {
     save();
     if (merged) window.dispatchEvent(new CustomEvent('bookreader:remote-applied'));
   }
+
+  // 1a) PULL de BIBLIOTECA — metadatos de libros y estanterías. Van en ficheros
+  // propios y solo se descargan si el manifest dice que cambiaron: leerlos en
+  // cada ciclo costaría dos peticiones de más cada 90 s por nada.
+  //
+  // library.json y covers.json están separados por su ritmo de escritura: el
+  // progreso de lectura mueve library.json constantemente, mientras que las
+  // portadas —que son casi todo el peso— solo cambian al añadir o quitar libros.
+  let libraryFingerprint = st.libraryHash;
+  let coversFingerprint = st.coversHash;
+  let libraryChanged = false;
+  if (remoteManifest && (remoteManifest.libraryUpdatedAt || 0) !== (st.libraryAt || 0)) {
+    const f = await Drive.read(LIBRARY_PATH);
+    if (f) {
+      const remoteLibrary = JSON.parse(f.content);
+      applyingRemote = true;
+      try {
+        libraryChanged = (await LibrarySync.applyLibrary(remoteLibrary)) > 0;
+      } finally {
+        applyingRemote = false;
+      }
+      libraryFingerprint = fingerprint(remoteLibrary);
+      st.books[LIBRARY_PATH] = f.etag;
+    }
+    st.libraryAt = remoteManifest.libraryUpdatedAt || 0;
+    save();
+  }
+  if (remoteManifest && (remoteManifest.coversUpdatedAt || 0) !== (st.coversAt || 0)) {
+    const f = await Drive.read(COVERS_PATH);
+    if (f) {
+      const remoteCovers = JSON.parse(f.content);
+      applyingRemote = true;
+      try {
+        libraryChanged = (await LibrarySync.applyCovers(remoteCovers)) > 0 || libraryChanged;
+      } finally {
+        applyingRemote = false;
+      }
+      coversFingerprint = fingerprint(remoteCovers);
+      st.books[COVERS_PATH] = f.etag;
+    }
+    st.coversAt = remoteManifest.coversUpdatedAt || 0;
+    save();
+  }
+  if (libraryChanged) window.dispatchEvent(new CustomEvent('bookreader:library-changed'));
 
   // 1b) Reconciliación de identidad: el mismo título bajo dos hashes (descargas
   // no byte-idénticas del mismo libro en cada dispositivo) se fusiona en el id
@@ -137,7 +209,40 @@ async function cycle() {
     save();
     pushed++;
   }
-  if (pushed || titleHealed || !m) {
+  // 2a) PUSH de BIBLIOTECA — se sube solo si el contenido difiere de aquello en
+  // lo que remoto y local ya coincidían (huella), no si "hay cambios locales":
+  // así dos dispositivos con la misma biblioteca no se pisan el fichero en
+  // bucle. El manifest hereda los sellos de tiempo del remoto cuando no hay
+  // nada que subir.
+  // Sube `content` a `path` solo si su huella difiere de la acordada con el
+  // remoto, y devuelve el sello de tiempo que debe ir al manifest: el de ahora
+  // si hubo subida, el del remoto si no. Comparar huellas —y no "¿hubo cambios
+  // locales?"— es lo que evita que dos dispositivos con la misma biblioteca se
+  // reescriban el fichero en bucle, cada uno reaccionando al push del otro.
+  async function pushIfChanged(path, content, agreedFp, remoteAt, stateKey) {
+    const fp = fingerprint(content);
+    st[stateKey] = fp;
+    if (fp === agreedFp) return { at: remoteAt || 0, pushed: false };
+    const w = await Drive.write(path, JSON.stringify(content), { ifMatch: st.books[path] });
+    st.books[path] = w.etag;
+    return { at: Date.now(), pushed: true };
+  }
+
+  const library = await pushIfChanged(
+    LIBRARY_PATH, await LibrarySync.buildLibrary(), libraryFingerprint,
+    remoteManifest && remoteManifest.libraryUpdatedAt, 'libraryHash');
+  st.libraryAt = library.at;
+
+  const covers = await pushIfChanged(
+    COVERS_PATH, await LibrarySync.buildCovers(), coversFingerprint,
+    remoteManifest && remoteManifest.coversUpdatedAt, 'coversHash');
+  st.coversAt = covers.at;
+  save();
+
+  snap.manifest.libraryUpdatedAt = library.at;
+  snap.manifest.coversUpdatedAt = covers.at;
+
+  if (pushed || titleHealed || library.pushed || covers.pushed || !m) {
     if (!m) await Drive.write(BASE + 'settings.json', JSON.stringify(snap.settings));
     const w = await Drive.write(BASE + 'manifest.json', JSON.stringify(snap.manifest), { ifMatch: m ? m.etag : undefined });
     st.manifestEtag = w.etag;
@@ -154,15 +259,9 @@ async function runWithLock(fn) {
   });
 }
 
-export async function syncNow() {
-  if (!DriveAuth.isConnected()) {
-    setStatus('off');
-    return 'off';
-  }
-  if (running) {
-    pendingChange = true;
-    return 'busy';
-  }
+// Un ciclo completo, con reintento en 412. No mira si ya hay otro en curso: de
+// eso se encargan syncNow/syncSoon.
+async function runOnce() {
   clearTimeout(debounceTimer);
   running = true;
   let result;
@@ -193,7 +292,44 @@ export async function syncNow() {
     pendingChange = false;
     notifyLocalChange();
   }
+  // Los ficheros de libro van FUERA del lock de sync: una descarga de 50 MB
+  // dentro de él dejaría a todas las pestañas sin sincronizar durante minutos.
+  Blobs.schedule();
   return result;
+}
+
+// "Sincroniza AHORA, incluyendo lo que acabo de cambiar". Si hay un ciclo en
+// vuelo, espera a que acabe y lanza otro: el que estaba corriendo pudo empezar
+// antes de mi cambio y no lo llevaría.
+//
+// Antes devolvía 'busy' al instante, y eso convertía a `await syncNow()` en una
+// promesa mentirosa — resolvía sin haber sincronizado nada. Lo usan el botón de
+// Ajustes y los tests, justo donde esa mentira más duele.
+export function syncNow() {
+  if (!DriveAuth.isConnected()) {
+    setStatus('off');
+    return Promise.resolve('off');
+  }
+  if (inFlight) return inFlight.then(() => syncNow());
+  inFlight = runOnce().finally(() => { inFlight = null; });
+  return inFlight;
+}
+
+// Disparadores automáticos (intervalo, pestaña visible, reconexión): si ya hay
+// un ciclo en curso no encadenan otro — sería tráfico por nada. Marcan que
+// quedaron cambios y el propio ciclo se reprograma al terminar.
+function syncSoon() {
+  if (!DriveAuth.isConnected()) {
+    setStatus('off');
+    return;
+  }
+  // `running` se pone en síncrono al empezar el ciclo; `inFlight` un tick
+  // después. Mirar los dos cierra esa ventana.
+  if (running || inFlight) {
+    pendingChange = true;
+    return;
+  }
+  syncNow();
 }
 
 // Reevalúa la conexión (tras Conectar/Desconectar en Ajustes).
@@ -219,20 +355,32 @@ export function start(options = {}) {
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden' && debounceTimer) {
       clearTimeout(debounceTimer);
-      syncNow();
+      syncSoon();
     } else if (document.visibilityState === 'visible') {
-      syncNow();
+      syncSoon();
     }
   });
   window.addEventListener('online', notifyLocalChange);
 
   // Periódico (trae cambios de otros dispositivos) — solo con la pestaña visible.
   intervalTimer = setInterval(() => {
-    if (document.visibilityState === 'visible') syncNow();
+    if (document.visibilityState === 'visible') syncSoon();
   }, cfg.intervalMs);
 
+  // Guardar libros enteros en IndexedDB sin pedir persistencia es jugársela: el
+  // navegador desaloja el origen cuando anda justo de espacio y se lleva la
+  // biblioteca por delante. Con sync eso sería recuperable, pero sin él no.
+  Blobs.requestPersistence();
+
   // syncOnLoad, con un pequeño margen para no competir con el arranque.
-  setTimeout(() => syncNow(), cfg.startDelayMs);
+  setTimeout(() => syncSoon(), cfg.startDelayMs);
+
+  // Purga de tombstones de biblioteca ya propagados (mismo TTL que el resto).
+  setTimeout(() => {
+    const before = Date.now() - TOMBSTONE_TTL_MS;
+    LibStore.purgeDeleted(before).catch(() => {});
+    LibStore.purgeDeletedShelves(before).catch(() => {});
+  }, cfg.startDelayMs + 5000);
 }
 
 export function stop() {

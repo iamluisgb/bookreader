@@ -2505,6 +2505,43 @@ body.in-library .ai-fab { display: none; }
   display: inline-flex; align-items: center; justify-content: center;
   border-radius: 50%; background: var(--accent); color: var(--on-accent); box-shadow: var(--shadow-1);
 }
+/* Ficha fantasma: el libro está en la biblioteca pero su archivo no en este
+   dispositivo. La portada se atenúa (sigue reconociéndose, no engaña con que
+   está listo) y aparece la acción de traerlo. */
+.lib-card.is-ghost .lib-cover-img,
+.lib-card.is-ghost .lib-cover-fallback { opacity: 0.45; filter: saturate(0.6); }
+.lib-card.is-ghost .lib-title, .lib-card.is-ghost .lib-author { color: var(--text-faint); }
+
+.lib-dl {
+  position: absolute; inset: auto 0 0 0; padding: 8px;
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.62), transparent);
+}
+.lib-dl-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 12px; border: none; border-radius: var(--r-pill); cursor: pointer;
+  background: var(--accent); color: var(--on-accent);
+  font-size: var(--fs-xs); font-weight: 600; box-shadow: var(--shadow-1);
+  transition: background var(--transition-fast), transform var(--transition-fast);
+}
+.lib-dl-btn:hover { background: var(--accent-hover); }
+.lib-dl-btn:active { transform: scale(0.96); }
+.lib-dl-note {
+  font-size: var(--fs-xs); font-weight: 600; color: #fff;
+  padding: 4px 10px; border-radius: var(--r-pill); background: rgba(0, 0, 0, 0.45);
+}
+.lib-dl-lbl { font-size: var(--fs-xs); font-weight: 600; color: #fff; }
+.lib-dl-bar {
+  width: 100%; height: 4px; border-radius: var(--r-pill);
+  background: rgba(255, 255, 255, 0.3); overflow: hidden;
+}
+.lib-dl-fill {
+  display: block; height: 100%; width: 0;
+  background: var(--accent); border-radius: inherit;
+  transition: width var(--transition-normal);
+}
+.lib-card.is-transferring .lib-cover { transform: none; }
+
 .lib-kebab {
   position: absolute; top: 6px; right: 6px;
   width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center;

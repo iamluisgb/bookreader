@@ -666,6 +666,50 @@ const EN = {
   'Abrir': 'Open',
   'Eliminar libro': 'Delete book',
   'Nueva estantería…': 'New shelf…',
+
+  // Sync de biblioteca y de archivos (fichas fantasma, descarga bajo demanda)
+  'Descargar y abrir': 'Download and open',
+  'Descargar a este dispositivo': 'Download to this device',
+  'Quitar descarga de este dispositivo': 'Remove download from this device',
+  'Quitar descarga': 'Remove download',
+  'Subir a Drive ({size})': 'Upload to Drive ({size})',
+  'Descargando…': 'Downloading…',
+  'Subiendo…': 'Uploading…',
+  'Solo notas': 'Notes only',
+  'Sincronización': 'Sync',
+  'Archivo no disponible': 'File not available',
+  'Se liberará el archivo de este dispositivo. Seguirá en tu biblioteca y podrás volver a descargarlo desde Drive.':
+    'The file will be freed from this device. It stays in your library and you can download it again from Drive.',
+  'Este libro se sincronizó desde otro dispositivo, pero su archivo aún no está en Drive. Ábrelo allí una vez para subirlo.':
+    'This book synced from another device, but its file is not in Drive yet. Open it there once to upload it.',
+  'Conecta con Google Drive en Ajustes para descargar tus libros en este dispositivo.':
+    'Connect Google Drive in Settings to download your books to this device.',
+  'Conecta con Google Drive en Ajustes para subir tus libros.':
+    'Connect Google Drive in Settings to upload your books.',
+  '¿Eliminar "{title}" de la biblioteca? Se borrará en todos tus dispositivos sincronizados, junto con la copia de Drive.':
+    'Delete "{title}" from your library? It will be removed on all your synced devices, along with the Drive copy.',
+  'El fichero ya no está en Drive.': 'The file is no longer in Drive.',
+  'El fichero descargado no coincide con el original.': 'The downloaded file does not match the original.',
+  'Tu Google Drive está lleno. Libera espacio para seguir sincronizando libros.':
+    'Your Google Drive is full. Free up space to keep syncing books.',
+  'La transferencia se quedó sin respuesta. Se reintentará.': 'The transfer stalled. It will be retried.',
+  'El permiso de Google caducó. Vuelve a conectar con Drive.': 'Your Google permission expired. Reconnect Drive.',
+  'No se pudo transferir el fichero.': 'Could not transfer the file.',
+  'Tu biblioteca en todos tus dispositivos': 'Your library on all your devices',
+  'Sincronizar también los archivos de los libros': 'Sync book files too',
+  'Tus libros se suben a esa misma carpeta privada y aparecen en el resto de dispositivos listos para descargar. Los de más de {n} MB no se suben solos: se piden desde el menú del libro.':
+    'Your books upload to that same private folder and show up on your other devices ready to download. Books over {n} MB are not uploaded automatically: request them from the book menu.',
+  'Consultando espacio…': 'Checking space…',
+  'BookReader ocupa {used} de los {limit} de tu Drive ({usage} usados en total).':
+    'BookReader uses {used} of your {limit} Drive ({usage} used in total).',
+  'BookReader ocupa {used} en tu Drive.': 'BookReader uses {used} in your Drive.',
+  'En este dispositivo: {used}.': 'On this device: {used}.',
+  'No se pudo consultar el espacio de Drive.': 'Could not check Drive space.',
+  'Los archivos de tus libros se subirán a Drive en segundo plano.':
+    'Your book files will upload to Drive in the background.',
+  'Se dejarán de subir archivos. Los que ya están en Drive siguen ahí.':
+    'File uploads are off. Files already in Drive stay there.',
+
   'Mazo': 'Deck',
   'Generar': 'Generate',
   'Crear': 'Create',

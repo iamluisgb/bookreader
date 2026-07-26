@@ -15,6 +15,7 @@ import { escapeHtml } from './escape.js';
 // demo. Se cobra el "convertir el libro en conocimiento": tarjetas, repaso, mapas,
 // plantillas avanzadas y perfiles.
 const FEATURES = {
+  files: () => t('Tu biblioteca en todos tus dispositivos'),
   flashcards: () => t('Flashcards con export a Anki'),
   study: () => t('Repaso espaciado (quizzes)'),
   mindmap: () => t('Mapas mentales navegables'),

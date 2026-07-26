@@ -3,10 +3,13 @@
 // herramientas con orden (Recientes) y filtro (Progreso), y rejilla de portadas.
 import * as Store from './store.js';
 import * as Study from '../ai/study.js';
+import * as Blobs from '../sync/blobs.js';
+import * as DriveAuth from '../sync/drive-auth.js';
+import { ensurePro } from '../ui/paywall.js';
 import { icon } from '../ui/icons.js';
 import { t, getLang } from '../i18n.js';
 import { escapeHtml } from '../ui/escape.js';
-import { confirmBox, promptBox } from '../ui/dialog.js';
+import { confirmBox, promptBox, alertBox } from '../ui/dialog.js';
 
 let host = null;                 // #library
 let onOpenBook = () => {};
@@ -19,6 +22,9 @@ let filterProgress = 'all';      // 'all' | 'unread' | 'reading' | 'finished'
 let query = '';                  // texto del buscador de la estantería (título/autor)
 let allBooks = [];               // caché del último render (para refiltrar sin re-fetch)
 let menuEl = null;
+// Transferencias en curso, por bookId: { loaded, total, state }. Solo para
+// pintar la barra de la tarjeta; la verdad la tiene sync/blobs.js.
+const transfers = new Map();
 
 const SORT_LABELS = { recent: t('Recientes'), title: t('Título'), author: t('Autor') };
 const PROG_LABELS = { all: t('Progreso'), unread: t('Sin empezar'), reading: t('Leyendo'), finished: t('Terminados') };
@@ -34,6 +40,37 @@ export function init(opts = {}) {
     if (menuEl && !menuEl.contains(e.target) && !e.target.closest('.lib-kebab, .lib-rail-kebab')) closeMenu();
     if (!e.target.closest('.lib-dd')) host.querySelectorAll('.lib-dd.open').forEach(d => d.classList.remove('open'));
   });
+
+  // El sync trajo libros de otro dispositivo: repintar para que aparezcan sus
+  // fichas (o desaparezcan las que se borraron allí).
+  window.addEventListener('bookreader:library-changed', () => { if (isOpen()) render(); });
+  window.addEventListener('bookreader:blob-progress', onBlobProgress);
+}
+
+// Progreso de una transferencia. Se actualiza SOLO la tarjeta afectada: un
+// render completo por cada trozo descargado haría parpadear toda la rejilla y
+// perdería el foco del buscador.
+function onBlobProgress(e) {
+  const d = e.detail || {};
+  if (!d.id) return;
+  if (d.state === 'done' || d.state === 'error') {
+    transfers.delete(d.id);
+    if (d.state === 'error' && d.message) alertBox(d.message, { title: t('Sincronización') });
+    if (isOpen()) render();
+    return;
+  }
+  transfers.set(d.id, { loaded: d.loaded || 0, total: d.total || 0, state: d.state });
+  paintTransfer(d.id);
+}
+
+function paintTransfer(id) {
+  const card = host && host.querySelector(`.lib-card[data-id="${CSS.escape(id)}"]`);
+  if (!card) return;
+  const tr = transfers.get(id);
+  const bar = card.querySelector('.lib-dl-fill');
+  if (!bar || !tr) return;
+  card.classList.add('is-transferring');
+  bar.style.width = tr.total ? Math.round((tr.loaded / tr.total) * 100) + '%' : '0%';
 }
 
 export function show() {
@@ -204,17 +241,49 @@ function dropdownHtml(key, label, options, current) {
   </div>`;
 }
 
+// Tamaño legible para el botón de descarga ("Descargar · 4,2 MB").
+function humanSize(bytes) {
+  if (!bytes) return '';
+  const mb = bytes / (1024 * 1024);
+  if (mb < 1) return Math.max(1, Math.round(bytes / 1024)) + ' KB';
+  return (mb < 10 ? mb.toFixed(1) : Math.round(mb)) + ' MB';
+}
+
 function cardHtml(b) {
   const pct = Math.max(0, Math.min(100, Math.round(b.progress || 0)));
   const cover = b.cover
     ? `<img class="lib-cover-img" src="${escapeHtml(b.cover)}" alt="">`
     : `<div class="lib-cover-fallback"><span>${escapeHtml(initials(b.title))}</span></div>`;
   const badge = (b.status === 'finished') ? `<span class="lib-badge">${icon('check', { size: 13 })}</span>` : '';
+
+  // Ficha FANTASMA: el libro está en tu biblioteca pero su fichero no está en
+  // este dispositivo. Se distingue de un libro normal (portada atenuada) y
+  // ofrece traerlo, igual que la nube de Play Books. Si nadie lo subió todavía,
+  // no hay nada que ofrecer: se dice y punto, en vez de un botón que fallaría.
+  const ghost = Store.isGhost(b);
+  const transfer = transfers.get(b.id);
+  let overlay = '';
+  if (transfer) {
+    overlay = `<div class="lib-dl lib-dl-active">
+      <div class="lib-dl-bar"><span class="lib-dl-fill" style="width:${transfer.total ? Math.round((transfer.loaded / transfer.total) * 100) : 0}%"></span></div>
+      <span class="lib-dl-lbl">${transfer.dir === 'up' ? t('Subiendo…') : t('Descargando…')}</span>
+    </div>`;
+  } else if (ghost && b.blob && b.blob.path) {
+    overlay = `<div class="lib-dl">
+      <button class="lib-dl-btn" data-download="${escapeHtml(b.id)}" title="${t('Descargar a este dispositivo')}">
+        ${icon('download', { size: 16 })}<span>${escapeHtml(humanSize(b.size))}</span>
+      </button>
+    </div>`;
+  } else if (ghost) {
+    overlay = `<div class="lib-dl"><span class="lib-dl-note">${t('Solo notas')}</span></div>`;
+  }
+
   return `
-    <div class="lib-card" data-id="${b.id}">
+    <div class="lib-card${ghost ? ' is-ghost' : ''}${transfer ? ' is-transferring' : ''}" data-id="${b.id}">
       <div class="lib-cover">
         ${cover}
         ${badge}
+        ${overlay}
         <button class="lib-kebab" data-id="${b.id}" title="${t('Más')}" aria-label="${t('Más opciones')}">${icon('ellipsis', { size: 20 })}</button>
       </div>
       <div class="lib-progressbar"><span style="width:${pct}%"></span></div>
@@ -317,12 +386,40 @@ async function onClick(e) {
     currentShelf = railItem.dataset.shelf; await render(); return;
   }
 
+  // Botón de descarga de una ficha fantasma (no abre el libro)
+  const dl = e.target.closest('[data-download]');
+  if (dl) { e.stopPropagation(); await startDownload(dl.dataset.download); return; }
+
   // Menú de libro
   const kebab = e.target.closest('.lib-kebab');
   if (kebab) { e.stopPropagation(); await openBookMenu(kebab.dataset.id, kebab); return; }
 
   const card = e.target.closest('.lib-card');
-  if (card) { const book = await Store.getBook(card.dataset.id); if (book) onOpenBook(book); }
+  if (card) await openCard(card.dataset.id);
+}
+
+// Abrir una tarjeta. Si el fichero no está aquí, pulsar la portada equivale a
+// pedir la descarga: es lo que espera cualquiera que venga de Play Books, y
+// mejor que un "no se pudo abrir" sobre un libro que sí es suyo.
+async function openCard(id) {
+  const book = await Store.getBook(id);
+  if (!book) return;
+  if (Store.hasFile(book)) { onOpenBook(book); return; }
+  if (book.blob && book.blob.path) await startDownload(id, { open: true });
+  else await alertBox(t('Este libro se sincronizó desde otro dispositivo, pero su archivo aún no está en Drive. Ábrelo allí una vez para subirlo.'), { title: t('Archivo no disponible') });
+}
+
+// Descarga con las tres puertas en orden: Drive conectado, licencia Pro y cola.
+async function startDownload(id, { open = false } = {}) {
+  if (Blobs.isQueued(id)) return;
+  if (!DriveAuth.isConnected()) {
+    await alertBox(t('Conecta con Google Drive en Ajustes para descargar tus libros en este dispositivo.'), { title: t('Sincronización') });
+    return;
+  }
+  if (!(await ensurePro('files'))) return;
+  await Blobs.requestDownload(id);
+  const book = await Store.getBook(id);
+  if (open && book && Store.hasFile(book)) onOpenBook(book);
 }
 
 async function createShelf() {
@@ -366,10 +463,24 @@ async function openBookMenu(id, anchor) {
   if (!book) return;
   const inShelf = new Set(book.shelfIds || []);
   const finished = book.status === 'finished';
+  const local = Store.hasFile(book);
+  const uploaded = !!(book.blob && book.blob.path);
+
+  // Bloque de almacenamiento: traer el fichero, liberarlo de este dispositivo o
+  // —para los libros grandes que no se suben solos— subirlo a mano.
+  let storage = '';
+  if (!local && uploaded) {
+    storage = `<button class="lib-menu-item" data-act="download">${icon('download', { size: 16 })}<span>${t('Descargar a este dispositivo')}</span></button>`;
+  } else if (local && uploaded) {
+    storage = `<button class="lib-menu-item" data-act="undownload">${icon('xmark', { size: 16 })}<span>${t('Quitar descarga de este dispositivo')}</span></button>`;
+  } else if (local && (book.size || 0) > Blobs.MAX_AUTO_UPLOAD) {
+    storage = `<button class="lib-menu-item" data-act="upload">${icon('upload', { size: 16 })}<span>${t('Subir a Drive ({size})', { size: humanSize(book.size) })}</span></button>`;
+  }
 
   buildMenu(anchor, `
-    <button class="lib-menu-item" data-act="open">${icon('book', { size: 16 })}<span>${t('Abrir')}</span></button>
+    <button class="lib-menu-item" data-act="open">${icon('book', { size: 16 })}<span>${local ? t('Abrir') : t('Descargar y abrir')}</span></button>
     <button class="lib-menu-item" data-act="finish">${icon('check', { size: 16 })}<span>${finished ? t('Marcar como no leído') : t('Marcar como terminado')}</span></button>
+    ${storage ? `<div class="lib-menu-sep"></div>${storage}` : ''}
     <div class="lib-menu-sep"></div>
     <div class="lib-menu-label">${t('Estanterías')}</div>
     ${shelves.length
@@ -380,7 +491,27 @@ async function openBookMenu(id, anchor) {
     <div class="lib-menu-sep"></div>
     <button class="lib-menu-item danger" data-act="delete">${icon('trash', { size: 16 })}<span>${t('Eliminar')}</span></button>
   `, async (act, item) => {
-    if (act === 'open') { const b = await Store.getBook(id); if (b) onOpenBook(b); return; }
+    if (act === 'open') { await openCard(id); return; }
+    if (act === 'download') { await startDownload(id); return; }
+    if (act === 'upload') {
+      if (!DriveAuth.isConnected()) {
+        await alertBox(t('Conecta con Google Drive en Ajustes para subir tus libros.'), { title: t('Sincronización') });
+        return;
+      }
+      if (!(await ensurePro('files'))) return;
+      Blobs.markManualUpload(id);
+      Blobs.schedule();
+      return;
+    }
+    if (act === 'undownload') {
+      // Solo se ofrece con el fichero ya en Drive: si no, "quitar la descarga"
+      // sería un borrado disfrazado, porque no habría de dónde recuperarlo.
+      if (!(await confirmBox(t('Se liberará el archivo de este dispositivo. Seguirá en tu biblioteca y podrás volver a descargarlo desde Drive.'),
+          { title: t('Quitar descarga'), okText: t('Quitar') }))) return;
+      await Store.removeDownload(id);
+      await render();
+      return;
+    }
     if (act === 'finish') {
       await Store.updateBook(id, { status: finished ? (book.progress > 0 ? 'reading' : 'unread') : 'finished' });
     } else if (act === 'shelf') {
@@ -389,9 +520,14 @@ async function openBookMenu(id, anchor) {
       const name = (await promptBox('Nombre de la nueva estantería:', { title: 'Nueva estantería' }) || '').trim();
       if (name) { const sh = await Store.addShelf(name); await Store.toggleBookShelf(id, sh.id, true); }
     } else if (act === 'delete') {
-      if (!(await confirmBox(t('¿Eliminar "{title}" de la biblioteca? Esto borra el archivo guardado.', { title: book.title }),
-          { title: 'Eliminar libro', okText: 'Eliminar', danger: true }))) return;
+      // Con sync activo el borrado deja de ser local: viaja al resto de
+      // dispositivos y se lleva la copia de Drive. Hay que decirlo antes.
+      const msg = DriveAuth.isConnected()
+        ? t('¿Eliminar "{title}" de la biblioteca? Se borrará en todos tus dispositivos sincronizados, junto con la copia de Drive.', { title: book.title })
+        : t('¿Eliminar "{title}" de la biblioteca? Esto borra el archivo guardado.', { title: book.title });
+      if (!(await confirmBox(msg, { title: t('Eliminar libro'), okText: t('Eliminar'), danger: true }))) return;
       await Store.deleteBook(id);
+      Blobs.schedule();   // libera también el binario de Drive
     }
     await render();
   });
