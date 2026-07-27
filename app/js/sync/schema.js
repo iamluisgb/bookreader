@@ -14,10 +14,13 @@
 // repetir el trabajo en cada arranque.
 
 import * as Storage from '../storage.js';
-import { backfillSyncFields, purgeDeletedNotes, purgeDeletedArtifacts } from '../ai/db.js';
+import { backfillSyncFields, purgeDeletedNotes, purgeDeletedArtifacts, purgeDeletedDecks } from '../ai/db.js';
 
 const MIGRATED_KEY = 'sync_schema_migrated';
-const SCHEMA_VERSION = 1;
+// v2: identidad por TARJETA dentro de los mazos (card.uid/updatedAt). Sube la versión
+// porque los usuarios que ya migraron a v1 tienen mazos con uid de mazo pero sin uid de
+// tarjeta, y sin él el merge no puede fusionar repasos hechos en otro dispositivo.
+const SCHEMA_VERSION = 2;
 const COLLECTION_PREFIXES = ['highlights_', 'bookmarks_'];
 
 export const TOMBSTONE_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 días
@@ -93,4 +96,5 @@ export async function purgeExpiredTombstones(now = Date.now()) {
   }
   await purgeDeletedNotes(now - TOMBSTONE_TTL_MS);
   await purgeDeletedArtifacts(now - TOMBSTONE_TTL_MS);
+  await purgeDeletedDecks(now - TOMBSTONE_TTL_MS);
 }

@@ -25,27 +25,18 @@ import * as LibrarySync from './library-sync.js';
 import * as Blobs from './blobs.js';
 import * as LibStore from '../library/store.js';
 import { TOMBSTONE_TTL_MS } from './schema.js';
-import { buildSnapshot, restoreSnapshot, BASE, SCHEMA_VERSION } from './layout.js';
+import { buildSnapshot, restoreSnapshot, bookDigest, stable, BASE, SCHEMA_VERSION } from './layout.js';
 
-const STATE_KEY = 'sync_state'; // { manifestEtag, books: { <path>: etag }, libraryAt, libraryHash, … }
+// { manifestEtag, books: { <path>: etag }, digests: { <path>: digest }, libraryAt, libraryHash, … }
+const STATE_KEY = 'sync_state';
 const RETRIES = 3;
 
 const LIBRARY_PATH = BASE + LibrarySync.LIBRARY_FILE;
 const COVERS_PATH = BASE + LibrarySync.COVERS_FILE;
-
-// Serialización con claves ordenadas: el "¿cambió la biblioteca?" se decide
-// comparando huellas, y con JSON.stringify normal dos objetos idénticos con las
-// claves en distinto orden dan huellas distintas → push infinito entre
-// dispositivos, cada uno "corrigiendo" al otro sin que nada cambie.
-function stable(value) {
-  if (Array.isArray(value)) return '[' + value.map(stable).join(',') + ']';
-  if (value && typeof value === 'object') {
-    return '{' + Object.keys(value).sort().map(k => JSON.stringify(k) + ':' + stable(value[k])).join(',') + '}';
-  }
-  return JSON.stringify(value === undefined ? null : value);
-}
+const SETTINGS_PATH = BASE + 'settings.json';
 
 // Huella corta (djb2) de un objeto, para guardarla en localStorage sin coste.
+// `stable` (claves ordenadas) vive en layout.js y la comparte con el digest de libro.
 function fingerprint(obj) {
   const s = stable(obj);
   let h = 5381;
@@ -74,7 +65,9 @@ export function getStatus() {
 }
 
 function loadState() {
-  return Storage.get(STATE_KEY, { manifestEtag: null, books: {} });
+  const st = Storage.get(STATE_KEY, { manifestEtag: null, books: {} });
+  if (!st.digests) st.digests = {};
+  return st;
 }
 
 // Un cambio local (subrayado, nota, posición…): push con debounce.
@@ -111,13 +104,17 @@ async function cycle() {
       const file = await Drive.read(f.path);
       if (!file) continue;
       const id = f.path.slice((BASE + 'books/').length).replace(/\.json$/, '');
+      const remoteBook = JSON.parse(file.content);
       applyingRemote = true;
       try {
-        await restoreSnapshot({ books: { [id]: JSON.parse(file.content) } }, { mode: 'merge' });
+        await restoreSnapshot({ books: { [id]: remoteBook } }, { mode: 'merge' });
       } finally {
         applyingRemote = false;
       }
       st.books[f.path] = file.etag;
+      // Lo que el remoto ya sabe de este libro. Compararlo con lo local es lo que
+      // detecta "tengo cambios que él no tiene" cuando los updatedAt ya empatan.
+      st.digests[f.path] = bookDigest(remoteBook);
       save();
       merged++;
     }
@@ -170,6 +167,26 @@ async function cycle() {
   }
   if (libraryChanged) window.dispatchEvent(new CustomEvent('bookreader:library-changed'));
 
+  // 1c) PULL de AJUSTES globales. settings.json se escribía solo en el primer push y no
+  // se leía jamás: los ajustes no viajaban entre dispositivos. Se aplica en modo 'merge'
+  // (solo rellena lo que falta en local), así que no pisa las preferencias de este
+  // equipo; lo que sí cruza es la RACHA de estudio, que no es una preferencia sino un
+  // contador que avanza allí donde repasas (ver layout.js · mergeStreak).
+  if (remoteManifest && (remoteManifest.settingsUpdatedAt || 0) !== (st.settingsAt || 0)) {
+    const f = await Drive.read(SETTINGS_PATH);
+    if (f) {
+      applyingRemote = true;
+      try {
+        await restoreSnapshot({ settings: JSON.parse(f.content) }, { mode: 'merge' });
+      } finally {
+        applyingRemote = false;
+      }
+      st.books[SETTINGS_PATH] = f.etag;
+    }
+    st.settingsAt = remoteManifest.settingsUpdatedAt || 0;
+    save();
+  }
+
   // 1b) Reconciliación de identidad: el mismo título bajo dos hashes (descargas
   // no byte-idénticas del mismo libro en cada dispositivo) se fusiona en el id
   // canónico ANTES del push, así ambos lados convergen al mismo fichero remoto
@@ -202,10 +219,17 @@ async function cycle() {
   let pushed = 0;
   for (const [id, info] of Object.entries(snap.manifest.books)) {
     const remoteAt = (remoteBooks[id] && remoteBooks[id].updatedAt) || 0;
-    if (info.updatedAt <= remoteAt) continue;
     const path = BASE + info.file;
+    // El sello de tiempo por sí solo no basta: al fusionar, el updatedAt local sube al
+    // del remoto, y lo que este dispositivo hizo ANTES (repasar sin conexión mientras el
+    // otro editaba) se quedaba por debajo del umbral y no subía nunca. El digest
+    // responde a la otra mitad de la pregunta: "¿tengo algo que él no tenga?".
+    const digest = bookDigest(snap.books[id]);
+    const agreed = st.digests[path];
+    if (info.updatedAt <= remoteAt && agreed !== undefined && digest === agreed) continue;
     const w = await Drive.write(path, JSON.stringify(snap.books[id]), { ifMatch: st.books[path] });
     st.books[path] = w.etag;
+    st.digests[path] = digest;
     save();
     pushed++;
   }
@@ -242,8 +266,27 @@ async function cycle() {
   snap.manifest.libraryUpdatedAt = library.at;
   snap.manifest.coversUpdatedAt = covers.at;
 
-  if (pushed || titleHealed || library.pushed || covers.pushed || !m) {
-    if (!m) await Drive.write(BASE + 'settings.json', JSON.stringify(snap.settings));
+  // 2b) PUSH de AJUSTES. A diferencia de biblioteca y portadas, la huella se compara
+  // contra lo que ESTE dispositivo subió la última vez, no contra lo acordado con el
+  // remoto: en modo 'merge' las preferencias locales no se pisan, así que dos equipos
+  // con ajustes distintos nunca convergen a un mismo fichero y compararse con el remoto
+  // los dejaría re-subiéndoselo el uno al otro para siempre. Así cada uno sube solo
+  // cuando cambia lo suyo, y el último en escribir manda.
+  const settingsFp = fingerprint(snap.settings);
+  let settingsAt = (remoteManifest && remoteManifest.settingsUpdatedAt) || 0;
+  let settingsPushed = false;
+  if (settingsFp !== st.settingsHash) {
+    const w = await Drive.write(SETTINGS_PATH, JSON.stringify(snap.settings), { ifMatch: st.books[SETTINGS_PATH] });
+    st.books[SETTINGS_PATH] = w.etag;
+    st.settingsHash = settingsFp;
+    settingsAt = Date.now();
+    settingsPushed = true;
+  }
+  st.settingsAt = settingsAt;
+  save();
+  snap.manifest.settingsUpdatedAt = settingsAt;
+
+  if (pushed || titleHealed || library.pushed || covers.pushed || settingsPushed || !m) {
     const w = await Drive.write(BASE + 'manifest.json', JSON.stringify(snap.manifest), { ifMatch: m ? m.etag : undefined });
     st.manifestEtag = w.etag;
     save();

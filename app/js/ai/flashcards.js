@@ -178,7 +178,7 @@ async function renderDeckList() {
       <div class="fc-deck" data-id="${d.id}">
         <div class="fc-deck-info">
           <span class="fc-deck-name">${escapeHtml(d.scope || t('Libro entero'))}</span>
-          <span class="fc-deck-meta">${t('{n} tarjetas', { n: d.cards.length })} · ${d.cardType === 'cloze' ? 'cloze' : 'P→R'} · ${new Date(d.createdAt).toLocaleDateString()}</span>
+          <span class="fc-deck-meta">${t('{n} tarjetas', { n: DB.cardsOf(d).length })} · ${d.cardType === 'cloze' ? 'cloze' : 'P→R'} · ${new Date(d.createdAt).toLocaleDateString()}</span>
           <span class="fc-deck-meta">${t('{a} nuevas · {b} aprendiendo · {c} maduras', { a: st.nuevas, b: st.aprendiendo, c: st.maduras })}</span>
         </div>
         <button class="fc-deck-study" data-act="study" title="${t('Repasar con repetición espaciada')}">
@@ -628,9 +628,9 @@ function renderReview(deck) {
     </div>`;
   b.innerHTML = `
     <button class="ai-ob-back">${icon('chevron-left', { size: 16 })}<span>${t('Volver')}</span></button>
-    <h2>${t('{n} tarjetas', { n: deck.cards.length })}</h2>
+    <h2>${t('{n} tarjetas', { n: DB.cardsOf(deck).length })}</h2>
     <p class="ai-ob-sub">${t('Revisa y edita antes de exportar. Mazo en Anki:')} <b>${escapeHtml(deck.name)}</b></p>
-    <div class="fc-list">${deck.cards.map(cardRow).join('')}</div>
+    <div class="fc-list">${deck.cards.map((c, i) => (c.deleted ? '' : cardRow(c, i))).join('')}</div>
     <div class="fc-export">
       <button id="fc-apkg" class="primary-btn">${icon('download', { size: 16 })} ${t('Exportar .apkg')}</button>
       <button id="fc-txt" class="ai-ob-back fc-txt-btn" title="${t('Formato de texto que Anki importa (Archivo → Importar)')}">.txt para Anki</button>
@@ -640,6 +640,9 @@ function renderReview(deck) {
 
   // Ediciones y borrados: se aplican al mazo en memoria y se persisten (re-export fiel).
   // Tras mapear, se renumeran los data-i para que sigan casando con el array nuevo.
+  // Quitar una fila la deja FUERA de `next`, y eso es exactamente lo que updateDeck lee
+  // como "borrada": guarda su tombstone para que el borrado viaje al otro dispositivo
+  // en vez de resucitar en el siguiente sync.
   const syncFromDom = () => {
     const rows = [...b.querySelectorAll('.fc-item')];
     const next = rows.map((r, idx) => {

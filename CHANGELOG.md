@@ -34,6 +34,49 @@ se da.
 
 **Pendiente aparte**: los **mazos de flashcards** (`decks`) siguen sin sincronizar. Necesitan el
 trabajo de `uid` que la Fase 0 hizo para mensajes y notas, porque su id es autoincremental.
+→ Entregado el mismo día, abajo.
+
+## 2026-07-27 — Leer en el PC, estudiar en el móvil: los mazos y su repaso ya sincronizan
+
+Los mazos de flashcards eran lo último que se quedaba en un solo dispositivo, y era justo lo que peor
+encajaba: **las tarjetas están para repasarlas en los ratos muertos**, no delante del PC donde
+preparaste el libro.
+
+Mover el registro no bastaba. **El estado de repetición espaciada vive DENTRO de cada tarjeta**
+(`card.srs`), así que un LWW a nivel de mazo se llevaría por delante el trabajo del otro dispositivo:
+repasas veinte tarjetas en el bus, el PC guarda una edición después, y tus veinte repasos
+desaparecen. De ahí las dos decisiones de fondo:
+
+- **Identidad por TARJETA** (`card.uid`), no solo por mazo. El merge va tarjeta a tarjeta: los
+  metadatos del mazo (nombre, tipo, ámbito) se resuelven por LWW de mazo, pero **las tarjetas se
+  fusionan por su cuenta**, así que el repaso del móvil y la edición del PC sobreviven los dos. Hay
+  un test exactamente para ese conflicto.
+- **Tombstones de mazo y de tarjeta suelta.** El editor permite quitar tarjetas una a una; sin
+  tombstone, quitarla aquí y sincronizar allá la resucita. `updateDeck` interpreta "no viene en la
+  lista" como borrada, para que ningún llamante pueda olvidarse.
+- **`sync_schema_migrated` sube a v2**: quien ya migró tiene mazos con `uid` de mazo pero sin `uid`
+  de tarjeta, y sin él no hay merge por tarjeta.
+- **La racha de estudio cruza** (`study_streak`): gana el día mayor y, en empate, el contador mayor.
+  No es una preferencia sino un contador que avanza allí donde repasas; con la regla general de
+  ajustes, el PC se quedaba clavado mientras estudiabas en el móvil.
+
+### Dos bugs previos del sync que este caso destapó
+
+Ninguno es de los mazos; los dos se arreglan aquí porque sin ellos la feature no funciona.
+
+- **Lo hecho sin conexión podía no subirse nunca.** El push se decidía solo por `updatedAt`, y al
+  fusionar el `updatedAt` local sube al del remoto: lo que hiciste *antes* queda por debajo del
+  umbral para siempre. Afectaba también a mensajes y notas creados offline. Ahora se sube también
+  cuando el **digest** del contenido fusionable difiere del último que se vio del remoto. El digest
+  ignora a propósito el `id` local, los registros sin `uid` y el orden de los items — si no, sería
+  una máquina de push en bucle. Un test comprueba que seis ciclos tras converger no escriben nada.
+- **Los ajustes globales no viajaban.** `settings.json` se escribía solo en el primer push y no se
+  leía jamás. Ahora se sincroniza comparando la huella contra **lo que este dispositivo subió**, no
+  contra lo acordado con el remoto: como los ajustes se aplican sin pisar los locales, dos equipos
+  con preferencias distintas nunca convergen al mismo fichero y compararse con el remoto los dejaría
+  re-subiéndoselo el uno al otro sin fin.
+
+**14 tests nuevos** (`tests/sync-decks.spec.ts`), cinco de ellos con dos dispositivos reales.
 
 ## 2026-07-27 — "Explícamelo tú": el modo Feynman, diseñado sobre literatura de tutoría
 

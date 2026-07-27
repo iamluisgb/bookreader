@@ -91,7 +91,7 @@ const reqP = (request) => new Promise((resolve, reject) => {
 // Stores que participan en el sync: sus escrituras de usuario avisan al
 // SyncEngine (que hace push con debounce). Las escrituras del propio sync
 // (mergeRecords) NO avisan — evita el bucle push→pull→push.
-const SYNCED_STORES = ['messages', 'notes', 'convos', 'ratings', 'artifacts'];
+const SYNCED_STORES = ['messages', 'notes', 'convos', 'ratings', 'artifacts', 'decks'];
 
 function notifySync(store) {
   if (!SYNCED_STORES.includes(store)) return;
@@ -291,6 +291,13 @@ export function backfillSyncFields(now = Date.now()) {
       let changed = false;
       if (!v.uid) { v.uid = crypto.randomUUID(); changed = true; }
       if (!v.updatedAt) { v.updatedAt = v.ts || v.createdAt || now; changed = true; }
+      // Los mazos necesitan identidad por TARJETA además de por mazo: el merge va
+      // tarjeta a tarjeta para no perder el estado de repaso (ver mergeDecks).
+      for (const card of v.cards || []) {
+        if (!card) continue;
+        if (!card.uid) { card.uid = crypto.randomUUID(); changed = true; }
+        if (!card.updatedAt) { card.updatedAt = v.updatedAt || v.createdAt || now; changed = true; }
+      }
       if (changed) c.update(v);
       c.continue();
     };
@@ -299,33 +306,187 @@ export function backfillSyncFields(now = Date.now()) {
   return Promise.all(['messages', 'notes', 'decks'].map(backfill));
 }
 
-// Mazos de flashcards (export a Anki) ----------------------------------------
+// Mazos de flashcards (export a Anki + modo Estudiar) -------------------------
+//
+// Sincronizan (leer en el PC, repasar en el móvil), y eso obliga a dos cosas que no
+// hacían falta cuando eran locales:
+//
+//   1. Identidad POR TARJETA (`card.uid`), no solo por mazo. El estado de repetición
+//      espaciada vive dentro de cada tarjeta (`card.srs`), así que un LWW a nivel de
+//      mazo tiraría los repasos del otro dispositivo: repasas 20 tarjetas en el bus,
+//      el PC guarda una edición después y se pierden. El merge va tarjeta a tarjeta.
+//   2. TOMBSTONES, tanto del mazo como de la tarjeta suelta (el editor permite quitar
+//      tarjetas): sin ellos, borrar aquí y sincronizar allá las resucita.
+//
+// Las tarjetas borradas se quedan en el array marcadas `deleted` (y sin `front`, que
+// es lo que ya filtraban las vistas) hasta que las purga purgeDeletedDecks().
+
+// Tarjetas VISIBLES de un mazo (las que no son tombstone). Todo lo que cuente,
+// pinte o exporte tarjetas debe pasar por aquí.
+export function cardsOf(deck) {
+  return (deck?.cards || []).filter(c => c && !c.deleted);
+}
 
 export function getDecks(bookId) {
   return tx('decks', 'readonly', s => reqP(s.index('bookId').getAll(bookId)))
-    .then(list => (list || []).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)));
+    .then(list => (list || []).filter(d => !d.deleted).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)));
 }
 
 // Todos los mazos (la cola diaria del modo Estudiar cruza todos los libros).
 export function getAllDecks() {
-  return getAll('decks').then(list => (list || []).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)));
+  return getAll('decks')
+    .then(list => (list || []).filter(d => !d.deleted).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)));
 }
 
 export function addDeck(deck) {
   const now = Date.now();
-  return tx('decks', 'readwrite', s => reqP(s.put({ uid: crypto.randomUUID(), ...deck, createdAt: now, updatedAt: now })));
+  const cards = (deck.cards || []).map(c => ({ uid: crypto.randomUUID(), updatedAt: now, ...c }));
+  return put('decks', { uid: crypto.randomUUID(), ...deck, cards, createdAt: now, updatedAt: now });
 }
 
+// `patch.cards`, si viene, es la lista COMPLETA de tarjetas visibles del mazo:
+//   - las que cambian de contenido o de estado SRS reciben su propio `updatedAt`
+//     (es lo que el merge compara: sin sello por tarjeta no hay LWW por tarjeta),
+//   - las que estaban y ya no vienen se convierten en tombstone y se conservan.
+// Poner el sello aquí y no en cada llamante es a propósito: hay tres sitios que
+// escriben tarjetas y olvidarlo en uno se manifestaría como repasos que se pierden
+// solo al sincronizar, que es justo el bug imposible de reproducir.
 export function updateDeck(id, patch) {
   return tx('decks', 'readwrite', async s => {
     const cur = await reqP(s.get(id));
     if (!cur) return;
-    return reqP(s.put({ ...cur, ...patch, id, updatedAt: Date.now() }));
+    const next = { ...cur, ...patch, id, updatedAt: Date.now() };
+    if (patch && patch.cards) next.cards = stampCards(cur.cards, patch.cards, next.updatedAt);
+    return reqP(s.put(next));
+  }).then(r => { notifySync('decks'); return r; });
+}
+
+// Reconcilia la lista entrante contra la guardada: sella lo que cambió, asigna uid a
+// lo nuevo y conserva como tombstone lo que desapareció.
+function stampCards(before, after, now) {
+  const prev = new Map();
+  for (const c of before || []) if (c && c.uid) prev.set(c.uid, c);
+  const out = [];
+  const seen = new Set();
+  for (const c of after || []) {
+    if (!c) continue;
+    const uid = c.uid || crypto.randomUUID();
+    seen.add(uid);
+    const old = prev.get(uid);
+    const same = old && sameCard(old, c);
+    out.push({ ...c, uid, updatedAt: same ? (old.updatedAt || now) : now });
+  }
+  for (const [uid, old] of prev) {
+    if (seen.has(uid)) continue;
+    // Ya era tombstone: se respeta su deletedAt para que la purga no se reinicie.
+    out.push(old.deleted ? old : { ...old, front: '', back: '', srs: old.srs, deleted: true, deletedAt: now, updatedAt: now });
+  }
+  return out;
+}
+
+function sameCard(a, b) {
+  const norm = (c) => JSON.stringify({ front: c.front, back: c.back, type: c.type, chapter: c.chapter, src: c.src, srs: c.srs || null });
+  return norm(a) === norm(b);
+}
+
+// TOMBSTONE (mismo motivo que en notas y artefactos). Las tarjetas se vacían: un mazo
+// borrado no debe seguir ocupando su contenido en el fichero de sync durante 30 días.
+export function deleteDeck(id) {
+  return tx('decks', 'readwrite', async s => {
+    const cur = await reqP(s.get(id));
+    if (!cur) return;
+    const now = Date.now();
+    return reqP(s.put({ ...cur, cards: [], deleted: true, deletedAt: now, updatedAt: now }));
+  }).then(r => { notifySync('decks'); return r; });
+}
+
+// Purga física: mazos con tombstone caducado y, en los mazos vivos, sus tarjetas
+// borradas hace más de `olderThan`.
+export function purgeDeletedDecks(olderThan) {
+  return tx('decks', 'readwrite', s => new Promise((resolve, reject) => {
+    const cur = s.openCursor();
+    cur.onsuccess = () => {
+      const c = cur.result;
+      if (!c) return resolve();
+      const v = c.value;
+      if (v.deleted && (v.deletedAt || 0) < olderThan) c.delete();
+      else {
+        const kept = (v.cards || []).filter(x => !x.deleted || (x.deletedAt || 0) >= olderThan);
+        if (kept.length !== (v.cards || []).length) c.update({ ...v, cards: kept });
+      }
+      c.continue();
+    };
+    cur.onerror = () => reject(cur.error);
+  }));
+}
+
+// Sync · Fusiona mazos remotos. Casa por `uid` (el id es autoincremental y colisiona
+// entre dispositivos) conservando el id LOCAL, como mergeRecords. La diferencia está en
+// las tarjetas: NO se toman las del ganador del LWW, se fusionan por su cuenta —
+// si no, repasar en el móvil y editar en el PC hace que uno de los dos pierda su trabajo.
+export function mergeDecks(records) {
+  if (!records || !records.length) return Promise.resolve(0);
+  return tx('decks', 'readwrite', async s => {
+    const existing = await reqP(s.getAll());
+    const byUid = new Map();
+    for (const e of existing) if (e.uid) byUid.set(e.uid, e);
+    let written = 0;
+    for (const r of records) {
+      if (!r || !r.uid) continue;              // mazo pre-Fase 0: no mergeable
+      const l = byUid.get(r.uid);
+      if (!l) {
+        const rest = { ...r };
+        delete rest.id;                        // autoincrement asigna uno local
+        await reqP(s.put(rest));
+        written++;
+        continue;
+      }
+      const merged = mergeDeckPair(l, r);
+      if (merged) { await reqP(s.put({ ...merged, id: l.id })); written++; }
+    }
+    return written;
   });
 }
 
-export function deleteDeck(id) {
-  return tx('decks', 'readwrite', s => reqP(s.delete(id)));
+// Fusión de un mazo (pura, exportada para poder testearla sin IndexedDB).
+// Devuelve null si el remoto no aporta nada (evita escrituras que reboten en el sync).
+export function mergeDeckPair(local, remote) {
+  const lu = local.updatedAt || 0;
+  const ru = remote.updatedAt || 0;
+  // Metadatos (nombre, tipo, ámbito, borrado del mazo entero): LWW, con el borrado
+  // ganando el empate — misma regla determinista que mergeCollections.
+  const win = ru > lu || (ru === lu && remote.deleted && !local.deleted) ? remote : local;
+  const cards = mergeCards(local.cards, remote.cards);
+  const changed = win !== local || !sameCardList(local.cards, cards);
+  if (!changed) return null;
+  return { ...win, cards: win.deleted ? [] : cards, updatedAt: Math.max(lu, ru) };
+}
+
+function mergeCards(local = [], remote = []) {
+  const byUid = new Map();
+  for (const c of local || []) if (c && c.uid) byUid.set(c.uid, c);
+  const out = [];
+  const seen = new Set();
+  for (const r of remote || []) {
+    if (!r || !r.uid) continue;
+    seen.add(r.uid);
+    const l = byUid.get(r.uid);
+    if (!l) { out.push(r); continue; }
+    const lu = l.updatedAt || 0;
+    const ru = r.updatedAt || 0;
+    if (ru > lu || (ru === lu && r.deleted && !l.deleted)) out.push(r);
+    else out.push(l);
+  }
+  for (const l of local || []) {
+    if (l && l.uid && !seen.has(l.uid)) out.push(l);
+    else if (l && !l.uid) out.push(l);        // pre-backfill: nunca se descarta
+  }
+  return out;
+}
+
+function sameCardList(a, b) {
+  if ((a || []).length !== (b || []).length) return false;
+  return JSON.stringify(a) === JSON.stringify(b);
 }
 
 // Relevancia de capítulos vs objetivo ---------------------------------------

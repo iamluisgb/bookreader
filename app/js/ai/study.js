@@ -116,7 +116,7 @@ export function open({ decks, title = t('Estudiar'), onClose, onNavigate } = {})
   done = 0;
   flipped = false;
   for (const deck of decks || []) {
-    (deck.cards || []).forEach((c, idx) => { if (c.front && Srs.isDue(c, now)) queue.push({ deck, idx }); });
+    (deck.cards || []).forEach((c, idx) => { if (c.front && !c.deleted && Srs.isDue(c, now)) queue.push({ deck, idx }); });
   }
 
   overlay = document.createElement('div');
@@ -268,7 +268,10 @@ function gradeCurrent(rating) {
   const entry = queue.shift();
   const { deck, idx } = entry;
   deck.cards[idx] = { ...deck.cards[idx], srs: Srs.grade(deck.cards[idx].srs, rating) };
-  if (deck.id) DB.updateDeck(deck.id, { cards: deck.cards });   // persistir TRAS CADA tarjeta
+  // Se persiste TRAS CADA tarjeta (cerrar a media sesión no pierde nada) y se pasa el
+  // array COMPLETO —tombstones incluidos— porque updateDeck interpreta lo ausente como
+  // tarjeta borrada. El sello por tarjeta lo pone él.
+  if (deck.id) DB.updateDeck(deck.id, { cards: deck.cards });
   Storage.set(STREAK_KEY, Srs.bumpStreak(Storage.get(STREAK_KEY)));   // repaso de hoy → racha
   if (rating === 'again') queue.push(entry);                    // se repite al final de la sesión
   else done++;

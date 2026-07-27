@@ -29,8 +29,10 @@ export function newState(now = Date.now()) {
   return { reps: 0, lapses: 0, ease: EASE_START, interval: 0, due: dayOf(now), lastReview: 0 };
 }
 
-// ¿La tarjeta toca hoy? Las nuevas (sin srs) siempre tocan.
+// ¿La tarjeta toca hoy? Las nuevas (sin srs) siempre tocan. Una tarjeta borrada
+// (tombstone que aún viaja por el sync) no toca nunca.
 export function isDue(card, now = Date.now()) {
+  if (!card || card.deleted) return false;
   return !card.srs || card.srs.due <= dayOf(now);
 }
 
@@ -112,6 +114,7 @@ export function currentStreak(streak, now = Date.now()) {
 export function deckStats(cards, now = Date.now()) {
   const st = { total: 0, nuevas: 0, aprendiendo: 0, maduras: 0, due: 0 };
   for (const c of cards || []) {
+    if (!c || c.deleted) continue;             // tombstone: no cuenta en el desglose
     st.total++;
     if (!c.srs || c.srs.reps === 0) st.nuevas++;
     else if (c.srs.interval >= 21) st.maduras++;
