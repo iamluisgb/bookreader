@@ -957,11 +957,6 @@ body.resizing-panel .reader-main { transition: none !important; }
 /* ⚙ (y ✕ a su lado) quedan a la derecha aunque el grupo de conversación esté oculto. */
 .ai-toolbar-cfg { margin-left: auto; }
 
-/* Flashcards = acción de valor (monetización): tinte de acento para que NO se funda con la
-   fila de iconos grises (exportar, ⚙, ✕). El color es la señal, sin ensanchar el toolbar. */
-.ai-cards-btn { color: var(--accent); background: var(--accent-soft); }
-.ai-cards-btn:hover { background: var(--accent); color: var(--on-accent); }
-.ai-cards-btn .icon { color: inherit; }
 
 /* Coach mark de una sola vez que señala el botón de Flashcards. */
 .ai-coachmark {

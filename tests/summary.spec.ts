@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { seedProLicense } from './pro-license';
 import path from 'path';
+import { openFromStudio } from './studio-nav';
 
 // P13 · Resumen citado estructurado: map (viñetas citadas por trozo) + framing (TL;DR +
 // Ideas principales + Qué llevarte) + secciones por capítulo, render con citas [[aN]]
@@ -56,7 +57,7 @@ async function setup(page) {
 
 test('genera un resumen estructurado (TL;DR + marco + puntos citados y clicables)', async ({ page }) => {
   await setup(page);
-  await page.click('#ai-convo-summary');
+  await openFromStudio(page, 'summary');
   await page.waitForSelector('#ai-summary', { timeout: 5000 });
   await page.click('#sum-generate');   // profundidad por defecto: Estándar (estructurado)
 
@@ -72,7 +73,7 @@ test('genera un resumen estructurado (TL;DR + marco + puntos citados y clicables
 
 test('el modo Breve produce lista plana sin secciones de marco', async ({ page }) => {
   await setup(page);
-  await page.click('#ai-convo-summary');
+  await openFromStudio(page, 'summary');
   await page.waitForSelector('#ai-summary', { timeout: 5000 });
   await page.selectOption('#sum-depth', 'breve');
   await page.click('#sum-generate');
@@ -83,7 +84,7 @@ test('el modo Breve produce lista plana sin secciones de marco', async ({ page }
 
 test('clic en una cita del resumen salta al libro y cierra el modal', async ({ page }) => {
   await setup(page);
-  await page.click('#ai-convo-summary');
+  await openFromStudio(page, 'summary');
   await page.waitForSelector('#ai-summary', { timeout: 5000 });
   await page.click('#sum-generate');
   await page.waitForSelector('.sum-doc .ai-cite', { timeout: 20000 });

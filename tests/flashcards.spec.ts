@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import { seedProLicense } from './pro-license';
 import path from 'path';
 import fs from 'fs';
+import { openFromStudio } from './studio-nav';
 
 const EPUB_PATH = path.join(__dirname, 'test.epub');
 
@@ -89,7 +90,7 @@ async function setup(page, canned = JSON.stringify(CANNED_CARDS), delayMs = 0) {
 }
 
 async function generate(page) {
-  await page.click('#ai-convo-cards');
+  await openFromStudio(page, 'flashcards');
   await page.waitForSelector('#ai-flashcards', { timeout: 5000 });
   await page.click('#fc-generate');
   await expect(page.locator('#ai-flashcards h2')).toContainText('tarjetas', { timeout: 15000 });
@@ -111,7 +112,7 @@ test('generar muestra la revisión con las tarjetas del modelo (vía function ca
 // deja elegir un capítulo, que se refleja en el botón.
 test('el alcance usa un combobox propio y permite elegir capítulo', async ({ page }) => {
   await setup(page);
-  await page.click('#ai-convo-cards');
+  await openFromStudio(page, 'flashcards');
   await page.waitForSelector('#ai-flashcards', { timeout: 5000 });
   // No hay <select> nativo para el alcance; es un combo propio.
   await expect(page.locator('#fc-scope select')).toHaveCount(0);
@@ -264,7 +265,7 @@ test('los mazos persisten y se pueden reabrir desde el modal', async ({ page }) 
   await generate(page);
   // Cerrar y reabrir: el mazo generado aparece listado.
   await page.click('#ai-flashcards .ai-ob-close');
-  await page.click('#ai-convo-cards');
+  await openFromStudio(page, 'flashcards');
   await expect(page.locator('.fc-deck')).toHaveCount(1);
   await expect(page.locator('.fc-deck-meta').first()).toContainText('3 tarjetas');
   // F3: mini-stats del mazo (todas nuevas: aún sin repasar).
@@ -312,7 +313,7 @@ test('tras generar se puede estudiar sin salir, y el botón dice cuántas encola
 
 test('cerrar el modal no cancela la generación: el chip la recoge al terminar', async ({ page }) => {
   await setup(page, JSON.stringify(CANNED_CARDS), 400);   // lenta a propósito
-  await page.click('#ai-convo-cards');
+  await openFromStudio(page, 'flashcards');
   await page.waitForSelector('#ai-flashcards', { timeout: 5000 });
   await page.click('#fc-generate');
   await expect(page.locator('#fc-generate .ai-typing')).toBeVisible();

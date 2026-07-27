@@ -207,9 +207,6 @@ const EN = {
   'Conversación': 'Conversation',
   'Nueva conversación': 'New conversation',
   'Exportar esta conversación (libreta + chat) a Markdown': 'Export this conversation (notebook + chat) to Markdown',
-  'Crear flashcards para Anki': 'Create flashcards for Anki',
-  'Resumen citado del libro': 'Cited summary of the book',
-  'Mapa mental del libro': 'Mind map of the book',
   'Ajustes del agente': 'Agent settings',
   'Cerrar': 'Close',
   'Abre un EPUB para empezar.': 'Open an EPUB to get started.',
@@ -225,7 +222,7 @@ const EN = {
   // panel.js — estados y acciones
   'Abre o crea una conversación para exportarla.': 'Open or create a conversation to export it.',
   'Conversación exportada (Markdown).': 'Conversation exported (Markdown).',
-  'Convierte este libro en <b>flashcards para Anki</b> desde aquí.': 'Turn this book into <b>Anki flashcards</b> from here.',
+  'Convierte este libro en <b>flashcards para Anki</b> desde el Studio.': 'Turn this book into <b>Anki flashcards</b> from the Studio.',
   '¿Estudiando este libro? Elige un <b>objetivo de lectura</b> para activar la libreta y el repaso.': 'Studying this book? Pick a <b>reading goal</b> to enable the notebook and reviews.',
   'Abre un libro para crear flashcards.': 'Open a book to create flashcards.',
   'Abre un libro para generar el resumen.': 'Open a book to generate the summary.',

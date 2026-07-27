@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { seedProLicense } from './pro-license';
 import path from 'path';
+import { openFromStudio, openArtifactFromStudio } from './studio-nav';
 
 // Trabajos de IA en segundo plano: "Generar" → "Seguir leyendo" (suelta el modal, sigue) →
 // chip flotante de progreso → toast "listo" → reabrir el resultado (y desde caché, instantáneo).
@@ -55,7 +56,7 @@ async function setup(page) {
 
 test('seguir leyendo mientras genera, aviso al terminar y reabrir', async ({ page }) => {
   await setup(page);
-  await page.click('#ai-convo-summary');
+  await openFromStudio(page, 'summary');
   await page.waitForSelector('#ai-summary', { timeout: 5000 });
   await page.click('#sum-generate');
 
@@ -75,17 +76,17 @@ test('seguir leyendo mientras genera, aviso al terminar y reabrir', async ({ pag
   // Reabre directo en el resultado (no en la configuración).
   await expect(page.locator('#ai-summary .sum-doc')).toContainText('pueblo de muertos', { timeout: 5000 });
 
-  // Cerrar y reabrir desde el lanzador → resultado desde caché, sin re-generar (instantáneo).
+  // Cerrar y reabrir desde su tarjeta del Studio → resultado desde caché, sin re-generar.
   await page.locator('#ai-summary .ai-ob-close').click();
   await expect(page.locator('#ai-summary')).toHaveCount(0);
-  await page.click('#ai-convo-summary');
+  await openArtifactFromStudio(page, 'summary');
   await expect(page.locator('#ai-summary .sum-doc')).toContainText('pueblo de muertos', { timeout: 3000 });
   await expect(page.locator('#ai-summary #sum-generate')).toHaveCount(0);   // no es la vista de setup
 });
 
 test('el resumen se persiste en IndexedDB y se restaura al reabrir el libro', async ({ page }) => {
   await setup(page);
-  await page.click('#ai-convo-summary');
+  await openFromStudio(page, 'summary');
   await page.waitForSelector('#ai-summary', { timeout: 5000 });
   await page.click('#sum-generate');
   await expect(page.locator('#ai-summary .sum-doc')).toContainText('pueblo de muertos', { timeout: 15000 });
@@ -109,7 +110,7 @@ test('el resumen se persiste en IndexedDB y se restaura al reabrir el libro', as
 
 test('cancelar desde el chip detiene la generación', async ({ page }) => {
   await setup(page);
-  await page.click('#ai-convo-summary');
+  await openFromStudio(page, 'summary');
   await page.waitForSelector('#ai-summary', { timeout: 5000 });
   await page.click('#sum-generate');
   await expect(page.locator('#ai-summary')).toContainText('Generando resumen', { timeout: 5000 });

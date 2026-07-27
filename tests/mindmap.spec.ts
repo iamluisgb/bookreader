@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { seedProLicense } from './pro-license';
 import path from 'path';
+import { openFromStudio } from './studio-nav';
 
 // P14 · Mapa mental: map (viñetas citadas) + reduce (árbol JSON) → SVG radial con hojas
 // citadas clicables. LLM stubbeado.
@@ -57,7 +58,7 @@ async function setup(page) {
 
 test('genera un mapa radial SVG con ramas y hojas citadas', async ({ page }) => {
   await setup(page);
-  await page.click('#ai-convo-mindmap');
+  await openFromStudio(page, 'mindmap');
   await page.waitForSelector('#ai-mindmap', { timeout: 5000 });
   await page.click('#mm-generate');
 
@@ -76,7 +77,7 @@ test('genera un mapa radial SVG con ramas y hojas citadas', async ({ page }) => 
 
 test('clic en una hoja citada salta al libro y cierra el modal', async ({ page }) => {
   await setup(page);
-  await page.click('#ai-convo-mindmap');
+  await openFromStudio(page, 'mindmap');
   await page.waitForSelector('#ai-mindmap', { timeout: 5000 });
   await page.click('#mm-generate');
   await page.waitForSelector('.mm-canvas .mm-cite', { timeout: 20000 });

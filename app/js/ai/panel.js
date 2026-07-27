@@ -118,9 +118,6 @@ export function init(opts) {
   els.convoBtn.addEventListener('click', (e) => { e.stopPropagation(); if (convo) openConvoMenu(els.convoBtn); else openOnboarding(); });
   els.convoNew.addEventListener('click', () => openOnboarding());
   els.convoExport.addEventListener('click', exportConvo);
-  els.panel.querySelector('#ai-convo-cards').addEventListener('click', openFlashcards);
-  els.panel.querySelector('#ai-convo-summary').addEventListener('click', openSummary);
-  els.panel.querySelector('#ai-convo-mindmap').addEventListener('click', openMindMap);
   // Trabajos de IA en segundo plano (resumen/mapa/flashcards): chip flotante + toast. Los
   // "openers" reabren el modal reconstruyendo el contexto del libro actual.
   JobsUI.setOpener('summary', openSummary);
@@ -317,26 +314,44 @@ let flashcardsHintEl = null;
 function maybeHintFlashcards() {
   if (!isOpen() || Storage.get(FLASHCARDS_HINT_KEY, false)) return;
   if (flashcardsHintEl) return;
-  const btn = els.panel?.querySelector('#ai-convo-cards');
-  if (!btn || btn.offsetParent === null) return;   // botón no visible (sin convo aún)
+  // Apunta a la pestaña STUDIO, no al icono de flashcards: ese icono ya no existe (los
+  // artefactos viven en el Studio) y, además, enseñar la casa entera vale más que enseñar
+  // una acción suelta — dentro están también el resumen, el mapa y "Explícamelo tú".
+  const btn = els.panel?.querySelector('.ai-tab[data-view="studio"]');
+  if (!btn || btn.offsetParent === null) return;   // pestaña no visible (sin convo aún)
   Storage.set(FLASHCARDS_HINT_KEY, true);          // se enseña UNA vez, aunque lo ignoren
   const hint = document.createElement('div');
   hint.className = 'ai-coachmark';
   hint.innerHTML = `
-    <span>${t('Convierte este libro en <b>flashcards para Anki</b> desde aquí.')}</span>
+    <span>${t('Convierte este libro en <b>flashcards para Anki</b> desde el Studio.')}</span>
     <button class="ai-coachmark-x" aria-label="Entendido">${icon('xmark', { size: 14 })}</button>`;
   document.body.appendChild(hint);
   flashcardsHintEl = hint;
-  const r = btn.getBoundingClientRect();
-  // Anclado bajo el botón, con la flecha apuntándolo; clamp al viewport por si va justo al borde.
-  hint.style.top = `${r.bottom + 10}px`;
-  const left = Math.min(r.left + r.width / 2 - 130, window.innerWidth - 270);
-  hint.style.left = `${Math.max(10, left)}px`;
-  hint.style.setProperty('--arrow-x', `${r.left + r.width / 2 - Math.max(10, left)}px`);
-  requestAnimationFrame(() => hint.classList.add('is-in'));
+  // OJO: hay que medir el objetivo con el panel YA COLOCADO. El panel entra deslizándose
+  // (transform), así que durante la animación su contenido está desplazado y la flecha
+  // acababa apuntando fuera de la pantalla. Se coloca al terminar la transición, con un
+  // plazo de respaldo por si el navegador no emite el evento (o no hay animación).
+  const place = () => placeCoachmark(hint, btn);
+  els.panel.addEventListener('transitionend', place, { once: true });
+  setTimeout(place, 400);
   hint.querySelector('.ai-coachmark-x').addEventListener('click', dismissFlashcardsHint);
   // Cualquier interacción fuera lo cierra (se arma en el próximo tick para no auto-cerrarse).
   setTimeout(() => document.addEventListener('click', onHintOutside, { once: false }), 0);
+}
+
+// Ancla el coachmark bajo su objetivo, con la flecha apuntándolo. Idempotente: se puede
+// llamar varias veces (transitionend + respaldo) sin efectos raros.
+function placeCoachmark(hint, btn) {
+  if (!hint.isConnected) return;
+  const r = btn.getBoundingClientRect();
+  if (!r.width) return;
+  hint.style.top = `${r.bottom + 10}px`;
+  // Clamp al viewport por si el objetivo va justo al borde; la flecha se recoloca en
+  // consecuencia para seguir señalándolo.
+  const left = Math.max(10, Math.min(r.left + r.width / 2 - 130, window.innerWidth - 270));
+  hint.style.left = `${left}px`;
+  hint.style.setProperty('--arrow-x', `${r.left + r.width / 2 - left}px`);
+  requestAnimationFrame(() => hint.classList.add('is-in'));
 }
 
 function onHintOutside(e) {

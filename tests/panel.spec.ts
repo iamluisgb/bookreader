@@ -214,3 +214,46 @@ test('el fragmento adjunto entra ANCLADO en el extracto aunque la pregunta sea d
   expect(r.agentic).toBe(false);
   expect(r.expansion).toBe(false);
 });
+
+// Los artefactos (resumen, mapa, flashcards) tenían icono propio en el toolbar ADEMÁS de su
+// tarjeta en el Studio. La duplicación ya estaba rota —"Explícamelo tú" nació sin icono— así
+// que se retiraron: la barra es de la CONVERSACIÓN y los artefactos viven en el Studio.
+test('el toolbar ya no duplica los lanzadores de artefactos', async ({ page }) => {
+  await page.goto('/');
+  for (const id of ['#ai-convo-cards', '#ai-convo-summary', '#ai-convo-mindmap']) {
+    await expect(page.locator(id)).toHaveCount(0);
+  }
+  // Lo que sí es de la conversación se queda.
+  for (const id of ['#ai-convo-btn', '#ai-convo-new', '#ai-convo-export', '#ai-edit-cfg', '#ai-close']) {
+    await expect(page.locator(id)).toHaveCount(1);
+  }
+});
+
+// El coachmark de flashcards apuntaba al icono retirado (sin él no se enseñaba nada, que es
+// la única pista que tiene un usuario nuevo de que existen). Ahora señala la pestaña Studio.
+// Y se coloca CUANDO el panel ha terminado de entrar: midiendo a mitad de la animación, la
+// flecha salía disparada fuera de la tarjeta.
+test('el coachmark señala la pestaña Studio, y la flecha cae dentro', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('bookreader_ai_key', JSON.stringify('sk-test')));
+  await page.goto('/');
+  const fc = page.waitForEvent('filechooser');
+  await page.click('#open-file-btn');
+  await (await fc).setFiles(path.join(__dirname, 'test.epub'));
+  await page.waitForSelector('#epub-container iframe', { timeout: 15000 });
+  await page.locator('#ai-toggle').click();
+  await page.locator('.ai-ob-quickchat').click().catch(() => { /* ya hay conversación */ });
+  await expect(page.locator('.ai-coachmark')).toBeVisible({ timeout: 15000 });
+  await page.waitForTimeout(600);   // deja terminar la entrada del panel
+
+  const g = await page.evaluate(() => {
+    const m = document.querySelector('.ai-coachmark')!.getBoundingClientRect();
+    const tab = document.querySelector('.ai-tab[data-view="studio"]')!.getBoundingClientRect();
+    const arrow = parseFloat(getComputedStyle(document.querySelector('.ai-coachmark')!).getPropertyValue('--arrow-x'));
+    return { m: { left: m.left, right: m.right, top: m.top, width: m.width }, tabCx: tab.left + tab.width / 2, tabBottom: tab.bottom, arrow };
+  });
+  expect(g.m.top).toBeGreaterThanOrEqual(g.tabBottom);        // debajo de la pestaña
+  expect(g.arrow).toBeGreaterThan(0);
+  expect(g.arrow).toBeLessThan(g.m.width);                    // la flecha, DENTRO de la tarjeta
+  expect(g.m.left + g.arrow).toBeCloseTo(g.tabCx, 0);         // y apuntando a su centro
+  await expect(page.locator('.ai-coachmark')).toContainText('Studio');
+});

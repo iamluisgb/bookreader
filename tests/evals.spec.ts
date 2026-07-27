@@ -4,6 +4,7 @@ import { BATTERIES } from '../evals/batteries.mjs';
 import * as fs from 'fs';
 import * as path from 'path';
 import { execSync } from 'child_process';
+import { openFromStudio } from './studio-nav';
 
 // EV1 · Runner de GENERACIÓN de las baterías de evals (docs/EVALS.md). Tag @eval:
 // fuera del `npm test` determinista y del `test:ai` (@live) — se lanza con
@@ -89,7 +90,7 @@ test.describe('EV1 · generación de artefactos @eval', () => {
 
       // Flashcards (alcance y nº por defecto de la UI — lo que vería el usuario; smoke: 10).
       const tCards = Date.now();
-      await page.click('#ai-convo-cards');
+      await openFromStudio(page, 'flashcards');
       await page.waitForSelector('#ai-flashcards', { timeout: 10000 });
       if (SMOKE) await page.selectOption('#fc-count', '10');
       await page.click('#fc-generate');
@@ -103,7 +104,7 @@ test.describe('EV1 · generación de artefactos @eval', () => {
       // se sigue, para no perder las tarjetas ya generadas de la batería.
       const tSum = Date.now();
       let summaryError = '';
-      await page.click('#ai-convo-summary');
+      await openFromStudio(page, 'summary');
       await page.waitForSelector('#ai-summary', { timeout: 10000 });
       if (SMOKE) await page.selectOption('#sum-depth', 'breve');
       await page.click('#sum-generate');
@@ -123,7 +124,7 @@ test.describe('EV1 · generación de artefactos @eval', () => {
       const tMm = Date.now();
       let mindmapError = '';
       if (!SMOKE) {
-        await page.click('#ai-convo-mindmap');
+        await openFromStudio(page, 'mindmap');
         await page.click('#mm-generate');
         try {
           await expect(page.locator('#mm-png')).toBeVisible({ timeout: 420000 });

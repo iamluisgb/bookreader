@@ -10,8 +10,11 @@ export const TEMPLATE = () => `
   <!-- Tirador del sheet (solo visible en móvil). Es un ELEMENTO REAL y no un ::before porque
        los pseudo-elementos no reciben eventos: sin nodo no hay arrastre posible. -->
   <button id="ai-sheet-grab" class="ai-sheet-grab" aria-label="${t('Ajustar alto del panel')}"></button>
-  <!-- Toolbar único (una sola fila de chrome): selector de conversación + perfil + acciones +
-       ajustes/cerrar. Sustituye a la antigua cabecera "Agente" (redundante) para dar el máximo
+  <!-- Toolbar único (una sola fila de chrome): todo lo que hay aquí es de la CONVERSACIÓN
+       (perfil, selector, nueva, exportar) más ajustes/cerrar. Los artefactos (resumen, mapa,
+       flashcards) vivían también aquí como iconos sueltos y se quitaron: su casa es el Studio,
+       que además muestra su estado e historial —cosas que un icono no puede decir— y ya era el
+       único sitio de los tipos nuevos ("Explícamelo tú" nació sin icono). Sustituye a la antigua cabecera "Agente" (redundante) para dar el máximo
        alto al chat. El grupo de conversación (#ai-convobar) se oculta sin libro; ⚙ y ✕ siempre
        visibles (por eso ⚙ lleva margin-left:auto para quedar a la derecha cuando el grupo falta). -->
   <div class="ai-toolbar">
@@ -22,9 +25,6 @@ export const TEMPLATE = () => `
       </button>
       <button id="ai-convo-new" class="icon-btn" title="${t('Nueva conversación')}">${icon('plus', { size: 18 })}</button>
       <button id="ai-convo-export" class="icon-btn" title="${t('Exportar esta conversación (libreta + chat) a Markdown')}">${icon('share', { size: 17 })}</button>
-      <button id="ai-convo-cards" class="icon-btn ai-cards-btn" title="${t('Crear flashcards para Anki')}">${icon('cards', { size: 17 })}</button>
-      <button id="ai-convo-summary" class="icon-btn" title="${t('Resumen citado del libro')}">${icon('note', { size: 17 })}</button>
-      <button id="ai-convo-mindmap" class="icon-btn" title="${t('Mapa mental del libro')}">${icon('columns', { size: 17 })}</button>
     </div>
     <button id="ai-edit-cfg" class="icon-btn ai-toolbar-cfg" title="${t('Ajustes del agente')}">${icon('gear')}</button>
     <button id="ai-close" class="icon-btn" title="${t('Cerrar')}">${icon('xmark')}</button>

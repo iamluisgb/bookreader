@@ -5,6 +5,32 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-27 — El toolbar del agente deja de duplicar el Studio
+
+Los artefactos tenían icono propio en la barra superior **además** de su tarjeta en el Studio. La
+duplicación ya estaba rota antes de tocarla: el Studio tiene cuatro tipos y la barra tenía tres —
+*"Explícamelo tú"* nació sin icono—, así que en la práctica el sitio canónico ya era el Studio y la
+barra era deuda de la etapa anterior, cuando esas acciones "solo se lanzaban desde iconos sueltos"
+(lo dice la cabecera de `studio.js`).
+
+- **Fuera los tres iconos** (flashcards, resumen, mapa mental). Lo que queda en la barra es
+  homogéneo: perfil, selector de conversación, nueva, exportar, ⚙ y ✕ — todo **de la conversación**.
+  Los artefactos son del libro, que es de lo que va el Studio.
+- **La tarjeta dice lo que el icono no podía**: "72 citas · hace 1 día", el historial completo,
+  abrir uno concreto o borrarlo. Y 📄 vs 🏛 para *Resumen* vs *Mapa mental* no lo acertaba nadie.
+- **El coachmark de flashcards apuntaba al icono retirado** y, sin él, no se enseñaba nada — era la
+  única pista de que las flashcards existen. Ahora señala la **pestaña Studio**, que además enseña
+  la casa entera en vez de una acción suelta.
+- **Bug destapado al moverlo:** el coachmark se colocaba midiendo su objetivo **a mitad de la
+  animación de entrada del panel**, con lo que la flecha se calculaba a 523px en una tarjeta de 260
+  y apuntaba fuera de la pantalla. Ahora se ancla al terminar la transición (con plazo de respaldo).
+- **Los tests entran por donde entra el usuario:** 14 llamadas a los iconos migradas a la pestaña
+  Studio (`tests/studio-nav.ts`). De paso queda explícita una distinción que el icono no hacía:
+  *Nuevo* (generar otro) no es lo mismo que abrir un artefacto del historial.
+
+**Coste asumido:** de 1 toque a 2 para generar o reabrir. Son acciones de una o dos veces por libro,
+y para "acaba de generarse, quiero verlo" ya está el chip de jobs con su *"Ver resumen"*.
+
 ## 2026-07-27 — Preguntar por una ZONA de la página, y que el panel no la tape
 
 A raíz de ver cómo lo resuelve un lector de PDF con asistente en tablet: seleccionas un trozo de la
