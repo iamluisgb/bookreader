@@ -430,6 +430,10 @@ vía deep-link) · F3 ✓ (racha + mini-stats por mazo). Ver CHANGELOG 2026-07-0
 - **SM-2, no FSRS.** ~40 líneas puras y testables; FSRS solo rinde con historial largo que nadie tendrá
   en meses. El estado `srs` por tarjeta guarda `reps/lapses/ease/interval/due/lastReview` → migrable a
   FSRS después sin romper.
+  > **Revisado (2026-07-27): la segunda mitad de esta razón es falsa.** FSRS con parámetros por
+  > defecto —sin historial ni optimización— ya predice mejor que SM-2 en el 99,5% de los usuarios.
+  > La migración es ahora [P19](#p19--migrar-el-scheduler-a-fsrs--s--la-razón-de-p10-ya-no-se-sostiene).
+  > La primera mitad (simple y testable) sigue siendo cierta y por eso no urge.
 - **Overlay a pantalla completa, no pestaña de sidebar.** La sidebar es contextual de lectura; el hábito
   empieza SIN libro abierto. Dos puertas: botón "Estudiar" por mazo (modal de flashcards) + chip
   "Repasar hoy (N)" en la estantería (el bucle de retorno).
@@ -527,6 +531,157 @@ retrieval (ADR-012) para medir que no regresa.
   poder distinguir cuál funciona. Con analytics por landing (Plausible/GoatCounter, pendiente en
   LAUNCH_PLAN) se decide cuáles escalar (oposiciones/medicina/ES, SEO programático).
 - Los CTA de todas apuntan a `app/` (demo instantánea, prioridad nº1 del plan).
+
+---
+
+## 🎓 Aprendizaje basado en evidencia
+
+> **Contexto (2026-07-27).** Revisión de la literatura de tutoría y aprendizaje. El hallazgo que
+> ordena esta épica son **dos RCT con resultados opuestos usando la misma tecnología**:
+> - [Bastani et al., PNAS (2025)](https://www.pnas.org/doi/10.1073/pnas.2422633122) — preinscrito,
+>   ~1.000 alumnos: con GPT-4 **sin guardarraíles** durante la práctica, **+127% resolviendo
+>   ejercicios** y **−17% en el examen** frente al control. Lo usan de muleta. Con guardarraíles
+>   pedagógicos el daño desaparece (pero tampoco hay beneficio).
+> - [Kestin et al., Scientific Reports (2025)](https://www.nature.com/articles/s41598-025-97652-6) —
+>   Harvard, física, n=194: un tutor **diseñado con andamiaje experto** dobla el aprendizaje de una
+>   clase de aprendizaje activo, en menos tiempo. (Una sola sede: no es ley.)
+>
+> **La variable no es "usar IA": es si el sistema deja al lector hacer el trabajo cognitivo.** El
+> mecanismo del daño tiene nombre —**pereza metacognitiva**
+> ([BJET 2024](https://arxiv.org/pdf/2412.09315))—: el usuario delega planificación y evaluación,
+> obtiene mejor producto y peor aprendizaje.
+>
+> **Consecuencia para el producto.** En el marco **ICAP** de Chi (pasivo < activo < constructivo <
+> interactivo, ~8-10% más de aprendizaje por escalón,
+> [Chi & Wylie 2014](https://education.asu.edu/sites/g/files/litvpz656/files/lcl/chiwylie2014icap_2.pdf)),
+> **resumen, mapa mental y flashcards generadas producen el artefacto POR el lector**: mitad baja de
+> la escala. HQ&A, "Con números" y el Feynman son la mitad alta. No hay que quitar las primeras —son
+> las que traen usuarios— pero el centro de gravedad debe moverse hacia **"tú produces, él
+> comprueba"**, que además es un diferenciador que ningún "chatea con tu PDF" tiene.
+>
+> **Nota de posicionamiento:** el "2 sigma de Bloom" que cita todo el marketing de tutores con IA no
+> sobrevive a la revisión de [VanLehn (2011)](https://www.tandfonline.com/doi/full/10.1080/00461520.2011.611369):
+> tutores humanos **0.79**, sistemas de tutoría inteligente **0.76**. La afirmación honesta y fuerte
+> es esa segunda cifra, no el 2.0.
+
+### P17 — Preguntas ANTES de leer (efecto pretesting) · `M` · **evidencia fuerte, nadie lo tiene**
+
+**Qué es.** Al abrir un capítulo, 2-3 preguntas sobre material que **todavía no has leído**. Fallas,
+lees, y al terminar te las devuelve para responderlas de verdad.
+
+**Por qué.** El **efecto de pretesting/prequestioning** está sólidamente establecido: preguntar antes
+mejora la retención posterior **incluso cuando el lector falla todas las respuestas** — el error
+genera atención, curiosidad y mejor organización de lo que viene
+([Pan & Carpenter, 2023](https://link.springer.com/article/10.1007/s10648-023-09814-5)). Es
+*generación*, no recuperación: encaja en el escalón constructivo del ICAP.
+
+**Por qué aquí.** Es la feature que mejor encaja con un LECTOR y que no tiene la competencia: sabemos
+qué capítulo abres y cuál viene después. Y el objeto es casi el mismo que ya extrae
+[`flashcards.js`](js/ai/flashcards.js) (unidad de contenido + cita al pasaje): cambia **cuándo** se
+pregunta, no qué se extrae.
+
+**Piezas:**
+1. Generación al abrir capítulo (o precalculada para el siguiente, sin bloquear la lectura).
+2. **Ver la respuesta está deshabilitado hasta leer**: el valor está en fallar, no en acertar. Si se
+   puede desplegar la solución, es un resumen con pasos extra.
+3. Cierre al terminar el capítulo: las mismas preguntas, ahora con corrección y cita.
+4. Las falladas dos veces → tarjeta en el mazo del libro (engancha con [`srs.js`](js/ai/srs.js)).
+
+**Riesgos:** interrumpir al que solo quiere leer (debe ser saltable y recordar la elección);
+preguntas triviales o que se responden solas si el modelo ve demasiado contexto del capítulo.
+
+### P18 — Modo Feynman: explicas tú, el libro te contrasta · `M` · **cima del ICAP**
+
+**Qué es.** Eliges un concepto, lo explicas **con tus palabras** (voz o texto) y el sistema contrasta
+tu explicación contra el libro. Diseño revisado sobre literatura de tutoría — la versión ingenua
+(«dime qué he dicho mal») falla de tres formas conocidas:
+
+1. **Las expectativas se calculan ANTES, no al corregir.** Mecanismo central de AutoTutor:
+   *expectation & misconception-tailored dialogue* — una lista previa de unidades de contenido
+   esperadas **y de errores anticipados**, y se marca cuáles cubres
+   ([Graesser et al.](https://link.springer.com/content/pdf/10.3758/BF03195563.pdf)). Improvisar el
+   listón mientras corrige es la receta del juicio injusto ("has omitido X" cuando X estaba
+   implícito), que es el riesgo nº1 de esta feature. Con la lista precalculada **y su cita**, el
+   criterio es auditable. Las *misconceptions* salen casi gratis: los libros técnicos avisan de las
+   confusiones típicas explícitamente.
+2. **No dar el veredicto: escalar.** AutoTutor recorre **pump → hint → prompt → assert**: "¿qué
+   más?" → pista → pedir la pieza que falta → y **sólo al final** afirmarlo. Soltar el diagnóstico de
+   entrada es empezar por el último escalón.
+3. **Por defecto, sólo preguntar.** En [Chi et al. (2001)](https://onlinelibrary.wiley.com/doi/10.1207/s15516709cog2504_1)
+   suprimieron a los tutores explicar y dar feedback, dejándoles sólo preguntar: **los alumnos
+   aprendieron igual de bien**. Doble premio: **más barato** (una llamada por vuelta, no dos) y **más
+   seguro** (si casi nunca emite veredicto, casi nunca puede ser injusto). El diagnóstico completo
+   pasa a ser una acción explícita de cierre.
+
+**Granularidad: por expectativa, no por frase.** En VanLehn, la tutoría *step-based* rinde 0.76
+(≈ humano) pero la *sub-step*, más fina, cae a **0.40**. Más granular no es mejor.
+
+**Piezas:** artefacto con estado en el Studio (hermano de Flashcards, no un perfil ni un rol de chat:
+el valor está en el ciclo, y un rol de chat pierde el estado en dos turnos) · dos llamadas
+**separadas** (la que pregunta nunca ve tu respuesta) · entrada por **voz** (`SpeechRecognition`,
+del navegador, con fallback a textarea: explicar en voz alta *es* el ejercicio) · enganche con
+`srs.js` (los conceptos flojos son los candidatos; un hueco detectado genera tarjeta).
+
+**Riesgos:** que se sienta injusto (mitigado por 1); coste (mitigado por 3); no es para todo el
+mundo — Pro, no gancho de landing.
+
+### P19 — Migrar el scheduler a FSRS · `S` · **la razón de P10 ya no se sostiene**
+
+[P10](#p10--modo-estudiar-repetición-espaciada-in-app--ml--f1f3) eligió SM-2 con este argumento:
+*"FSRS solo rinde con historial largo que nadie tendrá en meses"*. Los datos de referencia lo
+refutan: sobre **>500 millones de repasos reales**, FSRS predice el recuerdo mejor que SM-2 en el
+**99,6%** de las colecciones y —**sin optimización personalizada, con parámetros por defecto y sin
+historial**— ya gana en el **99,5%** de los usuarios, con un **20-30% menos de repasos** para la
+misma retención ([comparativa](https://deepwiki.com/open-spaced-repetition/fsrs-optimizer/7.3-comparison-with-sm-2)).
+Anki lo puso por defecto en la 23.10 ([FAQ](https://faqs.ankiweb.net/what-spaced-repetition-algorithm)).
+
+La premisa era razonable al escribirla; el benchmark la contradice. El estado por tarjeta ya se
+diseñó migrable (`reps/lapses/ease/interval/due/lastReview`), así que el coste es bajo: modelo
+D/S/R + los parámetros por defecto, conservando el estado viejo para no perder programaciones.
+
+### P20 — Continuidad del ciclo flashcards → estudiar · `S`–`M` · **fricción reportada en uso real**
+
+Las piezas del ciclo (generar → revisar → estudiar → volver al libro) están todas construidas, pero
+**no se conectan entre sí**: en tres puntos el usuario tiene que salir, reabrir o reiniciar. Dos de
+las tres son incoherencias con infraestructura que la app ya tiene y que flashcards no usa.
+
+**F1 · Estudiar desde la pantalla de "listo" · `XS`.** Tras generar, `renderReview()`
+([flashcards.js L618-688](app/js/ai/flashcards.js#L618-L688)) solo ofrece `.apkg` y `.txt` — pero el
+mazo ya se guardó en IndexedDB ([L583](app/js/ai/flashcards.js#L583)) y `Study.open()` ya se llama
+desde la lista de mazos ([L201](app/js/ai/flashcards.js#L201)). La vista post-generación es la única
+que no lo ofrece: la pantalla de éxito empuja fuera de la app justo donde [P10](#p10--modo-estudiar-repetición-espaciada-in-app--ml--f1f3)
+quería retener. **Estudiar ahora** como primario, export degradado a secundario.
+
+**F2 · "Ver en el libro" no debe matar la sesión · `S`.** `goToSource()`
+([study.js L258-272](app/js/ai/study.js#L258-L272)) hace `close()`, y `close()` vacía `queue` y
+`done`. El scheduling SRS sobrevive (se persiste tras cada tarjeta), pero la **sesión** no: se
+pierden la cola, el contador de pendientes y los "otra vez" re-encolados — hay que reiniciar el
+repaso. **Minimizar en vez de cerrar:** ocultar el overlay con una clase sin tocar `queue`, y sacar
+un chip *"Volver al repaso · N pendientes"* (familia visual de `.ai-taskchip`). Como la navegación
+es SPA por `hashchange` ([app.js L229](app/js/app.js#L229)) y no recarga la página, el estado en
+memoria sobrevive. Persistir la sesión en localStorage queda como F2b, solo si el uso real muestra
+recargas de por medio.
+
+**F3 · Pasaje citado inline al voltear · `S`–`M`.** La mayoría de los "ver en el libro" son *"quiero
+releer esa frase"*, no *"quiero abandonar el repaso"*. Con `card.src` y `anchorsFor()` ya se puede
+mostrar el pasaje **dentro** de la tarjeta, dejando el salto al libro como acción secundaria. Ataca
+la causa de F2 en vez del síntoma.
+
+**F4 · Generación en segundo plano · `M`.** `onGenerate()`
+([flashcards.js L528](app/js/ai/flashcards.js#L528)) corre el map-reduce **dentro del modal** y
+aborta al cerrarlo (`if (!overlay) return;`). Resumen y mapa mental ya corren en
+[jobs.js](app/js/ai/jobs.js)/[jobs-ui.js](app/js/ai/jobs-ui.js) con chip + toast; flashcards, que es
+la generación *más lenta* (N llamadas encadenadas), es la única que secuestra al lector. Migrar a
+`Jobs.start({ kind: 'flashcards', run })` con el `DB.addDeck` dentro del `run`, añadir el tipo a
+`NAMES` ([jobs-ui.js L8](app/js/ai/jobs-ui.js#L8)) y registrar el opener junto a los otros dos
+([panel.js L117-118](app/js/ai/panel.js#L117-L118)). El chip hace visible la promesa de *"puedes
+seguir leyendo"* sin necesidad de un cartel que la anuncie.
+- **Ojo:** `Jobs` es exclusivo (uno a la vez) → generar tarjetas cancelaría un resumen en curso.
+  Consistente con lo que ya pasa entre resumen y mapa.
+- **Ojo:** `Jobs` persiste en `artifacts` y flashcards vive en `decks`. Usarlo solo como
+  ejecutor/progreso; el `run` devuelve el `deckId`.
+
+**Orden por esfuerzo/impacto:** F1 → F2 → F3 → F4.
 
 ---
 
