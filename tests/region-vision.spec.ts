@@ -157,3 +157,39 @@ test('dos zonas viajan etiquetadas y en el mismo turno', async ({ page }) => {
   expect(body.messages[0].content).toMatch(/RECORTES|recortado/);
   expect(label).toContain('Zona 1');
 });
+
+// Marcar una zona y quedarte ante un campo vacío es la misma barrera que seleccionar texto y
+// no saber qué preguntar: la captura ofrece las mismas acciones que el subrayado, más una que
+// solo tiene sentido mirando (definir los símbolos de una fórmula o un diagrama).
+test('la zona capturada ofrece acciones, y cada una manda su modo con la imagen', async ({ page }) => {
+  let body: any = null;
+  await page.route('**/chat/completions', async (route) => {
+    body = JSON.parse(route.request().postData() || '{}');
+    await route.fulfill({ status: 200, contentType: 'application/json',
+      body: JSON.stringify({ choices: [{ message: { content: 'Q: matriz de consultas…' } }] }) });
+  });
+  await page.addInitScript(() => {
+    localStorage.setItem('bookreader_ai_key', JSON.stringify('sk-test'));
+    localStorage.setItem('bookreader_ai_base_url', JSON.stringify('https://example.invalid/v1'));
+    localStorage.setItem('bookreader_ai_vision_model', JSON.stringify('vision-test'));
+  });
+  await openPdf(page);
+  await page.locator('#ai-toggle').click();
+  await page.locator('.ai-ob-quickchat').click().catch(() => { /* ya hay conversación */ });
+  await page.waitForTimeout(400);
+
+  await page.evaluate(async () => {
+    const P: any = await import('/js/pdf-reader.js');
+    const Panel: any = await import('/js/ai/panel.js');
+    const rect = { x: 0.1, y: 0.1, w: 0.7, h: 0.3 };
+    Panel.__setZonesForTest([{ dataUrl: P.captureRegionImage(1, rect, 300), page: 1, rect, label: 'Zona 1 · p. 1' }]);
+  });
+  await expect(page.locator('.ai-zone-acts .sel-act')).toHaveCount(3);
+
+  await page.locator('[data-va="symbols"]').click();
+  await page.waitForTimeout(600);
+  // La acción viaja como MODO en el sistema, y la imagen sigue yendo en el mismo turno.
+  expect(body.messages[0].content).toContain('LISTA cada símbolo');
+  expect(body.messages[1].content.filter((c: any) => c.type === 'image_url')).toHaveLength(1);
+  expect(body.messages[1].content.find((c: any) => c.type === 'text').text).toContain('Define cada símbolo');
+});

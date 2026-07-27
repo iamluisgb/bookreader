@@ -1140,6 +1140,43 @@ function visionReady() {
   return true;
 }
 
+// Acciones sobre lo capturado, hermanas de las de la barra de selección: marcar una zona y
+// tener que redactar la pregunta es la misma barrera que seleccionar texto y quedarte ante un
+// campo vacío. "Define los símbolos" no existe para texto porque solo tiene sentido mirando
+// una fórmula o un diagrama, que es justo lo que se recorta.
+const VISION_ACTIONS = {
+  explain: {
+    label: () => t('Explícame'), ico: 'bubble',
+    ask: () => t('Explícame qué es esto y qué está pasando aquí.'),
+    mode: `Explica lo que se ve con claridad: primero QUÉ es (figura, ecuación, tabla, esquema) y
+qué representa, y después cómo funciona, siguiendo el flujo o los términos como los lee un humano.
+Nada de describir la estética; el lector ya la ve. 150 palabras como mucho.`,
+  },
+  symbols: {
+    label: () => t('Define los símbolos'), ico: 'chart',
+    ask: () => t('Define cada símbolo y término que aparece aquí.'),
+    mode: `LISTA cada símbolo, variable, término o bloque etiquetado que aparezca, uno por línea, con
+su significado y su papel en el conjunto ("Q (matriz de consultas): …; papel: …"). Solo los que se
+VEAN de verdad; si algo no se lee bien, dilo en vez de adivinarlo. Sin párrafos de introducción.`,
+  },
+  why: {
+    label: () => t('Por qué importa'), ico: 'target',
+    ask: () => t('¿Por qué es importante esto para mi objetivo de lectura?'),
+    mode: `Responde en relación al OBJETIVO DE LECTURA del usuario (está arriba), nombrándolo. Di qué
+se desbloquea si entiende esto. Si para su objetivo es secundario, dilo claramente. 120 palabras.`,
+  },
+};
+
+async function visionAction(kind) {
+  const act = VISION_ACTIONS[kind];
+  if (!act || busy || !pendingImages.length) return;
+  const images = pendingImages;
+  els.input.value = '';
+  clearImageRef();
+  clearRef();
+  await deliverVision(act.ask(), images, act.mode);
+}
+
 // Miniaturas de lo adjunto. Se ven ANTES de enviar a propósito: el usuario comprueba que el
 // recorte es el que quería en vez de descubrirlo por una respuesta que habla de otra cosa.
 function renderZones() {
@@ -1163,6 +1200,16 @@ function renderZones() {
     (zones.length < MAX_ZONES
       ? `<button class="ai-zone-add" id="ai-zone-add">${icon('plus', { size: 14 })}${t('Otra zona')}</button>`
       : '');
+  // Fila de acciones: el equivalente para imagen de las acciones rápidas del subrayado.
+  const acts = document.createElement('div');
+  acts.className = 'ai-zone-acts';
+  acts.innerHTML = Object.entries(VISION_ACTIONS)
+    .map(([k, a]) => `<button class="sel-act" data-va="${k}">${icon(a.ico, { size: 15 })}${a.label()}</button>`).join('');
+  host.appendChild(acts);
+  acts.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-va]');
+    if (b) visionAction(b.dataset.va);
+  });
   host.querySelector('#ai-zone-add')?.addEventListener('click', () => pickZone());
   host.querySelectorAll('.ai-zone-x').forEach((btn, i) => btn.addEventListener('click', () => {
     pendingImages = pendingImages.filter((z) => z !== zones[i]);
@@ -1196,7 +1243,7 @@ function pageText(page) {
   return out.join(' ').slice(0, 4000);
 }
 
-async function deliverVision(userText, images) {
+async function deliverVision(userText, images, systemExtra = '') {
   const list = Array.isArray(images) ? images : [images];
   if (busy || !list.length) return;
   const mySeq = bookSeq;   // guard: no persistir si el usuario cambia de libro mid-turno
@@ -1243,7 +1290,7 @@ te vayas al resto de la página. Si se te da más de una zona, están etiquetada
 `Eres un tutor de lectura. Te doy ${what} y el texto extraído de su página. Explica su contenido —sobre
 todo las figuras, diagramas o tablas— con claridad y en el idioma del usuario, conectándolo con su
 objetivo de lectura. Describe lo que REALMENTE se ve en la imagen; no inventes ni cambies el número de
-página.${zonedRules}` },
+página.${zonedRules}${systemExtra ? `\n\n${systemExtra}` : ''}` },
       // Cada imagen va PRECEDIDA de su etiqueta: sin ella el modelo funde las dos zonas en una
       // respuesta promedio y no puede referirse a ninguna por su nombre.
       { role: 'user', content: [

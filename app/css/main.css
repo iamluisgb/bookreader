@@ -3054,3 +3054,17 @@ body.region-selecting { user-select: none; }
   background: none; color: var(--text-soft); font-size: var(--fs-xs); cursor: pointer;
 }
 .ai-zone-add:hover { color: var(--accent); border-color: var(--accent); }
+
+/* Acciones sobre lo capturado: ocupan su propia línea bajo las miniaturas y reutilizan el
+   aspecto de la barra de selección — es la misma idea (no empezar ante un campo vacío)
+   aplicada a la imagen. */
+.ai-zone-acts {
+  flex: 1 0 100%;
+  display: flex; flex-wrap: wrap; gap: 6px;
+  margin-top: 2px;
+}
+.ai-zone-acts .sel-act {
+  border: 1px solid var(--border); border-radius: var(--r-pill);
+  padding: 5px 12px; font-size: var(--fs-xs); gap: 6px;
+}
+.ai-zone-acts .sel-act .icon { color: var(--accent); }

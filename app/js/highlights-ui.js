@@ -47,6 +47,7 @@ export function initHighlights() {
 
 let tempSelCfi = null;
 let lastSelWin = null;   // ventana del iframe de la última selección (escritorio)
+let pdfPending = null;   // selección de PDF VIVA (se refresca con selectionchange; ver setupPdfSelection)
 
 export function setupHighlights() {
   const rendition = EpubReader.getRendition();
@@ -132,15 +133,17 @@ function positionTooltip(tooltip, rect) {
 
 // Acciones de agente de la barra de selección (idénticas en EPUB y PDF): preguntar con el
 // fragmento adjunto, o una de las acciones rápidas, que mandan una petición ya formulada.
-function wireAgentActions(text) {
+// `getText` es una FUNCIÓN, no una cadena: en PDF el texto puede cambiar entre que se abre la
+// barra y se pulsa la acción (asas de selección), así que se lee al pulsar.
+function wireAgentActions(getText) {
   const on = (id, fn) => {
     const el = document.getElementById(id);
-    if (el) el.onclick = () => { fn(); hideHighlightTooltip(); };
+    if (el) el.onclick = () => { fn(getText()); hideHighlightTooltip(); };
   };
-  on('sel-ask', () => AiPanel.quoteSelection(text));
-  on('sel-numeric', () => AiPanel.quickAction('numeric', text));
-  on('sel-explain', () => AiPanel.quickAction('explain', text));
-  on('sel-why', () => AiPanel.quickAction('why', text));
+  on('sel-ask', (txt) => AiPanel.quoteSelection(txt));
+  on('sel-numeric', (txt) => AiPanel.quickAction('numeric', txt));
+  on('sel-explain', (txt) => AiPanel.quickAction('explain', txt));
+  on('sel-why', (txt) => AiPanel.quickAction('why', txt));
 }
 
 function showHighlightTooltip(cfiRange, text, rect) {
@@ -162,7 +165,7 @@ function showHighlightTooltip(cfiRange, text, rect) {
     };
   });
 
-  wireAgentActions(text);
+  wireAgentActions(() => text);
 
   // Añadir nota (subraya y guarda la nota)
   document.getElementById('sel-note').onclick = async () => {
@@ -202,6 +205,7 @@ export function hideHighlightTooltip() {
   try { lastSelWin && lastSelWin.getSelection().removeAllRanges(); } catch (e) {}  // selección nativa (escritorio)
   try { window.getSelection().removeAllRanges(); } catch (e) {}  // selección nativa del PDF (documento padre)
   lastSelWin = null;
+  pdfPending = null;   // cerrada la barra, la captura viva deja de valer
 }
 
 // PDF2/PDF3 · Selección en PDF. La capa de texto del PDF ya es seleccionable (vive en el
@@ -213,28 +217,54 @@ export function setupPdfSelection() {
   container.dataset.selWired = '1';   // no re-atar en cada render/página
 
   const onSelectEnd = () => setTimeout(() => {
-    const sel = window.getSelection();
-    const text = sel && !sel.isCollapsed ? dehyphenate(sel.toString().replace(/\s+/g, ' ').trim()) : '';
-    if (!text || text.length < 2) return;
-    // Solo si la selección cae dentro de la capa de texto del PDF.
-    const node = sel.anchorNode;
-    const host = node && (node.nodeType === 1 ? node : node.parentElement);
-    if (!host || !host.closest('#pdf-container .textLayer')) return;
-    // La página del subrayado es la del wrapper que contiene la selección (clave en modo
-    // scroll, donde hay varias páginas montadas a la vez).
-    const wrapper = host.closest('#pdf-container .pdf-page');
-    const page = wrapper ? (+wrapper.dataset.page || PdfReader.getCurrentPage()) : PdfReader.getCurrentPage();
-    let rect = null, rects = [];
-    try {
-      const range = sel.getRangeAt(0);
-      rect = range.getBoundingClientRect();
-      rects = pdfFractionalRects(range, wrapper);
-    } catch (e) {}
-    showPdfSelectionTooltip(text, rect, rects, page);
+    const cap = capturePdfSelection();
+    if (!cap) return;
+    pdfPending = cap;
+    showPdfSelectionTooltip(cap);
   }, 0);
 
   container.addEventListener('mouseup', onSelectEnd);
   container.addEventListener('touchend', onSelectEnd);
+
+  // EL BUG DEL MÓVIL: al mantener pulsado, el navegador selecciona UNA PALABRA y ahí llega el
+  // `touchend` → capturábamos esa palabra. Después el usuario arrastra las ASAS para extender
+  // la selección, pero ese gesto se lo queda el navegador y NO emite más eventos táctiles a la
+  // página: al tocar el color se guardaba la palabra del principio y no lo que se veía
+  // marcado. De ahí el subrayado "descuadrado" (medido: 82px guardados frente a 322 visibles).
+  //
+  // `selectionchange` sí se dispara mientras se arrastran las asas, así que la captura se
+  // mantiene VIVA mientras la barra está abierta. Se ignoran los colapsos —tocar la barra
+  // colapsa la selección en algunos navegadores— para no perder lo último bueno.
+  document.addEventListener('selectionchange', () => {
+    if (!pdfPending || !isTooltipVisible()) return;
+    const cap = capturePdfSelection();
+    if (cap) { pdfPending = cap; positionTooltip(document.getElementById('highlight-tooltip'), cap.rect); }
+  });
+}
+
+function isTooltipVisible() {
+  const tt = document.getElementById('highlight-tooltip');
+  return !!tt && tt.style.display !== 'none';
+}
+
+// Foto de la selección actual del PDF: texto, rects fraccionales y página. `null` si no hay
+// selección utilizable (colapsada, muy corta o fuera de la capa de texto).
+function capturePdfSelection() {
+  const sel = window.getSelection();
+  const text = sel && !sel.isCollapsed ? dehyphenate(sel.toString().replace(/\s+/g, ' ').trim()) : '';
+  if (!text || text.length < 2) return null;
+  const node = sel.anchorNode;
+  const host = node && (node.nodeType === 1 ? node : node.parentElement);
+  if (!host || !host.closest('#pdf-container .textLayer')) return null;
+  // La página del subrayado es la del wrapper que contiene la selección (clave en modo
+  // scroll, donde hay varias páginas montadas a la vez).
+  const wrapper = host.closest('#pdf-container .pdf-page');
+  const page = wrapper ? (+wrapper.dataset.page || PdfReader.getCurrentPage()) : PdfReader.getCurrentPage();
+  // Sin rango utilizable no hay captura: antes se seguía adelante con rects vacíos y el
+  // subrayado se guardaba sin geometría (invisible al repintar).
+  let range;
+  try { range = sel.getRangeAt(0); } catch (e) { return null; }
+  return { text, rect: range.getBoundingClientRect(), rects: pdfFractionalRects(range, wrapper), page };
 }
 
 // Rectángulos de la selección en coordenadas FRACCIONALES (0..1) de la página del PDF, para
@@ -254,11 +284,17 @@ export function pdfFractionalRects(range, wrapper) {
     .filter(r => r.width > 0.001 && r.height > 0.001);
 }
 
-function showPdfSelectionTooltip(text, rect, rects, page) {
+// Los manejadores leen `pdfPending` EN EL MOMENTO DE LA ACCIÓN, no lo que hubiera al abrir la
+// barra: entre una cosa y otra el usuario ha podido mover las asas de selección (ver el bug
+// descrito en setupPdfSelection).
+function showPdfSelectionTooltip(cap) {
   const tooltip = document.getElementById('highlight-tooltip');
-  positionTooltip(tooltip, rect);
+  positionTooltip(tooltip, cap.rect);
+  pdfPending = cap;
+  const current = () => pdfPending || cap;
 
   const saveHighlight = (color, note = '') => {
+    const { page, rects, text } = current();
     Highlights.addPdf(page, rects, text, color, t('Pág. {n}', { n: page }), note);
     drawPdfHighlights(page);
     hideHighlightTooltip();
@@ -275,14 +311,14 @@ function showPdfSelectionTooltip(text, rect, rects, page) {
     saveHighlight('#ffd54f', note.trim());
   };
 
-  wireAgentActions(text);
+  wireAgentActions(() => current().text);
   document.getElementById('sel-copy').onclick = async () => {
-    try { await navigator.clipboard.writeText(text); } catch (e) { /* sin clipboard */ }
+    try { await navigator.clipboard.writeText(current().text); } catch (e) { /* sin clipboard */ }
     hideHighlightTooltip();
   };
   document.getElementById('sel-share').onclick = () => {
     hideHighlightTooltip();
-    shareHighlight(text);
+    shareHighlight(current().text);
   };
 
   setTimeout(() => document.addEventListener('click', hideHighlightTooltipOnOutside), 100);

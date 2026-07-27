@@ -5,6 +5,37 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-27 — El subrayado del móvil dejaba de cuadrar (bug real) + acciones sobre la captura
+
+**El bug, reportado desde el móvil: *"es difícil seleccionar y se descuadra lo subrayado"*.** No era
+la geometría —los rects fraccionales caen sobre el texto con desviación de sub-píxel a cualquier
+zoom, comprobado— sino el MOMENTO de la captura:
+
+1. Mantienes pulsado → el navegador selecciona **una palabra** y ahí llega el `touchend`, que es
+   cuando guardábamos texto y rectángulos.
+2. Arrastras las asas para extender la selección. **Ese gesto se lo queda el navegador y no emite
+   más eventos táctiles a la página**, así que nuestra captura se quedaba congelada en el paso 1.
+3. Tocas el color → se guardaba la palabra del principio, no lo que veías marcado.
+
+Medido en la reproducción: **82px guardados frente a 322 visibles**. La captura se mantiene ahora
+viva con `selectionchange` —que sí se dispara al arrastrar las asas— y los manejadores leen la
+selección EN EL MOMENTO DE LA ACCIÓN, no la que hubiera al abrir la barra. Los colapsos se ignoran
+(tocar la barra colapsa la selección en algunos navegadores) para no perder lo último bueno.
+
+De paso, una captura sin rango utilizable ahora se descarta: antes seguía adelante con la geometría
+vacía y guardaba un subrayado invisible al repintar.
+
+**Acciones sobre la zona capturada.** Marcar un recorte y quedarte ante un campo vacío es la misma
+barrera que seleccionar texto sin saber qué preguntar. Bajo las miniaturas aparecen **Explícame ·
+Define los símbolos · Por qué importa**, hermanas de las de la barra de selección. *Define los
+símbolos* no existe para texto porque solo tiene sentido mirando: lista cada variable y bloque
+etiquetado de una fórmula o un diagrama, y dice cuáles no se leen bien en vez de adivinarlos.
+
+**Nota sobre la selección táctil:** el menú nativo del sistema ("Copiar / Compartir") se superpone a
+nuestra barra y no se puede suprimir desde la web. El camino que sí evita el problema en móvil es
+marcar una **zona** (arrastrar un marco es mucho más fácil que ajustar asas), que ahora ya lleva sus
+propias acciones.
+
 ## 2026-07-27 — El toolbar del agente deja de duplicar el Studio
 
 Los artefactos tenían icono propio en la barra superior **además** de su tarjeta en el Studio. La

@@ -515,3 +515,77 @@ test.describe('PDF inmersivo (ocultar barras)', () => {
     expect(c).toBe(a);                               // y vuelve
   });
 });
+
+// PDF3 · El subrayado del MÓVIL salía descuadrado. Al mantener pulsado, el navegador
+// selecciona una PALABRA y ahí llega el `touchend`; después el usuario arrastra las asas para
+// extender la selección, pero ese gesto se lo queda el navegador y no emite más eventos
+// táctiles. Se guardaba la palabra inicial en vez de lo que se veía marcado (medido: 82px
+// guardados frente a 322 visibles). La captura se mantiene viva con `selectionchange`.
+test('PDF3: se guarda la selección AMPLIADA con las asas, no la del touchend', async ({ page }) => {
+  await openPdf(page);
+  await page.waitForSelector('#pdf-container .textLayer span', { timeout: 15000 });
+  const out = await page.evaluate(async () => {
+    const H: any = await import('/js/highlights.js');
+    const spans = [...document.querySelectorAll('#pdf-container .textLayer span')] as HTMLElement[];
+    const layer = spans[0].closest('.textLayer')!;
+    const sel = window.getSelection()!;
+
+    // 1) Long-press: una palabra + touchend.
+    const r1 = document.createRange();
+    r1.setStart(spans[0].firstChild!, 0);
+    r1.setEnd(spans[0].firstChild!, Math.min(5, spans[0].textContent!.length));
+    sel.removeAllRanges(); sel.addRange(r1);
+    document.getElementById('pdf-container')!.dispatchEvent(new TouchEvent('touchend', { bubbles: true }));
+    await new Promise((r) => setTimeout(r, 50));
+    const alLevantarElDedo = sel.toString();
+
+    // 2) Asas: se amplía SIN más eventos táctiles.
+    const r2 = document.createRange();
+    r2.selectNodeContents(layer);
+    sel.removeAllRanges(); sel.addRange(r2);
+    await new Promise((r) => setTimeout(r, 50));
+    const anchoVisible = r2.getBoundingClientRect().width;
+
+    // 3) Se toca el color.
+    (document.querySelector('#highlight-tooltip .highlight-color') as HTMLElement).click();
+    const saved = H.getByPage(1)[H.getByPage(1).length - 1];
+    const wrapper = document.querySelector('.pdf-page') as HTMLElement;
+    const anchoGuardado = (saved.rects || []).reduce((m: number, r: any) => Math.max(m, r.width), 0)
+      * wrapper.getBoundingClientRect().width;
+    return { alLevantarElDedo, textoGuardado: saved.text, anchoVisible, anchoGuardado };
+  });
+  expect(out.alLevantarElDedo).toBe('Hello');                      // lo que había en el touchend
+  expect(out.textoGuardado).toContain('PDF test page');            // lo que se guarda es lo ampliado
+  expect(Math.abs(out.anchoGuardado - out.anchoVisible)).toBeLessThan(3);
+});
+
+// Y la geometría del repintado, que es lo primero que se sospecha cuando algo "se descuadra":
+// los rects fraccionales tienen que caer sobre el texto a cualquier zoom.
+test('PDF3: el subrayado se repinta sobre su texto también con zoom', async ({ page }) => {
+  await openPdf(page);
+  await page.waitForSelector('#pdf-container .textLayer span', { timeout: 15000 });
+  const d = await page.evaluate(async () => {
+    const HU: any = await import('/js/highlights-ui.js');
+    const H: any = await import('/js/highlights.js');
+    const P: any = await import('/js/pdf-reader.js');
+    const span = document.querySelector('#pdf-container .textLayer span') as HTMLElement;
+    const wrapper = span.closest('.pdf-page') as HTMLElement;
+    const range = document.createRange();
+    range.selectNodeContents(span);
+    H.addPdf(1, HU.pdfFractionalRects(range, wrapper), span.textContent || '', '#ffd54f', 'p1');
+
+    const deltas: number[] = [];
+    for (const z of [1, 1.8]) {
+      P.setZoom(z);
+      await new Promise((r) => setTimeout(r, 250));
+      HU.drawPdfHighlights(1);
+      const rr = document.createRange();
+      rr.selectNodeContents(span);
+      const s = rr.getBoundingClientRect();
+      const painted = document.querySelector('.pdf-hl')!.getBoundingClientRect();
+      deltas.push(Math.abs(painted.left - s.left), Math.abs(painted.top - s.top), Math.abs(painted.width - s.width));
+    }
+    return Math.max(...deltas);
+  });
+  expect(d).toBeLessThan(1);   // sub-píxel a zoom 1 y 1.8
+});

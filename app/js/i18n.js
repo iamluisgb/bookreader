@@ -128,6 +128,10 @@ const EN = {
   'Explícame estas zonas y cómo se relacionan entre sí.': 'Explain these areas and how they relate to each other.',
   // Sheet del agente en móvil
   'Ajustar alto del panel': 'Adjust panel height',
+  // Acciones sobre la zona/página capturada
+  'Define los símbolos': 'Define the symbols',
+  'Explícame qué es esto y qué está pasando aquí.': 'Explain what this is and what is going on here.',
+  'Define cada símbolo y término que aparece aquí.': 'Define every symbol and term that appears here.',
   // P18 · Modo Feynman
   'Explícamelo tú': 'You explain it',
   'Explicas un concepto con tus palabras y el libro te pregunta hasta que lo construyes.': 'You explain a concept in your own words and the book keeps asking until you build it.',
