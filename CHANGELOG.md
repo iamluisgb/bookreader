@@ -5,6 +5,44 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-27 — "Explícamelo tú": el modo Feynman, diseñado sobre literatura de tutoría
+
+Eliges un concepto, lo explicas con **tus** palabras (voz o texto) y el libro te pregunta hasta que lo
+construyes. Nuevo en el Studio, junto a Resumen / Mapa mental / Flashcards — y el único de los cuatro
+que **no produce un artefacto: lo produces tú**.
+
+Tres decisiones que vienen de la evidencia y no del instinto (ver `BACKLOG · P18`):
+
+- **Las expectativas se calculan ANTES de que hables.** Mecanismo de AutoTutor (*expectation &
+  misconception-tailored dialogue*): lista previa de unidades de contenido esperadas + errores
+  típicos, **cada una con su cita**. Improvisar el listón mientras se corrige es lo que produce el
+  "has omitido X" injusto cuando X estaba implícito — el riesgo nº1 de esta feature. Precalculado y
+  citado, el criterio es auditable.
+- **No se da el veredicto: se escala.** `pump → hint → prompt → assert`, y **la escalada la decide el
+  código**, no el modelo (`moveFor`, por expectativa, no por sesión). Si se la dejas al modelo, elige
+  ayudar. El prompt le impone el movimiento del turno y le prohíbe adelantarse.
+- **Por defecto solo pregunta.** En Chi et al. (2001), suprimir a los tutores explicar y dar feedback
+  no empeoró el aprendizaje. Aquí eso es **una sola llamada por vuelta** (barato) y un diagnóstico que
+  solo aparece si lo pides — y que **sale del estado, sin llamar al modelo**, así que no puede
+  inventarse lo que te dejaste.
+
+Otros detalles: granularidad de **una expectativa por vuelta** (en VanLehn, la tutoría *sub-step*,
+más fina, rinde 0.40 frente al 0.76 de la *step-based*); **dictado** con `SpeechRecognition` —explicar
+en voz alta *es* el ejercicio— y textarea como camino normal donde no haya soporte; progreso "N de M
+ideas" como feedback **sin veredicto**.
+
+Dos cosas que costaron encontrar y que valen para futuros artefactos:
+
+- **Un `max_tokens` bajo con un modelo de razonamiento devuelve texto VACÍO**, sin error: el
+  razonamiento se come el presupuesto. Las llamadas van ahora a 3000/1500 como resumen y mapa, y si
+  aun así vuelve vacío el mensaje lo dice en vez de culpar al concepto.
+- `addEventListener('click', renderDiagnosisView)` pasaba el **MouseEvent** como `complete` y, siendo
+  truthy, **felicitaba por "haberlo cubierto entero"** justo cuando el usuario se rendía a medias.
+  Con test de regresión.
+
+10 tests deterministas (escalada, cobertura, parseo tolerante, diagnóstico) + 1 @live del ciclo
+completo contra el gateway.
+
 ## 2026-07-27 — "Con números": la fórmula que acabas de leer, ejecutada a mano
 
 Leer `x' = (x − vt)/√(1 − v²/c²)` y **entenderla** son cosas distintas. Seleccionas la fórmula o el

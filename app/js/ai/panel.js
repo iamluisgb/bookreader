@@ -23,6 +23,7 @@ import * as Backup from '../backup.js';
 import * as Flashcards from './flashcards.js';
 import * as Summary from './summary.js';
 import * as MindMap from './mindmap.js';
+import * as Feynman from './feynman.js';
 import * as Jobs from './jobs.js';
 import * as JobsUI from './jobs-ui.js';
 import * as Studio from './studio.js';
@@ -122,6 +123,7 @@ export function init(opts) {
       if (kind === 'summary') openSummary(opts);
       else if (kind === 'mindmap') openMindMap(opts);
       else if (kind === 'flashcards') openFlashcards();
+      else if (kind === 'feynman') openFeynman();
     },
     getContext: () => ({ bookId, bookTitle, segReady }),
   });
@@ -341,6 +343,22 @@ function openSummary(opts) {
     onCite: navigateCite,
     mode: opts && opts.mode,   // 'setup' desde Studio → generar uno nuevo (salta el cacheado)
     viewArtifact: opts && opts.artifact,   // abrir un artefacto concreto del historial
+  });
+}
+
+// P18 · Modo Feynman: el usuario explica, el libro contrasta. No pasa por el chat a
+// propósito (el valor está en el ciclo con estado, ver feynman.js).
+async function openFeynman() {
+  if (!book && !bookId) { setStatus('Abre un libro para explicar un concepto.'); return; }
+  if (!segReady) { setStatus('Preparando el libro… inténtalo en unos segundos.'); return; }
+  if (!(await ensurePro('feynman'))) return;   // gate Pro (MON2)
+  Feynman.open({
+    bookId, bookTitle,
+    tocLabels,
+    currentChapter: EpubReader.getCurrentChapterLabel?.() || '',
+    ensureIndex,
+    anchors,
+    onCite: navigateCite,
   });
 }
 
