@@ -617,6 +617,41 @@ export async function getOutlineItems() {
   return build(outline);
 }
 
+// Índice cacheado en plano (label + página), para resolver el capítulo de la burbuja
+// de arrastre sin volver a pedirle el outline a pdf.js en cada movimiento del dedo.
+let flatOutline = null;
+
+export async function primeOutlineCache() {
+  try {
+    const items = await getOutlineItems();
+    const flat = [];
+    for (const it of items) {
+      if (it.page != null) flat.push({ label: it.label, page: it.page });
+      for (const sub of it.subitems || []) {
+        if (sub.page != null) flat.push({ label: sub.label, page: sub.page });
+      }
+    }
+    flatOutline = flat.sort((a, b) => a.page - b.page);
+  } catch {
+    flatOutline = [];
+  }
+}
+
+// Qué hay en la fracción [0..1] de la barra, SIN navegar (ver getSeekPreview del
+// EPUB). En PDF la página es exacta; el capítulo sale del outline si lo hay.
+export function getSeekPreview(f) {
+  if (!totalPages) return null;
+  const page = Math.min(totalPages, Math.max(1, Math.round(f * totalPages)));
+  let chapter = '';
+  if (flatOutline?.length) {
+    for (const it of flatOutline) {
+      if (it.page <= page) chapter = it.label;
+      else break;
+    }
+  }
+  return { page, total: totalPages, chapter };
+}
+
 async function destToPage(dest) {
   try {
     let explicit = dest;

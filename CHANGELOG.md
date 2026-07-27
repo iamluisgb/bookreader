@@ -5,6 +5,31 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-27 — Barra de progreso deslizable e índice con números de página
+
+Dos gestos que se dan por supuestos en cualquier lector serio y aquí faltaban.
+
+- **Arrastrar la barra (estilo Play Books)** — `initProgressScrub()` en `js/app.js`. Mientras el dedo
+  se mueve, una **burbuja** dice a qué página y capítulo se llegaría; el salto ocurre **al soltar**.
+  Renderizar en cada píxel sería insufrible (el EPUB repagina, el PDF rasteriza) y además impediría
+  arrepentirse a mitad del gesto. El `%` de la fila acompaña al arrastre —verlo clavado en "0%" con
+  la barra a media altura parecía un fallo— y se restaura si el gesto se cancela. Un toque sin
+  desplazamiento sigue saltando, como el click de antes. `touch-action: none` es lo que evita que el
+  scroll de la página se robe el gesto en móvil.
+- **Accesible de paso**: el contenedor es un `role="slider"` real, enfocable, con ±1% en flechas,
+  ±10% en Re/Av Pág y extremos con Inicio/Fin. El handler global de flechas lo ignora para que una
+  pulsación no mueva el slider y pase de página a la vez.
+- **Página de cada sección en el índice** — `getTocPages()` en `js/epub-reader.js` y el `page` que el
+  outline del PDF ya resolvía. Dos cosas que costaron descubrir: `cfiBase` **no es un CFI válido**
+  por sí solo (epub.js lo rechaza), y muchos EPUB —los de Gutenberg, por ejemplo— meten decenas de
+  capítulos en un solo fichero separados por ancla, así que quedarse en la sección le habría dado
+  **la misma página a diez capítulos seguidos**. Se resuelve el ancla (~2 ms por sección), agrupando
+  por fichero para cargar cada uno una vez y descargando solo lo que carguemos nosotros.
+- Las localizaciones de epub.js se generan **después** de pintar el índice, así que los números
+  aparecen cuando están listas (`fillTocPages()`), sin reconstruir la lista.
+- `tests/progress-scrub.spec.ts` (7 tests) sobre los fixtures de evals, no sobre `test.epub`: con un
+  stub de 3 localizaciones, "página 1" en todas las entradas habría pasado por bueno.
+
 ## 2026-07-26 — Gateway F1.2: saber lo que cuesta una llamada (sin romper la retención cero)
 
 `DEMO_QUOTA=30` y `MAX_DAILY_CALLS=2000` eran números inventados: el gateway contaba llamadas pero

@@ -215,8 +215,11 @@
           <span id="progress-text" class="progress-text">0%</span>
           <span id="progress-time" class="progress-time" title="Tiempo de lectura restante" data-i18n-attrs="title"></span>
         </div>
-        <div id="progress-container" class="progress-container" title="Pulsa para saltar a esa parte del libro" data-i18n-attrs="title">
+        <div id="progress-container" class="progress-container" title="Arrastra o pulsa para saltar a esa parte del libro"
+             role="slider" tabindex="0" aria-label="Progreso de lectura" data-i18n-attrs="title,aria-label"
+             aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
           <div id="progress-bar" class="progress-bar"></div>
+          <div id="progress-bubble" class="progress-bubble" aria-hidden="true"></div>
         </div>
       </div>
       <button id="next-btn" class="nav-btn" aria-label="Página siguiente" data-i18n-attrs="aria-label" data-icon="chevron-right"></button>

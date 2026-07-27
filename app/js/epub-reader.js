@@ -729,6 +729,84 @@ export function getPageInfo(cfi) {
   }
 }
 
+// Página en la que empieza cada entrada del índice, para pintarla junto al título.
+// Recibe los href del TOC y devuelve Map<href, página>.
+//
+// Dos detalles que costaron descubrir:
+//  - `cfiBase` NO es un CFI válido por sí solo (epub.js: "not a valid argument for
+//    EpubCFI"); hay que componer el CFI del inicio del documento.
+//  - Muchos EPUB (los de Gutenberg, por ejemplo) meten decenas de capítulos en un
+//    solo fichero y los distinguen por ancla. Quedarse en la sección daría la MISMA
+//    página a diez capítulos seguidos, que es peor que no poner número. Por eso se
+//    resuelve el ancla: cargar la sección y localizar el elemento cuesta ~2 ms.
+//
+// Se agrupa por fichero para cargar cada sección una sola vez, y se descarga solo lo
+// que hayamos cargado nosotros (una sección ya cargada puede estar renderizándose).
+export async function getTocPages(hrefs) {
+  const out = new Map();
+  try {
+    if (!book?.spine || !book.locations?.length?.()) return out;
+  } catch (e) { return out; }
+
+  const byFile = new Map();
+  for (const href of hrefs) {
+    const [file, anchor] = String(href).split('#');
+    if (!byFile.has(file)) byFile.set(file, []);
+    byFile.get(file).push({ href, anchor });
+  }
+
+  for (const [file, entries] of byFile) {
+    let section = null;
+    try { section = book.spine.get(file); } catch (e) { /* href no resoluble */ }
+    if (!section?.cfiBase) continue;
+
+    const basePage = getPageInfo(`epubcfi(${section.cfiBase}!/4/2)`)?.page ?? null;
+
+    let doc = null, loadedByUs = false;
+    if (entries.some((e) => e.anchor)) {
+      try {
+        if (section.document) doc = section.document;
+        else { doc = await section.load(book.load.bind(book)); loadedByUs = true; }
+      } catch (e) { /* sin documento: nos quedamos en la página de la sección */ }
+    }
+
+    for (const e of entries) {
+      let page = basePage;
+      if (e.anchor && doc) {
+        try {
+          const el = doc.getElementById?.(e.anchor);
+          if (el) page = getPageInfo(section.cfiFromElement(el))?.page ?? basePage;
+        } catch (err) { /* ancla no encontrada: página de la sección */ }
+      }
+      if (page != null) out.set(e.href, page);
+    }
+
+    if (loadedByUs) { try { section.unload(); } catch (e) { /* ya descargada */ } }
+  }
+  return out;
+}
+
+// Qué hay en la fracción [0..1] de la barra, SIN navegar: alimenta la burbuja que
+// sigue al dedo mientras se arrastra. Página, total y capítulo si se puede resolver.
+export function getSeekPreview(f) {
+  try {
+    if (!book?.locations?.cfiFromPercentage) return null;
+    const frac = Math.min(1, Math.max(0, f));
+    const cfi = book.locations.cfiFromPercentage(frac);
+    if (!cfi) return null;
+    const info = getPageInfo(cfi);
+    let chapter = '';
+    try {
+      const href = book.spine.get(cfi)?.href;
+      const item = href && book.navigation?.toc?.find((t) => t.href.includes(href));
+      chapter = item?.label?.trim() || '';
+    } catch (e) { /* sin capítulo resoluble: la burbuja enseña solo la página */ }
+    return { page: info?.page || null, total: info?.total || 0, chapter };
+  } catch (e) {
+    return null;
+  }
+}
+
 export function getTitle() {
   return book?.packaging?.metadata?.title || t('Sin título');
 }

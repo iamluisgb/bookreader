@@ -99,6 +99,8 @@ const EN = {
   'Página siguiente': 'Next page',
   'Tiempo de lectura restante': 'Reading time left',
   'Pulsa para saltar a esa parte del libro': 'Click to jump to that part of the book',
+  'Arrastra o pulsa para saltar a esa parte del libro': 'Drag or tap to jump to that part of the book',
+  'Progreso de lectura': 'Reading progress',
   'Abrir agente': 'Open agent',
   'Agente': 'Agent',
   'Preguntar al agente': 'Ask the agent',

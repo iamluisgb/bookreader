@@ -1031,6 +1031,7 @@ async function loadEpub(buffer, bookId, aiBookId, persist = null) {
       // mostraba 0 hasta moverse: lo refrescamos ya con las localizaciones.
       EpubReader.refreshProgress();
       updateProgressDetail(undefined, totalWords);
+      fillTocPages();   // el índice ya se pintó; ahora sí se sabe la página de cada sección
     } catch (locErr) {
       console.warn('Could not generate locations:', locErr);
       totalWords = countBookWords();
@@ -1108,6 +1109,7 @@ async function loadPdf(buffer, bookId, aiBookId, persist = null) {
     renderBookmarks();               // poblar la lista de marcadores del PDF
     updateBookmarkButton();          // estado del botón para la página inicial
     loadPdfTOC();                    // índice del PDF (outline) en el sidebar
+    PdfReader.primeOutlineCache();   // capítulo de la burbuja al arrastrar la barra
     updateReadingModeToggle();       // PDF4: reflejar el modo (paginado/scroll) recordado
     return true;
   } catch (err) {
@@ -1131,7 +1133,7 @@ async function loadPdfTOC() {
   const addLink = (it, isSub) => {
     const a = document.createElement('a');
     a.href = '#';
-    a.textContent = it.label;
+    a.appendChild(tocLabel(it.label, it.page));
     if (isSub) a.classList.add('subitem');
     if (it.page != null) {
       a.addEventListener('click', async (e) => {
@@ -1150,6 +1152,23 @@ async function loadPdfTOC() {
   });
 }
 
+// Fila del índice: etiqueta + número de página a la derecha. `page` null → solo la
+// etiqueta (PDF sin destino resoluble, o EPUB sin localizaciones todavía).
+function tocLabel(label, page) {
+  const frag = document.createDocumentFragment();
+  const span = document.createElement('span');
+  span.className = 'toc-label';
+  span.textContent = String(label || '').trim();
+  frag.appendChild(span);
+  if (page != null) {
+    const num = document.createElement('span');
+    num.className = 'toc-page';
+    num.textContent = String(page);
+    frag.appendChild(num);
+  }
+  return frag;
+}
+
 function loadTOC() {
   const nav = EpubReader.getNavigation();
   const tocList = document.getElementById('toc-list');
@@ -1160,30 +1179,174 @@ function loadTOC() {
   }
 
   tocList.innerHTML = '';
-  nav.toc.forEach(item => {
+  const addLink = (item, isSub) => {
     const a = document.createElement('a');
     a.href = '#';
-    a.textContent = item.label.trim();
+    a.dataset.tocHref = item.href;
+    a.appendChild(tocLabel(item.label, null));   // la página llega en fillTocPages()
+    if (isSub) a.classList.add('subitem');
     a.addEventListener('click', async (e) => {
       e.preventDefault();
       await EpubReader.goTo(item.href);
     });
     tocList.appendChild(a);
+  };
+  nav.toc.forEach(item => {
+    addLink(item, false);
+    (item.subitems || []).forEach(sub => addLink(sub, true));
+  });
+}
 
-    // Subitems
-    if (item.subitems && item.subitems.length > 0) {
-      item.subitems.forEach(sub => {
-        const subA = document.createElement('a');
-        subA.href = '#';
-        subA.textContent = sub.label.trim();
-        subA.classList.add('subitem');
-        subA.addEventListener('click', async (e) => {
-          e.preventDefault();
-          await EpubReader.goTo(sub.href);
-        });
-        tocList.appendChild(subA);
-      });
+// Las localizaciones de epub.js se generan DESPUÉS de pintar el índice (en un libro
+// grande tardan segundos), y sin ellas no hay número de página que dar. Cuando
+// terminan se rellenan los huecos, sin reconstruir la lista.
+async function fillTocPages() {
+  const tocList = document.getElementById('toc-list');
+  if (!tocList || !EpubReader.isLoaded()) return;
+  const links = [...tocList.querySelectorAll('a[data-toc-href]')];
+  if (!links.length) return;
+  const pages = await EpubReader.getTocPages(links.map((a) => a.dataset.tocHref));
+  for (const a of links) {
+    if (a.querySelector('.toc-page')) continue;
+    const page = pages.get(a.dataset.tocHref);
+    if (page == null) continue;
+    const num = document.createElement('span');
+    num.className = 'toc-page';
+    num.textContent = String(page);
+    a.appendChild(num);
+  }
+}
+
+// ============ BARRA DE PROGRESO: ARRASTRE (estilo Play Books) ============
+// Se arrastra el pulgar y una burbuja va diciendo a qué página y capítulo se llegaría;
+// el salto ocurre al SOLTAR. Renderizar en cada pixel sería insufrible (el EPUB
+// repagina y el PDF vuelve a rasterizar), y además impide arrepentirse a mitad del
+// gesto. Un toque sin desplazamiento salta directo, como el click de antes.
+function initProgressScrub() {
+  const container = document.getElementById('progress-container');
+  const bar = document.getElementById('progress-bar');
+  const bubble = document.getElementById('progress-bubble');
+  if (!container || !bar) return;
+
+  const pctText = document.getElementById('progress-text');
+  let dragging = false;
+  let widthBeforeDrag = '';
+  let pctBeforeDrag = '';
+
+  const fractionAt = (clientX) => {
+    const rect = container.getBoundingClientRect();
+    if (!rect.width) return null;
+    return Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+  };
+
+  const preview = (f) => {
+    if (EpubReader.isLoaded()) return EpubReader.getSeekPreview(f);
+    if (PdfReader.isLoaded()) return PdfReader.getSeekPreview(f);
+    return null;
+  };
+
+  const showBubble = (f) => {
+    if (!bubble) return;
+    const info = preview(f);
+    const pct = Math.round(f * 100);
+    // Sin localizaciones aún (EPUB recién abierto) la página no se puede saber:
+    // se enseña el % antes que un número inventado.
+    const head = info?.page && info.total
+      ? t('Pág. {n} / {total}', { n: info.page, total: info.total })
+      : `${pct}%`;
+    bubble.innerHTML = '';
+    const strong = document.createElement('strong');
+    strong.textContent = head;
+    bubble.appendChild(strong);
+    if (info?.chapter) {
+      const small = document.createElement('span');
+      small.textContent = info.chapter;
+      bubble.appendChild(small);
     }
+    // El % de la fila acompaña al arrastre: verlo clavado en "0%" con la barra a
+    // media altura parece un fallo. El salto al soltar lo devuelve a la verdad.
+    if (pctText) pctText.textContent = `${pct}%`;
+    container.setAttribute('aria-valuenow', String(pct));
+
+    // La burbuja se centra en el dedo, pero se frena en los bordes para no salirse
+    // del footer (en el 0% y el 100% se saldría media burbuja).
+    bubble.classList.add('visible');
+    bubble.style.left = `${f * 100}%`;
+    const cw = container.getBoundingClientRect().width;
+    const bw = bubble.getBoundingClientRect().width;
+    if (cw && bw) {
+      const half = bw / 2;
+      const clamped = Math.min(cw - half, Math.max(half, f * cw));
+      bubble.style.left = `${(clamped / cw) * 100}%`;
+    }
+  };
+
+  const onDown = (e) => {
+    if (!EpubReader.isLoaded() && !PdfReader.isLoaded()) return;
+    const f = fractionAt(e.clientX);
+    if (f === null) return;
+    dragging = true;
+    widthBeforeDrag = bar.style.width;
+    pctBeforeDrag = pctText?.textContent || '';
+    container.classList.add('dragging');
+    container.setPointerCapture?.(e.pointerId);
+    bar.style.width = `${f * 100}%`;
+    showBubble(f);
+    e.preventDefault();          // no seleccionar texto ni desplazar la página al arrastrar
+  };
+
+  const onMove = (e) => {
+    if (!dragging) return;
+    const f = fractionAt(e.clientX);
+    if (f === null) return;
+    bar.style.width = `${f * 100}%`;
+    showBubble(f);
+  };
+
+  const onUp = async (e) => {
+    if (!dragging) return;
+    dragging = false;
+    container.classList.remove('dragging');
+    bubble?.classList.remove('visible');
+    const f = fractionAt(e.clientX);
+    // El propio salto refresca barra y %; si fallara (CFI irresoluble), lo provisional
+    // se quedaría mintiendo, así que se restaura antes de navegar.
+    const restore = () => {
+      bar.style.width = widthBeforeDrag;
+      if (pctText) pctText.textContent = pctBeforeDrag;
+    };
+    if (f === null) { restore(); return; }
+    restore();
+    if (EpubReader.isLoaded()) await EpubReader.seekToFraction(f);
+    else if (PdfReader.isLoaded()) await PdfReader.seekToFraction(f);
+  };
+
+  container.addEventListener('pointerdown', onDown);
+  container.addEventListener('pointermove', onMove);
+  container.addEventListener('pointerup', onUp);
+  container.addEventListener('pointercancel', () => {
+    if (!dragging) return;
+    dragging = false;
+    container.classList.remove('dragging');
+    bubble?.classList.remove('visible');
+    bar.style.width = widthBeforeDrag;
+    if (pctText) pctText.textContent = pctBeforeDrag;
+  });
+
+  // Teclado: la barra es un slider real. ±1% con flechas, ±10% con Re/Av Pág,
+  // extremos con Inicio/Fin. El handler global de flechas ignora este elemento
+  // (si no, cada flecha movería el slider y pasaría de página a la vez).
+  container.addEventListener('keydown', (e) => {
+    const current = parseFloat(bar.style.width) / 100 || 0;
+    const step = { ArrowLeft: -0.01, ArrowRight: 0.01, PageDown: -0.1, PageUp: 0.1 };
+    let f = null;
+    if (e.key in step) f = Math.min(1, Math.max(0, current + step[e.key]));
+    else if (e.key === 'Home') f = 0;
+    else if (e.key === 'End') f = 1;
+    if (f === null) return;
+    e.preventDefault();
+    if (EpubReader.isLoaded()) EpubReader.seekToFraction(f);
+    else if (PdfReader.isLoaded()) PdfReader.seekToFraction(f);
   });
 }
 
@@ -1200,18 +1363,12 @@ function initNavigation() {
   });
 
   // Pulsar la barra de progreso = saltar a esa parte del libro (por fracción).
-  const progressContainer = document.getElementById('progress-container');
-  progressContainer.addEventListener('click', (e) => {
-    const rect = progressContainer.getBoundingClientRect();
-    if (!rect.width) return;
-    const f = (e.clientX - rect.left) / rect.width;
-    if (EpubReader.isLoaded()) EpubReader.seekToFraction(f);
-    else if (PdfReader.isLoaded()) PdfReader.seekToFraction(f);
-  });
+  initProgressScrub();
 
   // Keyboard navigation
   document.addEventListener('keydown', (e) => {
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return;
+    if (e.target.id === 'progress-container') return;   // el slider gestiona sus propias flechas
     if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
     if (e.key === 'ArrowLeft') {
       if (EpubReader.isLoaded()) EpubReader.prev();
