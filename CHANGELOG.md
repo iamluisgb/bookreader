@@ -5,6 +5,36 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-27 — El modo Feynman propone conceptos, no títulos de capítulo
+
+Reportado en uso real sobre *Build a Large Language Model (From Scratch)*: la pantalla de "¿qué
+concepto vas a explicar?" ofrecía **"brief contents"** y **"about this book"**. Dos fallos
+encadenados, uno visible y otro de fondo.
+
+**Un título de capítulo no es un concepto.** "Working with Text Data" no es algo que se pueda
+explicar; "byte pair encoding" sí. La pantalla ofrecía etiquetas del TOC porque era lo único a mano,
+y dejaba al usuario escribiendo a ciegas justo en la feature que más depende de elegir bien.
+
+- **Los subtítulos del libro, que ya se producían y se tiraban.** `parsePassages` solo abría capítulo
+  con las etiquetas del TOC y descartaba el resto de `## `; ahora los conserva en `section`, la
+  granularidad a la que el libro nombra sus conceptos. Nueva `sectionsByChapter()`. Coste: cero
+  llamadas al modelo.
+- **Bug de caja en el segmentador (la razón de que no hubiera ni un subtítulo).** Los capítulos de un
+  EPUB se parsean como **XHTML**, donde `tagName` conserva la caja del documento (`h2`), y la
+  comprobación era contra un `Set` en MAYÚSCULAS: no casaba nunca, así que ningún encabezado interno
+  se reconocía como tal — se colaban como párrafo corriente. Medido en Pro Git: **0 de 3810** pasajes
+  con sección antes, **3709** después. El encabezado ahora marca frontera **y sigue siendo un pasaje
+  indexado**, para no mover la numeración de anclas (las citas guardadas siguen valiendo).
+- **Hojas del mapa mental ya generado** como segunda fuente gratis (`jobs.js`): conceptos ya
+  destilados y citados, que no se vuelven a pagar.
+- **"Sugerir conceptos" con el modelo, detrás de un botón.** Una llamada corta sobre una muestra
+  repartida por todo el capítulo (no el principio), cacheada. Entrar al modo sigue costando cero.
+- **Cedazo de concepto** (`looksLikeConcept`): fuera el aparato del libro ("Exercises", "Summary",
+  "Figure 3.2"), las frases enteras y el título del propio libro repetido como capítulo.
+- **`isFrontMatter` ampliado** con los casos reales que lo destaparon: "brief contents" y "about this
+  book" (los EPUB de Manning), "Dedications", "Contributors" y las páginas de traducción. Aprovecha
+  a todo lo que muestrea el libro entero, no solo a Feynman.
+
 ## 2026-07-27 — Los artefactos del Studio ya viajan entre dispositivos
 
 Reportado desde el móvil: *"el resumen y el mapa que creé en el PC no me aparecen"*. No era cosa de

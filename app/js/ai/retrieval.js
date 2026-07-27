@@ -49,20 +49,26 @@ let index = null; // { key, passages:[{id,text,chapter,cfi,len,tf:Map}], df:Map,
 // nada. Por eso, igual que context.js, un `## X` solo ABRE capítulo si X es una etiqueta
 // del TOC; los demás son subtítulos internos y heredan el capítulo en curso. Sin
 // tocLabels (fallback) se comporta como antes (cada `## ` abre capítulo).
+// Los subtítulos NO se tiraban: se guardan en `section` (el encabezado interno vigente,
+// "Encoding word positions"…). Es la granularidad a la que el libro nombra sus CONCEPTOS
+// —el capítulo es demasiado grueso para eso— y sale gratis, sin una llamada al modelo.
 export function parsePassages(annotatedText, anchors = new Map(), tocLabels = null) {
   const tocSet = tocLabels ? new Set(tocLabels.map(norm).filter(Boolean)) : null;
   const passages = [];
   let chapter = '';
+  let section = '';
   for (const line of (annotatedText || '').split('\n')) {
     const h = /^##\s+(.*)$/.exec(line);
     if (h) {
       const label = h[1].trim();
-      if (!tocSet || tocSet.has(norm(label))) chapter = label;   // solo el TOC abre capítulo
+      // Abrir capítulo reinicia la sección: los subtítulos del anterior ya no aplican.
+      if (!tocSet || tocSet.has(norm(label))) { chapter = label; section = ''; }
+      else section = label;
       continue;
     }
     const m = /^\[\[(a\d+)\]\]\s*(.*)$/.exec(line);
     if (m) {
-      passages.push({ id: m[1], text: m[2], chapter, cfi: anchors.get(m[1])?.cfi || null });
+      passages.push({ id: m[1], text: m[2], chapter, section, cfi: anchors.get(m[1])?.cfi || null });
     }
   }
   return passages;
@@ -139,7 +145,10 @@ export function search(query, k = 40) {
 // contenido del libro. Resúmenes y mapas lo excluyen para no ensuciarse con secciones
 // como "Cover", "Index" o "about the cover illustration". Conservador a propósito: solo
 // etiquetas claramente accesorias, nunca capítulos numerados ni "Introduction".
-const FRONT_MATTER_RE = /^(cover|portada|title\s*page|copyright|creditos|contents|table of contents|indice|index|preface|prefacio|foreword|prologo|acknowledge?ments?|agradecimientos|dedicat(ion|oria)|colophon|about (the )?(author|cover|book|illustration)|bibliograf|references|glossary|glosario|half[-\s]?title|frontispiece|epigraph)\b/;
+// Los calificadores de delante son parte del caso real: los EPUB de Manning titulan sus
+// secciones "brief contents" / "about this book", y sin ellos el filtro las dejaba pasar
+// como si fueran capítulos (se veían ofrecidas como conceptos en el modo Feynman).
+const FRONT_MATTER_RE = /^((brief|detailed|table of)\s+)?(cover|portada|title\s*page|copyright|creditos|contents|indice|index|preface|prefacio|foreword|prologo|acknowledge?ments?|agradecimientos|dedicat(ion|oria)s?|contributors?|colophon|about (the |this )?(author|cover|book|illustration)|bibliograf|references|glossary|glosario|half[-\s]?title|frontispiece|epigraph|(authoris|authoriz)ed translation|translated by|traducci[óo]n de)\b/;
 export function isFrontMatter(label) {
   const n = norm(label);
   return !!n && FRONT_MATTER_RE.test(n);
@@ -216,6 +225,21 @@ export function passagesByChapter(chapterLabel) {
     if (core && core.length >= 6 && (pc.includes(core) || core.includes(pc))) return true;
     return false;
   });
+}
+
+// Subtítulos internos de un capítulo, en orden de lectura y sin repetir, con cuántos
+// pasajes cuelgan de cada uno. Un encabezado con UN solo pasaje debajo suele ser un pie de
+// figura, un rótulo de tabla o un titulillo suelto, no una sección: se descarta con `minPassages`.
+export function sectionsByChapter(chapterLabel, minPassages = 2) {
+  const counts = new Map();
+  for (const p of passagesByChapter(chapterLabel)) {
+    const s = (p.section || '').trim();
+    if (!s) continue;
+    counts.set(s, (counts.get(s) || 0) + 1);
+  }
+  return [...counts.entries()]
+    .filter(([, n]) => n >= minPassages)
+    .map(([label, n]) => ({ label, count: n }));
 }
 
 // Router de capítulo: detecta en la pregunta referencias estructurales explícitas y

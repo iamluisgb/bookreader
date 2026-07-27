@@ -3,7 +3,12 @@
 // E2.1 + E2.2 del backlog (validado en el spike E0.2).
 
 const BLOCK_SELECTOR = 'p, h1, h2, h3, h4, h5, h6, li, blockquote';
-const HEADINGS = new Set(['H1', 'H2', 'H3', 'H4', 'H5', 'H6']);
+// OJO con la caja: los capítulos de un EPUB se parsean como XHTML (XML), y ahí `tagName`
+// CONSERVA la caja del documento ('h2') en vez de normalizarla a mayúsculas como en HTML.
+// Con un Set de mayúsculas la comparación no casaba NUNCA: ningún encabezado interno se
+// reconocía como tal y todos se colaban como párrafo corriente. De ahí que el libro anotado
+// no tuviera fronteras de sección y `retrieval.sectionsByChapter` viniera siempre vacío.
+const HEADING_RE = /^h[1-6]$/i;
 
 // Devuelve { annotatedText, anchors: Map<id,{cfi,chapter}>, tokenEstimate, blockCount }.
 export async function segmentBook(book, onProgress) {
@@ -31,10 +36,13 @@ export async function segmentBook(book, onProgress) {
         const text = collapse(el.textContent);
         if (!text || text.length < 2) continue;
 
-        if (HEADINGS.has(el.tagName)) {
-          currentChapter = text;
+        // Un encabezado marca frontera (`## texto`) PERO sigue siendo un pasaje con su
+        // ancla: así el índice conserva su texto (un título es buena señal para BM25) y
+        // la numeración de anclas no se mueve — las citas ya guardadas siguen valiendo.
+        // El encabezado solo hace de capítulo si la sección no traía etiqueta del TOC.
+        if (HEADING_RE.test(el.tagName)) {
           lines.push(`\n## ${text}`);
-          continue;
+          if (!tocLabel) currentChapter = text;
         }
 
         // CFI de RANGO sobre el texto del bloque (no de elemento): así la cita

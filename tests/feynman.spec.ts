@@ -230,3 +230,99 @@ test('el ciclo completo funciona contra un modelo real @live', async ({ page }) 
   await page.locator('#fey-finish').click();
   await expect(page.locator('.fey-diag')).toBeVisible();
 });
+
+// P18 · Sugerencias de concepto. El riesgo aquí no es el modelo: es ofrecer basura como si
+// fuera un concepto ("brief contents", "Exercises", el propio título del capítulo) y que el
+// usuario se quede igual de a ciegas que con el campo vacío.
+test.describe('qué concepto explicar (puro)', () => {
+  test('cleanConcept quita el numeral de sección y la puntuación de cierre', async ({ page }) => {
+    await openApp(page);
+    const r = await page.evaluate(async () => {
+      const F: any = await import('/js/ai/feynman.js');
+      return [
+        F.cleanConcept('3.2 Encoding word positions'),
+        F.cleanConcept('2. Working with Text Data'),
+        F.cleanConcept('Chapter 4 — Implementing a GPT model'),
+        F.cleanConcept('  byte pair   encoding.  '),
+        F.cleanConcept('Self-attention'),        // sin numeral: intacto
+      ];
+    });
+    expect(r).toEqual([
+      'Encoding word positions',
+      'Working with Text Data',
+      'Implementing a GPT model',
+      'byte pair encoding',
+      'Self-attention',
+    ]);
+  });
+
+  test('looksLikeConcept descarta aparato del libro y frases enteras', async ({ page }) => {
+    await openApp(page);
+    const r = await page.evaluate(async () => {
+      const F: any = await import('/js/ai/feynman.js');
+      const ok = ['embeddings', 'byte pair encoding', 'atención causal multi-cabeza'];
+      const no = [
+        'Exercises', 'Summary', 'Further reading', 'Figure 3.2', 'brief contents', 'about this book',
+        'ab',                                                        // demasiado corto
+        'Cómo se comporta el modelo cuando la secuencia crece más allá de la ventana de contexto entrenada',
+      ];
+      return { ok: ok.map(F.looksLikeConcept), no: no.map(F.looksLikeConcept) };
+    });
+    expect(r.ok).toEqual([true, true, true]);
+    expect(r.no.every((v: boolean) => v === false)).toBe(true);
+  });
+
+  test('suggestConcepts prioriza el capítulo actual, deduplica y excluye su título', async ({ page }) => {
+    await openApp(page);
+    const r = await page.evaluate(async () => {
+      const F: any = await import('/js/ai/feynman.js');
+      return F.suggestConcepts({
+        leaves: [
+          { label: 'attention scores', chapter: '3. Coding Attention' },   // otro capítulo → al final
+          { label: 'Byte pair encoding', chapter: '2. Working with Text Data' },
+          { label: 'Exercises', chapter: '2. Working with Text Data' },    // no es un concepto
+        ],
+        sections: [
+          { label: '2.5 Byte pair encoding', count: 4 },                   // duplicado del leaf
+          { label: 'Encoding word positions', count: 3 },
+          { label: '2. Working with Text Data', count: 9 },                // el propio capítulo
+        ],
+        currentChapter: '2. Working with Text Data',
+      });
+    });
+    expect(r).toEqual(['Byte pair encoding', 'Encoding word positions', 'attention scores']);
+  });
+
+  test('parseConcepts tolera prosa y razonamiento alrededor del JSON', async ({ page }) => {
+    await openApp(page);
+    const r = await page.evaluate(async () => {
+      const F: any = await import('/js/ai/feynman.js');
+      return F.parseConcepts(`<think>a ver…</think>
+Aquí van:
+\`\`\`json
+{"concept":"3.1 self-attention"}
+{"concept":"Summary"}
+{"concept":"self-attention"}
+{"concept":"positional embeddings"}
+{"concept": "truncado a mit
+\`\`\``);
+    });
+    // "Summary" fuera, el duplicado (tras limpiar el numeral) fuera, y el objeto truncado
+    // al final —lo que pasa de verdad cuando la respuesta se corta— no tumba a los anteriores.
+    expect(r).toEqual(['self-attention', 'positional embeddings']);
+  });
+
+  test('sampleForConcepts reparte por todo el capítulo en vez de coger el principio', async ({ page }) => {
+    await openApp(page);
+    const r = await page.evaluate(async () => {
+      const F: any = await import('/js/ai/feynman.js');
+      const passages = Array.from({ length: 100 }, (_, i) => ({ id: `a${i}`, text: 'x'.repeat(100) }));
+      const picked = F.sampleForConcepts(passages, 1000);
+      return { n: picked.length, first: picked[0].id, last: picked[picked.length - 1].id };
+    });
+    expect(r.n).toBeLessThanOrEqual(10);
+    expect(r.first).toBe('a0');
+    // Llega al final del capítulo: si cortara por el principio, el último sería ~a9.
+    expect(Number(r.last.slice(1))).toBeGreaterThan(80);
+  });
+});

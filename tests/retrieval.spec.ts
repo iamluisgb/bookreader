@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import path from 'path';
 
 // IA5 · Retrieval por pasaje. Tests deterministas del módulo (sin depender de un EPUB):
 // se ejercita en el navegador importando el módulo real, con texto anotado sintético que
@@ -152,4 +153,76 @@ test('isBackMatter/isBoilerplate: licencias y promo fuera; capítulos y apéndic
   expect(r.boilerCover).toBe(true);
   expect(r.boilerLicense).toBe(true);
   expect(r.boilerChapter).toBe(false);
+});
+
+// Los subtítulos internos (H2/H3) se parseaban y se TIRABAN: solo abrían capítulo los del
+// TOC. Ahora se conservan en `section`, que es la granularidad a la que el libro nombra sus
+// conceptos — de ahí salen las sugerencias del modo Feynman sin gastar una llamada.
+test('parsePassages guarda el subtítulo vigente sin romper la frontera de capítulo', async ({ page }) => {
+  await page.goto('/');
+  const r = await page.evaluate(async () => {
+    const R: any = await import('/js/ai/retrieval.js');
+    const text = [
+      '## 2. Working with Text Data',
+      '[[a1]] Intro del capítulo.',
+      '## Byte pair encoding',
+      '[[a2]] BPE parte de caracteres sueltos.',
+      '[[a3]] Y va fusionando los pares más frecuentes.',
+      '## Encoding word positions',
+      '[[a4]] Los embeddings posicionales resuelven el orden.',
+      '## 3. Coding Attention Mechanisms',
+      '[[a5]] Empieza otro capítulo.',
+    ].join('\n');
+    const toc = ['2. Working with Text Data', '3. Coding Attention Mechanisms'];
+    const ps = R.parsePassages(text, new Map(), toc);
+    R.buildIndex('k', ps);
+    return {
+      shape: ps.map((p: any) => [p.id, p.chapter, p.section]),
+      // minPassages=2 descarta el titulillo con un solo pasaje debajo (pies de figura y
+      // rótulos sueltos, que no son secciones).
+      sections: R.sectionsByChapter('2. Working with Text Data'),
+      all: R.sectionsByChapter('2. Working with Text Data', 1).map((s: any) => s.label),
+      otro: R.sectionsByChapter('3. Coding Attention Mechanisms', 1),
+    };
+  });
+  // El subtítulo NO abre capítulo: los pasajes siguen siendo del capítulo 2.
+  expect(r.shape).toEqual([
+    ['a1', '2. Working with Text Data', ''],
+    ['a2', '2. Working with Text Data', 'Byte pair encoding'],
+    ['a3', '2. Working with Text Data', 'Byte pair encoding'],
+    ['a4', '2. Working with Text Data', 'Encoding word positions'],
+    ['a5', '3. Coding Attention Mechanisms', ''],
+  ]);
+  expect(r.sections).toEqual([{ label: 'Byte pair encoding', count: 2 }]);
+  expect(r.all).toEqual(['Byte pair encoding', 'Encoding word positions']);
+  // Abrir capítulo reinicia la sección: el capítulo 3 no hereda subtítulos del 2.
+  expect(r.otro).toEqual([]);
+});
+
+// Regresión del segmentador: en XHTML (que es como se parsean los capítulos de un EPUB)
+// `tagName` CONSERVA la caja del documento, así que el viejo `HEADINGS.has(el.tagName)`
+// —un Set en mayúsculas— no casaba nunca y NINGÚN encabezado interno se marcaba como tal.
+// El libro anotado salía sin fronteras de sección y todo el aparato que depende de ellas
+// (las sugerencias de concepto del modo Feynman) se quedaba a cero.
+test('segmentBook marca los encabezados internos y los conserva como pasaje', async ({ page }) => {
+  await page.goto('/index.html');
+  await page.setInputFiles('#file-input', path.join(__dirname, 'test.epub'));
+  await page.waitForSelector('#epub-container iframe', { timeout: 15000 });
+  const r = await page.evaluate(async () => {
+    const Epub: any = await import('/js/epub-reader.js');
+    const Seg: any = await import('/js/ai/segment.js');
+    const seg = await Seg.segmentBook(Epub.getBook());
+    const lines = seg.annotatedText.split('\n');
+    const heads = lines.filter((l: string) => l.startsWith('## '));
+    // Todo `## X` debe tener su pasaje `[[aN]] X`: el encabezado marca frontera Y sigue
+    // indexado (si desapareciera del índice, se moverían las anclas y las citas guardadas
+    // dejarían de apuntar donde apuntaban).
+    const bodies = new Set(lines.map((l: string) => (l.match(/^\[\[a\d+\]\]\s+(.*)$/) || [])[1]).filter(Boolean));
+    return {
+      heads: heads.length,
+      headsSinPasaje: heads.map((h: string) => h.slice(3).trim()).filter((h: string) => !bodies.has(h)).slice(0, 3),
+    };
+  });
+  expect(r.heads).toBeGreaterThan(0);
+  expect(r.headsSinPasaje).toEqual([]);
 });

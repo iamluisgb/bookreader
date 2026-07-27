@@ -27,6 +27,7 @@
 import { t, uiLangName } from '../i18n.js';
 import * as LLM from './llm.js';
 import * as Retrieval from './retrieval.js';
+import * as Jobs from './jobs.js';
 import { balancedObjects } from './query-expand.js';
 import { renderWithCitations } from './render.js';
 import { icon } from '../ui/icons.js';
@@ -236,6 +237,153 @@ export function passagesFor(concept, k = 8) {
   return picked.filter((p) => p && p.id && p.text).slice(0, 14);
 }
 
+// ---- qué concepto explicar: sugerencias ----------------------------------------
+
+// Un TÍTULO DE CAPÍTULO NO ES UN CONCEPTO. "Working with Text Data" no es algo que puedas
+// explicar; "byte pair encoding" sí. La pantalla ofrecía capítulos del TOC porque era lo
+// único a mano, y dejaba al usuario escribiendo a ciegas. Aquí se ofrecen conceptos de
+// verdad, por tres vías y en este orden de preferencia:
+//
+//   1. Hojas del MAPA MENTAL ya generado de este libro (`jobs`): conceptos destilados por
+//      el modelo y con su ancla. Gratis, ya están pagados.
+//   2. SUBTÍTULOS del capítulo actual (`retrieval.sectionsByChapter`): la propia estructura
+//      del libro a nivel de sección. Gratis, siempre disponible y fiel al texto.
+//   3. Extracción con el modelo, DETRÁS DE UN BOTÓN explícito (`suggestWithLLM`): entrar al
+//      modo no debe costar una llamada antes de haber escrito nada.
+
+const MAX_CONCEPT_WORDS = 8;
+const MAX_SUGGESTIONS = 8;
+
+// Quita el numeral de sección de delante ("3.2 Encoding word positions") y la puntuación
+// de cierre. Mismo criterio que `tidyChapter` en mindmap.js.
+export function cleanConcept(label) {
+  return String(label || '')
+    .replace(/^\s*(?:chapter|cap[íi]tulo|secci[óo]n|section|part[e]?|appendix|ap[ée]ndice|anexo)?\s*\d+(?:\.\d+)*\s*[.)\-–—:\s]\s*/i, '')
+    .replace(/^\s*(?:chapter|cap[íi]tulo|part[e]?)\s+[ivxlcdm]+\s*[.)\-–—:\s]\s*/i, '')
+    .replace(/^\s*[-–—]\s*/, '')
+    .replace(/\s+/g, ' ')
+    .replace(/[.:;,\s]+$/, '')
+    .trim();
+}
+
+// ¿Esto se puede explicar? Fuera lo accesorio (índices, bibliografía…), los rótulos de
+// aparato ("Exercises", "Summary", "Figure 3.2") y lo que es demasiado largo para ser el
+// nombre de un concepto — un encabezado que es una frase entera es una sección, no una idea.
+const NON_CONCEPT_RE = /^(exercises?|ejercicios?|summary|resumen|conclusi[óo]n|conclusions?|key ?takeaways?|further reading|lecturas?|notes?|notas?|figure|figura|table|tabla|listing|c[óo]digo|example \d|referencias?)\b/i;
+
+export function looksLikeConcept(label) {
+  const s = cleanConcept(label);
+  if (s.length < 3 || s.length > 60) return false;
+  if (s.split(/\s+/).length > MAX_CONCEPT_WORDS) return false;
+  if (NON_CONCEPT_RE.test(s)) return false;
+  if (Retrieval.isBoilerplate(s)) return false;
+  return true;
+}
+
+// Mezcla y ordena las fuentes. PURA (recibe listas ya recolectadas) para poder testearla
+// sin índice ni jobs. Las del capítulo que se está leyendo van primero: es lo que el lector
+// acaba de ver y lo que puede explicar ahora mismo.
+// `exclude`: rótulos que nunca son un concepto DE ESTE libro por más que aparezcan como
+// encabezado — su propio título y el del capítulo en curso (explicar "el capítulo 2" no es
+// explicar nada).
+export function suggestConcepts({ leaves = [], sections = [], currentChapter = '', exclude = [], max = MAX_SUGGESTIONS } = {}) {
+  const sameChapter = (ch) => !!currentChapter && norm(ch) === norm(currentChapter);
+  const buckets = [
+    leaves.filter((l) => sameChapter(l.chapter)),      // concepto destilado + del capítulo
+    sections,                                          // ya vienen solo del capítulo actual
+    leaves.filter((l) => !sameChapter(l.chapter)),     // relleno de otros capítulos
+  ];
+  const seen = new Set([currentChapter, ...exclude].map((s) => norm(cleanConcept(s))));
+  const out = [];
+  for (const bucket of buckets) {
+    for (const item of bucket) {
+      const label = cleanConcept(item.label);
+      const key = norm(label);
+      if (!key || seen.has(key) || !looksLikeConcept(label)) continue;
+      seen.add(key);
+      out.push(label);
+      if (out.length >= max) return out;
+    }
+  }
+  return out;
+}
+
+function norm(s) {
+  return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim();
+}
+
+// Hojas del último mapa mental de este libro, con el capítulo de su ancla. Si no hay mapa
+// generado, no pasa nada: es una fuente oportunista, no un requisito.
+export function mindmapConcepts(bookId) {
+  const tree = Jobs.latest(bookId, 'mindmap')?.result;
+  if (!tree || !Array.isArray(tree.branches)) return [];
+  const chapterOf = new Map(Retrieval.allPassages().map((p) => [p.id, p.chapter || '']));
+  const out = [];
+  for (const br of tree.branches) {
+    for (const leaf of br.children || []) {
+      const label = (leaf.full || leaf.label || '').trim();
+      if (label) out.push({ label, chapter: chapterOf.get(leaf.src) || '' });
+    }
+  }
+  return out;
+}
+
+// ---- extracción de conceptos con el modelo (acción explícita) --------------------
+
+export function buildConceptsPrompt(scopeLabel, bookTitle, passages) {
+  const ctxText = passages.map((p) => p.text).join('\n\n');
+  return [
+    { role: 'system', content:
+`Preparas una lista de conceptos del libro "${bookTitle}" para que un alumno elija cuál va a
+EXPLICAR con sus palabras.
+
+Devuelve SOLO objetos JSON, uno por línea, sin prosa alrededor:
+{"concept":"<nombre del concepto>"}
+
+Reglas:
+- Entre 4 y ${MAX_SUGGESTIONS} conceptos, del más central al más accesorio.
+- El NOMBRE de una idea (2-5 palabras), en ${uiLangName()}: "atención causal", "byte pair
+  encoding". NO títulos de sección, NO preguntas, NO frases enteras.
+- Algo que se pueda explicar y en lo que quepa equivocarse. Nada de datos sueltos ni de
+  nombres propios sin sustancia.
+- Solo conceptos que el texto de abajo desarrolle de verdad.` },
+    { role: 'user', content: `${scopeLabel ? `SECCIÓN DEL LIBRO: ${scopeLabel}\n\n` : ''}TEXTO:\n${ctxText}` },
+  ];
+}
+
+export function parseConcepts(raw) {
+  const text = String(raw || '').replace(/```(?:json)?/gi, '').replace(/<think>[\s\S]*?<\/think>/gi, ' ');
+  const out = [];
+  const seen = new Set();
+  for (const chunk of balancedObjects(text)) {
+    let o;
+    try { o = JSON.parse(chunk); } catch { continue; }
+    const label = cleanConcept(typeof o?.concept === 'string' ? o.concept : '');
+    const key = norm(label);
+    if (!key || seen.has(key) || !looksLikeConcept(label)) continue;
+    seen.add(key);
+    out.push(label);
+  }
+  return out.slice(0, MAX_SUGGESTIONS);
+}
+
+// Muestra del capítulo para la extracción: pasajes REPARTIDOS por todo el capítulo (no los
+// primeros), acotados en tamaño. Los conceptos de la segunda mitad cuentan igual que los de
+// la primera, y el coste queda acotado.
+export function sampleForConcepts(passages, maxChars = 24000) {
+  const usable = (passages || []).filter((p) => p && p.text);
+  const total = usable.reduce((n, p) => n + p.text.length, 0);
+  if (total <= maxChars) return usable;
+  const step = Math.ceil(total / maxChars);
+  const out = [];
+  let chars = 0;
+  for (let i = 0; i < usable.length && chars < maxChars; i += step) {
+    out.push(usable[i]);
+    chars += usable[i].text.length;
+  }
+  return out;
+}
+
 // ---- render de apoyo (usado por la UI y testeado aparte) ------------------------
 
 // ---- dictado ------------------------------------------------------------------
@@ -343,28 +491,103 @@ export function __setSessionForTest(s) {
   renderSession('');
 }
 
+// Sugerencias en memoria de la sesión del modal, por capítulo: las gratis se recalculan
+// solas, pero las que costaron una llamada no se vuelven a pedir al volver de una sesión.
+const suggestCache = new Map();   // `${bookId}::${chapter}` → [concepto]
+
+function suggestKey() { return `${ctx?.bookId || ''}::${ctx?.currentChapter || ''}`; }
+
+function freeSuggestions() {
+  const currentChapter = ctx.currentChapter || '';
+  return suggestConcepts({
+    leaves: mindmapConcepts(ctx.bookId),
+    sections: Retrieval.sectionsByChapter(currentChapter),
+    currentChapter,
+    exclude: [ctx.bookTitle || ''],
+  });
+}
+
 function renderSetup() {
   const b = body();
   if (!b) return;
   ctx.ensureIndex?.();
-  const chapters = (ctx.tocLabels || []).filter((c) => c && !Retrieval.isBoilerplate(c));
+  const cached = suggestCache.get(suggestKey());
+  const concepts = cached || freeSuggestions();
+  // Último recurso cuando el libro no da ni subtítulos ni mapa (PDF plano, EPUB sin
+  // encabezados internos, como los de Gutenberg): capítulos del TOC, pero solo los que de
+  // verdad tienen texto indexado —el filtro que ya usa el mapa mental— y pasados por el
+  // mismo cedazo de concepto, que descarta el título del libro repetido como capítulo,
+  // la página de créditos de la traducción y demás aparato.
+  const chapters = concepts.length ? [] : suggestConcepts({
+    leaves: (ctx.tocLabels || [])
+      .filter((c) => c && Retrieval.passagesByChapter(c).length)
+      .map((c) => ({ label: c, chapter: '' })),
+    exclude: [ctx.bookTitle || ''],
+    max: 4,
+  });
+  const chips = (list) => list.map((c) => `<button class="fey-chip" data-c="${escapeHtml(c)}">${escapeHtml(c)}</button>`).join('');
   b.innerHTML = `
     <h2>${t('Explícamelo tú')}</h2>
     <p class="ai-ob-sub">${t('Explica un concepto con tus palabras. No te voy a dar la respuesta: te voy a preguntar hasta que la construyas tú. Al final te digo qué te dejaste.')}</p>
     <label class="fc-label" for="fey-concept">${t('¿Qué concepto vas a explicar?')}</label>
     <input id="fey-concept" class="appset-input" autocomplete="off"
            placeholder="${t('p. ej. la atención causal, el mecanismo de tokenización…')}" />
-    ${chapters.length ? `<p class="fey-hint">${t('Del capítulo actual:')} ${
-      chapters.filter((c) => c === ctx.currentChapter).map((c) => `<button class="fey-chip" data-c="${escapeHtml(c)}">${escapeHtml(c)}</button>`).join('') ||
-      chapters.slice(0, 3).map((c) => `<button class="fey-chip" data-c="${escapeHtml(c)}">${escapeHtml(c)}</button>`).join('')
-    }</p>` : ''}
+    <div id="fey-suggest">
+      ${concepts.length || chapters.length
+        ? `<p class="fey-hint">${concepts.length ? t('Conceptos de lo que estás leyendo:') : t('Del libro:')}</p>
+           <div class="fey-chips">${chips(concepts.length ? concepts : chapters)}</div>`
+        : ''}
+      <button id="fey-more" class="fey-suggest-btn">${icon('sparkles', { size: 14 })} ${
+        concepts.length ? t('Sugerir otros conceptos') : t('Sugerir conceptos')}</button>
+    </div>
     <button id="fey-start" class="primary-btn ai-ob-start">${icon('sparkles', { size: 16 })} ${t('Empezar')}</button>
     <div id="fey-error" class="fc-error" style="display:none"></div>`;
-  b.querySelectorAll('.fey-chip').forEach((chip) => {
-    chip.addEventListener('click', () => { b.querySelector('#fey-concept').value = chip.dataset.c; });
+  b.querySelector('#fey-suggest').addEventListener('click', (e) => {
+    const chip = e.target.closest('.fey-chip');
+    if (chip) { b.querySelector('#fey-concept').value = chip.dataset.c; return; }
+    if (e.target.closest('#fey-more')) suggestWithLLM();
   });
   b.querySelector('#fey-start').addEventListener('click', startSession);
   b.querySelector('#fey-concept').addEventListener('keydown', (e) => { if (e.key === 'Enter') startSession(); });
+}
+
+// Extracción con el modelo: una llamada corta sobre una muestra del capítulo. Va detrás de
+// un botón —no al abrir— para que entrar al modo siga costando cero. Se queda en caché para
+// que volver a la pantalla no la repita.
+async function suggestWithLLM() {
+  const b = body();
+  const btn = b?.querySelector('#fey-more');
+  if (!btn || btn.disabled) return;
+  if (!LLM.hasKey()) { showError(t('Configura tu API key en Ajustes → Agente.')); return; }
+  ctx.ensureIndex?.();
+  const chapter = ctx.currentChapter || '';
+  const passages = sampleForConcepts(chapter ? Retrieval.passagesByChapter(chapter) : Retrieval.allPassages());
+  if (!passages.length) { showError(t('No hay texto indexado del que sacar conceptos.')); return; }
+
+  btn.disabled = true;
+  btn.innerHTML = `<span class="ai-typing">${t('Buscando conceptos…')}</span>`;
+  try {
+    const raw = await LLM.chatStream({
+      messages: buildConceptsPrompt(chapter, ctx.bookTitle, passages), maxTokens: 1200,
+    });
+    const concepts = parseConcepts(raw);
+    if (!concepts.length) { showError(t('No he sabido sacar conceptos de aquí. Escribe el que tengas en mente.')); return; }
+    // Los del modelo van DELANTE de los gratuitos: el usuario acaba de pedirlos.
+    const merged = suggestConcepts({
+      leaves: [...concepts.map((c) => ({ label: c, chapter })), ...mindmapConcepts(ctx.bookId)],
+      sections: Retrieval.sectionsByChapter(chapter),
+      currentChapter: chapter,
+      exclude: [ctx.bookTitle || ''],
+    });
+    suggestCache.set(suggestKey(), merged);
+    if (body()) renderSetup();
+  } catch (e) {
+    console.error('feynman: sugerir conceptos', e);
+    showError(e.message || t('No se pudieron sugerir conceptos.'));
+  } finally {
+    const again = body()?.querySelector('#fey-more');
+    if (again) { again.disabled = false; again.innerHTML = `${icon('sparkles', { size: 14 })} ${t('Sugerir otros conceptos')}`; }
+  }
 }
 
 function showError(msg) {

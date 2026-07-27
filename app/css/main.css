@@ -2918,6 +2918,7 @@ body.ai-open #sync-badge { right: calc(var(--ai-panel-width) + 14px); }
 .fey-card { max-width: 620px; }
 .fey-h2 { margin: 0 0 4px; font-size: 20px; }
 .fey-hint { font-size: 13px; color: var(--text-soft); margin: 10px 0 0; }
+.fey-chips { margin-top: 2px; }
 .fey-chip {
   display: inline-block; margin: 4px 6px 0 0; padding: 4px 10px;
   border: 1px solid var(--border); border-radius: var(--r-pill);
@@ -2925,6 +2926,16 @@ body.ai-open #sync-badge { right: calc(var(--ai-panel-width) + 14px); }
   font-size: 12px; cursor: pointer;
 }
 .fey-chip:hover { background: var(--surface-3); color: var(--text); }
+
+/* "Sugerir conceptos": acción discreta, no un botón de acento — la acción principal de la
+   pantalla es Empezar, y esto solo alimenta el campo de arriba. */
+.fey-suggest-btn {
+  display: inline-flex; align-items: center; gap: 6px; margin-top: 10px; padding: 0;
+  border: 0; background: none; color: var(--accent);
+  font-size: 12px; cursor: pointer;
+}
+.fey-suggest-btn:hover:not(:disabled) { text-decoration: underline; }
+.fey-suggest-btn:disabled { color: var(--text-faint); cursor: default; }
 
 /* Progreso de ideas cubiertas. Es feedback SIN veredicto: dice cuánto llevas, no qué has
    hecho mal — el diagnóstico solo aparece si lo pides. */
