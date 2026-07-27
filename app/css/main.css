@@ -1853,9 +1853,13 @@ body.ai-open .ai-taskchip { right: calc(var(--ai-panel-width) + 20px); }
 /* ============ HIGHLIGHT TOOLTIP (v2) ============ */
 /* Barra de selección de texto (estilo O'Reilly): preguntar al agente arriba;
    colores + nota + copiar abajo. */
+/* La barra crece con el número de acciones y es `fixed`: sin un tope, en un móvil de
+   375px se salía de la pantalla (447px ya antes de añadir "Con números"). Se acota al
+   viewport y la fila de acciones envuelve. */
 .sel-toolbar {
   position: fixed; z-index: 200;
   display: flex; flex-direction: column;
+  max-width: calc(100vw - 20px);
   background: var(--surface-2); border: 1px solid var(--border);
   border-radius: var(--r-md); box-shadow: var(--shadow-3);
   overflow: hidden;
@@ -1870,8 +1874,12 @@ body.ai-open .ai-taskchip { right: calc(var(--ai-panel-width) + 20px); }
 .sel-ask .icon { color: var(--accent); }
 .sel-row {
   display: flex; align-items: stretch; gap: 0;
+  flex-wrap: wrap;
   border-top: 1px solid var(--border-soft);
 }
+/* Al envolver, el separador vertical del primer botón de cada línea sobra; se sustituye
+   por el horizontal de la propia línea. */
+.sel-row > .sel-act { border-top: 1px solid transparent; }
 .sel-colors { display: flex; align-items: center; gap: 8px; padding: 10px 14px; }
 .highlight-color {
   width: 24px; height: 24px; border: 2px solid transparent; border-radius: 50%;

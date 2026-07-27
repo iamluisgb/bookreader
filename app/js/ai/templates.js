@@ -96,6 +96,27 @@ export const TEMPLATES = [
     ],
   },
   {
+    // T6 · Libros que se IMPLEMENTAN (ML, sistemas, lenguajes): el material no se aplica
+    // como un método de negocio, se teclea y se ejecuta. T1 aquí no encaja —pide un "plan
+    // de acción a 3 días y 2 semanas", que no significa nada cuando lo que toca es
+    // construir el tokenizador del capítulo 2—. El eje aquí es: qué construye este
+    // capítulo, con qué formas/tipos, dónde me atasqué y qué implemento antes de seguir.
+    id: 't6-implementacion',
+    block: 'tecnico',
+    objective: tr('Implementar lo que enseña el libro, capítulo a capítulo'),
+    name: tr('T6 · Construir con el libro'),
+    ideal: tr('Libros con código: ML/IA, sistemas, compiladores, "from scratch".'),
+    goalPrompt: tr('¿Qué quieres ser capaz de construir al terminar el libro?'),
+    agentRole: tr('Trata el libro como un proyecto que se construye: prioriza el mecanismo sobre la narrativa, explica las estructuras de datos y sus dimensiones, y cuando aparezca una fórmula ofrece verla con números pequeños. No des por entendido lo que no se ha implementado.'),
+    fields: [
+      { key: 'que_construyo',    label: tr('Qué construye este capítulo (la pieza y para qué sirve)'), type: 'text', fill: 'agent' },
+      { key: 'piezas_clave',     label: tr('Piezas clave del código (qué hace cada una)'), type: 'list', fill: 'agent' },
+      { key: 'formas_datos',     label: tr('Formas y tipos: qué entra, qué sale, con qué dimensiones'), type: 'list', fill: 'agent' },
+      { key: 'donde_me_atasque', label: tr('Dónde me atasqué (y qué lo desatascó)'), type: 'list', fill: 'user' },
+      { key: 'lo_implemento',    label: tr('Lo implemento yo antes de seguir (sin mirar el libro)'), type: 'text', fill: 'user' },
+    ],
+  },
+  {
     // Modo avanzado "Artesano": opt-in dentro de T5 (leo para aprender a escribir). No se
     // muestra como objetivo en el onboarding; se selecciona con la casilla de la pantalla T5.
     id: 'artesano',

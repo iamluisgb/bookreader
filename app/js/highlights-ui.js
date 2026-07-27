@@ -155,6 +155,12 @@ function showHighlightTooltip(cfiRange, text, rect) {
     hideHighlightTooltip();
   };
 
+  // Ejemplo numérico: la fórmula/algoritmo seleccionado, ejecutado con números pequeños
+  document.getElementById('sel-numeric').onclick = () => {
+    AiPanel.numericExample(text);
+    hideHighlightTooltip();
+  };
+
   // Añadir nota (subraya y guarda la nota)
   document.getElementById('sel-note').onclick = async () => {
     const note = await promptBox('Tu nota sobre este pasaje:', { title: 'Nota' });
@@ -268,6 +274,10 @@ function showPdfSelectionTooltip(text, rect, rects, page) {
 
   document.getElementById('sel-ask').onclick = () => {
     AiPanel.quoteSelection(text);
+    hideHighlightTooltip();
+  };
+  document.getElementById('sel-numeric').onclick = () => {
+    AiPanel.numericExample(text);
     hideHighlightTooltip();
   };
   document.getElementById('sel-copy').onclick = async () => {

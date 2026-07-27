@@ -171,6 +171,57 @@ export function quoteSelection(text) {
   setRef(clean);
 }
 
+// EJEMPLO NUMÉRICO · Lo que separa "he leído la fórmula" de "la entiendo" es verla
+// con números diminutos. Se lanza sobre una selección (fórmula, algoritmo, definición
+// con notación) y devuelve el cálculo hecho a mano, paso a paso.
+//
+// Va por el flujo normal de `deliver()` a propósito: así hereda retrieval (para que el
+// modelo tenga las definiciones de los símbolos del capítulo), citas [[aN]], historial,
+// persistencia en la conversación y export. Lo único propio es el bloque de sistema.
+//
+// Las reglas del prompt no son decorativas; cada una tapa un modo de fallo observado en
+// modelos pidiendo "un ejemplo": responder con variables en vez de números, saltarse la
+// aritmética, o escribir LaTeX que aquí no se renderiza (mdToHtml no hace matemáticas).
+const NUMERIC_MODE = `MODO EJEMPLO NUMÉRICO (para este turno).
+El usuario ha marcado un fragmento con una fórmula, un algoritmo o una definición con notación, y
+quiere verlo EJECUTADO A MANO con números concretos. Reglas:
+1. Construye el ejemplo MÁS PEQUEÑO que conserve la idea (2-3 elementos, dimensiones 2 o 3). Lo
+   pequeño es el objetivo, no una limitación.
+2. Usa NÚMEROS CONCRETOS desde el principio: nunca dejes variables sin instanciar. Elige valores
+   fáciles de seguir a mano (enteros pequeños, 0.5, 2) aunque sean poco realistas.
+3. Indica la FORMA en cada paso, así: (3,2) @ (2,3) -> (3,3). Es donde más gente se pierde.
+4. Muestra la ARITMÉTICA de al menos un elemento: de dónde sale ese número exacto.
+5. Cierra con una COMPROBACIÓN DE SENTIDO: qué debería cumplirse si está bien (las filas suman 1,
+   el triángulo superior es cero, la dimensión de salida coincide con la de entrada...).
+6. Si el fragmento NO contiene nada calculable, dilo en una línea y da en su lugar el ejemplo
+   concreto más pequeño que ilustre la idea. No te lo inventes como si hubiera fórmula.
+FORMATO: Markdown. Las matrices y los cálculos, en bloques de código cercados. NADA de LaTeX ni
+tablas: no se renderizan aquí. Cita [[aN]] si te apoyas en un pasaje del extracto.`;
+
+export async function numericExample(text) {
+  const clean = (text || '').replace(/\s+/g, ' ').trim();
+  if (!clean) return;
+  setOpen(true);
+  showView('chat');
+  if (busy) { setStatus('Espera a que termine la respuesta en curso.'); return; }
+  if (!convo) { setRefAndAsk(clean); return; }
+  if (!LLM.hasKey()) { AppSettings.open('agent'); setStatus('Introduce tu API key primero.'); return; }
+  if (!annotatedText) { setStatus('El libro aún no está listo.'); return; }
+
+  const ask = t('Hazme un ejemplo numérico de esto, con números pequeños y concretos.');
+  // Lo que se ve (y se guarda) es corto; el detalle va en el bloque de sistema.
+  const shown = t('🔢 Ejemplo numérico · «{ref}»', { ref: clean.length > 160 ? clean.slice(0, 160) + '…' : clean });
+  await deliver(shown, ask, { showUser: true, ref: clean, systemExtra: NUMERIC_MODE });
+}
+
+// Sin conversación todavía: adjuntamos el fragmento y dejamos que el onboarding elija
+// objetivo; el usuario relanza. Mejor que perder la selección en silencio.
+function setRefAndAsk(clean) {
+  pendingQuoteOnActivate = clean;
+  setStatus('Elige un objetivo de lectura y vuelve a pulsar «Con números».');
+  openOnboarding();
+}
+
 // P8 · Exporta la conversación ACTIVA (libreta + chat) a Markdown, con formato preservado y
 // citas resueltas a pág./capítulo. A diferencia del volcado global de Ajustes → Datos, es por
 // conversación y desde donde se usa (el panel).
@@ -1235,7 +1286,7 @@ OBJETIVO: ${convo?.goal || '(sin definir)'}` },
 // `showUser` false = continuación (no se pinta ni persiste una burbuja de usuario; el
 // mensaje va igualmente al modelo como último turno). Reutilizado por send() y por el
 // botón "Continuar" que aparece si el proveedor corta la respuesta por longitud.
-async function deliver(aug, question, { showUser = true, ref = null } = {}) {
+async function deliver(aug, question, { showUser = true, ref = null, systemExtra = '' } = {}) {
   if (busy) return;
   const mySeq = bookSeq;   // guard: si el usuario cambia de libro mid-turno, no persistir aquí
   // Reservamos el turno YA (antes de la reescritura de consulta, que hace un await): evita
@@ -1311,7 +1362,11 @@ async function deliver(aug, question, { showUser = true, ref = null } = {}) {
     }
 
     const messages = [
-      { role: 'system', content: systemPrompt(convo?.goal, template, Profiles.getActive(), { tocLabels: ctx.tocLabels, hasBookSummary: !!bookSummaryMd, transversal: !!ctx.transversal }) },
+      // `systemExtra` = instrucciones de MODO para este turno (p. ej. el ejemplo
+      // numérico). Van al final del system para pesar más que las genéricas, y solo
+      // afectan a este turno: no se persisten ni contaminan los siguientes.
+      { role: 'system', content: systemPrompt(convo?.goal, template, Profiles.getActive(), { tocLabels: ctx.tocLabels, hasBookSummary: !!bookSummaryMd, transversal: !!ctx.transversal })
+        + (systemExtra ? `\n\n${systemExtra}` : '') },
     ];
     if (bookSummaryMd) {
       messages.push({ role: 'user', content:

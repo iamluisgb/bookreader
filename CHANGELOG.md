@@ -5,6 +5,32 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-27 — "Con números": la fórmula que acabas de leer, ejecutada a mano
+
+Leer `x' = (x − vt)/√(1 − v²/c²)` y **entenderla** son cosas distintas. Seleccionas la fórmula o el
+algoritmo, pulsas **Con números** en la barra de selección, y el agente lo ejecuta con un ejemplo
+diminuto: valores concretos, la aritmética de al menos un elemento, y una comprobación de sentido al
+final.
+
+- **Va por el flujo normal del chat** (`deliver()` con `systemExtra`), no por un modal aparte: así
+  hereda retrieval —clave, porque las definiciones de los símbolos están en el capítulo—, citas
+  `[[aN]]` clicables, historial, persistencia en la conversación y export. Lo único propio es un
+  bloque de sistema, que **no se pega a los turnos siguientes**.
+- **Las reglas del prompt tapan modos de fallo reales** de pedirle "un ejemplo" a un modelo:
+  responder con variables sin instanciar, saltarse la aritmética, o escribir LaTeX —que aquí no se
+  renderiza, `mdToHtml` no hace matemáticas—. También obliga a declarar las **formas** en cada paso
+  (`(3,2) @ (2,3) -> (3,3)`), que es donde se pierde la gente con tensores, y a **decir que no hay
+  nada calculable** en vez de inventarse una fórmula.
+- **El mensaje que se ve es corto** (`🔢 Ejemplo numérico · «fragmento…»`): las instrucciones no
+  ensucian el chat ni el export.
+- **T6 · Construir con el libro** — plantilla nueva para libros que se *implementan* (ML, sistemas,
+  "from scratch"). T1 pedía un "plan de acción a 3 días y 2 semanas", que no significa nada cuando lo
+  que toca es construir el tokenizador del capítulo 2. Campos: qué construye este capítulo · piezas
+  clave del código · formas y tipos · dónde me atasqué · qué implemento yo antes de seguir.
+- **Arreglo de paso**: la barra de selección es `fixed` y crecía con cada acción; en un móvil de
+  375px medía **447px y se salía de la pantalla** — ya antes de este botón. Ahora se acota al
+  viewport y la fila envuelve (355×128 en móvil), con test de regresión.
+
 ## 2026-07-27 — Barra de progreso deslizable e índice con números de página
 
 Dos gestos que se dan por supuestos en cualquier lector serio y aquí faltaban.
