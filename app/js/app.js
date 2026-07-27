@@ -23,6 +23,7 @@ import * as SyncEngine from './sync/engine.js';
 import * as Aliases from './sync/aliases.js';
 import * as License from './license.js';
 import { toast } from './ai/toast.js';
+import * as Jobs from './ai/jobs.js';
 import { t, translateDom } from './i18n.js';
 
 // ============ INIT ============
@@ -94,6 +95,10 @@ function initSyncEngine() {
       renderHighlights();
       renderBookmarks();
       repaintStoredHighlights();
+      // Artefactos llegados del otro dispositivo: el espejo en memoria de jobs.js solo se
+      // llena al ABRIR el libro, así que sin esto un resumen recién sincronizado no aparece
+      // en el Studio hasta reabrirlo — que es justo el síntoma que se venía a arreglar.
+      if (currentBook) Jobs.loadForBook(currentBook.id).catch(() => {});
     } catch (e) { console.warn('sync re-render:', e); }
   });
 

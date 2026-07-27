@@ -2,7 +2,8 @@
 //
 //   bookreader/manifest.json      índice { schemaVersion, books: { id: {file, title, updatedAt} } }
 //   bookreader/settings.json      ajustes globales + plantillas propias
-//   bookreader/books/<id>.json    subrayados, marcadores, posición, convos, mensajes, notas, ratings
+//   bookreader/books/<id>.json    subrayados, marcadores, posición, convos, mensajes, notas,
+//                                 ratings y artefactos del Studio (resúmenes / mapas mentales)
 //
 // Un blob único global es lo que hace mal arete (todo o nada, pisa cambios).
 // Particionar por libro aísla los conflictos y evita re-subir lo que no cambió.
@@ -48,7 +49,7 @@ function maxUpdatedAt(...lists) {
 export async function buildSnapshot() {
   const settings = {};
   const books = {};
-  const bookOf = (id) => (books[id] = books[id] || { local: {}, convos: [], messages: [], notes: [], ratings: [], meta: null });
+  const bookOf = (id) => (books[id] = books[id] || { local: {}, convos: [], messages: [], notes: [], ratings: [], artifacts: [], meta: null });
 
   for (const [key, value] of Object.entries(Storage.getAll(''))) {
     if (SECRET_KEYS.includes(key) || SKIP_KEYS.includes(key)) continue;
@@ -57,8 +58,9 @@ export async function buildSnapshot() {
     else settings[key] = value;
   }
 
-  const [convos, messages, notes, ratings, meta] = await Promise.all([
-    DB.getAll('convos'), DB.getAll('messages'), DB.getAll('notes'), DB.getAll('ratings'), DB.getAll('books'),
+  const [convos, messages, notes, ratings, artifacts, meta] = await Promise.all([
+    DB.getAll('convos'), DB.getAll('messages'), DB.getAll('notes'), DB.getAll('ratings'),
+    DB.getAll('artifacts'), DB.getAll('books'),
   ]);
   const convoBook = Object.fromEntries((convos || []).map(c => [c.id, c.bookId]));
   for (const c of convos || []) if (c.bookId) bookOf(c.bookId).convos.push(c);
@@ -70,6 +72,10 @@ export async function buildSnapshot() {
     const b = n.bookId || convoBook[n.convoId];
     if (b) bookOf(b).notes.push(n);
   }
+  // Artefactos del Studio (resúmenes, mapas mentales): generarlos cuesta llamadas al
+  // modelo, así que NO tenerlos aquí significaba pagarlos dos veces al cambiar de
+  // dispositivo. Viajan crudos, con sus tombstones (el borrado también se propaga).
+  for (const a of artifacts || []) if (a.bookId) bookOf(a.bookId).artifacts.push(a);
   // ratings: keyPath `bookId` pero la clave real hoy es el convoId (ver db.js).
   for (const r of ratings || []) {
     const b = convoBook[r.bookId] || (books[r.bookId] ? r.bookId : null);
@@ -99,7 +105,7 @@ export async function buildSnapshot() {
     manifest.books[id] = {
       file: 'books/' + id + '.json',
       title: titles[id] || null,
-      updatedAt: maxUpdatedAt(b.local['highlights_' + id], b.local['bookmarks_' + id], b.messages, b.notes, positionStamps) || now,
+      updatedAt: maxUpdatedAt(b.local['highlights_' + id], b.local['bookmarks_' + id], b.messages, b.notes, b.artifacts, positionStamps) || now,
     };
   }
   return { manifest, settings, books };
@@ -172,6 +178,8 @@ export async function restoreSnapshot({ settings = {}, books = {} }, { mode = 'r
     }
     records += await DB.mergeRecords('messages', b.messages);
     records += await DB.mergeRecords('notes', b.notes);
+    // Artefactos: merge por `key` (ya global), no por uid — ver mergeArtifacts.
+    records += await DB.mergeArtifacts(b.artifacts);
     for (const r of b.ratings || []) { await DB.put('ratings', r); records++; }
     if (b.meta) { await DB.put('books', b.meta); records++; }
   }

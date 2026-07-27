@@ -45,6 +45,15 @@ export async function loadForBook(bookId) {
       for (const e of (cache.get(k) || [])) if (!m.has(e.key)) m.set(e.key, e);
       cache.set(k, [...m.values()].sort((a, b) => (b.at || 0) - (a.at || 0)));
     }
+    // Los borrados que llegan por sync desaparecen de getArtifacts, pero seguirían en el
+    // espejo: se limpian las entradas de este libro que ya no existen en IndexedDB.
+    const alive = new Set(arts.map(a => a.key));
+    for (const [k, list] of cache) {
+      if (!k.startsWith(bookId + ':')) continue;
+      const kept = list.filter(e => alive.has(e.key));
+      if (kept.length !== list.length) cache.set(k, kept);
+    }
+    emit();   // el Studio repinta si está visible (p. ej. tras un pull del sync)
   } catch { /* IDB no disponible */ }
 }
 

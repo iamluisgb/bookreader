@@ -5,6 +5,36 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-27 — Los artefactos del Studio ya viajan entre dispositivos
+
+Reportado desde el móvil: *"el resumen y el mapa que creé en el PC no me aparecen"*. No era cosa de
+ese libro — **los artefactos nunca han entrado en el sync**: el store `artifacts` no estaba en
+`SYNCED_STORES` ni en `buildSnapshot()`. El chat sí sincronizaba; sus productos no.
+
+No es cosmético: **regenerar un resumen cuesta llamadas al modelo**, así que el usuario lo pagaba dos
+veces. Y no era una exclusión razonada — el SYNC_PLAN lista explícitamente lo que NO viaja (la API
+key y `bookText`/`anchors`) y los artefactos no aparecían en ninguna de las dos listas: el sync se
+diseñó antes de que existiera el Studio.
+
+- **Viajan dentro de `books/<bookId>.json`**, con su `updatedAt` contando para el manifest.
+- **Merge por `key`, no por uid**: la clave ya es global (`bookId:kind:<uuid>`), así que no hace
+  falta el trabajo de identidad que sí necesitaron `messages`/`notes`. Dos dispositivos que generan
+  cada uno su resumen acaban con los dos, no con uno pisando al otro.
+- **`deleteArtifact` pasa a ser un tombstone.** Con borrado físico, borrar un resumen en el portátil
+  no se propagaba y el móvil lo devolvía en el ciclo siguiente. Se purga con el mismo TTL que el
+  resto (30 días).
+- **El Studio se repinta al llegar un pull**: el espejo en memoria de `jobs.js` solo se llenaba al
+  ABRIR el libro, así que un resumen recién sincronizado no aparecía hasta reabrirlo — que es
+  exactamente el síntoma que se venía a arreglar.
+
+**Límite conocido, con test que lo fija**: la clave lleva el `bookId` crudo, así que —a diferencia de
+los subrayados— los artefactos no se reconcilian por título cuando el mismo libro tiene hashes
+distintos en cada dispositivo. Con el fichero sincronizado (Fase B) los hashes coinciden y el caso no
+se da.
+
+**Pendiente aparte**: los **mazos de flashcards** (`decks`) siguen sin sincronizar. Necesitan el
+trabajo de `uid` que la Fase 0 hizo para mensajes y notas, porque su id es autoincremental.
+
 ## 2026-07-27 — "Explícamelo tú": el modo Feynman, diseñado sobre literatura de tutoría
 
 Eliges un concepto, lo explicas con **tus** palabras (voz o texto) y el libro te pregunta hasta que lo

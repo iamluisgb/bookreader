@@ -103,9 +103,18 @@ test('Studio conserva el historial: generar dos no sobrescribe; borrar uno deja 
   await page.locator('.dlg-ok').click();
   await expect(summaryCards).toHaveCount(1);
 
-  const left = await page.evaluate(async () => {
+  // Se comprueba con getArtifacts (lo que ve el usuario) y no con getAll (el store crudo):
+  // desde que el borrado es un TOMBSTONE —para que se propague por sync en vez de
+  // resucitar— la fila sigue existiendo marcada como borrada.
+  const { visible, raw } = await page.evaluate(async () => {
     const DB: any = await import('/js/ai/db.js');
-    return (await DB.getAll('artifacts')).filter((a: any) => a.kind === 'summary').length;
+    const all = await DB.getAll('artifacts');
+    const bookId = all[0]?.bookId;
+    return {
+      visible: (await DB.getArtifacts(bookId)).filter((a: any) => a.kind === 'summary').length,
+      raw: all.filter((a: any) => a.kind === 'summary').length,
+    };
   });
-  expect(left).toBe(1);
+  expect(visible).toBe(1);
+  expect(raw).toBe(2);            // el tombstone sigue ahí hasta que caduque
 });

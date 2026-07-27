@@ -14,7 +14,7 @@
 // repetir el trabajo en cada arranque.
 
 import * as Storage from '../storage.js';
-import { backfillSyncFields, purgeDeletedNotes } from '../ai/db.js';
+import { backfillSyncFields, purgeDeletedNotes, purgeDeletedArtifacts } from '../ai/db.js';
 
 const MIGRATED_KEY = 'sync_schema_migrated';
 const SCHEMA_VERSION = 1;
@@ -92,4 +92,5 @@ export async function purgeExpiredTombstones(now = Date.now()) {
     }
   }
   await purgeDeletedNotes(now - TOMBSTONE_TTL_MS);
+  await purgeDeletedArtifacts(now - TOMBSTONE_TTL_MS);
 }

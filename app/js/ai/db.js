@@ -91,7 +91,7 @@ const reqP = (request) => new Promise((resolve, reject) => {
 // Stores que participan en el sync: sus escrituras de usuario avisan al
 // SyncEngine (que hace push con debounce). Las escrituras del propio sync
 // (mergeRecords) NO avisan — evita el bucle push→pull→push.
-const SYNCED_STORES = ['messages', 'notes', 'convos', 'ratings'];
+const SYNCED_STORES = ['messages', 'notes', 'convos', 'ratings', 'artifacts'];
 
 function notifySync(store) {
   if (!SYNCED_STORES.includes(store)) return;
@@ -383,7 +383,7 @@ export async function saveSegmented(bookId, title, seg) {
 
 export function getArtifacts(bookId) {
   return tx('artifacts', 'readonly', s => reqP(s.index('bookId').getAll(bookId)))
-    .then(list => (list || []).filter(a => a.segVersion === SEG_VERSION));
+    .then(list => (list || []).filter(a => a.segVersion === SEG_VERSION && !a.deleted));
 }
 
 // Devuelve la clave del artefacto guardado (el handle para borrarlo). `id` opcional: si no
@@ -400,8 +400,53 @@ export function putArtifact({ bookId, kind, result, params, id }) {
 }
 
 // Borra por clave completa (soporta también las claves legacy `${bookId}:${kind}` sin id).
+// TOMBSTONE, no borrado físico: sin él, borrar un resumen en el portátil no se propaga y
+// el móvil lo devuelve en el siguiente ciclo de sync. La purga la hace purgeDeletedArtifacts().
 export function deleteArtifact(key) {
-  return tx('artifacts', 'readwrite', s => reqP(s.delete(key)));
+  return tx('artifacts', 'readwrite', async s => {
+    const cur = await reqP(s.get(key));
+    if (!cur) return;
+    const now = Date.now();
+    return reqP(s.put({ ...cur, result: null, deleted: true, deletedAt: now, updatedAt: now }));
+  }).then(r => { notifySync('artifacts'); return r; });
+}
+
+// Purga física de tombstones de artefactos anteriores a `olderThan` (ms epoch).
+export function purgeDeletedArtifacts(olderThan) {
+  return tx('artifacts', 'readwrite', s => new Promise((resolve, reject) => {
+    const cur = s.openCursor();
+    cur.onsuccess = () => {
+      const c = cur.result;
+      if (!c) return resolve();
+      if (c.value.deleted && (c.value.deletedAt || 0) < olderThan) c.delete();
+      c.continue();
+    };
+    cur.onerror = () => reject(cur.error);
+  }));
+}
+
+// Sync · Fusiona artefactos remotos. A diferencia de messages/notes, la clave (`key`) YA es
+// global —`bookId:kind:<uuid>`— así que no hay que casar por uid ni reasignar ids: mismo key
+// → gana el updatedAt mayor (con el borrado ganando los empates, como mergeCollections).
+// El `result` de un artefacto no se edita nunca; en la práctica esto solo resuelve
+// generado-aquí / borrado-allí.
+export function mergeArtifacts(records) {
+  if (!records || !records.length) return Promise.resolve(0);
+  return tx('artifacts', 'readwrite', async s => {
+    let written = 0;
+    for (const r of records) {
+      if (!r || !r.key) continue;
+      const l = await reqP(s.get(r.key));
+      if (!l) { await reqP(s.put(r)); written++; continue; }
+      const ru = r.updatedAt || 0;
+      const lu = l.updatedAt || 0;
+      if (ru > lu || (ru === lu && r.deleted && !l.deleted)) {
+        await reqP(s.put(r));
+        written++;
+      }
+    }
+    return written;
+  });
 }
 
 // Utilidad: SHA-256 del arrayBuffer del fichero -> id estable del libro.
