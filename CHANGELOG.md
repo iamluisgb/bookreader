@@ -5,6 +5,22 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-27 — "Sugerir conceptos" fallaba con modelos de razonamiento
+
+Reportado: el botón daba error. No era el botón, era el **presupuesto de tokens**: pedía
+`maxTokens: 1200` mientras el propio módulo documenta, veinte líneas más abajo y para la extracción
+de expectativas, que *"con un techo bajo el razonamiento se come el presupuesto y el contenido sale
+VACÍO (no da error, simplemente no hay texto)"*. Escribí la llamada nueva sin aplicarme el aviso que
+ya estaba escrito al lado. Sube a 3000, como su vecina.
+
+- **El mensaje distingue dos cosas que exigen arreglos distintos:** *"el modelo no respondió"* (con
+  la pista de que puede ser el modelo de razonamiento) frente a *"respondió algo que no sirve"*.
+  Antes ambos casos daban el mismo texto, que además apuntaba en la dirección equivocada.
+- **Fallback al libro entero**: si el capítulo en curso no tiene texto indexado —cubierta,
+  portadilla, una etiqueta del TOC que no casa, un PDF sin estructura— ya no se rinde con "no hay
+  texto indexado"; saca los conceptos del libro. El usuario pidió conceptos, no un diagnóstico.
+- El botón queda **habilitado tras el fallo**, así que reintentar es un toque.
+
 ## 2026-07-27 — El subrayado del móvil dejaba de cuadrar (bug real) + acciones sobre la captura
 
 **El bug, reportado desde el móvil: *"es difícil seleccionar y se descuadra lo subrayado"*.** No era

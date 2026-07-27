@@ -326,3 +326,65 @@ Aquí van:
     expect(Number(r.last.slice(1))).toBeGreaterThan(80);
   });
 });
+
+// "Sugerir conceptos" pedía maxTokens: 1200 mientras el propio módulo documenta, para la
+// extracción de expectativas, que con un techo bajo el razonamiento se come el presupuesto y
+// el contenido sale VACÍO — sin error, simplemente sin texto. Con un modelo de razonamiento
+// detrás, el botón "fallaba". Se sube a 3000 y se distingue "no respondió" de "respondió algo
+// que no sirve", que para el usuario son dos arreglos distintos.
+test('sugerir conceptos: presupuesto holgado, fallo legible y se puede reintentar', async ({ page }) => {
+  test.setTimeout(120000);
+  await page.addInitScript(() => {
+    localStorage.setItem('bookreader_ai_key', JSON.stringify('sk-test'));
+    localStorage.setItem('bookreader_ai_base_url', JSON.stringify('https://stub.invalid/v1'));
+  });
+  await page.goto('/');
+  const [chooser] = await Promise.all([
+    page.waitForEvent('filechooser'),
+    page.getByRole('button', { name: 'Abrir archivo' }).click(),
+  ]);
+  await chooser.setFiles(path.join(__dirname, '..', 'evals', 'fixtures', 'p2-progit.epub'));
+  await page.waitForSelector('#reader-footer', { state: 'visible', timeout: 30000 });
+  await page.locator('#ai-toggle').click();
+  await page.locator('.ai-ob-quickchat').click().catch(() => { /* ya hay conversación */ });
+  await page.waitForFunction(
+    () => /Listo|Ready/.test(document.getElementById('ai-status')?.textContent || ''), null, { timeout: 60000 });
+
+  await page.evaluate(() => {
+    const real = window.fetch.bind(window);
+    (window as any).__emptyReply = true;
+    (window as any).fetch = async (url: any, opts: any) => {
+      const u = typeof url === 'string' ? url : url?.url || '';
+      if (u.includes('/chat/completions')) {
+        (window as any).__lastBody = JSON.parse(opts.body);
+        const payload = (window as any).__emptyReply
+          ? ''                                              // razonamiento que agota el cupo
+          : '{"concept":"byte pair encoding"}\n{"concept":"self-attention"}';
+        const chunks = [
+          `data: ${JSON.stringify({ choices: [{ delta: { content: payload }, finish_reason: null }] })}\n\n`,
+          'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n\n',
+          'data: [DONE]\n\n',
+        ];
+        const s = new ReadableStream({ start(c) { const e = new TextEncoder(); chunks.forEach((x) => c.enqueue(e.encode(x))); c.close(); } });
+        return new Response(s, { status: 200, headers: { 'Content-Type': 'text/event-stream' } });
+      }
+      return real(url, opts);
+    };
+  });
+
+  await seedProLicense(page);
+  await page.locator('.ai-tab[data-view="studio"]').click();
+  await page.locator('[data-act="gen"][data-kind="feynman"]').click();
+  await page.waitForSelector('#fey-more', { timeout: 10000 });
+
+  // 1) Respuesta vacía: mensaje que dice qué hacer, y el botón vuelve a estar disponible.
+  await page.locator('#fey-more').click();
+  await expect(page.locator('#fey-error')).toContainText('modelo de razonamiento', { timeout: 10000 });
+  await expect(page.locator('#fey-more')).toBeEnabled();
+  expect(await page.evaluate(() => (window as any).__lastBody.max_tokens)).toBe(3000);
+
+  // 2) Reintento con respuesta buena: los chips pasan a ser los conceptos del modelo.
+  await page.evaluate(() => { (window as any).__emptyReply = false; });
+  await page.locator('#fey-more').click();
+  await expect(page.locator('.fey-chip').first()).toHaveText('byte pair encoding', { timeout: 10000 });
+});

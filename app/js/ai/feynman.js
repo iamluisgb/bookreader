@@ -561,22 +561,39 @@ async function suggestWithLLM() {
   if (!LLM.hasKey()) { showError(t('Configura tu API key en Ajustes → Agente.')); return; }
   ctx.ensureIndex?.();
   const chapter = ctx.currentChapter || '';
-  const passages = sampleForConcepts(chapter ? Retrieval.passagesByChapter(chapter) : Retrieval.allPassages());
+  // Si el capítulo en curso no tiene texto indexado —cubierta, portadilla, una etiqueta del
+  // TOC que no casa, un PDF sin estructura—, se cae al LIBRO ENTERO en vez de rendirse: el
+  // usuario ha pedido conceptos, no un informe de por qué no los hay.
+  const chapterPassages = chapter ? Retrieval.passagesByChapter(chapter) : [];
+  const scoped = chapterPassages.length ? chapterPassages : Retrieval.allPassages();
+  const scopeLabel = chapterPassages.length ? chapter : '';
+  const passages = sampleForConcepts(scoped);
   if (!passages.length) { showError(t('No hay texto indexado del que sacar conceptos.')); return; }
 
   btn.disabled = true;
   btn.innerHTML = `<span class="ai-typing">${t('Buscando conceptos…')}</span>`;
   try {
+    // Holgura para modelos de razonamiento: MISMO motivo que en la extracción de expectativas
+    // (más abajo). Con un techo bajo el razonamiento se come el presupuesto y el contenido
+    // sale VACÍO —no da error, simplemente no hay texto—, que es como se veía este botón
+    // "fallando" con un modelo de razonamiento detrás.
     const raw = await LLM.chatStream({
-      messages: buildConceptsPrompt(chapter, ctx.bookTitle, passages), maxTokens: 1200,
+      messages: buildConceptsPrompt(scopeLabel, ctx.bookTitle, passages), maxTokens: 3000,
     });
     const concepts = parseConcepts(raw);
-    if (!concepts.length) { showError(t('No he sabido sacar conceptos de aquí. Escribe el que tengas en mente.')); return; }
+    if (!concepts.length) {
+      // Distinguir "no respondió" de "respondió algo que no sirve": son dos arreglos distintos
+      // para el usuario (cambiar de modelo vs. reintentar).
+      showError(String(raw || '').trim()
+        ? t('No he sabido sacar conceptos de aquí. Escribe el que tengas en mente.')
+        : t('El modelo no respondió. Si usas un modelo de razonamiento, prueba con otro o inténtalo de nuevo.'));
+      return;
+    }
     // Los del modelo van DELANTE de los gratuitos: el usuario acaba de pedirlos.
     const merged = suggestConcepts({
-      leaves: [...concepts.map((c) => ({ label: c, chapter })), ...mindmapConcepts(ctx.bookId)],
-      sections: Retrieval.sectionsByChapter(chapter),
-      currentChapter: chapter,
+      leaves: [...concepts.map((c) => ({ label: c, chapter: ctx.currentChapter || '' })), ...mindmapConcepts(ctx.bookId)],
+      sections: Retrieval.sectionsByChapter(ctx.currentChapter || ''),
+      currentChapter: ctx.currentChapter || '',
       exclude: [ctx.bookTitle || ''],
     });
     suggestCache.set(suggestKey(), merged);
