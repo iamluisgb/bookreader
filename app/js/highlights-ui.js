@@ -235,12 +235,29 @@ export function setupPdfSelection() {
   // `selectionchange` sí se dispara mientras se arrastran las asas, así que la captura se
   // mantiene VIVA mientras la barra está abierta. Se ignoran los colapsos —tocar la barra
   // colapsa la selección en algunos navegadores— para no perder lo último bueno.
+  //
+  // DOS RITMOS DISTINTOS a propósito: el DATO se actualiza en cada evento (es la corrección:
+  // lo que se guarde debe ser lo último marcado), pero la BARRA solo se recoloca cuando la
+  // selección se queda quieta. Moviéndola en cada micro-ajuste, perseguiría al dedo justo
+  // mientras se arrastra el asa — que es la parte incómoda de seleccionar en un móvil.
+  let repositionTimer = 0;
   document.addEventListener('selectionchange', () => {
     if (!pdfPending || !isTooltipVisible()) return;
     const cap = capturePdfSelection();
-    if (cap) { pdfPending = cap; positionTooltip(document.getElementById('highlight-tooltip'), cap.rect); }
+    if (!cap) return;
+    pdfPending = cap;
+    clearTimeout(repositionTimer);
+    repositionTimer = setTimeout(() => {
+      if (pdfPending && isTooltipVisible()) {
+        positionTooltip(document.getElementById('highlight-tooltip'), pdfPending.rect);
+      }
+    }, SELECTION_SETTLE_MS);
   });
 }
+
+// Quietud que se exige a la selección antes de mover la barra (arrastrando un asa llegan
+// decenas de eventos por segundo).
+const SELECTION_SETTLE_MS = 250;
 
 function isTooltipVisible() {
   const tt = document.getElementById('highlight-tooltip');

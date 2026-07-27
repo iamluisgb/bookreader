@@ -25,6 +25,13 @@ selección EN EL MOMENTO DE LA ACCIÓN, no la que hubiera al abrir la barra. Los
 De paso, una captura sin rango utilizable ahora se descarta: antes seguía adelante con la geometría
 vacía y guardaba un subrayado invisible al repintar.
 
+**Dos ritmos, a propósito:** el DATO se refresca en cada evento (es la corrección), pero la BARRA
+solo se recoloca cuando la selección lleva 250 ms quieta. Moviéndola en cada micro-ajuste
+perseguiría al dedo justo mientras se arrastra el asa — empeorando la parte que ya era incómoda.
+
+**Lo que este arreglo NO hace:** ajustar las asas sigue costando lo mismo; ese gesto es del
+navegador. Lo que cambia es que trabajar bien ya no da un resultado mal puesto.
+
 **Acciones sobre la zona capturada.** Marcar un recorte y quedarte ante un campo vacío es la misma
 barrera que seleccionar texto sin saber qué preguntar. Bajo las miniaturas aparecen **Explícame ·
 Define los símbolos · Por qué importa**, hermanas de las de la barra de selección. *Define los

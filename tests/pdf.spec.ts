@@ -589,3 +589,44 @@ test('PDF3: el subrayado se repinta sobre su texto también con zoom', async ({ 
   });
   expect(d).toBeLessThan(1);   // sub-píxel a zoom 1 y 1.8
 });
+
+// La contrapartida de mantener viva la captura: si la barra se recolocara en CADA cambio de
+// selección, perseguiría al dedo mientras se arrastra el asa (llegan decenas de eventos por
+// segundo) — empeorando justo la parte incómoda. El dato se refresca siempre; la barra, solo
+// cuando la selección se queda quieta.
+test('PDF3: la barra no persigue al dedo mientras se ajusta la selección', async ({ page }) => {
+  await openPdf(page);
+  await page.waitForSelector('#pdf-container .textLayer span', { timeout: 15000 });
+  const out = await page.evaluate(async () => {
+    const spans = [...document.querySelectorAll('#pdf-container .textLayer span')] as HTMLElement[];
+    const layer = spans[0].closest('.textLayer')!;
+    const sel = window.getSelection()!;
+    const tt = document.getElementById('highlight-tooltip')!;
+
+    const r1 = document.createRange();
+    r1.setStart(spans[0].firstChild!, 0);
+    r1.setEnd(spans[0].firstChild!, 3);
+    sel.removeAllRanges(); sel.addRange(r1);
+    document.getElementById('pdf-container')!.dispatchEvent(new TouchEvent('touchend', { bubbles: true }));
+    await new Promise((r) => setTimeout(r, 60));
+    const start = tt.getBoundingClientRect().left;
+
+    const posiciones: number[] = [];
+    for (let i = 4; i <= 18; i++) {
+      const r = document.createRange();
+      r.setStart(spans[0].firstChild!, 0);
+      r.setEnd(spans[0].firstChild!, Math.min(i, spans[0].textContent!.length));
+      sel.removeAllRanges(); sel.addRange(r);
+      await new Promise((res) => setTimeout(res, 20));
+      posiciones.push(Math.round(tt.getBoundingClientRect().left));
+    }
+
+    const rr = document.createRange();
+    rr.selectNodeContents(layer);
+    sel.removeAllRanges(); sel.addRange(rr);
+    await new Promise((r) => setTimeout(r, 500));
+    return { start, distintasDuranteElArrastre: new Set(posiciones).size, alQuedarseQuieta: tt.getBoundingClientRect().left };
+  });
+  expect(out.distintasDuranteElArrastre).toBe(1);            // quieta mientras se arrastra
+  expect(out.alQuedarseQuieta).not.toBeCloseTo(out.start, 0); // y se recoloca al parar
+});
