@@ -43,10 +43,12 @@ de IA5, no una feature suelta.
 Fase 1 hecha (ver CHANGELOG · ADR-018): modelo de visión configurable e independiente + acción "Ver" que
 manda la **página actual del PDF** (imagen reescalada + texto de la página) al modelo de visión, con
 degradación honesta si no hay VL configurado.
+- **v2 — recorte de región ✓ (2026-07-27)**: botón **Zona** en el composer → el usuario arrastra un
+  marco sobre la figura/ecuación y se adjunta SOLO ese recorte, con hasta 3 zonas etiquetadas en el
+  mismo turno ([`region-select.js`](app/js/region-select.js), `captureRegionImage`). Ver CHANGELOG.
 - **v2 pendiente:**
   - Auto-detectar "Figure/Figura N.M" en la pregunta y **localizar su página por el índice BM25** →
     mandar esa página aunque no estés en ella (sin acción manual).
-  - Recorte de la **región de la figura** (no toda la página) para bajar tokens y mejorar el foco.
   - "Explicar lo que veo" en **EPUB** (requiere rasterizar el iframe de contenido).
   - **PDF escaneado:** usar el modelo de visión como lector cuando no hay capa de texto (OCR-por-VLM).
   - **Seleccionar el pie de una figura → botón "Ver figura":** al seleccionar texto tipo "Figure/Figura

@@ -130,6 +130,19 @@ function positionTooltip(tooltip, rect) {
   });
 }
 
+// Acciones de agente de la barra de selección (idénticas en EPUB y PDF): preguntar con el
+// fragmento adjunto, o una de las acciones rápidas, que mandan una petición ya formulada.
+function wireAgentActions(text) {
+  const on = (id, fn) => {
+    const el = document.getElementById(id);
+    if (el) el.onclick = () => { fn(); hideHighlightTooltip(); };
+  };
+  on('sel-ask', () => AiPanel.quoteSelection(text));
+  on('sel-numeric', () => AiPanel.quickAction('numeric', text));
+  on('sel-explain', () => AiPanel.quickAction('explain', text));
+  on('sel-why', () => AiPanel.quickAction('why', text));
+}
+
 function showHighlightTooltip(cfiRange, text, rect) {
   const tooltip = document.getElementById('highlight-tooltip');
 
@@ -149,17 +162,7 @@ function showHighlightTooltip(cfiRange, text, rect) {
     };
   });
 
-  // Preguntar al agente con el pasaje como referencia
-  document.getElementById('sel-ask').onclick = () => {
-    AiPanel.quoteSelection(text);
-    hideHighlightTooltip();
-  };
-
-  // Ejemplo numérico: la fórmula/algoritmo seleccionado, ejecutado con números pequeños
-  document.getElementById('sel-numeric').onclick = () => {
-    AiPanel.numericExample(text);
-    hideHighlightTooltip();
-  };
+  wireAgentActions(text);
 
   // Añadir nota (subraya y guarda la nota)
   document.getElementById('sel-note').onclick = async () => {
@@ -272,14 +275,7 @@ function showPdfSelectionTooltip(text, rect, rects, page) {
     saveHighlight('#ffd54f', note.trim());
   };
 
-  document.getElementById('sel-ask').onclick = () => {
-    AiPanel.quoteSelection(text);
-    hideHighlightTooltip();
-  };
-  document.getElementById('sel-numeric').onclick = () => {
-    AiPanel.numericExample(text);
-    hideHighlightTooltip();
-  };
+  wireAgentActions(text);
   document.getElementById('sel-copy').onclick = async () => {
     try { await navigator.clipboard.writeText(text); } catch (e) { /* sin clipboard */ }
     hideHighlightTooltip();

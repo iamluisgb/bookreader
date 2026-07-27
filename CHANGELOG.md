@@ -5,6 +5,58 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-27 — Preguntar por una ZONA de la página, y que el panel no la tape
+
+A raíz de ver cómo lo resuelve un lector de PDF con asistente en tablet: seleccionas un trozo de la
+página y te ofrece acciones ya formuladas, con la ventana del agente movible. Cuatro cambios, dos de
+ellos independientes de la visión.
+
+**1 · Acciones rápidas en la barra de selección.** Un composer vacío es una barrera: hay que decidir
+qué preguntar antes de poder preguntar. Junto a "Con números" aparecen **Explícame** y **Por qué
+importa**, que mandan una petición ya formulada sobre el fragmento. Comparten el camino de siempre
+(`deliver` → retrieval, citas, historial, persistencia); lo propio de cada una es su bloque de
+sistema, con las reglas que evitan sus dos fallos típicos: que "explícame" degenere en paráfrasis
+(obliga a un ejemplo concreto) y que "por qué importa" degenere en elogio (obliga a decirlo cuando
+algo es secundario). **"Por qué importa" responde contra el OBJETIVO de lectura del libro** — la
+pregunta que un visor de PDF genérico no puede responder porque no sabe a qué has venido.
+
+**2 · Selección de región en el PDF (IA6 v2).** Botón **Zona** en el composer: se aparta el panel, se
+arrastra un marco sobre la figura o la ecuación y se adjunta SOLO ese recorte. Lo de fuera del marco
+se atenúa, así que lo que queda claro es exactamente lo que va a ver el modelo.
+- Coordenadas **fraccionales** (0..1), el mismo sistema que los subrayados de PDF: sobreviven al zoom.
+- `captureRegionImage` recorta del canvas ya renderizado y **puede ampliar hasta ×2**: un recorte
+  pequeño escalado hacia arriba le da al modelo más píxeles útiles de la figura que la misma zona
+  perdida dentro de la página completa. Un recorte degenerado (un toque sin arrastre) se rechaza en
+  vez de mandar un sello ilegible.
+- La zona se marca sobre **la página que hay bajo el dedo**, no sobre "la página actual": en modo
+  scroll hay varias a la vista.
+
+**3 · Hasta 3 zonas en el mismo turno.** *"¿Qué parte del diagrama implementa esta ecuación?"* es la
+pregunta que una captura de página entera no sabe responder: se le da todo sin decirle qué comparar.
+El formato OpenAI-compatible ya admitía varias imágenes por mensaje, así que `llm.js` no se tocó.
+Lo que sí decide si funciona: **cada imagen viaja precedida de su etiqueta** ("Zona 1 · p. 4"), y sin
+ella el modelo funde las zonas en una respuesta promedio y no puede referirse a ninguna. Al quitar
+una zona se **renumeran** las demás, o llegaría una "Zona 3" sin Zona 2.
+
+**4 · El sheet del agente en móvil deja de tapar el libro.** Era de una sola altura (92dvh): abrirlo
+para preguntar por una figura hacía desaparecer la figura. Ahora tiene dos alturas (52% / 92%) que se
+alternan tocando el tirador o arrastrándolo, y **encaja** en una de las dos al soltar — una altura
+libre en un móvil siempre acaba en un tamaño incómodo. La preferencia se recuerda, como el ancho del
+panel en escritorio. Y al adjuntar una zona, el PDF se desplaza para dejarla a la vista por encima
+del sheet.
+- **El tirador tuvo que dejar de ser un `::before`**: los pseudo-elementos no reciben eventos, así
+  que no había nada que arrastrar. Ahora es un botón real con 26px de alto (objetivo de toque; la
+  barrita sola son 4px).
+
+**Lo que NO se hizo, y por qué:** la ventana flotante y arrastrable del original. En un móvil se
+solapa con lo que estás mirando, hay que persistir su posición y no hay pantalla que ganar; los
+puntos de anclaje dan el mismo beneficio con mucho menos estado. En tablet el panel lateral ya
+resuelve el caso.
+
+**Límite conocido:** todo esto es **solo PDF**. En EPUB no hay canvas que recortar — haría falta
+rasterizar el iframe de contenido, que sigue pendiente en IA6 v2. Las figuras y las ecuaciones viven
+en los PDF, que es el caso que motivó el cambio.
+
 ## 2026-07-27 — El modo Feynman propone conceptos, no títulos de capítulo
 
 Reportado en uso real sobre *Build a Large Language Model (From Scratch)*: la pantalla de "¿qué

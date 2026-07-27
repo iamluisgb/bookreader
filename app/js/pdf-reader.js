@@ -576,6 +576,45 @@ export function capturePageImage(maxPx = 1024) {
   return off.toDataURL('image/jpeg', 0.85);
 }
 
+// IA6 v2 · Captura de una REGIÓN de una página, no de la página entera. `rect` es
+// fraccional ({x,y,w,h} en 0..1 sobre la página), el mismo sistema de coordenadas que usan
+// los subrayados de PDF — así una zona se puede guardar, repintar o volver a capturar
+// aunque cambie el zoom. Recortar baja los tokens del turno de visión y, sobre todo, le
+// dice al modelo QUÉ mirar: con la página entera responde en promedio sobre todo.
+export function captureRegionImage(page, rect, maxPx = 1024) {
+  const canvas = document.querySelector(`#pdf-container .pdf-page[data-page="${page}"] canvas`)
+    || document.querySelector('#pdf-container canvas');
+  if (!canvas || !canvas.width || !canvas.height || !rect) return null;
+  const sx = Math.max(0, Math.round(rect.x * canvas.width));
+  const sy = Math.max(0, Math.round(rect.y * canvas.height));
+  const sw = Math.min(canvas.width - sx, Math.round(rect.w * canvas.width));
+  const sh = Math.min(canvas.height - sy, Math.round(rect.h * canvas.height));
+  if (sw < 8 || sh < 8) return null;                     // recorte degenerado: no sirve
+  // Al recortar se puede AMPLIAR hasta maxPx: un recorte pequeño reescalado hacia arriba le
+  // da al modelo más píxeles útiles de la figura que la misma zona dentro de la página.
+  const scale = Math.min(2, maxPx / Math.max(sw, sh));
+  const off = document.createElement('canvas');
+  off.width = Math.max(1, Math.round(sw * scale));
+  off.height = Math.max(1, Math.round(sh * scale));
+  off.getContext('2d').drawImage(canvas, sx, sy, sw, sh, 0, 0, off.width, off.height);
+  return off.toDataURL('image/jpeg', 0.85);
+}
+
+// Deja una región VISIBLE por encima del sheet del agente (que en móvil ocupa la mitad
+// inferior): centra el rect en la franja libre. Sin esto, adjuntar una zona y que el panel
+// la tape deja al usuario preguntando por algo que no ve.
+export function revealRegion(page, rect, reservedBottomPx = 0) {
+  const wrapper = document.querySelector(`#pdf-container .pdf-page[data-page="${page}"]`);
+  const container = document.getElementById('pdf-container');
+  if (!wrapper || !container || !rect) return;
+  const cr = container.getBoundingClientRect();
+  const wr = wrapper.getBoundingClientRect();
+  const visibleH = Math.max(80, cr.height - reservedBottomPx);
+  const centerInPage = (rect.y + rect.h / 2) * wr.height;
+  const target = (wr.top - cr.top) + container.scrollTop + centerInPage - visibleH / 2;
+  container.scrollTo({ top: Math.max(0, target), behavior: 'smooth' });
+}
+
 // Portada para la estantería: renderiza la PÁGINA 1 en un canvas propio (fuera de pantalla)
 // y devuelve un data URL JPEG reescalado (lado largo ≈ maxPx). '' si no se puede.
 export async function renderCoverDataUrl(maxPx = 400) {

@@ -7,6 +7,9 @@ import { isCognitionField } from './templates.js';
 import { t, uiLangName } from '../i18n.js';
 
 export const TEMPLATE = () => `
+  <!-- Tirador del sheet (solo visible en móvil). Es un ELEMENTO REAL y no un ::before porque
+       los pseudo-elementos no reciben eventos: sin nodo no hay arrastre posible. -->
+  <button id="ai-sheet-grab" class="ai-sheet-grab" aria-label="${t('Ajustar alto del panel')}"></button>
   <!-- Toolbar único (una sola fila de chrome): selector de conversación + perfil + acciones +
        ajustes/cerrar. Sustituye a la antigua cabecera "Agente" (redundante) para dar el máximo
        alto al chat. El grupo de conversación (#ai-convobar) se oculta sin libro; ⚙ y ✕ siempre
@@ -44,10 +47,14 @@ export const TEMPLATE = () => `
       <span id="ai-imgref-text" class="ai-ref-text"></span>
       <button id="ai-imgref-clear" class="ai-ref-clear" title="${t('Quitar imagen')}">${icon('xmark', { size: 15 })}</button>
     </div>
+    <!-- Zonas recortadas de la página (IA6 v2). Se ven ANTES de enviar: el usuario comprueba
+         qué va a mirar el modelo, y puede añadir otra para preguntar por la relación. -->
+    <div id="ai-zones" class="ai-zones" style="display:none"></div>
     <div class="ai-composer">
       <textarea id="ai-input" rows="2" placeholder="${t('Pregunta sobre el libro...')}"></textarea>
       <div class="ai-composer-btns">
         <button id="ai-see" class="ai-see" title="${t('Explicar lo que veo en la página (figuras, diagramas)')}" style="display:none">${icon('sparkles', { size: 15 })}<span>${t('Ver')}</span></button>
+        <button id="ai-zone" class="ai-see" title="${t('Marcar una zona de la página (una figura, una ecuación) y preguntar por ella')}" style="display:none">${icon('crop', { size: 15 })}<span>${t('Zona')}</span></button>
         <button id="ai-send" class="primary-btn ai-send">${t('Enviar')}</button>
       </div>
     </div>

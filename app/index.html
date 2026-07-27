@@ -242,6 +242,13 @@
   <!-- Highlight tooltip -->
   <div id="highlight-tooltip" class="sel-toolbar" style="display:none;">
     <button id="sel-ask" class="sel-ask"><span class="sel-ask-ico" data-icon="sparkles" data-icon-size="18"></span><span data-i18n>Preguntar al agente</span></button>
+    <!-- Acciones rápidas: un composer vacío es una barrera. Cada una manda una petición ya
+         formulada sobre el fragmento, sin escribir nada. "Por qué importa" usa el OBJETIVO
+         de lectura del libro, que es lo que un lector con PDF genérico no puede tener. -->
+    <div class="sel-row sel-quick">
+      <button id="sel-explain" class="sel-act" title="Explicar este fragmento en llano, con un ejemplo" data-i18n-attrs="title"><span data-icon="bubble" data-icon-size="17"></span><span data-i18n>Explícame</span></button>
+      <button id="sel-why" class="sel-act" title="Qué peso tiene esto para tu objetivo de lectura" data-i18n-attrs="title"><span data-icon="target" data-icon-size="17"></span><span data-i18n>Por qué importa</span></button>
+    </div>
     <div class="sel-row">
       <div class="sel-colors">
         <button class="highlight-color" data-color="#ffd54f" style="background:#ffd54f;" title="Amarillo" data-i18n-attrs="title"></button>

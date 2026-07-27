@@ -1914,6 +1914,13 @@ body.has-taskchip .ai-taskchip.is-study { bottom: 74px; }
 .sel-act:hover { background: var(--surface-3); }
 .sel-act .icon { color: var(--text-soft); }
 
+/* Acciones rápidas: mismo peso visual que el resto de la barra, pero con el icono teñido
+   de acento — son turnos del agente, no utilidades del subrayado. Cada botón ocupa la
+   mitad para que se lean como un par y no como el principio de una lista larga. */
+.sel-quick > .sel-act { flex: 1 1 0; justify-content: center; }
+.sel-quick > .sel-act:first-child { border-left: none; }
+.sel-quick .icon { color: var(--accent); }
+
 /* Chip de referencia (pasaje adjunto) sobre el compositor del agente. */
 .ai-ref {
   display: flex; align-items: center; gap: 10px;
@@ -2080,7 +2087,11 @@ body.ai-busy #ai-toggle::after, body.ai-busy .ai-fab::after {
   /* El panel del agente se convierte en bottom sheet */
   #ai-panel {
     width: 100%;
-    height: 92dvh;
+    /* Dos alturas: media (se sigue viendo la página por encima) y completa. Ver
+       `initSheetSnap` en ai/panel.js — el objetivo es que preguntar por una figura no
+       implique perder de vista la figura. */
+    height: var(--ai-sheet-h, 92dvh);
+    transition: transform var(--transition-normal), height var(--transition-normal);
     top: auto;
     bottom: 0;
     right: 0;
@@ -2091,16 +2102,24 @@ body.ai-busy #ai-toggle::after, body.ai-busy .ai-fab::after {
     padding-bottom: env(safe-area-inset-bottom);
   }
   body.ai-open #ai-panel { transform: translateY(0); }
-  /* Grabber del sheet */
-  #ai-panel::before {
+  /* Tirador del sheet: zona de toque generosa (44px de alto) con la barrita dentro. El área
+     de toque es lo que hace usable el arrastre con el pulgar; la barrita sola sería un
+     objetivo de 4px. */
+  .ai-sheet-grab {
+    display: block; flex-shrink: 0;
+    width: 100%; height: 26px; padding: 0;
+    border: none; background: none; cursor: grab;
+    touch-action: none;                      /* el gesto es nuestro, no del scroll */
+  }
+  .ai-sheet-grab::before {
     content: '';
-    flex-shrink: 0;
-    width: 36px;
-    height: 4px;
-    margin: 8px auto 0;
+    display: block; width: 36px; height: 4px;
+    margin: 9px auto 0;
     border-radius: 2px;
     background: var(--border);
   }
+  body.sheet-dragging .ai-sheet-grab { cursor: grabbing; }
+  body.sheet-dragging #ai-panel { transition: none; }
 
   /* Índice como drawer ancho */
   #sidebar { width: min(86%, 360px); }
@@ -2969,3 +2988,74 @@ body.ai-open #sync-badge { right: calc(var(--ai-panel-width) + 14px); }
 .fey-ok li::marker { color: var(--accent); }
 .fey-missing li::marker { color: var(--danger, #e5484d); }
 .fey-wrong li::marker { color: #f5a524; }
+
+/* ---- IA6 v2 · Selección de región sobre el PDF ---------------------------------------
+   Capa fija sobre el hueco del lector mientras dura la selección. `touch-action: none` es
+   obligatorio: sin él, el navegador se queda el gesto para hacer scroll y el arrastre no
+   llega nunca a la capa. */
+.region-overlay {
+  position: fixed; z-index: 190;
+  cursor: crosshair; touch-action: none;
+  background: rgba(0, 0, 0, 0.12);
+}
+/* Con un marco dibujado, el atenuado se INVIERTE: lo que queda claro es exactamente lo que
+   se va a mandar al modelo. Se consigue con una sombra enorme hacia fuera del marco, no con
+   otra capa (que taparía el propio marco). */
+.region-overlay:has(.region-box:not([hidden])) { background: transparent; }
+.region-hint {
+  position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 12px;
+  padding: 8px 10px 8px 16px;
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: var(--r-pill); box-shadow: var(--shadow-3);
+  font-size: var(--fs-sm); color: var(--text); white-space: nowrap;
+}
+.region-cancel {
+  border: none; background: var(--surface-3); color: var(--text-soft);
+  padding: 5px 12px; border-radius: var(--r-pill); font-size: var(--fs-xs); cursor: pointer;
+}
+.region-cancel:hover { color: var(--text); }
+/* El recorte se ve a través del marco: el resto de la página queda atenuado por el overlay,
+   así el usuario ve exactamente lo que va a mandar al modelo. */
+.region-box {
+  position: absolute; pointer-events: none;
+  border: 2px solid var(--accent);
+  border-radius: 2px;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.38);
+}
+body.region-selecting { user-select: none; }
+
+/* Zonas adjuntas al composer (multi-región): una miniatura por zona, con su × */
+.ai-zones {
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+  margin: 0 18px 10px;
+}
+.ai-zone {
+  position: relative; flex: 0 0 auto;
+  width: 72px; height: 54px;
+  border: 1px solid var(--border); border-radius: var(--r-sm);
+  overflow: hidden; line-height: 0;
+  background: var(--surface-3);
+}
+.ai-zone img { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* Rótulo corto y de UNA línea: el nombre largo ("Zona 2 · p. 4") es el que viaja al modelo,
+   aquí solo hace falta distinguir una miniatura de otra. */
+.ai-zone-label {
+  position: absolute; left: 0; bottom: 0; right: 0;
+  padding: 2px 4px; font-size: 10px; line-height: 1.3;
+  background: rgba(0, 0, 0, 0.6); color: #fff; text-align: center;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.ai-zone-x {
+  position: absolute; top: 2px; right: 2px;
+  width: 18px; height: 18px; display: inline-flex; align-items: center; justify-content: center;
+  border: none; border-radius: 50%; cursor: pointer;
+  background: rgba(0, 0, 0, 0.6); color: #fff; padding: 0;
+}
+.ai-zone-add {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 54px; padding: 0 12px;
+  border: 1px dashed var(--border); border-radius: var(--r-sm);
+  background: none; color: var(--text-soft); font-size: var(--fs-xs); cursor: pointer;
+}
+.ai-zone-add:hover { color: var(--accent); border-color: var(--accent); }

@@ -172,3 +172,36 @@ test('con una fórmula real, el modelo da números, aritmética y comprobación 
   // Y una comprobación de sentido al cierre (regla 5 del prompt).
   expect(answer).toMatch(/comprueb|comprobación|verific|coincid|cuadra|sentido/i);
 });
+
+// Las otras dos acciones rápidas de la barra comparten camino con "Con números" (deliver →
+// retrieval, citas, historial): lo propio de cada una es su bloque de sistema, y es lo que
+// distingue "explícame" de "resúmemelo" y "por qué importa" de un elogio genérico.
+test('las acciones rápidas están en la barra y cada una activa su modo', async ({ page }) => {
+  test.setTimeout(120000);
+  await page.goto('/');
+  await expect(page.locator('#sel-explain')).toHaveCount(1);
+  await expect(page.locator('#sel-why')).toHaveCount(1);
+
+  await openWithAgent(page);
+  const frag = 'La atención causal impide que una posición atienda a las siguientes.';
+
+  await page.evaluate(async (f) => {
+    const m: any = await import('/js/ai/panel.js');
+    await m.quickAction('explain', f);
+  }, frag);
+  let sys = await page.evaluate(() => (window as any).__lastSystem);
+  expect(sys).toContain('MODO EXPLICAR');
+  // La regla que evita la paráfrasis (el fallo típico de "explícame"): un ejemplo concreto.
+  expect(sys).toContain('ejemplo concreto');
+  expect(sys).toContain('no has explicado nada');
+
+  await page.evaluate(async (f) => {
+    const m: any = await import('/js/ai/panel.js');
+    await m.quickAction('why', f);
+  }, frag);
+  sys = await page.evaluate(() => (window as any).__lastSystem);
+  expect(sys).toContain('MODO POR QUÉ IMPORTA');
+  expect(sys).toContain('OBJETIVO DE LECTURA');
+  // Y la regla que permite decir "esto puedes saltártelo" en vez de justificarlo todo.
+  expect(sys).toContain('SECUNDARIO');
+});

@@ -7,6 +7,7 @@ import { segmentPdf } from './segment-pdf.js';
 import * as DB from './db.js';
 import * as EpubReader from '../epub-reader.js';
 import * as PdfReader from '../pdf-reader.js';
+import * as RegionSelect from '../region-select.js';
 import { getTemplate, objectiveTemplates, isValidField, isAgentFillable, agentFields, isCognitionField, ARTESANO_ID, INMERSIVA_ID } from './templates.js';
 import { icon } from '../ui/icons.js';
 import { t } from '../i18n.js';
@@ -58,7 +59,12 @@ let busy = false, abortCtrl = null;
 let onCite = () => {};
 let segReady = false, segBlocks = 0, segCached = false;
 let pendingRef = null;             // pasaje seleccionado adjunto a la próxima pregunta
-let pendingImage = null;           // { dataUrl, page } captura adjunta (botón "Ver") para visión
+// Adjuntos de VISIÓN del turno: la página entera (botón "Ver") o hasta MAX_ZONES recortes
+// (botón "Zona"). Es una LISTA porque preguntar por la relación entre dos zonas —la ecuación
+// y el bloque del diagrama que la implementa— es justo lo que una captura de página entera
+// no sabe responder: se le da todo sin decirle qué comparar.
+let pendingImages = [];            // [{ dataUrl, page, rect|null, label }]
+const MAX_ZONES = 3;               // tope de coste: cada imagen son tokens del turno
 let pendingQuoteOnActivate = null; // cola: pasaje a adjuntar tras crear/activar convo
 // IA2 · Repaso al terminar capítulo ("Pepito Grillo"). Ver DECISIONS.md · ADR-013.
 let ia2LastChapter = null;
@@ -76,6 +82,7 @@ export function init(opts) {
     convobar: $('#ai-convobar'), convoBtn: $('#ai-convo-btn'), convoLabel: $('#ai-convo-label'), convoNew: $('#ai-convo-new'), convoExport: $('#ai-convo-export'),
     ref: $('#ai-ref'), refText: $('#ai-ref-text'), profileChip: $('#ai-profile-chip'),
     imgref: $('#ai-imgref'), imgrefText: $('#ai-imgref-text'),
+    zone: $('#ai-zone'), zones: $('#ai-zones'),
   });
   $('#ai-ref-clear').addEventListener('click', clearRef);
   $('#ai-imgref-clear').addEventListener('click', clearImageRef);
@@ -93,10 +100,12 @@ export function init(opts) {
   els.profileChip.addEventListener('click', () => AppSettings.open('profiles'));
   els.send.addEventListener('click', send);
   els.see.addEventListener('click', explainView);
+  els.zone.addEventListener('click', () => pickZone());
   els.input.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
   });
   els.close.addEventListener('click', () => setOpen(false));
+  initSheetSnap();
 
   els.tabs.addEventListener('click', (e) => {
     const b = e.target.closest('.ai-tab'); if (!b) return;
@@ -203,27 +212,81 @@ quiere verlo EJECUTADO A MANO con números concretos. Reglas:
 FORMATO: Markdown. Las matrices y los cálculos, en bloques de código cercados. NADA de LaTeX ni
 tablas: no se renderizan aquí. Cita [[aN]] si te apoyas en un pasaje del extracto.`;
 
-export async function numericExample(text) {
+// Explicar el fragmento en llano. La regla que hace que esto NO sea "resúmemelo" es la 2:
+// un ejemplo concreto. Sin ella el modelo parafrasea el pasaje con otras palabras, que es
+// exactamente lo que el lector ya ha leído y no ha entendido.
+const EXPLAIN_MODE = `MODO EXPLICAR (para este turno).
+El usuario ha marcado un fragmento que no acaba de entender. Reglas:
+1. Empieza por la IDEA en una o dos frases llanas, sin jerga. Si hay un término técnico
+   imprescindible, defínelo la primera vez que lo uses.
+2. Sigue con UN ejemplo concreto o una analogía corta. No parafrasees el fragmento: si tu
+   explicación se puede sustituir por el original sin pérdida, no has explicado nada.
+3. Cierra con lo que el fragmento da por sabido y el lector quizá no (el prerrequisito
+   escondido), si lo hay.
+4. Breve: 150 palabras como mucho. Cita [[aN]] si te apoyas en otro pasaje del extracto.`;
+
+// "Por qué esto importa" es la acción que solo esta app puede hacer bien: el libro tiene un
+// OBJETIVO de lectura declarado, así que la respuesta no es "por qué importa en general"
+// sino "por qué te importa a TI, para lo que has venido a hacer". La regla 3 es la que evita
+// el halago vacío: si no aporta a su objetivo, hay que decirlo.
+const WHY_MODE = `MODO POR QUÉ IMPORTA (para este turno).
+El usuario ha marcado un fragmento y quiere saber qué peso tiene PARA SU OBJETIVO DE LECTURA
+(está arriba, en el bloque de contexto). Reglas:
+1. Responde en relación a ESE objetivo, no en abstracto. Nómbralo.
+2. Di qué se desbloquea si lo domina: qué otra parte del libro deja de tener sentido sin esto,
+   o qué podrá hacer que ahora no puede.
+3. Si para su objetivo esto es SECUNDARIO, dilo claramente y en una línea di qué merece más su
+   atención. Vale más un "puedes saltártelo" honesto que un elogio de todo.
+4. Breve: 120 palabras como mucho. Cita [[aN]] cuando conectes con otras partes del libro.`;
+
+// Acciones rápidas de la barra de selección. Todas comparten el mismo camino (`deliver`), así
+// que heredan retrieval, citas, historial, persistencia y export; lo único propio de cada una
+// es su bloque de sistema y la etiqueta que se guarda en la conversación.
+const QUICK_ACTIONS = {
+  numeric: {
+    mode: NUMERIC_MODE,
+    ask: () => t('Hazme un ejemplo numérico de esto, con números pequeños y concretos.'),
+    label: (ref) => t('🔢 Ejemplo numérico · «{ref}»', { ref }),
+    button: () => t('Con números'),
+  },
+  explain: {
+    mode: EXPLAIN_MODE,
+    ask: () => t('Explícame esto en llano, con un ejemplo concreto.'),
+    label: (ref) => t('💡 Explícame · «{ref}»', { ref }),
+    button: () => t('Explícame'),
+  },
+  why: {
+    mode: WHY_MODE,
+    ask: () => t('¿Por qué es importante esto para mi objetivo de lectura?'),
+    label: (ref) => t('🎯 Por qué importa · «{ref}»', { ref }),
+    button: () => t('Por qué importa'),
+  },
+};
+
+export async function quickAction(kind, text) {
+  const act = QUICK_ACTIONS[kind];
+  if (!act) return;
   const clean = (text || '').replace(/\s+/g, ' ').trim();
   if (!clean) return;
   setOpen(true);
   showView('chat');
   if (busy) { setStatus('Espera a que termine la respuesta en curso.'); return; }
-  if (!convo) { setRefAndAsk(clean); return; }
+  if (!convo) { setRefAndAsk(clean, act.button()); return; }
   if (!LLM.hasKey()) { AppSettings.open('agent'); setStatus('Introduce tu API key primero.'); return; }
   if (!annotatedText) { setStatus('El libro aún no está listo.'); return; }
 
-  const ask = t('Hazme un ejemplo numérico de esto, con números pequeños y concretos.');
   // Lo que se ve (y se guarda) es corto; el detalle va en el bloque de sistema.
-  const shown = t('🔢 Ejemplo numérico · «{ref}»', { ref: clean.length > 160 ? clean.slice(0, 160) + '…' : clean });
-  await deliver(shown, ask, { showUser: true, ref: clean, systemExtra: NUMERIC_MODE });
+  const shown = act.label(clean.length > 160 ? clean.slice(0, 160) + '…' : clean);
+  await deliver(shown, act.ask(), { showUser: true, ref: clean, systemExtra: act.mode });
 }
+
+export function numericExample(text) { return quickAction('numeric', text); }
 
 // Sin conversación todavía: adjuntamos el fragmento y dejamos que el onboarding elija
 // objetivo; el usuario relanza. Mejor que perder la selección en silencio.
-function setRefAndAsk(clean) {
+function setRefAndAsk(clean, buttonLabel = t('Con números')) {
   pendingQuoteOnActivate = clean;
-  setStatus('Elige un objetivo de lectura y vuelve a pulsar «Con números».');
+  setStatus(t('Elige un objetivo de lectura y vuelve a pulsar «{btn}».', { btn: buttonLabel }));
   openOnboarding();
 }
 
@@ -422,6 +485,7 @@ export async function setBook(b, id, title, opts = {}) {
   bookFormat = opts.format || 'epub'; tocLabels = [];
   // "Explicar lo que veo" (visión) solo tiene sentido en PDF (renderizamos su canvas).
   if (els.see) els.see.style.display = bookFormat === 'pdf' ? '' : 'none';
+  if (els.zone) els.zone.style.display = bookFormat === 'pdf' ? '' : 'none';
   clearImageRef();
   convo = null; template = null; history = []; notes = [];
   ia2LastChapter = null; ia2Seen = new Set();   // IA2: reinicia el repaso por libro
@@ -881,18 +945,18 @@ async function startQuickChat() {
 async function send() {
   if (busy) return;
   const q = els.input.value.trim();
-  if (!q && !pendingImage) return;
+  if (!q && !pendingImages.length) return;
   if (!convo) { setStatus('Elige un objetivo de lectura primero.'); openOnboarding(); return; }
   if (!LLM.hasKey()) { AppSettings.open('agent'); setStatus('Introduce tu API key primero.'); return; }
 
   // VISIÓN · si hay una captura de página adjunta (botón "Ver"), este turno va con imagen al
   // modelo de visión, con el texto del usuario como petición.
-  if (pendingImage) {
-    const image = pendingImage;
+  if (pendingImages.length) {
+    const images = pendingImages;
     els.input.value = '';
     clearImageRef();
     clearRef();
-    await deliverVision(q, image);
+    await deliverVision(q, images);
     return;
   }
 
@@ -907,6 +971,87 @@ async function send() {
   // `ref` también guía el retrieval: localiza el pasaje del fragmento en el índice para
   // que entre ANCLADO en el extracto (sin esto, "¿qué significa esto?" no lo recuperaba).
   await deliver(aug, q, { showUser: true, ref });
+}
+
+// Solo para tests (inspección visual): adjunta zonas ya recortadas sin gestos.
+export function __setZonesForTest(zones) {
+  pendingImages = zones;
+  renderZones();
+}
+
+// Solo para tests: el turno de visión sin pasar por el recorte interactivo (que necesita
+// gestos reales). Lo que se quiere fijar es el MENSAJE que sale hacia el proveedor.
+export function __deliverVisionForTest(text, images) {
+  convo = convo || { id: 'test', goal: 'probar' };
+  return deliverVision(text, images);
+}
+
+// ---- Sheet móvil: dos alturas -------------------------------------------------------
+//
+// El panel en móvil es un bottom sheet que solo tenía UN estado: 92dvh, o sea tapando la
+// página. Preguntar por una figura y perder de vista la figura es el caso que más se repite.
+// Ahora hay dos alturas y el tirador alterna entre ellas.
+//
+// Se ENCAJA en una de las dos al soltar (no altura libre): en un móvil, una altura arbitraria
+// te deja siempre en un tamaño incómodo, y además así el estado es uno de dos y se puede
+// recordar entre sesiones.
+const SHEET_SNAPS = [52, 92];          // % de la altura visible (dvh)
+const SHEET_KEY = 'ui_ai_sheet_snap';
+let sheetSnap = SHEET_SNAPS[SHEET_SNAPS.length - 1];
+
+function isSheet() { return window.matchMedia('(max-width: 767px)').matches; }
+
+function applySheetSnap(pct) {
+  sheetSnap = pct;
+  document.documentElement.style.setProperty('--ai-sheet-h', pct + 'dvh');
+}
+
+// Alto reservado por el sheet, para que quien deba dejar algo a la vista (el recorte de una
+// zona) sepa cuánta pantalla tiene libre de verdad.
+export function sheetReservedPx() {
+  if (!isSheet() || !isOpen()) return 0;
+  return Math.round(window.innerHeight * sheetSnap / 100);
+}
+
+function initSheetSnap() {
+  const grab = document.getElementById('ai-sheet-grab');
+  if (!grab) return;
+  applySheetSnap(Storage.get(SHEET_KEY, SHEET_SNAPS[SHEET_SNAPS.length - 1]));
+
+  let startY = 0, startPct = 0, moved = false;
+  const pctFor = (clientY) => {
+    // Arrastrar hacia ARRIBA agranda: el delta va con signo invertido respecto a la Y.
+    const delta = (startY - clientY) / window.innerHeight * 100;
+    return Math.min(96, Math.max(30, startPct + delta));
+  };
+  const onMove = (e) => {
+    moved = moved || Math.abs(e.clientY - startY) > 6;
+    applySheetSnap(pctFor(e.clientY));
+  };
+  const end = (e) => {
+    grab.removeEventListener('pointermove', onMove);
+    grab.removeEventListener('pointerup', end);
+    grab.removeEventListener('pointercancel', end);
+    try { grab.releasePointerCapture(e.pointerId); } catch { /* ya liberado */ }
+    document.body.classList.remove('sheet-dragging');
+    // Un toque sin arrastre ALTERNA; un arrastre encaja en la altura más cercana.
+    const target = moved ? pctFor(e.clientY) : (sheetSnap === SHEET_SNAPS[0] ? SHEET_SNAPS[1] : SHEET_SNAPS[0]);
+    const nearest = moved
+      ? SHEET_SNAPS.reduce((a, b) => (Math.abs(b - target) < Math.abs(a - target) ? b : a))
+      : target;
+    applySheetSnap(nearest);
+    Storage.set(SHEET_KEY, nearest);
+  };
+  grab.addEventListener('pointerdown', (e) => {
+    if (!isSheet()) return;
+    e.preventDefault();
+    startY = e.clientY; startPct = sheetSnap; moved = false;
+    try { grab.setPointerCapture(e.pointerId); } catch { /* sin captura: sigue funcionando */ }
+    document.body.classList.add('sheet-dragging');
+    grab.addEventListener('pointermove', onMove);
+    grab.addEventListener('pointerup', end);
+    grab.addEventListener('pointercancel', end);
+  });
 }
 
 // VISIÓN · Botón "Ver": ADJUNTA la captura de la página actual al composer (no envía). Así el
@@ -925,16 +1070,105 @@ async function explainView() {
   const page = PdfReader.getCurrentPage();
   const dataUrl = PdfReader.capturePageImage(1024);
   if (!dataUrl) { setStatus('Espera a que la página termine de renderizarse.'); return; }
-  pendingImage = { dataUrl, page };
-  if (els.imgref) { els.imgref.style.display = 'flex'; els.imgrefText.textContent = t('Página {n}', { n: page }); }
+  pendingImages = [{ dataUrl, page, rect: null, label: t('Página {n}', { n: page }) }];
+  renderZones();
   setOpen(true); showView('chat');
   focusInput();
   setStatus('Imagen de la página adjunta — escribe tu pregunta y pulsa Enviar.');
 }
 
+// VISIÓN · Botón "Zona": el usuario marca un marco sobre la página y se adjunta SOLO ese
+// recorte. Mismo destino que "Ver" (el composer), pero acotando qué mira el modelo.
+async function pickZone() {
+  if (busy) return;
+  if (!visionReady()) return;
+  // El panel se aparta mientras se marca: en móvil ocupa media pantalla y taparía justo la
+  // figura que se quiere recortar.
+  setOpen(false);
+  const ok = RegionSelect.start({
+    onPick: ({ page, rect }) => {
+      setOpen(true); showView('chat');
+      const dataUrl = PdfReader.captureRegionImage(page, rect, 1024);
+      if (!dataUrl) { setStatus('Esa zona es demasiado pequeña; marca un área mayor.'); return; }
+      if (pendingImages.length >= MAX_ZONES) {
+        setStatus(t('Máximo {n} zonas por pregunta.', { n: MAX_ZONES }));
+        return;
+      }
+      // Una captura de página entera y unos recortes no se mezclan: la página ya contiene
+      // las zonas, y mandar ambas cosas duplica tokens para decir lo mismo.
+      pendingImages = pendingImages.filter((z) => z.rect);
+      pendingImages.push({ dataUrl, page, rect, label: t('Zona {i} · p. {n}', { i: pendingImages.length + 1, n: page }) });
+      renderZones();
+      // Que la zona recortada siga a la vista por encima del sheet: si el panel la tapa, el
+      // usuario acaba preguntando por algo que ya no ve.
+      PdfReader.revealRegion(page, rect, sheetReservedPx());
+      focusInput();
+      setStatus(pendingImages.length > 1
+        ? 'Zonas adjuntas — pregunta por la relación entre ellas y pulsa Enviar.'
+        : 'Zona adjunta — escribe tu pregunta y pulsa Enviar.');
+    },
+    onCancel: () => { setOpen(true); showView('chat'); },
+  });
+  if (!ok) { setOpen(true); setStatus('Disponible al leer un PDF.'); }
+}
+
+// Puertas comunes de las acciones de visión (key, conversación, modelo con visión, formato).
+function visionReady() {
+  if (bookFormat !== 'pdf' || !PdfReader.isLoaded()) { setStatus('Disponible al leer un PDF.'); return false; }
+  if (!convo) { setStatus('Elige un objetivo de lectura primero.'); openOnboarding(); return false; }
+  if (!LLM.hasKey()) { AppSettings.open('agent'); setStatus('Introduce tu API key primero.'); return false; }
+  if (!LLM.hasVision()) {
+    setStatus('Configura un modelo con visión en Ajustes para explicar figuras.');
+    AppSettings.open('agent');
+    return false;
+  }
+  return true;
+}
+
+// Miniaturas de lo adjunto. Se ven ANTES de enviar a propósito: el usuario comprueba que el
+// recorte es el que quería en vez de descubrirlo por una respuesta que habla de otra cosa.
+function renderZones() {
+  const host = els.zones;
+  if (!host) return;
+  const zones = pendingImages.filter((z) => z.rect);
+  const page = pendingImages.find((z) => !z.rect);
+  // Página entera: el chip de siempre. Recortes: miniaturas.
+  if (els.imgref) {
+    els.imgref.style.display = page ? 'flex' : 'none';
+    if (page) els.imgrefText.textContent = page.label;
+  }
+  if (!zones.length) { host.style.display = 'none'; host.innerHTML = ''; return; }
+  host.style.display = 'flex';
+  host.innerHTML = zones.map((z, i) => `
+    <div class="ai-zone" data-i="${i}" title="${escapeHtml(z.label)}">
+      <img src="${z.dataUrl}" alt="${escapeHtml(z.label)}">
+      <span class="ai-zone-label">${t('Zona {i}', { i: i + 1 })}</span>
+      <button class="ai-zone-x" title="${t('Quitar zona')}" aria-label="${t('Quitar zona')}">${icon('xmark', { size: 12 })}</button>
+    </div>`).join('') +
+    (zones.length < MAX_ZONES
+      ? `<button class="ai-zone-add" id="ai-zone-add">${icon('plus', { size: 14 })}${t('Otra zona')}</button>`
+      : '');
+  host.querySelector('#ai-zone-add')?.addEventListener('click', () => pickZone());
+  host.querySelectorAll('.ai-zone-x').forEach((btn, i) => btn.addEventListener('click', () => {
+    pendingImages = pendingImages.filter((z) => z !== zones[i]);
+    // Las etiquetas son ordinales ("Zona 2"): tras quitar una hay que renumerar, o el modelo
+    // recibe una "Zona 3" sin Zona 2 y se pone a razonar sobre la que falta.
+    relabelZones();
+    renderZones();
+  }));
+}
+
+function relabelZones() {
+  let i = 0;
+  for (const z of pendingImages) {
+    if (z.rect) z.label = t('Zona {i} · p. {n}', { i: ++i, n: z.page });
+  }
+}
+
 function clearImageRef() {
-  pendingImage = null;
+  pendingImages = [];
   if (els.imgref) els.imgref.style.display = 'none';
+  if (els.zones) { els.zones.style.display = 'none'; els.zones.innerHTML = ''; }
 }
 
 // Texto ya extraído de una página (para dar contexto textual al turno de visión).
@@ -947,15 +1181,19 @@ function pageText(page) {
   return out.join(' ').slice(0, 4000);
 }
 
-async function deliverVision(userText, image) {
-  if (busy || !image) return;
+async function deliverVision(userText, images) {
+  const list = Array.isArray(images) ? images : [images];
+  if (busy || !list.length) return;
   const mySeq = bookSeq;   // guard: no persistir si el usuario cambia de libro mid-turno
-  const page = image.page;
-  const img = image.dataUrl;
+  const zoned = list.every((z) => z.rect);
+  const page = list[0].page;
 
-  const instruction = userText ||
-    t('Explícame el contenido de esta página, en especial las figuras, diagramas o tablas que aparezcan.');
-  const userLabel = `📷 ${t('Página {n}', { n: page })} · ${instruction}`;
+  const instruction = userText || (zoned
+    ? (list.length > 1
+      ? t('Explícame estas zonas y cómo se relacionan entre sí.')
+      : t('Explícame esta zona de la página.'))
+    : t('Explícame el contenido de esta página, en especial las figuras, diagramas o tablas que aparezcan.'));
+  const userLabel = `📷 ${list.map((z) => z.label).join(' + ')} · ${instruction}`;
 
   appendBubble('user', userLabel, false);
   history.push({ role: 'user', content: userLabel });
@@ -969,17 +1207,36 @@ async function deliverVision(userText, image) {
 
   try {
     const goalLine = convo?.goal ? `OBJETIVO DE LECTURA: ${convo.goal}\n\n` : '';
-    const ctxText = pageText(page);
-    const textBlock = ctxText ? `TEXTO EXTRAÍDO DE LA PÁGINA ${page} (para contexto):\n${ctxText}\n\n` : '';
+    // El texto de TODAS las páginas implicadas (dos zonas pueden venir de páginas distintas).
+    const pages = [...new Set(list.map((z) => z.page))];
+    const ctxText = pages.map((n) => pageText(n)).filter(Boolean).join('\n\n');
+    const textBlock = ctxText
+      ? `TEXTO EXTRAÍDO DE ${pages.length > 1 ? `LAS PÁGINAS ${pages.join(', ')}` : `LA PÁGINA ${page}`} (para contexto):\n${ctxText}\n\n`
+      : '';
+    const what = zoned
+      ? (list.length > 1
+        ? `${list.length} RECORTES que el usuario ha marcado en el libro "${bookTitle}"`
+        : `un RECORTE que el usuario ha marcado en el libro "${bookTitle}"`)
+      : `la IMAGEN de la PÁGINA ${page} del libro "${bookTitle}"`;
+    const zonedRules = zoned
+      ? `\nEl usuario ha recortado él mismo esa zona: es EXACTAMENTE lo que quiere entender, así que no
+te vayas al resto de la página. Si se te da más de una zona, están etiquetadas antes de cada imagen:
+úsalas por su nombre ("Zona 1") y explica CÓMO SE RELACIONAN, que es lo que se pregunta al marcar dos.`
+      : '';
     const messages = [
       { role: 'system', content:
-`Eres un tutor de lectura. Te doy la IMAGEN de la PÁGINA ${page} del libro "${bookTitle}" y su texto
-extraído. Explica su contenido —sobre todo las figuras, diagramas o tablas— con claridad y en el idioma
-del usuario, conectándolo con su objetivo de lectura. Describe lo que REALMENTE se ve en la imagen; no
-inventes ni cambies el número de página.` },
+`Eres un tutor de lectura. Te doy ${what} y el texto extraído de su página. Explica su contenido —sobre
+todo las figuras, diagramas o tablas— con claridad y en el idioma del usuario, conectándolo con su
+objetivo de lectura. Describe lo que REALMENTE se ve en la imagen; no inventes ni cambies el número de
+página.${zonedRules}` },
+      // Cada imagen va PRECEDIDA de su etiqueta: sin ella el modelo funde las dos zonas en una
+      // respuesta promedio y no puede referirse a ninguna por su nombre.
       { role: 'user', content: [
-        { type: 'text', text: `${goalLine}${textBlock}(Es la página ${page}.) PETICIÓN: ${instruction}` },
-        { type: 'image_url', image_url: { url: img } },
+        { type: 'text', text: `${goalLine}${textBlock}PETICIÓN: ${instruction}` },
+        ...list.flatMap((z) => [
+          { type: 'text', text: `${z.label}:` },
+          { type: 'image_url', image_url: { url: z.dataUrl } },
+        ]),
       ] },
     ];
 
