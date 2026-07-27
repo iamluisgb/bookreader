@@ -1340,6 +1340,9 @@ body.resizing-panel .reader-main { transition: none !important; }
   background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center;
   padding: 20px;
 }
+/* `display:flex` gana a [hidden] por especificidad; sin esto, minimizar la sesión de
+   estudio (F2) dejaría el overlay tapando el libro al que se acaba de saltar. */
+.ai-onboarding[hidden] { display: none; }
 .ai-ob-card {
   position: relative;
   background: var(--surface-1); border: 1px solid var(--border); border-radius: 16px;
@@ -1476,6 +1479,11 @@ body.resizing-panel .reader-main { transition: none !important; }
 .ai-taskchip-x:hover { color: var(--text); }
 /* Con el panel de IA abierto, aparta el chip a su izquierda para no tapar el input del chat. */
 body.ai-open .ai-taskchip { right: calc(var(--ai-panel-width) + 20px); }
+/* Chip de vuelta al repaso (F2): misma familia. Si hay un trabajo de IA en curso, su chip
+   ya ocupa la esquina, así que este se apila encima en vez de taparlo. */
+.ai-taskchip.is-study { border-color: var(--accent); }
+body.has-taskchip .ai-taskchip.is-study { bottom: 74px; }
+@media (max-width: 600px) { body.has-taskchip .ai-taskchip.is-study { bottom: 62px; } }
 
 /* Toast de aviso (encima de todo) */
 .ai-toast-host { position: fixed; left: 0; right: 0; bottom: 20px; z-index: 600; display: flex; flex-direction: column; align-items: center; gap: 8px; pointer-events: none; }
@@ -1564,8 +1572,11 @@ body.ai-open .ai-taskchip { right: calc(var(--ai-panel-width) + 20px); }
 .fc-back { color: var(--text-soft); }
 .fc-front:focus, .fc-back:focus { outline: 1px solid var(--accent); background: var(--surface-0); }
 .fc-back:empty::before { content: attr(data-ph); color: var(--text-faint); }
-.fc-export { display: flex; align-items: center; gap: 14px; }
+.fc-export { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
 .fc-export .primary-btn { display: inline-flex; align-items: center; gap: 8px; }
+.fc-export .ai-ob-back { display: inline-flex; align-items: center; gap: 8px; margin-bottom: 0; }
+#fc-study small { font-weight: 700; opacity: .8; }
+#fc-study[disabled] { opacity: .5; cursor: default; }
 .fc-txt-btn { margin-bottom: 0; }
 .fc-deck-study {
   display: inline-flex; align-items: center; gap: 6px;
@@ -1607,6 +1618,13 @@ body.ai-open .ai-taskchip { right: calc(var(--ai-panel-width) + 20px); }
 }
 .study-cloze.is-revealed { background: var(--accent-soft); }
 .study-extra { font-size: 14px; color: var(--text-soft); margin-top: 12px; }
+/* F3 · El pasaje del libro que respalda la tarjeta, para releerlo sin salir del repaso. */
+.study-passage {
+  margin: 16px 0 0; padding: 10px 14px; border-left: 3px solid var(--border);
+  background: var(--surface-1); border-radius: 0 var(--r-sm) var(--r-sm) 0;
+  font-size: 14px; line-height: 1.55; color: var(--text-soft); max-height: 30vh; overflow-y: auto;
+}
+.study-passage-ch { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; opacity: .7; margin-bottom: 4px; }
 .study-foot { padding-top: 14px; }
 .study-foot .study-flip {
   width: 100%; display: inline-flex; align-items: center; justify-content: center; gap: 10px;

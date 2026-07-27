@@ -25,13 +25,14 @@ const CANNED_CARDS = [
 //   SIN tool_call (proveedor sin function calling → fuerza la escalera al fallback).
 // - stream: el payload como texto ('[]' en trozos con "YA EXISTEN").
 // Contadores en window.__fc para asertar qué camino se usó.
-async function stubLLM(page, content: string) {
-  await page.evaluate((payload) => {
+async function stubLLM(page, content: string, delayMs = 0) {
+  await page.evaluate(({ payload, delayMs }) => {
     const real = window.fetch.bind(window);
     (window as any).__fc = { tool: 0, stream: 0 };
     window.fetch = async (url: any, opts: any) => {
       const u = typeof url === 'string' ? url : url?.url || '';
       if (u.includes('/chat/completions') && opts?.body) {
+        if (delayMs) await new Promise((r) => setTimeout(r, delayMs));
         const body = JSON.parse(opts.body);
         const sys = (body.messages || []).find((m: any) => m.role === 'system')?.content || '';
         const later = /YA EXISTEN/.test(sys);   // trozo 2+ del map-reduce
@@ -60,11 +61,11 @@ async function stubLLM(page, content: string) {
       }
       return real(url, opts);
     };
-  }, content);
+  }, { payload: content, delayMs });
 }
 
 // Abre el epub, pasa el onboarding y deja el panel listo (patrón de panel.spec.ts).
-async function setup(page, canned = JSON.stringify(CANNED_CARDS)) {
+async function setup(page, canned = JSON.stringify(CANNED_CARDS), delayMs = 0) {
   await page.goto('/index.html');
   await seedProLicense(page);   // features Pro gateadas (MON2): el test ejercita la feature
   await page.evaluate((k) => {
@@ -72,7 +73,7 @@ async function setup(page, canned = JSON.stringify(CANNED_CARDS)) {
     localStorage.setItem('bookreader_flashcards_hint_seen', 'true');   // coach mark aparte
   }, 'test-key');
   await page.reload();
-  await stubLLM(page, canned);
+  await stubLLM(page, canned, delayMs);
 
   const fc = page.waitForEvent('filechooser');
   await page.click('#open-file-btn');
@@ -284,6 +285,61 @@ test('dos mazos seguidos: Volver desde la revisión y generar otra vez', async (
   await page.click('#fc-generate');                                    // segundo mazo
   await expect(page.locator('#ai-flashcards h2')).toContainText('tarjetas', { timeout: 15000 });
   await expect(page.locator('.fc-item')).toHaveCount(3);
+});
+
+// ---- P20 F1 · Estudiar desde la pantalla de "listo" --------------------------
+
+test('tras generar se puede estudiar sin salir, y el botón dice cuántas encola', async ({ page }) => {
+  await setup(page);
+  await generate(page);
+  const study = page.locator('#fc-study');
+  await expect(study).toBeVisible();
+  // Recién generadas están TODAS vencidas: el botón lo dice para no meter en una sesión
+  // de N por sorpresa.
+  await expect(study).toContainText('3');
+  await study.click();
+  await expect(page.locator('#ai-study')).toBeVisible();
+  await expect(page.locator('#ai-study .study-q')).toContainText('Juan Preciado');
+  // Al cerrar el repaso se vuelve a la revisión, con el contador ya al día.
+  await page.locator('#ai-study .study-flip').click();          // mostrar respuesta
+  await page.locator('#ai-study [data-rate="good"]').click();   // una tarjeta superada
+  await page.locator('#ai-study .ai-ob-close').click();
+  await expect(page.locator('.fc-item')).toHaveCount(3);
+  await expect(page.locator('#fc-study')).toContainText('2');
+});
+
+// ---- P20 F4 · La generación sobrevive al cierre del modal --------------------
+
+test('cerrar el modal no cancela la generación: el chip la recoge al terminar', async ({ page }) => {
+  await setup(page, JSON.stringify(CANNED_CARDS), 400);   // lenta a propósito
+  await page.click('#ai-convo-cards');
+  await page.waitForSelector('#ai-flashcards', { timeout: 5000 });
+  await page.click('#fc-generate');
+  await expect(page.locator('#fc-generate .ai-typing')).toBeVisible();
+
+  // El lector se va a seguir leyendo: antes esto abortaba el trabajo a medias.
+  await page.click('#ai-flashcards .ai-ob-close');
+  await expect(page.locator('#ai-flashcards')).toHaveCount(0);
+
+  const chip = page.locator('.ai-taskchip');
+  await expect(chip).toContainText('Flashcards');
+  await expect(chip).toContainText('Ver flashcards', { timeout: 20000 });
+
+  // El mazo está en `decks`, ya completo, y el chip reabre directo en la revisión.
+  const decks = await page.evaluate(async () => (await import('/js/ai/db.js') as any).getAllDecks());
+  expect(decks).toHaveLength(1);
+  expect(decks[0].cards).toHaveLength(3);
+  await chip.click();
+  await expect(page.locator('.fc-item')).toHaveCount(3);
+});
+
+test('el mazo no se duplica como artefacto (que ahora sincroniza)', async ({ page }) => {
+  await setup(page);
+  await generate(page);
+  // Jobs persiste su resultado en `artifacts` salvo `persist: false`. Sin eso, cada mazo
+  // viajaría DOS veces a todos los dispositivos: una en `decks` y otra aquí.
+  const artifacts = await page.evaluate(async () => (await import('/js/ai/db.js') as any).getAll('artifacts'));
+  expect(artifacts.filter((a: any) => a.kind === 'flashcards')).toHaveLength(0);
 });
 
 // ---- P10 F2 · Fuente citada: cada tarjeta guarda su ancla [[aN]] de origen ----

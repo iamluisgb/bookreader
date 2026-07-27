@@ -7,7 +7,7 @@ import { icon } from '../ui/icons.js';
 import { t } from '../i18n.js';
 
 const openers = {};                                         // kind -> fn() que reabre el modal
-const NAMES = { summary: t('Resumen'), mindmap: t('Mapa mental') };
+const NAMES = { summary: t('Resumen'), mindmap: t('Mapa mental'), flashcards: t('Flashcards') };
 let chip = null, lastNotifiedId = 0, started = false;
 
 export function setOpener(kind, fn) { openers[kind] = fn; }

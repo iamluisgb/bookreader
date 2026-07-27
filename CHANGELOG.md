@@ -36,6 +36,43 @@ se da.
 trabajo de `uid` que la Fase 0 hizo para mensajes y notas, porque su id es autoincremental.
 → Entregado el mismo día, abajo.
 
+## 2026-07-27 — P20: el ciclo flashcards → estudiar deja de romperse en tres sitios
+
+Las piezas estaban todas construidas y **no se conectaban**: en tres puntos había que salir, reabrir
+o reiniciar. Entregado en el orden F1 → **F3** → F2 → F4 (F3 adelantada: ataca la causa de F2 en vez
+del síntoma, y deja a F2 como red de seguridad del caso que sí quiere irse al libro).
+
+- **F1 · Estudiar desde la pantalla de "listo".** La vista post-generación solo ofrecía `.apkg` y
+  `.txt` — la única superficie que no dejaba repasar el mazo que acababa de guardar, empujando fuera
+  de la app justo donde P10 quería retener. El botón **dice cuántas tarjetas encola**: recién
+  generadas están todas vencidas, y meterse en una sesión de 30 sin avisar es una sorpresa
+  desagradable.
+- **F3 · El pasaje citado, dentro de la tarjeta.** La mayoría de los "ver en el libro" son *quiero
+  releer esa frase*. El texto sale del libro **segmentado** (`bookText`), no de Retrieval: la cola
+  diaria cruza libros y ninguno tiene por qué estar abierto. Se cachea por libro y se suelta al
+  cerrar la sesión — son MB por libro.
+- **F2 · "Ver en el libro" minimiza la sesión, no la mata.** El scheduling ya se persistía tras cada
+  tarjeta, pero la sesión no: se perdían la cola, el contador y los "otra vez" re-encolados. Como la
+  navegación es SPA, basta con ocultar el overlay y sacar un chip de vuelta.
+- **F4 · Generación en segundo plano.** Corría dentro del modal y moría con él (`if (!overlay)
+  return`), en la generación **más lenta** de la app. Ahora va por `jobs.js`, con chip y toast.
+
+**Dos cosas que la ficha no podía prever**, porque el sync de mazos entró el mismo día:
+
+- **`Jobs.start({ persist: false })`**, nuevo. Jobs guardaba su resultado en `artifacts` siempre; con
+  los artefactos ya sincronizando, usarlo para flashcards no dejaba una fila muerta en local sino un
+  **duplicado del mazo entero viajando a todos los dispositivos**. Hay test que lo fija.
+- **Un fallo latente de F4, cazado al implementarla**: el índice de Retrieval es global y el trabajo
+  sobrevive al modal, así que si el lector se iba a otro libro mientras generaba, las tarjetas
+  citaban pasajes **del libro equivocado**. Los pasajes se capturan ahora al arrancar el trabajo, y
+  la repesca por búsqueda solo se usa si el índice sigue siendo el de ese libro.
+
+**No se hizo**: capar la cola de tarjetas nuevas por sesión (20/día, estilo Anki). Cambiaría el
+scheduling de todas las superficies, no solo de F1.
+
+**7 tests nuevos**; uno existente actualizado (`study.spec.ts` afirmaba que saltar al libro CERRABA
+el overlay — es justo lo que F2 cambia).
+
 ## 2026-07-27 — Leer en el PC, estudiar en el móvil: los mazos y su repaso ya sincronizan
 
 Los mazos de flashcards eran lo último que se quedaba en un solo dispositivo, y era justo lo que peor

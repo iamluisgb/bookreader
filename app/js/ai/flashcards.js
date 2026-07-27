@@ -18,6 +18,7 @@ import { buildApkg, buildAnkiTxt } from './anki-export.js';
 import { downloadText } from '../backup.js';
 import * as Srs from './srs.js';
 import * as Study from './study.js';
+import * as Jobs from './jobs.js';
 import { balancedObjects } from './query-expand.js';
 
 // Generación por TROZOS (map-reduce): el material se divide en trozos de ~CHUNK_TOKENS
@@ -35,7 +36,8 @@ const MAX_PREV_FRONTS = 40;   // nº de frentes previos que se pasan al siguient
 
 let ctx = null;        // { bookId, bookTitle, goal, tocLabels, currentChapter, ensureIndex }
 let overlay = null;
-let generating = false, abortCtrl = null;
+let generating = false;   // hay un job de flashcards de ESTE libro en curso (solo para la UI)
+let unsubJobs = null;     // suscripción a jobs.js mientras el modal está abierto
 let scopeValue = '';   // alcance elegido: '' = libro entero, o la etiqueta del capítulo
 // Umbral a partir del cual el desplegable de alcance muestra buscador (índices largos).
 const SCOPE_SEARCH_MIN = 8;
@@ -52,20 +54,26 @@ export function open(context) {
       <div class="ai-ob-body"></div>
     </div>`;
   document.body.appendChild(overlay);
-  overlay.addEventListener('mousedown', (e) => { if (e.target === overlay && !generating) closeModal(); });
-  overlay.querySelector('.ai-ob-close').addEventListener('click', () => { abortCtrl?.abort(); closeModal(); });
+  // Cerrar el modal ya NO cancela la generación (F4): el trabajo sigue en segundo plano y
+  // el chip de jobs-ui avisa al terminar. Para cancelar de verdad está la × del chip.
+  overlay.addEventListener('mousedown', (e) => { if (e.target === overlay) closeModal(); });
+  overlay.querySelector('.ai-ob-close').addEventListener('click', closeModal);
   document.addEventListener('keydown', onKey);
   renderSetup();
+  // Al suscribirse, jobs.js entrega el trabajo activo de inmediato: si se reabre el modal
+  // con una generación en curso (o recién terminada) se cae en la rama que toca.
+  unsubJobs = Jobs.subscribe(onJobUpdate);
 }
 
 function onKey(e) {
   if (Study.isOpen()) return;   // el overlay de estudio va encima: su ESC no cierra este modal
-  if (e.key === 'Escape' && overlay) { abortCtrl?.abort(); closeModal(); }
+  if (e.key === 'Escape' && overlay) closeModal();
 }
 
 function closeModal() {
   document.removeEventListener('keydown', onKey);
   if (overlay) { overlay.remove(); overlay = null; }
+  if (unsubJobs) { unsubJobs(); unsubJobs = null; }
   generating = false;
 }
 
@@ -480,7 +488,7 @@ export function attachSources(cards, { validIds, search, textOf }) {
 //   3) fallback a texto + parser tolerante (proveedores BYOK sin function calling).
 // Devuelve { cards, mode } con el escalón que funcionó: los trozos siguientes entran
 // directos por ahí (no se re-prueba un camino roto en cada trozo).
-async function generateChunk({ text, ask, type, prevFronts, mode, signal }) {
+async function generateChunk({ text, ask, type, goal, prevFronts, mode, signal }) {
   const user = { role: 'user', content: 'PASAJES DEL LIBRO:\n\n' + text };
   const lang = detectLang(text);   // el prompt nombra el idioma del material (ver detectLang)
   // Cupo holgado por trozo: la salida es pequeña (≤ ask tarjetas) pero el razonamiento
@@ -494,7 +502,7 @@ async function generateChunk({ text, ask, type, prevFronts, mode, signal }) {
   const attempt = async (toolChoice, extra = []) => {
     const { toolCalls } = await LLM.chatTools({
       messages: [
-        { role: 'system', content: cardsPrompt(ask, type, ctx.goal, { viaTool: true, prevFronts, lang }) },
+        { role: 'system', content: cardsPrompt(ask, type, goal, { viaTool: true, prevFronts, lang }) },
         user, ...extra,
       ],
       tools: cardsTool(), toolChoice, maxTokens, signal,
@@ -519,14 +527,17 @@ async function generateChunk({ text, ask, type, prevFronts, mode, signal }) {
     } catch (e) { if (e.name === 'AbortError') throw e; }
   }
   const raw = await LLM.chatStream({
-    messages: [{ role: 'system', content: cardsPrompt(ask, type, ctx.goal, { prevFronts, lang }) }, user],
+    messages: [{ role: 'system', content: cardsPrompt(ask, type, goal, { prevFronts, lang }) }, user],
     maxTokens, signal,
   });
   return { cards: parseCards(raw, type), mode: 'text' };
 }
 
-async function onGenerate() {
-  if (generating) return;
+// F4 · La generación corre en SEGUNDO PLANO (jobs.js), como resumen y mapa mental.
+// Antes vivía dentro del modal y moría con él (`if (!overlay) return`), justo en la
+// generación MÁS lenta de la app (N llamadas encadenadas): el lector tenía que quedarse
+// mirando. El chip de jobs-ui hace visible la promesa de "sigue leyendo".
+function onGenerate() {
   const b = body();
   if (!LLM.hasKey()) { showError(t('Configura tu API key en Ajustes → Agente para generar tarjetas.')); return; }
   const scopeLabel = scopeValue;
@@ -537,65 +548,97 @@ async function onGenerate() {
   if (!chunks.length) { showError(t('Ese contenido no tiene texto indexado; prueba con otro capítulo o con el libro entero.')); return; }
   const counts = allocateCounts(chunks, count);
 
-  generating = true; abortCtrl = new AbortController();
-  const btn = b.querySelector('#fc-generate');
-  btn.disabled = true;
-  btn.innerHTML = `<span class="ai-typing">Generando tarjetas…</span>`;
+  // Todo lo que el job necesita se captura AHORA. El trabajo sobrevive al modal y hasta al
+  // libro: `ctx` puede haber cambiado cuando termine, y el índice de Retrieval es global
+  // —si el lector se va a otro libro, `allPassages()` devolvería los pasajes de ESE otro y
+  // las tarjetas acabarían citando fuentes de un libro que no es el suyo.
+  const bookId = ctx.bookId;
+  const goal = ctx.goal;
+  const name = deckName(scopeLabel);
+  const byId = new Map(Retrieval.allPassages().map(p => [p.id, p.text]));
+
   showError('');
-  try {
-    // Map-reduce sobre los trozos: cada uno aporta su cupo (+ el déficit arrastrado de
-    // trozos anteriores que dieron de menos). Un trozo fallido no tira el mazo.
-    let cards = [], expected = 0, failed = 0, mode = 'forced';
-    for (let i = 0; i < chunks.length; i++) {
-      if (!counts[i]) continue;
-      // Déficit arrastrado con TOPE: si varios trozos anteriores dieron poco (modelo con
-      // mal día), sin tope el último trozo absorbía el cupo entero — el eval EV1 cazó un
-      // mazo completo salido de un único capítulo. Mejor un mazo corto y repartido
-      // ("éxito parcial", ya avisado abajo) que uno completo y monotema.
-      const deficit = Math.min(Math.max(0, expected - cards.length), counts[i] + 2);
-      expected += counts[i];
-      try {
-        const res = await generateChunk({
-          text: chunks[i].text, ask: counts[i] + deficit, type,
-          prevFronts: cards.slice(-MAX_PREV_FRONTS).map(c => c.front),
-          mode, signal: abortCtrl.signal,
-        });
-        mode = res.mode;
-        cards = cards.concat(res.cards.slice(0, counts[i] + deficit));
-      } catch (e) {
-        if (e.name === 'AbortError') throw e;
-        console.warn(`Flashcards: el trozo ${i + 1}/${chunks.length} falló:`, e);
-        failed++;
+  Jobs.start({
+    bookId, kind: 'flashcards', label: t('Flashcards'),
+    params: { scope: scopeLabel, scopeName: scopeLabel || t('Libro entero'), type, count },
+    persist: false,        // el mazo vive en `decks`; ver Jobs.start
+    run: async ({ signal, progress }) => {
+      // Map-reduce sobre los trozos: cada uno aporta su cupo (+ el déficit arrastrado de
+      // trozos anteriores que dieron de menos). Un trozo fallido no tira el mazo.
+      let cards = [], expected = 0, failed = 0, mode = 'forced';
+      progress(0, count, 'map');
+      for (let i = 0; i < chunks.length; i++) {
+        if (!counts[i]) continue;
+        // Déficit arrastrado con TOPE: si varios trozos anteriores dieron poco (modelo con
+        // mal día), sin tope el último trozo absorbía el cupo entero — el eval EV1 cazó un
+        // mazo completo salido de un único capítulo. Mejor un mazo corto y repartido
+        // ("éxito parcial", ya avisado abajo) que uno completo y monotema.
+        const deficit = Math.min(Math.max(0, expected - cards.length), counts[i] + 2);
+        expected += counts[i];
+        try {
+          const res = await generateChunk({
+            text: chunks[i].text, ask: counts[i] + deficit, type, goal,
+            prevFronts: cards.slice(-MAX_PREV_FRONTS).map(c => c.front),
+            mode, signal,
+          });
+          mode = res.mode;
+          cards = cards.concat(res.cards.slice(0, counts[i] + deficit));
+        } catch (e) {
+          if (e.name === 'AbortError') throw e;
+          console.warn(`Flashcards: el trozo ${i + 1}/${chunks.length} falló:`, e);
+          failed++;
+        }
+        progress(Math.min(cards.length, count), count, 'map');
       }
-      if (!overlay) return;                     // el usuario cerró el modal: no seguir
-      btn.innerHTML = `<span class="ai-typing">Generando… ${Math.min(cards.length, count)}/${count}</span>`;
+      if (!cards.length) throw new Error(t('El modelo no devolvió tarjetas válidas. Vuelve a intentarlo.'));
+      cards = attachSources(cards.slice(0, count), {
+        validIds: new Set(byId.keys()),
+        // La repesca por búsqueda solo vale si el índice sigue siendo el de ESTE libro.
+        search: (q, k) => (Retrieval.hasIndex(bookId) ? Retrieval.search(q, k) : []),
+        textOf: (id) => byId.get(id),   // valida que el pasaje respalde la tarjeta (EV1)
+      });
+      const deck = { bookId, name, cardType: type, scope: scopeLabel, cards, createdAt: Date.now() };
+      if (bookId) deck.id = await DB.addDeck(deck);
+      return { deckId: deck.id || null, deck, generated: cards.length, requested: count, failed, blocks: chunks.length };
+    },
+  });
+}
+
+// Refleja el trabajo en curso mientras el modal está abierto: progreso en el botón y salto
+// automático a la revisión al terminar. Si el modal está cerrado, de esto se encarga el
+// chip + toast de jobs-ui, y al reabrir se cae en la misma rama de 'done'.
+let shownDeckKey = null;    // evita re-renderizar la revisión en cada emit del job
+
+function onJobUpdate(job) {
+  if (!overlay || !ctx) return;
+  const btn = body()?.querySelector('#fc-generate');
+  if (!job || job.kind !== 'flashcards' || job.bookId !== ctx.bookId) {
+    if (btn) { btn.disabled = false; btn.innerHTML = `${icon('sparkles', { size: 16 })} ${t('Generar tarjetas')}`; }
+    return;
+  }
+  generating = job.status === 'running';
+  if (job.status === 'running') {
+    shownDeckKey = null;
+    if (btn) {
+      btn.disabled = true;
+      const p = job.progress;
+      btn.innerHTML = `<span class="ai-typing">${p.i ? t('Generando… {i}/{n}', { i: p.i, n: p.n }) : t('Generando tarjetas…')}</span>`;
     }
-    if (!cards.length) throw new Error(t('El modelo no devolvió tarjetas válidas. Vuelve a intentarlo.'));
-    const byId = new Map(Retrieval.allPassages().map(p => [p.id, p.text]));
-    cards = attachSources(cards.slice(0, count), {
-      validIds: new Set(byId.keys()),
-      search: (q, k) => Retrieval.search(q, k),
-      textOf: (id) => byId.get(id),   // valida que el pasaje respalde la tarjeta (EV1)
-    });
-    const deck = {
-      bookId: ctx.bookId, name: deckName(scopeLabel), cardType: type,
-      scope: scopeLabel, cards,
-    };
-    if (ctx.bookId) deck.id = await DB.addDeck(deck);
-    deck.createdAt = deck.createdAt || Date.now();
+    return;
+  }
+  if (job.status === 'error') {
+    if (btn) { btn.disabled = false; btn.innerHTML = `${icon('sparkles', { size: 16 })} ${t('Generar tarjetas')}`; }
+    showError(job.error?.message || t('No se pudo generar el mazo.'));
+    return;
+  }
+  if (job.status === 'done' && job.result && shownDeckKey !== job.id) {
+    shownDeckKey = job.id;
+    const { deck, generated, requested, failed, blocks } = job.result;
     renderReview(deck);
-    if (cards.length < count) {                 // éxito parcial: avisa en la revisión, no descarta
-      showError(`Se generaron ${cards.length} de ${count} tarjetas${failed ? ` (fallaron ${failed} de ${chunks.length} bloques)` : ''}.`);
+    if (generated < requested) {              // éxito parcial: avisa en la revisión, no descarta
+      showError(t('Se generaron {a} de {b} tarjetas', { a: generated, b: requested })
+        + (failed ? ` (${t('fallaron {a} de {b} bloques', { a: failed, b: blocks })})` : '') + '.');
     }
-  } catch (e) {
-    if (e.name !== 'AbortError') {
-      console.error('Generación de flashcards falló:', e);
-      showError(e.message);
-    }
-  } finally {
-    generating = false; abortCtrl = null;
-    const btn2 = body()?.querySelector('#fc-generate');
-    if (btn2) { btn2.disabled = false; btn2.innerHTML = `${icon('sparkles', { size: 16 })} Generar tarjetas`; }
   }
 }
 
@@ -632,7 +675,8 @@ function renderReview(deck) {
     <p class="ai-ob-sub">${t('Revisa y edita antes de exportar. Mazo en Anki:')} <b>${escapeHtml(deck.name)}</b></p>
     <div class="fc-list">${deck.cards.map((c, i) => (c.deleted ? '' : cardRow(c, i))).join('')}</div>
     <div class="fc-export">
-      <button id="fc-apkg" class="primary-btn">${icon('download', { size: 16 })} ${t('Exportar .apkg')}</button>
+      ${deck.id ? `<button id="fc-study" class="primary-btn">${icon('cards', { size: 16 })} ${t('Estudiar ahora')}<small></small></button>` : ''}
+      <button id="fc-apkg" class="${deck.id ? 'ai-ob-back' : 'primary-btn'}">${icon('download', { size: 16 })} ${t('Exportar .apkg')}</button>
       <button id="fc-txt" class="ai-ob-back fc-txt-btn" title="${t('Formato de texto que Anki importa (Archivo → Importar)')}">.txt para Anki</button>
     </div>
     <div id="fc-error" class="fc-error" style="display:none"></div>`;
@@ -662,6 +706,26 @@ function renderReview(deck) {
     if (h2) h2.textContent = t('{n} tarjetas', { n: deck.cards.length });
   });
   b.querySelector('.fc-list').addEventListener('focusout', syncFromDom);
+
+  // F1 · Estudiar sin salir. El mazo YA está en IndexedDB, así que la pantalla de "listo"
+  // era la única superficie que no ofrecía repasarlo: empujaba fuera de la app (exportar a
+  // Anki) justo donde P10 quería retener. El botón dice CUÁNTAS tarjetas va a encolar —
+  // recién generadas están todas vencidas, y meterse en una sesión de 30 sin avisar es una
+  // sorpresa desagradable.
+  const studyBtn = b.querySelector('#fc-study');
+  if (studyBtn) {
+    const due = Srs.dueCount(DB.cardsOf(deck));
+    studyBtn.querySelector('small').textContent = due ? ` · ${due}` : '';
+    studyBtn.disabled = !due;
+    studyBtn.addEventListener('click', () => {
+      syncFromDom();                                  // las ediciones sin guardar entran al repaso
+      Study.open({
+        decks: [deck], title: deck.name || t('Estudiar'),
+        onClose: () => { if (overlay) renderReview(deck); },
+        onNavigate: () => closeModal(),
+      });
+    });
+  }
 
   const fileBase = () => {
     const slug = (s) => (s || '').replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'libro';

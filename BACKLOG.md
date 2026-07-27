@@ -639,7 +639,22 @@ La premisa era razonable al escribirla; el benchmark la contradice. El estado po
 diseñó migrable (`reps/lapses/ease/interval/due/lastReview`), así que el coste es bajo: modelo
 D/S/R + los parámetros por defecto, conservando el estado viejo para no perder programaciones.
 
-### P20 — Continuidad del ciclo flashcards → estudiar · `S`–`M` · **fricción reportada en uso real**
+### P20 — Continuidad del ciclo flashcards → estudiar · **✓ entregada** (2026-07-27) · F1–F4
+
+> **Entregada entera.** Se implementó en el orden F1 → **F3** → F2 → F4: F3 antes que F2 porque ataca
+> la causa (querías releer una frase, no abandonar el repaso) y así F2 quedó como la red de seguridad
+> del caso que de verdad quiere ir al libro. Ver CHANGELOG 2026-07-27. Dos cosas que la ficha no
+> podía saber, porque el sync de mazos entró ese mismo día:
+> - **F4 necesitaba un prerrequisito**: `Jobs.start()` guardaba el resultado en `artifacts` siempre, y
+>   desde que los artefactos sincronizan, usarlo para flashcards no dejaba una fila muerta en local
+>   sino un **duplicado del mazo entero viajando a todos los dispositivos**. De ahí `persist: false`.
+> - **F4 tenía un fallo latente propio**: el índice de Retrieval es global y el job sobrevive al
+>   modal, así que si el lector se iba a otro libro, las citas de las tarjetas salían del libro
+>   equivocado. Ahora los pasajes se capturan al arrancar el trabajo.
+>
+> **No se hizo** (decisión consciente): capar la cola de tarjetas nuevas por sesión al estilo Anki
+> (20/día). Cambia el scheduling de todas las superficies, no solo de F1; de momento el botón
+> **dice** cuántas va a encolar, que era el problema real de sorprender al usuario.
 
 Las piezas del ciclo (generar → revisar → estudiar → volver al libro) están todas construidas, pero
 **no se conectan entre sí**: en tres puntos el usuario tiene que salir, reabrir o reiniciar. Dos de

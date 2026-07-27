@@ -151,10 +151,21 @@ test('al voltear, "Ver en el libro" abre el libro de origen por deep-link', asyn
   await expect(overlay.locator('.study-src')).toBeVisible();
   await overlay.locator('.study-src').click();
 
-  // El overlay se cierra y el router abre el libro en modo lectura con la ruta correcta.
-  await expect(overlay).toHaveCount(0);
+  // El overlay se APARTA (F2: minimizar, no cerrar) y el router abre el libro en modo
+  // lectura con la ruta correcta. Antes se cerraba, y con él se perdían la cola y el
+  // contador: releer una frase obligaba a reiniciar el repaso entero.
+  await expect(overlay).toBeHidden();
   await expect(page.locator('body')).toHaveClass(/reading/, { timeout: 20000 });
   expect(page.url()).toContain('book=bk-src');
+
+  // El chip de vuelta trae la sesión de vuelta donde estaba, con su tarjeta ya volteada.
+  const chip = page.locator('.ai-taskchip.is-study');
+  await expect(chip).toContainText('Volver al repaso');
+  await chip.click();
+  await expect(overlay).toBeVisible();
+  await expect(overlay.locator('.study-a')).toBeVisible();
+  await expect(chip).toHaveCount(0);
+  await overlay.locator('.ai-ob-close').click();
 
   // La tarjeta SIN src no ofrece el salto. (La primera sigue vencida: saltar al libro
   // no la evalúa; se supera con "bien" para llegar a la segunda.)
@@ -166,4 +177,49 @@ test('al voltear, "Ver en el libro" abre el libro de origen por deep-link', asyn
   await expect(again.locator('.study-q')).toHaveText('sin fuente');
   await again.locator('.study-flip').click();
   await expect(again.locator('.study-src')).toHaveCount(0);
+});
+
+// ---- P20 F3 · El pasaje citado, dentro de la tarjeta ------------------------------
+
+test('al voltear se ve el pasaje del libro que respalda la tarjeta', async ({ page }) => {
+  await page.goto('/index.html');
+  await seedProLicense(page);
+  await page.evaluate(async () => {
+    const DB: any = await import('/js/ai/db.js');
+    // El pasaje sale del libro SEGMENTADO, no de Retrieval: la cola diaria cruza libros
+    // y ninguno tiene por qué estar abierto ni indexado.
+    await DB.put('bookText', {
+      bookId: 'bk-q', segVersion: 5, blockCount: 2, tokenEstimate: 20,
+      annotatedText: '## I\n[[a1]] Vine a Comala porque me dijeron que acá vivía mi padre.\n[[a2]] Otro pasaje.',
+    });
+    await DB.addDeck({
+      bookId: 'bk-q', name: 'Con cita', cardType: 'basic', scope: '',
+      cards: [{ type: 'basic', front: '¿Por qué va a Comala?', back: 'Por su padre', chapter: 'I', src: 'a1' }],
+    });
+  });
+  await page.evaluate(async () => (await import('/js/ai/study.js') as any).openToday());
+  const overlay = page.locator('#ai-study');
+  await overlay.locator('.study-flip').click();
+  const quote = overlay.locator('.study-passage');
+  await expect(quote).toContainText('Vine a Comala');
+  await expect(quote).toContainText('I');            // el capítulo, como cabecera de la cita
+  // El salto al libro sigue estando, pero ya como secundario.
+  await expect(overlay.locator('.study-src')).toBeVisible();
+});
+
+test('sin libro segmentado no se inventa cita ni se rompe el volteo', async ({ page }) => {
+  await page.goto('/index.html');
+  await seedProLicense(page);
+  await page.evaluate(async () => {
+    const DB: any = await import('/js/ai/db.js');
+    await DB.addDeck({
+      bookId: 'bk-sin', name: 'Sin texto', cardType: 'basic', scope: '',
+      cards: [{ type: 'basic', front: 'p', back: 'r', src: 'a9' }],
+    });
+  });
+  await page.evaluate(async () => (await import('/js/ai/study.js') as any).openToday());
+  const overlay = page.locator('#ai-study');
+  await overlay.locator('.study-flip').click();
+  await expect(overlay.locator('.study-a')).toContainText('r');
+  await expect(overlay.locator('.study-passage')).toHaveCount(0);
 });

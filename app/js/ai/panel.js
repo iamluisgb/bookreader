@@ -112,10 +112,13 @@ export function init(opts) {
   els.panel.querySelector('#ai-convo-cards').addEventListener('click', openFlashcards);
   els.panel.querySelector('#ai-convo-summary').addEventListener('click', openSummary);
   els.panel.querySelector('#ai-convo-mindmap').addEventListener('click', openMindMap);
-  // Trabajos de IA en segundo plano (resumen/mapa): chip flotante + toast de aviso. Los
+  // Trabajos de IA en segundo plano (resumen/mapa/flashcards): chip flotante + toast. Los
   // "openers" reabren el modal reconstruyendo el contexto del libro actual.
   JobsUI.setOpener('summary', openSummary);
   JobsUI.setOpener('mindmap', openMindMap);
+  // Flashcards también corre en segundo plano (F4). Su opener reabre el modal, que al
+  // suscribirse a jobs.js cae directo en la revisión del mazo recién generado.
+  JobsUI.setOpener('flashcards', openFlashcards);
   JobsUI.init();
   // Studio: galería per-libro de artefactos (resumen/mapa) + invitación a los no generados.
   Studio.mount(els.studioView, {

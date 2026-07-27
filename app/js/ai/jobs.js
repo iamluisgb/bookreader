@@ -57,10 +57,15 @@ export async function loadForBook(bookId) {
   } catch { /* IDB no disponible */ }
 }
 
-export function start({ bookId, kind, label, params, run }) {
+// `persist: false` → ejecuta y reporta progreso, pero NO guarda el resultado como artefacto.
+// Lo necesitan los trabajos cuyo resultado tiene su propio store: las flashcards viven en
+// `decks`, y desde que los artefactos sincronizan (2026-07-27), guardarlas también aquí no
+// dejaría una fila muerta en local sino un duplicado del mazo entero viajando a todos los
+// dispositivos. El `run` se encarga de persistir lo suyo y devuelve lo que quiera cachear.
+export function start({ bookId, kind, label, params, run, persist = true }) {
   if (active && active.status === 'running') active.abortCtrl.abort();   // exclusividad: uno a la vez
   const job = {
-    id: ++seq, bookId, kind, label, params, run,
+    id: ++seq, bookId, kind, label, params, run, persist,
     status: 'running', progress: { i: 0, n: 0, phase: '' },
     result: null, error: null, abortCtrl: new AbortController(),
   };
@@ -74,12 +79,14 @@ export function start({ bookId, kind, label, params, run }) {
       if (active !== job) return;                       // superado por otro job → descartar
       if (job.abortCtrl.signal.aborted) { active = null; emit(); return; }
       job.status = 'done'; job.result = result;
-      // Historial: AÑADE un artefacto nuevo (no sobrescribe el anterior).
-      const id = (crypto.randomUUID && crypto.randomUUID()) || String(Date.now()) + Math.random().toString(36).slice(2);
-      const k = `${bookId}:${kind}`;
-      const entry = { key: `${k}:${id}`, id, result, params, at: Date.now() };
-      cache.set(k, [entry, ...(cache.get(k) || [])]);
-      DB.putArtifact({ bookId, kind, result, params, id }).catch(() => { /* IDB no disponible: queda en memoria */ });
+      if (persist) {
+        // Historial: AÑADE un artefacto nuevo (no sobrescribe el anterior).
+        const id = (crypto.randomUUID && crypto.randomUUID()) || String(Date.now()) + Math.random().toString(36).slice(2);
+        const k = `${bookId}:${kind}`;
+        const entry = { key: `${k}:${id}`, id, result, params, at: Date.now() };
+        cache.set(k, [entry, ...(cache.get(k) || [])]);
+        DB.putArtifact({ bookId, kind, result, params, id }).catch(() => { /* IDB no disponible: queda en memoria */ });
+      }
       emit();
     } catch (e) {
       if (active !== job) return;
@@ -93,7 +100,7 @@ export function start({ bookId, kind, label, params, run }) {
 
 export function retry(job) {
   if (!job) return null;
-  return start({ bookId: job.bookId, kind: job.kind, label: job.label, params: job.params, run: job.run });
+  return start({ bookId: job.bookId, kind: job.kind, label: job.label, params: job.params, run: job.run, persist: job.persist });
 }
 
 export function cancel() {

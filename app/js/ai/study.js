@@ -25,7 +25,10 @@ let onNavigateCb = null;
 let queue = [];          // [{deck, idx}] pendientes de la sesión (los "otra vez" se re-encolan)
 let done = 0;            // tarjetas superadas en la sesión (no cuenta los "otra vez")
 let flipped = false;
+let minimized = false;   // sesión viva pero oculta (se fue a ver la fuente en el libro)
+let chip = null;         // chip "Volver al repaso" mientras está minimizada
 const anchorsCache = new Map();   // bookId → Map(aN → {cfi, href, page, chapter})
+const passageCache = new Map();   // bookId → Map(aN → texto del pasaje) — se suelta al cerrar
 
 // ---- Cola diaria (para el chip de la estantería) -----------------------------
 
@@ -138,12 +141,55 @@ export function open({ decks, title = t('Estudiar'), onClose, onNavigate } = {})
   renderCard();
 }
 
-export function isOpen() { return !!overlay; }
+export function isOpen() { return !!overlay && !minimized; }
+
+// F2 · Saltar al libro MINIMIZA la sesión, no la mata. El scheduling ya se persistía tras
+// cada tarjeta, pero la sesión no: `close()` vacía la cola, el contador y los "otra vez"
+// re-encolados, así que releer una frase obligaba a reiniciar el repaso entero.
+//
+// La navegación es SPA (hashchange, sin recarga), así que basta con ocultar el overlay y
+// dejar el estado en memoria. Un chip de vuelta lo hace visible.
+function minimize() {
+  if (!overlay || minimized) return;
+  minimized = true;
+  overlay.hidden = true;
+  document.removeEventListener('keydown', onKey);
+  renderChip();
+}
+
+function restore() {
+  if (!overlay || !minimized) return;
+  minimized = false;
+  overlay.hidden = false;
+  document.addEventListener('keydown', onKey);
+  removeChip();
+}
+
+function renderChip() {
+  removeChip();
+  chip = document.createElement('div');
+  chip.className = 'ai-taskchip is-study';
+  chip.innerHTML = `<span class="ai-taskchip-dot" aria-hidden="true">${icon('cards', { size: 13 })}</span>
+    <span class="ai-taskchip-label"></span>
+    <button class="ai-taskchip-x" title="${t('Terminar repaso')}" aria-label="${t('Terminar repaso')}">${icon('xmark', { size: 14 })}</button>`;
+  chip.querySelector('.ai-taskchip-label').textContent =
+    t('Volver al repaso · {n} pendiente{s}', { n: queue.length, s: queue.length === 1 ? '' : 's' });
+  chip.querySelector('.ai-taskchip-x').onclick = (e) => { e.stopPropagation(); close(); };
+  chip.onclick = restore;
+  document.body.appendChild(chip);
+}
+
+function removeChip() {
+  if (chip) { chip.remove(); chip = null; }
+}
 
 function close() {
   document.removeEventListener('keydown', onKey);
   if (overlay) { overlay.remove(); overlay = null; }
+  minimized = false;
+  removeChip();
   queue = [];
+  passageCache.clear();          // el texto anotado de un libro son MB: no sobrevive a la sesión
   if (onCloseCb) { const cb = onCloseCb; onCloseCb = null; cb(); }
 }
 
@@ -215,6 +261,11 @@ function flip() {
   a.hidden = card.type !== 'cloze' && !card.back;
   if (card.type === 'cloze') overlay.querySelector('.study-q').hidden = true;   // el revelado la sustituye
 
+  // El pasaje que respalda la tarjeta, debajo de la respuesta. Se pide en asíncrono para
+  // no retrasar el volteo (la BD puede tardar unos ms); si al llegar ya se ha pasado de
+  // tarjeta, no se pinta.
+  if (card.src && deck.bookId) showPassage(deck.bookId, card);
+
   const prev = Srs.previewIntervals(card.srs);
   const btn = (r, lbl, cls) => `
     <button class="study-grade ${cls}" data-rate="${r}">
@@ -234,6 +285,21 @@ function flip() {
   f.querySelector('.study-src')?.addEventListener('click', () => goToSource(deck, card));
 }
 
+async function showPassage(bookId, card) {
+  let text = '';
+  try {
+    text = (await passagesFor(bookId)).get(card.src) || '';
+  } catch { /* IDB no disponible: sin pasaje, el botón "ver en el libro" sigue ahí */ }
+  if (!text || !overlay || !flipped) return;
+  if (queue[0]?.deck.cards[queue[0].idx] !== card) return;   // ya se pasó de tarjeta
+  const a = overlay.querySelector('.study-a');
+  if (!a || a.querySelector('.study-passage')) return;
+  const chapter = card.chapter ? `<span class="study-passage-ch">${escapeHtml(card.chapter)}</span>` : '';
+  a.insertAdjacentHTML('beforeend',
+    `<blockquote class="study-passage">${chapter}${escapeHtml(text)}</blockquote>`);
+  a.hidden = false;
+}
+
 // ---- Fuente citada (P10 F2): "ver en el libro" ----------------------------------
 
 // Anclas [[aN]] del libro (store `anchors` de la BD del agente), cacheadas por sesión.
@@ -243,6 +309,27 @@ async function anchorsFor(bookId) {
     anchorsCache.set(bookId, new Map(rec?.entries || []));
   }
   return anchorsCache.get(bookId);
+}
+
+// F3 · Texto del pasaje que respalda la tarjeta, para enseñarlo SIN salir del repaso.
+// La mayoría de los "ver en el libro" son "quiero releer esa frase", no "quiero abandonar
+// la sesión"; con el pasaje delante, el salto pasa a ser la excepción.
+//
+// La fuente es el libro segmentado (`bookText`), no Retrieval: la cola diaria cruza libros
+// y ninguno tiene por qué estar abierto ni indexado. Se cachea el mapa entero por libro
+// —una pasada por el texto anotado— y se suelta al cerrar la sesión, que si no serían
+// varios MB retenidos por libro repasado.
+async function passagesFor(bookId) {
+  if (!passageCache.has(bookId)) {
+    const rec = await DB.get('bookText', bookId);
+    const map = new Map();
+    for (const line of (rec?.annotatedText || '').split('\n')) {
+      const m = /^\[\[(a\d+)\]\]\s*(.*)$/.exec(line);
+      if (m) map.set(m[1], m[2]);
+    }
+    passageCache.set(bookId, map);
+  }
+  return passageCache.get(bookId);
 }
 
 // Salta a la página/CFI de origen de la tarjeta vía el deep-link del router
@@ -256,10 +343,11 @@ async function goToSource(deck, card) {
   const p = new URLSearchParams();
   p.set('book', deck.bookId);
   p.set('loc', String(loc));
-  const cb = onNavigateCb;
-  onNavigateCb = null;
-  close();                                  // el progreso ya está persistido tarjeta a tarjeta
-  if (cb) cb();
+  // MINIMIZA, no cierra: al volver, la cola sigue donde estaba (F2). `onNavigate` sí se
+  // llama —quien abrió la sesión debe apartar lo suyo (el modal de flashcards) para dejar
+  // ver el libro—, pero se conserva por si se vuelve a saltar desde la misma sesión.
+  minimize();
+  if (onNavigateCb) onNavigateCb();
   location.hash = p.toString();             // dispara hashchange → el router abre/reposiciona
 }
 
