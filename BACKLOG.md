@@ -512,6 +512,42 @@ para postear en redes. Reusar el enfoque del **content-engine**. Temas claro/osc
   compartir, nada se sube solo.
 - Prioridad alta como jugada de distribución. Ver también [P6](#p6--mejoras-de-subrayados--sm).
 
+### P23 — Tarjeta de BIBLIOTECA compartible · `S`–`M` · **distribución** · demo hecha (2026-07-28)
+
+Hermana de [P11](#p11--compartir-frase-subrayada-en-redes-tarjeta-cita---m--distribución) y del mismo
+molde: [`share-card.js`](app/js/share-card.js) ya hace lienzo 1080², papel a sangre, canvas 2D,
+`navigator.share` con descarga de reserva y **todo en el dispositivo**. Cambia la composición, no la
+maquinaria: se reutilizan `roundRect`, `loadImage` y la sombra editorial de `drawCover`.
+
+**Diferencia de ritmo con P11:** la tarjeta-cita se comparte **en caliente** y muchas veces, mientras
+lees. Esta se comparte **poco y por ocasión** — pero llega más lejos, porque habla del lector y no de
+un libro. No compiten.
+
+**Composición — portadas DE FRENTE, sin perspectiva.** Medido el 2026-07-28: reescalada a 380 px (el
+tamaño real en un feed), una estantería en 3/4 se convierte en **papilla de lomos ilegibles**; solo
+sobrevive el libro que mira de frente. El escorzo se come el diseño de la tapa, que es justo lo único
+reconocible y lo que hace parar el scroll. Abanico solapado, las centrales **encima** de las de los
+extremos (jerarquía, no baraja plana), y sombra fina en el canto izquierdo de cada una para que no
+parezcan pegatinas.
+
+**La ocasión y la cifra mandan** (tercio superior: «Mi año en libros · 2026» + el número enorme).
+Sin eso es «una foto de mis libros» y no se publica: se comparte un **logro**, no un objeto — es lo
+que hace funcionar el resumen anual de Goodreads o el Wrapped. En el pie, la **racha de estudio**:
+dato que casi ninguna app de lectura tiene y esta sí.
+
+**Ventaja sobre la vista de biblioteca: la tarjeta CURA.** Si un libro no trae portada, se queda
+fuera. La vista tiene que enseñarlos todos; la tarjeta elige. El agujero de «EPUB sin portada» que
+bloquea otras ideas aquí no existe.
+
+**Pendiente de decidir:** criterio de selección cuando hay 15-20 libros (¿últimos? ¿terminados? ¿solo
+con portada?) — la demo se solapaba hasta ser ilegible hasta que el paso se calculó desde el ancho
+disponible; y la **variante vertical 9:16** para stories.
+
+> **Descartado, y por qué:** reutilizar la estantería 3D del prototipo. Aparte de lo de arriba, es CSS
+> 3D en el DOM y **eso no se puede capturar como imagen**: `canvas` no rasteriza DOM y html2canvas ni
+> soporta transformaciones 3D ni pasaría la CSP. Habría que **redibujar la escena en canvas 2D con la
+> proyección a mano** — una segunda implementación entera, no una reutilización.
+
 ### P12 — Flashcards por libro y por estantería (selector de repaso) · **✓** `S`–`M`
 **Hecho** (ver CHANGELOG): chip "Repasar hoy" abre selector Todo/estantería; `study.js` filtra por ámbito.
 Hoy "Repasar hoy" mezcla los mazos de todos los libros. Añadir un **selector**: repasar todo / este
