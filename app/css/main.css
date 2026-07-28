@@ -2977,6 +2977,10 @@ body.ai-open #sync-badge { right: calc(var(--ai-panel-width) + 14px); }
 /* Selector de idioma del dictado: pegado al micro, porque es un ajuste DE ese botón.
    `width: auto` es obligatorio: el `select` global lleva `width: 100%` y aquí partía la
    fila de acciones en tres líneas. */
+.fey-err-act {
+  margin-left: 2px; padding: 0; border: 0; background: none; cursor: pointer;
+  color: inherit; font: inherit; font-weight: 700; text-decoration: underline;
+}
 .fey-mic-lang {
   width: auto; flex: 0 0 auto; margin-left: -4px;
   padding: 6px 22px 6px 8px; border: 1px solid var(--border); border-radius: 8px;

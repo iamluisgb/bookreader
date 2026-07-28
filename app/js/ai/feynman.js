@@ -33,6 +33,7 @@ import { renderWithCitations } from './render.js';
 import { icon } from '../ui/icons.js';
 import { escapeHtml } from '../ui/escape.js';
 import * as Storage from '../storage.js';
+import * as AppSettings from '../ui/app-settings.js';
 
 // Vueltas sobre la MISMA expectativa antes de subir de escalón. La escalada es por
 // expectativa, no por sesión: cambiar de tema reinicia el andamiaje de ese tema.
@@ -458,6 +459,7 @@ export function createDictation({ onText, onEnd, onError, lang } = {}) {
   const code = LANGS[lang] || LANGS[dictationLang()];
   let rec = null;
   let wantsRunning = false;
+  let retriedNetwork = false;
   // Acumulado FUERA del reconocedor: cada reinicio crea uno nuevo y su `finalText` empieza
   // vacío. Si viviera dentro, cada pausa borraría todo lo dicho hasta entonces.
   let finalText = '';
@@ -477,10 +479,15 @@ export function createDictation({ onText, onEnd, onError, lang } = {}) {
       onText?.(finalText + interim, finalText);
     };
     r.onerror = (ev) => {
-      const msg = speechErrorMessage(ev?.error);
+      const code = ev?.error;
+      const msg = speechErrorMessage(code);
       if (!msg) return;                 // pausa: `onend` se encarga de reanudar
-      wantsRunning = false;             // fatal: no reintentar contra un muro
-      onError?.(msg);
+      // `network` puede ser transitorio (el servicio de voz del navegador tarda en responder
+      // al arrancar). Se le da UNA segunda oportunidad; si vuelve, es que no hay servicio y
+      // se avisa. Los demás fatales —permiso, sin micro— no se reintentan: no van a cambiar.
+      if (code === 'network' && !retriedNetwork) { retriedNetwork = true; return; }
+      wantsRunning = false;
+      onError?.(msg, code);
     };
     r.onend = () => {
       if (wantsRunning) { try { r.start(); } catch (e) { /* aún cerrando: lo reintenta el próximo onend */ } return; }
@@ -495,7 +502,7 @@ export function createDictation({ onText, onEnd, onError, lang } = {}) {
       rec = build();
       // Un `start()` que falla de verdad (sin permiso) lanza igual que un doble arranque.
       // Se distingue por `wantsRunning`: si estamos arrancando, el fallo es real.
-      try { rec.start(); } catch (e) { wantsRunning = false; onError?.(speechErrorMessage('not-allowed')); }
+      try { rec.start(); } catch (e) { wantsRunning = false; onError?.(speechErrorMessage('not-allowed'), 'not-allowed'); }
     },
     stop: () => { wantsRunning = false; try { rec?.stop(); } catch (e) { /* ya parado */ } },
   };
@@ -769,6 +776,22 @@ function hideError() {
   if (el) el.style.display = 'none';
 }
 
+// Error CON SALIDA. Un mensaje que solo describe el problema deja al usuario parado; si hay
+// una acción que lo resuelve, va pegada al mensaje. Se construye con nodos (no innerHTML):
+// el texto puede venir de un error del navegador.
+function showErrorWithAction(msg, label, run) {
+  const el = body()?.querySelector('#fey-error');
+  if (!el) return;
+  el.textContent = msg + ' ';
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'fey-err-act';
+  btn.textContent = label;
+  btn.addEventListener('click', run);
+  el.appendChild(btn);
+  el.style.display = 'block';
+}
+
 // ---- arranque: extraer expectativas -------------------------------------------
 
 // Localiza los pasajes del concepto con hasta TRES intentos, de más barato a más caro:
@@ -935,7 +958,22 @@ function startBrowserDictation(input) {
     lang: dictationLang(),
     onText: (text) => append(text),
     onEnd: () => { dictation = null; micUi('idle'); },
-    onError: (msg) => { dictation = null; micUi('idle'); showError(msg); },
+    onError: (msg, code) => {
+      dictation = null; micUi('idle');
+      // El dictado del navegador va contra un servicio externo que puede no estar disponible
+      // (sin red, bloqueado por el navegador o por la red del usuario). No es algo que se
+      // pueda arreglar desde aquí — pero SÍ tenemos otro motor: el del proveedor BYOK, que
+      // solo necesita un modelo en Ajustes. Ofrecerlo es la diferencia entre un mensaje que
+      // explica y uno que resuelve.
+      const puedeProveedor = recorderSupported() && !LLM.hasStt();
+      if ((code === 'network' || code === 'service-not-allowed') && puedeProveedor) {
+        showErrorWithAction(
+          msg + ' ' + t('Puedes dictar con tu proveedor configurando un modelo de transcripción.'),
+          t('Abrir Ajustes'), () => AppSettings.open('agent'));
+        return;
+      }
+      showError(msg);
+    },
   });
   if (!d) return null;
   d.start();

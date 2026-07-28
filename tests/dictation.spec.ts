@@ -99,6 +99,33 @@ test.describe('dictado del navegador', () => {
     expect(out.startsFinal).toBe(2);             // tras un fatal no se reintenta contra el muro
   });
 
+  // `network` (el servicio de voz del navegador no responde) puede ser transitorio al
+  // arrancar. Se le da UNA segunda oportunidad antes de molestar al usuario; a la segunda
+  // ya no es transitorio y hay que avisar.
+  test('un fallo de red se reintenta una vez antes de avisar', async ({ page }) => {
+    await openApp(page);
+    await installFakeRecognition(page);
+    const out = await page.evaluate(async () => {
+      const F: any = await import('/js/ai/feynman.js');
+      const w = window as any;
+      const errs: string[] = [];
+      const d = F.createDictation({ onText: () => {}, onError: (m: string) => errs.push(m) });
+      d.start();
+      w.__last.onerror({ error: 'network' });        // 1º: se calla y reanuda
+      const tras1 = { errs: errs.length };
+      w.__last.onend();
+      const startsTras1 = w.__starts;
+      w.__last.onerror({ error: 'network' });        // 2º: ya no es casualidad
+      w.__last.onend();
+      return { tras1, startsTras1, errs, startsFinal: w.__starts };
+    });
+    expect(out.tras1.errs).toBe(0);        // el primero no molesta
+    expect(out.startsTras1).toBe(2);       // y reanuda
+    expect(out.errs).toHaveLength(1);      // el segundo sí avisa
+    expect(out.errs[0]).toMatch(/conexión/i);
+    expect(out.startsFinal).toBe(2);       // y ya no insiste contra un servicio caído
+  });
+
   test('cada código de error dice algo distinto', async ({ page }) => {
     await openApp(page);
     const msgs = await page.evaluate(async () => {

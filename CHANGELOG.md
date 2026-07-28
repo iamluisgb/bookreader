@@ -78,6 +78,16 @@ Reportado desde el móvil: *"la opción de voz no va bien"*. Al leer `createDict
 - Y el texto dictado ya **no pisa lo que escribes a mano** (la base se recalculaba mal), con
   autoscroll para no perder de vista el final en una explicación larga.
 
+**Cuando el navegador no puede dictar, ahora hay salida.** El dictado del navegador va contra un
+servicio externo que puede no estar disponible (sin red, bloqueado por el navegador o por la red del
+usuario): eso da un error `network` que no se puede arreglar desde la app. Dos cambios:
+
+- **Un reintento silencioso**: al arrancar, ese error puede ser transitorio. Se le da una segunda
+  oportunidad antes de molestar; a la segunda ya se avisa y no se insiste contra un servicio caído.
+- **El mensaje deja de ser un callejón**: si el motor del proveedor es posible pero no está
+  configurado, el error ofrece **«Abrir Ajustes»** y lleva directo al campo del modelo de
+  transcripción. Un mensaje que solo describe el problema deja al usuario parado.
+
 **Dictado por proveedor (BYOK), opcional.** Ajustes → *Modelo de transcripción*. Con él, el micro
 graba con `MediaRecorder` y transcribe contra `/audio/transcriptions`: **no hay corte automático por
 silencio** —el fallo nº1 en móvil— y acierta mucho más con vocabulario técnico.

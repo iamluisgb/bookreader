@@ -578,6 +578,9 @@ const EN = {
   'Para dictar tu explicación en el modo Feynman. Acierta bastante más que el dictado del navegador con vocabulario técnico y no se corta solo en el móvil, pero envía el audio a tu proveedor y gasta tokens. Vacío = se usa el dictado del navegador.':
     'To dictate your explanation in Feynman mode. Far more accurate than the browser\'s dictation with technical vocabulary, and it does not cut out on its own on mobile — but it sends the audio to your provider and spends tokens. Empty = the browser\'s dictation is used.',
   'Idioma del dictado': 'Dictation language',
+  'Puedes dictar con tu proveedor configurando un modelo de transcripción.':
+    'You can dictate with your provider by configuring a transcription model.',
+  'Abrir Ajustes': 'Open Settings',
   'Transcribiendo…': 'Transcribing…',
   'No hay modelo de transcripción configurado.': 'No transcription model configured.',
   'El proveedor no ofrece transcripción, o el modelo no existe.': 'The provider does not offer transcription, or the model does not exist.',
