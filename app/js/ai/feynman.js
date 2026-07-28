@@ -302,10 +302,11 @@ export function suggestConcepts({ leaves = [], sections = [], currentChapter = '
       const key = norm(label);
       if (!key || seen.has(key) || !looksLikeConcept(label)) continue;
       seen.add(key);
-      // `term` = con qué se BUSCA. Las fuentes heurísticas (secciones del libro, hojas del
-      // mapa) ya vienen en el idioma del libro, así que su término es su propio rótulo; solo
-      // las del modelo, que se traducen a la interfaz, traen uno distinto.
-      out.push({ label, term: cleanConcept(item.term || '') || label });
+      // Cada sugerencia viaja con TRES cosas: el rótulo que se lee, el término con el que se
+      // busca, y —si la fuente lo sabe— el ANCLA del pasaje de origen, que hace innecesario
+      // buscar. Las secciones vienen del propio libro (su rótulo ya está en su idioma); las
+      // hojas del mapa mental están en el idioma de la interfaz y solo se salvan por el ancla.
+      out.push({ label, term: cleanConcept(item.term || '') || label, src: item.src || '' });
       if (out.length >= max) return out;
     }
   }
@@ -326,7 +327,10 @@ export function mindmapConcepts(bookId) {
   for (const br of tree.branches) {
     for (const leaf of br.children || []) {
       const label = (leaf.full || leaf.label || '').trim();
-      if (label) out.push({ label, chapter: chapterOf.get(leaf.src) || '' });
+      // `src` es el ancla del pasaje del que salió la hoja: con ella NO hay que buscar nada.
+      // Importa porque el mapa se redacta en el idioma de la interfaz, así que sus hojas no
+      // sirven como consulta léxica contra un libro en otro idioma — pero su ancla sí.
+      if (label) out.push({ label, src: leaf.src || '', chapter: chapterOf.get(leaf.src) || '' });
     }
   }
   return out;
@@ -576,6 +580,7 @@ let session = null;
 let dictation = null;
 let sttDone = null;      // promesa de la transcripción en curso (motor del proveedor)
 let pickedTerm = '';     // término del chip elegido: con lo que se BUSCA en el libro
+let pickedSrc = '';      // ancla del chip elegido: mejor que buscar, es el pasaje exacto
 let busy = false;
 
 export function open(context) {
@@ -658,9 +663,11 @@ function renderSetup() {
     exclude: [ctx.bookTitle || ''],
     max: 4,
   });
-  // El chip lleva DOS cosas: lo que se lee (`label`) y con lo que se busca (`data-term`).
+  // El chip lleva lo que se lee (`data-c`), con qué se busca (`data-term`) y, si se conoce,
+  // el ancla exacta del pasaje (`data-src`), que evita buscar del todo.
   const chips = (list) => list.map((c) =>
-    `<button class="fey-chip" data-c="${escapeHtml(c.label)}" data-term="${escapeHtml(c.term || c.label)}">${escapeHtml(c.label)}</button>`).join('');
+    `<button class="fey-chip" data-c="${escapeHtml(c.label)}" data-term="${escapeHtml(c.term || c.label)}"${
+      c.src ? ` data-src="${escapeHtml(c.src)}"` : ''}>${escapeHtml(c.label)}</button>`).join('');
   b.innerHTML = `
     <h2>${t('Explícamelo tú')}</h2>
     <p class="ai-ob-sub">${t('Explica un concepto con tus palabras. No te voy a dar la respuesta: te voy a preguntar hasta que la construyas tú. Al final te digo qué te dejaste.')}</p>
@@ -682,6 +689,7 @@ function renderSetup() {
     if (chip) {
       b.querySelector('#fey-concept').value = chip.dataset.c;
       pickedTerm = chip.dataset.term || '';
+      pickedSrc = chip.dataset.src || '';
       return;
     }
     if (e.target.closest('#fey-more')) suggestWithLLM();
@@ -689,7 +697,7 @@ function renderSetup() {
   b.querySelector('#fey-start').addEventListener('click', startSession);
   const inp = b.querySelector('#fey-concept');
   // Si el usuario reescribe, el término del chip deja de valer: se busca lo que él ha puesto.
-  inp.addEventListener('input', () => { pickedTerm = ''; });
+  inp.addEventListener('input', () => { pickedTerm = ''; pickedSrc = ''; });
   inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') startSession(); });
 }
 
@@ -770,6 +778,16 @@ function hideError() {
 //     añade sinónimos. Es la red para quien escribe "tokenización" en un libro en inglés.
 // Sin (3), el usuario se queda contra un muro sin forma de salir salvo adivinar el idioma.
 async function locatePassages(concept) {
+  // 0) ANCLA. Si la sugerencia sabe de qué pasaje salió, no hay nada que buscar: se coge ese
+  //    y sus vecinos. Es el caso de las hojas del mapa mental, que se redactan en el idioma
+  //    de la INTERFAZ y por tanto nunca casarían por léxico contra un libro en otro idioma.
+  if (pickedSrc) {
+    const seed = Retrieval.allPassages().find((p) => p.id === pickedSrc);
+    if (seed) {
+      const hits = Retrieval.withNeighbors([{ id: seed.id, text: seed.text || '' }], 2) || [];
+      if (hits.length) return hits.filter((p) => p && p.id && p.text).slice(0, 14);
+    }
+  }
   for (const q of [pickedTerm, concept]) {
     if (!q) continue;
     const hits = passagesFor(q);
@@ -792,7 +810,11 @@ async function startSession() {
     ctx.ensureIndex?.();
     const passages = await locatePassages(concept);
     if (!passages.length) {
+      // `renderSetup()` repinta de cero y dejaba el campo VACÍO: había que volver a escribir
+      // el concepto para reintentar, justo cuando el mensaje te pide probar otra cosa.
       renderSetup();
+      const again = body()?.querySelector('#fey-concept');
+      if (again) { again.value = concept; again.focus(); again.select(); }
       showError(t('No encuentro «{c}» en este libro. Si el libro está en otro idioma, prueba con el término tal y como aparece en él.', { c: concept }));
       return;
     }

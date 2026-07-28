@@ -349,6 +349,30 @@ Aquí van:
     expect(r.porTermino).toBeGreaterThan(0);
   });
 
+  // Segunda mitad del mismo bug: las hojas del MAPA MENTAL se redactan en el idioma de la
+  // interfaz, así que como consulta léxica contra un libro en inglés no valen NUNCA — ni
+  // traducidas ni con expansión. Pero traen `src`, el ancla del pasaje del que salieron: con
+  // ella no hay que buscar nada. La sugerencia debe arrastrar ese ancla hasta el chip.
+  test('las sugerencias arrastran el ancla de origen hasta el chip', async ({ page }) => {
+    await openApp(page);
+    const r = await page.evaluate(async () => {
+      const F: any = await import('/js/ai/feynman.js');
+      return F.suggestConcepts({
+        leaves: [
+          { label: 'Atención escalada', src: 'a42', chapter: 'Coding Attention' },  // hoja del mapa, en español
+          { label: 'Bloques Transformer', src: 'a77', chapter: 'Coding Attention' },
+        ],
+        sections: [{ label: 'Encoding word positions', count: 3 }],                 // del libro: sin ancla
+        currentChapter: 'Coding Attention',
+      });
+    });
+    const byLabel = Object.fromEntries(r.map((x: any) => [x.label, x]));
+    expect(byLabel['Atención escalada'].src).toBe('a42');
+    expect(byLabel['Bloques Transformer'].src).toBe('a77');
+    // Las secciones vienen del propio libro y se localizan por texto: no necesitan ancla.
+    expect(byLabel['Encoding word positions'].src).toBe('');
+  });
+
   test('sampleForConcepts reparte por todo el capítulo en vez de coger el principio', async ({ page }) => {
     await openApp(page);
     const r = await page.evaluate(async () => {

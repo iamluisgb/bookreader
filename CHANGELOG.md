@@ -36,8 +36,23 @@ es el comportamiento anterior: nunca es peor.
   sinónimos) antes de dar error.
 - **Y el mensaje de error deja de mandarte a adivinar:** dice qué concepto ha fallado y avisa de que
   el libro puede estar en otro idioma.
-- Las fuentes heurísticas (secciones del libro, hojas del mapa mental) ya venían en el idioma del
-  libro, así que su término es su propio rótulo y no cambia nada para ellas.
+- Las secciones del libro ya vienen en su idioma, así que su término es su propio rótulo.
+
+**Segunda mitad del fallo (mismo día, tras seguir reproduciéndose).** El arreglo de arriba cubría los
+conceptos que sugiere el MODELO, pero los chips que fallaban venían de otro sitio: **las hojas del
+mapa mental**, que se redactan en el idioma de la interfaz y están **persistidas** de una generación
+anterior. Ahí no hay término que valga — ni traducido ni expandido.
+
+Pero esas hojas traen algo mejor que un término: **el ancla `src` del pasaje del que salieron**. Así
+que ya no se busca: se va directo a ese pasaje y sus vecinos. La sugerencia arrastra el ancla hasta el
+chip (`data-src`) y `locatePassages` la usa **antes** que cualquier búsqueda. Es exacto y no puede
+fallar por idioma.
+
+Orden final al arrancar una sesión: **ancla → término del libro → lo escrito → expansión de consulta**.
+
+- **Y el error ya no te borra lo escrito:** al fallar, `renderSetup()` repintaba de cero y dejaba el
+  campo vacío, así que había que teclear el concepto otra vez justo cuando el mensaje te pedía probar
+  con otras palabras. Ahora lo conserva, con el foco puesto y el texto seleccionado.
 
 ## 2026-07-28 — El dictado del modo Feynman deja de morirse a media explicación
 
