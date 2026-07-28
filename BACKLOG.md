@@ -700,6 +700,72 @@ seguir leyendo"* sin necesidad de un cartel que la anuncie.
 
 **Orden por esfuerzo/impacto:** F1 → F2 → F3 → F4.
 
+### P21 — Vertical opositor: del estudio al examen · `L` · **el nicho que [`LAUNCH_PLAN.md`](LAUNCH_PLAN.md#L75) señala**
+
+**Contexto (2026-07-27).** El plan de lanzamiento nombra el pivote — *"pivotar el mensaje 100% a
+estudiantes de oposiciones/certificaciones/medicina […] Este público paga más y más rápido"* — y
+[PDF6](#pdf6--segmentación-estructural-de-pdfs-planos-temarioslegales--m--✓-2026-07-16) ya entregó la
+mitad de contenido: detección de `TÍTULO`, `CAPÍTULO`, `Artículo N`, `Tema N` en PDFs planos, que es
+exactamente el material del nicho. Lo que falta **no es contenido: es el formato de evaluación.**
+
+La app entrena **recuerdo libre** (flashcards + SRS). Al opositor le evalúan con **test de opciones y
+penalización por fallo**, y en muchos cuerpos con **desarrollo o exposición oral de un tema entero**.
+Son habilidades distintas de la que entrenamos hoy.
+
+> **Deuda de promesa.** [`paywall.js` L20](app/js/ui/paywall.js#L20) ya vende la feature Pro como
+> *"Repaso espaciado (**quizzes**)"*, y [MON2](#mon2--bookreader-pro-licencias-polar--gate-de-features--m--hecho-modo-simulado)
+> lista "quizzes" entre los puntos de gate. Un opositor lee «quiz» y entiende test con opciones.
+> Estamos cobrando por una palabra que el producto todavía no cumple: F1 la cumple.
+
+**F1 — Modo test con penalización** · `M` · *la pieza que decide*
+Opción múltiple (4 opciones) generada desde los pasajes del temario, con puntuación real:
+aciertos − fallos/k, con `k` configurable por convocatoria (3, 4, o sin penalización — **varía y no
+debemos asumir una**). Enseña lo que las flashcards no pueden: **cuándo no contestar**.
+- **Lo difícil son los distractores, no la pregunta.** Tienen que salir del propio temario —el
+  artículo vecino, el plazo parecido, el órgano que se confunde—. Un distractor absurdo convierte el
+  test en un regalo y destruye el valor de la penalización. Materia prima: los pasajes hermanos que
+  ya devuelve [`retrieval.js`](app/js/ai/retrieval.js) (mismo capítulo/sección).
+- Cada pregunta conserva su ancla `[[aN]]` → justificación citada al corregir.
+
+**F2 — Simulacro cronometrado** · `M` · *convierte la app en donde MIDES si apruebas*
+N preguntas, T minutos, nota con la penalización aplicada y **desglose por tema** («fallas el Título
+VIII»). Las falladas entran automáticamente al mazo SRS del libro
+([`srs.js`](app/js/ai/srs.js)) — el bucle que cierra estudio y examen.
+Misma pieza que F1: hacerlas juntas.
+
+**F3 — Citar por artículo, no por página** · `S` · *la más barata, se apoya en PDF6*
+Que citas y tarjetas digan **«art. 103.1 CE»** y no «pág. 47». Para un opositor la cita *es* el
+contenido: sin el artículo no puntúa en el desarrollo. PDF6 ya reconoce el literal `Artículo N`;
+falta propagarlo al `label` de la cita.
+
+**F4 — Vueltas al temario (SRS a nivel de TEMA)** · `M`
+El opositor no piensa en tarjetas: piensa en **temas** y en **vueltas** (primera, segunda…).
+Necesita «qué tema toca hoy» y «cuándo repaso el tema 12». Hoy el SRS programa *tarjetas*
+y [P12](#p12--flashcards-por-libro-y-por-estantería-selector-de-repaso--✓-sm) da ámbitos por
+libro/estantería; falta el **tema como unidad programable** con su propio estado de madurez. El
+scheduler es puro y reutilizable → menos código del que parece.
+
+**F5 — «Cantar el tema»** · `M` · *extiende [P18](#p18--modo-feynman-explicas-tú-el-libro-te-contrasta--m--cima-del-icap)*
+Exponer un tema **completo contra reloj**, en voz. El Feynman ya reconoce voz (`speechSupported` /
+`createDictation` en [`feynman.js`](app/js/ai/feynman.js)) — la infraestructura está construida y
+desaprovechada. Lo que cambia es la **unidad** (tema entero, no un concepto) y el **criterio**: no
+diálogo socrático, sino **rúbrica** — epígrafes cubiertos, artículos citados, orden, tiempo.
+
+**F6 — Literales exactos** · `S`
+Enumeraciones y plazos se memorizan palabra por palabra. El cloze ya existe; falta un tipo *literal*
+que compare **estrictamente** y señale la palabra que falta, en vez de la autoevaluación generosa del
+repaso actual. Encaja con el «bonus opositor» ya anotado en PDF6 (`Artículo {{c1::168}}`).
+
+**Fuera de alcance — decidido, no pendiente:**
+- **Actualización normativa automática** («tu PDF cita la ley derogada»). Suena irresistible y es una
+  trampa: exige fuentes vivas, mantenimiento perpetuo y nos hace responsables. Un opositor que
+  suspende porque le dijimos que un artículo seguía vigente no vuelve.
+- **Banco de preguntas de convocatorias pasadas.** Lo más pedido y lo peor: derechos de terceros y
+  curación infinita. Generar desde *su* temario es defendible; redistribuir exámenes ajenos, no.
+
+**Orden:** F1+F2 juntos (formato de evaluación + cierra la deuda del paywall) → F3 (barata, PDF6) →
+F4 → F5 → F6.
+
 ---
 
 ## 📄 PDF — paridad de features con EPUB
