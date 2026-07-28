@@ -766,6 +766,106 @@ repaso actual. Encaja con el «bonus opositor» ya anotado en PDF6 (`Artículo {
 **Orden:** F1+F2 juntos (formato de evaluación + cierra la deuda del paywall) → F3 (barata, PDF6) →
 F4 → F5 → F6.
 
+### P22 — Vertical investigador: papers y base de conocimiento · `L`
+
+**Contexto (2026-07-28).** Medido sobre un paper real (ResNet, CVPR, dos columnas) pasando el
+segmentador de producción [`segment-pdf.js`](app/js/ai/segment-pdf.js).
+
+**Lo que SÍ aguanta** (comprobado, no asumido): el **orden de lectura a dos columnas**. `reconstruct()`
+declara *"No dependemos de coordenadas"* y une por `hasEOL`; el orden del stream de pdf.js respeta las
+columnas en un LaTeX típico. También cubren bien su parte el recorte de región + visión
+([IA6](#ia6--visión-explicar-lo-que-veo-figuras--fase-1--m)) para preguntar por una figura, y las
+fórmulas en MathML.
+
+> ⚠️ **F1 y F2 no son features: son corrección.** Hoy indexamos texto FALSO de un paper, y eso se
+> propaga a citas, tarjetas y resúmenes. **No vender a investigadores antes de F1+F2**, y no construir
+> la base de conocimiento (F5–F6) encima: acumular mala extracción no da una base de conocimiento, da
+> N fichas erróneas que ahora *parecen* datos.
+
+**F1 — Figuras, tablas y gráficas fuera del flujo de texto** · `M` · **bug**
+Medido en la página 4: **~1.500 caracteres seguidos** de etiquetas del diagrama tratadas como prosa —
+`3x3 conv, 512 3x3 conv, 512 … pool, /2 fc 4096 fc 4096 fc 1000 image output size: 112`. En la 5,
+celdas de tabla (`1×1, 512 3×3, 512 1×1, 2048 ×3`) y ejes de gráfica (`0 10 20 30 40 50 … iter. (1e4)
+error (%) plain-18 plain-34`). Todo eso entra en el índice BM25 y en el muestreo de flashcards. En un
+libro no ocurre; en un paper **media página es figura o tabla**.
+- Daños de borde medidos: el pie se pega sin separación (`34-layer residual` **`Figure 3.`** `Example
+  network…`) y `stride of 2.` se fusionó con el eje en `stride of 2.0 10 20 30 40 50`.
+- **Arreglo:** usar coordenadas (`transform[4]`/`[5]`) para descartar bloques fuera de la caja de la
+  columna, y tratar `Figure N.` / `Table N.` como unidad propia. Es exactamente lo que hoy evitamos.
+
+**F2 — Notas al pie que parten frases** · `S`–`M` · **bug**
+Literal del final de la página 3: `F = W2σ(W1x) in which σ denotes` **`2This hypothesis, however, is
+still an open question. See [28].`** `ReLU [29`. La frase era *"σ denotes ReLU"*. **El pasaje indexado
+dice otra cosa → produce citas literalmente falsas.** Mismo arreglo que F1: el pie está fuera del
+cuerpo de la columna.
+
+**F3 — Las citas `[41]` están muertas** · `M`
+En un paper `[41]` es un enlace. Hoy no lleva a ningún sitio y, peor, la sección References está
+**filtrada como front matter**: `FRONT_MATTER_RE` ([retrieval.js L151](app/js/ai/retrieval.js#L151))
+incluye `references|bibliograf`. Correcto para un libro, **al revés para un paper** — ahí la
+bibliografía es contenido de primera clase. Resolver `[41]` → *Simonyan & Zisserman, VGG* + salto es
+barato una vez deja de descartarse.
+
+**F4 — Citar por sección y figura** · `S`
+`§3.2` y `Fig. 3`, no `pág. 4`. Es lo que se pega en un manuscrito o en un review. Hermana de
+[P21·F3](#p21--vertical-opositor-del-estudio-al-examen--l--el-nicho-que-launch_planmdl75) (`art. 103.1`).
+
+---
+
+#### Base de conocimiento (F5–F7) — *la libreta YA es la primitiva*
+
+[`templates.js`](app/js/ai/templates.js) define fichas con **campos tipados** (`key`,
+`type: 'text'|'list'`, `fill: 'agent'|'user'`). Eso no es «una plantilla de notas»: es un **registro
+estructurado por documento**. Una ficha de paper es una plantilla más, no arquitectura nueva.
+
+Lo que falta no es dónde guardar: es que **cada libreta es una isla**. Un `key` como `metodo` existe
+en 40 papers y nadie los junta nunca.
+
+**F5 — Plantilla `ficha-paper`** · `S` (dado F1–F2)
+```
+pregunta        text   agent   ¿qué pregunta responde?
+metodo          text   agent   diseño, no resultados
+datos           text   agent   n, fuente, periodo
+comparacion     list   agent   contra qué se mide (baselines)
+resultado       list   agent   con CIFRA y ancla [[aN]]
+limitaciones    list   agent   las que EL PAPER declara
+────────────────────────────────────────────────────────
+vale_para_mi    text   user    por qué lo estoy leyendo
+no_me_convence  list   user    dónde flaquea, a mi juicio
+citar_para      text   user    en qué sección de MI paper
+```
+Tres decisiones sin las cuales **no construirlo**:
+1. **«No consta» es un valor legal.** Si el modelo debe rellenar `n` sí o sí, se lo inventa. Un dato
+   de método falso es peor que un hueco.
+2. **Cada campo lleva su ancla `[[aN]]`.** Sin cita a la página la ficha no es verificable → no sirve
+   para citar.
+3. **La frontera `agent`/`user` no es arbitraria.** Lo mecánico (qué dice el paper) lo extrae la IA;
+   **el juicio lo escribe el usuario**. Es la tesis ICAP de esta épica y además es lo correcto
+   profesionalmente: si la IA escribe «esto flaquea en X», el investigador firma una opinión ajena.
+
+**F6 — Matriz de literatura** · `M` · **la salida que importa**
+Filas = papers, columnas = los `key` de la plantilla. **Es el entregable real de una revisión de
+literatura.** Sale casi gratis en cuanto los campos son *los mismos* en todos — de ahí la única
+disciplina de diseño que importa: **campos fijos, no prosa libre**. Requiere lo único estructural de
+esta épica: hoy `retrieval.js` mantiene **un solo índice de módulo** (`hasIndex(key)`), es decir el
+agente ve un documento y solo uno; para un investigador la unidad no es un documento, es **una
+literatura**.
+
+**F7 — Exports que alimentan SU sistema** · `S`–`M` · **posicionamiento**
+El investigador **ya tiene** base de conocimiento —Zotero, Obsidian, Notion, con años de notas—. El
+coste de cambio es brutal y esa pelea no se gana. **Nuestra posición no es el almacén, es el momento
+de la lectura.** Así que la salida correcta no es retenerlo: es alimentar la suya — Markdown con
+`[[wikilinks]]`, **BibTeX** de la referencia, **CSV** de la matriz. [P8](#p8--exportar-libretas-y-conversaciones--fase-1--m)
+ya montó el patrón `download()` CSP-safe: son formas nuevas, no un sistema nuevo.
+*«Lee aquí, se archiva allí»* se acepta mucho más fácil que *«múdate»*.
+
+**Ventaja que ya tenemos gratis:** manuscritos sin publicar, material de peer review y PDFs de pago.
+Elicit/SciSpace son servidor: el PDF sube. Con BYOK + IndexedDB **el paper no sale del dispositivo**.
+A un investigador eso le importa — merece estar en la landing del nicho.
+
+**Orden:** F1+F2 (corrección, bloquean todo lo demás) → F3+F4 (baratas) → F5 → F7 → F6 (la apuesta
+grande: multi-documento).
+
 ---
 
 ## 📄 PDF — paridad de features con EPUB
