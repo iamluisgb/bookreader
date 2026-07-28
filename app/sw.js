@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bookreader-v97';
+const CACHE_NAME = 'bookreader-v98';
 const ASSETS = [
   './',
   './index.html',
@@ -82,6 +82,11 @@ const ASSETS = [
   './vendor/pdf.worker-3.11.174.min.js',
   './vendor/sql-wasm-1.13.0.min.js',
   './vendor/sql-wasm-1.13.0.wasm',
+  // Temml solo se carga cuando aparece una fórmula, pero se precachea para que ese momento
+  // también funcione sin red (es un lector offline: la primera fórmula puede ser en el metro).
+  './vendor/temml-0.13.3.min.js',
+  './css/temml.css',
+  './css/Temml.woff2',
   './manifest.json',
   './icons/icon.svg',
   './icons/icon-192.png',

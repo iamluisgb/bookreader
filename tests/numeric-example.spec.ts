@@ -85,8 +85,12 @@ test('activa el modo numérico en el system prompt del turno', async ({ page }) 
   expect(sys).toContain('MODO EJEMPLO NUMÉRICO');
   expect(sys).toContain('NÚMEROS CONCRETOS');
   expect(sys).toContain('COMPROBACIÓN DE SENTIDO');
-  // Sin LaTeX: mdToHtml no renderiza matemáticas, así que el prompt debe prohibirlo.
-  expect(sys).toContain('NADA de LaTeX');
+  // El formato CAMBIÓ: la regla prohibía LaTeX y tablas porque no se renderizaban. Las tablas
+  // se implementaron y la regla se quedó sin actualizar —mintiéndole al modelo sobre la mitad,
+  // que es la mejor forma de que ignore la otra mitad—. Hoy se renderizan las dos (ver
+  // math.js) y el prompt las PIDE.
+  expect(sys).toContain('LaTeX entre $…$');
+  expect(sys).not.toContain('NADA de LaTeX');
 });
 
 test('el mensaje que se ve es corto: las instrucciones no ensucian el chat', async ({ page }) => {

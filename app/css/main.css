@@ -3068,3 +3068,20 @@ body.region-selecting { user-select: none; }
   padding: 5px 12px; font-size: var(--fs-xs); gap: 6px;
 }
 .ai-zone-acts .sel-act .icon { color: var(--accent); }
+
+/* ---- Fórmulas (MathML vía Temml) ---------------------------------------------------- */
+.ai-math { font-size: 1.05em; }
+/* En bloque: centrada y con scroll PROPIO. Una fórmula larga en un móvil de 390px no puede
+   ensanchar la burbuja del chat ni el panel entero — que scrolle ella. */
+.ai-math--block {
+  display: block;
+  margin: 12px 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  text-align: center;
+  padding-bottom: 2px;   /* sitio para la barra de scroll cuando aparece */
+}
+/* Hereda el color del texto: en tema oscuro la fórmula no puede quedarse en negro. */
+.ai-math math { color: inherit; }
+/* Antes de hidratar (o si Temml no llega) se ve el TeX ya legible, no `\cdot` crudo. */
+.ai-math:not([data-math-done]) { font-family: var(--font-mono, monospace); font-size: 0.95em; }

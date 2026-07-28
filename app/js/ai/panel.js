@@ -191,8 +191,11 @@ export function quoteSelection(text) {
 // persistencia en la conversación y export. Lo único propio es el bloque de sistema.
 //
 // Las reglas del prompt no son decorativas; cada una tapa un modo de fallo observado en
-// modelos pidiendo "un ejemplo": responder con variables en vez de números, saltarse la
-// aritmética, o escribir LaTeX que aquí no se renderiza (mdToHtml no hace matemáticas).
+// modelos pidiendo "un ejemplo": responder con variables en vez de números o saltarse la
+// aritmética. La regla de formato SÍ cambió: prohibía LaTeX y tablas porque no se renderizaban,
+// y para cuando las tablas se implementaron la regla se quedó sin actualizar — mintiéndole al
+// modelo sobre la mitad, que es la mejor forma de que ignore la otra mitad. Hoy se renderizan
+// las dos cosas (ver math.js) y el prompt las pide en vez de prohibirlas.
 const NUMERIC_MODE = `MODO EJEMPLO NUMÉRICO (para este turno).
 El usuario ha marcado un fragmento con una fórmula, un algoritmo o una definición con notación, y
 quiere verlo EJECUTADO A MANO con números concretos. Reglas:
@@ -206,8 +209,9 @@ quiere verlo EJECUTADO A MANO con números concretos. Reglas:
    el triángulo superior es cero, la dimensión de salida coincide con la de entrada...).
 6. Si el fragmento NO contiene nada calculable, dilo en una línea y da en su lugar el ejemplo
    concreto más pequeño que ilustre la idea. No te lo inventes como si hubiera fórmula.
-FORMATO: Markdown. Las matrices y los cálculos, en bloques de código cercados. NADA de LaTeX ni
-tablas: no se renderizan aquí. Cita [[aN]] si te apoyas en un pasaje del extracto.`;
+FORMATO: Markdown. Las matrices y los cálculos paso a paso, en bloques de código cercados (se leen
+mejor alineados). Las FÓRMULAS, en LaTeX entre $…$ o $$…$$: se renderizan. Las tablas GFM también.
+Cita [[aN]] si te apoyas en un pasaje del extracto.`;
 
 // Explicar el fragmento en llano. La regla que hace que esto NO sea "resúmemelo" es la 2:
 // un ejemplo concreto. Sin ella el modelo parafrasea el pasaje con otras palabras, que es

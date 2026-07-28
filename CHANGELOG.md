@@ -5,6 +5,38 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-28 — Las fórmulas se ven como fórmulas (LaTeX → MathML)
+
+Reportado con un ejemplo numérico de GELU: la respuesta salía con `$$\text{GELU}(x) \approx 0.5
+\cdot x \cdot \left[...` tal cual, barras invertidas incluidas. En un lector cuyo público lee
+libros técnicos, la notación no es un adorno: es el contenido.
+
+**Y había una trampa de fondo.** El prompt del ejemplo numérico terminaba con *"NADA de LaTeX ni
+tablas: no se renderizan aquí"*. Las tablas se implementaron después y **esa regla se quedó sin
+actualizar**: le mentía al modelo sobre la mitad, que es la mejor forma de que ignore la otra mitad.
+Ahora se renderizan las dos cosas y el prompt las PIDE en vez de prohibirlas.
+
+- **Temml (MIT) vendorizado**, no KaTeX. KaTeX maqueta a mano con `<span>` y necesita **sus propias
+  fuentes** (cientos de KB de woff2) para que la notación no se descuadre; Temml emite **MathML** y
+  lo compone el navegador, que ya lo soporta de forma nativa. Para una PWA offline con CSP estricta
+  —donde cada byte se precachea— esa diferencia decide. Se usa la hoja `Temml-Local.css`, que tira
+  de las fuentes matemáticas del sistema.
+- **Carga perezosa**: son ~167 KB y la mayoría de las respuestas no llevan una sola fórmula.
+  `mdToHtml` es síncrono y deja un marcador; la librería se baja la **primera vez que aparece una
+  fórmula de verdad**. Verificado con un test que cuenta peticiones: 0 sin fórmulas, 1 con ellas.
+  Va precacheada igualmente, para que esa primera vez también funcione sin red.
+- **Degradación**: si no llega la librería o el TeX está roto, queda el TeX traducido a Unicode
+  (`0.5 · x² ≈ π`), no `0.5 \cdot x^2 \approx \pi` ni una respuesta en blanco.
+- **El `$` sigue siendo un `$`** donde toca: dentro de un bloque de código (`echo $HOME`) y en prosa
+  ("cuesta $5 y no $7"). Las fórmulas se extraen después del código y antes del resto del formato,
+  porque si no un `\frac{a}{b}` pasa por las reglas de énfasis y sale destrozado.
+- **El TeX lo escribe un modelo**, así que se trata como entrada no confiable: `trust: false` (sin
+  `\href` ni `\includegraphics`) y `throwOnError: false` (un TeX roto se marca, no tumba la
+  respuesta). Test con `<img onerror>` y `\href{javascript:…}`: nada se ejecuta, ni un `<img>`, ni
+  un `<script>`, ni un enlace.
+- **En móvil una fórmula larga scrollea sola** (`overflow-x` propio) en vez de ensanchar la burbuja
+  o la página, y el color se hereda del tema (en oscuro no se queda en negro).
+
 ## 2026-07-27 — "Sugerir conceptos" fallaba con modelos de razonamiento
 
 Reportado: el botón daba error. No era el botón, era el **presupuesto de tokens**: pedía
