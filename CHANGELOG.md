@@ -5,6 +5,56 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-28 — El dictado del modo Feynman deja de morirse a media explicación
+
+Reportado desde el móvil: *"la opción de voz no va bien"*. Al leer `createDictation` había
+**cuatro defectos**, y el primero explica el síntoma exacto en Android.
+
+- **El micro se moría en cada pausa y no lo decía.** `continuous = true` **no** impide que el
+  navegador termine el reconocimiento tras unos segundos de silencio, y en Android lo ignora casi
+  por completo. Explicar algo con tus palabras está lleno de pausas para pensar: el reconocedor
+  terminaba, `onend` desmontaba el dictado y el usuario seguía hablando para nadie. Ahora se
+  distingue **"ha terminado el reconocedor"** de **"el usuario ha pulsado parar"**: mientras siga
+  activo, se rearranca solo.
+- **El acumulado vivía dentro del reconocedor.** Cada reinicio crea uno nuevo con su `finalText`
+  vacío, así que la corrección anterior habría borrado lo ya dictado en cada pausa. Ahora se acumula
+  fuera.
+- **Todos los errores eran el mismo error:** el botón se apagaba en silencio. Permiso denegado,
+  micro ausente y falta de red ahora dicen qué pasa; `no-speech` y `aborted` dejan de tratarse como
+  errores (son pausas: se reanuda). Un `start()` que falla de verdad ya no se confunde con un doble
+  arranque.
+- **Dictaba en el idioma de la INTERFAZ**, no en el del libro: leer en inglés con la app en español
+  metía "attention"/"embeddings" a un reconocedor `es-ES`. Ahora hay un selector ES/EN junto al
+  micro, y se recuerda.
+- Y el texto dictado ya **no pisa lo que escribes a mano** (la base se recalculaba mal), con
+  autoscroll para no perder de vista el final en una explicación larga.
+
+**Dictado por proveedor (BYOK), opcional.** Ajustes → *Modelo de transcripción*. Con él, el micro
+graba con `MediaRecorder` y transcribe contra `/audio/transcriptions`: **no hay corte automático por
+silencio** —el fallo nº1 en móvil— y acierta mucho más con vocabulario técnico.
+
+**La pieza que lo justifica es el `prompt`.** Whisper lo usa para sesgar el vocabulario, y la sesión
+Feynman ya tiene el del capítulo calculado *antes* de que el usuario hable (concepto + expectativas):
+alimentarlo no cuesta ni una llamada. Medido el 2026-07-28 sobre la misma grabación, español con
+términos técnicos en inglés:
+
+| | sin `prompt` | con `prompt` |
+|---|---|---|
+| matrices | `o sea **IV**` | `o sea **A y B**` |
+| rango | `bajo **rago**`, `el **rago** R` | `bajo **rango**`, `el **rango** r` |
+| cache | `**KVKH**` | `**KV cache**` |
+
+Sin el prompt, `o sea IV` **destruye la frase**: el modelo que luego evalúa la explicación no puede
+saber que hablaba de las matrices A y B. Esto el navegador no puede hacerlo.
+
+Contrapartidas, dichas en Ajustes: **no hay texto en vivo** (llega al soltar el botón; medido ~2,3 s
+para 8 s de audio y 4-9 s para 25 s), gasta tokens y sube el audio al proveedor — aunque el dictado
+del navegador **también** manda el audio fuera (a Google, en Chrome), así que no es un intercambio de
+privacidad sino de a quién.
+
+*Nota:* las mediciones se hicieron con voz sintética a 16 kHz, no con voz real contra el micro de un
+móvil. Son un techo, no una predicción.
+
 ## 2026-07-28 — Las fórmulas se ven como fórmulas (LaTeX → MathML)
 
 Reportado con un ejemplo numérico de GELU: la respuesta salía con `$$\text{GELU}(x) \approx 0.5

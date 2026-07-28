@@ -130,6 +130,9 @@ function agentHtml() {
     <label class="appset-label" for="appset-vmodel">${t('Modelo de visión (opcional)')}</label>
     <input id="appset-vmodel" class="appset-input" value="${escapeHtml(LLM.getVisionModel())}" placeholder="p. ej. mimo-v2.5" autocomplete="off" spellcheck="false" />
     <p class="appset-muted">${t('Para explicar figuras y páginas de un libro (multimodal). En nan, <code>mimo-v2.5</code> funciona. Déjalo vacío si tu modelo no interpreta imágenes; entonces "Explicar lo que veo" queda desactivado.')}</p>
+    <label class="appset-label" for="appset-smodel">${t('Modelo de transcripción (opcional)')}</label>
+    <input id="appset-smodel" class="appset-input" value="${escapeHtml(LLM.getSttModel())}" placeholder="p. ej. whisper" autocomplete="off" spellcheck="false" />
+    <p class="appset-muted">${t('Para dictar tu explicación en el modo Feynman. Acierta bastante más que el dictado del navegador con vocabulario técnico y no se corta solo en el móvil, pero envía el audio a tu proveedor y gasta tokens. Vacío = se usa el dictado del navegador.')}</p>
     <label class="appset-label" for="appset-lmodel">${t('Modelo rápido (opcional)')}</label>
     <input id="appset-lmodel" class="appset-input" value="${escapeHtml(LLM.getLiteModelSetting())}" placeholder="${escapeHtml(t('vacío = automático'))}" autocomplete="off" spellcheck="false" />
     <p class="appset-muted">${t('Para las llamadas auxiliares del agente (preparar búsquedas, puntuar capítulos): un modelo pequeño responde igual de bien y mucho más rápido. Vacío = automático (en nan usa <code>qwen3.6</code>; en otros proveedores, el modelo principal).')}</p>
@@ -240,6 +243,7 @@ function wireAgent(content) {
     LLM.setBaseUrl(baseUrl.value);
     LLM.setModel(model.value);
     LLM.setVisionModel(content.querySelector('#appset-vmodel').value);
+    LLM.setSttModel(content.querySelector('#appset-smodel').value);
     LLM.setLiteModel(content.querySelector('#appset-lmodel').value);
     LLM.setAutoExtract(content.querySelector('#appset-auto').checked);
     const ok = content.querySelector('#appset-saved');

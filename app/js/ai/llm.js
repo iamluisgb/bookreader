@@ -58,6 +58,11 @@ export function getLiteModel() {
 export function getVisionModel() { return (Storage.get('ai_vision_model', '') || '').trim(); }
 export function setVisionModel(m) { Storage.set('ai_vision_model', (m || '').trim()); }
 export function hasVision()      { return getVisionModel().length > 0; }
+
+// Modelo de transcripción (voz → texto). Opcional: vacío = se usa el dictado del navegador.
+export function getSttModel()    { return (Storage.get('ai_stt_model', '') || '').trim(); }
+export function setSttModel(m)   { Storage.set('ai_stt_model', (m || '').trim()); }
+export function hasStt()         { return getSttModel().length > 0; }
 export function hasKey()         { return getKey().trim().length > 0; }
 
 // Base URL del proveedor (sin barra final). Debe ser el endpoint OpenAI-compatible
@@ -342,6 +347,56 @@ async function _chatToolsLoop({ messages, tools, execute, maxRounds = 3, signal 
     }
   }
   return { content: '', rounds: maxRounds, calls, exhausted: true };
+}
+
+// TRANSCRIPCIÓN (voz → texto) contra `/audio/transcriptions`, formato OpenAI. No pasa por
+// `serialize`: el usuario espera con el modal delante y encolarlo detrás de una generación
+// larga lo dejaría mirando "transcribiendo…" un minuto.
+//
+// `prompt` es la pieza que justifica todo esto. Whisper lo usa para SESGAR el vocabulario, y
+// nosotros tenemos el del capítulo antes de que el usuario hable (concepto + expectativas de
+// la sesión Feynman). Medido el 2026-07-28 sobre la misma grabación, en español con términos
+// técnicos en inglés:
+//   sin prompt: "dos matrices de bajo rago, o sea IV"   ← la frase pierde el sentido
+//   con prompt: "dos matrices de bajo rango, o sea A y B"
+// También arregla "KVKH" → "KV cache". El navegador no puede hacer esto.
+export async function transcribe({ blob, prompt = '', language = '', signal } = {}) {
+  const key = getKey().trim();
+  if (!key) throw new Error(t('Falta la API key.'));
+  const model = getSttModel();
+  if (!model) throw new Error(t('No hay modelo de transcripción configurado.'));
+
+  const form = new FormData();
+  // El nombre importa: algunos proveedores deciden el formato por la extensión del fichero.
+  form.append('file', blob, `audio.${extFor(blob.type)}`);
+  form.append('model', model);
+  if (prompt) form.append('prompt', prompt.slice(0, 900));   // el límite de Whisper son 224 tokens
+  if (language) form.append('language', language);
+
+  // Sin `Content-Type`: lo pone el navegador con el `boundary` del multipart.
+  const res = await fetchRetrying(`${getBaseUrl()}/audio/transcriptions`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${key}` },
+    body: form,
+    signal,
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    if (res.status === 401) throw new Error(t('API key inválida (401).'));
+    if (res.status === 404) throw new Error(t('El proveedor no ofrece transcripción, o el modelo no existe.'));
+    throw new Error(t('Error al transcribir ({status}). {body}', { status: res.status, body: apiErrMsg(body) }));
+  }
+  const json = await res.json().catch(() => ({}));
+  return (json.text || '').trim();
+}
+
+function extFor(mime) {
+  const m = String(mime || '');
+  if (m.includes('webm')) return 'webm';
+  if (m.includes('ogg')) return 'ogg';
+  if (m.includes('mp4') || m.includes('m4a') || m.includes('aac')) return 'm4a';
+  if (m.includes('wav')) return 'wav';
+  return 'webm';
 }
 
 // Extrae el `error.message` de un body con forma OpenAI; si no la tiene, recorta el texto.

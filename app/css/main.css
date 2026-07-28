@@ -2974,6 +2974,14 @@ body.ai-open #sync-badge { right: calc(var(--ai-panel-width) + 14px); }
 .fey-input:focus { outline: none; border-color: var(--accent); }
 .fey-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 .fey-mic-on { background: var(--accent) !important; color: #fff !important; }
+/* Selector de idioma del dictado: pegado al micro, porque es un ajuste DE ese botón.
+   `width: auto` es obligatorio: el `select` global lleva `width: 100%` y aquí partía la
+   fila de acciones en tres líneas. */
+.fey-mic-lang {
+  width: auto; flex: 0 0 auto; margin-left: -4px;
+  padding: 6px 22px 6px 8px; border: 1px solid var(--border); border-radius: 8px;
+  background: var(--surface-0); color: var(--text); font-size: 12px; font-weight: 600; cursor: pointer;
+}
 
 .fey-diag { margin-top: 8px; }
 .fey-block { margin-bottom: 18px; }

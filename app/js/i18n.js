@@ -572,6 +572,21 @@ const EN = {
   'Descubrir': 'Discover',
   'Escribe el id del modelo a mano o elige uno de los sugeridos. «Descubrir» los lista automáticamente si el proveedor lo permite (nan no lo permite desde el navegador).': 'Type the model id by hand or pick a suggested one. “Discover” lists them automatically if the provider allows it (nan does not allow it from the browser).',
   'Modelo de visión (opcional)': 'Vision model (optional)',
+  'Modelo de transcripción (opcional)': 'Transcription model (optional)',
+  'Para dictar tu explicación en el modo Feynman. Acierta bastante más que el dictado del navegador con vocabulario técnico y no se corta solo en el móvil, pero envía el audio a tu proveedor y gasta tokens. Vacío = se usa el dictado del navegador.':
+    'To dictate your explanation in Feynman mode. Far more accurate than the browser\'s dictation with technical vocabulary, and it does not cut out on its own on mobile — but it sends the audio to your provider and spends tokens. Empty = the browser\'s dictation is used.',
+  'Idioma del dictado': 'Dictation language',
+  'Transcribiendo…': 'Transcribing…',
+  'No hay modelo de transcripción configurado.': 'No transcription model configured.',
+  'El proveedor no ofrece transcripción, o el modelo no existe.': 'The provider does not offer transcription, or the model does not exist.',
+  'Error al transcribir ({status}). {body}': 'Transcription error ({status}). {body}',
+  'No hay permiso para usar el micrófono. Habilítalo en los ajustes del navegador para este sitio.':
+    'No permission to use the microphone. Enable it in your browser settings for this site.',
+  'No se encuentra ningún micrófono.': 'No microphone found.',
+  'El dictado del navegador necesita conexión (envía el audio a un servicio externo).':
+    'The browser\'s dictation needs a connection (it sends the audio to an external service).',
+  'El dictado se ha detenido ({code}).': 'Dictation stopped ({code}).',
+  'Este navegador no puede grabar audio.': 'This browser cannot record audio.',
   'Para explicar figuras y páginas de un libro (multimodal). En nan, <code>mimo-v2.5</code> funciona. Déjalo vacío si tu modelo no interpreta imágenes; entonces "Explicar lo que veo" queda desactivado.': 'For explaining figures and pages of a book (multimodal). On nan, <code>mimo-v2.5</code> works. Leave it empty if your model cannot read images; then "Explain what I see" is disabled.',
   'Modelo rápido (opcional)': 'Fast model (optional)',
   'vacío = automático': 'empty = automatic',
