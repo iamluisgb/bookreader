@@ -5,6 +5,40 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-28 — Feynman: el concepto que la propia app te ofrecía «no estaba en el libro»
+
+Reportado con captura: la pantalla sugería **«Tokenización de texto»**, se pulsaba, y respondía
+*«No encuentro ese concepto en el libro»*. Contradicción en la misma pantalla.
+
+**La causa:** las sugerencias se traducen al idioma de la INTERFAZ (el prompt pide los conceptos
+`en ${uiLangName()}`), pero localizarlos es **BM25 léxico sobre el texto del LIBRO**. Con la app en
+español y el libro en inglés, `"Tokenización de texto"` tokeniza a `tokenizacion` + `texto`, que no
+aparecen en ninguna parte. Reproducido sobre pasajes reales en inglés:
+
+```
+✗  0 resultados  "Tokenización de texto"      ← el chip que ofrecía la app
+✓  3 resultados  "Embeddings de token"
+✗  0 resultados  "Auto-atención multi-cabeza"
+✓  1 resultados  "text tokenization"          ← lo mismo, en el idioma del libro
+```
+
+Eso explica lo más desconcertante del fallo: **unos chips funcionaban y otros no**. Sobrevivían los
+que se escriben igual en los dos idiomas (*token*, *embeddings*); en cuanto el término estaba
+traducido de verdad, desaparecía.
+
+**El arreglo: separar lo que se MUESTRA de lo que se BUSCA.** El modelo devuelve ahora
+`{"concept":"Tokenización de texto","term":"tokenizing text"}` — `concept` se pinta en el chip,
+`term` (las palabras exactas del libro) es con lo que se localiza. Sin `term` se cae al rótulo, que
+es el comportamiento anterior: nunca es peor.
+
+- **Red de seguridad para lo tecleado a mano**, que tiene el mismo problema: si no hay resultados, se
+  reintenta con la **expansión de consulta de [IA7](BACKLOG.md)** (modelo rápido, traduce y añade
+  sinónimos) antes de dar error.
+- **Y el mensaje de error deja de mandarte a adivinar:** dice qué concepto ha fallado y avisa de que
+  el libro puede estar en otro idioma.
+- Las fuentes heurísticas (secciones del libro, hojas del mapa mental) ya venían en el idioma del
+  libro, así que su término es su propio rótulo y no cambia nada para ellas.
+
 ## 2026-07-28 — El dictado del modo Feynman deja de morirse a media explicación
 
 Reportado desde el móvil: *"la opción de voz no va bien"*. Al leer `createDictation` había

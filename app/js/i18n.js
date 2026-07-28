@@ -573,6 +573,8 @@ const EN = {
   'Escribe el id del modelo a mano o elige uno de los sugeridos. «Descubrir» los lista automáticamente si el proveedor lo permite (nan no lo permite desde el navegador).': 'Type the model id by hand or pick a suggested one. “Discover” lists them automatically if the provider allows it (nan does not allow it from the browser).',
   'Modelo de visión (opcional)': 'Vision model (optional)',
   'Modelo de transcripción (opcional)': 'Transcription model (optional)',
+  'No encuentro «{c}» en este libro. Si el libro está en otro idioma, prueba con el término tal y como aparece en él.':
+    'I can\'t find “{c}” in this book. If the book is in another language, try the term exactly as it appears there.',
   'Para dictar tu explicación en el modo Feynman. Acierta bastante más que el dictado del navegador con vocabulario técnico y no se corta solo en el móvil, pero envía el audio a tu proveedor y gasta tokens. Vacío = se usa el dictado del navegador.':
     'To dictate your explanation in Feynman mode. Far more accurate than the browser\'s dictation with technical vocabulary, and it does not cut out on its own on mobile — but it sends the audio to your provider and spends tokens. Empty = the browser\'s dictation is used.',
   'Idioma del dictado': 'Dictation language',

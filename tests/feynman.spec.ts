@@ -290,7 +290,10 @@ test.describe('qué concepto explicar (puro)', () => {
         currentChapter: '2. Working with Text Data',
       });
     });
-    expect(r).toEqual(['Byte pair encoding', 'Encoding word positions', 'attention scores']);
+    // Devuelve {label, term}: lo que se PINTA y con lo que se BUSCA. Las fuentes heurísticas
+    // ya vienen en el idioma del libro, así que su término es su propio rótulo.
+    expect(r.map((x: any) => x.label)).toEqual(['Byte pair encoding', 'Encoding word positions', 'attention scores']);
+    expect(r.every((x: any) => x.term === x.label)).toBe(true);
   });
 
   test('parseConcepts tolera prosa y razonamiento alrededor del JSON', async ({ page }) => {
@@ -300,16 +303,50 @@ test.describe('qué concepto explicar (puro)', () => {
       return F.parseConcepts(`<think>a ver…</think>
 Aquí van:
 \`\`\`json
-{"concept":"3.1 self-attention"}
+{"concept":"3.1 self-attention","term":"self-attention"}
 {"concept":"Summary"}
 {"concept":"self-attention"}
-{"concept":"positional embeddings"}
+{"concept":"Embeddings posicionales","term":"positional embeddings"}
 {"concept": "truncado a mit
 \`\`\``);
     });
     // "Summary" fuera, el duplicado (tras limpiar el numeral) fuera, y el objeto truncado
     // al final —lo que pasa de verdad cuando la respuesta se corta— no tumba a los anteriores.
-    expect(r).toEqual(['self-attention', 'positional embeddings']);
+    expect(r.map((x: any) => x.label)).toEqual(['self-attention', 'Embeddings posicionales']);
+    // El TÉRMINO viaja aparte del rótulo: es lo que arregla el chip en español sobre libro
+    // en inglés. Y sin `term` se cae al rótulo, que es el comportamiento de antes.
+    expect(r.map((x: any) => x.term)).toEqual(['self-attention', 'positional embeddings']);
+  });
+
+  // BUG REAL (2026-07-28): con la app en español y el libro en inglés, la app ofrecía
+  // "Tokenización de texto" y al pulsarlo respondía "No encuentro ese concepto en el libro".
+  // El prompt pide los conceptos en el idioma de la INTERFAZ, pero el retrieval es BM25
+  // LÉXICO sobre el texto del LIBRO: "tokenizacion"/"texto" no aparecen en ningún sitio.
+  // Sobrevivían de casualidad los que se escriben igual en los dos idiomas.
+  test('el chip busca por el término del libro, no por su etiqueta traducida', async ({ page }) => {
+    await openApp(page);
+    const r = await page.evaluate(async () => {
+      const F: any = await import('/js/ai/feynman.js');
+      const R: any = await import('/js/ai/retrieval.js');
+      const texto = [
+        '## Working with Text Data',
+        '[[a1]] Tokenizing text is the first step: we split the input text into individual tokens.',
+        '[[a2]] These tokens are then converted into token IDs using a vocabulary.',
+        '[[a3]] Byte pair encoding is the tokenizer used by GPT-2 and GPT-3.',
+      ].join('\n');
+      R.buildIndex('libro-en', R.parsePassages(texto, new Map(), ['Working with Text Data']));
+      const [c] = F.parseConcepts('{"concept":"Tokenización de texto","term":"tokenizing text"}');
+      return {
+        label: c.label,
+        term: c.term,
+        porEtiqueta: F.passagesFor(c.label).length,   // lo que hacía antes → 0
+        porTermino: F.passagesFor(c.term).length,     // lo que hace ahora
+      };
+    });
+    expect(r.label).toBe('Tokenización de texto');
+    expect(r.term).toBe('tokenizing text');
+    expect(r.porEtiqueta).toBe(0);          // la etiqueta traducida NO aparece en el libro
+    expect(r.porTermino).toBeGreaterThan(0);
   });
 
   test('sampleForConcepts reparte por todo el capítulo en vez de coger el principio', async ({ page }) => {

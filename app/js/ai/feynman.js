@@ -28,7 +28,7 @@ import { t, uiLangName } from '../i18n.js';
 import * as LLM from './llm.js';
 import * as Retrieval from './retrieval.js';
 import * as Jobs from './jobs.js';
-import { balancedObjects } from './query-expand.js';
+import { balancedObjects, expandQuery, expansionQuery } from './query-expand.js';
 import { renderWithCitations } from './render.js';
 import { icon } from '../ui/icons.js';
 import { escapeHtml } from '../ui/escape.js';
@@ -302,7 +302,10 @@ export function suggestConcepts({ leaves = [], sections = [], currentChapter = '
       const key = norm(label);
       if (!key || seen.has(key) || !looksLikeConcept(label)) continue;
       seen.add(key);
-      out.push(label);
+      // `term` = con qué se BUSCA. Las fuentes heurísticas (secciones del libro, hojas del
+      // mapa) ya vienen en el idioma del libro, así que su término es su propio rótulo; solo
+      // las del modelo, que se traducen a la interfaz, traen uno distinto.
+      out.push({ label, term: cleanConcept(item.term || '') || label });
       if (out.length >= max) return out;
     }
   }
@@ -339,12 +342,15 @@ export function buildConceptsPrompt(scopeLabel, bookTitle, passages) {
 EXPLICAR con sus palabras.
 
 Devuelve SOLO objetos JSON, uno por línea, sin prosa alrededor:
-{"concept":"<nombre del concepto>"}
+{"concept":"<nombre del concepto>","term":"<cómo lo llama el texto de abajo>"}
 
 Reglas:
 - Entre 4 y ${MAX_SUGGESTIONS} conceptos, del más central al más accesorio.
 - El NOMBRE de una idea (2-5 palabras), en ${uiLangName()}: "atención causal", "byte pair
   encoding". NO títulos de sección, NO preguntas, NO frases enteras.
+- "term" es ese mismo concepto CON LAS PALABRAS EXACTAS DEL TEXTO DE ABAJO, en su idioma y sin
+  traducir ("tokenizing text", "causal attention"). Es OBLIGATORIO: con él se localiza el
+  concepto en el libro. Si el texto está en el mismo idioma, repite el nombre.
 - Algo que se pueda explicar y en lo que quepa equivocarse. Nada de datos sueltos ni de
   nombres propios sin sustancia.
 - Solo conceptos que el texto de abajo desarrolle de verdad.` },
@@ -352,6 +358,12 @@ Reglas:
   ];
 }
 
+// Devuelve `{ label, term }`. El LABEL es lo que se pinta (idioma de la interfaz) y el TERM es
+// con lo que se BUSCA (idioma del libro). Separarlos es el arreglo de un bug real: con la app
+// en español y el libro en inglés, el chip decía "Tokenización de texto", el retrieval es BM25
+// léxico sobre el texto en inglés, y "tokenizacion"/"texto" no aparecen en ninguna parte →
+// "No encuentro ese concepto en el libro" sobre un concepto que la propia app acababa de
+// ofrecer. Sobrevivían solo los que se escriben igual en los dos idiomas ("token embeddings").
 export function parseConcepts(raw) {
   const text = String(raw || '').replace(/```(?:json)?/gi, '').replace(/<think>[\s\S]*?<\/think>/gi, ' ');
   const out = [];
@@ -363,7 +375,10 @@ export function parseConcepts(raw) {
     const key = norm(label);
     if (!key || seen.has(key) || !looksLikeConcept(label)) continue;
     seen.add(key);
-    out.push(label);
+    // Sin `term` (modelo que ignora el campo, o libro en el mismo idioma) se busca por el label:
+    // es exactamente el comportamiento anterior, así que nunca es peor.
+    const term = cleanConcept(typeof o?.term === 'string' ? o.term : '') || label;
+    out.push({ label, term });
   }
   return out.slice(0, MAX_SUGGESTIONS);
 }
@@ -560,6 +575,7 @@ let overlay = null;
 let session = null;
 let dictation = null;
 let sttDone = null;      // promesa de la transcripción en curso (motor del proveedor)
+let pickedTerm = '';     // término del chip elegido: con lo que se BUSCA en el libro
 let busy = false;
 
 export function open(context) {
@@ -642,7 +658,9 @@ function renderSetup() {
     exclude: [ctx.bookTitle || ''],
     max: 4,
   });
-  const chips = (list) => list.map((c) => `<button class="fey-chip" data-c="${escapeHtml(c)}">${escapeHtml(c)}</button>`).join('');
+  // El chip lleva DOS cosas: lo que se lee (`label`) y con lo que se busca (`data-term`).
+  const chips = (list) => list.map((c) =>
+    `<button class="fey-chip" data-c="${escapeHtml(c.label)}" data-term="${escapeHtml(c.term || c.label)}">${escapeHtml(c.label)}</button>`).join('');
   b.innerHTML = `
     <h2>${t('Explícamelo tú')}</h2>
     <p class="ai-ob-sub">${t('Explica un concepto con tus palabras. No te voy a dar la respuesta: te voy a preguntar hasta que la construyas tú. Al final te digo qué te dejaste.')}</p>
@@ -661,11 +679,18 @@ function renderSetup() {
     <div id="fey-error" class="fc-error" style="display:none"></div>`;
   b.querySelector('#fey-suggest').addEventListener('click', (e) => {
     const chip = e.target.closest('.fey-chip');
-    if (chip) { b.querySelector('#fey-concept').value = chip.dataset.c; return; }
+    if (chip) {
+      b.querySelector('#fey-concept').value = chip.dataset.c;
+      pickedTerm = chip.dataset.term || '';
+      return;
+    }
     if (e.target.closest('#fey-more')) suggestWithLLM();
   });
   b.querySelector('#fey-start').addEventListener('click', startSession);
-  b.querySelector('#fey-concept').addEventListener('keydown', (e) => { if (e.key === 'Enter') startSession(); });
+  const inp = b.querySelector('#fey-concept');
+  // Si el usuario reescribe, el término del chip deja de valer: se busca lo que él ha puesto.
+  inp.addEventListener('input', () => { pickedTerm = ''; });
+  inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') startSession(); });
 }
 
 // Extracción con el modelo: una llamada corta sobre una muestra del capítulo. Va detrás de
@@ -708,7 +733,7 @@ async function suggestWithLLM() {
     }
     // Los del modelo van DELANTE de los gratuitos: el usuario acaba de pedirlos.
     const merged = suggestConcepts({
-      leaves: [...concepts.map((c) => ({ label: c, chapter: ctx.currentChapter || '' })), ...mindmapConcepts(ctx.bookId)],
+      leaves: [...concepts.map((c) => ({ ...c, chapter: ctx.currentChapter || '' })), ...mindmapConcepts(ctx.bookId)],
       sections: Retrieval.sectionsByChapter(ctx.currentChapter || ''),
       currentChapter: ctx.currentChapter || '',
       exclude: [ctx.bookTitle || ''],
@@ -738,6 +763,24 @@ function hideError() {
 
 // ---- arranque: extraer expectativas -------------------------------------------
 
+// Localiza los pasajes del concepto con hasta TRES intentos, de más barato a más caro:
+//  1) el término del chip (idioma del libro) — gratis y el que resuelve el caso habitual;
+//  2) lo escrito por el usuario — para conceptos tecleados a mano;
+//  3) la expansión de consulta de IA7 — una llamada corta al modelo rápido, que traduce y
+//     añade sinónimos. Es la red para quien escribe "tokenización" en un libro en inglés.
+// Sin (3), el usuario se queda contra un muro sin forma de salir salvo adivinar el idioma.
+async function locatePassages(concept) {
+  for (const q of [pickedTerm, concept]) {
+    if (!q) continue;
+    const hits = passagesFor(q);
+    if (hits.length) return hits;
+  }
+  if (!LLM.hasKey()) return [];
+  const exp = await expandQuery(concept, { tocLabels: ctx.tocLabels || [] }).catch(() => null);
+  const q = expansionQuery(exp);
+  return q ? passagesFor(q) : [];
+}
+
 async function startSession() {
   const input = body()?.querySelector('#fey-concept');
   const concept = (input?.value || '').trim();
@@ -747,8 +790,12 @@ async function startSession() {
   renderLoading(t('Preparando las preguntas…'));
   try {
     ctx.ensureIndex?.();
-    const passages = passagesFor(concept);
-    if (!passages.length) { renderSetup(); showError(t('No encuentro ese concepto en el libro. Prueba con otras palabras.')); return; }
+    const passages = await locatePassages(concept);
+    if (!passages.length) {
+      renderSetup();
+      showError(t('No encuentro «{c}» en este libro. Si el libro está en otro idioma, prueba con el término tal y como aparece en él.', { c: concept }));
+      return;
+    }
     // Holgura para modelos de razonamiento: con un techo bajo, el razonamiento se come el
     // presupuesto y el contenido sale VACÍO (no da error, simplemente no hay texto).
     const raw = await LLM.chatStream({ messages: buildExpectationsPrompt(concept, ctx.bookTitle, passages), maxTokens: 3000 });
