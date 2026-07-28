@@ -222,6 +222,64 @@ producto. **Veredicto: deepseek sigue de principal**; mimo queda como visión (d
 único fiable) y como alternativa documentada para quien priorice velocidad sobre citas.
 Se re-evalúa si mimo mejora o si la pertinencia se arregla por prompt (EV2/smoke).
 
+### IA9 — Retrieval multi-fuente (cruzar libros, papers y posts) · `M`
+
+**El caso.** «El paper, el post y las docs dicen cosas distintas de lo mismo; quiero **esa**
+comparación.» Hoy es imposible: [`retrieval.js`](app/js/ai/retrieval.js) mantiene `let index = null`,
+un singleton con `key` de UN libro. Desbloquea [P22·F6](#f6--matriz-de-literatura--m--depende-de-ia9)
+(matriz de literatura) y el caso del lector que se prepara un tema con fuentes heterogéneas.
+
+**Tres de las cuatro piezas duras YA existen** (verificado 2026-07-28):
+1. **El corpus está persistido.** Store `bookText` (`{bookId, annotatedText, tokenEstimate}`) + `anchors`
+   en [`db.js`](app/js/ai/db.js). Indexar un libro cerrado **no** reabre el EPUB ni repagina el PDF:
+   es leer de IndexedDB y tokenizar.
+2. **Hay precedente de usarlo sin abrir el libro.** [`study.js` L322](app/js/ai/study.js#L322)
+   (`passagesFor`) ya lo hace para la cola diaria — *"la cola diaria cruza libros y ninguno tiene por
+   qué estar abierto ni indexado"*—, con caché por libro y **liberación al cerrar sesión** («si no,
+   serían varios MB retenidos por libro»). **Copiar ese patrón de memoria, no inventar otro.**
+3. **Ya se navega a otro libro.** `goToSource` usa `#book=<id>&loc=<cfi|página>` y el router **abre**
+   el libro si no está abierto. Una cita de una fuente cerrada ya es clicable.
+
+> ⚠️ **Las dos trampas del arreglo obvio.**
+> **(a) No convertir el índice en una sopa multi-libro.** ~15 llamadas asumen que «el índice» es «el
+> libro abierto»: `allPassages()` alimenta el muestreo de flashcards y
+> [flashcards.js L553](app/js/ai/flashcards.js#L553) ya avisa del peligro. Se corromperían **en
+> silencio** (mazos con tarjetas de tres libros).
+> **(b) Top-k global es PEOR para este caso de uso.** Devuelve 8 pasajes del documento más largo y
+> verboso. No queremos los mejores pasajes del corpus: queremos **qué dice cada fuente**. La
+> comparación exige representación equilibrada, no ranking puro.
+
+**Diseño:**
+- **A — El singleton se queda y significa «libro activo».** Nada se vuelve multi por defecto; lo multi
+  es **opt-in y se pide por su nombre**. Encima, una capa explícita:
+  ```
+  Map<bookId, index>   con presupuesto y desalojo LRU
+  Retrieval.load(bookId)                    // bookText+anchors → parse → índice, cacheado
+  Retrieval.searchAcross(ids, q, kPorFuente)
+  ```
+- **B — Ids cualificados (`bookId:a12`).** `a12` existe en los tres libros; sin cualificar, los chips
+  de cita resuelven contra el libro equivocado y navegan a una página aleatoria. **Es el detalle más
+  peligroso de la épica: entra en la primera línea de código, no después.**
+- **C — Puntuar por fuente, mezclar en round-robin.** El `idf` de BM25 es relativo al corpus: las
+  puntuaciones crudas de índices distintos no son comparables. Puntuar cada fuente por separado y
+  tomar **k por fuente** es a la vez lo correcto estadísticamente y lo que resuelve la trampa (b).
+- **D — El ámbito es la estantería.** Sin UI nueva: [P12](#p12--flashcards-por-libro-y-por-estantería-selector-de-repaso--✓-sm) ya
+  estableció la estantería como ámbito de repaso. Aquí es «ámbito de esta conversación: *este libro* /
+  *esta estantería*».
+- **E — Las citas dicen de dónde vienen.** «*Attention Is All You Need* · pág. 4», no «pág. 47». El
+  salto ya funciona (pieza 3): falta la etiqueta.
+
+**Lo que sí es trabajo nuevo:** el **presupuesto de contexto**. Con una fuente caben 60 pasajes; con
+seis no caben 360. Hay que repartir —¿a partes iguales o proporcional a la relevancia?— y eso toca la
+lógica de relleno de [`panel.js`](app/js/ai/panel.js). Es la parte que pide criterio, no código.
+
+**Limitación honesta:** BM25 sufre más cruzando fuentes que dentro de un libro, porque el paper, el
+post y las docs **llaman a lo mismo con palabras distintas**. Aquí la expansión de query de
+[IA7](#ia7--reescritura-de-consulta-por-defecto-hyde-lite--m--en-curso) deja de ser un extra y pasa a
+ser necesaria.
+
+**Orden:** A+B primero — son el cimiento, se entregan con tests y **sin cambiar nada visible**.
+
 ---
 
 ## 🎨 Producto / UX
@@ -843,13 +901,16 @@ Tres decisiones sin las cuales **no construirlo**:
    **el juicio lo escribe el usuario**. Es la tesis ICAP de esta épica y además es lo correcto
    profesionalmente: si la IA escribe «esto flaquea en X», el investigador firma una opinión ajena.
 
-**F6 — Matriz de literatura** · `M` · **la salida que importa**
+**F6 — Matriz de literatura** · `M` · **depende de [IA9](#ia9--retrieval-multi-fuente-cruzar-libros-papers-y-posts--m)**
 Filas = papers, columnas = los `key` de la plantilla. **Es el entregable real de una revisión de
 literatura.** Sale casi gratis en cuanto los campos son *los mismos* en todos — de ahí la única
-disciplina de diseño que importa: **campos fijos, no prosa libre**. Requiere lo único estructural de
-esta épica: hoy `retrieval.js` mantiene **un solo índice de módulo** (`hasIndex(key)`), es decir el
-agente ve un documento y solo uno; para un investigador la unidad no es un documento, es **una
-literatura**.
+disciplina de diseño que importa: **campos fijos, no prosa libre**.
+Necesita lo único estructural de esta épica —que el agente vea más de un documento, porque para un
+investigador la unidad no es un documento sino **una literatura**—, pero eso **ya no vive aquí**:
+está diseñado en [IA9](#ia9--retrieval-multi-fuente-cruzar-libros-papers-y-posts--m), y resultó
+bastante más barato de lo que esta épica asumía (el corpus ya está persistido en `bookText` y
+`study.js` ya tiene el patrón de leerlo sin abrir el libro). F6 es la **capa de agregación** encima:
+recorrer las fichas, alinear por `key`, pintar la tabla.
 
 **F7 — Exports que alimentan SU sistema** · `S`–`M` · **posicionamiento**
 El investigador **ya tiene** base de conocimiento —Zotero, Obsidian, Notion, con años de notas—. El
@@ -863,8 +924,8 @@ ya montó el patrón `download()` CSP-safe: son formas nuevas, no un sistema nue
 Elicit/SciSpace son servidor: el PDF sube. Con BYOK + IndexedDB **el paper no sale del dispositivo**.
 A un investigador eso le importa — merece estar en la landing del nicho.
 
-**Orden:** F1+F2 (corrección, bloquean todo lo demás) → F3+F4 (baratas) → F5 → F7 → F6 (la apuesta
-grande: multi-documento).
+**Orden:** F1+F2 (corrección, bloquean todo lo demás) → F3+F4 (baratas) → F5 → F7 → F6 (tras
+IA9).
 
 ---
 
