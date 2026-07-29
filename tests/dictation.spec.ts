@@ -282,3 +282,70 @@ test.describe('dictado por proveedor (BYOK)', () => {
     expect(msg).toMatch(/transcripción/i);
   });
 });
+
+// El modo Feynman comparte la barra de grabación con el chat (mic.js). Aquí la explicación es
+// LARGA —hablas un par de minutos—, así que saber que sigue grabando y que se te oye importa
+// más que en el chat, no menos.
+test('en Feynman la barra de grabación sustituye al textarea y el vúmetro va', async ({ page }) => {
+  test.setTimeout(60000);
+  await page.addInitScript(() => {
+    localStorage.setItem('bookreader_ai_key', JSON.stringify('k-test'));
+    localStorage.setItem('bookreader_ai_stt_model', JSON.stringify('whisper'));
+  });
+  await page.goto('/');
+  const [chooser] = await Promise.all([
+    page.waitForEvent('filechooser'),
+    page.getByRole('button', { name: 'Abrir archivo' }).click(),
+  ]);
+  await chooser.setFiles(path.join(__dirname, 'test.epub'));
+  await expect(page.locator('#reader-title')).toHaveText('Pedro Páramo', { timeout: 15000 });
+
+  // Grabadora y medidor falsos: sin micro real, con nivel controlable.
+  await page.evaluate(() => {
+    const w = window as any;
+    w.__nivel = 0.9;
+    delete w.SpeechRecognition; delete w.webkitSpeechRecognition;
+    w.MediaRecorder = class {
+      mimeType = 'audio/webm';
+      ondataavailable: any = null; onstop: any = null;
+      start() {} stop() { this.onstop?.(); }
+    };
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: { getUserMedia: async () => ({ getTracks: () => [] }) },
+    });
+    w.AudioContext = class {
+      createMediaStreamSource() { return { connect() {} }; }
+      createAnalyser() {
+        return { fftSize: 512, getByteTimeDomainData: (b: Uint8Array) => b.fill(128 + Math.round(w.__nivel * 127)) };
+      }
+      close() {}
+    };
+  });
+
+  await page.evaluate(async () => {
+    const F: any = await import('/js/ai/feynman.js');
+    F.open({ bookId: 'x', bookTitle: 'Pedro Páramo', tocLabels: [], ensureIndex: () => {}, anchors: new Map() });
+    F.__renderSessionForTest(F.newSession('la muerte en Comala', {
+      expectations: [{ id: 'e1', text: 'Comala está poblada de muertos', src: 'a1' }],
+      misconceptions: [],
+    }), 'x');
+  });
+
+  const fey = page.locator('#ai-feynman');   // el chat monta SU barra: hay que acotar
+  await expect(page.locator('#fey-input')).toBeVisible();
+  await expect(fey.locator('.mic-bar')).toBeHidden();      // en reposo no ocupa nada
+
+  await page.locator('#fey-mic').click();
+  await expect(fey.locator('.mic-bar')).toBeVisible();
+  await expect(page.locator('#fey-input')).toBeHidden();    // la barra ocupa su sitio
+  await expect(page.locator('#fey-mic')).toHaveClass(/ai-mic-on/);
+  await expect(fey.locator('.mic-bar-time')).toHaveText(/^\d:\d\d$/);
+  // Con voz, el vúmetro se enciende: es lo que distingue "te oigo" de "micro mudo".
+  await expect(fey.locator('.mic-bar-level i.on').first()).toBeVisible();
+
+  // Y al parar, todo vuelve a su sitio.
+  await page.locator('#fey-mic').click();
+  await expect(page.locator('#fey-input')).toBeVisible();
+  await expect(fey.locator('.mic-bar')).toBeHidden();
+});

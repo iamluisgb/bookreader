@@ -3075,7 +3075,12 @@ body.ai-open #sync-badge { right: calc(var(--ai-panel-width) + 14px); }
 }
 .fey-input:focus { outline: none; border-color: var(--accent); }
 .fey-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
-.fey-mic-on { background: var(--accent) !important; color: #fff !important; }
+/* El estado "grabando" lo pinta mic.js con .ai-mic-on (compartido con la barra del chat).
+   Doble clase para ganarle a .appset-tpl-cancel sin recurrir a !important. */
+.appset-tpl-cancel.ai-mic-on { background: var(--accent); color: #fff; }
+/* La barra de grabación sustituye al textarea, y este es alto (rows=5): sin igualar la
+   altura, el modal pegaba un salto al empezar a dictar. */
+.ai-ob-body > .mic-bar { min-height: 132px; align-items: center; }
 /* Selector de idioma del dictado: pegado al micro, porque es un ajuste DE ese botón.
    `width: auto` es obligatorio: el `select` global lleva `width: 100%` y aquí partía la
    fila de acciones en tres líneas. */

@@ -1,9 +1,10 @@
 // Dictado enganchado a un <textarea> + un botón. Nace de la barra del chat (escribirle al
-// agente desde el móvil con el pulgar es el cuello de botella real), pero no sabe nada del
-// panel: recibe los dos elementos y ya.
+// agente desde el móvil con el pulgar es el cuello de botella real), pero no sabe nada de
+// quién lo usa: recibe los dos elementos y ya. Lo comparten el chat y el modo Feynman.
 //
-// Los motores y su porqué están en feynman.js, que es donde se estrenó el dictado; aquí solo
-// se reutilizan. Resumen: si hay modelo de transcripción configurado (BYOK) se graba con
+// Los motores y su porqué están en dictation-engine.js; aquí está la UI que los envuelve
+// (barra de grabación, acumulado, papelera). Resumen: si hay modelo de transcripción
+// configurado (BYOK) se graba con
 // MediaRecorder y se transcribe al soltar — acierta mucho más con vocabulario técnico y NO
 // se corta solo por silencio, que es el fallo nº1 del dictado del navegador en móvil. Si no,
 // se cae al reconocedor del navegador, que sí da texto en vivo.
@@ -11,7 +12,7 @@ import { t } from '../i18n.js';
 import * as LLM from './llm.js';
 import {
   speechSupported, createDictation, recorderSupported, createRecorder, dictationLang,
-} from './feynman.js';
+} from './dictation-engine.js';
 
 export function micAvailable() { return speechSupported() || (LLM.hasStt() && recorderSupported()); }
 function useProviderStt() { return LLM.hasStt() && recorderSupported(); }
@@ -101,8 +102,9 @@ function makeAppender(input) {
  * @param {() => string} [o.getPrompt]   vocabulario para sesgar la transcripción (título del
  *                                       libro, capítulo actual): sale gratis y arregla justo
  *                                       los nombres propios que Whisper se inventa
- * @param {(msg: string) => void} [o.onError]
- * @returns {{ stop: () => Promise<void>, recording: () => boolean }}
+ * @param {(msg: string, code?: string) => void} [o.onError]  `code` solo con el motor del
+ *                                       navegador; Feynman lo usa para ofrecer Ajustes
+ * @returns {{ start: () => void, stop: () => Promise<void>, recording: () => boolean }}
  */
 export function attachMic({ input, btn, getPrompt = () => '', onError = () => {} }) {
   let active = null;    // motor en marcha (null = parado)
@@ -164,7 +166,10 @@ export function attachMic({ input, btn, getPrompt = () => '', onError = () => {}
       lang: dictationLang(),
       onText: append,
       onEnd: () => { active = null; ui('idle'); },
-      onError: (msg) => { active = null; ui('idle'); onError(msg); },
+      // El `code` se pasa tal cual: Feynman lo usa para distinguir un fallo de red del
+      // reconocedor —que SÍ tiene arreglo, configurar el motor del proveedor— y ofrecer
+      // abrir Ajustes en vez de un mensaje que solo describe el problema.
+      onError: (msg, code) => { active = null; ui('idle'); onError(msg, code); },
     });
     if (!d) return null;
     d.start();
@@ -210,8 +215,8 @@ export function attachMic({ input, btn, getPrompt = () => '', onError = () => {}
     return done || Promise.resolve();
   }
 
-  btn.addEventListener('click', () => {
-    if (active) { stop(); return; }
+  function start() {
+    if (active) return;
     discard = false;
     const provider = useProviderStt();
     // Nivel y papelera solo tienen sentido con el motor del proveedor: el del navegador no da
@@ -224,8 +229,12 @@ export function attachMic({ input, btn, getPrompt = () => '', onError = () => {}
       : t('Escuchando…');
     active = provider ? startProvider() : startBrowser();
     if (active) ui('rec');
-  });
+  }
+
+  btn.addEventListener('click', () => { if (active) stop(); else start(); });
 
   ui('idle');
-  return { stop, recording: () => !!active };
+  // `start` lo necesita Feynman para rearrancar tras cambiar el idioma del dictado; el chat
+  // solo usa el botón.
+  return { start, stop, recording: () => !!active };
 }

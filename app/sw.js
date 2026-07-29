@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bookreader-v103';
+const CACHE_NAME = 'bookreader-v104';
 const ASSETS = [
   './',
   './index.html',
@@ -46,6 +46,7 @@ const ASSETS = [
   './js/pdf-reader.js',
   './js/ai/llm.js',
   './js/ai/mic.js',
+  './js/ai/dictation-engine.js',
   './js/ai/segment.js',
   './js/ai/segment-pdf.js',
   './js/ai/db.js',

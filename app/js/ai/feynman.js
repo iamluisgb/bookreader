@@ -32,8 +32,9 @@ import { balancedObjects, expandQuery, expansionQuery } from './query-expand.js'
 import { renderWithCitations } from './render.js';
 import { icon } from '../ui/icons.js';
 import { escapeHtml } from '../ui/escape.js';
-import * as Storage from '../storage.js';
 import * as AppSettings from '../ui/app-settings.js';
+import { attachMic, micAvailable } from './mic.js';
+import { dictationLang, setDictationLang, recorderSupported } from './dictation-engine.js';
 
 // Vueltas sobre la MISMA expectativa antes de subir de escalón. La escalada es por
 // expectativa, no por sesión: cambiar de tema reinicia el andamiaje de ese tema.
@@ -409,155 +410,13 @@ export function sampleForConcepts(passages, maxChars = 24000) {
 
 // ---- dictado ------------------------------------------------------------------
 
-// Explicar EN VOZ ALTA es el ejercicio de Feynman; teclear un párrafo es otra cosa y casi
-// nadie lo hace. `SpeechRecognition` es del navegador (nada sale de la máquina salvo lo que
-// el propio navegador haga), pero su soporte es irregular: si no está, no se enseña el botón
-// y el textarea es el camino normal, no un consuelo.
-export function speechSupported() {
-  return !!(window.SpeechRecognition || window.webkitSpeechRecognition);
-}
-
-// Idioma del dictado. NO se deduce de la UI: se lee en inglés con la interfaz en español
-// más veces de las que parece, y meterle "attention"/"embeddings" a un reconocedor `es-ES`
-// da puré justo en el vocabulario que importa. Se elige a mano y se recuerda.
-const LANGS = { es: 'es-ES', en: 'en-US' };
-export function dictationLang() {
-  const v = Storage.get('fey_dictation_lang', '');
-  return LANGS[v] ? v : (uiLangName() === 'español' ? 'es' : 'en');
-}
-export function setDictationLang(l) { if (LANGS[l]) Storage.set('fey_dictation_lang', l); }
-
-// Mensaje por código de error del reconocedor. Antes TODOS terminaban igual —el botón se
-// apagaba sin decir nada—, así que "permiso denegado" y "he dejado de oírte" eran
-// indistinguibles de "no funciona". `no-speech` y `aborted` no son errores: son el caso
-// normal de una pausa, y deben reintentar en silencio.
-export function speechErrorMessage(code) {
-  switch (code) {
-    case 'not-allowed':
-    case 'service-not-allowed':
-      return t('No hay permiso para usar el micrófono. Habilítalo en los ajustes del navegador para este sitio.');
-    case 'audio-capture':
-      return t('No se encuentra ningún micrófono.');
-    case 'network':
-      return t('El dictado del navegador necesita conexión (envía el audio a un servicio externo).');
-    case 'no-speech':
-    case 'aborted':
-      return '';        // no es un error: se reintenta
-    default:
-      return t('El dictado se ha detenido ({code}).', { code: code || '?' });
-  }
-}
-
-// El navegador CORTA el reconocimiento solo tras unos segundos de silencio —y en Android
-// ignora `continuous` casi por completo, terminando en cada frase—. Explicar algo con tus
-// palabras está lleno de pausas para pensar, así que el micro se moría a media explicación
-// y el usuario ni se enteraba. La corrección es distinguir "ha terminado el reconocedor" de
-// "el usuario ha pulsado parar": mientras `wantsRunning`, se vuelve a arrancar.
-export function createDictation({ onText, onEnd, onError, lang } = {}) {
-  const Ctor = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!Ctor) return null;
-  const code = LANGS[lang] || LANGS[dictationLang()];
-  let rec = null;
-  let wantsRunning = false;
-  let retriedNetwork = false;
-  // Acumulado FUERA del reconocedor: cada reinicio crea uno nuevo y su `finalText` empieza
-  // vacío. Si viviera dentro, cada pausa borraría todo lo dicho hasta entonces.
-  let finalText = '';
-
-  const build = () => {
-    const r = new Ctor();
-    r.continuous = true;
-    r.interimResults = true;
-    r.lang = code;
-    r.onresult = (ev) => {
-      let interim = '';
-      for (let i = ev.resultIndex; i < ev.results.length; i++) {
-        const res = ev.results[i];
-        if (res.isFinal) finalText += res[0].transcript + ' ';
-        else interim += res[0].transcript;
-      }
-      onText?.(finalText + interim, finalText);
-    };
-    r.onerror = (ev) => {
-      const code = ev?.error;
-      const msg = speechErrorMessage(code);
-      if (!msg) return;                 // pausa: `onend` se encarga de reanudar
-      // `network` puede ser transitorio (el servicio de voz del navegador tarda en responder
-      // al arrancar). Se le da UNA segunda oportunidad; si vuelve, es que no hay servicio y
-      // se avisa. Los demás fatales —permiso, sin micro— no se reintentan: no van a cambiar.
-      if (code === 'network' && !retriedNetwork) { retriedNetwork = true; return; }
-      wantsRunning = false;
-      onError?.(msg, code);
-    };
-    r.onend = () => {
-      if (wantsRunning) { try { r.start(); } catch (e) { /* aún cerrando: lo reintenta el próximo onend */ } return; }
-      onEnd?.(finalText);
-    };
-    return r;
-  };
-
-  return {
-    start: () => {
-      wantsRunning = true;
-      rec = build();
-      // Un `start()` que falla de verdad (sin permiso) lanza igual que un doble arranque.
-      // Se distingue por `wantsRunning`: si estamos arrancando, el fallo es real.
-      try { rec.start(); } catch (e) { wantsRunning = false; onError?.(speechErrorMessage('not-allowed'), 'not-allowed'); }
-    },
-    stop: () => { wantsRunning = false; try { rec?.stop(); } catch (e) { /* ya parado */ } },
-  };
-}
-
-// ---- dictado por proveedor (BYOK) ---------------------------------------------
-
-export function recorderSupported() {
-  return !!(window.MediaRecorder && navigator.mediaDevices?.getUserMedia);
-}
-
-// Graba con MediaRecorder y transcribe al parar. Frente al dictado del navegador: no hay
-// corte automático por silencio (el fallo nº1 en móvil), acierta mucho más con vocabulario
-// técnico, y se puede sesgar con el `prompt`. A cambio NO hay texto en vivo: el resultado
-// llega al soltar el botón. Medido: ~2,3 s para 8 s de audio; 4-9 s para 25 s.
-//
-// Formato: se deja elegir al navegador (webm/opus en Chrome, mp4 en Safari). Opus pesa
-// ~30× menos que WAV, que en móvil con datos no es un detalle.
-// `onStream` recibe el MediaStream en cuanto hay permiso: es lo único con lo que se puede
-// medir el nivel de entrada (ver mic.js), y sin él "grabando" y "grabando pero sordo" se ven
-// igual. Opcional: quien no lo pase se comporta como antes.
-export function createRecorder({ onStop, onError, onStream } = {}) {
-  if (!recorderSupported()) return null;
-  let rec = null;
-  let stream = null;
-  const chunks = [];
-  const release = () => { stream?.getTracks().forEach((tr) => tr.stop()); stream = null; };
-
-  return {
-    start: async () => {
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      } catch (e) {
-        onError?.(t('No hay permiso para usar el micrófono. Habilítalo en los ajustes del navegador para este sitio.'));
-        return false;
-      }
-      try {
-        rec = new MediaRecorder(stream);
-      } catch (e) {
-        release();
-        onError?.(t('Este navegador no puede grabar audio.'));
-        return false;
-      }
-      onStream?.(stream);
-      rec.ondataavailable = (ev) => { if (ev.data?.size) chunks.push(ev.data); };
-      rec.onstop = () => {
-        release();
-        onStop?.(chunks.length ? new Blob(chunks, { type: rec.mimeType || 'audio/webm' }) : null);
-      };
-      rec.start();
-      return true;
-    },
-    stop: () => { try { rec?.stop(); } catch (e) { release(); } },
-  };
-}
+// Los MOTORES viven en dictation-engine.js (los comparten el modo Feynman y la barra del
+// chat). Se re-exportan aquí porque son parte de la superficie pública histórica de este
+// módulo y hay tests que los importan desde él.
+export {
+  speechSupported, dictationLang, setDictationLang, speechErrorMessage,
+  createDictation, recorderSupported, createRecorder,
+} from './dictation-engine.js';
 
 // Vocabulario del capítulo para sesgar la transcripción. Sale de lo que la sesión YA tiene
 // calculado antes de que el usuario abra la boca: no cuesta ni una llamada.
@@ -589,7 +448,6 @@ let ctx = null;          // { bookId, bookTitle, tocLabels, currentChapter, ensu
 let overlay = null;
 let session = null;
 let dictation = null;
-let sttDone = null;      // promesa de la transcripción en curso (motor del proveedor)
 let pickedTerm = '';     // término del chip elegido: con lo que se BUSCA en el libro
 let pickedSrc = '';      // ancla del chip elegido: mejor que buscar, es el pasaje exacto
 let busy = false;
@@ -775,11 +633,6 @@ function showError(msg) {
   el.style.display = 'block';
 }
 
-function hideError() {
-  const el = body()?.querySelector('#fey-error');
-  if (el) el.style.display = 'none';
-}
-
 // Error CON SALIDA. Un mensaje que solo describe el problema deja al usuario parado; si hay
 // una acción que lo resuelve, va pegada al mensaje. Se construye con nodos (no innerHTML):
 // el texto puede venir de un error del navegador.
@@ -891,7 +744,7 @@ function renderSession(say) {
     <textarea id="fey-input" class="fey-input" rows="5"
       placeholder="${t('Explícalo con tus palabras…')}"></textarea>
     <div class="fey-actions">
-      ${micAvailable() ? `<button id="fey-mic" class="appset-tpl-cancel" title="${t('Dictar')}">${icon('user', { size: 15 })} <span id="fey-mic-label">${t('Dictar')}</span></button>
+      ${micAvailable() ? `<button id="fey-mic" class="appset-tpl-cancel" title="${t('Dictar')}">${icon('mic', { size: 15 })} <span id="fey-mic-label">${t('Dictar')}</span></button>
       <select id="fey-mic-lang" class="fey-mic-lang" title="${t('Idioma del dictado')}" aria-label="${t('Idioma del dictado')}">
         <option value="es"${dictationLang() === 'es' ? ' selected' : ''}>ES</option>
         <option value="en"${dictationLang() === 'en' ? ' selected' : ''}>EN</option>
@@ -905,15 +758,15 @@ function renderSession(say) {
   // Sin la lambda, el MouseEvent entra como `complete` y —siendo truthy— el diagnóstico
   // felicitaría por haberlo cubierto todo justo cuando el usuario se rinde a medias.
   b.querySelector('#fey-finish').addEventListener('click', () => renderDiagnosisView(false));
-  const mic = b.querySelector('#fey-mic');
-  if (mic) mic.addEventListener('click', toggleDictation);
+  attachFeynmanMic();
   const micLang = b.querySelector('#fey-mic-lang');
   if (micLang) micLang.addEventListener('change', async () => {
+    const grabando = dictation?.recording();
     setDictationLang(micLang.value);
     // Reabrir con el idioma nuevo, pero ESPERANDO a que termine lo anterior: con el motor
     // del proveedor, parar deja una transcripción en vuelo y arrancar otra grabación encima
     // se comería su resultado.
-    if (dictation) { await stopDictation(); toggleDictation(); }
+    if (grabando) { await stopDictation(); dictation?.start(); }
   });
   b.querySelector('#fey-input').focus();
 }
@@ -921,49 +774,19 @@ function renderSession(say) {
 // Hay micro si el navegador dicta O si hay modelo de transcripción configurado. El motor
 // BYOK es OPT-IN: se activa poniendo el modelo en Ajustes, y entonces tiene preferencia
 // (acierta bastante más con vocabulario técnico y no se corta solo en móvil).
-function micAvailable() { return speechSupported() || (LLM.hasStt() && recorderSupported()); }
-function useProviderStt() { return LLM.hasStt() && recorderSupported(); }
-
-function micUi(state) {
-  const label = body()?.querySelector('#fey-mic-label');
-  const btn = body()?.querySelector('#fey-mic');
-  if (label) label.textContent = state === 'rec' ? t('Parar') : state === 'busy' ? t('Transcribiendo…') : t('Dictar');
-  btn?.classList.toggle('fey-mic-on', state === 'rec');
-  if (btn) btn.disabled = state === 'busy';
-}
-
-// Añade el texto dictado SIN pisar lo que el usuario haya escrito a mano. Antes se hacía
-// `input.value = base + text` con `base` congelado al arrancar: cualquier corección manual
-// desaparecía en el siguiente resultado. Ahora la base se recalcula quitando solo lo último
-// que escribimos nosotros.
-function makeAppender(input) {
-  let last = '';
-  return (text) => {
-    const cur = input.value;
-    const base = last && cur.endsWith(last) ? cur.slice(0, -last.length) : (cur ? cur + ' ' : '');
-    input.value = base + text;
-    last = text;
-    input.scrollTop = input.scrollHeight;   // en una explicación larga, seguir viendo el final
-  };
-}
-
-function toggleDictation() {
-  const input = body()?.querySelector('#fey-input');
-  if (!input) return;
-  if (dictation) { stopDictation(); return; }
-  hideError();
-  dictation = useProviderStt() ? startProviderDictation(input) : startBrowserDictation(input);
-  if (dictation) micUi('rec');
-}
-
-function startBrowserDictation(input) {
-  const append = makeAppender(input);
-  const d = createDictation({
-    lang: dictationLang(),
-    onText: (text) => append(text),
-    onEnd: () => { dictation = null; micUi('idle'); },
+// La lógica (motores, acumulado, barra de grabación) es la de mic.js, compartida con la barra
+// del chat; aquí solo queda lo propio de Feynman: el prompt sale de la sesión y el fallo de red
+// del reconocedor ofrece configurar el motor del proveedor en vez de solo describirse.
+function attachFeynmanMic() {
+  const b = body();
+  const input = b?.querySelector('#fey-input');
+  const btn = b?.querySelector('#fey-mic');
+  if (!input || !btn) return;
+  dictation = attachMic({
+    input,
+    btn,
+    getPrompt: () => sttPrompt(session),
     onError: (msg, code) => {
-      dictation = null; micUi('idle');
       // El dictado del navegador va contra un servicio externo que puede no estar disponible
       // (sin red, bloqueado por el navegador o por la red del usuario). No es algo que se
       // pueda arreglar desde aquí — pero SÍ tenemos otro motor: el del proveedor BYOK, que
@@ -979,50 +802,13 @@ function startBrowserDictation(input) {
       showError(msg);
     },
   });
-  if (!d) return null;
-  d.start();
-  return d;
-}
-
-function startProviderDictation(input) {
-  let resolveDone;
-  sttDone = new Promise((r) => { resolveDone = r; });
-  const rec = createRecorder({
-    onStop: async (blob) => {
-      dictation = null;
-      try {
-        if (!blob || blob.size < 1200) return;   // pulsación accidental: no hay nada que enviar
-        micUi('busy');
-        const text = await LLM.transcribe({
-          blob,
-          prompt: sttPrompt(session),
-          language: dictationLang(),
-        });
-        if (text) makeAppender(input)(text);
-      } catch (e) {
-        showError(e.message);
-      } finally {
-        micUi('idle');
-        resolveDone();
-      }
-    },
-    onError: (msg) => { dictation = null; micUi('idle'); showError(msg); resolveDone(); },
-  });
-  if (!rec) { resolveDone(); return null; }
-  // `start` es asíncrono (pide permiso): si falla, `onError` ya ha limpiado.
-  rec.start().then((ok) => { if (!ok) { dictation = null; micUi('idle'); resolveDone(); } });
-  return rec;
 }
 
 // Devuelve una promesa que resuelve cuando el texto YA está en el textarea. Importa con el
 // motor del proveedor: la transcripción llega después de soltar el botón, así que "Enviar"
 // mientras grabas tiene que esperarla o mandaría la explicación sin la última parte.
 function stopDictation() {
-  if (!dictation) return Promise.resolve();
-  const d = dictation;
-  d.stop();
-  if (!useProviderStt()) { dictation = null; return Promise.resolve(); }
-  return sttDone || Promise.resolve();   // `onStop` la resuelve tras escribir el texto
+  return dictation?.stop() || Promise.resolve();
 }
 
 async function sendExplanation() {
