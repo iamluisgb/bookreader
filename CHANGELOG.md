@@ -5,6 +5,33 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-29 — PDF: ampliar con dos dedos «recargaba» y movía la vista
+
+Reportado: al ampliar con pinch en el móvil, el PDF se recargaba y la vista se descolocaba un
+poco. El zoom ya era fluido (canvas oversampleado, sin volver a pdf.js), así que la recarga
+venía de otro sitio.
+
+**Tres causas encadenadas:**
+
+1. **El `resize` reconstruía todo.** En móvil la barra de URL se pliega al gestear y emite
+   `resize`; el handler hacía `rerender()` completo (vaciar el contenedor + `goTo`), o sea
+   recarga y salto al principio de la página. El ajuste **solo depende del ancho**, así que
+   ahora un cambio de alto no hace nada.
+2. **El hueco entre páginas no escalaba.** Durante el pinch se escala el layer entero, huecos
+   incluidos; al hornear volvían a 12px fijos y lo de arriba se recolocaba. Ahora
+   `gap: calc(12px * var(--pdf-zoom))`.
+3. **El anclaje al foco se calculaba, no se medía.** La fórmula suponía que todo escalaba
+   desde el padding, pero ni el padding, ni el centrado del layer, ni los huecos escalan
+   igual, y el scroll además se recorta en los bordes: cada desajuste era un saltito. Ahora se
+   anota dónde cae el foco dentro de la página ancla y se corrige con la posición **real**
+   resultante.
+
+Además, un cambio de ancho real (rotar, abrir el panel) ya no reconstruye: se re-ajustan las
+cajas en sitio y se re-rasteriza con **doble buffer** (el canvas nuevo sustituye al viejo ya
+terminado), así que la página nunca se queda en blanco.
+
+---
+
 ## 2026-07-29 — Móvil: el teclado tapaba el composer del agente
 
 Reportado: al escribir en el chat del agente desde el móvil, el teclado ocultaba la caja de

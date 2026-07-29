@@ -787,7 +787,13 @@ body:not(.scroll-mode) .epub-container .epub-view {
   justify-content: safe center;   /* centra verticalmente si la página cabe (paginado) */
   min-height: 100%;
 }
-.pdf-container.pdf-scroll #pdf-zoom-layer { justify-content: flex-start; gap: 12px; }
+/* El hueco entre páginas escala CON el zoom. Durante el pinch se escala el layer entero
+   (gaps incluidos); si al hornear el gap se quedara fijo, el contenido de arriba mediría
+   distinto que en el preview y la vista pegaba un salto al soltar los dedos. */
+.pdf-container.pdf-scroll #pdf-zoom-layer {
+  justify-content: flex-start;
+  gap: calc(12px * var(--pdf-zoom, 1));
+}
 
 .pdf-page {
   position: relative;

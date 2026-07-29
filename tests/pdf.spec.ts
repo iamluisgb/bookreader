@@ -475,6 +475,117 @@ test.describe('PDF fit-to-width + zoom', () => {
     expect(r.zoom).toBeCloseTo(2.2, 1);
     expect(Math.abs(r.boxAfter - r.fit * 2.2)).toBeLessThan(2);   // horneado al soltar
   });
+
+  // En MÓVIL, la barra de URL se pliega/despliega al hacer gestos y eso emite `resize`. Cada
+  // aviso disparaba un rerender() completo: el contenedor se vaciaba y la vista saltaba al
+  // principio de la página ("se recarga y me mueve la vista" al ampliar con dos dedos). El
+  // ajuste solo depende del ANCHO, así que un cambio de alto no debe tocar NADA.
+  test('un resize que solo cambia el alto no reconstruye ni mueve la vista', async ({ page }) => {
+    await openPdf(page);
+    await page.waitForTimeout(300);
+    await page.evaluate(async () => {
+      const P: any = await import('/js/pdf-reader.js');
+      P.setZoom(6, { x: 195, y: 390 });          // suficiente para que la página desborde
+      const c = document.getElementById('pdf-container')!;
+      c.scrollTop = 200;
+      (document.querySelector('#pdf-container canvas') as HTMLElement).dataset.mark = 'orig';
+    });
+    await page.setViewportSize({ width: 390, height: 640 });   // solo el alto (barra de URL)
+    await page.waitForTimeout(500);                            // más que el debounce de 200ms
+
+    const r = await page.evaluate(async () => {
+      const P: any = await import('/js/pdf-reader.js');
+      const cv = document.querySelector('#pdf-container canvas') as HTMLCanvasElement;
+      return { sameCanvas: cv.dataset.mark === 'orig', zoom: P.getZoom(),
+               scrollTop: document.getElementById('pdf-container')!.scrollTop };
+    });
+    expect(r.sameCanvas).toBe(true);          // no se reconstruyó el contenedor
+    expect(r.zoom).toBeCloseTo(6, 1);         // el zoom sobrevive
+    expect(r.scrollTop).toBeGreaterThan(150); // y la posición de lectura, también
+  });
+
+  // Cambio de ancho DE VERDAD (rotar, abrir el panel): hay que re-ajustar, pero EN SITIO —
+  // sin vaciar el contenedor ni saltar al principio de la página.
+  test('un cambio de ancho re-ajusta sin reconstruir y conserva la página', async ({ page }) => {
+    await openPdf(page);
+    await page.waitForTimeout(300);
+    await page.evaluate(() => {
+      (document.querySelector('#pdf-container canvas') as HTMLElement).dataset.mark = 'orig';
+    });
+    const before = await page.evaluate(() => parseFloat(
+      (document.querySelector('#pdf-container .pdf-page') as HTMLElement).style.width));
+
+    await page.setViewportSize({ width: 700, height: 780 });
+    await page.waitForTimeout(600);
+
+    const after = await page.evaluate(() => {
+      const box = document.querySelector('#pdf-container .pdf-page') as HTMLElement;
+      const cv = document.querySelector('#pdf-container canvas') as HTMLCanvasElement;
+      return { box: parseFloat(box.style.width), css: parseFloat(cv.style.width),
+               liveCanvas: cv.width > 0 };
+    });
+    expect(after.box).toBeGreaterThan(before);              // se re-ajusta al nuevo ancho
+    expect(after.css).toBeCloseTo(after.box, 0);            // el canvas acompaña (sin hueco)
+    expect(after.liveCanvas).toBe(true);                    // nunca se queda en blanco
+  });
+});
+
+// El pinch en modo SCROLL, ya avanzado en el documento: el hueco entre páginas (gap) se
+// escala durante el preview pero antes NO al hornear, así que al soltar los dedos la vista
+// pegaba un salto proporcional a cuántas páginas llevabas por encima.
+test.describe('PDF zoom en scroll continuo (multipágina)', () => {
+  test.use({ viewport: { width: 390, height: 780 } });
+  test('el pinch mantiene el punto focal aunque haya páginas (y huecos) por encima', async ({ page }) => {
+    await page.goto('/index.html');
+    const fc = page.waitForEvent('filechooser');
+    await page.click('#open-file-btn');
+    await (await fc).setFiles(path.join(__dirname, '..', 'evals', 'fixtures', 'p3-constitucion.pdf'));
+    await page.waitForSelector('#pdf-container canvas', { timeout: 30000 });
+
+    await page.evaluate(async () => {
+      const P: any = await import('/js/pdf-reader.js');
+      await P.setReadingMode('scroll');
+      await new Promise((r) => setTimeout(r, 600));
+      P.goTo(6);                                    // bien entrado el documento: varios gaps arriba
+    });
+    await page.waitForTimeout(600);
+
+    const focal = { x: 195, y: 400 };
+    // Qué punto del contenido cae bajo el foco, medido contra la página que hay ahí.
+    const probe = (f: {x: number, y: number}) => page.evaluate((f) => {
+      const els = Array.from(document.querySelectorAll('#pdf-container .pdf-page')) as HTMLElement[];
+      const el = els.find((p) => { const r = p.getBoundingClientRect(); return f.y >= r.top && f.y <= r.bottom; });
+      if (!el) return null;
+      const r = el.getBoundingClientRect();
+      return { page: el.dataset.page, fy: (f.y - r.top) / r.height };
+    }, f);
+
+    const before = await probe(focal);
+    expect(before).not.toBeNull();
+
+    await page.evaluate(async (f) => {
+      const P: any = await import('/js/pdf-reader.js');
+      P.setZoom(P.getZoom() * 1.8, f);
+    }, focal);
+    await page.waitForTimeout(300);
+
+    const after = await probe(focal);
+    expect(after).not.toBeNull();
+    expect(after!.page).toBe(before!.page);                       // sigue la misma página
+    expect(Math.abs(after!.fy - before!.fy)).toBeLessThan(0.03);  // y el mismo punto de ella
+
+    // El hueco entre páginas escala con el zoom. Durante el pinch se escala el layer ENTERO
+    // (huecos incluidos); si al hornear el hueco volviera a 12px fijos, lo que hay por encima
+    // del foco se recolocaría al soltar los dedos — el salto que se veía.
+    const g = await page.evaluate(async () => {
+      const P: any = await import('/js/pdf-reader.js');
+      const els = Array.from(document.querySelectorAll('#pdf-container .pdf-page')) as HTMLElement[];
+      const a = els[0].getBoundingClientRect(), b = els[1].getBoundingClientRect();
+      return { gap: b.top - a.bottom, zoom: P.getZoom() };
+    });
+    expect(g.zoom).toBeGreaterThan(1.5);
+    expect(g.gap).toBeCloseTo(12 * g.zoom, 0);
+  });
 });
 
 // Márgenes: en una pantalla ANCHA (landscape) la página se centra con margen simétrico. Antes

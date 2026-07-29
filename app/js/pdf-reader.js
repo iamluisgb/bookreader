@@ -19,6 +19,7 @@ let scrollRaf = 0;
 // scaler), anclando el scroll al punto focal. No se llama a pdf.js en todo el gesto.
 let zoom = 1;
 let zoomHandlersReady = false;
+let fitWidth = 0;               // ancho de contenedor con el que se calcularon las cajas
 const PDF_PAD = 20;             // padding del contenedor (coincide con el CSS)
 const OVERSAMPLE = 2.5;         // el canvas se pinta 2.5× → nítido al ampliar sin re-render
 const MAX_BACKING_PX = 3800;    // tope del lado mayor del canvas (memoria)
@@ -45,6 +46,8 @@ export function getZoom() { return zoom; }
 // "Hornea" el zoom en el layout: cada caja pasa a fit·zoom y su scaler a scale(zoom).
 // El canvas (oversampleado) se re-escala por CSS → nítido, SIN volver a pdf.js.
 function applyCommittedZoom() {
+  const layer = zoomLayer();
+  if (layer) layer.style.setProperty('--pdf-zoom', String(zoom));   // el gap escala con el zoom
   for (const w of pdfPages()) {
     const fw = parseFloat(w.dataset.fitw || '0'), fh = parseFloat(w.dataset.fith || '0');
     if (fw && fh) { w.style.width = (fw * zoom) + 'px'; w.style.height = (fh * zoom) + 'px'; }
@@ -53,22 +56,47 @@ function applyCommittedZoom() {
   }
 }
 
+// Página bajo un punto de pantalla (o la más cercana). Es el ANCLA del zoom: su caja escala
+// exactamente por el zoom alrededor de su esquina, así que sirve de sistema de referencia
+// estable — a diferencia del contenedor, cuyo padding, centrado y huecos no escalan.
+function pageAt(clientY) {
+  const pages = pdfPages();
+  let best = null, bestD = Infinity;
+  for (const p of pages) {
+    const r = p.getBoundingClientRect();
+    const d = clientY < r.top ? r.top - clientY : clientY > r.bottom ? clientY - r.bottom : 0;
+    if (d < bestD) { bestD = d; best = p; }
+    if (d === 0) break;
+  }
+  return best;
+}
+
 // Fija el zoom anclado a un punto de pantalla (client coords). Reposiciona el scroll para
 // que ese punto del contenido siga bajo el foco. Sin re-render.
+//
+// La corrección se MIDE, no se calcula: antes se aplicaba la fórmula "todo escala por ratio
+// desde el padding", pero ni el padding, ni el centrado del layer, ni los huecos entre
+// páginas escalan igual, y el scroll además se recorta en los bordes. Cada desajuste era un
+// saltito al soltar los dedos. Ahora anotamos dónde cae el foco DENTRO de la página ancla,
+// horneamos, y corregimos el scroll con la posición real resultante.
 export function setZoom(z, focalClient) {
   const nz = clampZoom(z);
   const container = document.getElementById('pdf-container');
   if (Math.abs(nz - zoom) < 0.0005 || !container) { zoom = nz; applyCommittedZoom(); return; }
-  const ratio = nz / zoom;
   const cr = container.getBoundingClientRect();
-  const fx = focalClient ? focalClient.x - cr.left : container.clientWidth / 2;
-  const fy = focalClient ? focalClient.y - cr.top : container.clientHeight / 2;
-  const sl = container.scrollLeft, stp = container.scrollTop;
+  const fx = focalClient ? focalClient.x : cr.left + container.clientWidth / 2;
+  const fy = focalClient ? focalClient.y : cr.top + container.clientHeight / 2;
+  const anchor = pageAt(fy);
+  if (!anchor) { zoom = nz; applyCommittedZoom(); return; }
+  // Punto del contenido bajo el foco, en unidades "a zoom 1" de la página ancla.
+  const before = anchor.getBoundingClientRect();
+  const ux = (fx - before.left) / zoom, uy = (fy - before.top) / zoom;
   zoom = nz;
   applyCommittedZoom();
-  // El contenido escaló por `ratio`; el padding del contenedor NO escala.
-  container.scrollLeft = Math.max(0, (sl + fx - PDF_PAD) * ratio + PDF_PAD - fx);
-  container.scrollTop  = Math.max(0, (stp + fy - PDF_PAD) * ratio + PDF_PAD - fy);
+  // getBoundingClientRect fuerza el layout: ya son las posiciones nuevas.
+  const after = anchor.getBoundingClientRect();
+  container.scrollLeft += (after.left + ux * zoom) - fx;
+  container.scrollTop  += (after.top  + uy * zoom) - fy;
 }
 export function resetZoom() { setZoom(1); }
 
@@ -184,6 +212,7 @@ async function rerender() {
   teardownScroll();
   const container = document.getElementById('pdf-container');
   if (!container) return;
+  fitWidth = container.clientWidth;
   container.innerHTML = '';
   container.classList.toggle('pdf-scroll', readingMode === 'scroll');
   const layer = document.createElement('div');
@@ -192,6 +221,50 @@ async function rerender() {
   ensureZoomHandlers();
   if (readingMode === 'scroll') await renderScroll();
   else await renderPaginated(currentPage);
+}
+
+// Re-ajuste al nuevo ancho SIN reconstruir nada: se recalculan las cajas (fit·zoom) sobre los
+// mismos elementos y se ancla el scroll a la página que estabas leyendo. El canvas está
+// oversampleado, así que mientras tanto se re-escala por CSS y sigue nítido; después se
+// re-rasteriza lo que está a la vista (con doble buffer, sin hueco en blanco).
+async function refit() {
+  const container = document.getElementById('pdf-container');
+  if (!pdfDoc || !container) return;
+  const avail = container.clientWidth;
+  if (!avail || avail === fitWidth) return;   // el alto no afecta al ajuste: nada que hacer
+  fitWidth = avail;
+  const pages = pdfPages();
+  if (!pages.length) return;
+
+  // Ancla: la página del borde superior y en qué fracción de ella estás (volver al mismo
+  // sitio, no al principio de la página).
+  const cr = container.getBoundingClientRect();
+  const anchor = pageAt(cr.top + 1) || pages[0];
+  const ar = anchor.getBoundingClientRect();
+  const fracY = ar.height ? (cr.top - ar.top) / ar.height : 0;
+
+  for (const w of pages) {
+    const bw = parseFloat(w.dataset.basew || '0'), bh = parseFloat(w.dataset.baseh || '0');
+    if (!bw || !bh) continue;
+    const f = fitScale(bw);
+    const fw = bw * f, fh = bh * f;
+    w.dataset.fitw = String(fw);
+    w.dataset.fith = String(fh);
+    w.style.setProperty('--scale-factor', String(f));
+    const s = w.querySelector('.pdf-scaler');
+    if (s) { s.style.width = fw + 'px'; s.style.height = fh + 'px'; }
+    const cv = w.querySelector('canvas');
+    if (cv) { cv.style.width = Math.floor(fw) + 'px'; cv.style.height = Math.floor(fh) + 'px'; }
+  }
+  applyCommittedZoom();
+
+  const nr = anchor.getBoundingClientRect();
+  container.scrollTop += (nr.top + fracY * nr.height) - cr.top;
+
+  // Solo lo pintado: las demás las repinta el observer perezoso cuando toque.
+  for (const w of pages) {
+    if (w.dataset.rendered) renderInto(w, +w.dataset.page || currentPage);
+  }
 }
 
 // Gestos de zoom. Todas las rutas comparten el mismo preview EN VIVO: durante el gesto
@@ -306,10 +379,15 @@ function ensureZoomHandlers() {
   });
 
   // Al rotar/redimensionar cambia el ancho disponible → recomputar el ajuste (re-fit).
+  //
+  // Solo importa el ANCHO: `fitScale` no mira el alto. En móvil el alto cambia
+  // constantemente (la barra de URL se pliega al hacer scroll, y al ampliar con dos dedos),
+  // y cada uno de esos avisos disparaba un rerender() completo — el contenedor se vaciaba y
+  // la vista saltaba al principio de la página. Justo el "se recarga y me mueve la vista".
   let rt = 0;
   window.addEventListener('resize', () => {
     clearTimeout(rt);
-    rt = setTimeout(() => { if (pdfDoc) { const k = currentPage; rerender().then(() => { if (readingMode === 'scroll') goTo(k); }); } }, 200);
+    rt = setTimeout(refit, 200);
   });
 }
 
@@ -333,10 +411,12 @@ async function renderScroll() {
   const container = document.getElementById('pdf-container');
   const layer = zoomLayer();
   // Aspecto FIT (a zoom 1) de la página 1 para dimensionar los placeholders.
-  let w = 600, h = 800;
+  let w = 600, h = 800, bw = 0, bh = 0;
   try {
     const p1 = await pdfDoc.getPage(1);
-    const vp = p1.getViewport({ scale: fitScale(p1.getViewport({ scale: 1 }).width) });
+    const base = p1.getViewport({ scale: 1 });
+    bw = base.width; bh = base.height;
+    const vp = p1.getViewport({ scale: fitScale(bw) });
     w = vp.width; h = vp.height;
   } catch (e) {}
 
@@ -346,6 +426,8 @@ async function renderScroll() {
     wrapper.dataset.page = String(n);
     wrapper.dataset.fitw = String(w);
     wrapper.dataset.fith = String(h);
+    // Tamaño SIN escalar: deja re-calcular el ajuste al cambiar el ancho sin volver a pdf.js.
+    if (bw && bh) { wrapper.dataset.basew = String(bw); wrapper.dataset.baseh = String(bh); }
     wrapper.style.width = (w * zoom) + 'px';
     wrapper.style.height = (h * zoom) + 'px';
     layer.appendChild(wrapper);
@@ -427,6 +509,8 @@ async function renderInto(wrapper, num) {
   wrapper.dataset.page = String(num);
   wrapper.dataset.fitw = String(viewport.width);
   wrapper.dataset.fith = String(viewport.height);
+  wrapper.dataset.basew = String(base.width);
+  wrapper.dataset.baseh = String(base.height);
   wrapper.style.width = (viewport.width * zoom) + 'px';       // caja = fit·zoom (área de scroll)
   wrapper.style.height = (viewport.height * zoom) + 'px';
   wrapper.style.setProperty('--scale-factor', String(fit));
@@ -438,8 +522,11 @@ async function renderInto(wrapper, num) {
   scaler.style.height = viewport.height + 'px';
   scaler.style.transform = zoom === 1 ? '' : `scale(${zoom})`;
 
-  let canvas = scaler.querySelector('canvas');
-  if (!canvas) { canvas = document.createElement('canvas'); scaler.appendChild(canvas); }
+  // DOBLE BUFFER: se pinta en un canvas nuevo y solo se cuelga del DOM cuando está listo.
+  // Reutilizarlo obligaba a poner canvas.width (que lo BORRA) antes de repintar, así que
+  // re-rasterizar —al cambiar el ancho— dejaba la página en blanco mientras tanto.
+  const prev = scaler.querySelector('canvas');
+  const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d');
   canvas.width = Math.floor(renderViewport.width);
   canvas.height = Math.floor(renderViewport.height);
@@ -456,6 +543,14 @@ async function renderInto(wrapper, num) {
     throw e;
   }
   if (wrapper._renderTask === task) wrapper._renderTask = null;
+
+  // El canvas va SIEMPRE el primero: la capa de texto y la de subrayados se pintan encima.
+  if (prev && prev.parentNode === scaler) {
+    scaler.replaceChild(canvas, prev);
+    prev.width = prev.height = 0;                 // libera el backing del viejo
+  } else {
+    scaler.insertBefore(canvas, scaler.firstChild);
+  }
 
   await renderTextLayer(page, viewport, scaler);
   wrapper.dataset.rendered = '1';
