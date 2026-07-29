@@ -400,7 +400,7 @@ async function openBookRecord(record, { fromRoute = false, loc = null } = {}) {
     setBookMeta({ title: record.title, author: record.author, cover: record.cover });
     currentBook = { id: record.id, fileBaseId: record.fileBaseId || record.id, format: record.format };
     if (record.format === 'pdf') {
-      const ok = await loadPdf(buffer, record.fileBaseId || record.id, record.id);
+      const ok = await loadPdf(buffer, record.fileBaseId || record.id, record.id, null, record.title);
       // Fallo real → limpiar y volver a la biblioteca; pero SOLO si este libro sigue
       // siendo el actual (una carga abortada que resuelve tarde no debe pisar al
       // libro que el usuario abrió después ni a la biblioteca ya mostrada).
@@ -1065,7 +1065,7 @@ async function loadEpub(buffer, bookId, aiBookId, persist = null) {
   }
 }
 
-async function loadPdf(buffer, bookId, aiBookId, persist = null) {
+async function loadPdf(buffer, bookId, aiBookId, persist = null, displayTitle = '') {
   const seq = ++pdfLoadSeq;
   try {
     resetSearch();
@@ -1073,8 +1073,7 @@ async function loadPdf(buffer, bookId, aiBookId, persist = null) {
     if (!aiBookId) aiBookId = await AiDB.hashBuffer(buffer.slice(0));
 
     // Setup callback BEFORE load
-    PdfReader.onPage((page, total) => {
-      document.getElementById('reader-title').textContent = t('PDF - Página {n} de {total}', { n: page, total });
+    PdfReader.onPage((page) => {
       syncRouteSoon();               // reflejar la página en la URL (deep-link)
       drawPdfHighlights(page);       // PDF3: re-pintar los subrayados de la página
       updateBookmarkButton();        // reflejar si la página actual está marcada
@@ -1096,7 +1095,13 @@ async function loadPdf(buffer, bookId, aiBookId, persist = null) {
     // UI de lectura sobre la biblioteca ni sobre el documento del otro.
     if (seq !== pdfLoadSeq || !currentBook || currentBook.id !== aiBookId) return false;
 
-    document.getElementById('reader-title').textContent = 'PDF';
+    // Cabecera = título del libro, igual que en EPUB (la página va en el pie, junto al
+    // % y la barra: repetirla arriba era ruido). Sin título conocido, el nombre del
+    // fichero sin extensión, que es justo lo que guarda la biblioteca.
+    const headerTitle = displayTitle
+      || (persist ? persist.fileName.replace(/\.[^.]+$/, '') : '')
+      || bookId || 'PDF';
+    document.getElementById('reader-title').textContent = headerTitle;
     document.body.classList.add('reading');
     // Móvil (estilo Play Books): arrancar SIN barras (PDF a pantalla completa). Se
     // muestran/ocultan tocando el centro o con el botón ⤢. Las barras son overlay.

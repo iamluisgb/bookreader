@@ -197,7 +197,6 @@ const EN = {
   'Preparando el libro para búsqueda…': 'Preparing the book for search…',
   'pág. {n}': 'p. {n}',
   'Error al cargar el archivo EPUB: {msg}': 'Error loading the EPUB file: {msg}',
-  'PDF - Página {n} de {total}': 'PDF - Page {n} of {total}',
   'Error al cargar el archivo PDF': 'Error loading the PDF file',
   'Este PDF no tiene índice': 'This PDF has no table of contents',
   'No hay índice disponible': 'No table of contents available',
