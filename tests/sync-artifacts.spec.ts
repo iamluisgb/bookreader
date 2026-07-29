@@ -163,12 +163,18 @@ test.describe('unidades del merge de artefactos', () => {
     await page.goto('/');
     const deleted = await page.evaluate(async () => {
       const DB: any = await import('/js/ai/db.js');
+      // Sellos REALISTAS, no 5000 (= 5 s después de 1970). Con aquellos, el tombstone nacía
+      // caducado y `purgeExpiredTombstones` —que corre en cada arranque y borra los de más de
+      // 30 días— lo barría si llegaba después de este evaluate: el test fallaba 1 de cada 5
+      // veces por una carrera con el arranque, no por el merge. El empate, que es lo que aquí
+      // se comprueba, se mantiene: mismo updatedAt en los dos registros.
+      const now = Date.now();
       const base = {
         key: 'b:summary:2', id: '2', uid: 'u2', bookId: 'b', kind: 'summary',
-        params: {}, segVersion: 1, createdAt: 1, updatedAt: 5000,
+        params: {}, segVersion: 1, createdAt: now - 1000, updatedAt: now,
       };
       await DB.mergeArtifacts([{ ...base, result: 'vivo' }]);
-      await DB.mergeArtifacts([{ ...base, result: null, deleted: true, deletedAt: 5000 }]);
+      await DB.mergeArtifacts([{ ...base, result: null, deleted: true, deletedAt: now }]);
       return (await DB.get('artifacts', 'b:summary:2')).deleted;
     });
     expect(deleted).toBe(true);

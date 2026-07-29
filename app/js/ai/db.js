@@ -76,7 +76,13 @@ function tx(store, mode, fn) {
     const t = db.transaction(store, mode);
     const s = t.objectStore(store);
     let result;
-    Promise.resolve(fn(s)).then(r => { result = r; }).catch(reject);
+    // Si el callback falla hay que ABORTAR: sin esto, `oncomplete` podía resolver antes de
+    // que llegara el rechazo y la operación se daba por buena habiendo escrito a medias.
+    // En código de sync eso es pérdida de datos silenciosa, que es la peor clase que hay.
+    Promise.resolve(fn(s)).then(r => { result = r; }).catch(err => {
+      try { t.abort(); } catch (e) { /* ya terminada */ }
+      reject(err);
+    });
     t.oncomplete = () => resolve(result);
     t.onerror = () => reject(t.error);
     t.onabort = () => reject(t.error);
@@ -87,6 +93,30 @@ const reqP = (request) => new Promise((resolve, reject) => {
   request.onsuccess = () => resolve(request.result);
   request.onerror = () => reject(request.error);
 });
+
+// Lee, decide y escribe DENTRO de la misma transacción, encadenando por callbacks.
+//
+// La versión con `await reqP(s.get(k))` y luego `s.put(...)` parecía equivalente y no lo es:
+// IndexedDB auto-confirma la transacción en cuanto la cola de microtareas se vacía sin
+// peticiones pendientes, así que bajo carga el `put` caía en una transacción ya muerta. Se
+// manifestaba como un sync que fallaba 1 de cada 5 veces sin decir nada. Desde un callback de
+// petición la transacción sigue viva por definición, y el problema desaparece.
+//
+// `patch(actual)` devuelve el registro a guardar, o algo falsy para no tocar nada.
+function readModifyWrite(s, key, patch) {
+  return new Promise((resolve, reject) => {
+    const g = s.get(key);
+    g.onerror = () => reject(g.error);
+    g.onsuccess = () => {
+      let next;
+      try { next = patch(g.result); } catch (e) { return reject(e); }
+      if (!next) return resolve(undefined);
+      const p = s.put(next);
+      p.onerror = () => reject(p.error);
+      p.onsuccess = () => resolve(p.result);
+    };
+  });
+}
 
 // Stores que participan en el sync: sus escrituras de usuario avisan al
 // SyncEngine (que hace push con debounce). Las escrituras del propio sync
@@ -215,22 +245,19 @@ export function addNote(convoId, fieldKey, content, sourceCfis = []) {
 }
 
 export function updateNote(id, patch) {
-  return tx('notes', 'readwrite', async s => {
-    const cur = await reqP(s.get(id));
-    if (!cur) return;
-    return reqP(s.put({ ...cur, ...patch, id, updatedAt: Date.now() }));
-  }).then(r => { notifySync('notes'); return r; });
+  return tx('notes', 'readwrite', s => readModifyWrite(s, id,
+    cur => cur && { ...cur, ...patch, id, updatedAt: Date.now() }),
+  ).then(r => { notifySync('notes'); return r; });
 }
 
 // Borrado lógico (tombstone): el borrado se propaga en el sync en vez de
 // resucitar en la unión. La purga física la hace purgeDeletedNotes().
 export function deleteNote(id) {
-  return tx('notes', 'readwrite', async s => {
-    const cur = await reqP(s.get(id));
-    if (!cur) return;
+  return tx('notes', 'readwrite', s => readModifyWrite(s, id, (cur) => {
+    if (!cur) return null;
     const now = Date.now();
-    return reqP(s.put({ ...cur, deleted: true, deletedAt: now, updatedAt: now }));
-  }).then(r => { notifySync('notes'); return r; });
+    return { ...cur, deleted: true, deletedAt: now, updatedAt: now };
+  })).then(r => { notifySync('notes'); return r; });
 }
 
 // Purga física de tombstones de notas anteriores a `olderThan` (ms epoch).
@@ -252,8 +279,10 @@ export function purgeDeletedNotes(olderThan) {
 // el updatedAt mayor conservando el id LOCAL; uid nuevo → inserta con id nuevo.
 export function mergeRecords(store, records) {
   if (!records || !records.length) return Promise.resolve(0);
-  return tx(store, 'readwrite', async s => {
-    const existing = await reqP(s.getAll());
+  // Un solo `await` (el getAll) y después SOLO escrituras: los put no dependen unos de
+  // otros, así que no hay nada que esperar y la transacción no puede auto-confirmarse a
+  // mitad del bucle. Los errores de cada put burbujean a `t.onerror`, que ya se escucha.
+  return tx(store, 'readwrite', s => reqP(s.getAll()).then(existing => {
     const byUid = new Map();
     for (const e of existing) if (e.uid) byUid.set(e.uid, e);
     let written = 0;
@@ -264,18 +293,18 @@ export function mergeRecords(store, records) {
         const ru = r.updatedAt || 0;
         const lu = l.updatedAt || 0;
         if (ru > lu || (ru === lu && r.deleted && !l.deleted)) {
-          await reqP(s.put({ ...r, id: l.id }));
+          s.put({ ...r, id: l.id });
           written++;
         }
       } else {
         const rest = { ...r };
         delete rest.id; // el id remoto no vale aquí: autoincrement asigna uno local
-        await reqP(s.put(rest));
+        s.put(rest);
         written++;
       }
     }
     return written;
-  });
+  }));
 }
 
 // Sync Fase 0 · Backfill de uid/updatedAt en los stores con id autoincremental
@@ -352,13 +381,12 @@ export function addDeck(deck) {
 // escriben tarjetas y olvidarlo en uno se manifestaría como repasos que se pierden
 // solo al sincronizar, que es justo el bug imposible de reproducir.
 export function updateDeck(id, patch) {
-  return tx('decks', 'readwrite', async s => {
-    const cur = await reqP(s.get(id));
-    if (!cur) return;
+  return tx('decks', 'readwrite', s => readModifyWrite(s, id, (cur) => {
+    if (!cur) return null;
     const next = { ...cur, ...patch, id, updatedAt: Date.now() };
     if (patch && patch.cards) next.cards = stampCards(cur.cards, patch.cards, next.updatedAt);
-    return reqP(s.put(next));
-  }).then(r => { notifySync('decks'); return r; });
+    return next;
+  })).then(r => { notifySync('decks'); return r; });
 }
 
 // Reconcilia la lista entrante contra la guardada: sella lo que cambió, asigna uid a
@@ -392,12 +420,11 @@ function sameCard(a, b) {
 // TOMBSTONE (mismo motivo que en notas y artefactos). Las tarjetas se vacían: un mazo
 // borrado no debe seguir ocupando su contenido en el fichero de sync durante 30 días.
 export function deleteDeck(id) {
-  return tx('decks', 'readwrite', async s => {
-    const cur = await reqP(s.get(id));
-    if (!cur) return;
+  return tx('decks', 'readwrite', s => readModifyWrite(s, id, (cur) => {
+    if (!cur) return null;
     const now = Date.now();
-    return reqP(s.put({ ...cur, cards: [], deleted: true, deletedAt: now, updatedAt: now }));
-  }).then(r => { notifySync('decks'); return r; });
+    return { ...cur, cards: [], deleted: true, deletedAt: now, updatedAt: now };
+  })).then(r => { notifySync('decks'); return r; });
 }
 
 // Purga física: mazos con tombstone caducado y, en los mazos vivos, sus tarjetas
@@ -426,8 +453,8 @@ export function purgeDeletedDecks(olderThan) {
 // si no, repasar en el móvil y editar en el PC hace que uno de los dos pierda su trabajo.
 export function mergeDecks(records) {
   if (!records || !records.length) return Promise.resolve(0);
-  return tx('decks', 'readwrite', async s => {
-    const existing = await reqP(s.getAll());
+  // Igual que mergeRecords: un solo await (el getAll) y después solo escrituras.
+  return tx('decks', 'readwrite', s => reqP(s.getAll()).then(existing => {
     const byUid = new Map();
     for (const e of existing) if (e.uid) byUid.set(e.uid, e);
     let written = 0;
@@ -437,15 +464,15 @@ export function mergeDecks(records) {
       if (!l) {
         const rest = { ...r };
         delete rest.id;                        // autoincrement asigna uno local
-        await reqP(s.put(rest));
+        s.put(rest);
         written++;
         continue;
       }
       const merged = mergeDeckPair(l, r);
-      if (merged) { await reqP(s.put({ ...merged, id: l.id })); written++; }
+      if (merged) { s.put({ ...merged, id: l.id }); written++; }
     }
     return written;
-  });
+  }));
 }
 
 // Fusión de un mazo (pura, exportada para poder testearla sin IndexedDB).
@@ -564,12 +591,11 @@ export function putArtifact({ bookId, kind, result, params, id }) {
 // TOMBSTONE, no borrado físico: sin él, borrar un resumen en el portátil no se propaga y
 // el móvil lo devuelve en el siguiente ciclo de sync. La purga la hace purgeDeletedArtifacts().
 export function deleteArtifact(key) {
-  return tx('artifacts', 'readwrite', async s => {
-    const cur = await reqP(s.get(key));
-    if (!cur) return;
+  return tx('artifacts', 'readwrite', s => readModifyWrite(s, key, (cur) => {
+    if (!cur) return null;
     const now = Date.now();
-    return reqP(s.put({ ...cur, result: null, deleted: true, deletedAt: now, updatedAt: now }));
-  }).then(r => { notifySync('artifacts'); return r; });
+    return { ...cur, result: null, deleted: true, deletedAt: now, updatedAt: now };
+  })).then(r => { notifySync('artifacts'); return r; });
 }
 
 // Purga física de tombstones de artefactos anteriores a `olderThan` (ms epoch).
@@ -593,21 +619,25 @@ export function purgeDeletedArtifacts(olderThan) {
 // generado-aquí / borrado-allí.
 export function mergeArtifacts(records) {
   if (!records || !records.length) return Promise.resolve(0);
-  return tx('artifacts', 'readwrite', async s => {
+  // Un getAll en vez de un get por clave: así hay UN solo await y el resto son escrituras
+  // que no dependen entre sí (antes, el get de cada vuelta dejaba morir la transacción bajo
+  // carga y el merge decía que había ido bien sin escribir nada).
+  return tx('artifacts', 'readwrite', s => reqP(s.getAll()).then(existing => {
+    const byKey = new Map(existing.map(e => [e.key, e]));
     let written = 0;
     for (const r of records) {
       if (!r || !r.key) continue;
-      const l = await reqP(s.get(r.key));
-      if (!l) { await reqP(s.put(r)); written++; continue; }
+      const l = byKey.get(r.key);
       const ru = r.updatedAt || 0;
-      const lu = l.updatedAt || 0;
-      if (ru > lu || (ru === lu && r.deleted && !l.deleted)) {
-        await reqP(s.put(r));
-        written++;
+      const lu = l ? (l.updatedAt || 0) : -1;
+      if (!l || ru > lu || (ru === lu && r.deleted && !l.deleted)) {
+        s.put(r);
+        byKey.set(r.key, r);   // dos registros con la misma clave en el mismo lote: gana el
+        written++;             // que corresponda, no el último que pase por aquí
       }
     }
     return written;
-  });
+  }));
 }
 
 // Utilidad: SHA-256 del arrayBuffer del fichero -> id estable del libro.
