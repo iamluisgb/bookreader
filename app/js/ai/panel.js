@@ -25,6 +25,7 @@ import * as Flashcards from './flashcards.js';
 import * as Summary from './summary.js';
 import * as MindMap from './mindmap.js';
 import * as Feynman from './feynman.js';
+import { attachMic, micAvailable } from './mic.js';
 import * as Jobs from './jobs.js';
 import * as JobsUI from './jobs-ui.js';
 import * as Studio from './studio.js';
@@ -82,8 +83,9 @@ export function init(opts) {
     convobar: $('#ai-convobar'), convoBtn: $('#ai-convo-btn'), convoLabel: $('#ai-convo-label'), convoNew: $('#ai-convo-new'), convoExport: $('#ai-convo-export'),
     ref: $('#ai-ref'), refText: $('#ai-ref-text'), profileChip: $('#ai-profile-chip'),
     imgref: $('#ai-imgref'), imgrefText: $('#ai-imgref-text'),
-    zone: $('#ai-zone'), zones: $('#ai-zones'),
+    zone: $('#ai-zone'), zones: $('#ai-zones'), mic: $('#ai-mic'),
   });
+  initMic();
   $('#ai-ref-clear').addEventListener('click', clearRef);
   $('#ai-imgref-clear').addEventListener('click', clearImageRef);
 
@@ -960,10 +962,36 @@ async function startQuickChat() {
   setOpen(true);
 }
 
+// ---- Dictado ---------------------------------------------------------------
+
+let mic = null;
+
+function initMic() {
+  mic = attachMic({
+    input: els.input,
+    btn: els.mic,
+    // Sesgar la transcripción con el libro y el capítulo: es justo donde caen los nombres
+    // propios y los tecnicismos que si no se transcriben de oído (y sale gratis).
+    getPrompt: () => [bookTitle, EpubReader.getCurrentChapterLabel?.() || ''].filter(Boolean).join('. '),
+    onError: (msg) => setStatus(msg),
+  });
+  updateMicVisibility();
+  // El motor BYOK se activa poniendo el modelo de transcripción en Ajustes: si el usuario
+  // acaba de hacerlo, el botón tiene que aparecer sin recargar.
+  window.addEventListener('appsettings:agent-saved', updateMicVisibility);
+}
+
+function updateMicVisibility() {
+  if (els.mic) els.mic.style.display = micAvailable() ? '' : 'none';
+}
+
 // ---- Chat ------------------------------------------------------------------
 
 async function send() {
   if (busy) return;
+  // Parar ANTES de leer el textarea: con el motor del proveedor la transcripción llega al
+  // soltar el botón, así que enviar mientras dictas mandaría el mensaje sin el último tramo.
+  await mic?.stop();
   const q = els.input.value.trim();
   if (!q && !pendingImages.length) return;
   if (!convo) { setStatus('Elige un objetivo de lectura primero.'); openOnboarding(); return; }

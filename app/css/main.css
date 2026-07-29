@@ -1126,6 +1126,22 @@ body.resizing-panel .reader-main { transition: none !important; }
 /* Botonera del composer: "Ver" (visión) + Enviar, apiladas a la derecha del textarea. */
 .ai-composer-btns { display: flex; flex-direction: column; gap: 6px; }
 .ai-composer-btns .ai-send { flex: 1; }
+/* Última fila: micro (cuadrado, solo icono) + Enviar, que se queda con el resto del ancho. */
+.ai-composer-row { display: flex; gap: 6px; flex: 1; }
+.ai-composer-row .ai-send { flex: 1; }
+.ai-mic { padding: 6px 9px; justify-content: center; }
+/* Grabando: mismo lenguaje que el micro de Feynman (acento sólido), más un latido suave
+   que deja claro que el micro está ABIERTO aunque no haya texto en vivo (con el motor del
+   proveedor la transcripción no llega hasta soltar). */
+.ai-mic-on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  animation: ai-mic-pulse 1.6s ease-in-out infinite;
+}
+.ai-mic-on:hover { color: #fff; }
+@keyframes ai-mic-pulse { 50% { opacity: 0.62; } }
+@media (prefers-reduced-motion: reduce) { .ai-mic-on { animation: none; } }
 .ai-see {
   display: inline-flex;
   align-items: center;

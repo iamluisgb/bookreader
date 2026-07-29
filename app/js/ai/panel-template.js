@@ -55,7 +55,13 @@ export const TEMPLATE = () => `
       <div class="ai-composer-btns">
         <button id="ai-see" class="ai-see" title="${t('Explicar lo que veo en la página (figuras, diagramas)')}" style="display:none">${icon('sparkles', { size: 15 })}<span>${t('Ver')}</span></button>
         <button id="ai-zone" class="ai-see" title="${t('Marcar una zona de la página (una figura, una ecuación) y preguntar por ella')}" style="display:none">${icon('crop', { size: 15 })}<span>${t('Zona')}</span></button>
-        <button id="ai-send" class="primary-btn ai-send">${t('Enviar')}</button>
+        <!-- Micro y Enviar comparten fila: en PDF la botonera ya lleva "Ver" y "Zona", y una
+             cuarta fila apilada se comía el alto del composer justo en móvil, que es donde el
+             dictado importa. Solo icono, y el estado (grabando) se ve por el color. -->
+        <div class="ai-composer-row">
+          <button id="ai-mic" class="ai-see ai-mic" title="${t('Dictar')}" aria-label="${t('Dictar')}" aria-pressed="false" style="display:none">${icon('mic', { size: 15 })}</button>
+          <button id="ai-send" class="primary-btn ai-send">${t('Enviar')}</button>
+        </div>
       </div>
     </div>
   </div>

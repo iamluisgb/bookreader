@@ -50,6 +50,8 @@ const ICONS = {
   bubble: '<path d="M21 11.5a8.5 8.5 0 0 1-12.4 7.5L4 20.5l1.2-4.3A8.5 8.5 0 1 1 21 11.5Z"/>',
   user: '<circle cx="12" cy="8" r="3.5"/><path d="M5.5 19.5a6.5 6.5 0 0 1 13 0"/>',
   note: '<rect x="5" y="3.5" width="14" height="17" rx="2.2"/><line x1="8.5" y1="9" x2="15.5" y2="9"/><line x1="8.5" y1="12.5" x2="15.5" y2="12.5"/><line x1="8.5" y1="16" x2="12.5" y2="16"/>',
+  // Dictado: cápsula del micro + arco del soporte. Sin relleno, como el resto.
+  mic: '<rect x="9" y="3" width="6" height="10.5" rx="3"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0"/><line x1="12" y1="18" x2="12" y2="21"/>',
   // Recorte de zona (IA6 v2): dos escuadras cruzadas, como el marco de una cámara.
   crop: '<path d="M7.5 3.5v13h13"/><path d="M3.5 7.5h13v13"/>',
   target: '<circle cx="12" cy="12" r="7.5"/><circle cx="12" cy="12" r="3.6"/><circle cx="12" cy="12" r="0.6" fill="currentColor" stroke="none"/>',
