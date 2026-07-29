@@ -521,7 +521,10 @@ export function recorderSupported() {
 //
 // Formato: se deja elegir al navegador (webm/opus en Chrome, mp4 en Safari). Opus pesa
 // ~30× menos que WAV, que en móvil con datos no es un detalle.
-export function createRecorder({ onStop, onError } = {}) {
+// `onStream` recibe el MediaStream en cuanto hay permiso: es lo único con lo que se puede
+// medir el nivel de entrada (ver mic.js), y sin él "grabando" y "grabando pero sordo" se ven
+// igual. Opcional: quien no lo pase se comporta como antes.
+export function createRecorder({ onStop, onError, onStream } = {}) {
   if (!recorderSupported()) return null;
   let rec = null;
   let stream = null;
@@ -543,6 +546,7 @@ export function createRecorder({ onStop, onError } = {}) {
         onError?.(t('Este navegador no puede grabar audio.'));
         return false;
       }
+      onStream?.(stream);
       rec.ondataavailable = (ev) => { if (ev.data?.size) chunks.push(ev.data); };
       rec.onstop = () => {
         release();

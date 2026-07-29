@@ -136,3 +136,102 @@ test('stop() espera a la transcripción del proveedor antes de resolver', async 
   // Al resolver, el texto YA está puesto: quien esperó a stop() lee el mensaje completo.
   expect(out.textoFinal).toContain('la ultima frase');
 });
+
+// ---- barra de grabación (patrón WhatsApp) -----------------------------------
+
+test('la barra sustituye al textarea, cuenta el tiempo y el vúmetro sigue al nivel', async ({ page }) => {
+  await openApp(page);
+  await installFakeRecorder(page);
+  // Stream sintético con nivel controlable: es lo que distingue "te oigo" de "micro mudo".
+  await page.evaluate(() => {
+    const w = window as any;
+    w.__nivel = 0;
+    class FakeAnalyser {
+      fftSize = 512;
+      getByteTimeDomainData(buf: Uint8Array) { buf.fill(128 + Math.round(w.__nivel * 127)); }
+    }
+    w.AudioContext = class {
+      createMediaStreamSource() { return { connect() {} }; }
+      createAnalyser() { return new FakeAnalyser(); }
+      close() {}
+    };
+  });
+
+  const out = await page.evaluate(async () => {
+    const w = window as any;
+    delete w.SpeechRecognition; delete w.webkitSpeechRecognition;
+    const LLM: any = await import('/js/ai/llm.js');
+    const M: any = await import('/js/ai/mic.js');
+    LLM.setKey('test-key'); LLM.setSttModel('whisper-1');
+
+    const wrap = document.createElement('div');
+    const input = document.createElement('textarea');
+    const btn = document.createElement('button');
+    btn.innerHTML = '<span></span>';
+    wrap.append(input); document.body.append(wrap, btn);
+    M.attachMic({ input, btn });
+
+    const bar = wrap.querySelector('.mic-bar') as HTMLElement;
+    const oculta = bar.hidden;
+
+    btn.click();
+    await new Promise((r) => setTimeout(r, 60));
+    const grabando = { barra: !bar.hidden, textarea: input.classList.contains('is-recording'), provider: bar.classList.contains('is-provider') };
+
+    // Nivel alto → se encienden barras; silencio → se apagan.
+    w.__nivel = 0.9;
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    const conVoz = wrap.querySelectorAll('.mic-bar-level i.on').length;
+    w.__nivel = 0;
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    const enSilencio = wrap.querySelectorAll('.mic-bar-level i.on').length;
+
+    return { oculta, grabando, conVoz, enSilencio, reloj: bar.querySelector('.mic-bar-time')!.textContent };
+  });
+
+  expect(out.oculta).toBe(true);              // en reposo no ocupa nada
+  expect(out.grabando).toEqual({ barra: true, textarea: true, provider: true });
+  expect(out.conVoz).toBeGreaterThan(0);      // el vúmetro reacciona a la voz…
+  expect(out.enSilencio).toBe(0);             // …y delata el micro mudo
+  expect(out.reloj).toMatch(/^\d:\d\d$/);
+});
+
+test('la papelera descarta sin gastar la llamada a Whisper', async ({ page }) => {
+  await openApp(page);
+  await installFakeRecorder(page);
+
+  let llamadas = 0;
+  await page.route('**/audio/transcriptions', async (route) => {
+    llamadas++;
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ text: 'no deberia salir' }) });
+  });
+
+  const out = await page.evaluate(async () => {
+    const w = window as any;
+    delete w.SpeechRecognition; delete w.webkitSpeechRecognition;
+    const LLM: any = await import('/js/ai/llm.js');
+    const M: any = await import('/js/ai/mic.js');
+    LLM.setKey('test-key'); LLM.setSttModel('whisper-1');
+
+    const wrap = document.createElement('div');
+    const input = document.createElement('textarea');
+    const btn = document.createElement('button');
+    btn.innerHTML = '<span></span>';
+    wrap.append(input); document.body.append(wrap, btn);
+    const mic = M.attachMic({ input, btn });
+
+    btn.click();
+    await new Promise((r) => setTimeout(r, 60));
+    (wrap.querySelector('.mic-bar-cancel') as HTMLElement).click();
+    await mic.stop();
+    await new Promise((r) => setTimeout(r, 120));
+
+    const bar = wrap.querySelector('.mic-bar') as HTMLElement;
+    return { texto: input.value, barraOculta: bar.hidden, grabando: mic.recording() };
+  });
+
+  expect(llamadas).toBe(0);                   // ni se transcribe ni se cobra
+  expect(out.texto).toBe('');
+  expect(out.barraOculta).toBe(true);         // la UI vuelve a reposo
+  expect(out.grabando).toBe(false);
+});

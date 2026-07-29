@@ -1142,6 +1142,75 @@ body.resizing-panel .reader-main { transition: none !important; }
 .ai-mic-on:hover { color: #fff; }
 @keyframes ai-mic-pulse { 50% { opacity: 0.62; } }
 @media (prefers-reduced-motion: reduce) { .ai-mic-on { animation: none; } }
+
+/* ---- barra de grabación (patrón WhatsApp) ---- */
+/* Ocupa el hueco del textarea mientras grabas, con su mismo alto para que el composer no dé
+   un salto al entrar y salir. */
+.mic-bar {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface-0);
+}
+.mic-bar[hidden] { display: none; }
+textarea.is-recording { display: none; }
+
+.mic-bar-cancel {
+  display: none;              /* solo con el motor del proveedor (ver mic.js) */
+  align-items: center;
+  padding: 2px;
+  border: 0;
+  background: none;
+  color: var(--text-soft);
+  cursor: pointer;
+}
+.mic-bar.is-provider .mic-bar-cancel { display: inline-flex; }
+.mic-bar-cancel:hover { color: #e53935; }
+
+/* Punto latiendo: el "estoy grabando" de toda la vida. Rojo aunque el acento sea verde —
+   grabando es grabando, y es el código de color que todo el mundo ya tiene aprendido. */
+.mic-bar-dot {
+  width: 9px;
+  height: 9px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: #e53935;
+  animation: mic-dot 1.3s ease-in-out infinite;
+}
+@keyframes mic-dot { 50% { opacity: 0.25; } }
+
+.mic-bar-time {
+  font-variant-numeric: tabular-nums;   /* que el ancho no baile al pasar de 0:09 a 0:10 */
+  font-size: 13px;
+  color: var(--text);
+}
+
+/* Vúmetro: se enciende de dentro afuera. Solo con el motor del proveedor, que es el único
+   que da stream que medir. */
+.mic-bar-level { display: none; align-items: center; gap: 2px; flex: 1; }
+.mic-bar.is-provider .mic-bar-level { display: flex; }
+.mic-bar-level i {
+  flex: 1;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--border);
+  transition: height 80ms linear, background-color 80ms linear;
+}
+.mic-bar-level i.on { height: 14px; background: var(--accent); }
+
+.mic-bar-hint { font-size: 12px; color: var(--text-soft); white-space: nowrap; }
+/* Con vúmetro el hueco se queda corto: la pista sobra, el medidor ya lo dice todo. */
+.mic-bar.is-provider .mic-bar-hint { display: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .mic-bar-dot { animation: none; }
+  .mic-bar-level i { transition: none; }
+}
 .ai-see {
   display: inline-flex;
   align-items: center;
