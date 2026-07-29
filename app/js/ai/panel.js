@@ -106,6 +106,7 @@ export function init(opts) {
   });
   els.close.addEventListener('click', () => setOpen(false));
   initSheetSnap();
+  initKeyboardInset();
 
   els.tabs.addEventListener('click', (e) => {
     const b = e.target.closest('.ai-tab'); if (!b) return;
@@ -1071,6 +1072,37 @@ function initSheetSnap() {
     grab.addEventListener('pointerup', end);
     grab.addEventListener('pointercancel', end);
   });
+}
+
+// ---- Teclado virtual: mantener el composer a la vista ---------------------------------
+//
+// El panel es `position: fixed`. En iOS (y en Android con `resizes-content` desactivado) abrir
+// el teclado NO encoge el viewport de layout: la hoja seguía midiendo lo mismo y su parte de
+// abajo —el composer— quedaba tapada por el teclado, así que escribías sin ver el texto.
+// visualViewport sí refleja el área realmente visible; publicamos su diferencia como
+// `--kb-inset` y el CSS apoya la hoja encima del teclado.
+function initKeyboardInset() {
+  const vv = window.visualViewport;
+  if (!vv) return;                       // sin API: se queda como estaba (inset 0)
+
+  let raf = 0;
+  function apply() {
+    raf = 0;
+    // Hueco entre el fondo del viewport visible y el del layout = teclado (o barra de
+    // accesorios). Se redondea hacia abajo: sobrar 1px deja una rendija del lector visible.
+    const inset = Math.max(0, Math.floor(window.innerHeight - vv.height - vv.offsetTop));
+    document.documentElement.style.setProperty('--kb-inset', inset + 'px');
+    // Umbral: los cambios pequeños son la barra de URL al hacer scroll, no el teclado.
+    document.body.classList.toggle('kb-open', inset > 120);
+  }
+  function schedule() { if (!raf) raf = requestAnimationFrame(apply); }
+
+  vv.addEventListener('resize', schedule);
+  vv.addEventListener('scroll', schedule);
+  // Al enfocar el composer, el último mensaje debe seguir siendo el visible: el teclado se
+  // come el alto DESPUÉS del focus, así que reajustamos cuando ya ha aparecido.
+  els.input.addEventListener('focus', () => { schedule(); setTimeout(() => { apply(); scrollDown(); }, 300); });
+  apply();
 }
 
 // VISIÓN · Botón "Ver": ADJUNTA la captura de la página actual al composer (no envía). Así el

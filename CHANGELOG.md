@@ -5,6 +5,27 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-29 — Móvil: el teclado tapaba el composer del agente
+
+Reportado: al escribir en el chat del agente desde el móvil, el teclado ocultaba la caja de
+texto y no se veía lo que se estaba escribiendo.
+
+**La causa:** el panel es `position: fixed` y en iOS el teclado **no encoge el viewport de
+layout**. La hoja seguía midiendo `92dvh` anclada a `bottom: 0`, así que su parte de abajo —el
+composer— quedaba por debajo del teclado. `dvh` no ayuda: contempla las barras del navegador,
+no el teclado.
+
+**La solución:** `visualViewport` sí refleja el área realmente visible. `initKeyboardInset()`
+(`js/ai/panel.js`) publica la diferencia como `--kb-inset` y el CSS apoya la hoja sobre el
+teclado (`bottom: var(--kb-inset)`) recortándola por arriba (`min(...)`) para no salirse de la
+pantalla. Con el teclado abierto se retira el padding del home indicator (lo tapa el teclado) y
+el tirador de la hoja. Misma variable en el panel lateral, que cubre el móvil en horizontal.
+
+De propina: el `textarea` sube a **16px** en pantallas táctiles — por debajo de eso Safari iOS
+hace zoom al enfocar, que descolocaba el panel por su cuenta.
+
+---
+
 ## 2026-07-28 — Feynman: el concepto que la propia app te ofrecía «no estaba en el libro»
 
 Reportado con captura: la pantalla sugería **«Tokenización de texto»**, se pulsaba, y respondía
