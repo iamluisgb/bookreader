@@ -790,3 +790,109 @@ test('PDF3: la barra no persigue al dedo mientras se ajusta la selección', asyn
   expect(out.distintasDuranteElArrastre).toBe(1);            // quieta mientras se arrastra
   expect(out.alQuedarseQuieta).not.toBeCloseTo(out.start, 0); // y se recoloca al parar
 });
+
+// ADR-026 · Papel del PDF: tinte (multiply) para los claros e inversión para «Noche», los
+// dos bajo la misma palanca `data-pdf-paper`. Todo el pintado es CSS: el bitmap no se toca,
+// no se vuelve a pdf.js y no se re-rasteriza nada.
+test.describe('PDF papel (tinte + noche)', () => {
+  const setPaper = (page, v: string) => page.evaluate(async (val) => {
+    const S: any = await import('/js/settings.js');
+    S.set('pdfPaper', val);
+    await new Promise((r) => setTimeout(r, 60));
+  }, v);
+
+  test('los tintes claros pintan una capa multiply; «Noche» invierte el canvas', async ({ page }) => {
+    await openPdf(page);
+    await page.waitForTimeout(300);
+
+    // Por defecto (auto sobre tema claro) NO hay capa de tinte: el papel ya es blanco y no
+    // se paga un contexto de mezcla por página para nada.
+    await setPaper(page, 'white');
+    const blanco = await page.evaluate(() => {
+      const w = document.querySelector('#pdf-container .pdf-page') as HTMLElement;
+      const cv = document.querySelector('#pdf-container .pdf-scaler canvas') as HTMLCanvasElement;
+      return { after: getComputedStyle(w, '::after').display, filtro: getComputedStyle(cv).filter };
+    });
+    expect(blanco.after).toBe('none');
+    expect(blanco.filtro === 'none' || blanco.filtro === '').toBe(true);
+
+    await setPaper(page, 'cream');
+    const crema = await page.evaluate(() => {
+      const w = document.querySelector('#pdf-container .pdf-page') as HTMLElement;
+      const cv = document.querySelector('#pdf-container .pdf-scaler canvas') as HTMLCanvasElement;
+      const st = getComputedStyle(w, '::after');
+      return {
+        attr: document.documentElement.getAttribute('data-pdf-paper'),
+        after: st.display, blend: st.mixBlendMode, bg: st.backgroundColor,
+        filtro: getComputedStyle(cv).filter,
+      };
+    });
+    expect(crema.attr).toBe('cream');
+    expect(crema.after).toBe('block');
+    expect(crema.blend).toBe('multiply');         // solo oscurece: papel a crema, tinta intacta
+    expect(crema.bg).not.toBe('rgba(0, 0, 0, 0)');
+    expect(crema.filtro === 'none' || crema.filtro === '').toBe(true);   // el tinte NO invierte
+
+    await setPaper(page, 'night');
+    const noche = await page.evaluate(() => {
+      const w = document.querySelector('#pdf-container .pdf-page') as HTMLElement;
+      const cv = document.querySelector('#pdf-container .pdf-scaler canvas') as HTMLCanvasElement;
+      return { after: getComputedStyle(w, '::after').display, filtro: getComputedStyle(cv).filter };
+    });
+    // Noche NO es un tinte más: multiplicar por negro dejaría la página entera en negro.
+    expect(noche.after).toBe('none');
+    expect(noche.filtro).toContain('invert');
+    expect(noche.filtro).toContain('hue-rotate');
+  });
+
+  test('en «Noche» los subrayados cambian a screen (con multiply serían invisibles)', async ({ page }) => {
+    await openPdf(page);
+    await selectPdfText(page);
+    await page.locator('#highlight-tooltip .highlight-color').first().click();
+    await expect(page.locator('#pdf-container .pdf-hl').first()).toBeVisible();
+
+    const claro = await page.evaluate(() => getComputedStyle(
+      document.querySelector('#pdf-container .pdf-hl-group')!).mixBlendMode);
+    expect(claro).toBe('multiply');
+
+    await setPaper(page, 'night');
+    const oscuro = await page.evaluate(() => getComputedStyle(
+      document.querySelector('#pdf-container .pdf-hl-group')!).mixBlendMode);
+    expect(oscuro).toBe('screen');
+  });
+
+  test('el papel no toca el bitmap: el agente de visión sigue viendo la página real', async ({ page }) => {
+    await openPdf(page);
+    await page.waitForTimeout(400);
+    const shot = () => page.evaluate(async () => {
+      const P: any = await import('/js/pdf-reader.js');
+      return P.capturePageImage(256);
+    });
+
+    await setPaper(page, 'white');
+    const enBlanco = await shot();
+    expect(enBlanco).toBeTruthy();
+
+    // Ni el tinte ni la inversión pasan por el canvas, así que lo que se le manda al modelo
+    // es byte a byte lo mismo. Si esto se rompe, es que el papel se está rasterizando.
+    await setPaper(page, 'sepia');
+    expect(await shot()).toBe(enBlanco);
+    await setPaper(page, 'night');
+    expect(await shot()).toBe(enBlanco);
+  });
+
+  test('en «auto» el papel sigue al tema de la app (la incoherencia que arregla)', async ({ page }) => {
+    await openPdf(page);
+    const paper = async (theme: string) => page.evaluate(async (th) => {
+      const S: any = await import('/js/settings.js');
+      S.set('theme', th);
+      S.set('pdfPaper', 'auto');
+      await new Promise((r) => setTimeout(r, 60));
+      return document.documentElement.getAttribute('data-pdf-paper');
+    }, theme);
+
+    expect(await paper('light')).toBe('white');
+    expect(await paper('sepia')).toBe('cream');   // antes: app en sepia, folio blanco deslumbrando
+    expect(await paper('dark')).toBe('night');
+  });
+});

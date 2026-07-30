@@ -799,6 +799,65 @@ body:not(.scroll-mode) .epub-container .epub-view {
   position: relative;
   flex: none;
   box-shadow: 0 2px 8px var(--shadow);
+  /* Grupo de mezcla acotado a la página: el tinte de papel y los subrayados (ambos con
+     mix-blend-mode) se mezclan con el papel y entre sí, nunca con el fondo de la app que
+     hay detrás ni con la sombra de la caja. */
+  isolation: isolate;
+}
+
+/* ---- Papel del PDF: tinte y modo noche (ADR-026) --------------------------
+   Una sola palanca: `data-pdf-paper` en <html>, que resuelve settings.js. TODO el pintado
+   es CSS → el cambio es instantáneo, no vuelve a pdf.js y no re-rasteriza nada (respeta
+   ADR-019/025: el zoom sigue siendo compositor puro).
+
+   Son DOS mecanismos distintos bajo el mismo control, y no es un capricho:
+   - Tintes claros → capa en `multiply`. Multiplicar solo puede OSCURECER, que es justo lo
+     que hace falta: papel blanco × crema = crema, y la tinta (ya negra) no se mueve.
+   - Noche → `invert`. Un tinte NO sirve: multiplicar por negro deja la página entera en
+     negro, tinta incluida. Por eso «Noche» no es un color más de la paleta.
+
+   Lo que el agente de visión captura (capturePageImage / captureRegionImage) lee el canvas
+   directamente, así que sigue viendo la página REAL, sin teñir ni invertir. Es la ventaja
+   de hacer esto en CSS y no al rasterizar. */
+:root { --pdf-paper-tint: transparent; }
+[data-pdf-paper="cream"] { --pdf-paper-tint: #f6ecd8; }
+[data-pdf-paper="sepia"] { --pdf-paper-tint: #eadcc0; }
+[data-pdf-paper="grey"]  { --pdf-paper-tint: #dcdcda; }
+/* "white" y "auto"→claro no llevan tinte: el papel del PDF ya es blanco. */
+
+/* El tinte es un ::after del wrapper: no añade DOM por página ni toca el render. Va por
+   encima del canvas (base Y parche de detalle, ambos dentro del .pdf-scaler) y por DEBAJO
+   de los subrayados (.pdf-hl-layer, z-index 2), que deben teñirse como la tinta y no
+   quedar "bajo el papel". Solo se pinta cuando hay tinte: si no, ni se crea la capa. */
+.pdf-page::after {
+  content: '';
+  display: none;
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: var(--pdf-paper-tint);
+  mix-blend-mode: multiply;
+}
+[data-pdf-paper="cream"] .pdf-page::after,
+[data-pdf-paper="sepia"] .pdf-page::after,
+[data-pdf-paper="grey"] .pdf-page::after { display: block; }
+
+/* Noche: invertir los canvas. El `hue-rotate` devuelve el tono a los colores (sin él, un
+   diagrama azul sale naranja). Coge base y parche de detalle a la vez, y deja fuera la capa
+   de texto y los subrayados, que viven fuera del .pdf-scaler.
+   El `contrast(0.88)` final evita el par negro puro / blanco puro: deja el papel en gris muy
+   oscuro y la tinta en hueso. Invertir a pelo es más agresivo de lo que parece en una sesión
+   larga, que es justo cuando se usa este modo. */
+[data-pdf-paper="night"] .pdf-scaler canvas {
+  filter: invert(1) hue-rotate(180deg) contrast(0.88);
+}
+/* Con el papel ya en negro, `multiply` haría desaparecer los subrayados (color × negro =
+   negro). En noche el blend se invierte a `screen`: el color ilumina el papel oscuro y la
+   tinta, ahora blanca, sigue legible por encima. */
+[data-pdf-paper="night"] .pdf-hl-group {
+  mix-blend-mode: screen;
+  opacity: 0.3;
 }
 
 /* Contenido de la página (canvas + capa de texto) a tamaño fit; se escala al zoom actual. */
@@ -2497,6 +2556,38 @@ body.ai-open #ai-toggle { color: var(--accent); }
 .theme-selector .theme-swatch.active {
   border-color: transparent;
   box-shadow: 0 0 0 2px var(--surface-1), 0 0 0 4px var(--accent);
+}
+
+/* Papel del PDF: mismos swatches que el tema (misma gramática visual, mismo tamaño de
+   toque), con la paleta de tintes real. "Noche" va aparte a propósito —no es un color
+   más: invierte la tinta— y por eso se separa con un margen. */
+.paper-selector { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.paper-selector .paper-swatch {
+  width: 30px; height: 30px; border-radius: 50%;
+  border: 1px solid var(--border); padding: 0; font-size: 0;
+  background: var(--surface-0);
+  cursor: pointer;
+  box-shadow: var(--shadow-1);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+.paper-selector .swatch-auto  { background: linear-gradient(110deg, #ffffff 0 50%, #1c1c1e 50% 100%); }
+.paper-selector .swatch-white { background: #ffffff; }
+.paper-selector .swatch-cream { background: #f6ecd8; }
+.paper-selector .swatch-paper-sepia { background: #eadcc0; }
+.paper-selector .swatch-grey  { background: #dcdcda; }
+.paper-selector .swatch-night { background: #14161a; margin-left: 6px; }
+.paper-selector .paper-swatch:hover { transform: scale(1.08); }
+.paper-selector .paper-swatch.active {
+  border-color: transparent;
+  box-shadow: 0 0 0 2px var(--surface-1), 0 0 0 4px var(--accent);
+}
+
+/* Nota bajo un control: explica una contrapartida sin robarle sitio a la etiqueta. */
+.settings-hint {
+  margin: 8px 0 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-soft);
 }
 
 /* Onboarding: icono del bloque dentro de un disco de acento tenue. */

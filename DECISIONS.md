@@ -689,3 +689,58 @@ del transform en vivo y no las del zoom horneado. Test en
 [`tests/pdf.spec.ts`](tests/pdf.spec.ts): el parche aparece a zoom alto, es más denso que el base, el
 base queda intacto, el orden es base → parche → capa de texto (seleccionable), el área está acotada y
 al volver a zoom bajo el parche se suelta.
+
+<a id="adr-026"></a>
+## ADR-026 — Papel del PDF: tinte en multiply y noche por inversión, resueltos en CSS · `ACEPTADA`
+
+**Contexto.** La app tiene tres temas (`light`/`sepia`/`dark`) y el PDF era la **única superficie
+que los ignoraba**: el contenedor se teñía (`--surface-3`) pero la página seguía blanca. Leer de
+noche en tema oscuro significaba un folio deslumbrando dentro de un marco negro. PDF5 había cerrado
+el debate de "tema en PDF" concluyendo que el reflow es imposible y que el máximo alcanzable es zoom
++ un `invert`; esta decisión ejecuta ese máximo, sin reabrir el reflow.
+
+**Decisión.** **Una sola palanca y todo el pintado en CSS.** `settings.js` resuelve el ajuste
+`pdfPaper` (`auto` sigue al tema; si no, valor explícito) a un valor concreto y lo publica como
+`data-pdf-paper` en `<html>`. Nadie más decide el papel. `pdf-reader.js` **no se toca**.
+
+Debajo hay **dos mecanismos distintos**, y esa es la parte no obvia:
+- **Tintes claros** (crema, sepia, gris) → capa en `multiply` (`.pdf-page::after`). Multiplicar solo
+  puede **oscurecer**, que es exactamente lo que hace falta: papel blanco × crema = crema, y la tinta
+  (ya negra) no se mueve.
+- **Noche** → `invert(1) hue-rotate(180deg) contrast(0.88)` sobre los canvas. Un tinte **no sirve**:
+  multiplicar por negro deja la página entera en negro, tinta incluida. Por eso «Noche» se presenta
+  separada en la UI y no como un color más de la paleta.
+
+**Porqué.**
+1. **CSS y no rasterizado.** El cambio es instantáneo, no vuelve a pdf.js y no re-rasteriza nada, así
+   que respeta ADR-019/025: el zoom sigue siendo compositor puro. La alternativa (`background` en
+   `page.render`) obligaría a repintar **las dos capas** de cada página en cada cambio de color.
+2. **El agente de visión sigue viendo la página real.** `capturePageImage`/`captureRegionImage` leen
+   el canvas, que no se toca: teñir en CSS no contamina lo que se le manda al modelo. Con tinte al
+   rasterizar, el modelo recibiría páginas sepia o en negativo. Hay un test que lo fija comparando
+   la captura byte a byte entre papeles.
+3. **Cero DOM nuevo por página.** El tinte es un `::after` del wrapper que ya existe, y solo se pinta
+   cuando hay tinte (`display:none` por defecto): con papel blanco no se paga ni un contexto de mezcla.
+4. **`hue-rotate` en noche.** Sin él, invertir gira el tono: un diagrama azul sale naranja. Con él,
+   los colores se reconocen (verificado sobre el PDF del BOE: el logo sigue azul).
+5. **`contrast(0.88)`.** Evita el par negro puro / blanco puro, que es agresivo en la sesión larga
+   que es justo cuando se usa este modo.
+
+**Consecuencias.**
+- **Los subrayados conmutan de blend.** `.pdf-hl-group` usa `multiply`; sobre papel negro, color ×
+  negro = negro y desaparecerían. En noche pasan a `screen`. Es una línea, pero sin ella el bug se
+  reporta como "se me borraron los subrayados por la noche".
+- **`.pdf-page` gana `isolation: isolate`**, para que el tinte y los subrayados se mezclen con el
+  papel y entre sí, nunca con el fondo de la app ni con la sombra de la caja.
+- **En noche las fotos salen en negativo.** El `hue-rotate` salva diagramas y texto de color; una
+  fotografía o un escaneado no tiene arreglo barato. Es la contrapartida que PDF5 ya anticipaba, se
+  asume a conciencia y **se avisa en la propia UI** bajo el selector.
+- El ajuste es **global**, no por libro: es una preferencia de confort visual (como el brillo), no
+  una propiedad del documento.
+- `theme: 'system'` ahora reacciona **en caliente** a `prefers-color-scheme` (antes solo se leía al
+  arrancar). Sin eso, `auto` no cumple lo que promete: quien lee de noche con el tema del sistema se
+  quedaba con papel claro hasta recargar.
+
+Tests en [`tests/pdf.spec.ts`](tests/pdf.spec.ts) (`PDF papel`): tinte solo en los claros, inversión
+solo en noche, conmutación del blend de subrayados, captura de visión idéntica entre papeles, y
+`auto` siguiendo al tema.

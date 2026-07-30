@@ -5,6 +5,36 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-30 — PDF: color de papel (tintes + modo Noche)
+
+El PDF era **la única superficie de la app que ignoraba el tema**: el contenedor se teñía pero la
+página seguía blanca, así que leer de noche en tema oscuro era un folio deslumbrando dentro de un
+marco negro. Nuevo ajuste **Papel (PDF)** en la pestaña Ajustes, con `auto` (sigue al tema) por
+defecto: claro → blanco, sepia → crema, oscuro → noche.
+
+Debajo hay **dos mecanismos**, no uno:
+
+- **Tintes claros** (crema, sepia, gris): capa en `multiply`. Multiplicar solo puede oscurecer, que
+  es justo lo que hace falta — el papel se tiñe y la tinta, ya negra, no se mueve.
+- **Noche**: `invert` + `hue-rotate` + `contrast` sobre los canvas. Un tinte negro **no** vale:
+  multiplicar por negro deja la página entera en negro, tinta incluida. Por eso «Noche» va separada
+  en la UI y no como un color más.
+
+Todo el pintado es **CSS sobre un único atributo** (`data-pdf-paper`, que resuelve `settings.js`).
+`pdf-reader.js` no se toca: el cambio es instantáneo, no vuelve a pdf.js y no re-rasteriza nada, así
+que el zoom sigue siendo compositor puro (ADR-019/025). Y como el bitmap no se altera, **el agente de
+visión sigue recibiendo la página real**, sin teñir ni invertir — hay test que lo compara byte a byte.
+
+Detalles que no se ven pero se notan: los subrayados conmutan de `multiply` a `screen` en noche (con
+`multiply` sobre papel negro habrían desaparecido); el `hue-rotate` evita que los diagramas azules
+salgan naranjas; y `theme: system` ahora reacciona en caliente al modo del sistema, sin recargar.
+
+Contrapartida asumida y **avisada en la propia UI**: en Noche las fotos y los escaneados en color
+salen en negativo. No tiene arreglo barato y ya estaba anticipado en PDF5. Ver
+[ADR-026](DECISIONS.md#adr-026).
+
+---
+
 ## 2026-07-30 — PDF: capa de detalle a zoom alto (y −64% de memoria en canvas)
 
 Cerrada la consecuencia que ADR-019 dejó abierta: la nitidez dependía de un único canvas por

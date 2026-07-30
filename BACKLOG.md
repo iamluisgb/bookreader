@@ -1029,11 +1029,16 @@ La página actual se deriva del scroll; el modo se recuerda por libro. Render po
 (común a ambos modos) que conserva PDF3 (subrayados por página). Ver ADR-017. Test en
 [`tests/pdf.spec.ts`](tests/pdf.spec.ts).
 
-### PDF5 — Tipografía / tema en PDF · límite de formato
+### PDF5 — Tipografía / tema en PDF · límite de formato · **máximo alcanzable ✓ (2026-07-30)**
 **No portable de raíz:** el texto del PDF es layout fijo (imagen), no reflowable. No hay tamaño de
 fuente, ni reflow, ni recolorear texto. Máximo alcanzable: **zoom** y, para modo oscuro, un filtro
 `invert` sobre el canvas (funciona pero degrada figuras/colores). Reflow real exigiría reconvertir el
 PDF a HTML → **fuera de alcance**. Documentado aquí para no reabrir el debate.
+
+**Ese máximo ya está entregado** (ver ADR-026 y CHANGELOG): ajuste **Papel (PDF)** con tintes claros
+en `multiply` y **Noche** por inversión, todo en CSS sobre `data-pdf-paper` (sin re-render). La
+degradación de figuras en Noche se asume y **se avisa en la UI**. Lo que sigue fuera de alcance es el
+reflow; esto no lo reabre.
 
 ### PDF6 — Segmentación estructural de PDFs planos (temarios/legales) · `M` · **✓ (2026-07-16)**
 

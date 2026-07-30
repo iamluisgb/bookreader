@@ -10,9 +10,28 @@ const defaults = {
   lineHeight: 1.6,
   brightness: 1,      // 1 = sin atenuar; < 1 oscurece con un overlay (brillo tipo Play Books)
   nightLight: 0,      // 0 = off; > 0 aplica un filtro cálido ámbar (reduce luz azul)
+  pdfPaper: 'auto',   // color de papel del PDF: 'auto' sigue al tema de la app (ver ADR-026)
 };
 
+// Papel del PDF que corresponde a cada tema cuando el ajuste está en 'auto'. Sin esto, el
+// PDF era la única superficie que ignoraba el tema: app en sepia y folio blanco deslumbrando.
+const PAPER_BY_THEME = { light: 'white', sepia: 'cream', dark: 'night' };
+
 let current = { ...defaults, ...Storage.get(SETTINGS_KEY, {}) };
+
+// Tema efectivo: 'system' se resuelve contra el sistema operativo.
+function resolvedTheme() {
+  const th = current.theme;
+  if (th && th !== 'system') return th;
+  return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
+
+// Papel efectivo del PDF: nunca devuelve 'auto'. Es la ÚNICA función que decide el papel;
+// el resto de la app solo lee el atributo `data-pdf-paper` que publica applySettings.
+export function resolvedPdfPaper() {
+  const p = current.pdfPaper || 'auto';
+  return p === 'auto' ? (PAPER_BY_THEME[resolvedTheme()] || 'white') : p;
+}
 
 export function getAll() {
   return { ...current };
@@ -39,17 +58,21 @@ export function applySettings() {
   // theme-color de la barra de estado (PWA), resolviendo 'system'.
   const meta = document.getElementById('meta-theme-color');
   if (meta) {
-    let resolved = current.theme;
-    if (!resolved || resolved === 'system') {
-      resolved = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-    }
     const bar = { light: '#ffffff', dark: '#1c1c1e', sepia: '#f1e9d6' };
-    meta.setAttribute('content', bar[resolved] || bar.light);
+    meta.setAttribute('content', bar[resolvedTheme()] || bar.light);
   }
+
+  // Papel del PDF. Se resuelve AQUÍ a un valor concreto y se publica como atributo: todo
+  // el pintado lo hace el CSS (tinte en multiply / inversión en noche), sin volver a
+  // pdf.js y sin re-rasterizar. Ver ADR-026.
+  document.documentElement.setAttribute('data-pdf-paper', resolvedPdfPaper());
 
   // Update theme buttons
   document.querySelectorAll('.theme-btn').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.theme === current.theme);
+  });
+  document.querySelectorAll('.paper-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.paper === (current.pdfPaper || 'auto'));
   });
 
   // Font size display
@@ -88,6 +111,17 @@ export function init() {
   document.querySelectorAll('.theme-btn').forEach(btn => {
     btn.addEventListener('click', () => set('theme', btn.dataset.theme));
   });
+
+  // Papel del PDF
+  document.querySelectorAll('.paper-btn').forEach(btn => {
+    btn.addEventListener('click', () => set('pdfPaper', btn.dataset.paper));
+  });
+
+  // Con el tema (o el papel) en 'auto', un cambio de modo del sistema debe arrastrar la
+  // app EN CALIENTE. Sin esto, quien lee de noche con el tema del sistema se quedaba con
+  // el papel claro hasta recargar — justo el caso que 'auto' existe para cubrir.
+  window.matchMedia?.('(prefers-color-scheme: dark)')
+    ?.addEventListener?.('change', () => applySettings());
 
   // Font size
   document.getElementById('font-decrease')?.addEventListener('click', () => {
