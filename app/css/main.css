@@ -810,6 +810,15 @@ body:not(.scroll-mode) .epub-container .epub-view {
 }
 .pdf-scaler canvas, #pdf-canvas { display: block; }
 
+/* Parche de detalle: solo el trozo visible, rasterizado a la resolución exacta del zoom y
+   superpuesto al canvas base (que NUNCA se retira → nada de huecos en blanco). Posición y
+   tamaño en unidades fit, puestos por JS, así escala con el .pdf-scaler como todo lo demás.
+   Va encima del base y DEBAJO de la capa de texto, que debe seguir seleccionable. */
+.pdf-scaler canvas.pdf-detail {
+  position: absolute;
+  pointer-events: none;
+}
+
 /* Flash al saltar a una página desde una cita del agente (señala el destino). */
 @keyframes pdfCiteFlash {
   0%, 100% { box-shadow: 0 2px 8px var(--shadow); }

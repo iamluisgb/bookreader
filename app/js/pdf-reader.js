@@ -10,8 +10,11 @@ let lazyObserver = null;         // observer del render perezoso en modo scroll
 let scrollRaf = 0;
 
 // ---- Zoom fluido (tipo Adobe): sin re-render ------------------------------
-// Cada página se pinta OVERSAMPLEADA (canvas a ~OVERSAMPLE× su tamaño mostrado), así
-// ampliar hasta ~OVERSAMPLE× sigue nítido sin re-rasterizar. El zoom vive en el layout:
+// DOS CAPAS. La BASE es la página entera, pintada oversampleada (canvas a ~OVERSAMPLE× su
+// tamaño mostrado): nunca se retira, así que siempre hay algo que enseñar y ampliar hasta
+// ~OVERSAMPLE× sigue nítido sin re-rasterizar. Encima, al quedarse quieto a más zoom, se
+// superpone un PARCHE de detalle del trozo visible a la resolución exacta (ver más abajo).
+// El zoom vive en el layout:
 //   .pdf-page  → caja de tamaño fit·zoom (define el área de scroll → paneo NATIVO)
 //   .pdf-scaler→ contenido a tamaño fit con transform: scale(zoom) (canvas + capa de texto)
 // Durante el gesto (pinch táctil, pinch de trackpad o Ctrl+rueda) escalamos en vivo el
@@ -19,10 +22,11 @@ let scrollRaf = 0;
 // scaler), anclando el scroll al punto focal. No se llama a pdf.js en todo el gesto.
 let zoom = 1;
 let zoomHandlersReady = false;
+let zoomPreviewing = false;     // hay un gesto de zoom en curso (preview con transform)
 let fitWidth = 0;               // ancho de contenedor con el que se calcularon las cajas
 const PDF_PAD = 20;             // padding del contenedor (coincide con el CSS)
-const OVERSAMPLE = 2.5;         // el canvas se pinta 2.5× → nítido al ampliar sin re-render
-const MAX_BACKING_PX = 3800;    // tope del lado mayor del canvas (memoria)
+const OVERSAMPLE = 1.5;         // el canvas base se pinta 1.5× → preview nítido sin re-render
+const MAX_BACKING_PX = 3000;    // tope del lado mayor del canvas base (memoria)
 const ZOOM_MIN = 1, ZOOM_MAX = 6;
 
 const clampZoom = (z) => Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, z));
@@ -54,6 +58,140 @@ function applyCommittedZoom() {
     const s = w.querySelector('.pdf-scaler');
     if (s) s.style.transform = zoom === 1 ? '' : `scale(${zoom})`;
   }
+  scheduleDetail();
+}
+
+// ---- Capa de detalle (parche nítido bajo demanda) --------------------------
+// El canvas base se pinta a fit·OVERSAMPLE·dpr: nítido hasta ~OVERSAMPLE× con memoria
+// acotada. Más allá, en vez de subir el oversample de TODAS las páginas —coste que crece
+// con el zoom Y con el nº de páginas montadas en modo scroll—, al quedarse quieto se
+// rasteriza SOLO el trozo visible a la resolución exacta del zoom y se superpone al base.
+//
+// La base NUNCA se retira, así que el parche solo AÑADE nitidez: en ningún momento del
+// gesto hay hueco en blanco. Y como vive dentro del .pdf-scaler posicionado en unidades
+// fit, sigue siendo geométricamente correcto a cualquier zoom posterior — al ampliar más
+// se queda blando (y se repinta al parar), al reducir sobra resolución (y se descarta).
+// Por eso tampoco hay que esconderlo durante el pinch: escala con todo lo demás.
+const DETAIL_IDLE_MS = 220;      // quietud (zoom o scroll) antes de pedir el parche
+const DETAIL_MAX_PX = 3000;      // tope del lado mayor del parche
+const DETAIL_MAX_AREA = 4.5e6;   // tope de área del parche (~18 MB de backing)
+const DETAIL_MARGIN = 0.08;      // margen alrededor del viewport (aguanta paneos cortos)
+let detailTimer = 0;
+let detailSeq = 0;               // invalida los parches en vuelo (cambió el zoom/scroll/doc)
+
+function scheduleDetail() {
+  clearTimeout(detailTimer);
+  detailTimer = setTimeout(() => { runDetail().catch(e => console.warn('pdf detail:', e)); }, DETAIL_IDLE_MS);
+}
+
+// Cancela y suelta el parche de una página (fuera de vista, re-fit, o ya no hace falta).
+function dropDetail(wrapper) {
+  if (wrapper._detailTask) { try { wrapper._detailTask.cancel(); } catch (e) {} wrapper._detailTask = null; }
+  const d = wrapper.querySelector('canvas.pdf-detail');
+  if (d) { d.width = d.height = 0; d.remove(); }
+  wrapper.dataset.detailKey = '';
+}
+
+function dropAllDetail() {
+  detailSeq++;
+  clearTimeout(detailTimer);
+  for (const w of pdfPages()) dropDetail(w);
+}
+
+// Recorre las páginas montadas: pinta parche en las visibles que lo necesiten y suelta el
+// de las que no. Secuencial a propósito — un solo render de pdf.js a la vez.
+async function runDetail() {
+  const container = document.getElementById('pdf-container');
+  if (!pdfDoc || !container) return;
+  if (zoomPreviewing) { scheduleDetail(); return; }   // mitad de un gesto: las medidas mienten
+  const seq = ++detailSeq;
+  const cr = container.getBoundingClientRect();
+  const need = zoom * (window.devicePixelRatio || 1);  // px de backing por unidad fit que pide el zoom
+  for (const w of pdfPages()) {
+    if (seq !== detailSeq) return;
+    if (!w.dataset.rendered) continue;
+    const r = w.getBoundingClientRect();
+    const vis = {
+      top: Math.max(r.top, cr.top), bottom: Math.min(r.bottom, cr.bottom),
+      left: Math.max(r.left, cr.left), right: Math.min(r.right, cr.right),
+    };
+    const rbase = parseFloat(w.dataset.rratio || '0');
+    // Fuera de vista, o el base ya da resolución de sobra → no gastar memoria.
+    if (vis.bottom - vis.top < 1 || vis.right - vis.left < 1 || !rbase || need <= rbase * 1.05) {
+      dropDetail(w);
+      continue;
+    }
+    await renderDetail(w, r, vis, need, seq);
+  }
+}
+
+async function renderDetail(wrapper, wr, vis, need, seq) {
+  const num = +wrapper.dataset.page || currentPage;
+  const fitw = parseFloat(wrapper.dataset.fitw || '0');
+  const fith = parseFloat(wrapper.dataset.fith || '0');
+  const basew = parseFloat(wrapper.dataset.basew || '0');
+  if (!fitw || !fith || !basew) return;
+  const fit = fitw / basew;                 // px CSS por unidad PDF (a zoom 1)
+
+  // Región visible de la página en unidades fit (el sistema del .pdf-scaler), con margen.
+  const mx = (vis.right - vis.left) * DETAIL_MARGIN, my = (vis.bottom - vis.top) * DETAIL_MARGIN;
+  const ux = Math.max(0, (vis.left - mx - wr.left) / zoom);
+  const uy = Math.max(0, (vis.top - my - wr.top) / zoom);
+  const uw = Math.min((vis.right - vis.left + 2 * mx) / zoom, fitw - ux);
+  const uh = Math.min((vis.bottom - vis.top + 2 * my) / zoom, fith - uy);
+  if (uw < 1 || uh < 1) return;
+
+  // Resolución del parche: la exacta del zoom, acotada por lado y por área → la memoria del
+  // parche NO crece con el zoom (a más zoom, menos página cabe en el mismo viewport).
+  const rbase = parseFloat(wrapper.dataset.rratio || '0');
+  const r = Math.min(need, DETAIL_MAX_PX / Math.max(uw, uh), Math.sqrt(DETAIL_MAX_AREA / (uw * uh)));
+  if (r <= rbase * 1.05) return;            // tras acotar ya no mejora al base
+
+  const key = [num, Math.round(ux), Math.round(uy), Math.round(uw), Math.round(uh), r.toFixed(2)].join(':');
+  if (wrapper.dataset.detailKey === key) return;   // ese parche ya está puesto
+
+  const page = await pdfDoc.getPage(num);
+  if (seq !== detailSeq) return;
+
+  const canvas = document.createElement('canvas');
+  canvas.className = 'pdf-detail';
+  canvas.width = Math.max(1, Math.floor(uw * r));
+  canvas.height = Math.max(1, Math.floor(uh * r));
+  canvas.style.left = ux + 'px';
+  canvas.style.top = uy + 'px';
+  canvas.style.width = uw + 'px';           // tamaño fit → escala con el scaler
+  canvas.style.height = uh + 'px';
+
+  if (wrapper._detailTask) { try { wrapper._detailTask.cancel(); } catch (e) {} }
+  // `transform` desplaza el origen antes del viewport: se pide la página entera a la escala
+  // del parche pero solo cae en el canvas el rectángulo que interesa (recorte, no reescalado).
+  const task = page.render({
+    canvasContext: canvas.getContext('2d'),
+    viewport: page.getViewport({ scale: fit * r }),
+    transform: [1, 0, 0, 1, -ux * r, -uy * r],
+  });
+  wrapper._detailTask = task;
+  try {
+    await task.promise;
+  } catch (e) {
+    canvas.width = canvas.height = 0;
+    if (e && e.name === 'RenderingCancelledException') return;
+    throw e;
+  }
+  if (wrapper._detailTask === task) wrapper._detailTask = null;
+  const scaler = wrapper.querySelector('.pdf-scaler');
+  if (seq !== detailSeq || !scaler) { canvas.width = canvas.height = 0; return; }
+
+  // DOBLE BUFFER, igual que el base: el parche viejo no se quita hasta tener el nuevo listo.
+  // Va justo encima del canvas base y DEBAJO de la capa de texto (que debe seguir arriba
+  // para poder seleccionar).
+  const prev = scaler.querySelector('canvas.pdf-detail');
+  if (prev) { scaler.replaceChild(canvas, prev); prev.width = prev.height = 0; }
+  else {
+    const base = scaler.querySelector('canvas:not(.pdf-detail)');
+    scaler.insertBefore(canvas, base ? base.nextSibling : scaler.firstChild);
+  }
+  wrapper.dataset.detailKey = key;
 }
 
 // Página bajo un punto de pantalla (o la más cercana). Es el ANCLA del zoom: su caja escala
@@ -210,6 +348,7 @@ function fpKey() { try { return pdfDoc && pdfDoc.fingerprints ? pdfDoc.fingerpri
 async function rerender() {
   if (!pdfDoc) return;
   teardownScroll();
+  dropAllDetail();                 // se va a vaciar el contenedor: invalida parches en vuelo
   const container = document.getElementById('pdf-container');
   if (!container) return;
   fitWidth = container.clientWidth;
@@ -235,6 +374,8 @@ async function refit() {
   fitWidth = avail;
   const pages = pdfPages();
   if (!pages.length) return;
+  // Cambia `fit`, y los parches están posicionados en unidades fit → dejan de encajar.
+  dropAllDetail();
 
   // Ancla: la página del borde superior y en qué fracción de ella estás (volver al mismo
   // sitio, no al principio de la página).
@@ -288,6 +429,10 @@ function ensureZoomHandlers() {
 
   const startPreview = (fx, fy) => {
     if (preview) return;
+    // Durante el gesto las medidas son las del transform en vivo, no las del zoom horneado:
+    // cualquier parche pedido ahora saldría recortado por el sitio equivocado.
+    zoomPreviewing = true;
+    clearTimeout(detailTimer);
     const layer = zoomLayer();
     if (layer) {                         // origen del preview en el foco (layer aún en identidad)
       const r = layer.getBoundingClientRect();
@@ -304,6 +449,7 @@ function ensureZoomHandlers() {
   };
   const commitPreview = () => {
     clearTimeout(wheelTimer);
+    zoomPreviewing = false;
     if (!preview) return;
     const { target, fx, fy } = preview;
     preview = null;
@@ -471,6 +617,7 @@ function onScroll() {
       if (d < bestD) { bestD = d; best = +el.dataset.page; }
     });
     if (best !== currentPage) setCurrentPage(best);
+    scheduleDetail();     // al parar el paneo, recubrir lo que ahora se ve
   });
 }
 
@@ -483,6 +630,7 @@ function teardownScroll() {
 // Libera el canvas/capas de una página fuera de vista (memoria acotada en scroll).
 function freeWrapper(wrapper) {
   if (wrapper._renderTask) { try { wrapper._renderTask.cancel(); } catch (e) {} wrapper._renderTask = null; }
+  dropDetail(wrapper);
   const canvas = wrapper.querySelector('canvas');
   if (canvas) { canvas.width = 0; canvas.height = 0; }
   const tl = wrapper.querySelector('.textLayer'); if (tl) tl.innerHTML = '';
@@ -511,6 +659,9 @@ async function renderInto(wrapper, num) {
   wrapper.dataset.fith = String(viewport.height);
   wrapper.dataset.basew = String(base.width);
   wrapper.dataset.baseh = String(base.height);
+  // Resolución REAL del base (px de backing por unidad fit, tras el tope): es lo que decide
+  // a partir de qué zoom hace falta parche de detalle.
+  wrapper.dataset.rratio = String(renderScale / fit);
   wrapper.style.width = (viewport.width * zoom) + 'px';       // caja = fit·zoom (área de scroll)
   wrapper.style.height = (viewport.height * zoom) + 'px';
   wrapper.style.setProperty('--scale-factor', String(fit));
@@ -525,7 +676,7 @@ async function renderInto(wrapper, num) {
   // DOBLE BUFFER: se pinta en un canvas nuevo y solo se cuelga del DOM cuando está listo.
   // Reutilizarlo obligaba a poner canvas.width (que lo BORRA) antes de repintar, así que
   // re-rasterizar —al cambiar el ancho— dejaba la página en blanco mientras tanto.
-  const prev = scaler.querySelector('canvas');
+  const prev = scaler.querySelector('canvas:not(.pdf-detail)');
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d');
   canvas.width = Math.floor(renderViewport.width);
@@ -554,6 +705,7 @@ async function renderInto(wrapper, num) {
 
   await renderTextLayer(page, viewport, scaler);
   wrapper.dataset.rendered = '1';
+  scheduleDetail();     // si estamos a zoom alto, el base recién puesto pide parche
 
   // Re-pintar los subrayados de esta página (app.js escucha este evento).
   window.dispatchEvent(new CustomEvent('reader:pdf-page-rendered', { detail: { page: num } }));

@@ -449,8 +449,8 @@ dentro de `#pdf-zoom-layer`.
 4. **Nitidez acotada por memoria.** Oversample con tope del lado mayor del canvas; el lazy de scroll
    (ADR-017) mantiene ~2-3 canvas vivos.
 
-**Consecuencias.** Más allá de ~OVERSAMPLE× el bitmap se ablanda (aceptable en el rango de lectura); un
-**re-render progresivo** al quedarse quieto a zoom alto queda como mejora futura (F4). Tests en
+**Consecuencias.** Más allá de ~OVERSAMPLE× el bitmap se ablanda. Esa consecuencia queda **resuelta en
+[ADR-025](#adr-025)**, que añade una segunda capa de detalle y permite abaratar el base. Tests en
 [`tests/pdf.spec.ts`](tests/pdf.spec.ts): anclaje focal, cero re-render (canvas/backing intactos) y zoom
 en modo scroll.
 
@@ -637,3 +637,55 @@ que la UI tiene que representar y todo el código que abre libros tiene que cont
 (`LibStore.hasFile`). El borrado pasa a ser lógico (tombstone) porque ahora se propaga. Y
 `getAllBooks()` deja de devolver el binario —cargaba en memoria el de todos los libros para pintar
 la rejilla—, así que quien necesite el fichero pide `getRaw(id)` explícitamente.
+
+<a id="adr-025"></a>
+## ADR-025 — PDF a zoom alto: capa de detalle bajo demanda (base barata + parche nítido) · `ACEPTADA`
+
+**Contexto.** [ADR-019](#adr-019--zoom-fluido-de-pdf-oversample--transform-sin-re-render--aceptada) dejó
+la nitidez atada al oversample del canvas base, y ese único bitmap tenía que servir para todo el rango
+`ZOOM_MIN..ZOOM_MAX` (1..6). Con `OVERSAMPLE = 2.5` y tope `MAX_BACKING_PX = 3800`, una A4 salía a
+~10 Mpx = **~40 MB de backing por página**; con el lazy de scroll (`rootMargin: 150%`) hay ~4 páginas
+montadas a la vez, o sea **~150 MB solo en canvas** — medido: 148,7 MB en un viewport de 390×780 a
+dpr 3. Ese es territorio donde iOS Safari descarta la pestaña, que el usuario vive como perder la
+sesión de estudio. Y aun pagándolo, más allá de ~2,5× (en escritorio, donde el tope recortaba, ~1,5×)
+la página seguía blanda: precisamente en figuras, tablas y fórmulas, lo único por lo que se amplía.
+Subir el oversample no era salida: el coste crece con el zoom **y** con las páginas montadas.
+
+**Decisión.** **Dos capas, como MuPDF/PDF.js.** El canvas base baja a `OVERSAMPLE = 1.5` /
+`MAX_BACKING_PX = 3000` y deja de ser el responsable de la nitidez a zoom alto; encima, al **quedarse
+quieto** (`DETAIL_IDLE_MS = 220`, tras zoom o paneo), se rasteriza **solo el trozo visible** a la
+resolución exacta del zoom y se superpone como `canvas.pdf-detail` dentro del `.pdf-scaler` (recorte
+vía `transform` en `page.render`, no reescalado). El parche está acotado por lado y por área
+(`DETAIL_MAX_PX`, `DETAIL_MAX_AREA` ≈ 18 MB), así que **su memoria no crece con el zoom**: a más zoom,
+menos página cabe en el mismo viewport.
+
+**Porqué.**
+1. **La base nunca se retira.** El parche solo AÑADE nitidez, así que en ningún instante del gesto hay
+   hueco en blanco — el fallo clásico de los visores que re-rasterizan la vista al hacer zoom.
+2. **El parche sobrevive al zoom.** Vive dentro del `.pdf-scaler` posicionado en **unidades fit**, así
+   que sigue siendo geométricamente correcto a cualquier zoom posterior: al ampliar más se ablanda (y
+   se repinta al parar), al reducir sobra resolución (y se suelta). Por eso **no hay que esconderlo
+   durante el pinch**: escala con todo lo demás y el gesto sigue siendo compositor puro.
+3. **Memoria: −64% medido.** 148,7 MB → **53,5 MB** (móvil dpr 3, 4 páginas montadas). Y el pico no
+   empeora al ampliar: a zoom 4 y 6, **38,9 MB** incluido el parche (menos páginas visibles y patch
+   acotado). De paso, cada página se rasteriza más rápido → menos placeholders vacíos en scroll rápido.
+4. **Nitidez real de 1,5× a 6×**, que antes no existía a ningún precio razonable.
+
+**Alternativas descartadas.**
+- *Subir `OVERSAMPLE`*: paga la nitidez en TODAS las páginas montadas y en todo el rango de zoom, para
+  un caso que solo ocurre parado y en un trozo de una página. Es justo el intercambio que este ADR
+  invierte.
+- *Jerarquía de tiles multi-resolución (SumatraPDF)*: correcta para un visor de escritorio nativo con
+  zoom arbitrario sobre documentos enormes; aquí un solo parche por página visible cubre el caso real
+  y evita gestionar una caché de tiles con invalidación propia.
+- *Re-renderizar el base a la escala del zoom al soltar*: vuelve a meter pdf.js en el camino del gesto
+  (lo que ADR-019 sacó) y el coste crece con el zoom sin tope.
+
+**Consecuencias.** El preview EN VIVO durante el pinch ahora se ablanda antes (a partir de ~1,5×, y
+en escritorio antes por el tope) porque el base es más barato; se resuelve solo al parar los dedos. Los
+parches se sueltan en `refit` (cambia `fit` → las unidades dejan de encajar), en `freeWrapper` y en
+`rerender`, y no se piden mientras hay un gesto en curso (`zoomPreviewing`), donde las medidas son las
+del transform en vivo y no las del zoom horneado. Test en
+[`tests/pdf.spec.ts`](tests/pdf.spec.ts): el parche aparece a zoom alto, es más denso que el base, el
+base queda intacto, el orden es base → parche → capa de texto (seleccionable), el área está acotada y
+al volver a zoom bajo el parche se suelta.

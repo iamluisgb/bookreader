@@ -5,6 +5,38 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-30 — PDF: capa de detalle a zoom alto (y −64% de memoria en canvas)
+
+Cerrada la consecuencia que ADR-019 dejó abierta: la nitidez dependía de un único canvas por
+página que tenía que servir para todo el rango de zoom (1..6). Costaba **~40 MB por página** y
+aun así, más allá de ~2,5× (en escritorio ~1,5×, donde el tope de backing recortaba), figuras,
+tablas y fórmulas —lo único por lo que se amplía— salían blandas.
+
+Ahora hay **dos capas**, como MuPDF/PDF.js:
+
+- **Base** más barata (`OVERSAMPLE` 2.5 → 1.5, `MAX_BACKING_PX` 3800 → 3000). Sigue siendo la
+  página entera y **nunca se retira**, así que no hay hueco en blanco en ningún momento.
+- **Parche de detalle**: al quedarse quieto (220 ms tras zoom o paneo) se rasteriza **solo el
+  trozo visible** a la resolución exacta del zoom y se superpone al base. Acotado por lado y por
+  área (~18 MB), así que **su memoria no crece con el zoom**.
+
+El parche vive dentro del `.pdf-scaler` en unidades fit, así que sigue encajando a cualquier zoom
+posterior y **no hay que esconderlo durante el pinch**: el gesto sigue siendo compositor puro,
+sin tocar pdf.js.
+
+**Medido** (viewport 390×780, dpr 3, modo scroll, 4 páginas montadas): **148,7 MB → 53,5 MB** de
+backing de canvas. Y el pico no empeora al ampliar: a zoom 4 y 6, **38,9 MB** con el parche
+incluido. Efecto colateral: cada página se rasteriza más rápido → menos placeholders vacíos al
+scrollear rápido.
+
+Contrapartida asumida: durante el pinch el preview se ablanda antes que antes (el base es más
+barato); se resuelve solo al parar los dedos. Ver [ADR-025](DECISIONS.md#adr-025). Test nuevo en
+[`tests/pdf.spec.ts`](tests/pdf.spec.ts): el parche aparece a zoom alto, es más denso que el base,
+el base queda intacto, el orden es base → parche → capa de texto (seleccionable), el área está
+acotada, y al volver a zoom bajo se suelta.
+
+---
+
 ## 2026-07-29 — PDF: ampliar con dos dedos «recargaba» y movía la vista
 
 Reportado: al ampliar con pinch en el móvil, el PDF se recargaba y la vista se descolocaba un

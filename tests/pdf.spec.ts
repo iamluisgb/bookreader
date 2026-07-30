@@ -376,8 +376,9 @@ test.describe('PDF fit-to-width + zoom', () => {
       const box = document.querySelector('#pdf-container .pdf-page') as HTMLElement;
       return { backing: cv.width, css: parseFloat(cv.style.width), box: parseFloat(box.style.width) };
     });
-    // Oversampleado: el backing es bastante mayor que el tamaño mostrado.
-    expect(before.backing).toBeGreaterThan(before.css * 2);
+    // Oversampleado: el backing es mayor que el tamaño mostrado (la nitidez por encima de
+    // OVERSAMPLE× la da el parche de detalle, no un base más gordo).
+    expect(before.backing).toBeGreaterThan(before.css * 1.4);
 
     const after = await page.evaluate(async () => {
       const P: any = await import('/js/pdf-reader.js');
@@ -394,6 +395,54 @@ test.describe('PDF fit-to-width + zoom', () => {
     expect(after.css).toBe(before.css);           // el canvas se muestra igual; escala el scaler
     expect(after.scaler).toContain('scale(2.5)');
     expect(Math.abs(after.box - before.box * 2.5)).toBeLessThan(2);   // la caja crece a fit·2.5
+  });
+
+  // ADR-019bis · Capa de detalle: al PARAR a zoom alto se superpone un parche del trozo
+  // visible a la resolución exacta, SIN tocar el canvas base (que nunca se retira → nunca
+  // hay hueco en blanco). Es lo que permite que el base sea barato en memoria.
+  test('a zoom alto aparece un parche de detalle encima del base, sin tocarlo', async ({ page }) => {
+    await openPdf(page);
+    await page.waitForTimeout(300);
+    await page.evaluate(() => {
+      const cv = document.querySelector('#pdf-container canvas') as HTMLCanvasElement;
+      cv.dataset.mark = 'orig';
+    });
+
+    const r = await page.evaluate(async () => {
+      const P: any = await import('/js/pdf-reader.js');
+      P.setZoom(4, { x: 195, y: 390 });
+      await new Promise((res) => setTimeout(res, 900));   // DETAIL_IDLE_MS + render
+      const scaler = document.querySelector('#pdf-container .pdf-scaler') as HTMLElement;
+      const base = scaler.querySelector('canvas:not(.pdf-detail)') as HTMLCanvasElement;
+      const det = scaler.querySelector('canvas.pdf-detail') as HTMLCanvasElement;
+      const kids = Array.from(scaler.children).map((el) => el.className || el.tagName.toLowerCase());
+      return {
+        hasDetail: !!det,
+        baseIntact: base?.dataset.mark === 'orig' && base.width > 0,
+        // Densidad = px de backing por px CSS mostrado (antes del scale del scaler).
+        baseDensity: base ? base.width / parseFloat(base.style.width) : 0,
+        detDensity: det ? det.width / parseFloat(det.style.width) : 0,
+        detArea: det ? det.width * det.height : 0,
+        order: kids,
+      };
+    });
+
+    expect(r.hasDetail).toBe(true);
+    expect(r.baseIntact).toBe(true);                            // el base sigue ahí, intacto
+    expect(r.detDensity).toBeGreaterThan(r.baseDensity * 1.5);  // el parche es más nítido
+    expect(r.detArea).toBeLessThanOrEqual(4.5e6);               // memoria acotada (DETAIL_MAX_AREA)
+    // base → parche → capa de texto (que debe quedar arriba para seleccionar).
+    expect(r.order.indexOf('pdf-detail')).toBeGreaterThan(0);
+    expect(r.order.indexOf('pdf-detail')).toBeLessThan(r.order.indexOf('textLayer'));
+
+    // Al volver a zoom bajo el base ya da de sobra → el parche se suelta (memoria).
+    const gone = await page.evaluate(async () => {
+      const P: any = await import('/js/pdf-reader.js');
+      P.setZoom(1);
+      await new Promise((res) => setTimeout(res, 900));
+      return !document.querySelector('#pdf-container canvas.pdf-detail');
+    });
+    expect(gone).toBe(true);
   });
 
   // Modo scroll: el zoom también funciona (leer PDFs técnicos en móvil/tablet).
