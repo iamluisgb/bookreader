@@ -5,6 +5,44 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-30 — Agente: el chat deja de esperar, la expansión entiende el idioma, y los modelos se pueden probar
+
+Tres mejoras del agente, la primera bastante más grave de lo que parecía.
+
+**1 · El chat iba encolado detrás de los trabajos en segundo plano.** `llm.js` serializaba *todas*
+las llamadas de la app, porque nan rechaza concurrencia contra la misma key. Pero un resumen es un
+map-reduce de muchas llamadas: preguntarle algo al agente durante esa generación encolaba la
+pregunta detrás de **todos** los trozos pendientes. `jobs.js` prometía "puede seguir leyendo" —
+cierto— pero el agente quedaba inutilizable durante minutos sin explicación visible. El código ya
+tenía el argumento escrito: `transcribe` estaba fuera de la cola porque *"el usuario espera con el
+modal delante"*. El chat es **la** interacción donde el usuario espera mirando.
+
+Ahora la cola tiene dos carriles: lo interactivo adelanta a lo de fondo. No hay preempción (una
+llamada en vuelo se termina; abortarla desperdicia tokens y deja el artefacto a medias), así que lo
+que se gana es no esperar a los trozos **que faltan**. Además el límite de concurrencia pasa a ser
+**por proveedor**: era una restricción de nan aplicada a todo el mundo, y en OpenAI/Groq/OpenRouter
+ya no se serializa. Sin declarar → se serializa, así que ningún BYOK personalizado empeora.
+Ver [ADR-027](DECISIONS.md#adr-027).
+
+**2 · La expansión de consulta ahora la decide el idioma.** IA7 solo expandía cuando no se nombraba
+capítulo. La medición de su fase F2 decía otra cosa: mismo idioma, BM25 crudo ya da 6/6 y la
+expansión no aporta; **cruzando idiomas (ES→EN), 0/5 → 4/5**. Y el cruzado es el caso real: se leen
+libros técnicos en inglés y se pregunta en español. Cruzando idiomas BM25 no tiene *nada* que
+emparejar — da igual lo explícita que sea la intención. Así que el idioma manda sobre el resto del
+gate. `detectLang` se muda a `retrieval.js` (ahora tiene dos consumidores) y hay un
+`Retrieval.indexLang()` cacheado, medido sobre una muestra repartida del libro porque las primeras
+páginas mienten sobre el idioma del cuerpo. Ver [ADR-028](DECISIONS.md#adr-028).
+
+**3 · Botón «Probar» en cada slot de modelo.** Los cuatro slots son texto libre (nan bloquea
+`/models` por CORS), y un id mal escrito no se notaba al guardar: se notaba mucho después y en otro
+sitio — `hasVision()` solo mira que la cadena no esté vacía, así que un typo dejaba "Explicar lo que
+veo" aparentemente activado y fallando al usarlo. Cada slot se prueba con la llamada mínima **del
+tipo que le corresponde**: texto, imagen de 1×1 para visión, WAV de silencio para transcripción.
+Con los valores del formulario, antes de guardar. Y al probar "Modelo rápido" en blanco, resuelve el
+que se usaría de verdad y **dice cuál es**. Ver [ADR-029](DECISIONS.md#adr-029).
+
+---
+
 ## 2026-07-30 — PDF: color de papel (tintes + modo Noche)
 
 El PDF era **la única superficie de la app que ignoraba el tema**: el contenedor se teñía pero la

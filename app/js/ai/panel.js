@@ -1698,12 +1698,14 @@ async function deliver(aug, question, { showUser = true, ref = null, systemExtra
   busy = true; els.send.disabled = true; abortCtrl = new AbortController();
 
   // IA7 · Reescritura de consulta por defecto (HyDE-lite): en preguntas conceptuales, expande
-  // la query para mejorar el recall BM25. Gate: solo turnos normales (showUser), con key,
-  // libro listo y SIN capítulo nombrado (ahí la intención ya es explícita). Nunca bloquea:
+  // la query para mejorar el recall BM25. Precondiciones aquí (turno normal, con key, libro
+  // listo, sin fragmento adjunto — con pasaje adjunto el pasaje manda); la POLÍTICA de cuándo
+  // vale la pena la decide `QueryExpand.shouldExpand`, que además fuerza la expansión si la
+  // pregunta va en otro idioma que el libro (ahí BM25 crudo recupera 0/5). Nunca bloquea:
   // ante fallo/timeout, expansion=null → retrieval con la pregunta cruda (cero regresión).
-  // Con fragmento adjunto la intención ya es explícita (el pasaje manda): sin expansión.
   let expansion = null;
-  if (showUser && !ref && LLM.hasKey() && segReady && !Retrieval.matchChapters(question, tocLabels).length) {
+  if (showUser && !ref && LLM.hasKey() && segReady
+      && QueryExpand.shouldExpand({ question, chapterNamed: !!Retrieval.matchChapters(question, tocLabels).length })) {
     setStatus('Entendiendo la pregunta…');
     expansion = await QueryExpand.expandQuery(question, { tocLabels, signal: abortCtrl.signal });
   }

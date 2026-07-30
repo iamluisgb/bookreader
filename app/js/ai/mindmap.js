@@ -228,13 +228,13 @@ function onGenerate() {
   Jobs.start({
     bookId: ctx.bookId, kind: KIND, label: t('el mapa mental'),
     params: { scopeName },
-    run: ({ signal, progress }) => runMindmap({ chunks, goal, scopeName, chapterHints, signal, progress }),
+    run: ({ signal, progress, background }) => runMindmap({ chunks, goal, scopeName, chapterHints, signal, progress, background }),
   });
   renderRunning(Jobs.activeJob());
 }
 
 // Map (conceptos citados por trozo) + reduce (árbol JSON), desacoplado del modal.
-async function runMindmap({ chunks, goal, scopeName, chapterHints = [], signal, progress }) {
+async function runMindmap({ chunks, goal, scopeName, chapterHints = [], signal, progress, background = false }) {
   const bullets = [];
   for (let i = 0; i < chunks.length; i++) {
     const raw = await LLM.chatStream({
@@ -242,7 +242,7 @@ async function runMindmap({ chunks, goal, scopeName, chapterHints = [], signal, 
         { role: 'system', content: mapPrompt(goal) },
         { role: 'user', content: 'PASAJES DEL LIBRO:\n\n' + chunks[i].text },
       ],
-      maxTokens: 1500, signal,   // holgura para modelos de razonamiento
+      maxTokens: 1500, signal, background,   // holgura para modelos de razonamiento
     });
     for (const line of String(raw || '').split('\n')) {
       const t = line.trim();
@@ -266,7 +266,7 @@ async function runMindmap({ chunks, goal, scopeName, chapterHints = [], signal, 
       ],
       // Alto a propósito: los modelos de razonamiento gastan miles de tokens "pensando" antes
       // del JSON; con poco cupo emitían JSON vacío/truncado → el mapa temático caía al fallback.
-      maxTokens: 5000, signal,
+      maxTokens: 5000, signal, background,
     });
     tree = extractJson(raw);
   } catch (e) { if (e.name === 'AbortError') throw e; }

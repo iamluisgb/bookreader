@@ -28,11 +28,14 @@ const MAX_TOKENS = 4096;
 // consulta, atenuación del TOC) — tareas baratas y sensibles a latencia donde un modelo
 // pequeño rinde igual. Solo se declara donde está verificado (nan: qwen3.6 responde en
 // <1s y soporta tools); en el resto, las auxiliares usan el modelo principal.
+// `concurrent` (opcional): el proveedor tolera peticiones simultáneas con la misma key.
+// nan NO (devuelve "network error"), y ese límite suyo era el que obligaba a serializar
+// toda la app. Se declara solo donde está verificado; sin declarar → se serializa.
 export const PROVIDERS = [
   { id: 'nan',        name: 'nan',        baseUrl: 'https://api.nan.builders/v1',   models: ['deepseek-v4-flash', 'mimo-v2.5', 'qwen3.6', 'gemma4'], liteModel: 'qwen3.6' },
-  { id: 'openai',     name: 'OpenAI',     baseUrl: 'https://api.openai.com/v1',     models: ['gpt-4o', 'gpt-4o-mini', 'o4-mini'] },
-  { id: 'openrouter', name: 'OpenRouter', baseUrl: 'https://openrouter.ai/api/v1',  models: ['deepseek/deepseek-chat', 'anthropic/claude-3.7-sonnet', 'google/gemini-2.0-flash-001'] },
-  { id: 'groq',       name: 'Groq',       baseUrl: 'https://api.groq.com/openai/v1', models: ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant'] },
+  { id: 'openai',     name: 'OpenAI',     baseUrl: 'https://api.openai.com/v1',     models: ['gpt-4o', 'gpt-4o-mini', 'o4-mini'], concurrent: true },
+  { id: 'openrouter', name: 'OpenRouter', baseUrl: 'https://openrouter.ai/api/v1',  models: ['deepseek/deepseek-chat', 'anthropic/claude-3.7-sonnet', 'google/gemini-2.0-flash-001'], concurrent: true },
+  { id: 'groq',       name: 'Groq',       baseUrl: 'https://api.groq.com/openai/v1', models: ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant'], concurrent: true },
 ];
 
 export function getKey()        { return Storage.get('ai_key', '') || ''; }
@@ -107,25 +110,149 @@ export async function listModels({ baseUrl, key, signal } = {}) {
   return [...new Set(ids)].sort((a, b) => a.localeCompare(b));
 }
 
+// ---- Probar un slot de modelo ----------------------------------------------
+// Hay CUATRO slots (principal, rápido, visión, transcripción) y todos son texto libre: un
+// id mal escrito no se nota al guardar, se nota mucho después y en otro sitio. `hasVision()`
+// solo mira que la cadena no esté vacía, así que un typo deja la feature "activada" y
+// fallando en el momento de usarla. Esto convierte ese fallo silencioso y diferido en una
+// respuesta inmediata: se prueba el slot con una llamada mínima del tipo que le corresponde.
+//
+// Usa los valores del FORMULARIO (aún sin guardar), como `listModels`: se prueba antes de
+// comprometerse. Va por el carril interactivo de la cola (el usuario espera mirando, pero en
+// nan no se puede atropellar una llamada en vuelo).
+
+// PNG de 1×1 transparente: la imagen más pequeña posible para comprobar que el modelo
+// acepta contenido multimodal. No nos importa qué conteste, solo que no rechace la forma.
+const PIXEL_PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
+
+// WAV de silencio (PCM 16 bit mono). Vale para verificar el endpoint y el id del modelo: si
+// transcribe a cadena vacía, es un éxito — lo que se prueba es que la llamada no revienta.
+function silentWav(ms = 300, rate = 16000) {
+  const n = Math.floor(rate * ms / 1000);
+  const buf = new ArrayBuffer(44 + n * 2);
+  const v = new DataView(buf);
+  const str = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+  str(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true); str(8, 'WAVE');
+  str(12, 'fmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+  v.setUint32(24, rate, true); v.setUint32(28, rate * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true);
+  str(36, 'data'); v.setUint32(40, n * 2, true);
+  return new Blob([buf], { type: 'audio/wav' });   // el cuerpo ya es todo ceros = silencio
+}
+
+// kind: 'text' | 'vision' | 'stt'. Devuelve { ok, ms }; lanza con un mensaje legible.
+export async function probeModel({ kind = 'text', model, baseUrl, key, signal } = {}) {
+  const b = (baseUrl != null ? baseUrl : getBaseUrl()).trim().replace(/\/+$/, '');
+  const k = (key != null ? key : getKey()).trim();
+  const m = String(model || '').trim();
+  if (!b) throw new Error(t('Falta la Base URL.'));
+  if (!k) throw new Error(t('Falta la API key.'));
+  if (!m) throw new Error(t('Falta el id del modelo.'));
+
+  const t0 = Date.now();
+  const run = async () => {
+    let res;
+    if (kind === 'stt') {
+      const form = new FormData();
+      form.append('file', silentWav(), 'probe.wav');
+      form.append('model', m);
+      res = await fetch(`${b}/audio/transcriptions`, {
+        method: 'POST', headers: { 'Authorization': `Bearer ${k}` }, body: form, signal,
+      });
+    } else {
+      const content = kind === 'vision'
+        ? [{ type: 'text', text: 'ok?' }, { type: 'image_url', image_url: { url: PIXEL_PNG } }]
+        : 'ok?';
+      res = await fetch(`${b}/chat/completions`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${k}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: m, messages: [{ role: 'user', content }], stream: false, max_tokens: 1 }),
+        signal,
+      });
+    }
+    if (res.status === 401 || res.status === 403) throw new Error(t('la API key es inválida o falta.'));
+    if (res.status === 404) throw new Error(t('el proveedor no reconoce ese modelo (404).'));
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      throw new Error(t('el proveedor respondió {status}. {body}', { status: res.status, body: body.slice(0, 160) }));
+    }
+    return { ok: true, ms: Date.now() - t0 };
+  };
+
+  try {
+    return await enqueue(run, false);
+  } catch (e) {
+    // TypeError de fetch = red caída o CORS. El mensaje del navegador ("Failed to fetch")
+    // no le dice nada a nadie; lo traducimos conservando la causa.
+    if (e instanceof TypeError) throw new Error(t('no se pudo conectar (red o CORS).'), { cause: e });
+    throw e;
+  }
+}
+
 // Auto-extracción a la libreta tras cada respuesta (por defecto activada).
 export function getAutoExtract() { return Storage.get('ai_auto_extract', true); }
 export function setAutoExtract(v) { Storage.set('ai_auto_extract', !!v); }
 
-// Streamea una respuesta de chat. `onToken(text)` se llama por cada fragmento de
-// contenido visible. Devuelve el texto completo. `signal` permite abortar.
-// nan rechaza peticiones concurrentes a la misma key (da "network error"), así que
-// serializamos TODAS las llamadas: cada una espera a que termine la anterior.
-let lastCall = Promise.resolve();
-function serialize(task) {
-  const p = lastCall.then(task, task);
-  lastCall = p.then(() => {}, () => {});
-  return p;
+// ---- Cola de llamadas: prioridad + serialización solo donde hace falta -------
+// nan rechaza peticiones concurrentes a la misma key (da "network error"), así que había
+// una cadena de promesas que serializaba TODAS las llamadas de la app. Dos problemas:
+//
+// 1. Es un límite de UN proveedor aplicado a todos. En OpenAI/Groq/OpenRouter no hace
+//    falta y estábamos regalando paralelismo.
+// 2. Peor: el CHAT quedaba detrás de los trabajos en segundo plano. Un resumen es un
+//    map-reduce de muchas llamadas; preguntar algo durante esa generación encolaba la
+//    pregunta detrás de TODOS los trozos que quedaran. jobs.js promete "puede seguir
+//    leyendo", pero el agente quedaba inutilizable. Es el mismo argumento por el que
+//    `transcribe` ya estaba fuera de la cola: cuando el usuario espera mirando, encolarlo
+//    detrás de una generación larga no es aceptable.
+//
+// Ahora: una cola con dos carriles. Lo interactivo (chat, visión del chat) adelanta a lo
+// de fondo (jobs). No hay preempción —una llamada en vuelo se termina—, así que lo que se
+// gana es no esperar a los trozos QUE FALTAN, que es donde estaba el minuto de espera.
+const INTERACTIVE = 0, BACKGROUND = 1;
+const waiting = [[], []];        // [interactivas, de fondo]; FIFO dentro de cada carril
+let running = 0;
+
+// ¿Este proveedor tolera llamadas concurrentes? Solo se declara donde está verificado.
+// Ante una base URL desconocida (BYOK), lo conservador es serializar: es el comportamiento
+// que había, así que ningún proveedor personalizado puede empeorar con este cambio.
+function maxConcurrent() {
+  const p = currentProvider();
+  return p && p.concurrent ? 4 : 1;
 }
 
-export function chatStream(opts)  { return serialize(() => _chatStream(opts)); }
-export function chatTools(opts)   { return serialize(() => _chatTools(opts)); }
-export function chatToolsLoop(opts) { return serialize(() => _chatToolsLoop(opts)); }
-export function chatVision(opts)  { return serialize(() => _chatVision(opts)); }
+function pump() {
+  while (running < maxConcurrent()) {
+    const next = waiting[INTERACTIVE].shift() || waiting[BACKGROUND].shift();
+    if (!next) return;
+    running++;
+    Promise.resolve()
+      .then(next.task)
+      .then(next.resolve, next.reject)
+      .finally(() => { running--; pump(); });
+  }
+}
+
+// `background: true` manda la llamada al carril lento. Por defecto todo es interactivo:
+// si alguien añade una ruta nueva y se olvida de marcarla, el fallo es que va rápida —
+// no que el usuario se queda esperando.
+function enqueue(task, background) {
+  return new Promise((resolve, reject) => {
+    waiting[background ? BACKGROUND : INTERACTIVE].push({ task, resolve, reject });
+    pump();
+  });
+}
+
+// Estado de la cola (para tests y diagnóstico).
+export function queueState() {
+  return { running, interactive: waiting[INTERACTIVE].length, background: waiting[BACKGROUND].length };
+}
+
+// Streamea una respuesta de chat. `onToken(text)` se llama por cada fragmento de
+// contenido visible. Devuelve el texto completo. `signal` permite abortar.
+export function chatStream(opts)  { return enqueue(() => _chatStream(opts), opts?.background); }
+export function chatTools(opts)   { return enqueue(() => _chatTools(opts), opts?.background); }
+export function chatToolsLoop(opts) { return enqueue(() => _chatToolsLoop(opts), opts?.background); }
+export function chatVision(opts)  { return enqueue(() => _chatVision(opts), opts?.background); }
 
 // ---- IA3 · Reintentos con backoff en errores transitorios --------------------
 // Ver ADR-008 en DECISIONS.md. Los proveedores BYOK dan 429/5xx transitorios; casi

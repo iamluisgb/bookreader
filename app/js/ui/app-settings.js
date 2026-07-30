@@ -122,19 +122,32 @@ function agentHtml() {
     <div class="appset-model-row">
       <input id="appset-model" class="appset-input" list="appset-model-list" value="${escapeHtml(LLM.getModel())}" placeholder="id-del-modelo" autocomplete="off" spellcheck="false" />
       <button type="button" id="appset-model-discover" class="appset-discover">${t('Descubrir')}</button>
+      <button type="button" id="appset-probe-model" class="appset-discover" data-kind="text" data-for="appset-model">${t('Probar')}</button>
     </div>
     <datalist id="appset-model-list">${modelDatalist(suggested)}</datalist>
     <div id="appset-model-chips" class="appset-chips"></div>
     <p class="appset-muted appset-model-manual">${t('Escribe el id del modelo a mano o elige uno de los sugeridos. «Descubrir» los lista automáticamente si el proveedor lo permite (nan no lo permite desde el navegador).')}</p>
     <p id="appset-model-hint" class="appset-model-hint" hidden></p>
     <label class="appset-label" for="appset-vmodel">${t('Modelo de visión (opcional)')}</label>
-    <input id="appset-vmodel" class="appset-input" value="${escapeHtml(LLM.getVisionModel())}" placeholder="p. ej. mimo-v2.5" autocomplete="off" spellcheck="false" />
+    <div class="appset-model-row">
+      <input id="appset-vmodel" class="appset-input" value="${escapeHtml(LLM.getVisionModel())}" placeholder="p. ej. mimo-v2.5" autocomplete="off" spellcheck="false" />
+      <button type="button" id="appset-probe-appset-vmodel" class="appset-discover" data-kind="vision" data-for="appset-vmodel">${t('Probar')}</button>
+    </div>
+    <p id="appset-probe-appset-vmodel-hint" class="appset-model-hint" hidden></p>
     <p class="appset-muted">${t('Para explicar figuras y páginas de un libro (multimodal). En nan, <code>mimo-v2.5</code> funciona. Déjalo vacío si tu modelo no interpreta imágenes; entonces "Explicar lo que veo" queda desactivado.')}</p>
     <label class="appset-label" for="appset-smodel">${t('Modelo de transcripción (opcional)')}</label>
-    <input id="appset-smodel" class="appset-input" value="${escapeHtml(LLM.getSttModel())}" placeholder="p. ej. whisper" autocomplete="off" spellcheck="false" />
+    <div class="appset-model-row">
+      <input id="appset-smodel" class="appset-input" value="${escapeHtml(LLM.getSttModel())}" placeholder="p. ej. whisper" autocomplete="off" spellcheck="false" />
+      <button type="button" id="appset-probe-appset-smodel" class="appset-discover" data-kind="stt" data-for="appset-smodel">${t('Probar')}</button>
+    </div>
+    <p id="appset-probe-appset-smodel-hint" class="appset-model-hint" hidden></p>
     <p class="appset-muted">${t('Para dictar tu explicación en el modo Feynman. Acierta bastante más que el dictado del navegador con vocabulario técnico y no se corta solo en el móvil, pero envía el audio a tu proveedor y gasta tokens. Vacío = se usa el dictado del navegador.')}</p>
     <label class="appset-label" for="appset-lmodel">${t('Modelo rápido (opcional)')}</label>
-    <input id="appset-lmodel" class="appset-input" value="${escapeHtml(LLM.getLiteModelSetting())}" placeholder="${escapeHtml(t('vacío = automático'))}" autocomplete="off" spellcheck="false" />
+    <div class="appset-model-row">
+      <input id="appset-lmodel" class="appset-input" value="${escapeHtml(LLM.getLiteModelSetting())}" placeholder="${escapeHtml(t('vacío = automático'))}" autocomplete="off" spellcheck="false" />
+      <button type="button" id="appset-probe-appset-lmodel" class="appset-discover" data-kind="text" data-for="appset-lmodel">${t('Probar')}</button>
+    </div>
+    <p id="appset-probe-appset-lmodel-hint" class="appset-model-hint" hidden></p>
     <p class="appset-muted">${t('Para las llamadas auxiliares del agente (preparar búsquedas, puntuar capítulos): un modelo pequeño responde igual de bien y mucho más rápido. Vacío = automático (en nan usa <code>qwen3.6</code>; en otros proveedores, el modelo principal).')}</p>
     <label class="appset-label" for="appset-key">API key</label>
     <input id="appset-key" class="appset-input" type="password" placeholder="sk-..." autocomplete="off" value="${escapeHtml(LLM.getKey())}" />
@@ -237,6 +250,42 @@ function wireAgent(content) {
       discover.disabled = false;
     }
   });
+
+  // ---- Probar un slot de modelo ------------------------------------------
+  // Un solo manejador para los cuatro botones: cada uno declara en `data-*` qué input mira
+  // y qué tipo de llamada le corresponde. Se prueba con lo que hay EN EL FORMULARIO (base
+  // URL y key incluidas), no con lo guardado: la gracia es comprobar antes de guardar.
+  for (const btn of content.querySelectorAll('[id^="appset-probe-"]')) {
+    btn.addEventListener('click', async () => {
+      const input = content.querySelector('#' + btn.dataset.for);
+      // El hint propio del slot; el modelo principal reutiliza el que ya tenía.
+      const out = content.querySelector('#' + btn.id + '-hint') || hint;
+      let value = (input?.value || '').trim();
+      // "Modelo rápido" vacío = automático: probamos el que se usaría de verdad, y lo
+      // decimos, para que "vacío" deje de ser una caja negra.
+      let auto = '';
+      if (!value && btn.dataset.for === 'appset-lmodel') {
+        const preset = LLM.PROVIDERS.find(p => p.baseUrl.replace(/\/+$/, '') === baseUrl.value.trim().replace(/\/+$/, ''));
+        value = (preset && preset.liteModel) || model.value.trim();
+        auto = value;
+      }
+      out.hidden = false; out.classList.remove('is-error');
+      if (!value) { out.classList.add('is-error'); out.textContent = t('Escribe primero un id de modelo.'); return; }
+      out.textContent = t('Probando {model}…', { model: value });
+      btn.disabled = true;
+      try {
+        const r = await LLM.probeModel({ kind: btn.dataset.kind, model: value, baseUrl: baseUrl.value, key: keyEl.value });
+        out.textContent = auto
+          ? t('Funciona: {model} (automático) respondió en {ms} ms.', { model: auto, ms: r.ms })
+          : t('Funciona: respondió en {ms} ms.', { ms: r.ms });
+      } catch (e) {
+        out.classList.add('is-error');
+        out.textContent = t('No funciona: {msg}', { msg: e.message });
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  }
 
   content.querySelector('#appset-save').addEventListener('click', () => {
     LLM.setKey(content.querySelector('#appset-key').value.trim());

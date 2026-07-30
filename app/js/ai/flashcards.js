@@ -317,14 +317,11 @@ export function allocateCounts(chunks, total) {
   return counts;
 }
 
-// Idioma del material (es/en) por stopwords. La instrucción relativa ("el idioma de los
-// pasajes") no basta: con el objetivo del lector en español y un libro en inglés, el
-// modelo derivaba al español (regresión cazada por EV1) — nombrar el idioma la ancla.
-export function detectLang(text) {
-  const es = (String(text).match(/\b(el|la|los|las|de|del|que|una?|es|por|para|con)\b/gi) || []).length;
-  const en = (String(text).match(/\b(the|of|and|to|is|in|that|for|with|as)\b/gi) || []).length;
-  return es >= en ? 'es' : 'en';
-}
+// Idioma del material (es/en). La instrucción relativa ("el idioma de los pasajes") no
+// basta: con el objetivo del lector en español y un libro en inglés, el modelo derivaba al
+// español (regresión cazada por EV1) — nombrar el idioma la ancla. La heurística vive en
+// retrieval.js desde que también la usa el gate de IA7; se re-exporta por compatibilidad.
+export const detectLang = Retrieval.detectLang;
 
 function cardsPrompt(count, type, goal, { viaTool = false, prevFronts = [], lang = '' } = {}) {
   const shape = type === 'cloze'
@@ -488,7 +485,7 @@ export function attachSources(cards, { validIds, search, textOf }) {
 //   3) fallback a texto + parser tolerante (proveedores BYOK sin function calling).
 // Devuelve { cards, mode } con el escalón que funcionó: los trozos siguientes entran
 // directos por ahí (no se re-prueba un camino roto en cada trozo).
-async function generateChunk({ text, ask, type, goal, prevFronts, mode, signal }) {
+async function generateChunk({ text, ask, type, goal, prevFronts, mode, signal, background = false }) {
   const user = { role: 'user', content: 'PASAJES DEL LIBRO:\n\n' + text };
   const lang = detectLang(text);   // el prompt nombra el idioma del material (ver detectLang)
   // Cupo holgado por trozo: la salida es pequeña (≤ ask tarjetas) pero el razonamiento
@@ -505,7 +502,7 @@ async function generateChunk({ text, ask, type, goal, prevFronts, mode, signal }
         { role: 'system', content: cardsPrompt(ask, type, goal, { viaTool: true, prevFronts, lang }) },
         user, ...extra,
       ],
-      tools: cardsTool(), toolChoice, maxTokens, signal,
+      tools: cardsTool(), toolChoice, maxTokens, signal, background,
     });
     const call = toolCalls.find(t => t.name === 'create_flashcards');
     return call ? sanitizeCards(call.args?.cards, type) : null;
@@ -528,7 +525,7 @@ async function generateChunk({ text, ask, type, goal, prevFronts, mode, signal }
   }
   const raw = await LLM.chatStream({
     messages: [{ role: 'system', content: cardsPrompt(ask, type, goal, { prevFronts, lang }) }, user],
-    maxTokens, signal,
+    maxTokens, signal, background,
   });
   return { cards: parseCards(raw, type), mode: 'text' };
 }
@@ -562,7 +559,7 @@ function onGenerate() {
     bookId, kind: 'flashcards', label: t('Flashcards'),
     params: { scope: scopeLabel, scopeName: scopeLabel || t('Libro entero'), type, count },
     persist: false,        // el mazo vive en `decks`; ver Jobs.start
-    run: async ({ signal, progress }) => {
+    run: async ({ signal, progress, background }) => {
       // Map-reduce sobre los trozos: cada uno aporta su cupo (+ el déficit arrastrado de
       // trozos anteriores que dieron de menos). Un trozo fallido no tira el mazo.
       let cards = [], expected = 0, failed = 0, mode = 'forced';
@@ -579,7 +576,7 @@ function onGenerate() {
           const res = await generateChunk({
             text: chunks[i].text, ask: counts[i] + deficit, type, goal,
             prevFronts: cards.slice(-MAX_PREV_FRONTS).map(c => c.front),
-            mode, signal,
+            mode, signal, background,
           });
           mode = res.mode;
           cards = cards.concat(res.cards.slice(0, counts[i] + deficit));

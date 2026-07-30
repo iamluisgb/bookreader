@@ -180,7 +180,7 @@ export async function ensureBookSummary(context, { depth = 'estandar' } = {}) {
   const job = Jobs.start({
     bookId: context.bookId, kind: KIND, label: t('el resumen'),
     params: { scopeName },
-    run: ({ signal, progress }) => runSummary({ chunks, depth: d, goal, scopeName, signal, progress }),
+    run: ({ signal, progress, background }) => runSummary({ chunks, depth: d, goal, scopeName, signal, progress, background }),
   });
   return watch(job);
 }
@@ -256,13 +256,13 @@ function onGenerate() {
   Jobs.start({
     bookId: ctx.bookId, kind: KIND, label: t('el resumen'),
     params: { scopeName },
-    run: ({ signal, progress }) => runSummary({ chunks, depth, goal, scopeName, signal, progress }),
+    run: ({ signal, progress, background }) => runSummary({ chunks, depth, goal, scopeName, signal, progress, background }),
   });
   renderRunning(Jobs.activeJob());
 }
 
 // El bucle map-reduce, desacoplado del modal: recibe `signal` y `progress(i,n,phase)`.
-async function runSummary({ chunks, depth, goal, scopeName, signal, progress }) {
+async function runSummary({ chunks, depth, goal, scopeName, signal, progress, background = false }) {
   const bullets = [];
   // Un trozo que no produce viñetas se reintenta UNA vez antes de darlo por perdido:
   // algunos modelos fallan el formato de forma intermitente (EV1: "no devolvió puntos"
@@ -273,7 +273,7 @@ async function runSummary({ chunks, depth, goal, scopeName, signal, progress }) 
         { role: 'system', content: pointsPrompt(goal, depth.bullets) },
         { role: 'user', content: 'PASAJES DEL LIBRO:\n\n' + chunk.text },
       ],
-      maxTokens: 1500, signal,   // holgura para modelos de razonamiento
+      maxTokens: 1500, signal, background,   // holgura para modelos de razonamiento
     });
     const out = [];
     for (const line of String(raw || '').split('\n')) {
@@ -293,7 +293,7 @@ async function runSummary({ chunks, depth, goal, scopeName, signal, progress }) 
   progress(chunks.length, chunks.length, 'reduce');
   if (depth.prose) {
     // Estructurado: marco (1 llamada) + secciones por capítulo a partir de los puntos.
-    const framing = await runFraming(bullets, goal, signal);
+    const framing = await runFraming(bullets, goal, signal, background);
     return assembleStructured(scopeName, framing, bullets, depth.perCap);
   }
   // Breve: TL;DR + lista plana.
@@ -304,7 +304,7 @@ async function runSummary({ chunks, depth, goal, scopeName, signal, progress }) 
         { role: 'system', content: tldrPrompt(goal) },
         { role: 'user', content: bullets.join('\n') },
       ],
-      maxTokens: 1500, signal,
+      maxTokens: 1500, signal, background,
     }) || '').trim();
   } catch (e) { if (e.name === 'AbortError') throw e; }
   return `# Resumen — ${scopeName}\n\n${tldr ? `${tldr}\n\n` : ''}## Puntos clave\n\n${bullets.join('\n')}\n`;
@@ -349,14 +349,14 @@ function renderRunning(job) {
 }
 
 // Marco del resumen estructurado en UNA llamada; devuelve { tldr, ideas, llevar }.
-async function runFraming(bullets, goal, signal) {
+async function runFraming(bullets, goal, signal, background = false) {
   try {
     const raw = (await LLM.chatStream({
       messages: [
         { role: 'system', content: framingPrompt(goal) },
         { role: 'user', content: bullets.join('\n') },
       ],
-      maxTokens: 1600, signal,
+      maxTokens: 1600, signal, background,
     }) || '').trim();
     return parseFraming(raw);
   } catch (e) {

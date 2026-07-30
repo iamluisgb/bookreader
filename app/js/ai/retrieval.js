@@ -82,6 +82,31 @@ export function allPassages() {
   return index ? index.passages : [];
 }
 
+// Idioma (es/en) por stopwords. Vivía en flashcards.js —donde nombra el idioma del material
+// en el prompt— y ahora lo comparten dos consumidores, así que su sitio es aquí: quien sabe
+// qué texto tenemos es el índice. Heurística a propósito: decidir el idioma NO puede costar
+// una llamada al LLM, porque justo se usa para decidir si merece la pena hacerla.
+export function detectLang(text) {
+  const es = (String(text).match(/\b(el|la|los|las|de|del|que|una?|es|por|para|con)\b/gi) || []).length;
+  const en = (String(text).match(/\b(the|of|and|to|is|in|that|for|with|as)\b/gi) || []).length;
+  return es >= en ? 'es' : 'en';
+}
+
+// Idioma del LIBRO indexado, cacheado por índice. Se mide sobre una muestra repartida (no
+// las primeras páginas: portada, créditos y cita inicial mienten sobre el idioma del cuerpo).
+let langCache = null;   // { key, lang }
+export function indexLang() {
+  if (!index) return null;
+  if (langCache && langCache.key === index.key) return langCache.lang;
+  const ps = index.passages;
+  const step = Math.max(1, Math.floor(ps.length / 24));
+  let sample = '';
+  for (let i = 0; i < ps.length && sample.length < 4000; i += step) sample += ' ' + ps[i].text;
+  const lang = detectLang(sample);
+  langCache = { key: index.key, lang };
+  return lang;
+}
+
 export function buildIndex(key, passages) {
   const df = new Map();
   let totalLen = 0;

@@ -11,8 +11,29 @@
 // (sin key, timeout, JSON inválido, red) devuelve null y el retrieval sigue con la
 // pregunta cruda (comportamiento actual, cero regresión).
 import * as LLM from './llm.js';
+import * as Retrieval from './retrieval.js';
 
 const EXPAND_TIMEOUT_MS = 7000;   // techo de latencia: si tarda más, fallback a la cruda
+
+// ¿Merece la pena expandir esta pregunta? La política vive aquí, no en panel.js: es de IA7.
+//
+// El gate original era "no se nombró capítulo" (si lo nombras, la intención ya es explícita).
+// Se le añade el caso CRUZADO DE IDIOMA, que es donde la expansión mueve la aguja de verdad.
+// Medido en la fase F2 de IA7 sobre el DDIA real (ver BACKLOG · IA7):
+//   - mismo idioma (EN→EN): BM25 crudo ya recupera 6/6 a top-40; la expansión no mejora el
+//     recall, pero por la unión tampoco lo empeora nunca.
+//   - cruzado (ES→EN, el caso real: se leen libros técnicos en inglés y se pregunta en
+//     español): crudo 0/5 → con expansión 4/5.
+// Con la pregunta en otro idioma que el libro, BM25 no tiene NADA que emparejar: da igual lo
+// explícita que sea la intención o que se nombre el capítulo, sin puente léxico no hay
+// aciertos. Por eso el idioma manda sobre el resto del gate.
+export function shouldExpand({ question, chapterNamed = false, bookLang = null } = {}) {
+  const q = String(question || '').trim();
+  if (!q) return false;
+  const book = bookLang || Retrieval.indexLang();
+  if (book && Retrieval.detectLang(q) !== book) return true;   // cruzado: siempre
+  return !chapterNamed;
+}
 
 function systemPrompt(tocLabels) {
   const map = (Array.isArray(tocLabels) ? tocLabels.filter(Boolean) : []).slice(0, 40);

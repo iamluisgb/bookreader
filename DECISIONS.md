@@ -744,3 +744,101 @@ Debajo hay **dos mecanismos distintos**, y esa es la parte no obvia:
 Tests en [`tests/pdf.spec.ts`](tests/pdf.spec.ts) (`PDF papel`): tinte solo en los claros, inversión
 solo en noche, conmutación del blend de subrayados, captura de visión idéntica entre papeles, y
 `auto` siguiendo al tema.
+
+<a id="adr-027"></a>
+## ADR-027 — Cola de llamadas al LLM: prioridad para lo interactivo, serialización solo donde hace falta · `ACEPTADA`
+
+**Contexto.** nan rechaza peticiones concurrentes contra la misma key (devuelve "network error"),
+así que `llm.js` serializaba **todas** las llamadas de la app con una cadena de promesas. Eso trajo
+dos problemas. Uno menor: es un límite de UN proveedor aplicado a todos, y en OpenAI/Groq/OpenRouter
+estábamos regalando paralelismo. Y uno grave: **el chat quedaba detrás de los trabajos en segundo
+plano**. Un resumen es un map-reduce de muchas llamadas; preguntarle algo al agente durante esa
+generación encolaba la pregunta detrás de **todos** los trozos pendientes.
+[`jobs.js`](app/js/ai/jobs.js) promete *"puede seguir leyendo"*, y era cierto — pero el agente
+quedaba inutilizable durante minutos, sin explicación visible. El propio código ya tenía el
+argumento escrito: `transcribe` estaba fuera de la cola porque *"el usuario espera con el modal
+delante"*. El chat es **la** interacción donde el usuario espera mirando.
+
+**Decisión.** Una cola con **dos carriles** y un límite de concurrencia **por proveedor**.
+- `INTERACTIVE` (por defecto) y `BACKGROUND` (`background: true` en las opciones de la llamada).
+  Al liberarse un hueco se despacha primero el carril interactivo; FIFO dentro de cada carril.
+- `maxConcurrent()` lee `concurrent` del preset del proveedor: declarado solo donde está
+  verificado (OpenAI, OpenRouter, Groq). **Sin declarar → serializa**, que es el comportamiento
+  que había: ningún proveedor BYOK personalizado puede empeorar con este cambio.
+- `Jobs.start` pasa `background: true` al `run` de cada trabajo, y summary/mindmap/flashcards lo
+  propagan a sus llamadas. Explícito en el sitio de la llamada, no un flag ambiental global.
+
+**Porqué.**
+1. **El default correcto es "interactivo".** Si alguien añade una ruta nueva y olvida marcarla, el
+   fallo es que va rápida — no que el usuario se queda esperando. El fallo por omisión debe ser el
+   benigno.
+2. **No hay preempción, y está bien.** Una llamada en vuelo se termina (abortarla desperdicia
+   tokens ya pagados y deja el artefacto a medias). Lo que se gana es no esperar a los trozos **que
+   faltan**, que es donde estaba el minuto de espera.
+3. **El paralelismo es del proveedor, no de la app.** Codificarlo en `PROVIDERS`, junto a
+   `liteModel`, mantiene en un solo sitio lo que sabemos de cada uno.
+
+**Consecuencias.** `queueState()` expone el estado para tests y diagnóstico. `transcribe` sigue
+fuera de la cola por su propio motivo (documentado); en nan eso implica que transcribir durante una
+generación puede chocar con el límite de concurrencia — es previo a este ADR y no lo empeora, pero
+queda anotado. Tests en [`tests/llm.spec.ts`](tests/llm.spec.ts): el chat adelanta a dos trabajos
+encolados antes que él, y un proveedor concurrente despacha en paralelo.
+
+<a id="adr-028"></a>
+## ADR-028 — El gate de la expansión de consulta lo decide el idioma · `ACEPTADA`
+
+**Contexto.** [IA7](BACKLOG.md) expandía la consulta (HyDE-lite) solo cuando **no** se nombraba un
+capítulo: si lo nombras, la intención ya es explícita. La fase F2 midió sobre el DDIA real que ese
+criterio deja fuera el caso que importa. Mismo idioma (EN→EN): BM25 crudo ya recupera 6/6 a top-40 y
+la expansión no mejora el recall (aunque por la unión tampoco lo empeora nunca). **Cruzado (ES→EN):
+crudo 0/5 → con expansión 4/5.** Y el cruzado es el caso real del usuario: lee libros técnicos en
+inglés y pregunta en español. El BACKLOG dejaba abierta la pregunta de si subir el gate al idioma.
+
+**Decisión.** Sí. `QueryExpand.shouldExpand({ question, chapterNamed })` devuelve `true` **siempre**
+que el idioma de la pregunta difiera del idioma del libro; si coinciden, se mantiene el criterio
+anterior. La política vive en `query-expand.js` —es de IA7, no de `panel.js`, que solo comprueba sus
+precondiciones (turno normal, con key, libro listo, sin fragmento adjunto).
+
+**Porqué.** Cruzando idiomas BM25 no tiene **nada** que emparejar: da igual lo explícita que sea la
+intención o que se nombre el capítulo, sin puente léxico no hay aciertos. El idioma no es una señal
+más dentro del gate, es la que lo domina. Además la decisión es barata: `detectLang` es una
+heurística de stopwords, y no podía ser otra cosa — decidir el idioma no puede costar una llamada al
+LLM, porque justo sirve para decidir si merece la pena hacerla.
+
+**Consecuencias.** `detectLang` se mueve de `flashcards.js` a
+[`retrieval.js`](app/js/ai/retrieval.js) (ahora tiene dos consumidores, y quien sabe qué texto
+tenemos es el índice); flashcards lo re-exporta por compatibilidad. Nuevo `Retrieval.indexLang()`,
+cacheado por índice y medido sobre una **muestra repartida** del libro: las primeras páginas
+(portada, créditos, cita inicial) mienten sobre el idioma del cuerpo. Sin libro indexado el gate cae
+al criterio de siempre. Más llamadas de expansión en sesiones cruzadas — es el coste que la medición
+justifica, y va con el modelo lite ([ADR-022](#adr-022)). Tests deterministas en
+[`tests/query-gate.spec.ts`](tests/query-gate.spec.ts); el golden con modelo real sigue en
+`retrieval-hyde.spec.ts` (@live).
+
+<a id="adr-029"></a>
+## ADR-029 — Probar un slot de modelo desde Ajustes · `ACEPTADA`
+
+**Contexto.** Hay **cuatro** slots de modelo (principal, rápido, visión, transcripción) y los cuatro
+son texto libre, porque en BYOK no siempre se pueden enumerar (`/models` existe, pero nan —el
+proveedor por defecto— lo bloquea por CORS). Un id mal escrito no se nota al guardar: se nota mucho
+después y en otro sitio. `hasVision()` solo comprueba que la cadena no esté vacía, así que un typo
+deja "Explicar lo que veo" **aparentemente activado** y fallando en el momento de usarlo.
+
+**Decisión.** Un botón **Probar** por slot. `LLM.probeModel({ kind, model, baseUrl, key })` hace la
+llamada mínima **del tipo que le corresponde**: texto → `/chat/completions` con `max_tokens: 1`;
+visión → el mismo endpoint con un PNG de 1×1; transcripción → `/audio/transcriptions` con un WAV de
+silencio. Prueba con los valores **del formulario**, no con los guardados.
+
+**Porqué.**
+1. **Del tipo que le corresponde, o no prueba nada.** Verificar el slot de visión con una llamada de
+   texto suelto no distingue un modelo multimodal de uno que no lo es — que es justo el error que se
+   quiere cazar. Hay un test que falla si el probe de visión deja de mandar imagen.
+2. **Antes de guardar.** Igual que `listModels`: la gracia es comprobar antes de comprometerse.
+3. **"Vacío = automático" deja de ser una caja negra.** Al probar el modelo rápido en blanco, se
+   resuelve el que se usaría de verdad (el `liteModel` del preset) y **se dice cuál es**.
+
+**Consecuencias.** El probe va por el carril interactivo de [ADR-027](#adr-027), no fuera de la cola:
+en nan una llamada suelta durante una generación chocaría con el límite de concurrencia. Un WAV de
+silencio que transcribe a cadena vacía **es un éxito**: lo que se verifica es que la llamada no
+revienta (endpoint, id de modelo y key), no el contenido. Tests en
+[`tests/model-probe.spec.ts`](tests/model-probe.spec.ts).

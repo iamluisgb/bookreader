@@ -75,7 +75,10 @@ export function start({ bookId, kind, label, params, run, persist = true }) {
   };
   (async () => {
     try {
-      const result = await run({ signal: job.abortCtrl.signal, progress });
+      // `background: true` → las llamadas al LLM de este trabajo van por el carril lento
+      // de la cola (llm.js): el chat las adelanta en vez de esperar a que termine el
+      // map-reduce entero. Se pasa explícito para que se vea en el sitio de la llamada.
+      const result = await run({ signal: job.abortCtrl.signal, progress, background: true });
       if (active !== job) return;                       // superado por otro job → descartar
       if (job.abortCtrl.signal.aborted) { active = null; emit(); return; }
       job.status = 'done'; job.result = result;

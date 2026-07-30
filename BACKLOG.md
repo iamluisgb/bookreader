@@ -166,8 +166,8 @@ el gate del agéntico ahora que la 1ª recuperación es mejor).
   **mueve la aguja de verdad**: el usuario lee libros técnicos en inglés preguntando en español, y sin la
   expansión BM25 no cruza la barrera del idioma. Este es el valor principal de IA7, no el mismo-idioma.
 
-**Abiertas:** ¿subir el gate al idioma (activar siempre que la pregunta no coincida con el idioma del
-libro)? · reducir los `null` de expansión (variación del modelo reasoning; el fallback ya lo cubre) ·
+**Abiertas:** ~~¿subir el gate al idioma?~~ **cerrada en sí (2026-07-30, ADR-028)**: cruzando idiomas
+se expande SIEMPRE, aunque se nombre capítulo — sin puente léxico BM25 no tiene nada que emparejar. · reducir los `null` de expansión (variación del modelo reasoning; el fallback ya lo cubre) ·
 presupuesto de latencia (max_tokens/timeout). Nota 2026-07-16: la expansión (y la atenuación) ya van
 con el **modelo lite** ([ADR-022](DECISIONS.md)) — el presupuesto de latencia mejora ~3-4x en nan.
 
