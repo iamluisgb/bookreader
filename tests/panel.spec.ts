@@ -257,3 +257,25 @@ test('el coachmark señala la pestaña Studio, y la flecha cae dentro', async ({
   expect(g.m.left + g.arrow).toBeCloseTo(g.tabCx, 0);         // y apuntando a su centro
   await expect(page.locator('.ai-coachmark')).toContainText('Studio');
 });
+
+// Guard de navegación del panel. EV1 (la batería de evals) estuvo ROTA en silencio porque
+// los artefactos se movieron a la pestaña Studio y su arnés siguió asumiendo que, tras
+// generar, se podía escribir en el chat sin más. `#ai-input` vive en `#ai-view-chat`, que
+// es `display:none` mientras Studio está activa: el fill esperaba 30s a un elemento que
+// existe pero no se ve, y la batería moría ahí. Como los @eval no corren en `npm test`,
+// nadie se enteró. Este test determinista fija el invariante que faltaba.
+test('el chat NO es escribible desde la pestaña Studio, y vuelve a serlo al volver a Chat', async ({ page }) => {
+  await setup(page);
+  await expect(page.locator('#ai-input')).toBeVisible();
+
+  await page.locator('.ai-tab[data-view="studio"]').click();
+  await expect(page.locator('#ai-view-studio')).toHaveClass(/active/);
+  // Existe en el DOM pero NO es visible: es exactamente lo que confundía al arnés.
+  await expect(page.locator('#ai-input')).toHaveCount(1);
+  await expect(page.locator('#ai-input')).not.toBeVisible();
+
+  await page.locator('.ai-tab[data-view="chat"]').click();
+  await expect(page.locator('#ai-input')).toBeVisible();
+  await page.fill('#ai-input', 'ya se puede escribir');
+  await expect(page.locator('#ai-input')).toHaveValue('ya se puede escribir');
+});

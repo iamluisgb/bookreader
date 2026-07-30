@@ -842,3 +842,51 @@ en nan una llamada suelta durante una generación chocaría con el límite de co
 silencio que transcribe a cadena vacía **es un éxito**: lo que se verifica es que la llamada no
 revienta (endpoint, id de modelo y key), no el contenido. Tests en
 [`tests/model-probe.spec.ts`](tests/model-probe.spec.ts).
+
+<a id="adr-030"></a>
+## ADR-030 — Contrato con el proveedor: un @live que afirma capacidades, no contenido · `ACEPTADA`
+
+**Contexto.** Ya había dos niveles de test contra modelos reales: los `@live` (comportamiento del
+producto: responder con citas, el ciclo Feynman, el golden de retrieval) y la batería `@eval`
+(calidad de los artefactos con doble juez). Faltaba un tercero, y era el que fallaba en silencio:
+**nadie verificaba las afirmaciones sobre el proveedor** que viven como comentarios en el código y
+sobre las que se apoyan ADRs enteros — que nan rechaza concurrencia ([ADR-027](#adr-027)), que
+`qwen3.6` soporta tools y es rápido ([ADR-022](#adr-022)), que `mimo-v2.5` interpreta imágenes, que
+`/models` está bloqueado por CORS. El proveedor cambia y nuestros presets mienten sin que nada se
+ponga rojo.
+
+**Decisión.** `tests/provider-contract.spec.ts` (@live, `npm run test:provider`), con **una regla
+que es la que lo hace viable: se afirman CAPACIDADES, nunca CONTENIDO.** Nada de "la respuesta
+menciona X" — eso es flaky por construcción y además ya lo mide el juez de `@eval`. Aquí se afirma
+"devolvió un `tool_call`", "aceptó una imagen", "el stream emitió deltas parseables". Seis
+capacidades, unos segundos, céntimos. La salida no es un semáforo sino una **matriz** impresa y
+volcada a `evals/runs/provider-contract.json`: el valor está en enterarse de *qué* ha cambiado.
+
+**Porqué.**
+1. **Sin esa regla, un test contra un modelo real es ruido rojo intermitente** y acaba desactivado.
+   Afirmar capacidades lo hace estable sin renunciar a que sea real.
+2. **Los tests que NO afirman son igual de útiles.** Concurrencia y `/models` solo anotan y avisan:
+   fallar cuando el proveedor **mejora** sería absurdo.
+3. **Sin `mode: 'serial'`.** Aborta el resto al primer fallo, y eso escondería el estado de las
+   demás capacidades — justo lo contrario de una matriz. La ejecución ya es secuencial (un worker),
+   que es lo único necesario para no dispararle peticiones a la vez a un proveedor que puede
+   rechazarlas.
+
+**Primer hallazgo, ya en la primera ejecución: nan ACEPTA concurrencia** (12/12 en 3 rondas de 4).
+La premisa de [ADR-027](#adr-027) —"nan rechaza peticiones concurrentes a la misma key"— ya no se
+sostiene, así que `concurrent: true` en su preset daría paralelismo gratis. **No se ha cambiado**:
+afecta a todas las llamadas del proveedor por defecto y es una decisión de producto, no del test.
+El test lo deja anotado en la matriz y avisa por consola.
+
+**Segundo hallazgo, sobre nosotros mismos.** La primera versión del test de streaming daba 0 tokens
+y parecía que el proveedor estaba roto. Lo roto era el test: `max_tokens: 16` a un modelo de
+**razonamiento**, que se gasta el cupo entero pensando y no emite contenido visible. El repo ya lo
+sabía (`mindmap.js` pide 5000 tokens "porque los modelos de razonamiento gastan miles de tokens
+pensando antes del JSON"). Queda escrito en el test: es el error clásico al escribir pruebas contra
+un modelo real.
+
+**Consecuencias.** Fuera de `npm test` (cuesta dinero y red). Parametrizable por entorno
+(`PROVIDER_BASE_URL`, `PROVIDER_MODEL`, `PROVIDER_LITE_MODEL`, `PROVIDER_VISION_MODEL`) para correr
+el mismo contrato contra otro proveedor BYOK. Se apoya en `probeModel` y en los clientes reales de
+`llm.js`, no en peticiones duplicadas — salvo el test de concurrencia, que llama a `fetch` a pelo
+**a propósito**: la cola de ADR-027 serializaría justo lo que se quiere medir.

@@ -114,6 +114,28 @@ objetivo, anotado a mano una vez por fixture. Determinista tras la anotación.
    deltas contra el run anterior, y los 5 peores ejemplos con su evidencia (el material de
    mejora está ahí, no en la media).
 
+### Los tres niveles de test contra modelos reales
+
+No son lo mismo y conviene no mezclarlos: cada uno afirma una cosa distinta.
+
+| Nivel | Comando | Qué afirma | Estabilidad |
+|---|---|---|---|
+| **Contrato del proveedor** (`@live`) | `npm run test:provider` | **Capacidades**: streaming parseable, tool-calling, visión, concurrencia, `/models`. Nunca contenido. | Alta — no depende de qué diga el modelo |
+| **Comportamiento** (`@live`) | `npm run test:ai` | Que el producto funciona de punta a punta con un modelo real (citas navegables, ciclo Feynman, golden de retrieval) | Media |
+| **Calidad** (`@eval`) | `npm run eval` | Qué tan BUENOS son los artefactos, con doble juez y rúbrica | Baja por naturaleza — de ahí el doble juez |
+
+La regla que hace viable el primero: **afirmar capacidades, nunca contenido**. Un test live que
+afirme lo que dice el modelo es flaky por construcción y acaba desactivado; uno que afirme "devolvió
+un `tool_call`" es estable y mantiene honesto a `PROVIDERS`. El contrato imprime una matriz y la
+vuelca a `evals/runs/provider-contract.json`: su valor no es el semáforo, es enterarse de **qué ha
+cambiado en el proveedor** (ver ADR-030). Dos de sus seis comprobaciones —concurrencia y `/models`—
+solo anotan y avisan: fallar cuando el proveedor *mejora* sería absurdo.
+
+> ⚠️ **Los `@eval` no corren en `npm test`, así que su arnés se pudre sin avisar.** Ocurrió: EV1
+> estuvo roto desde que los artefactos se movieron a la pestaña Studio (el panel se queda en esa
+> vista y `#ai-input` es `display:none`), y nadie se enteró porque nada lo ejecutaba. Si tocas la
+> navegación del panel, corre `npm run eval:smoke` antes de darlo por bueno.
+
 Coste estimado por run completo (4 baterías × ~6 artefactos × generación+juicio, modelos
 nan): céntimos. Se corre a mano antes de cambiar prompt/modelo y antes de cada release;
 no va en CI.

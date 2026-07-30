@@ -5,6 +5,38 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-30 — Tests contra modelos reales: EV1 estaba roto, y ahora hay contrato de proveedor
+
+**EV1 llevaba tiempo sin poder correr.** Las dos baterías de evals morían siempre en el mismo sitio:
+`page.fill('#ai-input')` esperando 30 s a un elemento que existe pero no se ve. La causa: los
+artefactos se abren desde la pestaña **Studio** y el panel se queda en esa vista; `#ai-input` vive
+en `#ai-view-chat`, que es `display:none` mientras Studio está activa. El arnés nunca se actualizó
+cuando los lanzadores se movieron del toolbar al Studio. Y como los `@eval` no corren en `npm test`,
+**nadie se enteró**: todo el aparato de medición de calidad (comparar modelos, validar prompts)
+llevaba parado sin avisar.
+
+Arreglado, y con un **guard determinista** en `npm test` que fija el invariante que faltaba: desde
+Studio el chat no es escribible, y vuelve a serlo al volver a Chat. Verificado con un run real
+contra nan: **2/2 baterías, 17,2 min, 6/6 turnos de chat respondidos** (antes moría en el primero).
+
+**Nuevo: contrato con el proveedor** (`npm run test:provider`, @live). Verifica contra la API real
+las afirmaciones sobre nan que vivían como comentarios y sostienen ADRs enteros: streaming SSE,
+tool-calling del principal, tool-calling del lite, visión, concurrencia y `/models`. La regla que lo
+hace viable: **se afirman capacidades, nunca contenido** — "devolvió un `tool_call`", no "la
+respuesta menciona X" (eso ya lo mide el juez de `@eval`). Imprime una matriz y la vuelca a
+`evals/runs/provider-contract.json`. Ver [ADR-030](DECISIONS.md#adr-030).
+
+**Y ya ha encontrado algo: nan acepta peticiones concurrentes** (12/12 en 3 rondas de 4). La premisa
+de [ADR-027](DECISIONS.md#adr-027) ya no se sostiene y `concurrent: true` daría paralelismo gratis.
+No se ha tocado: afecta a todas las llamadas del proveedor por defecto y es una decisión de
+producto. Queda anotado en la matriz.
+
+También: el golden de IA7 tenía **una ruta absoluta al Downloads de una máquina concreta**; en
+cualquier otra se saltaba en silencio y parecía que había pasado. Ahora busca en
+`evals/fixtures/ddia.pdf` (o `GOLDEN_BOOK=`) y **avisa por consola** si falta.
+
+---
+
 ## 2026-07-30 — Agente: el chat deja de esperar, la expansión entiende el idioma, y los modelos se pueden probar
 
 Tres mejoras del agente, la primera bastante más grave de lo que parecía.

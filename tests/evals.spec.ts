@@ -141,6 +141,16 @@ test.describe('EV1 · generación de artefactos @eval', () => {
       // libro; responderla "de memoria" es el fallo que mide la rúbrica de honestidad).
       const tChat = Date.now();
       const chat: any[] = [];
+      // VOLVER A LA PESTAÑA CHAT antes de preguntar. Los artefactos se abren desde el
+      // Studio (ver studio-nav.ts) y el panel se QUEDA en esa vista; `#ai-input` vive en
+      // `#ai-view-chat`, que es `display:none` mientras Studio esté activa. Sin esto,
+      // `page.fill('#ai-input')` esperaba 30s a un elemento que existe pero no se ve, y
+      // toda la batería moría ahí — EV1 llevaba roto desde que los artefactos se movieron
+      // al Studio (antes se abrían con iconos sueltos del toolbar, sin cambiar de vista).
+      if (!SMOKE && (battery.questions || []).length) {
+        await page.locator('.ai-tab[data-view="chat"]').click();
+        await expect(page.locator('#ai-input')).toBeVisible({ timeout: 10000 });
+      }
       for (const { q, trap } of SMOKE ? [] : (battery.questions || [])) {
         const before = await page.locator('.ai-msg-assistant .ai-bubble-text').count();
         await page.fill('#ai-input', q);

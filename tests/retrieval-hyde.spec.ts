@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import fs from 'fs';
+import path from 'path';
 
 // IA7 · F2 — Golden @live de la reescritura de consulta (HyDE-lite). Mide, sobre un libro
 // REAL y con la API real, si el retrieval encuentra el pasaje correcto con la pregunta cruda
@@ -14,9 +15,14 @@ import fs from 'fs';
 //    y la PRECISIÓN (top-k pequeño), donde la expansión sí puede subir el pasaje de rango.
 //  - ES→EN (cross-lingüe): el caso real del usuario (pregunta en español, libro en inglés). Aquí
 //    BM25 crudo ≈ 0 y la expansión, con el idioma del libro, recupera el pasaje. Aquí MUEVE la aguja.
+// El libro del golden es DDIA: las preguntas y sus `targets` son suyos ("lost update",
+// "compare-and-set"…), así que NO vale cualquier libro — cambiarlo invalida las aserciones.
+// No se puede versionar (con copyright), así que se busca en `evals/fixtures/` (gitignored:
+// deja ahí el PDF) o se apunta con GOLDEN_BOOK. Antes había una ruta absoluta al Downloads
+// de una máquina concreta: en cualquier otra el golden se saltaba y parecía que había pasado.
 const KEY = process.env.NAN_API_KEY;
-const BOOK = process.env.GOLDEN_BOOK
-  || '/Users/lgb/Downloads/Designing Data-Intensive Ap_ (z-library.sk, 1lib.sk, z-lib.sk).pdf';
+const DEFAULT_BOOK = path.resolve(__dirname, '..', 'evals', 'fixtures', 'ddia.pdf');
+const BOOK = process.env.GOLDEN_BOOK || DEFAULT_BOOK;
 
 const EN = [
   { q: "How can two clients avoid silently overwriting each other's changes to the same record?", targets: ['lost update', 'compare-and-set', 'atomic write'] },
@@ -39,7 +45,13 @@ const ES = [
 
 test.describe('IA7 · HyDE-lite golden (retrieval real)', () => {
   test.skip(!KEY, 'NAN_API_KEY no definido (.env)');
-  test.skip(!fs.existsSync(BOOK), `Libro no encontrado: ${BOOK} (usa GOLDEN_BOOK=...)`);
+  // Un skip en medio de un run largo pasa desapercibido y este golden es la única prueba
+  // de que el retrieval cross-lingüe sigue funcionando: si no está el libro, que se vea.
+  if (KEY && !fs.existsSync(BOOK)) {
+    console.warn(`\n[golden IA7] SALTADO: falta el libro en ${BOOK}.\n` +
+                 `             Deja el PDF de DDIA ahí (evals/fixtures/ está gitignored) o usa GOLDEN_BOOK=/ruta.\n`);
+  }
+  test.skip(!fs.existsSync(BOOK), `Libro no encontrado: ${BOOK} (déjalo en evals/fixtures/ddia.pdf o usa GOLDEN_BOOK=...)`);
 
   test('la expansión mejora precisión y recupera lo cross-lingüe, sin regresión @live', async ({ page }) => {
     test.setTimeout(420000);
