@@ -1137,6 +1137,12 @@ body.resizing-panel .reader-main { transition: none !important; }
 
 /* Toolbar único del panel: una sola fila con el selector de conversación + perfil +
    acciones + ajustes/cerrar. Sustituye a la antigua .ai-header ("Agente"). */
+/* Tirador del bottom-sheet: SOLO existe en móvil (sus estilos viven en la media query de
+   <768px). Sin esta línea el <button> se colaba en escritorio con el estilo por defecto del
+   navegador —un rectángulo de 379×4px con borde `2px outset`— y se veía como dos rayas
+   sueltas encima de la barra del panel. */
+.ai-sheet-grab { display: none; }
+
 .ai-toolbar {
   display: flex;
   align-items: center;
