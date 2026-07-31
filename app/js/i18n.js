@@ -261,6 +261,7 @@ const EN = {
   'Listo para preguntar': 'Ready for questions',
   'Elegir objetivo de lectura': 'Choose a reading goal',
   'Nueva conversación…': 'New conversation…',
+  'Exportar a Markdown…': 'Export to Markdown…',
   'Nombre de la conversación:': 'Conversation name:',
   'Renombrar conversación': 'Rename conversation',
   '¿Eliminar la conversación "{name}"? Se borran su chat y su libreta.': 'Delete the conversation "{name}"? Its chat and notebook will be erased.',

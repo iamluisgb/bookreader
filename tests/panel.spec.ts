@@ -224,8 +224,13 @@ test('el toolbar ya no duplica los lanzadores de artefactos', async ({ page }) =
     await expect(page.locator(id)).toHaveCount(0);
   }
   // Lo que sí es de la conversación se queda.
-  for (const id of ['#ai-convo-btn', '#ai-convo-new', '#ai-convo-export', '#ai-edit-cfg', '#ai-close']) {
+  for (const id of ['#ai-convo-btn', '#ai-edit-cfg', '#ai-close']) {
     await expect(page.locator(id)).toHaveCount(1);
+  }
+  // "Nueva" y "Exportar" bajaron al menú del selector: a 380px de panel los seis controles
+  // no cabían y el flex aplastaba a cero la etiqueta de la conversación.
+  for (const id of ['#ai-convo-new', '#ai-convo-export']) {
+    await expect(page.locator(id)).toHaveCount(0);
   }
 });
 

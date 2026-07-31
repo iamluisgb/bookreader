@@ -5,6 +5,26 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-31 — La barra del agente cabía a la fuerza: ＋ y ↥ bajan al menú
+
+Dos defectos en la cabecera del panel del agente, uno visible y otro medible.
+
+- **El tirador del bottom-sheet se colaba en escritorio.** `#ai-sheet-grab` solo tiene estilos
+  dentro de `@media (max-width: 767px)`, así que por encima de ese ancho el `<button>` se
+  pintaba con el estilo por defecto del navegador —379×4px con borde `2px outset`— y se veía
+  como dos rayas sueltas sobre la barra. Ahora está oculto por defecto y la media query móvil
+  lo vuelve a mostrar.
+- **Seis controles no caben en 380px.** Presupuesto real: 351px útiles − 144 de iconos (＋ ↥ ⚙ ✕)
+  − 40 de separaciones = 167 para el chip de perfil y el selector de conversación, que necesitan
+  unos 210. El flex hacía lo único que podía: truncar el perfil a "Calí…" y aplastar a cero la
+  etiqueta del selector, que es precisamente lo que dice de qué conversación se trata — quedaba
+  un círculo con una burbuja dentro. Ningún ajuste de `flex` arregla eso; sobraba un control.
+  **Nueva conversación** y **Exportar** son acciones DE la conversación y el menú del selector ya
+  listaba "Nueva conversación…", así que los dos iconos se bajan ahí. Medido después: perfil
+  completo (85px) y etiqueta visible (95px), sin desbordar.
+
+`export.spec` pasa por el menú y `panel.spec` comprueba que los dos iconos ya no están en la barra.
+
 ## 2026-07-31 — La página como objeto, el índice con jerarquía y el pie con capítulo
 
 Revisión de UI a partir de una crítica externa. De ocho propuestas se aplican cuatro; las otras

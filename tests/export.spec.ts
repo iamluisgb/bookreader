@@ -67,11 +67,15 @@ test('el botón de exportar del panel descarga un .md', async ({ page }) => {
   await page.click('.ai-ob-tpl[data-tpl="t3-juicio"]');
   await page.fill('#ai-ob-goal', 'objetivo de prueba');
   await page.click('#ai-ob-start');
-  await expect(page.locator('#ai-convo-export')).toBeVisible({ timeout: 5000 });
+  // Exportar vive en el menú del selector de conversación (antes era un icono del toolbar).
+  await expect(page.locator('#ai-convo-btn')).toBeVisible({ timeout: 5000 });
+  await page.click('#ai-convo-btn');
+  const exportItem = page.locator('.ai-convo-menu [data-act="export"]');
+  await expect(exportItem).toBeVisible({ timeout: 5000 });
 
   const [download] = await Promise.all([
     page.waitForEvent('download', { timeout: 10000 }),
-    page.click('#ai-convo-export'),
+    exportItem.click(),
   ]);
   expect(download.suggestedFilename()).toMatch(/\.md$/);
 });

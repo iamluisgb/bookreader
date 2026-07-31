@@ -16,15 +16,17 @@ export const TEMPLATE = () => `
        que además muestra su estado e historial —cosas que un icono no puede decir— y ya era el
        único sitio de los tipos nuevos ("Explícamelo tú" nació sin icono). Sustituye a la antigua cabecera "Agente" (redundante) para dar el máximo
        alto al chat. El grupo de conversación (#ai-convobar) se oculta sin libro; ⚙ y ✕ siempre
-       visibles (por eso ⚙ lleva margin-left:auto para quedar a la derecha cuando el grupo falta). -->
+       visibles (por eso ⚙ lleva margin-left:auto para quedar a la derecha cuando el grupo falta).
+       "Nueva conversación" y "Exportar" ESTABAN aquí como iconos sueltos y se han bajado al menú
+       del selector: son acciones DE la conversación, el menú ya listaba "Nueva conversación…", y
+       a 380px de panel los seis controles no caben —el flex aplastaba a cero la etiqueta del
+       selector, que es justo lo que dice de qué conversación se trata—. -->
   <div class="ai-toolbar">
     <div id="ai-convobar" class="ai-convobar" style="display:none">
       <button id="ai-profile-chip" class="ai-profile-chip" style="display:none" title="${t('Perfil del agente')}"></button>
       <button id="ai-convo-btn" class="ai-convo-btn" title="${t('Cambiar de conversación')}">
         ${icon('bubble', { size: 15 })}<span id="ai-convo-label" class="ai-convo-label">${t('Conversación')}</span>${icon('chevron-down', { size: 14 })}
       </button>
-      <button id="ai-convo-new" class="icon-btn" title="${t('Nueva conversación')}">${icon('plus', { size: 18 })}</button>
-      <button id="ai-convo-export" class="icon-btn" title="${t('Exportar esta conversación (libreta + chat) a Markdown')}">${icon('share', { size: 17 })}</button>
     </div>
     <button id="ai-edit-cfg" class="icon-btn ai-toolbar-cfg" title="${t('Ajustes del agente')}">${icon('gear')}</button>
     <button id="ai-close" class="icon-btn" title="${t('Cerrar')}">${icon('xmark')}</button>

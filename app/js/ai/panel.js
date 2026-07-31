@@ -80,7 +80,7 @@ export function init(opts) {
     status: $('#ai-status'), tabs: $('#ai-tabs'),
     chatView: $('#ai-view-chat'), noteView: $('#ai-view-notebook'), studioView: $('#ai-view-studio'),
     messages: $('#ai-messages'), input: $('#ai-input'), send: $('#ai-send'), see: $('#ai-see'), close: $('#ai-close'),
-    convobar: $('#ai-convobar'), convoBtn: $('#ai-convo-btn'), convoLabel: $('#ai-convo-label'), convoNew: $('#ai-convo-new'), convoExport: $('#ai-convo-export'),
+    convobar: $('#ai-convobar'), convoBtn: $('#ai-convo-btn'), convoLabel: $('#ai-convo-label'),
     ref: $('#ai-ref'), refText: $('#ai-ref-text'), profileChip: $('#ai-profile-chip'),
     imgref: $('#ai-imgref'), imgrefText: $('#ai-imgref-text'),
     zone: $('#ai-zone'), zones: $('#ai-zones'), mic: $('#ai-mic'),
@@ -119,8 +119,6 @@ export function init(opts) {
 
   // Selector de conversaciones.
   els.convoBtn.addEventListener('click', (e) => { e.stopPropagation(); if (convo) openConvoMenu(els.convoBtn); else openOnboarding(); });
-  els.convoNew.addEventListener('click', () => openOnboarding());
-  els.convoExport.addEventListener('click', exportConvo);
   // Trabajos de IA en segundo plano (resumen/mapa/flashcards): chip flotante + toast. Los
   // "openers" reabren el modal reconstruyendo el contexto del libro actual.
   JobsUI.setOpener('summary', openSummary);
@@ -706,14 +704,14 @@ async function switchConvo(id) {
   showView('chat');
 }
 
-// Barra con la conversación activa + selector + nueva. Si no hay conversación
-// pero sí libro, muestra una entrada para elegir objetivo (reabrir onboarding).
+// Barra con la conversación activa + selector. Si no hay conversación pero sí libro,
+// muestra una entrada para elegir objetivo (reabrir onboarding). "Nueva" y "Exportar"
+// viven en el menú que abre el selector, no aquí (ver panel-template.js).
 function renderConvoBar() {
   if (!els.convobar) return;
   if (!book) { els.convobar.style.display = 'none'; return; }
   els.convobar.style.display = 'flex';
   els.convobar.classList.toggle('no-convo', !convo);
-  els.convoNew.style.display = convo ? '' : 'none';
   // Mostramos la identidad HUMANA de la conversación: su nombre propio si lo tiene, si no el
   // OBJETIVO de lectura (lo que el usuario escribió), no el código interno de la plantilla
   // ("T2 · HQ&A"), que no significa nada para quien lee y ya no aporta aquí.
@@ -740,6 +738,7 @@ async function openConvoMenu(anchor) {
     }).join('')}
     <div class="lib-menu-sep"></div>
     <button class="lib-menu-item" data-act="new">${icon('plus', { size: 16 })}<span>${t('Nueva conversación…')}</span></button>
+    ${convo ? `<button class="lib-menu-item" data-act="export">${icon('share', { size: 16 })}<span>${t('Exportar a Markdown…')}</span></button>` : ''}
   `;
   document.body.appendChild(menu);
   convoMenuEl = menu;
@@ -786,6 +785,7 @@ async function openConvoMenu(anchor) {
     const item = ev.target.closest('.ai-convo-item');
     if (item) { closeConvoMenu(); await switchConvo(item.dataset.id); return; }
     if (ev.target.closest('[data-act="new"]')) { closeConvoMenu(); openOnboarding(); return; }
+    if (ev.target.closest('[data-act="export"]')) { closeConvoMenu(); await exportConvo(); return; }
   });
 }
 
