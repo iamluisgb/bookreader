@@ -5,6 +5,23 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-31 — Fuera las barras de acento laterales
+
+Barrido completo: ninguna superficie marca estado con un `border-left`/`box-shadow inset` de
+acento pegado al borde (principio 6 de [`DESIGN.md`](DESIGN.md)). Ocho sitios reescritos con
+fondo, color y peso:
+
+- **Fichas de subrayado**: el color ya no vive en la barra sino en el fondo de la ficha
+  (`--hl-color` + `color-mix`), que es justo lo que es — una marca de rotulador. Se lee mejor
+  el color que antes, en claro y en oscuro.
+- **Citas del agente y pasaje del repaso**: superficie propia, cursiva y texto atenuado.
+- **Toasts**: aro completo de 1px (verde/rojo) en vez de barra.
+- **Chip de referencia, tutor Feynman, campos de cognición**: ya tenían fondo de acento; la
+  barra solo sobraba.
+
+Los `border-left: 1px` que separan botones adyacentes se quedan: son divisores estructurales,
+no marcas de estado.
+
 ## 2026-07-31 — El índice marca dónde estás
 
 Abrías **Contenido** y el índice era una lista muerta: ninguna pista de por dónde ibas, así que

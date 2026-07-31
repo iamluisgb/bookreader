@@ -447,7 +447,7 @@ export function renderHighlights() {
   highlights.sort((a, b) => b.timestamp - a.timestamp).forEach(hl => {
     const item = document.createElement('div');
     item.className = 'highlight-item';
-    item.style.borderLeftColor = hl.color;
+    item.style.setProperty('--hl-color', hl.color);   // tiñe la ficha (ver .highlight-item)
     item.innerHTML = `
       <div class="highlight-text">"${escapeHtml(dehyphenate(hl.text))}"</div>
       ${hl.note ? `<div class="highlight-note">${icon('note', { size: 13 })}<span>${escapeHtml(hl.note)}</span></div>` : ''}

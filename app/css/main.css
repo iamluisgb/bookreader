@@ -341,17 +341,20 @@ html, body {
   cursor: default;
 }
 
+/* El color del subrayado se lleva en el propio fondo de la ficha (--hl-color lo pone
+   renderHighlights), como una marca de rotulador: dice de qué color es sin recurrir a
+   una barra lateral. */
 .highlight-item {
   padding: 10px 12px;
   border-radius: var(--r-sm);
-  border-left: 3px solid;
+  background: color-mix(in srgb, var(--hl-color, var(--surface-2)) 16%, transparent);
   margin-bottom: 10px;
   cursor: pointer;
   transition: background var(--transition-fast);
 }
 
 .highlight-item:hover {
-  background: var(--surface-3);
+  background: color-mix(in srgb, var(--hl-color, var(--surface-2)) 30%, transparent);
 }
 
 .highlight-item .highlight-text {
@@ -1437,9 +1440,10 @@ textarea.is-recording { display: none; }
   padding: 10px 12px; overflow-x: auto; margin: 0 0 8px;
 }
 .ai-code code { background: none; padding: 0; }
+/* Cita: se distingue por superficie y color de texto, sin barra lateral. */
 .ai-bubble-text blockquote, .ai-nb-note-text blockquote {
-  border-left: 3px solid var(--border); margin: 0 0 8px; padding: 2px 0 2px 10px;
-  color: var(--text-soft);
+  margin: 0 0 8px; padding: 8px 12px; border-radius: var(--r-sm);
+  background: var(--surface-2); color: var(--text-soft); font-style: italic;
 }
 .ai-bubble-text hr, .ai-nb-note-text hr { border: none; border-top: 1px solid var(--border); margin: 10px 0; }
 .ai-bubble-text a, .ai-nb-note-text a { color: var(--accent); }
@@ -1663,8 +1667,9 @@ body.has-taskchip .ai-taskchip.is-study { bottom: 74px; }
 }
 .ai-toast.show { opacity: 1; transform: translateY(0); }
 .ai-toast-msg { flex: 1; }
-.ai-toast--success { border-left: 3px solid var(--accent); }
-.ai-toast--error { border-left: 3px solid #ef4444; }
+/* Éxito/error: un aro completo alrededor del toast, no una barra pegada al borde. */
+.ai-toast--success { box-shadow: 0 8px 30px rgba(0,0,0,.28), inset 0 0 0 1px var(--accent); }
+.ai-toast--error { box-shadow: 0 8px 30px rgba(0,0,0,.28), inset 0 0 0 1px #ef4444; }
 .ai-toast-action { background: var(--accent); color: var(--on-accent, #fff); border: none; border-radius: var(--r-md, 8px); padding: 6px 12px; font: inherit; font-weight: 600; cursor: pointer; white-space: nowrap; }
 .ai-toast-action:hover { background: var(--accent-hover); }
 .ai-toast-close { background: none; border: none; color: rgba(255,255,255,.6); cursor: pointer; display: inline-flex; padding: 2px; }
@@ -1788,8 +1793,8 @@ body.has-taskchip .ai-taskchip.is-study { bottom: 74px; }
 .study-extra { font-size: 14px; color: var(--text-soft); margin-top: 12px; }
 /* F3 · El pasaje del libro que respalda la tarjeta, para releerlo sin salir del repaso. */
 .study-passage {
-  margin: 16px 0 0; padding: 10px 14px; border-left: 3px solid var(--border);
-  background: var(--surface-1); border-radius: 0 var(--r-sm) var(--r-sm) 0;
+  margin: 16px 0 0; padding: 10px 14px;
+  background: var(--surface-1); border-radius: var(--r-sm);
   font-size: 14px; line-height: 1.55; color: var(--text-soft); max-height: 30vh; overflow-y: auto;
 }
 .study-passage-ch { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; opacity: .7; margin-bottom: 4px; }
@@ -2094,7 +2099,6 @@ body.has-taskchip .ai-taskchip.is-study { bottom: 74px; }
   display: flex; align-items: center; gap: 10px;
   margin: 0 18px 10px; padding: 10px 12px;
   background: var(--accent-soft); border-radius: var(--r-md);
-  border-left: 3px solid var(--accent);
 }
 .ai-ref-ico { display: inline-flex; flex: 0 0 auto; color: var(--accent); }
 .ai-ref-text {
@@ -2405,7 +2409,10 @@ body.ai-busy #ai-toggle::after, body.ai-busy .ai-fab::after {
   font-size: 12px; color: var(--text-faint); line-height: 1.5;
   margin: 2px 0 6px; font-style: italic;
 }
-.ai-nb-field.is-cognition { border-left: 2px solid color-mix(in srgb, var(--accent) 35%, transparent); padding-left: 10px; }
+.ai-nb-field.is-cognition {
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+  border-radius: var(--r-sm); padding: 8px 10px;
+}
 .ai-nb-note {
   background: var(--surface-2);
   border: 1px solid var(--border-soft);
@@ -3175,7 +3182,7 @@ body.ai-open #sync-badge { right: calc(var(--ai-panel-width) + 14px); }
    respondería en corto; aquí queremos un párrafo suyo. */
 .fey-say {
   padding: 14px 16px; margin-bottom: 14px;
-  background: var(--accent-soft); border-left: 3px solid var(--accent);
+  background: var(--accent-soft);
   border-radius: var(--r-md); font-size: 15px; line-height: 1.5;
 }
 .fey-input {
