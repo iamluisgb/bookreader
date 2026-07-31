@@ -5,6 +5,21 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-31 — El índice marca dónde estás
+
+Abrías **Contenido** y el índice era una lista muerta: ninguna pista de por dónde ibas, así que
+tocaba contar capítulos o cotejar el número de página con el del pie. Ahora la sección actual va
+marcada (fondo de acento + barra a la izquierda, `aria-current="location"`) y el índice se
+desplaza para dejarla a la vista al abrir el sidebar o al volver a la pestaña.
+
+En EPUB se resuelve por el href del spine actual: se marca la sección que contiene lo que se lee
+(si un fichero trae varias subsecciones se marca la que las engloba, no se adivina el anclaje). En
+PDF, la última entrada del outline que empieza en la página actual o antes. La marca se mantiene
+viva mientras se lee con el sidebar abierto, y gana a la atenuación por objetivo del agente: da
+igual lo poco que importe el capítulo, si es donde estás tiene que verse.
+
+Nuevo test determinista `tests/toc-current.spec.ts` (una sola entrada marcada; saltar mueve la marca).
+
 ## 2026-07-30 — Tests contra modelos reales: EV1 estaba roto, y ahora hay contrato de proveedor
 
 **EV1 llevaba tiempo sin poder correr.** Las dos baterías de evals morían siempre en el mismo sitio:

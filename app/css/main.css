@@ -206,6 +206,16 @@ html, body {
   color: var(--text-soft);
 }
 
+/* Sección que se está leyendo: fondo suave + barra de acento a la izquierda. El
+   borde va como box-shadow inset para no descuadrar el padding de las demás filas. */
+.toc-list a.current {
+  background: var(--accent-soft);
+  box-shadow: inset 3px 0 0 var(--accent);
+  color: var(--accent-hover);
+  font-weight: 600;
+}
+.toc-list a.current .toc-page { color: var(--accent-hover); }
+
 /* Etiqueta flexible + número de página anclado a la derecha, como un índice impreso.
    El número no se encoge ni se parte aunque el título sea larguísimo. */
 .toc-label { flex: 1; min-width: 0; }
@@ -1408,6 +1418,9 @@ textarea.is-recording { display: none; }
 #toc-list a.ai-toc-high::before {
   content: '★'; color: var(--accent); margin-right: 6px; font-size: 11px;
 }
+/* La marca de "estoy aquí" gana a la atenuación por objetivo: da igual lo poco que
+   importe el capítulo para el objetivo, si es donde se lee tiene que verse. */
+#toc-list a.current { opacity: 1; }
 
 /* Markdown dentro de respuestas y notas */
 .ai-bubble-text > :first-child, .ai-nb-note-text > :first-child { margin-top: 0; }

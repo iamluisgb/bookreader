@@ -871,7 +871,11 @@ function initSidebar() {
   const toggle = document.getElementById('sidebar-toggle');
   const close = document.getElementById('sidebar-close');
 
-  toggle.addEventListener('click', () => sidebar.classList.toggle('open'));
+  toggle.addEventListener('click', () => {
+    sidebar.classList.toggle('open');
+    // Al abrir, el índice debe decir dónde se está leyendo y dejarlo a la vista.
+    if (sidebar.classList.contains('open')) markCurrentToc(true);
+  });
   close.addEventListener('click', () => sidebar.classList.remove('open'));
 
   // Tabs
@@ -881,6 +885,8 @@ function initSidebar() {
       document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
       btn.classList.add('active');
       document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+      // Volver a Contenido: re-marcar por si la lectura avanzó con el sidebar abierto.
+      if (btn.dataset.tab === 'contents') markCurrentToc(true);
     });
   });
 }
@@ -990,6 +996,7 @@ async function loadEpub(buffer, bookId, aiBookId, persist = null) {
     EpubReader.onChapter((label) => {
       updateBookmarkButton();
       updateProgressDetail(undefined, totalWords);
+      markCurrentToc();                // mantener viva la marca del índice
     });
 
     // Reading mode: barras como overlay (ver CSS de `body.reading`); el área de
@@ -1077,6 +1084,7 @@ async function loadPdf(buffer, bookId, aiBookId, persist = null, displayTitle = 
       syncRouteSoon();               // reflejar la página en la URL (deep-link)
       drawPdfHighlights(page);       // PDF3: re-pintar los subrayados de la página
       updateBookmarkButton();        // reflejar si la página actual está marcada
+      markCurrentToc();              // mantener viva la marca del índice
     });
 
     await PdfReader.load(buffer);
@@ -1146,6 +1154,7 @@ async function loadPdfTOC() {
     a.appendChild(tocLabel(it.label, it.page));
     if (isSub) a.classList.add('subitem');
     if (it.page != null) {
+      a.dataset.tocPage = String(it.page);   // para marcar dónde se está leyendo
       a.addEventListener('click', async (e) => {
         e.preventDefault();
         await PdfReader.goTo(it.page);
@@ -1160,6 +1169,38 @@ async function loadPdfTOC() {
     addLink(it, false);
     (it.subitems || []).forEach(sub => addLink(sub, true));
   });
+  markCurrentToc();
+}
+
+// Marca en el índice la sección que se está leyendo (y la deja a la vista al abrir el
+// sidebar). En EPUB se resuelve por href; en PDF, la última entrada que empieza en la
+// página actual o antes. Silencioso si el índice aún no está pintado.
+function markCurrentToc(scroll = false) {
+  const tocList = document.getElementById('toc-list');
+  if (!tocList) return;
+  const links = [...tocList.querySelectorAll('a')];
+  if (!links.length) return;
+
+  let current = null;
+  if (EpubReader.isLoaded()) {
+    const href = EpubReader.getCurrentTocHref();
+    if (href) current = links.find((a) => a.dataset.tocHref === href) || null;
+  } else if (PdfReader.isLoaded()) {
+    const page = PdfReader.getCurrentPage();
+    for (const a of links) {
+      const start = Number(a.dataset.tocPage);
+      if (!a.dataset.tocPage || Number.isNaN(start) || start > page) continue;
+      current = a;   // van en orden de lectura: la última que ya empezó es la actual
+    }
+  }
+
+  for (const a of links) {
+    const isCurrent = a === current;
+    a.classList.toggle('current', isCurrent);
+    if (isCurrent) a.setAttribute('aria-current', 'location');
+    else a.removeAttribute('aria-current');
+  }
+  if (scroll && current) current.scrollIntoView({ block: 'center' });
 }
 
 // Fila del índice: etiqueta + número de página a la derecha. `page` null → solo la
@@ -1205,6 +1246,7 @@ function loadTOC() {
     addLink(item, false);
     (item.subitems || []).forEach(sub => addLink(sub, true));
   });
+  markCurrentToc();
 }
 
 // Las localizaciones de epub.js se generan DESPUÉS de pintar el índice (en un libro

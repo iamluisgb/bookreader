@@ -852,6 +852,32 @@ export function getCurrentChapterLabel() {
   return chapter ? chapter.label.trim() : '';
 }
 
+// href (tal cual está en el índice) de la entrada que corresponde a lo que se está
+// leyendo AHORA, para marcarla en el sidebar. Se recorre el índice —incluidas las
+// subentradas— y se devuelve la PRIMERA del fichero actual: cuando un fichero trae
+// varias secciones no se sabe por cuál va la lectura sin resolver los anclajes, así
+// que se marca la sección que las contiene. '' si no se puede resolver.
+export function getCurrentTocHref() {
+  if (!book || !rendition) return '';
+  const nav = book.navigation;
+  if (!nav || !nav.toc) return '';
+
+  const location = rendition.currentLocation();
+  if (!location || !location.start) return '';
+
+  const href = location.start.href;
+  let match = '';
+  const walk = (items) => {
+    for (const item of items || []) {
+      if (match) return;
+      if (item.href && item.href.includes(href)) { match = item.href; return; }
+      walk(item.subitems);
+    }
+  };
+  walk(nav.toc);
+  return match;
+}
+
 export async function generateLocations() {
   if (book) {
     await book.locations.generate(1024);
