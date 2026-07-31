@@ -225,10 +225,14 @@
     <footer id="reader-footer" class="reader-footer" style="display:none;">
       <button id="prev-btn" class="nav-btn" aria-label="Página anterior" data-i18n-attrs="aria-label" data-icon="chevron-left"></button>
       <div class="progress-wrap">
+        <!-- Jerarquía: DÓNDE estás (capítulo) manda; cuánto llevas es dato secundario. -->
         <div class="progress-info">
-          <span id="progress-page" class="progress-page">—</span>
-          <span id="progress-text" class="progress-text">0%</span>
-          <span id="progress-time" class="progress-time" title="Tiempo de lectura restante" data-i18n-attrs="title"></span>
+          <span id="progress-chapter" class="progress-chapter"></span>
+          <span class="progress-meta">
+            <span id="progress-page" class="progress-page">—</span>
+            <span id="progress-text" class="progress-text">0%</span>
+            <span id="progress-time" class="progress-time" title="Tiempo de lectura restante" data-i18n-attrs="title"></span>
+          </span>
         </div>
         <div id="progress-container" class="progress-container" title="Arrastra o pulsa para saltar a esa parte del libro"
              role="slider" tabindex="0" aria-label="Progreso de lectura" data-i18n-attrs="title,aria-label"

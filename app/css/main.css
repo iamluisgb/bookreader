@@ -32,7 +32,11 @@ html, body {
   flex-direction: column;
   z-index: 100;
   transform: translateX(-100%);
-  transition: transform var(--transition-normal);
+  /* Los paneles que ENTRAN en pantalla usan la curva de salida suave (--transition-panel):
+     arrancan rápido y frenan largo. Con la curva simétrica anterior el drawer parecía
+     arrastrarse. El lector (.reader-main) usa la MISMA curva y duración, si no el empuje
+     del contenido y el panel van desacompasados. */
+  transition: transform var(--transition-panel);
 }
 
 .sidebar.open {
@@ -182,29 +186,73 @@ html, body {
   font-size: 14px;
 }
 
-/* ============ TOC (v2: más aire) ============ */
+/* ============ TOC (v3: jerarquía por grupos, estilo Notion) ============
+   Antes era una lista plana donde la única señal de jerarquía era la sangría: parecía un
+   listado de ficheros. Ahora hay tres niveles de lectura — cabecera de grupo (entrada con
+   subentradas), capítulo y subcapítulo — y AIRE entre grupos, que es lo que deja escanear
+   el índice de un vistazo. La estructura del DOM no cambia (todo siguen siendo <a>): el
+   marcado de la sección actual, la atenuación por relevancia y los tests siguen igual. */
 .toc-list a {
   display: flex;
   align-items: baseline;
   gap: 10px;
-  padding: 10px 12px;
+  padding: 9px 12px;
   color: var(--text);
   text-decoration: none;
   border-radius: var(--r-sm);
   font-size: 14px;
-  line-height: 1.4;
-  transition: background var(--transition-fast);
+  line-height: 1.45;
+  transition: background var(--transition-fast), color var(--transition-fast);
 }
 
 .toc-list a:hover {
   background: var(--surface-3);
 }
 
+/* Entrada que ABRE grupo (tiene subentradas): hace de título de sección. */
+.toc-list a.has-sub {
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+/* Aire entre grupos: el primer capítulo de nivel 1 después de un bloque de subentradas
+   abre grupo nuevo. Es la separación que hace legible un índice largo. */
+.toc-list a.subitem + a:not(.subitem) { margin-top: var(--s-4); }
+
 .toc-list a.subitem {
-  padding-left: 28px;
+  padding-left: 22px;
   font-size: 13px;
   color: var(--text-soft);
 }
+
+/* Punto guía en vez de sangría a secas: marca el nivel sin dibujar una línea vertical
+   (las barras laterales están proscritas, ver DESIGN.md §1.6). */
+.toc-list a.subitem .toc-label::before {
+  content: '';
+  display: inline-block;
+  width: 4px; height: 4px;
+  margin-right: 9px;
+  vertical-align: middle;
+  border-radius: 50%;
+  background: var(--text-faint);
+  opacity: 0.65;
+}
+.toc-list a.subitem.current .toc-label::before { background: currentColor; opacity: 1; }
+
+/* Entrada escalonada del índice al abrir el panel (F4). Solo las primeras entradas: más
+   allá el retardo acumulado se percibe como lentitud, no como cuidado. El resto aparece
+   ya colocado, que es lo correcto —el ojo está arriba—. */
+.sidebar.open .toc-list a { animation: toc-in 0.22s var(--ease-out-soft) both; }
+@keyframes toc-in { from { opacity: 0; transform: translateX(-6px); } to { opacity: 1; transform: none; } }
+.sidebar.open .toc-list a:nth-child(1)  { animation-delay: 0ms; }
+.sidebar.open .toc-list a:nth-child(2)  { animation-delay: 14ms; }
+.sidebar.open .toc-list a:nth-child(3)  { animation-delay: 28ms; }
+.sidebar.open .toc-list a:nth-child(4)  { animation-delay: 42ms; }
+.sidebar.open .toc-list a:nth-child(5)  { animation-delay: 56ms; }
+.sidebar.open .toc-list a:nth-child(6)  { animation-delay: 70ms; }
+.sidebar.open .toc-list a:nth-child(7)  { animation-delay: 84ms; }
+.sidebar.open .toc-list a:nth-child(8)  { animation-delay: 98ms; }
+.sidebar.open .toc-list a:nth-child(n+9) { animation-delay: 112ms; }
 
 /* Sección que se está leyendo: fondo suave y texto de acento, sin barra lateral. */
 .toc-list a.current {
@@ -504,7 +552,9 @@ input[type="range"] {
   flex-direction: column;
   height: 100%;
   margin-left: 0;
-  transition: margin-left var(--transition-normal);
+  /* `margin` y no `margin-left`: el panel del agente empuja por la DERECHA y sin esto
+     ese lado saltaba de golpe mientras el panel se deslizaba. */
+  transition: margin var(--transition-panel);
 }
 
 /* ============ READER HEADER ============ */
@@ -556,10 +606,12 @@ input[type="range"] {
   justify-content: center;
   background: var(--surface-0);
 }
-/* Con un libro abierto, el fondo del viewport iguala al de la página (--page-bg,
-   fijado por epub-reader según el tema). Así, al arrastrar para pasar página, el
-   hueco que se revela no muestra una franja de otro color. */
-body.reading .reader-viewport { background: var(--page-bg, var(--surface-0)); }
+/* Con un libro abierto el viewport es el "escritorio": el mismo color de la página
+   (--page-bg, fijado por epub-reader según el tema) un punto más oscuro. Así el hueco
+   que se revela al arrastrar sigue siendo del mismo tono —no una franja de otro color—
+   pero en escritorio la columna de texto se lee como una HOJA apoyada encima en vez de
+   fundirse con el cromo. Ver --desk en themes.css. */
+body.reading .reader-viewport { background: var(--desk); }
 /* Modo scroll: el contenido crece en vertical y se desplaza; alineamos arriba y dejamos
    que epub.js gestione el scroll interno (no centramos ni ocultamos el desborde). */
 body.scroll-mode .reader-viewport { align-items: stretch; justify-content: flex-start; }
@@ -640,18 +692,44 @@ body.scroll-mode .reader-viewport { align-items: stretch; justify-content: flex-
 
 .progress-info {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   justify-content: space-between;
-  gap: 8px;
+  gap: var(--s-4);
   font-size: 12px;
   line-height: 1;
   color: var(--text-faint);
 }
 .progress-info > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.progress-time { text-align: right; }
+
+/* Capítulo actual: la información primaria del pie (lo que un lector quiere saber es
+   dónde está, no qué número de localización lleva). Lo rellena markCurrentToc() en
+   app.js reusando la sección que ya calcula para marcar el índice. Sin índice queda
+   vacío y el bloque de cifras se va solo a la izquierda. */
+.progress-chapter {
+  flex: 1;
+  min-width: 0;
+  color: var(--text-soft);
+  font-weight: 500;
+}
+
+/* Cifras: página · % · tiempo restante, en un solo bloque atenuado y con cifras de
+   ancho fijo para que no bailen al avanzar. El separador es CSS (no texto) para no
+   meter cadenas nuevas al i18n, y salta las piezas vacías. */
+.progress-meta {
+  flex: none;
+  display: inline-flex;
+  align-items: baseline;
+  font-variant-numeric: tabular-nums;
+}
+.progress-meta > span:not(:empty) + span:not(:empty)::before {
+  content: '·';
+  margin: 0 6px;
+  color: var(--text-faint);
+  opacity: 0.7;
+}
 
 .progress-container {
-  height: 4px;
+  height: 3px;
   background: var(--surface-3);
   border-radius: var(--r-pill);
   position: relative;
@@ -755,6 +833,32 @@ body.scroll-mode .reader-viewport { align-items: stretch; justify-content: flex-
   position: relative;
   overflow: hidden;
 }
+
+/* La página como objeto (F1). Solo en pantallas anchas: es donde `sizeContainer()`
+   (js/epub-reader.js) limita el contenedor al "ancho de columna" y sobra escritorio a los
+   lados. Por debajo de 1000px la página va a sangre y una tarjeta solo robaría línea de
+   lectura. El umbral debe seguir al `vw > 1000` de sizeContainer: si cambia allí, cambia aquí.
+   El fondo va en el CONTENEDOR (no en el viewport) porque el swipe lo traslada: la hoja se
+   mueve entera y lo que asoma detrás es el escritorio, como al pasar página de verdad.
+   Ojo: NADA aquí puede cambiar el tamaño del área de lectura. Un inset vertical (padding en
+   el viewport) parece inofensivo y repagina el EPUB entero: la página que anuncia la burbuja
+   de la barra deja de ser la página a la que se salta (progress-scrub.spec) y, de paso, el
+   PDF se re-ajusta. Por eso el respiro es solo lateral —el que sizeContainer ya deja— y aquí
+   únicamente se pinta: fondo, radio y sombra. */
+@media (min-width: 1001px) {
+  body.reading:not(.scroll-mode) .epub-container {
+    background: var(--page-bg, var(--surface-0));
+    border-radius: var(--r-lg);
+    box-shadow: var(--shadow-2);
+  }
+  /* En inmersivo la hoja ocupa todo: sin cromo alrededor, el marco sobra. */
+  body.reading.immersive:not(.scroll-mode) .epub-container { border-radius: 0; box-shadow: none; }
+}
+
+/* Entrada de capítulo (F4). La dispara fadeChapterIn() en js/epub-reader.js al
+   renderizarse una sección nueva; ahí están las exclusiones (giro de pantalla, swipe). */
+.epub-container.chapter-in { animation: chapter-in var(--dur-chapter) var(--ease-out-soft); }
+@keyframes chapter-in { from { opacity: 0.35; } to { opacity: 1; } }
 
 /* En PAGINADO la vista debe llenar el viewport (altura fija). En SCROLL debe conservar
    su altura de contenido (la que epub.js pone inline, p. ej. 1229px) para que el
@@ -980,7 +1084,7 @@ body:not(.scroll-mode) .epub-container .epub-view {
   flex-direction: column;
   z-index: 100;
   transform: translateX(100%);
-  transition: transform var(--transition-normal);
+  transition: transform var(--transition-panel);
 }
 
 body.ai-open #ai-panel { transform: translateX(0); }
@@ -2381,8 +2485,9 @@ body.ai-busy #ai-toggle::after, body.ai-busy .ai-fab::after {
 .icon-btn { border-radius: var(--r-sm); width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; }
 .nav-btn { border-radius: var(--r-sm); }
 
-/* Barra de progreso más fina y redondeada */
-.progress-container { height: 4px; border-radius: var(--r-pill); }
+/* Barra de progreso más fina y redondeada (la zona de pulsación NO se encoge: la
+   amplía .progress-container::before, que la extiende 8px arriba y abajo). */
+.progress-container { height: 3px; border-radius: var(--r-pill); }
 .progress-bar { border-radius: var(--r-pill); }
 
 /* Composer: input redondeado y separación */
@@ -3322,3 +3427,15 @@ body.region-selecting { user-select: none; }
 .ai-math math { color: inherit; }
 /* Antes de hidratar (o si Temml no llega) se ve el TeX ya legible, no `\cdot` crudo. */
 .ai-math:not([data-math-done]) { font-family: var(--font-mono, monospace); font-size: 0.95em; }
+
+/* ============================================================================
+   Movimiento reducido (F4)
+   Las animaciones nuevas son decorativas: con `prefers-reduced-motion` desaparecen
+   sin dejar el elemento a medio camino (por eso se anula también el `both` del
+   escalonado del índice, que si no lo dejaría en opacity:0 para siempre).
+   ========================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  .sidebar.open .toc-list a { animation: none; opacity: 1; transform: none; }
+  .epub-container.chapter-in { animation: none; }
+  .sidebar, #ai-panel, .reader-main { transition: none; }
+}

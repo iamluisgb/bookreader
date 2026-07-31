@@ -502,9 +502,27 @@ export async function load(arrayBuffer, onProgress) {
       } catch (e) { /* currentLocation not ready yet */ }
     }
     updateChapterInfo();
+    fadeChapterIn();
   });
 
   return book;
+}
+
+// Entrada de capítulo: un fundido corto al renderizarse una sección nueva (saltar desde
+// el índice, una cita, el teclado). Antes el cambio era un corte seco y se notaba barato.
+// Dos exclusiones, y son las que importan:
+//   - pinnedCfi != null → hay un giro/reflow en curso y 'rendered' se dispara por la
+//     REPAGINACIÓN, no por cambio de capítulo: fundir ahí es un parpadeo gratuito.
+//   - swipeBusy → el pase de página táctil ya tiene su propia animación de traslación;
+//     encadenar un fundido encima la ensucia.
+// Solo opacidad (nada de translate): mover el contenedor obligaría al iframe a repintar.
+function fadeChapterIn() {
+  if (pinnedCfi != null || swipeBusy) return;
+  const c = document.getElementById('epub-container');
+  if (!c) return;
+  c.classList.remove('chapter-in');
+  void c.offsetWidth;           // reinicia la animación al encadenar capítulos seguidos
+  c.classList.add('chapter-in');
 }
 
 function getThemeColors() {

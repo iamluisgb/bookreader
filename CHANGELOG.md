@@ -5,6 +5,38 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-07-31 — La página como objeto, el índice con jerarquía y el pie con capítulo
+
+Revisión de UI a partir de una crítica externa. De ocho propuestas se aplican cuatro; las otras
+cuatro se descartan o quedan pendientes de decisión, y el porqué está abajo.
+
+- **La página se lee como una hoja.** `sizeContainer()` ya limitaba el contenedor al ancho de
+  columna en escritorio, pero el viewport usaba el mismo color que la página, así que el libro se
+  fundía con el cromo. Ahora el viewport es el "escritorio" (`--desk`) y el contenedor lleva
+  fondo, radio y sombra. `--desk` se **deriva** de `--page-bg` con `color-mix`, así funciona igual
+  en claro, oscuro, sepia y con cualquier tinte de papel sin una tabla de colores paralela. Solo
+  ≥1001px (por debajo la página va a sangre y una tarjeta robaría línea de lectura) y nada de esto
+  toca el TAMAÑO del área de lectura: un inset vertical repagina el EPUB y desincroniza la burbuja
+  de la barra de progreso con el salto real (lo pilló `progress-scrub.spec`).
+- **El índice tiene tres niveles, no uno.** Era una lista plana donde la única señal de jerarquía
+  era la sangría. Ahora: cabecera de grupo (entrada con subentradas, clase `has-sub`), capítulo y
+  subentrada con punto guía, y aire entre grupos. El DOM no cambia —todo siguen siendo `<a>`—, así
+  que la marca de sección actual, la atenuación por relevancia y sus tests siguen igual.
+- **El pie dice dónde estás.** Antes: página, % y tiempo restante. Ahora el **capítulo** es la
+  información primaria y las cifras van juntas, atenuadas y en tabular-nums. El capítulo lo pone
+  `markCurrentToc()` reusando la entrada que ya resuelve para el índice: no hay un segundo cálculo
+  que pueda desincronizarse. Barra a 3px (la zona de pulsación no se encoge).
+- **Movimiento.** Fundido corto al renderizarse un capítulo nuevo (excluye giro de pantalla y
+  swipe, que ya tienen su animación), entrada escalonada del índice, y curva de salida suave
+  (`--transition-panel`) en drawers y panel del agente — con el lector empujando a la vez, que
+  antes saltaba de golpe por la derecha. Todo anulado bajo `prefers-reduced-motion`.
+
+**Descartado:** las citas con borde izquierdo verde (contradice el principio 6 de `DESIGN.md`, y
+el barrido que lo implantó es de este mismo día) y reducir los iconos de la barra superior (ya son
+cuatro más el logo, y el modo inmersivo los oculta). **Pendiente de decisión:** reservar el verde
+para IA/selección/progreso, que choca con "un solo acento en todos los componentes", y convertir
+el panel del agente en un *reading companion* con conceptos y preguntas del capítulo actual.
+
 ## 2026-07-31 — Fuera las barras de acento laterales
 
 Barrido completo: ninguna superficie marca estado con un `border-left`/`box-shadow inset` de

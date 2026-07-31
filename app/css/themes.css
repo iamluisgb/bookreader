@@ -37,8 +37,13 @@
 
   /* Motion */
   --ease: cubic-bezier(0.4, 0, 0.2, 1);
+  /* Salida suave (arranca rápido, frena largo) para lo que ENTRA en pantalla: drawers,
+     panel del agente, entrada de capítulo. Da sensación de peso sin rebote de muelle. */
+  --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
   --transition-fast: 0.15s var(--ease);
   --transition-normal: 0.25s var(--ease);
+  --transition-panel: 0.28s var(--ease-out-soft);
+  --dur-chapter: 0.18s;
 
   /* ---- Paleta CLARA (por defecto) — BLANCO neutro (no sepia) ----
      El tono cálido "papel" vive ahora en el tema Sepia; "Claro" es blanco puro con grises
@@ -47,6 +52,11 @@
   --surface-1: #ffffff;  /* barras / paneles */
   --surface-2: #ffffff;  /* tarjetas */
   --surface-3: #eef0f2;  /* hover / activo (gris neutro claro) */
+  /* "Escritorio": el fondo sobre el que reposa la página del libro. Se DERIVA del color
+     real de la página (--page-bg, que fija epub-reader según el tema) oscureciéndolo un
+     punto, así funciona igual en claro, oscuro, sepia y con cualquier tinte de papel sin
+     mantener una tabla de colores paralela. Ver .reader-viewport en main.css. */
+  --desk: color-mix(in srgb, var(--page-bg, var(--surface-0)) 90%, #0d1117);
   --text: #1f2328;
   --text-soft: #6b7280;
   --text-faint: #9aa1ab;
@@ -76,6 +86,7 @@
   --surface-1: #1a1f24;  /* fondo secundario */
   --surface-2: #232a31;  /* paneles / tarjetas */
   --surface-3: #2b333b;  /* hover / activo */
+  --desk: color-mix(in srgb, var(--page-bg, var(--surface-0)) 76%, #000);
   --text: #f2f3f5;
   --text-soft: #a8b0b8;
   --text-faint: #7b838c;
@@ -98,6 +109,7 @@
     --surface-1: #1a1f24;
     --surface-2: #232a31;
     --surface-3: #2b333b;
+    --desk: color-mix(in srgb, var(--page-bg, var(--surface-0)) 76%, #000);
     --text: #f2f3f5;
     --text-soft: #a8b0b8;
     --text-faint: #7b838c;

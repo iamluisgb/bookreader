@@ -1164,10 +1164,13 @@ async function loadPdfTOC() {
       a.style.opacity = '0.6';   // entrada sin destino resoluble
     }
     tocList.appendChild(a);
+    return a;
   };
   items.forEach(it => {
-    addLink(it, false);
-    (it.subitems || []).forEach(sub => addLink(sub, true));
+    const subs = it.subitems || [];
+    const a = addLink(it, false);
+    if (subs.length) a.classList.add('has-sub');   // cabecera de grupo (ver loadTOC)
+    subs.forEach(sub => addLink(sub, true));
   });
   markCurrentToc();
 }
@@ -1177,9 +1180,9 @@ async function loadPdfTOC() {
 // página actual o antes. Silencioso si el índice aún no está pintado.
 function markCurrentToc(scroll = false) {
   const tocList = document.getElementById('toc-list');
-  if (!tocList) return;
+  if (!tocList) return setFooterChapter(null);
   const links = [...tocList.querySelectorAll('a')];
-  if (!links.length) return;
+  if (!links.length) return setFooterChapter(null);
 
   let current = null;
   if (EpubReader.isLoaded()) {
@@ -1201,6 +1204,19 @@ function markCurrentToc(scroll = false) {
     else a.removeAttribute('aria-current');
   }
   if (scroll && current) current.scrollIntoView({ block: 'center' });
+  setFooterChapter(current);
+}
+
+// El pie del lector dice DÓNDE se está leyendo, no solo cuánto se lleva. Reusa la
+// entrada del índice que markCurrentToc() acaba de resolver: no hay una segunda forma
+// de calcular el capítulo que pueda desincronizarse de la marca del índice. Sin índice
+// (PDF escaneado sin outline) queda vacío y el pie se queda solo con las cifras.
+function setFooterChapter(link) {
+  const el = document.getElementById('progress-chapter');
+  if (!el) return;
+  const label = link ? (link.querySelector('.toc-label')?.textContent || '').trim() : '';
+  el.textContent = label;
+  el.title = label;   // el nombre completo cuando el truncado lo corta
 }
 
 // Fila del índice: etiqueta + número de página a la derecha. `page` null → solo la
@@ -1241,10 +1257,15 @@ function loadTOC() {
       await EpubReader.goTo(item.href);
     });
     tocList.appendChild(a);
+    return a;
   };
   nav.toc.forEach(item => {
-    addLink(item, false);
-    (item.subitems || []).forEach(sub => addLink(sub, true));
+    const subs = item.subitems || [];
+    // Una entrada con subentradas hace de cabecera de grupo en el índice (ver .has-sub
+    // en main.css): sigue siendo un enlace navegable, solo pesa más tipográficamente.
+    const a = addLink(item, false);
+    if (subs.length) a.classList.add('has-sub');
+    subs.forEach(sub => addLink(sub, true));
   });
   markCurrentToc();
 }
