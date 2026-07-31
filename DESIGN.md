@@ -21,6 +21,9 @@ poco cromo, foco en el contenido). **Mobile-first / PWA** como requisito de prim
 4. **Una sola lengua de diseño en 3 superficies**: lector · agente · libreta.
 5. **Responsive de verdad.** No "encoge el desktop": en móvil los paneles son *drawers/bottom
    sheets*, el lector ocupa toda la pantalla, navegación por gestos/tab inferior.
+6. **Nada de barras de acento laterales.** El estado (activo, actual, seleccionado) se
+   señala con fondo, color de texto y peso — nunca con un `border-left`/`box-shadow inset`
+   de acento pegado al borde.
 
 ---
 

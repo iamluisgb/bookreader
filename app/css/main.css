@@ -206,11 +206,9 @@ html, body {
   color: var(--text-soft);
 }
 
-/* Sección que se está leyendo: fondo suave + barra de acento a la izquierda. El
-   borde va como box-shadow inset para no descuadrar el padding de las demás filas. */
+/* Sección que se está leyendo: fondo suave y texto de acento, sin barra lateral. */
 .toc-list a.current {
   background: var(--accent-soft);
-  box-shadow: inset 3px 0 0 var(--accent);
   color: var(--accent-hover);
   font-weight: 600;
 }
