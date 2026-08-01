@@ -141,6 +141,9 @@ html, body {
    igual que el logo coloreado de Play Books entre iconos neutros. Mantiene el
    emerald también en hover (solo cambia el fondo). */
 .icon-btn.brand-btn, .icon-btn.brand-btn:hover { color: var(--accent); }
+/* El botón de marca lleva el imagotipo completo (tile + página + cinta), no un
+   glyph de línea: no hereda currentColor, sus colores vienen de --logo-*. */
+.icon-btn.brand-btn .brand-mark { display: block; }
 
 .primary-btn {
   background: var(--accent);

@@ -57,6 +57,11 @@
      punto, así funciona igual en claro, oscuro, sepia y con cualquier tinte de papel sin
      mantener una tabla de colores paralela. Ver .reader-viewport en main.css. */
   --desk: color-mix(in srgb, var(--page-bg, var(--surface-0)) 90%, #0d1117);
+  /* Imagotipo completo (botón "biblioteca"): tile oscuro sobre barra clara. En
+     oscuro se invierte, si no el tile se fundiría con la barra. La cinta usa
+     --accent, así que sigue al tema sola. */
+  --logo-tile: #111418;
+  --logo-page: #f8fafc;
   --text: #1f2328;
   --text-soft: #6b7280;
   --text-faint: #9aa1ab;
@@ -87,6 +92,8 @@
   --surface-2: #232a31;  /* paneles / tarjetas */
   --surface-3: #2b333b;  /* hover / activo */
   --desk: color-mix(in srgb, var(--page-bg, var(--surface-0)) 76%, #000);
+  --logo-tile: #f2f4f7;
+  --logo-page: #111418;
   --text: #f2f3f5;
   --text-soft: #a8b0b8;
   --text-faint: #7b838c;
@@ -110,6 +117,8 @@
     --surface-2: #232a31;
     --surface-3: #2b333b;
     --desk: color-mix(in srgb, var(--page-bg, var(--surface-0)) 76%, #000);
+    --logo-tile: #f2f4f7;
+    --logo-page: #111418;
     --text: #f2f3f5;
     --text-soft: #a8b0b8;
     --text-faint: #7b838c;

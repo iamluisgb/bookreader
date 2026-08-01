@@ -178,7 +178,8 @@
   <main id="reader-main" class="reader-main">
     <!-- Top bar -->
     <header id="reader-header" class="reader-header">
-      <button id="library-btn" class="icon-btn brand-btn" aria-label="Volver a la biblioteca" data-tip="Biblioteca" data-i18n-attrs="aria-label,data-tip" data-tip-align="left" data-icon="logo" style="display:none;"></button>
+      <!-- Imagotipo completo (con tile), no el glyph de línea: es el ancla de marca de la barra. -->
+      <button id="library-btn" class="icon-btn brand-btn" aria-label="Volver a la biblioteca" data-tip="Biblioteca" data-i18n-attrs="aria-label,data-tip" data-tip-align="left" style="display:none;"><svg class="brand-mark" viewBox="0 0 512 512" width="24" height="24" aria-hidden="true" focusable="false"><rect width="512" height="512" rx="118" fill="var(--logo-tile)"/><path d="M288 119 Q288 99 308 99 L396 99 Q416 99 416 119 L416 371 L352 323 L288 371 Z" fill="var(--accent)"/><path d="M98 90 L222 90 Q256 90 256 124 L256 470 C 249 442 233 424 206 414 C 177 403 140 401 100 401 Q64 401 64 365 L64 124 Q64 90 98 90 Z" fill="var(--logo-page)"/></svg></button>
       <button id="sidebar-toggle" class="icon-btn" aria-label="Abrir sidebar" data-tip="Panel" data-i18n-attrs="aria-label,data-tip" data-tip-align="left" data-icon="panel-left"></button>
       <div id="reader-title" class="reader-title">BookReader</div>
       <div class="header-actions">
