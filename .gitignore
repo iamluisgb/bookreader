@@ -17,3 +17,6 @@ evals/runs/
 
 # Estado local de wrangler (D1 local, caches del dev server)
 .wrangler/
+
+# Salida de build para Cloudflare Pages (scripts/build-pages.mjs)
+dist/
