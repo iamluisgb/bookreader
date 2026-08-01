@@ -851,6 +851,32 @@ const EN = {
   'Modo Estudiar': 'Study mode',
   '{n} pendiente{s}': '{n} due',
   'Mostrar respuesta': 'Show answer',
+  // P24 · Higiene de la sesión de repaso: deshacer, editar/suspender/borrar, tope de nuevas.
+  'Deshacer la última nota': 'Undo last rating',
+  'Editar la tarjeta': 'Edit card',
+  'Suspender: no volver a mostrarla': 'Suspend: stop showing this one',
+  'Reactivar: vuelve al repaso': 'Unsuspend: back into review',
+  'Borrar la tarjeta': 'Delete card',
+  'La has fallado {n} veces. Suele ser señal de que la tarjeta está mal formulada, no de que el tema sea difícil: edítala o suspéndela.':
+    'You’ve missed it {n} times. That usually means the card is badly written, not that the topic is hard: edit it or suspend it.',
+  'Frase con huecos': 'Sentence with blanks',
+  'Pregunta': 'Question',
+  'Se borrará esta tarjeta del mazo. No afecta al resto del repaso.':
+    'This card will be deleted from the deck. The rest of the review is unaffected.',
+  'Borrar tarjeta': 'Delete card',
+  'Quedan <b>{n}</b> tarjeta{s} nueva{s} fuera del tope de hoy.':
+    '<b>{n}</b> new card{s} left out by today’s limit.',
+  'Seguir con {n} nueva{s}': 'Continue with {n} new',
+  'Tarjetas nuevas por sesión': 'New cards per session',
+  'Sin tope': 'No limit',
+  'Tope de tarjetas SIN estrenar que entran en cada repaso. Las que ya llevas empezadas entran siempre: el tope solo evita que un mazo recién generado te ponga 90 tarjetas el primer día.':
+    'How many never-seen cards enter each review. Cards already in progress always come up: the limit only stops a freshly generated deck from throwing 90 cards at you on day one.',
+  '{n} suspendidas': '{n} suspended',
+  'Ya tienes un mazo de este contenido ({n} tarjetas). Añádele solo lo que salga nuevo en vez de crear otro.':
+    'You already have a deck for this content ({n} cards). Add only what’s new to it instead of creating another.',
+  'Añadidas {a} tarjetas nuevas al mazo': 'Added {a} new cards to the deck',
+  '{n} descartadas por repetidas': '{n} dropped as duplicates',
+  'No salió ninguna tarjeta que no tuvieras ya en este mazo.': 'Nothing came out that wasn’t already in this deck.',
   'espacio': 'space',
   '{n}a': '{n}y',
   '> {text}\n\n**P:** {q}\n**R:** _(escribe tu respuesta)_': '> {text}\n\n**Q:** {q}\n**A:** _(write your answer)_',

@@ -89,7 +89,7 @@ test('SM-2: isDue/dueCount/deckStats y previews de intervalo', async ({ page }) 
 
   expect(r.due).toBe(3);
   expect(r.dueFlags).toEqual([true, true, false, true]);
-  expect(r.stats).toEqual({ total: 4, nuevas: 1, aprendiendo: 1, maduras: 2, due: 3 });
+  expect(r.stats).toEqual({ total: 4, nuevas: 1, aprendiendo: 1, maduras: 2, due: 3, suspendidas: 0 });
   expect(r.prev.again).toBe(0);
   expect(r.prev.good).toBe(1);                            // nueva + bien = 1d
   expect(r.prev.easy).toBeGreaterThan(r.prev.good);
@@ -119,4 +119,91 @@ test('racha: suma en días consecutivos, es idempotente hoy y se rompe con hueco
   expect(r.alive).toBe(3);
   expect(r.broken).toBe(0);
   expect(r.restart).toBe(1);
+});
+
+// ---- P24 · Suspensión y leeches -------------------------------------------------
+
+test('suspendida: fuera de la cola y en su propio cubo de stats; leech a partir de 8 fallos', async ({ page }) => {
+  await page.goto('/index.html');
+  const r = await page.evaluate(async (t0) => {
+    const S: any = await import('/js/ai/srs.js');
+    const today = S.dayOf(t0);
+    const vencida = (extra = {}) => ({
+      front: 'x', srs: { reps: 3, lapses: 0, ease: 2.5, interval: 5, due: today - 1, lastReview: 0 }, ...extra,
+    });
+    const cards = [
+      vencida(),                                   // vencida normal
+      vencida({ suspended: true }),                // vencida pero suspendida → no toca
+      { front: 'nueva', suspended: true },         // nueva suspendida → tampoco
+    ];
+    const leech = { front: 'l', srs: { reps: 0, lapses: 8, ease: 1.3, interval: 0, due: today, lastReview: 0 } };
+    return {
+      due: S.dueCount(cards, t0),
+      stats: S.deckStats(cards, t0),
+      leech: S.isLeech(leech),
+      casi: S.isLeech({ front: 'l', srs: { ...leech.srs, lapses: 7 } }),
+      suspendidoNoEsLeech: S.isLeech({ ...leech, suspended: true }),
+      umbral: S.LEECH_LAPSES,
+    };
+  }, new Date('2026-07-08T12:00:00').getTime());
+
+  expect(r.due).toBe(1);                                    // solo la que no está suspendida
+  expect(r.stats).toEqual({ total: 3, nuevas: 0, aprendiendo: 1, maduras: 0, due: 1, suspendidas: 2 });
+  expect(r.leech).toBe(true);
+  expect(r.casi).toBe(false);                               // 7 fallos aún no es leech
+  expect(r.suspendidoNoEsLeech).toBe(false);                // ya está fuera: no hay nada que avisar
+  expect(r.umbral).toBe(8);
+});
+
+// ---- P24 F1 · Orden de la sesión (buildQueue, pura) -----------------------------
+
+test('buildQueue: tope de nuevas, barajado y hermanas separadas', async ({ page }) => {
+  await page.goto('/index.html');
+  const r = await page.evaluate(async (t0) => {
+    const St: any = await import('/js/ai/study.js');
+    const today = (await import('/js/ai/srs.js') as any).dayOf(t0);
+    // rng determinista (LCG): el barajado tiene que ser testeable, no "a ver qué sale".
+    let seed = 42;
+    const rng = () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;
+
+    const nuevas = Array.from({ length: 30 }, (_, i) => ({ type: 'basic', front: 'n' + i, back: 'b' }));
+    const repasos = Array.from({ length: 5 }, (_, i) => ({
+      type: 'basic', front: 'r' + i, back: 'b',
+      srs: { reps: 3, lapses: 0, ease: 2.5, interval: 5, due: today - 1, lastReview: 0 },
+    }));
+    const deck = { id: 1, name: 'D', cards: [...repasos, ...nuevas] };
+
+    const capped = St.buildQueue([deck], { now: t0, newLimit: 20, rng });
+    const sinTope = St.buildQueue([deck], { now: t0, newLimit: 0, rng });
+
+    // Hermanas: 4 tarjetas del MISMO pasaje entre otras de pasajes distintos.
+    const sibs = {
+      id: 2, name: 'S', cards: [
+        ...Array.from({ length: 4 }, (_, i) => ({ type: 'cloze', front: 's' + i, src: 'a1' })),
+        ...Array.from({ length: 4 }, (_, i) => ({ type: 'cloze', front: 'o' + i, src: 'a' + (i + 2) })),
+      ],
+    };
+    const sq = St.buildQueue([sibs], { now: t0, newLimit: 0, rng }).queue;
+    let adyacentes = 0;
+    for (let i = 1; i < sq.length; i++) if (sq[i].src && sq[i].src === sq[i - 1].src) adyacentes++;
+
+    const fronts = (q) => q.map(e => deck.cards[e.idx].front);
+    return {
+      cappedLen: capped.queue.length, held: capped.held.length,
+      // El tope recorta NUEVAS, nunca repasos: los 5 repasos siguen enteros.
+      repasosEnCola: fronts(capped.queue).filter(f => f.startsWith('r')).length,
+      heldSonNuevas: capped.held.every(e => deck.cards[e.idx].front.startsWith('n')),
+      sinTopeLen: sinTope.queue.length,
+      barajada: fronts(sinTope.queue).join() !== fronts(sinTope.queue.slice().sort((a, b) => a.idx - b.idx)).join(),
+      adyacentes,
+    };
+  }, new Date('2026-07-08T12:00:00').getTime());
+
+  expect(r.cappedLen).toBe(25);            // 5 repasos + 20 nuevas
+  expect(r.held).toBe(10);                 // las 10 nuevas que no entraron
+  expect(r.repasosEnCola).toBe(5);
+  expect(r.heldSonNuevas).toBe(true);
+  expect(r.sinTopeLen).toBe(35);
+  expect(r.barajada).toBe(true);
+  expect(r.adyacentes).toBe(0);            // ninguna pareja del mismo pasaje seguida
 });

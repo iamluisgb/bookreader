@@ -1867,6 +1867,12 @@ body.has-taskchip .ai-taskchip.is-study { bottom: 74px; }
 .fc-type small { display: block; font-size: 12px; color: var(--text-soft); line-height: 1.35; margin-top: 2px; }
 #fc-generate { width: 100%; margin-top: 20px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
 .fc-error { color: var(--danger, #e5484d); font-size: 13px; margin-top: 12px; }
+/* Aviso de mazo ya existente para este alcance (P24 F4): casilla marcada por defecto. */
+.fc-dup {
+  display: flex; gap: 9px; align-items: flex-start; margin-top: 12px;
+  font-size: 12.5px; line-height: 1.45; color: var(--text-soft); cursor: pointer;
+}
+.fc-dup input { margin-top: 2px; accent-color: var(--accent); flex: none; }
 .fc-deck {
   display: flex; align-items: center; gap: 8px;
   background: var(--surface-0); border: 1px solid var(--border); border-radius: var(--r-md);
@@ -1880,6 +1886,10 @@ body.has-taskchip .ai-taskchip.is-study { bottom: 74px; }
   display: flex; gap: 8px; align-items: flex-start;
   background: var(--surface-0); border: 1px solid var(--border); border-radius: var(--r-md); padding: 12px;
 }
+/* Suspendida: sigue en el mazo (y en el export a Anki) pero fuera de la rotación. Se
+   apaga en vez de tacharse — el texto hay que poder leerlo para decidir si arreglarla. */
+.fc-item.is-suspended { background: var(--surface-2); }
+.fc-item.is-suspended .fc-item-fields { opacity: 0.5; }
 .fc-item-fields { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
 .fc-front, .fc-back { font-size: 14px; line-height: 1.45; border-radius: var(--r-sm); padding: 2px 4px; }
 .fc-front { font-weight: 600; }
@@ -1913,6 +1923,12 @@ body.has-taskchip .ai-taskchip.is-study { bottom: 74px; }
 .study-head { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; padding-right: 44px; }
 .study-title { font-size: 15px; font-weight: 700; }
 .study-left { font-size: 13px; color: var(--text-soft); }
+/* Acciones sobre la tarjeta actual (editar/suspender/borrar) + deshacer: a la derecha
+   del contador, pegadas al aspa. Discretas hasta que se pasa por encima: son el arreglo,
+   no el camino principal. */
+.study-tools { display: flex; gap: 2px; margin-left: auto; }
+.study-tool { opacity: 0.55; }
+.study-tool:hover { opacity: 1; }
 .study-body {
   flex: 1; min-height: 0; overflow-y: auto;
   display: flex; flex-direction: column; justify-content: center; gap: 14px;
@@ -1932,6 +1948,18 @@ body.has-taskchip .ai-taskchip.is-study { bottom: 74px; }
 }
 .study-cloze.is-revealed { background: var(--accent-soft); }
 .study-extra { font-size: 14px; color: var(--text-soft); margin-top: 12px; }
+/* Aviso de leech: informativo, no alarmante — la acción está en la barra de arriba. */
+.study-leech {
+  display: flex; align-items: flex-start; gap: 8px; text-align: left;
+  font-size: 12.5px; line-height: 1.45; color: var(--text-soft);
+  background: var(--surface-3); border-radius: var(--r-sm); padding: 8px 10px;
+}
+.study-leech svg { flex: none; margin-top: 1px; }
+/* Editor inline de la tarjeta: mismos campos que la vista de revisión. */
+.study-edit { text-align: left; display: flex; flex-direction: column; gap: 4px; }
+.study-edit .fc-label { margin-top: 8px; }
+.study-editbar { display: flex; gap: 8px; justify-content: flex-end; }
+.study-held { font-size: 13px; color: var(--text-soft); }
 /* F3 · El pasaje del libro que respalda la tarjeta, para releerlo sin salir del repaso. */
 .study-passage {
   margin: 16px 0 0; padding: 10px 14px;
@@ -1948,12 +1976,12 @@ body.has-taskchip .ai-taskchip.is-study { bottom: 74px; }
   border: 1px solid currentColor; border-radius: 4px; padding: 1px 6px;
 }
 .study-src {
-  display: inline-flex; align-items: center; gap: 7px; margin: 0 auto 10px;
+  display: inline-flex; align-items: center; gap: 7px; margin: 0 auto 2px;   /* +8px del gap del pie */
   border: none; background: none; color: var(--accent); font-family: inherit;
   font-size: 13px; font-weight: 600; cursor: pointer; padding: 4px 8px; border-radius: var(--r-sm);
 }
 .study-src:hover { background: var(--accent-soft); }
-.study-foot { display: flex; flex-direction: column; }
+.study-foot { display: flex; flex-direction: column; gap: 8px; }
 .study-grades { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
 .study-grade {
   display: flex; flex-direction: column; align-items: center; gap: 2px;

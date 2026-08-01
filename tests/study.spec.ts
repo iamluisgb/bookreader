@@ -37,25 +37,30 @@ test('estantería → chip Repasar hoy → sesión completa con persistencia SRS
   await expect(chip).toContainText('Repasar hoy · 2');
   await chip.click();
 
-  // Tarjeta 1: frente visible, respuesta oculta hasta voltear.
+  // Tarjeta 1: frente visible, respuesta oculta hasta voltear. CUÁL sale primero es
+  // aleatorio desde P24 (la cola se baraja), así que el test se guía por lo que hay en
+  // pantalla en vez de por el orden del mazo.
+  const ANSWERS = { '¿Qué es Raft?': 'Un algoritmo de consenso.', '¿Qué es BM25?': 'Un ranking léxico.' };
   const overlay = page.locator('#ai-study');
   await expect(overlay.locator('.study-left')).toHaveText('2 pendientes');
-  await expect(overlay.locator('.study-q')).toHaveText('¿Qué es Raft?');
+  const first = (await overlay.locator('.study-q').textContent())!.trim();
+  expect(Object.keys(ANSWERS)).toContain(first);
   await expect(overlay.locator('.study-a')).toBeHidden();
   await overlay.locator('.study-flip').click();
-  await expect(overlay.locator('.study-a')).toHaveText('Un algoritmo de consenso.');
+  await expect(overlay.locator('.study-a')).toHaveText(ANSWERS[first]);
   await expect(overlay.locator('.study-grade')).toHaveCount(4);
   // Los botones anuncian el intervalo previsto (tarjeta nueva: bien = 1d).
   await expect(overlay.locator('.study-grade.is-good small')).toHaveText('1d');
   await overlay.locator('.study-grade.is-good').click();
 
   // Tarjeta 2 por teclado: espacio voltea, "1" = otra vez → se re-encola…
-  await expect(overlay.locator('.study-q')).toHaveText('¿Qué es BM25?');
+  const second = (await overlay.locator('.study-q').textContent())!.trim();
+  expect(second).not.toBe(first);
   await page.keyboard.press(' ');
   await expect(overlay.locator('.study-a')).toBeVisible();
   await page.keyboard.press('1');
   // …y vuelve a aparecer; esta vez "bien" (tecla 3).
-  await expect(overlay.locator('.study-q')).toHaveText('¿Qué es BM25?');
+  await expect(overlay.locator('.study-q')).toHaveText(second);
   await page.keyboard.press(' ');
   await page.keyboard.press('3');
 
@@ -69,12 +74,12 @@ test('estantería → chip Repasar hoy → sesión completa con persistencia SRS
   // Persistencia: el SRS quedó guardado en IndexedDB (reps ≥ 1, due a futuro; el lapse
   // de "otra vez" quedó registrado) y la futura sigue intacta.
   const decks = await page.evaluate(async () => (await import('/js/ai/db.js') as any).getAllDecks());
-  const cards = decks[0].cards;
-  expect(cards[0].srs.reps).toBe(1);
-  expect(cards[0].srs.due).toBe(today + 1);
-  expect(cards[1].srs.reps).toBe(1);
-  expect(cards[1].srs.lapses).toBe(1);
-  expect(cards[2].srs.due).toBe(today + 5);
+  const byFront = Object.fromEntries(decks[0].cards.map((c: any) => [c.front, c]));
+  expect(byFront[first].srs.reps).toBe(1);
+  expect(byFront[first].srs.due).toBe(today + 1);
+  expect(byFront[second].srs.reps).toBe(1);
+  expect(byFront[second].srs.lapses).toBe(1);
+  expect(byFront['futura'].srs.due).toBe(today + 5);
 
   // Sin vencidas → el chip desaparece de la estantería.
   await expect(page.locator('.lib-study-chip')).toHaveCount(0);
@@ -137,10 +142,9 @@ test('al voltear, "Ver en el libro" abre el libro de origen por deep-link', asyn
     await DB.put('anchors', { bookId: 'bk-src', entries: [['a7', { cfi: null, href: 'cap1.xhtml', chapter: 'I' }]] });
     await DB.addDeck({
       bookId: 'bk-src', name: 'Libro fuente', cardType: 'basic', scope: '',
-      cards: [
-        { type: 'basic', front: 'con fuente', back: 'r', chapter: 'I', src: 'a7' },
-        { type: 'basic', front: 'sin fuente', back: 'r', chapter: '' },
-      ],
+      // Una sola tarjeta: la cola se baraja (P24), así que un mazo de dos no garantiza
+      // cuál sale primero. La tarjeta SIN fuente tiene su propio test más abajo.
+      cards: [{ type: 'basic', front: 'con fuente', back: 'r', chapter: 'I', src: 'a7' }],
     });
   }, epubBytes);
   await page.reload();
@@ -166,17 +170,18 @@ test('al voltear, "Ver en el libro" abre el libro de origen por deep-link', asyn
   await expect(overlay.locator('.study-a')).toBeVisible();
   await expect(chip).toHaveCount(0);
   await overlay.locator('.ai-ob-close').click();
+});
 
-  // La tarjeta SIN src no ofrece el salto. (La primera sigue vencida: saltar al libro
-  // no la evalúa; se supera con "bien" para llegar a la segunda.)
-  await page.evaluate(async () => (await import('/js/ai/study.js') as any).openToday());
-  const again = page.locator('#ai-study');
-  await expect(again.locator('.study-q')).toHaveText('con fuente');
-  await page.keyboard.press(' ');
-  await page.keyboard.press('3');
-  await expect(again.locator('.study-q')).toHaveText('sin fuente');
-  await again.locator('.study-flip').click();
-  await expect(again.locator('.study-src')).toHaveCount(0);
+test('una tarjeta sin fuente no ofrece el salto al libro', async ({ page }) => {
+  await page.goto('/index.html');
+  await seedProLicense(page);
+  await seed(page, [{ type: 'basic', front: 'sin fuente', back: 'r', chapter: '' }]);
+  await page.reload();
+  await page.locator('.lib-study-chip').click();
+  const overlay = page.locator('#ai-study');
+  await overlay.locator('.study-flip').click();
+  await expect(overlay.locator('.study-a')).toBeVisible();
+  await expect(overlay.locator('.study-src')).toHaveCount(0);
 });
 
 // ---- P20 F3 · El pasaje citado, dentro de la tarjeta ------------------------------
@@ -222,4 +227,98 @@ test('sin libro segmentado no se inventa cita ni se rompe el volteo', async ({ p
   await overlay.locator('.study-flip').click();
   await expect(overlay.locator('.study-a')).toContainText('r');
   await expect(overlay.locator('.study-passage')).toHaveCount(0);
+});
+
+// ---- P24 F2/F3 · Deshacer y arreglar la tarjeta sin salir de la sesión -----------
+
+test('deshacer devuelve la tarjeta a la cola y su estado SRS anterior', async ({ page }) => {
+  await page.goto('/index.html');
+  await seedProLicense(page);
+  await seed(page, [{ type: 'basic', front: 'única', back: 'r', chapter: '' }]);
+  await page.reload();
+  await page.locator('.lib-study-chip').click();
+
+  const overlay = page.locator('#ai-study');
+  // Nada que deshacer todavía: el botón no está.
+  await expect(overlay.locator('.study-tools [data-act="undo"]')).toHaveCount(0);
+  await overlay.locator('.study-flip').click();
+  await overlay.locator('.study-grade.is-easy').click();          // "fácil" por error: se va a meses
+  await expect(overlay.locator('.study-end h2')).toBeVisible();
+
+  await overlay.locator('.study-tools [data-act="undo"]').click();
+  // Vuelve a estar en la cola y VUELVE A SER NUEVA (el srs se borra, no se "des-agenda").
+  await expect(overlay.locator('.study-q')).toHaveText('única');
+  await expect(overlay.locator('.study-left')).toHaveText('1 pendiente');
+  const card = await page.evaluate(async () => {
+    const decks = await (await import('/js/ai/db.js') as any).getAllDecks();
+    return decks[0].cards[0];
+  });
+  expect(card.srs).toBeUndefined();
+
+  // Y ahora la nota correcta, que sí se persiste.
+  await overlay.locator('.study-flip').click();
+  await overlay.locator('.study-grade.is-again').click();
+  const after = await page.evaluate(async () => {
+    const decks = await (await import('/js/ai/db.js') as any).getAllDecks();
+    return decks[0].cards[0].srs;
+  });
+  expect(after.lapses).toBe(1);
+});
+
+test('editar, suspender y borrar la tarjeta durante el repaso', async ({ page }) => {
+  await page.goto('/index.html');
+  await seedProLicense(page);
+  await seed(page, [
+    { type: 'basic', front: 'mala', back: 'r', chapter: '' },
+    { type: 'basic', front: 'peor', back: 'r', chapter: '' },
+    { type: 'basic', front: 'tercera', back: 'r', chapter: '' },
+  ]);
+  await page.reload();
+  await page.locator('.lib-study-chip').click();
+  const overlay = page.locator('#ai-study');
+
+  // 1) Editar: se corrige el frente sin salir y la tarjeta sigue en la cola.
+  const primera = (await overlay.locator('.study-q').textContent())!.trim();
+  await overlay.locator('.study-tools [data-act="edit"]').click();
+  await overlay.locator('.study-edit-f').fill('corregida');
+  await overlay.locator('.study-edit-save').click();
+  await expect(overlay.locator('.study-q')).toHaveText('corregida');
+  await expect(overlay.locator('.study-left')).toHaveText('3 pendientes');
+
+  // 2) Suspender: sale de la cola en el acto (quedan 2).
+  await overlay.locator('.study-tools [data-act="suspend"]').click();
+  await expect(overlay.locator('.study-left')).toHaveText('2 pendientes');
+  await expect(overlay.locator('.study-q')).not.toHaveText('corregida');
+
+  // 3) Borrar: pide confirmación y deja la cola en 1.
+  const segunda = (await overlay.locator('.study-q').textContent())!.trim();
+  await overlay.locator('.study-tools [data-act="delete"]').click();
+  await page.locator('.dlg-ok').click();
+  await expect(overlay.locator('.study-left')).toHaveText('1 pendiente');
+
+  // Persistencia: la editada guarda su texto y su suspensión; la borrada es tombstone.
+  const cards = await page.evaluate(async () => {
+    const decks = await (await import('/js/ai/db.js') as any).getAllDecks();
+    return decks[0].cards;
+  });
+  const editada = cards.find((c: any) => c.front === 'corregida');
+  expect(editada.suspended).toBe(true);
+  expect(cards.find((c: any) => c.front === primera)).toBeUndefined();   // ya no existe con el viejo
+  expect(cards.find((c: any) => c.front === segunda)).toBeUndefined();   // borrada
+  expect(cards.filter((c: any) => c.deleted).length).toBe(1);
+
+  // La suspendida se puede reactivar desde la revisión del mazo (no es un viaje de ida).
+  await overlay.locator('.ai-ob-close').click();
+  await page.evaluate(async () => {
+    const DB: any = await import('/js/ai/db.js');
+    const Fc: any = await import('/js/ai/flashcards.js');
+    Fc.open({ bookId: 'bk-study', bookTitle: 'Libro de prueba', goal: '', tocLabels: [], ensureIndex: () => {} });
+    await new Promise(r => setTimeout(r, 50));
+    const deck = (await DB.getDecks('bk-study'))[0];
+    return deck.id;
+  });
+  await page.locator('.fc-deck [data-act="review"]').click();
+  await expect(page.locator('.fc-item.is-suspended')).toHaveCount(1);
+  await page.locator('.fc-item.is-suspended .fc-susp').click();
+  await expect(page.locator('.fc-item.is-suspended')).toHaveCount(0);
 });

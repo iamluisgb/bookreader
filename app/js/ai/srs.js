@@ -19,6 +19,10 @@ const FIRST_INTERVAL = 1;     // días tras el primer "bien"
 const SECOND_INTERVAL = 6;    // días tras el segundo
 const MAX_INTERVAL = 365;     // techo: nunca agendar a más de un año
 
+// Fallos a partir de los cuales una tarjeta es un "leech" (mismo umbral que Anki, que ya
+// exportamos en la config del .apkg: ver anki-export.js `leechFails`).
+export const LEECH_LAPSES = 8;
+
 // Día de calendario local (días desde epoch, cortando a medianoche local).
 export function dayOf(ts) {
   const d = new Date(ts);
@@ -30,10 +34,19 @@ export function newState(now = Date.now()) {
 }
 
 // ¿La tarjeta toca hoy? Las nuevas (sin srs) siempre tocan. Una tarjeta borrada
-// (tombstone que aún viaja por el sync) no toca nunca.
+// (tombstone que aún viaja por el sync) o SUSPENDIDA no toca nunca.
 export function isDue(card, now = Date.now()) {
-  if (!card || card.deleted) return false;
+  if (!card || card.deleted || card.suspended) return false;
   return !card.srs || card.srs.due <= dayOf(now);
+}
+
+// ¿Tarjeta "leech" (fallada una y otra vez)? En Anki el leech suele ser material difícil;
+// aquí las tarjetas las escribe un LLM, así que lo más probable es que esté MAL FORMULADA
+// —ambigua, con dos preguntas dentro, o con una respuesta que no está en el pasaje—. Por
+// eso el repaso no la suspende solo: la señala y ofrece editarla, que es el arreglo real.
+export function isLeech(card) {
+  if (!card || card.deleted || card.suspended) return false;
+  return (card.srs?.lapses || 0) >= LEECH_LAPSES;
 }
 
 export function dueCount(cards, now = Date.now()) {
@@ -111,12 +124,15 @@ export function currentStreak(streak, now = Date.now()) {
 }
 
 // Desglose nuevas / aprendiendo / maduras (madura = intervalo ≥ 21d, criterio Anki).
+// Las suspendidas van a su propio cubo: siguen existiendo (se pueden reactivar y se
+// exportan a Anki) pero no son ni nuevas ni maduras, están fuera de la rotación.
 export function deckStats(cards, now = Date.now()) {
-  const st = { total: 0, nuevas: 0, aprendiendo: 0, maduras: 0, due: 0 };
+  const st = { total: 0, nuevas: 0, aprendiendo: 0, maduras: 0, due: 0, suspendidas: 0 };
   for (const c of cards || []) {
     if (!c || c.deleted) continue;             // tombstone: no cuenta en el desglose
     st.total++;
-    if (!c.srs || c.srs.reps === 0) st.nuevas++;
+    if (c.suspended) st.suspendidas++;
+    else if (!c.srs || c.srs.reps === 0) st.nuevas++;
     else if (c.srs.interval >= 21) st.maduras++;
     else st.aprendiendo++;
     if (isDue(c, now)) st.due++;

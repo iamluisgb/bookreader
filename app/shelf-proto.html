@@ -1,0 +1,202 @@
+<!doctype html><meta charset="utf-8"><title>proto estantería v3 — portadas reales</title>
+<style>
+:root{--paper:#e9e3d8;--ink:#191713;--soft:#6d6353}
+*{box-sizing:border-box}
+body{margin:0;background:#0e0e0d;font-family:ui-sans-serif,system-ui,sans-serif}
+.stage{position:relative;background:
+   radial-gradient(120% 80% at 50% 0%, #f3eee4 0%, var(--paper) 55%, #ded6c8 100%);
+  border-radius:14px;margin:16px;padding:28px;min-height:660px;display:flex;flex-direction:column;overflow:hidden}
+.stage::after{content:"";position:absolute;inset:0;pointer-events:none;opacity:.5;mix-blend-mode:multiply;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/><feColorMatrix type='saturate' values='0'/></filter><rect width='140' height='140' filter='url(%23n)' opacity='.16'/></svg>")}
+.eyebrow{font:600 10px/1 ui-sans-serif;letter-spacing:.16em;text-transform:uppercase;color:var(--soft);position:relative;z-index:2}
+
+.scene{flex:1;display:flex;align-items:center;justify-content:flex-start;padding-left:40px;
+  perspective:1700px;perspective-origin:36% 44%}
+.shelf{position:relative;display:flex;align-items:flex-end;transform-style:preserve-3d;
+  transform:rotateX(5deg) rotateY(-24deg) translateX(var(--shift,0px));
+  transition:transform .55s cubic-bezier(.22,.9,.28,1)}
+.shelf::after{content:"";position:absolute;left:-18px;right:-30px;bottom:0;height:120px;
+  transform:rotateX(90deg);transform-origin:bottom center;
+  background:radial-gradient(50% 60% at 50% 92%, rgba(52,38,18,.55), rgba(52,38,18,.18) 45%, rgba(52,38,18,0) 78%);
+  filter:blur(10px)}
+
+.book{position:relative;transform-style:preserve-3d;cursor:pointer;
+  transition:transform .55s cubic-bezier(.22,.9,.28,1);margin-right:1px}
+
+/* ---------- LOMO ----------
+   El fondo NO es un color inventado: es la COLUMNA IZQUIERDA de la portada real, estirada.
+   Una sobrecubierta de verdad envuelve el libro, así que el lomo continúa el diseño de la
+   tapa — si la portada se oscurece hacia abajo, el lomo también. Encima va el sombreado
+   cilíndrico (un lomo es curvo: sombra en los dos cantos, luz cerca del izquierdo). */
+.spine{position:absolute;inset:0;border-radius:2px 1px 1px 2px;overflow:hidden;
+  background-size:100% 100%;background-repeat:no-repeat;
+  display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:12px 0}
+.spine::after{content:"";position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(90deg, rgba(0,0,0,.5) 0%, rgba(255,255,255,.20) 13%, rgba(255,255,255,.06) 40%,
+                              rgba(0,0,0,.12) 70%, rgba(0,0,0,.5) 100%)}
+.spine-t{writing-mode:vertical-rl;transform:rotate(180deg);
+  font:500 11px/1 Georgia,serif;letter-spacing:.05em;white-space:nowrap;overflow:hidden;
+  max-height:58%;text-overflow:ellipsis;position:relative;z-index:2}
+.spine-a{writing-mode:vertical-rl;transform:rotate(180deg);
+  font:400 7.5px/1 Georgia,serif;letter-spacing:.04em;white-space:nowrap;opacity:.85;
+  max-height:30%;overflow:hidden;text-overflow:ellipsis;position:relative;z-index:2}
+/* Filete: el hilo horizontal que separa título de autor en casi cualquier lomo real. */
+.spine-r{height:1px;width:56%;flex:none;position:relative;z-index:2}
+
+/* CANTO SUPERIOR: solo en el libro sacado (con la cámara a 5º, el de los que siguen en fila
+   no aporta y se proyectaba por encima de los vecinos). */
+.top{position:absolute;left:0;top:0;width:100%;transform-origin:top center;transform:rotateX(-90deg);
+  background:linear-gradient(180deg, rgba(40,30,14,.5) 0%, rgba(40,30,14,.15) 45%, rgba(40,30,14,.6) 100%),
+             repeating-linear-gradient(90deg,#ded5c0 0 1px,#cec3a8 1px 2px);
+  box-shadow:inset 0 0 10px rgba(70,54,28,.6)}
+.book:not(.sel) .top{display:none}
+
+/* ---------- PORTADA REAL ---------- */
+.front{position:absolute;top:0;left:100%;transform-origin:left center;transform:rotateY(90deg);
+  border-radius:0 3px 3px 0;overflow:hidden;background:#2a2622}
+.front img{width:100%;height:100%;object-fit:cover;display:block}
+/* Bisagra: junto al lomo la tapa se curva y queda en sombra. Sin esto la portada parece
+   una pegatina plana. Y un barniz suave en diagonal, que es como refleja una tapa real. */
+.front::after{content:"";position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(90deg, rgba(0,0,0,.55) 0%, rgba(0,0,0,.16) 7%, rgba(0,0,0,0) 18%),
+             linear-gradient(112deg, rgba(255,255,255,.16) 0%, rgba(255,255,255,0) 38%)}
+/* Cerrado en fila: no se ve la tapa, se ve el CORTE DE PÁGINAS, y en sombra. */
+.book:not(.sel):not(:last-child) .front{display:none}
+.book:not(.sel) .front img{opacity:0}
+.book:not(.sel) .front{
+  background:repeating-linear-gradient(180deg,#e6ddc8 0 2px,#d7ccb1 2px 3px)}
+.book:not(.sel) .front::after{
+  background:linear-gradient(90deg, rgba(48,38,20,.9) 0%, rgba(48,38,20,.35) 30%, rgba(48,38,20,.12) 70%, rgba(48,38,20,.4) 100%),
+             linear-gradient(0deg, rgba(60,46,24,.5), rgba(60,46,24,0) 25%)}
+.book.sel{z-index:5}
+
+.meta{max-width:560px;position:relative;z-index:2}
+/* NAVEGACIÓN. Sin esto la vista tiene un CALLEJÓN SIN SALIDA: al elegir el último libro los
+   anteriores quedan fuera del recorte y ya no hay nada que pulsar para volver. Anclar el
+   elegido al margen izquierdo —que es lo que evita que su tapa tape a los vecinos— obliga a
+   dar una forma de moverse que no sea "pulsar el libro de al lado". */
+.nav{position:relative;z-index:3;display:flex;align-items:center;gap:14px;margin-top:20px}
+.nav button{width:40px;height:40px;flex:none;border-radius:50%;border:1px solid rgba(60,50,30,.32);
+  background:transparent;color:var(--ink);cursor:pointer;font-size:15px;line-height:1;
+  display:flex;align-items:center;justify-content:center;transition:background .2s,opacity .2s}
+.nav button:hover:not(:disabled){background:rgba(60,50,30,.09)}
+.nav button:disabled{opacity:.28;cursor:default}
+/* Regleta: además de decir dónde estás, cada marca es un destino pulsable. */
+.scrub{flex:1;display:flex;align-items:center;height:40px}
+.scrub i{flex:1;height:14px;border:0;background:none;cursor:pointer;position:relative}
+.scrub i::after{content:"";position:absolute;left:0;top:6px;width:100%;height:1px;background:rgba(60,50,30,.3)}
+.scrub i.on::after{top:0;height:14px;width:2px;background:var(--ink)}
+.num{font:500 10px/1 ui-sans-serif;color:var(--soft);letter-spacing:.14em}
+.title{font:400 clamp(28px,5.4vw,52px)/1.04 Georgia,serif;color:var(--ink);margin:12px 0 8px;letter-spacing:-.01em}
+.author{font:italic 400 14px/1 Georgia,serif;color:var(--soft)}
+</style>
+<div class="stage">
+  <div class="eyebrow">Mi biblioteca &nbsp;—&nbsp; <span id="c">3</span> libros</div>
+  <div class="scene"><div class="shelf" id="sh"></div></div>
+  <div class="meta">
+    <div class="num" id="n">01 —— 03</div>
+    <div class="title" id="t">—</div>
+    <div class="author" id="a"></div>
+  </div>
+  <div class="nav">
+    <button id="prev" aria-label="Anterior">&#8592;</button>
+    <div class="scrub" id="scrub"></div>
+    <button id="next" aria-label="Siguiente">&#8594;</button>
+  </div>
+</div>
+<script>
+// PORTADAS REALES, extraídas de los EPUB del propio repo (tests/ y evals/fixtures/).
+// `kb` es el tamaño real del fichero: de ahí sale el grosor del lomo, que es dato que la app
+// ya tiene. Un libro de 14 MB se ve más gordo que uno de 800 KB, como en un estante.
+const BOOKS=[
+  {t:"Pedro Páramo",a:"Juan Rulfo",src:"_proto/paramo.jpg",kb:829},
+  {t:"Relativity: The Special and General Theory",a:"Albert Einstein",src:"_proto/relativity.jpg",kb:1060},
+  {t:"Pro Git",a:"Scott Chacon & Ben Straub",src:"_proto/progit.png",kb:13986},
+];
+const sh=document.getElementById('sh');
+const T=document.getElementById('t'),A=document.getElementById('a'),N=document.getElementById('n');
+document.getElementById('c').textContent=BOOKS.length;
+
+// Grosor a partir del peso real, comprimido con raíz para que 14 MB no dé un ladrillo.
+const thickFor=kb=>Math.round(26+Math.min(30, Math.sqrt(kb/1024)*13));
+
+// De la portada al lomo: se toma la COLUMNA IZQUIERDA (6 px) y se estira a lo alto. Es lo que
+// hace una sobrecubierta al doblarse. Devuelve también la luminancia media, que decide si el
+// texto del lomo va en blanco o en negro — sin eso, un lomo claro se queda ilegible.
+function spineFromCover(img){
+  const H=64, c=document.createElement('canvas'); c.width=1; c.height=H;
+  const x=c.getContext('2d');
+  x.drawImage(img, 0,0, Math.max(1,Math.round(img.naturalWidth*0.02)), img.naturalHeight, 0,0, 1,H);
+  const d=x.getImageData(0,0,1,H).data;
+  let lum=0;
+  for(let i=0;i<H;i++) lum+=(0.2126*d[i*4]+0.7152*d[i*4+1]+0.0722*d[i*4+2]);
+  return { url:c.toDataURL(), light: (lum/H) > 140 };
+}
+
+function build(){
+  BOOKS.forEach((b,i)=>{
+    const img=new Image();
+    img.onload=()=>{
+      const {url,light}=spineFromCover(img);
+      const thick=thickFor(b.kb);
+      const ratio=img.naturalHeight/img.naturalWidth;
+      // El FONDO sale de la proporción REAL de la portada y NO se acota: al recortarlo, la cara
+      // dejaba de tener el ratio de la imagen y `object-fit:cover` se comía los bordes del
+      // diseño (en Pro Git se perdía "Scott Chacon and Ben Straub"). Un libro algo hondo es
+      // preferible a una portada real mutilada.
+      const height=232, depth=Math.round(height/ratio);
+      const ink = light ? 'rgba(20,16,10,.9)' : 'rgba(255,255,255,.95)';
+      const d=document.createElement('div');
+      d.className='book';
+      d.style.cssText=`width:${thick}px;height:${height}px`;
+      d.dataset.depth=depth;
+      d.innerHTML=`
+        <div class="spine" style="background-image:url(${url})">
+          <div class="spine-t" style="color:${ink}">${b.t}</div>
+          <div class="spine-r" style="background:${ink};opacity:.45"></div>
+          <div class="spine-a" style="color:${ink}">${b.a}</div>
+        </div>
+        <div class="top" style="height:${depth}px"></div>
+        <div class="front" style="width:${depth}px;height:${height}px"><img src="${b.src}" alt=""></div>`;
+      d.onclick=()=>select(i);
+      d.dataset.i=i; d.dataset.pull=Math.round(depth*.62);
+      d.dataset.z=Math.round(depth*.9);
+      // Mantener el orden aunque las imágenes carguen desordenadas.
+      const next=[...sh.children].find(x=>+x.dataset.i>i);
+      sh.insertBefore(d, next||null);
+      if(sh.children.length===BOOKS.length){ buildScrub(); select(0); }
+    };
+    img.src=b.src;
+  });
+}
+// ---- selección + navegación -------------------------------------------------
+let cur=-1;
+function select(i){
+  const books=[...sh.children];
+  if(i<0||i>=books.length) return;
+  cur=i;
+  const d=books[i], b=BOOKS[+d.dataset.i];
+  books.forEach(x=>{x.classList.remove('sel');x.style.transform='';});
+  d.classList.add('sel');
+  d.style.transform=`translateX(-${d.dataset.pull}px) translateZ(${d.dataset.z}px) rotateY(-62deg)`;
+  sh.style.setProperty('--shift', `${-d.offsetLeft + (+d.dataset.pull)}px`);
+  T.textContent=b.t; A.textContent=b.a;
+  N.textContent=String(i+1).padStart(2,'0')+' —— '+String(books.length).padStart(2,'0');
+  document.getElementById('prev').disabled = i===0;
+  document.getElementById('next').disabled = i===books.length-1;
+  [...document.getElementById('scrub').children].forEach((m,k)=>m.classList.toggle('on',k===i));
+}
+function buildScrub(){
+  const s=document.getElementById('scrub'); s.innerHTML='';
+  BOOKS.forEach((b,k)=>{const m=document.createElement('i');
+    m.title=b.t; m.onclick=()=>select(k); s.appendChild(m);});
+}
+document.getElementById('prev').onclick=()=>select(cur-1);
+document.getElementById('next').onclick=()=>select(cur+1);
+// Teclado: sin esto la vista es inaccesible con navegación por teclas.
+addEventListener('keydown',e=>{
+  if(e.key==='ArrowLeft') select(cur-1);
+  if(e.key==='ArrowRight') select(cur+1);
+});
+build();
+</script>

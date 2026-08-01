@@ -19,6 +19,8 @@ import * as Recovery from '../sync/recovery.js';
 import * as Profiles from '../ai/profiles.js';
 import * as Backup from '../backup.js';
 import * as License from '../license.js';
+import * as Storage from '../storage.js';
+import * as Study from '../ai/study.js';
 import { ensurePro } from './paywall.js';
 import { icon } from './icons.js';
 import { escapeHtml } from './escape.js';
@@ -307,6 +309,7 @@ function wireAgent(content) {
 
 function appHtml() {
   const lang = getLang();
+  const limit = Study.newLimit();
   return `<div class="appset-section">
     <h3 class="appset-h3">${t('Aplicación')}</h3>
     <label class="appset-label" for="appset-lang">${t('Idioma')} · Language</label>
@@ -315,6 +318,12 @@ function appHtml() {
       <option value="es"${lang === 'es' ? ' selected' : ''}>Español</option>
     </select>
     <p class="appset-muted">${t('Idioma de la interfaz. El agente responde en el idioma en el que le escribas. Cambiarlo recarga la app.')}</p>
+    <label class="appset-label" for="appset-newlimit">${t('Tarjetas nuevas por sesión')}</label>
+    <select id="appset-newlimit" class="appset-input">
+      ${[10, 20, 30, 50].map(n => `<option value="${n}"${limit === n ? ' selected' : ''}>${n}</option>`).join('')}
+      <option value="0"${limit === 0 ? ' selected' : ''}>${t('Sin tope')}</option>
+    </select>
+    <p class="appset-muted">${t('Tope de tarjetas SIN estrenar que entran en cada repaso. Las que ya llevas empezadas entran siempre: el tope solo evita que un mazo recién generado te ponga 90 tarjetas el primer día.')}</p>
   </div>`;
 }
 
@@ -322,6 +331,9 @@ function wireApp(content) {
   content.querySelector('#appset-lang').addEventListener('change', (e) => {
     setLang(e.target.value);
     location.reload();
+  });
+  content.querySelector('#appset-newlimit').addEventListener('change', (e) => {
+    Storage.set('study_new_limit', parseInt(e.target.value, 10));
   });
 }
 

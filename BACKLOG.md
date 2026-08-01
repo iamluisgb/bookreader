@@ -794,6 +794,51 @@ seguir leyendo"* sin necesidad de un cartel que la anuncie.
 
 **Orden por esfuerzo/impacto:** F1 → F2 → F3 → F4.
 
+### P24 — Higiene de la sesión de repaso · **✓ entregada** (2026-08-01) · F1–F4
+
+> **Entregada entera.** Ver CHANGELOG 2026-08-01. Cuatro arreglos de la sesión, ninguno
+> con LLM ni esquema nuevo, todos sobre la misma pregunta: **¿por qué no hay una segunda
+> sesión?** [P10](#p10--modo-estudiar-repetición-espaciada-in-app--ml--f1f3) construyó el
+> hábito y [P20](#p20--continuidad-del-ciclo-flashcards--estudiar--✓-entregada-2026-07-27--f1f4)
+> conectó el ciclo; lo que faltaba era que la sesión se pudiera **sobrevivir**.
+
+**F1 · Tope de nuevas, barajado y hermanas separadas.** La cola encolaba todo lo vencido en
+orden de mazo: tres mazos de 30 = 90 tarjetas el primer día, seguidas y por capítulo, con
+los cloze del mismo pasaje pegados cantándose la respuesta. `buildQueue()` (pura, en
+`study.js`) recorta las NUEVAS al tope (20 por defecto, ajustable en Ajustes → Aplicación,
+0 = sin tope), baraja y separa hermanas por `src`. Las que no entran se ofrecen al
+terminar — el tope es una recomendación, no una cárcel. **Lo que P20 decidió no hacer**
+("cambia el scheduling de todas las superficies") sí había que hacerlo: el aviso de cuántas
+encola no evitaba las 90, solo las anunciaba.
+
+**F2 · Deshacer.** Las notas van en las teclas 1-4 y se persisten al instante: un "fácil"
+mal pulsado mandaba la tarjeta a meses sin vuelta atrás. Pila de hasta 30, tecla `Z`. Se
+guarda la cola ENTERA, no solo el `srs`: con "otra vez" re-encolando, restaurar solo el
+estado dejaría una repetición fantasma en la sesión.
+
+**F3 · Editar / suspender / borrar durante el repaso, y leeches.** El más importante y el
+más específico de este producto: **las tarjetas las escribe un LLM**, así que un porcentaje
+son malas, y el único momento en que se descubre es repasándolas — pero para arreglarlas
+había que cerrar la sesión y llegar hasta la vista de revisión por cuatro pantallas. Barra
+de acciones en la cabecera (disponible con la tarjeta boca abajo: una tarjeta mala se
+reconoce muchas veces desde el frente). A los 8 fallos (`LEECH_LAPSES`, el umbral que ya
+exportábamos en el `.apkg`) se avisa de que **lo probable es que esté mal formulada**, no
+que el tema sea difícil. Las suspendidas se reactivan desde la revisión del mazo.
+
+**F4 · Regenerar amplía en vez de duplicar.** `prevFronts` solo dedupe DENTRO de una
+generación, así que regenerar un capítulo creaba un mazo paralelo y las dos copias competían
+en la misma cola diaria. Ahora, si ya hay mazo de ese alcance y tipo, se ofrece marcado
+añadirle solo lo nuevo: sus frentes entran como "no repitas esto" desde el primer trozo
+(más barato evitar el duplicado que descartarlo) y lo repetido se filtra por frente
+normalizado.
+
+**Pendiente que esto deja a la vista:** las tarjetas solo pueden nacer de una generación
+masiva. No hay "crear tarjeta desde este subrayado", ni desde una respuesta del chat, ni
+desde un hueco detectado por el Feynman —que [P18](#p18--modo-feynman-explicas-tú-el-libro-te-contrasta--m--cima-del-icap)
+prometía y `feynman.js` no implementa—. Es el siguiente paso natural: convierte el SRS de
+"producto de una generación masiva" en algo que crece mientras lees, y es el escalón ICAP
+que esta épica dice que falta (tú produces, él comprueba).
+
 ### P21 — Vertical opositor: del estudio al examen · `L` · **el nicho que [`LAUNCH_PLAN.md`](LAUNCH_PLAN.md#L75) señala**
 
 **Contexto (2026-07-27).** El plan de lanzamiento nombra el pivote — *"pivotar el mensaje 100% a

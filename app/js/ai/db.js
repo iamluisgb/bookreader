@@ -412,8 +412,14 @@ function stampCards(before, after, now) {
   return out;
 }
 
+// OJO: todo campo que decida el comportamiento de la tarjeta tiene que estar aquí. Lo que
+// falte no sella `updatedAt`, y lo que no se sella lo pisa el otro dispositivo al sincronizar
+// (`suspended` entró con P24: sin él, suspender una tarjeta en el móvil la resucitaba).
 function sameCard(a, b) {
-  const norm = (c) => JSON.stringify({ front: c.front, back: c.back, type: c.type, chapter: c.chapter, src: c.src, srs: c.srs || null });
+  const norm = (c) => JSON.stringify({
+    front: c.front, back: c.back, type: c.type, chapter: c.chapter, src: c.src,
+    srs: c.srs || null, suspended: !!c.suspended, deleted: !!c.deleted,
+  });
   return norm(a) === norm(b);
 }
 

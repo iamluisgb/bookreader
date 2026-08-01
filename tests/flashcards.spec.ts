@@ -274,18 +274,26 @@ test('los mazos persisten y se pueden reabrir desde el modal', async ({ page }) 
   await expect(page.locator('.fc-item')).toHaveCount(3);
 });
 
-// Regresión: generar un SEGUNDO mazo tras "Volver" desde la revisión del primero (la
+// Regresión: generar por SEGUNDA vez tras "Volver" desde la revisión de la primera (la
 // reentrada del modal no debe romperse; se comprobó que el fallo real era del modelo
 // reasoning truncando por tokens, no de esta lógica).
-test('dos mazos seguidos: Volver desde la revisión y generar otra vez', async ({ page }) => {
+//
+// Desde P24 F4 la segunda pasada no crea un mazo paralelo: el aviso de duplicado sale
+// marcado y AMPLÍA el que ya hay. Con el stub —que respeta el "YA EXISTEN"— no sale
+// ninguna tarjeta nueva, y ese final tiene que ser un aviso, no un error.
+test('regenerar el mismo alcance amplía el mazo en vez de duplicarlo', async ({ page }) => {
   await setup(page);
   await generate(page);
   await expect(page.locator('.fc-item')).toHaveCount(3);
   await page.locator('#ai-flashcards .ai-ob-back').first().click();   // Volver al setup
   await page.waitForSelector('#fc-generate');
-  await page.click('#fc-generate');                                    // segundo mazo
+  await expect(page.locator('#fc-merge')).toBeChecked();               // fusionar por defecto
+  await page.click('#fc-generate');
   await expect(page.locator('#ai-flashcards h2')).toContainText('tarjetas', { timeout: 15000 });
-  await expect(page.locator('.fc-item')).toHaveCount(3);
+  await expect(page.locator('.fc-item')).toHaveCount(3);               // ni duplicados ni pérdidas
+  await expect(page.locator('#fc-error')).toContainText('ninguna tarjeta');
+  const decks = await page.evaluate(async () => (await import('/js/ai/db.js') as any).getAllDecks());
+  expect(decks.length).toBe(1);                                        // un mazo, no dos
 });
 
 // ---- P20 F1 · Estudiar desde la pantalla de "listo" --------------------------
@@ -300,7 +308,10 @@ test('tras generar se puede estudiar sin salir, y el botón dice cuántas encola
   await expect(study).toContainText('3');
   await study.click();
   await expect(page.locator('#ai-study')).toBeVisible();
-  await expect(page.locator('#ai-study .study-q')).toContainText('Juan Preciado');
+  // Cuál sale primero lo decide el barajado de la cola (P24): basta con que sea una de
+  // las generadas.
+  const q = (await page.locator('#ai-study .study-q').textContent())!.trim();
+  expect(CANNED_CARDS.map(c => c.front)).toContain(q);
   // Al cerrar el repaso se vuelve a la revisión, con el contador ya al día.
   await page.locator('#ai-study .study-flip').click();          // mostrar respuesta
   await page.locator('#ai-study [data-rate="good"]').click();   // una tarjeta superada

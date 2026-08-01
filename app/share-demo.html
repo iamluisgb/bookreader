@@ -1,0 +1,128 @@
+<!doctype html><meta charset="utf-8"><title>demo · tarjeta de biblioteca</title>
+<style>
+body{margin:0;background:#15150f;color:#e7e2d6;font:14px/1.5 ui-sans-serif,system-ui,sans-serif;padding:24px}
+h1{font:600 15px/1 ui-sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#a49b86;margin:0 0 18px}
+.row{display:flex;gap:32px;align-items:flex-start;flex-wrap:wrap}
+.box{background:#1e1e18;padding:14px;border-radius:10px}
+.box h2{font:600 11px/1 ui-sans-serif;letter-spacing:.12em;text-transform:uppercase;color:#8d8button;color:#8d8574;margin:0 0 10px}
+canvas{display:block;border-radius:6px}
+.note{max-width:420px;color:#9c9484;font-size:13px}
+button{margin-top:12px;background:#22c55e;border:0;color:#08240f;font-weight:700;padding:9px 14px;border-radius:8px;cursor:pointer}
+</style>
+<h1>Tarjeta de biblioteca — propuesta</h1>
+<div class="row">
+  <div class="box">
+    <h2>1080×1080 (mostrada a 460)</h2>
+    <canvas id="big" width="460" height="460"></canvas>
+    <button id="dl">Descargar PNG real</button>
+  </div>
+  <div class="box">
+    <h2>Al tamaño de un feed (380 px)</h2>
+    <canvas id="feed" width="380" height="380"></canvas>
+    <p class="note">La prueba que importa: aquí es donde la estantería 3D se convertía
+    en papilla de lomos. Con las portadas de frente, se reconocen.</p>
+  </div>
+</div>
+<script type="module">
+// Mismos tokens y molde que js/share-card.js (P11): lienzo 1080², papel a sangre, serif
+// para lo editorial, Inter para lo funcional, verde solo como acento.
+const W=1080,H=1080, PAPER='#faf8f3', INK='#2b2b2b', MUTED='#7a736a', ACCENT='#22c55e';
+
+const REAL=[
+  {t:"Pedro Páramo",a:"Juan Rulfo",src:"_proto/paramo.jpg"},
+  {t:"Relativity",a:"Albert Einstein",src:"_proto/relativity.jpg"},
+  {t:"Pro Git",a:"Scott Chacon",src:"_proto/progit.png"},
+];
+// Solo hay TRES portadas reales en el repo. Para juzgar la composición llena se repiten;
+// en la app serían libros distintos.
+const BOOKS=[0,1,2,0,1,2,0].map(i=>REAL[i]);
+
+function roundRect(ctx,x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);
+  ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);
+  ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath();}
+
+async function loadImage(src){const i=new Image();i.src=src;await i.decode();return i;}
+
+// Portada de frente, con una pizca de giro y sombra editorial. NADA de perspectiva: a
+// tamaño de feed, el escorzo se come el diseño de la tapa, que es lo único reconocible.
+function drawCover(ctx,img,cx,cy,w,h,rot){
+  ctx.save();
+  ctx.translate(cx,cy); ctx.rotate(rot);
+  ctx.shadowColor='rgba(40,30,15,0.28)'; ctx.shadowBlur=34; ctx.shadowOffsetY=14;
+  roundRect(ctx,-w/2,-h/2,w,h,6); ctx.fillStyle='#fff'; ctx.fill();
+  ctx.shadowColor='transparent';
+  ctx.save(); roundRect(ctx,-w/2,-h/2,w,h,6); ctx.clip();
+  ctx.drawImage(img,-w/2,-h/2,w,h);
+  // Bisagra: una sombra fina en el canto izquierdo basta para que no parezca una pegatina.
+  const g=ctx.createLinearGradient(-w/2,0,-w/2+w*0.10,0);
+  g.addColorStop(0,'rgba(0,0,0,.34)'); g.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.fillStyle=g; ctx.fillRect(-w/2,-h/2,w*0.10,h);
+  ctx.restore(); ctx.restore();
+}
+
+async function buildLibraryCard({books, count, period, streak}){
+  try{await document.fonts.ready}catch{}
+  const c=document.createElement('canvas'); c.width=W; c.height=H;
+  const ctx=c.getContext('2d');
+  ctx.fillStyle=PAPER; ctx.fillRect(0,0,W,H);
+
+  const PAD=88;
+  // --- cabecera: la OCASIÓN. Sin ella esto es "una foto de mis libros" y no se comparte.
+  ctx.textAlign='left'; ctx.textBaseline='alphabetic';
+  ctx.fillStyle=MUTED; ctx.font=`600 26px 'Inter',ui-sans-serif,sans-serif`;
+  ctx.letterSpacing='4px';
+  ctx.fillText(period.toUpperCase(), PAD, PAD+30);
+  ctx.letterSpacing='0px';
+
+  // --- la CIFRA. Es lo que hace que alguien lo publique: un logro, no un objeto.
+  ctx.fillStyle=INK; ctx.font=`600 148px 'Source Serif 4',Georgia,serif`;
+  ctx.fillText(String(count), PAD, PAD+188);
+  const nw=ctx.measureText(String(count)).width;
+  ctx.fillStyle=INK; ctx.font=`400 54px 'Source Serif 4',Georgia,serif`;
+  ctx.fillText('libros leídos', PAD+nw+26, PAD+188);
+
+  // --- abanico de portadas, TODAS de frente y solapadas. La de más peso, delante.
+  const imgs=await Promise.all(books.map(b=>loadImage(b.src).catch(()=>null)));
+  const ok=imgs.filter(Boolean);
+  const n=ok.length;
+  // El alto común alinea portadas de ratios distintos. Se calcula el paso para que el
+  // abanico OCUPE el ancho disponible sin salirse: con portadas grandes y paso corto, unas
+  // tapaban a otras y solo se leía la del centro.
+  const CH=340;
+  const cy=Math.round(H*0.585);
+  const maxW=CH*0.78;                       // ancho de la portada más apaisada, aprox.
+  const span=W-PAD*2-maxW;                  // el abanico va de centro a centro
+  const step=n>1 ? span/(n-1) : 0;
+  const startX=PAD+maxW/2;
+  // De fuera hacia dentro, para que las centrales queden ENCIMA (jerarquía natural).
+  const order=[...ok.keys()].sort((i,j)=>Math.abs(i-(n-1)/2)>Math.abs(j-(n-1)/2)?-1:1);
+  for(const i of order){
+    const img=ok[i];
+    const w=Math.round(CH*(img.naturalWidth/img.naturalHeight));
+    const d=i-(n-1)/2;
+    drawCover(ctx,img,startX+step*i,cy+Math.abs(d)*10,w,CH,d*0.045);
+  }
+
+  // --- pie: racha + marca. El dato que casi ninguna app de lectura tiene.
+  ctx.textAlign='left';
+  ctx.fillStyle=MUTED; ctx.font=`500 28px 'Inter',ui-sans-serif,sans-serif`;
+  ctx.fillText(streak, PAD, H-PAD);
+  ctx.textAlign='right';
+  ctx.fillStyle=ACCENT; ctx.font=`700 28px 'Inter',ui-sans-serif,sans-serif`;
+  ctx.fillText('BookReader', W-PAD, H-PAD);
+  return c;
+}
+
+const card=await buildLibraryCard({
+  books:BOOKS, count:7, period:'Mi año en libros · 2026',
+  streak:'Racha de estudio: 34 días',
+});
+for(const [id,size] of [['big',460],['feed',380]]){
+  const el=document.getElementById(id);
+  el.getContext('2d').drawImage(card,0,0,size,size);
+}
+document.getElementById('dl').onclick=()=>card.toBlob(b=>{
+  const u=URL.createObjectURL(b); const a=document.createElement('a');
+  a.href=u; a.download='biblioteca.png'; a.click(); URL.revokeObjectURL(u);
+});
+</script>

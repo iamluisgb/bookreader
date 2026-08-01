@@ -42,6 +42,12 @@ const ICONS = {
   ellipsis: '<circle cx="5" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.4" fill="currentColor" stroke="none"/>',
   books: '<path d="M5 5.5A1.5 1.5 0 0 1 6.5 4H10a1.5 1.5 0 0 1 1.5 1.5V20a2 2 0 0 0-2-2H5V5.5Z"/><path d="M19 5.5A1.5 1.5 0 0 0 17.5 4H14a1.5 1.5 0 0 0-1.5 1.5V20a2 2 0 0 1 2-2H19V5.5Z"/>',
   trash: '<polyline points="4 7 20 7"/><path d="M9 7V5.5A1.5 1.5 0 0 1 10.5 4h3A1.5 1.5 0 0 1 15 5.5V7"/><path d="M6 7l1 12.5A1.5 1.5 0 0 0 8.5 21h7a1.5 1.5 0 0 0 1.5-1.5L18 7"/>',
+  // Deshacer: flecha en U hacia la izquierda (modo Estudiar).
+  undo: '<polyline points="8.5 6.5 4.5 10.5 8.5 14.5"/><path d="M4.5 10.5h9a5 5 0 0 1 0 10H9"/>',
+  // Suspender una tarjeta: ojo tachado.
+  'eye-off': '<path d="M4 12s3.2-5 8-5c1.2 0 2.3.3 3.2.8"/><path d="M19.4 9.4c.4.5.6 1 .6 1.1v1.5s-3.2 5-8 5c-1.3 0-2.4-.4-3.4-.9"/><circle cx="12" cy="12" r="2.4"/><line x1="4.5" y1="19.5" x2="19.5" y2="4.5"/>',
+  // Aviso (leech, avisos discretos): triángulo con exclamación.
+  warning: '<path d="M12 4.5 21 19.5H3L12 4.5Z"/><line x1="12" y1="10" x2="12" y2="14.5"/><circle cx="12" cy="17" r="0.9" fill="currentColor" stroke="none"/>',
   // Engranaje geométrico de 8 dientes (dientes definidos, sin las curvas
   // abultadas del glifo Feather que se emborronaban a 16–20px).
   gear: '<circle cx="12" cy="12" r="3.2"/><path d="M19.19 10.74 21.26 10.38 21.26 13.62 19.19 13.26 17.97 16.2 19.69 17.41 17.41 19.69 16.2 17.97 13.26 19.19 13.62 21.26 10.38 21.26 10.74 19.19 7.8 17.97 6.59 19.69 4.31 17.41 6.03 16.2 4.81 13.26 2.74 13.62 2.74 10.38 4.81 10.74 6.03 7.8 4.31 6.59 6.59 4.31 7.8 6.03 10.74 4.81 10.38 2.74 13.62 2.74 13.26 4.81 16.2 6.03 17.41 4.31 19.69 6.59 17.97 7.8Z"/>',

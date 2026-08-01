@@ -5,6 +5,61 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-08-01 — La sesión de repaso, sobrevivible (P24 · F1–F4)
+
+Cuatro arreglos de la misma pregunta: por qué no hay una segunda sesión. Ninguno usa el
+LLM ni cambia el esquema.
+
+**El orden de la cola era el del mazo.** `open()` encolaba todo lo vencido recorriendo
+mazos y tarjetas en orden: con tres mazos de 30 son 90 tarjetas el primer día, agrupadas
+por capítulo, y con los cloze del mismo pasaje pegados —cantándose la respuesta el uno al
+otro—. Ahora `buildQueue()` (pura, testeada con un rng inyectado) recorta las tarjetas
+NUEVAS a un tope, baraja y separa las hermanas por `src`. El tope sale en Ajustes →
+Aplicación (20 por defecto, 0 = sin tope) y **solo toca a las nuevas**: lo ya empezado vence
+hoy porque lo decidió el scheduler, y aplazarlo es justo lo que rompe la programación. Las
+que no entran no se pierden: la pantalla de fin ofrece seguir con ellas.
+
+P20 decidió conscientemente no capar la cola ("cambia el scheduling de todas las
+superficies") y dejarlo en que el botón **dijera** cuántas encolaba. Anunciar 90 no evita
+las 90.
+
+**Deshacer.** Las notas están en las teclas 1-4 y se persisten tras cada tarjeta: un
+"fácil" mal pulsado mandaba la tarjeta a meses y no había vuelta atrás. Pila de 30 y tecla
+`Z`. Se guarda la cola entera y no solo el `srs` de la tarjeta, porque "otra vez" la
+re-encola: restaurar solo el estado dejaría una repetición fantasma dando vueltas.
+
+**Arreglar la tarjeta donde se descubre que está mal.** Es el que más cambia el producto y
+el que solo tiene sentido aquí: las tarjetas las escribe un LLM, así que un porcentaje son
+malas —ambiguas, con dos preguntas dentro, con una respuesta que no está en el pasaje— y el
+único momento en que eso se ve es repasándolas. Hasta ahora la única salida era cerrar la
+sesión, abrir el Studio, el modal, el mazo y la vista de revisión; con la sesión ya perdida.
+Ahora hay editar / suspender / borrar en la cabecera del repaso, disponibles **con la
+tarjeta boca abajo**: una tarjeta mala se reconoce muchas veces desde el frente.
+
+Y con eso el leech empieza a significar algo. `lapses` se contaba desde P10 y no se usaba
+nunca —irónicamente el `.apkg` que exportamos sí configura `leechFails: 8`, así que Anki
+protegía al usuario de nuestras tarjetas mejor que nosotros—. A los 8 fallos aparece un
+aviso que dice lo que casi siempre es cierto: **que la tarjeta está mal formulada, no que
+el tema sea difícil**. No suspende sola; ofrece el arreglo, que es lo que hace falta.
+Suspender no es un viaje de ida: la revisión del mazo las marca y las reactiva.
+
+**Regenerar un capítulo creaba un mazo paralelo.** El anti-duplicados (`prevFronts`) solo
+actúa dentro de una generación, así que la segunda pasada dejaba dos copias compitiendo en
+la misma cola diaria y el lector repasaba dos veces lo mismo sin saber por qué. Si ya hay
+mazo de ese alcance y tipo, el setup ofrece —marcado— añadirle solo lo nuevo: sus frentes
+entran en el prompt desde el primer trozo (evitar el duplicado es más barato que
+descartarlo) y lo que aun así se repita se filtra por frente normalizado.
+
+De ahí sale un caso que antes era imposible: **generar y que no salga nada nuevo**. Con un
+mazo nuevo eso es un fallo ("el modelo no devolvió tarjetas"); ampliando uno es un final
+legítimo y frecuente, porque le hemos pasado sus propios frentes como "no repitas esto".
+Ahora se dice con un aviso, no con un error.
+
+**Un detalle de sync que habría costado caro:** `sameCard()` decide si una tarjeta cambió
+para sellarle `updatedAt`, y lo que no se sella lo pisa el otro dispositivo. No miraba
+`suspended` (ni `deleted`), así que suspender en el móvil se habría deshecho solo al
+sincronizar — el tipo de bug que solo aparece con dos dispositivos y nunca en local.
+
 ## 2026-08-01 — "Toda la página" tenía que devolver al chat también al fallar
 
 Agujero abierto por la unificación de arriba, del mismo día. `explainView()` (el alcance

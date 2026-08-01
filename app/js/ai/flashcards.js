@@ -39,6 +39,7 @@ let overlay = null;
 let generating = false;   // hay un job de flashcards de ESTE libro en curso (solo para la UI)
 let unsubJobs = null;     // suscripción a jobs.js mientras el modal está abierto
 let scopeValue = '';   // alcance elegido: '' = libro entero, o la etiqueta del capítulo
+let mergeInto = null;  // id del mazo existente al que AÑADIR (P24 F4), o null = mazo nuevo
 // Umbral a partir del cual el desplegable de alcance muestra buscador (índices largos).
 const SCOPE_SEARCH_MIN = 8;
 
@@ -109,12 +110,36 @@ async function renderSetup() {
     </div>
     <label class="fc-label" for="fc-count">${t('Cantidad')}</label>
     <select id="fc-count" class="fc-select">${COUNTS.map(n => `<option ${n === defaultCount ? 'selected' : ''}>${n}</option>`).join('')}</select>
+    <div id="fc-dup"></div>
     <button id="fc-generate" class="primary-btn ai-ob-start">${icon('sparkles', { size: 16 })} ${t('Generar tarjetas')}</button>
     <div id="fc-error" class="fc-error" style="display:none"></div>
     <div id="fc-decks"></div>`;
-  mountScopeCombo(b.querySelector('#fc-scope'), options, scopeValue, (v) => { scopeValue = v; });
+  mountScopeCombo(b.querySelector('#fc-scope'), options, scopeValue, (v) => { scopeValue = v; refreshDupNote(); });
   b.querySelector('#fc-generate').addEventListener('click', onGenerate);
+  b.querySelectorAll('input[name="fc-type"]').forEach(r => r.addEventListener('change', refreshDupNote));
   renderDeckList();
+  refreshDupNote();
+}
+
+// P24 F4 · Regenerar el mismo alcance creaba un mazo PARALELO: el anti-duplicados
+// (`prevFronts`) solo actúa dentro de una generación, así que las dos copias acaban
+// compitiendo en la misma cola diaria y el lector repasa dos veces lo mismo sin saber por
+// qué. Si ya hay un mazo de este contenido, se ofrece AÑADIRLE lo que salga nuevo — y por
+// defecto sí, que es lo que casi siempre se quiere.
+async function refreshDupNote() {
+  const b = body();
+  const host = b?.querySelector('#fc-dup');
+  if (!host || !ctx.bookId) { mergeInto = null; return; }
+  const type = b.querySelector('input[name="fc-type"]:checked')?.value;
+  const decks = await DB.getDecks(ctx.bookId);
+  if (!overlay || !b.isConnected) return;             // el modal se cerró mientras leía la BD
+  const hit = decks.find(d => (d.scope || '') === scopeValue && d.cardType === type && DB.cardsOf(d).length);
+  mergeInto = hit ? hit.id : null;
+  host.innerHTML = hit
+    ? `<label class="fc-dup"><input type="checkbox" id="fc-merge" checked>
+        <span>${t('Ya tienes un mazo de este contenido ({n} tarjetas). Añádele solo lo que salga nuevo en vez de crear otro.', { n: DB.cardsOf(hit).length })}</span>
+      </label>`
+    : '';
 }
 
 // Desplegable propio para el alcance (sustituye al <select> nativo, que ignoraba el tema y
@@ -187,7 +212,7 @@ async function renderDeckList() {
         <div class="fc-deck-info">
           <span class="fc-deck-name">${escapeHtml(d.scope || t('Libro entero'))}</span>
           <span class="fc-deck-meta">${t('{n} tarjetas', { n: DB.cardsOf(d).length })} · ${d.cardType === 'cloze' ? 'cloze' : 'P→R'} · ${new Date(d.createdAt).toLocaleDateString()}</span>
-          <span class="fc-deck-meta">${t('{a} nuevas · {b} aprendiendo · {c} maduras', { a: st.nuevas, b: st.aprendiendo, c: st.maduras })}</span>
+          <span class="fc-deck-meta">${t('{a} nuevas · {b} aprendiendo · {c} maduras', { a: st.nuevas, b: st.aprendiendo, c: st.maduras })}${st.suspendidas ? ` · ${t('{n} suspendidas', { n: st.suspendidas })}` : ''}</span>
         </div>
         <button class="fc-deck-study" data-act="study" title="${t('Repasar con repetición espaciada')}">
           ${icon('cards', { size: 14 })} ${t('Estudiar')}${due ? ` <span class="fc-deck-due">${due}</span>` : ''}
@@ -553,6 +578,7 @@ function onGenerate() {
   const goal = ctx.goal;
   const name = deckName(scopeLabel);
   const byId = new Map(Retrieval.allPassages().map(p => [p.id, p.text]));
+  const target = b.querySelector('#fc-merge')?.checked ? mergeInto : null;
 
   showError('');
   Jobs.start({
@@ -563,6 +589,14 @@ function onGenerate() {
       // Map-reduce sobre los trozos: cada uno aporta su cupo (+ el déficit arrastrado de
       // trozos anteriores que dieron de menos). Un trozo fallido no tira el mazo.
       let cards = [], expected = 0, failed = 0, mode = 'forced';
+      // Fusión (F4): los frentes que YA existen en el mazo destino se le pasan al modelo
+      // como "no repitas esto" desde el primer trozo. Es más barato evitar el duplicado
+      // que descartarlo después, y de paso el mazo crece con material nuevo de verdad.
+      let seedFronts = [];
+      if (target) {
+        const d = (await DB.getDecks(bookId)).find(x => x.id === target);
+        seedFronts = DB.cardsOf(d || {}).map(c => c.front);
+      }
       progress(0, count, 'map');
       for (let i = 0; i < chunks.length; i++) {
         if (!counts[i]) continue;
@@ -575,7 +609,7 @@ function onGenerate() {
         try {
           const res = await generateChunk({
             text: chunks[i].text, ask: counts[i] + deficit, type, goal,
-            prevFronts: cards.slice(-MAX_PREV_FRONTS).map(c => c.front),
+            prevFronts: seedFronts.concat(cards.map(c => c.front)).slice(-MAX_PREV_FRONTS),
             mode, signal, background,
           });
           mode = res.mode;
@@ -587,13 +621,29 @@ function onGenerate() {
         }
         progress(Math.min(cards.length, count), count, 'map');
       }
-      if (!cards.length) throw new Error(t('El modelo no devolvió tarjetas válidas. Vuelve a intentarlo.'));
+      // Sin tarjetas es un FALLO cuando se pedía un mazo nuevo, pero no cuando se está
+      // ampliando uno: ahí "el modelo no encontró nada que no tuvieras ya" es un final
+      // legítimo (y frecuente: sus frentes van en el prompt como "no repitas esto").
+      const target0 = target ? (await DB.getDecks(bookId)).find(x => x.id === target) : null;
+      if (!cards.length && !target0) throw new Error(t('El modelo no devolvió tarjetas válidas. Vuelve a intentarlo.'));
       cards = attachSources(cards.slice(0, count), {
         validIds: new Set(byId.keys()),
         // La repesca por búsqueda solo vale si el índice sigue siendo el de ESTE libro.
         search: (q, k) => (Retrieval.hasIndex(bookId) ? Retrieval.search(q, k) : []),
         textOf: (id) => byId.get(id),   // valida que el pasaje respalde la tarjeta (EV1)
       });
+      // Fusión: al mazo existente solo entra lo que no esté ya (el modelo repite aun con
+      // los frentes delante). Si el mazo se borró mientras se generaba, `target0` es null
+      // y se cae al camino normal creando uno nuevo: nunca se tira el trabajo.
+      const existing = target0;
+      if (existing) {
+        const have = new Set(DB.cardsOf(existing).map(c => normFront(c.front)));
+        const fresh = cards.filter(c => !have.has(normFront(c.front)));
+        const merged = { ...existing, cards: existing.cards.concat(fresh) };
+        await DB.updateDeck(existing.id, { cards: merged.cards });
+        return { deckId: existing.id, deck: merged, generated: fresh.length, requested: count,
+          failed, blocks: chunks.length, merged: true, dropped: cards.length - fresh.length };
+      }
       const deck = { bookId, name, cardType: type, scope: scopeLabel, cards, createdAt: Date.now() };
       if (bookId) deck.id = await DB.addDeck(deck);
       return { deckId: deck.id || null, deck, generated: cards.length, requested: count, failed, blocks: chunks.length };
@@ -630,9 +680,14 @@ function onJobUpdate(job) {
   }
   if (job.status === 'done' && job.result && shownDeckKey !== job.id) {
     shownDeckKey = job.id;
-    const { deck, generated, requested, failed, blocks } = job.result;
+    const { deck, generated, requested, failed, blocks, merged, dropped } = job.result;
     renderReview(deck);
-    if (generated < requested) {              // éxito parcial: avisa en la revisión, no descarta
+    if (merged) {                             // fusión: "menos de las pedidas" es lo esperado
+      showError(generated
+        ? t('Añadidas {a} tarjetas nuevas al mazo', { a: generated })
+          + (dropped ? ` (${t('{n} descartadas por repetidas', { n: dropped })})` : '') + '.'
+        : t('No salió ninguna tarjeta que no tuvieras ya en este mazo.'));
+    } else if (generated < requested) {        // éxito parcial: avisa en la revisión, no descarta
       showError(t('Se generaron {a} de {b} tarjetas', { a: generated, b: requested })
         + (failed ? ` (${t('fallaron {a} de {b} bloques', { a: failed, b: blocks })})` : '') + '.');
     }
@@ -644,6 +699,14 @@ function showError(msg) {
   if (!el) return;
   el.style.display = msg ? '' : 'none';
   el.textContent = msg;
+}
+
+// Frente normalizado para comparar duplicados entre generaciones: sin acentos, sin signos
+// y sin dobles espacios. No pretende cazar paráfrasis (eso lo evita `prevFronts` en el
+// prompt), solo la repetición literal, que es la que de verdad se repite.
+function normFront(s) {
+  return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, ' ').trim();
 }
 
 // Nombre del mazo en Anki: subdeck por libro (— separa el alcance para no crear
@@ -658,12 +721,16 @@ function deckName(scopeLabel) {
 function renderReview(deck) {
   const b = body();
   if (!b) return;
+  // Una tarjeta suspendida en el repaso (P24 F3) se marca aquí y se puede reactivar: sin
+  // esta puerta, suspender sería un viaje de ida.
   const cardRow = (c, i) => `
-    <div class="fc-item" data-i="${i}">
+    <div class="fc-item${c.suspended ? ' is-suspended' : ''}" data-i="${i}">
       <div class="fc-item-fields">
         <div class="fc-front" contenteditable="true" spellcheck="false">${escapeHtml(c.front)}</div>
         <div class="fc-back" contenteditable="true" spellcheck="false" data-ph="${deck.cardType === 'cloze' ? t('Extra (opcional)') : t('Respuesta')}">${escapeHtml(c.back)}</div>
       </div>
+      <button class="icon-btn fc-susp" data-act="susp" title="${c.suspended ? t('Reactivar: vuelve al repaso') : t('Suspender: no volver a mostrarla')}"
+        aria-label="${c.suspended ? t('Reactivar: vuelve al repaso') : t('Suspender: no volver a mostrarla')}">${icon(c.suspended ? 'undo' : 'eye-off', { size: 15 })}</button>
       <button class="icon-btn fc-del" title="${t('Quitar tarjeta')}">${icon('xmark', { size: 15 })}</button>
     </div>`;
   b.innerHTML = `
@@ -695,6 +762,19 @@ function renderReview(deck) {
     if (deck.id) DB.updateDeck(deck.id, { cards: next });
   };
   b.querySelector('.fc-list').addEventListener('click', (e) => {
+    const susp = e.target.closest('.fc-susp');
+    if (susp) {
+      // Se aplican primero las ediciones pendientes del DOM y después el cambio de estado,
+      // que no se puede leer del DOM (no es un campo editable).
+      syncFromDom();
+      const i = parseInt(susp.closest('.fc-item').dataset.i, 10);
+      const card = deck.cards[i];
+      if (!card) return;
+      deck.cards[i] = { ...card, suspended: !card.suspended };
+      if (deck.id) DB.updateDeck(deck.id, { cards: deck.cards });
+      renderReview(deck);
+      return;
+    }
     const del = e.target.closest('.fc-del');
     if (!del) return;
     del.closest('.fc-item').remove();
