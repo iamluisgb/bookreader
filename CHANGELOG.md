@@ -5,6 +5,23 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-08-01 — La hoja solo se dibuja si hay escritorio de sobra
+
+La página como objeto (F1, ayer) pintaba el fondo del viewport con `--desk` siempre que hubiera
+un EPUB abierto en pantalla ancha. Con el "Ancho de columna" cerca del máximo (1120px en una
+ventana de 1300) el margen se queda en ~94px por lado: a esa escala el gris deja de leerse como
+un escritorio y se lee como una franja gris pegada al borde. El margen ya existía antes —lo pone
+`sizeContainer()`—, pero era invisible por ser blanco sobre blanco; lo que hizo F1 fue darle color.
+
+Ahora `sizeContainer()` mide el margen real contra el viewport y marca `.has-desk` solo a partir
+de 120px por lado; el fondo del escritorio, las esquinas y la sombra cuelgan de esa clase. Por
+debajo del umbral la página vuelve a ir a sangre, como antes de F1. El efecto de hoja aparece
+donde funciona (columna estrecha, pantalla ancha) y desaparece donde estorbaba.
+
+Comprobado en cuatro configuraciones (1308/1120 → no · 1308/720 → sí · 1440/720 → sí ·
+1100/1000 → no) y de paso queda medido que el contenedor va **centrado**: los márgenes salen
+iguales a ambos lados en todos los casos.
+
 ## 2026-07-31 — La barra del agente cabía a la fuerza: ＋ y ↥ bajan al menú
 
 Dos defectos en la cabecera del panel del agente, uno visible y otro medible.

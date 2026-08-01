@@ -606,12 +606,17 @@ input[type="range"] {
   justify-content: center;
   background: var(--surface-0);
 }
-/* Con un libro abierto el viewport es el "escritorio": el mismo color de la página
-   (--page-bg, fijado por epub-reader según el tema) un punto más oscuro. Así el hueco
-   que se revela al arrastrar sigue siendo del mismo tono —no una franja de otro color—
-   pero en escritorio la columna de texto se lee como una HOJA apoyada encima en vez de
-   fundirse con el cromo. Ver --desk en themes.css. */
-body.reading .reader-viewport { background: var(--desk); }
+/* Con un libro abierto, el fondo del viewport iguala al de la página (--page-bg, fijado
+   por epub-reader según el tema). Así, al arrastrar para pasar página, el hueco que se
+   revela no muestra una franja de otro color. */
+body.reading .reader-viewport { background: var(--page-bg, var(--surface-0)); }
+
+/* Salvo cuando la página se dibuja como HOJA: entonces el viewport es el "escritorio"
+   sobre el que reposa (el mismo color, un punto más oscuro). La condición la decide
+   `sizeContainer()` en js/epub-reader.js poniendo `.has-desk` cuando hay margen lateral
+   de sobra; con poco margen el gris no se lee como escritorio sino como una franja rara
+   pegada al borde. Ver --desk en themes.css. */
+body.reading .reader-viewport:has(> .epub-container.has-desk) { background: var(--desk); }
 /* Modo scroll: el contenido crece en vertical y se desplaza; alineamos arriba y dejamos
    que epub.js gestione el scroll interno (no centramos ni ocultamos el desborde). */
 body.scroll-mode .reader-viewport { align-items: stretch; justify-content: flex-start; }
@@ -846,7 +851,7 @@ body.scroll-mode .reader-viewport { align-items: stretch; justify-content: flex-
    PDF se re-ajusta. Por eso el respiro es solo lateral —el que sizeContainer ya deja— y aquí
    únicamente se pinta: fondo, radio y sombra. */
 @media (min-width: 1001px) {
-  body.reading:not(.scroll-mode) .epub-container {
+  body.reading:not(.scroll-mode) .epub-container.has-desk {
     background: var(--page-bg, var(--surface-0));
     border-radius: var(--r-lg);
     box-shadow: var(--shadow-2);

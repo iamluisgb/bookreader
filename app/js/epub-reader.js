@@ -29,6 +29,10 @@ let resizeTimer = null;
 // (típico en móviles lentos: el reflow asienta más tarde). Ver rotate.spec.ts.
 let pinnedCfi = null;
 
+// Margen mínimo (px por lado) para dibujar la página como hoja sobre el "escritorio".
+// Ver sizeContainer() y `.epub-container.has-desk` en main.css.
+const DESK_MIN_MARGIN = 120;
+
 // Libera el pin de posición (lo llama toda navegación real del usuario).
 function releasePin() { pinnedCfi = null; clearTimeout(resizeTimer); resizeTimer = null; }
 
@@ -369,6 +373,15 @@ function sizeContainer(container) {
   container.style.width = '100%';
   container.style.maxWidth = maxWidth + 'px';
   container.style.margin = '0 auto';
+
+  // ¿Hay escritorio suficiente para que la página se lea como una HOJA apoyada encima?
+  // El efecto (fondo propio, esquinas, sombra) necesita aire a los lados: con un margen
+  // estrecho deja de leerse como un margen y pasa a leerse como una franja gris pegada
+  // al borde —justo lo que pasa con el "Ancho de columna" cerca del máximo—. Por debajo
+  // del umbral no se dibuja nada y la página vuelve a ir a sangre.
+  const avail = container.parentElement ? container.parentElement.clientWidth : vw;
+  const margin = Math.max(0, (avail - Math.min(avail, maxWidth)) / 2);
+  container.classList.toggle('has-desk', margin >= DESK_MIN_MARGIN);
 }
 
 export function isLoaded() {
