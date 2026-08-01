@@ -276,6 +276,24 @@ test('VISIÓN: "Ver" envía la imagen de la página al modelo de visión', async
   const vis = await page.evaluate(() => (window as any).__vis);
   expect(vis.imageSent).toBe(true);
   expect(vis.model).toBe('vision-model');
+
+  // "Toda la página" se pulsa con el panel CERRADO (pickZone lo aparta para no tapar la
+  // página), así que tiene que devolver al chat pase lo que pase. Si la captura falla —la
+  // página aún no ha terminado de renderizarse— y el camino de error no reabre el panel, el
+  // usuario se queda sin overlay, sin panel y con el aviso dentro de algo que no ve: el botón
+  // parece no hacer nada. Se fuerza el fallo quitando el canvas.
+  await page.click('#ai-see');
+  await expect(page.locator('.region-overlay')).toBeVisible();
+  // El panel se aparta para marcar: `body.ai-open` es el estado real (el panel siempre está
+  // en el DOM, solo se traslada fuera de pantalla, así que "visible" no distingue nada).
+  await expect(page.locator('body')).not.toHaveClass(/ai-open/);
+  await page.evaluate(() => document.querySelectorAll('#pdf-container canvas').forEach((c) => c.remove()));
+  await page.locator('.region-overlay .region-whole').dispatchEvent('pointerdown');
+
+  await expect(page.locator('.region-overlay')).toHaveCount(0);      // el overlay se retira…
+  await expect(page.locator('body')).toHaveClass(/ai-open/);         // …y el panel vuelve
+  await expect(page.locator('#ai-view-chat')).toHaveClass(/active/);
+  await expect(page.locator('#ai-status')).toContainText('renderiz'); // con el aviso a la vista
 });
 
 test('PDF-portada: se guarda la miniatura de la página 1 como portada', async ({ page }) => {

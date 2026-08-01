@@ -1141,13 +1141,18 @@ function initKeyboardInset() {
 // al modelo de visión (ADR-018). Se llama desde el botón "Toda la página" del overlay, que
 // solo se abre tras pasar `visionReady()` — por eso aquí no se repiten esas puertas.
 async function explainView() {
+  // Volver al chat es lo PRIMERO, antes de cualquier return. A esta función se llega desde el
+  // overlay, y pickZone() cerró el panel para no tapar la página; si se sale por un camino de
+  // error sin reabrirlo, el usuario se queda sin overlay, sin panel y con el aviso escrito
+  // dentro de un panel que no ve — o sea, "Toda la página" no haría nada visible. Es el mismo
+  // orden que ya seguía `onPick` para el recorte.
+  setOpen(true); showView('chat');
   if (busy) return;
   const page = PdfReader.getCurrentPage();
   const dataUrl = PdfReader.capturePageImage(1024);
   if (!dataUrl) { setStatus('Espera a que la página termine de renderizarse.'); return; }
   pendingImages = [{ dataUrl, page, rect: null, label: t('Página {n}', { n: page }) }];
   renderZones();
-  setOpen(true); showView('chat');
   focusInput();
   setStatus('Imagen de la página adjunta — escribe tu pregunta y pulsa Enviar.');
 }

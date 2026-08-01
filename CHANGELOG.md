@@ -5,6 +5,24 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-08-01 — "Toda la página" tenía que devolver al chat también al fallar
+
+Agujero abierto por la unificación de arriba, del mismo día. `explainView()` (el alcance
+"página entera") se escribió cuando colgaba de un botón del composer, con el panel abierto:
+sus dos returns tempranos —turno en curso, o página aún sin renderizar— solo dejaban un aviso
+de estado, y el aviso se veía porque el panel estaba delante.
+
+Al pasar a llamarse desde el overlay eso dejó de ser cierto: `pickZone()` cierra el panel para
+no tapar la página. Por esos caminos el usuario se quedaba sin overlay, sin panel y con el
+aviso escrito dentro de algo que no ve — pulsar "Toda la página" no hacía nada visible. Ahora
+`setOpen(true); showView('chat')` es lo primero de la función, antes de cualquier return, que
+es el orden que ya seguía `onPick` para el recorte.
+
+Cubierto en `pdf.spec.ts` forzando el fallo (se quita el canvas antes de pulsar). El test
+comprueba `body.ai-open`, no la visibilidad del panel: el panel siempre está en el DOM y solo
+se traslada fuera de pantalla, así que "visible" no distingue abierto de cerrado — la primera
+versión del test pasaba con y sin el arreglo justo por eso.
+
 ## 2026-08-01 — "Ver" y "Zona" eran un botón con dos modos
 
 En PDF había dos botones de visión en el composer. Compartían las mismas puertas
