@@ -83,6 +83,18 @@ export function icon(name, { size = 22, strokeWidth = 1.7, filled = false } = {}
   return `<svg class="icon" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${strokeWidth}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${body}</svg>`;
 }
 
+// Imagotipo de marca a color. Va aparte de ICONS a propósito: los glifos de
+// arriba son de línea y heredan currentColor, y este tiene sus tres tonos fijos
+// (fondo, página, cinta) porque es la marca, no un icono de interfaz. Fuente:
+// assets/brand/mark-dark.svg.
+export function brandMark({ size = 28 } = {}) {
+  return `<svg width="${size}" height="${size}" viewBox="0 0 512 512" role="img" aria-label="BookReader" focusable="false">`
+    + '<rect width="512" height="512" rx="118" fill="#111418"/>'
+    + '<path d="M288 119 Q288 99 308 99 L396 99 Q416 99 416 119 L416 371 L352 323 L288 371 Z" fill="#22c55e"/>'
+    + '<path d="M98 90 L222 90 Q256 90 256 124 L256 470 C 249 442 233 424 206 414 C 177 403 140 401 100 401 Q64 401 64 365 L64 124 Q64 90 98 90 Z" fill="#f8fafc"/>'
+    + '</svg>';
+}
+
 // Fill every element carrying a data-icon attribute. Reads optional
 // data-icon-size / data-icon-filled overrides. Idempotent.
 export function hydrateIcons(root = document) {

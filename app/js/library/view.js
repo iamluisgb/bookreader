@@ -6,7 +6,7 @@ import * as Study from '../ai/study.js';
 import * as Blobs from '../sync/blobs.js';
 import * as DriveAuth from '../sync/drive-auth.js';
 import { ensurePro } from '../ui/paywall.js';
-import { icon } from '../ui/icons.js';
+import { icon, brandMark } from '../ui/icons.js';
 import { t, getLang } from '../i18n.js';
 import { escapeHtml } from '../ui/escape.js';
 import { confirmBox, promptBox, alertBox } from '../ui/dialog.js';
@@ -122,7 +122,7 @@ export async function render() {
     <div class="lib-layout">
       <aside class="lib-rail">
         <button class="lib-rail-item${currentShelf === 'all' ? ' active' : ''}" data-shelf="all">
-          <span class="lib-rail-ico">${icon('logo', { size: 20 })}</span>
+          <span class="lib-rail-mark">${brandMark({ size: 28 })}</span>
           <span class="lib-rail-name">${t('Libros')}</span>
           <span class="lib-rail-count">${books.length}</span>
         </button>

@@ -2838,6 +2838,11 @@ body.in-library .ai-fab { display: none; }
 .lib-rail-item.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
 .lib-rail-item.active .lib-rail-ico .icon { color: var(--accent); }
 .lib-rail-ico { display: inline-flex; flex: 0 0 auto; color: var(--text-soft); }
+/* La marca ocupa la misma caja que las miniaturas de estantería para que la
+   columna de iconos quede alineada. No se tiñe con el estado activo: es la
+   marca, y cambiarle el color la desvirtúa. */
+.lib-rail-mark { display: inline-flex; flex: 0 0 auto; width: 28px; height: 28px; }
+.lib-rail-mark svg { display: block; }
 .lib-rail-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .lib-rail-count { color: var(--text-faint); font-size: var(--fs-sm); flex: 0 0 auto; }
 .lib-rail-section {
@@ -3099,7 +3104,7 @@ body.in-library .ai-fab { display: none; }
     flex: 0 0 auto; width: auto; background: var(--surface-3);
     padding: 7px 12px; gap: var(--s-2);
   }
-  .lib-rail-ico, .lib-rail-thumb { display: none; }
+  .lib-rail-ico, .lib-rail-thumb, .lib-rail-mark { display: none; }
   .lib-rail-create { width: auto; flex: 0 0 auto; margin: 0; padding: 7px 12px; }
   .lib-rail-create span { display: none; }
   .lib-main { padding-left: var(--s-4); padding-right: var(--s-4); padding-top: var(--s-4); }
