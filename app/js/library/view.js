@@ -122,7 +122,7 @@ export async function render() {
     <div class="lib-layout">
       <aside class="lib-rail">
         <button class="lib-rail-item${currentShelf === 'all' ? ' active' : ''}" data-shelf="all">
-          <span class="lib-rail-ico">${icon('books', { size: 20 })}</span>
+          <span class="lib-rail-ico">${icon('logo', { size: 20 })}</span>
           <span class="lib-rail-name">${t('Libros')}</span>
           <span class="lib-rail-count">${books.length}</span>
         </button>
