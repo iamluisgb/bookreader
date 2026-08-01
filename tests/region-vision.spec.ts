@@ -193,3 +193,44 @@ test('la zona capturada ofrece acciones, y cada una manda su modo con la imagen'
   expect(body.messages[1].content.filter((c: any) => c.type === 'image_url')).toHaveLength(1);
   expect(body.messages[1].content.find((c: any) => c.type === 'text').text).toContain('Define cada símbolo');
 });
+
+// "Ver" y "Zona" eran dos botones para la misma intención con distinto alcance, y sus
+// resultados se excluían entre sí (adjuntar una zona borra la captura de página y al revés).
+// Ahora hay un único botón que abre el overlay y el alcance se elige allí, mirando la página.
+test('el overlay ofrece los dos alcances desde un solo botón', async ({ page }) => {
+  await page.goto('/');
+  const out = await page.evaluate(async () => {
+    const RS: any = await import('/js/region-select.js');
+    const cont = document.createElement('div');
+    cont.id = 'pdf-container';
+    cont.style.cssText = 'position:fixed;inset:0';
+    document.body.appendChild(cont);
+
+    // Sin callback de página entera, el botón NO se pinta: el módulo no impone la opción.
+    RS.start({ onPick: () => {}, onCancel: () => {} });
+    const sinCallback = !!document.querySelector('.region-whole');
+    RS.cancel();
+
+    let elegido = '';
+    RS.start({
+      onPick: () => { elegido = 'zona'; },
+      onCancel: () => { elegido = 'cancelado'; },
+      onWholePage: () => { elegido = 'pagina'; },
+    });
+    const conCallback = !!document.querySelector('.region-whole');
+    const textoBoton = document.querySelector('.region-whole')!.textContent;
+
+    // El overlay captura el puntero, por eso la barra escucha pointerdown y no click.
+    document.querySelector('.region-whole')!.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+    const overlayCerrado = !document.querySelector('.region-overlay');
+
+    return { sinCallback, conCallback, textoBoton, elegido, overlayCerrado, activo: RS.isActive() };
+  });
+
+  expect(out.sinCallback).toBe(false);      // opcional: sin callback no hay botón
+  expect(out.conCallback).toBe(true);
+  expect(out.textoBoton).toContain('Toda la página');
+  expect(out.elegido).toBe('pagina');       // y NO 'cancelado': elegir alcance no es cancelar
+  expect(out.overlayCerrado).toBe(true);    // el overlay se retira al elegir
+  expect(out.activo).toBe(false);
+});

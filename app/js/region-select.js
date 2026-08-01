@@ -17,17 +17,25 @@ export function isActive() { return !!overlay; }
 
 // Arranca el modo selección. `onPick({page, rect})` recibe la zona elegida; `onCancel` se
 // llama si el usuario sale con ESC, con el botón o con un clic sin arrastre.
-export function start({ onPick, onCancel } = {}) {
+//
+// `onWholePage` es opcional y, si viene, añade un botón "Toda la página" a la barra de ayuda.
+// Existe porque adjuntar la página entera y recortar una zona son la MISMA intención con dos
+// alcances ("enséñale esto al agente"), y el sitio donde eliges alcance es mirando la página,
+// no en el composer antes de haberla mirado. Es el patrón de la captura de pantalla del
+// sistema: un punto de entrada, el modo se decide dentro. El módulo sigue sin saber quién lo
+// usa: si no le pasas el callback, el botón no se pinta.
+export function start({ onPick, onCancel, onWholePage } = {}) {
   cancel();
   const container = document.getElementById('pdf-container');
   if (!container) return false;
 
-  onDone = { onPick, onCancel };
+  onDone = { onPick, onCancel, onWholePage };
   overlay = document.createElement('div');
   overlay.className = 'region-overlay';
   overlay.innerHTML = `
     <div class="region-hint">
       <span>${t('Arrastra para marcar la zona')}</span>
+      ${onWholePage ? `<button type="button" class="region-whole">${t('Toda la página')}</button>` : ''}
       <button type="button" class="region-cancel">${t('Cancelar')}</button>
     </div>
     <div class="region-box" hidden></div>`;
@@ -42,6 +50,14 @@ export function start({ onPick, onCancel } = {}) {
   overlay.querySelector('.region-cancel').addEventListener('pointerdown', (e) => {
     e.stopPropagation();
     finish(null);
+  });
+  // `pointerdown` y no `click`, igual que Cancelar: el overlay captura el puntero al bajar,
+  // así que un `click` sobre los botones de la barra no llegaría a dispararse.
+  overlay.querySelector('.region-whole')?.addEventListener('pointerdown', (e) => {
+    e.stopPropagation();
+    const cb = onDone?.onWholePage;
+    cancel();
+    cb?.();
   });
   document.addEventListener('keydown', onKey, true);
 

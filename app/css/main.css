@@ -3386,6 +3386,16 @@ body.ai-open #sync-badge { right: calc(var(--ai-panel-width) + 14px); }
   padding: 5px 12px; border-radius: var(--r-pill); font-size: var(--fs-xs); cursor: pointer;
 }
 .region-cancel:hover { color: var(--text); }
+
+/* "Toda la página": el otro alcance de la misma acción. Se marca con acento tenue —no sólido—
+   porque la acción principal aquí sigue siendo ARRASTRAR; esto es la alternativa, no el
+   camino recomendado. */
+.region-whole {
+  border: none; background: var(--accent-soft); color: var(--accent-hover);
+  padding: 5px 12px; border-radius: var(--r-pill); font-size: var(--fs-xs); font-weight: 600;
+  cursor: pointer; transition: background var(--transition-fast);
+}
+.region-whole:hover { background: var(--accent); color: var(--on-accent); }
 /* El recorte se ve a través del marco: el resto de la página queda atenuado por el overlay,
    así el usuario ve exactamente lo que va a mandar al modelo. */
 .region-box {

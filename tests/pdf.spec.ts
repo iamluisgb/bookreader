@@ -253,12 +253,16 @@ test('VISIÓN: "Ver" envía la imagen de la página al modelo de visión', async
   await page.click('#ai-ob-start');
   await expect(page.locator('#ai-tabs')).toBeVisible({ timeout: 5000 });
 
-  // El botón "Ver" es visible en PDF.
+  // El botón de visión es visible en PDF (uno solo: el alcance se elige en el overlay).
   await expect(page.locator('#ai-see')).toBeVisible();
+  await expect(page.locator('#ai-zone')).toHaveCount(0);   // "Zona" ya no es un botón aparte
 
-  // "Ver" ADJUNTA la captura (no envía): aparece el chip de imagen y el usuario personaliza.
+  // Abre el overlay y se elige "Toda la página": ADJUNTA la captura (no envía), aparece el
+  // chip de imagen y el usuario personaliza la pregunta.
   await page.fill('#ai-input', 'explica la figura');
   await page.click('#ai-see');
+  await expect(page.locator('.region-overlay .region-whole')).toBeVisible();
+  await page.locator('.region-overlay .region-whole').dispatchEvent('pointerdown');
   await expect(page.locator('#ai-imgref')).toBeVisible();
   const visBefore = await page.evaluate(() => (window as any).__vis.imageSent);
   expect(visBefore).toBe(false);   // aún no se ha enviado nada

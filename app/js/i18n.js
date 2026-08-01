@@ -132,8 +132,8 @@ const EN = {
   'Elige un objetivo de lectura y vuelve a pulsar «{btn}».': 'Pick a reading goal and press “{btn}” again.',
   // Selección de zona sobre el PDF (IA6 v2)
   'Zona': 'Area',
-  'Marcar una zona de la página (una figura, una ecuación) y preguntar por ella': 'Mark an area of the page (a figure, an equation) and ask about it',
   'Arrastra para marcar la zona': 'Drag to mark the area',
+  'Toda la página': 'Whole page',
   'Zona {i}': 'Area {i}',
   'Zona {i} · p. {n}': 'Area {i} · p. {n}',
   'Quitar zona': 'Remove area',
@@ -239,6 +239,7 @@ const EN = {
   'Quitar imagen': 'Remove image',
   'Pregunta sobre el libro...': 'Ask about the book...',
   'Explicar lo que veo en la página (figuras, diagramas)': 'Explain what I see on the page (figures, diagrams)',
+  'Enseñarle al agente una figura, una tabla o la página entera': 'Show the agent a figure, a table or the whole page',
   'Ver': 'See',
   'Enviar': 'Send',
 

@@ -5,6 +5,30 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-08-01 — "Ver" y "Zona" eran un botón con dos modos
+
+En PDF había dos botones de visión en el composer. Compartían las mismas puertas
+(`visionReady()`), el mismo destino (`pendingImages` → composer → `deliverVision`) y el mismo
+render de adjuntos; la única diferencia era el ALCANCE: página entera o recorte. Y sus
+resultados se excluían entre sí, hasta el punto de que el código tenía que reconciliarlos a
+mano ("una captura de página entera y unos recortes no se mezclan"). Dos botones que producen
+cosas mutuamente excluyentes son un botón con dos modos.
+
+Ahora hay un solo botón que abre el overlay de recorte, y el alcance se elige allí: arrastrar
+marca una zona, y un botón **"Toda la página"** en la barra de ayuda adjunta la página entera.
+Es el patrón de la captura de pantalla del sistema —un punto de entrada, el modo se decide
+dentro— y pone la decisión donde el usuario está mirando: la página, no el composer antes de
+haberla visto. De paso libera un hueco en una botonera que en móvil ya iba tan justa que hubo
+que dejar el micro sin etiqueta.
+
+`onWholePage` es OPCIONAL en `region-select.js`: sin ese callback el botón no se pinta, así
+que el módulo sigue sin saber quién lo usa (y sigue valiendo para rasterizar un EPUB algún día).
+
+**El coste, sin maquillar:** la página entera pasa de un clic a dos. No se resuelve haciendo
+que un toque simple valga como "toda la página", porque el toque sin arrastre cancela a
+propósito (ver `region-vision.spec.ts`) y cambiarlo haría adjuntar páginas sin querer cada vez
+que se falla un arrastre.
+
 ## 2026-08-01 — Parar el dictado se hace en la propia barra
 
 Para terminar de dictar había que volver a pulsar el botón del micro. El problema es dónde

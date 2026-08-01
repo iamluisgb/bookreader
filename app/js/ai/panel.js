@@ -83,7 +83,7 @@ export function init(opts) {
     convobar: $('#ai-convobar'), convoBtn: $('#ai-convo-btn'), convoLabel: $('#ai-convo-label'),
     ref: $('#ai-ref'), refText: $('#ai-ref-text'), profileChip: $('#ai-profile-chip'),
     imgref: $('#ai-imgref'), imgrefText: $('#ai-imgref-text'),
-    zone: $('#ai-zone'), zones: $('#ai-zones'), mic: $('#ai-mic'),
+    zones: $('#ai-zones'), mic: $('#ai-mic'),
   });
   initMic();
   $('#ai-ref-clear').addEventListener('click', clearRef);
@@ -101,8 +101,12 @@ export function init(opts) {
   // Abrir Ajustes en la sección Perfiles al tocar el chip.
   els.profileChip.addEventListener('click', () => AppSettings.open('profiles'));
   els.send.addEventListener('click', send);
-  els.see.addEventListener('click', explainView);
-  els.zone.addEventListener('click', () => pickZone());
+  // Un solo punto de entrada a la visión: abre el overlay, y allí se elige el alcance
+  // (arrastrar una zona o "Toda la página"). Antes eran dos botones —"Ver" y "Zona"— que
+  // producían cosas EXCLUYENTES entre sí (adjuntar una zona borra la captura de página, y al
+  // revés), o sea un botón con dos modos; y en móvil la botonera del composer ya iba tan
+  // justa que hubo que dejar el micro sin etiqueta para que cupieran.
+  els.see.addEventListener('click', () => pickZone());
   els.input.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
   });
@@ -505,7 +509,6 @@ export async function setBook(b, id, title, opts = {}) {
   bookFormat = opts.format || 'epub'; tocLabels = [];
   // "Explicar lo que veo" (visión) solo tiene sentido en PDF (renderizamos su canvas).
   if (els.see) els.see.style.display = bookFormat === 'pdf' ? '' : 'none';
-  if (els.zone) els.zone.style.display = bookFormat === 'pdf' ? '' : 'none';
   clearImageRef();
   convo = null; template = null; history = []; notes = [];
   ia2LastChapter = null; ia2Seen = new Set();   // IA2: reinicia el repaso por libro
@@ -1133,19 +1136,12 @@ function initKeyboardInset() {
   apply();
 }
 
-// VISIÓN · Botón "Ver": ADJUNTA la captura de la página actual al composer (no envía). Así el
-// usuario escribe/personaliza su pregunta y, al enviar, ese turno va con imagen al modelo de
-// visión (ADR-018). Fallback honesto: sin modelo de visión, guiamos a configurarlo.
+// VISIÓN · alcance "página entera": ADJUNTA la captura de la página actual al composer (no
+// envía). Así el usuario escribe/personaliza su pregunta y, al enviar, ese turno va con imagen
+// al modelo de visión (ADR-018). Se llama desde el botón "Toda la página" del overlay, que
+// solo se abre tras pasar `visionReady()` — por eso aquí no se repiten esas puertas.
 async function explainView() {
   if (busy) return;
-  if (bookFormat !== 'pdf' || !PdfReader.isLoaded()) { setStatus('Disponible al leer un PDF.'); return; }
-  if (!convo) { setStatus('Elige un objetivo de lectura primero.'); openOnboarding(); return; }
-  if (!LLM.hasKey()) { AppSettings.open('agent'); setStatus('Introduce tu API key primero.'); return; }
-  if (!LLM.hasVision()) {
-    setStatus('Configura un modelo con visión en Ajustes para explicar figuras.');
-    AppSettings.open('agent');
-    return;
-  }
   const page = PdfReader.getCurrentPage();
   const dataUrl = PdfReader.capturePageImage(1024);
   if (!dataUrl) { setStatus('Espera a que la página termine de renderizarse.'); return; }
@@ -1156,8 +1152,9 @@ async function explainView() {
   setStatus('Imagen de la página adjunta — escribe tu pregunta y pulsa Enviar.');
 }
 
-// VISIÓN · Botón "Zona": el usuario marca un marco sobre la página y se adjunta SOLO ese
-// recorte. Mismo destino que "Ver" (el composer), pero acotando qué mira el modelo.
+// VISIÓN · punto de entrada único. Abre el overlay: arrastrar recorta una zona y el botón
+// "Toda la página" adjunta la página entera. Los dos alcances acaban en el mismo sitio (el
+// composer), que es justo por lo que no merecían dos botones separados.
 async function pickZone() {
   if (busy) return;
   if (!visionReady()) return;
@@ -1187,6 +1184,7 @@ async function pickZone() {
         : 'Zona adjunta — escribe tu pregunta y pulsa Enviar.');
     },
     onCancel: () => { setOpen(true); showView('chat'); },
+    onWholePage: () => { explainView(); },
   });
   if (!ok) { setOpen(true); setStatus('Disponible al leer un PDF.'); }
 }
