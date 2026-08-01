@@ -173,7 +173,6 @@ const EN = {
   'Parar': 'Stop',
   'Descartar': 'Discard',
   'Escuchando…': 'Listening…',
-  'Pulsa el micro para terminar': 'Tap the mic to finish',
   'Ya vale, ¿qué me dejé?': 'That’s enough — what did I miss?',
   'Escribe o dicta tu explicación primero.': 'Write or dictate your explanation first.',
   'escuchando…': 'listening…',

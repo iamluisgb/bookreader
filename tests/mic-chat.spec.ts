@@ -235,3 +235,55 @@ test('la papelera descarta sin gastar la llamada a Whisper', async ({ page }) =>
   expect(out.barraOculta).toBe(true);         // la UI vuelve a reposo
   expect(out.grabando).toBe(false);
 });
+
+// Parar la grabación solo se podía volviendo a pulsar el botón del micro, que mientras grabas
+// queda fuera de donde miras (la barra sustituye al textarea) y sigue enseñando un icono de
+// micro. La pista "Pulsa el micro para terminar" tapaba ese hueco... salvo con el motor del
+// proveedor, donde se ocultaba para dejar sitio al vúmetro: ahí no quedaba ninguna indicación.
+// Ahora hay botón de parar en la propia barra, y transcribe igual que el micro.
+test('el botón de parar de la barra termina la grabación y transcribe', async ({ page }) => {
+  await openApp(page);
+  await installFakeRecorder(page);
+
+  let llamadas = 0;
+  await page.route('**/audio/transcriptions', async (route) => {
+    llamadas++;
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ text: 'dictado con el boton de parar' }) });
+  });
+
+  const out = await page.evaluate(async () => {
+    const w = window as any;
+    delete w.SpeechRecognition; delete w.webkitSpeechRecognition;
+    const LLM: any = await import('/js/ai/llm.js');
+    const M: any = await import('/js/ai/mic.js');
+    LLM.setKey('test-key'); LLM.setSttModel('whisper-1');
+
+    const wrap = document.createElement('div');
+    const input = document.createElement('textarea');
+    const btn = document.createElement('button');
+    btn.innerHTML = '<span></span>';
+    wrap.append(input); document.body.append(wrap, btn);
+    const mic = M.attachMic({ input, btn });
+
+    const bar = wrap.querySelector('.mic-bar') as HTMLElement;
+    const stop = wrap.querySelector('.mic-bar-stop') as HTMLElement;
+    const enReposo = { existe: !!stop, barraOculta: bar.hidden };
+
+    btn.click();
+    await new Promise((r) => setTimeout(r, 60));
+    const visibleAlGrabar = !!stop && getComputedStyle(stop).display !== 'none';
+
+    stop.click();                 // ← lo que antes solo hacía el botón del micro
+    await mic.stop();
+    await new Promise((r) => setTimeout(r, 150));
+
+    return { enReposo, visibleAlGrabar, texto: input.value, barraOculta: bar.hidden, grabando: mic.recording() };
+  });
+
+  expect(out.enReposo).toEqual({ existe: true, barraOculta: true });
+  expect(out.visibleAlGrabar).toBe(true);
+  expect(llamadas).toBe(1);                             // sí transcribe (la papelera no)
+  expect(out.texto).toBe('dictado con el boton de parar');
+  expect(out.barraOculta).toBe(true);                   // la UI vuelve a reposo
+  expect(out.grabando).toBe(false);
+});

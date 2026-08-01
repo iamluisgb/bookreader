@@ -1401,6 +1401,29 @@ textarea.is-recording { display: none; }
 /* Con vúmetro el hueco se queda corto: la pista sobra, el medidor ya lo dice todo. */
 .mic-bar.is-provider .mic-bar-hint { display: none; }
 
+/* Parar: la acción principal mientras grabas, y por eso es lo único con acento en la barra.
+   Va a la DERECHA (margin-left:auto), enfrente de la papelera: destructivo a un extremo,
+   confirmar al otro. Antes esto solo estaba en el botón del micro, que queda fuera de donde
+   miras porque la barra sustituye al textarea. */
+.mic-bar-stop {
+  margin-left: auto;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--on-accent);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+.mic-bar-stop:hover { background: var(--accent-hover); }
+.mic-bar-stop .icon { color: currentColor; }
+
 @media (prefers-reduced-motion: reduce) {
   .mic-bar-dot { animation: none; }
   .mic-bar-level i { transition: none; }

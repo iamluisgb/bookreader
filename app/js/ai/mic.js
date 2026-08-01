@@ -9,6 +9,7 @@
 // se corta solo por silencio, que es el fallo nº1 del dictado del navegador en móvil. Si no,
 // se cae al reconocedor del navegador, que sí da texto en vivo.
 import { t } from '../i18n.js';
+import { icon } from '../ui/icons.js';
 import * as LLM from './llm.js';
 import {
   speechSupported, createDictation, recorderSupported, createRecorder, dictationLang,
@@ -23,7 +24,7 @@ function useProviderStt() { return LLM.hasStt() && recorderSupported(); }
 // que de verdad hace falta aquí: con el motor del proveedor no hay texto en vivo, así que sin
 // nivel "te estoy oyendo" y "el micro está mudo" se ven exactamente igual — y no te enteras
 // hasta 30 segundos después, cuando vuelve vacío.
-function buildBar({ onCancel }) {
+function buildBar({ onCancel, onDone }) {
   const bar = document.createElement('div');
   bar.className = 'mic-bar';
   bar.hidden = true;
@@ -34,8 +35,10 @@ function buildBar({ onCancel }) {
     <span class="mic-bar-dot" aria-hidden="true"></span>
     <span class="mic-bar-time" role="timer">0:00</span>
     <span class="mic-bar-level" aria-hidden="true">${'<i></i>'.repeat(14)}</span>
-    <span class="mic-bar-hint">${t('Pulsa el micro para terminar')}</span>`;
+    <span class="mic-bar-hint">${t('Escuchando…')}</span>
+    <button type="button" class="mic-bar-stop" title="${t('Parar')}" aria-label="${t('Parar')}">${icon('check', { size: 18 })}</button>`;
   bar.querySelector('.mic-bar-cancel').addEventListener('click', onCancel);
+  bar.querySelector('.mic-bar-stop').addEventListener('click', onDone);
   return bar;
 }
 
@@ -113,7 +116,13 @@ export function attachMic({ input, btn, getPrompt = () => '', onError = () => {}
   let meter = null;
   let raf = 0;
 
-  const bar = buildBar({ onCancel: () => { discard = true; stop(); } });
+  // Parar estaba SOLO en el botón del micro, que mientras grabas queda fuera de donde miras
+  // (la barra sustituye al textarea) y sigue enseñando un icono de micro. La pista "Pulsa el
+  // micro para terminar" existía justo para tapar ese hueco... y con el motor del proveedor
+  // se ocultaba para dejar sitio al vúmetro, así que no quedaba ninguna indicación. Ahora la
+  // acción principal vive en la propia barra, a la derecha, enfrente de la papelera. El botón
+  // del micro sigue alternando: quien ya lo tenía aprendido no pierde nada.
+  const bar = buildBar({ onCancel: () => { discard = true; stop(); }, onDone: () => stop() });
   input.parentNode?.insertBefore(bar, input);
   const timeEl = bar.querySelector('.mic-bar-time');
   const bars = [...bar.querySelectorAll('.mic-bar-level i')];
@@ -224,9 +233,6 @@ export function attachMic({ input, btn, getPrompt = () => '', onError = () => {}
     // podría deshacer nada. Enseñar controles que no hacen lo que prometen es peor que no
     // enseñarlos.
     bar.classList.toggle('is-provider', provider);
-    bar.querySelector('.mic-bar-hint').textContent = provider
-      ? t('Pulsa el micro para terminar')
-      : t('Escuchando…');
     active = provider ? startProvider() : startBrowser();
     if (active) ui('rec');
   }

@@ -5,6 +5,24 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-08-01 — Parar el dictado se hace en la propia barra
+
+Para terminar de dictar había que volver a pulsar el botón del micro. El problema es dónde
+está ese botón mientras grabas: la barra de grabación **sustituye al textarea**, así que miras
+a la barra, y el micro se queda en la botonera del composer enseñando todavía un icono de
+micro. La prueba de que el hueco existía es que había una pista de texto —"Pulsa el micro para
+terminar"— cuyo único trabajo era explicar el gesto; y con el motor del proveedor esa pista
+**se ocultaba** para dejar sitio al vúmetro, así que ahí no quedaba ninguna indicación.
+
+Ahora la barra lleva su propio botón de parar a la derecha, en acento y con ✓: destructivo
+(papelera) a un extremo, confirmar al otro. Hace exactamente lo mismo que el micro —con el
+motor del proveedor, cerrar y transcribir—, así que el chat y el modo Feynman lo heredan sin
+tocar nada. El botón del micro sigue alternando: quien ya lo tenía aprendido no pierde nada.
+La pista de texto sobra y se retira (también su cadena de i18n).
+
+Test en `mic-chat.spec.ts`: el botón de la barra termina la grabación, transcribe (1 llamada,
+a diferencia de la papelera, que es 0) y devuelve la UI a reposo.
+
 ## 2026-08-01 — Tu pregunta aparece al pulsar Enviar, no cuando contesta la red
 
 Enviabas un mensaje y el chat se quedaba igual que antes de pulsar durante varios segundos.
