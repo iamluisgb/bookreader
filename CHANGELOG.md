@@ -5,6 +5,26 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-08-01 — Tu pregunta aparece al pulsar Enviar, no cuando contesta la red
+
+Enviabas un mensaje y el chat se quedaba igual que antes de pulsar durante varios segundos.
+Como `send()` vacía el textarea al momento, la lectura natural era que el mensaje no había
+salido o se había borrado, y el remedio del usuario es reescribirlo o volver a enviar.
+
+La causa: en `deliver()` la burbuja del usuario se pintaba **después** de la reescritura de
+consulta (IA7, que es una llamada al proveedor) y del retrieval. O sea, el eco de lo que
+acabas de escribir dependía de la red. Medido con 1,2 s de latencia simulada: **1577 ms**
+hasta ver la propia pregunta. Con un proveedor real y un libro grande, más.
+
+Ahora se pinta antes de cualquier `await`, nada más reservar el turno: **249 ms**, y ese resto
+es el clic del test. La persistencia (historial + IndexedDB) no se toca —sigue después del
+guard de contexto grande—, y si ese guard cancela el turno la burbuja se retira, así que no
+queda una pregunta huérfana en el chat.
+
+Test de regresión en `panel.spec.ts`: el stub tarda 2,5 s por llamada y se exige que la
+burbuja aparezca en menos de 1,5 s, de modo que no puede pasar si vuelve a depender de la red
+(verificado: sin el arreglo mide 3069 ms y falla).
+
 ## 2026-08-01 — La hoja solo se dibuja si hay escritorio de sobra
 
 La página como objeto (F1, ayer) pintaba el fondo del viewport con `--desk` siempre que hubiera

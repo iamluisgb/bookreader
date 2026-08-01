@@ -1697,6 +1697,14 @@ async function deliver(aug, question, { showUser = true, ref = null, systemExtra
   // un segundo envío concurrente durante ese hueco y da la señal de aborto a la expansión.
   busy = true; els.send.disabled = true; abortCtrl = new AbortController();
 
+  // La pregunta se pinta AQUÍ, antes de cualquier await. Estaba más abajo, después de la
+  // reescritura de consulta (que es una llamada al LLM) y del retrieval: como send() ya ha
+  // vaciado el textarea, el usuario se quedaba segundos con el chat igual que antes de
+  // pulsar —medido: 1577 ms con solo 1,2 s de latencia— y la sensación era que el mensaje
+  // no había salido o se había borrado. La PERSISTENCIA (history + IndexedDB) sigue abajo,
+  // pasado el guard de tokens: si ese guard cancela el turno, esta burbuja se retira.
+  const userBubble = showUser ? appendBubble('user', aug, false) : null;
+
   // IA7 · Reescritura de consulta por defecto (HyDE-lite): en preguntas conceptuales, expande
   // la query para mejorar el recall BM25. Precondiciones aquí (turno normal, con key, libro
   // listo, sin fragmento adjunto — con pasaje adjunto el pasaje manda); la POLÍTICA de cuándo
@@ -1728,12 +1736,12 @@ async function deliver(aug, question, { showUser = true, ref = null, systemExtra
       !(await confirmBox(t('El contexto es grande (~{n}k tokens): puede ser lento o caro. ¿Enviar igualmente?', { n: Math.round(estTokens / 1000) }),
         { title: 'Contexto grande', okText: 'Enviar igualmente' }))) {
     busy = false; els.send.disabled = false; abortCtrl = null;   // liberar el turno reservado
+    if (userBubble) userBubble.remove();   // el turno no sale: su burbuja tampoco se queda
     refreshStatus();
-    return;   // se conservan input y referencia adjunta
+    return;
   }
 
   if (showUser) {
-    appendBubble('user', aug, false);
     history.push({ role: 'user', content: aug });
     if (convo) DB.addMessage(convo.id, 'user', aug);
   }

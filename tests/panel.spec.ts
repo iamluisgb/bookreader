@@ -284,3 +284,46 @@ test('el chat NO es escribible desde la pestaña Studio, y vuelve a serlo al vol
   await page.fill('#ai-input', 'ya se puede escribir');
   await expect(page.locator('#ai-input')).toHaveValue('ya se puede escribir');
 });
+
+// La pregunta del usuario se pintaba DESPUÉS de la reescritura de consulta (una llamada al
+// LLM) y del retrieval. Como send() ya ha vaciado el textarea, entre pulsar Enviar y ver tu
+// propio mensaje pasaban segundos con el chat idéntico a antes de pulsar: la lectura natural
+// es que el mensaje no ha salido o se ha borrado. Medido antes del arreglo: 1577 ms con solo
+// 1,2 s de latencia. Aquí el stub tarda 2,5 s por llamada, así que si la burbuja depende de
+// la red el test no puede pasar.
+test('mi pregunta aparece al instante, sin esperar a la red', async ({ page }) => {
+  test.setTimeout(120000);
+  await setup(page);
+
+  // Re-stub LENTO (el de setup responde al momento): 2,5 s por llamada al proveedor.
+  await page.evaluate(() => {
+    const real = window.fetch.bind(window);
+    window.fetch = async (url: any, opts: any) => {
+      const u = typeof url === 'string' ? url : url?.url || '';
+      if (u.includes('/chat/completions') && opts?.body) {
+        await new Promise((r) => setTimeout(r, 2500));
+        const body = JSON.parse(opts.body);
+        if (body.stream) {
+          const chunks = ['data: {"choices":[{"delta":{"content":"Respuesta de prueba."},"finish_reason":null}]}\n\n',
+            'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n\n', 'data: [DONE]\n\n'];
+          const s = new ReadableStream({ start(c) { const e = new TextEncoder(); chunks.forEach(x => c.enqueue(e.encode(x))); c.close(); } });
+          return new Response(s, { status: 200, headers: { 'Content-Type': 'text/event-stream' } });
+        }
+        return new Response(JSON.stringify({ choices: [{ message: { content: 'LISTO' } }] }), { status: 200 });
+      }
+      return real(url, opts);
+    };
+  });
+
+  const pregunta = '¿Por qué es importante esto y qué significa para el conjunto del libro?';
+  await page.fill('#ai-input', pregunta);
+  const t0 = Date.now();
+  await page.click('#ai-send');
+  await page.locator('.ai-msg-user').last().waitFor({ state: 'visible', timeout: 30000 });
+  const ms = Date.now() - t0;
+
+  expect(ms, `la burbuja del usuario tardó ${ms} ms (el stub tarda 2500 ms por llamada)`).toBeLessThan(1500);
+  await expect(page.locator('.ai-msg-user').last()).toContainText('Por qué es importante');
+  // Y el turno sigue funcionando de punta a punta.
+  await expect(answerBubble(page)).toContainText('Respuesta de prueba', { timeout: 30000 });
+});
