@@ -890,3 +890,72 @@ un modelo real.
 el mismo contrato contra otro proveedor BYOK. Se apoya en `probeModel` y en los clientes reales de
 `llm.js`, no en peticiones duplicadas — salvo el test de concurrencia, que llama a `fetch` a pelo
 **a propósito**: la cola de ADR-027 serializaría justo lo que se quiere medir.
+
+## ADR-031 — Tres fuentes de inferencia, saldo en dinero y el token Pro sale de la licencia · `PROPUESTA`
+
+**Contexto.** MON1 dejó el gateway (ADR-021) sirviendo una demo. MON3 añade una segunda forma de
+pagar: **pago único** por las features premium (sync, biblioteca en todos los dispositivos,
+flashcards, repaso, mapas) y **suscripción aparte** para que la inferencia la pongamos nosotros.
+BYOK sigue siendo gratis y sin cupo. Son tres orígenes de inferencia sobre el mismo cliente, que
+ya habla OpenAI-compatible contra una base URL configurable.
+
+**Decisiones.**
+
+1. **Dos productos separados, y se dice.** El pago único NO incluye inferencia; la suscripción NO
+   incluye las features premium. Un coste recurrente no se financia con un pago único: el usuario
+   que más usa el agente sería el que más pérdida genera, para siempre. El paywall de features
+   declara explícitamente qué no incluye — el fallo caro aquí no es de código, es alguien pagando
+   29 $ esperando que la IA funcione.
+
+2. **La unidad de cuenta es DINERO, no llamadas.** `tokens.remaining` (llamadas) no sirve para un
+   plan de pago: con el techo de entrada en 90K tokens, dos llamadas legítimas se diferencian en
+   dos órdenes de magnitud. Pasa a `credits_remaining` en microcents de coste de proveedor.
+   Reserva antes de llamar (entrada estimada + `max_tokens` al precio del alias) y liquidación al
+   coste real al terminar: la reserva es lo que impide vaciar el saldo con llamadas simultáneas.
+   El tier `demo` sigue contando llamadas — es un cupo de prueba, no una cuenta.
+
+3. **Se mide también el streaming.** Hoy `real_output_tokens` solo existe en las llamadas de tools
+   y visión: el chat, que es el grueso del gasto, no se mide (ADR-021 §5 devuelve el body sin
+   parsear). Con `stream_options: {include_usage: true}` y un `TransformStream` que mira los chunks
+   al pasar, se liquida en `ctx.waitUntil` sin bufferizar nada. La retención cero se mantiene: se
+   lee el último chunk de `usage`, jamás el contenido.
+
+4. **OpenRouter como backend de la suscripción, por la contabilidad — no por el catálogo.**
+   Devuelve el coste real en dólares de cada generación, así que el saldo se lleva en dinero sin
+   mantener una tabla de precios por modelo: cambiar el modelo detrás de `bookreader-fast` no
+   descuadra nada. Créditos prepago = pérdida máxima acotada (un contrato directo te la enseña en
+   la factura de fin de mes). Coste: ~5% al comprar créditos y precio de tarifa. A este volumen
+   sale más barato que operar varios proveedores; cuando un modelo concreto domine el gasto, se
+   mueve a contrato directo cambiando **una fila** de `ROUTING` (esa es toda la gracia de ADR-021 §3).
+   **Condición**: `provider: { data_collection: 'deny' }` y sin fallback a proveedores que
+   entrenan con los datos. Sin eso, lo que promete la landing es falso.
+
+5. **El token Pro se emite contra la licencia, sin webhooks.** `POST /pro-token` recibe la license
+   key, la valida **server-side** contra Polar y devuelve un `br-pro-…` ligado a ella (la columna
+   `license_key` existe desde ADR-021), recargando el saldo si el periodo venció. No se duplica el
+   estado de la suscripción y la revocación llega sola en la siguiente recarga. Un endpoint, cero
+   infraestructura de webhooks.
+
+6. **La UI elige FUENTE, no configuración.** Ajustes → Agente arranca con tres opciones excluyentes
+   (demo · inferencia de BookReader · tu propia key) y el formulario técnico actual —base URL y los
+   cuatro slots de modelo— se despliega **solo** bajo BYOK. Quien paga una suscripción no ve nunca
+   "Base URL (endpoint OpenAI-compatible)". El catálogo del proveedor NO se expone en el plan de
+   pago: dos o tres alias, que es lo que hace predecible el coste y lo que promete la app (elegimos
+   nosotros el modelo bueno para leer). Quien quiera elegir tiene BYOK, gratis.
+
+7. **El saldo se ve donde se gasta.** El gateway ya devuelve `X-Quota-Remaining` y **el cliente no
+   lo lee** (no aparece en `app/js`): hoy el usuario se entera de que se acabó la demo cuando le
+   falla una respuesta a medias. El medidor va en la cabecera del panel del agente, no solo en
+   Ajustes, y en unidades que se entiendan ("~35 respuestas"), nunca en créditos ni tokens. Las
+   acciones caras (resumen de libro, mapa mental: map-reduce de muchas llamadas) declaran su coste
+   estimado antes de lanzarse.
+
+8. **El 403 de cupo agotado es el momento de conversión.** Llega a mitad de una respuesta, que es
+   justo cuando el usuario quiere seguir. El mensaje ofrece las dos salidas (suscribirse · poner
+   tu key) y dice que lo escrito no se pierde. Hoy solo dice "añade tu propia key".
+
+**Consecuencias.** BYOK no se penaliza nunca: es la credibilidad de todo el discurso de privacidad
+y se anuncia como gratis para siempre. La app sigue leyéndose entera sin inferencia. Requiere
+migración de D1 (`credits_remaining`, periodo de recarga) y precio por alias para la reserva previa;
+los `daily_stats` que ya existen dan el coste real por usuario activo con el que poner precio a la
+suscripción — ponerlo antes de medir sería inventárselo.
