@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>BookReader — marca v2</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { margin:0; font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+  section { padding:40px 48px; }
+  .light { background:#fbfbfd; color:#111418; }
+  .dark  { background:#0e1116; color:#e6eaef; }
+  h2 { font-size:13px; text-transform:uppercase; letter-spacing:.08em; opacity:.55; margin:0 0 24px; font-weight:600; }
+  .row { display:flex; align-items:flex-end; gap:32px; flex-wrap:wrap; }
+  figure { margin:0; text-align:center; }
+  figcaption { font-size:11px; opacity:.5; margin-top:8px; font-variant-numeric:tabular-nums; }
+  img { display:block; image-rendering:auto; }
+  .px16 img{width:16px}.px32 img{width:32px}.px64 img{width:64px}.px128 img{width:128px}.px192 img{width:192px}
+  .mask img { border-radius:22.5%; }
+  .lockup img { max-width:340px; height:auto; }
+  .tabbar { display:flex; align-items:center; gap:8px; background:#e6e6ea; padding:6px 12px; border-radius:8px 8px 0 0; width:max-content; color:#111; font-size:13px; }
+  .dark .tabbar { background:#2a2d33; color:#e6eaef; }
+  .tabbar img { width:16px; }
+</style>
+</head>
+<body>
+
+<section class="dark">
+  <h2>Variante oscura — recomendada para icono</h2>
+  <div class="row">
+    <figure class="px192"><img src="png/icon-512.png"><figcaption>192</figcaption></figure>
+    <figure class="px128"><img src="png/icon-512.png"><figcaption>128</figcaption></figure>
+    <figure class="px64"><img src="png/icon-512.png"><figcaption>64</figcaption></figure>
+    <figure class="px32"><img src="png/icon-32.png"><figcaption>32 · favicon</figcaption></figure>
+    <figure class="px16"><img src="png/icon-16.png"><figcaption>16 · pestaña</figcaption></figure>
+    <figure class="px128 mask"><img src="png/maskable-512.png"><figcaption>maskable</figcaption></figure>
+  </div>
+  <div style="margin-top:32px" class="tabbar"><img src="png/icon-16.png"> BookReader — Lector con agente</div>
+</section>
+
+<section class="light">
+  <h2>Variante clara — fiel al original (marketing)</h2>
+  <div class="row">
+    <figure class="px192"><img src="png/icon-light-512.png"><figcaption>192</figcaption></figure>
+    <figure class="px128"><img src="png/icon-light-512.png"><figcaption>128</figcaption></figure>
+    <figure class="px64"><img src="png/icon-light-512.png"><figcaption>64</figcaption></figure>
+    <figure class="px32"><img src="png/icon-light-32.png"><figcaption>32 · se disuelve</figcaption></figure>
+    <figure class="px128 mask"><img src="png/maskable-light-512.png"><figcaption>maskable</figcaption></figure>
+  </div>
+  <div style="margin-top:32px" class="tabbar"><img src="png/icon-light-32.png"> BookReader — Lector con agente</div>
+</section>
+
+<section class="light">
+  <h2>Lockup y wordmark (recorte del raster original)</h2>
+  <div class="row lockup">
+    <figure><img src="png/lockup-vertical.png"><figcaption>lockup vertical</figcaption></figure>
+    <figure><img src="png/wordmark.png"><figcaption>wordmark</figcaption></figure>
+  </div>
+</section>
+
+<section class="light">
+  <h2>Original entregado</h2>
+  <div class="row lockup"><figure><img src="png/original-1536.png" style="max-width:640px"><figcaption>logo_bookreader.png · 1536×1024</figcaption></figure></div>
+</section>
+
+</body>
+</html>
