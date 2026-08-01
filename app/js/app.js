@@ -7,7 +7,7 @@ import * as Storage from './storage.js';
 import * as AiPanel from './ai/panel.js';
 import * as AiDB from './ai/db.js';
 import { hydrateIcons } from './ui/icons.js';
-import { countBookWords, updateProgressDetail } from './progress.js';
+import { countBookWords, countPdfWords, updateProgressDetail } from './progress.js';
 import { initHighlights, setupHighlights, setupPdfSelection, drawPdfHighlights, renderHighlights, applyStoredHighlights, repaintStoredHighlights, hideHighlightTooltip, pdfFractionalRects, setBookMeta } from './highlights-ui.js';
 import { initBookmarkButton, updateBookmarkButton, renderBookmarks } from './bookmarks-ui.js';
 import * as Library from './library/view.js';
@@ -481,7 +481,7 @@ let pendingProgress = null;   // { bookId, pct } aún no escrito
 
 function saveProgress(pct) {
   if (!currentBook) return;
-  pendingProgress = { bookId: currentBook.id, pct };
+  pendingProgress = { bookId: currentBook.id, pct, format: currentBook.format };
   clearTimeout(progressTimer);
   progressTimer = setTimeout(flushProgress, 800);
 }
@@ -495,7 +495,9 @@ async function flushProgress() {
   pendingProgress = null;
   if (!pending) return;
   try {
-    const cfi = EpubReader.getCurrentCfi();
+    // En PDF no hay CFI: leerlo aquí devolvería el del último EPUB abierto y lo
+    // escribiría en la ficha del PDF. Se conserva el previo (null).
+    const cfi = pending.format === 'pdf' ? null : EpubReader.getCurrentCfi();
     const prev = await LibStore.getBook(pending.bookId);
     const status = LibStore.statusFor(pending.pct, prev?.status);
     await LibStore.updateBook(pending.bookId, { progress: pending.pct, lastCfi: cfi || prev?.lastCfi || null, status });
@@ -1076,6 +1078,7 @@ async function loadPdf(buffer, bookId, aiBookId, persist = null, displayTitle = 
   const seq = ++pdfLoadSeq;
   try {
     resetSearch();
+    totalWords = 0;   // el de este PDF se estima al final; no heredar el del libro anterior
     // Hash estable del contenido (id canónico para el agente). Se reutiliza si ya viene dado.
     if (!aiBookId) aiBookId = await AiDB.hashBuffer(buffer.slice(0));
 
@@ -1085,6 +1088,13 @@ async function loadPdf(buffer, bookId, aiBookId, persist = null, displayTitle = 
       drawPdfHighlights(page);       // PDF3: re-pintar los subrayados de la página
       updateBookmarkButton();        // reflejar si la página actual está marcada
       markCurrentToc();              // mantener viva la marca del índice
+      // Mismo par que en EPUB: tiempo restante en el pie y progreso a la biblioteca
+      // (la barra bajo la portada). Sin esto el PDF salía siempre al 0%.
+      const pages = PdfReader.getTotalPages();
+      if (!pages) return;
+      const pct = Math.round((page / pages) * 100);
+      updateProgressDetail(pct, totalWords);
+      saveProgress(pct);
     });
 
     await PdfReader.load(buffer);
@@ -1129,6 +1139,14 @@ async function loadPdf(buffer, bookId, aiBookId, persist = null, displayTitle = 
     loadPdfTOC();                    // índice del PDF (outline) en el sidebar
     PdfReader.primeOutlineCache();   // capítulo de la burbuja al arrastrar la barra
     updateReadingModeToggle();       // PDF4: reflejar el modo (paginado/scroll) recordado
+    // Tiempo restante del pie. Se lanza sin await: muestrea páginas y tarda unas
+    // décimas; el resto de la UI no tiene por qué esperarla.
+    countPdfWords().then((w) => {
+      if (seq !== pdfLoadSeq) return;   // otro PDF ganó la carrera
+      totalWords = w;
+      const pages = PdfReader.getTotalPages();
+      if (pages) updateProgressDetail(Math.round((PdfReader.getCurrentPage() / pages) * 100), totalWords);
+    });
     return true;
   } catch (err) {
     console.error('Error loading PDF:', err);

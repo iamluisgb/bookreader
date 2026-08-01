@@ -2,11 +2,16 @@
 // estimado. Extraído de app.js (T8, ver CHANGELOG). Las funciones reciben totalWords
 // por parámetro en vez de leer estado global del módulo principal.
 import * as EpubReader from './epub-reader.js';
+import * as PdfReader from './pdf-reader.js';
 import { t } from './i18n.js';
 
 const WORDS_PER_MINUTE = 250;
 // Debe coincidir con el valor de book.locations.generate() en epub-reader.js.
 const CHARS_PER_LOCATION = 1024;
+// Páginas que se muestrean para estimar las palabras de un PDF. Extraer el texto
+// del documento entero costaría segundos en libros grandes y aquí solo hace falta
+// un orden de magnitud.
+const PDF_SAMPLE_PAGES = 12;
 
 // Actualiza el tiempo de lectura restante mostrado en el pie (#progress-time), a
 // partir del % de progreso y las palabras totales estimadas. (Antes vivía en un
@@ -23,6 +28,10 @@ export function updateProgressDetail(pct, totalWords = 0) {
     timeEl.textContent = t('Terminado');
     return;
   }
+
+  // Sin palabras estimadas no se inventa un tiempo: pasa en PDFs escaneados (sin
+  // capa de texto), donde el muestreo no encuentra nada. Mejor vacío que "~1 min".
+  if (!totalWords) { timeEl.textContent = ''; return; }
 
   const wordsLeft = Math.round(totalWords * (remaining / 100));
   const minutesLeft = Math.max(1, Math.round(wordsLeft / WORDS_PER_MINUTE));
@@ -69,6 +78,35 @@ export function countBookWords() {
 
   // Último recurso: una novela típica ronda las 80 000 palabras.
   return 80000;
+}
+
+// Equivalente de countBookWords() para PDF. No hay `locations` que dividan el
+// documento, así que se muestrean páginas REPARTIDAS por todo el libro (no las
+// primeras: portada, créditos e índice no representan al cuerpo) y se extrapola.
+// chars/5 ≈ palabras, el mismo criterio que en EPUB. Devuelve 0 si no hay capa de
+// texto (PDF escaneado), para que el pie no muestre una estimación inventada.
+export async function countPdfWords() {
+  const doc = PdfReader.getDocument();
+  const total = PdfReader.getTotalPages();
+  if (!doc || !total) return 0;
+
+  const n = Math.min(PDF_SAMPLE_PAGES, total);
+  let chars = 0;
+  let sampled = 0;
+  for (let i = 0; i < n; i++) {
+    const p = Math.max(1, Math.min(total, Math.round(((i + 0.5) / n) * total)));
+    try {
+      const page = await doc.getPage(p);
+      const content = await page.getTextContent();
+      for (const it of content.items) {
+        if (typeof it.str === 'string') chars += it.str.length;
+      }
+      page.cleanup?.();
+      sampled++;
+    } catch { /* página ilegible: no cuenta para la media */ }
+  }
+  if (!sampled || !chars) return 0;
+  return Math.round(((chars / sampled) * total) / 5);
 }
 
 function getCurrentPct() {
