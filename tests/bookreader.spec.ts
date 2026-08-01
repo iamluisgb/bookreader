@@ -3,15 +3,27 @@ import path from 'path';
 
 const EPUB_PATH = path.join(__dirname, 'test.epub');
 
-test.describe('BookReader - Landing', () => {
-  test('shows landing page with title and open button', async ({ page }) => {
+// La pantalla de inicio es la BIBLIOTECA, también sin libros: la vista de lectura
+// vacía no llevaba a ninguna parte (ni estanterías, ni ajustes).
+test.describe('BookReader - Inicio', () => {
+  test('arranca en la biblioteca, con su estado vacío', async ({ page }) => {
     await page.goto('/');
-    await expect(page.locator('h1')).toHaveText('BookReader');
-    await expect(page.getByRole('button', { name: 'Abrir archivo' })).toBeVisible();
+    await expect(page.locator('.lib-h1')).toHaveText('Libros');
+    await expect(page.getByRole('button', { name: 'Subir tu primer libro' })).toBeVisible();
+    await expect(page.locator('.lib-rail-settings')).toBeVisible();
   });
 
+  // La sidebar es del LECTOR: sobre la biblioteca está apartada a propósito
+  // (`body.in-library`), así que hay que abrir un libro para ejercitarla.
   test('sidebar opens and closes', async ({ page }) => {
     await page.goto('/');
+    const [fileChooser] = await Promise.all([
+      page.waitForEvent('filechooser'),
+      page.getByRole('button', { name: 'Subir tu primer libro' }).click(),
+    ]);
+    await fileChooser.setFiles(EPUB_PATH);
+    await expect(page.locator('#epub-container')).toBeVisible({ timeout: 10000 });
+
     await page.getByRole('button', { name: 'Abrir sidebar' }).click();
     await expect(page.locator('#sidebar')).toHaveClass(/open/);
     await page.getByRole('button', { name: 'Cerrar sidebar' }).click();
@@ -25,14 +37,14 @@ test.describe('BookReader - EPUB Loading', () => {
 
     const [fileChooser] = await Promise.all([
       page.waitForEvent('filechooser'),
-      page.getByRole('button', { name: 'Abrir archivo' }).click(),
+      page.getByRole('button', { name: 'Subir tu primer libro' }).click(),
     ]);
     await fileChooser.setFiles(EPUB_PATH);
 
     await expect(page.locator('#reader-title')).toHaveText('Pedro Páramo', { timeout: 10000 });
     await expect(page.locator('#reader-footer')).toBeVisible();
     await expect(page.locator('#epub-container')).toBeVisible();
-    await expect(page.locator('#landing')).not.toBeVisible();
+    await expect(page.locator('#library')).not.toBeVisible();
   });
 
   test('navigation buttons work', async ({ page }) => {
@@ -40,7 +52,7 @@ test.describe('BookReader - EPUB Loading', () => {
 
     const [fileChooser] = await Promise.all([
       page.waitForEvent('filechooser'),
-      page.getByRole('button', { name: 'Abrir archivo' }).click(),
+      page.getByRole('button', { name: 'Subir tu primer libro' }).click(),
     ]);
     await fileChooser.setFiles(EPUB_PATH);
     await page.waitForTimeout(2000);
@@ -65,7 +77,7 @@ test.describe('BookReader - EPUB Loading', () => {
 
     const [fileChooser] = await Promise.all([
       page.waitForEvent('filechooser'),
-      page.getByRole('button', { name: 'Abrir archivo' }).click(),
+      page.getByRole('button', { name: 'Subir tu primer libro' }).click(),
     ]);
     await fileChooser.setFiles(EPUB_PATH);
     await page.waitForTimeout(2000);
@@ -85,7 +97,7 @@ test.describe('BookReader - Sidebar Tabs', () => {
     await page.goto('/');
     const [fileChooser] = await Promise.all([
       page.waitForEvent('filechooser'),
-      page.getByRole('button', { name: 'Abrir archivo' }).click(),
+      page.getByRole('button', { name: 'Subir tu primer libro' }).click(),
     ]);
     await fileChooser.setFiles(EPUB_PATH);
     await page.waitForTimeout(3000);
@@ -151,7 +163,7 @@ test.describe('BookReader - Settings', () => {
     await page.goto('/');
     const [fileChooser] = await Promise.all([
       page.waitForEvent('filechooser'),
-      page.getByRole('button', { name: 'Abrir archivo' }).click(),
+      page.getByRole('button', { name: 'Subir tu primer libro' }).click(),
     ]);
     await fileChooser.setFiles(EPUB_PATH);
     await page.waitForTimeout(3000);
@@ -242,7 +254,7 @@ test.describe('BookReader - Highlights', () => {
     await page.goto('/');
     const [fileChooser] = await Promise.all([
       page.waitForEvent('filechooser'),
-      page.getByRole('button', { name: 'Abrir archivo' }).click(),
+      page.getByRole('button', { name: 'Subir tu primer libro' }).click(),
     ]);
     await fileChooser.setFiles(EPUB_PATH);
     await page.waitForTimeout(3000);
@@ -264,7 +276,7 @@ test.describe('BookReader - Export', () => {
     await page.goto('/');
     const [fileChooser] = await Promise.all([
       page.waitForEvent('filechooser'),
-      page.getByRole('button', { name: 'Abrir archivo' }).click(),
+      page.getByRole('button', { name: 'Subir tu primer libro' }).click(),
     ]);
     await fileChooser.setFiles(EPUB_PATH);
     await page.waitForTimeout(3000);
@@ -299,7 +311,7 @@ test.describe('BookReader - Export', () => {
     // Load epub
     const [fileChooser] = await Promise.all([
       page.waitForEvent('filechooser'),
-      page.getByRole('button', { name: 'Abrir archivo' }).click(),
+      page.getByRole('button', { name: 'Subir tu primer libro' }).click(),
     ]);
     await fileChooser.setFiles(EPUB_PATH);
     await page.waitForTimeout(3000);
@@ -312,7 +324,7 @@ test.describe('BookReader - Export', () => {
 });
 
 test.describe('BookReader - Drag & Drop', () => {
-  test('drag area is visible on landing', async ({ page }) => {
+  test('drag area is visible en la biblioteca', async ({ page }) => {
     await page.goto('/');
     const viewport = page.locator('#reader-viewport');
     await expect(viewport).toBeVisible();
@@ -347,7 +359,7 @@ test.describe('BookReader - No JS errors', () => {
     await page.goto('/');
     const [fileChooser] = await Promise.all([
       page.waitForEvent('filechooser'),
-      page.getByRole('button', { name: 'Abrir archivo' }).click(),
+      page.getByRole('button', { name: 'Subir tu primer libro' }).click(),
     ]);
     await fileChooser.setFiles(EPUB_PATH);
     await page.waitForTimeout(5000);

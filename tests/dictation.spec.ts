@@ -8,7 +8,7 @@ import path from 'path';
 
 async function openApp(page: Page) {
   await page.goto('/');
-  await page.waitForFunction(() => !!document.getElementById('landing'));
+  await page.waitForFunction(() => !!document.getElementById('library'));
 }
 
 // Reconocedor falso: registra arranques y deja disparar los eventos a mano.
@@ -177,7 +177,7 @@ test('el selector de idioma no rompe la fila de acciones', async ({ page }) => {
   await page.goto('/');
   const [chooser] = await Promise.all([
     page.waitForEvent('filechooser'),
-    page.getByRole('button', { name: 'Abrir archivo' }).click(),
+    page.getByRole('button', { name: 'Subir tu primer libro' }).click(),
   ]);
   await chooser.setFiles(path.join(__dirname, 'test.epub'));
   await expect(page.locator('#reader-title')).toHaveText('Pedro Páramo', { timeout: 15000 });
@@ -295,7 +295,7 @@ test('en Feynman la barra de grabación sustituye al textarea y el vúmetro va',
   await page.goto('/');
   const [chooser] = await Promise.all([
     page.waitForEvent('filechooser'),
-    page.getByRole('button', { name: 'Abrir archivo' }).click(),
+    page.getByRole('button', { name: 'Subir tu primer libro' }).click(),
   ]);
   await chooser.setFiles(path.join(__dirname, 'test.epub'));
   await expect(page.locator('#reader-title')).toHaveText('Pedro Páramo', { timeout: 15000 });

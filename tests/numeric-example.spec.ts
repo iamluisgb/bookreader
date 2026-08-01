@@ -40,7 +40,7 @@ async function openWithAgent(page: Page) {
   await page.goto('/');
   const [chooser] = await Promise.all([
     page.waitForEvent('filechooser'),
-    page.getByRole('button', { name: 'Abrir archivo' }).click(),
+    page.getByRole('button', { name: 'Subir tu primer libro' }).click(),
   ]);
   await chooser.setFiles(EPUB);
   await expect(page.locator('#reader-title')).toHaveText('Pedro Páramo', { timeout: 15000 });
@@ -150,7 +150,7 @@ test('con una fórmula real, el modelo da números, aritmética y comprobación 
   await page.goto('/');
   const [chooser] = await Promise.all([
     page.waitForEvent('filechooser'),
-    page.getByRole('button', { name: 'Abrir archivo' }).click(),
+    page.getByRole('button', { name: 'Subir tu primer libro' }).click(),
   ]);
   await chooser.setFiles(path.join(__dirname, '..', 'evals', 'fixtures', 'p1-relativity.epub'));
   await page.waitForSelector('#reader-footer', { state: 'visible', timeout: 30000 });

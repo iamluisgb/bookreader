@@ -31,8 +31,11 @@ const MAX_TOKENS = 4096;
 // `concurrent` (opcional): el proveedor tolera peticiones simultáneas con la misma key.
 // nan NO (devuelve "network error"), y ese límite suyo era el que obligaba a serializar
 // toda la app. Se declara solo donde está verificado; sin declarar → se serializa.
+// `visionModel` (opcional): modelo multimodal del proveedor, para que la VISTA SIMPLE
+// pueda dejar "Explicar lo que veo" funcionando sin que el usuario configure un segundo
+// slot. Igual que `liteModel`, solo se declara donde está verificado.
 export const PROVIDERS = [
-  { id: 'nan',        name: 'nan',        baseUrl: 'https://api.nan.builders/v1',   models: ['deepseek-v4-flash', 'mimo-v2.5', 'qwen3.6', 'gemma4'], liteModel: 'qwen3.6' },
+  { id: 'nan',        name: 'nan',        baseUrl: 'https://api.nan.builders/v1',   models: ['deepseek-v4-flash', 'mimo-v2.5', 'qwen3.6', 'gemma4'], liteModel: 'qwen3.6', visionModel: 'mimo-v2.5' },
   { id: 'openai',     name: 'OpenAI',     baseUrl: 'https://api.openai.com/v1',     models: ['gpt-4o', 'gpt-4o-mini', 'o4-mini'], concurrent: true },
   { id: 'openrouter', name: 'OpenRouter', baseUrl: 'https://openrouter.ai/api/v1',  models: ['deepseek/deepseek-chat', 'anthropic/claude-3.7-sonnet', 'google/gemini-2.0-flash-001'], concurrent: true },
   { id: 'groq',       name: 'Groq',       baseUrl: 'https://api.groq.com/openai/v1', models: ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant'], concurrent: true },
@@ -73,10 +76,91 @@ export function hasKey()         { return getKey().trim().length > 0; }
 export function getBaseUrl()    { return (Storage.get('ai_base_url', DEFAULT_BASE_URL) || DEFAULT_BASE_URL).trim().replace(/\/+$/, ''); }
 export function setBaseUrl(u)    { Storage.set('ai_base_url', ((u || '').trim() || DEFAULT_BASE_URL).replace(/\/+$/, '')); }
 
+// ---- Proveedores propios del usuario -----------------------------------------
+// Los presets de arriba son los que traemos verificados, pero cualquier endpoint
+// OpenAI-compatible vale (un LLM local, un gateway de empresa, un proveedor que no
+// conocemos). Guardarlo como PROVEEDOR —y no solo como "base URL personalizada"—
+// es lo que le da nombre, lo mete en el desplegable y lo hace utilizable desde la
+// vista simple, que es donde vive quien no quiere pensar en esto cada vez.
+const CUSTOM_KEY = 'ai_custom_providers';
+const normUrl = (u) => (u || '').trim().replace(/\/+$/, '');
+
+export function getCustomProviders() {
+  const list = Storage.get(CUSTOM_KEY, []);
+  if (!Array.isArray(list)) return [];
+  return list.filter(p => p && p.id && p.baseUrl && Array.isArray(p.models) && p.models.length);
+}
+
+// Todos los proveedores seleccionables: los de fábrica primero. El resto del código
+// resuelve SIEMPRE contra esta lista; `PROVIDERS` es solo la parte de fábrica.
+export function allProviders() {
+  return [...PROVIDERS, ...getCustomProviders()];
+}
+
+export function isCustomProvider(id) { return String(id || '').startsWith('custom:'); }
+
+// Alta o actualización. La identidad de un proveedor es su base URL: guardar dos
+// veces el mismo endpoint con distinto nombre daría dos filas que `currentProvider()`
+// no sabría distinguir (busca por URL), así que se actualiza la que ya hubiera.
+export function saveCustomProvider({ name, baseUrl, models, liteModel, visionModel }) {
+  const url = normUrl(baseUrl);
+  const list = models.map(m => String(m || '').trim()).filter(Boolean);
+  if (!url) throw new Error(t('Falta la Base URL.'));
+  if (!list.length) throw new Error(t('Falta el id del modelo.'));
+  const clean = {
+    id: 'custom:' + url,
+    name: (name || '').trim() || url.replace(/^https?:\/\//, '').split('/')[0],
+    baseUrl: url,
+    models: [...new Set(list)],
+    liteModel: (liteModel || '').trim() || undefined,
+    visionModel: (visionModel || '').trim() || undefined,
+  };
+  const rest = getCustomProviders().filter(p => p.baseUrl !== url);
+  Storage.set(CUSTOM_KEY, [...rest, clean]);
+  return clean;
+}
+
+export function removeCustomProvider(id) {
+  Storage.set(CUSTOM_KEY, getCustomProviders().filter(p => p.id !== id));
+}
+
 // Preset que coincide con la base URL actual, o null si es personalizada.
 export function currentProvider() {
   const b = getBaseUrl();
-  return PROVIDERS.find(p => p.baseUrl.replace(/\/+$/, '') === b) || null;
+  return allProviders().find(p => normUrl(p.baseUrl) === b) || null;
+}
+
+// ---- Vista simple / avanzada de Ajustes → Agente -----------------------------
+// Elegir modelo es una decisión que la mayoría no puede tomar (no sabe qué es
+// `deepseek-v4-flash` ni por qué debería importarle) y que nosotros SÍ sabemos tomar:
+// cada preset declara su modelo bueno. La vista simple pide lo mínimo —proveedor y
+// key— y resuelve los cuatro slots; la avanzada es el formulario completo de siempre.
+// La preferencia se recuerda: quien la abre una vez, la quiere siempre.
+export function isAdvanced()      { return Storage.get('ai_advanced', false) === true; }
+export function setAdvanced(v)     { Storage.set('ai_advanced', !!v); }
+
+// ¿Es la demo del gateway lo que está configurado? La vista simple la trata como un
+// estado propio (no es un proveedor de la lista y no tiene key que enseñar).
+export function isDemo()          { return getBaseUrl() === GATEWAY_BASE_URL; }
+
+// La vista simple solo sabe representar un preset o la demo. Una base URL propia
+// (BYOK contra un proveedor no listado) no cabe en ella: se fuerza la avanzada, o
+// abriríamos Ajustes mostrando algo que no es lo que está configurado.
+export function canUseSimple()    { return isDemo() || currentProvider() !== null; }
+
+// Los cuatro slots que la vista simple resuelve sola a partir del preset. `model`
+// respeta el que ya hubiera si pertenece al proveedor (alguien pudo elegirlo en la
+// avanzada); el resto solo se rellenan si están vacíos — nunca pisamos una elección
+// explícita del usuario por el hecho de guardar en la vista simple.
+export function presetDefaults(providerId) {
+  const p = allProviders().find(x => x.id === providerId);
+  if (!p) return null;
+  return {
+    baseUrl: p.baseUrl,
+    model: p.models.includes(getModel()) ? getModel() : p.models[0],
+    visionModel: getVisionModel() || p.visionModel || '',
+    liteModel: getLiteModelSetting(),   // vacío = automático, que ya usa p.liteModel
+  };
 }
 
 // Descubre los modelos que ofrece el proveedor: GET /models (OpenAI-compatible,

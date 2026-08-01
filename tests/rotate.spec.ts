@@ -23,7 +23,7 @@ test('epub re-paginates on rotation (no cut-off)', async ({ page }) => {
   await page.goto('/');
 
   const fc = page.waitForEvent('filechooser');
-  await page.click('#open-file-btn');
+  await page.click('.lib-empty .lib-upload');
   await (await fc).setFiles(EPUB_PATH);
 
   // Esperar a que el iframe del libro exista y tenga tamaño.
@@ -85,7 +85,7 @@ test('rotation preserves reading position (no walk-back)', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/');
   const fc = page.waitForEvent('filechooser');
-  await page.click('#open-file-btn');
+  await page.click('.lib-empty .lib-upload');
   await (await fc).setFiles(EPUB_PATH);
   await page.waitForSelector('#epub-container iframe', { timeout: 15000 });
   await page.waitForFunction(() => {

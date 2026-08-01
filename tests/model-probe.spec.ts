@@ -6,10 +6,12 @@ import { test, expect } from '@playwright/test';
 // la feature "activada" y fallando al usarla). El botón «Probar» convierte ese fallo
 // silencioso y diferido en una respuesta inmediata.
 
+// La pantalla de inicio es la biblioteca, y su rail lleva a Ajustes. Los cuatro slots
+// viven en la VISTA AVANZADA: la simple no pide modelo (lo pone el preset).
 const openAgentSettings = async (page) => {
   await page.goto('/');
-  await page.locator('#sidebar-toggle').click();
-  await page.locator('#open-app-settings').click();
+  await page.locator('.lib-rail-settings').click();
+  await page.locator('#appset-agent-advanced').click();
 };
 
 test('un modelo válido responde «Funciona» con su latencia', async ({ page }) => {

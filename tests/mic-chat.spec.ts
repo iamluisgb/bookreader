@@ -6,7 +6,7 @@ import { test, expect, Page } from '@playwright/test';
 
 async function openApp(page: Page) {
   await page.goto('/');
-  await page.waitForFunction(() => !!document.getElementById('landing'));
+  await page.waitForFunction(() => !!document.getElementById('library'));
 }
 
 // MediaRecorder falso: graba "audio" sin micro real y deja controlar cuándo para.

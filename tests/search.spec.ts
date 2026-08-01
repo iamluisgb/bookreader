@@ -50,7 +50,7 @@ test('searchPassages: es insensible a acentos y a mayúsculas', async ({ page })
 test('búsqueda E2E: escribir en la pestaña Buscar lista y navega a la coincidencia', async ({ page }) => {
   await page.goto('/index.html');
   const fc = page.waitForEvent('filechooser');
-  await page.click('#open-file-btn');
+  await page.click('.lib-empty .lib-upload');
   await (await fc).setFiles(EPUB_PATH);
   await page.waitForSelector('#ai-toggle:not([disabled])', { timeout: 20000 });
 

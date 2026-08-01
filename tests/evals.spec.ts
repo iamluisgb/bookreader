@@ -60,7 +60,7 @@ test.describe('EV1 · generación de artefactos @eval', () => {
 
       // Abrir el fixture y pasar el onboarding con el objetivo de la persona.
       const fc = page.waitForEvent('filechooser');
-      await page.click('#open-file-btn');
+      await page.click('.lib-empty .lib-upload');
       await (await fc).setFiles(fixture);
       await page.waitForSelector('#ai-toggle:not([disabled])', { timeout: 120000 });
       timings.load = Date.now() - t0;

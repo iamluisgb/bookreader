@@ -77,7 +77,7 @@ async function setup(page, canned = JSON.stringify(CANNED_CARDS), delayMs = 0) {
   await stubLLM(page, canned, delayMs);
 
   const fc = page.waitForEvent('filechooser');
-  await page.click('#open-file-btn');
+  await page.click('.lib-empty .lib-upload');
   await (await fc).setFiles(EPUB_PATH);
 
   await page.waitForSelector('#ai-toggle:not([disabled])', { timeout: 15000 });

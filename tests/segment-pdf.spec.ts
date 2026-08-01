@@ -212,7 +212,7 @@ test('el outline de raíz única del BOE produce capítulos por TÍTULO (PDF rea
   test.setTimeout(180000);
   await page.goto('/index.html');
   const fc = page.waitForEvent('filechooser');
-  await page.click('#open-file-btn');
+  await page.click('.lib-empty .lib-upload');
   await (await fc).setFiles(fixture);
   await page.waitForSelector('#ai-toggle:not([disabled])', { timeout: 120000 });
   const r = await page.evaluate(async () => {

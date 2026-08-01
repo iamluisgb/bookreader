@@ -10,7 +10,7 @@ test.use({ viewport: { width: 390, height: 780 } });
 async function openApp(page: Page) {
   await page.goto('/index.html');
   const fc = page.waitForEvent('filechooser');
-  await page.click('#open-file-btn');
+  await page.click('.lib-empty .lib-upload');
   await (await fc).setFiles(path.join(__dirname, 'test.epub'));
   await page.waitForSelector('#epub-container iframe', { timeout: 15000 });
 }

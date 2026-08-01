@@ -101,25 +101,72 @@ function modelDatalist(models) {
   return models.map(m => `<option value="${escapeHtml(m)}"></option>`).join('');
 }
 
-function agentHtml() {
-  const cur = LLM.currentProvider();
-  const provOpts = LLM.PROVIDERS.map(p =>
-    `<option value="${p.id}"${cur && cur.id === p.id ? ' selected' : ''}>${escapeHtml(p.name)}</option>`).join('')
-    + `<option value="custom"${cur ? '' : ' selected'}>${t('Personalizado')}</option>`;
-  const suggested = (cur || LLM.PROVIDERS[0]).models;
-  const demoBlock = LLM.hasKey() ? '' : `
+// Bloque de la demo self-service (F3), común a las dos vistas.
+function demoBlockHtml() {
+  if (LLM.hasKey()) return '';
+  return `
     <div class="appset-demo">
       <button id="appset-demo-btn" class="primary-btn appset-save">${icon('sparkles', { size: 15 })} ${t('Probar la demo (sin API key)')}</button>
       <p class="appset-muted">${t('Un cupo de llamadas de prueba con el modelo de la casa, sin registro. Cuando se acabe, pon tu propia key (BYOK) — o configúrala ya abajo.')}</p>
       <p class="appset-model-hint" id="appset-demo-hint" hidden></p>
     </div>`;
+}
+
+// Borrador que sobrevive al cambio de vista: sin esto, pulsar "Opciones avanzadas"
+// después de pegar una API key larga la tira a la basura.
+let agentDraft = null;
+
+function draftKey() { return agentDraft && agentDraft.key != null ? agentDraft.key : LLM.getKey(); }
+function draftProvider() {
+  if (agentDraft && agentDraft.provider) return agentDraft.provider;
+  const cur = LLM.currentProvider();
+  return cur ? cur.id : '';
+}
+
+// ---- Vista SIMPLE: proveedor + key. El modelo lo elegimos nosotros -------------
+// No hay ni un campo cuyo valor haya que buscar en la documentación del proveedor.
+function agentSimpleHtml() {
+  const curId = draftProvider() || LLM.allProviders()[0].id;
+  const provOpts = LLM.allProviders().map(p =>
+    `<option value="${p.id}"${p.id === curId ? ' selected' : ''}>${escapeHtml(p.name)}</option>`).join('');
+  const demoNote = LLM.isDemo()
+    ? `<p class="appset-muted appset-demo-on">${icon('sparkles', { size: 13 })} ${t('Ahora mismo estás usando la demo. Elige un proveedor y pega tu key para seguir sin cupo.')}</p>`
+    : '';
   return `<div class="appset-section">
     <h3 class="appset-h3">${t('Agente')}</h3>
+    ${demoBlockHtml()}
+    ${demoNote}
+    <label class="appset-label" for="appset-provider">${t('Proveedor')}</label>
+    <select id="appset-provider" class="appset-input">${provOpts}</select>
+    <label class="appset-label" for="appset-key">API key</label>
+    <input id="appset-key" class="appset-input" type="password" placeholder="sk-..." autocomplete="off" value="${escapeHtml(draftKey())}" />
+    <p class="appset-muted" id="appset-simple-model"></p>
+    <label class="appset-check"><input type="checkbox" id="appset-auto"${LLM.getAutoExtract() ? ' checked' : ''} /> ${t('Rellenar la libreta automáticamente')}</label>
+    <button id="appset-save" class="primary-btn appset-save">${t('Guardar')}</button>
+    <p class="appset-saved" id="appset-saved" hidden>${icon('check', { size: 14 })} ${t('Guardado')}</p>
+    <p class="appset-privacy">${icon('shield', { size: 13 })} ${t('Tu API key se guarda solo en este navegador. Para responder, el contenido del libro se envía al proveedor que configures.')}</p>
+    <button type="button" id="appset-agent-advanced" class="appset-viewlink">${t('Opciones avanzadas')} ${icon('chevron-down', { size: 13 })}</button>
+  </div>`;
+}
+
+function agentHtml() {
+  if (!LLM.isAdvanced() && LLM.canUseSimple()) return agentSimpleHtml();
+  const cur = LLM.currentProvider();
+  const curId = draftProvider();
+  const provOpts = LLM.allProviders().map(p =>
+    `<option value="${p.id}"${curId === p.id ? ' selected' : ''}>${escapeHtml(p.name)}</option>`).join('')
+    + `<option value="custom"${curId ? '' : ' selected'}>${t('Personalizado')}</option>`;
+  const suggested = (cur || LLM.allProviders()[0]).models;
+  const demoBlock = demoBlockHtml();
+  return `<div class="appset-section">
+    <h3 class="appset-h3">${t('Agente')}</h3>
+    ${LLM.canUseSimple() ? `<button type="button" id="appset-agent-simple" class="appset-viewlink">${icon('chevron-left', { size: 13 })} ${t('Vista simple')}</button>` : ''}
     ${demoBlock}
     <label class="appset-label" for="appset-provider">${t('Proveedor')}</label>
     <select id="appset-provider" class="appset-input">${provOpts}</select>
     <label class="appset-label" for="appset-baseurl">Base URL (endpoint OpenAI-compatible)</label>
     <input id="appset-baseurl" class="appset-input" value="${escapeHtml(LLM.getBaseUrl())}" placeholder="https://…/v1" autocomplete="off" spellcheck="false" />
+    <div id="appset-prov-manage" class="appset-prov"></div>
     <label class="appset-label" for="appset-model">${t('Modelo')}</label>
     <div class="appset-model-row">
       <input id="appset-model" class="appset-input" list="appset-model-list" value="${escapeHtml(LLM.getModel())}" placeholder="id-del-modelo" autocomplete="off" spellcheck="false" />
@@ -152,7 +199,7 @@ function agentHtml() {
     <p id="appset-probe-appset-lmodel-hint" class="appset-model-hint" hidden></p>
     <p class="appset-muted">${t('Para las llamadas auxiliares del agente (preparar búsquedas, puntuar capítulos): un modelo pequeño responde igual de bien y mucho más rápido. Vacío = automático (en nan usa <code>qwen3.6</code>; en otros proveedores, el modelo principal).')}</p>
     <label class="appset-label" for="appset-key">API key</label>
-    <input id="appset-key" class="appset-input" type="password" placeholder="sk-..." autocomplete="off" value="${escapeHtml(LLM.getKey())}" />
+    <input id="appset-key" class="appset-input" type="password" placeholder="sk-..." autocomplete="off" value="${escapeHtml(draftKey())}" />
     <label class="appset-check"><input type="checkbox" id="appset-auto"${LLM.getAutoExtract() ? ' checked' : ''} /> ${t('Rellenar la libreta automáticamente')}</label>
     <button id="appset-save" class="primary-btn appset-save">${t('Guardar')}</button>
     <p class="appset-saved" id="appset-saved" hidden>${icon('check', { size: 14 })} ${t('Guardado')}</p>
@@ -160,8 +207,59 @@ function agentHtml() {
   </div>`;
 }
 
-function wireAgent(content) {
-  // F3 · demo self-service: pide token al gateway, autoconfigura y refresca la sección.
+// Cambio de vista simple ↔ avanzada. Arrastra lo tecleado (proveedor y key) para que
+// cruzar no cueste volver a escribirlo, y re-renderiza la sección entera.
+function wireAgentViewSwitch(content) {
+  const go = (advanced) => {
+    agentDraft = {
+      provider: content.querySelector('#appset-provider')?.value || '',
+      key: content.querySelector('#appset-key')?.value ?? null,
+    };
+    if (agentDraft.provider === 'custom') agentDraft.provider = '';
+    LLM.setAdvanced(advanced);
+    selectSection('agent');
+  };
+  content.querySelector('#appset-agent-advanced')?.addEventListener('click', () => go(true));
+  content.querySelector('#appset-agent-simple')?.addEventListener('click', () => go(false));
+}
+
+// ---- Vista SIMPLE ------------------------------------------------------------
+function wireAgentSimple(content) {
+  wireDemoButton(content);
+  wireAgentViewSwitch(content);
+  const prov = content.querySelector('#appset-provider');
+  const note = content.querySelector('#appset-simple-model');
+
+  // Se dice qué modelo se va a usar aunque no se pueda elegir aquí: "no lo eliges"
+  // no debe significar "no sabes qué está pasando".
+  const paintNote = () => {
+    const d = LLM.presetDefaults(prov.value);
+    if (!d) { note.textContent = ''; return; }
+    note.textContent = d.visionModel
+      ? t('Usaremos {model} para responder y {vision} para las figuras. Puedes cambiarlo en las opciones avanzadas.', { model: d.model, vision: d.visionModel })
+      : t('Usaremos {model}. Puedes cambiarlo en las opciones avanzadas.', { model: d.model });
+  };
+  prov.addEventListener('change', paintNote);
+  paintNote();
+
+  content.querySelector('#appset-save').addEventListener('click', () => {
+    const d = LLM.presetDefaults(prov.value);
+    if (!d) return;
+    LLM.setKey(content.querySelector('#appset-key').value.trim());
+    LLM.setBaseUrl(d.baseUrl);
+    LLM.setModel(d.model);
+    LLM.setVisionModel(d.visionModel);
+    LLM.setLiteModel(d.liteModel);
+    LLM.setAutoExtract(content.querySelector('#appset-auto').checked);
+    agentDraft = null;
+    const ok = content.querySelector('#appset-saved');
+    if (ok) { ok.hidden = false; setTimeout(() => { ok.hidden = true; }, 1800); }
+    window.dispatchEvent(new CustomEvent('appsettings:agent-saved'));
+  });
+}
+
+// F3 · demo self-service: pide token al gateway, autoconfigura y refresca la sección.
+function wireDemoButton(content) {
   const demoBtn = content.querySelector('#appset-demo-btn');
   if (demoBtn) demoBtn.addEventListener('click', async () => {
     const hint = content.querySelector('#appset-demo-hint');
@@ -181,6 +279,19 @@ function wireAgent(content) {
       demoBtn.disabled = false;
     }
   });
+}
+
+// Punto de entrada de la sección: cada vista tiene su cableado. La avanzada es el
+// formulario de siempre; la simple, un subconjunto que no comparte casi ningún campo.
+function wireAgent(content) {
+  if (content.querySelector('#appset-simple-model')) return wireAgentSimple(content);
+  return wireAgentAdvanced(content);
+}
+
+// ---- Vista AVANZADA: los cuatro slots a mano ---------------------------------
+function wireAgentAdvanced(content) {
+  wireDemoButton(content);
+  wireAgentViewSwitch(content);
 
   const prov = content.querySelector('#appset-provider');
   const baseUrl = content.querySelector('#appset-baseurl');
@@ -212,19 +323,92 @@ function wireAgent(content) {
   });
   model.addEventListener('input', markActiveChip);
 
-  const suggested = (LLM.currentProvider() || LLM.PROVIDERS[0]).models;
+  const suggested = (LLM.currentProvider() || LLM.allProviders()[0]).models;
   renderChips(suggested);
+
+  // Modelos que devolvió "Descubrir" para la base URL actual. Se guardan con el
+  // proveedor propio: sin ellos su lista sería un solo modelo y la vista simple no
+  // tendría nada que ofrecer si mañana quiere cambiarlo.
+  let discovered = null;
+
+  // ---- Proveedor propio: alta y baja ---------------------------------------
+  // El bloque cambia según lo que haya en Base URL: un endpoint que no conocemos se
+  // puede guardar con nombre; uno ya guardado se puede quitar; los de fábrica no
+  // ofrecen nada (no son del usuario).
+  const provManage = content.querySelector('#appset-prov-manage');
+  const paintProvManage = () => {
+    const url = baseUrl.value.trim().replace(/\/+$/, '');
+    const match = LLM.allProviders().find(p => p.baseUrl.replace(/\/+$/, '') === url);
+    if (match && LLM.isCustomProvider(match.id)) {
+      provManage.innerHTML = `
+        <p class="appset-muted appset-prov-on">${icon('check', { size: 13 })} ${t('Guardado en tu lista como «{name}».', { name: escapeHtml(match.name) })}</p>
+        <button type="button" id="appset-prov-del" class="appset-discover">${t('Quitar de mis proveedores')}</button>`;
+      return;
+    }
+    if (match || !url) { provManage.innerHTML = ''; return; }
+    provManage.innerHTML = `
+      <div class="appset-model-row">
+        <input id="appset-prov-name" class="appset-input" placeholder="${t('Nombre de este proveedor')}" autocomplete="off" />
+        <button type="button" id="appset-prov-save" class="appset-discover">${t('Guardar proveedor')}</button>
+      </div>
+      <p class="appset-muted">${t('Lo añade al desplegable con nombre propio, aquí y en la vista simple. Se guarda también la configuración actual del agente.')}</p>
+      <p class="appset-model-hint" id="appset-prov-hint" hidden></p>`;
+  };
+
+  provManage.addEventListener('click', (e) => {
+    if (e.target.closest('#appset-prov-del')) {
+      const url = baseUrl.value.trim().replace(/\/+$/, '');
+      const match = LLM.allProviders().find(p => p.baseUrl.replace(/\/+$/, '') === url);
+      if (match) LLM.removeCustomProvider(match.id);
+      paintProvManage();
+      // El desplegable ya no lo contiene: se repinta la sección entera.
+      agentDraft = { provider: '', key: keyEl.value };
+      selectSection('agent');
+      return;
+    }
+    if (!e.target.closest('#appset-prov-save')) return;
+    const out = content.querySelector('#appset-prov-hint');
+    out.hidden = false; out.classList.remove('is-error');
+    try {
+      const saved = LLM.saveCustomProvider({
+        name: content.querySelector('#appset-prov-name').value,
+        baseUrl: baseUrl.value,
+        models: [model.value, ...(discovered || [])],
+        liteModel: content.querySelector('#appset-lmodel').value,
+        visionModel: content.querySelector('#appset-vmodel').value,
+      });
+      saveAgentForm(content, baseUrl, model);
+      agentDraft = { provider: saved.id, key: keyEl.value };
+      selectSection('agent');
+    } catch (err) {
+      out.classList.add('is-error');
+      out.textContent = t('No se pudo guardar el proveedor: {msg}', { msg: err.message });
+    }
+  });
+
+  baseUrl.addEventListener('input', () => {
+    paintProvManage();
+    // Los chips sugeridos son los del proveedor anterior: dejarlos ahí propone
+    // modelos que este endpoint no tiene. Sin sugerencias hasta "Descubrir".
+    const url = baseUrl.value.trim().replace(/\/+$/, '');
+    const match = LLM.allProviders().find(p => p.baseUrl.replace(/\/+$/, '') === url);
+    renderChips(match ? match.models : (discovered || []));
+    dl.innerHTML = modelDatalist(match ? match.models : (discovered || []));
+  });
+  paintProvManage();
 
   // Al elegir un preset: rellena Base URL + sugerencias de modelo (chips + datalist).
   // "Personalizado" deja los campos como están para editarlos a mano.
   prov.addEventListener('change', () => {
-    const p = LLM.PROVIDERS.find(x => x.id === prov.value);
-    if (!p) return;
+    const p = LLM.allProviders().find(x => x.id === prov.value);
+    if (!p) { paintProvManage(); return; }
     baseUrl.value = p.baseUrl;
     dl.innerHTML = modelDatalist(p.models);
     renderChips(p.models);
+    discovered = null;
     hint.hidden = true;
     if (!p.models.includes(model.value.trim())) { model.value = p.models[0]; markActiveChip(); }
+    paintProvManage();
   });
 
   // Descubrir modelos reales del proveedor (GET /models) con los valores actuales del
@@ -237,6 +421,7 @@ function wireAgent(content) {
       if (!models.length) { hint.textContent = t('El proveedor no devolvió modelos. Escribe el id del modelo a mano.'); return; }
       dl.innerHTML = modelDatalist(models);
       renderChips(models);
+      discovered = models;
       hint.textContent = t('{n} modelos disponibles — pulsa uno para elegirlo.', { n: models.length });
     } catch (e) {
       // El discovery puede fallar por CORS (el proveedor no expone /models al navegador)
@@ -246,7 +431,7 @@ function wireAgent(content) {
       hint.textContent = e.cors
         ? t('Este proveedor no permite descubrir modelos desde el navegador. Escribe el id del modelo a mano o elige uno de los sugeridos abajo.')
         : t('No se pudieron descubrir los modelos: {msg} Escribe el id a mano o elige uno de los sugeridos.', { msg: e.message });
-      renderChips((LLM.PROVIDERS.find(p => p.baseUrl.replace(/\/+$/, '') === baseUrl.value.trim().replace(/\/+$/, '')) || LLM.PROVIDERS[0]).models);
+      renderChips((LLM.allProviders().find(p => p.baseUrl.replace(/\/+$/, '') === baseUrl.value.trim().replace(/\/+$/, '')) || LLM.allProviders()[0]).models);
       model.focus();
     } finally {
       discover.disabled = false;
@@ -267,7 +452,7 @@ function wireAgent(content) {
       // decimos, para que "vacío" deje de ser una caja negra.
       let auto = '';
       if (!value && btn.dataset.for === 'appset-lmodel') {
-        const preset = LLM.PROVIDERS.find(p => p.baseUrl.replace(/\/+$/, '') === baseUrl.value.trim().replace(/\/+$/, ''));
+        const preset = LLM.allProviders().find(p => p.baseUrl.replace(/\/+$/, '') === baseUrl.value.trim().replace(/\/+$/, ''));
         value = (preset && preset.liteModel) || model.value.trim();
         auto = value;
       }
@@ -290,17 +475,25 @@ function wireAgent(content) {
   }
 
   content.querySelector('#appset-save').addEventListener('click', () => {
-    LLM.setKey(content.querySelector('#appset-key').value.trim());
-    LLM.setBaseUrl(baseUrl.value);
-    LLM.setModel(model.value);
-    LLM.setVisionModel(content.querySelector('#appset-vmodel').value);
-    LLM.setSttModel(content.querySelector('#appset-smodel').value);
-    LLM.setLiteModel(content.querySelector('#appset-lmodel').value);
-    LLM.setAutoExtract(content.querySelector('#appset-auto').checked);
+    saveAgentForm(content, baseUrl, model);
     const ok = content.querySelector('#appset-saved');
     if (ok) { ok.hidden = false; setTimeout(() => { ok.hidden = true; }, 1800); }
-    window.dispatchEvent(new CustomEvent('appsettings:agent-saved'));
   });
+}
+
+// Vuelca el formulario avanzado a los ajustes. Compartido por el botón Guardar y por
+// el alta de proveedor propio, que también guarda: dar de alta el endpoint que acabas
+// de escribir y que la app siga apuntando al anterior no tendría sentido.
+function saveAgentForm(content, baseUrl, model) {
+  LLM.setKey(content.querySelector('#appset-key').value.trim());
+  LLM.setBaseUrl(baseUrl.value);
+  LLM.setModel(model.value);
+  LLM.setVisionModel(content.querySelector('#appset-vmodel').value);
+  LLM.setSttModel(content.querySelector('#appset-smodel').value);
+  LLM.setLiteModel(content.querySelector('#appset-lmodel').value);
+  LLM.setAutoExtract(content.querySelector('#appset-auto').checked);
+  agentDraft = null;
+  window.dispatchEvent(new CustomEvent('appsettings:agent-saved'));
 }
 
 // ---- Sección Aplicación (P15: idioma) ---------------------------------------
@@ -1031,6 +1224,7 @@ function openHistory(trigger, show, fail) {
 
 export function open(section = 'agent') {
   ensureOverlay();
+  agentDraft = null;   // el borrador solo cruza entre vistas, no entre aperturas
   overlay.style.display = 'flex';
   selectSection(SECTIONS.some(s => s.id === section) ? section : 'agent');
 }

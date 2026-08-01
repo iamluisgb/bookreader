@@ -10,7 +10,7 @@ test.describe('Índice — sección actual', () => {
     await page.goto('/');
     const [fileChooser] = await Promise.all([
       page.waitForEvent('filechooser'),
-      page.getByRole('button', { name: 'Abrir archivo' }).click(),
+      page.getByRole('button', { name: 'Subir tu primer libro' }).click(),
     ]);
     await fileChooser.setFiles(EPUB_PATH);
     await page.waitForTimeout(3000);

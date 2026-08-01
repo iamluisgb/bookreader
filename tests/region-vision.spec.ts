@@ -10,7 +10,7 @@ const PDF_PATH = path.join(__dirname, 'test.pdf');
 async function openPdf(page: Page) {
   await page.goto('/index.html');
   const fc = page.waitForEvent('filechooser');
-  await page.click('#open-file-btn');
+  await page.click('.lib-empty .lib-upload');
   await (await fc).setFiles(PDF_PATH);
   await page.waitForSelector('#pdf-container canvas', { timeout: 15000 });
 }

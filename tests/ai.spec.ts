@@ -26,7 +26,7 @@ test.describe('BookReader - Agente IA', () => {
     // Abrir el EPUB de prueba.
     const [fc] = await Promise.all([
       page.waitForEvent('filechooser'),
-      page.getByRole('button', { name: 'Abrir archivo' }).click(),
+      page.getByRole('button', { name: 'Subir tu primer libro' }).click(),
     ]);
     await fc.setFiles('tests/test.epub');
 

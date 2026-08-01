@@ -38,13 +38,13 @@ test('auditoría EN: lector + sidebar + biblioteca + panel + modales sin españo
   const found: string[] = [];
   await page.goto('/');
 
-  // 1) landing
-  found.push(...leaks(await dumpUiText(page)).map(x => 'landing: ' + x));
+  // 1) biblioteca (pantalla de inicio)
+  found.push(...leaks(await dumpUiText(page)).map(x => 'biblioteca: ' + x));
 
   // 2) cargar libro
   const [fc] = await Promise.all([
     page.waitForEvent('filechooser'),
-    page.getByRole('button', { name: 'Open file' }).click(),
+    page.getByRole('button', { name: 'Upload your first book' }).click(),
   ]);
   await fc.setFiles(EPUB_PATH);
   await expect(page.locator('#reader-title')).toHaveText('Pedro Páramo', { timeout: 10000 });

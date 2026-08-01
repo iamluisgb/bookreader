@@ -50,7 +50,7 @@ async function setup(page, { template = 't3-juicio', goal = 'probar el panel' } 
   await stubLLM(page);
 
   const fc = page.waitForEvent('filechooser');
-  await page.click('#open-file-btn');
+  await page.click('.lib-empty .lib-upload');
   await (await fc).setFiles(EPUB_PATH);
 
   await page.waitForSelector('#ai-toggle:not([disabled])', { timeout: 15000 });
@@ -147,7 +147,7 @@ test('el coach mark de flashcards aparece una vez y no reaparece', async ({ page
   await page.reload();
   await stubLLM(page);
   const fc = page.waitForEvent('filechooser');
-  await page.click('#open-file-btn');
+  await page.click('.lib-empty .lib-upload');
   await (await fc).setFiles(EPUB_PATH);
   await page.waitForSelector('#ai-toggle:not([disabled])', { timeout: 15000 });
   await page.click('#ai-toggle');
@@ -242,7 +242,7 @@ test('el coachmark señala la pestaña Studio, y la flecha cae dentro', async ({
   await page.addInitScript(() => localStorage.setItem('bookreader_ai_key', JSON.stringify('sk-test')));
   await page.goto('/');
   const fc = page.waitForEvent('filechooser');
-  await page.click('#open-file-btn');
+  await page.click('.lib-empty .lib-upload');
   await (await fc).setFiles(path.join(__dirname, 'test.epub'));
   await page.waitForSelector('#epub-container iframe', { timeout: 15000 });
   await page.locator('#ai-toggle').click();

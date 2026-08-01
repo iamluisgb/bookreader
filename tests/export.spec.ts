@@ -59,7 +59,7 @@ test('el botón de exportar del panel descarga un .md', async ({ page }) => {
   });
 
   const fc = page.waitForEvent('filechooser');
-  await page.click('#open-file-btn');
+  await page.click('.lib-empty .lib-upload');
   await (await fc).setFiles(EPUB_PATH);
   await page.waitForSelector('#ai-toggle:not([disabled])', { timeout: 15000 });
   await page.click('#ai-toggle');

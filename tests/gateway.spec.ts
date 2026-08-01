@@ -14,8 +14,7 @@ test('el botón de demo autoconfigura el proveedor (stub del gateway)', async ({
   await page.route('**/demo-token', (route) =>
     route.fulfill({ json: { token: 'br-demo-stub123', remaining: 30, model: 'bookreader-fast' } }));
   await page.goto('/');
-  await page.locator('#sidebar-toggle').click();
-  await page.locator('#open-app-settings').click();   // abre ya en la sección Agente
+  await page.locator('.lib-rail-settings').click();   // abre ya en la sección Agente
 
   const btn = page.locator('#appset-demo-btn');
   await expect(btn).toBeVisible();          // sin key → el botón está
@@ -23,6 +22,8 @@ test('el botón de demo autoconfigura el proveedor (stub del gateway)', async ({
 
   // La sección se re-renderiza con la config puesta y el botón desaparece (ya hay key).
   await expect(page.locator('#appset-demo-btn')).toHaveCount(0);
+  // La vista simple no enseña base URL ni modelo: se comprueban en la avanzada.
+  await page.locator('#appset-agent-advanced').click();
   await expect(page.locator('#appset-baseurl')).toHaveValue(/bookreader-gateway/);
   await expect(page.locator('#appset-model')).toHaveValue('bookreader-fast');
   const cfg = await page.evaluate(() => ({
@@ -37,8 +38,7 @@ test('si el gateway rechaza (429), el botón enseña el motivo y sigue usable', 
   await page.route('**/demo-token', (route) =>
     route.fulfill({ status: 429, json: { error: { message: 'No demo tokens left today.', code: 'demo_sold_out' } } }));
   await page.goto('/');
-  await page.locator('#sidebar-toggle').click();
-  await page.locator('#open-app-settings').click();   // abre ya en la sección Agente
+  await page.locator('.lib-rail-settings').click();   // abre ya en la sección Agente
   await page.locator('#appset-demo-btn').click();
   await expect(page.locator('#appset-demo-hint')).toContainText('No demo tokens left today');
   await expect(page.locator('#appset-demo-btn')).toBeEnabled();
@@ -55,7 +55,7 @@ test('el agente responde a través del gateway con alias bookreader-fast @live',
   await page.goto('/');
   const [fc] = await Promise.all([
     page.waitForEvent('filechooser'),
-    page.getByRole('button', { name: 'Abrir archivo' }).click(),
+    page.getByRole('button', { name: 'Subir tu primer libro' }).click(),
   ]);
   await fc.setFiles(EPUB_PATH);
   await expect(page.locator('#reader-title')).toHaveText('Pedro Páramo', { timeout: 10000 });

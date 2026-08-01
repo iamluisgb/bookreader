@@ -11,7 +11,7 @@ const PDF_PATH = path.join(__dirname, 'test.pdf');
 async function openPdf(page) {
   await page.goto('/index.html');
   const fc = page.waitForEvent('filechooser');
-  await page.click('#open-file-btn');
+  await page.click('.lib-empty .lib-upload');
   await (await fc).setFiles(PDF_PATH);
   await page.waitForSelector('#pdf-container canvas', { timeout: 15000 });
 }
@@ -241,7 +241,7 @@ test('VISIÓN: "Ver" envía la imagen de la página al modelo de visión', async
   });
 
   const fc = page.waitForEvent('filechooser');
-  await page.click('#open-file-btn');
+  await page.click('.lib-empty .lib-upload');
   await (await fc).setFiles(PDF_PATH);
   await page.waitForSelector('#pdf-container canvas', { timeout: 15000 });
 
@@ -609,7 +609,7 @@ test.describe('PDF zoom en scroll continuo (multipágina)', () => {
   test('el pinch mantiene el punto focal aunque haya páginas (y huecos) por encima', async ({ page }) => {
     await page.goto('/index.html');
     const fc = page.waitForEvent('filechooser');
-    await page.click('#open-file-btn');
+    await page.click('.lib-empty .lib-upload');
     await (await fc).setFiles(path.join(__dirname, '..', 'evals', 'fixtures', 'p3-constitucion.pdf'));
     await page.waitForSelector('#pdf-container canvas', { timeout: 30000 });
 

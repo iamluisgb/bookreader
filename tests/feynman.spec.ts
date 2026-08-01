@@ -14,7 +14,7 @@ const mod = (page: Page) => page.evaluate(() => import('/js/ai/feynman.js').then
 
 async function openApp(page: Page) {
   await page.goto('/');
-  await page.waitForFunction(() => !!document.getElementById('landing'));
+  await page.waitForFunction(() => !!document.getElementById('library'));
 }
 
 test.describe('escalada del andamiaje (pura)', () => {
@@ -168,7 +168,7 @@ test('sin API key, la sesión no arranca y lo dice', async ({ page }) => {
   await page.goto('/');
   const [chooser] = await Promise.all([
     page.waitForEvent('filechooser'),
-    page.getByRole('button', { name: 'Abrir archivo' }).click(),
+    page.getByRole('button', { name: 'Subir tu primer libro' }).click(),
   ]);
   await chooser.setFiles(EPUB);
   await expect(page.locator('#reader-title')).toHaveText('Pedro Páramo', { timeout: 15000 });
@@ -193,7 +193,7 @@ test('el ciclo completo funciona contra un modelo real @live', async ({ page }) 
   await page.goto('/');
   const [chooser] = await Promise.all([
     page.waitForEvent('filechooser'),
-    page.getByRole('button', { name: 'Abrir archivo' }).click(),
+    page.getByRole('button', { name: 'Subir tu primer libro' }).click(),
   ]);
   await chooser.setFiles(path.join(__dirname, '..', 'evals', 'fixtures', 'p1-relativity.epub'));
   await page.waitForSelector('#reader-footer', { state: 'visible', timeout: 30000 });
@@ -402,7 +402,7 @@ test('sugerir conceptos: presupuesto holgado, fallo legible y se puede reintenta
   await page.goto('/');
   const [chooser] = await Promise.all([
     page.waitForEvent('filechooser'),
-    page.getByRole('button', { name: 'Abrir archivo' }).click(),
+    page.getByRole('button', { name: 'Subir tu primer libro' }).click(),
   ]);
   await chooser.setFiles(path.join(__dirname, '..', 'evals', 'fixtures', 'p2-progit.epub'));
   await page.waitForSelector('#reader-footer', { state: 'visible', timeout: 30000 });

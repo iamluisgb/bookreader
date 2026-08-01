@@ -13,7 +13,9 @@ test.describe('inglés por defecto (locale en-US)', () => {
     await expect(page.locator('html')).toHaveAttribute('lang', 'en');
     // data-i18n (texto) y data-i18n-attrs (atributos) aplicados en el arranque.
     await expect(page.locator('.tab-btn[data-tab="contents"]')).toHaveText('Contents');
-    await expect(page.locator('#open-file-btn')).toHaveText('Open file');
+    await expect(page.locator('#toc-list .empty-state')).toHaveText('Open a book to see its table of contents');
+    // Y lo renderizado por JS con t(): la biblioteca es ya la pantalla de inicio.
+    await expect(page.locator('.lib-empty .lib-upload')).toHaveText('Upload your first book');
     // El footer está oculto hasta abrir un libro → se comprueba el atributo, no el rol.
     await expect(page.locator('#next-btn')).toHaveAttribute('aria-label', 'Next page');
   });

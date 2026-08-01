@@ -11,7 +11,7 @@ async function openBook(page: Page, file: string) {
   await page.goto('/');
   const [chooser] = await Promise.all([
     page.waitForEvent('filechooser'),
-    page.getByRole('button', { name: 'Abrir archivo' }).click(),
+    page.getByRole('button', { name: 'Subir tu primer libro' }).click(),
   ]);
   await chooser.setFiles(file);
   await page.waitForSelector('#reader-footer', { state: 'visible', timeout: 30000 });

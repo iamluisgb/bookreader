@@ -62,7 +62,7 @@ test.describe('IA7 · HyDE-lite golden (retrieval real)', () => {
 
     const [fc] = await Promise.all([
       page.waitForEvent('filechooser'),
-      page.getByRole('button', { name: 'Abrir archivo' }).click(),
+      page.getByRole('button', { name: 'Subir tu primer libro' }).click(),
     ]);
     await fc.setFiles(BOOK);
 
