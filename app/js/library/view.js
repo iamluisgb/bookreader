@@ -74,7 +74,6 @@ function paintTransfer(id) {
 }
 
 export function show() {
-  document.getElementById('landing').style.display = 'none';
   document.getElementById('epub-container').style.display = 'none';
   document.getElementById('pdf-container').style.display = 'none';
   document.getElementById('reader-footer').style.display = 'none';

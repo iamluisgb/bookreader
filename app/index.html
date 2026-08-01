@@ -193,17 +193,9 @@
 
     <!-- Reader viewport -->
     <div id="reader-viewport" class="reader-viewport">
-      <!-- Landing screen -->
-      <div id="landing" class="landing">
-        <div class="landing-content">
-          <div class="landing-icon" data-icon="logo" data-icon-size="96"></div>
-          <h1>BookReader</h1>
-          <p data-i18n>Lector de EPUB y PDF</p>
-          <button id="open-file-btn" class="primary-btn" data-i18n>Abrir archivo</button>
-          <p class="landing-hint" data-i18n>o arrastra un archivo aquí</p>
-          <input type="file" id="file-input" accept=".epub,.pdf" hidden>
-        </div>
-      </div>
+      <!-- Selector de archivo: lo disparan el botón "Subir archivos" de la
+           biblioteca y el menú. La pantalla de inicio es la biblioteca. -->
+      <input type="file" id="file-input" accept=".epub,.pdf" hidden>
 
       <!-- Library (home) -->
       <div id="library" class="library" style="display:none;"></div>

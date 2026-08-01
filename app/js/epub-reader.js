@@ -440,7 +440,6 @@ export async function load(arrayBuffer, onProgress) {
   const container = document.getElementById('epub-container');
   container.innerHTML = '';
   container.style.display = 'block';
-  document.getElementById('landing').style.display = 'none';
   document.getElementById('pdf-container').style.display = 'none';
 
   console.log('Rendering book...');

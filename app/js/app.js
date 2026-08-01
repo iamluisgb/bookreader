@@ -200,8 +200,11 @@ async function applyRoute() {
     if (currentBook || document.body.classList.contains('reading')) {
       await goToLibrary({ fromRoute: true });          // volver a biblioteca (sin re-empujar)
     } else {
-      const has = await Library.hasBooks();            // arranque sin libro: comportamiento normal
-      if (has) { await Library.render(); Library.show(); }
+      // Arranque sin libro: la biblioteca SIEMPRE, también vacía. Su estado vacío
+      // ("Subir tu primer libro") y el rail con Ajustes son mejor primera pantalla
+      // que la vista de lectura en blanco, que no lleva a ninguna parte.
+      await Library.render();
+      Library.show();
     }
     return;
   }
@@ -325,7 +328,7 @@ function initLibrary() {
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') flushProgress();
   });
-  // La pantalla inicial (biblioteca/landing o el libro del enlace) la resuelve initRouter().
+  // La pantalla inicial (la biblioteca, o el libro del enlace) la resuelve initRouter().
 }
 
 // Toggle Páginas/Scroll (Ajustes de lectura). El modo se recuerda por libro en
@@ -901,9 +904,6 @@ function initSidebar() {
 // ============ FILE HANDLING ============
 function initFileHandling() {
   const fileInput = document.getElementById('file-input');
-  const openBtn = document.getElementById('open-file-btn');
-
-  openBtn.addEventListener('click', () => fileInput.click());
 
   fileInput.addEventListener('change', async (e) => {
     const file = e.target.files[0];

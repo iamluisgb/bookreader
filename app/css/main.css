@@ -624,44 +624,6 @@ body.reading .reader-viewport:has(> .epub-container.has-desk) { background: var(
    que epub.js gestione el scroll interno (no centramos ni ocultamos el desborde). */
 body.scroll-mode .reader-viewport { align-items: stretch; justify-content: flex-start; }
 
-/* ============ LANDING (v2: más expresiva) ============ */
-.landing {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  height: 100%;
-}
-
-.landing-content {
-  text-align: center;
-  padding: 40px;
-}
-
-.landing-icon {
-  font-size: 72px;
-  margin-bottom: 20px;
-}
-
-.landing-content h1 {
-  font-size: 32px;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  margin-bottom: 8px;
-}
-
-.landing-content p {
-  color: var(--text-soft);
-  margin-bottom: 28px;
-  font-size: 16px;
-}
-
-.landing-hint {
-  font-size: 13px;
-  color: var(--text-faint) !important;
-  margin-top: 16px !important;
-}
-
 /* ============ READER FOOTER (v2) ============ */
 .reader-footer {
   height: var(--footer-height);
@@ -2722,12 +2684,6 @@ body.ai-open #ai-toggle { color: var(--accent); }
 .ai-act .icon { color: var(--text-faint); }
 .ai-act:hover:not(:disabled) { background: var(--surface-3); color: var(--text); }
 
-/* Landing: icono de libro en color de acento, sin caja. */
-.landing-icon {
-  display: inline-flex; color: var(--accent);
-  margin-bottom: var(--s-3);
-}
-
 /* Selector de tema como muestras de color (estilo Apple Books). */
 .theme-selector { gap: 12px; }
 .theme-selector .theme-swatch {
@@ -2824,6 +2780,7 @@ body.in-library .ai-fab { display: none; }
 /* ---- Rail izquierdo ---- */
 .lib-rail {
   flex: 0 0 264px; width: 264px; height: 100%;
+  display: flex; flex-direction: column;
   overflow-y: auto; border-right: 1px solid var(--border-soft);
   background: var(--surface-1);
   padding: calc(var(--s-4) + env(safe-area-inset-top)) var(--s-3) var(--s-5);
@@ -2872,6 +2829,20 @@ body.in-library .ai-fab { display: none; }
 }
 .lib-rail-create .icon { color: var(--accent); }
 .lib-rail-create:hover { text-decoration: underline; }
+/* Los hijos del rail no se comprimen: con muchas estanterías el rail hace scroll,
+   no encoge las filas. */
+.lib-rail > * { flex: 0 0 auto; }
+/* Ajustes generales: única puerta a la configuración desde la biblioteca (y la
+   primera pantalla de quien no tiene libros), así que va anclado abajo, separado
+   del resto y con caja propia — no como un enlace más de acción. */
+.lib-rail-settings {
+  margin-top: auto; padding-top: var(--s-3);
+  border-top: 1px solid var(--border-soft); border-radius: 0;
+  color: var(--text); font-weight: 500;
+}
+.lib-rail-settings .icon { color: var(--text-soft); }
+.lib-rail-settings:hover { text-decoration: none; color: var(--accent); }
+.lib-rail-settings:hover .icon { color: var(--accent); }
 
 /* ---- Panel principal ---- */
 .lib-main {
@@ -3065,6 +3036,10 @@ body.in-library .ai-fab { display: none; }
 }
 .lib-empty-icon { color: var(--accent); opacity: 0.6; }
 .lib-empty p { font-size: var(--fs-lg); margin-bottom: var(--s-2); }
+/* El margin-left:auto que alinea el botón a la derecha en la barra de herramientas
+   lo descolocaba aquí: dentro del estado vacío va centrado. */
+.lib-empty .lib-upload { margin-left: 0; }
+.lib-empty .lib-upload span { display: inline; }
 
 /* Menú contextual (libro / estantería) */
 .lib-menu {
@@ -3094,6 +3069,7 @@ body.in-library .ai-fab { display: none; }
   .lib-layout { flex-direction: column; }
   .lib-rail {
     flex: 0 0 auto; width: 100%; height: auto; display: flex; gap: var(--s-2);
+    flex-direction: row;   /* en escritorio el rail es columna */
     overflow-x: auto; overflow-y: hidden; border-right: none;
     border-bottom: 1px solid var(--border-soft); scrollbar-width: none;
     padding: calc(var(--s-3) + env(safe-area-inset-top)) var(--s-3) var(--s-3);
@@ -3107,6 +3083,13 @@ body.in-library .ai-fab { display: none; }
   .lib-rail-ico, .lib-rail-thumb, .lib-rail-mark { display: none; }
   .lib-rail-create { width: auto; flex: 0 0 auto; margin: 0; padding: 7px 12px; }
   .lib-rail-create span { display: none; }
+  /* En la tira horizontal no hay "abajo": Ajustes vuelve a ser un chip más, pero
+     conserva su etiqueta porque es la única entrada a la configuración. */
+  .lib-rail-settings {
+    margin: 0; padding: 7px 12px; border-top: none;
+    border-radius: var(--r-pill); background: var(--surface-3);
+  }
+  .lib-rail-settings span { display: inline; }
   .lib-main { padding-left: var(--s-4); padding-right: var(--s-4); padding-top: var(--s-4); }
   .lib-grid { grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: var(--s-4) var(--s-3); }
   .lib-h1 { font-size: var(--fs-xl); }

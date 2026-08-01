@@ -291,7 +291,6 @@ export async function load(arrayBuffer, onProgress) {
   // flex-item que encogía a su contenido y se pegaba a la izquierda → margen gris a la derecha
   // en pantallas anchas (landscape). Ver CSS de .pdf-container.
   container.style.display = 'block';
-  document.getElementById('landing').style.display = 'none';
   document.getElementById('epub-container').style.display = 'none';
 
   // TEC1 · pdf.js TRANSFIERE (detacha) el ArrayBuffer que le pasas a getDocument. Si el
