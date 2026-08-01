@@ -351,6 +351,11 @@ function updateReadingModeToggle() {
     : EpubReader.isLoaded() ? EpubReader.getReadingMode() : 'paginated';
   document.querySelectorAll('.reading-mode-btn').forEach(btn =>
     btn.classList.toggle('active', btn.dataset.mode === mode));
+  // La doble página es reflowable: el PDF ya trae su propia maquetación y el
+  // selector es el mismo control para los dos formatos.
+  document.querySelectorAll('.reading-mode-btn[data-epub-only]').forEach(btn => {
+    btn.style.display = PdfReader.isLoaded() ? 'none' : '';
+  });
 }
 
 async function goToLibrary({ fromRoute = false } = {}) {
@@ -1336,7 +1341,9 @@ function initProgressScrub() {
     return null;
   };
 
-  const showBubble = (f) => {
+  // `movePct`: al ARRASTRAR, el % de la fila acompaña al pulgar; al pasar el ratón
+  // por encima no, porque la barra no se ha movido y mentiría sobre dónde estás.
+  const showBubble = (f, { movePct = true } = {}) => {
     if (!bubble) return;
     const info = preview(f);
     const pct = Math.round(f * 100);
@@ -1356,8 +1363,8 @@ function initProgressScrub() {
     }
     // El % de la fila acompaña al arrastre: verlo clavado en "0%" con la barra a
     // media altura parece un fallo. El salto al soltar lo devuelve a la verdad.
-    if (pctText) pctText.textContent = `${pct}%`;
-    container.setAttribute('aria-valuenow', String(pct));
+    if (movePct && pctText) pctText.textContent = `${pct}%`;
+    if (movePct) container.setAttribute('aria-valuenow', String(pct));
 
     // La burbuja se centra en el dedo, pero se frena en los bordes para no salirse
     // del footer (en el 0% y el 100% se saldría media burbuja).
@@ -1386,12 +1393,37 @@ function initProgressScrub() {
     e.preventDefault();          // no seleccionar texto ni desplazar la página al arrastrar
   };
 
+  // Señalar sin pulsar (ratón): la burbuja dice a qué página se saltaría, como en
+  // Play Books. Va en rAF porque getSeekPreview del EPUB resuelve un CFI y busca su
+  // capítulo, y un pointermove dispara decenas de veces por segundo.
+  let hoverRaf = 0;
+  const hoverPreview = (clientX) => {
+    if (hoverRaf) return;
+    hoverRaf = requestAnimationFrame(() => {
+      hoverRaf = 0;
+      if (dragging) return;
+      const f = fractionAt(clientX);
+      if (f !== null) showBubble(f, { movePct: false });
+    });
+  };
+
   const onMove = (e) => {
-    if (!dragging) return;
+    if (!dragging) {
+      // El táctil no tiene hover: ahí la burbuja es cosa del arrastre.
+      if (e.pointerType !== 'touch' && (EpubReader.isLoaded() || PdfReader.isLoaded())) {
+        hoverPreview(e.clientX);
+      }
+      return;
+    }
     const f = fractionAt(e.clientX);
     if (f === null) return;
     bar.style.width = `${f * 100}%`;
     showBubble(f);
+  };
+
+  const onLeave = () => {
+    if (hoverRaf) { cancelAnimationFrame(hoverRaf); hoverRaf = 0; }
+    if (!dragging) bubble?.classList.remove('visible');
   };
 
   const onUp = async (e) => {
@@ -1415,6 +1447,7 @@ function initProgressScrub() {
   container.addEventListener('pointerdown', onDown);
   container.addEventListener('pointermove', onMove);
   container.addEventListener('pointerup', onUp);
+  container.addEventListener('pointerleave', onLeave);
   container.addEventListener('pointercancel', () => {
     if (!dragging) return;
     dragging = false;

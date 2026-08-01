@@ -775,6 +775,7 @@ const EN = {
   'No se pudo activar la demo: {msg}': 'Could not enable the demo: {msg}',
   'Reconectar Drive': 'Reconnect Drive',
   // biblioteca (2ª pasada) / studio / panel onboarding
+  'Doble': 'Two-page',
   'Libros': 'Books',
   'Estanterías': 'Shelves',
   'Crear estantería': 'Create shelf',

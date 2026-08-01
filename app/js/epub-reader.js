@@ -333,12 +333,22 @@ function bookKey() {
   try { return (book && book.key) ? book.key() : 'default'; } catch (e) { return 'default'; }
 }
 
+// Modos: 'paginated' (una columna), 'spread' (doble página, estilo Play Books) y
+// 'scroll'. `spread` es paginado + dos columnas; epub.js solo las abre si el
+// contenedor llega a minSpreadWidth, así que en ventana estrecha cae solo a una.
+const MODES = ['paginated', 'spread', 'scroll'];
+// Ancho de contenedor por debajo del cual epub.js vuelve a una sola columna aunque
+// el modo sea 'spread'. El suyo por defecto (800) deja fuera casos razonables: con
+// el sidebar abierto el contenedor real baja de ahí y el modo se caía solo.
+const MIN_SPREAD_WIDTH = 700;
+
 export function getReadingMode() {
-  return Storage.get('readingMode_' + bookKey(), 'paginated') === 'scroll' ? 'scroll' : 'paginated';
+  const v = Storage.get('readingMode_' + bookKey(), 'paginated');
+  return MODES.includes(v) ? v : 'paginated';
 }
 
 export function setReadingMode(mode) {
-  const m = mode === 'scroll' ? 'scroll' : 'paginated';
+  const m = MODES.includes(mode) ? mode : 'paginated';
   Storage.set('readingMode_' + bookKey(), m);
   applyReadingMode();
 }
@@ -352,6 +362,13 @@ export function applyReadingMode() {
   if (!rendition) return;
   const cfi = currentCfi;
   try { rendition.flow(mode === 'scroll' ? 'scrolled-doc' : 'paginated'); } catch (e) { /* flow no disponible */ }
+  // spread() también aplica en caliente (updateLayout del manager), así que el
+  // cambio de modo no recrea el rendition ni pierde anotaciones.
+  // El ancho máximo del contenedor cambia con el modo (una página o dos), así que
+  // se re-mide ANTES de que el manager recalcule la maquetación.
+  const container = document.getElementById('epub-container');
+  if (container) sizeContainer(container);
+  try { rendition.spread(mode === 'spread' ? 'auto' : 'none', MIN_SPREAD_WIDTH); } catch (e) { /* spread no disponible */ }
   updateReaderScale();
   if (cfi) {
     pinnedCfi = cfi;   // fija hasta la próxima navegación (ignora el relocated del re-display)
@@ -368,8 +385,12 @@ function sizeContainer(container) {
   // Como Play Books: en móvil (incl. horizontal) la página llena el ancho con un
   // margen mínimo; el "Ancho de columna" solo limita la longitud de línea en
   // pantallas grandes (escritorio / tablet ancha), donde las líneas largas cansan.
+  // En doble página el ajuste vale por PÁGINA, así que el contenedor cabe dos: si
+  // se dejara en `cols` (720 por defecto) el contenedor no llegaría nunca al
+  // MIN_SPREAD_WIDTH de epub.js y las dos columnas no se abrirían jamás.
+  const pages = getReadingMode() === 'spread' ? 2 : 1;
   const vw = window.innerWidth;
-  const maxWidth = vw > 1000 ? cols : Math.max(cols, vw);
+  const maxWidth = vw > 1000 ? cols * pages : Math.max(cols, vw);
   container.style.width = '100%';
   container.style.maxWidth = maxWidth + 'px';
   container.style.margin = '0 auto';
@@ -436,7 +457,8 @@ export async function load(arrayBuffer, onProgress) {
   rendition = book.renderTo(container, {
     width: '100%',
     height: '100%',
-    spread: 'none',
+    spread: readingMode === 'spread' ? 'auto' : 'none',
+    minSpreadWidth: MIN_SPREAD_WIDTH,
     flow: readingMode === 'scroll' ? 'scrolled-doc' : 'paginated'
   });
 
