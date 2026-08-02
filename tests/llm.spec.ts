@@ -167,13 +167,15 @@ test('getLiteModel resuelve: explícito → preset del proveedor → modelo prin
 // ADR-027 · Cola con prioridad. El chat NO puede quedar detrás de un trabajo en segundo
 // plano: un resumen es un map-reduce de muchas llamadas y, con la cadena de promesas que
 // había, preguntar durante esa generación encolaba la pregunta detrás de TODOS los trozos
-// pendientes. Aquí se fija el invariante con un proveedor serial (nan, el de por defecto).
+// pendientes. Aquí se fija el invariante con un proveedor serial: una base URL que NO
+// está en `PROVIDERS`, que es el caso conservador por defecto (BYOK desconocido). Antes se
+// usaba nan, pero desde 2026-08-02 declara `concurrent: true` (ver ADR-027, actualización).
 test('el chat adelanta a las llamadas de fondo en un proveedor serial', async ({ page }) => {
   await page.goto('/');
   const r = await page.evaluate(async () => {
     const L: any = await import('/js/ai/llm.js');
     L.setKey('test-key');
-    L.setBaseUrl('https://api.nan.builders/v1');    // preset sin `concurrent` → serializa
+    L.setBaseUrl('https://proveedor-desconocido.example/v1');   // sin preset → serializa
 
     const started: string[] = [];
     // Compuerta: las llamadas se quedan esperando hasta que abrimos, y a partir de ahí
@@ -227,8 +229,8 @@ test('el chat adelanta a las llamadas de fondo en un proveedor serial', async ({
   expect(r.enCola.background).toBe(2);
 });
 
-// El límite de concurrencia era de UN proveedor (nan) aplicado a todos. En los verificados
-// como concurrentes no hay razón para serializar.
+// El límite de concurrencia era de UN proveedor aplicado a todos. En los verificados como
+// concurrentes no hay razón para serializar.
 test('un proveedor concurrente despacha en paralelo', async ({ page }) => {
   await page.goto('/');
   const r = await page.evaluate(async () => {

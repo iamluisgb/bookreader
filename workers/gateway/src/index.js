@@ -10,9 +10,11 @@
 // - Anti-abuso F1: cuota por token + allowlist de alias + tope de max_tokens server-side.
 //   (rate-limit rpm y pool de keys → F2, si la medición lo pide.)
 //
-// Riesgo aceptado F1: todos los usuarios comparten la key de nan y nan rechaza
-// peticiones concurrentes por key; con tráfico demo bajo, los reintentos del
-// cliente (IA3) absorben los transitorios. F2 lo resuelve si hace falta.
+// Riesgo aceptado F1: todos los usuarios comparten la key de nan. Se aceptó porque nan
+// rechazaba las peticiones concurrentes por key; medido el 2026-08-02, ya no lo hace
+// (12/12 simultáneas correctas), así que el riesgo es menor de lo que decía esta nota.
+// Los reintentos del cliente (IA3) siguen absorbiendo transitorios; el pool de keys (F2)
+// solo si la telemetría muestra colisiones reales.
 
 // Tabla de routing: alias público → destino real + capacidades. Una fila por
 // alias; `provider` está para el día que haya un segundo backend (OpenRouter…).

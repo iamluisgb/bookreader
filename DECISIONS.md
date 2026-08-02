@@ -784,6 +784,15 @@ generación puede chocar con el límite de concurrencia — es previo a este ADR
 queda anotado. Tests en [`tests/llm.spec.ts`](tests/llm.spec.ts): el chat adelanta a dos trabajos
 encolados antes que él, y un proveedor concurrente despacha en paralelo.
 
+**Actualización 2026-08-02 — la premisa sobre nan ha caducado.** El contrato con el proveedor
+([ADR-030](#adr-030)) mide 12/12 peticiones simultáneas correctas contra nan, en dos ejecuciones
+independientes (2026-08-01 y 2026-08-02). "nan rechaza la concurrencia" era cierto cuando se
+escribió esto y ya no lo es, así que su preset pasa a `concurrent: true`: el proveedor por defecto
+—el de la demo y el de la mayoría de usuarios— deja de serializar y gana paralelismo real justo
+donde se nota, en los map-reduce de resumen y mapa mental. El mecanismo del ADR no cambia; cambia
+un dato sobre un proveedor, que es exactamente para lo que se escribió ADR-030. Si nan volviera a
+rechazarla, el test lo dirá y se quita la bandera.
+
 <a id="adr-028"></a>
 ## ADR-028 — El gate de la expansión de consulta lo decide el idioma · `ACEPTADA`
 

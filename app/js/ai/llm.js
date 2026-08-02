@@ -29,13 +29,15 @@ const MAX_TOKENS = 4096;
 // pequeño rinde igual. Solo se declara donde está verificado (nan: qwen3.6 responde en
 // <1s y soporta tools); en el resto, las auxiliares usan el modelo principal.
 // `concurrent` (opcional): el proveedor tolera peticiones simultáneas con la misma key.
-// nan NO (devuelve "network error"), y ese límite suyo era el que obligaba a serializar
-// toda la app. Se declara solo donde está verificado; sin declarar → se serializa.
+// Se declara solo donde está verificado; sin declarar → se serializa (conservador: es
+// lo único seguro ante un BYOK desconocido). nan lo tenía SIN declarar porque en su día
+// devolvía "network error" ante concurrencia; ya no: 12/12 simultáneas correctas en dos
+// medidas independientes (tests/provider-contract.spec.ts, 2026-08-01 y 2026-08-02).
 // `visionModel` (opcional): modelo multimodal del proveedor, para que la VISTA SIMPLE
 // pueda dejar "Explicar lo que veo" funcionando sin que el usuario configure un segundo
 // slot. Igual que `liteModel`, solo se declara donde está verificado.
 export const PROVIDERS = [
-  { id: 'nan',        name: 'nan',        baseUrl: 'https://api.nan.builders/v1',   models: ['deepseek-v4-flash', 'mimo-v2.5', 'qwen3.6', 'gemma4'], liteModel: 'qwen3.6', visionModel: 'mimo-v2.5' },
+  { id: 'nan',        name: 'nan',        baseUrl: 'https://api.nan.builders/v1',   models: ['deepseek-v4-flash', 'mimo-v2.5', 'qwen3.6', 'gemma4'], liteModel: 'qwen3.6', visionModel: 'mimo-v2.5', concurrent: true },
   { id: 'openai',     name: 'OpenAI',     baseUrl: 'https://api.openai.com/v1',     models: ['gpt-4o', 'gpt-4o-mini', 'o4-mini'], concurrent: true },
   // Verificado contra la API real el 2026-08-02 (tests/provider-contract.spec.ts):
   // `claude-3.7-sonnet` y `gemini-2.0-flash-001` ya NO existen en el catálogo, así que
@@ -280,8 +282,9 @@ export function getAutoExtract() { return Storage.get('ai_auto_extract', true); 
 export function setAutoExtract(v) { Storage.set('ai_auto_extract', !!v); }
 
 // ---- Cola de llamadas: prioridad + serialización solo donde hace falta -------
-// nan rechaza peticiones concurrentes a la misma key (da "network error"), así que había
-// una cadena de promesas que serializaba TODAS las llamadas de la app. Dos problemas:
+// nan rechazaba peticiones concurrentes a la misma key (daba "network error") — ya no,
+// ver la nota de `concurrent` arriba y ADR-027. De aquel límite venía una cadena de
+// promesas que serializaba TODAS las llamadas de la app. Dos problemas:
 //
 // 1. Es un límite de UN proveedor aplicado a todos. En OpenAI/Groq/OpenRouter no hace
 //    falta y estábamos regalando paralelismo.
