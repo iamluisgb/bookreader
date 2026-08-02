@@ -37,7 +37,10 @@ const MAX_TOKENS = 4096;
 export const PROVIDERS = [
   { id: 'nan',        name: 'nan',        baseUrl: 'https://api.nan.builders/v1',   models: ['deepseek-v4-flash', 'mimo-v2.5', 'qwen3.6', 'gemma4'], liteModel: 'qwen3.6', visionModel: 'mimo-v2.5' },
   { id: 'openai',     name: 'OpenAI',     baseUrl: 'https://api.openai.com/v1',     models: ['gpt-4o', 'gpt-4o-mini', 'o4-mini'], concurrent: true },
-  { id: 'openrouter', name: 'OpenRouter', baseUrl: 'https://openrouter.ai/api/v1',  models: ['deepseek/deepseek-chat', 'anthropic/claude-3.7-sonnet', 'google/gemini-2.0-flash-001'], concurrent: true },
+  // Verificado contra la API real el 2026-08-02 (tests/provider-contract.spec.ts):
+  // `claude-3.7-sonnet` y `gemini-2.0-flash-001` ya NO existen en el catálogo, así que
+  // el preset ofrecía ids muertos. Los de ahora sí tienen tools y visión.
+  { id: 'openrouter', name: 'OpenRouter', baseUrl: 'https://openrouter.ai/api/v1',  models: ['google/gemini-2.5-flash', 'google/gemini-2.5-flash-lite', 'deepseek/deepseek-chat-v3.1', 'anthropic/claude-haiku-4.5'], liteModel: 'google/gemini-2.5-flash-lite', visionModel: 'google/gemini-2.5-flash', concurrent: true },
   { id: 'groq',       name: 'Groq',       baseUrl: 'https://api.groq.com/openai/v1', models: ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant'], concurrent: true },
 ];
 
