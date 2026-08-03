@@ -14,7 +14,17 @@ try {
 
 export default defineConfig({
   testDir: './tests',
-  timeout: 30000,
+  // 60 s, no 30. Un timeout es una RED DE SEGURIDAD contra un cuelgue, no un
+  // objetivo de rendimiento, y 30 s daban muy poco margen a los tests que montan
+  // un EPUB o un PDF entero: cite-nav tarda ~10 s aislado y se pasaba de 30 en
+  // cuanto la máquina tenía algo más entre manos. Subirlo no cuesta nada cuando
+  // los tests pasan —solo cambia cuánto se espera antes de rendirse— y elimina el
+  // modo de fallo más frágil de la suite.
+  //
+  // NO se limitan los `workers`: medido en una máquina de 16 GB, pasar de 4 a 2
+  // sube el tiempo un 21 % y baja el pico de swap un 3 %. La presión de memoria
+  // es del sistema (7 GB de swap ya en uso en reposo), no de la suite.
+  timeout: 60000,
   use: {
     baseURL: 'http://localhost:8888',
     headless: true,
@@ -27,13 +37,13 @@ export default defineConfig({
     {
       // La app vive en app/; se sirve como raíz para que los tests sigan usando
       // rutas absolutas (/index.html, /js/…) sin cambios tras la reorganización.
-      command: 'python3 -m http.server 8888 --directory app',
+      command: 'node scripts/test-server.mjs 8888 app',
       port: 8888,
       reuseExistingServer: true,
     },
     {
       // Raíz del repo (landings /, /es/, /anki/, /privacy/) para landing-lang.spec.ts.
-      command: 'python3 -m http.server 8899',
+      command: 'node scripts/test-server.mjs 8899 .',
       port: 8899,
       reuseExistingServer: true,
     },
