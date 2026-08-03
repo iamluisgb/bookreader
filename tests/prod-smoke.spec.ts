@@ -37,11 +37,23 @@ test('@smoke el deploy sirve el commit que se espera', async ({ request }) => {
   // árbol de trabajo: puede llevar código sin commitear e irreproducible.
   expect(build.commit, 'hay un build del ÁRBOL DE TRABAJO en producción').not.toBe('worktree');
 
+  // Encadenado a `deploy:pages`, esto corre a los pocos segundos de subir los
+  // ficheros y Cloudflare todavía puede estar sirviendo el deploy anterior. Se
+  // ESPERA a que aparezca el commit en vez de fiarlo a los reintentos, que
+  // disparan de inmediato y convierten la propagación en un test flaky.
   if (process.env.SMOKE_COMMIT) {
-    expect(build.commit, 'producción no sirve el commit esperado (¿deploy a medias?)')
-      .toBe(process.env.SMOKE_COMMIT);
+    await expect.poll(async () => {
+      const r = await request.get(`${BASE}/build.json?cb=${Date.now()}`);
+      const t = await r.text();
+      return t.trimStart().startsWith('{') ? JSON.parse(t).commit : null;
+    }, {
+      message: 'producción no llegó a servir el commit desplegado (¿deploy a medias?)',
+      timeout: 90_000,
+      intervals: [1000, 2000, 3000, 5000],
+    }).toBe(process.env.SMOKE_COMMIT);
   }
-  console.log(`  desplegado: ${build.commit.slice(0, 7)} (${build.builtAt})`);
+  const final = await (await request.get(`${BASE}/build.json?cb=${Date.now()}`)).json();
+  console.log(`  desplegado: ${final.commit.slice(0, 7)} (${final.builtAt})`);
 });
 
 test('@smoke la app arranca en /app/ y sus módulos cargan desde ahí', async ({ page }) => {
