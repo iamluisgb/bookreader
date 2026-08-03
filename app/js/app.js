@@ -245,7 +245,10 @@ function initRouter() {
 // persistida como preferencia global de UI. En móvil (drawer/overlay) no aplica.
 const PANEL_LIMITS = {
   ai:      { cssVar: '--ai-panel-width', key: 'ui_ai_panel_width', min: 320, maxVw: 0.6, maxPx: 760 },
-  sidebar: { cssVar: '--sidebar-width',  key: 'ui_sidebar_width',  min: 240, maxVw: 0.5, maxPx: 560 },
+  // min 288: por debajo de ~282px las 4 pestañas ya no caben en una fila (medido con la
+  // tipografía de escritorio; el español es el peor caso, 281px frente a 259 en inglés).
+  // Con el mínimo antiguo de 240 el tirador dejaba arrastrar hasta juntar las etiquetas.
+  sidebar: { cssVar: '--sidebar-width',  key: 'ui_sidebar_width',  min: 288, maxVw: 0.5, maxPx: 560 },
 };
 
 function clampPanel(cfg, w) {

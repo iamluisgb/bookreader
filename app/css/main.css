@@ -74,17 +74,24 @@ html, body {
 .sidebar-tabs {
   display: flex;
   /* Sin wrap: con wrap las 4 pestañas se partían en dos filas irregulares y el punto de
-     corte cambiaba con el idioma (la maquetación dependía del locale). Si un idioma no
-     cabe, que se compriman en una fila antes que saltar de línea. */
+     corte cambiaba con el idioma (la maquetación dependía del locale). */
   flex-wrap: nowrap;
+  /* Red de seguridad para el sidebar estrecho (drawer móvil: min(86%, 360px), que en un
+     teléfono de 320px son 275). Cuando las 4 etiquetas no caben, la barra se desliza en
+     vez de dejar que se aplasten unas contra otras. Sin barra de scroll visible: sobre
+     4 pestañas cantaría más que el propio desbordamiento. */
+  overflow-x: auto;
+  scrollbar-width: none;
   border-bottom: 1px solid var(--border-soft);
 }
 
+.sidebar-tabs::-webkit-scrollbar { display: none; }
+
 .tab-btn {
-  /* Ancho natural (no repartido a partes iguales): las 4 etiquetas suman menos que el
-     ancho del sidebar, y así "Buscar" no ocupa lo mismo que "Subrayados". */
-  flex: 1 1 auto;
-  min-width: 0;
+  /* Crece para repartirse el sobrante, pero NUNCA encoge por debajo de su texto
+     (shrink 0): con shrink las etiquetas se metían unas dentro de otras al estrechar
+     —"ContenidoBuscar" pegados— en vez de desbordar y dejar deslizar la barra. */
+  flex: 1 0 auto;
   white-space: nowrap;
   padding: 12px 6px;
   background: none;
@@ -2499,6 +2506,11 @@ body.ai-busy #ai-toggle::after, body.ai-busy .ai-fab::after {
 
   /* Índice como drawer ancho */
   #sidebar { width: min(86%, 360px); }
+
+  /* Aquí el sidebar puede bajar de 300px, donde las 4 etiquetas dejan de caber. Apretar
+     un punto de tipo y los laterales las devuelve a una fila completa en los teléfonos
+     normales; por debajo de eso queda el deslizamiento de .sidebar-tabs. */
+  .tab-btn { font-size: 12px; padding: 12px 4px; }
 
   /* FAB visible; se oculta cuando el agente está abierto */
   .ai-fab { display: flex; align-items: center; justify-content: center; }
