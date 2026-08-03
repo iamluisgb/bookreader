@@ -35,7 +35,13 @@
   <aside id="sidebar" class="sidebar">
     <div class="sidebar-header">
       <h2>BookReader</h2>
-      <button id="sidebar-close" class="icon-btn" aria-label="Cerrar sidebar" data-i18n-attrs="aria-label" data-icon="xmark"></button>
+      <div class="sidebar-header-actions">
+        <!-- Ajustes de lectura: no es navegación por el libro (como sí lo son las pestañas),
+             es cómo se ve. Por eso vive aquí y no gasta una ranura de la barra. Sigue siendo
+             contextual: el panel oculta los grupos que no aplican al formato abierto. -->
+        <button id="reading-settings" class="icon-btn" data-tab="settings" aria-label="Ajustes de lectura" data-tip="Ajustes de lectura" data-i18n-attrs="aria-label,data-tip" data-icon="sliders"></button>
+        <button id="sidebar-close" class="icon-btn" aria-label="Cerrar sidebar" data-i18n-attrs="aria-label" data-icon="xmark"></button>
+      </div>
     </div>
 
     <!-- Tabs -->
@@ -44,7 +50,6 @@
       <button class="tab-btn" data-tab="search" data-i18n>Buscar</button>
       <button class="tab-btn" data-tab="bookmarks" data-i18n>Marcadores</button>
       <button class="tab-btn" data-tab="highlights" data-i18n>Subrayados</button>
-      <button class="tab-btn" data-tab="settings" data-i18n>Ajustes</button>
     </div>
 
     <!-- Tab: Search -->
@@ -91,8 +96,11 @@
         </div>
       </div>
 
-      <div class="settings-group">
-        <label data-i18n>Papel (PDF)</label>
+      <!-- data-format: grupos que solo aplican a un formato. El papel tiñe el lienzo del
+           PDF; la tipografía solo existe en EPUB (el PDF trae su maquetación rasterizada
+           y pdf-reader.js no lee ninguno de esos ajustes). Ver updateFormatScopedUI(). -->
+      <div class="settings-group" data-format="pdf">
+        <label data-i18n>Papel</label>
         <div class="paper-selector">
           <button class="paper-btn paper-swatch swatch-auto" data-paper="auto" title="Auto (sigue al tema)" aria-label="Auto (sigue al tema)" data-i18n-attrs="title,aria-label"></button>
           <button class="paper-btn paper-swatch swatch-white" data-paper="white" title="Blanco" aria-label="Blanco" data-i18n-attrs="title,aria-label"></button>
@@ -122,7 +130,7 @@
         </div>
       </div>
 
-      <div class="settings-group">
+      <div class="settings-group" data-format="epub">
         <label data-i18n>Tamaño de fuente</label>
         <div class="font-size-control">
           <button id="font-decrease" class="icon-btn">A-</button>
@@ -131,7 +139,7 @@
         </div>
       </div>
 
-      <div class="settings-group">
+      <div class="settings-group" data-format="epub">
         <label data-i18n>Fuente</label>
         <select id="font-family-select">
           <option value="serif">Serif</option>
@@ -141,7 +149,7 @@
         </select>
       </div>
 
-      <div class="settings-group">
+      <div class="settings-group" data-format="epub">
         <label data-i18n>Ancho de columna</label>
         <div class="column-width-control">
           <input type="range" id="column-width" min="480" max="1120" value="720" step="40">
@@ -149,7 +157,7 @@
         </div>
       </div>
 
-      <div class="settings-group">
+      <div class="settings-group" data-format="epub">
         <label data-i18n>Espaciado de líneas</label>
         <div class="line-height-control">
           <input type="range" id="line-height" min="1.2" max="2.2" value="1.6" step="0.1">

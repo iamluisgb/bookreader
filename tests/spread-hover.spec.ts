@@ -11,10 +11,11 @@ async function openEpub(page) {
   await page.waitForSelector('#epub-container iframe', { timeout: 20000 });
 }
 
-// El selector de modo vive en la pestaña Ajustes del sidebar, cerrado por defecto.
+// El selector de modo vive en los ajustes de lectura (engranaje de la cabecera del
+// sidebar, que arranca cerrado).
 async function openReadingSettings(page) {
   await page.click('#sidebar-toggle');
-  await page.click('.tab-btn[data-tab="settings"]');
+  await page.click('#reading-settings');
   await page.waitForSelector('.reading-mode-btn[data-mode="spread"]', { state: 'visible' });
 }
 

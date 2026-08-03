@@ -153,7 +153,7 @@ test.describe('BookReader - Sidebar Tabs', () => {
     await page.getByRole('button', { name: 'Subrayados' }).click();
     await expect(page.locator('#tab-highlights')).toBeVisible();
 
-    await page.getByRole('button', { name: 'Ajustes', exact: true }).click();
+    await page.getByRole('button', { name: 'Ajustes de lectura' }).click();
     await expect(page.locator('#tab-settings')).toBeVisible();
   });
 });
@@ -173,7 +173,7 @@ test.describe('BookReader - Settings', () => {
     await loadEpub(page);
 
     await page.getByRole('button', { name: 'Abrir sidebar' }).click();
-    await page.getByRole('button', { name: 'Ajustes', exact: true }).click();
+    await page.getByRole('button', { name: 'Ajustes de lectura' }).click();
 
     // Por defecto = 'system' (sin atributo data-theme; manda prefers-color-scheme).
     expect(await page.locator('html').getAttribute('data-theme')).toBeNull();
@@ -203,7 +203,7 @@ test.describe('BookReader - Settings', () => {
     await loadEpub(page);
 
     await page.getByRole('button', { name: 'Abrir sidebar' }).click();
-    await page.getByRole('button', { name: 'Ajustes', exact: true }).click();
+    await page.getByRole('button', { name: 'Ajustes de lectura' }).click();
 
     const fontValue = page.locator('#font-size-value');
     await expect(fontValue).toHaveText('16px');
@@ -221,7 +221,7 @@ test.describe('BookReader - Settings', () => {
     await loadEpub(page);
 
     await page.getByRole('button', { name: 'Abrir sidebar' }).click();
-    await page.getByRole('button', { name: 'Ajustes', exact: true }).click();
+    await page.getByRole('button', { name: 'Ajustes de lectura' }).click();
 
     const select = page.locator('#font-family-select');
     await select.selectOption('sans-serif');
@@ -235,7 +235,7 @@ test.describe('BookReader - Settings', () => {
     await loadEpub(page);
 
     await page.getByRole('button', { name: 'Abrir sidebar' }).click();
-    await page.getByRole('button', { name: 'Ajustes', exact: true }).click();
+    await page.getByRole('button', { name: 'Ajustes de lectura' }).click();
 
     // Change theme
     await page.locator('.theme-btn[data-theme="dark"]').click();

@@ -51,9 +51,10 @@ test('auditoría EN: lector + sidebar + biblioteca + panel + modales sin españo
 
   // 3) sidebar: todas las pestañas
   await page.locator('#sidebar-toggle').click();
-  for (const tab of ['contents', 'search', 'bookmarks', 'highlights', 'settings']) {
+  for (const tab of ['contents', 'search', 'bookmarks', 'highlights']) {
     await page.locator(`.tab-btn[data-tab="${tab}"]`).click();
   }
+  await page.locator('#reading-settings').click();   // ajustes de lectura: engranaje, no pestaña
   found.push(...leaks(await dumpUiText(page)).map(x => 'reader/sidebar: ' + x));
   await page.locator('#sidebar-close').click();
 

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bookreader-v107';
+const CACHE_NAME = 'bookreader-v108';
 const ASSETS = [
   './',
   './index.html',

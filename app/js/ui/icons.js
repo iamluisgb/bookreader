@@ -52,6 +52,10 @@ const ICONS = {
   // Engranaje geométrico de 8 dientes (dientes definidos, sin las curvas
   // abultadas del glifo Feather que se emborronaban a 16–20px).
   gear: '<circle cx="12" cy="12" r="3.2"/><path d="M19.19 10.74 21.26 10.38 21.26 13.62 19.19 13.26 17.97 16.2 19.69 17.41 17.41 19.69 16.2 17.97 13.26 19.19 13.62 21.26 10.38 21.26 10.74 19.19 7.8 17.97 6.59 19.69 4.31 17.41 6.03 16.2 4.81 13.26 2.74 13.62 2.74 10.38 4.81 10.74 6.03 7.8 4.31 6.59 6.59 4.31 7.8 6.03 10.74 4.81 10.38 2.74 13.62 2.74 13.26 4.81 16.2 6.03 17.41 4.31 19.69 6.59 17.97 7.8Z"/>',
+  // Deslizadores: ajustes de LECTURA (cómo se ve el libro abierto). Deliberadamente
+  // distinto del engranaje, que queda reservado a los Ajustes generales de la app; con
+  // los dos glifos iguales el pie y la cabecera del sidebar parecían el mismo botón.
+  sliders: '<line x1="3.5" y1="7.5" x2="20.5" y2="7.5"/><line x1="3.5" y1="16.5" x2="20.5" y2="16.5"/><circle cx="9" cy="7.5" r="2.3"/><circle cx="15" cy="16.5" r="2.3"/>',
 
   // ——— agent / AI ———
   sparkles: '<path d="M12 3.5l1.5 4.2 4.2 1.5-4.2 1.5L12 14.9l-1.5-4.2L6.3 9.2l4.2-1.5L12 3.5Z"/><path d="M18.5 14l.7 1.9 1.9.7-1.9.7-.7 1.9-.7-1.9-1.9-.7 1.9-.7.7-1.9Z"/>',

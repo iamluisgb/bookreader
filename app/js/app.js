@@ -41,6 +41,7 @@ document.addEventListener('DOMContentLoaded', () => {
   Settings.init();
   EpubReader.init();
   initSidebar();
+  updateFormatScopedUI();   // sin libro abierto el panel arranca en su forma de EPUB
   initSearch();
   initFileHandling();
   initNavigation();
@@ -337,10 +338,10 @@ function initReadingMode() {
   const btns = [...document.querySelectorAll('.reading-mode-btn')];
   if (!btns.length) return;
   btns.forEach(btn => btn.addEventListener('click', async () => {
-    if (PdfReader.isLoaded()) { await PdfReader.setReadingMode(btn.dataset.mode); updateReadingModeToggle(); return; }
+    if (PdfReader.isLoaded()) { await PdfReader.setReadingMode(btn.dataset.mode); updateFormatScopedUI(); return; }
     if (!EpubReader.isLoaded()) return;
     EpubReader.setReadingMode(btn.dataset.mode);
-    updateReadingModeToggle();
+    updateFormatScopedUI();
   }));
   // Al cambiar el flujo (o al recrearse el rendition) los subrayados pueden quedar sin
   // dibujar: los repintamos. Idempotente.
@@ -349,15 +350,27 @@ function initReadingMode() {
   window.addEventListener('reader:pdf-page-rendered', (e) => { drawPdfHighlights(e.detail?.page); });
 }
 
-function updateReadingModeToggle() {
-  const mode = PdfReader.isLoaded() ? PdfReader.getReadingMode()
+// Ajusta los controles que dependen del formato abierto. Los ajustes en sí son globales
+// (una sola clave en localStorage, por dispositivo): lo que cambia con el formato no es
+// el valor guardado sino qué controles tienen efecto. El PDF no lee tipografía —viene
+// rasterizado— y el EPUB no tiene papel que teñir.
+function updateFormatScopedUI() {
+  const isPdf = PdfReader.isLoaded();
+  const mode = isPdf ? PdfReader.getReadingMode()
     : EpubReader.isLoaded() ? EpubReader.getReadingMode() : 'paginated';
   document.querySelectorAll('.reading-mode-btn').forEach(btn =>
     btn.classList.toggle('active', btn.dataset.mode === mode));
   // La doble página es reflowable: el PDF ya trae su propia maquetación y el
   // selector es el mismo control para los dos formatos.
   document.querySelectorAll('.reading-mode-btn[data-epub-only]').forEach(btn => {
-    btn.style.display = PdfReader.isLoaded() ? 'none' : '';
+    btn.style.display = isPdf ? 'none' : '';
+  });
+  // Grupos de ajustes marcados con data-format: fuera los que no aplican. Sin esto el
+  // panel enseñaba «Papel (PDF)» leyendo un EPUB y cuatro controles de tipografía sobre
+  // un PDF que los ignora.
+  const fmt = isPdf ? 'pdf' : 'epub';
+  document.querySelectorAll('.settings-group[data-format]').forEach(g => {
+    g.hidden = g.dataset.format !== fmt;
   });
 }
 
@@ -888,10 +901,11 @@ function initSidebar() {
   });
   close.addEventListener('click', () => sidebar.classList.remove('open'));
 
-  // Tabs
-  document.querySelectorAll('.tab-btn').forEach(btn => {
+  // Tabs. El selector es [data-tab] y no .tab-btn porque el engranaje de la cabecera
+  // (Ajustes de lectura) abre otro panel más del mismo conmutador sin ser una pestaña.
+  document.querySelectorAll('[data-tab]').forEach(btn => {
     btn.addEventListener('click', () => {
-      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('[data-tab]').forEach(b => b.classList.remove('active'));
       document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
       btn.classList.add('active');
       document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
@@ -1070,7 +1084,7 @@ async function loadEpub(buffer, bookId, aiBookId, persist = null) {
     renderHighlights();
 
     updateBookmarkButton();
-    updateReadingModeToggle();   // reflejar el modo (paginado/scroll) guardado del libro
+    updateFormatScopedUI();   // modo de lectura guardado + controles que aplican al EPUB
     return true;
   } catch (err) {
     console.error('Error loading EPUB:', err);
@@ -1143,7 +1157,7 @@ async function loadPdf(buffer, bookId, aiBookId, persist = null, displayTitle = 
     updateBookmarkButton();          // estado del botón para la página inicial
     loadPdfTOC();                    // índice del PDF (outline) en el sidebar
     PdfReader.primeOutlineCache();   // capítulo de la burbuja al arrastrar la barra
-    updateReadingModeToggle();       // PDF4: reflejar el modo (paginado/scroll) recordado
+    updateFormatScopedUI();          // PDF4: modo recordado + controles que aplican al PDF
     // Tiempo restante del pie. Se lanza sin await: muestrea páginas y tarda unas
     // décimas; el resto de la UI no tiene por qué esperarla.
     countPdfWords().then((w) => {

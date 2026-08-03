@@ -60,22 +60,38 @@ html, body {
   font-weight: 600;
 }
 
+.sidebar-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+/* El engranaje es un modo del panel, no una acción suelta: cuando los ajustes de lectura
+   están a la vista se tiñe de acento, igual que la pestaña activa. */
+#reading-settings.active, #reading-settings.active:hover { color: var(--accent); }
+
 /* Tabs (v2: más limpias) */
 .sidebar-tabs {
   display: flex;
-  flex-wrap: wrap;
+  /* Sin wrap: con wrap las 4 pestañas se partían en dos filas irregulares y el punto de
+     corte cambiaba con el idioma (la maquetación dependía del locale). Si un idioma no
+     cabe, que se compriman en una fila antes que saltar de línea. */
+  flex-wrap: nowrap;
   border-bottom: 1px solid var(--border-soft);
 }
 
 .tab-btn {
-  flex: 1 0 auto;
+  /* Ancho natural (no repartido a partes iguales): las 4 etiquetas suman menos que el
+     ancho del sidebar, y así "Buscar" no ocupa lo mismo que "Subrayados". */
+  flex: 1 1 auto;
+  min-width: 0;
   white-space: nowrap;
-  padding: 12px 10px;
+  padding: 12px 6px;
   background: none;
   border: none;
   border-bottom: 2px solid transparent;
   color: var(--text-soft);
-  font-size: 13px;
+  font-size: 12.5px;
   font-weight: 500;
   cursor: pointer;
   transition: color var(--transition-fast), border-color var(--transition-fast);
@@ -448,6 +464,10 @@ html, body {
 .settings-group {
   margin-bottom: 24px;
 }
+
+/* Grupos ocultos por formato (data-format + updateFormatScopedUI). Explícito para que
+   añadir un `display` a .settings-group no resucite el grupo oculto. */
+.settings-group[hidden] { display: none; }
 
 .settings-group label {
   display: block;
