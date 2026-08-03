@@ -45,6 +45,9 @@ offline con un agente de IA (BYOK) que lee el libro completo según un objetivo.
   un HEAD que no esté en `origin/main` (escape: `DEPLOY_ALLOW_UNPUSHED=1`). El commit
   desplegado queda en `dist/build.json`, servido como `/build.json`.
 - `npm run build:preview` construye desde el árbol de trabajo, solo para previsualizar.
+- `npm run smoke` — humo contra producción (fuera de `npm test`: necesita red). `deploy:pages`
+  lo lanza solo al terminar, exigiendo que lo servido sea el commit recién desplegado.
+  `SMOKE_URL=…` para apuntar a otro deploy.
 - `npm test` — 19 E2E deterministas (Playwright, sin API). `npm run test:ai` — `@live` contra la API real (key en `.env`).
 - `npm run lint` (ESLint) · `npm run format` (Prettier).
 - El test "export after highlight" depende de que el epub de prueba se llame `test.epub` (bookId `test`).

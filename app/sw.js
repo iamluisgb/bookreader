@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bookreader-v105';
+const CACHE_NAME = 'bookreader-v106';
 const ASSETS = [
   './',
   './index.html',
@@ -71,6 +71,10 @@ const ASSETS = [
   './js/ai/anki-export.js',
   './js/ai/srs.js',
   './js/ai/study.js',
+  './js/region-select.js',
+  './js/ai/feynman.js',
+  './js/ai/math.js',
+  './js/ui/text.js',
   './js/ui/icons.js',
   './js/ui/escape.js',
   './js/ui/dialog.js',
@@ -99,11 +103,25 @@ const ASSETS = [
 ];
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS))
-  );
+  event.waitUntil(caches.open(CACHE_NAME).then(precache));
   self.skipWaiting();
 });
+
+// Uno a uno, no `addAll`. addAll es ATÓMICO: un solo recurso que falle —una entrada
+// que quedó obsoleta al renombrar un fichero, un 404 puntual— aborta el precache
+// ENTERO y deja al usuario sin NADA offline. En un lector offline eso es perder la
+// app por perder un icono. Aquí un fallo cuesta ese recurso y ya; los demás se
+// guardan igual, y lo que faltó se avisa en consola.
+//
+// Que la lista no se quede corta lo vigila tests/sw-precache.spec.ts: es a mano, y
+// ya se había desincronizado (tres módulos en uso sin precachear).
+async function precache(cache) {
+  const fallidos = [];
+  await Promise.all(ASSETS.map(async (url) => {
+    try { await cache.add(url); } catch { fallidos.push(url); }
+  }));
+  if (fallidos.length) console.warn('[sw] no se pudieron precachear:', fallidos);
+}
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
