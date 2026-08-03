@@ -794,7 +794,11 @@ test('PDF3: la barra no persigue al dedo mientras se ajusta la selección', asyn
     r1.setEnd(spans[0].firstChild!, 3);
     sel.removeAllRanges(); sel.addRange(r1);
     document.getElementById('pdf-container')!.dispatchEvent(new TouchEvent('touchend', { bubbles: true }));
-    await new Promise((r) => setTimeout(r, 60));
+    // Esperar a que la barra EXISTA antes de anotar su sitio: con 60 ms fijos, en una
+    // máquina ocupada se medía una barra aún sin pintar y todo lo demás salía torcido.
+    for (let i = 0; i < 100 && tt.getBoundingClientRect().width === 0; i++) {
+      await new Promise((r) => setTimeout(r, 20));
+    }
     const start = tt.getBoundingClientRect().left;
 
     const posiciones: number[] = [];
@@ -810,7 +814,14 @@ test('PDF3: la barra no persigue al dedo mientras se ajusta la selección', asyn
     const rr = document.createRange();
     rr.selectNodeContents(layer);
     sel.removeAllRanges(); sel.addRange(rr);
-    await new Promise((r) => setTimeout(r, 500));
+    // Esperar a que la barra se recoloque, con tope de 3 s. Esto NO sesga la aserción:
+    // si nunca se mueve, se sale por el tope con el valor de partida y el test falla
+    // igual — solo cambia cuánto se le concede. Con 500 ms fijos, el debounce de la app
+    // (~200 ms) no llegaba a tiempo en cuanto la máquina estaba ocupada.
+    for (let i = 0; i < 150; i++) {
+      await new Promise((r) => setTimeout(r, 20));
+      if (Math.round(tt.getBoundingClientRect().left) !== Math.round(start)) break;
+    }
     return { start, distintasDuranteElArrastre: new Set(posiciones).size, alQuedarseQuieta: tt.getBoundingClientRect().left };
   });
   expect(out.distintasDuranteElArrastre).toBe(1);            // quieta mientras se arrastra

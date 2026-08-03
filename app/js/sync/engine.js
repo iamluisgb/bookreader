@@ -172,18 +172,30 @@ async function cycle() {
   // (solo rellena lo que falta en local), así que no pisa las preferencias de este
   // equipo; lo que sí cruza es la RACHA de estudio, que no es una preferencia sino un
   // contador que avanza allí donde repasas (ver layout.js · mergeStreak).
-  if (remoteManifest && (remoteManifest.settingsUpdatedAt || 0) !== (st.settingsAt || 0)) {
-    const f = await Drive.read(SETTINGS_PATH);
-    if (f) {
-      applyingRemote = true;
-      try {
-        await restoreSnapshot({ settings: JSON.parse(f.content) }, { mode: 'merge' });
-      } finally {
-        applyingRemote = false;
-      }
-      st.books[SETTINGS_PATH] = f.etag;
+  //
+  // La decisión NO puede colgar de `manifest.settingsUpdatedAt`. Drive no soporta
+  // If-Match, así que el manifest se escribe releyendo la versión justo antes (ver
+  // drive-provider.js): hay una ventana en la que dos equipos que sincronizan a la vez
+  // se pisan, y el segundo puede dejar un `settingsUpdatedAt` MÁS VIEJO. Cuando eso
+  // pasa, ambos acaban con el mismo número mientras uno conserva los ajustes viejos —
+  // y comparando por igualdad, ese equipo no vuelve a leer settings.json NUNCA: la
+  // racha de estudio y cualquier ajuste global se le congelan, en silencio y para
+  // siempre. Medido: pasaba en ~6 de cada 10 arranques solapados.
+  //
+  // La versión del PROPIO settings.json sí es monótona: la asigna el proveedor en cada
+  // escritura y no puede retroceder. Se compara contra la que este equipo aplicó (o
+  // subió, que también la guarda). Cuesta una lectura por ciclo de un fichero pequeño,
+  // a cambio de que el estado no pueda quedar encallado.
+  const remoteSettings = await Drive.read(SETTINGS_PATH);
+  if (remoteSettings && String(remoteSettings.etag) !== String(st.books[SETTINGS_PATH] || '')) {
+    applyingRemote = true;
+    try {
+      await restoreSnapshot({ settings: JSON.parse(remoteSettings.content) }, { mode: 'merge' });
+    } finally {
+      applyingRemote = false;
     }
-    st.settingsAt = remoteManifest.settingsUpdatedAt || 0;
+    st.books[SETTINGS_PATH] = remoteSettings.etag;
+    st.settingsAt = (remoteManifest && remoteManifest.settingsUpdatedAt) || st.settingsAt || 0;
     save();
   }
 
@@ -282,6 +294,17 @@ async function cycle() {
     settingsAt = Date.now();
     settingsPushed = true;
   }
+  // `settingsUpdatedAt` NO PUEDE RETROCEDER. Dos dispositivos escriben el manifest casi
+  // a la vez y el segundo en llegar puede llevar un valor MÁS VIEJO: el If-Match es de
+  // cliente (Drive no lo soporta, ver drive-provider.js), así que entre releer la versión
+  // y escribir hay una ventana. Si el número retrocede, ambos equipos acaban con el mismo
+  // valor mientras uno conserva los ajustes viejos — y como la condición de pull (1c) es
+  // una IGUALDAD, ese equipo no vuelve a leer settings.json NUNCA: la racha de estudio y
+  // cualquier ajuste global se le congelan en silencio y para siempre.
+  //
+  // Quedarse con el máximo cierra el agujero sin tocar el protocolo: el que va por detrás
+  // ve un número mayor que el suyo y sí re-lee.
+  settingsAt = Math.max(settingsAt, st.settingsAt || 0);
   st.settingsAt = settingsAt;
   save();
   snap.manifest.settingsUpdatedAt = settingsAt;
