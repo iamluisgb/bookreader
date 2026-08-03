@@ -1,6 +1,6 @@
 # AGENTS.md — BookReader
 
-Lector web de EPUB/PDF desplegable en GitHub Pages. 100% frontend, sin build step. PWA
+Lector web de EPUB/PDF desplegado en Cloudflare Pages. 100% frontend, sin build step. PWA
 offline con un agente de IA (BYOK) que lee el libro completo según un objetivo.
 
 ## Stack
@@ -39,7 +39,12 @@ offline con un agente de IA (BYOK) que lee el libro completo según un objetivo.
 - Escapar SIEMPRE con `js/ui/escape.js` al construir HTML con datos.
 
 ## Desarrollo
-- Servir en local: `python3 -m http.server` y abrir `index.html`. No hay build; deploy directo a GitHub Pages.
+- Servir en local: `python3 -m http.server` y abrir `index.html`. No hay build de la app.
+- **Deploy** (Cloudflare Pages): `npm run deploy:pages`. El build sale de **HEAD**, no del
+  árbol de trabajo — lo que tengas sin commitear no se despliega, y avisa de ello. Rechaza
+  un HEAD que no esté en `origin/main` (escape: `DEPLOY_ALLOW_UNPUSHED=1`). El commit
+  desplegado queda en `dist/build.json`, servido como `/build.json`.
+- `npm run build:preview` construye desde el árbol de trabajo, solo para previsualizar.
 - `npm test` — 19 E2E deterministas (Playwright, sin API). `npm run test:ai` — `@live` contra la API real (key en `.env`).
 - `npm run lint` (ESLint) · `npm run format` (Prettier).
 - El test "export after highlight" depende de que el epub de prueba se llame `test.epub` (bookId `test`).
