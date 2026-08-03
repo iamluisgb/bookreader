@@ -2,6 +2,7 @@
 // "Libros" + estanterías (miniatura, contador, renombrar/borrar), barra de
 // herramientas con orden (Recientes) y filtro (Progreso), y rejilla de portadas.
 import * as Store from './store.js';
+import * as Shelves from './shelves.js';
 import * as Study from '../ai/study.js';
 import * as Blobs from '../sync/blobs.js';
 import * as DriveAuth from '../sync/drive-auth.js';
@@ -9,18 +10,32 @@ import { ensurePro } from '../ui/paywall.js';
 import { icon, brandMark } from '../ui/icons.js';
 import { t, getLang } from '../i18n.js';
 import { escapeHtml } from '../ui/escape.js';
-import { confirmBox, promptBox, alertBox } from '../ui/dialog.js';
+import { confirmBox, promptBox, alertBox, formBox } from '../ui/dialog.js';
 
 let host = null;                 // #library
 let onOpenBook = () => {};
 let onAddBook = () => {};
 let onOpenSettings = () => {};
 
-let currentShelf = 'all';        // 'all' | 'none' | <shelfId>
+// Selección de estanterías. Un conjunto, no un valor: las estanterías son
+// etiquetas y un libro está en varias, así que lo que la gente quiere ver casi
+// siempre es un CRUCE ("Técnico" ∩ "Pendientes"), no una carpeta. Vacía = todos
+// los libros; el pseudo-id 'none' (sin estantería) es exclusivo, porque cruzarlo
+// con cualquier estantería da siempre el conjunto vacío.
+//
+// Cada entrada es una FILA del rail, no un id: `{ label, ids }`. Una rama con
+// hijas ("Técnico", con "Técnico/ML" debajo) son varios ids que valen como UNA
+// condición —"Técnico o algo bajo él"—, y se resuelve en O internamente. Si se
+// guardaran los ids sueltos, cruzar esa rama con otra estantería en modo Y
+// pediría los libros que están en la rama Y en TODAS sus hijas a la vez: casi
+// siempre vacío, y nunca lo que se quería pedir.
+let selection = new Map();   // key (id de estantería | 'g:<ruta>' | 'none') → { label, ids }
+let matchAllShelves = true;      // true = intersección (Y) · false = unión (O)
 let sortBy = 'recent';           // 'recent' | 'title' | 'author'
 let filterProgress = 'all';      // 'all' | 'unread' | 'reading' | 'finished'
 let query = '';                  // texto del buscador de la estantería (título/autor)
 let allBooks = [];               // caché del último render (para refiltrar sin re-fetch)
+let allShelves = [];             // ídem para las estanterías (resolver reglas y nombres)
 let menuEl = null;
 // Transferencias en curso, por bookId: { loaded, total, state }. Solo para
 // pintar la barra de la tarjeta; la verdad la tiene sync/blobs.js.
@@ -100,54 +115,46 @@ export async function render() {
   if (!host) return;
   const [books, shelves] = await Promise.all([Store.getAllBooks(), Store.getShelves()]);
   allBooks = books;
+  allShelves = shelves;
+  memberCache = new Map();   // los datos son otros: la pertenencia calculada caduca
 
-  if (currentShelf !== 'all' && currentShelf !== 'none' && !shelves.some(s => s.id === currentShelf)) {
-    currentShelf = 'all';
+  // Una estantería borrada (aquí o en otro dispositivo) desaparece de la
+  // selección en vez de dejarla filtrando por ids que ya no existen.
+  const live = new Set(shelves.map(s => s.id));
+  for (const [key, entry] of [...selection]) {
+    if (key === 'none') continue;
+    const ids = entry.ids.filter(id => live.has(id));
+    if (ids.length) selection.set(key, { ...entry, ids }); else selection.delete(key);
   }
 
   const noShelfCount = books.filter(b => !(b.shelfIds && b.shelfIds.length)).length;
-  const shelfThumb = (id) => {
-    const b = books.find(x => (x.shelfIds || []).includes(id));
-    return b && b.cover ? `<img src="${escapeHtml(b.cover)}" alt="">` : `<span class="lib-rail-thumb-ph">${icon('book', { size: 14 })}</span>`;
-  };
-
   const list = computeList();
-
-  const title = currentShelf === 'all' ? t('Libros')
-    : currentShelf === 'none' ? t('Sin estantería')
-    : (shelves.find(s => s.id === currentShelf)?.name || t('Estantería'));
 
   host.innerHTML = `
     <div class="lib-layout">
       <aside class="lib-rail">
-        <button class="lib-rail-item${currentShelf === 'all' ? ' active' : ''}" data-shelf="all">
+        <button class="lib-rail-item${selection.size ? '' : ' active'}" data-shelf="all">
           <span class="lib-rail-mark">${brandMark({ size: 28 })}</span>
           <span class="lib-rail-name">${t('Libros')}</span>
           <span class="lib-rail-count">${books.length}</span>
         </button>
 
         <div class="lib-rail-section">${t('Estanterías')}</div>
-        ${shelves.map(s => {
-          const count = books.filter(b => (b.shelfIds || []).includes(s.id)).length;
-          return `<button class="lib-rail-item lib-rail-shelf${currentShelf === s.id ? ' active' : ''}" data-shelf="${s.id}">
-            <span class="lib-rail-thumb">${shelfThumb(s.id)}</span>
-            <span class="lib-rail-name">${escapeHtml(s.name)}</span>
-            <span class="lib-rail-count">${count}</span>
-            <span class="lib-rail-kebab" data-shelf-menu="${s.id}" title="${t('Opciones')}">${icon('ellipsis', { size: 18 })}</span>
-          </button>`;
-        }).join('')}
-        <button class="lib-rail-item lib-rail-shelf${currentShelf === 'none' ? ' active' : ''}" data-shelf="none">
+        ${Shelves.shelfRows(shelves).map(railRowHtml).join('')}
+        <button class="lib-rail-item lib-rail-shelf${selection.has('none') ? ' active' : ''}" data-shelf="none">
           <span class="lib-rail-thumb"><span class="lib-rail-thumb-ph">${icon('book', { size: 14 })}</span></span>
           <span class="lib-rail-name">${t('Sin estantería')}</span>
           <span class="lib-rail-count">${noShelfCount}</span>
         </button>
 
         <button class="lib-rail-create" data-act="newshelf">${icon('pencil', { size: 16 })}<span>${t('Crear estantería')}</span></button>
+        <button class="lib-rail-create" data-act="newsmart">${icon('sparkles', { size: 16 })}<span>${t('Estantería inteligente')}</span></button>
         <button class="lib-rail-create lib-rail-settings" data-act="settings">${icon('gear', { size: 16 })}<span>${t('Ajustes generales')}</span></button>
       </aside>
 
       <section class="lib-main">
-        <h1 class="lib-h1">${escapeHtml(title)}</h1>
+        <h1 class="lib-h1">${escapeHtml(currentTitle())}</h1>
+        ${filterChipsHtml()}
         <div class="lib-toolbar">
           <div class="lib-search-box">
             ${icon('search', { size: 16 })}
@@ -163,6 +170,65 @@ export async function render() {
     </div>
   `;
   paintStudyChip();   // async, no bloquea el render de la rejilla
+}
+
+// Portada de muestra de una fila del rail: la del primer libro que contenga.
+function rowThumb(ids) {
+  const set = memberIdsOf(ids);
+  const b = allBooks.find(x => set.has(x.id) && x.cover);
+  return b ? `<img src="${escapeHtml(b.cover)}" alt="">` : `<span class="lib-rail-thumb-ph">${icon('book', { size: 14 })}</span>`;
+}
+
+// Una fila del rail: estantería (manual o inteligente) o GRUPO —un tramo del
+// nombre que no existe como estantería propia, p. ej. "Técnico" cuando solo hay
+// "Técnico/ML"—. El grupo filtra por todo lo que cuelga de él, pero no tiene
+// menú: no hay nada que renombrar ni borrar.
+function railRowHtml(row) {
+  const ids = row.shelfIds;
+  const active = selection.has(row.key);
+  const count = memberIdsOf(ids).size;
+  const indent = row.depth ? ` style="padding-left:${12 + row.depth * 16}px"` : '';
+  const smart = row.shelf && Shelves.isSmart(row.shelf);
+  const thumb = smart
+    ? `<span class="lib-rail-thumb lib-rail-thumb--smart">${icon('sparkles', { size: 15 })}</span>`
+    : `<span class="lib-rail-thumb">${rowThumb(ids)}</span>`;
+  const kebab = row.shelf
+    ? `<span class="lib-rail-kebab" data-shelf-menu="${escapeHtml(row.shelf.id)}" title="${t('Opciones')}">${icon('ellipsis', { size: 18 })}</span>`
+    : '';
+  return `<button class="lib-rail-item lib-rail-shelf${active ? ' active' : ''}${row.kind === 'group' ? ' lib-rail-group' : ''}"
+      data-row-key="${escapeHtml(row.key)}" data-row-label="${escapeHtml(row.label)}"
+      data-shelf-ids="${escapeHtml(ids.join(','))}"${indent}>
+    ${row.kind === 'group' ? `<span class="lib-rail-thumb lib-rail-thumb--group"></span>` : thumb}
+    <span class="lib-rail-name">${escapeHtml(row.label)}</span>
+    <span class="lib-rail-count">${count}</span>
+    ${kebab}
+  </button>`;
+}
+
+function currentTitle() {
+  if (!selection.size) return t('Libros');
+  if (selection.has('none')) return t('Sin estantería');
+  const names = [...selection.values()].map(e => e.label);
+  if (names.length === 1) return names[0];
+  return names.join(matchAllShelves ? ' · ' : ' / ');
+}
+
+// Chips de la selección: hacen visible QUÉ está filtrando (con varias
+// estanterías el título solo no basta), permiten quitar una a una en táctil
+// —donde no hay ⌘+clic— y llevan el conmutador Y/O, que es la diferencia entre
+// "los que están en las dos" y "los que están en alguna".
+function filterChipsHtml() {
+  if (selection.size < 1 || selection.has('none')) return '';
+  const chips = [...selection].map(([key, entry]) =>
+    `<span class="lib-chip">${escapeHtml(entry.label)}
+      <button class="lib-chip-x" data-unselect="${escapeHtml(key)}" aria-label="${t('Quitar del filtro')}">${icon('xmark', { size: 13 })}</button>
+    </span>`).join('');
+  const mode = selection.size > 1
+    ? `<button class="lib-chip lib-chip-mode" data-act="togglemode" title="${t('Cambiar entre Y (en todas) y O (en alguna)')}">
+        ${matchAllShelves ? t('en todas') : t('en alguna')}</button>`
+    : '';
+  return `<div class="lib-chips">${chips}${mode}
+    <button class="lib-chip lib-chip-clear" data-act="clearsel">${t('Quitar filtro')}</button></div>`;
 }
 
 // Chip "Repasar hoy · N" (P10): la cola diaria de repetición espaciada, el bucle de
@@ -301,10 +367,35 @@ function emptyHtml(noBooksAtAll) {
 
 // ---- filtros / orden -------------------------------------------------------
 
+// Miembros de una estantería, cacheados por render. Una estantería INTELIGENTE
+// no guarda miembros: los calcula recorriendo la biblioteca. Sin caché eso se
+// repetiría por cada contador del rail y por cada libro de la rejilla —O(n·m) en
+// cada tecleo del buscador—; con ella se evalúa una vez por estantería.
+let memberCache = new Map();
+function membersOf(id) {
+  let set = memberCache.get(id);
+  if (!set) {
+    const sh = allShelves.find(s => s.id === id);
+    set = new Set(Shelves.booksIn(allBooks, sh).map(b => b.id));
+    memberCache.set(id, set);
+  }
+  return set;
+}
+// Unión de varias estanterías (una fila del rail arrastra a sus descendientes).
+function memberIdsOf(ids) {
+  const out = new Set();
+  for (const id of ids) for (const bid of membersOf(id)) out.add(bid);
+  return out;
+}
+
+// Cada entrada de la selección se resuelve en O (la rama y todo lo que cuelga de
+// ella) y las entradas entre sí en Y u O según el conmutador.
 function matchShelf(b) {
-  if (currentShelf === 'all') return true;
-  if (currentShelf === 'none') return !(b.shelfIds && b.shelfIds.length);
-  return (b.shelfIds || []).includes(currentShelf);
+  if (!selection.size) return true;
+  if (selection.has('none')) return !(b.shelfIds && b.shelfIds.length);
+  const entries = [...selection.values()];
+  const inEntry = (e) => e.ids.some(id => membersOf(id).has(b.id));
+  return matchAllShelves ? entries.every(inEntry) : entries.some(inEntry);
 }
 function matchFilter(b) {
   if (filterProgress === 'all') return true;
@@ -374,16 +465,21 @@ async function onClick(e) {
   if (e.target.closest('[data-act="settings"]')) { onOpenSettings(); return; }
 
   if (e.target.closest('[data-act="newshelf"]')) { await createShelf(); return; }
+  if (e.target.closest('[data-act="newsmart"]')) { await createSmartShelf(); return; }
 
-  // Menú de estantería (renombrar / borrar)
+  // Chips del filtro: quitar una estantería, alternar Y/O, limpiar.
+  const unsel = e.target.closest('[data-unselect]');
+  if (unsel) { selection.delete(unsel.dataset.unselect); await render(); return; }
+  if (e.target.closest('[data-act="togglemode"]')) { matchAllShelves = !matchAllShelves; await render(); return; }
+  if (e.target.closest('[data-act="clearsel"]')) { selection.clear(); await render(); return; }
+
+  // Menú de estantería (renombrar / regla / mover / borrar)
   const shelfMenu = e.target.closest('.lib-rail-kebab');
   if (shelfMenu) { e.stopPropagation(); await openShelfMenu(shelfMenu.dataset.shelfMenu, shelfMenu); return; }
 
-  // Seleccionar estantería / "Libros"
+  // Seleccionar estantería / grupo / "Libros"
   const railItem = e.target.closest('.lib-rail-item');
-  if (railItem && !e.target.closest('.lib-rail-create')) {
-    currentShelf = railItem.dataset.shelf; await render(); return;
-  }
+  if (railItem && !e.target.closest('.lib-rail-create')) { await selectRail(railItem, e); return; }
 
   // Botón de descarga de una ficha fantasma (no abre el libro)
   const dl = e.target.closest('[data-download]');
@@ -421,12 +517,85 @@ async function startDownload(id, { open = false } = {}) {
   if (open && book && Store.hasFile(book)) onOpenBook(book);
 }
 
+// Pulsar una fila del rail. Clic normal = ver SOLO eso (lo de siempre).
+// ⌘/Ctrl/Mayús+clic = añadir o quitar del cruce sin salir del rail; en táctil,
+// donde no hay modificador, lo mismo se hace desde el menú de la estantería.
+async function selectRail(el, ev) {
+  const fixed = el.dataset.shelf;          // "Libros" y "Sin estantería"
+  if (fixed === 'all') { selection.clear(); await render(); return; }
+  if (fixed === 'none') { selection = new Map([['none', { label: t('Sin estantería'), ids: [] }]]); await render(); return; }
+
+  const key = el.dataset.rowKey;
+  const entry = { label: el.dataset.rowLabel || '', ids: (el.dataset.shelfIds || '').split(',').filter(Boolean) };
+  if (ev && (ev.metaKey || ev.ctrlKey || ev.shiftKey)) {
+    selection.delete('none');
+    if (selection.has(key)) selection.delete(key); else selection.set(key, entry);
+  } else {
+    selection = new Map([[key, entry]]);
+  }
+  await render();
+}
+
 async function createShelf() {
-  const name = (await promptBox('Nombre de la nueva estantería:', { title: 'Nueva estantería' }) || '').trim();
+  const name = (await promptBox('Nombre de la nueva estantería:', { title: 'Nueva estantería',
+    placeholder: 'Técnico/Machine Learning' }) || '').trim();
   if (!name) return;
   const sh = await Store.addShelf(name);
-  currentShelf = sh.id;
+  selection = new Map([[sh.id, { label: Shelves.segments(sh.name).pop(), ids: [sh.id] }]]);
   await render();
+}
+
+async function createSmartShelf() {
+  const sh = await editSmartShelf(null);
+  if (sh) selection = new Map([[sh.id, { label: Shelves.segments(sh.name).pop(), ids: [sh.id] }]]);
+  await render();
+}
+
+// ---- estanterías inteligentes ----------------------------------------------
+
+// Editor de la regla. Devuelve la estantería creada/actualizada, o null.
+//
+// Los campos son los SINCRONIZADOS del libro a propósito: una regla sobre
+// "abierto por última vez" o sobre si el fichero está descargado daría
+// resultados distintos en cada dispositivo (ver library/shelves.js).
+async function editSmartShelf(shelf) {
+  const rule = (shelf && shelf.rule) || {};
+  const manual = allShelves.filter(s => !Shelves.isSmart(s) && s.id !== (shelf && shelf.id));
+  const res = await formBox({
+    title: shelf ? 'Editar estantería inteligente' : 'Nueva estantería inteligente',
+    message: 'Los libros entran solos cuando cumplen la regla.',
+    fields: [
+      { name: 'name', label: 'Nombre', type: 'text', value: shelf ? shelf.name : '', placeholder: 'Pendientes técnicos' },
+      { name: 'status', label: 'Estado', type: 'select', value: rule.status || '',
+        options: { '': 'Cualquiera', unread: 'Sin empezar', reading: 'Leyendo', finished: 'Terminados' } },
+      { name: 'format', label: 'Formato', type: 'select', value: rule.format || '',
+        options: { '': 'Cualquiera', epub: 'EPUB', pdf: 'PDF' } },
+      { name: 'author', label: 'Autor contiene', type: 'text', value: rule.author || '' },
+      { name: 'title', label: 'Título contiene', type: 'text', value: rule.title || '' },
+      { name: 'addedWithinDays', label: 'Añadido hace menos de', type: 'select', value: String(rule.addedWithinDays || ''),
+        options: { '': 'Cualquier fecha', 7: '7 días', 30: '30 días', 90: '90 días', 365: 'Un año' } },
+      { name: 'shelfIds', label: 'En alguna de estas estanterías', type: 'checks', value: rule.shelfIds || [],
+        emptyText: 'Aún no hay estanterías', options: manual.map(s => ({ value: s.id, label: s.name })) },
+    ],
+  });
+  if (!res) return null;
+
+  const name = (res.name || '').trim();
+  if (!name) { await alertBox(t('La estantería necesita un nombre.'), { title: t('Nueva estantería inteligente') }); return null; }
+  const next = Shelves.cleanRule({
+    status: res.status, format: res.format, author: res.author, title: res.title,
+    addedWithinDays: parseInt(res.addedWithinDays, 10) || 0, shelfIds: res.shelfIds || [],
+  });
+  // Sin ninguna condición la estantería contendría la biblioteca entera y no se
+  // podría meter nada a mano (los miembros se calculan): mejor decirlo que
+  // guardar una estantería que parece rota.
+  if (!Shelves.hasRule(next)) {
+    await alertBox(t('Pon al menos una condición: si no, la estantería contendría todos los libros.'),
+      { title: t('Nueva estantería inteligente') });
+    return null;
+  }
+  if (shelf) return Store.updateShelf(shelf.id, { name, rule: next });
+  return Store.addShelf(name, { rule: next });
 }
 
 // ---- menú de estantería ----------------------------------------------------
@@ -436,18 +605,41 @@ async function openShelfMenu(id, anchor) {
   const shelves = await Store.getShelves();
   const shelf = shelves.find(s => s.id === id);
   if (!shelf) return;
+  const smart = Shelves.isSmart(shelf);
+  const inFilter = selection.has(id);
   buildMenu(anchor, `
+    <button class="lib-menu-item" data-act="filter">${icon(inFilter ? 'xmark' : 'plus', { size: 16 })}<span>${inFilter ? t('Quitar del filtro') : t('Añadir al filtro')}</span></button>
+    <div class="lib-menu-sep"></div>
     <button class="lib-menu-item" data-act="rename">${icon('pencil', { size: 16 })}<span>${t('Renombrar')}</span></button>
+    ${smart ? `<button class="lib-menu-item" data-act="rule">${icon('sparkles', { size: 16 })}<span>${t('Editar regla')}</span></button>` : ''}
+    <button class="lib-menu-item" data-act="up">${icon('chevron-up', { size: 16 })}<span>${t('Subir')}</span></button>
+    <button class="lib-menu-item" data-act="down">${icon('chevron-down', { size: 16 })}<span>${t('Bajar')}</span></button>
+    <div class="lib-menu-sep"></div>
     <button class="lib-menu-item danger" data-act="delete">${icon('trash', { size: 16 })}<span>${t('Eliminar estantería')}</span></button>
   `, async (act) => {
-    if (act === 'rename') {
-      const name = (await promptBox('Nuevo nombre:', { title: 'Renombrar estantería', value: shelf.name }) || '').trim();
+    if (act === 'filter') {
+      // La vía táctil para cruzar estanterías: en el rail eso es ⌘/Ctrl+clic,
+      // que en un móvil no existe.
+      selection.delete('none');
+      if (inFilter) selection.delete(id);
+      else selection.set(id, { label: Shelves.segments(shelf.name).pop(), ids: [id] });
+    } else if (act === 'rename') {
+      // El nombre ES la jerarquía: renombrar a "Técnico/ML" la mueve bajo
+      // "Técnico" (y lo crea como grupo si no existe). De ahí la pista.
+      const name = (await promptBox('Nuevo nombre (usa «/» para anidar, p. ej. Técnico/ML):',
+        { title: 'Renombrar estantería', value: shelf.name }) || '').trim();
       if (name) await Store.renameShelf(id, name);
+    } else if (act === 'rule') {
+      await editSmartShelf(shelf);
+    } else if (act === 'up' || act === 'down') {
+      await Store.moveShelf(id, act === 'up' ? -1 : 1);
     } else if (act === 'delete') {
-      if (await confirmBox(t('¿Eliminar la estantería "{name}"? Los libros no se borran.', { name: shelf.name }),
-          { title: 'Eliminar estantería', okText: 'Eliminar', danger: true })) {
+      const msg = smart
+        ? t('¿Eliminar la estantería inteligente "{name}"? Los libros no se borran.', { name: shelf.name })
+        : t('¿Eliminar la estantería "{name}"? Los libros no se borran.', { name: shelf.name });
+      if (await confirmBox(msg, { title: 'Eliminar estantería', okText: 'Eliminar', danger: true })) {
         await Store.deleteShelf(id);
-        if (currentShelf === id) currentShelf = 'all';
+        selection.delete(id);
       }
     }
     await render();
@@ -461,6 +653,11 @@ async function openBookMenu(id, anchor) {
   const [book, shelves] = await Promise.all([Store.getBook(id), Store.getShelves()]);
   if (!book) return;
   const inShelf = new Set(book.shelfIds || []);
+  // Solo las MANUALES se marcan: en una inteligente la pertenencia la decide la
+  // regla, y ofrecer una casilla que no hace nada sería mentir. Las que ya
+  // contienen el libro se dicen abajo, para que no parezca que faltan.
+  const manualShelves = shelves.filter(s => !Shelves.isSmart(s));
+  const smartShelves = shelves.filter(s => Shelves.isSmart(s) && Shelves.booksIn([book], s).length);
   const finished = book.status === 'finished';
   const local = Store.hasFile(book);
   const uploaded = !!(book.blob && book.blob.path);
@@ -482,10 +679,13 @@ async function openBookMenu(id, anchor) {
     ${storage ? `<div class="lib-menu-sep"></div>${storage}` : ''}
     <div class="lib-menu-sep"></div>
     <div class="lib-menu-label">${t('Estanterías')}</div>
-    ${shelves.length
-      ? shelves.map(s => `<button class="lib-menu-item" data-act="shelf" data-shelf="${s.id}">
+    ${manualShelves.length
+      ? manualShelves.map(s => `<button class="lib-menu-item" data-act="shelf" data-shelf="${s.id}">
           <span class="lib-menu-check">${inShelf.has(s.id) ? icon('check', { size: 16 }) : ''}</span><span>${escapeHtml(s.name)}</span></button>`).join('')
       : `<div class="lib-menu-empty">${t('Aún no hay estanterías')}</div>`}
+    ${smartShelves.length
+      ? `<div class="lib-menu-note">${icon('sparkles', { size: 13 })}<span>${t('En {names} entra solo, por su regla.', { names: smartShelves.map(s => s.name).join(', ') })}</span></div>`
+      : ''}
     <button class="lib-menu-item" data-act="newshelf">${icon('plus', { size: 16 })}<span>${t('Nueva estantería…')}</span></button>
     <div class="lib-menu-sep"></div>
     <button class="lib-menu-item danger" data-act="delete">${icon('trash', { size: 16 })}<span>${t('Eliminar')}</span></button>

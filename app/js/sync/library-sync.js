@@ -97,9 +97,16 @@ function bookEntry(b) {
   };
 }
 
+// `rule` (estantería inteligente) y `order` (posición en el rail) viajan como
+// cualquier otro campo, con LWW por registro. Ambos son opcionales y se
+// normalizan a null/0: un cliente antiguo que no los conozca los reescribiría
+// como ausentes, y sin normalizar la comparación con el registro local daría
+// siempre "cambiado" y provocaría un push en cada sync.
 function shelfEntry(s) {
   return {
     name: s.name || '', createdAt: s.createdAt || 0,
+    order: Number.isFinite(s.order) ? s.order : null,
+    rule: s.rule && Object.keys(s.rule).length ? s.rule : null,
     deleted: !!s.deleted, deletedAt: s.deletedAt || 0,
     updatedAt: s.updatedAt || s.createdAt || 0,
   };

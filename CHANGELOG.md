@@ -5,6 +5,54 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-08-03 — Organizar la biblioteca sin carpetas
+
+Las estanterías se quedaban cortas y la salida obvia era anidarlas. **No se han anidado**, y
+la razón es que una estantería nunca fue una carpeta: `book.shelfIds` es un array desde el
+primer día, un libro está en varias a la vez. Sobre un modelo N:N la jerarquía no significa
+nada por sí sola —¿un libro de "Técnico/ML" sale al filtrar "Técnico"?— y un `parentId`
+además rompe el sync: el merge es LWW por registro, así que dos dispositivos moviendo X bajo
+Y e Y bajo X producen un **ciclo** al fusionar, y habría que detectarlo y repararlo en cada
+carga. Hoy cualquier resultado del merge es un estado válido, y eso vale más que la
+jerarquía.
+
+Tres cosas en su lugar, todas en el nuevo `js/library/shelves.js` (lógica pura: la comparten
+el rail, los contadores y los ámbitos de repaso).
+
+**Cruzar estanterías.** El filtro pasa de un valor a un conjunto: ⌘/Ctrl+clic en el rail
+añade en vez de reemplazar, y un conmutador decide si se piden los libros que están **en
+todas** (intersección, por defecto) o **en alguna**. Esto es lo que la gente quería casi
+siempre al pedir jerarquía: "Técnico ∩ Pendientes". Los chips bajo el título hacen visible
+qué se está cruzando y permiten deshacerlo en táctil, donde no hay modificador (ahí se
+añade desde el menú de la estantería).
+
+Cada entrada de la selección es una FILA del rail, no un id: una rama con hijas son varios
+ids que valen como UNA condición. Guardarlos sueltos habría hecho que cruzar "Técnico" con
+otra estantería en modo Y pidiera los libros que están en la rama y en todas sus hijas a la
+vez: casi siempre vacío.
+
+**Estanterías inteligentes.** Una estantería con `rule` no guarda miembros, los calcula:
+estado, formato, autor, título, antigüedad y "en alguna de estas estanterías". El coste que
+duele en una biblioteca no es la falta de niveles, es el archivado manual. La regla solo
+admite campos **sincronizados** del libro a propósito: una sobre "abierto por última vez" o
+sobre si el fichero está descargado daría un contador distinto en cada dispositivo. Y como
+una regla solo puede apoyarse en estanterías manuales, la recursión —y con ella los
+ciclos— tampoco existe por aquí. Valen como ámbito de repaso sin caso especial, porque la
+pertenencia se resuelve en un único sitio.
+
+**Jerarquía por el nombre.** "Técnico/ML" se pinta bajo "Técnico" y el padre arrastra a sus
+hijas al filtrar y al contar. Si el tramo intermedio no existe como estantería, sale como
+grupo (no se puede renombrar ni borrar: no es nada). Un ciclo es imposible por construcción
+—un string no puede ser prefijo propio de sí mismo— y mover una rama es renombrar, que el
+merge ya sabe fusionar. Es lo que hacen las etiquetas de Gmail y Obsidian. Más un `order`
+para colocar a mano entre hermanas, y `formBox()` en `ui/dialog.js` (formulario corto en
+modal) para editar la regla.
+
+Al borrar una estantería se limpia también de las reglas que la citaban: si no, quedaría
+filtrando por un id fantasma, sin miembros posibles y sin forma de verlo desde la UI.
+
+---
+
 ## 2026-08-01 — La sesión de repaso, sobrevivible (P24 · F1–F4)
 
 Cuatro arreglos de la misma pregunta: por qué no hay una segunda sesión. Ninguno usa el

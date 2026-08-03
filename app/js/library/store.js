@@ -8,7 +8,12 @@
 //                              file (ArrayBuffer|null), size, addedAt, lastOpenedAt,
 //                              progress (0..100), lastCfi, status, shelfIds: [],
 //                              blob, updatedAt, deleted, deletedAt }
-//   shelves (keyPath id)  -> { id, name, createdAt, updatedAt, deleted, deletedAt }
+//   shelves (keyPath id)  -> { id, name, order, rule, createdAt, updatedAt, deleted, deletedAt }
+//
+// Una estantería con `rule` es INTELIGENTE: no guarda miembros, los calcula
+// (library/shelves.js). `order` coloca la fila entre sus hermanas del rail y la
+// jerarquía sale del propio `name` ("Técnico/ML"): no hay `parentId`, y por eso
+// no hay ciclos que reparar tras un merge. El porqué, en shelves.js.
 //
 // Sync de biblioteca (Fase A): los metadatos viajan entre dispositivos, el
 // fichero no necesariamente. De ahí tres cambios sobre el modelo original:
@@ -24,6 +29,8 @@
 //   `updatedAt` → LWW por registro en el merge. Solo lo bumpean los campos
 //   SINCRONIZABLES: `lastOpenedAt` o tener o no el fichero descargado son
 //   decisiones de ESTE dispositivo y no deben provocar tráfico ni ganar merges.
+
+import * as Shelves from './shelves.js';
 
 const DB_NAME = 'bookreader_library';
 const DB_VERSION = 1;
@@ -214,9 +221,16 @@ export function statusFor(progress, prev) {
 
 // ---- Estanterías -----------------------------------------------------------
 
+// Estanterías vivas, ordenadas por `order` y, a falta de él (las creadas antes
+// de que existiera el orden manual), por antigüedad. El rail las reagrupa
+// después en árbol según el nombre; este orden es el de las hermanas.
 export function getShelves() {
   return getAllShelfRecords()
-    .then(list => list.filter(s => !s.deleted).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)));
+    .then(list => list.filter(s => !s.deleted).sort((a, b) => {
+      const oa = Number.isFinite(a.order) ? a.order : Number.POSITIVE_INFINITY;
+      const ob = Number.isFinite(b.order) ? b.order : Number.POSITIVE_INFINITY;
+      return oa - ob || (a.createdAt || 0) - (b.createdAt || 0);
+    }));
 }
 
 export function getAllShelfRecords() {
@@ -229,7 +243,7 @@ export async function putShelf(shelf) {
   return r;
 }
 
-export async function addShelf(name) {
+export async function addShelf(name, { rule = null } = {}) {
   const now = Date.now();
   // El id lleva sufijo aleatorio: dos dispositivos creando una estantería en el
   // mismo milisegundo generaban el MISMO id y el merge las fusionaba en una.
@@ -237,17 +251,46 @@ export async function addShelf(name) {
     id: 'sh_' + now.toString(36) + Math.random().toString(36).slice(2, 6),
     name: name.trim(), createdAt: now, updatedAt: now,
   };
+  const clean = Shelves.cleanRule(rule);
+  if (Object.keys(clean).length) shelf.rule = clean;
   await putShelf(shelf);
   return shelf;
 }
 
 export async function renameShelf(id, name) {
-  const sh = await tx('shelves', 'readonly', s => reqP(s.get(id)));
-  if (!sh) return null;
-  return putShelf({ ...sh, name: name.trim(), updatedAt: Date.now() });
+  return updateShelf(id, { name: name.trim() });
 }
 
-// Borra la estantería (tombstone) y la quita de todos los libros (no borra los libros).
+// Parche sobre una estantería existente (nombre, regla, orden). `rule: null`
+// la convierte en manual: se borra el campo en vez de guardar un objeto vacío,
+// que en el sync es un valor distinto de "no hay regla".
+export async function updateShelf(id, patch = {}) {
+  const sh = await tx('shelves', 'readonly', s => reqP(s.get(id)));
+  if (!sh) return null;
+  const next = { ...sh, ...patch, updatedAt: Date.now() };
+  if ('rule' in patch) {
+    const clean = Shelves.cleanRule(patch.rule);
+    if (Object.keys(clean).length) next.rule = clean; else delete next.rule;
+  }
+  return putShelf(next);
+}
+
+// Sube o baja una estantería entre sus hermanas del rail (delta -1 / +1).
+export async function moveShelf(id, delta) {
+  const shelves = await getShelves();
+  const patches = Shelves.reorder(shelves, id, delta);
+  const byId = new Map(shelves.map(s => [s.id, s]));
+  // Un solo `updatedAt` para todo el lote: reordenar es UN cambio, y con
+  // timestamps distintos un merge a medias podría dejar el nivel entrelazado.
+  const now = Date.now();
+  await Promise.all(patches.map(p => putShelf({ ...byId.get(p.id), order: p.order, updatedAt: now })));
+  return patches.length;
+}
+
+// Borra la estantería (tombstone) y la quita de todos los libros (no borra los
+// libros) y de las reglas que la citaran: una estantería inteligente que apunte
+// a una borrada se quedaría filtrando por un id fantasma, sin miembros posibles
+// y sin forma de verlo desde la UI.
 export async function deleteShelf(id) {
   const sh = await tx('shelves', 'readonly', s => reqP(s.get(id)));
   const now = Date.now();
@@ -256,6 +299,9 @@ export async function deleteShelf(id) {
   await Promise.all(books
     .filter(b => (b.shelfIds || []).includes(id))
     .map(b => updateBook(b.id, { shelfIds: b.shelfIds.filter(x => x !== id) })));
+  const others = (await getShelves()).filter(s => (s.rule && s.rule.shelfIds || []).includes(id));
+  await Promise.all(others.map(s =>
+    updateShelf(s.id, { rule: { ...s.rule, shelfIds: s.rule.shelfIds.filter(x => x !== id) } })));
 }
 
 export async function purgeDeletedShelves(before) {

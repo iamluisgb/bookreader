@@ -12,6 +12,7 @@ import * as DB from './db.js';
 import * as Srs from './srs.js';
 import * as Storage from '../storage.js';
 import * as Store from '../library/store.js';
+import * as Shelves from '../library/shelves.js';
 import { icon } from '../ui/icons.js';
 import { escapeHtml } from '../ui/escape.js';
 import { confirmBox } from '../ui/dialog.js';
@@ -54,8 +55,12 @@ async function decksForScope(scope) {
   if (!scope || scope.type === 'all') return decks;
   if (scope.type === 'book') return decks.filter(d => d.bookId === scope.bookId);
   if (scope.type === 'shelf') {
-    const books = await Store.getAllBooks();
-    const inShelf = new Set(books.filter(b => (b.shelfIds || []).includes(scope.shelfId)).map(b => b.id));
+    const [books, shelves] = await Promise.all([Store.getAllBooks(), Store.getShelves()]);
+    const shelf = shelves.find(s => s.id === scope.shelfId);
+    // Vía Shelves.booksIn, no leyendo `shelfIds`: así una estantería INTELIGENTE
+    // (que no guarda miembros, los calcula) vale como ámbito de repaso igual que
+    // una manual, sin caso especial aquí.
+    const inShelf = new Set(Shelves.booksIn(books, shelf).map(b => b.id));
     return decks.filter(d => inShelf.has(d.bookId));
   }
   return decks;
@@ -98,11 +103,16 @@ export async function studyScopes(now = Date.now()) {
   const dueBooks = books
     .filter(b => dueByBook.get(b.id))
     .map(b => ({ id: b.id, title: b.title || t('Sin título'), cards: dueByBook.get(b.id), shelfIds: b.shelfIds || [] }));
+  const dueById = new Map(dueBooks.map(b => [b.id, b]));
 
   const placed = new Set();
   const shelfScopes = [];
   for (const sh of shelves) {
-    const members = dueBooks.filter(b => b.shelfIds.includes(sh.id)).sort(byCardsThenTitle);
+    // Pertenencia calculada sobre los libros COMPLETOS (una regla mira `status`,
+    // `addedAt`…, no solo `shelfIds`) y luego proyectada a los que tienen
+    // vencidas hoy, que es lo único que el selector enseña.
+    const members = Shelves.booksIn(books, sh, now)
+      .map(b => dueById.get(b.id)).filter(Boolean).sort(byCardsThenTitle);
     if (!members.length) continue;
     members.forEach(b => placed.add(b.id));
     shelfScopes.push({

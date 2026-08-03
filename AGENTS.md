@@ -25,7 +25,9 @@ offline con un agente de IA (BYOK) que lee el libro completo según un objetivo.
     `templates.js`, `render.js`, `markdown.js`, `attenuation.js`)
   - sync: `js/sync/` (`engine.js` orquesta; `layout.js`/`merge.js` datos; `library-sync.js`
     biblioteca; `blobs.js` ficheros de libro; `drive-*.js` proveedor)
-  - utilidades: `js/ui/` (`icons.js`, `escape.js`), `storage.js`, `library/`
+  - utilidades: `js/ui/` (`icons.js`, `escape.js`), `storage.js`
+  - biblioteca: `js/library/` (`store.js` IndexedDB, `view.js` pantalla,
+    `shelves.js` reglas/árbol/pertenencia — lógica pura, sin DOM ni IDB)
 - `vendor/` — libs vendorizadas (jszip, epub.js, pdf.js + worker).
 - `sw.js` — service worker (precache + stale-while-revalidate). `manifest.json` — PWA.
 
