@@ -67,22 +67,49 @@ test('genera un mapa radial SVG con ramas y hojas citadas', async ({ page }) => 
   await expect(page.locator('.mm-canvas')).toContainText('Comala');
   await expect(page.locator('.mm-canvas')).toContainText('Personajes');
   await expect(page.locator('.mm-canvas')).toContainText('Juan Preciado');
-  // Las hojas con src mapeado a anclas reales (a0/a1) son clicables (.mm-cite).
+  // Las hojas con src mapeado a anclas reales (a0/a1) son citables (.mm-cite).
   const cites = page.locator('.mm-canvas .mm-cite');
   expect(await cites.count()).toBeGreaterThanOrEqual(1);
-  // Hover: cada nodo lleva <title> nativo con el detalle completo (modelo NotebookLM).
+  // Cada nodo conserva su <title> nativo (nombre accesible + tooltip de escritorio).
   expect(await page.locator('.mm-canvas svg title').count()).toBeGreaterThan(0);
+  // F5 · los nodos son focusables y anunciados como botón (antes eran <g> inertes).
+  await expect(cites.first()).toHaveAttribute('role', 'button');
+  await expect(cites.first()).toHaveAttribute('tabindex', '0');
   await expect(page.locator('#mm-png')).toBeVisible();
 });
 
-test('clic en una hoja citada salta al libro y cierra el modal', async ({ page }) => {
+// F5 · El clic ya no salta directo al libro: abre el detalle del nodo, que es lo único que
+// funciona en táctil (el <title> de SVG no existe ahí) y donde viven las acciones. Desde
+// ahí, "Ir al libro" hace lo que antes hacía el clic.
+test('clic en una hoja abre su detalle, y desde ahí salta al libro', async ({ page }) => {
   await setup(page);
   await openFromStudio(page, 'mindmap');
   await page.waitForSelector('#ai-mindmap', { timeout: 5000 });
   await page.click('#mm-generate');
   await page.waitForSelector('.mm-canvas .mm-cite', { timeout: 20000 });
   await page.locator('.mm-canvas .mm-cite').first().click();
+
+  const pop = page.locator('.mm-pop');
+  await expect(pop).toBeVisible();
+  await expect(pop.locator('blockquote')).toBeVisible();   // la cita real del pasaje
+  await pop.locator('.mm-pop-act[data-act="cite"]').click();
   await expect(page.locator('#ai-mindmap')).toHaveCount(0);
+});
+
+// F5 · Plegar una rama la convierte en hoja del árbol visible: sus hijos desaparecen del
+// lienzo y la píldora muestra cuántos oculta.
+test('plegar una rama esconde sus hijos', async ({ page }) => {
+  await setup(page);
+  await openFromStudio(page, 'mindmap');
+  await page.waitForSelector('#ai-mindmap', { timeout: 5000 });
+  await page.click('#mm-generate');
+  await page.waitForSelector('.mm-canvas svg', { timeout: 20000 });
+  await expect(page.locator('.mm-canvas')).toContainText('Juan Preciado');
+
+  await page.locator('.mm-node[data-id="r.0"]').click();
+  await page.locator('.mm-pop .mm-pop-act[data-act="fold"]').click();
+  await expect(page.locator('.mm-canvas')).not.toContainText('Juan Preciado');
+  await expect(page.locator('.mm-canvas')).toContainText('Personajes');
 });
 
 // P14 F2 · El cap de viñetas reparte por capítulo (antes un muestreo uniforme podía

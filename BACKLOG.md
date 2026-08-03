@@ -631,7 +631,8 @@ Resumen del libro/capítulo bonito y **citado** (cada punto enlaza a su pasaje `
 Sirve al pitch "entender más rápido" y explota el foso citado (Atlas no puede saltar a la frase exacta).
 
 ### P14 — Mapa mental · **✓** `L` · **artefacto de marketing**
-**Hecho** (ver CHANGELOG): `mindmap.js` — mapa radial SVG citado, export PNG/SVG.
+**Hecho** (ver CHANGELOG): `mindmap.js` + `mindmap-render.js` — mapa radial SVG citado con
+zoom/pan, plegado, expansión bajo demanda y export PNG/SVG con marca.
 Mapa mental (jerarquía radial, render SVG/HTML) del libro/capítulo, exportable/compartible. El artefacto
 con mayor techo de marketing (la gente postea mapas mentales), pero el más caro (layout + render). Hacer
 **después** de las victorias baratas (P11/P12/P13).
@@ -643,6 +644,31 @@ con mayor techo de marketing (la gente postea mapas mentales), pero el más caro
   puntos por trozo con presupuesto acotado + un reduce que arma el árbol, con **esqueleto
   inicial desde el TOC** (gratis, garantiza ramas y jerarquía). El gate del eval ("mindmap
   generado con ramas") ya existe: el ciclo se mide solo.
+
+- **F3 — el export se ve como la pantalla** `S` · **✓ (2026-08-03)**. Inter embebida como
+  `data:` URI en el SVG (un SVG cargado como `<img>` no puede pedir fuentes externas: el PNG
+  salía con la del sistema), pie con procedencia y marca, paleta a tonos 700 (los 500 daban
+  2.1–2.2:1 con blanco, AA pide 4.5), y fondo/tinta desde el tema en vez de clavados.
+- **F4 — medida real y anticolisión** `S` · **✓ (2026-08-03)**. `canvas.measureText` en lugar
+  de `CHARW = 8` fijo; radio de cada anillo derivado de la cuerda que piden sus vecinos (antes
+  solo las hojas tenían anticolisión); ramas curvas con grosor decreciente.
+- **F5 — de imagen a herramienta** `M` · **✓ (2026-08-03)**. Zoom (rueda/pinza), pan, plegado
+  de ramas, detalle del nodo en panel propio (el `<title>` de SVG no existe en táctil, y esto
+  es una PWA) y nodos focusables con `role="button"`.
+- **F6 — profundidad bajo demanda** `M` · **✓ (2026-08-03)**. "Expandir" una hoja con una
+  llamada acotada a su subárbol → tercer nivel solo donde interesa, aceptando únicamente
+  subconceptos citados con un ancla real. Y "Preguntar", que siembra el chat con el nodo y su
+  pasaje.
+
+- **Pendiente (no planificado).** Edición manual del mapa (renombrar/mover/borrar nodos antes
+  de publicar) y persistir el plegado entre sesiones. Ninguna de las dos se ha hecho a
+  propósito: la primera es un editor de grafos —mucho alcance para el retorno— y la segunda
+  choca con querer ver el mapa entero al reabrirlo. Se retomarán si el uso lo pide.
+
+- **Sin medir todavía.** El eval de P14 sigue puntuando el CONTENIDO del árbol (ramas,
+  cobertura), no el render. F3–F6 se cubren con tests (`tests/mindmap-render.spec.ts`:
+  colisión, medida, contraste, plegado, fuente embebida), pero el efecto de "Expandir" sobre
+  la cobertura del mapa no está en la batería. Es el siguiente ciclo natural de EV2.
 
 ### P15 — Internacionalización EN/ES (UI + prompts) · `L` · **F1+F2 ✓** · **lanzamiento**
 

@@ -112,6 +112,22 @@ export function cancel() {
   active = null; emit();
 }
 
+// Reemplaza el resultado de un artefacto ya guardado, sin crear entrada nueva en el
+// historial. Lo usa el mapa mental al expandir una rama (P14 F6): el mapa crece sobre sí
+// mismo, y si eso generase un artefacto por expansión el Studio se llenaría de versiones.
+// Devuelve la entrada actualizada, o null si esa clave ya no está.
+export function update(key, result) {
+  for (const arr of cache.values()) {
+    const e = arr.find(x => x.key === key);
+    if (!e) continue;
+    e.result = result; e.at = Date.now();
+    DB.updateArtifact(key, result).catch(() => { /* IDB no disponible: queda en memoria */ });
+    emit();
+    return e;
+  }
+  return null;
+}
+
 // Borra UN artefacto del historial por su clave (Studio): lo quita del espejo en memoria y de
 // IndexedDB, y notifica para que el Studio se repinte. No toca los demás del mismo tipo.
 export function remove(key) {

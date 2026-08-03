@@ -593,6 +593,18 @@ export function putArtifact({ bookId, kind, result, params, id }) {
   }).then(() => key);
 }
 
+// Actualiza el CONTENIDO de un artefacto ya guardado, conservando su identidad (`uid`,
+// `createdAt`). Lo necesita el mapa mental al expandir una rama (P14 F6): el mapa crece in
+// situ y debe seguir siendo el mismo artefacto, no uno nuevo en el historial. Reusar
+// `putArtifact` con el mismo id valdría para IndexedDB pero regeneraría el `uid`, y el sync
+// lo vería como otro documento.
+export function updateArtifact(key, result) {
+  return tx('artifacts', 'readwrite', s => readModifyWrite(s, key, (cur) => {
+    if (!cur || cur.deleted) return null;
+    return { ...cur, result, updatedAt: Date.now() };
+  })).then(r => { notifySync('artifacts'); return r; });
+}
+
 // Borra por clave completa (soporta también las claves legacy `${bookId}:${kind}` sin id).
 // TOMBSTONE, no borrado físico: sin él, borrar un resumen en el portátil no se propaga y
 // el móvil lo devuelve en el siguiente ciclo de sync. La purga la hace purgeDeletedArtifacts().

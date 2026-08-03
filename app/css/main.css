@@ -1747,9 +1747,54 @@ textarea.is-recording { display: none; }
 .mm-card.mm-card--wide { max-width: 92vw; width: 900px; }
 /* El mapa no tiene el texto de ayuda que en el resumen separa el select del botón: dale aire. */
 .mm-card .ai-ob-start { margin-top: 20px; }
-.mm-canvas { margin: 8px 0; border: 1px solid var(--border); border-radius: 12px; overflow: auto; background: #faf8f3; }
+/* F5 · El lienzo es un escenario con zoom/pan: `overflow: hidden` porque quien recorta ahora
+   es el viewBox del SVG, no la barra de scroll; `touch-action: none` para que el arrastre y
+   la pinza los gestione el mapa y no el scroll de la página. El `background` lo pone JS
+   desde el tema (antes estaba clavado a papel y en oscuro cantaba). */
+.mm-stage { position: relative; }
+.mm-canvas {
+  margin: 8px 0; border: 1px solid var(--border); border-radius: 12px;
+  overflow: hidden; touch-action: none; cursor: grab; background: var(--surface-2);
+}
+.mm-canvas:active { cursor: grabbing; }
 .mm-canvas svg { display: block; width: 100%; height: auto; }
-.mm-cite:hover rect { stroke-width: 2.5; }
+.mm-node:hover rect { stroke-width: 2.5; }
+.mm-node:focus-visible { outline: none; }
+.mm-node:focus-visible rect { stroke: var(--accent); stroke-width: 3; }
+
+/* Controles de zoom, flotando sobre el lienzo */
+.mm-zoom { position: absolute; right: 12px; bottom: 20px; display: flex; gap: 4px; }
+.mm-zoom button {
+  width: 32px; height: 32px; display: grid; place-items: center;
+  border: 1px solid var(--border); border-radius: 8px;
+  background: var(--surface-1); color: var(--text);
+  font-size: 17px; line-height: 1; cursor: pointer; box-shadow: var(--shadow-1);
+}
+.mm-zoom button:hover { background: var(--surface-3); }
+
+/* Detalle de un nodo. Reemplaza al <title> nativo, que en táctil no existe. */
+.mm-pop {
+  position: absolute; z-index: 3; width: min(320px, 78vw);
+  background: var(--surface-1); color: var(--text);
+  border: 1px solid var(--border); border-radius: 12px;
+  box-shadow: var(--shadow-3); padding: 12px 14px;
+}
+.mm-pop h4 { margin: 0 22px 8px 0; font-size: 15px; line-height: 1.3; }
+.mm-pop blockquote {
+  margin: 0 0 10px; padding-left: 10px; border-left: 2px solid var(--border);
+  font-size: 13px; line-height: 1.5; color: var(--text-soft);
+  max-height: 190px; overflow: auto;
+}
+.mm-pop-close { position: absolute; top: 8px; right: 8px; background: none; border: 0; color: var(--text-soft); cursor: pointer; padding: 2px; }
+.mm-pop-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.mm-pop-act {
+  display: inline-flex; align-items: center; gap: 5px;
+  border: 1px solid var(--border); border-radius: 999px; background: var(--surface-2);
+  color: var(--text); font-size: 12.5px; padding: 5px 11px; cursor: pointer;
+}
+.mm-pop-act:hover { border-color: var(--accent); }
+.mm-pop-act:disabled { opacity: .5; cursor: wait; }
+.mm-pop-status:not(:empty) { margin-top: 8px; font-size: 12.5px; color: var(--text-soft); }
 
 /* Trabajos de IA en segundo plano: vista "en curso", chip flotante y toast de aviso */
 @keyframes ai-spin { to { transform: rotate(360deg); } }

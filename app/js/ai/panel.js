@@ -43,7 +43,7 @@ const HISTORY_MSGS = 6;            // mensajes de historial verbatim que se reen
 const TOKEN_GUARD = 180000;        // por encima de esto, avisar antes de enviar (caso patológico)
 
 let els = {};
-let book = null, bookId = null, bookTitle = '';
+let book = null, bookId = null, bookTitle = '', bookAuthor = '';
 let convo = null;            // conversación activa { id, bookId, templateId, goal, title }
 let template = null;
 let annotatedText = '', anchors = new Map();
@@ -460,16 +460,27 @@ async function openMindMap(opts) {
   // (si la licencia caduca nadie pierde lo que ya tenía).
   if (!(opts && opts.artifact) && !(await ensurePro('mindmap'))) return;
   MindMap.open({
-    bookId, bookTitle,
+    bookId, bookTitle, bookAuthor,
     goal: convo?.goal || '',
     tocLabels,
     currentChapter: EpubReader.getCurrentChapterLabel?.() || '',
     ensureIndex,
     anchors,
     onCite: navigateCite,
+    onAsk: askAbout,
     mode: opts && opts.mode,
     viewArtifact: opts && opts.artifact,
   });
+}
+
+// P14 F6 · Un nodo del mapa lanza la pregunta al agente con su pasaje ya adjunto: la
+// pregunta queda ESCRITA, no enviada, para que el usuario la ajuste antes de gastar una
+// llamada. Cerrar el modal del mapa deja el panel a la vista.
+function askAbout(question, ref) {
+  showView('chat');
+  if (ref) setRef(ref);
+  if (els.input) els.input.value = question || '';
+  focusInput();
 }
 
 function setRef(text) {
@@ -505,6 +516,8 @@ export async function setBook(b, id, title, opts = {}) {
   Jobs.cancelForBookChange(id || null);
   busy = false;
   book = b; bookId = id || null; bookTitle = title || 'Libro';
+  // Autor: solo para firmar los artefactos que se publican (mapa mental, tarjeta-cita).
+  bookAuthor = opts.author || '';
   Jobs.loadForBook(bookId);   // trae resúmenes/mapas ya generados de IndexedDB (reabrir instantáneo)
   bookFormat = opts.format || 'epub'; tocLabels = [];
   // "Explicar lo que veo" (visión) solo tiene sentido en PDF (renderizamos su canvas).

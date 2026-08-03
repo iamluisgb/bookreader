@@ -1,7 +1,16 @@
 // P14 · Mapa mental. El agente organiza el capítulo o el libro en una jerarquía radial
-// (tema central → ramas → puntos), con las hojas citando su pasaje [[aN]] (clic → salta
-// al libro). Es el artefacto compartible por excelencia (la gente postea mapas mentales):
-// export a PNG para redes y a SVG. Reutiliza el troceado y el map de summary/flashcards.
+// (tema central → ramas → puntos), con las hojas citando su pasaje [[aN]]. Es el artefacto
+// compartible por excelencia (la gente postea mapas mentales): export a PNG para redes y a
+// SVG. Reutiliza el troceado y el map de summary/flashcards.
+//
+// F3-F6 (2026-08-03) — el mapa dejó de ser una imagen y pasó a ser una herramienta:
+//   F3 el export se ve como la pantalla (fuente embebida) y lleva procedencia y marca;
+//   F4 medida real del texto, ramas curvas con grosor decreciente, anticolisión por anillo;
+//   F5 zoom/pan, plegado de ramas y popover táctil con la cita (los <title> nativos no
+//      existen en móvil, y esto es una PWA);
+//   F6 "Expandir" una hoja con una llamada acotada → tercer nivel bajo demanda, en vez de
+//      pagar por adelantado un mapa gigante que nadie lee.
+// La geometría vive en `mindmap-render.js` (pura, sin red ni IDB).
 import { t } from '../i18n.js';
 import * as LLM from './llm.js';
 import * as Retrieval from './retrieval.js';
@@ -10,6 +19,8 @@ import { estimateTokens } from './context.js';
 import { buildChunks } from './flashcards.js';
 import { icon } from '../ui/icons.js';
 import { escapeHtml } from '../ui/escape.js';
+import { interFaceCss } from '../ui/svg-fonts.js';
+import * as Render from './mindmap-render.js';
 
 const KIND = 'mindmap';
 const BOOK_TOKENS = 30000;
@@ -17,14 +28,15 @@ const BOOK_TOKENS = 30000;
 // reasoning superaban el presupuesto de paciencia (el eval lo cazó: DNF a los 7 min en
 // Pro Git). Trozos más grandes, menos llamadas: ≤3 de map + 1 de reduce.
 const MAX_MAP_CALLS = 3;
-const SVG_NS = 'http://www.w3.org/2000/svg';
-// Paleta de ramas (una por rama, tono suave de marca).
-const PALETTE = ['#22c55e', '#3b82f6', '#f59e0b', '#ec4899', '#8b5cf6', '#14b8a6', '#ef4444', '#0ea5e9'];
-
 let ctx = null;
 let overlay = null, scopeValue = '', runUnsub = null;
-let lastTree = null, lastSvg = null, lastDims = { width: 1200, height: 1000 };
+let lastTree = null, lastSvg = null, lastLayout = null, lastScope = '';
 let forceSetup = false;      // abrir directo en el setup aunque haya caché (Regenerar desde Studio)
+// Estado de VISTA (no de contenido): plegado y zoom/pan viven en memoria, por sesión. No se
+// persisten a propósito — guardar en IndexedDB en cada rueda del ratón sería absurdo, y al
+// reabrir el mapa se quiere verlo entero.
+let collapsed = new Set();
+let view = { k: 1, tx: 0, ty: 0 };
 
 export function open(context) {
   ctx = context;
@@ -325,10 +337,15 @@ function clampWords(s, maxChars) {
 
 function normalizeTree(tree, bullets, scopeName) {
   const cleanSrc = (s) => (typeof s === 'string' && (s.match(/a\d+/) || [])[0]) || '';
-  // Cada hoja guarda una etiqueta CORTA visible + el texto completo (`full`) para el tooltip.
-  const asLeaf = (raw) => {
+  // Cada hoja guarda una etiqueta CORTA visible + el texto completo (`full`) para el detalle.
+  // RECURSIVA desde F6: un mapa expandido tiene nietos, y al reabrirlo desde IndexedDB pasa
+  // otra vez por aquí — sin recursión, expandir se perdía al cerrar el modal.
+  const asLeaf = (raw, depth = 0) => {
     const full = String(raw.label ?? raw).replace(/\s*\[\[a\d+\]\]\s*$/, '').trim();
-    return { label: clampWords(full, 42), src: cleanSrc(raw.src), full };
+    const leaf = { label: clampWords(full, 42), src: cleanSrc(raw.src), full };
+    const kids = depth < 2 && Array.isArray(raw.children) ? raw.children : [];
+    if (kids.length) leaf.children = kids.slice(0, 6).map(k => asLeaf(k, depth + 1)).filter(c => c.label);
+    return leaf;
   };
   if (tree && Array.isArray(tree.branches) && tree.branches.length) {
     const branches = tree.branches.slice(0, 8).map((br, i) => {
@@ -380,182 +397,463 @@ function showError(msg) {
   el.textContent = msg;
 }
 
-// ---- Render radial en SVG -----------------------------------------------------
+// ---- Tema del lienzo -----------------------------------------------------------
 
-const CHARW = 8, PILL_PADX = 22, LINEH = 19, PILL_PADY = 12;   // métricas de píldora (font 14)
-const LEAF_MAXCH = 22, LEAF_MAXLINES = 2;                       // hojas: hasta ~44 car. legibles
-
-function svgEl(name, attrs = {}) {
-  const el = document.createElementNS(SVG_NS, name);
-  for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
-  return el;
+// En pantalla el mapa sigue al tema (antes el fondo `#faf8f3` y la tinta `#2b2b2b` estaban
+// clavados: en oscuro el modal mostraba un parche crema). En claro y sepia se conserva el
+// papel de marca, que es el mismo de la tarjeta-cita.
+function screenTheme() {
+  const cs = getComputedStyle(document.documentElement);
+  const v = (name, fb) => ((cs.getPropertyValue(name) || '').trim() || fb);
+  const isDark = Render.contrastInk(v('--surface-0', '#ffffff')) === '#ffffff';
+  if (!isDark) return Render.POSTER;
+  return {
+    bg: v('--surface-1', '#1a1f24'), ink: v('--text', '#f2f3f5'),
+    muted: v('--text-soft', '#a8b0b8'), leaf: v('--surface-2', '#232a31'),
+    line: v('--border', '#30363d'),
+  };
 }
 
-// Parte una etiqueta en líneas por palabras (máx maxLines; … si se pasa). Reemplaza al
-// truncado a 21 car., que dejaba las hojas ilegibles.
-function wrapLabel(text, maxChars, maxLines) {
-  const clean = String(text || '').replace(/\s+/g, ' ').trim();
-  if (!clean) return [''];
-  const lines = []; let cur = '';
-  for (const raw of clean.split(' ')) {
-    const w = raw.length > maxChars ? raw.slice(0, maxChars - 1) + '…' : raw;
-    const cand = cur ? cur + ' ' + w : w;
-    if (cand.length <= maxChars) cur = cand;
-    else { lines.push(cur); cur = w; }
+// Las métricas de texto solo son correctas con Inter YA cargada; si se mide con la fuente de
+// sistema, las píldoras salen con el ancho equivocado. `document.fonts.ready` es barato
+// (resuelto de inmediato salvo en la primerísima visita).
+async function fontsReady() {
+  try { await document.fonts.ready; } catch { /* sin API de fuentes: métricas del sistema */ }
+  Render.clearMeasureCache();
+}
+
+// ---- Pintado y vista (zoom / pan / plegado) --------------------------------------
+
+const clampK = (k) => Math.min(6, Math.max(0.4, k));
+
+function applyView() {
+  lastSvg?.querySelector('.mm-viewport')
+    ?.setAttribute('transform', `translate(${view.tx} ${view.ty}) scale(${view.k})`);
+}
+
+// Punto del ratón/dedo en coordenadas del viewBox (antes del transform del viewport), que es
+// donde vive la geometría del mapa.
+function toUserSpace(evt) {
+  if (!lastSvg) return { x: 0, y: 0 };
+  const ctm = lastSvg.getScreenCTM();
+  if (!ctm) return { x: 0, y: 0 };
+  const p = lastSvg.createSVGPoint();
+  p.x = evt.clientX; p.y = evt.clientY;
+  const q = p.matrixTransform(ctm.inverse());
+  return { x: q.x, y: q.y };
+}
+
+// Zoom conservando el punto bajo el cursor (si no, acercarse "huye" del sitio que miras).
+function zoomAt(px, py, factor) {
+  const k = clampK(view.k * factor);
+  if (k === view.k) return;
+  view.tx = px - (px - view.tx) * (k / view.k);
+  view.ty = py - (py - view.ty) * (k / view.k);
+  view.k = k;
+  applyView();
+}
+
+function zoomCenter(factor) {
+  if (!lastLayout) return;
+  zoomAt(lastLayout.width / 2, lastLayout.height / 2, factor);
+}
+
+function resetView() { view = { k: 1, tx: 0, ty: 0 }; applyView(); }
+
+function paintMap() {
+  const holder = body()?.querySelector('#mm-canvas');
+  if (!holder || !lastTree) return;
+  const theme = screenTheme();
+  lastLayout = Render.layout(lastTree, { collapsed });
+  const built = Render.renderSvg(lastLayout, {
+    theme, interactive: true,
+    title: t('Mapa mental de {scope}', { scope: lastScope || '' }),
+  });
+  lastSvg = built.svg;
+  holder.style.background = theme.bg;
+  holder.replaceChildren(lastSvg);
+  applyView();
+  wireCanvas(holder);
+}
+
+// Puntero unificado (ratón, dedo y lápiz): arrastrar = pan, dos dedos = pinza, rueda = zoom.
+// Un gesto que se mueve menos de 4 px se considera clic, no arrastre.
+function wireCanvas(holder) {
+  const pointers = new Map();
+  let moved = 0, pinchDist = 0, captured = 0;
+
+  holder.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const p = toUserSpace(e);
+    zoomAt(p.x, p.y, Math.exp(-e.deltaY * 0.0015));
+  }, { passive: false });
+
+  holder.addEventListener('pointerdown', (e) => {
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    moved = 0;
+    if (pointers.size === 2) {
+      const [a, b] = [...pointers.values()];
+      pinchDist = Math.hypot(a.x - b.x, a.y - b.y);
+    }
+    // OJO: aquí NO se captura el puntero. Con la captura puesta desde `pointerdown`, el
+    // `click` posterior se re-dirige al contenedor y `e.target` deja de ser el nodo del SVG
+    // — o sea, ningún clic abriría nunca el detalle. Se captura solo cuando el arrastre
+    // empieza de verdad (ver `pointermove`), que es cuando hace falta.
+  });
+
+  holder.addEventListener('pointermove', (e) => {
+    const prev = pointers.get(e.pointerId);
+    if (!prev) return;
+    const dx = e.clientX - prev.x, dy = e.clientY - prev.y;
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    moved += Math.hypot(dx, dy);
+    if (moved > 4 && !captured) { captured = e.pointerId; holder.setPointerCapture?.(e.pointerId); }
+    if (pointers.size === 2) {
+      const [a, b] = [...pointers.values()];
+      const d = Math.hypot(a.x - b.x, a.y - b.y);
+      if (pinchDist > 0 && d > 0) {
+        const mid = toUserSpace({ clientX: (a.x + b.x) / 2, clientY: (a.y + b.y) / 2 });
+        zoomAt(mid.x, mid.y, d / pinchDist);
+      }
+      pinchDist = d;
+      return;
+    }
+    // Pan: el desplazamiento va en píxeles de pantalla; hay que pasarlo a unidades del
+    // viewBox, que es donde se aplica el transform.
+    const scale = lastLayout && holder.clientWidth ? lastLayout.width / holder.clientWidth : 1;
+    view.tx += dx * scale; view.ty += dy * scale;
+    applyView();
+  });
+
+  const release = (e) => {
+    pointers.delete(e.pointerId);
+    if (pointers.size < 2) pinchDist = 0;
+    if (captured === e.pointerId) { holder.releasePointerCapture?.(e.pointerId); captured = 0; }
+  };
+  holder.addEventListener('pointerup', release);
+  holder.addEventListener('pointercancel', release);
+
+  holder.addEventListener('click', (e) => {
+    if (moved > 4) return;                                   // fue un arrastre, no un clic
+    const g = e.target.closest('.mm-node');
+    if (g) openNodePopover(g.dataset.id);
+    else closePopover();
+  });
+
+  // Teclado: los nodos son focusables (role="button"); Enter/Espacio abren su detalle.
+  holder.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const g = e.target.closest?.('.mm-node');
+    if (!g) return;
+    e.preventDefault();
+    openNodePopover(g.dataset.id);
+  });
+}
+
+// ---- Detalle de un nodo (sustituye al tooltip nativo) ----------------------------
+
+// El `<title>` de SVG NO existe en táctil: en el móvil la cita del pasaje era invisible, y
+// es lo que da valor al mapa. Este panel además es donde viven "Ir al libro", "Preguntar",
+// plegar y expandir — acciones que un tooltip no puede ofrecer.
+let popover = null;
+
+function closePopover() {
+  popover?.remove();
+  popover = null;
+}
+
+function passageText(src) {
+  if (!src) return '';
+  const p = Retrieval.allPassages().find(x => x.id === src);
+  return (p?.text || '').trim();
+}
+
+function openNodePopover(id) {
+  closePopover();
+  const node = lastLayout?.byId.get(id);
+  const holder = body()?.querySelector('#mm-canvas');
+  if (!node || !holder) return;
+
+  const quote = passageText(node.src);
+  const canCite = !!(node.src && ctx.anchors?.has(node.src));
+  const actions = [];
+  if (node.childCount > 0) {
+    actions.push(`<button class="mm-pop-act" data-act="fold">${icon(node.collapsed ? 'chevron-down' : 'chevron-up', { size: 14 })} ${node.collapsed ? t('Desplegar') : t('Plegar')}</button>`);
+  } else if (node.depth >= 1) {
+    actions.push(`<button class="mm-pop-act" data-act="expand">${icon('sparkles', { size: 14 })} ${t('Expandir')}</button>`);
   }
-  if (cur) lines.push(cur);
-  if (lines.length <= maxLines) return lines;
-  const kept = lines.slice(0, maxLines);
-  kept[maxLines - 1] = kept[maxLines - 1].slice(0, maxChars - 1).replace(/[\s…]+$/, '') + '…';
-  return kept;
+  if (canCite) actions.push(`<button class="mm-pop-act" data-act="cite">${icon('book', { size: 14 })} ${t('Ir al libro')}</button>`);
+  if (ctx.onAsk) actions.push(`<button class="mm-pop-act" data-act="ask">${icon('sparkles', { size: 14 })} ${t('Preguntar')}</button>`);
+
+  popover = document.createElement('div');
+  popover.className = 'mm-pop';
+  popover.setAttribute('role', 'dialog');
+  popover.setAttribute('aria-label', node.full || node.label);
+  popover.innerHTML = `
+    <button class="mm-pop-close" aria-label="${t('Cerrar')}">${icon('xmark', { size: 14 })}</button>
+    <h4>${escapeHtml(node.full || node.label)}</h4>
+    ${quote ? `<blockquote>${escapeHtml(quote.slice(0, 420))}${quote.length > 420 ? '…' : ''}</blockquote>` : ''}
+    <div class="mm-pop-actions">${actions.join('')}</div>
+    <div class="mm-pop-status" role="status"></div>`;
+  holder.appendChild(popover);
+
+  // Anclado al nodo, pero siempre dentro del lienzo (si no, en los nodos del borde el panel
+  // se salía y quedaba inalcanzable).
+  const box = holder.getBoundingClientRect();
+  const ctm = lastSvg.querySelector('.mm-viewport')?.getScreenCTM();
+  let left = box.width / 2, top = box.height / 2;
+  if (ctm) {
+    const p = lastSvg.createSVGPoint();
+    p.x = node.x + lastLayout.ox; p.y = node.y + lastLayout.oy;
+    const s = p.matrixTransform(ctm);
+    left = s.x - box.left + 12;
+    top = s.y - box.top + 12;
+  }
+  popover.style.left = Math.max(8, Math.min(left, box.width - popover.offsetWidth - 8)) + 'px';
+  popover.style.top = Math.max(8, Math.min(top, box.height - popover.offsetHeight - 8)) + 'px';
+
+  popover.querySelector('.mm-pop-close').addEventListener('click', closePopover);
+  popover.addEventListener('click', (e) => e.stopPropagation());
+  popover.querySelectorAll('.mm-pop-act').forEach(btn => {
+    btn.addEventListener('click', () => onNodeAction(btn.dataset.act, node, quote));
+  });
 }
 
-function pillSize(lines) {
-  const maxLen = Math.max(...lines.map(l => l.length));
-  return { w: Math.max(58, maxLen * CHARW + PILL_PADX), h: lines.length * LINEH + PILL_PADY };
+function onNodeAction(act, node, quote) {
+  if (act === 'fold') {
+    if (collapsed.has(node.id)) collapsed.delete(node.id); else collapsed.add(node.id);
+    closePopover();
+    paintMap();
+    return;
+  }
+  if (act === 'cite') { closeModal(); ctx.onCite?.(node.src); return; }
+  if (act === 'ask') {
+    closeModal();
+    ctx.onAsk?.(t('Explícame «{label}» en el contexto del libro.', { label: node.full || node.label }), quote || '');
+    return;
+  }
+  if (act === 'expand') expandNode(node);
 }
 
-function pill(parent, x, y, lines, { fill, stroke, color, id, bold, tooltip }) {
-  const { w, h } = pillSize(lines);
-  const g = svgEl('g', id ? { class: 'mm-cite', 'data-id': id, style: 'cursor:pointer' } : {});
-  // <title> = tooltip nativo al pasar el ratón: el texto completo / la cita real del libro.
-  if (tooltip) { const ti = svgEl('title'); ti.textContent = tooltip; g.appendChild(ti); }
-  g.appendChild(svgEl('rect', { x: x - w / 2, y: y - h / 2, width: w, height: h, rx: Math.min(16, h / 2), fill, stroke: stroke || 'none', 'stroke-width': 1.5 }));
-  const t = svgEl('text', { x, 'text-anchor': 'middle', 'font-size': 14, 'font-family': 'Inter, system-ui, sans-serif', 'font-weight': bold ? 600 : 400, fill: color });
-  const y0 = y - (lines.length - 1) * LINEH / 2 + 5;
-  lines.forEach((ln, i) => {
-    const ts = svgEl('tspan', { x, y: y0 + i * LINEH });
-    ts.textContent = ln;
-    t.appendChild(ts);
-  });
-  g.appendChild(t);
-  parent.appendChild(g);
+// ---- F6 · Expandir una hoja bajo demanda -----------------------------------------
+
+// El mapa nace conciso (24 viñetas) y se profundiza SOLO donde interesa, con una llamada
+// acotada al subárbol. Es lo contrario a subir el cupo inicial: no encarece la generación ni
+// satura el lienzo, y evita el techo de dos niveles que tenía el esquema del reduce.
+function expandPrompt(label, goal) {
+  return `Del siguiente fragmento de un libro, extrae 2 a 4 SUBCONCEPTOS que desarrollen «${label}».
+Devuelve SOLO un objeto JSON válido: {"children":[{"label":"subconcepto (2-5 palabras)","src":"aN"}]}
+REGLAS:
+- Etiquetas de MAPA MENTAL: sintagmas nominales CORTOS, nunca frases ni oraciones.
+- Deben ser MÁS ESPECÍFICOS que «${label}»: no lo repitas ni lo parafrasees.
+- "src" = el marcador [[aN]] del pasaje que sostiene ese subconcepto (solo "aN", sin corchetes).
+  Si ningún pasaje lo sostiene, NO lo incluyas: mejor devolver menos que inventar.
+- Mismo idioma que el fragmento.${goal ? `\n- Prioriza lo relevante para: «${goal}».` : ''}`;
 }
 
-// Layout radial que reparte TODO el círculo proporcionalmente al nº de hojas (densidad
-// angular constante ⇒ una rama con muchas hojas no las amontona). Auto-ajusta el lienzo al
-// contenido real de las píldoras, así nada se recorta ni se solapa.
-function buildSvg(tree) {
-  const branches = tree.branches;
-  // Texto real de cada pasaje (por ancla) para el tooltip de las hojas: al pasar el ratón se
-  // ve la CITA del libro, no una paráfrasis recortada (lección de NotebookLM).
-  const p2text = new Map(Retrieval.allPassages().map(p => [p.id, p.text]));
-  const leaves = [];
-  branches.forEach((br, bi) => br.children.forEach(ch => leaves.push({ ch, bi })));
-  const M = Math.max(1, leaves.length);
-  const step = 360 / M;                                   // grados por hoja
-  const stepRad = step * Math.PI / 180;
-  const R1 = 210;
-  // Anticolisión: alterno el radio de las hojas contiguas (par/impar). Así las del MISMO
-  // radio distan 2 pasos angulares —cuerda holgada frente al ANCHO de la píldora, no solo el
-  // alto, que era el fallo cerca del eje vertical— y las contiguas se separan radialmente por
-  // `stagger` (≥ alto de píldora). El lienzo se auto-ajusta, así que crecer el radio no recorta.
-  const WEST = 150;                                       // ancho típico de píldora de hoja
-  const stagger = 2 * LINEH + PILL_PADY + 6;              // ~56 px
-  let R2 = M <= 1 ? 360 : Math.min(860, Math.max(360, WEST / (2 * Math.sin(stepRad))));
-
-  const start = -90;
-  leaves.forEach((lf, k) => {
-    lf.ang = (start + (k + 0.5) * step) * Math.PI / 180;
-    lf.r = R2 + (k % 2) * stagger;
-  });
-  const branchAng = branches.map((_, bi) => {
-    const own = leaves.filter(l => l.bi === bi);
-    return own.reduce((s, l) => s + l.ang, 0) / (own.length || 1);
-  });
-
-  const nodes = [], edges = [];
-  branchAng.forEach((ang, bi) => {
-    const col = PALETTE[bi % PALETTE.length];
-    const bx = R1 * Math.cos(ang), by = R1 * Math.sin(ang);
-    edges.push({ x1: 0, y1: 0, x2: bx, y2: by, col, w: 3, op: 0.5 });
-    nodes.push({ x: bx, y: by, lines: wrapLabel(branches[bi].label, 18, 2), style: { fill: col, color: '#fff', bold: true, tooltip: branches[bi].full || branches[bi].label } });
-  });
-  leaves.forEach((lf) => {
-    const col = PALETTE[lf.bi % PALETTE.length];
-    const bx = R1 * Math.cos(branchAng[lf.bi]), by = R1 * Math.sin(branchAng[lf.bi]);
-    const lx = lf.r * Math.cos(lf.ang), ly = lf.r * Math.sin(lf.ang);
-    edges.push({ x1: bx, y1: by, x2: lx, y2: ly, col, w: 1.5, op: 0.38 });
-    const id = (lf.ch.src && ctx.anchors?.has(lf.ch.src)) ? lf.ch.src : null;
-    const tip = ((lf.ch.src && p2text.get(lf.ch.src)) || lf.ch.full || lf.ch.label || '').trim().slice(0, 500);
-    nodes.push({ x: lx, y: ly, lines: wrapLabel(lf.ch.label, LEAF_MAXCH, LEAF_MAXLINES), style: { fill: '#fff', stroke: col, color: '#2b2b2b', id, tooltip: tip } });
-  });
-  nodes.push({ x: 0, y: 0, lines: wrapLabel(tree.title, 20, 2), style: { fill: '#2b2b2b', color: '#fff', bold: true, tooltip: tree.title } });
-
-  // Bounding box de todas las píldoras → viewBox ajustado.
-  let minX = 0, minY = 0, maxX = 0, maxY = 0;
-  nodes.forEach(nd => {
-    const { w, h } = pillSize(nd.lines);
-    minX = Math.min(minX, nd.x - w / 2); maxX = Math.max(maxX, nd.x + w / 2);
-    minY = Math.min(minY, nd.y - h / 2); maxY = Math.max(maxY, nd.y + h / 2);
-  });
-  const pad = 40;
-  const width = Math.round(maxX - minX + pad * 2), height = Math.round(maxY - minY + pad * 2);
-  const ox = -minX + pad, oy = -minY + pad;
-
-  const svg = svgEl('svg', { xmlns: SVG_NS, viewBox: `0 0 ${width} ${height}`, width, height, style: 'max-width:100%;height:auto;display:block;margin:0 auto' });
-  svg.appendChild(svgEl('rect', { x: 0, y: 0, width, height, fill: '#faf8f3' }));
-  const root = svgEl('g', { transform: `translate(${ox} ${oy})` });
-  svg.appendChild(root);
-  edges.forEach(e => root.appendChild(svgEl('path', {
-    d: `M ${e.x1} ${e.y1} L ${e.x2} ${e.y2}`, fill: 'none', stroke: e.col, 'stroke-width': e.w, opacity: e.op,
-  })));
-  nodes.forEach(nd => pill(root, nd.x, nd.y, nd.lines, nd.style));
-  return { svg, width, height };
+// Localiza el nodo CRUDO del árbol a partir de la ruta estable del layout ("r.0.2").
+function rawAt(tree, id) {
+  const idx = String(id).split('.').slice(1).map(Number);
+  if (!idx.length || idx.some(Number.isNaN)) return null;
+  let node = (tree.branches || [])[idx[0]];
+  for (let i = 1; i < idx.length && node; i++) node = (node.children || [])[idx[i]];
+  return node || null;
 }
 
-function renderResult(tree, scopeName) {
+// Pasajes en los que apoyar la expansión: los del propio nodo y su subárbol, con vecinos
+// para dar contexto. Si el nodo no cita nada (pasa en el fallback por capítulos), se cae al
+// capítulo de la rama, que siempre existe.
+function passagesForNode(node) {
+  const srcs = new Set();
+  const collect = (n) => {
+    if (!n) return;
+    if (n.src) srcs.add(n.src);
+    (n.children || []).forEach(collect);
+  };
+  collect(rawAt(lastTree, node.id));
+  const all = Retrieval.allPassages();
+  let seed = all.filter(p => srcs.has(p.id));
+  if (!seed.length) {
+    const parent = lastLayout.byId.get(node.parent);
+    const parentRaw = parent ? rawAt(lastTree, parent.id) : null;
+    const psrcs = new Set();
+    collect(parentRaw);
+    parentRaw?.children?.forEach(c => c.src && psrcs.add(c.src));
+    seed = all.filter(p => psrcs.has(p.id));
+  }
+  if (!seed.length) return [];
+  return Retrieval.withNeighbors(seed, 2);
+}
+
+async function expandNode(node) {
+  const status = popover?.querySelector('.mm-pop-status');
+  const setStatus = (msg) => { if (status) status.textContent = msg; };
+  if (!LLM.hasKey()) { setStatus(t('Configura tu API key en Ajustes → Agente.')); return; }
+  const passages = passagesForNode(node);
+  if (!passages.length) { setStatus(t('Este punto no tiene pasajes que ampliar.')); return; }
+
+  popover?.querySelectorAll('.mm-pop-act').forEach(b => { b.disabled = true; });
+  setStatus(t('Ampliando…'));
+  try {
+    const text = passages.map(p => `[[${p.id}]] ${p.text}`).join('\n\n').slice(0, 24000);
+    const raw = await LLM.chatStream({
+      messages: [
+        { role: 'system', content: expandPrompt(node.full || node.label, ctx.goal) },
+        { role: 'user', content: text },
+      ],
+      maxTokens: 1200,
+    });
+    const parsed = extractJson(raw);
+    const kids = Array.isArray(parsed?.children) ? parsed.children : [];
+    const anchors = new Set(passages.map(p => p.id));
+    // Solo se aceptan subconceptos CITADOS y con un ancla que exista de verdad entre los
+    // pasajes que se le pasaron. Un nieto sin cita es justo lo que no queremos en un mapa
+    // que se publica: parece contenido del libro sin serlo.
+    const clean = kids
+      .map(k => ({ label: String(k?.label || '').trim(), src: (String(k?.src || '').match(/a\d+/) || [])[0] || '' }))
+      .filter(k => k.label && k.src && anchors.has(k.src))
+      .slice(0, 4)
+      .map(k => ({ label: clampWords(k.label, 42), full: k.label, src: k.src }));
+    if (!clean.length) { setStatus(t('No se encontraron subconceptos citables aquí.')); return; }
+
+    const target = rawAt(lastTree, node.id);
+    if (!target) { setStatus(t('No se pudo ampliar este punto.')); return; }
+    target.children = clean;
+    persistTree();
+    closePopover();
+    paintMap();
+  } catch (e) {
+    if (e.name === 'AbortError') return;
+    setStatus(e?.message || t('No se pudo ampliar este punto.'));
+  } finally {
+    popover?.querySelectorAll('.mm-pop-act').forEach(b => { b.disabled = false; });
+  }
+}
+
+// El mapa expandido reemplaza al artefacto existente (misma entrada del historial): si cada
+// expansión creara uno nuevo, el Studio se llenaría de versiones casi idénticas.
+function persistTree() {
+  const entry = Jobs.cached(ctx.bookId, KIND);
+  if (entry?.key) Jobs.update(entry.key, lastTree);
+}
+
+// ---- Resultado y export ----------------------------------------------------------
+
+async function renderResult(tree, scopeName) {
   const b = body();
   if (!b) return;
   setWide(true);
   lastTree = tree;
+  lastScope = scopeName;
+  collapsed = new Set();
+  view = { k: 1, tx: 0, ty: 0 };
   Jobs.clearActive();          // el usuario está viendo el resultado → retira chip/aviso
   b.innerHTML = `
     <div class="sum-resulthead">
       <button class="ai-ob-back">${icon('chevron-left', { size: 16 })}<span>${t('Volver')}</span></button>
       <button id="mm-regen" class="fc-txt-btn">${icon('sparkles', { size: 14 })} ${t('Regenerar')}</button>
     </div>
-    <h2>Mapa mental — ${escapeHtml(scopeName)}</h2>
-    <div class="mm-canvas" id="mm-canvas"></div>
+    <h2>${t('Mapa mental')} — ${escapeHtml(scopeName)}</h2>
+    <div class="mm-stage">
+      <div class="mm-canvas" id="mm-canvas"></div>
+      <div class="mm-zoom" role="group" aria-label="${t('Zoom del mapa')}">
+        <button id="mm-zoom-out" aria-label="${t('Alejar')}" title="${t('Alejar')}">−</button>
+        <button id="mm-zoom-fit" aria-label="${t('Ajustar')}" title="${t('Ajustar')}">${icon('target', { size: 14 })}</button>
+        <button id="mm-zoom-in" aria-label="${t('Acercar')}" title="${t('Acercar')}">+</button>
+      </div>
+    </div>
+    <p class="sum-depth-hint">${t('Clic en un nodo para ver su cita, plegarlo o ampliarlo. Rueda o pinza para el zoom; arrastra para mover.')}</p>
     <div class="fc-export">
       <button id="mm-png" class="primary-btn">${icon('download', { size: 16 })} ${t('Descargar PNG')}</button>
+      <button id="mm-share" class="ai-ob-back fc-txt-btn" style="display:none">${icon('share', { size: 14 })} ${t('Compartir')}</button>
       <button id="mm-svg" class="ai-ob-back fc-txt-btn">SVG</button>
-    </div>`;
+    </div>
+    <div id="mm-export-error" class="fc-error" style="display:none"></div>`;
   b.querySelector('.ai-ob-back').addEventListener('click', renderSetup);
   b.querySelector('#mm-regen').addEventListener('click', renderSetup);
-  const holder = b.querySelector('#mm-canvas');
-  const built = buildSvg(tree);
-  lastSvg = built.svg; lastDims = { width: built.width, height: built.height };
-  holder.appendChild(lastSvg);
+  b.querySelector('#mm-zoom-in').addEventListener('click', () => zoomCenter(1.25));
+  b.querySelector('#mm-zoom-out').addEventListener('click', () => zoomCenter(1 / 1.25));
+  b.querySelector('#mm-zoom-fit').addEventListener('click', resetView);
 
-  // Clic en una hoja citada → navegar en el libro.
-  holder.addEventListener('click', (e) => {
-    const g = e.target.closest('.mm-cite');
-    if (g && ctx.onCite) { ctx.onCite(g.dataset.id); closeModal(); }
-  });
+  await fontsReady();
+  if (!body()?.querySelector('#mm-canvas')) return;    // el modal se cerró mientras cargaba
+  paintMap();
 
   const slug = (s) => (s || 'mapa').replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '').slice(0, 50);
-  b.querySelector('#mm-svg').addEventListener('click', () => download(`bookreader-mapa-${slug(scopeName)}.svg`, serializeSvg(lastSvg), 'image/svg+xml'));
+  const name = (ext) => `bookreader-mapa-${slug(scopeName)}.${ext}`;
+  b.querySelector('#mm-svg').addEventListener('click', async () => {
+    const { svg } = await buildExport();
+    download(name('svg'), new XMLSerializer().serializeToString(svg), 'image/svg+xml');
+  });
   b.querySelector('#mm-png').addEventListener('click', async () => {
-    try { download(`bookreader-mapa-${slug(scopeName)}.png`, await svgToPngBlob(lastSvg, lastDims), 'image/png'); }
-    catch (err) { console.warn('PNG del mapa falló:', err); }
+    try { download(name('png'), await exportPng()); }
+    catch (err) {
+      console.warn('PNG del mapa falló:', err);
+      showExportError(t('No se pudo generar la imagen.'));
+    }
+  });
+  // Compartir nativo (móvil): mismo camino que la tarjeta-cita. Solo se muestra si el
+  // navegador acepta compartir ficheros; si no, el PNG ya cubre el caso.
+  const shareBtn = b.querySelector('#mm-share');
+  if (navigator.canShare?.({ files: [new File([new Blob()], 'x.png', { type: 'image/png' })] })) {
+    shareBtn.style.display = '';
+    shareBtn.addEventListener('click', async () => {
+      try {
+        const blob = await exportPng();
+        await navigator.share({ files: [new File([blob], name('png'), { type: 'image/png' })] });
+      } catch (err) {
+        if (err?.name === 'AbortError') return;
+        showExportError(t('No se pudo compartir la imagen.'));
+      }
+    });
+  }
+}
+
+function showExportError(msg) {
+  const el = body()?.querySelector('#mm-export-error');
+  if (!el) return;
+  el.style.display = msg ? '' : 'none';
+  el.textContent = msg;
+}
+
+// Versión "póster" para publicar: papel de marca (independiente del tema de la app), pie con
+// procedencia y Inter EMBEBIDA. Exporta lo que se ve — si el usuario plegó ramas para dejar
+// el mapa limpio, eso es curaduría suya y debe respetarse.
+async function buildExport() {
+  const fontCss = await interFaceCss();
+  const lay = Render.layout(lastTree, { collapsed });
+  return Render.renderSvg(lay, {
+    theme: Render.POSTER,
+    fontCss,
+    title: t('Mapa mental de {scope}', { scope: lastScope || '' }),
+    footer: {
+      title: ctx.bookTitle || lastScope || '',
+      author: ctx.bookAuthor || '',
+      mark: 'BookReader',
+    },
   });
 }
 
-function serializeSvg(svg) {
-  return new XMLSerializer().serializeToString(svg);
-}
-
-async function svgToPngBlob(svg, dims) {
-  const url = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(serializeSvg(svg))));
+async function exportPng() {
+  const { svg, width, height } = await buildExport();
+  const xml = new XMLSerializer().serializeToString(svg);
+  // `unescape` está deprecado; `TextEncoder` + base64 por trozos hace lo mismo sin él y
+  // aguanta los mapas grandes.
+  const bytes = new TextEncoder().encode(xml);
+  let bin = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
   const img = new Image();
-  img.src = url;
+  img.src = 'data:image/svg+xml;base64,' + btoa(bin);
   await img.decode();
-  const scale = 2;   // 2× para una imagen nítida al compartir en redes
+  // 2× para que se vea nítido al compartir, con tope: un mapa grande a 2× podía pedir un
+  // lienzo que el navegador rechaza en silencio (y devolvía un PNG vacío).
+  const scale = Math.min(2, Math.max(1, 4200 / Math.max(width, height)));
   const canvas = document.createElement('canvas');
-  canvas.width = dims.width * scale; canvas.height = dims.height * scale;
-  canvas.getContext('2d').drawImage(img, 0, 0, dims.width * scale, dims.height * scale);
-  return new Promise((res, rej) => canvas.toBlob(b => b ? res(b) : rej(new Error('toBlob null')), 'image/png'));
+  canvas.width = Math.round(width * scale);
+  canvas.height = Math.round(height * scale);
+  canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+  return new Promise((res, rej) =>
+    canvas.toBlob(b => (b ? res(b) : rej(new Error('toBlob null'))), 'image/png'));
 }
 
 function download(filename, data, mime) {

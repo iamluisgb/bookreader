@@ -1038,7 +1038,7 @@ async function loadEpub(buffer, bookId, aiBookId, persist = null) {
     // biblioteca ANTES del guard de aborto: aunque el usuario salga o abra otro
     // libro a mitad de carga, este queda guardado y su segmentación cacheada bajo
     // SU id (el panel aísla segmentaciones tardías; ver book-switch.spec.ts).
-    AiPanel.setBook(EpubReader.getBook(), aiBookId, EpubReader.getTitle());
+    AiPanel.setBook(EpubReader.getBook(), aiBookId, EpubReader.getTitle(), { author: EpubReader.getAuthor() });
     if (persist) {
       await persistToLibrary(aiBookId, buffer, 'epub', persist.fileName, bookId);
       Library.render();

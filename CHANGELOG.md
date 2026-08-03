@@ -5,6 +5,65 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-08-03 — El mapa mental deja de ser una imagen (P14 F3-F6)
+
+El mapa se generaba bien y se veía mal. Estaba en el sitio equivocado del reparto: el
+contenido (map-reduce con esqueleto del TOC, fallback por capítulos, citas ancladas) llevaba
+dos iteraciones de trabajo, y el render seguía siendo el primero que se escribió. Cuatro
+fases, de la más barata a la más diferencial.
+
+**El export ya se ve como la pantalla.** El bug más caro del artefacto que existe para
+publicarse: el PNG salía en la fuente del sistema. Un SVG cargado como `<img>` —que es
+exactamente como se rasteriza— es un documento aislado y no puede pedir NINGÚN recurso
+externo, tampoco fuentes; Inter está self-hosted, así que nunca llegaba. Ahora se embebe como
+`data:` URI dentro del propio SVG (`js/ui/svg-fonts.js`), con dos efectos: el PNG es idéntico
+a lo que se ve, y el `.svg` descargado es autónomo en una máquina que no tenga Inter.
+El export lleva además **pie con procedencia** (título · autor · BookReader): un mapa
+posteado sin atribución no devuelve a nadie, y P14 existe justamente como artefacto de
+marketing. Se suma "Compartir" nativo en móvil, el mismo camino que la tarjeta-cita.
+
+**Contraste y tema.** La paleta de ramas eran tonos 500 con texto blanco encima: `#22c55e`
+daba 2.2:1 y `#f59e0b` 2.1:1, contra el 4.5:1 que pide AA. Se sube a tonos 700 —todos pasan—
+y `contrastInk()` elige tinta por luminancia como red de seguridad si alguien toca la paleta.
+El fondo `#faf8f3` y la tinta `#2b2b2b` estaban clavados en el código: en tema oscuro el
+modal mostraba un parche crema. Ahora la pantalla sigue al tema y el export fuerza el papel
+de marca, que es lo que se quiere al publicar.
+
+**Medida real y anticolisión.** Se medía el texto con `CHARW = 8` fijo y Inter es
+proporcional: `iiii` y `WWWW` daban la misma píldora. Ahora se mide con `canvas.measureText`
+(cacheado, invalidado cuando `document.fonts.ready`). Y la anticolisión solo cubría las
+hojas: las ramas iban a un radio FIJO de 210 con el ángulo medio de sus hojas, así que dos
+ramas de una hoja cada una salían superpuestas. El radio de cada anillo sale ahora de la
+CUERDA que piden sus vecinos reales —que es lo que colisiona, no el arco; por eso el fallo
+antiguo aparecía cerca del eje vertical—. Las ramas se dibujan curvas y con grosor
+decreciente hacia la hoja (la regla de Buzan que separa un mapa mental de un grafo): son
+polígonos cerrados, porque un `stroke-width` constante no puede afinar.
+
+**De imagen a herramienta.** Zoom (rueda y pinza, conservando el punto bajo el cursor), pan
+por arrastre, y **plegado** de ramas: plegar no oculta píxeles, convierte el nodo en hoja del
+árbol visible y el reparto angular se recalcula sin sus hijos, así que el mapa se despeja de
+verdad; la píldora anuncia cuántos esconde. El detalle de un nodo pasa a un panel propio:
+el `<title>` nativo de SVG **no existe en táctil**, o sea que en el móvil —siendo esto una
+PWA— la cita del pasaje era sencillamente invisible. Los nodos son ahora focusables, con
+`role="button"` y activación por teclado; antes eran `<g>` con `cursor:pointer`, inertes para
+el tabulador y para un lector de pantalla.
+
+**Profundidad bajo demanda.** El esquema del reduce no admitía nietos: un libro entero en dos
+niveles es un índice, no un mapa. En vez de subir el cupo inicial —más coste, más saturación,
+peor lectura— se añade **Expandir** sobre una hoja: una llamada acotada a los pasajes de su
+subárbol que añade un tercer nivel solo ahí. Solo se aceptan subconceptos **citados** con un
+ancla que exista entre los pasajes enviados: un nieto sin cita es justo lo que no puede
+llevar un mapa que se publica, porque parece contenido del libro sin serlo. El mapa expandido
+reemplaza al artefacto (`Jobs.update` / `DB.updateArtifact`) en lugar de crear una versión
+nueva en el historial. Y desde el mismo panel, **Preguntar** siembra el chat con el nodo y su
+pasaje adjunto — la pregunta queda escrita, no enviada, para poder ajustarla antes de gastar
+una llamada.
+
+La geometría vive ahora en `js/ai/mindmap-render.js`, separada de la orquestación: es pura
+(árbol → SVG, sin red ni IndexedDB) y se testea sola.
+
+---
+
 ## 2026-08-03 — Organizar la biblioteca sin carpetas
 
 Las estanterías se quedaban cortas y la salida obvia era anidarlas. **No se han anidado**, y
