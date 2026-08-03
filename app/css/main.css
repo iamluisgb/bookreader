@@ -2108,6 +2108,33 @@ body.has-taskchip .ai-taskchip.is-study { bottom: 74px; }
 .appset-viewlink .icon { color: currentColor; }
 .appset-demo-on { display: flex; align-items: center; gap: 6px; color: var(--accent); }
 .appset-demo-on .icon { flex: none; }
+/* ---- Selector de modelo (models.dev) ---- */
+.mp-card { width: min(560px, 92vw); }
+.mp-card .appset-input { margin-top: 4px; }
+.mp-source { margin: 8px 0 6px; font-size: 12px; }
+.mp-source.is-error { color: var(--danger, #e5484d); }
+.mp-list {
+  max-height: min(52vh, 420px); overflow-y: auto;
+  border: 1px solid var(--border-soft); border-radius: 10px;
+}
+.mp-item {
+  display: block; width: 100%; text-align: left; cursor: pointer;
+  padding: 9px 12px; border: none; border-bottom: 1px solid var(--border-soft);
+  background: none; color: var(--text);
+}
+.mp-item:last-child { border-bottom: none; }
+.mp-item:hover { background: var(--surface-3); }
+.mp-item.active { background: var(--accent-soft); }
+.mp-name { display: block; font-size: 14px; font-weight: 600; }
+.mp-id { display: block; font-size: 11px; color: var(--text-faint); font-family: var(--font-mono, monospace); word-break: break-all; }
+.mp-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
+.mp-tag {
+  font-size: 10px; line-height: 1.6; padding: 0 6px; border-radius: var(--r-pill);
+  background: var(--surface-3); color: var(--text-soft);
+}
+.mp-cost { font-variant-numeric: tabular-nums; }
+.mp-empty { padding: 14px 12px; margin: 0; }
+
 /* Alta/baja de un proveedor propio: aparece bajo la Base URL solo cuando hay algo
    que hacer con ella (guardarla con nombre, o quitarla de la lista). */
 .appset-prov:not(:empty) { margin-top: 10px; }

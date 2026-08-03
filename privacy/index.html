@@ -269,7 +269,7 @@
   <div class="wrap">
     <div class="beat-copy">
       <h2>Local-first, verifiably.</h2>
-      <p class="support">Books and annotations live in <b>IndexedDB and localStorage</b>, on your device. The reader libraries are vendored (no CDNs), the CSP is <b>script-src 'self'</b>, and the whole app deploys as static files. Open DevTools and watch the network tab: nothing phones home.</p>
+      <p class="support">Books and annotations live in <b>IndexedDB and localStorage</b>, on your device. The reader libraries are vendored (no CDNs), the CSP is <b>script-src 'self'</b>, and the whole app deploys as static files. Open DevTools and watch the network tab: nothing phones home — the one exception is the public model catalogue, and only if you open the model picker.</p>
     </div>
   </div>
 </section>
@@ -306,6 +306,7 @@
       <details>
         <summary>What exactly leaves my device?</summary>
         <p class="ans">Only what you send to the AI provider you configured, when you use the agent: the relevant book passages and your question. Reading, highlighting, searching and reviewing cards are fully local.</p>
+        <p class="ans">One third party, and only on demand: if you open the model picker in Settings, the app downloads the public catalogue from <b>models.dev</b> to list model names and capabilities. It's a plain GET of a public file — no API key, no book content, nothing about you. Never fetched unless you open that picker.</p>
       </details>
       <details>
         <summary>Can I self-host it?</summary>

@@ -8,6 +8,7 @@
 // Punto de entrada desde la estantería y desde el pie de la sidebar. Al guardar la
 // config del agente se emite 'appsettings:agent-saved' para que el panel se refresque.
 import * as LLM from '../ai/llm.js';
+import * as Catalog from '../ai/catalog.js';
 import { BLOCKS, allTemplates } from '../ai/templates.js';
 import * as CustomTpl from '../ai/custom-templates.js';
 import * as DriveAuth from '../sync/drive-auth.js';
@@ -101,6 +102,112 @@ function modelDatalist(models) {
   return models.map(m => `<option value="${escapeHtml(m)}"></option>`).join('');
 }
 
+// ---- Selector de modelo ------------------------------------------------------
+// Sustituye al muro de chips: con OpenRouter, "Descubrir" devolvía 337 ids pelados,
+// que no sirven para elegir. Aquí hay buscador, nombre legible y capacidades, y el
+// slot de VISIÓN solo ofrece modelos que aceptan imágenes — el error de poner ahí un
+// modelo ciego dejaba de notarse hasta pulsar "Explicar lo que veo", semanas después.
+//
+// Tres fuentes, en orden de calidad, y siempre se dice cuál se usó:
+//   1. models.dev (nombres + capacidades + precio, sin necesitar la key)
+//   2. GET /models del proveedor (solo ids; lo único que hay en un endpoint propio)
+//   3. los modelos curados del preset (nan: su /models está bloqueado por CORS)
+async function fetchPickerModels(provider, { baseUrl, key }) {
+  if (Catalog.has(provider)) {
+    const models = await Catalog.modelsFor(provider);
+    if (models.length) return { models, source: 'catalog' };
+  }
+  if (!provider || provider.discover !== false) {
+    try {
+      const ids = await LLM.listModels({ baseUrl, key });
+      if (ids.length) return { models: ids.map(id => ({ id, name: id })), source: 'provider' };
+    } catch (e) { /* CORS o key inválida: quedan los curados */ }
+  }
+  const curated = (provider && provider.models) || [];
+  return { models: curated.map(id => ({ id, name: id })), source: 'preset' };
+}
+
+const SOURCE_NOTE = {
+  catalog: () => t('Catálogo de models.dev — nombres y capacidades. No se envía nada tuyo.'),
+  provider: () => t('Lista que devuelve tu proveedor.'),
+  preset: () => t('Modelos verificados por nosotros: este proveedor no deja consultar su lista desde el navegador.'),
+};
+
+// `need`: 'text' | 'vision'. En visión se filtra a los que aceptan imágenes; solo se
+// puede filtrar con metadatos, así que con las otras dos fuentes se ofrecen todos.
+function openModelPicker({ provider, need, current, baseUrl, key }) {
+  return new Promise((resolve) => {
+    const overlay = document.createElement('div');
+    overlay.className = 'dlg-overlay mp-overlay';
+    overlay.innerHTML = `
+      <div class="dlg-card mp-card" role="dialog" aria-modal="true" aria-label="${t('Elegir modelo')}">
+        <h2 class="dlg-title">${t('Elegir modelo')}</h2>
+        <input id="mp-search" class="appset-input" type="search" autocomplete="off" spellcheck="false"
+          placeholder="${t('Buscar por nombre o id…')}" aria-label="${t('Buscar modelo')}">
+        <p class="appset-muted mp-source">${t('Cargando…')}</p>
+        <div class="mp-list" id="mp-list"></div>
+        <div class="dlg-actions"><button class="dlg-btn dlg-cancel mp-cancel">${t('Cancelar')}</button></div>
+      </div>`;
+    document.body.appendChild(overlay);
+
+    const done = (value) => {
+      document.removeEventListener('keydown', onKey, true);
+      overlay.remove();
+      resolve(value);
+    };
+    const onKey = (e) => { if (e.key === 'Escape') { e.preventDefault(); done(null); } };
+    document.addEventListener('keydown', onKey, true);
+    overlay.addEventListener('mousedown', (e) => { if (e.target === overlay) done(null); });
+    overlay.querySelector('.mp-cancel').addEventListener('click', () => done(null));
+
+    const listEl = overlay.querySelector('#mp-list');
+    const srcEl = overlay.querySelector('.mp-source');
+    const search = overlay.querySelector('#mp-search');
+    let all = [];
+
+    const money = (n) => n == null ? '' : (n < 1 ? n.toFixed(2) : String(Math.round(n))) + ' $/M';
+    const paint = () => {
+      const q = search.value.trim().toLowerCase();
+      const list = all.filter(m => !q || m.id.toLowerCase().includes(q) || (m.name || '').toLowerCase().includes(q));
+      if (!list.length) {
+        listEl.innerHTML = `<p class="appset-muted mp-empty">${t('Ningún modelo coincide.')}</p>`;
+        return;
+      }
+      listEl.innerHTML = list.slice(0, 300).map(m => {
+        const tags = [
+          m.tools ? `<span class="mp-tag">${t('herramientas')}</span>` : '',
+          m.vision ? `<span class="mp-tag">${t('imágenes')}</span>` : '',
+          m.contextK ? `<span class="mp-tag">${m.contextK}K</span>` : '',
+          m.costIn != null ? `<span class="mp-tag mp-cost">${escapeHtml(money(m.costIn))}</span>` : '',
+        ].join('');
+        return `<button type="button" class="mp-item${m.id === current ? ' active' : ''}" data-id="${escapeHtml(m.id)}">
+          <span class="mp-name">${escapeHtml(m.name || m.id)}</span>
+          <span class="mp-id">${escapeHtml(m.id)}</span>
+          ${tags ? `<span class="mp-tags">${tags}</span>` : ''}
+        </button>`;
+      }).join('');
+    };
+
+    listEl.addEventListener('click', (e) => {
+      const it = e.target.closest('.mp-item');
+      if (it) done(it.dataset.id);
+    });
+    search.addEventListener('input', paint);
+
+    fetchPickerModels(provider, { baseUrl, key }).then(({ models, source }) => {
+      const filtered = (need === 'vision' && source === 'catalog') ? models.filter(m => m.vision) : models;
+      all = filtered;
+      srcEl.textContent = SOURCE_NOTE[source]();
+      paint();
+      search.focus();
+    }).catch((e) => {
+      srcEl.classList.add('is-error');
+      srcEl.textContent = t('No se pudo cargar la lista: {msg}', { msg: e.message });
+      listEl.innerHTML = '';
+    });
+  });
+}
+
 // Bloque de la demo self-service (F3), común a las dos vistas.
 function demoBlockHtml() {
   if (LLM.hasKey()) return '';
@@ -170,16 +277,17 @@ function agentHtml() {
     <label class="appset-label" for="appset-model">${t('Modelo')}</label>
     <div class="appset-model-row">
       <input id="appset-model" class="appset-input" list="appset-model-list" value="${escapeHtml(LLM.getModel())}" placeholder="id-del-modelo" autocomplete="off" spellcheck="false" />
-      <button type="button" id="appset-model-discover" class="appset-discover">${t('Descubrir')}</button>
+      <button type="button" id="appset-model-discover" class="appset-discover" data-slot="appset-model" data-need="text">${t('Elegir…')}</button>
       <button type="button" id="appset-probe-model" class="appset-discover" data-kind="text" data-for="appset-model">${t('Probar')}</button>
     </div>
     <datalist id="appset-model-list">${modelDatalist(suggested)}</datalist>
     <div id="appset-model-chips" class="appset-chips"></div>
-    <p class="appset-muted appset-model-manual">${t('Escribe el id del modelo a mano o elige uno de los sugeridos. «Descubrir» los lista automáticamente si el proveedor lo permite (nan no lo permite desde el navegador).')}</p>
+    <p class="appset-muted appset-model-manual">${t('Escribe el id del modelo a mano o elige uno de los sugeridos. «Elegir…» abre la lista del proveedor cuando se puede consultar.')}</p>
     <p id="appset-model-hint" class="appset-model-hint" hidden></p>
     <label class="appset-label" for="appset-vmodel">${t('Modelo de visión (opcional)')}</label>
     <div class="appset-model-row">
       <input id="appset-vmodel" class="appset-input" value="${escapeHtml(LLM.getVisionModel())}" placeholder="p. ej. mimo-v2.5" autocomplete="off" spellcheck="false" />
+      <button type="button" id="appset-pick-appset-vmodel" class="appset-discover" data-slot="appset-vmodel" data-need="vision">${t('Elegir…')}</button>
       <button type="button" id="appset-probe-appset-vmodel" class="appset-discover" data-kind="vision" data-for="appset-vmodel">${t('Probar')}</button>
     </div>
     <p id="appset-probe-appset-vmodel-hint" class="appset-model-hint" hidden></p>
@@ -194,6 +302,7 @@ function agentHtml() {
     <label class="appset-label" for="appset-lmodel">${t('Modelo rápido (opcional)')}</label>
     <div class="appset-model-row">
       <input id="appset-lmodel" class="appset-input" value="${escapeHtml(LLM.getLiteModelSetting())}" placeholder="${escapeHtml(t('vacío = automático'))}" autocomplete="off" spellcheck="false" />
+      <button type="button" id="appset-pick-appset-lmodel" class="appset-discover" data-slot="appset-lmodel" data-need="text">${t('Elegir…')}</button>
       <button type="button" id="appset-probe-appset-lmodel" class="appset-discover" data-kind="text" data-for="appset-lmodel">${t('Probar')}</button>
     </div>
     <p id="appset-probe-appset-lmodel-hint" class="appset-model-hint" hidden></p>
@@ -299,7 +408,6 @@ function wireAgentAdvanced(content) {
   const dl = content.querySelector('#appset-model-list');
   const chips = content.querySelector('#appset-model-chips');
   const hint = content.querySelector('#appset-model-hint');
-  const discover = content.querySelector('#appset-model-discover');
   const keyEl = content.querySelector('#appset-key');
 
   // Lista visible de modelos (chips clicables). En escritorio el datalist no se
@@ -411,32 +519,31 @@ function wireAgentAdvanced(content) {
     paintProvManage();
   });
 
-  // Descubrir modelos reales del proveedor (GET /models) con los valores actuales del
-  // formulario (aún sin guardar), y rellenar los chips + el datalist.
-  discover.addEventListener('click', async () => {
-    hint.hidden = false; hint.classList.remove('is-error');
-    hint.textContent = t('Buscando modelos…'); discover.disabled = true;
-    try {
-      const models = await LLM.listModels({ baseUrl: baseUrl.value, key: keyEl.value });
-      if (!models.length) { hint.textContent = t('El proveedor no devolvió modelos. Escribe el id del modelo a mano.'); return; }
-      dl.innerHTML = modelDatalist(models);
-      renderChips(models);
-      discovered = models;
-      hint.textContent = t('{n} modelos disponibles — pulsa uno para elegirlo.', { n: models.length });
-    } catch (e) {
-      // El discovery puede fallar por CORS (el proveedor no expone /models al navegador)
-      // o por key inválida. En ambos casos el camino es escribir el modelo a mano: lo
-      // decimos claramente y dejamos los chips sugeridos para elegir con un toque.
-      hint.classList.add('is-error');
-      hint.textContent = e.cors
-        ? t('Este proveedor no permite descubrir modelos desde el navegador. Escribe el id del modelo a mano o elige uno de los sugeridos abajo.')
-        : t('No se pudieron descubrir los modelos: {msg} Escribe el id a mano o elige uno de los sugeridos.', { msg: e.message });
-      renderChips((LLM.allProviders().find(p => p.baseUrl.replace(/\/+$/, '') === baseUrl.value.trim().replace(/\/+$/, '')) || LLM.allProviders()[0]).models);
-      model.focus();
-    } finally {
-      discover.disabled = false;
-    }
-  });
+  // "Elegir…": un solo manejador para los tres slots de texto/visión. Cada botón declara
+  // en `data-*` a qué input escribe y qué necesita el slot. Se resuelve con los valores
+  // del FORMULARIO (base URL y key sin guardar), como "Probar".
+  for (const btn of content.querySelectorAll('[data-slot]')) {
+    btn.addEventListener('click', async () => {
+      const url = baseUrl.value.trim().replace(/\/+$/, '');
+      const provider = LLM.allProviders().find(p => p.baseUrl.replace(/\/+$/, '') === url) || null;
+      const input = content.querySelector('#' + btn.dataset.slot);
+      const chosen = await openModelPicker({
+        provider, need: btn.dataset.need, current: (input.value || '').trim(),
+        baseUrl: baseUrl.value, key: keyEl.value,
+      });
+      if (!chosen) return;
+      input.value = chosen;
+      if (input === model) {
+        markActiveChip();
+        // Un modelo elegido fuera de los sugeridos merece estar entre los chips: si no,
+        // el chip activo desaparece y parece que no se ha guardado nada.
+        if (![...chips.querySelectorAll('.appset-chip')].some(c => c.dataset.model === chosen)) {
+          discovered = [...new Set([chosen, ...(discovered || [])])];
+          renderChips([chosen, ...[...chips.querySelectorAll('.appset-chip')].map(c => c.dataset.model)]);
+        }
+      }
+    });
+  }
 
   // ---- Probar un slot de modelo ------------------------------------------
   // Un solo manejador para los cuatro botones: cada uno declara en `data-*` qué input mira

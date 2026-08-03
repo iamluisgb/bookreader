@@ -36,14 +36,20 @@ const MAX_TOKENS = 4096;
 // `visionModel` (opcional): modelo multimodal del proveedor, para que la VISTA SIMPLE
 // pueda dejar "Explicar lo que veo" funcionando sin que el usuario configure un segundo
 // slot. Igual que `liteModel`, solo se declara donde está verificado.
+// `catalogId` (opcional): clave de este proveedor en models.dev (ver ai/catalog.js).
+// Con ella el selector ofrece nombres y capacidades en vez de ids pelados.
+// `discover: false`: el proveedor NO deja enumerar sus modelos desde el navegador.
+// nan responde 200 a `GET /models` pero sin cabeceras CORS, así que el navegador lo
+// bloquea: ofrecer ahí un botón que solo puede fallar es peor que no ofrecerlo
+// (verificado 2026-08-02, y el contrato con el proveedor lo revisa).
 export const PROVIDERS = [
-  { id: 'nan',        name: 'nan',        baseUrl: 'https://api.nan.builders/v1',   models: ['deepseek-v4-flash', 'mimo-v2.5', 'qwen3.6', 'gemma4'], liteModel: 'qwen3.6', visionModel: 'mimo-v2.5', concurrent: true },
-  { id: 'openai',     name: 'OpenAI',     baseUrl: 'https://api.openai.com/v1',     models: ['gpt-4o', 'gpt-4o-mini', 'o4-mini'], concurrent: true },
+  { id: 'nan',        name: 'nan',        baseUrl: 'https://api.nan.builders/v1',   models: ['deepseek-v4-flash', 'mimo-v2.5', 'qwen3.6', 'gemma4'], liteModel: 'qwen3.6', visionModel: 'mimo-v2.5', concurrent: true, discover: false },
+  { id: 'openai',     name: 'OpenAI',     baseUrl: 'https://api.openai.com/v1',     models: ['gpt-4o', 'gpt-4o-mini', 'o4-mini'], concurrent: true, catalogId: 'openai' },
   // Verificado contra la API real el 2026-08-02 (tests/provider-contract.spec.ts):
   // `claude-3.7-sonnet` y `gemini-2.0-flash-001` ya NO existen en el catálogo, así que
   // el preset ofrecía ids muertos. Los de ahora sí tienen tools y visión.
-  { id: 'openrouter', name: 'OpenRouter', baseUrl: 'https://openrouter.ai/api/v1',  models: ['google/gemini-2.5-flash', 'google/gemini-2.5-flash-lite', 'deepseek/deepseek-chat-v3.1', 'anthropic/claude-haiku-4.5'], liteModel: 'google/gemini-2.5-flash-lite', visionModel: 'google/gemini-2.5-flash', concurrent: true },
-  { id: 'groq',       name: 'Groq',       baseUrl: 'https://api.groq.com/openai/v1', models: ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant'], concurrent: true },
+  { id: 'openrouter', name: 'OpenRouter', baseUrl: 'https://openrouter.ai/api/v1',  models: ['google/gemini-2.5-flash', 'google/gemini-2.5-flash-lite', 'deepseek/deepseek-chat-v3.1', 'anthropic/claude-haiku-4.5'], liteModel: 'google/gemini-2.5-flash-lite', visionModel: 'google/gemini-2.5-flash', concurrent: true, catalogId: 'openrouter' },
+  { id: 'groq',       name: 'Groq',       baseUrl: 'https://api.groq.com/openai/v1', models: ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant'], concurrent: true, catalogId: 'groq' },
 ];
 
 export function getKey()        { return Storage.get('ai_key', '') || ''; }
