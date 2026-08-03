@@ -29,8 +29,12 @@ test('un PDF se renderiza (canvas visible con tamaño)', async ({ page }) => {
 
 test('un PDF SÍ se guarda en la biblioteca (buffer no detached)', async ({ page }) => {
   await openPdf(page);
-  // El guardado ocurre tras cargar; damos un margen y consultamos el store real.
-  await page.waitForTimeout(500);
+  // El guardado es asíncrono tras la carga: se sondea el store real hasta que aparece,
+  // en vez de apostar 500 ms (que en una máquina ocupada no bastan).
+  await expect.poll(async () => page.evaluate(async () => {
+    const Store = await import('/js/library/store.js');
+    return ((await Store.getAllBooks()) || []).some((b: any) => b.format === 'pdf');
+  }), { message: 'el PDF no llegó a guardarse en la biblioteca', timeout: 15000 }).toBe(true);
   const rec = await page.evaluate(async () => {
     const Store = await import('/js/library/store.js');
     // getAllBooks() ya no devuelve el binario (cargaba en memoria el de TODOS
@@ -54,21 +58,8 @@ test('un PDF SÍ se guarda en la biblioteca (buffer no detached)', async ({ page
 // El subrayado real (color/nota) es PDF3, así que en modo PDF esas acciones se ocultan.
 test('PDF2: seleccionar texto muestra "Preguntar al agente" y abre el panel', async ({ page }) => {
   await openPdf(page);
-  await page.waitForFunction(() => {
-    const l = document.querySelector('#pdf-container .textLayer');
-    return !!l && l.textContent!.trim().length > 0;
-  }, { timeout: 15000 });
-
-  // Seleccionar el texto de la capa y simular el fin de selección (mouseup).
-  await page.evaluate(() => {
-    const layer = document.querySelector('#pdf-container .textLayer')!;
-    const range = document.createRange();
-    range.selectNodeContents(layer);
-    const sel = window.getSelection()!;
-    sel.removeAllRanges();
-    sel.addRange(range);
-    document.getElementById('pdf-container')!.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
-  });
+  // Mismo gesto que el resto de tests de selección, con el reintento del helper.
+  await selectPdfText(page);
 
   await expect(page.locator('#highlight-tooltip')).toBeVisible();
   await expect(page.locator('#highlight-tooltip .sel-colors')).toBeVisible();  // subrayar (PDF3)
@@ -83,12 +74,17 @@ test('PDF2: seleccionar texto muestra "Preguntar al agente" y abre el panel', as
 
 // PDF3 · Subrayar en PDF: crea un ancla {página, rects}, pinta el overlay sobre el canvas,
 // lo persiste y lo re-pinta al re-renderizar la página.
+// Que la capa de texto tenga contenido no significa que la app ya escuche el `mouseup`:
+// un gesto lanzado antes de que el manejador esté puesto se pierde en silencio y el fallo
+// aparece después, en el `toBeVisible` del tooltip. Se REINTENTA la selección hasta que la
+// app reacciona — el gesto es idempotente, así que repetirlo no altera lo que se prueba.
 async function selectPdfText(page) {
   await page.waitForFunction(() => {
     const l = document.querySelector('#pdf-container .textLayer');
     return !!l && l.textContent!.trim().length > 0;
   }, { timeout: 15000 });
-  await page.evaluate(() => {
+
+  const gesto = () => page.evaluate(() => {
     const layer = document.querySelector('#pdf-container .textLayer')!;
     const range = document.createRange();
     range.selectNodeContents(layer);
@@ -97,6 +93,14 @@ async function selectPdfText(page) {
     sel.addRange(range);
     document.getElementById('pdf-container')!.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
   });
+
+  await gesto();
+  await expect.poll(async () => {
+    if (await page.locator('#highlight-tooltip').isVisible()) return true;
+    await gesto();
+    return false;
+  }, { message: 'el tooltip de selección no apareció tras seleccionar texto del PDF', timeout: 15000 })
+    .toBe(true);
 }
 
 test('PDF3: subrayar en PDF crea overlay, lo persiste y lo re-pinta', async ({ page }) => {

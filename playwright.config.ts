@@ -25,6 +25,11 @@ export default defineConfig({
   // sube el tiempo un 21 % y baja el pico de swap un 3 %. La presión de memoria
   // es del sistema (7 GB de swap ya en uso en reposo), no de la suite.
   timeout: 60000,
+  // Las aserciones web-first (toBeVisible, toHaveText, expect.poll…) se rinden a los 5 s
+  // por defecto, y ESE era el techo que se tocaba antes que el del test: con la máquina
+  // ocupada, un repintado tarda más de 5 s y el test moría a los 10, muy lejos de los 60.
+  // Reintentar más tiempo no cuesta nada cuando la aserción acaba pasando.
+  expect: { timeout: 15000 },
   use: {
     baseURL: 'http://localhost:8888',
     headless: true,

@@ -46,12 +46,28 @@ test('las citas del agente navegan a la página del pasaje', async ({ page }) =>
       .map((id) => ({ id, key: norm(lineOf.get(id) || '').slice(0, 22) }))
       .filter((x) => x.key.length >= 12);
 
+    // Espera a que la posición SE ASIENTE: goTo hace un segundo `display` que corrige el
+    // salto, así que leer demasiado pronto mide la página intermedia. Se espera a que el
+    // cfi de inicio no cambie entre dos lecturas, con tope.
+    //
+    // Deliberadamente NO se espera "hasta que el texto coincida": eso convertiría el
+    // test en una profecía autocumplida, y lo que mide es justo cuántas citas caen mal.
+    const settle = async () => {
+      let prev = null;
+      for (let i = 0; i < 40; i++) {                 // tope 2 s
+        await new Promise((r) => setTimeout(r, 50));
+        const cfi = rendition.currentLocation()?.start?.cfi ?? null;
+        if (cfi && cfi === prev) return;
+        prev = cfi;
+      }
+    };
+
     let ok = 0;
     const misses: string[] = [];
     for (const { id, key } of sample) {
       await rendition.display(0);            // salta lejos para forzar la navegación
       await Epub.goTo(seg.anchors.get(id).cfi);  // camino REAL de la app (con el fix)
-      await new Promise((r) => setTimeout(r, 120));
+      await settle();
       if (pageText().includes(key)) ok++; else misses.push(id);
     }
     return { n: sample.length, ok, misses };
