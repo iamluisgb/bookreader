@@ -548,6 +548,73 @@ disponible; y la **variante vertical 9:16** para stories.
 > soporta transformaciones 3D ni pasaría la CSP. Habría que **redibujar la escena en canvas 2D con la
 > proyección a mano** — una segunda implementación entera, no una reutilización.
 
+### P24 — Compartir material entre lectores (dossier y método) · `M` · **distribución**
+
+Pasarle a otra persona lo que has sacado de un libro: subrayados + libreta. Sin backend, sin cuentas:
+un **fichero** que se manda por donde ya se manda todo (el grupo de la clase). A diferencia de
+[P11](#p11--compartir-frase-subrayada-en-redes-tarjeta-cita---m--distribución)/[P23](#p23--tarjeta-de-biblioteca-compartible--sm--distribución--demo-hecha-2026-07-28),
+que comparten una **imagen** que se ve igual sin la app, aquí lo compartido **no sirve sin BookReader**
+→ bucle de invitación real, no impresiones.
+
+**Son DOS documentos, no uno.** Comparten sobre (`{ format: 'bookreader-bundle', version, kind,
+exportedAt, author }`) y el 80% del código; separarlos desde el día uno es lo que permite **ver cuál de
+los dos se mueve**, que es la pregunta abierta de verdad:
+- **Dossier** (`kind: 'dossier'`) — atado a un libro por `bookId`. Contiene texto de obra ajena.
+- **Método** (`kind: 'method'`) — perfil de agente + plantilla, **sin libro**. Reutilizable en cualquier
+  lectura, no contiene una línea de nadie → es lo único de aquí que se podría **vender** sin recibir un
+  DMCA, y con coste marginal cero (el comprador pone su key BYOK y su libro).
+
+**Lo que el código ya regala.** `bookId` es el **SHA-256 del fichero** ([`hashBuffer`](app/js/ai/db.js)):
+dos personas con el mismo EPUB/PDF comparten id, así que la capa ajena aterriza **en el pasaje exacto**
+sin distribuir el libro. Y [`profiles.js`](app/js/ai/profiles.js) + [`custom-templates.js`](app/js/ai/custom-templates.js)
+ya son datos puros en localStorage: el "Método" está a un `JSON.stringify` de existir.
+
+**Restricción no negociable — carril separado.** En EPUB `uid = cfi` ([`highlights.js`](app/js/highlights.js)):
+meter los subrayados de otro en el mismo array hace que `mergeCollections` **machaque los tuyos** en cada
+pasaje que ambos hayáis subrayado. Lo ajeno va a un **store `shared` en IndexedDB** (keyPath `id`, índice
+`bookId`), no a localStorage: no compite por la cuota de los subrayados propios y queda fuera del sync de
+Drive y del backup. *Coste aceptado en v1:* el dossier no viaja entre tus dispositivos; se reimporta.
+
+**Regla de hash.** `bookId` coincide → se pinta anclado. No coincide (otra edición) → se importa en **modo
+lectura**, legible pero sin pintar. Pintar CFIs de otra edición coloca los subrayados en sitios
+equivocados, y eso es peor que no pintarlos.
+
+**Encaje con las plantillas.** Las de fábrica viajan por `templateId` (las tiene todo el mundo); una
+`custom: true` viaja **con su definición incrustada**, o los `fieldKey` de la libreta importada no se
+pueden renderizar. Al importar recibe id nuevo (`shared-…`) para no pisar una plantilla tuya homónima.
+La **plantilla 2 (HQ&A)** de [`templates.md`](templates.md) es el caso canónico: subrayado → pregunta →
+respuesta propia, pasaje a pasaje, *es* el cuaderno de una asignatura. Demo y primer test, ahí.
+
+**Seguridad — frontera de confianza nº1 de [P9](#p9--skills--artefactos-plataforma-extensible-de-salidas-del-agente--l--futuro):**
+importar = datos, jamás ejecución. Pero una plantilla/perfil ajeno **inyecta texto en el system prompt**
+(`promptBlock()`, `agentRole`): el import de un Método **muestra el prompt completo antes de aceptar**.
+Con BYOK el daño se limita a gastar tu clave y mentirte, pero el usuario tiene que ver qué acepta.
+`author` es texto libre y se muestra siempre como *"según el fichero"*, nunca como identidad verificada.
+
+**Fases:**
+- **F0 — Formato** `S`: `js/share/bundle.js` con `build()`/`parse()`/`validate()`, funciones puras sin DOM.
+  Hermano de [`backup.js`](app/js/backup.js), reusando su `download()` CSP-safe.
+- **F1 — Exportar dossier** `S`: botón "Compartir" en la cabecera del panel, junto al export `.md` de
+  [P8](#p8--exportar-libretas-y-conversaciones--fase-1--m). Casillas: incluir chat / incluir subrayados.
+- **F2 — Importar + carril** `M`: store `shared`, regla de hash, libreta ajena en **solo lectura**.
+  Distinción visual **por trazo, no por barra lateral**: lo ajeno con línea inferior punteada del color
+  original, lo propio con fondo sólido. Filtro "Míos · De X" en la sidebar de subrayados.
+- **F3 — Método** `S`: mismo sobre, `kind: 'method'`, con la pantalla de revisión del prompt.
+- **Test que justifica el diseño:** round-trip con `test.epub` — exportar, importar en perfil limpio,
+  verificar que aparece en el carril compartido y que **los subrayados propios del mismo CFI siguen intactos**.
+
+**Fuera de alcance en v1, explícitamente:** enlaces/servidor, cuentas, pagos, firma de autoría, versiones,
+licencias. Un formato de intercambio entre dos personas y un formato de catálogo son cosas distintas;
+forzar el segundo ahora encarece el primero y probablemente acierta en el sitio equivocado.
+
+> **Por qué no un marketplace de apuntes (todavía).** Wuolah, Studocu, Course Hero: la parte difícil no es
+> el fichero, es la **liquidez del catálogo** y las retiradas por copyright — competir en "apuntes de
+> Cálculo I" es una guerra que no se gana desde un lector. La señal que hay que observar primero es cuál
+> de los dos documentos circula. Si circula el **Método** → directorio de métodos con Polar. Si circula el
+> **Dossier** → el producto no es una tienda sino **grupos de clase**, y eso es Perusall: B2B2C
+> institucional, otra empresa. Brazo de distribución natural de
+> [P21](#p21--vertical-opositor-del-estudio-al-examen--l--el-nicho-que-launch_planmdl75-señala).
+
 ### P12 — Flashcards por libro y por estantería (selector de repaso) · **✓** `S`–`M`
 **Hecho** (ver CHANGELOG): chip "Repasar hoy" abre selector Todo/estantería; `study.js` filtra por ámbito.
 Hoy "Repasar hoy" mezcla los mazos de todos los libros. Añadir un **selector**: repasar todo / este
