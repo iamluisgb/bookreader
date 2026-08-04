@@ -134,10 +134,14 @@ Responde SOLO JSON: {"turnos":[{"n":1,"fundamento":N,"honestidad":N|null,"clarid
       messages: [
         { role: 'system', content:
 `Eres un evaluador RIGUROSO de mapas mentales de libros. Puntúa de 1 a 5:
-- "jerarquia": cada hijo pertenece de verdad a su rama padre; la estructura refleja la del material.
+- "jerarquia": cada hijo pertenece de verdad a su rama padre y las ramas son temas coherentes
+  entre sí. NO premies que el árbol calque el índice del libro: un mapa cuyas ramas son los
+  capítulos NO organiza nada, repite la tabla de contenidos, y debe puntuar BAJO aquí.
 - "cobertura": las ramas principales cubren los conceptos dorados listados.
+- "utilidad_objetivo": el mapa está organizado para servir al OBJETIVO declarado. 5 = las ramas
+  son las que elegiría alguien con ese objetivo; 1 = describe el libro en abstracto, ignorándolo.
 - "no_invencion": nada del árbol es ajeno al libro (usa los conceptos dorados y el título como referencia).
-Sé exigente. Responde SOLO JSON: {"jerarquia":N,"cobertura":N,"no_invencion":N,"nota":"máx 15 palabras"}` },
+Sé exigente. Responde SOLO JSON: {"jerarquia":N,"cobertura":N,"utilidad_objetivo":N,"no_invencion":N,"nota":"máx 15 palabras"}` },
         { role: 'user', content:
 `LIBRO: ${b.meta?.fixture}\nOBJETIVO: ${b.battery.goal}\nCONCEPTOS DORADOS:\n${b.battery.goldenConcepts.join(' · ')}\n\nÁRBOL:\n${JSON.stringify(mmArt.result).slice(0, 7000)}` },
       ],
@@ -172,7 +176,7 @@ Sé exigente. Responde SOLO JSON: {"jerarquia":N,"cobertura":N,"no_invencion":N,
     + ` · cobertura ${covered}/${b.battery.goldenConcepts.length}`
     + (sumRes ? ` · resumen: fidelidad ${sumRes.fidelidad}, citas ${sumRes.pertinencia_citas}, cobertura ${sumRes.cobertura}` : '')
     + (j.chat_avg ? ` · chat: fundamento ${j.chat_avg.fundamento?.toFixed(1)}, honestidad ${Number.isFinite(j.chat_avg.honestidad) ? j.chat_avg.honestidad.toFixed(1) : 'n/a'}` : '')
-    + (mmRes ? ` · mindmap: ${mmRes.jerarquia}/${mmRes.cobertura}/${mmRes.no_invencion}` : ''));
+    + (mmRes ? ` · mindmap: ${mmRes.jerarquia}/${mmRes.cobertura}/${mmRes.utilidad_objetivo}/${mmRes.no_invencion}` : ''));
   return entry;
 }
 
@@ -187,6 +191,7 @@ function numericScores(e) {
     'chat.fundamento': e.chat_avg?.fundamento, 'chat.honestidad': e.chat_avg?.honestidad,
     'chat.claridad': e.chat_avg?.claridad,
     'mindmap.jerarquia': e.mindmap?.jerarquia, 'mindmap.cobertura': e.mindmap?.cobertura,
+    'mindmap.utilidad_objetivo': e.mindmap?.utilidad_objetivo,
     'mindmap.no_invencion': e.mindmap?.no_invencion,
   };
 }

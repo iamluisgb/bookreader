@@ -104,10 +104,15 @@ function renderSetup() {
 
 function gatherScope(label) {
   ctx.ensureIndex();
-  if (label) return Retrieval.passagesByChapter(label);
+  // Fuera los pasajes que SON un encabezado. Es la causa raíz de que el mapa saliera índice:
+  // el titular es lo que más se parece a un concepto, así que la fase de extracción devolvía
+  // titulares y el árbol no tenía otra cosa que agrupar. Se filtra aquí, no con una regla en
+  // el prompt: pedirle al modelo que ignore lo que le das no funcionó (eval p14-sin-titulares).
+  if (label) return Retrieval.passagesByChapter(label).filter(p => !Retrieval.isHeadingPassage(p));
   const byChapter = new Map();
   for (const p of Retrieval.allPassages()) {
     if (Retrieval.isBoilerplate(p.chapter)) continue;   // fuera cubierta/índice/prólogo/licencias…
+    if (Retrieval.isHeadingPassage(p)) continue;
     const k = p.chapter || '';
     if (!byChapter.has(k)) byChapter.set(k, []);
     byChapter.get(k).push(p);
@@ -154,6 +159,21 @@ export function capBulletsFair(bullets, max, chapterOf) {
   return out;
 }
 
+// Cuántas ramas del árbol son, de hecho, un capítulo del libro. Comparación por PREFIJO
+// porque el rótulo se recorta a 32 caracteres: "THE PRINCIPLE OF RELATIVITY (IN" es el
+// capítulo "V. THE PRINCIPLE OF RELATIVITY (IN THE RESTRICTED SENSE)". Pura y testeable: la
+// lista de capítulos se inyecta.
+export function chapterLikeBranches(tree, chapters) {
+  const norm = (x) => String(x || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^\p{L}\p{N} ]/gu, ' ').replace(/\s+/g, ' ').trim();
+  const chs = [...new Set((chapters || []).map(c => norm(tidyChapter(c))))].filter(Boolean);
+  if (!chs.length || !tree?.branches?.length) return 0;
+  return tree.branches.filter(br => {
+    const l = norm(br.label);
+    return !!l && chs.some(c => c === l || (l.length >= 10 && c.startsWith(l)));
+  }).length;
+}
+
 // Extrae el primer objeto JSON balanceado (tolerante a prosa/``` y a TRUNCACIÓN: si el
 // modelo corta el JSON a media —el fallo típico de "Ideas N"— lo repara para rescatar las
 // ramas completas en vez de descartarlo entero).
@@ -196,28 +216,63 @@ function mapPrompt(goal) {
 REGLAS:
 - Cada etiqueta es un sintagma nominal de 2 a 6 palabras. NUNCA una frase u oración completa.
   Ej.: "- Desambiguación de entidades [[a12]]", NO "- La desambiguación de entidades requiere un contexto rico [[a12]]".
+- NOMBRA LA IDEA, no el titular. Si un pasaje es un encabezado, un título de sección o una
+  enumeración del libro, NO lo copies: extrae la idea que contiene, o sáltalo. Un rótulo
+  copiado del libro no es un concepto, es una cita del índice.
 - Formato: viñeta Markdown "- ..." TERMINADA con el marcador de su pasaje [[aN]].
 - Mismo idioma que los pasajes.${goal ? `\n- Prioriza lo relevante para: «${goal}».` : ''}
 Responde solo las viñetas.`;
 }
 
-function treePrompt(title, goal, chapterHints = []) {
-  // P14 F2 · Esqueleto desde el TOC: anclar las ramas en la estructura real del libro
-  // sube jerarquía y cobertura (el modelo tiende a inventarse taxonomías propias).
-  const skeleton = chapterHints.length ? `
-- RAMAS DE PARTIDA (capítulos reales del libro): ${chapterHints.join(' · ')}. Úsalas como
-  base de las ramas; puedes fusionar dos afines o renombrar, pero no ignores la estructura.` : '';
+// El principio organizador del mapa es el OBJETIVO del lector, no la estructura del libro.
+//
+// POR QUÉ SE INVIRTIÓ (2026-08-04). F2 metió aquí un "esqueleto del TOC" —los capítulos
+// reales como ramas de partida, con un «no ignores la estructura»— para subir jerarquía y
+// cobertura. Funcionó para la métrica y arruinó el artefacto: el mapa salía siendo el ÍNDICE
+// del libro. Tres razones para quitarlo, no para matizarlo:
+//
+//  1. Competía con el objetivo DENTRO del mismo prompt, y ganaba: la estructura iba en
+//     imperativo y arriba, el objetivo en tono suave y al final.
+//  2. Era redundante para lo único que justificaba su existencia. La cobertura ya está
+//     garantizada aguas arriba por `capBulletsFair`, que reparte las 24 viñetas del reduce
+//     por capítulo en round-robin: lo que llega aquí YA cubre el libro entero. F2 añadió dos
+//     mecanismos de cobertura a la vez y solo uno impone estructura.
+//  3. Un mapa que reproduce el índice no aporta nada que no esté ya en el índice. La teoría
+//     del concept mapping (Novak y Cañas) lo dice al derecho: la jerarquía de un dominio
+//     depende del CONTEXTO en que se va a aplicar, y por eso un mapa se construye respecto a
+//     una pregunta que lo enfoque. Aquí esa pregunta existe y es el objetivo del usuario.
+//
+// OJO CON EL TÍTULO DEL LIBRO: NO se le pasa, y es deliberado. Dárselo era la llave que le
+// abría el recuerdo del índice. Medido (eval p14-validado): con las viñetas limpias y en
+// español, el modelo devolvía ramas en inglés y mayúsculas que NO estaban en su entrada
+// —"THE APPARENT INCOMPATIBILITY OF…"—, o sea reconstruidas de memoria porque reconocía el
+// libro de Einstein. Sin el título tiene que agrupar lo que se le da, que es el trabajo.
+// El nombre del libro se sigue viendo en la cabecera del modal; no hace falta en el mapa.
+function treePrompt(goal) {
   return `Organiza estos puntos de un libro en un MAPA MENTAL jerárquico.
 Devuelve SOLO un objeto JSON válido con esta forma:
 {"title": "tema central (2-4 palabras)", "branches": [{"label": "rama (1-3 palabras)", "children": [{"label": "concepto (2-5 palabras)", "src": "aN"}]}]}
 REGLAS:
-- 3 a 6 ramas; 2 a 5 hijos por rama.${skeleton}
+- Las ramas son TEMAS, no partes del libro: no uses como rama un capítulo, su número ni su
+  título ("I", "Capítulo 3", "Parte II", "Introducción"), ni las ordenes por orden de lectura.
+  Un mapa que reproduce el índice no aporta nada que el índice no diera ya.
+  ÚNICA excepción: que el propio objetivo pida esa estructura (p. ej. memorizar los títulos de
+  una ley), en cuyo caso la estructura ES el tema.
+- Agrupa por AFINIDAD CONCEPTUAL: dos puntos de capítulos distintos que hablan de lo mismo van
+  juntos en la misma rama. Que una rama tenga muchos hijos y otra pocos es correcto, y además
+  informa: enseña dónde carga el libro.
+- El rótulo de cada rama lo SINTETIZAS TÚ: es el nombre del tema que agrupa a sus hijos. No
+  vale copiar una de las viñetas ni un titular del libro — si el rótulo aparece literal en la
+  entrada, no has agrupado nada.${goal ? `
+- CRITERIO PRINCIPAL para elegir y nombrar las ramas: «${goal}». El mapa organiza el libro
+  para ese fin; no describe el libro en abstracto.` : ''}
+- 3 a 6 ramas; 2 a 5 hijos por rama.
 - Las etiquetas son de MAPA MENTAL: rótulos CORTOS de concepto (2-5 palabras), sintagmas
   nominales, NUNCA frases ni oraciones. Ej.: "Desambiguación de entidades", NO "La
   desambiguación de entidades requiere un contexto rico".
 - "src" = el id [[aN]] del punto de origen (solo "aN", sin corchetes) para ampliar el detalle; si no lo sabes, "".
-- Mismo idioma que los puntos.${goal ? `\n- Enfoca el mapa en: «${goal}».` : ''}
-- Título tentativo: «${title}».`;
+- Mismo idioma que los puntos.
+- "title" es el TEMA CENTRAL que emerge de las viñetas, sintetizado por ti en 2-4 palabras.`;
 }
 
 function onGenerate() {
@@ -225,13 +280,10 @@ function onGenerate() {
   const passages = gatherScope(scopeValue);
   if (!passages.length) { showError(t('Ese contenido no tiene texto indexado; prueba con otro capítulo o el libro entero.')); return; }
   const totalTokens = passages.reduce((n, p) => n + estimateTokens(p.text) + 4, 0);
-  const chunks = buildChunks(passages, Math.max(10000, Math.ceil(totalTokens / MAX_MAP_CALLS)));
+  // Sin encabezados de capítulo: son la fuente probada de que el mapa saliera índice.
+  const chunks = buildChunks(passages, Math.max(10000, Math.ceil(totalTokens / MAX_MAP_CALLS)), { headings: false });
   const scopeName = scopeValue || ctx.bookTitle || 'Libro';
   const goal = ctx.goal;
-  // Esqueleto para el árbol: los capítulos reales del ámbito (≤8, sin accesorios) anclan
-  // la jerarquía en la estructura del libro (cobertura/jerarquía medían 2/5 sin esto).
-  const chapterHints = scopeValue ? [] : [...new Set(passages.map(p => tidyChapter(p.chapter)).filter(Boolean))].slice(0, 8);
-
   const act = Jobs.activeJob();
   if (act && act.status === 'running' && !(act.kind === KIND && act.bookId === ctx.bookId)) {
     if (!window.confirm(t('Ya se está generando {label}. ¿Cancelarlo y empezar el mapa?', { label: act.label }))) return;
@@ -240,13 +292,13 @@ function onGenerate() {
   Jobs.start({
     bookId: ctx.bookId, kind: KIND, label: t('el mapa mental'),
     params: { scopeName },
-    run: ({ signal, progress, background }) => runMindmap({ chunks, goal, scopeName, chapterHints, signal, progress, background }),
+    run: ({ signal, progress, background }) => runMindmap({ chunks, goal, scopeName, signal, progress, background }),
   });
   renderRunning(Jobs.activeJob());
 }
 
 // Map (conceptos citados por trozo) + reduce (árbol JSON), desacoplado del modal.
-async function runMindmap({ chunks, goal, scopeName, chapterHints = [], signal, progress, background = false }) {
+async function runMindmap({ chunks, goal, scopeName, signal, progress, background = false }) {
   const bullets = [];
   for (let i = 0; i < chunks.length; i++) {
     const raw = await LLM.chatStream({
@@ -258,7 +310,13 @@ async function runMindmap({ chunks, goal, scopeName, chapterHints = [], signal, 
     });
     for (const line of String(raw || '').split('\n')) {
       const t = line.trim();
-      if (t.startsWith('- ') || t.startsWith('* ')) bullets.push(t.slice(2).trim());
+      if (!t.startsWith('- ') && !t.startsWith('* ')) continue;
+      const bullet = t.slice(2).trim();
+      // Sin ancla no hay viñeta. Todo el mapa se sostiene en que cada hoja cite su pasaje: una
+      // viñeta sin [[aN]] no se puede citar, ni ampliar, ni llevar al libro. Además ensucia:
+      // `capBulletsFair` las agrupa bajo "General" y salía una rama basura con ese nombre — y
+      // por ahí se coló un "- Relat" cortado que llegó hasta el mapa final (eval p14-validado).
+      if (/\[\[a\d+\]\]/.test(bullet)) bullets.push(bullet);
     }
     progress(i + 1, chunks.length, 'map');
   }
@@ -269,20 +327,46 @@ async function runMindmap({ chunks, goal, scopeName, chapterHints = [], signal, 
   const capped = capBulletsFair(bullets, 24, (id) => p2ch.get(id));
 
   progress(chunks.length, chunks.length, 'reduce');
-  let tree = null;
-  try {
+  const askTree = async (extra = '') => {
     const raw = await LLM.chatStream({
       messages: [
-        { role: 'system', content: treePrompt(scopeName, goal, chapterHints) },
+        { role: 'system', content: treePrompt(goal) + extra },
         { role: 'user', content: capped.join('\n') },
       ],
       // Alto a propósito: los modelos de razonamiento gastan miles de tokens "pensando" antes
       // del JSON; con poco cupo emitían JSON vacío/truncado → el mapa temático caía al fallback.
       maxTokens: 5000, signal, background,
     });
-    tree = extractJson(raw);
+    return extractJson(raw);
+  };
+  let built = null;
+  try {
+    built = buildTree(await askTree(), scopeName);
+    // ¿Las ramas son el índice del libro? Se comprueba en CLIENTE, donde tenemos los capítulos:
+    // no hace falta creerle al modelo, y tres rondas de pedírselo por prompt demostraron que
+    // pedirlo no basta. Pero es UN AVISO, NO UN VETO: si tras señalárselo insiste, se acepta.
+    // Hay libros donde la estructura ES el tema —una ley que se memoriza por títulos— y ahí el
+    // índice es la respuesta correcta; el cliente no sabe distinguirlo, el modelo con el
+    // objetivo delante sí. Cuesta una llamada, y solo cuando el primer intento calca el índice.
+    const chapters = [...new Set(Retrieval.allPassages().map(p => p.chapter))].filter(Boolean);
+    if (built && chapterLikeBranches(built, chapters) * 2 >= built.branches.length) {
+      const copiadas = built.branches.map(b => `«${b.label}»`).join(', ');
+      const retry = buildTree(await askTree(`
+
+AVISO: en tu intento anterior las ramas fueron ${copiadas}, que son los capítulos de este
+libro. Eso es su índice, no un mapa. Reagrupa LAS MISMAS viñetas por tema, con rótulos que
+sintetices tú. Solo mantén una estructura de capítulos si el objetivo la pide expresamente.`), scopeName);
+      if (retry) built = retry;
+    }
   } catch (e) { if (e.name === 'AbortError') throw e; }
-  return normalizeTree(tree, capped, scopeName);
+  // El fallback por capítulos es fiel pero NO es un mapa de conceptos: es el índice del
+  // libro, justo lo que no se quiere. Queda como último recurso ante un JSON inservible.
+  const result = built || chapterFallback(capped, scopeName);
+  // Diagnóstico: las viñetas que entraron al reduce. Sin esto no se puede saber si un rótulo
+  // malo vino de la extracción o se lo inventó el árbol — se estaba deduciendo por la forma de
+  // las mayúsculas, que no es manera de decidir dónde intervenir.
+  result.bullets = capped;
+  return result;
 }
 
 // Vista "en curso": progreso + "Seguir leyendo" / "Cancelar", suscrita a Jobs.
@@ -335,7 +419,10 @@ function clampWords(s, maxChars) {
   return (sp > 6 ? cut.slice(0, sp) : cut).trim();
 }
 
-function normalizeTree(tree, bullets, scopeName) {
+// Valida/normaliza el árbol del modelo. Devuelve null si no es usable, para que el llamante
+// decida — antes caía directo al fallback aquí dentro, y eso impedía darle una segunda
+// oportunidad al modelo.
+function buildTree(tree, scopeName) {
   const cleanSrc = (s) => (typeof s === 'string' && (s.match(/a\d+/) || [])[0]) || '';
   // Cada hoja guarda una etiqueta CORTA visible + el texto completo (`full`) para el detalle.
   // RECURSIVA desde F6: un mapa expandido tiene nietos, y al reabrirlo desde IndexedDB pasa
@@ -359,7 +446,7 @@ function normalizeTree(tree, bullets, scopeName) {
     // fallback por capítulos, que garantiza estructura fiel al libro.
     if (branches.length >= 2) return { title: String(tree.title || scopeName).slice(0, 44), branches };
   }
-  return chapterFallback(bullets, scopeName);
+  return null;
 }
 
 // Acorta un título de capítulo para usarlo como rótulo de rama: quita el numeral inicial

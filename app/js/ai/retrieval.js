@@ -173,7 +173,7 @@ export function search(query, k = 40) {
 // Los calificadores de delante son parte del caso real: los EPUB de Manning titulan sus
 // secciones "brief contents" / "about this book", y sin ellos el filtro las dejaba pasar
 // como si fueran capítulos (se veían ofrecidas como conceptos en el modo Feynman).
-const FRONT_MATTER_RE = /^((brief|detailed|table of)\s+)?(cover|portada|title\s*page|copyright|creditos|contents|indice|index|preface|prefacio|foreword|prologo|acknowledge?ments?|agradecimientos|dedicat(ion|oria)s?|contributors?|colophon|about (the |this )?(author|cover|book|illustration)|bibliograf|references|glossary|glosario|half[-\s]?title|frontispiece|epigraph|(authoris|authoriz)ed translation|translated by|traducci[óo]n de)\b/;
+const FRONT_MATTER_RE = /^((brief|detailed|table of)\s+)?(cover|portada|cubierta|contracubierta|contraportada|sobrecubierta|title\s*page|copyright|creditos|contents|indice|index|preface|prefacio|foreword|prologo|acknowledge?ments?|agradecimientos|dedicat(ion|oria)s?|contributors?|colophon|about (the |this )?(author|cover|book|illustration)|bibliograf|references|glossary|glosario|half[-\s]?title|frontispiece|epigraph|(authoris|authoriz)ed translation|translated by|traducci[óo]n de)\b/;
 export function isFrontMatter(label) {
   const n = norm(label);
   return !!n && FRONT_MATTER_RE.test(n);
@@ -187,6 +187,18 @@ const BACK_MATTER_RE = /^((the\s+)?full\s+project\s+gutenberg|project\s+gutenber
 export function isBackMatter(label) {
   const n = norm(label);
   return !!n && BACK_MATTER_RE.test(n);
+}
+
+// Un pasaje que ES un encabezado. `segment.js` emite cada título DOS VECES a propósito: como
+// frontera `## texto` y como pasaje con su propia ancla (el título es buena señal para BM25 y
+// así la numeración de anclas no se mueve al cambiar de versión). Para buscar está bien; para
+// extraer CONCEPTOS es la ruina, porque un titular es justo lo que más se parece a un concepto
+// y el mapa acaba siendo el índice del libro — medido en el eval: 8 de 8 ramas en Relatividad
+// eran títulos de capítulo. Se detecta sin heurística: el texto del pasaje coincide con la
+// etiqueta de capítulo o de sección que `parsePassages` ya le atribuyó.
+export function isHeadingPassage(p) {
+  const t = norm(p?.text);
+  return !!t && (t === norm(p.chapter) || t === norm(p.section));
 }
 
 // Accesorio por delante o por detrás: lo que el muestreo de artefactos (flashcards,

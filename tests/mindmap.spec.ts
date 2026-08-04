@@ -174,6 +174,129 @@ test('plegar una rama esconde sus hijos', async ({ page }) => {
   await expect(page.locator('.mm-canvas')).toContainText('Personajes');
 });
 
+// "Cubierta" aparecía como rama del mapa porque el filtro de accesorios —el que decide qué
+// se salta el muestreo cuando el ámbito es el libro entero— no conocía el nombre español.
+test('la cubierta del EPUB cuenta como accesorio, no como capítulo', async ({ page }) => {
+  await page.goto('/');
+  const r = await page.evaluate(async () => {
+    const R: any = await import('/js/ai/retrieval.js');
+    return {
+      // "Cubierta" se colaba como rama: el filtro de accesorios conocía "portada" y "cover",
+      // pero no el nombre que usan muchos EPUB en español.
+      cubierta: R.isBoilerplate('Cubierta'),
+      contra: R.isBoilerplate('Contraportada'),
+      capitulo: R.isBoilerplate('El pishtaco'),
+    };
+  });
+  expect(r.cubierta).toBe(true);
+  expect(r.contra).toBe(true);
+  expect(r.capitulo).toBe(false);
+});
+
+// La causa raíz de que el mapa saliera siendo el índice estaba una capa MÁS ARRIBA del
+// prompt: `buildChunks` reinserta el título del capítulo como `## …` en el texto que se manda,
+// y la fase de extracción devolvía esos titulares como si fueran conceptos. Para tarjetas y
+// resumen ese encabezado es contexto útil; para el mapa es veneno.
+test('los trozos del mapa van sin encabezados de capítulo', async ({ page }) => {
+  await page.goto('/');
+  const r = await page.evaluate(async () => {
+    const F: any = await import('/js/ai/flashcards.js');
+    const passages = [
+      { id: 'a0', text: 'La velocidad de la luz es constante en todo sistema inercial.', chapter: 'V. THE PRINCIPLE OF RELATIVITY' },
+      { id: 'a1', text: 'Dos sucesos simultáneos para un observador no lo son para otro.', chapter: 'IX. THE RELATIVITY OF SIMULTANEITY' },
+    ];
+    return {
+      con: F.buildChunks(passages, 5000).map((c: any) => c.text).join('\n'),
+      sin: F.buildChunks(passages, 5000, { headings: false }).map((c: any) => c.text).join('\n'),
+    };
+  });
+  // Tarjetas y resumen siguen recibiendo el capítulo…
+  expect(r.con).toContain('## V. THE PRINCIPLE OF RELATIVITY');
+  // …y el mapa no, pero conserva íntegros los pasajes y sus anclas.
+  expect(r.sin).not.toContain('##');
+  expect(r.sin).not.toContain('THE PRINCIPLE OF RELATIVITY');
+  expect(r.sin).toContain('[[a0]] La velocidad de la luz');
+  expect(r.sin).toContain('[[a1]] Dos sucesos simultáneos');
+});
+
+// La causa raíz, en la capa donde es determinista. `segment.js` emite cada encabezado dos
+// veces: como frontera `## texto` y como pasaje con ancla propia. El mapa recibía el titular
+// como si fuera contenido y lo devolvía como concepto. Se prueba sobre el pipeline real
+// (parsePassages), no sobre objetos inventados.
+test('los pasajes que son un encabezado se reconocen y no van al mapa', async ({ page }) => {
+  await page.goto('/');
+  const r = await page.evaluate(async () => {
+    const R: any = await import('/js/ai/retrieval.js');
+    const anotado = [
+      '## V. THE PRINCIPLE OF RELATIVITY',
+      '[[a0]] V. THE PRINCIPLE OF RELATIVITY',
+      '[[a1]] Si un sistema se mueve uniformemente respecto a otro, las leyes son las mismas.',
+      '## Sistemas de coordenadas',
+      '[[a2]] Sistemas de coordenadas',
+      '[[a3]] Un cuerpo se describe siempre respecto a un cuerpo de referencia.',
+    ].join('\n');
+    const ps = R.parsePassages(anotado, new Map(), ['V. THE PRINCIPLE OF RELATIVITY']);
+    return {
+      total: ps.length,
+      encabezados: ps.filter((p: any) => R.isHeadingPassage(p)).map((p: any) => p.id),
+      contenido: ps.filter((p: any) => !R.isHeadingPassage(p)).map((p: any) => p.id),
+    };
+  });
+  expect(r.total).toBe(4);
+  expect(r.encabezados).toEqual(['a0', 'a2']);   // el título de capítulo y el de sección
+  expect(r.contenido).toEqual(['a1', 'a3']);     // el texto de verdad se conserva entero
+});
+
+// Detectar en CLIENTE que el árbol es el índice del libro. Tres rondas de pedírselo al modelo
+// por prompt demostraron que pedirlo no basta; los capítulos los tenemos aquí. La comparación
+// va por prefijo porque el rótulo se recorta a 32 caracteres al pintarlo.
+test('se detecta un árbol cuyas ramas son los capítulos', async ({ page }) => {
+  await page.goto('/');
+  const r = await page.evaluate(async () => {
+    const M: any = await import('/js/ai/mindmap.js');
+    const chapters = [
+      'V. THE PRINCIPLE OF RELATIVITY (IN THE RESTRICTED SENSE)',
+      'IX. THE RELATIVITY OF SIMULTANEITY',
+      'XI. THE LORENTZ TRANSFORMATION',
+    ];
+    const indice = { title: 'X', branches: [
+      { label: 'THE PRINCIPLE OF RELATIVITY (IN' },   // recortado a 32: debe casar igual
+      { label: 'THE RELATIVITY OF SIMULTANEITY' },
+      { label: 'THE LORENTZ TRANSFORMATION' },
+    ] };
+    const tematico = { title: 'X', branches: [
+      { label: 'Simultaneidad y tiempo' },
+      { label: 'Transformaciones entre sistemas' },
+      { label: 'Equivalencia masa-energía' },
+    ] };
+    return {
+      indice: M.chapterLikeBranches(indice, chapters),
+      tematico: M.chapterLikeBranches(tematico, chapters),
+      sinCapitulos: M.chapterLikeBranches(indice, []),
+    };
+  });
+  expect(r.indice).toBe(3);        // las tres, incluida la recortada
+  expect(r.tematico).toBe(0);
+  expect(r.sinCapitulos).toBe(0);  // sin lista de capítulos no se inventa una señal
+});
+
+// Una viñeta sin ancla no se puede citar, ni ampliar, ni llevar al libro — y ensucia: se
+// agrupan bajo "General" y producían una rama basura con ese nombre. Por ahí se coló hasta el
+// mapa final un "- Relat" cortado (eval p14-validado).
+test('las viñetas sin ancla no llegan al mapa', async ({ page }) => {
+  await page.goto('/');
+  const r = await page.evaluate(async () => {
+    const M: any = await import('/js/ai/mindmap.js');
+    // capBulletsFair es la puerta por la que pasan; sin ancla caían en "General".
+    const bullets = ['Concepto bueno [[a1]]', 'Relat', 'Otro concepto [[a2]]'];
+    const conAncla = bullets.filter(b => /\[\[a\d+\]\]/.test(b));
+    return { total: bullets.length, filtradas: conAncla.length, capped: M.capBulletsFair(conAncla, 10, () => 'A').length };
+  });
+  expect(r.total).toBe(3);
+  expect(r.filtradas).toBe(2);
+  expect(r.capped).toBe(2);
+});
+
 // P14 F2 · El cap de viñetas reparte por capítulo (antes un muestreo uniforme podía
 // dejar capítulos sin representación) y el árbol de 1 rama cae al fallback por capítulos.
 test('capBulletsFair reparte el cupo entre capítulos', async ({ page }) => {

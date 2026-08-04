@@ -675,6 +675,29 @@ con mayor techo de marketing (la gente postea mapas mentales), pero el más caro
   colisión, medida, contraste, plegado, fuente embebida), pero el efecto de "Expandir" sobre
   la cobertura del mapa no está en la batería. Es el siguiente ciclo natural de EV2.
 
+### P14 F7 — El mapa era el índice del libro · **✓ (2026-08-04)** `M`
+**Hecho** (ver CHANGELOG): esqueleto del TOC fuera, objetivo como criterio organizador,
+`isHeadingPassage()` para que los titulares no entren como contenido, título del libro fuera
+del prompt, validación en cliente (aviso, no veto) y viñetas sin ancla descartadas. Medido:
+Pedro Páramo 0/4 ramas-capítulo, Constitución 7/8 (correcto, su objetivo son los títulos).
+
+- **Límite conocido — libros que el modelo se sabe.** Relatividad sigue en 7/8: con capítulos
+  titulados y una obra que el modelo conoce, reconstruye el índice de memoria aunque no se le
+  dé el título ni los encabezados. Un aviso no vence a ese anclaje. Vías no probadas: exigir
+  que cada rótulo se derive léxicamente de sus hijos, o un segundo aviso más duro. No se ha
+  seguido porque el rendimiento de los ciclos de eval era decreciente.
+- **Sin verificar.** Quitar el título del libro del prompt está razonado sobre la evidencia del
+  run `p14-validado` (ramas en inglés que no estaban en la entrada) pero **no medido**: la
+  batería de Relatividad agotó el tiempo del arnés tres veces seguidas antes de llegar al mapa.
+
+### EV4 — El arnés del eval no llega a los libros grandes · `S` · **prioridad alta**
+Las flashcards de Pro Git (14 MB) y de Relatividad agotan los 600 s del gate en
+[`tests/evals.spec.ts`](tests/evals.spec.ts) y tumban la batería ENTERA, así que resumen, mapa y
+chat de esos libros se quedan sin medir. Pasó en 3 de las 5 corridas de P14 F7 y dejó sin
+verificar justo el caso que se estaba arreglando. Subir el límite es el parche obvio, pero
+enmascara el problema real: esos libros tardan demasiado. Medir primero dónde se va el tiempo
+(¿nº de llamadas del map? ¿ventanas lentas de nan?) y decidir con eso.
+
 - **Límite conocido del layout.** Sin solapes, pero en mapas muy desiguales quedan **cruces de
   aristas** entre subárboles: la relajación mueve en radio y nunca en ángulo, así que una hoja
   empujada lejos puede cruzar el territorio de la rama vecina. Evitarlo pide enrutado de

@@ -299,7 +299,12 @@ function gatherScope(scopeLabel) {
 // Trozos de ~chunkTokens con el texto anotado (encabezados ## + marcadores [[aN]], que
 // alimentan el "src" de P10 F2). Pura (recibe pasajes) para poder testearla. Un capítulo
 // mayor que el trozo se parte; al continuar en el trozo siguiente se repite su encabezado.
-export function buildChunks(passages, chunkTokens = CHUNK_TOKENS) {
+// `headings: false` omite los `## Capítulo` que separan los pasajes. Para tarjetas y resumen
+// esos encabezados son CONTEXTO útil (el modelo sabe dónde está). Para el mapa mental son
+// veneno, y está medido: el modelo los devolvía como si fueran conceptos, y el mapa acababa
+// siendo el índice del libro con otro formato (eval p14-sin-esqueleto: 8 de 8 ramas eran
+// títulos de capítulo recortados). Los conceptos tienen que salir del TEXTO, no del titular.
+export function buildChunks(passages, chunkTokens = CHUNK_TOKENS, { headings = true } = {}) {
   const chunks = [];
   let lines = [], tokens = 0, curCh = undefined;
   const flush = () => {
@@ -310,7 +315,7 @@ export function buildChunks(passages, chunkTokens = CHUNK_TOKENS) {
     const t = estimateTokens(p.text) + 4;
     if (tokens && tokens + t > chunkTokens) flush();
     if (p.chapter !== curCh) {
-      if (p.chapter) lines.push(`\n## ${p.chapter}`);
+      if (p.chapter && headings) lines.push(`\n## ${p.chapter}`);
       curCh = p.chapter;
     }
     lines.push(`[[${p.id}]] ${p.text}`);

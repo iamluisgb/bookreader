@@ -5,6 +5,81 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-08-04 — El mapa mental devolvía el índice del libro (P14 F7)
+
+Con *Lituma en los Andes* las ramas salían "I", "III", "VII". Con Pro Git salían *Getting
+Started · Git Branching · Distributed Git…*, o sea su tabla de contenidos verbatim. El mapa no
+organizaba nada: repetía lo que el índice ya daba. Cuatro causas encadenadas, todas medidas, y
+tres intentos fallidos por el camino que quedan documentados porque cada uno acotó el problema.
+
+**1 · El esqueleto del TOC (la causa de diseño).** F2 introdujo aquí los capítulos reales como
+"ramas de partida", con un «no ignores la estructura», para subir jerarquía y cobertura.
+Funcionó para la métrica y arruinó el artefacto. Se quita entero, no se matiza, por tres
+razones: competía con el objetivo del lector dentro del mismo prompt —la estructura en
+imperativo y arriba, el objetivo en tono suave y al final—; era redundante, porque la cobertura
+ya la garantiza `capBulletsFair` repartiendo las viñetas por capítulo antes del reduce; y
+porque la teoría del concept mapping (Novak y Cañas) dice que la jerarquía de un dominio
+depende del contexto en que se aplica, y por eso un mapa se construye respecto a una pregunta
+que lo enfoque. Esa pregunta ya existe en BookReader y es el objetivo del usuario — algo que
+NotebookLM no tiene. El prompt se invierte: el objetivo pasa a ser el criterio principal, con
+una excepción explícita para cuando el objetivo pide la estructura (memorizar los títulos de
+una ley).
+
+**2 · Los encabezados viajaban como contenido (la causa raíz).** `segment.js` emite cada título
+DOS veces —como frontera `## texto` y como pasaje con ancla propia, a propósito: el título es
+buena señal para BM25—. Al mapa le llegaba `[[a57]] V. THE PRINCIPLE OF RELATIVITY…` como un
+pasaje del que extraer conceptos, y un titular es justo lo que más se parece a un concepto.
+Dos intentos previos fallaron por atacarlo mal: quitar el marcador `##` de los trozos no bastó
+(el titular seguía entrando como pasaje) y pedírselo por prompt tampoco (el modelo no obedecía).
+Lo que funciona es no dárselo: `isHeadingPassage()` los reconoce sin heurística —el texto del
+pasaje coincide con la etiqueta de capítulo o sección que `parsePassages` ya le atribuyó— y el
+mapa los descarta. Tarjetas, resumen y BM25 los siguen viendo. **Verificado:** tras el filtro,
+las viñetas de Relatividad son *"Geometría como rama de la física"*, *"Contracción de la
+longitud"*, *"Unificación masa-energía"* — ni un titular.
+
+**3 · El título del libro abría el recuerdo del índice.** Con las viñetas ya limpias y en
+español, el modelo seguía devolviendo ramas en inglés y mayúsculas que NO estaban en su
+entrada: las reconstruía de memoria porque el prompt le decía «Título tentativo: *Relativity:
+The Special and General Theory*» y conoce ese clásico. Se deja de pasar el título; el `title`
+del mapa lo sintetiza el modelo de las viñetas. **Sin verificar:** la batería de Relatividad
+agotó el tiempo del arnés tres veces seguidas en un paso anterior (flashcards), así que este
+cambio está razonado sobre la evidencia del run anterior pero no medido.
+
+**4 · Validación en cliente, como aviso y no como veto.** `chapterLikeBranches()` compara las
+ramas con los capítulos reales —por prefijo, porque el rótulo se recorta a 32 caracteres— y, si
+la mitad o más son capítulos, se le señala al modelo citando los rótulos copiados y se le pide
+reagrupar. Si insiste, **se acepta**: la Constitución demuestra que a veces el índice es la
+respuesta correcta, y el cliente no puede distinguirlo mientras que el modelo con el objetivo
+delante sí. Vetarlo habría roto el único caso que ya salía bien por estructura.
+
+**Resultados medidos** (eval con 3 baterías; Pro Git sin datos por timeout del arnés):
+
+| Batería | Ramas | Veredicto |
+|---|---|---|
+| Pedro Páramo | *Viaje a Comala · Poder y corrupción · Muerte y sobrenatural · Legado y memoria* | 0/4 índice ✅ |
+| Constitución | *TÍTULO PRELIMINAR · TÍTULO I · TÍTULO III…* | 7/8, correcto: el objetivo son los títulos ✅ |
+| Relatividad | *THE PRINCIPLE OF RELATIVITY (IN…* | 7/8, sigue siendo el índice ❌ |
+
+**Límite conocido:** en libros que el modelo se sabe de memoria y cuyos capítulos tienen título,
+reconstruye el índice aunque no se lo demos. Un aviso no vence a ese anclaje.
+
+**Instrumentación.** El eval era cómplice: su criterio `jerarquia` decía literalmente «la
+estructura refleja la del material» —premiando el mimetismo— y el objetivo se le pasaba al juez
+como contexto sin que ningún criterio lo puntuara. Ahora `jerarquia` penaliza calcar el índice y
+hay un criterio nuevo, `utilidad_objetivo`. Se añade además una medida DETERMINISTA, sin juez:
+cuántas ramas son literalmente un capítulo. Validada contra los runs históricos, donde caza el
+7/8 de Pro Git y da 0 en los mapas temáticos. Y el artefacto guarda ahora las viñetas que
+entraron al reduce: sin eso no se podía saber si un rótulo malo venía de la extracción o se lo
+inventaba el árbol — se estaba deduciendo por la forma de las mayúsculas.
+
+De paso: "Cubierta" aparecía como rama porque el filtro de accesorios conocía "portada" y
+"cover" pero no el nombre que usan muchos EPUB en español (se añaden cubierta, sobrecubierta,
+contracubierta, contraportada); y las viñetas sin ancla dejan de pasar al mapa — no se pueden
+citar ni ampliar, se agrupaban bajo una rama basura "General", y por ahí se coló un "- Relat"
+cortado hasta el mapa final.
+
+---
+
 ## 2026-08-04 — La cita del agente vuelve a resaltar la frase
 
 Pinchabas una cita `[[aN]]`, el libro saltaba al pasaje y no se destacaba nada. El resaltado
@@ -126,7 +201,9 @@ pasaje. Se añade el test de "Expandir" que faltaba —comprueba que un subconce
 inventada se descarta y que la expansión persiste al reabrir—, aunque cubre el filtrado y la
 persistencia, no el presupuesto de tokens: con el LLM stubbeado la respuesta llega entera.
 
-`CACHE_NAME` del service worker sube a v111. Se había quedado sin subir, y sin eso `activate`
+
+
+`CACHE_NAME` del service worker sube a v112. Se había quedado sin subir, y sin eso `activate`
 no purga el cache anterior: quien ya tuviera la app instalada nunca habría precacheado los dos
 módulos nuevos, rompiendo el mapa sin red.
 

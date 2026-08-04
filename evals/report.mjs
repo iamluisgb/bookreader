@@ -36,7 +36,7 @@ for (const b of batteries) {
     j.coverage_ratio != null ? 1 + 4 * j.coverage_ratio : NaN,   // ratio 0..1 → escala 1..5
     s.fidelidad, s.pertinencia_citas, s.cobertura, s.concision,
     j.chat_avg?.fundamento, j.chat_avg?.honestidad, j.chat_avg?.claridad,
-    j.mindmap?.jerarquia, j.mindmap?.cobertura, j.mindmap?.no_invencion,
+    j.mindmap?.jerarquia, j.mindmap?.cobertura, j.mindmap?.utilidad_objetivo, j.mindmap?.no_invencion,
   ];
   let nota = avg(scores);
   if (gatesFailed.length) nota = Math.min(nota, 2);   // gate duro fallido capa la nota
@@ -94,7 +94,8 @@ for (const b of batteries) {
       }
     }
   }
-  if (j.mindmap) md += `\n**Mindmap:** jerarquía ${j.mindmap.jerarquia} · cobertura ${j.mindmap.cobertura} · no-invención ${j.mindmap.no_invencion} — ${j.mindmap.nota || ''}\n`;
+  if (j.mindmap) md += `\n**Mindmap:** jerarquía ${j.mindmap.jerarquia} · cobertura ${j.mindmap.cobertura} · utilidad-objetivo ${j.mindmap.utilidad_objetivo ?? '—'} · no-invención ${j.mindmap.no_invencion} — ${j.mindmap.nota || ''}\n`;
+  if (c && c.mindmap_branches) md += `**Mindmap (objetivo):** ${c.mindmap_branches} ramas · ${c.mindmap_branches_as_chapters ?? '—'} son un capítulo · ${c.mindmap_branches_numeric} son un numeral\n`;
   if (c.attenuation_separation != null) md += `\n**Atenuación (Δ oro − resto):** ${c.attenuation_separation} (positivo = distingue los capítulos relevantes)\n`;
 }
 

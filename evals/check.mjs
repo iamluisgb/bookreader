@@ -17,6 +17,10 @@ function langOf(text) {
   return es === en ? null : (es > en ? 'es' : 'en');
 }
 
+// Quita el prefijo estructural ("9. ", "Título I: ", "Capítulo 3 — ") para comparar el NOMBRE
+// del capítulo con el de la rama: "Git Branching" y "3. Git Branching" son el mismo rótulo.
+const stripNumeral = s => String(s || '').replace(/^\s*(?:cap[íi]tulo|chapter|parte|part|t[íi]tulo|libro|book|appendix|ap[ée]ndice)?\s*[ivxlcdm\d]+\s*[.):\-—]\s*/i, '');
+const NUMERAL_BRANCH = /^\s*(?:cap[íi]tulo|chapter|parte|part|t[íi]tulo|libro|book)?\s*[ivxlcdm\d]+\s*[.):\-—]?\s*$/i;
 const normalize = s => String(s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^\p{L}\p{N} ]/gu, ' ').replace(/\s+/g, ' ').trim();
 
 const runDir = resolveRunDir();
@@ -42,6 +46,22 @@ for (const b of loadBatteries(runDir)) {
   // F2 · Mindmap: árbol persistido con ramas no vacías.
   const mmArt = (b.artifacts || []).filter(a => a.kind === 'mindmap').pop();
   const mmBranches = Array.isArray(mmArt?.result?.branches) ? mmArt.result.branches : [];
+  // Los capítulos reales del libro salen de las puntuaciones de atenuación, que están
+  // KEYEADAS por capítulo. Sin ratings (PDF sin TOC) no hay con qué comparar → null.
+  const chapterNames = Object.keys((b.ratings || [])[0]?.scores || {});
+  const mmChapterBranches = (chapterNames.length && mmBranches.length)
+    ? (() => {
+      // PREFIJO, no igualdad: el rótulo de la rama se recorta a 32 caracteres al pintarlo,
+      // así que "THE PRINCIPLE OF RELATIVITY (IN" es el capítulo "V. THE PRINCIPLE OF
+      // RELATIVITY (IN THE RESTRICTED SENSE)". Comparando por igualdad, la métrica decía 2 de
+      // 8 donde el juez —y la vista— decían que las 8 eran el índice.
+      const chs = chapterNames.map(c => normalize(stripNumeral(c))).filter(Boolean);
+      return mmBranches.filter(br => {
+        const l = normalize(stripNumeral(br.label || ''));
+        return !!l && chs.some(c => c === l || (l.length >= 10 && c.startsWith(l)));
+      }).length;
+    })()
+    : null;
 
   // F2 · Atenuación vs oro: separación entre la media de score de los capítulos dorados
   // (deberían ser relevantes para el objetivo) y el resto. Sin ratings (PDF sin TOC) o
@@ -73,6 +93,15 @@ for (const b of loadBatteries(runDir)) {
     summary_lang_ok: !summary || langOf(summary.replace(/\[\[a\d+\]\]/g, '')) !== ((b.meta?.uiLang || 'es') === 'es' ? 'en' : 'es'),
     mindmap_exists: !!mmArt,
     mindmap_branches: mmBranches.length,
+    // ¿El mapa es el ÍNDICE del libro? Medida OBJETIVA, sin juez: cuántas ramas son
+    // literalmente un capítulo. Se añadió al descubrir que los runs históricos ya lo
+    // delataban — en Pro Git 7 de 8 ramas eran títulos de capítulo verbatim, y en la
+    // Constitución las 8 eran los Títulos de la norma. Un mapa así no organiza nada: repite
+    // la tabla de contenidos, que el lector ya tenía. Null sin ratings (PDF sin TOC).
+    mindmap_branches_as_chapters: mmChapterBranches,
+    // Señal que NO necesita TOC: una rama que es solo un numeral ("I", "Capítulo 3") no
+    // nombra ningún tema. Es el caso que destapó todo esto (una novela numerada).
+    mindmap_branches_numeric: mmBranches.filter(br => NUMERAL_BRANCH.test(String(br.label || ''))).length,
     attenuation_separation: attSeparation,
     chat_answered: (b.chat || []).filter(c => c.answer).length,
     chat_total: (b.chat || []).length,
