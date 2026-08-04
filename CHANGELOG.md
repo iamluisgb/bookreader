@@ -5,6 +5,26 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-08-04 — La cita del agente vuelve a resaltar la frase
+
+Pinchabas una cita `[[aN]]`, el libro saltaba al pasaje y no se destacaba nada. El resaltado
+llevaba escrito desde v5 de la segmentación y nunca funcionó: el CFI del ancla era degenerado.
+
+`range.selectNodeContents(el)` deja los extremos del rango en el ELEMENTO, con offsets que
+son índices de hijo; `cfiFromRange` de epub.js los emite tal cual como offsets de CARÁCTER.
+Un `<p>` con tres hijos daba `,/1:0,/1:3` — "los tres primeros caracteres" — y un `<p>` cuyo
+primer hijo era un `<span>` o un `<a>` daba un rect de ancho **0**. De ahí que la navegación
+pareciese correcta (el inicio del rango sí cae en el bloque) y el subrayado no se viese.
+
+Ahora el rango se ancla en el primer y el último nodo de TEXTO del bloque, donde el offset ya
+es de carácter: el CFI cubre el pasaje entero (`,/1:0,/3:413`) y el resaltado pinta los siete
+rects del párrafo en vez de uno vacío. `SEG_VERSION` sube a 6, así que los libros ya
+segmentados se re-segmentan solos al abrirlos — con el coste habitual de esa subida: los
+artefactos guardados (resúmenes, mapas) quedan invalidados y se regeneran.
+
+El test de regresión mide el **ancho pintado**, no el string del CFI: el bug producía un CFI
+sintácticamente válido que habría pasado cualquier aserción sobre su forma.
+
 ## 2026-08-03 — El mapa mental deja de ser una imagen (P14 F3-F6)
 
 El mapa se generaba bien y se veía mal. Estaba en el sitio equivocado del reparto: el

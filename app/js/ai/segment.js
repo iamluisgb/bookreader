@@ -50,9 +50,8 @@ export async function segmentBook(book, onProgress) {
         // elemento si el rango falla (algunos EPUB no lo permiten).
         let cfi = null;
         try {
-          const range = doc.createRange();
-          range.selectNodeContents(el);
-          cfi = section.cfiFromRange(range);
+          const range = textRange(doc, el);
+          if (range) cfi = section.cfiFromRange(range);
         } catch { /* rango sin cfi */ }
         if (!cfi) { try { cfi = section.cfiFromElement(el); } catch { /* sin cfi para este nodo */ } }
         const id = 'a' + (n++);
@@ -78,6 +77,33 @@ export async function segmentBook(book, onProgress) {
     blockCount: n,
     tokenEstimate: Math.round(annotatedText.length / 4),
   };
+}
+
+// Rango que cubre TODO el texto del bloque, anclado en nodos de TEXTO.
+//
+// No vale `range.selectNodeContents(el)`: ahí los offsets son índices de HIJO, y
+// `cfiFromRange` de epub.js los emite tal cual como offsets de CARÁCTER. El CFI salía
+// siempre como "los primeros N caracteres" con N = número de hijos (`,/1:0,/1:3`), así
+// que el resaltado de la cita marcaba 1-7 caracteres — o nada, ancho 0, cuando el primer
+// hijo era un elemento (`<span>`, `<a>`, `<i>`). Síntoma: pinchas la cita, navega al
+// pasaje y no se destaca la frase.
+//
+// Con los extremos en el primer y el último nodo de texto, el offset ya es de carácter y
+// el CFI cubre el bloque entero. Sin nodos de texto (bloque solo con imagen) → null, y
+// el llamador cae al CFI de elemento.
+function textRange(doc, el) {
+  const walker = doc.createTreeWalker(el, 4 /* NodeFilter.SHOW_TEXT */);
+  let first = null, last = null, node;
+  while ((node = walker.nextNode())) {
+    if (!node.data.length) continue;
+    if (!first) first = node;
+    last = node;
+  }
+  if (!first) return null;
+  const range = doc.createRange();
+  range.setStart(first, 0);
+  range.setEnd(last, last.data.length);
+  return range;
 }
 
 function collapse(s) {

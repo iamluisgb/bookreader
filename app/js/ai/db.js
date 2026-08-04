@@ -543,7 +543,9 @@ export function saveRatings(bookId, goal, scores) {
 // v4: en PDFs "Part → Chapter" los capítulos reales son los hijos de la Part (antes
 // todo se atribuía a la Part) → re-segmentar para recuperar la granularidad de capítulo.
 // v5: anclas EPUB con CFI de RANGO (no de elemento) → la cita resalta el trozo exacto.
-const SEG_VERSION = 5;
+// v6: el rango de v5 salía degenerado (offsets de hijo emitidos como offsets de carácter:
+// `,/1:0,/1:3`) y el resaltado marcaba 1-7 caracteres o nada → anclado en nodos de texto.
+const SEG_VERSION = 6;
 
 export async function loadSegmented(bookId) {
   const [text, anch] = await Promise.all([get('bookText', bookId), get('anchors', bookId)]);
