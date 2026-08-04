@@ -677,12 +677,14 @@ function passagesForNode(node) {
   const all = Retrieval.allPassages();
   let seed = all.filter(p => srcs.has(p.id));
   if (!seed.length) {
+    // El nodo no cita nada (pasa en el fallback por capítulos y en las ramas): se apoya en lo
+    // que citan sus HERMANOS, o sea el subárbol del padre. `collect` acumula en `srcs`, que
+    // aquí ya sabemos que está vacío de coincidencias, así que reutilizarlo es correcto —
+    // antes se creaba un `psrcs` aparte que `collect` no rellenaba nunca, y el fallback solo
+    // veía los hijos directos.
     const parent = lastLayout.byId.get(node.parent);
-    const parentRaw = parent ? rawAt(lastTree, parent.id) : null;
-    const psrcs = new Set();
-    collect(parentRaw);
-    parentRaw?.children?.forEach(c => c.src && psrcs.add(c.src));
-    seed = all.filter(p => psrcs.has(p.id));
+    collect(parent ? rawAt(lastTree, parent.id) : null);
+    seed = all.filter(p => srcs.has(p.id));
   }
   if (!seed.length) return [];
   return Retrieval.withNeighbors(seed, 2);
@@ -746,6 +748,12 @@ async function renderResult(tree, scopeName) {
   const b = body();
   if (!b) return;
   setWide(true);
+  // IMPRESCINDIBLE: reabrir un mapa ya generado entra por aquí SIN pasar por el setup, que
+  // era el único sitio que construía el índice. Tras recargar la página eso dejaba
+  // `allPassages()` vacío, y el mapa perdía en silencio lo que le da valor: ni la cita del
+  // pasaje en el detalle, ni "Expandir" (que respondía "no tiene pasajes que ampliar" en
+  // TODOS los nodos). Es idempotente y barata: si el índice ya está, no hace nada.
+  ctx.ensureIndex();
   lastTree = tree;
   lastScope = scopeName;
   collapsed = new Set();

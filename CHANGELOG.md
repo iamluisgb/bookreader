@@ -103,6 +103,20 @@ mapa y las etiquetas cortadas. La regla pasa a hijo directo (`.mm-canvas > svg`)
 cuelga ahora del escenario y no del lienzo, que tiene `overflow: hidden` y habría recortado el
 detalle de cualquier nodo pegado al borde.
 
+**Y una tercera, la peor de las tres.** Reabrir un mapa ya generado entra por `renderResult`
+sin pasar por el setup, que era el único sitio que construía el índice de pasajes. Tras
+recargar la página eso dejaba `allPassages()` vacío, y el mapa perdía en silencio justo lo que
+lo distingue de un dibujo: el detalle salía sin la cita del libro y "Expandir" respondía *"este
+punto no tiene pasajes que ampliar"* en **todos** los nodos. Ahora `renderResult` asegura el
+índice —es idempotente y barata— y el caso queda cubierto por un test que recarga y reabre el
+artefacto guardado. De paso, el respaldo de "Expandir" para nodos sin cita propia (los que
+salen del fallback por capítulos) acumulaba en un conjunto que nunca se rellenaba, así que solo
+veía a los hijos directos en vez del subárbol del padre.
+
+`CACHE_NAME` del service worker sube a v110. Se había quedado sin subir, y sin eso `activate`
+no purga el cache anterior: quien ya tuviera la app instalada nunca habría precacheado los dos
+módulos nuevos, rompiendo el mapa sin red.
+
 ---
 
 ## 2026-08-03 — Organizar la biblioteca sin carpetas

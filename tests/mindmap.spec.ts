@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { seedProLicense } from './pro-license';
 import path from 'path';
-import { openFromStudio } from './studio-nav';
+import { openFromStudio, openArtifactFromStudio } from './studio-nav';
 
 // P14 · Mapa mental: map (viñetas citadas) + reduce (árbol JSON) → SVG radial con hojas
 // citadas clicables. LLM stubbeado.
@@ -94,6 +94,33 @@ test('clic en una hoja abre su detalle, y desde ahí salta al libro', async ({ p
   await expect(pop.locator('blockquote')).toBeVisible();   // la cita real del pasaje
   await pop.locator('.mm-pop-act[data-act="cite"]').click();
   await expect(page.locator('#ai-mindmap')).toHaveCount(0);
+});
+
+// Reabrir un mapa YA generado entra por `renderResult` sin pasar por el setup, que era el
+// único sitio que construía el índice de pasajes. Tras recargar, eso dejaba el mapa sin lo
+// que le da valor: el detalle salía sin la cita y "Expandir" respondía "no tiene pasajes que
+// ampliar" en TODOS los nodos.
+test('un mapa cacheado reabierto tras recargar conserva sus citas', async ({ page }) => {
+  await setup(page);
+  await openFromStudio(page, 'mindmap');
+  await page.waitForSelector('#ai-mindmap', { timeout: 5000 });
+  await page.click('#mm-generate');
+  await page.waitForSelector('.mm-canvas .mm-cite', { timeout: 20000 });
+
+  await page.reload();
+  await stubLLM(page);
+  await page.waitForSelector('#ai-toggle:not([disabled])', { timeout: 15000 });
+  await page.click('#ai-toggle');
+  // Reabrir el artefacto guardado (data-act="open"), NO "Nuevo": es el único camino que
+  // llega a `renderResult` sin pasar por el setup, y por tanto el que se rompía.
+  await openArtifactFromStudio(page, 'mindmap');
+  await page.waitForSelector('.mm-canvas .mm-cite', { timeout: 20000 });
+
+  await page.locator('.mm-canvas .mm-cite').first().click();
+  const pop = page.locator('.mm-pop');
+  await expect(pop).toBeVisible();
+  await expect(pop.locator('blockquote')).toBeVisible();          // la cita sigue ahí
+  await expect(pop.locator('.mm-pop-act[data-act="cite"]')).toBeVisible();
 });
 
 // F5 · Plegar una rama la convierte en hoja del árbol visible: sus hijos desaparecen del
