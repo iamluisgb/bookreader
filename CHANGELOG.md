@@ -113,7 +113,20 @@ artefacto guardado. De paso, el respaldo de "Expandir" para nodos sin cita propi
 salen del fallback por capítulos) acumulaba en un conjunto que nunca se rellenaba, así que solo
 veía a los hijos directos en vez del subárbol del padre.
 
-`CACHE_NAME` del service worker sube a v110. Se había quedado sin subir, y sin eso `activate`
+**"Expandir" tampoco ampliaba, por dos motivos y ninguno era el prompt.** La llamada salía con
+`maxTokens: 1200` — cuando a veinte líneas de ahí, el reduce del árbol documenta que un modelo
+de razonamiento gasta miles de tokens *pensando* antes de emitir el JSON y por eso usa 5000.
+Con el cupo agotado no llegaba JSON y esto respondía "no se encontraron subconceptos". Y el
+contexto era un radio fijo de 2 vecinos, que en cronologías y listas —donde cada pasaje es una
+línea suelta— son cinco frases para extraer 2-4 subconceptos. El radio crece ahora hasta un
+suelo de tokens o hasta que el capítulo se acaba. Además los dos fracasos posibles (el modelo
+no devuelve nada / lo devuelto no se sostiene en el texto) dejan de compartir mensaje: tienen
+arreglos distintos y confundirlos hacía indistinguible un fallo de cupo de un límite real del
+pasaje. Se añade el test de "Expandir" que faltaba —comprueba que un subconcepto con ancla
+inventada se descarta y que la expansión persiste al reabrir—, aunque cubre el filtrado y la
+persistencia, no el presupuesto de tokens: con el LLM stubbeado la respuesta llega entera.
+
+`CACHE_NAME` del service worker sube a v111. Se había quedado sin subir, y sin eso `activate`
 no purga el cache anterior: quien ya tuviera la app instalada nunca habría precacheado los dos
 módulos nuevos, rompiendo el mapa sin red.
 

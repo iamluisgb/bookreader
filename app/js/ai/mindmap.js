@@ -687,7 +687,25 @@ function passagesForNode(node) {
     seed = all.filter(p => srcs.has(p.id));
   }
   if (!seed.length) return [];
-  return Retrieval.withNeighbors(seed, 2);
+  return withEnoughContext(seed);
+}
+
+// Radio de vecinos ADAPTATIVO. Con radio fijo 2 este paso fallaba justo donde más se pide:
+// en cronologías y listas, donde cada pasaje es una línea suelta ("Tercer viaje de Pizarro a
+// Perú.") y cinco de ellas no dan para extraer nada. Se crece hasta un suelo de tokens, o
+// hasta que el capítulo se acaba —`withNeighbors` no cruza frontera de capítulo, así que si
+// deja de crecer es que no hay más contexto legítimo—.
+const EXPAND_MIN_TOKENS = 1500;
+function withEnoughContext(seed) {
+  let best = Retrieval.withNeighbors(seed, 2);
+  for (let radius = 5; radius <= 11; radius += 3) {
+    const tokens = best.reduce((n, p) => n + estimateTokens(p.text), 0);
+    if (tokens >= EXPAND_MIN_TOKENS) break;
+    const grown = Retrieval.withNeighbors(seed, radius);
+    if (grown.length === best.length) break;
+    best = grown;
+  }
+  return best;
 }
 
 async function expandNode(node) {
@@ -706,10 +724,18 @@ async function expandNode(node) {
         { role: 'system', content: expandPrompt(node.full || node.label, ctx.goal) },
         { role: 'user', content: text },
       ],
-      maxTokens: 1200,
+      // Alto A PROPÓSITO, por la misma razón que el reduce del árbol: un modelo de
+      // razonamiento gasta miles de tokens "pensando" antes de emitir el JSON, y con 1200 se
+      // quedaba sin cupo — devolvía vacío o truncado y esto respondía "no se encontraron
+      // subconceptos" aunque el pasaje diera de sobra.
+      maxTokens: 5000,
     });
     const parsed = extractJson(raw);
     const kids = Array.isArray(parsed?.children) ? parsed.children : [];
+    // Dos fracasos DISTINTOS con arreglos distintos: que el modelo no devuelva nada (reintentar
+    // sirve) y que lo devuelto no se sostenga en el texto (reintentar no sirve). Un mensaje
+    // único para ambos hacía indistinguible un fallo de cupo de un límite real del pasaje.
+    if (!kids.length) { setStatus(t('El modelo no devolvió subconceptos. Vuelve a intentarlo.')); return; }
     const anchors = new Set(passages.map(p => p.id));
     // Solo se aceptan subconceptos CITADOS y con un ancla que exista de verdad entre los
     // pasajes que se le pasaron. Un nieto sin cita es justo lo que no queremos en un mapa

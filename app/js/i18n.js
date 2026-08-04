@@ -587,6 +587,7 @@ const EN = {
   'Explícame «{label}» en el contexto del libro.': 'Explain «{label}» in the context of the book.',
   'Este punto no tiene pasajes que ampliar.': 'This node has no passages to expand.',
   'No se encontraron subconceptos citables aquí.': 'No citable sub-concepts were found here.',
+  'El modelo no devolvió subconceptos. Vuelve a intentarlo.': 'The model returned no sub-concepts. Try again.',
   'No se pudo ampliar este punto.': 'Could not expand this node.',
   'No se pudo generar la imagen.': 'Could not generate the image.',
   'No se pudo compartir la imagen.': 'Could not share the image.',

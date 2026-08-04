@@ -16,6 +16,19 @@ async function stubLLM(page) {
       if (u.includes('/chat/completions') && opts?.body) {
         const body = JSON.parse(opts.body);
         const sys = (body.messages || []).find((m: any) => m.role === 'system')?.content || '';
+        // F6 · "Expandir": el prompt pide SUBCONCEPTOS. Se devuelve uno legítimo y otro con un
+        // ancla que NO viaja en los pasajes enviados, para comprobar que se descarta.
+        if (/SUBCONCEPTOS/.test(sys)) {
+          const body2 = JSON.stringify({ children: [
+            { label: 'Busca a su padre', src: 'a0' },
+            { label: 'Dato inventado', src: 'a999' },
+          ] });
+          const cs = [
+            `data: ${JSON.stringify({ choices: [{ delta: { content: body2 }, finish_reason: null }] })}\n\n`,
+            'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n\n', 'data: [DONE]\n\n'];
+          const st = new ReadableStream({ start(c) { const e = new TextEncoder(); cs.forEach(x => c.enqueue(e.encode(x))); c.close(); } });
+          return new Response(st, { status: 200, headers: { 'Content-Type': 'text/event-stream' } });
+        }
         const out = /MAPA MENTAL/.test(sys)
           ? JSON.stringify({
               title: 'Comala',
@@ -121,6 +134,28 @@ test('un mapa cacheado reabierto tras recargar conserva sus citas', async ({ pag
   await expect(pop).toBeVisible();
   await expect(pop.locator('blockquote')).toBeVisible();          // la cita sigue ahí
   await expect(pop.locator('.mm-pop-act[data-act="cite"]')).toBeVisible();
+});
+
+// F6 · Expandir una hoja añade un tercer nivel bajo demanda. Y solo acepta subconceptos con
+// un ancla que exista ENTRE LOS PASAJES ENVIADOS: un nieto sin cita real parecería contenido
+// del libro sin serlo, que es lo que no puede llevar un mapa que se publica.
+test('expandir añade subconceptos citados y descarta los que no lo están', async ({ page }) => {
+  await setup(page);
+  await openFromStudio(page, 'mindmap');
+  await page.waitForSelector('#ai-mindmap', { timeout: 5000 });
+  await page.click('#mm-generate');
+  await page.waitForSelector('.mm-canvas .mm-cite', { timeout: 20000 });
+
+  await page.locator('.mm-node[data-id="r.0.0"]').click();
+  await page.locator('.mm-pop .mm-pop-act[data-act="expand"]').click();
+
+  await expect(page.locator('.mm-canvas')).toContainText('Busca a su padre', { timeout: 20000 });
+  await expect(page.locator('.mm-canvas')).not.toContainText('Dato inventado');
+
+  // Persiste en el artefacto: al reabrirlo desde el Studio el nieto sigue ahí.
+  await page.locator('#ai-mindmap .ai-ob-close').click();
+  await openArtifactFromStudio(page, 'mindmap');
+  await expect(page.locator('.mm-canvas')).toContainText('Busca a su padre', { timeout: 20000 });
 });
 
 // F5 · Plegar una rama la convierte en hoja del árbol visible: sus hijos desaparecen del
