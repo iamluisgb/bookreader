@@ -652,6 +652,11 @@ con mayor techo de marketing (la gente postea mapas mentales), pero el más caro
 - **F4 — medida real y anticolisión** `S` · **✓ (2026-08-03)**. `canvas.measureText` en lugar
   de `CHARW = 8` fijo; radio de cada anillo derivado de la cuerda que piden sus vecinos (antes
   solo las hojas tenían anticolisión); ramas curvas con grosor decreciente.
+  **Revisión el mismo día, sobre un mapa real** (*Los últimos días incas*): la anticolisión por
+  cuerda no bastaba —solo compara el mismo anillo, así que una hoja tapaba a su propia rama, y
+  el `stagger` no separa nada cerca del eje vertical—. Se añade relajación radial hasta cero
+  solapes, y reparto por sector con **calle entre ramas** para que cada una se lea como un
+  bloque. El caso está congelado como test.
 - **F5 — de imagen a herramienta** `M` · **✓ (2026-08-03)**. Zoom (rueda/pinza), pan, plegado
   de ramas, detalle del nodo en panel propio (el `<title>` de SVG no existe en táctil, y esto
   es una PWA) y nodos focusables con `role="button"`.
@@ -669,6 +674,11 @@ con mayor techo de marketing (la gente postea mapas mentales), pero el más caro
   cobertura), no el render. F3–F6 se cubren con tests (`tests/mindmap-render.spec.ts`:
   colisión, medida, contraste, plegado, fuente embebida), pero el efecto de "Expandir" sobre
   la cobertura del mapa no está en la batería. Es el siguiente ciclo natural de EV2.
+
+- **Límite conocido del layout.** Sin solapes, pero en mapas muy desiguales quedan **cruces de
+  aristas** entre subárboles: la relajación mueve en radio y nunca en ángulo, así que una hoja
+  empujada lejos puede cruzar el territorio de la rama vecina. Evitarlo pide enrutado de
+  aristas o reordenar ramas por afinidad; no compensa hoy.
 
 ### P15 — Internacionalización EN/ES (UI + prompts) · `L` · **F1+F2 ✓** · **lanzamiento**
 

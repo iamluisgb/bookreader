@@ -571,8 +571,11 @@ function passageText(src) {
 function openNodePopover(id) {
   closePopover();
   const node = lastLayout?.byId.get(id);
+  // Se ancla al ESCENARIO, no al lienzo: el lienzo recorta (`overflow: hidden`), así que el
+  // panel de un nodo pegado al borde quedaba cortado.
+  const stage = body()?.querySelector('.mm-stage');
   const holder = body()?.querySelector('#mm-canvas');
-  if (!node || !holder) return;
+  if (!node || !stage || !holder) return;
 
   const quote = passageText(node.src);
   const canCite = !!(node.src && ctx.anchors?.has(node.src));
@@ -595,11 +598,11 @@ function openNodePopover(id) {
     ${quote ? `<blockquote>${escapeHtml(quote.slice(0, 420))}${quote.length > 420 ? '…' : ''}</blockquote>` : ''}
     <div class="mm-pop-actions">${actions.join('')}</div>
     <div class="mm-pop-status" role="status"></div>`;
-  holder.appendChild(popover);
+  stage.appendChild(popover);
 
-  // Anclado al nodo, pero siempre dentro del lienzo (si no, en los nodos del borde el panel
-  // se salía y quedaba inalcanzable).
-  const box = holder.getBoundingClientRect();
+  // Anclado al nodo, pero siempre dentro del escenario (si no, en los nodos del borde el
+  // panel se salía y quedaba inalcanzable).
+  const box = stage.getBoundingClientRect();
   const ctm = lastSvg.querySelector('.mm-viewport')?.getScreenCTM();
   let left = box.width / 2, top = box.height / 2;
   if (ctm) {

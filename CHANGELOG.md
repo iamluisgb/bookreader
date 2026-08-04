@@ -82,6 +82,27 @@ una llamada.
 La geometría vive ahora en `js/ai/mindmap-render.js`, separada de la orquestación: es pura
 (árbol → SVG, sin red ni IndexedDB) y se testea sola.
 
+**Corrección el mismo día, sobre uso real.** Un mapa de *Los últimos días incas* destapó dos
+fallos que los tests no cubrían. El primero: seguía habiendo solapes, porque la anticolisión
+analítica solo compara vecinos del **mismo anillo** —una hoja podía aterrizar encima de su
+propia rama— y porque el `stagger` supone que separar radialmente basta, lo cual es falso
+cerca del eje vertical, donde el radio va en vertical y las píldoras chocan en horizontal. Se
+añade una pasada de relajación que empuja hacia fuera hasta que no queda ningún par
+superpuesto, moviendo **solo el radio**: las aristas siguen siendo radiales y el orden angular
+—que es la jerarquía— no se toca. El caso real está congelado como test.
+
+Con los solapes fuera quedó a la vista el problema de percepción: repartir las hojas de
+corrido por todo el círculo daba densidad uniforme pero mezclaba ramas contiguas, y el mapa
+se leía como una maraña aunque no hubiera un solo solape. Ahora cada rama recibe un sector
+proporcional a sus hojas y las aprieta dentro dejando una **calle** hasta la vecina, así que
+cada rama se lee como un bloque.
+
+El segundo fallo era mío y bien tonto: `.mm-canvas svg { width: 100% }` alcanzaba también a
+los iconos del panel de detalle, que vive dentro del lienzo — salían inflados al ancho del
+mapa y las etiquetas cortadas. La regla pasa a hijo directo (`.mm-canvas > svg`), y el panel
+cuelga ahora del escenario y no del lienzo, que tiene `overflow: hidden` y habría recortado el
+detalle de cualquier nodo pegado al borde.
+
 ---
 
 ## 2026-08-03 — Organizar la biblioteca sin carpetas

@@ -30,6 +30,44 @@ test.describe('P14 · render del mapa', () => {
     expect(Math.max(overlap.gapX, overlap.gapY)).toBeGreaterThan(0);
   });
 
+  // Caso real (mapa de "Los últimos días incas"): con ramas desiguales y etiquetas largas
+  // aparecían solapes de dos clases que la anticolisión analítica no ve —entre ANILLOS
+  // distintos (una hoja encima de su propia rama) y entre hojas cerca del eje vertical, donde
+  // alternar el radio no separa nada porque el choque es horizontal—. Ningún par, del anillo
+  // que sea, puede quedar superpuesto.
+  test('ningún par de píldoras se superpone en un mapa denso y desigual', async ({ page }) => {
+    await page.goto('/');
+    const bad = await page.evaluate(async () => {
+      const R: any = await import('/js/ai/mindmap-render.js');
+      const lay = R.layout({
+        title: 'Los últimos días incas',
+        branches: [
+          { label: 'Eventos de la Conquista', children: [
+            { label: 'Conquista del imperio inca', src: 'a0' }, { label: 'Captura de Atahualpa', src: 'a1' },
+            { label: 'Ejecución de Atahualpa', src: 'a2' }, { label: 'Sitio de Cuzco', src: 'a3' },
+            { label: 'Conflictos entre imperios', src: 'a4' }] },
+          { label: 'Cultura y Legado', children: [
+            { label: 'Descubrimiento de Machu Picchu', src: 'a5' }, { label: 'Cosmovisión inca', src: 'a6' },
+            { label: 'Imperio inca', src: 'a7' }] },
+          { label: 'Resistencia Inca', children: [
+            { label: 'Resistencia de Manco Inca', src: 'a8' }, { label: 'Vilcabamba como capital inca', src: 'a9' },
+            { label: 'Última resistencia inca', src: 'a10' }] },
+        ],
+      });
+      const pairs: string[] = [];
+      for (let i = 0; i < lay.nodes.length; i++) {
+        for (let j = i + 1; j < lay.nodes.length; j++) {
+          const a = lay.nodes[i], b = lay.nodes[j];
+          const dx = Math.abs(a.x - b.x) - (a.size.w + b.size.w) / 2;
+          const dy = Math.abs(a.y - b.y) - (a.size.h + b.size.h) / 2;
+          if (dx < 0 && dy < 0) pairs.push(`${a.label} ✕ ${b.label}`);
+        }
+      }
+      return pairs;
+    });
+    expect(bad).toEqual([]);
+  });
+
   // Antes se medía con `CHARW = 8` fijo, y Inter es proporcional: una etiqueta de íes y otra
   // de emes de la misma longitud daban la misma píldora.
   test('la píldora se mide con el ancho real del texto, no por nº de caracteres', async ({ page }) => {

@@ -27,7 +27,8 @@ const FS = 14, LINEH = 19, PADX = 22, PADY = 12, MINW = 58;
 const MAXW = { 0: 210, 1: 170, default: 190 };
 const MAXLINES = 2;
 const RING_GAP = 62;      // separación radial mínima entre anillos
-const PILL_GAP = 18;      // aire mínimo entre dos píldoras vecinas del mismo anillo
+const PILL_GAP = 18;      // aire horizontal mínimo entre dos píldoras
+const PILL_GAP_Y = 12;    // aire vertical mínimo entre dos píldoras
 const R_MAX = 1500;       // tope de radio: pasado esto se reparte con `stagger`, no creciendo
 const STAGGER = 2 * LINEH + PADY + 8;
 
@@ -151,6 +152,49 @@ function ringRadius(sorted, floor, staggered) {
   return Math.min(R_MAX, need);
 }
 
+// Los radios analíticos de `ringRadius` son un punto de partida OPTIMISTA, y por dos razones
+// concretas se quedan cortos:
+//   1. Solo comparan vecinos del MISMO anillo. Una hoja puede aterrizar encima de una rama —
+//      incluso de su propia rama— porque nadie mira entre anillos. Es el solape que más se
+//      veía: la hoja tapando el rótulo del que cuelga.
+//   2. El `stagger` supone que separar radialmente basta, y eso es FALSO cerca del eje
+//      vertical: ahí el radio va en vertical y las píldoras chocan en horizontal, así que
+//      alternar el radio no las separa nada.
+// Esta pasada empuja hacia fuera hasta que no queda ningún par solapado. Solo mueve en
+// RADIO, nunca en ángulo: las aristas siguen siendo radiales y no se deforman, y el orden
+// angular (que es la jerarquía) se conserva intacto.
+function relaxRadial(list, byId) {
+  const place = (n) => {
+    n.x = n.depth === 0 ? 0 : n.r * Math.cos(n.ang);
+    n.y = n.depth === 0 ? 0 : n.r * Math.sin(n.ang);
+  };
+  list.forEach(place);
+  for (let pass = 0; pass < 120; pass++) {
+    let hit = false;
+    // Un hijo nunca por dentro de su padre: la arista se vería invertida. Va ANTES de la
+    // detección para que la corrección no reintroduzca solapes sin revisar.
+    for (const n of list) {
+      if (!n.parent) continue;
+      const p = byId.get(n.parent);
+      if (n.r < p.r + RING_GAP) { n.r = p.r + RING_GAP; place(n); hit = true; }
+    }
+    for (let i = 0; i < list.length; i++) {
+      for (let j = i + 1; j < list.length; j++) {
+        const a = list[i], b = list[j];
+        const ox = (a.size.w + b.size.w) / 2 + PILL_GAP - Math.abs(a.x - b.x);
+        const oy = (a.size.h + b.size.h) / 2 + PILL_GAP_Y - Math.abs(a.y - b.y);
+        if (ox <= 0 || oy <= 0) continue;         // sin intersección en algún eje ⇒ no solapan
+        const outer = a.r >= b.r ? a : b;
+        if (outer.depth === 0) continue;          // el centro no se mueve
+        outer.r += Math.min(ox, oy) + 2;
+        place(outer);
+        hit = true;
+      }
+    }
+    if (!hit) break;
+  }
+}
+
 // Layout radial: el ángulo se reparte entre las HOJAS DEL ÁRBOL VISIBLE (densidad angular
 // constante ⇒ una rama con muchas hojas no las amontona) y cada nodo interno se sitúa en el
 // ángulo medio de su descendencia. El radio de cada anillo sale de la colisión real.
@@ -167,11 +211,28 @@ export function layout(tree, { collapsed = new Set(), palette = PALETTE } = {}) 
     n.color = n.depth === 0 ? null : palette[(n.branch >= 0 ? n.branch : 0) % palette.length];
   }
 
+  // Reparto angular: cada RAMA recibe un sector proporcional a sus hojas, y sus hojas se
+  // aprietan dentro de ese sector dejando una CALLE hasta la vecina. Repartir las hojas de
+  // corrido por todo el círculo (como se hacía) daba densidad uniforme pero mezclaba
+  // visualmente ramas contiguas: una hoja verde quedaba pegada a una marrón y el mapa se leía
+  // como una maraña aunque no hubiera un solo solape. La calle es lo que hace que cada rama
+  // se lea como un bloque.
   const leaves = list.filter(n => n.kids.length === 0 && n.depth > 0);
   const M = Math.max(1, leaves.length);
-  const step = (Math.PI * 2) / M;
   const start = -Math.PI / 2;              // arranca arriba
-  leaves.forEach((lf, k) => { lf.ang = start + (k + 0.5) * step; lf.slot = k; });
+  const FILL = 0.78;                       // fracción del sector que ocupan las hojas
+  let cursor = start, slot = 0;
+  for (const top of list.filter(n => n.depth === 1)) {
+    const own = top.kids.length ? leaves.filter(l => l.branch === top.branch) : [top];
+    const sector = (Math.PI * 2) * own.length / M;
+    const inner = own.length > 1 ? sector * FILL : 0;
+    const from = cursor + (sector - inner) / 2;
+    own.forEach((lf, i) => {
+      lf.ang = own.length > 1 ? from + (i + 0.5) * (inner / own.length) : cursor + sector / 2;
+      lf.slot = slot++;
+    });
+    cursor += sector;
+  }
 
   // Ángulo de los internos: media de su descendencia. `list` es preorden, así que recorrerla
   // al revés garantiza que los hijos ya tienen ángulo cuando se resuelve el padre.
@@ -195,11 +256,8 @@ export function layout(tree, { collapsed = new Set(), palette = PALETTE } = {}) 
     ring.forEach((n, i) => { n.staggered = staggered && i % 2 === 1; });
   }
 
-  for (const n of list) {
-    const r = n.depth === 0 ? 0 : radii[n.depth] + (n.staggered ? STAGGER : 0);
-    n.x = n.depth === 0 ? 0 : r * Math.cos(n.ang);
-    n.y = n.depth === 0 ? 0 : r * Math.sin(n.ang);
-  }
+  for (const n of list) n.r = n.depth === 0 ? 0 : radii[n.depth] + (n.staggered ? STAGGER : 0);
+  relaxRadial(list, byId);
 
   const edges = [];
   for (const n of list) {

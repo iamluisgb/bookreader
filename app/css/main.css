@@ -1757,7 +1757,9 @@ textarea.is-recording { display: none; }
   overflow: hidden; touch-action: none; cursor: grab; background: var(--surface-2);
 }
 .mm-canvas:active { cursor: grabbing; }
-.mm-canvas svg { display: block; width: 100%; height: auto; }
+/* `>` DELIBERADO: el panel de detalle vive dentro del escenario y sus iconos son <svg>.
+   Sin el hijo directo, `width: 100%` los inflaba al ancho del lienzo. */
+.mm-canvas > svg { display: block; width: 100%; height: auto; }
 .mm-node:hover rect { stroke-width: 2.5; }
 .mm-node:focus-visible { outline: none; }
 .mm-node:focus-visible rect { stroke: var(--accent); stroke-width: 3; }
@@ -1774,6 +1776,8 @@ textarea.is-recording { display: none; }
 
 /* Detalle de un nodo. Reemplaza al <title> nativo, que en táctil no existe. */
 .mm-pop {
+  /* Cuelga de .mm-stage, NO de .mm-canvas: el lienzo recorta (`overflow: hidden`) y el
+     panel de un nodo del borde quedaba cortado. */
   position: absolute; z-index: 3; width: min(320px, 78vw);
   background: var(--surface-1); color: var(--text);
   border: 1px solid var(--border); border-radius: 12px;
@@ -1792,6 +1796,7 @@ textarea.is-recording { display: none; }
   border: 1px solid var(--border); border-radius: 999px; background: var(--surface-2);
   color: var(--text); font-size: 12.5px; padding: 5px 11px; cursor: pointer;
 }
+.mm-pop-act svg { flex: 0 0 auto; width: 14px; height: 14px; }
 .mm-pop-act:hover { border-color: var(--accent); }
 .mm-pop-act:disabled { opacity: .5; cursor: wait; }
 .mm-pop-status:not(:empty) { margin-top: 8px; font-size: 12.5px; color: var(--text-soft); }
