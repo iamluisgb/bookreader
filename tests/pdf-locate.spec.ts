@@ -39,8 +39,8 @@ test.describe('PDF · rangeForText', () => {
       // Target con espacios simples: debe casar contra el texto de blancos colapsados.
       const exacto = rangeForText(layer, 'huesos de los muertos');
 
-      // Fallback al prefijo: el corpus tiene una cola que la capa NO tiene (p. ej. pdf.js
-      // cortó la página); el prefijo (60 chars) sí está → localiza el inicio del pasaje.
+      // Fallback al prefijo: el corpus tiene una cola que la capa NO tiene (p. ej. el
+      // pasaje sigue en la página siguiente); se resalta el prefijo MÁS LARGO presente.
       const layer2 = document.createElement('div');
       layer2.textContent = 'En el páramo de Naccos los terrucos habían tomado el control absoluto';
       document.body.appendChild(layer2);
@@ -49,7 +49,24 @@ test.describe('PDF · rangeForText', () => {
       return { exacto: exacto?.toString().replace(/\s+/g, ' '), largo: largo?.toString() };
     });
     expect(res.exacto).toBe('huesos de los muertos');
-    // Cayó al prefijo de 60 chars (no al target completo, que no está entero en la capa).
-    expect(res.largo).toBe('En el páramo de Naccos los terrucos habían tomado el control');
+    // Cayó al prefijo más largo presente: todo lo que la capa sí tiene del pasaje.
+    expect(res.largo).toBe('En el páramo de Naccos los terrucos habían tomado el control absoluto');
+  });
+
+  test('casa aunque la capa no separe los renglones y parta palabras con guion', async ({ page }) => {
+    await page.goto('/');
+    const res = await page.evaluate(async () => {
+      const { rangeForText } = await import('/js/pdf-locate.js');
+      // Capa de texto REAL de pdf.js: un span por renglón, concatenados SIN separador, y
+      // una palabra partida con guion de corte. El corpus (segment-pdf) tiene el mismo
+      // texto con los renglones unidos por espacio y sin el guion.
+      const layer = document.createElement('div');
+      layer.innerHTML = '<span>sed do eiusmod</span><span>tempor incidi-</span><span>dunt ut labore</span>';
+      document.body.appendChild(layer);
+      const r = rangeForText(layer, 'sed do eiusmod tempor incididunt ut labore');
+      return { chars: r?.toString().length ?? 0 };
+    });
+    // El rango cubre los tres renglones (44 chars crudos: 42 del pasaje + el guion partido).
+    expect(res.chars).toBeGreaterThan(40);
   });
 });

@@ -2119,6 +2119,9 @@ function navigateCite(id) {
   if (!a) return;
   // EPUB → CFI (o href del capítulo si el CFI puntual falló); PDF → nº de página.
   // El texto del pasaje (del corpus indexado) permite resaltar el trozo exacto en PDF.
+  // El índice se construye al preguntar; al pinchar una cita de una conversación
+  // RESTAURADA aún no existe, y sin él no habría texto que resaltar.
+  if (annotatedText) ensureIndex();
   const text = Retrieval.allPassages().find(p => p.id === id)?.text;
   onCite(a.cfi ?? a.href ?? a.page, text);
 }

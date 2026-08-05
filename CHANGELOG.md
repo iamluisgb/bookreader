@@ -5,6 +5,35 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-08-05 — Las citas de un PDF saltaban a la página y no señalaban nada
+
+Pinchabas `[[aN]]` en el chat, el lector iba a la página correcta y el pasaje no se resaltaba.
+No era el resaltado: era que **nunca se localizaba el texto**. El corpus y la página que ve el
+usuario escriben el mismo pasaje de dos formas distintas, y `rangeForText` las comparaba
+literalmente.
+
+`segment-pdf · reconstruct` une los renglones con un espacio y deshace los guiones de corte
+("incidi-\ndunt" → "incididunt"). La capa de texto de pdf.js concatena sus spans **sin
+separador**: el mismo pasaje es `eiusmod tempor` en el corpus y `eiusmodtempor` en el DOM.
+`rangeForText` normalizaba colapsando blancos —que arregla "dos espacios contra uno", no "un
+espacio contra ninguno"— así que el `indexOf` fallaba en cuanto el pasaje cruzaba un renglón,
+o sea casi siempre; el fallback de prefijo (60 chars) fallaba por lo mismo. Se caía al destello
+de página entera, que es justo el "no me señala nada".
+
+La comparación pasa a hacerse sobre un **esqueleto** —sin blancos, sin guiones, en
+minúsculas— manteniendo el mapa a las posiciones reales para reconstruir el Range. Y el
+fallback ya no es un prefijo fijo: busca por bisección el **prefijo más largo presente** en la
+página, así un pasaje que sigue en la página siguiente se resalta hasta donde llega.
+
+De paso, pinchar una cita de una conversación **restaurada** tampoco resaltaba: el índice de
+retrieval se construye al preguntar, y sin él `allPassages()` estaba vacío y no había texto que
+buscar. `navigateCite` lo construye ahora si hace falta.
+
+**Regresión:** `tests/pdf-cite-highlight.spec.ts` cruza las dos fuentes REALES (corpus
+segmentado ↔ capa de texto renderizada, 5 páginas) y mide el **ancho pintado**, no si la
+función devuelve no-null: un Range sintácticamente válido puede pintar 0 px y no señalar nada.
+Con el código anterior falla en el primer pasaje que prueba — 0 caracteres localizados.
+
 ## 2026-08-04 — El mapa mental devolvía el índice del libro (P14 F7)
 
 Con *Lituma en los Andes* las ramas salían "I", "III", "VII". Con Pro Git salían *Getting
