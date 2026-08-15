@@ -3611,6 +3611,36 @@ body.ai-open #sync-badge { right: calc(var(--ai-panel-width) + 14px); }
 }
 body.region-selecting { user-select: none; }
 
+/* Cupo de la demo, encima del composer. Barra + una línea: el porcentaje es el dato,
+   el resto es ruido. Solo se pinta pasada la mitad del cupo (ver renderQuota), así que
+   cuando aparece ya es información y no decoración.
+   La barra mide lo que QUEDA, no lo consumido: es lo que el usuario quiere saber, y
+   vaciarse de derecha a izquierda es la metáfora que ya conoce (batería, depósito). */
+.ai-quota {
+  margin: 0 18px 10px;
+  display: flex; flex-direction: column; gap: 5px;
+}
+.ai-quota-bar {
+  height: 4px; border-radius: var(--r-pill);
+  background: var(--surface-3); overflow: hidden;
+}
+.ai-quota-bar > span {
+  display: block; height: 100%;
+  background: var(--accent);
+  border-radius: inherit;
+  transition: width var(--transition-normal);
+}
+.ai-quota-txt {
+  margin: 0; font-size: var(--fs-xs); line-height: 1.4; color: var(--text-soft);
+}
+.ai-quota-link {
+  background: none; border: none; padding: 0; cursor: pointer;
+  font: inherit; color: var(--accent); text-decoration: underline;
+}
+/* Queda poco: el mismo componente sube el tono en vez de aparecer otro distinto. */
+.ai-quota--low .ai-quota-bar > span { background: #f59e0b; }
+.ai-quota--low .ai-quota-txt { color: var(--text); }
+
 /* Zonas adjuntas al composer (multi-región): una miniatura por zona, con su × */
 .ai-zones {
   display: flex; flex-wrap: wrap; gap: 8px; align-items: center;

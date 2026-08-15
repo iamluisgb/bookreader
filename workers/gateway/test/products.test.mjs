@@ -66,10 +66,55 @@ const pedirDemo = async (product) => {
   return { status: res.status, body: await res.json() };
 };
 
-const chat = (token, model) => call('/v1/chat/completions', {
+const chat = (token, model, extra = {}) => call('/v1/chat/completions', {
   method: 'POST',
   headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-  body: JSON.stringify({ model, messages: [{ role: 'user', content: 'hola' }], stream: false }),
+  body: JSON.stringify({ model, messages: [{ role: 'user', content: 'hola' }], stream: false, ...extra }),
+});
+
+// ---- cupo visible (F5) --------------------------------------------------------
+
+test('cada respuesta dice cuánto queda Y sobre cuánto: el % no depende del cliente', async () => {
+  const { body } = await pedirDemo('arete');
+  assert.equal(body.quota, 3);
+
+  const res = await chat(body.token, 'arete-fast');
+  assert.equal(res.headers.get('X-Quota-Remaining'), '2');
+  assert.equal(res.headers.get('X-Quota-Total'), '3');
+  // Recibirlas no basta: sin exponerlas, el navegador no deja que el JS las lea.
+  const expuestas = res.headers.get('Access-Control-Expose-Headers') || '';
+  assert.match(expuestas, /X-Quota-Remaining/);
+  assert.match(expuestas, /X-Quota-Total/);
+});
+
+test('el total se congela al emitir: subir DEMO_QUOTA no mueve la barra de un token vivo', async () => {
+  const { body } = await pedirDemo('arete');
+  env.DEMO_QUOTA = '500';                       // se sube la cuota a mitad de camino
+  const res = await chat(body.token, 'arete-fast');
+  assert.equal(res.headers.get('X-Quota-Total'), '3', 'el denominador es el del día de la emisión');
+});
+
+test('las llamadas auxiliares no descuentan cupo, pero sí exigen tenerlo', async () => {
+  const { body } = await pedirDemo('bookreader');
+
+  const aux = await chat(body.token, 'bookreader-lite');
+  assert.equal(aux.status, 200);
+  assert.equal(aux.headers.get('X-Quota-Remaining'), '3', 'el alias lite es gratis');
+  assert.equal(upstream[0].body.model, 'qwen3.6');
+
+  // Agotar el cupo con las que sí cuentan y comprobar que la auxiliar deja de pasar:
+  // media app funcionando con el cupo agotado sería inexplicable para el usuario.
+  for (let i = 0; i < 3; i++) await chat(body.token, 'bookreader-fast');
+  const sinCupo = await chat(body.token, 'bookreader-lite');
+  assert.equal(sinCupo.status, 403);
+  assert.equal((await sinCupo.json()).error.code, 'demo_exhausted');
+});
+
+test('las auxiliares siguen contando para el disyuntor diario (es antiabuso)', async () => {
+  const { body } = await pedirDemo('bookreader');
+  await chat(body.token, 'bookreader-lite');
+  const row = await env.DB.prepare('SELECT demo_calls FROM daily_stats').first();
+  assert.equal(row.demo_calls, 1);
 });
 
 // ---- routing -----------------------------------------------------------------

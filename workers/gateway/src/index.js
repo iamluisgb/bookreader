@@ -45,11 +45,18 @@ export const ROUTING = {
   },
   // Llamadas auxiliares del cliente (query-expand, attenuation): modelo pequeño y
   // rápido (~0.8s vs ~3s del fast, que gasta tokens razonando donde no aporta).
+  //
+  // `free`: NO descuenta cuota. El usuario no pide estas llamadas ni las percibe, así
+  // que cobrárselas hacía que el contador bajara de dos en dos por una sola pregunta
+  // — con el cupo en porcentaje eso se lee directamente como un timo. Son qwen3.6 y
+  // el proveedor es tarifa plana: lo que cuestan no es el problema. Siguen contando
+  // para los disyuntores diarios, que son antiabuso y no presupuesto.
   'bookreader-lite': {
     product: 'bookreader',
     provider: 'nan',
     model: 'qwen3.6',
     caps: { tools: true, vision: false },
+    free: true,
   },
   // arete (Quirón). El chat es streaming CON tools, igual que el de bookreader.
   'arete-fast': {
@@ -197,9 +204,13 @@ async function handleChat(request, env, ctx) {
 
   // Decremento ATÓMICO: solo pasa si el token sigue activo y con cuota. El
   // RETURNING evita la carrera leer-luego-escribir entre peticiones simultáneas.
-  const dec = await env.DB
-    .prepare('UPDATE tokens SET remaining = remaining - 1 WHERE token = ?1 AND active = 1 AND remaining > 0 RETURNING remaining')
-    .bind(tok.token).first();
+  // Los alias `free` no descuentan, pero SÍ exigen cuota viva: si no, el cupo agotado
+  // dejaría media app funcionando y el usuario no entendería qué se ha roto.
+  const dec = route.free
+    ? (tok.remaining > 0 ? { remaining: tok.remaining } : null)
+    : await env.DB
+      .prepare('UPDATE tokens SET remaining = remaining - 1 WHERE token = ?1 AND active = 1 AND remaining > 0 RETURNING remaining')
+      .bind(tok.token).first();
   if (!dec) {
     // El token existía (getToken lo validó) → la cuota se agotó entre medias o justo ahora.
     // 403 y no 429 a propósito: el cliente (IA3) reintenta los 429 con backoff y aquí
@@ -228,16 +239,20 @@ async function handleChat(request, env, ctx) {
   // devuelve la llamada a la cuota. Perder llamadas de la demo sin recibir nada es
   // la peor primera impresión posible justo donde queremos convertir.
   let remaining = dec.remaining;
-  if (upstream.status >= 500) {
+  if (upstream.status >= 500 && !route.free) {
     const back = await env.DB
       .prepare('UPDATE tokens SET remaining = remaining + 1 WHERE token = ?1 RETURNING remaining')
       .bind(tok.token).first();
     if (back) remaining = back.remaining;
   }
 
+  // El TOTAL viaja con cada respuesta para que el cliente pueda pintar el consumo en
+  // porcentaje sin recordar nada: si tuviera que guardarse con cuánto empezó, limpiar
+  // el navegador (o cambiar de dispositivo) dejaría la barra sin denominador.
   const headers = {
     'Content-Type': upstream.headers.get('Content-Type') || 'application/json',
     'X-Quota-Remaining': String(remaining),
+    'X-Quota-Total': String(tok.quota),
   };
 
   // MEDICIÓN (F1.2). Contadores agregados por día, jamás contenido: retención cero
@@ -304,13 +319,16 @@ async function handleDemoToken(request, env) {
 
   const token = 'br-demo-' + randomHex(12);
   const quota = num(env.DEMO_QUOTA, 30);
+  // `quota` se congela con el token: es el denominador del porcentaje que enseña el
+  // cliente, y subir DEMO_QUOTA mañana no puede hacer que a los tokens vivos les
+  // crezca el total y su barra salte hacia atrás.
   await env.DB
-    .prepare("INSERT INTO tokens (token, remaining, tier, product, note) VALUES (?1, ?2, 'demo', ?3, 'self-service')")
+    .prepare("INSERT INTO tokens (token, remaining, quota, tier, product, note) VALUES (?1, ?2, ?2, 'demo', ?3, 'self-service')")
     .bind(token, quota, product).run();
   // `model` es el alias de texto del producto: el cliente se autoconfigura con lo que
   // venga aquí y no tiene que saberse la tabla de alias.
   const models = aliasesFor(product);
-  return json(200, { token, remaining: quota, product, model: models[0], models });
+  return json(200, { token, remaining: quota, quota, product, model: models[0], models });
 }
 
 // Producto pedido en /demo-token. Los clientes ya desplegados llaman SIN body, así
@@ -449,10 +467,10 @@ function randomHex(bytes) {
 async function getToken(request, env) {
   const m = (request.headers.get('Authorization') || '').match(/^Bearer\s+(br-[\w-]+)$/i);
   if (!m) return { ok: false, response: oaiError(401, 'invalid_token', 'Missing or malformed token (expected "Bearer br-…").') };
-  const row = await env.DB.prepare('SELECT active, remaining, tier, product FROM tokens WHERE token = ?1').bind(m[1]).first();
+  const row = await env.DB.prepare('SELECT active, remaining, tier, product, quota FROM tokens WHERE token = ?1').bind(m[1]).first();
   if (!row || !row.active) return { ok: false, response: oaiError(401, 'invalid_token', 'Unknown or revoked token.') };
   return {
-    ok: true, token: m[1], remaining: row.remaining, tier: row.tier,
+    ok: true, token: m[1], remaining: row.remaining, tier: row.tier, quota: row.quota,
     // Los tokens anteriores a F4 no tienen producto: son todos de bookreader.
     product: PRODUCTS.includes(row.product) ? row.product : DEFAULT_PRODUCT,
   };
@@ -465,7 +483,9 @@ function corsHeaders(request, env) {
     'Access-Control-Allow-Origin': allowed.includes(origin) ? origin : allowed[0] || '*',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Authorization, Content-Type',
-    'Access-Control-Expose-Headers': 'X-Quota-Remaining',
+    // Sin exponerlas, el navegador las recibe pero NO deja que el JS las lea: el
+    // medidor de cupo del cliente se quedaría siempre a ciegas.
+    'Access-Control-Expose-Headers': 'X-Quota-Remaining, X-Quota-Total',
     'Vary': 'Origin',
   };
 }

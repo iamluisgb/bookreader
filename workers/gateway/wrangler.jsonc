@@ -10,10 +10,17 @@
     // Orígenes permitidos por CORS (dev + producción de las dos apps que sirve el
     // gateway: bookreader y arete), separados por comas.
     "ALLOWED_ORIGINS": "http://localhost:8000,http://localhost:8888,https://bookreader.raiatech.com,https://arete.raiatech.com,https://arete-6a8.pages.dev,https://luisgonzalezbernal.com",
-    // F3 · demo self-service: cuota por token y disyuntores globales diarios
-    "DEMO_QUOTA": "30",
+    // F3 · demo self-service: cuota por token y disyuntores globales diarios.
+    //
+    // nan es TARIFA PLANA, así que estos números no protegen una factura: protegen de
+    // que alguien use la demo como API gratis y de que el uso concurrente sobre la key
+    // compartida degrade el servicio a todos. Por eso la cuota por token es generosa
+    // (que la demo se acabe a mitad de un libro es perder al usuario, no ahorrar) y el
+    // techo diario se queda como red de seguridad, holgado sobre el tráfico real
+    // (~74 llamadas en todo el histórico).
+    "DEMO_QUOTA": "100",
     "MAX_DAILY_TOKENS": "200",
-    "MAX_DAILY_CALLS": "2000"
+    "MAX_DAILY_CALLS": "5000"
   },
   "d1_databases": [
     {

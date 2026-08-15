@@ -52,6 +52,10 @@ export const TEMPLATE = () => `
     <!-- Zonas recortadas de la página (IA6 v2). Se ven ANTES de enviar: el usuario comprueba
          qué va a mirar el modelo, y puede añadir otra para preguntar por la relación. -->
     <div id="ai-zones" class="ai-zones" style="display:none"></div>
+    <!-- Cupo de la demo. Vive pegado al composer porque es donde se gasta, y NO se
+         pinta hasta pasada la mitad: un medidor delante de quien acaba de empezar
+         solo comunica escasez. Lo rellena renderQuota() en panel.js. -->
+    <div id="ai-quota" class="ai-quota" hidden></div>
     <div class="ai-composer">
       <textarea id="ai-input" rows="2" placeholder="${t('Pregunta sobre el libro...')}"></textarea>
       <div class="ai-composer-btns">

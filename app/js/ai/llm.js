@@ -85,7 +85,12 @@ export function hasKey()         { return getKey().trim().length > 0; }
 // Base URL del proveedor (sin barra final). Debe ser el endpoint OpenAI-compatible
 // que expone /chat/completions.
 export function getBaseUrl()    { return (Storage.get('ai_base_url', DEFAULT_BASE_URL) || DEFAULT_BASE_URL).trim().replace(/\/+$/, ''); }
-export function setBaseUrl(u)    { Storage.set('ai_base_url', ((u || '').trim() || DEFAULT_BASE_URL).replace(/\/+$/, '')); }
+export function setBaseUrl(u)    {
+  Storage.set('ai_base_url', ((u || '').trim() || DEFAULT_BASE_URL).replace(/\/+$/, ''));
+  // Salir de la demo tira su cupo: dejarlo guardado haría que volver a entrar
+  // enseñara el porcentaje del token anterior hasta la primera llamada.
+  if (!isDemo()) clearQuota();
+}
 
 // ---- Proveedores propios del usuario -----------------------------------------
 // Los presets de arriba son los que traemos verificados, pero cualquier endpoint
@@ -397,6 +402,34 @@ function sleep(ms, signal) {
   });
 }
 
+// ---- Cupo de la demo ---------------------------------------------------------
+// El gateway manda `X-Quota-Remaining` y `X-Quota-Total` en CADA respuesta, así que
+// el cupo se lee en el único sitio por el que pasan todas las llamadas: ninguna ruta
+// puede olvidarse y no hay que preguntar al servidor aparte. Se guarda para poder
+// pintarlo antes de la primera llamada de la sesión, y se publica como evento para
+// que la UI no tenga que sondear.
+//
+// El TOTAL viene del servidor a propósito: si el cliente recordara con cuánto empezó,
+// limpiar el navegador dejaría el porcentaje sin denominador.
+const QUOTA_KEY = 'ai_demo_quota';
+
+/** { remaining, total, pct } del cupo demo, o null si no estamos en la demo. */
+export function getQuota() {
+  const q = Storage.get(QUOTA_KEY, null);
+  if (!isDemo() || !q || !(q.total > 0)) return null;
+  return { ...q, pct: Math.max(0, Math.min(100, Math.round(100 * q.remaining / q.total))) };
+}
+
+function readQuota(res) {
+  const remaining = Number(res.headers?.get?.('X-Quota-Remaining'));
+  const total = Number(res.headers?.get?.('X-Quota-Total'));
+  if (!Number.isFinite(remaining) || !Number.isFinite(total) || total <= 0) return;
+  Storage.set(QUOTA_KEY, { remaining, total });
+  window.dispatchEvent?.(new CustomEvent('llm:quota', { detail: getQuota() }));
+}
+
+function clearQuota() { Storage.remove(QUOTA_KEY); }
+
 // fetch con reintentos. Reintenta ante red caída y estados retryables; honra Retry-After.
 // Devuelve la respuesta final (aunque siga siendo un error tras agotar): el llamante ya
 // tiene su manejo de status. Respeta AbortSignal.
@@ -407,6 +440,7 @@ async function fetchRetrying(url, opts, { retries = 3 } = {}) {
     if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
     try {
       const res = await fetch(url, opts);
+      readQuota(res);
       if (res.ok || !isRetryableStatus(res.status) || i === retries) return res;
       const wait = parseRetryAfter(res.headers.get('retry-after')) ?? backoffDelay(i);
       await sleep(wait, signal);
@@ -656,5 +690,9 @@ export async function requestDemoToken() {
   setBaseUrl(GATEWAY_BASE_URL);
   setKey(body.token);
   setModel(body.model || 'bookreader-fast');
-  return body; // { token, remaining, model }
+  // El cupo se conoce ya al emitir: así el medidor existe desde el primer momento y
+  // no aparece de golpe a mitad de la primera respuesta.
+  const total = Number(body.quota ?? body.remaining);
+  if (total > 0) Storage.set(QUOTA_KEY, { remaining: Number(body.remaining), total });
+  return body; // { token, remaining, quota, model }
 }

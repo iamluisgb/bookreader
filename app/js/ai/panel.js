@@ -83,9 +83,14 @@ export function init(opts) {
     convobar: $('#ai-convobar'), convoBtn: $('#ai-convo-btn'), convoLabel: $('#ai-convo-label'),
     ref: $('#ai-ref'), refText: $('#ai-ref-text'), profileChip: $('#ai-profile-chip'),
     imgref: $('#ai-imgref'), imgrefText: $('#ai-imgref-text'),
-    zones: $('#ai-zones'), mic: $('#ai-mic'),
+    zones: $('#ai-zones'), mic: $('#ai-mic'), quota: $('#ai-quota'),
   });
   initMic();
+  // El cupo de la demo se repinta solo: llm.js lo publica al leer las cabeceras del
+  // gateway en cada llamada, y al guardar Ajustes puede haber dejado de ser demo.
+  window.addEventListener('llm:quota', renderQuota);
+  window.addEventListener('appsettings:agent-saved', renderQuota);
+  renderQuota();
   $('#ai-ref-clear').addEventListener('click', clearRef);
   $('#ai-imgref-clear').addEventListener('click', clearImageRef);
 
@@ -2148,6 +2153,35 @@ function setStatus(s) {
   els.status.classList.toggle('ai-status--busy', /…\s*$/.test(s));
 }
 function scrollDown() { if (els.messages) els.messages.scrollTop = els.messages.scrollHeight; }
+
+// ---- Cupo de la demo ---------------------------------------------------------
+// En PORCENTAJE, no en llamadas: lo que cuesta un turno cambia (una pregunta puede
+// ser una llamada o cuatro si entra el camino agéntico), y un contador que baja a
+// saltos se lee como un timo. El porcentaje significa lo mismo aunque mañana cambie
+// la cuota o el coste de un turno.
+//
+// Umbral: nada hasta consumida la mitad. Enseñar un medidor a quien acaba de empezar
+// solo transmite escasez, y la conversión a BYOK no se juega ahí — se juega cuando
+// queda poco, que es cuando el aviso es un favor y no una presión.
+const QUOTA_SHOW_AT = 50;   // % consumido a partir del cual aparece
+const QUOTA_LOW_AT = 20;    // % restante por debajo del cual se avisa de verdad
+
+function renderQuota() {
+  if (!els.quota) return;
+  const q = LLM.getQuota();
+  if (!q || q.pct > 100 - QUOTA_SHOW_AT) { els.quota.hidden = true; return; }
+
+  const low = q.pct <= QUOTA_LOW_AT;
+  els.quota.hidden = false;
+  els.quota.classList.toggle('ai-quota--low', low);
+  els.quota.innerHTML = `
+    <div class="ai-quota-bar"><span style="width:${q.pct}%"></span></div>
+    <p class="ai-quota-txt">${q.pct > 0
+      ? t('Te queda el {pct}% de la prueba gratuita.', { pct: q.pct })
+      : t('Se acabó la prueba gratuita.')}
+      <button type="button" class="ai-quota-link">${t('Usar mi propia API key')}</button></p>`;
+  els.quota.querySelector('.ai-quota-link').addEventListener('click', () => AppSettings.open('agent'));
+}
 
 // Render del Markdown EN VIVO durante el streaming: la respuesta se ve ya formateada (negritas,
 // listas, tablas, citas) antes de completarse, en vez de texto crudo hasta el final. Se coalesce
