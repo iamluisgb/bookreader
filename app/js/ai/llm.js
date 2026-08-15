@@ -152,7 +152,23 @@ export function setAdvanced(v)     { Storage.set('ai_advanced', !!v); }
 
 // ¿Es la demo del gateway lo que está configurado? La vista simple la trata como un
 // estado propio (no es un proveedor de la lista y no tiene key que enseñar).
-export function isDemo()          { return getBaseUrl() === GATEWAY_BASE_URL; }
+export function isDemo()          { return isGatewayUrl(getBaseUrl()); }
+
+// Igual que isDemo pero para una URL suelta: el formulario avanzado necesita saber si
+// lo que hay ESCRITO en el campo sigue siendo el gateway antes de decidir qué hacer
+// con una key vacía (el token de la demo no se enseña, así que vacío no es "bórralo").
+export function isGatewayUrl(u)   { return (u || '').trim().replace(/\/+$/, '') === GATEWAY_BASE_URL; }
+
+// Reparación de un estado imposible: un token `br-…` es del gateway y solo vale ahí,
+// así que verlo junto a otra base URL significa que Ajustes lo movió de sitio (lo hacía
+// "Guardar" en la vista simple con la demo activa). El síntoma era 401 en todo, con el
+// usuario convencido de que la key de la demo nacía rota. Se restaura la demo en vez de
+// dejarla inservible; quien pegue su propia key lo pisa igual que siempre.
+if (/^br-/i.test(getKey().trim()) && !isGatewayUrl(getBaseUrl())) {
+  setBaseUrl(GATEWAY_BASE_URL);
+  setModel('bookreader-fast');
+  setVisionModel('');
+}
 
 // La vista simple solo sabe representar un preset o la demo. Una base URL propia
 // (BYOK contra un proveedor no listado) no cabe en ella: se fuerza la avanzada, o

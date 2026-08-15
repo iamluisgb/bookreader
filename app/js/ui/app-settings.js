@@ -223,7 +223,13 @@ function demoBlockHtml() {
 // después de pegar una API key larga la tira a la basura.
 let agentDraft = null;
 
-function draftKey() { return agentDraft && agentDraft.key != null ? agentDraft.key : LLM.getKey(); }
+// La key de la demo NO se enseña: es un token nuestro, no algo que el usuario haya
+// escrito ni pueda reutilizar (ADR-021: "no ve token ni URLs"). Enseñarlo además
+// invitaba a guardarlo contra otro proveedor → 401 "API key inválida" al preguntar.
+function draftKey() {
+  if (agentDraft && agentDraft.key != null) return agentDraft.key;
+  return LLM.isDemo() ? '' : LLM.getKey();
+}
 function draftProvider() {
   if (agentDraft && agentDraft.provider) return agentDraft.provider;
   const cur = LLM.currentProvider();
@@ -248,6 +254,7 @@ function agentSimpleHtml() {
     <label class="appset-label" for="appset-key">API key</label>
     <input id="appset-key" class="appset-input" type="password" placeholder="sk-..." autocomplete="off" value="${escapeHtml(draftKey())}" />
     <p class="appset-muted" id="appset-simple-model"></p>
+    <p class="appset-model-hint" id="appset-simple-hint" hidden></p>
     <label class="appset-check"><input type="checkbox" id="appset-auto"${LLM.getAutoExtract() ? ' checked' : ''} /> ${t('Rellenar la libreta automáticamente')}</label>
     <button id="appset-save" class="primary-btn appset-save">${t('Guardar')}</button>
     <p class="appset-saved" id="appset-saved" hidden>${icon('check', { size: 14 })} ${t('Guardado')}</p>
@@ -351,10 +358,29 @@ function wireAgentSimple(content) {
   prov.addEventListener('change', paintNote);
   paintNote();
 
+  const hint = content.querySelector('#appset-simple-hint');
+
   content.querySelector('#appset-save').addEventListener('click', () => {
     const d = LLM.presetDefaults(prov.value);
     if (!d) return;
-    LLM.setKey(content.querySelector('#appset-key').value.trim());
+    const key = content.querySelector('#appset-key').value.trim();
+
+    // Con la demo activa, el campo de key sale VACÍO (el token no se enseña) y el
+    // desplegable marca un proveedor cualquiera. Guardar tal cual apuntaba el token
+    // del gateway a ese proveedor: la primera pregunta moría con "API key inválida
+    // (401)" y el usuario creía que la key de la demo estaba rota. Sin key escrita no
+    // hay proveedor al que cambiar: se conserva la demo y se guarda lo que sí es suyo.
+    if (!key && LLM.isDemo()) {
+      LLM.setAutoExtract(content.querySelector('#appset-auto').checked);
+      if (hint) {
+        hint.hidden = false;
+        hint.textContent = t('Sigues con la demo. Para cambiar de proveedor, pega su API key aquí.');
+      }
+      return;
+    }
+    if (hint) hint.hidden = true;
+
+    LLM.setKey(key);
     LLM.setBaseUrl(d.baseUrl);
     LLM.setModel(d.model);
     LLM.setVisionModel(d.visionModel);
@@ -592,7 +618,12 @@ function wireAgentAdvanced(content) {
 // el alta de proveedor propio, que también guarda: dar de alta el endpoint que acabas
 // de escribir y que la app siga apuntando al anterior no tendría sentido.
 function saveAgentForm(content, baseUrl, model) {
-  LLM.setKey(content.querySelector('#appset-key').value.trim());
+  const key = content.querySelector('#appset-key').value.trim();
+  // Demo activa y base URL sin tocar (sigue siendo el gateway): el campo de key sale
+  // vacío a propósito, así que vaciarlo aquí sería borrar el token de la demo por el
+  // mero hecho de guardar otro campo. Si la base URL ya apunta a otro sitio, el vacío
+  // sí es una elección del usuario y se respeta.
+  if (key || !LLM.isGatewayUrl(baseUrl.value)) LLM.setKey(key);
   LLM.setBaseUrl(baseUrl.value);
   LLM.setModel(model.value);
   LLM.setVisionModel(content.querySelector('#appset-vmodel').value);

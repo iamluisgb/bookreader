@@ -633,6 +633,7 @@ const EN = {
   'Usaremos {model}. Puedes cambiarlo en las opciones avanzadas.': 'We’ll use {model}. You can change it in the advanced options.',
   'Usaremos {model} para responder y {vision} para las figuras. Puedes cambiarlo en las opciones avanzadas.': 'We’ll use {model} to answer and {vision} for figures. You can change it in the advanced options.',
   'Ahora mismo estás usando la demo. Elige un proveedor y pega tu key para seguir sin cupo.': 'You’re on the demo right now. Pick a provider and paste your key to continue without a quota.',
+  'Sigues con la demo. Para cambiar de proveedor, pega su API key aquí.': 'You’re still on the demo. To switch provider, paste its API key here.',
   'Proveedor': 'Provider',
   'Modelo': 'Model',
   'Modelo de visión (opcional)': 'Vision model (optional)',
