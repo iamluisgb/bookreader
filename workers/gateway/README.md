@@ -72,16 +72,42 @@ llamadas en streaming que nunca se miden. Con una semana de datos, `DEMO_QUOTA` 
 ## Demo self-service (F3)
 
 `POST /demo-token` emite un token de `DEMO_QUOTA` llamadas (30). Guardas: 1 demo por IP
-(hasheada con `IP_HASH_SALT`) y día → 429 `demo_already_granted`; tope de emisión diaria
-`MAX_DAILY_TOKENS` → 429 `demo_sold_out`; tope de llamadas demo/día `MAX_DAILY_CALLS` →
-403 `demo_paused` en el chat. Los topes son vars de `wrangler.jsonc`. Las concesiones de
-más de 30 días se barren al emitir (el límite es por día: guardarlas no sirve de nada).
-Consumo del día:
+(hasheada con `IP_HASH_SALT`), día **y producto** → 429 `demo_already_granted`; tope de
+emisión diaria `MAX_DAILY_TOKENS` → 429 `demo_sold_out`; tope de llamadas demo/día
+`MAX_DAILY_CALLS` → 403 `demo_paused` en el chat. Los topes son vars de `wrangler.jsonc`.
+Las concesiones de más de 30 días se barren al emitir (el límite es por día: guardarlas
+no sirve de nada).
+
+## Dos productos (F4)
+
+El gateway sirve a **bookreader** y a **arete**. Cada token nace con su `product` y solo
+puede usar los alias de ese producto (`bookreader-*` / `arete-*`); pedirlos cruzados es
+`400 model_not_found` y **no** gasta cuota. Sin esa atadura, el desglose de consumo sería
+decorativo: cualquiera podría gastar por la puerta de la otra app.
 
 ```bash
+# Pedir un token para arete (sin `product` → bookreader, por los clientes ya desplegados)
+curl -X POST https://bookreader-gateway.luisgonzalezb93.workers.dev/demo-token \
+  -H 'Content-Type: application/json' -d '{"product":"arete"}'
+```
+
+Los disyuntores diarios siguen siendo **uno solo** (`daily_stats`): acotan el gasto que
+se paga, que no se reparte por app. El desglose vive aparte, en `product_stats`:
+
+```bash
+# Quién consume qué (últimos días)
+npx wrangler d1 execute bookreader-gateway --remote --command \
+  "SELECT day, product, tokens_issued, demo_calls, calls,
+          real_input_tokens / NULLIF(measured_calls,0) AS in_por_llamada
+   FROM product_stats ORDER BY day DESC, product LIMIT 14"
+
+# Total del día (el que miran los disyuntores)
 npx wrangler d1 execute bookreader-gateway --remote --command \
   "SELECT * FROM daily_stats ORDER BY day DESC LIMIT 7"
 ```
+
+Añadir un producto = una entrada en `PRODUCTS`, sus filas en `ROUTING` y su origen en
+`ALLOWED_ORIGINS`. Nada más: la emisión, la validación y el desglose salen de ahí.
 
 ## Límites de entrada (anti-abuso)
 
@@ -110,11 +136,15 @@ paga el usuario de la demo.
 
 ## Test
 
-Los helpers de límites son puros y se prueban sin Worker ni D1:
-
 ```bash
-npm run test:gateway     # node --test · allowlist, medición de entrada, buckets de IP
+npm run test:gateway     # node --test
 ```
+
+Dos familias: los helpers de límites son puros (allowlist, medición de entrada, buckets
+de IP), y `products.test.mjs` conduce el Worker entero contra **SQLite real**
+(`node:sqlite` con estas mismas migraciones) para lo que no es puro: emisión por
+producto, alias cruzados, cuota y desglose. Un doble de D1 a mano tendría que fingir
+`RETURNING`, `ON CONFLICT` y `date('now')`, que es donde vive la atomicidad que importa.
 
 `tests/gateway.spec.ts` (@live) conduce la app real contra el gateway. Necesita
 `GW_TOKEN=br-…` en `.env`:

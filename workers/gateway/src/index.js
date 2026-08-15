@@ -1,6 +1,11 @@
 // MON1 F1 · bookreader-gateway — proxy OpenAI-compatible con tokens propios.
 //
 // bookreader ──Bearer br-…──▶ este Worker ──alias→modelo──▶ nan
+// arete      ──Bearer br-…──▶
+//
+// F4: sirve a las DOS apps. Cada token nace con su `product` y solo puede usar los
+// alias de ese producto, que es lo que hace que el consumo se pueda atribuir (y que
+// una demo de arete no se gaste por la puerta de bookreader).
 //
 // - Valida el token contra D1 y decrementa su cuota de forma ATÓMICA por petición.
 // - Expone ALIAS propios (bookreader-fast…), nunca nombres de modelos del proveedor:
@@ -16,15 +21,24 @@
 // Los reintentos del cliente (IA3) siguen absorbiendo transitorios; el pool de keys (F2)
 // solo si la telemetría muestra colisiones reales.
 
+// Productos que sirve el gateway (F4). Cada uno tiene sus propios alias: el alias es
+// la cara pública del contrato, y "bookreader-fast" en la app de entrenamiento sería
+// una filtración de que ambas comparten tubería. `product` viaja en el token y se
+// verifica en cada llamada, que es lo que hace fiable el desglose de consumo.
+export const PRODUCTS = ['bookreader', 'arete'];
+const DEFAULT_PRODUCT = 'bookreader';   // los clientes ya desplegados no lo mandan
+
 // Tabla de routing: alias público → destino real + capacidades. Una fila por
 // alias; `provider` está para el día que haya un segundo backend (OpenRouter…).
-const ROUTING = {
+export const ROUTING = {
   'bookreader-fast': {
+    product: 'bookreader',
     provider: 'nan',
     model: 'deepseek-v4-flash',
     caps: { tools: true, vision: false },
   },
   'bookreader-vision': {
+    product: 'bookreader',
     provider: 'nan',
     model: 'mimo-v2.5',
     caps: { tools: false, vision: true },
@@ -32,11 +46,32 @@ const ROUTING = {
   // Llamadas auxiliares del cliente (query-expand, attenuation): modelo pequeño y
   // rápido (~0.8s vs ~3s del fast, que gasta tokens razonando donde no aporta).
   'bookreader-lite': {
+    product: 'bookreader',
     provider: 'nan',
     model: 'qwen3.6',
     caps: { tools: true, vision: false },
   },
+  // arete (Quirón). El chat es streaming CON tools, igual que el de bookreader.
+  'arete-fast': {
+    product: 'arete',
+    provider: 'nan',
+    model: 'deepseek-v4-flash',
+    caps: { tools: true, vision: false },
+  },
+  // Visión: qwen3.6 y no mimo-v2.5 porque es el que arete tiene verificado para leer
+  // capturas de entrenos (ver su js/ai/llm.js) — y además acepta tools.
+  'arete-vision': {
+    product: 'arete',
+    provider: 'nan',
+    model: 'qwen3.6',
+    caps: { tools: true, vision: true },
+  },
 };
+
+// Alias visibles para un producto. Un token solo puede usar los suyos.
+export function aliasesFor(product) {
+  return Object.keys(ROUTING).filter((id) => ROUTING[id].product === product);
+}
 
 // `urlEnv` permite apuntar el proveedor a otro sitio sin tocar código: un mock en
 // `wrangler dev` (así se verifican allowlist y devolución de cuota sin gastar
@@ -106,7 +141,9 @@ export default {
 async function handleModels(request, env) {
   const tok = await getToken(request, env);
   if (!tok.ok) return tok.response;
-  const data = Object.keys(ROUTING).map((id) => ({ id, object: 'model', owned_by: 'bookreader' }));
+  // Solo los alias del producto del token: ofrecer los de la otra app sería ofrecer
+  // modelos que van a devolver 403 en cuanto se elijan.
+  const data = aliasesFor(tok.product).map((id) => ({ id, object: 'model', owned_by: tok.product }));
   return json(200, { object: 'list', data });
 }
 
@@ -138,17 +175,20 @@ async function handleChat(request, env, ctx) {
       `Input context too large (~${size.tokens} tokens, max ${LIMITS.inputTokens}).`);
   }
 
+  // El alias tiene que existir Y ser del producto del token. Sin lo segundo, el
+  // desglose por producto sería decorativo: cualquier token podría gastar por la
+  // puerta de la otra app y el consumo quedaría atribuido al alias, no a quien paga.
   const route = ROUTING[body.model];
-  if (!route) {
+  if (!route || route.product !== tok.product) {
     return oaiError(400, 'model_not_found',
-      `Unknown model "${body.model}". Available: ${Object.keys(ROUTING).join(', ')}.`);
+      `Unknown model "${body.model}". Available: ${aliasesFor(tok.product).join(', ')}.`);
   }
 
   // DISYUNTOR global (F3): tope de llamadas demo/día. Protege el gasto máximo
   // diario aunque el abuso sea distribuido (VPNs, muchas IPs). Incremento atómico
   // con RETURNING; un pequeño rebase por peticiones en vuelo es irrelevante.
   if (tok.tier === 'demo') {
-    const st = await bumpStat(env, 'demo_calls');
+    const st = await bumpStat(env, 'demo_calls', tok.product);
     if (st > num(env.MAX_DAILY_CALLS, 2000)) {
       return oaiError(403, 'demo_paused',
         'The demo is taking a breather today (daily budget reached). Come back tomorrow, or add your own API key in Settings → Agent.');
@@ -209,7 +249,7 @@ async function handleChat(request, env, ctx) {
 
   if (body.stream === true || !upstream.ok) {
     // Passthrough intacto del stream (o del error): no se toca el body.
-    ctx?.waitUntil(addStats(env, stats));
+    ctx?.waitUntil(addStats(env, stats, null, tok.product));
     return new Response(upstream.body, { status: upstream.status, headers });
   }
 
@@ -227,7 +267,7 @@ async function handleChat(request, env, ctx) {
     stats.real_input_tokens = usage.input;
     stats.real_output_tokens = usage.output;
   }
-  ctx?.waitUntil(addStats(env, stats));
+  ctx?.waitUntil(addStats(env, stats, null, tok.product));
   return new Response(text, { status: upstream.status, headers });
 }
 
@@ -235,7 +275,12 @@ async function handleChat(request, env, ctx) {
 // (1) disyuntor de emisión diaria; (2) 1 demo por IP (hasheada) y día. El botón
 // "Probar la demo" del cliente llama aquí y se autoconfigura con la respuesta.
 async function handleDemoToken(request, env) {
-  const issued = await bumpStat(env, 'tokens_issued');
+  const product = await readProduct(request);
+  if (!product) {
+    return oaiError(400, 'unknown_product', `Unknown product. Available: ${PRODUCTS.join(', ')}.`);
+  }
+
+  const issued = await bumpStat(env, 'tokens_issued', product);
   if (issued > num(env.MAX_DAILY_TOKENS, 200)) {
     return oaiError(429, 'demo_sold_out',
       'No demo tokens left today. Come back tomorrow, or add your own API key (BYOK).');
@@ -243,9 +288,11 @@ async function handleDemoToken(request, env) {
 
   const ip = request.headers.get('CF-Connecting-IP') || '0.0.0.0';
   const ipHash = await sha256Hex(`${env.IP_HASH_SALT || ''}|${ipBucket(ip)}`);
+  // La concesión es por (red, día, PRODUCTO): haber probado una app no puede dejarte
+  // sin probar la otra.
   const grant = await env.DB
-    .prepare("INSERT INTO demo_grants (ip_hash, day) VALUES (?1, date('now')) ON CONFLICT DO NOTHING RETURNING ip_hash")
-    .bind(ipHash).first();
+    .prepare("INSERT INTO demo_grants (ip_hash, day, product) VALUES (?1, date('now'), ?2) ON CONFLICT DO NOTHING RETURNING ip_hash")
+    .bind(ipHash, product).first();
   if (!grant) {
     return oaiError(429, 'demo_already_granted',
       'This network already got a demo today. Try again tomorrow, or add your own API key (BYOK).');
@@ -258,9 +305,23 @@ async function handleDemoToken(request, env) {
   const token = 'br-demo-' + randomHex(12);
   const quota = num(env.DEMO_QUOTA, 30);
   await env.DB
-    .prepare("INSERT INTO tokens (token, remaining, tier, note) VALUES (?1, ?2, 'demo', 'self-service')")
-    .bind(token, quota).run();
-  return json(200, { token, remaining: quota, model: 'bookreader-fast' });
+    .prepare("INSERT INTO tokens (token, remaining, tier, product, note) VALUES (?1, ?2, 'demo', ?3, 'self-service')")
+    .bind(token, quota, product).run();
+  // `model` es el alias de texto del producto: el cliente se autoconfigura con lo que
+  // venga aquí y no tiene que saberse la tabla de alias.
+  const models = aliasesFor(product);
+  return json(200, { token, remaining: quota, product, model: models[0], models });
+}
+
+// Producto pedido en /demo-token. Los clientes ya desplegados llaman SIN body, así
+// que la ausencia significa bookreader; un valor desconocido, en cambio, es un error
+// y no un silencioso "pues bookreader": emitiría el token equivocado.
+async function readProduct(request) {
+  const fromQuery = new URL(request.url).searchParams.get('product');
+  let fromBody = null;
+  try { fromBody = (await request.json())?.product ?? null; } catch { /* sin body o no JSON */ }
+  const p = (fromBody ?? fromQuery ?? DEFAULT_PRODUCT);
+  return PRODUCTS.includes(p) ? p : null;
 }
 
 // Columnas de daily_stats que se pueden incrementar. Los nombres se interpolan en
@@ -272,26 +333,45 @@ const STAT_COLS = [
   'real_input_tokens', 'real_output_tokens',
 ];
 
-// Incrementa (y crea si no existe) el contador diario indicado; devuelve el valor.
-async function bumpStat(env, col) {
-  const row = await addStats(env, { [col]: 1 }, col);
+// Incrementa (y crea si no existe) el contador diario indicado; devuelve el TOTAL del
+// día (todos los productos): los disyuntores acotan el gasto que se paga, que es uno.
+async function bumpStat(env, col, product) {
+  const row = await addStats(env, { [col]: 1 }, col, product);
   return row ? row[col] : 0;
 }
 
 // Suma varios contadores del día en una sola sentencia atómica. `returning` pide
-// de vuelta una columna (la usa el disyuntor para decidir en el acto).
-async function addStats(env, deltas, returning) {
+// de vuelta una columna (la usa el disyuntor para decidir en el acto). Con `product`
+// además se anota el mismo delta en el desglose por producto (F4): dos escrituras
+// pequeñas, pero la global sigue siendo la que decide y la que se lee en un solo sitio.
+async function addStats(env, deltas, returning, product) {
   const cols = Object.keys(deltas).filter((c) => STAT_COLS.includes(c));
   if (!cols.length) return null;
   const vals = cols.map((c) => Number(deltas[c]) || 0);
   const params = cols.map((_, i) => `?${i + 1}`);
   const sets = cols.map((c, i) => `${c} = ${c} + ?${i + 1}`);
   const tail = returning && STAT_COLS.includes(returning) ? ` RETURNING ${returning}` : '';
-  return env.DB
+
+  const global = env.DB
     .prepare(`INSERT INTO daily_stats (day, ${cols.join(', ')}) VALUES (date('now'), ${params.join(', ')})
               ON CONFLICT(day) DO UPDATE SET ${sets.join(', ')}${tail}`)
     .bind(...vals)
     .first();
+
+  if (!PRODUCTS.includes(product)) return global;
+
+  // El desglose nunca puede tumbar una llamada: si falla, se pierde una fila de
+  // telemetría, no la respuesta del usuario.
+  const byProduct = env.DB
+    .prepare(`INSERT INTO product_stats (day, product, ${cols.join(', ')})
+              VALUES (date('now'), ?${cols.length + 1}, ${params.join(', ')})
+              ON CONFLICT(day, product) DO UPDATE SET ${sets.join(', ')}`)
+    .bind(...vals, product)
+    .run()
+    .catch((e) => { console.error('gateway: product_stats:', e.message); });
+
+  const [row] = await Promise.all([global, byProduct]);
+  return row;
 }
 
 // Saca {input, output} del `usage` de una respuesta OpenAI-compatible. Solo mira
@@ -369,9 +449,13 @@ function randomHex(bytes) {
 async function getToken(request, env) {
   const m = (request.headers.get('Authorization') || '').match(/^Bearer\s+(br-[\w-]+)$/i);
   if (!m) return { ok: false, response: oaiError(401, 'invalid_token', 'Missing or malformed token (expected "Bearer br-…").') };
-  const row = await env.DB.prepare('SELECT active, remaining, tier FROM tokens WHERE token = ?1').bind(m[1]).first();
+  const row = await env.DB.prepare('SELECT active, remaining, tier, product FROM tokens WHERE token = ?1').bind(m[1]).first();
   if (!row || !row.active) return { ok: false, response: oaiError(401, 'invalid_token', 'Unknown or revoked token.') };
-  return { ok: true, token: m[1], remaining: row.remaining, tier: row.tier };
+  return {
+    ok: true, token: m[1], remaining: row.remaining, tier: row.tier,
+    // Los tokens anteriores a F4 no tienen producto: son todos de bookreader.
+    product: PRODUCTS.includes(row.product) ? row.product : DEFAULT_PRODUCT,
+  };
 }
 
 function corsHeaders(request, env) {

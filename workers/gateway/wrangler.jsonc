@@ -7,8 +7,9 @@
   "compatibility_date": "2026-07-01",
   "observability": { "enabled": true, "head_sampling_rate": 1 },
   "vars": {
-    // Orígenes permitidos por CORS (dev + producción), separados por comas.
-    "ALLOWED_ORIGINS": "http://localhost:8000,http://localhost:8888,https://bookreader.raiatech.com,https://luisgonzalezbernal.com",
+    // Orígenes permitidos por CORS (dev + producción de las dos apps que sirve el
+    // gateway: bookreader y arete), separados por comas.
+    "ALLOWED_ORIGINS": "http://localhost:8000,http://localhost:8888,https://bookreader.raiatech.com,https://arete.raiatech.com,https://arete-6a8.pages.dev,https://luisgonzalezbernal.com",
     // F3 · demo self-service: cuota por token y disyuntores globales diarios
     "DEMO_QUOTA": "30",
     "MAX_DAILY_TOKENS": "200",
