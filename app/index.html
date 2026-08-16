@@ -275,6 +275,13 @@
       <button id="sel-note" class="sel-act"><span data-icon="note" data-icon-size="17"></span><span data-i18n>Nota</span></button>
       <button id="sel-copy" class="sel-act"><span data-icon="copy" data-icon-size="17"></span><span data-i18n>Copiar</span></button>
       <button id="sel-share" class="sel-act"><span data-icon="share" data-icon-size="17"></span><span data-i18n>Compartir</span></button>
+      <!-- Solo al pulsar un subrayado YA hecho (la barra en modo edición). -->
+      <button id="sel-delete" class="sel-act sel-act--danger" hidden><span data-icon="trash" data-icon-size="17"></span><span data-i18n>Eliminar</span></button>
+    </div>
+    <!-- La nota se escribe AQUÍ, no en un modal: anotas mirando el pasaje. Se guarda sola
+         al cerrar la barra, así que no hay botón Guardar ni estado "sin guardar". -->
+    <div class="sel-note-box" id="sel-note-box" hidden>
+      <textarea id="sel-note-input" rows="3" placeholder="Tu nota sobre este pasaje" data-i18n-attrs="placeholder"></textarea>
     </div>
   </div>
 

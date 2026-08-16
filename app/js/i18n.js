@@ -201,6 +201,9 @@ const EN = {
   'Nota': 'Note',
   'Copiar': 'Copy',
   'Compartir': 'Share',
+  'Tu nota sobre este pasaje': 'Your note on this passage',
+  'Subrayado eliminado': 'Highlight deleted',
+  'Deshacer': 'Undo',
 
   // Diálogos (ui/dialog.js)
   'Aviso': 'Notice',

@@ -5,6 +5,39 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-08-16 — Pulsar un subrayado no hacía nada
+
+Para cambiar el color de un subrayado, editar su nota o borrarlo había que salir a la pestaña
+Subrayados. Sobre el texto, el resaltado era decorado: en EPUB el callback del clic estaba
+literalmente vacío y en PDF la capa de subrayados no captura eventos a propósito (la de texto,
+encima, debe seguir siendo seleccionable).
+
+Ahora pulsarlo abre **la misma barra** de la selección en modo edición: su color va marcado,
+aparecen Nota y Eliminar, y siguen ahí copiar, compartir y el agente. No es un diálogo nuevo
+—Play Books abre un modal centrado que tapa justo el pasaje que estás anotando, que es lo
+contrario del principio 1 de DESIGN.md—.
+
+Los tres usos de la barra (selección EPUB, selección PDF, subrayado existente) se unifican en
+un `editor` que solo responde a `commit({color, note})`, `getNote()` y `remove()`. En PDF el
+`commit` recuerda el id que creó: `addPdf` siempre inserta, así que guardar dos veces desde la
+misma barra —nota y luego color— habría duplicado el pasaje.
+
+**La nota se escribe en la barra**, no en un modal, y se guarda al cerrarla: sin botón Guardar
+no hay estado "sin guardar" que perder. **Borrar es reversible** —un aviso con Deshacer, que
+cuesta un clic menos que confirmar cada vez y salva el borrado accidental, que es el que
+duele—; el tombstone conserva los campos, así que deshacer devuelve el subrayado entero. La
+papelera de la lista de la sidebar usa el mismo camino.
+
+De paso, una carrera real: el temporizador que arma el cierre "al pulsar fuera" seguía vivo
+tras cerrar la barra, así que elegir un color y tocar enseguida el subrayado recién hecho lo
+abría y lo cerraba en el acto. Cubierto por `tests/highlight-edit.spec.ts`.
+
+**No se implementan colecciones de subrayados** (la "Colección predeterminada" de Play). El
+color ya es la clasificación, y las estanterías y las libretas son las otras dos taxonomías:
+una tercera solo para subrayados es un sitio más donde perder cosas.
+
+---
+
 ## 2026-08-16 — En un PDF, el índice no decía por dónde ibas
 
 Abres un EPUB, vuelves a la biblioteca, abres un PDF: en la pestaña Contenido no se marcaba

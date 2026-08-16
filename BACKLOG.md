@@ -311,9 +311,15 @@ _(v2 posible: match exacto a nivel de palabra con `section.find` de epub.js, y n
 resultados con ↑/↓.)_
 
 ### P6 — Mejoras de subrayados · `S`–`M`
-- Exportar por color (solo amarillos, etc.); copiar el texto de un highlight al portapapeles.
-- Confirmación al borrar y borrar desde el propio resaltado en el lector.
+- Exportar por color (solo amarillos, etc.).
+- Señal de que un subrayado TIENE nota sobre el propio texto (hoy solo se ve en la lista;
+  en PDF hay un `title` nativo y en EPUB nada).
+- Al pulsar un subrayado en móvil, la barra debería ser *bottom sheet* y no flotante
+  (DESIGN.md §1.5); el patrón ya existe en `ai-sheet`.
+- ~~Borrar desde el propio resaltado en el lector~~ ✓ 2026-08-16 (con Deshacer en vez de
+  confirmación, y edición de color/nota in situ — ver CHANGELOG).
 - _(El backup/restore de highlights y bookmarks ya lo cubre P3, ver CHANGELOG.)_
+- _(Copiar el texto de un highlight al portapapeles ya está en la barra de selección.)_
 
 ### P7 — Sync entre dispositivos · **fases 0-2 y A-C ✓** `L`
 Plan completo en [`SYNC_PLAN.md`](SYNC_PLAN.md). **Fase 0**: modelo mergeable

@@ -132,6 +132,39 @@ export function removeById(id) {
   if (onChangeCallback) onChangeCallback();
 }
 
+// Un subrayado ya guardado, por identidad genérica (id de PDF o CFI de EPUB).
+export function getById(id) {
+  return getAll().find(h => (h.id ?? h.cfi) === id);
+}
+
+// Edición in situ desde el lector: cambiar color y/o nota de un subrayado existente sin
+// pasar por la lista de la sidebar. `note` sí distingue '' (borrar la nota) de undefined
+// (no tocarla) — al revés que en add(), donde '' es "no traía nota".
+export function update(id, { color, note } = {}) {
+  const highlights = getAllRaw();
+  const h = highlights.find(x => !x.deleted && (x.id ?? x.cfi) === id);
+  if (!h) return false;
+  if (color) h.color = color;
+  if (note !== undefined) h.note = note;
+  h.updatedAt = Date.now();
+  Storage.set(getKey(), highlights);
+  onChangeCallback();
+  return true;
+}
+
+// Deshace un borrado reciente (el "Deshacer" del aviso). `tombstone()` no limpia los
+// campos, así que quitarlo devuelve el subrayado entero, con su uid: el sync lo ve como
+// una edición posterior al borrado y no lo resucita en el otro dispositivo por error.
+export function restoreById(id) {
+  const highlights = getAllRaw();
+  const h = highlights.find(x => x.deleted && (x.id ?? x.cfi) === id);
+  if (!h) return false;
+  revive(h);
+  Storage.set(getKey(), highlights);
+  onChangeCallback();
+  return true;
+}
+
 export function setNote(cfi, note) {
   const highlights = getAllRaw();
   const h = highlights.find(x => !x.deleted && x.cfi === cfi);

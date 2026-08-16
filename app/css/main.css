@@ -2333,6 +2333,9 @@ body.has-taskchip .ai-taskchip.is-study { bottom: 74px; }
   transition: transform var(--transition-fast), border-color var(--transition-fast);
 }
 .highlight-color:hover { transform: scale(1.15); border-color: var(--text); }
+/* Editando un subrayado ya hecho: su color va marcado con un anillo (el mismo recurso que
+   el hover, fijo). Así se ve de qué color es sin salir a la lista. */
+.highlight-color.is-current { border-color: var(--text); transform: scale(1.15); }
 .sel-act {
   display: flex; align-items: center; gap: 8px;
   padding: 10px 16px; border: none; border-left: 1px solid var(--border-soft);
@@ -2348,6 +2351,22 @@ body.has-taskchip .ai-taskchip.is-study { bottom: 74px; }
 .sel-quick > .sel-act { flex: 1 1 0; justify-content: center; }
 .sel-quick > .sel-act:first-child { border-left: none; }
 .sel-quick .icon { color: var(--accent); }
+
+/* Eliminar: destructivo, pero no grita. Solo el icono va en rojo hasta que se apunta. */
+.sel-act--danger:hover { background: var(--danger-soft, var(--surface-3)); color: var(--danger, #e5484d); }
+.sel-act--danger .icon { color: var(--danger, #e5484d); }
+
+/* La nota se escribe dentro de la propia barra, bajo las acciones: se anota mirando el
+   pasaje, sin un modal que lo tape. Sin botón Guardar — se guarda al cerrar la barra. */
+.sel-note-box { border-top: 1px solid var(--border-soft); padding: 10px 12px; }
+.sel-note-box textarea {
+  display: block; width: 100%; min-width: 240px; box-sizing: border-box;
+  padding: 8px 10px; resize: vertical;
+  background: var(--surface-1); color: var(--text);
+  border: 1px solid var(--border); border-radius: var(--r-sm);
+  font: inherit; font-size: var(--fs-sm); line-height: 1.5;
+}
+.sel-note-box textarea:focus { outline: none; border-color: var(--accent); }
 
 /* Chip de referencia (pasaje adjunto) sobre el compositor del agente. */
 .ai-ref {

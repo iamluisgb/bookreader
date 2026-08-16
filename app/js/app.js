@@ -8,7 +8,7 @@ import * as AiPanel from './ai/panel.js';
 import * as AiDB from './ai/db.js';
 import { hydrateIcons } from './ui/icons.js';
 import { countBookWords, countPdfWords, updateProgressDetail } from './progress.js';
-import { initHighlights, setupHighlights, setupPdfSelection, drawPdfHighlights, renderHighlights, applyStoredHighlights, repaintStoredHighlights, hideHighlightTooltip, pdfFractionalRects, setBookMeta } from './highlights-ui.js';
+import { initHighlights, setupHighlights, setupPdfSelection, drawPdfHighlights, renderHighlights, applyStoredHighlights, repaintStoredHighlights, hideHighlightTooltip, pdfHighlightAt, pdfFractionalRects, setBookMeta } from './highlights-ui.js';
 import { initBookmarkButton, updateBookmarkButton, renderBookmarks } from './bookmarks-ui.js';
 import * as Library from './library/view.js';
 import * as LibStore from './library/store.js';
@@ -690,6 +690,9 @@ function initPdfTap() {
     valid = true; st = Date.now();
     sx = e.touches[0].clientX; sy = e.touches[0].clientY;
   }, { passive: true });
+  // Tocar un subrayado lo EDITA (abre la barra, ver highlights-ui): ese toque no alterna
+  // las barras. Se decide con las coords del touchstart porque en touchend ya no hay dedo.
+  const onHighlight = () => !!pdfHighlightAt(sx, sy);
   container.addEventListener('touchmove', (e) => {
     if (!valid) return;
     if (e.touches.length !== 1) { valid = false; return; }
@@ -703,6 +706,7 @@ function initPdfTap() {
     if (tip && tip.style.display !== 'none') { hideHighlightTooltip(); return; }
     const sel = window.getSelection();
     if (sel && !sel.isCollapsed) return;               // se acaba de seleccionar texto → no
+    if (onHighlight()) return;                         // el toque va a abrir la barra de edición
     setImmersive(!document.body.classList.contains('immersive'));
   }, { passive: true });
 }
