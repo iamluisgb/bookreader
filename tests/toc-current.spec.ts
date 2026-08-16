@@ -2,6 +2,8 @@ import { test, expect } from '@playwright/test';
 import path from 'path';
 
 const EPUB_PATH = path.join(__dirname, 'test.epub');
+// PDF con outline (el `test.pdf` de la suite no tiene índice).
+const PDF_PATH = path.join(__dirname, '..', 'evals', 'fixtures', 'p3-constitucion.pdf');
 
 // El índice tiene que decir dónde se está leyendo: al abrir la pestaña Contenido, la
 // sección actual va marcada (`a.current`), y solo una.
@@ -48,5 +50,27 @@ test.describe('Índice — sección actual', () => {
     const current = page.locator('#toc-list a.current');
     await expect(current).toHaveCount(1);
     await expect(current).toHaveText(label!);
+  });
+
+  // Regresión: abrir un EPUB dejaba el lector de EPUB "cargado" para siempre, así que al
+  // abrir DESPUÉS un PDF, markCurrentToc seguía yendo por la rama EPUB: el índice del PDF
+  // se quedaba sin marcar y el pie, sin capítulo. Cada load suelta ahora al otro lector.
+  test('un PDF abierto después de un EPUB también marca su sección', async ({ page }) => {
+    await page.goto('/index.html');
+    await page.setInputFiles('#file-input', EPUB_PATH);
+    await page.waitForSelector('#epub-container iframe', { timeout: 30000 });
+    await page.waitForFunction(() => !!document.querySelector('#toc-list a'), null, { timeout: 30000 });
+
+    await page.setInputFiles('#file-input', PDF_PATH);
+    await page.waitForSelector('#pdf-container canvas', { timeout: 30000 });
+    await page.waitForFunction(
+      () => !!document.querySelector('#toc-list a[data-toc-page]'), null, { timeout: 30000 });
+
+    await page.getByRole('button', { name: 'Abrir sidebar' }).click();
+
+    const current = page.locator('#toc-list a.current');
+    await expect(current).toHaveCount(1);
+    await expect(current).toHaveAttribute('aria-current', 'location');
+    await expect(page.locator('#progress-chapter')).not.toBeEmpty();
   });
 });

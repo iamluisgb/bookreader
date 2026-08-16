@@ -1004,6 +1004,9 @@ async function loadEpub(buffer, bookId, aiBookId, persist = null) {
   const seq = ++epubLoadSeq;
   try {
     resetSearch();
+    // Soltar el PDF anterior: media app decide el lector activo con `isLoaded()`, y el
+    // que no se suelta sigue contestando que sí desde el libro que ya no está en pantalla.
+    PdfReader.deactivate();
     console.log('Loading EPUB, buffer size:', buffer.byteLength);
 
     // Hash estable del fichero (id canónico). Se reutiliza si ya viene calculado.
@@ -1100,6 +1103,10 @@ async function loadPdf(buffer, bookId, aiBookId, persist = null, displayTitle = 
   const seq = ++pdfLoadSeq;
   try {
     resetSearch();
+    // Soltar el EPUB anterior (ver el comentario gemelo en loadEpub): con el EPUB vivo,
+    // markCurrentToc/seek/prev seguían yendo por su rama y el PDF se quedaba sin marca
+    // de sección en el índice ni capítulo en el pie.
+    EpubReader.deactivate();
     totalWords = 0;   // el de este PDF se estima al final; no heredar el del libro anterior
     // Hash estable del contenido (id canónico para el agente). Se reutiliza si ya viene dado.
     if (!aiBookId) aiBookId = await AiDB.hashBuffer(buffer.slice(0));

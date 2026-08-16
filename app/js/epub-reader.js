@@ -420,15 +420,25 @@ export function restoredSavedPosition() {
   return restoredSaved;
 }
 
-export async function load(arrayBuffer, onProgress) {
-  if (book) {
-    try { await book.destroy(); } catch(e) { console.warn('Destroy error:', e); }
-    book = null;
-    rendition = null;
-  }
+// Deja de ser el lector activo: `isLoaded()` vuelve a false. Lo llama app.js al abrir un
+// PDF, porque «qué lector está activo» se decide preguntando a los dos (isLoaded) y un
+// EPUB que no se soltó seguía respondiendo que sí — con el PDF ya en pantalla.
+// SUELTA la referencia pero NO destruye el libro: el agente sigue segmentándolo en
+// segundo plano bajo SU id y destruirlo a media carga le dejaba la caché vacía
+// (tests/book-switch.spec.ts). Lo libera el GC cuando el panel también lo suelta.
+export function deactivate() {
+  book = null;
+  rendition = null;
   lastChapterLabel = null;   // IA2: nuevo libro → reinicia el seguimiento de capítulo
   pinnedCfi = null;
   restoredSaved = false;
+}
+
+export async function load(arrayBuffer, onProgress) {
+  if (book) {
+    try { await book.destroy(); } catch(e) { console.warn('Destroy error:', e); }
+  }
+  deactivate();
 
   console.log('Creating ePub book from ArrayBuffer...');
   book = ePub(arrayBuffer);

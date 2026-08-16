@@ -270,6 +270,18 @@ export function getTotalPages() {
   return totalPages;
 }
 
+// Deja de ser el lector activo: `isLoaded()` vuelve a false. Lo llama app.js al abrir un
+// EPUB, porque «qué lector está activo» se decide preguntando a los dos (isLoaded) y un
+// PDF que no se soltó seguía diciendo que sí desde el libro anterior.
+// SUELTA la referencia pero NO destruye el documento (ver el gemelo en epub-reader.js):
+// el agente lo sigue recorriendo para segmentarlo bajo su propio id.
+export function deactivate() {
+  teardownScroll();
+  pdfDoc = null;
+  totalPages = 0;
+  flatOutline = null;
+}
+
 export async function load(arrayBuffer, onProgress) {
   const lib = getPdfjs();
   if (!lib) {
@@ -278,8 +290,8 @@ export async function load(arrayBuffer, onProgress) {
 
   if (pdfDoc) {
     try { pdfDoc.destroy(); } catch(e) { console.warn('pdf destroy error:', e); }
-    pdfDoc = null;
   }
+  deactivate();
 
   currentPage = 1;
   zoom = 1;                     // cada libro empieza ajustado a ancho

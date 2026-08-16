@@ -5,6 +5,27 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-08-16 — En un PDF, el índice no decía por dónde ibas
+
+Abres un EPUB, vuelves a la biblioteca, abres un PDF: en la pestaña Contenido no se marcaba
+ninguna sección y el pie se quedaba sin capítulo. Con el PDF abierto en frío funcionaba, y
+por eso costaba verlo.
+
+El fallo no estaba en `markCurrentToc`, sino en **quién decía ser el lector activo**. Media app
+resuelve el formato preguntando a los dos módulos (`EpubReader.isLoaded()` /
+`PdfReader.isLoaded()`), y `isLoaded` solo miraba si el módulo tenía un libro cargado —nunca si
+seguía en pantalla—. El EPUB solo se soltaba dentro de su propio `load()`, así que al abrir un
+PDF el EPUB seguía contestando que sí y `markCurrentToc` entraba por su rama, buscando un
+`href` entre entradas que ya solo tenían página. Lo mismo afectaba a la barra de progreso
+(`getSeekPreview`, `seekToFraction`) y a las flechas de página.
+
+Cada lector expone ahora `deactivate()`, y `loadPdf`/`loadEpub` sueltan al otro antes de cargar.
+`deactivate()` suelta la referencia pero **no destruye** el documento: el agente puede estar
+segmentando el libro anterior en segundo plano y destruirlo a media carga le dejaba la caché
+vacía (`tests/book-switch.spec.ts` lo cubre). Regresión fijada en `tests/toc-current.spec.ts`.
+
+---
+
 ## 2026-08-05 — Las citas de un PDF saltaban a la página y no señalaban nada
 
 Pinchabas `[[aN]]` en el chat, el lector iba a la página correcta y el pasaje no se resaltaba.
