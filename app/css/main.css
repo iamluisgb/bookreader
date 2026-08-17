@@ -449,7 +449,18 @@ html, body {
   align-items: center;
   gap: 6px;
 }
-.highlight-item .highlight-meta > span { margin-right: auto; }
+/* Capítulo y fecha a la izquierda, acciones a la derecha. El empuje lo da el primer BOTÓN,
+   no el span: así la fila no se descoloca cuando un subrayado no trae fecha (los importados
+   de un backup antiguo). El capítulo cede espacio antes que la fecha —un título largo se
+   recorta, pero el "cuándo" se lee entero—. */
+.highlight-item .highlight-meta > span:first-child {
+  min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.highlight-item .highlight-when { flex: none; }
+/* Separador solo cuando hay capítulo delante (si no, el punto quedaría huérfano). */
+.highlight-item .highlight-meta > span + .highlight-when::before { content: '·'; margin-right: 6px; }
+.highlight-item .highlight-share { margin-left: auto; }
 
 .highlight-item .highlight-share,
 .highlight-item .highlight-delete {

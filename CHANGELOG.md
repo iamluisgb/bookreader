@@ -5,6 +5,26 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-08-17 — La lista de subrayados no decía cuándo
+
+Ordena por fecha de creación —lo último subrayado, arriba—, pero sin la fecha a la vista ese
+orden era adivinanza: dos pasajes de la página 160 sobre uno de la 157 parecen desordenados
+hasta que sabes que el criterio es el tiempo, no el libro.
+
+Cada ficha muestra ahora el cuándo junto al capítulo: relativo mientras signifique algo
+("hace 3 h") y fecha corta a partir de la semana ("7 jul" — un subrayado de hace tres meses no
+se sitúa mejor con "hace 92 días"). El `title` lleva fecha y hora completas. El formateador
+sale a `js/ui/when.js`, compartido: el Studio tenía el suyo en privado.
+
+**De paso, un fallo del cambio de lector del día anterior.** `deactivate()` anulaba el libro,
+y si el usuario cambiaba de libro MIENTRAS el anterior aún se abría, la carga en vuelo se
+quedaba sin documento y el agente sin nada que segmentar (`book-switch.spec.ts` lo cazó, 2 de
+cada 3 veces). Desactivar baja ahora una BANDERA y no toca el documento: `isLoaded()` pasa a
+ser "hay libro Y es el que está en pantalla", y un `claimSeq` arbitra entre una carga en vuelo
+y el lector que se le adelanta.
+
+---
+
 ## 2026-08-16 — Pulsar un subrayado no hacía nada
 
 Para cambiar el color de un subrayado, editar su nota o borrarlo había que salir a la pestaña

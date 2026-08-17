@@ -10,6 +10,10 @@ import * as TouchSelect from './touch-select.js';
 const COARSE = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
 
 let book = null;
+// El lector en pantalla, que no es lo mismo que "tiene un libro cargado" (ver isLoaded).
+// `claimSeq` arbitra entre una carga en vuelo y el lector que se le adelanta.
+let active = false;
+let claimSeq = 0;
 let rendition = null;
 let currentCfi = null;
 let restoredSaved = false;  // el open restauró lastPosition_ (manda sobre lastCfi de la biblioteca)
@@ -405,8 +409,11 @@ function sizeContainer(container) {
   container.classList.toggle('has-desk', margin >= DESK_MIN_MARGIN);
 }
 
+// "Cargado" = hay libro Y es el lector que está en pantalla. Media app decide el formato
+// activo con esto (índice, barra de progreso, flechas), así que un EPUB que ya no se ve no
+// puede seguir diciendo que sí — ver deactivate().
 export function isLoaded() {
-  return book !== null;
+  return book !== null && active;
 }
 
 export function getCurrentCfi() {
@@ -420,25 +427,30 @@ export function restoredSavedPosition() {
   return restoredSaved;
 }
 
-// Deja de ser el lector activo: `isLoaded()` vuelve a false. Lo llama app.js al abrir un
-// PDF, porque «qué lector está activo» se decide preguntando a los dos (isLoaded) y un
-// EPUB que no se soltó seguía respondiendo que sí — con el PDF ya en pantalla.
-// SUELTA la referencia pero NO destruye el libro: el agente sigue segmentándolo en
-// segundo plano bajo SU id y destruirlo a media carga le dejaba la caché vacía
-// (tests/book-switch.spec.ts). Lo libera el GC cuando el panel también lo suelta.
+// Deja de ser el lector activo (lo llama app.js al abrir un PDF). Baja la BANDERA, no el
+// libro: la carga del EPUB puede seguir en vuelo —el usuario cambia de libro mientras el
+// anterior aún se abre— y anular `book` a media carga dejaba al agente sin nada que
+// segmentar, con su caché vacía (tests/book-switch.spec.ts). El libro se libera cuando
+// otro EPUB ocupa su sitio en load().
 export function deactivate() {
-  book = null;
-  rendition = null;
+  active = false;
+  claimSeq++;                // una carga en vuelo sabrá que la han jubilado
   lastChapterLabel = null;   // IA2: nuevo libro → reinicia el seguimiento de capítulo
   pinnedCfi = null;
   restoredSaved = false;
 }
 
 export async function load(arrayBuffer, onProgress) {
+  const mine = ++claimSeq;
+  active = true;
   if (book) {
     try { await book.destroy(); } catch(e) { console.warn('Destroy error:', e); }
+    book = null;
+    rendition = null;
   }
-  deactivate();
+  lastChapterLabel = null;
+  pinnedCfi = null;
+  restoredSaved = false;
 
   console.log('Creating ePub book from ArrayBuffer...');
   book = ePub(arrayBuffer);
@@ -549,6 +561,7 @@ export async function load(arrayBuffer, onProgress) {
     fadeChapterIn();
   });
 
+  if (claimSeq !== mine) active = false;   // otro lector tomó la pantalla mientras cargaba
   return book;
 }
 

@@ -15,6 +15,7 @@ import { dehyphenate } from './ui/text.js';
 import { alertBox } from './ui/dialog.js';
 import { shareQuote } from './share-card.js';
 import { toast } from './ai/toast.js';
+import { whenLabel, fullWhen } from './ui/when.js';
 
 const DEFAULT_COLOR = '#ffd54f';
 
@@ -611,7 +612,8 @@ export function renderHighlights() {
       <div class="highlight-text">"${escapeHtml(dehyphenate(hl.text))}"</div>
       ${hl.note ? `<div class="highlight-note">${icon('note', { size: 13 })}<span>${escapeHtml(hl.note)}</span></div>` : ''}
       <div class="highlight-meta">
-        <span>${escapeHtml(hl.chapter)}</span>
+        ${hl.chapter ? `<span>${escapeHtml(hl.chapter)}</span>` : ''}
+        ${hl.timestamp ? `<span class="highlight-when" title="${escapeHtml(fullWhen(hl.timestamp))}">${escapeHtml(whenLabel(hl.timestamp))}</span>` : ''}
         <button class="highlight-share" title="Compartir">${icon('share', { size: 15 })}</button>
         <button class="highlight-delete" title="Eliminar">${icon('xmark', { size: 16 })}</button>
       </div>

@@ -17,6 +17,7 @@ import * as Jobs from './jobs.js';
 import { icon } from '../ui/icons.js';
 import { escapeHtml } from '../ui/escape.js';
 import { confirmBox } from '../ui/dialog.js';
+import { ago } from '../ui/when.js';
 
 // Tipos de artefacto. `stateful` = participa del historial de jobs (resumen/mapa). Flashcards no
 // es un artefacto persistido: es una acción (genera un mazo Anki), así que va como invitación.
@@ -44,16 +45,6 @@ export function mount(el, { open, getContext }) {
 
 function isVisible() {
   return !!container && container.classList.contains('active');
-}
-
-function ago(ts) {
-  if (!ts) return '';
-  const s = (Date.now() - ts) / 1000;
-  if (s < 60) return t('hace un momento');
-  if (s < 3600) return t('hace {n} min', { n: Math.round(s / 60) });
-  if (s < 86400) return t('hace {n} h', { n: Math.round(s / 3600) });
-  const d = Math.round(s / 86400);
-  return d === 1 ? t('hace {n} día', { n: d }) : t('hace {n} días', { n: d });
 }
 
 // Metadatos de un artefacto: ámbito + (citas, solo resumen) + antigüedad. Distingue los del

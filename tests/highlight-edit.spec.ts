@@ -30,17 +30,20 @@ test.describe('Subrayado · edición desde el lector', () => {
   async function selectInEpub(page) {
     // La primera página de test.epub es la portadilla (una imagen, sin texto): se avanza
     // hasta una página con prosa que seleccionar.
+    // `?.body` no es paranoia: entre páginas epub.js REEMPLAZA el iframe, y leerlo justo
+    // entonces da un documento sin body.
     await expect.poll(async () => page.evaluate(async () => {
       const doc = (document.querySelector('#epub-container iframe') as HTMLIFrameElement)?.contentDocument;
-      if (doc && doc.body.textContent!.trim().length > 60) return true;
+      if ((doc?.body?.textContent || '').trim().length > 60) return true;
       await (await import('/js/epub-reader.js') as any).next();
       return false;
-    }, ), { message: 'no se encontró una página con texto en el EPUB', timeout: 30000 }).toBe(true);
+    }), { message: 'no se encontró una página con texto en el EPUB', timeout: 30000 }).toBe(true);
 
     const gesto = () => page.evaluate(() => {
-      const doc = (document.querySelector('#epub-container iframe') as HTMLIFrameElement).contentDocument!;
-      const p = [...doc.body.querySelectorAll('*')]
-        .find(el => el.children.length === 0 && (el.textContent || '').trim().length > 20)!;
+      const doc = (document.querySelector('#epub-container iframe') as HTMLIFrameElement)?.contentDocument;
+      const p = doc?.body && [...doc.body.querySelectorAll('*')]
+        .find(el => el.children.length === 0 && (el.textContent || '').trim().length > 20);
+      if (!p) return;              // iframe a medio reemplazar: el gesto se reintenta
       const range = doc.createRange();
       range.selectNodeContents(p);
       const sel = doc.defaultView!.getSelection()!;
@@ -129,17 +132,25 @@ test.describe('Subrayado · edición desde el lector', () => {
     await page.waitForSelector('#pdf-container canvas', { timeout: 30000 });
     await page.waitForSelector('#pdf-container .textLayer span', { timeout: 30000 });
 
-    // Seleccionar texto de la capa del PDF y subrayarlo en rosa.
-    await page.evaluate(() => {
-      const span = document.querySelector('#pdf-container .textLayer span')!;
+    // Seleccionar texto de la capa del PDF y subrayarlo en rosa. El gesto se REINTENTA (el
+    // mismo motivo que en pdf.spec.ts: lanzado antes de que el manejador esté puesto se
+    // pierde en silencio, y el fallo aparece luego, en la espera de la barra).
+    const gesto = () => page.evaluate(() => {
+      const span = document.querySelector('#pdf-container .textLayer span');
+      if (!span) return;
       const range = document.createRange();
       range.selectNodeContents(span);
       const sel = window.getSelection()!;
       sel.removeAllRanges();
       sel.addRange(range);
-      document.getElementById('pdf-container')!.dispatchEvent(new Event('mouseup', { bubbles: true }));
+      document.getElementById('pdf-container')!.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
     });
-    await expect(page.locator('#highlight-tooltip')).toBeVisible({ timeout: 15000 });
+    await gesto();
+    await expect.poll(async () => {
+      if (await page.locator('#highlight-tooltip').isVisible()) return true;
+      await gesto();
+      return false;
+    }, { message: 'la barra de selección no apareció en el PDF', timeout: 20000 }).toBe(true);
     await page.locator('.highlight-color[data-color="#f06292"]').click();
     await expect(page.locator('#pdf-container .pdf-hl-group')).toHaveCount(1);
 
@@ -163,4 +174,38 @@ test.describe('Subrayado · edición desde el lector', () => {
     });
     expect(saved).toEqual([{ note: 'nota del pdf', color: '#f06292' }]);
   });
+});
+
+// La lista de la sidebar ordena por fecha de creación (lo último subrayado, arriba). Sin
+// fecha a la vista ese orden era adivinanza: se muestra junto al capítulo, relativa mientras
+// signifique algo y como fecha corta a partir de la semana.
+test('la lista de subrayados muestra cuándo se hizo cada uno', async ({ page }) => {
+  await page.goto('/index.html');
+  await page.setInputFiles('#file-input', PDF_PATH);
+  await page.waitForSelector('#pdf-container .textLayer span', { timeout: 30000 });
+
+  await page.evaluate(async () => {
+    const H: any = await import('/js/highlights.js');
+    const rects = [{ left: .1, top: .1, width: .5, height: .02 }];
+    H.addPdf(3, rects, 'el más viejo', '#ffd54f', 'Pág. 3', '');
+    H.addPdf(1, rects, 'de hace un rato', '#ffd54f', 'Pág. 1', '');
+    // Envejecer el primero: 40 días atrás → deja de ser relativo y pasa a fecha.
+    const key = Object.keys(localStorage).find(k => k.startsWith('bookreader_highlights_'))!;
+    const all = JSON.parse(localStorage.getItem(key)!);
+    all[0].timestamp = Date.now() - 40 * 86400 * 1000;
+    localStorage.setItem(key, JSON.stringify(all));
+  });
+  await page.evaluate(async () => (await import('/js/highlights-ui.js') as any).renderHighlights());
+
+  const items = page.locator('.highlight-item');
+  await expect(items).toHaveCount(2);
+  // El más reciente va primero (orden por timestamp, descendente).
+  await expect(items.nth(0).locator('.highlight-text')).toContainText('de hace un rato');
+  await expect(items.nth(0).locator('.highlight-when')).toHaveText(/hace|ago/);
+  // Y el de hace 40 días se muestra como fecha, no como "hace 40 días".
+  const viejo = await items.nth(1).locator('.highlight-when').textContent();
+  expect(viejo).not.toMatch(/hace|ago/);
+  expect(viejo!.trim().length).toBeGreaterThan(2);
+  // El tooltip lleva la fecha y hora completas.
+  await expect(items.nth(1).locator('.highlight-when')).toHaveAttribute('title', /\d/);
 });

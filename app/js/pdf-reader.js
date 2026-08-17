@@ -2,6 +2,10 @@ import * as Storage from './storage.js';
 
 let pdfjsLib = null;
 let pdfDoc = null;
+// El lector en pantalla (ver isLoaded/deactivate). `claimSeq` arbitra entre una carga en
+// vuelo y el lector que se le adelanta.
+let active = false;
+let claimSeq = 0;
 let currentPage = 1;
 let totalPages = 0;
 let onPageCallback = null;
@@ -253,8 +257,10 @@ function getPdfjs() {
   return pdfjsLib;
 }
 
+// "Cargado" = hay documento Y es el lector que está en pantalla (ver deactivate y el
+// gemelo en epub-reader.js).
 export function isLoaded() {
-  return pdfDoc !== null;
+  return pdfDoc !== null && active;
 }
 
 // Documento pdf.js cargado (para el agente: segment-pdf lo recorre con getTextContent/getOutline).
@@ -270,16 +276,14 @@ export function getTotalPages() {
   return totalPages;
 }
 
-// Deja de ser el lector activo: `isLoaded()` vuelve a false. Lo llama app.js al abrir un
-// EPUB, porque «qué lector está activo» se decide preguntando a los dos (isLoaded) y un
-// PDF que no se soltó seguía diciendo que sí desde el libro anterior.
-// SUELTA la referencia pero NO destruye el documento (ver el gemelo en epub-reader.js):
-// el agente lo sigue recorriendo para segmentarlo bajo su propio id.
+// Deja de ser el lector activo (lo llama app.js al abrir un EPUB). Baja la BANDERA, no el
+// documento: el agente puede estar recorriéndolo para segmentarlo bajo su propio id, y una
+// carga aún en vuelo no debe quedarse sin documento a medias (ver el gemelo en
+// epub-reader.js y tests/book-switch.spec.ts).
 export function deactivate() {
   teardownScroll();
-  pdfDoc = null;
-  totalPages = 0;
-  flatOutline = null;
+  active = false;
+  claimSeq++;
 }
 
 export async function load(arrayBuffer, onProgress) {
@@ -288,10 +292,13 @@ export async function load(arrayBuffer, onProgress) {
     throw new Error('pdf.js not loaded');
   }
 
+  const mine = ++claimSeq;
+  active = true;
   if (pdfDoc) {
     try { pdfDoc.destroy(); } catch(e) { console.warn('pdf destroy error:', e); }
+    pdfDoc = null;
   }
-  deactivate();
+  flatOutline = null;
 
   currentPage = 1;
   zoom = 1;                     // cada libro empieza ajustado a ancho
@@ -338,6 +345,7 @@ export async function load(arrayBuffer, onProgress) {
 
   await rerender();
 
+  if (claimSeq !== mine) active = false;   // otro lector tomó la pantalla mientras cargaba
   return pdfDoc;
 }
 
