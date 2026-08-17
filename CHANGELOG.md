@@ -5,6 +5,24 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-08-17 — Al marcar una zona, media página quedaba atenuada y media no
+
+El modo de captura de zona atenúa el hueco del lector para que se vea qué se va a mandar al
+modelo. Se atenuaba solo una parte, con un corte vertical a media página — y lo importante no
+era lo feo: **la mitad de fuera no recibía el arrastre**, porque la capa que captura el puntero
+terminaba ahí.
+
+La capa se medía UNA vez, al montarla. Y quien la monta es el panel del agente, que se aparta
+justo antes (`setOpen(false)`): el lector ensancha con una transición CSS que todavía no ha
+ocurrido cuando se mide, así que la capa se quedaba con el ancho de cuando el panel estaba
+abierto. El corte caía justo donde empezaba el panel.
+
+Ahora la capa sigue al hueco con un `ResizeObserver` (dispara en cada paso de la transición)
+más el `resize` de ventana, en vez de perseguirlo con un temporizador. Cubierto en
+`region-vision.spec.ts` — comprobado que el test falla sin el arreglo.
+
+---
+
 ## 2026-08-17 — La lista de subrayados no decía cuándo
 
 Ordena por fecha de creación —lo último subrayado, arriba—, pero sin la fecha a la vista ese

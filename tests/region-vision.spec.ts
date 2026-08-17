@@ -68,6 +68,46 @@ test('el marco se dibuja donde se arrastra y devuelve el rect de esa página', a
   expect(await page.locator('.region-overlay').count()).toBe(0);
 });
 
+// El overlay lo abre el panel del agente, que se aparta justo antes: el hueco del lector
+// ENSANCHA con una transición CSS posterior a la medida. Medir una sola vez dejaba media
+// página atenuada y media no —y la mitad de fuera no recibía el arrastre—.
+test('la capa sigue al hueco del lector cuando el panel se aparta', async ({ page }) => {
+  // ≥1024: por debajo el panel es un drawer que NO empuja al lector (main.css), y entonces
+  // no hay nada que seguir.
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await openPdf(page);
+  // Panel abierto: el lector queda estrecho (margin-right = ancho del panel).
+  await page.evaluate(() => document.body.classList.add('ai-open'));
+  await page.waitForTimeout(400);   // que asiente la transición antes de medir
+
+  const before = await page.evaluate(async () => {
+    const RS: any = await import('/js/region-select.js');
+    RS.start({ onPick: () => {}, onCancel: () => {} });
+    const o = document.querySelector('.region-overlay')!.getBoundingClientRect();
+    const c = document.getElementById('pdf-container')!.getBoundingClientRect();
+    return { overlay: o.width, container: c.width };
+  });
+  expect(before.overlay).toBeCloseTo(before.container, 0);
+
+  // El panel se aparta con la capa YA puesta.
+  await page.evaluate(() => document.body.classList.remove('ai-open'));
+
+  // Las DOS condiciones en la misma espera, y a propósito: el lector tiene que haber
+  // ensanchado de verdad Y la capa tiene que coincidir con él. Comprobarlas por separado da
+  // un test tramposo por los dos lados —recién quitada la clase ambos miden todavía lo
+  // mismo, y a mitad de la transición la capa va legítimamente un fotograma por detrás—.
+  // Sin el ResizeObserver la capa se queda clavada en el ancho de antes y esto no converge.
+  await expect.poll(async () => page.evaluate((prevW) => {
+    const o = document.querySelector('.region-overlay')?.getBoundingClientRect();
+    const c = document.getElementById('pdf-container')!.getBoundingClientRect();
+    if (!o) return false;
+    return c.width > prevW + 50 && Math.abs(o.width - c.width) <= 1 && Math.abs(o.left - c.left) <= 1;
+  }, before.container), { message: 'la capa de selección no siguió al hueco del lector', timeout: 5000 })
+    .toBe(true);
+
+  await page.evaluate(async () => (await import('/js/region-select.js') as any).cancel());
+});
+
 test('un toque sin arrastre cancela en vez de recortar un sello', async ({ page }) => {
   await openPdf(page);
   const r = await page.evaluate(async () => {

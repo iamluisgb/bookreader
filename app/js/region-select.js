@@ -12,6 +12,7 @@ import { t } from './i18n.js';
 
 let overlay = null;
 let onDone = null;
+let unwatch = null;   // deja de seguir al contenedor (ver watchContainer)
 
 export function isActive() { return !!overlay; }
 
@@ -44,6 +45,7 @@ export function start({ onPick, onCancel, onWholePage } = {}) {
   // salen los marcos desplazados en cuanto la página es más alta que la ventana.
   document.body.appendChild(overlay);
   placeOverlay(container);
+  watchContainer(container);
   document.body.classList.add('region-selecting');
 
   const box = overlay.querySelector('.region-box');
@@ -109,6 +111,7 @@ export function start({ onPick, onCancel, onWholePage } = {}) {
 
 export function cancel() {
   document.removeEventListener('keydown', onKey, true);
+  if (unwatch) { unwatch(); unwatch = null; }
   if (overlay) { overlay.remove(); overlay = null; }
   document.body.classList.remove('region-selecting');
   onDone = null;
@@ -142,6 +145,26 @@ export function normalize(a, b) {
     y: Math.min(a.y, b.y),
     w: Math.abs(b.x - a.x),
     h: Math.abs(b.y - a.y),
+  };
+}
+
+// El hueco del lector CAMBIA mientras la capa está puesta: quien abre la selección es el
+// panel del agente, que se aparta justo antes (`setOpen(false)`), y el ensanchado del lector
+// es una transición CSS que aún no ha ocurrido cuando se mide. Medir una sola vez dejaba la
+// capa con el ancho de antes: media página atenuada y media no —y, peor, la mitad de fuera
+// no recibía el arrastre—. El ResizeObserver dispara en cada paso de la transición, así que
+// la capa acompaña al hueco en vez de perseguirlo con un temporizador.
+function watchContainer(container) {
+  const place = () => { if (overlay) placeOverlay(container); };
+  let ro = null;
+  try {
+    ro = new ResizeObserver(place);
+    ro.observe(container);
+  } catch (e) { /* sin ResizeObserver: queda el resize de ventana */ }
+  window.addEventListener('resize', place);
+  unwatch = () => {
+    try { ro?.disconnect(); } catch (e) {}
+    window.removeEventListener('resize', place);
   };
 }
 
