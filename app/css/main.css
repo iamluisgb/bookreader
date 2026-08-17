@@ -4,6 +4,13 @@
   box-sizing: border-box;
 }
 
+/* `hidden` tiene que ganar SIEMPRE. El `display:none` que el navegador da a [hidden] lo pisa
+   cualquier `display:flex/grid` de una clase (más específico), y eso ya nos había mordido
+   cinco veces —cada una parcheada aparte, cada una descubierta en producción: la última, un
+   botón "Eliminar" visible al subrayar algo que aún no existía—. Una sola regla, arriba, en
+   vez de tener que acordarse en cada componente nuevo. */
+[hidden] { display: none !important; }
+
 html, body {
   height: 100%;
   overflow: hidden;
@@ -485,7 +492,6 @@ html, body {
 
 /* Grupos ocultos por formato (data-format + updateFormatScopedUI). Explícito para que
    añadir un `display` a .settings-group no resucite el grupo oculto. */
-.settings-group[hidden] { display: none; }
 
 .settings-group label {
   display: block;
@@ -1354,7 +1360,6 @@ body.resizing-panel .reader-main { transition: none !important; }
   border-radius: var(--r-md);
   background: var(--surface-0);
 }
-.mic-bar[hidden] { display: none; }
 textarea.is-recording { display: none; }
 
 .mic-bar-cancel {
@@ -1653,9 +1658,6 @@ textarea.is-recording { display: none; }
   background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center;
   padding: 20px;
 }
-/* `display:flex` gana a [hidden] por especificidad; sin esto, minimizar la sesión de
-   estudio (F2) dejaría el overlay tapando el libro al que se acaba de saltar. */
-.ai-onboarding[hidden] { display: none; }
 .ai-ob-card {
   position: relative;
   background: var(--surface-1); border: 1px solid var(--border); border-radius: 16px;
@@ -1889,7 +1891,6 @@ body.has-taskchip .ai-taskchip.is-study { bottom: 74px; }
   background: var(--surface-1); border: 1px solid var(--border); border-radius: var(--r-md);
   box-shadow: var(--shadow-3); padding: 6px; max-height: 300px; display: flex; flex-direction: column;
 }
-.fc-combo-pop[hidden] { display: none; }
 .fc-combo-search {
   width: 100%; box-sizing: border-box; border: 1px solid var(--border); border-radius: var(--r-sm);
   padding: 8px 10px; background: var(--surface-0); color: var(--text); font-family: inherit; font-size: 14px;
@@ -1991,7 +1992,6 @@ body.has-taskchip .ai-taskchip.is-study { bottom: 74px; }
 .study-q, .study-a { font-size: 19px; line-height: 1.5; overflow-wrap: break-word; }
 .study-q { font-weight: 600; }
 .study-a { color: var(--text); border-top: 1px solid var(--border); padding-top: 16px; }
-.study-a[hidden] { display: none; }
 .study-cloze {
   background: var(--accent-soft); color: var(--accent);
   border-radius: var(--r-sm); padding: 0 6px; font-weight: 700;
@@ -2176,9 +2176,6 @@ body.has-taskchip .ai-taskchip.is-study { bottom: 74px; }
 .appset-check { display: flex; align-items: center; gap: 8px; margin-top: 14px; font-size: 13px; color: var(--text-soft); }
 .appset-save { width: 100%; margin-top: 16px; padding: 8px; font-size: 14px; }
 .appset-saved { display: flex; align-items: center; gap: 5px; margin: 8px 0 0; font-size: 12px; color: var(--accent); }
-/* `display:flex` de la regla de arriba gana al [hidden] de la hoja del navegador, así
-   que el "Guardado" se veía siempre, desde el primer render. */
-.appset-saved[hidden] { display: none; }
 .appset-privacy {
   display: flex; align-items: flex-start; gap: 6px; margin: 14px 0 0;
   font-size: 11px; line-height: 1.5; color: var(--text-faint);

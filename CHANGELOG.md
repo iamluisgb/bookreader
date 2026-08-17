@@ -5,6 +5,24 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-08-17 — "Eliminar" en la barra de subrayar, sin nada que eliminar
+
+Al seleccionar texto —cuando el pasaje todavía no es un subrayado— la barra ofrecía Eliminar.
+El botón se marcaba `hidden` desde el primer momento; lo que fallaba es que el `display:flex`
+de `.sel-act` le gana por especificidad al `display:none` que el navegador da a `[hidden]`.
+
+Es la SEXTA vez que este choque muerde en esta hoja: había cinco parches puntuales
+(`.settings-group`, `.mic-bar`, `.ai-onboarding`, `.fc-combo-pop`, `.study-a`,
+`.appset-saved`), cada uno con su comentario explicando lo mismo, cada uno descubierto en
+producción. En vez de añadir el sexto, una sola regla arriba del todo —`[hidden] { display:
+none !important; }`— y fuera los cinco parches: ya no hay que acordarse en cada componente
+nuevo.
+
+Los tests de la barra afirman ahora los DOS estados: sin subrayado, Eliminar no está; sobre
+un subrayado, sí.
+
+---
+
 ## 2026-08-17 — Al marcar una zona, media página quedaba atenuada y media no
 
 El modo de captura de zona atenúa el hueco del lector para que se vea qué se va a mandar al

@@ -65,6 +65,11 @@ test.describe('Subrayado · edición desde el lector', () => {
     await openEpub(page);
     await selectInEpub(page);
 
+    // Sobre una selección todavía sin subrayar, Eliminar no pinta nada: no hay qué borrar.
+    // (Salía visible: el `display:flex` de .sel-act le ganaba al [hidden] del navegador.)
+    await expect(page.locator('#sel-delete')).toBeHidden();
+    await expect(page.locator('#sel-note-box')).toBeHidden();
+
     await page.locator('#sel-note').click();
     await expect(page.locator('#sel-note-box')).toBeVisible();
     await page.locator('#sel-note-input').fill('mi nota inline');
@@ -151,6 +156,7 @@ test.describe('Subrayado · edición desde el lector', () => {
       await gesto();
       return false;
     }, { message: 'la barra de selección no apareció en el PDF', timeout: 20000 }).toBe(true);
+    await expect(page.locator('#sel-delete')).toBeHidden();   // aún no hay subrayado
     await page.locator('.highlight-color[data-color="#f06292"]').click();
     await expect(page.locator('#pdf-container .pdf-hl-group')).toHaveCount(1);
 
