@@ -16,6 +16,7 @@ import { shareQuote } from './share-card.js';
 import { toast } from './ai/toast.js';
 import { whenLabel, fullWhen } from './ui/when.js';
 import { toScreen, anchorRect } from './ui/frame-rect.js';
+import * as PdfTextSelect from './pdf-text-select.js';
 
 const DEFAULT_COLOR = '#ffd54f';
 
@@ -302,6 +303,10 @@ export function setupPdfSelection() {
   const container = document.getElementById('pdf-container');
   if (!container || container.dataset.selWired) return;
   container.dataset.selWired = '1';   // no re-atar en cada render/página
+
+  // La selección con ratón se acota a la mancha de texto: sin esto, arrancar el arrastre en
+  // un margen ancla donde el DOM le parece y se traga media página (ver pdf-text-select.js).
+  PdfTextSelect.install(container);
 
   const onSelectEnd = () => setTimeout(() => {
     const cap = capturePdfSelection();

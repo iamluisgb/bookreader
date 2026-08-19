@@ -1523,6 +1523,51 @@ así que un temblor de 11 px al posar el dedo cancela la selección _y_ arranca 
 no se rearma: moverse pronto inutiliza el long-press para todo ese gesto. Subir `SWIPE_START` a ~18 px
 separaría los dos gestos. No se ha tocado porque es una decisión de tacto, no un defecto medible.
 
+### TEC7 — En el PDF, seleccionar un párrafo se tragaba lo de arriba · **✓ (2026-08-19)** `M`
+
+**Síntoma**: arrastrar sobre un párrafo seleccionaba además bloques de más arriba de la página.
+
+**Causa**: la capa de texto de pdf.js son `<span>` posicionados en absoluto, y su orden en el DOM
+es el del flujo de contenido del PDF, que no tiene por qué parecerse a lo que se ve. Cuando el
+puntero cae en un **hueco** —el margen, el aire entre dos bloques, más allá del final de una línea—
+el navegador resuelve el cursor por proximidad **en el DOM**, no en la página, y aterriza donde le
+parece.
+
+Medido sobre `tests/test-multipage.pdf`, queriendo un párrafo de **223** caracteres:
+
+| caso | obtenido antes | después |
+| --- | --- | --- |
+| sobre el texto (control) | 222 | 222 |
+| arranca en el margen izquierdo | **684** — ancla en la cabecera de la página | 222 |
+| arranca fuera de la caja de la página | **684** | 222 |
+| suelta 120 px a la derecha del final | **592** | 223 |
+
+Los dos extremos estaban rotos, no solo el ancla.
+
+**Lo que NO lo arregla**: el mecanismo `.endOfContent` del visor de pdf.js. Se implementó y se
+midió: cero efecto en los cuatro casos. Ataca el desbordamiento hacia abajo al arrastrar fuera de
+la página, no el anclaje. (`renderTextLayer`, que es lo que usa la app, no lo trae: es del visor.)
+
+**Implementación**: `app/js/pdf-text-select.js`. La selección con ratón se lleva en la app, como ya
+se hacía en táctil para el EPUB (`touch-select.js`): en cada extremo del arrastre se busca el span
+**más cercano en la página** —la línea manda sobre la columna, de ahí el peso vertical—, se mete el
+punto dentro de su rectángulo y ahí sí se le pide el cursor al navegador, que sobre texto acierta.
+Si el punto cae fuera de toda página, se repliega a la más cercana. Lo instala `setupPdfSelection`.
+
+Lo que se deja al navegador: el **doble y triple clic** (`e.detail >= 2`), que ya seleccionan
+palabra y párrafo bien, y **todo el táctil**, donde la selección la hace el sistema.
+
+**Tests** — `tests/pdf-selection.spec.ts` (4), los cuatro fallan sin el arreglo. Tres van
+extremo a extremo sobre el PDF de prueba. El cuarto —el caso reportado: un hueco grande de aire
+entre un bloque y el párrafo de abajo— va sobre un layout sintético montado dentro del
+`#pdf-container` de verdad, porque un PDF de prueba corriente tiene los párrafos seguidos y no sabe
+expresar ese hueco. El layout sintético necesita `z-index` alto: si no, `caretRangeFromPoint`
+devuelve el texto de la biblioteca que hay debajo.
+
+**De paso**: `ui/frame-rect.js` (TEC6) se había quedado fuera del precache del service worker. No
+saltó al commitear porque `sw-precache.spec.ts` mira `git ls-files` y el fichero aún no estaba
+seguido. Añadidos los dos módulos y subido `CACHE_NAME` a v116.
+
 ### TEC3 — Arnés de medición de rendimiento del lector · **✓ (2026-08-19)** `S`
 **Hecho:** [`tests/perf.spec.ts`](tests/perf.spec.ts) (`npm run perf`, etiqueta `@perf`, fuera de
 `npm test`). Fixtures pesadas reales vía `npm run eval:fixtures` (Pro Git, 14 MB, 21 secciones
