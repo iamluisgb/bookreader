@@ -1408,3 +1408,74 @@ del retrieval agéntico** (pregunta con match no dispara herramientas; pregunta 
 gating (el retrieval vacío no disparaba el agéntico). Complementan a los ya existentes de `llm.spec.ts`,
 `retrieval.spec.ts` y `chapter-event.spec.ts`.
 
+
+### TEC3 — Arnés de medición de rendimiento del lector · `S` · **bloquea a [TEC4](#tec4--el-motor-epub-es-el-techo-de-rendimiento--m-l)**
+Hoy no hay ni un número. Toda afirmación sobre rendimiento del lector (la de este backlog incluida)
+es lectura de código, no medición — y TEC4 propone gastar días en un motor nuevo sin saber cuánto
+se gana. Primero el termómetro.
+
+**Qué medir** (spec Playwright `@perf`, fuera de `npm test` por ruidoso, con fixture pesada real —
+no `test.epub`, que es de juguete):
+- **TTFP** — abrir libro → primera página pintada. EPUB y PDF.
+- **p95 de paso de página, separando los dos casos:** dentro de capítulo (barato: scroll de la
+  multicolumna) y **en frontera de capítulo** (caro: iframe nuevo + layout + medición). Mezclarlos
+  esconde justo el problema.
+- **Cambio de tipografía / tema / giro** → tiempo hasta layout estable (el que hoy tapa `pinnedCfi`).
+- **Memoria retenida** tras recorrer 50 páginas (PDF ya está acotado por `freeWrapper`; EPUB no se ha mirado).
+- **Arranque en frío** de la app (biblioteca vacía, cache vacía).
+
+**Salida:** presupuestos escritos en el propio spec, que fallan si se superan. Sin presupuesto no es
+una métrica, es un dato suelto.
+
+### TEC4 — El motor EPUB es el techo de rendimiento · `M`–`L`
+**Diagnóstico.** El PDF está en la parte alta del mercado web: virtualización con `IntersectionObserver`
+(`rootMargin: 150%`) + liberación de canvas lejanos, zoom de dos capas (base oversampleada 1.5×·dpr +
+parche de detalle al detenerse) con el gesto resuelto en `transform` sobre GPU sin tocar pdf.js, y
+cancelación de `renderTask`. Ver [`js/pdf-reader.js`](app/js/pdf-reader.js) y TEC1.
+
+El EPUB no, y **no es por el código propio sino por [epub.js 0.3.93](app/vendor/epub-0.3.93.min.js)**,
+que está efectivamente sin mantenimiento y cuya arquitectura —un iframe por sección + CSS multicolumn—
+impone costes inatacables desde fuera:
+1. **Frontera de capítulo = iframe nuevo + layout completo + medición de columnas.** Los pases dentro
+   de un capítulo son baratos; los de frontera no. En secciones grandes, parpadeo visible.
+2. **Cambiar tipografía o tema rehace la maquetación entera** del iframe.
+3. **`locations.generate(1024)` recorre el libro completo en el hilo principal**
+   ([epub-reader.js L1011](app/js/epub-reader.js#L1011)). Ya se cachea en IDB —el arreglo correcto—
+   pero la *primera* apertura de un libro grande sigue quemando main thread.
+4. **`pinnedCfi` existe porque el layout es inestable.** Es un parche excelente sobre cimiento frágil.
+
+**Plan por fases — no big-bang.**
+
+- **F0 · [TEC3](#tec3--arnés-de-medición-de-rendimiento-del-lector--s--bloquea-a-tec4).** Sin números no se decide F2.
+- **F1 · Quick wins sin cambiar de motor** `S`–`M`:
+  - **Locations en Web Worker.** No vía epub.js (su `generate` no es troceable): implementación propia
+    en worker leyendo el zip con JSZip —ya vendorizado— y guardando en el mismo formato que hoy
+    consume `book.locations.load()`. Mata el pico de la primera apertura.
+  - **`manager: 'continuous'` en `renderTo`** ([L493](app/js/epub-reader.js#L493), hoy el default).
+    Pre-renderiza secciones vecinas → la frontera de capítulo deja de notarse. Cuesta memoria: medir con F0.
+  - **`<link rel="modulepreload">`** del grafo de `app.js` en `index.html` (hoy 0). Colapsa la cascada
+    de módulos ES en frío, que es el precio de no tener build step.
+- **F2 · Migrar a [foliate-js](https://github.com/johnfactotum/foliate-js)** `L`. Motor de Foliate/Readest,
+  mantenido. Gana: paginador sin el thrash de recarga por sección, fixed-layout decente (cómic/manual
+  ilustrado, hoy pobre) y **progreso proporcional sin pre-pase de locations** → deja F1a sin objeto.
+  **Riesgos reales, en orden:**
+  - **CFIs.** De ellos cuelgan subrayados, marcadores, progreso, [`sync/layout.js`](app/js/sync/layout.js),
+    el pin de reflow y las anclas de citas del agente. foliate-js implementa CFI, pero hay usuarios con
+    datos sincronizados. **Bloqueante: test de migración que abra un backup real y verifique que los N
+    subrayados siguen resolviendo.** Sin eso, no se toca.
+  - **Sandbox.** Reproducir `allow-same-origin` SIN `allow-scripts` (defensa de la key BYOK, ver
+    [L505-511](app/js/epub-reader.js#L505)).
+  - **Re-cableado:** `touch-select.js`, tap-to-turn, inyección de tema, selección→agente.
+  - **Vendorizado:** foliate-js son módulos ES; los vendor de hoy son scripts clásicos con global.
+    Ampliar `vendor-loader.js` con `import()` (la CSP `script-src 'self'` lo permite).
+- **F3 · Paginación propia fuera del iframe-por-sección.** Solo si F0 dice que ni con foliate se llega.
+  Hoy no está justificado.
+
+**Extra PDF (independiente):** render base a `OffscreenCanvas` en worker para que el scroll no comparta
+hilo con la rasterización. Verificar soporte en pdf.js 3.11 — puede exigir subir a 4.x/5.x, que rompe
+`renderTextLayer` (acoplamiento ya anotado en TEC1).
+
+**❓ Abierta — la pregunta estratégica, antes que la técnica.** En EPUB **nadie gana el mercado por
+rendimiento**: es higiene, no diferenciación. La ventaja de BookReader es el agente sobre el libro
+entero. F1 es barato y se hace igual; **F2 solo si F0 mide un delta que lo justifique**, porque son
+días contra el riesgo de romper subrayados de usuarios reales.
