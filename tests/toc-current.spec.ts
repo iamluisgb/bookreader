@@ -38,18 +38,28 @@ test.describe('Índice — sección actual', () => {
     const links = page.locator('#toc-list a');
     await expect(links.first()).toBeVisible({ timeout: 5000 });
     const target = links.nth(await links.count() - 1);
-    const label = (await target.textContent())?.trim();
+    // La ETIQUETA de la sección, sin el número de página: `fillTocPages` (app.js) le
+    // cuelga un `<span class="toc-page">` a cada entrada en cuanto epub.js termina de
+    // generar las localizaciones. Leer el textContent entero comparaba "Pedro Páramo" de
+    // ANTES contra "Pedro Páramo13" de DESPUÉS, y que pasara o no dependía de si el libro
+    // había cargado más rápido que el test. El número no es lo que se está probando aquí.
+    const soloEtiqueta = (a: any) => a.evaluate((el: HTMLElement) => {
+      const c = el.cloneNode(true) as HTMLElement;
+      c.querySelector('.toc-page')?.remove();
+      return c.textContent?.trim();
+    });
+    const label = await soloEtiqueta(target);
 
     await target.click();
     // Volver a Contenido re-marca (por si la lectura avanzó con el sidebar abierto).
     await page.locator('.tab-btn[data-tab="contents"]').click();
 
     // Sin espera fija: `markCurrentToc` se re-ejecuta en cada `relocated` (app.js), así
-    // que la marca acaba llegando sola. `toHaveText` reintenta hasta que llega; leer el
+    // que la marca acaba llegando sola. La aserción reintenta hasta que llega; leer el
     // texto UNA vez tras 1,5 s era apostar a que la navegación ya había terminado.
     const current = page.locator('#toc-list a.current');
     await expect(current).toHaveCount(1);
-    await expect(current).toHaveText(label!);
+    await expect.poll(() => soloEtiqueta(current)).toBe(label);
   });
 
   // Regresión: abrir un EPUB dejaba el lector de EPUB "cargado" para siempre, así que al

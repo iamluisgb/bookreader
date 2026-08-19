@@ -1,0 +1,987 @@
+/* main-late.css — Cola de main.css: foco accesible, tooltips y los bloques responsive.
+ *
+ * Está en su propio fichero para que agent.css pueda insertarse ENTRE main.css y esta
+ * cola, que es donde vivían las reglas del agente. Ver la cabecera de agent.css.
+ */
+
+
+textarea:focus,
+input:not([type="range"]):not([type="checkbox"]):focus,
+select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: none;
+}
+
+/* ============================================================================
+   TOOLTIPS (Fase 3) — componente CSS puro, sin JS. Cualquier elemento con
+   [data-tip] muestra su texto debajo al hover/foco. Fondo charcoal fijo
+   (#232A31) coherente en los tres temas, radio 8px, aparición con leve retardo.
+   Se prefiere a `title` nativo (no estilable). Deja `aria-label` para a11y.
+   ========================================================================== */
+[data-tip] { position: relative; }
+[data-tip]::after {
+  content: attr(data-tip);
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%) translateY(-2px);
+  background: #232a31;
+  color: #f2f3f5;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  padding: 6px 9px;
+  border-radius: var(--r-sm);
+  box-shadow: var(--shadow-2);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--transition-fast), transform var(--transition-fast);
+  z-index: 500;
+}
+[data-tip]:hover::after,
+[data-tip]:focus-visible::after {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+  transition-delay: 0.35s;
+}
+/* Anclajes para botones pegados a un borde (evita que el globo se salga). */
+[data-tip][data-tip-align="left"]::after { left: 0; transform: translateX(0) translateY(-2px); }
+[data-tip][data-tip-align="left"]:hover::after,
+[data-tip][data-tip-align="left"]:focus-visible::after { transform: translateX(0) translateY(0); }
+[data-tip][data-tip-align="right"]::after { left: auto; right: 0; transform: translateX(0) translateY(-2px); }
+[data-tip][data-tip-align="right"]:hover::after,
+[data-tip][data-tip-align="right"]:focus-visible::after { transform: translateX(0) translateY(0); }
+/* En pantallas táctiles los tooltips estorban (no hay hover real): se ocultan. */
+@media (hover: none) {
+  [data-tip]::after { display: none; }
+}
+
+
+/* ============================================================================
+   RESPONSIVE / MÓVIL (Fase 2) — FAB + drawers + bottom sheets + safe-areas
+   ========================================================================== */
+
+/* Altura real del viewport en móvil (barra de URL): dvh con fallback. */
+@supports (height: 100dvh) {
+  html, body { height: 100dvh; }
+}
+
+
+/* Backdrop de los drawers (solo activo en pantallas pequeñas) */
+.scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  background: rgba(0, 0, 0, 0.45);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--transition-normal);
+}
+
+/* Aviso del agente cuando la respuesta llega con el panel cerrado: un punto sobre el
+   punto de entrada VISIBLE (#ai-toggle en escritorio, .ai-fab en móvil; el oculto es
+   display:none y no pinta nada). `ai-busy` = generando (pulso), `ai-unread` = listo. */
+body.ai-busy #ai-toggle, body.ai-busy .ai-fab,
+body.ai-unread #ai-toggle, body.ai-unread .ai-fab { position: relative; }
+body.ai-busy #ai-toggle::after, body.ai-busy .ai-fab::after,
+body.ai-unread #ai-toggle::after, body.ai-unread .ai-fab::after {
+  content: ''; position: absolute; top: 6px; right: 6px;
+  width: 9px; height: 9px; border-radius: 50%;
+  border: 1.5px solid var(--surface-1); pointer-events: none;
+}
+/* Sobre el FAB (flotante sobre el fondo del lector) el punto es algo mayor. */
+body.ai-busy .ai-fab::after, body.ai-unread .ai-fab::after {
+  top: 5px; right: 5px; width: 14px; height: 14px; border: 2px solid var(--surface-0);
+}
+body.ai-unread #ai-toggle::after, body.ai-unread .ai-fab::after { background: #e5484d; }
+body.ai-busy #ai-toggle::after, body.ai-busy .ai-fab::after {
+  background: var(--accent); animation: ai-dot-pulse 1.2s ease-in-out infinite;
+}
+@keyframes ai-dot-pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .35; transform: scale(.65); } }
+
+/* ---- Tablet y móvil (<1024): el agente se superpone, no empuja el lector ---- */
+@media (max-width: 1023px) {
+  body:has(#sidebar.open) .reader-main { margin-left: 0; }   /* drawer overlay, no empuja */
+  .sidebar { box-shadow: var(--shadow-3); }
+  body.ai-open .scrim,
+  body:has(#sidebar.open) .scrim { opacity: 1; pointer-events: auto; }
+}
+
+
+/* ---- Móvil (<768): bottom sheets, FAB, safe-areas ---- */
+@media (max-width: 767px) {
+  /* Cabecera/pie respetan el notch */
+  .reader-header { padding-top: env(safe-area-inset-top); height: auto; min-height: var(--header-height); }
+  .reader-footer { padding-bottom: env(safe-area-inset-bottom); height: auto; min-height: var(--footer-height); }
+  /* Teclado abierto: el hueco del home indicator lo tapa el propio teclado, y la altura
+     debe seguirlo al instante (una transición aquí se ve como un salto tardío). */
+  body.kb-open #ai-panel { padding-bottom: 0; transition: transform var(--transition-normal); }
+  body.kb-open .ai-sheet-grab { display: none; }
+  body.sheet-dragging .ai-sheet-grab { cursor: grabbing; }
+  body.sheet-dragging #ai-panel { transition: none; }
+
+  /* Índice como drawer ancho */
+  #sidebar { width: min(86%, 360px); }
+
+  /* Aquí el sidebar puede bajar de 300px, donde las 4 etiquetas dejan de caber. Apretar
+     un punto de tipo y los laterales las devuelve a una fila completa en los teléfonos
+     normales; por debajo de eso queda el deslizamiento de .sidebar-tabs. */
+  .tab-btn { font-size: 12px; padding: 12px 4px; }
+}
+
+
+/* ============================================================================
+   F3 · Pulido de componentes (estilo NotebookLM)
+   ========================================================================== */
+
+/* Cabecera del lector: translúcida sobre el contenido. El backdrop-filter crea un
+   contexto de apilamiento propio, así que la elevamos (z-index) para que los tooltips
+   de sus botones, que sobresalen hacia abajo, se pinten por encima del viewport
+   (queda por debajo de scrim/sidebar/paneles, que van a 90+). */
+.reader-header {
+  position: relative;
+  z-index: 40;
+  background: color-mix(in srgb, var(--surface-1) 82%, transparent);
+  -webkit-backdrop-filter: saturate(180%) blur(12px);
+  backdrop-filter: saturate(180%) blur(12px);
+  border-bottom: 1px solid var(--border-soft);
+}
+
+/* Botones unificados (Fase 3): radios a 8px, no píldora. La dirección es
+   "herramienta de ingeniería" (Linear/GitHub/Warp), no iOS: esquinas contenidas,
+   no cápsulas ni círculos. */
+.primary-btn { border-radius: var(--r-sm); box-shadow: var(--shadow-1); }
+.icon-btn { border-radius: var(--r-sm); width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; }
+.nav-btn { border-radius: var(--r-sm); }
+
+/* Barra de progreso más fina y redondeada (la zona de pulsación NO se encoge: la
+   amplía .progress-container::before, que la extiende 8px arriba y abajo). */
+.progress-container { height: 3px; border-radius: var(--r-pill); }
+.progress-bar { border-radius: var(--r-pill); }
+@keyframes ai-shimmer { to { background-position: -200% 0; } }
+
+/* ============================================================================
+   F4 · Modo lectura inmersivo
+   ========================================================================== */
+.reader-header, .reader-footer { transition: transform var(--transition-normal); }
+/* Overlay de barras (estilo Play Books): cabecera y pie flotan (position:absolute)
+   sobre un área de lectura que ocupa toda la altura, así ocultarlas/mostrarlas NO
+   re-pagina el EPUB. Pero, como flotan, TAPAN la 1ª/última línea si no se ocultan —
+   por eso el overlay solo se activa donde SÍ se ocultan:
+     · MÓVIL (pointer coarse): siempre en lectura; se ocultan tocando el centro.
+     · ESCRITORIO (pointer fine): SOLO en pantalla completa (`body.fs`), donde se
+       auto-ocultan y reaparecen al mover el ratón.
+   En ventana de escritorio las barras se quedan en el flujo normal (flex): el área
+   de lectura se ajusta entre ellas y se ve TODO el texto sin gestos. */
+@media (pointer: coarse) {
+  body.reading .reader-header,
+  body.reading .reader-footer { position: absolute; left: 0; right: 0; z-index: 60; }
+  body.reading .reader-header { top: 0; }
+  body.reading .reader-footer { bottom: 0; }
+}
+
+@media (pointer: fine) {
+  body.reading.fs .reader-header,
+  body.reading.fs .reader-footer { position: absolute; left: 0; right: 0; z-index: 60; }
+  body.reading.fs .reader-header { top: 0; }
+  body.reading.fs .reader-footer { bottom: 0; }
+  /* En pantalla completa el área de lectura usa TODA la altura (sin reservar la franja de
+     las barras): las barras están ocultas y son overlay. Al auto-revelarse (ratón al borde)
+     tapan un instante la línea del borde, pero justo entonces vas a por la barra, no leyendo.
+     Así se aprovecha la pantalla entera (antes se perdían ~104px arriba+abajo). */
+
+}
+
+/* Inmersivo = barras ocultas: se deslizan fuera (el área de lectura no cambia).
+   Solo tiene efecto cuando las barras son overlay (móvil, o escritorio en `fs`). */
+body.reading.immersive .reader-header { transform: translateY(-100%); }
+body.reading.immersive .reader-footer { transform: translateY(100%); }
+body.immersive .ai-fab { transform: scale(0); }
+
+/* Móvil: al dibujar de borde a borde (fullscreen inmersivo + viewport-fit=cover), el
+   área de lectura reserva el safe-area izquierdo/derecho (recorte de cámara en
+   landscape). El fondo de página rellena esa franja (adiós al borde negro) y el texto
+   queda inset, sin quedar bajo la cámara. En portrait los insets son 0 → sin efecto. */
+@media (pointer: coarse) {
+  body.reading .reader-viewport {
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+    /* Encogido suave al mostrar/ocultar barras (estilo Play Books, ver
+       updateReaderScale). Solo transform: no re-pagina, el texto no se mueve. */
+    transition: transform var(--transition-normal);
+  }
+  /* En modo scroll no encogemos el texto: cuando las barras overlay están visibles
+     (no inmersivo) reservamos su alto para que la primera/última línea no queden
+     ocultas mientras se hace scroll. */
+  body.scroll-mode.reading:not(.immersive) .reader-viewport {
+    padding-top: var(--header-height);
+    padding-bottom: var(--footer-height);
+  }
+}
+
+
+/* ============================================================================
+   F5 · Sistema de iconos (SF Symbols) + refinado de controles estilo Apple
+   ========================================================================== */
+
+/* Glifo base: hereda el color del texto, alineado al texto que lo acompaña. */
+.icon { display: inline-block; vertical-align: -0.18em; flex: 0 0 auto; }
+
+/* Botones de icono: caja cuadrada, glifo centrado, pulsado sutil. */
+.icon-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  color: var(--text-soft);
+}
+.icon-btn .icon { vertical-align: middle; }
+.icon-btn:active:not(:disabled) { transform: scale(0.92); }
+.icon-btn.is-active { color: var(--accent); }
+/* Toggle en acento cuando su panel está abierto (afordancia de estado). */
+body:has(#sidebar.open) #sidebar-toggle,
+body.ai-open #ai-toggle { color: var(--accent); }
+
+.nav-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 40px; height: 40px; color: var(--text-soft);
+}
+.nav-btn:active { transform: scale(0.92); }
+
+/* Botones con icono + texto (acciones, pestañas, volver, exportar). */
+.ai-tab, .ai-act, .ai-ob-back, .export-btn,
+.ai-nb-goal-label, .ai-extract-status {
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.export-btn { justify-content: center; }
+
+/* Acento del lustre Apple: transiciones y pulsado en botones primarios/píldora. */
+.primary-btn, .ai-act, .export-btn {
+  transition: background var(--transition-fast), color var(--transition-fast),
+              transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+.primary-btn:active, .ai-act:active:not(:disabled),
+.export-btn:active:not(:disabled) { transform: scale(0.97); }
+
+/* Selector de tema como muestras de color (estilo Apple Books). */
+.theme-selector { gap: 12px; }
+.theme-selector .theme-swatch {
+  width: 30px; height: 30px; border-radius: 50%;
+  border: 1px solid var(--border); padding: 0; font-size: 0;
+  box-shadow: var(--shadow-1);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+.theme-selector .swatch-light  { background: #ffffff; }
+.theme-selector .swatch-sepia  { background: #f3ead4; }
+.theme-selector .swatch-dark   { background: #1c1c1e; }
+.theme-selector .swatch-system { background: linear-gradient(110deg, #ffffff 0 50%, #1c1c1e 50% 100%); }
+.theme-selector .theme-swatch:hover { transform: scale(1.08); }
+.theme-selector .theme-swatch.active {
+  border-color: transparent;
+  box-shadow: 0 0 0 2px var(--surface-1), 0 0 0 4px var(--accent);
+}
+
+/* Papel del PDF: mismos swatches que el tema (misma gramática visual, mismo tamaño de
+   toque), con la paleta de tintes real. "Noche" va aparte a propósito —no es un color
+   más: invierte la tinta— y por eso se separa con un margen. */
+.paper-selector { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.paper-selector .paper-swatch {
+  width: 30px; height: 30px; border-radius: 50%;
+  border: 1px solid var(--border); padding: 0; font-size: 0;
+  background: var(--surface-0);
+  cursor: pointer;
+  box-shadow: var(--shadow-1);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+.paper-selector .swatch-auto  { background: linear-gradient(110deg, #ffffff 0 50%, #1c1c1e 50% 100%); }
+.paper-selector .swatch-white { background: #ffffff; }
+.paper-selector .swatch-cream { background: #f6ecd8; }
+.paper-selector .swatch-paper-sepia { background: #eadcc0; }
+.paper-selector .swatch-grey  { background: #dcdcda; }
+.paper-selector .swatch-night { background: #14161a; margin-left: 6px; }
+.paper-selector .paper-swatch:hover { transform: scale(1.08); }
+.paper-selector .paper-swatch.active {
+  border-color: transparent;
+  box-shadow: 0 0 0 2px var(--surface-1), 0 0 0 4px var(--accent);
+}
+
+/* Nota bajo un control: explica una contrapartida sin robarle sitio a la etiqueta. */
+.settings-hint {
+  margin: 8px 0 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-soft);
+}
+
+/* ============================================================================
+   F6 · Biblioteca — estilo Google Play Books (rail + orden/filtro + rejilla)
+   ========================================================================== */
+
+/* En la biblioteca se ocultan la cabecera del lector y el FAB del agente. */
+body.in-library .reader-header { display: none; }
+body.in-library .ai-fab { display: none; }
+
+.library {
+  position: absolute; inset: 0; z-index: 20;
+  overflow: hidden; background: var(--surface-1);
+}
+.lib-layout { display: flex; height: 100%; }
+
+/* ---- Rail izquierdo ---- */
+.lib-rail {
+  flex: 0 0 264px; width: 264px; height: 100%;
+  display: flex; flex-direction: column;
+  overflow-y: auto; border-right: 1px solid var(--border-soft);
+  background: var(--surface-1);
+  padding: calc(var(--s-4) + env(safe-area-inset-top)) var(--s-3) var(--s-5);
+}
+.lib-rail-item {
+  display: flex; align-items: center; gap: var(--s-3); width: 100%;
+  padding: 9px 12px; border: none; background: none; cursor: pointer;
+  border-radius: var(--r-pill); color: var(--text); font-size: var(--fs-md);
+  text-align: left; transition: background var(--transition-fast), color var(--transition-fast);
+}
+.lib-rail-item:hover { background: var(--surface-3); }
+.lib-rail-item.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.lib-rail-item.active .lib-rail-ico .icon { color: var(--accent); }
+.lib-rail-ico { display: inline-flex; flex: 0 0 auto; color: var(--text-soft); }
+/* La marca ocupa la misma caja que las miniaturas de estantería para que la
+   columna de iconos quede alineada. No se tiñe con el estado activo: es la
+   marca, y cambiarle el color la desvirtúa. */
+.lib-rail-mark { display: inline-flex; flex: 0 0 auto; width: 28px; height: 28px; }
+.lib-rail-mark svg { display: block; }
+.lib-rail-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lib-rail-count { color: var(--text-faint); font-size: var(--fs-sm); flex: 0 0 auto; }
+.lib-rail-section {
+  font-size: var(--fs-xs); font-weight: 600; color: var(--text-faint);
+  text-transform: uppercase; letter-spacing: 0.04em;
+  padding: var(--s-4) 12px var(--s-2);
+}
+.lib-rail-thumb {
+  flex: 0 0 auto; width: 28px; height: 28px; border-radius: 5px; overflow: hidden;
+  background: var(--surface-3); display: inline-flex; align-items: center; justify-content: center;
+}
+.lib-rail-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.lib-rail-thumb-ph { color: var(--text-faint); display: inline-flex; }
+.lib-rail-kebab {
+  flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; border-radius: 50%; color: var(--text-faint);
+  opacity: 0; transition: opacity var(--transition-fast), background var(--transition-fast);
+}
+.lib-rail-shelf:hover .lib-rail-kebab { opacity: 1; }
+.lib-rail-kebab:hover { background: var(--surface-2); color: var(--text); }
+@media (hover: none) { .lib-rail-kebab { opacity: 1; }
+}
+
+/* Estantería INTELIGENTE: la miniatura se sustituye por la marca de regla — no
+   tiene una portada "suya" porque sus miembros cambian solos. */
+.lib-rail-thumb--smart { background: var(--accent-soft); }
+.lib-rail-thumb--smart .icon { color: var(--accent); }
+/* GRUPO: un tramo del nombre ("Técnico" cuando solo existe "Técnico/ML"). No es
+   una estantería, así que no lleva miniatura ni menú; el hueco mantiene la
+   columna de nombres alineada con las filas hermanas. */
+.lib-rail-thumb--group { background: none; }
+.lib-rail-group .lib-rail-name { color: var(--text-soft); font-weight: 550; }
+.lib-rail-create {
+  display: inline-flex; align-items: center; gap: var(--s-3);
+  margin: var(--s-3) 0 0; padding: 9px 12px; width: 100%;
+  border: none; background: none; cursor: pointer;
+  color: var(--accent); font-size: var(--fs-md); font-weight: 550;
+}
+.lib-rail-create .icon { color: var(--accent); }
+.lib-rail-create:hover { text-decoration: underline; }
+/* Los hijos del rail no se comprimen: con muchas estanterías el rail hace scroll,
+   no encoge las filas. */
+.lib-rail > * { flex: 0 0 auto; }
+/* Ajustes generales: única puerta a la configuración desde la biblioteca (y la
+   primera pantalla de quien no tiene libros), así que va anclado abajo, separado
+   del resto y con caja propia — no como un enlace más de acción. */
+.lib-rail-settings {
+  margin-top: auto; padding-top: var(--s-3);
+  border-top: 1px solid var(--border-soft); border-radius: 0;
+  color: var(--text); font-weight: 500;
+}
+.lib-rail-settings .icon { color: var(--text-soft); }
+.lib-rail-settings:hover { text-decoration: none; color: var(--accent); }
+.lib-rail-settings:hover .icon { color: var(--accent); }
+
+/* ---- Panel principal ---- */
+.lib-main {
+  flex: 1; min-width: 0; height: 100%; overflow-y: auto; background: var(--surface-0);
+  padding: calc(var(--s-5) + env(safe-area-inset-top)) var(--s-6)
+           calc(var(--s-8) + env(safe-area-inset-bottom));
+}
+.lib-h1 { font-size: var(--fs-2xl); font-weight: 700; letter-spacing: -0.02em; margin-bottom: var(--s-4); }
+
+/* Chips del filtro por estanterías. Con varias seleccionadas el título no basta
+   para saber qué se está viendo (ni cómo se combinan), y en táctil son la única
+   forma de quitar una: el rail cruza con ⌘/Ctrl+clic, que ahí no existe. */
+.lib-chips { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2); margin: calc(var(--s-4) * -0.5) 0 var(--s-4); }
+.lib-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 10px; border-radius: var(--r-pill);
+  background: var(--surface-3); color: var(--text); font-size: var(--fs-sm);
+  border: none; max-width: 100%;
+}
+.lib-chip-x {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; margin-right: -4px; border: none; background: none;
+  border-radius: 50%; color: var(--text-faint); cursor: pointer;
+}
+.lib-chip-x:hover { background: var(--surface-1); color: var(--text); }
+/* El conmutador Y/O es el único chip que cambia el SIGNIFICADO del filtro
+   (intersección o unión), no lo que hay dentro: va en acento para que se lea
+   como control y no como una estantería más. */
+.lib-chip-mode { background: var(--accent-soft); color: var(--accent); font-weight: 600; cursor: pointer; }
+.lib-chip-clear { background: none; color: var(--text-faint); cursor: pointer; }
+.lib-chip-clear:hover { color: var(--text); text-decoration: underline; }
+
+/* ============ LIBRARY SECTIONS (estilo Stitch: "Reading Now", etc.) ============ */
+.lib-section {
+  margin-bottom: var(--s-6);
+}
+.lib-section-header {
+  display: flex; align-items: baseline; gap: var(--s-3);
+  margin-bottom: var(--s-4);
+}
+.lib-section-title {
+  font-size: var(--fs-lg);
+  font-weight: 600;
+  color: var(--text);
+}
+.lib-section-count {
+  font-size: var(--fs-sm);
+  color: var(--text-faint);
+}
+
+.lib-toolbar { display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap; margin-bottom: var(--s-5); }
+
+/* Buscador de la estantería (filtra por título/autor) */
+.lib-search-box {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 7px 14px; border: 1px solid var(--border); border-radius: var(--r-pill);
+  background: var(--surface-2); flex: 1 1 200px; max-width: 340px;
+  transition: border-color var(--transition-fast);
+}
+.lib-search-box:focus-within { border-color: var(--accent); }
+.lib-search-box .icon { color: var(--text-faint); flex: 0 0 auto; }
+.lib-search-box:focus-within .icon { color: var(--accent); }
+.lib-search {
+  flex: 1; min-width: 0; border: none; background: none; outline: none;
+  color: var(--text); font-size: var(--fs-sm); font-family: var(--font-ui);
+}
+.lib-search::placeholder { color: var(--text-faint); }
+/* Oculta la cruz nativa de los input[type=search] (usamos el propio flujo). */
+.lib-search::-webkit-search-cancel-button { -webkit-appearance: none; }
+
+/* Desplegables (orden / progreso) */
+.lib-dd { position: relative; }
+.lib-dd-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 14px; border: 1px solid var(--border); border-radius: var(--r-pill);
+  background: var(--surface-2); color: var(--text); font-size: var(--fs-sm); font-weight: 550;
+  cursor: pointer; transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+.lib-dd-btn:hover { background: var(--surface-3); }
+.lib-dd.open .lib-dd-btn { border-color: var(--accent); color: var(--accent); }
+.lib-dd.open .lib-dd-btn .icon { color: var(--accent); }
+
+/* ============ PROGRESS FILTER TABS (estilo Stitch: All Books / Reading Now / To Read) ============ */
+.lib-filters {
+  display: flex; gap: 8px; margin-bottom: var(--s-4);
+}
+.lib-filter-btn {
+  padding: 8px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-pill);
+  background: var(--surface-2);
+  color: var(--text-soft);
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+}
+.lib-filter-btn:hover {
+  background: var(--surface-3);
+  color: var(--text);
+}
+.lib-filter-btn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+}
+.lib-dd-menu {
+  display: none; position: absolute; top: calc(100% + 6px); left: 0; z-index: 60;
+  min-width: 180px; background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: var(--r-md); box-shadow: var(--shadow-3); padding: 6px;
+}
+.lib-dd.open .lib-dd-menu { display: block; }
+.lib-dd-opt {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  padding: 8px 10px; border: none; background: none; cursor: pointer;
+  border-radius: var(--r-sm); color: var(--text); font-size: var(--fs-md); text-align: left;
+}
+.lib-dd-opt:hover { background: var(--surface-3); }
+.lib-dd-opt.active { color: var(--accent); font-weight: 600; }
+.lib-dd-check { width: 16px; flex: 0 0 auto; display: inline-flex; }
+.lib-dd-check .icon { color: var(--accent); }
+
+.lib-upload {
+  display: inline-flex; align-items: center; gap: 6px; margin-left: auto;
+  padding: 8px 16px; border: none; border-radius: var(--r-pill);
+  background: var(--accent); color: var(--on-accent); font-size: var(--fs-sm); font-weight: 600;
+  cursor: pointer; box-shadow: var(--shadow-1);
+  transition: background var(--transition-fast), transform var(--transition-fast);
+}
+.lib-upload:hover { background: var(--accent-hover); }
+.lib-upload:active { transform: scale(0.97); }
+
+/* ---- Rejilla de portadas (v2: más aire, sombras suaves) ---- */
+.lib-grid {
+  display: grid; gap: var(--s-6) var(--s-5);
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+}
+.lib-card { cursor: pointer; }
+.lib-cover {
+  position: relative; aspect-ratio: 2 / 3; border-radius: var(--r-md);
+  overflow: hidden; background: var(--surface-3); box-shadow: var(--shadow-1);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+.lib-card:hover .lib-cover { transform: translateY(-4px); box-shadow: var(--shadow-2); }
+.lib-card:active .lib-cover { transform: scale(0.98); }
+.lib-cover-img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.lib-cover-fallback {
+  width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(150deg, var(--accent), var(--accent-hover));
+  color: #fff; font-size: 30px; font-weight: 700;
+}
+.lib-badge {
+  position: absolute; top: 8px; left: 8px; width: 22px; height: 22px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 50%; background: var(--accent); color: var(--on-accent); box-shadow: var(--shadow-1);
+}
+/* Ficha fantasma: el libro está en la biblioteca pero su archivo no en este
+   dispositivo. La portada se atenúa (sigue reconociéndose, no engaña con que
+   está listo) y aparece la acción de traerlo. */
+.lib-card.is-ghost .lib-cover-img,
+.lib-card.is-ghost .lib-cover-fallback { opacity: 0.45; filter: saturate(0.6); }
+.lib-card.is-ghost .lib-title, .lib-card.is-ghost .lib-author { color: var(--text-faint); }
+
+.lib-dl {
+  position: absolute; inset: auto 0 0 0; padding: 8px;
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.62), transparent);
+}
+.lib-dl-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 12px; border: none; border-radius: var(--r-pill); cursor: pointer;
+  background: var(--accent); color: var(--on-accent);
+  font-size: var(--fs-xs); font-weight: 600; box-shadow: var(--shadow-1);
+  transition: background var(--transition-fast), transform var(--transition-fast);
+}
+.lib-dl-btn:hover { background: var(--accent-hover); }
+.lib-dl-btn:active { transform: scale(0.96); }
+.lib-dl-note {
+  font-size: var(--fs-xs); font-weight: 600; color: #fff;
+  padding: 4px 10px; border-radius: var(--r-pill); background: rgba(0, 0, 0, 0.45);
+}
+.lib-dl-lbl { font-size: var(--fs-xs); font-weight: 600; color: #fff; }
+.lib-dl-bar {
+  width: 100%; height: 4px; border-radius: var(--r-pill);
+  background: rgba(255, 255, 255, 0.3); overflow: hidden;
+}
+.lib-dl-fill {
+  display: block; height: 100%; width: 0;
+  background: var(--accent); border-radius: inherit;
+  transition: width var(--transition-normal);
+}
+.lib-card.is-transferring .lib-cover { transform: none; }
+
+.lib-kebab {
+  position: absolute; top: 6px; right: 6px;
+  width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center;
+  border: none; border-radius: 50%; cursor: pointer; color: #fff;
+  background: rgba(0, 0, 0, 0.42); backdrop-filter: blur(4px);
+  opacity: 0; transition: opacity var(--transition-fast);
+}
+.lib-card:hover .lib-kebab, .lib-kebab:focus-visible { opacity: 1; }
+@media (hover: none) { .lib-kebab { opacity: 1; }
+}
+
+.lib-progressbar { height: 3px; border-radius: var(--r-pill); background: var(--surface-3); margin: 12px 0 8px; overflow: hidden; }
+.lib-progressbar span { display: block; height: 100%; background: var(--accent); border-radius: inherit; transition: width var(--transition-normal); }
+.lib-title {
+  font-size: var(--fs-sm); font-weight: 600; line-height: 1.3; color: var(--text);
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.lib-author { font-size: var(--fs-xs); color: var(--text-faint); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.lib-empty {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: var(--s-4); text-align: center; color: var(--text-soft); padding: 12vh var(--s-4);
+}
+.lib-empty-icon { color: var(--accent); opacity: 0.6; }
+.lib-empty p { font-size: var(--fs-lg); margin-bottom: var(--s-2); }
+/* El margin-left:auto que alinea el botón a la derecha en la barra de herramientas
+   lo descolocaba aquí: dentro del estado vacío va centrado. */
+.lib-empty .lib-upload { margin-left: 0; }
+.lib-empty .lib-upload span { display: inline; }
+
+/* Menú contextual (libro / estantería) */
+.lib-menu {
+  position: fixed; z-index: 200; min-width: 220px; display: none;
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: var(--r-md); box-shadow: var(--shadow-3); padding: 6px;
+}
+.lib-menu-item {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  padding: 9px 10px; border: none; background: none; cursor: pointer;
+  border-radius: var(--r-sm); color: var(--text); font-size: var(--fs-md); text-align: left;
+}
+.lib-menu-item:hover { background: var(--surface-3); }
+.lib-menu-item .icon { color: var(--text-soft); flex: 0 0 auto; }
+.lib-menu-item.danger, .lib-menu-item.danger .icon { color: #ff3b30; }
+.lib-menu-check { width: 16px; display: inline-flex; flex: 0 0 auto; }
+.lib-menu-check .icon { color: var(--accent); }
+.lib-menu-sep { height: 1px; background: var(--border-soft); margin: 6px 4px; }
+.lib-menu-label {
+  font-size: var(--fs-xs); color: var(--text-faint); font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.04em; padding: 6px 10px 2px;
+}
+.lib-menu-empty { font-size: var(--fs-sm); color: var(--text-faint); padding: 4px 10px 8px; }
+/* Aviso, no acción: las estanterías inteligentes en las que ya está el libro no
+   se pueden marcar ni desmarcar (manda la regla), así que se cuentan aquí en vez
+   de aparecer como casillas muertas en la lista de arriba. */
+.lib-menu-note {
+  display: flex; gap: 6px; align-items: flex-start;
+  font-size: var(--fs-sm); color: var(--text-faint); padding: 4px 10px 8px; max-width: 260px;
+}
+.lib-menu-note .icon { flex: 0 0 auto; margin-top: 2px; color: var(--accent); }
+
+/* ---- Móvil: el rail pasa a tira horizontal de chips ---- */
+@media (max-width: 767px) {
+  .lib-layout { flex-direction: column; }
+  .lib-rail {
+    flex: 0 0 auto; width: 100%; height: auto; display: flex; gap: var(--s-2);
+    flex-direction: row;   /* en escritorio el rail es columna */
+    overflow-x: auto; overflow-y: hidden; border-right: none;
+    border-bottom: 1px solid var(--border-soft); scrollbar-width: none;
+    padding: calc(var(--s-3) + env(safe-area-inset-top)) var(--s-3) var(--s-3);
+  }
+  .lib-rail::-webkit-scrollbar { display: none; }
+  .lib-rail-section { display: none; }
+  .lib-rail-item {
+    flex: 0 0 auto; width: auto; background: var(--surface-3);
+    padding: 7px 12px; gap: var(--s-2);
+  }
+  .lib-rail-ico, .lib-rail-thumb, .lib-rail-mark { display: none; }
+  .lib-rail-create { width: auto; flex: 0 0 auto; margin: 0; padding: 7px 12px; }
+  .lib-rail-create span { display: none; }
+  /* En la tira horizontal no hay "abajo": Ajustes vuelve a ser un chip más, pero
+     conserva su etiqueta porque es la única entrada a la configuración. */
+  .lib-rail-settings {
+    margin: 0; padding: 7px 12px; border-top: none;
+    border-radius: var(--r-pill); background: var(--surface-3);
+  }
+  .lib-rail-settings span { display: inline; }
+  .lib-main { padding-left: var(--s-4); padding-right: var(--s-4); padding-top: var(--s-4); }
+  .lib-grid { grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: var(--s-4) var(--s-3); }
+  .lib-h1 { font-size: var(--fs-xl); }
+  .lib-upload span { display: none; }
+  .lib-upload { padding: 8px 12px; }
+}
+
+
+/* ============================================================================
+   Diálogos propios (alert/confirm/prompt) — reemplazan a los nativos del navegador.
+   Modales sobrios y theme-aware; ver js/ui/dialog.js.
+   ========================================================================== */
+.dlg-overlay {
+  position: fixed; inset: 0; z-index: 3000;
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+  background: rgba(var(--shadow-color), 0.32);
+  backdrop-filter: blur(2px);
+}
+.dlg-card {
+  width: 100%; max-width: 420px;
+  background: var(--surface-2); color: var(--text);
+  border: 1px solid var(--border); border-radius: var(--r-lg);
+  box-shadow: var(--shadow-3);
+  padding: var(--s-5);
+  animation: dlg-in 0.16s var(--ease);
+}
+@keyframes dlg-in { from { opacity: 0; transform: translateY(8px) scale(0.98); } to { opacity: 1; transform: none; } }
+.dlg-title { font-size: var(--fs-lg); font-weight: 600; margin: 0 0 var(--s-2); }
+.dlg-msg { font-size: var(--fs-md); color: var(--text-soft); line-height: 1.5; white-space: pre-wrap; }
+.dlg-input {
+  width: 100%; margin-top: var(--s-4);
+  padding: 10px 12px; font: inherit; font-size: var(--fs-md);
+  color: var(--text); background: var(--surface-0);
+  border: 1px solid var(--border); border-radius: var(--r-sm);
+}
+.dlg-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+/* formBox: formulario corto en modal (la regla de una estantería inteligente).
+   Con varios campos el diálogo puede pasarse de alto en una pantalla baja, así
+   que el cuerpo hace scroll y las acciones nunca quedan fuera de alcance. */
+.dlg-card--form { max-width: 460px; }
+.dlg-form { margin-top: var(--s-4); max-height: min(56vh, 460px); overflow-y: auto; }
+.dlg-field + .dlg-field { margin-top: var(--s-3); }
+.dlg-field-lbl { display: block; font-size: var(--fs-sm); color: var(--text-soft); margin-bottom: 4px; }
+.dlg-field .dlg-input { margin-top: 0; }
+.dlg-field-empty { font-size: var(--fs-sm); color: var(--text-faint); }
+.dlg-checks {
+  display: flex; flex-direction: column; gap: 2px;
+  max-height: 148px; overflow-y: auto;
+  padding: 6px 8px; border: 1px solid var(--border); border-radius: var(--r-sm);
+  background: var(--surface-0);
+}
+.dlg-check { display: flex; align-items: center; gap: var(--s-2); font-size: var(--fs-md); padding: 3px 2px; cursor: pointer; }
+.dlg-check input { accent-color: var(--accent); }
+.dlg-actions { display: flex; justify-content: flex-end; gap: var(--s-2); margin-top: var(--s-5); }
+.dlg-btn {
+  padding: 8px 16px; font: inherit; font-size: var(--fs-md); font-weight: 500;
+  border-radius: var(--r-sm); border: 1px solid var(--border); cursor: pointer;
+  background: var(--surface-0); color: var(--text);
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+.dlg-cancel:hover { background: var(--surface-3); }
+.dlg-ok { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+.dlg-ok:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+.dlg-ok:focus-visible, .dlg-cancel:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.dlg-danger { background: #dc2626; border-color: #dc2626; color: #fff; }
+.dlg-danger:hover { background: #b91c1c; border-color: #b91c1c; }
+
+/* ==== Paywall Pro (ui/paywall.js) — misma familia visual que los diálogos ==== */
+.pw-card { max-width: 460px; }
+.pw-list { list-style: none; margin: var(--s-4) 0 0; padding: 0; display: grid; gap: 8px; }
+.pw-feat {
+  display: flex; align-items: center; gap: 8px;
+  font-size: var(--fs-md); color: var(--text-soft);
+}
+.pw-feat svg { color: var(--accent); flex: none; }
+.pw-feat-hot { color: var(--text); font-weight: 600; }
+.pw-price { margin-top: var(--s-4); font-size: var(--fs-sm); color: var(--text-soft); }
+
+/* ==== Badge de estado del sync (Fase 2) ==== */
+#sync-badge {
+  position: fixed;
+  bottom: 14px;
+  right: 14px;
+  z-index: 900;
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  background: var(--surface-2);
+  color: var(--text-soft);
+  border: 1px solid var(--border);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  pointer-events: none;
+}
+#sync-badge[data-state='error'] { color: #dc2626; border-color: #dc2626; }
+#sync-badge[data-state='reconnect'] {
+  color: var(--accent);
+  border-color: var(--accent);
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+/* ==== Historial de versiones — overlay dedicado (Fase 3: recuperación) ==== */
+/* Overlay propio a pantalla completa (z sobre Ajustes) con UNA sola zona scrollable de
+   altura completa: cabecera y buscador fijos, lista flex:1, pie fijo. Sin scroll anidado. */
+.histov { z-index: 320; }
+.histov-card {
+  position: relative;
+  display: flex; flex-direction: column;
+  background: var(--surface-1); border: 1px solid var(--border); border-radius: 16px;
+  width: 100%; max-width: 560px; height: 85vh; max-height: 85vh;
+  box-shadow: var(--shadow-3); overflow: hidden;
+}
+.histov-head {
+  flex: none; display: flex; align-items: center; gap: 12px;
+  padding: 16px 18px; border-bottom: 1px solid var(--border);
+}
+.histov-titles { flex: 1; min-width: 0; }
+.histov-title {
+  font-size: 17px; font-weight: 700; letter-spacing: -0.01em;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.histov-sub { font-size: 12px; color: var(--text-soft); margin-top: 2px; }
+.histov-back, .histov-close {
+  flex: none; display: inline-flex; align-items: center; gap: 4px; cursor: pointer;
+  border: 1px solid var(--border); background: var(--surface-0); color: var(--text-soft);
+  border-radius: var(--r-sm); transition: background var(--transition-fast), color var(--transition-fast);
+}
+.histov-back { padding: 6px 12px 6px 8px; font-size: 13px; }
+.histov-close { width: 34px; height: 34px; justify-content: center; border-radius: 50%; }
+.histov-back:hover, .histov-close:hover { background: var(--surface-3); color: var(--text); }
+.histov-search-wrap { flex: none; padding: 12px 18px; border-bottom: 1px solid var(--border); }
+.histov-search {
+  width: 100%; padding: 9px 12px; border: 1px solid var(--border); border-radius: var(--r-md);
+  background: var(--surface-0); color: var(--text); font-size: 14px;
+}
+.histov-search:focus { border-color: var(--accent); outline: none; }
+.histov-list {
+  flex: 1; min-height: 0; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 8px; padding: 14px 18px;
+}
+.histov-pad, .histov-empty { padding: 8px 2px; }
+.histov-empty { text-align: center; padding: 32px 12px; }
+.histov-book {
+  text-align: left; padding: 12px 14px; cursor: pointer;
+  border: 1px solid var(--border); border-radius: var(--r-md);
+  background: var(--surface-0); color: var(--text);
+  display: flex; flex-direction: column; gap: 3px;
+  transition: border-color var(--transition-fast), background var(--transition-fast);
+}
+.histov-book:hover { border-color: var(--accent); background: var(--surface-3); }
+.histov-book-title {
+  font-size: 14px; font-weight: 500; line-height: 1.35;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.histov-untitled { color: var(--text-soft); font-style: italic; font-weight: 400; }
+.histov-book-id { font-family: ui-monospace, SFMono-Regular, monospace; font-size: 11px; color: var(--text-soft); }
+.histov-ver {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--r-md);
+  background: var(--surface-0);
+}
+.histov-ver-date { font-size: 13px; color: var(--text); }
+.histov-ver-btn {
+  flex: none; padding: 6px 14px; cursor: pointer;
+  border: 1px solid var(--accent); border-radius: var(--r-sm);
+  background: transparent; color: var(--accent); font-size: 13px; font-weight: 500;
+}
+.histov-ver-btn:hover { background: var(--accent-soft); }
+.histov-ver-btn:disabled { opacity: 0.4; cursor: default; border-color: var(--border); color: var(--text-soft); background: transparent; }
+.histov-foot { flex: none; padding: 10px 18px; border-top: 1px solid var(--border); font-size: 12px; margin: 0; }
+@media (max-width: 600px) {
+  .histov-card { max-width: 100%; height: 100%; max-height: 100%; border-radius: 0; }
+}
+
+
+/* ============ P18 · MODO FEYNMAN (explícamelo tú) ============ */
+.fey-card { max-width: 620px; }
+.fey-h2 { margin: 0 0 4px; font-size: 20px; }
+.fey-hint { font-size: 13px; color: var(--text-soft); margin: 10px 0 0; }
+.fey-chips { margin-top: 2px; }
+.fey-chip {
+  display: inline-block; margin: 4px 6px 0 0; padding: 4px 10px;
+  border: 1px solid var(--border); border-radius: var(--r-pill);
+  background: var(--surface-2); color: var(--text-soft);
+  font-size: 12px; cursor: pointer;
+}
+.fey-chip:hover { background: var(--surface-3); color: var(--text); }
+
+/* "Sugerir conceptos": acción discreta, no un botón de acento — la acción principal de la
+   pantalla es Empezar, y esto solo alimenta el campo de arriba. */
+.fey-suggest-btn {
+  display: inline-flex; align-items: center; gap: 6px; margin-top: 10px; padding: 0;
+  border: 0; background: none; color: var(--accent);
+  font-size: 12px; cursor: pointer;
+}
+.fey-suggest-btn:hover:not(:disabled) { text-decoration: underline; }
+.fey-suggest-btn:disabled { color: var(--text-faint); cursor: default; }
+
+/* Progreso de ideas cubiertas. Es feedback SIN veredicto: dice cuánto llevas, no qué has
+   hecho mal — el diagnóstico solo aparece si lo pides. */
+.fey-progress { display: flex; align-items: center; gap: 10px; margin: 12px 0 16px; }
+.fey-progress-bar { flex: 1; height: 6px; background: var(--surface-3); border-radius: var(--r-pill); overflow: hidden; }
+.fey-progress-bar span { display: block; height: 100%; background: var(--accent); border-radius: inherit; transition: width var(--transition-normal); }
+.fey-progress-n { flex: none; font-size: 12px; color: var(--text-faint); font-variant-numeric: tabular-nums; }
+
+/* La intervención del tutor: una sola, destacada. Si pareciera un chat, el usuario
+   respondería en corto; aquí queremos un párrafo suyo. */
+.fey-say {
+  padding: 14px 16px; margin-bottom: 14px;
+  background: var(--accent-soft);
+  border-radius: var(--r-md); font-size: 15px; line-height: 1.5;
+}
+.fey-input {
+  width: 100%; padding: 12px 14px;
+  border: 1px solid var(--border); border-radius: var(--r-md);
+  background: var(--surface-1); color: var(--text);
+  font: inherit; font-size: 15px; line-height: 1.5; resize: vertical;
+}
+.fey-input:focus { outline: none; border-color: var(--accent); }
+.fey-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+/* Selector de idioma del dictado: pegado al micro, porque es un ajuste DE ese botón.
+   `width: auto` es obligatorio: el `select` global lleva `width: 100%` y aquí partía la
+   fila de acciones en tres líneas. */
+.fey-err-act {
+  margin-left: 2px; padding: 0; border: 0; background: none; cursor: pointer;
+  color: inherit; font: inherit; font-weight: 700; text-decoration: underline;
+}
+.fey-mic-lang {
+  width: auto; flex: 0 0 auto; margin-left: -4px;
+  padding: 6px 22px 6px 8px; border: 1px solid var(--border); border-radius: 8px;
+  background: var(--surface-0); color: var(--text); font-size: 12px; font-weight: 600; cursor: pointer;
+}
+
+.fey-diag { margin-top: 8px; }
+.fey-block { margin-bottom: 18px; }
+.fey-block h4 { margin: 0 0 8px; font-size: 13px; font-weight: 600; color: var(--text-soft); }
+.fey-block ul { margin: 0; padding-left: 20px; }
+.fey-block li { margin-bottom: 6px; line-height: 1.5; }
+.fey-ok li::marker { color: var(--accent); }
+.fey-missing li::marker { color: var(--danger, #e5484d); }
+.fey-wrong li::marker { color: #f5a524; }
+
+/* ---- IA6 v2 · Selección de región sobre el PDF ---------------------------------------
+   Capa fija sobre el hueco del lector mientras dura la selección. `touch-action: none` es
+   obligatorio: sin él, el navegador se queda el gesto para hacer scroll y el arrastre no
+   llega nunca a la capa. */
+.region-overlay {
+  position: fixed; z-index: 190;
+  cursor: crosshair; touch-action: none;
+  background: rgba(0, 0, 0, 0.12);
+}
+/* Con un marco dibujado, el atenuado se INVIERTE: lo que queda claro es exactamente lo que
+   se va a mandar al modelo. Se consigue con una sombra enorme hacia fuera del marco, no con
+   otra capa (que taparía el propio marco). */
+.region-overlay:has(.region-box:not([hidden])) { background: transparent; }
+.region-hint {
+  position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 12px;
+  padding: 8px 10px 8px 16px;
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: var(--r-pill); box-shadow: var(--shadow-3);
+  font-size: var(--fs-sm); color: var(--text); white-space: nowrap;
+}
+.region-cancel {
+  border: none; background: var(--surface-3); color: var(--text-soft);
+  padding: 5px 12px; border-radius: var(--r-pill); font-size: var(--fs-xs); cursor: pointer;
+}
+.region-cancel:hover { color: var(--text); }
+
+/* "Toda la página": el otro alcance de la misma acción. Se marca con acento tenue —no sólido—
+   porque la acción principal aquí sigue siendo ARRASTRAR; esto es la alternativa, no el
+   camino recomendado. */
+.region-whole {
+  border: none; background: var(--accent-soft); color: var(--accent-hover);
+  padding: 5px 12px; border-radius: var(--r-pill); font-size: var(--fs-xs); font-weight: 600;
+  cursor: pointer; transition: background var(--transition-fast);
+}
+.region-whole:hover { background: var(--accent); color: var(--on-accent); }
+/* El recorte se ve a través del marco: el resto de la página queda atenuado por el overlay,
+   así el usuario ve exactamente lo que va a mandar al modelo. */
+.region-box {
+  position: absolute; pointer-events: none;
+  border: 2px solid var(--accent);
+  border-radius: 2px;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.38);
+}
+body.region-selecting { user-select: none; }
+
+/* ============================================================================
+   Movimiento reducido (F4)
+   Las animaciones nuevas son decorativas: con `prefers-reduced-motion` desaparecen
+   sin dejar el elemento a medio camino (por eso se anula también el `both` del
+   escalonado del índice, que si no lo dejaría en opacity:0 para siempre).
+   ========================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  .sidebar.open .toc-list a { animation: none; opacity: 1; transform: none; }
+  .epub-container.chapter-in { animation: none; }
+  .sidebar, #ai-panel, .reader-main { transition: none; }
+}

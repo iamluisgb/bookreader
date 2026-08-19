@@ -17,7 +17,11 @@ offline con un agente de IA (BYOK) que lee el libro completo según un objetivo.
 
 ## Estructura
 - `index.html` — entry point (CSP, scripts vendorizados).
-- `css/` — main.css (layout), reader.css (iframe epub), themes.css (tokens/temas).
+- `css/` — main.css (layout), main-late.css (foco/tooltips/responsive), agent.css
+  (panel del agente + ajustes, **carga perezosa**), reader.css (iframe epub),
+  themes.css (tokens/temas). El orden de los tres primeros lo fija el `<head>`:
+  agent.css se inserta en el hueco `#css-slot-agent` para no alterar la cascada
+  (ver `js/css-loader.js`).
 - `js/` — orquestador (`app.js`) + módulos por responsabilidad:
   - lectura: `epub-reader.js`, `pdf-reader.js`, `touch-select.js`, `progress.js`
   - sidebar: `bookmarks.js`/`bookmarks-ui.js`, `highlights.js`/`highlights-ui.js`, `settings.js`
@@ -28,7 +32,8 @@ offline con un agente de IA (BYOK) que lee el libro completo según un objetivo.
   - utilidades: `js/ui/` (`icons.js`, `escape.js`), `storage.js`
   - biblioteca: `js/library/` (`store.js` IndexedDB, `view.js` pantalla,
     `shelves.js` reglas/árbol/pertenencia — lógica pura, sin DOM ni IDB)
-- `vendor/` — libs vendorizadas (jszip, epub.js, pdf.js + worker).
+- `vendor/` — libs vendorizadas (jszip, epub.js, pdf.js + worker). **No se cargan en el
+  arranque**: las pide `js/vendor-loader.js` al abrir un libro, y solo la del formato.
 - `sw.js` — service worker (precache + stale-while-revalidate). `manifest.json` — PWA.
 
 ## Convenciones

@@ -9,6 +9,7 @@ import * as EpubReader from '../epub-reader.js';
 import * as PdfReader from '../pdf-reader.js';
 import * as RegionSelect from '../region-select.js';
 import { SHEET_SNAPS, SHEET_KEY, applySheetSnap, getSheetSnap, restoreSheetSnap } from './sheet-height.js';
+import { loadAgentCss } from '../css-loader.js';
 import { getTemplate, objectiveTemplates, isValidField, isAgentFillable, agentFields, isCognitionField, ARTESANO_ID, INMERSIVA_ID } from './templates.js';
 import { icon } from '../ui/icons.js';
 import { t } from '../i18n.js';
@@ -159,6 +160,10 @@ export function init(opts) {
 }
 
 export function setOpen(open) {
+  // La hoja del agente (css/agent.css) ya no viene en main.css. Normalmente la trae el
+  // precalentado en tiempo ocioso de app.js mucho antes de que nadie pulse; esto es la
+  // garantía para quien abra el agente en el primer instante. Es idempotente.
+  if (open) loadAgentCss().catch(e => console.warn('agent.css:', e));
   document.body.classList.toggle('ai-open', open);
   if (open) agentUnread = false;          // al abrir se da por leído
   applyAgentBadge();

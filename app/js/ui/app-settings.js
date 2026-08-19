@@ -27,6 +27,7 @@ import { icon } from './icons.js';
 import { escapeHtml } from './escape.js';
 import { confirmBox } from './dialog.js';
 import { t, getLang, setLang } from '../i18n.js';
+import { loadAgentCss } from '../css-loader.js';
 
 const SECTIONS = [
   { id: 'agent',     label: () => t('Agente'),     ico: 'sparkles' },
@@ -1361,6 +1362,9 @@ function openHistory(trigger, show, fail) {
 }
 
 export function open(section = 'agent') {
+  // Ajustes comparte hoja con el agente (css/agent.css, perezosa). Idempotente: si el
+  // precalentado de app.js ya la trajo, esto no hace nada.
+  loadAgentCss().catch(e => console.warn('agent.css:', e));
   ensureOverlay();
   agentDraft = null;   // el borrador solo cruza entre vistas, no entre aperturas
   overlay.style.display = 'flex';

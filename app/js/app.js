@@ -24,6 +24,7 @@ import { toast } from './ai/toast.js';
 import * as Jobs from './ai/jobs.js';
 import { t, translateDom } from './i18n.js';
 import { prefetchVendor } from './vendor-loader.js';
+import { loadAgentCss } from './css-loader.js';
 import { restoreSheetSnap } from './ai/sheet-height.js';
 import { repairGatewayConfig } from './ai/gateway-repair.js';
 
@@ -69,7 +70,13 @@ function panel() {
 // abriéndolo al instante.
 function calentarModulosGrandes() {
   const idle = window.requestIdleCallback || ((fn) => setTimeout(fn, 1500));
-  idle(() => { import('./ui/app-settings.js').catch(() => {}); });
+  idle(() => {
+    import('./ui/app-settings.js').catch(() => {});
+    // css/agent.css (~63 KB) salió de main.css: ya no bloquea el primer pintado de la
+    // biblioteca, que no usa ni una de sus reglas. Se trae en cuanto hay hueco, así que
+    // abrir el agente sigue siendo instantáneo. Ver js/css-loader.js.
+    loadAgentCss().catch(() => {});
+  });
 }
 
 // ============ INIT ============

@@ -16,6 +16,12 @@
   <link rel="stylesheet" href="css/fonts.css">
   <link rel="stylesheet" href="css/themes.css">
   <link rel="stylesheet" href="css/main.css">
+  <!-- HUECO para css/agent.css (panel del agente + ajustes, ~63 KB). Lo inserta
+       js/css-loader.js justo aquí, ANTES de main-late.css, que es donde vivían esas
+       reglas dentro de main.css. El orden de las hojas lo fija la posición del <link> en
+       el DOM, no cuándo se inserta, así que la cascada queda igual que estaba. No mover
+       este marcador ni cambiar el orden de los dos <link> que lo rodean. -->
+  <link rel="stylesheet" id="css-slot-agent" href="css/main-late.css">
   <link rel="stylesheet" href="css/reader.css">
   <!-- Temml (fórmulas): usa las fuentes matemáticas del SISTEMA, no descarga tipografías. -->
   <link rel="stylesheet" href="css/temml.css">

@@ -1,0 +1,1398 @@
+/* agent.css — Hoja del AGENTE y de AJUSTES GENERALES, extraída de main.css.
+ *
+ * Son ~60 KB que solo hacen falta cuando se abre el panel del agente o los ajustes, y
+ * bloqueaban el primer pintado de la biblioteca, que no usa ni una de estas reglas.
+ * La carga js/ai/panel.js y js/ui/app-settings.js (ver js/css-loader.js).
+ *
+ * ORDEN: el <link> NO se añade al final del head, se inserta en el hueco que index.html
+ * reserva entre main.css y main-late.css. Ahí es donde estaban estas reglas, y el orden
+ * de las hojas lo fija la posición del <link> en el DOM, no cuándo se inserta. Moverlo
+ * al final cambiaría quién gana los empates de especificidad contra la cola genérica
+ * (foco, tooltips, responsive), que es exactamente lo que no se quiere tocar.
+ *
+ * Se generó partiendo main.css por selector; el orden RELATIVO entre estas reglas es el
+ * que tenían. No reordenar a mano.
+ */
+
+
+
+/* --kb-inset = alto del teclado virtual (lo publica `initKeyboardInset` en ai/panel.js a
+   partir de visualViewport). El panel es `fixed`: sin esto, en iOS el teclado NO encoge el
+   viewport de layout y el composer queda debajo del teclado — escribías a ciegas. */
+#ai-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: var(--ai-panel-width);
+  height: calc(100% - var(--kb-inset, 0px));
+  background: var(--surface-1);
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  z-index: 100;
+  transform: translateX(100%);
+  transition: transform var(--transition-panel);
+}
+
+body.ai-open #ai-panel { transform: translateX(0); }
+body.ai-open .reader-main { margin-right: var(--ai-panel-width); }
+
+/* ---- Tiradores para redimensionar los paneles (solo escritorio) ----
+   Ambos paneles EMPUJAN el lector con un margen = su anchura (variable CSS). Arrastrar
+   el tirador actualiza esa variable y el texto reflowea. En móvil (drawer/overlay) se
+   ocultan. */
+.panel-resizer {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 10px;
+  z-index: 110;
+  cursor: col-resize;
+  touch-action: none;
+}
+.ai-resizer { left: -5px; }    /* borde interior de la sidebar (derecha) */
+.panel-resizer::before {
+  content: '';
+  position: absolute;
+  top: 0; bottom: 0; left: 50%;
+  width: 2px;
+  transform: translateX(-50%);
+  background: transparent;
+  transition: background var(--transition-fast);
+}
+@media (max-width: 1023px) { .panel-resizer { display: none; }
+}
+
+
+/* Toolbar único del panel: una sola fila con el selector de conversación + perfil +
+   acciones + ajustes/cerrar. Sustituye a la antigua .ai-header ("Agente"). */
+/* Tirador del bottom-sheet: SOLO existe en móvil (sus estilos viven en la media query de
+   <768px). Sin esta línea el <button> se colaba en escritorio con el estilo por defecto del
+   navegador —un rectángulo de 379×4px con borde `2px outset`— y se veía como dos rayas
+   sueltas encima de la barra del panel. */
+.ai-sheet-grab { display: none; }
+
+.ai-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-soft);
+}
+/* ⚙ (y ✕ a su lado) quedan a la derecha aunque el grupo de conversación esté oculto. */
+.ai-toolbar-cfg { margin-left: auto; }
+
+
+/* Coach mark de una sola vez que señala el botón de Flashcards. */
+.ai-coachmark {
+  position: fixed; z-index: 400; max-width: 260px;
+  display: flex; align-items: flex-start; gap: 8px;
+  background: var(--accent); color: var(--on-accent);
+  border-radius: var(--r-md); padding: 10px 12px;
+  font-size: 13px; line-height: 1.4; box-shadow: var(--shadow-3);
+  opacity: 0; transform: translateY(-4px); transition: opacity var(--transition-fast), transform var(--transition-fast);
+  pointer-events: none;   /* no intercepta clics; solo su ✕ es interactivo */
+}
+.ai-coachmark .ai-coachmark-x { pointer-events: auto; }
+.ai-coachmark.is-in { opacity: 1; transform: translateY(0); }
+.ai-coachmark b { font-weight: 700; }
+.ai-coachmark::before {
+  content: ''; position: absolute; top: -6px; left: var(--arrow-x, 130px);
+  width: 12px; height: 12px; background: var(--accent);
+  transform: translateX(-50%) rotate(45deg);
+}
+.ai-coachmark-x {
+  flex: none; background: rgba(255,255,255,0.2); border: none; color: var(--on-accent);
+  width: 22px; height: 22px; border-radius: 50%; display: inline-flex; align-items: center;
+  justify-content: center; cursor: pointer; position: relative;
+}
+.ai-coachmark-x:hover { background: rgba(255,255,255,0.35); }
+
+.ai-config {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.ai-config label {
+  display: block;
+  font-size: 12px;
+  color: var(--text-soft);
+  margin: 8px 0 4px;
+}
+.ai-config input,
+.ai-config select {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface-0);
+  color: var(--text);
+  font-size: 13px;
+}
+.ai-save { width: 100%; margin-top: 12px; padding: 8px; font-size: 14px; }
+.ai-privacy {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 12px 0 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text-faint);
+}
+.ai-privacy .icon { flex: none; margin-top: 1px; }
+
+.ai-status {
+  padding: 10px 18px;
+  font-size: 13px;
+  color: var(--text-faint);
+  border-bottom: 1px solid var(--border-soft);
+}
+
+/* Chip del perfil de agente activo (P1): clicable, abre Ajustes → Perfiles. Vive en la
+   fila de la barra de conversación (ver panel-template.js), así que no lleva márgenes
+   propios y encoge con ellipsis para no empujar al selector de conversación. */
+.ai-profile-chip {
+  flex: 0 1 auto; min-width: 0;
+  display: flex; align-items: center; gap: 6px;
+  margin: 0; padding: 7px 12px;
+  max-width: 45%;
+  border: 1px solid var(--border); border-radius: var(--r-pill);
+  background: var(--surface-2);
+  font-size: 13px; color: var(--text-soft); cursor: pointer;
+  transition: border-color var(--transition-fast), color var(--transition-fast);
+}
+.ai-profile-chip:hover { border-color: var(--accent); color: var(--text); }
+.ai-profile-chip .icon { flex: none; color: var(--accent); }
+.ai-profile-chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.ai-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.ai-msg { display: flex; }
+.ai-msg-user { justify-content: flex-end; }
+.ai-bubble {
+  font-size: var(--fs-md);
+  line-height: 1.6;
+  white-space: normal;
+  word-wrap: break-word;
+}
+/* Usuario: burbuja de acento, alineada a la derecha */
+.ai-msg-user .ai-bubble {
+  max-width: 85%;
+  padding: 10px 16px;
+  border-radius: var(--r-lg) var(--r-lg) var(--r-sm) var(--r-lg);
+  background: var(--accent);
+  color: var(--on-accent);
+  box-shadow: var(--shadow-1);
+}
+/* Agente: bloque de texto limpio (estilo NotebookLM), sin caja */
+.ai-msg-assistant { width: 100%; }
+.ai-msg-assistant .ai-bubble { width: 100%; color: var(--text); }
+
+/* Chips de cita: pill sutil de acento (v2: más visible) */
+.ai-cite {
+  display: inline-flex;
+  align-items: center;
+  background: var(--accent-soft);
+  color: var(--accent);
+  border: 1px solid transparent;
+  border-radius: var(--r-pill);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  line-height: 1.4;
+  padding: 2px 8px;
+  margin: 0 2px;
+  cursor: pointer;
+  vertical-align: baseline;
+  transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+}
+.ai-cite:hover { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+.ai-typing { color: var(--text-faint); font-style: italic; }
+.ai-error { color: #e53935; }
+
+.ai-composer {
+  display: flex;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+}
+.ai-composer textarea {
+  flex: 1;
+  resize: none;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface-0);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 14px;
+  transition: border-color var(--transition-fast);
+}
+.ai-composer textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.ai-send { padding: 8px 16px; font-size: 14px; align-self: stretch; }
+
+/* Botonera del composer: "Ver" (visión) + Enviar, apiladas a la derecha del textarea. */
+.ai-composer-btns { display: flex; flex-direction: column; gap: 6px; }
+.ai-composer-btns .ai-send { flex: 1; }
+/* Última fila: micro (cuadrado, solo icono) + Enviar, que se queda con el resto del ancho. */
+.ai-composer-row { display: flex; gap: 6px; flex: 1; }
+.ai-composer-row .ai-send { flex: 1; }
+.ai-mic { padding: 6px 9px; justify-content: center; }
+/* Grabando: mismo lenguaje que el micro de Feynman (acento sólido), más un latido suave
+   que deja claro que el micro está ABIERTO aunque no haya texto en vivo (con el motor del
+   proveedor la transcripción no llega hasta soltar). */
+.ai-mic-on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  animation: ai-mic-pulse 1.6s ease-in-out infinite;
+}
+.ai-mic-on:hover { color: #fff; }
+@media (prefers-reduced-motion: reduce) { .ai-mic-on { animation: none; }
+}
+
+.ai-see {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 10px;
+  font-size: 13px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-0);
+  color: var(--text-soft);
+  cursor: pointer;
+}
+.ai-see:hover { color: var(--accent); border-color: var(--accent); }
+
+/* Tabs como segmented control (v2) */
+.ai-tabs {
+  display: flex;
+  gap: 4px;
+  margin: 12px 16px 0;
+  padding: 4px;
+  background: var(--surface-2);
+  border-radius: var(--r-pill);
+}
+.ai-tab {
+  flex: 1;
+  padding: 8px 12px;
+  background: none;
+  border: none;
+  border-radius: var(--r-pill);
+  color: var(--text-soft);
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+.ai-tab:hover { color: var(--text); }
+.ai-tab.active {
+  color: var(--text);
+  background: var(--surface-2);
+  box-shadow: var(--shadow-1);
+}
+
+.ai-view { display: none; flex: 1; min-height: 0; flex-direction: column; }
+.ai-view.active { display: flex; }
+#ai-view-notebook { overflow-y: auto; padding: 12px 16px; }
+
+/* ==== Studio: galería per-libro de artefactos (historial de resúmenes/mapas + flashcards) ==== */
+#ai-view-studio { overflow-y: auto; padding: 14px 16px; }
+.studio-book { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 8px; }
+.studio-hint { font-size: 12px; color: var(--text-soft); margin: 2px 0 8px; line-height: 1.45; }
+.studio-group { margin-bottom: 18px; }
+.studio-group-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.studio-ico { display: inline-flex; color: var(--accent); flex: none; }
+.studio-group-name { font-size: 14px; font-weight: 600; color: var(--text); flex: 1; min-width: 0; }
+.studio-new {
+  flex: none; display: inline-flex; align-items: center; gap: 4px; cursor: pointer;
+  padding: 4px 10px; font-size: 12px; font-weight: 600;
+  border: 1px solid var(--accent); border-radius: 999px; background: transparent; color: var(--accent);
+}
+.studio-new:hover { background: var(--accent-soft); }
+/* Tarjeta de artefacto: zona clicable (abrir) + botón borrar */
+.studio-card {
+  display: flex; align-items: stretch; gap: 4px; margin-bottom: 8px;
+  border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface-1);
+  overflow: hidden;
+}
+.studio-card-main {
+  flex: 1; min-width: 0; text-align: left; cursor: pointer;
+  background: none; border: none; padding: 12px 14px; color: var(--text);
+}
+.studio-card-main:hover { background: var(--surface-3); }
+.studio-del {
+  flex: none; width: 40px; display: inline-flex; align-items: center; justify-content: center;
+  background: none; border: none; border-left: 1px solid var(--border); color: var(--text-soft); cursor: pointer;
+}
+.studio-del:hover { background: var(--surface-3); color: #dc2626; }
+.studio-meta { font-size: 12.5px; color: var(--text-soft); margin: 0; line-height: 1.4; }
+.studio-value { font-size: 12.5px; color: var(--text-soft); margin: 0; line-height: 1.45; }
+/* Invitación (tipo sin artefactos aún) */
+.studio-empty {
+  flex-direction: column; align-items: flex-start; gap: 10px; padding: 12px 14px;
+  background: var(--surface-0); border-style: dashed;
+}
+.studio-gen {
+  padding: 6px 14px; font-size: 13px; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 5px;
+  border: 1px solid var(--accent); border-radius: var(--r-sm);
+  background: transparent; color: var(--accent); font-weight: 600;
+}
+.studio-gen:hover { background: var(--accent-soft); }
+.studio-link { background: none; border: none; color: var(--accent); cursor: pointer; font: inherit; font-size: inherit; padding: 0 0 0 2px; }
+/* Estados en curso / error, dentro del grupo del tipo */
+.studio-running, .studio-error { flex-direction: column; align-items: stretch; gap: 8px; padding: 12px 14px; }
+.studio-errmsg { color: #dc2626; }
+.studio-progress { height: 5px; border-radius: 999px; background: var(--surface-3); overflow: hidden; }
+.studio-bar { height: 100%; background: var(--accent); border-radius: 999px; transition: width .3s ease; }
+
+/* Acciones bajo una respuesta */
+.ai-bubble-actions { margin-top: 8px; display: flex; gap: 6px; flex-wrap: wrap; }
+.ai-act {
+  background: none; border: 1px solid var(--border); color: var(--text-soft);
+  border-radius: 6px; font-size: 11px; padding: 3px 8px; cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+.ai-act:hover:not(:disabled) { background: var(--surface-0); color: var(--text); }
+.ai-act:disabled { opacity: 0.6; cursor: default; }
+.ai-extract-status { font-size: 11px; color: var(--text-faint); align-self: center; }
+
+/* Toggle de auto-libreta en el config */
+.ai-check {
+  display: flex; align-items: center; gap: 8px; cursor: pointer;
+  font-size: 13px; color: var(--text-soft); margin-top: 12px;
+  text-transform: none; letter-spacing: 0; font-weight: 400;
+}
+.ai-check input { width: auto; }
+
+/* Aviso de notas nuevas en la pestaña Libreta */
+.ai-tab-unread::after {
+  content: ''; display: inline-block; width: 7px; height: 7px; margin-left: 6px;
+  border-radius: 50%; background: var(--accent); vertical-align: middle;
+}
+
+/* Markdown dentro de respuestas y notas */
+.ai-bubble-text > :first-child, .ai-nb-note-text > :first-child { margin-top: 0; }
+.ai-bubble-text > :last-child, .ai-nb-note-text > :last-child { margin-bottom: 0; }
+.ai-bubble-text p, .ai-nb-note-text p { margin: 0 0 8px; }
+.ai-md-h { font-size: 14px; font-weight: 700; margin: 12px 0 6px; line-height: 1.3; }
+.ai-bubble-text ul, .ai-bubble-text ol,
+.ai-nb-note-text ul, .ai-nb-note-text ol { margin: 0 0 8px; padding-left: 20px; }
+.ai-bubble-text li, .ai-nb-note-text li { margin-bottom: 3px; }
+.ai-bubble-text code, .ai-nb-note-text code {
+  background: var(--surface-0); border-radius: 4px; padding: 1px 5px;
+  font-size: 0.9em; font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.ai-code {
+  background: var(--surface-0); border: 1px solid var(--border); border-radius: 8px;
+  padding: 10px 12px; overflow-x: auto; margin: 0 0 8px;
+}
+.ai-code code { background: none; padding: 0; }
+/* Cita: se distingue por superficie y color de texto, sin barra lateral. */
+.ai-bubble-text blockquote, .ai-nb-note-text blockquote {
+  margin: 0 0 8px; padding: 8px 12px; border-radius: var(--r-sm);
+  background: var(--surface-2); color: var(--text-soft); font-style: italic;
+}
+.ai-bubble-text hr, .ai-nb-note-text hr { border: none; border-top: 1px solid var(--border); margin: 10px 0; }
+.ai-bubble-text a, .ai-nb-note-text a { color: var(--accent); }
+
+/* Tablas del Markdown del agente. El panel es estrecho → el contenedor hace scroll
+   horizontal en vez de desbordar; ver mdToHtml (js/ai/markdown.js). */
+.ai-md-tablewrap { overflow-x: auto; margin: 0 0 8px; }
+.ai-md-table { border-collapse: collapse; width: 100%; font-size: 13px; }
+.ai-md-table th, .ai-md-table td {
+  border: 1px solid var(--border); padding: 5px 9px; text-align: left; vertical-align: top;
+}
+.ai-md-table th { background: var(--surface-3); font-weight: 600; }
+.ai-md-table tbody tr:nth-child(even) td { background: var(--surface-1); }
+
+/* Libreta (v2) */
+.ai-nb-goal {
+  display: flex; flex-direction: column; gap: 4px;
+  background: var(--surface-3); border-radius: var(--r-md); padding: 12px 14px;
+  font-size: 14px; line-height: 1.5; margin-bottom: 8px;
+}
+.ai-nb-goal-label { display: block; font-size: 12px; color: var(--text-faint); margin-bottom: 4px; }
+.ai-nb-goal-value { word-break: break-word; }
+.ai-nb-tpl { font-size: 13px; color: var(--text-faint); margin-bottom: 18px; }
+.ai-nb-field { margin-bottom: 18px; }
+.ai-nb-field-label {
+  font-size: 12px; font-weight: 600; color: var(--text-soft);
+  text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 8px;
+}
+.ai-nb-note {
+  display: flex; gap: 10px; align-items: flex-start;
+  background: var(--surface-2); border: 1px solid var(--border-soft); border-radius: var(--r-md); padding: 10px 12px; margin-bottom: 8px;
+}
+.ai-nb-note-text { flex: 1; font-size: 14px; line-height: 1.5; }
+.ai-nb-note-tools { display: flex; gap: 4px; flex-shrink: 0; }
+.ai-nb-edit, .ai-nb-del, .ai-nb-goto { background: none; border: none; color: var(--text-faint); cursor: pointer; font-size: 13px; padding: 4px 6px; border-radius: var(--r-sm); }
+.ai-nb-edit:hover, .ai-nb-goto:hover { color: var(--accent); background: var(--surface-3); }
+.ai-nb-del:hover { color: #e53935; background: var(--surface-3); }
+.ai-nb-empty { font-size: 14px; color: var(--text-faint); margin-bottom: 8px; }
+
+/* Editor de nota (editar/añadir) */
+.ai-nb-editor { margin-bottom: 8px; }
+.ai-nb-input {
+  width: 100%; min-height: 72px; resize: vertical;
+  border: 1px solid var(--accent); border-radius: var(--r-md); padding: 10px 12px;
+  background: var(--surface-0); color: var(--text);
+  font-family: inherit; font-size: 14px; line-height: 1.5;
+}
+.ai-nb-editor-actions { display: flex; gap: 8px; margin-top: 8px; }
+.ai-nb-save, .ai-nb-cancel {
+  border: 1px solid var(--border); border-radius: var(--r-sm); font-size: 13px; font-weight: 500;
+  padding: 6px 14px; cursor: pointer;
+}
+.ai-nb-save { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+.ai-nb-save:hover { background: var(--accent-hover); }
+.ai-nb-cancel { background: none; color: var(--text-soft); }
+.ai-nb-cancel:hover { background: var(--surface-3); color: var(--text); }
+.ai-nb-add {
+  background: none; border: 1px dashed var(--border); color: var(--text-faint);
+  border-radius: var(--r-sm); font-size: 13px; padding: 6px 12px; cursor: pointer; width: 100%;
+}
+.ai-nb-add:hover { border-color: var(--accent); color: var(--accent); }
+
+/* Onboarding modal */
+.ai-onboarding {
+  position: fixed; inset: 0; z-index: 300;
+  background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+}
+.ai-ob-card {
+  position: relative;
+  background: var(--surface-1); border: 1px solid var(--border); border-radius: 16px;
+  padding: 32px; width: 100%; max-width: 560px; box-shadow: var(--shadow-3);
+}
+.ai-ob-close {
+  position: absolute; top: 16px; right: 16px;
+  width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center;
+  border: none; border-radius: 50%; background: var(--surface-3); color: var(--text-soft);
+  cursor: pointer; transition: background var(--transition-fast), color var(--transition-fast);
+}
+.ai-ob-close:hover { background: var(--border); color: var(--text); }
+.ai-ob-card h2 { font-size: 22px; font-weight: 700; margin-bottom: 8px; letter-spacing: -0.01em; }
+.ai-ob-sub { color: var(--text-soft); font-size: 15px; margin-bottom: 20px; }
+.ai-ob-back {
+  background: none; border: none; color: var(--accent); cursor: pointer;
+  font-size: 14px; font-weight: 500; margin-bottom: 16px; padding: 0;
+}
+.ai-ob-blocks, .ai-ob-templates { display: flex; flex-direction: column; gap: 12px; }
+.ai-ob-block, .ai-ob-tpl {
+  text-align: left; background: var(--surface-0); border: 1px solid var(--border);
+  border-radius: var(--r-md); padding: 16px 18px; cursor: pointer; transition: border-color var(--transition-fast), background var(--transition-fast);
+  display: flex; flex-direction: column; gap: 6px;
+}
+.ai-ob-block:hover, .ai-ob-tpl:hover { border-color: var(--accent); background: var(--surface-3); }
+.ai-ob-block-label, .ai-ob-tpl-name { font-size: 16px; font-weight: 600; color: var(--text); }
+.ai-ob-block-hint, .ai-ob-tpl-ideal { font-size: 13px; color: var(--text-soft); line-height: 1.4; }
+.ai-ob-goal {
+  width: 100%; border: 1px solid var(--border); border-radius: var(--r-md); padding: 12px;
+  background: var(--surface-0); color: var(--text); font-family: inherit; font-size: 14px;
+  resize: vertical; margin-bottom: 20px; transition: border-color var(--transition-fast);
+}
+.ai-ob-goal:focus { outline: none; border-color: var(--accent); }
+.ai-ob-start { width: 100%; }
+/* Opt-in del modo Artesano dentro de la Lectura Inmersiva. */
+.ai-ob-check {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 14px; color: var(--text-soft);
+  margin: -8px 0 20px; cursor: pointer;
+}
+/* Atajo de baja fricción: "solo chatear" bajo la lista de objetivos. */
+.ai-ob-quickchat {
+  display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%;
+  margin-top: 14px; padding: 12px; cursor: pointer;
+  background: none; border: 1px dashed var(--border); border-radius: var(--r-md);
+  color: var(--text-soft); font-size: 14px; font-family: inherit;
+  transition: border-color var(--transition-fast), color var(--transition-fast);
+}
+.ai-ob-quickchat:hover { border-color: var(--accent); color: var(--accent); }
+.ai-ob-quickchat .icon { color: var(--accent); }
+
+/* Aviso, tras la 1ª respuesta en chat libre, para activar un objetivo (sin perder el chat). */
+.ai-objnudge {
+  margin: 8px 0; padding: 12px 14px; border-radius: var(--r-md);
+  background: var(--accent-soft); border: 1px solid var(--border-soft);
+  font-size: 13px; line-height: 1.45; color: var(--text);
+  display: flex; flex-direction: column; gap: 10px;
+}
+.ai-objnudge b { font-weight: 700; }
+.ai-objnudge-btns { display: flex; align-items: center; gap: 8px; }
+.ai-objnudge-go {
+  background: var(--accent); color: var(--on-accent); border: none; border-radius: var(--r-sm);
+  padding: 7px 14px; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit;
+}
+.ai-objnudge-go:hover { background: var(--accent-hover); }
+.ai-objnudge-x {
+  background: none; border: none; color: var(--text-soft); cursor: pointer;
+  width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+}
+.ai-objnudge-x:hover { background: var(--surface-3); color: var(--text); }
+/* Conversación huérfana (plantilla eliminada tras consolidar a T1–T5). */
+.ai-nb-orphan { text-align: center; color: var(--text-soft); font-size: 14px; padding: 24px 12px; }
+.ai-nb-orphan p { margin-bottom: 14px; }
+
+/* ---- Flashcards para Anki (modal, reusa el patrón del onboarding) ---- */
+.fc-card { max-width: 640px; max-height: 90vh; overflow-y: auto; }
+
+/* P14 · Mapa mental */
+/* Setup/en curso: tarjeta cómoda como la del resumen. El resultado (SVG grande) la ensancha. */
+.mm-card { max-width: 680px; max-height: 92vh; overflow: auto; }
+.mm-card.mm-card--wide { max-width: 92vw; width: 900px; }
+/* El mapa no tiene el texto de ayuda que en el resumen separa el select del botón: dale aire. */
+.mm-card .ai-ob-start { margin-top: 20px; }
+/* F5 · El lienzo es un escenario con zoom/pan: `overflow: hidden` porque quien recorta ahora
+   es el viewBox del SVG, no la barra de scroll; `touch-action: none` para que el arrastre y
+   la pinza los gestione el mapa y no el scroll de la página. El `background` lo pone JS
+   desde el tema (antes estaba clavado a papel y en oscuro cantaba). */
+.mm-stage { position: relative; }
+.mm-canvas {
+  margin: 8px 0; border: 1px solid var(--border); border-radius: 12px;
+  overflow: hidden; touch-action: none; cursor: grab; background: var(--surface-2);
+}
+.mm-canvas:active { cursor: grabbing; }
+/* `>` DELIBERADO: el panel de detalle vive dentro del escenario y sus iconos son <svg>.
+   Sin el hijo directo, `width: 100%` los inflaba al ancho del lienzo. */
+.mm-canvas > svg { display: block; width: 100%; height: auto; }
+.mm-node:hover rect { stroke-width: 2.5; }
+.mm-node:focus-visible { outline: none; }
+.mm-node:focus-visible rect { stroke: var(--accent); stroke-width: 3; }
+
+/* Controles de zoom, flotando sobre el lienzo */
+.mm-zoom { position: absolute; right: 12px; bottom: 20px; display: flex; gap: 4px; }
+.mm-zoom button {
+  width: 32px; height: 32px; display: grid; place-items: center;
+  border: 1px solid var(--border); border-radius: 8px;
+  background: var(--surface-1); color: var(--text);
+  font-size: 17px; line-height: 1; cursor: pointer; box-shadow: var(--shadow-1);
+}
+.mm-zoom button:hover { background: var(--surface-3); }
+
+/* Detalle de un nodo. Reemplaza al <title> nativo, que en táctil no existe. */
+.mm-pop {
+  /* Cuelga de .mm-stage, NO de .mm-canvas: el lienzo recorta (`overflow: hidden`) y el
+     panel de un nodo del borde quedaba cortado. */
+  position: absolute; z-index: 3; width: min(320px, 78vw);
+  background: var(--surface-1); color: var(--text);
+  border: 1px solid var(--border); border-radius: 12px;
+  box-shadow: var(--shadow-3); padding: 12px 14px;
+}
+.mm-pop h4 { margin: 0 22px 8px 0; font-size: 15px; line-height: 1.3; }
+.mm-pop blockquote {
+  margin: 0 0 10px; padding-left: 10px; border-left: 2px solid var(--border);
+  font-size: 13px; line-height: 1.5; color: var(--text-soft);
+  max-height: 190px; overflow: auto;
+}
+.mm-pop-close { position: absolute; top: 8px; right: 8px; background: none; border: 0; color: var(--text-soft); cursor: pointer; padding: 2px; }
+.mm-pop-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.mm-pop-act {
+  display: inline-flex; align-items: center; gap: 5px;
+  border: 1px solid var(--border); border-radius: 999px; background: var(--surface-2);
+  color: var(--text); font-size: 12.5px; padding: 5px 11px; cursor: pointer;
+}
+.mm-pop-act svg { flex: 0 0 auto; width: 14px; height: 14px; }
+.mm-pop-act:hover { border-color: var(--accent); }
+.mm-pop-act:disabled { opacity: .5; cursor: wait; }
+.mm-pop-status:not(:empty) { margin-top: 8px; font-size: 12.5px; color: var(--text-soft); }
+.ai-run-status { font-size: 15px; color: var(--text); margin: 8px 0 18px; min-height: 1.4em; }
+.ai-run-actions { display: flex; gap: 10px; align-items: center; }
+.fc-txt-btn { background: none; border: none; color: var(--text-soft); font: inherit; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; padding: 4px 6px; border-radius: var(--r-md); }
+.fc-txt-btn:hover { color: var(--accent); }
+
+/* Chip flotante de progreso/reapertura (bajo el modal, sobre el lector) */
+.ai-taskchip {
+  position: fixed; right: 20px; bottom: 20px; z-index: 250;
+  display: flex; align-items: center; gap: 9px;
+  background: var(--surface-1); border: 1px solid var(--border); border-radius: var(--r-pill, 999px);
+  padding: 9px 14px; box-shadow: var(--shadow, 0 6px 24px rgba(0,0,0,.14));
+  font-size: 13px; font-weight: 600; color: var(--text); cursor: pointer; max-width: 260px;
+}
+.ai-taskchip.is-done { border-color: var(--accent); }
+.ai-taskchip.is-error { border-color: #ef4444; }
+.ai-taskchip-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ai-taskchip-spin {
+  width: 15px; height: 15px; flex: none; border-radius: 50%;
+  border: 2px solid var(--accent-soft, #cdefd8); border-top-color: var(--accent);
+  animation: ai-spin .7s linear infinite;
+}
+.ai-taskchip-dot { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; flex: none; border-radius: 50%; background: var(--accent); color: var(--on-accent, #fff); font-weight: 700; font-size: 12px; }
+.ai-taskchip.is-error .ai-taskchip-dot { background: #ef4444; }
+.ai-taskchip-x { background: none; border: none; color: var(--text-faint, #999); cursor: pointer; padding: 0 0 0 2px; display: inline-flex; }
+.ai-taskchip-x:hover { color: var(--text); }
+/* Con el panel de IA abierto, aparta el chip a su izquierda para no tapar el input del chat. */
+body.ai-open .ai-taskchip { right: calc(var(--ai-panel-width) + 20px); }
+/* Chip de vuelta al repaso (F2): misma familia. Si hay un trabajo de IA en curso, su chip
+   ya ocupa la esquina, así que este se apila encima en vez de taparlo. */
+.ai-taskchip.is-study { border-color: var(--accent); }
+body.has-taskchip .ai-taskchip.is-study { bottom: 74px; }
+@media (max-width: 600px) { body.has-taskchip .ai-taskchip.is-study { bottom: 62px; }
+}
+
+
+/* Toast de aviso (encima de todo) */
+.ai-toast-host { position: fixed; left: 0; right: 0; bottom: 20px; z-index: 600; display: flex; flex-direction: column; align-items: center; gap: 8px; pointer-events: none; }
+.ai-toast {
+  pointer-events: auto; display: flex; align-items: center; gap: 12px;
+  background: #23232a; color: #fff; border-radius: var(--r-md, 10px); padding: 11px 12px 11px 16px;
+  box-shadow: 0 8px 30px rgba(0,0,0,.28); font-size: 14px; max-width: min(92vw, 440px);
+  opacity: 0; transform: translateY(12px); transition: opacity .2s var(--ease, ease), transform .2s var(--ease, ease);
+}
+.ai-toast.show { opacity: 1; transform: translateY(0); }
+.ai-toast-msg { flex: 1; }
+/* Éxito/error: un aro completo alrededor del toast, no una barra pegada al borde. */
+.ai-toast--success { box-shadow: 0 8px 30px rgba(0,0,0,.28), inset 0 0 0 1px var(--accent); }
+.ai-toast--error { box-shadow: 0 8px 30px rgba(0,0,0,.28), inset 0 0 0 1px #ef4444; }
+.ai-toast-action { background: var(--accent); color: var(--on-accent, #fff); border: none; border-radius: var(--r-md, 8px); padding: 6px 12px; font: inherit; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.ai-toast-action:hover { background: var(--accent-hover); }
+.ai-toast-close { background: none; border: none; color: rgba(255,255,255,.6); cursor: pointer; display: inline-flex; padding: 2px; }
+.ai-toast-close:hover { color: #fff; }
+@media (max-width: 600px) { .ai-taskchip, body.ai-open .ai-taskchip { right: 12px; bottom: 12px; }
+}
+
+.fc-label { display: block; font-size: 13px; font-weight: 600; color: var(--text-soft); margin: 16px 0 6px; }
+.fc-select {
+  width: 100%; border: 1px solid var(--border); border-radius: var(--r-md); padding: 10px 12px;
+  background: var(--surface-0); color: var(--text); font-family: inherit; font-size: 14px;
+}
+.fc-select:focus { outline: none; border-color: var(--accent); }
+
+/* Desplegable propio del alcance (combobox con buscador) */
+.fc-combo { position: relative; }
+.fc-combo-btn {
+  width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  border: 1px solid var(--border); border-radius: var(--r-md); padding: 10px 12px;
+  background: var(--surface-0); color: var(--text); font-family: inherit; font-size: 14px; cursor: pointer;
+}
+.fc-combo-btn:hover { border-color: var(--accent); }
+.fc-combo-btn[aria-expanded="true"] { border-color: var(--accent); }
+.fc-combo-btn .icon { color: var(--text-soft); flex: none; }
+.fc-combo-val { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
+.fc-combo-pop {
+  position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 10;
+  background: var(--surface-1); border: 1px solid var(--border); border-radius: var(--r-md);
+  box-shadow: var(--shadow-3); padding: 6px; max-height: 300px; display: flex; flex-direction: column;
+}
+.fc-combo-search {
+  width: 100%; box-sizing: border-box; border: 1px solid var(--border); border-radius: var(--r-sm);
+  padding: 8px 10px; background: var(--surface-0); color: var(--text); font-family: inherit; font-size: 14px;
+  margin-bottom: 6px;
+}
+.fc-combo-search:focus { outline: none; border-color: var(--accent); }
+.fc-combo-list { list-style: none; margin: 0; padding: 0; overflow-y: auto; }
+.fc-combo-list li {
+  padding: 9px 10px; border-radius: var(--r-sm); cursor: pointer; font-size: 14px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.fc-combo-list li:hover { background: var(--surface-3); }
+.fc-combo-list li.is-sel { color: var(--accent); font-weight: 600; }
+.fc-combo-empty { color: var(--text-soft); cursor: default; }
+.fc-combo-empty:hover { background: none; }
+.fc-types { display: flex; gap: 10px; }
+.fc-type {
+  flex: 1; display: flex; gap: 10px; align-items: flex-start; cursor: pointer;
+  background: var(--surface-0); border: 1px solid var(--border); border-radius: var(--r-md); padding: 12px;
+  transition: border-color var(--transition-fast);
+}
+.fc-type:has(input:checked) { border-color: var(--accent); background: var(--surface-3); }
+.fc-type input { margin-top: 3px; accent-color: var(--accent); }
+.fc-type b { display: block; font-size: 14px; }
+.fc-type small { display: block; font-size: 12px; color: var(--text-soft); line-height: 1.35; margin-top: 2px; }
+.fc-error { color: var(--danger, #e5484d); font-size: 13px; margin-top: 12px; }
+/* Aviso de mazo ya existente para este alcance (P24 F4): casilla marcada por defecto. */
+.fc-dup {
+  display: flex; gap: 9px; align-items: flex-start; margin-top: 12px;
+  font-size: 12.5px; line-height: 1.45; color: var(--text-soft); cursor: pointer;
+}
+.fc-dup input { margin-top: 2px; accent-color: var(--accent); flex: none; }
+.fc-deck {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--surface-0); border: 1px solid var(--border); border-radius: var(--r-md);
+  padding: 10px 12px; margin-bottom: 8px;
+}
+.fc-deck-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.fc-deck-name { font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fc-deck-meta { font-size: 12px; color: var(--text-soft); }
+.fc-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
+.fc-item {
+  display: flex; gap: 8px; align-items: flex-start;
+  background: var(--surface-0); border: 1px solid var(--border); border-radius: var(--r-md); padding: 12px;
+}
+/* Suspendida: sigue en el mazo (y en el export a Anki) pero fuera de la rotación. Se
+   apaga en vez de tacharse — el texto hay que poder leerlo para decidir si arreglarla. */
+.fc-item.is-suspended { background: var(--surface-2); }
+.fc-item.is-suspended .fc-item-fields { opacity: 0.5; }
+.fc-item-fields { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.fc-front, .fc-back { font-size: 14px; line-height: 1.45; border-radius: var(--r-sm); padding: 2px 4px; }
+.fc-front { font-weight: 600; }
+.fc-back { color: var(--text-soft); }
+.fc-front:focus, .fc-back:focus { outline: 1px solid var(--accent); background: var(--surface-0); }
+.fc-back:empty::before { content: attr(data-ph); color: var(--text-faint); }
+.fc-export { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.fc-export .primary-btn { display: inline-flex; align-items: center; gap: 8px; }
+.fc-export .ai-ob-back { display: inline-flex; align-items: center; gap: 8px; margin-bottom: 0; }
+.fc-txt-btn { margin-bottom: 0; }
+.fc-deck-study {
+  display: inline-flex; align-items: center; gap: 6px;
+  border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--surface-1);
+  color: var(--text); padding: 6px 10px; font-size: 13px; font-weight: 600; cursor: pointer;
+  font-family: inherit; white-space: nowrap;
+}
+.fc-deck-study:hover { border-color: var(--accent); color: var(--accent); }
+.fc-deck-due {
+  min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px;
+  background: var(--accent); color: var(--on-accent);
+  font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center;
+}
+
+/* ---- Modo Estudiar (P10): sesión de repaso con repetición espaciada ---- */
+.study-card {
+  max-width: 680px; width: 100%; min-height: 460px; max-height: 92vh;
+  display: flex; flex-direction: column;
+}
+.study-head { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; padding-right: 44px; }
+.study-title { font-size: 15px; font-weight: 700; }
+.study-left { font-size: 13px; color: var(--text-soft); }
+/* Acciones sobre la tarjeta actual (editar/suspender/borrar) + deshacer: a la derecha
+   del contador, pegadas al aspa. Discretas hasta que se pasa por encima: son el arreglo,
+   no el camino principal. */
+.study-tools { display: flex; gap: 2px; margin-left: auto; }
+.study-tool { opacity: 0.55; }
+.study-tool:hover { opacity: 1; }
+.study-body {
+  flex: 1; min-height: 0; overflow-y: auto;
+  display: flex; flex-direction: column; justify-content: center; gap: 14px;
+  padding: 18px 4px; text-align: center;
+}
+.study-deckname {
+  font-size: 12px; font-weight: 600; color: var(--text-soft); text-transform: uppercase;
+  letter-spacing: 0.04em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.study-q, .study-a { font-size: 19px; line-height: 1.5; overflow-wrap: break-word; }
+.study-q { font-weight: 600; }
+.study-a { color: var(--text); border-top: 1px solid var(--border); padding-top: 16px; }
+.study-cloze {
+  background: var(--accent-soft); color: var(--accent);
+  border-radius: var(--r-sm); padding: 0 6px; font-weight: 700;
+}
+.study-cloze.is-revealed { background: var(--accent-soft); }
+.study-extra { font-size: 14px; color: var(--text-soft); margin-top: 12px; }
+/* Aviso de leech: informativo, no alarmante — la acción está en la barra de arriba. */
+.study-leech {
+  display: flex; align-items: flex-start; gap: 8px; text-align: left;
+  font-size: 12.5px; line-height: 1.45; color: var(--text-soft);
+  background: var(--surface-3); border-radius: var(--r-sm); padding: 8px 10px;
+}
+.study-leech svg { flex: none; margin-top: 1px; }
+/* Editor inline de la tarjeta: mismos campos que la vista de revisión. */
+.study-edit { text-align: left; display: flex; flex-direction: column; gap: 4px; }
+.study-edit .fc-label { margin-top: 8px; }
+.study-editbar { display: flex; gap: 8px; justify-content: flex-end; }
+.study-held { font-size: 13px; color: var(--text-soft); }
+/* F3 · El pasaje del libro que respalda la tarjeta, para releerlo sin salir del repaso. */
+.study-passage {
+  margin: 16px 0 0; padding: 10px 14px;
+  background: var(--surface-1); border-radius: var(--r-sm);
+  font-size: 14px; line-height: 1.55; color: var(--text-soft); max-height: 30vh; overflow-y: auto;
+}
+.study-passage-ch { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; opacity: .7; margin-bottom: 4px; }
+.study-foot { padding-top: 14px; }
+.study-foot .study-flip {
+  width: 100%; display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+}
+.study-flip kbd {
+  font-family: inherit; font-size: 11px; font-weight: 600; opacity: 0.75;
+  border: 1px solid currentColor; border-radius: 4px; padding: 1px 6px;
+}
+.study-src {
+  display: inline-flex; align-items: center; gap: 7px; margin: 0 auto 2px;   /* +8px del gap del pie */
+  border: none; background: none; color: var(--accent); font-family: inherit;
+  font-size: 13px; font-weight: 600; cursor: pointer; padding: 4px 8px; border-radius: var(--r-sm);
+}
+.study-src:hover { background: var(--accent-soft); }
+.study-foot { display: flex; flex-direction: column; gap: 8px; }
+.study-grades { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.study-grade {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface-0);
+  color: var(--text); padding: 10px 6px; cursor: pointer; font-family: inherit;
+  font-size: 14px; font-weight: 600; transition: border-color var(--transition-fast);
+}
+.study-grade small { font-size: 11px; font-weight: 500; color: var(--text-soft); }
+.study-grade.is-again:hover { border-color: var(--danger, #e5484d); color: var(--danger, #e5484d); }
+.study-grade.is-hard:hover { border-color: #d97706; color: #d97706; }
+.study-grade.is-good:hover, .study-grade.is-easy:hover { border-color: var(--accent); color: var(--accent); }
+.study-end { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.study-end-icon {
+  width: 72px; height: 72px; border-radius: 50%; background: var(--accent-soft); color: var(--accent);
+  display: flex; align-items: center; justify-content: center;
+}
+.study-end h2 { font-size: 20px; }
+.study-end p { font-size: 14px; color: var(--text-soft); max-width: 380px; }
+.study-streak {
+  margin-top: 6px; padding: 8px 16px; border-radius: 999px;
+  background: var(--accent-soft); color: var(--accent); font-size: 14px;
+}
+.appset-card {
+  position: relative;
+  background: var(--surface-1); border: 1px solid var(--border); border-radius: 16px;
+  padding: 28px 30px; width: 100%; max-width: 640px; box-shadow: var(--shadow-3);
+  /* Si la sección crece más que el viewport (p. ej. Agente en pantallas bajas), scroll
+     interno: con el centrado flex, sin esto el TOPE de la tarjeta queda inalcanzable. */
+  max-height: calc(100vh - 40px); overflow-y: auto;
+}
+.appset-close {
+  position: absolute; top: 16px; right: 16px;
+  width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center;
+  border: none; border-radius: 50%; background: var(--surface-3); color: var(--text-soft);
+  cursor: pointer; transition: background var(--transition-fast), color var(--transition-fast);
+}
+.appset-close:hover { background: var(--border); color: var(--text); }
+.appset-h2 {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 20px; font-weight: 700; margin-bottom: 20px; letter-spacing: -0.01em;
+}
+.appset-body { display: flex; gap: 24px; }
+.appset-nav { flex: none; width: 160px; display: flex; flex-direction: column; gap: 6px; }
+.appset-nav-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; border: none; border-radius: var(--r-sm); background: none;
+  color: var(--text-soft); font-size: 14px; text-align: left; cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+.appset-nav-item:hover { background: var(--surface-3); }
+.appset-nav-item.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.appset-content { flex: 1; min-width: 0; }
+.appset-section { display: flex; flex-direction: column; }
+.appset-h3 { font-size: 18px; font-weight: 600; margin-bottom: 12px; }
+.appset-label { display: block; font-size: 13px; color: var(--text-soft); margin: 12px 0 6px; font-weight: 500; }
+.appset-input {
+  width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--r-md);
+  background: var(--surface-0); color: var(--text); font-size: 14px;
+  transition: border-color var(--transition-fast);
+}
+.appset-input:focus { outline: none; border-color: var(--accent); }
+/* Fila del modelo: input + botón "Descubrir", y lista de chips clicables debajo. */
+.appset-model-row { display: flex; gap: 10px; align-items: stretch; flex-wrap: wrap; }
+.appset-model-row .appset-input { flex: 1; }
+.appset-discover {
+  flex: none; padding: 0 14px; border: 1px solid var(--border); border-radius: var(--r-md);
+  background: var(--surface-3); color: var(--text); font-size: 13px; font-weight: 500; cursor: pointer;
+  white-space: nowrap; transition: border-color var(--transition-fast), background var(--transition-fast);
+}
+.appset-discover:hover { border-color: var(--accent); }
+.appset-discover:disabled { opacity: .6; cursor: default; }
+.appset-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.appset-chip {
+  padding: 5px 12px; border: 1px solid var(--border); border-radius: var(--r-pill);
+  background: var(--surface-0); color: var(--text-soft); font-size: 13px; cursor: pointer;
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  transition: border-color var(--transition-fast), color var(--transition-fast), background var(--transition-fast);
+}
+.appset-chip:hover { border-color: var(--accent); color: var(--text); }
+.appset-chip.active { border-color: var(--accent); background: var(--accent); color: var(--on-accent); }
+.appset-model-hint { margin: 8px 0 0; font-size: 12px; color: var(--text-soft); line-height: 1.5; }
+.appset-model-hint.is-error { color: var(--danger, #e5484d); }
+.appset-model-manual { margin: 8px 0 0; font-size: 12px; }
+
+.appset-check { display: flex; align-items: center; gap: 8px; margin-top: 14px; font-size: 13px; color: var(--text-soft); }
+.appset-save { width: 100%; margin-top: 16px; padding: 8px; font-size: 14px; }
+.appset-saved { display: flex; align-items: center; gap: 5px; margin: 8px 0 0; font-size: 12px; color: var(--accent); }
+.appset-privacy {
+  display: flex; align-items: flex-start; gap: 6px; margin: 14px 0 0;
+  font-size: 11px; line-height: 1.5; color: var(--text-faint);
+}
+.appset-privacy .icon { flex: none; margin-top: 1px; }
+.appset-muted { color: var(--text-soft); font-size: 13px; line-height: 1.6; margin-bottom: 10px; }
+/* Salto entre la vista simple y la avanzada del Agente. Deliberadamente discreto:
+   es una salida para quien la busca, no una invitación a configurar cosas. */
+.appset-viewlink {
+  display: inline-flex; align-items: center; gap: 4px; margin-top: 16px;
+  padding: 0; border: none; background: none; cursor: pointer;
+  color: var(--text-soft); font-size: 12px; font-weight: 500;
+}
+.appset-viewlink:hover { color: var(--accent); }
+.appset-viewlink .icon { color: currentColor; }
+.appset-demo-on { display: flex; align-items: center; gap: 6px; color: var(--accent); }
+.appset-demo-on .icon { flex: none; }
+
+/* Alta/baja de un proveedor propio: aparece bajo la Base URL solo cuando hay algo
+   que hacer con ella (guardarla con nombre, o quitarla de la lista). */
+.appset-prov:not(:empty) { margin-top: 10px; }
+.appset-prov .appset-muted { margin-bottom: 0; }
+.appset-prov-on { display: flex; align-items: center; gap: 6px; color: var(--accent); margin-bottom: 8px; }
+.appset-prov-on .icon { flex: none; }
+.appset-soon { font-size: 12px; color: var(--text-faint); }
+.appset-soon code { background: var(--surface-3); border-radius: 4px; padding: 1px 6px; }
+.appset-err { margin: 10px 0 0; font-size: 12px; color: var(--danger, #e5484d); }
+
+/* Sección Plantillas (P2) */
+.appset-tpl-block { margin-top: 14px; }
+.appset-tpl-block-h {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 12px; font-weight: 600; color: var(--text-soft);
+  margin-bottom: 6px; text-transform: uppercase; letter-spacing: .02em;
+}
+.appset-tpl-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 11px; border: 1px solid var(--border); border-radius: 9px; margin-bottom: 6px;
+}
+.appset-tpl-meta { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.appset-tpl-name { font-size: 14px; font-weight: 600; color: var(--text); }
+.appset-tpl-ideal {
+  font-size: 12px; color: var(--text-soft);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.appset-tpl-acts { flex: none; display: flex; gap: 2px; }
+.appset-tpl-tag {
+  flex: none; font-size: 11px; color: var(--text-faint);
+  background: var(--surface-3); border-radius: 5px; padding: 2px 7px;
+}
+.appset-tpl-fields { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+.appset-tpl-field-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.appset-tpl-field-label { flex: 1; min-width: 140px; }
+.appset-tpl-field-type { flex: none; width: 90px; }
+.appset-tpl-field-fill { flex: none; width: 130px; }
+.appset-tpl-addfield {
+  margin-top: 10px; display: inline-flex; align-items: center; gap: 6px;
+  background: none; border: 1px dashed var(--border); border-radius: 8px;
+  padding: 7px 12px; color: var(--text-soft); font-size: 13px; cursor: pointer;
+  transition: border-color var(--transition-fast), color var(--transition-fast);
+}
+.appset-tpl-addfield:hover { border-color: var(--accent); color: var(--text); }
+.appset-tpl-formacts { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
+.appset-tpl-cancel {
+  background: none; border: 1px solid var(--border); border-radius: 8px;
+  padding: 8px 16px; color: var(--text-soft); font-size: 14px; cursor: pointer;
+}
+.appset-tpl-cancel:hover { background: var(--surface-3); color: var(--text); }
+
+/* Sección Perfiles (P1) */
+.appset-prof-active { font-size: 13px; color: var(--text-soft); margin: 4px 0 12px; }
+.appset-tpl-row.is-active { border-color: var(--accent); }
+.appset-prof-activate {
+  flex: none; background: none; border: 1px solid var(--border); border-radius: 7px;
+  padding: 4px 10px; color: var(--text-soft); font-size: 12px; cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+}
+.appset-prof-activate:hover { background: var(--surface-3); color: var(--text); }
+.appset-tpl-row.is-active .appset-prof-activate { border-color: var(--accent); color: var(--accent); }
+
+/* Sección Datos (P3) */
+.appset-data-md {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  width: 100%; margin-top: 8px;
+}
+.appset-data-msg { margin: 12px 0 0; font-size: 13px; color: var(--text-soft); line-height: 1.6; }
+.appset-data-msg.is-error { color: var(--danger, #e5484d); }
+.appset-data-msg .icon { vertical-align: -2px; color: var(--accent); }
+.appset-data-reload {
+  margin-left: 8px; background: none; border: 1px solid var(--border); border-radius: 6px;
+  padding: 3px 10px; color: var(--accent); cursor: pointer; font-size: 12px;
+}
+.appset-data-reload:hover { background: var(--surface-3); }
+@media (max-width: 560px) {
+  .appset-card { max-width: 100%; border-radius: 16px 16px 0 0; max-height: 90vh; overflow-y: auto; }
+  .appset-body { flex-direction: column; gap: 14px; }
+  .appset-nav { width: 100%; flex-direction: row; flex-wrap: wrap; }
+  .appset-nav-item { flex: 1; justify-content: center; }
+}
+
+
+/* Chip de referencia (pasaje adjunto) sobre el compositor del agente. */
+.ai-ref {
+  display: flex; align-items: center; gap: 10px;
+  margin: 0 18px 10px; padding: 10px 12px;
+  background: var(--accent-soft); border-radius: var(--r-md);
+}
+.ai-ref-ico { display: inline-flex; flex: 0 0 auto; color: var(--accent); }
+.ai-ref-text {
+  flex: 1; min-width: 0; font-size: var(--fs-sm); color: var(--text-soft); font-style: italic;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.ai-ref-clear {
+  flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; border: none; background: none; cursor: pointer;
+  color: var(--text-faint); border-radius: 50%;
+}
+.ai-ref-clear:hover { color: var(--text); background: var(--surface-3); }
+
+/* FAB del agente (oculto por defecto; visible en móvil) */
+.ai-fab {
+  display: none;
+  position: fixed;
+  right: 16px;
+  /* Por encima del footer del lector para no tapar la navegación. */
+  bottom: calc(var(--footer-height) + 16px + env(safe-area-inset-bottom));
+  z-index: 95;
+  width: 56px;
+  height: 56px;
+  border: none;
+  border-radius: var(--r-pill);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 24px;
+  cursor: pointer;
+  box-shadow: var(--shadow-2);
+  transition: transform var(--transition-normal), background var(--transition-fast);
+}
+.ai-fab:hover { background: var(--accent-hover); }
+@media (max-width: 1023px) {
+  body.ai-open .reader-main { margin-right: 0; }
+  #ai-panel { width: min(440px, 100%); box-shadow: var(--shadow-3); }
+}
+
+@media (max-width: 767px) {
+
+  /* El panel del agente se convierte en bottom sheet */
+  #ai-panel {
+    width: 100%;
+    /* Dos alturas: media (se sigue viendo la página por encima) y completa. Ver
+       `initSheetSnap` en ai/panel.js — el objetivo es que preguntar por una figura no
+       implique perder de vista la figura. */
+    /* Con el teclado abierto la hoja se apoya sobre él (bottom) y se recorta por arriba
+       (min con el alto libre) para no salirse de la pantalla. */
+    height: min(var(--ai-sheet-h, 92dvh), calc(100dvh - var(--kb-inset, 0px)));
+    transition: transform var(--transition-normal), height var(--transition-normal);
+    top: auto;
+    bottom: var(--kb-inset, 0px);
+    right: 0;
+    border-left: none;
+    border-top: 1px solid var(--border);
+    border-radius: var(--r-xl) var(--r-xl) 0 0;
+    transform: translateY(100%);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  body.ai-open #ai-panel { transform: translateY(0); }   /* con el teclado, cada píxel cuenta */
+  /* Tirador del sheet: zona de toque generosa (44px de alto) con la barrita dentro. El área
+     de toque es lo que hace usable el arrastre con el pulgar; la barrita sola sería un
+     objetivo de 4px. */
+  .ai-sheet-grab {
+    display: block; flex-shrink: 0;
+    width: 100%; height: 26px; padding: 0;
+    border: none; background: none; cursor: grab;
+    touch-action: none;                      /* el gesto es nuestro, no del scroll */
+  }
+  .ai-sheet-grab::before {
+    content: '';
+    display: block; width: 36px; height: 4px;
+    margin: 9px auto 0;
+    border-radius: 2px;
+    background: var(--border);
+  }
+
+  /* FAB visible; se oculta cuando el agente está abierto */
+  .ai-fab { display: flex; align-items: center; justify-content: center; }
+  body.ai-open .ai-fab { transform: scale(0); }
+  /* En móvil el toggle del header sobra (está el FAB) */
+  #ai-toggle { display: none; }
+
+  /* Onboarding como bottom sheet */
+  .ai-onboarding { padding: 0; align-items: flex-end; }
+  .ai-ob-card {
+    max-width: 100%;
+    width: 100%;
+    border-radius: var(--r-xl) var(--r-xl) 0 0;
+    max-height: 92dvh;
+    overflow-y: auto;
+    padding: 24px 20px calc(24px + env(safe-area-inset-bottom));
+  }
+}
+
+@media (max-height: 480px) {
+  #ai-panel { width: min(560px, 82%); }
+  .ai-toolbar { padding: 6px 12px; }
+  .ai-status { display: none; }              /* redundante con el selector de conversación */
+  .ai-tabs { margin-top: 6px; }
+  .ai-messages { padding-top: 8px; padding-bottom: 8px; gap: 8px; }
+  .ai-composer { padding: 8px 12px; }
+  .ai-composer textarea { min-height: 38px; }
+}
+
+@media (pointer: coarse) {
+  .ai-status { padding: 6px 18px; font-size: 12px; }
+  .ai-tabs { margin-top: 8px; }
+  .ai-messages { padding: 12px 16px; }
+  /* 16px exactos: por debajo de eso Safari iOS hace zoom al enfocar y descoloca el panel. */
+  .ai-composer textarea { font-size: 16px; }
+}
+
+@media (pointer: coarse), (max-width: 767px) {
+  .ai-status.ai-status--idle { display: none; }
+}
+
+.ai-status { border-bottom: 1px solid var(--border-soft); }
+
+/* Composer: input redondeado y separación */
+.ai-composer { border-top: 1px solid var(--border-soft); }
+.ai-composer textarea { border-radius: var(--r-md); }
+
+/* Libreta: etiqueta como "eyebrow" + notas como tarjetas suaves */
+.ai-nb-field-label {
+  font-size: var(--fs-xs);
+  letter-spacing: 0.6px;
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+/* INFO (IA) vs COGNICIÓN (tú): distintivo de quién rellena cada campo. */
+.ai-nb-fill {
+  font-size: 10px; font-weight: 700; letter-spacing: 0.3px; text-transform: none;
+  padding: 1px 6px; border-radius: 999px; line-height: 1.5;
+}
+.ai-nb-fill.is-agent { background: var(--surface-2); color: var(--text-faint); }
+.ai-nb-fill.is-user  { background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); }
+.ai-nb-cog-hint {
+  font-size: 12px; color: var(--text-faint); line-height: 1.5;
+  margin: 2px 0 6px; font-style: italic;
+}
+.ai-nb-field.is-cognition {
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+  border-radius: var(--r-sm); padding: 8px 10px;
+}
+.ai-nb-note {
+  background: var(--surface-2);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-1);
+}
+.ai-nb-goal {
+  background: var(--accent-soft);
+  border-radius: var(--r-md);
+}
+.ai-nb-goal-label { color: var(--accent); font-weight: 600; }
+
+/* Estado "ocupado": shimmer sutil mientras el agente trabaja */
+.ai-status--busy {
+  background: linear-gradient(90deg, var(--text-faint) 25%, var(--text) 50%, var(--text-faint) 75%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: ai-shimmer 1.4s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ai-status--busy { animation: none; color: var(--text-soft); background: none; -webkit-text-fill-color: currentColor; }
+}
+
+
+/* Onboarding: tarjetas con un punto más de elevación */
+.ai-ob-card { box-shadow: var(--shadow-3); }
+.ai-ob-block, .ai-ob-tpl { transition: border-color var(--transition-fast), background var(--transition-fast), transform var(--transition-fast); }
+.ai-ob-block:hover, .ai-ob-tpl:hover { background: var(--surface-1); transform: translateY(-1px); }
+.ai-tab { justify-content: center; }
+
+/* Acciones bajo una respuesta: píldoras tenues con icono. */
+.ai-act {
+  border-radius: var(--r-pill);
+  border-color: var(--border-soft);
+  background: var(--surface-1);
+  padding: 4px 11px 4px 9px;
+  font-weight: 500;
+}
+.ai-act .icon { color: var(--text-faint); }
+.ai-act:hover:not(:disabled) { background: var(--surface-3); color: var(--text); }
+
+/* Onboarding: icono del bloque dentro de un disco de acento tenue. */
+.ai-ob-block { position: relative; }
+.ai-ob-block-icon {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 44px; height: 44px; border-radius: 50%;
+  background: var(--accent-soft); color: var(--accent);
+  margin-bottom: var(--s-2);
+}
+
+/* Botones de herramienta de la libreta: cuadrados de icono. */
+.ai-nb-note-tools button,
+.ai-nb-goto {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; border: none; background: none;
+  color: var(--text-faint); border-radius: var(--r-sm); cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+.ai-nb-note-tools button:hover, .ai-nb-goto:hover {
+  background: var(--surface-3); color: var(--text);
+}
+.ai-nb-del:hover { color: #ff3b30; }   /* systemRed */
+
+/* "Volver" del onboarding como enlace de acento con chevron. */
+.ai-ob-back { color: var(--accent); background: none; border: none;
+  font-size: var(--fs-md); cursor: pointer; padding: 4px 2px; }
+.ai-ob-back .icon { color: var(--accent); }
+
+.ai-nb-goal-label .icon { color: var(--accent); }
+
+/* ============================================================================
+   F7 · Selector de conversaciones (varias por libro) — v2
+   ========================================================================== */
+.ai-convobar { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; margin: 0; }
+.ai-convo-btn {
+  flex: 1; min-width: 0; display: inline-flex; align-items: center; gap: 8px;
+  padding: 8px 14px; border: 1px solid var(--border); border-radius: var(--r-pill);
+  background: var(--surface-2); color: var(--text); font-size: var(--fs-sm); font-weight: 550;
+  cursor: pointer; transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+.ai-convo-btn:hover { background: var(--surface-3); }
+.ai-convo-btn .icon:first-child { color: var(--accent); flex: 0 0 auto; }
+.ai-convo-btn .icon:last-child { color: var(--text-faint); flex: 0 0 auto; }
+.ai-convo-label { flex: 1; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.ai-convo-menu { display: none; }
+.ai-convo-item { align-items: flex-start; }
+.ai-convo-item-text { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.ai-convo-item-name { font-weight: 600; }
+.ai-convo-item-goal {
+  font-size: var(--fs-xs); color: var(--text-faint);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.ai-convo-del {
+  margin-left: auto; flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center;
+  width: 24px; height: 24px; border-radius: 6px; color: var(--text-faint);
+}
+.ai-convo-del .icon { color: inherit; }
+.ai-convo-del:hover { color: #ff3b30; background: var(--surface-3); }
+
+/* Estado "sin conversación": invita a elegir objetivo (reabre el onboarding). */
+.ai-convobar.no-convo .ai-convo-btn {
+  border-style: dashed; border-color: var(--accent); color: var(--accent);
+}
+.ai-convobar.no-convo .ai-convo-btn .icon { color: var(--accent); }
+.ai-convobar.no-convo .ai-convo-btn .icon:last-child { display: none; }
+
+/* Botón de renombrar conversación en el menú. */
+.ai-convo-rename {
+  flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center;
+  width: 24px; height: 24px; border-radius: 6px; color: var(--text-faint); margin-left: 4px;
+}
+.ai-convo-rename .icon { color: inherit; }
+.ai-convo-rename:hover { color: var(--accent); background: var(--surface-3); }
+
+/* ==== Ajustes → Licencia (MON2) ==== */
+.appset-lic-state {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: var(--fs-md); font-weight: 600; margin-bottom: var(--s-2);
+}
+.appset-lic-state.is-pro { color: var(--accent); }
+.appset-lic-mock { margin-top: var(--s-4); opacity: 0.8; }
+/* Cuando hay un chip de trabajo de IA (mismo rincón), sube el badge de sync para no solaparse. */
+body.has-taskchip #sync-badge { bottom: 68px; }
+/* Con el panel de IA abierto, el badge (fijo abajo-derecha) tapaba el botón "Ver" y el input
+   del chat: apártalo a la izquierda del panel, igual que el task-chip. */
+body.ai-open #sync-badge { right: calc(var(--ai-panel-width) + 14px); }
+/* El estado "grabando" lo pinta mic.js con .ai-mic-on (compartido con la barra del chat).
+   Doble clase para ganarle a .appset-tpl-cancel sin recurrir a !important. */
+.appset-tpl-cancel.ai-mic-on { background: var(--accent); color: #fff; }
+/* La barra de grabación sustituye al textarea, y este es alto (rows=5): sin igualar la
+   altura, el modal pegaba un salto al empezar a dictar. */
+.ai-ob-body > .mic-bar { min-height: 132px; align-items: center; }
+
+/* Cupo de la demo, encima del composer. Barra + una línea: el porcentaje es el dato,
+   el resto es ruido. Solo se pinta pasada la mitad del cupo (ver renderQuota), así que
+   cuando aparece ya es información y no decoración.
+   La barra mide lo que QUEDA, no lo consumido: es lo que el usuario quiere saber, y
+   vaciarse de derecha a izquierda es la metáfora que ya conoce (batería, depósito). */
+.ai-quota {
+  margin: 0 18px 10px;
+  display: flex; flex-direction: column; gap: 5px;
+}
+.ai-quota-bar {
+  height: 4px; border-radius: var(--r-pill);
+  background: var(--surface-3); overflow: hidden;
+}
+.ai-quota-bar > span {
+  display: block; height: 100%;
+  background: var(--accent);
+  border-radius: inherit;
+  transition: width var(--transition-normal);
+}
+.ai-quota-txt {
+  margin: 0; font-size: var(--fs-xs); line-height: 1.4; color: var(--text-soft);
+}
+.ai-quota-link {
+  background: none; border: none; padding: 0; cursor: pointer;
+  font: inherit; color: var(--accent); text-decoration: underline;
+}
+/* Queda poco: el mismo componente sube el tono en vez de aparecer otro distinto. */
+.ai-quota--low .ai-quota-bar > span { background: #f59e0b; }
+.ai-quota--low .ai-quota-txt { color: var(--text); }
+
+/* Zonas adjuntas al composer (multi-región): una miniatura por zona, con su × */
+.ai-zones {
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+  margin: 0 18px 10px;
+}
+.ai-zone {
+  position: relative; flex: 0 0 auto;
+  width: 72px; height: 54px;
+  border: 1px solid var(--border); border-radius: var(--r-sm);
+  overflow: hidden; line-height: 0;
+  background: var(--surface-3);
+}
+.ai-zone img { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* Rótulo corto y de UNA línea: el nombre largo ("Zona 2 · p. 4") es el que viaja al modelo,
+   aquí solo hace falta distinguir una miniatura de otra. */
+.ai-zone-label {
+  position: absolute; left: 0; bottom: 0; right: 0;
+  padding: 2px 4px; font-size: 10px; line-height: 1.3;
+  background: rgba(0, 0, 0, 0.6); color: #fff; text-align: center;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.ai-zone-x {
+  position: absolute; top: 2px; right: 2px;
+  width: 18px; height: 18px; display: inline-flex; align-items: center; justify-content: center;
+  border: none; border-radius: 50%; cursor: pointer;
+  background: rgba(0, 0, 0, 0.6); color: #fff; padding: 0;
+}
+.ai-zone-add {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 54px; padding: 0 12px;
+  border: 1px dashed var(--border); border-radius: var(--r-sm);
+  background: none; color: var(--text-soft); font-size: var(--fs-xs); cursor: pointer;
+}
+.ai-zone-add:hover { color: var(--accent); border-color: var(--accent); }
+
+/* Acciones sobre lo capturado: ocupan su propia línea bajo las miniaturas y reutilizan el
+   aspecto de la barra de selección — es la misma idea (no empezar ante un campo vacío)
+   aplicada a la imagen. */
+.ai-zone-acts {
+  flex: 1 0 100%;
+  display: flex; flex-wrap: wrap; gap: 6px;
+  margin-top: 2px;
+}
+.ai-zone-acts .sel-act {
+  border: 1px solid var(--border); border-radius: var(--r-pill);
+  padding: 5px 12px; font-size: var(--fs-xs); gap: 6px;
+}
+.ai-zone-acts .sel-act .icon { color: var(--accent); }
+
+/* ---- Fórmulas (MathML vía Temml) ---------------------------------------------------- */
+.ai-math { font-size: 1.05em; }
+/* En bloque: centrada y con scroll PROPIO. Una fórmula larga en un móvil de 390px no puede
+   ensanchar la burbuja del chat ni el panel entero — que scrolle ella. */
+.ai-math--block {
+  display: block;
+  margin: 12px 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  text-align: center;
+  padding-bottom: 2px;   /* sitio para la barra de scroll cuando aparece */
+}
+/* Hereda el color del texto: en tema oscuro la fórmula no puede quedarse en negro. */
+.ai-math math { color: inherit; }
+/* Antes de hidratar (o si Temml no llega) se ve el TeX ya legible, no `\cdot` crudo. */
+.ai-math:not([data-math-done]) { font-family: var(--font-mono, monospace); font-size: 0.95em; }

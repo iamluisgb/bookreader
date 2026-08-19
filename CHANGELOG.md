@@ -5,6 +5,46 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-08-19 — main.css partido: 63 KB de CSS fuera del primer pintado
+
+Segunda mitad de la auditoría. `main.css` eran 163 KB en un solo fichero que bloquea el
+render, y **~63 KB de ellos son del panel del agente y de Ajustes**: la biblioteca, que es
+lo que se pinta primero, no usa ni una de esas reglas.
+
+Lo delicado no era cargarlas tarde, era cargarlas EN SU SITIO. El orden de las hojas lo
+decide la posición del `<link>` en el DOM, no cuándo se inserta. Colgar `agent.css` del
+final del `<head>` habría cambiado quién gana los empates de especificidad contra la cola
+genérica de `main.css` (foco accesible, tooltips, los bloques responsive), que hoy va
+DESPUÉS del bloque del agente y por tanto le gana. Así que main.css se parte en tres:
+
+    main.css        parte 1, sin las reglas del agente
+    [hueco]         ← aquí se inserta agent.css (js/css-loader.js)
+    main-late.css   la cola genérica
+
+La extracción es por SELECTOR, no por posición: un corte contiguo se habría llevado
+`:root`, la barra de subrayar y la toolbar de la biblioteca, que están intercaladas en ese
+tramo. Los cuatro `@media` mixtos se parten conservando su prelude en las dos hojas.
+
+`#ai-panel` y `.ai-fab` existen en index.html desde el primer momento, así que main.css
+conserva un guardia mínimo (posición y `display:none`) para que no se vean en crudo entre
+el primer pintado y la llegada de agent.css.
+
+**Verificado contra HEAD limpio**, que era la condición para hacer esto: 64 capturas
+(4 breakpoints × 3 temas × biblioteca/ajustes/lector/sidebar/agente/PDF) **idénticas al
+píxel**, y 24.154 propiedades computadas sobre 15 elementos —incluido el estado de foco,
+que ninguna captura ve— **sin una sola diferencia**.
+
+El CSS que bloquea el primer pintado baja de 32,5 KB brotli a 20,4 KB.
+
+**Dos tests dejan de depender de lo rápido que cargue la app.** `toc-current` comparaba la
+etiqueta del índice capturada ANTES de que `fillTocPages` colgara el número de página
+contra el texto de DESPUÉS ("Pedro Páramo" vs "Pedro Páramo13"): ahora compara la etiqueta
+sin el número, que es lo que el test afirma. Y `sync-decks` (en el commit anterior) espera
+a que termine el ciclo de sync que el motor lanza solo por arrancar, en vez de dejar que
+caiga en mitad de lo que el test guiona.
+
+---
+
 ## 2026-08-19 — El arranque ya no descarga la app entera para pintar la biblioteca
 
 Auditoría de rendimiento medida contra producción: **93 peticiones, 1,97 MB (~640 KB brotli),
