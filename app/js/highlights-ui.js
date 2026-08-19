@@ -15,6 +15,7 @@ import { alertBox } from './ui/dialog.js';
 import { shareQuote } from './share-card.js';
 import { toast } from './ai/toast.js';
 import { whenLabel, fullWhen } from './ui/when.js';
+import { toScreen, anchorRect } from './ui/frame-rect.js';
 
 const DEFAULT_COLOR = '#ffd54f';
 
@@ -80,11 +81,13 @@ export function setupHighlights() {
       if (selection && !selection.isCollapsed) {
         text = selection.toString().trim();
         if (selection.rangeCount > 0) {
-          // Rect de la selección en coords de PANTALLA (sumar offset del iframe).
-          const r = selection.getRangeAt(0).getBoundingClientRect();
-          const iframe = document.querySelector('#epub-container iframe');
-          const io = iframe ? iframe.getBoundingClientRect() : { left: 0, top: 0 };
-          rect = { left: io.left + r.left, top: io.top + r.top, width: r.width, height: r.height };
+          // Rect de la selección en coords de PANTALLA. Se ancla en la PRIMERA línea, no en
+          // el bounding box: con varias líneas —y sobre todo si la selección cruza un salto
+          // de columna— el bounding abarca todo el bloque y su centro cae en medio del
+          // párrafo o en el canalón, que es donde aparecía la barra. Y la conversión lleva
+          // la escala del viewport además del offset (ver ui/frame-rect.js).
+          const a = anchorRect(selection.getRangeAt(0));
+          if (a) rect = toScreen(a);
         }
       }
     } catch (e) {
@@ -120,11 +123,16 @@ function positionTooltip(tooltip, rect) {
   tooltip.style.visibility = 'hidden';
   requestAnimationFrame(() => {
     const tw = tooltip.offsetWidth, th = tooltip.offsetHeight;
+    // Sin rect no hay nada mejor que el centro; antes se llegaba aquí en silencio siempre
+    // que la lectura de la selección fallaba, y la barra aparecía arriba en medio sin
+    // relación con lo marcado. Ahora se avisa, porque es un fallo, no un caso normal.
     let cx = window.innerWidth / 2, top = 100;
     if (rect) {
       cx = rect.left + rect.width / 2;
       top = rect.top - th - 10;
       if (top < 10) top = rect.top + rect.height + 10;   // debajo si no cabe arriba
+    } else {
+      console.warn('barra de selección sin rect: se coloca centrada');
     }
     let left = Math.max(10, Math.min(cx - tw / 2, window.innerWidth - tw - 10));
     top = Math.max(10, Math.min(top, window.innerHeight - th - 10));
@@ -397,7 +405,11 @@ function capturePdfSelection() {
   // subrayado se guardaba sin geometría (invisible al repintar).
   let range;
   try { range = sel.getRangeAt(0); } catch (e) { return null; }
-  return { text, rect: range.getBoundingClientRect(), rects: pdfFractionalRects(range, wrapper), page };
+  // El ancla de la barra es la PRIMERA línea, no el bounding box de toda la selección
+  // (ver anchorRect). El PDF no vive en un iframe ni lleva escala, así que aquí el rect ya
+  // está en coordenadas de pantalla.
+  const ancla = anchorRect(range) || range.getBoundingClientRect();
+  return { text, rect: ancla, rects: pdfFractionalRects(range, wrapper), page };
 }
 
 // Rectángulos de la selección en coordenadas FRACCIONALES (0..1) de la página del PDF, para

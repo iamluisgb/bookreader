@@ -13,18 +13,25 @@
 // encima del iframe, para no depender de cómo epub.js desplaza las columnas.
 //
 // Toda la geometría de ENTRADA va en coordenadas del iframe (lo que devuelven
-// los toques, caretRangeFromPoint y getClientRects). Solo al DIBUJAR sumamos el
-// desplazamiento del iframe para pasar a coordenadas de pantalla.
+// los toques, caretRangeFromPoint y getClientRects). Al DIBUJAR se pasa a coordenadas de
+// pantalla con ui/frame-rect.js —offset Y escala, porque el viewport del lector se encoge
+// cuando las barras están a la vista— y el hit-test de los tiradores se hace también en
+// pantalla, contra el círculo que se ve, no contra una posición paralela.
 
 import { rafThrottle } from './ui/raf.js';
+import { frameTransform, toScreen, usableRects, anchorRect } from './ui/frame-rect.js';
 
 let callbacks = { onTap: () => {}, onImageTap: () => {}, onSelect: () => {}, onDismiss: () => {}, onSwipeMove: () => {}, onSwipeEnd: () => {} };
 export function configure(c) { callbacks = { ...callbacks, ...c }; }
 
 const LONGPRESS_MS = 380;   // pulsación larga que inicia la selección
 const MOVE_CANCEL = 10;     // px de movimiento que cancela la pulsación (=scroll)
-const HANDLE_HIT = 26;      // radio de toque para agarrar un tirador (px)
-const HANDLE_OFFSET = 14;   // separación del círculo del tirador respecto a la línea
+const HANDLE_HIT = 26;      // radio de toque para agarrar un tirador (px de pantalla)
+// Centro del círculo de cada tirador respecto a su línea, en px de pantalla. Sale de las
+// reglas de #ts-overlay de más abajo (::after a -32/+16 con 16 px de diámetro): el agarre
+// se comprueba EXACTAMENTE donde está pintado el círculo.
+const HANDLE_CY_START = -24;
+const HANDLE_CY_END = 24;
 const SWIPE_START = 10;     // px horizontales que inician el arrastre de página
 
 // Estado de la selección activa (una a la vez).
@@ -68,11 +75,9 @@ function injectStyles(doc) {
 }
 
 // --- coordenadas: iframe ↔ pantalla -----------------------------------------
-function iframeOffset() {
-  const f = document.querySelector('#epub-container iframe');
-  const r = f ? f.getBoundingClientRect() : { left: 0, top: 0 };
-  return { x: r.left, y: r.top };
-}
+// Offset Y ESCALA: el viewport del lector se encoge cuando las barras están a la vista
+// (ver ui/frame-rect.js). Sumar solo el offset dejaba el resaltado y los tiradores
+// desplazados, cada vez más abajo en la página.
 
 // --- caret bajo un punto (coords del iframe) --------------------------------
 function caretAt(doc, x, y) {
@@ -126,52 +131,62 @@ function draw() {
   if (!active || !active.range) return;
   const o = ensureOverlay();
   o.style.display = 'block';
-  const off = iframeOffset();
-  const rects = active.range.getClientRects();
+  const tr = frameTransform();
+  const rects = usableRects(active.range);
   // resaltado
   const hl = o.querySelector('.ts-hilayer');
   hl.innerHTML = '';
   for (const r of rects) {
-    if (r.width < 0.5 || r.height < 0.5) continue;
+    const s = toScreen(r, tr);
     const d = document.createElement('div');
     d.className = 'ts-hi';
-    d.style.left = (off.x + r.left) + 'px';
-    d.style.top = (off.y + r.top) + 'px';
-    d.style.width = r.width + 'px';
-    d.style.height = r.height + 'px';
+    d.style.left = s.left + 'px';
+    d.style.top = s.top + 'px';
+    d.style.width = s.width + 'px';
+    d.style.height = s.height + 'px';
     hl.appendChild(d);
   }
-  // tiradores en los extremos
+  // Tiradores en los extremos. Se toman de los rects USABLES: `getClientRects()` mete
+  // rects de ancho cero en los saltos de línea y de columna, y coger uno de esos como
+  // extremo ponía el tirador donde no hay texto.
   if (rects.length) {
     const first = rects[0], last = rects[rects.length - 1];
+    const fs = toScreen(first, tr);
+    const ls = toScreen({ left: last.right, top: last.top, width: 0, height: last.height }, tr);
     const hs = o.querySelector('.ts-start'), he = o.querySelector('.ts-end');
-    hs.style.left = (off.x + first.left) + 'px';
-    hs.style.top = (off.y + first.top) + 'px';
-    hs.style.height = first.height + 'px';
-    he.style.left = (off.x + last.right) + 'px';
-    he.style.top = (off.y + last.top) + 'px';
-    he.style.height = last.height + 'px';
+    hs.style.left = fs.left + 'px';
+    hs.style.top = fs.top + 'px';
+    hs.style.height = fs.height + 'px';
+    he.style.left = ls.left + 'px';
+    he.style.top = ls.top + 'px';
+    he.style.height = ls.height + 'px';
   }
 }
 
-// Posiciones (coords del iframe) de los círculos de los tiradores, para el
-// hit-test del agarre.
+// Centros de los círculos de los tiradores, en coordenadas de PANTALLA.
 function handlePoints() {
-  const rects = active.range.getClientRects();
+  const rects = usableRects(active.range);
   if (!rects.length) return null;
+  const tr = frameTransform();
   const first = rects[0], last = rects[rects.length - 1];
+  const fs = toScreen(first, tr);
+  const ls = toScreen({ left: last.right, top: last.top, width: 0, height: last.height }, tr);
   return {
-    start: { x: first.left, y: first.top - HANDLE_OFFSET },
-    end:   { x: last.right, y: last.bottom + HANDLE_OFFSET },
+    start: { x: fs.left, y: fs.top + HANDLE_CY_START },
+    end:   { x: ls.left, y: ls.top + HANDLE_CY_END },
   };
 }
 
+// (x, y) llegan en coordenadas del IFRAME —es donde ocurre el toque—; se pasan a pantalla
+// para compararlas con los círculos dibujados.
 function hitHandle(x, y) {
   if (!active || !active.range) return null;
   const p = handlePoints();
   if (!p) return null;
-  const ds = Math.hypot(x - p.start.x, y - p.start.y);
-  const de = Math.hypot(x - p.end.x, y - p.end.y);
+  const t = frameTransform();
+  const sx = t.x + x * t.sx, sy = t.y + y * t.sy;
+  const ds = Math.hypot(sx - p.start.x, sy - p.start.y);
+  const de = Math.hypot(sx - p.end.x, sy - p.end.y);
   if (ds <= HANDLE_HIT && ds <= de) return 'start';
   if (de <= HANDLE_HIT) return 'end';
   return null;
@@ -191,10 +206,11 @@ function updateEndpoint(which, x, y) {
   draw();
 }
 
+// Caja donde colocar la barra de acciones, en coordenadas de pantalla: la PRIMERA línea
+// de la selección, no el bounding box de todas (ver anchorRect).
 function screenRect(range) {
-  const off = iframeOffset();
-  const r = range.getBoundingClientRect();
-  return { left: off.x + r.left, top: off.y + r.top, width: r.width, height: r.height };
+  const a = anchorRect(range);
+  return a ? toScreen(a) : null;
 }
 
 function finalize() {

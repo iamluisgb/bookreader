@@ -1466,6 +1466,63 @@ razón—. Hay que sembrar ya en la página nueva. Y la aserción va a nivel de 
 epub.js muestra la página que CONTIENE el CFI migrado y luego guarda el INICIO de esa página (/62 para
 un pin en /80); exigir igualdad byte a byte comprobaría el redondeo de la paginación, no la migración.
 
+### TEC6 — La selección se dibujaba en un espacio de coordenadas y se tocaba en otro · **✓ (2026-08-19)** `M`
+
+**Síntoma**: en móvil, a veces no se dejaba subrayar, y la barra de acciones aparecía donde no debía.
+
+**Causa**: el contenido del EPUB va en un iframe dentro de `#reader-viewport`, y ese viewport lleva
+una **escala** en táctil con las barras a la vista (`updateReaderScale()` encoge el texto para que
+quepa entre cabecera y pie). La capa de selección (`#ts-overlay`) y la barra (`#highlight-tooltip`)
+cuelgan de `<body>`, **fuera** del viewport, en coordenadas de pantalla. El código sumaba solo el
+_offset_ del iframe a rects medidos **dentro**, mezclando los dos espacios.
+
+Medido en un móvil de 390 px: el iframe mide **390×780 px CSS** por dentro y ocupa **338×676 en
+pantalla** — factor 0,867. El error crece con la distancia al origen de la transformación: **~65 px
+de desvío vertical** a media página. De ahí los tres síntomas a la vez — el resaltado no cubría lo
+marcado, la barra salía descolocada, y los tiradores no se dejaban agarrar (el hit-test se hacía en
+coordenadas del iframe, correctas, contra un círculo pintado en otro sitio: 65 px de separación
+frente a un radio de agarre de 26).
+
+Solo pasaba con las barras **a la vista**, en paginado y en móvil. En inmersivo la escala es 1 y todo
+cuadraba — de ahí el «a veces».
+
+**Dos defectos más en el mismo camino**, encontrados al medir:
+
+- **El bounding box como ancla de la barra.** `getBoundingClientRect()` de una selección de varias
+  líneas abarca todo el bloque: su centro cae en medio del párrafo, y si la selección cruza un salto
+  de columna, en el canalón. Medido en el libro real: centro del bounding en **x = −20**, fuera de
+  pantalla. Ahora se ancla en la **primera línea** (`anchorRect`). Aplica igual al PDF.
+- **Rects degenerados.** `getClientRects()` devuelve rects de ancho o alto cero en los saltos de
+  línea y de columna. `draw()` los filtraba para el resaltado pero **no** para elegir los extremos, así
+  que un tirador podía ir a parar donde no hay texto. Ahora los filtra `usableRects()` en un solo sitio.
+
+**Implementación**: `app/js/ui/frame-rect.js` — `frameTransform` (offset y escala derivados del propio
+iframe: caja en pantalla ÷ caja CSS, así que sale 1 cuando no hay transformación y no hay que leer la
+matriz), `toScreen`, `usableRects`, `anchorRect`. Lo consumen `touch-select.js` (dibujo, extremos y
+hit-test, ahora todo en pantalla) y `highlights-ui.js` (EPUB de escritorio y PDF). El hit-test de los
+tiradores se hace contra **el círculo que se ve**: las constantes `HANDLE_CY_*` salen de las reglas CSS
+de `#ts-overlay`, que antes iban por su cuenta (≈10 px de desfase incluso sin escala).
+
+`positionTooltip` avisa por consola cuando le llega la barra sin rect, en vez de aterrizar en el centro
+de la pantalla en silencio.
+
+**Tests** — `tests/selection-geometry.spec.ts` (3):
+
+- El del tirador **falla sin el arreglo**: reproduce el gesto tal como llega del navegador —un toque en
+  pantalla se entrega al iframe convertido por la escala— y comprueba que la selección crece.
+- Los otros dos fijan el contrato de `frame-rect` sobre un layout sintético de columnas. Va así a
+  propósito: sobre el libro real **no se puede** asertar el sitio final de la barra, porque
+  `positionTooltip` la acota al viewport y ese recorte iguala los dos anclajes en cuanto la selección
+  está cerca de un borde (medido: 301 px con y sin arreglo).
+- Los gestos se dispatchan en el iframe **desde el contexto de la página padre** (`contentDocument`):
+  epub.js recicla la vista y un contexto de frame guardado se destruye a medio test.
+
+**Pendiente, si el síntoma no desaparece del todo**: los umbrales del gesto. `MOVE_CANCEL` (10 px
+cancelan la pulsación larga) y `SWIPE_START` (10 px inician el pase de página) son **el mismo número**,
+así que un temblor de 11 px al posar el dedo cancela la selección _y_ arranca a pasar página. Y `moved`
+no se rearma: moverse pronto inutiliza el long-press para todo ese gesto. Subir `SWIPE_START` a ~18 px
+separaría los dos gestos. No se ha tocado porque es una decisión de tacto, no un defecto medible.
+
 ### TEC3 — Arnés de medición de rendimiento del lector · **✓ (2026-08-19)** `S`
 **Hecho:** [`tests/perf.spec.ts`](tests/perf.spec.ts) (`npm run perf`, etiqueta `@perf`, fuera de
 `npm test`). Fixtures pesadas reales vía `npm run eval:fixtures` (Pro Git, 14 MB, 21 secciones
