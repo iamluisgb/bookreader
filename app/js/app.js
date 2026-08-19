@@ -1129,7 +1129,10 @@ async function loadEpub(buffer, bookId, aiBookId, persist = null) {
     if (EpubReader.isCoarsePointer()) document.body.classList.add('immersive');
     document.getElementById('reader-footer').style.display = 'flex';
 
-    await EpubReader.load(buffer);
+    // La posición y el modo de lectura se guardan bajo el id CANÓNICO —resuelto por
+    // alias, igual que subrayados y marcadores—, no bajo la clave interna de epub.js
+    // (ver BACKLOG TEC5 y `bookKey()` del lector).
+    await EpubReader.load(buffer, null, Aliases.canonicalOf(aiBookId));
     console.log('EPUB loaded successfully');
 
     // Alimentar al agente y (si la apertura viene de un archivo) guardar en la
@@ -1221,7 +1224,7 @@ async function loadPdf(buffer, bookId, aiBookId, persist = null, displayTitle = 
       saveProgress(pct);
     });
 
-    await PdfReader.load(buffer);
+    await PdfReader.load(buffer, null, Aliases.canonicalOf(aiBookId));
 
     // Alimentar al agente y (si viene de un archivo) guardar en biblioteca ANTES del
     // guard de aborto: aunque el usuario salga o abra otro libro a mitad de carga,

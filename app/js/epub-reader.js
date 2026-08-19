@@ -35,6 +35,10 @@ let resizeTimer = null;
 // (típico en móviles lentos: el reflow asienta más tarde). Ver rotate.spec.ts.
 let pinnedCfi = null;
 
+// Id CANÓNICO del libro (SHA-256 del fichero, ya resuelto por alias), que app.js pasa a
+// load(). Es la clave de todo lo que se guarda por libro. Ver `bookKey()`.
+let canonicalId = null;
+
 // Margen mínimo (px por lado) para dibujar la página como hoja sobre el "escritorio".
 // Ver sizeContainer() y `.epub-container.has-desk` en main.css.
 const DESK_MIN_MARGIN = 120;
@@ -356,8 +360,52 @@ export function updateReaderScale() {
 // ---- Modo de lectura: paginado vs scroll continuo -------------------------
 // Se recuerda POR LIBRO (mismo id que lastPosition_), default 'paginated'. El scroll
 // continuo es mejor para libros técnicos (code blocks, tablas, figuras sin cortes).
+// Clave de las cosas guardadas por libro (posición, modo de lectura).
+//
+// El id canónico es el SHA-256 del fichero: el MISMO que usan biblioteca, subrayados,
+// marcadores y el sync. Antes se usaba `book.key()` de epub.js —`epubjs:<v>:<dc:identifier
+// del OPF>`— y eso metía la posición en un espacio de ids DISTINTO al del resto, con tres
+// consecuencias medidas (ver BACKLOG TEC5): viajaba al proveedor como un "libro fantasma"
+// sin título, la reconciliación de alias no la alcanzaba (mismo libro de otro mirror: los
+// subrayados cruzaban y la página no) y, en EPUB sin `dc:identifier`, `key()` cae a
+// `url.filename` —cadena vacía al abrir desde un ArrayBuffer— así que TODOS ellos
+// compartían la clave `epubjs:0.3:` y se pisaban la posición entre libros distintos.
+//
+// `legacyBookKey()` sigue existiendo solo para migrar lo ya guardado (ver migrateLegacyKeys).
 function bookKey() {
+  return canonicalId || legacyBookKey();
+}
+
+function legacyBookKey() {
   try { return (book && book.key) ? book.key() : 'default'; } catch (e) { return 'default'; }
+}
+
+// Claves por libro que vivían bajo la clave vieja. `lastPositionAt` viaja con su valor: es
+// el sello del LWW de escalares del sync.
+const CLAVES_POR_LIBRO = ['lastPosition', 'lastPositionAt', 'readingMode'];
+
+// Traslada lo guardado bajo la clave vieja al id canónico, una vez por libro. Si ya hay
+// valor en ambos lados gana el más reciente por `lastPositionAt`, que es exactamente el
+// criterio que el sync aplica a estos escalares. La clave vieja se BORRA: si se dejara,
+// `buildSnapshot()` la seguiría subiendo como libro fantasma.
+function migrateLegacyKeys() {
+  const viejo = legacyBookKey();
+  if (!canonicalId || viejo === canonicalId) return;
+  const tieneViejo = Storage.get('lastPosition_' + viejo) != null;
+  if (tieneViejo) {
+    const tNuevo = Number(Storage.get('lastPositionAt_' + canonicalId)) || 0;
+    const tViejo = Number(Storage.get('lastPositionAt_' + viejo)) || 0;
+    if (tViejo > tNuevo) {
+      Storage.set('lastPosition_' + canonicalId, Storage.get('lastPosition_' + viejo));
+      Storage.set('lastPositionAt_' + canonicalId, tViejo);
+    }
+  }
+  // El modo de lectura no tiene sello; solo se adopta si no había nada elegido aquí.
+  const modoViejo = Storage.get('readingMode_' + viejo);
+  if (modoViejo != null && Storage.get('readingMode_' + canonicalId) == null) {
+    Storage.set('readingMode_' + canonicalId, modoViejo);
+  }
+  for (const p of CLAVES_POR_LIBRO) Storage.remove(p + '_' + viejo);
 }
 
 // Modos: 'paginated' (una columna), 'spread' (doble página, estilo Play Books) y
@@ -457,6 +505,7 @@ export function restoredSavedPosition() {
 // otro EPUB ocupa su sitio en load().
 export function deactivate() {
   flushLastPosition();   // el rebote no debe cruzarse con el libro que viene detrás
+  canonicalId = null;
   active = false;
   claimSeq++;                // una carga en vuelo sabrá que la han jubilado
   lastChapterLabel = null;   // IA2: nuevo libro → reinicia el seguimiento de capítulo
@@ -464,10 +513,13 @@ export function deactivate() {
   restoredSaved = false;
 }
 
-export async function load(arrayBuffer, onProgress) {
+export async function load(arrayBuffer, onProgress, bookId = null) {
   flushLastPosition();   // vaciar lo del libro anterior ANTES de soltarlo
   const mine = ++claimSeq;
   active = true;
+  // Antes de tocar `book`: `flushLastPosition()` de arriba aún tiene que escribir con la
+  // clave del libro SALIENTE.
+  canonicalId = bookId || null;
   if (book) {
     try { await book.destroy(); } catch(e) { console.warn('Destroy error:', e); }
     book = null;
@@ -486,6 +538,11 @@ export async function load(arrayBuffer, onProgress) {
   console.log('Waiting for book.ready...');
   await book.ready;
   console.log('Book ready');
+
+  // Migrar AQUÍ y no más abajo: es el primer punto donde existen a la vez el `book` (del
+  // que sale la clave vieja) y el id canónico, y el modo de lectura se lee ya en el
+  // renderTo, antes de restaurar la posición.
+  try { migrateLegacyKeys(); } catch (e) { console.warn('migración de claves por libro:', e); }
 
   // Otro lector se llevó la pantalla mientras esto cargaba (abrir un EPUB y, sin
   // esperar, un PDF): NO tocar los contenedores. Seguir adelante escondía el
@@ -554,14 +611,13 @@ export async function load(arrayBuffer, onProgress) {
     });
   });
 
-  // Restaurar la última posición de ESTE libro (guardada en cada 'relocated'
-  // bajo lastPosition_<book.key()>, estable entre sesiones). Así recordamos
-  // dónde íbamos abramos como abramos (archivo, arrastrar o biblioteca). Si el
-  // CFI guardado ya no es válido, abrimos por el principio.
+  // Restaurar la última posición de ESTE libro (guardada en cada 'relocated' bajo
+  // lastPosition_<id canónico>). Así recordamos dónde íbamos abramos como abramos
+  // (archivo, arrastrar o biblioteca). Si el CFI guardado ya no es válido, abrimos por el
+  // principio.
   let startCfi = null;
   try {
-    const key = book.key ? book.key() : 'default';
-    startCfi = Storage.get('lastPosition_' + key) || null;
+    startCfi = Storage.get('lastPosition_' + bookKey()) || null;
   } catch (e) { /* sin posición guardada */ }
   try {
     await rendition.display(startCfi || undefined);
@@ -792,7 +848,7 @@ export function flushLastPosition() {
   savePosTimer = 0;
   if (book && currentCfi) {
     try {
-      const key = book.key ? book.key() : 'default';
+      const key = bookKey();
       Storage.set('lastPosition_' + key, currentCfi);
       // Sello para el LWW del sync (la posición es un escalar sin updatedAt propio)
       Storage.set('lastPositionAt_' + key, Date.now());

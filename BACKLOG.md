@@ -1409,7 +1409,7 @@ gating (el retrieval vacío no disparaba el agéntico). Complementan a los ya ex
 `retrieval.spec.ts` y `chapter-event.spec.ts`.
 
 
-### TEC5 — La posición de lectura vive en OTRO espacio de ids que el resto · `M` · **abierto**
+### TEC5 — La posición de lectura vivía en OTRO espacio de ids que el resto · **✓ (2026-08-19)** `M`
 **Síntoma:** la página de lectura no cruza bien entre dispositivos, aunque los subrayados sí.
 
 **Causa (verificada con `buildSnapshot()`).** La posición del EPUB se guarda bajo
@@ -1449,8 +1449,22 @@ que estas claves **ya están sincronizadas en el Drive de los usuarios**:
 - Test obligatorio: dos dispositivos con **hash distinto del mismo libro** (el caso que ya
   cubre `sync-two-devices.spec.ts` para subrayados) tienen que converger también en la página.
 
-**No hacerlo a la ligera:** tocar claves ya sincronizadas es la vía más rápida a perder posiciones
-de usuarios reales. La parte de código es media hora; la migración es el trabajo.
+**Hecho.** Los dos lectores reciben el id canónico en `load(buffer, onProgress, bookId)` y lo usan en
+su único punto de construcción de clave (`bookKey()`); app.js pasa `Aliases.canonicalOf(aiBookId)`, el
+mismo id que subrayados y marcadores. `migrateLegacyKeys()` traslada lo guardado una vez por libro
+—resolviendo por `lastPositionAt`/`pdfLastPageAt`, el LWW de escalares que ya usa el sync— y borra la
+clave vieja. `purgeOrphans()` limpia además las claves de posición y modo huérfanas (antes solo
+`highlights`/`bookmarks`), con la lista de prefijos alineada con `BOOK_PREFIXES` de layout.js.
+
+Cubierto por [`tests/position-key.spec.ts`](tests/position-key.spec.ts): clave canónica en EPUB y PDF,
+migración de la clave vieja, y `buildSnapshot()` con **una sola** entrada (antes salían dos: el libro
+real y el fantasma).
+
+_Nota del montaje del test, que costó un intento:_ sembrar la clave vieja **antes** de navegar no vale
+—`pagehide` vacía la posición actual bajo la canónica con sello fresco y el LWW prefiere esa, con
+razón—. Hay que sembrar ya en la página nueva. Y la aserción va a nivel de SECCIÓN, no de CFI exacto:
+epub.js muestra la página que CONTIENE el CFI migrado y luego guarda el INICIO de esa página (/62 para
+un pin en /80); exigir igualdad byte a byte comprobaría el redondeo de la paginación, no la migración.
 
 ### TEC3 — Arnés de medición de rendimiento del lector · **✓ (2026-08-19)** `S`
 **Hecho:** [`tests/perf.spec.ts`](tests/perf.spec.ts) (`npm run perf`, etiqueta `@perf`, fuera de

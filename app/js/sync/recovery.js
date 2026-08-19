@@ -57,15 +57,23 @@ export async function purgeOrphans() {
   const manifest = m ? JSON.parse(m.content) : { books: {} };
   const remoteOrphans = Object.keys(manifest.books || {}).filter(id => !isCanonicalId(id));
 
+  // Claves locales particionadas por libro. Deben ser las MISMAS que `BOOK_PREFIXES` de
+  // layout.js: lo que aquel sube es lo que este tiene que poder limpiar. La posición y el
+  // modo de lectura se añadieron al migrarlos al id canónico (TEC5): hasta entonces vivían
+  // bajo la clave interna de epub.js / la huella de pdf.js y quedaban como libros fantasma.
+  const PREFIJOS = ['highlights', 'bookmarks', 'lastPosition', 'lastPositionAt',
+                    'pdfLastPage', 'pdfLastPageAt', 'readingMode', 'pdfMode'];
+
   // Reúne también las claves locales huérfanas (aunque no estén en el manifest remoto).
   const ids = new Set(remoteOrphans);
+  const re = new RegExp('^(?:' + PREFIJOS.join('|') + ')_(.+)$');
   for (const key of Object.keys(Storage.getAll(''))) {
-    const mk = key.match(/^(?:highlights|bookmarks)_(.+)$/);
+    const mk = key.match(re);
     if (mk && !isCanonicalId(mk[1])) ids.add(mk[1]);
   }
 
   // 1) Borra las claves locales para que buildSnapshot no las vuelva a subir.
-  for (const id of ids) { Storage.remove('highlights_' + id); Storage.remove('bookmarks_' + id); }
+  for (const id of ids) for (const p of PREFIJOS) Storage.remove(p + '_' + id);
 
   // 2) Borra de Drive los ficheros de libro huérfanos y quítalos del manifest.
   for (const id of remoteOrphans) {

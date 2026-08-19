@@ -11,6 +11,8 @@ let currentPage = 1;
 let totalPages = 0;
 let onPageCallback = null;
 let readingMode = 'paginated';   // 'paginated' | 'scroll' (continuo), recordado por libro
+// Id CANÓNICO del libro (SHA-256 del fichero), que app.js pasa a load(). Ver `bookKey()`.
+let canonicalId = null;
 let lazyObserver = null;         // observer del render perezoso en modo scroll
 // Páginas que el observer da por cercanas (viewport + rootMargin). Es la lista corta
 // sobre la que onScroll decide cuál está centrada, en vez de recorrer el documento.
@@ -298,11 +300,13 @@ export function getTotalPages() {
 // epub-reader.js y tests/book-switch.spec.ts).
 export function deactivate() {
   teardownScroll();
+  canonicalId = null;
   active = false;
   claimSeq++;
 }
 
-export async function load(arrayBuffer, onProgress) {
+export async function load(arrayBuffer, onProgress, bookId = null) {
+  canonicalId = bookId || null;
   const lib = await ensurePdfjs();
   if (!lib) {
     throw new Error('pdf.js not loaded');
@@ -341,11 +345,14 @@ export async function load(arrayBuffer, onProgress) {
   pdfDoc = await loadingTask.promise;
   totalPages = pdfDoc.numPages;
 
+  // Trasladar lo guardado bajo la huella de pdf.js al id canónico (ver bookKey()).
+  try { migrateLegacyKeys(); } catch (e) { console.warn('migración de claves por libro:', e); }
+
   // Restore last page
   try {
-    const fp = pdfDoc.fingerprints ? pdfDoc.fingerprints[0] : null;
-    if (fp) {
-      const lastPage = Storage.get('pdfLastPage_' + fp);
+    const k = bookKey();
+    if (k) {
+      const lastPage = Storage.get('pdfLastPage_' + k);
       if (lastPage && lastPage >= 1 && lastPage <= totalPages) {
         currentPage = lastPage;
       }
@@ -354,8 +361,8 @@ export async function load(arrayBuffer, onProgress) {
 
   // Modo de lectura recordado por libro (paginado por defecto).
   try {
-    const fp = fpKey();
-    const m = fp ? Storage.get('pdfMode_' + fp) : null;
+    const k = bookKey();
+    const m = k ? Storage.get('pdfMode_' + k) : null;
     if (m === 'scroll' || m === 'paginated') readingMode = m;
   } catch (e) {}
 
@@ -371,12 +378,42 @@ export function getReadingMode() { return readingMode; }
 export async function setReadingMode(mode) {
   if ((mode !== 'scroll' && mode !== 'paginated') || mode === readingMode) return;
   readingMode = mode;
-  try { const fp = fpKey(); if (fp) Storage.set('pdfMode_' + fp, mode); } catch (e) {}
+  try { const k = bookKey(); if (k) Storage.set('pdfMode_' + k, mode); } catch (e) {}
   await rerender();
   window.dispatchEvent(new CustomEvent('reader:flow-changed'));
 }
 
+// Clave de lo que se guarda por libro (última página, modo). El id canónico es el SHA-256
+// del fichero, el MISMO que usan biblioteca, subrayados y sync. Antes se usaba la huella de
+// pdf.js, que metía la posición en otro espacio de ids: viajaba al proveedor como "libro
+// fantasma" sin título y la reconciliación de alias no la alcanzaba. Ver BACKLOG TEC5.
+function bookKey() { return canonicalId || fpKey(); }
+
 function fpKey() { try { return pdfDoc && pdfDoc.fingerprints ? pdfDoc.fingerprints[0] : null; } catch { return null; } }
+
+const CLAVES_POR_LIBRO = ['pdfLastPage', 'pdfLastPageAt', 'pdfMode'];
+
+// Traslada lo guardado bajo la huella de pdf.js al id canónico, una vez por libro. Gana el
+// más reciente por `pdfLastPageAt` —el mismo LWW de escalares que aplica el sync— y la
+// clave vieja se BORRA: si se dejara, `buildSnapshot()` la seguiría subiendo como fantasma.
+function migrateLegacyKeys() {
+  const viejo = fpKey();
+  if (!canonicalId || !viejo || viejo === canonicalId) return;
+  if (Storage.get('pdfLastPage_' + viejo) != null) {
+    const tNuevo = Number(Storage.get('pdfLastPageAt_' + canonicalId)) || 0;
+    const tViejo = Number(Storage.get('pdfLastPageAt_' + viejo)) || 0;
+    if (tViejo > tNuevo) {
+      Storage.set('pdfLastPage_' + canonicalId, Storage.get('pdfLastPage_' + viejo));
+      Storage.set('pdfLastPageAt_' + canonicalId, tViejo);
+    }
+  }
+  // El modo no tiene sello; solo se adopta si aquí no había nada elegido.
+  const modoViejo = Storage.get('pdfMode_' + viejo);
+  if (modoViejo != null && Storage.get('pdfMode_' + canonicalId) == null) {
+    Storage.set('pdfMode_' + canonicalId, modoViejo);
+  }
+  for (const p of CLAVES_POR_LIBRO) Storage.remove(p + '_' + viejo);
+}
 
 // Reconstruye el contenedor según el modo actual (paginado o scroll). Las páginas viven
 // dentro de #pdf-zoom-layer (lo que escalamos EN VIVO durante el pinch).
@@ -799,7 +836,7 @@ async function renderTextLayer(page, viewport, wrapper) {
 function saveLastPage() {
   if (pdfDoc) {
     try {
-      const fp = pdfDoc.fingerprints ? pdfDoc.fingerprints[0] : null;
+      const fp = bookKey();
       if (fp) {
         Storage.set('pdfLastPage_' + fp, currentPage);
         // Sello para el LWW del sync (la posición es un escalar sin updatedAt propio)
