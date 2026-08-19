@@ -54,5 +54,9 @@ offline con un agente de IA (BYOK) que lee el libro completo según un objetivo.
   lo lanza solo al terminar, exigiendo que lo servido sea el commit recién desplegado.
   `SMOKE_URL=…` para apuntar a otro deploy.
 - `npm test` — 19 E2E deterministas (Playwright, sin API). `npm run test:ai` — `@live` contra la API real (key en `.env`).
+- `npm run perf` — arnés de rendimiento del lector ([`tests/perf.spec.ts`](tests/perf.spec.ts), `@perf`,
+  fuera de `npm test`). Necesita las fixtures pesadas (`npm run eval:fixtures`); sin ellas se salta.
+  Cada métrica tiene **presupuesto** y falla si se sale; la corrida se vuelca a `test-results/perf.json`.
+  Correrlo **solo**: medir con la suite en paralelo no mide nada.
 - `npm run lint` (ESLint) · `npm run format` (Prettier).
 - El test "export after highlight" depende de que el epub de prueba se llame `test.epub` (bookId `test`).

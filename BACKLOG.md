@@ -1409,25 +1409,55 @@ gating (el retrieval vacío no disparaba el agéntico). Complementan a los ya ex
 `retrieval.spec.ts` y `chapter-event.spec.ts`.
 
 
-### TEC3 — Arnés de medición de rendimiento del lector · `S` · **bloquea a [TEC4](#tec4--el-motor-epub-es-el-techo-de-rendimiento--m-l)**
-Hoy no hay ni un número. Toda afirmación sobre rendimiento del lector (la de este backlog incluida)
-es lectura de código, no medición — y TEC4 propone gastar días en un motor nuevo sin saber cuánto
-se gana. Primero el termómetro.
+### TEC3 — Arnés de medición de rendimiento del lector · **✓ (2026-08-19)** `S`
+**Hecho:** [`tests/perf.spec.ts`](tests/perf.spec.ts) (`npm run perf`, etiqueta `@perf`, fuera de
+`npm test`). Fixtures pesadas reales vía `npm run eval:fixtures` (Pro Git, 14 MB, 21 secciones
+grandes; Constitución en PDF); sin ellas los tests se **saltan con instrucciones**, no fallan. Cada
+medida se contrasta con un presupuesto y la corrida entera se vuelca a `test-results/perf.json`.
 
-**Qué medir** (spec Playwright `@perf`, fuera de `npm test` por ruidoso, con fixture pesada real —
-no `test.epub`, que es de juguete):
-- **TTFP** — abrir libro → primera página pintada. EPUB y PDF.
-- **p95 de paso de página, separando los dos casos:** dentro de capítulo (barato: scroll de la
-  multicolumna) y **en frontera de capítulo** (caro: iframe nuevo + layout + medición). Mezclarlos
-  esconde justo el problema.
-- **Cambio de tipografía / tema / giro** → tiempo hasta layout estable (el que hoy tapa `pinnedCfi`).
-- **Memoria retenida** tras recorrer 50 páginas (PDF ya está acotado por `freeWrapper`; EPUB no se ha mirado).
-- **Arranque en frío** de la app (biblioteca vacía, cache vacía).
+**Decisiones de medición que costaron un intento cada una** (documentadas en la cabecera del spec):
+- El reloj vive **dentro del navegador**, desde el `change` del `<input type=file>` hasta que hay
+  página pintada. Medir desde Playwright metía su propia latencia en la cifra.
+- "Página pintada" en EPUB **no puede exigir texto**: la primera página de muchos EPUB es la portada,
+  un SVG sin una letra. La señal es documento maquetado con altura real.
+- Las **fronteras de sección se miden a propósito** (`rendition.display(href)` sobre 13 secciones del
+  último 60 % del spine), no contando cruces al azar: con capítulos grandes, 30 pases cruzan una
+  frontera o ninguna según dónde caiga el arranque → test intermitente.
+- Los pases intra-capítulo se miden **tras entrar al cuerpo del libro**. Desde la portada solo se
+  recorre el preliminar (cubierta, créditos, índice), secciones diminutas cuyo coste no lo vive nadie.
+- El cambio de cuerpo de letra **no emite `relocated`** (el handler de `settings:changed` solo hace
+  resize + re-inyección de tema). La señal de reflow terminado es el `scrollWidth` del documento:
+  cambia y se estabiliza.
+- **`Documents` no es valla, solo observación.** Medido con 140 pases: va de 1 a 5 con un único iframe
+  enganchado y el heap plano → es retraso del GC en soltar documentos desenganchados, no una fuga.
+  La valla es el heap.
 
-**Salida:** presupuestos escritos en el propio spec, que fallan si se superan. Sin presupuesto no es
-una métrica, es un dato suelto.
+**Primera medición (MacBook, 3 corridas estables) — y desmiente la hipótesis de TEC4:**
 
-### TEC4 — El motor EPUB es el techo de rendimiento · `M`–`L`
+| Métrica | Medido | Presupuesto |
+|---|---|---|
+| `app.coldStart` | 140–265 ms | 600 |
+| `epub.ttfp` (14 MB) | 640–870 ms | 2000 |
+| `epub.turn.intra` p95 | 66–80 ms | 200 |
+| **`epub.section.load` p95** | **477–584 ms** | 900 |
+| `epub.locations` | ~2 200 ms | 6000 |
+| `epub.typography` | ~55 ms | 500 |
+| `epub.heap` | 10,6 MB | 30 MB |
+| `pdf.ttfp` | ~410 ms | 1500 |
+| `pdf.turn` p95 | ~67 ms | 250 |
+
+**Lectura:** el diagnóstico cualitativo de TEC4 era correcto en la FORMA (entrar en sección nueva
+cuesta ~7× un pase normal) pero **exagerado en la MAGNITUD**. Nada está roto: ni fuga de memoria, ni
+arranque lento, ni el reflow tipográfico caro que se suponía, y las locations son 2 s, no los
+"segundos de main thread" que se temían. **El único número con recorrido real es `section.load`.**
+Los presupuestos son valla anti-regresión, no objetivo: que pasen no significa que esté bien, sino
+que no ha empeorado.
+
+**Pendiente:** medir en un móvil de gama media (el techo real; el portátil esconde el problema) y en
+`p1-relativity.epub`, de secciones pequeñas y numerosas — el perfil **opuesto** a Pro Git, donde las
+fronteras dominan la lectura y `section.load` se paga cada pocas páginas.
+
+### TEC4 — El motor EPUB: ¿techo o sospecha? · `S` (F1) · **F2 congelada tras medir**
 **Diagnóstico.** El PDF está en la parte alta del mercado web: virtualización con `IntersectionObserver`
 (`rootMargin: 150%`) + liberación de canvas lejanos, zoom de dos capas (base oversampleada 1.5×·dpr +
 parche de detalle al detenerse) con el gesto resuelto en `transform` sobre GPU sin tocar pdf.js, y
@@ -1444,20 +1474,26 @@ impone costes inatacables desde fuera:
    pero la *primera* apertura de un libro grande sigue quemando main thread.
 4. **`pinnedCfi` existe porque el layout es inestable.** Es un parche excelente sobre cimiento frágil.
 
+> ⚠️ **El diagnóstico de arriba es la HIPÓTESIS de partida; se deja tal cual por trazabilidad. F0 la
+> midió y solo sostiene el punto 1.** El 2 es falso (cambiar el cuerpo de letra: ~55 ms) y el 3 está
+> muy inflado (~2,2 s una vez por libro, ya cacheado). Ver el veredicto al final.
+
 **Plan por fases — no big-bang.**
 
-- **F0 · [TEC3](#tec3--arnés-de-medición-de-rendimiento-del-lector--s--bloquea-a-tec4).** Sin números no se decide F2.
-- **F1 · Quick wins sin cambiar de motor** `S`–`M`:
-  - **Locations en Web Worker.** No vía epub.js (su `generate` no es troceable): implementación propia
-    en worker leyendo el zip con JSZip —ya vendorizado— y guardando en el mismo formato que hoy
-    consume `book.locations.load()`. Mata el pico de la primera apertura.
+- **F0 · [TEC3](#tec3--arnés-de-medición-de-rendimiento-del-lector---2026-08-19-s) ✓.** Hecho, y **reordena lo que sigue.**
+- **F1 · Quick wins sin cambiar de motor** `S`, reordenada con los datos de F0:
   - **`manager: 'continuous'` en `renderTo`** ([L493](app/js/epub-reader.js#L493), hoy el default).
-    Pre-renderiza secciones vecinas → la frontera de capítulo deja de notarse. Cuesta memoria: medir con F0.
-  - **`<link rel="modulepreload">`** del grafo de `app.js` en `index.html` (hoy 0). Colapsa la cascada
-    de módulos ES en frío, que es el precio de no tener build step.
+    **El único con recorrido demostrado:** `section.load` p95 es 477–584 ms contra 66–80 ms de un pase
+    normal. Pre-renderizar vecinos lo esconde. Cuesta memoria — hay 20 MB de margen sobre el
+    presupuesto del heap para gastarlos aquí, y el arnés dirá cuánto.
+  - ~~**Locations en Web Worker**~~ · **archivado**: medido, son **~2,2 s** en un EPUB de 14 MB, una
+    sola vez por libro y ya cacheado en IDB. No es el pico que se suponía. Se reabre solo si el móvil
+    de gama media lo desmiente.
+  - ~~**`modulepreload`**~~ · **archivado**: el arranque en frío mide **155 ms**. La cascada de módulos
+    ES no es un problema; no hay nada que colapsar.
 - **F2 · Migrar a [foliate-js](https://github.com/johnfactotum/foliate-js)** `L`. Motor de Foliate/Readest,
   mantenido. Gana: paginador sin el thrash de recarga por sección, fixed-layout decente (cómic/manual
-  ilustrado, hoy pobre) y **progreso proporcional sin pre-pase de locations** → deja F1a sin objeto.
+  ilustrado, hoy pobre) y progreso proporcional sin pre-pase de locations.
   **Riesgos reales, en orden:**
   - **CFIs.** De ellos cuelgan subrayados, marcadores, progreso, [`sync/layout.js`](app/js/sync/layout.js),
     el pin de reflow y las anclas de citas del agente. foliate-js implementa CFI, pero hay usuarios con
@@ -1475,7 +1511,17 @@ impone costes inatacables desde fuera:
 hilo con la rasterización. Verificar soporte en pdf.js 3.11 — puede exigir subir a 4.x/5.x, que rompe
 `renderTextLayer` (acoplamiento ya anotado en TEC1).
 
-**❓ Abierta — la pregunta estratégica, antes que la técnica.** En EPUB **nadie gana el mercado por
-rendimiento**: es higiene, no diferenciación. La ventaja de BookReader es el agente sobre el libro
-entero. F1 es barato y se hace igual; **F2 solo si F0 mide un delta que lo justifique**, porque son
-días contra el riesgo de romper subrayados de usuarios reales.
+**Veredicto tras F0 (2026-08-19).** El diagnóstico era correcto en la forma y **exagerado en la
+magnitud**: entrar en sección nueva cuesta ~7× un pase normal, sí, pero son ~500 ms en el peor
+percentil, no el desastre que se describía. No hay fuga de memoria, ni arranque lento, ni reflow
+tipográfico caro. **F2 (foliate-js) queda congelada**: es cambiar el motor —con los CFIs de subrayados
+de usuarios reales de por medio— para ganar medio segundo en una transición que ocurre una vez cada
+varias decenas de páginas. Se reabre solo si se cumple una de dos condiciones:
+1. La medición en **móvil de gama media** o en un EPUB de **secciones pequeñas y numerosas**
+   (`p1-relativity.epub`) multiplica el coste hasta hacerlo constante en la lectura.
+2. Aparece una necesidad de **producto** que epub.js no puede dar (fixed-layout decente para cómic o
+   manual ilustrado es la candidata real), y entonces el rendimiento es el acompañante, no el motivo.
+
+**Y la pregunta estratégica sigue en pie:** en EPUB **nadie gana el mercado por rendimiento** — es
+higiene, no diferenciación. La ventaja de BookReader es el agente sobre el libro entero. Los datos de
+F0 dicen que la higiene ya está hecha.
