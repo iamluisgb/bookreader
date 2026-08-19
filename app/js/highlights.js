@@ -52,13 +52,44 @@ function getKey() {
 // Lista cruda, tombstones incluidos. Los mutadores operan SIEMPRE sobre esta
 // (si trabajaran sobre la filtrada, cada guardado purgaría los tombstones).
 // El sync y el backup también la necesitan para propagar borrados.
+//
+// Devuelve una copia RECIÉN parseada en cada llamada, y eso es parte del contrato: los
+// mutadores modifican en sitio lo que reciben (tombstone, revive, cambiar color) antes de
+// guardarlo, así que dos llamadas no pueden compartir los mismos objetos sin que una
+// pise a la otra.
 export function getAllRaw() {
   return Storage.get(getKey(), []);
 }
 
-// Solo los subrayados vivos: lo que consume la UI y el export.
+// Memo del último parseo, SOLO para lectura (ver leerSoloLectura). Se guarda aparte de
+// getAllRaw precisamente para no romperle el contrato de copia privada.
+//
+// La validez se decide comparando la CADENA cruda, no con una invalidación manual. Es
+// deliberado: estas claves las escribe también gente de fuera de este módulo (el merge
+// del sync, la recuperación, la migración de esquema), y una caché que dependiera de que
+// todos avisen acabaría sirviendo subrayados fantasma tarde o temprano. Comparar la
+// cadena no puede quedarse obsoleta —si alguien escribió, la cadena es otra— y aun así se
+// ahorra lo caro, que es construir los objetos.
+let memo = { key: null, raw: null, parsed: null };
+
+// Lista para LEER: no se puede modificar lo que devuelve ni los objetos de dentro. La
+// usan getAll/getByPage, que es el camino caliente —dibujar los subrayados de un PDF pasa
+// por aquí en cada cambio de página, y en modo scroll eso es cada vez que cambia la
+// página centrada—, y ninguno de sus consumidores escribe: para eso está getAllRaw.
+function leerSoloLectura() {
+  const key = getKey();
+  const raw = Storage.raw(key);
+  if (raw === null) return [];
+  if (memo.key === key && memo.raw === raw) return memo.parsed;
+  const parsed = Storage.get(key, []);
+  memo = { key, raw, parsed: Array.isArray(parsed) ? parsed : [] };
+  return memo.parsed;
+}
+
+// Solo los subrayados vivos: lo que consume la UI y el export. De solo lectura, como
+// leerSoloLectura: el array es nuevo, pero los objetos de dentro son los memoizados.
 export function getAll() {
-  return getAllRaw().filter(h => !h.deleted);
+  return leerSoloLectura().filter(h => !h.deleted);
 }
 
 export function add(cfi, text, color, chapter, note = '') {

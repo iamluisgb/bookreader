@@ -8,7 +8,6 @@ import { t } from './i18n.js';
 import * as EpubReader from './epub-reader.js';
 import * as PdfReader from './pdf-reader.js';
 import * as Highlights from './highlights.js';
-import * as AiPanel from './ai/panel.js';
 import { icon } from './ui/icons.js';
 import { escapeHtml } from './ui/escape.js';
 import { dehyphenate } from './ui/text.js';
@@ -144,10 +143,13 @@ function wireAgentActions(getText) {
     const el = document.getElementById(id);
     if (el) el.onclick = () => { fn(getText()); hideHighlightTooltip(); };
   };
-  on('sel-ask', (txt) => AiPanel.quoteSelection(txt));
-  on('sel-numeric', (txt) => AiPanel.quickAction('numeric', txt));
-  on('sel-explain', (txt) => AiPanel.quickAction('explain', txt));
-  on('sel-why', (txt) => AiPanel.quickAction('why', txt));
+  // El panel del agente se carga con `import()` (no pesa en el arranque, ver app.js);
+  // el módulo se espera DENTRO del handler, no al importar este fichero.
+  const conPanel = (fn) => async (txt) => fn(await import('./ai/panel.js'), txt);
+  on('sel-ask', conPanel((AiPanel, txt) => AiPanel.quoteSelection(txt)));
+  on('sel-numeric', conPanel((AiPanel, txt) => AiPanel.quickAction('numeric', txt)));
+  on('sel-explain', conPanel((AiPanel, txt) => AiPanel.quickAction('explain', txt)));
+  on('sel-why', conPanel((AiPanel, txt) => AiPanel.quickAction('why', txt)));
 }
 
 // ---- Núcleo de la barra ---------------------------------------------------

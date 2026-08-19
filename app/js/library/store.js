@@ -172,10 +172,46 @@ export async function putBook(record, { stamp = true } = {}) {
 }
 
 // Aplica un parche parcial a un libro existente (progreso, estado, estanterías…).
+//
+// Va por patchBook, no por getRaw+putBook: encadenarlos LEÍA el registro dos veces
+// (una aquí y otra dentro de putBook para sellar `updatedAt`), y el registro lleva el
+// binario del libro. En un PDF de 30 MB eso son 60 MB de structured-clone por llamada,
+// y esta función está en el camino de guardar el progreso: se llama en cada pase de
+// página. Es el mismo pie del que ya se cuidaba getAllRecords() unas líneas más arriba.
 export async function updateBook(id, patch, opts) {
-  const cur = await getRaw(id);
-  if (!cur) return null;
-  return putBook({ ...cur, ...patch }, opts);
+  return patchBook(id, patch, opts);
+}
+
+// Lee-modifica-escribe en UNA sola transacción y con UNA sola lectura del registro.
+//
+// No se puede bajar de ahí sin cambiar el esquema: IndexedDB no sabe actualizar campos
+// sueltos, así que el `put` reescribe el registro entero, binario incluido. Lo que sí se
+// elimina son las lecturas de más, que eran las que se multiplicaban.
+export async function patchBook(id, patch, { stamp = true } = {}) {
+  let changed = false;
+  const next = await tx('books', 'readwrite', async (s) => {
+    const cur = await reqP(s.get(id));
+    if (!cur) return null;
+    // `patch` puede ser una FUNCIÓN del registro actual: así quien necesita leer lo que
+    // hay para decidir lo que escribe (el estado leyendo/terminado a partir del %) no
+    // tiene que hacer una lectura aparte, que era otra copia del binario.
+    const campos = typeof patch === 'function' ? patch(cur) : patch;
+    const rec = { ...cur, ...campos };
+    // Mismo cuidado que en putBook: un registro venido de getAllRecords() no trae
+    // binario y reescribirlo tal cual borraría el fichero del libro.
+    const stripped = typeof rec.hasLocalFile === 'boolean';
+    delete rec.hasLocalFile;
+    if (stripped && campos.file === undefined) rec.file = cur.file;
+    if (stamp) {
+      changed = syncedChanged(cur, rec);
+      if (changed) rec.updatedAt = Date.now();
+      else if (!rec.updatedAt) rec.updatedAt = cur.updatedAt;
+    }
+    await reqP(s.put(rec));
+    return rec;
+  });
+  if (changed) notifyChanged();
+  return next;
 }
 
 // Borrado LÓGICO: el registro sobrevive como tombstone para que el borrado se

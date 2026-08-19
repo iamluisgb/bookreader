@@ -9,6 +9,16 @@ export function get(key, defaultValue = null) {
   }
 }
 
+// La cadena cruda, sin parsear. La usa quien memoiza un parseo caro y necesita saber si
+// lo guardado sigue siendo lo mismo (ver highlights.js).
+export function raw(key) {
+  try {
+    return localStorage.getItem(PREFIX + key);
+  } catch {
+    return null;
+  }
+}
+
 export function set(key, value) {
   try {
     localStorage.setItem(PREFIX + key, JSON.stringify(value));

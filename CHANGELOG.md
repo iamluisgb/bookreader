@@ -5,6 +5,68 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-08-19 — El arranque ya no descarga la app entera para pintar la biblioteca
+
+Auditoría de rendimiento medida contra producción: **93 peticiones, 1,97 MB (~640 KB brotli),
+FCP 1432 ms**. El primer pixel llegaba después del `load`, porque la biblioteca la pinta el JS
+y antes había que bajar y ejecutar todo lo demás.
+
+**Libs vendorizadas bajo demanda** (`js/vendor-loader.js`). jszip, epub.js y pdf.js colgaban de
+`<script>` clásicos en `index.html`: 632 KB / **166 KB brotli** que se descargaban siempre,
+incluso para una pantalla —la biblioteca— que no usa ninguna, y aunque abrieras un EPUB y no
+tocaras los 316 KB de pdf.js. Ahora se piden al abrir el libro, y solo la del formato que toca;
+la descarga arranca en paralelo con leer el fichero de IndexedDB. Mismo patrón que ya usaba
+`ai/anki-export.js` con sql.js.
+
+**Ajustes generales con `import()`** (72 KB): siempre lo abre un clic. Su única
+responsabilidad de arranque —reparar la config del agente cuando el token del gateway quedó
+con otra base URL— se ha extraído a `ai/gateway-repair.js`, que sí corre al arrancar: quien
+está en ese estado no puede arreglarlo desde la UI, así que no vale esperar a que abra Ajustes.
+Por lo mismo, el alto del sheet del agente vive ahora en `ai/sheet-height.js`.
+
+El panel del agente también sale del grafo estático, pero su `init()` **sigue en el arranque**:
+tiene efectos (monta el panel, restaura trabajos en segundo plano, avisa al SyncEngine) y
+diferirlos a tiempo ocioso le cambiaba el orden al primer ciclo de sync — con dos dispositivos,
+una racha de estudio que no cruzaba, reproducible 2 de cada 5.
+
+**Guardar el progreso ya no relee el libro entero.** `updateBook` encadenaba `getRaw` +
+`putBook` (que vuelve a leer para sellar `updatedAt`), y antes `flushProgress` hacía otro
+`getBook`: **tres lecturas del registro CON el binario por pase de página**. En un PDF de 30 MB,
+~120 MB de structured-clone por ráfaga. Ahora es `patchBook`: una transacción, una lectura.
+Es el mismo pie del que ya se cuidaba `getAllRecords()` unas líneas más arriba.
+
+**Service worker con dos cachés.** `activate` purgaba la caché entera en cada despliegue, así
+que cambiar una línea de un `.js` obligaba a rebajar `pdf.worker` (1 MB), `sql-wasm.wasm`
+(648 KB) y el resto de vendor. Ahora `vendor/` vive en una caché permanente (va versionado en
+el nombre del fichero: dos versiones nunca comparten URL). Fuentes, iconos, `manifest.json` y
+`build.json` se quedan en la versionada a propósito — sus nombres no llevan versión, o cambian
+sin cambiar de nombre.
+
+**`_headers` en el despliegue.** Pages servía TODO con `max-age=0, must-revalidate`, libs
+incluidas: `vendor/` pasa a un año inmutable, fuentes e iconos a una semana. Y deja de
+publicarse `app/_proto` (1,6 MB de capturas) con las dos páginas de prototipo que lo usaban.
+
+**Menos trabajo en el hilo principal:** la segmentación cede el hilo cada 200 bloques (un
+capítulo largo lo bloqueaba de una vez, y de ella depende también la búsqueda); el scroll del
+PDF mide solo las páginas que el IntersectionObserver da por cercanas, no las 600 del documento
+en cada frame; los subrayados se memoizan por cadena cruda para no re-parsear la lista entera en
+cada cambio de página; `resize` en las capas de selección va a un repintado por frame.
+
+**`locations` de epub.js se guardan** (`ai/db.js` v7): generarlas recorre el libro entero y se
+rehacía en CADA apertura. Y la posición de lectura pasa a guardarse con rebote de 400 ms en vez
+de dos `localStorage.setItem` síncronos por pase de página, con vaciado al ocultar la pestaña.
+
+**Arreglo de paso:** abrir un EPUB y, sin esperar, un PDF dejaba la pantalla en blanco — la
+carga del EPUB, al terminar tarde, escondía el `#pdf-container` que el PDF acababa de mostrar.
+Faltaba el guard de `claimSeq` antes de tocar los contenedores.
+
+Dos hallazgos de la auditoría NO se aplican, y es deliberado: partir `main.css` (163 KB) exige
+mover fragmentos de sus 22 media queries y el riesgo de romper la cascada no compensa los ~20 KB;
+y sacar el diccionario EN (65 KB) a carga perezosa deja un parpadeo de UI sin traducir, porque
+hay `t()` evaluándose al importar módulos.
+
+---
+
 ## 2026-08-17 — "Eliminar" en la barra de subrayar, sin nada que eliminar
 
 Al seleccionar texto —cuando el pasaje todavía no es un subrayado— la barra ofrecía Eliminar.

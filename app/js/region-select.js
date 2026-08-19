@@ -9,6 +9,7 @@
 // Las coordenadas que devuelve son FRACCIONALES sobre la página (0..1), el mismo sistema que
 // los subrayados de PDF: sobreviven al zoom y al reflow, y valen para recapturar más tarde.
 import { t } from './i18n.js';
+import { rafThrottle } from './ui/raf.js';
 
 let overlay = null;
 let onDone = null;
@@ -155,7 +156,9 @@ export function normalize(a, b) {
 // no recibía el arrastre—. El ResizeObserver dispara en cada paso de la transición, así que
 // la capa acompaña al hueco en vez de perseguirlo con un temporizador.
 function watchContainer(container) {
-  const place = () => { if (overlay) placeOverlay(container); };
+  // Una recolocación por frame: el ResizeObserver y el `resize` de ventana llegan en
+  // ráfaga (girar el móvil, arrastrar el borde de la ventana) y placeOverlay mide.
+  const place = rafThrottle(() => { if (overlay) placeOverlay(container); });
   let ro = null;
   try {
     ro = new ResizeObserver(place);

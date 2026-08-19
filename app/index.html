@@ -287,10 +287,10 @@
 
   <!-- Scripts -->
   <!-- Libs vendorizadas (mismo origen): sin dependencia de CDN, funcionan offline
-       y permiten una CSP estricta (script-src 'self'). Ver CHANGELOG (T1/T2/T6). -->
-  <script src="vendor/jszip-3.10.1.min.js"></script>
-  <script src="vendor/epub-0.3.93.min.js"></script>
-  <script src="vendor/pdf-3.11.174.min.js"></script>
+       y permiten una CSP estricta (script-src 'self'). Ver CHANGELOG (T1/T2/T6).
+       Ya NO se cargan aquí: eran 632 KB en la ruta crítica de una pantalla —la
+       biblioteca— que no usa ninguna de las tres. Las pide `js/vendor-loader.js`
+       cuando se abre un libro, y solo la del formato que toca. -->
   <script type="module" src="js/app.js"></script>
 </body>
 </html>

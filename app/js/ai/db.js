@@ -12,6 +12,7 @@
 //   ratings  (keyPath bookId)  -> { bookId, goal, scores }  (la clave ahora es convoId)
 //   decks    (keyPath id, ++)  -> { id, bookId, name, cardType, scope, cards, createdAt } [index: bookId]
 //   artifacts(keyPath key)     -> { key:`${bookId}:${kind}`, bookId, kind, result, params, segVersion, createdAt } [index: bookId]
+//   locations(keyPath bookId)  -> { bookId, json }  — locations de epub.js ya serializadas
 //
 // v4: una conversación (convo) por objetivo; varias por libro. messages/notes
 // se indexan por convoId. Las conversaciones antiguas (sessions, una por libro)
@@ -19,9 +20,11 @@
 // v5: decks — mazos de flashcards generados (feature de export a Anki).
 // v6: artifacts — resúmenes y mapas mentales generados, cacheados para no re-generar
 // (coste LLM) al reabrir o recargar. Se validan contra SEG_VERSION.
+// v7: locations — el índice de posiciones de epub.js, serializado. Generarlo recorre el
+// libro ENTERO y se rehacía en CADA apertura; guardado, la segunda apertura es inmediata.
 
 const DB_NAME = 'bookreader_ai';
-const DB_VERSION = 6;
+const DB_VERSION = 7;
 
 let dbPromise = null;
 
@@ -64,6 +67,7 @@ function open() {
         const a = db.createObjectStore('artifacts', { keyPath: 'key' });
         a.createIndex('bookId', 'bookId', { unique: false });
       }
+      if (!db.objectStoreNames.contains('locations')) db.createObjectStore('locations', { keyPath: 'bookId' });
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
@@ -664,4 +668,21 @@ export function mergeArtifacts(records) {
 export async function hashBuffer(arrayBuffer) {
   const digest = await crypto.subtle.digest('SHA-256', arrayBuffer);
   return [...new Uint8Array(digest)].map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+// Locations de epub.js (índice de posiciones para el % de progreso) ----------
+// Generarlas recorre el libro entero, y se rehacía tal cual en cada apertura. epub.js sabe
+// serializarlas (`locations.save()`), así que se guardan y la próxima vez se reponen.
+//
+// No llevan versión propia: la clave es el hash del contenido del fichero, así que unas
+// locations guardadas solo pueden pertenecer a ese mismo libro byte a byte. Si epub.js
+// cambiara de formato, load() fallaría y se regeneran (ver epub-reader.js).
+export async function loadLocations(bookId) {
+  const rec = await get('locations', bookId);
+  return rec ? rec.json : null;
+}
+
+export async function saveLocations(bookId, json) {
+  if (!bookId || !json) return;
+  await put('locations', { bookId, json });
 }

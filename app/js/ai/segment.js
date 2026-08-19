@@ -10,6 +10,25 @@ const BLOCK_SELECTOR = 'p, h1, h2, h3, h4, h5, h6, li, blockquote';
 // no tuviera fronteras de sección y `retrieval.sectionsByChapter` viniera siempre vacío.
 const HEADING_RE = /^h[1-6]$/i;
 
+// Cada cuántos bloques se cede el hilo dentro de una sección. El bucle de bloques es lo
+// caro de todo esto —textRange + cfiFromRange por bloque— y era SÍNCRONO de principio a
+// fin de la sección: un capítulo largo bloqueaba el hilo principal de una vez, con la UI
+// congelada. Y no es solo cosa del agente: la búsqueda usa esta misma segmentación
+// (app.js → AiDB.loadSegmented), así que buscar en un libro sin segmentar lo disparaba
+// entero. Ceder POR BLOQUE mataría el rendimiento (una tarea por bloque); en lotes, la
+// UI respira y el coste añadido es despreciable.
+const BLOQUES_POR_TANDA = 200;
+
+// Devuelve el hilo al navegador dejándole atender lo que tenga en cola (un clic, un
+// repintado). `scheduler.yield()` vuelve con prioridad, así que la segmentación no se va
+// al final de la cola; donde no exista, un setTimeout(0) hace el mismo trabajo peor.
+function cederHilo() {
+  if (typeof scheduler !== 'undefined' && typeof scheduler.yield === 'function') {
+    return scheduler.yield();
+  }
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
 // Devuelve { annotatedText, anchors: Map<id,{cfi,chapter}>, tokenEstimate, blockCount }.
 export async function segmentBook(book, onProgress) {
   await book.ready;
@@ -32,7 +51,9 @@ export async function segmentBook(book, onProgress) {
       if (tocLabel) { currentChapter = tocLabel; lines.push(`\n## ${tocLabel}`); }
 
       const blocks = doc.body.querySelectorAll(BLOCK_SELECTOR);
+      let desdeLaUltimaCesion = 0;
       for (const el of blocks) {
+        if (++desdeLaUltimaCesion >= BLOQUES_POR_TANDA) { desdeLaUltimaCesion = 0; await cederHilo(); }
         const text = collapse(el.textContent);
         if (!text || text.length < 2) continue;
 

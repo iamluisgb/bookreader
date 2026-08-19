@@ -4,7 +4,6 @@ import * as Highlights from './highlights.js';
 import * as EpubReader from './epub-reader.js';
 import * as PdfReader from './pdf-reader.js';
 import * as Storage from './storage.js';
-import * as AiPanel from './ai/panel.js';
 import * as AiDB from './ai/db.js';
 import { hydrateIcons } from './ui/icons.js';
 import { countBookWords, countPdfWords, updateProgressDetail } from './progress.js';
@@ -12,7 +11,6 @@ import { initHighlights, setupHighlights, setupPdfSelection, drawPdfHighlights, 
 import { initBookmarkButton, updateBookmarkButton, renderBookmarks } from './bookmarks-ui.js';
 import * as Library from './library/view.js';
 import * as LibStore from './library/store.js';
-import * as AppSettings from './ui/app-settings.js';
 import * as Search from './search.js';
 import { escapeHtml } from './ui/escape.js';
 import { openImageZoom } from './image-zoom.js';
@@ -25,11 +23,66 @@ import * as License from './license.js';
 import { toast } from './ai/toast.js';
 import * as Jobs from './ai/jobs.js';
 import { t, translateDom } from './i18n.js';
+import { prefetchVendor } from './vendor-loader.js';
+import { restoreSheetSnap } from './ai/sheet-height.js';
+import { repairGatewayConfig } from './ai/gateway-repair.js';
+
+// ============ CARGA PEREZOSA ============
+// Módulos grandes que NO hacen falta para pintar la biblioteca. Con imports estáticos
+// entraban en la cascada de arranque —cuatro rondas secuenciales de descubrimiento
+// antes del primer pixel—; con `import()` solo se piden cuando se usan. Sigue sin
+// haber bundler (ADR-023): es `import()` nativo sobre los mismos módulos ES.
+
+// Ajustes de la app (~72 KB): siempre lo abre un clic, nunca el arranque.
+async function openAppSettings(seccion) {
+  const AppSettings = await import('./ui/app-settings.js');
+  return AppSettings.open(seccion);
+}
+
+// Panel del agente (~470 KB con su subárbol: mapa mental, flashcards, feynman,
+// study, resumen). Se calienta en tiempo ocioso tras el primer pintado, y quien lo
+// necesita antes lo espera: `panel()` devuelve siempre el módulo ya cargado, así que
+// el orden de las llamadas —incluido `setBook`, que arbitra el cambio de libro con su
+// propio `bookSeq`— se mantiene tal cual estaba.
+// `panel()` resuelve al módulo YA inicializado: init() monta el DOM del panel y engancha
+// sus listeners, y todo lo demás (setOpen, setBook, quoteSelection) lo da por hecho. Al
+// centralizarlo aquí, el orden es el mismo que cuando init() corría en el arranque.
+let aiPanelPromise = null;
+function panel() {
+  if (!aiPanelPromise) {
+    aiPanelPromise = import('./ai/panel.js').then((AiPanel) => {
+      AiPanel.init({ onCite: goToLocator });
+      return AiPanel;
+    });
+  }
+  return aiPanelPromise;
+}
+
+// Calienta en tiempo OCIOSO los dos módulos grandes que un clic puede pedir en
+// cualquier momento. Ya no están en la ruta crítica —la biblioteca se pinta sin
+// ellos—, pero para cuando el usuario pulsa ✨ o Ajustes suelen estar en memoria, así
+// que la apertura sigue siendo inmediata. Quien llegue antes los espera igual.
+//
+// Ajustes no tiene nada que hacer en el arranque (su única responsabilidad de arranque,
+// reparar la config rota del agente, vive ahora en ai/gateway-repair.js), así que se
+// carga entero bajo demanda. Se calienta en tiempo ocioso para que el clic siga
+// abriéndolo al instante.
+function calentarModulosGrandes() {
+  const idle = window.requestIdleCallback || ((fn) => setTimeout(fn, 1500));
+  idle(() => { import('./ui/app-settings.js').catch(() => {}); });
+}
 
 // ============ INIT ============
 document.addEventListener('DOMContentLoaded', () => {
   // i18n (P15): traduce el chrome estático ANTES de cualquier init que lea/pinte el DOM.
   translateDom();
+  // Alto del sheet del agente: se repone YA, sin cargar el panel (que va perezoso). Si
+  // esperase a él, el sheet saltaría de la altura por defecto a la guardada.
+  restoreSheetSnap();
+  // Config del agente en un estado imposible (token del gateway con otra base URL): se
+  // repara AL ARRANCAR. Quien lo tiene no puede arreglarlo desde la UI, así que no vale
+  // esperar a que abra el panel —que ahora se carga perezoso—. Ver ai/gateway-repair.js.
+  repairGatewayConfig();
   // Fase 0 sync: backfill de uid/updatedAt en datos previos + purga de
   // tombstones caducados. Asíncrono y no bloqueante; idempotente.
   migrateSchema()
@@ -55,6 +108,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initLibrary();
   initRouter();
   registerServiceWorker();
+  calentarModulosGrandes();
 });
 
 // Sync Fase 2: motor automático (pull→merge→push) + badge de estado + re-render
@@ -78,7 +132,7 @@ function initSyncEngine() {
   });
   // Token revocado: el badge lleva directo a Ajustes → Datos para reconectar.
   badge.addEventListener('click', () => {
-    if (badge.dataset.state === 'reconnect') AppSettings.open('data');
+    if (badge.dataset.state === 'reconnect') openAppSettings('data');
   });
 
   // Un merge remoto cambió datos: refrescar las listas de la sidebar en sitio y
@@ -116,7 +170,7 @@ function initLicense() {
       toast({
         message: t('Tu licencia Pro dejó de ser válida. Tus datos siguen intactos.'),
         actionLabel: t('Ver licencia'),
-        onAction: () => AppSettings.open('license'),
+        onAction: () => openAppSettings('license'),
         kind: 'error',
         timeout: 12000,
       });
@@ -322,9 +376,9 @@ function initLibrary() {
   Library.init({
     onOpenBook: openLibraryBook,
     onAddBook: () => document.getElementById('file-input').click(),
-    onOpenSettings: () => AppSettings.open(),
+    onOpenSettings: () => openAppSettings(),
   });
-  document.getElementById('open-app-settings')?.addEventListener('click', () => AppSettings.open('agent'));
+  document.getElementById('open-app-settings')?.addEventListener('click', () => openAppSettings('agent'));
   document.getElementById('library-btn')?.addEventListener('click', () => goToLibrary());
   initReadingMode();
   // En móvil, cerrar o cambiar de app congela la PWA sin avisar: volcar el progreso
@@ -380,12 +434,13 @@ function updateFormatScopedUI() {
 async function goToLibrary({ fromRoute = false } = {}) {
   if (!fromRoute) writeRoute(null, null);   // entra en el historial: atrás vuelve aquí
   await flushProgress();                    // progreso pendiente antes de soltar el libro
+  EpubReader.flushLastPosition();           // y la posición, que también va con rebote
   currentBook = null;                       // ya no hay libro abierto (para el router)
   document.body.classList.remove('reading', 'immersive', 'fs', 'scroll-mode');   // salir del modo lectura
   // Cerrar las sidebars de la vista de libro (índice + agente): no deben verse sobre
   // la biblioteca (van en z-index alto, por encima de la vista de estantería).
   document.getElementById('sidebar')?.classList.remove('open');
-  AiPanel.setOpen(false);
+  aiSetOpen(false);
   EpubReader.updateReaderScale();   // quita la escala del viewport (vuelve a 1)
   // Salir de pantalla completa nativa si estábamos en ella (inmersivo móvil).
   try {
@@ -410,6 +465,9 @@ function openLibraryBook(record) {
 async function openBookRecord(record, { fromRoute = false, loc = null } = {}) {
   try {
     Library.hide();
+    // La lib del formato empieza a bajar YA, en paralelo con leer el fichero de
+    // IndexedDB, en vez de en serie justo antes de renderizar (ver vendor-loader.js).
+    prefetchVendor(record.format === 'pdf' ? 'pdf' : 'epub');
     // El botón de volver a la biblioteca es visible desde YA, no al acabar la carga:
     // locations/portada/persistencia pueden tardar (o colgarse) en libros grandes y
     // el usuario tiene que poder salir siempre. goToLibrary lo vuelve a ocultar.
@@ -522,9 +580,14 @@ async function flushProgress() {
     // En PDF no hay CFI: leerlo aquí devolvería el del último EPUB abierto y lo
     // escribiría en la ficha del PDF. Se conserva el previo (null).
     const cfi = pending.format === 'pdf' ? null : EpubReader.getCurrentCfi();
-    const prev = await LibStore.getBook(pending.bookId);
-    const status = LibStore.statusFor(pending.pct, prev?.status);
-    await LibStore.updateBook(pending.bookId, { progress: pending.pct, lastCfi: cfi || prev?.lastCfi || null, status });
+    // Un solo paso por IndexedDB: el estado y el lastCfi previos se leen del MISMO
+    // registro que se va a escribir. Antes esto empezaba con un getBook() aparte, y
+    // cada lectura del registro arrastra el binario del libro entero (ver patchBook).
+    await LibStore.patchBook(pending.bookId, (prev) => ({
+      progress: pending.pct,
+      lastCfi: cfi || prev.lastCfi || null,
+      status: LibStore.statusFor(pending.pct, prev.status),
+    }));
   } catch (e) { /* sin persistencia */ }
 }
 
@@ -712,22 +775,43 @@ function initPdfTap() {
 }
 
 // ============ AI PANEL ============
+// El panel se carga con `import()` (ver panel()), así que init() es asíncrono. Los
+// listeners SÍ se registran ya, síncronos: los botones existen desde el HTML y un
+// clic durante la carga no puede perderse (el handler espera al módulo).
+//
+// `isOpen()` se lee del DOM (body.ai-open), no del módulo: así el toggle no tiene que
+// esperar a nada para saber en qué estado está.
+function aiIsOpen() { return document.body.classList.contains('ai-open'); }
+
+async function aiSetOpen(open) {
+  const AiPanel = await panel();
+  AiPanel.setOpen(open);
+}
+
 function initAiPanel() {
-  AiPanel.init({
-    onCite: goToLocator,
-  });
+  // El módulo se pide con `import()` —así no está en la cascada de dependencias que hay
+  // que resolver ANTES de ejecutar app.js, que era el objetivo—, pero su init() se lanza
+  // aquí, en el arranque, igual que siempre.
+  //
+  // No se difiere a tiempo ocioso, y la razón está medida: init() monta el panel,
+  // restaura los trabajos de IA en segundo plano y avisa al SyncEngine. Soltar esos
+  // efectos en un momento indeterminado le cambia el orden al primer ciclo de sync, y con
+  // dos dispositivos eso se traduce en un pull que llega tarde y una racha de estudio que
+  // no cruza (tests/sync-decks.spec.ts, reproducible 2 de cada 5). El arranque no espera
+  // a esto —no hay await—, así que el primer pintado sigue sin depender del panel.
+  panel().catch(e => console.warn('ai panel init:', e));
 
   document.getElementById('ai-toggle').addEventListener('click', () => {
-    AiPanel.setOpen(!AiPanel.isOpen());
+    aiSetOpen(!aiIsOpen());
   });
 
   // FAB (móvil): abre el agente.
-  document.getElementById('ai-fab')?.addEventListener('click', () => AiPanel.setOpen(true));
+  document.getElementById('ai-fab')?.addEventListener('click', () => aiSetOpen(true));
 
   // Backdrop: cierra cualquier drawer abierto (sidebar o agente).
   document.getElementById('scrim')?.addEventListener('click', () => {
     document.getElementById('sidebar')?.classList.remove('open');
-    AiPanel.setOpen(false);
+    aiSetOpen(false);
   });
 }
 
@@ -1045,7 +1129,7 @@ async function loadEpub(buffer, bookId, aiBookId, persist = null) {
     // biblioteca ANTES del guard de aborto: aunque el usuario salga o abra otro
     // libro a mitad de carga, este queda guardado y su segmentación cacheada bajo
     // SU id (el panel aísla segmentaciones tardías; ver book-switch.spec.ts).
-    AiPanel.setBook(EpubReader.getBook(), aiBookId, EpubReader.getTitle(), { author: EpubReader.getAuthor() });
+    (await panel()).setBook(EpubReader.getBook(), aiBookId, EpubReader.getTitle(), { author: EpubReader.getAuthor() });
     if (persist) {
       await persistToLibrary(aiBookId, buffer, 'epub', persist.fileName, bookId);
       Library.render();
@@ -1068,7 +1152,7 @@ async function loadEpub(buffer, bookId, aiBookId, persist = null) {
 
     // Generate locations for progress (may fail on some books)
     try {
-      await EpubReader.generateLocations();
+      await EpubReader.generateLocations(aiBookId);
       totalWords = countBookWords();
       // Las localizaciones se generan tras restaurar la posición, así que el %
       // mostraba 0 hasta moverse: lo refrescamos ya con las localizaciones.
@@ -1135,7 +1219,7 @@ async function loadPdf(buffer, bookId, aiBookId, persist = null, displayTitle = 
     // Alimentar al agente y (si viene de un archivo) guardar en biblioteca ANTES del
     // guard de aborto: aunque el usuario salga o abra otro libro a mitad de carga,
     // este queda guardado y su segmentación cacheada bajo SU id.
-    AiPanel.setBook(PdfReader.getDocument(), aiBookId, bookId || 'PDF', { format: 'pdf' });
+    (await panel()).setBook(PdfReader.getDocument(), aiBookId, bookId || 'PDF', { format: 'pdf' });
     if (persist) {
       await persistToLibrary(aiBookId, buffer, 'pdf', persist.fileName, bookId);
       Library.render();

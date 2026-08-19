@@ -16,6 +16,8 @@
 // los toques, caretRangeFromPoint y getClientRects). Solo al DIBUJAR sumamos el
 // desplazamiento del iframe para pasar a coordenadas de pantalla.
 
+import { rafThrottle } from './ui/raf.js';
+
 let callbacks = { onTap: () => {}, onImageTap: () => {}, onSelect: () => {}, onDismiss: () => {}, onSwipeMove: () => {}, onSwipeEnd: () => {} };
 export function configure(c) { callbacks = { ...callbacks, ...c }; }
 
@@ -221,8 +223,9 @@ function tapZone(x) {
   return f < 0.2 ? 'prev' : f > 0.8 ? 'next' : 'center';
 }
 
-// Reposiciona la capa si cambia el viewport mientras hay selección.
-window.addEventListener('resize', () => { if (active) draw(); });
+// Reposiciona la capa si cambia el viewport mientras hay selección. Una por frame: el
+// `resize` llega en ráfaga y cada draw() mide y repinta los tiradores.
+window.addEventListener('resize', rafThrottle(() => { if (active) draw(); }));
 
 export function attach(contents) {
   const doc = contents.document;

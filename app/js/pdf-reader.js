@@ -1,4 +1,5 @@
 import * as Storage from './storage.js';
+import { loadPdfJs } from './vendor-loader.js';
 
 let pdfjsLib = null;
 let pdfDoc = null;
@@ -11,6 +12,9 @@ let totalPages = 0;
 let onPageCallback = null;
 let readingMode = 'paginated';   // 'paginated' | 'scroll' (continuo), recordado por libro
 let lazyObserver = null;         // observer del render perezoso en modo scroll
+// Páginas que el observer da por cercanas (viewport + rootMargin). Es la lista corta
+// sobre la que onScroll decide cuál está centrada, en vez de recorrer el documento.
+const cercanas = new Set();
 let scrollRaf = 0;
 
 // ---- Zoom fluido (tipo Adobe): sin re-render ------------------------------
@@ -242,19 +246,31 @@ export function setZoom(z, focalClient) {
 }
 export function resetZoom() { setZoom(1); }
 
+// Síncrono: devuelve la lib SI ya está en memoria. Vale para todo lo que corre
+// durante el renderizado, que por definición sucede después de load().
 function getPdfjs() {
   if (pdfjsLib) return pdfjsLib;
   // El bundle (vendorizado) lo expone como window.pdfjsLib o window["pdfjs-dist/build/pdf"]
   pdfjsLib = window.pdfjsLib || window['pdfjs-dist/build/pdf'] || window['pdfjsLib'];
-  if (pdfjsLib) {
-    try {
-      // Worker local (mismo origen): funciona offline y bajo CSP worker-src 'self'.
-      pdfjsLib.GlobalWorkerOptions.workerSrc = 'vendor/pdf.worker-3.11.174.min.js';
-    } catch(e) {
-      console.warn('pdf.js worker setup error:', e);
-    }
-  }
+  if (pdfjsLib) configurarWorker();
   return pdfjsLib;
+}
+
+// El único sitio que puede encontrarse la lib SIN cargar es load(): pdf.js ya no viene
+// en el arranque, se pide al abrir el primer PDF (ver js/vendor-loader.js).
+async function ensurePdfjs() {
+  if (getPdfjs()) return pdfjsLib;
+  await loadPdfJs();
+  return getPdfjs();
+}
+
+function configurarWorker() {
+  try {
+    // Worker local (mismo origen): funciona offline y bajo CSP worker-src 'self'.
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'vendor/pdf.worker-3.11.174.min.js';
+  } catch(e) {
+    console.warn('pdf.js worker setup error:', e);
+  }
 }
 
 // "Cargado" = hay documento Y es el lector que está en pantalla (ver deactivate y el
@@ -287,7 +303,7 @@ export function deactivate() {
 }
 
 export async function load(arrayBuffer, onProgress) {
-  const lib = getPdfjs();
+  const lib = await ensurePdfjs();
   if (!lib) {
     throw new Error('pdf.js not loaded');
   }
@@ -598,14 +614,17 @@ async function renderScroll() {
     layer.appendChild(wrapper);
   }
 
+  cercanas.clear();
   lazyObserver = new IntersectionObserver((entries) => {
     for (const e of entries) {
       const wrapper = e.target;
       const n = +wrapper.dataset.page;
       if (e.isIntersecting) {
+        cercanas.add(wrapper);
         if (!wrapper.dataset.rendered) renderInto(wrapper, n);
-      } else if (wrapper.dataset.rendered) {
-        freeWrapper(wrapper);
+      } else {
+        cercanas.delete(wrapper);
+        if (wrapper.dataset.rendered) freeWrapper(wrapper);
       }
     }
   }, { root: container, rootMargin: '150% 0px' });
@@ -620,6 +639,12 @@ async function renderScroll() {
 }
 
 // Página actual en modo scroll = la más centrada en el viewport (throttle con rAF).
+//
+// Se mide SOLO lo que el IntersectionObserver dice que está cerca, no las `.pdf-page` del
+// documento entero. Antes eran un querySelectorAll y un getBoundingClientRect por página
+// en CADA frame de scroll: en un PDF de 600 páginas, 600 reflows forzados por frame para
+// averiguar cuál está en el centro. El observer ya lleva esa cuenta (con rootMargin 150%,
+// así que la centrada está siempre en el conjunto) y sale gratis.
 function onScroll() {
   if (scrollRaf) return;
   scrollRaf = requestAnimationFrame(() => {
@@ -629,12 +654,14 @@ function onScroll() {
     const cr = container.getBoundingClientRect();
     const midY = cr.top + container.clientHeight / 2;
     let best = currentPage, bestD = Infinity;
-    container.querySelectorAll('.pdf-page').forEach(el => {
+    // Si el observer aún no ha entregado su primer lote, se mira todo (una vez).
+    const candidatas = cercanas.size ? cercanas : container.querySelectorAll('.pdf-page');
+    for (const el of candidatas) {
       const r = el.getBoundingClientRect();
       const c = r.top + r.height / 2;
       const d = Math.abs(c - midY);
       if (d < bestD) { bestD = d; best = +el.dataset.page; }
-    });
+    }
     if (best !== currentPage) setCurrentPage(best);
     scheduleDetail();     // al parar el paneo, recubrir lo que ahora se ve
   });
@@ -642,6 +669,7 @@ function onScroll() {
 
 function teardownScroll() {
   const container = document.getElementById('pdf-container');
+  cercanas.clear();
   if (lazyObserver) { try { lazyObserver.disconnect(); } catch (e) {} lazyObserver = null; }
   if (container) container.removeEventListener('scroll', onScroll);
 }

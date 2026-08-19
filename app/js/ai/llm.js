@@ -8,12 +8,14 @@
 // scripts inyectados.
 import * as Storage from '../storage.js';
 import { t } from '../i18n.js';
+import { GATEWAY_BASE_URL, isGatewayUrl as esUrlGateway, repairGatewayConfig } from './gateway-repair.js';
 
 const DEFAULT_BASE_URL = 'https://api.nan.builders/v1';
 
 // MON1 F3 · Gateway propio para la demo sin API key (ver workers/gateway y ADR-021).
 // El botón "Probar la demo" pide un token self-service y autoconfigura el proveedor.
-const GATEWAY_BASE_URL = 'https://bookreader-gateway.luisgonzalezb93.workers.dev/v1';
+// La URL y la reparación del estado roto viven en gateway-repair.js (lo necesita el
+// arranque, que ya no carga este módulo).
 const DEFAULT_MODEL = 'deepseek-v4-flash';
 // Tope de tokens de salida por respuesta. Antes era 2048 (~1500 palabras), que
 // cortaba en seco las respuestas largas (análisis del Artesano del Texto, etc.). Con
@@ -162,18 +164,13 @@ export function isDemo()          { return isGatewayUrl(getBaseUrl()); }
 // Igual que isDemo pero para una URL suelta: el formulario avanzado necesita saber si
 // lo que hay ESCRITO en el campo sigue siendo el gateway antes de decidir qué hacer
 // con una key vacía (el token de la demo no se enseña, así que vacío no es "bórralo").
-export function isGatewayUrl(u)   { return (u || '').trim().replace(/\/+$/, '') === GATEWAY_BASE_URL; }
+export function isGatewayUrl(u)   { return esUrlGateway(u); }
 
-// Reparación de un estado imposible: un token `br-…` es del gateway y solo vale ahí,
-// así que verlo junto a otra base URL significa que Ajustes lo movió de sitio (lo hacía
-// "Guardar" en la vista simple con la demo activa). El síntoma era 401 en todo, con el
-// usuario convencido de que la key de la demo nacía rota. Se restaura la demo en vez de
-// dejarla inservible; quien pegue su propia key lo pisa igual que siempre.
-if (/^br-/i.test(getKey().trim()) && !isGatewayUrl(getBaseUrl())) {
-  setBaseUrl(GATEWAY_BASE_URL);
-  setModel('bookreader-fast');
-  setVisionModel('');
-}
+// La reparación del token del gateway vive en ai/gateway-repair.js y la dispara el
+// ARRANQUE (app.js): este módulo ya no se carga al arrancar —viene con el panel, que es
+// perezoso— y quien tiene el estado roto no puede arreglarlo desde la UI. Se deja aquí
+// también por si llm.js se carga sin haber pasado por app.js (tests de unidad).
+repairGatewayConfig();
 
 // La vista simple solo sabe representar un preset o la demo. Una base URL propia
 // (BYOK contra un proveedor no listado) no cabe en ella: se fuerza la avanzada, o

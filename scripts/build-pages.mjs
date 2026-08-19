@@ -25,6 +25,33 @@ const dist = join(root, 'dist');
 
 const PUBLIC = ['index.html', 'sw.js', 'app', 'es', 'anki', 'privacy', 'assets'];
 
+// Rutas que NO se despliegan aunque cuelguen de PUBLIC. Siguen en el repo; lo que se
+// corta es publicarlas.
+//
+// `app/_proto` son 1,6 MB de capturas que se subían en cada despliegue sin que nada de
+// la app las pidiese. Sus dos únicos consumidores son páginas sueltas de prototipo
+// —`shelf-proto.html` (que en producción ya redirige) y `share-demo.html`—, a las que no
+// enlaza ni la app, ni la web, ni los tests: se quedan fuera con ellas, porque publicar
+// la página sin sus imágenes sería peor que no publicarla.
+const EXCLUIDOS = ['app/_proto', 'app/shelf-proto.html', 'app/share-demo.html'];
+
+// Cabeceras de Cloudflare Pages. Sin este fichero, Pages sirve TODO con
+// `cache-control: public, max-age=0, must-revalidate`, incluidas las libs versionadas
+// por nombre: la primera visita y cualquier ruta sin service worker revalidaban ~90
+// recursos. `vendor/` va a un año inmutable porque el nombre lleva la versión
+// (pdf-3.11.174.min.js) y una versión nueva es una URL nueva. Las fuentes y los iconos
+// NO llevan versión en el nombre, así que se quedan en una semana: recorta el tráfico
+// repetido sin dejar a nadie clavado con un icono viejo si se cambia.
+const HEADERS = `/app/vendor/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/app/fonts/*
+  Cache-Control: public, max-age=604800
+
+/app/icons/*
+  Cache-Control: public, max-age=604800
+`;
+
 const fromWorktree = process.argv.includes('--worktree');
 const forDeploy = process.argv.includes('--deploy');
 
@@ -81,12 +108,16 @@ if (fromWorktree) {
 await rm(dist, { recursive: true, force: true });
 await mkdir(dist, { recursive: true });
 
+const excluidosAbs = EXCLUIDOS.map((e) => join(src, e));
+
 for (const entry of PUBLIC) {
   await cp(join(src, entry), join(dist, entry), {
     recursive: true,
-    filter: (p) => !p.split('/').pop().startsWith('.'),
+    filter: (p) => !p.split('/').pop().startsWith('.') && !excluidosAbs.some(x => p === x || p.startsWith(x + '/')),
   });
 }
+
+await writeFile(join(dist, '_headers'), HEADERS);
 
 // Sello del build: responde "¿qué hay desplegado?" sin tener que adivinarlo
 // comparando ficheros contra el repo.

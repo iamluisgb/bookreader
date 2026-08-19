@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bookreader-v113';
+const CACHE_NAME = 'bookreader-v114';
 const ASSETS = [
   './',
   './index.html',
@@ -28,6 +28,9 @@ const ASSETS = [
   './fonts/source-serif-4-400.woff2',
   './fonts/source-serif-4-600.woff2',
   './js/app.js',
+  './js/vendor-loader.js',
+  './js/ai/sheet-height.js',
+  './js/ai/gateway-repair.js',
   './js/i18n.js',
   './js/storage.js',
   './js/license.js',
@@ -106,8 +109,35 @@ const ASSETS = [
   './icons/apple-touch-icon.png'
 ];
 
+// DOS cachés, a propósito:
+//
+//   CACHE_NAME     versionada a mano por despliegue. Código de la app.
+//   STATIC_CACHE   permanente. SOLO vendor/, que va versionado EN EL NOMBRE del fichero
+//                  (pdf-3.11.174.min.js): dos versiones distintas nunca comparten URL,
+//                  así que no hay nada que invalidar y guardarlo para siempre es exacto.
+//
+// Antes había una sola, y `activate` la purgaba entera en cada despliegue: cambiar una
+// línea de un .js obligaba a volver a bajar pdf.worker (1 MB), sql-wasm.wasm (648 KB) y
+// el resto de vendor. 2,5 MB reconstruidos para no cambiar ninguno de ellos.
+//
+// Lo que NO entra en la permanente, y es deliberado: fuentes e iconos (sus nombres NO
+// llevan versión: cambiar icon-192.png reutiliza la URL, y en una caché permanente
+// cache-first el icono viejo se quedaría para siempre), y build.json/manifest.json, que
+// cambian sin cambiar de nombre —build.json lleva el commit desplegado, que es justo lo
+// que comprueba el humo—. Todo eso sigue en la caché versionada, que un despliegue
+// renueva; son 116 KB de fuentes y unos iconos, no los megas que costaba vendor. El
+// tráfico de esos sí se recorta, pero por cabeceras HTTP (ver `_headers`).
+const STATIC_CACHE = 'bookreader-static';
+
+function esAssetVersionado(pathname) {
+  return /\/vendor\//.test(pathname);
+}
+
 self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(CACHE_NAME).then(precache));
+  event.waitUntil(Promise.all([
+    caches.open(CACHE_NAME).then(c => precache(c, ASSETS.filter(u => !esAssetVersionado(u)))),
+    caches.open(STATIC_CACHE).then(c => precache(c, ASSETS.filter(esAssetVersionado), { soloSiFalta: true })),
+  ]));
   self.skipWaiting();
 });
 
@@ -119,10 +149,17 @@ self.addEventListener('install', (event) => {
 //
 // Que la lista no se quede corta lo vigila tests/sw-precache.spec.ts: es a mano, y
 // ya se había desincronizado (tres módulos en uso sin precachear).
-async function precache(cache) {
+//
+// `soloSiFalta` es lo que hace barato el despliegue en la caché permanente: lo que ya
+// está guardado bajo esa URL es, por definición, el mismo contenido, así que no se
+// vuelve a pedir. Sin esto, dos cachés no ahorrarían nada.
+async function precache(cache, urls, { soloSiFalta = false } = {}) {
   const fallidos = [];
-  await Promise.all(ASSETS.map(async (url) => {
-    try { await cache.add(url); } catch { fallidos.push(url); }
+  await Promise.all(urls.map(async (url) => {
+    try {
+      if (soloSiFalta && await cache.match(url)) return;
+      await cache.add(url);
+    } catch { fallidos.push(url); }
   }));
   if (fallidos.length) console.warn('[sw] no se pudieron precachear:', fallidos);
 }
@@ -130,7 +167,12 @@ async function precache(cache) {
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
+      // Se purgan las generaciones VIEJAS de la caché de código. La permanente
+      // (STATIC_CACHE) sobrevive: su contenido no puede quedar obsoleto sin cambiar
+      // de URL, y rehacerla era el grueso del coste de cada despliegue.
+      Promise.all(keys
+        .filter(k => k !== CACHE_NAME && k !== STATIC_CACHE)
+        .map(k => caches.delete(k)))
     )
   );
   self.clients.claim();
@@ -182,7 +224,8 @@ self.addEventListener('fetch', (event) => {
   const p = url.pathname;
   const isAppCode = !isImmutableAsset(p) &&
     (req.mode === 'navigate' || p.endsWith('/') || /\.(?:html|js|css)$/.test(p));
+  const nombreCache = esAssetVersionado(p) ? STATIC_CACHE : CACHE_NAME;
   event.respondWith(
-    caches.open(CACHE_NAME).then(cache => isAppCode ? networkFirst(req, cache) : cacheFirst(req, cache)),
+    caches.open(nombreCache).then(cache => isAppCode ? networkFirst(req, cache) : cacheFirst(req, cache)),
   );
 });

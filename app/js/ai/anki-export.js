@@ -15,6 +15,8 @@
 // Una tarjeta es { type: 'basic'|'cloze', front, back, tags: [..] }. En las cloze,
 // `front` lleva el texto con huecos {{c1::...}} y `back` la nota extra (opcional).
 
+import { loadJsZip } from '../vendor-loader.js';
+
 // Ids FIJOS de modelo (timestamp arbitrario reservado): estables entre exports.
 const MODEL_BASIC_ID = 1751800000001;
 const MODEL_CLOZE_ID = 1751800000002;
@@ -172,7 +174,10 @@ CREATE INDEX ix_notes_csum ON notes (csum);
 // Construye el paquete .apkg y lo devuelve como Blob. `deckName` es el nombre del
 // mazo en Anki; `cards` la lista { type, front, back, tags }.
 export async function buildApkg(deckName, cards) {
-  if (!window.JSZip) throw new Error('JSZip no disponible');
+  // JSZip ya no viene en el arranque (ver js/vendor-loader.js): se pide aquí, igual
+  // que sql.js. En un EPUB ya estará cargada; en un PDF puede no estarlo.
+  const JSZip = await loadJsZip();
+  if (!JSZip) throw new Error('JSZip no disponible');
   const SQL = await loadSqlJs();
   const db = new SQL.Database();
   try {
@@ -205,7 +210,7 @@ export async function buildApkg(deckName, cards) {
       }
     }
 
-    const zip = new window.JSZip();
+    const zip = new JSZip();
     zip.file('collection.anki2', db.export());
     zip.file('media', '{}');
     return await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });

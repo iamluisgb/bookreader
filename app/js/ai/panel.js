@@ -8,6 +8,7 @@ import * as DB from './db.js';
 import * as EpubReader from '../epub-reader.js';
 import * as PdfReader from '../pdf-reader.js';
 import * as RegionSelect from '../region-select.js';
+import { SHEET_SNAPS, SHEET_KEY, applySheetSnap, getSheetSnap, restoreSheetSnap } from './sheet-height.js';
 import { getTemplate, objectiveTemplates, isValidField, isAgentFillable, agentFields, isCognitionField, ARTESANO_ID, INMERSIVA_ID } from './templates.js';
 import { icon } from '../ui/icons.js';
 import { t } from '../i18n.js';
@@ -1064,28 +1065,21 @@ export function __deliverVisionForTest(text, images) {
 // Se ENCAJA en una de las dos al soltar (no altura libre): en un móvil, una altura arbitraria
 // te deja siempre en un tamaño incómodo, y además así el estado es uno de dos y se puede
 // recordar entre sesiones.
-const SHEET_SNAPS = [52, 92];          // % de la altura visible (dvh)
-const SHEET_KEY = 'ui_ai_sheet_snap';
-let sheetSnap = SHEET_SNAPS[SHEET_SNAPS.length - 1];
-
+// Las alturas y el estado viven en ai/sheet-height.js: la repone el ARRANQUE, que ya no
+// carga este módulo (ver app.js). Aquí queda el tirador, que sí es cosa del panel.
 function isSheet() { return window.matchMedia('(max-width: 767px)').matches; }
-
-function applySheetSnap(pct) {
-  sheetSnap = pct;
-  document.documentElement.style.setProperty('--ai-sheet-h', pct + 'dvh');
-}
 
 // Alto reservado por el sheet, para que quien deba dejar algo a la vista (el recorte de una
 // zona) sepa cuánta pantalla tiene libre de verdad.
 export function sheetReservedPx() {
   if (!isSheet() || !isOpen()) return 0;
-  return Math.round(window.innerHeight * sheetSnap / 100);
+  return Math.round(window.innerHeight * getSheetSnap() / 100);
 }
 
 function initSheetSnap() {
   const grab = document.getElementById('ai-sheet-grab');
   if (!grab) return;
-  applySheetSnap(Storage.get(SHEET_KEY, SHEET_SNAPS[SHEET_SNAPS.length - 1]));
+  restoreSheetSnap();
 
   let startY = 0, startPct = 0, moved = false;
   const pctFor = (clientY) => {
@@ -1104,7 +1098,7 @@ function initSheetSnap() {
     try { grab.releasePointerCapture(e.pointerId); } catch { /* ya liberado */ }
     document.body.classList.remove('sheet-dragging');
     // Un toque sin arrastre ALTERNA; un arrastre encaja en la altura más cercana.
-    const target = moved ? pctFor(e.clientY) : (sheetSnap === SHEET_SNAPS[0] ? SHEET_SNAPS[1] : SHEET_SNAPS[0]);
+    const target = moved ? pctFor(e.clientY) : (getSheetSnap() === SHEET_SNAPS[0] ? SHEET_SNAPS[1] : SHEET_SNAPS[0]);
     const nearest = moved
       ? SHEET_SNAPS.reduce((a, b) => (Math.abs(b - target) < Math.abs(a - target) ? b : a))
       : target;
@@ -1114,7 +1108,7 @@ function initSheetSnap() {
   grab.addEventListener('pointerdown', (e) => {
     if (!isSheet()) return;
     e.preventDefault();
-    startY = e.clientY; startPct = sheetSnap; moved = false;
+    startY = e.clientY; startPct = getSheetSnap(); moved = false;
     try { grab.setPointerCapture(e.pointerId); } catch { /* sin captura: sigue funcionando */ }
     document.body.classList.add('sheet-dragging');
     grab.addEventListener('pointermove', onMove);

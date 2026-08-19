@@ -14,6 +14,16 @@ async function bootDevice(context: BrowserContext, state: DriveState): Promise<P
   await seedDriveToken(context);
   const page = await context.newPage();
   await page.goto('/');
+  // El motor lanza un sync SOLO por arrancar (engine.js · startDelayMs = 1500 ms). Si no
+  // se le espera, ese ciclo cae en mitad de lo que el test guiona —entre el push de un
+  // dispositivo y el pull del otro— y el resultado depende de lo rápido que haya cargado
+  // la página, no de lo que se está probando. Se le deja terminar ANTES de tocar nada, y
+  // a partir de ahí los únicos ciclos son los que el test pide.
+  await page.waitForTimeout(1800);
+  await page.evaluate(async () => {
+    const Engine: any = await import('/js/sync/engine.js');
+    await Engine.syncNow();
+  });
   return page;
 }
 

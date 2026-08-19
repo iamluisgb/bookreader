@@ -4,6 +4,8 @@ import * as Bookmarks from './bookmarks.js';
 import * as Highlights from './highlights.js';
 import * as Storage from './storage.js';
 import * as TouchSelect from './touch-select.js';
+import { loadEpubJs } from './vendor-loader.js';
+import * as AiDB from './ai/db.js';
 
 // En táctil reimplementamos la selección de texto (los tiradores nativos de
 // epub.js están rotos en columnas). En escritorio usamos la selección nativa.
@@ -433,6 +435,7 @@ export function restoredSavedPosition() {
 // segmentar, con su caché vacía (tests/book-switch.spec.ts). El libro se libera cuando
 // otro EPUB ocupa su sitio en load().
 export function deactivate() {
+  flushLastPosition();   // el rebote no debe cruzarse con el libro que viene detrás
   active = false;
   claimSeq++;                // una carga en vuelo sabrá que la han jubilado
   lastChapterLabel = null;   // IA2: nuevo libro → reinicia el seguimiento de capítulo
@@ -441,6 +444,7 @@ export function deactivate() {
 }
 
 export async function load(arrayBuffer, onProgress) {
+  flushLastPosition();   // vaciar lo del libro anterior ANTES de soltarlo
   const mine = ++claimSeq;
   active = true;
   if (book) {
@@ -453,11 +457,22 @@ export async function load(arrayBuffer, onProgress) {
   restoredSaved = false;
 
   console.log('Creating ePub book from ArrayBuffer...');
+  // epub.js (+ jszip) se carga aquí, no en el arranque: hasta que no se abre un EPUB
+  // no hace falta. Ver js/vendor-loader.js.
+  const ePub = await loadEpubJs();
   book = ePub(arrayBuffer);
 
   console.log('Waiting for book.ready...');
   await book.ready;
   console.log('Book ready');
+
+  // Otro lector se llevó la pantalla mientras esto cargaba (abrir un EPUB y, sin
+  // esperar, un PDF): NO tocar los contenedores. Seguir adelante escondía el
+  // #pdf-container que el PDF acababa de mostrar y dejaba la pantalla en blanco.
+  // El libro queda cargado a propósito —`book` sigue en pie—, porque el agente aún
+  // tiene que segmentarlo bajo SU id (ver book-switch.spec.ts); lo que se corta es
+  // solo el montaje de la UI, que ya no es de este libro.
+  if (claimSeq !== mine) { active = false; return book; }
 
   const container = document.getElementById('epub-container');
   container.innerHTML = '';
@@ -734,7 +749,26 @@ function updateChapterInfo() {
   }
 }
 
+// Guardado de la posición, con rebote.
+//
+// Se llamaba en cada `relocated`, o sea en CADA pase de página, y hace dos
+// localStorage.setItem —que son síncronos y bloquean el hilo— más un evento que despierta
+// al SyncEngine, justo mientras corre la animación de página. Con rebote se escribe una
+// vez cuando el lector se para, que es cuando la posición significa algo.
+//
+// El rebote NO puede costar la posición: en móvil la PWA muere sin avisar. Por eso se
+// vacía al ocultarse la pestaña, igual que ya hacía el progreso en app.js.
+const SAVE_POS_MS = 400;
+let savePosTimer = 0;
+
 function saveLastPosition() {
+  clearTimeout(savePosTimer);
+  savePosTimer = setTimeout(flushLastPosition, SAVE_POS_MS);
+}
+
+export function flushLastPosition() {
+  clearTimeout(savePosTimer);
+  savePosTimer = 0;
   if (book && currentCfi) {
     try {
       const key = book.key ? book.key() : 'default';
@@ -747,6 +781,13 @@ function saveLastPosition() {
     }
   }
 }
+
+// `pagehide` cubre lo que `visibilitychange` no ve en iOS (volver al escritorio matando
+// la app). Ambos son idempotentes: si no hay nada pendiente, no escriben.
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') flushLastPosition();
+});
+window.addEventListener('pagehide', flushLastPosition);
 
 export function prev() {
   releasePin();
@@ -953,9 +994,24 @@ export function getCurrentTocHref() {
   return match;
 }
 
-export async function generateLocations() {
-  if (book) {
-    await book.locations.generate(1024);
+// `bookId` es el hash del fichero (el id canónico). Con él, las locations se guardan tras
+// generarlas y se reponen en las aperturas siguientes: generarlas recorre el libro ENTERO
+// y se rehacía cada vez. Sin id (aperturas sueltas que aún no lo han calculado) se
+// comporta como antes y simplemente las genera.
+export async function generateLocations(bookId) {
+  if (!book) return;
+  if (bookId) {
+    try {
+      const guardadas = await AiDB.loadLocations(bookId);
+      // `load()` devuelve las locations ya pobladas; si el formato no le cuadra, lanza y
+      // caemos a generarlas, que es el camino de siempre.
+      if (guardadas) { book.locations.load(guardadas); if (book.locations.length()) return; }
+    } catch (e) { console.warn('locations guardadas no válidas, se regeneran:', e); }
+  }
+  await book.locations.generate(1024);
+  if (bookId) {
+    try { await AiDB.saveLocations(bookId, book.locations.save()); }
+    catch (e) { console.warn('no se pudieron guardar las locations:', e); }
   }
 }
 
