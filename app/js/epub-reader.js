@@ -53,10 +53,18 @@ function resizeToContainer() {
   rendition.resize(container.clientWidth, container.clientHeight);
 }
 
-// Re-paginar al cambiar el tamaño del área de lectura (p. ej. al entrar/salir
-// del modo inmersivo, que libera el alto de la cabecera y el pie).
+// Re-paginar al cambiar el tamaño del área de lectura (modo inmersivo/pantalla completa,
+// tirador de los paneles, apertura y cierre de la sidebar).
+//
+// Re-ajusta YA —para que el texto siga al gesto sin latencia— y además AGENDA el reflujo
+// anclado al pin. Antes solo hacía lo primero, y esa era la vía por la que se perdía la
+// página: el re-ajuste re-pagina, epub.js emite 'relocated' con el inicio de la página
+// nueva (que cae ANTES de donde estabas) y, sin pin puesto, ese CFI se adoptaba y se
+// guardaba. Medido en pantalla completa: entrar movía la posición de /80 a /58 y salir de
+// /58 a /48 — hacia atrás y ACUMULATIVO, un poco en cada alternancia.
 export function resize() {
   resizeToContainer();
+  scheduleResize();
 }
 
 // ---- Navegación táctil sobre el contenido ---------------------------------
@@ -259,18 +267,13 @@ function registerTapHandler(contents) {
   doc.addEventListener('mousemove', () => onActivityCb(), { passive: true });
 }
 
-export function init() {
-  if (settingsListenerRegistered) return;
-  settingsListenerRegistered = true;
-  window.addEventListener('settings:changed', (e) => {
-    // Resize first so epub.js re-paginates, then re-apply theme to the new frames
-    resizeToContainer();
-    applyTheme();
-  });
-
-  // Re-paginate on any viewport change (debounced). Covers rotation, the mobile
-  // browser chrome collapsing/expanding, and resizing the standalone PWA window.
-  const scheduleResize = () => {
+// Reflujo anclado, DEBOUNCED. Es el único camino por el que puede re-paginarse sin perder
+// la página, y lo comparten todas las causas: giro, barra del navegador, PWA redimensionada,
+// pantalla completa, paneles y cambios de ajustes (cuerpo de letra, interlineado, ancho de
+// columna). El debounce importa: durante el arrastre de un panel esto se llama en cada
+// frame, y re-mostrar el CFI en cada uno sería inasumible — se re-ajusta en caliente y solo
+// al parar se ancla.
+function scheduleResize() {
     clearTimeout(resizeTimer);
     // Al girar la pantalla, rendition.resize() re-pagina pero epub.js conserva el
     // OFFSET visual, no la posición: a otro ancho ese mismo offset cae en otro punto
@@ -295,7 +298,25 @@ export function init() {
         saveLastPosition();
       }
     }, 250);
-  };
+}
+
+export function init() {
+  if (settingsListenerRegistered) return;
+  settingsListenerRegistered = true;
+  window.addEventListener('settings:changed', () => {
+    // Re-ajustar primero para que epub.js re-pagine, luego re-aplicar el tema a los frames
+    // nuevos. Y anclar: cambiar el cuerpo de letra reflúa el contenido DENTRO del iframe
+    // sin cambiar el tamaño del contenedor, así que `rendition.resize()` se cortocircuita
+    // (mismas dimensiones) y la vista se queda medida a lo viejo — medido: el contenido
+    // pasaba a 204450 px con el iframe todavía en 90720. El display(pin) del reflujo la
+    // rehace y devuelve la página donde estaba.
+    resizeToContainer();
+    applyTheme();
+    scheduleResize();
+  });
+
+  // Cualquier cambio de viewport (giro, chrome del navegador que se pliega, PWA
+  // redimensionada) entra por el mismo sitio.
   window.addEventListener('resize', scheduleResize);
   window.addEventListener('orientationchange', scheduleResize);
 }

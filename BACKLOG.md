@@ -1409,6 +1409,49 @@ gating (el retrieval vacío no disparaba el agéntico). Complementan a los ya ex
 `retrieval.spec.ts` y `chapter-event.spec.ts`.
 
 
+### TEC5 — La posición de lectura vive en OTRO espacio de ids que el resto · `M` · **abierto**
+**Síntoma:** la página de lectura no cruza bien entre dispositivos, aunque los subrayados sí.
+
+**Causa (verificada con `buildSnapshot()`).** La posición del EPUB se guarda bajo
+`lastPosition_<book.key()>`, y `book.key()` de epub.js es
+`epubjs:<versión>:<dc:identifier del OPF>` — no el **SHA-256 del fichero**, que es el id
+canónico de todo lo demás (biblioteca, subrayados, marcadores, convos, mazos, alias). Medido
+con `tests/test.epub`, el snapshot que sube al proveedor contiene un **libro fantasma**:
+
+```
+{ id: "epubjs:0.3:9780525566533",
+  claves: ["lastPosition_epubjs:0.3:9780525566533", "lastPositionAt_…"],
+  titulo: null }
+```
+
+Sin título y sin fichero, separado del libro de verdad. Consecuencias, de menor a mayor:
+1. **La reconciliación de alias no le llega.** [`sync/aliases.js`](app/js/sync/aliases.js) exige
+   `/^[0-9a-f]{64}$/` para considerar un id canónico. El caso que la app ya resuelve para los
+   subrayados —el mismo libro descargado de dos mirrors, con hash distinto— deja la posición
+   fuera: cruzan los subrayados y no cruza la página.
+2. **Los EPUB sin `dc:identifier` COLISIONAN.** `key()` cae a `this.url.filename`, que al abrir
+   desde un ArrayBuffer es cadena vacía (comprobado): la clave queda en `epubjs:0.3:` para
+   **todos** ellos → comparten una única posición y se pisan entre libros distintos.
+3. El manifest acumula entradas fantasma sin título ni fichero.
+
+_(El PDF tiene el mismo patrón con `pdfDoc.fingerprints[0]` en vez del hash — mismo diagnóstico,
+mismo arreglo.)_
+
+**Arreglo propuesto — `S` de código, `M` por la migración.** Guardar la posición bajo el **id
+canónico**, igual que todo lo demás, y migrar lo que ya existe. Lo delicado no es el cambio sino
+que estas claves **ya están sincronizadas en el Drive de los usuarios**:
+- Migración perezosa al abrir el libro: si existe `lastPosition_<clave vieja>` y no existe la
+  nueva, copiar y **dejar la vieja** una temporada (un dispositivo sin actualizar sigue
+  escribiendo en ella; borrarla resucitaría la posición vieja en el siguiente sync).
+- Al leer, ganar por `lastPositionAt` entre ambas: es el mismo LWW de escalares que ya usa
+  [`sync/layout.js`](app/js/sync/layout.js), sin campos nuevos en el esquema.
+- Purgar las entradas fantasma del manifest en una limpieza posterior, no en el mismo cambio.
+- Test obligatorio: dos dispositivos con **hash distinto del mismo libro** (el caso que ya
+  cubre `sync-two-devices.spec.ts` para subrayados) tienen que converger también en la página.
+
+**No hacerlo a la ligera:** tocar claves ya sincronizadas es la vía más rápida a perder posiciones
+de usuarios reales. La parte de código es media hora; la migración es el trabajo.
+
 ### TEC3 — Arnés de medición de rendimiento del lector · **✓ (2026-08-19)** `S`
 **Hecho:** [`tests/perf.spec.ts`](tests/perf.spec.ts) (`npm run perf`, etiqueta `@perf`, fuera de
 `npm test`). Fixtures pesadas reales vía `npm run eval:fixtures` (Pro Git, 14 MB, 21 secciones
