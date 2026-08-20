@@ -69,6 +69,7 @@ export function setupHighlights() {
       showHighlightTooltip(cfiRange, text, rect);
     });
     EpubReader.onSelectionDismiss(() => hideHighlightTooltip());
+    EpubReader.onSelectionMove(followSelection);
     return;
   }
 
@@ -118,30 +119,47 @@ function removeTempSelection(rendition) {
   tempSelCfi = null;
 }
 
-// Coloca la barra de selección junto al rect de la selección (coords de pantalla).
-// Compartido por EPUB y PDF.
+// Coloca la barra junto al rect (coords de pantalla), con la barra YA medida. Separado de
+// positionTooltip porque al desplazarse hay que recolocarla en cada frame, y ahí volver a
+// pasar por el display/visibility/rAF haría parpadear.
+function placeTooltip(tooltip, rect) {
+  const tw = tooltip.offsetWidth, th = tooltip.offsetHeight;
+  let cx = rect.left + rect.width / 2;
+  let top = rect.top - th - 10;
+  if (top < 10) top = rect.top + rect.height + 10;   // debajo si no cabe arriba
+  const left = Math.max(10, Math.min(cx - tw / 2, window.innerWidth - tw - 10));
+  top = Math.max(10, Math.min(top, window.innerHeight - th - 10));
+  tooltip.style.left = left + 'px';
+  tooltip.style.top = top + 'px';
+}
+
+// Muestra la barra de selección junto al rect. Compartido por EPUB y PDF.
 function positionTooltip(tooltip, rect) {
   tooltip.style.display = 'flex';
   tooltip.style.visibility = 'hidden';
   requestAnimationFrame(() => {
-    const tw = tooltip.offsetWidth, th = tooltip.offsetHeight;
     // Sin rect no hay nada mejor que el centro; antes se llegaba aquí en silencio siempre
     // que la lectura de la selección fallaba, y la barra aparecía arriba en medio sin
     // relación con lo marcado. Ahora se avisa, porque es un fallo, no un caso normal.
-    let cx = window.innerWidth / 2, top = 100;
     if (rect) {
-      cx = rect.left + rect.width / 2;
-      top = rect.top - th - 10;
-      if (top < 10) top = rect.top + rect.height + 10;   // debajo si no cabe arriba
+      placeTooltip(tooltip, rect);
     } else {
       console.warn('barra de selección sin rect: se coloca centrada');
+      const tw = tooltip.offsetWidth, th = tooltip.offsetHeight;
+      tooltip.style.left = Math.max(10, window.innerWidth / 2 - tw / 2) + 'px';
+      tooltip.style.top = Math.max(10, Math.min(100, window.innerHeight - th - 10)) + 'px';
     }
-    let left = Math.max(10, Math.min(cx - tw / 2, window.innerWidth - tw - 10));
-    top = Math.max(10, Math.min(top, window.innerHeight - th - 10));
-    tooltip.style.left = left + 'px';
-    tooltip.style.top = top + 'px';
     tooltip.style.visibility = 'visible';
   });
+}
+
+// La selección se ha movido bajo la barra (desplazamiento del lector): se la lleva con ella.
+// Los rects GUARDADOS del subrayado son fraccionales sobre la página, así que sobreviven al
+// scroll solos; lo único que hay que refrescar es el ancla de la barra.
+function followSelection(rect) {
+  if (!rect || !isTooltipVisible()) return;
+  if (pdfPending) pdfPending.rect = rect;
+  placeTooltip(document.getElementById('highlight-tooltip'), rect);
 }
 
 // Acciones de agente de la barra de selección (idénticas en EPUB y PDF): preguntar con el
@@ -322,6 +340,7 @@ export function setupPdfSelection() {
         showPdfSelectionTooltip(cap);
       },
       onDismiss: () => hideHighlightTooltip(),
+      onMove: followSelection,
     });
     wireHighlightEditTap(container);
     return;

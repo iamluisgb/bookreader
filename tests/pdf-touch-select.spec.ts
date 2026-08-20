@@ -114,3 +114,59 @@ test('la selección nativa está desactivada en táctil', async ({ page }) => {
   // encima de la barra de acciones.
   expect(v).toBe('none');
 });
+
+// La capa de selección es `position: fixed` y se dibuja una vez, en coordenadas de PANTALLA.
+// El PDF, en cambio, vive en un contenedor con `overflow: auto`. Al desplazarse con la
+// selección puesta, el texto se movía y el resaltado se quedaba clavado donde estaba: bandas
+// azules a un lado del texto y la barra de acciones flotando lejos de lo marcado.
+test('al desplazarse, el resaltado sigue pegado al texto', async ({ page }) => {
+  await abrir(page);
+  // En modo SCROLL, que es donde el contenedor se desplaza de verdad (en paginado la página
+  // cabe entera y `scrollHeight === clientHeight`, así que no probaría nada).
+  await page.evaluate(async () => {
+    const R: any = await import('/js/pdf-reader.js');
+    await R.setReadingMode('scroll');
+  });
+  await page.waitForTimeout(1200);
+  const L = await lineas(page);
+  await seleccionar(page, (L[0].left + L[0].right) / 2, L[0].cy, (L[2].left + L[2].right) / 2, L[2].cy);
+  await expect(page.locator('#highlight-tooltip')).toBeVisible();
+
+  // Distancia entre el resaltado y el texto que cubre, antes y después de desplazar. Es lo
+  // que tiene que NO cambiar; comparar posiciones absolutas no diría nada, porque las dos
+  // cosas se mueven.
+  const separacion = () => page.evaluate(() => {
+    const hi = document.querySelector('#ts-overlay .ts-hi') as HTMLElement;
+    const tt = document.getElementById('highlight-tooltip')!;
+    const spans = [...document.querySelectorAll('#pdf-container .textLayer span')] as HTMLElement[];
+    const i = spans.findIndex((s, k) => k > 4 && s.textContent!.startsWith('Lorem'));
+    const a = hi.getBoundingClientRect(), b = spans[i].getBoundingClientRect();
+    const t = tt.getBoundingClientRect();
+    return { dx: a.left - b.left, dy: a.top - b.top, barra: t.top - b.top };
+  });
+
+  const antes = await separacion();
+  const movido = await page.evaluate(() => {
+    const c = document.getElementById('pdf-container')!;
+    const t0 = c.scrollTop;
+    c.scrollTop += 30;
+    c.dispatchEvent(new Event('scroll'));
+    return c.scrollTop - t0;
+  });
+  expect(movido, 'el contenedor no se desplazó: el test no probaría nada').toBeGreaterThan(20);
+  await page.waitForTimeout(300);
+  const despues = await separacion();
+
+  expect(Math.abs(despues.dx - antes.dx), 'el resaltado se quedó atrás en horizontal').toBeLessThan(2);
+  expect(Math.abs(despues.dy - antes.dy), 'el resaltado se quedó atrás en vertical').toBeLessThan(2);
+  // Y la barra de acciones va con ellos: quedarse flotando lejos de lo marcado era la otra
+  // mitad del síntoma.
+  // Y la barra de acciones va con ellos: quedarse flotando lejos de lo marcado era la otra
+  // mitad del síntoma. Se desplaza POCO a propósito — con un salto grande la selección se sale
+  // por arriba y la barra se ancla al borde de la pantalla, que es lo correcto pero no es lo
+  // que aquí se quiere medir.
+  const enPantalla = await page.evaluate(() =>
+    document.querySelector('#ts-overlay .ts-hi')!.getBoundingClientRect().top > 0);
+  expect(enPantalla, 'la selección se salió de la pantalla: el caso medido sería el del recorte').toBe(true);
+  expect(Math.abs(despues.barra - antes.barra), 'la barra se quedó atrás').toBeLessThan(2);
+});

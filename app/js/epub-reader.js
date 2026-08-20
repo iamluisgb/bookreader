@@ -88,8 +88,11 @@ export function onImageTap(cb) { onImageTapCb = cb || (() => {}); }
 // ---- Selección de texto (táctil) ------------------------------------------
 let onSelectCb = () => {};
 let onSelectDismissCb = () => {};
+let onSelectMoveCb = () => {};
 export function onSelect(cb) { onSelectCb = cb || (() => {}); }
 export function onSelectionDismiss(cb) { onSelectDismissCb = cb || (() => {}); }
+// La selección se ha movido bajo la barra (reflujo o desplazamiento): la barra la sigue.
+export function onSelectionMove(cb) { onSelectMoveCb = cb || (() => {}); }
 export function clearSelection() { try { TouchSelect.dismiss(); } catch (e) {} }
 export function isCoarsePointer() { return COARSE; }
 
@@ -99,6 +102,7 @@ if (COARSE) {
     onImageTap: (img) => onImageTapCb(img),
     onSelect: (sel) => onSelectCb(sel),
     onDismiss: () => onSelectDismissCb(),
+    onMove: (rect) => onSelectMoveCb(rect),
     onSwipeMove: (dx) => swipeMove(dx),
     onSwipeEnd: (dx) => swipeEnd(dx),
   });

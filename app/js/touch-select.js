@@ -21,7 +21,7 @@ import { rafThrottle } from './ui/raf.js';
 import { frameTransform, toScreen, anchorRect } from './ui/frame-rect.js';
 import * as Engine from './ui/selection-engine.js';
 
-let callbacks = { onTap: () => {}, onImageTap: () => {}, onSelect: () => {}, onDismiss: () => {}, onSwipeMove: () => {}, onSwipeEnd: () => {} };
+let callbacks = { onTap: () => {}, onImageTap: () => {}, onSelect: () => {}, onDismiss: () => {}, onMove: () => {}, onSwipeMove: () => {}, onSwipeEnd: () => {} };
 export function configure(c) { callbacks = { ...callbacks, ...c }; }
 
 const LONGPRESS_MS = 380;   // pulsación larga que inicia la selección
@@ -122,13 +122,23 @@ function tapZone(x) {
   return f < 0.2 ? 'prev' : f > 0.8 ? 'next' : 'center';
 }
 
-// Reposiciona la capa si cambia el viewport mientras hay selección. Una por frame: el
-// `resize` llega en ráfaga y cada draw() mide y repinta los tiradores.
-window.addEventListener('resize', rafThrottle(() => { if (active) draw(); }));
+// Reposiciona la capa si cambia el viewport o si el contenido se desplaza mientras hay
+// selección. El scroll importa en modo continuo: la capa es `fixed` y en coordenadas de
+// pantalla, así que sin esto el resaltado se queda clavado y el texto se va. Una pasada por
+// frame: resize y scroll llegan en ráfaga y cada draw() mide y repinta los tiradores.
+const alMoverse = rafThrottle(() => {
+  if (!active || !active.range) return;
+  draw();
+  const r = screenRect(active.range);
+  if (r) callbacks.onMove(r);
+});
+window.addEventListener('resize', alMoverse);
 
 export function attach(contents) {
   const doc = contents.document;
   injectStyles(doc);
+  doc.addEventListener('scroll', alMoverse, { passive: true });
+  if (doc.defaultView) doc.defaultView.addEventListener('scroll', alMoverse, { passive: true });
 
   let downX = 0, downY = 0, downT = 0, moved = false;
   let lpTimer = null, lpStarted = false, dragging = null, swiping = false;

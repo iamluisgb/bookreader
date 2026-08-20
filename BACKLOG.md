@@ -1617,7 +1617,18 @@ cayeron dos tests de `pdf.spec.ts`. Tenían razón: `isCoarsePointer()` mira el 
 así que un portátil con pantalla táctil (o un iPad con ratón) reporta puntero fino y entra por el
 camino nativo **con gestos de dedo**. El `touchend` se queda ahí.
 
-**Tests** — `tests/pdf-touch-select.spec.ts` (3). El del ajuste por líneas se verificó
+**Corregido el mismo día (reportado con captura)**: al desplazarse con la selección puesta, el
+resaltado se quedaba clavado y la barra flotaba lejos de lo marcado. La capa se pinta en
+coordenadas de **pantalla** (`position: fixed`) y solo se redibujaba al **redimensionar**; el PDF
+vive en un contenedor con `overflow: auto`. Medido: 30 px de desplazamiento = 30 px de deriva,
+exactamente. Ahora se redibuja al desplazar —una pasada por frame, `rafThrottle`— y la barra va
+detrás. El EPUB tenía el mismo agujero latente en modo continuo y se ha tapado igual, con un
+`onSelectionMove` nuevo en `epub-reader`. `positionTooltip` se parte en dos: `placeTooltip` coloca
+con la barra ya medida, porque recolocarla en cada frame pasando por el `display`/`visibility`/rAF
+la haría parpadear. Los rects GUARDADOS del subrayado son fraccionales sobre la página, así que
+sobreviven al scroll solos: lo único que había que refrescar era el ancla de la barra.
+
+**Tests** — `tests/pdf-touch-select.spec.ts` (4). El del ajuste por líneas se verificó
 desactivando la regla: falla. Que estos tests puedan existir es parte del argumento — con las
 asas nativas no se podía simular nada.
 

@@ -25,11 +25,12 @@
 // este modelo encaja con el almacenamiento sin adaptador de por medio.
 import * as Engine from './ui/selection-engine.js';
 import { cursorEnPunto } from './pdf-text-select.js';
+import { rafThrottle } from './ui/raf.js';
 
 const LONGPRESS_MS = 380;   // igual que en el EPUB: el gesto debe sentirse el mismo
 const MOVE_CANCEL = 12;     // px que cancelan la pulsación larga (=scroll de la página)
 
-let callbacks = { onSelect: () => {}, onDismiss: () => {} };
+let callbacks = { onSelect: () => {}, onDismiss: () => {}, onMove: () => {} };
 let active = null;   // { pagina, spans, ini, fin, anclaIdx, anclaOff, ajustando }
 
 // --- líneas y orden visual ---------------------------------------------------
@@ -140,6 +141,17 @@ function pintar() {
   Engine.draw(rectsDelTramo(active.spans, active.ini, active.fin), Engine.IDENTIDAD);
 }
 
+// El resaltado se pinta en una capa `fixed`, en coordenadas de PANTALLA, y el PDF vive en un
+// contenedor con `overflow: auto`. Sin esto, desplazarse con la selección puesta dejaba las
+// bandas azules clavadas donde estaban —a un lado del texto— y la barra de acciones flotando
+// lejos de lo marcado. Una pasada por frame: el scroll llega en ráfaga.
+const alDesplazar = rafThrottle(() => {
+  if (!active) return;
+  pintar();
+  const rects = rectsDelTramo(active.spans, active.ini, active.fin);
+  if (rects[0]) callbacks.onMove(rects[0]);
+});
+
 function entregar() {
   if (!active) return;
   const { spans, ini, fin, pagina } = active;
@@ -168,6 +180,9 @@ export function install(container, cbs) {
   callbacks = { ...callbacks, ...(cbs || {}) };
   if (container.dataset.touchSelWired) return;
   container.dataset.touchSelWired = '1';
+  container.addEventListener('scroll', alDesplazar, { passive: true });
+  window.addEventListener('scroll', alDesplazar, { passive: true });
+  window.addEventListener('resize', alDesplazar);
 
   let downX = 0, downY = 0, movido = false;
   let lpTimer = null, lpIniciado = false, tirador = null;
