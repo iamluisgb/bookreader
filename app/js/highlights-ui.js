@@ -17,6 +17,7 @@ import { toast } from './ai/toast.js';
 import { whenLabel, fullWhen } from './ui/when.js';
 import { toScreen, anchorRect } from './ui/frame-rect.js';
 import * as PdfTextSelect from './pdf-text-select.js';
+import * as PdfTouchSelect from './pdf-touch-select.js';
 
 const DEFAULT_COLOR = '#ffd54f';
 
@@ -289,7 +290,8 @@ export function hideHighlightTooltip() {
   clearTimeout(outsideTimer);
   document.removeEventListener('click', hideHighlightTooltipOnOutside);
   removeTempSelection();
-  try { EpubReader.clearSelection(); } catch (e) {}   // overlay táctil, si lo hay
+  try { EpubReader.clearSelection(); } catch (e) {}   // overlay táctil del EPUB, si lo hay
+  try { PdfTouchSelect.dismiss(); } catch (e) {}      // y el del PDF
   try { lastSelWin && lastSelWin.getSelection().removeAllRanges(); } catch (e) {}  // selección nativa (escritorio)
   try { window.getSelection().removeAllRanges(); } catch (e) {}  // selección nativa del PDF (documento padre)
   lastSelWin = null;
@@ -304,6 +306,27 @@ export function setupPdfSelection() {
   if (!container || container.dataset.selWired) return;
   container.dataset.selWired = '1';   // no re-atar en cada render/página
 
+  // Táctil: la selección la lleva la app entera (pdf-touch-select), igual que en el EPUB. Las
+  // asas NATIVAS no se pueden gobernar —su arrastre no emite eventos a la página— y sobre una
+  // capa de spans en absoluto se disparaban en cuanto el dedo pasaba por un hueco.
+  if (EpubReader.isCoarsePointer && EpubReader.isCoarsePointer()) {
+    PdfTouchSelect.install(container, {
+      onSelect: (sel) => {
+        const cap = {
+          text: dehyphenate(sel.text),
+          rect: sel.rect,
+          rects: fractionalFromRects(sel.rectsPantalla, sel.wrapper),
+          page: sel.page,
+        };
+        pdfPending = cap;
+        showPdfSelectionTooltip(cap);
+      },
+      onDismiss: () => hideHighlightTooltip(),
+    });
+    wireHighlightEditTap(container);
+    return;
+  }
+
   // La selección con ratón se acota a la mancha de texto: sin esto, arrancar el arrastre en
   // un margen ancla donde el DOM le parece y se traga media página (ver pdf-text-select.js).
   PdfTextSelect.install(container);
@@ -316,19 +339,13 @@ export function setupPdfSelection() {
   }, 0);
 
   container.addEventListener('mouseup', onSelectEnd);
+  // `touchend` sigue atado AQUÍ, en el camino nativo, aunque el táctil de verdad se haya ido
+  // a pdf-touch-select: `isCoarsePointer()` mira el puntero PRIMARIO, así que un portátil con
+  // pantalla táctil (o un iPad con ratón) reporta puntero fino y entra por este camino con
+  // gestos de dedo.
   container.addEventListener('touchend', onSelectEnd);
+  wireHighlightEditTap(container);
 
-  // Pulsar un subrayado ya hecho abre la barra en modo edición. La capa de subrayados no
-  // captura eventos a propósito (la de texto, encima, debe seguir siendo seleccionable),
-  // así que en vez de escuchar en el rectángulo se comprueba dónde ha caído el clic contra
-  // los rects guardados de esa página. Si hay selección viva, es un gesto de seleccionar.
-  container.addEventListener('click', (e) => {
-    const sel = window.getSelection();
-    if (sel && !sel.isCollapsed) return;
-    const hit = pdfHighlightAt(e.clientX, e.clientY);
-    if (!hit) return;
-    openHighlightEditor(hit.id ?? hit.cfi, hit.rect);
-  });
 
   // EL BUG DEL MÓVIL: al mantener pulsado, el navegador selecciona UNA PALABRA y ahí llega el
   // `touchend` → capturábamos esa palabra. Después el usuario arrastra las ASAS para extender
@@ -356,6 +373,21 @@ export function setupPdfSelection() {
         positionTooltip(document.getElementById('highlight-tooltip'), pdfPending.rect);
       }
     }, SELECTION_SETTLE_MS);
+  });
+}
+
+// Pulsar un subrayado ya hecho abre la barra en modo edición. La capa de subrayados no
+// captura eventos a propósito (la de texto, encima, debe seguir siendo seleccionable), así
+// que en vez de escuchar en el rectángulo se comprueba dónde ha caído el clic contra los
+// rects guardados de esa página. Si hay selección viva, es un gesto de seleccionar.
+function wireHighlightEditTap(container) {
+  container.addEventListener('click', (e) => {
+    const sel = window.getSelection();
+    if (sel && !sel.isCollapsed) return;
+    if (PdfTouchSelect.hasSelection()) return;
+    const hit = pdfHighlightAt(e.clientX, e.clientY);
+    if (!hit) return;
+    openHighlightEditor(hit.id ?? hit.cfi, hit.rect);
   });
 }
 
@@ -420,11 +452,17 @@ function capturePdfSelection() {
 // Rectángulos de la selección en coordenadas FRACCIONALES (0..1) de la página del PDF, para
 // re-pintarlos nítidos a cualquier escala/HiDPI (el canvas se re-renderiza al cambiar zoom).
 export function pdfFractionalRects(range, wrapper) {
+  return fractionalFromRects([...range.getClientRects()], wrapper);
+}
+
+// Rectángulos de PANTALLA → fraccionales sobre la página. La selección táctil no produce un
+// rango del DOM (ver pdf-touch-select.js), así que entra por aquí con los rects ya hechos.
+export function fractionalFromRects(rects, wrapper) {
   wrapper = wrapper || document.querySelector('#pdf-container .pdf-page');
   if (!wrapper) return [];
   const wr = wrapper.getBoundingClientRect();
   if (!wr.width || !wr.height) return [];
-  return [...range.getClientRects()]
+  return rects
     .map(r => ({
       left: (r.left - wr.left) / wr.width,
       top: (r.top - wr.top) / wr.height,

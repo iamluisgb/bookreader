@@ -12,57 +12,24 @@
 // El resaltado y los tiradores se pintan en una capa del documento PADRE,
 // encima del iframe, para no depender de cómo epub.js desplaza las columnas.
 //
-// Toda la geometría de ENTRADA va en coordenadas del iframe (lo que devuelven
-// los toques, caretRangeFromPoint y getClientRects). Al DIBUJAR se pasa a coordenadas de
-// pantalla con ui/frame-rect.js —offset Y escala, porque el viewport del lector se encoge
-// cuando las barras están a la vista— y el hit-test de los tiradores se hace también en
-// pantalla, contra el círculo que se ve, no contra una posición paralela.
+// La capa de dibujo, los tiradores y las utilidades de rango son COMUNES con la selección
+// táctil del PDF y viven en ui/selection-engine.js. Aquí queda lo propio del EPUB: el gesto
+// —que compite con el pase de página y con el toque en una imagen— y el paso a coordenadas
+// de pantalla, que en el EPUB lleva la escala del viewport (ver ui/frame-rect.js).
 
 import { rafThrottle } from './ui/raf.js';
-import { frameTransform, toScreen, usableRects, anchorRect } from './ui/frame-rect.js';
+import { frameTransform, toScreen, anchorRect } from './ui/frame-rect.js';
+import * as Engine from './ui/selection-engine.js';
 
 let callbacks = { onTap: () => {}, onImageTap: () => {}, onSelect: () => {}, onDismiss: () => {}, onSwipeMove: () => {}, onSwipeEnd: () => {} };
 export function configure(c) { callbacks = { ...callbacks, ...c }; }
 
 const LONGPRESS_MS = 380;   // pulsación larga que inicia la selección
 const MOVE_CANCEL = 10;     // px de movimiento que cancela la pulsación (=scroll)
-const HANDLE_HIT = 26;      // radio de toque para agarrar un tirador (px de pantalla)
-// Centro del círculo de cada tirador respecto a su línea, en px de pantalla. Sale de las
-// reglas de #ts-overlay de más abajo (::after a -32/+16 con 16 px de diámetro): el agarre
-// se comprueba EXACTAMENTE donde está pintado el círculo.
-const HANDLE_CY_START = -24;
-const HANDLE_CY_END = 24;
 const SWIPE_START = 10;     // px horizontales que inician el arrastre de página
 
 // Estado de la selección activa (una a la vez).
 let active = null;  // { contents, doc, range, anchor }
-let overlay = null; // capa de dibujo en el documento padre
-
-function ensureOverlay() {
-  if (overlay) return overlay;
-  overlay = document.createElement('div');
-  overlay.id = 'ts-overlay';
-  overlay.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:150;display:none;';
-  overlay.innerHTML = `
-    <div class="ts-hilayer"></div>
-    <div class="ts-handle ts-start"></div>
-    <div class="ts-handle ts-end"></div>`;
-  document.body.appendChild(overlay);
-  if (!document.getElementById('ts-overlay-style')) {
-    const s = document.createElement('style');
-    s.id = 'ts-overlay-style';
-    s.textContent = `
-      #ts-overlay .ts-hi { position:absolute; background:rgba(100,181,246,0.40); border-radius:2px; }
-      #ts-overlay .ts-handle { position:absolute; width:0; height:0; }
-      #ts-overlay .ts-handle::before { content:''; position:absolute; left:-1px; width:2px; height:18px; background:#2563eb; }
-      #ts-overlay .ts-handle::after  { content:''; position:absolute; left:-8px; width:16px; height:16px; border-radius:50%; background:#2563eb; box-shadow:0 1px 3px rgba(0,0,0,.3); }
-      #ts-overlay .ts-start::before { top:-18px; }   #ts-overlay .ts-start::after { top:-32px; }
-      #ts-overlay .ts-end::before   { top:0; }        #ts-overlay .ts-end::after   { top:16px; }`;
-    document.head.appendChild(s);
-  }
-  return overlay;
-}
-
 // Desactiva la selección nativa dentro del contenido (solo táctil).
 function injectStyles(doc) {
   if (doc.getElementById('ts-content-style')) return;
@@ -94,102 +61,18 @@ function caretAt(doc, x, y) {
   return null;
 }
 
-// Char-class de limites de palabra con unicode intencionado para la seleccion.
-// eslint-disable-next-line no-irregular-whitespace, no-useless-escape
-const WORD_RE = /[^\s .,;:!?¡¿"'«»()\[\]{}—–\-]/;
-
-function expandToWord(doc, node, offset) {
-  if (!node || node.nodeType !== 3) return null;
-  const t = node.textContent;
-  let s = offset, e = offset;
-  while (s > 0 && WORD_RE.test(t[s - 1])) s--;
-  while (e < t.length && WORD_RE.test(t[e])) e++;
-  if (s === e) {                       // cayó en espacio/puntuación → palabra siguiente
-    while (e < t.length && !WORD_RE.test(t[e])) e++;
-    s = e;
-    while (e < t.length && WORD_RE.test(t[e])) e++;
-  }
-  if (s === e) return null;
-  const r = doc.createRange();
-  r.setStart(node, s); r.setEnd(node, e);
-  return r;
-}
-
-// Rango ordenado entre un punto ancla (fijo) y el punto foco (móvil).
-function orderedRange(doc, aNode, aOff, fNode, fOff) {
-  const r = doc.createRange();
-  try {
-    r.setStart(aNode, aOff);
-    if (r.comparePoint(fNode, fOff) >= 0) r.setEnd(fNode, fOff);
-    else { r.setEnd(aNode, aOff); r.setStart(fNode, fOff); }
-  } catch (e) { return null; }
-  return r;
-}
+const expandToWord = Engine.expandToWord;
+const orderedRange = Engine.orderedRange;
 
 // --- dibujo (capa del padre, coords de pantalla) ----------------------------
 function draw() {
   if (!active || !active.range) return;
-  const o = ensureOverlay();
-  o.style.display = 'block';
-  const tr = frameTransform();
-  const rects = usableRects(active.range);
-  // resaltado
-  const hl = o.querySelector('.ts-hilayer');
-  hl.innerHTML = '';
-  for (const r of rects) {
-    const s = toScreen(r, tr);
-    const d = document.createElement('div');
-    d.className = 'ts-hi';
-    d.style.left = s.left + 'px';
-    d.style.top = s.top + 'px';
-    d.style.width = s.width + 'px';
-    d.style.height = s.height + 'px';
-    hl.appendChild(d);
-  }
-  // Tiradores en los extremos. Se toman de los rects USABLES: `getClientRects()` mete
-  // rects de ancho cero en los saltos de línea y de columna, y coger uno de esos como
-  // extremo ponía el tirador donde no hay texto.
-  if (rects.length) {
-    const first = rects[0], last = rects[rects.length - 1];
-    const fs = toScreen(first, tr);
-    const ls = toScreen({ left: last.right, top: last.top, width: 0, height: last.height }, tr);
-    const hs = o.querySelector('.ts-start'), he = o.querySelector('.ts-end');
-    hs.style.left = fs.left + 'px';
-    hs.style.top = fs.top + 'px';
-    hs.style.height = fs.height + 'px';
-    he.style.left = ls.left + 'px';
-    he.style.top = ls.top + 'px';
-    he.style.height = ls.height + 'px';
-  }
+  Engine.draw(Engine.usableRects(active.range), frameTransform());
 }
 
-// Centros de los círculos de los tiradores, en coordenadas de PANTALLA.
-function handlePoints() {
-  const rects = usableRects(active.range);
-  if (!rects.length) return null;
-  const tr = frameTransform();
-  const first = rects[0], last = rects[rects.length - 1];
-  const fs = toScreen(first, tr);
-  const ls = toScreen({ left: last.right, top: last.top, width: 0, height: last.height }, tr);
-  return {
-    start: { x: fs.left, y: fs.top + HANDLE_CY_START },
-    end:   { x: ls.left, y: ls.top + HANDLE_CY_END },
-  };
-}
-
-// (x, y) llegan en coordenadas del IFRAME —es donde ocurre el toque—; se pasan a pantalla
-// para compararlas con los círculos dibujados.
 function hitHandle(x, y) {
   if (!active || !active.range) return null;
-  const p = handlePoints();
-  if (!p) return null;
-  const t = frameTransform();
-  const sx = t.x + x * t.sx, sy = t.y + y * t.sy;
-  const ds = Math.hypot(sx - p.start.x, sy - p.start.y);
-  const de = Math.hypot(sx - p.end.x, sy - p.end.y);
-  if (ds <= HANDLE_HIT && ds <= de) return 'start';
-  if (de <= HANDLE_HIT) return 'end';
-  return null;
+  return Engine.hitHandle(Engine.usableRects(active.range), frameTransform(), x, y);
 }
 
 function setActive(contents, range) {
@@ -224,7 +107,7 @@ function finalize() {
 
 export function dismiss() {
   active = null;
-  if (overlay) overlay.style.display = 'none';
+  Engine.hideOverlay();
   callbacks.onDismiss();
 }
 

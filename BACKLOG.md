@@ -1568,6 +1568,62 @@ devuelve el texto de la biblioteca que hay debajo.
 saltó al commitear porque `sw-precache.spec.ts` mira `git ls-files` y el fichero aún no estaba
 seguido. Añadidos los dos módulos y subido `CACHE_NAME` a v116.
 
+### TEC8 — Selección táctil propia en el PDF, con ajuste por líneas · **✓ (2026-08-20)** `L`
+
+**Síntoma**: en móvil, subrayar tres líneas de un PDF era una lotería — «se pierde y empieza a
+seleccionar mucho texto».
+
+**Causa**: la selección táctil del PDF era **100 % nativa** (no había `user-select: none` en la
+capa de texto para punteros gruesos), así que sufría el mismo defecto de raíz que TEC7 —el orden
+de los spans en el DOM no es el de la página— pero por una vía que no controlábamos: **el arrastre
+de un asa nativa no emite eventos táctiles a la página**, cosa ya medida y documentada en
+`setupPdfSelection`, que por eso tuvo que recurrir a `selectionchange`.
+
+**Lo que se descartó**: cualquier arreglo que conservara la selección nativa. Aunque acertara, no
+es verificable —las asas nativas no se pueden accionar desde los tests— y corregir la selección
+desde `selectionchange` es pelearse con el navegador en mitad del gesto.
+
+**Decisión**: tomar el control, como ya se hacía en el EPUB. Dos diferencias que salen de cómo es
+un PDF:
+
+1. **Ajuste por líneas.** Dentro de la línea donde empiezas, precisión de carácter; al cruzarla,
+   líneas **completas**. Con el dedo no se puede apuntar al carácter exacto tres líneas más abajo,
+   y «tres líneas» es lo que se quiere subrayar. Los tiradores siguen afinando por caracteres
+   después — gesto deliberado y con la selección ya a la vista.
+2. **La selección no es un rango del DOM.** Justamente porque el orden del DOM no es el de la
+   página, un `Range` de la línea A a la B se tragaría lo que hubiera entre medias. Se modela como
+   un tramo sobre las líneas en orden **visual**, y el texto y los rectángulos se construyen
+   recorriéndolo, con un rango **por span**. Encaja con el almacenamiento sin adaptador: el
+   subrayado de PDF ya se guarda como rectángulos fraccionales, no como rango.
+
+**Implementación**:
+
+- `app/js/ui/selection-engine.js` — extraído de `touch-select.js`: capa de dibujo, tiradores,
+  hit-test del agarre y utilidades de rango. Lo que **no** se extrajo es el gesto: el del EPUB
+  compite con el pase de página y el toque en una imagen, el del PDF no, y un tronco común habría
+  salido más enrevesado que las dos versiones. `draw`/`handlePoints`/`hitHandle` toman
+  **rectángulos**, no un rango, precisamente por el punto 2.
+- `app/js/pdf-touch-select.js` — el adaptador del PDF. Agrupa los spans en líneas por
+  solapamiento vertical (no por `top` exacto: dentro de una línea conviven versalitas,
+  superíndices y cambios de fuente, cada uno con su top).
+- `touch-select.js` pasa a ser el adaptador del EPUB (317 → 216 líneas), sin cambio de conducta:
+  `selection-geometry.spec.ts` sigue en verde.
+- `highlights-ui.js` bifurca en `setupPdfSelection`. `pdfFractionalRects` delega en un
+  `fractionalFromRects` nuevo, que es por donde entra la selección táctil.
+- CSS: `@media (pointer: coarse)` desactiva la selección nativa en la capa de texto.
+
+**Un detalle que costó un ciclo de tests**: al bifurcar quité el `touchend` del camino nativo, y
+cayeron dos tests de `pdf.spec.ts`. Tenían razón: `isCoarsePointer()` mira el puntero **primario**,
+así que un portátil con pantalla táctil (o un iPad con ratón) reporta puntero fino y entra por el
+camino nativo **con gestos de dedo**. El `touchend` se queda ahí.
+
+**Tests** — `tests/pdf-touch-select.spec.ts` (3). El del ajuste por líneas se verificó
+desactivando la regla: falla. Que estos tests puedan existir es parte del argumento — con las
+asas nativas no se podía simular nada.
+
+Se pierde: el menú del sistema en táctil (que aquí estorbaba, tapaba la barra) y la selección
+nativa para lectores de pantalla.
+
 ### TEC3 — Arnés de medición de rendimiento del lector · **✓ (2026-08-19)** `S`
 **Hecho:** [`tests/perf.spec.ts`](tests/perf.spec.ts) (`npm run perf`, etiqueta `@perf`, fuera de
 `npm test`). Fixtures pesadas reales vía `npm run eval:fixtures` (Pro Git, 14 MB, 21 secciones

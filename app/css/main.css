@@ -1052,6 +1052,17 @@ body:not(.scroll-mode) .epub-container .epub-view {
   background: rgba(79, 140, 255, 0.35);
 }
 
+/* En táctil la selección la lleva la app (pdf-touch-select.js): se desactiva la nativa para
+   que no compitan y para que no salga el menú del sistema, que tapa nuestra barra. */
+@media (pointer: coarse) {
+  .textLayer,
+  .textLayer span {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+}
+
 /* PDF3 · Overlay de subrayados: rectángulos (coords fraccionales → px) sobre el canvas.
    Multiply para que se vea como un marcador sobre el texto. No captura eventos: la capa de
    texto de encima sigue siendo seleccionable. */
