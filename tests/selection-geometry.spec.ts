@@ -217,3 +217,57 @@ test('se puede agarrar el tirador tocando donde se ve el círculo', async ({ pag
   const despues = await page.evaluate(() => (window as any).__sel.slice(-1)[0] || '');
   expect(despues.length, 'el tirador no se agarró: la selección no creció').toBeGreaterThan(antes.length);
 });
+
+// --- Umbrales del gesto en el EPUB -------------------------------------------
+// `MOVE_CANCEL` (cancela la pulsación larga) y `SWIPE_START` (inicia el pase de página)
+// valían 10 los DOS, así que un temblor de 11 px al posar el dedo hacía las dos cosas a la
+// vez: perdías la selección y encima se movía el libro.
+test.describe('umbrales del gesto táctil', () => {
+  test.use({ viewport: { width: 390, height: 780 }, hasTouch: true, isMobile: true });
+
+  // Gesto crudo sobre el iframe, desde el contexto del padre (epub.js recicla la vista y un
+  // contexto de frame guardado se destruye a medio test).
+  async function gesto(page: Page, dx: number, dy: number, esperaMs: number) {
+    return page.evaluate(async ([dx, dy, espera]) => {
+      const R: any = await import('/js/epub-reader.js');
+      const w = window as any;
+      w.__swipe = 0;
+      const previo = R.getCurrentCfi();
+      const f = document.querySelector('#epub-container iframe') as HTMLIFrameElement;
+      const d = f.contentDocument!;
+      const toque = (tipo: string, x: number, y: number) => {
+        const t = new Touch({ identifier: 9, target: d.body, clientX: x, clientY: y });
+        d.body.dispatchEvent(new TouchEvent(tipo, {
+          bubbles: true, cancelable: true,
+          touches: tipo === 'touchend' ? [] : [t],
+          changedTouches: [t], targetTouches: tipo === 'touchend' ? [] : [t],
+        }));
+      };
+      // Un punto con texto, a media pantalla.
+      const x0 = f.clientWidth / 2, y0 = f.clientHeight / 2;
+      toque('touchstart', x0, y0);
+      await new Promise((r) => setTimeout(r, 60));
+      toque('touchmove', x0 + dx, y0 + dy);          // el temblor
+      await new Promise((r) => setTimeout(r, espera));
+      const haySeleccion = !!document.querySelector('#ts-overlay .ts-hi');
+      const movido = getComputedStyle(document.getElementById('epub-container')!).transform;
+      toque('touchend', x0 + dx, y0 + dy);
+      return { haySeleccion, movido, previo };
+    }, [dx, dy, esperaMs] as any);
+  }
+
+  test('un temblor de 13 px no arranca a pasar página', async ({ page }) => {
+    await abrirConBarras(page);
+    // 13 px: por encima de MOVE_CANCEL (12), por debajo de SWIPE_START (18). Antes, con los
+    // dos a 10, esto ya estaba desplazando el libro.
+    const r = await gesto(page, 13, 0, 200);
+    expect(r.movido === 'none' || r.movido === '' || r.movido === 'matrix(1, 0, 0, 1, 0, 0)',
+      `el libro empezó a moverse con 13 px de temblor: ${r.movido}`).toBe(true);
+  });
+
+  test('una pulsación larga con 8 px de temblor sí selecciona', async ({ page }) => {
+    await abrirConBarras(page);
+    const r = await gesto(page, 8, 0, 600);   // > LONGPRESS_MS
+    expect(r.haySeleccion, 'un temblor de 8 px no debería impedir seleccionar').toBe(true);
+  });
+});

@@ -1635,6 +1635,48 @@ asas nativas no se podía simular nada.
 Se pierde: el menú del sistema en táctil (que aquí estorbaba, tapaba la barra) y la selección
 nativa para lectores de pantalla.
 
+### TEC9 — Auto-desplazamiento al seleccionar, umbrales del gesto, y una recursión escondida · **✓ (2026-08-20)** `M`
+
+**1 · Auto-desplazamiento (PDF).** La selección NATIVA se desplazaba sola al llegar al borde; al
+tomarle el control en TEC8 eso se perdió y no se repuso. Un párrafo que se sale por abajo quedaba
+inseleccionable: el dedo llega al borde de la pantalla y ahí se acaba. Ahora, sostenido contra el
+borde, el lector avanza solo —velocidad proporcional a lo dentro que esté el dedo en una banda de
+64 px, tope de 16 px por frame— y la selección **sigue creciendo con el dedo quieto**, porque bajo
+el mismo punto de pantalla hay texto nuevo en cada frame.
+
+Al hacerlo salió un segundo defecto: al arrastrar más allá del final de la página, el punto ya caía
+en la **página siguiente**, el span resuelto no estaba en el tramo y la selección dejaba de crecer
+justo cuando el desplazamiento empezaba. Un subrayado de PDF se guarda contra **una** página, así
+que el arrastre se clava a la suya: `cursorEnPagina` nuevo en `pdf-text-select.js`.
+
+**2 · Umbrales del gesto (EPUB).** `MOVE_CANCEL` y `SWIPE_START` valían **10 los dos**, así que un
+temblor de 11 px al posar el dedo cancelaba la pulsación larga **y** arrancaba a pasar página a la
+vez: perdías la selección y encima se movía el libro. Ahora 12 y 18, con una franja muerta entre
+medias — que es lo correcto: el dedo se ha movido un poco y todavía no se sabe qué quiere. Estaba
+anotado desde TEC6 sin hacer.
+
+**3 · Una recursión que llevaba ahí desde siempre.** `hideHighlightTooltip` suelta la selección
+táctil, y la selección táctil avisa de que se ha soltado llamando a `hideHighlightTooltip`. Es un
+ciclo. **Medido: 5047 llamadas anidadas en cada cierre de la barra**, hasta reventar la pila. No se
+veía porque la llamada va dentro de un `try/catch` que se tragaba el `RangeError`: el síntoma no
+era un error, eran 11 ms de trabajo inútil cada vez.
+
+Apareció investigando dos tests de `pdf.spec.ts` que fallaban **solo bajo carga** de la suite
+completa y pasaban aislados. Con el ciclo cortado dejaron de fallar, así que probablemente era la
+causa. El ciclo existía igual en el camino del EPUB desde que se escribió `touch-select.js`.
+
+El corte es no avisar cuando no hay nada que soltar. Se comprueba **en el aviso**, que es lo
+observable, y no en el tiempo ni en la profundidad de pila.
+
+**Tests** — `tests/pdf-touch-select.spec.ts` sube a 6 y `selection-geometry.spec.ts` a 5. Los tres
+nuevos fallan sin su arreglo (el de umbrales, con `SWIPE_START` a 10, mueve el libro 13 px).
+
+**Dos cosas que costaron un intento cada una en el test del borde**: las páginas del PDF de prueba
+miden ~450 px, así que a tamaño normal una cabe entera en pantalla, el dedo en el borde ya alcanza
+su última línea y no queda nada por descubrir — hace falta **zoom 2,6 y viewport bajo**. Y bajo
+carga el cambio de modo puede re-renderizar la capa de texto y dejarla vacía un instante: la
+medición espera a que haya algo que medir en vez de medir a ciegas.
+
 ### TEC3 — Arnés de medición de rendimiento del lector · **✓ (2026-08-19)** `S`
 **Hecho:** [`tests/perf.spec.ts`](tests/perf.spec.ts) (`npm run perf`, etiqueta `@perf`, fuera de
 `npm test`). Fixtures pesadas reales vía `npm run eval:fixtures` (Pro Git, 14 MB, 21 secciones

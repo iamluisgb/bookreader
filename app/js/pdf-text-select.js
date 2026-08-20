@@ -74,6 +74,17 @@ function spanMasCercano(pagina, x, y) {
   return mejor;
 }
 
+// El punto, pegado a la mancha de texto de una página concreta.
+function cursorAcotadoA(pagina, x, y) {
+  const r = spanMasCercano(pagina, x, y);
+  if (!r) return null;
+  // Medio píxel hacia dentro: justo en el borde el navegador puede resolver al vecino.
+  return cursorNativo(
+    Math.min(Math.max(x, r.left + 0.5), r.right - 0.5),
+    Math.min(Math.max(y, r.top + 0.5), r.bottom - 0.5),
+  );
+}
+
 // Cursor para un punto de pantalla, acotado a la mancha de texto de la página. Es LA regla
 // del módulo —los dos extremos del arrastre pasan por aquí— y por eso se exporta: los tests
 // la ejercitan sobre un layout sintético con un hueco grande, que es el caso que un PDF de
@@ -85,13 +96,20 @@ export function cursorEnPunto(x, y, paginaPorDefecto) {
 
   const pagina = paginaEn(x, y) || paginaPorDefecto;
   if (!pagina) return null;
-  const r = spanMasCercano(pagina, x, y);
-  if (!r) return null;
-  // Medio píxel hacia dentro: justo en el borde el navegador puede resolver al vecino.
-  return cursorNativo(
-    Math.min(Math.max(x, r.left + 0.5), r.right - 0.5),
-    Math.min(Math.max(y, r.top + 0.5), r.bottom - 0.5),
-  );
+  return cursorAcotadoA(pagina, x, y);
+}
+
+// Igual, pero clavado a UNA página. Lo usa el arrastre táctil: un subrayado de PDF se guarda
+// contra una sola página, así que la selección no puede saltar a la siguiente. Sin esto, al
+// arrastrar hasta el borde inferior el punto caía ya en la página de abajo, el span resuelto
+// no estaba en el tramo y la selección dejaba de crecer justo cuando el lector empezaba a
+// desplazarse solo.
+export function cursorEnPagina(x, y, pagina) {
+  if (!pagina) return null;
+  const el = document.elementFromPoint(x, y);
+  const span = el && el.closest ? el.closest('#pdf-container .textLayer span') : null;
+  if (span && pagina.contains(span)) return cursorNativo(x, y);
+  return cursorAcotadoA(pagina, x, y);
 }
 
 function alBajar(e) {

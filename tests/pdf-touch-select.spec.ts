@@ -26,8 +26,14 @@ async function abrir(page: Page) {
 async function lineas(page: Page) {
   return page.evaluate(() => {
     const spans = [...document.querySelectorAll('#pdf-container .textLayer span')] as HTMLElement[];
-    const i = spans.findIndex((s, k) => k > 4 && s.textContent!.startsWith('Lorem'));
-    if (i < 0) throw new Error('no se encontró el párrafo de referencia');
+    // Visible EN PANTALLA: con zoom alto el primer párrafo de la página puede haber quedado
+    // por encima del borde, y un toque ahí no cae sobre el texto.
+    const visible = (s: HTMLElement) => {
+      const r = s.getBoundingClientRect();
+      return r.top > 10 && r.bottom < window.innerHeight - 120;
+    };
+    const i = spans.findIndex((s, k) => k > 4 && s.textContent!.startsWith('Lorem') && visible(s));
+    if (i < 0) throw new Error('no se encontró el párrafo de referencia visible');
     return spans.slice(i, i + 4).map((s) => {
       const r = s.getBoundingClientRect();
       return { left: r.left, right: r.right, cy: r.top + r.height / 2, texto: s.textContent!.trim() };
@@ -135,7 +141,15 @@ test('al desplazarse, el resaltado sigue pegado al texto', async ({ page }) => {
   // Distancia entre el resaltado y el texto que cubre, antes y después de desplazar. Es lo
   // que tiene que NO cambiar; comparar posiciones absolutas no diría nada, porque las dos
   // cosas se mueven.
-  const separacion = () => page.evaluate(() => {
+  // Bajo carga, el cambio de modo y el propio scroll pueden re-renderizar la capa de texto y
+  // dejarla vacía un instante. Se espera a que haya algo que medir en vez de medir a ciegas.
+  const separacion = async () => {
+    await page.waitForFunction(() => {
+      const spans = [...document.querySelectorAll('#pdf-container .textLayer span')];
+      return !!document.querySelector('#ts-overlay .ts-hi') &&
+             spans.some((s, k) => k > 4 && s.textContent!.startsWith('Lorem'));
+    }, { timeout: 10000 });
+    return page.evaluate(() => {
     const hi = document.querySelector('#ts-overlay .ts-hi') as HTMLElement;
     const tt = document.getElementById('highlight-tooltip')!;
     const spans = [...document.querySelectorAll('#pdf-container .textLayer span')] as HTMLElement[];
@@ -143,7 +157,8 @@ test('al desplazarse, el resaltado sigue pegado al texto', async ({ page }) => {
     const a = hi.getBoundingClientRect(), b = spans[i].getBoundingClientRect();
     const t = tt.getBoundingClientRect();
     return { dx: a.left - b.left, dy: a.top - b.top, barra: t.top - b.top };
-  });
+    });
+  };
 
   const antes = await separacion();
   const movido = await page.evaluate(() => {
@@ -169,4 +184,76 @@ test('al desplazarse, el resaltado sigue pegado al texto', async ({ page }) => {
     document.querySelector('#ts-overlay .ts-hi')!.getBoundingClientRect().top > 0);
   expect(enPantalla, 'la selección se salió de la pantalla: el caso medido sería el del recorte').toBe(true);
   expect(Math.abs(despues.barra - antes.barra), 'la barra se quedó atrás').toBeLessThan(2);
+});
+
+// La selección NATIVA auto-desplazaba al llegar al borde; al tomar el control eso se perdió,
+// y un párrafo que se sale por abajo quedaba inseleccionable: el dedo llega al borde de la
+// pantalla y ahí se acaba. Ahora, sostenido contra el borde, el lector sigue solo.
+test('sostener el dedo contra el borde desplaza y la selección sigue creciendo', async ({ page }) => {
+  // Viewport bajo y zoom alto a propósito. Las páginas del PDF de prueba miden ~450 px: a
+  // tamaño normal una cabe entera en pantalla, el dedo en el borde ya alcanza su última línea
+  // y no queda nada por descubrir. Con zoom la página pasa a ser mucho más alta que la
+  // ventana, que es la situación en la que el auto-desplazamiento sirve para algo.
+  await page.setViewportSize({ width: 390, height: 400 });
+  await abrir(page);
+  await page.evaluate(async () => {
+    const R: any = await import('/js/pdf-reader.js');
+    await R.setReadingMode('scroll');
+    R.setZoom(2.6);
+  });
+  await page.waitForTimeout(1800);
+  await page.evaluate(() => { document.getElementById('pdf-container')!.scrollTop = 0; });
+  await page.waitForTimeout(300);
+  const L = await lineas(page);
+
+  // Pulsación larga y arrastre hasta MUY abajo, dentro de la banda del borde; y ahí el dedo
+  // se queda QUIETO. Todo lo que pase a partir de aquí es el auto-desplazamiento.
+  const res = await page.evaluate(async ([ax, ay]) => {
+    const cont = document.getElementById('pdf-container')!;
+    const toque = (tipo: string, x: number, y: number) => {
+      const t = new Touch({ identifier: 1, target: cont, clientX: x, clientY: y });
+      cont.dispatchEvent(new TouchEvent(tipo, {
+        bubbles: true, cancelable: true,
+        touches: tipo === 'touchend' ? [] : [t],
+        changedTouches: [t], targetTouches: tipo === 'touchend' ? [] : [t],
+      }));
+    };
+    const borde = window.innerHeight - 20;   // dentro de la banda de 64 px
+    toque('touchstart', ax, ay);
+    await new Promise((r) => setTimeout(r, 500));
+    toque('touchmove', ax, ay + 20);
+    await new Promise((r) => setTimeout(r, 40));
+    toque('touchmove', ax, borde);           // el dedo llega al borde…
+    const scroll0 = cont.scrollTop;
+    const alto0 = document.querySelectorAll('#ts-overlay .ts-hi').length;
+    await new Promise((r) => setTimeout(r, 700));   // …y se queda ahí, sin más eventos
+    const out = { scroll0, scroll1: cont.scrollTop, alto0, alto1: document.querySelectorAll('#ts-overlay .ts-hi').length };
+    toque('touchend', ax, borde);
+    return out;
+  }, [(L[0].left + L[0].right) / 2, L[0].cy]);
+
+  expect(res.scroll1 - res.scroll0, 'el lector no se desplazó solo').toBeGreaterThan(50);
+  expect(res.alto1, 'la selección dejó de crecer al parar el dedo').toBeGreaterThan(res.alto0);
+});
+
+// `hideHighlightTooltip` suelta la selección táctil, y la selección táctil avisa de que se ha
+// soltado llamando a `hideHighlightTooltip`. Es un CICLO: sin corte, cerrar la barra
+// encadenaba 5047 llamadas anidadas (medido) hasta reventar la pila. Y no se veía, porque la
+// llamada va dentro de un `try/catch` que se tragaba el RangeError — el síntoma era 11 ms de
+// trabajo inútil en cada cierre, no un error. El corte es no avisar cuando no hay nada que
+// soltar; se comprueba ahí, en el aviso, que es lo observable.
+test('soltar una selección que no existe no avisa a nadie (corta la recursión)', async ({ page }) => {
+  await abrir(page);
+  const avisos = await page.evaluate(async () => {
+    const P: any = await import('/js/pdf-touch-select.js');
+    const cont = document.getElementById('pdf-container')!;
+    const w = window as any;
+    w.__avisos = 0;
+    // install() refresca los callbacks aunque el contenedor ya esté atado.
+    P.install(cont, { onDismiss: () => { w.__avisos++; } });
+    P.dismiss();          // sin selección: no debe avisar
+    const sinSeleccion = w.__avisos;
+    return { sinSeleccion };
+  });
+  expect(avisos.sinSeleccion, 'avisó de un descarte que no había: el ciclo sigue abierto').toBe(0);
 });

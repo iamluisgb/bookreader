@@ -24,11 +24,16 @@
 // El subrayado de PDF ya se guarda como rectángulos fraccionales, no como rango, así que
 // este modelo encaja con el almacenamiento sin adaptador de por medio.
 import * as Engine from './ui/selection-engine.js';
-import { cursorEnPunto } from './pdf-text-select.js';
+import { cursorEnPagina } from './pdf-text-select.js';
 import { rafThrottle } from './ui/raf.js';
 
 const LONGPRESS_MS = 380;   // igual que en el EPUB: el gesto debe sentirse el mismo
 const MOVE_CANCEL = 12;     // px que cancelan la pulsación larga (=scroll de la página)
+// Auto-desplazamiento al arrastrar contra un borde. La selección NATIVA lo hacía sola; al
+// tomar el control había que reponerlo, o un párrafo que se sale por abajo es inseleccionable:
+// el dedo llega al borde de la pantalla y ahí se acaba.
+const BORDE = 64;           // banda desde el borde en la que empieza a desplazarse
+const VELOCIDAD_MAX = 16;   // px por frame pegado al borde (proporcional dentro de la banda)
 
 let callbacks = { onSelect: () => {}, onDismiss: () => {}, onMove: () => {} };
 let active = null;   // { pagina, spans, ini, fin, anclaIdx, anclaOff, ajustando }
@@ -65,6 +70,12 @@ function spansEnOrdenVisual(pagina) {
   }
   for (const l of lineas) l.items.sort((a, b) => a.r.left - b.r.left);
 
+  // Los rects que quedan guardados son la FOTO del momento; tras un desplazamiento están
+  // desfasados. No importa: solo se usan para comparaciones RELATIVAS dentro de esta misma
+  // foto (agrupar en líneas, decidir si dos spans van pegados), y un desplazamiento las
+  // traslada a todas por igual. Lo que sí se mide en vivo —el span bajo el dedo— pasa por
+  // cursorEnPunto, que lee getBoundingClientRect en ese instante.
+  //
   // Plano, con el número de línea a cuestas: el tramo seleccionado son dos índices aquí.
   const plano = [];
   lineas.forEach((l, li) => l.items.forEach((it) => plano.push({ ...it, linea: li })));
@@ -76,11 +87,12 @@ function indiceDe(spans, nodo) {
   return -1;
 }
 
-// Punto de pantalla → { idx, off } sobre el orden visual. Pasa por cursorEnPunto, que acota
-// el punto a la mancha de texto de la página (ver pdf-text-select.js): sin eso, un dedo en un
-// hueco vuelve a resolver por orden del DOM y estamos donde estábamos.
+// Punto de pantalla → { idx, off } sobre el orden visual. Pasa por cursorEnPagina, que pega
+// el punto a la mancha de texto de ESA página (ver pdf-text-select.js): sin eso, un dedo en un
+// hueco vuelve a resolver por orden del DOM y estamos donde estábamos, y un dedo más allá del
+// final de la página se iría a la siguiente, donde esta selección no puede continuar.
 function posicionEn(x, y, pagina, spans) {
-  const c = cursorEnPunto(x, y, pagina);
+  const c = cursorEnPagina(x, y, pagina);
   if (!c) return null;
   const idx = indiceDe(spans, c.node);
   if (idx < 0) return null;
@@ -167,13 +179,80 @@ function entregar() {
   });
 }
 
+// Sin selección no hay nada que soltar NI A QUIÉN AVISAR, y ese `return` no es una micro
+// optimización: `hideHighlightTooltip` llama aquí, y `onDismiss` vuelve a llamar a
+// `hideHighlightTooltip`. Sin corte, cerrar la barra encadenaba 5047 llamadas anidadas
+// (medido) hasta reventar la pila — y no se veía, porque la llamada va dentro de un
+// `try/catch` que se tragaba el RangeError. El EPUB tenía el mismo ciclo.
 export function dismiss() {
+  pararAutoscroll();
+  ultimoPunto = null;
+  if (!active) return;
   active = null;
   Engine.hideOverlay();
   callbacks.onDismiss();
 }
 
 export function hasSelection() { return !!active; }
+
+// --- auto-desplazamiento ------------------------------------------------------
+let ultimoPunto = null;   // último sitio donde estaba el dedo, para seguir tirando sin moverlo
+let rafAuto = 0;
+
+function velocidad(dentro) {
+  return Math.ceil((Math.min(dentro, BORDE) / BORDE) * VELOCIDAD_MAX);
+}
+
+function pararAutoscroll() {
+  if (rafAuto) cancelAnimationFrame(rafAuto);
+  rafAuto = 0;
+}
+
+function pasoAutoscroll() {
+  rafAuto = 0;
+  if (!active || !ultimoPunto) return;
+  const sc = document.getElementById('pdf-container');
+  if (!sc) return;
+  const r = sc.getBoundingClientRect();
+  const { x, y } = ultimoPunto;
+  let dy = 0, dx = 0;
+  if (y < r.top + BORDE) dy = -velocidad(r.top + BORDE - y);
+  else if (y > r.bottom - BORDE) dy = velocidad(y - (r.bottom - BORDE));
+  if (x < r.left + BORDE) dx = -velocidad(r.left + BORDE - x);
+  else if (x > r.right - BORDE) dx = velocidad(x - (r.right - BORDE));
+  if (!dx && !dy) return;
+
+  const t0 = sc.scrollTop, l0 = sc.scrollLeft;
+  sc.scrollTop += dy;
+  sc.scrollLeft += dx;
+  if (sc.scrollTop === t0 && sc.scrollLeft === l0) return;   // se acabó el recorrido
+
+  // El dedo no se ha movido, pero el contenido sí: bajo el mismo punto de pantalla hay ahora
+  // otro texto, así que la selección crece sola mientras se sostiene contra el borde.
+  extender(x, y);
+  rafAuto = requestAnimationFrame(pasoAutoscroll);
+}
+
+function quizaAutoscroll(x, y) {
+  ultimoPunto = { x, y };
+  if (!rafAuto) rafAuto = requestAnimationFrame(pasoAutoscroll);
+}
+
+// --- extender la selección hasta un punto -------------------------------------
+// Sale del manejador de touchmove porque el auto-desplazamiento la llama también, con el
+// dedo quieto.
+function extender(x, y) {
+  if (!active) return;
+  const pos = posicionEn(x, y, active.pagina, active.spans);
+  if (!pos) return;
+  let [ini, fin] = ordenar({ idx: active.anclaIdx, off: active.anclaOff }, pos);
+  // El ajuste por líneas solo en el arrastre INICIAL, y solo al salir de la línea.
+  if (!active.ajustando && active.spans[ini.idx].linea !== active.spans[fin.idx].linea) {
+    [ini, fin] = aLineasCompletas(active.spans, ini, fin);
+  }
+  active.ini = ini; active.fin = fin;
+  pintar();
+}
 
 // --- gesto --------------------------------------------------------------------
 export function install(container, cbs) {
@@ -235,19 +314,14 @@ export function install(container, cbs) {
     if (!active || (!tirador && !lpIniciado)) return;
 
     e.preventDefault();
-    const pos = posicionEn(t.clientX, t.clientY, active.pagina, active.spans);
-    if (!pos) return;
-    let [ini, fin] = ordenar({ idx: active.anclaIdx, off: active.anclaOff }, pos);
-    // El ajuste por líneas solo en el arrastre INICIAL, y solo al salir de la línea.
-    if (!active.ajustando && active.spans[ini.idx].linea !== active.spans[fin.idx].linea) {
-      [ini, fin] = aLineasCompletas(active.spans, ini, fin);
-    }
-    active.ini = ini; active.fin = fin;
-    pintar();
+    extender(t.clientX, t.clientY);
+    quizaAutoscroll(t.clientX, t.clientY);
   }, { passive: false });
 
   container.addEventListener('touchend', () => {
     limpiarLP();
+    pararAutoscroll();
+    ultimoPunto = null;
     if (tirador || lpIniciado) { tirador = null; lpIniciado = false; entregar(); return; }
     // Un toque suelto con selección a la vista la descarta; el resto de toques (pasar página,
     // alternar barras) los sigue llevando app.js.

@@ -25,8 +25,13 @@ let callbacks = { onTap: () => {}, onImageTap: () => {}, onSelect: () => {}, onD
 export function configure(c) { callbacks = { ...callbacks, ...c }; }
 
 const LONGPRESS_MS = 380;   // pulsación larga que inicia la selección
-const MOVE_CANCEL = 10;     // px de movimiento que cancela la pulsación (=scroll)
-const SWIPE_START = 10;     // px horizontales que inician el arrastre de página
+const MOVE_CANCEL = 12;     // px de movimiento que cancelan la pulsación larga (=scroll)
+// px horizontales que inician el arrastre de página. TIENE que ser holgadamente mayor que
+// MOVE_CANCEL: valían 10 los dos, así que un temblor de 11 px al posar el dedo cancelaba la
+// pulsación larga Y arrancaba a pasar página a la vez — se perdía la selección y encima se
+// movía el libro. Entre los dos valores queda ahora una franja muerta, que es lo correcto:
+// el dedo se ha movido un poco y todavía no se sabe qué quiere hacer.
+const SWIPE_START = 18;
 
 // Estado de la selección activa (una a la vez).
 let active = null;  // { contents, doc, range, anchor }
@@ -105,7 +110,12 @@ function finalize() {
   callbacks.onSelect({ cfiRange, text, rect: screenRect(active.range) });
 }
 
+// El `return` corta un ciclo: `hideHighlightTooltip` llama a `clearSelection` → aquí, y
+// `onDismiss` vuelve a llamar a `hideHighlightTooltip`. Sin corte, cerrar la barra encadenaba
+// miles de llamadas anidadas hasta reventar la pila, sin que se notara: la llamada va dentro
+// de un `try/catch` que se tragaba el RangeError.
 export function dismiss() {
+  if (!active) return;
   active = null;
   Engine.hideOverlay();
   callbacks.onDismiss();
