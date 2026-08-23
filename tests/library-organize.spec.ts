@@ -74,16 +74,30 @@ test('el rail anida por el nombre: "Técnico/ML" se pinta dentro de "Técnico" y
   const rows = page.locator('.lib-rail-shelf');
   // Tras el reload la biblioteca se pinta de forma asíncrona: hay que esperar a
   // que el rail esté completo antes de leerlo de una vez: "Técnico", su hija
-  // "ML", "Pendientes" y la fila fija "Sin estantería".
-  await expect(rows).toHaveCount(4);
+  // "ML" y "Pendientes". "Sin estantería" ya no cuenta aquí: es una vista del
+  // sistema y se pinta arriba, junto a "Libros", no entre las estanterías.
+  await expect(rows).toHaveCount(3);
   const labels = await rows.locator('.lib-rail-name').allTextContents();
   expect(labels).toContain('Técnico');
-  // La hija se pinta con su tramo final, no con la ruta completa.
+  // La hija se pinta con su tramo final, no con la ruta completa (la ruta solo
+  // sale en móvil, donde el rail es una tira plana sin indentación).
   expect(labels).toContain('ML');
   expect(labels).not.toContain('Técnico/ML');
 
-  const hija = page.locator('.lib-rail-item', { has: page.locator('.lib-rail-name', { hasText: /^ML$/ }) });
-  await expect(hija).toHaveCSS('padding-left', '28px');   // 12 + 1 nivel × 16
+  // La indentación la lleva la FILA (contenedor), no el botón: así el botón de
+  // opciones puede vivir fuera del botón de la estantería.
+  const filaHija = page.locator('.lib-rail-row', { has: page.locator('.lib-rail-name', { hasText: /^ML$/ }) });
+  await expect(filaHija).toHaveCSS('padding-left', '14px');   // 1 nivel × 14
+  await expect(filaHija).toHaveClass(/is-child/);
+
+  // La rama madre se pliega y su hija desaparece del rail (sin tocar el filtro).
+  const twisty = page.locator('.lib-rail-row', { has: page.locator('.lib-rail-name', { hasText: /^Técnico$/ }) })
+    .locator('.lib-rail-twisty');
+  await expect(twisty).toHaveAttribute('aria-expanded', 'true');
+  await twisty.click();
+  await expect(filaHija).toBeHidden();
+  await twisty.click();
+  await expect(filaHija).toBeVisible();
 
   // El contador del padre incluye lo que cuelga de él: 2 propios + 1 de "ML".
   const padre = page.locator('.lib-rail-item', { has: page.locator('.lib-rail-name', { hasText: /^Técnico$/ }) });
@@ -163,4 +177,34 @@ test('regla y orden sobreviven al ida y vuelta del sync', async ({ page }) => {
   // Sin cambios reales no hay escrituras: si las hubiera, cada sync provocaría
   // un push y los dispositivos se pisarían el orden entre ellos.
   expect(out.cambios).toBe(0);
+});
+
+test('arrastrar un libro al rail lo AÑADE a esa estantería (y una inteligente no acepta)', async ({ page }) => {
+  await page.goto('/');
+  await seed(page);
+  await page.evaluate(async () => {
+    const Store: any = await import('/js/library/store.js');
+    await Store.addShelf('Sin empezar', { rule: { status: 'unread' } });
+  });
+  await page.reload();
+
+  const ficha = page.locator('.lib-card', { has: page.locator('.lib-title', { hasText: 'Rayuela' }) });
+  await expect(ficha).toHaveAttribute('draggable', 'true');
+
+  // Una estantería MANUAL acepta el libro; una inteligente no ofrece dónde
+  // soltarlo, porque su pertenencia la decide la regla, no el gesto.
+  const manual = page.locator('.lib-rail-row', { has: page.locator('.lib-rail-name', { hasText: /^Pendientes$/ }) });
+  await expect(manual).toHaveAttribute('data-drop-shelf', /.+/);
+  const smart = page.locator('.lib-rail-row', { has: page.locator('.lib-rail-name', { hasText: /^Sin empezar$/ }) });
+  await expect(smart).not.toHaveAttribute('data-drop-shelf', /.+/);
+
+  await ficha.dragTo(manual);
+  // Se AÑADE, no se mueve: "Rayuela" no estaba en ninguna y ahora está en una.
+  await expect.poll(async () => page.evaluate(async () => {
+    const Store: any = await import('/js/library/store.js');
+    const b = await Store.getBook('b4');
+    return (b.shelfIds || []).length;
+  })).toBe(1);
+  await page.locator('.lib-rail-item', { hasText: 'Pendientes' }).click();
+  await expectGrid(page, ['Compiladores', 'Rayuela']);
 });

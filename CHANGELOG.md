@@ -5,6 +5,40 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-08-23 — El rail de la biblioteca se lee como un árbol
+
+Con dos niveles de estanterías el rail ya no se leía. La indentación desplazaba la fila entera
+—miniatura incluida—, así que la columna de nombres bailaba sin ningún eje donde apoyar la vista, y
+no había forma de plegar una rama: con veinte estanterías era una lista plana. Ahora cada rama con
+hijas trae su **triángulo** (plegado recordado en `localStorage`, por ruta de nodo: es preferencia
+de vista, no dato de biblioteca, y no viaja en el sync) y una **guía vertical** que la ata a sus
+hijas.
+
+La miniatura de estantería era la **portada del primer libro que contenía**. A 28px no se reconoce,
+cambia sola al añadir un libro y una rama sin libros propios acababa enseñando la portada de su
+hija: dos filas idénticas que parecían un duplicado. Ahora es la **inicial** sobre un tono derivado
+del nombre, saltándose la franja verde (90–180) donde vive el acento; el color se mezcla con los
+tokens del tema (`color-mix`), así que vale en claro, oscuro y sepia sin tres tablas de color.
+
+Manuales y automáticas se separan en dos secciones (`ESTANTERÍAS` / `AUTOMÁTICAS`): a una manual se
+le arrastran libros, a una inteligente los mete su regla, y mezcladas la misma fila prometía dos
+cosas distintas. "Sin estantería" sube junto a "Libros", que es lo que es: una vista del sistema.
+Las dos acciones de crear se funden en un **"+ Nueva estantería"** con las dos variantes dentro; su
+etiqueta deja el verde (solo el icono lo conserva) para que en el rail el acento señale una sola
+cosa: la fila seleccionada.
+
+**Arrastrar un libro** de la rejilla a una estantería manual lo añade ahí (añade, no mueve: una
+estantería es una etiqueta). Las inteligentes no ofrecen dónde soltar.
+
+Tres defectos de paso: en móvil la indentación iba en un `style=` en línea que **ganaba** al media
+query, y las hijas salían con un hueco a la izquierda sin sentido en la tira horizontal de chips
+(ahora la rama va delante del nombre, "Técnico/LLM"); el botón de opciones era un `<button>`
+**dentro** del botón de la fila —HTML inválido y fuera del alcance del tabulador—, y ahora es
+hermano; y los contadores no eran tabulares, `aria-current` no marcaba la fila activa ni el número
+se anunciaba con su nombre ("Técnico, 4 libros con sus subestanterías").
+
+---
+
 ## 2026-08-23 — La barra de selección deja de taparte lo subrayado
 
 Al marcar un pasaje de varias líneas, la barra de acciones caía encima del propio texto: quedaba

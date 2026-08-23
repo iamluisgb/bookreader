@@ -37,9 +37,27 @@ let query = '';                  // texto del buscador de la estantería (títul
 let allBooks = [];               // caché del último render (para refiltrar sin re-fetch)
 let allShelves = [];             // ídem para las estanterías (resolver reglas y nombres)
 let menuEl = null;
+// Ramas plegadas del rail, por RUTA de nodo ("Técnico", "Técnico/ML"). Se
+// guarda en localStorage porque plegar una rama es una preferencia de vista, no
+// un dato de la biblioteca: no viaja en el sync (cada pantalla es distinta) ni
+// cambia lo que contiene una estantería.
+const COLLAPSE_KEY = 'bookreader_lib_collapsed';
+let collapsed = loadCollapsed();
 // Transferencias en curso, por bookId: { loaded, total, state }. Solo para
 // pintar la barra de la tarjeta; la verdad la tiene sync/blobs.js.
 const transfers = new Map();
+// Libro que se está arrastrando sobre el rail, y la fila resaltada debajo.
+let dragBookId = null;
+let dropRow = null;
+
+function loadCollapsed() {
+  try { return new Set(JSON.parse(localStorage.getItem(COLLAPSE_KEY) || '[]')); }
+  catch (e) { return new Set(); }
+}
+function saveCollapsed() {
+  try { localStorage.setItem(COLLAPSE_KEY, JSON.stringify([...collapsed])); }
+  catch (e) { /* storage bloqueado: se pliega solo para esta sesión */ }
+}
 
 const SORT_LABELS = { recent: t('Recientes'), title: t('Título'), author: t('Autor') };
 const PROG_LABELS = { all: t('Progreso'), unread: t('Sin empezar'), reading: t('Leyendo'), finished: t('Terminados') };
@@ -51,6 +69,14 @@ export function init(opts = {}) {
   onOpenSettings = opts.onOpenSettings || (() => {});
   host.addEventListener('click', onClick);
   host.addEventListener('input', onInput);
+  // Arrastrar una ficha sobre una estantería del rail para meterla ahí: el
+  // gesto que cualquiera prueba en una biblioteca. Delegado en el host porque
+  // la rejilla y el rail se repintan enteros en cada render.
+  host.addEventListener('dragstart', onDragStart);
+  host.addEventListener('dragend', endDrag);
+  host.addEventListener('dragover', onDragOver);
+  host.addEventListener('dragleave', onDragLeave);
+  host.addEventListener('drop', onDrop);
   document.addEventListener('click', (e) => {
     if (menuEl && !menuEl.contains(e.target) && !e.target.closest('.lib-kebab, .lib-rail-kebab')) closeMenu();
     if (!e.target.closest('.lib-dd')) host.querySelectorAll('.lib-dd.open').forEach(d => d.classList.remove('open'));
@@ -129,26 +155,27 @@ export async function render() {
 
   const noShelfCount = books.filter(b => !(b.shelfIds && b.shelfIds.length)).length;
   const list = computeList();
+  // Manuales y automáticas se pintan en secciones distintas porque no se usan
+  // igual: a una manual se le arrastran libros, a una inteligente los mete su
+  // regla. Mezcladas, la misma fila prometía dos cosas distintas.
+  const manual = shelves.filter(s => !Shelves.isSmart(s));
+  const smart = shelves.filter(s => Shelves.isSmart(s));
 
   host.innerHTML = `
     <div class="lib-layout">
-      <aside class="lib-rail">
-        <button class="lib-rail-item${selection.size ? '' : ' active'}" data-shelf="all">
-          <span class="lib-rail-mark">${brandMark({ size: 28 })}</span>
-          <span class="lib-rail-name">${t('Libros')}</span>
-          <span class="lib-rail-count">${books.length}</span>
-        </button>
+      <aside class="lib-rail" aria-label="${t('Estanterías')}">
+        ${fixedRowHtml('all', `<span class="lib-rail-mark">${brandMark({ size: 28 })}</span>`,
+          t('Libros'), books.length, !selection.size)}
+        ${fixedRowHtml('none', `<span class="lib-rail-thumb lib-rail-thumb--none">${icon('book', { size: 14 })}</span>`,
+          t('Sin estantería'), noShelfCount, selection.has('none'))}
 
-        <div class="lib-rail-section">${t('Estanterías')}</div>
-        ${Shelves.shelfRows(shelves).map(railRowHtml).join('')}
-        <button class="lib-rail-item lib-rail-shelf${selection.has('none') ? ' active' : ''}" data-shelf="none">
-          <span class="lib-rail-thumb"><span class="lib-rail-thumb-ph">${icon('book', { size: 14 })}</span></span>
-          <span class="lib-rail-name">${t('Sin estantería')}</span>
-          <span class="lib-rail-count">${noShelfCount}</span>
-        </button>
+        ${manual.length ? `<div class="lib-rail-section">${t('Estanterías')}</div>
+        ${Shelves.shelfRows(manual).map(railRowHtml).join('')}` : ''}
 
-        <button class="lib-rail-create" data-act="newshelf">${icon('pencil', { size: 16 })}<span>${t('Crear estantería')}</span></button>
-        <button class="lib-rail-create" data-act="newsmart">${icon('sparkles', { size: 16 })}<span>${t('Estantería inteligente')}</span></button>
+        ${smart.length ? `<div class="lib-rail-section">${t('Automáticas')}</div>
+        ${Shelves.shelfRows(smart).map(railRowHtml).join('')}` : ''}
+
+        <button class="lib-rail-create" data-act="newshelfmenu">${icon('plus', { size: 16 })}<span>${t('Nueva estantería')}</span></button>
         <button class="lib-rail-create lib-rail-settings" data-act="settings">${icon('gear', { size: 16 })}<span>${t('Ajustes generales')}</span></button>
       </aside>
 
@@ -172,37 +199,110 @@ export async function render() {
   paintStudyChip();   // async, no bloquea el render de la rejilla
 }
 
-// Portada de muestra de una fila del rail: la del primer libro que contenga.
-function rowThumb(ids) {
-  const set = memberIdsOf(ids);
-  const b = allBooks.find(x => set.has(x.id) && x.cover);
-  return b ? `<img src="${escapeHtml(b.cover)}" alt="">` : `<span class="lib-rail-thumb-ph">${icon('book', { size: 14 })}</span>`;
+// Marca de una estantería: INICIAL sobre un tono derivado del nombre, no la
+// portada de un libro suyo. Una portada a 28px no se reconoce, CAMBIA sola al
+// añadir un libro (así que no sirve para acordarse de cuál es cuál) y una rama
+// sin libros propios acaba enseñando la portada de su hija — dos filas
+// idénticas que parecen un duplicado. La inicial es estable y legible.
+// El tono sale del nombre, saltándose la franja verde entera (90–180): ahí vive
+// el acento, y una inicial verdosa se lee como "seleccionada" o como las
+// automáticas, que sí usan el acento a propósito.
+function markHue(name) {
+  let h = 0;
+  const s = String(name || '');
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) % 270;
+  return h >= 90 ? h + 90 : h;
+}
+function markInitial(name) {
+  const c = String(name || '?').trim().charAt(0);
+  return (c || '?').toUpperCase();
+}
+// El contador se pinta como cifra suelta (aria-hidden): quien usa lector de
+// pantalla lo oye aquí, con el nombre y en singular o plural según toque.
+function countLabel(name, n) {
+  return n === 1 ? t('{name}, {n} libro', { name, n }) : t('{name}, {n} libros', { name, n });
+}
+
+function shelfMarkHtml(label) {
+  return `<span class="lib-rail-thumb lib-rail-thumb--mark" style="--mark-h:${markHue(label)}"
+    aria-hidden="true">${escapeHtml(markInitial(label))}</span>`;
 }
 
 // Una fila del rail: estantería (manual o inteligente) o GRUPO —un tramo del
 // nombre que no existe como estantería propia, p. ej. "Técnico" cuando solo hay
 // "Técnico/ML"—. El grupo filtra por todo lo que cuelga de él, pero no tiene
 // menú: no hay nada que renombrar ni borrar.
+//
+// El botón de opciones va FUERA del botón de la fila (un <button> dentro de
+// otro es HTML inválido y el de dentro no se alcanza con el tabulador): la fila
+// es un contenedor flex con triángulo · nombre · opciones.
 function railRowHtml(row) {
   const ids = row.shelfIds;
   const active = selection.has(row.key);
   const count = memberIdsOf(ids).size;
-  const indent = row.depth ? ` style="padding-left:${12 + row.depth * 16}px"` : '';
   const smart = row.shelf && Shelves.isSmart(row.shelf);
-  const thumb = smart
-    ? `<span class="lib-rail-thumb lib-rail-thumb--smart">${icon('sparkles', { size: 15 })}</span>`
-    : `<span class="lib-rail-thumb">${rowThumb(ids)}</span>`;
-  const kebab = row.shelf
-    ? `<span class="lib-rail-kebab" data-shelf-menu="${escapeHtml(row.shelf.id)}" title="${t('Opciones')}">${icon('ellipsis', { size: 18 })}</span>`
+  const folded = row.ancestors.some(p => collapsed.has(p));
+  const shut = row.hasChildren && collapsed.has(row.path);
+
+  const twisty = row.hasChildren
+    ? `<button class="lib-rail-twisty" data-collapse="${escapeHtml(row.path)}"
+        aria-expanded="${shut ? 'false' : 'true'}"
+        aria-label="${escapeHtml(shut ? t('Desplegar {name}', { name: row.label }) : t('Plegar {name}', { name: row.label }))}"
+        >${icon(shut ? 'chevron-right' : 'chevron-down', { size: 14 })}</button>`
+    : '<span class="lib-rail-twisty" aria-hidden="true"></span>';
+
+  const mark = row.kind === 'group'
+    ? '<span class="lib-rail-thumb lib-rail-thumb--group" aria-hidden="true"></span>'
+    : (smart
+      ? `<span class="lib-rail-thumb lib-rail-thumb--smart" aria-hidden="true">${icon('sparkles', { size: 15 })}</span>`
+      : shelfMarkHtml(row.label));
+
+  // En la tira horizontal de móvil no hay indentación que valga, así que la
+  // rama va delante del nombre ("Técnico/LLM"); en escritorio la dice el árbol.
+  const crumb = row.depth
+    ? `<span class="lib-rail-crumb">${escapeHtml(row.ancestors[row.ancestors.length - 1] + Shelves.SEP)}</span>`
     : '';
-  return `<button class="lib-rail-item lib-rail-shelf${active ? ' active' : ''}${row.kind === 'group' ? ' lib-rail-group' : ''}"
+
+  const kebab = row.shelf
+    ? `<button class="lib-rail-kebab" data-shelf-menu="${escapeHtml(row.shelf.id)}"
+        title="${t('Opciones')}" aria-label="${escapeHtml(t('Opciones de {name}', { name: row.label }))}"
+        >${icon('ellipsis', { size: 18 })}</button>`
+    : '';
+
+  // Soltar un libro encima solo tiene sentido en una estantería MANUAL: en una
+  // inteligente manda la regla, y un grupo no es una estantería.
+  const drop = row.shelf && !smart ? ` data-drop-shelf="${escapeHtml(row.shelf.id)}"` : '';
+  const label = row.hasChildren
+    ? t('{name}, {n} libros con sus subestanterías', { name: row.label, n: count })
+    : countLabel(row.label, count);
+
+  return `<div class="lib-rail-row${active ? ' is-active' : ''}${folded ? ' is-folded' : ''}${row.depth ? ' is-child' : ''}"
+      style="--depth:${row.depth}"${drop}>
+    ${twisty}
+    <button class="lib-rail-item lib-rail-shelf${active ? ' active' : ''}${row.kind === 'group' ? ' lib-rail-group' : ''}"
       data-row-key="${escapeHtml(row.key)}" data-row-label="${escapeHtml(row.label)}"
-      data-shelf-ids="${escapeHtml(ids.join(','))}"${indent}>
-    ${row.kind === 'group' ? `<span class="lib-rail-thumb lib-rail-thumb--group"></span>` : thumb}
-    <span class="lib-rail-name">${escapeHtml(row.label)}</span>
-    <span class="lib-rail-count">${count}</span>
+      data-shelf-ids="${escapeHtml(ids.join(','))}"
+      aria-label="${escapeHtml(label)}"${active ? ' aria-current="true"' : ''}>
+      ${mark}${crumb}
+      <span class="lib-rail-name">${escapeHtml(row.label)}</span>
+      <span class="lib-rail-count" aria-hidden="true">${count}</span>
+    </button>
     ${kebab}
-  </button>`;
+  </div>`;
+}
+
+// "Libros" y "Sin estantería": vistas del sistema, no estanterías. Comparten la
+// caja de fila para que la columna de nombres quede alineada con el árbol.
+function fixedRowHtml(key, mark, name, count, active) {
+  return `<div class="lib-rail-row${active ? ' is-active' : ''}">
+    <span class="lib-rail-twisty" aria-hidden="true"></span>
+    <button class="lib-rail-item" data-shelf="${key}"
+      aria-label="${escapeHtml(countLabel(name, count))}"${active ? ' aria-current="true"' : ''}>
+      ${mark}
+      <span class="lib-rail-name">${escapeHtml(name)}</span>
+      <span class="lib-rail-count" aria-hidden="true">${count}</span>
+    </button>
+  </div>`;
 }
 
 function currentTitle() {
@@ -344,7 +444,7 @@ function cardHtml(b) {
   }
 
   return `
-    <div class="lib-card${ghost ? ' is-ghost' : ''}${transfer ? ' is-transferring' : ''}" data-id="${b.id}">
+    <div class="lib-card${ghost ? ' is-ghost' : ''}${transfer ? ' is-transferring' : ''}" data-id="${b.id}" draggable="true">
       <div class="lib-cover">
         ${cover}
         ${badge}
@@ -464,8 +564,22 @@ async function onClick(e) {
 
   if (e.target.closest('[data-act="settings"]')) { onOpenSettings(); return; }
 
-  if (e.target.closest('[data-act="newshelf"]')) { await createShelf(); return; }
-  if (e.target.closest('[data-act="newsmart"]')) { await createSmartShelf(); return; }
+  // Crear estantería: un solo botón con las dos variantes dentro. Eran dos
+  // enlaces en color de acento compitiendo con la fila seleccionada — que es lo
+  // único que el acento debería señalar en el rail.
+  const createBtn = e.target.closest('[data-act="newshelfmenu"]');
+  if (createBtn) { e.stopPropagation(); openCreateMenu(createBtn); return; }
+
+  // Plegar/desplegar una rama del árbol (no cambia el filtro).
+  const twisty = e.target.closest('[data-collapse]');
+  if (twisty) {
+    e.stopPropagation();
+    const path = twisty.dataset.collapse;
+    if (collapsed.has(path)) collapsed.delete(path); else collapsed.add(path);
+    saveCollapsed();
+    await render();
+    return;
+  }
 
   // Chips del filtro: quitar una estantería, alternar Y/O, limpiar.
   const unsel = e.target.closest('[data-unselect]');
@@ -491,6 +605,63 @@ async function onClick(e) {
 
   const card = e.target.closest('.lib-card');
   if (card) await openCard(card.dataset.id);
+}
+
+// ---- arrastrar un libro al rail --------------------------------------------
+
+function onDragStart(e) {
+  const card = e.target.closest('.lib-card');
+  if (!card) return;
+  dragBookId = card.dataset.id;
+  card.classList.add('is-dragging');
+  host.querySelector('.lib-rail')?.classList.add('is-dropping');
+  if (e.dataTransfer) {
+    e.dataTransfer.effectAllowed = 'copy';
+    try { e.dataTransfer.setData('text/plain', dragBookId); } catch (err) { /* Safari con datos vacíos */ }
+  }
+}
+
+function endDrag() {
+  dragBookId = null;
+  dropRow?.classList.remove('is-drop-target');
+  dropRow = null;
+  host.querySelector('.lib-rail')?.classList.remove('is-dropping');
+  host.querySelector('.lib-card.is-dragging')?.classList.remove('is-dragging');
+}
+
+function onDragOver(e) {
+  if (!dragBookId) return;
+  const row = e.target.closest('[data-drop-shelf]');
+  if (!row) { if (dropRow) { dropRow.classList.remove('is-drop-target'); dropRow = null; } return; }
+  e.preventDefault();                    // sin esto el navegador no deja soltar
+  if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+  if (dropRow !== row) {
+    dropRow?.classList.remove('is-drop-target');
+    dropRow = row;
+    row.classList.add('is-drop-target');
+  }
+}
+
+function onDragLeave(e) {
+  if (!dropRow) return;
+  if (!e.relatedTarget || !dropRow.contains(e.relatedTarget)) {
+    dropRow.classList.remove('is-drop-target');
+    dropRow = null;
+  }
+}
+
+async function onDrop(e) {
+  const row = e.target.closest('[data-drop-shelf]');
+  const id = dragBookId || (e.dataTransfer ? e.dataTransfer.getData('text/plain') : '');
+  endDrag();
+  if (!row || !id) return;
+  e.preventDefault();
+  // Se AÑADE, no se mueve: una estantería es una etiqueta y un libro está en
+  // varias a la vez (ver library/shelves.js). Soltarlo donde ya está no hace nada.
+  const book = await Store.getBook(id);
+  if (!book || (book.shelfIds || []).includes(row.dataset.dropShelf)) return;
+  await Store.toggleBookShelf(id, row.dataset.dropShelf, true);
+  await render();
 }
 
 // Abrir una tarjeta. Si el fichero no está aquí, pulsar la portada equivale a
@@ -534,6 +705,22 @@ async function selectRail(el, ev) {
     selection = new Map([[key, entry]]);
   }
   await render();
+}
+
+// Las dos formas de crear, con la diferencia dicha en una línea: en la manual
+// eliges tú los libros, en la inteligente los elige una regla.
+function openCreateMenu(anchor) {
+  closeMenu();
+  buildMenu(anchor, `
+    <div class="lib-menu-label">${t('Nueva estantería')}</div>
+    <button class="lib-menu-item" data-act="manual">${icon('pencil', { size: 16 })}
+      <span>${t('Estantería')}<small>${t('Eliges tú los libros')}</small></span></button>
+    <button class="lib-menu-item" data-act="smart">${icon('sparkles', { size: 16 })}
+      <span>${t('Inteligente')}<small>${t('Los elige una regla')}</small></span></button>
+  `, async (act) => {
+    if (act === 'manual') await createShelf();
+    else if (act === 'smart') await createSmartShelf();
+  });
 }
 
 async function createShelf() {

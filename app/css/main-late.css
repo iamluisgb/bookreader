@@ -335,14 +335,39 @@ body.in-library .ai-fab { display: none; }
   background: var(--surface-1);
   padding: calc(var(--s-4) + env(safe-area-inset-top)) var(--s-3) var(--s-5);
 }
-.lib-rail-item {
-  display: flex; align-items: center; gap: var(--s-3); width: 100%;
-  padding: 9px 12px; border: none; background: none; cursor: pointer;
-  border-radius: var(--r-pill); color: var(--text); font-size: var(--fs-md);
-  text-align: left; transition: background var(--transition-fast), color var(--transition-fast);
+/* La FILA es la píldora: contiene el triángulo de plegado, el botón de la
+   estantería y el de opciones. Antes el de opciones vivía DENTRO del botón de
+   la fila —un <button> dentro de otro: HTML inválido y sin acceso por
+   tabulador—; sacarlo obliga a que el fondo de hover/activo lo pinte la fila. */
+.lib-rail-row {
+  display: flex; align-items: center; position: relative;
+  border-radius: var(--r-pill);
+  padding-left: calc(var(--depth, 0) * 14px);
+  transition: background var(--transition-fast);
 }
-.lib-rail-item:hover { background: var(--surface-3); }
-.lib-rail-item.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.lib-rail-row:hover { background: var(--surface-3); }
+.lib-rail-row.is-active { background: var(--accent-soft); }
+.lib-rail-row.is-folded { display: none; }
+/* Guía vertical hasta el triángulo de la rama madre: sin ella la indentación
+   sola no se lee como jerarquía, solo como filas descolocadas. */
+.lib-rail-row.is-child::before {
+  content: ''; position: absolute; top: 0; bottom: 0;
+  left: calc((var(--depth, 1) - 1) * 14px + 9px);
+  width: 1px; background: var(--border-soft);
+}
+.lib-rail-twisty {
+  flex: 0 0 auto; width: 18px; height: 18px; padding: 0; border: none; background: none;
+  display: inline-flex; align-items: center; justify-content: center;
+  color: var(--text-faint); cursor: pointer; border-radius: 4px;
+}
+button.lib-rail-twisty:hover { background: var(--surface-2); color: var(--text); }
+.lib-rail-item {
+  display: flex; align-items: center; gap: var(--s-3); flex: 1; min-width: 0;
+  padding: 9px 10px; border: none; background: none; cursor: pointer;
+  border-radius: var(--r-pill); color: var(--text); font-size: var(--fs-md);
+  text-align: left; transition: color var(--transition-fast);
+}
+.lib-rail-item.active { color: var(--accent); font-weight: 600; }
 .lib-rail-item.active .lib-rail-ico .icon { color: var(--accent); }
 .lib-rail-ico { display: inline-flex; flex: 0 0 auto; color: var(--text-soft); }
 /* La marca ocupa la misma caja que las miniaturas de estantería para que la
@@ -351,7 +376,20 @@ body.in-library .ai-fab { display: none; }
 .lib-rail-mark { display: inline-flex; flex: 0 0 auto; width: 28px; height: 28px; }
 .lib-rail-mark svg { display: block; }
 .lib-rail-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.lib-rail-count { color: var(--text-faint); font-size: var(--fs-sm); flex: 0 0 auto; }
+/* La rama ("Técnico/") solo en móvil, donde el rail es una tira plana y la
+   indentación no existe: sin ella "LLM" y "Sistemas" quedan sin padre. Va
+   FUERA de .lib-rail-name a propósito: dentro, el nombre "ML" se leería como
+   "Técnico/ML" para cualquiera que mire el textContent (tests incluidos). */
+.lib-rail-crumb {
+  display: none; flex: 0 0 auto; color: var(--text-faint); font-weight: 400;
+  margin-right: -4px;
+}
+/* Cifras tabulares: con contadores de una y dos cifras mezclados, las
+   proporcionales bailan y la columna deja de leerse como columna. */
+.lib-rail-count {
+  color: var(--text-faint); font-size: var(--fs-sm); flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+}
 .lib-rail-section {
   font-size: var(--fs-xs); font-weight: 600; color: var(--text-faint);
   text-transform: uppercase; letter-spacing: 0.04em;
@@ -363,15 +401,34 @@ body.in-library .ai-fab { display: none; }
 }
 .lib-rail-thumb img { width: 100%; height: 100%; object-fit: cover; }
 .lib-rail-thumb-ph { color: var(--text-faint); display: inline-flex; }
+/* Marca por INICIAL, con el tono derivado del nombre. Se mezcla con los tokens
+   del tema (color-mix) en vez de fijar claros y oscuros: así el mismo tono vale
+   en claro, oscuro y sepia sin tres tablas de color. */
+.lib-rail-thumb--mark {
+  background: color-mix(in srgb, hsl(var(--mark-h, 220) 62% 50%) 16%, var(--surface-1));
+  color: color-mix(in srgb, hsl(var(--mark-h, 220) 62% 45%) 55%, var(--text));
+  font-size: var(--fs-sm); font-weight: 650; line-height: 1;
+}
+.lib-rail-thumb--none .icon { color: var(--text-faint); }
 .lib-rail-kebab {
   flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center;
-  width: 26px; height: 26px; border-radius: 50%; color: var(--text-faint);
+  width: 26px; height: 26px; margin-right: 6px; padding: 0;
+  border: none; background: none; cursor: pointer;
+  border-radius: 50%; color: var(--text-faint);
   opacity: 0; transition: opacity var(--transition-fast), background var(--transition-fast);
 }
-.lib-rail-shelf:hover .lib-rail-kebab { opacity: 1; }
+.lib-rail-row:hover .lib-rail-kebab, .lib-rail-kebab:focus-visible { opacity: 1; }
 .lib-rail-kebab:hover { background: var(--surface-2); color: var(--text); }
 @media (hover: none) { .lib-rail-kebab { opacity: 1; }
 }
+
+/* Soltar un libro en una estantería: mientras se arrastra, las que aceptan el
+   libro se insinúan; la de debajo del puntero se marca del todo. */
+.lib-rail.is-dropping [data-drop-shelf] { background: var(--surface-3); }
+.lib-rail.is-dropping .lib-rail-row.is-drop-target {
+  background: var(--accent-soft); outline: 2px solid var(--accent); outline-offset: -2px;
+}
+.lib-card.is-dragging { opacity: 0.45; }
 
 /* Estantería INTELIGENTE: la miniatura se sustituye por la marca de regla — no
    tiene una portada "suya" porque sus miembros cambian solos. */
@@ -386,10 +443,14 @@ body.in-library .ai-fab { display: none; }
   display: inline-flex; align-items: center; gap: var(--s-3);
   margin: var(--s-3) 0 0; padding: 9px 12px; width: 100%;
   border: none; background: none; cursor: pointer;
-  color: var(--accent); font-size: var(--fs-md); font-weight: 550;
+  color: var(--text); font-size: var(--fs-md); font-weight: 550;
+  border-radius: var(--r-pill);
 }
+/* Solo el icono lleva el acento. Con la etiqueta también en verde, el rail
+   tenía tres cosas en color de acento y la seleccionada —lo único que el acento
+   debería señalar— dejaba de destacar. */
 .lib-rail-create .icon { color: var(--accent); }
-.lib-rail-create:hover { text-decoration: underline; }
+.lib-rail-create:hover { background: var(--surface-3); }
 /* Los hijos del rail no se comprimen: con muchas estanterías el rail hace scroll,
    no encoge las filas. */
 .lib-rail > * { flex: 0 0 auto; }
@@ -402,7 +463,7 @@ body.in-library .ai-fab { display: none; }
   color: var(--text); font-weight: 500;
 }
 .lib-rail-settings .icon { color: var(--text-soft); }
-.lib-rail-settings:hover { text-decoration: none; color: var(--accent); }
+.lib-rail-settings:hover { background: none; color: var(--accent); }
 .lib-rail-settings:hover .icon { color: var(--accent); }
 
 /* ---- Panel principal ---- */
@@ -640,6 +701,8 @@ body.in-library .ai-fab { display: none; }
 }
 .lib-menu-item:hover { background: var(--surface-3); }
 .lib-menu-item .icon { color: var(--text-soft); flex: 0 0 auto; }
+/* Opción de dos líneas: el qué arriba, la diferencia debajo (manual vs. regla). */
+.lib-menu-item small { display: block; color: var(--text-faint); font-size: var(--fs-xs); }
 .lib-menu-item.danger, .lib-menu-item.danger .icon { color: #ff3b30; }
 .lib-menu-check { width: 16px; display: inline-flex; flex: 0 0 auto; }
 .lib-menu-check .icon { color: var(--accent); }
@@ -670,11 +733,25 @@ body.in-library .ai-fab { display: none; }
   }
   .lib-rail::-webkit-scrollbar { display: none; }
   .lib-rail-section { display: none; }
+  /* En la tira horizontal la píldora es la fila entera, y la indentación del
+     árbol no significa nada: se anula (antes iba en un `style=` en línea que
+     ganaba a esta regla y dejaba las hijas con un hueco a la izquierda sin
+     sentido). La jerarquía la dice el prefijo "Técnico/" delante del nombre, y
+     las ramas plegadas se ven igual: aquí no hay dónde desplegarlas. */
+  .lib-rail-row {
+    flex: 0 0 auto; padding-left: 0; background: var(--surface-3);
+  }
+  .lib-rail-row.is-folded { display: flex; }
+  .lib-rail-row.is-child::before { display: none; }
+  .lib-rail-twisty { display: none; }
+  .lib-rail-crumb { display: inline; }
   .lib-rail-item {
-    flex: 0 0 auto; width: auto; background: var(--surface-3);
+    flex: 0 0 auto; width: auto;
     padding: 7px 12px; gap: var(--s-2);
   }
+  .lib-rail-name { flex: 0 0 auto; }
   .lib-rail-ico, .lib-rail-thumb, .lib-rail-mark { display: none; }
+  .lib-rail-kebab { margin-right: 4px; }
   .lib-rail-create { width: auto; flex: 0 0 auto; margin: 0; padding: 7px 12px; }
   .lib-rail-create span { display: none; }
   /* En la tira horizontal no hay "abajo": Ajustes vuelve a ser un chip más, pero

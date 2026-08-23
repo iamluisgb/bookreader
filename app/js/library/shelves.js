@@ -173,26 +173,42 @@ function buildNodes(shelves) {
 // Filas del rail en orden de pintado. Cada fila es o una ESTANTERÍA
 // (`shelf`) o un GRUPO (`shelf: null`), y trae `shelfIds` con todo lo que
 // cuelga de ella (la propia + descendientes) para poder filtrar y contar.
+//
+// Además de lo que filtra, cada fila lleva lo que hace falta para PINTAR el
+// árbol sin volver a recorrerlo: `path` (su nodo), `ancestors` (las rutas de
+// las que cuelga, para saber si alguna está plegada), `hasChildren` (si merece
+// un triángulo) y `ownIds` (solo ella, sin descendientes: es a lo que se añade
+// un libro al soltarlo encima, y el contador "propio" frente al del subárbol).
 export function shelfRows(shelves) {
   const rows = [];
-  const walk = (nodes, depth) => {
+  const walk = (nodes, depth, ancestors) => {
     for (const n of nodes) {
       const all = descendantIds(n);
+      const branches = n.children.length > 0;
       if (n.shelves.length) {
         for (const s of n.shelves) {
           // Solo la PRIMERA estantería del nodo arrastra a los descendientes:
           // si hay dos con el mismo nombre, duplicar el subárbol en ambas haría
-          // que el mismo libro se contara dos veces en el filtro.
-          const own = s === n.shelves[0] ? all : [s.id];
-          rows.push({ key: s.id, kind: 'shelf', depth, label: n.label, shelf: s, shelfIds: own });
+          // que el mismo libro se contara dos veces en el filtro. Por lo mismo
+          // solo ella manda sobre el plegado del nodo.
+          const first = s === n.shelves[0];
+          rows.push({
+            key: s.id, kind: 'shelf', depth, label: n.label, shelf: s,
+            shelfIds: first ? all : [s.id], ownIds: [s.id],
+            path: n.path, ancestors, hasChildren: branches && first,
+          });
         }
       } else {
-        rows.push({ key: 'g:' + n.path, kind: 'group', depth, label: n.label, shelf: null, shelfIds: all });
+        rows.push({
+          key: 'g:' + n.path, kind: 'group', depth, label: n.label, shelf: null,
+          shelfIds: all, ownIds: [],
+          path: n.path, ancestors, hasChildren: branches,
+        });
       }
-      walk(n.children, depth + 1);
+      walk(n.children, depth + 1, [...ancestors, n.path]);
     }
   };
-  walk(buildNodes(shelves), 0);
+  walk(buildNodes(shelves), 0, []);
   return rows;
 }
 
