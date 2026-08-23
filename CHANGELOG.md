@@ -5,6 +5,24 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-08-23 — La barra de selección deja de taparte lo subrayado
+
+Al marcar un pasaje de varias líneas, la barra de acciones caía encima del propio texto: quedaba
+oculto lo seleccionado y, como la barra se come los clics, tampoco se podía alargar la selección
+desde ahí.
+
+La barra se ancla en la **primera línea** para no aparecer a media página (eso sigue igual), pero
+esa era también la caja que esquivaba: si no cabía encima, se colocaba justo debajo de esa primera
+línea, es decir, sobre el resto del pasaje. Ahora el rect de anclaje viaja con la **banda vertical
+de toda la selección** (`blockTop`/`blockBottom`, ver `js/ui/frame-rect.js`) y la barra la esquiva
+entera — encima si cabe, si no debajo del último renglón. Cuando la selección es tan alta que no
+queda hueco a ningún lado, se va al mayor de los dos y tapa lo mínimo.
+
+Vale igual para EPUB (escritorio y táctil) y para PDF. Con test de regresión: la barra no puede
+solapar verticalmente la banda de la selección.
+
+---
+
 ## 2026-08-23 — PDF: ajustar al texto, no al papel
 
 Ampliar un PDF para que el texto llenara la pantalla sacaba scroll horizontal, y leyendo en

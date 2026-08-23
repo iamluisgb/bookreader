@@ -88,6 +88,57 @@ test.describe('Subrayado · edición desde el lector', () => {
     expect(saved[0].color).toBe('#ffd54f');   // sin color elegido, el subrayado por defecto
   });
 
+  // La barra tapaba el texto: se anclaba en la primera línea y, cuando no cabía encima,
+  // caía justo DEBAJO de esa línea — es decir, encima del resto de lo seleccionado, que ya
+  // no se podía leer ni alargar. Ahora esquiva la selección entera.
+  test('EPUB: la barra no tapa la selección de varias líneas', async ({ page }) => {
+    await openEpub(page);
+    await selectInEpub(page);
+
+    // selectInEpub marca el primer bloque con texto, que puede caber en una línea; el caso
+    // que se prueba necesita varias. Se amplía bloque a bloque hasta pasar de una línea,
+    // sin llegar a llenar la pantalla (ahí no hay colocación posible y no se prueba nada).
+    const lineas = await page.evaluate(() => {
+      const doc = (document.querySelector('#epub-container iframe') as HTMLIFrameElement).contentDocument!;
+      const hojas = [...doc.body.querySelectorAll('*')].filter(el => !el.children.length && (el.textContent || '').trim());
+      const sel = doc.defaultView!.getSelection()!;
+      const range = doc.createRange();
+      let n = 0;
+      for (let i = 0; i < hojas.length; i++) {
+        range.setStartBefore(hojas[0]);
+        range.setEndAfter(hojas[i]);
+        const rs = [...range.getClientRects()].filter(r => r.width >= 0.5 && r.height >= 0.5);
+        const alto = Math.max(...rs.map(r => r.bottom)) - Math.min(...rs.map(r => r.top));
+        if (rs.length > 1 && alto > doc.defaultView!.innerHeight * 0.25) { n = rs.length; break; }
+      }
+      sel.removeAllRanges();
+      sel.addRange(range);
+      doc.dispatchEvent(new Event('selectionchange', { bubbles: true }));
+      doc.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+      return n;
+    });
+    expect(lineas).toBeGreaterThan(1);   // con una sola línea el caso no se prueba
+    await expect(page.locator('#highlight-tooltip')).toBeVisible();
+    await page.waitForTimeout(300);   // la barra se coloca en el siguiente frame (rAF)
+
+    const solape = await page.evaluate(async () => {
+      const { toScreen } = await import('/js/ui/frame-rect.js') as any;
+      const doc = (document.querySelector('#epub-container iframe') as HTMLIFrameElement).contentDocument!;
+      const range = doc.defaultView!.getSelection()!.getRangeAt(0);
+      const rects = [...range.getClientRects()].filter(r => r.width >= 0.5 && r.height >= 0.5).map(r => toScreen(r));
+      const top = Math.min(...rects.map(r => r.top));
+      const bottom = Math.max(...rects.map(r => r.top + r.height));
+      const tt = document.getElementById('highlight-tooltip')!.getBoundingClientRect();
+      return {
+        lineas: rects.length,
+        // Solape vertical entre la barra y la banda que ocupa la selección.
+        px: Math.min(bottom, tt.bottom) - Math.max(top, tt.top),
+      };
+    });
+
+    expect(solape.px).toBeLessThanOrEqual(0);
+  });
+
   test('EPUB: pulsar el subrayado reabre la barra con su color y su nota', async ({ page }) => {
     await openEpub(page);
     await selectInEpub(page);

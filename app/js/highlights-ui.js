@@ -124,13 +124,23 @@ function removeTempSelection(rendition) {
 // pasar por el display/visibility/rAF haría parpadear.
 function placeTooltip(tooltip, rect) {
   const tw = tooltip.offsetWidth, th = tooltip.offsetHeight;
-  let cx = rect.left + rect.width / 2;
-  let top = rect.top - th - 10;
-  if (top < 10) top = rect.top + rect.height + 10;   // debajo si no cabe arriba
+  const cx = rect.left + rect.width / 2;
+  // La barra se ANCLA en la primera línea (horizontalmente) pero esquiva la selección
+  // ENTERA (verticalmente): con varias líneas, ponerla debajo del ancla la dejaba encima
+  // del resto de lo marcado, tapando el texto y sin poder alargar la selección.
+  const bandaTop = rect.blockTop != null ? rect.blockTop : rect.top;
+  const bandaBottom = rect.blockBottom != null ? rect.blockBottom : rect.top + rect.height;
+  const arriba = bandaTop - th - 10;
+  const abajo = bandaBottom + 10;
+  let top;
+  if (arriba >= 10) top = arriba;
+  else if (abajo + th <= window.innerHeight - 10) top = abajo;
+  // No cabe entera a ningún lado: al hueco mayor, tapando lo menos posible.
+  else if (bandaTop - 10 >= window.innerHeight - 10 - bandaBottom) top = 10;
+  else top = window.innerHeight - th - 10;
   const left = Math.max(10, Math.min(cx - tw / 2, window.innerWidth - tw - 10));
-  top = Math.max(10, Math.min(top, window.innerHeight - th - 10));
   tooltip.style.left = left + 'px';
-  tooltip.style.top = top + 'px';
+  tooltip.style.top = Math.max(10, Math.min(top, window.innerHeight - th - 10)) + 'px';
 }
 
 // Muestra la barra de selección junto al rect. Compartido por EPUB y PDF.

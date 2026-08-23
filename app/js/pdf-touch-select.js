@@ -26,6 +26,7 @@
 import * as Engine from './ui/selection-engine.js';
 import { cursorEnPagina } from './pdf-text-select.js';
 import { rafThrottle } from './ui/raf.js';
+import { withBand } from './ui/frame-rect.js';
 
 const LONGPRESS_MS = 380;   // igual que en el EPUB: el gesto debe sentirse el mismo
 const MOVE_CANCEL = 12;     // px que cancelan la pulsación larga (=scroll de la página)
@@ -161,7 +162,7 @@ const alDesplazar = rafThrottle(() => {
   if (!active) return;
   pintar();
   const rects = rectsDelTramo(active.spans, active.ini, active.fin);
-  if (rects[0]) callbacks.onMove(rects[0]);
+  if (rects[0]) callbacks.onMove(withBand(rects[0], rects));
 });
 
 function entregar() {
@@ -172,7 +173,7 @@ function entregar() {
   const rects = rectsDelTramo(spans, ini, fin);
   callbacks.onSelect({
     text: texto,
-    rect: rects[0] || null,             // la barra se ancla en la PRIMERA línea
+    rect: rects[0] ? withBand(rects[0], rects) : null,   // ancla en la PRIMERA línea + banda de toda la selección
     rectsPantalla: rects,
     wrapper: pagina,
     page: +pagina.dataset.page || 1,
