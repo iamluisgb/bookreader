@@ -693,3 +693,58 @@ export async function requestDemoToken() {
   if (total > 0) Storage.set(QUOTA_KEY, { remaining: Number(body.remaining), total });
   return body; // { token, remaining, quota, model }
 }
+
+// ---- Traspaso de la demo a otro dispositivo (F3.1) ---------------------------
+// El token NO se enseña como "API key" y eso no cambia (ADR-021: pegarlo suelto contra
+// otro proveedor es el 401 que ya nos costó un bug). Lo que se traspasa es la
+// CONFIGURACIÓN entera —base URL + token + alias—, que es lo que hace falta para llamar.
+//
+// El caso es real y no tiene otra salida: pedir una demo nueva desde el móvil suele
+// fallar, porque el gateway da 1 demo por red y día (`demo_already_granted`) y el móvil
+// está en la misma wifi que el portátil. Sin traspaso, la demo se queda encerrada donde
+// se emitió.
+
+/** ¿Hay una demo viva que traspasar? (no una key propia, que jamás va en una URL). */
+export function canTransferDemo() { return isDemo() && /^br-/i.test(getKey().trim()); }
+
+// Enlace que configura la demo en el dispositivo que lo abra. El token viaja en el
+// FRAGMENTO a propósito: el hash no se envía al servidor, así que no acaba en los logs
+// de acceso de Pages ni en los del gateway. Al abrirlo, app.js lo borra de la URL antes
+// de nada (`consumeDemoLink`), para que no se quede en el historial ni en un enlace que
+// el usuario copie después sin darse cuenta.
+export function demoTransferUrl() {
+  if (!canTransferDemo()) return '';
+  return location.origin + location.pathname + '#demo=' + encodeURIComponent(getKey().trim());
+}
+
+// GET /quota — cupo del token SIN gastar una llamada. Lo necesita el dispositivo que
+// recibe el enlace: por `X-Quota-Remaining` no se entera hasta la primera respuesta,
+// justo cuando ya es tarde para rechazar un enlace inválido.
+export async function fetchDemoQuota(token = getKey()) {
+  const res = await fetch(GATEWAY_BASE_URL.replace(/\/v1$/, '') + '/quota', {
+    headers: { 'Authorization': `Bearer ${String(token).trim()}` },
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body?.error?.message || `HTTP ${res.status}`);
+  return body; // { remaining, quota, tier, product, model, models }
+}
+
+// Recibe una demo emitida en OTRO dispositivo. Valida contra el gateway ANTES de
+// guardar nada: un token mal copiado dejaría la app apuntando al gateway con una key
+// que solo sabe devolver 401, y el usuario concluiría —otra vez— que la demo nace rota.
+export async function importDemoToken(token) {
+  const tok = String(token || '').trim();
+  if (!/^br-[\w-]+$/i.test(tok)) throw new Error(t('El enlace no lleva un token de demo válido.'));
+  const info = await fetchDemoQuota(tok);
+  setBaseUrl(GATEWAY_BASE_URL);
+  setKey(tok);
+  setModel(info.model || 'bookreader-fast');
+  // La demo no configura modelo de visión aparte (el alias de texto ya enruta), y
+  // heredar el de un proveedor anterior mandaría las imágenes a un modelo que este
+  // token no puede usar: 400 `model_not_found` en "Explicar lo que veo".
+  setVisionModel('');
+  const total = Number(info.quota ?? info.remaining);
+  if (total > 0) Storage.set(QUOTA_KEY, { remaining: Number(info.remaining), total });
+  window.dispatchEvent?.(new CustomEvent('llm:quota', { detail: getQuota() }));
+  return info;
+}

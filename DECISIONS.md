@@ -968,3 +968,39 @@ y se anuncia como gratis para siempre. La app sigue leyéndose entera sin infere
 migración de D1 (`credits_remaining`, periodo de recarga) y precio por alias para la reserva previa;
 los `daily_stats` que ya existen dan el coste real por usuario activo con el que poner precio a la
 suscripción — ponerlo antes de medir sería inventárselo.
+
+## ADR-032 — La demo se traspasa de dispositivo por enlace, no enseñando el token · `ACEPTADA`
+
+**Contexto.** La demo se emite y se autoconfigura en el dispositivo donde se pulsa el botón, y
+el token no se enseña nunca (ADR-021: el usuario no ve token ni URLs). Eso dejó un agujero: quien
+prueba la app en el portátil y quiere seguir en el móvil **no puede**. Pedir otra demo allí
+devuelve `demo_already_granted`, porque el gateway cuenta 1 demo por RED y día (ipBucket, /24 y
+/64) y los dos dispositivos están en la misma wifi. La demo queda encerrada donde se emitió.
+
+La salida obvia —enseñar el token para copiarlo— es justo la que ya nos costó un bug: pegado
+suelto en "API key" contra el proveedor del desplegable, viaja a api.nan.builders y muere con
+401. De ahí `gateway-repair.js` y `tests/demo-settings.spec.ts`.
+
+**Decisiones.**
+1. **Se traspasa la CONFIGURACIÓN, no la credencial.** Un enlace `#demo=br-…` lleva implícitos
+   los tres campos (base URL, token, alias): el dispositivo que lo abre queda configurado entero.
+   El token suelto no vale para nada sin los otros dos, que es exactamente el motivo por el que
+   no se enseñaba.
+2. **En el fragmento, no en la query.** El hash no se envía al servidor: el token no aparece en
+   los logs de acceso de Pages ni del gateway. Y se **borra de la URL** (`replaceState`) antes de
+   usarlo, para que no quede en el historial ni en un enlace que el usuario copie después.
+3. **Validar antes de guardar**, contra un `GET /quota` nuevo que no consume cupo. Guardar a
+   ciegas un enlace mal copiado dejaría la app pidiendo al gateway con una key que solo sabe
+   devolver 401 — el mismo síntoma de siempre, otra vez. El endpoint devuelve también el alias
+   y el cupo, así que el medidor existe antes de la primera pregunta.
+4. **Se atiende en el arranque** (`app.js`), no en el panel del agente: el enlace se abre en
+   frío. `llm.js` se trae con `import()` dinámico para no meterlo en el grafo de arranque por un
+   caso que casi nunca ocurre.
+5. **Solo para el token de la demo** (`canTransferDemo`). Una key BYOK jamás va en una URL.
+6. **El modo manual enseña los tres campos juntos**, nunca el token solo.
+
+**Consecuencias.** Riesgo aceptado: quien reenvíe el enlace regala su cupo. Es un token de 100
+llamadas, revocable por SQL y sin dato personal alguno, y la UI lo dice. El cupo es del TOKEN,
+así que los dispositivos comparten bolsa — también se dice, porque si no el segundo parece roto
+cuando se agota. `GET /quota` sirve además para cualquier cliente que quiera pintar el medidor
+sin gastar una llamada.

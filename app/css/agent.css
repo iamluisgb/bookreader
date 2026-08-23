@@ -930,6 +930,25 @@ body.has-taskchip .ai-taskchip.is-study { bottom: 74px; }
 .appset-demo-on { display: flex; align-items: center; gap: 6px; color: var(--accent); }
 .appset-demo-on .icon { flex: none; }
 
+/* Traspaso de la demo a otro dispositivo (F3.1). Plegado por defecto: quien está
+   probando la app no tiene que enterarse de que existe, y quien lo busca lo encuentra
+   donde ya vive el resto de la demo. */
+.appset-xfer-panel {
+  margin-top: 10px; padding: 12px; border-radius: 10px;
+  background: var(--surface-3);
+}
+.appset-xfer-panel .appset-input[readonly] {
+  color: var(--text-soft); font-family: var(--font-mono, ui-monospace, monospace); font-size: 12px;
+}
+.appset-xfer-panel .appset-privacy { margin-top: 12px; }
+.appset-xfer-share { width: 100%; margin-top: 8px; }
+.appset-xfer-manual { margin-top: 12px; }
+.appset-xfer-manual > summary {
+  cursor: pointer; font-size: 12px; font-weight: 500; color: var(--text-soft);
+}
+.appset-xfer-manual > summary:hover { color: var(--accent); }
+.appset-xfer-manual .appset-muted { margin: 8px 0 0; font-size: 12px; }
+
 /* Alta/baja de un proveedor propio: aparece bajo la Base URL solo cuando hay algo
    que hacer con ella (guardarla con nombre, o quitarla de la lista). */
 .appset-prov:not(:empty) { margin-top: 10px; }

@@ -132,6 +132,9 @@ export default {
       if (url.pathname === '/demo-token' && request.method === 'POST') {
         return withCors(await handleDemoToken(request, env), cors);
       }
+      if (url.pathname === '/quota' && request.method === 'GET') {
+        return withCors(await handleQuota(request, env), cors);
+      }
       return withCors(oaiError(404, 'not_found', 'Unknown endpoint.'), cors);
     } catch (e) {
       // Nunca filtrar detalles internos; el error real queda en observability.
@@ -152,6 +155,30 @@ async function handleModels(request, env) {
   // modelos que van a devolver 403 en cuanto se elijan.
   const data = aliasesFor(tok.product).map((id) => ({ id, object: 'model', owned_by: tok.product }));
   return json(200, { object: 'list', data });
+}
+
+// GET /quota — estado del token SIN gastar una llamada. Existe para el traspaso de la
+// demo a otro dispositivo (F3.1): el que recibe el enlace tiene que saber, antes de
+// preguntar nada, si el token vale y con cuánto cuenta. Sin este endpoint el cliente
+// solo puede averiguarlo por `X-Quota-Remaining`, que llega con la primera respuesta —
+// demasiado tarde para rechazar un enlace inválido y para pintar el medidor.
+//
+// Devuelve también los alias, que es la otra mitad de la configuración: un token suelto
+// no basta para llamar (hace falta base URL y modelo), y ese fue siempre el motivo de
+// no enseñarlo. `getToken` ya distingue token desconocido/revocado (401).
+async function handleQuota(request, env) {
+  const tok = await getToken(request, env);
+  if (!tok.ok) return tok.response;
+  const models = aliasesFor(tok.product);
+  const res = json(200, {
+    remaining: tok.remaining, quota: tok.quota, tier: tok.tier,
+    product: tok.product, model: models[0], models,
+  });
+  // Las mismas cabeceras que el chat: el cliente tiene UN solo camino para leer el cupo.
+  const h = new Headers(res.headers);
+  h.set('X-Quota-Remaining', String(tok.remaining));
+  h.set('X-Quota-Total', String(tok.quota));
+  return new Response(res.body, { status: res.status, headers: h });
 }
 
 // POST /v1/chat/completions — valida, decrementa, enruta y hace passthrough

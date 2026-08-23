@@ -78,6 +78,28 @@ emisión diaria `MAX_DAILY_TOKENS` → 429 `demo_sold_out`; tope de llamadas dem
 Las concesiones de más de 30 días se barren al emitir (el límite es por día: guardarlas
 no sirve de nada).
 
+## Traspaso de la demo entre dispositivos (F3.1)
+
+`GET /quota` devuelve el estado del token **sin gastar una llamada**: cupo, tier, producto y
+alias. Existe para el enlace de traspaso (`#demo=br-…`) que genera Ajustes → Agente cuando hay
+una demo activa: el dispositivo que lo abre valida el token antes de guardarlo y pinta el
+medidor sin esperar a la primera respuesta. Ver ADR-032.
+
+```bash
+curl -H 'Authorization: Bearer br-demo-…' \
+  https://bookreader-gateway.luisgonzalezb93.workers.dev/quota
+# {"remaining":27,"quota":100,"tier":"demo","product":"bookreader",
+#  "model":"bookreader-fast","models":[…]}
+```
+
+Token desconocido o revocado → 401 (así el cliente puede rechazar el enlace en vez de quedarse
+configurado con una key que solo devuelve 401 al preguntar). Token agotado → **200 con
+`remaining: 0`**: el traspaso tiene que poder decir *por qué* no sirve. Devuelve las mismas
+cabeceras `X-Quota-*` que el chat, para que el cliente tenga un solo camino de leer el cupo.
+
+El cupo es del TOKEN, así que los dispositivos que comparten enlace comparten bolsa. Revocar uno
+filtrado es el `UPDATE tokens SET active = 0` de siempre.
+
 ## Dos productos (F4)
 
 El gateway sirve a **bookreader** y a **arete**. Cada token nace con su `product` y solo
@@ -140,11 +162,13 @@ paga el usuario de la demo.
 npm run test:gateway     # node --test
 ```
 
-Dos familias: los helpers de límites son puros (allowlist, medición de entrada, buckets
-de IP), y `products.test.mjs` conduce el Worker entero contra **SQLite real**
-(`node:sqlite` con estas mismas migraciones) para lo que no es puro: emisión por
-producto, alias cruzados, cuota y desglose. Un doble de D1 a mano tendría que fingir
-`RETURNING`, `ON CONFLICT` y `date('now')`, que es donde vive la atomicidad que importa.
+Tres ficheros: los helpers de límites son puros (allowlist, medición de entrada, buckets
+de IP); `quota.test.mjs` cubre `GET /quota` (validar sin gastar cupo, agotado ≠ inválido); y
+`products.test.mjs` conduce el Worker entero contra **SQLite real**
+(`node:sqlite` con estas mismas migraciones, arnés compartido en `test/harness.mjs`) para lo
+que no es puro: emisión por producto, alias cruzados, cuota y desglose. Un doble de D1 a mano
+tendría que fingir `RETURNING`, `ON CONFLICT` y `date('now')`, que es donde vive la atomicidad
+que importa.
 
 `tests/gateway.spec.ts` (@live) conduce la app real contra el gateway. Necesita
 `GW_TOKEN=br-…` en `.env`:

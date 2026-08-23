@@ -1322,6 +1322,13 @@ self-service (F3), Turnstile si hiciera falta, allowlist de modelos y tope de `m
   usuario vea nada. Cuota por token: 30 llamadas (`DEMO_QUOTA`). Pendiente de F3: el botón en el
   onboarding del propio panel (hoy el flujo sin key ya desemboca en Ajustes → Agente) y Turnstile
   si aparece abuso con scripts.
+- **F3.1 — Traspaso entre dispositivos** `S` · **✓** _(2026-08-23, ver CHANGELOG · ADR-032)_: la
+  demo se emitía y se quedaba encerrada en el dispositivo donde se pulsó el botón — pedir otra
+  desde el móvil da `demo_already_granted`, porque el bucket de red de F1.1 cuenta 1 demo por RED
+  y día y el móvil está en la misma wifi. "Usar esta demo en otro dispositivo" genera un enlace
+  `#demo=br-…` que traspasa la CONFIGURACIÓN entera (base URL + token + alias), no la credencial
+  suelta: el token en el fragmento (no llega al servidor), borrado de la URL al abrirla, y
+  validado contra un `GET /quota` nuevo que no consume cupo. Solo para tokens demo.
 - **F4 — Gestión** `S`: listar tokens, uso, revocar (CLI ampliada o mini-admin).
 
 **Enlace con MON2 (licencias Polar) — los tokens Pro no se emiten a mano.** El flujo natural:

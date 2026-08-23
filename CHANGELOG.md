@@ -5,6 +5,33 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-08-23 — La demo se puede seguir en el móvil
+
+La demo se emitía y se quedaba encerrada en el dispositivo donde se pulsó el botón. Quien la
+probaba en el portátil y quería seguir en el móvil no tenía salida: pedir otra allí devuelve
+`demo_already_granted`, porque el gateway cuenta **1 demo por red y día** y los dos aparatos
+están en la misma wifi.
+
+Enseñar el token para copiarlo era la salida obvia y la mala: pegado suelto en "API key" contra
+el proveedor del desplegable, viaja a api.nan.builders y muere con 401 — el bug que ya arregló
+`gateway-repair.js`. Lo que se traspasa es la **configuración entera** (base URL + token +
+alias), en un enlace `#demo=br-…`:
+
+- El token va en el **fragmento**, que no se envía al servidor, y se **borra de la URL** nada
+  más abrirla: no queda en el historial ni en un enlace copiado después sin fijarse.
+- Se **valida antes de guardar**, contra un `GET /quota` nuevo en el gateway que no consume
+  cupo. Un enlace mal copiado avisa en vez de dejar la app pidiendo con una key inservible.
+- Ese mismo endpoint trae el alias y el cupo, así que el medidor existe **antes** de la primera
+  pregunta, y el panel que emite el enlace enseña el cupo de verdad y no el que hubiera cacheado.
+- El cupo es del **token**: los dos dispositivos gastan de la misma bolsa, y la UI lo dice — si
+  no, el segundo parece roto cuando se agota.
+- Solo para la demo. Una key BYOK no va nunca en una URL.
+
+Quien prefiera configurarlo a mano tiene los tres campos juntos, nunca el token solo. Ver
+ADR-032.
+
+---
+
 ## 2026-08-19 — main.css partido: 63 KB de CSS fuera del primer pintado
 
 Segunda mitad de la auditoría. `main.css` eran 163 KB en un solo fichero que bloquea el

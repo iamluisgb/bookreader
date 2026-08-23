@@ -220,6 +220,47 @@ function demoBlockHtml() {
     </div>`;
 }
 
+// Traspaso de la demo a otro dispositivo (F3.1). El token sigue SIN enseñarse como
+// "API key" —pegarlo suelto contra otro proveedor es el 401 de siempre—: lo que se
+// ofrece es un enlace que lleva la configuración entera (base URL + token + alias).
+// Sin esto la demo se queda encerrada donde se emitió: pedir otra desde el móvil da
+// `demo_already_granted`, porque el gateway cuenta 1 demo por RED y día y el móvil
+// está en la misma wifi que el portátil.
+function demoTransferHtml() {
+  if (!LLM.canTransferDemo()) return '';
+  const manual = [
+    ['Base URL', 'appset-xfer-base'],
+    ['API key', 'appset-xfer-token'],
+    [t('Modelo'), 'appset-xfer-model'],
+  ].map(([label, id]) => `
+      <label class="appset-label" for="${id}">${escapeHtml(label)}</label>
+      <div class="appset-model-row">
+        <input id="${id}" class="appset-input" readonly value="" spellcheck="false" />
+        <button type="button" class="appset-discover appset-copy" data-copy="${id}">${t('Copiar')}</button>
+      </div>`).join('');
+  return `
+    <div class="appset-xfer">
+      <button type="button" id="appset-xfer-btn" class="appset-viewlink" aria-expanded="false" aria-controls="appset-xfer-panel">
+        ${icon('share', { size: 13 })} ${t('Usar esta demo en otro dispositivo')}
+      </button>
+      <div class="appset-xfer-panel" id="appset-xfer-panel" hidden>
+        <p class="appset-muted">${t('Abre este enlace en el otro dispositivo y la demo queda lista allí. El cupo es del enlace, no del dispositivo: los dos gastan de la misma bolsa.')}</p>
+        <div class="appset-model-row">
+          <input id="appset-xfer-url" class="appset-input" readonly value="" spellcheck="false" />
+          <button type="button" class="appset-discover appset-copy" data-copy="appset-xfer-url">${t('Copiar')}</button>
+        </div>
+        <button type="button" id="appset-xfer-share" class="appset-discover appset-xfer-share" hidden>${icon('share', { size: 13 })} ${t('Compartir…')}</button>
+        <p class="appset-model-hint" id="appset-xfer-hint" hidden></p>
+        <details class="appset-xfer-manual">
+          <summary>${t('O configurarlo a mano')}</summary>
+          <p class="appset-muted">${t('Los tres campos van juntos, en Ajustes → Agente → Opciones avanzadas del otro dispositivo. El token por su cuenta no sirve: solo funciona contra esta Base URL.')}</p>
+          ${manual}
+        </details>
+        <p class="appset-privacy">${icon('shield', { size: 13 })} ${t('El enlace lleva tu token: quien lo tenga puede gastarte el cupo. Mándalo solo a tus dispositivos.')}</p>
+      </div>
+    </div>`;
+}
+
 // Borrador que sobrevive al cambio de vista: sin esto, pulsar "Opciones avanzadas"
 // después de pegar una API key larga la tira a la basura.
 let agentDraft = null;
@@ -250,6 +291,7 @@ function agentSimpleHtml() {
     <h3 class="appset-h3">${t('Agente')}</h3>
     ${demoBlockHtml()}
     ${demoNote}
+    ${demoTransferHtml()}
     <label class="appset-label" for="appset-provider">${t('Proveedor')}</label>
     <select id="appset-provider" class="appset-input">${provOpts}</select>
     <label class="appset-label" for="appset-key">API key</label>
@@ -277,6 +319,7 @@ function agentHtml() {
     <h3 class="appset-h3">${t('Agente')}</h3>
     ${LLM.canUseSimple() ? `<button type="button" id="appset-agent-simple" class="appset-viewlink">${icon('chevron-left', { size: 13 })} ${t('Vista simple')}</button>` : ''}
     ${demoBlock}
+    ${demoTransferHtml()}
     <label class="appset-label" for="appset-provider">${t('Proveedor')}</label>
     <select id="appset-provider" class="appset-input">${provOpts}</select>
     <label class="appset-label" for="appset-baseurl">Base URL (endpoint OpenAI-compatible)</label>
@@ -343,6 +386,7 @@ function wireAgentViewSwitch(content) {
 // ---- Vista SIMPLE ------------------------------------------------------------
 function wireAgentSimple(content) {
   wireDemoButton(content);
+  wireDemoTransfer(content);
   wireAgentViewSwitch(content);
   const prov = content.querySelector('#appset-provider');
   const note = content.querySelector('#appset-simple-model');
@@ -417,6 +461,73 @@ function wireDemoButton(content) {
   });
 }
 
+// F3.1 · Traspaso de la demo. El enlace se compone al ABRIR el panel, no al pintar la
+// sección: así refleja el token vivo aunque la demo se haya pedido hace un momento en
+// esta misma pantalla.
+function wireDemoTransfer(content) {
+  const btn = content.querySelector('#appset-xfer-btn');
+  if (!btn) return;
+  const panel = content.querySelector('#appset-xfer-panel');
+  const hint = content.querySelector('#appset-xfer-hint');
+  const share = content.querySelector('#appset-xfer-share');
+  const url = content.querySelector('#appset-xfer-url');
+
+  const set = (id, v) => { const el = content.querySelector('#' + id); if (el) el.value = v; };
+
+  btn.addEventListener('click', async () => {
+    const abrir = panel.hidden;
+    panel.hidden = !abrir;
+    btn.setAttribute('aria-expanded', String(abrir));
+    if (!abrir) return;
+
+    url.value = LLM.demoTransferUrl();
+    set('appset-xfer-base', LLM.getBaseUrl());
+    set('appset-xfer-token', LLM.getKey());
+    set('appset-xfer-model', LLM.getModel());
+    // navigator.share es el camino real entre dispositivos propios (AirDrop, la app de
+    // mensajería de turno). No está en escritorio: allí queda el botón de copiar.
+    if (navigator.share) share.hidden = false;
+
+    // El cupo se consulta al gateway (`/quota`, no gasta llamada) en vez de fiarse del
+    // que hay guardado: el número que se va a compartir tiene que ser el de verdad, y
+    // el local puede venir de la última respuesta de hace días.
+    hint.hidden = false;
+    hint.classList.remove('is-error');
+    hint.textContent = t('Comprobando el cupo…');
+    try {
+      const q = await LLM.fetchDemoQuota();
+      hint.textContent = Number(q.remaining) > 0
+        ? t('Quedan {n} de {total} preguntas en esta demo.', { n: q.remaining, total: q.quota })
+        : t('Esta demo está agotada: el enlace no le servirá de nada al otro dispositivo.');
+    } catch (e) {
+      hint.classList.add('is-error');
+      hint.textContent = t('No se pudo comprobar el cupo: {msg}', { msg: e.message });
+    }
+  });
+
+  share?.addEventListener('click', () => {
+    navigator.share({ title: 'bookreader', url: url.value }).catch(() => { /* cancelado */ });
+  });
+
+  // Copiar (enlace y los tres campos manuales). Mismo fallback que el panel del agente:
+  // sin Clipboard API (contexto no seguro), un textarea temporal y execCommand.
+  content.querySelectorAll('.appset-copy').forEach((b) => {
+    b.addEventListener('click', async () => {
+      const el = content.querySelector('#' + b.dataset.copy);
+      if (!el) return;
+      const antes = b.textContent;
+      try {
+        await navigator.clipboard.writeText(el.value);
+      } catch {
+        el.select();
+        try { document.execCommand('copy'); } catch { b.textContent = t('Error'); setTimeout(() => { b.textContent = antes; }, 1500); return; }
+      }
+      b.textContent = t('Copiado');
+      setTimeout(() => { b.textContent = antes; }, 1500);
+    });
+  });
+}
+
 // Punto de entrada de la sección: cada vista tiene su cableado. La avanzada es el
 // formulario de siempre; la simple, un subconjunto que no comparte casi ningún campo.
 function wireAgent(content) {
@@ -427,6 +538,7 @@ function wireAgent(content) {
 // ---- Vista AVANZADA: los cuatro slots a mano ---------------------------------
 function wireAgentAdvanced(content) {
   wireDemoButton(content);
+  wireDemoTransfer(content);
   wireAgentViewSwitch(content);
 
   const prov = content.querySelector('#appset-provider');
