@@ -1004,3 +1004,71 @@ llamadas, revocable por SQL y sin dato personal alguno, y la UI lo dice. El cupo
 así que los dispositivos comparten bolsa — también se dice, porque si no el segundo parece roto
 cuando se agota. `GET /quota` sirve además para cualquier cliente que quiera pintar el medidor
 sin gastar una llamada.
+
+---
+
+## ADR-033 — PDF: la unidad de ajuste es la mancha, no el papel · `ACEPTADA`
+
+**Contexto.** Al ampliar un PDF para que el texto llenara la pantalla aparecía scroll horizontal, y
+leyendo en vertical cualquier desvío del dedo o del trackpad descolocaba la columna de lado. La
+petición que llegó fue "una opción para bloquear el scroll horizontal".
+
+Pero el eje X no era el problema, era el **síntoma**. El zoom mínimo del lector era "página entera,
+márgenes blancos incluidos": `ZOOM_MIN = 1` y `fitScale()` ajustaba el **ancho de papel**. Para que
+la mancha llenara el ancho había que pasar de zoom 1, y a partir de ahí el contenido excede el
+viewport **por construcción**. En un A4 con márgenes normales eso es ~25% de ancho tirado, que en
+móvil es justo la diferencia entre leer y no leer.
+
+**Decisión.** No se bloquea nada. Se añade un ajuste de ancho por libro —**Página** (papel) o
+**Texto** (mancha)— y en «Texto» se recorta una **ventana horizontal** sobre la página. Con eso la
+mancha llena el ancho **a zoom 1**, `scrollWidth === clientWidth`, y no queda eje que bloquear.
+
+El recorte vive en el **layout**, igual que el zoom y por las mismas razones (ADR-025: el zoom es
+compositor puro):
+
+- `.pdf-page` → caja de ancho `fitw · cropW · zoom`. Es lo que se ve y lo que define el área de scroll.
+- `.pdf-scaler` → **sigue siendo la página entera**, desplazada `-fitw · cropX · zoom`.
+
+Que el sistema de coordenadas interno del scaler no cambie es lo que hace la decisión barata: el
+parche de detalle, la capa de texto y el re-fit siguen midiendo en unidades fit exactamente igual.
+Solo hay que sumar el desplazamiento donde el borde de la caja se cruza con el contenido — un
+sumando en `renderDetail` y el mapeo de los overlays.
+
+**Porqué así y no de las otras formas.**
+
+1. **Recortar en vez de bloquear el eje.** Un candado congela el síntoma: te deja con una vista
+   permanentemente descentrada, un modo más que mantener y —si se implementa restaurando
+   `scrollLeft`— rompe `scrollIntoView`, o sea la búsqueda, el foco de teclado y los lectores de
+   pantalla. Es un estado del que el usuario de teclado no puede salir. El recorte quita la causa.
+2. **Uniforme para todo el documento, no por página.** Un recorte por página haría que la anchura
+   bailara al pasar páginas en modo scroll. Se muestrean 8 páginas y se agrega por **percentil**
+   (0.15 / 0.85), no por mínimo: una sola página a sangre —una portada, una lámina— no puede anular
+   el recorte de las otras trescientas.
+3. **Se mide sobre píxeles, no sobre la capa de texto.** Rasterizar la muestra a ~200 px de ancho y
+   buscar la primera y la última columna con tinta funciona igual en un PDF digital, en uno
+   **escaneado** (que no tiene capa de texto y con el método del texto no se recortaría nunca) y en
+   uno con figuras. El umbral es **relativo a la mediana** de luminancia de la página: un escaneo
+   sobre papel gris no es "todo tinta".
+4. **Conservador por construcción, que es el escape.** Nunca se quita más de la mitad del ancho
+   (`CROP_MIN_W`), así que una tabla más ancha que la mancha se sigue viendo casi entera; y el
+   recorte se quita con un toque en «Página». No hace falta un escape por página.
+5. **El tope de `fitScale` acota el ANCHO resultante, no la escala.** Acotando la escala, en una
+   pantalla ancha —donde el tope ya mordía— el recorte no podía crecer para compensar y la página
+   quedaba en una tira estrecha en el centro: pedías "ajustar al texto" y salía **más pequeño**. Sin
+   recorte las dos formas son idénticas, así que el cambio no toca el comportamiento de «Página».
+6. **Los subrayados se guardan en fracciones de PÁGINA COMPLETA**, no de la caja visible. El recorte
+   es una preferencia que se puede quitar, cambiar o recalcular; un subrayado tiene que seguir sobre
+   el mismo texto en cualquiera de esos estados. `fractionalFromRects` suma el recorte al capturar y
+   `pdfRectToBox` lo resta al pintar (identidad cuando no hay recorte).
+7. **Por libro, no por dispositivo.** El margen es una propiedad del PDF, no del aparato: sigue el
+   precedente de `pdfMode` y viaja en el sync. El recorte **calculado** (`pdfCrop_*`) es dato
+   derivado, idéntico en cualquier dispositivo y barato de rehacer: se cachea en local y **no** se
+   sincroniza.
+
+**Consecuencias.**
+- Cambiar de ajuste **re-rasteriza** (cambia `fit`), a diferencia del zoom. Por eso pasa por
+  `rerender()`, que ya sabe recolocarse en la página actual, y el botón se deshabilita mientras tanto.
+- Al activar «Texto» el zoom vuelve a 1: el zoom que hubiera era el apaño para llenar el ancho, y
+  dejarlo puesto amplía **sobre** el recorte y devuelve el scroll horizontal que veníamos a quitar.
+- El primer «Texto» de un libro cuesta el muestreo (8 rasterizados de 200 px). Se cachea por libro.
+- `.pdf-page` pasa a `overflow: hidden`: la caja es una ventana y lo que cae fuera hay que cortarlo.

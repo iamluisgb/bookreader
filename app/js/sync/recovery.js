@@ -62,7 +62,7 @@ export async function purgeOrphans() {
   // modo de lectura se añadieron al migrarlos al id canónico (TEC5): hasta entonces vivían
   // bajo la clave interna de epub.js / la huella de pdf.js y quedaban como libros fantasma.
   const PREFIJOS = ['highlights', 'bookmarks', 'lastPosition', 'lastPositionAt',
-                    'pdfLastPage', 'pdfLastPageAt', 'readingMode', 'pdfMode'];
+                    'pdfLastPage', 'pdfLastPageAt', 'readingMode', 'pdfMode', 'pdfFit', 'pdfCrop'];
 
   // Reúne también las claves locales huérfanas (aunque no estén en el manifest remoto).
   const ids = new Set(remoteOrphans);

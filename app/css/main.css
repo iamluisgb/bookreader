@@ -509,8 +509,8 @@ html, body {
 }
 
 /* Control segmentado Páginas/Scroll (modo de lectura). */
-.reading-mode-selector { display: flex; gap: 10px; }
-.reading-mode-btn {
+.reading-mode-selector, .pdf-fit-selector { display: flex; gap: 10px; }
+.reading-mode-btn, .pdf-fit-btn {
   flex: 1;
   padding: 10px 12px;
   border: 2px solid var(--border);
@@ -522,8 +522,9 @@ html, body {
   cursor: pointer;
   transition: border-color var(--transition-fast), background var(--transition-fast), color var(--transition-fast);
 }
-.reading-mode-btn:hover { border-color: var(--accent); }
-.reading-mode-btn.active { border-color: var(--accent); background: var(--accent); color: var(--on-accent); }
+.reading-mode-btn:hover, .pdf-fit-btn:hover { border-color: var(--accent); }
+.reading-mode-btn.active,
+.pdf-fit-btn.active { border-color: var(--accent); background: var(--accent); color: var(--on-accent); }
 
 .theme-btn {
   width: 44px;
@@ -928,6 +929,11 @@ body:not(.scroll-mode) .epub-container .epub-view {
 .pdf-page {
   position: relative;
   flex: none;
+  /* La caja es la VENTANA de recorte (ADR-033): el .pdf-scaler de dentro sigue midiendo la
+     página entera y desplazado, así que lo que cae fuera hay que cortarlo aquí. Sin recorte
+     el scaler mide exactamente la caja y este overflow no corta nada. La sombra es del
+     propio elemento, no un descendiente: `hidden` no se la come. */
+  overflow: hidden;
   box-shadow: 0 2px 8px var(--shadow);
   /* Grupo de mezcla acotado a la página: el tinte de papel y los subrayados (ambos con
      mix-blend-mode) se mezclan con el papel y entre sí, nunca con el fondo de la app que
@@ -1016,7 +1022,7 @@ body:not(.scroll-mode) .epub-container .epub-view {
 .pdf-page.pdf-cite-flash { animation: pdfCiteFlash 1.5s var(--ease); }
 
 /* Resaltado transitorio del TROZO citado (cuando sí localizamos el pasaje en la página). */
-.pdf-cite-layer { position: absolute; inset: 0; pointer-events: none; z-index: 3; }
+.pdf-cite-layer { position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: 3; }
 .pdf-cite-hl {
   position: absolute;
   border-radius: 2px;
@@ -1070,6 +1076,9 @@ body:not(.scroll-mode) .epub-container .epub-view {
   position: absolute;
   inset: 0;
   pointer-events: none;
+  /* Los rects se guardan en fracciones de página ENTERA y se remapean a la caja, así que
+     con recorte pueden salirse por los lados (una nota al margen, un número de página). */
+  overflow: hidden;
   /* Por ENCIMA del .pdf-scaler (canvas) pase lo que pase con el orden del DOM: en modo
      scroll el subrayado se crea sobre el placeholder ANTES de que el observer perezoso
      añada el scaler, así que sin z-index el canvas opaco lo tapaba. */

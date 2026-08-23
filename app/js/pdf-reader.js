@@ -41,12 +41,46 @@ const ZOOM_MIN = 1, ZOOM_MAX = 6;
 
 const clampZoom = (z) => Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, z));
 
-// Ajuste a ancho (a zoom 1): la página cabe en el ancho disponible; tope 1.5 para no
-// agigantar en pantallas anchas. El zoom se aplica aparte (layout), no aquí.
+// ---- Recorte de márgenes: "Ajustar al texto" (ADR-033) --------------------
+// El zoom mínimo del lector es "página entera, márgenes blancos incluidos": para que la
+// mancha de texto llene la pantalla hay que pasar de zoom 1, y a partir de ahí el contenido
+// excede el viewport POR CONSTRUCCIÓN → aparece scroll horizontal y la columna se descoloca
+// de lado al leer. La cura no es bloquear el eje X (eso congela el síntoma y deja una vista
+// torcida), sino que la unidad de ajuste deje de ser el PAPEL y pase a ser la MANCHA.
+//
+// El recorte es una VENTANA HORIZONTAL sobre la página, en fracciones de su ancho, uniforme
+// para todo el documento (calculada por muestreo, ver computeCrop). Vive en el layout, igual
+// que el zoom, y por las mismas razones (ADR-025: el zoom es compositor puro):
+//   .pdf-page  → caja de ancho fitw·cropW·zoom (lo que se ve y define el área de scroll)
+//   .pdf-scaler→ sigue siendo la página ENTERA, desplazada -fitw·cropX·zoom
+// Es decir: el sistema de coordenadas interno del scaler NO cambia. Todo lo que mide en
+// unidades fit —el parche de detalle, la capa de texto, el re-fit— sigue valiendo tal cual;
+// solo hay que sumar el desplazamiento donde se cruza el borde de la caja con el contenido.
+let fitMode = 'page';           // 'page' (ajusta al papel) | 'text' (recorta los márgenes)
+let cropX = 0, cropW = 1;       // ventana ACTIVA, en fracción del ancho de página
+
+function applyCrop(win) {
+  cropX = win && win.w > 0 ? win.x : 0;
+  cropW = win && win.w > 0 ? win.w : 1;
+}
+
+// Desplazamiento del contenido dentro de la caja, en unidades fit.
+function cropOffset(fitw) { return fitw * cropX; }
+
+// Ajuste a ancho (a zoom 1): lo que se VE cabe en el ancho disponible. Con recorte, "lo que
+// se ve" es la mancha y no el papel — de ahí sale la ganancia de tamaño de letra en móvil.
+//
+// El tope acota el ANCHO RESULTANTE (lo que mediría el papel a escala 1.5), no la escala.
+// Acotando la escala, en una pantalla ancha —donde el tope ya mordía— el recorte no podía
+// crecer para compensar y la página se quedaba en una tira estrecha en el centro: pedías
+// "ajustar al texto" y salía más pequeño. Sin recorte las dos formas son idénticas.
+const FIT_MAX = 1.5;
 function fitScale(baseWidth) {
   const c = document.getElementById('pdf-container');
   const avail = (c ? c.clientWidth : 800) - PDF_PAD * 2;
-  return Math.min(avail > 0 && baseWidth > 0 ? avail / baseWidth : 1.5, 1.5);
+  const visible = baseWidth * cropW;
+  if (!(avail > 0) || !(visible > 0)) return FIT_MAX;
+  return Math.min(avail, baseWidth * FIT_MAX) / visible;
 }
 
 function pdfPages() {
@@ -57,17 +91,33 @@ function zoomLayer() { return document.getElementById('pdf-zoom-layer'); }
 
 export function getZoom() { return zoom; }
 
-// "Hornea" el zoom en el layout: cada caja pasa a fit·zoom y su scaler a scale(zoom).
+// Coloca UNA página: la caja es la ventana de recorte a zoom actual, y el scaler —que sigue
+// siendo la página entera— se desplaza para que el borde izquierdo del recorte caiga en 0.
+// Con transform-origin 0 0, `translateX(t) scale(z)` lleva el punto fit `p` a `z·p + t`;
+// queremos que fit `fitw·cropX` caiga en 0, así que t = -fitw·cropX·zoom.
+function layoutWrapper(w) {
+  const fw = parseFloat(w.dataset.fitw || '0'), fh = parseFloat(w.dataset.fith || '0');
+  if (!fw || !fh) return;
+  w.style.width = (fw * cropW * zoom) + 'px';
+  w.style.height = (fh * zoom) + 'px';
+  // El recorte lo leen también los subrayados y las citas, que guardan sus rects en
+  // fracciones de PÁGINA COMPLETA y tienen que mapearlos a esta caja (ver highlights-ui.js).
+  w.dataset.cropx = String(cropX);
+  w.dataset.cropw = String(cropW);
+  const s = w.querySelector('.pdf-scaler');
+  if (s) {
+    const tx = -cropOffset(fw) * zoom;
+    const t = tx ? `translateX(${tx}px)` : '';
+    s.style.transform = (zoom === 1 ? t : `${t} scale(${zoom})`).trim();
+  }
+}
+
+// "Hornea" el zoom en el layout: cada caja pasa a fit·cropW·zoom y su scaler a scale(zoom).
 // El canvas (oversampleado) se re-escala por CSS → nítido, SIN volver a pdf.js.
 function applyCommittedZoom() {
   const layer = zoomLayer();
   if (layer) layer.style.setProperty('--pdf-zoom', String(zoom));   // el gap escala con el zoom
-  for (const w of pdfPages()) {
-    const fw = parseFloat(w.dataset.fitw || '0'), fh = parseFloat(w.dataset.fith || '0');
-    if (fw && fh) { w.style.width = (fw * zoom) + 'px'; w.style.height = (fh * zoom) + 'px'; }
-    const s = w.querySelector('.pdf-scaler');
-    if (s) s.style.transform = zoom === 1 ? '' : `scale(${zoom})`;
-  }
+  for (const w of pdfPages()) layoutWrapper(w);
   scheduleDetail();
 }
 
@@ -144,8 +194,10 @@ async function renderDetail(wrapper, wr, vis, need, seq) {
   const fit = fitw / basew;                 // px CSS por unidad PDF (a zoom 1)
 
   // Región visible de la página en unidades fit (el sistema del .pdf-scaler), con margen.
+  // Con recorte, el borde izquierdo de la CAJA (wr.left) no es el de la página: es la unidad
+  // fit `cropOffset(fitw)`. Sin este sumando el parche saldría desplazado justo lo recortado.
   const mx = (vis.right - vis.left) * DETAIL_MARGIN, my = (vis.bottom - vis.top) * DETAIL_MARGIN;
-  const ux = Math.max(0, (vis.left - mx - wr.left) / zoom);
+  const ux = Math.max(0, cropOffset(fitw) + (vis.left - mx - wr.left) / zoom);
   const uy = Math.max(0, (vis.top - my - wr.top) / zoom);
   const uw = Math.min((vis.right - vis.left + 2 * mx) / zoom, fitw - ux);
   const uh = Math.min((vis.bottom - vis.top + 2 * my) / zoom, fith - uy);
@@ -322,6 +374,8 @@ export async function load(arrayBuffer, onProgress, bookId = null) {
 
   currentPage = 1;
   zoom = 1;                     // cada libro empieza ajustado a ancho
+  fitMode = 'page';             // ...y sin recorte, hasta leer lo guardado de ESTE libro
+  applyCrop(null);
 
   const container = document.getElementById('pdf-container');
   container.innerHTML = '';
@@ -366,6 +420,17 @@ export async function load(arrayBuffer, onProgress, bookId = null) {
     if (m === 'scroll' || m === 'paginated') readingMode = m;
   } catch (e) {}
 
+  // Ajuste de ancho recordado por libro (al papel por defecto). El recorte se resuelve
+  // ANTES del primer render: entrar sin él y recortar después obligaría a re-rasterizar
+  // el documento entero y a mover el scroll delante del usuario.
+  try {
+    const k = bookKey();
+    if (k && Storage.get('pdfFit_' + k) === 'text') {
+      fitMode = 'text';
+      await ensureCrop();
+    }
+  } catch (e) { console.warn('recorte de márgenes:', e); }
+
   await rerender();
 
   if (claimSeq !== mine) active = false;   // otro lector tomó la pantalla mientras cargaba
@@ -383,6 +448,141 @@ export async function setReadingMode(mode) {
   window.dispatchEvent(new CustomEvent('reader:flow-changed'));
 }
 
+// ---- Ajuste de ancho: al papel o a la mancha (ADR-033) --------------------
+export function getFitMode() { return fitMode; }
+
+// Cambiar de ajuste cambia `fit` (la escala a la que se rasteriza), así que hay que volver
+// a pintar: no es un cambio de compositor como el zoom. Se reconstruye por el mismo camino
+// que el cambio de modo de lectura, que ya sabe recolocarse en la página actual.
+export async function setFitMode(mode) {
+  if ((mode !== 'page' && mode !== 'text') || mode === fitMode) return;
+  fitMode = mode;
+  try { const k = bookKey(); if (k) Storage.set('pdfFit_' + k, mode); } catch (e) {}
+  if (mode === 'text') await ensureCrop();
+  else applyCrop(null);
+  // El zoom que tuvieras era el apaño para llenar el ancho; el recorte ya lo hace. Dejarlo
+  // puesto amplía SOBRE el recorte y devuelve el scroll horizontal que veníamos a quitar.
+  zoom = 1;
+  await rerender();
+  window.dispatchEvent(new CustomEvent('reader:flow-changed'));
+}
+
+// Ventana de recorte del libro actual: la calculada (y cacheada) o ninguna.
+async function ensureCrop() {
+  const k = bookKey();
+  let win = null;
+  try {
+    const guardado = k ? Storage.get('pdfCrop_' + k) : null;
+    if (guardado && guardado.w > 0) win = guardado;
+  } catch (e) {}
+  if (!win) {
+    win = await computeCrop();
+    // Derivado y barato de rehacer: se cachea en local pero NO se sincroniza (ver layout.js).
+    try { if (k && win) Storage.set('pdfCrop_' + k, win); } catch (e) {}
+  }
+  applyCrop(win);
+}
+
+// ---- Cálculo del recorte ---------------------------------------------------
+// Se mide sobre PÍXELES, no sobre la capa de texto: así funciona igual en un PDF digital,
+// en uno escaneado (que no tiene capa de texto) y en uno con figuras a sangre. Se rasteriza
+// una muestra de páginas a ~200 px de ancho —calderilla— y se busca la primera y la última
+// columna con tinta.
+//
+// El recorte es UNIFORME para todo el documento a propósito: uno por página haría que la
+// anchura bailara al pasar páginas en modo scroll. Y se agrega por PERCENTIL, no por mínimo:
+// una sola página a sangre (portada, una lámina) no puede anular el recorte de las otras 300.
+const CROP_SAMPLES = 8;          // páginas muestreadas
+const CROP_SCAN_W = 200;         // ancho de rasterizado del muestreo, en px
+const CROP_PAD = 0.015;          // aire a cada lado, en fracción de ancho (que no roce el texto)
+const CROP_MIN_W = 0.5;          // nunca quitar más de la mitad del ancho (red de seguridad)
+const CROP_NOOP_W = 0.985;       // por debajo de esto no hay márgenes que quitar
+
+function samplePages() {
+  // La portada suele ir a sangre y no dice nada de los márgenes del cuerpo.
+  const first = totalPages >= 6 ? 2 : 1;
+  const n = Math.min(CROP_SAMPLES, totalPages - first + 1);
+  if (n <= 0) return [1];
+  const span = totalPages - first;
+  const out = new Set();
+  for (let i = 0; i < n; i++) out.add(first + Math.round(span * (n === 1 ? 0 : i / (n - 1))));
+  return [...out];
+}
+
+function percentile(sorted, p) {
+  if (!sorted.length) return 0;
+  const i = Math.round(p * (sorted.length - 1));
+  return sorted[Math.max(0, Math.min(sorted.length - 1, i))];
+}
+
+async function computeCrop() {
+  if (!pdfDoc) return null;
+  const lefts = [], rights = [];
+  for (const n of samplePages()) {
+    let b = null;
+    try { b = await inkBounds(n); } catch (e) { console.warn('muestreo de márgenes:', e); }
+    if (b) { lefts.push(b.left); rights.push(b.right); }
+  }
+  if (lefts.length < 2) return null;          // sin muestra suficiente, no inventamos nada
+  lefts.sort((a, b) => a - b);
+  rights.sort((a, b) => a - b);
+  let x = Math.max(0, percentile(lefts, 0.15) - CROP_PAD);
+  const x1 = Math.min(1, percentile(rights, 0.85) + CROP_PAD);
+  let w = x1 - x;
+  if (!(w > 0)) return null;
+  // Conservador a propósito: si el recorte saliera agresivo, se abre hasta CROP_MIN_W. Una
+  // tabla más ancha que la mancha se sigue viendo casi entera, y siempre queda «Página».
+  if (w < CROP_MIN_W) {
+    x = Math.max(0, x - (CROP_MIN_W - w) / 2);
+    w = Math.min(1 - x, CROP_MIN_W);
+  }
+  if (w >= CROP_NOOP_W) return { x: 0, w: 1 };
+  return { x: +x.toFixed(4), w: +w.toFixed(4) };
+}
+
+// Primera y última columna con tinta de una página, en fracción de su ancho.
+async function inkBounds(num) {
+  const page = await pdfDoc.getPage(num);
+  const base = page.getViewport({ scale: 1 });
+  if (!base.width) return null;
+  const vp = page.getViewport({ scale: CROP_SCAN_W / base.width });
+  const cv = document.createElement('canvas');
+  cv.width = Math.max(1, Math.floor(vp.width));
+  cv.height = Math.max(1, Math.floor(vp.height));
+  const ctx = cv.getContext('2d', { willReadFrequently: true });
+  // Fondo blanco explícito: un PDF sin caja de papel se rasteriza sobre transparente, y
+  // entonces "oscuro" y "vacío" serían indistinguibles al leer los píxeles.
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, cv.width, cv.height);
+  await page.render({ canvasContext: ctx, viewport: vp }).promise;
+  const { data } = ctx.getImageData(0, 0, cv.width, cv.height);
+  const n = cv.width * cv.height;
+  const lum = new Uint8Array(n);
+  const hist = new Uint32Array(256);
+  for (let i = 0, p = 0; p < n; i += 4, p++) {
+    const l = (data[i] * 77 + data[i + 1] * 151 + data[i + 2] * 28) >> 8;
+    lum[p] = l; hist[l]++;
+  }
+  // Umbral RELATIVO al fondo (su mediana): un escaneo sobre papel gris no es "todo tinta".
+  let acc = 0, med = 255;
+  for (let l = 0; l < 256; l++) { acc += hist[l]; if (acc * 2 >= n) { med = l; break; } }
+  const thr = Math.min(med - 18, 235);
+  const W = cv.width, H = cv.height;
+  let min = W, max = -1;
+  for (let y = 0; y < H; y++) {
+    const row = y * W;
+    for (let x = 0; x < W; x++) {
+      if (lum[row + x] <= thr) {
+        if (x < min) min = x;
+        if (x > max) max = x;
+      }
+    }
+  }
+  cv.width = cv.height = 0;                   // suelta el backing del muestreo
+  if (max < 0) return null;                   // página en blanco: no opina
+  return { left: min / W, right: (max + 1) / W };
+}
+
 // Clave de lo que se guarda por libro (última página, modo). El id canónico es el SHA-256
 // del fichero, el MISMO que usan biblioteca, subrayados y sync. Antes se usaba la huella de
 // pdf.js, que metía la posición en otro espacio de ids: viajaba al proveedor como "libro
@@ -391,7 +591,7 @@ function bookKey() { return canonicalId || fpKey(); }
 
 function fpKey() { try { return pdfDoc && pdfDoc.fingerprints ? pdfDoc.fingerprints[0] : null; } catch { return null; } }
 
-const CLAVES_POR_LIBRO = ['pdfLastPage', 'pdfLastPageAt', 'pdfMode'];
+const CLAVES_POR_LIBRO = ['pdfLastPage', 'pdfLastPageAt', 'pdfMode', 'pdfFit', 'pdfCrop'];
 
 // Traslada lo guardado bajo la huella de pdf.js al id canónico, una vez por libro. Gana el
 // más reciente por `pdfLastPageAt` —el mismo LWW de escalares que aplica el sync— y la
@@ -407,10 +607,11 @@ function migrateLegacyKeys() {
       Storage.set('pdfLastPageAt_' + canonicalId, tViejo);
     }
   }
-  // El modo no tiene sello; solo se adopta si aquí no había nada elegido.
-  const modoViejo = Storage.get('pdfMode_' + viejo);
-  if (modoViejo != null && Storage.get('pdfMode_' + canonicalId) == null) {
-    Storage.set('pdfMode_' + canonicalId, modoViejo);
+  // Escalares sin sello (modo de lectura, ajuste de ancho): solo se adoptan si aquí no
+  // había nada elegido. El recorte cacheado no se traslada: se recalcula solo y es barato.
+  for (const p of ['pdfMode', 'pdfFit']) {
+    const v = Storage.get(p + '_' + viejo);
+    if (v != null && Storage.get(p + '_' + canonicalId) == null) Storage.set(p + '_' + canonicalId, v);
   }
   for (const p of CLAVES_POR_LIBRO) Storage.remove(p + '_' + viejo);
 }
@@ -646,8 +847,7 @@ async function renderScroll() {
     wrapper.dataset.fith = String(h);
     // Tamaño SIN escalar: deja re-calcular el ajuste al cambiar el ancho sin volver a pdf.js.
     if (bw && bh) { wrapper.dataset.basew = String(bw); wrapper.dataset.baseh = String(bh); }
-    wrapper.style.width = (w * zoom) + 'px';
-    wrapper.style.height = (h * zoom) + 'px';
+    layoutWrapper(wrapper);
     layer.appendChild(wrapper);
   }
 
@@ -746,16 +946,15 @@ async function renderInto(wrapper, num) {
   // Resolución REAL del base (px de backing por unidad fit, tras el tope): es lo que decide
   // a partir de qué zoom hace falta parche de detalle.
   wrapper.dataset.rratio = String(renderScale / fit);
-  wrapper.style.width = (viewport.width * zoom) + 'px';       // caja = fit·zoom (área de scroll)
-  wrapper.style.height = (viewport.height * zoom) + 'px';
   wrapper.style.setProperty('--scale-factor', String(fit));
 
-  // Contenedor interno que escala todo junto (canvas + capa de texto) al zoom actual.
+  // Contenedor interno que escala todo junto (canvas + capa de texto) al zoom actual. Mide
+  // la página ENTERA aunque haya recorte: lo que recorta es la caja de fuera (layoutWrapper).
   let scaler = wrapper.querySelector('.pdf-scaler');
   if (!scaler) { scaler = document.createElement('div'); scaler.className = 'pdf-scaler'; wrapper.appendChild(scaler); }
   scaler.style.width = viewport.width + 'px';
   scaler.style.height = viewport.height + 'px';
-  scaler.style.transform = zoom === 1 ? '' : `scale(${zoom})`;
+  layoutWrapper(wrapper);                                     // caja = fit·cropW·zoom (área de scroll)
 
   // DOBLE BUFFER: se pinta en un canvas nuevo y solo se cuelga del DOM cuando está listo.
   // Reutilizarlo obligaba a poner canvas.width (que lo BORRA) antes de repintar, así que

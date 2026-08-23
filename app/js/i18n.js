@@ -100,6 +100,10 @@ const EN = {
   'Fuente': 'Font',
   'Ancho de columna': 'Column width',
   'Espaciado de líneas': 'Line spacing',
+  'Ajuste': 'Fit',
+  'Página': 'Page',
+  '«Texto» recorta los márgenes blancos para que la mancha llene el ancho. Se calcula una vez por libro.':
+    '“Text” trims the white margins so the text block fills the width. Computed once per book.',
   'Modo de lectura': 'Reading mode',
   'Páginas': 'Pages',
   'Ajustes generales': 'App settings',

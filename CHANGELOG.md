@@ -5,6 +5,29 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-08-23 — PDF: ajustar al texto, no al papel
+
+Ampliar un PDF para que el texto llenara la pantalla sacaba scroll horizontal, y leyendo en
+vertical cualquier desvío del dedo descolocaba la columna de lado. La petición era "bloquear el
+scroll horizontal"; el eje X era el síntoma. El lector ajustaba al **ancho de papel**, márgenes
+blancos incluidos: para llenar la pantalla había que ampliar, y ampliar desborda por construcción.
+
+Ahora el PDF tiene un ajuste de ancho por libro, en los ajustes de lectura:
+
+- **Página** — como hasta ahora: cabe el folio entero.
+- **Texto** — recorta los márgenes blancos y la mancha llena el ancho **sin ampliar**. Con eso no
+  hay recorrido horizontal que descolocar, y en móvil la letra crece lo que ocupaban los márgenes.
+
+El recorte se calcula una vez por libro muestreando ocho páginas y buscando la primera y la última
+columna con tinta, sobre los píxeles y no sobre la capa de texto: así también funciona en PDF
+escaneados. Se agrega por percentil, así que una portada a sangre no anula el recorte del resto, y
+nunca quita más de la mitad del ancho, de forma que una tabla ancha se sigue viendo. Los subrayados
+se guardan en coordenadas de página completa y no se mueven al poner o quitar el recorte.
+
+Detalle en [ADR-033](DECISIONS.md).
+
+---
+
 ## 2026-08-23 — La demo se puede seguir en el móvil
 
 La demo se emitía y se quedaba encerrada en el dispositivo donde se pulsó el botón. Quien la

@@ -20,7 +20,9 @@ export const BASE = 'bookreader/';
 // Claves de localStorage particionadas por libro: `<prefijo>_<bookId>`.
 // lastPositionAt/pdfLastPageAt son los sellos de tiempo de la posición de
 // lectura (escalares LWW): viajan junto a su valor.
-const BOOK_PREFIXES = ['highlights', 'bookmarks', 'lastPosition', 'lastPositionAt', 'pdfLastPage', 'pdfLastPageAt', 'readingMode', 'pdfMode'];
+// `pdfCrop` NO está y no debe estar: es dato DERIVADO del fichero (la ventana de recorte
+// que calcula pdf-reader), idéntico en cualquier dispositivo y barato de recalcular.
+const BOOK_PREFIXES = ['highlights', 'bookmarks', 'lastPosition', 'lastPositionAt', 'pdfLastPage', 'pdfLastPageAt', 'readingMode', 'pdfMode', 'pdfFit'];
 // Pareja valor → sello de tiempo, para el LWW de escalares.
 const SCALAR_AT = { lastPosition: 'lastPositionAt', pdfLastPage: 'pdfLastPageAt' };
 const AT_PREFIXES = Object.values(SCALAR_AT);
@@ -197,7 +199,7 @@ const MERGE_PREFIXES = ['highlights_', 'bookmarks_'];
 //   - Colecciones: siempre mergeCollections (unión por uid + LWW + tombstones).
 //   - Posición de lectura (valor + sello *At): LWW por sello; en modo 'restore'
 //     gana remoto aunque el sello local sea más nuevo (es la orden explícita).
-//   - Escalares sin sello (readingMode/pdfMode): 'restore' → remoto;
+//   - Escalares sin sello (readingMode/pdfMode/pdfFit): 'restore' → remoto;
 //     'merge' (sync automático) → solo si falta en local (no pisar al usuario).
 function applyBookLocal(local, mode) {
   let keys = 0;

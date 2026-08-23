@@ -474,18 +474,40 @@ export function pdfFractionalRects(range, wrapper) {
   return fractionalFromRects([...range.getClientRects()], wrapper);
 }
 
+// Ventana de recorte de márgenes de una página (ADR-033). Sin recorte es la identidad.
+// La caja de la página (el wrapper) puede ser SOLO un trozo horizontal del papel, así que
+// las fracciones de pantalla y las que guardamos no son las mismas.
+function cropWin(wrapper) {
+  const x = parseFloat(wrapper?.dataset.cropx || '0');
+  const w = parseFloat(wrapper?.dataset.cropw || '1');
+  return { x: Number.isFinite(x) ? x : 0, w: Number.isFinite(w) && w > 0 ? w : 1 };
+}
+
+// Fracciones de PÁGINA COMPLETA → fracciones de la CAJA visible, que es en lo que se pintan
+// los overlays (porcentajes sobre el wrapper). Es la inversa de lo que hace
+// fractionalFromRects al capturar. Lo que quede fuera lo recorta el overflow del overlay.
+export function pdfRectToBox(wrapper, r) {
+  const c = cropWin(wrapper);
+  return { left: (r.left - c.x) / c.w, top: r.top, width: r.width / c.w, height: r.height };
+}
+
 // Rectángulos de PANTALLA → fraccionales sobre la página. La selección táctil no produce un
 // rango del DOM (ver pdf-touch-select.js), así que entra por aquí con los rects ya hechos.
+//
+// Se guardan SIEMPRE en fracciones de la página entera, aunque en ese momento haya recorte:
+// el recorte es una preferencia de visualización que se puede quitar, cambiar o recalcular,
+// y un subrayado tiene que seguir señalando el mismo texto en cualquiera de esos estados.
 export function fractionalFromRects(rects, wrapper) {
   wrapper = wrapper || document.querySelector('#pdf-container .pdf-page');
   if (!wrapper) return [];
   const wr = wrapper.getBoundingClientRect();
   if (!wr.width || !wr.height) return [];
+  const c = cropWin(wrapper);
   return rects
     .map(r => ({
-      left: (r.left - wr.left) / wr.width,
+      left: c.x + ((r.left - wr.left) / wr.width) * c.w,
       top: (r.top - wr.top) / wr.height,
-      width: r.width / wr.width,
+      width: (r.width / wr.width) * c.w,
       height: r.height / wr.height,
     }))
     .filter(r => r.width > 0.001 && r.height > 0.001);
@@ -595,7 +617,8 @@ export function drawPdfHighlights(page) {
     const group = document.createElement('div');
     group.className = 'pdf-hl-group';
     if (hl.note) group.title = hl.note;
-    for (const r of rects) {
+    for (const raw of rects) {
+      const r = pdfRectToBox(wrapper, raw);     // fracción de página → fracción de la caja
       const d = document.createElement('div');
       d.className = 'pdf-hl';
       d.style.left = (r.left * 100) + '%';

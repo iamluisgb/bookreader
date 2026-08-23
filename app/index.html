@@ -118,6 +118,18 @@
         <p class="settings-hint" data-i18n>Tiñe el papel del PDF. «Noche» invierte la tinta: las fotos y las figuras en color pueden verse raras.</p>
       </div>
 
+      <!-- ADR-033 · Ajuste de ancho: al papel (con sus márgenes) o a la mancha de texto.
+           Es lo que evita tener que ampliar para llenar la pantalla, que es lo que sacaba
+           el scroll horizontal y descolocaba la columna al leer. -->
+      <div class="settings-group" data-format="pdf">
+        <label id="pdf-fit-label" data-i18n>Ajuste</label>
+        <div class="pdf-fit-selector" role="radiogroup" aria-labelledby="pdf-fit-label">
+          <button class="pdf-fit-btn active" data-fit="page" role="radio" aria-checked="true" data-i18n>Página</button>
+          <button class="pdf-fit-btn" data-fit="text" role="radio" aria-checked="false" data-i18n>Texto</button>
+        </div>
+        <p class="settings-hint" data-i18n>«Texto» recorta los márgenes blancos para que la mancha llene el ancho. Se calcula una vez por libro.</p>
+      </div>
+
       <div class="settings-group">
         <label data-i18n>Brillo</label>
         <div class="slider-control">
