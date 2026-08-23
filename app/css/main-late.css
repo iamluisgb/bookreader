@@ -377,13 +377,10 @@ button.lib-rail-twisty:hover { background: var(--surface-2); color: var(--text);
 .lib-rail-mark svg { display: block; }
 .lib-rail-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* La rama ("Técnico/") solo en móvil, donde el rail es una tira plana y la
-   indentación no existe: sin ella "LLM" y "Sistemas" quedan sin padre. Va
-   FUERA de .lib-rail-name a propósito: dentro, el nombre "ML" se leería como
-   "Técnico/ML" para cualquiera que mire el textContent (tests incluidos). */
-.lib-rail-crumb {
-  display: none; flex: 0 0 auto; color: var(--text-faint); font-weight: 400;
-  margin-right: -4px;
-}
+   indentación no existe: sin ella "LLM" y "Sistemas" quedan sin padre. La pinta
+   el CSS desde un atributo, no un <span>: así el nombre de la estantería sigue
+   siendo "LLM" para quien lea el textContent de la fila (tests incluidos), y no
+   "Técnico/LLM". Ver la regla en el bloque móvil. */
 /* Cifras tabulares: con contadores de una y dos cifras mezclados, las
    proporcionales bailan y la columna deja de leerse como columna. */
 .lib-rail-count {
@@ -744,7 +741,9 @@ button.lib-rail-twisty:hover { background: var(--surface-2); color: var(--text);
   .lib-rail-row.is-folded { display: flex; }
   .lib-rail-row.is-child::before { display: none; }
   .lib-rail-twisty { display: none; }
-  .lib-rail-crumb { display: inline; }
+  .lib-rail-name[data-crumb]::before {
+    content: attr(data-crumb); color: var(--text-faint); font-weight: 400;
+  }
   .lib-rail-item {
     flex: 0 0 auto; width: auto;
     padding: 7px 12px; gap: var(--s-2);

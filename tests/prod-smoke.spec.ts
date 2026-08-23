@@ -86,8 +86,14 @@ test('@smoke las estanterías nuevas funcionan sobre el despliegue real', async 
     await Store.putBook({ id: 'smoke1', title: 'Libro de humo', format: 'epub',
       status: 'reading', addedAt: Date.now(), shelfIds: [sh.id] });
     await View.render();
-    return [...document.querySelectorAll('.lib-rail-item')]
-      .map(e => e.textContent!.replace(/\s+/g, ' ').trim());
+    // Nombre + contador por separado, no el textContent de la fila entera: esa
+    // caja lleva también la marca de la estantería (su inicial), que es
+    // decoración y ensuciaría la comparación.
+    return [...document.querySelectorAll('.lib-rail-item')].map(e => {
+      const name = e.querySelector('.lib-rail-name')!.textContent!.trim();
+      const count = e.querySelector('.lib-rail-count')!.textContent!.trim();
+      return `${name} ${count}`;
+    });
   });
 
   // "Humo" es un GRUPO derivado del nombre y "Regla" una inteligente que cuenta

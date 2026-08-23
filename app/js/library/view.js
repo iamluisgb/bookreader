@@ -259,8 +259,11 @@ function railRowHtml(row) {
 
   // En la tira horizontal de móvil no hay indentación que valga, así que la
   // rama va delante del nombre ("Técnico/LLM"); en escritorio la dice el árbol.
+  // Va como ATRIBUTO y lo pinta el CSS (content: attr(...)): es decoración de
+  // una sola disposición, y como span metía "Técnico/" en el textContent de la
+  // fila, donde el nombre de la estantería debe ser solo "LLM".
   const crumb = row.depth
-    ? `<span class="lib-rail-crumb">${escapeHtml(row.ancestors[row.ancestors.length - 1] + Shelves.SEP)}</span>`
+    ? ` data-crumb="${escapeHtml(row.ancestors[row.ancestors.length - 1] + Shelves.SEP)}"`
     : '';
 
   const kebab = row.shelf
@@ -283,8 +286,8 @@ function railRowHtml(row) {
       data-row-key="${escapeHtml(row.key)}" data-row-label="${escapeHtml(row.label)}"
       data-shelf-ids="${escapeHtml(ids.join(','))}"
       aria-label="${escapeHtml(label)}"${active ? ' aria-current="true"' : ''}>
-      ${mark}${crumb}
-      <span class="lib-rail-name">${escapeHtml(row.label)}</span>
+      ${mark}
+      <span class="lib-rail-name"${crumb}>${escapeHtml(row.label)}</span>
       <span class="lib-rail-count" aria-hidden="true">${count}</span>
     </button>
     ${kebab}
