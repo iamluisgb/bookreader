@@ -7,7 +7,7 @@ import * as Storage from './storage.js';
 import * as AiDB from './ai/db.js';
 import { hydrateIcons } from './ui/icons.js';
 import { countBookWords, countPdfWords, updateProgressDetail } from './progress.js';
-import { initHighlights, setupHighlights, setupPdfSelection, drawPdfHighlights, renderHighlights, applyStoredHighlights, repaintStoredHighlights, hideHighlightTooltip, pdfHighlightAt, pdfFractionalRects, pdfRectToBox, setBookMeta } from './highlights-ui.js';
+import { initHighlights, setupHighlights, setupPdfSelection, drawPdfHighlights, renderHighlights, applyStoredHighlights, repaintStoredHighlights, hideHighlightTooltip, pdfHighlightAt, pdfFractionalRects, setBookMeta } from './highlights-ui.js';
 import { initBookmarkButton, updateBookmarkButton, renderBookmarks } from './bookmarks-ui.js';
 import * as Library from './library/view.js';
 import * as LibStore from './library/store.js';
@@ -449,7 +449,6 @@ function initLibrary() {
   document.getElementById('open-app-settings')?.addEventListener('click', () => openAppSettings('agent'));
   document.getElementById('library-btn')?.addEventListener('click', () => goToLibrary());
   initReadingMode();
-  initPdfFit();
   // En móvil, cerrar o cambiar de app congela la PWA sin avisar: volcar el progreso
   // pendiente al ocultarse la pestaña, o el rebote de saveProgress no llega a escribir.
   document.addEventListener('visibilitychange', () => {
@@ -476,38 +475,6 @@ function initReadingMode() {
   window.addEventListener('reader:pdf-page-rendered', (e) => { drawPdfHighlights(e.detail?.page); });
 }
 
-// Ajuste de ancho del PDF (Página / Texto). El recorte se calcula en pdf-reader y se
-// recuerda por libro; aquí solo cableamos los botones. La primera vez hay que muestrear el
-// documento, así que el botón se deshabilita mientras tanto en vez de quedarse mudo.
-function initPdfFit() {
-  const btns = [...document.querySelectorAll('.pdf-fit-btn')];
-  if (!btns.length) return;
-  // Un radiogroup se recorre con flechas y ocupa UNA parada de tabulador (tabindex móvil):
-  // si se ponen los roles ARIA hay que dar también el teclado que esos roles prometen.
-  btns.forEach((btn, i) => btn.addEventListener('keydown', (e) => {
-    const paso = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1
-      : e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 0;
-    if (!paso) return;
-    e.preventDefault();
-    const next = btns[(i + paso + btns.length) % btns.length];
-    next.focus();
-    next.click();
-  }));
-  btns.forEach(btn => btn.addEventListener('click', async () => {
-    if (!PdfReader.isLoaded() || btn.classList.contains('active')) return;
-    btns.forEach(b => { b.disabled = true; });
-    try {
-      await PdfReader.setFitMode(btn.dataset.fit);
-    } catch (e) {
-      console.warn('ajuste de ancho del PDF:', e);
-    } finally {
-      btns.forEach(b => { b.disabled = false; });
-      updateFormatScopedUI();
-      repaintStoredHighlights();   // el recorte remapea los rects: hay que repintarlos
-    }
-  }));
-}
-
 // Ajusta los controles que dependen del formato abierto. Los ajustes en sí son globales
 // (una sola clave en localStorage, por dispositivo): lo que cambia con el formato no es
 // el valor guardado sino qué controles tienen efecto. El PDF no lee tipografía —viene
@@ -518,13 +485,6 @@ function updateFormatScopedUI() {
     : EpubReader.isLoaded() ? EpubReader.getReadingMode() : 'paginated';
   document.querySelectorAll('.reading-mode-btn').forEach(btn =>
     btn.classList.toggle('active', btn.dataset.mode === mode));
-  const fit = isPdf ? PdfReader.getFitMode() : 'page';
-  document.querySelectorAll('.pdf-fit-btn').forEach(btn => {
-    const on = btn.dataset.fit === fit;
-    btn.classList.toggle('active', on);
-    btn.setAttribute('aria-checked', on ? 'true' : 'false');
-    btn.tabIndex = on ? 0 : -1;          // tabindex móvil: el grupo es UNA parada
-  });
   // La doble página es reflowable: el PDF ya trae su propia maquetación y el
   // selector es el mismo control para los dos formatos.
   document.querySelectorAll('.reading-mode-btn[data-epub-only]').forEach(btn => {
@@ -999,8 +959,7 @@ function drawTransientPdfHighlight(wrapper, rects) {
   let layer = wrapper.querySelector('.pdf-cite-layer');
   if (!layer) { layer = document.createElement('div'); layer.className = 'pdf-cite-layer'; wrapper.appendChild(layer); }
   layer.innerHTML = '';
-  for (const raw of rects) {
-    const r = pdfRectToBox(wrapper, raw);       // fracción de página → fracción de la caja
+  for (const r of rects) {
     const d = document.createElement('div');
     d.className = 'pdf-cite-hl';
     d.style.left = (r.left * 100) + '%';
