@@ -5,6 +5,29 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-08-24 — Dictado: se ve que está transcribiendo
+
+Al soltar un audio, la barra de grabación desaparecía y volvía el textarea vacío. Con el motor
+BYOK el texto tarda segundos en llegar (se sube el audio y se transcribe), así que en ese hueco
+parecía que la grabación se había perdido. El estado existía —`ui('busy')`— pero solo cambiaba el
+`title` y el `aria-label` del botón del micro, que en la barra del chat es un icono sin texto y en
+móvil no tiene hover: invisible justo donde más falta hace.
+
+Ahora la barra **se queda**. El mismo chasis: se van el cronómetro, el vúmetro y los botones (ya
+no hay nada que parar ni que medir), el punto rojo pasa a spinner en color de acento —grabando
+ya no se está— y la pista dice "Transcribiendo…". El textarea sigue oculto hasta que llega el
+texto, así que el composer no da ningún salto. La pista es `role="status"`, de modo que el cambio
+también se anuncia. Con `prefers-reduced-motion` el spinner no gira: late en opacidad, que no es
+movimiento pero sigue diciendo que aquello está vivo.
+
+De paso, un hueco de la misma queja: `stop()` devolvía una promesa ya resuelta cuando la
+transcripción seguía en vuelo (`active` es null desde que para el grabador). Enviar en ese momento
+leía el textarea todavía vacío y no pasaba nada — que desde fuera es exactamente "se ha perdido".
+Ahora espera a la transcripción pendiente, así que enviar mientras transcribe manda el mensaje
+completo en cuanto llega.
+
+---
+
 ## 2026-08-23 — El rail de la biblioteca se lee como un árbol
 
 Con dos niveles de estanterías el rail ya no se leía. La indentación desplazaba la fila entera

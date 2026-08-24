@@ -1222,9 +1222,34 @@ textarea.is-recording { display: none; }
 .mic-bar-stop:hover { background: var(--accent-hover); }
 .mic-bar-stop .icon { color: currentColor; }
 
+/* ---- transcribiendo ---- */
+/* Al soltar, la barra se queda: cronómetro, vúmetro y botones se van (ya no hay nada que
+   parar ni que medir) y el punto rojo pasa a spinner. Lo que era "te estoy oyendo" se
+   convierte en "te estoy transcribiendo" sin que el composer dé un salto ni aparezca un
+   textarea vacío que hace pensar que el audio se ha perdido. */
+.mic-bar.is-busy .mic-bar-cancel,
+.mic-bar.is-busy .mic-bar-stop,
+.mic-bar.is-busy .mic-bar-time,
+.mic-bar.is-busy .mic-bar-level { display: none; }
+/* El vúmetro le robaba el hueco a la pista; sin vúmetro, la pista vuelve — y ahora es lo
+   único que queda diciendo qué pasa. */
+.mic-bar.is-provider.is-busy .mic-bar-hint { display: block; }
+.mic-bar.is-busy .mic-bar-dot {
+  width: 14px;
+  height: 14px;
+  background: none;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);   /* ya no es rojo: no se está grabando */
+  animation: mic-spin 0.7s linear infinite;
+}
+@keyframes mic-spin { to { transform: rotate(360deg); } }
+
 @media (prefers-reduced-motion: reduce) {
   .mic-bar-dot { animation: none; }
   .mic-bar-level i { transition: none; }
+  /* Aquí el movimiento SÍ se quita, pero la espera tiene que seguir viéndose viva: el
+     spinner deja de girar y late en opacidad, que no es movimiento. */
+  .mic-bar.is-busy .mic-bar-dot { animation: mic-dot 1.6s ease-in-out infinite; }
 }
 
 

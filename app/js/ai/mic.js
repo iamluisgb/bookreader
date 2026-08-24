@@ -35,7 +35,7 @@ function buildBar({ onCancel, onDone }) {
     <span class="mic-bar-dot" aria-hidden="true"></span>
     <span class="mic-bar-time" role="timer">0:00</span>
     <span class="mic-bar-level" aria-hidden="true">${'<i></i>'.repeat(14)}</span>
-    <span class="mic-bar-hint">${t('Escuchando…')}</span>
+    <span class="mic-bar-hint" role="status">${t('Escuchando…')}</span>
     <button type="button" class="mic-bar-stop" title="${t('Parar')}" aria-label="${t('Parar')}">${icon('check', { size: 18 })}</button>`;
   bar.querySelector('.mic-bar-cancel').addEventListener('click', onCancel);
   bar.querySelector('.mic-bar-stop').addEventListener('click', onDone);
@@ -125,6 +125,7 @@ export function attachMic({ input, btn, getPrompt = () => '', onError = () => {}
   const bar = buildBar({ onCancel: () => { discard = true; stop(); }, onDone: () => stop() });
   input.parentNode?.insertBefore(bar, input);
   const timeEl = bar.querySelector('.mic-bar-time');
+  const hintEl = bar.querySelector('.mic-bar-hint');
   const bars = [...bar.querySelectorAll('.mic-bar-level i')];
 
   // El cronómetro y el nivel van en el MISMO rAF: son la misma pregunta ("¿sigue vivo
@@ -164,8 +165,16 @@ export function attachMic({ input, btn, getPrompt = () => '', onError = () => {}
     if (span) span.textContent = label;
     // La barra sustituye al textarea mientras grabas (WhatsApp): el composer ya va justo de
     // alto en móvil y apilarla encima empujaba el chat.
-    bar.hidden = state !== 'rec';
-    input.classList.toggle('is-recording', state === 'rec');
+    //
+    // Y NO se va al soltar: con el motor del proveedor el texto tarda segundos en llegar
+    // (se sube el audio y se transcribe), y si en ese hueco volvía el textarea vacío parecía
+    // que el audio se había perdido. El único aviso era el `title` del botón del micro, que
+    // en el chat no tiene texto y en móvil no tiene hover: invisible justo donde más falta
+    // hace. Se queda el mismo chasis con el punto convertido en spinner.
+    bar.hidden = state === 'idle';
+    bar.classList.toggle('is-busy', state === 'busy');
+    hintEl.textContent = state === 'busy' ? t('Transcribiendo…') : t('Escuchando…');
+    input.classList.toggle('is-recording', state !== 'idle');
     if (state === 'rec') startTicking(); else stopTicking();
   };
 
@@ -217,7 +226,11 @@ export function attachMic({ input, btn, getPrompt = () => '', onError = () => {}
   // textarea (enviar el mensaje) tiene que esperar a esta promesa o mandaría el turno sin el
   // último tramo dictado.
   function stop() {
-    if (!active) return Promise.resolve();
+    // Ya soltado y transcribiendo: `active` es null desde que paró el grabador, pero el
+    // texto aún no ha llegado. Devolver aquí una promesa resuelta hacía que enviar leyera el
+    // textarea todavía vacío y el turno se fuera sin lo dictado — o no se fuera nada, que es
+    // lo mismo que ver desde fuera. Se espera a la transcripción en vuelo.
+    if (!active) return done || Promise.resolve();
     const d = active;
     d.stop();
     if (!useProviderStt()) { active = null; return Promise.resolve(); }

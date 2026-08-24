@@ -287,3 +287,81 @@ test('el botón de parar de la barra termina la grabación y transcribe', async 
   expect(out.barraOculta).toBe(true);                   // la UI vuelve a reposo
   expect(out.grabando).toBe(false);
 });
+
+test('mientras transcribe, la barra se queda diciendo "Transcribiendo…"', async ({ page }) => {
+  await openApp(page);
+  await installFakeRecorder(page);
+
+  // Transcripción retenida: es exactamente el hueco en el que antes volvía el textarea
+  // vacío y parecía que el audio se había perdido.
+  let responder: () => void;
+  const enVuelo = new Promise<void>((r) => { responder = r; });
+  await page.route('**/audio/transcriptions', async (route) => {
+    await enVuelo;
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ text: 'lo que dije' }) });
+  });
+  await page.exposeFunction('__responder', () => responder());
+
+  const out = await page.evaluate(async () => {
+    const w = window as any;
+    delete w.SpeechRecognition; delete w.webkitSpeechRecognition;
+    const LLM: any = await import('/js/ai/llm.js');
+    const M: any = await import('/js/ai/mic.js');
+    LLM.setKey('test-key'); LLM.setSttModel('whisper-1');
+    if (!LLM.hasStt()) return { skip: true };
+
+    const wrap = document.createElement('div');
+    const input = document.createElement('textarea');
+    const btn = document.createElement('button');
+    wrap.append(input); document.body.append(wrap, btn);
+    const mic = M.attachMic({ input, btn });
+    const bar = wrap.querySelector('.mic-bar') as HTMLElement;
+    const visible = (sel: string) => getComputedStyle(bar.querySelector(sel)!).display !== 'none';
+
+    btn.click();
+    await new Promise((r) => setTimeout(r, 60));
+
+    const stopped = mic.stop();
+    await new Promise((r) => setTimeout(r, 30));
+    const transcribiendo = {
+      barra: !bar.hidden,
+      busy: bar.classList.contains('is-busy'),
+      textarea: input.classList.contains('is-recording'),   // sigue oculto: no vuelve vacío
+      pista: bar.querySelector('.mic-bar-hint')!.textContent,
+      pistaVisible: visible('.mic-bar-hint'),
+      // Ya no hay nada que parar ni que medir: esos controles se van.
+      stop: visible('.mic-bar-stop'),
+      reloj: visible('.mic-bar-time'),
+      nivel: visible('.mic-bar-level'),
+    };
+
+    // Enviar MIENTRAS transcribe: stop() tiene que esperar a la transcripción en vuelo,
+    // no devolver una promesa resuelta sobre un textarea todavía vacío.
+    const segundoStop = mic.stop();
+    let resueltoAntes = false;
+    segundoStop.then(() => { resueltoAntes = true; });
+    await new Promise((r) => setTimeout(r, 30));
+    // Se fotografía AQUÍ: más abajo la promesa ya ha resuelto y la bandera diría que sí
+    // siempre, midiendo nada.
+    const resueltoEnVuelo = resueltoAntes;
+
+    w.__responder();
+    await stopped;
+    await segundoStop;
+    return {
+      skip: false, transcribiendo, resueltoEnVuelo,
+      tras: { barra: !bar.hidden, texto: input.value },
+    };
+  });
+
+  if (out.skip) test.skip(true, 'el motor BYOK no quedó configurado en este entorno');
+  expect(out.transcribiendo).toEqual({
+    barra: true, busy: true, textarea: true,
+    pista: 'Transcribiendo…', pistaVisible: true,
+    stop: false, reloj: false, nivel: false,
+  });
+  expect(out.resueltoEnVuelo).toBe(false);
+  // Y al llegar el texto, la barra se va y el textarea vuelve con lo dictado dentro.
+  expect(out.tras.barra).toBe(false);
+  expect(out.tras.texto).toContain('lo que dije');
+});
