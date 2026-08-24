@@ -142,6 +142,19 @@ const SWIPE_JITTER = 3;      // px: temblor del dedo quieto que NO se repinta (a
 const FLICK_VELOCITY = 0.35; // px/ms (~350 px/s): deslizamiento rápido que pasa página aunque sea corto
 const FLICK_MIN_DX = 24;     // px mínimos para que un flick cuente como intención
 const EDGE_RESIST = 3;       // en el borde del libro el dedo arrastra 1/3: se nota que no hay más
+// Curvas. La que ENTRA (y el rebote) desacelera al llegar: es lo natural para algo que se
+// coloca. La que SALE hace lo contrario, y NO es un detalle: con ease-out la página recorría
+// casi todo el camino en la primera mitad de la animación y se quedaba flotando fuera de
+// cuadro el resto, con la pantalla ya vacía. Medido en el screencast, ESA era la mayor parte
+// del parpadeo entre páginas —66-202 ms de blanco por pase—. Saliendo con ease-in la página
+// despeja rápido y el hueco empieza lo más tarde posible.
+const EASE_OUT = 'cubic-bezier(.22,.61,.36,1)';
+const EASE_IN = 'cubic-bezier(.4,0,1,1)';
+// La página que entra NO arranca desde el ancho completo, sino desde poco más de la mitad:
+// cubre la pantalla casi de inmediato en vez de dejar otro tramo en blanco al principio.
+// Salir SÍ tiene que ser entero (si no, el cambio de contenido se vería en la franja que
+// quedara a la vista), pero entrar entera no aporta nada y cuesta hueco.
+const ENTER_FROM = 0.55;
 
 function swipeBox() { return document.getElementById('epub-container'); }
 // translate3d (no translateX): fuerza capa de composición en la GPU, así el iframe
@@ -293,29 +306,43 @@ async function swipeEnd(dx) {
   // COMPLETA —la página salía entera y "otra" entraba por el lado contrario— con el mismo
   // contenido: una animación que afirmaba un pase que no había ocurrido.
   if (!quiere || !rendition || swipeAtEdge(dir)) {
-    await swipeAnimate(c, 0, swipeDuration(Math.abs(swipeAppliedX || 0), w, v));
+    await swipeAnimate(c, 0, swipeDuration(Math.abs(swipeAppliedX || 0), w, v), EASE_OUT);
     swipeReset(c);
     return;
   }
 
   swipeBusy = true;
   swipeHoldLayer(c);
-  // Lo que le queda a la página actual para terminar de salir.
-  await swipeAnimate(c, dir === 'next' ? -w : w, swipeDuration(w - Math.abs(x), w, v));
-  releasePin();   // navegación real del usuario: suelta el pin de giro para volver a seguir la posición
+  // Solo la PRIMERA salida arranca desde donde quedó el dedo; si encadenas, las siguientes
+  // salen desde la hoja en reposo y tienen que recorrer el ancho entero.
+  let recorrido = Math.abs(x);
+  let primera = true;
   let ultima = dir;
-  await turnPage(ultima);
-  swipeEdgeCache = null;   // ya no estamos donde estábamos
-  // Gestos encolados mientras la página estaba fuera de pantalla: se aplican SIN animación,
-  // porque no hay nada que ver. Ponerse al día cuesta un cambio de página, no un pase entero.
-  while (swipeQueue.length) {
-    ultima = swipeQueue.shift();
+  do {
+    await swipeAnimate(c, ultima === 'next' ? -w : w, swipeDuration(w - recorrido, w, v), EASE_IN);
+    if (primera) {
+      releasePin();   // navegación real del usuario: suelta el pin para volver a seguir la posición
+      primera = false;
+    }
     await turnPage(ultima);
-    swipeEdgeCache = null;
-  }
-  swipeSet(c, ultima === 'next' ? w : -w);          // la nueva se coloca al otro lado
-  void c.offsetWidth;                               // reflow para que anime
-  await swipeAnimate(c, 0, swipeDuration(w, w, v));  // y entra
+    swipeEdgeCache = null;   // ya no estamos donde estábamos
+    // Gestos encolados mientras la página estaba FUERA DE PANTALLA: se aplican sin animación,
+    // porque no hay nada que ver. Ponerse al día cuesta un cambio de página, no un pase entero.
+    while (swipeQueue.length) {
+      ultima = swipeQueue.shift();
+      await turnPage(ultima);
+      swipeEdgeCache = null;
+    }
+    const desde = w * ENTER_FROM;
+    swipeSet(c, ultima === 'next' ? desde : -desde);   // la nueva se coloca al otro lado
+    void c.offsetWidth;                                // reflow para que anime
+    await swipeAnimate(c, 0, swipeDuration(desde, w, v), EASE_OUT);   // y entra
+    // Y un gesto que llegó DURANTE la entrada: ahí la hoja ya está a la vista, así que le toca
+    // un pase completo. Sin esto se quedaba en la cola sin que nadie la vaciara y saltaba de
+    // más en el pase siguiente, que es peor que haberlo perdido.
+    recorrido = 0;
+    ultima = swipeQueue.shift() || null;
+  } while (ultima);
   swipeReset(c);
   swipeBusy = false;
   swipeReleaseLayer();
@@ -345,7 +372,7 @@ function swipeReset(c) {
 // era de 4 ms. Cualquier frame que se retrasara por encima de eso metía la limpieza DENTRO de
 // la animación —el contenedor saltaba desde donde estuviera— y ese es el parpadeo. Medido con
 // la CPU frenada 6× (un móvil de gama media), 3 de cada 10 transiciones se cortaban.
-function swipeAnimate(c, x, ms = SWIPE_TURN_MS) {
+function swipeAnimate(c, x, ms = SWIPE_TURN_MS, ease = EASE_OUT) {
   return new Promise((res) => {
     if (!c) { res(); return; }
     // Ya está ahí: no habría transición que escuchar y la promesa esperaría a la red de
@@ -371,7 +398,7 @@ function swipeAnimate(c, x, ms = SWIPE_TURN_MS) {
     c.addEventListener('transitionend', alAcabar);
     c.addEventListener('transitioncancel', alAcabar);
     guard = setTimeout(acabar, ms + SWIPE_GUARD_MS);
-    c.style.transition = `transform ${ms}ms cubic-bezier(.22,.61,.36,1)`;
+    c.style.transition = `transform ${ms}ms ${ease}`;
     requestAnimationFrame(() => {
       if (hecho) return;
       c.style.transform = tx(x);

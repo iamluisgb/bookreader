@@ -5,6 +5,51 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-08-24 — El parpadeo entre páginas era la pantalla quedándose en blanco
+
+El arreglo anterior quitó el parpadeo del momento de soltar (la transición se cortaba a
+medias), pero seguía apareciendo pasando páginas a ritmo normal. Era otro mecanismo, y hubo que
+mirar los frames para verlo: grabando un pase con screencast, entre la hoja que sale y la que
+entra la pantalla se queda **completamente en blanco** —frames de 2,8 KB de JPEG, que solo puede
+ser un color uniforme— durante 99-172 ms por pase sobre un libro real.
+
+Dos causas, ninguna evidente leyendo el código:
+
+**La hoja salía con la curva equivocada.** Salida y entrada compartían `cubic-bezier(.22,.61,.36,1)`,
+que es ease-out: rápido al principio, lento al final. Para la que entra es lo correcto; para la
+que SALE es justo lo contrario de lo que hace falta, porque recorría casi todo el camino en la
+primera mitad de la animación y se quedaba flotando fuera de cuadro el resto, con la pantalla ya
+vacía. Ahora sale con ease-in y despeja rápido, así que el hueco empieza lo más tarde posible.
+
+**La hoja que entra arrancaba desde el ancho completo**, dejando otro tramo de pantalla vacía al
+principio de la entrada. Ahora entra desde el 55 %: cubre la pantalla casi de inmediato. Salir sí
+tiene que ser entero —si no, el cambio de contenido se vería en la franja que quedara a la vista—,
+pero entrar entera no aporta nada y cuesta hueco.
+
+Medido sobre el EPUB de 14 MB, pases dentro de una misma sección: de **99-172 ms de blanco por
+pase a 48-86**. Sobre `test.epub`, de 66-67 ms a 15-20 (un solo frame). Lo que queda es el tiempo
+que epub.js tarda en cambiar de página, necesariamente con la hoja fuera de cuadro: el suelo de
+esta arquitectura, no un defecto que arreglar con curvas.
+
+**Descartado por medición:** precargar la sección siguiente (fetch + parseo, que epub.js cachea en
+la Section) no mueve nada — 197 ms de blanco antes, 204 después. El coste de una frontera de
+capítulo (~200 ms, que siguen ahí) es construir el iframe y maquetar, no descargar.
+
+**Un fallo propio, corregido:** la cola de gestos que se añadió antes solo se vaciaba ENTRE el
+cambio de página y la animación de entrada. Un gesto que llegaba durante la entrada se quedaba
+dentro sin que nadie lo consumiera y saltaba de más en el pase siguiente — peor que haberlo
+perdido. Ahora el pase encadena en bucle hasta dejar la cola vacía, y hay test que lo fija.
+
+**Una corrección sobre lo dicho antes:** el «de 2 pases a 4» al encadenar gestos no se sostiene.
+Ese número lo domina algo que está por debajo de la cola: epub.js reemplaza el iframe en cada
+pase, y los eventos táctiles quedan atados al documento donde ocurrió el `touchstart`, así que un
+gesto a caballo del reemplazo se pierde entero — a la sonda y a un dedo real. Repetida la medición,
+sale 4 con el código viejo y 3 con el nuevo, o al revés, según cómo caiga la cadencia. El test que
+afirmaba esa mejora se ha sustituido por otro que fija lo que sí es nuestro: que la cola no deje
+pases pendientes.
+
+---
+
 ## 2026-08-24 — Pasar página con el dedo: el parpadeo, los gestos perdidos y el borde del libro
 
 Tres defectos del deslizamiento del EPUB, los tres **medidos antes de tocar nada** con sondas de

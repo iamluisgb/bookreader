@@ -83,7 +83,18 @@ test('la animación del pase no se corta a medias, ni con la CPU de un móvil', 
   expect(await page.evaluate(() => (window as any).__cortadas)).toBe(0);
 });
 
-test('encadenar gestos no los pierde: se encolan mientras la página está fuera', async ({ page }) => {
+test('la cola de gestos no se queda con pases pendientes que salten después', async ({ page }) => {
+  // Encadenar gestos ya no los descarta: el que llega con un pase en curso se ENCOLA y se
+  // aplica con la hoja fuera de pantalla. Lo que este test fija es la corrección de esa cola,
+  // no su rendimiento: cuántos de N gestos acaban en pase lo decide algo que está por debajo
+  // —epub.js REEMPLAZA el iframe en cada pase y los eventos táctiles quedan atados al
+  // documento del touchstart, así que un gesto a caballo del reemplazo se pierde entero, le
+  // pase a esta sonda o a un dedo real—, y medirlo aquí solo mediría esa lotería.
+  //
+  // Lo que sí es nuestro y sí se puede fijar: que la cola quede VACÍA al terminar. La primera
+  // versión de la cola solo la vaciaba entre el cambio de página y la animación de entrada;
+  // un gesto llegado durante la entrada se quedaba dentro y saltaba de más en el pase
+  // siguiente, que es peor que haberlo perdido.
   await abrir(page);
   await page.evaluate(async () => {
     const w = window as any;
@@ -93,12 +104,19 @@ test('encadenar gestos no los pierde: se encolan mientras la página está fuera
     r.next = (...a: any[]) => { w.__pases++; return orig(...a); };
   });
 
-  for (let k = 0; k < 5; k++) await deslizar(page, -150);   // sin pausa entre ellos
-  await page.waitForTimeout(2000);
+  for (let k = 0; k < 5; k++) await deslizar(page, -150);   // ráfaga
+  await enReposo(page);
+  await page.waitForTimeout(1500);                          // que se drene todo lo pendiente
 
-  // Antes: 2 de 5. La cola es de 3 a propósito (ponerse al día, no convertir el libro en un
-  // pase de diapositivas), así que no se exige 5: se exige que ya no se pierda la mitad.
-  expect(await page.evaluate(() => (window as any).__pases)).toBeGreaterThanOrEqual(4);
+  const antes = await page.evaluate(() => (window as any).__pases);
+  expect(antes).toBeGreaterThan(1);                         // la ráfaga hizo algo
+
+  // Y ahora UN gesto suelto: tiene que producir exactamente UN pase. Si hubiera quedado algo
+  // en la cola, aquí se colaría de más.
+  await deslizar(page, -150);
+  await enReposo(page);
+  await page.waitForTimeout(1500);
+  expect(await page.evaluate(() => (window as any).__pases)).toBe(antes + 1);
 });
 
 test('en el borde del libro el arrastre resiste y vuelve, sin fingir un pase', async ({ page }) => {
@@ -153,4 +171,68 @@ test('en el borde del libro el arrastre resiste y vuelve, sin fingir un pase', a
   expect(await posicion()).toBe(finAntes);
   expect(fin.pasoCompleto).toBe(false);
   expect(fin.max).toBeLessThan(80);
+});
+
+test('el hueco en blanco entre páginas se mantiene corto', async ({ page }) => {
+  // El parpadeo que se veía pasando páginas a ritmo normal: entre la hoja que sale y la que
+  // entra la pantalla se quedaba en BLANCO. Medido con screencast, 99-172 ms por pase sobre
+  // un libro real. Dos causas, ninguna evidente leyendo el código:
+  //
+  //   · la hoja SALÍA con ease-out, así que recorría casi todo el camino en la primera mitad
+  //     de la animación y se quedaba flotando fuera de cuadro el resto, con la pantalla ya
+  //     vacía. Ahora sale con ease-in.
+  //   · la hoja que ENTRA arrancaba desde el ancho completo, dejando otro tramo vacío.
+  //     Ahora entra desde el 55 %.
+  //
+  // Lo que queda (~66 ms) es el tiempo que epub.js tarda en cambiar de página, con la hoja
+  // necesariamente fuera de cuadro: el suelo de esta arquitectura, no un defecto.
+  //
+  // Un frame del screencast tan pequeño solo puede ser una pantalla de color uniforme: una
+  // página con texto no baja de ~15 KB a esta calidad.
+  const UMBRAL_BYTES = 8000;
+  await abrir(page);
+  await page.evaluate(async () => {
+    const r = ((await import('/js/epub-reader.js')) as any).getRendition();
+    for (let k = 0; k < 6; k++) await r.next();   // salir de la portada, que es una imagen
+  });
+  await page.waitForTimeout(1200);
+
+  const seccion = () => page.evaluate(async () => {
+    const r = ((await import('/js/epub-reader.js')) as any).getRendition();
+    return (r.currentLocation() || {}).start?.index ?? -1;
+  });
+
+  const cdp = await page.context().newCDPSession(page);
+  const ventanas: number[] = [];
+  for (let k = 0; k < 6; k++) {
+    const secAntes = await seccion();
+    const frames: { t: number; n: number }[] = [];
+    const t0 = Date.now();
+    const onFrame = async (f: any) => {
+      frames.push({ t: Date.now() - t0, n: Buffer.from(f.data, 'base64').length });
+      try { await cdp.send('Page.screencastFrameAck', { sessionId: f.sessionId }); } catch { /* cerrado */ }
+    };
+    cdp.on('Page.screencastFrame', onFrame);
+    await cdp.send('Page.startScreencast', { format: 'jpeg', quality: 80, everyNthFrame: 1 });
+    await deslizar(page, -150);
+    await enReposo(page);
+    await page.waitForTimeout(250);
+    await cdp.send('Page.stopScreencast');
+    cdp.off('Page.screencastFrame', onFrame);
+
+    const blancos = frames.filter((f) => f.n < UMBRAL_BYTES);
+    // Solo cuentan los pases DENTRO de una sección: entrar en un capítulo nuevo obliga a
+    // epub.js a construir un iframe y maquetar (~200 ms), y eso no lo arregla ninguna curva.
+    const mismaSeccion = (await seccion()) === secAntes;
+    if (mismaSeccion && blancos.length >= 2) ventanas.push(blancos[blancos.length - 1].t - blancos[0].t);
+  }
+
+  expect(ventanas.length).toBeGreaterThanOrEqual(3);
+  const mediana = ventanas.sort((a, b) => a - b)[Math.floor(ventanas.length / 2)];
+  console.log('  hueco en blanco por pase (ms):', JSON.stringify(ventanas));
+  // Con ESTE libro: antes 66-67 ms clavados, ahora 15-20 (un frame). Sobre un libro real de
+  // 14 MB la misma medición daba 99-172 antes y 48-86 después. La valla en 40 separa las dos
+  // situaciones con holgura por los dos lados; comprobado que el test FALLA con el código
+  // anterior, que es lo único que lo hace valer.
+  expect(mediana).toBeLessThan(40);
 });
