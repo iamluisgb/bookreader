@@ -469,6 +469,13 @@ function initReadingMode() {
     EpubReader.setReadingMode(btn.dataset.mode);
     updateFormatScopedUI();
   }));
+  // Pase de página (solo EPUB): cuánto se mueve la hoja al pasar. Es un ajuste y no una
+  // constante porque el hueco en blanco entre páginas —lo que se ve como parpadeo— solo se
+  // quita reduciendo el movimiento, y cuánto vale eso lo decide quien lee.
+  document.querySelectorAll('.page-turn-btn').forEach(btn => btn.addEventListener('click', () => {
+    EpubReader.setPageTurn(btn.dataset.turn);
+    updateFormatScopedUI();
+  }));
   // Al cambiar el flujo (o al recrearse el rendition) los subrayados pueden quedar sin
   // dibujar: los repintamos. Idempotente.
   window.addEventListener('reader:flow-changed', () => { renderHighlights(); });
@@ -518,6 +525,9 @@ function updateFormatScopedUI() {
     : EpubReader.isLoaded() ? EpubReader.getReadingMode() : 'paginated';
   document.querySelectorAll('.reading-mode-btn').forEach(btn =>
     btn.classList.toggle('active', btn.dataset.mode === mode));
+  const turn = EpubReader.getPageTurn();
+  document.querySelectorAll('.page-turn-btn').forEach(btn =>
+    btn.classList.toggle('active', btn.dataset.turn === turn));
   const fit = isPdf ? PdfReader.getFitMode() : 'page';
   document.querySelectorAll('.pdf-fit-btn').forEach(btn => {
     const on = btn.dataset.fit === fit;

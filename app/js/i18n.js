@@ -840,6 +840,10 @@ const EN = {
   'Reconectar Drive': 'Reconnect Drive',
   // biblioteca (2ª pasada) / studio / panel onboarding
   'Doble': 'Two-page',
+  'Pase de página': 'Page turn',
+  'Deslizar': 'Slide',
+  'Suave': 'Soft',
+  'Ninguno': 'None',
   'Libros': 'Books',
   'Estanterías': 'Shelves',
   'Crear estantería': 'Create shelf',

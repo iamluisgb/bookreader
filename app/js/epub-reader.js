@@ -156,6 +156,36 @@ const EASE_IN = 'cubic-bezier(.4,0,1,1)';
 // quedara a la vista), pero entrar entera no aporta nada y cuesta hueco.
 const ENTER_FROM = 0.55;
 
+// ---- Cuánto se mueve la hoja al pasar página -------------------------------
+// El hueco en blanco entre páginas NO se puede quitar mientras la hoja salga entera de la
+// pantalla: si sale entera, por definición hay frames sin nada que enseñar, y eso es lo que
+// se ve como parpadeo. Reducirlo de verdad es reducir el movimiento, así que se ofrece como
+// ajuste en vez de decidirlo por el lector:
+//
+//   'slide' — la hoja sale entera y la nueva entra por el otro lado. El pase "de libro",
+//             con su hueco inevitable (48-86 ms medidos).
+//   'soft'  — la hoja NO se va: sigue al dedo amortiguada, cambia de página donde está y se
+//             recoloca. Nunca hay un frame en blanco; lo más que se ve es la franja que el
+//             propio dedo abrió. Por defecto.
+//   'none'  — sin movimiento. La página cambia y ya. Cero hueco.
+const TURN_KEY = 'pageTurn';
+const TURN_STYLES = ['slide', 'soft', 'none'];
+const SOFT_FOLLOW = 0.35;   // en 'soft' la hoja sigue al dedo a un tercio: menos franja abierta
+const SOFT_MIN = 0.10;      // desplazamiento mínimo al cambiar, para que el pase se note
+
+export function getPageTurn() {
+  // Quien pide menos movimiento en el sistema no quiere una hoja cruzando la pantalla.
+  try {
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return 'none';
+  } catch (e) { /* sin matchMedia: se sigue con el ajuste guardado */ }
+  const v = Storage.get(TURN_KEY, 'soft');
+  return TURN_STYLES.includes(v) ? v : 'soft';
+}
+
+export function setPageTurn(v) {
+  Storage.set(TURN_KEY, TURN_STYLES.includes(v) ? v : 'soft');
+}
+
 function swipeBox() { return document.getElementById('epub-container'); }
 // translate3d (no translateX): fuerza capa de composición en la GPU, así el iframe
 // no se repinta en cada frame; clave para que el texto no parpadee al arrastrar.
@@ -223,15 +253,27 @@ function swipeDuration(dist, w, velocity) {
   return Math.max(SWIPE_TURN_MIN_MS, Math.min(SWIPE_TURN_MS, Math.round(dist / v)));
 }
 
-function swipeMove(dx) {
-  if (swipeBusy) return;
-  if (getReadingMode() === 'scroll') return;   // en scroll manda el desplazamiento vertical nativo
+// Dónde se PINTA la hoja para un arrastre de `dx`. No es lo mismo que el recorrido del dedo:
+// en el borde resiste, y en 'soft' sigue amortiguada para abrir menos franja en blanco.
+function visualX(dx) {
+  const estilo = getPageTurn();
+  if (estilo === 'none') return 0;
   // En el borde del libro el arrastre RESISTE en vez de seguir al dedo: es la forma de decir
   // "no hay más" mientras la mano está en ello, y no después con una animación de pase que
   // no ha pasado.
-  const raw = swipeAtEdge(swipeDir(dx)) ? dx / EDGE_RESIST : dx;
-  const x = Math.round(raw);        // enteros: sin sub-píxel que tiemble
-  trackSwipe(x);
+  let x = swipeAtEdge(swipeDir(dx)) ? dx / EDGE_RESIST : dx;
+  if (estilo === 'soft') x *= SOFT_FOLLOW;
+  return Math.round(x);            // enteros: sin sub-píxel que tiemble
+}
+
+function swipeMove(dx) {
+  if (swipeBusy) return;
+  if (getReadingMode() === 'scroll') return;   // en scroll manda el desplazamiento vertical nativo
+  // El rastro guarda el recorrido del DEDO, no lo pintado: el umbral y el flick tienen que
+  // medirse sobre lo que la mano hizo. Si no, amortiguar la hoja obligaría a arrastrar el
+  // triple para pasar página.
+  trackSwipe(Math.round(dx));
+  const x = visualX(dx);
   // Dedo (casi) quieto: el jitter de ±1-2px del sensor táctil alternaría el
   // transform en cada evento (hasta 120/s) y el texto parpadea. Banda muerta.
   if (lastSwipeX !== null && Math.abs(x - lastSwipeX) < SWIPE_JITTER) return;
@@ -279,6 +321,21 @@ function swipeWantsTurn(dx, w, v) {
   return byDistance || byFlick;
 }
 
+// Cambia de página y aplica lo que se hubiera encolado mientras tanto. Los encolados van SIN
+// animación: llegan con la hoja ya apartada, donde no hay coreografía que ver, así que ponerse
+// al día cuesta un cambio de página y no un pase entero. Devuelve la última dirección aplicada.
+async function cambiarYDrenar(dir) {
+  await turnPage(dir);
+  swipeEdgeCache = null;   // ya no estamos donde estábamos
+  let ultima = dir;
+  while (swipeQueue.length) {
+    ultima = swipeQueue.shift();
+    await turnPage(ultima);
+    swipeEdgeCache = null;
+  }
+  return ultima;
+}
+
 async function turnPage(dir) {
   try { await (dir === 'next' ? rendition.next() : rendition.prev()); } catch (e) { /* fin del libro */ }
 }
@@ -288,9 +345,8 @@ async function swipeEnd(dx) {
   const c = swipeBox(); if (!c) return;
   const w = c.clientWidth || window.innerWidth || 1;
   const dir = swipeDir(dx);
-  // Mismo amortiguado que en swipeMove: si no, el umbral y la velocidad se medirían sobre un
-  // recorrido que la pantalla nunca hizo.
-  const x = Math.round(swipeAtEdge(dir) ? dx / EDGE_RESIST : dx);
+  // Sobre el recorrido del DEDO (ver swipeMove): amortiguar la hoja no debe endurecer el gesto.
+  const x = Math.round(dx);
   const v = swipeVelocity(x);
   const quiere = swipeWantsTurn(x, w, v);
 
@@ -313,34 +369,40 @@ async function swipeEnd(dx) {
 
   swipeBusy = true;
   swipeHoldLayer(c);
-  // Solo la PRIMERA salida arranca desde donde quedó el dedo; si encadenas, las siguientes
-  // salen desde la hoja en reposo y tienen que recorrer el ancho entero.
-  let recorrido = Math.abs(x);
+  const estilo = getPageTurn();
   let primera = true;
   let ultima = dir;
   do {
-    await swipeAnimate(c, ultima === 'next' ? -w : w, swipeDuration(w - recorrido, w, v), EASE_IN);
+    // La hoja se aparta ANTES de cambiar de página. Cuánto, según el estilo:
+    //   slide → entera (hay hueco en blanco, es el precio del pase "de libro")
+    //   soft  → se queda donde el dedo la dejó (o un mínimo): nunca hay frame en blanco
+    //   none  → no se mueve
+    if (estilo !== 'none') {
+      const signo = ultima === 'next' ? -1 : 1;
+      const meta = estilo === 'slide'
+        ? signo * w
+        : signo * Math.max(Math.abs(swipeAppliedX || 0), w * SOFT_MIN);
+      await swipeAnimate(c, meta, swipeDuration(Math.abs(meta - (swipeAppliedX || 0)), w, v), EASE_IN);
+    }
     if (primera) {
       releasePin();   // navegación real del usuario: suelta el pin para volver a seguir la posición
       primera = false;
     }
-    await turnPage(ultima);
-    swipeEdgeCache = null;   // ya no estamos donde estábamos
-    // Gestos encolados mientras la página estaba FUERA DE PANTALLA: se aplican sin animación,
-    // porque no hay nada que ver. Ponerse al día cuesta un cambio de página, no un pase entero.
-    while (swipeQueue.length) {
-      ultima = swipeQueue.shift();
-      await turnPage(ultima);
-      swipeEdgeCache = null;
+    ultima = await cambiarYDrenar(ultima);
+    if (estilo === 'slide') {
+      // La nueva entra por el lado contrario, y no desde el ancho completo (ver ENTER_FROM).
+      const desde = w * ENTER_FROM;
+      swipeSet(c, ultima === 'next' ? desde : -desde);
+      void c.offsetWidth;                              // reflow para que anime
+      await swipeAnimate(c, 0, swipeDuration(desde, w, v), EASE_OUT);
+    } else if (estilo === 'soft') {
+      // La nueva ya está pintada donde estaba la anterior: solo se recoloca. No cambia de
+      // lado a propósito — saltar de un lado al otro sería teleportar contenido visible.
+      await swipeAnimate(c, 0, swipeDuration(Math.abs(swipeAppliedX || 0), w, v), EASE_OUT);
     }
-    const desde = w * ENTER_FROM;
-    swipeSet(c, ultima === 'next' ? desde : -desde);   // la nueva se coloca al otro lado
-    void c.offsetWidth;                                // reflow para que anime
-    await swipeAnimate(c, 0, swipeDuration(desde, w, v), EASE_OUT);   // y entra
     // Y un gesto que llegó DURANTE la entrada: ahí la hoja ya está a la vista, así que le toca
     // un pase completo. Sin esto se quedaba en la cola sin que nadie la vaciara y saltaba de
     // más en el pase siguiente, que es peor que haberlo perdido.
-    recorrido = 0;
     ultima = swipeQueue.shift() || null;
   } while (ultima);
   swipeReset(c);

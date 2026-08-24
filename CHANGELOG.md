@@ -5,6 +5,37 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-08-24 — Pase de página: un ajuste, porque el hueco en blanco no se quita afinando
+
+El parpadeo seguía apareciendo en cada página, con capítulo nuevo o sin él. Descartado por
+medición que fuera el iframe: epub.js solo lo reemplaza en las fronteras de sección (identidad
+3→3 en los pases intra-sección), así que lo que quedaba era el hueco blanco residual, 48-86 ms
+sobre un libro real — 3-5 frames sin texto en pantalla, perceptibles en cada pase.
+
+Y ahí está el límite: **mientras la hoja salga entera de la pantalla, el hueco es geométrico**.
+No hay curva ni duración que lo evite; si la hoja se va, hay frames sin nada que enseñar. Bajarlo
+más es bajar el movimiento, y cuánto movimiento vale la pena no lo decide el lector: lo decide
+quien lee. Así que es un ajuste, en Ajustes de lectura, junto al modo:
+
+- **Deslizar** — la hoja sale entera y la nueva entra por el lado contrario. El pase "de libro",
+  con su hueco corto (15-20 ms con `test.epub`, 49-67 con el de 14 MB).
+- **Suave** (por defecto) — la hoja sigue al dedo amortiguada a un tercio, cambia de página
+  donde el dedo la dejó y se recoloca. **Cero frames en blanco**, medido en los dos libros.
+  Nunca hay más blanco que la franja que el propio dedo abrió.
+- **Ninguno** — la página cambia sin moverse. Cero.
+
+Con `prefers-reduced-motion` se fuerza «Ninguno»: quien pide menos movimiento en el sistema no
+quiere una hoja cruzando la pantalla.
+
+Un detalle que importa para que «Suave» no se sienta duro: la amortiguación es solo de lo que se
+PINTA. El umbral y la velocidad del flick se siguen midiendo sobre el recorrido del dedo, así que
+pasar página cuesta exactamente lo mismo que antes; lo único que cambia es cuánto se mueve la
+hoja. Amortiguar también la decisión habría obligado a arrastrar el triple.
+
+Con test que mide el hueco frame a frame en los tres estilos y exige CERO en «Suave» y «Ninguno».
+
+---
+
 ## 2026-08-24 — El parpadeo entre páginas era la pantalla quedándose en blanco
 
 El arreglo anterior quitó el parpadeo del momento de soltar (la transición se cortaba a

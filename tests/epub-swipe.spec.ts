@@ -173,19 +173,15 @@ test('en el borde del libro el arrastre resiste y vuelve, sin fingir un pase', a
   expect(fin.max).toBeLessThan(80);
 });
 
-test('el hueco en blanco entre páginas se mantiene corto', async ({ page }) => {
-  // El parpadeo que se veía pasando páginas a ritmo normal: entre la hoja que sale y la que
-  // entra la pantalla se quedaba en BLANCO. Medido con screencast, 99-172 ms por pase sobre
-  // un libro real. Dos causas, ninguna evidente leyendo el código:
+test('el pase suave no deja NI UN frame en blanco entre páginas', async ({ page }) => {
+  // El parpadeo que se veía en cada página era la pantalla quedándose en blanco entre la hoja
+  // que sale y la que entra. Afinando curvas y distancias bajó de 99-172 ms a 48-86, pero no
+  // se puede quitar del todo: mientras la hoja SALGA ENTERA de la pantalla hay, por
+  // definición, frames sin nada que enseñar. Por eso el movimiento es un ajuste:
   //
-  //   · la hoja SALÍA con ease-out, así que recorría casi todo el camino en la primera mitad
-  //     de la animación y se quedaba flotando fuera de cuadro el resto, con la pantalla ya
-  //     vacía. Ahora sale con ease-in.
-  //   · la hoja que ENTRA arrancaba desde el ancho completo, dejando otro tramo vacío.
-  //     Ahora entra desde el 55 %.
-  //
-  // Lo que queda (~66 ms) es el tiempo que epub.js tarda en cambiar de página, con la hoja
-  // necesariamente fuera de cuadro: el suelo de esta arquitectura, no un defecto.
+  //   slide → la hoja sale entera. Queda un hueco corto, es el precio del pase "de libro".
+  //   soft  → la hoja no se va: cambia de página donde el dedo la dejó. CERO hueco. (Por defecto.)
+  //   none  → sin movimiento. Cero hueco.
   //
   // Un frame del screencast tan pequeño solo puede ser una pantalla de color uniforme: una
   // página con texto no baja de ~15 KB a esta calidad.
@@ -197,42 +193,49 @@ test('el hueco en blanco entre páginas se mantiene corto', async ({ page }) => 
   });
   await page.waitForTimeout(1200);
 
-  const seccion = () => page.evaluate(async () => {
-    const r = ((await import('/js/epub-reader.js')) as any).getRendition();
-    return (r.currentLocation() || {}).start?.index ?? -1;
-  });
-
+  const seccion = () => page.evaluate(async () =>
+    (((await import('/js/epub-reader.js')) as any).getRendition().currentLocation() || {}).start?.index ?? -1);
   const cdp = await page.context().newCDPSession(page);
-  const ventanas: number[] = [];
-  for (let k = 0; k < 6; k++) {
-    const secAntes = await seccion();
-    const frames: { t: number; n: number }[] = [];
-    const t0 = Date.now();
-    const onFrame = async (f: any) => {
-      frames.push({ t: Date.now() - t0, n: Buffer.from(f.data, 'base64').length });
-      try { await cdp.send('Page.screencastFrameAck', { sessionId: f.sessionId }); } catch { /* cerrado */ }
-    };
-    cdp.on('Page.screencastFrame', onFrame);
-    await cdp.send('Page.startScreencast', { format: 'jpeg', quality: 80, everyNthFrame: 1 });
-    await deslizar(page, -150);
-    await enReposo(page);
-    await page.waitForTimeout(250);
-    await cdp.send('Page.stopScreencast');
-    cdp.off('Page.screencastFrame', onFrame);
 
-    const blancos = frames.filter((f) => f.n < UMBRAL_BYTES);
-    // Solo cuentan los pases DENTRO de una sección: entrar en un capítulo nuevo obliga a
-    // epub.js a construir un iframe y maquetar (~200 ms), y eso no lo arregla ninguna curva.
-    const mismaSeccion = (await seccion()) === secAntes;
-    if (mismaSeccion && blancos.length >= 2) ventanas.push(blancos[blancos.length - 1].t - blancos[0].t);
-  }
+  const medir = async (estilo: string) => {
+    await page.evaluate(async (e) => { ((await import('/js/epub-reader.js')) as any).setPageTurn(e); }, estilo);
+    const ventanas: number[] = [];
+    for (let k = 0; k < 5; k++) {
+      const secAntes = await seccion();
+      const frames: { t: number; n: number }[] = [];
+      const t0 = Date.now();
+      const onFrame = async (f: any) => {
+        frames.push({ t: Date.now() - t0, n: Buffer.from(f.data, 'base64').length });
+        try { await cdp.send('Page.screencastFrameAck', { sessionId: f.sessionId }); } catch { /* cerrado */ }
+      };
+      cdp.on('Page.screencastFrame', onFrame);
+      await cdp.send('Page.startScreencast', { format: 'jpeg', quality: 80, everyNthFrame: 1 });
+      await deslizar(page, -150);
+      await enReposo(page);
+      await page.waitForTimeout(250);
+      await cdp.send('Page.stopScreencast');
+      cdp.off('Page.screencastFrame', onFrame);
+      const blancos = frames.filter((f) => f.n < UMBRAL_BYTES);
+      // Solo cuentan los pases DENTRO de una sección: entrar en un capítulo nuevo obliga a
+      // epub.js a construir un iframe y maquetar (~200 ms), y eso no lo arregla ninguna curva.
+      if ((await seccion()) === secAntes) {
+        ventanas.push(blancos.length >= 2 ? blancos[blancos.length - 1].t - blancos[0].t : 0);
+      }
+    }
+    console.log(`  ${estilo}: hueco en blanco por pase (ms) ${JSON.stringify(ventanas)}`);
+    return ventanas;
+  };
 
-  expect(ventanas.length).toBeGreaterThanOrEqual(3);
-  const mediana = ventanas.sort((a, b) => a - b)[Math.floor(ventanas.length / 2)];
-  console.log('  hueco en blanco por pase (ms):', JSON.stringify(ventanas));
-  // Con ESTE libro: antes 66-67 ms clavados, ahora 15-20 (un frame). Sobre un libro real de
-  // 14 MB la misma medición daba 99-172 antes y 48-86 después. La valla en 40 separa las dos
-  // situaciones con holgura por los dos lados; comprobado que el test FALLA con el código
-  // anterior, que es lo único que lo hace valer.
+  const suave = await medir('soft');
+  expect(suave.length).toBeGreaterThanOrEqual(3);
+  expect(Math.max(...suave)).toBe(0);          // ni un frame: es el punto de este ajuste
+
+  const ninguno = await medir('none');
+  expect(Math.max(...ninguno)).toBe(0);
+
+  // Y el pase completo sigue acotado: antes de afinar curvas y distancias eran 66-67 ms con
+  // ESTE libro (99-172 con uno real de 14 MB); ahora 15-20, un solo frame.
+  const completo = await medir('slide');
+  const mediana = completo.sort((a, b) => a - b)[Math.floor(completo.length / 2)];
   expect(mediana).toBeLessThan(40);
 });
