@@ -119,20 +119,105 @@ let lastSwipeX = null;   // último translate aplicado (px enteros)
 let swipeRaf = 0;        // rAF pendiente (se pinta 1 vez por frame como mucho)
 let swipePendingX = null;
 let swipeTrail = [];     // muestras {x,t} recientes para detectar el flick al soltar
-const SWIPE_TURN_MS = 190;
+// Transform REALMENTE aplicado al contenedor (null = ninguno). Hace falta para saber
+// cuánto le queda por recorrer a una animación —y para no lanzar una transición hacia
+// el sitio donde el contenedor ya está, que no dispararía `transitionend` y dejaría la
+// promesa esperando a la red de seguridad.
+let swipeAppliedX = null;
+// Pases pedidos mientras había uno en curso. Antes se descartaban: medido, cinco gestos
+// seguidos daban DOS pases, y hojear —que es leer, no un caso raro— perdía la mitad de lo
+// que hacías sin ningún aviso. Se aplican con la página ya fuera de pantalla, donde no hay
+// coreografía que ver, así que ponerse al día no cuesta una animación por página.
+let swipeQueue = [];
+let swipeLayerTimer = 0;
+
+const SWIPE_TURN_MS = 190;       // TECHO: el ritmo de hoy para un arrastre lento y largo
+const SWIPE_TURN_MIN_MS = 80;    // SUELO: por debajo el movimiento deja de leerse
+// Red de seguridad por si `transitionend` no llega (pestaña en segundo plano, transición
+// que el navegador nunca arranca). Generosa a propósito: solo tiene que evitar un cuelgue,
+// no marcar el ritmo — ese trabajo es del evento.
+const SWIPE_GUARD_MS = 400;
+const SWIPE_QUEUE_MAX = 3;       // ponerse al día, sí; convertir el libro en un pase de diapositivas, no
 const SWIPE_JITTER = 3;      // px: temblor del dedo quieto que NO se repinta (anti-parpadeo)
 const FLICK_VELOCITY = 0.35; // px/ms (~350 px/s): deslizamiento rápido que pasa página aunque sea corto
 const FLICK_MIN_DX = 24;     // px mínimos para que un flick cuente como intención
+const EDGE_RESIST = 3;       // en el borde del libro el dedo arrastra 1/3: se nota que no hay más
 
 function swipeBox() { return document.getElementById('epub-container'); }
 // translate3d (no translateX): fuerza capa de composición en la GPU, así el iframe
 // no se repinta en cada frame; clave para que el texto no parpadee al arrastrar.
 function tx(x) { return `translate3d(${x}px,0,0)`; }
 
+const swipeDir = (dx) => (dx < 0 ? 'next' : 'prev');
+
+// ¿No hay más libro en esa dirección? epub.js lo publica en `rendition.location`
+// (`atStart`/`atEnd`), pero esos flags solo aparecen EXACTAMENTE en el borde, así que se
+// respalda con el cálculo equivalente a partir de la sección y la página mostrada — el mismo
+// dato, por si una versión de epub.js deja de poner la bandera.
+//
+// Se calcula UNA VEZ POR GESTO, no en cada `touchmove`: esto se consulta hasta 120 veces por
+// segundo mientras el dedo se mueve, y `currentLocation()` no es gratis.
+let swipeEdgeCache = null;
+function swipeEdges() {
+  if (swipeEdgeCache) return swipeEdgeCache;
+  const res = { next: false, prev: false };
+  try {
+    // `rendition.location` es una propiedad ya calculada (la publica reportLocation);
+    // `currentLocation()` recalcula, así que solo se usa si la primera no está.
+    const loc = rendition && (rendition.location || rendition.currentLocation());
+    if (loc) {
+      const ini = loc.start, fin = loc.end;
+      const ultimo = (book && book.spine && book.spine.spineItems)
+        ? book.spine.spineItems.length - 1 : -1;
+      res.prev = !!loc.atStart
+        || !!(ini && ini.index === 0 && ini.displayed && ini.displayed.page <= 1);
+      res.next = !!loc.atEnd
+        || !!(fin && fin.index === ultimo && fin.displayed && fin.displayed.page >= fin.displayed.total);
+    }
+  } catch (e) { /* sin dato fiable: se comporta como si hubiera más libro */ }
+  swipeEdgeCache = res;
+  return res;
+}
+function swipeAtEdge(dir) {
+  return dir === 'next' ? swipeEdges().next : swipeEdges().prev;
+}
+
+// La capa de composición se PIDE al empezar a arrastrar y se suelta con retraso. Antes se
+// soltaba (`willChange = ''`) en el mismo frame en que la página nueva se pintaba: destruir
+// la capa obliga al iframe a repintarse entero justo ahí, y eso es medio parpadeo. El otro
+// medio era la transición cortada (ver swipeAnimate). Además, encadenando pases el temporizador
+// se cancela y la capa no llega a irse: hojear no paga una promoción por página.
+function swipeHoldLayer(c) {
+  if (swipeLayerTimer) { clearTimeout(swipeLayerTimer); swipeLayerTimer = 0; }
+  if (c) c.style.willChange = 'transform';
+}
+function swipeReleaseLayer() {
+  if (swipeLayerTimer) clearTimeout(swipeLayerTimer);
+  swipeLayerTimer = setTimeout(() => {
+    swipeLayerTimer = 0;
+    const c = swipeBox();
+    if (c && !swipeBusy && swipeAppliedX === null) c.style.willChange = '';
+  }, 300);
+}
+
+// Duración PROPORCIONAL a lo que falta por recorrer, no fija. Con 190 ms clavados, arrastrar
+// el 85 % del ancho y soltar dejaba ese último 15 % tardando lo mismo que un pase entero: la
+// página se despegaba del dedo y se iba sola, despacio. El techo es el ritmo de antes (un
+// arrastre corto y lento no se acelera), así que esto nunca va MÁS LENTO que como estaba.
+function swipeDuration(dist, w, velocity) {
+  const nominal = (w || 1) / SWIPE_TURN_MS;                  // px/ms que daban los 190 ms a lo ancho
+  const v = Math.max(nominal, Math.abs(velocity || 0));      // si el flick fue más rápido, manda él
+  return Math.max(SWIPE_TURN_MIN_MS, Math.min(SWIPE_TURN_MS, Math.round(dist / v)));
+}
+
 function swipeMove(dx) {
   if (swipeBusy) return;
   if (getReadingMode() === 'scroll') return;   // en scroll manda el desplazamiento vertical nativo
-  const x = Math.round(dx);        // enteros: sin sub-píxel que tiemble
+  // En el borde del libro el arrastre RESISTE en vez de seguir al dedo: es la forma de decir
+  // "no hay más" mientras la mano está en ello, y no después con una animación de pase que
+  // no ha pasado.
+  const raw = swipeAtEdge(swipeDir(dx)) ? dx / EDGE_RESIST : dx;
+  const x = Math.round(raw);        // enteros: sin sub-píxel que tiemble
   trackSwipe(x);
   // Dedo (casi) quieto: el jitter de ±1-2px del sensor táctil alternaría el
   // transform en cada evento (hasta 120/s) y el texto parpadea. Banda muerta.
@@ -145,9 +230,10 @@ function swipeMove(dx) {
     if (swipePendingX === null || swipeBusy) return;
     const c = swipeBox(); if (!c) return;
     lastSwipeX = swipePendingX;
+    swipeHoldLayer(c);
     c.style.transition = 'none';
     c.style.transform = tx(swipePendingX);
-    c.style.willChange = 'transform';
+    swipeAppliedX = swipePendingX;
   });
 }
 
@@ -172,47 +258,125 @@ function swipeCancelPending() {
   swipePendingX = null;
 }
 
-async function swipeEnd(dx) {
-  if (swipeBusy) return;           // animación en curso: ignora, no la interrumpas
-  if (getReadingMode() === 'scroll') return;   // sin pasar página con swipe en modo scroll
-  const c = swipeBox(); if (!c) return;
-  swipeCancelPending();            // que un rAF rezagado no pise la animación de salida
-  const w = c.clientWidth || window.innerWidth || 1;
-  // Pasa página por DISTANCIA (recorrido corto, estilo Play Books) o por FLICK
-  // (deslizamiento rápido aunque corto, en el mismo sentido que el recorrido).
-  const v = swipeVelocity(Math.round(dx));
+// ¿Este gesto pide pasar página? Por DISTANCIA (recorrido corto, estilo Play Books) o por
+// FLICK (deslizamiento rápido aunque corto, en el mismo sentido que el recorrido).
+function swipeWantsTurn(dx, w, v) {
   const byDistance = Math.abs(dx) >= Math.min(60, w * 0.15);
   const byFlick = Math.abs(dx) >= FLICK_MIN_DX && Math.abs(v) >= FLICK_VELOCITY && (v < 0) === (dx < 0);
-  if ((!byDistance && !byFlick) || !rendition) {   // no llega → vuelve
-    await swipeAnimate(c, 0);
+  return byDistance || byFlick;
+}
+
+async function turnPage(dir) {
+  try { await (dir === 'next' ? rendition.next() : rendition.prev()); } catch (e) { /* fin del libro */ }
+}
+
+async function swipeEnd(dx) {
+  if (getReadingMode() === 'scroll') return;   // sin pasar página con swipe en modo scroll
+  const c = swipeBox(); if (!c) return;
+  const w = c.clientWidth || window.innerWidth || 1;
+  const dir = swipeDir(dx);
+  // Mismo amortiguado que en swipeMove: si no, el umbral y la velocidad se medirían sobre un
+  // recorrido que la pantalla nunca hizo.
+  const x = Math.round(swipeAtEdge(dir) ? dx / EDGE_RESIST : dx);
+  const v = swipeVelocity(x);
+  const quiere = swipeWantsTurn(x, w, v);
+
+  // Pase en curso: el gesto se ENCOLA en vez de perderse. La cola se aplica luego con la
+  // página fuera de pantalla (ver el bucle de abajo).
+  if (swipeBusy) {
+    if (quiere && !swipeAtEdge(dir) && swipeQueue.length < SWIPE_QUEUE_MAX) swipeQueue.push(dir);
+    return;
+  }
+
+  swipeCancelPending();            // que un rAF rezagado no pise la animación de salida
+  // En el borde no hay pase que valga: vuelve, y punto. Antes se ejecutaba la coreografía
+  // COMPLETA —la página salía entera y "otra" entraba por el lado contrario— con el mismo
+  // contenido: una animación que afirmaba un pase que no había ocurrido.
+  if (!quiere || !rendition || swipeAtEdge(dir)) {
+    await swipeAnimate(c, 0, swipeDuration(Math.abs(swipeAppliedX || 0), w, v));
     swipeReset(c);
     return;
   }
+
   swipeBusy = true;
-  const dir = dx < 0 ? 'next' : 'prev';
-  await swipeAnimate(c, dir === 'next' ? -w : w);   // la actual termina de salir
+  swipeHoldLayer(c);
+  // Lo que le queda a la página actual para terminar de salir.
+  await swipeAnimate(c, dir === 'next' ? -w : w, swipeDuration(w - Math.abs(x), w, v));
   releasePin();   // navegación real del usuario: suelta el pin de giro para volver a seguir la posición
-  try { await (dir === 'next' ? rendition.next() : rendition.prev()); } catch (e) { /* fin del libro */ }
-  swipeSet(c, dir === 'next' ? w : -w);             // la nueva se coloca al otro lado
+  let ultima = dir;
+  await turnPage(ultima);
+  swipeEdgeCache = null;   // ya no estamos donde estábamos
+  // Gestos encolados mientras la página estaba fuera de pantalla: se aplican SIN animación,
+  // porque no hay nada que ver. Ponerse al día cuesta un cambio de página, no un pase entero.
+  while (swipeQueue.length) {
+    ultima = swipeQueue.shift();
+    await turnPage(ultima);
+    swipeEdgeCache = null;
+  }
+  swipeSet(c, ultima === 'next' ? w : -w);          // la nueva se coloca al otro lado
   void c.offsetWidth;                               // reflow para que anime
-  await swipeAnimate(c, 0);                          // y entra
+  await swipeAnimate(c, 0, swipeDuration(w, w, v));  // y entra
   swipeReset(c);
   swipeBusy = false;
+  swipeReleaseLayer();
 }
 
-function swipeSet(c, x) { if (c) { c.style.transition = 'none'; c.style.transform = tx(x); } }
+function swipeSet(c, x) {
+  if (!c) return;
+  c.style.transition = 'none';
+  c.style.transform = tx(x);
+  swipeAppliedX = x;
+}
 function swipeReset(c) {
   swipeCancelPending();
   lastSwipeX = null;
   swipeTrail = [];
-  if (c) { c.style.transition = 'none'; c.style.transform = ''; c.style.willChange = ''; }
+  swipeAppliedX = null;
+  swipeEdgeCache = null;   // otra posición: los bordes se vuelven a preguntar
+  if (c) { c.style.transition = 'none'; c.style.transform = ''; }
+  // `willChange` NO se borra aquí: ver swipeReleaseLayer.
+  swipeReleaseLayer();
 }
-function swipeAnimate(c, x) {
-  return new Promise(res => {
+
+// Anima el contenedor hasta `x` y resuelve cuando la transición TERMINA DE VERDAD.
+//
+// Antes resolvía con `setTimeout(190 + 20)`, pero la transición arranca un rAF MÁS TARDE que
+// ese temporizador: cronometrado, el margen real entre el final de la animación y la limpieza
+// era de 4 ms. Cualquier frame que se retrasara por encima de eso metía la limpieza DENTRO de
+// la animación —el contenedor saltaba desde donde estuviera— y ese es el parpadeo. Medido con
+// la CPU frenada 6× (un móvil de gama media), 3 de cada 10 transiciones se cortaban.
+function swipeAnimate(c, x, ms = SWIPE_TURN_MS) {
+  return new Promise((res) => {
     if (!c) { res(); return; }
-    c.style.transition = `transform ${SWIPE_TURN_MS}ms cubic-bezier(.22,.61,.36,1)`;
-    requestAnimationFrame(() => { c.style.transform = tx(x); });
-    setTimeout(res, SWIPE_TURN_MS + 20);
+    // Ya está ahí: no habría transición que escuchar y la promesa esperaría a la red de
+    // seguridad. Pasa en el rebote de un arrastre tan corto que la banda muerta nunca lo pintó.
+    if (swipeAppliedX === null ? x === 0 : Math.round(swipeAppliedX) === Math.round(x)) {
+      c.style.transition = 'none';
+      res();
+      return;
+    }
+    let hecho = false;
+    let guard = 0;
+    const acabar = () => {
+      if (hecho) return;
+      hecho = true;
+      c.removeEventListener('transitionend', alAcabar);
+      c.removeEventListener('transitioncancel', alAcabar);
+      clearTimeout(guard);
+      res();
+    };
+    // `e.target === c`: transitionend BURBUJEA, y dentro del contenedor vive el iframe de
+    // epub.js con sus propias transiciones.
+    const alAcabar = (e) => { if (e.target === c && e.propertyName === 'transform') acabar(); };
+    c.addEventListener('transitionend', alAcabar);
+    c.addEventListener('transitioncancel', alAcabar);
+    guard = setTimeout(acabar, ms + SWIPE_GUARD_MS);
+    c.style.transition = `transform ${ms}ms cubic-bezier(.22,.61,.36,1)`;
+    requestAnimationFrame(() => {
+      if (hecho) return;
+      c.style.transform = tx(x);
+      swipeAppliedX = x;
+    });
   });
 }
 

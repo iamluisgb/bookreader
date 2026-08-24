@@ -5,6 +5,56 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-08-24 — Pasar página con el dedo: el parpadeo, los gestos perdidos y el borde del libro
+
+Tres defectos del deslizamiento del EPUB, los tres **medidos antes de tocar nada** con sondas de
+eventos táctiles reales y la CPU frenada para parecerse a un móvil.
+
+**El parpadeo: la animación se cortaba a medias.** `swipeAnimate` resolvía con
+`setTimeout(190 + 20)`, pero la transición arranca un `requestAnimationFrame` MÁS TARDE que ese
+temporizador. Cronometrado, el margen real entre el final de la animación y la limpieza que borra
+el `transform` era de **4 ms**. Cualquier frame que se retrasara por encima de eso metía la
+limpieza dentro de la animación: el contenedor saltaba desde donde estuviera y, en el mismo frame,
+se borraba `willChange` —`.epub-container` no tiene `will-change` en el CSS, así que la capa de
+composición se creaba y se destruía en cada pase— obligando al iframe a repintarse entero. Salto
+más repintado, justo cuando la página nueva aparecía. Con la CPU 6× lenta se cortaban **3 de cada
+10** transiciones; a 1× una de doce, que es por lo que en escritorio casi no se veía y en el móvil
+sí. Ahora se cierra por `transitionend` (con `transitioncancel` para no colgarse y un
+`setTimeout` holgado solo como red de seguridad) y la capa se suelta 300 ms después, no en el
+frame del pintado; encadenando pases el temporizador se cancela y la capa ni se va ni se
+recrea. Medido tras el arreglo: **0 transiciones cortadas de 12**, a 1×, 4× y 6×.
+
+Se descartó por medición el sospechoso natural: el fundido de entrada de capítulo
+(`chapter-in`, opacidad 0.35→1). Su guarda `swipeBusy` funciona — 0 fundidos en 8 pases.
+
+**Encadenar gestos perdía la mitad.** `swipeMove` y `swipeEnd` abrían con `if (swipeBusy) return`,
+y esa ventana duraba lo que el pase entero. Cinco deslizamientos seguidos daban **2 pases**; hacían
+falta ~500 ms entre gestos para que contaran todos. Hojear un libro —que es leer, no un caso
+raro— tiraba más de la mitad de lo que hacías sin ningún aviso. Ahora el gesto se **encola** (hasta
+3) y los pendientes se aplican con la página ya fuera de pantalla, donde no hay coreografía que
+ver: ponerse al día cuesta un cambio de página, no un pase entero. Cinco gestos seguidos: **4
+pases**; separados 300 ms, los 5.
+
+**En el borde del libro se fingía un pase.** `rendition.next()` falla en silencio al final, pero la
+coreografía se ejecutaba igual: la página salía entera por un lado y "otra" entraba por el otro
+—con el mismo contenido—. La traza del `transform` no dejaba lugar a dudas: `120px → 390px →
+-390px → 0px`, 450 ms de animación afirmando un pase que no había ocurrido. Ahora el arrastre
+**resiste** (un tercio del recorrido) mientras la mano está en ello y vuelve al soltar. El dato
+sale de `atStart`/`atEnd` de epub.js, respaldado por el cálculo equivalente (sección y página
+mostrada) y cacheado **una vez por gesto**: se consulta hasta 120 veces por segundo mientras el
+dedo se mueve.
+
+**De paso, la duración deja de ser fija.** Con 190 ms clavados, arrastrar el 85 % del ancho y
+soltar dejaba ese último 15 % tardando lo mismo que un pase entero: la página se despegaba del
+dedo y se iba sola, despacio. Ahora sale de la distancia que falta y de la velocidad del flick,
+con techo en los 190 ms de antes —un arrastre corto y lento no se acelera, así que esto nunca va
+más lento que como estaba—. Un pase suelto pasa de **587-620 ms a 354-386 ms**.
+
+Con tests de regresión que **fallan contra el código anterior** (comprobado): transiciones
+cortadas a 6× de CPU, gestos encadenados y los dos bordes del libro. `npm run perf` sin cambios.
+
+---
+
 ## 2026-08-24 — Dictado: se ve que está transcribiendo
 
 Al soltar un audio, la barra de grabación desaparecía y volvía el textarea vacío. Con el motor
