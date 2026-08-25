@@ -5,6 +5,37 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-08-25 — «Suave» se pasaba de suave: el pase no se leía como un pase
+
+El ajuste anterior quitó el parpadeo, pero el pase quedó raro: la hoja no llegaba a irse y de
+repente ya estabas leyendo la siguiente. Mirando los frames se ve por qué — la hoja se movía **52
+píxeles de 390** (un 13 % de la pantalla) y el contenido cambiaba con ella **parada** en ese
+punto. Dos errores a la vez: sin recorrido no hay salida que ver, y sustituir el texto en un
+momento estático es el peor instante posible, porque el ojo está fijo leyéndolo.
+
+Se probaron dos alternativas y **las dos se descartaron mirando los frames**, no razonando:
+
+1. *Apartar la hoja más y devolverla.* Tras deslizar hacia la izquierda, la hoja volvía hacia la
+   derecha — que es el gesto de «no ha pasado nada», un rebote, no un pase.
+2. *Apartarla a medias y traer la nueva por el lado contrario*, es decir el pase completo pero
+   recortando el tramo en que la pantalla estaría vacía. Los frames enseñaron el fallo sin lugar
+   a dudas: dos capturas consecutivas mostraban **la misma página**, una desplazada a −175 px y la
+   siguiente a +175 px. Lo que se recorta no es el hueco: es el instante en que la hoja nueva se
+   teletransporta de un extremo al otro, 90 % del ancho con media página a la vista.
+
+De ahí sale el límite real, y conviene dejarlo escrito: **para que la nueva entre por el lado
+contrario sin saltos, la anterior tiene que haberse ido ENTERA — y eso es exactamente la pantalla
+en blanco**. Con una sola página renderizada no hay tercera opción: o hueco, o cambio en el sitio.
+Un pase de libro de verdad, sin hueco, pide dos páginas a la vez (el manager continuo de epub.js o
+doble búfer), que es un cambio de arquitectura, no un ajuste.
+
+Así que «Suave» es ahora lo que no tiene ningún artefacto: **el movimiento del pase lo hace tu
+dedo** —la hoja lo sigue mientras arrastras— y al soltar está la página siguiente, ya centrada.
+Sin hueco, sin rebote y sin saltos. «Deslizar» sigue ahí para quien prefiera el pase completo con
+su hueco corto, y «Ninguno» para quien no quiera movimiento.
+
+---
+
 ## 2026-08-24 — Pase de página: un ajuste, porque el hueco en blanco no se quita afinando
 
 El parpadeo seguía apareciendo en cada página, con capítulo nuevo o sin él. Descartado por

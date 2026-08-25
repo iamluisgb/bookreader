@@ -170,8 +170,28 @@ const ENTER_FROM = 0.55;
 //   'none'  — sin movimiento. La página cambia y ya. Cero hueco.
 const TURN_KEY = 'pageTurn';
 const TURN_STYLES = ['slide', 'soft', 'none'];
-const SOFT_FOLLOW = 0.35;   // en 'soft' la hoja sigue al dedo a un tercio: menos franja abierta
-const SOFT_MIN = 0.10;      // desplazamiento mínimo al cambiar, para que el pase se note
+// Cuánto sigue al dedo y cuánto se aparta antes de cambiar. La primera versión usaba 0.35 y
+// 0.10: la hoja se movía 52 px de 390 —un 13 % de la pantalla— y el contenido cambiaba con
+// ella PARADA. El resultado no se leía como un pase: la hoja no llegaba a irse y de repente
+// ya estabas en la página siguiente. Con más recorrido la salida se ve, y sigue sin haber
+// blanco porque la franja que se abre es una franja, no la pantalla entera.
+const SOFT_FOLLOW = 0.55;   // la hoja sigue al dedo a algo más de la mitad
+// En 'soft' la hoja NO se aparta por su cuenta al soltar: se queda donde el dedo la dejó y la
+// nueva aparece ahí mismo, centrada. Suena a poco y es el resultado de descartar las dos
+// alternativas mirando los frames:
+//
+//   · apartarla un poco y devolverla → tras deslizar a la izquierda la hoja volvía hacia la
+//     derecha, que es el gesto de "no ha pasado nada"; y el contenido cambiaba con ella
+//     PARADA, el peor momento posible para sustituir un texto que el ojo está leyendo.
+//   · apartarla a medias y traer la nueva por el lado contrario (el pase completo, recortando
+//     el tramo en blanco) → los frames enseñaron que eso teletransporta la hoja NUEVA de un
+//     extremo al otro, 90 % del ancho con media página a la vista. Para que la nueva entre por
+//     el otro lado sin salto, la anterior tiene que haberse ido ENTERA — y eso es exactamente
+//     la pantalla en blanco que queríamos quitar. La geometría no da más de sí con una sola
+//     página renderizada: o hueco, o cambio en el sitio.
+//
+// Así que el movimiento del pase es el que hace tu propio dedo, y al soltar está la página
+// siguiente. Sin hueco, sin rebote y sin saltos.
 
 export function getPageTurn() {
   // Quien pide menos movimiento en el sistema no quiere una hoja cruzando la pantalla.
@@ -377,12 +397,11 @@ async function swipeEnd(dx) {
     //   slide → entera (hay hueco en blanco, es el precio del pase "de libro")
     //   soft  → se queda donde el dedo la dejó (o un mínimo): nunca hay frame en blanco
     //   none  → no se mueve
-    if (estilo !== 'none') {
-      const signo = ultima === 'next' ? -1 : 1;
-      const meta = estilo === 'slide'
-        ? signo * w
-        : signo * Math.max(Math.abs(swipeAppliedX || 0), w * SOFT_MIN);
-      await swipeAnimate(c, meta, swipeDuration(Math.abs(meta - (swipeAppliedX || 0)), w, v), EASE_IN);
+    // 'slide' aparta la hoja ENTERA antes de cambiar: es lo que permite que la nueva entre por
+    // el lado contrario sin saltos, y también lo que deja la pantalla vacía un momento.
+    if (estilo === 'slide') {
+      await swipeAnimate(c, ultima === 'next' ? -w : w,
+        swipeDuration(w - Math.abs(swipeAppliedX || 0), w, v), EASE_IN);
     }
     if (primera) {
       releasePin();   // navegación real del usuario: suelta el pin para volver a seguir la posición
@@ -390,15 +409,14 @@ async function swipeEnd(dx) {
     }
     ultima = await cambiarYDrenar(ultima);
     if (estilo === 'slide') {
-      // La nueva entra por el lado contrario, y no desde el ancho completo (ver ENTER_FROM).
-      const desde = w * ENTER_FROM;
+      const desde = w * ENTER_FROM;                    // no desde el ancho completo (ver ENTER_FROM)
       swipeSet(c, ultima === 'next' ? desde : -desde);
       void c.offsetWidth;                              // reflow para que anime
       await swipeAnimate(c, 0, swipeDuration(desde, w, v), EASE_OUT);
-    } else if (estilo === 'soft') {
-      // La nueva ya está pintada donde estaba la anterior: solo se recoloca. No cambia de
-      // lado a propósito — saltar de un lado al otro sería teleportar contenido visible.
-      await swipeAnimate(c, 0, swipeDuration(Math.abs(swipeAppliedX || 0), w, v), EASE_OUT);
+    } else {
+      // 'soft' y 'none': la página nueva aparece YA centrada, sin transición. No hay nada que
+      // animar porque no hay nada que devolver a su sitio.
+      swipeSet(c, 0);
     }
     // Y un gesto que llegó DURANTE la entrada: ahí la hoja ya está a la vista, así que le toca
     // un pase completo. Sin esto se quedaba en la cola sin que nadie la vaciara y saltaba de
