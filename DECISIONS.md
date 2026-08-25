@@ -1072,3 +1072,58 @@ sumando en `renderDetail` y el mapeo de los overlays.
   dejarlo puesto amplía **sobre** el recorte y devuelve el scroll horizontal que veníamos a quitar.
 - El primer «Texto» de un libro cuesta el muestreo (8 rasterizados de 200 px). Se cachea por libro.
 - `.pdf-page` pasa a `overflow: hidden`: la caja es una ventana y lo que cae fuera hay que cortarlo.
+
+---
+
+## ADR-034 — PDF: el eje se decide por gesto, no con un candado · `ACEPTADA`
+
+**Contexto.** ADR-033 quitó la causa del desvío lateral haciendo que la unidad de ajuste fuera la
+mancha: con «Texto», a zoom 1, `scrollWidth === clientWidth` y no hay eje que descolocar. Lo que
+ese ADR no cubre es el **zoom**. `layoutWrapper` da a la caja `fitw · cropW · zoom` y `ZOOM_MAX` es
+6: quien amplía sobre el recorte —una tabla, un escaneo torcido, un PDF a dos columnas, uno donde
+el recorte tocó su tope `CROP_MIN_W`— vuelve a tener recorrido horizontal por construcción, y con
+él la deriva de lado al leer en vertical.
+
+**Decisión.** Sigue sin haber candado. El eje se decide **por gesto**: al arrancar un arrastre (o
+una ráfaga de rueda), si el recorrido es claramente vertical —`|dy| ≥ 1.5·|dx|` una vez recorridos
+12 px— la componente X de **ese** gesto se ignora; el siguiente arrastre panea con total
+normalidad. Vive en [`js/pdf-axis-lock.js`](js/pdf-axis-lock.js), lo instala `ensureZoomHandlers`.
+
+**Porqué así y no de las otras formas.**
+
+1. **Por gesto y no por modo.** Un candado persistente es lo que ADR-033 ya rechazó, y sigue siendo
+   malo por la misma razón más una nueva: en móvil —sin rueda ni teclado— el dedo es el **único**
+   modo de alcanzar lo que queda fuera del viewport; a zoom 4 un eje X bloqueado es una trampa. Un
+   veredicto que muere con el gesto no deja nada fuera de alcance, no hay estado que recordar,
+   sincronizar ni explicar, y no hay nada que anunciar en la UI.
+2. **Reponer `scrollLeft`, y aun así no ser el candado.** `touch-action` se fija cuando el dedo baja
+   y no se puede cambiar a mitad de gesto; el scroll táctil lo lleva el compositor. No hay forma
+   declarativa de quitar un eje una vez empezado el arrastre, así que se deja scrollear nativo y se
+   repone `scrollLeft` en el evento `scroll`. La objeción de ADR-033 a esa técnica —rompe
+   `scrollIntoView`, la búsqueda, el foco de teclado— era contra un estado **permanente**: aquí solo
+   hay reposición mientras el dedo está abajo (más la inercia), y fuera de eso `scrollIntoView`, el
+   anclaje del zoom y el auto-desplazamiento de la selección mueven el eje X sin nada enfrente.
+3. **El umbral es 12 px porque es el `MOVE_CANCEL` de `pdf-touch-select`.** Por debajo de eso el
+   gesto todavía puede ser una pulsación larga (selección), no un scroll. Alinearlos hace que los
+   dos módulos no puedan reclamar el mismo gesto; además se suelta el eje en cuanto un `touchmove`
+   llega con `defaultPrevented` (pinch o selección: ahí no hay scroll nativo que gobernar).
+4. **La inercia hereda el veredicto.** El fling sale de la velocidad de los últimos puntos del dedo,
+   componente X incluida: soltar el eje en el `touchend` devolvería por la cola justo la deriva que
+   se acaba de quitar. Se mantiene mientras sigan llegando eventos de scroll y se suelta tras 140 ms
+   sin ellos — el mismo criterio de ráfaga que ya usa el zoom de rueda.
+5. **El trackpad entra por el mismo sitio.** La queja original nombraba el dedo **y** el trackpad, y
+   una ráfaga de `wheel` es el mismo gesto con otra entrada: se clasifica con los primeros deltas
+   acumulados y se cierra por inactividad. `Ctrl/⌘+rueda` es zoom y queda fuera.
+6. **Si no hay eje X, no hay nada que hacer.** La clasificación exige
+   `scrollWidth - clientWidth > 1`, así que en el caso normal —zoom 1, con o sin recorte— el módulo
+   no llega ni a bloquear: no compite con ADR-033, lo remata donde ADR-033 no llega.
+
+**Consecuencias.**
+- `setZoom` suelta el eje antes de anclar al foco: ancla moviendo `scrollLeft` a mano y con un
+  veredicto vivo se repondría justo después.
+- Con rueda se cuelan ~3 px de deriva antes de clasificar (el umbral se consume en scroll real). Con
+  el dedo son 0: el *slop* táctil del navegador se come el arranque antes de que el compositor
+  empiece a desplazar.
+- Verificado con gestos **reales** del compositor (CDP `Input.synthesizeScrollGesture`), no solo con
+  eventos sintéticos: un arrastre de −300 px con 45 px de deriva mueve 0 en X; uno lateral panea los
+  300. La regresión de la suite emula el desplazamiento porque Playwright no simula el compositor.

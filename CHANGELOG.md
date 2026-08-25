@@ -5,6 +5,29 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-08-25 — PDF: leer en vertical ya no se lleva la columna de lado
+
+«Ajustar al texto» quitó el scroll horizontal a zoom 1 (ADR-033), pero en cuanto amplías vuelve a
+haberlo: una tabla, un escaneo torcido, un PDF a dos columnas, o uno donde el recorte tocó su tope
+de seguridad. Ahí seguía pasando lo de siempre — lees hacia abajo, el pulgar se desvía cuatro
+píxeles y el texto se va de lado.
+
+Ahora el eje se decide **por gesto**: si el arranque del arrastre es claramente vertical, el desvío
+lateral de ese gesto se ignora; el siguiente arrastre panea con total normalidad. Vale igual para
+la ráfaga del trackpad, que era la otra mitad de la queja.
+
+No es el candado que se pidió en su día, y a propósito: un modo persistente deja la vista
+descentrada y, en móvil —sin rueda ni teclado—, deja lo que queda fuera de la pantalla fuera de
+alcance. Un veredicto que muere con el gesto no tiene botón, no tiene ajuste que sincronizar y no
+esconde nada. La inercia sí lo hereda: el impulso al soltar arrastra la componente lateral del
+dedo, así que soltar el eje en el `touchend` habría devuelto por la cola justo lo que se quitaba.
+
+Comprobado con gestos reales del compositor, no solo con eventos sintéticos: 300 px hacia arriba
+con 45 de desvío mueven 0 en horizontal; 300 px de lado panean los 300. Detalle en
+[ADR-034](DECISIONS.md).
+
+---
+
 ## 2026-08-25 — «Suave» se pasaba de suave: el pase no se leía como un pase
 
 El ajuste anterior quitó el parpadeo, pero el pase quedó raro: la hoja no llegaba a irse y de

@@ -1,5 +1,6 @@
 import * as Storage from './storage.js';
 import { loadPdfJs } from './vendor-loader.js';
+import * as AxisLock from './pdf-axis-lock.js';
 
 let pdfjsLib = null;
 let pdfDoc = null;
@@ -280,6 +281,9 @@ function pageAt(clientY) {
 // saltito al soltar los dedos. Ahora anotamos dónde cae el foco DENTRO de la página ancla,
 // horneamos, y corregimos el scroll con la posición real resultante.
 export function setZoom(z, focalClient) {
+  // Se ancla el scroll al foco moviendo scrollLeft a mano: si venía un eje decidido de un
+  // gesto anterior (ADR-034), soltarlo antes o repondría el X justo después de anclarlo.
+  AxisLock.release();
   const nz = clampZoom(z);
   const container = document.getElementById('pdf-container');
   if (Math.abs(nz - zoom) < 0.0005 || !container) { zoom = nz; applyCommittedZoom(); return; }
@@ -693,6 +697,7 @@ function ensureZoomHandlers() {
   const container = document.getElementById('pdf-container');
   if (!container) return;
   zoomHandlersReady = true;
+  AxisLock.install(container);          // eje dominante por gesto (ADR-034)
 
   // ---- Preview en vivo compartido -----------------------------------------
   // preview.target = zoom objetivo acumulado; el layer muestra target/zoom (relativo

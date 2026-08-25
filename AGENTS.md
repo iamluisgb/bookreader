@@ -23,7 +23,7 @@ offline con un agente de IA (BYOK) que lee el libro completo según un objetivo.
   agent.css se inserta en el hueco `#css-slot-agent` para no alterar la cascada
   (ver `js/css-loader.js`).
 - `js/` — orquestador (`app.js`) + módulos por responsabilidad:
-  - lectura: `epub-reader.js`, `pdf-reader.js`, `touch-select.js`, `progress.js`
+  - lectura: `epub-reader.js`, `pdf-reader.js`, `pdf-axis-lock.js`, `touch-select.js`, `progress.js`
   - sidebar: `bookmarks.js`/`bookmarks-ui.js`, `highlights.js`/`highlights-ui.js`, `settings.js`
   - agente IA: `js/ai/` (`panel.js`, `panel-template.js`, `llm.js`, `segment.js`, `db.js`,
     `templates.js`, `render.js`, `markdown.js`, `attenuation.js`)
