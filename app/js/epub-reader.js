@@ -43,8 +43,79 @@ let canonicalId = null;
 // Ver sizeContainer() y `.epub-container.has-desk` en main.css.
 const DESK_MIN_MARGIN = 120;
 
+// Secuencia de navegación: la incrementa TODO movimiento real (pasar página, swipe, saltar
+// a un CFI, la barra de progreso). Sirve para descartar un re-anclaje tardío
+// (`reanchorWhenSettled`) si el lector ya se ha ido a otro sitio: nada tan molesto como que
+// el libro te devuelva solo a la página que acabas de dejar.
+let navSeq = 0;
+// Último re-anclaje en vuelo, para poder esperarlo desde los tests.
+let reanchorTask = Promise.resolve();
+
 // Libera el pin de posición (lo llama toda navegación real del usuario).
 function releasePin() { pinnedCfi = null; clearTimeout(resizeTimer); resizeTimer = null; }
+
+const espera = (ms) => new Promise(r => setTimeout(r, ms));
+
+// Documento del iframe de lectura (o null si aún no hay vista montada).
+function contentDoc() {
+  try {
+    const c = rendition && rendition.getContents();
+    const contents = Array.isArray(c) ? c[0] : c;
+    return (contents && contents.document) || null;
+  } catch (e) {
+    return null;
+  }
+}
+
+// Tope de espera del re-anclaje. Más allá, o el contenido no asienta o no va a asentar:
+// insistir solo alarga la ventana en la que un re-display podría pisar al lector.
+const SETTLE_TIMEOUT = 3000;
+
+// Re-ancla el CFI cuando el CONTENIDO del iframe deja de re-maquetarse.
+//
+// El problema que resuelve: epub.js calcula a qué píxel saltar con la maqueta que ve EN ESE
+// INSTANTE. Si el contenido reflúa DESPUÉS —la fuente de lectura que llega tarde, imágenes
+// que decodifican, el CSS del propio EPUB— ese píxel ya no señala al pasaje, y como el texto
+// suele crecer, la misma posición cae ANTES: se ve como "el marcador me deja unas páginas
+// atrás". El pin de `scheduleResize` NO cubre este caso: ahí el contenedor no cambia de
+// tamaño, solo el contenido, así que no hay ni 'resize' ni nada que disparar.
+//
+// El doble `display` de `goTo` tampoco: espera un frame, que basta para que epub.js asiente
+// sus columnas pero no para una ida y vuelta a la red.
+//
+// Aquí se espera a `document.fonts.ready` (el reflujo tardío más habitual y el único
+// esperable de forma explícita) y, además, a que el ancho total del contenido se estabilice,
+// que detecta a los demás. Solo se re-muestra si el ancho CAMBIÓ: si no hubo reflujo, la
+// posición sigue siendo buena y un display de más sería un salto gratuito.
+async function reanchorWhenSettled(cfi, seq) {
+  if (!cfi || !rendition) return;
+  const doc = contentDoc();
+  if (!doc) return;
+  const anchoTotal = () => { try { return doc.documentElement.scrollWidth; } catch (e) { return -1; } };
+
+  const t0 = Date.now();
+  const inicial = anchoTotal();
+  try {
+    if (doc.fonts && doc.fonts.ready) await Promise.race([doc.fonts.ready, espera(SETTLE_TIMEOUT)]);
+  } catch (e) { /* sin API de fuentes: queda la vigilancia del ancho */ }
+  if (seq !== navSeq || !rendition || contentDoc() !== doc) return;
+
+  // Re-medir DESPUÉS de las fuentes, no antes: si `fonts.ready` se ha comido casi todo el
+  // tope, el bucle de estabilidad no llega a dar una vuelta y comparar contra la medida
+  // vieja diría "no hubo reflujo" justo cuando lo ha habido.
+  let ancho = anchoTotal();
+  while (Date.now() - t0 < SETTLE_TIMEOUT) {
+    await espera(150);
+    if (seq !== navSeq || !rendition || contentDoc() !== doc) return;
+    const nuevo = anchoTotal();
+    if (nuevo === ancho) break;
+    ancho = nuevo;
+  }
+
+  if (seq !== navSeq || !rendition || contentDoc() !== doc) return;
+  if (ancho === inicial) return;            // no hubo reflujo: donde estamos es donde toca
+  try { await rendition.display(cfi); } catch (e) { /* el CFI ya no resuelve */ }
+}
 
 // Re-apply the container width and re-fit. Width/height both track the
 // container (rendered at '100%'), so this mainly re-applies the max-width cap;
@@ -357,6 +428,7 @@ async function cambiarYDrenar(dir) {
 }
 
 async function turnPage(dir) {
+  navSeq++;   // pase con el dedo: también es navegación real (ver `reanchorWhenSettled`)
   try { await (dir === 'next' ? rendition.next() : rendition.prev()); } catch (e) { /* fin del libro */ }
 }
 
@@ -904,6 +976,10 @@ export async function load(arrayBuffer, onProgress, bookId = null) {
   restoredSaved = !!startCfi;
   console.log('Book displayed');
 
+  // La posición restaurada sufre el mismo reflujo tardío que un salto a marcador: es LA
+  // apertura en frío, justo cuando la fuente de lectura y las imágenes aún están de camino.
+  if (startCfi) reanchorTask = reanchorWhenSettled(startCfi, navSeq);
+
   // Track location changes
   rendition.on('relocated', (location) => {
     if (location && location.start) {
@@ -990,6 +1066,47 @@ function getFontFamily(settings) {
   }
 }
 
+// Literata (la serif de lectura por defecto) SELF-HOSTED, declarada dentro del iframe.
+//
+// Antes se pedía a Google Fonts con un `@import` desde el propio iframe, y era el único
+// asset de la app que no salía de nuestro origen ni entraba en el precache del SW. Eso
+// tenía un coste que no se veía como coste de red sino como un bug de posición: en una
+// apertura EN FRÍO la fuente llegaba TARDE, el capítulo ya se había paginado con la serif
+// de reserva, y al entrar Literata el texto se re-maquetaba entero sin que nadie
+// re-anclara → la página saltaba hacia ATRÁS (medido: −2 páginas al pulsar un marcador;
+// más cuanto más adentro del capítulo). Sirviéndola desde el mismo origen y precacheada,
+// llega antes de paginar y el salto desaparece. `reanchorWhenSettled` cubre el resto de
+// reflujos tardíos (imágenes, CSS del propio EPUB).
+//
+// Ficheros: variables en `wght` (400–600) con el eje `opsz` fijado en 18 —el tamaño de
+// lectura—, que es la mitad de bytes que la variable completa y visualmente lo mismo al
+// cuerpo por defecto. `latin` va precacheada (ver ASSETS de sw.js); `latin-ext` se cachea
+// al primer uso, ya cache-first y desde nuestro origen.
+//
+// Las URLs se resuelven contra `document.baseURI` del documento PADRE a propósito: el
+// documento del iframe lo sirve epub.js desde un blob, así que una ruta relativa se
+// resolvería contra el blob y no contra la app.
+function literataFontFaces() {
+  const url = (f) => new URL('fonts/' + f, document.baseURI).href;
+  const face = (style, subset, file, range) => `
+      @font-face {
+        font-family: 'Literata';
+        font-style: ${style};
+        font-weight: 400 600;
+        font-display: swap;
+        src: url('${url(file)}') format('woff2');
+        unicode-range: ${range};
+      }`;
+  const LATIN = 'U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD';
+  const LATIN_EXT = 'U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF';
+  return [
+    face('normal', 'latin', 'literata-latin.woff2', LATIN),
+    face('normal', 'latin-ext', 'literata-latin-ext.woff2', LATIN_EXT),
+    face('italic', 'latin', 'literata-italic-latin.woff2', LATIN),
+    face('italic', 'latin-ext', 'literata-italic-latin-ext.woff2', LATIN_EXT),
+  ].join('');
+}
+
 function injectThemeIntoContent(contents) {
   const settings = Settings.getAll();
   const colors = getThemeColors();
@@ -1013,7 +1130,7 @@ function injectThemeIntoContent(contents) {
     // horizontal). line-height y font-family se fuerzan también en los párrafos
     // porque muchos EPUB los fijan en su propio CSS y ganarían al de body.
     style.textContent = `
-      ${isSerif ? "@import url('https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,600;1,7..72,400;1,7..72,600&display=swap');" : ''}
+      ${isSerif ? literataFontFaces() : ''}
       html, body {
         background: ${colors.bg} !important;
         color: ${colors.text} !important;
@@ -1073,12 +1190,16 @@ function updateProgress(location) {
 // localizaciones y muestra esa parte del libro. No-op si aún no hay localizaciones.
 export async function seekToFraction(f) {
   if (!rendition || !book) return;
+  const seq = ++navSeq;
   const frac = Math.min(1, Math.max(0, f));
   let cfi = null;
   try {
     if (book.locations && book.locations.cfiFromPercentage) cfi = book.locations.cfiFromPercentage(frac);
   } catch (e) { /* sin localizaciones */ }
-  if (cfi) { try { await rendition.display(cfi); } catch (e) { /* CFI no válido */ } }
+  if (cfi) {
+    try { await rendition.display(cfi); } catch (e) { /* CFI no válido */ }
+    reanchorTask = reanchorWhenSettled(cfi, seq);
+  }
 }
 
 function updateChapterInfo() {
@@ -1143,16 +1264,19 @@ window.addEventListener('pagehide', flushLastPosition);
 
 export function prev() {
   releasePin();
+  navSeq++;
   if (rendition) rendition.prev();
 }
 
 export function next() {
   releasePin();
+  navSeq++;
   if (rendition) rendition.next();
 }
 
 export async function goTo(cfi) {
   releasePin();
+  const seq = ++navSeq;
   if (!rendition) return;
   await rendition.display(cfi);
   // epub.js mal-pagina a veces el PRIMER display dentro de una sección larga recién
@@ -1162,7 +1286,18 @@ export async function goTo(cfi) {
   // de citas caen en la página correcta. Barato: la sección ya está cargada; si el primero
   // acertó, el segundo es un no-op sin salto visible.
   await new Promise(r => requestAnimationFrame(() => r()));
-  if (rendition) await rendition.display(cfi);
+  if (seq !== navSeq || !rendition) return;
+  await rendition.display(cfi);
+  // Y un tercer anclaje cuando el contenido asiente de verdad (fuente, imágenes). NO se
+  // espera: quien llama —la ficha de un marcador o subrayado, una cita del agente— cierra
+  // la sidebar al volver, y bloquearlo hasta 3 s dejaría el panel abierto mirando.
+  reanchorTask = reanchorWhenSettled(cfi, seq);
+}
+
+// Promesa del re-anclaje en vuelo. La usan los tests para esperar al reflujo tardío sin
+// dormir a ciegas; en la app nadie necesita esperarlo.
+export function whenReanchored() {
+  return reanchorTask;
 }
 
 export function getRendition() {

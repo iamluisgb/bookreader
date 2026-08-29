@@ -30,6 +30,13 @@ const ASSETS = [
   './fonts/inter-600.woff2',
   './fonts/source-serif-4-400.woff2',
   './fonts/source-serif-4-600.woff2',
+  // Literata: la serif de lectura POR DEFECTO. Precacheada a propósito — mientras se pedía a
+  // Google Fonts llegaba tarde en frío y el capítulo se re-maquetaba con el lector ya dentro,
+  // moviéndole la página hacia atrás. Solo el subconjunto `latin`, que es el que usa casi todo
+  // libro; `latin-ext` y las cursivas de ese subconjunto se cachean al primer uso (cache-first,
+  // mismo origen), que es barato y evita meter 65 KB más en el precache de todos.
+  './fonts/literata-latin.woff2',
+  './fonts/literata-italic-latin.woff2',
   './js/app.js',
   './js/css-loader.js',
   './js/ui/raf.js',

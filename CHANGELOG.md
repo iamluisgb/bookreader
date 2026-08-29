@@ -5,6 +5,47 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-08-29 — El marcador ya no te deja unas páginas antes del pasaje
+
+Subrayas o marcas una página, sales, entras y pulsas la ficha: el lector te dejaba **unas páginas
+antes** del pasaje. Pasaba con marcadores y con subrayados —los dos salen por `EpubReader.goTo()`—
+y solo en frío, que es la pista que faltaba.
+
+**Causa.** El contenido se re-maquetaba DESPUÉS de que epub.js hubiera calculado a qué píxel
+saltar. Y lo que lo re-maquetaba era la propia fuente de lectura: Literata era el único asset de
+la app que no salía de nuestro origen —un `@import` a Google Fonts desde dentro del iframe— ni
+entraba en el precache del service worker. En una apertura en frío llegaba tarde, el capítulo ya
+estaba paginado con la serif de reserva, y al entrar Literata el texto crecía: ese mismo píxel
+pasaba a caer en texto anterior. En caliente la fuente ya estaba en la caché del navegador y se
+aplicaba antes de paginar, por eso el fallo solo se veía al salir y entrar. El pin de posición no
+cubría este caso, y no por descuido: el pin lo dispara un cambio del CONTENEDOR (giro, pantalla
+completa, paneles, ajustes) y aquí el contenedor no se mueve, solo el contenido. El doble
+`display` de `goTo` tampoco: espera un frame, que basta para que epub.js asiente sus columnas
+pero no para una ida y vuelta a la red.
+
+**Dos arreglos, y hacen falta los dos.**
+
+1. **Literata pasa a self-hosted**, como Inter y Source Serif 4: cuatro `.woff2` en `fonts/`
+   (`latin` y `latin-ext`, redonda y cursiva), variables en peso 400–600 con el eje `opsz` fijado
+   en 18 —la mitad de bytes que la variable completa y lo mismo a simple vista al cuerpo por
+   defecto—. Las dos de `latin` van al precache (81 KB); `latin-ext` se cachea al primer uso,
+   cache-first y desde nuestro origen. Quita la causa, funciona offline y de paso deja el iframe
+   de lectura sin una sola petición a terceros.
+2. **`goTo` re-ancla cuando el contenido asienta.** Espera a `document.fonts.ready` del documento
+   de lectura y a que su ancho total se estabilice, y solo entonces —y solo si hubo reflujo de
+   verdad— vuelve a mostrar el CFI. Cubre lo que la fuente ya no rompe pero otros sí: imágenes
+   que decodifican, CSS del propio EPUB. Se descarta si el lector ya ha navegado a otro sitio,
+   que devolverle a la página que acaba de dejar sería peor que el fallo. Mismo tratamiento para
+   la posición restaurada al abrir y para el salto de la barra de progreso.
+
+Medido sobre el EPUB real de la suite, marcador a mitad del capítulo largo: antes, pulsar la ficha
+tras salir y entrar dejaba **−2 páginas** (negativo = el pasaje queda por delante); ahora la página
+que aparece empieza exactamente en el CFI marcado, byte a byte la misma que al marcarla.
+`tests/reanchor-position.spec.ts` retiene la fuente a propósito para reproducir la apertura en frío
+y exige desvío 0; sin el arreglo falla 3 de 3.
+
+---
+
 ## 2026-08-25 — PDF: leer en vertical ya no se lleva la columna de lado
 
 «Ajustar al texto» quitó el scroll horizontal a zoom 1 (ADR-033), pero en cuanto amplías vuelve a
