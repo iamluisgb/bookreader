@@ -6,6 +6,7 @@ import * as Storage from './storage.js';
 import * as TouchSelect from './touch-select.js';
 import { loadEpubJs } from './vendor-loader.js';
 import * as AiDB from './ai/db.js';
+import * as NavDebug from './nav-debug.js';
 
 // En táctil reimplementamos la selección de texto (los tiradores nativos de
 // epub.js están rotos en columnas). En escritorio usamos la selección nativa.
@@ -87,6 +88,28 @@ const SETTLE_TIMEOUT = 3000;
 // esperable de forma explícita) y, además, a que el ancho total del contenido se estabilice,
 // que detecta a los demás. Solo se re-muestra si el ancho CAMBIÓ: si no hubo reflujo, la
 // posición sigue siendo buena y un display de más sería un salto gratuito.
+// Una muestra del estado de navegación para el diagnóstico temporal (ver nav-debug.js).
+// `cont` vs `ifr` es lo que importa: si el contenido mide más de lo que la vista cree, epub.js
+// recorta el salto y deja corto, tanto más cuanto más adentro esté el objetivo.
+function navSnapshot(etiqueta, objetivo) {
+  if (!NavDebug.enabled()) return;
+  let aqui = null, obj = null, cont = null, ifr = null;
+  try {
+    const loc = rendition && rendition.currentLocation();
+    if (loc && loc.start && book && book.locations && book.locations.length()) {
+      aqui = book.locations.locationFromCfi(loc.start.cfi);
+      if (objetivo) obj = book.locations.locationFromCfi(objetivo);
+    }
+  } catch (e) { /* sin localizaciones aún */ }
+  try {
+    const f = document.querySelector('#epub-container iframe');
+    cont = f.contentDocument.documentElement.scrollWidth;
+    ifr = f.clientWidth;
+  } catch (e) { /* iframe no accesible */ }
+  const paginas = (cont != null && ifr) ? Math.round(cont / ifr) : null;
+  NavDebug.log(`${etiqueta.padEnd(10)} aqui=${aqui} obj=${obj} cont=${cont} ifr=${ifr} pags=${paginas}`);
+}
+
 async function reanchorWhenSettled(cfi, seq) {
   if (!cfi || !rendition) return;
   const doc = contentDoc();
@@ -98,6 +121,7 @@ async function reanchorWhenSettled(cfi, seq) {
   try {
     if (doc.fonts && doc.fonts.ready) await Promise.race([doc.fonts.ready, espera(SETTLE_TIMEOUT)]);
   } catch (e) { /* sin API de fuentes: queda la vigilancia del ancho */ }
+  navSnapshot('fonts.ok', cfi);
   if (seq !== navSeq || !rendition || contentDoc() !== doc) return;
 
   // Re-medir DESPUÉS de las fuentes, no antes: si `fonts.ready` se ha comido casi todo el
@@ -113,8 +137,10 @@ async function reanchorWhenSettled(cfi, seq) {
   }
 
   if (seq !== navSeq || !rendition || contentDoc() !== doc) return;
+  navSnapshot(ancho === inicial ? 'asent(=)' : 'asent(!=)', cfi);
   if (ancho === inicial) return;            // no hubo reflujo: donde estamos es donde toca
   try { await rendition.display(cfi); } catch (e) { /* el CFI ya no resuelve */ }
+  navSnapshot('re-anclado', cfi);
 }
 
 // Re-apply the container width and re-fit. Width/height both track the
@@ -645,6 +671,7 @@ function scheduleResize() {
         // así que currentCfi no deriva. El pin se libera en la próxima navegación real.
         try { await rendition.display(pinnedCfi); }
         catch (e) { /* CFI inválido tras el reflow */ }
+        navSnapshot('pin/resize', pinnedCfi);
         currentCfi = pinnedCfi;
         saveLastPosition();
       }
@@ -1278,7 +1305,10 @@ export async function goTo(cfi) {
   releasePin();
   const seq = ++navSeq;
   if (!rendition) return;
+  NavDebug.reset(`goTo  vp=${window.innerWidth}x${window.innerHeight} dpr=${window.devicePixelRatio} coarse=${COARSE}`);
+  navSnapshot('antes', cfi);
   await rendition.display(cfi);
+  navSnapshot('display#1', cfi);
   // epub.js mal-pagina a veces el PRIMER display dentro de una sección larga recién
   // maquetada: calcula la posición antes de que asienten las columnas y el objetivo cae
   // en otra página (síntoma: las citas del agente no llevaban a la frase referida). Un
@@ -1288,6 +1318,8 @@ export async function goTo(cfi) {
   await new Promise(r => requestAnimationFrame(() => r()));
   if (seq !== navSeq || !rendition) return;
   await rendition.display(cfi);
+  navSnapshot('display#2', cfi);
+  if (NavDebug.enabled()) setTimeout(() => navSnapshot('final+4s', cfi), 4000);
   // Y un tercer anclaje cuando el contenido asiente de verdad (fuente, imágenes). NO se
   // espera: quien llama —la ficha de un marcador o subrayado, una cita del agente— cierra
   // la sidebar al volver, y bloquearlo hasta 3 s dejaría el panel abierto mirando.
