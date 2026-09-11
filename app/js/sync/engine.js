@@ -92,14 +92,20 @@ async function cycle() {
   // 1) PULL — manifest + libros con etag remoto distinto al último visto.
   const m = await Drive.read(BASE + 'manifest.json');
   let remoteManifest = null;
+  // Versiones de TODO lo que hay en remoto, en una sola petición (el listado de
+  // Drive trae ya la de cada fichero). Es la referencia que decide qué bajar:
+  // la asigna el proveedor en cada escritura y no puede retroceder, a
+  // diferencia de los sellos de tiempo del manifest (ver 1a).
+  const remoteFiles = await Drive.list(BASE);
+  const remoteEtags = new Map(remoteFiles.map(f => [f.path, String(f.etag)]));
+  const isFresh = (path) => remoteEtags.has(path) && remoteEtags.get(path) !== String(st.books[path] || '');
   if (m) {
     remoteManifest = JSON.parse(m.content);
     if ((remoteManifest.schemaVersion || 0) > SCHEMA_VERSION) {
       throw new Error(t('Lo guardado en Drive es de una versión más nueva de BookReader.'));
     }
-    const remoteFiles = await Drive.list(BASE + 'books/');
     let merged = 0;
-    for (const f of remoteFiles) {
+    for (const f of remoteFiles.filter(x => x.path.startsWith(BASE + 'books/'))) {
       if (st.books[f.path] === f.etag) continue;
       const file = await Drive.read(f.path);
       if (!file) continue;
@@ -124,16 +130,30 @@ async function cycle() {
   }
 
   // 1a) PULL de BIBLIOTECA — metadatos de libros y estanterías. Van en ficheros
-  // propios y solo se descargan si el manifest dice que cambiaron: leerlos en
+  // propios y solo se descargan si su VERSIÓN remota cambió: leerlos enteros en
   // cada ciclo costaría dos peticiones de más cada 90 s por nada.
   //
   // library.json y covers.json están separados por su ritmo de escritura: el
   // progreso de lectura mueve library.json constantemente, mientras que las
   // portadas —que son casi todo el peso— solo cambian al añadir o quitar libros.
+  //
+  // La decisión NO puede colgar de `manifest.libraryUpdatedAt`, y es la misma
+  // historia que ya costó los ajustes (ver 1c): ese sello PUEDE RETROCEDER. No
+  // hace falta ni una carrera — basta un 412 en el manifest, que es lo normal
+  // con dos dispositivos sincronizando a la vez: el reintento relee el manifest
+  // remoto y, como la biblioteca ya está subida, hereda el sello VIEJO y lo
+  // reescribe encima del suyo. A partir de ahí el otro dispositivo tiene ese
+  // mismo número apuntado, la condición —que era una IGUALDAD— da falso, y NO
+  // VUELVE A LEER `library.json` JAMÁS: sus libros nuevos están en Drive todo el
+  // tiempo, pero nadie los pide. Ese era el "descargué libros en el móvil y en
+  // la tablet no aparecen".
+  //
+  // La versión del propio fichero sí es monótona: la asigna Drive en cada
+  // escritura. Y viene gratis en el listado que ya hacemos para los libros.
   let libraryFingerprint = st.libraryHash;
   let coversFingerprint = st.coversHash;
   let libraryChanged = false;
-  if (remoteManifest && (remoteManifest.libraryUpdatedAt || 0) !== (st.libraryAt || 0)) {
+  if (isFresh(LIBRARY_PATH)) {
     const f = await Drive.read(LIBRARY_PATH);
     if (f) {
       const remoteLibrary = JSON.parse(f.content);
@@ -146,10 +166,10 @@ async function cycle() {
       libraryFingerprint = fingerprint(remoteLibrary);
       st.books[LIBRARY_PATH] = f.etag;
     }
-    st.libraryAt = remoteManifest.libraryUpdatedAt || 0;
+    st.libraryAt = (remoteManifest && remoteManifest.libraryUpdatedAt) || st.libraryAt || 0;
     save();
   }
-  if (remoteManifest && (remoteManifest.coversUpdatedAt || 0) !== (st.coversAt || 0)) {
+  if (isFresh(COVERS_PATH)) {
     const f = await Drive.read(COVERS_PATH);
     if (f) {
       const remoteCovers = JSON.parse(f.content);
@@ -162,7 +182,7 @@ async function cycle() {
       coversFingerprint = fingerprint(remoteCovers);
       st.books[COVERS_PATH] = f.etag;
     }
-    st.coversAt = remoteManifest.coversUpdatedAt || 0;
+    st.coversAt = (remoteManifest && remoteManifest.coversUpdatedAt) || st.coversAt || 0;
     save();
   }
   if (libraryChanged) window.dispatchEvent(new CustomEvent('bookreader:library-changed'));
@@ -186,6 +206,14 @@ async function cycle() {
   // escritura y no puede retroceder. Se compara contra la que este equipo aplicó (o
   // subió, que también la guarda). Cuesta una lectura por ciclo de un fichero pequeño,
   // a cambio de que el estado no pueda quedar encallado.
+  //
+  // Y esa lectura se hace AQUÍ, no con la versión que trae el listado del principio del
+  // ciclo: entre el listado y este punto se han bajado libros y biblioteca, y en esa
+  // ventana el otro dispositivo puede haber escrito settings.json. Decidir con el
+  // listado viejo es no leerlo, y como el merge de ajustes solo RELLENA lo que falta
+  // —no es una unión simétrica como la de biblioteca—, el que se lo salta se queda con
+  // los suyos y ya no vuelve a haber quien los cruce. Ahorrarse la petición sale caro
+  // justo aquí.
   const remoteSettings = await Drive.read(SETTINGS_PATH);
   if (remoteSettings && String(remoteSettings.etag) !== String(st.books[SETTINGS_PATH] || '')) {
     applyingRemote = true;
@@ -267,16 +295,20 @@ async function cycle() {
   const library = await pushIfChanged(
     LIBRARY_PATH, await LibrarySync.buildLibrary(), libraryFingerprint,
     remoteManifest && remoteManifest.libraryUpdatedAt, 'libraryHash');
-  st.libraryAt = library.at;
+  // Los sellos del manifest ya no deciden nada aquí (lo decide la versión del
+  // fichero, ver 1a), pero se siguen escribiendo para las versiones anteriores
+  // de la app que aún los miran — y sin dejar que RETROCEDAN, que es justo lo
+  // que las dejaba encalladas.
+  st.libraryAt = Math.max(library.at, st.libraryAt || 0);
 
   const covers = await pushIfChanged(
     COVERS_PATH, await LibrarySync.buildCovers(), coversFingerprint,
     remoteManifest && remoteManifest.coversUpdatedAt, 'coversHash');
-  st.coversAt = covers.at;
+  st.coversAt = Math.max(covers.at, st.coversAt || 0);
   save();
 
-  snap.manifest.libraryUpdatedAt = library.at;
-  snap.manifest.coversUpdatedAt = covers.at;
+  snap.manifest.libraryUpdatedAt = st.libraryAt;
+  snap.manifest.coversUpdatedAt = st.coversAt;
 
   // 2b) PUSH de AJUSTES. A diferencia de biblioteca y portadas, la huella se compara
   // contra lo que ESTE dispositivo subió la última vez, no contra lo acordado con el

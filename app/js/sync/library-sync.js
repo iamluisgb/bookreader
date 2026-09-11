@@ -18,8 +18,11 @@
 //                 añadir o quitar libros. Metidas en library.json, cada avance
 //                 de página habría reescrito cientos de KB.
 //
-// El manifest lleva `libraryUpdatedAt`/`coversUpdatedAt` para saber si hay que
-// bajarlos, sin leerlos en cada ciclo.
+// Quién decide si hay que bajarlos: la VERSIÓN remota de cada fichero, que trae
+// el listado del proveedor (engine.js · 1a). NO los sellos `libraryUpdatedAt`/
+// `coversUpdatedAt` del manifest, que pueden retroceder y dejaban a un
+// dispositivo sin volver a leer la biblioteca nunca; siguen escribiéndose solo
+// para las versiones anteriores de la app.
 
 import * as LibStore from '../library/store.js';
 import { mergeMaps } from './merge.js';
