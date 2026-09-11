@@ -11,6 +11,21 @@ históricos que cada ítem absorbe (trazabilidad con git).
 
 ## 🤖 IA / Agente
 
+### OFF1 — Preguntar al libro sin cobertura · **✓ (2026-09-11)** `M`
+
+**El caso.** Leer en un avión y querer seguir preguntándole al agente. Entregado: sin red se
+responde con los pasajes del propio libro (BM25 local, anclas clicables), la pregunta queda en cola
+y se responde entera al reconectar, y «Preparar para sin conexión» deja cacheado el resumen del
+libro entero antes de despegar. Ver [ADR-035](DECISIONS.md) y `js/ai/offline.js`.
+
+**Lo que NO cubre, por orden de lo que más se va a echar de menos:**
+- La cola solo se vacía en la conversación **activa**: las preguntas de otro libro esperan a que
+  abras ese libro. Responder a ciegas dejaría respuestas donde nadie las ve.
+- Sin conexión no hay **visión** (explicar una figura) ni generación de artefactos nuevos: los dos
+  son el modelo, no el índice.
+- La respuesta por pasajes no reordena ni resume: es recall crudo. Si el retrieval falla, falla a
+  la vista — que es preferible a inventar, pero sigue siendo un fallo.
+
 ### IA1 — Recorte de contexto y de historial al LLM · **fase 1+2 ✓** _(ex T5, E3.2, E3.3)_
 **Hecho (ver CHANGELOG):** retrieval por capítulo con presupuesto de tokens (60k), ventana de
 historial (6 mensajes), guard de tokens (~120k), fallback a libro entero sin ratings, prefijo estable

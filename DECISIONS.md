@@ -1127,3 +1127,47 @@ normalidad. Vive en [`js/pdf-axis-lock.js`](js/pdf-axis-lock.js), lo instala `en
 - Verificado con gestos **reales** del compositor (CDP `Input.synthesizeScrollGesture`), no solo con
   eventos sintéticos: un arrastre de −300 px con 45 px de deriva mueve 0 en X; uno lateral panea los
   300. La regresión de la suite emula el desplazamiento porque Playwright no simula el compositor.
+
+---
+
+## ADR-035 — Sin cobertura, el agente da pasajes; la prosa se encola · `ACEPTADA`
+
+**Contexto.** «A veces leo sin cobertura —en un avión— y quiero seguir preguntándole cosas al
+agente.» Hoy ese turno acaba en un error de red crudo.
+
+La observación que abre la puerta: de las dos mitades de una respuesta, **solo una necesita red**.
+ENCONTRAR el pasaje es local —`retrieval.js` es BM25 en el navegador, «cero API, cero coste»— y
+REDACTARLO es lo que vive al otro lado de la conexión. Sin cobertura el agente no se queda mudo:
+se queda **sin prosa**. Y el índice ya sobrevive al vuelo, porque la segmentación se cachea en
+IndexedDB (`DB.saveSegmented`) al abrir el libro.
+
+**Decisiones.**
+1. **Respuesta degradada honesta, no simulada.** Sin red se muestran los pasajes que eligió el
+   retrieval de ESE turno —los mismos que habrían ido al prompt— con sus anclas `[[aN]]`
+   clicables, encabezados por «Sin conexión: no puedo redactarte una respuesta». No se inventa
+   nada ni se disfraza de respuesta del agente.
+2. **No entran en la ventana del modelo.** El mensaje se persiste con `offline: true` y
+   `restoreChat` no lo mete en `history`: si entrara, el modelo leería esos pasajes como suyos y
+   al turno siguiente hablaría de «mi respuesta anterior» sobre un texto que no escribió.
+3. **Cola, no olvido.** La pregunta se guarda (`ai_offline_queue`, localStorage) y se responde de
+   verdad al volver la conexión, disparada por `online` y por volver a la pestaña — en móvil el
+   dispositivo reconecta con la pantalla apagada y `online` llega cuando nadie mira. Solo se vacía
+   la cola de la conversación ACTIVA: responder en una que no está a la vista deja respuestas
+   donde nadie las lee, y cada turno depende del libro cargado (índice, anclas, capítulo).
+4. **`navigator.onLine` no es el único camino.** Miente en un sentido conocido (dice `true` con el
+   wifi de un avión sin salida), así que un fallo de red a mitad de turno cae al mismo sitio. Un
+   4xx/5xx del proveedor NO: ahí sí hay red y su mensaje es más útil que un puñado de pasajes.
+5. **Preparar el vuelo.** «Preparar para sin conexión» genera y cachea el resumen del libro entero
+   (artefacto en IndexedDB, legible offline desde el Studio). Es lo caro que no se puede improvisar
+   a 10.000 metros; el índice ya estaba.
+
+**Descartado: modelo local en el dispositivo.** La CSP lo permitiría (`wasm-unsafe-eval`,
+`connect-src https:`), pero son 1-2 GB de pesos servidos desde Pages, se come la batería y un
+modelo de 1-3B no hace `tool_call` fiable ni respeta las anclas de cita: degrada **el foso del
+producto** (las citas) justo en el escenario donde nadie puede verificar nada. La variante sin
+descarga —Gemini Nano vía Prompt API— es solo Chrome de escritorio: en un iPad en un avión, no
+existe.
+
+**Consecuencias.** Sin cobertura se puede seguir preguntando y se obtiene el libro, no un error.
+El coste es explicar una respuesta de segunda clase, y por eso el encabezado es explícito. Queda
+pendiente lo que no cubre: responder en conversaciones no activas exige abrir ese libro.

@@ -1415,3 +1415,29 @@ body.ai-open #sync-badge { right: calc(var(--ai-panel-width) + 14px); }
 .ai-math math { color: inherit; }
 /* Antes de hidratar (o si Temml no llega) se ve el TeX ya legible, no `\cdot` crudo. */
 .ai-math:not([data-math-done]) { font-family: var(--font-mono, monospace); font-size: 0.95em; }
+/* Cola de preguntas sin cobertura (ai/offline.js). Chip discreto entre el chat y el
+   compositor: recuerda que hay trabajo pendiente sin robarle sitio a la lectura. */
+.ai-offline-chip {
+  margin: 0 18px 8px;
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  color: var(--text-soft);
+  font-size: 12.5px;
+}
+.ai-offline-chip svg { flex: none; opacity: .75; }
+.ai-offline-chip span { flex: 1 1 auto; }
+.ai-offline-go {
+  flex: none;
+  border: 0; border-radius: var(--r-pill);
+  padding: 4px 10px;
+  background: var(--accent); color: var(--on-accent, #fff);
+  font: inherit; font-size: 12px; cursor: pointer;
+}
+.ai-offline-go:hover { filter: brightness(1.05); }
+
+/* La pregunta que se hizo sin cobertura: se marca en el margen para que al releer el
+   hilo se entienda por qué debajo hay pasajes en vez de una respuesta. */
+.ai-msg--offline .ai-bubble { border-inline-start: 2px solid var(--border-strong, var(--border)); }

@@ -900,6 +900,31 @@ const EN = {
   'Bajar': 'Move down',
   'Nuevo nombre (usa «/» para anidar, p. ej. Técnico/ML):': 'New name (use “/” to nest, e.g. Tech/ML):',
 
+  // Sin cobertura (ai/offline.js): respuesta por pasajes + cola de preguntas
+  '**Sin conexión.** No puedo redactarte una respuesta, así que te enseño lo que dice el libro: estos son los pasajes que mejor encajan con tu pregunta.':
+    '**No connection.** I cannot write you an answer, so here is what the book says: these are the passages that best match your question.',
+  '**Sin conexión.** No encuentro en el libro ningún pasaje que encaje con tu pregunta, y sin red no puedo razonarla. La dejo en cola: te la respondo en cuanto vuelvas a tener cobertura.':
+    '**No connection.** I cannot find any passage in the book matching your question, and without a network I cannot reason about it. It is queued: I will answer it as soon as you are back online.',
+  '**Sin conexión.** Este libro no está preparado en este dispositivo, así que no puedo ni buscar dentro. La dejo en cola: te la respondo en cuanto vuelvas a tener cobertura.':
+    '**No connection.** This book is not prepared on this device, so I cannot even search inside it. It is queued: I will answer it as soon as you are back online.',
+  '_En cola: te la respondo entera al recuperar la conexión._':
+    '_Queued: I will answer it in full when the connection is back._',
+  'Sin conexión: respondido con pasajes del libro.': 'Offline: answered with passages from the book.',
+  '1 pregunta en cola, para cuando vuelva la conexión': '1 question queued, for when the connection is back',
+  '{n} preguntas en cola, para cuando vuelva la conexión': '{n} questions queued, for when the connection is back',
+  'Responder ahora': 'Answer now',
+  'Respondiendo lo que quedó en cola…': 'Answering what was queued…',
+  'Preparar para sin conexión…': 'Prepare for offline…',
+  'Preparar para sin conexión': 'Prepare for offline',
+  'Preparar': 'Prepare',
+  'Se generará ahora el resumen del libro entero para que puedas leerlo sin conexión. Tarda un par de minutos y consume llamadas a tu modelo.':
+    'The whole-book summary will be generated now so you can read it offline. It takes a couple of minutes and uses calls to your model.',
+  'Preparando el libro para sin conexión…': 'Preparing the book for offline…',
+  'Listo para volar: el libro y su resumen están en este dispositivo.': 'Ready to fly: the book and its summary are on this device.',
+  'No se pudo preparar del todo: {msg}': 'Could not fully prepare it: {msg}',
+  'Sin conexión: esto hay que prepararlo antes de perderla.': 'Offline: this has to be prepared before you lose the connection.',
+  'Abre un libro para prepararlo.': 'Open a book to prepare it.',
+
   // Sync de biblioteca y de archivos (fichas fantasma, descarga bajo demanda)
   'Descargar y abrir': 'Download and open',
   'Descargar a este dispositivo': 'Download to this device',

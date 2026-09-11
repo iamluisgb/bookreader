@@ -154,11 +154,13 @@ export function getMessages(convoId) {
   return tx('messages', 'readonly', s => reqP(s.index('convoId').getAll(convoId)));
 }
 
-export function addMessage(convoId, role, content) {
+// `extra` son campos sueltos del mensaje (hoy: `offline: true`, los pasajes que se
+// enseñaron sin cobertura). Viajan en el sync como cualquier otro campo del registro.
+export function addMessage(convoId, role, content, extra = null) {
   const now = Date.now();
   // uid: identidad global para el merge entre dispositivos (el id autoincremental
   // colisiona entre equipos; sigue siendo solo la clave local). Ver SYNC_PLAN.md.
-  return put('messages', { uid: crypto.randomUUID(), convoId, role, content, ts: now, updatedAt: now });
+  return put('messages', { uid: crypto.randomUUID(), convoId, role, content, ts: now, updatedAt: now, ...(extra || {}) });
 }
 
 function clearByIndex(store, index, key) {

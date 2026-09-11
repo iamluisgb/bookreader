@@ -5,6 +5,45 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-09-11 — Preguntarle al libro en un avión
+
+«A veces leo sin cobertura y quiero seguir preguntándole cosas al agente.» Hasta hoy eso acababa
+en un error de red.
+
+Lo que lo hace posible es que **de las dos mitades de una respuesta, solo una necesita red**.
+Encontrar el pasaje es local —`retrieval.js` es BM25 en el navegador, cero API— y redactarlo es lo
+que vive al otro lado de la conexión. Sin cobertura el agente no se queda mudo: se queda **sin
+prosa**. Y el índice ya sobrevivía al vuelo, porque la segmentación se cachea al abrir el libro.
+
+Así que ahora, sin red, preguntar devuelve **los pasajes que mejor encajan con la pregunta** —los
+mismos que habrían ido al modelo—, con sus anclas clicables y encabezados por un «Sin conexión: no
+puedo redactarte una respuesta». No se simula una respuesta ni se disfraza de una: es el libro, y
+se dice. Si no hay ningún pasaje que encaje, también se dice, en vez de rellenar.
+
+Esos pasajes **no entran en la ventana del modelo**. Se guardan marcados, y al reanudar la
+conversación el modelo no los ve: si los viera, los leería como suyos y al turno siguiente hablaría
+de «mi respuesta anterior» sobre un texto que no escribió.
+
+La pregunta, además, **queda en cola** y se responde entera al recuperar la conexión, sin que haya
+que acordarse de repetirla. La cola vive en disco (sobrevive a recargar y a cerrar la PWA) y se
+dispara con el evento `online` y al volver a la pestaña — en el móvil el dispositivo reconecta con
+la pantalla apagada y `online` llega cuando nadie está mirando. Se vacía solo la conversación
+activa: responder en una que no está a la vista deja respuestas donde nadie las lee.
+
+`navigator.onLine` no es el único camino, porque miente en un sentido conocido: el wifi de un avión
+dice que hay red y no hay salida. Un fallo de red a mitad de turno cae al mismo sitio. Un 4xx del
+proveedor **no** — ahí sí hay red, y su mensaje es más útil que un puñado de pasajes.
+
+Y para lo que sí hay que dejar hecho antes de despegar, **«Preparar para sin conexión»** genera y
+cachea el resumen del libro entero, que es el map-reduce que no se improvisa a 10.000 metros.
+
+**Lo descartado, y por qué:** un modelo local en el dispositivo (WebLLM/WebGPU). La CSP lo
+permitiría, pero son 1-2 GB de pesos, se come la batería y un modelo de 1-3B no respeta las anclas
+de cita — degrada el foso del producto justo donde nadie puede verificar nada. Detalle en
+[ADR-035](DECISIONS.md).
+
+---
+
 ## 2026-09-11 — Los libros del móvil no llegaban a la tablet, y hacer hueco obligaba a borrar en todos
 
 Dos quejas del mismo día, de la misma pantalla.

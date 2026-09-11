@@ -33,6 +33,7 @@ import * as JobsUI from './jobs-ui.js';
 import * as Studio from './studio.js';
 import * as Storage from '../storage.js';
 import * as QueryExpand from './query-expand.js';
+import * as Offline from './offline.js';
 import { ensurePro } from '../ui/paywall.js';
 
 // Icon + label markup for the small inline action buttons.
@@ -88,6 +89,13 @@ export function init(opts) {
     zones: $('#ai-zones'), mic: $('#ai-mic'), quota: $('#ai-quota'),
   });
   initMic();
+  // Al recuperar la conexión, las preguntas que se hicieron sin cobertura se responden
+  // solas (ver flushOfflineQueue). El chip se repinta también al perderla, para que el
+  // botón "Responder ahora" no quede ofreciendo algo que no puede hacer.
+  Offline.onBackOnline(flushOfflineQueue);
+  window.addEventListener('online', renderOfflineChip);
+  window.addEventListener('offline', renderOfflineChip);
+
   // El cupo de la demo se repinta solo: llm.js lo publica al leer las cabeceras del
   // gateway en cada llamada, y al guardar Ajustes puede haber dejado de ser demo.
   window.addEventListener('llm:quota', renderQuota);
@@ -766,6 +774,7 @@ async function openConvoMenu(anchor) {
     <div class="lib-menu-sep"></div>
     <button class="lib-menu-item" data-act="new">${icon('plus', { size: 16 })}<span>${t('Nueva conversación…')}</span></button>
     ${convo ? `<button class="lib-menu-item" data-act="export">${icon('share', { size: 16 })}<span>${t('Exportar a Markdown…')}</span></button>` : ''}
+    <button class="lib-menu-item" data-act="offline">${icon('download', { size: 16 })}<span>${t('Preparar para sin conexión…')}</span></button>
   `;
   document.body.appendChild(menu);
   convoMenuEl = menu;
@@ -813,6 +822,7 @@ async function openConvoMenu(anchor) {
     if (item) { closeConvoMenu(); await switchConvo(item.dataset.id); return; }
     if (ev.target.closest('[data-act="new"]')) { closeConvoMenu(); openOnboarding(); return; }
     if (ev.target.closest('[data-act="export"]')) { closeConvoMenu(); await exportConvo(); return; }
+    if (ev.target.closest('[data-act="offline"]')) { closeConvoMenu(); await prepareOffline(); return; }
   });
 }
 
@@ -853,9 +863,12 @@ async function restoreChat() {
   els.messages.innerHTML = '';
   const msgs = convo ? await DB.getMessages(convo.id) : [];
   for (const m of msgs) {
-    history.push({ role: m.role, content: m.content });
+    // Los pasajes que se enseñaron sin cobertura NO son palabras del modelo: se pintan,
+    // pero no vuelven a su ventana de contexto (ver answerOffline).
+    if (!m.offline) history.push({ role: m.role, content: m.content });
     appendBubble(m.role, m.content, m.role === 'assistant');
   }
+  renderOfflineChip();
   scrollDown();
 }
 
@@ -1725,6 +1738,16 @@ async function deliver(aug, question, { showUser = true, ref = null, systemExtra
   // pasado el guard de tokens: si ese guard cancela el turno, esta burbuja se retira.
   const userBubble = showUser ? appendBubble('user', aug, false) : null;
 
+  // SIN COBERTURA · el turno no sale a la red: se responde con los pasajes del propio
+  // libro (retrieval BM25, local) y la pregunta queda en cola para redactarla de verdad
+  // al volver la conexión. Va ANTES de la expansión y del retrieval agéntico porque las
+  // dos son llamadas al modelo: sin red solo servirían para esperar y fallar.
+  if (Offline.isOffline()) {
+    await answerOffline(question, aug, ref, { showUser, userBubble });
+    busy = false; els.send.disabled = false; abortCtrl = null;   // liberar el turno reservado
+    return;
+  }
+
   // IA7 · Reescritura de consulta por defecto (HyDE-lite): en preguntas conceptuales, expande
   // la query para mejorar el recall BM25. Precondiciones aquí (turno normal, con key, libro
   // listo, sin fragmento adjunto — con pasaje adjunto el pasaje manda); la POLÍTICA de cuándo
@@ -1831,6 +1854,14 @@ async function deliver(aug, question, { showUser = true, ref = null, systemExtra
     maybeOfferObjective();
   } catch (e) {
     if (e.name === 'AbortError') textNode.textContent += ' [cancelado]';
+    // La red se cayó A MITAD del turno (o `navigator.onLine` mentía, que es lo que pasa
+    // con el wifi de un avión: hay wifi, no hay salida). El usuario ya ha esperado; lo
+    // último que le sirve es un "Failed to fetch". Se degrada al mismo sitio que el turno
+    // sin cobertura: pasajes del libro + cola. La burbuja ya está puesta, se reutiliza.
+    else if (Offline.isNetworkError(e)) {
+      bubble.remove();
+      await answerOffline(question, aug, ref, { showUser: false });
+    }
     else { console.error(e); textNode.innerHTML = `<span class="ai-error">${escapeHtml(e.message)}</span>`; }
   } finally {
     busy = false; els.send.disabled = false; abortCtrl = null; scrollDown();
@@ -1838,6 +1869,123 @@ async function deliver(aug, question, { showUser = true, ref = null, systemExtra
     if (!isOpen()) agentUnread = true;      // llegó con el panel cerrado → no-leído
     applyAgentBadge();
   }
+}
+
+// ---- Preparar el vuelo -----------------------------------------------------
+
+// "Voy a estar sin cobertura": deja hecho AHORA lo que sin red no se puede hacer.
+//
+// El índice del libro ya se guarda solo al abrirlo (`DB.saveSegmented`), así que buscar
+// dentro funciona offline sin preparar nada. Lo que NO sobrevive es lo que exige al
+// modelo, y de eso el resumen del libro entero es lo caro: un map-reduce sobre todo el
+// texto que no se puede improvisar a 10.000 metros. Se genera y queda cacheado como
+// artefacto (IndexedDB), legible desde el Studio sin conexión.
+async function prepareOffline() {
+  if (!book && !bookId) { setStatus('Abre un libro para prepararlo.'); return; }
+  if (Offline.isOffline()) { setStatus('Sin conexión: esto hay que prepararlo antes de perderla.'); return; }
+  if (!segReady) { setStatus('Preparando el libro… inténtalo en unos segundos.'); return; }
+  if (!LLM.hasKey()) { AppSettings.open('agent'); setStatus('Introduce tu API key primero.'); return; }
+
+  const yaHecho = !!Jobs.cached(bookId, 'summary');
+  if (!yaHecho && !(await confirmBox(
+      t('Se generará ahora el resumen del libro entero para que puedas leerlo sin conexión. Tarda un par de minutos y consume llamadas a tu modelo.'),
+      { title: t('Preparar para sin conexión'), okText: t('Preparar') }))) return;
+
+  try {
+    setStatus('Preparando el libro para sin conexión…');
+    await Summary.ensureBookSummary({
+      bookId, bookTitle,
+      goal: convo?.goal || '',
+      tocLabels,
+      currentChapter: EpubReader.getCurrentChapterLabel?.() || '',
+      ensureIndex,
+      anchors,
+      onCite: navigateCite,
+    });
+    setStatus('Listo para volar: el libro y su resumen están en este dispositivo.');
+  } catch (e) {
+    setStatus(t('No se pudo preparar del todo: {msg}', { msg: e.message }));
+  }
+  setTimeout(refreshStatus, 4000);
+}
+
+// ---- Sin cobertura ---------------------------------------------------------
+
+// Responde un turno SIN RED. No hay modelo, así que no hay redacción: se enseñan los
+// pasajes que el retrieval eligió —los mismos que habrían ido al prompt— con sus anclas
+// clicables, y se encola la pregunta para responderla de verdad al reconectar.
+//
+// El mensaje se persiste con `offline: true` y NO entra en `history`: si entrara, el
+// modelo leería esos pasajes como si los hubiera escrito él y en el turno siguiente
+// hablaría de "mi respuesta anterior" sobre un texto que no es suyo.
+async function answerOffline(question, aug, ref, { showUser = true, userBubble = null } = {}) {
+  if (showUser) {
+    history.push({ role: 'user', content: aug });
+    if (convo) DB.addMessage(convo.id, 'user', aug);
+  }
+
+  // Sin índice no hay nada que buscar: el libro no se ha preparado en ESTE dispositivo.
+  // Se dice tal cual, en vez de dejar una burbuja vacía.
+  let texto = null;
+  if (segReady) {
+    const ctx = buildContext(question, null, ref);
+    texto = Offline.passageAnswer(ctx.picked);
+  }
+  if (!texto) {
+    texto = segReady
+      ? t('**Sin conexión.** No encuentro en el libro ningún pasaje que encaje con tu pregunta, y sin red no puedo razonarla. La dejo en cola: te la respondo en cuanto vuelvas a tener cobertura.')
+      : t('**Sin conexión.** Este libro no está preparado en este dispositivo, así que no puedo ni buscar dentro. La dejo en cola: te la respondo en cuanto vuelvas a tener cobertura.');
+  }
+
+  const uid = convo ? Offline.enqueue({ convoId: convo.id, bookId, question, aug, ref }) : null;
+  if (uid) texto += '\n\n' + t('_En cola: te la respondo entera al recuperar la conexión._');
+
+  appendBubble('assistant', texto, true);
+  if (convo) DB.addMessage(convo.id, 'assistant', texto, { offline: true });
+  if (userBubble) userBubble.classList.add('ai-msg--offline');
+  renderOfflineChip();
+  setStatus('Sin conexión: respondido con pasajes del libro.');
+  if (!isOpen()) { agentUnread = true; applyAgentBadge(); }
+  scrollDown();
+}
+
+// Chip "N preguntas en cola" sobre el compositor. Es el único recordatorio de que hay
+// trabajo pendiente: sin él, la cola sería un sitio donde las preguntas se pierden.
+function renderOfflineChip() {
+  if (!els.messages) return;
+  const n = convo ? Offline.pending(convo.id).length : 0;
+  let chip = document.getElementById('ai-offline-chip');
+  if (!n) { chip?.remove(); return; }
+  if (!chip) {
+    chip = document.createElement('div');
+    chip.id = 'ai-offline-chip';
+    chip.className = 'ai-offline-chip';
+    els.messages.parentNode.insertBefore(chip, els.messages.nextSibling);
+  }
+  chip.innerHTML = `${icon('bubble', { size: 14 })}<span>${escapeHtml(
+    n === 1 ? t('1 pregunta en cola, para cuando vuelva la conexión')
+            : t('{n} preguntas en cola, para cuando vuelva la conexión', { n }))}</span>` +
+    (Offline.isOffline() ? '' : `<button class="ai-offline-go" type="button">${escapeHtml(t('Responder ahora'))}</button>`);
+  chip.querySelector('.ai-offline-go')?.addEventListener('click', () => flushOfflineQueue());
+}
+
+// Vacía la cola de la conversación ACTIVA, una pregunta detrás de otra. Solo la activa:
+// responder en una conversación que no está a la vista dejaría respuestas donde nadie
+// las ve, y además cada turno depende del libro cargado (índice, anclas, capítulo).
+// Las de otros libros se quedan y se responden al abrir ese libro.
+async function flushOfflineQueue() {
+  if (!convo || busy || Offline.isOffline()) return;
+  const items = Offline.pending(convo.id);
+  if (!items.length) return;
+  for (const item of items) {
+    Offline.remove(item.uid);       // fuera antes de responder: si falla, no reintenta en bucle
+    renderOfflineChip();
+    setStatus('Respondiendo lo que quedó en cola…');
+    // `showUser: false` — la pregunta ya está pintada y persistida desde el turno offline.
+    await deliver(item.aug, item.question, { showUser: false, ref: item.ref });
+    if (Offline.isOffline()) break;  // se volvió a caer a mitad: el resto se queda en cola
+  }
+  renderOfflineChip();
 }
 
 // Continúa una respuesta que el proveedor cortó por longitud: reusa deliver() con una
