@@ -65,7 +65,10 @@ function build({ kind, title, message, value, placeholder, okText, cancelText, d
     document.body.appendChild(overlay);
 
     const card = overlay.querySelector('.dlg-card');
-    const input = overlay.querySelector('.dlg-input');
+    // Solo el de `prompt`: en un formulario, `.dlg-input` es el PRIMER campo, y
+    // si ese campo era un <select> el `input.select()` del final reventaba
+    // (un <select> no tiene ese método) y el diálogo no resolvía nunca.
+    const input = isPrompt ? overlay.querySelector('.dlg-input') : null;
     const okBtn = overlay.querySelector('.dlg-ok');
     const cancelBtn = overlay.querySelector('.dlg-cancel');
 

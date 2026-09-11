@@ -913,6 +913,14 @@ const EN = {
   'Archivo no disponible': 'File not available',
   'Se liberará el archivo de este dispositivo. Seguirá en tu biblioteca y podrás volver a descargarlo desde Drive.':
     'The file will be freed from this device. It stays in your library and you can download it again from Drive.',
+  'Primero se subirá a Drive ({size}) y luego se liberará de este dispositivo. Seguirá en tu biblioteca y podrás volver a descargarlo.':
+    'It will be uploaded to Drive first ({size}) and then freed from this device. It stays in your library and you can download it again.',
+  'No se pudo subir el archivo a Drive, así que no se ha quitado de aquí: sin copia en Drive, quitarlo sería perderlo.':
+    'The file could not be uploaded to Drive, so it was not removed from here: without a copy in Drive, removing it would lose it.',
+  '¿Qué quieres hacer con "{title}"?': 'What do you want to do with “{title}”?',
+  'Alcance': 'Scope',
+  'Quitar la descarga solo de este dispositivo ({size})': 'Remove the download from this device only ({size})',
+  'Eliminarlo de la biblioteca y de todos mis dispositivos': 'Delete it from the library and from all my devices',
   'Este libro se sincronizó desde otro dispositivo, pero su archivo aún no está en Drive. Ábrelo allí una vez para subirlo.':
     'This book synced from another device, but its file is not in Drive yet. Open it there once to upload it.',
   'Conecta con Google Drive en Ajustes para descargar tus libros en este dispositivo.':

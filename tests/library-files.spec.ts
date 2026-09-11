@@ -306,3 +306,128 @@ test.describe('Ficheros grandes (subida resumable)', () => {
     }
   });
 });
+
+// Hacer hueco en UN dispositivo sin perder el libro en los demás. Es la otra
+// mitad del reporte que arregló library-stale.spec.ts: "si quiero borrar un
+// libro de un dispositivo para ahorrar espacio, la única forma es borrarlo de
+// todos". Lo era porque "Quitar descarga" solo aparecía con el archivo ya en
+// Drive, y el archivo solo llega a Drive después de sincronizar.
+test.describe('Quitar la descarga de un solo dispositivo', () => {
+  const menuOf = async (page: Page) => {
+    await page.locator('.lib-card .lib-kebab').first().click({ force: true });
+    return page.locator('.lib-menu');
+  };
+
+  test('el libro que aún no está en Drive se sube y se libera, sin borrarlo de la biblioteca', async ({ browser }) => {
+    const drive = createDriveState();
+    const pc = await browser.newContext();
+    try {
+      const pcPage = await bootDevice(pc, drive);
+      const id = await importBook(pcPage, 'Para hacer hueco', 5);
+      await pcPage.reload();
+      await seedProLicense(pcPage);
+      await pcPage.reload();
+
+      const menu = await menuOf(pcPage);
+      await menu.getByText('Quitar descarga de este dispositivo').click();
+      await pcPage.locator('.dlg-ok').click();   // "Quitar": sube primero, libera después
+
+      // El archivo acaba en Drive y fuera de este dispositivo, y la ficha sigue
+      // en la biblioteca (fantasma, descargable).
+      await expect.poll(async () => (await libraryOf(pcPage))[0]?.ghost, { timeout: 15000 }).toBe(true);
+      const enPc = await libraryOf(pcPage);
+      expect(enPc).toHaveLength(1);
+      expect(enPc[0].uploaded).toBe(true);
+      expect(drive.store.get('bookreader/files/' + id + '.epub')).toBeTruthy();
+    } finally {
+      await pc.close();
+    }
+  });
+
+  // La papeleta es la puerta por la que se entra a hacer hueco, así que el
+  // diálogo de eliminar pregunta el ALCANCE cuando el archivo se puede recuperar.
+  test('«Eliminar» ofrece el alcance: por defecto solo este dispositivo', async ({ browser }) => {
+    const drive = createDriveState();
+    const pc = await browser.newContext();
+    const movil = await browser.newContext();
+    try {
+      const pcPage = await bootDevice(pc, drive);
+      const id = await importBook(pcPage, 'Con dos salidas', 13);
+      await sync(pcPage);
+      await flushBlobs(pcPage);
+      await sync(pcPage);
+
+      const movilPage = await bootDevice(movil, drive);
+      await sync(movilPage);
+      expect(await libraryOf(movilPage)).toHaveLength(1);
+
+      await pcPage.reload();
+      await pcPage.locator('.lib-card .lib-kebab').first().click({ force: true });
+      await pcPage.locator('.lib-menu').getByText('Eliminar').click();
+      await expect(pcPage.locator('.dlg-card select[data-field="scope"]')).toHaveValue('device');
+      await pcPage.locator('.dlg-ok').click();   // Continuar
+      await pcPage.locator('.dlg-ok').click();   // Quitar
+
+      // En el PC queda la ficha fantasma; en el móvil, el libro intacto.
+      await expect.poll(async () => (await libraryOf(pcPage))[0]?.ghost, { timeout: 15000 }).toBe(true);
+      await sync(movilPage);
+      const enMovil = await libraryOf(movilPage);
+      expect(enMovil).toHaveLength(1);
+      expect(enMovil[0].id).toBe(id);
+      expect(drive.store.get('bookreader/files/' + id + '.epub')).toBeTruthy();
+    } finally {
+      await pc.close(); await movil.close();
+    }
+  });
+
+  test('elegir «todos mis dispositivos» sigue borrando en todos', async ({ browser }) => {
+    const drive = createDriveState();
+    const pc = await browser.newContext();
+    const movil = await browser.newContext();
+    try {
+      const pcPage = await bootDevice(pc, drive);
+      await importBook(pcPage, 'Fuera de todas partes', 17);
+      await sync(pcPage);
+      await flushBlobs(pcPage);
+      await sync(pcPage);
+
+      const movilPage = await bootDevice(movil, drive);
+      await sync(movilPage);
+      expect(await libraryOf(movilPage)).toHaveLength(1);
+
+      await pcPage.reload();
+      await pcPage.locator('.lib-card .lib-kebab').first().click({ force: true });
+      await pcPage.locator('.lib-menu').getByText('Eliminar').click();
+      await pcPage.locator('.dlg-card select[data-field="scope"]').selectOption('all');
+      await pcPage.locator('.dlg-ok').click();   // Continuar
+      await pcPage.locator('.dlg-ok').click();   // Eliminar (destructivo)
+
+      await expect.poll(async () => (await libraryOf(pcPage)).length, { timeout: 15000 }).toBe(0);
+      await sync(pcPage);
+      await sync(movilPage);
+      expect(await libraryOf(movilPage)).toHaveLength(0);
+    } finally {
+      await pc.close(); await movil.close();
+    }
+  });
+
+  test('sin Drive no se ofrece: quitarlo sin copia sería perderlo', async ({ browser }) => {
+    const drive = createDriveState();
+    const solo = await browser.newContext();
+    try {
+      // Mismo Drive mockeado pero sin token: el dispositivo no está conectado.
+      await installDriveMocks(solo, drive);
+      const page = await solo.newPage();
+      await page.goto('/');
+      await seedProLicense(page);
+      await importBook(page, 'Sin red', 9);
+      await page.reload();
+
+      const menu = await menuOf(page);
+      await expect(menu.getByText('Quitar descarga de este dispositivo')).toHaveCount(0);
+      await expect(menu.getByText('Eliminar')).toHaveCount(1);
+    } finally {
+      await solo.close();
+    }
+  });
+});

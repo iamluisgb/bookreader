@@ -5,6 +5,46 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-09-11 — Los libros del móvil no llegaban a la tablet, y hacer hueco obligaba a borrar en todos
+
+Dos quejas del mismo día, de la misma pantalla.
+
+**«Descargué libros en el móvil y en la tablet no aparecían.»** Estaban en Drive todo el tiempo: lo
+que fallaba es que nadie los pedía. La decisión de bajarse `library.json` colgaba de un sello de
+tiempo del manifest (`libraryUpdatedAt`) comparado por **igualdad**, y ese sello puede ir hacia
+atrás. Es la misma enfermedad que en su día congeló los ajustes (entrada del 27/07), que allí se
+curó y aquí se quedó sin tratar.
+
+Y no hace falta ninguna carrera de relojes para provocarlo: basta un **412 en el manifest**, que es
+lo normal con dos dispositivos sincronizando cerca. El reintento relee el manifest remoto y, como
+la biblioteca ya está subida, hereda el `libraryUpdatedAt` **viejo** y lo reescribe encima del
+suyo. A partir de ahí el otro dispositivo tiene ese mismo número apuntado, la condición da falso, y
+**no vuelve a leer `library.json` jamás**. Encallado de forma permanente: sincronizar otra vez no
+lo arregla, y el usuario ve una biblioteca que se quedó en el pasado sin ningún error a la vista.
+
+Ahora la decisión cuelga de la **versión del propio fichero**, que la asigna Drive en cada
+escritura y no puede retroceder — igual que ya hacían los ajustes. Sale gratis: viene en el listado
+que el ciclo ya pedía para los libros, y de paso `settings.json` deja de descargarse entero en cada
+ciclo para comprobar si cambió. Hay test de regresión (`tests/library-stale.spec.ts`): provoca el
+412 de verdad y exige que la tablet acabe viendo los libros.
+
+**«Para ahorrar espacio en un dispositivo, la única forma es borrar el libro de todos.»** Lo era.
+«Quitar descarga de este dispositivo» existía, pero solo aparecía con el archivo **ya en Drive**, y
+el archivo llega a Drive después de sincronizar — antes de eso, en el menú solo quedaba «Eliminar»,
+que borra en todos los dispositivos y se lleva la copia de Drive. Ahora se ofrece también cuando el
+archivo todavía no está subido pero puede estarlo: lo sube primero y libera después. Lo que no se
+ofrece nunca es quitarlo sin copia en Drive, porque eso no es liberar espacio, es borrar.
+
+Y como a hacer hueco se entra por la papelera, el diálogo de **Eliminar** ya no da por hecho el
+borrado total: pregunta el alcance —solo este dispositivo, o todos— con «solo este» por defecto
+cuando el archivo se puede recuperar. El borrado en todos conserva su confirmación en rojo.
+
+De paso, dos cosas que aparecieron al tirar del hilo: la tarjeta decía «Descargando…» mientras
+subía, y cualquier diálogo de formulario cuyo primer campo fuera un desplegable **no resolvía
+nunca** (un `<select>` no tiene `.select()`). Lo segundo estaba latente; este cambio lo despertaba.
+
+---
+
 ## 2026-08-29 — El marcador ya no te deja unas páginas antes del pasaje
 
 Subrayas o marcas una página, sales, entras y pulsas la ficha: el lector te dejaba **unas páginas

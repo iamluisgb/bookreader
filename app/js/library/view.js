@@ -100,7 +100,8 @@ function onBlobProgress(e) {
     if (isOpen()) render();
     return;
   }
-  transfers.set(d.id, { loaded: d.loaded || 0, total: d.total || 0, state: d.state });
+  // `dir` va dentro: sin él la tarjeta decía "Descargando…" mientras subía.
+  transfers.set(d.id, { dir: d.dir, loaded: d.loaded || 0, total: d.total || 0, state: d.state });
   paintTransfer(d.id);
 }
 
@@ -838,6 +839,66 @@ async function openShelfMenu(id, anchor) {
 
 // ---- menú de libro ---------------------------------------------------------
 
+// Libera el archivo de ESTE dispositivo dejando la ficha fantasma. Si todavía no
+// está en Drive, lo sube primero: quitarlo sin copia no sería liberar espacio,
+// sería borrar el libro. Devuelve si se llegó a liberar.
+async function freeDownload(book) {
+  const size = humanSize(book.size);
+  const uploaded = !!(book.blob && book.blob.path);
+  const msg = uploaded
+    ? t('Se liberará el archivo de este dispositivo. Seguirá en tu biblioteca y podrás volver a descargarlo desde Drive.')
+    : t('Primero se subirá a Drive ({size}) y luego se liberará de este dispositivo. Seguirá en tu biblioteca y podrás volver a descargarlo.', { size });
+  if (!(await confirmBox(msg, { title: t('Quitar descarga'), okText: t('Quitar') }))) return false;
+
+  if (!uploaded) {
+    // markManualUpload por si supera el techo de subida automática: aquí lo ha
+    // pedido el usuario, que es justo la excepción que ese techo contempla.
+    Blobs.markManualUpload(book.id);
+    await Blobs.flush();
+    const fresh = await Store.getBook(book.id);
+    if (!(fresh && fresh.blob && fresh.blob.path)) {
+      await alertBox(t('No se pudo subir el archivo a Drive, así que no se ha quitado de aquí: sin copia en Drive, quitarlo sería perderlo.'),
+        { title: t('Quitar descarga') });
+      return false;
+    }
+  }
+  await Store.removeDownload(book.id);
+  return true;
+}
+
+// Eliminar de la biblioteca. Con sync activo el borrado NO es local: viaja al
+// resto de dispositivos y se lleva la copia de Drive.
+//
+// Por eso, cuando el archivo se puede recuperar después, el diálogo pregunta el
+// ALCANCE en vez de dar por hecho el borrado total. La papeleta es la puerta por
+// la que se entra buscando hacer hueco en un dispositivo, y sin esa pregunta la
+// única salida visible era borrar el libro en todos.
+async function removeBook(book, canFree) {
+  if (canFree) {
+    const choice = await formBox({
+      title: t('Eliminar libro'),
+      message: t('¿Qué quieres hacer con "{title}"?', { title: book.title }),
+      fields: [{
+        name: 'scope', label: 'Alcance', type: 'select', value: 'device',
+        options: {
+          device: t('Quitar la descarga solo de este dispositivo ({size})', { size: humanSize(book.size) }),
+          all: t('Eliminarlo de la biblioteca y de todos mis dispositivos'),
+        },
+      }],
+      okText: t('Continuar'),
+    });
+    if (!choice) return false;
+    if (choice.scope === 'device') return freeDownload(book);
+  }
+  const msg = DriveAuth.isConnected()
+    ? t('¿Eliminar "{title}" de la biblioteca? Se borrará en todos tus dispositivos sincronizados, junto con la copia de Drive.', { title: book.title })
+    : t('¿Eliminar "{title}" de la biblioteca? Esto borra el archivo guardado.', { title: book.title });
+  if (!(await confirmBox(msg, { title: t('Eliminar libro'), okText: t('Eliminar'), danger: true }))) return false;
+  await Store.deleteBook(book.id);
+  Blobs.schedule();   // libera también el binario de Drive
+  return true;
+}
+
 async function openBookMenu(id, anchor) {
   closeMenu();
   const [book, shelves] = await Promise.all([Store.getBook(id), Store.getShelves()]);
@@ -854,13 +915,23 @@ async function openBookMenu(id, anchor) {
 
   // Bloque de almacenamiento: traer el fichero, liberarlo de este dispositivo o
   // —para los libros grandes que no se suben solos— subirlo a mano.
+  //
+  // "Quitar descarga" se ofrece también cuando el archivo AÚN no está en Drive
+  // pero puede estarlo (conectado y Pro): se sube y luego se libera. Antes, en
+  // ese caso el menú no ofrecía nada y la única salida para hacer hueco era
+  // "Eliminar", que borra en todos los dispositivos. Lo que no se ofrece nunca
+  // es quitarlo sin copia en Drive: eso no es liberar espacio, es borrar.
+  const canFree = local && (uploaded || Blobs.canTransfer());
   let storage = '';
   if (!local && uploaded) {
     storage = `<button class="lib-menu-item" data-act="download">${icon('download', { size: 16 })}<span>${t('Descargar a este dispositivo')}</span></button>`;
-  } else if (local && uploaded) {
-    storage = `<button class="lib-menu-item" data-act="undownload">${icon('xmark', { size: 16 })}<span>${t('Quitar descarga de este dispositivo')}</span></button>`;
-  } else if (local && (book.size || 0) > Blobs.MAX_AUTO_UPLOAD) {
-    storage = `<button class="lib-menu-item" data-act="upload">${icon('upload', { size: 16 })}<span>${t('Subir a Drive ({size})', { size: humanSize(book.size) })}</span></button>`;
+  } else if (local) {
+    if (!uploaded && (book.size || 0) > Blobs.MAX_AUTO_UPLOAD) {
+      storage += `<button class="lib-menu-item" data-act="upload">${icon('upload', { size: 16 })}<span>${t('Subir a Drive ({size})', { size: humanSize(book.size) })}</span></button>`;
+    }
+    if (canFree) {
+      storage += `<button class="lib-menu-item" data-act="undownload">${icon('xmark', { size: 16 })}<span>${t('Quitar descarga de este dispositivo')}</span></button>`;
+    }
   }
 
   buildMenu(anchor, `
@@ -893,12 +964,7 @@ async function openBookMenu(id, anchor) {
       return;
     }
     if (act === 'undownload') {
-      // Solo se ofrece con el fichero ya en Drive: si no, "quitar la descarga"
-      // sería un borrado disfrazado, porque no habría de dónde recuperarlo.
-      if (!(await confirmBox(t('Se liberará el archivo de este dispositivo. Seguirá en tu biblioteca y podrás volver a descargarlo desde Drive.'),
-          { title: t('Quitar descarga'), okText: t('Quitar') }))) return;
-      await Store.removeDownload(id);
-      await render();
+      if (await freeDownload(book)) await render();
       return;
     }
     if (act === 'finish') {
@@ -909,14 +975,7 @@ async function openBookMenu(id, anchor) {
       const name = (await promptBox('Nombre de la nueva estantería:', { title: 'Nueva estantería' }) || '').trim();
       if (name) { const sh = await Store.addShelf(name); await Store.toggleBookShelf(id, sh.id, true); }
     } else if (act === 'delete') {
-      // Con sync activo el borrado deja de ser local: viaja al resto de
-      // dispositivos y se lleva la copia de Drive. Hay que decirlo antes.
-      const msg = DriveAuth.isConnected()
-        ? t('¿Eliminar "{title}" de la biblioteca? Se borrará en todos tus dispositivos sincronizados, junto con la copia de Drive.', { title: book.title })
-        : t('¿Eliminar "{title}" de la biblioteca? Esto borra el archivo guardado.', { title: book.title });
-      if (!(await confirmBox(msg, { title: t('Eliminar libro'), okText: t('Eliminar'), danger: true }))) return;
-      await Store.deleteBook(id);
-      Blobs.schedule();   // libera también el binario de Drive
+      if (!(await removeBook(book, canFree))) return;
     }
     await render();
   });
