@@ -5,6 +5,43 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-09-12 — Empezar a contar lo que se lee de verdad (P25 F1)
+
+Antes de poder enseñar «lo leído esta semana» hay que decidir qué cuenta como leer, y la respuesta
+fácil —tiempo con el libro abierto— cuenta igual leer un capítulo que pasar treinta páginas buscando
+una cita, y cuenta también el café. Así que el contador que empieza hoy ([`reading-log.js`](app/js/reading-log.js))
+no mide tiempo: mide **palabras a ritmo plausible**.
+
+Cada posición del lector llega en unidades comparables —la localización de epub.js (~205 palabras)
+o la página del PDF—, y entre dos eventos hay Δunidades y Δt. Su cociente clasifica el tramo: por
+encima de 600 wpm nadie ha leído nada, por debajo de 50 tampoco, y un avance mayor que una vuelta
+de página es navegación, no consumo. El segundo signo sale gratis y es más fuerte que cualquier
+umbral: **el origen del movimiento**. Los lectores avisan de los saltos (índice, marcador, búsqueda,
+barra de progreso, cita del agente) y tras uno el registro entra en modo consulta: no suma hasta
+encadenar tres tramos contiguos a ritmo humano. Rastrear un capítulo a saltos no suma ni un minuto;
+quien salta a un marcador y se pone a leer recupera el conteo enseguida.
+
+**Lo que la prueba en la app real cambió del diseño.** Con el libro de pruebas abierto y páginas
+pasadas a ritmo humano, el contador registró 106 s… y una sola unidad. No era un fallo: en esa
+pantalla **la página es más pequeña que una localización**, así que se pasan tres páginas sin que el
+índice se mueva. Pero enseñó un fallo de verdad al lado: el corte por inactividad medía el tramo
+entero, de modo que al lector lento —tres minutos por localización, con páginas pasando cada 45 s—
+se le descartaba todo como ausencia. El corte ahora va contra el **hueco sin señales de vida**: cada
+vuelta de página cuenta como señal aunque no mueva la unidad, y del ritmo global ya se encarga el
+mínimo de 50 wpm.
+
+Dos reglas más, para que la cifra no se infle: cada unidad suma palabras **una sola vez** (releer un
+párrafo tres veces es lectura real, pero no son tres párrafos leídos; el tiempo sí sigue contando), y
+ocultar la pestaña o cerrar el libro cierra el tramo abierto.
+
+Se guarda un registro por **día y dispositivo** (`${día}|${deviceId}`), nunca por día a secas: dos
+equipos leyendo el mismo martes se machacarían en un merge LWW —el problema que ya estaba
+documentado para la racha de estudio—, y con la clave por dispositivo el merge es una unión. Sin UI
+todavía: esto es el contador. La pantalla es P25 F2, y los datos no se reconstruyen hacia atrás, que
+es justo por lo que el contador va primero.
+
+---
+
 ## 2026-09-11 — Preguntarle al libro en un avión
 
 «A veces leo sin cobertura y quiero seguir preguntándole cosas al agente.» Hasta hoy eso acababa

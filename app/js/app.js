@@ -6,7 +6,8 @@ import * as PdfReader from './pdf-reader.js';
 import * as Storage from './storage.js';
 import * as AiDB from './ai/db.js';
 import { hydrateIcons } from './ui/icons.js';
-import { countBookWords, countPdfWords, updateProgressDetail } from './progress.js';
+import { countBookWords, countPdfWords, updateProgressDetail, WORDS_PER_LOCATION } from './progress.js';
+import * as ReadingLog from './reading-log.js';
 import { initHighlights, setupHighlights, setupPdfSelection, drawPdfHighlights, renderHighlights, applyStoredHighlights, repaintStoredHighlights, hideHighlightTooltip, pdfHighlightAt, pdfFractionalRects, pdfRectToBox, setBookMeta } from './highlights-ui.js';
 import { initBookmarkButton, updateBookmarkButton, renderBookmarks } from './bookmarks-ui.js';
 import * as Library from './library/view.js';
@@ -553,6 +554,7 @@ async function goToLibrary({ fromRoute = false } = {}) {
   if (!fromRoute) writeRoute(null, null);   // entra en el historial: atrás vuelve aquí
   await flushProgress();                    // progreso pendiente antes de soltar el libro
   EpubReader.flushLastPosition();           // y la posición, que también va con rebote
+  ReadingLog.endBook();                     // y el tramo de lectura abierto (P25)
   currentBook = null;                       // ya no hay libro abierto (para el router)
   document.body.classList.remove('reading', 'immersive', 'fs', 'scroll-mode');   // salir del modo lectura
   // Cerrar las sidebars de la vista de libro (índice + agente): no deben verse sobre
@@ -1220,11 +1222,12 @@ async function loadEpub(buffer, bookId, aiBookId, persist = null) {
     if (!aiBookId) aiBookId = await AiDB.hashBuffer(buffer.slice(0));
 
     // Setup callbacks BEFORE load so we don't miss first events
-    EpubReader.onProgress((pct) => {
+    EpubReader.onProgress((pct, unit) => {
       updateBookmarkButton();
       updateProgressDetail(pct, totalWords);
       saveProgress(pct);
       syncRouteSoon();               // reflejar la posición en la URL (deep-link)
+      ReadingLog.position(unit);     // P25: cuánto de esto fue lectura, lo decide él
     });
 
     EpubReader.onChapter((label) => {
@@ -1246,6 +1249,10 @@ async function loadEpub(buffer, bookId, aiBookId, persist = null) {
     // (ver BACKLOG TEC5 y `bookKey()` del lector).
     await EpubReader.load(buffer, null, Aliases.canonicalOf(aiBookId));
     console.log('EPUB loaded successfully');
+    // Registro de lectura (P25). La unidad es la localización de epub.js, de tamaño
+    // constante; `maxStep` es lo más que puede avanzar una vuelta de página (una pantalla
+    // ancha con letra pequeña cubre varias): más que eso es un salto, no lectura.
+    ReadingLog.startBook(Aliases.canonicalOf(aiBookId), { unitWords: WORDS_PER_LOCATION, maxStep: 4 });
 
     // Alimentar al agente y (si la apertura viene de un archivo) guardar en la
     // biblioteca ANTES del guard de aborto: aunque el usuario salga o abra otro
@@ -1324,6 +1331,8 @@ async function loadPdf(buffer, bookId, aiBookId, persist = null, displayTitle = 
     // Setup callback BEFORE load
     PdfReader.onPage((page) => {
       syncRouteSoon();               // reflejar la página en la URL (deep-link)
+      ReadingLog.position(page);     // P25: la unidad del PDF es la página
+
       drawPdfHighlights(page);       // PDF3: re-pintar los subrayados de la página
       updateBookmarkButton();        // reflejar si la página actual está marcada
       markCurrentToc();              // mantener viva la marca del índice
@@ -1337,6 +1346,9 @@ async function loadPdf(buffer, bookId, aiBookId, persist = null, displayTitle = 
     });
 
     await PdfReader.load(buffer, null, Aliases.canonicalOf(aiBookId));
+    // Registro de lectura (P25). Las palabras por página aún no se conocen (el muestreo
+    // va más abajo, sin await): arranca con la página tipo y se corrige al llegar.
+    ReadingLog.startBook(Aliases.canonicalOf(aiBookId), { maxStep: 2 });
 
     // Alimentar al agente y (si viene de un archivo) guardar en biblioteca ANTES del
     // guard de aborto: aunque el usuario salga o abra otro libro a mitad de carga,
@@ -1384,6 +1396,7 @@ async function loadPdf(buffer, bookId, aiBookId, persist = null, displayTitle = 
       if (seq !== pdfLoadSeq) return;   // otro PDF ganó la carrera
       totalWords = w;
       const pages = PdfReader.getTotalPages();
+      if (pages && w) ReadingLog.setUnitWords(w / pages);   // palabras reales por página
       if (pages) updateProgressDetail(Math.round((PdfReader.getCurrentPage() / pages) * 100), totalWords);
     });
     return true;

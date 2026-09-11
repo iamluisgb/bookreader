@@ -775,6 +775,65 @@ retrieval (ADR-012) para medir que no regresa.
   LAUNCH_PLAN) se decide cuáles escalar (oposiciones/medicina/ES, SEO programático).
 - Los CTA de todas apuntan a `app/` (demo instantánea, prioridad nº1 del plan).
 
+### P25 — Sección de análisis: lo leído de verdad · `M` · **F1 ✓ (2026-09-12)**
+
+Una pantalla de "lo leído esta semana/este mes": minutos, páginas, libros tocados, subrayados y
+notas creadas, racha. La mitad de los datos **ya existe y está datada** — subrayados con
+`timestamp` ([`highlights.js`](app/js/highlights.js)), libreta y sesiones en IndexedDB, racha en
+[`srs.js`](app/js/ai/srs.js). Lo que no existe es la otra mitad, y ahí está el único problema de
+diseño real:
+
+**Distinguir lectura de rastreo.** Pasar páginas buscando una cita no es leer, y "tiempo con el
+libro abierto" —lo que mide casi todo el mundo— cuenta las dos cosas igual y además cuenta el café.
+La salida no es medir tiempo sino **palabras a ritmo plausible**: en cada `relocated`
+([`epub-reader.js`](app/js/epub-reader.js)) hay posición en *locations*, y una location son 1024
+caracteres ≈ 205 palabras (`CHARS_PER_LOCATION` en [`progress.js`](app/js/progress.js)). Entre dos
+eventos salen Δpalabras y Δt, y su cociente es el discriminador:
+
+- **< 50 wpm** → no se estaba leyendo (móvil en la mesa). Lo corta la inactividad, no suma.
+- **50–600 wpm** → lectura: suman tiempo y palabras.
+- **> 600 wpm** → nadie lee a eso. Barrido: no suma.
+- **Salto no contiguo** (Δlocations grande) → navegación. Ni suma ni rompe nada.
+
+**El segundo signo es más fuerte que cualquier umbral y sale gratis: el ORIGEN del movimiento.**
+`app.js` ya sabe si la posición cambió por pasar página (tap/swipe/flecha) o por un salto desde
+índice, búsqueda, marcador o cita del agente. Tras un salto el tramo entra en modo *consulta* y solo
+vuelve a contar como lectura al encadenar ~3 pases contiguos a ritmo plausible. Eso mata el caso que
+motiva la ficha —buscar algo y dar vueltas por el capítulo— sin castigar a quien salta a un marcador
+y se pone a leer.
+
+Tres detalles que separan una cifra honesta de una inflada:
+- **Cortes duros**: `visibilitychange`/`pagehide` (ya enganchados en `epub-reader.js`) cierran el
+  tramo, y sin input durante ~2 min se cierra en el último evento.
+- **Deduplicar por location**: cada location suma palabras **una sola vez**. Releer un párrafo tres
+  veces es lectura real, pero no son tres párrafos leídos; el tiempo sí sigue contando aparte.
+- **Calibrar con el propio usuario**: arrancar en las 250 wpm de `progress.js` y ajustar a la mediana
+  de sus tramos válidos. 50/600 se quedan como topes físicos, no como su velocidad.
+
+En PDF no hay `locations`, pero `countPdfWords()` ya da palabras totales: palabras/página × cambio de
+página sirve igual, y el scroll continuo rápido cae solo por el techo de wpm.
+
+**La trampa del almacenamiento.** Agregado diario en IndexedDB con clave `${día}|${deviceId}`,
+**nunca `${día}` a secas**: dos dispositivos leyendo el mismo martes se machacarían en el merge LWW —
+el problema que ya está documentado para la racha en [`sync/layout.js`](app/js/sync/layout.js). Con
+la clave por dispositivo el merge es **unión**, sin conflicto posible, y al leer se suma.
+
+**En la UI, una sola cifra de tiempo: la validada.** Si al lado se enseña "tiempo abierto", el
+usuario se queda con la grande y la sección pierde el sentido.
+
+**Fases:**
+- **F1 — Contador** `S`–`M` · **✓ (2026-09-12, ver CHANGELOG)**: [`js/reading-log.js`](app/js/reading-log.js)
+  + enganche en `relocated` (que ahora entrega la localización junto al %) y en el cambio de página
+  del PDF. Sin UI, solo acumulando.
+  - **Corrección salida de probarlo en la app real:** el corte por inactividad no puede medirse
+    contra el tramo entero. En móvil o con letra grande **la página es más pequeña que una
+    localización**, así que se pasan varias páginas sin que la unidad se mueva, y medir así
+    descartaba como ausente justo al lector lento. Va contra el **hueco sin señales de vida**: cada
+    vuelta de página es señal aunque no cambie de unidad; del ritmo global ya responde MIN_WPM.
+- **F2 — Pantalla** `M`: semana/mes, desglose por libro, notas/subrayados (query sobre lo existente),
+  racha. Hogar natural: la estantería.
+- **F3 — Sync** `S`: los días agregados viajan en el layout (unión por `deviceId`).
+
 ---
 
 ## 🎓 Aprendizaje basado en evidencia

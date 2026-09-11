@@ -8,6 +8,9 @@ import { t } from './i18n.js';
 const WORDS_PER_MINUTE = 250;
 // Debe coincidir con el valor de book.locations.generate() en epub-reader.js.
 const CHARS_PER_LOCATION = 1024;
+// Palabras que cabe suponer en una localización de epub.js (chars/5, el mismo criterio que
+// countBookWords). Es la unidad con la que el registro de lectura mide avance (P25).
+export const WORDS_PER_LOCATION = CHARS_PER_LOCATION / 5;
 // Páginas que se muestrean para estimar las palabras de un PDF. Extraer el texto
 // del documento entero costaría segundos en libros grandes y aquí solo hace falta
 // un orden de magnitud.

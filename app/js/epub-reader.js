@@ -7,6 +7,7 @@ import * as TouchSelect from './touch-select.js';
 import { loadEpubJs } from './vendor-loader.js';
 import * as AiDB from './ai/db.js';
 import * as NavDebug from './nav-debug.js';
+import * as ReadingLog from './reading-log.js';
 
 // En táctil reimplementamos la selección de texto (los tiradores nativos de
 // epub.js están rotos en columnas). En escritorio usamos la selección nativa.
@@ -1200,23 +1201,26 @@ function updateProgress(location) {
   const pageEl = document.getElementById('progress-page');
   if (bar) bar.style.width = pct + '%';
   if (text) text.textContent = pct + '%';
-  if (pageEl) {
-    // "Página" por localizaciones de epub.js (~1024 chars cada una). Si el índice no
-    // viene en la ubicación, se estima desde el porcentaje. Sin localizaciones aún: —.
-    let total = 0;
-    try { total = book.locations && book.locations.length ? book.locations.length() : 0; } catch (e) { /* sin locs */ }
-    let cur = location.start.location || 0;
-    if (!cur && total) cur = Math.max(1, Math.round((pct / 100) * total));
-    pageEl.textContent = total ? t('Pág. {n} / {total}', { n: cur, total }) : '—';
-  }
 
-  if (onProgressCallback) onProgressCallback(pct);
+  // "Página" por localizaciones de epub.js (~1024 chars cada una). Si el índice no
+  // viene en la ubicación, se estima desde el porcentaje. Sin localizaciones aún: —.
+  let total = 0;
+  try { total = book.locations && book.locations.length ? book.locations.length() : 0; } catch (e) { /* sin locs */ }
+  let cur = location.start.location || 0;
+  if (!cur && total) cur = Math.max(1, Math.round((pct / 100) * total));
+  if (pageEl) pageEl.textContent = total ? t('Pág. {n} / {total}', { n: cur, total }) : '—';
+
+  // El índice de localización va con el %: es la UNIDAD con la que el registro de lectura
+  // mide cuánto se ha avanzado (P25). El % redondeado a entero no sirve — 1% de un libro
+  // de 400 localizaciones son 4 de golpe.
+  if (onProgressCallback) onProgressCallback(pct, cur);
 }
 
 // Salto por fracción [0..1] de la barra de progreso: convierte a CFI con las
 // localizaciones y muestra esa parte del libro. No-op si aún no hay localizaciones.
 export async function seekToFraction(f) {
   if (!rendition || !book) return;
+  ReadingLog.markJump();     // arrastrar la barra de progreso tampoco
   const seq = ++navSeq;
   const frac = Math.min(1, Math.max(0, f));
   let cfi = null;
@@ -1303,6 +1307,7 @@ export function next() {
 
 export async function goTo(cfi) {
   releasePin();
+  ReadingLog.markJump();     // índice, marcador, subrayado o cita: navegar no es leer
   const seq = ++navSeq;
   if (!rendition) return;
   NavDebug.reset(`goTo  vp=${window.innerWidth}x${window.innerHeight} dpr=${window.devicePixelRatio} coarse=${COARSE}`);

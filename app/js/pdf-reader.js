@@ -1,6 +1,7 @@
 import * as Storage from './storage.js';
 import { loadPdfJs } from './vendor-loader.js';
 import * as AxisLock from './pdf-axis-lock.js';
+import * as ReadingLog from './reading-log.js';
 
 let pdfjsLib = null;
 let pdfDoc = null;
@@ -1067,18 +1068,27 @@ function updateProgress() {
 export async function seekToFraction(f) {
   if (!totalPages) return;
   const p = Math.min(totalPages, Math.max(1, Math.round(f * totalPages)));
-  await goTo(p);
+  ReadingLog.markJump();     // arrastrar la barra es navegar, no leer
+  await move(p);
 }
 
 export async function prev() {
-  if (currentPage > 1) await goTo(currentPage - 1);
+  if (currentPage > 1) await move(currentPage - 1);
 }
 
 export async function next() {
-  if (currentPage < totalPages) await goTo(currentPage + 1);
+  if (currentPage < totalPages) await move(currentPage + 1);
 }
 
+// Salto pedido desde fuera (índice, marcador, búsqueda, cita del agente). Pasar página va
+// por `move` y NO se marca: si `goTo` marcara siempre, cada vuelta de página contaría como
+// navegación y no se registraría una sola línea leída (P25).
 export async function goTo(page) {
+  ReadingLog.markJump();
+  await move(page);
+}
+
+async function move(page) {
   if (page < 1 || page > totalPages) return;
   if (readingMode === 'scroll') {
     // Desplazar hasta la página; el observer la pinta si aún no lo estaba.
