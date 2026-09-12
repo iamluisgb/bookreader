@@ -177,6 +177,7 @@ export async function render() {
         ${Shelves.shelfRows(smart).map(railRowHtml).join('')}` : ''}
 
         <button class="lib-rail-create" data-act="newshelfmenu">${icon('plus', { size: 16 })}<span>${t('Nueva estantería')}</span></button>
+        <button class="lib-rail-create lib-rail-analysis" data-act="analysis">${icon('chart', { size: 16 })}<span>${t('Análisis')}</span></button>
         <button class="lib-rail-create lib-rail-settings" data-act="settings">${icon('gear', { size: 16 })}<span>${t('Ajustes generales')}</span></button>
       </aside>
 
@@ -567,6 +568,12 @@ async function onClick(e) {
   }
 
   if (e.target.closest('[data-act="settings"]')) { onOpenSettings(); return; }
+  // Carga perezosa: el Análisis arrastra el registro de lectura, la libreta y el SRS, y
+  // nada de eso hace falta para pintar la estantería (que es la pantalla de arranque).
+  if (e.target.closest('[data-act="analysis"]')) {
+    import('../analysis.js').then(m => m.open()).catch(err => console.warn('analysis:', err));
+    return;
+  }
 
   // Crear estantería: un solo botón con las dos variantes dentro. Eran dos
   // enlaces en color de acento compitiendo con la fila seleccionada — que es lo

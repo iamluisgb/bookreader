@@ -554,7 +554,7 @@ async function goToLibrary({ fromRoute = false } = {}) {
   if (!fromRoute) writeRoute(null, null);   // entra en el historial: atrás vuelve aquí
   await flushProgress();                    // progreso pendiente antes de soltar el libro
   EpubReader.flushLastPosition();           // y la posición, que también va con rebote
-  ReadingLog.endBook();                     // y el tramo de lectura abierto (P25)
+  await ReadingLog.endBook();               // y el tramo de lectura abierto (P25)
   currentBook = null;                       // ya no hay libro abierto (para el router)
   document.body.classList.remove('reading', 'immersive', 'fs', 'scroll-mode');   // salir del modo lectura
   // Cerrar las sidebars de la vista de libro (índice + agente): no deben verse sobre

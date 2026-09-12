@@ -178,14 +178,16 @@ export function setUnitWords(w) {
   if (book && w > 0) book.unitWords = w;
 }
 
-// Cierra el tramo abierto y suelta el libro. `now` inyectable para los tests.
+// Cierra el tramo abierto y suelta el libro. `now` inyectable para los tests. DEVUELVE la
+// promesa del volcado: quien cierre el libro y se vaya de la pantalla acto seguido tiene
+// que poder esperar a que el último tramo esté en disco, o se pierde.
 export function endBook(now = Date.now()) {
   if (book) closeOpenSpan(now);
   book = null;
   anchor = null;
   credited = null;
   creditedDay = null;
-  flush();
+  return flush();
 }
 
 // La posición cambió por navegación, no por leer: índice, búsqueda, marcador, barra de

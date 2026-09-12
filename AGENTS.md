@@ -24,6 +24,8 @@ offline con un agente de IA (BYOK) que lee el libro completo según un objetivo.
   (ver `js/css-loader.js`).
 - `js/` — orquestador (`app.js`) + módulos por responsabilidad:
   - lectura: `epub-reader.js`, `pdf-reader.js`, `pdf-axis-lock.js`, `touch-select.js`, `progress.js`
+  - análisis: `reading-log.js` (cuenta solo la lectura a ritmo plausible; los saltos no suman)
+    y `analysis.js` (la pantalla, carga perezosa desde la estantería)
   - sidebar: `bookmarks.js`/`bookmarks-ui.js`, `highlights.js`/`highlights-ui.js`, `settings.js`
   - agente IA: `js/ai/` (`panel.js`, `panel-template.js`, `llm.js`, `segment.js`, `db.js`,
     `templates.js`, `render.js`, `markdown.js`, `attenuation.js`)

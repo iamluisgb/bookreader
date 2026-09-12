@@ -775,7 +775,7 @@ retrieval (ADR-012) para medir que no regresa.
   LAUNCH_PLAN) se decide cuáles escalar (oposiciones/medicina/ES, SEO programático).
 - Los CTA de todas apuntan a `app/` (demo instantánea, prioridad nº1 del plan).
 
-### P25 — Sección de análisis: lo leído de verdad · `M` · **F1 ✓ (2026-09-12)**
+### P25 — Sección de análisis: lo leído de verdad · `M` · **F1+F2 ✓ (2026-09-12)**
 
 Una pantalla de "lo leído esta semana/este mes": minutos, páginas, libros tocados, subrayados y
 notas creadas, racha. La mitad de los datos **ya existe y está datada** — subrayados con
@@ -830,8 +830,16 @@ usuario se queda con la grande y la sección pierde el sentido.
     localización**, así que se pasan varias páginas sin que la unidad se mueva, y medir así
     descartaba como ausente justo al lector lento. Va contra el **hueco sin señales de vida**: cada
     vuelta de página es señal aunque no cambie de unidad; del ritmo global ya responde MIN_WPM.
-- **F2 — Pantalla** `M`: semana/mes, desglose por libro, notas/subrayados (query sobre lo existente),
-  racha. Hogar natural: la estantería.
+- **F2 — Pantalla** `M` · **✓ (2026-09-12, ver CHANGELOG)**: [`js/analysis.js`](app/js/analysis.js),
+  overlay hermano de Ajustes generales con entrada desde el rail de la estantería (carga perezosa:
+  arrastra registro + libreta + SRS, y nada de eso hace falta para pintar la estantería). Semana/mes,
+  cifra de tiempo validada como héroe, tarjetas (páginas, palabras, subrayados, notas, racha),
+  columnas por día y desglose por libro **ordenado por tiempo** — un técnico de 40 páginas puede
+  haber costado más que una novela de 200.
+  - **Una sola cifra de tiempo, la validada.** El "tiempo con el libro abierto" no aparece ni como
+    nota al pie: puesto al lado, siempre es mayor y el usuario se queda con él.
+  - **Sin lectura validada no se pinta un cero:** se explica qué se cuenta, que es la pregunta que
+    trae quien abre la sección por primera vez.
 - **F3 — Sync** `S`: los días agregados viajan en el layout (unión por `deviceId`).
 
 ---

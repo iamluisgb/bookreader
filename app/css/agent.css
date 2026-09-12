@@ -1441,3 +1441,75 @@ body.ai-open #sync-badge { right: calc(var(--ai-panel-width) + 14px); }
 /* La pregunta que se hizo sin cobertura: se marca en el margen para que al releer el
    hilo se entienda por qué debajo hay pasajes en vez de una respuesta. */
 .ai-msg--offline .ai-bubble { border-inline-start: 2px solid var(--border-strong, var(--border)); }
+
+/* ============ ANÁLISIS (P25 F2) ============ */
+/* Overlay hermano de Ajustes generales: reusa .appset/.appset-card/.appset-close para que
+   sean la misma cosa visual, y añade lo suyo. Una sola serie en la gráfica, así que el
+   color es el acento y no hay leyenda: el encabezado ya dice qué se está mirando. */
+.anal-card { max-width: 560px; }
+.anal-loading { color: var(--text-soft); font-size: 14px; }
+
+.anal-tabs { display: flex; gap: 4px; padding: 3px; margin-bottom: 20px;
+  background: var(--surface-3); border-radius: var(--r-pill); width: fit-content; }
+.anal-tab {
+  padding: 6px 16px; border: none; border-radius: var(--r-pill); background: none;
+  color: var(--text-soft); font-size: 13px; font-weight: 500; cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+.anal-tab.active { background: var(--surface-1); color: var(--text); font-weight: 600; box-shadow: var(--shadow-1); }
+
+/* La cifra que lidera. Una sola por vista: es la respuesta a "cuánto he leído". */
+.anal-hero { margin-bottom: 18px; }
+.anal-hero-n { font-size: 48px; font-weight: 700; letter-spacing: -0.03em; line-height: 1.05; }
+.anal-hero-l { margin-top: 4px; font-size: 13px; color: var(--text-soft); }
+
+.anal-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(92px, 1fr)); gap: 8px; }
+.anal-tile { padding: 10px 12px; border-radius: var(--r-md); background: var(--surface-2); }
+.anal-tile-l { font-size: 11px; color: var(--text-soft); }
+.anal-tile-v { font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+.anal-chart { margin-top: 22px; }
+.anal-chart-h { font-size: 13px; font-weight: 600; color: var(--text-soft); margin-bottom: 10px; }
+/* Las columnas se separan con AIRE (gap), no con borde: la barra es el único dato y no
+   necesita contorno. Ancho tope para que en "Semana" no se conviertan en bloques. */
+.anal-cols { display: flex; align-items: flex-end; gap: 4px; height: 132px; }
+/* La COLUMNA ocupa su banda entera (así el día de abajo cae bajo su dato y la semana se
+   reparte el ancho); la BARRA se acota a 24px dentro de ella y el resto de la banda es
+   aire. Si se acotara la columna, siete barras se amontonaban a la izquierda dejando
+   media gráfica vacía. */
+.anal-col { flex: 1; min-width: 0; height: 100%;
+  display: flex; flex-direction: column; justify-content: flex-end; gap: 5px; }
+.anal-col:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+.anal-col-track { flex: 1; display: flex; align-items: flex-end; }
+.anal-col-fill {
+  width: 100%; max-width: 24px; margin: 0 auto; background: var(--accent);
+  border-radius: 4px 4px 0 0;     /* punta redondeada, base cuadrada sobre la línea */
+}
+.anal-col-top { font-size: 10px; color: var(--text-soft); white-space: nowrap; text-align: center; }
+.anal-col-x { font-size: 10px; color: var(--text-faint, var(--text-soft)); text-align: center; height: 12px; }
+.anal-cols { border-bottom: 1px solid var(--border-soft); padding-bottom: 0; }
+
+.anal-books { margin-top: 22px; }
+.anal-book { display: flex; align-items: center; gap: 10px; padding: 8px 0;
+  border-bottom: 1px solid var(--border-soft); }
+.anal-book:last-child { border-bottom: none; }
+.anal-book-cover { width: 28px; height: 40px; object-fit: cover; border-radius: 3px; flex: none;
+  box-shadow: var(--shadow-1); }
+.anal-book-cover--none { display: flex; align-items: center; justify-content: center;
+  background: var(--surface-3); color: var(--text-soft); }
+.anal-book-txt { flex: 1; min-width: 0; }
+.anal-book-t { font-size: 14px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.anal-book-s { font-size: 12px; color: var(--text-soft); }
+.anal-book-ms { font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; flex: none; }
+
+.anal-note { margin-top: 18px; font-size: 12px; color: var(--text-soft); line-height: 1.5; }
+
+.anal-empty { display: flex; flex-direction: column; align-items: center; text-align: center;
+  gap: 8px; padding: 28px 12px; color: var(--text-soft); }
+.anal-empty-h { font-size: 15px; font-weight: 600; color: var(--text); margin: 0; }
+.anal-empty-p { font-size: 13px; margin: 0; max-width: 340px; line-height: 1.5; }
+
+@media (max-width: 560px) {
+  .anal-card { border-radius: 16px 16px 0 0; max-height: 92vh; }
+  .anal-hero-n { font-size: 40px; }
+}

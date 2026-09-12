@@ -5,6 +5,36 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-09-12 — La sección de Análisis (P25 F2)
+
+Con el contador ya escribiendo, la pantalla: un botón **Análisis** en el rail de la estantería abre
+un overlay hermano de Ajustes generales con lo leído en la **semana** o en el **mes**.
+
+Lidera una sola cifra —el tiempo leído— y es **la validada**. La tentación era enseñar al lado el
+rato que el libro estuvo abierto, que siempre es mayor y siempre más halagador; puesto al lado, uno
+se queda con el número grande y la sección deja de significar nada. No aparece ni como nota al pie.
+Debajo, las tarjetas que ya se podían contar sin instrumentar nada nuevo: páginas, palabras,
+**subrayados** y **notas** del periodo (ambos llevaban fecha desde siempre) y la racha de estudio.
+
+La gráfica es una columna por día, una sola serie —por eso no lleva leyenda: el encabezado ya dice
+qué se mira— y con etiqueta solo en el día más alto; el resto lo da el tooltip. **Los días sin
+lectura se quedan vacíos**: un muñón de dos píxeles diría «poco» donde la verdad es «nada», y los
+huecos son justamente parte de lo que se viene a ver.
+
+El desglose por libro va **ordenado por tiempo, no por páginas**: un técnico de 40 páginas puede
+haber costado más que una novela de 200, y lo que la pantalla responde es en qué se te fue la semana.
+
+**Sin lectura validada no se pinta un cero con una gráfica vacía al lado**: se explica qué se cuenta
+—que pasar páginas buscando algo no suma—, que es exactamente la pregunta que trae quien abre la
+sección por primera vez.
+
+Además, probándolo con datos sembrados apareció una carrera de verdad en el contador de F1: cerrar el
+libro lanzaba el volcado a disco **sin devolver la promesa**, así que salir de la pantalla en el mismo
+instante podía perder el último tramo. `endBook()` devuelve ahora ese volcado y quien cierra lo
+espera.
+
+---
+
 ## 2026-09-12 — Empezar a contar lo que se lee de verdad (P25 F1)
 
 Antes de poder enseñar «lo leído esta semana» hay que decidir qué cuenta como leer, y la respuesta
