@@ -653,6 +653,24 @@ button.lib-rail-twisty:hover { background: var(--surface-2); color: var(--text);
   background: var(--accent); border-radius: inherit;
   transition: width var(--transition-normal);
 }
+/* Sin tamaño conocido (evento 'queued', o respuesta sin Content-Length) no hay
+   porcentaje que pintar. Barra indeterminada: dice "está pasando algo" sin
+   mentir con una cifra. */
+.lib-dl-bar.is-indeterminate { position: relative; }
+.lib-dl-bar.is-indeterminate .lib-dl-fill { display: none; }
+.lib-dl-bar.is-indeterminate::after {
+  content: ''; position: absolute; top: 0; bottom: 0; left: 0; width: 40%;
+  border-radius: inherit; background: var(--accent);
+  animation: lib-dl-slide 1.1s ease-in-out infinite;
+}
+@keyframes lib-dl-slide {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(250%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lib-dl-bar.is-indeterminate::after { animation: none; width: 100%; opacity: 0.55; }
+}
+
 .lib-card.is-transferring .lib-cover { transform: none; }
 
 .lib-kebab {

@@ -951,6 +951,7 @@ const EN = {
   'Quitar descarga de este dispositivo': 'Remove download from this device',
   'Quitar descarga': 'Remove download',
   'Subir a Drive ({size})': 'Upload to Drive ({size})',
+  'Preparando…': 'Preparing…',
   'Descargando…': 'Downloading…',
   'Subiendo…': 'Uploading…',
   'Solo notas': 'Notes only',

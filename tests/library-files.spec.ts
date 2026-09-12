@@ -104,6 +104,48 @@ test.describe('Biblioteca y archivos entre dos dispositivos', () => {
     }
   });
 
+  // Regresión: el primer evento de progreso llega cuando la tarjeta todavía está
+  // pintada en modo FANTASMA (botón "descargar"), así que `.lib-dl-fill` aún no
+  // existe en el DOM. paintTransfer se rendía ahí y descartaba el evento en
+  // silencio; nadie volvía a renderizar hasta `done`, y pulsar descargar no
+  // movía nada hasta tener el fichero entero. Se dispara el evento a mano para
+  // no depender de la velocidad del mock de Drive.
+  test('al empezar a descargar, la tarjeta enseña la barra sin esperar al final', async ({ browser }) => {
+    const drive = createDriveState();
+    const pc = await browser.newContext();
+    const movil = await browser.newContext();
+    try {
+      const pcPage = await bootDevice(pc, drive);
+      const id = await importBook(pcPage, 'Lituma en los Andes', 7);
+      await sync(pcPage); await flushBlobs(pcPage); await sync(pcPage);
+
+      const movilPage = await bootDevice(movil, drive);
+      await sync(movilPage);
+      await movilPage.evaluate(async () => {
+        const View = await import('/js/library/view.js');
+        await View.render();
+      });
+
+      const card = movilPage.locator(`.lib-card[data-id="${id}"]`);
+      await expect(card.locator('.lib-dl-btn')).toBeVisible();   // fantasma, sin barra
+      await expect(card.locator('.lib-dl-fill')).toHaveCount(0);
+
+      // Encolada, sin tamaño todavía: barra indeterminada, no un 0% quieto.
+      await movilPage.evaluate((id) => window.dispatchEvent(new CustomEvent('bookreader:blob-progress',
+        { detail: { id, dir: 'down', state: 'queued', loaded: 0, total: 0 } })), id);
+      await expect(card.locator('.lib-dl-bar.is-indeterminate')).toHaveCount(1);
+
+      // Ya con bytes: barra real, a mitad, y el libro AÚN no está descargado.
+      await movilPage.evaluate((id) => window.dispatchEvent(new CustomEvent('bookreader:blob-progress',
+        { detail: { id, dir: 'down', state: 'running', loaded: 1024, total: 2048 } })), id);
+      await expect(card.locator('.lib-dl-fill')).toHaveAttribute('style', /width:\s*50%/);
+      await expect(card.locator('.lib-dl-lbl')).toHaveText('Descargando…');
+      expect((await libraryOf(movilPage))[0].ghost).toBe(true);
+    } finally {
+      await pc.close(); await movil.close();
+    }
+  });
+
   test('sin licencia Pro la ficha llega igual, pero el archivo no se sube ni se descarga', async ({ browser }) => {
     const drive = createDriveState();
     const pc = await browser.newContext();

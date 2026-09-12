@@ -5,6 +5,36 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-09-12 — La descarga se ve desde el primer byte
+
+Pulsar «descargar» en una ficha fantasma no movía nada hasta que el fichero estaba **entero**. Los
+eventos de progreso llegaban perfectamente —`net.js` lee el cuerpo por streaming y emite
+`loaded/total` en cada trozo—: los tiraba la vista.
+
+`onBlobProgress` no re-renderiza a propósito (un render por trozo haría parpadear la rejilla y
+perdería el foco del buscador), así que delegaba en `paintTransfer`, que buscaba `.lib-dl-fill`
+**dentro de la tarjeta ya pintada**. Y ese elemento solo se renderiza si había transferencia **en el
+momento del render**: cuando llega el primer evento la tarjeta sigue en modo fantasma, con su botón
+de descargar. La barra no existía, `paintTransfer` se rendía en silencio, y nadie volvía a renderizar
+hasta `done`. La misma ceguera afectaba a las **subidas**, donde era peor: un libro local no tiene
+overlay ninguno, así que subir 113 MB a Drive tampoco enseñaba nada.
+
+Ahora `paintTransfer` **inyecta el overlay** en vez de abandonar —sustituye el fantasma, o lo añade a
+la portada si no había—, sin re-renderizar la rejilla, que era la razón de que existiera. El markup
+sale a `transferOverlayHtml()`, compartido con `cardHtml`: dos copias del mismo overlay se habrían
+desincronizado a la primera.
+
+Y un estado que faltaba: el primer evento es `queued`, **sin tamaño**, y hay descargas que nunca lo
+traen (sin `Content-Length`). Sin total no hay porcentaje honesto, así que la barra va
+**indeterminada** en lugar de un 0% quieto — que es justo lo que se lee como «esto está colgado», el
+síntoma del que venimos.
+
+El test de regresión dispara los eventos a mano en vez de esperar al mock de Drive: lo que se prueba
+es que la tarjeta reacciona **mientras el libro sigue siendo fantasma**, y atarlo a la velocidad de
+una descarga simulada habría medido otra cosa.
+
+---
+
 ## 2026-09-12 — Lo leído viaja entre dispositivos (P25 F3)
 
 Los días de lectura ya cruzan al resto de equipos. Van dentro de `settings.json` —son un dato global

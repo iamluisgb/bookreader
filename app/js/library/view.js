@@ -105,14 +105,52 @@ function onBlobProgress(e) {
   paintTransfer(d.id);
 }
 
+// Overlay de transferencia en curso. Vive en su propia función porque se pinta
+// desde DOS sitios: cardHtml (render normal) y paintTransfer, que lo INYECTA en
+// una tarjeta ya dibujada.
+function transferOverlayHtml(tr) {
+  // Sin `total` no hay porcentaje honesto: el primer evento ('queued') llega
+  // antes de saber el tamaño, y en una descarga sin Content-Length nunca se
+  // sabe. Barra indeterminada, que un 0% quieto se lee como "está colgado".
+  const pct = tr.total ? Math.round((tr.loaded / tr.total) * 100) : 0;
+  return `<div class="lib-dl lib-dl-active">
+      <div class="lib-dl-bar${tr.total ? '' : ' is-indeterminate'}"><span class="lib-dl-fill" style="width:${pct}%"></span></div>
+      <span class="lib-dl-lbl">${transferLabel(tr)}</span>
+    </div>`;
+}
+
+function transferLabel(tr) {
+  if (tr.state === 'queued') return t('Preparando…');
+  return tr.dir === 'up' ? t('Subiendo…') : t('Descargando…');
+}
+
+// Progreso de UNA tarjeta, sin re-render de la rejilla (ver onBlobProgress).
+//
+// La tarjeta casi nunca tiene barra cuando llega el primer evento: se pintó en
+// modo fantasma (botón "descargar") o, en una subida, sin overlay ninguno —
+// `.lib-dl-fill` solo se renderiza si YA había transferencia al pintar. Antes
+// esto se rendía ahí (`if (!bar) return`) y el evento se descartaba en
+// silencio: nadie volvía a renderizar hasta `done`, así que pulsar descargar no
+// movía nada hasta que el fichero estaba entero. Por eso aquí se sustituye el
+// overlay en vez de abandonar.
 function paintTransfer(id) {
   const card = host && host.querySelector(`.lib-card[data-id="${CSS.escape(id)}"]`);
   if (!card) return;
   const tr = transfers.get(id);
-  const bar = card.querySelector('.lib-dl-fill');
-  if (!bar || !tr) return;
+  if (!tr) return;
   card.classList.add('is-transferring');
+
+  const bar = card.querySelector('.lib-dl-fill');
+  if (!bar) {
+    const old = card.querySelector('.lib-dl');
+    if (old) old.outerHTML = transferOverlayHtml(tr);
+    else card.querySelector('.lib-cover')?.insertAdjacentHTML('beforeend', transferOverlayHtml(tr));
+    return;   // el HTML recién puesto ya refleja ESTE evento
+  }
+  bar.parentElement?.classList.toggle('is-indeterminate', !tr.total);
   bar.style.width = tr.total ? Math.round((tr.loaded / tr.total) * 100) + '%' : '0%';
+  const lbl = card.querySelector('.lib-dl-lbl');
+  if (lbl) lbl.textContent = transferLabel(tr);
 }
 
 export function show() {
@@ -434,10 +472,7 @@ function cardHtml(b) {
   const transfer = transfers.get(b.id);
   let overlay = '';
   if (transfer) {
-    overlay = `<div class="lib-dl lib-dl-active">
-      <div class="lib-dl-bar"><span class="lib-dl-fill" style="width:${transfer.total ? Math.round((transfer.loaded / transfer.total) * 100) : 0}%"></span></div>
-      <span class="lib-dl-lbl">${transfer.dir === 'up' ? t('Subiendo…') : t('Descargando…')}</span>
-    </div>`;
+    overlay = transferOverlayHtml(transfer);
   } else if (ghost && b.blob && b.blob.path) {
     overlay = `<div class="lib-dl">
       <button class="lib-dl-btn" data-download="${escapeHtml(b.id)}" title="${t('Descargar a este dispositivo')}">
