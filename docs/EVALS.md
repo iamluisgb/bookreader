@@ -276,6 +276,51 @@ de SU batería → si mejora sin degradar el resto, entra; el ejemplo que falló
 la batería como caso de regresión. Las listas doradas crecen con los fallos reales de
 usuarios (cuando haya feedback), no especulando.
 
+### EV5 · El contrato: presupuesto ANTES de implementar
+
+Todo lo de arriba se medía **después**. El orden importa: sin un baseline tomado antes de
+tocar nada, una mejora de +0.3 y el ruido del juez son indistinguibles — y ya se gastaron
+ciclos persiguiendo exactamente eso (`pertinencia_citas`, 4 runs planos hasta concluir que
+no era el prompt). Así que **todo ítem del backlog que toque la calidad del agente** (IA\*,
+EV\*, OFF\*, artefactos) abre con este bloque, escrito antes de la primera línea de código:
+
+```markdown
+**Contrato (antes de implementar).**
+- Batería: `<id>` — y por qué esa.
+- Métrica primaria: `<métrica>` <umbral>. **Determinista** / **juez**.
+- Baseline: <valor> (run `<nombre>`, <fecha>).
+- Secundaria (tendencia, no gate): …
+- Time-box: N ciclos. Si no se mueve, se clasifica el fallo y se cierra con el hallazgo.
+```
+
+Tres reglas que lo hacen real:
+
+1. **El baseline es un run con nombre**, no un recuerdo. Si no existe, el primer paso del
+   ítem es correrlo — no implementar.
+2. **La métrica primaria tiene que ser determinista o sobrevivir al ruido.** Con ±0.4-0.5 de
+   varianza del juez, "+0.3 en fidelidad" no es una meta, es una moneda al aire. Elige por
+   adelantado: conviértela en determinista (como se hizo con la validación semántica de
+   anclas), declara N runs para promediar con su coste en minutos, o acepta que es tendencia
+   y no le pongas gate.
+3. **El time-box se pacta antes.** Un ítem puede cerrarse con un hallazgo clasificado en vez
+   de con un arreglo; eso es un resultado, no un fracaso.
+
+Al terminar, si la mejora se verifica, **sube su valla** en [`evals/budgets.mjs`](../evals/budgets.mjs)
+citando el run que la respalda. Esa es la parte que impide que la mejora se pierda después.
+
+### La valla (`evals/budgets.mjs`)
+
+`npm run eval:score` termina en rojo —código de salida 1— si un presupuesto se rompe, igual
+que `npm run perf`. Los números salen del **mínimo observado en runs completos comparables
+menos un margen** (el fichero documenta la regla y cita los runs de cada uno); son una valla
+contra regresiones, no un objetivo. No llevan valla la cobertura dorada (oscila 5/8 → 2/8 con
+el mismo prompt: es tendencia) ni nada que ya sea un gate de `check.mjs`.
+
+Dos detalles deliberados: una métrica **ausente** del run cuenta como rota (el arnés se pudre
+sin avisar, y una valla vacía por ausencia es la peor forma de fallar), y los runs **smoke**
+avisan pero no fallan, porque 10 tarjetas y `depth: breve` no son comparables con un run
+completo.
+
 ### Primer ciclo completado (2026-07-16): 7 mejoras + 1 regresión cazada
 
 Se implementaron las mejoras de §Primeros hallazgos (validación semántica de anclas,

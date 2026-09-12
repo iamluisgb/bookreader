@@ -14,6 +14,8 @@ offline con un agente de IA (BYOK) que lee el libro completo según un objetivo.
 - [`DECISIONS.md`](DECISIONS.md) — decisiones de arquitectura del agente IA (ADR: el _porqué_).
 - [`DESIGN.md`](DESIGN.md) — lenguaje visual (principios + tokens).
 - [`templates.md`](templates.md) — spec de las 6 plantillas de libreta.
+- [`docs/EVALS.md`](docs/EVALS.md) — cómo se mide la calidad del agente, y el **contrato**
+  (baseline + métrica + time-box) que todo ítem de calidad escribe antes de implementar.
 
 ## Estructura
 - `index.html` — entry point (CSP, scripts vendorizados).
@@ -60,5 +62,10 @@ offline con un agente de IA (BYOK) que lee el libro completo según un objetivo.
   fuera de `npm test`). Necesita las fixtures pesadas (`npm run eval:fixtures`); sin ellas se salta.
   Cada métrica tiene **presupuesto** y falla si se sale; la corrida se vuelca a `test-results/perf.json`.
   Correrlo **solo**: medir con la suite en paralelo no mide nada.
+- `npm run eval` — calidad del agente (fuera de `npm test`: cuesta dinero y minutos). Puntúa
+  y **falla si un presupuesto de [`evals/budgets.mjs`](evals/budgets.mjs) se rompe** — la valla
+  contra regresiones de calidad, hermana de la de `npm run perf`. Antes de tocar prompts,
+  retrieval o modelo, escribe el **contrato** del ítem (baseline medido, métrica primaria,
+  time-box): [`docs/EVALS.md` § EV5](docs/EVALS.md).
 - `npm run lint` (ESLint) · `npm run format` (Prettier).
 - El test "export after highlight" depende de que el epub de prueba se llame `test.epub` (bookId `test`).

@@ -6,6 +6,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { resolveRunDir, loadBatteries, cardsOf, avg, pct } from './lib.mjs';
+import { evalBudgets } from './budgets.mjs';
 
 const runDir = resolveRunDir();
 const read = f => { try { return JSON.parse(fs.readFileSync(path.join(runDir, f), 'utf8')); } catch { return null; } };
@@ -16,15 +17,20 @@ if (!checks || !judge) { console.error('faltan checks.json/judge.json — ejecut
 const batteries = loadBatteries(runDir);
 const meta = batteries[0]?.meta || {};
 const f1 = n => Number.isFinite(n) ? n.toFixed(1) : '—';
+const f2 = n => Number.isFinite(n) ? +n.toFixed(2) : '—';
 
 let md = `# Informe de evals — ${path.basename(runDir)}
 
 Modelo evaluado: \`${meta.model}\` · juez: \`${judge.judge}\` · commit \`${meta.sha}\` · ${meta.date?.slice(0, 10)}
 (rúbricas y método: [docs/EVALS.md](../../docs/EVALS.md))
 
-| Batería | Nota | Tarjetas (fid/atom/util) | Cobertura dorada | Resumen (fid/citas/cob/conc) | Gates |
-|---|---|---|---|---|---|
+| Batería | Nota | Tarjetas (fid/atom/util) | Cobertura dorada | Resumen (fid/citas/cob/conc) | Gates | Valla |
+|---|---|---|---|---|---|---|
 `;
+
+// EV5 · presupuestos por batería (evals/budgets.mjs): valla contra regresiones.
+const vallas = {};
+const smoke = batteries.some(b => b.meta?.smoke);
 
 for (const b of batteries) {
   const id = b.battery.id;
@@ -43,7 +49,14 @@ for (const b of batteries) {
   md += `| ${id} | **${f1(nota)}** | ${f1(j.cards_avg?.fidelidad)} / ${f1(j.cards_avg?.atomicidad)} / ${f1(j.cards_avg?.utilidad)} `
     + `| ${(j.coverage || []).filter(x => x.cubierto).length}/${b.battery.goldenConcepts.length} `
     + `| ${f1(s.fidelidad)} / ${f1(s.pertinencia_citas)} / ${f1(s.cobertura)} / ${f1(s.concision)} `
-    + `| ${gatesFailed.length ? '✗ ' + gatesFailed.length : '✓'} |\n`;
+    + `| ${gatesFailed.length ? '✗ ' + gatesFailed.length : '✓'} `
+    + `| ${vallaCell(vallas[id] = evalBudgets(id, c, j, b.meta?.evalVersion || 1))} |\n`;
+}
+
+function vallaCell(filas) {
+  if (!filas.length) return 'n/a';
+  const rotas = filas.filter(f => f.estado !== 'ok');
+  return rotas.length ? `✗ ${rotas.length}/${filas.length}` : `✓ ${filas.length}`;
 }
 
 md += `\nEscala 1-5 (juez exigente; 5 = excepcional). La nota se CAPA a 2 si falla un gate determinista.\n`;
@@ -66,6 +79,15 @@ for (const b of batteries) {
   const failed = Object.entries(c.gates || {}).filter(([, ok]) => !ok).map(([k]) => k);
   if (failed.length) md += `\n**✗ Gates fallidos:** ${failed.join(' · ')}\n`;
   if (b.meta?.summaryError) md += `\n**✗ El resumen no se generó:** ${b.meta.summaryError}\n`;
+  const rotas = (vallas[id] || []).filter(v => v.estado !== 'ok');
+  if (rotas.length) {
+    md += `\n**⛔ Presupuestos rotos** (valla de \`evals/budgets.mjs\`, no objetivo):\n`;
+    for (const v of rotas) {
+      md += v.estado === 'sin dato'
+        ? `- \`${v.metric}\` — **sin dato en este run** (la valla pedía ${v.tipo} ${v.limite}; el arnés no la produjo)\n`
+        : `- \`${v.metric}\` = ${f2(v.valor)} — se salió del presupuesto (${v.tipo} ${v.limite}, de ${v.de})\n`;
+    }
+  }
   md += `**Tiempos** (ms): ${JSON.stringify(b.meta?.timings || {})}\n`;
 
   const worst = (j.cards || []).filter(x => Math.min(x.fidelidad, x.atomicidad, x.utilidad) <= 2)
@@ -102,3 +124,23 @@ for (const b of batteries) {
 fs.writeFileSync(path.join(runDir, 'REPORT.md'), md);
 console.log(md);
 console.log(`→ ${path.relative(process.cwd(), path.join(runDir, 'REPORT.md'))}`);
+
+// EV5 · La valla decide el código de salida: una regresión de calidad tiene que doler igual
+// que un presupuesto de perf. En SMOKE no — mide 1 batería con 10 tarjetas y depth breve,
+// así que sus números no son comparables con los de un run completo: se avisa y se sigue.
+const todas = Object.entries(vallas).flatMap(([id, fs_]) => fs_.map(v => ({ id, ...v })));
+const rotas = todas.filter(v => v.estado !== 'ok');
+if (!todas.length) {
+  console.log('\n(sin presupuestos para estas baterías — evals/budgets.mjs)');
+} else if (!rotas.length) {
+  console.log(`\n✓ ${todas.length} presupuestos dentro de la valla.`);
+} else {
+  console.error(`\n⛔ ${rotas.length}/${todas.length} presupuestos ROTOS:`);
+  for (const v of rotas) {
+    console.error(v.estado === 'sin dato'
+      ? `   ${v.id} · ${v.metric} — sin dato en el run (pedía ${v.tipo} ${v.limite})`
+      : `   ${v.id} · ${v.metric} = ${f2(v.valor)} (${v.tipo} ${v.limite}, de ${v.de})`);
+  }
+  if (smoke) console.error('   — run SMOKE: no comparable con la valla, no falla. Confirma con un run completo.');
+  else process.exit(1);
+}

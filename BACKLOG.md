@@ -237,6 +237,29 @@ producto. **Veredicto: deepseek sigue de principal**; mimo queda como visión (d
 único fiable) y como alternativa documentada para quien priorice velocidad sobre citas.
 Se re-evalúa si mimo mejora o si la pertinencia se arregla por prompt (EV2/smoke).
 
+### EV5 — Presupuesto y contrato ANTES de implementar · `S` · **✓ (2026-09-12)**
+
+El bucle de mejora medía **después**: sin baseline previo, una mejora de +0.3 y el ruido del
+juez (±0.4-0.5) son indistinguibles — y ya se gastaron 4 runs en `pertinencia_citas` antes de
+concluir que no era el prompt. Además, las comparaciones eran "contra el run anterior" y los
+runs están gitignored: la mejora verificada no dejaba rastro que la protegiera.
+
+**Entregado:**
+- [`evals/budgets.mjs`](evals/budgets.mjs) — la valla, hermana de la de `tests/perf.spec.ts`.
+  Valla = mínimo observado en runs completos comparables − margen, citando los runs de cada
+  número. Cubre lo GRADUAL (notas del juez, contadores); los gates de `check.mjs` siguen
+  cubriendo lo binario y no se duplican.
+- `eval:score` **sale con código 1** si un presupuesto se rompe; el REPORT.md lista los rotos.
+  Una métrica ausente cuenta como rota (el arnés se pudre sin avisar — pasó con EV1 y Studio);
+  los runs smoke y los `evalVersion: 1` avisan pero no fallan, porque no son comparables.
+- El **contrato** de [`docs/EVALS.md` § EV5](docs/EVALS.md): baseline con nombre de run,
+  métrica primaria determinista o que sobreviva al ruido, y time-box pactado antes.
+
+**Sin verificar.** Los umbrales se sembraron desde los JSON de `f2-deepseek`, `verif-prio-deepseek`
+y `post-mejoras-deepseek`, y se validaron a posteriori sobre los runs históricos (verif-prio en
+verde; f2 en rojo exactamente en las 5 métricas que ese arreglo arregló). Falta un run completo
+nuevo que los confirme en caliente.
+
 ### IA9 — Retrieval multi-fuente (cruzar libros, papers y posts) · `M`
 
 **El caso.** «El paper, el post y las docs dicen cosas distintas de lo mismo; quiero **esa**
@@ -733,6 +756,19 @@ chat de esos libros se quedan sin medir. Pasó en 3 de las 5 corridas de P14 F7 
 verificar justo el caso que se estaba arreglando. Subir el límite es el parche obvio, pero
 enmascara el problema real: esos libros tardan demasiado. Medir primero dónde se va el tiempo
 (¿nº de llamadas del map? ¿ventanas lentas de nan?) y decidir con eso.
+
+**Contrato (antes de implementar)** — formato de [`docs/EVALS.md` § EV5](docs/EVALS.md):
+- **Batería:** `p2-tecnico` (Pro Git, 14 MB) y `p1-estudiante` (Relatividad) — los dos que
+  agotan el gate. P3/P4 son control: no deben empeorar.
+- **Métrica primaria:** `meta.timings.flashcards` < 600 s **sin** subir el límite del gate, y
+  la batería completa con sus 4 artefactos. **Determinista** — no interviene el juez.
+- **Baseline:** batería entera DNF en 3 de las 5 corridas de P14 F7 (2026-08-04). Tiempos de
+  referencia con libro grande que SÍ terminó: `verif-prio-deepseek`, P2 tarjetas 30 en el run
+  que pasó. Primer paso del ítem: **un run con los tiempos por fase**, no un arreglo.
+- **Secundaria (tendencia, no gate):** calidad de las tarjetas de P2 — el troceado no puede
+  acelerarse a costa de `cards.fidelidad`, que ya tiene valla en 4.1.
+- **Time-box:** 2 ciclos. Si la instrumentación apunta a ventanas lentas del proveedor y no a
+  nº de llamadas, se cierra con el hallazgo y se sube el límite a conciencia, documentándolo.
 
 - **Límite conocido del layout.** Sin solapes, pero en mapas muy desiguales quedan **cruces de
   aristas** entre subárboles: la relajación mueve en radio y nunca en ángulo, así que una hoja
