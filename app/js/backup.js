@@ -25,13 +25,16 @@ import { backfillAll } from './sync/schema.js';
 const FORMAT = 'bookreader-backup';
 const VERSION = 1;
 const SECRET_KEYS = ['ai_key', 'drive_refresh_token'];  // secretos: jamás a un fichero descargable
+// Identidad de ESTE equipo: restaurar una copia en otro dispositivo no puede clonarla, o
+// ambos escribirían la misma fila del registro de lectura (ver sync/layout.js · SKIP_KEYS).
+const LOCAL_ONLY_KEYS = ['device_id'];
 const AI_STORES = ['convos', 'messages', 'notes', 'ratings', 'books'];
 
 // ---- Export ----------------------------------------------------------------
 
 function exportLocal() {
   const ls = Storage.getAll('');                // { shortKey: valor } ya parseado
-  for (const k of SECRET_KEYS) delete ls[k];
+  for (const k of [...SECRET_KEYS, ...LOCAL_ONLY_KEYS]) delete ls[k];
   return ls;
 }
 
@@ -56,7 +59,7 @@ export async function buildBackup() {
 function importLocal(ls) {
   let n = 0;
   for (const [k, v] of Object.entries(ls || {})) {
-    if (SECRET_KEYS.includes(k)) continue;
+    if (SECRET_KEYS.includes(k) || LOCAL_ONLY_KEYS.includes(k)) continue;
     Storage.set(k, v); n++;
   }
   return n;

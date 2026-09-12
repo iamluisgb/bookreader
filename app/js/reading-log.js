@@ -274,7 +274,13 @@ export function flush() {
       const cur = rec.books[bookId] || { ms: 0, words: 0, units: [] };
       cur.ms += delta.ms;
       cur.words += delta.words;
-      cur.units = [...new Set([...cur.units, ...delta.units])].sort((a, b) => a - b);
+      // `units` es la LISTA de unidades contadas en el registro propio y un CONTADOR en
+      // los que llegan por sync (la lista no viaja: son cientos de enteros por libro y
+      // día, y fuera de este dispositivo no sirven para nada — la deduplicación es
+      // local). Con un contador ya no se puede deduplicar contra él: se suma.
+      cur.units = Array.isArray(cur.units)
+        ? [...new Set([...cur.units, ...delta.units])].sort((a, b) => a - b)
+        : (cur.units || 0) + delta.units.size;
       rec.books[bookId] = cur;
     }
     rec.updatedAt = Date.now();
@@ -291,7 +297,8 @@ function loadCredited(id) {
   const day = dayKey();
   return tx('readonly', s => reqP(s.get(recordKey(day)))).then((rec) => {
     if (!book || book.id !== id) return;        // se cambió de libro mientras leíamos IDB
-    const units = rec && rec.books[id] ? rec.books[id].units : [];
+    const u = rec && rec.books[id] ? rec.books[id].units : [];
+    const units = Array.isArray(u) ? u : [];
     // UNIÓN, no reemplazo: si algún tramo se contó mientras IndexedDB contestaba, lo
     // suyo es sumarlo a lo que ya había, no borrarlo.
     credited = new Set(creditedDay === day && credited ? [...credited, ...units] : units);
@@ -301,9 +308,16 @@ function loadCredited(id) {
 
 // ---- Lectura (lo que consumirá la pantalla de F2) --------------------------
 
-// Todos los registros, de todos los dispositivos que hayan sincronizado (hoy, solo este).
+// Todos los registros, de todos los dispositivos que hayan sincronizado.
 export function getRecords() {
   return tx('readonly', s => reqP(s.getAll())).catch(() => []);
+}
+
+// Unidades contadas de una entrada, venga como lista (registro propio) o como contador
+// (registro de otro dispositivo, ver flush).
+export function unitCount(v) {
+  if (!v) return 0;
+  return Array.isArray(v.units) ? v.units.length : (v.units || 0);
 }
 
 // Agregado de los últimos `days` días naturales, este incluido. Suma entre dispositivos:
@@ -315,10 +329,11 @@ export async function summary(days = 7, now = Date.now()) {
   for (const rec of recs) {
     for (const [bookId, v] of Object.entries(rec.books || {})) {
       const b = out.books[bookId] || (out.books[bookId] = { ms: 0, words: 0, units: 0 });
-      b.ms += v.ms; b.words += v.words; b.units += v.units.length;
+      const n = unitCount(v);
+      b.ms += v.ms; b.words += v.words; b.units += n;
       const d = out.byDay[rec.day] || (out.byDay[rec.day] = { ms: 0, words: 0, units: 0 });
-      d.ms += v.ms; d.words += v.words; d.units += v.units.length;
-      out.ms += v.ms; out.words += v.words; out.units += v.units.length;
+      d.ms += v.ms; d.words += v.words; d.units += n;
+      out.ms += v.ms; out.words += v.words; out.units += n;
     }
   }
   out.days = Object.keys(out.byDay).length;
@@ -343,4 +358,57 @@ if (typeof document !== 'undefined') {
     closeOpenSpan(Date.now());
     flush();
   });
+}
+
+// ---- Sync (P25 F3) ---------------------------------------------------------
+//
+// Los días viajan como REGISTROS INDEPENDIENTES por dispositivo, y esa es toda la
+// estrategia de conflicto: cada equipo escribe solo su propia fila (`${día}|${deviceId}`),
+// así que fusionar es UNIR, nunca elegir. Leer el martes en el PC y en la tablet da dos
+// filas que se suman; con una fila por día, el LWW se habría comido una de las dos — es el
+// problema que ya estaba documentado para la racha de estudio en `sync/layout.js`.
+
+// Días que viajan. Un año largo: suficiente para un "resumen anual" y acotado, que esto va
+// dentro de settings.json y no puede crecer sin fin. Lo más viejo no se borra de aquí, solo
+// deja de subirse (el otro dispositivo conserva lo que ya tuviera).
+const SYNC_DAYS = 400;
+
+// Forma compacta para el sync: la LISTA de unidades se convierte en su cuenta. Son cientos
+// de enteros por libro y día, y fuera de este dispositivo no sirven para nada: solo
+// alimentan la deduplicación de relecturas, que es local por definición.
+export async function exportDays(now = Date.now()) {
+  const from = dayKey(now - (SYNC_DAYS - 1) * 86400000);
+  const recs = await getRecords();
+  return recs
+    .filter(r => r && r.day >= from)
+    .map(r => ({
+      key: r.key, day: r.day, deviceId: r.deviceId, updatedAt: r.updatedAt || 0,
+      books: Object.fromEntries(Object.entries(r.books || {})
+        .map(([id, v]) => [id, { ms: v.ms, words: v.words, units: unitCount(v) }])),
+    }))
+    .sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));   // huella estable
+}
+
+// Une los registros remotos con los locales. Devuelve cuántos se escribieron.
+export async function importDays(list) {
+  if (!Array.isArray(list) || !list.length) return 0;
+  const mine = deviceId();
+  let written = 0;
+  for (const rec of list) {
+    if (!rec || !rec.key || !rec.day) continue;
+    try {
+      await tx('readwrite', async (s) => {
+        const cur = await reqP(s.get(rec.key));
+        // La fila PROPIA no se pisa jamás con la copia remota: este dispositivo es su
+        // único autor y lo local siempre está igual o más adelantado (la copia de allá es,
+        // como mucho, lo que subimos la última vez). La excepción es no tener nada: un
+        // equipo reinstalado recupera así su propio histórico.
+        if (rec.deviceId === mine && cur) return;
+        if (cur && (cur.updatedAt || 0) >= (rec.updatedAt || 0)) return;
+        s.put({ ...rec, books: rec.books || {} });
+        written++;
+      });
+    } catch (e) { /* sin IndexedDB: el análisis se queda sin estos días, leer no se rompe */ }
+  }
+  return written;
 }

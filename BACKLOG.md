@@ -775,7 +775,7 @@ retrieval (ADR-012) para medir que no regresa.
   LAUNCH_PLAN) se decide cuáles escalar (oposiciones/medicina/ES, SEO programático).
 - Los CTA de todas apuntan a `app/` (demo instantánea, prioridad nº1 del plan).
 
-### P25 — Sección de análisis: lo leído de verdad · `M` · **F1+F2 ✓ (2026-09-12)**
+### P25 — Sección de análisis: lo leído de verdad · `M` · **✓ entregada (2026-09-12)** · F1–F3
 
 Una pantalla de "lo leído esta semana/este mes": minutos, páginas, libros tocados, subrayados y
 notas creadas, racha. La mitad de los datos **ya existe y está datada** — subrayados con
@@ -840,7 +840,13 @@ usuario se queda con la grande y la sección pierde el sentido.
     nota al pie: puesto al lado, siempre es mayor y el usuario se queda con él.
   - **Sin lectura validada no se pinta un cero:** se explica qué se cuenta, que es la pregunta que
     trae quien abre la sección por primera vez.
-- **F3 — Sync** `S`: los días agregados viajan en el layout (unión por `deviceId`).
+- **F3 — Sync** `S` · **✓ (2026-09-12, ver CHANGELOG)**: los días viajan dentro de `settings.json`
+  (dato global, y el fichero ya sube solo cuando cambia su huella), como una fila por día Y
+  dispositivo. La lista de unidades no viaja, solo su cuenta.
+  - **Lo que el test destapó:** `device_id` viajaba en `settings.json` —donde va todo
+    `bookreader_*`— y el segundo dispositivo lo adoptaba al rellenar lo que le faltaba. Los dos
+    pasaban a escribir la MISMA fila y uno dejaba de contar, en silencio. Ahora es clave local
+    (`SKIP_KEYS` del layout) y tampoco sale en el backup descargable.
 
 ---
 

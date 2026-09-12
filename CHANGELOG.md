@@ -5,6 +5,29 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-09-12 — Lo leído viaja entre dispositivos (P25 F3)
+
+Los días de lectura ya cruzan al resto de equipos. Van dentro de `settings.json` —son un dato global
+de la app, no de un libro, y ese fichero ya se sube en cuanto cambia su huella— como **una fila por
+día y por dispositivo**. Esa partición es toda la estrategia de conflicto: cada equipo escribe solo
+la suya, así que fusionar es **unir** y leer el mismo martes en el PC y en la tablet **suma** en vez
+de competir. Con una fila por día, el LWW se habría comido una de las dos lecturas.
+
+La **lista de unidades leídas no viaja**: son cientos de enteros por libro y día, y fuera del
+dispositivo que los escribió no sirven para nada —solo alimentan la deduplicación de relecturas, que
+es local por definición—, así que viaja su cuenta. Y la fila propia **nunca** se pisa con la copia
+remota: este dispositivo es su único autor y lo de allá es, como mucho, lo que subimos la última vez.
+La excepción es no tener nada, que es como un equipo reinstalado recupera su histórico.
+
+**Lo que el test destapó, y era grave.** `device_id` viajaba en `settings.json`, porque ahí va todo
+`bookreader_*`. El segundo dispositivo lo adoptaba al rellenar los ajustes que le faltaban, los dos
+pasaban a escribir **la misma fila** y la partición por dispositivo —lo único que hace que fusionar
+sea unir— se deshacía en silencio: uno de los dos dejaba de contar. Ahora es clave local y tampoco
+sale en el backup descargable, donde restaurar una copia en otro equipo habría clonado la identidad
+igual de bien.
+
+---
+
 ## 2026-09-12 — La sección de Análisis (P25 F2)
 
 Con el contador ya escribiendo, la pantalla: un botón **Análisis** en el rail de la estantería abre

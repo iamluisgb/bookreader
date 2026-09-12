@@ -12,6 +12,7 @@
 import * as Storage from '../storage.js';
 import * as DB from '../ai/db.js';
 import * as LibStore from '../library/store.js';
+import * as ReadingLog from '../reading-log.js';
 import { mergeCollections } from './merge.js';
 
 export const SCHEMA_VERSION = 1;
@@ -28,8 +29,13 @@ const SCALAR_AT = { lastPosition: 'lastPositionAt', pdfLastPage: 'pdfLastPageAt'
 const AT_PREFIXES = Object.values(SCALAR_AT);
 // Secretos que jamás salen del dispositivo (mismo criterio que backup.js).
 const SECRET_KEYS = ['ai_key', 'drive_refresh_token'];
-// Estado puramente local, sin sentido en otro dispositivo.
-const SKIP_KEYS = ['sync_schema_migrated', 'sync_state'];
+// Estado puramente local, sin sentido en otro dispositivo. `device_id` es el caso
+// peligroso y no solo inútil: es la mitad de la clave con la que cada equipo escribe SUS
+// días de lectura (`${día}|${deviceId}`, P25 F3). Si viaja, el segundo dispositivo lo
+// adopta al rellenar ajustes que le faltan, los dos pasan a escribir la MISMA fila y la
+// partición por dispositivo —lo único que hace que fusionar sea unir— se deshace en
+// silencio: uno de los dos deja de contar.
+const SKIP_KEYS = ['sync_schema_migrated', 'sync_state', 'device_id'];
 
 function splitKey(key) {
   for (const p of BOOK_PREFIXES) {
@@ -103,6 +109,11 @@ export function bookDigest(book) {
 // (repasar en dos dispositivos el mismo día no debe partir la racha). Devuelve null si
 // lo local ya es igual o mejor, para no escribir de más.
 const STREAK_KEY = 'study_streak';
+// Clave SINTÉTICA dentro de settings.json: no existe en localStorage (los días de lectura
+// viven en su propia IndexedDB). Viaja ahí porque es un dato global de la app, no de un
+// libro, y porque settings.json ya se sube en cuanto su huella cambia — un fichero nuevo
+// habría que enseñárselo al engine, al guardado manual y al restaurar. Ver P25 F3.
+const READING_KEY = 'reading_days';
 export function mergeStreak(local, remote) {
   if (!remote || !remote.lastDay) return null;
   if (!local || !local.lastDay) return remote;
@@ -133,6 +144,11 @@ export async function buildSnapshot() {
     if (bk) bookOf(bk.bookId).local[key] = value;
     else settings[key] = value;
   }
+
+  // Días de lectura (P25 F3): registros por día Y DISPOSITIVO, así que fusionar es unir.
+  try {
+    settings[READING_KEY] = await ReadingLog.exportDays();
+  } catch (e) { /* sin IndexedDB: se sube el resto igual */ }
 
   const [convos, messages, notes, ratings, artifacts, decks, meta] = await Promise.all([
     DB.getAll('convos'), DB.getAll('messages'), DB.getAll('notes'), DB.getAll('ratings'),
@@ -245,6 +261,13 @@ export async function restoreSnapshot({ settings = {}, books = {} }, { mode = 'r
     // La racha de estudio no es una preferencia: es un contador que avanza en el
     // dispositivo donde repasas. Con la regla general ("solo si falta en local") el PC
     // se quedaría clavado mientras estudias en el móvil, que es el uso previsto.
+    // Los días de lectura NO son una preferencia y no dependen del modo: siempre unión,
+    // también en 'restore'. Pisar lo local con lo remoto perdería lo leído en este
+    // dispositivo desde la última subida.
+    if (k === READING_KEY) {
+      records += await ReadingLog.importDays(v);
+      continue;
+    }
     if (k === STREAK_KEY) {
       const merged = mergeStreak(Storage.get(k, null), v);
       if (merged) { Storage.set(k, merged); keys++; }
