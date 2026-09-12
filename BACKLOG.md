@@ -352,6 +352,21 @@ subida automática hasta 50 MB, panel de cuota en Ajustes.
 Historial). **Pendiente de Fase 3**: WebDAV como 2º proveedor (sync sin Worker, público
 r/selfhosted) — nótese que `WebDavProvider` tendrá que implementar también `readBinary`/
 `writeBinary`, no solo los 4 métodos de texto.
+- **El sync de ficheros no dice nunca POR QUÉ no sube un libro** · `S` · **medido en uso real
+  (2026-09-12).** Un libro de 113 MB llevaba días en el móvil sin subir y la tarjeta del otro
+  dispositivo solo ponía *"Solo notas"*. La causa era legítima —pasa de `MAX_AUTO_UPLOAD` (50 MB),
+  así que no se sube solo a propósito— pero **eso no se cuenta en ningún sitio**: hay que abrir el
+  menú del libro en el dispositivo de origen para descubrir el botón "Subir a Drive (113 MB)".
+  El badge dice lo mismo para cuatro situaciones distintas: no eres Pro, Drive desconectado,
+  interruptor `sync_files` apagado, o el fichero pasa del techo. Y `Blobs.schedule()` hace `return`
+  en silencio si `canTransfer()` es falso ([`blobs.js`](app/js/sync/blobs.js)) — con el agravante de
+  que `isPro()` caduca sola a los 30 días sin revalidar ([`license.js`](app/js/license.js)), así que
+  un dispositivo puede dejar de subir sin que pase nada visible.
+  - **Arreglo:** que "Solo notas" lleve el motivo real (`title` + toque en táctil), y que el error de
+    cuota —que **ya existe traducido** en `transferMessage`— llegue a la tarjeta en vez de morir en
+    un evento que nadie pinta. Es decir la verdad que el código ya sabe, no lógica nueva.
+  - *Hermano del bug de progreso arreglado el 2026-09-12 (ver CHANGELOG): el patrón que falla es
+    siempre el mismo — el estado existe en `blobs.js` y no llega a la tarjeta.*
 - **Pulir la vista de histórico de versiones (`recovery.js` · `listBooks`):** hoy la lista de
   libros sale fea — **nombres repetidos** (mismo título en varios `id`, p. ej. re-importados o
   datos de prueba) y **algunos son solo el hash/UUID** (cuando el libro no tiene título en los
@@ -850,6 +865,148 @@ usuario se queda con la grande y la sección pierde el sentido.
 
 ---
 
+### P26 — Ficha de referencia: el documento tiene nombre · `S`–`M` · **bloquea P22·F7**
+
+**El bug de fondo.** Al importar un PDF, [`app.js` L656-657](app/js/app.js#L656) pone `title` = nombre
+del fichero y `author` = `''`. Y el menú de la tarjeta de libro ([`library/view.js` L945-959](app/js/library/view.js#L945))
+tiene abrir · terminar · estantería · borrar: **no hay "Renombrar"** — solo las estanterías se
+renombran. Con 20 novelas se nota poco; con 40 papers la biblioteca es `2103.00020v1`,
+`s41586-021-03819-2`, `Downloaded (3)`.
+
+**Lo que arrastra, que es lo que importa:**
+- Las estanterías **inteligentes** filtran por `author`/`title` ([`shelves.js` RULE_FIELDS](app/js/library/shelves.js)).
+  Sin metadatos, media función del rail no aplica a papers.
+- Las citas con fuente de [IA9·E](#ia9--retrieval-multi-fuente-cruzar-libros-papers-y-posts--m)
+  («*Attention Is All You Need* · pág. 4») **no tienen nombre que poner**.
+- Sin `año`/`venue`/`DOI` no hay BibTeX, y sin BibTeX [P22·F7](#f7--exports-que-alimentan-su-sistema--sm--posicionamiento)
+  no existe.
+
+**Por qué esta pieza y no otra (evidencia de mercado, 2026-09-12).** El panorama está partido en dos y
+**nadie es end-to-end**: Zotero guarda la **referencia** (metadatos + bibliografía) y los lectores con
+IA guardan la **lectura**; los investigadores apilan las dos herramientas y existen puentes
+(`zotero2readwise`) precisamente por eso. Los metadatos son el lado que los lectores con IA **no**
+cubren y es barato cubrir. No es una feature de comodidad: es el enchufe.
+
+**Diseño:**
+- **A — Editar la ficha.** Acción `data-act="edit"` en el menú de la tarjeta → hoja con `title`,
+  `author` y los campos de referencia. Reusa el patrón de `promptBox` ya usado en `renameShelf`.
+- **B — Campos de referencia opcionales**, en el registro de `books`: `year`, `venue`, `doi`, `url`.
+  Vacíos por defecto y **no se inventan**: misma regla que [P22·F5](#f5--plantilla-ficha-paper--s-dado-f1f2)
+  — «No consta» es un valor legal.
+- **C — Al store hay que tocarlo con cuidado.** Los campos nuevos **entran en `SYNCED_FIELDS`**
+  ([`library/store.js`](app/js/library/store.js)) o no viajan entre dispositivos; y como bumpean
+  `updatedAt`, editar la ficha gana el LWW, que es lo correcto (una edición manual siempre debe
+  ganarle a un import automático).
+- **D — Autorrelleno, solo si es verificable.** El PDF trae `getMetadata()` (title/author del XMP),
+  que en papers está **mal más veces de las que está bien**. Propuesta: rellenar desde ahí **como
+  sugerencia visible y editable**, nunca en silencio. Un DOI extraído de la primera página es más
+  fiable que el XMP; una llamada a Crossref sería lo definitivo, pero **rompe la promesa de que el
+  paper no sale del dispositivo** → si se hace, opt-in explícito y solo el DOI, nunca el fichero.
+- **E — Añadir `year`/`venue` a `RULE_FIELDS`** para que las estanterías inteligentes hagan
+  «papers de 2024 en adelante». Ojo a la regla de `shelves.js`: solo campos **sincronizados**, y
+  estos lo son por (C). Encaja sin excepción.
+
+**Fuera de alcance:** importar `.bib`, buscar en Crossref/Semantic Scholar, gestionar PDFs por
+referencia. Eso es ser Zotero, y esa pelea no se gana desde un lector (lo dice [P22·F7](#f7--exports-que-alimentan-su-sistema--sm--posicionamiento)).
+
+---
+
+### P27 — Importar material suelto: apuntes, artículos y notas · `M`
+
+**El hueco.** [`index.html` L233](app/index.html#L233) → `accept=".epub,.pdf"`. Un artículo web, un
+`.md` de Obsidian, un `.txt`, un export de Notion: no entran. **Esto ya no es un lujo, es requisito de
+entrada**: Gemini Notebook ingiere PDFs, webs, YouTube y audio (50 fuentes en gratis); Readwise Reader
+se alimenta de clipper web, Kindle e Instapaper. El caso del usuario —«papers, apuntes y más
+material»— no cabe hoy en la app.
+
+**La decisión de diseño: no hay tercer lector.** El camino caro es un renderer de Markdown con su
+propia paginación, su propio sistema de anclas y su propia integración con subrayados, segmentación,
+retrieval, agente y sync. El barato es **envolver el texto en un EPUB mínimo en el cliente** —jszip ya
+está vendorizado, [`vendor-loader.js`](app/js/vendor-loader.js) ya lo carga— y de ahí para dentro
+**no cambia una línea**: paginación, CFI, subrayados, `bookText`, anclas `[[aN]]`, panel de IA,
+flashcards y `sync/blobs.js` funcionan tal cual porque el registro dice `format: 'epub'`.
+
+> ⚠️ **El detalle que hay que clavar a la primera: el EPUB generado debe ser DETERMINISTA.**
+> El `id` es el SHA-256 del fichero ([`hashBuffer`](app/js/ai/db.js)). Si el zip lleva un timestamp,
+> reimportar el mismo apunte produce **otro id** → biblioteca duplicada y, peor, **subrayados,
+> sesiones y flashcards huérfanos**. Timestamps a cero, orden de entradas fijo, sin compresión
+> variable. Es el primer test que hay que escribir, no el último.
+
+**Fases:**
+- **F1 — `js/import/text-epub.js`** `S`: función **pura** `buildEpub({ title, author, html })` →
+  `ArrayBuffer` determinista. Test: dos llamadas con la misma entrada → mismo hash.
+- **F2 — Markdown y texto plano** `S`: `accept` amplía a `.md,.txt`; conversión con el
+  [`markdown.js`](app/js/ai/markdown.js) que **ya existe** para el panel (no se añade dependencia).
+  Título: primer `# H1`, si no el nombre del fichero — y editable desde [P26](#p26--ficha-de-referencia-el-documento-tiene-nombre--sm).
+- **F3 — HTML y artículo web** `M`: `.html` de fichero primero (sin red, sin CORS, sin CSP que
+  negociar). **Pegar una URL es otra cosa y va aparte**: la CSP es estricta y de mismo origen —
+  descargar una página ajena desde el cliente se choca con `connect-src` y con el CORS del sitio.
+  Si se hace, es un Worker de Cloudflare que devuelve el HTML limpio, y **eso rompe la promesa
+  local-first** → opt-in explícito, y nunca para un PDF.
+- **F4 — Varios ficheros a la vez** `S`: soltar una carpeta de apuntes y que entren todos. Barato una
+  vez F1 existe, y es lo que convierte «probé uno» en «migré mi carpeta».
+
+**Lo que NO es esta épica:** escribir apuntes **dentro** de BookReader. Eso es un editor, es otra
+épica, y hoy lo más parecido son las notas de subrayado y los campos `fill: 'user'` de las libretas
+([`templates.js`](app/js/ai/templates.js)). Aquí solo se **lee lo tuyo**; si la señal aparece
+(gente importando y re-exportando el mismo apunte), entonces se plantea editar.
+
+**Coste oculto honesto:** un `.md` importado deja de estar vivo — editarlo en Obsidian no actualiza
+la copia de BookReader. Hay que decirlo en la UI («copia del <fecha>»), no esconderlo. La alternativa
+—sincronizar con la carpeta del usuario— es un producto distinto.
+
+---
+
+### P28 — MCP: que un agente externo lea tu biblioteca · `M`
+
+**La pregunta.** «¿Se puede añadir un MCP o una API para que Claude se conecte?» Sí, pero el sitio
+por el que se entra no es obvio, y elegir mal rompe la promesa del producto.
+
+**Lo que descarta la opción fácil.** BookReader **no tiene servidor con datos de usuario**: todo vive
+en el navegador (localStorage + IndexedDB) y, con sync activo, en la carpeta Drive **del usuario**.
+El único worker propio ([`workers/gateway`](workers/gateway/README.md), MON1) es un proxy de LLM con
+tokens — no guarda un subrayado. Poner un `GET /highlights` ahí obliga a **subir los datos del lector
+a un servidor nuestro**, que es justo el modelo del que huye toda la arquitectura (ADR de sync,
+[`SYNC_PLAN.md`](SYNC_PLAN.md)). No es la vía.
+
+**La vía: un servidor MCP local (stdio) que lea la fuente que ya existe.** El layout en el proveedor
+está definido y es estable ([`sync/layout.js` L3–L7](app/js/sync/layout.js#L3)) —
+`manifest.json`, `settings.json`, `books/<id>.json` con subrayados, marcadores, posición, convos,
+mensajes, notas, ratings, artefactos del Studio y mazos con su estado de repaso. Un MCP que lea eso
+**no toca una línea de la app**: cero riesgo de regresión en el lector, y se apoya en un contrato que
+ya se mantiene por otro motivo.
+
+**Fases:**
+- **F1 — MCP sobre el fichero de backup** `S`: la fuente es el JSON que ya produce
+  [`backup.js` · `buildBackup()`](app/js/backup.js#L47). Sin OAuth, sin red, sin cuenta. Tools:
+  `list_books`, `get_highlights(bookId)`, `get_notes(bookId)`, `search_highlights(query)`.
+  Sirve para **responder si el caso de uso aporta algo** antes de pagar el peaje de Drive.
+  Limitación que hay que decir en el README del MCP, no descubrir: el backup es una **foto**, y
+  **no lleva el registro de lectura** (`reading-log.js` vive en su propia IDB y `backup.js` no lo
+  incluye) → en F1 no hay estadísticas.
+- **F2 — MCP sobre Drive** `M`: misma superficie de tools, fuente viva, y con el OAuth de
+  [`sync/drive-auth.js`](app/js/sync/drive-auth.js). Aquí **sí** entra `reading_stats(range)`,
+  porque el registro de lectura viaja en el layout (P25·F3). Funciona con el navegador cerrado.
+- **F3 — Escritura (crear nota, crear tarjeta)** `M` · **solo si F1/F2 demuestran uso**: ver el aviso.
+
+> ⚠️ **Escribir es donde se rompe el sync, no donde se rompe el JSON.** El merge fusiona **por unión
+> y exige `uid`**: un registro sin él en un store de id autoincremental (`messages`, `notes`, `decks`)
+> **no lo acepta jamás el otro dispositivo**, y además deja el digest permanentemente distinto en los
+> dos lados → **push en bucle** ([`layout.js` · `LOCAL_ID_STORES`](app/js/sync/layout.js)). La regla:
+> el MCP no compone JSON a mano, reutiliza las mismas funciones de creación que usa la app.
+
+**Lo que el MCP no lee nunca**, y conviene que sea una lista explícita en el código y no una
+costumbre: `ai_key` y `drive_refresh_token` (secretos que no salen del dispositivo) y `device_id` —
+este último no es inocuo: es la mitad de la clave con la que cada equipo escribe sus días de lectura;
+si se clona, dos equipos escriben la misma fila y **uno deja de contar** (mismo motivo que
+`SKIP_KEYS` en layout y `LOCAL_ONLY_KEYS` en backup).
+
+**Lo que NO es esta épica:** una API pública de BookReader, ni exponer la biblioteca en la red. Es
+**un puente local en la máquina del lector**, con sus datos, bajo su control. Si algún día hay
+demanda de lo otro, es otra épica y otra conversación sobre privacidad.
+
+---
+
 ## 🎓 Aprendizaje basado en evidencia
 
 > **Contexto (2026-07-27).** Revisión de la literatura de tutoría y aprendizaje. El hallazgo que
@@ -1130,6 +1287,40 @@ F4 → F5 → F6.
 **Contexto (2026-07-28).** Medido sobre un paper real (ResNet, CVPR, dos columnas) pasando el
 segmentador de producción [`segment-pdf.js`](app/js/ai/segment-pdf.js).
 
+> **Panorama competitivo (investigado 2026-09-12).** El mercado está partido en **cuatro** categorías
+> y conviene saber en cuál NO estamos:
+> 1. **Descubrimiento** — Semantic Scholar, ResearchRabbit, Connected Papers, Consensus, scite.
+>    Exigen índice y servidor. **Fuera de alcance permanente**, no es una decisión que revisar.
+> 2. **Extracción estructurada + matriz** — [Elicit](https://elicit.com), SciSpace. Es el rival directo
+>    de F5/F6. Elicit hace **columnas definidas por el usuario** (no plantilla fija), extrae sobre N
+>    papers a la vez, cita a nivel de frase y **exporta CSV** —lo que sus propias reseñas destacan como
+>    su punto fuerte—. Admite ~90% de acierto y recomienda verificar leyendo el original: confunde
+>    tamaños de muestra y grupos.
+> 3. **Lector puro** — Readwise Reader (el mejor lector PDF/web que existe, highlights que sincronizan
+>    y **repaso espaciado diario de pago**), [alphaXiv](https://alphaxiv.org) (nativo de arXiv:
+>    subrayas y **preguntas ahí mismo**, y con `@` traes contexto de **otros papers** — literalmente
+>    [IA9](#ia9--retrieval-multi-fuente-cruzar-libros-papers-y-posts--m)).
+> 4. **Grounding genérico** — Gemini Notebook (ex NotebookLM, renombrado el 2026-07-16): 50 fuentes en
+>    el plan gratis, PDFs + webs + YouTube + audio, citas a la fuente, y un Studio que genera **mapa
+>    mental, flashcards, quizzes y tablas**.
+>
+> **Tres consecuencias que cambian decisiones de este backlog:**
+> - **Generar artefactos ya no diferencia.** Google regala mindmap + flashcards + quiz sobre 50
+>   fuentes. [P13](#p13--resumen-elegante-citado---m--artefacto)/[P14](#p14--mapa-mental---l--artefacto-de-marketing)
+>   están bien y están hechos, pero **no son el foso**: no invertir más ahí.
+> - **El campo de batalla declarado es «¿citan la página correcta?»** — hay comparativas dedicadas solo
+>   a eso, y el líder del sector admite que hay que verificar a mano. Por eso **F1+F2 no son deuda
+>   técnica: son el producto**. Si aquí se ancla a `§3.2` y el clic lleva *ahí*, se gana justo donde
+>   ellos reconocen fallar.
+> - **Nadie es end-to-end**: Zotero guarda la referencia, los lectores con IA guardan la lectura, y los
+>   investigadores apilan dos herramientas (existe `zotero2readwise` por eso). El lado libre es el de
+>   los **metadatos** → [P26](#p26--ficha-de-referencia-el-documento-tiene-nombre--sm).
+>
+> **Dónde queda el foso, en una frase:** el momento de la lectura, con citas verificables **y
+> retención**. Readwise cobra por el repaso espaciado y Elicit/SciSpace no retienen nada; aquí
+> [P10](#p10--modo-estudiar-repetición-espaciada-in-app--ml--f1f3)/[P20](#p20--continuidad-del-ciclo-flashcards--estudiar---entregada-2026-07-27--f1f4)
+> ya están construidos. Es lo único del stack que ningún rival junta.
+
 **Lo que SÍ aguanta** (comprobado, no asumido): el **orden de lectura a dos columnas**. `reconstruct()`
 declara *"No dependemos de coordenadas"* y une por `hasEOL`; el orden del stream de pdf.js respeta las
 columnas en un LaTeX típico. También cubren bien su parte el recorte de región + visión
@@ -1180,7 +1371,18 @@ estructurado por documento**. Una ficha de paper es una plantilla más, no arqui
 Lo que falta no es dónde guardar: es que **cada libreta es una isla**. Un `key` como `metodo` existe
 en 40 papers y nadie los junta nunca.
 
-**F5 — Plantilla `ficha-paper`** · `S` (dado F1–F2)
+**F5 — Ficha de paper: columnas del USUARIO, no plantilla fija** · `S` (dado F1–F2)
+
+> **Corrección de diseño (2026-09-12, tras investigar el mercado).** La versión original de F5 era
+> «una plantilla `ficha-paper` con estos 9 campos». Elicit demuestra que el valor **no** está en los
+> campos que elegimos nosotros: está en que **el investigador defina sus columnas** —cada revisión de
+> literatura pregunta cosas distintas— y eso ya existe aquí en
+> [`custom-templates.js`](app/js/ai/custom-templates.js). Así que F5 **no es arquitectura**: es
+> publicar la de abajo como **plantilla de fábrica de ejemplo**, y que F6 alinee por el `key` de
+> *cualquier* plantilla, no de una fija. El coste de equivocarse era grande: con campos fijos, el
+> primer usuario que quisiera una columna propia se quedaba fuera de la matriz entera.
+
+Plantilla de ejemplo (punto de partida editable, no contrato):
 ```
 pregunta        text   agent   ¿qué pregunta responde?
 metodo          text   agent   diseño, no resultados
@@ -1193,7 +1395,8 @@ vale_para_mi    text   user    por qué lo estoy leyendo
 no_me_convence  list   user    dónde flaquea, a mi juicio
 citar_para      text   user    en qué sección de MI paper
 ```
-Tres decisiones sin las cuales **no construirlo**:
+Tres decisiones que **sí** son contrato, y aplican a toda columna venga de donde venga (aquí somos
+mejores que Elicit, que mezcla extracción y juicio y luego te pide que verifiques):
 1. **«No consta» es un valor legal.** Si el modelo debe rellenar `n` sí o sí, se lo inventa. Un dato
    de método falso es peor que un hueco.
 2. **Cada campo lleva su ancla `[[aN]]`.** Sin cita a la página la ficha no es verificable → no sirve
@@ -1203,9 +1406,12 @@ Tres decisiones sin las cuales **no construirlo**:
    profesionalmente: si la IA escribe «esto flaquea en X», el investigador firma una opinión ajena.
 
 **F6 — Matriz de literatura** · `M` · **depende de [IA9](#ia9--retrieval-multi-fuente-cruzar-libros-papers-y-posts--m)**
-Filas = papers, columnas = los `key` de la plantilla. **Es el entregable real de una revisión de
-literatura.** Sale casi gratis en cuanto los campos son *los mismos* en todos — de ahí la única
-disciplina de diseño que importa: **campos fijos, no prosa libre**.
+Filas = papers, columnas = los `key` de la plantilla **que el usuario haya elegido para esa
+revisión** (ver corrección en F5). **Es el entregable real de una revisión de literatura**, y es lo
+que Elicit vende. Sale casi gratis en cuanto los `key` son *los mismos* en todas las fichas — de ahí
+la única disciplina de diseño que importa: **claves estables y valores cortos, no prosa libre**. El
+ámbito natural de una matriz es **la estantería**, igual que en [IA9·D](#ia9--retrieval-multi-fuente-cruzar-libros-papers-y-posts--m):
+una estantería *es* una literatura.
 Necesita lo único estructural de esta épica —que el agente vea más de un documento, porque para un
 investigador la unidad no es un documento sino **una literatura**—, pero eso **ya no vive aquí**:
 está diseñado en [IA9](#ia9--retrieval-multi-fuente-cruzar-libros-papers-y-posts--m), y resultó
@@ -1213,20 +1419,36 @@ bastante más barato de lo que esta épica asumía (el corpus ya está persistid
 `study.js` ya tiene el patrón de leerlo sin abrir el libro). F6 es la **capa de agregación** encima:
 recorrer las fichas, alinear por `key`, pintar la tabla.
 
-**F7 — Exports que alimentan SU sistema** · `S`–`M` · **posicionamiento**
+**F7 — Exports que alimentan SU sistema** · `S`–`M` · **posicionamiento** · *va ANTES que F6*
 El investigador **ya tiene** base de conocimiento —Zotero, Obsidian, Notion, con años de notas—. El
 coste de cambio es brutal y esa pelea no se gana. **Nuestra posición no es el almacén, es el momento
 de la lectura.** Así que la salida correcta no es retenerlo: es alimentar la suya — Markdown con
 `[[wikilinks]]`, **BibTeX** de la referencia, **CSV** de la matriz. [P8](#p8--exportar-libretas-y-conversaciones--fase-1--m)
 ya montó el patrón `download()` CSP-safe: son formas nuevas, no un sistema nuevo.
 *«Lee aquí, se archiva allí»* se acepta mucho más fácil que *«múdate»*.
+**El CSV es la pieza que más pesa** —las reseñas de Elicit lo señalan como su punto fuerte— y no
+necesita esperar a F6: exportar **una** ficha ya es una fila. Por eso F7 se adelanta a F6. El BibTeX
+depende de tener `year`/`venue`/`doi`, que los pone [P26](#p26--ficha-de-referencia-el-documento-tiene-nombre--sm).
 
-**Ventaja que ya tenemos gratis:** manuscritos sin publicar, material de peer review y PDFs de pago.
-Elicit/SciSpace son servidor: el PDF sube. Con BYOK + IndexedDB **el paper no sale del dispositivo**.
-A un investigador eso le importa — merece estar en la landing del nicho.
+**Ventaja que ya tenemos gratis — pero con el matiz corregido (2026-09-12):** manuscritos sin
+publicar, material de peer review y PDFs de pago. Elicit/SciSpace/Gemini Notebook son servidor: el PDF
+sube. Con BYOK + IndexedDB **el paper no sale del dispositivo**, y a un investigador eso le importa.
+**Lo que ya NO es cierto es que esto sea exclusivo:** hay local-first de sobra (Empty, HAVEN, NovaKit
+BYOK, PDFgear, y todo el stack AnythingLLM/Ollama/LM Studio). Lo raro no es «local», es **local y web
+sin instalar nada, en cualquier dispositivo, con sync propio** — así hay que redactarlo en la landing
+del nicho, o la afirmación se cae al primer lector informado.
 
-**Orden:** F1+F2 (corrección, bloquean todo lo demás) → F3+F4 (baratas) → F5 → F7 → F6 (tras
-IA9).
+**Orden (revisado 2026-09-12 tras la investigación de mercado):**
+**F1+F2** (ya no «corrección»: es el eje competitivo — citar la página correcta) →
+[**P26**](#p26--ficha-de-referencia-el-documento-tiene-nombre--sm) (metadatos: el
+enchufe con el mundo Zotero, y sin ellos no hay BibTeX) →
+[**P27**](#p27--importar-material-suelto-apuntes-artículos-y-notas--m) (requisito de entrada: todos
+los rivales ingieren web y texto suelto) → **F3+F4** (baratas, y cierran visiblemente F1+F2) →
+**F5** (barata: es publicar una plantilla, no arquitectura) → **F7** (CSV/BibTeX; adelantada a F6) →
+[**IA9 A+B**](#ia9--retrieval-multi-fuente-cruzar-libros-papers-y-posts--m) → **F6**.
+
+**Lo que esta revisión saca del plan, explícitamente:** descubrimiento de papers, más artefactos
+generados por el agente, y vender la privacidad como exclusiva.
 
 ---
 
