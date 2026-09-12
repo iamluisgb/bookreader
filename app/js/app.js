@@ -26,7 +26,7 @@ import * as Jobs from './ai/jobs.js';
 import { t, translateDom } from './i18n.js';
 import { prefetchVendor } from './vendor-loader.js';
 import { loadAgentCss } from './css-loader.js';
-import { restoreSheetSnap } from './ai/sheet-height.js';
+import { restoreSheetSnap, sheetReservedPx } from './ai/sheet-height.js';
 import { repairGatewayConfig } from './ai/gateway-repair.js';
 
 // ============ CARGA PEREZOSA ============
@@ -744,6 +744,18 @@ function initReaderReflow() {
   const sidebar = document.getElementById('sidebar');
   if (sidebar) new MutationObserver(check).observe(sidebar, { attributes: true, attributeFilter: ['class'] });
   new MutationObserver(check).observe(document.body, { attributes: true, attributeFilter: ['class'] });
+
+  // El split del sheet (móvil) cambia el ALTO del área de lectura, no su margen: no hay
+  // transición de márgenes que esperar, así que entra por su propio evento y re-pagina ya.
+  // El reflujo va anclado al CFI (EpubReader.resize → pin), que es lo que impide que
+  // encoger el área te mueva la página hacia atrás.
+  //
+  // El PDF no necesita nada: su ajuste mira SOLO el ancho (`fitScale`), y al encoger el
+  // contenedor por abajo el borde superior no se mueve, así que la página se queda donde
+  // estaba y simplemente se ve menos.
+  window.addEventListener('bookreader:sheet-split', () => {
+    if (EpubReader.isLoaded()) EpubReader.resize();
+  });
 }
 
 // ============ MODO LECTURA INMERSIVO ============
@@ -945,8 +957,15 @@ async function goToLocator(loc, passageText) {
       await PdfReader.goTo(page);
       // Resaltar el TROZO exacto en la página buscándolo en la capa de texto; si no
       // se localiza (o no tenemos el texto), destellar la página entera como fallback.
-      const marked = passageText ? await highlightPdfPassage(page, passageText) : false;
-      if (!marked) flashPdfPage(page);
+      const rects = passageText ? await highlightPdfPassage(page, passageText) : null;
+      if (!rects) flashPdfPage(page);
+      // Que el pasaje citado quede DENTRO de la franja visible. goTo() deja la página
+      // pegada al borde de arriba, así que una cita a media página cae por debajo del
+      // corte — antes, detrás de la hoja del agente; ahora, fuera del lector encogido.
+      // `sheetReservedPx()` ya vale 0 cuando el split está activo: ahí el contenedor
+      // mide justo la franja libre y descontar la hoja otra vez sería descontarla dos
+      // veces.
+      else PdfReader.revealRegion(page, boundingRect(rects), sheetReservedPx());
     }
     return;
   }
@@ -976,16 +995,26 @@ async function goToLocator(loc, passageText) {
 // Resalta el TROZO exacto de un pasaje citado en una página PDF: busca su texto en la
 // capa de texto de pdf.js, construye un rango DOM y pinta un overlay transitorio con los
 // rects fraccionales (misma técnica que los subrayados). Devuelve false si no lo localiza.
+// Devuelve los rects fraccionales del pasaje (null si no lo localiza): quien llama los
+// necesita para dejarlo a la vista, y recalcularlos costaría repetir la búsqueda.
 async function highlightPdfPassage(page, passageText) {
   const wrapper = await waitForPdfTextLayer(page);
   const layer = wrapper?.querySelector('.textLayer');
-  if (!layer) return false;
+  if (!layer) return null;
   const range = rangeForText(layer, passageText);
-  if (!range) return false;
+  if (!range) return null;
   const rects = pdfFractionalRects(range, wrapper);
-  if (!rects.length) return false;
+  if (!rects.length) return null;
   drawTransientPdfHighlight(wrapper, rects);
-  return true;
+  return rects;
+}
+
+// Caja que envuelve a todos los rects de un pasaje. Un pasaje son varias líneas, y
+// centrar solo la primera deja el resto fuera justo cuando la franja es estrecha.
+function boundingRect(rects) {
+  const top = Math.min(...rects.map(r => r.y));
+  const bottom = Math.max(...rects.map(r => r.y + r.h));
+  return { y: top, h: bottom - top };
 }
 
 // Espera a que la capa de texto de la página esté renderizada (pdf.js la pinta de forma

@@ -83,3 +83,59 @@ test('arrastrar encaja en la altura más cercana, no en una libre', async ({ pag
   const pct = after / 780 * 100;
   expect(Math.min(Math.abs(pct - 52), Math.abs(pct - 92))).toBeLessThan(3);
 });
+
+// El snap bajo existía para "preguntar por una figura sin perder de vista la figura", pero
+// la hoja era un OVERLAY: el lector seguía midiendo la ventana entera y paginando contra
+// ella, así que lo que caía en la mitad inferior quedaba detrás y NO había gesto que lo
+// trajera. Ahora el área de lectura termina donde empieza la hoja y re-pagina dentro.
+test('a media altura el lector ENCOGE en vez de quedarse debajo de la hoja', async ({ page }) => {
+  await openApp(page);
+  await openPanel(page);
+
+  // A altura completa no hay split: repaginar para dejar un 8% de pantalla no sirve de nada.
+  expect(await page.evaluate(() => document.body.classList.contains('ai-split'))).toBe(false);
+  const alturaVentana = await page.evaluate(() =>
+    document.getElementById('reader-main')!.getBoundingClientRect().height);
+
+  await page.locator('#ai-sheet-grab').click();   // → media altura
+  await page.waitForTimeout(600);                 // el reflujo anclado va con rebote de 250 ms
+  expect(await page.evaluate(() => document.body.classList.contains('ai-split'))).toBe(true);
+
+  const caja = await page.evaluate(() => {
+    const main = document.getElementById('reader-main')!.getBoundingClientRect();
+    const hoja = document.getElementById('ai-panel')!.getBoundingClientRect();
+    const frame = document.querySelector('#epub-container iframe')!.getBoundingClientRect();
+    return { readerBottom: main.bottom, readerH: main.height, sheetTop: hoja.top, frameH: frame.height };
+  });
+
+  // Lo que prueba el arreglo: el lector TERMINA donde empieza la hoja.
+  expect(caja.readerBottom).toBeLessThanOrEqual(caja.sheetTop + 1);
+  expect(caja.readerH).toBeLessThan(alturaVentana);
+  expect(caja.readerH).toBeGreaterThan(240);       // sigue siendo un lector, no una rendija
+  // Y el EPUB se re-paginó a ESE alto: si siguiera midiendo la ventana, su iframe no cabría.
+  expect(caja.frameH).toBeLessThanOrEqual(caja.readerH);
+
+  // Volver a completa lo deshace.
+  await page.locator('#ai-sheet-grab').click();
+  await page.waitForTimeout(600);
+  expect(await page.evaluate(() => document.body.classList.contains('ai-split'))).toBe(false);
+});
+
+// Cerrar el panel devuelve la pantalla entera al lector aunque el snap guardado sea el bajo:
+// el split depende de que la hoja esté ABIERTA, no solo de su altura.
+test('cerrar el agente devuelve el alto completo al lector', async ({ page }) => {
+  await openApp(page);
+  await openPanel(page);
+  await page.locator('#ai-sheet-grab').click();
+  await page.waitForTimeout(600);
+  expect(await page.evaluate(() => document.body.classList.contains('ai-split'))).toBe(true);
+
+  await page.locator('#ai-close').click();
+  await page.waitForTimeout(600);
+  expect(await page.evaluate(() => document.body.classList.contains('ai-split'))).toBe(false);
+  const { readerH, winH } = await page.evaluate(() => ({
+    readerH: document.getElementById('reader-main')!.getBoundingClientRect().height,
+    winH: window.innerHeight,
+  }));
+  expect(readerH).toBeCloseTo(winH, -1);
+});

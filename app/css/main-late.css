@@ -108,6 +108,11 @@ body.ai-busy #ai-toggle::after, body.ai-busy .ai-fab::after {
   .sidebar { box-shadow: var(--shadow-3); }
   body.ai-open .scrim,
   body:has(#sidebar.open) .scrim { opacity: 1; pointer-events: auto; }
+  /* …salvo en SPLIT: ahí el lector no es "lo que hay detrás", es la otra mitad de la
+     pantalla. Atenuarlo —y tragarse sus toques— es justo lo contrario de para lo que
+     existe el snap bajo: leer el pasaje mientras preguntas por él. Va después para ganar
+     por orden, no por especificidad. Ver `syncSplit` en js/ai/sheet-height.js. */
+  body.ai-split .scrim { opacity: 0; pointer-events: none; }
 }
 
 

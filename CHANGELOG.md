@@ -5,6 +5,57 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-09-12 — La hoja del agente a media altura ya no tapa: encoge el lector
+
+El snap bajo existía desde el principio con un objetivo escrito en el CSS: *"que preguntar por una
+figura no implique perder de vista la figura"*. No lo cumplía. La hoja era un **overlay**: ni
+`epub-reader.js` ni `pdf-reader.js` sabían nada de `--ai-sheet-h`, así que el lector seguía midiendo
+y paginando contra la ventana entera. Lo que cayera en la mitad inferior quedaba **detrás** de la
+hoja y no había gesto que lo trajera — no es que estuviera lejos: es que el lector creía que ya
+estaba a la vista. Justo el caso que motiva la feature: preguntas por la Figura 1 y la Figura 1 está
+debajo del asistente.
+
+Ahora el área de lectura **termina donde empieza la hoja** y re-pagina dentro. El estado vive en
+`ai/sheet-height.js`, que ya era el dueño de las alturas y —a diferencia del panel— corre en el
+arranque. Emite `bookreader:sheet-split` y quien re-pagina es `app.js`: meterle el lector a ese
+módulo lo devolvería al arranque pesado del que se separó.
+
+**Solo el snap bajo puede ser split.** Con el alto quedaría un 8% de pantalla para el texto, y
+repaginar un EPUB para eso es caro y no sirve de nada. Hay además un suelo de 240 px de franja libre
+que hace de guardarraíl del **teclado**: al abrirse, el hueco se queda sin sitio y el split se retira
+solo en lugar de repaginar a un alto ridículo. Por eso la medida sale de `visualViewport` y no de
+`innerHeight` — en iOS el viewport de layout no encoge con el teclado, que es exactamente cuando hay
+que decidir si cabe un lector.
+
+El aviso se emite **solo cuando el estado cambia**, y eso no es higiene: durante el arrastre del
+tirador esto se evalúa en cada frame, y repaginar por frame es inasumible. El reflujo va por
+`EpubReader.resize()`, anclado al CFI, que es lo que impide que encoger el área te mueva la página
+hacia atrás. El PDF no necesita nada: su ajuste mira solo el ancho, y al encoger el contenedor por
+abajo el borde superior no se mueve.
+
+**Lo que solo se vio mirando la captura, no midiendo:** con la hoja abierta, el lector salía
+**atenuado y sordo a los toques**. Hay un velo (`.scrim`) que se enciende con `ai-open`, y tiene todo
+el sentido cuando la hoja va a altura completa —el lector es lo que hay detrás—, pero en split el
+lector no es fondo: es la otra mitad de la pantalla. Atenuar justo el texto por el que estás
+preguntando es lo contrario de lo que el snap bajo persigue. En split no hay velo.
+
+Y las citas en PDF aterrizan ahora **dentro** de la franja: `goTo()` deja la página pegada al borde
+de arriba, así que una cita a media página caía por debajo del corte. `highlightPdfPassage` devuelve
+los rects en vez de un booleano y se revela su caja envolvente —la de **todas** las líneas, que
+centrar solo la primera deja el resto fuera cuando la franja es estrecha—. `sheetReservedPx()` vale
+0 con el split activo: ahí el contenedor ya mide la franja libre y descontar la hoja otra vez sería
+descontarla dos veces.
+
+**Lo que NO se hizo, a propósito.** El disparador fue ver otro lector de papers que ofrece tres
+layouts —ventana flotante, asistente arriba, asistente abajo—. Tres layouts es una decisión no
+tomada convertida en ajuste: en un móvil cada modo es cromo permanente para todos. Una ventana
+flotante es una metáfora de escritorio (su gracia es *apartarla* de lo que quieres ver, y en 390 px
+no hay "al lado"), y el asistente arriba pelea con el pulgar y con el teclado. `DESIGN.md` ya había
+decidido esto: en móvil, bottom sheets. La respuesta correcta no era un selector — era que el modo
+que ya existía hiciera lo que prometía.
+
+---
+
 ## 2026-09-12 — La descarga se ve desde el primer byte
 
 Pulsar «descargar» en una ficha fantasma no movía nada hasta que el fichero estaba **entero**. Los

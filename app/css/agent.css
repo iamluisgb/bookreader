@@ -1097,6 +1097,13 @@ body.has-taskchip .ai-taskchip.is-study { bottom: 74px; }
     padding-bottom: env(safe-area-inset-bottom);
   }
   body.ai-open #ai-panel { transform: translateY(0); }   /* con el teclado, cada píxel cuenta */
+
+  /* SPLIT (solo en el snap bajo): el lector no se queda DEBAJO de la hoja, se hace más
+     pequeño. Sin esto la hoja es un overlay y el lector sigue paginando contra la ventana
+     entera: lo que cae en la mitad inferior queda detrás y no hay gesto que lo traiga.
+     El alto no lleva transición a propósito — animarlo repaginaría el EPUB en cada frame;
+     lo que se ve moverse es la hoja, que sí anima. Ver `syncSplit` en ai/sheet-height.js. */
+  body.ai-open.ai-split .reader-main { height: calc(100% - var(--ai-sheet-h, 52dvh)); }
   /* Tirador del sheet: zona de toque generosa (44px de alto) con la barrita dentro. El área
      de toque es lo que hace usable el arrastre con el pulgar; la barrita sola sería un
      objetivo de 4px. */

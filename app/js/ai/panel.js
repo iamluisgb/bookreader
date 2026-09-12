@@ -8,7 +8,7 @@ import * as DB from './db.js';
 import * as EpubReader from '../epub-reader.js';
 import * as PdfReader from '../pdf-reader.js';
 import * as RegionSelect from '../region-select.js';
-import { SHEET_SNAPS, SHEET_KEY, applySheetSnap, getSheetSnap, restoreSheetSnap } from './sheet-height.js';
+import { SHEET_SNAPS, SHEET_KEY, applySheetSnap, getSheetSnap, restoreSheetSnap, syncSplit, sheetReservedPx } from './sheet-height.js';
 import { loadAgentCss } from '../css-loader.js';
 import { getTemplate, objectiveTemplates, isValidField, isAgentFillable, agentFields, isCognitionField, ARTESANO_ID, INMERSIVA_ID } from './templates.js';
 import { icon } from '../ui/icons.js';
@@ -173,6 +173,7 @@ export function setOpen(open) {
   // garantía para quien abra el agente en el primer instante. Es idempotente.
   if (open) loadAgentCss().catch(e => console.warn('agent.css:', e));
   document.body.classList.toggle('ai-open', open);
+  syncSplit();                            // abrir/cerrar cambia la franja libre del lector
   if (open) agentUnread = false;          // al abrir se da por leído
   applyAgentBadge();
   if (!open) return;
@@ -1086,13 +1087,6 @@ export function __deliverVisionForTest(text, images) {
 // Las alturas y el estado viven en ai/sheet-height.js: la repone el ARRANQUE, que ya no
 // carga este módulo (ver app.js). Aquí queda el tirador, que sí es cosa del panel.
 function isSheet() { return window.matchMedia('(max-width: 767px)').matches; }
-
-// Alto reservado por el sheet, para que quien deba dejar algo a la vista (el recorte de una
-// zona) sepa cuánta pantalla tiene libre de verdad.
-export function sheetReservedPx() {
-  if (!isSheet() || !isOpen()) return 0;
-  return Math.round(window.innerHeight * getSheetSnap() / 100);
-}
 
 function initSheetSnap() {
   const grab = document.getElementById('ai-sheet-grab');
