@@ -10,6 +10,11 @@ test('retry helpers classify status and parse Retry-After', async ({ page }) => 
     return {
       retry429: L.isRetryableStatus(429),
       retry503: L.isRetryableStatus(503),
+      // 524 = "origin timed out" de Cloudflare, que está delante de varios proveedores: lo
+      // devuelve cuando el modelo tarda más que su ventana. No estaba en la lista y llegaba
+      // al usuario como error duro en las peticiones largas (resumen de libro entero).
+      retry524: L.isRetryableStatus(524),
+      no526: L.isRetryableStatus(526),   // TLS mal configurado, no un transitorio
       no401: L.isRetryableStatus(401),
       no400: L.isRetryableStatus(400),
       raSecs: L.parseRetryAfter('2'),          // 2s → 2000ms
@@ -22,6 +27,8 @@ test('retry helpers classify status and parse Retry-After', async ({ page }) => 
   });
   expect(r.retry429).toBe(true);
   expect(r.retry503).toBe(true);
+  expect(r.retry524).toBe(true);
+  expect(r.no526).toBe(false);
   expect(r.no401).toBe(false);
   expect(r.no400).toBe(false);
   expect(r.raSecs).toBe(2000);

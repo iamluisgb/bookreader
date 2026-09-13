@@ -269,6 +269,33 @@ Mismo juez (mimo) que el baseline F2 para comparar limpio; 1 run por batería (r
 - Del arnés: timeout de tarjetas 420→600s (nan tiene ventanas lentas que confundimos
   con fallos: un "DNF" del eval siempre merece un re-run antes de concluir).
 
+## Primer run con valla (`2026-09-12-21-10-deepseek-v4-flash`, P1+P4)
+
+Fase 1 (`EVAL_PHASE` por defecto), juez `mimo-v2.5`. **15 de 17 presupuestos en verde**, todos
+los gates deterministas pasan: P1 **4.3** (tarjetas 4.8/4.8/5.0, cobertura 7/9, resumen 5/5/4/4)
+y P4 **4.0** (4.5/4.7/5.0, cobertura 7/8 — su mejor cobertura medida, resumen 4/4/3/4). Honestidad
+ante la trampa 5/5 en ambas, otra vez.
+
+Los dos rojos, que son el valor del ejercicio:
+
+1. **`p1 · mindmap.no_invencion` 5 → 3.** A la vez, **0 de 6 ramas-capítulo** en Relatividad,
+   donde P14 F7 había dejado anotado 7/8 como límite conocido. El mapa dejó de copiar el índice
+   y se fue a inventar: el juez señala una rama entera irrelevante. Trade-off real, un solo run
+   y escala entera — pendiente de una segunda corrida antes de tocar nada (BACKLOG · P14 F7).
+2. **`p4 · attenuation_separation` sin dato**, que la regla de EV5 cuenta como roto. No falló:
+   las ratings **existían** a los 680 ms y habían desaparecido en el volcado final. Clasificado
+   como bug candidato de producto en BACKLOG · TEC9.
+
+**Lo que el run arregló por el camino** (el bucle haciendo su trabajo): el juez murió dos veces
+con un **524** de Cloudflare, que no estaba en la lista de reintentables — ni en el arnés ni en
+`app/js/ai/llm.js`, así que al usuario le estallaba igual en las peticiones largas. Arreglado en
+los dos sitios (BACKLOG · IA3), con test. Y el juez ahora vuelca `judge.json` tras cada batería y
+reanuda al relanzarse: un fallo a mitad ya no tira lo juzgado y pagado.
+
+**Sin medir todavía:** P2 (Pro Git) y P3 (Constitución) piden `EVAL_PHASE=2`. Sus presupuestos
+—los que la valla marca en rojo sobre `f2-deepseek`— siguen sin confirmarse en caliente, y EV4
+sigue sin baseline porque el libro que hace DNF es justo Pro Git.
+
 ## Mejora continua (el bucle)
 
 fallo detectado → clasificar (prompt / retrieval / modelo / parsing) → arreglo → re-run

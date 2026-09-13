@@ -219,9 +219,24 @@ function agreement(a, b) {
 
 const batteries = loadBatteries(runDir);
 const out = { judge: JUDGE, date: new Date().toISOString(), batteries: {} };
+// Se vuelca tras CADA batería, no solo al final: juzgar cuesta dinero y minutos, y un
+// fallo del proveedor a mitad tiraba a la basura todo lo ya juzgado (pasó dos veces con
+// un 524). Al relanzar, las baterías ya juzgadas POR ESTE MISMO JUEZ se reutilizan y solo
+// se repite lo que falta; `EVAL_REJUDGE=1` fuerza juzgarlo todo de nuevo.
+const flush = () => fs.writeFileSync(path.join(runDir, 'judge.json'), JSON.stringify(out, null, 1));
+const previo = (() => {
+  if (process.env.EVAL_REJUDGE === '1') return {};
+  try {
+    const j = JSON.parse(fs.readFileSync(path.join(runDir, 'judge.json'), 'utf8'));
+    return j.judge === JUDGE ? (j.batteries || {}) : {};
+  } catch { return {}; }
+})();
 for (const b of batteries) {
-  console.log(`\n${b.battery.id} — juzgando con ${JUDGE}…`);
-  out.batteries[b.battery.id] = await judgeBattery(b, JUDGE);
+  const id = b.battery.id;
+  if (previo[id]) { console.log(`\n${id} — ya juzgada por ${JUDGE}, se reutiliza (EVAL_REJUDGE=1 para rehacerla)`); out.batteries[id] = previo[id]; continue; }
+  console.log(`\n${id} — juzgando con ${JUDGE}…`);
+  out.batteries[id] = await judgeBattery(b, JUDGE);
+  flush();
 }
 if (JUDGE2) {
   out.judge2 = JUDGE2;
@@ -238,5 +253,5 @@ if (JUDGE2) {
   }
 }
 
-fs.writeFileSync(path.join(runDir, 'judge.json'), JSON.stringify(out, null, 1));
+flush();
 console.log(`\n→ ${path.relative(process.cwd(), path.join(runDir, 'judge.json'))}`);

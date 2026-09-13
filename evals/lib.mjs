@@ -100,8 +100,12 @@ export async function nanChat({ model, messages, maxTokens = 4096, temperature =
       if (attempt < 3) { await new Promise(r => setTimeout(r, 1500 * (attempt + 1))); continue; }
       throw e;
     }
-    if ([408, 425, 429, 500, 502, 503, 504].includes(res.status) && attempt < 3) {
-      await new Promise(r => setTimeout(r, 1500 * (attempt + 1)));
+    // Misma lista que RETRYABLE_STATUS del producto (app/js/ai/llm.js), incluidos los 5xx
+    // de Cloudflare: el 524 es su "origin timed out" y es exactamente la ventana lenta de
+    // nan que ya estaba documentada en docs/EVALS.md. Espera más larga que en los demás:
+    // un 524 significa que el modelo sigue pensando, no que la petición se perdiera.
+    if ([408, 425, 429, 500, 502, 503, 504, 520, 521, 522, 523, 524].includes(res.status) && attempt < 3) {
+      await new Promise(r => setTimeout(r, (res.status === 524 ? 8000 : 1500) * (attempt + 1)));
       continue;
     }
     if (!res.ok) throw new Error(`nan ${res.status}: ${(await res.text()).slice(0, 200)}`);

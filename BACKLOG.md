@@ -49,6 +49,13 @@ recuerdo sobre el anterior (sin darla respuesta; solo hacia delante; una vez por
 [`llm.js`](js/ai/llm.js) reintenta ante red caída y 408/425/429/5xx con backoff exponencial + jitter,
 honrando `Retry-After`. Usado por `chatStream` y `chatTools`. Tests en [`tests/llm.spec.ts`](tests/llm.spec.ts).
 
+- **Hueco tapado (2026-09-12): faltaban los 5xx de Cloudflare.** La lista no incluía 520-524, y
+  el **524 ("origin timed out")** es lo que devuelve Cloudflare —que está delante de varios
+  proveedores— cuando el modelo tarda más que su ventana: precisamente en las peticiones largas
+  (resumen de libro entero, mapa), que son las que peor sienta perder. Lo destapó el juez de los
+  evals, que murió dos veces seguidas con un 524 sin reintentar; al usuario le estallaba igual.
+  525/526 quedan fuera a propósito: son TLS mal configurado, no un transitorio. Con test.
+
 ### IA4 — Retrieval por pregunta con embeddings · ~~`M`~~ · **absorbido por [IA5](#ia5--retrieval-profesional-rag-por-pasaje-agéntico--l--sustituye-a-ia4)** _(ex E7.2)_
 Era "añadir embeddings al retrieval por capítulo". El rediseño correcto no es *añadir embeddings* sino
 *cambiar de granularidad y de disparo* (pasaje + por pregunta + agéntico); los embeddings son la Fase 2
@@ -748,6 +755,14 @@ Pedro Páramo 0/4 ramas-capítulo, Constitución 7/8 (correcto, su objetivo son 
 - **Sin verificar.** Quitar el título del libro del prompt está razonado sobre la evidencia del
   run `p14-validado` (ramas en inglés que no estaban en la entrada) pero **no medido**: la
   batería de Relatividad agotó el tiempo del arnés tres veces seguidas antes de llegar al mapa.
+- **Medido por fin (run `2026-09-12`, 1 corrida): el límite cayó, y con peaje.** Relatividad da
+  **0 de 6 ramas-capítulo** (era 7/8): el mapa ya no reconstruye el índice ni en un libro que el
+  modelo se sabe. Pero su **no-invención bajó de 5 a 3** —primer presupuesto que rompe la valla
+  de EV5— con el juez señalando una rama entera irrelevante ("Modelos cosmológicos") y E=mc²
+  ausente; jerarquía 4→3 y utilidad-objetivo 2. Lectura: empujar al modelo fuera del TOC lo
+  manda a inventar. Un run y escala entera (un punto es el mínimo movimiento posible):
+  **confirmar con una segunda corrida antes de tocar el prompt**, y si se confirma, el ciclo es
+  de P14, no de EV.
 
 ### EV4 — El arnés del eval no llega a los libros grandes · `S` · **prioridad alta**
 Las flashcards de Pro Git (14 MB) y de Relatividad agotan los 600 s del gate en
@@ -1920,6 +1935,30 @@ devuelve el texto de la biblioteca que hay debajo.
 **De paso**: `ui/frame-rect.js` (TEC6) se había quedado fuera del precache del service worker. No
 saltó al commitear porque `sw-precache.spec.ts` mira `git ls-files` y el fichero aún no estaba
 seguido. Añadidos los dos módulos y subido `CACHE_NAME` a v116.
+
+### TEC9 — Las ratings de la atenuación desaparecen a mitad de sesión · `S` · **sin clasificar**
+
+Lo destapó la valla de EV5 en el run `2026-09-12`: `attenuation_separation` salió **sin dato**
+en P4 (Pedro Páramo), y sin dato cuenta como presupuesto roto justo para esto.
+
+**La evidencia, que es lo raro:** el runner espera a que el store `ratings` de IndexedDB tenga
+algo tras abrir el sidebar, y **lo encuentra a los 680 ms** — no imprimió su aviso de "sin
+atenuación (¿sin TOC?)", así que las ratings *existían*. Pero el volcado final de la batería,
+minutos después, trae `ratings: 0`. En `f2-deepseek` ese mismo fixture traía 8 capítulos
+puntuados. Algo las borra entre medias, o el volcado lee otro ámbito de ids (eco de TEC5).
+
+**Por qué importa más que un hueco en una tabla:** si es producto, el lector pierde la atenuación
+del TOC —el índice deja de resaltar lo relevante para su objetivo— **sin ningún error visible**.
+
+**Contrato (antes de implementar)** — [`docs/EVALS.md` § EV5](docs/EVALS.md):
+- **Métrica primaria:** `ratings.length > 0` en el volcado final de P1 **y** P4. **Determinista**,
+  sin juez.
+- **Baseline:** P4 = 0 y P1 = 8 capítulos en el run `2026-09-12`; P4 = 8 en `f2-deepseek`.
+- **Primer paso:** clasificar arnés vs producto sin gastar API — reproducir en local con
+  `@eval` sobre `tests/test.epub` volcando `ratings` en tres momentos (tras el sidebar, tras el
+  mapa, al final). Que P1 sí las conserve y P4 no es la pista: lo que cambia entre ambas es el
+  libro y el número de pasajes (1495 vs 485).
+- **Time-box:** 1 ciclo para clasificar. El arreglo se planifica después, ya con el culpable.
 
 ### TEC8 — Selección táctil propia en el PDF, con ajuste por líneas · **✓ (2026-08-20)** `L`
 

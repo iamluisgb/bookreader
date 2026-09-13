@@ -373,7 +373,12 @@ export function chatVision(opts)  { return enqueue(() => _chatVision(opts), opts
 // todos se resuelven en segundos. Reintentamos ANTES de consumir el stream (no se
 // re-emiten tokens ya mostrados). Helpers puros exportados para poder testarlos.
 
-const RETRYABLE_STATUS = new Set([408, 425, 429, 500, 502, 503, 504]);
+// 520-524 son los 5xx propios de Cloudflare, que está delante de varios proveedores: el
+// 524 ("origin timed out") es lo que devuelve cuando el modelo tarda más que su ventana.
+// Lo destapó el juez de los evals, que murió dos veces seguidas con un 524 sin reintentar
+// por no estar en esta lista — al usuario le estallaba igual. 525/526 quedan fuera: son
+// TLS mal configurado, no un transitorio.
+const RETRYABLE_STATUS = new Set([408, 425, 429, 500, 502, 503, 504, 520, 521, 522, 523, 524]);
 export function isRetryableStatus(status) { return RETRYABLE_STATUS.has(status); }
 
 // Cabecera Retry-After: segundos (número) o fecha HTTP. Devuelve ms o null.
