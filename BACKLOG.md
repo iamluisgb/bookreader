@@ -262,10 +262,18 @@ runs están gitignored: la mejora verificada no dejaba rastro que la protegiera.
 - El **contrato** de [`docs/EVALS.md` § EV5](docs/EVALS.md): baseline con nombre de run,
   métrica primaria determinista o que sobreviva al ruido, y time-box pactado antes.
 
-**Sin verificar.** Los umbrales se sembraron desde los JSON de `f2-deepseek`, `verif-prio-deepseek`
-y `post-mejoras-deepseek`, y se validaron a posteriori sobre los runs históricos (verif-prio en
-verde; f2 en rojo exactamente en las 5 métricas que ese arreglo arregló). Falta un run completo
-nuevo que los confirme en caliente.
+**Verificado en caliente (runs `2026-09-12` P1+P4 y `2026-09-13` las 4):** 36/36 en verde tras
+recalibrar dos presupuestos con lo que enseñaron. La valla ya ha pagado su coste tres veces:
+- Destapó que la cobertura dorada salía **0/N en las 4 baterías** por un JSON truncado —la
+  llamada del juez sin cupo propio ni aviso de parseo—, un fallo que llevaba meses saliendo como
+  "ruido del criterio". Arreglado; **pendiente re-medir si ahora es señal y merece valla**.
+- Bajó `p3 · summary.*` de 4 a 2: el 5/5 que la fijó venía de UN run y no se reprodujo (3/3 en
+  los otros dos). El comentario ya avisaba del riesgo; ahora está medido.
+- Bajó `mindmap_branches` de 6 a 5: las 8 ramas del baseline eran el índice copiado, anterior a
+  P14 F7. La valla medía el comportamiento viejo.
+
+Y dos rojos del 12-sep resultaron ser varianza al repetir 24 h después (P14 F7 y TEC9) — la regla
+del efecto mínimo detectable evitó "arreglar" dos cosas que no estaban rotas.
 
 ### IA9 — Retrieval multi-fuente (cruzar libros, papers y posts) · `M`
 
@@ -755,16 +763,16 @@ Pedro Páramo 0/4 ramas-capítulo, Constitución 7/8 (correcto, su objetivo son 
 - **Sin verificar.** Quitar el título del libro del prompt está razonado sobre la evidencia del
   run `p14-validado` (ramas en inglés que no estaban en la entrada) pero **no medido**: la
   batería de Relatividad agotó el tiempo del arnés tres veces seguidas antes de llegar al mapa.
-- **Medido por fin (run `2026-09-12`, 1 corrida): el límite cayó, y con peaje.** Relatividad da
-  **0 de 6 ramas-capítulo** (era 7/8): el mapa ya no reconstruye el índice ni en un libro que el
-  modelo se sabe. Pero su **no-invención bajó de 5 a 3** —primer presupuesto que rompe la valla
-  de EV5— con el juez señalando una rama entera irrelevante ("Modelos cosmológicos") y E=mc²
-  ausente; jerarquía 4→3 y utilidad-objetivo 2. Lectura: empujar al modelo fuera del TOC lo
-  manda a inventar. Un run y escala entera (un punto es el mínimo movimiento posible):
-  **confirmar con una segunda corrida antes de tocar el prompt**, y si se confirma, el ciclo es
-  de P14, no de EV.
+- **Medido por fin, y el límite cayó: 0 de 6 ramas-capítulo** en Relatividad (era 7/8) en los
+  runs `2026-09-12` y `2026-09-13`. El mapa ya no reconstruye el índice ni en un libro que el
+  modelo se sabe: el arreglo de F7 funciona también en el caso que quedó como límite conocido.
+- **El "peaje" que pareció acompañarlo era ruido.** El 12-sep la no-invención cayó de 5 a 3 y
+  rompió la valla de EV5; al día siguiente, mismo prompt y mismo modelo, volvió a **5** (y
+  jerarquía a 4). Un punto en una escala entera con un solo run no es una regresión, es la
+  varianza del juez — exactamente lo que la regla del efecto mínimo detectable dice que no se
+  puede leer. Se quedó sin tocar el prompt, que era la decisión correcta.
 
-### EV4 — El arnés del eval no llega a los libros grandes · `S` · **prioridad alta**
+### EV4 — El arnés del eval no llega a los libros grandes · `S` · **✓ cerrado con hallazgo (2026-09-13): era la red, no el libro**
 Las flashcards de Pro Git (14 MB) y de Relatividad agotan los 600 s del gate en
 [`tests/evals.spec.ts`](tests/evals.spec.ts) y tumban la batería ENTERA, así que resumen, mapa y
 chat de esos libros se quedan sin medir. Pasó en 3 de las 5 corridas de P14 F7 y dejó sin
@@ -784,6 +792,17 @@ enmascara el problema real: esos libros tardan demasiado. Medir primero dónde s
   acelerarse a costa de `cards.fidelidad`, que ya tiene valla en 4.1.
 - **Time-box:** 2 ciclos. Si la instrumentación apunta a ventanas lentas del proveedor y no a
   nº de llamadas, se cierra con el hallazgo y se sube el límite a conciencia, documentándolo.
+
+**Medido (run `2026-09-13`, las 4 baterías): NO reprodujo, y eso es el hallazgo.** Ninguna
+batería hizo DNF y las tarjetas quedaron holgadas dentro del gate de 600 s — Pro Git **176 s**
+con sus 30 tarjetas, Relatividad 63 s, Pedro Páramo 164 s, Constitución 123 s. El run entero
+—4 libros × 6 artefactos— cupo en ~35 min.
+
+Lectura: el DNF de P14 F7 era una **ventana lenta del proveedor**, no un coste estructural de los
+libros grandes. Se cumple la condición de cierre del time-box: se cierra con el hallazgo, sin
+tocar el límite ni el troceado. Queda como aviso ya escrito en docs/EVALS.md — *un "DNF" del eval
+siempre merece un re-run antes de concluir*—, ahora con números detrás. **Se reabre** solo si un
+DNF vuelve a aparecer con tiempos por fase que señalen al nº de llamadas y no a la red.
 
 - **Límite conocido del layout.** Sin solapes, pero en mapas muy desiguales quedan **cruces de
   aristas** entre subárboles: la relajación mueve en radio y nunca en ángulo, así que una hoja
@@ -1959,6 +1978,12 @@ del TOC —el índice deja de resaltar lo relevante para su objetivo— **sin ni
   mapa, al final). Que P1 sí las conserve y P4 no es la pista: lo que cambia entre ambas es el
   libro y el número de pasajes (1495 vs 485).
 - **Time-box:** 1 ciclo para clasificar. El arreglo se planifica después, ya con el culpable.
+
+**No reproduce (run `2026-09-13`):** P4 trajo su atenuación con normalidad (Δ+0.47, ratings
+presentes), con el mismo fixture y el mismo código. Es **intermitente**, no determinista, lo que
+apunta más a una carrera —el volcado leyendo mientras algo reescribe el store— que a un borrado
+sistemático. Baja de prioridad pero NO se cierra: un fallo intermitente que se traga una feature
+sin error visible es peor de diagnosticar cuanto más se tarda. Dos datos: falla 1 de 2 veces.
 
 ### TEC8 — Selección táctil propia en el PDF, con ajuste por líneas · **✓ (2026-08-20)** `L`
 

@@ -296,6 +296,41 @@ reanuda al relanzarse: un fallo a mitad ya no tira lo juzgado y pagado.
 —los que la valla marca en rojo sobre `f2-deepseek`— siguen sin confirmarse en caliente, y EV4
 sigue sin baseline porque el libro que hace DNF es justo Pro Git.
 
+## Run completo con valla (`2026-09-13-f2-valla`, las 4 baterías)
+
+`EVAL_PHASE=2`, juez `mimo-v2.5`, ~35 min. **36 de 36 presupuestos en verde** tras recalibrar dos
+(abajo), gates deterministas ✓ en las cuatro, anclas 100% válidas y 0 duplicados en todas. Notas:
+P1 **4.2** · P2 **4.1** · P3 **3.9** · P4 **4.1**. Honestidad ante la trampa **5/5 en las cuatro**,
+por tercer run consecutivo: es la afirmación de producto más sólida que tenemos.
+
+**El fallo que destapó, y que invalida parte de lo que creíamos:** la cobertura dorada salió
+**0/N en las cuatro baterías**. No es calidad: la llamada de cobertura era la única de las seis
+del juez **sin `maxTokens` propio** (se quedaba en el default de 4096) y la única **sin aviso de
+parseo**. Con mimo —que razona antes de responder con cargo al mismo cupo— y 8-9 conceptos, el
+JSON salía truncado, `lastJsonObject` devolvía null y el criterio caía a 0 **en silencio**.
+Arreglado (cupo 8192 + aviso explícito). Lo importante: **parte del "ruido" que llevábamos
+atribuyendo a este criterio** (5/8 → 4/8 → 2/8 con el mismo prompt) **puede haber sido esto**, no
+el juez. Toca re-medirlo antes de seguir tratándolo como no-señal — y si resulta estable, se
+merece una valla.
+
+**Dos presupuestos recalibrados, y los dos enseñan lo mismo:**
+- `p3 · summary.fidelidad` y `pertinencia_citas` rompieron la valla con 3/3. Pero el 5/5 que la
+  fijó en 4 venía de **una sola corrida** (`verif-prio`, post-PDF6) y no se ha reproducido:
+  f2 dio 3/3 y este run, 3/3. Era el outlier, no el suelo. La valla baja a 2 — el propio
+  comentario ya avisaba del riesgo al ponerla.
+- `mindmap_branches` bajó de 6 a 5 en P2/P3: las 8 ramas de `verif-prio` eran el **índice
+  copiado** (7 de 8, títulos verbatim). Desde P14 F7 el mapa organiza por objetivo y salen 5-6
+  ramas con **0 capítulos**. La valla estaba midiendo el comportamiento viejo.
+
+**Lo que este run desmiente del anterior** (24 h antes, mismo prompt y modelo): la no-invención
+del mapa de P1 volvió de 3 a **5**, y la atenuación de P4 apareció con normalidad (Δ+0.47). Los
+dos rojos del 12-sep eran varianza, no regresión — que es justo lo que la regla del efecto mínimo
+detectable predice y por lo que ninguno se "arregló" en caliente. Ver BACKLOG · P14 F7 y TEC9.
+
+**Y cierra EV4:** ninguna batería hizo DNF. Pro Git tardó **176 s** en sus 30 tarjetas, muy lejos
+de los 600 s del gate. El DNF que motivó el ítem era una ventana lenta del proveedor, no el
+tamaño del libro.
+
 ## Mejora continua (el bucle)
 
 fallo detectado → clasificar (prompt / retrieval / modelo / parsing) → arreglo → re-run

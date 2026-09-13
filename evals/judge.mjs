@@ -65,7 +65,14 @@ estudiarla lo fija (no basta una mención de pasada). Responde SOLO JSON:
 {"conceptos":[{"concepto":"...","cubierto":true|false,"tarjeta":N|null}...]}` },
       { role: 'user', content: `CONCEPTOS DORADOS:\n${b.battery.goldenConcepts.map((c, i) => `${i + 1}. ${c}`).join('\n')}\n\nMAZO:\n${fronts.join('\n')}` },
     ],
+    // Era la ÚNICA de las seis llamadas sin cupo propio: se quedaba en el default de 4096 y
+    // mimo, que razona antes de responder con cargo al mismo cupo, devolvía JSON truncado con
+    // 8-9 conceptos. `lastJsonObject` daba null y la cobertura salía 0 EN SILENCIO — cuatro
+    // baterías a 0/N en el run 2026-09-13. Parte del "ruido" que se le atribuía a este criterio
+    // (5/8 → 4/8 → 2/8 con el mismo prompt) puede ser esto, no el juez.
+    maxTokens: 8192,
   }));
+  if (!coverRes?.conceptos) console.warn(`  ⚠ cobertura: respuesta no parseable — el criterio saldrá 0/${b.battery.goldenConcepts.length}, NO es una cobertura real`);
 
   // ---- Resumen: fidelidad + pertinencia de citas + cobertura + concisión --------
   const summary = summaryOf(b) || '';

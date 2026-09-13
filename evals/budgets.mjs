@@ -23,7 +23,9 @@
 //
 // QUÉ NO LLEVA VALLA (la decisión que hace esto útil, ver docs/EVALS.md)
 //   · Cobertura dorada: osciló 5/8 → 4/8 → 2/8 con el MISMO prompt. Es tendencia, no señal;
-//     ponerle gate sería medir una moneda al aire.
+//     ponerle gate sería medir una moneda al aire. **Revisar tras arreglar el cupo de su
+//     llamada** (2026-09-13): parte de ese "ruido" era JSON truncado que salía como 0 en
+//     silencio, así que el criterio puede volverse fiable y merecerse una valla.
 //   · Nada que ya sea un gate de check.mjs (no se duplica).
 //   · Métricas con un solo run de respaldo, salvo que se anote explícitamente como tal.
 
@@ -53,9 +55,11 @@ export const BUDGETS = {
     'summary.pertinencia_citas': { min: 2, de: 'f2 4 · verif-prio 3' },
     'chat.fundamento': { min: 4.0, de: 'f2 5.00 · verif-prio 4.33' },
     'chat.honestidad': { min: 4.5, de: 'f2 5.00 · verif-prio 5.00' },
-    // Era DNF a los 7 min en f2 (bug, no calidad); el arreglo lo dejó en 8 ramas. El gate de
-    // check.mjs solo exige ≥2, que un mapa inservible cumple.
-    mindmap_branches: { min: 6, de: 'verif-prio 8' },
+    // Era DNF a los 7 min en f2 (bug, no calidad). El gate de check.mjs solo exige ≥2, que un
+    // mapa inservible cumple. Ojo con el baseline: las 8 ramas de verif-prio eran el ÍNDICE
+    // copiado (7 de 8 eran títulos de capítulo verbatim); desde P14 F7 el mapa organiza por
+    // objetivo y salen 5-6 ramas con 0 capítulos. La valla mide el suelo nuevo, no el viejo.
+    mindmap_branches: { min: 5, de: 'verif-prio 8 (pre-P14 F7) · 2026-09-13 6' },
     attenuation_separation: { min: 0.4, de: 'f2 +0.65 · verif-prio +0.59' },
   },
 
@@ -63,13 +67,15 @@ export const BUDGETS = {
     'cards.fidelidad': { min: 4.2, de: 'f2 4.58 · verif-prio 4.50' },
     'cards.atomicidad': { min: 3.9, de: 'f2 5.00 · verif-prio 4.25' },
     'cards.utilidad': { min: 4.5, de: 'f2 5.00 · verif-prio 4.83' },
-    // PDF6 subió fidelidad y citas de 3/3 a 5/5, pero en UNA sola corrida: la valla va en 4,
-    // no en 5, hasta que un segundo run completo lo confirme. Entonces sube.
-    'summary.fidelidad': { min: 4, de: 'verif-prio 5 — 1 run, post-PDF6' },
-    'summary.pertinencia_citas': { min: 4, de: 'verif-prio 5 — 1 run, post-PDF6' },
+    // El 5/5 de verif-prio (post-PDF6) NO se reprodujo: f2 dio 3/3 y el run 2026-09-13
+    // también. Era el outlier, no el nuevo suelo — justo el riesgo que la valla anotaba al
+    // ponerse en 4 "hasta que un segundo run lo confirme". Baja a lo observado dos de tres
+    // veces. Lección barata: una mejora de UN run no es un suelo.
+    'summary.fidelidad': { min: 2, de: 'f2 3 · verif-prio 5 · 2026-09-13 3' },
+    'summary.pertinencia_citas': { min: 2, de: 'f2 3 · verif-prio 5 · 2026-09-13 3' },
     'chat.fundamento': { min: 4.3, de: 'f2 4.67 · verif-prio 4.67' },
     'chat.honestidad': { min: 4.5, de: 'f2 5.00 · verif-prio 5.00' },
-    mindmap_branches: { min: 6, de: 'verif-prio 8 (f2: 1, pre-PDF6)' },
+    mindmap_branches: { min: 5, de: 'verif-prio 8 (pre-P14 F7) · 2026-09-13 6' },
     // En PDF la atenuación depende del fallback a `tocLabels`; sin TOC real queda null
     // legítimamente y nunca ha dado un número. Opcional hasta que lo dé.
     attenuation_separation: { min: 0, de: 'null en f2 y verif-prio', opcional: true },

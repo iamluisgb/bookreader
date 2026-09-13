@@ -241,7 +241,7 @@ test('la lista de subrayados muestra cuándo se hizo cada uno', async ({ page })
   await page.setInputFiles('#file-input', PDF_PATH);
   await page.waitForSelector('#pdf-container .textLayer span', { timeout: 30000 });
 
-  await page.evaluate(async () => {
+  const tsViejo = await page.evaluate(async () => {
     const H: any = await import('/js/highlights.js');
     const rects = [{ left: .1, top: .1, width: .5, height: .02 }];
     H.addPdf(3, rects, 'el más viejo', '#ffd54f', 'Pág. 3', '');
@@ -251,6 +251,7 @@ test('la lista de subrayados muestra cuándo se hizo cada uno', async ({ page })
     const all = JSON.parse(localStorage.getItem(key)!);
     all[0].timestamp = Date.now() - 40 * 86400 * 1000;
     localStorage.setItem(key, JSON.stringify(all));
+    return all[0].timestamp as number;
   });
   await page.evaluate(async () => (await import('/js/highlights-ui.js') as any).renderHighlights());
 
@@ -259,9 +260,16 @@ test('la lista de subrayados muestra cuándo se hizo cada uno', async ({ page })
   // El más reciente va primero (orden por timestamp, descendente).
   await expect(items.nth(0).locator('.highlight-text')).toContainText('de hace un rato');
   await expect(items.nth(0).locator('.highlight-when')).toHaveText(/hace|ago/);
-  // Y el de hace 40 días se muestra como fecha, no como "hace 40 días".
+  // Y el de hace 40 días se muestra como FECHA, no como "hace 40 días". No se puede
+  // comprobar buscando "hace|ago" en el texto: en español la fecha corta de agosto ES
+  // "4 ago" (el test moría cada septiembre por eso), y en inglés el relativo también
+  // acaba en "ago". Lo que distingue no es la cadena, es la función: se compara contra
+  // lo que `ago()` habría devuelto para ESE timestamp.
   const viejo = await items.nth(1).locator('.highlight-when').textContent();
-  expect(viejo).not.toMatch(/hace|ago/);
+  const relativo = await page.evaluate(async (ts) =>
+    (await import('/js/ui/when.js') as any).ago(ts), tsViejo);
+  expect(viejo!.trim()).not.toBe(relativo);
+  expect(viejo).toMatch(/\d/);              // una fecha siempre lleva el día
   expect(viejo!.trim().length).toBeGreaterThan(2);
   // El tooltip lleva la fecha y hora completas.
   await expect(items.nth(1).locator('.highlight-when')).toHaveAttribute('title', /\d/);
