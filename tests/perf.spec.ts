@@ -58,6 +58,11 @@ const BUDGET = {
   // variación de la máquina, pero no a que vuelva a pintarse por detrás de la
   // cola, que era lo que medía 1.241 ms antes de la cola con prioridad.
   'pdf.scroll.stop.p95': 800,    // medido ~530-545 (antes de la cola: 995-1361)
+  // Pasar página en una revista LEYENDO (con una pausa entre pases, que es lo
+  // que hay). Mide que la siguiente estaba pintada de antemano: sin eso son los
+  // ~376 ms de rasterizar la página, y 817 si es un pliego de dos hojas.
+  'pdf.turn.revista.p50': 120,   // medido ~13 (sin prefetch: ~376)
+  'pdf.turn.pliego.p50': 250,    // medido ~70 (sin prefetch: ~817)
 };
 
 // Todas las medidas de la corrida, volcadas a test-results/perf.json para poder comparar
@@ -284,6 +289,37 @@ test.describe('Rendimiento del lector @perf', () => {
 
     anota('pdf.turn.p50', p(pases, 0.5));
     anotaYExige('pdf.turn.p95', p(pases, 0.95));
+  });
+
+  // Pasar página en una revista, a ritmo de lectura. Lo que vigila es que la
+  // página siguiente se pinte MIENTRAS lees la actual: pasar página debería ser
+  // colgar algo ya pintado, no rasterizar. Pasando sin parar no hay prefetch que
+  // valga —el techo es el decodificado, ~376 ms por hoja— y por eso se mide con
+  // pausa, que es como se lee de verdad.
+  test('Revista: pasar página leyendo', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.locator('.lib-h1')).toBeVisible();
+    await abrirYMedir(page, PDF_REVISTA, 'pdf');
+
+    for (const [modo, metrica] of [['paginated', 'pdf.turn.revista'], ['spread', 'pdf.turn.pliego']] as const) {
+      const pases = await page.evaluate(async (modo) => {
+        const R: any = await import('/js/pdf-reader.js');
+        await R.setReadingMode(modo);
+        await R.goTo(2);
+        await new Promise((r) => setTimeout(r, 1500));
+        const out: number[] = [];
+        for (let i = 0; i < 8; i++) {
+          await new Promise((r) => setTimeout(r, 1200));   // el rato que se tarda en leer
+          const t0 = performance.now();
+          await R.next();
+          await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => r(null))));
+          out.push(performance.now() - t0);
+        }
+        return out;
+      }, modo);
+      anota(metrica + '.p95', p(pases, 0.95));
+      anotaYExige(metrica + '.p50', p(pases, 0.5));
+    }
   });
 
   // Scroll continuo en una revista: lo que se mide es el instante que sufre el

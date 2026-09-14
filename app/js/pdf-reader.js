@@ -446,6 +446,7 @@ export async function load(arrayBuffer, onProgress, bookId = null) {
   flatOutline = null;
 
   renderQueue.clear();
+  olvidarListas();
   ghosts.clear();               // las miniaturas son del libro que se va
   currentPage = 1;
   zoom = 1;                     // cada libro empieza ajustado a ancho
@@ -696,6 +697,7 @@ function migrateLegacyKeys() {
 async function rerender() {
   if (!pdfDoc) return;
   teardownScroll();
+  olvidarListas();                 // cambian modo/ajuste: lo pintado ya no encaja
   dropAllDetail();                 // se va a vaciar el contenedor: invalida parches en vuelo
   const container = document.getElementById('pdf-container');
   if (!container) return;
@@ -732,6 +734,7 @@ async function refit() {
   if (!pages.length) return;
   // Cambia `fit`, y los parches están posicionados en unidades fit → dejan de encajar.
   dropAllDetail();
+  olvidarListas();                 // y lo pintado por adelantado está a la escala vieja
 
   // Ancla: la página del borde superior y en qué fracción de ella estás (volver al mismo
   // sitio, no al principio de la página).
@@ -895,6 +898,112 @@ function ensureZoomHandlers() {
 }
 
 // Modo paginado: un único wrapper reutilizado (comportamiento clásico).
+// ---- Páginas pintadas por adelantado ----------------------------------------
+//
+// Pasar página costaba lo que cuesta rasterizarla: ~376 ms en una revista, y el
+// doble en pliego porque son dos hojas. Ese tiempo no se puede bajar (es el
+// decodificado de las imágenes, ver la cabecera de la cola de render), pero SÍ
+// se puede pagar antes: mientras lees una página no se está usando el worker
+// para nada.
+//
+// Así que al acabar de pintar se deja pintada la SIGUIENTE en un wrapper suelto,
+// fuera del DOM, y pasar página pasa a ser colgarlo — sin render, sin espera. La
+// que se va no se tira: se guarda igual, así que volver atrás también es
+// instantáneo.
+const listas = new Map();       // nº de página → wrapper ya pintado, fuera del DOM
+// Cada wrapper guardado retiene su canvas —en un móvil, unos 13 MB— así que el
+// techo es el justo: el siguiente y el anterior. En pliego son dos hojas cada
+// uno, de la mitad de ancho (y por tanto de la cuarta parte de píxeles).
+const maxListas = () => (spreadOn() ? 4 : 2);
+let listasSeq = 0;              // invalida un prefetch en vuelo (el lector se movió)
+let listasTimer = 0;
+
+function olvidarListas() {
+  listasSeq++;
+  clearTimeout(listasTimer);
+  for (const w of listas.values()) freeWrapper(w);   // deja su miniatura y suelta el canvas
+  listas.clear();
+}
+
+// Se queda con las MAX_LISTAS más cercanas a la página actual; el resto fuera.
+function podarListas() {
+  const tope = maxListas();
+  if (listas.size <= tope) return;
+  const orden = [...listas.keys()].sort((a, b) => Math.abs(a - currentPage) - Math.abs(b - currentPage));
+  for (const n of orden.slice(tope)) {
+    freeWrapper(listas.get(n));
+    listas.delete(n);
+  }
+}
+
+// Guarda un wrapper que sale de pantalla por si se vuelve a él.
+//
+// Lo PRIMERO es sacarlo del DOM, pase lo que pase después: si se queda colgado
+// —porque no estaba pintado, o porque esa página ya la teníamos guardada— deja
+// una hoja vacía junto a la que sí toca. En pliego eso es una tercera hoja en
+// blanco a la derecha; en paginado, dos páginas apiladas.
+function guardarLista(wrapper) {
+  wrapper.remove();
+  const n = +wrapper.dataset.page;
+  if (!n || !wrapper.dataset.rendered || listas.has(n)) { freeWrapper(wrapper); return; }
+  listas.set(n, wrapper);
+  podarListas();
+}
+
+// Coge una página ya pintada, lista para colgar. Se le re-aplica el layout
+// porque el zoom pudo cambiar mientras esperaba fuera (el zoom no re-rasteriza:
+// solo mueve cajas, ver applyCommittedZoom).
+function cogerLista(n) {
+  const w = listas.get(n);
+  if (!w) return null;
+  listas.delete(n);
+  layoutWrapper(w);
+  return w;
+}
+
+// Qué páginas conviene tener listas: el pliego (o la página) siguiente y el
+// anterior. En ese orden — hacia delante es a donde va casi todo el mundo.
+function vecinas() {
+  const out = [];
+  if (spreadOn()) {
+    const izq = spreadLeft(currentPage);
+    const sig = izq === 1 ? 2 : izq + 2;
+    const ant = izq === 1 ? 0 : (izq === 2 ? 1 : izq - 2);
+    for (const p of [sig, ant]) if (p >= 1) out.push(...spreadPair(p).filter(n => n && n <= totalPages));
+  } else {
+    if (currentPage < totalPages) out.push(currentPage + 1);
+    if (currentPage > 1) out.push(currentPage - 1);
+  }
+  return out.filter(n => !listas.has(n));
+}
+
+// Pinta las vecinas, de una en una y en silencio. El rebote es corto —lo justo
+// para no arrancar encima del render que acaba de terminar— porque cada
+// milisegundo que se retrasa es un milisegundo que le falta al prefetch para
+// llegar a tiempo al siguiente pase.
+function prefetchVecinas() {
+  if (readingMode === 'scroll') return;
+  clearTimeout(listasTimer);
+  listasTimer = setTimeout(async () => {
+    const seq = ++listasSeq;
+    for (const n of vecinas()) {
+      const w = document.createElement('div');
+      w.className = 'pdf-page';
+      try {
+        await renderInto(w, n, { anunciar: false });
+      } catch (e) {
+        freeWrapper(w);
+        return;
+      }
+      // El lector se movió mientras se pintaba: puede que esta página ya no
+      // pinte nada, pero guardarla es gratis y podarListas decide.
+      if (seq !== listasSeq) { freeWrapper(w); return; }
+      listas.set(n, w);
+      podarListas();
+    }
+  }, 60);
+}
+
 // Pinta el pliego de `num`: dos hojas en fila, cada una un .pdf-page normal (con
 // su canvas, su capa de texto y sus subrayados), así que todo lo que ya sabía
 // trabajar sobre una página —citas, búsqueda, selección— sigue funcionando sin
@@ -910,26 +1019,52 @@ async function renderSpread(num) {
     layer.appendChild(row);
   }
   const hojas = [left, right].filter(n => n !== null);
-  // Reutilizar los wrappers que ya están (mismo camino que el paginado) en vez
-  // de recrearlos: renderInto hace doble buffer y así al pasar pliego no hay
-  // parpadeo de caja vacía.
-  const wrappers = Array.from(row.querySelectorAll('.pdf-page'));
-  while (wrappers.length > hojas.length) { const w = wrappers.pop(); dropDetail(w); w.remove(); }
-  while (wrappers.length < hojas.length) {
-    const w = document.createElement('div');
-    w.className = 'pdf-page';
-    row.appendChild(w);
-    wrappers.push(w);
+  // Las que salen de pantalla se guardan por si se vuelve a ellas.
+  for (const w of Array.from(row.querySelectorAll('.pdf-page'))) {
+    if (!hojas.includes(+w.dataset.page)) guardarLista(w);
   }
-  // En serie: dos renders a la vez se estorban en el worker y la izquierda es la
-  // que el lector mira primero.
-  for (let i = 0; i < hojas.length; i++) await renderInto(wrappers[i], hojas[i]);
+  // Las dos hojas se piden A LA VEZ: el decodificado de imagen del navegador es
+  // paralelo, así que el pliego entero cuesta menos que las dos por separado
+  // (medido: 637 ms contra 954). Y aparece de una pieza, que es como se mira un
+  // pliego — media hoja pintada y la otra en blanco se lee como un error.
+  // Las que ya venían pintadas se cuelgan sin pasar por pdf.js.
+  const pendientes = [];
+  for (let i = 0; i < hojas.length; i++) {
+    const n = hojas[i];
+    let w = row.querySelector(`.pdf-page[data-page="${n}"]`) || cogerLista(n);
+    const yaEstaba = !!(w && w.dataset.rendered);
+    if (!w) { w = document.createElement('div'); w.className = 'pdf-page'; }
+    if (w.parentNode !== row || row.children[i] !== w) row.insertBefore(w, row.children[i] || null);
+    if (yaEstaba) anunciarPintada(n);
+    else pendientes.push(renderInto(w, n));
+  }
+  if (pendientes.length) await Promise.all(pendientes);
   setCurrentPage(num);
+  prefetchVecinas();
+}
+
+// Lo que renderInto hace al terminar, para una página que ya venía pintada: los
+// subrayados hay que volver a pedirlos (su capa se fue con el wrapper) y el
+// parche de detalle se decide con el zoom de AHORA.
+function anunciarPintada(num) {
+  scheduleDetail();
+  window.dispatchEvent(new CustomEvent('reader:pdf-page-rendered', { detail: { page: num } }));
 }
 
 async function renderPaginated(num) {
   const layer = zoomLayer();
-  let wrapper = layer.querySelector('.pdf-page');
+  const actual = layer.querySelector('.pdf-page');
+  const lista = cogerLista(num);
+  if (lista) {
+    // Ya estaba pintada: colgarla es todo el trabajo que queda.
+    if (actual) guardarLista(actual);
+    layer.appendChild(lista);
+    setCurrentPage(num);
+    anunciarPintada(num);
+    prefetchVecinas();
+    return;
+  }
+  let wrapper = actual;
   if (!wrapper) {
     wrapper = document.createElement('div');
     wrapper.className = 'pdf-page';
@@ -937,6 +1072,7 @@ async function renderPaginated(num) {
   }
   await renderInto(wrapper, num);
   setCurrentPage(num);
+  prefetchVecinas();
 }
 
 // Modo scroll: todas las páginas apiladas en vertical, con render PEREZOSO (solo las
@@ -1099,11 +1235,14 @@ function keepGhost(wrapper) {
 // Pone la miniatura de fondo del scaler. Va DEBAJO del canvas real (que es
 // opaco), así que no hace falta quitarla cuando el bueno llega.
 function showGhost(wrapper) {
-  const url = ghosts.get(+wrapper.dataset.page);
   const scaler = wrapper.querySelector('.pdf-scaler');
-  if (!url || !scaler) return;
-  scaler.style.backgroundImage = `url(${url})`;
-  scaler.style.backgroundSize = '100% 100%';
+  if (!scaler) return;
+  const url = ghosts.get(+wrapper.dataset.page);
+  // Se BORRA si esta página no tiene miniatura: en paginado el wrapper se
+  // reutiliza de una página a la siguiente, así que dejarla puesta enseñaba la
+  // página anterior borrosa debajo de la que estabas esperando.
+  scaler.style.backgroundImage = url ? `url(${url})` : '';
+  if (url) scaler.style.backgroundSize = '100% 100%';
 }
 
 // Libera el canvas/capas de una página fuera de vista (memoria acotada en scroll).
@@ -1120,7 +1259,7 @@ function freeWrapper(wrapper) {
 
 // Renderiza una página (canvas HiDPI + capa de texto) en un wrapper dado. Común a ambos
 // modos. Cancela el render en curso DEL PROPIO wrapper (evita el crash de doble render()).
-async function renderInto(wrapper, num) {
+async function renderInto(wrapper, num, { anunciar = true } = {}) {
   if (!pdfDoc) return;
   const page = await pdfDoc.getPage(num);
   const base = page.getViewport({ scale: 1 });
@@ -1185,6 +1324,10 @@ async function renderInto(wrapper, num) {
 
   await renderTextLayer(page, viewport, scaler);
   wrapper.dataset.rendered = '1';
+  // Una página pintada por adelantado no está en pantalla: ni pide parche de
+  // detalle (se lo pedirá al entrar) ni debe anunciarse, o app.js iría a pintar
+  // los subrayados de una página que el lector no está viendo.
+  if (!anunciar) return;
   scheduleDetail();     // si estamos a zoom alto, el base recién puesto pide parche
 
   // Re-pintar los subrayados de esta página (app.js escucha este evento).

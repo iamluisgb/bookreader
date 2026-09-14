@@ -5,6 +5,47 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-09-14 — Pasar página en una revista: de 376 ms a 13
+
+Pasar página costaba exactamente lo que cuesta rasterizarla: **376 ms** en una revista de fotos, y
+**817** en pliego porque son dos hojas. Ese tiempo no se puede bajar —es el decodificado de las
+imágenes, lo mismo que manda en el scroll— pero sí se puede **pagar antes**: mientras lees una
+página, el worker no está haciendo nada.
+
+Así que al terminar de pintar se deja pintada la siguiente (y la anterior) en un wrapper suelto,
+fuera del DOM, y pasar página pasa a ser **colgarlo**. La que se va no se tira: se guarda igual, así
+que volver atrás también es instantáneo. El techo es el justo para no comerse la memoria de un móvil
+—el siguiente y el anterior, cuatro hojas en pliego, que son de la mitad de ancho— y lo que se
+desaloja deja su miniatura, que ya estaba.
+
+Y las dos hojas de un pliego se piden **a la vez**: el decodificado del navegador es paralelo, así
+que el pliego entero sale por 637 ms en vez de 954. Aparece además de una pieza, que es como se mira
+un pliego; media hoja pintada y la otra en blanco se lee como un error.
+
+Medido con `npm run perf` sobre `p4-revista.pdf`, a ritmo de lectura:
+
+| | antes | ahora |
+|---|---|---|
+| pasar página (paginado) | 376 ms | **13-17 ms** |
+| pasar pliego (doble página) | 817 ms | **54-70 ms** |
+
+Quedan como valla: `pdf.turn.revista.p50 = 120` y `pdf.turn.pliego.p50 = 250`.
+
+**Pasando páginas sin parar sigue costando lo mismo** (~400 ms por hoja), y no hay prefetch que lo
+arregle: no se puede rasterizar más rápido de lo que se decodifica. La mejora es para quien lee, que
+es para quien se hizo.
+
+Un fallo encontrado por el camino, de los que solo salen con la máquina cargada: al guardar una
+página que sale de pantalla, el wrapper solo se sacaba del DOM en uno de los tres caminos posibles.
+En los otros dos se quedaba colgado y vacío — una tercera hoja en blanco junto al pliego, o dos
+páginas apiladas en paginado. Ahora se saca siempre, lo primero.
+
+De regalo, otro que estaba escondido: la miniatura de respaldo no se borraba al cambiar de página, y
+como en paginado el wrapper se reutiliza, durante el render se veía la página ANTERIOR borrosa debajo
+de la que estabas esperando.
+
+---
+
 ## 2026-09-14 — Doble página también en PDF: una revista se lee abierta
 
 El modo «Doble» existía solo para EPUB y en PDF estaba **ocultado a propósito**, con un argumento
