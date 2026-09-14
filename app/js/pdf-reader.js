@@ -21,6 +21,33 @@ let lazyObserver = null;         // observer del render perezoso en modo scroll
 const cercanas = new Set();
 let scrollRaf = 0;
 
+// ---- Cola de render con prioridad ------------------------------------------
+//
+// Rasterizar una página de revista cuesta ~350 ms, y ese coste es el
+// DECODIFICADO de sus imágenes, no el tamaño al que se pinta: medido, la misma
+// página en miniatura (148×192) tarda lo mismo que entera (1338×1732). Es decir,
+// no hay "versión rápida" que enseñar mientras llega la buena; solo se puede
+// elegir BIEN el orden.
+//
+// Y el orden importaba: el observer pedía las páginas en el orden en que se
+// cruzaban, así que al parar tras un scroll rápido la página que tenías delante
+// se pintaba DETRÁS de las que ya habías pasado — medido, 1.241 ms contra los
+// ~350 que cuesta ella sola. Aquí se sirve siempre la pendiente más cercana al
+// centro del viewport, de una en una, y se vuelve a decidir después de cada una:
+// lo que dejó de importar a mitad de cola sale sin pintarse.
+const renderQueue = new Set();   // wrappers pendientes de pintar
+let renderRunning = false;
+
+// Miniatura de lo ya pintado, para que volver atrás no sea una página en blanco.
+//
+// Se saca del canvas que se está liberando (un drawImage a 160 px de ancho, ~1 ms)
+// y se guarda como JPEG, unos 5 KB por página: se puede tener el libro entero.
+// No cubre la PRIMERA pasada —de una página que nadie ha pintado no hay nada que
+// guardar—, y ahí no hay remedio barato: los 350 ms son del decodificado.
+const ghosts = new Map();        // nº de página → dataURL de su miniatura
+const GHOST_W = 160;             // ancho de la miniatura, en px
+const GHOST_MAX = 400;           // tope de páginas recordadas (~2 MB)
+
 // ---- Zoom fluido (tipo Adobe): sin re-render ------------------------------
 // DOS CAPAS. La BASE es la página entera, pintada oversampleada (canvas a ~OVERSAMPLE× su
 // tamaño mostrado): nunca se retira, así que siempre hay algo que enseñar y ampliar hasta
@@ -377,6 +404,8 @@ export async function load(arrayBuffer, onProgress, bookId = null) {
   }
   flatOutline = null;
 
+  renderQueue.clear();
+  ghosts.clear();               // las miniaturas son del libro que se va
   currentPage = 1;
   zoom = 1;                     // cada libro empieza ajustado a ancho
   fitMode = 'page';             // ...y sin recorte, hasta leer lo guardado de ESTE libro
@@ -861,12 +890,12 @@ async function renderScroll() {
   lazyObserver = new IntersectionObserver((entries) => {
     for (const e of entries) {
       const wrapper = e.target;
-      const n = +wrapper.dataset.page;
       if (e.isIntersecting) {
         cercanas.add(wrapper);
-        if (!wrapper.dataset.rendered) renderInto(wrapper, n);
+        if (!wrapper.dataset.rendered) enqueueRender(wrapper);
       } else {
         cercanas.delete(wrapper);
+        renderQueue.delete(wrapper);        // ya no importa: que no gaste turno
         if (wrapper.dataset.rendered) freeWrapper(wrapper);
       }
     }
@@ -913,13 +942,93 @@ function onScroll() {
 function teardownScroll() {
   const container = document.getElementById('pdf-container');
   cercanas.clear();
+  renderQueue.clear();
   if (lazyObserver) { try { lazyObserver.disconnect(); } catch (e) {} lazyObserver = null; }
   if (container) container.removeEventListener('scroll', onScroll);
+}
+
+// ---- Cola de render ---------------------------------------------------------
+
+function enqueueRender(wrapper) {
+  if (wrapper.dataset.rendered) return;
+  renderQueue.add(wrapper);
+  pumpRenderQueue();
+}
+
+// La pendiente cuyo centro está más cerca del centro del viewport. Se recalcula
+// entre página y página: si el usuario se ha movido, la siguiente es otra.
+function nearestPending() {
+  const container = document.getElementById('pdf-container');
+  if (!container) return null;
+  const cr = container.getBoundingClientRect();
+  const midY = cr.top + container.clientHeight / 2;
+  let best = null, bestD = Infinity;
+  for (const w of renderQueue) {
+    const r = w.getBoundingClientRect();
+    const d = Math.abs(r.top + r.height / 2 - midY);
+    if (d < bestD) { bestD = d; best = w; }
+  }
+  return best;
+}
+
+// De una en una: pdf.js serializa igual en su worker, y hacerlo aquí es lo que
+// permite reordenar entre página y página en vez de comerse la cola entera en el
+// orden en que se pidió.
+async function pumpRenderQueue() {
+  if (renderRunning) return;
+  renderRunning = true;
+  try {
+    for (;;) {
+      const wrapper = nearestPending();
+      if (!wrapper) break;
+      renderQueue.delete(wrapper);
+      // Dejó de estar cerca (o ya la pintó otro camino) mientras esperaba turno.
+      if (!wrapper.isConnected || wrapper.dataset.rendered || !cercanas.has(wrapper)) continue;
+      try {
+        await renderInto(wrapper, +wrapper.dataset.page || currentPage);
+      } catch (e) {
+        console.warn('No se pudo pintar la página', wrapper.dataset.page, e);
+      }
+    }
+  } finally {
+    renderRunning = false;
+  }
+}
+
+// ---- Miniatura de respaldo ---------------------------------------------------
+
+// Guarda una miniatura del canvas que se va a liberar y la deja puesta de fondo.
+function keepGhost(wrapper) {
+  const canvas = wrapper.querySelector('canvas:not(.pdf-detail)');
+  const n = +wrapper.dataset.page;
+  if (n && canvas && canvas.width > 1 && !ghosts.has(n)) {
+    try {
+      const th = Math.max(1, Math.round(canvas.height * (GHOST_W / canvas.width)));
+      const small = document.createElement('canvas');
+      small.width = GHOST_W; small.height = th;
+      small.getContext('2d').drawImage(canvas, 0, 0, GHOST_W, th);
+      if (ghosts.size >= GHOST_MAX) ghosts.delete(ghosts.keys().next().value);
+      ghosts.set(n, small.toDataURL('image/jpeg', 0.6));
+      small.width = small.height = 0;
+    } catch (e) { /* canvas no exportable: sin miniatura, como antes */ }
+  }
+  showGhost(wrapper);
+}
+
+// Pone la miniatura de fondo del scaler. Va DEBAJO del canvas real (que es
+// opaco), así que no hace falta quitarla cuando el bueno llega.
+function showGhost(wrapper) {
+  const url = ghosts.get(+wrapper.dataset.page);
+  const scaler = wrapper.querySelector('.pdf-scaler');
+  if (!url || !scaler) return;
+  scaler.style.backgroundImage = `url(${url})`;
+  scaler.style.backgroundSize = '100% 100%';
 }
 
 // Libera el canvas/capas de una página fuera de vista (memoria acotada en scroll).
 function freeWrapper(wrapper) {
   if (wrapper._renderTask) { try { wrapper._renderTask.cancel(); } catch (e) {} wrapper._renderTask = null; }
+  keepGhost(wrapper);       // ANTES de borrar el canvas: es de donde sale
   dropDetail(wrapper);
   const canvas = wrapper.querySelector('canvas');
   if (canvas) { canvas.width = 0; canvas.height = 0; }
@@ -961,6 +1070,7 @@ async function renderInto(wrapper, num) {
   scaler.style.width = viewport.width + 'px';
   scaler.style.height = viewport.height + 'px';
   layoutWrapper(wrapper);                                     // caja = fit·cropW·zoom (área de scroll)
+  showGhost(wrapper);   // si ya se pintó alguna vez, borrosa YA en vez de en blanco
 
   // DOBLE BUFFER: se pinta en un canvas nuevo y solo se cuelga del DOM cuando está listo.
   // Reutilizarlo obligaba a poner canvas.width (que lo BORRA) antes de repintar, así que

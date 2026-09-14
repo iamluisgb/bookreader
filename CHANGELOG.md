@@ -5,6 +5,49 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-09-14 — El scroll de una revista deja de ser una sucesión de huecos en blanco
+
+Hojear un PDF de fotos a toda página era ir viendo huecos grises: la página aparecía segundo y pico
+después de parar el dedo. Lo primero fue medir de dónde sale ese tiempo, porque la solución
+intuitiva —pintar rápido una versión cutre y luego la buena— **no funciona aquí**:
+
+| | coste |
+|---|---|
+| pintar una página a 1338×1732 (fría) | 359 ms |
+| pintar **la misma** página a 148×192 (fría) | **376 ms** |
+| precalentarla con `getOperatorList()` y luego pintarla | 312 + 304 ms |
+| pintar una página **ya pintada antes** | **6 ms** |
+
+Lo que cuesta es el **decodificado de las imágenes**, no el tamaño al que se rasteriza. No hay
+versión barata que enseñar mientras llega la cara. Solo se puede elegir bien el orden, y no tirar lo
+que ya se pintó una vez.
+
+**Cola con prioridad.** El observer pedía las páginas en el orden en que se cruzaban, y se pintaban
+todas a la vez. Al parar tras hojear, la página que tenías delante se pintaba *detrás* de las que ya
+habías pasado. Ahora hay una cola que sirve de una en una y **vuelve a decidir después de cada
+página**: siempre la pendiente más cercana al centro del viewport, y lo que dejó de estar a la vista
+sale de la cola sin pintarse. Medido en el arnés (`npm run perf`, fixture nueva `p4-revista.pdf`,
+hojear doce pantallas y parar, dos corridas de cada):
+
+| | p50 | p95 |
+|---|---|---|
+| antes | 761 · 1031 ms | 995 · 1361 ms |
+| ahora | 325 · 317 ms | 545 · 532 ms |
+
+Queda como valla: `pdf.scroll.stop.p95 = 800`.
+
+**Miniatura de lo ya leído.** Al liberar una página que se va de la vista se le saca antes una
+miniatura de 160 px (~1 ms, ~5 KB) y se deja de fondo. Volver sobre algo ya leído ya no enseña un
+hueco: enseña la página borrosa hasta que el render la sustituye. El libro entero cabe en ~2 MB de
+miniaturas.
+
+Lo que **no** arregla: la primera pasada por páginas que nadie ha pintado todavía. De ahí no hay
+miniatura que sacar y los 350 ms del decodificado hay que pagarlos. Hacerlos desaparecer pedía una
+pasada de fondo que rasterizara el libro entero —45-60 s de worker por sesión en una revista de 133
+páginas— y se decidió que no compensa.
+
+---
+
 ## 2026-09-14 — Pasar página en una revista de 400 MB dejó de costar segundo y medio
 
 La navegación iba a trompicones en un PDF enorme, y el culpable no estaba en el lector: estaba en

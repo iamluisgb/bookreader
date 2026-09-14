@@ -36,6 +36,11 @@ import path from 'path';
 const FIXTURES = path.join(__dirname, '..', 'evals', 'fixtures');
 const EPUB_HEAVY = path.join(FIXTURES, 'p2-progit.epub');   // 14 MB, decenas de secciones
 const PDF_HEAVY = path.join(FIXTURES, 'p3-constitucion.pdf');
+// Revista: páginas que son una foto a toda página. Es otra cosa que un PDF de
+// texto — lo que domina aquí es el DECODIFICADO de imagen (~350 ms por página,
+// y da igual el tamaño al que se pinte), así que es la fixture que dice si el
+// scroll continuo sigue siendo usable. Se genera: `node scripts/make-magazine.mjs`.
+const PDF_REVISTA = path.join(FIXTURES, 'p4-revista.pdf');
 
 // Presupuestos en ms (salvo los contadores). Ver cabecera: valla, no objetivo.
 const BUDGET = {
@@ -48,6 +53,11 @@ const BUDGET = {
   'epub.heap.mb': 30,            // medido ~10.6
   'pdf.ttfp': 1500,              // medido ~410
   'pdf.turn.p95': 250,           // medido ~67
+  // Parar el scroll en una revista y esperar a ver la página. El coste mínimo es
+  // el de rasterizar UNA página (~350 ms); el presupuesto deja sitio a eso y a la
+  // variación de la máquina, pero no a que vuelva a pintarse por detrás de la
+  // cola, que era lo que medía 1.241 ms antes de la cola con prioridad.
+  'pdf.scroll.stop.p95': 800,    // medido ~530-545 (antes de la cola: 995-1361)
 };
 
 // Todas las medidas de la corrida, volcadas a test-results/perf.json para poder comparar
@@ -78,7 +88,7 @@ test.describe('Rendimiento del lector @perf', () => {
   test.describe.configure({ mode: 'serial' });
 
   test.skip(
-    !existsSync(EPUB_HEAVY) || !existsSync(PDF_HEAVY),
+    !existsSync(EPUB_HEAVY) || !existsSync(PDF_HEAVY) || !existsSync(PDF_REVISTA),
     'Faltan las fixtures pesadas. Ejecuta `npm run eval:fixtures` (no se versionan).',
   );
 
@@ -274,6 +284,56 @@ test.describe('Rendimiento del lector @perf', () => {
 
     anota('pdf.turn.p50', p(pases, 0.5));
     anotaYExige('pdf.turn.p95', p(pases, 0.95));
+  });
+
+  // Scroll continuo en una revista: lo que se mide es el instante que sufre el
+  // usuario — paras el dedo y miras un hueco en blanco hasta que la página
+  // aparece. La página cuesta lo que cuesta (~350 ms de decodificado); lo que
+  // este número vigila es que se pinte ELLA y no las que ya has dejado atrás.
+  test('Revista: parar el scroll y ver la página', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.locator('.lib-h1')).toBeVisible();
+    await abrirYMedir(page, PDF_REVISTA, 'pdf');
+    await page.evaluate(async () => {
+      const R: any = await import('/js/pdf-reader.js');
+      await R.setReadingMode('scroll');
+    });
+    await page.waitForTimeout(2000);
+
+    const paradas = await page.evaluate(async () => {
+      const c = document.getElementById('pdf-container')!;
+      const centrada = () => {
+        const mid = c.getBoundingClientRect().top + c.clientHeight / 2;
+        return [...c.querySelectorAll('.pdf-page')].find((el) => {
+          const r = el.getBoundingClientRect();
+          return r.top <= mid && r.bottom >= mid;
+        }) as HTMLElement;
+      };
+      const pintada = (w: HTMLElement) => {
+        const cv = w?.querySelector('canvas:not(.pdf-detail)') as HTMLCanvasElement;
+        return !!(cv && cv.width > 1);
+      };
+      const out: number[] = [];
+      for (let ronda = 0; ronda < 4; ronda++) {
+        // Dedo rápido: doce pantallas seguidas sin dar tiempo a pintar —hojear
+        // una revista, que es el gesto que rompía esto...
+        for (let i = 0; i < 12; i++) {
+          c.scrollTop += c.clientHeight;
+          await new Promise((r) => setTimeout(r, 110));
+        }
+        // ...y parar. Desde aquí, hasta ver la página que tienes delante.
+        const w = centrada();
+        const t0 = performance.now();
+        while (performance.now() - t0 < 20000 && !pintada(w)) {
+          await new Promise((r) => requestAnimationFrame(r));
+        }
+        out.push(performance.now() - t0);
+      }
+      return out;
+    });
+
+    anota('pdf.scroll.stop.p50', p(paradas, 0.5));
+    anotaYExige('pdf.scroll.stop.p95', p(paradas, 0.95));
   });
 });
 
