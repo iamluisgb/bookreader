@@ -12,7 +12,7 @@
 // (Fase 2) completa la garantía. Patrón REST portado de arete (js/drive.js).
 
 import { getAccessToken } from './drive-auth.js';
-import { fetchWithTimeout, fetchArrayBuffer, TRANSFER_TIMEOUT_MS, REQUEST_TIMEOUT_MS } from './net.js';
+import { fetchWithTimeout, fetchBinary, TRANSFER_TIMEOUT_MS, REQUEST_TIMEOUT_MS } from './net.js';
 
 const API = 'https://www.googleapis.com/drive/v3';
 const UPLOAD = 'https://www.googleapis.com/upload/drive/v3';
@@ -146,7 +146,7 @@ export async function readBinary(path, onProgress = null) {
   const file = await findByName(path);
   if (!file) return null;
   const token = await getAccessToken();
-  const r = await fetchArrayBuffer(
+  const r = await fetchBinary(
     `${API}/files/${file.id}?alt=media`,
     { headers: { Authorization: 'Bearer ' + token } },
     onProgress,
@@ -156,7 +156,7 @@ export async function readBinary(path, onProgress = null) {
     err.code = r.status;
     throw err;
   }
-  return { buffer: r.buffer, etag: String(file.version), size: Number(file.size || 0) };
+  return { blob: r.blob, etag: String(file.version), size: Number(file.size || 0) };
 }
 
 // Sube un binario. Hasta MULTIPART_MAX va en una petición (el cuerpo se ensambla

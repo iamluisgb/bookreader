@@ -5,6 +5,42 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-09-14 — Un libro de 400 MB ya no mata la pestaña del móvil al descargarlo
+
+Una revista de 407 MB sincronizada desde el PC dejaba el móvil clavado con la barra a tope. No era
+la red: era que el binario llegaba a existir **cuatro veces a la vez**. `net.js` guardaba los trozos
+del stream en un array y luego los copiaba a un `Uint8Array` final —los 407 MB dos veces, 814 MB de
+pico antes de devolver nada—, la verificación de integridad añadía una copia defensiva
+(`buffer.slice(0)`) para dársela entera a `crypto.subtle.digest`, y el `put` de IndexedDB
+serializaba otra. En un móvil, que corta por memoria mucho antes que un portátil, la pestaña moría a
+mitad de camino.
+
+Ahora la descarga **nunca materializa el fichero en el heap**. `fetchBinary` (antes
+`fetchArrayBuffer`) cierra un Blob parcial cada 4 MB y devuelve un Blob: los bytes los guarda el
+navegador fuera del heap de JS, y los vuelca a disco si crecen. El Blob se guarda tal cual en
+IndexedDB —`hasFile()` ya contaba con las dos formas— y la apertura del libro ya sabía leer ambas.
+
+La verificación tampoco pide el fichero entero. El id **es** el SHA-256 del contenido y comprobarlo
+es lo que garantiza que los subrayados de los otros dispositivos enganchan, así que no se podía
+quitar; lo que se ha quitado es la exigencia de tenerlo en RAM. Como la WebCrypto no sabe hacer
+streaming, hay un SHA-256 incremental propio (`sync/sha256.js`) que lee el Blob a rebanadas de 4 MB
+dentro de un Worker (`sync/hash-blob.js`). Medido sobre 300 MB: el camino viejo tardaba 980 ms con
+115 ms de hilo principal bloqueado; el nuevo tarda 3,2 s **sin pasar de 17 ms** de bloqueo, y da el
+mismo hash. Es más lento y da igual: nadie lo está mirando desde el hilo que pinta. Como sí se nota
+en el reloj, la tarjeta lo dice —estado `verifying`, "Verificando…"— en vez de dejar una barra llena
+que parece colgada.
+
+De propina, dos cosas que se veían de cerca: el progreso se emitía **por trozo recibido** (miles de
+repintados de la tarjeta en una descarga larga) y ahora va limitado a uno cada 200 ms, sin tirar
+nunca un cambio de estado; y por encima de 150 MB la descarga **se pregunta antes**, como hace Play
+Books, en vez de empezar y que el usuario se entere por la barra.
+
+Lo que sigue igual: **abrir** el libro sí lo pasa a un `ArrayBuffer` (`record.file.arrayBuffer()` en
+`app.js`), porque epub.js y pdf.js lo piden así. Para un PDF de cientos de MB eso sigue siendo un
+mordisco de memoria; leerlo por rangos desde el Blob es otro trabajo, y no es este.
+
+---
+
 ## 2026-09-12 — La hoja del agente a media altura ya no tapa: encoge el lector
 
 El snap bajo existía desde el principio con un objetivo escrito en el CSS: *"que preguntar por una

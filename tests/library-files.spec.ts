@@ -90,7 +90,9 @@ test.describe('Biblioteca y archivos entre dos dispositivos', () => {
         await Blobs.requestDownload(id);
         const raw: any = await Store.getRaw(id);
         if (!raw || !raw.file) return { ok: false, hash: null, bytes: 0 };
-        return { ok: true, hash: await DB.hashBuffer(raw.file.slice(0)), bytes: raw.file.byteLength };
+        // El binario se guarda como Blob (ver sync/net.js): fuera del heap.
+        const buf = await new Blob([raw.file]).arrayBuffer();
+        return { ok: true, hash: await DB.hashBuffer(buf), bytes: buf.byteLength };
       }, { id });
 
       expect(bajado.ok).toBe(true);
@@ -313,7 +315,8 @@ test.describe('Ficheros grandes (subida resumable)', () => {
         await Blobs.requestDownload(id);
         const raw: any = await Store.getRaw(id);
         if (!raw || !raw.file) return { bytes: 0, hash: null };
-        return { bytes: raw.file.byteLength, hash: await DB.hashBuffer(raw.file.slice(0)) };
+        const buf = await new Blob([raw.file]).arrayBuffer();
+        return { bytes: buf.byteLength, hash: await DB.hashBuffer(buf) };
       }, { id });
 
       expect(bajado.bytes).toBe(17 * 1024 * 1024);

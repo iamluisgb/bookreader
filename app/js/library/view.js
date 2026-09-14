@@ -121,6 +121,9 @@ function transferOverlayHtml(tr) {
 
 function transferLabel(tr) {
   if (tr.state === 'queued') return t('Preparando…');
+  // La comprobación de integridad de un libro grande tarda segundos: con la
+  // barra llena y el rótulo aún en "Descargando…" parecería atascada.
+  if (tr.state === 'verifying') return t('Verificando…');
   return tr.dir === 'up' ? t('Subiendo…') : t('Descargando…');
 }
 
@@ -449,6 +452,9 @@ function dropdownHtml(key, label, options, current) {
   </div>`;
 }
 
+// A partir de aquí la descarga se pregunta antes (ver startDownload).
+const BIG_DOWNLOAD = 150 * 1024 * 1024;
+
 // Tamaño legible para el botón de descarga ("Descargar · 4,2 MB").
 function humanSize(bytes) {
   if (!bytes) return '';
@@ -729,9 +735,22 @@ async function startDownload(id, { open = false } = {}) {
     return;
   }
   if (!(await ensurePro('files'))) return;
-  await Blobs.requestDownload(id);
+  // Un libro de cientos de MB no es una descarga cualquiera: son minutos de
+  // datos y un buen mordisco al almacenamiento del móvil. Se pregunta, como
+  // hace Play Books, en vez de empezar y que el usuario lo descubra por la
+  // barra.
   const book = await Store.getBook(id);
-  if (open && book && Store.hasFile(book)) onOpenBook(book);
+  const size = (book && book.size) || 0;
+  if (size > BIG_DOWNLOAD) {
+    const ok = await confirmBox(
+      t('«{title}» ocupa {size}. Descargarlo puede tardar y llenar el almacenamiento de este dispositivo.',
+        { title: (book && book.title) || '', size: humanSize(size) }),
+      { title: t('Descarga grande'), okText: t('Descargar') });
+    if (!ok) return;
+  }
+  await Blobs.requestDownload(id);
+  const fresh = await Store.getBook(id);
+  if (open && fresh && Store.hasFile(fresh)) onOpenBook(fresh);
 }
 
 // Pulsar una fila del rail. Clic normal = ver SOLO eso (lo de siempre).

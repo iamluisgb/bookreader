@@ -21,13 +21,16 @@ import * as LibStore from '../library/store.js';
 import * as Drive from './drive-provider.js';
 import * as DriveAuth from './drive-auth.js';
 import * as License from '../license.js';
-import { hashBuffer } from '../ai/db.js';
+import { hashBlob } from './hash-blob.js';
 import { BASE } from './layout.js';
 
 // Por encima de esto NO se sube solo: consumir varios cientos de MB de la cuota
 // de Drive del usuario sin que lo pida sería abusivo. El menú del libro ofrece
 // subirlo a mano y el id queda en MANUAL_KEY.
 export const MAX_AUTO_UPLOAD = 50 * 1024 * 1024;
+
+// Cadencia máxima de los eventos de progreso (ver emit).
+const PROGRESS_MS = 200;
 
 const MANUAL_KEY = 'blob_manual_uploads';  // ids que el usuario mandó subir pese al tamaño
 const ENABLED_KEY = 'sync_files';          // interruptor general de sync de ficheros
@@ -38,7 +41,18 @@ let current = null;  // { id, dir, loaded, total }
 
 // ---- Estado / eventos --------------------------------------------------------
 
+// Un evento por trozo recibido eran miles de repintados en una descarga
+// grande (la tarjeta se redibuja en cada uno). El progreso solo tiene que
+// moverse a ojo: 200 ms basta. Los cambios de estado —queued, done, error— no
+// se tiran nunca, que son los que mandan en la UI.
+let lastRunningEmit = 0;
+
 function emit(detail) {
+  if (detail.state === 'running') {
+    const now = Date.now();
+    if (now - lastRunningEmit < PROGRESS_MS) return;
+    lastRunningEmit = now;
+  }
   window.dispatchEvent(new CustomEvent('bookreader:blob-progress', { detail }));
 }
 
@@ -118,17 +132,25 @@ async function downloadOne(id) {
       return false;
     }
     // Verificación de integridad: el id ES el hash del fichero, así que
-    // comprobarlo sale gratis y garantiza que los subrayados enganchan. Los ids
-    // heredados (nombre de fichero, epubjs:…) no son hashes: no se verifican.
+    // comprobarlo garantiza que los subrayados enganchan. Los ids heredados
+    // (nombre de fichero, epubjs:…) no son hashes: no se verifican.
+    //
+    // Estado propio ('verifying') porque en un libro grande esto tarda lo suyo,
+    // y una barra al 100% que sigue diciendo "Descargando…" se lee como colgada.
     if (/^[0-9a-f]{64}$/i.test(id)) {
-      const got = await hashBuffer(r.buffer.slice(0));
+      current = { id, dir: 'down', loaded: r.blob.size, total: r.blob.size };
+      emit({ ...current, state: 'verifying' });
+      const got = await hashBlob(r.blob);
       if (got !== id) {
         emit({ id, dir: 'down', state: 'error', message: t('El fichero descargado no coincide con el original.') });
         return false;
       }
     }
-    await LibStore.putBook({ ...record, file: r.buffer, size: r.buffer.byteLength }, { stamp: false });
-    emit({ id, dir: 'down', state: 'done', loaded: r.buffer.byteLength, total: r.buffer.byteLength });
+    // Se guarda el Blob tal cual, sin pasar por ArrayBuffer: IndexedDB los
+    // almacena nativamente y así el binario nunca llega a estar entero en el
+    // heap. hasFile() ya contaba con las dos formas (byteLength | size).
+    await LibStore.putBook({ ...record, file: r.blob, size: r.blob.size }, { stamp: false });
+    emit({ id, dir: 'down', state: 'done', loaded: r.blob.size, total: r.blob.size });
     return true;
   } catch (e) {
     emit({ id, dir: 'down', state: 'error', message: transferMessage(e) });

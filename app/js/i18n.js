@@ -954,6 +954,11 @@ const EN = {
   'Preparando…': 'Preparing…',
   'Descargando…': 'Downloading…',
   'Subiendo…': 'Uploading…',
+  'Verificando…': 'Verifying…',
+  'Descarga grande': 'Large download',
+  'Descargar': 'Download',
+  '«{title}» ocupa {size}. Descargarlo puede tardar y llenar el almacenamiento de este dispositivo.':
+    '“{title}” is {size}. Downloading it may take a while and fill up this device\'s storage.',
   'Solo notas': 'Notes only',
   'Sincronización': 'Sync',
   'Archivo no disponible': 'File not available',

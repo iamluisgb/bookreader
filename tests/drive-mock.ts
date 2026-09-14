@@ -147,7 +147,7 @@ export async function installDriveMocks(
     if (dl && method === 'GET' && url.searchParams.get('alt') === 'media') {
       const f = [...store.values()].find((x) => x.id === dl[1]);
       if (!f) return route.fulfill({ status: 404, body: '' });
-      // Content-Length: lo usa fetchArrayBuffer para el progreso de la descarga.
+      // Content-Length: lo usa fetchBinary para el progreso de la descarga.
       return f.binary
         ? route.fulfill({ body: f.binary, headers: { 'Content-Length': String(f.binary.length) } })
         : route.fulfill({ body: f.content });
