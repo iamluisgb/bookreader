@@ -636,12 +636,34 @@ async function openBookRecord(record, { fromRoute = false, loc = null } = {}) {
     // Si el usuario salió a la biblioteca a mitad de carga, no tocar la ruta ni la UI.
     if (!currentBook || currentBook.id !== record.id) return;
     await LibStore.updateBook(record.id, { lastOpenedAt: Date.now() });
+    migrateFileToBlob(record);
     if (!fromRoute) writeRoute(record.id, currentLoc());   // pushState: atrás → biblioteca
   } catch (e) {
     console.error('No se pudo abrir el libro de la biblioteca:', e);
     await alertBox('No se pudo abrir el libro guardado.');
     currentBook = null;
   }
+}
+
+// El binario de un libro guardado como ArrayBuffer se pasa a Blob la primera vez
+// que se abre.
+//
+// IndexedDB no sabe actualizar campos sueltos: cada escritura de la ficha
+// —el progreso de CADA pase de página, lastOpenedAt, el estado— reescribe el
+// registro entero, binario incluido. Con un ArrayBuffer eso es copiarlo entero
+// dos veces (medido: ~4 ms por MB, o sea segundo y medio por página en una
+// revista de 400 MB); con un Blob, IndexedDB lo referencia y la escritura sale
+// plana, 1 ms sea cual sea el tamaño.
+//
+// Va después de la apertura y sin await: la conversión copia el fichero una vez
+// —lo caro de una sola vez, no de cada página— y no hay por qué esperarla para
+// empezar a leer.
+function migrateFileToBlob(record) {
+  if (!(record.file instanceof ArrayBuffer)) return;
+  const type = record.format === 'pdf' ? 'application/pdf' : 'application/epub+zip';
+  const file = new Blob([record.file], { type });
+  LibStore.patchBook(record.id, { file }, { stamp: false })
+    .catch(e => console.warn('No se pudo migrar el binario a Blob:', e));
 }
 
 // Guardar/actualizar un libro recién abierto desde un archivo (con portada).
@@ -663,7 +685,10 @@ async function persistToLibrary(id, buffer, format, fileName, fileBaseId) {
     const base = existing || { id, addedAt: Date.now(), progress: 0, lastCfi: null, status: 'unread', shelfIds: [] };
     await LibStore.putBook({
       ...base, id, title, author, cover: cover || base.cover || '',
-      format, fileName, fileBaseId, file: buffer.slice(0), size: buffer.byteLength,
+      format, fileName, fileBaseId, size: buffer.byteLength,
+      // Blob y no ArrayBuffer: es lo que hace barata cada escritura posterior
+      // de la ficha (ver migrateFileToBlob).
+      file: new Blob([buffer], { type: format === 'pdf' ? 'application/pdf' : 'application/epub+zip' }),
       lastOpenedAt: Date.now(),
       // Reimportar a mano un libro borrado lo revive (y con updatedAt de ahora,
       // así el tombstone que sigue vivo en los otros dispositivos pierde el LWW
@@ -1203,7 +1228,7 @@ async function loadFile(file) {
 
   const fileBaseId = file.name.replace(/\.[^.]+$/, '');
   // Hash estable del contenido: id canónico para biblioteca, agente Y subrayados/marcadores.
-  const id = await AiDB.hashBuffer(buffer.slice(0));
+  const id = await AiDB.hashBuffer(buffer);
   // Identidad unificada: migra subrayados/marcadores guardados con el nombre del fichero al
   // hash, y de ahí al canónico si el sync aliasó este libro con la copia de otro dispositivo.
   const annotId = Aliases.canonicalOf(id);
@@ -1248,7 +1273,7 @@ async function loadEpub(buffer, bookId, aiBookId, persist = null) {
     console.log('Loading EPUB, buffer size:', buffer.byteLength);
 
     // Hash estable del fichero (id canónico). Se reutiliza si ya viene calculado.
-    if (!aiBookId) aiBookId = await AiDB.hashBuffer(buffer.slice(0));
+    if (!aiBookId) aiBookId = await AiDB.hashBuffer(buffer);
 
     // Setup callbacks BEFORE load so we don't miss first events
     EpubReader.onProgress((pct, unit) => {
@@ -1355,7 +1380,7 @@ async function loadPdf(buffer, bookId, aiBookId, persist = null, displayTitle = 
     EpubReader.deactivate();
     totalWords = 0;   // el de este PDF se estima al final; no heredar el del libro anterior
     // Hash estable del contenido (id canónico para el agente). Se reutiliza si ya viene dado.
-    if (!aiBookId) aiBookId = await AiDB.hashBuffer(buffer.slice(0));
+    if (!aiBookId) aiBookId = await AiDB.hashBuffer(buffer);
 
     // Setup callback BEFORE load
     PdfReader.onPage((page) => {

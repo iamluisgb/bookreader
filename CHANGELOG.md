@@ -5,6 +5,35 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-09-14 — Pasar página en una revista de 400 MB dejó de costar segundo y medio
+
+La navegación iba a trompicones en un PDF enorme, y el culpable no estaba en el lector: estaba en
+IndexedDB. Cada pase de página guarda el progreso, y guardar el progreso pasa por `patchBook`, que
+no puede actualizar un campo suelto —IndexedDB no sabe— y reescribe el **registro entero, con el
+binario dentro**. El fichero se copiaba dos veces por página.
+
+Medido en este repo, con el mismo `patchBook` y el mismo registro, cambiando solo cómo se guarda el
+binario:
+
+| libro | `file` = ArrayBuffer | `file` = Blob |
+|---|---|---|
+| 10 MB | 77 ms | 1 ms |
+| 100 MB | 403 ms | 1 ms |
+| 200 MB | 810 ms | 1 ms |
+| 407 MB | ~1,6 s (extrapolado) | 1 ms |
+
+La diferencia es que un Blob IndexedDB lo **referencia**, y un ArrayBuffer lo copia. El coste con
+Blob no es que sea pequeño: es que es **plano**, no depende del tamaño del libro. Así que el
+binario se guarda como Blob al importar, y los libros que ya estaban guardados como ArrayBuffer se
+migran la primera vez que se abren (`migrateFileToBlob`, después de la apertura y sin `await`: la
+conversión copia el fichero una vez, que es justo lo que se deja de hacer en cada página).
+
+De paso, tres copias que no defendían de nada: `hashBuffer(buffer.slice(0))` en las tres aperturas.
+`crypto.subtle.digest` no detacha lo que le pasas, así que esa copia era un fichero entero de más en
+memoria en el peor momento — abriendo un libro grande, con pdf.js haciendo la suya al lado.
+
+---
+
 ## 2026-09-14 — Un libro de 400 MB ya no mata la pestaña del móvil al descargarlo
 
 Una revista de 407 MB sincronizada desde el PC dejaba el móvil clavado con la barra a tope. No era
