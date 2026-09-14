@@ -5,6 +5,35 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-09-14 — Doble página también en PDF: una revista se lee abierta
+
+El modo «Doble» existía solo para EPUB y en PDF estaba **ocultado a propósito**, con un argumento
+escrito en `app.js`: la doble página es cosa de contenido reflowable, y un PDF ya trae su propia
+maquetación. Es cierto para un libro y falso para una revista: una revista está maquetada para verse
+abierta, y sus dobles páginas de foto —lo que ocupa las dos hojas— se parten por la mitad si se ven
+de una en una. Se revierte esa decisión.
+
+El emparejado es el de la revista física: **la portada va sola** y a partir de ahí par-impar (2-3,
+4-5…), así el pliego que ves coincide con el que se imprimió. Emparejando 1-2 saldría todo corrido
+una página y las dobles quedarían partidas igual, que es justo lo que se venía a evitar.
+
+Cada hoja es un `.pdf-page` normal —su canvas, su capa de texto, sus subrayados—, así que todo lo que
+ya sabía trabajar sobre una página sigue funcionando sin enterarse de que ahora hay dos: citas,
+búsqueda, selección, zoom, recorte. Y `goTo(7)` dibuja el pliego 6-7 pero deja la página actual en la
+**7**: los subrayados y las citas de la 7 apuntan a la 7, no a la hoja izquierda.
+
+Detalles que se ven al usarlo: el pie dice el pliego entero («Pág. 2-3 / 60») porque con una sola
+cifra el número saltaba de dos en dos y parecía que se perdía una página; retroceder va al pliego
+anterior y no a la hoja de al lado, que ya la tienes delante; y por debajo de 700 px de ancho se
+dibuja **una** hoja sin apagar el modo, de forma que girar el móvil a horizontal devuelve el pliego
+sin tener que volver a elegirlo.
+
+Lo que **no** cambia: el ajuste sigue siendo al ancho, así que un pliego más alto que la ventana se
+sigue recorriendo hacia abajo, igual que una página suelta hoy. Un «ajustar al alto» es otra cosa y
+no entra aquí.
+
+---
+
 ## 2026-09-14 — El scroll de una revista deja de ser una sucesión de huecos en blanco
 
 Hojear un PDF de fotos a toda página era ir viendo huecos grises: la página aparecía segundo y pico

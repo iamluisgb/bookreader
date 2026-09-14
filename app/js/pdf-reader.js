@@ -12,7 +12,7 @@ let claimSeq = 0;
 let currentPage = 1;
 let totalPages = 0;
 let onPageCallback = null;
-let readingMode = 'paginated';   // 'paginated' | 'scroll' (continuo), recordado por libro
+let readingMode = 'paginated';   // 'paginated' | 'spread' (doble) | 'scroll', recordado por libro
 // Id CANÓNICO del libro (SHA-256 del fichero), que app.js pasa a load(). Ver `bookKey()`.
 let canonicalId = null;
 let lazyObserver = null;         // observer del render perezoso en modo scroll
@@ -64,6 +64,43 @@ let zoomHandlersReady = false;
 let zoomPreviewing = false;     // hay un gesto de zoom en curso (preview con transform)
 let fitWidth = 0;               // ancho de contenedor con el que se calcularon las cajas
 const PDF_PAD = 20;             // padding del contenedor (coincide con el CSS)
+
+// ---- Doble página (revistas) ------------------------------------------------
+//
+// El EPUB ya tenía 'spread' y el PDF lo tenía vetado a propósito: la doble
+// página es cosa de contenido reflowable, y un PDF ya trae su maquetación. En
+// una REVISTA eso se vuelve del revés — está pensada para verse abierta, y las
+// dobles páginas de foto se parten por la mitad si se ven de una en una.
+//
+// El emparejado es el de una revista física: la portada va SOLA y a partir de
+// ahí par-impar (2-3, 4-5…). Así el pliego que ves coincide con el que se
+// imprimió; emparejando 1-2 saldría todo corrido una página y las dobles
+// quedarían partidas igual, que es justo lo que se venía a evitar.
+const SPREAD_GAP = 12;          // hueco entre las dos hojas, en px (coincide con el CSS)
+// Por debajo de esto media página queda tan estrecha que no se lee. El modo NO
+// se apaga —sigue guardado— pero se dibuja una sola hoja: girar el móvil a
+// horizontal devuelve el pliego sin tener que volver a elegirlo.
+const MIN_SPREAD_W = 700;
+
+// ¿Toca dibujar pliego AHORA? (modo elegido + sitio para ponerlo)
+function spreadOn() {
+  if (readingMode !== 'spread') return false;
+  const c = document.getElementById('pdf-container');
+  return !c || c.clientWidth >= MIN_SPREAD_W;
+}
+
+// Hoja izquierda del pliego al que pertenece `n`.
+function spreadLeft(n) {
+  return n <= 1 ? 1 : (n % 2 === 0 ? n : n - 1);
+}
+
+// Las dos hojas del pliego de `n`: [izquierda, derecha|null]. La portada y —en un
+// libro de páginas pares— la última van solas.
+function spreadPair(n) {
+  const left = spreadLeft(n);
+  if (left === 1) return [1, null];                       // la portada, sola
+  return [left, left + 1 <= totalPages ? left + 1 : null];
+}
 const OVERSAMPLE = 1.5;         // el canvas base se pinta 1.5× → preview nítido sin re-render
 const MAX_BACKING_PX = 3000;    // tope del lado mayor del canvas base (memoria)
 const ZOOM_MIN = 1, ZOOM_MAX = 6;
@@ -106,7 +143,11 @@ function cropOffset(fitw) { return fitw * cropX; }
 const FIT_MAX = 1.5;
 function fitScale(baseWidth) {
   const c = document.getElementById('pdf-container');
-  const avail = (c ? c.clientWidth : 800) - PDF_PAD * 2;
+  let avail = (c ? c.clientWidth : 800) - PDF_PAD * 2;
+  // En pliego caben DOS hojas y el hueco de en medio: cada una dispone de la
+  // mitad. Sin esto, cada hoja se rasteriza al ancho entero y el pliego se sale
+  // del contenedor.
+  if (spreadOn()) avail = (avail - SPREAD_GAP) / 2;
   const visible = baseWidth * cropW;
   if (!(avail > 0) || !(visible > 0)) return FIT_MAX;
   return Math.min(avail, baseWidth * FIT_MAX) / visible;
@@ -451,7 +492,7 @@ export async function load(arrayBuffer, onProgress, bookId = null) {
   try {
     const k = bookKey();
     const m = k ? Storage.get('pdfMode_' + k) : null;
-    if (m === 'scroll' || m === 'paginated') readingMode = m;
+    if (m === 'scroll' || m === 'paginated' || m === 'spread') readingMode = m;
   } catch (e) {}
 
   // Ajuste de ancho recordado por libro (al papel por defecto). El recorte se resuelve
@@ -475,7 +516,7 @@ export async function load(arrayBuffer, onProgress, bookId = null) {
 export function getReadingMode() { return readingMode; }
 
 export async function setReadingMode(mode) {
-  if ((mode !== 'scroll' && mode !== 'paginated') || mode === readingMode) return;
+  if (!['scroll', 'paginated', 'spread'].includes(mode) || mode === readingMode) return;
   readingMode = mode;
   try { const k = bookKey(); if (k) Storage.set('pdfMode_' + k, mode); } catch (e) {}
   await rerender();
@@ -661,11 +702,13 @@ async function rerender() {
   fitWidth = container.clientWidth;
   container.innerHTML = '';
   container.classList.toggle('pdf-scroll', readingMode === 'scroll');
+  container.classList.toggle('pdf-spread-mode', spreadOn());
   const layer = document.createElement('div');
   layer.id = 'pdf-zoom-layer';
   container.appendChild(layer);
   ensureZoomHandlers();
   if (readingMode === 'scroll') await renderScroll();
+  else if (spreadOn()) await renderSpread(currentPage);
   else await renderPaginated(currentPage);
 }
 
@@ -678,6 +721,12 @@ async function refit() {
   if (!pdfDoc || !container) return;
   const avail = container.clientWidth;
   if (!avail || avail === fitWidth) return;   // el alto no afecta al ajuste: nada que hacer
+  // Girar el móvil puede cruzar el umbral del pliego en cualquiera de los dos
+  // sentidos, y eso no es un reajuste de tamaños: es otro montaje. Se rehace.
+  if (spreadOn() !== container.classList.contains('pdf-spread-mode')) {
+    await rerender();
+    return;
+  }
   fitWidth = avail;
   const pages = pdfPages();
   if (!pages.length) return;
@@ -846,6 +895,38 @@ function ensureZoomHandlers() {
 }
 
 // Modo paginado: un único wrapper reutilizado (comportamiento clásico).
+// Pinta el pliego de `num`: dos hojas en fila, cada una un .pdf-page normal (con
+// su canvas, su capa de texto y sus subrayados), así que todo lo que ya sabía
+// trabajar sobre una página —citas, búsqueda, selección— sigue funcionando sin
+// enterarse de que ahora hay dos.
+async function renderSpread(num) {
+  const layer = zoomLayer();
+  const [left, right] = spreadPair(num);
+  let row = layer.querySelector('.pdf-spread');
+  if (!row) {
+    layer.innerHTML = '';
+    row = document.createElement('div');
+    row.className = 'pdf-spread';
+    layer.appendChild(row);
+  }
+  const hojas = [left, right].filter(n => n !== null);
+  // Reutilizar los wrappers que ya están (mismo camino que el paginado) en vez
+  // de recrearlos: renderInto hace doble buffer y así al pasar pliego no hay
+  // parpadeo de caja vacía.
+  const wrappers = Array.from(row.querySelectorAll('.pdf-page'));
+  while (wrappers.length > hojas.length) { const w = wrappers.pop(); dropDetail(w); w.remove(); }
+  while (wrappers.length < hojas.length) {
+    const w = document.createElement('div');
+    w.className = 'pdf-page';
+    row.appendChild(w);
+    wrappers.push(w);
+  }
+  // En serie: dos renders a la vez se estorban en el worker y la izquierda es la
+  // que el lector mira primero.
+  for (let i = 0; i < hojas.length; i++) await renderInto(wrappers[i], hojas[i]);
+  setCurrentPage(num);
+}
+
 async function renderPaginated(num) {
   const layer = zoomLayer();
   let wrapper = layer.querySelector('.pdf-page');
@@ -1171,7 +1252,15 @@ function updateProgress() {
   const pageEl = document.getElementById('progress-page');
   if (bar) bar.style.width = pct + '%';
   if (text) text.textContent = pct + '%';
-  if (pageEl) pageEl.textContent = `Pág. ${currentPage} / ${totalPages}`;
+  // En pliego el pie dice las DOS hojas ("Pág. 2-3 / 133"): con una sola, al
+  // pasar de pliego el número saltaba de dos en dos y parecía que se perdía una.
+  let etiqueta = String(currentPage);
+  if (spreadOn()) {
+    const [izq, der] = spreadPair(currentPage);
+    if (der) etiqueta = `${izq}-${der}`;
+    else etiqueta = String(izq);
+  }
+  if (pageEl) pageEl.textContent = `Pág. ${etiqueta} / ${totalPages}`;
 }
 
 // Salto por fracción [0..1] de la barra de progreso → página correspondiente.
@@ -1183,10 +1272,22 @@ export async function seekToFraction(f) {
 }
 
 export async function prev() {
+  // En pliego se retrocede al pliego ENTERO anterior, no a la hoja de al lado:
+  // la de al lado ya la tienes delante.
+  if (spreadOn()) {
+    const anterior = spreadLeft(currentPage) - 2;
+    if (spreadLeft(currentPage) > 1) await move(Math.max(1, anterior));
+    return;
+  }
   if (currentPage > 1) await move(currentPage - 1);
 }
 
 export async function next() {
+  if (spreadOn()) {
+    const siguiente = spreadLeft(currentPage) === 1 ? 2 : spreadLeft(currentPage) + 2;
+    if (siguiente <= totalPages) await move(siguiente);
+    return;
+  }
   if (currentPage < totalPages) await move(currentPage + 1);
 }
 
@@ -1206,6 +1307,8 @@ async function move(page) {
     const target = container?.querySelector(`.pdf-page[data-page="${page}"]`);
     if (target) { const cr = container.getBoundingClientRect(), tr = target.getBoundingClientRect(); container.scrollTop += tr.top - cr.top; }
     setCurrentPage(page);
+  } else if (spreadOn()) {
+    await renderSpread(page);
   } else {
     await renderPaginated(page);
   }

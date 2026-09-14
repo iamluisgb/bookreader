@@ -926,6 +926,17 @@ body:not(.scroll-mode) .epub-container .epub-view {
   gap: calc(12px * var(--pdf-zoom, 1));
 }
 
+/* Doble página (revistas): las dos hojas en fila, con el mismo hueco que escala
+   con el zoom que usa el modo continuo entre páginas. `align-items: flex-start`
+   porque dos hojas de distinto alto —pasa en revistas escaneadas— deben quedar
+   alineadas por arriba, no centradas cada una por su cuenta. */
+.pdf-spread {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: calc(12px * var(--pdf-zoom, 1));
+}
+
 .pdf-page {
   position: relative;
   flex: none;

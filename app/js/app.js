@@ -536,11 +536,10 @@ function updateFormatScopedUI() {
     btn.setAttribute('aria-checked', on ? 'true' : 'false');
     btn.tabIndex = on ? 0 : -1;          // tabindex móvil: el grupo es UNA parada
   });
-  // La doble página es reflowable: el PDF ya trae su propia maquetación y el
-  // selector es el mismo control para los dos formatos.
-  document.querySelectorAll('.reading-mode-btn[data-epub-only]').forEach(btn => {
-    btn.style.display = isPdf ? 'none' : '';
-  });
+  // La doble página ya no se oculta en PDF: se ocultaba con el argumento de que
+  // es cosa de contenido reflowable —cierto para un libro, falso para una
+  // revista, que está pensada para verse abierta y trae dobles páginas de foto
+  // que de una en una salen partidas por la mitad.
   // Grupos de ajustes marcados con data-format: fuera los que no aplican. Sin esto el
   // panel enseñaba «Papel (PDF)» leyendo un EPUB y cuatro controles de tipografía sobre
   // un PDF que los ignora.
