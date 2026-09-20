@@ -900,6 +900,77 @@ async function openShelfMenu(id, anchor) {
 
 // ---- menú de libro ---------------------------------------------------------
 
+// Nombre del fichero que se exporta. `fileName` puede venir vacío en una ficha
+// que llegó por sync (library-sync.js propaga lo que tuviera el origen, y los
+// libros viejos no lo guardaban), así que hay plan B con el título. Se limpian
+// los caracteres que no valen en un nombre de fichero: el nombre sale del
+// título del EPUB, que es texto libre.
+function exportName(record) {
+  const ext = record.format === 'pdf' ? 'pdf' : 'epub';
+  const raw = (record.fileName || `${record.title || 'libro'}.${ext}`).replace(/[\\/:*?"<>|]/g, '_').trim();
+  const safe = raw || `libro.${ext}`;
+  return new RegExp(`\\.${ext}$`, 'i').test(safe) ? safe : `${safe}.${ext}`;
+}
+
+const mimeFor = (format) => (format === 'pdf' ? 'application/pdf' : 'application/epub+zip');
+
+// ¿Sabe este navegador compartir FICHEROS? El móvil sí (hoja del sistema:
+// AirDrop, WhatsApp…), el Chrome de escritorio no. Decide el VERBO del menú:
+// "Compartir" abre la hoja y "Exportar" deja el fichero en Descargas, y ofrecer
+// uno para hacer el otro sería mentir sobre lo que va a pasar al pulsar.
+//
+// Se prueba con un fichero de juguete porque `canShare` exige un File real, y
+// del mismo tipo porque el soporte depende de la extensión: Android comparte
+// PDF y rechaza EPUB. Por eso la pregunta es por formato y no global.
+function canShareFile(format) {
+  if (!navigator.canShare) return false;
+  const type = mimeFor(format);
+  try {
+    return navigator.canShare({ files: [new File([new Uint8Array(1)], 'probe.' + (format === 'pdf' ? 'pdf' : 'epub'), { type })] });
+  } catch (_) {
+    return false;
+  }
+}
+
+// Saca el ARCHIVO del libro de la biblioteca: Web Share con el fichero donde lo
+// haya (el camino real para mandárselo a alguien desde el móvil) y descarga en
+// el resto. Es la ÚNICA vía de recuperar el binario una vez importado: la copia
+// de Drive vive en el appDataFolder, que no se ve en drive.google.com ni se
+// puede compartir (ver sync/drive-provider.js).
+async function exportBook(id) {
+  const record = await Store.getRaw(id);
+  if (!record || !Store.hasFile(record)) {
+    await alertBox(t('El archivo no está en este dispositivo. Descárgalo primero y vuelve a intentarlo.'),
+      { title: t('Exportar archivo') });
+    return;
+  }
+  const type = mimeFor(record.format);
+  // El binario se guarda como Blob desde la migración; los libros importados
+  // antes siguen con ArrayBuffer hasta que se abren (app.js · migrateFileToBlob).
+  const blob = record.file instanceof Blob ? record.file : new Blob([record.file], { type });
+  const name = exportName(record);
+  const file = new File([blob], name, { type });
+
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try {
+      await navigator.share({ files: [file] });
+      return;
+    } catch (e) {
+      // Cancelar es una respuesta, no un fallo: no se cae a la descarga.
+      if (e && e.name === 'AbortError') return;
+      console.warn('No se pudo compartir el archivo, se descarga:', e);
+    }
+  }
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 // Libera el archivo de ESTE dispositivo dejando la ficha fantasma. Si todavía no
 // está en Drive, lo sube primero: quitarlo sin copia no sería liberar espacio,
 // sería borrar el libro. Devuelve si se llegó a liberar.
@@ -987,6 +1058,11 @@ async function openBookMenu(id, anchor) {
   if (!local && uploaded) {
     storage = `<button class="lib-menu-item" data-act="download">${icon('download', { size: 16 })}<span>${t('Descargar a este dispositivo')}</span></button>`;
   } else if (local) {
+    const size = humanSize(book.size);
+    const label = canShareFile(book.format)
+      ? (size ? t('Compartir archivo ({size})…', { size }) : t('Compartir archivo…'))
+      : (size ? t('Exportar archivo ({size})…', { size }) : t('Exportar archivo…'));
+    storage += `<button class="lib-menu-item" data-act="export">${icon('share', { size: 16 })}<span>${label}</span></button>`;
     if (!uploaded && (book.size || 0) > Blobs.MAX_AUTO_UPLOAD) {
       storage += `<button class="lib-menu-item" data-act="upload">${icon('upload', { size: 16 })}<span>${t('Subir a Drive ({size})', { size: humanSize(book.size) })}</span></button>`;
     }
@@ -1014,6 +1090,7 @@ async function openBookMenu(id, anchor) {
   `, async (act, item) => {
     if (act === 'open') { await openCard(id); return; }
     if (act === 'download') { await startDownload(id); return; }
+    if (act === 'export') { await exportBook(id); return; }
     if (act === 'upload') {
       if (!DriveAuth.isConnected()) {
         await alertBox(t('Conecta con Google Drive en Ajustes para subir tus libros.'), { title: t('Sincronización') });

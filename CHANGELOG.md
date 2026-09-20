@@ -31,6 +31,32 @@ Tres piezas:
 El marcador de la Answer en blanco pasó a constante compartida por el subrayado y el extractor,
 para que ambas rutas dejen la entrada con la misma forma.
 
+## 2026-09-16 — El libro también sale
+
+Un fichero entraba en BookReader y no volvía a salir. Importas un EPUB, borras el original del
+disco, y meses después quieres pasárselo a alguien: el binario sigue ahí —en IndexedDB, entero—
+pero no había ninguna manera de recuperarlo. «Descargar a este dispositivo» suena a eso y no lo
+es: trae el fichero de Drive a IndexedDB, no te da un archivo. Y la copia de Drive tampoco servía
+de escape, porque vive en el **appDataFolder**, que no se ve en drive.google.com ni se puede
+compartir. Tres sitios donde está el libro y ninguna puerta.
+
+Ahora el menú del libro saca el fichero cuando el binario está en este dispositivo: Web Share
+donde lo haya —que en el móvil es el camino real para mandárselo a alguien— y descarga en el
+resto. Sale con el nombre con el que entró.
+
+La entrada dice lo que va a pasar al pulsarla: **Compartir archivo (4.2 MB)…** donde hay hoja del
+sistema, **Exportar archivo (4.2 MB)…** donde el fichero acaba en Descargas. Y lo pregunta por
+formato, no una vez y para todo, porque el soporte depende de la extensión: Android comparte PDF
+y rechaza EPUB. El tamaño va en la etiqueta por la misma razón que en «Subir a Drive»: antes de
+soltar 400 MB por una hoja de compartir conviene saber que son 400 MB.
+
+Los bytes son los mismos, y eso importa más de lo que parece: el `bookId` es su SHA-256, así que
+quien lo reciba e importe obtiene el mismo id, y el día que compartáis subrayados enganchan solos
+sobre el mismo libro.
+
+En una ficha fantasma la entrada no aparece. No hay nada que sacar de un dispositivo donde el
+fichero no está, y lo que se ofrece en su lugar es traérselo primero.
+
 ## 2026-09-16 — La demo también ve
 
 Quedaba un agujero de la misma familia que el del micrófono. «Explícame esta figura» exige un
