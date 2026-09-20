@@ -915,6 +915,10 @@ usuario se queda con la grande y la sección pierde el sentido.
     localización**, así que se pasan varias páginas sin que la unidad se mueva, y medir así
     descartaba como ausente justo al lector lento. Va contra el **hueco sin señales de vida**: cada
     vuelta de página es señal aunque no cambie de unidad; del ritmo global ya responde MIN_WPM.
+  - **2ª corrección (PDF técnico):** el hueco tampoco puede tener un corte fijo. Una página densa
+    de un manual se tarda cinco minutos en leer **sin pasar nada entre medias**, y los 2 min fijos
+    la descartaban entera. El techo de inactividad ahora crece con las palabras de la unidad (suelo
+    2 min, techo 10 min): una página corta sigue igual de vigilada y una densa tolera su lectura.
 - **F2 — Pantalla** `M` · **✓ (2026-09-12, ver CHANGELOG)**: [`js/analysis.js`](app/js/analysis.js),
   overlay hermano de Ajustes generales con entrada desde el rail de la estantería (carga perezosa:
   arrastra registro + libreta + SRS, y nada de eso hace falta para pintar la estantería). Semana/mes,

@@ -43,10 +43,15 @@ const DEVICE_KEY = 'device_id';
 // de cada uno se deducirá de sus propios tramos válidos cuando haya con qué (F2).
 const MIN_WPM = 50;
 const MAX_WPM = 600;
-// Hueco sin cambiar de posición a partir del cual el tramo deja de ser lectura. Dos
-// minutos mirando la misma página es posible; también lo es haber ido a por un café, y no
-// hay forma de distinguirlos, así que no se cuenta.
+// Suelo del hueco sin cambiar de posición a partir del cual el tramo deja de ser lectura.
+// El techo real depende de la UNIDAD (ver idleMsFor): una página de manual técnico puede
+// tener 700 palabras y tardarse cinco minutos en leerla sin pasar nada entre medias; con un
+// corte fijo de 2 min ese tramo entero se descartaba como ausencia aunque se estuviera
+// leyendo. Dos minutos mirando una página corta sigue siendo sospechoso; una densa, no.
 const IDLE_MS = 2 * 60 * 1000;
+// Techo duro: por muchos cientos de palabras que tenga la unidad, un silencio mayor que
+// esto ya no es «leer despacio», es haber dejado el libro abierto. Acota la inflación.
+const IDLE_MAX_MS = 10 * 60 * 1000;
 // Tramos contiguos y a ritmo plausible que hay que encadenar tras un salto para volver a
 // contar. Cuesta hasta tres "páginas" de lectura legítima por salto; a cambio, rastrear un
 // capítulo entero a base de saltos no suma ni un minuto.
@@ -142,10 +147,19 @@ const reqP = (request) => new Promise((resolve, reject) => {
 // como "ausente" justo al lector lento, que es el que más está leyendo. Cada vuelta de
 // página es señal de vida aunque la unidad no cambie; que el ritmo global sea humano ya lo
 // vigila MIN_WPM.
+// Techo de inactividad para una unidad: su suelo es IDLE_MS, pero crece con las palabras
+// de la unidad hasta el tiempo que tardaría en leerse al ritmo humano más lento (MIN_WPM).
+// Un libro con páginas de 700 palabras tolera hasta ~10 min de silencio (el techo duro);
+// una localización de EPUB (~205) sigue con ~4 min. Así una página densa cuenta aunque no
+// haya señales intermedias, que es el caso real de leer un PDF técnico.
+function idleMsFor(unitWords) {
+  return Math.min(IDLE_MAX_MS, Math.max(IDLE_MS, (unitWords / MIN_WPM) * 60000));
+}
+
 export function classify(from, to, dt, gap, unitWords, maxStep) {
   const step = to - from;
   if (step === 0) return 'hold';          // misma unidad: el tramo sigue abierto
-  if (gap > IDLE_MS) return 'idle';       // se fue a por un café (o cerró el portátil)
+  if (gap > idleMsFor(unitWords)) return 'idle';  // se fue a por un café (o cerró el portátil)
   if (step < 0 || step > maxStep) return 'seek';
   if (dt <= 0) return 'skim';
   const wpm = (step * unitWords) / (dt / 60000);

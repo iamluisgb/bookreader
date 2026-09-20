@@ -7,8 +7,9 @@ const EPUB_PATH = path.join(__dirname, 'test.epub');
 // el reloj se inyecta en `position()`, así que no hay esperas reales.
 //
 // Unidad de prueba: 205 palabras (una localización de epub.js), maxStep 4. A ese tamaño,
-// 40 s por unidad son ~307 wpm (lectura), 5 s son ~2460 wpm (barrido) y 200 s pasan del
-// corte de inactividad.
+// 40 s por unidad son ~307 wpm (lectura) y 5 s son ~2460 wpm (barrido). El corte de
+// inactividad NO es fijo: crece con las palabras de la unidad (ver idleMsFor), porque una
+// página de manual técnico tarda mucho más en leerse que una localización de novela.
 
 const BOOK = { unitWords: 205, maxStep: 4 };
 
@@ -18,24 +19,30 @@ test('clasifica el tramo: lectura, barrido, inactividad y salto', async ({ page 
     const RL = await import('/js/reading-log.js');
     // Sin señales intermedias el hueco es el tramo entero (gap = dt).
     const c = (from: number, to: number, dt: number, gap = dt) => RL.classify(from, to, dt, gap, 205, 4);
+    // Página densa de manual (700 palabras), sin señales intermedias.
+    const denso = (dt: number) => RL.classify(10, 11, dt, dt, 700, 4);
     return {
       read: c(10, 11, 40000),
       skim: c(10, 11, 5000),
-      idle: c(10, 11, 200000),
+      idle: c(10, 11, 300000),           // 5 min para 205 palabras: 41 wpm
       seekFar: c(10, 40, 40000),
       seekBack: c(10, 9, 40000),
       hold: c(10, 10, 40000),
       // Lector lento con señales de vida (páginas más pequeñas que la unidad): tres
       // minutos por localización son ~68 wpm, gente leyendo despacio, no gente ausente.
       lento: c(10, 11, 180000, 45000),
-      // Los mismos tres minutos SIN tocar nada: eso ya no es leer.
-      ausente: c(10, 11, 180000, 180000),
+      // Una página densa sin señales intermedias: 5 min son 140 wpm. Con el corte fijo de
+      // 2 min que había antes esto se descartaba ENTERO como ausencia.
+      denso: denso(300000),
+      // ...pero un silencio que ni a ese ritmo se puede atribuir a leer (11 min, por encima
+      // del techo de inactividad) sí se descarta.
+      densoAusente: denso(660000),
     };
   });
   expect(v).toEqual({
     read: 'read', skim: 'skim', idle: 'idle',
     seekFar: 'seek', seekBack: 'seek', hold: 'hold',
-    lento: 'read', ausente: 'idle',
+    lento: 'read', denso: 'read', densoAusente: 'idle',
   });
 });
 
@@ -203,4 +210,25 @@ test('páginas más pequeñas que la unidad: el lector lento cuenta', async ({ p
 
   expect(res.units).toBe(3);
   expect(res.ms).toBeGreaterThan(3 * 120000);   // más de lo que el corte de 2 min permitía
+});
+
+// 2ª vuelta de la prueba en la app real: un PDF técnico (O'Reilly) tiene páginas densas que
+// se tardan cinco minutos en leer SIN pasar nada entre medias. El corte fijo de 2 min las
+// descartaba enteras, y el análisis contaba mucho menos de lo leído. El techo de inactividad
+// crece con las palabras de la unidad, así que la página tolera su tiempo de lectura.
+test('una página densa sin señales intermedias cuenta (PDF técnico)', async ({ page }) => {
+  await page.goto('/');
+  const res = await page.evaluate(async () => {
+    const RL = await import('/js/reading-log.js');
+    const t0 = Date.now();
+    await RL.startBook('libro-denso', { unitWords: 700, maxStep: 2 });
+    RL.position(100, t0);
+    RL.position(101, t0 + 300000);      // 5 min en una sola página
+    await RL.endBook(t0 + 300000);
+    await RL.flush();
+    const s = await RL.summary(1, t0);
+    return s.books['libro-denso'];
+  });
+  expect(res.ms).toBe(300000);
+  expect(res.units).toBe(1);
 });

@@ -5,6 +5,24 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-09-20 — El análisis deja de castigar la lectura densa
+
+Leyendo un PDF técnico de O'Reilly, el análisis contaba bastante menos de lo leído de verdad. No era
+un fallo de la cifra, sino de su umbral: el contador descarta el tramo cuando pasan más de **2 minutos
+sin una nueva señal de posición**, y ese corte era fijo. Una página de manual tiene cientos de
+palabras y se tarda cinco minutos en leerla sin pasar nada entre medias, así que cada página densa
+caía entera por «ausencia» aunque estuvieras leyendo. En una novela o en móvil no se nota —la página
+se pasa en menos de dos minutos— pero en un técnico se lleva por delante casi todo el rato.
+
+El techo de inactividad ahora crece con las palabras de la **unidad** que se está leyendo: su suelo
+sigue siendo 2 min, pero llega hasta el tiempo que tardaría en leerse al ritmo humano más lento
+(50 wpm) y se corta a los 10 min. Una localización de EPUB (~205 palabras) tolera ~4 min; una página
+densa de 700, hasta ese techo. El control de ritmo (MIN_WPM) sigue siendo la valla de fondo, y con
+un silencio mayor que el techo la página se sigue descartando.
+
+Regresión en [`tests/reading-log.spec.ts`](tests/reading-log.spec.ts), con el caso «página densa sin
+señales intermedias» medido por el camino real (`startBook`/`position`).
+
 ## 2026-09-20 — El lado derecho vuelve a estirarse (y el PDF lo sigue)
 
 El tirador del panel del agente llevaba tiempo sin existir. El panel no trae su markup en el
