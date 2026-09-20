@@ -26,6 +26,9 @@ export function repairGatewayConfig() {
   if (!/^br-/i.test(key) || isGatewayUrl(baseUrl)) return false;
   Storage.set('ai_base_url', GATEWAY_BASE_URL);
   Storage.set('ai_model', 'bookreader-fast');
-  Storage.set('ai_vision_model', '');
+  Storage.set('ai_vision_model', 'bookreader-vision');
+  // El dictado por proveedor tiene su propio alias en el gateway. Dejar aquí el de otro
+  // proveedor repetiría el bug que arregla este módulo, pero en el micrófono.
+  Storage.set('ai_stt_model', 'bookreader-voice');
   return true;
 }

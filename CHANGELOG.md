@@ -31,6 +31,56 @@ Tres piezas:
 El marcador de la Answer en blanco pasó a constante compartida por el subrayado y el extractor,
 para que ambas rutas dejen la entrada con la misma forma.
 
+## 2026-09-16 — La demo también ve
+
+Quedaba un agujero de la misma familia que el del micrófono. «Explícame esta figura» exige un
+modelo con visión configurado, y la demo lo dejaba vacío a propósito, con un comentario que decía
+que el alias de texto ya enrutaba. No era cierto: son alias distintos, y el gateway tenía
+`bookreader-vision` listo desde siempre. Así que la demo mandaba al usuario a Ajustes a escribir
+un id de modelo — lo único que con un token de demo **no se puede hacer**, porque cualquier id que
+no sea un alias nuestro es un 400.
+
+Ahora el alias de visión viaja con el resto de la configuración, también en el enlace de traspaso,
+igual que el de dictado.
+
+De paso, dos cosas que aparecieron midiendo:
+
+- El modelo de visión razona antes de responder, y con el techo de salida corto devuelve
+  **respuesta vacía** en vez de error (`finish_reason: 'length'`, `content: ''`). El único
+  llamador real ya pedía 2048 —holgado: sobre una página real gastó 402 y 849—, pero el defecto
+  de `_chatVision` seguía en 1024, esperando al primer llamador que no lo pasara. Ahora coinciden.
+- `caps` en la tabla de routing no lo leía nadie y además estaba desfasado: `deepseek-v4-flash`
+  describe imágenes perfectamente pese a declarar `vision: false`. Se queda como está —el turno de
+  visión debe ir a un sitio previsible— pero ahora dice lo que es: un papel declarado, no una
+  medida. Y le da un uso: es de donde sale el alias que se le manda al cliente.
+
+## 2026-09-15 — El micrófono de la demo también dicta
+
+El dictado por proveedor lleva desde que existe apuntando a `/v1/audio/transcriptions`, pero el
+gateway solo tenía cuatro rutas y esa no era una: quien usaba la demo recibía el 404 genérico y el
+cliente se lo enseñaba como *«el proveedor no ofrece transcripción, o el modelo no existe»* —
+culpando al modelo cuando el que faltaba era el endpoint.
+
+Ahora el gateway lo enruta, con las mismas reglas que el chat: cuesta una llamada de cuota, pasa
+por los disyuntores del día, se le reenvía una allowlist de campos y **un solo** fichero (varios
+serían varias transcripciones cobradas como una), y si el proveedor se cae la llamada vuelve a la
+cuota. El audio tiene techo propio, 20 MB: una transcripción cuesta lo mismo dure lo que dure, así
+que el tamaño es el único freno real.
+
+El alias es `bookreader-voice` y vive en un catálogo aparte del de chat. Tenía que ser aparte:
+«Descubrir» lo habría ofrecido como modelo de respuesta, que es un 404 esperando su turno. Viaja
+al cliente con el resto de la configuración —también en el enlace de traspaso—, porque un micro
+que hereda el `whisper-1` del proveedor anterior falla treinta segundos después de hablar, que es
+el peor momento para enterarse. Por lo mismo, cambiar de proveedor ahora lo limpia: vacío es el
+dictado del navegador, que funciona siempre.
+
+Y el `prompt` sigue siendo lo que justifica todo esto. Misma grabación, contra el gateway:
+
+```
+sin prompt: "Las matrices de bajo rago se multiplican en el KVKH."
+con prompt: "Las matrices de bajo rango se multiplican en el KV cache."
+```
+
 ## 2026-09-14 — Pasar página en una revista: de 376 ms a 13
 
 Pasar página costaba exactamente lo que cuesta rasterizarla: **376 ms** en una revista de fotos, y

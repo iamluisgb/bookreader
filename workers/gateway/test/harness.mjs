@@ -42,12 +42,19 @@ export function nuevoEnv(extra = {}) {
 }
 
 // Upstream de mentira: registra lo que se le pide y responde como el proveedor.
-export function stubUpstream() {
+//
+// `responder(llamada)` permite fingir un fallo del proveedor (la devolución de cuota
+// solo se puede comprobar si el upstream puede caerse). El cuerpo se registra parseado:
+// JSON en el chat y el `FormData` tal cual en la transcripción, que no es JSON.
+export function stubUpstream(responder) {
   const llamadas = [];
   globalThis.fetch = async (url, init) => {
-    llamadas.push({ url, body: JSON.parse(init.body) });
-    return new Response(JSON.stringify({ choices: [], usage: { prompt_tokens: 7, completion_tokens: 5 } }),
-      { status: 200, headers: { 'Content-Type': 'application/json' } });
+    const esForm = init.body instanceof FormData;
+    const llamada = { url, form: esForm ? init.body : null, body: esForm ? null : JSON.parse(init.body) };
+    llamadas.push(llamada);
+    return responder?.(llamada)
+      ?? new Response(JSON.stringify({ choices: [], usage: { prompt_tokens: 7, completion_tokens: 5 } }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } });
   };
   return llamadas;
 }

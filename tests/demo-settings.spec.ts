@@ -56,6 +56,23 @@ test('pegar una key propia sí cambia de proveedor', async ({ page }) => {
   expect(await leer(page, 'ai_model')).toBe('deepseek-v4-flash');
 });
 
+// Mismo bug que el token, en el micrófono: el alias de voz del gateway solo existe en el
+// gateway. Cambiar de proveedor sin limpiarlo dejaba el dictado mandando audio a un modelo
+// que el proveedor nuevo no conoce, con el agravante de que el fallo llega 30 segundos
+// después de hablar. Vacío = dictado del navegador, que funciona siempre.
+test('cambiar de proveedor no se lleva puesto el alias de dictado de la demo', async ({ page }) => {
+  await seed(page, {
+    ai_base_url: GATEWAY, ai_key: TOKEN, ai_model: 'bookreader-fast',
+    ai_stt_model: 'bookreader-voice',
+  });
+  await abrirAgente(page);
+  await page.selectOption('#appset-provider', 'nan');
+  await page.fill('#appset-key', 'sk-mia');
+  await page.locator('#appset-save').click();
+
+  expect(await leer(page, 'ai_stt_model')).toBe('');
+});
+
 test('la vista avanzada tampoco borra el token de la demo al guardar', async ({ page }) => {
   await seed(page, { ai_base_url: GATEWAY, ai_key: TOKEN, ai_model: 'bookreader-fast', ai_advanced: true });
   await abrirAgente(page);
@@ -74,6 +91,8 @@ test('un token del gateway con otra base URL se repara al cargar', async ({ page
 
   expect(await leer(page, 'ai_base_url')).toBe(GATEWAY);
   expect(await leer(page, 'ai_model')).toBe('bookreader-fast');
-  expect(await leer(page, 'ai_vision_model')).toBe('');
+  // La visión NO se limpia: el gateway tiene su propio alias multimodal, y dejarlo vacío
+  // apagaba "Explícame esta figura" en la demo.
+  expect(await leer(page, 'ai_vision_model')).toBe('bookreader-vision');
   await expect(page.locator('.appset-demo-on')).toBeVisible();
 });

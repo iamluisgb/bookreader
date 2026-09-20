@@ -430,6 +430,11 @@ function wireAgentSimple(content) {
     LLM.setModel(d.model);
     LLM.setVisionModel(d.visionModel);
     LLM.setLiteModel(d.liteModel);
+    // El dictado por proveedor es opcional y su id NO es portable entre proveedores: el
+    // alias de la demo (`bookreader-voice`) o el `whisper` de otro no existen aquí, y
+    // heredarlos rompería el micro en cuanto se cambia de proveedor. Vacío = dictado del
+    // navegador, que funciona siempre; quien quiera el suyo lo escribe en avanzadas.
+    LLM.setSttModel('');
     LLM.setAutoExtract(content.querySelector('#appset-auto').checked);
     agentDraft = null;
     const ok = content.querySelector('#appset-saved');

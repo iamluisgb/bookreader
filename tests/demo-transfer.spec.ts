@@ -42,6 +42,43 @@ test('un enlace de traspaso configura la demo en este dispositivo', async ({ pag
   expect(await leer(page, 'ai_demo_quota')).toEqual({ remaining: 27, total: 30 });
 });
 
+// El dictado por proveedor necesita su propio alias (el gateway lo enruta a whisper). Si
+// el traspaso no lo trajera, el micro del móvil se quedaría con el motor del navegador —
+// o peor, con el `whisper-1` del proveedor que hubiera antes, que este token no puede usar.
+test('el traspaso trae también el modelo de dictado del gateway', async ({ page }) => {
+  await stubQuota(page, {
+    remaining: 27, quota: 30, tier: 'demo', product: 'bookreader',
+    model: 'bookreader-fast', sttModel: 'bookreader-voice',
+  });
+  await page.goto('/#demo=' + TOKEN);
+
+  await expect(page.locator('.ai-toast')).toContainText('27');
+  expect(await leer(page, 'ai_stt_model')).toBe('bookreader-voice');
+});
+
+test('un gateway que no ofrece dictado no deja puesto el del proveedor anterior', async ({ page }) => {
+  await seed(page, { ai_stt_model: 'whisper-1' });
+  await stubQuota(page, { remaining: 27, quota: 30, model: 'bookreader-fast' });
+  await page.goto('/#demo=' + TOKEN);
+
+  await expect(page.locator('.ai-toast')).toContainText('27');
+  expect(await leer(page, 'ai_stt_model')).toBe('');
+});
+
+// "Explícame esta figura" mandaba a Ajustes a configurar un modelo con visión, que es lo
+// único que un token de demo no puede hacer: cualquier id que no sea alias del gateway
+// da 400. El alias existe; solo faltaba que viajara con la configuración.
+test('el traspaso trae el alias de visión, y no el del proveedor anterior', async ({ page }) => {
+  await seed(page, { ai_vision_model: 'mimo-v2.5' });
+  await stubQuota(page, {
+    remaining: 27, quota: 30, model: 'bookreader-fast', visionModel: 'bookreader-vision',
+  });
+  await page.goto('/#demo=' + TOKEN);
+
+  await expect(page.locator('.ai-toast')).toContainText('27');
+  expect(await leer(page, 'ai_vision_model')).toBe('bookreader-vision');
+});
+
 // El token es la credencial: dejarlo en la barra de direcciones lo mete en el historial
 // y en cualquier enlace que el usuario copie después sin fijarse.
 test('el token desaparece de la URL nada más abrirla', async ({ page }) => {

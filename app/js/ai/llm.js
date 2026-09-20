@@ -561,7 +561,11 @@ async function _chatTools({ messages, tools, toolChoice = 'auto', maxTokens = 10
 // Llamada MULTIMODAL (texto + imagen) al MODELO DE VISIÓN. `messages` ya trae el contenido
 // en formato OpenAI-compatible (content puede ser un array con {type:'text'} y
 // {type:'image_url'}). No streaming (más simple y suficiente para un turno de visión).
-async function _chatVision({ messages, signal, maxTokens = 1024 }) {
+// `maxTokens` por defecto 2048 y no 1024: el modelo de visión de la demo (mimo-v2.5)
+// razona antes de responder y con 1024 puede devolver `content: ''` con
+// `finish_reason: 'length'` — una respuesta vacía, que es peor que un error. Medido el
+// 2026-09-16 sobre una página real: 402 y 849 tokens de salida, holgado dentro de 2048.
+async function _chatVision({ messages, signal, maxTokens = 2048 }) {
   const key = getKey().trim();
   if (!key) throw new Error(t('Falta la API key.'));
   const model = getVisionModel();
@@ -692,6 +696,15 @@ export async function requestDemoToken() {
   setBaseUrl(GATEWAY_BASE_URL);
   setKey(body.token);
   setModel(body.model || 'bookreader-fast');
+  // El dictado por proveedor entra con la demo: el gateway enruta su propio alias de voz
+  // (ver workers/gateway). Se escribe SIEMPRE, también vacío, porque heredar el modelo de
+  // un proveedor anterior ("whisper-1") mandaría el audio a un alias que este token no
+  // tiene — el mismo motivo por el que la visión se limpia en `importDemoToken`.
+  setSttModel(body.sttModel || '');
+  // Y la visión, por lo mismo: el gateway tiene su propio alias multimodal. Sin esto,
+  // "Explícame esta figura" mandaba a Ajustes a configurar un modelo con visión — que es
+  // justo lo que un token de demo no puede hacer.
+  setVisionModel(body.visionModel || '');
   // El cupo se conoce ya al emitir: así el medidor existe desde el primer momento y
   // no aparece de golpe a mitad de la primera respuesta.
   const total = Number(body.quota ?? body.remaining);
@@ -744,10 +757,14 @@ export async function importDemoToken(token) {
   setBaseUrl(GATEWAY_BASE_URL);
   setKey(tok);
   setModel(info.model || 'bookreader-fast');
-  // La demo no configura modelo de visión aparte (el alias de texto ya enruta), y
-  // heredar el de un proveedor anterior mandaría las imágenes a un modelo que este
-  // token no puede usar: 400 `model_not_found` en "Explicar lo que veo".
-  setVisionModel('');
+  // La visión tiene alias propio en el gateway y viene con el resto de la configuración.
+  // Se escribe SIEMPRE, también vacío: heredar el modelo de un proveedor anterior
+  // mandaría las imágenes a uno que este token no puede usar (400 `model_not_found` en
+  // "Explicar lo que veo"), que fue el motivo original de limpiarlo aquí.
+  setVisionModel(info.visionModel || '');
+  // El dictado sí tiene alias propio, y por lo mismo se escribe siempre (ver
+  // `requestDemoToken`): el traspaso lleva la configuración ENTERA o no sirve.
+  setSttModel(info.sttModel || '');
   const total = Number(info.quota ?? info.remaining);
   if (total > 0) Storage.set(QUOTA_KEY, { remaining: Number(info.remaining), total });
   window.dispatchEvent?.(new CustomEvent('llm:quota', { detail: getQuota() }));

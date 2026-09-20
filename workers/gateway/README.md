@@ -89,7 +89,8 @@ medidor sin esperar a la primera respuesta. Ver ADR-032.
 curl -H 'Authorization: Bearer br-demo-…' \
   https://bookreader-gateway.luisgonzalezb93.workers.dev/quota
 # {"remaining":27,"quota":100,"tier":"demo","product":"bookreader",
-#  "model":"bookreader-fast","models":[…]}
+#  "model":"bookreader-fast","models":[…],
+#  "sttModel":"bookreader-voice","visionModel":"bookreader-vision"}
 ```
 
 Token desconocido o revocado → 401 (así el cliente puede rechazar el enlace en vez de quedarse
@@ -131,6 +132,57 @@ npx wrangler d1 execute bookreader-gateway --remote --command \
 Añadir un producto = una entrada en `PRODUCTS`, sus filas en `ROUTING` y su origen en
 `ALLOWED_ORIGINS`. Nada más: la emisión, la validación y el desglose salen de ahí.
 
+## Dictado por proveedor (voz → texto)
+
+`POST /v1/audio/transcriptions` (multipart, formato OpenAI). Existe porque el motor de
+dictado del navegador se corta en cada pausa y no admite `prompt` — y el `prompt` es justo
+lo que arregla el vocabulario técnico. Medido contra el gateway el 2026-09-15, misma
+grabación:
+
+```
+sin prompt: "Las matrices de bajo rago se multiplican en el KVKH."
+con prompt: "Las matrices de bajo rango se multiplican en el KV cache."
+```
+
+El alias es **`bookreader-voice`** y va en un catálogo aparte del de chat (`kind: 'stt'`):
+no aparece en `/v1/models` —ofrecerlo como modelo de respuesta sería ofrecer un 404— y
+llega al cliente por `sttModel` en `/demo-token` y `/quota`, que es lo que autoconfigura el
+micrófono en el dispositivo que recibe un traspaso.
+
+```bash
+curl -X POST https://bookreader-gateway.luisgonzalezb93.workers.dev/v1/audio/transcriptions \
+  -H 'Authorization: Bearer br-demo-…' \
+  -F 'file=@voz.wav' -F 'model=bookreader-voice' -F 'language=es' \
+  -F 'prompt=Capítulo sobre atención: KV cache, matrices de bajo rango.'
+```
+
+Cuesta **una llamada de cuota**, dure lo que dure el audio, y pasa por los mismos
+disyuntores diarios que el chat. Al proveedor se le reenvía una allowlist de campos
+(`file`, `model`, `prompt`, `language`) y **un solo** `file`: varios serían varias
+transcripciones cobradas como una.
+
+El id real del proveedor es `whisper` a secas; los nombres largos (`whisper-1`,
+`whisper-large-v3`, `gpt-4o-transcribe`) devuelven *"This API key does not have access to
+the requested model"*. Se puede cambiar sin tocar código con la var `NAN_STT_MODEL`.
+
+## Visión
+
+`bookreader-vision` → `mimo-v2.5`. Es un alias de chat normal (sale en `/v1/models` y se
+usa contra `/v1/chat/completions` con `content` multimodal), pero además viaja aparte como
+`visionModel` en `/demo-token` y `/quota`: el cliente lo necesita en un slot propio, y un
+token de demo no puede escribir a mano el id de ningún modelo —cualquiera que no sea alias
+nuestro es un 400—, así que sin mandarlo la demo se quedaba sin «Explícame esta figura».
+
+`caps.vision` en la tabla de routing es una **declaración de papel, no una medida**:
+`deepseek-v4-flash` también describe imágenes (medido el 2026-09-16) y aun así
+`bookreader-fast` declara `vision: false`. El turno de visión tiene que ir a un sitio
+previsible, y el modelo verificado para figuras de libro es el otro.
+
+Ojo con el techo de salida: mimo-v2.5 razona antes de responder, así que con
+`max_tokens` corto devuelve `content: ''` y `finish_reason: 'length'` — una respuesta
+vacía, no un error. Sobre una página real gastó 402 y 849 tokens de salida; el cliente
+pide 2048.
+
 ## Límites de entrada (anti-abuso)
 
 `MAX_TOKENS_CAP` solo acota la **salida**. Sin techos de entrada, una llamada puede
@@ -143,6 +195,7 @@ llevar megas de mensajes y sigue contando **1** contra la cuota y contra
 | Tamaño del body | 1 MB | `413 request_too_large` |
 | Contexto de texto | 90 000 tokens (~4 chars/token) | `413 context_too_large` |
 | Imágenes por petición | 2 | `400 too_many_images` |
+| Audio por transcripción | 20 MB | `413 audio_too_large` |
 
 Los tres rechazan **antes** del decremento: una petición inválida no gasta cuota. El
 peor caso legítimo (visión: captura de 1024px + texto de página) ronda 500 KB, y el
@@ -162,9 +215,10 @@ paga el usuario de la demo.
 npm run test:gateway     # node --test
 ```
 
-Tres ficheros: los helpers de límites son puros (allowlist, medición de entrada, buckets
-de IP); `quota.test.mjs` cubre `GET /quota` (validar sin gastar cupo, agotado ≠ inválido); y
-`products.test.mjs` conduce el Worker entero contra **SQLite real**
+Cuatro ficheros: los helpers de límites son puros (allowlist, medición de entrada, buckets
+de IP); `quota.test.mjs` cubre `GET /quota` (validar sin gastar cupo, agotado ≠ inválido);
+`transcription.test.mjs`, el dictado (que cueste cuota, que los dos catálogos de alias no se
+crucen, que el audio tenga techo); y `products.test.mjs` conduce el Worker entero contra **SQLite real**
 (`node:sqlite` con estas mismas migraciones, arnés compartido en `test/harness.mjs`) para lo
 que no es puro: emisión por producto, alias cruzados, cuota y desglose. Un doble de D1 a mano
 tendría que fingir `RETURNING`, `ON CONFLICT` y `date('now')`, que es donde vive la atomicidad

@@ -30,6 +30,12 @@ const DEFAULT_PRODUCT = 'bookreader';   // los clientes ya desplegados no lo man
 
 // Tabla de routing: alias público → destino real + capacidades. Una fila por
 // alias; `provider` está para el día que haya un segundo backend (OpenRouter…).
+//
+// `caps.vision` es una DECLARACIÓN DE PAPEL, no una medida: dice cuál es el alias que
+// se ofrece para ver, no qué modelos son capaces. deepseek-v4-flash también describe
+// imágenes (medido el 2026-09-16), y aun así `bookreader-fast` sigue declarando
+// `vision: false`: el turno de visión tiene que ir a un sitio previsible, y el modelo
+// verificado para leer figuras de libro es el otro.
 export const ROUTING = {
   'bookreader-fast': {
     product: 'bookreader',
@@ -58,6 +64,27 @@ export const ROUTING = {
     caps: { tools: true, vision: false },
     free: true,
   },
+  // Dictado por proveedor (voz → texto). `kind: 'stt'` porque NO es un modelo de chat:
+  // vive en otro endpoint y el cliente lo configura en otro campo (Ajustes → Modelo de
+  // transcripción). Sin distinguirlo, "Descubrir" lo ofrecería como modelo de respuesta
+  // y la primera pregunta moriría con un 404 del proveedor.
+  //
+  // Por qué existe: el motor del navegador (SpeechRecognition) se corta en cada pausa y
+  // no admite `prompt`, que es justo lo que arregla el vocabulario técnico ("bajo rago"
+  // → "bajo rango"). Ver `app/js/ai/llm.js:transcribe`.
+  //
+  // `modelEnv`: el id real del proveedor se puede cambiar desde `wrangler.jsonc` sin
+  // desplegar código, que es lo mismo que ya hace `urlEnv` con la base URL.
+  'bookreader-voice': {
+    product: 'bookreader',
+    provider: 'nan',
+    kind: 'stt',
+    // `whisper` a secas es el id que nan tiene habilitado para nuestra key: los
+    // nombres largos (whisper-large-v3, whisper-1, gpt-4o-transcribe) devuelven
+    // "This API key does not have access to the requested model" (medido 2026-09-15).
+    model: 'whisper',
+    modelEnv: 'NAN_STT_MODEL',
+  },
   // arete (Quirón). El chat es streaming CON tools, igual que el de bookreader.
   'arete-fast': {
     product: 'arete',
@@ -75,9 +102,23 @@ export const ROUTING = {
   },
 };
 
+// El alias de VISIÓN del producto: el declarado para ver (`caps.vision`). Viaja al
+// cliente en la emisión y en `/quota` por el mismo motivo que `sttModel` — sin él, la
+// demo mandaba a Ajustes a configurar un modelo con visión que un token de demo no
+// puede escribir (cualquier id que no sea alias nuestro es un 400).
+export function visionFor(product) {
+  return aliasesFor(product).find((id) => ROUTING[id].caps?.vision) || '';
+}
+
 // Alias visibles para un producto. Un token solo puede usar los suyos.
-export function aliasesFor(product) {
-  return Object.keys(ROUTING).filter((id) => ROUTING[id].product === product);
+//
+// `kind` separa dos catálogos que NO son intercambiables: los de chat van en el campo
+// "modelo" del cliente y los de transcripción en el suyo. Por defecto 'chat' para que
+// todo lo que ya preguntaba por los alias (modelos, /quota, mensajes de error) siga
+// devolviendo exactamente lo mismo.
+export function aliasesFor(product, kind = 'chat') {
+  return Object.keys(ROUTING)
+    .filter((id) => ROUTING[id].product === product && (ROUTING[id].kind || 'chat') === kind);
 }
 
 // `urlEnv` permite apuntar el proveedor a otro sitio sin tocar código: un mock en
@@ -100,6 +141,11 @@ const LIMITS = {
   bodyChars: 1_048_576,  // 1 MB; el peor caso legítimo (visión: imagen + texto) ronda 500 KB
   inputTokens: 90_000,   // solo texto, misma estimación de ~4 chars/token que context.js
   images: 2,             // el cliente adjunta 1 página por turno
+  // Audio del dictado. El techo de Whisper es 25 MB; el peor caso legítimo está muy por
+  // debajo (una explicación de 10 minutos en opus ronda los 5 MB), así que 20 MB deja
+  // margen de sobra sin regalar un canal de subida: una transcripción cuesta UNA llamada
+  // de cuota dure lo que dure, así que el tamaño es el único freno real al abuso.
+  audioBytes: 20 * 1024 * 1024,
 };
 
 // Parámetros que se reenvían al proveedor. Allowlist y no `...body` a propósito:
@@ -128,6 +174,9 @@ export default {
       }
       if (url.pathname === '/v1/chat/completions' && request.method === 'POST') {
         return withCors(await handleChat(request, env, ctx), cors);
+      }
+      if (url.pathname === '/v1/audio/transcriptions' && request.method === 'POST') {
+        return withCors(await handleTranscription(request, env, ctx), cors);
       }
       if (url.pathname === '/demo-token' && request.method === 'POST') {
         return withCors(await handleDemoToken(request, env), cors);
@@ -170,9 +219,14 @@ async function handleQuota(request, env) {
   const tok = await getToken(request, env);
   if (!tok.ok) return tok.response;
   const models = aliasesFor(tok.product);
+  // `sttModel` viaja por el mismo motivo que `models`: la configuración que recibe el
+  // dispositivo del enlace tiene que estar COMPLETA. Sin él, el dictado por proveedor
+  // quedaba apagado en el móvil (o peor: heredaba el modelo del proveedor anterior).
   const res = json(200, {
     remaining: tok.remaining, quota: tok.quota, tier: tok.tier,
     product: tok.product, model: models[0], models,
+    sttModel: aliasesFor(tok.product, 'stt')[0] || '',
+    visionModel: visionFor(tok.product),
   });
   // Las mismas cabeceras que el chat: el cliente tiene UN solo camino para leer el cupo.
   const h = new Headers(res.headers);
@@ -212,39 +266,16 @@ async function handleChat(request, env, ctx) {
   // El alias tiene que existir Y ser del producto del token. Sin lo segundo, el
   // desglose por producto sería decorativo: cualquier token podría gastar por la
   // puerta de la otra app y el consumo quedaría atribuido al alias, no a quien paga.
+  // …y ser un alias de CHAT: el de dictado enruta a otro endpoint del proveedor, así
+  // que mandarlo aquí sería un 404 suyo disfrazado de error nuestro.
   const route = ROUTING[body.model];
-  if (!route || route.product !== tok.product) {
+  if (!route || route.product !== tok.product || (route.kind || 'chat') !== 'chat') {
     return oaiError(400, 'model_not_found',
       `Unknown model "${body.model}". Available: ${aliasesFor(tok.product).join(', ')}.`);
   }
 
-  // DISYUNTOR global (F3): tope de llamadas demo/día. Protege el gasto máximo
-  // diario aunque el abuso sea distribuido (VPNs, muchas IPs). Incremento atómico
-  // con RETURNING; un pequeño rebase por peticiones en vuelo es irrelevante.
-  if (tok.tier === 'demo') {
-    const st = await bumpStat(env, 'demo_calls', tok.product);
-    if (st > num(env.MAX_DAILY_CALLS, 2000)) {
-      return oaiError(403, 'demo_paused',
-        'The demo is taking a breather today (daily budget reached). Come back tomorrow, or add your own API key in Settings → Agent.');
-    }
-  }
-
-  // Decremento ATÓMICO: solo pasa si el token sigue activo y con cuota. El
-  // RETURNING evita la carrera leer-luego-escribir entre peticiones simultáneas.
-  // Los alias `free` no descuentan, pero SÍ exigen cuota viva: si no, el cupo agotado
-  // dejaría media app funcionando y el usuario no entendería qué se ha roto.
-  const dec = route.free
-    ? (tok.remaining > 0 ? { remaining: tok.remaining } : null)
-    : await env.DB
-      .prepare('UPDATE tokens SET remaining = remaining - 1 WHERE token = ?1 AND active = 1 AND remaining > 0 RETURNING remaining')
-      .bind(tok.token).first();
-  if (!dec) {
-    // El token existía (getToken lo validó) → la cuota se agotó entre medias o justo ahora.
-    // 403 y no 429 a propósito: el cliente (IA3) reintenta los 429 con backoff y aquí
-    // reintentar no ayuda; el 403 aflora el mensaje al usuario a la primera.
-    return oaiError(403, 'demo_exhausted',
-      'Demo quota exhausted. Add your own API key in Settings → Agent (BYOK) to keep using the agent.');
-  }
+  const charge = await chargeCall(env, tok, route);
+  if (charge.error) return charge.error;
 
   const provider = PROVIDERS[route.provider];
   const baseUrl = env[provider.urlEnv] || provider.baseUrl;
@@ -261,17 +292,7 @@ async function handleChat(request, env, ctx) {
     }),
   });
 
-  // El fallo del proveedor no lo paga el usuario: si el upstream se cae (o rechaza
-  // por concurrencia sobre la key compartida — riesgo aceptado en ADR-021 §6), se
-  // devuelve la llamada a la cuota. Perder llamadas de la demo sin recibir nada es
-  // la peor primera impresión posible justo donde queremos convertir.
-  let remaining = dec.remaining;
-  if (upstream.status >= 500 && !route.free) {
-    const back = await env.DB
-      .prepare('UPDATE tokens SET remaining = remaining + 1 WHERE token = ?1 RETURNING remaining')
-      .bind(tok.token).first();
-    if (back) remaining = back.remaining;
-  }
+  const remaining = await refundIfUpstreamFailed(env, tok, route, upstream.status, charge.remaining);
 
   // El TOTAL viaja con cada respuesta para que el cliente pueda pintar el consumo en
   // porcentaje sin recordar nada: si tuviera que guardarse con cuánto empezó, limpiar
@@ -311,6 +332,137 @@ async function handleChat(request, env, ctx) {
   }
   ctx?.waitUntil(addStats(env, stats, null, tok.product));
   return new Response(text, { status: upstream.status, headers });
+}
+
+// POST /v1/audio/transcriptions — dictado por proveedor (voz → texto), formato OpenAI.
+//
+// El motor del navegador no necesita gateway; ESTE sí, y sin la ruta el cliente recibía
+// el 404 genérico y lo traducía a "el proveedor no ofrece transcripción" — un mensaje
+// que apuntaba al modelo cuando el que faltaba era el endpoint.
+//
+// No es passthrough del multipart tal cual: se reconstruye con una allowlist de campos,
+// por el mismo motivo que `PASSTHROUGH` en el chat. Aquí además importa que `file` no
+// pueda colarse por duplicado (varios ficheros = varias transcripciones cobradas como
+// una). Retención cero intacta: el audio se reenvía y no se guarda ni se loguea.
+async function handleTranscription(request, env, ctx) {
+  const tok = await getToken(request, env);
+  if (!tok.ok) return tok.response;
+
+  // El tamaño, ANTES de leer el cuerpo: un multipart enorme no debe llegar a memoria
+  // solo para acabar rechazado. `Content-Length` puede faltar (chunked), y entonces el
+  // que decide es el tamaño del fichero ya parseado, unas líneas más abajo.
+  const declared = Number(request.headers.get('Content-Length') || 0);
+  if (declared > LIMITS.audioBytes) return audioTooLarge();
+
+  let form;
+  try { form = await request.formData(); } catch {
+    return oaiError(400, 'invalid_request', 'Body must be multipart/form-data.');
+  }
+
+  const files = form.getAll('file');
+  const file = files[0];
+  if (files.length !== 1 || typeof file === 'string' || !file?.size) {
+    return oaiError(400, 'invalid_request', 'Exactly one audio file is required (field "file").');
+  }
+  if (file.size > LIMITS.audioBytes) return audioTooLarge();
+
+  const alias = String(form.get('model') || '');
+  const route = ROUTING[alias];
+  if (!route || route.product !== tok.product || route.kind !== 'stt') {
+    return oaiError(400, 'model_not_found',
+      `Unknown transcription model "${alias}". Available: ${aliasesFor(tok.product, 'stt').join(', ')}.`);
+  }
+
+  const charge = await chargeCall(env, tok, route);
+  if (charge.error) return charge.error;
+
+  const provider = PROVIDERS[route.provider];
+  const baseUrl = env[provider.urlEnv] || provider.baseUrl;
+
+  const out = new FormData();
+  // El nombre del fichero viaja porque algunos proveedores deciden el formato por la
+  // extensión (el cliente ya lo elige según el MIME en `extFor`).
+  out.append('file', file, file.name || 'audio.webm');
+  out.append('model', (route.modelEnv && env[route.modelEnv]) || route.model);
+  // `prompt` es lo que justifica el dictado por proveedor: sesga el vocabulario con el
+  // contexto del capítulo. El recorte es el mismo que aplica el cliente (224 tokens de
+  // Whisper ≈ 900 caracteres); aquí se repite porque el cliente no es la única puerta.
+  const prompt = form.get('prompt');
+  if (typeof prompt === 'string' && prompt) out.append('prompt', prompt.slice(0, 900));
+  const language = form.get('language');
+  if (typeof language === 'string' && language) out.append('language', language.slice(0, 8));
+
+  // Sin `Content-Type`: lo pone fetch con el boundary del multipart.
+  const upstream = await fetch(`${baseUrl}/audio/transcriptions`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${env[provider.keyEnv]}` },
+    body: out,
+  });
+
+  const remaining = await refundIfUpstreamFailed(env, tok, route, upstream.status, charge.remaining);
+
+  // Sin `est_input_tokens`: la entrada es audio, y estimarla en "tokens de texto a 4
+  // chars" mezclaría peras con manzanas justo en la serie que calibra la estimación.
+  ctx?.waitUntil(addStats(env, { calls: 1 }, null, tok.product));
+
+  return new Response(upstream.body, {
+    status: upstream.status,
+    headers: {
+      'Content-Type': upstream.headers.get('Content-Type') || 'application/json',
+      'X-Quota-Remaining': String(remaining),
+      'X-Quota-Total': String(tok.quota),
+    },
+  });
+}
+
+function audioTooLarge() {
+  return oaiError(413, 'audio_too_large',
+    `Audio too large (max ${Math.round(LIMITS.audioBytes / 1024 / 1024)} MB).`);
+}
+
+// ---- cuota por llamada (compartido por chat y transcripción) --------------------
+
+// DISYUNTOR global (F3) + decremento ATÓMICO. Devuelve `{ remaining }` o `{ error }`.
+//
+// El disyuntor diario protege el gasto máximo aunque el abuso sea distribuido (VPNs,
+// muchas IPs). El decremento solo pasa si el token sigue activo y con cuota, y el
+// RETURNING evita la carrera leer-luego-escribir entre peticiones simultáneas.
+async function chargeCall(env, tok, route) {
+  if (tok.tier === 'demo') {
+    const st = await bumpStat(env, 'demo_calls', tok.product);
+    if (st > num(env.MAX_DAILY_CALLS, 2000)) {
+      return { error: oaiError(403, 'demo_paused',
+        'The demo is taking a breather today (daily budget reached). Come back tomorrow, or add your own API key in Settings → Agent.') };
+    }
+  }
+
+  // Los alias `free` no descuentan, pero SÍ exigen cuota viva: si no, el cupo agotado
+  // dejaría media app funcionando y el usuario no entendería qué se ha roto.
+  const dec = route.free
+    ? (tok.remaining > 0 ? { remaining: tok.remaining } : null)
+    : await env.DB
+      .prepare('UPDATE tokens SET remaining = remaining - 1 WHERE token = ?1 AND active = 1 AND remaining > 0 RETURNING remaining')
+      .bind(tok.token).first();
+  if (!dec) {
+    // El token existía (getToken lo validó) → la cuota se agotó entre medias o justo ahora.
+    // 403 y no 429 a propósito: el cliente (IA3) reintenta los 429 con backoff y aquí
+    // reintentar no ayuda; el 403 aflora el mensaje al usuario a la primera.
+    return { error: oaiError(403, 'demo_exhausted',
+      'Demo quota exhausted. Add your own API key in Settings → Agent (BYOK) to keep using the agent.') };
+  }
+  return { remaining: dec.remaining };
+}
+
+// El fallo del proveedor no lo paga el usuario: si el upstream se cae (o rechaza por
+// concurrencia sobre la key compartida — riesgo aceptado en ADR-021 §6), se devuelve la
+// llamada a la cuota. Perder llamadas de la demo sin recibir nada es la peor primera
+// impresión posible justo donde queremos convertir.
+async function refundIfUpstreamFailed(env, tok, route, status, remaining) {
+  if (status < 500 || route.free) return remaining;
+  const back = await env.DB
+    .prepare('UPDATE tokens SET remaining = remaining + 1 WHERE token = ?1 RETURNING remaining')
+    .bind(tok.token).first();
+  return back ? back.remaining : remaining;
 }
 
 // POST /demo-token — emite un token demo self-service (F3). Guardas, en orden:
@@ -355,7 +507,11 @@ async function handleDemoToken(request, env) {
   // `model` es el alias de texto del producto: el cliente se autoconfigura con lo que
   // venga aquí y no tiene que saberse la tabla de alias.
   const models = aliasesFor(product);
-  return json(200, { token, remaining: quota, quota, product, model: models[0], models });
+  return json(200, {
+    token, remaining: quota, quota, product, model: models[0], models,
+    sttModel: aliasesFor(product, 'stt')[0] || '',
+    visionModel: visionFor(product),
+  });
 }
 
 // Producto pedido en /demo-token. Los clientes ya desplegados llaman SIN body, así
