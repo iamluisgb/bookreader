@@ -76,6 +76,106 @@ async function ask(page, q: string) {
   await expect(answerBubble(page)).toContainText('Respuesta de prueba', { timeout: 15000 });
 }
 
+// Notas de la libreta de la conversación activa (vía IndexedDB real). El bookId del libro
+// de prueba no es fijo, así que se toma la conversación más reciente del store 'convos'
+// (lectura IDB cruda: db.js no expone "todas las convos").
+async function dbNotes(page) {
+  return page.evaluate(async () => {
+    const convos: any[] = await new Promise((resolve, reject) => {
+      const req = indexedDB.open('bookreader_ai');
+      req.onsuccess = () => {
+        const db = req.result;
+        const cur = db.transaction('convos', 'readonly').objectStore('convos').getAll();
+        cur.onsuccess = () => { db.close(); resolve(cur.result || []); };
+        cur.onerror = () => { db.close(); reject(cur.error); };
+      };
+      req.onerror = () => reject(req.error);
+    });
+    convos.sort((a: any, b: any) => (b.lastUsedAt || 0) - (a.lastUsedAt || 0));
+    if (!convos.length) return [];
+    const DB: any = await import('/js/ai/db.js');
+    return DB.getNotes(convos[0].id);
+  });
+}
+
+// Re-stubea el LLM tras `setup`: las llamadas NO-streaming que piden `upsert_note` reciben
+// la tool-call dada (como haría el modelo al extraer); el resto se comporta como el stub
+// base (stream canned / "LISTO"). También graba las llamadas, igual que stubLLM.
+async function stubExtract(page, toolCall: { fieldKey: string; content: string }) {
+  await page.evaluate((tc) => {
+    const real = window.fetch.bind(window);
+    window.fetch = async (url: any, opts: any) => {
+      const u = typeof url === 'string' ? url : url?.url || '';
+      if (u.includes('/chat/completions') && opts?.body) {
+        const body = JSON.parse(opts.body);
+        (window as any).__llm.calls.push({ stream: !!body.stream, tools: (body.tools || []).map((t: any) => t.function?.name), messages: body.messages });
+        if (!body.stream && (body.tools || []).some((t: any) => t.function?.name === 'upsert_note')) {
+          return new Response(JSON.stringify({ choices: [{ message: { tool_calls: [{ function: { name: 'upsert_note', arguments: JSON.stringify(tc) } }] } }] }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        }
+        if (body.stream) {
+          const chunks = [
+            'data: {"choices":[{"delta":{"content":"Respuesta de prueba."},"finish_reason":null}]}\n\n',
+            'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n\n',
+            'data: [DONE]\n\n',
+          ];
+          const s = new ReadableStream({ start(c) { const e = new TextEncoder(); chunks.forEach(x => c.enqueue(e.encode(x))); c.close(); } });
+          return new Response(s, { status: 200, headers: { 'Content-Type': 'text/event-stream' } });
+        }
+        return new Response(JSON.stringify({ choices: [{ message: { content: 'LISTO' } }] }), { status: 200 });
+      }
+      return real(url, opts);
+    };
+  }, toolCall);
+}
+
+// UX #5 · Con HQ&A la extracción está vetada desde que existe (su único campo es de
+// cognición y el extractor solo escribía INFO): el botón decía "Nada que guardar" y pedir
+// "guárdalo" en el chat no guardaba nada —el modelo no tiene herramienta en el turno—.
+// Ahora la IA crea la entrada como ANDAMIO: pone su parte (Highlight + Question) y deja la
+// Answer en blanco para el usuario. El efecto de generación queda intacto.
+test('HQ&A: la extracción guarda la entrada andamio (H+Q con la Answer en blanco)', async ({ page }) => {
+  await setup(page, { template: 'hqa', goal: 'dominar el material' });
+  await stubExtract(page, {
+    fieldKey: 'hqa',
+    content: '> pasaje subrayado de prueba\n\n**P:** ¿qué tensión conceptual muestra?\n**R:** _(escribe tu respuesta)_',
+  });
+  await ask(page, 'explícame el pasaje subrayado');
+
+  await expect(async () => {
+    const notes: any[] = await dbNotes(page);
+    const hqa = notes.filter((n) => n.fieldKey === 'hqa' && !n.deleted);
+    expect(hqa.length).toBeGreaterThan(0);
+    expect(hqa[0].content).toContain('**P:**');                 // la parte de la IA entró
+    expect(hqa[0].content).toContain('escribe tu respuesta');   // la Answer sigue en blanco
+  }).toPass({ timeout: 10000 });
+});
+
+// UX #5 · El pedido explícito manda sobre el ajuste: con la auto-extracción APAGADA, una
+// pregunta normal no extrae nada, pero un "guárdalo en la libreta" lanza la extracción.
+test('pedido explícito de guardado extrae aunque la auto-extracción esté apagada', async ({ page }) => {
+  await setup(page, { template: 't3-juicio', goal: 'juzgar la tesis' });
+  await page.evaluate(() => localStorage.setItem('bookreader_ai_auto_extract', 'false'));
+  await stubExtract(page, {
+    fieldKey: 'mapa_global',
+    content: 'La tesis: los muertos condicionan a los vivos [[a1]].',
+  });
+
+  // Pregunta normal: sin auto-extracción NO hay llamada del extractor.
+  await ask(page, '¿de qué trata el libro?');
+  let calls = await page.evaluate(() => (window as any).__llm.calls);
+  expect(calls.some((c: any) => (c.tools || []).includes('upsert_note'))).toBe(false);
+
+  // Pedido explícito: el extractor SÍ se lanza y la nota entra.
+  await page.evaluate(() => ((window as any).__llm.calls = []));
+  await ask(page, 'guárdalo en la libreta');
+  calls = await page.evaluate(() => (window as any).__llm.calls);
+  expect(calls.some((c: any) => (c.tools || []).includes('upsert_note'))).toBe(true);
+  await expect(async () => {
+    const notes: any[] = await dbNotes(page);
+    expect(notes.some((n) => n.fieldKey === 'mapa_global' && !n.deleted)).toBe(true);
+  }).toPass({ timeout: 10000 });
+});
+
 test('onboarding deja la sesión lista y una pregunta obtiene respuesta', async ({ page }) => {
   await setup(page);
   await ask(page, 'Comala Pedro Páramo madre pueblo muerte almas');

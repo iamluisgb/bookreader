@@ -10,7 +10,7 @@ import * as PdfReader from '../pdf-reader.js';
 import * as RegionSelect from '../region-select.js';
 import { SHEET_SNAPS, SHEET_KEY, applySheetSnap, getSheetSnap, restoreSheetSnap, syncSplit, sheetReservedPx } from './sheet-height.js';
 import { loadAgentCss } from '../css-loader.js';
-import { getTemplate, objectiveTemplates, isValidField, isAgentFillable, agentFields, isCognitionField, ARTESANO_ID, INMERSIVA_ID } from './templates.js';
+import { getTemplate, objectiveTemplates, isValidField, aiWritableFields, isAiWritable, isCognitionField, ARTESANO_ID, INMERSIVA_ID } from './templates.js';
 import { icon } from '../ui/icons.js';
 import { t } from '../i18n.js';
 import { escapeHtml } from '../ui/escape.js';
@@ -617,7 +617,7 @@ P: <pregunta>` },
     ];
     const out = await LLM.chatStream({ messages });
     const q = (out.match(/P:\s*(.+)/i)?.[1] || '').trim();
-    const content = t('> {text}\n\n**P:** {q}\n**R:** _(escribe tu respuesta)_', { text, q: q || '—' });
+    const content = t('> {text}\n\n**P:** {q}\n**R:** {r}', { text, q: q || '—', r: answerBlank() });
     const id = convo ? await DB.addNote(convo.id, 'hqa', content, [cfiRange]) : Date.now();
     notes.push({ id, fieldKey: 'hqa', content, sourceCfis: [cfiRange] });
     renderNotebook();
@@ -1842,7 +1842,9 @@ async function deliver(aug, question, { showUser = true, ref = null, systemExtra
     if (mySeq !== bookSeq) return;   // el usuario cambió de libro → no pintar/persistir en el convo equivocado
     const finalText = raw || acc;
     textNode.innerHTML = renderWithCitations(finalText, anchors);
-    addMessageActions(bubble, finalText, question, { autoRun: LLM.getAutoExtract(), truncated });
+    // Auto-extracción si está activada —o si el usuario lo ha pedido explícitamente en este
+    // turno: un "guárdalo en la libreta" debe guardar aunque el ajuste esté apagado.
+    addMessageActions(bubble, finalText, question, { autoRun: LLM.getAutoExtract() || saveRequested(question), truncated });
     history.push({ role: 'assistant', content: finalText });
     if (convo) DB.addMessage(convo.id, 'assistant', finalText);
     maybeOfferObjective();
@@ -1992,6 +1994,27 @@ function continueResponse(question) {
 
 // ---- Extracción a la libreta (tool-use, no-streaming) ----------------------
 
+// Marcador de Answer en blanco en las entradas HQ&A: la IA lo escribe, el usuario lo
+// reemplaza con su respuesta. Compartido por el subrayado (generateHQA) y el extractor
+// para que ambas rutas dejen la entrada con la misma forma.
+function answerBlank() { return t('_(escribe tu respuesta)_'); }
+
+// ¿Pide el usuario EXPLÍCITAMENTE que algo vaya a la libreta? Un pedido explícito lanza la
+// extracción aunque la auto-extracción esté apagada: el gesto concreto manda sobre el ajuste.
+// Los falsos positivos son baratos: el extractor puede decidir que no hay nada que guardar.
+const SAVE_REQUEST_RE = new RegExp([
+  'libreta', 'notebook',
+  'gu[aá]rdal', 'ap[uú]ntal', 'an[oó]tal', 's[aá]lval',
+  'gu[aá]rda\\s+(?:esto|todo|la |el |lo |los |las )',
+  'ap[uú]nta\\s+(?:esto|todo)', 'an[oó]ta\\s+(?:esto|todo)',
+  'save\\s+(?:it|this|that|to)',
+  '(?:add|put|keep)\\s+(?:this|it|that)?\\s*(?:in|to|on)\\s+(?:the\\s+)?notebook',
+].join('|'), 'i');
+
+function saveRequested(text) {
+  return !!text && SAVE_REQUEST_RE.test(text);
+}
+
 function addMessageActions(bubble, answerText, question, { autoRun = false, truncated = false } = {}) {
   const bar = document.createElement('div');
   bar.className = 'ai-bubble-actions';
@@ -2047,9 +2070,11 @@ function addMessageActions(bubble, answerText, question, { autoRun = false, trun
 }
 
 function notebookTool() {
-  // Solo campos INFO (fill:'agent'). Los de cognición los genera el usuario: la IA no
-  // puede dirigirse a ellos (ni siquiera aparecen como enum válido en la herramienta).
-  const keys = agentFields(template).map(f => f.key);
+  // Campos escribibles por la IA: INFO más los andamio (cognición con parte de la IA, p.
+  // ej. HQ&A crea H+Q y deja la Answer en blanco). La cognición pura sigue vetada.
+  const fields = aiWritableFields(template);
+  const keys = fields.map(f => f.key);
+  const hasScaffold = fields.some(f => isCognitionField(f));
   return [{
     type: 'function',
     function: {
@@ -2059,7 +2084,8 @@ function notebookTool() {
         type: 'object',
         properties: {
           fieldKey: { type: 'string', enum: keys, description: 'Campo de la plantilla.' },
-          content: { type: 'string', description: 'Nota concisa en el idioma de la conversación, con cita [[aN]] si procede.' },
+          content: { type: 'string', description: 'Nota concisa en el idioma de la conversación, con cita [[aN]] si procede.'
+            + (hasScaffold ? ` Para un campo andamio (HQ&A): «> <fragmento>» + «**P:** <pregunta>» + «**R:** ${answerBlank()}» — NUNCA escribas la respuesta del usuario.` : '') },
           sourceCfis: { type: 'array', items: { type: 'string' }, description: 'Anclas [[aN]] de origen.' },
         },
         required: ['fieldKey', 'content'],
@@ -2073,22 +2099,28 @@ async function extractToNotebook(answerText, question, el) {
   const isBtn = el.tagName === 'BUTTON';
   if (isBtn) el.disabled = true;
   el.innerHTML = act('note', 'Apuntando…');
-  // Solo campos INFO: los de cognición (fill:'user') los genera el usuario, no la IA.
-  const fillable = agentFields(template);
-  if (!fillable.length) {                       // plantilla 100% cognición (p. ej. HQ&A)
+  // Campos escribibles por la IA: INFO más andamio (HQ&A: la IA pone H+Q, la Answer queda
+  // para el usuario). La cognición pura sigue vetada: la genera el usuario, no la IA.
+  const fillable = aiWritableFields(template);
+  if (!fillable.length) {                       // plantilla 100% cognición (sin andamio)
     el.innerHTML = act('note', 'Nada que guardar');
     if (isBtn) setTimeout(() => { el.disabled = false; el.innerHTML = act('note', 'A la libreta'); }, 2500);
     return;
   }
   const fieldList = fillable.map(f => `- ${f.key}: ${f.label}`).join('\n');
+  const scaffoldFields = fillable.filter(f => isCognitionField(f));
+  const scaffoldNote = scaffoldFields.length
+    ? `Campos andamio (${scaffoldFields.map(f => f.key).join(', ')}): crea la entrada con el formato EXACTO:\n> <fragmento>\n**P:** <pregunta>\n**R:** ${answerBlank()}\nNUNCA escribas la parte del usuario: la respuesta déjala siempre como «${answerBlank()}».\n`
+    : '';
   const messages = [
     { role: 'system', content:
 `Eres un extractor de notas para la plantilla "${template.name}".
 A partir de la respuesta del agente y el objetivo del usuario, guarda en la libreta SOLO lo que aporte
 valor real. Llama a upsert_note una vez por nota. fieldKey debe ser uno de estos:
 ${fieldList}
-Escribe content en español, conciso, conservando las citas [[aN]] que aparezcan. Si no hay nada que
-merezca guardarse, no llames a ninguna herramienta.` },
+${scaffoldNote}Escribe content en el idioma de la conversación, conciso, conservando las citas [[aN]] que aparezcan.
+Si el usuario pidió explícitamente guardar, guarda al menos la entrada principal de la respuesta. Si no
+hay nada que merezca guardarse, no llames a ninguna herramienta.` },
     { role: 'user', content:
 `OBJETIVO: ${convo.goal}\n\nPREGUNTA: ${question}\n\nRESPUESTA DEL AGENTE:\n${answerText}` },
   ];
@@ -2098,9 +2130,9 @@ merezca guardarse, no llames a ninguna herramienta.` },
     for (const tc of toolCalls) {
       if (tc.name !== 'upsert_note') continue;
       const { fieldKey, content, sourceCfis } = tc.args || {};
-      // isAgentFillable: existe Y es INFO. Blinda contra que el modelo intente escribir
-      // en un campo de cognición aunque no esté en el enum de la herramienta.
-      if (!fieldKey || !content || !isAgentFillable(template.id, fieldKey)) continue;
+      // isAiWritable: existe Y es INFO o andamio. Blinda contra que el modelo intente
+      // escribir en una cognición pura aunque no esté en el enum de la herramienta.
+      if (!fieldKey || !content || !isAiWritable(template.id, fieldKey)) continue;
       const cites = extractCites(content, sourceCfis);
       const id = convo ? await DB.addNote(convo.id, fieldKey, content, cites) : Date.now();
       notes.push({ id, fieldKey, content, sourceCfis: cites });

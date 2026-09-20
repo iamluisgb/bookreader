@@ -5,6 +5,32 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-09-20 — «Guárdalo en la libreta» guarda de verdad
+
+Con HQ&A era imposible guardar desde el chat, y el agente lo fingía. La cadena: el único campo de
+la plantilla es de cognición (`fill: 'user'`), el extractor solo escribía campos INFO, así que el
+botón contestaba **«Nada que guardar»** sin mirar la respuesta; y el turno de chat va en streaming,
+donde este proveedor no emite `tool_calls` fiables, así que no había herramienta de escritura en
+ningún momento. Al pedirle «guárdalo en la libreta», el modelo no tenía forma de cumplir — y como
+el system prompt no le decía que no podía, decía **«Hecho.»** y pintaba la tabla. Cero persistencia.
+
+Tres piezas:
+
+- **Campos andamio.** Cognición donde la IA crea la entrada con SU parte y deja la del usuario en
+  blanco (`aiScaffold`). HQ&A es el caso: Highlight + Question sí, Answer siempre
+  `_(escribe tu respuesta)_` — lo que ya hacía el subrayado (`generateHQA`), ahora también desde el
+  chat. El efecto de generación queda intacto: la respuesta la escribes tú. Nuevas API en
+  `templates.js` (`aiWritableFields`, `isAiWritable`); la cognición pura sigue vetada.
+- **El pedido explícito manda sobre el ajuste.** «Guárdalo / apúntalo / a la libreta» lanza la
+  extracción aunque la auto-extracción esté apagada. El extractor ve la pregunta del usuario, así
+  que sabe que fue pedido, y con el andamio ya tiene dónde escribir.
+- **Honestidad del prompt.** El system prompt explica el mecanismo real: la libreta se escribe
+  FUERA del turno, por el extractor; si te piden guardar, reescribe la entrada completa en tu
+  respuesta (el extractor solo ve la respuesta final) y nunca digas «ya lo guardé».
+
+El marcador de la Answer en blanco pasó a constante compartida por el subrayado y el extractor,
+para que ambas rutas dejen la entrada con la misma forma.
+
 ## 2026-09-14 — Pasar página en una revista: de 376 ms a 13
 
 Pasar página costaba exactamente lo que cuesta rasterizarla: **376 ms** en una revista de fotos, y

@@ -84,15 +84,23 @@ export const TEMPLATE = () => `
 // (reutilizable entre libros/convos), buen prefijo para el prompt caching.
 export function systemPrompt(goal, template, profile, opts = {}) {
   const tocLabels = Array.isArray(opts.tocLabels) ? opts.tocLabels.filter(Boolean) : [];
-  const info = template ? template.fields.filter(f => !isCognitionField(f)) : [];
-  const cog  = template ? template.fields.filter(f =>  isCognitionField(f)) : [];
+  const fields = template?.fields || [];
+  const info = fields.filter(f => !isCognitionField(f));
+  // Andamio: cognición donde la IA crea la entrada con SU parte y deja la del usuario en
+  // blanco (HQ&A: Highlight + Question sí, Answer nunca). Se separa de la cognición pura
+  // para que el modelo sepa que ahí sí puede proponer la entrada.
+  const scaffold = fields.filter(f => isCognitionField(f) && f.aiScaffold);
+  const cog  = fields.filter(f => isCognitionField(f) && !f.aiScaffold);
   const fmt = (arr) => arr.map(f => `- ${f.key}: ${f.label}`).join('\n');
-  // INFO vs COGNICIÓN: la libreta se auto-rellena solo en los campos INFO. Los de
+  // INFO vs COGNICIÓN: la libreta se escribe FUERA del turno —un extractor aparte guarda
+  // tras cada respuesta lo que aporte valor (y lo que el usuario pida guardar)—. Los de
   // cognición los genera el usuario (efecto de generación); ahí el agente NO escribe la
   // respuesta: pregunta al estilo socrático y, si el usuario aporta la suya, la revisa.
   const notebook = [
-    info.length ? `Campos INFO (recuperación; se rellenan aparte, no en el chat):\n${fmt(info)}` : '',
+    info.length ? `Campos INFO (recuperación; los guarda el extractor tras tu respuesta):\n${fmt(info)}` : '',
+    scaffold.length ? `Campos ANDAMIO (tú creas la entrada con tu parte; la del usuario queda en blanco):\n${fmt(scaffold)}\nEn ellos puedes proponer la entrada con tu parte (p. ej. el Highlight y la Pregunta) y dejar la parte del usuario literalmente en blanco: «_(escribe tu respuesta)_». El esfuerzo de responder sigue siendo suyo.` : '',
     cog.length ? `Campos de COGNICIÓN (los genera el USUARIO; TÚ NO los escribes):\n${fmt(cog)}\nEn estos campos no des la respuesta hecha: haz preguntas socráticas que ayuden al usuario a generarla, y cuando la escriba, revísala y señala huecos o errores.` : '',
+    fields.length ? `CÓMO SE GUARDA: tú no escribes la libreta dentro del turno; lo hace un extractor aparte después de tu respuesta. Cuando el usuario te pida guardar algo, REESCRIBE en tu respuesta la entrada completa y clara: el extractor solo ve tu respuesta final, no la conversación anterior. NUNCA digas que ya la guardaste tú ni que no puedes guardar: se guarda al cerrar el turno.` : '',
   ].filter(Boolean).join('\n\n');
   // MAPA DEL LIBRO: el índice completo de capítulos (TOC). Sirve para que el modelo sepa
   // que el libro SÍ tiene un capítulo aunque no esté en el extracto de este turno, y así

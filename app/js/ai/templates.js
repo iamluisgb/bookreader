@@ -48,7 +48,11 @@ export const TEMPLATES = [
     fields: [
       // Un solo campo por par: el Highlight y la Question las pone la IA, la Answer la
       // escribes tú (fill:'user'). Mantenerlo en un campo conserva el emparejamiento H-Q-A.
-      { key: 'hqa', label: tr('Highlight → Question → Answer (tú escribes la respuesta)'), type: 'list', fill: 'user' },
+      // aiScaffold: es un campo de cognición donde la IA SÍ puede crear la entrada como
+      // andamio —su parte (H+Q) sí, la del usuario (la Answer) SIEMPRE en blanco—. Es lo
+      // que ya hacía el subrayado (generateHQA); con el flag también puede hacerlo desde
+      // el chat cuando se le pide, sin romper el efecto de generación.
+      { key: 'hqa', label: tr('Highlight → Question → Answer (tú escribes la respuesta)'), type: 'list', fill: 'user', aiScaffold: true },
     ],
   },
   {
@@ -188,4 +192,20 @@ export function isAgentFillable(templateId, fieldKey) {
   const t = getTemplate(templateId);
   const f = t?.fields.find(f => f.key === fieldKey);
   return !!f && !isCognitionField(f);
+}
+
+// Campos que la IA puede ESCRIBIR en la libreta: los INFO siempre, y los de cognición
+// marcados como andamio (aiScaffold) creando la entrada con su parte y dejando la del
+// usuario en blanco. Hoy solo HQ&A; una plantilla custom puede usar el flag igualmente.
+export function aiWritableFields(template) {
+  if (!template) return [];
+  return template.fields.filter(f => !isCognitionField(f) || f.aiScaffold);
+}
+
+// Guard de escritura de la IA por campo: INFO, o cognición-andamio. Complementa a
+// isAgentFillable (que solo mira INFO) para las rutas donde el andamio sí vale.
+export function isAiWritable(templateId, fieldKey) {
+  const t = getTemplate(templateId);
+  const f = t?.fields.find(f => f.key === fieldKey);
+  return !!f && (!isCognitionField(f) || !!f.aiScaffold);
 }
