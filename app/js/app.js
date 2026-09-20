@@ -385,10 +385,30 @@ function initPanelResize() {
     const saved = Storage.get(cfg.key, null);
     if (saved) document.documentElement.style.setProperty(cfg.cssVar, clampPanel(cfg, saved) + 'px');
   }
-  addResizer(document.getElementById('ai-panel'), 'ai-resizer', PANEL_LIMITS.ai,
-    (e) => window.innerWidth - e.clientX);       // panel derecho: ancho = distancia al borde derecho
+  initAiResizer();
   addResizer(document.getElementById('sidebar'), 'sidebar-resizer', PANEL_LIMITS.sidebar,
     (e) => e.clientX);                            // panel izquierdo: ancho = posición del cursor
+}
+
+// Tirador del panel del agente. Su markup NO está en el index: lo monta `AiPanel.init()`
+// con `innerHTML = TEMPLATE()`, y eso borra cualquier hijo previo —incluido el tirador— si
+// se añadió antes. Como ese init es perezoso (import dinámico) y puede llegar DESPUÉS de
+// initPanelResize, se (re)crea aquí ya sobre el panel montado. Idempotente para poder
+// llamarse en los dos momentos sin duplicarlo.
+function initAiResizer() {
+  const panel = document.getElementById('ai-panel');
+  if (!panel) return;
+  panel.querySelector('.ai-resizer')?.remove();
+  addResizer(panel, 'ai-resizer', PANEL_LIMITS.ai,
+    (e) => window.innerWidth - e.clientX);       // panel derecho: ancho = distancia al borde derecho
+}
+
+// El lector refluye con el ancho del área de lectura. Varias vías lo piden (tirador de los
+// paneles, apertura/cierre de barras); cada formato re-ajusta a su manera —el EPUB
+// re-pagina, el PDF re-escala sus cajas— pero desde el mismo sitio.
+function reflowReader() {
+  if (EpubReader.isLoaded()) EpubReader.resize();
+  if (PdfReader.isLoaded()) PdfReader.resize();
 }
 
 function addResizer(panel, cls, cfg, widthFromEvent) {
@@ -406,9 +426,10 @@ function addResizer(panel, cls, cfg, widthFromEvent) {
   };
   const onMove = (e) => {
     apply(e);
-    // Reflow del EPUB acompasado a rAF (no en cada pointermove) para que el texto siga
-    // al tirador sin saturar. La captura de puntero garantiza eventos aun sobre el iframe.
-    if (!raf) raf = requestAnimationFrame(() => { raf = 0; if (EpubReader.isLoaded()) EpubReader.resize(); });
+    // Reflow acompasado a rAF (no en cada pointermove) para que el texto siga al tirador
+    // sin saturar; el PDF, que re-rasteriza, lleva su propio debounce dentro de resize().
+    // La captura de puntero garantiza eventos aun sobre el iframe.
+    if (!raf) raf = requestAnimationFrame(() => { raf = 0; reflowReader(); });
   };
   const end = (e) => {
     try { handle.releasePointerCapture(e.pointerId); } catch (_) {}
@@ -418,7 +439,7 @@ function addResizer(panel, cls, cfg, widthFromEvent) {
     document.body.classList.remove('resizing-panel');
     if (raf) { cancelAnimationFrame(raf); raf = 0; }
     Storage.set(cfg.key, apply(e));
-    if (EpubReader.isLoaded()) EpubReader.resize();
+    reflowReader();
   };
   handle.addEventListener('pointerdown', (e) => {
     if (!window.matchMedia('(min-width: 1024px)').matches) return;   // solo escritorio
@@ -433,7 +454,7 @@ function addResizer(panel, cls, cfg, widthFromEvent) {
   handle.addEventListener('dblclick', () => {
     document.documentElement.style.removeProperty(cfg.cssVar);
     Storage.remove(cfg.key);
-    if (EpubReader.isLoaded()) EpubReader.resize();
+    reflowReader();
   });
 }
 
@@ -750,7 +771,7 @@ function reflowReaderAfterTransition() {
     fired = true;
     main.removeEventListener('transitionend', done);
     clearTimeout(t);
-    if (EpubReader.isLoaded()) EpubReader.resize();
+    reflowReader();
   };
   const t = setTimeout(done, 350);   // respaldo si no llega transitionend
   main.addEventListener('transitionend', done);
@@ -774,11 +795,11 @@ function initReaderReflow() {
   // El reflujo va anclado al CFI (EpubReader.resize → pin), que es lo que impide que
   // encoger el área te mueva la página hacia atrás.
   //
-  // El PDF no necesita nada: su ajuste mira SOLO el ancho (`fitScale`), y al encoger el
-  // contenedor por abajo el borde superior no se mueve, así que la página se queda donde
-  // estaba y simplemente se ve menos.
+  // El PDF, por su parte, no cambia: su ajuste mira SOLO el ancho (`fitScale`), y al encoger
+  // el contenedor por abajo el borde superior no se mueve, así que se queda donde estaba y
+  // simplemente se ve menos. `PdfReader.resize()` lo comprueba y no re-ajusta (mismo ancho).
   window.addEventListener('bookreader:sheet-split', () => {
-    if (EpubReader.isLoaded()) EpubReader.resize();
+    reflowReader();
   });
 }
 
@@ -955,7 +976,9 @@ function initAiPanel() {
   // dos dispositivos eso se traduce en un pull que llega tarde y una racha de estudio que
   // no cruza (tests/sync-decks.spec.ts, reproducible 2 de cada 5). El arranque no espera
   // a esto —no hay await—, así que el primer pintado sigue sin depender del panel.
-  panel().catch(e => console.warn('ai panel init:', e));
+  // El tirador de este panel solo puede existir cuando el panel ya está montado
+  // (AiPanel.init() reescribe su `innerHTML`): se re-crea al resolverse el import.
+  panel().then(() => initAiResizer()).catch(e => console.warn('ai panel init:', e));
 
   document.getElementById('ai-toggle').addEventListener('click', () => {
     aiSetOpen(!aiIsOpen());

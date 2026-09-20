@@ -5,6 +5,22 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-09-20 — El lado derecho vuelve a estirarse (y el PDF lo sigue)
+
+El tirador del panel del agente llevaba tiempo sin existir. El panel no trae su markup en el
+index: lo monta `AiPanel.init()` con `innerHTML = TEMPLATE()`, y como ese init es perezoso
+(import dinámico) corría **después** de que `initPanelResize()` hubiera añadido el tirador, y lo
+barría. El de la sidebar, que no se re-monta, sobrevivía — por eso el que fallaba era el derecho.
+Ahora el tirador se (re)crea cuando el panel termina de montarse, sin duplicarse.
+
+El segundo fallo era del PDF, y se notaba al abrir el panel o al arrastrar el tirador: su `refit`
+solo escuchaba el `resize` de la ventana, pero cambiar el margen del lector no emite ese evento,
+así que la página se quedaba a la escala anterior y se salía del área de lectura. El PDF ya
+tiene `resize()` propio (debounce corto para no re-rasterizar en cada frame) y tanto el tirador
+como la apertura/cierre de barras lo llaman desde el mismo `reflowReader()` que ya usaba el EPUB.
+
+Regresión en [`tests/panel-resize.spec.ts`](tests/panel-resize.spec.ts).
+
 ## 2026-09-20 — «Guárdalo en la libreta» guarda de verdad
 
 Con HQ&A era imposible guardar desde el chat, y el agente lo fingía. La cadena: el único campo de

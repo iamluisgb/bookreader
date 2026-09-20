@@ -767,6 +767,16 @@ async function refit() {
   }
 }
 
+// Re-ajuste pedido desde FUERA del `resize` de la ventana: el tirador de los paneles y la
+// apertura/cierre de las barras cambian el ancho del contenedor (por `margin`) sin emitir
+// un evento de ventana, así que el PDF se quedaba con el ajuste viejo y la página se salía
+// del lector. Debounce corto para no re-rasterizar en cada frame del arrastre.
+let refitTimer = 0;
+export function resize() {
+  clearTimeout(refitTimer);
+  refitTimer = setTimeout(refit, 150);
+}
+
 // Gestos de zoom. Todas las rutas comparten el mismo preview EN VIVO: durante el gesto
 // solo se escala #pdf-zoom-layer con transform (GPU, sin reflow) y al terminar se hornea
 // con setZoom (cajas + scroll anclado al foco). Rutas:

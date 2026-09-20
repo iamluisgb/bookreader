@@ -17,6 +17,13 @@ async function openPdf(page) {
   await page.click('.lib-empty .lib-upload');
   await (await fc).setFiles(PDF_PATH);
   await page.waitForSelector('#pdf-container canvas', { timeout: 15000 });
+  // El guardado en IndexedDB es asíncrono tras la carga: el canvas puede estar pintado
+  // antes de que la ficha exista. Bajo carga en la suite completa, apostar por esa ventana
+  // falla (getAllBooks devuelve vacío). Se sondea el store real hasta que aparece.
+  await expect.poll(async () => page.evaluate(async () => {
+    const Store: any = await import('/js/library/store.js');
+    return ((await Store.getAllBooks()) || []).some((b: any) => b.format === 'pdf');
+  }), { message: 'el PDF no llegó a guardarse', timeout: 15000 }).toBe(true);
 }
 
 const tipoDelBinario = (page) => page.evaluate(async () => {
