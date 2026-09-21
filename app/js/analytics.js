@@ -1,11 +1,10 @@
-// Umami Analytics (sin cookies): solo carga en producción — el dominio sirve /u/s.js
-// (script self-hosteado en el repo de la web personal, mismo website-id que el resto de
-// luisgonzalezbernal.com, segmentado por ruta /bookreader/*) y reporta a cloud.umami.is.
+// Umami Analytics (sin cookies): solo carga en producción. El tracker se sirve desde la raíz
+// del dominio (`/u/s.js`, versionado en este repo — ver `u/s.js`) porque la CSP de la app
+// (`script-src 'self'`) no deja cargarlo de otro origen. Reporta a cloud.umami.is.
 // En localhost/tests no hay ni petición. Va en fichero aparte porque la CSP de la app
-// prohíbe scripts inline; /u/s.js pasa por script-src 'self' (same-origin) y el beacon
-// por connect-src https:.
+// prohíbe scripts inline; /u/s.js pasa por script-src 'self' y el beacon por connect-src https:.
 (function () {
-  if (location.hostname !== 'luisgonzalezbernal.com') return;
+  if (location.hostname !== 'bookreader.raiatech.com') return;
   var u = document.createElement('script');
   u.defer = true;
   u.src = '/u/s.js';

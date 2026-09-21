@@ -23,7 +23,9 @@ import { fileURLToPath } from 'node:url';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const dist = join(root, 'dist');
 
-const PUBLIC = ['index.html', 'sw.js', 'app', 'es', 'anki', 'privacy', 'assets'];
+// `u/` es el tracker de Umami (ver u/s.js): se sirve desde la raíz del dominio propio
+// porque la CSP de la app (`script-src 'self'`) no deja cargarlo de otro origen.
+const PUBLIC = ['index.html', 'sw.js', 'app', 'es', 'anki', 'privacy', 'assets', 'u'];
 
 // Rutas que NO se despliegan aunque cuelguen de PUBLIC. Siguen en el repo; lo que se
 // corta es publicarlas.
@@ -31,9 +33,9 @@ const PUBLIC = ['index.html', 'sw.js', 'app', 'es', 'anki', 'privacy', 'assets']
 // `app/_proto` son 1,6 MB de capturas que se subían en cada despliegue sin que nada de
 // la app las pidiese. Sus únicos consumidores son páginas sueltas de prototipo
 // —`shelf-proto.html` (que en producción ya redirige), `share-demo.html` e
-// `infographic-proto.html`—, a las que no
-// enlaza ni la app, ni la web, ni los tests: se quedan fuera con ellas, porque publicar
-// la página sin sus imágenes sería peor que no publicarla.
+// `infographic-proto.html`—, a las que no enlaza ni la app, ni la web, ni los tests: se
+// quedan fuera con ellas, porque publicar la página sin sus imágenes sería peor que no
+// publicarla.
 const EXCLUIDOS = ['app/_proto', 'app/shelf-proto.html', 'app/share-demo.html', 'app/infographic-proto.html'];
 
 // Cabeceras de Cloudflare Pages. Sin este fichero, Pages sirve TODO con
