@@ -360,9 +360,45 @@ pasan en las dos:
 - **Rojo ajeno al ítem:** el run trae `p4 · attenuation_separation` **sin dato** (el bug de ratings
   conocido, TEC9); el scoring termina en 1 por él, no por la infografía.
 
-**Siguiente ciclo (time-box del contrato: 3):** subir la **cobertura** del póster —que priorice los
-conceptos del objetivo, como ya hace el resumen— y confirmarlo con 2 runs; si no se mueve, se clasifica
-el fallo (¿prompt? ¿troceado?) y se cierra con el hallazgo.
+**Ciclo 1 (cobertura): cerrado con hallazgo — la cobertura no se mueve con el prompt.**
+
+*Hipótesis.* El póster se queda en **temas** y omite los conceptos con nombre del objetivo (en Git,
+`reset/checkout/revert` y `fetch vs pull`; en Comala, Susana San Juan). Dos palancas:
+(a) **sesgar la recuperación por el objetivo** (los scores de atenuación duplicando el cupo del
+capítulo relevante, como ya hace flashcards con IA8) y (b) **exigir cobertura concreta** en los
+dos prompts (ideas con nombre propio; «recorre el objetivo y comprueba que sus conceptos concretos
+están en el póster»).
+
+*Medido (2 runs, `2026-09-21-p29-cobertura` y `-cobertura-2`, EVAL_ONLY=p2+p4):*
+
+| | baseline | ciclo 1 (media de 2) |
+|---|---|---|
+| p2 · cobertura | 3 | **2,5** |
+| p4 · cobertura | 4 | **4** |
+| p2 · utilidad | 3 | 3 |
+| p4 · utilidad | 4 | 4,5 |
+
+*Gates intactos:* esquema en rango, anclas 8/8 y densidad 1.86-1.97 (≤2,4) en los dos runs.
+
+*Clasificación del fallo (leyendo los pósters, no solo la nota).* El cambio sí movió el contenido —
+y ahí está el diagnóstico: en Git ganó **internals** (Blob/Tree/Commit, «non-fast-forward
+rechazado», «rebase para historia lineal») y **perdió la dimensión de flujos de equipo** que el
+objetivo nombra explícitamente; en Comala ganó **personajes menores** (Abundio, Eduviges Dyada,
+Dagoberto) en vez de Susana San Juan. Es decir: la instrucción de «lo que tiene nombre» empuja a
+**concreción**, no a **la lista dorada**, y el sesgo por scores —pensado para un objetivo estrecho—
+**puede hambrear capítulos** cuando el objetivo es ancho («dominar Git»).
+
+*Conclusión.* La cobertura **no es un problema de prompt**: 8 ideas + 3 paneles (~20 ranuras, y no
+libres: los bloques tienen que ser coherentes entre sí y hay temas que piden varias ranuras) no dan para una lista dorada de 8-9
+conceptos de manual. El póster es un artefacto de **tesis + hilos**, y la cobertura dorada es una
+métrica de resumen y flashcards. Subirla pide cambiar la **estructura** (más ranuras, que choca con
+el gate de densidad), no las palabras del prompt.
+
+*Decisión.* **Revertido** (la regla del bucle: solo entra lo que mejora sin degradar). Queda como
+hallazgo clasificado, con el time-box del contrato consumido en 1 de sus 3 ciclos. Si se retoma, el
+siguiente ciclo no toca prompts: **medir el techo** —generar el póster con 12 ideas / 4 paneles en
+un run de prueba y ver cuánto sube la cobertura y cuánto la densidad— para decidir con números si el
+medio es el generador o la métrica.
 
 ## Mejora continua (el bucle)
 

@@ -821,6 +821,12 @@ export **PNG/SVG**, i18n ES/EN y tests ([`tests/infographic-render.spec.ts`](tes
 > que pide el objetivo** (cobertura, no fidelidad). Los gates viven en
 > [`evals/check.mjs`](evals/check.mjs) (`evalVersion 3`); las métricas del juez quedan como **tendencia
 > sin valla** hasta un 2º run. Detalle en [docs/EVALS.md § Baseline de infografía](docs/EVALS.md).
+>
+> **Ciclo 1 (cobertura) cerrado con hallazgo (2026-09-21).** Prompt de cobertura + sesgo por scores del
+> objetivo: la cobertura **no se movió** (p2 3 → 2,5 en 2 runs; p4 4 → 4) y el contenido se desvió a
+> internals. **Revertido.** El techo es **estructural** — 8 ideas + 3 paneles no dan para una lista
+> dorada de 9 conceptos: el póster es tesis + hilos, no un checklist. Detalle en
+> [docs/EVALS.md § Baseline de infografía](docs/EVALS.md).
 
 **La pregunta.** «¿Podríamos sacar una infografía de un libro como las que se ven en redes?» Sí, y
 encaja donde ya viven resumen y mapa.
