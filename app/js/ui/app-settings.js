@@ -1288,8 +1288,13 @@ function wireDrive(content, show) {
     DriveSync.restoreFromDrive((done, total) => show(`${t('Restaurando…')} ${done}/${total}`))
       .then(r => {
         if (!r) return show(t('No hay nada guardado en Drive todavía.'), true);
-        show(`${icon('check', { size: 14 })} ${t('Restaurado: {a} ajustes y {b} registros.', { a: r.keys, b: r.records })} <button id="appset-drive-reload" class="appset-data-reload">${t('Recargar para aplicar')}</button>`);
-        content.querySelector('#appset-drive-reload').addEventListener('click', () => location.reload());
+        // Recarga automática: lo restaurado aterriza en localStorage/IndexedDB y la
+        // app en memoria no lo refleja. El botón "Recargar para aplicar" era un paso
+        // que pedía entender un detalle interno; un respiro corto para leer el
+        // resultado y la página sola lo aplica. (Importar backup y Recuperar
+        // conservan el botón: son flujos donde quedarse a mirar es más habitual.)
+        show(`${icon('check', { size: 14 })} ${t('Restaurado: {a} ajustes y {b} registros. Recargando…', { a: r.keys, b: r.records })}`);
+        setTimeout(() => location.reload(), 1500);
       })
       .catch(fail('No se pudo restaurar'));
   });

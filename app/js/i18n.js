@@ -812,6 +812,7 @@ const EN = {
   'Restaurando…': 'Restoring…',
   'No hay nada guardado en Drive todavía.': 'Nothing saved in Drive yet.',
   'Restaurado: {a} ajustes y {b} registros.': 'Restored: {a} settings and {b} records.',
+  'Restaurado: {a} ajustes y {b} registros. Recargando…': 'Restored: {a} settings and {b} records. Reloading…',
   'Quita del historial de Drive las entradas “Sin título” bajo identidades viejas (de epub.js o del nombre de fichero), restos de versiones anteriores. No toca tus libros actuales. Es irreversible y puede perder subrayados muy antiguos que nunca se migraron. Te recomiendo “Descargar backup (JSON)” antes.': 'Removes from the Drive history the “Untitled” entries under old identities (from epub.js or the file name), leftovers from earlier versions. It does not touch your current books. It is irreversible and may lose very old highlights that were never migrated. I recommend “Download backup (JSON)” first.',
   'Limpiar': 'Clean up',
   'Limpiando…': 'Cleaning…',
