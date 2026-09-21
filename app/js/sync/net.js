@@ -26,10 +26,23 @@ export async function fetchWithTimeout(url, options = {}, ms = REQUEST_TIMEOUT_M
       err.code = 'timeout';
       throw err;
     }
-    throw e;
+    throw annotateHost(e, url);
   } finally {
     clearTimeout(timer);
   }
+}
+
+// "Failed to fetch" no dice contra quién: DNS caído, conexión rechazada, CORS o un
+// filtro de red que bloquea el dominio se ven idénticos. Anotar el host en el mensaje
+// es lo que permite distinguir en el diagnóstico "no llego a Drive" de "no llego al
+// Worker de auth" — la primera pista de por qué un dispositivo no sincroniza.
+function annotateHost(e, url) {
+  try {
+    const host = new URL(url).host;
+    e.host = host;
+    e.message = `${e.message} [${host}]`;
+  } catch (err) { /* url rara: dejar el mensaje tal cual */ }
+  return e;
 }
 
 export function timeoutError() {
@@ -91,7 +104,7 @@ export async function fetchBinary(url, options = {}, onProgress = null, idleMs =
     return { ok: true, status: res.status, blob: new Blob(parts) };
   } catch (e) {
     if (e && e.name === 'AbortError') throw timeoutError();
-    throw e;
+    throw annotateHost(e, url);
   } finally {
     clearTimeout(timer);
   }

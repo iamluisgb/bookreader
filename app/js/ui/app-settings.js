@@ -1107,9 +1107,28 @@ function syncDiagHtml() {
   return s;
 }
 
+// Sonda de alcanzabilidad: con no-cors, que resuelva significa que la red llega
+// (respuesta opaca, aunque sea 4xx); TypeError significa DNS caído, conexión
+// rechazada o dominio bloqueado por un filtro. La pareja googleapis/worker es la
+// primera bifurcación del diagnóstico: si el worker falla y Drive no, el culpable
+// es el filtro de red — workers.dev lo bloquean algunos controles parentales/ISP.
+async function probe(url) {
+  try {
+    await fetch(url, { mode: 'no-cors', cache: 'no-store' });
+    return true;
+  } catch (e) { return false; }
+}
+
 async function syncDiagReport() {
   let storage = null;
   try { storage = await Blobs.localEstimate(); } catch (e) { /* sin estimate */ }
+  let reachability = null;
+  try {
+    reachability = {
+      googleapis: await probe('https://www.googleapis.com/'),
+      authWorker: await probe(DriveAuth.WORKER_URL + '/'),
+    };
+  } catch (e) { /* la sonda es best-effort: no debe romper el informe */ }
   return {
     at: new Date().toISOString(),
     status: SyncEngine.getStatus(),
@@ -1117,6 +1136,7 @@ async function syncDiagReport() {
     filesSync: Blobs.isEnabled(),
     pro: License.isPro(),
     diag: SyncEngine.getDiag(),
+    reachability,
     storage,
     userAgent: navigator.userAgent,
   };

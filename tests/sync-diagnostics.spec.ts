@@ -104,5 +104,6 @@ test.describe('Sync — diagnóstico', () => {
     const report = JSON.parse(clip);
     expect(report.diag.lastOkAt).toBeGreaterThan(0);
     expect(report).toHaveProperty('userAgent');
+    expect(report.reachability).toHaveProperty('authWorker');
   });
 });

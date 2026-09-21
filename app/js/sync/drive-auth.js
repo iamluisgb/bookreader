@@ -12,7 +12,8 @@ import { t } from '../i18n.js';
 import * as Storage from '../storage.js';
 import { fetchWithTimeout } from './net.js';
 
-const WORKER_URL = 'https://bookreader-auth.luisgonzalezb93.workers.dev';
+// Exportado para la sonda de alcanzabilidad del diagnóstico (app-settings).
+export const WORKER_URL = 'https://bookreader-auth.luisgonzalezb93.workers.dev';
 const CLIENT_ID = '1075634570118-8ipsh5pn768rof3u0mq5rhqv2pp2dgqm.apps.googleusercontent.com';
 const SCOPE = 'https://www.googleapis.com/auth/drive.appdata';
 const AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
