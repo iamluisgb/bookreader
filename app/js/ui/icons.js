@@ -73,6 +73,8 @@ const ICONS = {
   book: '<path d="M5 4.5h7a2 2 0 0 1 2 2V20a2.5 2.5 0 0 0-2.5-2H5V4.5Z"/><path d="M19 4.5h-3a2 2 0 0 0-2 2V20a2.5 2.5 0 0 1 2.5-2H19V4.5Z"/>',
   columns: '<path d="M4 9l8-4.5L20 9"/><line x1="3.5" y1="20" x2="20.5" y2="20"/><line x1="6.5" y1="9.5" x2="6.5" y2="19"/><line x1="10" y1="9.5" x2="10" y2="19"/><line x1="14" y1="9.5" x2="14" y2="19"/><line x1="17.5" y1="9.5" x2="17.5" y2="19"/>',
   chart: '<line x1="5.5" y1="20" x2="5.5" y2="12"/><line x1="12" y1="20" x2="12" y2="4.5"/><line x1="18.5" y1="20" x2="18.5" y2="9"/>',
+  // P29 · Infografía: una lámina con su titular, su imagen y sus líneas.
+  poster: '<rect x="4" y="3.5" width="16" height="17" rx="2"/><line x1="7" y1="8" x2="17" y2="8"/><rect x="7" y="11.5" width="4.6" height="4.6" rx="1"/><line x1="14" y1="12" x2="17" y2="12"/><line x1="14" y1="15.4" x2="17" y2="15.4"/>',
 
   // ——— theme glyphs (used inside swatches when helpful) ———
   sun: '<circle cx="12" cy="12" r="4"/><line x1="12" y1="3" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="21"/><line x1="3" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="21" y2="12"/><line x1="5.6" y1="5.6" x2="7" y2="7"/><line x1="17" y1="17" x2="18.4" y2="18.4"/><line x1="18.4" y1="5.6" x2="17" y2="7"/><line x1="7" y1="17" x2="5.6" y2="18.4"/>',
@@ -86,6 +88,14 @@ export function icon(name, { size = 22, strokeWidth = 1.7, filled = false } = {}
   const body = ICONS[key];
   if (!body) return '';
   return `<svg class="icon" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${strokeWidth}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${body}</svg>`;
+}
+
+// Solo el contenido interno del glifo, en la rejilla 24×24. Lo necesitan los SVG que se
+// construyen como CADENA en vez de como DOM (el póster de la infografía, P29): ahí un
+// `<svg>` anidado no hereda trazo ni admite `currentColor`, así que se inserta el cuerpo
+// dentro de un `<g>` con su propio `stroke` y `transform`. Devuelve '' si no existe.
+export function iconBody(name) {
+  return ICONS[name] || '';
 }
 
 // Imagotipo de marca a color. Va aparte de ICONS a propósito: los glifos de

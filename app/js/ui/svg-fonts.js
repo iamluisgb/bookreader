@@ -17,12 +17,21 @@
 // queda con `font-family: Inter, system-ui, sans-serif` — o sea, exactamente lo que hacía
 // antes. Nunca se bloquea la descarga por no poder embeber la tipografía.
 
-const FACES = [
+const INTER_FACES = [
   { weight: 400, url: 'fonts/inter-400.woff2' },
   { weight: 600, url: 'fonts/inter-600.woff2' },
 ];
 
-let cached = null;
+// Póster de la infografía (P29): además de Inter, la serif de display para el titular. Source
+// Serif 4 ya estaba self-hosted para lectura, así que el artefacto no añade dependencias —
+// solo el coste de embeber dos woff2 más (≈40 KB), y solo al exportar.
+const SERIF_FACES = [
+  { weight: 400, url: 'fonts/source-serif-4-400.woff2' },
+  { weight: 600, url: 'fonts/source-serif-4-600.woff2' },
+];
+
+let interCached = null;
+let posterCached = null;
 
 function toBase64(buf) {
   const bytes = new Uint8Array(buf);
@@ -35,22 +44,34 @@ function toBase64(buf) {
   return btoa(bin);
 }
 
-async function faceCss({ weight, url }) {
+async function faceCss(family, { weight, url }) {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`${url}: ${res.status}`);
   const b64 = toBase64(await res.arrayBuffer());
-  return `@font-face{font-family:'Inter';font-style:normal;font-weight:${weight};` +
+  return `@font-face{font-family:'${family}';font-style:normal;font-weight:${weight};` +
     `src:url(data:font/woff2;base64,${b64}) format('woff2');}`;
 }
 
-// CSS con las `@font-face` de Inter embebidas, listo para un `<style>` dentro del SVG.
-// Cadena vacía si no se pudo cargar (el llamante no necesita distinguirlo: sin `<style>`,
-// el SVG cae a la fuente de sistema como siempre).
+// CSS con las `@font-face` embebidas, listo para un `<style>` dentro del SVG. Cadena vacía si
+// no se pudo cargar: el llamante no necesita distinguirlo (sin `<style>`, el SVG cae a la
+// fuente de sistema como siempre).
+function facesCss(family, faces, label) {
+  return Promise.all(faces.map((f) => faceCss(family, f)))
+    .then((parts) => parts.join(''))
+    .catch((e) => { console.warn(`No se pudo embeber ${label} en el SVG:`, e); return ''; });
+}
+
 export function interFaceCss() {
-  if (!cached) {
-    cached = Promise.all(FACES.map(faceCss))
-      .then(parts => parts.join(''))
-      .catch((e) => { console.warn('No se pudo embeber Inter en el SVG:', e); return ''; });
+  if (!interCached) interCached = facesCss('Inter', INTER_FACES, 'Inter');
+  return interCached;
+}
+
+export function posterFaceCss() {
+  if (!posterCached) {
+    posterCached = Promise.all([
+      facesCss('Inter', INTER_FACES, 'Inter'),
+      facesCss('Source Serif 4', SERIF_FACES, 'Source Serif 4'),
+    ]).then((parts) => parts.join(''));
   }
-  return cached;
+  return posterCached;
 }

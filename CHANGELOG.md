@@ -5,6 +5,28 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-09-20 — Infografía: el libro, resumido en un póster (P29)
+
+El agente ya puede componer una **infografía del libro**: un póster vertical de 1080 px con la tesis,
+las ideas clave numeradas, la cadena del argumento, los bloques que se comparan, un cierre y una
+cita. Sale con la **portada real** y un color de acento elegido del libro, y se descarga en PNG o SVG.
+Entra por el **Studio** (como el resumen y el mapa) y es una feature de **BookReader Pro**.
+
+No es una imagen generada: el modelo solo decide **qué dice cada bloque** (un JSON con anclas a los
+pasajes) y una plantilla fija decide **dónde va** ([`infographic-render.js`](app/js/ai/infographic-render.js),
+geometría pura y determinista). El JSON se **valida y se recorta** antes de pintar —máx. 8 ideas, 3
+paneles, longitudes por bloque—, que es lo que impide que el póster se convierta en un muro. El
+barrido es de **libro entero** (mismo troceado y techo de llamadas que el mapa mental) y corre en
+segundo plano: se puede cerrar la ventana y seguir leyendo.
+
+La decisión de medio la fijó la medición del prototipo: **el póster no es un activo de feed** (a
+380 px el cuerpo cae a ~4 px y no se lee). Es un resumen para leer con zoom o imprimir, y así se
+dice en la propia UI. El prototipo queda en [`app/infographic-proto.html`](app/infographic-proto.html)
+(local, excluido del deploy).
+
+Queda pendiente el **baseline y la valla de calidad** en [`evals/budgets.mjs`](evals/budgets.mjs)
+(esquema, anclas y densidad), que necesita un run @live — ver [BACKLOG § P29](BACKLOG.md).
+
 ## 2026-09-20 — El análisis deja de castigar la lectura densa
 
 Leyendo un PDF técnico de O'Reilly, el análisis contaba bastante menos de lo leído de verdad. No era

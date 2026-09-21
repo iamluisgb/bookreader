@@ -29,11 +29,12 @@ const PUBLIC = ['index.html', 'sw.js', 'app', 'es', 'anki', 'privacy', 'assets']
 // corta es publicarlas.
 //
 // `app/_proto` son 1,6 MB de capturas que se subían en cada despliegue sin que nada de
-// la app las pidiese. Sus dos únicos consumidores son páginas sueltas de prototipo
-// —`shelf-proto.html` (que en producción ya redirige) y `share-demo.html`—, a las que no
+// la app las pidiese. Sus únicos consumidores son páginas sueltas de prototipo
+// —`shelf-proto.html` (que en producción ya redirige), `share-demo.html` e
+// `infographic-proto.html`—, a las que no
 // enlaza ni la app, ni la web, ni los tests: se quedan fuera con ellas, porque publicar
 // la página sin sus imágenes sería peor que no publicarla.
-const EXCLUIDOS = ['app/_proto', 'app/shelf-proto.html', 'app/share-demo.html'];
+const EXCLUIDOS = ['app/_proto', 'app/shelf-proto.html', 'app/share-demo.html', 'app/infographic-proto.html'];
 
 // Cabeceras de Cloudflare Pages. Sin este fichero, Pages sirve TODO con
 // `cache-control: public, max-age=0, must-revalidate`, incluidas las libs versionadas

@@ -560,6 +560,26 @@ body.ai-open .reader-main { margin-right: var(--ai-panel-width); }
    es el viewBox del SVG, no la barra de scroll; `touch-action: none` para que el arrastre y
    la pinza los gestione el mapa y no el scroll de la página. El `background` lo pone JS
    desde el tema (antes estaba clavado a papel y en oscuro cantaba). */
+/* ---- P29 · Infografía del libro: póster con zoom y arrastre ---------------------------------
+   El póster se compone a 1080 px y NO es responsive (una infografía es una composición): se lee
+a tamaño real en este lienzo con scroll, o se descarga. La medida se maneja por CSS desde JS. */
+.ig-card.ig-card--wide { max-width: 94vw; width: 1000px; }
+.ig-bar { display: flex; gap: 4px; align-items: center; margin: 4px 0 8px; }
+.ig-bar button {
+  min-width: 32px; height: 32px; padding: 0 8px; display: grid; place-items: center;
+  border: 1px solid var(--border); border-radius: 8px;
+  background: var(--surface-1); color: var(--text); font-size: 13px; line-height: 1; cursor: pointer;
+}
+.ig-bar button:hover { background: var(--surface-3); }
+.ig-hint { margin-left: 8px; font-size: 12px; color: var(--text-muted); }
+.ig-stage {
+  max-height: 62vh; overflow: auto; overscroll-behavior: contain;
+  border: 1px solid var(--border); border-radius: 12px;
+  background: var(--surface-2); cursor: grab;
+}
+.ig-stage.dragging { cursor: grabbing; }
+.ig-canvas > svg { display: block; max-width: none; }
+
 .mm-stage { position: relative; }
 .mm-canvas {
   margin: 8px 0; border: 1px solid var(--border); border-radius: 12px;

@@ -809,6 +809,63 @@ DNF vuelve a aparecer con tiempos por fase que señalen al nº de llamadas y no 
   empujada lejos puede cruzar el territorio de la rama vecina. Evitarlo pide enrutado de
   aristas o reordenar ramas por afinidad; no compensa hoy.
 
+### P29 — Infografía del libro: el póster-resumen · `M`–`L` · **✓ entregada (2026-09-20)** · artefacto de marketing
+
+> **Estado.** Ruta completa en la app: tarjeta en el **Studio** (Pro), modal con zoom/arrastre y
+export **PNG/SVG**, i18n ES/EN y [`tests/infographic-render.spec.ts`](tests/infographic-render.spec.ts).
+> Queda pendiente el **baseline @live y la valla en [`evals/budgets.mjs`](evals/budgets.mjs)** (el
+> contrato de abajo), que necesita un run real — hasta entonces el render está cubierto pero la
+> calidad de generación no está medida.
+
+**La pregunta.** «¿Podríamos sacar una infografía de un libro como las que se ven en redes?» Sí, y
+encaja donde ya viven resumen y mapa.
+
+**Lo que descarta la opción fácil: NO es una imagen generada.** Un modelo de difusión no sabe
+escribir: el texto sale deforme, inventado y sin poder citar el pasaje — justo lo contrario del foso
+del producto. La infografía es **plantilla fija + contenido estructurado**: el modelo decide *qué*
+dice cada bloque (un JSON: tesis, ideas numeradas, cadena del argumento, comparativa, «cómo leerlo»,
+cierre y cita) y la plantilla decide *dónde* va. Mismo reparto que el mapa mental: geometría pura,
+determinista y testeable sola ([`infographic-render.js`](app/js/ai/infographic-render.js)).
+
+**Lo que ya está hecho y probado a mano** (prototipo, no feature):
+- El renderizador a 1080 px, con portada real (marco de proporción variable), acento por libro de una
+  paleta con AA garantizado, y export **PNG + PDF A4 en una página**.
+- La decisión de medio, que la medición dejó clara: **el póster no es un activo de feed**. A 380 px
+  el cuerpo cae a 3,7–4,6 px y no se lee — igual que en las referencias. Es un resumen **para leer
+  con zoom (o imprimir)**. El derivado social (varias láminas legibles a 380) es otra feature.
+- Ver [`infographic-proto.html`](app/infographic-proto.html) (local; excluido del deploy).
+
+**Lo que montó la ruta en la app:**
+- `ai/infographic.js`: la llamada — alcance de **libro entero**, mismo troceado y presupuesto que el
+  mapa ([`bookScopePassages`](app/js/ai/summary.js), `Jobs`) — que devuelve el JSON del esquema, y un
+  **validador que lo recorta** (máx. 8 ideas, 4 columnas, longitudes por bloque) antes de pintar.
+- La **portada**: `cover` de la biblioteca (dataURL) o la primera página del PDF, **con su
+  proporción**. El acento se elige de `ACCENTS`; nunca lo inventa el modelo.
+- Entrada en el **Studio** (`stateful`, con historial como resumen y mapa) + modal con zoom/arrastre
+  y export PNG/PDF (lo del prototipo, portado).
+- i18n ES/EN, tests deterministas y la valla en `evals/budgets.mjs` cuando el run lo respalde.
+
+**Contrato (antes de implementar)** — formato de [`docs/EVALS.md` § EV5](docs/EVALS.md):
+- **Batería:** `p4-noficcion` y `p2-tecnico` — los dos perfiles a los que sirve un póster-resumen
+  (ensayo y técnico). P1/P3 son control: no deben empeorar.
+- **Métrica primaria (determinista, sin juez):**
+  1. `infografia.esquema`: 1/1 generaciones con esquema válido (bloques del tipo esperado, listas no
+     vacías y dentro de rango). **Gate.**
+  2. `infografia.anclas`: 100 % de las citas `[[aN]]` existen en el libro. **Gate.**
+  3. `infografia.densidad`: alto/ancho ≤ **2,4** (la valla que ya usa el test del render). **Gate.**
+- **Baseline:** **no existe** — el primer paso del ítem es un run con nombre, no un arreglo. Lo único
+  medido hasta hoy son las 4 muestras escritas a mano (ratio 1,96–2,04) y el coste que se presupone
+  análogo al del mapa (≤ 3 llamadas).
+- **Secundaria (tendencia, no gate):** `cobertura_infografia` (juez, lista dorada de conceptos por
+  fixture) y `fidelidad_tesis` (juez), **2 runs para promediar** — con ±0,5 de varianza, un solo run
+  no distingue una mejora del ruido. Y `latencia_infografia` ≤ 120 s.
+- **Time-box:** 3 ciclos. Si la cobertura del juez no se mueve > 0,5 con dos runs, se clasifica el
+  fallo (¿prompt? ¿troceado? ¿el libro no da para póster?) y se cierra con el hallazgo.
+
+**Riesgo declarado.** La densidad es el riesgo real del artefacto: a un modelo al que se le piden
+«ideas clave» le salen veinte. El recorte del validador no es cosmético — es lo que impide que el
+póster deje de ser legible, y por eso `infografia.densidad` es gate y no tendencia.
+
 ### P15 — Internacionalización EN/ES (UI + prompts) · `L` · **F1+F2 ✓** · **lanzamiento**
 
 > **Estado: F1+F2 entregadas (2026-07-15, ver CHANGELOG); queda F3 (opcional, post-lanzamiento).**

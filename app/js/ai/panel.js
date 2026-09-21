@@ -26,6 +26,7 @@ import * as Backup from '../backup.js';
 import * as Flashcards from './flashcards.js';
 import * as Summary from './summary.js';
 import * as MindMap from './mindmap.js';
+import * as Infographic from './infographic.js';
 import * as Feynman from './feynman.js';
 import { attachMic, micAvailable } from './mic.js';
 import * as Jobs from './jobs.js';
@@ -142,6 +143,7 @@ export function init(opts) {
   // "openers" reabren el modal reconstruyendo el contexto del libro actual.
   JobsUI.setOpener('summary', openSummary);
   JobsUI.setOpener('mindmap', openMindMap);
+  JobsUI.setOpener('infographic', openInfographic);
   // Flashcards también corre en segundo plano (F4). Su opener reabre el modal, que al
   // suscribirse a jobs.js cae directo en la revisión del mazo recién generado.
   JobsUI.setOpener('flashcards', openFlashcards);
@@ -151,6 +153,7 @@ export function init(opts) {
     open: (kind, opts) => {
       if (kind === 'summary') openSummary(opts);
       else if (kind === 'mindmap') openMindMap(opts);
+      else if (kind === 'infographic') openInfographic(opts);
       else if (kind === 'flashcards') openFlashcards();
       else if (kind === 'feynman') openFeynman();
     },
@@ -488,6 +491,21 @@ async function openMindMap(opts) {
     anchors,
     onCite: navigateCite,
     onAsk: askAbout,
+    mode: opts && opts.mode,
+    viewArtifact: opts && opts.artifact,
+  });
+}
+
+// P29 · Infografía del libro. Generar es Pro; reabrir un artefacto ya generado sigue libre.
+async function openInfographic(opts) {
+  if (!book && !bookId) { setStatus('Abre un libro para generar la infografía.'); return; }
+  if (!segReady) { setStatus('Preparando el libro… inténtalo en unos segundos.'); return; }
+  if (!(opts && opts.artifact) && !(await ensurePro('infographic'))) return;
+  Infographic.open({
+    bookId, bookTitle, bookAuthor,
+    goal: convo?.goal || '',
+    ensureIndex,
+    anchors,
     mode: opts && opts.mode,
     viewArtifact: opts && opts.artifact,
   });

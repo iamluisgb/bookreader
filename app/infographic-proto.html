@@ -1,0 +1,1006 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <title>proto · infografía del libro</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      :root {
+        --bg: #111110;
+        --panel: #1b1b18;
+        --ink: #e9e4d8;
+        --muted: #98907f;
+        --accent: #22c55e;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font:
+          14px/1.5 Inter,
+          system-ui,
+          sans-serif;
+        padding: 26px;
+      }
+      h1 {
+        font:
+          600 13px/1 Inter,
+          system-ui;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--muted);
+        margin: 0 0 6px;
+      }
+      .lede {
+        max-width: 900px;
+        color: var(--muted);
+        font-size: 13px;
+        margin: 0 0 22px;
+      }
+      .lede b {
+        color: var(--ink);
+      }
+      .bar {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        flex-wrap: wrap;
+        margin-bottom: 22px;
+      }
+      select,
+      button {
+        font:
+          600 13px Inter,
+          system-ui;
+        background: var(--panel);
+        color: var(--ink);
+        border: 1px solid #333;
+        border-radius: 8px;
+        padding: 9px 14px;
+        cursor: pointer;
+      }
+      button.primary {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #07230f;
+      }
+      .row {
+        display: flex;
+        gap: 28px;
+        align-items: flex-start;
+        flex-wrap: wrap;
+      }
+      .box {
+        background: var(--panel);
+        border-radius: 12px;
+        padding: 14px;
+      }
+      .box h2 {
+        font:
+          600 10.5px Inter,
+          system-ui;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--muted);
+        margin: 0 0 12px;
+      }
+      .stage {
+        width: 620px;
+        max-width: 100%;
+        height: 620px;
+        overflow: auto;
+        background: #0c0c0b;
+        border-radius: 8px;
+        cursor: grab;
+      }
+      .stage.dragging {
+        cursor: grabbing;
+      }
+      .stage svg {
+        border-radius: 6px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+        max-width: none !important;
+      }
+      .zoombar {
+        display: flex;
+        gap: 6px;
+        align-items: center;
+        margin-bottom: 10px;
+      }
+      .zoombar button {
+        padding: 5px 11px;
+        font-size: 12px;
+      }
+      .zoombar span {
+        font:
+          500 11px ui-monospace,
+          monospace;
+        color: var(--muted);
+        margin-left: auto;
+      }
+      .feed {
+        width: 380px;
+      }
+      .feed svg {
+        border-radius: 6px;
+      }
+      #print-area {
+        display: none;
+      }
+      /* Opción A · salida para leer/imprimir: una A4 vertical por póster, a sangre de la caja
+         de impresión (el póster es 1:2,04, así que entra de alto en la página). */
+      @media print {
+        /* El padding del body de pantalla (26 px) se sumaba al alto del póster y lo partía en
+           dos páginas. En papel, a sangre de la caja de impresión. */
+        html,
+        body {
+          margin: 0 !important;
+          padding: 0 !important;
+          background: #fff !important;
+        }
+        body > *:not(#print-area) {
+          display: none !important;
+        }
+        #print-area {
+          display: block;
+        }
+        #print-area svg {
+          /* El `style` en línea del SVG (height:auto; max-width:100%) pide un SVG responsive:
+             aquí manda la página. `!important` es lo único que gana a un estilo en línea. */
+          height: 262mm !important;
+          width: auto !important;
+          max-width: none !important;
+          display: block;
+          margin: 0 auto;
+          box-shadow: none;
+        }
+        @page {
+          size: A4 portrait;
+          margin: 12mm;
+        }
+      }
+      .note {
+        width: 300px;
+        color: var(--muted);
+        font-size: 12.5px;
+      }
+      .note b {
+        color: var(--ink);
+      }
+      .stats {
+        font:
+          500 11.5px ui-monospace,
+          monospace;
+        color: var(--muted);
+        margin-top: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Infografía del libro · prototipo</h1>
+    <p class="lede">
+      Render puro con datos fijos (sin LLM). Estructura:
+      <b
+        >hero con portada + tesis · ideas en dos columnas · paneles a todo el ancho · cierre ·
+        cita</b
+      >. El póster no es un activo de feed a 380&nbsp;px (su cuerpo cae a ~4&nbsp;px): es un resumen
+      <b>para leer con zoom o imprimir</b>.
+    </p>
+    <div class="bar">
+      <select id="sample"></select>
+      <button id="dl" class="primary">Descargar PNG real</button>
+      <button id="print">Imprimir / PDF (A4)</button>
+      <span class="stats" id="stats"></span>
+    </div>
+    <div class="row">
+      <div class="box">
+        <h2>Opción A · léelo aquí (zoom y arrastre)</h2>
+        <div class="zoombar">
+          <button data-zoom="out" aria-label="Alejar">−</button>
+          <button data-zoom="in" aria-label="Acercar">+</button>
+          <button data-zoom="fit">Ajustar</button>
+          <button data-zoom="100">100 %</button>
+          <span id="zoomval"></span>
+        </div>
+        <div class="stage" id="stage"></div>
+      </div>
+      <div class="box feed">
+        <h2>A tamaño de feed · 380 px</h2>
+        <div id="feed"></div>
+      </div>
+      <p class="note">
+        <b>Qué se está validando aquí.</b> El póster se dibuja a 1080 px de ancho y alto calculado
+        (9:16 largo). El mismo SVG, encogido por CSS a 380, simula cómo se ve en un feed o una story
+        — el criterio con el que P23 descartó la estantería 3D.<br /><br />
+        <b>Portada:</b> las de <i>El pez en el agua</i> y <i>Diseño de sistemas</i> son REALES,
+        extraídas de sus EPUB; las otras dos son sintéticas (SVG generado) porque no tenemos esos
+        libros. El marco del póster toma la proporción de la tapa (2:3, 7:9…) en vez de recortarla.
+        En la app sale de la biblioteca (<code>cover</code> en IndexedDB) o de la primera página en
+        PDF, y viaja embebida como data URL para que el SVG exportado sea autónomo.
+      </p>
+    </div>
+
+    <script type="module">
+      import { renderSvg, POSTER, clearMeasureCache } from './js/ai/infographic-render.js';
+      import { posterFaceCss } from './js/ui/svg-fonts.js';
+
+      // ---- Portada sintética (en la app vendría del libro) ----------------------------------
+      function coverDataUrl({ title, author, bg, accent, lines }) {
+        const text = lines
+          .map(
+            (l, i) =>
+              `<text x="60" y="${340 + i * 88}" font-family="'Source Serif 4',Georgia,serif" font-size="64" font-weight="600" fill="${accent}">${l}</text>`,
+          )
+          .join('');
+        const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="600" height="900" viewBox="0 0 600 900">
+    <rect width="600" height="900" fill="${bg}"/>
+    <rect x="60" y="90" width="60" height="4" fill="${accent}"/>
+    <text x="60" y="170" font-family="Inter,sans-serif" font-size="26" font-weight="600" fill="${accent}">${author}</text>
+    ${text}
+    <text x="60" y="830" font-family="Inter,sans-serif" font-size="22" fill="#ffffff" opacity="0.75">${title}</text>
+  </svg>`;
+        return 'data:image/svg+xml,' + encodeURIComponent(svg);
+      }
+
+      // La portada real viaja como ASSET (`coverSrc`) y se convierte a data URL al cargar: un
+      // `<img>` que rasteriza el SVG es un documento aislado y no resuelve rutas relativas, así
+      // que el póster exportado solo es autónomo si la imagen va embebida.
+      async function toDataUrl(url) {
+        const blob = await (await fetch(url)).blob();
+        return await new Promise((res) => {
+          const r = new FileReader();
+          r.onload = () => res(r.result);
+          r.readAsDataURL(blob);
+        });
+      }
+
+      async function resolveCovers() {
+        await Promise.all(
+          Object.values(SAMPLES).map(async (s) => {
+            if (s.coverSrc && !s.cover) s.cover = await toDataUrl(s.coverSrc);
+            // La proporción viaja con la portada: el renderizador dimensiona el marco con ella
+            // en vez de recortar la tapa.
+            if (s.cover && !s.coverAspect) s.coverAspect = await imageAspect(s.cover);
+          }),
+        );
+      }
+
+      function imageAspect(src) {
+        return new Promise((res) => {
+          const img = new Image();
+          img.onload = () => res(img.naturalWidth / img.naturalHeight);
+          img.onerror = () => res(2 / 3);
+          img.src = src;
+        });
+      }
+
+      // ---- Muestras --------------------------------------------------------------------------
+      // Texto propio: resúmenes escritos para esta maqueta, NO copiados de las infografías de
+      // referencia ni del libro (el de Vargas Llosa se apoya en la estructura real del EPUB:
+      // 20 capítulos que alternan infancia y campaña). La maquetación es lo que se valida aquí.
+
+      const SAMPLES = {
+        'Pensar en sistemas · Donella Meadows': {
+          kicker: 'Un manual de iniciación',
+          title: 'Pensar en sistemas',
+          author: 'Donella Meadows',
+          accent: '#0f766e',
+          cover: coverDataUrl({
+            title: 'Un manual de iniciación',
+            author: 'Donella Meadows',
+            bg: '#0f1f1b',
+            accent: '#5eead4',
+            lines: ['PENSAR', 'EN', 'SISTEMAS'],
+          }),
+          thesis:
+            'Meadows explica por qué los mismos problemas reaparecen aunque cambien las personas que los gestionan: lo que produce el resultado no es quién está al mando, sino cómo están conectadas las piezas. Y esa estructura se puede analizar y modificar.',
+          ideasTitle: 'Ideas clave',
+          ideas: [
+            {
+              ico: 'target',
+              head: 'Qué es un sistema',
+              body: 'Un conjunto de elementos relacionados entre sí que persiguen algo. Si cambias las piezas, el comportamiento apenas cambia; si cambias las relaciones o el objetivo, cambia todo.',
+            },
+            {
+              ico: 'target',
+              head: 'El propósito está en lo que hace',
+              body: 'El objetivo real se deduce de los resultados, no de lo que el sistema declara. Si una y otra vez produce lo mismo, eso es lo que de verdad busca.',
+            },
+            {
+              ico: 'chart',
+              head: 'Depósitos y flujos',
+              body: 'Los niveles se mueven despacio, muy lejos de la velocidad a la que se abren o se cierran las llaves. Esa inercia explica por qué nada se arregla de inmediato.',
+            },
+            {
+              ico: 'undo',
+              head: 'Dos tipos de bucle',
+              body: 'Unos se oponen al cambio y lo corrigen (un termostato); otros lo amplifican (el interés compuesto). Casi todo sistema combina los dos.',
+            },
+            {
+              ico: 'note',
+              head: 'Los retardos producen vaivenes',
+              body: 'Cuando la respuesta tarda, se sobrerreacciona: se gira de más antes de notar el efecto y el resultado oscila. Detrás de casi toda oscilación hay un retardo.',
+            },
+            {
+              ico: 'user',
+              head: 'Nadie ve el sistema entero',
+              body: 'Cada cual decide con la información que tiene a mano y hace lo que parece sensato desde su posición. Decisiones razonables por separado pueden dar un mal resultado conjunto.',
+            },
+            {
+              ico: 'warning',
+              head: 'Se atacan los síntomas',
+              body: 'Los acontecimientos llaman la atención y las estructuras no se ven, así que la mayoría de las respuestas se quedan en lo superficial y el problema reaparece.',
+            },
+            {
+              ico: 'chart',
+              head: 'Las palancas engañan',
+              body: 'Donde casi todo el mundo interviene (cifras, precios, metas) suele haber poco poder real. Los puntos de apalancamiento están en la información, las reglas y los objetivos.',
+            },
+          ],
+          panels: [
+            {
+              kind: 'flow',
+              title: 'Lo que se ve y lo que manda',
+              steps: [
+                { ico: 'sparkles', head: 'Sucesos', body: 'Lo que aparece hoy en las noticias' },
+                { ico: 'chart', head: 'Patrones', body: 'Lo que se repite desde hace años' },
+                {
+                  ico: 'columns',
+                  head: 'Estructura',
+                  body: 'Los bucles que generan esos patrones',
+                },
+                { ico: 'target', head: 'Modelo mental', body: 'Las creencias que nadie discute' },
+              ],
+            },
+            {
+              kind: 'cols',
+              title: 'Cuatro trampas clásicas',
+              cols: [
+                {
+                  ico: 'undo',
+                  head: 'Resistencia a las políticas',
+                  sub: 'todos empujan',
+                  body: 'Cada parte presiona el mismo indicador en su favor; el indicador se queda donde está y el esfuerzo se multiplica.',
+                },
+                {
+                  ico: 'chart',
+                  head: 'Tragedia de los comunes',
+                  sub: 'el recurso compartido',
+                  body: 'Quien explota el recurso se lleva el beneficio y reparte el coste. Sin límites ni información, el recurso se agota.',
+                },
+                {
+                  ico: 'chart',
+                  head: 'Erosión del objetivo',
+                  sub: 'bajar la exigencia',
+                  body: 'Cuando el resultado no llega, se rebaja el listón poco a poco y el deterioro deja de notarse.',
+                },
+                {
+                  ico: 'chart',
+                  head: 'Éxito al exitoso',
+                  sub: 'gana quien gana',
+                  body: 'Quien va por delante consigue más medios para seguir delante; sin reglas que lo frenen, la ventaja se realimenta.',
+                },
+              ],
+            },
+            {
+              kind: 'rows',
+              title: 'Dónde tocar, de menos a más potente',
+              rows: [
+                {
+                  tag: 'Nivel bajo',
+                  body: 'Las cifras: precios, cuotas, presupuestos. Es donde más se interviene y donde menos cambia el resultado.',
+                },
+                {
+                  tag: 'Nivel medio',
+                  body: 'Los niveles y los retardos. Agrandar un almacén o acelerar una respuesta cambia el modo en que el sistema oscila.',
+                },
+                {
+                  tag: 'Nivel alto',
+                  body: 'La información. Hacer llegar un dato a quien no lo tenía cambia su conducta sin obligarle a nada.',
+                },
+                {
+                  tag: 'Más alto',
+                  body: 'Las reglas: quién entra, quién decide y quién puede cambiar lo acordado.',
+                },
+                {
+                  tag: 'El máximo',
+                  body: 'El objetivo y las creencias básicas. Decidir para qué existe el sistema es la palanca más potente de todas.',
+                },
+              ],
+            },
+          ],
+          aside: [
+            {
+              ico: 'note',
+              label: 'Recuerda',
+              body: 'Es una introducción para pensar en sistemas, no un manual de modelado. La autora insiste en que ningún sistema se domina por completo: se aprende a convivir con él.',
+            },
+            {
+              ico: 'target',
+              label: 'Idea final',
+              body: 'Cuando un mismo problema se repite bajo gobiernos y responsables distintos, la causa suele estar en la estructura que comparten, no en las personas.',
+            },
+          ],
+          quote: {
+            text: 'Un sistema no se controla: como mucho, se aprende a bailar con él.',
+            attribution: 'Donella Meadows, Pensar en sistemas',
+          },
+          footer: { mark: 'BookReader', url: 'bookreader.raiatech.com' },
+        },
+
+        'Armas, gérmenes y acero · Jared Diamond': {
+          kicker: 'Breve historia de la humanidad en los últimos trece mil años',
+          title: 'Armas, gérmenes y acero',
+          author: 'Jared Diamond',
+          accent: '#b45309',
+          cover: coverDataUrl({
+            title: 'Breve historia de la humanidad',
+            author: 'Jared Diamond',
+            bg: '#2a1a10',
+            accent: '#f8b96a',
+            lines: ['ARMAS,', 'GÉRMENES', 'Y ACERO'],
+          }),
+          thesis:
+            'Diamond se pregunta por qué la historia tomó caminos tan distintos en cada continente. Su respuesta no está en los pueblos, sino en el entorno: las especies domesticables disponibles, la orientación de cada continente y lo que ello desencadenó a lo largo de milenios.',
+          ideasTitle: 'Ideas clave',
+          ideas: [
+            {
+              ico: 'user',
+              head: 'La pregunta de Yali',
+              body: 'Un político de Nueva Guinea le preguntó por qué unos pueblos acumularon tecnología y poder y otros no. El libro entero es su intento de responder a eso.',
+            },
+            {
+              ico: 'target',
+              head: 'Geografía, no biología',
+              body: 'El punto de partida es el entorno, no las capacidades de las personas. La tesis se opone abiertamente a las explicaciones racistas.',
+            },
+            {
+              ico: 'undo',
+              head: 'Causas próximas y últimas',
+              body: 'Las armas, los gérmenes y el acero son la causa inmediata de las conquistas; la agricultura es la causa de fondo que permitió tenerlas.',
+            },
+            {
+              ico: 'chart',
+              head: 'La lotería de las especies',
+              body: 'Pocas plantas y animales sirven para domesticar. Disponer de trigo o de ganado dependió de que existieran en la región, no de ningún mérito.',
+            },
+            {
+              ico: 'note',
+              head: 'La regla de Ana Karenina',
+              body: 'Para domesticar un animal hace falta que cumpla muchas condiciones a la vez: dieta asequible, crecimiento rápido, buen temperamento y cría en cautividad. Basta que falle una.',
+            },
+            {
+              ico: 'target',
+              head: 'El eje este-oeste',
+              body: 'Los continentes anchos en horizontal permiten difundir cultivos entre climas parecidos; los orientados en vertical obligan a adaptarse a cada franja.',
+            },
+            {
+              ico: 'sun',
+              head: 'Los gérmenes hicieron el trabajo',
+              body: 'Las epidemias nacidas del contacto con el ganado y la vida urbana diezmaron a poblaciones sin defensas, a menudo antes de que llegaran los ejércitos.',
+            },
+            {
+              ico: 'chart',
+              head: 'Excedente, Estado y escritura',
+              body: 'Con alimento sobrante aparece gente que no cultiva: soldados, artesanos y administradores. Esa organización decide buena parte de los conflictos.',
+            },
+          ],
+          panels: [
+            {
+              kind: 'flow',
+              title: 'La cadena del argumento',
+              steps: [
+                {
+                  ico: 'columns',
+                  head: 'Geografía',
+                  body: 'Las especies y el clima de cada región',
+                },
+                {
+                  ico: 'chart',
+                  head: 'Agricultura',
+                  body: 'Excedente de alimento y vida sedentaria',
+                },
+                { ico: 'books', head: 'Densidad', body: 'Ciudades, oficios y jerarquía' },
+                { ico: 'sparkles', head: 'Ventaja', body: 'Tecnología, enfermedades y Estados' },
+              ],
+            },
+            {
+              kind: 'cols',
+              title: 'Por qué unos continentes se adelantaron',
+              cols: [
+                {
+                  ico: 'chart',
+                  head: 'Qué especies había',
+                  sub: 'la disponibilidad',
+                  body: 'La región con más cereales y animales domesticables partía con ventaja.',
+                },
+                {
+                  ico: 'target',
+                  head: 'Hacia dónde se extiende',
+                  sub: 'la orientación',
+                  body: 'En un eje horizontal el clima se repite y las innovaciones viajan; en uno vertical, no.',
+                },
+                {
+                  ico: 'columns',
+                  head: 'Qué separa las regiones',
+                  sub: 'las barreras',
+                  body: 'Desiertos, selvas y montañas determinan si una técnica llega al vecino o se queda aislada.',
+                },
+                {
+                  ico: 'books',
+                  head: 'Cuánta población conecta',
+                  sub: 'el tamaño',
+                  body: 'Más gente en contacto significa más innovaciones y más ocasiones de adoptar las ajenas.',
+                },
+              ],
+            },
+            {
+              kind: 'rows',
+              title: 'Cómo leerlo con cabeza',
+              rows: [
+                {
+                  tag: 'Escala continental',
+                  body: 'El libro trabaja con milenios y continentes enteros; sus conclusiones no se trasladan tal cual a países concretos.',
+                },
+                {
+                  tag: 'Determinismo',
+                  body: 'La geografía condiciona, pero no determina por sí sola: es la crítica más repetida al libro.',
+                },
+                {
+                  tag: 'Las instituciones',
+                  body: 'Otras corrientes ponen el acento en las reglas, la propiedad y el poder más que en el medio físico.',
+                },
+                {
+                  tag: 'No es una excusa',
+                  body: 'La obra se escribió para refutar el racismo científico; emplearla para legitimar desigualdades actuales la invierte.',
+                },
+              ],
+            },
+          ],
+          aside: [
+            {
+              ico: 'note',
+              label: 'Recuerda',
+              body: 'Publicado en 1997, ha recibido críticas de historiadores y antropólogos por su determinismo geográfico y por simplificar algunas pruebas. Sigue siendo un buen punto de partida para la pregunta.',
+            },
+            {
+              ico: 'target',
+              label: 'Idea final',
+              body: 'Si lo que explica las diferencias es el entorno, no hay pueblos superiores: hubo puntos de partida distintos.',
+            },
+          ],
+          quote: {
+            text: 'No ganaron pueblos mejores: ganaron continentes mejor repartidos.',
+            attribution: 'La tesis de Jared Diamond, resumida',
+          },
+          footer: { mark: 'BookReader', url: 'bookreader.raiatech.com' },
+        },
+
+        'El pez en el agua · Mario Vargas Llosa': {
+          kicker: 'Memorias',
+          title: 'El pez en el agua',
+          author: 'Mario Vargas Llosa',
+          accent: '#1d4ed8',
+          // Portada REAL, extraída del EPUB del libro (se convierte a data URL al cargar).
+          coverSrc: '_proto/pez-cover.jpg',
+          thesis:
+            'Vargas Llosa cuenta dos vidas a la vez: la del niño que crece entre Bolivia, Piura y Lima bajo un padre al que teme, y la del escritor consagrado que en 1987 se deja arrastrar a la política y acaba disputando la presidencia del Perú. El relato va y viene entre las dos para mostrar cómo se alimentan.',
+          ideasTitle: 'Ideas clave',
+          ideas: [
+            {
+              ico: 'columns',
+              head: 'Dos tiempos, un solo relato',
+              body: 'Los capítulos impares reconstruyen la infancia y la juventud; los pares, la campaña electoral. El vaivén no es un capricho: cada hilo explica el otro.',
+            },
+            {
+              ico: 'user',
+              head: 'El padre que lo cambió todo',
+              body: 'A los diez años descubre que el hombre al que creía muerto está vivo. Su llegada impone una autoridad dura que marcará el carácter del niño y su forma de mirar el mundo.',
+            },
+            {
+              ico: 'note',
+              head: 'La vocación como refugio',
+              body: 'Las lecturas y la imaginación son la salida de una casa sin salida. Escribir empieza siendo una forma de escapar y termina siendo un oficio.',
+            },
+            {
+              ico: 'books',
+              head: 'El colegio militar',
+              body: 'El paso por el Leoncio Prado le da el material de su primera novela: un microcosmos donde conviven la disciplina, la violencia y la amistad.',
+            },
+            {
+              ico: 'pencil',
+              head: 'Periodismo y bohemia',
+              body: 'En Lima y después en Europa vive de la prensa y de trabajos precarios mientras se forma como escritor. La bohemia es menos mito que necesidad.',
+            },
+            {
+              ico: 'sparkles',
+              head: 'La tía Julia',
+              body: 'El noviazgo y la fuga con una mujer mayor que él y emparentada con su familia es el episodio que años después convertiría en novela.',
+            },
+            {
+              ico: 'target',
+              head: 'La política como deber',
+              body: 'En 1987, ante el intento de estatizar la banca, acepta un papel público que no había buscado y acaba encabezando una candidatura presidencial.',
+            },
+            {
+              ico: 'undo',
+              head: 'La derrota y el regreso',
+              body: 'La campaña termina en 1990 con la victoria de Fujimori. El libro cierra el ciclo: vuelve a la literatura y convierte la experiencia en materia de escritura.',
+            },
+          ],
+          panels: [
+            {
+              kind: 'flow',
+              title: 'La campaña, paso a paso',
+              steps: [
+                {
+                  ico: 'sparkles',
+                  head: 'Plaza San Martín',
+                  body: '1987: la protesta contra la estatización de la banca',
+                },
+                {
+                  ico: 'columns',
+                  head: 'Movimiento Libertad',
+                  body: 'El grupo que nace de aquella movilización',
+                },
+                {
+                  ico: 'books',
+                  head: 'Frente Democrático',
+                  body: 'La coalición que lo presenta a la presidencia',
+                },
+                {
+                  ico: 'chart',
+                  head: 'Derrota en 1990',
+                  body: 'Segunda vuelta y victoria de Fujimori',
+                },
+              ],
+            },
+            {
+              kind: 'cols',
+              title: 'Los que lo marcaron',
+              cols: [
+                {
+                  ico: 'user',
+                  head: 'El padre',
+                  sub: 'la autoridad',
+                  body: 'Un hombre frío y violento cuya sola presencia reorganiza la vida de la familia y la del niño.',
+                },
+                {
+                  ico: 'sparkles',
+                  head: 'La tía Julia',
+                  sub: 'el escándalo',
+                  body: 'El amor juvenil y la fuga que la familia quiso impedir, y que acabaría en divorcio.',
+                },
+                {
+                  ico: 'books',
+                  head: 'El Leoncio Prado',
+                  sub: 'la escuela',
+                  body: 'El internado donde convive con la disciplina militar y con compañeros que no olvidaría.',
+                },
+                {
+                  ico: 'target',
+                  head: 'La política',
+                  sub: 'el desvío',
+                  body: 'Tres años de mítines y campaña que lo llevan del rechazo inicial a la candidatura.',
+                },
+              ],
+            },
+            {
+              kind: 'rows',
+              title: 'Claves de lectura',
+              rows: [
+                {
+                  tag: 'Sin ficción',
+                  body: 'El pacto es distinto al de sus novelas: aquí promete contar lo que recuerda, aunque la memoria sea selectiva.',
+                },
+                {
+                  tag: 'Memoria y novela',
+                  body: 'Varios episodios reaparecen transformados en su ficción; el libro enseña de dónde salieron.',
+                },
+                {
+                  tag: 'El Perú',
+                  body: 'El país es un personaje más: la política peruana de los ochenta, vista desde dentro y sin adornos.',
+                },
+                {
+                  tag: 'Autocrítica',
+                  body: 'No se ahorra el ridículo ni los errores de la campaña, y tampoco justifica el resultado.',
+                },
+              ],
+            },
+          ],
+          aside: [
+            {
+              ico: 'note',
+              label: 'Recuerda',
+              body: 'Se publicó en 1993, poco después de la derrota electoral. Es un ajuste de cuentas con dos etapas propias, escrito con la misma exigencia de estilo que sus novelas.',
+            },
+            {
+              ico: 'target',
+              label: 'Idea final',
+              body: 'Las dos mitades del libro dicen lo mismo: la escritura sirvió para ordenar una vida que la política no llegó a cambiar.',
+            },
+          ],
+          quote: {
+            text: 'Primero se vengó de su vida escribiéndola; después quiso cambiarla haciendo política.',
+            attribution: 'El doble hilo de estas memorias',
+          },
+          footer: { mark: 'BookReader', url: 'bookreader.raiatech.com' },
+        },
+        'Diseño de sistemas · Alex Xu': {
+          kicker: 'Una guía de información privilegiada',
+          title: 'Diseño de sistemas',
+          author: 'Alex Xu',
+          accent: '#4338ca',
+          // Portada REAL, extraída del EPUB del libro (proporción 7:9, no 2:3).
+          coverSrc: '_proto/ds-cover.jpg',
+          thesis:
+            'Una guía para preparar entrevistas de diseño de sistemas que empieza por lo básico —cómo pasar de un servidor a millones de usuarios— y termina resolviendo casos concretos: un limitador de frecuencia, un acortador de URL, un chat, YouTube o Google Drive.',
+          ideasTitle: 'Ideas clave',
+          ideas: [
+            {
+              ico: 'columns',
+              head: 'Escalar tiene un orden',
+              body: 'El primer capítulo recorre el camino desde un servidor único hasta millones de usuarios. Cada pieza nueva —base de datos, equilibrador, caché, CDN— aparece cuando aparece su cuello de botella.',
+            },
+            {
+              ico: 'chart',
+              head: 'Estimar antes de dibujar',
+              body: 'Antes de proponer una arquitectura se calculan órdenes de magnitud: usuarios, peticiones por segundo, almacenamiento. Sin números no se sabe si el diseño aguanta.',
+            },
+            {
+              ico: 'note',
+              head: 'Los números del oficio',
+              body: 'Potencias de dos, latencias típicas de memoria, disco y red, y tasas de disponibilidad. Es la tabla de multiplicar que se espera que uno tenga en la cabeza.',
+            },
+            {
+              ico: 'target',
+              head: 'Un método de cuatro pasos',
+              body: 'Acotar el problema, proponer un diseño de alto nivel, profundizar en lo crítico y cerrar con los cuellos de botella. El libro lo repite en cada capítulo.',
+            },
+            {
+              ico: 'warning',
+              head: 'El alcance primero',
+              body: 'Decidir qué entra y qué no, en requisitos funcionales y no funcionales, evita diseñar de más. Buena parte de la entrevista se decide en ese paso.',
+            },
+            {
+              ico: 'books',
+              head: 'Los mismos bloques, otra vez',
+              body: 'Equilibrador, caché, CDN, cola, réplica, partición. Cambian los casos de estudio, no las piezas con las que se resuelven.',
+            },
+            {
+              ico: 'user',
+              head: 'Capa web sin estado',
+              body: 'Separar el servidor de aplicaciones del almacenamiento permite replicar y escalar cada parte por su cuenta, en vez de arrastrar todo junto.',
+            },
+            {
+              ico: 'sparkles',
+              head: 'Cada caso enseña un truco',
+              body: 'El limitador aporta algoritmos; el clave-valor, replicación y partición; el acortador, hashing; el chat, conexiones persistentes; YouTube, procesado por lotes.',
+            },
+          ],
+          panels: [
+            {
+              kind: 'flow',
+              title: 'El método, en cuatro pasos',
+              steps: [
+                {
+                  ico: 'target',
+                  head: 'Alcance',
+                  body: 'Qué entra y qué no, con requisitos y cifras',
+                },
+                {
+                  ico: 'columns',
+                  head: 'Alto nivel',
+                  body: 'El dibujo general y el acuerdo con quien pregunta',
+                },
+                { ico: 'gear', head: 'Detalle', body: 'Los componentes críticos y sus decisiones' },
+                {
+                  ico: 'check',
+                  head: 'Cierre',
+                  body: 'Cuellos de botella, fallos y siguientes pasos',
+                },
+              ],
+            },
+            {
+              kind: 'cols',
+              title: 'Los bloques que se repiten',
+              cols: [
+                {
+                  ico: 'columns',
+                  head: 'Equilibrador de carga',
+                  sub: 'el tráfico',
+                  body: 'Reparte las peticiones entre servidores y aparta los que fallan.',
+                },
+                {
+                  ico: 'chart',
+                  head: 'Caché',
+                  sub: 'lo repetido',
+                  body: 'Guarda lo que se pide mucho para no volver a calcularlo o pedirlo.',
+                },
+                {
+                  ico: 'books',
+                  head: 'CDN',
+                  sub: 'lo estático',
+                  body: 'Sirve imágenes y ficheros desde el borde, cerca de quien los pide.',
+                },
+                {
+                  ico: 'undo',
+                  head: 'Cola de mensajes',
+                  sub: 'lo asíncrono',
+                  body: 'Desacopla quien produce de quien consume y absorbe los picos.',
+                },
+              ],
+            },
+            {
+              kind: 'rows',
+              title: 'Errores que hunden la entrevista',
+              rows: [
+                {
+                  tag: 'Diseñar sin acotar',
+                  body: 'Empezar a dibujar antes de saber qué se está resolviendo y para cuánta gente.',
+                },
+                {
+                  tag: 'Ignorar las cifras',
+                  body: 'No estimar si el diseño aguanta la carga ni cuánto va a costar sostenerlo.',
+                },
+                {
+                  tag: 'Enamorarse de una pieza',
+                  body: 'Meter una tecnología por moda en vez de porque la necesidad la pida.',
+                },
+                {
+                  tag: 'No cerrar',
+                  body: 'Terminar sin hablar de cuellos de botella, de fallos y de qué se haría después.',
+                },
+              ],
+            },
+          ],
+          aside: [
+            {
+              ico: 'note',
+              label: 'Recuerda',
+              body: 'No hay una única respuesta correcta. Lo que se evalúa es el razonamiento: por qué se elige cada pieza y qué se sacrifica con ella.',
+            },
+            {
+              ico: 'target',
+              label: 'Idea final',
+              body: 'Los casos concretos son excusas para practicar el mismo método —acotar, estimar, diseñar y criticar— hasta que sale solo.',
+            },
+          ],
+          quote: {
+            text: 'El diseño no falla por lo que dibujas, sino por lo que no llegaste a estimar.',
+            attribution: 'La lección común a todos los casos',
+          },
+          footer: { mark: 'BookReader', url: 'bookreader.raiatech.com' },
+        },
+      };
+
+      // ---- Render ----------------------------------------------------------------------------
+
+      const stage = document.getElementById('stage');
+      const feed = document.getElementById('feed');
+      const stats = document.getElementById('stats');
+      const printArea = document.getElementById('print-area');
+      const zoomval = document.getElementById('zoomval');
+      const sel = document.getElementById('sample');
+      let current = null;
+      let zoom = null; // null = ajustar al ancho de la caja
+      let svgW = 1080;
+
+      Object.keys(SAMPLES).forEach((k) => {
+        const o = document.createElement('option');
+        o.value = k;
+        o.textContent = k;
+        sel.appendChild(o);
+      });
+
+      // Zoom: el SVG se dimensiona por CSS. A 1:1 (1080 px) el cuerpo de 13 px se lee; a
+      // "ajustar" se ve la composición entera. Es la mitad "leer" de la opción A.
+      function applyZoom() {
+        const svgEl = stage.querySelector('svg');
+        if (!svgEl) return;
+        const fit = (stage.clientWidth - 2) / svgW;
+        const z = zoom === null ? fit : zoom;
+        svgEl.style.width = `${Math.round(svgW * z)}px`;
+        svgEl.style.height = 'auto';
+        zoomval.textContent = `${Math.round(z * 100)} %`;
+      }
+
+      function setZoom(z) {
+        zoom = z === null ? null : Math.min(3, Math.max(0.2, z));
+        applyZoom();
+      }
+
+      document.querySelector('.zoombar').addEventListener('click', (e) => {
+        const b = e.target.closest('[data-zoom]');
+        if (!b) return;
+        const cur = zoom === null ? (stage.clientWidth - 2) / svgW : zoom;
+        const act = b.dataset.zoom;
+        if (act === 'in') setZoom(cur * 1.3);
+        else if (act === 'out') setZoom(cur / 1.3);
+        else if (act === 'fit') setZoom(null);
+        else setZoom(1);
+      });
+
+      // Arrastrar para mover: en un póster de 1080×2100 a 1:1, la rueda sola no basta.
+      let drag = null;
+      stage.addEventListener('pointerdown', (e) => {
+        drag = { x: e.clientX, y: e.clientY, l: stage.scrollLeft, t: stage.scrollTop };
+        stage.classList.add('dragging');
+        stage.setPointerCapture(e.pointerId);
+      });
+      stage.addEventListener('pointermove', (e) => {
+        if (!drag) return;
+        stage.scrollLeft = drag.l - (e.clientX - drag.x);
+        stage.scrollTop = drag.t - (e.clientY - drag.y);
+      });
+      const endDrag = () => {
+        drag = null;
+        stage.classList.remove('dragging');
+      };
+      stage.addEventListener('pointerup', endDrag);
+      stage.addEventListener('pointercancel', endDrag);
+
+      async function paint() {
+        current = SAMPLES[sel.value];
+        // Las métricas del texto cambian cuando la fuente ACABA de cargar: medir antes daría un
+        // layout distinto al de después.
+        await document.fonts.ready;
+        await resolveCovers();
+        clearMeasureCache();
+        const { svg, width, height } = renderSvg(current, {
+          fontCss: await posterFaceCss(),
+          title: current.title,
+        });
+        svgW = width;
+        stage.replaceChildren(svg.cloneNode(true));
+        feed.replaceChildren(svg.cloneNode(true));
+        printArea.replaceChildren(svg);
+        stats.textContent = `${width} × ${height}px`;
+        applyZoom();
+      }
+
+      sel.addEventListener('change', paint);
+      document.getElementById('print').addEventListener('click', () => window.print());
+
+      document.getElementById('dl').addEventListener('click', async () => {
+        await resolveCovers();
+        const { svg, width, height } = renderSvg(current, {
+          fontCss: await posterFaceCss(),
+          title: current.title,
+        });
+        const xml = new XMLSerializer().serializeToString(svg);
+        const bytes = new TextEncoder().encode(xml);
+        let bin = '';
+        for (let i = 0; i < bytes.length; i += 0x8000)
+          bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+        const img = new Image();
+        img.src = 'data:image/svg+xml;base64,' + btoa(bin);
+        await img.decode();
+        const scale = Math.min(2, Math.max(1, 4200 / Math.max(width, height)));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.round(width * scale);
+        canvas.height = Math.round(height * scale);
+        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+        const blob = await new Promise((res) => canvas.toBlob(res, 'image/png'));
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `bookreader-infografia-${sel.value
+          .split(' ·')[0]
+          .replace(/[^a-z0-9]+/gi, '-')
+          .toLowerCase()}.png`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      });
+
+      paint();
+    </script>
+    <!-- Solo se ve al imprimir: el póster a tamaño A4 (ver @media print). -->
+    <div id="print-area" aria-hidden="true"></div>
+  </body>
+</html>

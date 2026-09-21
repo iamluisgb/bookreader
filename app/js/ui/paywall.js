@@ -19,6 +19,7 @@ const FEATURES = {
   flashcards: () => t('Flashcards con export a Anki'),
   study: () => t('Repaso espaciado (quizzes)'),
   mindmap: () => t('Mapas mentales navegables'),
+  infographic: () => t('Infografías del libro'),
   hqa: () => t('Plantilla HQ&A y plantillas avanzadas'),
   profiles: () => t('Perfiles del agente reutilizables'),
 };

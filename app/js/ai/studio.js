@@ -24,6 +24,7 @@ import { ago } from '../ui/when.js';
 const TYPES = [
   { kind: 'summary',    ico: 'note',    name: t('Resumen'),      value: t('TL;DR e ideas clave por capítulo, cada una con su cita al pasaje.'), stateful: true },
   { kind: 'mindmap',    ico: 'columns', name: t('Mapa mental'),  value: t('Mapa radial navegable de los conceptos del libro.'),              stateful: true },
+  { kind: 'infographic', ico: 'poster', name: t('Infografía'),   value: t('Un póster del libro —tesis, ideas clave y cita— listo para descargar.'), stateful: true },
   { kind: 'flashcards', ico: 'cards',   name: t('Flashcards'),   value: t('Tarjetas de repaso espaciado para exportar a Anki.'),              stateful: false },
   // P18 · El único que NO produce un artefacto: lo produces tú. Va aquí igualmente porque
   // es donde el lector busca "qué puedo hacer con este libro".
