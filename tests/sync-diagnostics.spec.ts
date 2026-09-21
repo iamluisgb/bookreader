@@ -96,6 +96,9 @@ test.describe('Sync — diagnóstico', () => {
     await page.locator('.appset-nav-item[data-section="data"]').click();
     const diag = page.locator('#appset-sync-diag');
     await expect(diag).toContainText(/Último sync correcto|Sincronizando/);
+    // "Sincronizar ahora" corre el ciclo y reporta el resultado en el momento.
+    await page.locator('#appset-sync-now').click();
+    await expect(page.locator('#appset-data-msg')).toContainText(/Sincronizado: \d+ ficheros recibidos/);
     // El volcado copiable funciona (concede el permiso del portapapeles).
     await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
     await page.locator('#appset-sync-copy').click();

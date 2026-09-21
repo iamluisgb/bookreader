@@ -1075,6 +1075,7 @@ function dataHtml() {
 
     <label class="appset-label" style="margin-top:18px">${t('Sincronización automática')}</label>
     <p class="appset-muted" id="appset-sync-diag"></p>
+    <button id="appset-sync-now" class="primary-btn appset-save">${icon('upload', { size: 15 })} ${t('Sincronizar ahora')}</button>
     <button id="appset-sync-copy" class="appset-tpl-cancel appset-data-md">${icon('copy', { size: 15 })} ${t('Copiar diagnóstico de sync')}</button>
     <p class="appset-data-msg" id="appset-data-msg" hidden></p>
   </div>`;
@@ -1180,6 +1181,22 @@ function wireData(content) {
   const paintDiag = () => { diagEl.innerHTML = syncDiagHtml(); };
   syncDiagPainter = paintDiag;
   paintDiag();
+  // Sincronizar ahora: el motor es automático (pull al abrir + cada 90 s + push
+  // con debounce), pero cuando algo va mal "esperar al siguiente ciclo" es una
+  // eternidad sin feedback. Este botón es el mismo ciclo, ya: dice qué ha bajado,
+  // qué ha subido o el error concreto — usar la app y diagnosticar a la vez.
+  content.querySelector('#appset-sync-now').addEventListener('click', async () => {
+    show(t('Sincronizando…'));
+    const r = await SyncEngine.syncNow();
+    paintDiag();
+    if (r === 'off') return show(t('No está conectado a Drive.'), true);
+    if (r === 'locked') return show(t('Otra pestaña está sincronizando. Prueba en unos segundos.'));
+    if (r === 'error') {
+      const diag = SyncEngine.getDiag();
+      return show(t('No se pudo sincronizar: {msg}', { msg: diag.lastError }), true);
+    }
+    show(`${icon('check', { size: 14 })} ${t('Sincronizado: {a} ficheros recibidos y {b} libros enviados.', { a: r.pulled, b: r.pushed })}`);
+  });
   content.querySelector('#appset-sync-copy').addEventListener('click', async () => {
     try {
       const report = JSON.stringify(await syncDiagReport(), null, 2);
