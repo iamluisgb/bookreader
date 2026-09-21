@@ -43,6 +43,7 @@ for (const b of batteries) {
     s.fidelidad, s.pertinencia_citas, s.cobertura, s.concision,
     j.chat_avg?.fundamento, j.chat_avg?.honestidad, j.chat_avg?.claridad,
     j.mindmap?.jerarquia, j.mindmap?.cobertura, j.mindmap?.utilidad_objetivo, j.mindmap?.no_invencion,
+    j.infographic?.fidelidad_tesis, j.infographic?.cobertura_infografia, j.infographic?.utilidad,
   ];
   let nota = avg(scores);
   if (gatesFailed.length) nota = Math.min(nota, 2);   // gate duro fallido capa la nota
@@ -117,6 +118,8 @@ for (const b of batteries) {
     }
   }
   if (j.mindmap) md += `\n**Mindmap:** jerarquía ${j.mindmap.jerarquia} · cobertura ${j.mindmap.cobertura} · utilidad-objetivo ${j.mindmap.utilidad_objetivo ?? '—'} · no-invención ${j.mindmap.no_invencion} — ${j.mindmap.nota || ''}\n`;
+  if (c && c.infographic_exists) md += `**Infografía (determinista):** ${c.infographic_ideas} ideas · ${c.infographic_panels} paneles · anclas ${c.infographic_srcs_valid}/${c.infographic_srcs} · ratio ${c.infographic_ratio ?? '—'}\n`;
+  if (j.infographic) md += `**Infografía:** fidelidad tesis ${j.infographic.fidelidad_tesis} · cobertura ${j.infographic.cobertura_infografia} · utilidad ${j.infographic.utilidad} — ${j.infographic.nota || ''}\n`;
   if (c && c.mindmap_branches) md += `**Mindmap (objetivo):** ${c.mindmap_branches} ramas · ${c.mindmap_branches_as_chapters ?? '—'} son un capítulo · ${c.mindmap_branches_numeric} son un numeral\n`;
   if (c.attenuation_separation != null) md += `\n**Atenuación (Δ oro − resto):** ${c.attenuation_separation} (positivo = distingue los capítulos relevantes)\n`;
 }

@@ -109,6 +109,7 @@ Sé exigente: 5 es excepcional. Responde SOLO JSON:
 
   // ---- F2 · Chat: grounding y honestidad (pregunta trampa) ----------------------
   const v2 = (b.meta?.evalVersion || 1) >= 2;
+  const v3 = (b.meta?.evalVersion || 1) >= 3;
   let chatRes = null;
   if (v2 && (b.chat || []).length) {
     chatRes = lastJsonObject(await nanChat({
@@ -157,6 +158,30 @@ Sé exigente. Responde SOLO JSON: {"jerarquia":N,"cobertura":N,"utilidad_objetiv
     if (!mmRes) console.warn('  ⚠ mindmap: respuesta del juez no parseable');
   }
 
+  // ---- P29 · Infografía: fidelidad de la tesis y cobertura (tendencia, sin gate) --
+  const igArt = (b.artifacts || []).filter(a => a.kind === 'infographic').pop();
+  let igRes = null;
+  if (v3 && igArt?.result) {
+    igRes = lastJsonObject(await nanChat({
+      model: JUDGE,
+      messages: [
+        { role: 'system', content:
+`Eres un evaluador RIGUROSO de infografías-resumen de libros (un póster: tesis, ideas clave, paneles y cita).
+Evalúa de 1 a 5:
+- "fidelidad_tesis": la tesis y las ideas están respaldadas por el libro (usa los conceptos dorados como
+  referencia de qué contiene). 5 = todo fiel; 1 = inventa o distorsiona.
+- "cobertura_infografia": el póster recoge los conceptos dorados que importan para el objetivo. 5 = casi
+  todos los centrales; 1 = deja fuera el núcleo.
+- "utilidad": resume el libro de forma que sirve al OBJETIVO declarado, no un índice plano de sus partes.
+Sé exigente. Responde SOLO JSON: {"fidelidad_tesis":N,"cobertura_infografia":N,"utilidad":N,"nota":"máx 15 palabras"}` },
+        { role: 'user', content:
+`PERFIL: ${b.battery.persona}\nOBJETIVO: ${b.battery.goal}\nCONCEPTOS DORADOS:\n${b.battery.goldenConcepts.join(' · ')}\n\nPÓSTER (JSON):\n${JSON.stringify(igArt.result).slice(0, 7000)}` },
+      ],
+      maxTokens: 8192,
+    }));
+    if (!igRes) console.warn('  ⚠ infografía: respuesta del juez no parseable');
+  }
+
   const cardScores = cardsRes?.cards || [];
   const covered = (coverRes?.conceptos || []).filter(c => c.cubierto).length;
   const entry = {
@@ -176,6 +201,7 @@ Sé exigente. Responde SOLO JSON: {"jerarquia":N,"cobertura":N,"utilidad_objetiv
       honestidad: avg(chatRes.turnos.filter(t => Number.isFinite(t.honestidad)).map(t => t.honestidad)),
     } : null,
     mindmap: mmRes,
+    infographic: igRes,
   };
   const j = entry;
   console.log(`  tarjetas (${cardScores.length} juzgadas): fidelidad ${j.cards_avg.fidelidad?.toFixed(1)}, `
@@ -183,7 +209,8 @@ Sé exigente. Responde SOLO JSON: {"jerarquia":N,"cobertura":N,"utilidad_objetiv
     + ` · cobertura ${covered}/${b.battery.goldenConcepts.length}`
     + (sumRes ? ` · resumen: fidelidad ${sumRes.fidelidad}, citas ${sumRes.pertinencia_citas}, cobertura ${sumRes.cobertura}` : '')
     + (j.chat_avg ? ` · chat: fundamento ${j.chat_avg.fundamento?.toFixed(1)}, honestidad ${Number.isFinite(j.chat_avg.honestidad) ? j.chat_avg.honestidad.toFixed(1) : 'n/a'}` : '')
-    + (mmRes ? ` · mindmap: ${mmRes.jerarquia}/${mmRes.cobertura}/${mmRes.utilidad_objetivo}/${mmRes.no_invencion}` : ''));
+    + (mmRes ? ` · mindmap: ${mmRes.jerarquia}/${mmRes.cobertura}/${mmRes.utilidad_objetivo}/${mmRes.no_invencion}` : '')
+    + (igRes ? ` · infografía: tesis ${igRes.fidelidad_tesis}/cob ${igRes.cobertura_infografia}/util ${igRes.utilidad}` : ''));
   return entry;
 }
 
@@ -200,6 +227,9 @@ function numericScores(e) {
     'mindmap.jerarquia': e.mindmap?.jerarquia, 'mindmap.cobertura': e.mindmap?.cobertura,
     'mindmap.utilidad_objetivo': e.mindmap?.utilidad_objetivo,
     'mindmap.no_invencion': e.mindmap?.no_invencion,
+    'infografia.fidelidad_tesis': e.infographic?.fidelidad_tesis,
+    'infografia.cobertura': e.infographic?.cobertura_infografia,
+    'infografia.utilidad': e.infographic?.utilidad,
   };
 }
 

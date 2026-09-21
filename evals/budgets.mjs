@@ -28,6 +28,9 @@
 //     silencio, así que el criterio puede volverse fiable y merecerse una valla.
 //   · Nada que ya sea un gate de check.mjs (no se duplica).
 //   · Métricas con un solo run de respaldo, salvo que se anote explícitamente como tal.
+//   · Infografía (P29): sus tres métricas PRIMARIAS ya son gates de check.mjs (esquema, anclas,
+//     densidad). Las del juez (fidelidad_tesis, cobertura_infografia, utilidad) son TENDENCIA
+//     hasta un 2º run — el contrato pide 2 para promediar. Baseline: run 2026-09-21-p29-baseline.
 
 export const BUDGETS = {
   'p1-estudiante': {
@@ -102,7 +105,7 @@ export const BUDGETS = {
 export function metricValue(name, checks, judge) {
   const [ns, key] = name.includes('.') ? name.split('.') : [null, name];
   if (!ns) return checks?.[key];
-  const bag = { cards: judge?.cards_avg, summary: judge?.summary, chat: judge?.chat_avg, mindmap: judge?.mindmap }[ns];
+  const bag = { cards: judge?.cards_avg, summary: judge?.summary, chat: judge?.chat_avg, mindmap: judge?.mindmap, infographic: judge?.infographic }[ns];
   return bag?.[key];
 }
 
@@ -110,6 +113,8 @@ export function metricValue(name, checks, judge) {
 // smoke y los runs históricos— faltan LEGÍTIMAMENTE: su presupuesto no aplica, y tratarlas
 // como "sin dato" llenaría de rojos falsos runs que están bien.
 const SOLO_V2 = m => /^(chat|mindmap)\./.test(m) || m === 'mindmap_branches' || m === 'attenuation_separation';
+// La infografía (P29) llega en evalVersion 3: en runs anteriores falta LEGÍTIMAMENTE.
+const SOLO_V3 = m => /^infographic\./.test(m) || /^infographic_/.test(m);
 
 // Evalúa los presupuestos de una batería. Cada fila: {metric, tipo, limite, valor, estado}.
 // estado ∈ 'ok' | 'roto' | 'sin dato'.
@@ -121,7 +126,9 @@ const SOLO_V2 = m => /^(chat|mindmap)\./.test(m) || m === 'mindmap_branches' || 
 export function evalBudgets(batteryId, checks, judge, evalVersion = 2) {
   const spec = BUDGETS[batteryId];
   if (!spec) return [];
-  return Object.entries(spec).filter(([metric]) => evalVersion >= 2 || !SOLO_V2(metric)).map(([metric, b]) => {
+  return Object.entries(spec)
+    .filter(([metric]) => (evalVersion >= 2 || !SOLO_V2(metric)) && (evalVersion >= 3 || !SOLO_V3(metric)))
+    .map(([metric, b]) => {
     const tipo = 'max' in b ? 'max' : 'min';
     const limite = b[tipo];
     const valor = metricValue(metric, checks, judge);

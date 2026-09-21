@@ -24,6 +24,9 @@ const PHASE = Number(process.env.EVAL_PHASE || 1);
 // iterar prompts sin pagar el run completo. Se puntúa igual (evalVersion 1: los gates
 // de F2 no aplican).
 const SMOKE = process.env.EVAL_SMOKE === '1';
+// EV5 · Baseline focalizado: `EVAL_ONLY=p2-tecnico,p4-noficcion` corre solo esas baterías
+// (el contrato de un ítem puede pedir 2 de las 4; correr las otras es coste sin dato nuevo).
+const ONLY = (process.env.EVAL_ONLY || '').split(',').map(s => s.trim()).filter(Boolean);
 const RUN = process.env.EVAL_RUN
   || `${new Date().toISOString().slice(0, 16).replace(/[T:]/g, '-')}${SMOKE ? '-smoke' : ''}-${MODEL.replace(/[^\w.-]+/g, '_')}`;
 const RUN_DIR = path.resolve(__dirname, '..', 'evals', 'runs', RUN);
@@ -37,8 +40,9 @@ test.describe('EV1 · generación de artefactos @eval', () => {
   // llevan su timeout explícito y no se ven afectados.
   test.use({ actionTimeout: 30000 });
 
-  const selected = SMOKE ? BATTERIES.filter(b => b.id === 'p4-noficcion')
+  let selected = SMOKE ? BATTERIES.filter(b => b.id === 'p4-noficcion')
     : BATTERIES.filter(b => b.phase <= PHASE);
+  if (ONLY.length) selected = selected.filter(b => ONLY.includes(b.id));
   for (const battery of selected) {
     test(`batería ${battery.id}: flashcards + resumen @eval`, async ({ page }) => {
       test.setTimeout(1800000);  // API real sobre un libro real, 6 artefactos: minutos, no segundos
@@ -137,6 +141,30 @@ test.describe('EV1 · generación de artefactos @eval', () => {
       }
       timings.mindmap = Date.now() - tMm;
 
+      // Infografía (P29), mismo trato tolerante que resumen y mindmap.
+      const tIg = Date.now();
+      let infographicError = '';
+      let infographicDims: { width: number; height: number } | null = null;
+      if (!SMOKE) {
+        await openFromStudio(page, 'infographic');
+        await page.waitForSelector('#ig-generate', { timeout: 10000 });
+        await page.click('#ig-generate');
+        try {
+          await expect(page.locator('#ig-canvas svg')).toBeVisible({ timeout: 420000 });
+          // La densidad (alto/ancho) es un gate determinista del contrato de P29; el SVG no
+          // se persiste (es un artefacto del modal), así que las dimensiones se capturan aquí.
+          infographicDims = await page.locator('#ig-canvas svg').evaluate((s) => ({
+            width: Number(s.getAttribute('width')), height: Number(s.getAttribute('height')),
+          }));
+        } catch {
+          infographicError = (await page.locator('#ai-infographic, .ai-onboarding').last().innerText().catch(() => ''))
+            .split('\n').map(s => s.trim()).filter(Boolean).slice(0, 4).join(' · ').slice(0, 300) || 'timeout sin error visible';
+          console.warn(`[eval] ${battery.id}: la infografía NO se generó — ${infographicError}`);
+        }
+        await page.click('#ai-infographic .ai-ob-close');   // cerrar: el overlay taparía el chat
+      }
+      timings.infographic = Date.now() - tIg;
+
       // Chat (F2): 2 preguntas con respuesta en el libro + 1 trampa (no está en el
       // libro; responderla "de memoria" es el fallo que mide la rúbrica de honestidad).
       const tChat = Date.now();
@@ -197,8 +225,9 @@ test.describe('EV1 · generación de artefactos @eval', () => {
         meta: {
           model: MODEL, sha, date: new Date().toISOString(), fixture: battery.fixture, timings,
           // Smoke = evalVersion 1: solo tarjetas+resumen, los gates de F2 no aplican.
-          uiLang: 'es', evalVersion: SMOKE ? 1 : 2, smoke: SMOKE || undefined,
+          uiLang: 'es', evalVersion: SMOKE ? 1 : 3, smoke: SMOKE || undefined,
           summaryError: summaryError || undefined, mindmapError: mindmapError || undefined,
+          infographic: infographicDims || undefined, infographicError: infographicError || undefined,
         },
         chat,
         ...data,

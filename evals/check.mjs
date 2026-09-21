@@ -78,6 +78,24 @@ for (const b of loadBatteries(runDir)) {
     if (gold.length && rest.length) attSeparation = +(mean(gold) - mean(rest)).toFixed(2);
   }
 
+  // P29 · Infografía: esquema válido, anclas existentes y densidad (los 3 gates del contrato).
+  const v3 = (b.meta?.evalVersion || 1) >= 3;
+  const igArt = (b.artifacts || []).filter(a => a.kind === 'infographic').pop();
+  const ig = igArt?.result || null;
+  const igSrcs = ig
+    ? [...(ig.ideas || []).map(i => i.src), ...(ig.panels || []).flatMap(p => (p.items || []).map(i => i.src))].filter(Boolean)
+    : [];
+  const IG_KINDS = ['flow', 'cols', 'rows'];
+  const igSchemaOk = !!ig
+    && typeof ig.thesis === 'string' && ig.thesis.trim().length > 0
+    && Array.isArray(ig.ideas) && ig.ideas.length >= 1 && ig.ideas.length <= 8
+    && ig.ideas.every(i => i.head && i.body)
+    && Array.isArray(ig.panels) && ig.panels.length >= 1 && ig.panels.length <= 3
+    && ig.panels.every(p => IG_KINDS.includes(p.kind) && Array.isArray(p.items) && p.items.length >= 1)
+    && Array.isArray(ig.aside) && ig.aside.length <= 2;
+  const igW = Number(b.meta?.infographic?.width), igH = Number(b.meta?.infographic?.height);
+  const igRatio = igW > 0 && igH > 0 ? +(igH / igW).toFixed(2) : null;
+
   const checks = {
     cards_total: cards.length,
     cards_src_valid: cards.filter(c => c.src && ids.has(c.src)).length,
@@ -103,6 +121,12 @@ for (const b of loadBatteries(runDir)) {
     // nombra ningún tema. Es el caso que destapó todo esto (una novela numerada).
     mindmap_branches_numeric: mmBranches.filter(br => NUMERAL_BRANCH.test(String(br.label || ''))).length,
     attenuation_separation: attSeparation,
+    infographic_exists: !!igArt,
+    infographic_ideas: ig?.ideas?.length ?? 0,
+    infographic_panels: ig?.panels?.length ?? 0,
+    infographic_srcs: igSrcs.length,
+    infographic_srcs_valid: igSrcs.filter(id => ids.has(id)).length,
+    infographic_ratio: igRatio,
     chat_answered: (b.chat || []).filter(c => c.answer).length,
     chat_total: (b.chat || []).length,
   };
@@ -127,6 +151,12 @@ for (const b of loadBatteries(runDir)) {
       'mindmap generado con ramas': !!mmArt && mmBranches.length >= 2,
       'chat respondió todas': checks.chat_total > 0 && checks.chat_answered === checks.chat_total,
     } : {}),
+    ...(v3 ? {
+      'infografía generada': !!igArt,
+      'esquema de infografía válido': igSchemaOk,
+      'anclas de infografía 100% válidas': igSrcs.length > 0 && igSrcs.every(id => ids.has(id)),
+      'densidad de infografía ≤2.4': igRatio != null && igRatio <= 2.4,
+    } : {}),
   };
   out[b.battery.id] = checks;
 
@@ -134,7 +164,9 @@ for (const b of loadBatteries(runDir)) {
   console.log(`\n${b.battery.id} — ${cards.length} tarjetas (${checks.cards_src_valid} con ancla válida, ${dupes} dupes), `
     + `resumen ${summary.length} chars con ${cites.length} citas (${checks.summary_cites_valid} válidas)`
     + (v2 ? `, mindmap ${mmBranches.length} ramas, chat ${checks.chat_answered}/${checks.chat_total}`
-      + (attSeparation != null ? `, atenuación Δ${attSeparation}` : ', atenuación n/a') : ''));
+      + (attSeparation != null ? `, atenuación Δ${attSeparation}` : ', atenuación n/a') : '')
+    + (v3 ? `, infografía ${checks.infographic_ideas} ideas/${checks.infographic_panels} paneles, `
+      + `${checks.infographic_srcs_valid}/${checks.infographic_srcs} anclas, ratio ${igRatio ?? 'n/a'}` : ''));
   console.log(failed.length ? `  ✗ gates fallidos: ${failed.join(' · ')}` : '  ✓ todos los gates pasan');
 }
 fs.writeFileSync(path.join(runDir, 'checks.json'), JSON.stringify(out, null, 1));

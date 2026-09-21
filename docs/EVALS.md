@@ -331,6 +331,39 @@ detectable predice y por lo que ninguno se "arregló" en caliente. Ver BACKLOG �
 de los 600 s del gate. El DNF que motivó el ítem era una ventana lenta del proveedor, no el
 tamaño del libro.
 
+## Baseline de infografía (run `2026-09-21-p29-baseline`, P29, 2026-09-21)
+
+Primer run del artefacto de **infografía** (P29). Baterías del contrato del ítem —ensayo y técnico,
+los dos perfiles a los que sirve un póster—: **p2-tecnico** y **p4-noficcion** (`EVAL_ONLY`),
+generación con `deepseek-v4-flash` y juez `mimo-v2.5`. Los **tres gates deterministas** del contrato
+pasan en las dos:
+
+| Batería | Esquema | Anclas | Densidad | Latencia | Juez: tesis / cobertura / utilidad |
+|---|---|---|---|---|---|
+| p2-tecnico | 8 ideas · 3 paneles · 2 aside | 8/8 ✓ | 1.91 ✓ | 51 s ✓ | 4 / 3 / 3 |
+| p4-noficcion | 8 ideas · 3 paneles · 2 aside | 8/8 ✓ | 1.90 ✓ | 80 s ✓ | 4 / 4 / 4 |
+
+- **Los deterministas nacen sin sustos.** El esquema cae dentro de rango, las **anclas son 100%
+  existentes** y la densidad se queda en ~1.9 (póster de ~2050 px de alto), muy lejos del techo **2.4**.
+  El **recorte del validador** hace su trabajo: el modelo propone y la plantilla apila sin desbordar.
+- **El juez aprueba con matiz.** Fidelidad de la tesis 4/4 (nada inventado); cobertura 3-4 sobre los 8
+  conceptos dorados y utilidad 3-4. El fallo que señala en las DOS es el mismo: **cubre los fundamentos
+  pero omite lo que pide el objetivo** (en Git, merge/rebase y flujos; en Pedro Páramo, Susana San Juan
+  y la estructura no lineal). Es **cobertura, no fidelidad** — el material del siguiente ciclo.
+- **La latencia va sobrada**: 51 s y 80 s frente al límite de 120 s del contrato.
+- **Secundarias SIN valla todavía.** El contrato las marca como tendencia y pide **2 runs para
+  promediar** (`fidelidad_tesis`, `cobertura_infografia`, `utilidad`); con un solo run, una mejora de
+  +0,5 y el ruido del juez son indistinguibles, así que no se les pone gate.
+- **Dónde vive la valla.** Los tres gates deterministas están en [`check.mjs`](../evals/check.mjs)
+  (`infografía generada`, `esquema válido`, `anclas 100%`, `densidad ≤2.4`) y CAPAN la nota si fallan;
+  llegan en `evalVersion 3`, así que los runs anteriores no se marcan en rojo por su ausencia.
+- **Rojo ajeno al ítem:** el run trae `p4 · attenuation_separation` **sin dato** (el bug de ratings
+  conocido, TEC9); el scoring termina en 1 por él, no por la infografía.
+
+**Siguiente ciclo (time-box del contrato: 3):** subir la **cobertura** del póster —que priorice los
+conceptos del objetivo, como ya hace el resumen— y confirmarlo con 2 runs; si no se mueve, se clasifica
+el fallo (¿prompt? ¿troceado?) y se cierra con el hallazgo.
+
 ## Mejora continua (el bucle)
 
 fallo detectado → clasificar (prompt / retrieval / modelo / parsing) → arreglo → re-run

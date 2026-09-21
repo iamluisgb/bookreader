@@ -812,10 +812,15 @@ DNF vuelve a aparecer con tiempos por fase que señalen al nº de llamadas y no 
 ### P29 — Infografía del libro: el póster-resumen · `M`–`L` · **✓ entregada (2026-09-20)** · artefacto de marketing
 
 > **Estado.** Ruta completa en la app: tarjeta en el **Studio** (Pro), modal con zoom/arrastre y
-export **PNG/SVG**, i18n ES/EN y [`tests/infographic-render.spec.ts`](tests/infographic-render.spec.ts).
-> Queda pendiente el **baseline @live y la valla en [`evals/budgets.mjs`](evals/budgets.mjs)** (el
-> contrato de abajo), que necesita un run real — hasta entonces el render está cubierto pero la
-> calidad de generación no está medida.
+export **PNG/SVG**, i18n ES/EN y tests ([`tests/infographic-render.spec.ts`](tests/infographic-render.spec.ts),
+> `infographic.spec.ts`, `infographic-generate.spec.ts`).
+>
+> **Baseline medido** (run `2026-09-21-p29-baseline`, p2+p4, `deepseek-v4-flash` + juez `mimo-v2.5`):
+> los tres gates deterministas ✓ en las dos (esquema en rango, **anclas 8/8**, **densidad 1.9** ≤ 2.4,
+> latencia 51-80 s ≤ 120 s). El juez da tesis 4/4 y cobertura 3-4: cubre la tesis y **omite parte de lo
+> que pide el objetivo** (cobertura, no fidelidad). Los gates viven en
+> [`evals/check.mjs`](evals/check.mjs) (`evalVersion 3`); las métricas del juez quedan como **tendencia
+> sin valla** hasta un 2º run. Detalle en [docs/EVALS.md § Baseline de infografía](docs/EVALS.md).
 
 **La pregunta.** «¿Podríamos sacar una infografía de un libro como las que se ven en redes?» Sí, y
 encaja donde ya viven resumen y mapa.
