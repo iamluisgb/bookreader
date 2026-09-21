@@ -879,6 +879,9 @@ button.lib-rail-twisty:hover { background: var(--surface-2); color: var(--text);
   pointer-events: none;
 }
 #sync-badge[data-state='error'] { color: #dc2626; border-color: #dc2626; }
+/* Error insistente y desconexión sorprendente también llevan a Ajustes → Datos. */
+#sync-badge[data-state='error'],
+#sync-badge[data-state='off'] { cursor: pointer; pointer-events: auto; }
 #sync-badge[data-state='reconnect'] {
   color: var(--accent);
   border-color: var(--accent);

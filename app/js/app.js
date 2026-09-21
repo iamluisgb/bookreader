@@ -130,20 +130,31 @@ function initSyncEngine() {
   badge.hidden = true;
   document.body.appendChild(badge);
 
+  const labels = {
+    reconnect: t('Reconectar Drive'),
+    error: t('Sync con errores'),
+    off: t('Sync desconectado'),
+  };
   window.addEventListener('bookreader:sync-status', (e) => {
     const s = e.detail;
-    // Sync invisible (estilo Play Books): ni "Sincronizando…" en cada ciclo ni errores
-    // transitorios (el motor reintenta solo cada 90 s y al volver la conexión). Solo
-    // asoma lo que exige acción del usuario: el token revocado, que sin reconectar
-    // dejaría el sync muerto en silencio.
-    const labels = { reconnect: t('Reconectar Drive') };
+    // Sync invisible (estilo Play Books): ni "Sincronizando…" en cada ciclo ni
+    // errores transitorios (el motor reintenta solo cada 90 s y al volver la
+    // conexión). Asoma lo que exige acción del usuario: el token revocado, el
+    // error que INSISTE (ERROR_BADGE_AFTER ciclos seguidos fallando — uno suelto
+    // no es ruido que merezca interrumpir) y la desconexión no intencionada (p.
+    // ej. el navegador purgó el storage): sin señal, el sync muere en silencio y
+    // el usuario solo ve "no sincroniza".
+    let visible = s in labels;
+    if (s === 'error' && SyncEngine.getDiag().consecutive < SyncEngine.ERROR_BADGE_AFTER) visible = false;
+    if (s === 'off' && !SyncEngine.hasSyncHistory()) visible = false;
     badge.dataset.state = s;
     badge.textContent = labels[s] || '';
-    badge.hidden = !(s in labels);
+    badge.hidden = !visible;
   });
-  // Token revocado: el badge lleva directo a Ajustes → Datos para reconectar.
+  // Cualquier badge de sync con problema lleva a Ajustes → Datos (reconectar o
+  // ver/copiar el diagnóstico).
   badge.addEventListener('click', () => {
-    if (badge.dataset.state === 'reconnect') openAppSettings('data');
+    if (badge.dataset.state in labels) openAppSettings('data');
   });
 
   // Un merge remoto cambió datos: refrescar las listas de la sidebar en sitio y

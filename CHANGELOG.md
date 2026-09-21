@@ -5,6 +5,30 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-09-21 — El sync se puede diagnosticar (badge con motivo + volcado en Ajustes)
+
+"Abro la app en la tablet, pasan minutos y no sincroniza lo del PC" — y no había forma de saber
+por qué desde el propio dispositivo: el sync era *invisible* a propósito (solo asomaba el token
+revocado) y el motor no guardaba ninguna traza de lo que hacía. Un ciclo que falla por timeout,
+por rate limit de Drive o porque el navegador purgó el refresh token se moría en silencio, y el
+intervalo lo reintentaba cada 90 s para fallar igual, para siempre.
+
+Ahora cada ciclo deja huella en `sync_state` ([`engine.js`](app/js/sync/engine.js)): último sync
+correcto, último error, fallos consecutivos y un historial de los últimos 12 ciclos (qué subió,
+qué bajó, cuánto tardó). Lo pinta **Ajustes → Datos · Sincronización automática**, con un botón
+**Copiar diagnóstico** que vuelca el informe completo (estado, conexión, storage, historial) al
+portapapeles — es lo que permite diagnosticar la tablet desde la tablet.
+
+Y ahora el badge asoma lo que antes callaba: un error que **insiste** (3 ciclos seguidos fallando;
+uno suelto sigue siendo ruido que no merece interrumpir) y la **desconexión no intencionada** (hay
+historial de sync pero el refresh token ya no está). Los tres estados del badge llevan a
+Ajustes → Datos. Desconectar a propósito no lo dispara: lo marca `setIntentionalOff()`.
+
+El ciclo también reporta `pulled` (ficheros remotos aplicados), la métrica que responde "¿el sync
+de hoy trajo algo del otro dispositivo?". Cubierto por [`tests/sync-diagnostics.spec.ts`](tests/sync-diagnostics.spec.ts).
+Queda pendiente la mitad estructural: cachear el `fileId` del listado para eliminar el `findByName`
+por lectura/escritura (el sospechoso principal de los 403 por rate limit) — ver [BACKLOG § P7](BACKLOG.md).
+
 ## 2026-09-20 — Infografía: el libro, resumido en un póster (P29)
 
 El agente ya puede componer una **infografía del libro**: un póster vertical de 1080 px con la tesis,

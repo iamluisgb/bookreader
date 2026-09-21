@@ -403,6 +403,14 @@ r/selfhosted) — nótese que `WebDavProvider` tendrá que implementar también 
   - **Arreglo:** que "Solo notas" lleve el motivo real (`title` + toque en táctil), y que el error de
     cuota —que **ya existe traducido** en `transferMessage`— llegue a la tarjeta en vez de morir en
     un evento que nadie pinta. Es decir la verdad que el código ya sabe, no lógica nueva.
+- **Cachear el `fileId` del listado para eliminar el `findByName` por lectura/escritura** · `M` ·
+  **la mitad estructural del diagnóstico de sync (2026-09-21, ver CHANGELOG).** Cada `read`/`write`
+  de Drive hace un `files.list` previo ([`drive-provider.js`](app/js/sync/drive-provider.js)):
+  un ciclo con ~20 libros y cambios son 40-60 peticiones, y con pushes con debounce de 4 s
+  mientras se lee es fácil rozar el rate limit de Drive → 403 → el ciclo entero falla → reintento
+  invisible en 90 s. La sospecha principal detrás del "abro la tablet y no sincroniza". El listado
+  del inicio del ciclo **ya devuelve el `id` de cada fichero**: guardarlo en `sync_state` por path
+  y usarlo en `read`/`write`/`exists` (con fallback a buscar si el fileId da 404) elimina el N+1.
   - *Hermano del bug de progreso arreglado el 2026-09-12 (ver CHANGELOG): el patrón que falla es
     siempre el mismo — el estado existe en `blobs.js` y no llega a la tarjeta.*
 - **Pulir la vista de histórico de versiones (`recovery.js` · `listBooks`):** hoy la lista de

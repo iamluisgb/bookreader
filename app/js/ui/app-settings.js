@@ -26,6 +26,7 @@ import { ensurePro } from './paywall.js';
 import { icon } from './icons.js';
 import { escapeHtml } from './escape.js';
 import { confirmBox } from './dialog.js';
+import { ago } from './when.js';
 import { t, getLang, setLang } from '../i18n.js';
 import { loadAgentCss } from '../css-loader.js';
 
@@ -41,6 +42,10 @@ const SECTIONS = [
 let overlay = null;
 let tplDraft = null;    // borrador en edición de la sección Plantillas (null = lista)
 let profDraft = null;   // borrador en edición de la sección Perfiles (null = lista)
+// Pintor de la línea de diagnóstico de sync (sección Datos), vivo solo mientras
+// esa sección está abierta: lo re-ejecuta cada cambio de estado del motor.
+let syncDiagPainter = null;
+window.addEventListener('bookreader:sync-status', () => { if (syncDiagPainter) syncDiagPainter(); });
 
 const oneLine = (s) => (s || '').replace(/\s+/g, ' ').trim();
 
@@ -79,6 +84,7 @@ function ensureOverlay() {
 }
 
 function selectSection(id) {
+  syncDiagPainter = null; // la sección anterior dejó de estar abierta
   overlay.querySelectorAll('.appset-nav-item').forEach(b =>
     b.classList.toggle('active', b.dataset.section === id));
   const content = overlay.querySelector('.appset-content');
@@ -1066,8 +1072,54 @@ function dataHtml() {
       <button id="appset-drive-purge" class="appset-tpl-cancel appset-data-md">${icon('trash', { size: 15 })} ${t('Limpiar entradas huérfanas')}</button>
       <button id="appset-drive-disconnect" class="appset-tpl-cancel appset-data-md">${t('Desconectar')}</button>
     </div>
+
+    <label class="appset-label" style="margin-top:18px">${t('Sincronización automática')}</label>
+    <p class="appset-muted" id="appset-sync-diag"></p>
+    <button id="appset-sync-copy" class="appset-tpl-cancel appset-data-md">${icon('copy', { size: 15 })} ${t('Copiar diagnóstico de sync')}</button>
     <p class="appset-data-msg" id="appset-data-msg" hidden></p>
   </div>`;
+}
+
+// ---- Diagnóstico de sync (P1/P2) --------------------------------------------
+// El sync automático no tiene botones: si algo va mal, el usuario solo ve que
+// "no sincroniza". Esta línea dice en qué estado está, y el volcado copiable
+// trae lo que hace falta para diagnosticarlo fuera del dispositivo.
+
+function syncStateText() {
+  if (!DriveAuth.isConnected()) return t('Desconectado de Drive.');
+  const st = SyncEngine.getStatus();
+  if (st === 'syncing') return t('Sincronizando…');
+  const diag = SyncEngine.getDiag();
+  if (diag.lastErrorAt > diag.lastOkAt && diag.lastError) {
+    const msg = diag.lastError === 'reconnect'
+      ? t('El permiso de Google caducó o fue revocado. Vuelve a conectar con Drive.')
+      : diag.lastError;
+    return t('Error: {msg} ({when}).', { msg, when: ago(diag.lastErrorAt) });
+  }
+  if (diag.lastOkAt) return t('Último sync correcto: {when}.', { when: ago(diag.lastOkAt) });
+  return t('Todavía no ha sincronizado.');
+}
+
+function syncDiagHtml() {
+  const diag = SyncEngine.getDiag();
+  let s = escapeHtml(syncStateText());
+  if (diag.consecutive > 0) s += ' ' + escapeHtml(t('Fallos consecutivos: {n}.', { n: diag.consecutive }));
+  return s;
+}
+
+async function syncDiagReport() {
+  let storage = null;
+  try { storage = await Blobs.localEstimate(); } catch (e) { /* sin estimate */ }
+  return {
+    at: new Date().toISOString(),
+    status: SyncEngine.getStatus(),
+    connected: DriveAuth.isConnected(),
+    filesSync: Blobs.isEnabled(),
+    pro: License.isPro(),
+    diag: SyncEngine.getDiag(),
+    storage,
+    userAgent: navigator.userAgent,
+  };
 }
 
 function wireData(content) {
@@ -1101,6 +1153,22 @@ function wireData(content) {
   });
 
   wireDrive(content, show);
+
+  // Diagnóstico de sync: estado vivo (se repinta con cada 'bookreader:sync-status'
+  // mientras la sección está abierta) + volcado copiable para diagnosticar fuera.
+  const diagEl = content.querySelector('#appset-sync-diag');
+  const paintDiag = () => { diagEl.innerHTML = syncDiagHtml(); };
+  syncDiagPainter = paintDiag;
+  paintDiag();
+  content.querySelector('#appset-sync-copy').addEventListener('click', async () => {
+    try {
+      const report = JSON.stringify(await syncDiagReport(), null, 2);
+      await navigator.clipboard.writeText(report);
+      show(t('Diagnóstico copiado al portapapeles.'));
+    } catch (err) {
+      show(t('No se pudo copiar: {msg}', { msg: err.message }), true);
+    }
+  });
 }
 
 // ---- Google Drive (sync Fase 1: guardar/restaurar manual) -------------------
@@ -1181,6 +1249,7 @@ function wireDrive(content, show) {
   });
 
   content.querySelector('#appset-drive-disconnect').addEventListener('click', () => {
+    SyncEngine.setIntentionalOff(true);   // desconexión a propósito: el badge no avisa
     DriveAuth.disconnect();
     SyncEngine.refreshConnection();
     refresh();

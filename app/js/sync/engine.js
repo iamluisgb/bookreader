@@ -27,9 +27,16 @@ import * as LibStore from '../library/store.js';
 import { TOMBSTONE_TTL_MS } from './schema.js';
 import { buildSnapshot, restoreSnapshot, bookDigest, stable, BASE, SCHEMA_VERSION } from './layout.js';
 
-// { manifestEtag, books: { <path>: etag }, digests: { <path>: digest }, libraryAt, libraryHash, … }
+// { manifestEtag, books: { <path>: etag }, digests: { <path>: digest }, libraryAt, libraryHash,
+//   diag: { lastOkAt, lastErrorAt, lastError, consecutive, history[], intentionalOff } }
 const STATE_KEY = 'sync_state';
 const RETRIES = 3;
+// Diagnóstico (P1): el sync fallaba en silencio — el badge solo asomaba el token
+// revocado y no había forma de saber desde el dispositivo QUÉ estaba pasando.
+// Cada ciclo deja huella en sync_state (que no viaja: está en SKIP_KEYS) y la
+// UI la expone en Ajustes → Datos y en el badge.
+const DIAG_MAX = 12;        // entradas de historial que se conservan
+export const ERROR_BADGE_AFTER = 3; // fallos consecutivos antes de asomar el badge
 
 const LIBRARY_PATH = BASE + LibrarySync.LIBRARY_FILE;
 const COVERS_PATH = BASE + LibrarySync.COVERS_FILE;
@@ -67,7 +74,55 @@ export function getStatus() {
 function loadState() {
   const st = Storage.get(STATE_KEY, { manifestEtag: null, books: {} });
   if (!st.digests) st.digests = {};
+  if (!st.diag) st.diag = { lastOkAt: 0, lastErrorAt: 0, lastError: '', consecutive: 0, history: [], intentionalOff: false };
   return st;
+}
+
+// ---- Diagnóstico -------------------------------------------------------------
+
+function pushHistory(st, entry) {
+  const h = st.diag.history || (st.diag.history = []);
+  h.unshift(entry);
+  if (h.length > DIAG_MAX) h.length = DIAG_MAX;
+}
+
+function recordSuccess(result, ms) {
+  const st = loadState();
+  st.diag.lastOkAt = Date.now();
+  st.diag.consecutive = 0;
+  pushHistory(st, { at: st.diag.lastOkAt, ok: true, ms, pulled: result.pulled || 0, pushed: result.pushed || 0 });
+  Storage.set(STATE_KEY, st);
+}
+
+function recordFailure(e, ms) {
+  const st = loadState();
+  st.diag.lastErrorAt = Date.now();
+  st.diag.lastError = String((e && e.message) || 'error').slice(0, 300);
+  st.diag.consecutive = (st.diag.consecutive || 0) + 1;
+  pushHistory(st, { at: st.diag.lastErrorAt, ok: false, ms, error: st.diag.lastError });
+  Storage.set(STATE_KEY, st);
+}
+
+// Lo que la UI pinta (Ajustes → Datos) y usa para decidir el badge.
+export function getDiag() {
+  return loadState().diag;
+}
+
+// ¿Sincronizó este dispositivo alguna vez? Para no alarmar con un badge a quien
+// nunca conectó Drive, y para detectar la desconexión SORPRENDIDA: si hay
+// historial pero el refresh token desapareció (el navegador purgó el storage,
+// p. ej.), el sync queda 'off' y sin señal — justo el caso que hay que enseñar.
+export function hasSyncHistory() {
+  const st = loadState();
+  return !st.diag.intentionalOff && !!(st.diag.lastOkAt || st.manifestEtag);
+}
+
+// Desconexión a propósito (botón "Desconectar"): no es un síntoma, no avisa.
+// La reconexión la deshace refreshConnection().
+export function setIntentionalOff(v) {
+  const st = loadState();
+  st.diag.intentionalOff = !!v;
+  Storage.set(STATE_KEY, st);
 }
 
 // Un cambio local (subrayado, nota, posición…): push con debounce.
@@ -92,6 +147,7 @@ async function cycle() {
   // 1) PULL — manifest + libros con etag remoto distinto al último visto.
   const m = await Drive.read(BASE + 'manifest.json');
   let remoteManifest = null;
+  let pulledBooks = 0;
   // Versiones de TODO lo que hay en remoto, en una sola petición (el listado de
   // Drive trae ya la de cada fichero). Es la referencia que decide qué bajar:
   // la asigna el proveedor en cada escritura y no puede retroceder, a
@@ -123,6 +179,7 @@ async function cycle() {
       st.digests[f.path] = bookDigest(remoteBook);
       save();
       merged++;
+      pulledBooks++;
     }
     st.manifestEtag = m.etag;
     save();
@@ -153,6 +210,7 @@ async function cycle() {
   let libraryFingerprint = st.libraryHash;
   let coversFingerprint = st.coversHash;
   let libraryChanged = false;
+  let pulledLibrary = 0;
   if (isFresh(LIBRARY_PATH)) {
     const f = await Drive.read(LIBRARY_PATH);
     if (f) {
@@ -165,6 +223,7 @@ async function cycle() {
       }
       libraryFingerprint = fingerprint(remoteLibrary);
       st.books[LIBRARY_PATH] = f.etag;
+      pulledLibrary++;
     }
     st.libraryAt = (remoteManifest && remoteManifest.libraryUpdatedAt) || st.libraryAt || 0;
     save();
@@ -184,6 +243,7 @@ async function cycle() {
     }
     st.coversAt = (remoteManifest && remoteManifest.coversUpdatedAt) || st.coversAt || 0;
     save();
+    pulledLibrary++;
   }
   if (libraryChanged) window.dispatchEvent(new CustomEvent('bookreader:library-changed'));
 
@@ -215,6 +275,7 @@ async function cycle() {
   // los suyos y ya no vuelve a haber quien los cruce. Ahorrarse la petición sale caro
   // justo aquí.
   const remoteSettings = await Drive.read(SETTINGS_PATH);
+  let pulledSettings = 0;
   if (remoteSettings && String(remoteSettings.etag) !== String(st.books[SETTINGS_PATH] || '')) {
     applyingRemote = true;
     try {
@@ -225,6 +286,7 @@ async function cycle() {
     st.books[SETTINGS_PATH] = remoteSettings.etag;
     st.settingsAt = (remoteManifest && remoteManifest.settingsUpdatedAt) || st.settingsAt || 0;
     save();
+    pulledSettings++;
   }
 
   // 1b) Reconciliación de identidad: el mismo título bajo dos hashes (descargas
@@ -346,7 +408,9 @@ async function cycle() {
     st.manifestEtag = w.etag;
     save();
   }
-  return { pushed };
+  // pulled: cuántos ficheros remotos se aplicaron (libros + biblioteca + ajustes).
+  // Es la métrica que responde "¿el ciclo de hoy trajo algo del otro dispositivo?".
+  return { pulled: pulledBooks + pulledLibrary + pulledSettings, pushed };
 }
 
 async function runWithLock(fn) {
@@ -362,6 +426,7 @@ async function runWithLock(fn) {
 async function runOnce() {
   clearTimeout(debounceTimer);
   running = true;
+  const t0 = Date.now();
   let result;
   try {
     result = await runWithLock(async () => {
@@ -380,8 +445,12 @@ async function runOnce() {
         }
       }
     });
+    // Huella de diagnóstico solo de ciclos REALES: 'locked' (otra pestaña)
+    // no es ni acierto ni fallo, es no haber corrido.
+    if (result && typeof result === 'object') recordSuccess(result, Date.now() - t0);
   } catch (e) {
     setStatus(e && e.message === 'reconnect' ? 'reconnect' : 'error');
+    recordFailure(e, Date.now() - t0);
     result = 'error';
   } finally {
     running = false;
@@ -432,8 +501,10 @@ function syncSoon() {
 
 // Reevalúa la conexión (tras Conectar/Desconectar en Ajustes).
 export function refreshConnection() {
-  if (DriveAuth.isConnected()) syncNow();
-  else {
+  if (DriveAuth.isConnected()) {
+    setIntentionalOff(false);
+    syncNow();
+  } else {
     clearTimeout(debounceTimer);
     setStatus('off');
   }
