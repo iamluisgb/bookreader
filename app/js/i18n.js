@@ -856,7 +856,7 @@ const EN = {
   // app-settings — Licencia / paywall
   'Modo simulado (aún sin plataforma de pagos): cualquier clave <code>BKRD-…</code> activa Pro para probar.': 'Simulated mode (no payment platform yet): any <code>BKRD-…</code> key activates Pro for testing.',
   'BookReader Pro activo': 'BookReader Pro active',
-  'Clave {key} · última verificación: {date}. Sin conexión, tu licencia sigue activa hasta 30 días.': 'Key {key} · last check: {date}. Offline, your license stays active for up to 30 days.',
+  'Última verificación: {date}. Sin conexión, tu licencia sigue activa hasta 30 días.': 'Last check: {date}. Offline, your license stays active for up to 30 days.',
   'Gestionar dispositivos y recibos': 'Manage devices and receipts',
   'Quitar la licencia de este navegador': 'Remove the license from this browser',
   'Quitar la licencia aquí no libera el hueco de dispositivo: eso se hace en el portal.': 'Removing the license here does not free the device slot: that is done in the portal.',

@@ -286,26 +286,31 @@ function draftProvider() {
   return cur ? cur.id : '';
 }
 
-// Fila de la API key (las dos vistas del Agente). En password a secas la key era
-// invisible e incopiable: quien la recibe pegada —por ejemplo un token de demo— no
-// puede verificar que la copió entera ni llevarla a otro dispositivo. El ojo revela;
-// el Copiar va siempre, revelada o no.
-function apiKeyRowHtml() {
+// Fila de key revelable (las dos vistas del Agente y la Licencia). En password a secas la
+// key era invisible e incopiable: quien la recibe pegada —por ejemplo un token de demo— no
+// puede verificar que la copió entera ni llevarla a otro dispositivo. El ojo revela; el
+// Copiar va siempre, revelada o no. La licencia comparte patrón: su clave también llega
+// por email y hay que poder rescatarla tras limpiar el navegador.
+function keyRowHtml(id, value, placeholder) {
   return `
     <div class="appset-model-row appset-key-row">
-      <input id="appset-key" class="appset-input" type="password" placeholder="sk-..." autocomplete="off" value="${escapeHtml(draftKey())}" />
-      <button type="button" class="appset-discover appset-key-eye" aria-label="${t('Ver la key')}" title="${t('Ver la key')}">${icon('eye', { size: 15 })}</button>
-      <button type="button" class="appset-discover appset-copy" data-copy="appset-key">${icon('copy', { size: 14 })} ${t('Copiar')}</button>
+      <input id="${id}" class="appset-input" type="password" placeholder="${escapeHtml(placeholder)}" autocomplete="off" value="${escapeHtml(value)}" />
+      <button type="button" class="appset-discover appset-key-eye" data-eye="${id}" aria-label="${t('Ver la key')}" title="${t('Ver la key')}">${icon('eye', { size: 15 })}</button>
+      <button type="button" class="appset-discover appset-copy" data-copy="${id}">${icon('copy', { size: 14 })} ${t('Copiar')}</button>
     </div>`;
 }
 
-// Ojo + Copiar de la fila de key, y Copiar de las filas del traspaso de la demo: un
-// solo binder para todos los .appset-copy de la sección, que antes vivía dentro de
-// wireDemoTransfer y no llegaba a la fila de key cuando no había demo que traspasar.
+function apiKeyRowHtml() {
+  return keyRowHtml('appset-key', draftKey(), 'sk-...');
+}
+
+// Ojo + Copiar de las filas de key (Agente y Licencia) y Copiar de las filas del traspaso
+// de la demo: un solo binder para todos los .appset-copy de la sección, que antes vivía
+// dentro de wireDemoTransfer y no llegaba a la fila de key cuando no había demo.
 function wireKeyAndCopy(content) {
-  const input = content.querySelector('#appset-key');
-  const eye = content.querySelector('.appset-key-eye');
-  if (input && eye) {
+  content.querySelectorAll('.appset-key-eye').forEach((eye) => {
+    const input = content.querySelector('#' + eye.dataset.eye);
+    if (!input) return;
     eye.addEventListener('click', () => {
       const ver = input.type === 'password';
       input.type = ver ? 'text' : 'password';
@@ -313,7 +318,7 @@ function wireKeyAndCopy(content) {
       eye.setAttribute('aria-label', t(ver ? 'Ocultar la key' : 'Ver la key'));
       eye.title = t(ver ? 'Ocultar la key' : 'Ver la key');
     });
-  }
+  });
   content.querySelectorAll('.appset-copy').forEach((b) => {
     b.addEventListener('click', async () => {
       const el = content.querySelector('#' + b.dataset.copy);
@@ -1367,10 +1372,9 @@ function wireDrive(content, show) {
 // Estados: Free (input para activar + compra), Pro (key enmascarada + gestión de
 // dispositivos en el portal), revocada (aviso + reactivar). Los datos nunca se tocan.
 
-function maskKey(key) {
-  return key.length > 9 ? `${key.slice(0, 5)}…${key.slice(-4)}` : key;
-}
-
+// La clave nunca se muestra en claro por defecto: va en un input de tipo password con ojo
+// y Copiar (ver keyRowHtml). maskKey ya no tiene uso en la UI — la enmascarada era la
+// fuente del bug de la clave incopiable.
 function licenseHtml() {
   const s = License.getState();
   const mockNote = License.isMock()
@@ -1382,7 +1386,8 @@ function licenseHtml() {
     return `<div class="appset-section">
       <h3 class="appset-h3">${t('Licencia')}</h3>
       <p class="appset-lic-state is-pro">${icon('check', { size: 15 })} ${t('BookReader Pro activo')}</p>
-      <p class="appset-muted">${t('Clave {key} · última verificación: {date}. Sin conexión, tu licencia sigue activa hasta 30 días.', { key: escapeHtml(maskKey(s.key)), date: escapeHtml(since) })}</p>
+      ${keyRowHtml('appset-lic-key', s.key, 'BKRD-XXXX-XXXX-XXXX')}
+      <p class="appset-muted">${t('Última verificación: {date}. Sin conexión, tu licencia sigue activa hasta 30 días.', { date: escapeHtml(since) })}</p>
       <button id="appset-lic-portal" class="primary-btn appset-save">${icon('user', { size: 15 })} ${t('Gestionar dispositivos y recibos')}</button>
       <button id="appset-lic-remove" class="appset-tpl-cancel appset-data-md">${t('Quitar la licencia de este navegador')}</button>
       <p class="appset-muted">${t('Quitar la licencia aquí no libera el hueco de dispositivo: eso se hace en el portal.')}</p>
@@ -1408,6 +1413,10 @@ function licenseHtml() {
 }
 
 function wireLicense(content) {
+  // Ojo + Copiar de la fila de clave activa (Pro). El binder es el mismo que el del Agente:
+  // sin esto, la fila de licencia se quedaba sin ojo ni Copiar — el binder no llegaba a
+  // esta sección.
+  wireKeyAndCopy(content);
   const portal = content.querySelector('#appset-lic-portal');
   if (portal) {
     portal.addEventListener('click', () => window.open(License.CONFIG.portalUrl, '_blank', 'noopener'));

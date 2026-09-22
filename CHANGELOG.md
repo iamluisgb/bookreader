@@ -13,6 +13,16 @@ buena viaja en el próximo covers.json a los demás dispositivos. La adopción d
 además por **ancho real** (decodificando), no por bytes: una v1 densa puede pesar lo mismo que
 una v2 plana.
 
+## 2026-09-22 — La clave de licencia, visible y copiable
+
+Mismo tratamiento que la API key del agente: en Ajustes → Licencia, la clave activa va en un
+input de tipo password (no en el texto enmascarado `BKRD-…XXXX`) con ojo para revelar y Copiar
+siempre disponible. Su clave llega por email y hay que poder rescatarla entera para llevarla a
+otro navegador o recuperarla tras limpiar datos. El binder ojo+Copiar (`wireKeyAndCopy`) se
+generaliza a cualquier fila con `data-eye`, y `wireLicense` lo invoca — antes solo lo llegaba a
+recibir la sección Agente. La máscara desaparece: era la fuente del problema, no la solución
+(se enmascaraba lo que el usuario necesitaba copiar).
+
 ---
 
 ## 2026-09-22 — La API key, visible y copiable en sus Ajustes

@@ -194,8 +194,29 @@ test('settings has a Licencia section that activates a mock key end-to-end', asy
   await page.waitForSelector('.appset-lic-state.is-pro');
   expect(await page.textContent('.appset-lic-state')).toContain('Pro activo');
 
-  // La key se muestra enmascarada, nunca entera.
-  const body = await page.textContent('#app-settings');
-  expect(body).not.toContain('BKRD-UI-TEST-0001');
-  expect(body).toContain('BKRD-…');
+  // La key no se muestra en claro por defecto: input de tipo password (su VALUE está en el
+  // DOM pero no es texto visible) con ojo para revelar y Copiar — igual que la API key:
+  // hay que poder rescatarla para llevarla a otro navegador.
+  const lic = page.locator('#appset-lic-key');
+  await expect(lic).toHaveAttribute('type', 'password');
+  await expect(lic).toHaveValue('BKRD-UI-TEST-0001');
+  await expect(page.locator('.appset-key-eye')).toBeVisible();
+
+  // El ojo la revela, y Copiar la lleva al portapapeles entera.
+  await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.click('.appset-key-eye');
+  await expect(lic).toHaveAttribute('type', 'text');
+  await page.click('[data-copy="appset-lic-key"]');
+  await expect(page.locator('[data-copy="appset-lic-key"]')).toHaveText(/Copiado/);
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('BKRD-UI-TEST-0001');
+
+  // Y en EN no cuela español en la fila.
+  await page.evaluate(() => localStorage.setItem('bookreader_lang', 'en'));
+  await page.reload();
+  await page.evaluate(async () => {
+    const AppSettings = await import('/js/ui/app-settings.js');
+    AppSettings.open('license');
+  });
+  await page.waitForSelector('.appset-lic-state.is-pro');
+  expect(await page.textContent('#app-settings')).toContain('Copy');
 });
