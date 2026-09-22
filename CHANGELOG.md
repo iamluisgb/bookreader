@@ -3,6 +3,16 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+Lo que no se podía arreglar sin el fichero, y cómo se arregla ahora: mientras el fichero no esté
+en el dispositivo, la resolución no se puede inventar. Dos agujeros hacían que la portada
+raquítica se quedara para siempre aunque el fichero llegara: abrir un libro solo recalculaba la
+portada si **no tenía ninguna** (un thumb de 200px existente bloqueaba el backfill para siempre),
+y descargar el fichero de una fantasma no tocaba la portada. Ahora abrir un libro con portada
+menor que la miniatura actual la regenera desde el fichero ya cargado (EPUB y PDF), y esa portada
+buena viaja en el próximo covers.json a los demás dispositivos. La adopción del thumb mejorado es
+además por **ancho real** (decodificando), no por bytes: una v1 densa puede pesar lo mismo que
+una v2 plana.
+
 ---
 
 ## 2026-09-22 — La API key, visible y copiable en sus Ajustes

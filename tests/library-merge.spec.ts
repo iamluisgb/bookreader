@@ -225,3 +225,35 @@ test('makeThumb reescala la portada al ancho de miniatura actual, sin pasarse', 
   expect(out.h).toBe(672);              // 1400 × (480/1000), proporción intacta
   expect(out.w2).toBe(120);             // la pequeña no se agranda
 });
+
+// La adopción de portadas es por ANCHO real, no por bytes: una v1 densa (arte pintado,
+// 200px, muchos KB) puede pesar lo mismo que una v2 plana (O'Reilly blanca, 480px, pocos
+// KB). El tamaño solo pre-filtra; con bytes ambiguos se decodifican y manda el ancho.
+test('applyCovers adopta la portada más ancha y respeta la original local', async ({ page }) => {
+  await page.goto('/');
+  const out = await page.evaluate(async () => {
+    const LibStore = await import('/js/library/store.js');
+    const { applyCovers } = await import('/js/sync/library-sync.js');
+    const dataUrl = (w) => {
+      const c = document.createElement('canvas');
+      c.width = w; c.height = Math.round(w * 1.4);
+      return c.toDataURL('image/jpeg', 0.8);
+    };
+    // A: fantasma con el thumb v1 (100px, pocos bytes) → la remota (300px, más bytes) entra.
+    // B: original local de 600px (muchos bytes) → la remota (480px, menos bytes) NO entra.
+    // C: sin portada → adopta directamente.
+    await LibStore.putBook({ id: 'cov_a', title: 'A', cover: dataUrl(100), deleted: false });
+    await LibStore.putBook({ id: 'cov_b', title: 'B', cover: dataUrl(600), deleted: false });
+    await LibStore.putBook({ id: 'cov_c', title: 'C', deleted: false });
+    const remotaA = dataUrl(300), remotaB = dataUrl(480), remotaC = dataUrl(480);
+    const changed = await applyCovers({ covers: { cov_a: remotaA, cov_b: remotaB, cov_c: remotaC } });
+    const raw = await LibStore.getAllRecords();
+    const por = Object.fromEntries(raw.map((b) => [b.id, b.cover]));
+    return { changed, a: por.cov_a, b: por.cov_b, c: por.cov_c, remotaA, remotaB, remotaC };
+  });
+
+  expect(out.changed).toBe(2);
+  expect(out.a).toBe(out.remotaA);     // v1 → adopta la más ancha
+  expect(out.b).not.toBe(out.remotaB); // la original local manda
+  expect(out.c).toBe(out.remotaC);     // sin portada, adopta
+});

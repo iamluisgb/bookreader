@@ -21,6 +21,7 @@ import { rangeForText } from './pdf-locate.js';
 import { migrateSchema, purgeExpiredTombstones } from './sync/schema.js';
 import * as SyncEngine from './sync/engine.js';
 import * as Aliases from './sync/aliases.js';
+import { THUMB_WIDTH } from './sync/library-sync.js';
 import * as License from './license.js';
 import { toast } from './ai/toast.js';
 import * as Jobs from './ai/jobs.js';
@@ -651,11 +652,9 @@ async function openBookRecord(record, { fromRoute = false, loc = null } = {}) {
         return;
       }
       if (!currentBook || currentBook.id !== record.id) return;   // salió durante la carga
-      // Backfill de portada para PDFs guardados antes de tenerla (imagen genérica → página 1).
-      if (!record.cover) {
-        const cover = await PdfReader.renderCoverDataUrl();
-        if (cover) { await LibStore.updateBook(record.id, { cover }); Library.render(); }
-      }
+      // Portada raquítica (thumb del sync que pisó la original) o ausente: con el PDF
+      // ya cargado, regenerarla es una sola página a escala alta.
+      await backfillCover(record);
       if (loc) await seekTo(loc);
     } else {
       const ok = await loadEpub(buffer, record.fileBaseId || record.id, record.id);
@@ -672,6 +671,9 @@ async function openBookRecord(record, { fromRoute = false, loc = null } = {}) {
       else if (!EpubReader.restoredSavedPosition() && record.lastCfi) {
         try { await EpubReader.goTo(record.lastCfi); } catch (e) { /* posición no válida */ }
       }
+      // Portada raquítica (thumb del sync que pisó la original) o ausente: el EPUB ya
+      // está abierto, su coverUrl sale sin coste extra para el usuario.
+      await backfillCover(record);
     }
     // Si el usuario salió a la biblioteca a mitad de carga, no tocar la ruta ni la UI.
     if (!currentBook || currentBook.id !== record.id) return;
@@ -704,6 +706,35 @@ function migrateFileToBlob(record) {
   const file = new Blob([record.file], { type });
   LibStore.patchBook(record.id, { file }, { stamp: false })
     .catch(e => console.warn('No se pudo migrar el binario a Blob:', e));
+}
+
+// ¿La portada guardada es una miniatura del sync y no la original? La v1 (200px) pisaba
+// el campo cover en los dispositivos fantasma, y el backfill histórico solo actuaba sin
+// portada: con una existente —por raquítica que fuera— nunca se regeneraba. Al abrir el
+// libro el fichero está cargado: si la portada es más estrecha que la miniatura actual,
+// sale de aquí una de verdad. Sin decodificable (o sin portada) también se recalcula.
+async function coverNeedsBackfill(dataUrl) {
+  if (!dataUrl || typeof dataUrl !== 'string' || !dataUrl.startsWith('data:image')) return true;
+  try {
+    const img = new Image();
+    await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = dataUrl; });
+    return img.naturalWidth < THUMB_WIDTH;
+  } catch { return true; }
+}
+
+// Regenera la portada del libro abierto desde el lector ya cargado (sin re-abrir nada)
+// y refresca la estantería. No-op si el libro dejó de ser el actual mientras medía.
+async function backfillCover(record) {
+  if (!(await coverNeedsBackfill(record.cover))) return;
+  const cover = record.format === 'pdf'
+    ? await PdfReader.renderCoverDataUrl()
+    : await EpubReader.getCoverDataUrl();
+  if (!cover) return;
+  // coverThumb: null — la miniatura cacheada representaba la portada vieja; thumbFor
+  // la regenera de la nueva en el próximo ciclo de sync.
+  await LibStore.updateBook(record.id, { cover, coverThumb: null });
+  if (currentBook && currentBook.id === record.id) setBookMeta({ cover });
+  Library.render();
 }
 
 // Guardar/actualizar un libro recién abierto desde un archivo (con portada).

@@ -39,6 +39,7 @@ export const SCHEMA_VERSION = 1;
 // distingue de la original.
 const THUMB_WIDTH = 480;
 const THUMB_QUALITY = 0.80;
+export { THUMB_WIDTH };
 // Versión de la caché: coverThumb de la era 200px no sirve — pero solo se puede regenerar
 // donde sigue la portada original (en un dispositivo fantasma el thumb PISÓ cover, ver
 // applyCovers, y no hay de dónde rascar). El prefijo invalida la caché vieja una vez y
@@ -195,11 +196,13 @@ export async function applyLibrary(remote) {
 }
 
 // Portadas de libros que aquí no tienen ninguna (fichas fantasma recién llegadas) — y las
-// que tienen la miniatura de la GENERACIÓN VIEJA (200px): la portada viaja como thumb y ha
-// habido dos generaciones, así que un dispositivo fantasma de la v1 debe adoptar la v2
-// aunque ya tenga "cover". La comparación por tamaño basta y es gratis: v1 son ~6-10 KB,
-// v2 ~40-60 KB, y la portada original nunca es más pequeña que la miniatura que la
-// representa. Unión pura: va indexada por el hash del libro, no hay conflicto ni LWW.
+// que tienen la miniatura de la GENERACIÓN VIEJA (200px): la portada que viaja es una
+// miniatura y ha habido dos generaciones, así que un dispositivo fantasma de la v1 debe
+// adoptar la v2 aunque ya tenga "cover". La decisión es por ANCHO real (decodificando), no
+// por bytes: el tamaño solo pre-filtra — la remota es SIEMPRE una miniatura, así que si
+// pesa menos que la local, la local es original o una miniatura al menos tan buena. Con
+// bytes ambiguos (v1 densa ≈ v2 plana) manda el ancho. Unión pura: va indexada por el hash
+// del libro, no hay conflicto ni LWW.
 export async function applyCovers(remote) {
   const covers = (remote && remote.covers) || {};
   if (!Object.keys(covers).length) return 0;
@@ -209,9 +212,20 @@ export async function applyCovers(remote) {
     if (!b || b.deleted || !covers[b.id]) continue;
     const remoteCover = covers[b.id];
     if (b.cover === remoteCover) continue;
-    if (b.cover && remoteCover.length <= b.cover.length * 2) continue;
-    await LibStore.putBook({ ...b, cover: remoteCover, coverThumb: THUMB_PREFIX + remoteCover }, { stamp: false });
-    changed++;
+    const adoptar = async () => {
+      await LibStore.putBook({ ...b, cover: remoteCover, coverThumb: THUMB_PREFIX + remoteCover }, { stamp: false });
+      changed++;
+    };
+    if (!b.cover) { await adoptar(); continue; }
+    if (remoteCover.length <= b.cover.length) continue;
+    const ancho = (dataUrl) => new Promise((res) => {
+      const img = new Image();
+      img.onload = () => res(img.naturalWidth || 0);
+      img.onerror = () => res(0);
+      img.src = dataUrl;
+    });
+    const [wl, wr] = await Promise.all([ancho(b.cover), ancho(remoteCover)]);
+    if (wr > wl) await adoptar();
   }
   return changed;
 }
