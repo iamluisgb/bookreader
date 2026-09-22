@@ -25,6 +25,7 @@ import { loadAgentCss } from './css-loader.js';
 
 const DAY_MS = 86400000;
 const RANGES = [
+  { id: 'day', days: 1, label: () => t('Día') },
   { id: 'week', days: 7, label: () => t('Semana') },
   { id: 'month', days: 30, label: () => t('Mes') },
 ];
@@ -184,7 +185,7 @@ function renderData(d) {
   return `
     <div class="anal-hero">
       <div class="anal-hero-n">${escapeHtml(humanTime(d.ms))}</div>
-      <div class="anal-hero-l">${t('leyendo · {n} de {total} días', { n: d.activeDays, total: d.days })}</div>
+      <div class="anal-hero-l">${d.days === 1 ? t('leyendo hoy') : t('leyendo · {n} de {total} días', { n: d.activeDays, total: d.days })}</div>
     </div>
     <div class="anal-tiles">
       ${tile(t('Páginas'), String(d.units))}
@@ -213,8 +214,10 @@ function compact(n) {
 // Columnas por día, una sola serie (por eso no hay leyenda: el título ya dice qué es). La
 // altura es proporcional al MÁXIMO del periodo, no a un tope fijo: lo que se compara aquí
 // son los días entre sí. Solo lleva etiqueta el día más alto — un número sobre cada
-// columna es ruido que nadie lee, y el resto lo da el tooltip.
+// columna es ruido que nadie lee, y el resto lo da el tooltip. En el rango DIARIO no hay
+// gráfica: una sola columna no compara nada, y la cifra del héroe ya es la respuesta.
 function renderChart(d) {
+  if (d.days === 1) return '';
   const max = Math.max(...d.series.map(s => s.ms));
   const every = d.days <= 7 ? 1 : 5;
   const cols = d.series.map((s, i) => {

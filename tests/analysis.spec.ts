@@ -105,3 +105,27 @@ test('la pantalla está traducida (EN)', async ({ page }) => {
   const txt = await page.locator('#analysis').innerText();
   expect(txt).not.toMatch(/leyendo|pág\.|Subrayados|Semana/);
 });
+
+// Rango DIARIO: la cifra es solo hoy y la gráfica desaparece — una sola columna no
+// compara nada; quedan el héroe, las tiles y el desglose por libro.
+test('el rango Día cuenta solo hoy y no pinta gráfica de una columna', async ({ page }) => {
+  await page.goto('/');
+  await seed(page);
+  await page.click('[data-act="analysis"]');
+  await page.click('[data-range="day"]');
+  await expect(page.locator('.anal-hero-n')).toHaveText('8 min');
+  await expect(page.locator('.anal-hero-l')).toHaveText('leyendo hoy');
+  await expect(page.locator('.anal-chart')).toHaveCount(0);
+  // Solo el libro leído HOY sale en el desglose.
+  await expect(page.locator('.anal-book')).toHaveCount(1);
+  await expect(page.locator('.anal-book').first()).toContainText('El infinito en un junco');
+
+  // Y en EN no cuela español.
+  await page.evaluate(() => localStorage.setItem('bookreader_lang', 'en'));
+  await page.reload();
+  await page.click('[data-act="analysis"]');
+  await page.click('[data-range="day"]');
+  await expect(page.locator('.anal-hero-l')).toHaveText('reading today');
+  const txt = await page.locator('#analysis').innerText();
+  expect(txt).not.toMatch(/leyendo|Día/);
+});

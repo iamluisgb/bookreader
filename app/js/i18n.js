@@ -115,6 +115,8 @@ const EN = {
   'Contando…': 'Counting…',
   'Libro sin título': 'Untitled book',
   'leyendo · {n} de {total} días': 'reading · {n} of {total} days',
+  'Día': 'Day',
+  'leyendo hoy': 'reading today',
   'Palabras': 'Words',
   'Notas': 'Notes',
   'Racha': 'Streak',
