@@ -91,12 +91,41 @@ export function expansionQuery(expansion) {
   return [...(expansion.terms || []), expansion.hypothetical || ''].join(' ').replace(/\s+/g, ' ').trim();
 }
 
+// IA7 F3 · Caché por pregunta: la misma pregunta repetida (re-preguntar, reintentar tras un
+// error del turno) no vuelve a pagar la llamada de expansión — su salida es determinista a
+// efectos prácticos y el coste es latencia delante de la respuesta. En memoria (muere al
+// recargar; no hay razones para persistirla) y solo aciertos: un `null` puede ser un timeout
+// transitorio — repetirlo tiene que poder funcionar. La clave incluye el modelo lite: si el
+// usuario lo cambia, la caché vieja no envenena el nuevo. Capa pequeña con expulsión LRU:
+// es un caché de sesión de lectura, no una base de datos.
+const CACHE_MAX = 40;
+const cache = new Map();   // normalizada + modelo → { terms, hypothetical }
+
+function cacheKey(q) {
+  return q.toLowerCase().replace(/\s+/g, ' ').trim() + '|' + (LLM.getLiteModel() || '');
+}
+
+function cacheGet(key) {
+  if (!cache.has(key)) return null;
+  const v = cache.get(key);
+  cache.delete(key); cache.set(key, v);   // LRU por re-inserción
+  return v;
+}
+
+function cacheSet(key, v) {
+  cache.set(key, v);
+  if (cache.size > CACHE_MAX) cache.delete(cache.keys().next().value);
+}
+
 // Genera la expansión de la pregunta. `signal` (opcional) = aborto del turno; internamente
 // añade un timeout. Nunca lanza: devuelve null y se cae con gracia a la pregunta cruda.
 export async function expandQuery(question, { tocLabels = [], signal } = {}) {
   const q = String(question || '').trim();
   if (!q || !LLM.hasKey()) return null;
   if (signal?.aborted) return null;
+  const key = cacheKey(q);
+  const cached = cacheGet(key);
+  if (cached) return cached;
 
   const ctrl = new AbortController();
   const onAbort = () => ctrl.abort();
@@ -113,7 +142,9 @@ export async function expandQuery(question, { tocLabels = [], signal } = {}) {
       signal: ctrl.signal,
       onToken: (t) => { acc += t; },
     });
-    return parseExpansion(raw || acc);
+    const exp = parseExpansion(raw || acc);
+    if (exp) cacheSet(key, exp);   // solo aciertos: un null puede ser un timeout transitorio
+    return exp;
   } catch {
     return null;   // timeout, red, aborto, proveedor… → fallback a la pregunta cruda
   } finally {

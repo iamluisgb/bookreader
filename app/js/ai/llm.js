@@ -45,7 +45,11 @@ const MAX_TOKENS = 4096;
 // bloquea: ofrecer ahí un botón que solo puede fallar es peor que no ofrecerlo
 // (verificado 2026-08-02, y el contrato con el proveedor lo revisa).
 export const PROVIDERS = [
-  { id: 'nan',        name: 'nan',        baseUrl: 'https://api.nan.builders/v1',   models: ['deepseek-v4-flash', 'mimo-v2.5', 'qwen3.6', 'gemma4'], liteModel: 'qwen3.6', visionModel: 'mimo-v2.5', concurrent: true, discover: false },
+  // liteModel: fue 'qwen3.6' y quedó roto en silencio (IA7 F3, medido 2026-09-22): hoy es un
+  // modelo reasoning que NO emite content — ~16 s y ~4.000 ch de reasoning_content, content
+  // vacío — así que la expansión de consulta (y la atenuación) caían siempre en fallback.
+  // deepseek-v4-flash responde en ~3 s con JSON parseable (ver BACKLOG · IA7, sondeo F3).
+  { id: 'nan',        name: 'nan',        baseUrl: 'https://api.nan.builders/v1',   models: ['deepseek-v4-flash', 'mimo-v2.5', 'qwen3.6', 'gemma4'], liteModel: 'deepseek-v4-flash', visionModel: 'mimo-v2.5', concurrent: true, discover: false },
   { id: 'openai',     name: 'OpenAI',     baseUrl: 'https://api.openai.com/v1',     models: ['gpt-4o', 'gpt-4o-mini', 'o4-mini'], concurrent: true, catalogId: 'openai' },
   // Verificado contra la API real el 2026-08-02 (tests/provider-contract.spec.ts):
   // `claude-3.7-sonnet` y `gemini-2.0-flash-001` ya NO existen en el catálogo, así que

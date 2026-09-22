@@ -1506,11 +1506,14 @@ function buildContext(question, expansion = null, ref = null) {
     return { text: annotatedText.slice(0, budget * 4), tocLabels, passages: 0, chapters: [], routed, bm25Count: 0, refCount: refHits.length, picked: [] };
   }
   const chapters = [...new Set(picked.map(p => p.chapter).filter(Boolean))];
-  // routed = capítulos nombrados; bm25Count = fuerza del match léxico de la pregunta CRUDA
-  // (se conserva a propósito: alimenta el gate del retrieval agéntico de la Fase 1b sin que
-  // la expansión IA7 lo altere). refCount = pasajes localizados del fragmento adjunto.
+  // routed = capítulos nombrados; bm25Count = fuerza del match léxico de la pregunta CRUDA;
+  // unionCount = la del crudo ∪ expansión IA7 — es la que alimenta el gate del retrieval
+  // agéntico (F3 de IA7, 2026-09-22): si la expansión ya recuperó de sobra, el turno no
+  // necesita la ronda agéntica ni su coste. Antes el gate miraba SOLO el crudo (decisión
+  // deliberada en su día) y en cross-lingüe —crudo 0/5, expansión 4/5— la ronda agéntica
+  // saltaba siempre aunque el contexto ya fuera bueno. refCount = fragmento adjunto.
   // `expanded` es solo observabilidad.
-  return { text: formatPassages(picked), tocLabels, passages: picked.length, chapters, routed, bm25Count: bm25.length, refCount: refHits.length, picked, expanded: !!expQuery };
+  return { text: formatPassages(picked), tocLabels, passages: picked.length, chapters, routed, bm25Count: bm25.length, unionCount: hits.length, refCount: refHits.length, picked, expanded: !!expQuery };
 }
 
 // Ensambla una lista de pasajes en texto para el prompt: cabecera `## capítulo` + `[[aN]]`
@@ -1815,10 +1818,14 @@ async function deliver(aug, question, { showUser = true, ref = null, systemExtra
     // IA5 Fase 1b · Retrieval agéntico SOLO en turnos difíciles (sin capítulo nombrado y
     // pocos aciertos BM25): el agente reúne más contexto con herramientas antes de
     // responder; los turnos normales van directos a streaming. Ver DECISIONS.md · ADR-009.
+    // IA7 F3: la fuerza se mide sobre el UNION (crudo ∪ expansión), no sobre el crudo —
+    // en cross-lingüe el crudo es siempre débil y la ronda agéntica saltaba aunque la
+    // expansión ya hubiera recuperado bien (medido: crudo 0/5 → unión 4/5).
     // Guard: libro indexado (segReady). Un retrieval DÉBIL —incluido el vacío (0 aciertos)—
     // es justo cuando el agente debe buscar por su cuenta; por eso NO exigimos picked>0.
     // Con fragmento localizado (refCount) el contexto ya es el correcto: sin ronda agéntica.
-    if (LLM.hasKey() && segReady && !ctx.routed?.length && !ctx.refCount && ctx.bm25Count < AGENTIC_MIN_HITS) {
+    const hitsForGate = ctx.unionCount ?? ctx.bm25Count;   // ctx viejo sin union: crudo
+    if (LLM.hasKey() && segReady && !ctx.routed?.length && !ctx.refCount && hitsForGate < AGENTIC_MIN_HITS) {
       textNode.innerHTML = `<span class="ai-typing">${t('buscando en el libro…')}</span>`;
       ctx = await agenticGather(question, ctx, abortCtrl.signal);
     }

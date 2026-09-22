@@ -154,10 +154,34 @@ para indexar y citar, y el function-calling (`chatTools`, ya usado en
 [DECISIONS.md ADR-006](DECISIONS.md) y CHANGELOG), ya corregido. Presupuesto de contexto ahora adaptativo
 ([ADR-007](DECISIONS.md)): 60k normal, ~110k al nombrar un capítulo.
 
-### IA7 — Reescritura de consulta por defecto (HyDE-lite) · `M` · **en curso**
+### IA7 — Reescritura de consulta por defecto (HyDE-lite) · `M` · **F1+F2 ✓ · F3 ✓ (2026-09-22)**
 
-> **Estado: en implementación (2026-07-06).** La mejora de retrieval de mayor ROI sin embeddings (que se
-> aplazaron en [ADR-014](DECISIONS.md)): entender la pregunta **antes** de buscar, no como fallback.
+> **Estado: F1+F2 entregadas (2026-07-30); F3 (caché + gate agéntico) entregada 2026-09-22** —
+> y al medir el baseline salió que la expansión estaba ROTA en producción (hallazgo abajo).
+
+**Contrato (EV5, antes de implementar F3).**
+- Batería: golden IA7 ([`tests/retrieval-hyde.spec.ts`](tests/retrieval-hyde.spec.ts), @live DDIA) —
+  la única que mide recall cross-lingüe real sobre el libro canónico.
+- Métrica primaria: **ES→EN top-40 ≥ 4/5 con expansión** (baseline F2, 2026-07-30). Determinista
+  (targets léxicos en top-40, sin juez).
+- Baseline del día: **roto — ES→EN 0/5 con expansión** (run `evals/runs/ia7-f3-baseline-2026-09-22.log`,
+  2026-09-22): 11/11 expansiones `null`. El test de F2 ya no pasaba de fiable.
+- Secundarias (invariante): EN top-40 no empeora (la unión nunca quita); latencia de expansión
+  p50 < 7 s (el timeout actual).
+- Time-box: 2 ciclos. Si el gate agéntico sobre el union baja el recall de la primaria, se revierte
+  el gate (la caché no toca calidad) y se cierra con hallazgo.
+
+**Hallazgo F3 (la causa de los `null` — la abierta del BACKLOG, resuelta midiendo).** El modelo
+lite del preset `nan` era `qwen3.6`, que hoy es un modelo reasoning que **no emite `content`**:
+con el prompt real de expansión gasta ~16 s y ~4.000 caracteres en `reasoning_content` y devuelve
+`content` vacío → `parseExpansion` → `null` SIEMPRE (el fallback a pregunta cruda lo cubría en
+silencio, y el cross-lingüe —su único caso donde mueve la aguja— quedó sin puente léxico). Sondeo
+con el prompt real (2026-09-22): `qwen3.6` 16,2 s/0 ch/NO · `deepseek-v4-flash` 3,2 s/373 ch/**OK** ·
+`gemma4` 7,0 s/235 ch/OK al límite. Fix: el preset pasa a `liteModel: 'deepseek-v4-flash'`
+(measured, dentro del presupuesto con margen). Caché y gate no tocan calidad: la caché solo
+evita repeticiones, y el gate pasa a mirar el union (crudo ∪ expansión) en vez del crudo, ahora
+que la 1ª recuperación es buena — el comentario antiguo de `buildContext` lo tenía deliberadamente
+congelado al crudo; F3 es la decisión contraria, medida.
 
 **Problema.** BM25 falla en preguntas **conceptuales/parafraseadas** (las palabras de la pregunta no están
 en el texto) y devuelve pasajes de alta coincidencia léxica pero sentido equivocado. La expansión agéntica
@@ -176,9 +200,25 @@ con **gate** (solo si hay key, libro listo y NO se nombró capítulo — ahí la
 **timeout + fallback** a la pregunta cruda ante cualquier fallo. El router y el capítulo actual siguen
 sobre la pregunta cruda; solo el paso BM25 usa la unión.
 
+**Resultado F3 (post-fix, run `evals/runs/ia7-f3-post-2026-09-22.log`, DDIA real):**
+- **ES→EN: crudo 0/5 → con expansión 4/5** — métrica primaria del contrato cumplida; queda
+  en el nivel del hallazgo histórico de F2. Las expansiones parseadas pasan de 0/11 a 10/11
+  (el `null` restante es la variación conocida; el fallback lo cubre y el golden pasa).
+- Invariante EN intacta: top-40 5/6 → 5/6 (la unión nunca quita).
+- Latencia: el golden entero bajó de ~1,5 min a ~45 s (llamadas de expansión que antes
+  colgaban hasta el timeout de 7 s ahora resuelven en ~3 s).
+- Gate agéntico sobre el union: cubierto deterministamente en
+  [`tests/query-gate.spec.ts`](tests/query-gate.spec.ts) — con expansión buena el turno
+  cross-lingüe NO dispara la ronda agéntica (2 llamadas, no 4); con expansión rota el
+  fallback conserva la red de seguridad. La caché (misma pregunta → 1 llamada, null no
+  cacheado) también ahí.
+
 **Fases:** F1 ✓ (módulo + integración con unión y fallback) · F2 ✓ (golden @live sobre DDIA real,
-[`tests/retrieval-hyde.spec.ts`](tests/retrieval-hyde.spec.ts)) · F3 opcional (caché por pregunta, afinar
-el gate del agéntico ahora que la 1ª recuperación es mejor).
+[`tests/retrieval-hyde.spec.ts`](tests/retrieval-hyde.spec.ts)) · **F3 ✓ (2026-09-22)**: caché por
+pregunta (en memoria, LRU 40, solo aciertos, clave con modelo lite), gate agéntico sobre el union,
+y el fix del lite model que resucitó todo. Pendiente menor: el `null` residual de expansión
+(variación del modelo; el fallback ya lo cubre) · presupuesto de latencia con el modelo lite ya
+verificado en el sondeo F3.
 
 **Hallazgo de F2 (medido, DDIA real, `npm run test:ai`):**
 - **Mismo idioma (EN):** BM25 crudo ya recupera **6/6** a top-40; la expansión **no mejora el recall**
@@ -189,9 +229,12 @@ el gate del agéntico ahora que la 1ª recuperación es mejor).
   expansión BM25 no cruza la barrera del idioma. Este es el valor principal de IA7, no el mismo-idioma.
 
 **Abiertas:** ~~¿subir el gate al idioma?~~ **cerrada en sí (2026-07-30, ADR-028)**: cruzando idiomas
-se expande SIEMPRE, aunque se nombre capítulo — sin puente léxico BM25 no tiene nada que emparejar. · reducir los `null` de expansión (variación del modelo reasoning; el fallback ya lo cubre) ·
-presupuesto de latencia (max_tokens/timeout). Nota 2026-07-16: la expansión (y la atenuación) ya van
-con el **modelo lite** ([ADR-022](DECISIONS.md)) — el presupuesto de latencia mejora ~3-4x en nan.
+se expande SIEMPRE, aunque se nombre capítulo — sin puente léxico BM25 no tiene nada que emparejar. ·
+~~reducir los `null` de expansión~~ **cerrada en F3 (2026-09-22)**: la causa no era variación del
+modelo sino el modelo lite (`qwen3.6` no emitía content; ver hallazgo arriba) — 10/11 parseadas ·
+~~presupuesto de latencia~~ **verificado en el sondeo F3** (~3 s con `deepseek-v4-flash`, margen
+dentro del timeout de 7 s). Nota 2026-07-16: la expansión (y la atenuación) ya van con el
+**modelo lite** ([ADR-022](DECISIONS.md)) — con el fix, esa promesa vuelve a ser cierta.
 
 ### EV1 — Batería de evals por persona (LLM-as-judge) · `M` · **plan escrito**
 

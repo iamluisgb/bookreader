@@ -13,6 +13,23 @@ buena viaja en el próximo covers.json a los demás dispositivos. La adopción d
 además por **ancho real** (decodificando), no por bytes: una v1 densa puede pesar lo mismo que
 una v2 plana.
 
+## 2026-09-22 — IA7 F3: la expansión de consulta vuelve a la vida (y se hace barata)
+
+Al abrir la F3 de IA7 (caché por pregunta + gate agéntico), el baseline @live destapó que la
+expansión HyDE estaba **rota en producción sin que nadie lo notara**: el modelo lite del gateway
+(`qwen3.6`) se volvió un modelo reasoning que no emite `content` — ~16 s y solo `reasoning_content`
+— así que TODAS las expansiones caían en `null` y el retrieval cross-lingüe (su caso estrella,
+ES→EN) quedó sin puente léxico: 0/5. El fallback silencioso lo escondía.
+
+- **Fix**: preset `nan` con `liteModel: 'deepseek-v4-flash'` (sondeo medido: ~3 s, JSON OK).
+- **Resultado golden DDIA**: ES→EN 0/5 → **4/5**; invariante EN intacta; run entero de ~1,5 min a ~45 s.
+- **Caché por pregunta**: misma pregunta → una sola llamada (LRU 40, en memoria, solo aciertos).
+- **Gate agéntico sobre el union** (crudo ∪ expansión, no solo crudo): el turno cross-lingüe con
+  expansión buena ya no paga la ronda agéntica; si la expansión falla, la red de seguridad sigue.
+- Tests deterministas en `tests/query-gate.spec.ts` (caché, gate, fallback); runs en `evals/runs/`.
+
+---
+
 ## 2026-09-22 — La clave de licencia, visible y copiable
 
 Mismo tratamiento que la API key del agente: en Ajustes → Licencia, la clave activa va en un
