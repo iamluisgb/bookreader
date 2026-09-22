@@ -5,6 +5,18 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-09-22 — La API key, visible y copiable en sus Ajustes
+
+El campo **API key** de Ajustes → Agente (las dos vistas) era un `input[type=password]` a secas:
+quien pega una key —la suya o un token de demo que le han pasado— no puede verificar que la copió
+entera ni recuperarla para llevarla a otro dispositivo. Ahora la fila lleva un **ojo** que revela/
+oculta y un botón **Copiar** que funciona revelada o no.
+
+De paso, el binding de «Copiar» salió de `wireDemoTransfer`, donde estaba atrapado: si no había
+demo que traspasar, no había copiado en ninguna fila.
+
+---
+
 ## 2026-09-22 — Las portadas dejan de verse pixeladas en la estantería
 
 Las tarjetas de la estantería se veían pixeladas en pantallas retina. La causa estaba en la

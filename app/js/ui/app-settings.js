@@ -286,6 +286,51 @@ function draftProvider() {
   return cur ? cur.id : '';
 }
 
+// Fila de la API key (las dos vistas del Agente). En password a secas la key era
+// invisible e incopiable: quien la recibe pegada —por ejemplo un token de demo— no
+// puede verificar que la copió entera ni llevarla a otro dispositivo. El ojo revela;
+// el Copiar va siempre, revelada o no.
+function apiKeyRowHtml() {
+  return `
+    <div class="appset-model-row appset-key-row">
+      <input id="appset-key" class="appset-input" type="password" placeholder="sk-..." autocomplete="off" value="${escapeHtml(draftKey())}" />
+      <button type="button" class="appset-discover appset-key-eye" aria-label="${t('Ver la key')}" title="${t('Ver la key')}">${icon('eye', { size: 15 })}</button>
+      <button type="button" class="appset-discover appset-copy" data-copy="appset-key">${icon('copy', { size: 14 })} ${t('Copiar')}</button>
+    </div>`;
+}
+
+// Ojo + Copiar de la fila de key, y Copiar de las filas del traspaso de la demo: un
+// solo binder para todos los .appset-copy de la sección, que antes vivía dentro de
+// wireDemoTransfer y no llegaba a la fila de key cuando no había demo que traspasar.
+function wireKeyAndCopy(content) {
+  const input = content.querySelector('#appset-key');
+  const eye = content.querySelector('.appset-key-eye');
+  if (input && eye) {
+    eye.addEventListener('click', () => {
+      const ver = input.type === 'password';
+      input.type = ver ? 'text' : 'password';
+      eye.innerHTML = icon(ver ? 'eye-off' : 'eye', { size: 15 });
+      eye.setAttribute('aria-label', t(ver ? 'Ocultar la key' : 'Ver la key'));
+      eye.title = t(ver ? 'Ocultar la key' : 'Ver la key');
+    });
+  }
+  content.querySelectorAll('.appset-copy').forEach((b) => {
+    b.addEventListener('click', async () => {
+      const el = content.querySelector('#' + b.dataset.copy);
+      if (!el) return;
+      const antes = b.textContent;
+      try {
+        await navigator.clipboard.writeText(el.value);
+      } catch {
+        el.select();
+        try { document.execCommand('copy'); } catch { b.textContent = t('Error'); setTimeout(() => { b.textContent = antes; }, 1500); return; }
+      }
+      b.textContent = t('Copiado');
+      setTimeout(() => { b.textContent = antes; }, 1500);
+    });
+  });
+}
+
 // ---- Vista SIMPLE: proveedor + key. El modelo lo elegimos nosotros -------------
 // No hay ni un campo cuyo valor haya que buscar en la documentación del proveedor.
 function agentSimpleHtml() {
@@ -303,7 +348,7 @@ function agentSimpleHtml() {
     <label class="appset-label" for="appset-provider">${t('Proveedor')}</label>
     <select id="appset-provider" class="appset-input">${provOpts}</select>
     <label class="appset-label" for="appset-key">API key</label>
-    <input id="appset-key" class="appset-input" type="password" placeholder="sk-..." autocomplete="off" value="${escapeHtml(draftKey())}" />
+    ${apiKeyRowHtml()}
     <p class="appset-muted" id="appset-simple-model"></p>
     <p class="appset-model-hint" id="appset-simple-hint" hidden></p>
     <label class="appset-check"><input type="checkbox" id="appset-auto"${LLM.getAutoExtract() ? ' checked' : ''} /> ${t('Rellenar la libreta automáticamente')}</label>
@@ -367,7 +412,7 @@ function agentHtml() {
     <p id="appset-probe-appset-lmodel-hint" class="appset-model-hint" hidden></p>
     <p class="appset-muted">${t('Para las llamadas auxiliares del agente (preparar búsquedas, puntuar capítulos): un modelo pequeño responde igual de bien y mucho más rápido. Vacío = automático (en nan usa <code>qwen3.6</code>; en otros proveedores, el modelo principal).')}</p>
     <label class="appset-label" for="appset-key">API key</label>
-    <input id="appset-key" class="appset-input" type="password" placeholder="sk-..." autocomplete="off" value="${escapeHtml(draftKey())}" />
+    ${apiKeyRowHtml()}
     <label class="appset-check"><input type="checkbox" id="appset-auto"${LLM.getAutoExtract() ? ' checked' : ''} /> ${t('Rellenar la libreta automáticamente')}</label>
     <button id="appset-save" class="primary-btn appset-save">${t('Guardar')}</button>
     <p class="appset-saved" id="appset-saved" hidden>${icon('check', { size: 14 })} ${t('Guardado')}</p>
@@ -521,29 +566,12 @@ function wireDemoTransfer(content) {
   share?.addEventListener('click', () => {
     navigator.share({ title: 'bookreader', url: url.value }).catch(() => { /* cancelado */ });
   });
-
-  // Copiar (enlace y los tres campos manuales). Mismo fallback que el panel del agente:
-  // sin Clipboard API (contexto no seguro), un textarea temporal y execCommand.
-  content.querySelectorAll('.appset-copy').forEach((b) => {
-    b.addEventListener('click', async () => {
-      const el = content.querySelector('#' + b.dataset.copy);
-      if (!el) return;
-      const antes = b.textContent;
-      try {
-        await navigator.clipboard.writeText(el.value);
-      } catch {
-        el.select();
-        try { document.execCommand('copy'); } catch { b.textContent = t('Error'); setTimeout(() => { b.textContent = antes; }, 1500); return; }
-      }
-      b.textContent = t('Copiado');
-      setTimeout(() => { b.textContent = antes; }, 1500);
-    });
-  });
 }
 
 // Punto de entrada de la sección: cada vista tiene su cableado. La avanzada es el
 // formulario de siempre; la simple, un subconjunto que no comparte casi ningún campo.
 function wireAgent(content) {
+  wireKeyAndCopy(content);
   if (content.querySelector('#appset-simple-model')) return wireAgentSimple(content);
   return wireAgentAdvanced(content);
 }

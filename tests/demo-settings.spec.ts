@@ -96,3 +96,25 @@ test('un token del gateway con otra base URL se repara al cargar', async ({ page
   expect(await leer(page, 'ai_vision_model')).toBe('bookreader-vision');
   await expect(page.locator('.appset-demo-on')).toBeVisible();
 });
+
+// La fila de la API key lleva ojo + copiar en las dos vistas: en password a secas la
+// key era invisible e incopiable, y quien la recibe pegada (un token de demo, por
+// ejemplo) no puede verificarla ni llevarla a otro dispositivo.
+test('el ojo revela y oculta la API key, y hay botón de copiar', async ({ page }) => {
+  await seed(page, { ai_base_url: NAN, ai_key: 'sk-mi-key-secreta-123', ai_model: 'm1' });
+  await abrirAgente(page);
+  const key = page.locator('#appset-key');
+  await expect(key).toHaveValue('sk-mi-key-secreta-123');
+  await expect(key).toHaveAttribute('type', 'password');
+
+  await page.locator('.appset-key-eye').click();
+  await expect(key).toHaveAttribute('type', 'text');
+  await page.locator('.appset-key-eye').click();
+  await expect(key).toHaveAttribute('type', 'password');
+
+  // Copiar existe y funciona (el portapapeles se rellena con lo del campo).
+  await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.locator('#appset-key + .appset-key-eye ~ .appset-copy, .appset-key-row .appset-copy').first().click();
+  const clip = await page.evaluate(() => navigator.clipboard.readText());
+  expect(clip).toBe('sk-mi-key-secreta-123');
+});

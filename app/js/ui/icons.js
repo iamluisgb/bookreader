@@ -47,6 +47,8 @@ const ICONS = {
   undo: '<polyline points="8.5 6.5 4.5 10.5 8.5 14.5"/><path d="M4.5 10.5h9a5 5 0 0 1 0 10H9"/>',
   // Suspender una tarjeta: ojo tachado.
   'eye-off': '<path d="M4 12s3.2-5 8-5c1.2 0 2.3.3 3.2.8"/><path d="M19.4 9.4c.4.5.6 1 .6 1.1v1.5s-3.2 5-8 5c-1.3 0-2.4-.4-3.4-.9"/><circle cx="12" cy="12" r="2.4"/><line x1="4.5" y1="19.5" x2="19.5" y2="4.5"/>',
+  // Ver la API key en Ajustes (estado revelado → eye-off).
+  eye: '<path d="M4 12s3.2-5 8-5 8 5 8 5-3.2 5-8 5-8-5-8-5Z"/><circle cx="12" cy="12" r="2.4"/>',
   // Aviso (leech, avisos discretos): triángulo con exclamación.
   warning: '<path d="M12 4.5 21 19.5H3L12 4.5Z"/><line x1="12" y1="10" x2="12" y2="14.5"/><circle cx="12" cy="17" r="0.9" fill="currentColor" stroke="none"/>',
   // Engranaje geométrico de 8 dientes (dientes definidos, sin las curvas
