@@ -1235,6 +1235,27 @@ existir para que la feature se entienda, el bug probablemente sea de la feature.
 
 ---
 
+### P31 — Análisis con historia: escope y rangos · señal-driven · `S`
+
+**Seguimiento de P25** (el registro ya guarda y sincroniza ~400 días; la pantalla enseña máximo
+30). No es un panel de filtros: el rango sigue siendo el ÚNICO interruptor, y lo que se añade es
+escope cuando los listados crecen. Orden de llegada según duela, no según calendario:
+
+1. **Tope en «Por libro»** (lo primero, y llega con biblioteca grande, no con tiempo): el desglose
+   va ordenado por tiempo pero sin tope — 40 libros y la tarjeta no acaba. Cap + «ver todos».
+2. **Rango «Este año»/«Todo»**: cuando 30 días deje de responder «¿cuánto he leído en total?».
+   Barato de añadir salvo la gráfica: 400 columnas diarias no caben — agregar por semana.
+3. **Filtro por libro como escope, no como barra**: «¿cuánto llevo este mes en *este* libro?».
+   Contextual > constante: cada fila de «Por libro» clicable y escope el análisis al libro dentro
+   del rango activo, con salida clara para volver al total.
+
+**Lo que NO es esta épica:** comparativas (esta semana vs. la anterior), heatmaps, filtro por
+estantería o formato — responden preguntas que nadie se hace al abrir la pantalla, y añaden justo
+el ruido que P25 evita. Antes de implementar cualquiera de los tres puntos, mirar el
+`usage-log` (P30·F5): si nadie llega a «Mes», el año no lo pide nadie.
+
+---
+
 ## 🎓 Aprendizaje basado en evidencia
 
 > **Contexto (2026-07-27).** Revisión de la literatura de tutoría y aprendizaje. El hallazgo que
