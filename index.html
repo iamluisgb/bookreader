@@ -232,8 +232,17 @@
   .values .seal span { color: var(--accent-bright); }
 
   /* ---- "Y además" + FAQ ---- */
-  .etc { font-size: 15px; color: var(--ink-soft); max-width: 60ch; margin: 0 auto; }
-  .etc b { color: var(--ink); font-weight: 600; }
+  /* ---- What's in the box (P30 · F5): inventario por momento de lectura.
+       Regla: una feature entra aquí y también en es/index.html (y en la guía in-app) o en ninguna. ---- */
+  .box-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 22px; max-width: 920px; margin: clamp(36px, 5vh, 52px) auto 0; text-align: left; }
+  .box-group { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 20px 22px 22px; }
+  .box-group h3 { margin: 0 0 10px; font: 600 11.5px var(--sans); letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); }
+  .box-group ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 7px; }
+  .box-group li { font-size: 14.5px; color: var(--ink-soft); line-height: 1.5; padding-left: 21px; position: relative; }
+  .box-group li b { color: var(--ink); font-weight: 600; }
+  .box-group li::before { content: ""; position: absolute; left: 0; top: 7.5px; width: 10px; height: 10px; border-radius: 50%; background: var(--accent-soft); box-shadow: inset 0 0 0 2px var(--accent-bright); }
+  @media (max-width: 720px) { .box-grid { grid-template-columns: 1fr; } }
+
   .faq { max-width: 720px; margin: clamp(40px, 6vh, 60px) auto 0; text-align: left; }
   .faq details { border-top: 1px solid var(--line); }
   .faq details:last-of-type { border-bottom: 1px solid var(--line); }
@@ -424,11 +433,53 @@ if (location.hostname === 'bookreader.raiatech.com') {
   </div>
 </section>
 
-<!-- Y además + FAQ -->
+<!-- What's in the box + FAQ -->
 <section class="beat alt">
   <div class="wrap">
     <div class="beat-copy">
-      <p class="etc"><b>And also:</b> highlights and notes, in-book search, bookmarks, pages or scroll, three reading themes, Anki and Markdown export, and it works offline.</p>
+      <h2>Everything in the box.</h2>
+      <p class="support">The whole toolkit, grouped by the moment you need it — nothing buried in menus.</p>
+    </div>
+    <div class="box-grid">
+      <div class="box-group">
+        <h3>While you read</h3>
+        <ul>
+          <li><b>Immersive mode</b>, page by page or continuous scroll.</li>
+          <li><b>In-book search</b>, bookmarks, highlights & notes.</li>
+          <li>Three reading themes, paper tones, <b>brightness & warm light</b>.</li>
+          <li>Typography tuned your way: font, size, columns, line height.</li>
+          <li>Remaining <b>reading time</b>, per chapter and per book.</li>
+        </ul>
+      </div>
+      <div class="box-group">
+        <h3>When something doesn't click</h3>
+        <ul>
+          <li><b>Ask the agent</b>: it knows the whole book and your reading goal.</li>
+          <li>Select a passage: «<b>Explain this</b>», «Why it matters», «With numbers».</li>
+          <li><b>Zone</b>: circle a figure or equation, get it explained (PDF).</li>
+          <li>Every answer <b>cites its page</b> — tap and verify.</li>
+          <li><b>Feynman mode</b>: you explain it, the book checks you.</li>
+        </ul>
+      </div>
+      <div class="box-group">
+        <h3>To make it stick</h3>
+        <ul>
+          <li><b>Flashcards</b> from the book, with spaced repetition.</li>
+          <li><b>Study mode</b> with streaks, across books and shelves.</li>
+          <li>A recall question when you <b>finish each chapter</b>.</li>
+          <li>Notebook templates; export to <b>Anki & Markdown</b>.</li>
+          <li>An honest <b>analysis</b> of what you really read.</li>
+        </ul>
+      </div>
+      <div class="box-group">
+        <h3>Offline & yours</h3>
+        <ul>
+          <li><b>Prepare for offline</b>: read and ask the book on the plane.</li>
+          <li>Installable <b>PWA</b> — reading, highlighting, reviewing without connection.</li>
+          <li>Sync between devices via <b>your own Google Drive</b>.</li>
+          <li><b>Full backup</b>, export anytime. No account, ever.</li>
+        </ul>
+      </div>
     </div>
     <div class="faq">
       <details>

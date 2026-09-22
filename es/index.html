@@ -226,8 +226,17 @@
   .values .seal span { color: var(--accent-bright); }
 
   /* ---- "Y además" + FAQ ---- */
-  .etc { font-size: 15px; color: var(--ink-soft); max-width: 60ch; margin: 0 auto; }
-  .etc b { color: var(--ink); font-weight: 600; }
+  /* ---- Qué trae la caja (P30 · F5): inventario por momento de lectura.
+       Regla: una feature entra aquí y también en index.html (y en la guía in-app) o en ninguna. ---- */
+  .box-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 22px; max-width: 920px; margin: clamp(36px, 5vh, 52px) auto 0; text-align: left; }
+  .box-group { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 20px 22px 22px; }
+  .box-group h3 { margin: 0 0 10px; font: 600 11.5px var(--sans); letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); }
+  .box-group ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 7px; }
+  .box-group li { font-size: 14.5px; color: var(--ink-soft); line-height: 1.5; padding-left: 21px; position: relative; }
+  .box-group li b { color: var(--ink); font-weight: 600; }
+  .box-group li::before { content: ""; position: absolute; left: 0; top: 7.5px; width: 10px; height: 10px; border-radius: 50%; background: var(--accent-soft); box-shadow: inset 0 0 0 2px var(--accent-bright); }
+  @media (max-width: 720px) { .box-grid { grid-template-columns: 1fr; } }
+
   .faq { max-width: 720px; margin: clamp(40px, 6vh, 60px) auto 0; text-align: left; }
   .faq details { border-top: 1px solid var(--line); }
   .faq details:last-of-type { border-bottom: 1px solid var(--line); }
@@ -418,11 +427,53 @@ if (location.hostname === 'bookreader.raiatech.com') {
   </div>
 </section>
 
-<!-- Y además + FAQ -->
+<!-- Qué trae la caja + FAQ -->
 <section class="beat alt">
   <div class="wrap">
     <div class="beat-copy">
-      <p class="etc"><b>Y además:</b> subrayados y notas, búsqueda en el libro, marcadores, páginas o scroll, tres temas de lectura, export a Anki y Markdown, y funciona sin conexión.</p>
+      <h2>Todo lo que trae.</h2>
+      <p class="support">Las herramientas completas, agrupadas por el momento en que las necesitas — nada enterrado en menús.</p>
+    </div>
+    <div class="box-grid">
+      <div class="box-group">
+        <h3>Mientras lees</h3>
+        <ul>
+          <li><b>Modo inmersivo</b>, a páginas o scroll continuo.</li>
+          <li><b>Búsqueda en el libro</b>, marcadores, subrayados y notas.</li>
+          <li>Tres temas de lectura, tonos de papel, <b>brillo y luz cálida</b>.</li>
+          <li>Tipografía a tu gusto: fuente, tamaño, columnas, interlineado.</li>
+          <li><b>Tiempo de lectura</b> restante, por capítulo y por libro.</li>
+        </ul>
+      </div>
+      <div class="box-group">
+        <h3>Cuando algo no encaja</h3>
+        <ul>
+          <li><b>Pregunta al agente</b>: se sabe el libro entero y tu objetivo de lectura.</li>
+          <li>Selecciona un pasaje: «<b>Explícame</b>», «Por qué importa», «Con números».</li>
+          <li><b>Zona</b>: rodea una figura o ecuación y te la explica (PDF).</li>
+          <li>Cada respuesta <b>cita su página</b> — un toque y la verificas.</li>
+          <li><b>Modo Feynman</b>: tú lo explicas, el libro te contrasta.</li>
+        </ul>
+      </div>
+      <div class="box-group">
+        <h3>Para que se quede</h3>
+        <ul>
+          <li><b>Flashcards</b> generadas del libro, con repetición espaciada.</li>
+          <li><b>Modo Estudiar</b> con racha, por libro y por estantería.</li>
+          <li>Una pregunta de repaso al <b>terminar cada capítulo</b>.</li>
+          <li>Plantillas de libreta; export a <b>Anki y Markdown</b>.</li>
+          <li>Un <b>análisis</b> honesto de lo que leíste de verdad.</li>
+        </ul>
+      </div>
+      <div class="box-group">
+        <h3>Sin conexión y tuyo</h3>
+        <ul>
+          <li><b>Prepáralo para sin conexión</b>: leer y preguntar al libro en el avión.</li>
+          <li><b>PWA instalable</b> — leer, subrayar y repasar sin red.</li>
+          <li>Sync entre dispositivos con <b>tu propio Google Drive</b>.</li>
+          <li><b>Backup completo</b>, exportable cuando quieras. Sin cuenta, nunca la habrá.</li>
+        </ul>
+      </div>
     </div>
     <div class="faq">
       <details>

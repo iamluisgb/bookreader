@@ -1157,6 +1157,74 @@ demanda de lo otro, es otra épica y otra conversación sobre privacidad.
 
 ---
 
+### P30 — Descubrimiento de features: el producto que no se ve · `M`
+
+**El caso.** La app es deliberadamente minimalista (header de 4 iconos, footer de navegación) y casi
+toda la superficie funcional vive **detrás de contextos**: la barra de selección (Explícame, Por qué
+importa, Con números, Zona…), la pestaña de ajustes (luz cálida, brillo, papel, columnas), el panel
+del agente (objetivos, plantillas, offline, sync). Un usuario nuevo que no seleccione texto ni abra
+el panel no sabe que eso existe. El coste no es estético: la feature que define el producto (el
+agente) requiere un funnel (key + objetivo) que hoy depende de que el usuario **encuentre** el panel.
+
+**Lo que ya existe y no hay que repetir.** El onboarding del agente (objetivo + plantilla,
+`#ai-onboarding` en [`panel.js`](app/js/ai/panel.js)) ya cubre el funnel crítico **una vez dentro del
+panel**; y los `data-tip` del header ya dan nombre a los 4 iconos. El hueco es lo demás: nadie lleva
+al usuario a la selección con IA, al modo sin conexión, a Pepito Grillo o al registro de análisis.
+
+**La decisión de diseño: contextual > constante.** Nada de tours bloqueantes (en un lector son
+veneno), ni tooltips persistentes, ni un quinto icono en el header — el minimalismo es parte del
+producto ([DESIGN.md](DESIGN.md)). Cuatro instrumentos, todos one-shot y descartables:
+
+1. **Hints ligados al momento natural** — un módulo [`js/ui/hints.js`](app/js/ui/hints.js) muestra
+   como máximo UN hint a la vez, en el momento en que la feature se vuelve relevante, y lo marca
+   visto en localStorage para no repetirlo jamás:
+   - Primera selección de texto → la barra de selección se estrena sola: «Puedo explicarte esto o
+     decirte por qué importa».
+   - Primer libro cerrado pasado el ~25% → «¿Sabías que puedes prepararlo para leer sin conexión?»
+     (puente a [OFF1](#off1--preguntar-al-libro-sin-cobertura--2026-09-11-m)).
+   - Primera vez que HQ&A interrumpe (IA2) → explicar de dónde viene, que no parezca un bug.
+2. **«Primeros pasos» en la estantería.** La vista de biblioteca vacía/nueva es el único sitio con
+   atención garantizada sin coste de lectura. Checklist de 3 hitos (importa un libro · configura tu
+   clave · dale objetivo a tu primer libro) que se van marcando solos; desaparece al completarse.
+3. **Guía rápida agrupada por contexto.** Un «¿qué puedo hacer aquí?» (entrada discreta en ajustes
+   generales + atajo `?`) que lista las features en tres bloques: *leyendo*, *con texto
+   seleccionado*, *con el agente*. Índice a coste de una pantalla, para quien ya está enganchado.
+4. **El mismo inventario, en la landing.** La landing (los «beats» narrativos) cuenta muy bien la
+   historia pero muy poc features: offline, Estudiar, análisis, Zona, sync viven en una línea de FAQ
+   o no salen. En la app el usuario está *leyendo* (hint contextual); en la landing está
+   *evaluando* (ahí un listado sí funciona). Se añade una sección «what's in the box» entre los
+   beats y la FAQ, agrupada **por momento de lectura y no por módulo interno** — y alimentada de la
+   misma fuente que la guía rápida (F5): una sola lista, dos ropajes, cero desincronización. No
+   toca la narrativa: los beats son la estructura de conversión y se quedan como están.
+
+**Fases:**
+- **F1 — `js/ui/hints.js`** `S`: motor de hints (cola, máximo uno activo, persistencia de vistos,
+  `data-i18n` obligatorio — P15 está hecho). Test E2E: hint de selección aparece una vez y no vuelve
+  tras recargar.
+- **F2 — Los 3 hints del momento** `S`: contenido + disparadores (arriba). Sin copys en inglés
+desincronizados: todo por el diccionario.
+- **F3 — Primeros pasos en la estantería** `M`: estados derivados de lo que ya sabe la app (hay
+  libros, hay key, hay objetivo en alguna conversación) — no contador propio que se desincronice.
+- **F4 — Guía rápida** `S`: contenido estático agrupado por contexto; primera versión sin buscar
+  dentro, solo listar.
+- **F5 — Fuente compartida: guía in-app + sección de landing** `S`: el inventario vive en un único
+  módulo (dict i18n estructurado por momento de lectura) del que beben la guía rápida (F4) y una
+  sección nueva de la landing («what's in the box», entre beats y FAQ). Regla: una feature nueva
+  entra al diccionario una vez y aparece en ambos sitios o en ninguno. Los landings por nicho
+  (P16) luego *seleccionan* de esa lista; no reescriben.
+
+**Medir antes de rediseñar (y después).** Sin telemetría no hay forma de saber qué feature «no se
+encuentra». F1 deja puesto el suelo mínimo: un registro local (localStorage, rotación acotada, nada
+sale del dispositivo) de qué controles se pulsan; se audita exportando el backup. Si algún día el
+signal pide telemetría real, es otra decisión con su propio ADR — nunca un inline en este módulo.
+
+**Lo que NO es esta épica:** rediseñar la landing ni tocar su narrativa (los beats y las landings
+por nicho son distribución, P16/P23 — la excepción es la sección-inventario de F5, que no añade
+historia) ni añadir features nuevas: aquí solo se **da a ver lo que ya hay**. Si un hint necesita
+existir para que la feature se entienda, el bug probablemente sea de la feature.
+
+---
+
 ## 🎓 Aprendizaje basado en evidencia
 
 > **Contexto (2026-07-27).** Revisión de la literatura de tutoría y aprendizaje. El hallazgo que
