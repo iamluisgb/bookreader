@@ -112,7 +112,9 @@ export async function countPdfWords() {
   return Math.round(((chars / sampled) * total) / 5);
 }
 
-function getCurrentPct() {
+// Exportado para app.js: el hint de sin conexión (P30 F2) lo consulta al cerrar el
+// libro ("primer libro cerrado pasado ~25%").
+export function getCurrentPct() {
   const bar = document.getElementById('progress-bar');
   if (!bar) return 0;
   return parseFloat(bar.style.width) || 0;

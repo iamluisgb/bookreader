@@ -6,7 +6,8 @@ import * as PdfReader from './pdf-reader.js';
 import * as Storage from './storage.js';
 import * as AiDB from './ai/db.js';
 import { hydrateIcons } from './ui/icons.js';
-import { countBookWords, countPdfWords, updateProgressDetail, WORDS_PER_LOCATION } from './progress.js';
+import { countBookWords, countPdfWords, updateProgressDetail, getCurrentPct, WORDS_PER_LOCATION } from './progress.js';
+import * as FeatureGuide from './ui/feature-guide.js';
 import * as ReadingLog from './reading-log.js';
 import { initHighlights, setupHighlights, setupPdfSelection, drawPdfHighlights, renderHighlights, applyStoredHighlights, repaintStoredHighlights, hideHighlightTooltip, pdfHighlightAt, pdfFractionalRects, pdfRectToBox, setBookMeta } from './highlights-ui.js';
 import { initBookmarkButton, updateBookmarkButton, renderBookmarks } from './bookmarks-ui.js';
@@ -24,6 +25,7 @@ import * as License from './license.js';
 import { toast } from './ai/toast.js';
 import * as Jobs from './ai/jobs.js';
 import { t, translateDom } from './i18n.js';
+import * as Hints from './ui/hints.js';
 import { prefetchVendor } from './vendor-loader.js';
 import { loadAgentCss } from './css-loader.js';
 import { restoreSheetSnap, sheetReservedPx } from './ai/sheet-height.js';
@@ -584,6 +586,13 @@ function updateFormatScopedUI() {
 async function goToLibrary({ fromRoute = false } = {}) {
   if (!fromRoute) writeRoute(null, null);   // entra en el historial: atrás vuelve aquí
   await flushProgress();                    // progreso pendiente antes de soltar el libro
+  // P30 F2: primer libro que se cierra pasado ~25% → momento natural del hint de
+  // sin conexión (el libro ya no es "acabo de empezar", aún no es "lo terminé").
+  try {
+    if (getCurrentPct() >= 25) {
+      Hints.maybeShow('offline', t('¿Vas a leer en el tren o en el avión? En el menú del agente, <b>«Preparar para sin conexión»</b> deja cacheado el libro para seguir preguntándole sin red.'));
+    }
+  } catch (e) { /* el hint nunca puede estorbar la salida a la biblioteca */ }
   EpubReader.flushLastPosition();           // y la posición, que también va con rebote
   await ReadingLog.endBook();               // y el tramo de lectura abierto (P25)
   currentBook = null;                       // ya no hay libro abierto (para el router)
@@ -1827,6 +1836,9 @@ function initNavigation() {
   document.addEventListener('keydown', (e) => {
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return;
     if (e.target.id === 'progress-container') return;   // el slider gestiona sus propias flechas
+    // P30 F4: '?' abre la guía rápida («¿qué puedo hacer aquí?»). Va ANTES del guard
+    // de modificadores: en la mayoría de teclados '?' ES Shift+'/' y si no, no llega.
+    if (e.key === '?') { FeatureGuide.toggle(); return; }
     if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
     if (e.key === 'ArrowLeft') {
       if (EpubReader.isLoaded()) EpubReader.prev();

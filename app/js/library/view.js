@@ -11,6 +11,9 @@ import { icon, brandMark } from '../ui/icons.js';
 import { t, getLang } from '../i18n.js';
 import { escapeHtml } from '../ui/escape.js';
 import { confirmBox, promptBox, alertBox, formBox } from '../ui/dialog.js';
+import * as AiDB from '../ai/db.js';
+import * as Storage from '../storage.js';
+import { track } from '../ui/usage-log.js';
 
 let host = null;                 // #library
 let onOpenBook = () => {};
@@ -224,6 +227,7 @@ export async function render() {
 
       <section class="lib-main">
         <h1 class="lib-h1">${escapeHtml(currentTitle())}</h1>
+        ${await firstStepsHtml(books)}
         ${filterChipsHtml()}
         <div class="lib-toolbar">
           <div class="lib-search-box">
@@ -503,6 +507,40 @@ function cardHtml(b) {
     </div>`;
 }
 
+// ---- Primeros pasos (P30 · F3) ---------------------------------------------
+// Checklist de onboarding en la estantería. Los estados se DERIVAN de lo que la
+// app ya sabe — no hay contador propio que se desincronice:
+//   1. hay algún libro importado (Store)
+//   2. hay clave de IA configurada (la misma entrada que lee llm.js)
+//   3. hay alguna conversación con objetivo de lectura (IDB del agente)
+// Cuando los tres están, la tarjeta ni se renderiza: ya no hay nada que enseñar.
+async function firstStepsHtml(books) {
+  const hasBooks = books.length > 0;
+  let hasKey = false;
+  try { hasKey = (Storage.get('ai_key', '') || '').trim().length > 0; } catch (e) { /* sin storage: se muestra pendiente */ }
+  let hasGoal = false;
+  try {
+    const convos = await AiDB.getAll('convos');
+    hasGoal = (convos || []).some((c) => c && c.goal);
+  } catch (e) { /* IDB no disponible: se muestra pendiente */ }
+  if (hasBooks && hasKey && hasGoal) return '';
+
+  const step = (done, label, act, cta) => `
+    <li class="lib-step${done ? ' done' : ''}">
+      <span class="lib-step-mark" aria-hidden="true">${done ? icon('check', { size: 12 }) : ''}</span>
+      <span class="lib-step-label">${escapeHtml(label)}${!done && act ? ` <button class="lib-step-go" data-act="${act}">${escapeHtml(cta)}</button>` : ''}</span>
+    </li>`;
+  return `
+    <div class="lib-steps">
+      <div class="lib-steps-head">${t('Primeros pasos')}</div>
+      <ol>
+        ${step(hasBooks, t('Importa un libro'), 'add', t('Subir archivos'))}
+        ${step(hasKey, t('Configura tu clave de IA'), 'settings', t('Abrir ajustes'))}
+        ${step(hasGoal, t('Dale un objetivo a tu primer libro'), 'openbook', t('Abrir un libro'))}
+      </ol>
+    </div>`;
+}
+
 function emptyHtml(noBooksAtAll) {
   return `<div class="lib-empty">
     <div class="lib-empty-icon">${icon('books', { size: 56 })}</div>
@@ -609,6 +647,12 @@ async function onClick(e) {
   }
 
   if (e.target.closest('[data-act="settings"]')) { onOpenSettings(); return; }
+  // P30 F3: el paso "dale un objetivo a tu primer libro" abre el libro más reciente.
+  if (e.target.closest('[data-act="openbook"]')) {
+    track('steps:go', 'openbook');
+    const b = allBooks[0];
+    if (b) { onOpenBook(b); return; }
+  }
   // Carga perezosa: el Análisis arrastra el registro de lectura, la libreta y el SRS, y
   // nada de eso hace falta para pintar la estantería (que es la pantalla de arranque).
   if (e.target.closest('[data-act="analysis"]')) {

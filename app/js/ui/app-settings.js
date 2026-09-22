@@ -8,6 +8,7 @@
 // Punto de entrada desde la estantería y desde el pie de la sidebar. Al guardar la
 // config del agente se emite 'appsettings:agent-saved' para que el panel se refresque.
 import * as LLM from '../ai/llm.js';
+import * as FeatureGuide from './feature-guide.js';
 import * as Catalog from '../ai/catalog.js';
 import { BLOCKS, allTemplates } from '../ai/templates.js';
 import * as CustomTpl from '../ai/custom-templates.js';
@@ -62,6 +63,7 @@ function ensureOverlay() {
       <div class="appset-body">
         <nav class="appset-nav">
           ${SECTIONS.map(s => `<button class="appset-nav-item" data-section="${s.id}">${icon(s.ico, { size: 16 })}<span>${s.label()}</span></button>`).join('')}
+          <button class="appset-nav-item appset-nav-guide" data-guide>${icon('sparkles', { size: 16 })}<span>${t('Guía rápida')}</span></button>
         </nav>
         <div class="appset-content"></div>
       </div>
@@ -77,6 +79,9 @@ function ensureOverlay() {
   });
 
   overlay.querySelector('.appset-nav').addEventListener('click', (e) => {
+    // P30 F4: la guía rápida no es una sección, es un overlay propio apilado encima.
+    const g = e.target.closest('[data-guide]');
+    if (g) { FeatureGuide.open(); return; }
     const b = e.target.closest('.appset-nav-item');
     if (b) selectSection(b.dataset.section);
   });

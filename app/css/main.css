@@ -1356,6 +1356,71 @@ textarea.is-recording { display: none; }
   background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center;
   padding: 20px;
 }
+
+/* ==== Hints de descubrimiento (P30 · F1/F2) ====
+   One-shot, descartables, máximo uno en pantalla. Por debajo de los modales
+   (appset 300, diálogos 3000) y por encima de la lectura. */
+.hint-pop {
+  position: fixed; left: 50%; bottom: 84px; z-index: 250;
+  transform: translate(-50%, 12px);
+  display: flex; align-items: flex-start; gap: 9px;
+  max-width: min(480px, calc(100vw - 32px));
+  padding: 12px 14px;
+  background: var(--surface-1); color: var(--text);
+  border: 1px solid var(--border); border-radius: 12px;
+  box-shadow: var(--shadow-3);
+  font-size: 13.5px; line-height: 1.5;
+  opacity: 0; visibility: hidden; pointer-events: none;
+  transition: opacity 0.25s ease, transform 0.25s ease, visibility 0s linear 0.25s;
+}
+.hint-pop.show { opacity: 1; visibility: visible; transform: translate(-50%, 0); pointer-events: auto; transition: opacity 0.25s ease, transform 0.25s ease; }
+.hint-pop-ico { color: var(--accent); flex: none; margin-top: 1px; }
+.hint-pop-text b { color: var(--text); }
+.hint-pop-close {
+  flex: none; width: 24px; height: 24px; margin: -2px -3px 0 2px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: none; border-radius: 50%; background: var(--surface-3); color: var(--text-soft);
+  cursor: pointer;
+}
+.hint-pop-close:hover { color: var(--text); }
+@media (max-width: 560px) { .hint-pop { bottom: 96px; } }
+
+/* ==== Guía rápida "¿qué puedo hacer aquí?" (P30 · F4) ====
+   Encima del overlay de ajustes (300) porque desde ahí también se abre. */
+.fguide {
+  position: fixed; inset: 0; z-index: 310;
+  background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+}
+.fguide-card {
+  position: relative;
+  background: var(--surface-1); border: 1px solid var(--border); border-radius: 16px;
+  padding: 26px 28px; width: 100%; max-width: 560px; box-shadow: var(--shadow-3);
+  max-height: calc(100vh - 40px); overflow-y: auto;
+}
+.fguide-close {
+  position: absolute; top: 14px; right: 14px;
+  width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center;
+  border: none; border-radius: 50%; background: var(--surface-3); color: var(--text-soft);
+  cursor: pointer;
+}
+.fguide-close:hover { background: var(--border); color: var(--text); }
+.fguide-h2 { font-size: 19px; font-weight: 700; margin: 0 0 18px; letter-spacing: -0.01em; }
+.fguide-group { margin-top: 16px; }
+.fguide-group h3 {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--accent); margin: 0 0 8px;
+}
+.fguide-group ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.fguide-group li {
+  font-size: 14px; color: var(--text-soft); line-height: 1.5;
+  padding-left: 16px; position: relative;
+}
+.fguide-group li::before {
+  content: ""; position: absolute; left: 2px; top: 8px;
+  width: 5px; height: 5px; border-radius: 50%; background: var(--accent);
+}
+.appset-nav-guide { margin-top: 10px; border-top: 1px solid var(--border-soft); padding-top: 12px !important; }
 /* ---- Selector de modelo (models.dev) ---- */
 .mp-card { width: min(560px, 92vw); }
 .mp-card .appset-input { margin-top: 4px; }

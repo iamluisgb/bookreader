@@ -13,6 +13,7 @@ import { loadAgentCss } from '../css-loader.js';
 import { getTemplate, objectiveTemplates, isValidField, aiWritableFields, isAiWritable, isCognitionField, ARTESANO_ID, INMERSIVA_ID } from './templates.js';
 import { icon } from '../ui/icons.js';
 import { t } from '../i18n.js';
+import * as Hints from '../ui/hints.js';
 import { escapeHtml } from '../ui/escape.js';
 import { confirmBox, promptBox } from '../ui/dialog.js';
 import * as AppSettings from '../ui/app-settings.js';
@@ -1692,6 +1693,9 @@ function onChapterChanged(label) {
 
 async function quizChapter(chapterLabel) {
   if (busy) return;
+  // P30 F2: la primera interrupción de IA2 es un momento de descubrimiento gratis —
+  // pero solo si se entiende de dónde viene, que si no parece un bug.
+  Hints.maybeShow('hqa', t('Esto es el <b>repaso del capítulo</b>: antes de avanzar, el agente te pregunta de memoria lo que acabas de leer. Responde como puedas — la conversación sigue después.'));
   const mySeq = bookSeq;   // guard: no persistir el repaso si el usuario cambia de libro
   ensureIndex();
   const passages = capPassages(Retrieval.passagesByChapter(chapterLabel), 12000);

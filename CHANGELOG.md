@@ -5,6 +5,51 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-09-22 — P30 · Descubrimiento: hints contextuales, Primeros pasos y guía rápida (F1–F5)
+
+La app es deliberadamente minimalista y muchas features viven detrás de contextos: un usuario nuevo
+que no seleccione texto ni abra el panel no sabe que existen. La landing ya muestra el inventario
+(sección *what's in the box*, commit anterior); esto es la parte in-app.
+
+**F1+F2 · Hints one-shot ([`js/ui/hints.js`](app/js/ui/hints.js)).** Máximo UN hint en pantalla,
+ligado al momento natural en que la feature se vuelve relevante, marcado visto en localStorage al
+descartarlo (no al mostrarse: una recarga no lo roba), auto-caducidad a los 20 s y cola si llega
+otro mientras hay uno activo. Los tres primeros:
+
+- **Primera selección de texto** → «puedes preguntar al agente, marcarlo, copiarlo o compartirlo»
+  (dispara al abrir la barra de selección, [`highlights-ui.js`](app/js/highlights-ui.js)).
+- **Primer libro cerrado pasado el 25%** → «Preparar para sin conexión» ([`app.js`](app/js/app.js),
+  al volver a la estantería, consultando `getCurrentPct()` — ahora exportado de
+  [`progress.js`](app/js/progress.js)).
+- **Primera interrupción de HQ&A** (IA2) → explica de dónde viene el repaso, para que no parezca
+  un bug ([`panel.js`](app/js/ai/panel.js)).
+
+**F3 · «Primeros pasos» en la estantería** ([`view.js`](app/js/library/view.js)). Checklist de 3
+hitos (importa un libro · configura tu clave · dale objetivo a tu primer libro) cuyos estados se
+**derivan del estado real** — libros en Store, `ai_key` en storage, convos con objetivo en la IDB
+del agente — sin contador propio que se desincronice. Cada paso pendiente es clicable (subir,
+ajustes, abrir el libro más reciente) y la tarjeta ni se renderiza cuando los tres están.
+
+**F4 · Guía rápida «¿qué puedes hacer aquí?»** ([`js/ui/feature-guide.js`](app/js/ui/feature-guide.js)).
+Inventario en tres bloques por momento (*leyendo / con texto seleccionado / con el agente*),
+abierto con **`?`** (fuera de inputs) o desde **Ajustes generales → Guía rápida**.
+
+**F5 · Fuente compartida.** La taxonomía de la guía es la misma que la sección de la landing; la
+regla (*una feature entra en ambas o en ninguna*) vive en la cabecera de
+[`feature-guide.js`](app/js/ui/feature-guide.js) y en el CSS de ambas landings. Sin build, la
+landing sigue siendo HTML estático: la sincronización es por convención, no por import.
+
+**Medición local (suelo de la épica).** [`js/ui/usage-log.js`](app/js/ui/usage-log.js) registra en
+localStorage (rotación de 400 entradas, nada sale del dispositivo) los eventos de descubrimiento:
+hints mostrados/descartados, guía abierta, pasos completados. Para auditar localmente; telemetría
+real sería otra decisión con su propio ADR.
+
+SW: los tres módulos nuevos van al precache (v125) — lo vigila `sw-precache.spec.ts`. Tests E2E en
+[`tests/p30-discovery.spec.ts`](tests/p30-discovery.spec.ts): one-shot del hint de selección tras
+recargar, guía con `?`, y Primeros pasos derivándose del estado real y desapareciendo al completar.
+
+---
+
 ## 2026-09-21 — El sync se puede diagnosticar (badge con motivo + volcado en Ajustes)
 
 "Abro la app en la tablet, pasan minutos y no sincroniza lo del PC" — y no había forma de saber

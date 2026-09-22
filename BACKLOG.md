@@ -1157,7 +1157,17 @@ demanda de lo otro, es otra épica y otra conversación sobre privacidad.
 
 ---
 
-### P30 — Descubrimiento de features: el producto que no se ve · `M`
+### P30 — Descubrimiento de features: el producto que no se ve · **✓ (2026-09-22)** `M`
+
+**Hecho (ver CHANGELOG):** landing con la sección *what's in the box* (EN+ES, commit previo);
+en la app, motor de hints one-shot ([`js/ui/hints.js`](app/js/ui/hints.js)) con los 3 hints de
+momento, «Primeros pasos» derivado de estado real en la estantería, guía rápida con `?` y desde
+ajustes generales, y el registro local de uso como suelo de medición. El epicentro — el funnel
+key+objetivo — ya lo cubría el onboarding del panel, que no se toca.
+
+**Pendiente (señal, no calendario):** si la auditoría local del `usage-log` muestra hints
+descartados al instante o pasos que nadie completa, se itera el copy; los landings por nicho
+(P16) seleccionarán de esta lista cuando existan.
 
 **El caso.** La app es deliberadamente minimalista (header de 4 iconos, footer de navegación) y casi
 toda la superficie funcional vive **detrás de contextos**: la barra de selección (Explícame, Por qué

@@ -14,6 +14,7 @@ import { dehyphenate } from './ui/text.js';
 import { alertBox } from './ui/dialog.js';
 import { shareQuote } from './share-card.js';
 import { toast } from './ai/toast.js';
+import * as Hints from './ui/hints.js';
 import { whenLabel, fullWhen } from './ui/when.js';
 import { toScreen, anchorRect } from './ui/frame-rect.js';
 import * as PdfTextSelect from './pdf-text-select.js';
@@ -288,6 +289,10 @@ function wireToolbar(ed, getText) {
 }
 
 function showHighlightTooltip(cfiRange, text, rect) {
+  // P30 F2: la barra de selección se estrena sola la primera vez que aparece — el
+  // momento exacto en que "seleccionar texto" deja de ser solo subrayar.
+  Hints.maybeShow('sel-actions', t('Con un texto seleccionado puedes <b>preguntar al agente</b>, marcarlo, copiarlo o compartirlo. Prueba «Explícame» o «Por qué importa».'));
+
   const tooltip = document.getElementById('highlight-tooltip');
 
   // Ya hemos borrado la selección nativa (finalizeSelection), así que no hay
