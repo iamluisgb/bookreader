@@ -5,6 +5,20 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-09-22 — La key de la demo se ve y se copia sin desplegar nada
+
+El traspaso de la demo (F3.1) ya enseñaba la API key con su botón de copiar, pero a dos pliegues de
+profundidad: abrir el panel de traspaso **y además** desplegar «O configurarlo a mano». Para quien
+solo quiere ver la key y llevarla a otro dispositivo, un pliegue de más era el mismo que no
+encontrarla.
+
+Ahora los tres campos —Base URL, API key, Modelo— salen directamente en el panel de traspaso, cada
+uno con su Copiar. La advertencia no cambia: la key de la demo no sirve sola, solo funciona contra
+esa Base URL (pegarla contra otro proveedor es el 401 de siempre), así que la fila nunca viaja sin
+su texto al lado.
+
+---
+
 ## 2026-09-22 — P30 · Descubrimiento: hints contextuales, Primeros pasos y guía rápida (F1–F5)
 
 La app es deliberadamente minimalista y muchas features viven detrás de contextos: un usuario nuevo

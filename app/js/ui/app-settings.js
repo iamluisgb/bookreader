@@ -231,12 +231,12 @@ function demoBlockHtml() {
     </div>`;
 }
 
-// Traspaso de la demo a otro dispositivo (F3.1). El token sigue SIN enseñarse como
-// "API key" —pegarlo suelto contra otro proveedor es el 401 de siempre—: lo que se
-// ofrece es un enlace que lleva la configuración entera (base URL + token + alias).
-// Sin esto la demo se queda encerrada donde se emitió: pedir otra desde el móvil da
-// `demo_already_granted`, porque el gateway cuenta 1 demo por RED y día y el móvil
-// está en la misma wifi que el portátil.
+// Traspaso de la demo a otro dispositivo (F3.1). El token se enseña como "API key" copiable
+// —es la única forma de llevarse la demo a otro dispositivo a mano— pero siempre JUNTO a su
+// Base URL: pegarlo suelto contra otro proveedor es el 401 de siempre, así que la fila nunca
+// viaja sin la advertencia. Sin esto la demo se queda encerrada donde se emitió: pedir otra
+// desde el móvil da `demo_already_granted`, porque el gateway cuenta 1 demo por RED y día y
+// el móvil está en la misma wifi que el portátil.
 function demoTransferHtml() {
   if (!LLM.canTransferDemo()) return '';
   const manual = [
@@ -262,11 +262,8 @@ function demoTransferHtml() {
         </div>
         <button type="button" id="appset-xfer-share" class="appset-discover appset-xfer-share" hidden>${icon('share', { size: 13 })} ${t('Compartir…')}</button>
         <p class="appset-model-hint" id="appset-xfer-hint" hidden></p>
-        <details class="appset-xfer-manual">
-          <summary>${t('O configurarlo a mano')}</summary>
-          <p class="appset-muted">${t('Los tres campos van juntos, en Ajustes → Agente → Opciones avanzadas del otro dispositivo. El token por su cuenta no sirve: solo funciona contra esta Base URL.')}</p>
-          ${manual}
-        </details>
+        <p class="appset-muted appset-xfer-manual-intro">${t('O cópialo a mano: la API key no sirve sola — solo funciona contra esta Base URL. Los tres campos van juntos, en Ajustes → Agente del otro dispositivo.')}</p>
+        ${manual}
         <p class="appset-privacy">${icon('shield', { size: 13 })} ${t('El enlace lleva tu token: quien lo tenga puede gastarte el cupo. Mándalo solo a tus dispositivos.')}</p>
       </div>
     </div>`;

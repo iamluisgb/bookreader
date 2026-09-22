@@ -150,7 +150,6 @@ test('el modo manual da los tres campos, no solo el token', async ({ page }) => 
   await stubQuota(page, { remaining: 12, quota: 30, model: 'bookreader-fast' });
   await seed(page, { ai_base_url: GATEWAY, ai_key: TOKEN, ai_model: 'bookreader-fast' });
   await abrirTraspaso(page);
-  await page.locator('.appset-xfer-manual > summary').click();
 
   await expect(page.locator('#appset-xfer-base')).toHaveValue(GATEWAY);
   await expect(page.locator('#appset-xfer-token')).toHaveValue(TOKEN);

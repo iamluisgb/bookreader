@@ -962,12 +962,7 @@ body.has-taskchip .ai-taskchip.is-study { bottom: 74px; }
 }
 .appset-xfer-panel .appset-privacy { margin-top: 12px; }
 .appset-xfer-share { width: 100%; margin-top: 8px; }
-.appset-xfer-manual { margin-top: 12px; }
-.appset-xfer-manual > summary {
-  cursor: pointer; font-size: 12px; font-weight: 500; color: var(--text-soft);
-}
-.appset-xfer-manual > summary:hover { color: var(--accent); }
-.appset-xfer-manual .appset-muted { margin: 8px 0 0; font-size: 12px; }
+.appset-xfer-manual-intro { margin: 12px 0 0; font-size: 12px; }
 
 /* Alta/baja de un proveedor propio: aparece bajo la Base URL solo cuando hay algo
    que hacer con ella (guardarla con nombre, o quitarla de la lista). */
