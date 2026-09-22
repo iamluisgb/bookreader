@@ -31,11 +31,19 @@ export const LIBRARY_FILE = 'library.json';
 export const COVERS_FILE = 'covers.json';
 export const SCHEMA_VERSION = 1;
 
-// Ancho de la miniatura que viaja. Las tarjetas de la rejilla se pintan a ~160px
-// de ancho; guardar la portada original (a veces 1400px y 400 KB) multiplicaba
-// por cincuenta el tamaño de covers.json sin que se notara en pantalla.
-const THUMB_WIDTH = 200;
-const THUMB_QUALITY = 0.72;
+// Ancho de la miniatura que viaja. La rejilla pinta las tarjetas de ~160 a ~300 px de ancho
+// (minmax(160px,1fr)) y en pantallas retina eso son ~600 px físicos: a 200 la miniatura se
+// ve pixelada en cuanto la ventana pasa de estrecha (era el ancho de una rejilla de móvil).
+// Guardar la portada original (a veces 1400px y 400 KB) multiplicaría por cien el tamaño de
+// covers.json; a 480/0.80 salen ~40-60 KB por libro — el punto donde en pantalla no se
+// distingue de la original.
+const THUMB_WIDTH = 480;
+const THUMB_QUALITY = 0.80;
+// Versión de la caché: coverThumb de la era 200px no sirve — pero solo se puede regenerar
+// donde sigue la portada original (en un dispositivo fantasma el thumb PISÓ cover, ver
+// applyCovers, y no hay de dónde rascar). El prefijo invalida la caché vieja una vez y
+// evita re-encodear en cada ciclo.
+const THUMB_PREFIX = 'v2|';
 
 // Campos que solo conoce quien tiene el fichero: no se pierden porque el otro
 // lado gane el LWW por haber tocado el progreso (ver mergeMaps · monotone).
@@ -72,13 +80,14 @@ export function makeThumb(dataUrl, width = THUMB_WIDTH) {
 // se re-encodaría cada portada en CADA ciclo de sync (decodificar + pintar +
 // exportar, por libro, cada 90 segundos).
 async function thumbFor(record) {
-  if (record.coverThumb) return record.coverThumb;
+  const cached = record.coverThumb;
+  if (typeof cached === 'string' && cached.startsWith(THUMB_PREFIX)) return cached.slice(THUMB_PREFIX.length);
   if (!record.cover) return null;
   const thumb = await makeThumb(record.cover);
   if (thumb) {
     // stamp:false — la miniatura es un detalle de representación, no un cambio
     // del libro: no debe bumpear updatedAt ni ganar merges ajenos.
-    await LibStore.putBook({ ...record, coverThumb: thumb }, { stamp: false });
+    await LibStore.putBook({ ...record, coverThumb: THUMB_PREFIX + thumb }, { stamp: false });
   }
   return thumb;
 }
@@ -185,17 +194,23 @@ export async function applyLibrary(remote) {
   return changed;
 }
 
-// Portadas de libros que aquí no tienen ninguna (fichas fantasma recién
-// llegadas). Unión pura: la portada es inmutable y va indexada por el hash del
-// libro, así que no hay conflicto posible ni hace falta LWW.
+// Portadas de libros que aquí no tienen ninguna (fichas fantasma recién llegadas) — y las
+// que tienen la miniatura de la GENERACIÓN VIEJA (200px): la portada viaja como thumb y ha
+// habido dos generaciones, así que un dispositivo fantasma de la v1 debe adoptar la v2
+// aunque ya tenga "cover". La comparación por tamaño basta y es gratis: v1 son ~6-10 KB,
+// v2 ~40-60 KB, y la portada original nunca es más pequeña que la miniatura que la
+// representa. Unión pura: va indexada por el hash del libro, no hay conflicto ni LWW.
 export async function applyCovers(remote) {
   const covers = (remote && remote.covers) || {};
   if (!Object.keys(covers).length) return 0;
   const books = await LibStore.getAllRecords();
   let changed = 0;
   for (const b of books) {
-    if (!b || b.deleted || b.cover || !covers[b.id]) continue;
-    await LibStore.putBook({ ...b, cover: covers[b.id], coverThumb: covers[b.id] }, { stamp: false });
+    if (!b || b.deleted || !covers[b.id]) continue;
+    const remoteCover = covers[b.id];
+    if (b.cover === remoteCover) continue;
+    if (b.cover && remoteCover.length <= b.cover.length * 2) continue;
+    await LibStore.putBook({ ...b, cover: remoteCover, coverThumb: THUMB_PREFIX + remoteCover }, { stamp: false });
     changed++;
   }
   return changed;

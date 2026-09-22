@@ -5,6 +5,31 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ---
 
+## 2026-09-22 — Las portadas dejan de verse pixeladas en la estantería
+
+Las tarjetas de la estantería se veían pixeladas en pantallas retina. La causa estaba en la
+miniatura que viaja en `covers.json`: **200 px de ancho, JPEG 0.72** — pensada para una rejilla de
+móvil (~160 px), inservible cuando la tarjeta pasa de 200 px CSS y el DPR la duplica. Encima, en
+los dispositivos donde el libro es ficha fantasma esa miniatura había **pisado el campo `cover`**,
+así que no quedaba resolución original de donde rascar.
+
+Tres cambios:
+
+- La miniatura pasa a **480 px / 0.80** (~40-60 KB por libro; la original a veces son 400 KB —
+  covers.json sigue siendo un fichero pequeño). La caché `coverThumb` se versiona (`v2|`) para que
+  los thumbs de la era 200px se regeneren una vez en los dispositivos que aún tienen la portada
+  original, y no vuelvan a re-encodear en cada ciclo.
+- `applyCovers` ya no solo rellena portadas ausentes: un dispositivo fantasma que tenga el thumb
+  de la generación vieja **adopta el mejorado** del otro dispositivo (comparación por tamaño: v1
+  son ~8 KB, v2 ~50 KB, la original nunca es más pequeña que su miniatura).
+- La portada de los PDF se renderiza a 800 px y no a 400 (mismo motivo).
+
+Lo que no se puede arreglar sin el fichero: un fantasma de la v1 que nunca sincronice con un
+servidor del thumb mejorado se queda a 200px hasta abrir el libro (la portada se recalcula al
+abrir, desde el fichero de verdad).
+
+---
+
 ## 2026-09-22 — La key de la demo se ve y se copia sin desplegar nada
 
 El traspaso de la demo (F3.1) ya enseñaba la API key con su botón de copiar, pero a dos pliegues de

@@ -1527,8 +1527,10 @@ export function revealRegion(page, rect, reservedBottomPx = 0) {
 }
 
 // Portada para la estantería: renderiza la PÁGINA 1 en un canvas propio (fuera de pantalla)
-// y devuelve un data URL JPEG reescalado (lado largo ≈ maxPx). '' si no se puede.
-export async function renderCoverDataUrl(maxPx = 400) {
+// y devuelve un data URL JPEG reescalado (lado largo ≈ maxPx). 800 y no 400: la tarjeta de la
+// rejilla pasa de 200 a 300+ px CSS en pantallas retina — a 400 se veia pixelada igual que las
+// miniaturas del sync. '' si no se puede.
+export async function renderCoverDataUrl(maxPx = 800) {
   if (!pdfDoc) return '';
   try {
     const page = await pdfDoc.getPage(1);

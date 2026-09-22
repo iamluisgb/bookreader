@@ -190,3 +190,38 @@ test('getAllBooks no carga los binarios en memoria', async ({ page }) => {
   expect(out.hasFileEnListado).toBe(true);
   expect(out.rawTraeFichero).toBe(true);
 });
+
+// La miniatura que viaja en covers.json tiene que aguantar la rejilla en retina:
+// ~300 px CSS de tarjeta × 2 de DPR ≈ 600 px físicos. El ancho viejo (200) se veía
+// pixelado en cuanto la ventana pasaba de estrecha — es el motivo del bump a 480.
+test('makeThumb reescala la portada al ancho de miniatura actual, sin pasarse', async ({ page }) => {
+  await page.goto('/');
+  const out = await page.evaluate(async () => {
+    const { makeThumb } = await import('/js/sync/library-sync.js');
+    // Portada "grande": 1000 px de ancho, con ruido para que el JPEG no colapse a nada.
+    const c = document.createElement('canvas');
+    c.width = 1000; c.height = 1400;
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, 1000, 1400);
+    for (let i = 0; i < 4000; i++) {
+      ctx.fillStyle = `hsl(${i % 360}, 50%, 50%)`;
+      ctx.fillRect((i * 37) % 1000, (i * 53) % 1400, 3, 3);
+    }
+    const grande = c.toDataURL('image/png');
+    const thumb = await makeThumb(grande);
+    const img = new Image();
+    await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = thumb; });
+    // Y una mini ya: pasa casi tal cual (nada que reescalar).
+    c.width = 120; c.height = 168;
+    const pequena = c.toDataURL('image/png');
+    const t2 = await makeThumb(pequena);
+    const img2 = new Image();
+    await new Promise((res, rej) => { img2.onload = res; img2.onerror = rej; img2.src = t2; });
+    return { w: img.naturalWidth, h: img.naturalHeight, w2: img2.naturalWidth, len: grande.length };
+  });
+
+  expect(out.w).toBeLessThanOrEqual(480);
+  expect(out.w).toBeGreaterThan(400);   // ni de coña 200: eso era lo pixelado
+  expect(out.h).toBe(672);              // 1400 × (480/1000), proporción intacta
+  expect(out.w2).toBe(120);             // la pequeña no se agranda
+});
