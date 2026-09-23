@@ -8,7 +8,7 @@
     "bookreader-mcp": "./server.mjs"
   },
   "scripts": {
-    "test": "node --test test/",
+    "test": "node --test test/*.test.mjs",
     "start": "node server.mjs"
   },
   "author": "iamluisgb",

@@ -25,7 +25,8 @@
     "eval:score": "node evals/check.mjs && node evals/judge.mjs && node evals/report.mjs",
     "eval:smoke": "EVAL_SMOKE=1 playwright test --grep @eval && npm run eval:score",
     "eval": "npm run eval:gen && npm run eval:score",
-    "lint": "eslint app/js app/sw.js sw.js",
+    "lint": "eslint app/js app/sw.js sw.js mcp",
+    "test:mcp": "npm --prefix mcp test",
     "format": "prettier --write \"**/*.{js,css,html,json,md}\"",
     "format:check": "prettier --check \"**/*.{js,css,html,json,md}\""
   },
