@@ -1,5 +1,6 @@
-// tools.mjs — la superficie que ve el agente externo (F1: cuatro tools sobre la fuente de
-// backup). La definición y la ejecución viven juntas a propósito: el esquema y lo que de verdad
+// tools.mjs — la superficie que ve el agente externo. Cuatro tools sobre cualquiera de las
+// dos fuentes, más `reading_stats`, que solo existe si la fuente lleva el registro de lectura
+// (F2). La definición y la ejecución viven juntas a propósito: el esquema y lo que de verdad
 // devuelve la tool se leen en el mismo sitio.
 //
 // Reglas de la casa:
@@ -9,6 +10,7 @@
 //   - El payload va como JSON en un bloque de texto. Un solo formato, sin sorpresas.
 
 import { ToolError, SourceError } from './errors.mjs';
+import { aggregateReading, RANGES, GROUP_BY } from './stats.mjs';
 
 const LIMIT_DEFAULT = 50;
 const LIMIT_MAX = 500;
@@ -239,25 +241,61 @@ const SEARCH_HIGHLIGHTS = {
   },
 };
 
+const READING_STATS = {
+  name: 'reading_stats',
+  title: 'Estadísticas de lectura',
+  description:
+    'Cuánto se ha leído de verdad en un rango: minutos y palabras de lectura a ritmo ' +
+    'plausible (los saltos y el tiempo con el libro abierto sin leer no cuentan). Suma los ' +
+    'dispositivos del lector, así que no hay desglose por dispositivo a propósito. ' +
+    'Disponible solo con la fuente de Drive: el backup no lleva el registro de lectura.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      range: {
+        type: 'string',
+        enum: RANGES,
+        description: 'Ventana: today, 7d, 30d, 90d, 365d o all (7d por defecto).',
+      },
+      bookId: { type: 'string', description: 'Opcional: limita las cuentas a un libro.' },
+      groupBy: {
+        type: 'string',
+        enum: GROUP_BY,
+        description: 'Agrupación del desglose temporal: day, week o month (day por defecto).',
+      },
+    },
+    additionalProperties: false,
+  },
+  async run(source, args) {
+    const range = optionalString(args, 'range') || '7d';
+    const bookId = optionalString(args, 'bookId');
+    const groupBy = optionalString(args, 'groupBy') || 'day';
+    const titles = await source.titles();
+    const days = await source.readingDays();
+    return { source: source.kind, ...aggregateReading(days, { range, bookId, groupBy, titleOf: (id) => titles[id] || null }) };
+  },
+};
+
 /** Todas las definiciones, en el orden en que se anuncian. */
-export const ALL_TOOLS = [LIST_BOOKS, GET_HIGHLIGHTS, GET_NOTES, SEARCH_HIGHLIGHTS];
+export const ALL_TOOLS = [LIST_BOOKS, GET_HIGHLIGHTS, GET_NOTES, SEARCH_HIGHLIGHTS, READING_STATS];
 
 /**
- * Lo que se anuncia por MCP. (`source` aún no filtra nada: esa puerta llega con las fuentes que
- * no pueden responderlo todo.)
+ * Lo que se anuncia por MCP para una fuente concreta. `reading_stats` NO se anuncia si la
+ * fuente no lleva el registro de lectura: una tool que siempre responde «no hay datos» es
+ * peor que una tool que no existe — el modelo no la llama.
  */
-export function toolsFor() {
-  return ALL_TOOLS.map(({ name, title, description, inputSchema }) => ({
-    name,
-    title,
-    description,
-    inputSchema,
-  }));
+export function toolsFor(source) {
+  return ALL_TOOLS.filter((t) => t.name !== 'reading_stats' || source.hasReadingStats).map(
+    ({ name, title, description, inputSchema }) => ({ name, title, description, inputSchema }),
+  );
 }
 
 /** El ejecutor de una tool, o `null`. */
-export function findTool(name) {
-  return ALL_TOOLS.find((t) => t.name === name) || null;
+export function findTool(source, name) {
+  const found = ALL_TOOLS.find((t) => t.name === name);
+  if (!found) return null;
+  if (found.name === 'reading_stats' && !source.hasReadingStats) return null;
+  return found;
 }
 
 function idsHint(books) {
@@ -275,9 +313,9 @@ function idsHint(books) {
  * fallo previsto: el modelo tiene que poder leerlo y corregir la llamada.
  */
 export async function callTool(source, name, rawArgs) {
-  const tool = findTool(name);
+  const tool = findTool(source, name);
   if (!tool) {
-    const disponibles = toolsFor().map((t) => t.name).join(', ');
+    const disponibles = toolsFor(source).map((t) => t.name).join(', ');
     return errorResult('Tool desconocida: «' + name + '». Disponibles: ' + disponibles + '.');
   }
   try {
