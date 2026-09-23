@@ -138,6 +138,7 @@ const GET_HIGHLIGHTS = {
     const offset = optionalInt(args, 'offset', { min: 0, max: Number.MAX_SAFE_INTEGER, def: 0 });
     const highlights = await source.getHighlights(bookId);
     const book = await source.bookInfo(bookId);
+    const page = highlights.slice(offset, offset + limit);
     return {
       source: source.kind,
       bookId,
@@ -145,8 +146,8 @@ const GET_HIGHLIGHTS = {
       total: highlights.length,
       offset,
       limit,
-      returned: highlights.slice(offset, offset + limit).length,
-      highlights: highlights.slice(offset, offset + limit),
+      returned: page.length,
+      highlights: page,
     };
   },
 };
@@ -175,6 +176,7 @@ const GET_NOTES = {
     const offset = optionalInt(args, 'offset', { min: 0, max: Number.MAX_SAFE_INTEGER, def: 0 });
     const notes = await source.getNotes(bookId);
     const book = await source.bookInfo(bookId);
+    const page = notes.slice(offset, offset + limit);
     return {
       source: source.kind,
       bookId,
@@ -182,8 +184,8 @@ const GET_NOTES = {
       total: notes.length,
       offset,
       limit,
-      returned: notes.slice(offset, offset + limit).length,
-      notes: notes.slice(offset, offset + limit),
+      returned: page.length,
+      notes: page,
     };
   },
 };
@@ -213,7 +215,15 @@ const SEARCH_HIGHLIGHTS = {
     const terms = termsOf(query);
     if (!terms.length) throw new ToolError('La consulta no tiene ningún término buscable.');
 
-    const books = bookId ? [bookId] : (await source.listBooks()).map((b) => b.id);
+    // Un `bookId` explícito se valida ANTES de buscar. Sin esto, un id con una letra mal devolvía
+    // «cero resultados», que se lee como «ese libro no tiene nada subrayado» y no como «ese libro
+    // no existe» — y el que se equivoca es el modelo, que puede corregirse si se le dice.
+    if (bookId) await source.bookInfo(bookId);
+
+    // Los ids salen de `titles()` (el manifest: UNA lectura en la fuente de Drive) y no de
+    // `listBooks()` (una lectura POR LIBRO): buscar en toda la biblioteca no debe costar abrir
+    // todos los libros antes de buscar.
+    const books = bookId ? [bookId] : Object.keys(await source.titles());
     const results = [];
     for (const id of books) {
       let highlights;
@@ -271,6 +281,10 @@ const READING_STATS = {
     const bookId = optionalString(args, 'bookId');
     const groupBy = optionalString(args, 'groupBy') || 'day';
     const titles = await source.titles();
+    // Mismo criterio que en la búsqueda: un `bookId` que no existe es un error, no un cero.
+    if (bookId && !Object.hasOwn(titles, bookId)) {
+      throw new SourceError('Libro desconocido: ' + bookId);
+    }
     const days = await source.readingDays();
     return { source: source.kind, ...aggregateReading(days, { range, bookId, groupBy, titleOf: (id) => titles[id] || null }) };
   },
