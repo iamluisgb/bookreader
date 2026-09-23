@@ -1,0 +1,19 @@
+{
+  "name": "bookreader-mcp",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Servidor MCP local (stdio) que lee la biblioteca de BookReader: subrayados, notas y estadisticas de lectura.",
+  "type": "module",
+  "bin": {
+    "bookreader-mcp": "./server.mjs"
+  },
+  "scripts": {
+    "test": "node --test test/",
+    "start": "node server.mjs"
+  },
+  "author": "iamluisgb",
+  "license": "ISC",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.1"
+  }
+}
