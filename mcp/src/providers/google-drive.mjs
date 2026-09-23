@@ -66,11 +66,30 @@ export function createGoogleDriveProvider({ getAccessToken, fetchImpl = fetch, s
   }
 
   return {
+    /**
+     * Ficheros del appDataFolder con ese prefijo. La fuente del MCP lee por NOMBRE (`read`),
+     * así que esto no está en su camino caliente; se implementa entero —con `nextPageToken`—
+     * para que la interfaz del proveedor sea la misma que la de la app y no una versión a
+     * medias que sorprenda a quien la use.
+     */
     async list(prefix = '') {
-      const url =
-        API + '/files?' + new URLSearchParams({ spaces, fields: 'files(' + FIELDS + ')', pageSize: '1000' });
-      const data = await (await request(url)).json();
-      return (data.files || [])
+      const files = [];
+      let pageToken = '';
+      do {
+        const url =
+          API +
+          '/files?' +
+          new URLSearchParams({
+            spaces,
+            fields: 'nextPageToken,files(' + FIELDS + ')',
+            pageSize: '1000',
+            ...(pageToken ? { pageToken } : {}),
+          });
+        const data = await (await request(url)).json();
+        files.push(...(data.files || []));
+        pageToken = data.nextPageToken || '';
+      } while (pageToken);
+      return files
         .filter((f) => f.name.startsWith(prefix))
         .map((f) => ({
           path: f.name,
