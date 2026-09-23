@@ -19,3 +19,17 @@ export class ToolError extends Error {
     this.name = 'ToolError';
   }
 }
+
+/**
+ * Un `bookId` que no existe. Es un `SourceError` (la fuente es quien conoce los libros) pero se
+ * distingue a propósito: la tool que lo recibe puede añadir la lista de ids válidos, y con un
+ * `String.match` sobre el mensaje eso sería control de flujo por texto — el mensaje es para el
+ * lector, no para el programa.
+ */
+export class UnknownBookError extends SourceError {
+  constructor(bookId) {
+    super('Libro desconocido: ' + bookId);
+    this.name = 'UnknownBookError';
+    this.bookId = bookId;
+  }
+}

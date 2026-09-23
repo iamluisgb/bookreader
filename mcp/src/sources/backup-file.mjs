@@ -19,7 +19,7 @@
 // exportar, pero un volcado hecho a mano desde las DevTools lo lleva.
 
 import { readFile as fsReadFile } from 'node:fs/promises';
-import { SourceError } from '../errors.mjs';
+import { SourceError, UnknownBookError } from '../errors.mjs';
 import { scrub } from '../redact.mjs';
 import {
   liveItems,
@@ -182,7 +182,7 @@ export function createBackupFileSource({ path, readFile = fsReadFile }) {
     /** Id + título de un libro, sin bajar sus subrayados. */
     async bookInfo(bookId) {
       const entry = (await index()).get(bookId);
-      if (!entry) throw new SourceError('Libro desconocido: ' + bookId);
+      if (!entry) throw new UnknownBookError(bookId);
       return { id: entry.id, title: entry.title || (entry.meta && entry.meta.title) || null };
     },
     /** Títulos por id (para `reading_stats` y para pistas de error). */
@@ -195,12 +195,12 @@ export function createBackupFileSource({ path, readFile = fsReadFile }) {
     },
     async getHighlights(bookId) {
       const entry = (await index()).get(bookId);
-      if (!entry) throw new SourceError('Libro desconocido: ' + bookId);
+      if (!entry) throw new UnknownBookError(bookId);
       return project(entry).highlights;
     },
     async getNotes(bookId) {
       const entry = (await index()).get(bookId);
-      if (!entry) throw new SourceError('Libro desconocido: ' + bookId);
+      if (!entry) throw new UnknownBookError(bookId);
       return project(entry).notes;
     },
     /** El backup no trae días de lectura: contrato vacío, no un error. */

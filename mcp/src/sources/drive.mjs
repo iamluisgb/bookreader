@@ -22,7 +22,7 @@
 //     contra un patrón estricto antes de leer: un manifest manipulado no puede convertir al
 //     MCP en un lector de rutas arbitrarias (`../../`), ni con proveedor de disco.
 
-import { SourceError } from '../errors.mjs';
+import { SourceError, UnknownBookError } from '../errors.mjs';
 import { scrub, sanitizeReadingDay } from '../redact.mjs';
 import {
   liveItems,
@@ -188,7 +188,7 @@ export function createDriveSource({ provider, base = DEFAULT_BASE, cacheMs = 150
     /** Id + título de un libro, sin bajar su fichero. */
     async bookInfo(bookId) {
       const entry = await entryFrom(await load(), bookId);
-      if (!entry) throw new SourceError('Libro desconocido: ' + bookId);
+      if (!entry) throw new UnknownBookError(bookId);
       return { id: entry.id, title: entry.title || (entry.meta && entry.meta.title) || null };
     },
     /** Títulos por id, del manifest: ni una lectura de más (el manifest ya los tiene). */
@@ -200,12 +200,12 @@ export function createDriveSource({ provider, base = DEFAULT_BASE, cacheMs = 150
     },
     async getHighlights(bookId) {
       const entry = await entryFrom(await load(), bookId);
-      if (!entry) throw new SourceError('Libro desconocido: ' + bookId);
+      if (!entry) throw new UnknownBookError(bookId);
       return project(entry).highlights;
     },
     async getNotes(bookId) {
       const entry = await entryFrom(await load(), bookId);
-      if (!entry) throw new SourceError('Libro desconocido: ' + bookId);
+      if (!entry) throw new UnknownBookError(bookId);
       return project(entry).notes;
     },
     /** Días de lectura del layout, sin `key` ni `deviceId` (ver redact.mjs). */

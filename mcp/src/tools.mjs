@@ -9,7 +9,7 @@
 //     devuelve como resultado con isError, en texto que el modelo pueda leer y corregir.
 //   - El payload va como JSON en un bloque de texto. Un solo formato, sin sorpresas.
 
-import { ToolError, SourceError } from './errors.mjs';
+import { ToolError, SourceError, UnknownBookError } from './errors.mjs';
 import { aggregateReading, RANGES, GROUP_BY } from './stats.mjs';
 
 const LIMIT_DEFAULT = 50;
@@ -283,7 +283,7 @@ const READING_STATS = {
     const titles = await source.titles();
     // Mismo criterio que en la búsqueda: un `bookId` que no existe es un error, no un cero.
     if (bookId && !Object.hasOwn(titles, bookId)) {
-      throw new SourceError('Libro desconocido: ' + bookId);
+      throw new UnknownBookError(bookId);
     }
     const days = await source.readingDays();
     return { source: source.kind, ...aggregateReading(days, { range, bookId, groupBy, titleOf: (id) => titles[id] || null }) };
@@ -338,7 +338,7 @@ export async function callTool(source, name, rawArgs) {
       content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }],
     };
   } catch (e) {
-    if (e instanceof SourceError && /Libro desconocido/.test(e.message)) {
+    if (e instanceof UnknownBookError) {
       try {
         return errorResult(e.message + '. ' + idsHint(await source.listBooks()));
       } catch {

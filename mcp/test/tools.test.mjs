@@ -8,7 +8,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { callTool, toolsFor } from '../src/tools.mjs';
-import { SourceError } from '../src/errors.mjs';
+import { SourceError, UnknownBookError } from '../src/errors.mjs';
 
 /** Fuente de mentira: apunta cada llamada y contesta lo mínimo. */
 function stubSource(overrides = {}) {
@@ -80,10 +80,10 @@ test('buscar en toda la biblioteca no abre cada libro para saber cuáles hay', a
 test('un bookId que no existe se corrige con un error, no con «cero resultados»', async () => {
   const { source } = stubSource({
     async bookInfo() {
-      throw new SourceError('Libro desconocido: b9');
+      throw new UnknownBookError('b9');
     },
     async getHighlights() {
-      throw new SourceError('Libro desconocido: b9');
+      throw new UnknownBookError('b9');
     },
   });
   const res = await callTool(source, 'search_highlights', { query: 'consenso', bookId: 'b9' });
