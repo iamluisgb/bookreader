@@ -1,5 +1,5 @@
-// stdio — las tools de punta a punta (F1), con un cliente MCP de verdad hablando con el
-// servidor como proceso hijo. Es la prueba de que esto es un MCP y no una librería con buenas
+// stdio — las tools de punta a punta, con un cliente MCP de verdad hablando con el servidor
+// como proceso hijo. Es la prueba de que esto es un MCP y no una librería con buenas
 // intenciones: protocolo, esquemas, arranque por argumentos y forma de los errores.
 
 import { test } from 'node:test';
@@ -10,6 +10,7 @@ import { connect, SERVER, FIXTURES } from './helpers/mcp-client.mjs';
 import { BOOK_1, BOOK_2 } from './helpers/dataset.mjs';
 
 const BACKUP = ['--backup', resolve(FIXTURES, 'backup.json')];
+const DIR = ['--dir', resolve(FIXTURES, 'layout')];
 
 /** Arranca el servidor solo para ver con qué código y qué mensaje sale. */
 function run(args) {
@@ -33,6 +34,21 @@ test('F1 anuncia cuatro tools y NO anuncia reading_stats', async () => {
       assert.ok(t.description.length > 20, 'una tool sin descripción útil es una tool que nadie llama');
       assert.equal(t.inputSchema.type, 'object');
     }
+  } finally {
+    await c.close();
+  }
+});
+
+test('F2 anuncia la misma superficie más reading_stats', async () => {
+  const c = await connect(DIR);
+  try {
+    assert.deepEqual(await c.toolNames(), [
+      'list_books',
+      'get_highlights',
+      'get_notes',
+      'search_highlights',
+      'reading_stats',
+    ]);
   } finally {
     await c.close();
   }
@@ -144,6 +160,39 @@ test('search_highlights: texto y notas, sin mayúsculas ni acentos, con snippet'
   }
 });
 
+test('reading_stats: sumado entre dispositivos y sin rastro del deviceId', async () => {
+  const c = await connect(DIR);
+  try {
+    const { json } = await c.call('reading_stats', { range: 'all' });
+    assert.deepEqual(json.totals, { ms: 4800000, words: 14400, units: 72, minutes: 80 });
+    assert.equal(json.daysRead, 3);
+    assert.deepEqual(
+      json.byBook.map((b) => b.title),
+      ['Diseño de datos intensivos', null],
+    );
+    assert.ok(!JSON.stringify(json).includes('deviceId'));
+    assert.ok(!JSON.stringify(json).includes('"key"'));
+  } finally {
+    await c.close();
+  }
+});
+
+test('reading_stats: agrupación semanal y escope por libro', async () => {
+  const c = await connect(DIR);
+  try {
+    const weekly = await c.call('reading_stats', { range: 'all', groupBy: 'week' });
+    assert.deepEqual(
+      weekly.json.byDay.map((d) => d.bucket),
+      ['2026-W38', '2026-W39'],
+    );
+    const one = await c.call('reading_stats', { range: 'all', bookId: BOOK_2.id });
+    assert.equal(one.json.totals.minutes, 5);
+    assert.equal(one.json.byBook.length, 1);
+  } finally {
+    await c.close();
+  }
+});
+
 test('un libro desconocido es un error LEGIBLE con la lista de los que hay', async () => {
   const c = await connect(BACKUP);
   try {
@@ -152,6 +201,21 @@ test('un libro desconocido es un error LEGIBLE con la lista de los que hay', asy
     assert.match(res.text, /Libro desconocido/);
     assert.match(res.text, new RegExp(BOOK_1.id));
     assert.equal(res.json, null, 'un error se comunica como texto, no como JSON a medias');
+  } finally {
+    await c.close();
+  }
+});
+
+test('un rango inválido se corrige sin tirar la sesión', async () => {
+  const c = await connect(DIR);
+  try {
+    const res = await c.call('reading_stats', { range: '13m' });
+    assert.equal(res.isError, true);
+    assert.match(res.text, /Rango desconocido/);
+    assert.match(res.text, /today, 7d, 30d, 90d, 365d, all/);
+    // La sesión sigue viva.
+    const ok = await c.call('reading_stats', { range: 'all' });
+    assert.equal(ok.isError, false);
   } finally {
     await c.close();
   }
@@ -213,6 +277,10 @@ test('arranque: sin fuente, con fuente rota o con flags mezclados sale con códi
   assert.equal(roto.code, 1);
   assert.match(roto.stderr, /No puedo leer el backup/);
   assert.equal(roto.stdout, '');
+
+  const sinManifest = await run(['--dir', resolve(FIXTURES, 'backup.json')]);
+  assert.equal(sinManifest.code, 1);
+  assert.match(sinManifest.stderr, /manifest\.json/);
 
   const mezcla = await run(['--backup', 'b.json', '--dir', 'd']);
   assert.equal(mezcla.code, 2);

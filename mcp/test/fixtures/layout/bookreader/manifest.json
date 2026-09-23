@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": 1790115000000,
+  "settingsUpdatedAt": 1790115000000,
+  "books": {
+    "01f3a7c9d4b28e56": {
+      "file": "books/01f3a7c9d4b28e56.json",
+      "title": "Diseño de datos intensivos",
+      "updatedAt": 1790109060000
+    },
+    "7c4d1e9ab0f23a58": {
+      "file": "books/7c4d1e9ab0f23a58.json",
+      "title": null,
+      "updatedAt": 1789853100000
+    }
+  }
+}

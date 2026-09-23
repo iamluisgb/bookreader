@@ -185,6 +185,42 @@ export const LAST_POSITION = {
   [BOOK_1.id]: { cfi: 'epubcfi(/6/30!/4/2/6)', at: at('2026-09-22T20:30:00.000Z') },
 };
 
+/** Registro de lectura: filas por DÍA y DISPOSITIVO, como las exporta reading-log.js. */
+export const READING_DAYS = [
+  {
+    key: '2026-09-20|' + DEVICE_IDS[0],
+    day: '2026-09-20',
+    deviceId: DEVICE_IDS[0],
+    updatedAt: at('2026-09-20T22:00:00.000Z'),
+    books: { [BOOK_1.id]: { ms: 1200000, words: 3600, units: 18 } },
+  },
+  {
+    key: '2026-09-21|' + DEVICE_IDS[0],
+    day: '2026-09-21',
+    deviceId: DEVICE_IDS[0],
+    updatedAt: at('2026-09-21T22:00:00.000Z'),
+    books: { [BOOK_1.id]: { ms: 1800000, words: 5400, units: 27 } },
+  },
+  {
+    // Mismo día, otro dispositivo: el merge es unión y leer es SUMAR.
+    key: '2026-09-21|' + DEVICE_IDS[1],
+    day: '2026-09-21',
+    deviceId: DEVICE_IDS[1],
+    updatedAt: at('2026-09-21T23:30:00.000Z'),
+    books: { [BOOK_1.id]: { ms: 600000, words: 1800, units: 9 } },
+  },
+  {
+    key: '2026-09-22|' + DEVICE_IDS[0],
+    day: '2026-09-22',
+    deviceId: DEVICE_IDS[0],
+    updatedAt: at('2026-09-22T22:10:00.000Z'),
+    books: {
+      [BOOK_1.id]: { ms: 900000, words: 2700, units: 13 },
+      [BOOK_2.id]: { ms: 300000, words: 900, units: 5 },
+    },
+  },
+];
+
 /** El backup tal cual lo produce buildBackup(): localStorage aplanado + stores de IA. */
 export function buildBackupFixture() {
   return {
@@ -208,5 +244,77 @@ export function buildBackupFixture() {
       ratings: [],
       books: [{ id: BOOK_1.id, title: BOOK_1.title, addedAt: at('2026-09-20T17:50:00.000Z') }],
     },
+  };
+}
+
+/**
+ * El layout de sync tal cual queda en el proveedor: `books/<id>.json` por libro + manifest +
+ * settings. El backup y esto describen la MISMA biblioteca (menos el registro de lectura, que
+ * solo está aquí).
+ *
+ * @returns {Record<string, object>} rutas relativas a la raíz de la carpeta del layout
+ */
+export function buildLayoutFiles(base = 'bookreader/') {
+  const entry = (id) => ({
+    local: {
+      [`highlights_${id}`]: HIGHLIGHTS[id] || [],
+      [`bookmarks_${id}`]: BOOKMARKS[id] || [],
+      [`lastPosition_${id}`]: (LAST_POSITION[id] && LAST_POSITION[id].cfi) || null,
+      [`lastPositionAt_${id}`]: (LAST_POSITION[id] && LAST_POSITION[id].at) || null,
+      [`readingMode_${id}`]: 'paginated',
+    },
+    convos: id === BOOK_1.id ? [CONVO] : [],
+    messages: id === BOOK_1.id ? MESSAGES : [],
+    notes: id === BOOK_1.id ? NOTES : [],
+    ratings: [],
+    // Artefactos del Studio y mazos: están en el layout y NO se exponen en F1/F2 (ni falta):
+    // van aquí para que quede claro que el MCP los ignora a propósito.
+    artifacts:
+      id === BOOK_1.id
+        ? [
+            {
+              key: id + ':summary',
+              bookId: id,
+              kind: 'summary',
+              result: 'resumen del capítulo',
+              createdAt: at('2026-09-21T08:00:00.000Z'),
+              updatedAt: at('2026-09-21T08:00:00.000Z'),
+            },
+          ]
+        : [],
+    decks: [],
+    meta: id === BOOK_1.id ? { id, title: BOOK_1.title, addedAt: at('2026-09-20T17:50:00.000Z') } : null,
+  });
+
+  const manifest = {
+    schemaVersion: 1,
+    updatedAt: at('2026-09-22T22:10:00.000Z'),
+    settingsUpdatedAt: at('2026-09-22T22:10:00.000Z'),
+    books: {
+      [BOOK_1.id]: {
+        file: `books/${BOOK_1.id}.json`,
+        title: BOOK_1.title,
+        updatedAt: at('2026-09-22T20:31:00.000Z'),
+      },
+      [BOOK_2.id]: {
+        file: `books/${BOOK_2.id}.json`,
+        title: null, // el manifest no lo sabe: el libro se subrayó sin pasar por el agente
+        updatedAt: at('2026-09-19T21:25:00.000Z'),
+      },
+    },
+  };
+
+  const settings = {
+    theme: 'sepia',
+    fontScale: 1.15,
+    study_streak: { count: 4, lastDay: '2026-09-22' },
+    reading_days: READING_DAYS,
+  };
+
+  return {
+    [base + 'manifest.json']: manifest,
+    [base + 'settings.json']: settings,
+    [base + 'books/' + BOOK_1.id + '.json']: entry(BOOK_1.id),
+    [base + 'books/' + BOOK_2.id + '.json']: entry(BOOK_2.id),
   };
 }
