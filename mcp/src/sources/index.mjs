@@ -15,16 +15,41 @@
 import { readFile as fsReadFile } from 'node:fs/promises';
 import { ConfigError } from '../config.mjs';
 import { createBackupFileSource } from './backup-file.mjs';
+import { createDriveSource } from './drive.mjs';
+import { createFsProvider } from '../providers/fs.mjs';
+import { createGoogleDriveProvider } from '../providers/google-drive.mjs';
+import { createGoogleAuth, readRefreshTokenFile } from '../auth/google.mjs';
 
 /**
- * Construye la fuente de la configuración. `deps` es inyectable para los tests (lectura de
- * fichero falsa): el camino real no necesita más que lo que hay en Node.
+ * Construye la fuente de la configuración. `deps` es inyectable para los tests (fetch falso,
+ * lectura de fichero falsa): el camino real no necesita más que lo que hay en Node.
  */
 export async function createSource(config, deps = {}) {
-  const { readFile = fsReadFile } = deps;
+  const { fetchImpl = fetch, readFile = fsReadFile } = deps;
 
   if (config.source === 'backup-file') {
     return createBackupFileSource({ path: config.backupPath, readFile });
+  }
+
+  if (config.source === 'drive') {
+    if (config.layoutDir) {
+      const provider = createFsProvider({ root: config.layoutDir, readFile });
+      return createDriveSource({ provider, base: config.base, cacheMs: config.cacheMs });
+    }
+    let refreshToken = config.refreshToken;
+    if (!refreshToken && config.refreshTokenFile) {
+      refreshToken = await readRefreshTokenFile(config.refreshTokenFile, readFile);
+    }
+    if (!refreshToken && !config.accessToken) {
+      throw new ConfigError('La fuente drive necesita credenciales (ver --help).');
+    }
+    const auth = createGoogleAuth({
+      refreshToken,
+      accessToken: config.accessToken,
+      fetchImpl,
+    });
+    const provider = createGoogleDriveProvider({ getAccessToken: (f) => auth.getAccessToken(f), fetchImpl });
+    return createDriveSource({ provider, base: config.base, cacheMs: config.cacheMs });
   }
 
   throw new ConfigError('Fuente no soportada: ' + config.source);
