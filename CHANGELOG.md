@@ -13,6 +13,34 @@ buena viaja en el próximo covers.json a los demás dispositivos. La adopción d
 además por **ancho real** (decodificando), no por bytes: una v1 densa puede pesar lo mismo que
 una v2 plana.
 
+## 2026-09-23 — P28: un MCP local para que un agente externo lea tu biblioteca (F1–F2)
+
+El MCP pedido en P28, sin tocar una línea de la app: **`mcp/`**, un servidor local por stdio que
+lee lo que ya existe. Dos fuentes con la misma superficie de tools, y **cero escritura** (F3 queda
+fuera hasta que haya uso).
+
+- **F1 · el backup.** `--backup <json>`: `list_books`, `get_highlights`, `get_notes` y
+  `search_highlights` (sin acentos ni mayúsculas, términos en AND, con snippet). La limitación va
+  delante en el README: un backup es una **foto** y no lleva el registro de lectura, así que
+  `reading_stats` ni se anuncia — una tool que siempre contesta «no hay datos» es peor que una que
+  no existe. Los títulos solo existen si el libro pasó por el agente (`title: null` si no).
+- **F2 · el layout de sync.** `manifest.json` + `settings.json` + `books/<id>.json` detrás de una
+  **interfaz de proveedor** (Google Drive, carpeta con el layout, memoria en tests), y
+  `reading_stats(range)` con ventanas (`today`/`Nd`/`all`), agrupación por día, semana ISO o mes, y
+  escope por libro. Suma los dispositivos, como el resto de la app.
+- **Lo que el MCP nunca devuelve**, en código con test: `ai_key`, `drive_refresh_token` y
+  `device_id`. El último no es inocuo: el layout SÍ lo lleva en cada fila de `reading_days`
+  (`key` = `<día>|<deviceId>`, P25 F3) y clonarlo hace que un equipo deje de contar. Los registros
+  se proyectan a `{ day, updatedAt, books }` y `reading_stats` **no puede** desglosar por
+  dispositivo (ADR-037).
+- **Sin credenciales** (esta máquina no las tiene) el camino de Drive se prueba con un doble de
+  `fetch` con la forma real de la API y con el layout en disco; el **OAuth interactivo no se
+  implementó** porque el `redirect_uri` de la app no está registrado para localhost, y un
+  `--connect` que falla en el paso 1 es peor que no tenerlo (ADR-038). El README dice qué falta
+  para probarlo contra Drive de verdad.
+- 80 tests con `node --test` (`npm run test:mcp`), incluido un cliente MCP real por stdio, un test
+  de **paridad** entre las dos fuentes y uno que planta secretos para comprobar que no salen.
+
 ## 2026-09-22 — IA7 F3: la expansión de consulta vuelve a la vida (y se hace barata)
 
 Al abrir la F3 de IA7 (caché por pregunta + gate agéntico), el baseline @live destapó que la
