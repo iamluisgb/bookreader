@@ -1198,6 +1198,77 @@ si se clona, dos equipos escriben la misma fila y **uno deja de contar** (mismo 
 **un puente local en la máquina del lector**, con sus datos, bajo su control. Si algún día hay
 demanda de lo otro, es otra épica y otra conversación sobre privacidad.
 
+#### F4 — WebMCP: las tools dentro de la propia PWA · `S` · **experimental, time-boxed** · investigado 2026-09-24
+
+**El problema que ataca.** El MCP de F1/F2 es Node: los módulos de la app son de navegador (IDB,
+DOM), así que `mcp/` **re-implementa** la lectura del backup y del layout (ADR-036). Son dos copias
+de la misma lógica y nada avisa si divergen: los tests de `mcp/` usan fixtures escritas a mano con
+la forma de hoy, no generadas por el código de la app. Si cambia el formato de `buildBackup()` o del
+layout, el MCP se rompe en silencio. _(Arreglo barato para F1/F2, independiente de F4: un test que
+genere el backup con el `buildBackup()` real y se lo dé al MCP.)_
+
+**La idea.** [WebMCP](https://webmachinelearning.github.io/webmcp/) deja que una página registre
+tools en JavaScript (`document.modelContext.registerTool`) para que un agente del navegador las
+llame. Las tools corren **dentro de BookReader** y llaman a su propio código (`highlights.js`,
+`reading-log.js`, IDB). Tres cosas que F1/F2 no pueden dar:
+1. **Cero duplicación**: el contrato es el código de la app, no una copia en Node.
+2. **Datos en vivo sin backup ni OAuth**, registro de lectura incluido (`reading_stats` sin Drive).
+3. **Hace viable F3.** El aviso de F3 exige que el MCP «no componga JSON a mano, reutilice las
+   funciones de creación de la app». Con WebMCP eso es gratis: «crear nota» desde un agente llama a
+   la misma función que el botón, con su `uid`, y el sync no se rompe. Es el argumento más fuerte:
+   la escritura segura que el MCP de Node nunca podrá hacer bien.
+
+**Estado del estándar (septiembre 2026) — por qué es pronto:**
+- **Spec**: W3C _Draft Community Group Report_ (Web Machine Learning CG), editores de Google y
+  Microsoft. No es estándar y la API se mueve: en julio de 2026 pasó de `navigator.modelContext` a
+  `document.modelContext`; Chrome 150 depreca la vieja
+  ([Spronta, jul 2026](https://www.spronta.com/blog/state-of-webmcp-july-2026/)).
+- **Navegadores**: Chrome en **origin trial 149–156** (o `chrome://flags/#enable-webmcp-testing` en
+  local), estable esperado Q4 2026 ([Chrome](https://developer.chrome.com/blog/ai-webmcp-origin-trial));
+  Edge tras flag; Firefox y Safari sin compromiso
+  ([DEV](https://dev.to/ai-agent-economy/webmcp-in-2026-which-browsers-support-navigatormodelcontext-complete-compatibility-status-1oe4)).
+- **Consumidores: prácticamente ninguno.** Google anunció en I/O 2026 que Gemini in Chrome será el
+  primero, pero a finales de agosto aún no había salido; ni Claude, ni ChatGPT, ni Perplexity llaman
+  a estas tools ([Medium, ago 2026](https://topuzas.medium.com/i-tried-building-with-webmcp-before-gemini-in-chrome-could-even-call-it-16b0d93f42f1)).
+- **Puente a agentes de escritorio: existe.** `@mcp-b/webmcp-local-relay` es un MCP stdio (se
+  registra en Claude Desktop / Claude Code) que recoge las tools de la pestaña por WebSocket en
+  `localhost:9333`; no necesita el WebMCP nativo de Chrome, el `embed.js` de la página hace de
+  polyfill ([MCP-B](https://docs.mcp-b.ai/how-to/connect-desktop-agents-with-local-relay)).
+
+**Frenos y riesgos concretos para BookReader:**
+- **Solo con la pestaña abierta.** El MCP de Node funciona con el navegador cerrado; WebMCP no.
+- **Solo Chrome, y con token de origin trial** (caduca) hasta que llegue a estable.
+- **CSP estricta**: el puente de MCP-B se sirve desde jsdelivr → habría que vendorizarlo (como
+  `vendor/`) y abrir `connect-src ws://localhost:9333`. Por defecto el relay **acepta tools de
+  cualquier origen**: exigir `--widget-origin https://<dominio de bookreader>`. Sin verificar: si
+  Chrome pide el permiso de acceso a red local para que una página https hable con localhost.
+- **Prompt injection**: el texto de los libros y los subrayados es contenido no controlado que el
+  agente lee. Guía de Chrome: `untrustedContentHint` en esas salidas, `readOnlyHint` en las tools de
+  lectura, `consequentialHint` en las de escritura, y salidas acotadas (~1,5K caracteres por tool;
+  descripciones ≤ 500) ([Chrome · seguridad](https://developer.chrome.com/docs/ai/webmcp/secure-tools)).
+- **Permisos**: la Permissions Policy `tools` es `self` por defecto (sin iframes cross-origin);
+  `exposedTo` restringe orígenes. `requestUserInteraction()` para pedir confirmación aún está en
+  diseño.
+
+**Alcance propuesto (el experimento):**
+- Registrar las **mismas 5 tools** que `mcp/` (mismos nombres y esquemas: `list_books`,
+  `get_highlights`, `get_notes`, `search_highlights`, `reading_stats`), **solo lectura**, con
+  `readOnlyHint` y `untrustedContentHint`.
+- **Detección de capacidad** (`'modelContext' in document`, con fallback a `navigator` mientras dure
+  la migración) → en cualquier otro navegador no hace nada, riesgo cero para la app.
+- Tras un **ajuste desactivado por defecto**: «Permitir que agentes del navegador lean tu
+  biblioteca».
+- Reutilizar la **lista vetada** de `mcp/src/redact.mjs` (`ai_key`, `drive_refresh_token`,
+  `device_id`) — idealmente moverla a un módulo compartido que importen los dos.
+- El puente de MCP-B **no entra en la app**: para probar con Claude Code se carga en local.
+- **Fuera**: escritura (sería F3 por esta vía, con su propio ADR), y cualquier exposición
+  cross-origin.
+
+**Criterio de salida del experimento → feature:** que se cumpla una de tres — Gemini in Chrome
+consume tools, un agente de Claude lo soporta, o WebMCP llega a Chrome estable. Hasta entonces, no
+invertir más allá del time-box. El MCP de Node (F1/F2) sigue siendo **la vía estable y sin
+pestaña**; WebMCP sería la vía **en vivo** y la que abre la escritura.
+
 ---
 
 ### P30 — Descubrimiento de features: el producto que no se ve · **✓ (2026-09-22)** `M`
