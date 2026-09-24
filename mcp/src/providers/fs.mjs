@@ -8,9 +8,15 @@
 //
 // Confinamiento: `path` sale de un manifest remoto, así que toda ruta se resuelve y se
 // comprueba que sigue dentro de `root`. Un `..` en el manifest no puede sacar al MCP de la
-// carpeta que el usuario eligió.
+// carpeta que el usuario eligió. Y como `resolve` no sigue enlaces, la comprobación se
+// repite sobre el camino REAL: un symlink dentro de la carpeta que apunte fuera tampoco
+// saca al MCP. (`list` no sigue enlaces: `readdir` los marca como symlink, no como fichero.)
 
-import { readFile as fsReadFile, readdir as fsReaddir } from 'node:fs/promises';
+import {
+  readFile as fsReadFile,
+  readdir as fsReaddir,
+  realpath as fsRealpath,
+} from 'node:fs/promises';
 import { resolve, sep, join, relative } from 'node:path';
 import { SourceError } from '../errors.mjs';
 
@@ -18,15 +24,30 @@ export function createFsProvider({
   root,
   readFile = fsReadFile,
   readdir = fsReaddir,
+  realpath = fsRealpath,
   modifiedTime = '1970-01-01T00:00:00.000Z',
 } = {}) {
   if (!root) throw new SourceError('createFsProvider necesita un `root`.');
   const base = resolve(root);
+  let realBase = null; // la propia carpeta puede colgar de un enlace (/tmp → /private/tmp)
+
+  function inside(dir, target) {
+    return target === dir || target.startsWith(dir + sep);
+  }
 
   function confined(relPath) {
     const target = resolve(base, relPath);
-    if (target !== base && !target.startsWith(base + sep)) {
+    if (!inside(base, target)) {
       throw new SourceError('Ruta fuera de la carpeta del layout: ' + relPath);
+    }
+    return target;
+  }
+
+  async function confinedReal(relPath) {
+    const target = await realpath(confined(relPath));
+    realBase ??= await realpath(base);
+    if (!inside(realBase, target)) {
+      throw new SourceError('Ruta fuera de la carpeta del layout (enlace simbólico): ' + relPath);
     }
     return target;
   }
@@ -55,7 +76,11 @@ export function createFsProvider({
     },
     async read(path) {
       try {
-        return { content: await readFile(confined(path), 'utf8'), etag: null, modifiedTime };
+        return {
+          content: await readFile(await confinedReal(path), 'utf8'),
+          etag: null,
+          modifiedTime,
+        };
       } catch (e) {
         if (e.code === 'ENOENT' || e.code === 'EISDIR') return null;
         throw e;

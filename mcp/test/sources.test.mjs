@@ -3,8 +3,9 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { readFile, mkdtemp, mkdir, writeFile, symlink, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { resolve, join } from 'node:path';
 import { createBackupFileSource, indexBackup, BACKUP_FORMAT } from '../src/sources/backup-file.mjs';
 import { createDriveSource, isSafeBookFile } from '../src/sources/drive.mjs';
 import { createMemoryProvider } from '../src/providers/memory.mjs';
@@ -210,6 +211,29 @@ test('fs: lee el layout de una carpeta y no se sale de ella', async () => {
   assert.equal(await provider.read('bookreader/no-existe.json'), null);
   await assert.rejects(() => provider.read('../backup.json'), /fuera de la carpeta/);
   await assert.rejects(() => provider.read('/etc/hostname'), /fuera de la carpeta/);
+});
+
+test('fs: un enlace simbólico dentro de la carpeta no saca al MCP de ella', async () => {
+  const tmp = await mkdtemp(join(tmpdir(), 'bookreader-mcp-'));
+  try {
+    const root = join(tmp, 'layout');
+    await mkdir(join(root, 'bookreader'), { recursive: true });
+    await writeFile(join(root, 'bookreader', 'manifest.json'), '{"schemaVersion":1}');
+    await writeFile(join(tmp, 'secreto.txt'), 'ai_key=sk-no-debe-salir');
+    await symlink(join(tmp, 'secreto.txt'), join(root, 'bookreader', 'fuga.json'));
+    await symlink(join(root, 'bookreader', 'manifest.json'), join(root, 'bookreader', 'alias.json'));
+
+    const provider = createFsProvider({ root });
+    await assert.rejects(() => provider.read('bookreader/fuga.json'), /enlace simbólico/);
+    // un enlace que se queda dentro sigue funcionando, y list() no los enumera
+    assert.ok((await provider.read('bookreader/alias.json')).content.includes('schemaVersion'));
+    assert.deepEqual(
+      (await provider.list('bookreader/')).map((f) => f.path),
+      ['bookreader/manifest.json'],
+    );
+  } finally {
+    await rm(tmp, { recursive: true, force: true });
+  }
 });
 
 test('fs: la fuente funciona igual sobre disco que en memoria', async () => {
