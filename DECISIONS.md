@@ -1171,3 +1171,97 @@ existe.
 **Consecuencias.** Sin cobertura se puede seguir preguntando y se obtiene el libro, no un error.
 El coste es explicar una respuesta de segunda clase, y por eso el encabezado es explícito. Queda
 pendiente lo que no cubre: responder en conversaciones no activas exige abrir ese libro.
+
+---
+
+## ADR-036 — El MCP es un puente local de SOLO LECTURA, y vive en su propia carpeta · `ACEPTADA`
+
+**Contexto.** P28: «¿se puede añadir un MCP para que Claude se conecte?». La opción fácil —un
+`GET /highlights` en el Worker `workers/gateway`— obliga a **subir los datos del lector a un
+servidor nuestro**, que es justo el modelo del que huye la arquitectura (ADR de sync, local-first).
+La otra vía es leer lo que ya existe en el dispositivo del usuario.
+
+**Decisión.** Un **servidor MCP local por stdio** en `mcp/`, con la app intacta: no se toca una
+línea de `app/`, `index.html`, `sw.js` ni `css/`. Dos fuentes detrás de la misma interfaz —el
+fichero de backup (F1) y el layout de sync en el proveedor, `manifest.json` + `settings.json` +
+`books/<id>.json` (F2)— y **cero escritura**: F3 (crear nota o tarjeta) queda fuera hasta que haya
+uso real.
+
+**Porqué.** El layout del proveedor es un contrato que ya se mantiene por otro motivo (el sync), así
+que leerlo no añade superficie de regresión al lector: si el MCP se rompe, el lector no se entera.
+Y stdio no abre puertos ni publica nada: es un puente en la máquina del lector, con sus datos, bajo
+su control. La tentación contraria —un endpoint en el Worker— convertiría una app sin servidor de
+datos en una app con servidor de datos, que es la decisión que este ADR evita.
+
+**Consecuencias.**
+- El MCP **re-implementa la lectura del layout en Node**: los módulos de la app (`backup.js`,
+  `layout.js`, `storage.js`) son de navegador (localStorage, DOM, IndexedDB) y no se pueden
+  importar. El precio es duplicar la *forma* de los datos; el test de paridad entre las dos fuentes
+  es la red que impide que se separen.
+- Única dependencia directa: el **SDK oficial de MCP** (con su árbol transitivo, que incluye
+  servidores HTTP que un stdio no usa). El precio de la conformidad del protocolo y de tener un
+  cliente real en los tests; la alternativa era escribir JSON-RPC a mano.
+- Las libretas viajan con `fieldKey` + etiqueta humanizada, no con el `label` de `templates.js`
+  (tira de i18n y de plantillas del usuario: DOM y localStorage).
+- F3 no existe, y cuando exista tendrá su propio ADR: el merge del sync fusiona por unión y exige
+  `uid`, así que escribir no es «añadir un POST».
+
+---
+
+## ADR-037 — El `device_id` no sale por el MCP, ni siquiera dentro del registro de lectura · `ACEPTADA`
+
+**Contexto.** `backup.js` excluye `ai_key`, `drive_refresh_token` y `device_id` del fichero que se
+descarga, y `layout.js` hace lo mismo con los secretos. Pero el **layout de sync sí lleva el
+identificador de cada equipo**: `settings.reading_days` es una lista de filas
+`{ key: '<día>|<deviceId>', day, deviceId, updatedAt, books }` (P25 F3), y el `deviceId` está en el
+campo **y dentro de `key`**.
+
+`device_id` no es un dato inocuo: es la mitad de la clave con la que cada dispositivo escribe SUS
+días de lectura. Si se clona, dos equipos escriben la misma fila, la partición por dispositivo se
+deshace en silencio y **uno de los dos deja de contar**.
+
+**Decisión.** `ai_key`, `drive_refresh_token` y `device_id` (en sus dos grafías) están en una lista
+explícita en código (`mcp/src/redact.mjs`), no en una costumbre. Todo lo que devuelve una tool pasa
+por `scrub()`, que las borra a cualquier profundidad, y los registros de lectura se proyectan a
+`{ day, updatedAt, books }` (fuera `key` y `deviceId`). `reading_stats` **no ofrece desglose por
+dispositivo**, y por eso tampoco puede preguntarse. `license`, `sync_state` y
+`sync_schema_migrated` se vetan por el mismo criterio conservador: ninguna tool las necesita.
+
+**Porqué.** El MCP habla con un modelo de lenguaje al que el lector ha dado acceso a SUS datos; un
+identificador de dispositivo no es un dato del libro, es una capacidad de escritura disfrazada. Y la
+defensa se pone **a la salida**: aunque algún día otro módulo meta una de esas claves en el backup o
+en el layout, el MCP sigue sin devolverla.
+
+**Consecuencias.** `reading_stats` no puede decir «desde qué equipo», que es justo lo que no debe
+decir. Un test planta secretos en un backup y en un layout (manifest, settings, `local`, `meta`) y
+comprueba que ninguna tool los devuelve, incluido el identificador literal buscado en la salida
+entera. La app sigue excluyéndolos por su cuenta: son dos defensas, no una.
+
+---
+
+## ADR-038 — La fuente de Drive se prueba con proveedores simulados, y el OAuth interactivo no se implementa · `ACEPTADA`
+
+**Contexto.** F2 necesita credenciales de Google que esta máquina no tiene, y el flujo OAuth de la
+app (`sync/drive-auth.js`) es de navegador: PKCE con popup y un `redirect_uri` que apunta a
+`auth/callback.html` **del origen de la app**. Un redirect a `http://localhost:<puerto>` no está
+registrado en ese cliente OAuth: Google devolvería `redirect_uri_mismatch` a la primera.
+
+**Decisión.** La fuente de Drive depende de una **interfaz de proveedor** (`{ read(path) }`) con
+tres implementaciones: `google-drive` (el `appDataFolder` de verdad, mismas llamadas REST que la
+app), `fs` (una carpeta con el layout exportado) y `memory` (tests). El **OAuth interactivo no se
+implementa**: el camino es el *refresh token* que la app ya tiene, canjeado en el **mismo Worker de
+Cloudflare** que usa `drive-auth.js`, que es quien custodia el `client_secret`.
+
+**Porqué.** Un `--connect` que no puede funcionar —porque el `redirect_uri` no está registrado— es
+peor que no tenerlo: promete algo que falla en el paso 1. Y el refresh token reutiliza la única vía
+de confianza que ya existe, sin inventar un segundo cliente OAuth ni un segundo servidor que vería
+los permisos del usuario.
+
+**Consecuencias.**
+- Para probarlo contra Drive real hay que copiar el refresh token a mano (documentado en el README,
+  con `--refresh-token-file`) o probar con `--dir` sobre el layout copiado.
+- **No se ha ejecutado ni una llamada real contra la API de Drive.** El doble de `fetch` de los
+  tests reproduce la forma de la API (búsqueda por nombre, `alt=media`, `version` como etag,
+  `nextPageToken`), no su comportamiento exacto: queda como riesgo residual declarado.
+- Lo que sí queda probado sin credenciales: el layout completo, las cinco tools, la paridad con la
+  fuente de backup, el reintento único tras un 401, el mapeo de errores y el canje del token.

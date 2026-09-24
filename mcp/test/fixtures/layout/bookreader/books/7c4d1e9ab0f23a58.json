@@ -1,0 +1,39 @@
+{
+  "local": {
+    "highlights_7c4d1e9ab0f23a58": [
+      {
+        "uid": "epubcfi(/6/4!/4/2/2,/1:0,/1:52)",
+        "id": "epubcfi(/6/4!/4/2/2,/1:0,/1:52)",
+        "cfi": "epubcfi(/6/4!/4/2/2,/1:0,/1:52)",
+        "text": "La memoria es una reconstrucción, no un registro fiel.",
+        "color": "#ffeb3b",
+        "chapter": "Capítulo 1 · Ilusión y recuerdo",
+        "note": "La ilusión de continuidad.",
+        "timestamp": 1789852200000,
+        "updatedAt": 1789852200000
+      },
+      {
+        "uid": "epubcfi(/6/8!/4/2/4,/1:0,/1:60)",
+        "id": "epubcfi(/6/8!/4/2/4,/1:0,/1:60)",
+        "cfi": "epubcfi(/6/8!/4/2/4,/1:0,/1:60)",
+        "text": "Epidemiología y memoria: dos formas de contar lo que le pasa a un pueblo.",
+        "color": "#8bc34a",
+        "chapter": "Capítulo 2 · Contar",
+        "note": "",
+        "timestamp": 1789853100000,
+        "updatedAt": 1789853100000
+      }
+    ],
+    "bookmarks_7c4d1e9ab0f23a58": [],
+    "lastPosition_7c4d1e9ab0f23a58": null,
+    "lastPositionAt_7c4d1e9ab0f23a58": null,
+    "readingMode_7c4d1e9ab0f23a58": "paginated"
+  },
+  "convos": [],
+  "messages": [],
+  "notes": [],
+  "ratings": [],
+  "artifacts": [],
+  "decks": [],
+  "meta": null
+}

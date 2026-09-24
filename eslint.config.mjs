@@ -6,7 +6,13 @@ import globals from 'globals';
 
 export default [
   {
-    ignores: ['app/vendor/**', 'node_modules/**', 'test-results/**', 'playwright-report/**'],
+    ignores: [
+      'app/vendor/**',
+      'node_modules/**',
+      'mcp/node_modules/**',
+      'test-results/**',
+      'playwright-report/**',
+    ],
   },
   js.configs.recommended,
   {
@@ -41,6 +47,20 @@ export default [
       ecmaVersion: 2022,
       sourceType: 'module',
       globals: { ...globals.node },
+    },
+  },
+  {
+    // MCP local (P28): Node ESM puro, sin DOM, y con una regla que no se puede romper:
+    // stdout es el canal del protocolo, así que aquí no hay console.log que valga.
+    files: ['mcp/**/*.mjs'],
+    languageOptions: {
+      ecmaVersion: 2022,
+      sourceType: 'module',
+      globals: { ...globals.node },
+    },
+    rules: {
+      'no-unused-vars': ['warn', { args: 'none', caughtErrors: 'none', ignoreRestSiblings: true }],
+      'no-empty': ['warn', { allowEmptyCatch: true }],
     },
   },
 ];

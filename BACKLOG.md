@@ -1150,7 +1150,14 @@ la copia de BookReader. Hay que decirlo en la UI («copia del <fecha>»), no esc
 
 ---
 
-### P28 — MCP: que un agente externo lea tu biblioteca · `M`
+### P28 — MCP: que un agente externo lea tu biblioteca · `M` · **✓ (F1–F2)**
+
+> **Estado: F1 y F2 entregadas en `feat/p28-mcp` (2026-09-23; ver CHANGELOG y ADR-036/037/038).**
+> El MCP vive en `mcp/`, con la app intacta. **Falta probarlo contra Drive real** (no hay
+> credenciales en la máquina de desarrollo): el OAuth interactivo no se implementó a propósito —el
+> `redirect_uri` de la app no está registrado para localhost— y el camino documentado es el refresh
+> token que la app ya tiene, o una carpeta copiada del layout (`--dir`). **F3 (escritura) sigue
+> fuera** hasta que F1/F2 demuestren uso.
 
 **La pregunta.** «¿Se puede añadir un MCP o una API para que Claude se conecte?» Sí, pero el sitio
 por el que se entra no es obvio, y elegir mal rompe la promesa del producto.
@@ -1170,16 +1177,17 @@ mensajes, notas, ratings, artefactos del Studio y mazos con su estado de repaso.
 ya se mantiene por otro motivo.
 
 **Fases:**
-- **F1 — MCP sobre el fichero de backup** `S`: la fuente es el JSON que ya produce
+- **F1 — MCP sobre el fichero de backup** `S` · **✓**: la fuente es el JSON que ya produce
   [`backup.js` · `buildBackup()`](app/js/backup.js#L47). Sin OAuth, sin red, sin cuenta. Tools:
   `list_books`, `get_highlights(bookId)`, `get_notes(bookId)`, `search_highlights(query)`.
-  Sirve para **responder si el caso de uso aporta algo** antes de pagar el peaje de Drive.
-  Limitación que hay que decir en el README del MCP, no descubrir: el backup es una **foto**, y
+  La limitación está en el README del MCP, no para descubrirla: el backup es una **foto**, y
   **no lleva el registro de lectura** (`reading-log.js` vive en su propia IDB y `backup.js` no lo
-  incluye) → en F1 no hay estadísticas.
-- **F2 — MCP sobre Drive** `M`: misma superficie de tools, fuente viva, y con el OAuth de
-  [`sync/drive-auth.js`](app/js/sync/drive-auth.js). Aquí **sí** entra `reading_stats(range)`,
-  porque el registro de lectura viaja en el layout (P25·F3). Funciona con el navegador cerrado.
+  incluye) → en F1 no hay estadísticas, y `reading_stats` ni se anuncia.
+- **F2 — MCP sobre Drive** `M` · **✓ (sin verificar contra Drive real)**: misma superficie de tools,
+  fuente viva, y con el OAuth de [`sync/drive-auth.js`](app/js/sync/drive-auth.js). Aquí **sí**
+  entra `reading_stats(range)`, porque el registro de lectura viaja en el layout (P25·F3).
+  Funciona con el navegador cerrado. La fuente depende de una interfaz de proveedor (Google,
+  carpeta con el layout, memoria), así que se prueba entera sin credenciales.
 - **F3 — Escritura (crear nota, crear tarjeta)** `M` · **solo si F1/F2 demuestran uso**: ver el aviso.
 
 > ⚠️ **Escribir es donde se rompe el sync, no donde se rompe el JSON.** El merge fusiona **por unión

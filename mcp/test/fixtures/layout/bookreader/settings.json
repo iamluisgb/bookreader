@@ -1,0 +1,67 @@
+{
+  "theme": "sepia",
+  "fontScale": 1.15,
+  "study_streak": {
+    "count": 4,
+    "lastDay": "2026-09-22"
+  },
+  "reading_days": [
+    {
+      "key": "2026-09-20|dev0a1b2c",
+      "day": "2026-09-20",
+      "deviceId": "dev0a1b2c",
+      "updatedAt": 1789941600000,
+      "books": {
+        "01f3a7c9d4b28e56": {
+          "ms": 1200000,
+          "words": 3600,
+          "units": 18
+        }
+      }
+    },
+    {
+      "key": "2026-09-21|dev0a1b2c",
+      "day": "2026-09-21",
+      "deviceId": "dev0a1b2c",
+      "updatedAt": 1790028000000,
+      "books": {
+        "01f3a7c9d4b28e56": {
+          "ms": 1800000,
+          "words": 5400,
+          "units": 27
+        }
+      }
+    },
+    {
+      "key": "2026-09-21|dev9z8y7w",
+      "day": "2026-09-21",
+      "deviceId": "dev9z8y7w",
+      "updatedAt": 1790033400000,
+      "books": {
+        "01f3a7c9d4b28e56": {
+          "ms": 600000,
+          "words": 1800,
+          "units": 9
+        }
+      }
+    },
+    {
+      "key": "2026-09-22|dev0a1b2c",
+      "day": "2026-09-22",
+      "deviceId": "dev0a1b2c",
+      "updatedAt": 1790115000000,
+      "books": {
+        "01f3a7c9d4b28e56": {
+          "ms": 900000,
+          "words": 2700,
+          "units": 13
+        },
+        "7c4d1e9ab0f23a58": {
+          "ms": 300000,
+          "words": 900,
+          "units": 5
+        }
+      }
+    }
+  ]
+}

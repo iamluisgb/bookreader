@@ -1,0 +1,153 @@
+{
+  "local": {
+    "highlights_01f3a7c9d4b28e56": [
+      {
+        "uid": "epubcfi(/6/14!/4/2/2,/1:0,/1:88)",
+        "id": "epubcfi(/6/14!/4/2/2,/1:0,/1:88)",
+        "cfi": "epubcfi(/6/14!/4/2/2,/1:0,/1:88)",
+        "text": "Un índice de cobertura evita volver a la tabla: la consulta se resuelve solo con el árbol.",
+        "color": "#ffeb3b",
+        "chapter": "Capítulo 3 · Almacenamiento y recuperación",
+        "note": "Clave para el listado de pedidos por fecha.",
+        "timestamp": 1789927860000,
+        "updatedAt": 1789927860000
+      },
+      {
+        "uid": "epubcfi(/6/30!/4/2/6,/1:0,/1:64)",
+        "id": "epubcfi(/6/30!/4/2/6,/1:0,/1:64)",
+        "cfi": "epubcfi(/6/30!/4/2/6,/1:0,/1:64)",
+        "text": "El consenso no es gratis: cada ronda paga una ida y vuelta de red.",
+        "color": "#8bc34a",
+        "chapter": "Capítulo 9 · Consistencia y consenso",
+        "note": "",
+        "timestamp": 1789976700000,
+        "updatedAt": 1789976700000
+      },
+      {
+        "uid": "u-pdf-42-cobertura",
+        "id": "pdf-42-1789895400000-ab12c",
+        "page": 42,
+        "rects": [
+          {
+            "x": 40,
+            "y": 120,
+            "w": 380,
+            "h": 44
+          }
+        ],
+        "text": "Los registros con clave compuesta se reparten por el prefijo, no por el hash completo.",
+        "color": "#ff9800",
+        "chapter": "Pág. 42",
+        "note": "Ojo con el punto caliente de partición.",
+        "timestamp": 1790065200000,
+        "updatedAt": 1790065200000
+      },
+      {
+        "uid": "epubcfi(/6/14!/4/2/8,/1:0,/1:40)",
+        "cfi": "epubcfi(/6/14!/4/2/8,/1:0,/1:40)",
+        "text": "Este subrayado estaba borrado y no debe aparecer en ninguna tool.",
+        "deleted": true,
+        "deletedAt": 1790067600000,
+        "updatedAt": 1790067600000
+      }
+    ],
+    "bookmarks_01f3a7c9d4b28e56": [
+      {
+        "uid": "epubcfi(/6/14!/4/2/2)",
+        "cfi": "epubcfi(/6/14!/4/2/2)",
+        "title": "Índices de cobertura",
+        "chapter": "Capítulo 3",
+        "page": null,
+        "timestamp": 1789976400000,
+        "updatedAt": 1789976400000
+      }
+    ],
+    "lastPosition_01f3a7c9d4b28e56": "epubcfi(/6/30!/4/2/6)",
+    "lastPositionAt_01f3a7c9d4b28e56": 1790109000000,
+    "readingMode_01f3a7c9d4b28e56": "paginated"
+  },
+  "convos": [
+    {
+      "id": "c1f0a4b7e2d39415",
+      "bookId": "01f3a7c9d4b28e56",
+      "templateId": "t1-extraccion",
+      "goal": "Elegir el índice que aguante mi volumen de pedidos",
+      "createdAt": 1789927320000,
+      "lastUsedAt": 1790109060000
+    }
+  ],
+  "messages": [
+    {
+      "id": 1,
+      "uid": "m-1",
+      "convoId": "c1f0a4b7e2d39415",
+      "bookId": "01f3a7c9d4b28e56",
+      "role": "user",
+      "content": "¿Me sirve un índice de cobertura?",
+      "ts": 1789927500000
+    },
+    {
+      "id": 2,
+      "uid": "m-2",
+      "convoId": "c1f0a4b7e2d39415",
+      "bookId": "01f3a7c9d4b28e56",
+      "role": "assistant",
+      "content": "Depende del predicado: [[a1]] lo explica en la página 88.",
+      "ts": 1789927560000
+    }
+  ],
+  "notes": [
+    {
+      "id": 1,
+      "uid": "n-1-problema",
+      "convoId": "c1f0a4b7e2d39415",
+      "bookId": "01f3a7c9d4b28e56",
+      "fieldKey": "problema_actual",
+      "content": "El listado de pedidos por rango de fecha tarda 8 s con 40 M de filas.",
+      "sourceCfis": [],
+      "ts": 1789927920000,
+      "updatedAt": 1789927920000
+    },
+    {
+      "id": 2,
+      "uid": "n-2-conceptos",
+      "convoId": "c1f0a4b7e2d39415",
+      "fieldKey": "conceptos_frameworks",
+      "content": "Índice de cobertura · réplica de lectura · partición por prefijo.",
+      "sourceCfis": [
+        "epubcfi(/6/14!/4/2/2,/1:0,/1:88)"
+      ],
+      "ts": 1789929000000,
+      "updatedAt": 1789929000000
+    },
+    {
+      "id": 3,
+      "uid": "n-3-borrada",
+      "convoId": "c1f0a4b7e2d39415",
+      "bookId": "01f3a7c9d4b28e56",
+      "fieldKey": "plan_accion",
+      "content": "Esta nota se borró y no debe salir.",
+      "deleted": true,
+      "deletedAt": 1790067900000,
+      "ts": 1789929600000,
+      "updatedAt": 1790067900000
+    }
+  ],
+  "ratings": [],
+  "artifacts": [
+    {
+      "key": "01f3a7c9d4b28e56:summary",
+      "bookId": "01f3a7c9d4b28e56",
+      "kind": "summary",
+      "result": "resumen del capítulo",
+      "createdAt": 1789977600000,
+      "updatedAt": 1789977600000
+    }
+  ],
+  "decks": [],
+  "meta": {
+    "id": "01f3a7c9d4b28e56",
+    "title": "Diseño de datos intensivos",
+    "addedAt": 1789926600000
+  }
+}
