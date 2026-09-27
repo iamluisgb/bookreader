@@ -13,6 +13,35 @@ buena viaja en el próximo covers.json a los demás dispositivos. La adopción d
 además por **ancho real** (decodificando), no por bytes: una v1 densa puede pesar lo mismo que
 una v2 plana.
 
+## 2026-09-27 — P32: la landing en 3D, con un libro por público
+
+La landing contaba bien la historia pero no se movía nada, y el bloque central («Now the page
+answers back») no tenía imagen. Ahora un solo objeto, **el libro**, hace de hilo en toda la página:
+
+- **Hero:** un libro en CSS 3D (sin Three.js, el texto sigue siendo texto) que se abre con el
+  scroll por la página difícil; la de al lado es el agente, con la respuesta escribiéndose y su
+  cita. Se inclina hacia el cursor.
+- **Un libro por público**, con portada real: *Designing Data‑Intensive Applications* 2.ª ed.
+  (ingeniería), *First Aid for the USMLE Step 1 2026* (medicina) y la guía *AWS Solutions
+  Architect SAA‑C03* (certificaciones). Selector en el hero y enlace de campaña con
+  `?para=medicina|medicine|certificaciones|…`, que sobrevive a la redirección a `/es/`.
+  Cambiar de libro cambia todas las escenas.
+- **Beat 2:** el párrafo se nubla palabra a palabra al bajar y deja iluminada la frase clave.
+  **Beat 3:** página + agente que contesta. **Beat 4:** la cita tira un hilo hasta su frase, la
+  página gira hacia ti y el subrayado se dibuja. **Beat 5:** mazo de tarjetas en abanico.
+  **Privacidad:** vista explotada del dispositivo. **Cierre:** tu libro baja a la estantería.
+- `prefers-reduced-motion` (o sin JS): cada escena se pinta en su estado final, quieta.
+- Eventos de Umami en los CTA (`Open app`, con `where`) y en el selector (`Pick book`), para
+  medir si el hero mueve los clics.
+
+Código compartido en `assets/landing/` (`motion.css`, `motion.js`, portadas en WebP); los textos
+de cada libro viven en cada página (`#books-data`), en su idioma. Tests:
+`tests/landing-motion.spec.ts`.
+
+**Pendiente:** permiso de las editoriales para las portadas (O'Reilly, McGraw Hill, Wiley). Los
+pasajes de DDIA son del libro; los de First Aid y AWS están parafraseados y la página lo indica
+(«Example passages»).
+
 ## 2026-09-23 — P28: un MCP local para que un agente externo lea tu biblioteca (F1–F2)
 
 El MCP pedido en P28, sin tocar una línea de la app: **`mcp/`**, un servidor local por stdio que

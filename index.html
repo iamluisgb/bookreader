@@ -14,9 +14,14 @@
     if (q === 'en' || q === 'es') localStorage.setItem('bookreader_lang', q);
     var pref = localStorage.getItem('bookreader_lang');
     if (pref === 'en') return;
-    if (pref === 'es' || (!pref && /^es(-|_|$)/i.test(navigator.language || ''))) location.replace('es/');
+    if (pref === 'es' || (!pref && /^es(-|_|$)/i.test(navigator.language || ''))) location.replace('es/' + location.search); // conserva ?para= de las campañas
   } catch (e) { /* sin storage: se queda en inglés */ }
 })();
+</script>
+<script>
+// P32: el movimiento de la landing se activa solo si el sistema no pide menos. Sin esta
+// clase (o sin JS) cada escena se pinta en su estado final, quieta.
+if (!window.matchMedia || !matchMedia('(prefers-reduced-motion: reduce)').matches) document.documentElement.classList.add('motion');
 </script>
 <title>BookReader — What you read finally stays with you</title>
 <meta name="description" content="The EPUB & PDF reader with an AI agent that explains what you don't understand, shows you the page so you can verify it, and turns what matters into spaced review so you don't forget. All in your browser.">
@@ -142,12 +147,6 @@
   .alt { background: var(--bg-soft); border-block: 1px solid var(--line); }
 
   /* ---- Beat 1 · el producto (lector + agente) ---- */
-  .device { max-width: 880px; margin-inline: auto; background: var(--bg-soft); border: 1px solid var(--line); border-radius: 20px; box-shadow: var(--shadow-3); overflow: hidden; text-align: left; }
-  .alt .device { background: var(--card); }
-  .device-bar { display: flex; align-items: center; gap: 7px; padding: 12px 15px; border-bottom: 1px solid var(--line); }
-  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--line); }
-  .device-title { margin-left: 8px; font: 600 11.5px var(--sans); color: var(--ink-faint); }
-  .device-body { display: grid; grid-template-columns: 11fr 10fr; }
   .page { background: var(--paper); color: var(--paper-ink); padding: 28px 26px 30px; border-right: 1px solid var(--paper-edge); }
   .page-ch { font: 600 10px var(--sans); letter-spacing: 0.12em; text-transform: uppercase; color: #8a7f68; margin-bottom: 14px; }
   .page-text { font: 400 14px/1.75 var(--serif); }
@@ -164,17 +163,9 @@
   .bubble.a { align-self: flex-start; border: 1px solid var(--line); border-bottom-left-radius: 4px; color: var(--ink); }
   .cite { display: inline-flex; align-items: center; gap: 6px; margin-top: 9px; font: 600 10.5px var(--sans); color: var(--accent); background: var(--accent-soft); border-radius: 999px; padding: 4px 10px; white-space: nowrap; }
   .cite svg { flex: none; }
-  .composer { margin: 0 16px 16px; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; display: flex; align-items: center; gap: 8px; }
-  .composer span { font: 400 12.5px var(--sans); color: var(--ink-faint); flex: 1; text-align: left; }
-  .composer i { width: 26px; height: 26px; border-radius: 8px; background: var(--accent-bright); display: grid; place-items: center; color: var(--on-accent); }
 
   @keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
-  .anim-1, .anim-2, .anim-3 { animation: rise 0.5s ease both; }
-  .anim-1 { animation-delay: 0.6s; }
-  .anim-2 { animation-delay: 1.5s; }
-  .anim-3 { animation-delay: 2.2s; }
   @media (prefers-reduced-motion: reduce) {
-    .anim-1, .anim-2, .anim-3 { animation: none; }
     html { scroll-behavior: auto; }
     .fcard { transition: none !important; }
   }
@@ -207,7 +198,6 @@
     background: none; font-family: inherit; color: var(--ink); transform-style: preserve-3d;
     transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1); text-align: left; display: block;
   }
-  .fcard.flip { transform: rotateY(180deg); }
   .face {
     position: absolute; inset: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden;
     background: var(--card); border: 1px solid var(--line); border-radius: 18px; box-shadow: var(--shadow-3);
@@ -257,11 +247,12 @@
   .foot-in .brand { font-size: 14.5px; }
 
   @media (max-width: 760px) {
-    .device-body { grid-template-columns: 1fr; }
-    .page { border-right: 0; border-bottom: 1px solid var(--paper-edge); }
+      .page { border-right: 0; border-bottom: 1px solid var(--paper-edge); }
     .proof .cite-big { white-space: normal; width: max-content; max-width: 92%; text-align: center; }
   }
 </style>
+<link rel="stylesheet" href="assets/landing/motion.css">
+<link rel="preload" as="image" href="assets/landing/covers/ddia-2e.webp">
 <!-- Umami Analytics: solo carga en producción (servimos el tracker en /u/s.js); en localhost/tests, nada -->
 <script>
 if (location.hostname === 'bookreader.raiatech.com') {
@@ -283,55 +274,62 @@ if (location.hostname === 'bookreader.raiatech.com') {
     </span>
     <span style="display:flex;align-items:center;gap:18px">
       <a class="nav-lang" href="es/?lang=es" style="font:600 13.5px var(--sans);color:var(--ink-soft)">Español</a>
-      <a class="nav-cta" href="app/">Open the app</a>
+      <a class="nav-cta" data-umami-event="Open app" data-umami-event-where="nav" href="app/">Open the app</a>
     </span>
   </div>
 </nav>
 
-<!-- Beat 1 · La promesa -->
-<header class="beat">
-  <div class="wrap">
-    <div class="beat-copy">
-      <p class="product-name">BookReader</p>
-      <h1>What you read finally stays with you.</h1>
-      <div class="cta-row">
-        <a class="btn-primary" href="app/">Open BookReader
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg>
-        </a>
+<!-- Beat 1 · La promesa: el libro se abre con el scroll (P32) -->
+<header class="hero" id="hero">
+  <div class="hero-sticky">
+    <div class="wrap hero-in">
+      <div class="beat-copy">
+        <p class="product-name">BookReader</p>
+        <h1>What you read finally stays with you.</h1>
+        <div class="cta-row">
+          <a class="btn-primary" href="app/" data-umami-event="Open app" data-umami-event-where="hero">Open BookReader
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg>
+          </a>
+        </div>
+        <p class="cta-note">Free. No account. In your browser.</p>
       </div>
-      <p class="cta-note">Free. No account. In your browser.</p>
-    </div>
-
-    <div class="beat-visual" aria-label="BookReader: the reader with the agent explaining a concept">
-      <div class="device">
-        <div class="device-bar"><span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="device-title">Designing Data-Intensive Applications</span></div>
-        <div class="device-body">
-          <div class="page">
-            <div class="page-ch">9 · Consistency and Consensus</div>
-            <div class="page-text">
-              <p>In an eventually consistent database, if you ask two different replicas the same question at the same time, you may get two different answers.</p>
-              <p><mark>Linearizability is the idea of making a system appear as if there were only one copy of the data, and all operations on it are atomic.</mark></p>
+      <div class="picker" role="group" aria-label="Choose a book for the demo">
+        <span class="picker-label">Try it with</span>
+        <button type="button" data-book="ddia" aria-pressed="true" data-umami-event="Pick book" data-umami-event-book="engineering">Engineering</button>
+        <button type="button" data-book="fa" aria-pressed="false" data-umami-event="Pick book" data-umami-event-book="medicine">Medicine</button>
+        <button type="button" data-book="aws" aria-pressed="false" data-umami-event="Pick book" data-umami-event-book="certifications">Certifications</button>
+      </div>
+      <div class="bk-stage" role="img" aria-label="BookReader with Designing Data-Intensive Applications, 2nd ed.: the book opens and the agent answers beside the page">
+        <div class="bk-floor"></div>
+        <div class="bk-book" id="bk-book" aria-hidden="true">
+          <div class="bk-base bk-paper">
+            <div class="bk-chat">
+              <div class="bk-ch"><i></i>Agent</div>
+              <div class="bk-q" id="bk-q">I don&#x27;t quite get linearizability. Can you explain it simply?</div>
+              <div class="bk-a"><span id="bk-a">Imagine there were only one copy of the data and nobody could ever catch it mid-change. That&#x27;s the promise: you write, and anyone reading afterwards sees the new value, no matter which replica they ask.</span><br><span class="bk-cite" id="bk-cite">Consistency and Consensus</span></div>
             </div>
-            <div class="page-num">324</div>
           </div>
-          <div class="panel">
-            <div class="panel-head">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.5l1.5 4.2 4.2 1.5-4.2 1.5L12 14.9l-1.5-4.2L6.3 9.2l4.2-1.5L12 3.5Z"/><path d="M18.5 14l.7 1.9 1.9.7-1.9.7-.7 1.9-.7-1.9-1.9-.7 1.9-.7.7-1.9Z"/></svg>
-              Agent
-              <span class="panel-status">knows the whole book</span>
-            </div>
-            <div class="chat">
-              <div class="bubble q anim-1">I don't quite get linearizability. Can you explain it simply?</div>
-              <div class="bubble a anim-2">Imagine there were only <b>one copy of the data</b> and nobody could ever catch it mid-change. That's the promise: you write, and anyone reading afterwards sees the new value — no matter which replica they ask.
-                <br><span class="cite anim-3">
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4.5h7a2 2 0 0 1 2 2V20a2.5 2.5 0 0 0-2.5-2H5V4.5Z"/><path d="M19 4.5h-3a2 2 0 0 0-2 2V20a2.5 2.5 0 0 1 2.5-2H19V4.5Z"/></svg>
-                  p. 324 · Consistency and Consensus</span>
+          <div class="bk-sheet l2">
+            <div class="bk-face bk-paper bk-lines"></div>
+            <div class="bk-face back bk-paper">
+              <div class="bk-lp">
+                <div class="bk-ch" id="bk-ch">Consistency and Consensus</div>
+                <p id="bk-p1">In an eventually consistent database, if you ask two different replicas the same question at the same time, you may get two different answers.</p>
+                <p><span class="bk-hl lit" id="bk-hl">Linearizability is the idea of making a system appear as if there were only one copy of the data, and all operations on it are atomic.</span></p>
               </div>
             </div>
-            <div class="composer"><span>Ask about the book…</span><i><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5"/><path d="m6 11 6-6 6 6"/></svg></i></div>
+          </div>
+          <div class="bk-sheet l1">
+            <div class="bk-face bk-paper bk-lines"></div>
+            <div class="bk-face back bk-paper bk-lines"></div>
+          </div>
+          <div class="bk-sheet cover">
+            <div class="bk-face bk-cover-front" id="bk-cover" style="--cover-img: url('/assets/landing/covers/ddia-2e.webp')"></div>
+            <div class="bk-face back bk-cover-back"></div>
           </div>
         </div>
       </div>
+      <p class="bk-credit">Example passages. Covers © their publishers.</p>
     </div>
   </div>
 </header>
@@ -344,9 +342,7 @@ if (location.hostname === 'bookreader.raiatech.com') {
       <p class="support">Reading it for the third time. Understanding every word and none of the ideas.</p>
     </div>
     <div class="beat-visual">
-      <div class="dense" aria-hidden="true">
-        A subtle consequence of quorum consistency is that, even with w + r &gt; n, there are edge cases where stale values are returned: if a sloppy quorum is used, the w writes may end up on <span class="fade">different nodes than the r reads, so there is no longer a guaranteed overlap between the read nodes and the write nodes, and therefore…</span>
-      </div>
+      <div class="dense" id="dense" aria-hidden="true">A subtle consequence of quorum consistency is that, even with w + r &gt; n, there are edge cases where stale values are returned: if a <span class="w k">sloppy quorum</span> <span class="fade">is used, the w writes may end up on different nodes than the r reads, so there is no longer a guaranteed overlap between the read nodes and the write nodes, and therefore…</span></div>
     </div>
   </div>
 </section>
@@ -357,6 +353,24 @@ if (location.hostname === 'bookreader.raiatech.com') {
     <div class="beat-copy">
       <h2>Now the page answers back.</h2>
       <p class="support">Ask about whatever you don't understand, the way you'd actually ask. The agent knows the whole book, knows your goal, and explains it <b>at your level</b>, until it clicks.</p>
+    </div>
+    <div class="beat-visual">
+      <div class="ask" id="ask">
+        <div class="ask-page" aria-hidden="true">
+          <div class="page-ch" id="ask-ch">Transactions</div>
+          <p><span id="ask-before">This pattern of read-modify-write can cause lost updates. </span><span id="ask-mark">An atomic compare-and-set operation avoids the lost update by only allowing the write if the value has not changed since you last read it.</span></p>
+        </div>
+        <div class="ask-chat">
+          <div class="panel-head">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.5l1.5 4.2 4.2 1.5-4.2 1.5L12 14.9l-1.5-4.2L6.3 9.2l4.2-1.5L12 3.5Z"/><path d="M18.5 14l.7 1.9 1.9.7-1.9.7-.7 1.9-.7-1.9-1.9-.7 1.9-.7.7-1.9Z"/></svg>
+            Agent
+            <span class="panel-status">knows the whole book</span>
+          </div>
+          <div class="bubble q" id="ask-q">Why does my counter lose increments?</div>
+          <div class="bubble a" id="ask-a">Two requests read the same value, both add one, and the second write wipes out the first. The book&#x27;s fix is compare-and-set: the write only goes through if the value hasn&#x27;t changed since you read it.</div>
+          <span class="cite" id="ask-cite"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4.5h7a2 2 0 0 1 2 2V20a2.5 2.5 0 0 0-2.5-2H5V4.5Z"/><path d="M19 4.5h-3a2 2 0 0 0-2 2V20a2.5 2.5 0 0 1 2.5-2H19V4.5Z"/></svg> Transactions</span>
+        </div>
+      </div>
     </div>
   </div>
 </section>
@@ -369,18 +383,18 @@ if (location.hostname === 'bookreader.raiatech.com') {
       <p class="support">Every explanation carries its citation. Tap it and verify it in the book, word for word.</p>
     </div>
     <div class="beat-visual">
-      <div class="proof">
+      <div class="proof" id="proof">
         <div class="page">
-          <div class="page-ch">7 · Transactions</div>
+          <div class="page-ch" id="proof-ch">Transactions</div>
           <div class="page-text">
-            <p>This pattern of read-modify-write can cause lost updates. <mark>An atomic compare-and-set operation avoids the lost update by only allowing the write if the value has not changed since you last read it.</mark></p>
+            <p><span id="proof-before">This pattern of read-modify-write can cause lost updates. </span><mark id="proof-mark">An atomic compare-and-set operation avoids the lost update by only allowing the write if the value has not changed since you last read it.</mark></p>
           </div>
-          <div class="page-num">243</div>
         </div>
-        <span class="cite-big">
+        <span class="cite-big" id="proof-cite">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4.5h7a2 2 0 0 1 2 2V20a2.5 2.5 0 0 0-2.5-2H5V4.5Z"/><path d="M19 4.5h-3a2 2 0 0 0-2 2V20a2.5 2.5 0 0 1 2.5-2H19V4.5Z"/></svg>
-          p. 243 · Transactions — tap and verify
+          <span id="proof-cite-text">Transactions — tap and verify</span>
         </span>
+        <svg class="proof-link" aria-hidden="true"><path id="proof-path" d=""/><circle id="proof-dot" r="4" cx="-10" cy="-10"/></svg>
       </div>
     </div>
   </div>
@@ -396,28 +410,58 @@ if (location.hostname === 'bookreader.raiatech.com') {
     </div>
     <div class="beat-visual">
       <div class="fcard-zone">
-        <button class="fcard" id="fcard" type="button" aria-label="Example flashcard: tap to flip">
-          <span class="face">
-            <span class="face-tag">DDIA · Ch. 7 — Transactions</span>
-            <span class="face-q">What problem does a compare-and-set operation avoid?</span>
-            <span class="face-hint">Tap the card to flip it</span>
-          </span>
-          <span class="face back">
-            <span class="face-tag">Answer</span>
-            <span class="face-a"><b>Lost updates</b>: two clients read the same value, modify it, and overwrite each other on write. CAS only writes if the value hasn't changed.</span>
-            <span class="src-chip">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4.5h7a2 2 0 0 1 2 2V20a2.5 2.5 0 0 0-2.5-2H5V4.5Z"/><path d="M19 4.5h-3a2 2 0 0 0-2 2V20a2.5 2.5 0 0 1 2.5-2H19V4.5Z"/></svg>
-              See it in the book · p. 243</span>
-            <span class="grade-row" aria-hidden="true">
-              <span class="grade">Again<small>&lt;10m</small></span>
-              <span class="grade">Hard<small>3d</small></span>
-              <span class="grade g3">Good<small>6d</small></span>
-              <span class="grade">Easy<small>13d</small></span>
+        <div class="deck" id="deck">
+          <button class="fcard" type="button" aria-label="Example flashcard: tap to flip">
+            <span class="fcard-in">
+              <span class="face">
+                <span class="face-tag">DDIA · Transactions</span>
+                <span class="face-q">What problem does a compare-and-set operation avoid?</span>
+                <span class="face-hint">Tap the card to flip it</span>
+              </span>
+              <span class="face back">
+                <span class="face-tag">Answer</span>
+                <span class="face-a"><b>Lost updates</b>: two clients read the same value, modify it, and overwrite each other on write. CAS only writes if the value hasn’t changed.</span>
+                <span class="src-chip"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4.5h7a2 2 0 0 1 2 2V20a2.5 2.5 0 0 0-2.5-2H5V4.5Z"/><path d="M19 4.5h-3a2 2 0 0 0-2 2V20a2.5 2.5 0 0 1 2.5-2H19V4.5Z"/></svg> See it in the book · <span class="src-cite">Transactions</span></span>
+                <span class="grade-row" aria-hidden="true"><span class="grade">Again<small>&lt;10m</small></span><span class="grade">Hard<small>3d</small></span><span class="grade g3">Good<small>6d</small></span><span class="grade">Easy<small>13d</small></span></span>
+              </span>
             </span>
-          </span>
-        </button>
+          </button>
+          <button class="fcard" type="button" aria-label="Example flashcard: tap to flip">
+            <span class="fcard-in">
+              <span class="face">
+                <span class="face-tag">DDIA · Consistency and Consensus</span>
+                <span class="face-q">What does linearizability promise?</span>
+                <span class="face-hint">Tap the card to flip it</span>
+              </span>
+              <span class="face back">
+                <span class="face-tag">Answer</span>
+                <span class="face-a">The system behaves as if there were <b>one copy of the data</b> and every operation were atomic.</span>
+                <span class="src-chip"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4.5h7a2 2 0 0 1 2 2V20a2.5 2.5 0 0 0-2.5-2H5V4.5Z"/><path d="M19 4.5h-3a2 2 0 0 0-2 2V20a2.5 2.5 0 0 1 2.5-2H19V4.5Z"/></svg> See it in the book · <span class="src-cite">Consistency and Consensus</span></span>
+                <span class="grade-row" aria-hidden="true"><span class="grade">Again<small>&lt;10m</small></span><span class="grade">Hard<small>3d</small></span><span class="grade g3">Good<small>6d</small></span><span class="grade">Easy<small>13d</small></span></span>
+              </span>
+            </span>
+          </button>
+          <button class="fcard" type="button" aria-label="Example flashcard: tap to flip">
+            <span class="fcard-in">
+              <span class="face">
+                <span class="face-tag">DDIA · Replication</span>
+                <span class="face-q">What is a sloppy quorum?</span>
+                <span class="face-hint">Tap the card to flip it</span>
+              </span>
+              <span class="face back">
+                <span class="face-tag">Answer</span>
+                <span class="face-a">Writes are accepted by <b>reachable nodes</b> that aren’t the value’s usual home, so a read may miss them.</span>
+                <span class="src-chip"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4.5h7a2 2 0 0 1 2 2V20a2.5 2.5 0 0 0-2.5-2H5V4.5Z"/><path d="M19 4.5h-3a2 2 0 0 0-2 2V20a2.5 2.5 0 0 1 2.5-2H19V4.5Z"/></svg> See it in the book · <span class="src-cite">Replication</span></span>
+                <span class="grade-row" aria-hidden="true"><span class="grade">Again<small>&lt;10m</small></span><span class="grade">Hard<small>3d</small></span><span class="grade g3">Good<small>6d</small></span><span class="grade">Easy<small>13d</small></span></span>
+              </span>
+            </span>
+          </button>
+        </div>
       </div>
-      <p class="fcard-note">It's a real card. Try it.</p>
+      <div class="deck-ctl">
+        <button class="btn-quiet" type="button" id="deck-next">Next card</button>
+        <p class="fcard-note">It’s a real card. Try it.</p>
+      </div>
     </div>
   </div>
 </section>
@@ -429,6 +473,15 @@ if (location.hostname === 'bookreader.raiatech.com') {
       <h2>Your books are yours. So are your questions.</h2>
       <p class="support">No account. No server. Nobody in between. Everything lives on your device, and you can take it with you anytime.</p>
       <p class="seal">Private by design. <span>That's BookReader.</span></p>
+    </div>
+    <div class="strata-stage" role="img" aria-label="Everything stays in layers inside your device: your books, highlights and notes, flashcards and progress, and your AI key">
+      <div class="strata" id="strata" aria-hidden="true">
+          <div class="stratum base" style="--i:0"><b>Your device</b><small>No account</small></div>
+          <div class="stratum" style="--i:1"><span class="bars"><i></i><i></i><i></i><i></i></span><b>Your books</b><small>EPUB &amp; PDF</small></div>
+          <div class="stratum" style="--i:2"><span class="bars"><i></i><i></i><i></i></span><b>Highlights &amp; notes</b><small>and your questions</small></div>
+          <div class="stratum" style="--i:3"><span class="bars"><i></i><i></i></span><b>Flashcards &amp; progress</b><small>spaced review</small></div>
+          <div class="stratum key" style="--i:4"><b>Your AI key</b><small>BYOK</small></div>
+      </div>
     </div>
   </div>
 </section>
@@ -518,9 +571,10 @@ if (location.hostname === 'bookreader.raiatech.com') {
 <section class="beat">
   <div class="wrap">
     <div class="beat-copy">
+      <div class="shelf" id="shelf" aria-hidden="true"><span class="spine" style="--h:96px;--c:#cfd5dc"></span><span class="spine" style="--h:118px;--c:#9aa7b4"></span><span class="spine mine" id="spine-mine" style="--c:#f4f3ef;--ci:#111418">DDIA · 2nd ed.</span><span class="spine" style="--h:104px;--c:#e3d9c6"></span><span class="spine" style="--h:128px;--c:#5d6b78"></span></div>
       <h2>The next book you read, you keep.</h2>
       <div class="cta-row">
-        <a class="btn-primary" href="app/">Open BookReader
+        <a class="btn-primary" data-umami-event="Open app" data-umami-event-where="close" href="app/">Open BookReader
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg>
         </a>
       </div>
@@ -539,9 +593,169 @@ if (location.hostname === 'bookreader.raiatech.com') {
   </div>
 </footer>
 
-<script>
-  const card = document.getElementById('fcard');
-  card.addEventListener('click', () => card.classList.toggle('flip'));
+<script type="application/json" id="books-data">
+{
+ "ddia": {
+  "slug": "engineering",
+  "title": "Designing Data-Intensive Applications, 2nd ed.",
+  "short": "DDIA · 2nd ed.",
+  "spine": [
+   "#f4f3ef",
+   "#111418"
+  ],
+  "cover": "/assets/landing/covers/ddia-2e.webp",
+  "stageLabel": "BookReader with Designing Data-Intensive Applications, 2nd ed.: the book opens and the agent answers beside the page",
+  "hero": {
+   "ch": "Consistency and Consensus",
+   "p1": "In an eventually consistent database, if you ask two different replicas the same question at the same time, you may get two different answers.",
+   "hl": "Linearizability is the idea of making a system appear as if there were only one copy of the data, and all operations on it are atomic.",
+   "cite": "Consistency and Consensus",
+   "q": "I don't quite get linearizability. Can you explain it simply?",
+   "a": "Imagine there were only one copy of the data and nobody could ever catch it mid-change. That's the promise: you write, and anyone reading afterwards sees the new value, no matter which replica they ask."
+  },
+  "dense": {
+   "lead": "A subtle consequence of quorum consistency is that, even with w + r > n, there are edge cases where stale values are returned: if a",
+   "key": "sloppy quorum",
+   "tail": "is used, the w writes may end up on different nodes than the r reads, so there is no longer a guaranteed overlap between the read nodes and the write nodes, and therefore…"
+  },
+  "ask": {
+   "ch": "Transactions",
+   "before": "This pattern of read-modify-write can cause lost updates. ",
+   "mark": "An atomic compare-and-set operation avoids the lost update by only allowing the write if the value has not changed since you last read it.",
+   "cite": "Transactions",
+   "q": "Why does my counter lose increments?",
+   "a": "Two requests read the same value, both add one, and the second write wipes out the first. The book's fix is compare-and-set: the write only goes through if the value hasn't changed since you read it.",
+   "verify": "tap and verify"
+  },
+  "cards": [
+   {
+    "tag": "DDIA · Transactions",
+    "q": "What problem does a compare-and-set operation avoid?",
+    "a": "<b>Lost updates<\/b>: two clients read the same value, modify it, and overwrite each other on write. CAS only writes if the value hasn’t changed.",
+    "cite": "Transactions"
+   },
+   {
+    "tag": "DDIA · Consistency and Consensus",
+    "q": "What does linearizability promise?",
+    "a": "The system behaves as if there were <b>one copy of the data<\/b> and every operation were atomic.",
+    "cite": "Consistency and Consensus"
+   },
+   {
+    "tag": "DDIA · Replication",
+    "q": "What is a sloppy quorum?",
+    "a": "Writes are accepted by <b>reachable nodes<\/b> that aren’t the value’s usual home, so a read may miss them.",
+    "cite": "Replication"
+   }
+  ]
+ },
+ "fa": {
+  "slug": "medicine",
+  "title": "First Aid for the USMLE Step 1 2026",
+  "short": "First Aid · Step 1",
+  "spine": [
+   "#c8102e",
+   "#ffffff"
+  ],
+  "cover": "/assets/landing/covers/first-aid-step1-2026.webp",
+  "stageLabel": "BookReader with First Aid for the USMLE Step 1 2026: the book opens and the agent answers beside the page",
+  "hero": {
+   "ch": "Cardiovascular · Physiology",
+   "p1": "Stroke volume depends on preload, afterload and contractility.",
+   "hl": "Frank–Starling law: the more the ventricle fills and stretches before it contracts, the harder it contracts, up to a limit.",
+   "cite": "Cardiovascular · Physiology",
+   "q": "Why does stroke volume go up when more blood fills the ventricle?",
+   "a": "Stretch. More filling stretches the muscle fibers, and a stretched fiber contracts harder, up to a point. That's the Frank–Starling law, and it's why preload matters."
+  },
+  "dense": {
+   "lead": "In the Frank–Starling relationship, ↑ end-diastolic volume → ↑ sarcomere length → ↑ force of contraction until the curve flattens; in systolic HF the whole curve shifts down, so",
+   "key": "↑ preload",
+   "tail": "raises filling pressures far more than stroke volume, and the extra volume backs up into the pulmonary circulation…"
+  },
+  "ask": {
+   "ch": "Cardiovascular · Pharmacology",
+   "before": "ACE inhibitors (eg, captopril, enalapril, lisinopril) block the conversion of angiotensin I to angiotensin II. ",
+   "mark": "Because ACE also breaks down bradykinin, inhibiting it lets bradykinin build up, which causes the dry cough and angioedema; ARBs don’t do this.",
+   "cite": "Cardiovascular · Pharmacology",
+   "q": "Why do ACE inhibitors cause a cough but ARBs don't?",
+   "a": "ACE does two jobs: it makes angiotensin II and it breaks down bradykinin. Block it and bradykinin builds up, which irritates the airway. ARBs act further downstream, so bradykinin is untouched.",
+   "verify": "tap and verify"
+  },
+  "cards": [
+   {
+    "tag": "First Aid · Cardiovascular",
+    "q": "Why do ACE inhibitors cause a dry cough?",
+    "a": "They block ACE, which also degrades bradykinin, so <b>bradykinin builds up<\/b>.",
+    "cite": "Cardiovascular · Pharmacology"
+   },
+   {
+    "tag": "First Aid · Cardiovascular",
+    "q": "What does the Frank–Starling law describe?",
+    "a": "<b>More preload, stronger contraction<\/b>, up to a limit: stretch before systole raises stroke volume.",
+    "cite": "Cardiovascular · Physiology"
+   },
+   {
+    "tag": "First Aid · Endocrine",
+    "q": "Which hormone’s deficiency causes central diabetes insipidus?",
+    "a": "<b>ADH (vasopressin)<\/b>: without it the kidney can’t concentrate urine.",
+    "cite": "Endocrine · Pathology"
+   }
+  ]
+ },
+ "aws": {
+  "slug": "certifications",
+  "title": "AWS Certified Solutions Architect Study Guide",
+  "short": "AWS SAA-C03",
+  "spine": [
+   "#f7f5f0",
+   "#b8650a"
+  ],
+  "cover": "/assets/landing/covers/aws-saa-c03.webp",
+  "stageLabel": "BookReader with AWS Certified Solutions Architect Study Guide: the book opens and the agent answers beside the page",
+  "hero": {
+   "ch": "Amazon S3 · Storage classes",
+   "p1": "Choosing a storage class is a trade-off between what you pay to keep data and what you pay to read it.",
+   "hl": "S3 Standard-IA costs less to store than S3 Standard, but every retrieval is charged, so it suits data you rarely read yet need right away.",
+   "cite": "Amazon S3 · Storage classes",
+   "q": "When is Standard-IA cheaper than Standard?",
+   "a": "When you rarely read the data. Storage is cheaper, but each read adds a retrieval fee, so frequent access wipes out the saving. Think backups you still need fast."
+  },
+  "dense": {
+   "lead": "Objects in S3 Standard-IA are billed for a minimum storage duration of 30 days and a minimum object size of 128 KB, and each GET adds a per-GB retrieval charge, so a lifecycle rule that transitions small, frequently read objects can",
+   "key": "increase your bill",
+   "tail": "rather than reduce it, especially once request pricing and early-deletion fees are factored in…"
+  },
+  "ask": {
+   "ch": "Amazon S3 · Versioning",
+   "before": "Once you enable versioning on a bucket, it can never return to an unversioned state; it can only be suspended. ",
+   "mark": "Deleting an object in a versioned bucket doesn’t remove it: S3 adds a delete marker, and earlier versions stay recoverable until you delete them by version ID.",
+   "cite": "Amazon S3 · Versioning",
+   "q": "I deleted a file from a versioned bucket. Is it gone?",
+   "a": "No. S3 only placed a delete marker on top. The earlier versions are still there: remove the marker, or fetch a version by its ID, and the file is back.",
+   "verify": "tap and verify"
+  },
+  "cards": [
+   {
+    "tag": "AWS SAA · Amazon S3",
+    "q": "When is S3 Standard-IA cheaper than Standard?",
+    "a": "When data is <b>rarely read<\/b>: storage costs less, but every retrieval is charged.",
+    "cite": "Amazon S3 · Storage classes"
+   },
+   {
+    "tag": "AWS SAA · Amazon S3",
+    "q": "What happens when you delete an object in a versioned bucket?",
+    "a": "S3 adds a <b>delete marker<\/b>; earlier versions stay recoverable.",
+    "cite": "Amazon S3 · Versioning"
+   },
+   {
+    "tag": "AWS SAA · Networking",
+    "q": "What does a NAT gateway let private subnets do?",
+    "a": "Open <b>outbound<\/b> connections to the internet without accepting inbound ones.",
+    "cite": "Amazon VPC · NAT"
+   }
+  ]
+ }
+}
 </script>
+<script src="assets/landing/motion.js" defer></script>
 </body>
 </html>
