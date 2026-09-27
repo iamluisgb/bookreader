@@ -56,20 +56,20 @@ export const TEMPLATE = () => `
          pinta hasta pasada la mitad: un medidor delante de quien acaba de empezar
          solo comunica escasez. Lo rellena renderQuota() en panel.js. -->
     <div id="ai-quota" class="ai-quota" hidden></div>
+    <!-- UI3 · Composer en cápsula: campo, micro y enviar dentro de UNA caja (antes eran tres
+         piezas: textarea con borde, micro suelto y un bloque verde «Enviar»). Enviar es un
+         botón redondo con flecha; conserva su nombre accesible. -->
     <div class="ai-composer">
-      <textarea id="ai-input" rows="2" placeholder="${t('Pregunta sobre el libro...')}"></textarea>
-      <div class="ai-composer-btns">
-        <!-- Un solo botón de visión: abre el overlay sobre la página y allí se elige el
-             alcance (arrastrar una zona · "Toda la página"). Antes había dos, "Ver" y "Zona",
-             con destinos excluyentes entre sí y apretando una botonera que en móvil ya iba
-             al límite. Ver pickZone() en panel.js. -->
-        <button id="ai-see" class="ai-see" title="${t('Enseñarle al agente una figura, una tabla o la página entera')}" style="display:none">${icon('crop', { size: 15 })}<span>${t('Ver')}</span></button>
-        <!-- Micro y Enviar comparten fila: en PDF la botonera ya lleva "Ver" y "Zona", y una
-             cuarta fila apilada se comía el alto del composer justo en móvil, que es donde el
-             dictado importa. Solo icono, y el estado (grabando) se ve por el color. -->
-        <div class="ai-composer-row">
-          <button id="ai-mic" class="ai-see ai-mic" title="${t('Dictar')}" aria-label="${t('Dictar')}" aria-pressed="false" style="display:none">${icon('mic', { size: 15 })}</button>
-          <button id="ai-send" class="primary-btn ai-send">${t('Enviar')}</button>
+      <div class="ai-compose-box">
+        <textarea id="ai-input" rows="1" placeholder="${t('Pregunta sobre el libro...')}"></textarea>
+        <div class="ai-composer-btns">
+          <!-- Un solo botón de visión: abre el overlay sobre la página y allí se elige el
+               alcance (arrastrar una zona · "Toda la página"). Ver pickZone() en panel.js. -->
+          <button id="ai-see" class="ai-see" title="${t('Enseñarle al agente una figura, una tabla o la página entera')}" style="display:none">${icon('crop', { size: 15 })}<span>${t('Ver')}</span></button>
+          <div class="ai-composer-row">
+            <button id="ai-mic" class="ai-see ai-mic" title="${t('Dictar')}" aria-label="${t('Dictar')}" aria-pressed="false" style="display:none">${icon('mic', { size: 16 })}</button>
+            <button id="ai-send" class="ai-send" title="${t('Enviar')}" aria-label="${t('Enviar')}">${icon('arrow-up', { size: 18 })}</button>
+          </div>
         </div>
       </div>
     </div>

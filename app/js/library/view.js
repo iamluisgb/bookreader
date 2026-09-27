@@ -7,7 +7,7 @@ import * as Study from '../ai/study.js';
 import * as Blobs from '../sync/blobs.js';
 import * as DriveAuth from '../sync/drive-auth.js';
 import { ensurePro } from '../ui/paywall.js';
-import { icon, brandMark } from '../ui/icons.js';
+import { icon } from '../ui/icons.js';
 import { t, getLang } from '../i18n.js';
 import { escapeHtml } from '../ui/escape.js';
 import { confirmBox, promptBox, alertBox, formBox } from '../ui/dialog.js';
@@ -71,6 +71,14 @@ export function init(opts = {}) {
   onAddBook = opts.onAddBook || (() => {});
   onOpenSettings = opts.onOpenSettings || (() => {});
   host.addEventListener('click', onClick);
+  // «Continuar leyendo» es un botón (role/tabindex): Intro y Espacio lo abren.
+  host.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const hero = e.target.closest?.('.lib-hero');
+    if (!hero) return;
+    e.preventDefault();
+    openCard(hero.dataset.id);
+  });
   host.addEventListener('input', onInput);
   // Arrastrar una ficha sobre una estantería del rail para meterla ahí: el
   // gesto que cualquiera prueba en una biblioteca. Delegado en el host porque
@@ -209,7 +217,7 @@ export async function render() {
   host.innerHTML = `
     <div class="lib-layout">
       <aside class="lib-rail" aria-label="${t('Estanterías')}">
-        ${fixedRowHtml('all', `<span class="lib-rail-mark">${brandMark({ size: 28 })}</span>`,
+        ${fixedRowHtml('all', `<span class="lib-rail-thumb lib-rail-thumb--all">${icon('books', { size: 15 })}</span>`,
           t('Libros'), books.length, !selection.size)}
         ${fixedRowHtml('none', `<span class="lib-rail-thumb lib-rail-thumb--none">${icon('book', { size: 14 })}</span>`,
           t('Sin estantería'), noShelfCount, selection.has('none'))}
@@ -228,6 +236,7 @@ export async function render() {
       <section class="lib-main">
         <h1 class="lib-h1">${escapeHtml(currentTitle())}</h1>
         ${await firstStepsHtml(books)}
+        ${continueHtml(books)}
         ${filterChipsHtml()}
         <div class="lib-toolbar">
           <div class="lib-search-box">
@@ -465,6 +474,34 @@ function humanSize(bytes) {
   const mb = bytes / (1024 * 1024);
   if (mb < 1) return Math.max(1, Math.round(bytes / 1024)) + ' KB';
   return (mb < 10 ? mb.toFixed(1) : Math.round(mb)) + ' MB';
+}
+
+// UI4 · «Continuar leyendo»: el libro que tienes a medias, grande y con su progreso, arriba
+// de todo. Solo en la vista general (sin estantería, búsqueda ni filtro): dentro de un
+// filtro, el usuario está buscando otra cosa. Reutiliza `.lib-card` para abrirse igual.
+function continueHtml(books) {
+  if (selection.size || query.trim() || filterProgress !== 'all') return '';
+  const b = books.find(x => !Store.isGhost(x) && (x.status === 'reading' || (x.progress > 0 && x.progress < 100)));
+  if (!b) return '';
+  const pct = Math.max(0, Math.min(100, Math.round(b.progress || 0)));
+  const cover = b.cover
+    ? `<img class="lib-cover-img" src="${escapeHtml(b.cover)}" alt="">`
+    : `<div class="lib-cover-fallback"><span>${escapeHtml(initials(b.title))}</span></div>`;
+  return `<section class="lib-continue" aria-label="${t('Continuar leyendo')}">
+    <div class="lib-card lib-hero" data-id="${b.id}" role="button" tabindex="0">
+      <div class="lib-hero-cover">${cover}</div>
+      <div class="lib-hero-body">
+        <p class="lib-hero-kicker">${t('Continuar leyendo')}</p>
+        <h2 class="lib-hero-title">${escapeHtml(b.title || t('Sin título'))}</h2>
+        ${b.author ? `<p class="lib-hero-author">${escapeHtml(b.author)}</p>` : ''}
+        <div class="lib-hero-progress">
+          <div class="lib-progressbar"><span style="width:${pct}%"></span></div>
+          <span>${t('{n}% leído', { n: pct })}</span>
+        </div>
+        <span class="lib-hero-cta">${t('Seguir leyendo')} ${icon('chevron-right', { size: 15 })}</span>
+      </div>
+    </div>
+  </section>`;
 }
 
 function cardHtml(b) {

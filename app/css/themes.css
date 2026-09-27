@@ -1,17 +1,21 @@
 /* ============================================================================
-   Design tokens — bookreader v2
-   Un solo acento: #22c55e (emerald) en TODOS los componentes.
-   Hover: #16a34a · Soft: rgba(34,197,94,0.14) · Superficies: #faf8f3/#fdfbf6/#efeae0.
-   Referencias: NotebookLM (superficies tonales), Apple Books (lectura inmersiva).
+   Design tokens — bookreader v3 (UI moderna, línea Apple)
+   - Letra del SISTEMA en la interfaz (SF en Apple; Inter en el resto). La serif, solo
+     dentro del libro.
+   - Verde más sobrio y con contraste AA como texto (#178046 sobre blanco = 5:1). El verde
+     de marca (#22c55e) queda para el logo (--brand). Las acciones principales van en
+     TINTA (--btn-bg), no en verde: cuando todo era verde, nada destacaba.
+   - Grises de Apple, radios algo menores y sombras en dos capas, más difusas.
+   Referencias: Apple Books, Freeform, Notes; NotebookLM para el panel del agente.
    ========================================================================== */
 
 :root {
   /* ---- Escalas independientes del tema ---- */
   /* Radios */
   --r-sm: 8px;
-  --r-md: 12px;
-  --r-lg: 16px;
-  --r-xl: 22px;
+  --r-md: 10px;
+  --r-lg: 14px;
+  --r-xl: 20px;
   --r-pill: 999px;
 
   /* Espaciado (base 4px) */
@@ -19,7 +23,7 @@
   --s-5: 20px; --s-6: 24px; --s-7: 32px; --s-8: 40px;
 
   /* Tipografía */
-  --font-ui: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-ui: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', 'Segoe UI', Roboto, sans-serif;
   --font-display: var(--font-ui);
   --font-reader: ui-serif, 'New York', Georgia, 'Times New Roman', serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -51,7 +55,7 @@
   --surface-0: #ffffff;  /* fondo de la app */
   --surface-1: #ffffff;  /* barras / paneles */
   --surface-2: #ffffff;  /* tarjetas */
-  --surface-3: #eef0f2;  /* hover / activo (gris neutro claro) */
+  --surface-3: #f0f0f2;  /* hover / activo (gris de sistema) */
   /* "Escritorio": el fondo sobre el que reposa la página del libro. Se DERIVA del color
      real de la página (--page-bg, que fija epub-reader según el tema) oscureciéndolo un
      punto, así funciona igual en claro, oscuro, sepia y con cualquier tinte de papel sin
@@ -62,19 +66,25 @@
      --accent, así que sigue al tema sola. */
   --logo-tile: #111418;
   --logo-page: #f8fafc;
-  --text: #1f2328;
-  --text-soft: #6b7280;
-  --text-faint: #9aa1ab;
-  --accent: #22c55e;     /* emerald */
-  --accent-hover: #16a34a;
-  --accent-soft: rgba(34, 197, 94, 0.14);
-  --on-accent: #111418;  /* texto OSCURO sobre emerald (contraste) */
-  --border: #e3e6ea;
-  --border-soft: #eef0f2;
-  --shadow-color: 20, 28, 40;
-  --shadow-1: 0 1px 2px rgba(var(--shadow-color), 0.05), 0 1px 3px rgba(var(--shadow-color), 0.04);
-  --shadow-2: 0 4px 16px rgba(var(--shadow-color), 0.07);
-  --shadow-3: 0 12px 40px rgba(var(--shadow-color), 0.12);
+  --text: #1d1d1f;
+  --text-soft: #6e6e73;
+  --text-faint: #a1a1a6;
+  --accent: #178046;     /* emerald sobrio: AA como texto y como fondo con blanco */
+  --accent-hover: #126b3a;
+  --accent-soft: rgba(23, 128, 70, 0.10);
+  --on-accent: #ffffff;
+  --brand: #22c55e;      /* verde de marca: logo y detalles de identidad, no controles */
+  --btn-bg: #1d1d1f;     /* botón principal: tinta */
+  --btn-bg-hover: #3a3a3c;
+  --btn-ink: #ffffff;
+  --fill: rgba(118, 118, 128, 0.12);   /* relleno de controles (pistas, secundarios) */
+  --fill-strong: rgba(118, 118, 128, 0.20);
+  --border: #e5e5ea;
+  --border-soft: #f0f0f2;
+  --shadow-color: 0, 0, 0;
+  --shadow-1: 0 1px 2px rgba(var(--shadow-color), 0.06);
+  --shadow-2: 0 1px 3px rgba(var(--shadow-color), 0.05), 0 6px 20px rgba(var(--shadow-color), 0.07);
+  --shadow-3: 0 4px 12px rgba(var(--shadow-color), 0.06), 0 24px 60px rgba(var(--shadow-color), 0.14);
 
   /* Color de sombra suelto (no hay equivalente 1:1 entre los tokens --shadow-1/2/3, que son
      box-shadows completos). Se conserva como token propio. Nota histórica: aquí hubo una
@@ -87,22 +97,28 @@
 /* Se aplican: (a) explícitamente con [data-theme="dark"], o (b) por sistema
    cuando no hay override y el dispositivo está en oscuro. */
 [data-theme="dark"] {
-  --surface-0: #111418;  /* charcoal casi negro */
-  --surface-1: #1a1f24;  /* fondo secundario */
-  --surface-2: #232a31;  /* paneles / tarjetas */
-  --surface-3: #2b333b;  /* hover / activo */
+  --surface-0: #121214;  /* casi negro, neutro */
+  --surface-1: #1c1c1e;  /* fondo secundario (gris de sistema) */
+  --surface-2: #232325;  /* paneles / tarjetas */
+  --surface-3: #2c2c2e;  /* hover / activo */
   --desk: color-mix(in srgb, var(--page-bg, var(--surface-0)) 76%, #000);
   --logo-tile: #f2f4f7;
   --logo-page: #111418;
-  --text: #f2f3f5;
-  --text-soft: #a8b0b8;
-  --text-faint: #7b838c;
-  --accent: #22c55e;     /* emerald */
-  --accent-hover: #34d06a;
-  --accent-soft: rgba(34, 197, 94, 0.18);
-  --on-accent: #111418;
-  --border: #30363d;
-  --border-soft: #23292f;
+  --text: #f5f5f7;
+  --text-soft: #a1a1a6;
+  --text-faint: #6e6e73;
+  --accent: #32d074;
+  --accent-hover: #4fdc8a;
+  --accent-soft: rgba(50, 208, 116, 0.16);
+  --on-accent: #06180d;
+  --brand: #22c55e;
+  --btn-bg: #f5f5f7;
+  --btn-bg-hover: #d1d1d6;
+  --btn-ink: #1c1c1e;
+  --fill: rgba(118, 118, 128, 0.24);
+  --fill-strong: rgba(118, 118, 128, 0.36);
+  --border: #38383a;
+  --border-soft: #2c2c2e;
   --shadow-color: 0, 0, 0;
   --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.35);
   --shadow-2: 0 4px 16px rgba(0, 0, 0, 0.4);
@@ -112,22 +128,28 @@
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]):not([data-theme="sepia"]):not([data-theme="dark"]) {
-    --surface-0: #111418;
-    --surface-1: #1a1f24;
-    --surface-2: #232a31;
-    --surface-3: #2b333b;
+    --surface-0: #121214;
+    --surface-1: #1c1c1e;
+    --surface-2: #232325;
+    --surface-3: #2c2c2e;
     --desk: color-mix(in srgb, var(--page-bg, var(--surface-0)) 76%, #000);
     --logo-tile: #f2f4f7;
     --logo-page: #111418;
-    --text: #f2f3f5;
-    --text-soft: #a8b0b8;
-    --text-faint: #7b838c;
-    --accent: #22c55e;
-    --accent-hover: #34d06a;
-    --accent-soft: rgba(34, 197, 94, 0.18);
-    --on-accent: #111418;
-    --border: #30363d;
-    --border-soft: #23292f;
+    --text: #f5f5f7;
+    --text-soft: #a1a1a6;
+    --text-faint: #6e6e73;
+    --accent: #32d074;
+    --accent-hover: #4fdc8a;
+    --accent-soft: rgba(50, 208, 116, 0.16);
+    --on-accent: #06180d;
+    --brand: #22c55e;
+    --btn-bg: #f5f5f7;
+    --btn-bg-hover: #d1d1d6;
+    --btn-ink: #1c1c1e;
+    --fill: rgba(118, 118, 128, 0.24);
+    --fill-strong: rgba(118, 118, 128, 0.36);
+    --border: #38383a;
+    --border-soft: #2c2c2e;
     --shadow-color: 0, 0, 0;
     --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.35);
     --shadow-2: 0 4px 16px rgba(0, 0, 0, 0.4);
@@ -148,7 +170,10 @@
   --accent: #1f9d54;     /* emerald ligeramente atenuado para el papel cálido */
   --accent-hover: #178646;
   --accent-soft: rgba(31, 157, 84, 0.14);
-  --on-accent: #111418;   /* texto oscuro sobre el acento, coherente con el resto */
+  --on-accent: #ffffff;
+  --btn-bg: #3f382e;
+  --btn-bg-hover: #5a5044;
+  --btn-ink: #fbf6ea;
   --border: #ddcfb2;
   --border-soft: #e7dcc3;
   --shadow-color: 91, 70, 54;

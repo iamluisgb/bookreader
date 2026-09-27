@@ -209,11 +209,11 @@ test.describe('BookReader - Settings', () => {
     await expect(fontValue).toHaveText('16px');
 
     // Increase
-    await page.getByRole('button', { name: 'A+' }).click();
+    await page.getByRole('button', { name: 'Letra más grande' }).click();
     await expect(fontValue).toHaveText('17px');
 
     // Decrease
-    await page.getByRole('button', { name: 'A-' }).click();
+    await page.getByRole('button', { name: 'Letra más pequeña' }).click();
     await expect(fontValue).toHaveText('16px');
   });
 

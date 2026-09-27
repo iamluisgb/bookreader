@@ -14,6 +14,7 @@ const ICONS = {
   'chevron-left': '<polyline points="14.5 5 8 12 14.5 19"/>',
   'chevron-right': '<polyline points="9.5 5 16 12 9.5 19"/>',
   'arrow-up-right': '<line x1="7" y1="17" x2="16.5" y2="7.5"/><polyline points="8.5 7 17 7 17 15.5"/>',
+  'arrow-up': '<line x1="12" y1="19" x2="12" y2="5.5"/><polyline points="6.5 11 12 5.5 17.5 11"/>',
   'chevron-down': '<polyline points="5 9.5 12 16 19 9.5"/>',
   'chevron-up': '<polyline points="5 14.5 12 8 19 14.5"/>',
   upload: '<path d="M12 15V4.5"/><polyline points="7.5 9 12 4.5 16.5 9"/><path d="M5 14v3.5A1.5 1.5 0 0 0 6.5 19h11a1.5 1.5 0 0 0 1.5-1.5V14"/>',

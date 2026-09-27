@@ -1,0 +1,359 @@
+/* ============================================================================
+   UI moderna (UI2–UI4, 2026-09-27) — capa de sistema, cargada la ÚLTIMA.
+   Unifica lo que cada pantalla resolvía a su manera: un solo sistema de botones, controles
+   segmentados de verdad, desplegables y casillas propios, panel del agente más limpio,
+   lectura sin marco y biblioteca con «Continuar leyendo». Los tokens viven en themes.css;
+   aquí solo se APLICAN. Regla de la casa: nada de barras de acento laterales.
+   ========================================================================== */
+
+body { font-family: var(--font-ui); -webkit-font-smoothing: antialiased; }
+
+/* ---------------------------------------------------------------- Botones ---
+   Principal = tinta. Secundario = relleno gris de sistema. Texto = acento. El verde deja
+   de ser el color de TODAS las acciones: ahora señala marca, progreso, citas y selección. */
+.primary-btn, .lib-upload, .dlg-ok, .ai-nb-save, .ai-toast-action {
+  background: var(--btn-bg);
+  color: var(--btn-ink);
+  border: none;
+  border-radius: var(--r-md);
+  font-weight: 600;
+  box-shadow: none;
+  transition: background var(--transition-fast), transform var(--transition-fast);
+}
+.primary-btn:hover, .lib-upload:hover, .dlg-ok:hover, .ai-nb-save:hover, .ai-toast-action:hover {
+  background: var(--btn-bg-hover);
+}
+.primary-btn:active, .lib-upload:active, .dlg-ok:active { transform: scale(0.98); }
+.primary-btn:disabled { opacity: 0.4; cursor: default; transform: none; }
+.primary-btn { padding: 10px 18px; font-size: var(--fs-md); }
+.lib-upload { border-radius: var(--r-pill); }
+
+.studio-gen, .studio-new, .ai-see, .lib-dd-btn {
+  background: var(--fill);
+  color: var(--text);
+  border: none;
+  font-weight: 600;
+  transition: background var(--transition-fast);
+}
+.studio-gen:hover, .studio-new:hover, .ai-see:hover, .lib-dd-btn:hover { background: var(--fill-strong); color: var(--text); }
+.studio-gen { border-radius: var(--r-pill); padding: 7px 14px; }
+.studio-new { border-radius: var(--r-pill); }
+
+/* Foco visible y consistente en todo lo pulsable. */
+:where(button, [role="button"], select, input, textarea, a):focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 70%, transparent);
+  outline-offset: 2px;
+}
+
+/* ------------------------------------------------------- Controles segmentados ---
+   Pista gris con la opción elegida «levantada» (blanca con sombra), como en iOS/macOS.
+   Sirve para modo de lectura, pase de página, ajuste del PDF, pestañas del agente y la
+   barra lateral. «Pase de página» ni siquiera tenía estilo: eran botones del navegador. */
+.reading-mode-selector, .pdf-fit-selector, .ai-tabs, .sidebar-tabs {
+  display: flex; gap: 2px; padding: 2px;
+  background: var(--fill);
+  border-radius: 9px;
+}
+.reading-mode-btn, .pdf-fit-btn, .page-turn-btn, .ai-tab, .tab-btn {
+  flex: 1; min-width: 0;
+  padding: 6px 10px;
+  border: none; border-radius: 7px;
+  background: transparent;
+  color: var(--text);
+  font: inherit; font-size: var(--fs-sm); font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  box-shadow: none;
+  transition: background var(--transition-fast), box-shadow var(--transition-fast), color var(--transition-fast);
+}
+.reading-mode-btn:hover, .pdf-fit-btn:hover, .page-turn-btn:hover, .ai-tab:hover, .tab-btn:hover {
+  background: color-mix(in srgb, var(--surface-0) 45%, transparent);
+  border-color: transparent;
+}
+.reading-mode-btn.active, .pdf-fit-btn.active, .page-turn-btn.active, .ai-tab.active, .tab-btn.active {
+  background: var(--surface-0);
+  color: var(--text);
+  font-weight: 600;
+  border-color: transparent;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08), 0 2px 6px rgba(0, 0, 0, 0.06);
+}
+[data-theme="dark"] :is(.reading-mode-btn, .pdf-fit-btn, .page-turn-btn, .ai-tab, .tab-btn).active { background: #636366; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]):not([data-theme="sepia"]) :is(.reading-mode-btn, .pdf-fit-btn, .page-turn-btn, .ai-tab, .tab-btn).active { background: #636366; }
+}
+/* La barra lateral: la pista va con margen, no pegada al borde. */
+.sidebar-tabs { margin: 10px 12px 4px; border-bottom: none; overflow: hidden; }
+/* Cuatro pestañas en 296 px: se reparten el ancho y encogen letra y relleno lo justo para
+   que «Subrayados» no se corte. */
+.tab-btn { flex: 1 1 auto; padding: 6px 4px; font-size: 12.5px; }
+.tab-btn::after { display: none !important; }
+.ai-tabs { margin: 10px 16px 0; }
+.ai-tab { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+
+/* ------------------------------------------------------ Desplegables y casillas --- */
+select {
+  -webkit-appearance: none; appearance: none;
+  padding: 9px 34px 9px 12px;
+  border: none; border-radius: var(--r-md);
+  background-color: var(--fill);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238e8e93' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  color: var(--text);
+  font: inherit; font-size: var(--fs-md);
+  cursor: pointer;
+}
+select:hover { background-color: var(--fill-strong); }
+/* Los campos de ajustes pintan su fondo con el atajo `background`, que borraba la flecha. */
+select.appset-input {
+  -webkit-appearance: none; appearance: none;
+  padding-right: 34px; border: none;
+  background: var(--fill) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238e8e93' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E") no-repeat right 12px center;
+}
+.appset-input:not(select) { background: var(--fill); border-color: transparent; }
+.appset-input:not(select):focus { background: var(--surface-0); border-color: color-mix(in srgb, var(--accent) 55%, var(--border)); box-shadow: 0 0 0 3px var(--accent-soft); }
+select:focus { outline: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent); }
+
+/* Casillas como interruptores (iOS). Solo las de ajustes: las de listas siguen siendo casillas. */
+input[type="checkbox"]:is(.appset-check, [id^="appset-"], [id^="set-"]),
+.appset-row input[type="checkbox"], .settings-group input[type="checkbox"] {
+  -webkit-appearance: none; appearance: none;
+  position: relative; flex: none;
+  width: 36px; height: 22px; margin: 0;
+  border-radius: 999px;
+  background: var(--fill-strong);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+  vertical-align: middle;
+}
+input[type="checkbox"]:is(.appset-check, [id^="appset-"], [id^="set-"])::after,
+.appset-row input[type="checkbox"]::after, .settings-group input[type="checkbox"]::after {
+  content: ''; position: absolute; top: 2px; left: 2px;
+  width: 18px; height: 18px; border-radius: 50%;
+  background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  transition: transform var(--transition-fast);
+}
+input[type="checkbox"]:is(.appset-check, [id^="appset-"], [id^="set-"]):checked,
+.appset-row input[type="checkbox"]:checked, .settings-group input[type="checkbox"]:checked { background: var(--accent); }
+input[type="checkbox"]:is(.appset-check, [id^="appset-"], [id^="set-"]):checked::after,
+.appset-row input[type="checkbox"]:checked::after, .settings-group input[type="checkbox"]:checked::after { transform: translateX(14px); }
+
+input[type="range"] { accent-color: var(--accent); }
+input[type="text"], input[type="password"], input[type="search"], input[type="url"], input[type="number"], textarea {
+  font-family: inherit;
+}
+
+/* ------------------------------------------------------- Ajustes de lectura --- */
+.settings-group label { font-size: 11px; letter-spacing: 0.06em; color: var(--text-faint); margin-bottom: 8px; }
+.font-size-control {
+  display: inline-flex; align-items: center; gap: 2px; padding: 2px;
+  background: var(--fill); border-radius: 9px;
+}
+.font-size-control .icon-btn {
+  width: 44px; height: 32px; border-radius: 7px; color: var(--text);
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.font-size-control .icon-btn:hover { background: var(--surface-0); }
+.font-size-control span#font-size-value { min-width: 52px; font-size: var(--fs-sm); color: var(--text-soft); font-variant-numeric: tabular-nums; }
+.fs-a { font-family: var(--font-reader); font-weight: 600; line-height: 1; }
+.fs-a--sm { font-size: 12px; }
+.fs-a--lg { font-size: 21px; }
+.column-width-control span, .line-height-control span, .slider-value { color: var(--text-soft); font-variant-numeric: tabular-nums; }
+.theme-btn.active { border-color: var(--text); box-shadow: 0 0 0 3px var(--fill); }
+
+/* ------------------------------------------------ Selección en listas y rails ---
+   Seleccionado = relleno gris y texto en tinta (como la barra lateral de Finder/Notas),
+   no verde: el verde no puede significar a la vez «pulsa aquí» y «estás aquí». */
+.lib-rail-row.is-active { background: var(--fill); }
+.lib-rail-item.active { color: var(--text); font-weight: 600; }
+.lib-rail-item.active .lib-rail-ico .icon { color: var(--text); }
+.lib-rail-thumb--all { background: var(--fill); }
+.lib-rail-thumb--all .icon { color: var(--text-soft); }
+.lib-rail-settings, .lib-rail-settings:hover { color: var(--text); }
+.appset-nav-item.active { background: var(--fill); color: var(--text); }
+.appset-nav-item.active .icon { color: var(--accent); }
+
+/* ---------------------------------------------------------- Panel del agente --- */
+#ai-panel { background: var(--surface-1); }
+/* Cerrado, el panel vive fuera de pantalla a la derecha, pero su sombra asomaba como una
+   franja gris por todo el borde (en móvil, sobre la biblioteca). Sin abrir, sin sombra. */
+body:not(.ai-open) #ai-panel { box-shadow: none; }
+.ai-toolbar { border-bottom: none; }
+/* La línea de estado solo aparece cuando dice algo (leyendo, generando…): «Listo para
+   preguntar» ocupaba una fila entera para no decir nada. */
+.ai-status { border-bottom: none; }
+.ai-status.ai-status--idle { display: none; }
+.ai-messages { background: transparent; }
+
+/* Burbuja del usuario: gris de sistema con tinta (iMessage/Notas), no un bloque verde. */
+.ai-msg-user .ai-bubble {
+  background: var(--fill);
+  color: var(--text);
+  box-shadow: none;
+  border-radius: 18px 18px 6px 18px;
+}
+.ai-msg-user .ai-bubble :is(a, .ai-cite) { color: var(--accent); }
+
+/* Chips de cita: cápsula discreta con la página; al pasar, se rellena. */
+.ai-cite { background: var(--accent-soft); color: var(--accent); font-variant-numeric: tabular-nums; }
+.ai-cite:hover { background: var(--accent); color: var(--on-accent); }
+
+/* Composer en cápsula: una caja con el campo y los botones dentro; enviar, redondo. */
+.ai-composer { padding: 10px 14px 14px; border-top: none; background: transparent; }
+.ai-compose-box {
+  flex: 1; min-width: 0;
+  display: flex; align-items: flex-end; gap: 6px;
+  padding: 6px 6px 6px 14px;
+  background: var(--surface-0);
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  box-shadow: var(--shadow-1);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+.ai-compose-box:focus-within { border-color: color-mix(in srgb, var(--accent) 55%, var(--border)); box-shadow: 0 0 0 3px var(--accent-soft); }
+.ai-composer .ai-compose-box textarea {
+  flex: 1; min-width: 0;
+  min-height: 24px; max-height: 160px;
+  padding: 7px 0; margin: 0;
+  border: none; border-radius: 0; background: transparent;
+  box-shadow: none; outline: none;
+  font-size: var(--fs-md); line-height: 1.45; resize: none;
+}
+.ai-composer .ai-compose-box textarea:focus { border: none; outline: none; }
+.ai-compose-box .ai-composer-btns { flex-direction: row; align-items: center; gap: 4px; }
+.ai-compose-box .ai-composer-row { flex: none; gap: 4px; align-items: center; }
+.ai-compose-box .ai-see { height: 32px; padding: 0 10px; border-radius: 16px; font-size: 12.5px; background: transparent; color: var(--text-soft); }
+.ai-compose-box .ai-see:hover { background: var(--fill); color: var(--text); }
+.ai-compose-box .ai-mic { width: 32px; padding: 0; }
+.ai-compose-box .ai-mic-on { background: var(--accent); color: var(--on-accent); }
+.ai-send {
+  flex: none !important;
+  width: 32px; height: 32px; padding: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: none; border-radius: 50%;
+  background: var(--btn-bg); color: var(--btn-ink);
+  cursor: pointer;
+  transition: background var(--transition-fast), transform var(--transition-fast), opacity var(--transition-fast);
+}
+.ai-send:hover { background: var(--btn-bg-hover); }
+.ai-send:active { transform: scale(0.94); }
+.ai-send:disabled { opacity: 0.35; cursor: default; transform: none; }
+@media (pointer: coarse) { .ai-composer .ai-compose-box textarea { font-size: 16px; } }
+
+/* Studio en mosaico: cada tipo es una baldosa; con historial, ocupa el ancho entero. */
+.studio-book { font-size: var(--fs-sm); color: var(--text-soft); font-weight: 500; margin-bottom: 12px; }
+.studio-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; }
+.studio-group {
+  margin: 0; padding: 14px;
+  display: flex; flex-direction: column; gap: 8px;
+  background: var(--surface-0);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-1);
+}
+.studio-group--wide { grid-column: 1 / -1; }
+.studio-group-head { margin: 0; }
+.studio-ico {
+  width: 30px; height: 30px; border-radius: 8px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--accent-soft); color: var(--accent);
+}
+.studio-group-name { font-size: var(--fs-md); }
+.studio-card { border: none; background: transparent; margin: 0; }
+.studio-empty { padding: 0; gap: 10px; flex: 1; border: none; background: transparent; }
+.studio-empty .studio-value { flex: 1; }
+.studio-generated { background: var(--surface-1); border-radius: var(--r-md); }
+.studio-generated + .studio-generated { margin-top: 6px; }
+.studio-del { border-left: none; }
+
+/* Aviso de una vez (coachmark): tinta, como un tooltip del sistema. */
+.ai-coachmark { border-radius: 12px; }
+
+/* ------------------------------------------------------------------ Lectura ---
+   Papel a sangre: sin hoja con esquinas y sombra sobre un «escritorio» gris. El papel
+   llena la zona de lectura y la cabecera y el pie son del mismo papel, sin rayas. Solo
+   se cambia PINTURA (fondo, radio, sombra, bordes): nada de tamaños, que repaginarían. */
+body.reading .reader-viewport:has(> .epub-container.has-desk) { background: var(--page-bg, var(--surface-0)); }
+@media (min-width: 1001px) {
+  body.reading:not(.scroll-mode) .epub-container.has-desk { border-radius: 0; box-shadow: none; }
+}
+body.reading .reader-header, body.reading .reader-footer {
+  background: var(--page-bg, var(--surface-1));
+  border-color: transparent;
+  transition: background var(--transition-normal);
+}
+/* Cromo en calma: mientras lees, cabecera y pie se desvanecen (solo opacidad) y vuelven al
+   acercar el ratón o al enfocarlos. Lo activa initImmersive() en app.js. */
+body.reading.chrome-quiet:not(.fs) :is(.reader-header, .reader-footer) > * {
+  opacity: 0;
+  transition: opacity 0.6s var(--ease);
+}
+body.reading :is(.reader-header, .reader-footer) > * { transition: opacity 0.2s var(--ease); }
+body.reading :is(.reader-header, .reader-footer):hover > * { opacity: 1; }
+@media (prefers-reduced-motion: reduce) {
+  body.reading :is(.reader-header, .reader-footer) > * { transition: none; }
+}
+
+/* --------------------------------------------------------------- Biblioteca --- */
+.lib-h1 { font-size: 30px; letter-spacing: -0.025em; }
+.lib-search-box { background: var(--fill); border-color: transparent; }
+.lib-search-box:focus-within { background: var(--surface-0); border-color: color-mix(in srgb, var(--accent) 55%, var(--border)); box-shadow: 0 0 0 3px var(--accent-soft); }
+.lib-search-box:focus-within .icon { color: var(--text-soft); }
+.lib-grid { grid-template-columns: repeat(auto-fill, minmax(176px, 1fr)); gap: 28px 22px; }
+.lib-cover { border-radius: 6px; box-shadow: 0 1px 2px rgba(0,0,0,0.08), 0 8px 20px rgba(0,0,0,0.10); }
+.lib-card:hover .lib-cover { transform: translateY(-4px); box-shadow: 0 2px 4px rgba(0,0,0,0.08), 0 16px 32px rgba(0,0,0,0.16); }
+.lib-title { font-size: var(--fs-md); font-weight: 600; margin-top: 8px; line-height: 1.3; }
+.lib-author { font-size: var(--fs-sm); color: var(--text-soft); }
+.lib-progressbar { height: 3px; border-radius: 3px; background: var(--fill); }
+
+/* «Continuar leyendo»: el libro a medias, grande, arriba de todo. */
+.lib-continue { margin: 4px 0 28px; }
+.lib-hero {
+  display: flex; align-items: center; gap: 28px;
+  padding: 22px;
+  background: var(--surface-1);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r-xl);
+  cursor: pointer;
+  transition: box-shadow var(--transition-normal), transform var(--transition-normal);
+}
+.lib-hero:hover { box-shadow: var(--shadow-2); }
+.lib-hero:hover .lib-hero-cover { transform: translateY(-3px) rotate(-0.6deg); }
+.lib-hero-cover {
+  flex: none; width: 128px; aspect-ratio: 2 / 3; border-radius: 6px; overflow: hidden;
+  background: var(--surface-3);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.10), 0 18px 36px rgba(0,0,0,0.18);
+  transition: transform var(--transition-normal);
+}
+.lib-hero-cover .lib-cover-img, .lib-hero-cover .lib-cover-fallback { width: 100%; height: 100%; }
+.lib-hero-body { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.lib-hero-kicker { margin: 0; font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-faint); }
+.lib-hero-title { margin: 0; font-size: 26px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.15; color: var(--text); }
+.lib-hero-author { margin: 0; font-size: var(--fs-md); color: var(--text-soft); }
+.lib-hero-progress { display: flex; align-items: center; gap: 10px; margin-top: 8px; font-size: var(--fs-sm); color: var(--text-soft); font-variant-numeric: tabular-nums; }
+.lib-hero-progress .lib-progressbar { width: 180px; height: 4px; margin: 0; }
+.lib-hero-cta {
+  align-self: flex-start; margin-top: 10px;
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 8px 16px; border-radius: var(--r-pill);
+  background: var(--btn-bg); color: var(--btn-ink);
+  font-size: var(--fs-sm); font-weight: 600;
+}
+@media (max-width: 767px) {
+  /* La tira de estanterías se desliza: un fundido al final lo dice (antes cortaba «Aju…»
+     sin ninguna pista de que había más). */
+  .lib-rail {
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 36px), transparent);
+    mask-image: linear-gradient(to right, #000 calc(100% - 36px), transparent);
+    padding-right: 36px; scroll-padding-right: 36px;
+  }
+  .lib-rail-row, .lib-rail-settings { background: var(--fill); }
+  /* Buscador a todo el ancho; debajo, filtros y subir en una fila. */
+  .lib-toolbar { flex-wrap: wrap; row-gap: 10px; }
+  .lib-search-box { flex: 1 1 100%; max-width: none; }
+  .lib-hero { gap: 16px; padding: 14px; border-radius: var(--r-lg); }
+  .lib-hero-cover { width: 84px; }
+  .lib-hero-title { font-size: 19px; }
+  .lib-hero-progress .lib-progressbar { width: 100px; }
+  .lib-grid { grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 22px 14px; }
+}

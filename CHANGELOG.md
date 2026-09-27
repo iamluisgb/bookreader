@@ -13,6 +13,39 @@ buena viaja en el próximo covers.json a los demás dispositivos. La adopción d
 además por **ancho real** (decodificando), no por bytes: una v1 densa puede pesar lo mismo que
 una v2 plana.
 
+## 2026-09-28 — UI1–UI4: la app, modernizada (auditoría completa)
+
+La app no se veía anticuada por el layout sino por la inconsistencia: tres estilos de botón para
+lo mismo, controles del navegador sin diseñar, el verde `#22c55e` en todo (así nada destacaba) y
+jerga interna a la vista. Se hizo la auditoría entera en cuatro fases, en la línea Apple del mapa.
+
+- **UI1 · Arreglos rápidos.** Las citas del chat dicen **«pág. 15»** (o el capítulo) en vez de
+  `a0`: el PDF trae la página y el EPUB la calcula el lector desde el CFI. Fuera la jerga: las
+  plantillas se llaman por su nombre («Pregunta y respuesta», «Juicio analítico»…) sin «T2 ·
+  HQ&A», el campo de la libreta ya no sale en inglés, el proveedor se llama «nan.builders» y
+  «Error al apuntar» pasa a «No se pudo guardar en la libreta» (y se traduce). El aviso de
+  Studio **ya no tapa la pregunta del chat** (se cierra también al teclear) y es un tooltip en
+  tinta. El ancho de columna se dice en palabras (Estrecha/Media/Ancha).
+- **UI2 · Sistema.** Tokens nuevos en `themes.css`: letra del sistema en la interfaz (SF; Inter
+  de reserva) y la serif solo en el libro; verde sobrio con contraste AA (`#178046`), verde de
+  marca solo en el logo; grises y sombras de Apple. Nueva `css/modern.css`, la última hoja: un
+  solo sistema de botones (principal en tinta, secundario en gris, texto en verde), controles
+  segmentados de verdad (modo de lectura, **pase de página —que no tenía estilo—**, pestañas),
+  desplegables con flecha propia, casillas de ajustes como interruptores, tamaño de letra como
+  selector de dos «A». Selección en listas en gris, no en verde. De paso, `--text-muted` (sin
+  definir) ya no deja un texto sin color.
+- **UI3 · Agente.** Composer en **cápsula** con el micro y un botón de enviar redondo dentro, que
+  crece con el texto. Pestañas con contraste. La línea «Listo para preguntar» ya no ocupa una
+  fila. La burbuja del usuario, gris. **Studio en mosaico** (cada tipo, una baldosa).
+- **UI4 · Lectura y biblioteca.** **Papel a sangre**: sin hoja con esquinas sobre un escritorio
+  gris; cabecera y pie del color del papel, sin rayas, y **se desvanecen al leer** (solo
+  opacidad: el EPUB no se repagina). Biblioteca con **«Continuar leyendo»** arriba (portada
+  grande, progreso y botón), portadas más grandes, «Libros» con su icono en vez del logo. En
+  móvil, la tira de estanterías avisa de que se desliza, el buscador va a todo el ancho y se
+  quitó la sombra del panel cerrado que asomaba por el borde derecho.
+
+Tests: chip de cita con página/capítulo; los del tamaño de letra siguen a sus nuevos nombres.
+
 ## 2026-09-27 — P34: compartir el mapa en horizontal o en vertical, con la portada
 
 El PNG/SVG del mapa era un único póster del tamaño del mapa, con un pie de texto. Ahora se elige

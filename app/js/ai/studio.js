@@ -111,7 +111,9 @@ function group(ty, ctx, job) {
   if (items.length) bodyHtml += items.map(e => artifactCard(ty, e)).join('');
   else if (!running && !errored) bodyHtml += emptyCard(ty);
 
-  return `<div class="studio-group">${head}${bodyHtml}</div>`;
+  // UI3 · Mosaico: cada tipo es una baldosa; con historial ocupa el ancho entero.
+  const wide = items.length || running || errored;
+  return `<div class="studio-group${wide ? ' studio-group--wide' : ''}" data-kind="${ty.kind}">${head}${bodyHtml}</div>`;
 }
 
 export function render() {
@@ -125,7 +127,7 @@ export function render() {
   container.innerHTML =
     `<div class="studio-book">${escapeHtml(ctx.bookTitle || t('Libro'))}</div>` +
     (ctx.segReady ? '' : `<p class="studio-hint">${t('Preparando el libro… la generación estará lista en unos segundos.')}</p>`) +
-    TYPES.map(ty => group(ty, ctx, job)).join('');
+    `<div class="studio-grid">${TYPES.map(ty => group(ty, ctx, job)).join('')}</div>`;
 }
 
 async function onClick(e) {

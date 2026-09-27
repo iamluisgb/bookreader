@@ -903,7 +903,22 @@ function initImmersive() {
     document.addEventListener('mousemove', onEdge);
     // El ratón sobre el texto vive en el iframe (sus eventos no llegan al document):
     // cualquier actividad ahí = estás leyendo → ocultar las barras.
-    EpubReader.onActivity(() => { if (inFs()) hideBars(); });
+    // UI4 · Cromo en calma (ventana normal): mientras lees, la cabecera y el pie se desvanecen
+    // a los 2,5 s; vuelven al llevar el ratón a ellos o al enfocarlos. Solo OPACIDAD: nada
+    // cambia de tamaño, así que el EPUB no se repagina (ver .epub-container.has-desk).
+    let quietT = 0;
+    const quiet = () => {
+      if (document.body.classList.contains('reading') && !inFs()) document.body.classList.add('chrome-quiet');
+    };
+    const wake = () => { document.body.classList.remove('chrome-quiet'); clearTimeout(quietT); };
+    const quietSoon = () => { clearTimeout(quietT); quietT = setTimeout(quiet, 2500); };
+    EpubReader.onActivity(() => { if (inFs()) hideBars(); quietSoon(); });
+    document.addEventListener('mousemove', (e) => {
+      if (e.target.closest?.('.reader-header, .reader-footer, #sidebar, #ai-panel')) wake();
+    }, { passive: true });
+    document.addEventListener('focusin', (e) => {
+      if (e.target.closest?.('.reader-header, .reader-footer')) wake();
+    });
 
     // Sincroniza clase/estado/icono con el estado real de fullscreen (clic, Esc, F11).
     const syncFs = () => {

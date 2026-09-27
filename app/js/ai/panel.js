@@ -17,7 +17,11 @@ import * as Hints from '../ui/hints.js';
 import { escapeHtml } from '../ui/escape.js';
 import { confirmBox, promptBox } from '../ui/dialog.js';
 import * as AppSettings from '../ui/app-settings.js';
-import { renderWithCitations } from './render.js';
+import { renderWithCitations, setCitePageResolver } from './render.js';
+
+// UI1 · Los chips de cita muestran la página; en EPUB se calcula desde el CFI con las
+// localizaciones del lector (null si aún no están: el chip cae al capítulo).
+setCitePageResolver((cfi) => EpubReader.getPageInfo(cfi)?.page || null);
 import { computeChapterRelevance, applyChapterAttenuation, clearChapterAttenuation } from './attenuation.js';
 import { estimateTokens } from './context.js';
 import * as Retrieval from './retrieval.js';
@@ -127,6 +131,8 @@ export function init(opts) {
   els.input.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
   });
+  // UI3 · La cápsula crece con lo que escribes (hasta 6 líneas) y vuelve a una al enviar.
+  els.input.addEventListener('input', fitInput);
   els.close.addEventListener('click', () => setOpen(false));
   initSheetSnap();
   initKeyboardInset();
@@ -369,7 +375,12 @@ function maybeHintFlashcards() {
   setTimeout(place, 400);
   hint.querySelector('.ai-coachmark-x').addEventListener('click', dismissFlashcardsHint);
   // Cualquier interacción fuera lo cierra (se arma en el próximo tick para no auto-cerrarse).
-  setTimeout(() => document.addEventListener('click', onHintOutside, { once: false }), 0);
+  // También al teclear: quien escribe su pregunta sin tocar el ratón dejaba el aviso encima
+  // del chat, tapando su propio mensaje (UI1).
+  setTimeout(() => {
+    document.addEventListener('click', onHintOutside, { once: false });
+    document.addEventListener('keydown', dismissFlashcardsHint, { once: true });
+  }, 0);
 }
 
 // Ancla el coachmark bajo su objetivo, con la flecha apuntándolo. Idempotente: se puede
@@ -394,6 +405,7 @@ function onHintOutside(e) {
 function dismissFlashcardsHint() {
   Storage.set(FLASHCARDS_HINT_KEY, true);
   document.removeEventListener('click', onHintOutside);
+  document.removeEventListener('keydown', dismissFlashcardsHint);
   if (flashcardsHintEl) { flashcardsHintEl.remove(); flashcardsHintEl = null; }
 }
 
@@ -948,7 +960,7 @@ function openOnboarding(opts = {}) {
         ${list.map(t => `
           <button class="ai-ob-tpl" data-tpl="${t.id}">
             <span class="ai-ob-tpl-name">${t.objective || t.name}</span>
-            <span class="ai-ob-tpl-ideal">${t.name}${t.ideal ? ' · ' + t.ideal : ''}</span>
+            <span class="ai-ob-tpl-ideal">${t.ideal || t.name}</span>
           </button>`).join('')}
       </div>
       ${upgrade ? '' : `<button class="ai-ob-quickchat">${icon('bubble', { size: 15 })}<span>${t('Prefiero solo chatear con el libro')}</span></button>`}`;
@@ -1061,7 +1073,7 @@ async function send() {
   // modelo de visión, con el texto del usuario como petición.
   if (pendingImages.length) {
     const images = pendingImages;
-    els.input.value = '';
+    els.input.value = ''; fitInput();
     clearImageRef();
     clearRef();
     await deliverVision(q, images);
@@ -1074,7 +1086,7 @@ async function send() {
   const ref = pendingRef;
   const aug = ref ? t('Sobre este fragmento del libro:\n«{ref}»\n\n{q}', { ref, q }) : q;
 
-  els.input.value = '';
+  els.input.value = ''; fitInput();
   clearRef();
   // `ref` también guía el retrieval: localiza el pasaje del fragmento en el índice para
   // que entre ANCLADO en el extracto (sin esto, "¿qué significa esto?" no lo recuperaba).
@@ -1281,7 +1293,7 @@ async function visionAction(kind) {
   const act = VISION_ACTIONS[kind];
   if (!act || busy || !pendingImages.length) return;
   const images = pendingImages;
-  els.input.value = '';
+  els.input.value = ''; fitInput();
   clearImageRef();
   clearRef();
   await deliverVision(act.ask(), images, act.mode);
@@ -2127,13 +2139,13 @@ async function extractToNotebook(answerText, question, el) {
   if (!template) return;
   const isBtn = el.tagName === 'BUTTON';
   if (isBtn) el.disabled = true;
-  el.innerHTML = act('note', 'Apuntando…');
+  el.innerHTML = act('note', t('Apuntando…'));
   // Campos escribibles por la IA: INFO más andamio (HQ&A: la IA pone H+Q, la Answer queda
   // para el usuario). La cognición pura sigue vetada: la genera el usuario, no la IA.
   const fillable = aiWritableFields(template);
   if (!fillable.length) {                       // plantilla 100% cognición (sin andamio)
-    el.innerHTML = act('note', 'Nada que guardar');
-    if (isBtn) setTimeout(() => { el.disabled = false; el.innerHTML = act('note', 'A la libreta'); }, 2500);
+    el.innerHTML = act('note', t('Nada que guardar'));
+    if (isBtn) setTimeout(() => { el.disabled = false; el.innerHTML = act('note', t('A la libreta')); }, 2500);
     return;
   }
   const fieldList = fillable.map(f => `- ${f.key}: ${f.label}`).join('\n');
@@ -2168,17 +2180,17 @@ hay nada que merezca guardarse, no llames a ninguna herramienta.` },
       added++;
     }
     renderNotebook();
-    el.innerHTML = added ? act('check', `${added} a la libreta`) : act('note', 'Nada que guardar');
+    el.innerHTML = added ? act('check', t('{n} a la libreta', { n: added })) : act('note', t('Nada que guardar'));
     if (added) {
       if (isBtn) showView('notebook');         // manual: el usuario lo pidió → mostrar
       else markNotebookUnread();               // auto: avisar sin interrumpir el chat
     }
   } catch (e) {
     console.error('Extracción falló:', e);
-    el.innerHTML = act('xmark', 'Error al apuntar');
+    el.innerHTML = act('xmark', t('No se pudo guardar en la libreta'));
   } finally {
     // Solo el botón se restaura para poder reintentar; el indicador auto se queda.
-    if (isBtn) setTimeout(() => { el.disabled = false; el.innerHTML = act('note', 'A la libreta'); }, 2500);
+    if (isBtn) setTimeout(() => { el.disabled = false; el.innerHTML = act('note', t('A la libreta')); }, 2500);
   }
 }
 
@@ -2354,6 +2366,13 @@ function setStatus(s) {
   // Shimmer mientras el agente trabaja (mensajes que terminan en "…").
   els.status.classList.toggle('ai-status--busy', /…\s*$/.test(s));
 }
+function fitInput() {
+  const el = els.input;
+  if (!el) return;
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 160) + 'px';
+}
+
 function scrollDown() { if (els.messages) els.messages.scrollTop = els.messages.scrollHeight; }
 
 // ---- Cupo de la demo ---------------------------------------------------------

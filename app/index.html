@@ -25,6 +25,9 @@
   <link rel="stylesheet" href="css/reader.css">
   <!-- Temml (fórmulas): usa las fuentes matemáticas del SISTEMA, no descarga tipografías. -->
   <link rel="stylesheet" href="css/temml.css">
+  <!-- UI2–UI4 · capa de sistema (botones, controles, agente, lectura, biblioteca). La ÚLTIMA:
+       aplica los tokens de themes.css por encima de los estilos de cada pantalla. -->
+  <link rel="stylesheet" href="css/modern.css">
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" id="meta-theme-color" content="#fbfbfd">
   <meta name="mobile-web-app-capable" content="yes">
@@ -151,9 +154,9 @@
       <div class="settings-group" data-format="epub">
         <label data-i18n>Tamaño de fuente</label>
         <div class="font-size-control">
-          <button id="font-decrease" class="icon-btn">A-</button>
+          <button id="font-decrease" class="icon-btn" aria-label="Letra más pequeña" data-tip="Letra más pequeña" data-i18n-attrs="aria-label,data-tip"><span class="fs-a fs-a--sm" aria-hidden="true">A</span></button>
           <span id="font-size-value">16px</span>
-          <button id="font-increase" class="icon-btn">A+</button>
+          <button id="font-increase" class="icon-btn" aria-label="Letra más grande" data-tip="Letra más grande" data-i18n-attrs="aria-label,data-tip"><span class="fs-a fs-a--lg" aria-hidden="true">A</span></button>
         </div>
       </div>
 
@@ -215,7 +218,7 @@
     <!-- Top bar -->
     <header id="reader-header" class="reader-header">
       <!-- Imagotipo completo (con tile), no el glyph de línea: es el ancla de marca de la barra. -->
-      <button id="library-btn" class="icon-btn brand-btn" aria-label="Volver a la biblioteca" data-tip="Biblioteca" data-i18n-attrs="aria-label,data-tip" data-tip-align="left" style="display:none;"><svg class="brand-mark" viewBox="0 0 512 512" width="24" height="24" aria-hidden="true" focusable="false"><rect width="512" height="512" rx="118" fill="var(--logo-tile)"/><path d="M288 119 Q288 99 308 99 L396 99 Q416 99 416 119 L416 371 L352 323 L288 371 Z" fill="var(--accent)"/><path d="M98 90 L222 90 Q256 90 256 124 L256 470 C 249 442 233 424 206 414 C 177 403 140 401 100 401 Q64 401 64 365 L64 124 Q64 90 98 90 Z" fill="var(--logo-page)"/></svg></button>
+      <button id="library-btn" class="icon-btn brand-btn" aria-label="Volver a la biblioteca" data-tip="Biblioteca" data-i18n-attrs="aria-label,data-tip" data-tip-align="left" style="display:none;"><svg class="brand-mark" viewBox="0 0 512 512" width="24" height="24" aria-hidden="true" focusable="false"><rect width="512" height="512" rx="118" fill="var(--logo-tile)"/><path d="M288 119 Q288 99 308 99 L396 99 Q416 99 416 119 L416 371 L352 323 L288 371 Z" fill="var(--brand, #22c55e)"/><path d="M98 90 L222 90 Q256 90 256 124 L256 470 C 249 442 233 424 206 414 C 177 403 140 401 100 401 Q64 401 64 365 L64 124 Q64 90 98 90 Z" fill="var(--logo-page)"/></svg></button>
       <button id="sidebar-toggle" class="icon-btn" aria-label="Abrir sidebar" data-tip="Panel" data-i18n-attrs="aria-label,data-tip" data-tip-align="left" data-icon="panel-left"></button>
       <div id="reader-title" class="reader-title">BookReader</div>
       <div class="header-actions">
