@@ -145,6 +145,33 @@ test.describe('P14 · render del mapa', () => {
   });
 });
 
+// P34 · Póster para compartir: horizontal 16:9 y vertical 4:5, con la portada del libro. El
+// vertical pone todas las ramas a un lado (a dos lados quedaría demasiado ancho).
+test('el póster sale en horizontal y en vertical, con la portada', async ({ page }) => {
+  await page.goto('/');
+  const r = await page.evaluate(async () => {
+    const R: any = await import('/js/ai/mindmap-render.js');
+    const tree = { title: 'Libro', branches: ['A', 'B', 'C', 'D'].map((l) => ({ label: l, children: [{ label: l + '1', src: 'a0' }] })) };
+    const cover = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+    const out: any = {};
+    for (const f of ['landscape', 'portrait']) {
+      const lay = R.layout(tree, { sides: R.FORMATS[f].sides });
+      const { svg, width, height } = R.renderPoster(lay, { format: f, header: { title: 'Libro', author: 'Autora', cover, coverAspect: 2 / 3 } });
+      out[f] = {
+        width, height,
+        cover: svg.querySelector('image')?.getAttribute('href') === cover,
+        leftBranches: lay.nodes.filter((n: any) => n.depth === 1 && n.x < 0).length,
+      };
+    }
+    return out;
+  });
+  expect([r.landscape.width, r.landscape.height]).toEqual([1920, 1080]);
+  expect([r.portrait.width, r.portrait.height]).toEqual([1080, 1350]);
+  expect(r.landscape.cover && r.portrait.cover).toBe(true);
+  expect(r.landscape.leftBranches).toBe(2);
+  expect(r.portrait.leftBranches).toBe(0);
+});
+
 // F3 · El bug que más costaba: el PNG se rasteriza cargando el SVG como <img>, y ahí no se
 // pueden pedir recursos externos — Inter está self-hosted, así que el PNG salía con la
 // fuente del sistema y no se parecía a la pantalla. Embebida como data: URI viaja dentro.

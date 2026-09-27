@@ -164,7 +164,7 @@ function measureNode(n) {
 // Árbol horizontal a dos lados: las primeras ramas (en su orden) van a la derecha de arriba
 // abajo y el resto a la izquierda. Cada subárbol reserva el alto que necesitan sus hijos, así
 // que dos cajas no pueden solaparse por construcción.
-export function layout(tree, { collapsed = new Set(), palette = PALETTE } = {}) {
+export function layout(tree, { collapsed = new Set(), palette = PALETTE, sides = 2 } = {}) {
   const list = flatten(tree, collapsed);
   const byId = new Map(list.map(n => [n.id, n]));
   for (const n of list) {
@@ -203,7 +203,8 @@ export function layout(tree, { collapsed = new Set(), palette = PALETTE } = {}) 
   const root = list[0];
   root.x = 0; root.y = 0; root.side = 0;
   const branches = root.kids.map(id => byId.get(id));
-  const cut = Math.ceil(branches.length / 2);
+  // `sides: 1` (póster vertical) pone todas las ramas a la derecha: una sola columna alta.
+  const cut = sides === 1 ? branches.length : Math.ceil(branches.length / 2);
   [[branches.slice(0, cut), 1], [branches.slice(cut), -1]].forEach(([col, side]) => {
     if (!col.length) return;
     const total = col.reduce((a, b) => a + subH.get(b.id), 0) + gap(1) * (col.length - 1);
@@ -449,4 +450,79 @@ export function renderSvg(lay, {
 
   if (footer) drawFooter(svg, { width, height, bandH, footer, theme });
   return { svg, width, height };
+}
+
+// ---- Póster para compartir (P34) ---------------------------------------------------------
+
+// Horizontal 16:9 (presentaciones, X, LinkedIn) y vertical 4:5 (feed de Instagram y LinkedIn
+// en el móvil). El vertical usa el árbol a un solo lado: a dos lados quedaría muy ancho.
+export const FORMATS = {
+  landscape: { w: 1920, h: 1080, sides: 2, margin: 72, head: 170, coverH: 128, titleFs: 40 },
+  portrait: { w: 1080, h: 1350, sides: 1, margin: 64, head: 250, coverH: 214, titleFs: 42 },
+};
+
+// Cabecera con la portada del libro, título, autor y un antetítulo; el mapa, escalado para
+// caber en el resto; y un pie con la marca. `header.cover` es un data URL (el de la
+// biblioteca): viaja dentro del SVG, así que el PNG rasterizado lo conserva.
+export function renderPoster(lay, { format = 'landscape', theme = POSTER, fontCss = '', title = '', header = {} } = {}) {
+  const F = FORMATS[format] || FORMATS.landscape;
+  const W = F.w, H = F.h, m = F.margin;
+  const svg = el('svg', {
+    xmlns: SVG_NS, viewBox: `0 0 ${W} ${H}`, width: W, height: H,
+    role: 'img', 'aria-label': title || 'Mapa mental',
+  });
+  const defs = el('defs');
+  if (fontCss) { const st = el('style'); st.textContent = fontCss; defs.appendChild(st); }
+  const sh = el('filter', { id: 'mm-cover-shadow', x: '-30%', y: '-30%', width: '160%', height: '160%' });
+  sh.appendChild(el('feDropShadow', { dx: 0, dy: 8, stdDeviation: 12, 'flood-color': '#000', 'flood-opacity': 0.16 }));
+  defs.appendChild(sh);
+  svg.appendChild(defs);
+  svg.appendChild(el('rect', { x: 0, y: 0, width: W, height: H, fill: theme.bg }));
+
+  // Cabecera
+  let tx = m;
+  if (header.cover) {
+    const ch = F.coverH, cw = Math.round(ch * (header.coverAspect || 2 / 3));
+    const clip = el('clipPath', { id: 'mm-cover-clip' });
+    clip.appendChild(el('rect', { x: m, y: m, width: cw, height: ch, rx: 6 }));
+    defs.appendChild(clip);
+    svg.appendChild(el('rect', { x: m, y: m, width: cw, height: ch, rx: 6, fill: theme.line, filter: 'url(#mm-cover-shadow)' }));
+    svg.appendChild(el('image', {
+      href: header.cover, x: m, y: m, width: cw, height: ch,
+      preserveAspectRatio: 'xMidYMid slice', 'clip-path': 'url(#mm-cover-clip)',
+    }));
+    tx = m + cw + 36;
+  }
+  const tw = W - tx - m;
+  const titleLines = wrapLabel(header.title || '', tw, 2, 700, F.titleFs);
+  const lineH = Math.round(F.titleFs * 1.18);
+  const blockH = 22 + titleLines.length * lineH + (header.author ? 36 : 0);
+  // Centrado vertical respecto a la portada (o a la banda, si no hay portada).
+  let y = m + Math.max(0, ((header.cover ? F.coverH : 110) - blockH) / 2);
+  if (header.kicker) svg.appendChild(text(tx, y + 14, header.kicker.toUpperCase(), { size: 15, weight: 600, fill: theme.muted }));
+  // letter-spacing no existe en el atributo de texto de todos los rasterizadores: se deja sin él.
+  y += 22;
+  titleLines.forEach((l, i) => svg.appendChild(text(tx, y + (i + 1) * lineH - 8, l, { size: F.titleFs, weight: 700, fill: theme.ink })));
+  y += titleLines.length * lineH;
+  if (header.author) svg.appendChild(text(tx, y + 28, header.author, { size: 24, fill: theme.muted }));
+
+  // Mapa: el SVG normal anidado, escalado para caber (con tope, para que un mapa pequeño no
+  // salga gigante).
+  const top = m + F.head, bottom = H - m - 44;
+  const bw = W - m * 2, bh = bottom - top;
+  const sc = Math.min(bw / lay.width, bh / lay.height, 1.6);
+  const mw = lay.width * sc, mh = lay.height * sc;
+  const inner = renderSvg(lay, { theme }).svg;
+  inner.removeAttribute('style');
+  inner.setAttribute('x', m + (bw - mw) / 2);
+  inner.setAttribute('y', top + (bh - mh) / 2);
+  inner.setAttribute('width', mw);
+  inner.setAttribute('height', mh);
+  svg.appendChild(inner);
+
+  // Pie
+  svg.appendChild(el('line', { x1: m, y1: H - m - 20, x2: W - m, y2: H - m - 20, stroke: theme.line, 'stroke-width': 1 }));
+  if (header.site) svg.appendChild(text(m, H - m + 12, header.site, { size: 18, fill: theme.muted }));
+  svg.appendChild(text(W - m, H - m + 12, header.mark || 'BookReader', { size: 19, weight: 600, fill: theme.ink, anchor: 'end' }));
+  return { svg, width: W, height: H };
 }

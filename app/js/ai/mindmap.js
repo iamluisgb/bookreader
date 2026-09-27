@@ -1,4 +1,4 @@
-// P14 · Mapa mental. El agente organiza el capítulo o el libro en una jerarquía radial
+// P14 · Mapa mental. El agente organiza el capítulo o el libro en una jerarquía de ramas
 // (tema central → ramas → puntos), con las hojas citando su pasaje [[aN]]. Es el artefacto
 // compartible por excelencia (la gente postea mapas mentales): export a PNG para redes y a
 // SVG. Reutiliza el troceado y el map de summary/flashcards.
@@ -21,6 +21,7 @@ import { icon } from '../ui/icons.js';
 import { escapeHtml } from '../ui/escape.js';
 import { interFaceCss } from '../ui/svg-fonts.js';
 import * as Render from './mindmap-render.js';
+import { getBook } from '../library/store.js';
 
 const KIND = 'mindmap';
 const BOOK_TOKENS = 30000;
@@ -31,6 +32,8 @@ const MAX_MAP_CALLS = 3;
 let ctx = null;
 let overlay = null, scopeValue = '', runUnsub = null;
 let lastTree = null, lastSvg = null, lastLayout = null, lastScope = '';
+// Formato del póster para compartir; se recuerda entre sesiones (preferencia del usuario).
+let shareFormat = (() => { try { return localStorage.getItem('bookreader_mm_format') || 'landscape'; } catch { return 'landscape'; } })();
 let forceSetup = false;      // abrir directo en el setup aunque haya caché (Regenerar desde Studio)
 // Estado de VISTA (no de contenido): plegado y zoom/pan viven en memoria, por sesión. No se
 // persisten a propósito — guardar en IndexedDB en cada rueda del ratón sería absurdo, y al
@@ -90,7 +93,7 @@ function renderSetup() {
   scopeValue = chapters.includes(ctx.currentChapter) ? ctx.currentChapter : '';
   b.innerHTML = `
     <h2>${t('Mapa mental')}</h2>
-    <p class="ai-ob-sub">${t('El agente organiza el contenido en un mapa radial; cada punto cita su pasaje. Clic en una cita para saltar al libro.')}</p>
+    <p class="ai-ob-sub">${t('El agente organiza el contenido en un mapa por ramas; cada idea cita su pasaje. Toca una cita para saltar al libro.')}</p>
     <label class="fc-label">${t('Contenido')}</label>
     <select id="mm-scope" class="fc-select">
       <option value="">${t('Libro entero')}</option>
@@ -896,6 +899,11 @@ async function renderResult(tree, scopeName) {
       </div>
     </div>
     <p class="sum-depth-hint">${t('Clic en un nodo para ver su cita, plegarlo o ampliarlo. Rueda o pinza para el zoom; arrastra para mover.')}</p>
+    <div class="mm-format" role="group" aria-label="${t('Formato para compartir')}">
+      <span>${t('Formato')}</span>
+      <button type="button" data-f="landscape" aria-pressed="${shareFormat === 'landscape'}">${t('Horizontal')}</button>
+      <button type="button" data-f="portrait" aria-pressed="${shareFormat === 'portrait'}">${t('Vertical')}</button>
+    </div>
     <div class="fc-export">
       <button id="mm-png" class="primary-btn">${icon('download', { size: 16 })} ${t('Descargar PNG')}</button>
       <button id="mm-share" class="ai-ob-back fc-txt-btn" style="display:none">${icon('share', { size: 14 })} ${t('Compartir')}</button>
@@ -913,7 +921,12 @@ async function renderResult(tree, scopeName) {
   paintMap();
 
   const slug = (s) => (s || 'mapa').replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '').slice(0, 50);
-  const name = (ext) => `bookreader-mapa-${slug(scopeName)}.${ext}`;
+  const name = (ext) => `bookreader-mapa-${slug(scopeName)}-${shareFormat === 'portrait' ? 'vertical' : 'horizontal'}.${ext}`;
+  b.querySelectorAll('.mm-format button').forEach(btn => btn.addEventListener('click', () => {
+    shareFormat = btn.dataset.f;
+    try { localStorage.setItem('bookreader_mm_format', shareFormat); } catch { /* sin storage: solo esta sesión */ }
+    b.querySelectorAll('.mm-format button').forEach(o => o.setAttribute('aria-pressed', String(o === btn)));
+  }));
   b.querySelector('#mm-svg').addEventListener('click', async () => {
     const { svg } = await buildExport();
     download(name('svg'), new XMLSerializer().serializeToString(svg), 'image/svg+xml');
@@ -949,21 +962,43 @@ function showExportError(msg) {
   el.textContent = msg;
 }
 
-// Versión "póster" para publicar: papel de marca (independiente del tema de la app), pie con
-// procedencia y Inter EMBEBIDA. Exporta lo que se ve — si el usuario plegó ramas para dejar
-// el mapa limpio, eso es curaduría suya y debe respetarse.
+// Versión "póster" para publicar (P34): horizontal 16:9 o vertical 4:5, con la PORTADA del
+// libro, título y autor arriba, independiente del tema de la app e Inter EMBEBIDA. Exporta lo
+// que se ve — si el usuario plegó ramas para dejar el mapa limpio, eso es curaduría suya.
 async function buildExport() {
   const fontCss = await interFaceCss();
-  const lay = Render.layout(lastTree, { collapsed });
-  return Render.renderSvg(lay, {
+  const fmt = Render.FORMATS[shareFormat] ? shareFormat : 'landscape';
+  const lay = Render.layout(lastTree, { collapsed, sides: Render.FORMATS[fmt].sides });
+  const book = ctx.bookId ? await getBook(ctx.bookId).catch(() => null) : null;
+  const cover = book && book.cover ? book.cover : '';
+  const ideas = lay.nodes.filter(n => n.depth >= 2).length;
+  const bookTitle = ctx.bookTitle || lastScope || '';
+  // Si el mapa es de un capítulo, el antetítulo lo dice; el título sigue siendo el libro.
+  const scopeNote = lastScope && lastScope !== bookTitle ? ` · ${lastScope}` : '';
+  return Render.renderPoster(lay, {
+    format: fmt,
     theme: Render.POSTER,
     fontCss,
     title: t('Mapa mental de {scope}', { scope: lastScope || '' }),
-    footer: {
-      title: ctx.bookTitle || lastScope || '',
+    header: {
+      title: bookTitle,
       author: ctx.bookAuthor || '',
+      cover,
+      coverAspect: cover ? await imageAspect(cover) : 0,
+      kicker: `${t('Mapa mental')}${scopeNote} · ${t('{n} ideas', { n: ideas })}`,
+      site: 'bookreader.raiatech.com',
       mark: 'BookReader',
     },
+  });
+}
+
+// Proporción real de la portada, para no deformarla en su marco (misma idea que la infografía).
+function imageAspect(src) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => resolve(img.naturalWidth / img.naturalHeight || 2 / 3);
+    img.onerror = () => resolve(2 / 3);
+    img.src = src;
   });
 }
 

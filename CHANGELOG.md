@@ -13,6 +13,21 @@ buena viaja en el próximo covers.json a los demás dispositivos. La adopción d
 además por **ancho real** (decodificando), no por bytes: una v1 densa puede pesar lo mismo que
 una v2 plana.
 
+## 2026-09-27 — P34: compartir el mapa en horizontal o en vertical, con la portada
+
+El PNG/SVG del mapa era un único póster del tamaño del mapa, con un pie de texto. Ahora se elige
+el formato antes de descargar o compartir (se recuerda entre sesiones):
+
+- **Horizontal 16:9** (1920×1080), para presentaciones, X o LinkedIn en escritorio: árbol a dos lados.
+- **Vertical 4:5** (1080×1350), para el feed de Instagram y LinkedIn en el móvil: árbol a un solo
+  lado, que en vertical ocupa mejor el alto.
+- **Cabecera con la portada del libro** (la de la biblioteca, con su proporción real), título,
+  autor y un antetítulo con el nº de ideas (y el capítulo, si el mapa es de uno). Pie con
+  `bookreader.raiatech.com` y la marca. El mapa se escala para caber, con tope.
+
+`renderPoster` en `mindmap-render.js`; `layout` acepta `sides: 1|2`. Test del póster en los dos
+formatos. De paso, los textos que aún decían «mapa radial» ya no lo dicen.
+
 ## 2026-09-27 — P33: el mapa mental, rediseñado con estilo Apple
 
 La estrella radial dejaba casi todo el lienzo vacío (ramas pegadas al centro, hojas a 600–700 px

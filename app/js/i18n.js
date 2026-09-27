@@ -390,7 +390,7 @@ const EN = {
   'Mapa mental': 'Mind map',
   'Flashcards': 'Flashcards',
   'TL;DR e ideas clave por capítulo, cada una con su cita al pasaje.': 'TL;DR and key ideas per chapter, each with its citation to the passage.',
-  'Mapa radial navegable de los conceptos del libro.': 'Navigable radial map of the book’s concepts.',
+  'Mapa por ramas navegable de los conceptos del libro.': 'Navigable branching map of the book’s concepts.',
   'Tarjetas de repaso espaciado para exportar a Anki.': 'Spaced-repetition cards you can export to Anki.',
 
   // P29 · infographic.js
@@ -637,7 +637,12 @@ const EN = {
   'Regenerar': 'Regenerate',
   'el resumen': 'the summary',
   'el mapa mental': 'the mind map',
-  'El agente organiza el contenido en un mapa radial; cada punto cita su pasaje. Clic en una cita para saltar al libro.': 'The agent organizes the content into a radial map; each node cites its passage. Click a citation to jump to the book.',
+  'El agente organiza el contenido en un mapa por ramas; cada idea cita su pasaje. Toca una cita para saltar al libro.': 'The agent organizes the content into a branching map; each idea cites its passage. Tap a citation to jump to the book.',
+  // P34 · póster para compartir
+  'Formato para compartir': 'Share format',
+  'Horizontal': 'Landscape',
+  'Vertical': 'Portrait',
+  '{n} ideas': '{n} ideas',
   'Generar mapa': 'Generate map',
   'Generando mapa mental…': 'Generating mind map…',
   'Rama {n}': 'Branch {n}',
