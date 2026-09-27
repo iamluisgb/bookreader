@@ -22,8 +22,9 @@ el formato antes de descargar o compartir (se recuerda entre sesiones):
 - **Vertical 4:5** (1080×1350), para el feed de Instagram y LinkedIn en el móvil: árbol a un solo
   lado, que en vertical ocupa mejor el alto.
 - **Cabecera con la portada del libro** (la de la biblioteca, con su proporción real), título,
-  autor y un antetítulo con el nº de ideas (y el capítulo, si el mapa es de uno). Pie con
-  `bookreader.raiatech.com` y la marca. El mapa se escala para caber, con tope.
+  autor y un antetítulo con el nº de ideas (y el capítulo, si el mapa es de uno). Pie con el
+  **logo** y la marca a la izquierda y **`bookreader.raiatech.com`** a la derecha, en tinta y a
+  22 px (en gris y pequeña pasaba desapercibida). El mapa se escala para caber, con tope.
 
 `renderPoster` en `mindmap-render.js`; `layout` acepta `sides: 1|2`. Test del póster en los dos
 formatos. De paso, los textos que aún decían «mapa radial» ya no lo dicen.

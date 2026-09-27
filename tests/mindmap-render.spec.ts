@@ -156,11 +156,14 @@ test('el póster sale en horizontal y en vertical, con la portada', async ({ pag
     const out: any = {};
     for (const f of ['landscape', 'portrait']) {
       const lay = R.layout(tree, { sides: R.FORMATS[f].sides });
-      const { svg, width, height } = R.renderPoster(lay, { format: f, header: { title: 'Libro', author: 'Autora', cover, coverAspect: 2 / 3 } });
+      const { svg, width, height } = R.renderPoster(lay, { format: f, header: { title: 'Libro', author: 'Autora', cover, coverAspect: 2 / 3, site: 'bookreader.raiatech.com', mark: 'BookReader' } });
       out[f] = {
         width, height,
         cover: svg.querySelector('image')?.getAttribute('href') === cover,
         leftBranches: lay.nodes.filter((n: any) => n.depth === 1 && n.x < 0).length,
+        // Pie: la URL visible y el logo (su marcapáginas verde) para volver a la app.
+        site: [...svg.querySelectorAll('text')].some((t: any) => t.textContent === 'bookreader.raiatech.com'),
+        logo: !!svg.querySelector('path[fill="#22c55e"]'),
       };
     }
     return out;
@@ -170,6 +173,8 @@ test('el póster sale en horizontal y en vertical, con la portada', async ({ pag
   expect(r.landscape.cover && r.portrait.cover).toBe(true);
   expect(r.landscape.leftBranches).toBe(2);
   expect(r.portrait.leftBranches).toBe(0);
+  expect(r.landscape.site && r.portrait.site).toBe(true);
+  expect(r.landscape.logo && r.portrait.logo).toBe(true);
 });
 
 // F3 · El bug que más costaba: el PNG se rasteriza cargando el SVG como <img>, y ahí no se

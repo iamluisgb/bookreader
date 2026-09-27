@@ -520,9 +520,23 @@ export function renderPoster(lay, { format = 'landscape', theme = POSTER, fontCs
   inner.setAttribute('height', mh);
   svg.appendChild(inner);
 
-  // Pie
-  svg.appendChild(el('line', { x1: m, y1: H - m - 20, x2: W - m, y2: H - m - 20, stroke: theme.line, 'stroke-width': 1 }));
-  if (header.site) svg.appendChild(text(m, H - m + 12, header.site, { size: 18, fill: theme.muted }));
-  svg.appendChild(text(W - m, H - m + 12, header.mark || 'BookReader', { size: 19, weight: 600, fill: theme.ink, anchor: 'end' }));
+  // Pie: el logo y la marca a la izquierda y la URL a la derecha, en tinta y a buen tamaño —
+  // en gris claro y pequeña pasaba desapercibida, y es lo que devuelve a alguien a la app.
+  const fy = H - m + 12;
+  svg.appendChild(el('line', { x1: m, y1: H - m - 30, x2: W - m, y2: H - m - 30, stroke: theme.line, 'stroke-width': 1 }));
+  const L = 34;
+  svg.appendChild(logo(m, fy - L + 8, L));
+  svg.appendChild(text(m + L + 12, fy, header.mark || 'BookReader', { size: 22, weight: 700, fill: theme.ink }));
+  if (header.site) svg.appendChild(text(W - m, fy, header.site, { size: 22, weight: 600, fill: theme.ink, anchor: 'end' }));
   return { svg, width: W, height: H };
+}
+
+// Logo de BookReader (el de la web y la app: libro blanco con marcapáginas verde sobre fondo
+// oscuro), dibujado en SVG para que viaje dentro del póster sin pedir nada fuera.
+function logo(x, y, size) {
+  const g = el('g', { transform: `translate(${x} ${y}) scale(${size / 512})` });
+  g.appendChild(el('rect', { width: 512, height: 512, rx: 118, fill: '#111418' }));
+  g.appendChild(el('path', { d: 'M288 119 Q288 99 308 99 L396 99 Q416 99 416 119 L416 371 L352 323 L288 371 Z', fill: '#22c55e' }));
+  g.appendChild(el('path', { d: 'M98 90 L222 90 Q256 90 256 124 L256 470 C 249 442 233 424 206 414 C 177 403 140 401 100 401 Q64 401 64 365 L64 124 Q64 90 98 90 Z', fill: '#f8fafc' }));
+  return g;
 }
