@@ -4,20 +4,15 @@
    menos movimiento). Sin `.motion` —o sin JS— cada escena se ve en su estado final, quieta:
    nada espera oculto a que un observer lo destape. */
 
-/* ================= Hero · el libro que se abre ================= */
+/* ================= Hero · el libro que se abre solo ================= */
 .hero { position: relative; text-align: center; }
-.hero-sticky { padding-block: clamp(56px, 9vh, 110px) clamp(40px, 6vh, 80px); }
+.hero-box { padding-block: clamp(40px, 6vh, 90px) clamp(40px, 6vh, 80px); }
 .hero-in { display: flex; flex-direction: column; align-items: center; gap: clamp(16px, 2.6vh, 28px); width: 100%; }
 .hero .cta-row { margin-top: clamp(20px, 3.2vh, 34px); }
 .hero .cta-note { margin-top: 12px; }
-.motion .hero { height: 230vh; }
-.motion .hero-sticky {
-  position: sticky; top: 60px; height: calc(100vh - 60px); height: calc(100svh - 60px);
-  /* `safe`: si el contenido no cabe, se recorta por abajo, nunca por encima del titular. */
-  display: flex; align-items: center; align-items: safe center; padding-block: 12px; overflow: hidden;
-}
 
-.picker { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px; }
+/* Por delante del libro: la hoja que gira sube en 3D y taparía los botones. */
+.picker { position: relative; z-index: 2; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px; }
 .picker-label { font: 400 13.5px var(--sans); color: var(--ink-faint); margin-right: 2px; }
 .picker button {
   font: 600 13.5px var(--sans); border: 1px solid var(--line); background: var(--card); color: var(--ink-soft);
@@ -33,7 +28,8 @@
   perspective: 1800px; perspective-origin: 50% 20%;
   min-height: calc(var(--w) * 1.31 + 36px);
 }
-/* Lo que no es libro (titular, CTA, selector, créditos) ocupa ~520px: el libro se queda con el resto. */
+/* El libro cabe con el titular en la primera pantalla, para que se vea abrirse sin bajar.
+   Lo que no es libro (titular, CTA, selector, créditos) ocupa ~520px. */
 .motion .bk-stage { --w: clamp(110px, min(19vw, calc((100svh - 540px) / 1.31)), 250px); }
 .bk-credit { font: 400 12px var(--sans); color: var(--ink-faint); }
 

@@ -20,6 +20,13 @@ test.describe('landing · un libro por público', () => {
     expect(errors).toEqual([]);
   });
 
+  test('el libro se abre solo al cargar, sin tener que hacer scroll', async ({ page }) => {
+    await page.goto(BASE + '/');
+    await expect.poll(() => page.locator('#bk-book').evaluate((el) => el.style.getPropertyValue('--open')), { timeout: 8000 }).toBe('1.0000');
+    await expect(page.locator('#bk-a')).toContainText('no matter which replica they ask');
+    expect(await page.evaluate(() => window.scrollY)).toBe(0);
+  });
+
   test('?para= abre directamente ese libro, también tras la redirección a /es/', async ({ browser }) => {
     const ctx = await browser.newContext({ locale: 'es-ES' });
     const page = await ctx.newPage();

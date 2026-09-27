@@ -1,7 +1,7 @@
 /* global window, document, location, history, performance, requestAnimationFrame, setTimeout, URLSearchParams, IntersectionObserver */
 // Landing · movimiento en 3D y un libro por público (P32).
 //
-// Un solo objeto, el libro, hace de hilo: se abre con el scroll (hero), se nubla (beat 2),
+// Un solo objeto, el libro, hace de hilo: se abre solo al cargar (hero), se nubla (beat 2),
 // contesta (beat 3), señala su línea (beat 4), se reparte en tarjetas (beat 5) y vuelve a la
 // estantería (cierre). El libro lo elige el visitante o el enlace de la campaña (?para=).
 //
@@ -16,7 +16,8 @@
   var root = document.documentElement;
   var motion = root.classList.contains('motion');
   var finePointer = window.matchMedia('(pointer: fine)').matches;
-  var NAV = 60;
+  // El hero se reproduce solo: atar la apertura al scroll obligaba a bajar para verla (fricción).
+  var HERO_MS = 3800;
 
   // Alias de ?para= en los dos idiomas: un enlace de campaña funciona en /, /es/ y tras la
   // redirección de idioma.
@@ -44,21 +45,13 @@
   })();
 
   /* ------------------------------------------------------------------ Hero */
-  var hero = $('#hero');
   var book = $('#bk-book');
   var stage = $('.bk-stage');
   var floor = $('.bk-floor');
   var cover = $('#bk-cover');
   var hQ = $('#bk-q'), hA = $('#bk-a'), hCite = $('#bk-cite'), hHl = $('#bk-hl');
   var heroAnswer = '';
-  var target = 0, cur = 0, tilt = { x: 0, y: 0 }, tiltT = { x: 0, y: 0 }, raf = 0, swapping = false;
-
-  function heroProgress() {
-    if (!motion) return 1;
-    var r = hero.getBoundingClientRect();
-    var total = hero.offsetHeight - (window.innerHeight - NAV);
-    return total > 0 ? clamp((NAV - r.top) / total) : 1;
-  }
+  var prog = 0, anim = null, tilt = { x: 0, y: 0 }, tiltT = { x: 0, y: 0 }, raf = 0, swapping = false, started = false;
 
   function renderHero(p) {
     var open = ease(seg(p, 0.04, 0.5));
@@ -82,13 +75,20 @@
   }
 
   function heroLoop() {
-    cur += (target - cur) * 0.16;
+    if (anim) {
+      var t = clamp((performance.now() - anim.t0) / anim.dur);
+      prog = lerp(anim.from, anim.to, t);
+      if (t >= 1) { var done = anim.done; anim = null; if (done) done(); }
+    }
     tilt.x += (tiltT.x - tilt.x) * 0.12;
     tilt.y += (tiltT.y - tilt.y) * 0.12;
-    renderHero(cur);
-    var moving = Math.abs(target - cur) > 0.0005 || Math.abs(tiltT.x - tilt.x) > 0.01 || Math.abs(tiltT.y - tilt.y) > 0.01;
-    if (moving) raf = requestAnimationFrame(heroLoop);
-    else { cur = target; renderHero(cur); raf = 0; }
+    renderHero(prog);
+    var tilting = Math.abs(tiltT.x - tilt.x) > 0.01 || Math.abs(tiltT.y - tilt.y) > 0.01;
+    raf = anim || tilting ? requestAnimationFrame(heroLoop) : 0;
+  }
+  function playHero(to, dur, done) {
+    anim = { from: prog, to: to, t0: performance.now(), dur: dur, done: done };
+    kickHero();
   }
   function kickHero() { if (!raf) raf = requestAnimationFrame(heroLoop); }
 
@@ -289,21 +289,13 @@
     var params = new URLSearchParams(location.search);
     params.set('para', BOOKS[key].slug);
     history.replaceState(null, '', location.pathname + '?' + params.toString() + location.hash);
-    if (!motion || cur < 0.03) { applyBook(key); renderHero(cur); return; }
-    // Se cierra, cambia la portada y vuelve a abrirse donde estaba.
+    if (!motion || !started) { applyBook(key); renderHero(prog); return; }
+    // Se cierra, cambia la portada y vuelve a abrirse sola.
     swapping = true;
-    var back = cur;
-    target = 0;
-    kickHero();
-    (function waitClosed() {
-      if (cur > 0.02) { requestAnimationFrame(waitClosed); return; }
+    playHero(0, 550, function () {
       applyBook(key);
-      setTimeout(function () {
-        swapping = false;
-        target = Math.max(back, heroProgress());
-        kickHero();
-      }, 220);
-    })();
+      setTimeout(function () { swapping = false; playHero(1, HERO_MS); }, 180);
+    });
   }
 
   /* -------------------------------------------------------------- Arranque */
@@ -334,20 +326,25 @@
     return;
   }
 
-  target = cur = heroProgress();
-  renderHero(cur);
+  renderHero(0);
+  // Arranca cuando el libro está a la vista (al cargar, casi siempre).
+  onView(stage, 0.35, function (vis) {
+    if (!vis || started) return;
+    started = true;
+    // Si en ese rato ya se eligió otro libro, su cambio manda: no se pisa su animación.
+    setTimeout(function () { if (!anim && !swapping) playHero(1, HERO_MS); }, 350);
+  });
   var ticking = false;
   window.addEventListener('scroll', function () {
     if (ticking) return;
     ticking = true;
     requestAnimationFrame(function () {
       ticking = false;
-      if (!swapping) { target = heroProgress(); kickHero(); }
       renderDense();
     });
   }, { passive: true });
   window.addEventListener('resize', function () {
-    target = heroProgress(); kickHero(); renderDense();
+    renderDense();
     if (proof.classList.contains('marked')) drawThread(1);
   });
 

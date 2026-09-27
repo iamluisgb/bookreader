@@ -18,8 +18,9 @@ una v2 plana.
 La landing contaba bien la historia pero no se movía nada, y el bloque central («Now the page
 answers back») no tenía imagen. Ahora un solo objeto, **el libro**, hace de hilo en toda la página:
 
-- **Hero:** un libro en CSS 3D (sin Three.js, el texto sigue siendo texto) que se abre con el
-  scroll por la página difícil; la de al lado es el agente, con la respuesta escribiéndose y su
+- **Hero:** un libro en CSS 3D (sin Three.js, el texto sigue siendo texto) que se abre solo al
+  cargar por la página difícil (primero iba atado al scroll, con un tramo fijo de 230vh: obligaba a
+  bajar para verlo y frenaba el scroll; se descartó el mismo día); la de al lado es el agente, con la respuesta escribiéndose y su
   cita. Se inclina hacia el cursor.
 - **Un libro por público**, con portada real: *Designing Data‑Intensive Applications* 2.ª ed.
   (ingeniería), *First Aid for the USMLE Step 1 2026* (medicina) y la guía *AWS Solutions
