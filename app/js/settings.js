@@ -1,4 +1,5 @@
 import * as Storage from './storage.js';
+import { t } from './i18n.js';
 
 const SETTINGS_KEY = 'settings';
 
@@ -81,7 +82,11 @@ export function applySettings() {
 
   // Column width display
   const colValue = document.getElementById('column-width-value');
-  if (colValue) colValue.textContent = current.columnWidth + 'px';
+  // En palabras, no en píxeles (UI1): «720px» no le dice nada a quien lee.
+  if (colValue) {
+    const w = Number(current.columnWidth) || 720;
+    colValue.textContent = w <= 600 ? t('Estrecha') : w <= 840 ? t('Media') : t('Ancha');
+  }
 
   // Line height display
   const lhValue = document.getElementById('line-height-value');

@@ -16,6 +16,24 @@ test('renderWithCitations solo convierte anclas existentes', async ({ page }) =>
   expect(html).toContain('a77');                            // `aN` suelto en prosa → se respeta
 });
 
+// UI1 · El chip enseña a DÓNDE lleva la cita (página o capítulo), no el id interno `aN`.
+test('el chip de cita muestra la página o el capítulo, no el id', async ({ page }) => {
+  await page.goto('/');
+  const r = await page.evaluate(async () => {
+    const R = await import('/js/ai/render.js');
+    const anchors = new Map<string, any>([
+      ['a1', { page: 42, chapter: 'Cap. 3' }],
+      ['a2', { cfi: 'x', chapter: 'Un capítulo con un título bastante largo' }],
+    ]);
+    const html = R.renderWithCitations('Uno [[a1]] y dos [[a2]].', anchors);
+    const box = document.createElement('div'); box.innerHTML = html;
+    return [...box.querySelectorAll('.ai-cite')].map((b) => b.textContent);
+  });
+  expect(r[0]).toMatch(/42/);
+  expect(r[1]).toContain('Un capítulo');
+  expect(r.join(' ')).not.toMatch(/\ba\d+\b/);
+});
+
 // Las tablas GFM del agente deben renderizarse como <table>, no salir como texto crudo
 // con pipes y `|---|---|` (era ilegible en el chat). Ver mdToHtml (js/ai/markdown.js).
 test('mdToHtml renderiza tablas GFM como <table>', async ({ page }) => {

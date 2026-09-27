@@ -20,7 +20,7 @@ const FEATURES = {
   study: () => t('Repaso espaciado (quizzes)'),
   mindmap: () => t('Mapas mentales navegables'),
   infographic: () => t('Infografías del libro'),
-  hqa: () => t('Plantilla HQ&A y plantillas avanzadas'),
+  hqa: () => t('Plantillas avanzadas, como Pregunta y respuesta'),
   profiles: () => t('Perfiles del agente reutilizables'),
 };
 

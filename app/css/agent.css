@@ -89,7 +89,9 @@ body.ai-open .reader-main { margin-right: var(--ai-panel-width); }
 .ai-coachmark {
   position: fixed; z-index: 400; max-width: 260px;
   display: flex; align-items: flex-start; gap: 8px;
-  background: var(--accent); color: var(--on-accent);
+  /* Tinta sobre el fondo (como un tooltip del sistema), no verde: el verde queda para lo
+     que es de la marca o de las citas. */
+  background: var(--text); color: var(--surface-0);
   border-radius: var(--r-md); padding: 10px 12px;
   font-size: 13px; line-height: 1.4; box-shadow: var(--shadow-3);
   opacity: 0; transform: translateY(-4px); transition: opacity var(--transition-fast), transform var(--transition-fast);
@@ -100,15 +102,15 @@ body.ai-open .reader-main { margin-right: var(--ai-panel-width); }
 .ai-coachmark b { font-weight: 700; }
 .ai-coachmark::before {
   content: ''; position: absolute; top: -6px; left: var(--arrow-x, 130px);
-  width: 12px; height: 12px; background: var(--accent);
+  width: 12px; height: 12px; background: var(--text);
   transform: translateX(-50%) rotate(45deg);
 }
 .ai-coachmark-x {
-  flex: none; background: rgba(255,255,255,0.2); border: none; color: var(--on-accent);
+  flex: none; background: color-mix(in srgb, var(--surface-0) 18%, transparent); border: none; color: var(--surface-0);
   width: 22px; height: 22px; border-radius: 50%; display: inline-flex; align-items: center;
   justify-content: center; cursor: pointer; position: relative;
 }
-.ai-coachmark-x:hover { background: rgba(255,255,255,0.35); }
+.ai-coachmark-x:hover { background: color-mix(in srgb, var(--surface-0) 32%, transparent); }
 
 .ai-config {
   padding: 12px 16px;
@@ -571,7 +573,7 @@ a tamaño real en este lienzo con scroll, o se descarga. La medida se maneja por
   background: var(--surface-1); color: var(--text); font-size: 13px; line-height: 1; cursor: pointer;
 }
 .ig-bar button:hover { background: var(--surface-3); }
-.ig-hint { margin-left: 8px; font-size: 12px; color: var(--text-muted); }
+.ig-hint { margin-left: 8px; font-size: 12px; color: var(--text-soft); }
 .ig-stage {
   max-height: 62vh; overflow: auto; overscroll-behavior: contain;
   border: 1px solid var(--border); border-radius: 12px;

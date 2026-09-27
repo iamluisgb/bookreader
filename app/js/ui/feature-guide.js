@@ -45,7 +45,7 @@ const GROUPS = [
     items: [
       'Objetivo de lectura y plantillas de libreta por conversación',
       'Resumen citado, mapa mental, flashcards y Modo Estudiar',
-      'Repaso al terminar cada capítulo (HQ&A) y modo Feynman',
+      'Repaso al terminar cada capítulo y modo Feynman',
       'Preparar el libro para preguntarle sin conexión',
       'Sync entre dispositivos con tu propio Google Drive (Ajustes generales)',
     ],
