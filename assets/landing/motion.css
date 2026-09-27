@@ -13,7 +13,8 @@
 .motion .hero { height: 230vh; }
 .motion .hero-sticky {
   position: sticky; top: 60px; height: calc(100vh - 60px); height: calc(100svh - 60px);
-  display: flex; align-items: center; padding-block: 12px; overflow: hidden;
+  /* `safe`: si el contenido no cabe, se recorta por abajo, nunca por encima del titular. */
+  display: flex; align-items: center; align-items: safe center; padding-block: 12px; overflow: hidden;
 }
 
 .picker { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px; }
@@ -32,7 +33,8 @@
   perspective: 1800px; perspective-origin: 50% 20%;
   min-height: calc(var(--w) * 1.31 + 36px);
 }
-.motion .bk-stage { --w: clamp(120px, min(19vw, calc((100svh - 470px) / 1.31)), 250px); }
+/* Lo que no es libro (titular, CTA, selector, créditos) ocupa ~520px: el libro se queda con el resto. */
+.motion .bk-stage { --w: clamp(110px, min(19vw, calc((100svh - 540px) / 1.31)), 250px); }
 .bk-credit { font: 400 12px var(--sans); color: var(--ink-faint); }
 
 .bk-book {
@@ -161,7 +163,7 @@
 
 @media (max-width: 760px) {
   .bk-stage { --w: 42vw; }
-  .motion .bk-stage { --w: clamp(108px, min(42vw, calc((100svh - 520px) / 1.31)), 250px); }
+  .motion .bk-stage { --w: clamp(100px, min(42vw, calc((100svh - 540px) / 1.31)), 250px); }
   .ask { grid-template-columns: 1fr; gap: 28px; }
   .ask-page { transform: rotateX(12deg); transform-origin: center bottom; }
   .strata-stage { min-height: 440px; padding-top: 200px; }
