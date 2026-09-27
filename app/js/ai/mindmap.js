@@ -622,6 +622,12 @@ function wireCanvas(holder) {
 
   holder.addEventListener('click', (e) => {
     if (moved > 4) return;                                   // fue un arrastre, no un clic
+    // Atajos del mapa (P33): el círculo pliega y el indicador de cita va al libro, sin pasar
+    // por el panel de detalle.
+    const fold = e.target.closest('.mm-fold');
+    if (fold) { toggleFold(fold.dataset.id); return; }
+    const go = e.target.closest('.mm-go');
+    if (go && ctx.anchors?.has(go.dataset.src)) { closeModal(); ctx.onCite?.(go.dataset.src); return; }
     const g = e.target.closest('.mm-node');
     if (g) openNodePopover(g.dataset.id);
     else closePopover();
@@ -630,6 +636,8 @@ function wireCanvas(holder) {
   // Teclado: los nodos son focusables (role="button"); Enter/Espacio abren su detalle.
   holder.addEventListener('keydown', (e) => {
     if (e.key !== 'Enter' && e.key !== ' ') return;
+    const fold = e.target.closest?.('.mm-fold');
+    if (fold) { e.preventDefault(); toggleFold(fold.dataset.id); return; }
     const g = e.target.closest?.('.mm-node');
     if (!g) return;
     e.preventDefault();
@@ -709,13 +717,14 @@ function openNodePopover(id) {
   });
 }
 
+function toggleFold(id) {
+  if (collapsed.has(id)) collapsed.delete(id); else collapsed.add(id);
+  closePopover();
+  paintMap();
+}
+
 function onNodeAction(act, node, quote) {
-  if (act === 'fold') {
-    if (collapsed.has(node.id)) collapsed.delete(node.id); else collapsed.add(node.id);
-    closePopover();
-    paintMap();
-    return;
-  }
+  if (act === 'fold') { toggleFold(node.id); return; }
   if (act === 'cite') { closeModal(); ctx.onCite?.(node.src); return; }
   if (act === 'ask') {
     closeModal();

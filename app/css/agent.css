@@ -589,9 +589,11 @@ a tamaño real en este lienzo con scroll, o se descarga. La medida se maneja por
 /* `>` DELIBERADO: el panel de detalle vive dentro del escenario y sus iconos son <svg>.
    Sin el hijo directo, `width: 100%` los inflaba al ancho del lienzo. */
 .mm-canvas > svg { display: block; width: 100%; height: auto; }
-.mm-node:hover rect { stroke-width: 2.5; }
-.mm-node:focus-visible { outline: none; }
-.mm-node:focus-visible rect { stroke: var(--accent); stroke-width: 3; }
+.mm-node:hover .mm-hit { stroke: var(--accent); }
+.mm-idea:hover .mm-hit { fill: var(--surface-3); stroke: none; }
+.mm-node:focus-visible, .mm-fold:focus-visible { outline: none; }
+.mm-node:focus-visible .mm-hit { stroke: var(--accent); stroke-width: 2; }
+.mm-fold:hover circle, .mm-fold:focus-visible circle { stroke: var(--accent); }
 
 /* Controles de zoom, flotando sobre el lienzo */
 .mm-zoom { position: absolute; right: 12px; bottom: 20px; display: flex; gap: 4px; }

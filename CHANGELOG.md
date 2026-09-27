@@ -13,6 +13,26 @@ buena viaja en el próximo covers.json a los demás dispositivos. La adopción d
 además por **ancho real** (decodificando), no por bytes: una v1 densa puede pesar lo mismo que
 una v2 plana.
 
+## 2026-09-27 — P33: el mapa mental, rediseñado con estilo Apple
+
+La estrella radial dejaba casi todo el lienzo vacío (ramas pegadas al centro, hojas a 600–700 px
+unidas por radios largos), cruzaba aristas cerca del centro y dejaba que el ángulo decidiera el
+orden de lectura. Encajado en pantalla, el texto quedaba en ~11 px.
+
+- **Árbol horizontal a dos lados** (`mindmap-render.js`): las primeras ramas, en su orden, a la
+  derecha de arriba abajo y el resto a la izquierda; las ideas se apilan al lado de su rama. Cada
+  subárbol reserva su alto, así que no hay solapes ni cruces por construcción, y el mapa de
+  ejemplo pasa de 1895×1760 a 1500×626.
+- **Estilo Apple**: lienzo blanco (en claro, sepia y export; en oscuro, las superficies de la
+  app), centro y ramas como tarjetas blancas con borde fino y sombra suave, colores de sistema
+  solo en líneas, puntos y aros, ideas como texto sobre su línea (sin caja) y la tipografía del
+  sistema (SF en Apple, Inter en el resto; el export sigue llevando Inter embebida).
+- **La cita a la vista**: cada idea con fuente lleva un indicador de libro que va directo al
+  pasaje. **Plegar** también es directo: el círculo al final de cada rama pliega sin abrir el
+  panel, y plegado muestra cuántas ideas esconde.
+- Ningún texto va en color de rama (los de sistema no aguantan texto encima); un test lo vigila
+  y sustituye al de AA de la paleta anterior. Test nuevo del reparto a dos lados.
+
 ## 2026-09-27 — P32: la landing en 3D, con un libro por público
 
 La landing contaba bien la historia pero no se movía nada, y el bloque central («Now the page

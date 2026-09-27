@@ -68,6 +68,27 @@ test.describe('P14 · render del mapa', () => {
     expect(bad).toEqual([]);
   });
 
+  // P33 · Árbol a dos lados: las primeras ramas, en su orden, a la derecha de arriba abajo; el
+  // resto a la izquierda. El orden del árbol es el del libro y el mapa tiene que respetarlo.
+  test('las ramas se reparten a izquierda y derecha, en su orden', async ({ page }) => {
+    await page.goto('/');
+    const r = await page.evaluate(async () => {
+      const R: any = await import('/js/ai/mindmap-render.js');
+      const lay = R.layout({ title: 'T', branches: ['A', 'B', 'C', 'D', 'E'].map((l) => ({ label: l, children: [{ label: l + '1', src: '' }] })) });
+      const br = lay.nodes.filter((n: any) => n.depth === 1);
+      return {
+        right: br.filter((n: any) => n.x > 0).map((n: any) => n.label),
+        left: br.filter((n: any) => n.x < 0).map((n: any) => n.label),
+        rightDown: br.filter((n: any) => n.x > 0).every((n: any, i: number, a: any[]) => !i || n.y > a[i - 1].y),
+        leafOutside: lay.nodes.filter((n: any) => n.depth === 2).every((n: any) => Math.sign(n.x) === Math.sign(lay.byId.get(n.parent).x) && Math.abs(n.x) > Math.abs(lay.byId.get(n.parent).x)),
+      };
+    });
+    expect(r.right).toEqual(['A', 'B', 'C']);
+    expect(r.left).toEqual(['D', 'E']);
+    expect(r.rightDown).toBe(true);
+    expect(r.leafOutside).toBe(true);   // cada idea, del lado de su rama y por fuera de ella
+  });
+
   // Antes se medía con `CHARW = 8` fijo, y Inter es proporcional: una etiqueta de íes y otra
   // de emes de la misma longitud daban la misma píldora.
   test('la píldora se mide con el ancho real del texto, no por nº de caracteres', async ({ page }) => {
@@ -81,27 +102,31 @@ test.describe('P14 · render del mapa', () => {
     expect(r.wide).toBeGreaterThan(r.narrow + 20);
   });
 
-  // La paleta anterior (tonos 500) no llegaba ni a 2.5:1 con texto blanco. El mínimo AA
-  // para texto normal es 4.5:1.
-  test('toda la paleta de ramas pasa AA con su tinta', async ({ page }) => {
+  // P33 · Los colores de sistema de Apple no aguantan texto (verde o naranja sobre blanco no
+  // llegan a 3:1), así que el color va solo en líneas, puntos y aros. Todo texto del mapa,
+  // en claro y en oscuro, usa la tinta del tema. Sustituye al test de AA de la paleta vieja,
+  // que ponía texto blanco sobre el color de la rama.
+  test('ningún texto del mapa va en el color de una rama', async ({ page }) => {
     await page.goto('/');
-    const worst = await page.evaluate(async () => {
+    const bad = await page.evaluate(async () => {
       const R: any = await import('/js/ai/mindmap-render.js');
-      const lum = (hex: string) => {
-        const c = hex.replace('#', '');
-        const v = [0, 2, 4].map(i => {
-          const u = parseInt(c.slice(i, i + 2), 16) / 255;
-          return u <= 0.03928 ? u / 12.92 : Math.pow((u + 0.055) / 1.055, 2.4);
-        });
-        return 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2];
-      };
-      const ratio = (a: string, b: string) => {
-        const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p);
-        return (x + 0.05) / (y + 0.05);
-      };
-      return Math.min(...R.PALETTE.map((c: string) => ratio(c, R.contrastInk(c))));
+      const tree = { title: 'Libro', branches: [
+        { label: 'Rama uno', children: [{ label: 'hoja', src: 'a0' }, { label: 'otra', src: 'a1' }] },
+        { label: 'Rama dos', children: [{ label: 'hoja dos', src: 'a2' }] },
+      ] };
+      const dark = { bg: '#1a1f24', ink: '#f2f3f5', muted: '#a8b0b8', leaf: '#232a31', line: '#30363d' };
+      const out: string[] = [];
+      for (const theme of [R.POSTER, dark]) {
+        const lay = R.layout(tree, { collapsed: new Set(['r.0']) });
+        const svg = R.renderSvg(lay, { theme, interactive: true, footer: { title: 'Libro', mark: 'BookReader' } }).svg;
+        for (const t of svg.querySelectorAll('text')) {
+          const f = t.getAttribute('fill');
+          if (f !== theme.ink && f !== theme.muted) out.push(`${t.textContent} → ${f}`);
+        }
+      }
+      return out;
     });
-    expect(worst).toBeGreaterThanOrEqual(4.5);
+    expect(bad).toEqual([]);
   });
 
   // Plegar no es ocultar píxeles: el nodo pasa a ser hoja del árbol visible y el reparto
