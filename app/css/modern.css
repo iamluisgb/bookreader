@@ -434,14 +434,21 @@ body.reading :is(.reader-header, .reader-footer):hover > * { opacity: 1; }
 .study-stack span:nth-child(3) { transform: translateY(30px) scale(0.91); opacity: 0.5; }
 
 .study-card3d {
-  --drag: 0px;
-  position: relative; display: grid; min-height: 340px;
+  --drag: 0;
+  position: relative; display: grid;
+  grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr);
+  min-height: 340px;
   transform-style: preserve-3d;
-  transform: translateX(var(--drag)) rotate(calc(var(--drag) / 30)) rotateY(0deg);
+  /* --drag es un NÚMERO sin unidad (JS lo setea como "-42"): así rotate() recibe un
+     ángulo real vía calc(x / 30 * 1deg). La versión anterior (translateX(var(--drag))
+     con --drag en px + rotate(calc(px / 30))) producía una LONGITUD donde rotate()
+     exige un ángulo: declaración inválida → transform nunca aplicado → la tarjeta no
+     giraba visualmente en ningún navegador (transform computado = none). */
+  transform: translateX(calc(var(--drag) * 1px)) rotate(calc(var(--drag) / 30 * 1deg)) rotateY(0deg);
   transition: transform 0.55s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.2s ease;
   cursor: pointer; outline: none;
 }
-.study-card3d.is-flipped { transform: translateX(var(--drag)) rotate(calc(var(--drag) / 30)) rotateY(180deg); cursor: grab; }
+.study-card3d.is-flipped { transform: translateX(calc(var(--drag) * 1px)) rotate(calc(var(--drag) / 30 * 1deg)) rotateY(180deg); cursor: grab; }
 .study-card3d.is-dragging { transition: none; }
 .study-ghost-wrap { position: fixed; inset: 0; z-index: 301; pointer-events: none; }
 .study-ghost { position: fixed !important; pointer-events: none; margin: 0; }
@@ -456,6 +463,10 @@ body.reading :is(.reader-header, .reader-footer):hover > * { opacity: 1; }
   box-shadow: 0 1px 2px rgba(0,0,0,0.06), 0 18px 44px rgba(0,0,0,0.10);
   backface-visibility: hidden; -webkit-backface-visibility: hidden;
   overflow-wrap: break-word;
+  /* min-width: 0 + overflow:hidden: el contenido nowrap (deckname) no debe poder
+     expandir la cara más allá del track (minmax(0,1fr) del grid la fija) ni
+     derramarse fuera de la tarjeta. */
+  min-width: 0; overflow: hidden;
 }
 .study-face--back { transform: rotateY(180deg); }
 .study-meta { display: flex; align-items: center; gap: 10px; min-width: 0; }

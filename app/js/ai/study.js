@@ -748,7 +748,8 @@ function wireSwipe(el) {
   el.addEventListener('pointermove', (e) => {
     if (x0 === null) return;
     dx = e.clientX - x0;
-    el.style.setProperty('--drag', `${dx}px`);
+    // Número sin unidad: el CSS lo convierte (calc(--drag * 1px) / * 1deg).
+    el.style.setProperty('--drag', String(Math.round(dx)));
     el.dataset.lean = dx > 40 ? 'good' : dx < -40 ? 'again' : '';
   });
   const end = () => {

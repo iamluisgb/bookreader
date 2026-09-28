@@ -13,6 +13,25 @@ buena viaja en el próximo covers.json a los demás dispositivos. La adopción d
 además por **ancho real** (decodificando), no por bytes: una v1 densa puede pesar lo mismo que
 una v2 plana.
 
+## 2026-09-28 — Hotfix ST2: la tarjeta no giraba y el nombre del mazo se derramaba
+
+Dos defectos del rediseño de arriba, visibles en producción con mazos reales:
+
+- **La tarjeta nunca giraba visualmente** (ningún navegador). El transform usaba
+  `rotate(calc(var(--drag) / 30))` con `--drag` en px: px÷número es una **longitud**, y
+  `rotate()` exige un ángulo. Declaración inválida → `transform` computado `none` siempre.
+  Ahora `--drag` viaja sin unidad y el CSS lo convierte: `translateX(calc(var(--drag) * 1px))
+  rotate(calc(var(--drag) / 30 * 1deg))` ([`study.js`](app/js/ai/study.js),
+  [`modern.css`](app/css/modern.css)).
+- **El nombre del mazo se salía de la tarjeta**: un título de fichero de 130+ caracteres en
+  `nowrap` forzaba el min-content del track implícito del grid 3D y el deckname se pintaba
+  fuera de la tarjeta de 620px. Ahora el track es `minmax(0, 1fr)` y la cara lleva
+  `min-width: 0; overflow: hidden`, así el ellipsis del deckname trabaja de verdad.
+
+Regresión: `tests/study-overflow.spec.ts` (Chromium + WebKit vía
+`playwright.webkit.config.ts`), que siembra un mazo con el título del reporte y afirma que la
+tarjeta cabe en el stage, el deckname no se derrama y el transform computado cambia al girar.
+
 ## 2026-09-28 — P19+ST2: «Estudiar» — FSRS-5 y la sesión de repaso, rediseñada
 
 Dos piezas sobre el mismo hábito: el **algoritmo** que decide cuándo vuelve cada tarjeta y la
