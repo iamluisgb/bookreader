@@ -101,9 +101,11 @@ Salida: `{steps[{name, detected, stroke}], extraCount, comment}`.
 
 ## Tareas de implementación (ODD, work units)
 
-- [x] **WU1** Spec + evidencia de grounding + anclajes → `odd/tasks/tarjetas-visuales.md` (`7152577`)
-- [x] **WU2** `app/js/ai/figures.js` + `tests/figures.spec.ts` (5 tests, eslint limpio)
-- [ ] **WU3** `app/js/ai/visual-cards.js`: prompts 1–3 + parsers/validadores puros
+- [x] **WU1** Spec + evidencia de grounding + anclajes (`7152577`)
+- [x] **WU2** `app/js/ai/figures.js` + `tests/figures.spec.ts` — 5 tests, eslint limpio (`ea017e1`)
+- [x] **WU3** `app/js/ai/visual-cards.js` + `tests/visual-cards.spec.ts` — 8 tests (incluye
+      propagación de abort sin reintento) (`e0f6196`); precache de ambos módulos (`ef56473`)
+- [ ] **WU4** `app/js/ai/visual-cards.js`: prompts 1–3 + parsers/validadores puros
       (incluye validador de SVG) + tests con `fetch` stubbeado
 - [ ] **WU4** Menú de tipos en `renderSetup()` (`flashcards.js`) + ramificación de generación
 - [ ] **WU5** Render por tipo en estudio (`study.js`): oclusión (overlay %), diagrama (SVG),
@@ -111,6 +113,17 @@ Salida: `{steps[{name, detected, stroke}], extraCount, comment}`.
 - [ ] **WU6** Revisión del boceto con `chatVision` + pintado por colores de trazo
 - [ ] **WU7** Sync/export: campos visuales en `sameCard`; comportamiento definido en export Anki
 - [ ] **WU8** Docs: CHANGELOG, BACKLOG, DECISIONS + evals/check determinista si aplica
+
+## Estado del árbol de tests (checkpoint WU3)
+
+Suite completa: 544 passed / 4 failed. De las 4 fallas, **ninguna es de esta feature**:
+
+| Falla | Estado |
+|---|---|
+| `sw-precache`: `ui/book-accent.js` sin precachear | Preexistente (también falla en `main`); **corregida** en `ef56473` |
+| `llm.spec.ts:149` getLiteModel | Preexistente — falla igual con los cambios de la feature fuera del árbol |
+| `model-probe.spec.ts:67` | Preexistente — ídem |
+| `pdf-touch-select.spec.ts:128` | Flaky en corrida paralela: pasa aislado (6/6) |
 
 ## Riesgos abiertos
 
