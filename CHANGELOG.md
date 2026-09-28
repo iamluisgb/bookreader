@@ -13,6 +13,47 @@ buena viaja en el próximo covers.json a los demás dispositivos. La adopción d
 además por **ancho real** (decodificando), no por bytes: una v1 densa puede pesar lo mismo que
 una v2 plana.
 
+## 2026-09-28 — P19+ST2: «Estudiar» — FSRS-5 y la sesión de repaso, rediseñada
+
+Dos piezas sobre el mismo hábito: el **algoritmo** que decide cuándo vuelve cada tarjeta y la
+**sesión** donde eso se vive.
+
+**P19 · FSRS-5 sustituye a SM-2** ([`ai/srs.js`](app/js/ai/srs.js)). El argumento de P10 («FSRS solo
+rinde con historial largo») lo refutaba el benchmark: con parámetros por defecto y sin historial,
+FSRS ya gana en el 99,5% de los usuarios con un 20-30% menos de repasos. Modelo DSR: cada tarjeta
+ahorra su **estabilidad** (días hasta caer del 90% de recuerdo) y su **dificultad** (1-10); el
+intervalo es la estabilidad (retención objetivo 0,9). Las tarjetas ya programadas **no se pierden**:
+su primer repaso con FSRS parte de su intervalo SM-2 (lo que ya se sabía de ellas) y la dificultad,
+del ease heredado. Los tests fijan PROPIEDADES (crece con aciertos, el fallo vuelve a hoy, los
+botones nunca se contradicen), no decimales de pesos.
+
+**ST2 · La sesión, una pantalla de concentración** ([`ai/study.js`](app/js/ai/study.js)). La tarjeta
+es el objeto: **gira en 3D** sobre un montón que es el progreso, en el **color del libro** (portada
+→ color dominante → paleta AA garantizada; nuevo [`ui/book-accent.js`](app/js/ui/book-accent.js)).
+Y todo lo que el repaso pedía a gritos:
+
+- **Dos botones por defecto** (Otra vez · Bien): elegir entre Difícil y Bien en cada tarjeta cansa,
+  y FSRS funciona igual de bien con dos notas. Las cuatro siguen disponibles en Ajustes →
+  Aplicación → Botones del repaso, y las teclas 1-4 valen siempre.
+- **Recuerdo activo**: escribe tu respuesta antes de voltear y el agente la corrige (veredicto
+  bien / a medias / aún no, con qué acertaste y qué falta) y sugiere la nota, resaltada. La
+  decisión sigue siendo tuya.
+- **Reescribir con el agente**: las tarjetas las escribe un LLM y la que fallas una y otra vez
+  suele estar mal formulada. Desde el leech o el menú «⋯», el agente la reformula a partir de su
+  pasaje y la propuesta abre en el editor para confirmarla.
+- **El pasaje citado, plegado**: el respaldo del libro es un recorte de página que se abre con un
+  toque; «Ver en el libro» queda como acción secundaria.
+- **Deslizar en móvil** (izquierda = otra vez, derecha = bien, con umbral), progreso arriba y un
+  cierre con datos: % a la primera, tiempo, racha, **heatmap de 5 semanas** y **previsión de los
+  próximos 7 días**.
+
+En la biblioteca, el chip suelto pasa a ser la tarjeta **«Repaso de hoy»**: anillo de progreso
+hechas/(hechas+pendientes), minutos estimados, racha y las portadas de los libros que tocan.
+Y lo subrayado ya no se queda fuera del ciclo: la barra de selección tiene **«Tarjeta»**, que
+convierte el fragmento en cloze (el agente elige el término clave; sin red, se oculta la palabra
+más larga) y lo manda al mazo «De tus subrayados». Extra silencioso: el icono de la PWA lleva el
+número de tarjetas pendientes (`setAppBadge`), el recordatorio que no necesita notificaciones.
+
 ## 2026-09-28 — IG2: la infografía, de informe a pieza para redes
 
 La v1 se leía como un informe: cuatro bandas negras con tarjetas idénticas, casi sin color, los

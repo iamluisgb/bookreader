@@ -1469,7 +1469,13 @@ del navegador, con fallback a textarea: explicar en voz alta *es* el ejercicio) 
 **Riesgos:** que se sienta injusto (mitigado por 1); coste (mitigado por 3); no es para todo el
 mundo — Pro, no gancho de landing.
 
-### P19 — Migrar el scheduler a FSRS · `S` · **la razón de P10 ya no se sostiene**
+### P19 — Migrar el scheduler a FSRS · `S` · **✓ entregada (2026-09-28, ver CHANGELOG)**
+
+> **Entregada junto a ST2.** FSRS-5 con parámetros por defecto en [`ai/srs.js`](app/js/ai/srs.js):
+> modelo DSR (estabilidad + dificultad por tarjeta), intervalo = estabilidad con retención objetivo
+> 0,9, techo de un año y orden de botones garantizado (difícil ≤ bien < fácil). El estado viejo de
+> SM-2 se convierte al vuelo en su primer repaso FSRS: la estabilidad sale de su intervalo y la
+> dificultad, de su ease — nadie pierde programaciones. Los tests fijan propiedades, no decimales.
 
 [P10](#p10--modo-estudiar-repetición-espaciada-in-app--ml--f1f3) eligió SM-2 con este argumento:
 *"FSRS solo rinde con historial largo que nadie tendrá en meses"*. Los datos de referencia lo
@@ -1541,6 +1547,15 @@ seguir leyendo"* sin necesidad de un cartel que la anuncie.
   ejecutor/progreso; el `run` devuelve el `deckId`.
 
 **Orden por esfuerzo/impacto:** F1 → F2 → F3 → F4.
+
+### ST2 — La sesión de repaso, rediseñada · **✓ entregada (2026-09-28, ver CHANGELOG)**
+
+> La tarjeta como objeto: 3D con montón de progreso, color y portada del libro
+> ([`ui/book-accent.js`](app/js/ui/book-accent.js)), dos botones por defecto (configurables),
+> recuerdo activo con corrección del agente, reescribir con el agente (leech y menú «⋯»), pasaje
+> citado plegado, swipe en móvil y cierre con métricas (heatmap 5 semanas + previsión 7 días).
+> En la biblioteca, la tarjeta «Repaso de hoy» sustituye al chip; «Tarjeta» en la barra de
+> selección convierte subrayados en clozes; badge PWA con las pendientes.
 
 ### P24 — Higiene de la sesión de repaso · **✓ entregada** (2026-08-01) · F1–F4
 
