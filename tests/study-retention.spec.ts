@@ -105,3 +105,35 @@ test('meta diaria: anillo con repaso de hoy / meta, ajustable al click', async (
   await expect(ring.locator('.study-goal-n')).toHaveText('1/25');
   await expect(ring.locator('.study-goal-fill')).not.toHaveAttribute('style', /stroke-dashoffset:\s*94/);
 });
+
+test('hito de racha: se celebra al cruzar 7 y comparte una tarjeta PNG', async ({ page }) => {
+  await page.goto('/index.html');
+  await seedProLicense(page);
+  // Racha cruda 6: al repasar hoy pasa a 7 y esta sesión cruza el hito → celebración.
+  const yesterday = Math.floor((Date.now() - 86400000) / 86400000);
+  await seedStreak(page, { count: 6, lastDay: yesterday });
+  await seedDeck(page, { cards: [{ type: 'basic', front: 'q1', back: 'a1', chapter: '', src: '' }] });
+  await page.reload();
+  await page.locator('.lib-study-chip').click();
+  const overlay = page.locator('#ai-study');
+
+  await overlay.locator('.study-flip').click();
+  await overlay.locator('.study-grade[data-rate="good"]').click();
+
+  const ms = overlay.locator('.study-milestone');
+  await expect(ms).toBeVisible();
+  await expect(ms.locator('h3')).toContainText('7 días');
+  await expect(ms.locator('.study-share')).toBeVisible();
+
+  // La tarjeta compartible: PNG 1080×1080 no vacío con el hito en él (canvas real, no stub).
+  const png = await page.evaluate(async () => {
+    const { buildStreakCard } = await import('/js/share-card.js');
+    const blob = await buildStreakCard({ streak: 7, bookTitle: 'Libro retención' });
+    const bmp = await createImageBitmap(blob);
+    return { type: blob.type, size: blob.size, w: bmp.width, h: bmp.height };
+  });
+  expect(png.type).toBe('image/png');
+  expect(png.size).toBeGreaterThan(2000);
+  expect(png.w).toBe(1080);
+  expect(png.h).toBe(1080);
+});

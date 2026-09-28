@@ -12,6 +12,7 @@ import * as DB from './db.js';
 import * as Srs from './srs.js';
 import * as Storage from '../storage.js';
 import * as Store from '../library/store.js';
+import { shareStreak } from '../share-card.js';
 import * as Shelves from '../library/shelves.js';
 import { icon } from '../ui/icons.js';
 import { escapeHtml } from '../ui/escape.js';
@@ -40,6 +41,9 @@ const GOAL_KEY = 'study_goal';
 export const DEFAULT_GOAL = 20;
 const GOAL_STEP = 5;
 const GOAL_C = +(2 * Math.PI * 15).toFixed(2);   // circunferencia del anillo del header
+
+// Hitos de racha celebrables (T4): el primer «jaja, llevo una semana» es el que engancha.
+const MILESTONES = [7, 30, 100, 365];
 
 export function dailyGoal() {
   const v = Storage.get(GOAL_KEY, DEFAULT_GOAL);
@@ -231,6 +235,7 @@ export function reviewsToday(now = Date.now()) {
 }
 
 let startedAt = 0;       // para el tiempo de la sesión
+let streakAtStart = 0;   // racha al abrir la sesión: el hito se celebra una vez, no cada día
 let graded = 0;          // notas puestas (incluye los «otra vez»)
 let firstTry = 0;        // tarjetas acertadas a la primera
 let failedOnce = new Set();
@@ -256,6 +261,7 @@ export function open({ decks, title = t('Estudiar'), onClose, onNavigate } = {})
   failedOnce = new Set();
   sessionBooks = new Set((decks || []).map(d => d.bookId).filter(Boolean));
   startedAt = Date.now();
+  streakAtStart = Srs.currentStreak(Storage.get(STREAK_KEY));
   flipped = false;
   editing = false;
   animating = false;
@@ -944,6 +950,9 @@ async function forecastHtml(now = Date.now()) {
 function renderDone(b, f, left) {
   if (left) left.textContent = '';
   const streak = Srs.currentStreak(Storage.get(STREAK_KEY));
+  // Hito (T4): solo si esta sesión lo CRUZÓ (no se re-celebra 7 días seguidos). El hito
+  // convertirse en hábito compartido es lo que tracciona el bucle: se puede compartir.
+  const milestone = MILESTONES.find(m => streak >= m && streakAtStart < m) || 0;
   const acc = done ? Math.round((firstTry / done) * 100) : 0;
   b.innerHTML = `
     <div class="study-end">
@@ -961,6 +970,12 @@ function renderDone(b, f, left) {
         <div><b>${streak}</b><span>${t('días de racha')}</span></div>
       </div>` : ''}
       ${done && streak ? `<div class="study-streak">${t('🔥 Racha de <b>{n}</b> día{s} estudiando', { n: streak, s: streak === 1 ? '' : 's' })}</div>` : ''}
+      ${milestone ? `<div class="study-milestone" role="status">
+        <span class="study-milestone-flame" aria-hidden="true">🔥</span>
+        <div class="study-milestone-txt"><h3>${t('¡{n} días de racha!', { n: milestone })}</h3>
+          <p>${t('La constancia ya es un hábito. Presúmelo.')}</p></div>
+        <button class="study-share">${icon('share', { size: 15 })} ${t('Compartir')}</button>
+      </div>` : ''}
       <div class="study-end-charts">
         <div><h3>${t('Tu racha')}</h3>${heatmapHtml()}</div>
         <div><h3>${t('Próximos días')}</h3><div class="study-forecast-slot"></div></div>
@@ -972,6 +987,14 @@ function renderDone(b, f, left) {
     if (slot) slot.innerHTML = html;
   });
   const oneBook = sessionBooks.size === 1 ? [...sessionBooks][0] : null;
+  b.querySelector('.study-share')?.addEventListener('click', async (e) => {
+    const btn = e.currentTarget;
+    btn.disabled = true;
+    try {
+      const book = oneBook ? await Store.getBook(oneBook).catch(() => null) : null;
+      await shareStreak({ streak: milestone, bookTitle: book?.title, cover: book?.cover });
+    } finally { btn.disabled = false; }
+  });
   // El tope de nuevas es una recomendación, no una cárcel: quien quiera seguir, sigue.
   f.innerHTML = `<div class="study-end-actions">
     ${held.length ? `<button class="primary-btn study-more-new">${t('Seguir con {n} nueva{s}', { n: held.length, s: held.length === 1 ? '' : 's' })}</button>` : ''}

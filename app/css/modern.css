@@ -687,6 +687,25 @@ body.reading :is(.reader-header, .reader-footer):hover > * { opacity: 1; }
   font: inherit; font-weight: 700; line-height: 1;
 }
 .study-goal-less:hover, .study-goal-more:hover { background: var(--fill-strong); }
+
+/* Hito de racha (T4): celebración puntual al cruzar 7/30/100/365, con tarjeta compartible. */
+.study-milestone {
+  display: flex; align-items: center; gap: 12px; margin-top: 16px; padding: 12px 14px;
+  text-align: left; border-radius: var(--r-lg);
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface-1));
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border-soft));
+}
+.study-milestone-flame { flex: none; font-size: 28px; }
+.study-milestone-txt { flex: 1; min-width: 0; }
+.study-milestone-txt h3 { margin: 0; font-size: var(--fs-md); color: var(--text); }
+.study-milestone-txt p { margin: 2px 0 0; font-size: var(--fs-sm); color: var(--text-soft); }
+.study-share {
+  flex: none; display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
+  padding: 8px 12px; border: none; border-radius: var(--r-md);
+  background: var(--accent); color: #fff; font: inherit; font-size: var(--fs-sm); font-weight: 600;
+}
+.study-share:disabled { opacity: 0.6; }
+.study-share:hover { filter: brightness(1.05); }
 .lib-streak-slot { display: inline-flex; justify-content: flex-end; }
 .lib-streakchip {
   display: inline-flex; align-items: center; gap: 6px; align-self: start;

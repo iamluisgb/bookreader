@@ -152,11 +152,10 @@ export async function buildQuoteCard({ quote, title, author, cover }) {
     canvas.toBlob(b => (b ? resolve(b) : reject(new Error(t('No se pudo generar la imagen')))), 'image/png'));
 }
 
-// Genera la tarjeta y la comparte (Web Share con ficheros si el navegador lo soporta;
-// si no, descarga el PNG). Devuelve 'shared' | 'downloaded' | 'cancelled'.
-export async function shareQuote({ quote, title, author, cover }) {
-  const blob = await buildQuoteCard({ quote, title, author, cover });
-  const file = new File([blob], 'bookreader-cita.png', { type: 'image/png' });
+// Comparte un blob PNG (Web Share con ficheros si el navegador lo soporta; si no, descarga).
+// Devuelve 'shared' | 'downloaded' | 'cancelled'. Común a la tarjeta-cita y la de racha.
+async function sharePng(blob, filename) {
+  const file = new File([blob], filename, { type: 'image/png' });
   if (navigator.canShare && navigator.canShare({ files: [file] })) {
     try {
       await navigator.share({ files: [file] });
@@ -169,10 +168,75 @@ export async function shareQuote({ quote, title, author, cover }) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = 'bookreader-cita.png';
+  a.download = filename;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
   return 'downloaded';
+}
+
+// Genera la tarjeta y la comparte (Web Share con ficheros si el navegador lo soporta;
+// si no, descarga el PNG). Devuelve 'shared' | 'downloaded' | 'cancelled'.
+export async function shareQuote({ quote, title, author, cover }) {
+  const blob = await buildQuoteCard({ quote, title, author, cover });
+  return sharePng(blob, 'bookreader-cita.png');
+}
+
+// ---- Racha: tarjeta de hito (retención T4) -----------------------------------------
+// Celebración compartible de un hito de racha (7/30/100/365 días). Mismo papel y tokens
+// que la tarjeta-cita — el hito merece la misma presencia editorial que una frase del
+// libro. Duolingo crece mucho por gente que postea su racha; BookReader puede hacer lo
+// propio con «llevo N días repasando lo que leo».
+export async function buildStreakCard({ streak, bookTitle, cover }) {
+  try { await document.fonts.ready; } catch { /* sin API de fuentes: se usa la del sistema */ }
+  const canvas = document.createElement('canvas');
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+
+  ctx.fillStyle = PAPER;
+  ctx.fillRect(0, 0, W, H);
+
+  // Portada arriba si la hay: el hito es por estudiar un libro concreto.
+  const img = await loadImage(cover);
+  let top = 140;
+  if (img) {
+    const h = 240, w = Math.round(h * 0.7);
+    drawCover(ctx, img, (W - w) / 2, top, w, h);
+    top += h + 64;
+  }
+
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'alphabetic';
+
+  // Número gigante del hito + rótulo.
+  ctx.font = `800 280px 'Inter', sans-serif`;
+  ctx.fillStyle = ACCENT;
+  ctx.fillText(String(streak), W / 2, top + 260);
+  ctx.font = `600 54px 'Inter', sans-serif`;
+  ctx.fillStyle = INK;
+  ctx.fillText(t('{n} días de racha', { n: streak }), W / 2, top + 350);
+
+  // Libro de la sesión, si hay uno.
+  let foot = top + 430;
+  if (bookTitle) {
+    ctx.font = `500 30px 'Inter', sans-serif`;
+    ctx.fillStyle = MUTED;
+    ctx.fillText(ellipsize(ctx, `🔥 ${t('Repasando · {t}', { t: bookTitle })}`, W - 160), W / 2, foot);
+    foot += 56;
+  }
+
+  // Wordmark al pie.
+  ctx.font = `700 30px 'Inter', sans-serif`;
+  ctx.fillStyle = MUTED;
+  ctx.fillText('BookReader', W / 2, Math.max(foot, H - 110));
+
+  return new Promise((resolve, reject) =>
+    canvas.toBlob(b => (b ? resolve(b) : reject(new Error(t('No se pudo generar la imagen')))), 'image/png'));
+}
+
+// Genera la tarjeta de racha y la comparte (mismo contrato que shareQuote).
+export async function shareStreak(opts) {
+  const blob = await buildStreakCard(opts);
+  return sharePng(blob, 'bookreader-racha.png');
 }
