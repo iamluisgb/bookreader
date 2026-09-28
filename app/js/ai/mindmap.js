@@ -899,10 +899,12 @@ async function renderResult(tree, scopeName) {
       </div>
     </div>
     <p class="sum-depth-hint">${t('Clic en un nodo para ver su cita, plegarlo o ampliarlo. Rueda o pinza para el zoom; arrastra para mover.')}</p>
-    <div class="mm-format" role="group" aria-label="${t('Formato para compartir')}">
-      <span>${t('Formato')}</span>
-      <button type="button" data-f="landscape" aria-pressed="${shareFormat === 'landscape'}">${t('Horizontal')}</button>
-      <button type="button" data-f="portrait" aria-pressed="${shareFormat === 'portrait'}">${t('Vertical')}</button>
+    <div class="mm-format-row">
+      <span class="mm-format-label" id="mm-format-label">${t('Formato')}</span>
+      <div class="mm-format" role="group" aria-labelledby="mm-format-label">
+        <button type="button" data-f="landscape" aria-pressed="${shareFormat === 'landscape'}">${t('Horizontal')}</button>
+        <button type="button" data-f="portrait" aria-pressed="${shareFormat === 'portrait'}">${t('Vertical')}</button>
+      </div>
     </div>
     <div class="fc-export">
       <button id="mm-png" class="primary-btn">${icon('download', { size: 16 })} ${t('Descargar PNG')}</button>

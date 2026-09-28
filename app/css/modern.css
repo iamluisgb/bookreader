@@ -372,7 +372,16 @@ body.reading :is(.reader-header, .reader-footer):hover > * { opacity: 1; }
 }
 .ig-slide svg { display: block; width: 100%; height: auto; max-width: 100%; }
 .ig-slides--story .ig-slide { width: min(280px, 70vw); }
-.ig-format { margin-top: 6px; }
+.mm-format-row:has(.ig-format) { margin-top: 6px; }
 /* La cabecera del resultado (Volver · Regenerar) dejaba «Regenerar» debajo de la X de cerrar
    del modal: se le reserva su hueco. */
 .sum-resulthead { padding-right: 44px; }
+/* Selector de formato (mapa e infografía): mismo control segmentado que el resto de la app.
+   En oscuro, la opción elegida se levanta en gris claro (antes quedaba más oscura que la pista). */
+.mm-format { background: var(--fill); border-radius: 9px; padding: 2px; gap: 2px; }
+.mm-format button { border-radius: 7px; color: var(--text); }
+.mm-format button[aria-pressed="true"] { background: var(--surface-0); font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,0.08), 0 2px 6px rgba(0,0,0,0.06); }
+[data-theme="dark"] .mm-format button[aria-pressed="true"] { background: #636366; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]):not([data-theme="sepia"]) .mm-format button[aria-pressed="true"] { background: #636366; }
+}

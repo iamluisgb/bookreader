@@ -527,9 +527,11 @@ async function renderResult(data) {
       <button id="ig-regen" class="fc-txt-btn">${icon('sparkles', { size: 14 })} ${t('Regenerar')}</button>
     </div>
     <h2>${t('Infografía')} — ${escapeHtml(ctx.bookTitle || t('Libro'))}</h2>
-    <div class="mm-format ig-format" role="group" aria-label="${t('Formato para compartir')}">
-      <span>${t('Formato')}</span>
-      ${fmtBtn('carousel', t('Carrusel 4:5'))}${fmtBtn('story', t('Story 9:16'))}${fmtBtn('poster', t('Póster'))}
+    <div class="mm-format-row">
+      <span class="mm-format-label" id="ig-format-label">${t('Formato')}</span>
+      <div class="mm-format ig-format" role="group" aria-labelledby="ig-format-label">
+        ${fmtBtn('carousel', t('Carrusel 4:5'))}${fmtBtn('story', t('Story 9:16'))}${fmtBtn('poster', t('Póster'))}
+      </div>
     </div>
     <div id="ig-view"></div>
     <p class="sum-depth-hint" id="ig-hint"></p>
