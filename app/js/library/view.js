@@ -236,7 +236,7 @@ export async function render() {
       <section class="lib-main">
         <h1 class="lib-h1">${escapeHtml(currentTitle())}</h1>
         ${await firstStepsHtml(books)}
-        ${continueHtml(books)}
+        <div class="lib-top">${continueHtml(books)}<div class="lib-today-slot"></div></div>
         ${filterChipsHtml()}
         <div class="lib-toolbar">
           <div class="lib-search-box">
@@ -394,25 +394,56 @@ function filterChipsHtml() {
 // retorno de la app. Solo aparece si hay tarjetas vencidas; al cerrar la sesión se
 // re-pinta (el contador baja o el chip desaparece).
 async function paintStudyChip() {
-  const bar = host && host.querySelector('.lib-toolbar');
-  if (!bar) return;
-  const { cards } = await Study.dueToday();
-  bar.querySelector('.lib-study-chip')?.remove();
-  if (!cards || !bar.isConnected) return;
-  const chip = document.createElement('button');
-  chip.className = 'lib-study-chip';
-  chip.innerHTML = `${icon('cards', { size: 16 })}<span>${t('Repasar hoy · {n}', { n: cards })}</span>`;
-  // P12 · Si hay estanterías con vencidas, el chip abre un selector de ámbito
-  // (Todo / cada estantería). Si no, repasa todo directo (flujo rápido de siempre).
-  chip.addEventListener('click', async (e) => {
+  const slot = host && host.querySelector('.lib-today-slot');
+  if (!slot) return;
+  const [{ cards, decks }, doneToday] = await Promise.all([Study.dueToday(), Promise.resolve(Study.reviewsToday())]);
+  Study.syncBadge();
+  if (!slot.isConnected) return;
+  slot.innerHTML = '';
+  slot.closest('.lib-top')?.classList.toggle('has-today', !!(cards || doneToday));
+  if (!cards && !doneToday) return;
+  // ST2 · «Hoy»: el motivo diario para volver a la app, con presencia propia (antes era un
+  // botón más entre los filtros). Anillo = hechas / (hechas + pendientes), minutos estimados
+  // (~8 s por tarjeta), racha y las portadas de los libros que tocan.
+  const total = cards + doneToday;
+  const pct = total ? doneToday / total : 1;
+  const C = 2 * Math.PI * 26;
+  const streak = Study.currentStreak();
+  const mins = Math.max(1, Math.round((cards * 8) / 60));
+  const books = await Promise.all([...new Set(decks.map(d => d.bookId).filter(Boolean))].slice(0, 4)
+    .map(id => Store.getBook(id).catch(() => null)));
+  const covers = books.filter(Boolean).map(b => b.cover
+    ? `<img src="${escapeHtml(b.cover)}" alt="" title="${escapeHtml(b.title || '')}">`
+    : `<span class="lib-today-ph" title="${escapeHtml(b.title || '')}">${escapeHtml(initials(b.title))}</span>`).join('');
+  slot.innerHTML = `<section class="lib-today${cards ? '' : ' is-done'}" aria-label="${t('Repaso de hoy')}">
+    <div class="lib-today-ring" aria-hidden="true">
+      <svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="26" class="lib-ring-track"/>
+      <circle cx="32" cy="32" r="26" class="lib-ring-fill" style="stroke-dasharray:${C.toFixed(1)};stroke-dashoffset:${(C * (1 - pct)).toFixed(1)}"/></svg>
+      <span>${cards ? cards : icon('check', { size: 20 })}</span>
+    </div>
+    <div class="lib-today-body">
+      <p class="lib-hero-kicker">${t('Repaso de hoy')}</p>
+      <h2 class="lib-today-title">${cards ? t('{n} tarjeta{s}', { n: cards, s: cards === 1 ? '' : 's' }) : t('Hecho por hoy')}</h2>
+      <p class="lib-today-meta">${cards ? t('~{n} min', { n: mins }) : t('{n} repasada{s}', { n: doneToday, s: doneToday === 1 ? '' : 's' })}${streak ? ` · ${t('🔥 {n} día{s}', { n: streak, s: streak === 1 ? '' : 's' })}` : ''}</p>
+      ${covers ? `<div class="lib-today-covers">${covers}</div>` : ''}
+      ${cards ? `<div class="lib-today-actions">
+        <button class="lib-study-chip">${icon('cards', { size: 16 })}<span>${t('Repasar hoy · {n}', { n: cards })}</span></button>
+        <button class="lib-study-pick" title="${t('Elegir qué repasar')}">${t('Elegir')}${icon('chevron-down', { size: 14 })}</button>
+      </div>` : ''}
+    </div>
+  </section>`;
+  const chip = slot.querySelector('.lib-study-chip');
+  // Empezar repasa TODO, sin desplegable. Elegir un libro o una estantería es secundario.
+  chip?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    Study.openToday({ onClose: paintStudyChip });
+  });
+  const pick = slot.querySelector('.lib-study-pick');
+  pick?.addEventListener('click', async (e) => {
     e.stopPropagation();
     const scopes = await Study.studyScopes();
-    // Sin elección real (un solo libro suelto, sin estanterías) → repasa todo directo.
-    const nBooks = scopes.shelves.reduce((n, s) => n + s.books.length, 0) + scopes.looseBooks.length;
-    if (!scopes.shelves.length && nBooks <= 1) { Study.openToday({ onClose: paintStudyChip }); return; }
-    showStudyChooser(chip, scopes);
+    showStudyChooser(pick, scopes);
   });
-  bar.insertBefore(chip, bar.querySelector('.lib-upload'));
 }
 
 // Selector de ámbito de repaso (P12, árbol estilo Anki): "Todo" + cada estantería como

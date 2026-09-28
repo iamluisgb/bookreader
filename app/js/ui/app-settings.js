@@ -814,6 +814,12 @@ function appHtml() {
       <option value="0"${limit === 0 ? ' selected' : ''}>${t('Sin tope')}</option>
     </select>
     <p class="appset-muted">${t('Tope de tarjetas SIN estrenar que entran en cada repaso. Las que ya llevas empezadas entran siempre: el tope solo evita que un mazo recién generado te ponga 90 tarjetas el primer día.')}</p>
+    <label class="appset-label" for="appset-grading">${t('Botones del repaso')}</label>
+    <select id="appset-grading" class="appset-input">
+      <option value="simple"${Study.gradingMode() === 'simple' ? ' selected' : ''}>${t('Dos: Otra vez · Bien')}</option>
+      <option value="full"${Study.gradingMode() === 'full' ? ' selected' : ''}>${t('Cuatro: Otra vez · Difícil · Bien · Fácil')}</option>
+    </select>
+    <p class="appset-muted">${t('Con dos botones se decide más rápido y el algoritmo (FSRS) funciona igual de bien. Las teclas 1–4 valen siempre.')}</p>
   </div>`;
 }
 
@@ -824,6 +830,9 @@ function wireApp(content) {
   });
   content.querySelector('#appset-newlimit').addEventListener('change', (e) => {
     Storage.set('study_new_limit', parseInt(e.target.value, 10));
+  });
+  content.querySelector('#appset-grading').addEventListener('change', (e) => {
+    Storage.set('study_grading', e.target.value === 'full' ? 'full' : 'simple');
   });
 }
 

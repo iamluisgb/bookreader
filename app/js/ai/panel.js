@@ -299,6 +299,60 @@ const QUICK_ACTIONS = {
   },
 };
 
+// ST2 · «Tarjeta» desde la barra de selección: lo que subrayas es lo que te importa, y hasta
+// ahora no podía convertirse en tarjeta. Se crea una de HUECOS con su cita: el agente elige el
+// término clave (si hay clave de IA) y, si no, se oculta la palabra más larga —sin red, el
+// gesto sigue funcionando—. Va a un mazo «De tus subrayados» por libro y entra en el repaso.
+export async function cardFromSelection(text) {
+  const clean = String(text || '').replace(/\s+/g, ' ').trim();
+  if (!clean || !bookId) {
+    toastMsg(t('Abre un libro para crear tarjetas.'), 'error');
+    return;
+  }
+  const quote = clean.length > 320 ? clean.slice(0, 320).replace(/\s\S*$/, '') + '…' : clean;
+  // Ancla del pasaje: la que contiene el fragmento (para «Ver en el libro» y la cita).
+  const probe = quote.slice(0, 60).toLowerCase();
+  const passage = Retrieval.allPassages().find(p => String(p.text || '').toLowerCase().includes(probe));
+  let front = '';
+  if (LLM.hasKey()) {
+    try {
+      const raw = await LLM.chatStream({
+        messages: [
+          { role: 'system', content: 'Convierte este fragmento de un libro en UNA tarjeta de huecos. Copia la frase (o la más importante, máx. 220 caracteres) SIN cambiar su idioma y oculta con {{c1::…}} el término o dato clave (1-4 palabras). Devuelve SOLO la frase.' },
+          { role: 'user', content: quote },
+        ],
+        maxTokens: 200,
+      });
+      const line = String(raw || '').trim().split('\n').find(l => /\{\{c\d+::/.test(l));
+      if (line) front = line.replace(/^["«]|["»]$/g, '').trim();
+    } catch { /* sin modelo: hueco determinista */ }
+  }
+  if (!front) front = clozeLongestWord(quote);
+  if (!front) { toastMsg(t('No se pudo crear la tarjeta con ese fragmento.'), 'error'); return; }
+  const card = {
+    type: 'cloze', front, back: '',
+    chapter: EpubReader.getCurrentChapterLabel?.() || passage?.chapter || '',
+    src: passage?.id || '', quote,
+  };
+  const decks = await DB.getDecks(bookId).catch(() => []);
+  const mine = (decks || []).find(d => d.source === 'highlights' && !d.deleted);
+  if (mine) await DB.updateDeck(mine.id, { cards: [...(mine.cards || []), card] });
+  else await DB.addDeck({ bookId, name: bookTitle || t('Libro'), cardType: 'cloze', scope: t('De tus subrayados'), source: 'highlights', cards: [card] });
+  toastMsg(t('Tarjeta creada: entra en tu próximo repaso.'));
+}
+
+function clozeLongestWord(textIn) {
+  const words = textIn.match(/[\p{L}\p{N}][\p{L}\p{N}'’-]*/gu) || [];
+  const key = words.filter(w => w.length >= 5).sort((a, b) => b.length - a.length)[0];
+  if (!key) return '';
+  const i = textIn.indexOf(key);
+  return `${textIn.slice(0, i)}{{c1::${key}}}${textIn.slice(i + key.length)}`;
+}
+
+function toastMsg(message, kind = 'info') {
+  import('./toast.js').then(({ toast }) => toast({ message, kind, timeout: 4000 })).catch(() => {});
+}
+
 export async function quickAction(kind, text) {
   const act = QUICK_ACTIONS[kind];
   if (!act) return;

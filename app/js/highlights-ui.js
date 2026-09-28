@@ -189,6 +189,7 @@ function wireAgentActions(getText) {
   on('sel-numeric', conPanel((AiPanel, txt) => AiPanel.quickAction('numeric', txt)));
   on('sel-explain', conPanel((AiPanel, txt) => AiPanel.quickAction('explain', txt)));
   on('sel-why', conPanel((AiPanel, txt) => AiPanel.quickAction('why', txt)));
+  on('sel-card', conPanel((AiPanel, txt) => AiPanel.cardFromSelection(txt)));
 }
 
 // ---- Núcleo de la barra ---------------------------------------------------

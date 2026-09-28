@@ -48,9 +48,10 @@ test('estantería → chip Repasar hoy → sesión completa con persistencia SRS
   await expect(overlay.locator('.study-a')).toBeHidden();
   await overlay.locator('.study-flip').click();
   await expect(overlay.locator('.study-a')).toHaveText(ANSWERS[first]);
-  await expect(overlay.locator('.study-grade')).toHaveCount(4);
-  // Los botones anuncian el intervalo previsto (tarjeta nueva: bien = 1d).
-  await expect(overlay.locator('.study-grade.is-good small')).toHaveText('1d');
+  // ST2 · Dos botones por defecto (Otra vez / Bien); las cuatro notas en Ajustes.
+  await expect(overlay.locator('.study-grade')).toHaveCount(2);
+  // Los botones anuncian el intervalo previsto EN PALABRAS (tarjeta nueva, FSRS: bien = 3 días).
+  await expect(overlay.locator('.study-grade.is-good small')).toHaveText('3 días');
   await overlay.locator('.study-grade.is-good').click();
 
   // Tarjeta 2 por teclado: espacio voltea, "1" = otra vez → se re-encola…
@@ -76,7 +77,7 @@ test('estantería → chip Repasar hoy → sesión completa con persistencia SRS
   const decks = await page.evaluate(async () => (await import('/js/ai/db.js') as any).getAllDecks());
   const byFront = Object.fromEntries(decks[0].cards.map((c: any) => [c.front, c]));
   expect(byFront[first].srs.reps).toBe(1);
-  expect(byFront[first].srs.due).toBe(today + 1);
+  expect(byFront[first].srs.due).toBe(today + 3);   // FSRS-5: nueva + bien = 3 días
   expect(byFront[second].srs.reps).toBe(1);
   expect(byFront[second].srs.lapses).toBe(1);
   expect(byFront['futura'].srs.due).toBe(today + 5);
@@ -242,7 +243,7 @@ test('deshacer devuelve la tarjeta a la cola y su estado SRS anterior', async ({
   // Nada que deshacer todavía: el botón no está.
   await expect(overlay.locator('.study-tools [data-act="undo"]')).toHaveCount(0);
   await overlay.locator('.study-flip').click();
-  await overlay.locator('.study-grade.is-easy').click();          // "fácil" por error: se va a meses
+  await page.keyboard.press('4');          // "fácil" por error (tecla 4, vale también en modo simple)
   await expect(overlay.locator('.study-end h2')).toBeVisible();
 
   await overlay.locator('.study-tools [data-act="undo"]').click();
@@ -279,6 +280,7 @@ test('editar, suspender y borrar la tarjeta durante el repaso', async ({ page })
 
   // 1) Editar: se corrige el frente sin salir y la tarjeta sigue en la cola.
   const primera = (await overlay.locator('.study-q').textContent())!.trim();
+  await overlay.locator('.study-more').click();          // ST2 · las acciones viven en el menú «⋯»
   await overlay.locator('.study-tools [data-act="edit"]').click();
   await overlay.locator('.study-edit-f').fill('corregida');
   await overlay.locator('.study-edit-save').click();
@@ -286,12 +288,14 @@ test('editar, suspender y borrar la tarjeta durante el repaso', async ({ page })
   await expect(overlay.locator('.study-left')).toHaveText('3 pendientes');
 
   // 2) Suspender: sale de la cola en el acto (quedan 2).
+  await overlay.locator('.study-more').click();
   await overlay.locator('.study-tools [data-act="suspend"]').click();
   await expect(overlay.locator('.study-left')).toHaveText('2 pendientes');
   await expect(overlay.locator('.study-q')).not.toHaveText('corregida');
 
   // 3) Borrar: pide confirmación y deja la cola en 1.
   const segunda = (await overlay.locator('.study-q').textContent())!.trim();
+  await overlay.locator('.study-more').click();
   await overlay.locator('.study-tools [data-act="delete"]').click();
   await page.locator('.dlg-ok').click();
   await expect(overlay.locator('.study-left')).toHaveText('1 pendiente');

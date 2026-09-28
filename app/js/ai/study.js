@@ -17,6 +17,8 @@ import { icon } from '../ui/icons.js';
 import { escapeHtml } from '../ui/escape.js';
 import { confirmBox } from '../ui/dialog.js';
 import { ensurePro } from '../ui/paywall.js';
+import * as LLM from './llm.js';
+import { bookLook } from '../ui/book-accent.js';
 
 // Racha de estudio (F3): {count, lastDay}, global de la app (no por libro).
 const STREAK_KEY = 'study_streak';
@@ -176,8 +178,43 @@ export function buildQueue(decks, { now = Date.now(), newLimit: limit = 0, rng =
 }
 
 // ---- Sesión -------------------------------------------------------------------
+// ST2 (2026-09-28): la sesión pasa a ser una pantalla de concentración con la tarjeta como
+// objeto (gira en 3D, el montón de detrás es el progreso), el color del libro de cada
+// tarjeta, dos botones por defecto con el tiempo en palabras, deslizar en móvil, responder
+// por escrito para que el agente corrija, «reescribir con el agente» y un cierre con datos.
 
-// `decks`: mazos a repasar (solo entran sus tarjetas vencidas, en orden de mazo).
+// Modo de notas: 'simple' (Otra vez / Bien) por defecto; 'full' con las cuatro. Elegir entre
+// «Difícil» y «Bien» en cada tarjeta cansa, y FSRS funciona bien con dos notas.
+const GRADING_KEY = 'study_grading';
+export function gradingMode() { return Storage.get(GRADING_KEY, 'simple') === 'full' ? 'full' : 'simple'; }
+
+// Registro diario de repasos {día: nº} para el calendario de la racha (últimos 120 días).
+const LOG_KEY = 'study_log';
+function bumpLog(delta = 1, now = Date.now()) {
+  const log = Storage.get(LOG_KEY, {}) || {};
+  const day = Srs.dayOf(now);
+  log[day] = Math.max(0, (log[day] || 0) + delta);
+  const keys = Object.keys(log).map(Number).sort((a, b) => a - b);
+  while (keys.length > 120) delete log[keys.shift()];
+  Storage.set(LOG_KEY, log);
+}
+// Racha vigente (para la tarjeta «Hoy» de la biblioteca).
+export function currentStreak(now = Date.now()) { return Srs.currentStreak(Storage.get(STREAK_KEY), now); }
+
+export function reviewsToday(now = Date.now()) {
+  return (Storage.get(LOG_KEY, {}) || {})[Srs.dayOf(now)] || 0;
+}
+
+let startedAt = 0;       // para el tiempo de la sesión
+let graded = 0;          // notas puestas (incluye los «otra vez»)
+let firstTry = 0;        // tarjetas acertadas a la primera
+let failedOnce = new Set();
+let animating = false;
+let sessionBooks = new Set();
+let recallText = '';     // lo que el usuario escribió como respuesta (recuerdo activo)
+let suggested = null;    // nota sugerida por el agente al corregir
+
+// `decks`: mazos a repasar (solo entran sus tarjetas vencidas).
 // `onNavigate`: se llama al saltar a la fuente ("ver en el libro") para que quien abrió
 // la sesión cierre lo suyo (p. ej. el modal de flashcards) antes de mostrar el libro.
 export function open({ decks, title = t('Estudiar'), onClose, onNavigate } = {}) {
@@ -189,14 +226,21 @@ export function open({ decks, title = t('Estudiar'), onClose, onNavigate } = {})
   held = built.held;
   undoStack = [];
   done = 0;
+  graded = 0;
+  firstTry = 0;
+  failedOnce = new Set();
+  sessionBooks = new Set((decks || []).map(d => d.bookId).filter(Boolean));
+  startedAt = Date.now();
   flipped = false;
   editing = false;
+  animating = false;
 
   overlay = document.createElement('div');
   overlay.id = 'ai-study';
-  overlay.className = 'ai-onboarding';
+  overlay.className = 'ai-onboarding study-screen';
   overlay.innerHTML = `
     <div class="ai-ob-card study-card" role="dialog" aria-modal="true" aria-label="${t('Modo Estudiar')}">
+      <div class="study-progress" aria-hidden="true"><span></span></div>
       <div class="study-head">
         <span class="study-title">${escapeHtml(title)}</span>
         <span class="study-left" aria-live="polite"></span>
@@ -214,12 +258,8 @@ export function open({ decks, title = t('Estudiar'), onClose, onNavigate } = {})
 
 export function isOpen() { return !!overlay && !minimized; }
 
-// F2 · Saltar al libro MINIMIZA la sesión, no la mata. El scheduling ya se persistía tras
-// cada tarjeta, pero la sesión no: `close()` vacía la cola, el contador y los "otra vez"
-// re-encolados, así que releer una frase obligaba a reiniciar el repaso entero.
-//
-// La navegación es SPA (hashchange, sin recarga), así que basta con ocultar el overlay y
-// dejar el estado en memoria. Un chip de vuelta lo hace visible.
+// F2 · Saltar al libro MINIMIZA la sesión, no la mata (la navegación es SPA): se oculta el
+// overlay y un chip permite volver con la cola intacta.
 function minimize() {
   if (!overlay || minimized) return;
   minimized = true;
@@ -264,33 +304,45 @@ function close() {
   undoStack = [];
   editing = false;
   passageCache.clear();        // el texto anotado de un libro son MB: no sobrevive a la sesión
+  syncBadge();
   if (onCloseCb) { const cb = onCloseCb; onCloseCb = null; cb(); }
+}
+
+function typingInRecall(e) {
+  return e.target && e.target.closest && e.target.closest('.study-recall-input');
 }
 
 function onKey(e) {
   if (!overlay) return;
   // Editando: el teclado es del editor (Escape cancela la edición, no la sesión).
   if (editing) { if (e.key === 'Escape') { e.preventDefault(); renderCard(); } return; }
+  // Escribiendo la respuesta: Intro (sin mayúsculas) comprueba; el resto es texto.
+  if (typingInRecall(e)) {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); flip(); }
+    if (e.key === 'Escape') { e.preventDefault(); e.target.blur(); }
+    return;
+  }
   if (e.key === 'Escape') { close(); return; }
   if ((e.key === 'z' || e.key === 'Z') && undoStack.length) { e.preventDefault(); undo(); return; }
   const current = queue[0];
-  if (!current) return;
+  if (!current || animating) return;
   if (!flipped && (e.key === ' ' || e.key === 'Enter')) { e.preventDefault(); flip(); return; }
   if (flipped) {
-    const map = { 1: 'again', 2: 'hard', 3: 'good', 4: 'easy' };
+    // Las cuatro teclas valen siempre; en modo simple el 2 también es «bien».
+    const map = gradingMode() === 'full'
+      ? { 1: 'again', 2: 'hard', 3: 'good', 4: 'easy' }
+      : { 1: 'again', 2: 'good', 3: 'good', 4: 'easy' };
     if (map[e.key]) { e.preventDefault(); gradeCurrent(map[e.key]); }
   }
 }
 
 // ---- Render de la tarjeta -------------------------------------------------------
 
-// Cloze {{cN::respuesta(::pista)}} → hueco “[…]” (o “[pista]”) en el frente; revelado
-// resaltado al voltear. Las tarjetas básicas muestran pregunta → respuesta.
+// Cloze {{cN::respuesta(::pista)}} → hueco en el frente; revelado resaltado al voltear.
 const CLOZE_RE = /\{\{c\d+::((?:(?!::|\}\}).)*)(?:::((?:(?!\}\}).)*))?\}\}/g;
 
-// Nota: el replace corre sobre el texto YA escapado, así que los grupos capturados
-// (respuesta/pista) llegan escapados — insertarlos tal cual es seguro; re-escaparlos
-// duplicaría entidades (&amp;amp;).
+// Nota: el replace corre sobre el texto YA escapado, así que los grupos capturados llegan
+// escapados — insertarlos tal cual es seguro.
 function frontHtml(card) {
   if (card.type === 'cloze') {
     return escapeHtml(card.front).replace(CLOZE_RE, (_, _ans, hint) =>
@@ -308,29 +360,69 @@ function backHtml(card) {
   return escapeHtml(card.back || '');
 }
 
-// Barra de acciones sobre la tarjeta ACTUAL (P24 F3) + deshacer (F2). Vive en la cabecera
-// porque debe estar disponible con la tarjeta boca abajo: una tarjeta mala se reconoce
-// muchas veces desde el frente, y hasta ahora la única salida era cerrar la sesión, abrir
-// el Studio, el mazo y la vista de revisión.
+// Cabecera de acciones: deshacer (visible) y un menú «⋯» con editar, reescribir con el
+// agente, suspender y borrar. Antes eran tres iconos grises sin texto (el ojo tachado de
+// «suspender» no se entendía).
 function renderTools() {
   const host = overlay?.querySelector('.study-tools');
   if (!host) return;
   const hasCard = !editing && !!queue.length;
-  const btn = (act, ico, label) =>
-    `<button class="icon-btn study-tool" data-act="${act}" title="${label}" aria-label="${label}">${icon(ico, { size: 15 })}</button>`;
+  const item = (act, ico, label) =>
+    `<button class="study-menu-item" data-act="${act}" role="menuitem">${icon(ico, { size: 15 })}<span>${label}</span></button>`;
   host.innerHTML =
-    (undoStack.length ? btn('undo', 'undo', t('Deshacer la última nota')) : '') +
-    (hasCard ? btn('edit', 'pencil', t('Editar la tarjeta')) : '') +
-    (hasCard ? btn('suspend', 'eye-off', t('Suspender: no volver a mostrarla')) : '') +
-    (hasCard ? btn('delete', 'trash', t('Borrar la tarjeta')) : '');
+    (undoStack.length ? `<button class="icon-btn study-tool" data-act="undo" title="${t('Deshacer la última nota')} (Z)" aria-label="${t('Deshacer la última nota')}">${icon('undo', { size: 16 })}</button>` : '') +
+    (hasCard ? `<button class="icon-btn study-tool study-more" aria-haspopup="menu" aria-expanded="false" title="${t('Más acciones')}" aria-label="${t('Más acciones')}">${icon('ellipsis', { size: 18 })}</button>
+      <div class="study-menu" role="menu" hidden>
+        ${item('edit', 'pencil', t('Editar la tarjeta'))}
+        ${LLM.hasKey() ? item('rewrite', 'sparkles', t('Reescribir con el agente')) : ''}
+        ${item('suspend', 'eye-off', t('Suspender: no volver a mostrarla'))}
+        ${item('delete', 'trash', t('Borrar la tarjeta'))}
+      </div>` : '');
   host.onclick = (e) => {
+    const more = e.target.closest('.study-more');
+    const menu = host.querySelector('.study-menu');
+    if (more && menu) {
+      menu.hidden = !menu.hidden;
+      more.setAttribute('aria-expanded', String(!menu.hidden));
+      return;
+    }
     const b = e.target.closest('[data-act]');
     if (!b) return;
+    if (menu) menu.hidden = true;
     if (b.dataset.act === 'undo') undo();
     if (b.dataset.act === 'edit') renderEditor();
+    if (b.dataset.act === 'rewrite') rewriteCurrent();
     if (b.dataset.act === 'suspend') suspendCurrent();
     if (b.dataset.act === 'delete') deleteCurrent();
   };
+}
+
+function setProgress() {
+  const bar = overlay?.querySelector('.study-progress span');
+  if (!bar) return;
+  const total = done + queue.length;
+  bar.style.width = total ? `${Math.round((done / total) * 100)}%` : '100%';
+}
+
+// Cabecera de la tarjeta: portada en miniatura + libro · capítulo, en el color del libro.
+function metaHtml(deck, card) {
+  const where = [deck.name || deck.scope || t('Mazo'), card.chapter].filter(Boolean).join(' · ');
+  return `<div class="study-meta"><span class="study-meta-cover" aria-hidden="true"></span><span class="study-deckname">${escapeHtml(where)}</span></div>`;
+}
+
+// El color y la portada llegan en asíncrono (se leen de la biblioteca): la tarjeta se pinta ya
+// y se tiñe al llegar, si sigue siendo la misma.
+function paintLook(deck) {
+  const stage = overlay?.querySelector('.study-stage');
+  if (!stage || !deck.bookId) return;
+  bookLook(deck.bookId).then(({ accent, cover }) => {
+    if (!overlay || overlay.querySelector('.study-stage') !== stage) return;
+    stage.style.setProperty('--book', accent);
+    overlay.querySelector('.study-card').style.setProperty('--book', accent);
+    stage.querySelectorAll('.study-meta-cover').forEach((el) => {
+      if (cover) { el.style.backgroundImage = `url("${cover}")`; el.classList.add('has-cover'); }
+    });
+  });
 }
 
 function renderCard() {
@@ -339,6 +431,10 @@ function renderCard() {
   const left = overlay?.querySelector('.study-left');
   if (!b || !f) return;
   editing = false;
+  animating = false;
+  recallText = '';
+  suggested = null;
+  setProgress();
 
   if (!queue.length) { renderDone(b, f, left); renderTools(); return; }
   left.textContent = t('{n} pendiente{s}', { n: queue.length, s: queue.length === 1 ? '' : 's' });
@@ -346,29 +442,61 @@ function renderCard() {
   const { deck, idx } = queue[0];
   const card = deck.cards[idx];
   flipped = false;
+  const behind = Math.min(queue.length - 1, 3);
   b.innerHTML = `
-    <div class="study-deckname">${escapeHtml(deck.name || deck.scope || t('Mazo'))}</div>
-    ${leechHtml(card)}
-    <div class="study-q">${frontHtml(card)}</div>
-    <div class="study-a" hidden></div>`;
+    <div class="study-stage">
+      <div class="study-stack" aria-hidden="true">${'<span></span>'.repeat(behind)}</div>
+      <div class="study-card3d" tabindex="-1">
+        <div class="study-face study-face--front">
+          ${metaHtml(deck, card)}
+          ${leechHtml(card)}
+          <div class="study-q">${frontHtml(card)}</div>
+          <p class="study-tap">${t('Toca la tarjeta para girarla')}</p>
+        </div>
+        <div class="study-face study-face--back">
+          ${metaHtml(deck, card)}
+          <div class="study-qmini">${card.type === 'cloze' ? '' : escapeHtml(card.front)}</div>
+          <div class="study-a" hidden></div>
+          <div class="study-feedback" hidden></div>
+        </div>
+      </div>
+    </div>
+    ${LLM.hasKey() ? `<div class="study-recall">
+      <textarea class="study-recall-input" rows="1" placeholder="${t('Escribe tu respuesta y el agente la corrige (opcional)')}" aria-label="${t('Tu respuesta')}"></textarea>
+    </div>` : ''}`;
   f.innerHTML = `<button class="primary-btn study-flip">${t('Mostrar respuesta')} <kbd>${t('espacio')}</kbd></button>`;
   f.querySelector('.study-flip').addEventListener('click', flip);
+  b.querySelector('.study-card3d').addEventListener('click', (e) => {
+    if (!flipped && !e.target.closest('button, a, textarea')) flip();
+  });
+  const input = b.querySelector('.study-recall-input');
+  if (input) {
+    input.addEventListener('input', () => {
+      input.style.height = 'auto';
+      input.style.height = Math.min(input.scrollHeight, 140) + 'px';
+      f.querySelector('.study-flip').firstChild.textContent = input.value.trim() ? `${t('Comprobar')} ` : `${t('Mostrar respuesta')} `;
+    });
+  }
+  wireSwipe(b.querySelector('.study-card3d'));
+  paintLook(deck);
   renderTools();
 }
 
-// Aviso de leech: no suspende sola: propone el arreglo que casi siempre es el bueno.
+// Aviso de leech: no suspende sola; propone el arreglo, que casi siempre es reformularla.
 function leechHtml(card) {
   if (!Srs.isLeech(card)) return '';
   return `<div class="study-leech">${icon('warning', { size: 14 })}
     <span>${t('La has fallado {n} veces. Suele ser señal de que la tarjeta está mal formulada, no de que el tema sea difícil: edítala o suspéndela.', { n: card.srs.lapses })}</span>
+    ${LLM.hasKey() ? `<button class="study-leech-fix" data-act="rewrite">${icon('sparkles', { size: 13 })} ${t('Reescribir con el agente')}</button>` : ''}
   </div>`;
 }
 
-// ---- Editar / suspender / borrar la tarjeta actual (P24 F3) ---------------------
+// ---- Editar / reescribir / suspender / borrar la tarjeta actual ------------------
 
-// Editor inline: los mismos dos campos de la vista de revisión, pero sin salir del repaso.
-// En cloze se edita el TEXTO CRUDO (con {{c1::…}}), que es justo lo que hay que corregir.
-function renderEditor() {
+// Editor inline: los mismos dos campos de la vista de revisión, sin salir del repaso. En
+// cloze se edita el TEXTO CRUDO (con {{c1::…}}). `draft` prellena (p. ej. con lo que propone
+// el agente) sin guardar: el usuario confirma.
+function renderEditor(draft = null) {
   if (!queue.length) return;
   const b = overlay?.querySelector('.study-body');
   const f = overlay?.querySelector('.study-foot');
@@ -376,13 +504,17 @@ function renderEditor() {
   editing = true;
   const { deck, idx } = queue[0];
   const card = deck.cards[idx];
+  const front = draft ? draft.front : card.front;
+  const back = draft ? draft.back : (card.back || '');
   b.innerHTML = `
-    <div class="study-deckname">${escapeHtml(deck.name || deck.scope || t('Mazo'))}</div>
-    <div class="study-edit">
-      <label class="fc-label">${card.type === 'cloze' ? t('Frase con huecos') : t('Pregunta')}</label>
-      <div class="fc-front study-edit-f" contenteditable="true" spellcheck="false">${escapeHtml(card.front)}</div>
-      <label class="fc-label">${card.type === 'cloze' ? t('Extra (opcional)') : t('Respuesta')}</label>
-      <div class="fc-back study-edit-b" contenteditable="true" spellcheck="false">${escapeHtml(card.back || '')}</div>
+    <div class="study-stage study-stage--edit">
+      ${draft ? `<p class="study-draft-note">${icon('sparkles', { size: 14 })} ${t('Propuesta del agente a partir del pasaje. Revísala y guarda.')}</p>` : ''}
+      <div class="study-edit">
+        <label class="fc-label">${card.type === 'cloze' ? t('Frase con huecos') : t('Pregunta')}</label>
+        <div class="fc-front study-edit-f" contenteditable="true" spellcheck="false">${escapeHtml(front)}</div>
+        <label class="fc-label">${card.type === 'cloze' ? t('Extra (opcional)') : t('Respuesta')}</label>
+        <div class="fc-back study-edit-b" contenteditable="true" spellcheck="false">${escapeHtml(back)}</div>
+      </div>
     </div>`;
   f.innerHTML = `
     <div class="study-editbar">
@@ -391,13 +523,52 @@ function renderEditor() {
     </div>`;
   f.querySelector('.study-edit-cancel').addEventListener('click', renderCard);
   f.querySelector('.study-edit-save').addEventListener('click', () => {
-    const front = b.querySelector('.study-edit-f').innerText.trim();
-    if (!front) return;                                   // sin frente no hay tarjeta
-    patchCurrent({ front, back: b.querySelector('.study-edit-b').innerText.trim() });
+    const nf = b.querySelector('.study-edit-f').innerText.trim();
+    if (!nf) return;                                   // sin frente no hay tarjeta
+    patchCurrent({ front: nf, back: b.querySelector('.study-edit-b').innerText.trim() });
     renderCard();
   });
   b.querySelector('.study-edit-f').focus();
   renderTools();
+}
+
+// Reescribir con el agente: las tarjetas las escribe un LLM y la que se falla una y otra vez
+// suele estar mal formulada. El agente la reformula a partir de su pasaje y la propuesta se
+// abre en el editor para confirmarla.
+async function rewriteCurrent() {
+  if (!queue.length || !LLM.hasKey()) return;
+  const { deck, idx } = queue[0];
+  const card = deck.cards[idx];
+  const b = overlay?.querySelector('.study-body');
+  if (b) b.insertAdjacentHTML('afterbegin', `<p class="study-working">${icon('sparkles', { size: 14 })} ${t('Reescribiendo la tarjeta…')}</p>`);
+  const passage = await passageOf(deck, card);
+  try {
+    const raw = await LLM.chatStream({
+      messages: [
+        { role: 'system', content:
+`Eres un experto en tarjetas de memoria. Reescribe esta tarjeta para que sea CLARA y ATÓMICA: una sola pregunta, sin ambigüedad, con una respuesta corta que esté en el pasaje. Mantén el idioma de la tarjeta.
+${card.type === 'cloze' ? 'Es una tarjeta de HUECOS: "front" debe ser una frase con UN hueco en formato {{c1::respuesta}} y "back" puede ir vacío.' : '"front" es la pregunta y "back" la respuesta.'}
+Devuelve SOLO un JSON: {"front": "...", "back": "..."}` },
+        { role: 'user', content: `TARJETA ACTUAL\nfront: ${card.front}\nback: ${card.back || ''}\n\nPASAJE DEL LIBRO\n${passage || '(no disponible)'}` },
+      ],
+      maxTokens: 500,
+    });
+    const m = String(raw || '').match(/\{[\s\S]*\}/);
+    const j = m ? JSON.parse(m[0]) : null;
+    const front = j && String(j.front || '').trim();
+    if (!front || (card.type === 'cloze' && !/\{\{c\d+::/.test(front))) throw new Error('bad');
+    renderEditor({ front, back: String(j.back || '').trim() });
+  } catch {
+    overlay?.querySelector('.study-working')?.remove();
+    toastError(t('El agente no pudo reescribirla. Puedes editarla a mano.'));
+  }
+}
+
+function toastError(msg) {
+  const b = overlay?.querySelector('.study-body');
+  if (!b) return;
+  b.querySelector('.study-working')?.remove();
+  b.insertAdjacentHTML('afterbegin', `<p class="study-working is-error">${escapeHtml(msg)}</p>`);
 }
 
 // Escribe un parche en la tarjeta actual y lo persiste (array COMPLETO, tombstones
@@ -408,8 +579,7 @@ function patchCurrent(patch) {
   if (deck.id) DB.updateDeck(deck.id, { cards: deck.cards });
 }
 
-// Saca de la cola TODAS las entradas de una tarjeta (la actual puede estar re-encolada
-// por un "otra vez" anterior).
+// Saca de la cola TODAS las entradas de una tarjeta (la actual puede estar re-encolada).
 function dropFromQueue(deck, idx) {
   queue = queue.filter(e => !(e.deck === deck && e.idx === idx));
   held = held.filter(e => !(e.deck === deck && e.idx === idx));
@@ -429,8 +599,7 @@ async function deleteCurrent() {
   if (!(await confirmBox('Se borrará esta tarjeta del mazo. No afecta al resto del repaso.',
     { title: 'Borrar tarjeta', okText: 'Borrar', danger: true }))) return;
   if (!queue.length || queue[0].deck !== deck || queue[0].idx !== idx) return;   // cambió mientras confirmaba
-  // Tombstone EN SU SITIO (no se quita del array): los índices de la cola apuntan a
-  // posiciones, y compactar el array las desalinearía a media sesión.
+  // Tombstone EN SU SITIO: los índices de la cola apuntan a posiciones.
   patchCurrent({ front: '', back: '', deleted: true, deletedAt: Date.now() });
   dropFromQueue(deck, idx);
   renderCard();
@@ -438,10 +607,6 @@ async function deleteCurrent() {
 
 // ---- Deshacer la última nota (P24 F2) -------------------------------------------
 
-// La nota se persiste al instante y las teclas 1-4 están pegadas: pulsar "fácil" en la que
-// no era condena esa tarjeta a no volver en meses, y hasta ahora no había vuelta atrás.
-// Se guarda la cola ENTERA (no solo la tarjeta) porque "otra vez" la re-encola: restaurar
-// solo el estado SRS dejaría la sesión con una repetición fantasma.
 function pushUndo(entry) {
   undoStack.push(entry);
   if (undoStack.length > UNDO_DEPTH) undoStack.shift();
@@ -455,58 +620,293 @@ function undo() {
   u.deck.cards[u.idx] = card;
   if (u.deck.id) DB.updateDeck(u.deck.id, { cards: u.deck.cards });
   if (u.streak) Storage.set(STREAK_KEY, u.streak); else Storage.remove(STREAK_KEY);
+  bumpLog(-1);
   queue = u.queue;
   done = u.done;
+  graded = u.graded ?? graded;
+  firstTry = u.firstTry ?? firstTry;
   renderCard();
 }
 
+// ---- Voltear, corregir y notas --------------------------------------------------
+
+async function passageOf(deck, card) {
+  if (card.quote) return card.quote;
+  if (!card.src || !deck.bookId) return '';
+  try { return (await passagesFor(deck.bookId)).get(card.src) || ''; } catch { return ''; }
+}
+
 function flip() {
-  if (!overlay || flipped || !queue.length) return;
+  if (!overlay || flipped || !queue.length || animating) return;
   flipped = true;
   const { deck, idx } = queue[0];
   const card = deck.cards[idx];
   const a = overlay.querySelector('.study-a');
   a.innerHTML = backHtml(card);
   a.hidden = card.type !== 'cloze' && !card.back;
-  if (card.type === 'cloze') overlay.querySelector('.study-q').hidden = true;   // el revelado la sustituye
+  const input = overlay.querySelector('.study-recall-input');
+  recallText = input ? input.value.trim() : '';
+  overlay.querySelector('.study-recall')?.remove();
+  overlay.querySelector('.study-card3d')?.classList.add('is-flipped');
+  overlay.querySelector('.study-card')?.classList.add('is-flipped');
 
-  // El pasaje que respalda la tarjeta, debajo de la respuesta. Se pide en asíncrono para
-  // no retrasar el volteo (la BD puede tardar unos ms); si al llegar ya se ha pasado de
-  // tarjeta, no se pinta.
-  if (card.src && deck.bookId) showPassage(deck.bookId, card);
+  // El pasaje que respalda la tarjeta, como recorte de página plegable.
+  if ((card.src && deck.bookId) || card.quote) showPassage(deck, card);
+  if (recallText) checkRecall(deck, card, recallText);
+  renderGrades(card);
+}
 
+function renderGrades(card) {
+  const f = overlay?.querySelector('.study-foot');
+  if (!f) return;
   const prev = Srs.previewIntervals(card.srs);
+  const full = gradingMode() === 'full';
+  const keys = full ? { again: 1, hard: 2, good: 3, easy: 4 } : { again: 1, good: 2 };
   const btn = (r, lbl, cls) => `
-    <button class="study-grade ${cls}" data-rate="${r}">
-      <span>${lbl}</span><small>${Srs.intervalLabel(prev[r])}</small>
+    <button class="study-grade ${cls}${suggested === r ? ' is-suggested' : ''}" data-rate="${r}">
+      <span class="study-grade-lbl">${lbl}</span><small>${Srs.intervalLabel(prev[r])}</small><kbd>${keys[r]}</kbd>
     </button>`;
-  const f = overlay.querySelector('.study-foot');
   f.innerHTML = `
     ${card.src ? `<button class="study-src">${icon('book', { size: 15 })} ${t('Ver en el libro')}</button>` : ''}
-    <div class="study-grades">
-      ${btn('again', t('Otra vez'), 'is-again')}${btn('hard', t('Difícil'), 'is-hard')}
-      ${btn('good', t('Bien'), 'is-good')}${btn('easy', t('Fácil'), 'is-easy')}
-    </div>`;
+    <div class="study-grades${full ? '' : ' is-simple'}">
+      ${btn('again', t('Otra vez'), 'is-again')}${full ? btn('hard', t('Difícil'), 'is-hard') : ''}
+      ${btn('good', t('Bien'), 'is-good')}${full ? btn('easy', t('Fácil'), 'is-easy') : ''}
+    </div>
+    <p class="study-swipe-hint">${t('Desliza: ← otra vez · bien →')}</p>`;
   f.querySelector('.study-grades').addEventListener('click', (e) => {
     const g = e.target.closest('[data-rate]');
     if (g) gradeCurrent(g.dataset.rate);
   });
+  const { deck } = queue[0];
   f.querySelector('.study-src')?.addEventListener('click', () => goToSource(deck, card));
 }
 
-async function showPassage(bookId, card) {
-  let text = '';
+// Recuerdo activo: el agente compara lo que escribiste con la respuesta y el pasaje, te dice
+// qué acertaste y qué falta, y sugiere la nota (resaltada; la decisión sigue siendo tuya).
+async function checkRecall(deck, card, answer) {
+  const box = overlay?.querySelector('.study-feedback');
+  if (!box) return;
+  box.hidden = false;
+  box.innerHTML = `<p class="study-feedback-wait">${icon('sparkles', { size: 14 })} ${t('El agente está corrigiendo tu respuesta…')}</p>`;
+  const expected = card.type === 'cloze'
+    ? String(card.front).replace(CLOZE_RE, (_, ans) => ans) + (card.back ? `\n${card.back}` : '')
+    : `${card.front}\n${card.back || ''}`;
+  const passage = await passageOf(deck, card);
   try {
-    text = (await passagesFor(bookId)).get(card.src) || '';
-  } catch { /* IDB no disponible: sin pasaje, el botón "ver en el libro" sigue ahí */ }
+    const raw = await LLM.chatStream({
+      messages: [
+        { role: 'system', content:
+`Eres un profesor que corrige de forma breve, justa y amable. Compara la RESPUESTA DEL ALUMNO con la RESPUESTA CORRECTA (y el pasaje del libro, si lo hay). No penalices la redacción, solo el contenido.
+Devuelve SOLO un JSON: {"veredicto": "bien" | "a medias" | "mal", "comentario": "una o dos frases, en el idioma del alumno: qué acertó y qué le falta"}` },
+        { role: 'user', content: `TARJETA Y RESPUESTA CORRECTA\n${expected}\n\nPASAJE\n${passage || '(no disponible)'}\n\nRESPUESTA DEL ALUMNO\n${answer}` },
+      ],
+      maxTokens: 300,
+    });
+    if (!overlay || queue[0]?.deck.cards[queue[0].idx] !== card) return;   // ya se pasó de tarjeta
+    const m = String(raw || '').match(/\{[\s\S]*\}/);
+    const j = m ? JSON.parse(m[0]) : {};
+    const v = String(j.veredicto || '').toLowerCase();
+    const verdict = v.startsWith('bien') ? 'good' : v.includes('medias') ? 'partial' : 'wrong';
+    const full = gradingMode() === 'full';
+    suggested = verdict === 'good' ? 'good' : verdict === 'partial' ? (full ? 'hard' : 'again') : 'again';
+    const label = { good: t('Bien'), partial: t('A medias'), wrong: t('Aún no') }[verdict];
+    box.className = `study-feedback is-${verdict}`;
+    box.innerHTML = `
+      <div class="study-feedback-head"><span class="study-feedback-tag">${label}</span><span class="study-feedback-you">${t('Tu respuesta')}: «${escapeHtml(answer)}»</span></div>
+      <p>${escapeHtml(String(j.comentario || ''))}</p>`;
+    renderGrades(card);
+  } catch {
+    box.innerHTML = `<p class="study-feedback-wait">${t('No se pudo corregir ahora. Compárala tú con la respuesta.')}</p>`;
+  }
+}
+
+async function showPassage(deck, card) {
+  const text = await passageOf(deck, card);
   if (!text || !overlay || !flipped) return;
   if (queue[0]?.deck.cards[queue[0].idx] !== card) return;   // ya se pasó de tarjeta
   const a = overlay.querySelector('.study-a');
   if (!a || a.querySelector('.study-passage')) return;
   const chapter = card.chapter ? `<span class="study-passage-ch">${escapeHtml(card.chapter)}</span>` : '';
+  // Recorte de página: papel, serif y la tarjeta citándolo. Plegado: se abre con un toque.
   a.insertAdjacentHTML('beforeend',
-    `<blockquote class="study-passage">${chapter}${escapeHtml(text)}</blockquote>`);
+    `<details class="study-passage-wrap"><summary>${icon('book', { size: 14 })} ${t('Ver el pasaje del libro')}</summary>
+      <blockquote class="study-passage">${chapter}${escapeHtml(text)}</blockquote></details>`);
   a.hidden = false;
+}
+
+// Deslizar la tarjeta ya girada: izquierda = otra vez, derecha = bien. Con umbral y vuelta a su
+// sitio si no se llega (un toque o un arrastre corto no califica por error).
+function wireSwipe(el) {
+  if (!el) return;
+  let x0 = null, dx = 0;
+  el.addEventListener('pointerdown', (e) => {
+    if (!flipped || animating || e.target.closest('button, a, details, textarea')) return;
+    x0 = e.clientX; dx = 0;
+    el.setPointerCapture?.(e.pointerId);
+    el.classList.add('is-dragging');
+  });
+  el.addEventListener('pointermove', (e) => {
+    if (x0 === null) return;
+    dx = e.clientX - x0;
+    el.style.setProperty('--drag', `${dx}px`);
+    el.dataset.lean = dx > 40 ? 'good' : dx < -40 ? 'again' : '';
+  });
+  const end = () => {
+    if (x0 === null) return;
+    x0 = null;
+    el.classList.remove('is-dragging');
+    el.style.removeProperty('--drag');
+    const lean = Math.abs(dx) > 90 ? (dx > 0 ? 'good' : 'again') : '';
+    el.dataset.lean = '';
+    if (lean) gradeCurrent(lean);
+  };
+  el.addEventListener('pointerup', end);
+  el.addEventListener('pointercancel', end);
+}
+
+function gradeCurrent(rating) {
+  if (!queue.length || editing || animating) return;
+  // Foto de la sesión ANTES de tocar nada: es lo que restaura "deshacer".
+  pushUndo({
+    queue: queue.slice(), done, graded, firstTry, deck: queue[0].deck, idx: queue[0].idx,
+    srs: queue[0].deck.cards[queue[0].idx].srs, streak: Storage.get(STREAK_KEY),
+  });
+  const entry = queue.shift();
+  const { deck, idx } = entry;
+  const key = `${deck.id}:${idx}`;
+  deck.cards[idx] = { ...deck.cards[idx], srs: Srs.grade(deck.cards[idx].srs, rating) };
+  // Se persiste TRAS CADA tarjeta y con el array COMPLETO (tombstones incluidos).
+  if (deck.id) DB.updateDeck(deck.id, { cards: deck.cards });
+  Storage.set(STREAK_KEY, Srs.bumpStreak(Storage.get(STREAK_KEY)));   // repaso de hoy → racha
+  bumpLog(1);
+  graded++;
+  if (rating === 'again') { queue.push(entry); failedOnce.add(key); }
+  else { done++; if (!failedOnce.has(key)) firstTry++; }
+
+  // La tarjeta sale hacia el lado de la nota (izquierda = otra vez). La siguiente entra YA:
+  // lo que se va es una copia fija encima, así la sesión nunca espera a la animación.
+  const el = overlay?.querySelector('.study-card3d');
+  const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  if (el && !reduce) {
+    const r = el.getBoundingClientRect();
+    const ghost = el.cloneNode(true);
+    ghost.classList.add('study-ghost');
+    ghost.removeAttribute('tabindex');
+    ghost.setAttribute('aria-hidden', 'true');
+    Object.assign(ghost.style, { left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px` });
+    ghost.style.setProperty('--book', overlay.querySelector('.study-card')?.style.getPropertyValue('--book') || '');
+    // Fuera del overlay (en un envoltorio con la misma clase de estilos): la copia no debe
+    // duplicar la tarjeta en el DOM de la sesión mientras se va.
+    const wrap = document.createElement('div');
+    wrap.className = 'study-screen study-ghost-wrap';
+    wrap.appendChild(ghost);
+    document.body.appendChild(wrap);
+    requestAnimationFrame(() => ghost.classList.add(rating === 'again' ? 'out-left' : 'out-right'));
+    setTimeout(() => wrap.remove(), 320);
+  }
+  renderCard();
+}
+
+// ---- Final de sesión --------------------------------------------------------------
+
+function fmtTime(ms) {
+  const s = Math.max(1, Math.round(ms / 1000));
+  return s < 60 ? t('{n} s', { n: s }) : t('{m} min {s} s', { m: Math.floor(s / 60), s: s % 60 });
+}
+
+// Calendario de la racha: las últimas 5 semanas, un cuadro por día (más oscuro = más repasos).
+function heatmapHtml(now = Date.now()) {
+  const log = Storage.get(LOG_KEY, {}) || {};
+  const today = Srs.dayOf(now);
+  const cells = [];
+  for (let d = today - 34; d <= today; d++) {
+    const n = log[d] || 0;
+    const lvl = n === 0 ? 0 : n < 10 ? 1 : n < 25 ? 2 : 3;
+    cells.push(`<span class="study-heat-cell lvl-${lvl}${d === today ? ' is-today' : ''}" title="${n}"></span>`);
+  }
+  return `<div class="study-heat" aria-label="${t('Repasos de las últimas 5 semanas')}">${cells.join('')}</div>`;
+}
+
+// Previsión: cuántas tarjetas vencen cada uno de los próximos 7 días (de todos los mazos).
+async function forecastHtml(now = Date.now()) {
+  const decks = await DB.getAllDecks().catch(() => []);
+  const today = Srs.dayOf(now);
+  const days = Array(7).fill(0);
+  for (const d of decks) for (const c of d.cards || []) {
+    if (!c || c.deleted || c.suspended || !c.srs) continue;
+    const k = c.srs.due - today;
+    if (k >= 1 && k <= 7) days[k - 1]++;
+  }
+  const max = Math.max(1, ...days);
+  const names = [t('mañana')].concat([2, 3, 4, 5, 6, 7].map((k) => {
+    const dt = new Date(now + k * 86400000);
+    return dt.toLocaleDateString(undefined, { weekday: 'short' }).replace('.', '');
+  }));
+  return `<div class="study-forecast" aria-label="${t('Tarjetas de los próximos 7 días')}">
+    ${days.map((n, i) => `<div class="study-fc-col"><span class="study-fc-n">${n || ''}</span><span class="study-fc-bar" style="height:${Math.round((n / max) * 100)}%"></span><span class="study-fc-day">${escapeHtml(names[i])}</span></div>`).join('')}
+  </div>`;
+}
+
+function renderDone(b, f, left) {
+  if (left) left.textContent = '';
+  const streak = Srs.currentStreak(Storage.get(STREAK_KEY));
+  const acc = done ? Math.round((firstTry / done) * 100) : 0;
+  b.innerHTML = `
+    <div class="study-end">
+      <div class="study-end-icon${done ? ' is-done' : ''}">
+        <svg viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="28" class="study-ring-track"/><circle cx="32" cy="32" r="28" class="study-ring-fill"/></svg>
+        ${icon('check', { size: 30 })}
+      </div>
+      <h2>${done ? t('¡Repaso completado!') : t('Nada que repasar')}</h2>
+      <p>${done
+        ? t('Has repasado <b>{n}</b> tarjeta{s}. La repetición espaciada hará el resto.', { n: done, s: done === 1 ? '' : 's' })
+        : t('No hay tarjetas vencidas ahora mismo. Vuelve mañana.')}</p>
+      ${done ? `<div class="study-stats">
+        <div><b>${acc}%</b><span>${t('a la primera')}</span></div>
+        <div><b>${fmtTime(Date.now() - startedAt)}</b><span>${t('de sesión')}</span></div>
+        <div><b>${streak}</b><span>${t('días de racha')}</span></div>
+      </div>` : ''}
+      ${done && streak ? `<div class="study-streak">${t('🔥 Racha de <b>{n}</b> día{s} estudiando', { n: streak, s: streak === 1 ? '' : 's' })}</div>` : ''}
+      <div class="study-end-charts">
+        <div><h3>${t('Tu racha')}</h3>${heatmapHtml()}</div>
+        <div><h3>${t('Próximos días')}</h3><div class="study-forecast-slot"></div></div>
+      </div>
+      ${held.length ? `<p class="study-held">${t('Quedan <b>{n}</b> tarjeta{s} nueva{s} fuera del tope de hoy.', { n: held.length, s: held.length === 1 ? '' : 's' })}</p>` : ''}
+    </div>`;
+  forecastHtml().then((html) => {
+    const slot = b.querySelector('.study-forecast-slot');
+    if (slot) slot.innerHTML = html;
+  });
+  const oneBook = sessionBooks.size === 1 ? [...sessionBooks][0] : null;
+  // El tope de nuevas es una recomendación, no una cárcel: quien quiera seguir, sigue.
+  f.innerHTML = `<div class="study-end-actions">
+    ${held.length ? `<button class="primary-btn study-more-new">${t('Seguir con {n} nueva{s}', { n: held.length, s: held.length === 1 ? '' : 's' })}</button>` : ''}
+    ${done && oneBook ? `<button class="ai-ob-back study-read">${icon('book', { size: 15 })} ${t('Seguir leyendo')}</button>` : ''}
+    <button class="${held.length ? 'ai-ob-back' : 'primary-btn'} study-flip">${t('Cerrar')}</button>
+  </div>`;
+  f.querySelector('.study-flip').addEventListener('click', close);
+  f.querySelector('.study-read')?.addEventListener('click', () => {
+    const id = oneBook;
+    close();
+    const p = new URLSearchParams();
+    p.set('book', id);
+    location.hash = p.toString();
+  });
+  f.querySelector('.study-more-new')?.addEventListener('click', () => {
+    queue = held;                                  // ya venían barajadas de buildQueue
+    held = [];
+    renderCard();
+  });
+}
+
+// ---- Número en el icono de la app (PWA instalada) --------------------------------
+// «N tarjetas pendientes» en el propio icono: el recordatorio que no necesita notificaciones.
+export async function syncBadge() {
+  try {
+    if (!('setAppBadge' in navigator)) return;
+    const { cards } = await dueToday();
+    if (cards) await navigator.setAppBadge(cards); else await navigator.clearAppBadge();
+  } catch { /* sin permiso o sin soporte: el badge es un extra */ }
 }
 
 // ---- Fuente citada (P10 F2): "ver en el libro" ----------------------------------
@@ -560,47 +960,3 @@ async function goToSource(deck, card) {
   location.hash = p.toString();             // dispara hashchange → el router abre/reposiciona
 }
 
-function gradeCurrent(rating) {
-  if (!queue.length || editing) return;
-  // Foto de la sesión ANTES de tocar nada: es lo que restaura "deshacer".
-  pushUndo({
-    queue: queue.slice(), done, deck: queue[0].deck, idx: queue[0].idx,
-    srs: queue[0].deck.cards[queue[0].idx].srs, streak: Storage.get(STREAK_KEY),
-  });
-  const entry = queue.shift();
-  const { deck, idx } = entry;
-  deck.cards[idx] = { ...deck.cards[idx], srs: Srs.grade(deck.cards[idx].srs, rating) };
-  // Se persiste TRAS CADA tarjeta (cerrar a media sesión no pierde nada) y se pasa el
-  // array COMPLETO —tombstones incluidos— porque updateDeck interpreta lo ausente como
-  // tarjeta borrada. El sello por tarjeta lo pone él.
-  if (deck.id) DB.updateDeck(deck.id, { cards: deck.cards });
-  Storage.set(STREAK_KEY, Srs.bumpStreak(Storage.get(STREAK_KEY)));   // repaso de hoy → racha
-  if (rating === 'again') queue.push(entry);                    // se repite al final de la sesión
-  else done++;
-  renderCard();
-}
-
-function renderDone(b, f, left) {
-  if (left) left.textContent = '';
-  const streak = Srs.currentStreak(Storage.get(STREAK_KEY));
-  b.innerHTML = `
-    <div class="study-end">
-      <div class="study-end-icon">${icon('check', { size: 40 })}</div>
-      <h2>${done ? t('¡Repaso completado!') : t('Nada que repasar')}</h2>
-      <p>${done
-        ? t('Has repasado <b>{n}</b> tarjeta{s}. La repetición espaciada hará el resto.', { n: done, s: done === 1 ? '' : 's' })
-        : t('No hay tarjetas vencidas ahora mismo. Vuelve mañana.')}</p>
-      ${done && streak ? `<div class="study-streak">${t('🔥 Racha de <b>{n}</b> día{s} estudiando', { n: streak, s: streak === 1 ? '' : 's' })}</div>` : ''}
-      ${held.length ? `<p class="study-held">${t('Quedan <b>{n}</b> tarjeta{s} nueva{s} fuera del tope de hoy.', { n: held.length, s: held.length === 1 ? '' : 's' })}</p>` : ''}
-    </div>`;
-  // El tope de nuevas es una recomendación, no una cárcel: quien quiera seguir, sigue.
-  f.innerHTML = (held.length
-    ? `<button class="primary-btn study-more">${t('Seguir con {n} nueva{s}', { n: held.length, s: held.length === 1 ? '' : 's' })}</button>`
-    : '') + `<button class="${held.length ? 'ai-ob-back' : 'primary-btn'} study-flip">${t('Cerrar')}</button>`;
-  f.querySelector('.study-flip').addEventListener('click', close);
-  f.querySelector('.study-more')?.addEventListener('click', () => {
-    queue = held;                                  // ya venían barajadas de buildQueue
-    held = [];
-    renderCard();
-  });
-}

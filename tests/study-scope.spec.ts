@@ -77,7 +77,8 @@ test.describe('P12 · ámbitos de repaso', () => {
     const chip = page.locator('.lib-study-chip');
     // paintStudyChip es async (lee IndexedDB tras el render); espera holgada anti-flake.
     await expect(chip).toContainText('Repasar hoy · 5', { timeout: 15000 });
-    await chip.click();
+    // ST2 · «Repasar hoy» repasa TODO directo; el árbol de ámbitos está en «Elegir».
+    await page.locator('.lib-study-pick').click();
     const menu = page.locator('.lib-study-menu');
     await expect(menu).toBeVisible();
     // Todo(1) + 2 estanterías (padre) + 3 libros anidados + 1 suelto = 7 opciones.
