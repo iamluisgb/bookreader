@@ -32,6 +32,26 @@ const NEW_LIMIT_KEY = 'study_new_limit';
 export const DEFAULT_NEW_LIMIT = 20;
 const UNDO_DEPTH = 30;
 
+// Meta diaria elegible (retención T3): el usuario elige cuántas tarjetas quiere por día.
+// Lección Duolingo: quien ELIGE la meta, la cumple (ownership), y el copy de compromiso
+// solo funciona si hay una promesa propia que cumplir. El anillo cuenta el repaso de TODO
+// el día (study_log): cerrar la sesión y volver no reinicia el progreso.
+const GOAL_KEY = 'study_goal';
+export const DEFAULT_GOAL = 20;
+const GOAL_STEP = 5;
+const GOAL_C = +(2 * Math.PI * 15).toFixed(2);   // circunferencia del anillo del header
+
+export function dailyGoal() {
+  const v = Storage.get(GOAL_KEY, DEFAULT_GOAL);
+  return Number.isFinite(v) && v >= 5 ? Math.min(200, Math.round(v)) : DEFAULT_GOAL;
+}
+
+export function setDailyGoal(n) {
+  const v = Math.min(200, Math.max(5, Math.round(Number(n) || DEFAULT_GOAL)));
+  Storage.set(GOAL_KEY, v);
+  return v;
+}
+
 export function newLimit() {
   const v = Storage.get(NEW_LIMIT_KEY, DEFAULT_NEW_LIMIT);
   return Number.isFinite(v) && v >= 0 ? v : DEFAULT_NEW_LIMIT;
@@ -249,6 +269,10 @@ export function open({ decks, title = t('Estudiar'), onClose, onNavigate } = {})
       <div class="study-head">
         <span class="study-title">${escapeHtml(title)}</span>
         <span class="study-streakchip" aria-live="polite"></span>
+        <button class="study-goal" title="${t('Meta diaria')}" aria-label="${t('Meta diaria')}">
+          <svg viewBox="0 0 36 36" aria-hidden="true"><circle cx="18" cy="18" r="15" class="study-goal-track"/><circle cx="18" cy="18" r="15" class="study-goal-fill"/></svg>
+          <span class="study-goal-n" aria-live="polite"></span>
+        </button>
         <span class="study-left" aria-live="polite"></span>
         <div class="study-tools"></div>
         <button class="ai-ob-close" title="${t('Cerrar')}" aria-label="${t('Cerrar')}">${icon('xmark', { size: 18 })}</button>
@@ -258,6 +282,10 @@ export function open({ decks, title = t('Estudiar'), onClose, onNavigate } = {})
     </div>`;
   document.body.appendChild(overlay);
   overlay.querySelector('.ai-ob-close').addEventListener('click', close);
+  overlay.querySelector('.study-goal').addEventListener('click', (e) => {
+    e.stopPropagation();
+    toggleGoalPop();
+  });
   document.addEventListener('keydown', onKey);
   renderCard();
 }
@@ -443,6 +471,46 @@ function refreshHead() {
   el.setAttribute('aria-label', t('Racha de {n} día{s}', { n: streak, s: streak === 1 ? '' : 's' }));
   el.classList.toggle('is-zero', !streak);
   el.classList.toggle('is-risky', streak > 0 && !reviewsToday());
+  // Anillo de meta: repaso de hoy / meta elegida. Se llena aunque la sesión se cierre:
+  // es la promesa del día, no de la sesión.
+  const goalEl = overlay?.querySelector('.study-goal');
+  if (goalEl) {
+    const today = reviewsToday();
+    const goal = dailyGoal();
+    const fill = goalEl.querySelector('.study-goal-fill');
+    fill.style.strokeDasharray = String(GOAL_C);
+    fill.style.strokeDashoffset = (GOAL_C * (1 - Math.min(1, today / goal))).toFixed(1);
+    goalEl.querySelector('.study-goal-n').textContent = `${today}/${goal}`;
+    goalEl.classList.toggle('is-done', today >= goal);
+  }
+}
+
+// Popover para cambiar la meta (±5, 5–200). Nada de pantallas de ajustes: la meta se
+// ajusta donde se ve. El click fuera la cierra.
+function toggleGoalPop() {
+  overlay?.querySelector('.study-goal-pop')?.remove();
+  const btn = overlay?.querySelector('.study-goal');
+  if (!btn) return;
+  const pop = document.createElement('div');
+  pop.className = 'study-goal-pop';
+  const paint = () => {
+    pop.innerHTML = `
+      <button class="study-goal-less" aria-label="${t('Menos')}">−</button>
+      <span class="study-goal-v"><b>${dailyGoal()}</b> ${t('al día')}</span>
+      <button class="study-goal-more" aria-label="${t('Más')}">+</button>`;
+    pop.querySelector('.study-goal-less').onclick = () => { setDailyGoal(dailyGoal() - GOAL_STEP); paint(); refreshHead(); };
+    pop.querySelector('.study-goal-more').onclick = () => { setDailyGoal(dailyGoal() + GOAL_STEP); paint(); refreshHead(); };
+  };
+  paint();
+  btn.appendChild(pop);
+  setTimeout(() => {
+    const off = (ev) => {
+      if (!pop.isConnected || ev.target.closest?.('.study-goal')) return;
+      pop.remove();
+      document.removeEventListener('click', off);
+    };
+    document.addEventListener('click', off);
+  });
 }
 
 function renderCard() {

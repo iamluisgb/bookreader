@@ -71,3 +71,37 @@ test('la ficha del libro muestra la barra de dominio ponderada por estabilidad F
   await expect(bar.locator('.lib-mastery-fill')).toHaveAttribute('style', /width:\s*58%/);
   await expect(bar).toHaveAttribute('title', /2 maduras/);
 });
+
+test('meta diaria: anillo con repaso de hoy / meta, ajustable al click', async ({ page }) => {
+  await page.goto('/index.html');
+  await seedProLicense(page);
+  await seedDeck(page, { cards: [
+    { type: 'basic', front: 'q1', back: 'a1', chapter: '', src: '' },
+    { type: 'basic', front: 'q2', back: 'a2', chapter: '', src: '' },
+  ] });
+  await page.reload();
+  await page.locator('.lib-study-chip').click();
+  const overlay = page.locator('#ai-study');
+  const ring = overlay.locator('.study-goal');
+
+  // Default 20; el contador es de TODO el día (empieza en 0 aunque la sesión recién arranque).
+  await expect(ring.locator('.study-goal-n')).toHaveText('0/20');
+
+  // Elegir la meta: popover con ±5, persistida.
+  await ring.click();
+  const pop = overlay.locator('.study-goal-pop');
+  await expect(pop).toBeVisible();
+  await pop.locator('.study-goal-more').click();
+  await expect(pop.locator('.study-goal-v')).toContainText('25');
+  await expect(ring.locator('.study-goal-n')).toHaveText('0/25');
+  await page.locator('.study-body').click({ position: { x: 10, y: 10 } });
+  await expect(pop).toBeHidden();
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('bookreader_study_goal')));
+  expect(saved).toBe(25);
+
+  // Repasar llena el anillo y sube el contador del día.
+  await overlay.locator('.study-flip').click();
+  await overlay.locator('.study-grade[data-rate="good"]').click();
+  await expect(ring.locator('.study-goal-n')).toHaveText('1/25');
+  await expect(ring.locator('.study-goal-fill')).not.toHaveAttribute('style', /stroke-dashoffset:\s*94/);
+});
