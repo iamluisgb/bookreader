@@ -23,11 +23,12 @@ commiteado y desplegado por el orchestrator el 2026-09-28.
 
 ## Evidencia
 
-- Commits: `feat(srs)` P19 · `feat(study)` ST2 · `docs` (ver `git log` del proyecto).
+- Commits: `f1ebbaf` feat(srs) P19 · `17f0652` feat(study) ST2 · `956b829` docs.
 - Verificación: 18/18 tests SRS/estudio OK; suite completa 539 passed / 9 failed
   (6 también fallan en HEAD limpio: `@live`/modelo, `@race`; 3 flaky de carga: `perf`,
   `pdf-touch-select`, `segment-pdf` — pasan aisladas con los cambios); eslint sin errores.
-- Deploy: `wrangler pages deploy dist --project-name bookreader --branch main` + `@smoke`.
+- Deploy: `https://5c91d394.bookreader-2h5.pages.dev` (prod por rama main); @smoke 3/3 OK
+  contra `956b829` (commit servido, arranque de app, estanterías).
 
 ## Notas
 
