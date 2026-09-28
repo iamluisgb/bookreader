@@ -82,11 +82,27 @@ rechazar `<script>`/`on*=`; si falla → 1 regeneración → descarte.
 JPEG del canvas (máx 640 px) + metadatos de trazos (índice, bbox) + rúbrica de pasos.
 Salida: `{steps[{name, detected, stroke}], extraCount, comment}`.
 
+## API de `app/js/ai/figures.js` (WU2, entregado)
+
+| Función | Contrato |
+|---|---|
+| `clampBbox(bbox, {width,height,minSize=5,tolerance=2})` | Salida canónica `{x,y,w,h}` enteros dentro de la imagen, o `null` (inválido, degenerado o >2px fuera) |
+| `normalizeText(s)` | minúsculas, sin tildes, solo alfanuméricos con espacios colapsados |
+| `dedupeLabels(labels, {iouThreshold=0.55})` | Filtra/deduplica por texto normalizado o IoU; **preserva la forma de `bbox` de la entrada** (array del modelo → array) |
+| `parseLabelsResponse(text, {width,height})` | Tolerante (fences, prosa, truncado); NUNCA lanza; salida con **bbox canónico `{x,y,w,h}`** |
+| `figureRectToBox(rect, {pageWidth,pageHeight})` | rect fraccional 0..1 → box `{x,y,w,h}` en píxeles (clampea, no descarta) |
+| `saveFigure({bookId,page,rect,dataUrl,labels,caption,source})` | Artefacto `kind:'figures'` en el store `artifacts`; devuelve la clave |
+| `getFigures(bookId)` | Figuras del libro, más nuevas primero, como `{key, page, rect, dataUrl, labels, caption, source}` |
+| `deleteFigure(key)` | Tombstone (se propaga por sync) |
+
+**Regla para WU3/WU5**: los labels que llegan del modelo y se consumen en la UI pasan por
+`parseLabelsResponse` → **bbox canónico `{x,y,w,h}` en píxeles de la imagen recortada**.
+`dedupeLabels` conserva la forma de entrada (es un filtro, no un normalizador).
+
 ## Tareas de implementación (ODD, work units)
 
-- [ ] **WU1** Spec + evidencia de grounding + anclajes → `odd/tasks/tarjetas-visuales.md`
-- [ ] **WU2** `app/js/ai/figures.js`: helpers puros (validar/normalizar bboxes, deduplicar
-      labels, parseo tolerante) + persistencia de figuras en `artifacts` + tests unitarios
+- [x] **WU1** Spec + evidencia de grounding + anclajes → `odd/tasks/tarjetas-visuales.md` (`7152577`)
+- [x] **WU2** `app/js/ai/figures.js` + `tests/figures.spec.ts` (5 tests, eslint limpio)
 - [ ] **WU3** `app/js/ai/visual-cards.js`: prompts 1–3 + parsers/validadores puros
       (incluye validador de SVG) + tests con `fetch` stubbeado
 - [ ] **WU4** Menú de tipos en `renderSetup()` (`flashcards.js`) + ramificación de generación
