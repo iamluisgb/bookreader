@@ -200,3 +200,19 @@ export function deckStats(cards, now = Date.now()) {
   }
   return st;
 }
+
+// Dominio de un libro (retención T2): % del material dominado, ponderado por estabilidad.
+// Madura (intervalo ≥ 21d, mismo criterio que deckStats) vale 1; lo que se está aprendiendo
+// vale su intervalo/21; lo nuevo, 0. Las suspendidas cuentan con su peso: es material ya
+// aprendido que alguien aparcó, no ignorado. `mastery` ∈ [0, 1] — el % lo pone la vista.
+export function deckMastery(cards) {
+  let total = 0, w = 0, maduras = 0, aprendiendo = 0, nuevas = 0;
+  for (const c of cards || []) {
+    if (!c || c.deleted) continue;             // tombstone: no cuenta en el desglose
+    total++;
+    if (!c.srs || c.srs.reps === 0) { nuevas++; continue; }
+    if (c.srs.interval >= 21) { maduras++; w += 1; }
+    else { aprendiendo++; w += Math.max(0, Math.min(1, (c.srs.interval || 0) / 21)); }
+  }
+  return { total, mastery: total ? w / total : 0, maduras, aprendiendo, nuevas };
+}

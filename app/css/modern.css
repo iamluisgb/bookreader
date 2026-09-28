@@ -669,3 +669,20 @@ body.reading :is(.reader-header, .reader-footer):hover > * { opacity: 1; }
   background: color-mix(in srgb, var(--accent) 10%, var(--surface-1));
   animation: study-risk 1.8s var(--ease) infinite;
 }
+
+/* Dominio del libro (T2): % del material dominado, ponderado por estabilidad FSRS. La barra
+   vive justo bajo la de progreso de lectura: leer ≠ dominar, y ahora se ve la diferencia. */
+.lib-mastery {
+  display: flex; align-items: center; gap: 8px; margin-top: 4px;
+}
+.lib-mastery-bar {
+  position: relative; flex: 1; height: 4px; border-radius: 2px; background: var(--fill);
+  overflow: hidden;
+}
+.lib-mastery-fill {
+  position: absolute; inset: 0 auto 0 0; width: 0;
+  background: var(--accent); border-radius: 2px;
+  transition: width 0.5s var(--ease);
+}
+.lib-mastery-lbl { flex: none; font-size: var(--fs-xs); font-weight: 600; color: var(--text-soft); font-variant-numeric: tabular-nums; }
+.lib-mastery[hidden] { display: none; }

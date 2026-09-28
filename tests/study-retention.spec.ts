@@ -54,3 +54,20 @@ test('la racha se ve en la biblioteca con estado en riesgo y pasa a encendida al
   await expect(chip).toContainText('7');
   await expect(chip).not.toHaveClass(/is-risky/);
 });
+
+test('la ficha del libro muestra la barra de dominio ponderada por estabilidad FSRS', async ({ page }) => {
+  await page.goto('/index.html');
+  await seedProLicense(page);
+  // 4 tarjetas: 2 maduras (peso 1 cada una), 1 aprendiendo (intervalo 7 → 7/21), 1 nueva (0).
+  // Dominio = (1 + 1 + 1/3 + 0) / 4 = 58%.
+  const mk = (interval, reps) => ({ type: 'basic', front: 'q', back: 'a', chapter: '', src: '',
+    srs: reps ? { reps, lapses: 0, interval, due: 0, lastReview: 1, stability: interval, difficulty: 5 } : undefined });
+  await seedDeck(page, { cards: [mk(30, 5), mk(45, 6), mk(7, 2), { type: 'basic', front: 'q2', back: 'a2', chapter: '', src: '' }] });
+  await page.reload();
+
+  const bar = page.locator('.lib-card[data-id="bk-ret"] .lib-mastery');
+  await expect(bar).toBeVisible();
+  await expect(bar.locator('.lib-mastery-lbl')).toHaveText('58% dominado');
+  await expect(bar.locator('.lib-mastery-fill')).toHaveAttribute('style', /width:\s*58%/);
+  await expect(bar).toHaveAttribute('title', /2 maduras/);
+});

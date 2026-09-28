@@ -12,6 +12,7 @@ import { t, getLang } from '../i18n.js';
 import { escapeHtml } from '../ui/escape.js';
 import { confirmBox, promptBox, alertBox, formBox } from '../ui/dialog.js';
 import * as AiDB from '../ai/db.js';
+import * as Srs from '../ai/srs.js';
 import * as Storage from '../storage.js';
 import { track } from '../ui/usage-log.js';
 
@@ -253,6 +254,7 @@ export async function render() {
     </div>
   `;
   paintStudyChip();   // async, no bloquea el render de la rejilla
+  paintMastery();     // ídem: dominio por libro, se pinta cuando llega la consulta
 }
 
 // Marca de una estantería: INICIAL sobre un tono derivado del nombre, no la
@@ -583,6 +585,9 @@ function cardHtml(b) {
         <button class="lib-kebab" data-id="${b.id}" title="${t('Más')}" aria-label="${t('Más opciones')}">${icon('ellipsis', { size: 20 })}</button>
       </div>
       <div class="lib-progressbar"><span style="width:${pct}%"></span></div>
+      <div class="lib-mastery" data-mastery="${escapeHtml(b.id)}" hidden>
+        <span class="lib-mastery-bar"><span class="lib-mastery-fill"></span></span><span class="lib-mastery-lbl"></span>
+      </div>
       <div class="lib-title">${escapeHtml(b.title || t('Sin título'))}</div>
       <div class="lib-author">${escapeHtml(b.author || '')}</div>
     </div>`;
@@ -690,7 +695,39 @@ function resultsHtml(list) {
 // Re-pinta SOLO la rejilla (el input vive en la toolbar, intacto → no pierde el foco).
 function paintResults() {
   const wrap = host && host.querySelector('.lib-results');
-  if (wrap) wrap.innerHTML = resultsHtml(computeList());
+  if (wrap) {
+    wrap.innerHTML = resultsHtml(computeList());
+    paintMastery();
+  }
+}
+
+// Dominio por libro (T2 retención): una sola pasada por TODOS los mazos, agrupados por
+// libro. Es la visualización que un SRS genérico no puede dar — pero un lector sí: conecta
+// el repaso diario con el objetivo real («¿cuánto de este libro dominó?»). Sin mazo, oculta.
+let masterySeq = 0;
+async function paintMastery() {
+  const seq = ++masterySeq;
+  let decks;
+  try { decks = await AiDB.getAllDecks(); } catch { return; }
+  const byBook = new Map();
+  for (const d of decks || []) {
+    if (!d?.bookId) continue;
+    const cur = byBook.get(d.bookId) || [];
+    cur.push(...(d.cards || []));
+    byBook.set(d.bookId, cur);
+  }
+  const wrap = host && host.querySelector('.lib-results');
+  if (!wrap) return;
+  for (const el of wrap.querySelectorAll('[data-mastery]')) {
+    if (seq !== masterySeq || !el.isConnected) return;   // llegó otro render: la vista manda
+    const m = Srs.deckMastery(byBook.get(el.dataset.mastery) || []);
+    if (!m.total) { el.hidden = true; continue; }
+    const pct = Math.round(m.mastery * 100);
+    el.hidden = false;
+    el.querySelector('.lib-mastery-fill').style.width = `${pct}%`;
+    el.querySelector('.lib-mastery-lbl').textContent = t('{n}% dominado', { n: pct });
+    el.title = t('{a} maduras · {b} aprendiendo · {c} nuevas', { a: m.maduras, b: m.aprendiendo, c: m.nuevas });
+  }
 }
 function sortBooks(list) {
   if (sortBy === 'title') return list.sort((a, b) => (a.title || '').localeCompare(b.title || '', getLang()));

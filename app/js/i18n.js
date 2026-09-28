@@ -496,6 +496,8 @@ const EN = {
   'El fichero de este libro no está en este dispositivo': 'This book’s file isn’t on this device',
   'No encontré la posición exacta; te abrí el libro': 'Couldn’t find the exact position; opened the book instead',
   'Racha de {n} día{s}': 'Streak: {n} day{s}',
+  '{n}% dominado': '{n}% mastered',
+  '{a} maduras · {b} aprendiendo · {c} nuevas': '{a} mature · {b} learning · {c} new',
   'Otra vez': 'Again',
   'Difícil': 'Hard',
   'Bien': 'Good',
