@@ -132,7 +132,7 @@ test.describe('P29 · generador de la infografía', () => {
     expect(r.width).toBe(1080);
     expect(r.height).toBeGreaterThan(600);
     expect(r.height / r.width).toBeLessThan(2.4); // el presupuesto del póster
-    for (const needle of ['UN LIBRO', 'IDEAS CLAVE', 'CADENA', 'COMPARATIVA', 'NIVELES', 'Recuerda', 'Idea final', 'Una cita']) {
+    for (const needle of ['UN LIBRO', 'IDEAS CLAVE', 'CADENA', 'COMPARATIVA', 'NIVELES', 'RECUERDA', 'IDEA FINAL', 'Una cita']) {
       expect(r.xml).toContain(needle);
     }
   });

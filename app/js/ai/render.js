@@ -16,6 +16,14 @@ export function renderWithCitations(text, anchors) {
 let pageOf = null;
 export function setCitePageResolver(fn) { pageOf = typeof fn === 'function' ? fn : null; }
 
+// Solo la página (número) de un ancla, o null. Para los artefactos que la pintan como «p. N»
+// (infografía) y no quieren la reserva del capítulo.
+export function citePage(a) {
+  let page = a && a.page;
+  if (!page && a && a.cfi && pageOf) { try { page = pageOf(a.cfi); } catch { /* sin página */ } }
+  return page || null;
+}
+
 export function citeLabel(id, a) {
   let page = a && a.page;
   if (!page && a && a.cfi && pageOf) { try { page = pageOf(a.cfi); } catch { /* sin página */ } }

@@ -100,13 +100,13 @@ test.describe('P29 · render de la infografía', () => {
     // 9:16 largo: si sale más bajo, algún bloque no se dibujó.
     expect(r.height).toBeGreaterThan(1700);
     for (const needle of [
-      'PENSAR EN SISTEMAS',
+      'Pensar en sistemas',
       'IDEAS CLAVE',
       'LA CADENA DEL ARGUMENTO',
       'POR QUÉ UNOS SE ADELANTARON',
       'DÓNDE TOCAR',
-      'Recuerda',
-      'Idea final',
+      'RECUERDA',
+      'IDEA FINAL',
       'bailar con él',
     ]) {
       expect(r.xml).toContain(needle);
@@ -165,6 +165,9 @@ test.describe('P29 · render de la infografía', () => {
 
   // La densidad es EL riesgo declarado del artefacto: sin tope, un libro largo produce un
   // póster que nadie lee. Aquí se fija el presupuesto de proporción sobre la muestra realista.
+  // IG2: el techo sube de 2,4 a 2,9. El póster largo pasó a ser el formato de LEER con zoom o
+  // imprimir (con tipos mayores y diagramas); para redes están el carrusel 4:5 y la story 9:16,
+  // de tamaño fijo. La muestra es el peor caso: 8 ideas con el cuerpo al tope.
   test('la densidad se queda dentro del presupuesto', async ({ page }) => {
     await page.goto('/');
     const ratio = await page.evaluate(async (data) => {
@@ -173,7 +176,7 @@ test.describe('P29 · render de la infografía', () => {
       return height / width;
     }, FULL);
     expect(ratio).toBeGreaterThan(1.6);
-    expect(ratio).toBeLessThan(2.4);
+    expect(ratio).toBeLessThan(2.9);
   });
 
   // Un póster mínimo (solo titular) no puede reventar: los bloques son opcionales y la
@@ -298,7 +301,91 @@ test.describe('P29 · render de la infografía', () => {
     expect(errors).toEqual([]);
   });
 
-  // Opción A · leer en pantalla: el control de zoom lleva el SVG a 1080 px (1:1), que es donde
+    // IG2 · Carrusel 4:5: diapositivas de 1080×1350, ninguna desborda, la primera es la portada
+  // y todas llevan la marca; con cita, la última es la cita.
+  test('el carrusel sale en diapositivas 4:5 que no desbordan', async ({ page }) => {
+    await page.goto('/');
+    const r = await page.evaluate(async (data) => {
+      const M: any = await import('/js/ai/infographic-render.js');
+      await M.ensureFonts();
+      const slides = M.renderSlides({ ...data, footer: { mark: 'BookReader', url: 'bookreader.raiatech.com' } });
+      const bad: string[] = [];
+      for (const [i, s] of slides.entries()) {
+        document.body.appendChild(s.svg);
+        for (const el of Array.from(s.svg.querySelectorAll('text, image'))) {
+          const b = (el as SVGGraphicsElement).getBBox();
+          if (b.x < -1 || b.y < -1 || b.x + b.width > s.width + 1 || b.y + b.height > s.height + 1) bad.push(`${i + 1}: ${el.textContent?.slice(0, 30)}`);
+        }
+        s.svg.remove();
+      }
+      const xml = (s: any) => new XMLSerializer().serializeToString(s.svg);
+      return {
+        n: slides.length,
+        sizes: [...new Set(slides.map((s: any) => `${s.width}x${s.height}`))],
+        bad,
+        firstHasTitle: xml(slides[0]).includes('Pensar en sistemas'),
+        lastHasQuote: xml(slides[slides.length - 1]).includes('bailar con él'),
+        allBranded: slides.every((s: any) => xml(s).includes('#22c55e')),
+      };
+    }, FULL);
+    expect(r.n).toBeGreaterThanOrEqual(8);
+    expect(r.sizes).toEqual(['1080x1350']);
+    expect(r.bad).toEqual([]);
+    expect(r.firstHasTitle).toBe(true);
+    expect(r.lastHasQuote).toBe(true);
+    expect(r.allBranded).toBe(true);   // el logo (su marcapáginas verde) en cada diapositiva
+  });
+
+  // IG2 · Story 9:16: una imagen de 1080×1920 que no desborda por mucho que traiga el dato.
+  test('la story sale en 9:16 y no desborda', async ({ page }) => {
+    await page.goto('/');
+    const bad = await page.evaluate(async (data) => {
+      const M: any = await import('/js/ai/infographic-render.js');
+      await M.ensureFonts();
+      const s = M.renderStory({ ...data, footer: { mark: 'BookReader', url: 'bookreader.raiatech.com' } });
+      if (s.width !== 1080 || s.height !== 1920) return [`tamaño ${s.width}x${s.height}`];
+      document.body.appendChild(s.svg);
+      const out: string[] = [];
+      for (const el of Array.from(s.svg.querySelectorAll('text, image'))) {
+        const b = (el as SVGGraphicsElement).getBBox();
+        if (b.x < -1 || b.y < -1 || b.x + b.width > 1081 || b.y + b.height > 1921) out.push(el.textContent?.slice(0, 30) || el.tagName);
+      }
+      return out;
+    }, FULL);
+    expect(bad).toEqual([]);
+  });
+
+  // IG2 · Cada idea con página la enseña («p. 42»): la prueba de que no se inventa nada.
+  test('las ideas con página la muestran', async ({ page }) => {
+    await page.goto('/');
+    const xml = await page.evaluate(async () => {
+      const M: any = await import('/js/ai/infographic-render.js');
+      return new XMLSerializer().serializeToString(M.renderSvg({ title: 'T', ideas: [{ head: 'Una idea', body: 'Con su cuerpo.', page: 42 }] }).svg);
+    });
+    expect(xml).toContain('p. 42');
+  });
+
+  // IG2 · El PDF del carrusel: cabecera, una página por imagen y la tabla xref bien cerrada.
+  test('el PDF del carrusel tiene una página por diapositiva', async ({ page }) => {
+    await page.goto('/');
+    const r = await page.evaluate(async () => {
+      const { imagesToPdf } = await import('/js/ui/pdf-images.js');
+      const c = document.createElement('canvas'); c.width = 20; c.height = 25;
+      c.getContext('2d')!.fillRect(0, 0, 20, 25);
+      const blob: Blob = await new Promise((res) => c.toBlob((b) => res(b!), 'image/jpeg', 0.9));
+      const jpeg = new Uint8Array(await blob.arrayBuffer());
+      const pdf = imagesToPdf([{ jpeg, px: 20, py: 25 }, { jpeg, px: 20, py: 25 }, { jpeg, px: 20, py: 25 }], 1080, 1350);
+      const text = new TextDecoder('latin1').decode(new Uint8Array(await pdf.arrayBuffer()));
+      return { head: text.slice(0, 8), count: (text.match(/\/Type \/Page /g) || []).length, kids: /\/Count 3/.test(text), eof: text.trimEnd().endsWith('%%EOF'), type: pdf.type };
+    });
+    expect(r.head).toBe('%PDF-1.4');
+    expect(r.count).toBe(3);
+    expect(r.kids).toBe(true);
+    expect(r.eof).toBe(true);
+    expect(r.type).toBe('application/pdf');
+  });
+
+// Opción A · leer en pantalla: el control de zoom lleva el SVG a 1080 px (1:1), que es donde
   // el cuerpo de 13 px se lee de verdad. "Ajustar" vuelve a encajarlo en la caja.
   test('el zoom lleva el póster a tamaño real y vuelve', async ({ page }) => {
     await page.setViewportSize({ width: 1400, height: 900 });

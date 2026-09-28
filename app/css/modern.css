@@ -357,3 +357,22 @@ body.reading :is(.reader-header, .reader-footer):hover > * { opacity: 1; }
   .lib-hero-progress .lib-progressbar { width: 100px; }
   .lib-grid { grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 22px 14px; }
 }
+
+/* ---------------------------------------------------- Infografía (IG2): carrusel y story ---
+   Vista previa de las diapositivas en una tira que se desliza, cada una con su sombra de
+   «publicación»; la story, una sola, más estrecha. */
+.ig-slides {
+  display: flex; gap: 16px; overflow-x: auto; padding: 8px 4px 18px;
+  scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch;
+}
+.ig-slide {
+  flex: 0 0 auto; width: min(300px, 78vw); scroll-snap-align: start;
+  border-radius: 10px; overflow: hidden;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.08), 0 10px 26px rgba(0,0,0,0.14);
+}
+.ig-slide svg { display: block; width: 100%; height: auto; max-width: 100%; }
+.ig-slides--story .ig-slide { width: min(280px, 70vw); }
+.ig-format { margin-top: 6px; }
+/* La cabecera del resultado (Volver · Regenerar) dejaba «Regenerar» debajo de la X de cerrar
+   del modal: se le reserva su hueco. */
+.sum-resulthead { padding-right: 44px; }

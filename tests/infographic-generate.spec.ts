@@ -89,24 +89,29 @@ test.describe('P29 · infografía de punta a punta', () => {
     await expect(page.locator('.studio-empty [data-act="gen"][data-kind="infographic"]')).toBeVisible();
     await page.click('.studio-empty [data-act="gen"][data-kind="infographic"]');
 
-    // Setup → generar → póster.
+    // Setup → generar → carrusel (el formato por defecto, IG2) → póster.
     await page.waitForSelector('#ig-generate', { timeout: 5000 });
     await page.click('#ig-generate');
-    await expect(page.locator('#ig-canvas svg')).toBeVisible({ timeout: 30000 });
+    await expect(page.locator('#ig-slides .ig-slide svg').first()).toBeVisible({ timeout: 30000 });
+    expect(await page.locator('#ig-slides .ig-slide svg').count()).toBeGreaterThan(3);
+    await expect(page.locator('#ig-png')).toContainText('PDF');
+    await page.click('.ig-format button[data-f="poster"]');
+    await expect(page.locator('#ig-canvas svg')).toBeVisible({ timeout: 10000 });
     const xml = await page
       .locator('#ig-canvas svg')
       .evaluate((s) => new XMLSerializer().serializeToString(s as SVGSVGElement));
-    for (const needle of ['Comala', 'LA LLEGADA', 'VOCES', 'CLAVES', 'Recuerda', 'Idea final']) {
+    for (const needle of ['Comala', 'LA LLEGADA', 'VOCES', 'CLAVES', 'RECUERDA', 'IDEA FINAL']) {
       expect(xml).toContain(needle);
     }
-    // Un póster, no un muro: la densidad sigue dentro del presupuesto.
+    // Un póster, no un muro: la densidad sigue dentro del presupuesto (IG2: 2,9, ver
+    // infographic-render.spec — el póster largo es el formato de leer con zoom o imprimir).
     const ratio = await page
       .locator('#ig-canvas svg')
       .evaluate((s) => {
         const svg = s as SVGSVGElement;
         return Number(svg.getAttribute('height')) / Number(svg.getAttribute('width'));
       });
-    expect(ratio).toBeLessThan(2.4);
+    expect(ratio).toBeLessThan(2.9);
     await expect(page.locator('#ig-png')).toBeVisible();
 
     // Al cerrar, el artefacto está en el historial (y se puede reabrir).
@@ -114,6 +119,7 @@ test.describe('P29 · infografía de punta a punta', () => {
     const card = page.locator('.studio-card.studio-generated [data-kind="infographic"]');
     await expect(card).toHaveCount(1);
     await card.click();
+    // Se recuerda el último formato elegido (póster).
     await expect(page.locator('#ig-canvas svg')).toBeVisible({ timeout: 10000 });
 
     expect(errors).toEqual([]);

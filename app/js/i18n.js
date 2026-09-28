@@ -654,6 +654,15 @@ const EN = {
   'El agente organiza el contenido en un mapa por ramas; cada idea cita su pasaje. Toca una cita para saltar al libro.': 'The agent organizes the content into a branching map; each idea cites its passage. Tap a citation to jump to the book.',
   // P34 · póster para compartir
   'Formato para compartir': 'Share format',
+  // IG2 · infografía en formatos para redes
+  'Carrusel 4:5': 'Carousel 4:5',
+  'Story 9:16': 'Story 9:16',
+  'Póster': 'Poster',
+  'Descargar PDF': 'Download PDF',
+  'Vista previa': 'Preview',
+  'Para leer con zoom o imprimir. Para redes, mejor el carrusel o la story.': 'For reading zoomed in or printing. For social media, use the carousel or the story.',
+  '{n} diapositivas de 1080×1350: el PDF es el carrusel de LinkedIn; «Compartir» manda las imágenes (Instagram).': '{n} slides at 1080×1350: the PDF is a LinkedIn carousel; “Share” sends the images (Instagram).',
+  'Una imagen de 1080×1920 para stories.': 'One 1080×1920 image for stories.',
   'Horizontal': 'Landscape',
   'Vertical': 'Portrait',
   '{n} ideas': '{n} ideas',

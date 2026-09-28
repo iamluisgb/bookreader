@@ -13,6 +13,34 @@ buena viaja en el próximo covers.json a los demás dispositivos. La adopción d
 además por **ancho real** (decodificando), no por bytes: una v1 densa puede pesar lo mismo que
 una v2 plana.
 
+## 2026-09-28 — IG2: la infografía, de informe a pieza para redes
+
+La v1 se leía como un informe: cuatro bandas negras con tarjetas idénticas, casi sin color, los
+«diagramas» eran texto de 11 px y el póster (1080 × ~2100, alto variable) no encajaba en ningún
+formato de redes: a ancho de feed el cuerpo quedaba en ~5 px. Se rehízo la puesta en escena
+manteniendo la regla de oro (el modelo decide QUÉ, la plantilla DÓNDE):
+
+- **Tres formatos, mismos componentes** (`infographic-render.js`): **carrusel 4:5** (1080×1350,
+  una diapositiva por bloque: portada, tesis, ideas de tres en tres, un panel por diapositiva,
+  «para recordar» y la cita; el tipo crece o encoge para llenar sin desbordar), **story 9:16**
+  (1080×1920) y el **póster largo** para leer con zoom o imprimir. Selector en el resultado; el
+  carrusel se descarga como **PDF** (el formato de carrusel de LinkedIn; `ui/pdf-images.js`, un
+  PDF de JPEG escrito a mano, sin dependencias) y «Compartir» manda las imágenes.
+- **Paleta del libro:** el acento (ya salía de la portada) tiñe ahora el papel, los números, los
+  diagramas y la banda de la cita (`themeFor`). Cada libro tiene su póster.
+- **Jerarquía editorial:** fuera las bandas negras; secciones con antetítulo y filete. Ideas con
+  **número grande en serif**, sin icono, y con su **página** («p. 42», el mismo resolutor que los
+  chips del chat). La **tesis**, en grande en el hero. Pie con **logo** y URL.
+- **Diagramas de verdad:** línea de pasos con círculos (vertical en el carrusel), comparativa en
+  tarjetas con la palabra en serif, y la escala «de menos a más» con **barras que crecen**.
+- Prompt más corto (rótulos de ≤ 6 palabras, cuerpos de ≤ 20) y las filas, ordenadas.
+- Arreglo de fondo: el texto se medía antes de que cargara la serif y desbordaba en el PNG;
+  `ensureFonts()` carga las dos familias antes de medir. «Regenerar» ya no queda bajo la X.
+
+El techo de proporción del póster largo sube de 2,4 a 2,9 (es el formato de leer/imprimir; para
+redes están los de tamaño fijo). Tests nuevos: carrusel 4:5 sin desbordes y con marca, story
+9:16, página en las ideas y PDF con una página por diapositiva.
+
 ## 2026-09-28 — UI1–UI4: la app, modernizada (auditoría completa)
 
 La app no se veía anticuada por el layout sino por la inconsistencia: tres estilos de botón para

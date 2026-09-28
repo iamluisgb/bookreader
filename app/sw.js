@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bookreader-v126';
+const CACHE_NAME = 'bookreader-v127';
 const ASSETS = [
   './',
   './index.html',
@@ -44,6 +44,7 @@ const ASSETS = [
   './fonts/literata-italic-latin.woff2',
   './js/app.js',
   './js/css-loader.js',
+  './js/ui/pdf-images.js',
   './js/ui/raf.js',
   './js/ui/frame-rect.js',
   './js/ui/selection-engine.js',

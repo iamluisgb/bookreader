@@ -15,7 +15,9 @@ import * as LLM from './llm.js';
 import * as Jobs from './jobs.js';
 import { buildChunks } from './flashcards.js';
 import { bookScopePassages } from './summary.js';
-import { renderSvg, ACCENTS, POSTER } from './infographic-render.js';
+import { renderSvg, renderSlides, renderStory, ensureFonts, ACCENTS, POSTER, SLIDE } from './infographic-render.js';
+import { citePage } from './render.js';
+import { imagesToPdf } from '../ui/pdf-images.js';
 import { posterFaceCss } from '../ui/svg-fonts.js';
 import { icon } from '../ui/icons.js';
 import { escapeHtml } from '../ui/escape.js';
@@ -32,9 +34,9 @@ export const LIMITS = {
   panels: 3,
   panelItems: 4,
   aside: 2,
-  thesis: 320,
-  head: 60,
-  body: 240,
+  thesis: 260,
+  head: 48,
+  body: 170,
   quote: 170,
   attribution: 90,
 };
@@ -49,6 +51,11 @@ let ctx = null; // { bookId, bookTitle, bookAuthor, goal, ensureIndex, anchors, 
 let overlay = null;
 let runUnsub = null;
 let zoom = null; // null = ajustar; 1 = 1:1
+// Formato de salida (IG2): póster largo, carrusel 4:5 o story 9:16. Se recuerda.
+const FORMATS = ['poster', 'carousel', 'story'];
+let igFormat = (() => {
+  try { const f = localStorage.getItem('bookreader_ig_format'); return FORMATS.includes(f) ? f : 'carousel'; } catch { return 'carousel'; }
+})();
 
 // ---- Ciclo de vida del modal -------------------------------------------------
 
@@ -240,11 +247,11 @@ Devuelve SOLO un objeto JSON con esta forma exacta:
   "kicker": "una línea de encuadre del libro (máx. 60 caracteres)",
   "thesis": "la tesis del libro en 2-3 frases",
   "ideasTitle": "Ideas clave",
-  "ideas": [ { "head": "rótulo de 2-5 palabras", "body": "una o dos frases", "src": "aN" } ],
+  "ideas": [ { "head": "rótulo de 2-6 palabras", "body": "UNA frase de máx. 20 palabras", "src": "aN" } ],
   "panels": [
     { "kind": "flow", "title": "el argumento paso a paso", "items": [ { "head": "paso", "body": "en una línea" } ] },
     { "kind": "cols", "title": "bloques o tipos que se comparan", "items": [ { "head": "nombre", "sub": "etiqueta corta", "body": "una frase" } ] },
-    { "kind": "rows", "title": "consejos o niveles", "items": [ { "tag": "etiqueta", "body": "una frase" } ] }
+    { "kind": "rows", "title": "niveles o grados, ORDENADOS de menos a más", "items": [ { "tag": "etiqueta", "body": "una frase" } ] }
   ],
   "aside": [ { "label": "Recuerda", "body": "un aviso o límite del libro" }, { "label": "Idea final", "body": "el cierre" } ],
   "quote": { "text": "una sola línea que resuma la tesis", "attribution": "de dónde sale esa frase" }
@@ -254,8 +261,9 @@ LÍMITES (respétalos; si no caben, prioriza):
 - ideas: máximo ${LIMITS.ideas}, cada una con su "src" (el ancla del pasaje). Deduplica.
 - panels: exactamente 3, uno de cada kind ("flow" con 3-4 pasos; "cols" con 3-4 columnas; "rows" con 3-5 filas).
 - aside: exactamente 2.
-- Los rótulos son CORTOS (máx. ${LIMITS.head} caracteres) y los cuerpos de UNA frase: esto se lee
-  en un póster, no es un artículo.
+- Los rótulos son CORTOS (máx. 6 palabras) y los cuerpos, UNA frase de máx. 20 palabras: esto se
+  lee en el móvil, en un carrusel, no es un artículo. La tesis, 2 frases como mucho.
+- En "rows" el orden importa: se dibuja como una escala de menos a más.
 NO inventes nada que no esté en las ideas; no repitas la misma idea en dos bloques.
 ${langRule(goal)}${goal ? `\n- Enfoca el póster en: «${goal}».` : ''}
 Responde SOLO el JSON, sin markdown ni texto alrededor.`;
@@ -512,25 +520,21 @@ async function renderResult(data) {
   Jobs.clearActive();
   setWide(true);
   zoom = null;
+  const fmtBtn = (f, label) => `<button type="button" data-f="${f}" aria-pressed="${igFormat === f}">${label}</button>`;
   b.innerHTML = `
     <div class="sum-resulthead">
       <button class="ai-ob-back">${icon('chevron-left', { size: 16 })}<span>${t('Volver')}</span></button>
       <button id="ig-regen" class="fc-txt-btn">${icon('sparkles', { size: 14 })} ${t('Regenerar')}</button>
     </div>
     <h2>${t('Infografía')} — ${escapeHtml(ctx.bookTitle || t('Libro'))}</h2>
-    <div class="ig-bar" role="group" aria-label="${t('Zoom del póster')}">
-      <button id="ig-out" aria-label="${t('Alejar')}" title="${t('Alejar')}">−</button>
-      <button id="ig-fit" aria-label="${t('Ajustar')}" title="${t('Ajustar')}">${icon('target', { size: 14 })}</button>
-      <button id="ig-100" aria-label="${t('Tamaño real')}" title="${t('Tamaño real')}">1:1</button>
-      <button id="ig-in" aria-label="${t('Acercar')}" title="${t('Acercar')}">+</button>
-      <span class="ig-hint">${t('Arrastra para mover')}</span>
+    <div class="mm-format ig-format" role="group" aria-label="${t('Formato para compartir')}">
+      <span>${t('Formato')}</span>
+      ${fmtBtn('carousel', t('Carrusel 4:5'))}${fmtBtn('story', t('Story 9:16'))}${fmtBtn('poster', t('Póster'))}
     </div>
-    <div class="ig-stage" id="ig-stage">
-      <div class="ig-canvas" id="ig-canvas"></div>
-    </div>
-    <p class="sum-depth-hint">${t('A tamaño real el texto se lee; a tamaño de feed, no. Es un póster para leer con zoom o imprimir.')}</p>
+    <div id="ig-view"></div>
+    <p class="sum-depth-hint" id="ig-hint"></p>
     <div class="fc-export">
-      <button id="ig-png" class="primary-btn">${icon('download', { size: 16 })} ${t('Descargar PNG')}</button>
+      <button id="ig-png" class="primary-btn">${icon('download', { size: 16 })} <span id="ig-png-label">${t('Descargar PNG')}</span></button>
       <button id="ig-svg" class="ai-ob-back fc-txt-btn">SVG</button>
       <button id="ig-share" class="ai-ob-back fc-txt-btn" style="display:none">${icon('share', { size: 14 })} ${t('Compartir')}</button>
     </div>
@@ -538,39 +542,90 @@ async function renderResult(data) {
   b.querySelector('.ai-ob-back').addEventListener('click', renderSetup);
   b.querySelector('#ig-regen').addEventListener('click', renderSetup);
 
-  await document.fonts.ready;
+  // Las medidas solo son buenas con las dos familias YA cargadas (ver ensureFonts).
+  await ensureFonts();
   const cover = await coverFor(ctx.bookId, ctx.bookTitle, ctx.bookAuthor);
+  // Página de cada idea desde su ancla («p. 42»): el mismo resolutor que los chips del chat.
+  const withPage = (it) => ({ ...it, page: it.src && ctx.anchors ? citePage(ctx.anchors.get(it.src)) : null });
   const payload = {
     ...data,
     ...cover,
+    ideas: (data.ideas || []).map(withPage),
     title: ctx.bookTitle || t('Libro'),
     author: ctx.bookAuthor || '',
-    footer: { mark: 'BookReader', url: location.hostname },
+    footer: { mark: 'BookReader', url: 'bookreader.raiatech.com' },
     accent: data.accent || POSTER.accent,
   };
-  if (!body()?.querySelector('#ig-canvas')) return; // se cerró mientras cargaba
-
+  if (!body()?.querySelector('#ig-view')) return; // se cerró mientras cargaba
   const fontCss = await posterFaceCss();
-  const { svg, width, height } = renderSvg(payload, { fontCss, title: t('Infografía de {scope}', { scope: ctx.bookTitle || '' }) });
-  const canvas = body().querySelector('#ig-canvas');
-  canvas.replaceChildren(svg);
-  paintZoom(width, height);
+  const aria = t('Infografía de {scope}', { scope: ctx.bookTitle || '' });
+  const name = (ext, n = '') => `bookreader-infografia-${slug(ctx.bookTitle || 'libro')}-${igFormat}${n}.${ext}`;
 
-  body().querySelector('#ig-out').addEventListener('click', () => setZoom(curZoom(width) / 1.3, width));
-  body().querySelector('#ig-fit').addEventListener('click', () => setZoom(null, width));
-  body().querySelector('#ig-100').addEventListener('click', () => setZoom(1, width));
-  body().querySelector('#ig-in').addEventListener('click', () => setZoom(curZoom(width) * 1.3, width));
-  wirePan();
+  // Lo pintado del formato actual: SVGs y su tamaño. Se rehace al cambiar de formato.
+  let current = null;
+  const paint = () => {
+    const view = body()?.querySelector('#ig-view');
+    if (!view) return;
+    const hint = body().querySelector('#ig-hint');
+    const svgBtn = body().querySelector('#ig-svg');
+    body().querySelector('#ig-png-label').textContent = igFormat === 'carousel' ? t('Descargar PDF') : t('Descargar PNG');
+    svgBtn.style.display = igFormat === 'poster' ? '' : 'none';
+    if (igFormat === 'poster') {
+      const r = renderSvg(payload, { fontCss, title: aria });
+      current = { svgs: [r.svg], width: r.width, height: r.height };
+      view.innerHTML = `
+        <div class="ig-bar" role="group" aria-label="${t('Zoom del póster')}">
+          <button id="ig-out" aria-label="${t('Alejar')}" title="${t('Alejar')}">−</button>
+          <button id="ig-fit" aria-label="${t('Ajustar')}" title="${t('Ajustar')}">${icon('target', { size: 14 })}</button>
+          <button id="ig-100" aria-label="${t('Tamaño real')}" title="${t('Tamaño real')}">1:1</button>
+          <button id="ig-in" aria-label="${t('Acercar')}" title="${t('Acercar')}">+</button>
+          <span class="ig-hint">${t('Arrastra para mover')}</span>
+        </div>
+        <div class="ig-stage" id="ig-stage"><div class="ig-canvas" id="ig-canvas"></div></div>`;
+      view.querySelector('#ig-canvas').replaceChildren(r.svg);
+      paintZoom(r.width, r.height);
+      view.querySelector('#ig-out').addEventListener('click', () => setZoom(curZoom(r.width) / 1.3, r.width));
+      view.querySelector('#ig-fit').addEventListener('click', () => setZoom(null, r.width));
+      view.querySelector('#ig-100').addEventListener('click', () => setZoom(1, r.width));
+      view.querySelector('#ig-in').addEventListener('click', () => setZoom(curZoom(r.width) * 1.3, r.width));
+      wirePan();
+      hint.textContent = t('Para leer con zoom o imprimir. Para redes, mejor el carrusel o la story.');
+      return;
+    }
+    const list = igFormat === 'carousel' ? renderSlides(payload, { fontCss, title: aria }) : [renderStory(payload, { fontCss, title: aria })];
+    current = { svgs: list.map((x) => x.svg), width: list[0].width, height: list[0].height };
+    view.innerHTML = `<div class="ig-slides ig-slides--${igFormat}" id="ig-slides" tabindex="0" aria-label="${t('Vista previa')}"></div>`;
+    const strip = view.querySelector('#ig-slides');
+    list.forEach((x) => {
+      const fig = document.createElement('div');
+      fig.className = 'ig-slide';
+      fig.appendChild(x.svg);
+      strip.appendChild(fig);
+    });
+    hint.textContent = igFormat === 'carousel'
+      ? t('{n} diapositivas de 1080×1350: el PDF es el carrusel de LinkedIn; «Compartir» manda las imágenes (Instagram).', { n: list.length })
+      : t('Una imagen de 1080×1920 para stories.');
+  };
+  paint();
 
-  const name = (ext) => `bookreader-infografia-${slug(ctx.bookTitle || 'libro')}.${ext}`;
+  b.querySelectorAll('.ig-format button').forEach((btn) => btn.addEventListener('click', () => {
+    igFormat = btn.dataset.f;
+    try { localStorage.setItem('bookreader_ig_format', igFormat); } catch { /* sin storage: solo esta sesión */ }
+    b.querySelectorAll('.ig-format button').forEach((o) => o.setAttribute('aria-pressed', String(o === btn)));
+    exportError('');
+    zoom = null;
+    paint();
+  }));
+
   body().querySelector('#ig-svg').addEventListener('click', () => {
-    download(name('svg'), new XMLSerializer().serializeToString(canvas.querySelector('svg')), 'image/svg+xml');
+    download(name('svg'), new XMLSerializer().serializeToString(current.svgs[0]), 'image/svg+xml');
   });
   body().querySelector('#ig-png').addEventListener('click', async () => {
     try {
-      download(name('png'), await rasterize(canvas.querySelector('svg'), width, height));
+      if (igFormat === 'carousel') download(name('pdf'), await carouselPdf(current));
+      else download(name('png'), await rasterize(current.svgs[0], current.width, current.height));
     } catch (err) {
-      console.warn('PNG de la infografía falló:', err);
+      console.warn('Export de la infografía falló:', err);
       exportError(t('No se pudo generar la imagen.'));
     }
   });
@@ -579,13 +634,28 @@ async function renderResult(data) {
     shareBtn.style.display = '';
     shareBtn.addEventListener('click', async () => {
       try {
-        await navigator.share({ files: [new File([await rasterize(canvas.querySelector('svg'), width, height)], name('png'), { type: 'image/png' })] });
+        const files = [];
+        for (let i = 0; i < current.svgs.length; i++) {
+          const blob = await rasterize(current.svgs[i], current.width, current.height);
+          files.push(new File([blob], name('png', current.svgs.length > 1 ? `-${i + 1}` : ''), { type: 'image/png' }));
+        }
+        await navigator.share({ files });
       } catch (err) {
         if (err?.name === 'AbortError') return;
         exportError(t('No se pudo compartir la imagen.'));
       }
     });
   }
+}
+
+// Carrusel → PDF: cada diapositiva en JPEG a 2× (nítida en pantallas retina) y una por página.
+async function carouselPdf(cur) {
+  const pages = [];
+  for (const svg of cur.svgs) {
+    const blob = await rasterize(svg, cur.width, cur.height, { type: 'image/jpeg', scale: 2 });
+    pages.push({ jpeg: new Uint8Array(await blob.arrayBuffer()), px: cur.width * 2, py: cur.height * 2 });
+  }
+  return imagesToPdf(pages, SLIDE.w, SLIDE.h);
 }
 
 // ---- Zoom y arrastre ---------------------------------------------------------
@@ -649,7 +719,7 @@ function slug(s) {
   return (s || 'libro').replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '').slice(0, 50).toLowerCase();
 }
 
-async function rasterize(svg, width, height) {
+async function rasterize(svg, width, height, { type = 'image/png', scale: fixed = null } = {}) {
   const xml = new XMLSerializer().serializeToString(svg);
   const bytes = new TextEncoder().encode(xml);
   let bin = '';
@@ -657,12 +727,14 @@ async function rasterize(svg, width, height) {
   const img = new Image();
   img.src = `data:image/svg+xml;base64,${btoa(bin)}`;
   await img.decode();
-  const scale = Math.min(2, Math.max(1, 4200 / Math.max(width, height)));
+  const scale = fixed || Math.min(2, Math.max(1, 4200 / Math.max(width, height)));
   const canvas = document.createElement('canvas');
   canvas.width = Math.round(width * scale);
   canvas.height = Math.round(height * scale);
-  canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-  return new Promise((res, rej) => canvas.toBlob((bl) => (bl ? res(bl) : rej(new Error('toBlob null'))), 'image/png'));
+  const g = canvas.getContext('2d');
+  if (type === 'image/jpeg') { g.fillStyle = '#ffffff'; g.fillRect(0, 0, canvas.width, canvas.height); }
+  g.drawImage(img, 0, 0, canvas.width, canvas.height);
+  return new Promise((res, rej) => canvas.toBlob((bl) => (bl ? res(bl) : rej(new Error('toBlob null'))), type, 0.92));
 }
 
 function download(filename, data, mime) {
