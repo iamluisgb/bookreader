@@ -739,10 +739,10 @@ export function renderSlides(data, { theme = POSTER, fontCss = '', title = '' } 
       const cw = Math.round(ch * (data.coverAspect || 2 / 3));
       out += coverImg(data, (W - cw) / 2, y, ch).svg;
       y += ch + 70;
-    } else {
-      y += 180;
     }
-    const t = fitDisplay(String(data.title || ''), W - SM * 2, { sizes: [76, 68, 60, 52, 44], weight: 600, family: DISPLAY, maxLines: 3 });
+    const t = fitDisplay(String(data.title || ''), W - SM * 2, { sizes: data.cover ? [76, 68, 60, 52, 44] : [96, 86, 76, 66, 56], weight: 600, family: DISPLAY, maxLines: 3 });
+    // Sin portada, el título se centra en la diapositiva (arriba dejaba media página vacía).
+    if (!data.cover) y = (H - t.size * 1.08 * t.lines.length) / 2 - 60;
     out += textEl(t.lines, W / 2, y + t.size * 0.9, { size: t.size, lineH: t.size * 1.08, weight: 600, family: DISPLAY, fill: '#ffffff', anchor: 'middle' });
     y += t.size * 1.08 * t.lines.length + 10;
     if (data.author) out += textEl([data.author], W / 2, y + 30, { size: 30, lineH: 30, fill: th.accentOnBand, anchor: 'middle' });
