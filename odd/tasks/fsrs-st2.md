@@ -38,3 +38,6 @@ commiteado y desplegado por el orchestrator el 2026-09-28.
 
 ## Hotfix post-entrega (2026-09-28)
 Reporte del usuario en producción (mazos reales): (1) la tarjeta 3D no giraba —`rotate(calc(px/30))` es inválido, transform computado `none`; fix: `--drag` unitless + `calc(x * 1px / x * 1deg)`— y (2) el deckname nowrap se derramaba fuera de la tarjeta —fix: track `minmax(0,1fr)` + `.study-face { min-width:0; overflow:hidden }`. Regresión: `tests/study-overflow.spec.ts` (Chromium y WebKit con `playwright.webkit.config.ts`). Commit `b36840d`.
+
+## Hotfix #2 (2026-09-28): «Ver en el libro» en silencio con mazos sincronizados
+El sync mueve mazos pero no `bookText`/`anchors`: sin segmentación local el botón no hacía nada y no había pasaje. Fix: `ensureSegmented` genera la segmentación a demanda (local, sin IA, persistente), `showPassage` reintenta, y `goToSource` nunca falla en silencio (fallback a abrir el libro + toast; fantasma → toast y seguir). Regresión: `tests/study-source.spec.ts`. Commit `1b76934`.
