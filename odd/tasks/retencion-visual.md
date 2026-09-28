@@ -44,15 +44,15 @@ real del repaso (retención verdadera). Sin cambiar el scheduler (FSRS-5 ya es v
 - Commit: `feat(study): streak milestone celebration with shareable card`
 
 ### T5 · Heatmap coloreado por acierto (true retention)
-- `study.js`: `bumpLog(delta, okDelta)` — entradas nuevas `{n, ok}` (migración on-write desde
-  número); `gradeCurrent` pasa `ok = (rating!=='again' && !failedOnce.has(key))`; `undo`
-  calcula `okDelta = firstTry - u.firstTry` antes de restaurar. `heatmapHtml`: días con datos
-  de acierto llevan subrayado por retención (≥85% verde / 70–85 ámbar / <70 rojo) y tooltip
-  «N repasos · X% a la primera».
-- Commit: `feat(study): heatmap shows true retention per day`
+- `study.js`: `readLog()` migra on-read el log legacy (número plano → `{n, ok: null}`);
+  `bumpLog(delta, okDelta)` escribe `{n, ok}`; `gradeCurrent` pasa `okDelta = rating==='again' ? 0 : 1`
+  (aproximación: cada evento de repaso cuenta, «otra vez» no es acierto); `undo` calcula
+  `okDelta = firstTry > u.firstTry ? -1 : 0` antes de restaurar. `heatmapHtml`: subrayado por
+  retención (≥85% verde / 70–85 ámbar / <70 rojo), sin subrayado en días legacy; tooltip «n · pct%».
+- Commit: `feat(study): heatmap underlined by true retention`
 
 ### T6 · Docs + deploy
-- CHANGELOG (entrada bajo las de hoy), odd/tasks, `npm run deploy:pages` + smoke + verificación.
+- CHANGELOG (entrada «Retención visible»), odd/tasks, `npm run deploy:pages` + smoke + verificación.
 
 ## Convenciones
 - i18n: strings ES fuente + mapa EN en `app/js/i18n.js` (zona `// study.js`).
@@ -63,4 +63,9 @@ real del repaso (retención verdadera). Sin cambiar el scheduler (FSRS-5 ya es v
 ## Evidencia
 | Tarea | Commit | Tests |
 |---|---|---|
-| T1 | (pendiente) | (pendiente) |
+| T1 | `935a68a` feat(study): persistent streak chip with at-risk state | tests/study-retention.spec.ts · 1 test (chip biblioteca → sesión, riesgo → encendida) + 14 vecinos |
+| T2 | `a276a09` feat(library): per-book mastery bar weighted by FSRS stability | · mastery 58% con 2 maduras / 1 aprendiendo / 1 nueva; tooltip · nota: primer intento falló por ediciones de un lote que no entraron (import de Srs + paintResults) — corregido y verificado en navegador |
+| T3 | `25ef968` feat(study): user-chosen daily goal with progress ring | · default 0/20, popover ±5, persistencia, anillo llena tras repasar |
+| T4 | `926cb01` feat(study): streak milestone celebration with shareable card | · hito exacto a 7 (racha cruda 6), PNG 1080×1080 real · 7 tests pasando (incl. share-card P11) |
+| T5 | `75c3a15` feat(study): heatmap underlined by true retention | · verde 90% / rojo 50% / hoy muta a 9·56% / legacy sin subrayado; log migrado · nota: día sembrado con clave UTC no matcheaba dayOf (local) — corregido; el segundo .study-flip era «Cerrar» |
+| T6 | (este commit de docs) | suites vecinas: 22 passed |

@@ -3,6 +3,25 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-09-28 — Retención visible: la racha, el dominio y la calidad del día dejan de ser invisibles
+
+La investigación de retención (informe del mismo día) fue clara: el algoritmo ya es lo mejor
+que existe (FSRS-5); lo que faltaba es que el progreso se VEA — quien abandona nunca llega a la
+pantalla final donde hoy viven las estadísticas. Cinco entregas, todas con tests:
+
+- **Chip de racha persistente** con estado «en riesgo» (pulso suave) mientras el día corre sin
+  ningún repaso: en el header de la sesión y en la biblioteca junto a la tarjeta «Hoy».
+- **Barra de dominio por libro** en la ficha de la biblioteca, ponderada por estabilidad FSRS
+  (`deckMastery`: madura = 1, aprendiendo = intervalo/21, nueva = 0; suspendidas cuentan): la
+  visualización que un SRS genérico no puede dar — el lector sabe cuánto del LIBRO dominó.
+- **Meta diaria elegible** con anillo de progreso en el header (5–200, por 5, por defecto 20):
+  cuenta el repaso de TODO el día, y se ajusta al click sin ir a ajustes.
+- **Celebración de hitos** (7/30/100/365) solo en la sesión que cruza el hito, con tarjeta
+  editorial compartible de 1080×1080 (`buildStreakCard`, Web Share + descarga).
+- **Heatmap por retención verdadera**: cada día lleva subrayado por aciertos a la primera
+  (verde ≥85% / ámbar 70–85% / rojo <70%); el log pasa a `{n, ok}` con migración de los días
+  legacy, y deshacer baja ambos.
+
 Lo que no se podía arreglar sin el fichero, y cómo se arregla ahora: mientras el fichero no esté
 en el dispositivo, la resolución no se puede inventar. Dos agujeros hacían que la portada
 raquítica se quedara para siempre aunque el fichero llegara: abrir un libro solo recalculaba la
