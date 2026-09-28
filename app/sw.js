@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bookreader-v127';
+const CACHE_NAME = 'bookreader-v128';
 const ASSETS = [
   './',
   './index.html',
@@ -45,6 +45,7 @@ const ASSETS = [
   './js/app.js',
   './js/css-loader.js',
   './js/ui/pdf-images.js',
+  './js/ui/book-accent.js',
   './js/ui/raf.js',
   './js/ui/frame-rect.js',
   './js/ui/selection-engine.js',
@@ -103,6 +104,8 @@ const ASSETS = [
   './js/ai/anki-export.js',
   './js/ai/srs.js',
   './js/ai/study.js',
+  './js/ai/figures.js',
+  './js/ai/visual-cards.js',
   './js/region-select.js',
   './js/pdf-text-select.js',
   './js/pdf-touch-select.js',
