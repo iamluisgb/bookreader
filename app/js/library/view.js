@@ -236,7 +236,7 @@ export async function render() {
       <section class="lib-main">
         <h1 class="lib-h1">${escapeHtml(currentTitle())}</h1>
         ${await firstStepsHtml(books)}
-        <div class="lib-top">${continueHtml(books)}<div class="lib-today-slot"></div></div>
+        <div class="lib-top">${continueHtml(books)}<div class="lib-today-slot"></div><span class="lib-streak-slot"></span></div>
         ${filterChipsHtml()}
         <div class="lib-toolbar">
           <div class="lib-search-box">
@@ -393,9 +393,22 @@ function filterChipsHtml() {
 // Chip "Repasar hoy · N" (P10): la cola diaria de repetición espaciada, el bucle de
 // retorno de la app. Solo aparece si hay tarjetas vencidas; al cerrar la sesión se
 // re-pinta (el contador baja o el chip desaparece).
+// Racha siempre visible en la biblioteca (T1 retención), no solo al terminar la sesión.
+// «En riesgo» = la racha vive pero hoy aún no repasaste: flama atenuada que pide acción.
+function paintStreakChip() {
+  const slot = host && host.querySelector('.lib-streak-slot');
+  if (!slot) return;
+  const streak = Study.currentStreak();
+  if (!streak) { slot.innerHTML = ''; return; }
+  const risky = !Study.reviewsToday();
+  slot.innerHTML = `<span class="lib-streakchip${risky ? ' is-risky' : ''}" `
+    + `aria-label="${t('Racha de {n} día{s}', { n: streak, s: streak === 1 ? '' : 's' })}">🔥 <b>${streak}</b></span>`;
+}
+
 async function paintStudyChip() {
   const slot = host && host.querySelector('.lib-today-slot');
   if (!slot) return;
+  paintStreakChip();              // la racha se pinta aunque no haya nada vencido hoy
   const [{ cards, decks }, doneToday] = await Promise.all([Study.dueToday(), Promise.resolve(Study.reviewsToday())]);
   Study.syncBadge();
   if (!slot.isConnected) return;

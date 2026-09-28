@@ -248,6 +248,7 @@ export function open({ decks, title = t('Estudiar'), onClose, onNavigate } = {})
       <div class="study-progress" aria-hidden="true"><span></span></div>
       <div class="study-head">
         <span class="study-title">${escapeHtml(title)}</span>
+        <span class="study-streakchip" aria-live="polite"></span>
         <span class="study-left" aria-live="polite"></span>
         <div class="study-tools"></div>
         <button class="ai-ob-close" title="${t('Cerrar')}" aria-label="${t('Cerrar')}">${icon('xmark', { size: 18 })}</button>
@@ -430,6 +431,20 @@ function paintLook(deck) {
   });
 }
 
+// La racha se ve en los primeros 3 segundos de sesión (lección de retención de Duolingo:
+// la gente que abandona nunca llega a la pantalla final, así que la racha solo al cerrar no
+// motiva a nadie). «En riesgo» = la racha sigue viva pero HOY todavía no repasaste: mejor
+// avisar ahora que lamentar mañana.
+function refreshHead() {
+  const el = overlay?.querySelector('.study-streakchip');
+  if (!el) return;
+  const streak = Srs.currentStreak(Storage.get(STREAK_KEY));
+  el.textContent = `🔥 ${streak}`;
+  el.setAttribute('aria-label', t('Racha de {n} día{s}', { n: streak, s: streak === 1 ? '' : 's' }));
+  el.classList.toggle('is-zero', !streak);
+  el.classList.toggle('is-risky', streak > 0 && !reviewsToday());
+}
+
 function renderCard() {
   const b = overlay?.querySelector('.study-body');
   const f = overlay?.querySelector('.study-foot');
@@ -440,6 +455,7 @@ function renderCard() {
   recallText = '';
   suggested = null;
   setProgress();
+  refreshHead();
 
   if (!queue.length) { renderDone(b, f, left); renderTools(); return; }
   left.textContent = t('{n} pendiente{s}', { n: queue.length, s: queue.length === 1 ? '' : 's' });

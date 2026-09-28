@@ -495,6 +495,7 @@ const EN = {
   'Esta tarjeta no tiene libro de origen': 'This card has no source book',
   'El fichero de este libro no está en este dispositivo': 'This book’s file isn’t on this device',
   'No encontré la posición exacta; te abrí el libro': 'Couldn’t find the exact position; opened the book instead',
+  'Racha de {n} día{s}': 'Streak: {n} day{s}',
   'Otra vez': 'Again',
   'Difícil': 'Hard',
   'Bien': 'Good',

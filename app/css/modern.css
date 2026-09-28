@@ -645,3 +645,27 @@ body.reading :is(.reader-header, .reader-footer):hover > * { opacity: 1; }
   .lib-today { padding: 14px; gap: 14px; border-radius: var(--r-lg); }
   .lib-today-ring { width: 70px; height: 70px; }
 }
+
+/* ----------------------------- Retención visible (T1): racha siempre presente -------------- */
+.study-streakchip {
+  flex: none; font-size: var(--fs-sm); font-weight: 700; font-variant-numeric: tabular-nums;
+  padding: 4px 10px; border-radius: 999px; background: var(--fill); color: var(--text);
+}
+.study-streakchip.is-zero { opacity: 0.45; }
+/* «En riesgo»: hoy todavía no repasaste y la racha vive. Pulso suave que pide acción. */
+.study-streakchip.is-risky {
+  background: color-mix(in srgb, var(--accent) 14%, var(--fill));
+  animation: study-risk 1.8s var(--ease) infinite;
+}
+@keyframes study-risk { 50% { opacity: 0.55; } }
+.lib-streak-slot { display: inline-flex; justify-content: flex-end; }
+.lib-streakchip {
+  display: inline-flex; align-items: center; gap: 6px; align-self: start;
+  padding: 6px 14px; border-radius: 999px; background: var(--surface-1);
+  border: 1px solid var(--border-soft); font-size: var(--fs-sm); color: var(--text);
+}
+.lib-streakchip b { font-variant-numeric: tabular-nums; }
+.lib-streakchip.is-risky {
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface-1));
+  animation: study-risk 1.8s var(--ease) infinite;
+}
