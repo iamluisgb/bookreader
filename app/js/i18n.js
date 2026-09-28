@@ -491,6 +491,10 @@ const EN = {
   // study.js
   'Repaso de hoy': 'Today’s review',
   'Ver en el libro': 'See in the book',
+  'Preparando el libro…': 'Preparing the book…',
+  'Esta tarjeta no tiene libro de origen': 'This card has no source book',
+  'El fichero de este libro no está en este dispositivo': 'This book’s file isn’t on this device',
+  'No encontré la posición exacta; te abrí el libro': 'Couldn’t find the exact position; opened the book instead',
   'Otra vez': 'Again',
   'Difícil': 'Hard',
   'Bien': 'Good',

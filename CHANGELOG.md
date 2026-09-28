@@ -13,6 +13,25 @@ buena viaja en el próximo covers.json a los demás dispositivos. La adopción d
 además por **ancho real** (decodificando), no por bytes: una v1 densa puede pesar lo mismo que
 una v2 plana.
 
+## 2026-09-28 — Hotfix ST2 #2: «Ver en el libro» moría en silencio con mazos llegados por sync
+
+Reporte del usuario: el botón «Ver en el libro» no hacía nada con el mazo de Lituma. Causa: el
+sync mueve **mazos** entre dispositivos pero NO el libro segmentado (`bookText`/`anchors`); una
+tarjeta con `card.src` estudiada donde nunca se segmentó el libro no tenía ni ancla para saltar
+ni pasaje que mostrar (la ausencia del bloque «Ver el pasaje del libro» en la captura lo
+confirmaba), y `goToSource` retornaba en silencio.
+
+- **Segmentación a demanda** (`study.js`): si el libro no está segmentado en este dispositivo,
+  `ensureSegmented` lo genera en caliente —parsea el EPUB/PDF localmente, sin IA—, lo persiste
+  (`saveSegmented`) y limpia las cachés de la sesión. Se deduplica por libro (`segInFlight`).
+- **El pasaje se reintenta**: `showPassage` tras segmentar vuelve a resolver el texto.
+- **Nunca silencioso**: con ancla → salto por deep-link como siempre; sin ancla exacta (p. ej.
+  PDF escaneado) → abre el libro sin posición + aviso; fichero fantasma → aviso y la sesión
+  sigue. El botón se deshabilita mientras segmenta.
+
+Regresión: `tests/study-source.spec.ts` (segmenta y abre por deep-link; el pasaje aparece tras
+voltear; fantasma avisa y no se aparta).
+
 ## 2026-09-28 — Hotfix ST2: la tarjeta no giraba y el nombre del mazo se derramaba
 
 Dos defectos del rediseño de arriba, visibles en producción con mazos reales:

@@ -499,6 +499,7 @@ body.reading :is(.reader-header, .reader-footer):hover > * { opacity: 1; }
 }
 .study-src { align-self: center; margin: 0 auto 2px; }
 .study-src:hover, .study-leech-fix:hover { background: var(--fill-strong); }
+.study-src:disabled { opacity: 0.55; cursor: default; }   /* segmentando el libro en caliente */
 
 /* El pasaje citado, como recorte de página: papel, serif y plegado por defecto. */
 .study-passage-wrap { margin-top: 6px; }

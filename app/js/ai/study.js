@@ -19,6 +19,10 @@ import { confirmBox } from '../ui/dialog.js';
 import { ensurePro } from '../ui/paywall.js';
 import * as LLM from './llm.js';
 import { bookLook } from '../ui/book-accent.js';
+import { toast } from './toast.js';
+import { segmentBook } from './segment.js';
+import { segmentPdf } from './segment-pdf.js';
+import { loadEpubJs, loadPdfJs } from '../vendor-loader.js';
 
 // Racha de estudio (F3): {count, lastDay}, global de la app (no por libro).
 const STREAK_KEY = 'study_streak';
@@ -46,6 +50,7 @@ let minimized = false;   // sesión viva pero oculta (se fue a ver la fuente en 
 let chip = null;         // chip "Volver al repaso" mientras está minimizada
 const anchorsCache = new Map();   // bookId → Map(aN → {cfi, href, page, chapter})
 const passageCache = new Map();   // bookId → Map(aN → texto del pasaje) — se suelta al cerrar
+const segInFlight = new Map();    // bookId → Promise<boolean> segmentación en curso (dedupe)
 
 // ---- Cola diaria (para el chip de la estantería) -----------------------------
 
@@ -678,7 +683,7 @@ function renderGrades(card) {
     if (g) gradeCurrent(g.dataset.rate);
   });
   const { deck } = queue[0];
-  f.querySelector('.study-src')?.addEventListener('click', () => goToSource(deck, card));
+  f.querySelector('.study-src')?.addEventListener('click', (e) => goToSource(deck, card, e.currentTarget));
 }
 
 // Recuerdo activo: el agente compara lo que escribiste con la respuesta y el pasaje, te dice
@@ -721,7 +726,11 @@ Devuelve SOLO un JSON: {"veredicto": "bien" | "a medias" | "mal", "comentario": 
 }
 
 async function showPassage(deck, card) {
-  const text = await passageOf(deck, card);
+  let text = await passageOf(deck, card);
+  // Libro llegada por sync sin segmentación local: generarla y reintentar una vez.
+  if (!text && card.src && deck.bookId && await ensureSegmented(deck.bookId)) {
+    text = await passageOf(deck, card);
+  }
   if (!text || !overlay || !flipped) return;
   if (queue[0]?.deck.cards[queue[0].idx] !== card) return;   // ya se pasó de tarjeta
   const a = overlay.querySelector('.study-a');
@@ -942,22 +951,80 @@ async function passagesFor(bookId) {
   return passageCache.get(bookId);
 }
 
+// Segmenta el libro en este dispositivo si aún no lo está. El sync mueve mazos entre
+// dispositivos pero NO el libro segmentado (bookText/anchors): una tarjeta llegada por sync
+// tiene `src` pero aquí no hay anclas — ni pasaje (F3) ni salto a la fuente (F2). La
+// segmentación es local y barata (parsea el EPUB/PDF sin IA) y el resultado persiste, así
+// que se regenera a demanda la primera vez que hace falta y queda para siempre.
+async function ensureSegmented(bookId, onStatus) {
+  if (!bookId) return false;
+  if (await DB.loadSegmented(bookId)) {
+    anchorsCache.delete(bookId); passageCache.delete(bookId);
+    return true;
+  }
+  if (segInFlight.has(bookId)) return segInFlight.get(bookId);
+  const job = (async () => {
+    try {
+      const record = await Store.getBook(bookId);
+      if (!record || !Store.hasFile(record)) return false;
+      onStatus?.(t('Preparando el libro…'));
+      const buf = record.file instanceof ArrayBuffer ? record.file.slice(0) : await record.file.arrayBuffer();
+      let seg;
+      if (record.format === 'pdf') {
+        const pdfjs = await loadPdfJs();
+        const doc = await pdfjs.getDocument({ data: new Uint8Array(buf) }).promise;
+        try { seg = await segmentPdf(doc, onStatus); } finally { doc.destroy(); }
+      } else {
+        const ePub = await loadEpubJs();
+        const book = ePub(buf);
+        try { seg = await segmentBook(book, onStatus); } finally { book.destroy?.(); }
+      }
+      await DB.saveSegmented(bookId, record.title, seg);
+      anchorsCache.delete(bookId); passageCache.delete(bookId);
+      return true;
+    } catch { return false; }
+  })();
+  segInFlight.set(bookId, job);
+  try { return await job; } finally { segInFlight.delete(bookId); }
+}
+
 // Salta a la página/CFI de origen de la tarjeta vía el deep-link del router
 // (`#book=<id>&loc=<cfi|página>`): el mismo camino abre el libro si no está abierto
 // (la cola global cruza libros) o solo reposiciona si ya lo está. El id del mazo y el
 // de la biblioteca son el mismo hash del archivo.
-async function goToSource(deck, card) {
-  const a = (await anchorsFor(deck.bookId)).get(card.src);
-  const loc = a ? (a.cfi ?? a.href ?? a.page) : null;
-  if (loc == null || !deck.bookId) return;
-  const p = new URLSearchParams();
-  p.set('book', deck.bookId);
-  p.set('loc', String(loc));
-  // MINIMIZA, no cierra: al volver, la cola sigue donde estaba (F2). `onNavigate` sí se
-  // llama —quien abrió la sesión debe apartar lo suyo (el modal de flashcards) para dejar
-  // ver el libro—, pero se conserva por si se vuelve a saltar desde la misma sesión.
-  minimize();
-  if (onNavigateCb) onNavigateCb();
-  location.hash = p.toString();             // dispara hashchange → el router abre/reposiciona
+// NUNCA silencioso: si falta el dato de origen lo genera (ensureSegmented); si aun así
+// no hay ancla exacta abre el libro sin posición; si el fichero no está aquí avisa.
+async function goToSource(deck, card, btn) {
+  if (!deck.bookId) { toast({ message: t('Esta tarjeta no tiene libro de origen') }); return; }
+  if (btn) { btn.disabled = true; btn.classList.add('is-busy'); }
+  try {
+    let a = (await anchorsFor(deck.bookId)).get(card.src);
+    if (!a && await ensureSegmented(deck.bookId)) a = (await anchorsFor(deck.bookId)).get(card.src);
+    const loc = a ? (a.cfi ?? a.href ?? a.page) : null;
+    if (loc == null) {
+      const record = await Store.getBook(deck.bookId);
+      if (!record || !Store.hasFile(record)) {
+        toast({ message: t('El fichero de este libro no está en este dispositivo') });
+        return;
+      }
+      // Sin ancla exacta (p. ej. PDF escaneado): mejor el libro entero que nada.
+      minimize();
+      if (onNavigateCb) onNavigateCb();
+      location.hash = new URLSearchParams({ book: deck.bookId }).toString();
+      toast({ message: t('No encontré la posición exacta; te abrí el libro') });
+      return;
+    }
+    const p = new URLSearchParams();
+    p.set('book', deck.bookId);
+    p.set('loc', String(loc));
+    // MINIMIZA, no cierra: al volver, la cola sigue donde estaba (F2). `onNavigate` sí se
+    // llama —quien abrió la sesión debe apartar lo suyo (el modal de flashcards) para dejar
+    // ver el libro—, pero se conserva por si se vuelve a saltar desde la misma sesión.
+    minimize();
+    if (onNavigateCb) onNavigateCb();
+    location.hash = p.toString();             // dispara hashchange → el router abre/reposiciona
+  } finally {
+    if (btn) { btn.disabled = false; btn.classList.remove('is-busy'); }
+  }
 }
 
