@@ -137,3 +137,41 @@ test('hito de racha: se celebra al cruzar 7 y comparte una tarjeta PNG', async (
   expect(png.w).toBe(1080);
   expect(png.h).toBe(1080);
 });
+
+test('heatmap: subrayado por retención a la primera y migración del log legacy', async ({ page }) => {
+  await page.goto('/index.html');
+  await seedProLicense(page);
+  const seedLog = await page.evaluate(() => {
+    const d = new Date();
+    const today = Math.floor((d.getTime() - d.getTimezoneOffset() * 60000) / 86400000); // mismo dayOf que srs.js
+    const y = today - 1;
+    localStorage.setItem('bookreader_study_log', JSON.stringify({
+      [today]: { n: 8, ok: 4 },       // mutará con el repaso de la sesión (→ 9 · 56%)
+      [y]: { n: 10, ok: 9 },          // 90% → verde
+      [today - 2]: { n: 8, ok: 4 },   // 50% estable → rojo
+      [today - 3]: 12,                // legacy: número plano → sin subrayado
+    }));
+    return { today, y };
+  });
+  await seedDeck(page);
+  await page.reload();
+  await page.locator('.lib-study-chip').click();
+  const overlay = page.locator('#ai-study');
+
+  // Los repasos de HOY ya cuentan para la meta (8 del log) y siguen contando tras repasar.
+  await expect(overlay.locator('.study-goal-n')).toHaveText('8/20');
+  await overlay.locator('.study-flip').click();
+  await overlay.locator('.study-grade[data-rate="good"]').click();
+  await expect(overlay.locator('.study-goal-n')).toHaveText('9/20');
+
+  // Tras repasar la única tarjeta, renderCard pasa a la pantalla final: ahí está el heatmap
+  // (el .study-flip del pie AHORA es «Cerrar»: no se vuelve a tocar).
+  const heat = overlay.locator('.study-heat');
+  await expect(heat.locator('.study-heat-cell.ret-good[title="10 · 90%"]')).toHaveCount(1);
+  await expect(heat.locator('.study-heat-cell.ret-low[title="8 · 50%"]')).toHaveCount(1);
+  // Hoy: 8 repasos · 4 aciertos + 1 acierto de esta sesión → 5/9 = 56% → rojo.
+  await expect(heat.locator('.study-heat-cell.ret-low.is-today[title="9 · 56%"]')).toHaveCount(1);
+
+  // Legacy: 12 repasos, sin datos de acierto → sin subrayado, tooltip plano.
+  await expect(heat.locator('.study-heat-cell:not([class*="ret-"])[title="12"]')).toHaveCount(1);
+});

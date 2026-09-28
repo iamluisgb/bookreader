@@ -217,12 +217,20 @@ export function buildQueue(decks, { now = Date.now(), newLimit: limit = 0, rng =
 const GRADING_KEY = 'study_grading';
 export function gradingMode() { return Storage.get(GRADING_KEY, 'simple') === 'full' ? 'full' : 'simple'; }
 
-// Registro diario de repasos {día: nº} para el calendario de la racha (últimos 120 días).
+// Registro diario de repasos para el calendario de la racha (últimos 120 días).
+// Entrada: { n: repasos, ok: aciertos a la primera } — el día ya no solo dice CUÁNTO se
+// repasó sino CÓMO fue (retención verdadera, T5). Legacy: número plano migrado al escribir.
 const LOG_KEY = 'study_log';
-function bumpLog(delta = 1, now = Date.now()) {
+function readLog() {
   const log = Storage.get(LOG_KEY, {}) || {};
+  for (const k of Object.keys(log)) if (typeof log[k] === 'number') log[k] = { n: log[k], ok: null };
+  return log;
+}
+function bumpLog(delta, okDelta = 0, now = Date.now()) {
+  const log = readLog();
   const day = Srs.dayOf(now);
-  log[day] = Math.max(0, (log[day] || 0) + delta);
+  const e = log[day] || { n: 0, ok: 0 };
+  log[day] = { n: Math.max(0, e.n + delta), ok: Math.max(0, (e.ok ?? 0) + okDelta) };
   const keys = Object.keys(log).map(Number).sort((a, b) => a - b);
   while (keys.length > 120) delete log[keys.shift()];
   Storage.set(LOG_KEY, log);
@@ -231,7 +239,8 @@ function bumpLog(delta = 1, now = Date.now()) {
 export function currentStreak(now = Date.now()) { return Srs.currentStreak(Storage.get(STREAK_KEY), now); }
 
 export function reviewsToday(now = Date.now()) {
-  return (Storage.get(LOG_KEY, {}) || {})[Srs.dayOf(now)] || 0;
+  const e = (Storage.get(LOG_KEY, {}) || {})[Srs.dayOf(now)];
+  return typeof e === 'number' ? e : e?.n || 0;
 }
 
 let startedAt = 0;       // para el tiempo de la sesión
@@ -715,7 +724,7 @@ function undo() {
   u.deck.cards[u.idx] = card;
   if (u.deck.id) DB.updateDeck(u.deck.id, { cards: u.deck.cards });
   if (u.streak) Storage.set(STREAK_KEY, u.streak); else Storage.remove(STREAK_KEY);
-  bumpLog(-1);
+  bumpLog(-1, firstTry > (u.firstTry ?? firstTry) ? -1 : 0);   // si deshago un acierto, bajo `ok`
   queue = u.queue;
   done = u.done;
   graded = u.graded ?? graded;
@@ -878,7 +887,7 @@ function gradeCurrent(rating) {
   // Se persiste TRAS CADA tarjeta y con el array COMPLETO (tombstones incluidos).
   if (deck.id) DB.updateDeck(deck.id, { cards: deck.cards });
   Storage.set(STREAK_KEY, Srs.bumpStreak(Storage.get(STREAK_KEY)));   // repaso de hoy → racha
-  bumpLog(1);
+  bumpLog(1, rating === 'again' ? 0 : 1);   // «otra vez» no es acierto a la primera (T5)
   graded++;
   if (rating === 'again') { queue.push(entry); failedOnce.add(key); }
   else { done++; if (!failedOnce.has(key)) firstTry++; }
@@ -915,14 +924,21 @@ function fmtTime(ms) {
 }
 
 // Calendario de la racha: las últimas 5 semanas, un cuadro por día (más oscuro = más repasos).
+// El subrayado inferior dice la CALIDAD del día (retención a la primera, T5): verde ≥85%,
+// ámbar 70–85%, rojo <70%. Días sin datos de acierto (legacy) quedan sin subrayado.
 function heatmapHtml(now = Date.now()) {
-  const log = Storage.get(LOG_KEY, {}) || {};
+  const log = readLog();
   const today = Srs.dayOf(now);
   const cells = [];
   for (let d = today - 34; d <= today; d++) {
-    const n = log[d] || 0;
+    const e = log[d];
+    const n = typeof e === 'number' ? e : e?.n || 0;
+    const ok = e && typeof e === 'object' ? e.ok : null;
     const lvl = n === 0 ? 0 : n < 10 ? 1 : n < 25 ? 2 : 3;
-    cells.push(`<span class="study-heat-cell lvl-${lvl}${d === today ? ' is-today' : ''}" title="${n}"></span>`);
+    const ret = ok == null ? null : (n ? ok / n : null);
+    const retCls = ret == null ? '' : ret >= 0.85 ? ' ret-good' : ret >= 0.7 ? ' ret-mid' : ' ret-low';
+    const title = n === 0 ? '' : ret == null ? `${n}` : `${n} · ${Math.round(ret * 100)}%`;
+    cells.push(`<span class="study-heat-cell lvl-${lvl}${retCls}${d === today ? ' is-today' : ''}" title="${title}"></span>`);
   }
   return `<div class="study-heat" aria-label="${t('Repasos de las últimas 5 semanas')}">${cells.join('')}</div>`;
 }
