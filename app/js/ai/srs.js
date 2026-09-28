@@ -1,10 +1,9 @@
-// P10 · Modo Estudiar — scheduler de repetición espaciada (SM-2, ver BACKLOG · P10).
+// P10 · Modo Estudiar — scheduler de repetición espaciada (FSRS-5 desde P19; antes SM-2).
 // Módulo PURO (sin DOM, sin IndexedDB): recibe estados y fechas, devuelve estados nuevos.
 // El estado vive inline en cada tarjeta (`card.srs`); una tarjeta sin `srs` es NUEVA.
 //
-// Se eligió SM-2 sobre FSRS (decisión en BACKLOG · P10): simple, probado y suficiente sin
-// historial largo. El estado guarda lo necesario (reps/lapses/ease/interval/due/lastReview)
-// para poder migrar a FSRS más adelante sin romper.
+// P10 eligió SM-2; P19 lo cambió a FSRS-5 (ver más abajo). El estado se diseñó migrable y
+// lo fue: las tarjetas ya programadas se convierten en su siguiente repaso.
 //
 // `due` e `interval` se miden en DÍAS (medianoche local): "vence hoy" significa hoy de
 // calendario, no "hace 24h exactas" — el repaso es un hábito diario, no un cronómetro.
@@ -14,9 +13,6 @@ import { t } from '../i18n.js';
 export const RATINGS = ['again', 'hard', 'good', 'easy'];
 
 const EASE_START = 2.5;
-const EASE_MIN = 1.3;
-const FIRST_INTERVAL = 1;     // días tras el primer "bien"
-const SECOND_INTERVAL = 6;    // días tras el segundo
 const MAX_INTERVAL = 365;     // techo: nunca agendar a más de un año
 
 // Fallos a partir de los cuales una tarjeta es un "leech" (mismo umbral que Anki, que ya
@@ -53,42 +49,101 @@ export function dueCount(cards, now = Date.now()) {
   return (cards || []).filter(c => isDue(c, now)).length;
 }
 
-// Aplica una nota de autoevaluación al estado y devuelve el estado NUEVO (no muta).
-// - again: fallo → reps a 0, se re-encola en la sesión (interval 0, due hoy) y baja el ease.
-// - hard:  cuesta → crece poco (×1.2) y baja el ease.
-// - good:  1d → 6d → ×ease.
-// - easy:  ×ease×1.3 y sube el ease.
-export function grade(srs, rating, now = Date.now()) {
-  const s = { ...(srs || newState(now)) };
-  const today = dayOf(now);
+// ---- FSRS-5 (P19) ------------------------------------------------------------------
+// Sustituye a SM-2: con parámetros por defecto y sin historial ya predice el recuerdo mejor
+// que SM-2 en el 99,5 % de los usuarios y pide un 20-30 % menos de repasos para la misma
+// retención (ver BACKLOG · P19). Modelo DSR: cada tarjeta guarda su ESTABILIDAD (días hasta
+// que la probabilidad de recordarla baja al 90 %) y su DIFICULTAD (1–10). El intervalo es la
+// estabilidad: con retención objetivo 0,9 y esta curva, I = S.
+//
+// Compatibilidad: el estado sigue siendo `{reps, lapses, interval, due, lastReview}` (+ `ease`
+// heredado, que ya no se usa) y se AÑADEN `stability` y `difficulty`. Una tarjeta programada
+// con SM-2 se convierte al vuelo en su primer repaso: la estabilidad sale de su intervalo
+// (lo que el SM-2 ya había aprendido de ella) y la dificultad, de su ease.
+const W = [0.40255, 1.18385, 3.173, 15.69105, 7.1949, 0.5345, 1.4604, 0.0046, 1.54575, 0.1192,
+  1.01925, 1.9395, 0.11, 0.29605, 2.2698, 0.2315, 2.9898, 0.51655, 0.6621];
+const DECAY = -0.5;
+const FACTOR = 19 / 81;
+const G = { again: 1, hard: 2, good: 3, easy: 4 };
+const clampD = (d) => Math.min(10, Math.max(1, d));
 
-  if (rating === 'again') {
+export function retrievability(elapsedDays, stability) {
+  return Math.pow(1 + FACTOR * Math.max(0, elapsedDays) / stability, DECAY);
+}
+const initS = (g) => Math.max(W[g - 1], 0.1);
+const initD = (g) => clampD(W[4] - Math.exp(W[5] * (g - 1)) + 1);
+function nextD(d, g) {
+  const delta = -W[6] * (g - 3);
+  const dp = d + delta * (10 - d) / 9;                    // cambio lineal amortiguado
+  return clampD(W[7] * initD(4) + (1 - W[7]) * dp);       // reversión a la media
+}
+function recallS(d, s, r, g) {
+  const hard = g === 2 ? W[15] : 1;
+  const easy = g === 4 ? W[16] : 1;
+  return s * (1 + Math.exp(W[8]) * (11 - d) * Math.pow(s, -W[9]) * (Math.exp((1 - r) * W[10]) - 1) * hard * easy);
+}
+function forgetS(d, s, r) {
+  const f = W[11] * Math.pow(d, -W[12]) * (Math.pow(s + 1, W[13]) - 1) * Math.exp((1 - r) * W[14]);
+  return Math.min(f, s);
+}
+// Repaso en el MISMO día (el «otra vez» re-encolado en la sesión): la curva no ha tenido
+// tiempo de caer, así que la estabilidad se ajusta por el término de corto plazo de FSRS-5.
+const shortS = (s, g) => s * Math.exp(W[17] * (g - 3 + W[18]));
+
+// Estado FSRS de partida para una tarjeta ya programada con SM-2.
+function migrate(s) {
+  if (s.stability || !(s.reps > 0)) return s;
+  return {
+    ...s,
+    stability: Math.max(0.5, s.interval || 1),
+    difficulty: clampD(5 + (2.5 - (s.ease || EASE_START)) * 5),
+  };
+}
+
+function core(srs, rating, now) {
+  const today = dayOf(now);
+  const g = G[rating] || 3;
+  let s = migrate({ ...(srs || newState(now)) });
+  const elapsed = s.lastReview ? Math.max(0, today - dayOf(s.lastReview)) : 0;
+  let S, D;
+  if (!s.stability) { S = initS(g); D = initD(g); }
+  else if (elapsed === 0) { S = shortS(s.stability, g); D = nextD(s.difficulty, g); }
+  else {
+    const r = retrievability(elapsed, s.stability);
+    D = nextD(s.difficulty, g);
+    S = g === 1 ? forgetS(s.difficulty, s.stability, r) : recallS(s.difficulty, s.stability, r, g);
+  }
+  s = { ...s, stability: +S.toFixed(4), difficulty: +D.toFixed(4) };
+  return { s, today, g };
+}
+
+// Aplica una nota de autoevaluación al estado y devuelve el estado NUEVO (no muta).
+// - again: fallo → reps a 0, cuenta el lapse y vuelve HOY (se re-encola en la sesión).
+// - hard / good / easy: el intervalo es la nueva estabilidad, con difícil ≤ bien < fácil.
+export function grade(srs, rating, now = Date.now()) {
+  const { s, today, g } = core(srs, rating, now);
+  if (g === 1) {
     s.reps = 0;
-    s.lapses += 1;
+    s.lapses = (s.lapses || 0) + 1;
     s.interval = 0;
-    s.ease = Math.max(EASE_MIN, s.ease - 0.2);
-    s.due = today;                       // se repite en la misma sesión
+    s.due = today;
   } else {
-    if (rating === 'hard') {
-      s.interval = Math.max(1, Math.round(s.interval * 1.2));
-      s.ease = Math.max(EASE_MIN, s.ease - 0.15);
-    } else if (rating === 'easy') {
-      s.interval = Math.max(2, Math.round(Math.max(s.interval, 1) * s.ease * 1.3));
-      s.ease = s.ease + 0.15;
-    } else { // good
-      s.interval = s.reps === 0 ? FIRST_INTERVAL
-        : s.reps === 1 ? SECOND_INTERVAL
-        : Math.round(s.interval * s.ease);
+    let interval = Math.min(MAX_INTERVAL, Math.max(1, Math.round(s.stability)));
+    // Orden de los botones: una nota más alta nunca programa MENOS días que una más baja.
+    if (g !== 3) {
+      const good = Math.min(MAX_INTERVAL, Math.max(1, Math.round(core(srs, 'good', now).s.stability)));
+      if (g === 2) interval = Math.min(interval, good);
+      if (g === 4) interval = Math.min(MAX_INTERVAL, Math.max(interval, good + 1));
     }
-    s.interval = Math.min(MAX_INTERVAL, s.interval);
-    s.reps += 1;
-    s.due = today + s.interval;
+    s.interval = interval;
+    s.reps = (s.reps || 0) + 1;
+    s.due = today + interval;
   }
   s.lastReview = now;
   return s;
 }
 
-// Intervalos previstos por nota (para pintarlos en los botones: "bien · 6d").
+// Intervalos previstos por nota (para pintarlos en los botones: «bien · en 3 días»).
 export function previewIntervals(srs, now = Date.now()) {
   const out = {};
   for (const r of RATINGS) {
@@ -98,12 +153,18 @@ export function previewIntervals(srs, now = Date.now()) {
   return out;
 }
 
-// Etiqueta corta de un intervalo en días ("<10m" para el re-encolado de "otra vez").
+// Etiqueta de un intervalo en PALABRAS («mañana», «3 días»): «1d» obligaba a descifrar.
+// 0 = se repite en esta misma sesión.
 export function intervalLabel(days) {
-  if (!days) return '<10m';
-  if (days < 30) return `${days}d`;
-  if (days < 365) return `${Math.round(days / 30)}m`;
-  return t('{n}a', { n: (days / 365).toFixed(1).replace('.0', '') });
+  if (!days) return t('ahora');
+  if (days === 1) return t('mañana');
+  if (days < 30) return t('{n} días', { n: days });
+  if (days < 365) {
+    const m = Math.round(days / 30);
+    return m === 1 ? t('1 mes') : t('{n} meses', { n: m });
+  }
+  const y = (days / 365).toFixed(1).replace('.0', '');
+  return y === '1' ? t('1 año') : t('{n} años', { n: y });
 }
 
 // ---- Racha de estudio (F3): días consecutivos con al menos un repaso ---------------
