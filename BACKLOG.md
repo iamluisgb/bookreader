@@ -1557,6 +1557,36 @@ seguir leyendo"* sin necesidad de un cartel que la anuncie.
 > En la biblioteca, la tarjeta «Repaso de hoy» sustituye al chip; «Tarjeta» en la barra de
 > selección convierte subrayados en clozes; badge PWA con las pendientes.
 
+### P35 — Tarjetas visuales: lo que quedó pendiente de la primera entrega · `M` acumulado
+
+> **Entregado (ver CHANGELOG 2026-09-28 · [ADR-039..043](DECISIONS.md)):** tres tipos de tarjeta
+> junto a `basic`/`cloze` — oclusión sobre la figura real del libro, diagrama SVG generado y
+> dibujo de memoria revisado con visión —, pipeline de dos modelos con grounding verificado
+> (52/52 etiquetas), extracción de figuras de PDF (operator list) y EPUB (zip), menú de tipos en
+> flashcards, render en estudio y campos visuales sellados en el sync. Especificación y evidencia:
+> [`odd/tasks/tarjetas-visuales.md`](odd/tasks/tarjetas-visuales.md). Lo de abajo es lo que NO
+> entró.
+
+- **La extracción no ve todas las figuras** · `M`. En PDF solo se detectan imágenes raster
+  embebidas (objetos de imagen pintados en la operator list, con filtros de lado mínimo y área
+  2%–95% de la página): una figura vectorial dibujada a trazos no se detecta. En EPUB se recorren
+  `<img>`/`<image>` de los XHTML del zip: quedan fuera las imágenes referenciadas por CSS, y el
+  grounding con visión sobre figuras SVG no está validado (el prompt pide píxeles). Tope de 12
+  figuras por libro. Las figuras de EPUB no llevan página (`page`/`rect` null), así que desde la
+  tarjeta no hay «ver en el libro».
+- **Calidad de oclusiones y diagramas sin medir a escala** · `M`. El grounding se verificó sobre
+  4 figuras de prueba (52/52 etiquetas); la guarda de la spec pide validar el prompt sobre más
+  libros y estilos antes de confiar. Tampoco hay batería de evals para la selección de oclusión ni
+  para los diagramas — qué tan bien elige el modelo QUÉ ocluir (regla de Mayer) es hoy una
+  impresión de la demo, no un número.
+- **La revisión del boceto no tiene CSS propio** · `S`. WU7 reutilizó las clases existentes
+  (`.study-steps`) porque el CSS quedó fuera del alcance; las nuevas (`study-review-*`,
+  `study-step-*`) no tienen estilos en `modern.css`: funciona, pero se ve crudo.
+- **Anki: la figura no viaja** · `S`–`M`. El comportamiento de WU8 ya está definido: el export es de
+  TEXTO — `buildApkg`/`buildAnkiTxt` solo leen `front`/`back`, las visuales salen como pregunta +
+  explicación y el modal lo avisa («Las tarjetas visuales viajan como texto…»). Lo pendiente es si
+  vale la pena un export rico: embeber la figura o el SVG en el modelo Anki en vez de solo avisar.
+
 ### P24 — Higiene de la sesión de repaso · **✓ entregada** (2026-08-01) · F1–F4
 
 > **Entregada entera.** Ver CHANGELOG 2026-08-01. Cuatro arreglos de la sesión, ninguno

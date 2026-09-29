@@ -3,6 +3,69 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-09-28 — Tarjetas visuales: la figura del libro entra al repaso (ocluir, diagramar, dibujar)
+
+El repaso era todo texto, y buena parte de un libro técnico se estudia por lo que se ve: la figura
+1-12, el diagrama de flujo, el proceso que hay que reproducir de memoria. Tres tipos de tarjeta que
+se suman a `basic`/`cloze`, cada uno con su respaldo pedagógico (ocluir componentes de una figura
+real es estándar de industria —Anki 23.10 lo trae nativo—; el aprendizaje verbal + visual, Paivio y
+Mayer; dibujar de memoria, Wammes y Fernandes):
+
+- **Oclusión sobre la figura REAL del libro**: el agente localiza las etiquetas de la figura, elige
+  las que portan información (máx. 3 por figura; regla de Mayer —si ninguna vale la pena, no hay
+  tarjeta—) y la tarjeta tapa una con un «?»; al voltear se resalta y se explica con un hecho
+  rastreable al texto del capítulo. La figura es el recorte real del libro, no una invención del
+  modelo.
+- **Diagramas SVG generados por código**: el modelo de texto decide si el concepto tiene estructura
+  relacional (secuencia, flujo, comparación, jerarquía) y produce un SVG autocontenido con el nodo
+  de respuesta en «?»; al voltear, el nodo aparece resaltado. El SVG se valida por código AL
+  GENERARSE (parseo XML, `answerNodeId` presente, sin `<script>` ni `on*=`) y OTRA VEZ en cada
+  render: si no valida, una regeneración y, si sigue fallando, descarte — nunca markup crudo.
+- **Dibujo de memoria**: la pregunta pide dibujar el proceso con una rúbrica de al menos 3 pasos, un
+  canvas recoge el boceto y al voltear el agente LO MIRA con el modelo de visión contra la rúbrica:
+  pinta cada trazo detectado de un color, dice cuántos pasos reconoció y cuáles faltan. La revisión
+  nunca rompe el estudio: si falla, queda la rúbrica.
+
+**Dos modelos, cada uno en lo que es bueno.** El pipeline separa percepción de pedagogía: el modelo
+de visión localiza las etiquetas de la figura (grounding) y el de texto decide qué ocluir, escribe
+las preguntas, genera los diagramas y revisa los bocetos. No fue una elección estética: en el
+experimento de grounding, el modelo de texto puso las cajas desplazadas; el de visión clavó
+**52/52 etiquetas** verificadas por cross-check sobre 4 figuras de prueba (mq 6/6, metrics 12/12,
+lbs 18/18, datastore 16/16, cero cajas fuera de límites). Del experimento salieron además las
+guardas de código: presupuesto de salida ≥4000 tokens (el modelo de visión razona y con menos
+trunca el JSON a mitad), detección de truncamiento con reintento, parseo tolerante y descarte de
+cajas degeneradas o fuera de la imagen.
+
+**Las figuras se sacan de la estructura del libro, no de OCR ni de selección manual.** En PDF se
+detectan los objetos de imagen pintados en la operator list de pdf.js —el rectángulo exacto sale de
+la transformación del CTM, validado contra el fixture `tests/test-figure.pdf` con el operator list
+real de pdf.js—, se renderiza la página offscreen y se recorta con la misma semántica que la
+captura de zona. En EPUB se recorren las referencias `<img>` de los capítulos dentro del zip. Las
+figuras se extraen una vez por libro (tope 12), se guardan en el store de artefactos y se
+reutilizan en cada generación.
+
+**Todo el camino, cableado**: el modal de flashcards tiene menú de tipos (texto + «Solo tarjetas
+visuales» con las tres familias, botón deshabilitado sin selección, mazo `mixed` al combinar), la
+generación corre en segundo plano bajo `Jobs` con las figuras del libro resueltas una sola vez, el
+estudio renderiza cada tipo (la cola ya no exige `front` de texto: una tarjeta visual es tarjeta) y
+la revisión del boceto usa visión. Y el arreglo que el sync exigía: `sameCard` —la lista blanca del
+merge LWW por tarjeta— ahora sella los campos visuales (`figureKey`, `bbox`, `svg`, `answerNodeId`,
+`steps`); fuera de la whitelist, una copia vieja del otro dispositivo pisaba el bbox corregido o el
+SVG regenerado. Y en el export a Anki, el límite se dice en la cara: las visuales viajan como
+texto (pregunta + explicación) y el modal lo avisa — la figura no entra en el fichero.
+
+Dos bugs latentes que solo la prueba end-to-end destapó: el modelo de figura no persistía
+dimensiones, así que el grounding recibía ancho 0 y el validador descartaba TODAS las etiquetas —
+cero tarjetas de oclusión en producción—; ahora la figura guarda `width`/`height` y la que no tenga
+tamaño resoluble se saltea sin gastar visión. Y el de `sameCard`, arriba. Módulos:
+[`figures.js`](app/js/ai/figures.js), [`figures-pdf.js`](app/js/ai/figures-pdf.js),
+[`figures-epub.js`](app/js/ai/figures-epub.js), [`visual-figures.js`](app/js/ai/visual-figures.js),
+[`visual-cards.js`](app/js/ai/visual-cards.js), [`visual-deck.js`](app/js/ai/visual-deck.js),
+wiring en [`flashcards.js`](app/js/ai/flashcards.js) y [`study.js`](app/js/ai/study.js). **72
+tests nuevos** (siete specs nuevos + ampliaciones a flashcards y sync-decks), y de paso el precache
+del SW volvió a cubrir los módulos nuevos. Lo pendiente, en [BACKLOG § P35](BACKLOG.md); las
+decisiones, en [DECISIONS ADR-039..043](DECISIONS.md).
+
 ## 2026-09-28 — Retención visible: la racha, el dominio y la calidad del día dejan de ser invisibles
 
 La investigación de retención (informe del mismo día) fue clara: el algoritmo ya es lo mejor

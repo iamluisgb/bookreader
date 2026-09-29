@@ -1265,3 +1265,134 @@ los permisos del usuario.
   `nextPageToken`), no su comportamiento exacto: queda como riesgo residual declarado.
 - Lo que sí queda probado sin credenciales: el layout completo, las cinco tools, la paridad con la
   fuente de backup, el reintento único tras un 401, el mapeo de errores y el canje del token.
+
+---
+
+## ADR-039 — Figuras desde la estructura del contenedor (operator list / zip), no OCR ni selección manual · `ACEPTADA`
+
+**Contexto.** Para ocluir hay que UBICAR las figuras del libro. Tres caminos posibles: OCR o
+detección visual sobre páginas renderizadas, que el usuario marque las figuras a mano, o leer la
+estructura del contenedor.
+
+**Decisión.** Leer la estructura. En **PDF**, detectar los objetos de imagen pintados en la
+operator list de pdf.js ([`figures-pdf.js`](app/js/ai/figures-pdf.js)): el rectángulo de la figura
+es el cuadrado unitario transformado por el CTM vigente. En **EPUB**, recorrer las referencias
+`<img>`/`<image>` de los XHTML dentro del zip ([`figures-epub.js`](app/js/ai/figures-epub.js)).
+Con el rect, render offscreen de solo las páginas con imágenes y recorte con la misma semántica de
+`captureRegionImage` ([`visual-figures.js`](app/js/ai/visual-figures.js)).
+
+**Porqué.** El experimento de grounding midió que las figuras del libro son **raster embebido, una
+por página, sin capa de texto**: el OCR del PDF no aporta nada ahí, y la localización exigiría
+visión píxel a píxel por página — la percepción que ya se paga una vez, y bien hecha, en el
+grounding de la figura recortada. La operator list en cambio da el rect exacto, gratis y
+determinista: validado contra pdf.js 3.11.174 real con el fixture `tests/test-figure.pdf` (rect
+(120,300,480,525) → fraccional exacto, y vacío en la página sin imágenes). La selección manual no
+escala a libro entero y le traslada al usuario la decisión de QUÉ figura vale — que es justo lo que
+el paso pedagógico (regla de Mayer) hace mejor.
+
+**Consecuencias.** Una figura vectorial dibujada a trazos (paths, sin objeto de imagen) no se
+detecta; los filtros de lado/área descartan iconos y fondos a página completa; tope de 12 figuras
+por libro. En EPUB solo se cubren `<img>`/`<image>` de los XHTML y las figuras no llevan página.
+Ver [BACKLOG § P35](BACKLOG.md).
+
+---
+
+## ADR-040 — Dos modelos: la visión localiza, el texto enseña · `ACEPTADA`
+
+**Contexto.** El pipeline necesita dos cosas de naturaleza distinta: (1) LEER la figura — etiquetas y
+sus cajas — y (2) pedagogía: elegir qué ocluir, escribir las preguntas, generar el diagrama,
+revisar el boceto. Un único modelo multimodal podría intentar ambas.
+
+**Decisión.** Mantener la separación sobre el par `ai_vision_model` / `ai_model` que ya existía
+(BYOK): el modelo de visión hace el grounding (prompt 1) y el modelo de texto hace el resto
+(prompts 2–4). Sin UI nueva: es la configuración que ya tenía quien usaba «Explicar lo que veo»
+(ADR-018).
+
+**Porqué.** Medido, no asumido ([experimento de grounding](odd/tasks/tarjetas-visuales.md)):
+`deepseek-v4-flash` como grounder devolvía labels correctos pero **cajas desplazadas
+verticalmente**; `glm5.3-flash` clavó **52/52 etiquetas** verificadas por cross-check (recorte del
+bbox → transcripción por otro modelo → coincide: mq 6/6, metrics 12/12, lbs 18/18, datastore
+16/16, cero cajas fuera de límites). Y la pedagogía es el fuerte del modelo de texto principal
+(EV3: deepseek se quedó como principal por fidelidad/pertinencia). Separar además acota el coste:
+la visión corre una vez por figura, no por tarjeta.
+
+**Consecuencias.** Las guardas del experimento viven en código ([`visual-cards.js`](app/js/ai/visual-cards.js)):
+presupuesto de salida ≥4000 tokens en el grounding (el modelo de visión razona y con menos trunca
+el JSON a mitad — con 1500 se truncaba), detección de truncamiento con reintento, parseo tolerante
+(`balancedObjects`) y descarte de cajas degeneradas o fuera de la imagen con dedupe de labels.
+Sin modelo de visión configurado la llamada falla con error explícito («No hay modelo de visión
+configurado.»), no en silencio.
+
+---
+
+## ADR-041 — La tarjeta guarda `figureKey`, no la imagen en base64 · `ACEPTADA`
+
+**Contexto.** Una tarjeta de oclusión necesita la figura. O la embebe (data URL dentro de la
+tarjeta) o referencia un artefacto persistido.
+
+**Decisión.** Referencia. La tarjeta trae `figureKey` (apunta al store `artifacts`, clave
+`${bookId}:figures:...`) + `bbox`; la figura vive una vez por libro y se resuelve async al render.
+
+**Porqué.** El sync manda los mazos completos: cada cambio LWW reescribe el fichero del mazo, así
+que embeber un JPEG por tarjeta multiplicaría el payload en cada regeneración de bbox o
+re-guardado — exactamente el tipo de carga que el sync de biblioteca ya aprendió a evitar
+separando portadas de fichas (ADR-024). Una figura sirve hasta 3 oclusiones (tope del
+prompt) y potencialmente varios mazos: una copia, N referencias. Y persistir dimensiones
+(`width`/`height`) junto a la figura permite al grounding resolver el tamaño sin re-decodificar el
+data URL (WU5c/5d).
+
+**Consecuencias.** El render de la oclusión es asíncrono (montaje del overlay con guardia de
+carrera); borrar figura es tombstone del artefacto y se propaga por sync; una tarjeta cuya figura
+no está en este dispositivo degrada con placeholder, no con error.
+
+---
+
+## ADR-042 — Los campos visuales entran en la whitelist del merge LWW (`sameCard`) · `ACEPTADA`
+
+**Contexto.** El sync de mazos resuelve conflictos por tarjeta con LWW guiado por `sameCard`
+([`db.js`](app/js/ai/db.js)): si dos copias difieren solo en algo que `sameCard` no mira, se leen
+como «iguales» y gana la copia con `updatedAt` mayor — aunque sea la vieja.
+
+**Decisión.** Enumerar los campos visuales en `sameCard`: `figureKey`, `occludedLabel`, `bbox`,
+`svg`, `answerNodeId`, `steps` — con normalización defensiva (bbox canónico `{x,y,w,h}` tanto si
+llega como array del modelo como si llega canónico; ausente → `null`/`[]`).
+
+**Porqué.** Regenerar el SVG, corregir un bbox o editar la rúbrica son exactamente los cambios que
+esta feature produce, y fuera de la whitelist no se sellan: la copia vieja del otro dispositivo
+los pisa en el próximo sync. Es la misma clase de fallo silencioso entre dispositivos que ya
+mordió al repaso (el botón «Ver en el libro» muerto con mazos llegados por sync). La
+normalización evita el ruido inverso: dos
+representaciones del mismo rectángulo no deben leerse como cambio y re-sellar la tarjeta en cada
+ciclo.
+
+**Consecuencias.** Tests en [`tests/sync-decks.spec.ts`](tests/sync-decks.spec.ts). La lista es el
+contrato: toda tarjeta futura con campos propios debe pasar por `sameCard` o el sync la corromperá
+en silencio entre dispositivos.
+
+---
+
+## ADR-043 — Diagramas como SVG generado por código y re-validado en render, no imagen raster · `ACEPTADA`
+
+**Contexto.** El tipo `diagram` necesita un dibujo con un nodo en blanco en el frente y resaltado
+en el dorso (Paivio/Mayer: el aprendizaje verbal + visual y la coherencia del diagrama mueven la
+aguja — d=1,39 y d=0,86 en las referencias de la spec). Había que elegir el formato de ese dibujo.
+
+**Decisión.** SVG autocontenido generado por el modelo de texto (viewBox 720×180–280, clases
+propias), validado por código AL generarse (parseo XML, `answerNodeId` presente, rechazo de
+`<script>`, `on*=`) y OTRA VEZ en cada render ([`sanitizeSvg`](app/js/ai/visual-cards.js) desde
+[`study.js`](app/js/ai/study.js): rechaza `script`, `on*`, `javascript:` y `foreignObject`). El
+frente reemplaza en render el texto del nodo respuesta por «?»; el dorso lo muestra tal como lo
+generó el modelo.
+
+**Porqué.** El SVG es TEXTO: viaja dentro de la tarjeta por el sync sin binarios (ADR-041/042),
+pesa una fracción de un raster y — lo decisivo — se puede AUDITAR con un parser. Una imagen
+generada no se puede validar más allá de confiar: el LLM que la produjo podría haber escondido lo
+que sea y la app no tendría cómo saberlo; el SVG malicioso se rechaza por estructura. Y la
+pedagogía pide estados: el frente/dorso son una transformación de DOM sobre el mismo SVG (enmascarar
+el nodo vs mostrarlo), no dos imágenes que mantener coherentes. La re-validación en render cubre
+además el caso de una tarjeta vieja llegada por sync que ya no pasaría la validación actual.
+
+**Consecuencias.** Un diagrama que no valida muestra placeholder silencioso — nunca markup crudo.
+El tamaño queda acotado por `LIMITS.svg` y por CSS (max-height 240px). Los diagramas solo salen si
+el concepto tiene estructura relacional; el gate lo decide el modelo y un `usable: false` no es un
+fallo.
