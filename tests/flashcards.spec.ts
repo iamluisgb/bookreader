@@ -484,3 +484,159 @@ test('scopeRotation: capítulos relevantes muestrean al doble; sin scores, unifo
   expect(r.round1).toEqual(['r1', 'r2', 'p1']);
   expect(r.sharedCursor).toBe(true);
 });
+
+// ---- WU5e · Menú multi-tipo + generación de tarjetas visuales ----------------
+
+// El stub de visuales envuelve al de flashcards: las llamadas de las familias visuales
+// (herramienta create_occlusion_cards y lote de diagramas) se responden aquí; todo lo
+// demás cae al stub original.
+async function stubVisualLLM(page) {
+  await page.evaluate(() => {
+    const real = window.fetch.bind(window);
+    window.fetch = async (url: any, opts: any) => {
+      const u = typeof url === 'string' ? url : url?.url || '';
+      if (u.includes('/chat/completions') && opts?.body) {
+        const body = JSON.parse(opts.body);
+        const sys = (body.messages || []).find((m: any) => m.role === 'system')?.content || '';
+        // Familia oclusión: tool-call con una tarjeta sobre la etiqueta de la figura sembrada.
+        if ((body.tools || []).some((t: any) => t.function?.name === 'create_occlusion_cards')) {
+          const message = {
+            content: '',
+            tool_calls: [{
+              id: 'tc-occ',
+              function: {
+                name: 'create_occlusion_cards',
+                arguments: JSON.stringify({
+                  cards: [{
+                    occludedLabel: 'Productor',
+                    question: '¿Quién envía los mensajes en la figura?',
+                    contextFact: 'El productor envía mensajes y el consumidor los recibe.',
+                  }],
+                }),
+              },
+            }],
+          };
+          return new Response(JSON.stringify({ choices: [{ message }] }), { status: 200 });
+        }
+        // Familia diagrama: lote de un diagrama con nodo objetivo válido (pasa sanitizeSvg).
+        if (/"diagrams":\s*\[/.test(sys)) {
+          const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 200">'
+            + '<rect class="d-box" x="10" y="10" width="120" height="40"/>'
+            + '<text class="d-txt" x="30" y="35">Productor</text>'
+            + '<rect class="d-box" id="nodo-respuesta" x="200" y="10" width="120" height="40"/>'
+            + '<text class="d-txt" x="220" y="35">?</text></svg>';
+          const out = JSON.stringify({
+            diagrams: [{
+              concept: 'flujo de mensajes',
+              svg,
+              answerNodeId: 'nodo-respuesta',
+              question: '¿Qué componente recibe los mensajes?',
+              contextFact: 'Los mensajes pasan por la cola antes de llegar.',
+            }],
+          });
+          const chunks = [
+            `data: ${JSON.stringify({ choices: [{ delta: { content: out }, finish_reason: null }] })}\n\n`,
+            'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n\n',
+            'data: [DONE]\n\n',
+          ];
+          const s = new ReadableStream({ start(c) { const e = new TextEncoder(); chunks.forEach(x => c.enqueue(e.encode(x))); c.close(); } });
+          return new Response(s, { status: 200, headers: { 'Content-Type': 'text/event-stream' } });
+        }
+      }
+      return real(url, opts);
+    };
+  });
+}
+
+// Siembra UNA figura con labels ya presentes (cero llamadas de visión) y devuelve su clave.
+async function seedFigure(page, bookId: string) {
+  return page.evaluate(async (bk) => {
+    const F: any = await import('/js/ai/figures.js');
+    const canvas = document.createElement('canvas');
+    canvas.width = 120;
+    canvas.height = 80;
+    const c = canvas.getContext('2d');
+    c.fillStyle = '#ffffff';
+    c.fillRect(0, 0, 120, 80);
+    c.fillStyle = '#333333';
+    c.fillRect(10, 20, 60, 24);
+    return F.saveFigure({
+      bookId: bk,
+      page: 3,
+      rect: { x: 0.1, y: 0.2, w: 0.5, h: 0.3 },
+      dataUrl: canvas.toDataURL('image/jpeg', 0.8),
+      labels: [{ text: 'Productor', bbox: { x: 10, y: 20, w: 60, h: 24 } }],
+      caption: 'p. 3',
+      source: 'epub',
+      width: 120,
+      height: 80,
+    });
+  }, bookId);
+}
+
+async function currentBookId(page): Promise<string> {
+  return page.evaluate(async () => {
+    const L: any = await import('/js/library/store.js');
+    const books = await L.getAllBooks();
+    return books[0]?.id || null;
+  });
+}
+
+// El menú multi-tipo: tres radios de texto (basic/cloze/none) + grupo de visuales. Con
+// "none" y cero visuales el botón está deshabilitado; una familia visual lo habilita y
+// volver a un tipo de texto lo mantiene habilitado.
+test('el menú multi-tipo habilita generar solo con algún tipo elegido', async ({ page }) => {
+  await setup(page);
+  await openFromStudio(page, 'flashcards');
+  await page.waitForSelector('#ai-flashcards', { timeout: 5000 });
+  await expect(page.locator('input[name="fc-type"]')).toHaveCount(3);
+  await expect(page.locator('input[name="fc-vtype"]')).toHaveCount(3);
+  await page.check('input[name="fc-type"][value="none"]');
+  await expect(page.locator('#fc-generate')).toBeDisabled();
+  await page.check('input[name="fc-vtype"][value="diagram"]');
+  await expect(page.locator('#fc-generate')).toBeEnabled();
+  await expect(page.locator('#fc-vhint')).toBeVisible();
+  await page.check('input[name="fc-type"][value="basic"]');
+  await expect(page.locator('#fc-generate')).toBeEnabled();
+});
+
+// Generación visual end to end: figura sembrada con labels (sin visión), oclusión +
+// diagrama, mazo mixto en IndexedDB con una tarjeta de cada familia.
+test('generar con visuales produce un mazo mixed con oclusión y diagrama', async ({ page }) => {
+  await setup(page);
+  await stubVisualLLM(page);
+  const bookId = await currentBookId(page);
+  const figKey = await seedFigure(page, bookId);
+  await openFromStudio(page, 'flashcards');
+  await page.waitForSelector('#ai-flashcards', { timeout: 5000 });
+  await page.check('input[name="fc-type"][value="none"]');
+  await page.check('input[name="fc-vtype"][value="occlusion"]');
+  await page.check('input[name="fc-vtype"][value="diagram"]');
+  await page.click('#fc-generate');
+  await expect(page.locator('#ai-flashcards h2')).toContainText('tarjetas', { timeout: 30000 });
+  const decks = await page.evaluate(async () => (await import('/js/ai/db.js') as any).getAllDecks());
+  expect(decks).toHaveLength(1);
+  expect(decks[0].cardType).toBe('mixed');
+  const cards = decks[0].cards;
+  const occ = cards.find((c: any) => c.type === 'occlusion');
+  const dia = cards.find((c: any) => c.type === 'diagram');
+  expect(occ).toBeDefined();
+  expect(occ.figureKey).toBe(figKey);
+  expect(occ.bbox).toEqual({ x: 10, y: 20, w: 60, h: 24 });
+  expect(dia).toBeDefined();
+  expect(dia.svg).toContain('<svg');
+});
+
+// Solo oclusión y sin figuras posibles: el job FALLA con el mensaje explícito (no un
+// mazo vacío hecho pasar por éxito).
+test('oclusión sin figuras disponibles falla con el mensaje de figuras ausentes', async ({ page }) => {
+  await setup(page);
+  await openFromStudio(page, 'flashcards');
+  await page.waitForSelector('#ai-flashcards', { timeout: 5000 });
+  await page.check('input[name="fc-type"][value="none"]');
+  await page.check('input[name="fc-vtype"][value="occlusion"]');
+  await page.click('#fc-generate');
+  await expect(page.locator('#fc-error')).toBeVisible({ timeout: 30000 });
+  await expect(page.locator('#fc-error')).toHaveText(
+    'No se encontraron figuras en este libro, así que no hay tarjetas de oclusión que generar.');
+});

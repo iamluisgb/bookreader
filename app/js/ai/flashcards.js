@@ -20,6 +20,10 @@ import * as Srs from './srs.js';
 import * as Study from './study.js';
 import * as Jobs from './jobs.js';
 import { balancedObjects } from './query-expand.js';
+import { getBook } from '../library/store.js';
+import { ensureBookFigures } from './visual-figures.js';
+import { buildVisualCards, VISUAL_TYPES } from './visual-deck.js';
+import * as PdfReader from '../pdf-reader.js';
 
 // Generación por TROZOS (map-reduce): el material se divide en trozos de ~CHUNK_TOKENS
 // y cada llamada produce SOLO las tarjetas de su trozo (cupo proporcional). Así ninguna
@@ -107,7 +111,18 @@ async function renderSetup() {
         <span><b>${t('Pregunta → Respuesta')}</b><small>${t('Clásicas. Para conceptos y definiciones.')}</small></span></label>
       <label class="fc-type"><input type="radio" name="fc-type" value="cloze">
         <span><b>${t('Cloze (huecos)')}</b><small>${t('Frases con el dato clave oculto {{c1::así}}.')}</small></span></label>
+      <label class="fc-type"><input type="radio" name="fc-type" value="none">
+        <span><b>${t('Solo tarjetas visuales')}</b><small>${t('Sin texto: solo figuras, diagramas y dibujo.')}</small></span></label>
     </div>
+    <div class="fc-types fc-vtypes">
+      <label class="fc-type"><input type="checkbox" name="fc-vtype" value="occlusion">
+        <span><b>${t('Oclusión de figuras')}</b></span></label>
+      <label class="fc-type"><input type="checkbox" name="fc-vtype" value="diagram">
+        <span><b>${t('Diagrama')}</b></span></label>
+      <label class="fc-type"><input type="checkbox" name="fc-vtype" value="drawing">
+        <span><b>${t('Dibujo de memoria')}</b></span></label>
+    </div>
+    <p class="ai-ob-sub" id="fc-vhint" hidden>${t('Las figuras se extraen del libro en la primera generación: la primera vez tarda más.')}</p>
     <label class="fc-label" for="fc-count">${t('Cantidad')}</label>
     <select id="fc-count" class="fc-select">${COUNTS.map(n => `<option ${n === defaultCount ? 'selected' : ''}>${n}</option>`).join('')}</select>
     <div id="fc-dup"></div>
@@ -116,9 +131,41 @@ async function renderSetup() {
     <div id="fc-decks"></div>`;
   mountScopeCombo(b.querySelector('#fc-scope'), options, scopeValue, (v) => { scopeValue = v; refreshDupNote(); });
   b.querySelector('#fc-generate').addEventListener('click', onGenerate);
-  b.querySelectorAll('input[name="fc-type"]').forEach(r => r.addEventListener('change', refreshDupNote));
+  b.querySelectorAll('input[name="fc-type"], input[name="fc-vtype"]').forEach(el =>
+    el.addEventListener('change', () => { refreshGenerateState(); refreshDupNote(); }));
+  refreshGenerateState();
   renderDeckList();
   refreshDupNote();
+}
+
+// Selección del menú multi-tipo: tipo de TEXTO (o null con "Solo tarjetas visuales") y
+// familias visuales marcadas. Única fuente de verdad para el tipo efectivo del mazo.
+function selectedTypes() {
+  const b = body();
+  const radio = b?.querySelector('input[name="fc-type"]:checked')?.value;
+  const visual = [...(b?.querySelectorAll('input[name="fc-vtype"]:checked') || [])]
+    .map(el => el.value).filter(v => VISUAL_TYPES.includes(v));
+  return { text: radio && radio !== 'none' ? radio : null, visual };
+}
+
+// Tipo con el que se etiqueta el mazo: "mixed" cuando se combinan texto con visuales (o
+// dos o más visuales); si no, el único tipo elegido. Sin nada (botón deshabilitado) cae a
+// "basic" para no propagar null.
+function effectiveDeckType(sel) {
+  const picked = (sel.text ? 1 : 0) + sel.visual.length;
+  if (picked >= 2) return 'mixed';
+  return sel.text || sel.visual[0] || 'basic';
+}
+
+// El botón de generar solo se habilita con ALGO elegido: radio "none" + cero visuales no
+// produciría tarjetas. El hint de figuras se muestra en cuanto hay una familia visual.
+function refreshGenerateState() {
+  const b = body();
+  const btn = b?.querySelector('#fc-generate');
+  const hint = b?.querySelector('#fc-vhint');
+  const sel = selectedTypes();
+  if (btn) btn.disabled = !sel.text && !sel.visual.length;
+  if (hint) hint.hidden = !sel.visual.length;
 }
 
 // P24 F4 · Regenerar el mismo alcance creaba un mazo PARALELO: el anti-duplicados
@@ -130,7 +177,7 @@ async function refreshDupNote() {
   const b = body();
   const host = b?.querySelector('#fc-dup');
   if (!host || !ctx.bookId) { mergeInto = null; return; }
-  const type = b.querySelector('input[name="fc-type"]:checked')?.value;
+  const type = effectiveDeckType(selectedTypes());
   const decks = await DB.getDecks(ctx.bookId);
   if (!overlay || !b.isConnected) return;             // el modal se cerró mientras leía la BD
   const hit = decks.find(d => (d.scope || '') === scopeValue && d.cardType === type && DB.cardsOf(d).length);
@@ -568,12 +615,19 @@ function onGenerate() {
   const b = body();
   if (!LLM.hasKey()) { showError(t('Configura tu API key en Ajustes → Agente para generar tarjetas.')); return; }
   const scopeLabel = scopeValue;
-  const type = b.querySelector('input[name="fc-type"]:checked').value;
+  const sel = selectedTypes();
+  const type = effectiveDeckType(sel);
   const count = parseInt(b.querySelector('#fc-count').value, 10);
 
-  const chunks = buildChunks(gatherScope(scopeLabel));
-  if (!chunks.length) { showError(t('Ese contenido no tiene texto indexado; prueba con otro capítulo o con el libro entero.')); return; }
-  const counts = allocateCounts(chunks, count);
+  // Camino de TEXTO: igual que siempre (chunks, map-reduce, attachSources). Con "solo
+  // visuales" no hay trozos que trocear y el índice de texto no se exige.
+  const wantsText = !!sel.text;
+  let chunks = [], counts = [];
+  if (wantsText) {
+    chunks = buildChunks(gatherScope(scopeLabel));
+    if (!chunks.length) { showError(t('Ese contenido no tiene texto indexado; prueba con otro capítulo o con el libro entero.')); return; }
+    counts = allocateCounts(chunks, count);
+  }
 
   // Todo lo que el job necesita se captura AHORA. El trabajo sobrevive al modal y hasta al
   // libro: `ctx` puede haber cambiado cuando termine, y el índice de Retrieval es global
@@ -626,17 +680,57 @@ function onGenerate() {
         }
         progress(Math.min(cards.length, count), count, 'map');
       }
+      // Familias visuales (secuenciales, dentro del MISMO job): resolver las figuras del
+      // libro (store primero; si no, extracción con el documento del lector — nunca el de
+      // OTRO libro) y construir las tarjetas de oclusión/diagrama/dibujo.
+      let vres = null;
+      if (sel.visual.length) {
+        const chapterText = gatherScope(scopeLabel).map(p => p.text).join('\n\n').slice(0, 8000);
+        const record = bookId ? await getBook(bookId).catch(() => null) : null;
+        const fr = await ensureBookFigures({
+          bookId, format: record?.format, record, signal,
+          onProgress: ({ done, total }) => progress(done, total, 'figures'),
+          deps: {
+            getDocument: () => (PdfReader.getBookId() === bookId && PdfReader.isLoaded()
+              ? PdfReader.getDocument() : null),
+          },
+        });
+        vres = await buildVisualCards({
+          types: sel.visual, chapterText, figures: fr.figures, signal,
+          onProgress: ({ phase, done, total }) => progress(done, total, phase),
+          bookTitle: record?.title,
+        });
+      }
+      // Solo las tarjetas de TEXTO llevan ancla: las visuales traen src '' y no hay pasaje
+      // que las respalde — el validador de anclas las descartaría a todas.
+      if (cards.length) {
+        cards = attachSources(cards.slice(0, count), {
+          validIds: new Set(byId.keys()),
+          // La repesca por búsqueda solo vale si el índice sigue siendo el de ESTE libro.
+          search: (q, k) => (Retrieval.hasIndex(bookId) ? Retrieval.search(q, k) : []),
+          textOf: (id) => byId.get(id),   // valida que el pasaje respalde la tarjeta (EV1)
+        });
+      }
+      // Mazo final: texto + visuales, deduplicadas por frente normalizado.
+      const seenFronts = new Set();
+      cards = cards.concat(vres ? vres.cards : []).filter(c => {
+        const k = normFront(c.front);
+        if (k && seenFronts.has(k)) return false;
+        if (k) seenFronts.add(k);
+        return true;
+      });
       // Sin tarjetas es un FALLO cuando se pedía un mazo nuevo, pero no cuando se está
       // ampliando uno: ahí "el modelo no encontró nada que no tuvieras ya" es un final
       // legítimo (y frecuente: sus frentes van en el prompt como "no repitas esto").
+      // Con SOLO oclusión pedida y mazo vacío el motivo es otro: sin figuras no hay tarjetas
+      // — hay que decirlo, no simular éxito con un mazo vacío.
       const target0 = target ? (await DB.getDecks(bookId)).find(x => x.id === target) : null;
-      if (!cards.length && !target0) throw new Error(t('El modelo no devolvió tarjetas válidas. Vuelve a intentarlo.'));
-      cards = attachSources(cards.slice(0, count), {
-        validIds: new Set(byId.keys()),
-        // La repesca por búsqueda solo vale si el índice sigue siendo el de ESTE libro.
-        search: (q, k) => (Retrieval.hasIndex(bookId) ? Retrieval.search(q, k) : []),
-        textOf: (id) => byId.get(id),   // valida que el pasaje respalde la tarjeta (EV1)
-      });
+      if (!cards.length && !target0) {
+        if (!sel.text && sel.visual.length === 1 && sel.visual[0] === 'occlusion') {
+          throw new Error(t('No se encontraron figuras en este libro, así que no hay tarjetas de oclusión que generar.'));
+        }
+        throw new Error(t('El modelo no devolvió tarjetas válidas. Vuelve a intentarlo.'));
+      }
       // Fusión: al mazo existente solo entra lo que no esté ya (el modelo repite aun con
       // los frentes delante). Si el mazo se borró mientras se generaba, `target0` es null
       // y se cae al camino normal creando uno nuevo: nunca se tira el trabajo.
@@ -645,13 +739,19 @@ function onGenerate() {
         const have = new Set(DB.cardsOf(existing).map(c => normFront(c.front)));
         const fresh = cards.filter(c => !have.has(normFront(c.front)));
         const merged = { ...existing, cards: existing.cards.concat(fresh) };
-        await DB.updateDeck(existing.id, { cards: merged.cards });
-        return { deckId: existing.id, deck: merged, generated: fresh.length, requested: count,
-          failed, blocks: chunks.length, merged: true, dropped: cards.length - fresh.length };
+        // Tipos: si lo que entra no es del tipo declarado del mazo, el mazo pasa a mixto.
+        const patch = { cards: merged.cards };
+        if (existing.cardType !== type) patch.cardType = 'mixed';
+        await DB.updateDeck(existing.id, patch);
+        return { deckId: existing.id, deck: { ...merged, cardType: patch.cardType || existing.cardType },
+          generated: fresh.length, requested: count,
+          failed, blocks: chunks.length, merged: true, dropped: cards.length - fresh.length,
+          ...(vres ? { visual: vres.stats } : {}) };
       }
       const deck = { bookId, name, cardType: type, scope: scopeLabel, cards, createdAt: Date.now() };
       if (bookId) deck.id = await DB.addDeck(deck);
-      return { deckId: deck.id || null, deck, generated: cards.length, requested: count, failed, blocks: chunks.length };
+      return { deckId: deck.id || null, deck, generated: cards.length, requested: count, failed, blocks: chunks.length,
+        ...(vres ? { visual: vres.stats } : {}) };
     },
   });
 }

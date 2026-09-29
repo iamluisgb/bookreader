@@ -505,7 +505,6 @@ const EN = {
   '{n} días de racha': '{n}-day streak',
   'Repasando · {t}': 'Studying · {t}',
   'Menos': 'Less',
-  'Más': 'More',
   'Otra vez': 'Again',
   'Difícil': 'Hard',
   'Bien': 'Good',
@@ -685,6 +684,16 @@ const EN = {
   // flashcards.js
   'Flashcards para Anki': 'Flashcards for Anki',
   'Tipo de tarjeta': 'Card type',
+  // Tarjetas visuales (menú multi-tipo)
+  'Solo tarjetas visuales': 'Visual cards only',
+  'Sin texto: solo figuras, diagramas y dibujo.': 'No text: figures, diagrams and drawing only.',
+  'Oclusión de figuras': 'Figure occlusion',
+  'Diagrama': 'Diagram',
+  'Dibujo de memoria': 'Drawing from memory',
+  'Las figuras se extraen del libro en la primera generación: la primera vez tarda más.':
+    'Figures are extracted from the book on first generation: the first run takes longer.',
+  'No se encontraron figuras en este libro, así que no hay tarjetas de oclusión que generar.':
+    'No figures were found in this book, so there are no occlusion cards to generate.',
   'Cantidad': 'How many',
   'Generar tarjetas': 'Generate cards',
   'Mazos generados': 'Generated decks',

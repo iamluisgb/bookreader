@@ -411,6 +411,12 @@ export function getDocument() {
   return pdfDoc;
 }
 
+// Libro al que pertenece el documento abierto (canonicalId de load()). El generador de
+// tarjetas visuales lo usa para no extraer figuras del documento de OTRO libro.
+export function getBookId() {
+  return canonicalId;
+}
+
 export function getCurrentPage() {
   return currentPage;
 }
