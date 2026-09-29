@@ -126,11 +126,16 @@ como `<img>` no tiene camino todavía (fuera del alcance de la primera entrega).
       grounding recibía 0 y `clampBbox` descartaba todas las etiquetas (cero tarjetas de oclusión
       en producción). `figureSize()` usa las dimensiones si están y si no decodifica el dataUrl;
       figura sin tamaño resoluble se saltea sin gastar visión (`9b9b3f4`); 13 tests en el spec
-- [ ] **WU5d** Fuente de figuras: `app/js/ai/visual-figures.js` — resolver por libro (formato,
-      blob de la biblioteca, documento PDF abierto) → figuras del store o extracción + guardado,
-      con render offscreen para páginas no montadas (patrón `renderCoverDataUrl`) y jszip para EPUB
-- [ ] **WU5e** Menú multi-tipo en `renderSetup()` (`flashcards.js`) + wiring bajo `Jobs`
-      (scope → texto del capítulo → `buildVisualCards` → mazo con `cardType` mixto)
+- [x] **WU5d** `app/js/ai/visual-figures.js` — render offscreen de páginas + recorte (misma
+      semántica que `captureRegionImage`), `figuresForPdf` (renderiza SOLO páginas con imágenes,
+      pasa los píxeles reales del recorte) y `figuresForEpub` (JSZip sobre el blob de la
+      biblioteca), más `ensureBookFigures` (store primero, extracción después); 8 tests.
+      `figures.js` persiste `width`/`height` para no re-decodificar (`b1df59a`)
+- [x] **WU5e** Menú multi-tipo en `flashcards.js` (radio de texto + `none` + checkboxes visuales,
+      botón deshabilitado sin selección) y wiring bajo `Jobs` con `ensureBookFigures` +
+      `buildVisualCards`; `PdfReader.getBookId()` evita extraer del documento de otro libro;
+      mazo con `cardType` efectivo (`mixed` al combinar) y migración a `mixed` al fusionar;
+      20 tests en `flashcards.spec.ts` (`1fac7c1`)
 - [ ] **WU6** Render por tipo en estudio (`study.js`): oclusión (overlay %), diagrama (SVG),
       dibujo (canvas) + arreglar `buildQueue` para tarjetas sin `front`
 - [ ] **WU7** Revisión del boceto con `chatVision` + pintado por colores de trazo
