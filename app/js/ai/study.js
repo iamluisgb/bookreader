@@ -24,7 +24,7 @@ import { toast } from './toast.js';
 import { segmentBook } from './segment.js';
 import { segmentPdf } from './segment-pdf.js';
 import { loadEpubJs, loadPdfJs } from '../vendor-loader.js';
-import { sanitizeSvg } from './visual-cards.js';
+import { sanitizeSvg, reviewDrawing } from './visual-cards.js';
 
 // Racha de estudio (F3): {count, lastDay}, global de la app (no por libro).
 const STREAK_KEY = 'study_streak';
@@ -33,6 +33,21 @@ const STREAK_KEY = 'study_streak';
 const NEW_LIMIT_KEY = 'study_new_limit';
 export const DEFAULT_NEW_LIMIT = 20;
 const UNDO_DEPTH = 30;
+
+// Paleta de la revisión del boceto (WU7): un color por paso de la rúbrica, el mismo que
+// tiñe la traza correspondiente en el canvas. La rúbrica tiene 3–7 pasos.
+const SKETCH_COLORS = ['#e8590c', '#2f9e44', '#1971c2', '#9c36b5', '#e03131', '#0c8599', '#f08c00', '#5f3dc4'];
+// Trazas sin paso asignado, tras la revisión: gris punteado (demo book-cards.html).
+const SKETCH_GREY = '#94a3b8';
+// Lado mayor máximo del JPEG del boceto que viaja al modelo de visión.
+const SKETCH_IMAGE_MAX_PX = 640;
+
+// Controlador de la revisión en vuelo: abortar al cambiar de tarjeta o cerrar la sesión
+// evita pintar la revisión de un boceto sobre la tarjeta siguiente.
+let sketchCtl = null;
+function abortSketchReview() {
+  if (sketchCtl) { sketchCtl.abort(); sketchCtl = null; }
+}
 
 // Meta diaria elegible (retención T3): el usuario elige cuántas tarjetas quiere por día.
 // Lección Duolingo: quien ELIGE la meta, la cumple (ownership), y el copy de compromiso
@@ -355,6 +370,7 @@ function removeChip() {
 }
 
 function close() {
+  abortSketchReview();
   document.removeEventListener('keydown', onKey);
   if (overlay) { overlay.remove(); overlay = null; }
   minimized = false;
@@ -545,14 +561,26 @@ function wireDrawingCanvas(canvas) {
     const c = getComputedStyle(canvas).color;
     return c && c !== 'rgba(0, 0, 0, 0)' ? c : '#1d1d1f';
   };
-  const drawStroke = (s) => {
+  const drawStroke = (s, idx) => {
     if (!s.length) return;
+    // Con revisión en pantalla (_match) cada traza se repinta con el color de SU paso;
+    // las que ningún paso reclamó van gris punteadas (el estudiante ve qué le faltó).
+    const match = canvas._match || null;
+    const stepIdx = match && idx in match ? match[idx] : null;
+    if (match) {
+      ctx.strokeStyle = stepIdx == null ? SKETCH_GREY : SKETCH_COLORS[stepIdx % SKETCH_COLORS.length];
+      ctx.setLineDash(stepIdx == null ? [7, 5] : []);
+    } else {
+      ctx.strokeStyle = ink();
+      ctx.setLineDash([]);
+    }
     ctx.beginPath();
     s.forEach((p, i) => {
       const x = p.x * canvas.width, y = p.y * canvas.height;
       if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
     });
     ctx.stroke();
+    ctx.setLineDash([]);
   };
   const redraw = () => {
     const dpr = window.devicePixelRatio || 1;
@@ -561,7 +589,7 @@ function wireDrawingCanvas(canvas) {
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     ctx.strokeStyle = ink();
-    for (const s of strokes) drawStroke(s);
+    strokes.forEach((s, i) => drawStroke(s, i));
   };
   const resize = () => {
     const r = canvas.getBoundingClientRect();
@@ -601,6 +629,107 @@ function wireDrawingCanvas(canvas) {
     redraw();
   });
   resize();
+  // Repintado por colores de la revisión (WU7): la revisión pasa el mapa traza → paso
+  // y el canvas queda pintado así. `_match` queda expuesto para tests.
+  canvas._paint = (match) => { canvas._match = match || null; redraw(); };
+}
+
+// ---- Revisión del boceto con visión (WU7) ---------------------------------------
+
+// JPEG chico del canvas (máx 640 px el lado MAYOR): reescala en un canvas offscreen,
+// no manda el canvas entero a resolución completa.
+function sketchDataUrl(canvas) {
+  const scale = Math.min(1, SKETCH_IMAGE_MAX_PX / Math.max(canvas.width, canvas.height));
+  const off = document.createElement('canvas');
+  off.width = Math.max(1, Math.round(canvas.width * scale));
+  off.height = Math.max(1, Math.round(canvas.height * scale));
+  off.getContext('2d').drawImage(canvas, 0, 0, off.width, off.height);
+  return off.toDataURL('image/jpeg', 0.85);
+}
+
+// Trazas normalizadas 0..1 → píxeles del canvas: el prompt de la revisión informa
+// cajas delimitadoras en píxeles, como la imagen que acompaña.
+function sketchStrokesInPixels(canvas) {
+  return (canvas._strokes || []).map(s => s.map(p => ({ x: p.x * canvas.width, y: p.y * canvas.height })));
+}
+
+// Revisa el boceto de la tarjeta de dibujo contra la rúbrica y pinta el veredicto.
+// Sin modelo de visión no hay red: nota corta y la rúbrica ordenada de siempre.
+async function runSketchReview(card) {
+  const a = overlay?.querySelector('.study-a');
+  const host = a?.querySelector('.study-review');
+  if (!host) return;
+  const canvas = overlay.querySelector('.study-draw-canvas');
+  const strokes = (canvas && canvas._strokes) || [];
+  if (!strokes.length) return;   // sin boceto no hay qué revisar: la rúbrica sola alcanza
+  if (!LLM.hasVision()) {
+    host.hidden = false;
+    host.innerHTML = `<p class="study-review-note">${t('La revisión del boceto necesita un modelo de visión configurado.')}</p>`;
+    return;
+  }
+  abortSketchReview();
+  const ctl = new AbortController();
+  sketchCtl = ctl;
+  host.hidden = false;
+  host.innerHTML = `<p class="study-review-wait">${icon('sparkles', { size: 14 })} ${t('El agente está revisando tu boceto…')}</p>`;
+  try {
+    const { review } = await reviewDrawing({
+      dataUrl: sketchDataUrl(canvas),
+      strokes: sketchStrokesInPixels(canvas),
+      plan: Array.isArray(card.steps) ? card.steps : [],
+      question: card.front || '',
+      signal: ctl.signal,
+    });
+    // Guardia de carrera (patrón mountOcclusion): mientras esperábamos la sesión pudo
+    // pasar a otra tarjeta o cerrarse — nunca pintar sobre la tarjeta equivocada.
+    if (!overlay || !flipped || queue[0]?.deck.cards[queue[0].idx] !== card) return;
+    if (!review || !review.steps.length) throw new Error('empty review');
+    paintSketchReview(host, canvas, review);
+  } catch (e) {
+    if (e && e.name === 'AbortError') return;   // cancelada: la tarjeta ya no está
+    if (!overlay || !flipped || queue[0]?.deck.cards[queue[0].idx] !== card) return;
+    // La revisión nunca rompe el estudio: nota tenue y la rúbrica sigue visible.
+    host.innerHTML = `<p class="study-review-note">${t('No se pudo revisar el boceto.')}</p>`;
+  } finally {
+    if (sketchCtl === ctl) sketchCtl = null;
+  }
+}
+
+// Pinta el veredicto: cabecera (pasos detectados + comentario del modelo), filas de la
+// rúbrica con color y nº de traza, y el recoloreado de las trazas en el canvas (cada
+// traza con el color de su paso; las que ningún paso reclamó, gris punteado).
+function paintSketchReview(host, canvas, review) {
+  const rows = review.steps;
+  // Mapa traza → paso (lo que expone `canvas._match`): la PRIMERA fila que reclama
+  // cada traza gana (dos pasos con la misma traza serían un error del modelo).
+  const match = {};
+  rows.forEach((r, si) => {
+    if (r.detected && Number.isInteger(r.stroke) && r.stroke >= 1 && !(r.stroke - 1 in match)) {
+      match[r.stroke - 1] = si;
+    }
+  });
+  if (canvas) canvas._paint?.(match);   // deja `canvas._match = match` para tests
+  const detected = rows.reduce((n, r, si) =>
+    n + (r.detected && Number.isInteger(r.stroke) && match[r.stroke - 1] === si ? 1 : 0), 0);
+  host.hidden = false;
+  host.innerHTML = `
+    <div class="study-review-head">
+      <b>${t('Detecté {n} de {m} pasos', { n: detected, m: rows.length })}</b>
+      ${review.comment ? `<span class="study-review-comment">${escapeHtml(review.comment)}</span>` : ''}
+    </div>`;
+  const ol = overlay?.querySelector('.study-a .study-steps');
+  if (!ol) return;
+  ol.classList.add('is-review');
+  ol.innerHTML = rows.map((r, si) => {
+    const strokeIdx = r.detected && Number.isInteger(r.stroke) && r.stroke >= 1 ? r.stroke - 1 : null;
+    const matched = strokeIdx != null && match[strokeIdx] === si;
+    const color = matched ? SKETCH_COLORS[si % SKETCH_COLORS.length] : 'transparent';
+    return `<li${matched ? '' : ' class="is-miss"'}>
+      <span class="study-step-dot" aria-hidden="true" style="background:${color}"></span>
+      <span class="study-step-name">${escapeHtml(r.name)}</span>
+      <span class="study-step-status">${matched ? t('trazo {n}', { n: strokeIdx + 1 }) : t('no detectado')}</span>
+    </li>`;
+  }).join('');
 }
 
 function backHtml(card) {
@@ -621,7 +750,8 @@ function backHtml(card) {
   }
   if (card.type === 'drawing') {
     const steps = Array.isArray(card.steps) ? card.steps : [];
-    return (steps.length ? `<ol class="study-steps">${steps.map(s => `<li>${escapeHtml(s)}</li>`).join('')}</ol>` : '')
+    return `<div class="study-review" hidden></div>`
+      + (steps.length ? `<ol class="study-steps">${steps.map(s => `<li>${escapeHtml(s)}</li>`).join('')}</ol>` : '')
       + (card.back ? `<div class="study-extra">${escapeHtml(card.back)}</div>` : '');
   }
   return escapeHtml(card.back || '');
@@ -751,6 +881,7 @@ function renderCard() {
   const f = overlay?.querySelector('.study-foot');
   const left = overlay?.querySelector('.study-left');
   if (!b || !f) return;
+  abortSketchReview();   // nueva tarjeta: la revisión del boceto anterior ya no pinta
   editing = false;
   animating = false;
   recallText = '';
@@ -980,6 +1111,7 @@ function flip() {
   // El pasaje que respalda la tarjeta, como recorte de página plegable.
   if ((card.src && deck.bookId) || card.quote) showPassage(deck, card);
   if (recallText) checkRecall(deck, card, recallText);
+  if (card.type === 'drawing') runSketchReview(card);
   renderGrades(card);
 }
 

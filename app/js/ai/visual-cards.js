@@ -566,3 +566,141 @@ export async function generateDrawingCards({ chapterText, count = 1, signal } = 
     return { cards: [] };
   }
 }
+
+// ---------------------------------------------------------------------------
+// Prompt 5 — revisión del boceto de una tarjeta de dibujo (modelo de visión).
+// ---------------------------------------------------------------------------
+
+// Presupuesto de la revisión: mismas guardas del grounding (un modelo de visión que
+// razona trunca el JSON con un tope corto), ahora con evidencia propia de WU7.
+const DRAWING_REVIEW_MAX_TOKENS = 4000;
+// Reintento: un poco más de margen sobre el presupuesto del primer intento.
+const DRAWING_REVIEW_RETRY_MARGIN = 2000;
+// El comentario del modelo es una sola frase; se cappea por si el modelo se desboca.
+const MAX_COMMENT_CHARS = 140;
+
+// Caja delimitadora de un trazo (puntos ya en las coordenadas que el caller decidió
+// enviar — píxeles del canvas) como [x0, y0, x1, y1] redondeada. null si el trazo
+// está vacío.
+function strokeBbox(points) {
+  if (!Array.isArray(points) || !points.length) return null;
+  const xs = points.map(p => Number(p && p.x)).filter(Number.isFinite);
+  const ys = points.map(p => Number(p && p.y)).filter(Number.isFinite);
+  if (!xs.length || !ys.length) return null;
+  const r = (n) => Math.round(n);
+  return [r(Math.min(...xs)), r(Math.min(...ys)), r(Math.max(...xs)), r(Math.max(...ys))];
+}
+
+// Mensajes de visión para la revisión del boceto: (a) texto con la rúbrica numerada
+// (los `steps` del dorso de la tarjeta), la consigna y los metadatos de trazos
+// (índice 1-based, nº de puntos y bbox en píxeles); (b) la imagen del canvas.
+// Los trazos llegan con puntos en PÍXELES del canvas (study.js reescala los
+// normalizados 0..1 antes de llamar); el bbox sale de ellos.
+// Contrato de salida, explícito en el prompt: SOLO JSON.
+export function buildDrawingReviewMessages({ dataUrl, strokes, plan, question } = {}) {
+  const steps = (Array.isArray(plan) ? plan : []).map(s => String(s ?? '').trim()).filter(Boolean);
+  const meta = (Array.isArray(strokes) ? strokes : []).map((s, i) => ({
+    i: i + 1,
+    points: Array.isArray(s) ? s.length : 0,
+    bbox: strokeBbox(s) || [0, 0, 0, 0],
+  }));
+  const text = `Un estudiante dibujó de memoria el siguiente proceso (canvas en blanco, trazos negros):
+"""
+Pasos esperados (en orden): ${steps.length ? steps.map((s, i) => `${i + 1}. ${s}`).join(' ') : '(sin rúbrica)'}
+Proceso: ${String(question ?? '').trim()}
+"""
+Trazos detectados (numerados, con caja delimitadora en píxeles del canvas):
+${JSON.stringify(meta)}
+
+Tu tarea: mirando la IMAGEN adjunta del boceto, determina qué pasos esperados fueron
+dibujados y a qué trazo corresponden.
+Devuelve SOLO JSON sin markdown, con esta forma exacta:
+{"steps":[{"name":"<paso exacto de la rúbrica>","detected":true|false,"stroke":<nº de trazo o null>}],"extraCount":<nº de trazos que no corresponden a ningún paso>,"comment":"<una frase en español, máx ${MAX_COMMENT_CHARS} caracteres>"}`;
+  return [{
+    role: 'user',
+    content: [
+      { type: 'text', text },
+      { type: 'image_url', image_url: { url: String(dataUrl ?? '') } },
+    ],
+  }];
+}
+
+// `stroke` crudo del modelo → nº de trazo 1-based o null. false/negativo/no entero → null.
+function sanitizeStrokeNumber(raw, detected) {
+  if (!detected) return null;
+  return Number.isInteger(raw) && raw >= 1 ? raw : null;
+}
+
+// Parseo tolerante de la revisión del boceto (prosa/fences/JSON truncado). NUNCA lanza.
+// Normaliza contra `plan` (los steps del dorso): una fila cuyo `name` no coincide con
+// ningún paso (comparación sin caso ni tildes, la de normalizeText) se DESCARTA — el
+// modelo no inventa pasos; los pasos de `plan` que el modelo no mencionó se rellenan
+// como { name, detected: false, stroke: null } para que la UI tenga las filas completas
+// en el orden de la rúbrica. `stroke` fuera de forma (no entero ≥ 1) → null; el recorte
+// contra la cantidad real de trazos lo hace reviewDrawing, que sí la conoce.
+export function parseDrawingReview(text, { plan = [] } = {}) {
+  const names = (Array.isArray(plan) ? plan : []).map(s => String(s ?? '').trim());
+  const byNorm = new Map();
+  names.forEach((name, i) => {
+    const norm = normalizeText(name);
+    if (norm && !byNorm.has(norm)) byNorm.set(norm, i);
+  });
+  const raw = stripWrappers(text);
+  for (const chunk of balancedObjects(raw)) {
+    let obj;
+    try { obj = JSON.parse(chunk); } catch { continue; }   // truncado/roto → siguiente
+    if (!obj || typeof obj !== 'object' || !Array.isArray(obj.steps)) continue;
+    const rows = names.map(name => ({ name, detected: false, stroke: null }));
+    let matched = 0;
+    for (const entry of obj.steps) {
+      if (!entry || typeof entry !== 'object') continue;
+      const name = typeof entry.name === 'string' ? entry.name.trim() : '';
+      const idx = byNorm.get(normalizeText(name));
+      if (idx == null) continue;                           // paso que no está en la rúbrica: fuera
+      const detected = entry.detected === true;
+      rows[idx] = { name: names[idx], detected, stroke: sanitizeStrokeNumber(entry.stroke, detected) };
+      matched++;
+    }
+    // Un objeto sin NINGÚN paso de la rúbrica no es una revisión: probar el siguiente
+    // candidato (puede haber un JSON bueno después del razonamiento).
+    if (!matched) continue;
+    const extraRaw = Number(obj.extraCount);
+    const extraCount = Number.isFinite(extraRaw) ? Math.max(0, Math.round(extraRaw)) : 0;
+    const comment = typeof obj.comment === 'string' ? obj.comment.trim().slice(0, MAX_COMMENT_CHARS) : '';
+    return { steps: rows, extraCount, comment };
+  }
+  return { steps: [], extraCount: 0, comment: '' };
+}
+
+// Revisión del boceto contra el modelo de visión. Presupuesto generoso (mismo motivo
+// que el grounding: los modelos de visión que razonan truncan JSON corto). Si el parseo
+// no rinde NINGÚN paso, reintenta UNA vez con más presupuesto; AbortError propaga sin
+// reintentar (la señal ya abortada solo gastaría cuota). Devuelve { review, attempts }
+// o { review: null, attempts, error }: nunca lanza salvo abort. Además recorta el nº de
+// trazo contra la cantidad real de trazos: fuera de rango → null.
+export async function reviewDrawing({ dataUrl, strokes, plan, question, signal, maxTokens = DRAWING_REVIEW_MAX_TOKENS } = {}) {
+  const messages = buildDrawingReviewMessages({ dataUrl, strokes, plan, question });
+  const strokeCount = Array.isArray(strokes) ? strokes.length : 0;
+  const clamp = (review) => ({
+    ...review,
+    steps: review.steps.map(r => (r.stroke != null && r.stroke > strokeCount
+      ? { ...r, stroke: null }
+      : r)),
+  });
+  let attempts = 0;
+  try {
+    let raw = await LLM.chatVision({ messages, signal, maxTokens });
+    attempts = 1;
+    let review = parseDrawingReview(raw, { plan });
+    if (!review.steps.length) {
+      // Reintento documentado: mismo motivo que en el grounding de figuras.
+      raw = await LLM.chatVision({ messages, signal, maxTokens: maxTokens + DRAWING_REVIEW_RETRY_MARGIN });
+      attempts = 2;
+      review = parseDrawingReview(raw, { plan });
+    }
+    return { review: clamp(review), attempts };
+  } catch (e) {
+    if (e && e.name === 'AbortError') throw e;   // cancelación del usuario: propaga, no reintenta
+    return { review: null, attempts, error: e && e.message ? e.message : String(e) };
+  }
+}

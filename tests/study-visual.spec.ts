@@ -250,3 +250,203 @@ test('buildQueue: tarjeta visual sin front entra a la cola; sin front y sin visu
   // Entran las tres visuales (aun sin front) y la básica con pregunta; la vacía, no.
   expect(result.included.sort()).toEqual([0, 1, 2, 4]);
 });
+
+// ---------------------------------------------------------------------------
+// WU7 · Revisión del boceto con visión: prompt + veredicto por pasos + trazos
+// coloreados por paso. Sin modelo de visión: cero red y la rúbrica de siempre.
+// ---------------------------------------------------------------------------
+
+const PLAN_5 = ['Evaporación del agua', 'Condensación en nubes', 'Precipitación', 'Escurrimiento', 'Infiltración'];
+
+// Licencia Pro + key + modelo de visión en localStorage (el mismo patrón de
+// visual-cards.spec.ts: chatVision los exige).
+async function setupVision(page): Promise<void> {
+  await page.goto('/index.html');
+  await seedProLicense(page);
+  await page.evaluate(() => {
+    localStorage.setItem('bookreader_ai_key', JSON.stringify('test-key'));
+    localStorage.setItem('bookreader_ai_vision_model', JSON.stringify('vision-test'));
+  });
+}
+
+// Stub de /chat/completions que registra cada body en window.__rev.calls y responde
+// con `payload` como content del mensaje.
+async function stubChat(page, payload: string): Promise<void> {
+  await page.evaluate((content) => {
+    const real = window.fetch.bind(window);
+    (window as any).__rev = { calls: [] as any[] };
+    window.fetch = async (url: any, opts: any) => {
+      const u = typeof url === 'string' ? url : url?.url || '';
+      if (u.includes('/chat/completions') && opts?.body) {
+        (window as any).__rev.calls.push(JSON.parse(opts.body));
+        return new Response(
+          JSON.stringify({ choices: [{ message: { content } }] }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      return real(url, opts);
+    };
+  }, payload);
+}
+
+// Contador de fetch sin respuestas falsas (para probar que NO hay red).
+async function stubFetchCounter(page): Promise<void> {
+  await page.evaluate(() => {
+    const real = window.fetch.bind(window);
+    (window as any).__rev = { calls: [] as string[] };
+    window.fetch = async (url: any, opts: any) => {
+      (window as any).__rev.calls.push(typeof url === 'string' ? url : url?.url || '');
+      return real(url, opts);
+    };
+  });
+}
+
+// Dos trazos en el canvas (mismo gesto que el test del lienzo de WU6).
+async function drawTwoStrokes(page): Promise<void> {
+  const canvas = page.locator('.study-draw-canvas');
+  const drag = async (x0: number, y0: number) => {
+    const box = await canvas.boundingBox();
+    await page.mouse.move(box!.x + x0, box!.y + y0);
+    await page.mouse.down();
+    await page.mouse.move(box!.x + x0 + 60, box!.y + y0 + 30, { steps: 4 });
+    await page.mouse.up();
+  };
+  await drag(10, 10);
+  await drag(30, 60);
+}
+
+test('drawing review: la imagen y la rúbrica viajan al modelo; el veredicto colorea trazos por paso', async ({ page }) => {
+  await setupVision(page);
+  await seedVisualDeck(page, {
+    bookId: 'bk-vis7a',
+    cards: [{ type: 'drawing', front: 'Dibujá el ciclo del agua.', back: '', steps: PLAN_5 }],
+    figure: null,
+  });
+  await page.reload();
+  await stubChat(page, JSON.stringify({
+    steps: [
+      { name: 'Evaporación del agua', detected: true, stroke: 1 },
+      { name: 'Condensación en nubes', detected: true, stroke: 2 },
+      { name: 'Precipitación', detected: false, stroke: null },
+      { name: 'Escurrimiento', detected: false, stroke: null },
+      { name: 'Infiltración', detected: false, stroke: null },
+    ],
+    extraCount: 0,
+    comment: 'Muy bien: el sol y las nubes están, faltan tres pasos.',
+  }));
+  await page.locator('.lib-study-chip').click();
+  const overlay = page.locator('#ai-study');
+  await drawTwoStrokes(page);
+  await overlay.locator('.study-flip').click();
+
+  // El pedido al modelo: modelo de visión, parte image_url (JPEG) y la rúbrica completa.
+  const state = await page.evaluate(() => (window as any).__rev);
+  expect(state.calls).toHaveLength(1);
+  const body = state.calls[0];
+  expect(body.model).toBe('vision-test');
+  expect(body.max_tokens).toBeGreaterThanOrEqual(4000);
+  const content = body.messages[0].content;
+  const imgPart = content.find((p: any) => p.type === 'image_url');
+  expect(imgPart.image_url.url).toMatch(/^data:image\/jpeg;/);
+  const textPart = content.find((p: any) => p.type === 'text');
+  for (const step of PLAN_5) expect(textPart.text).toContain(step);
+  expect(textPart.text).toContain('"i":1');
+  expect(textPart.text).toContain('"i":2');
+
+  // Veredicto: cabecera + comentario, y las 5 filas de la rúbrica con su estado.
+  const back = overlay.locator('.study-face--back');
+  await expect(back.locator('.study-review-head')).toContainText('Detecté 2 de 5 pasos');
+  await expect(back.locator('.study-review-comment')).toContainText('Muy bien');
+  const rows = back.locator('.study-steps li');
+  await expect(rows).toHaveCount(5);
+  await expect(rows.nth(0)).toContainText('trazo 1');
+  await expect(rows.nth(1)).toContainText('trazo 2');
+  await expect(rows.nth(2)).toContainText('no detectado');
+  await expect(rows.nth(4)).toContainText('no detectado');
+
+  // El mapa traza → paso queda expuesto en el canvas y las trazas detectadas se pintaron
+  // con el color de su paso (estilo inline distinto del gris punteado).
+  expect(await page.evaluate(() => (document.querySelector('.study-draw-canvas') as any)._match)).toEqual({ 0: 0, 1: 1 });
+});
+
+test('drawing review: un nombre que no está en la rúbrica no inventa fila', async ({ page }) => {
+  await setupVision(page);
+  await seedVisualDeck(page, {
+    bookId: 'bk-vis7b',
+    cards: [{ type: 'drawing', front: 'Dibujá el ciclo del agua.', back: '', steps: PLAN_5 }],
+    figure: null,
+  });
+  await page.reload();
+  await stubChat(page, JSON.stringify({
+    steps: [
+      { name: 'Evaporación del agua', detected: true, stroke: 1 },
+      { name: 'Fase imaginaria', detected: true, stroke: 2 },
+      { name: 'Precipitación', detected: false, stroke: null },
+      { name: 'Escurrimiento', detected: false, stroke: null },
+      { name: 'Infiltración', detected: false, stroke: null },
+    ],
+    extraCount: 1,
+    comment: 'ok',
+  }));
+  await page.locator('.lib-study-chip').click();
+  const overlay = page.locator('#ai-study');
+  await drawTwoStrokes(page);
+  await overlay.locator('.study-flip').click();
+
+  const back = overlay.locator('.study-face--back');
+  const rows = back.locator('.study-steps li');
+  await expect(rows).toHaveCount(5);                       // no se inventó la fila
+  await expect(back).not.toContainText('Fase imaginaria');
+  await expect(rows.nth(0)).toContainText('trazo 1');
+  // Los pasos de la rúbrica que el modelo no mencionó quedan como no detectados.
+  await expect(rows.nth(1)).toContainText('no detectado');
+  expect(await page.evaluate(() => (document.querySelector('.study-draw-canvas') as any)._match)).toEqual({ 0: 0 });
+});
+
+test('drawing review: respuesta basura → UN reintento y la nota tenue sin romper la rúbrica', async ({ page }) => {
+  await setupVision(page);
+  await seedVisualDeck(page, {
+    bookId: 'bk-vis7c',
+    cards: [{ type: 'drawing', front: 'Dibujá el ciclo del agua.', back: '', steps: PLAN_5 }],
+    figure: null,
+  });
+  await page.reload();
+  await stubChat(page, 'Lo siento, no puedo analizar imágenes en este momento.');
+  await page.locator('.lib-study-chip').click();
+  const overlay = page.locator('#ai-study');
+  await drawTwoStrokes(page);
+  await overlay.locator('.study-flip').click();
+
+  const back = overlay.locator('.study-face--back');
+  await expect(back.locator('.study-review-note')).toContainText('No se pudo revisar el boceto');
+  const state = await page.evaluate(() => (window as any).__rev);
+  expect(state.calls).toHaveLength(2);   // exactamente UN reintento
+  // La rúbrica sigue visible e intacta: la revisión nunca rompe el estudio.
+  const rows = back.locator('.study-steps li');
+  await expect(rows).toHaveCount(5);
+  await expect(rows.nth(0)).toHaveText('Evaporación del agua');
+});
+
+test('drawing review sin modelo de visión: cero red, nota tenue y la rúbrica de siempre', async ({ page }) => {
+  await page.goto('/index.html');
+  await seedProLicense(page);
+  await seedVisualDeck(page, {
+    bookId: 'bk-vis7d',
+    cards: [{ type: 'drawing', front: 'Dibujá el ciclo del agua.', back: '', steps: PLAN_5 }],
+    figure: null,
+  });
+  await page.reload();
+  await stubFetchCounter(page);
+  await page.locator('.lib-study-chip').click();
+  const overlay = page.locator('#ai-study');
+  await drawTwoStrokes(page);
+  await overlay.locator('.study-flip').click();
+
+  const back = overlay.locator('.study-face--back');
+  await expect(back.locator('.study-review-note')).toContainText('necesita un modelo de visión');
+  const calls = await page.evaluate(() => (window as any).__rev.calls as string[]);
+  expect(calls.filter((u) => u.includes('/chat/completions'))).toHaveLength(0);
+  const rows = back.locator('.study-steps li');
+  await expect(rows).toHaveCount(5);
+  await expect(rows.nth(3)).toHaveText('Escurrimiento');
+});
