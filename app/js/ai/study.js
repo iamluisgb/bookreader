@@ -24,6 +24,7 @@ import { toast } from './toast.js';
 import { segmentBook } from './segment.js';
 import { segmentPdf } from './segment-pdf.js';
 import { loadEpubJs, loadPdfJs } from '../vendor-loader.js';
+import { sanitizeSvg } from './visual-cards.js';
 
 // Racha de estudio (F3): {count, lastDay}, global de la app (no por libro).
 const STREAK_KEY = 'study_streak';
@@ -184,18 +185,28 @@ function spreadSiblings(q) {
 }
 
 // Cola de una sesión a partir de los mazos. PURA (mazos → entradas) para poder testearla.
-// Tres reglas, todas para que exista una segunda sesión:
+// Cuatro reglas, todas para que exista una segunda sesión:
+//  - CONTENIDO: entra toda tarjeta con `front` y, además, las tarjetas visuales (WU6)
+//    sin pregunta pero con carga visual (svg, figureKey o pasos): una occlusión importada
+//    o llegada por sync sin `front` se repasa igual; lo que no tiene ni pregunta ni
+//    visual no es una tarjeta.
 //  - TOPE de nuevas: la cola diaria suma lo vencido de TODOS los mazos, así que generar
 //    tres mazos de 30 pone 90 tarjetas el primer día. Las que no entran se devuelven en
 //    `held` (al terminar se pueden pedir), no se pierden.
 //  - BARAJADO: en orden de mazo se repasa siempre el mismo capítulo primero, y el orden
 //    acaba siendo una pista más (te sabes la siguiente por dónde va la sesión).
 //  - HERMANAS separadas (spreadSiblings).
+function hasVisualPayload(c) {
+  return (typeof c.svg === 'string' && !!c.svg)
+    || (typeof c.figureKey === 'string' && !!c.figureKey)
+    || (Array.isArray(c.steps) && c.steps.length > 0);
+}
+
 export function buildQueue(decks, { now = Date.now(), newLimit: limit = 0, rng = Math.random } = {}) {
   const news = [], revs = [];
   for (const deck of decks || []) {
     (deck.cards || []).forEach((c, idx) => {
-      if (!c || !c.front || !Srs.isDue(c, now)) return;
+      if (!c || (!c.front && !hasVisualPayload(c)) || !Srs.isDue(c, now)) return;
       (c.srs && c.srs.reps > 0 ? revs : news).push({ deck, idx, src: c.src || '' });
     });
   }
@@ -397,7 +408,199 @@ function frontHtml(card) {
     return escapeHtml(card.front).replace(CLOZE_RE, (_, _ans, hint) =>
       `<span class="study-cloze">[${hint || '…'}]</span>`);
   }
-  return escapeHtml(card.front);
+  return escapeHtml(card.front) + visualHtml(card, 'front');
+}
+
+// ---- Tarjetas visuales (WU6) --------------------------------------------------
+// Tres tipos, un mismo contrato (visual-deck.js): oclusión (figura + caja), diagrama
+// (SVG con la respuesta tapada) y dibujo (lienzo + rúbrica). La figura NUNCA viaja en
+// la tarjeta: `figureKey` apunta al artefacto y se monta ASÍNCRONO (mountOcclusion);
+// el SVG llega de un modelo y puede venir por sync, así que SIEMPRE pasa por
+// sanitizeSvg antes de tocar el DOM — si no valida, placeholder, nunca inyección.
+function visualHtml(card, state) {
+  if (card.type === 'occlusion') {
+    const masked = state === 'front';
+    return `<div class="study-fig is-loading" data-figkey="${escapeHtml(card.figureKey || '')}" data-occl="${masked ? 'masked' : 'hl'}" aria-busy="true"></div>`;
+  }
+  if (card.type === 'diagram') {
+    return `<div class="study-diagram">${diagramSvgHtml(card, state === 'front')}</div>`;
+  }
+  if (card.type === 'drawing' && state === 'front') {
+    return `<div class="study-draw">
+      <canvas class="study-draw-canvas" aria-label="${t('Zona para dibujar tu respuesta antes de girar la tarjeta')}"></canvas>
+      <div class="study-draw-bar">
+        <button type="button" class="study-draw-undo">${t('Deshacer')}</button>
+        <button type="button" class="study-draw-clear">${t('Limpiar')}</button>
+      </div>
+    </div>`;
+  }
+  return '';
+}
+
+// SVG del diagrama, ya saneado. `mask` (frente) reemplaza el label del nodo de respuesta
+// por «?»; el dorso lo muestra intacto (el highlight lo puso el prompt que lo generó).
+// NUNCA inyecta el markup crudo: sanitizeSvg rechaza <script>, on*, javascript: y
+// <foreignObject>; si no valida, placeholder silencioso.
+function diagramSvgHtml(card, mask) {
+  const check = sanitizeSvg(card.svg, { answerNodeId: card.answerNodeId || '' });
+  if (!check.ok) return `<p class="study-fig-empty">${t('El diagrama no se pudo mostrar en este dispositivo')}</p>`;
+  if (!mask || !card.answerNodeId) return check.svg;
+  let doc;
+  try { doc = new DOMParser().parseFromString(check.svg, 'image/svg+xml'); } catch { return check.svg; }
+  const root = doc.documentElement;
+  const all = [root, ...root.getElementsByTagName('*')];
+  const target = all.find(el => el.getAttribute && el.getAttribute('id') === card.answerNodeId);
+  if (!target) return check.svg;
+  const texts = [target, ...target.getElementsByTagName('*')]
+    .filter(el => el.localName === 'text' || el.localName === 'tspan');
+  if (texts.length) texts.forEach((el, i) => { el.textContent = i === 0 ? '?' : ''; });
+  else target.textContent = '?';
+  target.classList?.add('study-answer-node');
+  try { return new XMLSerializer().serializeToString(root); } catch { return check.svg; }
+}
+
+// Monta la figura de una tarjeta de oclusión dentro de su slot (frente o dorso).
+// La caja se posiciona en PORCENTAJES del contenedor de la imagen: sirve para cualquier
+// tamaño renderizado. Dimensiones: primero las persistidas del artefacto; si faltan
+// (figuras viejas), se miden naturalWidth/naturalHeight al cargar. Sin figura o sin
+// imagen legible: placeholder visible — nunca un <img> roto.
+async function mountOcclusion(slot, bookId, card) {
+  if (!slot || slot.dataset.mounted) return;
+  slot.dataset.mounted = '1';
+  const hl = slot.dataset.occl === 'hl';
+  let fig = null;
+  try {
+    const arts = bookId ? await DB.getArtifacts(bookId) : [];
+    // El resultado vive anidado en `result` (mismo layout que getFigures en figures.js:
+    // { key, ...result }); aplanamos para leer dataUrl/width/height directo.
+    const art = (arts || []).find(a => a && a.key === card.figureKey) || null;
+    fig = art && art.result && typeof art.result === 'object' ? { ...art.result, key: art.key } : null;
+  } catch { /* store caído o índice ausente: vale el placeholder */ }
+  // Mientras se leía el artefacto la sesión pudo pasar a otra tarjeta (o el slot
+  // desmontarse): no pintar sobre la tarjeta equivocada.
+  if (!slot.isConnected || queue[0]?.deck.cards[queue[0].idx] !== card) return;
+  const dataUrl = fig && typeof fig.dataUrl === 'string' ? fig.dataUrl : '';
+  if (!dataUrl) {
+    slot.removeAttribute('aria-busy');
+    slot.classList.remove('is-loading');
+    slot.innerHTML = `<p class="study-fig-empty">${t('La figura no está disponible en este dispositivo')}</p>`;
+    return;
+  }
+  const img = document.createElement('img');
+  img.className = 'study-fig-img';
+  img.alt = '';
+  img.setAttribute('role', 'img');
+  img.setAttribute('aria-label', t('Figura del libro con una zona señalada'));
+  const box = document.createElement('div');
+  box.className = `study-occl${hl ? ' is-hl' : ''}`;
+  box.innerHTML = '<span class="study-occl-mark" aria-hidden="true">?</span>';
+  box.setAttribute('aria-label', hl
+    ? t('Zona de la respuesta, ya revelada')
+    : t('Zona tapada: pensá qué etiqueta esconde la caja'));
+  slot.textContent = '';
+  slot.appendChild(img);
+  slot.appendChild(box);
+  slot.removeAttribute('aria-busy');
+  slot.classList.remove('is-loading');
+  const bb = card.bbox;
+  const place = (w, h) => {
+    if (!w || !h || !bb || ![bb.x, bb.y, bb.w, bb.h].every(Number.isFinite)) return;
+    box.style.left = `${bb.x / w * 100}%`;
+    box.style.top = `${bb.y / h * 100}%`;
+    box.style.width = `${bb.w / w * 100}%`;
+    box.style.height = `${bb.h / h * 100}%`;
+  };
+  const w = Number.isFinite(fig.width) && fig.width > 0 ? fig.width : 0;
+  const h = Number.isFinite(fig.height) && fig.height > 0 ? fig.height : 0;
+  if (w && h) place(w, h);
+  else img.addEventListener('load', () => place(img.naturalWidth, img.naturalHeight), { once: true });
+  img.addEventListener('error', () => {
+    slot.innerHTML = `<p class="study-fig-empty">${t('La figura no está disponible en este dispositivo')}</p>`;
+  }, { once: true });
+  img.src = dataUrl;
+}
+
+// Monta los slots visuales asíncronos que queden pendientes dentro de `root` (una cara
+// de la tarjeta). Los diagramas y el lienzo son síncronos; solo la figura espera al store.
+function mountVisuals(root, deck, card) {
+  if (!root || !card || card.type !== 'occlusion') return;
+  const slot = root.querySelector('.study-fig[data-figkey]');
+  if (slot) mountOcclusion(slot, deck?.bookId, card);
+}
+
+// Lienzo de dibujo: las trazas ACUMULAN. Un trazo (array de puntos normalizados 0..1)
+// se abre en pointerdown, crece en pointermove y el redibujado repite SIEMPRE todas las
+// trazas más la en curso — redibujar solo la actual borraría las anteriores al empezar
+// la segunda. Las coordenadas normalizadas sobreviven a cambios de tamaño del canvas.
+// `_strokes` queda expuesto en el elemento para unidades posteriores (corrección del
+// boceto con visión).
+function wireDrawingCanvas(canvas) {
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  const strokes = [];
+  canvas._strokes = strokes;
+  let current = null;
+  const ink = () => {
+    const c = getComputedStyle(canvas).color;
+    return c && c !== 'rgba(0, 0, 0, 0)' ? c : '#1d1d1f';
+  };
+  const drawStroke = (s) => {
+    if (!s.length) return;
+    ctx.beginPath();
+    s.forEach((p, i) => {
+      const x = p.x * canvas.width, y = p.y * canvas.height;
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+  };
+  const redraw = () => {
+    const dpr = window.devicePixelRatio || 1;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.lineWidth = 2.5 * dpr;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = ink();
+    for (const s of strokes) drawStroke(s);
+  };
+  const resize = () => {
+    const r = canvas.getBoundingClientRect();
+    if (!r.width || !r.height) return;
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = Math.round(r.width * dpr);
+    canvas.height = Math.round(r.height * dpr);
+    redraw();
+  };
+  const addPoint = (e) => {
+    const r = canvas.getBoundingClientRect();
+    if (!r.width || !r.height || !current) return;
+    current.push({ x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height });
+    redraw();   // TODAS las trazas + la en curso, en cada movimiento
+  };
+  canvas.addEventListener('pointerdown', (e) => {
+    if (current) return;
+    canvas.setPointerCapture?.(e.pointerId);
+    current = [];
+    strokes.push(current);
+    addPoint(e);
+  });
+  canvas.addEventListener('pointermove', (e) => { if (current) addPoint(e); });
+  const end = () => { current = null; };
+  canvas.addEventListener('pointerup', end);
+  canvas.addEventListener('pointercancel', end);
+  // Los botones viven junto al canvas: deshacer saca la última traza, limpiar vacía todo.
+  const bar = canvas.closest('.study-draw')?.querySelector('.study-draw-bar');
+  bar?.querySelector('.study-draw-undo')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    strokes.pop();
+    redraw();
+  });
+  bar?.querySelector('.study-draw-clear')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    strokes.length = 0;
+    redraw();
+  });
+  resize();
 }
 
 function backHtml(card) {
@@ -405,6 +608,21 @@ function backHtml(card) {
     const revealed = escapeHtml(card.front).replace(CLOZE_RE, (_, ans) =>
       `<span class="study-cloze is-revealed">${ans}</span>`);
     return revealed + (card.back ? `<div class="study-extra">${escapeHtml(card.back)}</div>` : '');
+  }
+  if (card.type === 'occlusion') {
+    // Misma figura con la caja en estado «revelada» (sin texto dentro) + respuesta + dato.
+    return visualHtml(card, 'back')
+      + (card.occludedLabel ? `<div class="study-occl-answer">${escapeHtml(card.occludedLabel)}</div>` : '')
+      + (card.back ? `<div class="study-extra">${escapeHtml(card.back)}</div>` : '');
+  }
+  if (card.type === 'diagram') {
+    return visualHtml(card, 'back')
+      + (card.back ? `<div class="study-extra">${escapeHtml(card.back)}</div>` : '');
+  }
+  if (card.type === 'drawing') {
+    const steps = Array.isArray(card.steps) ? card.steps : [];
+    return (steps.length ? `<ol class="study-steps">${steps.map(s => `<li>${escapeHtml(s)}</li>`).join('')}</ol>` : '')
+      + (card.back ? `<div class="study-extra">${escapeHtml(card.back)}</div>` : '');
   }
   return escapeHtml(card.back || '');
 }
@@ -571,7 +789,8 @@ function renderCard() {
   f.innerHTML = `<button class="primary-btn study-flip">${t('Mostrar respuesta')} <kbd>${t('espacio')}</kbd></button>`;
   f.querySelector('.study-flip').addEventListener('click', flip);
   b.querySelector('.study-card3d').addEventListener('click', (e) => {
-    if (!flipped && !e.target.closest('button, a, textarea')) flip();
+    // El canvas es para dibujar, no para girar: un trazo no voltea la tarjeta.
+    if (!flipped && !e.target.closest('button, a, textarea, canvas')) flip();
   });
   const input = b.querySelector('.study-recall-input');
   if (input) {
@@ -582,6 +801,8 @@ function renderCard() {
     });
   }
   wireSwipe(b.querySelector('.study-card3d'));
+  wireDrawingCanvas(b.querySelector('.study-draw-canvas'));
+  mountVisuals(b.querySelector('.study-face--front'), deck, card);
   paintLook(deck);
   renderTools();
 }
@@ -746,8 +967,10 @@ function flip() {
   const { deck, idx } = queue[0];
   const card = deck.cards[idx];
   const a = overlay.querySelector('.study-a');
-  a.innerHTML = backHtml(card);
-  a.hidden = card.type !== 'cloze' && !card.back;
+  const html = backHtml(card);
+  a.innerHTML = html;
+  a.hidden = !html;
+  mountVisuals(a, deck, card);
   const input = overlay.querySelector('.study-recall-input');
   recallText = input ? input.value.trim() : '';
   overlay.querySelector('.study-recall')?.remove();
@@ -848,7 +1071,7 @@ function wireSwipe(el) {
   if (!el) return;
   let x0 = null, dx = 0;
   el.addEventListener('pointerdown', (e) => {
-    if (!flipped || animating || e.target.closest('button, a, details, textarea')) return;
+    if (!flipped || animating || e.target.closest('button, a, details, textarea, canvas')) return;
     x0 = e.clientX; dx = 0;
     el.setPointerCapture?.(e.pointerId);
     el.classList.add('is-dragging');
