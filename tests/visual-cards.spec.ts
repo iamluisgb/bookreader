@@ -334,6 +334,40 @@ test('groundFigure: un abort del usuario propaga el AbortError y no reintenta', 
   expect(await page.evaluate(() => (window as any).__vc.calls)).toBe(1);   // sin reintento
 });
 
+// Stub para los llamadores que van por chatStream (lote de diagramas y tarjetas de
+// dibujo): responde cada /chat/completions con `payloads[i]` como SSE —misma forma que el
+// fallback de texto de setupOcclusionStub— y registra cada body en window.__vc.calls.
+// Con más de un payload, el último se repite (así se prueba la regeneración única).
+async function setupStreamStub(page, payloads: string | string[]) {
+  const chunks = Array.isArray(payloads) ? payloads : [payloads];
+  await page.goto('/index.html');
+  await seedProLicense(page);
+  await page.evaluate(() => {
+    localStorage.setItem('bookreader_ai_key', JSON.stringify('test-key'));
+  });
+  await page.evaluate((texts: string[]) => {
+    const real = window.fetch.bind(window);
+    (window as any).__vc = { calls: [] as any[] };
+    let n = 0;
+    window.fetch = async (url: any, opts: any) => {
+      const u = typeof url === 'string' ? url : url?.url || '';
+      if (u.includes('/chat/completions') && opts?.body) {
+        const body = JSON.parse(opts.body);
+        (window as any).__vc.calls.push(body);
+        const content = texts[Math.min(n++, texts.length - 1)];
+        const sse = [
+          `data: ${JSON.stringify({ choices: [{ delta: { content }, finish_reason: null }] })}\n\n`,
+          'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n\n',
+          'data: [DONE]\n\n',
+        ];
+        const s = new ReadableStream({ start(c) { const e = new TextEncoder(); sse.forEach(x => c.enqueue(e.encode(x))); c.close(); } });
+        return new Response(s, { status: 200, headers: { 'Content-Type': 'text/event-stream' } });
+      }
+      return real(url, opts);
+    };
+  }, chunks);
+}
+
 test('generateOcclusions: llamada forzada a create_occlusion_cards, tarjetas filtradas por labels; sin tool_call cae al texto', async ({ page }) => {
   const cardsJson = JSON.stringify({ cards: [
     { occludedLabel: 'Message queue', question: '¿Qué desacopla al productor del consumidor?', contextFact: 'El buffer desacopla ambos ritmos.', difficulty: 'hard' },
@@ -369,4 +403,172 @@ test('generateOcclusions: llamada forzada a create_occlusion_cards, tarjetas fil
   const state2 = await page.evaluate(() => (window as any).__vc);
   expect(state2.calls).toHaveLength(2);            // tools (sin tool_call) + stream
   expect(state2.calls[1].stream).toBe(true);
+});
+
+test('buildDiagramBatchMessages: pide count diagramas, gate relacional, reglas de viewBox/clases y español', async ({ page }) => {
+  await page.goto('/index.html');
+  await seedProLicense(page);
+  const msgs = await inPage(page, async ({ chapter }: any) => {
+    const VC = await import('/js/ai/visual-cards.js');
+    return VC.buildDiagramBatchMessages({ chapterText: chapter, count: 3 });
+  }, { chapter: CHAPTER_TEXT });
+  expect(msgs).toHaveLength(1);
+  expect(msgs[0].role).toBe('system');
+  const c = msgs[0].content;
+  expect(c).toContain('hasta 3');                       // pide `count` diagramas
+  expect(c).toContain('ESTRUCTURA RELACIONAL');         // mismo gate que el single
+  expect(c).toContain('viewBox="0 0 720 H"');
+  expect(c).toContain('180');
+  expect(c).toContain('280');
+  expect(c).toContain('d-box');
+  expect(c).toContain('d-txt');
+  expect(c).toContain('d-cap');
+  expect(c).toContain('d-line');
+  expect(c).toContain('is-fill');
+  expect(c).toContain('is-strong');
+  expect(c).toContain('answerNodeId');
+  expect(c).toContain('ESPAÑOL');
+  expect(c).toContain('"diagrams"');                    // contrato de salida por lote
+  expect(c).toContain(CHAPTER_TEXT);
+});
+
+test('parseDiagramBatchResponse: lote válido, inválidas descartadas sin tirar las demás, cap, dedupe y truncado', async ({ page }) => {
+  await page.goto('/index.html');
+  await seedProLicense(page);
+  const res = await inPage(page, async ({ clean }: any) => {
+    const VC = await import('/js/ai/visual-cards.js');
+    const d1 = { concept: 'Flujo de mensajes', svg: clean, answerNodeId: 'tgt', question: '¿Qué desacopla al productor del consumidor?', contextFact: 'El buffer desacopla ambos ritmos.' };
+    const d2 = { concept: 'Ciclo de extracción', svg: clean.replace('tgt', 'tgt2'), answerNodeId: 'tgt2', question: '¿Quién extrae los mensajes?', contextFact: 'El consumidor extrae después.' };
+    // Lote válido envuelto en prosa y fences (modelos reasoning).
+    const batch = 'Claro, aquí van:\n```json\n' + JSON.stringify({ diagrams: [d1, d2] }) + '\n```';
+    // Una entrada con <script> (sanitizeSvg la tumba) y la otra sana: solo sobrevive la sana.
+    const withScript = JSON.stringify({ diagrams: [{ ...d1, svg: clean.replace('<text', '<script>x()</script><text') }, d2] });
+    // answerNodeId que no está en el markup → fuera.
+    const ghostNode = JSON.stringify({ diagrams: [{ ...d1, answerNodeId: 'fantasma' }, d2] });
+    // question vacía → fuera.
+    const noQuestion = JSON.stringify({ diagrams: [{ ...d1, question: '  ' }, d2] });
+    // Concepto duplicado (sin caso ni tildes) → colapsa a uno.
+    const dup = JSON.stringify({ diagrams: [d1, { ...d2, concept: 'flujo DE mensajes' }] });
+    // Cap: dos válidas con maxCards=1 → una.
+    return {
+      batch: VC.parseDiagramBatchResponse(batch),
+      withScript: VC.parseDiagramBatchResponse(withScript),
+      ghostNode: VC.parseDiagramBatchResponse(ghostNode),
+      noQuestion: VC.parseDiagramBatchResponse(noQuestion),
+      dup: VC.parseDiagramBatchResponse(dup),
+      capped: VC.parseDiagramBatchResponse(batch, { maxCards: 1 }),
+      truncated: VC.parseDiagramBatchResponse('Analizando: {"diagrams":[{"concept":"roto"'),
+      garbage: VC.parseDiagramBatchResponse('sin json útil {'),
+      nullInput: VC.parseDiagramBatchResponse(null as any),
+    };
+  }, { clean: CLEAN_SVG });
+  expect(res.batch).toEqual([
+    { concept: 'Flujo de mensajes', svg: expect.stringContaining('<svg'), answerNodeId: 'tgt', question: '¿Qué desacopla al productor del consumidor?', contextFact: 'El buffer desacopla ambos ritmos.' },
+    { concept: 'Ciclo de extracción', svg: expect.stringContaining('id="tgt2"'), answerNodeId: 'tgt2', question: '¿Quién extrae los mensajes?', contextFact: 'El consumidor extrae después.' },
+  ]);
+  expect(res.withScript).toHaveLength(1);          // la del script fuera, la sana sobrevive
+  expect(res.withScript[0].concept).toBe('Ciclo de extracción');
+  expect(res.ghostNode).toHaveLength(1);
+  expect(res.noQuestion).toHaveLength(1);
+  expect(res.dup).toHaveLength(1);                 // concepto duplicado colapsa
+  expect(res.dup[0].answerNodeId).toBe('tgt');     // queda la primera
+  expect(res.capped).toHaveLength(1);
+  expect(res.truncated).toEqual([]);               // truncado → [] sin lanzar
+  expect(res.garbage).toEqual([]);
+  expect(res.nullInput).toEqual([]);
+});
+
+test('generateDiagrams: lote usable en 1 intento; basura la primera vez → exactamente una regeneración (2 llamadas)', async ({ page }) => {
+  const batch = JSON.stringify({ diagrams: [
+    { concept: 'Flujo de mensajes', svg: CLEAN_SVG, answerNodeId: 'tgt', question: '¿Qué desacopla al productor del consumidor?', contextFact: 'El buffer desacopla ambos ritmos.' },
+    { concept: 'Ciclo de extracción', svg: CLEAN_SVG.replace('tgt', 'tgt2'), answerNodeId: 'tgt2', question: '¿Quién extrae los mensajes?', contextFact: 'El consumidor extrae después.' },
+  ] });
+  await setupStreamStub(page, batch);
+  const res = await inPage(page, async (chapter: string) => {
+    const VC = await import('/js/ai/visual-cards.js');
+    return VC.generateDiagrams({ chapterText: chapter, count: 2 });
+  }, CHAPTER_TEXT);
+  expect(res.attempts).toBe(1);
+  expect(res.diagrams).toHaveLength(2);
+  expect(res.diagrams[0].question).toBe('¿Qué desacopla al productor del consumidor?');
+  expect(res.diagrams[1].answerNodeId).toBe('tgt2');
+  let state = await page.evaluate(() => (window as any).__vc);
+  expect(state.calls).toHaveLength(1);
+  expect(state.calls[0].stream).toBe(true);
+  expect(state.calls[0].max_tokens).toBeGreaterThanOrEqual(4000);
+  expect(state.calls[0].messages[0].content).toContain('ESTRUCTURA RELACIONAL');
+
+  // Primera llamada basura (JSON truncado), segunda usable: exactamente UNA regeneración.
+  await setupStreamStub(page, ['Aquí va: {"diagrams":[{"concept":"roto"', batch]);
+  const res2 = await inPage(page, async (chapter: string) => {
+    const VC = await import('/js/ai/visual-cards.js');
+    return VC.generateDiagrams({ chapterText: chapter, count: 2 });
+  }, CHAPTER_TEXT);
+  expect(res2.attempts).toBe(2);
+  expect(res2.diagrams).toHaveLength(2);
+  state = await page.evaluate(() => (window as any).__vc);
+  expect(state.calls).toHaveLength(2);             // solo una regeneración
+});
+
+test('buildDrawingCardMessages y parseDrawingCards: consigna en español, rúbrica de ≥3 pasos, descartes y cap', async ({ page }) => {
+  await page.goto('/index.html');
+  await seedProLicense(page);
+  const { msgs, parsed } = await inPage(page, async ({ chapter }: any) => {
+    const VC = await import('/js/ai/visual-cards.js');
+    const msgs = VC.buildDrawingCardMessages({ chapterText: chapter, count: 2 });
+    const good = { question: 'Dibujá de memoria el flujo de mensajes del productor al consumidor.', steps: ['El productor publica en el buffer', 'El buffer acumula los mensajes', 'El consumidor los extrae después'], contextFact: 'El buffer desacopla ambos ritmos.' };
+    const twoSteps = { question: 'Dibujá de memoria algo.', steps: ['paso 1', 'paso 2'], contextFact: 'f' };
+    const blankSteps = { question: 'Dibujá de memoria el ciclo.', steps: ['El productor publica', '   ', 'El buffer acumula', 'El consumidor extrae'], contextFact: 'f' };
+    const noQuestion = { question: '   ', steps: ['a', 'b', 'c'], contextFact: 'f' };
+    const wrapped = 'Claro:\n```json\n' + JSON.stringify({ cards: [good, twoSteps, noQuestion] }) + '\n```';
+    return {
+      msgs,
+      parsed: {
+        wrapped: VC.parseDrawingCards(wrapped),
+        blankSteps: VC.parseDrawingCards(JSON.stringify({ cards: [blankSteps] })),
+        capped: VC.parseDrawingCards(JSON.stringify({ cards: [good, good] }), { maxCards: 1 }),
+        garbage: VC.parseDrawingCards('basura { sin cerrar'),
+        nullInput: VC.parseDrawingCards(null as any),
+      },
+    };
+  }, { chapter: CHAPTER_TEXT });
+  // Prompt: consigna con "Dibujá de memoria", rúbrica de 3..7 pasos, rastreable y español.
+  expect(msgs).toHaveLength(1);
+  expect(msgs[0].role).toBe('system');
+  expect(msgs[0].content).toContain('Dibujá de memoria');
+  expect(msgs[0].content).toContain('hasta 2');
+  expect(msgs[0].content).toContain('entre 3 y 7');
+  expect(msgs[0].content).toContain('rúbrica');
+  expect(msgs[0].content).toContain('rastreable');
+  expect(msgs[0].content).toContain('ESPAÑOL');
+  expect(msgs[0].content).toContain('"cards"');
+  expect(msgs[0].content).toContain(CHAPTER_TEXT);
+  // Parseo: solo la tarjeta completa sobrevive (2 pasos no es rúbrica); pasos en blanco
+  // se filtran; cap; basura → [] sin lanzar.
+  expect(parsed.wrapped).toEqual([
+    { question: 'Dibujá de memoria el flujo de mensajes del productor al consumidor.', steps: ['El productor publica en el buffer', 'El buffer acumula los mensajes', 'El consumidor los extrae después'], contextFact: 'El buffer desacopla ambos ritmos.' },
+  ]);
+  expect(parsed.blankSteps).toHaveLength(1);       // 3 pasos reales tras filtrar blanks
+  expect(parsed.blankSteps[0].steps).toHaveLength(3);
+  expect(parsed.capped).toHaveLength(1);
+  expect(parsed.garbage).toEqual([]);
+  expect(parsed.nullInput).toEqual([]);
+});
+
+test('generateDrawingCards: rúbrica válida via stream → { cards: [...] }', async ({ page }) => {
+  const payload = JSON.stringify({ cards: [
+    { question: 'Dibujá de memoria el flujo de mensajes del productor al consumidor.', steps: ['El productor publica en el buffer', 'El buffer acumula los mensajes', 'El consumidor los extrae después'], contextFact: 'El buffer desacopla ambos ritmos.' },
+  ] });
+  await setupStreamStub(page, payload);
+  const res = await inPage(page, async (chapter: string) => {
+    const VC = await import('/js/ai/visual-cards.js');
+    return VC.generateDrawingCards({ chapterText: chapter, count: 1 });
+  }, CHAPTER_TEXT);
+  expect(res.cards).toEqual([
+    { question: 'Dibujá de memoria el flujo de mensajes del productor al consumidor.', steps: ['El productor publica en el buffer', 'El buffer acumula los mensajes', 'El consumidor los extrae después'], contextFact: 'El buffer desacopla ambos ritmos.' },
+  ]);
+  const state = await page.evaluate(() => (window as any).__vc);
+  expect(state.calls).toHaveLength(1);
+  expect(state.calls[0].stream).toBe(true);
+  expect(state.calls[0].messages[0].content).toContain('Dibujá de memoria');
 });

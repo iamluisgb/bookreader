@@ -187,6 +187,47 @@ export function buildDiagramMessages({ concept, chapterText } = {}) {
 }
 
 // ---------------------------------------------------------------------------
+// Prompt 3 (variante por LOTE) — varios diagramas en una sola llamada.
+// ---------------------------------------------------------------------------
+
+// El modelo SELECCIONA los conceptos con estructura relacional y los genera en el mismo
+// turno: una llamada en vez de N (una por concepto, con gate individual) a cambio de una
+// salida más larga — por eso comparte el presupuesto generoso de la pedagogía.
+function diagramBatchPrompt({ chapterText, count }) {
+  return `Eres un experto en aprendizaje multimedia (principios de Mayer) que convierte conceptos de un libro en diagramas de estudio con un nodo oculto.
+
+TEXTO DEL CAPÍTULO (única fuente permitida para el contenido):
+"""
+${String(chapterText ?? '')}
+"""
+
+TAREA: elegí hasta ${count} conceptos DISTINTOS del capítulo que tengan ESTRUCTURA RELACIONAL
+(secuencia, flujo, comparación o jerarquía) y generá un diagrama por concepto en este mismo
+turno (seleccionar y generar en la misma pasada evita una llamada por concepto).
+Mejor menos diagramas que diagramas forzados: un concepto sin estructura relacional se deja afuera.
+
+Cada diagrama debe cumplir TODAS estas reglas:
+- viewBox="0 0 720 H" con H entre 180 y 280 (relación de aspecto apaisada, sin px fijos fuera del viewBox).
+- Clases obligatorias: "d-box" en las cajas, "d-txt" en los textos, "d-cap" en los rótulos de
+  flechas/leyendas, "d-line" en las líneas y flechas.
+- El NODO OBJETIVO (la respuesta que el estudiante debe recordar) lleva un id único
+  (answerNodeId) y su texto es "?" en el frente; al voltear la tarjeta se le añaden las clases
+  "is-fill" e "is-strong" y se muestra la respuesta. Los demás nodos van completos.
+- Solo formas y texto SVG básicos (rect, line, path, text, g). Sin scripts, sin eventos, sin
+  imágenes externas: el SVG se sanitiza después y lo inválido se descarta.
+- TODO el texto del diagrama en ESPAÑOL.
+
+FORMATO (obligatorio): responde SOLO con un objeto JSON válido, sin markdown ni texto alrededor:
+{"diagrams":[{"concept":"<concepto diagramado>","svg":"<svg ...>...</svg>","answerNodeId":"<id del nodo objetivo>","question":"<pregunta en español>","contextFact":"<dato rastreable al capítulo>"}]}`;
+}
+
+// Mensajes de texto para la variante por lote del prompt 3: mismas reglas que el single,
+// pero pide hasta `count` diagramas distintos del capítulo en una sola llamada.
+export function buildDiagramBatchMessages({ chapterText, count = 2 } = {}) {
+  return [{ role: 'system', content: diagramBatchPrompt({ chapterText, count }) }];
+}
+
+// ---------------------------------------------------------------------------
 // Parsers tolerantes. Nunca lanzan.
 // ---------------------------------------------------------------------------
 
@@ -305,6 +346,47 @@ export function parseDiagramResponse(text) {
   return { usable: false, reason: 'no usable JSON object found' };
 }
 
+// Normaliza una entrada cruda del lote de diagramas. null si no sirve: exige answerNodeId
+// no vacío y presente en el markup (sanitizeSvg lo verifica) y question no vacía.
+function sanitizeDiagramBatchEntry(entry) {
+  if (!entry || typeof entry !== 'object') return null;
+  const concept = typeof entry.concept === 'string' ? entry.concept.trim() : '';
+  const answerNodeId = typeof entry.answerNodeId === 'string' ? entry.answerNodeId.trim() : '';
+  const question = typeof entry.question === 'string' ? entry.question.trim() : '';
+  if (!answerNodeId || !question) return null;
+  const check = sanitizeSvg(entry.svg, { answerNodeId });
+  if (!check.ok) return null;
+  const contextFact = typeof entry.contextFact === 'string' ? entry.contextFact.trim() : '';
+  return { concept, svg: check.svg, answerNodeId, question, contextFact };
+}
+
+// Parseo tolerante de la respuesta del lote del prompt 3. Misma tolerancia que sus
+// hermanos (prosa/fences/truncado): busca el objeto con "diagrams" array y valida cada
+// entrada con sanitizeSvg; las inválidas se descartan SIN tirar las demás, se deduplica
+// por concepto normalizado (misma comparación sin caso ni tildes que las labels) y se
+// cappea a maxCards. NUNCA lanza: [] = nada aprovechable.
+export function parseDiagramBatchResponse(text, { maxCards = 2 } = {}) {
+  const raw = stripWrappers(text);
+  for (const chunk of balancedObjects(raw)) {
+    let obj;
+    try { obj = JSON.parse(chunk); } catch { continue; }   // truncado/roto → siguiente
+    if (!obj || typeof obj !== 'object' || !Array.isArray(obj.diagrams)) continue;
+    const seen = new Set();
+    const out = [];
+    for (const entry of obj.diagrams) {
+      if (out.length >= maxCards) break;
+      const card = sanitizeDiagramBatchEntry(entry);
+      if (!card) continue;
+      const key = normalizeText(card.concept);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(card);
+    }
+    return out;
+  }
+  return [];
+}
+
 // ---------------------------------------------------------------------------
 // Llamadores finos (async). UI-cero: la Vista llama, esto responde datos.
 // ---------------------------------------------------------------------------
@@ -373,4 +455,114 @@ export async function generateDiagram({ concept, chapterText, signal } = {}) {
     signal,
   });
   return parseDiagramResponse(raw);
+}
+
+// Prompt 3 por lote (texto, no tools: el SVG es prosa larga dentro del JSON). Si NINGÚN
+// diagrama sale usable, regenera UNA vez — el spec cierra el reintento diferido de WU3
+// con "1 regeneración → descarte": si tampoco sale nada, se devuelven cero diagramas.
+// AbortError propaga (no reintentar con la señal ya abortada); nada más lanza.
+export async function generateDiagrams({ chapterText, count = 2, signal } = {}) {
+  const messages = buildDiagramBatchMessages({ chapterText, count });
+  let attempts = 0;
+  try {
+    let raw = await LLM.chatStream({ messages, maxTokens: PEDAGOGY_MAX_TOKENS, signal });
+    attempts = 1;
+    let diagrams = parseDiagramBatchResponse(raw, { maxCards: count });
+    if (!diagrams.length) {
+      // Regeneración única: otra pasada con el mismo prompt y el mismo presupuesto.
+      raw = await LLM.chatStream({ messages, maxTokens: PEDAGOGY_MAX_TOKENS, signal });
+      attempts = 2;
+      diagrams = parseDiagramBatchResponse(raw, { maxCards: count });
+    }
+    return { diagrams, attempts };
+  } catch (e) {
+    if (e && e.name === 'AbortError') throw e;   // cancelación del usuario: propaga, no reintenta
+    return { diagrams: [], attempts };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Prompt 4 — tarjetas de dibujo (proceso para dibujar de memoria + rúbrica).
+// ---------------------------------------------------------------------------
+
+// La rúbrica (steps) es el contrato con la revisión del boceto de WU6: el modelo de visión
+// coteja el dibujo del lector contra estos pasos, así que deben ser concretos y ordenados.
+function drawingCardPrompt({ chapterText, count }) {
+  return `Eres un experto en aprendizaje multimedia (principios de Mayer) que prepara ejercicios de recuerdo activo con dibujo: el lector dibuja de memoria un proceso del libro y después compara su boceto contra una rúbrica de pasos esperados.
+
+TEXTO DEL CAPÍTULO (única fuente permitida para el contenido):
+"""
+${String(chapterText ?? '')}
+"""
+
+REGLAS (obligatorias):
+- Elegí hasta ${count} PROCESOS o SECUENCIAS del capítulo que valga la pena dibujar de memoria:
+  algo con pasos ordenados (un flujo, un ciclo, una transformación). Si no hay ninguno,
+  devuelve {"cards":[]}. Mejor cero tarjetas que una mala.
+- "question": la consigna en ESPAÑOL, empezando con "Dibujá de memoria ..." y AUTOCONTENIDA
+  (se entiende sin tener el libro delante).
+- "steps": entre 3 y 7 pasos ORDENADOS y concretos del proceso, con los nombres de los
+  componentes conectados (no frases genéricas tipo "paso 1"). Son la rúbrica con la que
+  después se revisa el boceto del lector.
+- "contextFact": UN dato del capítulo que ayude a recordar el proceso, rastreable al texto
+  del capítulo: debe poder SUBRAYARSE en él. Prohibido inventar datos que el texto no diga.
+- TODO lo visible para el usuario va en ESPAÑOL.
+
+FORMATO (obligatorio): responde SOLO con un objeto JSON válido, sin markdown ni texto alrededor:
+{"cards":[{"question":"Dibujá de memoria ...","steps":["paso 1","paso 2","paso 3"],"contextFact":"..."}]}`;
+}
+
+// Mensajes de texto para el prompt 4: consigna de dibujo de memoria + rúbrica de pasos.
+export function buildDrawingCardMessages({ chapterText, count = 1 } = {}) {
+  return [{ role: 'system', content: drawingCardPrompt({ chapterText, count }) }];
+}
+
+// Normaliza una tarjeta de dibujo cruda. null si no sirve: sin question no hay consigna y
+// con menos de 3 pasos no es una rúbrica (es una pregunta suelta).
+function sanitizeDrawingCard(card) {
+  if (!card || typeof card !== 'object') return null;
+  const question = typeof card.question === 'string' ? card.question.trim() : '';
+  const steps = (Array.isArray(card.steps) ? card.steps : [])
+    .map(s => (typeof s === 'string' ? s.trim() : ''))
+    .filter(Boolean);
+  if (!question || steps.length < 3) return null;
+  const contextFact = typeof card.contextFact === 'string' ? card.contextFact.trim() : '';
+  return { question, steps, contextFact };
+}
+
+// Parseo tolerante de la respuesta del prompt 4. Misma tolerancia que sus hermanos
+// (prosa/fences/truncado): busca el objeto con "cards" array y exige question no vacía y
+// steps con AL MENOS 3 strings no vacíos tras trim; las inválidas se descartan SIN tirar
+// las demás y se cappea a maxCards. NUNCA lanza: [] = nada aprovechable.
+export function parseDrawingCards(text, { maxCards = 1 } = {}) {
+  const raw = stripWrappers(text);
+  for (const chunk of balancedObjects(raw)) {
+    let obj;
+    try { obj = JSON.parse(chunk); } catch { continue; }   // truncado/roto → siguiente
+    if (!obj || typeof obj !== 'object' || !Array.isArray(obj.cards)) continue;
+    const out = [];
+    for (const card of obj.cards) {
+      if (out.length >= maxCards) break;
+      const clean = sanitizeDrawingCard(card);
+      if (clean) out.push(clean);
+    }
+    return out;
+  }
+  return [];
+}
+
+// Prompt 4 (texto, no tools: la rúbrica es prosa dentro del JSON). Devuelve { cards }
+// (posiblemente vacío) ya validado. AbortError propaga; nada más lanza.
+export async function generateDrawingCards({ chapterText, count = 1, signal } = {}) {
+  try {
+    const raw = await LLM.chatStream({
+      messages: buildDrawingCardMessages({ chapterText, count }),
+      maxTokens: PEDAGOGY_MAX_TOKENS,
+      signal,
+    });
+    return { cards: parseDrawingCards(raw, { maxCards: count }) };
+  } catch (e) {
+    if (e && e.name === 'AbortError') throw e;   // cancelación del usuario: propaga
+    return { cards: [] };
+  }
 }
