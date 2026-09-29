@@ -37,6 +37,11 @@ const CHUNK_TOKENS = 10000;
 const BOOK_TOKENS = 40000;
 const COUNTS = [10, 15, 20, 30];
 const MAX_PREV_FRONTS = 40;   // nº de frentes previos que se pasan al siguiente trozo (anti-duplicados)
+// Tipos de TEXTO multi-selección (orden estable: basic siempre primero). El "solo
+// visuales" ya no es opción: es el caso implícito de no marcar ningún tipo de texto.
+const TEXT_TYPES = ['basic', 'cloze'];
+// Nombre del tipo DENTRO de los prompts (contenido para el modelo, no UI: no pasa por t()).
+const TYPE_NAMES = { basic: 'Pregunta → Respuesta', cloze: 'Cloze (huecos)' };
 
 let ctx = null;        // { bookId, bookTitle, goal, tocLabels, currentChapter, ensureIndex }
 let overlay = null;
@@ -107,12 +112,10 @@ async function renderSetup() {
     <div id="fc-scope"></div>
     <label class="fc-label">${t('Tipo de tarjeta')}</label>
     <div class="fc-types">
-      <label class="fc-type"><input type="radio" name="fc-type" value="basic" checked>
+      <label class="fc-type"><input type="checkbox" name="fc-type" value="basic" checked>
         <span><b>${t('Pregunta → Respuesta')}</b><small>${t('Clásicas. Para conceptos y definiciones.')}</small></span></label>
-      <label class="fc-type"><input type="radio" name="fc-type" value="cloze">
+      <label class="fc-type"><input type="checkbox" name="fc-type" value="cloze">
         <span><b>${t('Cloze (huecos)')}</b><small>${t('Frases con el dato clave oculto {{c1::así}}.')}</small></span></label>
-      <label class="fc-type"><input type="radio" name="fc-type" value="none">
-        <span><b>${t('Solo tarjetas visuales')}</b><small>${t('Sin texto: solo figuras, diagramas y dibujo.')}</small></span></label>
     </div>
     <div class="fc-types fc-vtypes">
       <label class="fc-type"><input type="checkbox" name="fc-vtype" value="occlusion">
@@ -125,6 +128,7 @@ async function renderSetup() {
     <p class="ai-ob-sub" id="fc-vhint" hidden>${t('Las figuras se extraen del libro en la primera generación: la primera vez tarda más.')}</p>
     <label class="fc-label" for="fc-count">${t('Cantidad')}</label>
     <select id="fc-count" class="fc-select">${COUNTS.map(n => `<option ${n === defaultCount ? 'selected' : ''}>${n}</option>`).join('')}</select>
+    <p class="ai-ob-sub" id="fc-split" hidden></p>
     <div id="fc-dup"></div>
     <button id="fc-generate" class="primary-btn ai-ob-start">${icon('sparkles', { size: 16 })} ${t('Generar tarjetas')}</button>
     <div id="fc-error" class="fc-error" style="display:none"></div>
@@ -132,40 +136,70 @@ async function renderSetup() {
   mountScopeCombo(b.querySelector('#fc-scope'), options, scopeValue, (v) => { scopeValue = v; refreshDupNote(); });
   b.querySelector('#fc-generate').addEventListener('click', onGenerate);
   b.querySelectorAll('input[name="fc-type"], input[name="fc-vtype"]').forEach(el =>
-    el.addEventListener('change', () => { refreshGenerateState(); refreshDupNote(); }));
+    el.addEventListener('change', () => { refreshGenerateState(); refreshSplitHint(); refreshDupNote(); }));
+  b.querySelector('#fc-count').addEventListener('change', refreshSplitHint);
   refreshGenerateState();
+  refreshSplitHint();
   renderDeckList();
   refreshDupNote();
 }
 
-// Selección del menú multi-tipo: tipo de TEXTO (o null con "Solo tarjetas visuales") y
-// familias visuales marcadas. Única fuente de verdad para el tipo efectivo del mazo.
+// Selección del menú multi-tipo: tipos de TEXTO marcados (en orden estable) y familias
+// visuales marcadas. Única fuente de verdad para el tipo efectivo del mazo. Con ambos
+// tipos de texto marcados se generan DOS pasadas (una por tipo); sin ninguno, solo
+// visuales (el antiguo radio "none", ahora implícito).
 function selectedTypes() {
   const b = body();
-  const radio = b?.querySelector('input[name="fc-type"]:checked')?.value;
+  const text = TEXT_TYPES.filter(tp => b?.querySelector(`input[name="fc-type"][value="${tp}"]`)?.checked);
   const visual = [...(b?.querySelectorAll('input[name="fc-vtype"]:checked') || [])]
     .map(el => el.value).filter(v => VISUAL_TYPES.includes(v));
-  return { text: radio && radio !== 'none' ? radio : null, visual };
+  return { text, visual };
 }
 
-// Tipo con el que se etiqueta el mazo: "mixed" cuando se combinan texto con visuales (o
-// dos o más visuales); si no, el único tipo elegido. Sin nada (botón deshabilitado) cae a
-// "basic" para no propagar null.
+// Tipo con el que se etiqueta el mazo: "mixed" cuando se combina más de una cosa (dos
+// tipos de texto, o texto con visuales); si no, el único tipo elegido. Sin nada (botón
+// deshabilitado) cae a "basic" para no propagar un array vacío.
 function effectiveDeckType(sel) {
-  const picked = (sel.text ? 1 : 0) + sel.visual.length;
+  const picked = sel.text.length + sel.visual.length;
   if (picked >= 2) return 'mixed';
-  return sel.text || sel.visual[0] || 'basic';
+  return sel.text[0] || sel.visual[0] || 'basic';
 }
 
-// El botón de generar solo se habilita con ALGO elegido: radio "none" + cero visuales no
-// produciría tarjetas. El hint de figuras se muestra en cuanto hay una familia visual.
+// Reparte el total ENTRE los tipos de texto elegidos: el total es la SUMA y las partes
+// son iguales, con el resto para los primeros del orden estable (20 → 10/10;
+// 15 → 8/7; 10 → 5/5). Pura, testeable.
+export function splitQuota(total, types) {
+  const n = Math.max(1, types);
+  const base = Math.floor(total / n);
+  const rem = total % n;
+  return Array.from({ length: n }, (_, i) => base + (i < rem ? 1 : 0));
+}
+
+// El botón de generar solo se habilita con ALGO elegido: ningún tipo de texto ni familia
+// visual no produciría tarjetas. El hint de figuras se muestra en cuanto hay una familia
+// visual; el hint de reparto, solo con DOS tipos de texto (la cantidad se divide).
 function refreshGenerateState() {
   const b = body();
   const btn = b?.querySelector('#fc-generate');
   const hint = b?.querySelector('#fc-vhint');
   const sel = selectedTypes();
-  if (btn) btn.disabled = !sel.text && !sel.visual.length;
+  if (btn) btn.disabled = !sel.text.length && !sel.visual.length;
   if (hint) hint.hidden = !sel.visual.length;
+}
+
+// Con dos tipos de texto el total se divide entre pasadas: se lo decimos ANTES de
+// generar (15 → 8 P→R + 7 Cloze) y avisamos de que las visuales añaden las suyas aparte.
+function refreshSplitHint() {
+  const b = body();
+  const el = b?.querySelector('#fc-split');
+  if (!el) return;
+  const sel = selectedTypes();
+  if (sel.text.length < 2) { el.hidden = true; return; }
+  const count = parseInt(b.querySelector('#fc-count').value, 10);
+  const [a, r] = splitQuota(count, sel.text.length);
+  el.textContent = t('{n} en total · {a} P→R + {b} Cloze', { n: count, a, b: r })
+    + (sel.visual.length ? ' ' + t('Las tarjetas visuales se suman aparte.') : '');
+  el.hidden = false;
 }
 
 // P24 F4 · Regenerar el mismo alcance creaba un mazo PARALELO: el anti-duplicados
@@ -400,7 +434,7 @@ export function allocateCounts(chunks, total) {
 // retrieval.js desde que también la usa el gate de IA7; se re-exporta por compatibilidad.
 export const detectLang = Retrieval.detectLang;
 
-function cardsPrompt(count, type, goal, { viaTool = false, prevFronts = [], lang = '' } = {}) {
+function cardsPrompt(count, type, goal, { viaTool = false, prevFronts = [], lang = '', otherTypes = [] } = {}) {
   const shape = type === 'cloze'
     ? `- "front": una frase con el dato CLAVE oculto en sintaxis cloze de Anki: {{c1::texto oculto}}
   (máximo 2 huecos por tarjeta, {{c1::..}} y {{c2::..}}). Oculta términos/datos importantes, no palabras triviales.
@@ -419,6 +453,15 @@ Cada tarjeta es {"front": "...", "back": "...", "chapter": "...", "src": "..."}:
 
 YA EXISTEN estas tarjetas de otros pasajes del libro (NO repitas su contenido):
 ${prevFronts.map(f => '- ' + f).join('\n')}` : '';
+  // WU3 · Arbitraje de formato por concepto: SOLO cuando hay más de un tipo de texto
+  // elegido (cada pasada corre con su propio tipo). El agente decide qué formato le
+  // sienta a cada concepto en vez de forzárselo: los conceptos de formato natural ajeno
+  // los omite aquí y los cubre la pasada que los nombra. Con un solo tipo la cláusula NO
+  // existe: el prompt de una pasada debe ser idéntico byte a byte al de siempre
+  // (contrato EV5: el baseline se midió con ese prompt).
+  const arbitration = otherTypes.length
+    ? `\n- ARBITRAJE DE FORMATO: esta pasada genera SOLO tarjetas ${TYPE_NAMES[type]}. De los conceptos de los pasajes, incluye únicamente los cuyo formato natural es ese; los que funcionen mejor como ${otherTypes.map(o => TYPE_NAMES[o]).join(' / ')}, OMÍTELOS aquí: los cubre la pasada de ${otherTypes.map(o => TYPE_NAMES[o]).join(' / ')}. No fuerces el formato sobre un concepto que no le sienta.`
+    : '';
   return `Eres un experto en repetición espaciada creando flashcards de Anki de máxima calidad a partir de pasajes de un libro.
 
 REGLAS DE CALIDAD (obligatorias):
@@ -434,7 +477,7 @@ REGLAS DE CALIDAD (obligatorias):
   corrige toda tarjeta cuyo "back" no se pueda subrayar ahí.${goal ? `
 - OBJETIVO DEL LECTOR: «${goal}». Pregunta primero lo que un examen sobre ese objetivo
   preguntaría; descarta lo que no ayude a ese objetivo aunque esté en los pasajes.` : ''}
-- Sin tarjetas duplicadas ni casi iguales.
+- Sin tarjetas duplicadas ni casi iguales.${arbitration}
 - IDIOMA: TODAS las tarjetas ${lang ? `en ${lang === 'es' ? 'ESPAÑOL' : 'INGLÉS'} (el idioma de los pasajes)` : 'en el idioma de los PASAJES'} —
   no el de estas instrucciones ni el del objetivo del lector. Nunca mezcles idiomas entre tarjetas.
 - Material administrativo (licencias, copyright, créditos, índices, promoción) NO da
@@ -562,7 +605,7 @@ export function attachSources(cards, { validIds, search, textOf }) {
 //   3) fallback a texto + parser tolerante (proveedores BYOK sin function calling).
 // Devuelve { cards, mode } con el escalón que funcionó: los trozos siguientes entran
 // directos por ahí (no se re-prueba un camino roto en cada trozo).
-async function generateChunk({ text, ask, type, goal, prevFronts, mode, signal, background = false }) {
+async function generateChunk({ text, ask, type, goal, prevFronts, otherTypes = [], mode, signal, background = false }) {
   const user = { role: 'user', content: 'PASAJES DEL LIBRO:\n\n' + text };
   const lang = detectLang(text);   // el prompt nombra el idioma del material (ver detectLang)
   // Cupo holgado por trozo: la salida es pequeña (≤ ask tarjetas) pero el razonamiento
@@ -576,7 +619,7 @@ async function generateChunk({ text, ask, type, goal, prevFronts, mode, signal, 
   const attempt = async (toolChoice, extra = []) => {
     const { toolCalls } = await LLM.chatTools({
       messages: [
-        { role: 'system', content: cardsPrompt(ask, type, goal, { viaTool: true, prevFronts, lang }) },
+        { role: 'system', content: cardsPrompt(ask, type, goal, { viaTool: true, prevFronts, lang, otherTypes }) },
         user, ...extra,
       ],
       tools: cardsTool(), toolChoice, maxTokens, signal, background,
@@ -601,7 +644,7 @@ async function generateChunk({ text, ask, type, goal, prevFronts, mode, signal, 
     } catch (e) { if (e.name === 'AbortError') throw e; }
   }
   const raw = await LLM.chatStream({
-    messages: [{ role: 'system', content: cardsPrompt(ask, type, goal, { prevFronts, lang }) }, user],
+    messages: [{ role: 'system', content: cardsPrompt(ask, type, goal, { prevFronts, lang, otherTypes }) }, user],
     maxTokens, signal, background,
   });
   return { cards: parseCards(raw, type), mode: 'text' };
@@ -619,14 +662,15 @@ function onGenerate() {
   const type = effectiveDeckType(sel);
   const count = parseInt(b.querySelector('#fc-count').value, 10);
 
-  // Camino de TEXTO: igual que siempre (chunks, map-reduce, attachSources). Con "solo
-  // visuales" no hay trozos que trocear y el índice de texto no se exige.
-  const wantsText = !!sel.text;
-  let chunks = [], counts = [];
+  // Camino de TEXTO: igual que siempre (chunks, map-reduce, attachSources). Los trozos se
+  // calculan UNA vez; con varios tipos de texto cada tipo corre SU pasada sobre esos
+  // mismos trozos con su cupo (WU1). Sin tipos de texto (solo visuales) no hay trozos que
+  // trocear y el índice de texto no se exige.
+  const wantsText = sel.text.length > 0;
+  let chunks = [];
   if (wantsText) {
     chunks = buildChunks(gatherScope(scopeLabel));
     if (!chunks.length) { showError(t('Ese contenido no tiene texto indexado; prueba con otro capítulo o con el libro entero.')); return; }
-    counts = allocateCounts(chunks, count);
   }
 
   // Todo lo que el job necesita se captura AHORA. El trabajo sobrevive al modal y hasta al
@@ -645,9 +689,12 @@ function onGenerate() {
     params: { scope: scopeLabel, scopeName: scopeLabel || t('Libro entero'), type, count },
     persist: false,        // el mazo vive en `decks`; ver Jobs.start
     run: async ({ signal, progress, background }) => {
-      // Map-reduce sobre los trozos: cada uno aporta su cupo (+ el déficit arrastrado de
-      // trozos anteriores que dieron de menos). Un trozo fallido no tira el mazo.
-      let cards = [], expected = 0, failed = 0, mode = 'forced';
+      // Map-reduce sobre los trozos, UNA PASADA por tipo de texto elegido (orden estable):
+      // cada pasada corre la escalera completa con SU cupo del total (splitQuota). Los
+      // frentes acumulan ENTRE pasadas en `cards`: el prevFronts de la segunda pasada
+      // lleva los de la primera, así el arbitraje no produce el mismo concepto dos veces.
+      // Un trozo/pasada fallido no tira el trabajo del resto (éxito parcial, ya avisado).
+      let cards = [], failed = 0, mode = 'forced';
       // Fusión (F4): los frentes que YA existen en el mazo destino se le pasan al modelo
       // como "no repitas esto" desde el primer trozo. Es más barato evitar el duplicado
       // que descartarlo después, y de paso el mazo crece con material nuevo de verdad.
@@ -656,29 +703,40 @@ function onGenerate() {
         const d = (await DB.getDecks(bookId)).find(x => x.id === target);
         seedFronts = DB.cardsOf(d || {}).map(c => c.front);
       }
+      const quotas = splitQuota(count, sel.text.length);
       progress(0, count, 'map');
-      for (let i = 0; i < chunks.length; i++) {
-        if (!counts[i]) continue;
-        // Déficit arrastrado con TOPE: si varios trozos anteriores dieron poco (modelo con
-        // mal día), sin tope el último trozo absorbía el cupo entero — el eval EV1 cazó un
+      for (let ti = 0; ti < sel.text.length; ti++) {
+        const textType = sel.text[ti];
+        const counts = allocateCounts(chunks, quotas[ti]);
+        // Los demás tipos elegidos alimentan la cláusula de arbitraje (WU3): en esta
+        // pasada solo van los conceptos de formato natural textType.
+        const otherTypes = sel.text.filter(x => x !== textType);
+        // Déficit POR PASADA (no entre pasadas): si varios trozos anteriores dieron de
+        // menos, sin tope el último trozo absorbía el cupo entero — el eval EV1 cazó un
         // mazo completo salido de un único capítulo. Mejor un mazo corto y repartido
         // ("éxito parcial", ya avisado abajo) que uno completo y monotema.
-        const deficit = Math.min(Math.max(0, expected - cards.length), counts[i] + 2);
-        expected += counts[i];
-        try {
-          const res = await generateChunk({
-            text: chunks[i].text, ask: counts[i] + deficit, type, goal,
-            prevFronts: seedFronts.concat(cards.map(c => c.front)).slice(-MAX_PREV_FRONTS),
-            mode, signal, background,
-          });
-          mode = res.mode;
-          cards = cards.concat(res.cards.slice(0, counts[i] + deficit));
-        } catch (e) {
-          if (e.name === 'AbortError') throw e;
-          console.warn(`Flashcards: el trozo ${i + 1}/${chunks.length} falló:`, e);
-          failed++;
+        let expected = 0, passCards = 0;
+        for (let i = 0; i < chunks.length; i++) {
+          if (!counts[i]) continue;
+          const deficit = Math.min(Math.max(0, expected - passCards), counts[i] + 2);
+          expected += counts[i];
+          try {
+            const res = await generateChunk({
+              text: chunks[i].text, ask: counts[i] + deficit, type: textType, goal,
+              prevFronts: seedFronts.concat(cards.map(c => c.front)).slice(-MAX_PREV_FRONTS),
+              otherTypes, mode, signal, background,
+            });
+            mode = res.mode;
+            const fresh = res.cards.slice(0, counts[i] + deficit);
+            cards = cards.concat(fresh);
+            passCards += fresh.length;
+          } catch (e) {
+            if (e.name === 'AbortError') throw e;
+            console.warn(`Flashcards: el trozo ${i + 1}/${chunks.length} falló:`, e);
+            failed++;
+          }
+          progress(Math.min(cards.length, count), count, 'map');
         }
-        progress(Math.min(cards.length, count), count, 'map');
       }
       // Familias visuales (secuenciales, dentro del MISMO job): resolver las figuras del
       // libro (store primero; si no, extracción con el documento del lector — nunca el de
@@ -726,7 +784,7 @@ function onGenerate() {
       // — hay que decirlo, no simular éxito con un mazo vacío.
       const target0 = target ? (await DB.getDecks(bookId)).find(x => x.id === target) : null;
       if (!cards.length && !target0) {
-        if (!sel.text && sel.visual.length === 1 && sel.visual[0] === 'occlusion') {
+        if (!sel.text.length && sel.visual.length === 1 && sel.visual[0] === 'occlusion') {
           throw new Error(t('No se encontraron figuras en este libro, así que no hay tarjetas de oclusión que generar.'));
         }
         throw new Error(t('El modelo no devolvió tarjetas válidas. Vuelve a intentarlo.'));

@@ -29,7 +29,7 @@ const CANNED_CARDS = [
 async function stubLLM(page, content: string, delayMs = 0) {
   await page.evaluate(({ payload, delayMs }) => {
     const real = window.fetch.bind(window);
-    (window as any).__fc = { tool: 0, stream: 0 };
+    (window as any).__fc = { tool: 0, stream: 0, prompts: [] as string[] };
     window.fetch = async (url: any, opts: any) => {
       const u = typeof url === 'string' ? url : url?.url || '';
       if (u.includes('/chat/completions') && opts?.body) {
@@ -51,6 +51,7 @@ async function stubLLM(page, content: string, delayMs = 0) {
         const isCards = (body.tools || []).some((t: any) => t.function?.name === 'create_flashcards');
         if (isCards) {
           (window as any).__fc.tool++;
+          (window as any).__fc.prompts.push(sys);   // para asertar el prompt de cada pasada
           let cards: any = null;
           try { const p = JSON.parse(payload); if (Array.isArray(p)) cards = p; } catch { /* no-array → sin tool_call */ }
           const message = cards
@@ -582,17 +583,23 @@ async function currentBookId(page): Promise<string> {
   });
 }
 
-// El menú multi-tipo: tres radios de texto (basic/cloze/none) + grupo de visuales. Con
-// "none" y cero visuales el botón está deshabilitado; una familia visual lo habilita y
-// volver a un tipo de texto lo mantiene habilitado.
+// El menú multi-tipo: checkboxes de texto (basic/cloze) + grupo de visuales. Sin ningún
+// tipo marcado (texto ni visual) el botón está deshabilitado; una familia visual lo
+// habilita y volver a marcar un tipo de texto lo mantiene habilitado.
 test('el menú multi-tipo habilita generar solo con algún tipo elegido', async ({ page }) => {
   await setup(page);
   await openFromStudio(page, 'flashcards');
   await page.waitForSelector('#ai-flashcards', { timeout: 5000 });
-  await expect(page.locator('input[name="fc-type"]')).toHaveCount(3);
+  // WU1: los tipos de texto son checkboxes; el radio "solo visuales" ya no existe.
+  await expect(page.locator('input[name="fc-type"]')).toHaveCount(2);
+  await expect(page.locator('input[name="fc-type"][type="checkbox"]')).toHaveCount(2);
+  await expect(page.locator('input[name="fc-type"][value="none"]')).toHaveCount(0);
   await expect(page.locator('input[name="fc-vtype"]')).toHaveCount(3);
-  await page.check('input[name="fc-type"][value="none"]');
+  await page.uncheck('input[name="fc-type"][value="basic"]');
   await expect(page.locator('#fc-generate')).toBeDisabled();
+  await page.check('input[name="fc-type"][value="cloze"]');
+  await expect(page.locator('#fc-generate')).toBeEnabled();
+  await page.uncheck('input[name="fc-type"][value="cloze"]');
   await page.check('input[name="fc-vtype"][value="diagram"]');
   await expect(page.locator('#fc-generate')).toBeEnabled();
   await expect(page.locator('#fc-vhint')).toBeVisible();
@@ -609,7 +616,7 @@ test('generar con visuales produce un mazo mixed con oclusión y diagrama', asyn
   const figKey = await seedFigure(page, bookId);
   await openFromStudio(page, 'flashcards');
   await page.waitForSelector('#ai-flashcards', { timeout: 5000 });
-  await page.check('input[name="fc-type"][value="none"]');
+  await page.uncheck('input[name="fc-type"][value="basic"]');   // solo visuales (sin radio "none")
   await page.check('input[name="fc-vtype"][value="occlusion"]');
   await page.check('input[name="fc-vtype"][value="diagram"]');
   await page.click('#fc-generate');
@@ -633,10 +640,161 @@ test('oclusión sin figuras disponibles falla con el mensaje de figuras ausentes
   await setup(page);
   await openFromStudio(page, 'flashcards');
   await page.waitForSelector('#ai-flashcards', { timeout: 5000 });
-  await page.check('input[name="fc-type"][value="none"]');
+  await page.uncheck('input[name="fc-type"][value="basic"]');   // solo oclusión, sin texto
   await page.check('input[name="fc-vtype"][value="occlusion"]');
   await page.click('#fc-generate');
   await expect(page.locator('#fc-error')).toBeVisible({ timeout: 30000 });
   await expect(page.locator('#fc-error')).toHaveText(
     'No se encontraron figuras en este libro, así que no hay tarjetas de oclusión que generar.');
+});
+
+// ---- WU1/WU3 · Multi-tipo de texto: dos pasadas + arbitraje ------------------
+
+// Stub para las pasadas de TEXTO con multi-tipo: responde a create_flashcards con tantas
+// tarjetas como pide el prompt ("Genera EXACTAMENTE N"), del tipo que pide la pasada (el
+// prompt cloze lleva la sintaxis {{c1::}}). Entregar el cupo completo mantiene el déficit
+// en cero, así la suma de cupos pedidos por pasada es exactamente splitQuota. Registra
+// cada prompt de sistema en window.__fcText.prompts para asertar reparto, arbitraje y
+// anti-duplicados cruzado.
+async function stubTextLLM(page) {
+  await page.evaluate(() => {
+    const real = window.fetch.bind(window);
+    (window as any).__fcText = { prompts: [] as string[], seq: 0 };
+    window.fetch = async (url: any, opts: any) => {
+      const u = typeof url === 'string' ? url : url?.url || '';
+      if (u.includes('/chat/completions') && opts?.body) {
+        const body = JSON.parse(opts.body);
+        if ((body.tools || []).some((t: any) => t.function?.name === 'create_flashcards')) {
+          const sys = (body.messages || []).find((m: any) => m.role === 'system')?.content || '';
+          (window as any).__fcText.prompts.push(sys);
+          const ask = parseInt((sys.match(/Genera EXACTAMENTE (\d+) tarjetas/) || [])[1] || '0', 10);
+          const cloze = /sintaxis cloze de Anki/.test(sys);
+          const seq = ++(window as any).__fcText.seq;
+          const cards = Array.from({ length: ask }, (_, i) => cloze
+            ? { front: `El dato número {{c1::${seq}-${i + 1}}} queda oculto en el texto.`, back: 'aclaración cloze' }
+            : { front: `¿Qué afirma el pasaje ${seq} sobre el punto ${i + 1}?`, back: 'respuesta breve' });
+          const message = { content: '', tool_calls: [{ id: 'tc' + seq, function: { name: 'create_flashcards', arguments: JSON.stringify({ cards }) } }] };
+          return new Response(JSON.stringify({ choices: [{ message }] }), { status: 200 });
+        }
+      }
+      return real(url, opts);
+    };
+  });
+}
+
+// UI: dos checkboxes de texto, sin radio "solo visuales", botón bloqueado sin selección
+// y hint de reparto 8/7 con total 15 y ambos tipos marcados.
+test('WU1 UI: checkboxes de texto, sin radio "solo visuales" y hint de reparto 8/7', async ({ page }) => {
+  await setup(page);
+  await openFromStudio(page, 'flashcards');
+  await page.waitForSelector('#ai-flashcards', { timeout: 5000 });
+  await expect(page.locator('input[name="fc-type"]')).toHaveCount(2);
+  await expect(page.locator('input[name="fc-type"][value="none"]')).toHaveCount(0);
+  // Con ambos tipos y total 15, el hint muestra el reparto (resto al primero del orden).
+  await page.check('input[name="fc-type"][value="cloze"]');
+  await page.selectOption('#fc-count', '15');
+  await expect(page.locator('#fc-split')).toContainText('15 en total · 8 P→R + 7 Cloze');
+  // Con un solo tipo de texto el hint no aplica.
+  await page.uncheck('input[name="fc-type"][value="cloze"]');
+  await expect(page.locator('#fc-split')).toBeHidden();
+});
+
+// Dos pasadas: una por tipo de texto, en orden estable (basic antes que cloze), y el mazo
+// queda etiquetado 'mixed' con una tarjeta de cada tipo en IndexedDB.
+test('WU1: con basic + cloze se corren dos pasadas y el mazo queda mixed', async ({ page }) => {
+  await setup(page);
+  await stubTextLLM(page);
+  await openFromStudio(page, 'flashcards');
+  await page.waitForSelector('#ai-flashcards', { timeout: 5000 });
+  await page.check('input[name="fc-type"][value="cloze"]');
+  await page.click('#fc-generate');
+  await expect(page.locator('#ai-flashcards h2')).toContainText('tarjetas', { timeout: 30000 });
+  const { prompts } = await page.evaluate(() => (window as any).__fcText);
+  expect(prompts.length).toBeGreaterThan(0);
+  // Una pasada por tipo: todas las pasadas basic van antes que las cloze (orden estable).
+  const kinds = prompts.map((p: string) => (/sintaxis cloze de Anki/.test(p) ? 'cloze' : 'basic'));
+  expect(kinds.filter((k: string) => k === 'basic').length).toBeGreaterThan(0);
+  expect(kinds.filter((k: string) => k === 'cloze').length).toBeGreaterThan(0);
+  expect((kinds as string[]).join(',')).toMatch(/^basic(,basic)*,cloze(,cloze)*$/);
+  const decks = await page.evaluate(async () => (await import('/js/ai/db.js') as any).getAllDecks());
+  expect(decks).toHaveLength(1);
+  expect(decks[0].cardType).toBe('mixed');
+  const types = decks[0].cards.map((c: any) => c.type);
+  expect(types).toContain('basic');
+  expect(types).toContain('cloze');
+});
+
+// Anti-duplicados CRUZADO: el primer prompt de la pasada cloze lleva los frentes que la
+// pasada basic ya produjo (bloque "YA EXISTEN"), para no repetir el mismo concepto.
+test('WU1: la segunda pasada recibe los frentes de la primera como anti-duplicados', async ({ page }) => {
+  await setup(page);
+  await stubTextLLM(page);
+  await openFromStudio(page, 'flashcards');
+  await page.waitForSelector('#ai-flashcards', { timeout: 5000 });
+  await page.check('input[name="fc-type"][value="cloze"]');
+  await page.click('#fc-generate');
+  await expect(page.locator('#ai-flashcards h2')).toContainText('tarjetas', { timeout: 30000 });
+  const { prompts } = await page.evaluate(() => (window as any).__fcText);
+  const firstCloze = prompts.findIndex((p: string) => /sintaxis cloze de Anki/.test(p));
+  expect(firstCloze).toBeGreaterThan(0);                     // hubo una pasada basic antes
+  const front = '¿Qué afirma el pasaje 1 sobre el punto 1?'; // frente que produjo la pasada 1
+  expect(prompts[firstCloze]).toContain('YA EXISTEN');
+  expect(prompts[firstCloze]).toContain(front);
+});
+
+// Arbitraje de formato (WU3): con ambos tipos, CADA pasada lleva la cláusula nombrando el
+// formato de la otra.
+test('WU3: con dos tipos, cada prompt lleva la cláusula de arbitraje nombrando el otro', async ({ page }) => {
+  await setup(page);
+  await stubTextLLM(page);
+  await openFromStudio(page, 'flashcards');
+  await page.waitForSelector('#ai-flashcards', { timeout: 5000 });
+  await page.check('input[name="fc-type"][value="cloze"]');
+  await page.click('#fc-generate');
+  await expect(page.locator('#ai-flashcards h2')).toContainText('tarjetas', { timeout: 30000 });
+  const { prompts } = await page.evaluate(() => (window as any).__fcText);
+  for (const p of prompts) {
+    expect(p).toContain('ARBITRAJE DE FORMATO');
+    if (/sintaxis cloze de Anki/.test(p)) expect(p).toContain('Pregunta → Respuesta');
+    else expect(p).toContain('Cloze (huecos)');
+  }
+});
+
+// REGRESIÓN del baseline EV5: con UN solo tipo de texto el prompt NO lleva la cláusula y
+// conserva la forma de siempre (el baseline se midió con ese prompt exacto).
+test('WU3 baseline: con un solo tipo el prompt no lleva la cláusula de arbitraje', async ({ page }) => {
+  await setup(page);
+  await openFromStudio(page, 'flashcards');
+  await page.waitForSelector('#ai-flashcards', { timeout: 5000 });
+  await page.selectOption('#fc-count', '15');
+  await page.click('#fc-generate');
+  await expect(page.locator('#ai-flashcards h2')).toContainText('tarjetas', { timeout: 30000 });
+  const { prompts } = await page.evaluate(() => (window as any).__fc);
+  expect(prompts.length).toBeGreaterThan(0);
+  for (const p of prompts) {
+    expect(p).not.toContain('ARBITRAJE DE FORMATO');
+    expect(p).toContain('pregunta clara y AUTOCONTENIDA');
+    expect(p).toContain('Genera EXACTAMENTE');
+  }
+});
+
+// Reparto del total entre pasadas: con 10 y ambos tipos, cada pasada pide 5 en total
+// (suma de los "Genera EXACTAMENTE N" de sus trozos; el stub entrega el cupo completo,
+// así el déficit arrastrado es cero).
+test('WU1: con total 10 y ambos tipos, cada pasada pide 5 en total', async ({ page }) => {
+  await setup(page);
+  await stubTextLLM(page);
+  await openFromStudio(page, 'flashcards');
+  await page.waitForSelector('#ai-flashcards', { timeout: 5000 });
+  await page.check('input[name="fc-type"][value="cloze"]');
+  await page.selectOption('#fc-count', '10');
+  await page.click('#fc-generate');
+  await expect(page.locator('#ai-flashcards h2')).toContainText('tarjetas', { timeout: 30000 });
+  const { prompts } = await page.evaluate(() => (window as any).__fcText);
+  const sumAsked = (ps: string[]) => ps.reduce((s: number, p: string) =>
+    s + parseInt((p.match(/Genera EXACTAMENTE (\d+) tarjetas/) || [])[1] || '0', 10), 0);
+  const basic = prompts.filter((p: string) => !/sintaxis cloze de Anki/.test(p));
+  const cloze = prompts.filter((p: string) => /sintaxis cloze de Anki/.test(p));
+  expect(sumAsked(basic)).toBe(5);
+  expect(sumAsked(cloze)).toBe(5);
 });

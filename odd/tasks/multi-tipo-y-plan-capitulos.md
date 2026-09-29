@@ -72,6 +72,28 @@ el contrato **antes** de la primera línea de código:
 - **Time-box**: 2 ciclos. Si la cláusula de arbitraje no mueve nada, se clasifica el fallo y se
   cierra con el hallazgo (regla de EV5).
 
+**Cierre EV5 (medido 2026-09-29)** — dos corridas, mismo generador (`deepseek-v4-flash`), mismo juez
+(`glm5.3-flash`):
+
+| Métrica | Baseline (run 12-18) | Después (run 13-53) | Lectura |
+|---|---|---|---|
+| Deterministas (p1 y p4) | 15 tarjetas · 15 anclas válidas · 0 dupes · 0 idioma mal | **idénticos** | El camino de un solo tipo no cambió (prompt byte-idéntico) |
+| p1 · fidelidad / atomicidad / utilidad | 5,00 / 4,67 / 4,17 | 4,75 / 4,58 / 4,92 | Ruido de juez (una corrida por régimen) |
+| p1 · cobertura | 5/9 | 4/9 | Ruido |
+| p4 · fidelidad / atomicidad / utilidad | 4,08 / 4,50 / *sin dato* | 4,33 / 4,58 / 4,17 | Ídem |
+| p4 · cobertura | 7/8 | 6/8 | Ruido |
+| Presupuestos | 2/17 rotos | **17/17 dentro** | El baseline ya tenía 2 rotos; no se empeoró |
+
+**Conclusión**: sin regresión medible. Las diferencias del juez están dentro del ruido de una
+corrida y los checks deterministas son idénticos — que es exactamente lo que se espera cuando el
+camino de un solo tipo queda intacto (la regla dura del punto 7 de WU3).
+
+**Hueco declarado**: la batería del eval conduce el modal con la selección por defecto (un solo
+tipo), así que **la cláusula de arbitraje y el camino multi-tipo NO quedan medidos** por la
+batería. Follow-up propuesto: un check determinista del camino multi-tipo (que una corrida de dos
+tipos produzca ambos tipos con huecos cloze válidos) y, si se quiere juez, una variante de batería
+con ambos tipos seleccionados.
+
 **Consecuencia de secuencia**: el arbitraje de formato se implementa **después** del baseline. Si
 el baseline no se puede correr (falta de key/fixtures), la entrega se hace sin la cláusula de
 arbitraje (dos pasadas puras) y el arbitraje queda como ítem aparte con su contrato.
@@ -110,11 +132,11 @@ arbitraje (dos pasadas puras) y el arbitraje queda como ítem aparte con su cont
 
 ## Work units
 
-- [ ] **WU1** Multi-selección de tipos de texto (radio → checkboxes) + dos pasadas por tipo +
+- [x] **WU1** Multi-selección de tipos de texto (radio → checkboxes) + dos pasadas por tipo +
   `cardType: 'mixed'` + tests (sin cláusula de arbitraje: no toca prompts).
 - [x] **WU2** Contrato EV5 + baseline medido (`npm run eval:gen` + `eval:score` con `EVAL_JUDGE=glm5.3-flash`).
   Run `2026-09-29-12-18-deepseek-v4-flash`. 2/17 presupuestos ya rotos antes de tocar nada.
-- [ ] **WU3** Cláusula de arbitraje de formato en la pasada + dedupe cruzado por `prevFronts` +
+- [x] **WU3** Cláusula de arbitraje de formato en la pasada + dedupe cruzado por `prevFronts` +
   tests.
 - [ ] **WU4** Planificador por capítulo: prompt + validador determinista + fallback proporcional +
   tests con `fetch` stubbeado.

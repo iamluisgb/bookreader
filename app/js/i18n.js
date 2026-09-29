@@ -716,8 +716,6 @@ const EN = {
   'Flashcards para Anki': 'Flashcards for Anki',
   'Tipo de tarjeta': 'Card type',
   // Tarjetas visuales (menú multi-tipo)
-  'Solo tarjetas visuales': 'Visual cards only',
-  'Sin texto: solo figuras, diagramas y dibujo.': 'No text: figures, diagrams and drawing only.',
   'Oclusión de figuras': 'Figure occlusion',
   'Diagrama': 'Diagram',
   'Dibujo de memoria': 'Drawing from memory',
@@ -726,6 +724,9 @@ const EN = {
   'No se encontraron figuras en este libro, así que no hay tarjetas de oclusión que generar.':
     'No figures were found in this book, so there are no occlusion cards to generate.',
   'Cantidad': 'How many',
+  // Multi-tipo de texto (WU1): hint del reparto del total entre pasadas
+  '{n} en total · {a} P→R + {b} Cloze': '{n} in total · {a} Q→A + {b} Cloze',
+  'Las tarjetas visuales se suman aparte.': 'Visual cards are added on top.',
   'Generar tarjetas': 'Generate cards',
   'Mazos generados': 'Generated decks',
   '{n} tarjetas': '{n} cards',
