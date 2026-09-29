@@ -105,6 +105,7 @@ const ASSETS = [
   './js/ai/srs.js',
   './js/ai/study.js',
   './js/ai/figures.js',
+  './js/ai/figures-pdf.js',
   './js/ai/visual-cards.js',
   './js/region-select.js',
   './js/pdf-text-select.js',
