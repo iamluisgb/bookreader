@@ -136,22 +136,26 @@ como `<img>` no tiene camino todavía (fuera del alcance de la primera entrega).
       `buildVisualCards`; `PdfReader.getBookId()` evita extraer del documento de otro libro;
       mazo con `cardType` efectivo (`mixed` al combinar) y migración a `mixed` al fusionar;
       20 tests en `flashcards.spec.ts` (`1fac7c1`)
-- [ ] **WU6** Render por tipo en estudio (`study.js`): oclusión (overlay %), diagrama (SVG),
+- [x] **WU6** Render por tipo en estudio (`study.js`): oclusión (overlay %), diagrama (SVG),
       dibujo (canvas) + arreglar `buildQueue` para tarjetas sin `front`
-- [ ] **WU7** Revisión del boceto con `chatVision` + pintado por colores de trazo
-- [ ] **WU8** Sync/export: campos visuales en `sameCard`; comportamiento definido en export Anki
-- [ ] **WU9** Docs: CHANGELOG, BACKLOG, DECISIONS + evals/check determinista si aplica
+- [x] **WU7** Revisión del boceto con `chatVision` + pintado por colores de trazo
+- [x] **WU8** Sync/export: campos visuales en `sameCard`; comportamiento definido en export Anki
+- [x] **WU9** Docs: CHANGELOG, BACKLOG, DECISIONS + evals/check determinista si aplica
 
-## Estado del árbol de tests (checkpoint WU3)
+## Estado del árbol de tests (checkpoint final, WU9)
 
-Suite completa: 544 passed / 4 failed. De las 4 fallas, **ninguna es de esta feature**:
+Suite completa: **603 passed / 4 failed**. Ninguna falla es de esta feature:
 
 | Falla | Estado |
 |---|---|
-| `sw-precache`: `ui/book-accent.js` sin precachear | Preexistente (también falla en `main`); **corregida** en `ef56473` |
 | `llm.spec.ts:149` getLiteModel | Preexistente — falla igual con los cambios de la feature fuera del árbol |
 | `model-probe.spec.ts:67` | Preexistente — ídem |
-| `pdf-touch-select.spec.ts:128` | Flaky en corrida paralela: pasa aislado (6/6) |
+| `pdf-scroll-ghost.spec.ts:47`, `reanchor-position.spec.ts:117` | Flaky por carga: pasan aislados (3/3); el par que falla cambia entre corridas (en la corrida anterior fueron `sw-precache` y `pdf-touch-select`) |
+| `sw-precache` (gap de `ui/book-accent.js`) | Preexistente y **corregido** en `ef56473` |
+
+Tests nuevos de la feature: **72** (66 en siete specs nuevos + 3 en `flashcards.spec.ts` + 3 en
+`sync-decks.spec.ts`), todos en verde. Lint: sin hallazgos en los módulos nuevos; la rama además
+deja el repo más limpio que `main` (elimina el error de clave duplicada de `i18n.js`).
 
 ## Riesgos abiertos
 
