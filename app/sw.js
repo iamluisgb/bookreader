@@ -112,6 +112,7 @@ const ASSETS = [
   './js/ai/visual-deck.js',
   './js/ai/deck-repair.js',
   './js/ai/deck-manager.js',
+  './js/ai/card-plan.js',
   './js/ai/visual-figures.js',
   './js/region-select.js',
   './js/pdf-text-select.js',
