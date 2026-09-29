@@ -43,10 +43,14 @@ export const ROUTING = {
     model: 'deepseek-v4-flash',
     caps: { tools: true, vision: false },
   },
+  // Visión del producto: deepseek-v4-flash tiene entrada de imagen verificada y la key
+  // del gateway tiene acceso. Antes apuntaba a mimo-v2.5, que responde 401 con la key
+  // (el modelo dejó de estar disponible para esta cuenta) y dejaba sin visión tanto la
+  // explicación de figuras como la oclusión y la revisión de bocetos.
   'bookreader-vision': {
     product: 'bookreader',
     provider: 'nan',
-    model: 'mimo-v2.5',
+    model: 'deepseek-v4-flash',
     caps: { tools: false, vision: true },
   },
   // Llamadas auxiliares del cliente (query-expand, attenuation): modelo pequeño y

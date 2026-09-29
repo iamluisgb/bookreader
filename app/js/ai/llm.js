@@ -49,7 +49,11 @@ export const PROVIDERS = [
   // modelo reasoning que NO emite content — ~16 s y ~4.000 ch de reasoning_content, content
   // vacío — así que la expansión de consulta (y la atenuación) caían siempre en fallback.
   // deepseek-v4-flash responde en ~3 s con JSON parseable (ver BACKLOG · IA7, sondeo F3).
-  { id: 'nan',        name: 'nan.builders',      baseUrl: 'https://api.nan.builders/v1',   models: ['deepseek-v4-flash', 'mimo-v2.5', 'qwen3.6', 'gemma4'], liteModel: 'deepseek-v4-flash', visionModel: 'mimo-v2.5', concurrent: true, discover: false },
+  // visionModel: fue 'mimo-v2.5' y quedó roto de fábrica — la key disponible devuelve 401
+  // ("This API key does not have access to the requested model") para ese modelo.
+  // deepseek-v4-flash está verificado con esa key Y acepta imágenes (petición real con
+  // imagen). No usar 'deepseek-v4-flash-0731': con esta key también responde 401.
+  { id: 'nan',        name: 'nan.builders',      baseUrl: 'https://api.nan.builders/v1',   models: ['deepseek-v4-flash', 'qwen3.6', 'gemma4'], liteModel: 'deepseek-v4-flash', visionModel: 'deepseek-v4-flash', concurrent: true, discover: false },
   { id: 'openai',     name: 'OpenAI',     baseUrl: 'https://api.openai.com/v1',     models: ['gpt-4o', 'gpt-4o-mini', 'o4-mini'], concurrent: true, catalogId: 'openai' },
   // Verificado contra la API real el 2026-08-02 (tests/provider-contract.spec.ts):
   // `claude-3.7-sonnet` y `gemini-2.0-flash-001` ya NO existen en el catálogo, así que
@@ -565,10 +569,12 @@ async function _chatTools({ messages, tools, toolChoice = 'auto', maxTokens = 10
 // Llamada MULTIMODAL (texto + imagen) al MODELO DE VISIÓN. `messages` ya trae el contenido
 // en formato OpenAI-compatible (content puede ser un array con {type:'text'} y
 // {type:'image_url'}). No streaming (más simple y suficiente para un turno de visión).
-// `maxTokens` por defecto 2048 y no 1024: el modelo de visión de la demo (mimo-v2.5)
-// razona antes de responder y con 1024 puede devolver `content: ''` con
-// `finish_reason: 'length'` — una respuesta vacía, que es peor que un error. Medido el
-// 2026-09-16 sobre una página real: 402 y 849 tokens de salida, holgado dentro de 2048.
+// `maxTokens` por defecto 2048 y no 1024: se calibró con el modelo de visión anterior
+// (mimo-v2.5, retirado del preset: la key disponible no tiene acceso a él, 401), que
+// razonaba antes de responder y con 1024 podía devolver `content: ''` con
+// `finish_reason: 'length'` — una respuesta vacía, que es peor que un error. El
+// visionModel actual (deepseek-v4-flash, verificado con imágenes) entra holgado: medido
+// el 2026-09-16 sobre una página real, 402 y 849 tokens de salida dentro de 2048.
 async function _chatVision({ messages, signal, maxTokens = 2048 }) {
   const key = getKey().trim();
   if (!key) throw new Error(t('Falta la API key.'));

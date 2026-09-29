@@ -102,7 +102,7 @@ test('sin catálogo ni /models, el selector cae en los modelos verificados', asy
   await page.locator('#appset-model-discover').click();
 
   await expect(page.locator('.mp-source')).toContainText(/verificados|verified/);
-  await expect(page.locator('.mp-item')).toHaveCount(4);
+  await expect(page.locator('.mp-item')).toHaveCount(3);
   expect(catalogHits()).toBe(0);   // nan no declara catalogId
   expect(modelsHits).toBe(0);      // `discover: false` evita la petición que iba a fallar
 });

@@ -8,7 +8,7 @@ import * as path from 'path';
 //
 //   «nan rechaza peticiones concurrentes a la misma key»   → premisa de ADR-027
 //   «qwen3.6 responde rápido y soporta tools»              → ADR-022 (routing lite)
-//   «mimo-v2.5 interpreta imágenes»                        → slot de visión
+//   «deepseek-v4-flash interpreta imágenes»                 → slot de visión
 //   «/models está bloqueado por CORS»                      → el fallback manual de Ajustes
 //
 // Eso es lo que se pudre en silencio: el proveedor cambia y nuestros presets mienten sin
@@ -28,7 +28,7 @@ const KEY = process.env.NAN_API_KEY;
 const BASE = process.env.PROVIDER_BASE_URL || 'https://api.nan.builders/v1';
 const MODEL = process.env.PROVIDER_MODEL || 'deepseek-v4-flash';
 const LITE = process.env.PROVIDER_LITE_MODEL || 'qwen3.6';
-const VISION = process.env.PROVIDER_VISION_MODEL || 'mimo-v2.5';
+const VISION = process.env.PROVIDER_VISION_MODEL || 'deepseek-v4-flash';
 
 // Matriz de capacidades: cada test apunta aquí y al final se imprime junta. El valor de
 // esta suite no es el semáforo, es enterarse de QUÉ ha cambiado en el proveedor.

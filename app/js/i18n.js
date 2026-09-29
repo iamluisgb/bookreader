@@ -870,7 +870,7 @@ const EN = {
     'The browser\'s dictation needs a connection (it sends the audio to an external service).',
   'El dictado se ha detenido ({code}).': 'Dictation stopped ({code}).',
   'Este navegador no puede grabar audio.': 'This browser cannot record audio.',
-  'Para explicar figuras y páginas de un libro (multimodal). En nan, <code>mimo-v2.5</code> funciona. Déjalo vacío si tu modelo no interpreta imágenes; entonces "Explicar lo que veo" queda desactivado.': 'For explaining figures and pages of a book (multimodal). On nan, <code>mimo-v2.5</code> works. Leave it empty if your model cannot read images; then "Explain what I see" is disabled.',
+  'Para explicar figuras y páginas de un libro (multimodal). En nan, <code>deepseek-v4-flash</code> funciona. Déjalo vacío si tu modelo no interpreta imágenes; entonces "Explicar lo que veo" queda desactivado.': 'For explaining figures and pages of a book (multimodal). On nan, <code>deepseek-v4-flash</code> works. Leave it empty if your model cannot read images; then "Explain what I see" is disabled.',
   'Modelo rápido (opcional)': 'Fast model (optional)',
   'vacío = automático': 'empty = automatic',
   'Para las llamadas auxiliares del agente (preparar búsquedas, puntuar capítulos): un modelo pequeño responde igual de bien y mucho más rápido. Vacío = automático (en nan usa <code>qwen3.6</code>; en otros proveedores, el modelo principal).': 'For the agent’s auxiliary calls (preparing searches, rating chapters): a small model answers just as well and much faster. Empty = automatic (on nan it uses <code>qwen3.6</code>; on other providers, the main model).',

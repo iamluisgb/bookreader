@@ -395,12 +395,12 @@ function agentHtml() {
     <p id="appset-model-hint" class="appset-model-hint" hidden></p>
     <label class="appset-label" for="appset-vmodel">${t('Modelo de visión (opcional)')}</label>
     <div class="appset-model-row">
-      <input id="appset-vmodel" class="appset-input" value="${escapeHtml(LLM.getVisionModel())}" placeholder="p. ej. mimo-v2.5" autocomplete="off" spellcheck="false" />
+      <input id="appset-vmodel" class="appset-input" value="${escapeHtml(LLM.getVisionModel())}" placeholder="p. ej. deepseek-v4-flash" autocomplete="off" spellcheck="false" />
       <button type="button" id="appset-pick-appset-vmodel" class="appset-discover" data-slot="appset-vmodel" data-need="vision">${t('Elegir…')}</button>
       <button type="button" id="appset-probe-appset-vmodel" class="appset-discover" data-kind="vision" data-for="appset-vmodel">${t('Probar')}</button>
     </div>
     <p id="appset-probe-appset-vmodel-hint" class="appset-model-hint" hidden></p>
-    <p class="appset-muted">${t('Para explicar figuras y páginas de un libro (multimodal). En nan, <code>mimo-v2.5</code> funciona. Déjalo vacío si tu modelo no interpreta imágenes; entonces "Explicar lo que veo" queda desactivado.')}</p>
+    <p class="appset-muted">${t('Para explicar figuras y páginas de un libro (multimodal). En nan, <code>deepseek-v4-flash</code> funciona. Déjalo vacío si tu modelo no interpreta imágenes; entonces "Explicar lo que veo" queda desactivado.')}</p>
     <label class="appset-label" for="appset-smodel">${t('Modelo de transcripción (opcional)')}</label>
     <div class="appset-model-row">
       <input id="appset-smodel" class="appset-input" value="${escapeHtml(LLM.getSttModel())}" placeholder="p. ej. whisper" autocomplete="off" spellcheck="false" />

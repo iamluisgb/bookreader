@@ -69,7 +69,7 @@ test('un gateway que no ofrece dictado no deja puesto el del proveedor anterior'
 // único que un token de demo no puede hacer: cualquier id que no sea alias del gateway
 // da 400. El alias existe; solo faltaba que viajara con la configuración.
 test('el traspaso trae el alias de visión, y no el del proveedor anterior', async ({ page }) => {
-  await seed(page, { ai_vision_model: 'mimo-v2.5' });
+  await seed(page, { ai_vision_model: 'deepseek-v4-flash' });
   await stubQuota(page, {
     remaining: 27, quota: 30, model: 'bookreader-fast', visionModel: 'bookreader-vision',
   });

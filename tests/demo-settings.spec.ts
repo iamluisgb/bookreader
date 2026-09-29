@@ -86,7 +86,7 @@ test('la vista avanzada tampoco borra el token de la demo al guardar', async ({ 
 // Quien ya se quedó con el estado roto no puede arreglarlo desde la UI (no ve el token
 // que hay que borrar): la app lo repara al arrancar.
 test('un token del gateway con otra base URL se repara al cargar', async ({ page }) => {
-  await seed(page, { ai_base_url: NAN, ai_key: TOKEN, ai_model: 'deepseek-v4-flash', ai_vision_model: 'mimo-v2.5' });
+  await seed(page, { ai_base_url: NAN, ai_key: TOKEN, ai_model: 'deepseek-v4-flash', ai_vision_model: 'deepseek-v4-flash' });
   await abrirAgente(page);
 
   expect(await leer(page, 'ai_base_url')).toBe(GATEWAY);
