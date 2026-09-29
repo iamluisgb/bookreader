@@ -421,10 +421,29 @@ function stampCards(before, after, now) {
 // OJO: todo campo que decida el comportamiento de la tarjeta tiene que estar aquí. Lo que
 // falte no sella `updatedAt`, y lo que no se sella lo pisa el otro dispositivo al sincronizar
 // (`suspended` entró con P24: sin él, suspender una tarjeta en el móvil la resucitaba).
+// Con las tarjetas visuales pasa igual (WU8): regenerar el SVG del diagrama, corregir el
+// bbox de una oclusión o editar la rúbrica de dibujo solo toca `figureKey`/`bbox`/
+// `occludedLabel`/`svg`/`answerNodeId`/`steps`. Fuera de la whitelist, el cambio no se
+// sella y la copia vieja del otro dispositivo lo pisa. Se normalizan defensivamente
+// (ausente → null / []): una tarjeta de texto legada y su re-guardado idéntico siguen
+// siendo "iguales" y NO se re-sellan en cada sync.
 function sameCard(a, b) {
+  // bbox canónico con claves fijas: dos representaciones del mismo rectángulo
+  // ({x,y,w,h} canónico o array del modelo) no deben leerse como cambio.
+  const normBbox = (b) => {
+    if (Array.isArray(b) && b.length === 4) b = { x: b[0], y: b[1], w: b[2], h: b[3] };
+    if (!b || typeof b !== 'object') return null;
+    return { x: b.x ?? null, y: b.y ?? null, w: b.w ?? null, h: b.h ?? null };
+  };
   const norm = (c) => JSON.stringify({
     front: c.front, back: c.back, type: c.type, chapter: c.chapter, src: c.src,
     srs: c.srs || null, suspended: !!c.suspended, deleted: !!c.deleted,
+    figureKey: c.figureKey || null,
+    occludedLabel: c.occludedLabel || null,
+    bbox: normBbox(c.bbox),
+    svg: c.svg || null,
+    answerNodeId: c.answerNodeId || null,
+    steps: Array.isArray(c.steps) ? c.steps : [],
   });
   return norm(a) === norm(b);
 }

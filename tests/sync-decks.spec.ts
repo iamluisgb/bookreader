@@ -377,6 +377,64 @@ test.describe('unidades del merge de mazos', () => {
     expect(out.sellos).toBe(true);
   });
 
+  test('un cambio SOLO visual (WU8) sella updatedAt: si el campo falta en la whitelist, el sello no se mueve', async ({ page }) => {
+    // Es el mismo bug que tuvo `suspended` (ver comentario en db.js · sameCard): si el
+    // campo que cambió no está en la whitelist, sameCard dice "igual", stampCards no
+    // sella, y al sincronizar la copia vieja del otro dispositivo pisa la corrección.
+    // La aserción del SELLO es la que caza el bug: el valor del bbox ya viajaba bien.
+    await page.goto('/');
+    const out = await page.evaluate(async () => {
+      const DB: any = await import('/js/ai/db.js');
+      const t0 = Date.now() - 60000;
+      // Tarjeta de oclusión ya guardada (sello viejo), como la tendría el otro dispositivo.
+      await DB.put('decks', { bookId: 'w8', name: 'Visual', cardType: 'basic', createdAt: t0, updatedAt: t0, cards: [
+        { uid: 'v1', type: 'occlusion', front: '¿A?', back: 'a', figureKey: 'b:figures:1',
+          bbox: { x: 1, y: 2, w: 3, h: 4 }, occludedLabel: 'Aorta', chapter: 'c1', updatedAt: t0 },
+      ] });
+      const before = (await DB.getAll('decks')).find((d: any) => d.bookId === 'w8');
+      // El PC corrige SOLO el bbox: ni front ni back ni srs cambian.
+      await DB.updateDeck(before.id, { cards: [{ ...before.cards[0], bbox: { x: 9, y: 8, w: 7, h: 6 } }] });
+      const after = (await DB.getAll('decks')).find((d: any) => d.bookId === 'w8');
+      return { sello: after.cards[0].updatedAt, selloAnterior: before.cards[0].updatedAt, bbox: after.cards[0].bbox };
+    });
+    expect(out.sello, 'el cambio visual debe re-sellar updatedAt').toBeGreaterThan(out.selloAnterior);
+    expect(out.bbox).toEqual({ x: 9, y: 8, w: 7, h: 6 });
+  });
+
+  test('la copia con el campo visual más nuevo gana el LWW de tarjeta', async ({ page }) => {
+    await page.goto('/');
+    const out = await page.evaluate(async (base) => {
+      const DB: any = await import('/js/ai/db.js');
+      // Local: el SVG regenerado hace un rato. Remoto: copia vieja que llegó tarde
+      // (el mazo remoto es más nuevo, pero la TARJETA no).
+      const local = { ...base, cards: [{ uid: 'c1', type: 'diagram', front: 'A', back: 'a', svg: '<svg id="nuevo"/>', updatedAt: 9000 }] };
+      const remote = { ...base, updatedAt: 9999, cards: [{ uid: 'c1', type: 'diagram', front: 'A', back: 'a', svg: '<svg id="viejo"/>', updatedAt: 3000 }] };
+      const m = DB.mergeDeckPair(local, remote);
+      return { svg: m?.cards[0].svg, updatedAt: m?.cards[0].updatedAt };
+    }, base);
+    expect(out.svg).toBe('<svg id="nuevo"/>');
+    expect(out.updatedAt).toBe(9000);
+  });
+
+  test('una tarjeta de texto sin campos visuales no se re-sella al re-guardarla', async ({ page }) => {
+    // Compatibilidad hacia atrás: la tarjeta legada y su re-guardado idéntico (con los
+    // campos visuales ausentes) siguen siendo "iguales" — updateDeck no debe mover el
+    // sello ni generar escrituras que reboten en el sync.
+    await page.goto('/');
+    const out = await page.evaluate(async () => {
+      const DB: any = await import('/js/ai/db.js');
+      const t0 = Date.now() - 60000;
+      await DB.put('decks', { bookId: 'w8b', name: 'Texto', cardType: 'basic', createdAt: t0, updatedAt: t0, cards: [
+        { uid: 't1', type: 'basic', front: 'A', back: 'a', chapter: 'c1', updatedAt: t0 },
+      ] });
+      const before = (await DB.getAll('decks')).find((d: any) => d.bookId === 'w8b');
+      await DB.updateDeck(before.id, { cards: [{ ...before.cards[0] }] });   // idéntica
+      const after = (await DB.getAll('decks')).find((d: any) => d.bookId === 'w8b');
+      return { sello: after.cards[0].updatedAt, selloAnterior: before.cards[0].updatedAt };
+    });
+    expect(out.sello).toBe(out.selloAnterior);
+  });
+
   test('purga: la tarjeta borrada hace 40 días desaparece; la de ayer se queda', async ({ page }) => {
     await page.goto('/');
     const fronts = await page.evaluate(async () => {

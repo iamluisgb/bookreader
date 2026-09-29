@@ -847,6 +847,11 @@ function renderReview(deck) {
       ${deck.id ? `<button id="fc-study" class="primary-btn">${icon('cards', { size: 16 })} ${t('Estudiar ahora')}<small></small></button>` : ''}
       <button id="fc-apkg" class="${deck.id ? 'ai-ob-back' : 'primary-btn'}">${icon('download', { size: 16 })} ${t('Exportar .apkg')}</button>
       <button id="fc-txt" class="ai-ob-back fc-txt-btn" title="${t('Formato de texto que Anki importa (Archivo → Importar)')}">.txt para Anki</button>
+      ${deck.cards.some(c => VISUAL_TYPES.includes(c.type))
+        // Limitación honesta (WU8): el export de Anki es de TEXTO — la pregunta y el dato
+        // viajan, pero la figura/diagrama no. Clase global reutilizada (ver main.css).
+        ? `<span class="sum-depth-hint">${t('Las tarjetas visuales viajan como texto: la figura o el diagrama no va incluida en el fichero.')}</span>`
+        : ''}
     </div>
     <div id="fc-error" class="fc-error" style="display:none"></div>`;
   b.querySelector('.ai-ob-back').addEventListener('click', renderSetup);

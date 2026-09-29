@@ -716,6 +716,9 @@ const EN = {
   'Revisa y edita antes de exportar. Mazo en Anki:': 'Review and edit before exporting. Deck in Anki:',
   'Exportar .apkg': 'Export .apkg',
   'Formato de texto que Anki importa (Archivo → Importar)': 'Text format Anki can import (File → Import)',
+  // WU8: limitación honesta del export cuando el mazo trae tarjetas visuales.
+  'Las tarjetas visuales viajan como texto: la figura o el diagrama no va incluida en el fichero.':
+    'Visual cards travel as text: the figure or diagram is not included in the file.',
   'No queda ninguna tarjeta que exportar.': 'No cards left to export.',
   'No se pudo exportar: {msg}': 'Could not export: {msg}',
 
