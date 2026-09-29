@@ -1612,6 +1612,32 @@ seguir leyendo"* sin necesidad de un cartel que la anuncie.
   repaso de flashcards (modal) y el gestor: dos sitios que pintar y editar la misma cosa. Un
   componente compartido evita que el próximo arreglo de fila se haga dos veces y quede distinto.
 
+### P37 — Multi-tipo y plan por capítulo: lo que quedó pendiente de la entrega · `M` acumulado
+
+> **Entregado (ver CHANGELOG 2026-09-29 · [ADR-047..050](DECISIONS.md)):** multi-selección de
+> tipos de texto (basic + cloze) con dos pasadas y arbitraje de formato por concepto, plan de
+> tarjetas por capítulo sugerido por el agente, validado deterministamente y editable, con
+> generación por capítulo en mazos separados. Especificación y cierre EV5:
+> [`odd/tasks/multi-tipo-y-plan-capitulos.md`](odd/tasks/multi-tipo-y-plan-capitulos.md). Lo de
+> abajo es lo que NO entró.
+
+- **El camino multi-tipo no está medido por la batería** (hueco declarado del cierre EV5) · `S`–`M`.
+  La batería del eval conduce el modal con la selección por defecto (un solo tipo), así que la
+  cláusula de arbitraje y las dos pasadas quedan fuera de la medición — el cierre EV5 solo prueba
+  que el camino de un tipo no cambió. Falta un **check determinista**: que una corrida de dos tipos
+  produzca ambos formatos y que los cloze traigan huecos `{{c1::…}}` válidos; si se quiere juez,
+  una variante de batería con ambos tipos seleccionados.
+- **El tope de 12 capítulos por corrida** · `S`. Con un libro grande, el plan deja el resto de los
+  capítulos para una segunda pasada (capítulos × tipos = llamadas pagas). Falta el flujo de
+  «segunda tanda»: retomar los capítulos que quedaron fuera sin re-generar los ya hechos.
+- **Plan para un solo capítulo** · `S`. El botón «Sugerir cantidades» solo aparece con el alcance
+  de libro entero — que es donde tiene sentido repartir. Para el alcance de un capítulo no hay
+  plan que editar; habría que definir qué significaría (¿reparto dentro de las secciones del
+  capítulo?).
+- **Presupuesto de coste en dinero** · `S`. Declarado fuera de alcance a propósito en la spec: la
+  UI avisa el número de llamadas estimadas (capítulos × tipos), no su coste en dinero. Queda
+  apuntado por si alguien lo pide; el aviso de llamadas cubre la decisión de lanzar o no.
+
 ### P24 — Higiene de la sesión de repaso · **✓ entregada** (2026-08-01) · F1–F4
 
 > **Entregada entera.** Ver CHANGELOG 2026-08-01. Cuatro arreglos de la sesión, ninguno

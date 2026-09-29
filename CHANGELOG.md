@@ -3,6 +3,79 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-09-29 — Flashcards: varios tipos de texto a la vez y el plan de tarjetas por capítulo
+
+Hasta hoy el generador de texto era **de un solo tipo por corrida**: el radio de P→R / Cloze no
+era un capricho de UI — el pipeline genera **un tipo por pasada** (`cardsPrompt` lleva el tipo
+fijo) y el mazo nacía con ese `cardType`. Quien quería P→R **y** cloze del mismo libro tenía que
+correr dos generaciones y fusionar a mano.
+
+- **Multi-selección de tipos de texto con dos pasadas**: basic y cloze pasan a ser checkboxes;
+  por cada tipo elegido corre el map-reduce completo con **su propio cupo**, y el mazo queda
+  `cardType: 'mixed'` (soportado desde las visuales). El total pedido es un **reparto entre los
+  tipos** (10 tarjetas con dos tipos = 5 y 5, no 10 y 10) — ver [ADR-047](DECISIONS.md). El coste
+  de la fase de texto se multiplica por los tipos elegidos y la UI lo dice.
+- **Arbitraje de formato por concepto**: cada pasada lleva en su prompt la instrucción de generar
+  SOLO los conceptos cuyo formato natural es el de esa pasada («si el concepto funciona mejor como
+  hueco, omitilo aquí: lo cubre la pasada de Cloze») — ver [ADR-048](DECISIONS.md). El modelo no
+  fuerza un formato sobre un concepto que no le sienta. Para que el arbitraje no produzca el mismo
+  concepto en los dos formatos, la segunda pasada recibe los frentes de la primera como
+  `prevFronts` (el mecanismo anti-duplicados que ya existía). Con un solo tipo el prompt **no
+  lleva la cláusula** — es la regla que hace verificable el EV5 de abajo.
+
+- **El plan de tarjetas por capítulo**: el reparto proporcional por tokens existía pero era
+  invisible. Ahora el agente **propone** cuántas tarjetas merece cada capítulo (viendo títulos,
+  tamaños y una muestra corta — estructura, no contenido profundo), pero **la validación es
+  determinista y en código, no en el prompt** ([card-plan.js](app/js/ai/card-plan.js),
+  [ADR-049](DECISIONS.md)): los nombres que no existen se descartan y se avisan, cada capítulo
+  con contenido recibe al menos 1, nadie supera 3× su reparto proporcional (anti-concentración) y
+  la suma se normaliza EXACTAMENTE al total pedido. Si la respuesta no valida tras un reintento,
+  **fallback honesto al reparto proporcional** — nunca bloquea la generación. El plan llega
+  **editable**: tabla capítulo → N + motivo del agente, total vivo y el coste real delante
+  (capítulos × tipos = llamadas estimadas), y «Generar» corre **un trabajo por capítulo** que aterriza
+  en un mazo por capítulo (mismo `mergeInto` por scope+tipo; si no hay mazo, lo crea con el título
+  del capítulo), con progreso `i/n` y resumen `generated`/`requested` — un capítulo fallido no tira
+  el resto. Tope de **12 capítulos con generación en una corrida** (libro grande = demasiadas
+  llamadas pagas).
+
+- **EV5, como hecho de primera clase**: la cláusula de arbitraje modifica `cardsPrompt`, un prompt
+  medido, así que abrió con el contrato de [docs/EVALS.md § EV5](docs/EVALS.md) y el **baseline
+  medido ANTES de la primera línea de código** (run `2026-09-29-12-18-deepseek-v4-flash`):
+  p1-estudiante 4,8/4,8/4,6 con cobertura 6/9 y p4-noficcion 4,3/4,7/4,3 con 7/8 — 15 tarjetas,
+  15 anclas válidas y 0 duplicados en ambas — con **2/17 presupuestos ya rotos antes de tocar
+  nada** (preexistentes, fuera de alcance: la vara era no empeorarlos). Por regla, el prompt de
+  un solo tipo queda **byte-idéntico**. Cierre (dos corridas, mismo generador, mismo juez):
+  los checks deterministas **idénticos** entre baseline y después, las diferencias del juez
+  dentro del ruido de una corrida y **17/17 presupuestos dentro**. Sin regresión medible — que
+  es exactamente lo que se espera cuando el camino de un solo tipo queda intacto.
+- **Hueco declarado**: la batería del eval conduce el modal con la selección por defecto (un solo
+  tipo), así que **la cláusula de arbitraje y el camino multi-tipo NO quedan medidos**. Queda en
+  [BACKLOG § P37](BACKLOG.md): un check determinista de que una corrida de dos tipos produce ambos
+  formatos con huecos cloze válidos.
+
+- **Cambio de modelo asociado**: `mimo-v2.5` se retiró porque la key disponible le responde **401**
+  («does not have access to the requested model») — y era el modelo de visión por defecto del
+  preset `nan`, o sea que **la explicación de figuras, la oclusión y la revisión de bocetos estaban
+  rotas de fábrica**. Reemplazado por `deepseek-v4-flash` — verificado con entrada de imagen real —
+  en el preset de [`llm.js`](app/js/ai/llm.js), la ayuda de Ajustes, el diccionario, las seeds de
+  tests y el alias `bookreader-vision` del gateway
+  ([workers/gateway](workers/gateway/src/index.js)). Y el **juez por defecto del eval tuvo que
+  cambiar con medición detrás** ([evals/judge.mjs](evals/judge.mjs)): `mimo-v2.5` da 401;
+  `deepseek-v4-flash` como juez es el propio generador (sesgo de auto-preferencia) y **no respeta
+  el esquema** — omitió `utilidad` en las 12 tarjetas de p4 y devolvió `pertinidad_citas` (con
+  typo) en p1, métricas `NaN` que la regla de EV5 cuenta como rotas y dejarían los gates en rojo
+  permanente; **`glm5.3-flash`** completó el esquema en las dos baterías y es neutral frente al
+  generador. Los números del baseline son comparables entre corridas con el MISMO juez;
+  `EVAL_JUDGE` sigue permitiendo enchufar otro.
+
+**26 tests nuevos**: 14 del planificador con `fetch` stubbeado
+([tests/card-plan.spec.ts](tests/card-plan.spec.ts)), 6 de la UI del plan (tabla, total vivo,
+fallback visible, mazo por capítulo — [tests/card-plan-ui.spec.ts](tests/card-plan-ui.spec.ts)) y
+6 de multi-tipo en [tests/flashcards.spec.ts](tests/flashcards.spec.ts) (checkboxes, dos pasadas,
+reparto del total, cláusula de arbitraje solo con dos tipos, anti-duplicados entre pasadas). Lo
+pendiente, en [BACKLOG § P37](BACKLOG.md); las decisiones, en
+[DECISIONS ADR-047..050](DECISIONS.md).
+
 ## 2026-09-29 — Gestor de mazos: las tarjetas vuelven a su libro (y todas se gestionan desde la biblioteca)
 
 Reporte del usuario: *«borro un libro del dispositivo, lo vuelvo a descargar y las tarjetas no

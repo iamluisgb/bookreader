@@ -1484,3 +1484,139 @@ Ninguna función lanza: la entrada malformada se ignora, igual que en `deck-repa
 viceversa. El coste es el doble salto (helper → caller → `DB`) en cada escritura, aceptado a
 cambio del aislamiento. Las tarjetas visuales (`occlusion`, `diagram`, `drawing`) siguen naciendo
 del generador (`visual-deck.js`): los tipos manuales son deliberadamente solo `basic` y `cloze`.
+
+---
+
+<a id="adr-047"></a>
+## ADR-047 — Multi-tipo de texto: el total es un REPARTO entre tipos, no cupos por tipo · `ACEPTADA`
+
+**Contexto.** El generador de texto era de un solo tipo por corrida: `cardsPrompt(count, type, …)`
+lleva el tipo fijo y el mazo nace con ese `cardType`. Las familias visuales sí son multi-selección
+porque cada una es una llamada aparte (`buildVisualCards`). Para permitir P→R **y** cloze a la vez
+había que decidir qué significa el total pedido cuando hay dos tipos.
+
+**Decisión.** El total es un **reparto entre los tipos elegidos**: por cada tipo corre una pasada
+(map-reduce completo con `allocateCounts` por trozo y su déficit arrastrado) con **su cupo de la
+mitad** — 10 tarjetas con basic + cloze son 5 y 5, no 10 y 10. El mazo queda
+`cardType: 'mixed'` (ya soportado desde WU5e). Orden de pasadas estable: `basic`, `cloze`.
+
+**Porqué.** Duplicar el total al marcar un segundo tipo sería una sorpresa de coste (la fase de
+texto ya se multiplica por los tipos elegidos) y rompería la expectativa de «pedí 10». Los cupos
+por tipo son predecibles y el deficit de una pasada se arrastra **dentro** de esa pasada, no entre
+pasadas: forzar cupos cruzados para compensar una pasada que omitió reintroduciría el problema de
+monotema que cazó EV1. Test fijado: con total 10 y ambos tipos, cada pasada pide 5
+([tests/flashcards.spec.ts](tests/flashcards.spec.ts)).
+
+**Consecuencias.** Si las pasadas «omiten» mucho (el arbitraje de ADR-048), el mazo sale corto:
+el trabajo ya reporta `generated` vs `requested` y la UI lo dice — se acepta y se avisa, no se
+fuerza. Coste y tiempo ≈ ×(tipos elegidos), avisado en la UI.
+
+---
+
+<a id="adr-048"></a>
+## ADR-048 — El arbitraje de formato vive en cada pasada con anti-duplicados cruzados, no en un clasificador aparte ni un prompt mixto · `ACEPTADA`
+
+**Contexto.** Con dos tipos activos había que decidir quién decide el formato de cada concepto.
+Tres caminos: un prompt mixto que genere los dos formatos en una llamada, un clasificador previo
+(una llamada que etiquete cada concepto con su formato), o una cláusula de arbitraje dentro de
+cada pasada.
+
+**Decisión.** **Cláusula de arbitraje en cada pasada** (`cardsPrompt`, `otherTypes`): la pasada
+genera SOLO los conceptos cuyo formato natural es el suyo («si el concepto funciona mejor como
+hueco, omitilo aquí: lo cubre la pasada de Cloze. No fuerces el formato sobre un concepto que no
+le sienta»). La cláusula entra al prompt **solo con dos o más tipos de texto** — con un solo tipo
+el prompt queda byte-idéntico. La segunda pasada recibe los frentes de la primera como
+`prevFronts` (el mecanismo anti-duplicados que ya existía contra el mazo), acumulados entre
+pasadas.
+
+**Porqué.** No añade ninguna llamada pagada (el clasificador sería una llamada entera más por
+trozo, y encima con juicio menos informado — no ve cómo salen las tarjetas). El prompt mixto
+rompería la sintaxis por tipo (la de cloze es estricta) y los cupos por tipo de ADR-047. Y
+`prevFronts` es gratis: sin él, el arbitraje podría producir el mismo concepto en los dos
+formatos, que es exactamente el fallo que la dualidad introduce. La condición «solo con 2+
+tipos» es lo que hace demostrable el no-regresión del EV5 (ADR-050): si el camino de un tipo
+no cambia de bytes, cualquier diferencia medida no puede venir de la cláusula.
+
+**Consecuencias.** El camino multi-tipo NO queda medido por la batería del eval (conduce el modal
+con la selección por defecto) — hueco declarado en [BACKLOG § P37](BACKLOG.md). Si las pasadas
+omiten mucho, el mazo sale corto (ADR-047). Tests: la cláusula nombra al otro tipo con dos tipos y
+NO aparece con uno; los frentes de la primera pasada llegan a la segunda
+([tests/flashcards.spec.ts](tests/flashcards.spec.ts)).
+
+---
+
+<a id="adr-049"></a>
+## ADR-049 — El plan por capítulo se valida DETERMINISTAMENTE en código con fallback proporcional; el agente sugiere, no decide · `ACEPTADA`
+
+**Contexto.** El reparto proporcional de tarjetas por tokens (`allocateCounts`) existía pero era
+invisible. La spec pidió que el agente propusiera cuántas tarjetas merece cada capítulo, editable
+y con generación por capítulo. La respuesta del modelo es texto libre sobre un contrato JSON:
+nombres que pueden no existir, números que pueden concentrar todo en un capítulo, sumas que no
+cuadran.
+
+**Decisión.** Un planificador con **prompt nuevo** (no toca prompts existentes:
+[card-plan.js](app/js/ai/card-plan.js)) que ve títulos, tamaños y una muestra corta por capítulo —
+estructura, no contenido profundo— y entrega `{"chapters":[{name,cards,reason}],"total"}`. La
+**validación es código, no prompt** (`validatePlan`): nombres que no existen (comparados con
+`normalizeText`) o duplicados se descartan y se avisan; `cards` entero ≥ 0; tope por capítulo de
+`max(1, 3 × su reparto proporcional)`; cada capítulo con contenido recibe al menos 1; los no
+mencionados toman su proporcional; y la suma se normaliza EXACTAMENTE al total pedido. Si la
+respuesta no valida → 1 reintento → **fallback al reparto proporcional** (criterio espejo de
+`allocateCounts`): nunca bloquea la generación. El plan llega editable (tabla capítulo → N +
+motivo, total vivo, coste en llamadas: capítulos × tipos) y «Generar» corre un trabajo `Jobs` por
+capítulo que fusiona en un mazo por capítulo (mismo `mergeInto` por scope+tipo; si no hay mazo, lo
+crea con el título del capítulo).
+
+**Porqué.** El plan del agente es una **sugerencia** que el lector edita — tratarlo como autoridad
+pondría la generación rehén de un JSON caprichoso. La validación determinista es lo único
+testeable sin red (14 tests con `fetch` stubbeado en
+[tests/card-plan.spec.ts](tests/card-plan.spec.ts)) y el fallback garantiza que el peor caso del
+modelo sea «reparto proporcional como siempre», no un bloqueo — una regresión frente a lo que ya
+había. El tope de 3× evita que el agente concentre el mazo en un capítulo; el mínimo de 1 ejecuta
+en código el contrato del prompt.
+
+**Consecuencias.** Tope de **12 capítulos con generación en una corrida** (`MAX_PLAN_CHAPTERS`;
+libro grande = demasiadas llamadas pagas; el resto queda para una segunda pasada —
+[BACKLOG § P37](BACKLOG.md)). Los ajustes y descartes del validador se informan como notas, no en
+silencio. Progreso `i/n` por capítulo y resumen `generated`/`requested`; un capítulo fallido no
+tira el resto. La UI del plan solo aparece con alcance de libro entero (6 tests en
+[tests/card-plan-ui.spec.ts](tests/card-plan-ui.spec.ts)).
+
+---
+
+<a id="adr-050"></a>
+## ADR-050 — EV5: el baseline se mide ANTES de tocar un prompt, y el camino de un solo tipo queda byte-idéntico · `ACEPTADA`
+
+**Contexto.** La cláusula de arbitraje (ADR-048) modifica `cardsPrompt`, un prompt medido por la
+batería de evals. La regla del repo ([docs/EVALS.md § EV5](docs/EVALS.md)) es que todo ítem que
+toque la calidad del agente abre con contrato y baseline **antes** de la primera línea de código:
+sin baseline previo, una mejora de +0,3 y el ruido del juez (±0,5 medido en EV2) son
+indistinguibles.
+
+**Decisión.** El contrato EV5 se escribió y el baseline se midió **antes de implementar** (run
+`2026-09-29-12-18-deepseek-v4-flash`, juez `glm5.3-flash`; golden IA7 saltado por falta de
+fixture): p1-estudiante 4,8/4,8/4,6 con cobertura 6/9 y p4-noficcion 4,3/4,7/4,3 con 7/8, 15
+tarjetas · 15 anclas válidas · 0 duplicados en ambas, y **2/17 presupuestos ya rotos antes de
+tocar nada** (preexistentes, fuera de alcance: la vara era no empeorarlos). Regla dura: la
+cláusula de arbitraje solo entra al prompt con dos o más tipos de texto, así que **el prompt de
+un solo tipo queda byte-idéntico**. Cierre con dos corridas (mismo generador, mismo juez): checks
+deterministas idénticos, diferencias del juez dentro del ruido de una corrida y **17/17
+presupuestos dentro**. Hueco declarado: la batería conduce el modal con la selección por defecto,
+así que el camino multi-tipo no queda medido ([BACKLOG § P37](BACKLOG.md)).
+
+**Porqué.** La identidad byte a byte convierte el «deterministas idénticos entre corridas» de una
+coincidencia en una **prueba**: si el camino de un tipo no cambia ni un byte, cualquier diferencia
+medida no puede venir de este feature. Y medir primero es lo que separó «sin regresión» de «creo
+que no rompí nada»: la vara fue un número con nombre de run, no una impresión. El cierre también
+obligó a elegir juez con medición (no con gusto): `mimo-v2.5` responde 401 con la key disponible;
+`deepseek-v4-flash` como juez es el propio generador y no respeta el esquema (omitió `utilidad`,
+typo `pertinidad_citas` → métricas `NaN` que EV5 cuenta como rotas, gates en rojo permanente);
+`glm5.3-flash` completó el esquema en ambas baterías y es neutral — es el default, y
+`EVAL_JUDGE` sigue permitiendo otro. Los números solo son comparables entre corridas con el MISMO
+juez.
+
+**Consecuencias.** Los presupuestos rotos del baseline (p1·cards.utilidad, p4·chat.honestidad) y
+el gate de densidad de infografía siguen siendo deuda preexistente, no de este feature. El hueco
+declarado vive como ítem en [BACKLOG § P37](BACKLOG.md) (check determinista de una corrida de dos
+tipos: ambos formatos con huecos cloze válidos). Contrato y cierre completos, con tablas, en
+[`odd/tasks/multi-tipo-y-plan-capitulos.md`](odd/tasks/multi-tipo-y-plan-capitulos.md).

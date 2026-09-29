@@ -138,10 +138,10 @@ arbitraje (dos pasadas puras) y el arbitraje queda como ítem aparte con su cont
   Run `2026-09-29-12-18-deepseek-v4-flash`. 2/17 presupuestos ya rotos antes de tocar nada.
 - [x] **WU3** Cláusula de arbitraje de formato en la pasada + dedupe cruzado por `prevFronts` +
   tests.
-- [ ] **WU4** Planificador por capítulo: prompt + validador determinista + fallback proporcional +
+- [x] **WU4** Planificador por capítulo: prompt + validador determinista + fallback proporcional +
   tests con `fetch` stubbeado.
-- [ ] **WU5** UI del plan editable + generación por capítulo bajo `Jobs` + tests de pantalla.
-- [ ] **WU6** Docs (CHANGELOG/BACKLOG/DECISIONS) + precache + bump de caché.
+- [x] **WU5** UI del plan editable + generación por capítulo bajo `Jobs` + tests de pantalla.
+- [x] **WU6** Docs (CHANGELOG/BACKLOG/DECISIONS) + precache + bump de caché.
 
 ## Cambio de modelo asociado (decisión del usuario)
 
