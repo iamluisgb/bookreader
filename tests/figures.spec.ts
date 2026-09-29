@@ -137,6 +137,8 @@ test('persistencia: saveFigure → getFigures devuelve la figura con sus campos;
       dataUrl: 'data:image/png;base64,AAAA',
       labels,
       caption: 'Figura de prueba',
+      width: 320,
+      height: 200,
     });
     return { key: savedKey, figures: await F.getFigures(bookId) };
   }, bookId);
@@ -150,6 +152,10 @@ test('persistencia: saveFigure → getFigures devuelve la figura con sus campos;
   expect(figures[0].labels).toEqual([{ text: 'Cristo redentor', bbox: [12, 34, 100, 200] }]);
   expect(figures[0].caption).toBe('Figura de prueba');
   expect(figures[0].source).toBe('pdf');
+  // Los píxeles reales del recorte se persisten: sin ellos el grounding descarta los labels
+  // (clampBbox exige width/height) y habría que re-decodificar el dataUrl en cada generación.
+  expect(figures[0].width).toBe(320);
+  expect(figures[0].height).toBe(200);
 
   const after = await inPage(page, async ({ bookId: bk, key: k }: any) => {
     const F = await import('/js/ai/figures.js');

@@ -141,12 +141,15 @@ export function figureRectToBox(rect, { pageWidth, pageHeight } = {}) {
 
 // Persiste una figura como artefacto del libro y devuelve la clave (handle para borrarla).
 // Cada save crea un artefacto NUEVO (historial), como el resto de los artefactos.
-export async function saveFigure({ bookId, page, rect, dataUrl, labels = [], caption = '', source = 'pdf' }) {
+export async function saveFigure({ bookId, page, rect, dataUrl, labels = [], caption = '', source = 'pdf', width = 0, height = 0 }) {
   return putArtifact({
     bookId,
     kind: FIGURE_KIND,
     params: { page },
-    result: { page, rect, dataUrl, labels, caption, source },
+    // width/height son los píxeles REALES del recorte. Se persisten para no tener que
+    // volver a decodificar el dataUrl en cada generación (figureSize de visual-deck los
+    // usa primero y solo decodifica si faltan: artefactos viejos sin estos campos).
+    result: { page, rect, dataUrl, labels, caption, source, width, height },
   });
 }
 
