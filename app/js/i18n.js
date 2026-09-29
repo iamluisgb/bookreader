@@ -390,6 +390,7 @@ const EN = {
   'Título': 'Title',
   'Autor': 'Author',
   'Sin estantería': 'No shelf',
+  'Mazos sin libro': 'Decks without a book',
   'Estantería': 'Shelf',
   'Buscar libro por título o autor': 'Search books by title or author',
   'Más': 'More',

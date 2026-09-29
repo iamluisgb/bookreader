@@ -14,6 +14,7 @@ import * as Storage from '../storage.js';
 import * as Store from '../library/store.js';
 import { shareStreak } from '../share-card.js';
 import * as Shelves from '../library/shelves.js';
+import { canonicalOf } from '../sync/aliases.js';
 import { icon } from '../ui/icons.js';
 import { escapeHtml } from '../ui/escape.js';
 import { confirmBox } from '../ui/dialog.js';
@@ -100,15 +101,22 @@ const segInFlight = new Map();    // bookId → Promise<boolean> segmentación e
 async function decksForScope(scope) {
   const decks = await DB.getAllDecks();
   if (!scope || scope.type === 'all') return decks;
-  if (scope.type === 'book') return decks.filter(d => d.bookId === scope.bookId);
+  // Los mazos pueden quedar guardados bajo un id VIEJO del libro: la biblioteca migra
+  // identidades (fichero → hash → canónico; `reconcile` remapea subrayados pero NO
+  // mazos), así que el filtro compara el id CANÓNICO de ambos lados. Elegir un libro
+  // incluye también sus mazos aliased, igual que los cuenta el selector.
+  if (scope.type === 'book') {
+    const cid = canonicalOf(scope.bookId);
+    return decks.filter(d => canonicalOf(d.bookId) === cid);
+  }
   if (scope.type === 'shelf') {
     const [books, shelves] = await Promise.all([Store.getAllBooks(), Store.getShelves()]);
     const shelf = shelves.find(s => s.id === scope.shelfId);
     // Vía Shelves.booksIn, no leyendo `shelfIds`: así una estantería INTELIGENTE
     // (que no guarda miembros, los calcula) vale como ámbito de repaso igual que
     // una manual, sin caso especial aquí.
-    const inShelf = new Set(Shelves.booksIn(books, shelf).map(b => b.id));
-    return decks.filter(d => inShelf.has(d.bookId));
+    const inShelf = new Set(Shelves.booksIn(books, shelf).map(b => canonicalOf(b.id)));
+    return decks.filter(d => inShelf.has(canonicalOf(d.bookId)));
   }
   return decks;
 }
@@ -140,16 +148,28 @@ export async function studyScopes(now = Date.now()) {
   const [decks, books, shelves] = await Promise.all([
     DB.getAllDecks(), Store.getAllBooks(), Store.getShelves(),
   ]);
-  const dueByBook = new Map();
+  // Identidad de cada libro de la biblioteca resuelta a su id canónico: un mazo
+  // guardado bajo un alias del libro cuenta como ESA columna, no como otra.
+  const libCanonical = new Map(books.map(b => [canonicalOf(b.id), b]));
+  const dueByBook = new Map();   // clave: id canónico
+  const orphanDecks = [];
   let total = 0;
   for (const d of decks) {
     const n = Srs.dueCount(d.cards, now);
-    if (n) { dueByBook.set(d.bookId, (dueByBook.get(d.bookId) || 0) + n); total += n; }
+    if (!n) continue;
+    total += n;
+    const cid = canonicalOf(d.bookId);
+    if (libCanonical.has(cid)) dueByBook.set(cid, (dueByBook.get(cid) || 0) + n);
+    // El libro ya no está en la biblioteca (o su identidad quedó vieja): esas tarjetas
+    // vencidas no salen en ninguna fila si no se listan aparte, pero «Repasar hoy»
+    // SÍ las estudia (total = TODO lo vencido, huérfanos incluidos).
+    else orphanDecks.push({ bookId: cid, name: d.name || t('Sin título'), cards: n });
   }
+  orphanDecks.sort((a, b) => b.cards - a.cards);
   const byCardsThenTitle = (a, b) => b.cards - a.cards || a.title.localeCompare(b.title);
   const dueBooks = books
-    .filter(b => dueByBook.get(b.id))
-    .map(b => ({ id: b.id, title: b.title || t('Sin título'), cards: dueByBook.get(b.id), shelfIds: b.shelfIds || [] }));
+    .filter(b => dueByBook.get(canonicalOf(b.id)))
+    .map(b => ({ id: b.id, title: b.title || t('Sin título'), cards: dueByBook.get(canonicalOf(b.id)), shelfIds: b.shelfIds || [] }));
   const dueById = new Map(dueBooks.map(b => [b.id, b]));
 
   const placed = new Set();
@@ -173,7 +193,7 @@ export async function studyScopes(now = Date.now()) {
   const looseBooks = dueBooks.filter(b => !placed.has(b.id)).sort(byCardsThenTitle)
     .map(({ id, title, cards }) => ({ id, title, cards }));
 
-  return { total, shelves: shelfScopes, looseBooks };
+  return { total, shelves: shelfScopes, looseBooks, orphanDecks };
 }
 
 // ---- Orden de la sesión (P24 F1) ------------------------------------------------

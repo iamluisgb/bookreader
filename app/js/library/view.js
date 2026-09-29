@@ -478,15 +478,30 @@ function showStudyChooser(chip, scopes) {
     s.books.map(b => row(b.title, b.cards, { type: 'book', bookId: b.id }, 'book')).join('')
   ).join('');
   const loose = scopes.looseBooks.map(b => row(b.title, b.cards, { type: 'book', bookId: b.id }, 'book')).join('');
+  // Mazos huérfanos: su libro ya no está en la biblioteca (o su identidad quedó vieja).
+  // Sin esta sección sus tarjetas vencidas no eran alcanzables desde «Elegir», aunque
+  // «Repasar hoy» (que recorre TODOS los mazos) sí las estudia.
+  const orphans = (scopes.orphanDecks || [])
+    .map(o => row(o.name, o.cards, { type: 'book', bookId: o.bookId }, 'book')).join('');
   menu.innerHTML =
     row(t('Todo'), scopes.total, { type: 'all' }) +
     shelfTree +
-    section(t('Sin estantería'), loose);
+    section(t('Sin estantería'), loose) +
+    section(t('Mazos sin libro'), orphans);
   chip.parentElement.appendChild(menu);
+  // Anclar al botón pero SUJETARLO al viewport (mismo patrón que positionMenu): medir
+  // ya insertado, recortar contra los bordes con margen de 8px y abrir hacia arriba
+  // si abajo no hay lugar. Antes se posicionaba a pelo y junto al borde derecho el
+  // menú se salía de pantalla y cortaba las filas.
   const r = chip.getBoundingClientRect();
   const pr = chip.parentElement.getBoundingClientRect();
-  menu.style.left = (r.left - pr.left) + 'px';
-  menu.style.top = (r.bottom - pr.top + 6) + 'px';
+  const mw = menu.offsetWidth, mh = menu.offsetHeight;
+  let left = Math.min(r.left, window.innerWidth - mw - 8);
+  left = Math.max(8, left);
+  let top = r.bottom + 6;
+  if (top + mh > window.innerHeight - 8) top = Math.max(8, r.top - mh - 6);
+  menu.style.left = (left - pr.left) + 'px';
+  menu.style.top = (top - pr.top) + 'px';
 
   const close = () => { menu.remove(); document.removeEventListener('click', onOutside, true); };
   const onOutside = (ev) => { if (!menu.contains(ev.target)) close(); };

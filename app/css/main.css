@@ -1320,11 +1320,14 @@ textarea.is-recording { display: none; }
   border: 1px solid var(--border);
   border-radius: 12px;
   box-shadow: var(--shadow-3);
-  padding: 6px;
+  padding: 6px 6px 0;
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
+/* Lista scrolleable: el padding inferior del contenedor se recorta al hacer scroll
+   (la última fila quedaba cortada); el aire va como margen del último hijo. */
+.lib-study-menu > :last-child { margin-bottom: 6px; }
 .lib-study-sec {
   font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
   color: var(--text-faint); padding: 8px 12px 4px;
@@ -1341,11 +1344,13 @@ textarea.is-recording { display: none; }
   flex: none; font-size: 12px; font-weight: 600; color: var(--accent);
   background: var(--accent-soft); border-radius: 999px; padding: 2px 9px;
 }
-/* Árbol: estantería = categoría padre (negrita); libro = hijo (sangrado, con guía). */
+/* Árbol: estantería = categoría padre (negrita); libro = hijo (sangrado, con guía).
+   Los hijos NO se ven deshabilitados: texto a pleno contraste y hover propio, porque
+   son clicables (se repasan a cualquier nivel). */
 .lib-study-opt--shelf { font-weight: 600; }
-.lib-study-opt--shelf .lib-study-opt-lbl::before { content: '▸ '; color: var(--text-faint); font-weight: 400; }
-.lib-study-opt--book { padding-left: 30px; position: relative; color: var(--text-soft); }
+.lib-study-opt--book { padding-left: 30px; position: relative; }
 .lib-study-opt--book .lib-study-opt-lbl::before { content: '└ '; color: var(--text-faint); }
+.lib-study-opt--book:hover { background: var(--surface-3); }
 .lib-study-opt--book .lib-study-opt-n { color: var(--text-soft); background: var(--surface-3); }
 
 /* ============ AJUSTES GENERALES (overlay global) ============ */
