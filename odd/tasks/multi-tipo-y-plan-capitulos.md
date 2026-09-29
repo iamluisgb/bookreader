@@ -37,14 +37,34 @@ La instrucción de arbitraje **modifica un prompt existente** (`cardsPrompt`), y
 ([`docs/EVALS.md` § EV5](docs/EVALS.md)) es que todo ítem que toque la calidad del agente abre con
 el contrato **antes** de la primera línea de código:
 
-```markdown
-**Contrato (antes de implementar).**
-- Batería: `p1` (flashcards) + gate determinista de anclas/cloze — es la batería que ya cubre esta ruta.
-- Métrica primaria: `cobertura`/`fidelidad` de la batería EV1 (la que gatea hoy). Determinista + juez.
-- Baseline: PENDIENTE DE MEDIR (`npm run eval`, requiere key real y fixtures; el golden IA7 necesita `evals/fixtures/ddia.pdf`).
-- Secundaria (tendencia, no gate): proporción de tarjetas cloze vs básicas realmente generadas.
-- Time-box: 2 ciclos. Si no se mueve, se clasifica el fallo y se cierra con el hallazgo.
-```
+**Contrato (antes de implementar) — MEDIDO el 2026-09-29.**
+
+- **Batería**: `p1-estudiante` (física/relatividad, `p1-relativity.epub`) y `p4-noficcion`
+  (Pedro Páramo). Son las dos que corren en este entorno; el golden IA7 se salta por falta de
+  `evals/fixtures/ddia.pdf`.
+- **Métrica primaria**: tarjetas — `fidelidad` · `atomicidad` · `utilidad` (juez, escala 5) y
+  `cobertura` de conceptos oro. **Determinista además de juez**: número de tarjetas generadas,
+  anclas válidas y duplicados.
+- **Baseline** (run `2026-09-29-12-18-deepseek-v4-flash`, generador `deepseek-v4-flash`):
+
+  | Batería | fidelidad | atomicidad | utilidad | cobertura | determinista |
+  |---|---|---|---|---|---|
+  | p1-estudiante | 4,8 | 4,8 | 4,6 | 6/9 | 15 tarjetas, 15 anclas válidas, 0 dupes |
+  | p4-noficcion | 4,3 | 4,7 | 4,3 | 7/8 | 15 tarjetas, 15 anclas válidas, 0 dupes |
+
+  **Caveat honesto — juez sustituido**: el juez por defecto (`mimo-v2.5`) devuelve 401 con la key
+  disponible («does not have access to the requested model»), así que el baseline se midió con
+  `EVAL_JUDGE=glm5.3-flash`. Los números son **comparables entre corridas con ese mismo juez**, no
+  con los runs históricos (que usaron otro). Toda comparación de esta feature se hace dentro de
+  este régimen.
+- **Estado del árbol de calidad en el baseline**: **2/17 presupuestos ya rotos** antes de tocar
+  nada — `p1 · cards.utilidad = 4,58` (mín 4,6) y `p4 · chat.honestidad = 4` (mín 4,5) — y el gate
+  de densidad de infografía falla en las dos baterías. Son preexistentes y **fuera del alcance de
+  este ítem**: la vara es **no empeorarlos**.
+- **Secundaria (tendencia, no gate)**: proporción real de cloze vs básicas generadas por pasada
+  (hoy el eval no la mide; se agrega como dato del run).
+- **Time-box**: 2 ciclos. Si la cláusula de arbitraje no mueve nada, se clasifica el fallo y se
+  cierra con el hallazgo (regla de EV5).
 
 **Consecuencia de secuencia**: el arbitraje de formato se implementa **después** del baseline. Si
 el baseline no se puede correr (falta de key/fixtures), la entrega se hace sin la cláusula de
@@ -86,8 +106,8 @@ arbitraje (dos pasadas puras) y el arbitraje queda como ítem aparte con su cont
 
 - [ ] **WU1** Multi-selección de tipos de texto (radio → checkboxes) + dos pasadas por tipo +
   `cardType: 'mixed'` + tests (sin cláusula de arbitraje: no toca prompts).
-- [ ] **WU2** Contrato EV5 + baseline medido del prompt de flashcards (`npm run eval` con key real
-  y fixtures) antes de tocar `cardsPrompt`.
+- [x] **WU2** Contrato EV5 + baseline medido (`npm run eval:gen` + `eval:score` con `EVAL_JUDGE=glm5.3-flash`).
+  Run `2026-09-29-12-18-deepseek-v4-flash`. 2/17 presupuestos ya rotos antes de tocar nada.
 - [ ] **WU3** Cláusula de arbitraje de formato en la pasada + dedupe cruzado por `prevFronts` +
   tests.
 - [ ] **WU4** Planificador por capítulo: prompt + validador determinista + fallback proporcional +
