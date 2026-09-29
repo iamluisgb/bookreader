@@ -31,6 +31,7 @@ import { prefetchVendor } from './vendor-loader.js';
 import { loadAgentCss } from './css-loader.js';
 import { restoreSheetSnap, sheetReservedPx } from './ai/sheet-height.js';
 import { repairGatewayConfig } from './ai/gateway-repair.js';
+import { repairOrphanDecks } from './ai/deck-repair.js';
 
 // ============ CARGA PEREZOSA ============
 // Módulos grandes que NO hacen falta para pintar la biblioteca. Con imports estáticos
@@ -120,6 +121,11 @@ document.addEventListener('DOMContentLoaded', () => {
   initReaderReflow();
   initPanelResize();
   initLibrary();
+  // WU1 · Reparación de mazos huérfanos al arrancar: un mazo cuyo libro cambió
+  // de identidad (borrado y re-descargado, alias canónico) reaparece en su
+  // libro sin que el usuario haga nada. No bloquea el render: lee la biblioteca
+  // por su cuenta, nunca lanza y es idempotente.
+  void repairOrphanDecks().catch(() => {});
   initRouter();
   registerServiceWorker();
   calentarModulosGrandes();

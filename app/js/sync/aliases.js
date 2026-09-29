@@ -102,6 +102,13 @@ export function reconcile(titlesById) {
     const canonical = canonicalOf(alias);
     moved += Highlights.migrateBook([alias], canonical);
     moved += Bookmarks.migrateBook([alias], canonical);
+    // WU1: los mazos también siguen al canónico. remapDecks es asíncrono
+    // (IndexedDB) y reconcile es SÍNCRONO — el engine y los tests leen el
+    // total al volver (tests/book-aliases.spec.ts pinia el contrato) — así
+    // que se lanza sin bloquear: el remapeo es idempotente (no-op sin mazos
+    // bajo el alias), nunca deja el mazo a medias y avisa al sync por su
+    // cuenta (notifySync en remapDecks).
+    void DB.remapDecks(alias, canonical).catch(() => {});
   }
   return moved;
 }

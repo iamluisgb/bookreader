@@ -458,6 +458,32 @@ export function deleteDeck(id) {
   })).then(r => { notifySync('decks'); return r; });
 }
 
+// Reasigna los mazos de un libro a otro (WU1 · reparación de identidad de
+// mazos). La usan deck-repair.js (reparación por título al arrancar) y
+// aliases.reconcile() (cuando el alias manda todo al id canónico). No hace nada
+// si faltan ids, si son iguales o si no hay mazos bajo fromId; los mazos con
+// tombstone no se tocan (su borrado ya decidió su destino). Sella `updatedAt`
+// y avisa al sync como updateDeck. Devuelve cuántos mazos movió. Idempotente:
+// si nadie apunta a fromId, no escribe ni avisa.
+export function remapDecks(fromId, toId) {
+  if (!fromId || !toId || fromId === toId) return Promise.resolve(0);
+  return tx('decks', 'readwrite', s => new Promise((resolve, reject) => {
+    const cur = s.index('bookId').openCursor(IDBKeyRange.only(fromId));
+    let moved = 0;
+    cur.onsuccess = () => {
+      const c = cur.result;
+      if (!c) return resolve(moved);
+      const v = c.value;
+      if (v && !v.deleted) {
+        c.update({ ...v, bookId: toId, updatedAt: Date.now() });
+        moved++;
+      }
+      c.continue();
+    };
+    cur.onerror = () => reject(cur.error);
+  })).then(r => { if (r) notifySync('decks'); return r; });
+}
+
 // Purga física: mazos con tombstone caducado y, en los mazos vivos, sus tarjetas
 // borradas hace más de `olderThan`.
 export function purgeDeletedDecks(olderThan) {

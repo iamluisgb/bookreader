@@ -109,6 +109,7 @@ const ASSETS = [
   './js/ai/figures-epub.js',
   './js/ai/visual-cards.js',
   './js/ai/visual-deck.js',
+  './js/ai/deck-repair.js',
   './js/ai/visual-figures.js',
   './js/region-select.js',
   './js/pdf-text-select.js',
