@@ -99,20 +99,32 @@ Salida: `{steps[{name, detected, stroke}], extraCount, comment}`.
 `parseLabelsResponse` → **bbox canónico `{x,y,w,h}` en píxeles de la imagen recortada**.
 `dedupeLabels` conserva la forma de entrada (es un filtro, no un normalizador).
 
+**Validación con pdf.js real (WU4)**: el fixture `tests/test-figure.pdf` tiene una imagen
+insertada en el rect (120,300,480,525) con origen arriba-izquierda. El módulo devuelve
+`{x: 120/612, y: 300/792, w: 360/612, h: 225/792}` y `[]` en la página sin imágenes — confirmado
+con el operator list real de pdf.js 3.11.174, no solo con listas sintéticas.
+
+**Hueco conocido**: la extracción cubre `painted image objects` del PDF. Un EPUB con figuras
+como `<img>` no tiene camino todavía (fuera del alcance de la primera entrega).
+
 ## Tareas de implementación (ODD, work units)
 
 - [x] **WU1** Spec + evidencia de grounding + anclajes (`7152577`)
-- [x] **WU2** `app/js/ai/figures.js` + `tests/figures.spec.ts` — 5 tests, eslint limpio (`ea017e1`)
-- [x] **WU3** `app/js/ai/visual-cards.js` + `tests/visual-cards.spec.ts` — 8 tests (incluye
-      propagación de abort sin reintento) (`e0f6196`); precache de ambos módulos (`ef56473`)
-- [ ] **WU4** `app/js/ai/visual-cards.js`: prompts 1–3 + parsers/validadores puros
-      (incluye validador de SVG) + tests con `fetch` stubbeado
-- [ ] **WU4** Menú de tipos en `renderSetup()` (`flashcards.js`) + ramificación de generación
-- [ ] **WU5** Render por tipo en estudio (`study.js`): oclusión (overlay %), diagrama (SVG),
+- [x] **WU2** `app/js/ai/figures.js` + `tests/figures.spec.ts` — 5 tests (`ea017e1`)
+- [x] **WU3** `app/js/ai/visual-cards.js` + `tests/visual-cards.spec.ts` — 8 tests incl. abort (`e0f6196`)
+- [x] **WU4** `app/js/ai/figures-pdf.js` + `tests/figures-pdf.spec.ts` — 10 tests (9 sintéticos +
+      1 de integración contra pdf.js real con el fixture `tests/test-figure.pdf`) (`44036d3`)
+- [x] **WU5a** Lote de diagramas con regeneración única + tarjetas de dibujo con rúbrica de ≥3
+      pasos en `visual-cards.js`; 13 tests (`662ce34`)
+- [ ] **WU5b** Menú multi-tipo en `renderSetup()` (`flashcards.js`) + orquestación del mazo visual
+      (`app/js/ai/visual-deck.js`): figuras del PDF abierto (render offscreen, patrón de
+      `renderCoverDataUrl`) → `groundFigure` → `generateOcclusions`/`generateDiagrams`/
+      `generateDrawingCards` → mazo con tarjetas de tipo visual
+- [ ] **WU6** Render por tipo en estudio (`study.js`): oclusión (overlay %), diagrama (SVG),
       dibujo (canvas) + arreglar `buildQueue` para tarjetas sin `front`
-- [ ] **WU6** Revisión del boceto con `chatVision` + pintado por colores de trazo
-- [ ] **WU7** Sync/export: campos visuales en `sameCard`; comportamiento definido en export Anki
-- [ ] **WU8** Docs: CHANGELOG, BACKLOG, DECISIONS + evals/check determinista si aplica
+- [ ] **WU7** Revisión del boceto con `chatVision` + pintado por colores de trazo
+- [ ] **WU8** Sync/export: campos visuales en `sameCard`; comportamiento definido en export Anki
+- [ ] **WU9** Docs: CHANGELOG, BACKLOG, DECISIONS + evals/check determinista si aplica
 
 ## Estado del árbol de tests (checkpoint WU3)
 
