@@ -525,6 +525,9 @@ async function mountOcclusion(slot, bookId, card) {
   const img = document.createElement('img');
   img.className = 'study-fig-img';
   img.alt = '';
+  // Draggable nativo off: un arrastre sobre la figura tenía que ser un swipe de repaso,
+  // no un drag de imagen del navegador (que cancelaba la secuencia de pointers).
+  img.draggable = false;
   img.setAttribute('role', 'img');
   img.setAttribute('aria-label', t('Figura del libro con una zona señalada'));
   const box = document.createElement('div');
@@ -933,24 +936,15 @@ function renderCard() {
           <div class="study-feedback" hidden></div>
         </div>
       </div>
-    </div>
-    ${LLM.hasKey() ? `<div class="study-recall">
-      <textarea class="study-recall-input" rows="1" placeholder="${t('Escribe tu respuesta y el agente la corrige (opcional)')}" aria-label="${t('Tu respuesta')}"></textarea>
-    </div>` : ''}`;
-  f.innerHTML = `<button class="primary-btn study-flip">${t('Mostrar respuesta')} <kbd>${t('espacio')}</kbd></button>`;
-  f.querySelector('.study-flip').addEventListener('click', flip);
+    </div>`;
+  renderFrontFoot(b, f);
   b.querySelector('.study-card3d').addEventListener('click', (e) => {
-    // El canvas es para dibujar, no para girar: un trazo no voltea la tarjeta.
-    if (!flipped && !e.target.closest('button, a, textarea, canvas')) flip();
+    // El canvas es para dibujar, no para girar: un trazo no voltea la tarjeta. Y el toque
+    // es un TOGGLE: con la tarjeta girada, tap vuelve al frente (unflip). El avance sigue
+    // siendo solo por nota: botones de grade, teclas 1..4 o swipe con la tarjeta girada.
+    if (e.target.closest('button, a, textarea, canvas')) return;
+    if (!flipped) flip(); else unflip();
   });
-  const input = b.querySelector('.study-recall-input');
-  if (input) {
-    input.addEventListener('input', () => {
-      input.style.height = 'auto';
-      input.style.height = Math.min(input.scrollHeight, 140) + 'px';
-      f.querySelector('.study-flip').firstChild.textContent = input.value.trim() ? `${t('Comprobar')} ` : `${t('Mostrar respuesta')} `;
-    });
-  }
   wireSwipe(b.querySelector('.study-card3d'));
   wireDrawingCanvas(b.querySelector('.study-draw-canvas'));
   mountVisuals(b.querySelector('.study-face--front'), deck, card);
@@ -1135,6 +1129,49 @@ function flip() {
   renderGrades(card);
 }
 
+// Pie del FRENTE de la tarjeta: botón «Mostrar respuesta» + bloque de recuerdo cuando hay
+// agente. Compartido por renderCard y unflip para que ambas direcciones construyan LO MISMO
+// en vez de duplicar el markup. `recall` repone el texto que el alumno ya hubiera escrito.
+function renderFrontFoot(b, f, recall = '') {
+  if (!b || !f) return;
+  f.innerHTML = `<button class="primary-btn study-flip">${t('Mostrar respuesta')} <kbd>${t('espacio')}</kbd></button>`;
+  f.querySelector('.study-flip').addEventListener('click', flip);
+  if (!LLM.hasKey()) return;
+  b.querySelector('.study-recall')?.remove();
+  b.insertAdjacentHTML('beforeend', `
+    <div class="study-recall">
+      <textarea class="study-recall-input" rows="1" placeholder="${t('Escribe tu respuesta y el agente la corrige (opcional)')}" aria-label="${t('Tu respuesta')}"></textarea>
+    </div>`);
+  const input = b.querySelector('.study-recall-input');
+  input.addEventListener('input', () => {
+    input.style.height = 'auto';
+    input.style.height = Math.min(input.scrollHeight, 140) + 'px';
+    f.querySelector('.study-flip').firstChild.textContent = input.value.trim() ? `${t('Comprobar')} ` : `${t('Mostrar respuesta')} `;
+  });
+  if (recall) {
+    input.value = recall;
+    // Reusar el listener: ajusta el alto y deja la etiqueta coherente con el texto.
+    input.dispatchEvent(new Event('input'));
+  }
+}
+
+// Volver al frente: el toque sobre la tarjeta girada es un TOGGLE, no un avance. Sin
+// renderCard(): el lienzo de dibujo conserva sus trazas. Se ocultan respuesta, feedback y
+// pasaje (viven dentro de .study-a) y el pie se reconstruye con el mismo render del frente.
+function unflip() {
+  if (!overlay || !flipped || animating) return;
+  flipped = false;
+  const a = overlay.querySelector('.study-a');
+  if (a) { a.innerHTML = ''; a.hidden = true; }
+  const fb = overlay.querySelector('.study-feedback');
+  if (fb) { fb.innerHTML = ''; fb.hidden = true; }
+  abortSketchReview();   // la revisión del boceto no sigue pintando con el frente visible
+  suggested = null;
+  overlay.querySelector('.study-card3d')?.classList.remove('is-flipped');
+  overlay.querySelector('.study-card')?.classList.remove('is-flipped');
+  renderFrontFoot(overlay.querySelector('.study-body'), overlay.querySelector('.study-foot'), recallText);
+}
+
 function renderGrades(card) {
   const f = overlay?.querySelector('.study-foot');
   if (!f) return;
@@ -1181,7 +1218,7 @@ Devuelve SOLO un JSON: {"veredicto": "bien" | "a medias" | "mal", "comentario": 
       ],
       maxTokens: 300,
     });
-    if (!overlay || queue[0]?.deck.cards[queue[0].idx] !== card) return;   // ya se pasó de tarjeta
+    if (!overlay || !flipped || queue[0]?.deck.cards[queue[0].idx] !== card) return;   // ya se pasó de tarjeta (o volvió al frente)
     const m = String(raw || '').match(/\{[\s\S]*\}/);
     const j = m ? JSON.parse(m[0]) : {};
     const v = String(j.veredicto || '').toLowerCase();
@@ -1222,6 +1259,11 @@ async function showPassage(deck, card) {
 function wireSwipe(el) {
   if (!el) return;
   let x0 = null, dx = 0;
+  // El drag nativo del navegador (imágenes draggable, selección de texto) se llevaba el
+  // gesto: el pointerdown moría en pointercancel y el swipe sobre una figura o un texto
+  // seleccionable nunca calificaba. Sin drag nativo dentro de la tarjeta. El swipe sigue
+  // exigiendo la tarjeta girada: sin ver la respuesta no se califica.
+  el.addEventListener('dragstart', (e) => e.preventDefault());
   el.addEventListener('pointerdown', (e) => {
     if (!flipped || animating || e.target.closest('button, a, details, textarea, canvas')) return;
     x0 = e.clientX; dx = 0;

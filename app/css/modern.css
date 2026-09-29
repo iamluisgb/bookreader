@@ -447,6 +447,10 @@ body.reading :is(.reader-header, .reader-footer):hover > * { opacity: 1; }
   transform: translateX(calc(var(--drag) * 1px)) rotate(calc(var(--drag) / 30 * 1deg)) rotateY(0deg);
   transition: transform 0.55s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.2s ease;
   cursor: pointer; outline: none;
+  /* pan-y: el gesto HORIZONTAL es del swipe (calificar); el vertical queda para el scroll
+     del overlay en táctil. Sin esto, el navegador podía robarse el arrastre y matar el
+     gesto con un pointercancel. El lienzo de dibujo sigue en touch-action: none. */
+  touch-action: pan-y;
 }
 .study-card3d.is-flipped { transform: translateX(calc(var(--drag) * 1px)) rotate(calc(var(--drag) / 30 * 1deg)) rotateY(180deg); cursor: grab; }
 .study-card3d.is-dragging { transition: none; }
@@ -540,6 +544,8 @@ body.reading :is(.reader-header, .reader-footer):hover > * { opacity: 1; }
 .study-fig-img {
   display: block; max-width: 100%; max-height: 220px; margin: 0 auto;
   border-radius: 10px; border: 1px solid var(--border); background: var(--surface-0);
+  /* Ni drag nativo de imagen (Safari/WebKit): sobre la figura se desliza para calificar. */
+  -webkit-user-drag: none;
 }
 .study-fig.is-loading { min-height: 60px; min-width: 160px; }
 .study-fig-empty { margin: 4px 0 0; font-size: var(--fs-sm); color: var(--text-faint); text-align: center; }
