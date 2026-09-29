@@ -724,6 +724,22 @@ const EN = {
   'No se encontraron figuras en este libro, así que no hay tarjetas de oclusión que generar.':
     'No figures were found in this book, so there are no occlusion cards to generate.',
   'Cantidad': 'How many',
+  // WU5 · Plan editable por capítulo (botón, nota, tabla y pie)
+  'Sugerir cantidades': 'Suggest amounts',
+  'El plan manda: se ignora la cantidad de arriba.': 'The plan rules: the amount above is ignored.',
+  'Tarjetas para este capítulo': 'Cards for this chapter',
+  'reparto automático (el agente no dio un plan usable)': 'automatic split (the agent did not return a usable plan)',
+  '{n} en total': '{n} in total',
+  '≈ {n} llamadas al modelo': '≈ {n} model calls',
+  'Quitar plan': 'Remove plan',
+  'Plan por capítulo': 'Chapter plan',
+  'Ese libro no tiene capítulos con contenido para planificar.': 'This book has no content chapters to plan.',
+  'No se pudo sugerir el plan: {msg}': 'Could not suggest a plan: {msg}',
+  'El plan no tiene ninguna tarjeta: sube algún número antes de generar.': 'The plan has no cards: raise some numbers before generating.',
+  'El plan supera el tope de {n} capítulos por corrida; quita capítulos o bájales el número.':
+    'The plan exceeds the limit of {n} chapters per run; remove chapters or lower their numbers.',
+  'Plan aplicado: {a} de {b} tarjetas': 'Plan applied: {a} of {b} cards',
+  '{n} capítulos fallaron': '{n} chapters failed',
   // Multi-tipo de texto (WU1): hint del reparto del total entre pasadas
   '{n} en total · {a} P→R + {b} Cloze': '{n} in total · {a} Q→A + {b} Cloze',
   'Las tarjetas visuales se suman aparte.': 'Visual cards are added on top.',

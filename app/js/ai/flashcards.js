@@ -23,6 +23,7 @@ import { balancedObjects } from './query-expand.js';
 import { getBook } from '../library/store.js';
 import { ensureBookFigures } from './visual-figures.js';
 import { buildVisualCards, VISUAL_TYPES } from './visual-deck.js';
+import { chapterList, suggestPlan, MAX_PLAN_CHAPTERS } from './card-plan.js';
 import * as PdfReader from '../pdf-reader.js';
 
 // Generación por TROZOS (map-reduce): el material se divide en trozos de ~CHUNK_TOKENS
@@ -49,6 +50,14 @@ let generating = false;   // hay un job de flashcards de ESTE libro en curso (so
 let unsubJobs = null;     // suscripción a jobs.js mientras el modal está abierto
 let scopeValue = '';   // alcance elegido: '' = libro entero, o la etiqueta del capítulo
 let mergeInto = null;  // id del mazo existente al que AÑADIR (P24 F4), o null = mazo nuevo
+// WU5 · Plan de tarjetas por capítulo activo: lo produce suggestPlan y lo edita la tabla.
+// Es la fuente de verdad de la generación mientras exista (el selector de cantidad se
+// ignora); un cambio de alcance lo limpia (un plan de libro entero no sirve para un
+// capítulo suelto).
+let planState = null;  // { plan: [{ name, cards, reason }], source, adjusted, notes, total }
+// Tope de llamadas de las familias visuales por alcance (los caps de buildVisualCards):
+// sirve para el coste estimado del plan (las visuales corren UNA vez por corrida).
+const VISUAL_CALL_CAPS = { occlusion: 6, diagram: 2, drawing: 1 };
 // Umbral a partir del cual el desplegable de alcance muestra buscador (índices largos).
 const SCOPE_SEARCH_MIN = 8;
 
@@ -69,6 +78,7 @@ export function open(context) {
   overlay.addEventListener('mousedown', (e) => { if (e.target === overlay) closeModal(); });
   overlay.querySelector('.ai-ob-close').addEventListener('click', closeModal);
   document.addEventListener('keydown', onKey);
+  planState = null;   // el plan no sobrevive a la apertura: se vuelve a sugerir si hace falta
   renderSetup();
   // Al suscribirse, jobs.js entrega el trabajo activo de inmediato: si se reabre el modal
   // con una generación en curso (o recién terminada) se cae en la rama que toca.
@@ -94,6 +104,9 @@ const body = () => overlay?.querySelector('.ai-ob-body');
 async function renderSetup() {
   const b = body();
   if (!b) return;
+  // El plan no sobrevive a un re-render del setup («Volver» desde la revisión): la tabla
+  // se pintaría vacía con el estado activo. Se vuelve a sugerir si hace falta.
+  planState = null;
   // Solo capítulos con texto indexado (fuera cubierta, copyright…); el actual se
   // preselecciona solo si tiene contenido — si no, "Libro entero".
   ctx.ensureIndex();
@@ -104,8 +117,7 @@ async function renderSetup() {
   // conceptos centrales (medido: cobertura 1/8 en Pro Git). Sugerimos 30 por defecto.
   const totalTokens = Retrieval.allPassages().reduce((n, p) => n + estimateTokens(p.text), 0);
   const defaultCount = totalTokens > BOOK_TOKENS * 2 ? 30 : 15;
-  const options = [{ value: '', label: t('Libro entero') }, ...chapters.map(c => ({ value: c, label: c }))];
-  b.innerHTML = `
+  const options = [{ value: '', label: t('Libro entero') }, ...chapters.map(c => ({ value: c, label: c }))];  b.innerHTML = `
     <h2>${t('Flashcards para Anki')}</h2>
     <p class="ai-ob-sub">${t('El agente crea tarjetas de estudio desde el libro; revísalas y expórtalas a Anki.')}</p>
     <label class="fc-label" id="fc-scope-label">${t('Contenido')}</label>
@@ -127,19 +139,30 @@ async function renderSetup() {
     </div>
     <p class="ai-ob-sub" id="fc-vhint" hidden>${t('Las figuras se extraen del libro en la primera generación: la primera vez tarda más.')}</p>
     <label class="fc-label" for="fc-count">${t('Cantidad')}</label>
-    <select id="fc-count" class="fc-select">${COUNTS.map(n => `<option ${n === defaultCount ? 'selected' : ''}>${n}</option>`).join('')}</select>
+    <div class="fc-count-row">
+      <select id="fc-count" class="fc-select">${COUNTS.map(n => `<option ${n === defaultCount ? 'selected' : ''}>${n}</option>`).join('')}</select>
+      <button id="fc-plan-btn" type="button" class="fc-plan-btn" hidden>${icon('sparkles', { size: 14 })} ${t('Sugerir cantidades')}</button>
+    </div>
+    <p class="ai-ob-sub fc-plan-note" id="fc-plan-note" hidden>${t('El plan manda: se ignora la cantidad de arriba.')}</p>
+    <div id="fc-plan"></div>
     <p class="ai-ob-sub" id="fc-split" hidden></p>
     <div id="fc-dup"></div>
     <button id="fc-generate" class="primary-btn ai-ob-start">${icon('sparkles', { size: 16 })} ${t('Generar tarjetas')}</button>
     <div id="fc-error" class="fc-error" style="display:none"></div>
     <div id="fc-decks"></div>`;
-  mountScopeCombo(b.querySelector('#fc-scope'), options, scopeValue, (v) => { scopeValue = v; refreshDupNote(); });
+  mountScopeCombo(b.querySelector('#fc-scope'), options, scopeValue, (v) => {
+    scopeValue = v;
+    clearPlan();        // un plan de libro entero no sirve para otro alcance (WU5)
+    refreshDupNote();
+  });
   b.querySelector('#fc-generate').addEventListener('click', onGenerate);
+  b.querySelector('#fc-plan-btn').addEventListener('click', onSuggestPlan);
   b.querySelectorAll('input[name="fc-type"], input[name="fc-vtype"]').forEach(el =>
-    el.addEventListener('change', () => { refreshGenerateState(); refreshSplitHint(); refreshDupNote(); }));
+    el.addEventListener('change', () => { refreshGenerateState(); refreshSplitHint(); refreshDupNote(); refreshPlanFooter(); }));
   b.querySelector('#fc-count').addEventListener('change', refreshSplitHint);
   refreshGenerateState();
   refreshSplitHint();
+  refreshPlanUI();   // estado inicial del botón/nota del plan (WU5)
   renderDeckList();
   refreshDupNote();
 }
@@ -200,6 +223,99 @@ function refreshSplitHint() {
   el.textContent = t('{n} en total · {a} P→R + {b} Cloze', { n: count, a, b: r })
     + (sel.visual.length ? ' ' + t('Las tarjetas visuales se suman aparte.') : '');
   el.hidden = false;
+}
+
+// WU5 · Plan editable por capítulo ------------------------------------------------
+
+// Quita el plan activo y vuelve al flujo normal (el selector de cantidad vuelve a mandar).
+// Se dispara con «Quitar plan» y con CUALQUIER cambio de alcance: un plan de libro
+// entero no significa nada para un capítulo suelto.
+function clearPlan() {
+  planState = null;
+  renderPlanTable();
+  refreshPlanUI();
+}
+
+async function onSuggestPlan() {
+  const b = body();
+  const btn = b?.querySelector('#fc-plan-btn');
+  if (!b || !btn) return;
+  const chapters = chapterList(Retrieval.allPassages());
+  if (!chapters.length) { showError(t('Ese libro no tiene capítulos con contenido para planificar.')); return; }
+  const total = parseInt(b.querySelector('#fc-count').value, 10);
+  btn.disabled = true;
+  btn.classList.add('is-busy');
+  try {
+    const res = await suggestPlan({ bookTitle: ctx.bookTitle, goal: ctx.goal, chapters, total });
+    planState = { ...res, total };
+    renderPlanTable();
+    refreshPlanUI();
+  } catch (e) {
+    if (e.name === 'AbortError') return;   // cancelar es del usuario: sin aviso
+    showError(t('No se pudo sugerir el plan: {msg}', { msg: e.message }));
+  } finally {
+    if (btn.isConnected) { btn.disabled = false; btn.classList.remove('is-busy'); }
+  }
+}
+
+// Visibilidad del plan: el botón SOLO tiene sentido con el libro entero (un capítulo
+// suelto no tiene nada que repartir) y sin plan activo (para eso está «Quitar plan»). La
+// nota de "el plan manda" solo con plan activo.
+function refreshPlanUI() {
+  const b = body();
+  if (!b) return;
+  const btn = b.querySelector('#fc-plan-btn');
+  if (btn) btn.hidden = !!scopeValue || !!planState;
+  const note = b.querySelector('#fc-plan-note');
+  if (note) note.hidden = !planState;
+}
+
+// Tabla editable: nombre + motivo del agente por fila, número editable, total vivo y
+// coste estimado honesto (capítulos con tarjetas × tipos de texto + los topes propios de
+// las familias visuales, que corren UNA vez por corrida). El marcador de fallback es la
+// parte honesta: si el agente no dio un plan usable, se dice.
+function renderPlanTable() {
+  const host = body()?.querySelector('#fc-plan');
+  if (!host) return;
+  if (!planState) { host.innerHTML = ''; return; }
+  const rows = planState.plan.map((row, i) => `
+    <tr class="fc-plan-row" data-i="${i}">
+      <td class="fc-plan-name">${escapeHtml(row.name)}${row.reason ? `<small class="fc-plan-reason">${escapeHtml(row.reason)}</small>` : ''}</td>
+      <td class="fc-plan-count"><input type="number" class="fc-plan-num" min="0" max="999" step="1" value="${row.cards}" data-i="${i}" aria-label="${t('Tarjetas para este capítulo')}"></td>
+    </tr>`).join('');
+  host.innerHTML = `
+    ${planState.source !== 'agent' ? `<p class="fc-plan-src">${t('reparto automático (el agente no dio un plan usable)')}</p>` : ''}
+    <table class="fc-plan-table"><tbody>${rows}</tbody></table>
+    <div class="fc-plan-foot">
+      <span class="fc-plan-total"></span>
+      <span class="fc-plan-cost"></span>
+      <button id="fc-plan-clear" type="button" class="fc-txt-btn">${t('Quitar plan')}</button>
+    </div>`;
+  host.querySelector('#fc-plan-clear').addEventListener('click', clearPlan);
+  host.oninput = (e) => {
+    const inp = e.target.closest('.fc-plan-num');
+    if (!inp) return;
+    const i = parseInt(inp.dataset.i, 10);
+    planState.plan[i].cards = Math.max(0, Math.floor(Number(inp.value) || 0));
+    refreshPlanFooter();
+  };
+  refreshPlanFooter();
+}
+
+// Total vivo y coste estimado del plan activo; se recalcula al editar números y al
+// cambiar la selección de tipos (el coste depende de ambas cosas).
+function refreshPlanFooter() {
+  const b = body();
+  if (!b || !planState) return;
+  const total = b.querySelector('.fc-plan-total');
+  if (!total) return;
+  const sum = planState.plan.reduce((s, r) => s + r.cards, 0);
+  total.textContent = t('{n} en total', { n: sum });
+  const sel = selectedTypes();
+  let calls = planState.plan.filter(r => r.cards > 0).length * sel.text.length;
+  for (const v of sel.visual) calls += VISUAL_CALL_CAPS[v] || 0;
+  const cost = b.querySelector('.fc-plan-cost');
+  if (cost) cost.textContent = t('≈ {n} llamadas al modelo', { n: calls });
 }
 
 // P24 F4 · Regenerar el mismo alcance creaba un mazo PARALELO: el anti-duplicados
@@ -650,6 +766,75 @@ async function generateChunk({ text, ask, type, goal, prevFronts, otherTypes = [
   return { cards: parseCards(raw, type), mode: 'text' };
 }
 
+// Corre las PASADAS DE TEXTO (WU1: una por tipo elegido, orden estable) sobre los trozos
+// dados, con el cupo total repartido entre pasadas (splitQuota) y el déficit arrastrado
+// DENTRO de cada pasada. Es el motor común del mazo de libro entero y del plan por
+// capítulo (WU5): misma escalera de robustez, mismo anti-duplicados. Los frentes
+// acumulan ENTRE pasadas en `cards`: el prevFronts de la segunda lleva los de la primera.
+// Un trozo/pasada fallido no tira el trabajo del resto (éxito parcial). El progreso y el
+// destino de las tarjetas los decide el caller vía onProgress.
+async function runTextPasses({ chunks, count, sel, goal, seedFronts = [], mode = 'forced', signal, background, onProgress }) {
+  let cards = [], failed = 0;
+  const quotas = splitQuota(count, sel.text.length);
+  onProgress?.(0, count, 'map');
+  for (let ti = 0; ti < sel.text.length; ti++) {
+    const textType = sel.text[ti];
+    const counts = allocateCounts(chunks, quotas[ti]);
+    // Los demás tipos elegidos alimentan la cláusula de arbitraje (WU3): en esta
+    // pasada solo van los conceptos de formato natural textType.
+    const otherTypes = sel.text.filter(x => x !== textType);
+    // Déficit POR PASADA (no entre pasadas): si varios trozos anteriores dieron de
+    // menos, sin tope el último trozo absorbía el cupo entero — el eval EV1 cazó un
+    // mazo completo salido de un único capítulo. Mejor un mazo corto y repartido
+    // ("éxito parcial", ya avisado abajo) que uno completo y monotema.
+    let expected = 0, passCards = 0;
+    for (let i = 0; i < chunks.length; i++) {
+      if (!counts[i]) continue;
+      const deficit = Math.min(Math.max(0, expected - passCards), counts[i] + 2);
+      expected += counts[i];
+      try {
+        const res = await generateChunk({
+          text: chunks[i].text, ask: counts[i] + deficit, type: textType, goal,
+          prevFronts: seedFronts.concat(cards.map(c => c.front)).slice(-MAX_PREV_FRONTS),
+          otherTypes, mode, signal, background,
+        });
+        mode = res.mode;
+        const fresh = res.cards.slice(0, counts[i] + deficit);
+        cards = cards.concat(fresh);
+        passCards += fresh.length;
+      } catch (e) {
+        if (e.name === 'AbortError') throw e;
+        console.warn(`Flashcards: el trozo ${i + 1}/${chunks.length} falló:`, e);
+        failed++;
+      }
+      onProgress?.(Math.min(cards.length, count), count, 'map');
+    }
+  }
+  return { cards, failed, mode };
+}
+
+// Familias visuales del alcance entero (resolver figuras del libro + tarjetas de
+// oclusión/diagrama/dibujo). Compartido por el camino de mazo único y el de plan por
+// capítulo (WU5): las visuales corren UNA vez por corrida, nunca por capítulo — son
+// figuras del libro, no del capítulo. Secuenciales, dentro del MISMO job.
+async function buildScopeVisuals({ sel, scopeLabel, bookId, signal, progress }) {
+  const chapterText = gatherScope(scopeLabel).map(p => p.text).join('\n\n').slice(0, 8000);
+  const record = bookId ? await getBook(bookId).catch(() => null) : null;
+  const fr = await ensureBookFigures({
+    bookId, format: record?.format, record, signal,
+    onProgress: ({ done, total }) => progress(done, total, 'figures'),
+    deps: {
+      getDocument: () => (PdfReader.getBookId() === bookId && PdfReader.isLoaded()
+        ? PdfReader.getDocument() : null),
+    },
+  });
+  return buildVisualCards({
+    types: sel.visual, chapterText, figures: fr.figures, signal,
+    onProgress: ({ phase, done, total }) => progress(done, total, phase),
+    bookTitle: record?.title,
+  });
+}
+
 // F4 · La generación corre en SEGUNDO PLANO (jobs.js), como resumen y mapa mental.
 // Antes vivía dentro del modal y moría con él (`if (!overlay) return`), justo en la
 // generación MÁS lenta de la app (N llamadas encadenadas): el lector tenía que quedarse
@@ -662,13 +847,28 @@ function onGenerate() {
   const type = effectiveDeckType(sel);
   const count = parseInt(b.querySelector('#fc-count').value, 10);
 
+  // WU5 · Plan activo: manda el plan (la cantidad de arriba se ignora). Guardas de coste:
+  // sin filas con tarjetas no hay nada que generar, y por encima del tope de capítulos
+  // por corrida se NIEGA a gastar (más capítulos activos = más llamadas pagas) en vez de
+  // recortarlo por su cuenta.
+  const planRows = planState ? planState.plan.filter(r => r.cards > 0) : null;
+  if (planRows && !planRows.length) {
+    showError(t('El plan no tiene ninguna tarjeta: sube algún número antes de generar.'));
+    return;
+  }
+  if (planRows && planRows.length > MAX_PLAN_CHAPTERS) {
+    showError(t('El plan supera el tope de {n} capítulos por corrida; quita capítulos o bájales el número.', { n: MAX_PLAN_CHAPTERS }));
+    return;
+  }
+
   // Camino de TEXTO: igual que siempre (chunks, map-reduce, attachSources). Los trozos se
   // calculan UNA vez; con varios tipos de texto cada tipo corre SU pasada sobre esos
   // mismos trozos con su cupo (WU1). Sin tipos de texto (solo visuales) no hay trozos que
-  // trocear y el índice de texto no se exige.
+  // trocear y el índice de texto no se exige. Con plan activo el troceo es POR CAPÍTULO,
+  // dentro del job (cada capítulo se calcula cuando le toca).
   const wantsText = sel.text.length > 0;
   let chunks = [];
-  if (wantsText) {
+  if (!planRows && wantsText) {
     chunks = buildChunks(gatherScope(scopeLabel));
     if (!chunks.length) { showError(t('Ese contenido no tiene texto indexado; prueba con otro capítulo o con el libro entero.')); return; }
   }
@@ -684,17 +884,139 @@ function onGenerate() {
   const target = b.querySelector('#fc-merge')?.checked ? mergeInto : null;
 
   showError('');
+
+  // ---- WU5 · Camino PLAN POR CAPÍTULO: un tramo de job por capítulo con tarjetas ----
+  // Cada capítulo corre el MISMO motor de pasadas (runTextPasses) sobre SUS trozos con su
+  // cupo, y fusiona/crea el mazo de ESE alcance (etiqueta del capítulo). El mazo de libro
+  // entero NO se usa con plan activo. Un capítulo fallido no tira el resto (misma
+  // filosofía que un trozo fallido) y queda en el desglose del resumen del trabajo.
+  if (planRows) {
+    const requested = planRows.reduce((s, r) => s + r.cards, 0);
+    Jobs.start({
+      bookId, kind: 'flashcards', label: t('Flashcards'),
+      params: { scope: scopeLabel, scopeName: t('Plan por capítulo'), type, count: requested },
+      persist: false,        // los mazos viven en `decks`; ver Jobs.start
+      run: async ({ signal, progress, background }) => {
+        const breakdown = [];
+        let mode = 'forced';
+        let frontsSeen = [];                 // frentes ya generados en capítulos previos
+        let done = 0;
+        for (const row of planRows) {
+          const chChunks = buildChunks(Retrieval.passagesByChapter(row.name));
+          let generated = 0, failed, deckId = null;   // failed siempre se asigna abajo
+          if (!chChunks.length) {
+            failed = 1;                      // el capítulo no tiene texto indexado
+          } else {
+            try {
+              // Fusión por capítulo: el mazo existente de ESE alcance y tipo efectivo
+              // recibe lo nuevo; sus frentes entran al prompt como anti-duplicados junto
+              // con los de los capítulos ya generados en esta corrida.
+              const decks = await DB.getDecks(bookId);
+              const existing = decks.find(d => (d.scope || '') === row.name && d.cardType === type && DB.cardsOf(d).length);
+              const seedFronts = existing
+                ? DB.cardsOf(existing).map(c => c.front).concat(frontsSeen)
+                : frontsSeen;
+              const res = await runTextPasses({
+                chunks: chChunks, count: row.cards, sel, goal, seedFronts, mode, signal, background,
+                onProgress: (d, n, ph) => progress(Math.min(done + d, requested), requested, ph),
+              });
+              mode = res.mode;
+              failed = res.failed;
+              if (res.cards.length) {
+                // Solo las tarjetas de TEXTO llevan ancla (las visuales van aparte).
+                const withSrc = attachSources(res.cards.slice(0, row.cards), {
+                  validIds: new Set(byId.keys()),
+                  search: (q, k) => (Retrieval.hasIndex(bookId) ? Retrieval.search(q, k) : []),
+                  textOf: (id) => byId.get(id),
+                });
+                const seen = new Set(existing ? DB.cardsOf(existing).map(c => normFront(c.front)) : []);
+                const fresh = withSrc.filter(c => {
+                  const k = normFront(c.front);
+                  if (k && seen.has(k)) return false;
+                  if (k) seen.add(k);
+                  return true;
+                });
+                generated = fresh.length;    // lo repetido no cuenta como generado
+                frontsSeen = frontsSeen.concat(fresh.map(c => c.front)).slice(-MAX_PREV_FRONTS);
+                if (fresh.length) {
+                  if (existing) {
+                    const merged = { ...existing, cards: existing.cards.concat(fresh) };
+                    const patch = { cards: merged.cards };
+                    if (existing.cardType !== type) patch.cardType = 'mixed';
+                    await DB.updateDeck(existing.id, patch);
+                    deckId = existing.id;
+                  } else {
+                    const deck = { bookId, name: deckName(row.name), cardType: type, scope: row.name, cards: fresh, createdAt: Date.now() };
+                    if (bookId) deck.id = await DB.addDeck(deck);
+                    deckId = deck.id || null;
+                  }
+                }
+              }
+            } catch (e) {
+              if (e.name === 'AbortError') throw e;
+              console.warn(`Flashcards: el capítulo "${row.name}" falló:`, e);
+              failed = chChunks.length;      // el capítulo entero se reporta fallido
+            }
+          }
+          done += Math.min(generated, row.cards);
+          breakdown.push({ name: row.name, requested: row.cards, generated, failed, deckId });
+          progress(Math.min(done, requested), requested, 'map');
+        }
+        // Familias visuales: UNA vez para el alcance entero, DESPUÉS de las pasadas de
+        // texto, a su mazo propio de libro entero (scope ''): son figuras del libro, no
+        // de un capítulo.
+        let vres = null, visualDeckId = null;
+        if (sel.visual.length) {
+          vres = await buildScopeVisuals({ sel, scopeLabel, bookId, signal, progress });
+          if (vres.cards.length) {
+            const vType = sel.visual.length === 1 ? sel.visual[0] : 'mixed';
+            const decks = await DB.getDecks(bookId);
+            const vExisting = decks.find(d => (d.scope || '') === '' && d.cardType === vType && DB.cardsOf(d).length);
+            const seen = new Set(vExisting ? DB.cardsOf(vExisting).map(c => normFront(c.front)) : []);
+            const fresh = vres.cards.filter(c => {
+              const k = normFront(c.front);
+              if (k && seen.has(k)) return false;
+              if (k) seen.add(k);
+              return true;
+            });
+            if (vExisting) {
+              const patch = { cards: vExisting.cards.concat(fresh) };
+              if (vExisting.cardType !== vType) patch.cardType = 'mixed';
+              await DB.updateDeck(vExisting.id, patch);
+              visualDeckId = vExisting.id;
+            } else {
+              const deck = { bookId, name: deckName(''), cardType: vType, scope: '', cards: fresh, createdAt: Date.now() };
+              if (bookId) deck.id = await DB.addDeck(deck);
+              visualDeckId = deck.id || null;
+            }
+          }
+        }
+        const generatedTotal = breakdown.reduce((s, c) => s + c.generated, 0);
+        const failedChapters = breakdown.filter(c => c.failed).length;
+        // Sin tarjetas en NINGÚN capítulo ni visual es un fallo (mismo criterio que el
+        // camino de mazo único: no simular éxito con nada).
+        if (!generatedTotal && !(vres && vres.cards.length)) {
+          if (!sel.text.length && sel.visual.length === 1 && sel.visual[0] === 'occlusion') {
+            throw new Error(t('No se encontraron figuras en este libro, así que no hay tarjetas de oclusión que generar.'));
+          }
+          throw new Error(t('El modelo no devolvió tarjetas válidas. Vuelve a intentarlo.'));
+        }
+        return { planned: true, chapters: breakdown, visualDeckId,
+          generated: generatedTotal, requested, failed: failedChapters,
+          ...(vres ? { visual: vres.stats } : {}) };
+      },
+    });
+    return;
+  }
+
   Jobs.start({
     bookId, kind: 'flashcards', label: t('Flashcards'),
     params: { scope: scopeLabel, scopeName: scopeLabel || t('Libro entero'), type, count },
     persist: false,        // el mazo vive en `decks`; ver Jobs.start
     run: async ({ signal, progress, background }) => {
-      // Map-reduce sobre los trozos, UNA PASADA por tipo de texto elegido (orden estable):
-      // cada pasada corre la escalera completa con SU cupo del total (splitQuota). Los
-      // frentes acumulan ENTRE pasadas en `cards`: el prevFronts de la segunda pasada
-      // lleva los de la primera, así el arbitraje no produce el mismo concepto dos veces.
-      // Un trozo/pasada fallido no tira el trabajo del resto (éxito parcial, ya avisado).
-      let cards = [], failed = 0, mode = 'forced';
+      // Map-reduce sobre los trozos, UNA PASADA por tipo de texto elegido (runTextPasses,
+      // el mismo motor que usa el plan por capítulo en WU5). Un trozo/pasada fallido no
+      // tira el trabajo del resto (éxito parcial, ya avisado abajo).
       // Fusión (F4): los frentes que YA existen en el mazo destino se le pasan al modelo
       // como "no repitas esto" desde el primer trozo. Es más barato evitar el duplicado
       // que descartarlo después, y de paso el mazo crece con material nuevo de verdad.
@@ -703,62 +1025,16 @@ function onGenerate() {
         const d = (await DB.getDecks(bookId)).find(x => x.id === target);
         seedFronts = DB.cardsOf(d || {}).map(c => c.front);
       }
-      const quotas = splitQuota(count, sel.text.length);
-      progress(0, count, 'map');
-      for (let ti = 0; ti < sel.text.length; ti++) {
-        const textType = sel.text[ti];
-        const counts = allocateCounts(chunks, quotas[ti]);
-        // Los demás tipos elegidos alimentan la cláusula de arbitraje (WU3): en esta
-        // pasada solo van los conceptos de formato natural textType.
-        const otherTypes = sel.text.filter(x => x !== textType);
-        // Déficit POR PASADA (no entre pasadas): si varios trozos anteriores dieron de
-        // menos, sin tope el último trozo absorbía el cupo entero — el eval EV1 cazó un
-        // mazo completo salido de un único capítulo. Mejor un mazo corto y repartido
-        // ("éxito parcial", ya avisado abajo) que uno completo y monotema.
-        let expected = 0, passCards = 0;
-        for (let i = 0; i < chunks.length; i++) {
-          if (!counts[i]) continue;
-          const deficit = Math.min(Math.max(0, expected - passCards), counts[i] + 2);
-          expected += counts[i];
-          try {
-            const res = await generateChunk({
-              text: chunks[i].text, ask: counts[i] + deficit, type: textType, goal,
-              prevFronts: seedFronts.concat(cards.map(c => c.front)).slice(-MAX_PREV_FRONTS),
-              otherTypes, mode, signal, background,
-            });
-            mode = res.mode;
-            const fresh = res.cards.slice(0, counts[i] + deficit);
-            cards = cards.concat(fresh);
-            passCards += fresh.length;
-          } catch (e) {
-            if (e.name === 'AbortError') throw e;
-            console.warn(`Flashcards: el trozo ${i + 1}/${chunks.length} falló:`, e);
-            failed++;
-          }
-          progress(Math.min(cards.length, count), count, 'map');
-        }
-      }
+      let { cards, failed } = await runTextPasses({
+        chunks, count, sel, goal, seedFronts, signal, background,
+        onProgress: (d, n, ph) => progress(d, n, ph),
+      });
       // Familias visuales (secuenciales, dentro del MISMO job): resolver las figuras del
       // libro (store primero; si no, extracción con el documento del lector — nunca el de
       // OTRO libro) y construir las tarjetas de oclusión/diagrama/dibujo.
-      let vres = null;
-      if (sel.visual.length) {
-        const chapterText = gatherScope(scopeLabel).map(p => p.text).join('\n\n').slice(0, 8000);
-        const record = bookId ? await getBook(bookId).catch(() => null) : null;
-        const fr = await ensureBookFigures({
-          bookId, format: record?.format, record, signal,
-          onProgress: ({ done, total }) => progress(done, total, 'figures'),
-          deps: {
-            getDocument: () => (PdfReader.getBookId() === bookId && PdfReader.isLoaded()
-              ? PdfReader.getDocument() : null),
-          },
-        });
-        vres = await buildVisualCards({
-          types: sel.visual, chapterText, figures: fr.figures, signal,
-          onProgress: ({ phase, done, total }) => progress(done, total, phase),
-          bookTitle: record?.title,
-        });
-      }
+      const vres = sel.visual.length
+        ? await buildScopeVisuals({ sel, scopeLabel, bookId, signal, progress })
+        : null;
       // Solo las tarjetas de TEXTO llevan ancla: las visuales traen src '' y no hay pasaje
       // que las respalde — el validador de anclas las descartaría a todas.
       if (cards.length) {
@@ -843,6 +1119,17 @@ function onJobUpdate(job) {
   }
   if (job.status === 'done' && job.result && shownDeckKey !== job.id) {
     shownDeckKey = job.id;
+    // WU5 · Plan por capítulo: no hay UN mazo que abrir en revisión; se refresca la lista
+    // de mazos y se muestra el desglose por capítulo (éxito parcial incluido).
+    if (job.result.planned) {
+      renderDeckList();
+      const { chapters, generated, requested, failed } = job.result;
+      let msg = t('Plan aplicado: {a} de {b} tarjetas', { a: generated, b: requested });
+      if (failed) msg += ` (${t('{n} capítulos fallaron', { n: failed })})`;
+      msg += '\n' + chapters.map(c => `${c.name} ${c.generated}/${c.requested}`).join(' · ');
+      showError(msg);
+      return;
+    }
     const { deck, generated, requested, failed, blocks, merged, dropped } = job.result;
     renderReview(deck);
     if (merged) {                             // fusión: "menos de las pedidas" es lo esperado
