@@ -1426,6 +1426,60 @@ textarea.is-recording { display: none; }
   width: 5px; height: 5px; border-radius: 50%; background: var(--accent);
 }
 .appset-nav-guide { margin-top: 10px; border-top: 1px solid var(--border-soft); padding-top: 12px !important; }
+
+/* ==== MAZOS (gestor de mazos, hermano de Análisis) ====
+   Concha reutilizada (.appset/.appset-card/.appset-close + .fc-item para las
+   filas de tarjetas); aquí solo lo propio: héroe de cifras, grupos por libro,
+   filas de mazo y el formulario de creación a mano. */
+.dk-card { max-width: 640px; }
+.dk-hero { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 20px; }
+.dk-tile { padding: 10px 12px; border-radius: var(--r-md); background: var(--surface-2); }
+.dk-tile-l { font-size: 11px; color: var(--text-soft); }
+.dk-tile-v { font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.dk-book-h {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--text-soft); margin: 18px 0 4px;
+}
+.dk-orphans .dk-book-h { color: var(--danger, #e5484d); }
+.dk-row { display: flex; align-items: center; gap: 10px; padding: 9px 0;
+  border-bottom: 1px solid var(--border-soft); }
+.dk-row:last-child { border-bottom: none; }
+.dk-row-main { flex: 1; min-width: 0; }
+.dk-row-name { font-size: 14px; font-weight: 500;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dk-row-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  margin-top: 2px; font-size: 12px; color: var(--text-soft); }
+.dk-chip { font-size: 11px; padding: 1px 8px; border-radius: 999px;
+  background: var(--surface-3); color: var(--text-soft); flex: none; }
+.dk-badge { font-size: 11px; font-weight: 600; padding: 1px 8px; border-radius: 999px;
+  background: var(--accent-soft); color: var(--accent); flex: none; }
+.dk-actions { display: flex; gap: 2px; flex: none; }
+.dk-empty { color: var(--text-soft); font-size: 14px; padding: 24px 0; text-align: center; }
+
+/* Detalle de un mazo. */
+.dk-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin: 4px 0 14px; }
+.dk-head-name { font-size: 17px; font-weight: 700; margin: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dk-head-meta { font-size: 12px; color: var(--text-soft); }
+.dk-add { margin-top: 18px; border-top: 1px solid var(--border-soft); padding-top: 14px;
+  display: flex; flex-direction: column; gap: 8px; }
+.dk-add-h { font-size: 13px; font-weight: 600; }
+.dk-add-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.dk-input {
+  flex: 1; min-width: 120px; padding: 8px 10px; font: inherit; font-size: 14px;
+  border: 1px solid var(--border); border-radius: var(--r-sm);
+  background: var(--surface-2); color: var(--text);
+}
+.dk-input:focus { outline: 1px solid var(--accent); }
+.dk-add-btn { flex: none; }
+.dk-error { color: var(--danger, #e5484d); font-size: 13px; }
+
+@media (max-width: 560px) {
+  .dk-card { border-radius: 16px 16px 0 0; max-height: 92vh; }
+  .dk-hero { gap: 6px; }
+  .dk-tile-v { font-size: 17px; }
+  .dk-actions { flex-direction: column; }
+}
 /* ---- Selector de modelo (models.dev) ---- */
 .mp-card { width: min(560px, 92vw); }
 .mp-card .appset-input { margin-top: 4px; }

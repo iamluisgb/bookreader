@@ -231,6 +231,7 @@ export async function render() {
 
         <button class="lib-rail-create" data-act="newshelfmenu">${icon('plus', { size: 16 })}<span>${t('Nueva estantería')}</span></button>
         <button class="lib-rail-create lib-rail-analysis" data-act="analysis">${icon('chart', { size: 16 })}<span>${t('Análisis')}</span></button>
+        <button class="lib-rail-create lib-rail-decks" data-act="decks">${icon('cards', { size: 16 })}<span>${t('Mazos')}</span></button>
         <button class="lib-rail-create lib-rail-settings" data-act="settings">${icon('gear', { size: 16 })}<span>${t('Ajustes generales')}</span></button>
       </aside>
 
@@ -790,6 +791,12 @@ async function onClick(e) {
   // nada de eso hace falta para pintar la estantería (que es la pantalla de arranque).
   if (e.target.closest('[data-act="analysis"]')) {
     import('../analysis.js').then(m => m.open()).catch(err => console.warn('analysis:', err));
+    return;
+  }
+  // El gestor de mazos también entra perezoso: agrupa IndexedDB + biblioteca y
+  // nada de eso hace falta para pintar la estantería.
+  if (e.target.closest('[data-act="decks"]')) {
+    import('../decks.js').then(m => m.open()).catch(err => console.warn('decks:', err));
     return;
   }
 
