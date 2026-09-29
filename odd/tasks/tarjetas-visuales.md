@@ -116,10 +116,21 @@ como `<img>` no tiene camino todavía (fuera del alcance de la primera entrega).
       1 de integración contra pdf.js real con el fixture `tests/test-figure.pdf`) (`44036d3`)
 - [x] **WU5a** Lote de diagramas con regeneración única + tarjetas de dibujo con rúbrica de ≥3
       pasos en `visual-cards.js`; 13 tests (`662ce34`)
-- [ ] **WU5b** Menú multi-tipo en `renderSetup()` (`flashcards.js`) + orquestación del mazo visual
-      (`app/js/ai/visual-deck.js`): figuras del PDF abierto (render offscreen, patrón de
-      `renderCoverDataUrl`) → `groundFigure` → `generateOcclusions`/`generateDiagrams`/
-      `generateDrawingCards` → mazo con tarjetas de tipo visual
+- [x] **WU4b** `app/js/ai/figures-epub.js` + `tests/figures-epub.spec.ts` — detección de imágenes
+      en el zip del EPUB, resolución de hrefs con `../`, lectores de zip y pipelines de
+      colección/guardado con IO inyectada; 7 tests incl. integración contra `tests/test.epub` (`7d6854c`)
+- [x] **WU5b** `app/js/ai/visual-deck.js` — contrato de tarjeta visual (occlusion/diagram/drawing),
+      mapeo etiqueta→bbox, sanitizador y `buildVisualCards` (familias secuenciales, resultado
+      parcial ante fallos, abort propaga); 8 tests (`a594bd3`)
+- [x] **WU5c** Bug latente corregido: el modelo de figura no persiste dimensiones, así que el
+      grounding recibía 0 y `clampBbox` descartaba todas las etiquetas (cero tarjetas de oclusión
+      en producción). `figureSize()` usa las dimensiones si están y si no decodifica el dataUrl;
+      figura sin tamaño resoluble se saltea sin gastar visión (`9b9b3f4`); 13 tests en el spec
+- [ ] **WU5d** Fuente de figuras: `app/js/ai/visual-figures.js` — resolver por libro (formato,
+      blob de la biblioteca, documento PDF abierto) → figuras del store o extracción + guardado,
+      con render offscreen para páginas no montadas (patrón `renderCoverDataUrl`) y jszip para EPUB
+- [ ] **WU5e** Menú multi-tipo en `renderSetup()` (`flashcards.js`) + wiring bajo `Jobs`
+      (scope → texto del capítulo → `buildVisualCards` → mazo con `cardType` mixto)
 - [ ] **WU6** Render por tipo en estudio (`study.js`): oclusión (overlay %), diagrama (SVG),
       dibujo (canvas) + arreglar `buildQueue` para tarjetas sin `front`
 - [ ] **WU7** Revisión del boceto con `chatVision` + pintado por colores de trazo
