@@ -3,6 +3,57 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-09-29 — Gestor de mazos: las tarjetas vuelven a su libro (y todas se gestionan desde la biblioteca)
+
+Reporte del usuario: *«borro un libro del dispositivo, lo vuelvo a descargar y las tarjetas no
+salen en el menú para gestionarlas»*, más los «Mazos sin libro» que aparecían en el selector de
+repaso. La causa raíz, verificada en código: **un mazo guarda el `bookId` con el que se creó y
+nunca lo actualiza.** La biblioteca sí migra identidades — el id es el hash SHA-256 del fichero, y
+los libros viejos conservan ids heredados (nombre de fichero o `epubjs:…`) que los alias canónicos
+reconcilian — pero `reconcile()` remapeaba SOLO subrayados y marcadores: los mazos nunca entraban.
+Y el enlace por alias tampoco podía salvarlos, porque `computeAliases()` excluye a propósito los
+ids heredados (los legacy los trata `purgeOrphans`). Remate: `deleteBook()` solo pone tombstone
+al libro y no toca sus mazos. Resultado: el mazo quedaba **huérfano** — sus vencidas contaban en
+el total de «Repasar hoy» (por eso se las daba), pero ninguna fila del libro lo alcanzaba y el
+modal de flashcards, que filtra por el libro abierto, no lo listaba.
+
+Tres arreglos en cadena:
+
+- **Reparación por título, que nunca adivina** ([`deck-repair.js`](app/js/ai/deck-repair.js)):
+  independiente del id — funciona aunque el registro viejo ya no exista. Si el nombre del mazo,
+  normalizado, coincide con el título de EXACTAMENTE UN libro de la biblioteca, el mazo se
+  reasigna; con dos libros del mismo título la ambigüedad es una decisión del usuario, no del
+  código: el mazo queda como huérfano para resolverlo a mano. Corre al arrancar, es idempotente y
+  nunca lanza. La escritura la hace el nuevo `DB.remapDecks` ([`db.js`](app/js/ai/db.js)), que
+  sella `updatedAt` y avisa al sync.
+- **Los mazos entran en `reconcile()`** ([`aliases.js`](app/js/sync/aliases.js)): cuando el id de
+  un libro migra al canónico, sus mazos lo siguen. El remapeo es idempotente (no-op sin mazos bajo
+  el alias) y se lanza sin bloquear el reconcile, que sigue siendo síncrono para el engine.
+- **Reparación manual en la pantalla nueva**: «asignar a…» un libro de la biblioteca o borrar el
+  mazo, para los casos que la reparación automática no decide.
+
+**La pantalla «Mazos»** ([`decks.js`](app/js/decks.js)): hermana de Análisis — misma concha,
+mismo arranque perezoso desde el rail de la biblioteca — y el único sitio que puede ver TODOS los
+mazos. Agrupados por libro (resolviendo la cadena de alias: un mazo nacido bajo un id alias cae en
+el grupo de su libro), con los huérfanos en su propia sección «Mazos sin libro». El detalle de
+cada mazo trae lo que el modal no daba: editar frente/dorso **en el sitio**, suspender/reactivar,
+quitar tarjeta, borrar mazo y **crear tarjetas a mano** — solo texto, P→R y cloze — con sus
+validaciones de verdad: frente vacío, cloze sin hueco `{{c1::…}}`, y duplicado detectado
+normalizando tildes, mayúsculas y puntuación. Las mutaciones salen de los helpers PUROS de
+[`deck-manager.js`](app/js/ai/deck-manager.js) (sin escrituras propias en IndexedDB: la pantalla
+decide cuándo guardar con `DB.updateDeck`) y todo valor interpolado pasa por `escapeHtml` — los
+nombres de mazos y libros los escribió un LLM o una persona.
+
+**Fuera de alcance a propósito:** crear a mano tarjetas VISUALES (oclusión sobre figura) —
+necesita el editor de recuadros; las visuales siguen naciendo del generador. Queda apuntado en
+[BACKLOG § P36](BACKLOG.md) junto al resto de lo pendiente del área (importar mazos, mover
+tarjetas entre mazos, duplicar mazo). El precache del SW cubre los tres módulos nuevos. **16
+tests nuevos** en [`tests/deck-repair.spec.ts`](tests/deck-repair.spec.ts) (único → reparado,
+ambiguo → intacto, correcto → intacto, idempotente),
+[`tests/deck-manager.spec.ts`](tests/deck-manager.spec.ts) (agrupación, resumen, validación y
+mutaciones puras) y [`tests/decks.spec.ts`](tests/decks.spec.ts) (la pantalla, Playwright).
+Las decisiones, en [DECISIONS ADR-044..046](DECISIONS.md).
+
 ## 2026-09-28 — Tarjetas visuales: la figura del libro entra al repaso (ocluir, diagramar, dibujar)
 
 El repaso era todo texto, y buena parte de un libro técnico se estudia por lo que se ve: la figura

@@ -1587,6 +1587,31 @@ seguir leyendo"* sin necesidad de un cartel que la anuncie.
   explicación y el modal lo avisa («Las tarjetas visuales viajan como texto…»). Lo pendiente es si
   vale la pena un export rico: embeber la figura o el SVG en el modelo Anki en vez de solo avisar.
 
+### P36 — Gestor de mazos: lo que quedó pendiente de la primera entrega · `M` acumulado
+
+> **Entregado (ver CHANGELOG 2026-09-29 · [ADR-044..046](DECISIONS.md)):** reparación de
+> identidad por título (ambigüedad nunca adivinada), remapeo de mazos dentro de `reconcile()` y
+> pantalla «Mazos» en la biblioteca con reparación manual, edición en el sitio y creación a mano
+> de tarjetas de TEXTO (P→R y cloze). Especificación: [`odd/tasks/gestor-mazos.md`](odd/tasks/gestor-mazos.md).
+> Lo de abajo es lo que NO entró.
+
+- **Crear a mano tarjetas visuales (editor de oclusiones)** · `L`. Fase 3 de la spec, fuera de
+  alcance a propósito: una oclusión pintada a mano exige el editor de recuadros (arrastrar una
+  caja sobre la figura real del libro, la misma maquinaria de figuras que ADR-039 extrajo) más la
+  validación de la tarjeta resultante. Las visuales hoy solo nacen del generador.
+- **Importar mazos** · `M`. Traer un mazo de fuera (el caso natural: un export Anki `.apkg` — el
+  builder ya existe, falta el camino inverso— o el `.txt`). Decide qué gana el usuario: estudiar
+  material ajeno sin pasar por el generador.
+- **Mover tarjetas entre mazos** · `S`. Hoy la única manera de reagrupar es borrar y recrear. Con
+  `remapDecks` como precedente, mover una tarjeta es tocar su `deckId`/array y sellar `updatedAt`
+  para el merge por tarjeta — el caso de uso es separar el mazo que el generador mezcló.
+- **Duplicar un mazo** · `S`. Estudiar dos variantes del mismo material (p. ej. un mazo «intenso»
+  con suspensos distintos) sin regenerar nada: copia profunda con `uid` nuevos en las tarjetas
+  para que el sync no los mezcle.
+- **Extraer la fila de tarjeta compartida** · `S`. El markup de la fila está duplicado entre el
+  repaso de flashcards (modal) y el gestor: dos sitios que pintar y editar la misma cosa. Un
+  componente compartido evita que el próximo arreglo de fila se haga dos veces y quede distinto.
+
 ### P24 — Higiene de la sesión de repaso · **✓ entregada** (2026-08-01) · F1–F4
 
 > **Entregada entera.** Ver CHANGELOG 2026-08-01. Cuatro arreglos de la sesión, ninguno

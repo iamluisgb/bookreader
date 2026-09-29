@@ -1396,3 +1396,91 @@ además el caso de una tarjeta vieja llegada por sync que ya no pasaría la vali
 El tamaño queda acotado por `LIMITS.svg` y por CSS (max-height 240px). Los diagramas solo salen si
 el concepto tiene estructura relacional; el gate lo decide el modelo y un `usable: false` no es un
 fallo.
+
+---
+
+## ADR-044 — Reparación de mazos por título normalizado, con «título ambiguo nunca se adivina» · `ACEPTADA`
+
+**Contexto.** Un mazo guarda el `bookId` con el que se creó y nunca lo actualizaba. La biblioteca
+sí migra identidades (el id es el SHA-256 del fichero; los libros viejos conservan ids heredados
+que `reconcile()` reconcilia al canónico), pero ese remapeo solo cubría subrayados y marcadores —
+los mazos quedaban huérfanos: sus vencidas contaban en «Repasar hoy» y ninguna fila las alcanzaba.
+La reparación por cadena de alias no basta sola: `computeAliases()` excluye a propósito los ids
+heredados (los legacy los trata `purgeOrphans`), así que un mazo nacido bajo un id legacy no puede
+enlazar por alias aunque su libro esté en la biblioteca.
+
+**Decisión.** Doble camino. (1) **Matcher puro por título** (`matchDecksByTitle` en
+[`deck-repair.js`](app/js/ai/deck-repair.js)): si el nombre del mazo normalizado (`normTitle`)
+coincide con el título de EXACTAMENTE UN libro de la biblioteca, se propone reasignar; si hay dos
+libros con el mismo título, no se propone nada — el mazo queda huérfano. (2) **Los mazos entran en
+`reconcile()`** vía `DB.remapDecks` ([`aliases.js`](app/js/sync/aliases.js)): cuando el libro
+migra de id, sus mazos lo siguen. La reparación por título corre además al arrancar
+(`repairOrphanDecks`, idempotente) para los huérfanos históricos.
+
+**Porqué.** El título es el único atributo que sobrevive a la pérdida de identidad: el mazo se
+creó con el nombre del libro, y ese nombre sigue ahí aunque el registro del libro viejo ya no
+exista. La regla de no adivinar no es timidez: reasignar a un libro equivocado silencia las
+tarjetas (aparecen en el mazo de otro libro) peor que dejarlas visiblemente huérfanas — la
+ambigüedad se resuelve A MANO en la pantalla «Mazos» («asignar a…» o borrar), donde el usuario ve
+los candidatos. El matcher es puro y DOM-free a propósito: testeable fuera de la página y
+reutilizable sin arrastrar interfaz.
+
+**Consecuencias.** La reparación automática no cubre el caso de títulos duplicados ni de mazos
+renombrados a mano — quedan en la sección «Mazos sin libro» esperando decisión humana, y así se
+diseñó. `DB.remapDecks` sella `updatedAt` y avisa al sync, así que el remapeo se propaga entre
+dispositivos. Tests en [`tests/deck-repair.spec.ts`](tests/deck-repair.spec.ts): heredado con
+título único → reparado; ambiguo → intacto; correcto → intacto; idempotente.
+
+---
+
+## ADR-045 — El gestor de mazos vive en la biblioteca, no dentro del modal de flashcards · `ACEPTADA`
+
+**Contexto.** Con los mazos huérfanos sobre la mesa había que decidir dónde vive su gestión. El
+modal de flashcards era el sitio donde ya se editaba y borraba por tarjeta, pero está atado al
+libro abierto (filtra por su `bookId`): un mazo huérfano —justo el que hay que reparar— no tiene
+libro abierto que lo alcance, y por eso ninguna fila lo listaba.
+
+**Decisión.** Una pantalla **«Mazos» en la biblioteca** ([`decks.js`](app/js/decks.js)), hermana
+de Análisis (misma concha `.appset`, mismo arranque perezoso desde el rail), que enseña TODOS los
+mazos agrupados por libro con los huérfanos en su propia sección, y concentra ahí la reparación
+manual, el detalle por mazo y la creación a mano.
+
+**Porqué.** Solo la vista de biblioteca puede ver la estantería completa: es la única que puede
+cruzar todos los mazos contra todos los libros y detectar a los huérfanos — exactamente el
+trabajo que este feature tenía que hacer. Poner el gestor dentro del modal habría hecho imposible
+su caso de uso estrella, y además el hábito ya demostró que la biblioteca es su hogar: el chip
+de repaso y «Repasar hoy» viven ahí, sin libro abierto ([P10](BACKLOG.md)). El modal queda como
+está: generar desde el libro, que es lo que hace bien.
+
+**Consecuencias.** El markup de la fila de tarjeta queda duplicado entre el modal y el gestor (la
+extracción a un componente compartido está apuntada en [BACKLOG § P36](BACKLOG.md)); a cambio, la
+pantalla reutiliza el patrón de Análisis sin UI nueva de cero. La entrada en el rail es perezosa
+(`import('../decks.js')`) y los tres módulos van al precache del SW.
+
+---
+
+## ADR-046 — El gestor es read-mostly: helpers puros en `deck-manager.js`, persistencia solo en `DB` · `ACEPTADA`
+
+**Contexto.** La pantalla «Mazos» necesita agrupar, resumir, validar y mutar tarjetas. La pregunta
+de diseño era dónde vive esa lógica: repartida en el módulo de UI (como creció el modal de
+flashcards) o separada de la persistencia.
+
+**Decisión.** El gestor es **read-mostly con dos capas**: [`deck-manager.js`](app/js/ai/deck-manager.js)
+concentra los helpers PUROS y sin DOM — agrupar por libro (resolviendo la cadena de alias
+canónica), resumen por mazo (los cubos los calcula `Srs.deckStats`), validación y construcción de
+tarjeta manual, y mutaciones que devuelven un mazo NUEVO sin tocar el original — mientras que toda
+escritura en IndexedDB pasa por `DB.updateDeck`/`DB.deleteDeck`/`DB.remapDecks`; la pantalla
+([`decks.js`](app/js/decks.js)) solo decide CUÁNDO guardar.
+
+**Porqué.** La separación mantiene testable lo que decide el comportamiento (la agrupación, las
+validaciones de tarjeta manual, el sellado de `updatedAt` para el merge por tarjeta) sin IndexedDB
+ni página: 6 tests de [`tests/deck-manager.spec.ts`](tests/deck-manager.spec.ts) ejercen el
+contrato completo en puro. Y respeta la arquitectura que ya existe: el sellado y el aviso al sync
+viven en `DB` (donde están para TODOS los escritores, no solo este), y las mutaciones puras que
+devuelven copia dejan al caller decidir el guardado — que es la única decisión con efecto real.
+Ninguna función lanza: la entrada malformada se ignora, igual que en `deck-repair.js`.
+
+**Consecuencias.** Un cambio en el esquema de persistencia no toca la lógica de la pantalla, y
+viceversa. El coste es el doble salto (helper → caller → `DB`) en cada escritura, aceptado a
+cambio del aislamiento. Las tarjetas visuales (`occlusion`, `diagram`, `drawing`) siguen naciendo
+del generador (`visual-deck.js`): los tipos manuales son deliberadamente solo `basic` y `cloze`.
