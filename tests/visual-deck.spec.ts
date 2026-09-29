@@ -342,3 +342,111 @@ test('buildVisualCards: el abort del signal propaga AbortError', async ({ page }
   });
   expect(out).toBe('AbortError');
 });
+
+// ---------------------------------------------------------------------------
+// figureSize + grounding sin dimensiones persistidas: el modelo de figura
+// (saveFigure en figures.js) NO guarda width/height, así que el tamaño hay que
+// sacarlo del propio dataUrl cuando la figura no lo trae.
+// ---------------------------------------------------------------------------
+
+// Con width/height finitos y > 0 NO se decodifica nada: se devuelven tal cual.
+// El dataUrl es basura a propósito: si figureSize intentara decodificarlo,
+// onerror daría null y este test fallaría.
+test('figureSize: width/height finitos se devuelven sin decodificar (el dataUrl no se toca)', async ({ page }) => {
+  await page.goto('/index.html');
+  await seedProLicense(page);
+  const res = await inPage(page, async () => {
+    const VD = await import('/js/ai/visual-deck.js');
+    return VD.figureSize({ key: 'book:figures:f1', dataUrl: 'data:image/jpeg;base64,ZZZZ', width: 810, height: 130, labels: [] });
+  });
+  expect(res).toEqual({ width: 810, height: 130 });
+});
+
+// Sin width/height: el dataUrl real (canvas 40x30 dibujado en la página) se
+// decodifica con un <img> y las dimensiones naturales son exactas.
+test('figureSize: dataUrl real de canvas 40x30 decodifica exactamente {width: 40, height: 30}', async ({ page }) => {
+  await page.goto('/index.html');
+  await seedProLicense(page);
+  const res = await inPage(page, async () => {
+    const VD = await import('/js/ai/visual-deck.js');
+    const c = document.createElement('canvas');
+    c.width = 40;
+    c.height = 30;
+    c.getContext('2d').fillRect(0, 0, 40, 30);
+    return VD.figureSize({ key: 'book:figures:f2', dataUrl: c.toDataURL('image/png'), labels: [] });
+  });
+  expect(res).toEqual({ width: 40, height: 30 });
+});
+
+// DataUrl ilegible: null y SIN colgarse (los caminos de error resuelven enseguida;
+// si el timeout interno de 5 s estuviera roto, el test tardaría más de ~6 s).
+test('figureSize: dataUrl basura devuelve null sin colgar el test', async ({ page }) => {
+  await page.goto('/index.html');
+  await seedProLicense(page);
+  const res = await inPage(page, async () => {
+    const VD = await import('/js/ai/visual-deck.js');
+    const t0 = Date.now();
+    const size = await VD.figureSize({ key: 'book:figures:f3', dataUrl: 'esto no es un dataUrl', labels: [] });
+    return { size, elapsed: Date.now() - t0 };
+  });
+  expect(res.size).toBeNull();
+  expect(res.elapsed).toBeLessThan(6000);
+});
+
+// La figura no trae dimensiones pero sí un dataUrl real: figureSize decodifica
+// 40x30 ANTES de llamar al modelo de visión, y el prompt del grounding lleva la
+// dimensión real (buildGroundingMessages arma "La imagen mide 40×30 píxeles.").
+test('buildVisualCards: figura sin dimensiones y dataUrl real → grounding con el tamaño decodificado', async ({ page }) => {
+  const dataUrl = await page.evaluate(() => {
+    const c = document.createElement('canvas');
+    c.width = 40;
+    c.height = 30;
+    c.getContext('2d').fillRect(0, 0, 40, 30);
+    return c.toDataURL('image/png');
+  });
+  // Labels dentro de una imagen de 40x30: clampBbox las rechazaría si el
+  // tamaño que llega al modelo no fuera el real.
+  const groundedLabels = JSON.stringify({ labels: [
+    { text: 'Eje X', bbox: [5, 5, 10, 6] },
+    { text: 'Eje Y', bbox: [25, 20, 10, 6] },
+  ] });
+  const occlusionJson = JSON.stringify({ cards: [
+    { occludedLabel: 'Eje X', question: '¿Qué eje del gráfico marca el tiempo?', contextFact: 'El eje X marca el tiempo.', difficulty: 'easy' },
+  ] });
+  await setupDeckStub(page, [groundedLabels, occlusionJson]);
+  const res = await inPage(page, async ({ figure, chapter }: any) => {
+    const VD = await import('/js/ai/visual-deck.js');
+    return VD.buildVisualCards({ types: ['occlusion'], chapterText: chapter, figures: [figure] });
+  }, { figure: { key: 'book:figures:f9', dataUrl, labels: [], caption: 'Fig. 9' }, chapter: CHAPTER_TEXT });
+  // La tarjeta de oclusión SALE (con el fix latente no salía nunca).
+  expect(res.cards).toHaveLength(1);
+  expect(res.cards[0].type).toBe('occlusion');
+  expect(res.cards[0].figureKey).toBe('book:figures:f9');
+  expect(res.cards[0].bbox).toEqual({ x: 5, y: 5, w: 10, h: 6 });
+  expect(res.stats.grounded).toBe(1);
+  const state = await page.evaluate(() => (window as any).__vd);
+  expect(state.calls).toHaveLength(2);   // grounding + pedagogía
+  // El body del grounding lleva la dimensión REAL decodificada del dataUrl.
+  const groundingText = state.calls[0].messages[0].content.find((p: any) => p.type === 'text').text;
+  expect(groundingText).toContain('40×30');
+  expect(state.calls[0].messages[0].content.some((p: any) => p.type === 'image_url')).toBe(true);
+});
+
+// DataUrl indescifrable y sin dimensiones: figureSize da null y la figura se
+// saltea ANTES de llamar al modelo de visión (cero llamadas con image_url).
+test('buildVisualCards: figura con dataUrl indescifrable se saltea sin llamar al modelo de visión', async ({ page }) => {
+  await setupDeckStub(page, ['{"labels":[]}']);   // no debería consumirse nunca
+  const res = await inPage(page, async ({ chapter }: any) => {
+    const VD = await import('/js/ai/visual-deck.js');
+    return VD.buildVisualCards({
+      types: ['occlusion'],
+      chapterText: chapter,
+      figures: [{ key: 'book:figures:f10', dataUrl: 'data:image/jpeg;base64,NOPE', labels: [], caption: 'Fig. 10' }],
+    });
+  }, { chapter: CHAPTER_TEXT });
+  expect(res.cards).toEqual([]);
+  expect(res.stats.skipped).toBe(1);
+  const state = await page.evaluate(() => (window as any).__vd);
+  expect(state.calls).toHaveLength(0);   // ni grounding ni pedagogía
+  expect(JSON.stringify(state.calls)).not.toContain('image_url');
+});

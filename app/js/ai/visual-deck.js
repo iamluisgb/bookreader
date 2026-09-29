@@ -15,6 +15,15 @@
 // La figura NUNCA viaja inline en la tarjeta: `figureKey` es la clave del
 // artefacto y la UI carga el dataUrl desde el store (base64 por tarjeta
 // inflaría el mazo y el payload de sync).
+//
+// POR QUÉ SE DECODIFICA EL DATAURL (figureSize): el modelo de figura
+// (saveFigure en figures.js) NO persiste las dimensiones de la imagen — guarda
+// { page, rect, dataUrl, labels, caption, source }. Sin width/height reales,
+// clampBbox de figures.js descarta TODAS las labels (las exige finitas y dentro
+// de la imagen), así que el grounding devolvería siempre vacío. En vez de
+// agrandar el esquema de datos y la sincronización, cuando la figura no trae
+// tamaño usable se decodifica el dataUrl en el navegador con un <img>: la
+// imagen es la fuente de verdad y el modelo persistido no cambia.
 
 import { normalizeText } from './figures.js';
 import {
@@ -28,6 +37,51 @@ export const VISUAL_TYPES = ['occlusion', 'diagram', 'drawing'];
 
 export function isVisualType(t) {
   return VISUAL_TYPES.includes(t);
+}
+
+// ---------------------------------------------------------------------------
+// Resolución del tamaño de una figura.
+// ---------------------------------------------------------------------------
+
+// Tope de espera de la decodificación del dataUrl: una imagen que no carga en
+// 5 s no va a cargar; mejor saltear la figura que colgar la generación.
+const FIGURE_SIZE_TIMEOUT_MS = 5000;
+
+// Dimensiones usables de una figura, para el grounding: { width, height } o null.
+// 1) Si la figura trae width/height finitos y > 0, se devuelven sin decodificar
+//    nada (figura recién creada en memoria, o test que los inyecta).
+// 2) Si no, se decodifica figure.dataUrl con un new Image() (el dataUrl es una
+//    imagen real: la app corre en un navegador) y se resuelve naturalWidth/
+//    naturalHeight en onload. El timer de 5 s se limpia en AMBOS caminos (load
+//    y error): nada de timers colgando.
+// NUNCA lanza y nunca decodifica si no hace falta: null = no hay forma de
+// conocer el tamaño (dataUrl ausente, ilegible o timeout) y la figura debe
+// saltearse — llamar al modelo de visión con dimensiones 0 o ausentes es cuota
+// pagada para que clampBbox descarte siempre todas las labels.
+export async function figureSize(figure) {
+  const width = figure && Number.isFinite(figure.width) ? figure.width : 0;
+  const height = figure && Number.isFinite(figure.height) ? figure.height : 0;
+  if (width > 0 && height > 0) return { width, height };
+  const dataUrl = figure && typeof figure.dataUrl === 'string' ? figure.dataUrl : '';
+  if (!dataUrl) return null;   // sin imagen que decodificar: tamaño desconocido
+  return new Promise((resolve) => {
+    const img = new Image();
+    let timer = null;
+    const finish = (value) => {
+      if (timer !== null) clearTimeout(timer);   // se limpia en load, error Y timeout
+      img.onload = null;
+      img.onerror = null;
+      resolve(value);
+    };
+    timer = setTimeout(() => finish(null), FIGURE_SIZE_TIMEOUT_MS);
+    img.onload = () => {
+      const w = img.naturalWidth;
+      const h = img.naturalHeight;
+      finish(w > 0 && h > 0 ? { width: w, height: h } : null);
+    };
+    img.onerror = () => finish(null);
+    img.src = dataUrl;
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -180,14 +234,22 @@ export async function buildVisualCards({
       let labels = labelList(figure);
       if (!labels.length) {
         // Sin labels previas: grounding con el modelo de visión. Las dimensiones
-        // salen de la propia figura (width/height si existen; si no, 0 y se
-        // acepta igual — groundFigure solo las usa en el texto del prompt).
+        // salen de figureSize (width/height de la figura si son usables; si no,
+        // el dataUrl decodificado en el navegador — el modelo de figura no
+        // persiste dimensiones). Sin tamaño no se llama al modelo: con 0 o
+        // ausentes clampBbox descarta TODAS las labels y la llamada es cuota
+        // pagada para volver siempre sin labels.
+        const size = await figureSize(figure);
+        if (!size) {
+          stats.skipped++;          // tamaño desconocido: esta figura no puede salir
+          continue;
+        }
         let res;
         try {
           res = await groundFigure({
             dataUrl: figure.dataUrl,
-            width: Number.isFinite(figure.width) ? figure.width : 0,
-            height: Number.isFinite(figure.height) ? figure.height : 0,
+            width: size.width,
+            height: size.height,
             signal,
           });
         } catch (e) {
