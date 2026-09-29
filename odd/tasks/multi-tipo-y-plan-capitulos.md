@@ -52,11 +52,17 @@ el contrato **antes** de la primera línea de código:
   | p1-estudiante | 4,8 | 4,8 | 4,6 | 6/9 | 15 tarjetas, 15 anclas válidas, 0 dupes |
   | p4-noficcion | 4,3 | 4,7 | 4,3 | 7/8 | 15 tarjetas, 15 anclas válidas, 0 dupes |
 
-  **Caveat honesto — juez sustituido**: el juez por defecto (`mimo-v2.5`) devuelve 401 con la key
-  disponible («does not have access to the requested model»), así que el baseline se midió con
-  `EVAL_JUDGE=glm5.3-flash`. Los números son **comparables entre corridas con ese mismo juez**, no
-  con los runs históricos (que usaron otro). Toda comparación de esta feature se hace dentro de
-  este régimen.
+  **Elección del juez (medida, 2026-09-29)** — tres regímenes probados sobre el MISMO run:
+
+  | Juez | Resultado |
+  |---|---|
+  | `mimo-v2.5` (el default histórico) | **401** con la key disponible: «does not have access to the requested model» |
+  | `deepseek-v4-flash` (el propio generador) | Sesgo de auto-preferencia **y salida que no respeta el esquema**: omitió `utilidad` en las 12 tarjetas de p4 y devolvió `pertinidad_citas` (con typo) en p1 → métricas `NaN`/`undefined`, que la regla de EV5 cuenta como rotas (dejaría los gates en rojo permanente) |
+  | `glm5.3-flash` | Esquema completo en las dos baterías; neutral frente al generador → **juez por defecto** |
+
+  Los números del baseline son **comparables entre corridas con el mismo juez** (no con los runs
+  históricos). Toda comparación de esta feature se hace dentro de este régimen; `EVAL_JUDGE` sigue
+  permitiendo enchufar otro juez.
 - **Estado del árbol de calidad en el baseline**: **2/17 presupuestos ya rotos** antes de tocar
   nada — `p1 · cards.utilidad = 4,58` (mín 4,6) y `p4 · chat.honestidad = 4` (mín 4,5) — y el gate
   de densidad de infografía falla en las dos baterías. Son preexistentes y **fuera del alcance de
@@ -114,6 +120,15 @@ arbitraje (dos pasadas puras) y el arbitraje queda como ítem aparte con su cont
   tests con `fetch` stubbeado.
 - [ ] **WU5** UI del plan editable + generación por capítulo bajo `Jobs` + tests de pantalla.
 - [ ] **WU6** Docs (CHANGELOG/BACKLOG/DECISIONS) + precache + bump de caché.
+
+## Cambio de modelo asociado (decisión del usuario)
+
+El usuario retiró `mimo-v2.5`: la key responde 401 para ese modelo, así que **era el modelo de visión
+por defecto del preset `nan` y estaba roto de fábrica** (oclusión y revisión de bocetos fallaban sin
+que nadie lo pidiera). Reemplazado por `deepseek-v4-flash` — verificado con entrada de imagen — en:
+preset de `llm.js`, ayuda/placeholder de Ajustes, diccionario EN, seeds de tests, contrato de
+proveedor (`provider-contract`) y el alias del gateway (`workers/gateway`: `bookreader-vision`).
+`deepseek-v4-flash-0731` **no** sirve: 401.
 
 ## Fuera de alcance
 - Crear tarjetas visuales a mano (BACKLOG P36).

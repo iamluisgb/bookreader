@@ -1,11 +1,21 @@
 #!/usr/bin/env node
 // EV1 · Juez LLM sobre un run de evals (docs/EVALS.md): puntúa lo que exige criterio
 // (fidelidad, atomicidad, pertinencia de citas, cobertura de conceptos dorados) con el
-// pasaje fuente delante. Juez de OTRA familia que el generador (sesgo de auto-
-// preferencia); temperature 0. Los checks duros ya los hizo check.mjs.
+// pasaje fuente delante. temperature 0. Los checks duros ya los hizo check.mjs.
+//
+// ELECCIÓN DEL JUEZ (medida, no gusto). `mimo-v2.5` era el default y dejó de ser usable:
+// la key responde 401 («does not have access to the requested model»). Se probó
+// `deepseek-v4-flash` (el mismo modelo del generador) y su salida NO respeta el esquema:
+// en el run 2026-09-29-12-18 omitió `utilidad` en las 12 tarjetas de p4 y escribió
+// `pertinidad_citas` (con typo) en p1 — métricas NaN/undefined, que la regla de EV5 cuenta
+// como rotas, así que un juez así deja los gates en rojo permanente. Además arrastraba
+// sesgo de auto-preferencia por ser el generador. El default es `glm5.3-flash`: neutral
+// frente al generador y con esquema completo verificado en ambos runs del 2026-09-29.
+// `EVAL_JUDGE` sigue existiendo para enchufar cualquier otro juez (p. ej.
+// `EVAL_JUDGE=deepseek-v4-flash`, asumiendo el sesgo y las métricas sin dato).
 //
 // Uso: node evals/judge.mjs [run]
-// Env: EVAL_JUDGE (default mimo-v2.5) · EVAL_JUDGE2 (opcional, EV2: segundo juez —
+// Env: EVAL_JUDGE (default glm5.3-flash; ver la elección del juez arriba) · EVAL_JUDGE2 (opcional, EV2: segundo juez —
 // se juzga todo dos veces y se mide el ACUERDO; |Δ|≥1.5 en un criterio = desacuerdo
 // fuerte, no te fíes de ese número con un solo juez).
 import fs from 'node:fs';
@@ -13,7 +23,7 @@ import path from 'node:path';
 import { loadEnv, resolveRunDir, loadBatteries, summaryOf, cardsOf, citesOf, nanChat, lastJsonObject, avg } from './lib.mjs';
 
 loadEnv();
-const JUDGE = process.env.EVAL_JUDGE || 'mimo-v2.5';
+const JUDGE = process.env.EVAL_JUDGE || 'glm5.3-flash';
 const JUDGE2 = process.env.EVAL_JUDGE2 || '';
 const MAX_CARDS = 12;      // muestra de tarjetas juzgadas una a una (coste/estabilidad)
 const MAX_CITES = 15;      // puntos citados del resumen que se verifican contra su pasaje
