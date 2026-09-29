@@ -39,16 +39,16 @@ existen en el modal de flashcards y en la sesión (se reutiliza el patrón).
 
 ## Work units
 
-- [ ] **WU1** Reparación de identidad: `DB.remapDecks(from, to)` + matcher puro por título
+- [x] **WU1** Reparación de identidad: `DB.remapDecks(from, to)` + matcher puro por título
       (`matchDecksByTitle(decks, books)`) + integración en `reconcile()` + aplicación idempotente
       al arrancar. Tests: heredado con título único → reparado; título ambiguo → intacto;
       correcto → intacto; idempotente.
-- [ ] **WU2** Capa de datos del gestor: módulo `app/js/ai/deck-manager.js` con helpers puros
+- [x] **WU2** Capa de datos del gestor: módulo `app/js/ai/deck-manager.js` con helpers puros
       (agrupar por libro/sin libro, validar y construir una tarjeta a mano con `uid`/`updatedAt`,
       resumen por mazo) + tests.
-- [ ] **WU3** Pantalla «Mazos» en la biblioteca: entrada + vista (lista agrupada, abrir mazo,
+- [x] **WU3** Pantalla «Mazos» en la biblioteca: entrada + vista (lista agrupada, abrir mazo,
       editar/borrar/suspender tarjeta, crear a mano, borrar mazo, reparar huérfano) + CSS.
-- [ ] **WU4** Tests de la pantalla (Playwright) + precache del SW + docs (CHANGELOG/BACKLOG/DECISIONS).
+- [x] **WU4** Tests de la pantalla (Playwright) + precache del SW + docs (CHANGELOG/BACKLOG/DECISIONS).
 
 ## Límites / fuera de alcance
 
