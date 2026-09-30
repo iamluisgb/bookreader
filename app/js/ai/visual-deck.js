@@ -24,13 +24,21 @@
 // agrandar el esquema de datos y la sincronización, cuando la figura no trae
 // tamaño usable se decodifica el dataUrl en el navegador con un <img>: la
 // imagen es la fuente de verdad y el modelo persistido no cambia.
+//
+// OCLUSIONES-CALIDAD WU2 — solo los DIAGRAMAS generan oclusiones: el grounding
+// devuelve un veredicto `kind` (diagram|illustration|screenshot|code|other) y lo
+// aprendido se PERSISTE en el artefacto de la figura (updateArtifact), así la
+// próxima corrida no paga otra llamada de visión ni intenta ocluir una captura
+// o una anécdota (la pág. 59 del backup: el acertijo del granjero).
 
 import { normalizeText } from './figures.js';
+import { updateArtifact } from './db.js';
 import {
   groundFigure,
   generateOcclusions,
   generateDiagrams,
   generateDrawingCards,
+  normalizeFigureKind,
 } from './visual-cards.js';
 
 export const VISUAL_TYPES = ['occlusion', 'diagram', 'drawing'];
@@ -272,7 +280,7 @@ export async function buildVisualCards({
   bookTitle = '',
 } = {}) {
   const selected = (Array.isArray(types) ? types : []).filter(isVisualType);
-  const stats = { figures: 0, grounded: 0, occlusion: 0, diagram: 0, drawing: 0, skipped: 0, rejectedFacts: 0 };
+  const stats = { figures: 0, grounded: 0, occlusion: 0, diagram: 0, drawing: 0, skipped: 0, skippedNotDiagram: 0, rejectedFacts: 0 };
   const raw = [];
   // Solo figuras con clave: sin artifact key no hay tarjeta de oclusión que
   // referencie la imagen (la UI la carga desde el store por figureKey).
@@ -291,6 +299,15 @@ export async function buildVisualCards({
     let produced = 0;
     for (const figure of figs) {
       if (produced >= occlusionCap) break;
+      // WU2: figura ya clasificada como NO diagrama (kind persistido en una
+      // corrida anterior) → fuera SIN ninguna llamada de visión: ni grounding ni
+      // pedagogía. kind '' o ausente no salta acá: no hay veredicto todavía.
+      const persistedKind = normalizeFigureKind(figure.kind);
+      if (persistedKind && persistedKind !== 'diagram') {
+        stats.skipped++;
+        stats.skippedNotDiagram++;
+        continue;
+      }
       let labels = labelList(figure);
       if (!labels.length) {
         // Sin labels previas: grounding con el modelo de visión. Las dimensiones
@@ -319,11 +336,44 @@ export async function buildVisualCards({
         }
         groundedDone++;
         onProgress?.({ phase: 'grounding', done: groundedDone, total: toGround });
+        // WU2: persistir lo que la llamada de visión aprendió (labels + kind) en el
+        // artefacto de la figura, así la PRÓXIMA corrida es gratis. updateArtifact
+        // reemplaza `result` completo y `key` ES el keyPath del artefacto: hay que
+        // sacarlo antes de guardar. Un fallo de persistencia (IndexedDB caído, clave
+        // inexistente) se registra y NO corta la generación.
+        const learned = res && typeof res === 'object' ? res : {};
+        const learnedKind = normalizeFigureKind(learned.kind);
+        try {
+          const figureRest = { ...figure };
+          delete figureRest.key;   // key ES el keyPath del artefacto: no viaja en result
+          await updateArtifact(figure.key, {
+            ...figureRest,
+            labels: Array.isArray(learned.labels) ? learned.labels : [],
+            kind: learnedKind,
+          });
+        } catch (persistError) {
+          console.warn('visual-deck: figure grounding could not be persisted:', persistError);
+        }
+        if (learnedKind && learnedKind !== 'diagram') {
+          // El grounding clasificó la figura como NO diagrama (captura, foto,
+          // código, anécdota): no se gasta cuota de pedagogía en ella.
+          stats.skipped++;
+          stats.skippedNotDiagram++;
+          continue;
+        }
         if (res && Array.isArray(res.labels) && res.labels.length) {
           stats.grounded++;
           labels = res.labels;
         } else {
           // Grounding sin labels: de esta figura no puede salir ninguna tarjeta.
+          stats.skipped++;
+          continue;
+        }
+        if (!learnedKind) {
+          // kind '' (el modelo no respondió un valor del contrato) se trata como NO
+          // diagrama, por seguridad: una figura sin clasificar no paga cuota de
+          // oclusiones. Cuenta en `skipped` (fue "sin veredicto"), no como
+          // no-diagrama confirmado.
           stats.skipped++;
           continue;
         }

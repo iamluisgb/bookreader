@@ -33,11 +33,17 @@ const MAX_OCCLUSION_CARDS = 3;
 // Mensajes multimodales (formato OpenAI: content como array con {type:'text'} y
 // {type:'image_url'}) para pedir las etiquetas de una figura. El texto replica el
 // prompt validado en el experimento: contrato JSON exacto, medidas en píxeles y
-// la orden de omitir lo dudoso (mejor un label menos que una alucinación).
+// la orden de omitir lo dudoso (mejor un label menos que una alucinación). Agrega
+// el veredicto `kind` (oclusiones-calidad WU2): SOLO un diagrama vale la pena
+// ocluir; una captura, foto, código o anécdota ilustrada produce tarjetas que no
+// son material de estudio (la captura del acertijo del granjero de la pág. 59).
 export function buildGroundingMessages({ dataUrl, width, height }) {
-  const text = `Detecta las etiquetas de texto de este diagrama técnico. Devuelve SOLO JSON sin markdown:
-{"labels":[{"text":"<texto exacto>","bbox":[x,y,w,h]}]}
-con bbox en PÍXELES de la imagen (x,y = arriba-izquierda), encerrando SOLO el texto
+  const text = `Clasifica qué ES esta imagen y detecta sus etiquetas de texto. Devuelve SOLO JSON sin markdown:
+{"kind":"diagram|illustration|screenshot|code|other","labels":[{"text":"<texto exacto>","bbox":[x,y,w,h]}]}
+REGLA DE "kind": SOLO un DIAGRAMA (esquema, flujo, jerarquía, grafo, arquitectura o tabla con
+estructura) sirve para estudiar tapando etiquetas; una captura de pantalla, una foto, una
+página de código, una imagen decorativa o una anécdota ilustrada NO.
+Las bbox van en PÍXELES de la imagen (x,y = arriba-izquierda), encerrando SOLO el texto
 (no el ícono ni la forma completa). La imagen mide ${width}×${height} píxeles.
 Omite las etiquetas de las que no estés seguro.`;
   return [{
@@ -89,8 +95,12 @@ REGLAS (obligatorias):
   puramente decorativas (marcos, fondos, logos, adornos sin contenido informativo).
 - "question": pregunta clara y AUTOCONTENIDA en ESPAÑOL que se responda tapando esa etiqueta
   (se entiende sin tener el libro delante).
-- "contextFact": UN dato del capítulo que ayude a recordar la respuesta, rastreable al texto
-  del capítulo: debe poder SUBRAYARSE en él. Prohibido inventar datos que el texto no diga.
+- "contextFact": UNA frase corta con UN dato del capítulo que RESPONDA la pregunta y NOMBRE
+  explícitamente el contenido de la etiqueta tapada (lo que quedó oculto). Rastreable al texto
+  del capítulo: un dato rastreable debe poder SUBRAYARSE en él. Prohibido inventar datos que el
+  texto no diga. Prohibido el relleno genérico que no menciona lo tapado (p. ej.
+  «El capítulo explica que…»), la misma frase de relleno repetida en varias tarjetas y el
+  dato que no dice qué estaba oculto.
 - "difficulty": "easy", "medium" o "hard", según cuánto cuesta recordar la etiqueta.
 - TODO lo visible para el usuario va en ESPAÑOL.
 - Si NINGUNA etiqueta vale la pena, devuelve {"cards":[]}. Mejor cero tarjetas que una mala.
@@ -236,6 +246,37 @@ function stripWrappers(text) {
   return String(text ?? '')
     .replace(/```(?:json)?/gi, '')
     .replace(/<think>[\s\S]*?<\/think>/gi, ' ');
+}
+
+// WU2 (oclusiones-calidad): valores válidos del veredicto `kind` del grounding.
+// Solo 'diagram' (esquema, flujo, jerarquía, grafo, arquitectura o tabla con
+// estructura) se oculta; el resto NO es material de estudio.
+const FIGURE_KINDS = new Set(['diagram', 'illustration', 'screenshot', 'code', 'other']);
+
+// Normaliza el veredicto `kind` del modelo a un valor del contrato, o a '' cuando
+// falta o es desconocido. '' se trata como NO diagrama (por seguridad): mejor
+// perder la figura que pagar cuota por una captura o una anécdota. NUNCA lanza.
+export function normalizeFigureKind(raw) {
+  const k = String(raw ?? '').trim().toLowerCase();
+  return FIGURE_KINDS.has(k) ? k : '';
+}
+
+// Parseo tolerante de la respuesta del prompt 1 con el veredicto `kind` incluido.
+// Las labels salen de parseLabelsResponse (figures.js: la misma extracción
+// tolerante de siempre, con clampBbox y dedupe) y el `kind` del PRIMER objeto
+// balanceado que traiga un kind válido del contrato (prosa, fences y truncado no
+// importan). kind '' = el modelo no respondió un valor conocido. NUNCA lanza.
+export function parseGroundingResponse(text, { width, height } = {}) {
+  const labels = parseLabelsResponse(text, { width, height });
+  const raw = stripWrappers(text);
+  for (const chunk of balancedObjects(raw)) {
+    let obj;
+    try { obj = JSON.parse(chunk); } catch { continue; }   // truncado/roto → siguiente
+    if (!obj || typeof obj !== 'object') continue;
+    const kind = normalizeFigureKind(obj.kind);
+    if (kind) return { labels, kind };
+  }
+  return { labels, kind: '' };
 }
 
 // Normaliza una tarjeta cruda del prompt 2. null si no sirve.
@@ -394,26 +435,27 @@ export function parseDiagramBatchResponse(text, { maxCards = 2 } = {}) {
 // Prompt 1 contra el modelo de visión. Si el parseo no rinde labels, reintenta UNA vez
 // con más presupuesto: los modelos de visión que razonan truncan el JSON cuando el tope
 // de tokens es corto (medido en el experimento de grounding del spec). truncated=true
-// solo cuando TAMBIÉN el reintento rinde vacío. No lanza salvo abort del usuario (la
-// cancelación de la generación debe propagarse: reintentar con la señal ya abortada
-// solo gasta cuota).
+// solo cuando TAMBIÉN el reintento rinde vacío. Devuelve { labels, kind, attempts,
+// truncated } (kind '' si el modelo no dio un valor del contrato). No lanza salvo abort
+// del usuario (la cancelación de la generación debe propagarse: reintentar con la señal
+// ya abortada solo gasta cuota).
 export async function groundFigure({ dataUrl, width, height, signal } = {}) {
   const messages = buildGroundingMessages({ dataUrl, width, height });
   let attempts = 0;
   try {
     let raw = await LLM.chatVision({ messages, signal, maxTokens: GROUNDING_MAX_TOKENS });
     attempts = 1;
-    let labels = parseLabelsResponse(raw, { width, height });
-    if (!labels.length) {
+    let parsed = parseGroundingResponse(raw, { width, height });
+    if (!parsed.labels.length) {
       // Reintento documentado: los modelos de visión reasoning truncan el JSON.
       raw = await LLM.chatVision({ messages, signal, maxTokens: GROUNDING_RETRY_TOKENS });
       attempts = 2;
-      labels = parseLabelsResponse(raw, { width, height });
+      parsed = parseGroundingResponse(raw, { width, height });
     }
-    return { labels, attempts, truncated: labels.length === 0 };
+    return { labels: parsed.labels, kind: parsed.kind, attempts, truncated: parsed.labels.length === 0 };
   } catch (e) {
     if (e && e.name === 'AbortError') throw e;   // cancelación del usuario: propaga, no reintenta
-    return { labels: [], attempts, truncated: true, error: e && e.message ? e.message : String(e) };
+    return { labels: [], kind: '', attempts, truncated: true, error: e && e.message ? e.message : String(e) };
   }
 }
 

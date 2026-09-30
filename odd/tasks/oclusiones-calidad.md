@@ -56,12 +56,12 @@ sigue válido).
 
 ## Work units
 
-- [ ] **WU1** `app/js/ai/visual-deck.js`: validador (respuesta en el dorso + dorsos repetidos) y
+- [x] **WU1** `app/js/ai/visual-deck.js`: validador (respuesta en el dorso + dorsos repetidos) y
   contadores en `stats`; tests con los 6 casos reales del backup (5 rechazados, 1 aceptado).
-- [ ] **WU2** `visual-cards.js` (prompt `kind` + `parseGroundingResponse` + `groundFigure`) y
+- [x] **WU2** `visual-cards.js` (prompt `kind` + `parseGroundingResponse` + `groundFigure`) y
   `visual-deck.js` (filtro por `kind` + persistencia con `DB.updateArtifact`); tests: ilustración
   descartada sin pagar cuota extra, diagrama aceptado, `kind` persistido.
-- [ ] **WU3** Cláusula del `contextFact` en el prompt de oclusión + tests del texto del prompt.
+- [x] **WU3** Cláusula del `contextFact` en el prompt de oclusión + tests del texto del prompt.
 - [ ] **WU4** Docs (CHANGELOG/BACKLOG/DECISIONS) y precache si hace falta.
 
 ## Fuera de alcance

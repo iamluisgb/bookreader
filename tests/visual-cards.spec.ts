@@ -106,11 +106,14 @@ test('buildGroundingMessages: prompt 1 con contrato JSON, medidas en píxeles y 
   expect(msgs[0].role).toBe('user');
   const content = msgs[0].content;
   expect(Array.isArray(content)).toBe(true);
-  // Parte de texto: contrato JSON exacto, medidas y la orden de omitir lo dudoso.
+  // Parte de texto: contrato JSON exacto (con el veredicto kind), medidas, regla
+  // del diagrama (solo un diagrama vale la pena ocluir) y orden de omitir lo dudoso.
   expect(content[0].type).toBe('text');
-  expect(content[0].text).toContain('{"labels":[{"text":"<texto exacto>","bbox":[x,y,w,h]}]}');
+  expect(content[0].text).toContain('{"kind":"diagram|illustration|screenshot|code|other","labels":[{"text":"<texto exacto>","bbox":[x,y,w,h]}]}');
   expect(content[0].text).toContain('La imagen mide 810×130 píxeles');
   expect(content[0].text).toContain('Omite las etiquetas');
+  expect(content[0].text).toContain('SOLO un DIAGRAMA');
+  expect(content[0].text).toContain('anécdota ilustrada');
   // Parte de imagen: el data URL viaja como image_url.
   expect(content[1]).toEqual({ type: 'image_url', image_url: { url: DATA_URL } });
 });
@@ -151,6 +154,60 @@ test('buildOcclusionMessages y buildDiagramMessages: regla de Mayer, español y 
   expect(dia[0].content).toContain('is-strong');
   expect(dia[0].content).toContain('answerNodeId');
   expect(dia[0].content).toContain('ESPAÑOL');
+});
+
+test('buildOcclusionMessages: el contextFact debe responder la pregunta y nombrar lo tapado (WU3)', async ({ page }) => {
+  await page.goto('/index.html');
+  await seedProLicense(page);
+  const msgs = await inPage(page, async ({ labels, chapter }: any) => {
+    const VC = await import('/js/ai/visual-cards.js');
+    return VC.buildOcclusionMessages({ labels, chapterText: chapter, figureCaption: 'Fig. 3' });
+  }, { labels: LABELS, chapter: CHAPTER_TEXT });
+  expect(msgs).toHaveLength(1);
+  const c = msgs[0].content;
+  // Cláusula WU3: el dato RESPONDE la pregunta y NOMBRA el contenido tapado.
+  expect(c).toContain('RESPONDA la pregunta');
+  expect(c).toContain('NOMBRE');
+  // El relleno genérico real del backup queda prohibido explícitamente.
+  expect(c).toContain('El capítulo explica que');
+  expect(c).toContain('oculto');
+  // El resto del contrato no se toca: Mayer, tope de 3, JSON-only y español.
+  expect(c).toContain('MAYER');
+  expect(c).toContain('máximo 3');
+  expect(c).toContain('ESPAÑOL');
+  expect(c).toContain('rastreable');
+});
+
+test('parseGroundingResponse: labels + kind normalizado; kind ausente o desconocido → \'\'', async ({ page }) => {
+  await page.goto('/index.html');
+  await seedProLicense(page);
+  const res = await inPage(page, async () => {
+    const VC = await import('/js/ai/visual-cards.js');
+    // JSON envuelto en prosa y fences (modelos reasoning) con kind y labels.
+    const good = 'Pensando...\n```json\n' + JSON.stringify({
+      kind: 'diagram',
+      labels: [{ text: 'Producer', bbox: [71, 56, 66, 15] }, { text: 'Message queue', bbox: [350.4, 30, 111, 16] }],
+    }) + '\n```';
+    return {
+      good: VC.parseGroundingResponse(good, { width: 810, height: 130 }),
+      caseInsensitive: VC.parseGroundingResponse('{"kind":"Screenshot","labels":[]}', { width: 810, height: 130 }),
+      unknown: VC.parseGroundingResponse('{"kind":"3d-model","labels":[]}', { width: 810, height: 130 }),
+      missing: VC.parseGroundingResponse('{"labels":[{"text":"A","bbox":[1,1,10,10]}]}', { width: 810, height: 130 }),
+      garbage: VC.parseGroundingResponse('basura { roto sin cerrar', { width: 810, height: 130 }),
+      nullInput: VC.parseGroundingResponse(null as any, { width: 810, height: 130 }),
+    };
+  });
+  expect(res.good).toEqual({ kind: 'diagram', labels: [
+    { text: 'Producer', bbox: { x: 71, y: 56, w: 66, h: 15 } },
+    { text: 'Message queue', bbox: { x: 350, y: 30, w: 111, h: 16 } },
+  ] });
+  expect(res.caseInsensitive.kind).toBe('screenshot');
+  expect(res.caseInsensitive.labels).toEqual([]);
+  expect(res.unknown.kind).toBe('');            // valor fuera del contrato → ''
+  expect(res.missing.kind).toBe('');            // sin kind → ''
+  expect(res.missing.labels).toHaveLength(1);   // las labels sobreviven igual
+  expect(res.garbage).toEqual({ labels: [], kind: '' });   // nunca lanza
+  expect(res.nullInput).toEqual({ labels: [], kind: '' });
 });
 
 test('parseOcclusionCards: prosa/fences, string de tool-call, filtro por labels y saneo de campos', async ({ page }) => {
@@ -271,8 +328,8 @@ test('parseDiagramResponse: gate usable:false, camino útil con SVG, SVG inváli
 });
 
 test('groundFigure: envía imagen + dimensiones con max_tokens≥4000, parsea labels; ante JSON truncado reintenta una vez', async ({ page }) => {
-  // Camino feliz: el stub devuelve el JSON de labels y solo hace falta una llamada.
-  await setupLLMStub(page, JSON.stringify({ labels: [
+  // Camino feliz: el stub devuelve el JSON de labels + kind y solo hace falta una llamada.
+  await setupLLMStub(page, JSON.stringify({ kind: 'diagram', labels: [
     { text: 'Producer', bbox: [71, 56, 66, 15] },
     { text: 'Message queue', bbox: [350.4, 30, 111, 16] },
   ] }));
@@ -282,6 +339,7 @@ test('groundFigure: envía imagen + dimensiones con max_tokens≥4000, parsea la
   }, DATA_URL);
   expect(res.attempts).toBe(1);
   expect(res.truncated).toBe(false);
+  expect(res.kind).toBe('diagram');                 // el veredicto kind viaja en el resultado
   expect(res.labels).toEqual(LABELS.slice(0, 2));   // bbox canónico {x,y,w,h}
   const state = await page.evaluate(() => (window as any).__vc);
   expect(state.calls).toHaveLength(1);
@@ -305,6 +363,7 @@ test('groundFigure: envía imagen + dimensiones con max_tokens≥4000, parsea la
   expect(state2.calls[1].max_tokens).toBe(6000);
   expect(res2.attempts).toBe(2);
   expect(res2.labels).toEqual([]);
+  expect(res2.kind).toBe('');                       // el truncado tampoco trajo kind
   expect(res2.truncated).toBe(true);
 });
 

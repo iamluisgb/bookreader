@@ -216,7 +216,7 @@ test('buildVisualCards (solo occlusion, con labels): sin llamadas de visión y t
     // 'consumer' casa sin caso con la label 'Consumer'.
     { type: 'occlusion', front: '¿Quién extrae los mensajes?', back: 'El consumer extrae después.', figureKey: 'book:figures:f1', bbox: { x: 668, y: 55, w: 73, h: 16 }, occludedLabel: 'consumer', chapter: '', src: '' },
   ]);
-  expect(res.stats).toEqual({ figures: 1, grounded: 0, occlusion: 2, diagram: 0, drawing: 0, skipped: 1, rejectedFacts: 0 });
+  expect(res.stats).toEqual({ figures: 1, grounded: 0, occlusion: 2, diagram: 0, drawing: 0, skipped: 1, skippedNotDiagram: 0, rejectedFacts: 0 });
   const state = await page.evaluate(() => (window as any).__vd);
   expect(state.calls).toHaveLength(1);                    // UNA llamada de pedagogía
   expect(state.calls[0].tools[0].function.name).toBe('create_occlusion_cards');
@@ -229,8 +229,8 @@ test('buildVisualCards (solo occlusion, con labels): sin llamadas de visión y t
 // después la de oclusión. Y el caso triste: grounding con labels vacías → la
 // figura se salta y stats.skipped sube.
 test('buildVisualCards (figura sin labels): grounding primero, y con labels vacías se salta', async ({ page }) => {
-  // (a) Grounding rendidor: labels nuevas → la 2ª llamada es la de oclusión.
-  const groundedLabels = JSON.stringify({ labels: [
+  // (a) Grounding rendidor: labels nuevas + veredicto diagram → la 2ª llamada es la de oclusión.
+  const groundedLabels = JSON.stringify({ kind: 'diagram', labels: [
     { text: 'Producer', bbox: [71, 56, 66, 15] },
     { text: 'Message queue', bbox: [350, 30, 111, 16] },
     { text: 'Consumer', bbox: [668, 55, 73, 16] },
@@ -259,7 +259,7 @@ test('buildVisualCards (figura sin labels): grounding primero, y con labels vac�
     return VD.buildVisualCards({ types: ['occlusion'], chapterText: chapter, figures: [figure] });
   }, { figure: FIGURE_WITHOUT_LABELS, chapter: CHAPTER_TEXT });
   expect(res2.cards).toEqual([]);
-  expect(res2.stats).toEqual({ figures: 1, grounded: 0, occlusion: 0, diagram: 0, drawing: 0, skipped: 1, rejectedFacts: 0 });
+  expect(res2.stats).toEqual({ figures: 1, grounded: 0, occlusion: 0, diagram: 0, drawing: 0, skipped: 1, skippedNotDiagram: 0, rejectedFacts: 0 });
   const state2 = await page.evaluate(() => (window as any).__vd);
   expect(state2.calls).toHaveLength(2);   // 2 intentos de visión, 0 de pedagogía
   expect(state2.calls.every((b: any) => b.model === 'vision-test')).toBe(true);
@@ -282,7 +282,7 @@ test('buildVisualCards (tres tipos): mazo mixto, una llamada por familia y fases
   }, { figure: FIGURE_WITH_LABELS, chapter: CHAPTER_TEXT });
   const types = res.cards.map((c: any) => c.type);
   expect(types).toEqual(['occlusion', 'occlusion', 'diagram', 'drawing']);
-  expect(res.stats).toEqual({ figures: 1, grounded: 0, occlusion: 2, diagram: 1, drawing: 1, skipped: 0, rejectedFacts: 0 });
+  expect(res.stats).toEqual({ figures: 1, grounded: 0, occlusion: 2, diagram: 1, drawing: 1, skipped: 0, skippedNotDiagram: 0, rejectedFacts: 0 });
   expect(res.cards[2].svg).toContain('<svg');
   expect(res.cards[2].answerNodeId).toBe('tgt');
   expect(res.cards[3].steps).toHaveLength(3);
@@ -316,7 +316,7 @@ test('buildVisualCards: error HTTP en el grounding de una figura no corta la cor
   }, { chapter: CHAPTER_TEXT, figure: FIGURE_WITH_LABELS });
   expect(res.cards).toHaveLength(2);
   expect(res.cards.every((c: any) => c.figureKey === 'book:figures:f1')).toBe(true);
-  expect(res.stats).toEqual({ figures: 2, grounded: 0, occlusion: 2, diagram: 0, drawing: 0, skipped: 1, rejectedFacts: 0 });
+  expect(res.stats).toEqual({ figures: 2, grounded: 0, occlusion: 2, diagram: 0, drawing: 0, skipped: 1, skippedNotDiagram: 0, rejectedFacts: 0 });
   const state = await page.evaluate(() => (window as any).__vd);
   expect(state.calls).toHaveLength(2);   // grounding fallido + oclusión de la 2ª figura
 });
@@ -411,7 +411,7 @@ test('buildVisualCards: figura sin dimensiones y dataUrl real → grounding con 
   });
   // Labels dentro de una imagen de 40x30: clampBbox las rechazaría si el
   // tamaño que llega al modelo no fuera el real.
-  const groundedLabels = JSON.stringify({ labels: [
+  const groundedLabels = JSON.stringify({ kind: 'diagram', labels: [
     { text: 'Eje X', bbox: [5, 5, 10, 6] },
     { text: 'Eje Y', bbox: [25, 20, 10, 6] },
   ] });
@@ -554,7 +554,7 @@ test('buildVisualCards: el validador descarta el dorso genérico y el repetido (
   expect(res.cards).toEqual([
     { type: 'occlusion', front: '¿Qué desacopla al productor del consumidor?', back: 'La message queue desacopla al productor del consumidor.', figureKey: 'book:figures:f1', bbox: { x: 350, y: 30, w: 111, h: 16 }, occludedLabel: 'Message queue', chapter: '', src: '' },
   ]);
-  expect(res.stats).toEqual({ figures: 1, grounded: 0, occlusion: 1, diagram: 0, drawing: 0, skipped: 0, rejectedFacts: 2 });
+  expect(res.stats).toEqual({ figures: 1, grounded: 0, occlusion: 1, diagram: 0, drawing: 0, skipped: 0, skippedNotDiagram: 0, rejectedFacts: 2 });
   const state = await page.evaluate(() => (window as any).__vd);
   expect(state.calls).toHaveLength(1);   // solo la llamada de pedagogía
 });
@@ -573,7 +573,141 @@ test('buildVisualCards: figura sin labels útiles no produce tarjetas ni dorsi v
     });
   }, { chapter: CHAPTER_TEXT });
   expect(res.cards).toEqual([]);
-  expect(res.stats).toEqual({ figures: 1, grounded: 0, occlusion: 0, diagram: 0, drawing: 0, skipped: 1, rejectedFacts: 0 });
+  expect(res.stats).toEqual({ figures: 1, grounded: 0, occlusion: 0, diagram: 0, drawing: 0, skipped: 1, skippedNotDiagram: 0, rejectedFacts: 0 });
   const state = await page.evaluate(() => (window as any).__vd);
   expect(state.calls.every((b: any) => b.model === 'vision-test')).toBe(true);   // solo grounding, 0 pedagogía
+});
+
+// ---------------------------------------------------------------------------
+// WU2: solo los DIAGRAMAS generan oclusiones. El veredicto `kind` del grounding
+// (persistido en el artefacto de la figura) decide: una captura, una foto, una
+// página de código o una anécdota ilustrada (la pág. 59 del backup: el acertijo
+// del granjero) NO es material de estudio. kind '' (el modelo no respondió) se
+// trata como NO diagrama, por seguridad.
+// ---------------------------------------------------------------------------
+
+// Figura ya clasificada como illustration (persistido en una corrida anterior):
+// se saltea SIN NINGUNA llamada — ni visión ni pedagogía.
+test('buildVisualCards: figura persistida como illustration → cero llamadas y skippedNotDiagram', async ({ page }) => {
+  await setupDeckStub(page, ['{"cards":[]}']);   // no debería consumirse nunca
+  const res = await inPage(page, async ({ chapter, dataUrl, labels }: any) => {
+    const VD = await import('/js/ai/visual-deck.js');
+    return VD.buildVisualCards({
+      types: ['occlusion'],
+      chapterText: chapter,
+      figures: [{ key: 'book:figures:f20', dataUrl, width: 810, height: 130, labels, caption: 'Fig. 20', kind: 'illustration' }],
+    });
+  }, { chapter: CHAPTER_TEXT, dataUrl: DATA_URL, labels: LABELS });
+  expect(res.cards).toEqual([]);
+  expect(res.stats.skipped).toBe(1);
+  expect(res.stats.skippedNotDiagram).toBe(1);
+  const state = await page.evaluate(() => (window as any).__vd);
+  expect(state.calls).toHaveLength(0);   // ni visión ni pedagogía: cuota intacta
+});
+
+// Figura kind diagram y sin labels: grounding + oclusión, las dos familias.
+test('buildVisualCards: figura kind diagram pasa por grounding y oclusión sin salteos por kind', async ({ page }) => {
+  const groundedLabels = JSON.stringify({ kind: 'diagram', labels: [
+    { text: 'Producer', bbox: [71, 56, 66, 15] },
+    { text: 'Message queue', bbox: [350, 30, 111, 16] },
+    { text: 'Consumer', bbox: [668, 55, 73, 16] },
+  ] });
+  await setupDeckStub(page, [groundedLabels, OCCLUSION_JSON]);
+  const res = await inPage(page, async ({ chapter, dataUrl }: any) => {
+    const VD = await import('/js/ai/visual-deck.js');
+    return VD.buildVisualCards({
+      types: ['occlusion'],
+      chapterText: chapter,
+      figures: [{ key: 'book:figures:f21', dataUrl, width: 810, height: 130, labels: [], caption: 'Fig. 21', kind: 'diagram' }],
+    });
+  }, { chapter: CHAPTER_TEXT, dataUrl: DATA_URL });
+  expect(res.cards.map((c: any) => c.type)).toEqual(['occlusion', 'occlusion']);
+  expect(res.stats.grounded).toBe(1);
+  expect(res.stats.skippedNotDiagram).toBe(0);
+  const state = await page.evaluate(() => (window as any).__vd);
+  expect(state.calls).toHaveLength(2);   // grounding + pedagogía
+});
+
+// El grounding clasifica la figura como código: se saltea SIN llamar a la familia
+// de oclusión (cuota de pedagogía intacta), aunque haya traído labels.
+test('buildVisualCards: grounding con kind code saltea la figura sin llamada de oclusión', async ({ page }) => {
+  const groundedCode = JSON.stringify({ kind: 'code', labels: [
+    { text: 'const x', bbox: [10, 10, 60, 12] },
+  ] });
+  await setupDeckStub(page, [groundedCode]);
+  const res = await inPage(page, async ({ chapter, dataUrl }: any) => {
+    const VD = await import('/js/ai/visual-deck.js');
+    return VD.buildVisualCards({
+      types: ['occlusion'],
+      chapterText: chapter,
+      figures: [{ key: 'book:figures:f22', dataUrl, width: 810, height: 130, labels: [], caption: 'Fig. 22' }],
+    });
+  }, { chapter: CHAPTER_TEXT, dataUrl: DATA_URL });
+  expect(res.cards).toEqual([]);
+  expect(res.stats.skipped).toBe(1);
+  expect(res.stats.skippedNotDiagram).toBe(1);
+  const state = await page.evaluate(() => (window as any).__vd);
+  expect(state.calls).toHaveLength(1);   // solo la de visión
+  expect(state.calls[0].messages[0].content.some((p: any) => p.type === 'image_url')).toBe(true);
+  expect(state.calls.some((b: any) => (b.tools || []).length > 0)).toBe(false);   // la familia de oclusión no se llamó
+});
+
+// kind '' (el modelo no respondió un valor del contrato) se trata como NO diagrama:
+// la figura con labels se saltea igual, sin gastar la llamada de pedagogía.
+test('buildVisualCards: grounding sin kind (\'\') se trata como no diagrama, por seguridad', async ({ page }) => {
+  const groundedNoKind = JSON.stringify({ labels: [
+    { text: 'Producer', bbox: [71, 56, 66, 15] },
+  ] });
+  await setupDeckStub(page, [groundedNoKind]);
+  const res = await inPage(page, async ({ chapter, dataUrl }: any) => {
+    const VD = await import('/js/ai/visual-deck.js');
+    return VD.buildVisualCards({
+      types: ['occlusion'],
+      chapterText: chapter,
+      figures: [{ key: 'book:figures:f23', dataUrl, width: 810, height: 130, labels: [], caption: 'Fig. 23' }],
+    });
+  }, { chapter: CHAPTER_TEXT, dataUrl: DATA_URL });
+  expect(res.cards).toEqual([]);
+  expect(res.stats.skipped).toBe(1);
+  expect(res.stats.skippedNotDiagram).toBe(0);   // fue "sin veredicto", no un no-diagrama confirmado
+  const state = await page.evaluate(() => (window as any).__vd);
+  expect(state.calls).toHaveLength(1);   // solo visión: la pedagogía nunca se llamó
+});
+
+// Lo que la llamada de visión aprendió (labels + kind) queda persistido en el
+// artefacto de la figura: la próxima corrida no paga otra llamada. `key` es el
+// keyPath del artefacto, así que NO viaja dentro del result guardado.
+test('buildVisualCards: el kind y las labels aprendidos se persisten en el artefacto de la figura', async ({ page }) => {
+  const groundedCode = JSON.stringify({ kind: 'code', labels: [
+    { text: 'import db', bbox: [10, 10, 80, 12] },
+  ] });
+  await setupDeckStub(page, [groundedCode]);
+  const res = await inPage(page, async ({ chapter, dataUrl }: any) => {
+    const DB = await import('/js/ai/db.js');
+    const F = await import('/js/ai/figures.js');
+    const VD = await import('/js/ai/visual-deck.js');
+    const key = await F.saveFigure({
+      bookId: 'testbook-wu2', page: 59, rect: { x: 0.1, y: 0.1, w: 0.5, h: 0.4 },
+      dataUrl, labels: [], caption: 'Fig. 24', source: 'pdf', width: 810, height: 130,
+    });
+    const out = await VD.buildVisualCards({
+      types: ['occlusion'],
+      chapterText: chapter,
+      figures: [{
+        key, dataUrl, width: 810, height: 130, labels: [], caption: 'Fig. 24',
+        source: 'pdf', page: 59, rect: { x: 0.1, y: 0.1, w: 0.5, h: 0.4 },
+      }],
+    });
+    const arts = await DB.getArtifacts('testbook-wu2');
+    const stored = arts.find((a: any) => a.key === key);
+    return { out, stored: stored ? stored.result : null };
+  }, { chapter: CHAPTER_TEXT, dataUrl: DATA_URL });
+  // El grounding reportó kind 'code': la figura se saltea...
+  expect(res.out.stats.skippedNotDiagram).toBe(1);
+  // ...pero lo aprendido queda persistido para la próxima corrida.
+  expect(res.stored.kind).toBe('code');
+  expect(res.stored.labels).toEqual([{ text: 'import db', bbox: { x: 10, y: 10, w: 80, h: 12 } }]);
+  expect(res.stored.dataUrl).toBe(DATA_URL);
+  expect(res.stored.caption).toBe('Fig. 24');
+  expect(res.stored).not.toHaveProperty('key');   // key es el keyPath: no viaja en result
 });
