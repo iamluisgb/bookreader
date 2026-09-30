@@ -82,10 +82,13 @@ body { font-family: var(--font-ui); -webkit-font-smoothing: antialiased; }
   :root:not([data-theme="light"]):not([data-theme="sepia"]) :is(.reading-mode-btn, .pdf-fit-btn, .page-turn-btn, .ai-tab, .tab-btn).active { background: #636366; }
 }
 /* La barra lateral: la pista va con margen, no pegada al borde. */
-.sidebar-tabs { margin: 10px 12px 4px; border-bottom: none; overflow: hidden; }
+.sidebar-tabs { margin: 10px 12px 4px; border-bottom: none; }
 /* Cuatro pestañas en 296 px: se reparten el ancho y encogen letra y relleno lo justo para
-   que «Subrayados» no se corte. */
-.tab-btn { flex: 1 1 auto; padding: 6px 4px; font-size: 12.5px; }
+   que «Subrayados» no se corte. Y si aun así no caben (drawer móvil de 275 px), la barra
+   DESLIZA: overflow:hidden cortaba «Subrayados» a la mitad. La scrollbar sigue oculta
+   (scrollbar-width:none y ::-webkit-scrollbar en main.css). */
+.sidebar-tabs { overflow-x: auto; scrollbar-width: none; }
+.tab-btn { flex: 1 1 auto; padding: 6px 5px; font-size: 12px; }
 .tab-btn::after { display: none !important; }
 .ai-tabs { margin: 10px 16px 0; }
 .ai-tab { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
