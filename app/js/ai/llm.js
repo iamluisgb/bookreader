@@ -81,10 +81,28 @@ export function getLiteModel() {
   return getModel();
 }
 // Modelo de VISIÓN (opcional, independiente del de texto): se usa solo en los turnos que
-// necesitan "ver" una página (figuras/diagramas). Vacío = no configurado → sin visión.
+// necesitan "ver" una página (figuras/diagramas). `getVisionModel` es lo guardado EN CRUDO
+// (lo lee el formulario de Ajustes); la resolución efectiva vive en `effectiveVisionModel`.
 export function getVisionModel() { return (Storage.get('ai_vision_model', '') || '').trim(); }
 export function setVisionModel(m) { Storage.set('ai_vision_model', (m || '').trim()); }
-export function hasVision()      { return getVisionModel().length > 0; }
+// El modelo de visión EFECTIVO. Lo guardado manda, con dos rescates:
+//  · vacío → el `visionModel` del preset del proveedor actual (`currentProvider()?.visionModel`),
+//    para que la visión funcione de fábrica sin abrir Ajustes (antes, con el ajuste vacío,
+//    `hasVision()` era false y "Explicar lo que veo", el grounding y el repaso de bocetos
+//    quedaban desactivados aunque el preset trajera un modelo verificado);
+//  · un alias del gateway (empieza con `bookreader-`) cuando NO estamos en la demo
+//    (`!isDemo()`) → se ignora y se usa el preset: ese id solo existe en el gateway, y
+//    mandarlo al proveedor propio (p. ej. api.nan.builders) da 400 `model_not_found` —
+//    era el residuo de una sesión demo que sobrevivió al cambio a la key BYOK;
+//  · cualquier otro valor guardado se respeta tal cual (la elección explícita del usuario manda).
+// Devuelve '' cuando no hay nada usable (p. ej. un proveedor sin visión declarada).
+export function effectiveVisionModel() {
+  const stored = getVisionModel();
+  if (stored && !(stored.startsWith('bookreader-') && !isDemo())) return stored;
+  const preset = currentProvider();
+  return (preset && preset.visionModel) || '';
+}
+export function hasVision()      { return effectiveVisionModel().length > 0; }
 
 // Modelo de transcripción (voz → texto). Opcional: vacío = se usa el dictado del navegador.
 export function getSttModel()    { return (Storage.get('ai_stt_model', '') || '').trim(); }
@@ -578,7 +596,9 @@ async function _chatTools({ messages, tools, toolChoice = 'auto', maxTokens = 10
 async function _chatVision({ messages, signal, maxTokens = 2048 }) {
   const key = getKey().trim();
   if (!key) throw new Error(t('Falta la API key.'));
-  const model = getVisionModel();
+  // Resolución EFECTIVA (guardado con rescates — ver `effectiveVisionModel`): si aquí se
+  // usara solo lo guardado, un ajuste vacío o un alias de demo vencido romperían la llamada.
+  const model = effectiveVisionModel();
   if (!model) throw new Error(t('No hay modelo de visión configurado.'));
 
   const res = await fetchRetrying(`${getBaseUrl()}/chat/completions`, {

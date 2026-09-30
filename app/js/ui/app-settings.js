@@ -400,7 +400,7 @@ function agentHtml() {
       <button type="button" id="appset-probe-appset-vmodel" class="appset-discover" data-kind="vision" data-for="appset-vmodel">${t('Probar')}</button>
     </div>
     <p id="appset-probe-appset-vmodel-hint" class="appset-model-hint" hidden></p>
-    <p class="appset-muted">${t('Para explicar figuras y páginas de un libro (multimodal). En nan, <code>deepseek-v4-flash</code> funciona. Déjalo vacío si tu modelo no interpreta imágenes; entonces "Explicar lo que veo" queda desactivado.')}</p>
+    <p class="appset-muted">${t('Para explicar figuras y páginas de un libro (multimodal). Vacío = se usa el modelo de visión recomendado del proveedor (en nan, <code>deepseek-v4-flash</code>). Si escribes un valor, ese manda: usa uno que interprete imágenes o la llamada fallará.')}</p>
     <label class="appset-label" for="appset-smodel">${t('Modelo de transcripción (opcional)')}</label>
     <div class="appset-model-row">
       <input id="appset-smodel" class="appset-input" value="${escapeHtml(LLM.getSttModel())}" placeholder="p. ej. whisper" autocomplete="off" spellcheck="false" />
