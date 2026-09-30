@@ -297,7 +297,17 @@ html, body {
 
 /* Etiqueta flexible + número de página anclado a la derecha, como un índice impreso.
    El número no se encoge ni se parte aunque el título sea larguísimo. */
-.toc-label { flex: 1; min-width: 0; }
+.toc-label {
+  flex: 1; min-width: 0;
+  overflow-wrap: break-word;
+  /* Títulos largos (p. ej. "Graph representation learning and graph neural networks"):
+     dos líneas y elipsis — la entrada sigue escaneable y el índice no se vuelve una
+     pared de texto de tres líneas. El título completo va en el tooltip (title en app.js). */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
 .toc-page {
   flex: none;
   font-variant-numeric: tabular-nums;

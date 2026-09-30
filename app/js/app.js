@@ -1644,6 +1644,9 @@ function tocLabel(label, page) {
   const span = document.createElement('span');
   span.className = 'toc-label';
   span.textContent = String(label || '').trim();
+  // El CSS limita la etiqueta a 2 líneas con elipsis: el título completo queda en el
+  // tooltip (y para lectores de pantalla el accessible name sigue siendo el texto).
+  span.title = span.textContent;
   frag.appendChild(span);
   if (page != null) {
     const num = document.createElement('span');

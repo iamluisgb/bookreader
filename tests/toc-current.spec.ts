@@ -31,6 +31,22 @@ test.describe('Índice — sección actual', () => {
     await expect(current).toHaveAttribute('aria-current', 'location');
   });
 
+  // Títulos largos (p. ej. "Graph representation learning and graph neural networks"):
+  // la etiqueta se limita a 2 líneas con elipsis y el título completo va en el tooltip —
+  // sin clamp, cada entrada larga se volvía una pared de texto de 3 líneas.
+  test('las etiquetas largas del índice se recortan a 2 líneas y llevan tooltip', async ({ page }) => {
+    await loadEpub(page);
+    await page.getByRole('button', { name: 'Abrir sidebar' }).click();
+
+    const label = page.locator('#toc-list a .toc-label').first();
+    await expect(label).toBeVisible({ timeout: 5000 });
+    await expect(label).toHaveCSS('-webkit-line-clamp', '2');
+    await expect(label).toHaveCSS('overflow', 'hidden');
+    const text = (await label.textContent())?.trim() || '';
+    expect(text.length).toBeGreaterThan(0);
+    await expect(label).toHaveAttribute('title', text);
+  });
+
   test('saltar a otra sección mueve la marca', async ({ page }) => {
     await loadEpub(page);
     await page.getByRole('button', { name: 'Abrir sidebar' }).click();
