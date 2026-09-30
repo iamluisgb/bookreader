@@ -812,3 +812,167 @@ body.reading :is(.reader-header, .reader-footer):hover > * { opacity: 1; }
 }
 .lib-mastery-lbl { flex: none; font-size: var(--fs-xs); font-weight: 600; color: var(--text-soft); font-variant-numeric: tabular-nums; }
 .lib-mastery[hidden] { display: none; }
+
+/* ============================================================================
+   Libreta que guía (NB2, 2026-09-30). «Te toca» arriba; campos vacíos en una línea; lo tuyo
+   con más peso que lo de la IA; notas sin iconos fijos (menú ⋯); capítulos plegables.
+   ========================================================================== */
+#ai-view-notebook { padding: 14px 16px 24px; }
+.ai-nb-goal { padding: 10px 12px; margin-bottom: 6px; gap: 2px; }
+.ai-nb-goal-label { font-size: var(--fs-xs); margin: 0; display: inline-flex; align-items: center; gap: 6px; }
+.ai-nb-goal-value { font-size: var(--fs-md); color: var(--text); }
+.ai-nb-tpl { font-size: var(--fs-xs); margin: 0 2px 14px; }
+
+/* Te toca: la pregunta del momento. Superficie elevada, sin acento lateral. */
+.ai-nb-toca {
+  background: var(--surface-1); border: 1px solid var(--border-soft);
+  border-radius: var(--r-lg); padding: 14px; margin-bottom: 14px;
+  box-shadow: var(--shadow-2, 0 4px 14px rgba(0, 0, 0, 0.06));
+}
+.ai-nb-toca-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; min-width: 0; }
+.ai-nb-toca-tag {
+  flex-shrink: 0; font-size: var(--fs-xs); font-weight: 700; color: var(--accent);
+  background: var(--accent-soft); border-radius: var(--r-pill); padding: 2px 8px;
+}
+.ai-nb-toca-ctx { font-size: var(--fs-xs); color: var(--text-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ai-nb-toca-q { font-size: var(--fs-lg); font-weight: 600; line-height: 1.35; color: var(--text); margin: 0 0 10px; }
+.ai-nb-toca-input {
+  width: 100%; min-height: 76px; resize: vertical; box-sizing: border-box;
+  border: none; border-radius: var(--r-md); background: var(--fill); color: var(--text);
+  padding: 10px 12px; font: inherit; font-size: var(--fs-md); line-height: 1.5;
+}
+.ai-nb-toca-input:focus { outline: 2px solid color-mix(in srgb, var(--accent) 45%, transparent); outline-offset: 0; background: var(--surface-0); }
+.ai-nb-toca-actions { display: flex; gap: 8px; margin-top: 10px; align-items: center; }
+.ai-nb-toca-save {
+  background: var(--btn-bg); color: var(--btn-ink); border: none; border-radius: var(--r-pill);
+  font-weight: 600; font-size: var(--fs-sm); padding: 7px 16px; cursor: pointer;
+}
+.ai-nb-toca-save:hover { background: var(--btn-bg-hover); }
+.ai-nb-toca-skip { background: none; border: none; color: var(--text-soft); font-size: var(--fs-sm); padding: 7px 8px; cursor: pointer; border-radius: var(--r-pill); }
+.ai-nb-toca-skip:hover { background: var(--fill); color: var(--text); }
+
+.ai-nb-saved {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 6px 8px; margin-bottom: 12px;
+  font-size: var(--fs-sm); color: var(--text-soft);
+}
+.ai-nb-saved > .icon { color: var(--accent); }
+.ai-nb-saved .ai-nb-review { margin-left: auto; }
+
+/* Entregable (T1) */
+.ai-nb-deliver {
+  display: flex; align-items: center; gap: 12px; margin-bottom: 14px;
+  background: var(--fill); border-radius: var(--r-lg); padding: 12px 12px 12px 14px;
+}
+.ai-nb-deliver-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; font-size: var(--fs-sm); }
+.ai-nb-deliver-txt span { color: var(--text-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ai-nb-deliver-btn, .ai-nb-review, .ai-nb-answer {
+  display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0;
+  background: var(--btn-bg); color: var(--btn-ink); border: none; border-radius: var(--r-pill);
+  font-size: var(--fs-sm); font-weight: 600; padding: 7px 12px; cursor: pointer;
+}
+.ai-nb-deliver-btn:hover, .ai-nb-review:hover, .ai-nb-answer:hover { background: var(--btn-bg-hover); }
+.ai-nb-answer { padding: 4px 10px; font-size: var(--fs-xs); }
+
+/* Campo con notas */
+.ai-nb-field, .ai-nb-field.is-cognition { background: none; padding: 0; margin-bottom: 16px; border-radius: 0; }
+.ai-nb-field-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.ai-nb-field-label {
+  font-size: var(--fs-sm); font-weight: 600; color: var(--text);
+  text-transform: none; letter-spacing: 0; margin: 0; display: block;
+}
+.ai-nb-field.is-agent .ai-nb-field-label { color: var(--text-soft); }
+.ai-nb-field-head .ai-nb-add {
+  margin-left: auto; width: 28px; height: 28px; padding: 0; border: none; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: none; color: var(--text-faint);
+}
+.ai-nb-field-head .ai-nb-add:hover { background: var(--fill); color: var(--text); }
+
+/* Nota: lo tuyo en tarjeta; lo de la IA, lista compacta sin caja. */
+.ai-nb-note {
+  position: relative; display: block; margin-bottom: 8px;
+  background: var(--surface-1); border: 1px solid var(--border-soft); border-radius: var(--r-md);
+  box-shadow: none; padding: 10px 12px 8px;
+}
+.ai-nb-field.is-agent .ai-nb-note {
+  background: none; border: none; border-radius: 0; padding: 8px 0 6px;
+  border-bottom: 1px solid var(--border-soft); margin: 0;
+}
+.ai-nb-field.is-agent .ai-nb-note-text { font-size: var(--fs-sm); color: var(--text-soft); }
+.ai-nb-note-text { font-size: var(--fs-md); line-height: 1.55; color: var(--text); cursor: text; }
+.ai-nb-note.is-unanswered { background: color-mix(in srgb, var(--accent) 5%, var(--surface-1)); }
+.ai-nb-note-meta { display: flex; align-items: center; justify-content: flex-end; gap: 6px; margin-top: 4px; min-height: 24px; }
+.ai-nb-note-meta .ai-nb-answer { margin-right: auto; }
+.ai-nb-chap {
+  display: inline-flex; align-items: center; max-width: 60%; width: auto; height: auto;
+  font-size: var(--fs-xs); color: var(--text-faint); background: var(--fill); border: none;
+  border-radius: var(--r-pill); padding: 2px 8px; cursor: default;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+button.ai-nb-chap { cursor: pointer; }
+button.ai-nb-chap:hover { color: var(--text); background: var(--fill-strong); }
+.ai-nb-more {
+  width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center;
+  border: none; background: none; color: var(--text-faint); border-radius: 50%; cursor: pointer;
+  opacity: 0.55; transition: opacity var(--transition-fast), background var(--transition-fast);
+}
+.ai-nb-note:hover .ai-nb-more, .ai-nb-more[aria-expanded="true"], .ai-nb-more:focus-visible { opacity: 1; }
+.ai-nb-more:hover { background: var(--fill); color: var(--text); }
+@media (hover: none) { .ai-nb-more { opacity: 1; } }
+.ai-nb-menu {
+  position: absolute; right: 8px; top: calc(100% - 6px); z-index: 5; min-width: 200px;
+  background: var(--surface-0); border: 1px solid var(--border-soft); border-radius: var(--r-md);
+  box-shadow: var(--shadow-3, 0 10px 30px rgba(0, 0, 0, 0.14)); padding: 4px;
+  display: flex; flex-direction: column;
+}
+.ai-nb-menu button {
+  display: flex; align-items: center; gap: 10px; width: 100%; height: auto; justify-content: flex-start;
+  background: none; border: none; border-radius: var(--r-sm); padding: 8px 10px;
+  font-size: var(--fs-sm); font-weight: 500; color: var(--text); cursor: pointer; text-align: left;
+}
+.ai-nb-menu button .icon { color: var(--text-faint); }
+.ai-nb-menu button:hover { background: var(--fill); color: var(--text); }
+.ai-nb-menu .ai-nb-del, .ai-nb-menu .ai-nb-del .icon { color: #d70015; }
+.ai-nb-expand {
+  background: none; border: none; color: var(--accent); font-size: var(--fs-sm); font-weight: 500;
+  padding: 8px 0 0; cursor: pointer;
+}
+
+/* Campo vacío: UNA línea. */
+.ai-nb-slot {
+  display: flex; align-items: center; gap: 8px; width: 100%; margin-bottom: 6px;
+  background: none; border: 1px dashed var(--border); border-radius: var(--r-md);
+  padding: 9px 10px 9px 12px; cursor: pointer; text-align: left; color: var(--text-faint);
+  font: inherit; transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+.ai-nb-slot:hover { background: var(--fill); border-color: transparent; color: var(--text-soft); }
+.ai-nb-slot-label { font-size: var(--fs-sm); font-weight: 600; color: var(--text-soft); flex-shrink: 0; }
+.ai-nb-slot.is-mine .ai-nb-slot-label { color: var(--text); }
+.ai-nb-slot-when { font-size: var(--fs-xs); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ai-nb-slot.is-locked { cursor: default; opacity: 0.7; }
+.ai-nb-slot.is-locked:hover { background: none; border-color: var(--border); }
+
+/* Editor */
+.ai-nb-input { border: none; background: var(--fill); box-sizing: border-box; }
+.ai-nb-input:focus { outline: 2px solid color-mix(in srgb, var(--accent) 45%, transparent); background: var(--surface-0); }
+.ai-nb-save, .ai-nb-cancel { border-radius: var(--r-pill); padding: 6px 14px; }
+.ai-nb-cancel { border: none; }
+.ai-nb-editor-q { font-size: var(--fs-sm); color: var(--text-soft); margin-bottom: 8px; }
+.ai-nb-editor-q blockquote { margin: 0 0 6px; padding: 0; font-style: italic; color: var(--text-faint); }
+.ai-nb-editor-q p { margin: 0; color: var(--text); }
+
+/* Capítulos (plantillas por capítulo) */
+.ai-nb-chapter { border-top: 1px solid var(--border-soft); }
+.ai-nb-chapter:last-child { border-bottom: 1px solid var(--border-soft); }
+.ai-nb-chapter > summary {
+  list-style: none; display: flex; align-items: center; gap: 8px; cursor: pointer;
+  padding: 11px 2px; font-size: var(--fs-sm); font-weight: 600; color: var(--text);
+}
+.ai-nb-chapter > summary::-webkit-details-marker { display: none; }
+.ai-nb-chapter > summary .icon { color: var(--text-faint); transition: transform var(--transition-fast); flex-shrink: 0; }
+.ai-nb-chapter[open] > summary .icon { transform: rotate(90deg); }
+.ai-nb-chapter-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ai-nb-chapter-now { font-size: var(--fs-xs); font-weight: 600; color: var(--accent); }
+.ai-nb-chapter-n { font-size: var(--fs-xs); color: var(--text-faint); font-weight: 500; min-width: 1ch; text-align: right; }
+.ai-nb-chapter-body { padding: 2px 0 8px; }
+@media (prefers-reduced-motion: reduce) { .ai-nb-chapter > summary .icon { transition: none; } }

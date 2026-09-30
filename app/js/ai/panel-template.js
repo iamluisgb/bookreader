@@ -91,7 +91,7 @@ export function systemPrompt(goal, template, profile, opts = {}) {
   // para que el modelo sepa que ahí sí puede proponer la entrada.
   const scaffold = fields.filter(f => isCognitionField(f) && f.aiScaffold);
   const cog  = fields.filter(f => isCognitionField(f) && !f.aiScaffold);
-  const fmt = (arr) => arr.map(f => `- ${f.key}: ${f.label}`).join('\n');
+  const fmt = (arr) => arr.map(f => `- ${f.key}: ${f.label}${f.hint ? ` (${f.hint})` : ''}`).join('\n');
   // INFO vs COGNICIÓN: la libreta se escribe FUERA del turno —un extractor aparte guarda
   // tras cada respuesta lo que aporte valor (y lo que el usuario pida guardar)—. Los de
   // cognición los genera el usuario (efecto de generación); ahí el agente NO escribe la

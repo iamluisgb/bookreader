@@ -245,9 +245,11 @@ export function getNotes(convoId) {
     .then(list => (list || []).filter(n => !n.deleted));
 }
 
-export function addNote(convoId, fieldKey, content, sourceCfis = []) {
+// `extra`: campos opcionales de la nota (NB2: `chapter`, en qué capítulo se escribió; `uid`
+// si quien llama ya lo tiene, para enlazarla con su tarjeta del mazo).
+export function addNote(convoId, fieldKey, content, sourceCfis = [], extra = {}) {
   const now = Date.now();
-  return put('notes', { uid: crypto.randomUUID(), convoId, fieldKey, content, sourceCfis, ts: now, updatedAt: now });
+  return put('notes', { uid: crypto.randomUUID(), ...extra, convoId, fieldKey, content, sourceCfis, ts: now, updatedAt: now });
 }
 
 export function updateNote(id, patch) {

@@ -38,6 +38,7 @@ import * as Jobs from './jobs.js';
 import * as JobsUI from './jobs-ui.js';
 import * as Studio from './studio.js';
 import * as Storage from '../storage.js';
+import * as NB from './notebook.js';
 import * as QueryExpand from './query-expand.js';
 import * as Offline from './offline.js';
 import { ensurePro } from '../ui/paywall.js';
@@ -62,6 +63,12 @@ let history = [];            // {role, content}
 let notes = [];              // {id, fieldKey, content, sourceCfis}
 let editingId = null;        // nota en edición
 let addingField = null;      // campo donde se añade una nota nueva
+// NB2 · libreta que guía: campos de la IA desplegados, menú ⋯ abierto, nota recién guardada
+// desde «Te toca» (para ofrecer la revisión) y si el libro está terminado (preguntas finales).
+let nbExpanded = new Set();
+let nbMenu = null;
+let nbJustSaved = null;
+let bookFinished = false;
 let attenuationDone = false;  // atenuación de capítulos aplicada para este libro
 let registeredRendition = null; // rendition con el listener de subrayado registrado
 let hqaBusy = false;          // generación HQ&A en curso
@@ -143,6 +150,7 @@ export function init(opts) {
   });
   els.messages.addEventListener('click', onMessagesClick);
   els.noteView.addEventListener('click', onNotebookClick);
+  els.noteView.addEventListener('toggle', onNotebookToggle, true);
 
   // Selector de conversaciones.
   els.convoBtn.addEventListener('click', (e) => { e.stopPropagation(); if (convo) openConvoMenu(els.convoBtn); else openOnboarding(); });
@@ -334,10 +342,7 @@ export async function cardFromSelection(text) {
     chapter: EpubReader.getCurrentChapterLabel?.() || passage?.chapter || '',
     src: passage?.id || '', quote,
   };
-  const decks = await DB.getDecks(bookId).catch(() => []);
-  const mine = (decks || []).find(d => d.source === 'highlights' && !d.deleted);
-  if (mine) await DB.updateDeck(mine.id, { cards: [...(mine.cards || []), card] });
-  else await DB.addDeck({ bookId, name: bookTitle || t('Libro'), cardType: 'cloze', scope: t('De tus subrayados'), source: 'highlights', cards: [card] });
+  await pushCard(card);
   toastMsg(t('Tarjeta creada: entra en tu próximo repaso.'));
 }
 
@@ -605,7 +610,7 @@ function showView(view) {
   els.chatView.classList.toggle('active', view === 'chat');
   els.noteView.classList.toggle('active', view === 'notebook');
   els.studioView.classList.toggle('active', view === 'studio');
-  if (view === 'notebook') els.tabs.querySelector('.ai-tab[data-view="notebook"]')?.classList.remove('ai-tab-unread');
+  if (view === 'notebook') { els.tabs.querySelector('.ai-tab[data-view="notebook"]')?.classList.remove('ai-tab-unread'); refreshFinished(); }
   if (view === 'studio') Studio.render();
 }
 
@@ -631,6 +636,8 @@ export async function setBook(b, id, title, opts = {}) {
   convo = null; template = null; history = []; notes = [];
   ia2LastChapter = null; ia2Seen = new Set();   // IA2: reinicia el repaso por libro
   editingId = null; addingField = null; attenuationDone = false;
+  nbExpanded = new Set(); nbMenu = null; nbJustSaved = null; bookFinished = false;
+  nbAddChapter = null; nbOpenChapters = new Set();
   clearChapterAttenuation();
   annotatedText = ''; anchors = new Map();
   segReady = false; segBlocks = 0; segCached = false;
@@ -703,8 +710,7 @@ P: <pregunta>` },
     const out = await LLM.chatStream({ messages });
     const q = (out.match(/P:\s*(.+)/i)?.[1] || '').trim();
     const content = t('> {text}\n\n**P:** {q}\n**R:** {r}', { text, q: q || '—', r: answerBlank() });
-    const id = convo ? await DB.addNote(convo.id, 'hqa', content, [cfiRange]) : Date.now();
-    notes.push({ id, fieldKey: 'hqa', content, sourceCfis: [cfiRange] });
+    await saveNote('hqa', content, [cfiRange]);
     renderNotebook();
     markNotebookUnread();
     setStatus('Pregunta añadida — escribe tu respuesta en la libreta');
@@ -806,7 +812,9 @@ async function activateConvo() {
   renderConvoBar();
   clearRef();
   notes = convo ? await DB.getNotes(convo.id) : [];
+  nbMenu = null; nbJustSaved = null;
   renderNotebook();
+  refreshFinished();
   await restoreChat();
   refreshStatus();
   if (pendingQuoteOnActivate) { setRef(pendingQuoteOnActivate); pendingQuoteOnActivate = null; }
@@ -1756,6 +1764,15 @@ function onChapterChanged(label) {
   if (ia2Seen.has(label)) return;       // ya visto (volver atrás): no repasar
   ia2Seen.add(label);
   if (!prev) return;                     // primer capítulo del libro: nada que repasar aún
+  // NB2 · capítulo terminado: si la plantilla pregunta algo por capítulo, la libreta lo
+  // enseña en «Te toca» (sin interrumpir la lectura: solo el punto de no leído).
+  if (convo && template?.fields?.some(f => f.when === 'capitulo' && isCognitionField(f))) {
+    NB.setDoneChapter(convo.id, prev);
+    renderNotebook();
+    markNotebookUnread();
+    if (!isOpen()) { agentUnread = true; applyAgentBadge(); }
+  }
+  refreshFinished();
   if (template?.id !== 'hqa') return;    // IA2 solo con la plantilla de recuerdo activo
   if (!convo || !LLM.hasKey() || busy || !segReady) return;
   quizChapter(prev);
@@ -2203,7 +2220,7 @@ async function extractToNotebook(answerText, question, el) {
     if (isBtn) setTimeout(() => { el.disabled = false; el.innerHTML = act('note', t('A la libreta')); }, 2500);
     return;
   }
-  const fieldList = fillable.map(f => `- ${f.key}: ${f.label}`).join('\n');
+  const fieldList = fillable.map(f => `- ${f.key}: ${f.label}${f.hint ? ` (${f.hint})` : ''}`).join('\n');
   const scaffoldFields = fillable.filter(f => isCognitionField(f));
   const scaffoldNote = scaffoldFields.length
     ? `Campos andamio (${scaffoldFields.map(f => f.key).join(', ')}): crea la entrada con el formato EXACTO:\n> <fragmento>\n**P:** <pregunta>\n**R:** ${answerBlank()}\nNUNCA escribas la parte del usuario: la respuesta déjala siempre como «${answerBlank()}».\n`
@@ -2230,8 +2247,7 @@ hay nada que merezca guardarse, no llames a ninguna herramienta.` },
       // escribir en una cognición pura aunque no esté en el enum de la herramienta.
       if (!fieldKey || !content || !isAiWritable(template.id, fieldKey)) continue;
       const cites = extractCites(content, sourceCfis);
-      const id = convo ? await DB.addNote(convo.id, fieldKey, content, cites) : Date.now();
-      notes.push({ id, fieldKey, content, sourceCfis: cites });
+      await saveNote(fieldKey, content, cites);
       added++;
     }
     renderNotebook();
@@ -2262,11 +2278,49 @@ function extractCites(content, sourceCfis) {
 }
 
 // ---- Libreta (render) ------------------------------------------------------
+// NB2 · la libreta guía en vez de esperar. Arriba, «Te toca»: UNA pregunta en su momento
+// (al empezar, al terminar un capítulo, al terminar el libro; ver ai/notebook.js). Un campo
+// vacío es una línea, no un bloque con «—», consejo y botón. Lo tuyo pesa más que lo de la
+// IA (que se pliega a partir de 3). Cada nota lleva su capítulo y un menú ⋯ con ir al pasaje,
+// revisar con el agente, hacer tarjeta, editar y borrar; tocar el texto también edita.
 
-function editorHtml(attr, value) {
+const NB_FOLD = 3;           // notas de la IA visibles por campo antes de «Ver N más»
+let nbAddChapter = null;     // capítulo del grupo donde se está añadiendo (libreta por capítulos)
+let nbOpenChapters = new Set();
+
+function currentChapter() {
+  if (bookFormat !== 'epub') return '';
+  return EpubReader.getCurrentChapterLabel?.() || ia2LastChapter || '';
+}
+
+function fieldOf(key) { return template?.fields.find(f => f.key === key) || null; }
+
+async function saveNote(fieldKey, content, sourceCfis = [], chapter = currentChapter()) {
+  const extra = { uid: crypto.randomUUID(), ...(chapter ? { chapter } : {}) };
+  const id = convo ? await DB.addNote(convo.id, fieldKey, content, sourceCfis, extra) : Date.now();
+  const note = { id, fieldKey, content, sourceCfis, ...extra };
+  notes.push(note);
+  return note;
+}
+
+// ¿Libro terminado? (lo decide la biblioteca: progreso ≥ 97 % o marcado a mano). Abre las
+// preguntas del final en «Te toca».
+async function refreshFinished() {
+  const id = bookId;
+  if (!id) return;
+  try {
+    const { getBook } = await import('../library/store.js');
+    const b = await getBook(id);
+    const f = b?.status === 'finished';
+    if (id === bookId && f !== bookFinished) { bookFinished = f; renderNotebook(); }
+  } catch { /* sin biblioteca no hay preguntas del final */ }
+}
+
+function editorHtml(attr, value, placeholder = '', lead = '') {
   return `
     <div class="ai-nb-editor" ${attr}>
-      <textarea class="ai-nb-input" placeholder="Escribe tu nota...">${escapeHtml(value)}</textarea>
+      ${lead}
+      <textarea class="ai-nb-input" placeholder="${escapeHtml(placeholder || t('Escribe tu nota…'))}">${escapeHtml(value)}</textarea>
       <div class="ai-nb-editor-actions">
         <button class="ai-nb-save">${t('Guardar')}</button>
         <button class="ai-nb-cancel">${t('Cancelar')}</button>
@@ -2274,20 +2328,110 @@ function editorHtml(attr, value) {
     </div>`;
 }
 
-function noteHtml(n) {
-  if (n.id === editingId) return editorHtml(`data-id="${n.id}"`, n.content);
+function noteHtml(n, { showChapter = true } = {}) {
+  const f = fieldOf(n.fieldKey);
+  const qa = f?.aiScaffold ? NB.parseQA(n.content) : null;
+  if (n.id === editingId) {
+    // HQ&A: se edita SOLO tu respuesta; el fragmento y la pregunta quedan a la vista.
+    if (qa?.q) {
+      const lead = `<div class="ai-nb-editor-q">${qa.quote ? `<blockquote>${escapeHtml(qa.quote)}</blockquote>` : ''}<p><b>${t('P:')}</b> ${escapeHtml(qa.q)}</p></div>`;
+      return editorHtml(`data-id="${n.id}" data-qa="1"`, qa.a, t('Tu respuesta, con tus palabras'), lead);
+    }
+    return editorHtml(`data-id="${n.id}"`, n.content, f?.hint);
+  }
   const navCfi = (n.sourceCfis || []).find(c => typeof c === 'string' && c.startsWith('epubcfi'));
-  const gotoBtn = navCfi
-    ? `<button class="ai-nb-goto" data-cfi="${escapeHtml(navCfi)}" title="Ir al subrayado">${icon('arrow-up-right', { size: 15 })}</button>`
+  const chip = showChapter && n.chapter
+    ? (navCfi
+      ? `<button class="ai-nb-chap ai-nb-goto" data-cfi="${escapeHtml(navCfi)}">${escapeHtml(n.chapter)}</button>`
+      : `<span class="ai-nb-chap">${escapeHtml(n.chapter)}</span>`)
     : '';
+  const mine = isCognitionField(f);
+  const unanswered = qa && qa.q && !qa.a;
+  const menu = nbMenu === n.id ? `
+      <div class="ai-nb-menu" role="menu">
+        ${navCfi ? `<button class="ai-nb-goto" role="menuitem" data-cfi="${escapeHtml(navCfi)}">${icon('arrow-up-right', { size: 15 })}<span>${t('Ir al pasaje')}</span></button>` : ''}
+        ${mine && !unanswered ? `<button class="ai-nb-review" role="menuitem" data-id="${n.id}">${icon('sparkles', { size: 15 })}<span>${t('Revisar con el agente')}</span></button>` : ''}
+        ${unanswered ? '' : `<button class="ai-nb-card" role="menuitem" data-id="${n.id}">${icon('cards', { size: 15 })}<span>${t('Hacer tarjeta')}</span></button>`}
+        <button class="ai-nb-edit" role="menuitem" data-id="${n.id}">${icon('pencil', { size: 15 })}<span>${t('Editar')}</span></button>
+        <button class="ai-nb-del" role="menuitem" data-id="${n.id}">${icon('trash', { size: 15 })}<span>${t('Borrar')}</span></button>
+      </div>` : '';
   return `
-    <div class="ai-nb-note" data-id="${n.id}">
-      <div class="ai-nb-note-text">${renderWithCitations(n.content, anchors)}</div>
-      <div class="ai-nb-note-tools">
-        ${gotoBtn}
-        <button class="ai-nb-edit" data-id="${n.id}" title="Editar">${icon('pencil', { size: 15 })}</button>
-        <button class="ai-nb-del" data-id="${n.id}" title="Eliminar">${icon('trash', { size: 15 })}</button>
+    <div class="ai-nb-note${mine ? ' is-mine' : ''}${unanswered ? ' is-unanswered' : ''}" data-id="${n.id}">
+      <div class="ai-nb-note-text" data-id="${n.id}">${renderWithCitations(n.content, anchors)}</div>
+      <div class="ai-nb-note-meta">
+        ${unanswered ? `<button class="ai-nb-answer ai-nb-edit" data-id="${n.id}">${t('Responder')}</button>` : ''}
+        ${chip}
+        <button class="ai-nb-more" data-id="${n.id}" aria-label="${t('Más acciones')}" aria-expanded="${nbMenu === n.id}">${icon('ellipsis', { size: 16 })}</button>
       </div>
+      ${menu}
+    </div>`;
+}
+
+function fieldBlock(f, list, { chapter = null, pending = null } = {}) {
+  const mine = isCognitionField(f);
+  const chapAttr = chapter != null ? ` data-chapter="${escapeHtml(chapter)}"` : '';
+  const adding = addingField === f.key && (chapter == null || nbAddChapter === chapter);
+  if (f.fromGoal && !list.length && !adding) return '';            // ya es el objetivo de arriba
+  if (f.after && !notes.some(n => n.fieldKey === f.after)) {        // primero tú, luego la IA
+    return list.length
+      ? `<div class="ai-nb-slot is-locked"><span class="ai-nb-slot-label">${escapeHtml(f.label)}</span><span class="ai-nb-slot-when">${t('se muestra cuando escribas la tuya')}</span></div>`
+      : '';
+  }
+  if (!list.length && !adding && pending?.field.key === f.key) return '';   // ya está en «Te toca»
+  if (!list.length && !adding) {
+    const when = mine ? NB.whenLabel(f.when) : t('lo apunta el agente');
+    return `<button class="ai-nb-slot${mine ? ' is-mine' : ''}" data-field="${f.key}"${chapAttr}>
+      <span class="ai-nb-slot-label">${escapeHtml(f.label)}</span>
+      <span class="ai-nb-slot-when">${escapeHtml(when)}</span>
+      ${icon('plus', { size: 15 })}</button>`;
+  }
+  const foldKey = `${f.key}|${chapter ?? ''}`;
+  const folded = !mine && list.length > NB_FOLD && !nbExpanded.has(foldKey);
+  const shown = folded ? list.slice(0, NB_FOLD) : list;
+  return `
+    <section class="ai-nb-field ${mine ? 'is-mine' : 'is-agent'}">
+      <header class="ai-nb-field-head">
+        <span class="ai-nb-field-label">${escapeHtml(f.label)}</span>
+        <span class="ai-nb-fill ${mine ? 'is-user' : 'is-agent'}">${mine ? t('tú') : t('IA')}</span>
+        ${adding ? '' : `<button class="ai-nb-add" data-field="${f.key}"${chapAttr} aria-label="${t('Añadir nota')}" title="${t('Añadir nota')}">${icon('plus', { size: 15 })}</button>`}
+      </header>
+      ${shown.map(n => noteHtml(n, { showChapter: chapter == null })).join('')}
+      ${folded ? `<button class="ai-nb-expand" data-key="${escapeHtml(foldKey)}">${t('Ver {n} más', { n: list.length - NB_FOLD })}</button>` : ''}
+      ${adding ? editorHtml(`data-field="${f.key}"`, '', f.hint) : ''}
+    </section>`;
+}
+
+function tocaHtml(p) {
+  const saved = nbJustSaved != null && notes.find(n => n.id === nbJustSaved);
+  const savedHtml = saved
+    ? `<div class="ai-nb-saved">${icon('check', { size: 15 })}<span>${t('Guardado en «{f}».', { f: escapeHtml(fieldOf(saved.fieldKey)?.label || '') })}</span>${LLM.hasKey() ? `<button class="ai-nb-review" data-id="${saved.id}">${t('Revisar con el agente')}</button>` : ''}</div>`
+    : '';
+  if (!p) return savedHtml;
+  const f = p.field;
+  const ctx = p.chapter
+    ? t('Has terminado «{c}»', { c: escapeHtml(p.chapter) })
+    : f.when === 'final' ? t('Has terminado el libro') : t('Para empezar');
+  return `${savedHtml}
+    <div class="ai-nb-toca" data-field="${f.key}" data-chapter="${escapeHtml(p.chapter)}">
+      <div class="ai-nb-toca-head"><span class="ai-nb-toca-tag">${t('Te toca')}</span><span class="ai-nb-toca-ctx">${ctx}</span></div>
+      <p class="ai-nb-toca-q">${escapeHtml(f.ask || f.label)}</p>
+      <textarea class="ai-nb-toca-input" rows="3" placeholder="${escapeHtml(f.hint || t('Escribe tu respuesta…'))}" aria-label="${escapeHtml(f.ask || f.label)}"></textarea>
+      <div class="ai-nb-toca-actions">
+        <button class="ai-nb-toca-save">${t('Guardar')}</button>
+        <button class="ai-nb-toca-skip">${t('Ahora no')}</button>
+      </div>
+    </div>`;
+}
+
+// T1 · la recompensa: con tus respuestas, el agente monta el entregable que pediste.
+function deliverHtml() {
+  const d = template?.deliverable;
+  if (!d || !notes.some(n => d.from.includes(n.fieldKey))) return '';
+  const what = NB.plainText(notes.find(n => n.fieldKey === d.what)?.content || '');
+  return `
+    <div class="ai-nb-deliver">
+      <div class="ai-nb-deliver-txt"><b>${t('Tu entregable')}</b><span>${escapeHtml(what ? what.slice(0, 90) : t('Lo que querías tener al terminar'))}</span></div>
+      <button class="ai-nb-deliver-btn">${icon('sparkles', { size: 15 })}<span>${t('Montarlo con mis notas')}</span></button>
     </div>`;
 }
 
@@ -2306,30 +2450,42 @@ function renderNotebook() {
   if (!template) { els.noteView.innerHTML = ''; return; }
   const byField = {};
   for (const n of notes) (byField[n.fieldKey] ||= []).push(n);
+  // Campos con notas que la plantilla ya no tiene (p. ej. «Highlights sueltos» de la
+  // inmersiva): se siguen enseñando, las notas son del usuario.
+  const legacy = Object.keys(byField).filter(k => !fieldOf(k))
+    .map(k => ({ key: k, label: k === 'highlights' ? t('Highlights sueltos') : k, fill: 'agent' }));
+  const fields = [...template.fields, ...legacy];
+  const cur = currentChapter();
+  const pending = NB.pendingPrompt(template, notes, { convoId: convo?.id, finished: bookFinished });
+
+  let body;
+  if (template.byChapter && (cur || notes.some(n => n.chapter))) {
+    const groups = NB.groupByChapter(notes, { order: tocLabels, current: cur });
+    body = groups.map((g) => {
+      const isCur = g.chapter === cur;
+      const inner = fields.map((f) => {
+        const list = g.notes.filter(n => n.fieldKey === f.key);
+        const addingHere = addingField === f.key && nbAddChapter === g.chapter;
+        if (!list.length && !isCur && !addingHere) return '';
+        return fieldBlock(f, list, { chapter: g.chapter, pending: pending?.chapter === g.chapter ? pending : null });
+      }).join('');
+      const open = isCur || groups.length === 1 || nbOpenChapters.has(g.chapter) || nbAddChapter === g.chapter;
+      return `
+        <details class="ai-nb-chapter" data-chapter="${escapeHtml(g.chapter)}"${open ? ' open' : ''}>
+          <summary>${icon('chevron-right', { size: 14 })}<span class="ai-nb-chapter-name">${escapeHtml(g.chapter || t('Sin capítulo'))}</span>${isCur ? `<span class="ai-nb-chapter-now">${t('Ahora')}</span>` : ''}<span class="ai-nb-chapter-n">${g.notes.length || ''}</span></summary>
+          <div class="ai-nb-chapter-body">${inner}</div>
+        </details>`;
+    }).join('');
+  } else {
+    body = fields.map(f => fieldBlock(f, byField[f.key] || [], { pending })).join('');
+  }
 
   els.noteView.innerHTML = `
     <div class="ai-nb-goal"><span class="ai-nb-goal-label">${icon('target', { size: 15 })} ${t('Objetivo')}</span><span class="ai-nb-goal-value">${escapeHtml(convo.goal)}</span></div>
-    <div class="ai-nb-tpl">${template.name}</div>
-    ${template.fields.map(f => {
-      const list = byField[f.key] || [];
-      const notesHtml = list.map(noteHtml).join('');
-      const adding = addingField === f.key ? editorHtml(`data-field="${f.key}"`, '') : '';
-      const addBtn = addingField === f.key ? '' : `<button class="ai-nb-add" data-field="${f.key}">${t('+ nota')}</button>`;
-      // INFO (IA) vs COGNICIÓN (tú): la etiqueta hace explícito quién rellena cada campo.
-      const cog = isCognitionField(f);
-      const tag = `<span class="ai-nb-fill ${cog ? 'is-user' : 'is-agent'}">${cog ? t('tú') : t('IA')}</span>`;
-      const hint = cog && !list.length && !adding
-        ? `<div class="ai-nb-cog-hint">${t('Escríbela tú; luego pide al agente en el chat que la revise.')}</div>`
-        : '';
-      return `
-      <div class="ai-nb-field${cog ? ' is-cognition' : ''}">
-        <div class="ai-nb-field-label">${escapeHtml(f.label)}${tag}</div>
-        ${notesHtml || (adding ? '' : '<div class="ai-nb-empty">—</div>')}
-        ${hint}
-        ${adding}
-        ${addBtn}
-      </div>`;
-    }).join('')}
+    <div class="ai-nb-tpl">${escapeHtml(template.name)}</div>
+    ${tocaHtml(pending)}
+    ${deliverHtml()}
+    <div class="ai-nb-fields">${body}</div>
   `;
 }
 
@@ -2337,48 +2493,224 @@ function focusEditor() {
   setTimeout(() => els.noteView.querySelector('.ai-nb-editor .ai-nb-input')?.focus(), 0);
 }
 
+function onNotebookToggle(e) {
+  const d = e.target;
+  if (!d.classList?.contains('ai-nb-chapter')) return;
+  const label = d.dataset.chapter || '';
+  if (d.open) nbOpenChapters.add(label); else nbOpenChapters.delete(label);
+}
+
 async function onNotebookClick(e) {
+  const cite = e.target.closest('.ai-cite');
+  if (cite) { navigateCite(cite.dataset.id); return; }
+  // Un menú ⋯ abierto se cierra con cualquier clic fuera de él.
+  if (nbMenu != null && !e.target.closest('.ai-nb-menu, .ai-nb-more')) {
+    nbMenu = null; renderNotebook(); return;
+  }
+
+  // «Te toca»
+  const tocaSave = e.target.closest('.ai-nb-toca-save');
+  if (tocaSave) {
+    const box = tocaSave.closest('.ai-nb-toca');
+    const input = box.querySelector('.ai-nb-toca-input');
+    const val = input.value.trim();
+    if (!val) { input.focus(); return; }
+    const note = await saveNote(box.dataset.field, val, extractCites(val, []), box.dataset.chapter || currentChapter());
+    nbJustSaved = note.id;
+    afterNoteSaved(note);
+    renderNotebook();
+    return;
+  }
+  const tocaSkip = e.target.closest('.ai-nb-toca-skip');
+  if (tocaSkip) {
+    const box = tocaSkip.closest('.ai-nb-toca');
+    if (convo) NB.skipPrompt(convo.id, box.dataset.field, box.dataset.chapter);
+    nbJustSaved = null;
+    renderNotebook();
+    return;
+  }
+
   const save = e.target.closest('.ai-nb-save');
   if (save) {
     const editor = save.closest('.ai-nb-editor');
     const val = editor.querySelector('.ai-nb-input').value.trim();
     const id = editor.dataset.id ? Number(editor.dataset.id) : null;
     const field = editor.dataset.field || null;
-    if (val && id != null) {
-      const cites = extractCites(val, []);
-      if (convo) await DB.updateNote(id, { content: val, sourceCfis: cites });
+    let saved = null;
+    if (id != null) {
       const note = notes.find(n => n.id === id);
-      if (note) { note.content = val; note.sourceCfis = cites; }
+      // HQ&A: el editor solo tiene la respuesta; se recompone la nota con su P/R.
+      const content = editor.dataset.qa && note
+        ? note.content.replace(/(\*\*(?:R|A):\*\*)[\s\S]*$/, `$1 ${val || answerBlank()}`)
+        : val;
+      if (content && note) {
+        const cites = extractCites(content, note.sourceCfis);
+        if (convo) await DB.updateNote(id, { content, sourceCfis: cites });
+        note.content = content; note.sourceCfis = cites;
+        saved = note;
+      }
     } else if (val && field) {
-      const cites = extractCites(val, []);
-      const newId = convo ? await DB.addNote(convo.id, field, val, cites) : Date.now();
-      notes.push({ id: newId, fieldKey: field, content: val, sourceCfis: cites });
+      saved = await saveNote(field, val, extractCites(val, []), nbAddChapter ?? currentChapter());
     }
-    editingId = null; addingField = null;
+    editingId = null; addingField = null; nbAddChapter = null;
+    if (saved) afterNoteSaved(saved);
     renderNotebook();
     return;
   }
-  if (e.target.closest('.ai-nb-cancel')) { editingId = null; addingField = null; renderNotebook(); return; }
+  if (e.target.closest('.ai-nb-cancel')) { editingId = null; addingField = null; nbAddChapter = null; renderNotebook(); return; }
+
+  const more = e.target.closest('.ai-nb-more');
+  if (more) { const id = Number(more.dataset.id); nbMenu = nbMenu === id ? null : id; renderNotebook(); return; }
 
   const edit = e.target.closest('.ai-nb-edit');
-  if (edit) { editingId = Number(edit.dataset.id); addingField = null; renderNotebook(); focusEditor(); return; }
+  if (edit) { editingId = Number(edit.dataset.id); addingField = null; nbMenu = null; renderNotebook(); focusEditor(); return; }
 
-  const add = e.target.closest('.ai-nb-add');
-  if (add) { addingField = add.dataset.field; editingId = null; renderNotebook(); focusEditor(); return; }
+  const add = e.target.closest('.ai-nb-add, .ai-nb-slot:not(.is-locked)');
+  if (add) {
+    addingField = add.dataset.field; nbAddChapter = add.dataset.chapter ?? null;
+    editingId = null; nbMenu = null;
+    renderNotebook(); focusEditor(); return;
+  }
 
   const goto = e.target.closest('.ai-nb-goto');
-  if (goto) { onCite(goto.dataset.cfi); return; }
+  if (goto) { nbMenu = null; onCite(goto.dataset.cfi); return; }
+
+  const review = e.target.closest('.ai-nb-review');
+  if (review) { reviewNote(Number(review.dataset.id)); return; }
+
+  const card = e.target.closest('.ai-nb-card');
+  if (card) { cardFromNote(Number(card.dataset.id)); return; }
 
   const del = e.target.closest('.ai-nb-del');
   if (del) {
     const id = Number(del.dataset.id);
     notes = notes.filter(n => n.id !== id);
     if (convo) DB.deleteNote(id);
+    nbMenu = null; if (nbJustSaved === id) nbJustSaved = null;
     renderNotebook();
     return;
   }
-  const cite = e.target.closest('.ai-cite');
-  if (cite) navigateCite(cite.dataset.id);
+
+  const expand = e.target.closest('.ai-nb-expand');
+  if (expand) { nbExpanded.add(expand.dataset.key); renderNotebook(); return; }
+
+  if (e.target.closest('.ai-nb-deliver-btn')) { buildDeliverable(); return; }
+
+  // Tocar el texto de una nota la edita (salvo enlaces y citas, ya atendidos arriba).
+  const txt = e.target.closest('.ai-nb-note-text');
+  if (txt && !e.target.closest('a') && !window.getSelection()?.toString()) {
+    editingId = Number(txt.dataset.id); addingField = null;
+    renderNotebook(); focusEditor();
+  }
+}
+
+// Tras guardar una nota: si su campo va al mazo (HQ&A), tu respuesta se vuelve tarjeta.
+function afterNoteSaved(note) {
+  if (fieldOf(note.fieldKey)?.toDeck) syncNoteCard(note);
+}
+
+// Añade (o actualiza, si ya existe la de esa nota) una tarjeta en el mazo «De tus
+// subrayados» del libro. Devuelve true si la tarjeta es nueva.
+async function pushCard(card) {
+  const decks = await DB.getDecks(bookId).catch(() => []);
+  const mine = (decks || []).find(d => d.source === 'highlights' && !d.deleted);
+  if (!mine) {
+    await DB.addDeck({ bookId, name: bookTitle || t('Libro'), cardType: card.type, scope: t('De tus subrayados'), source: 'highlights', cards: [card] });
+    return true;
+  }
+  const cards = [...(mine.cards || [])];
+  const i = card.noteUid ? cards.findIndex(c => c.noteUid === card.noteUid && !c.deleted) : -1;
+  if (i >= 0) cards[i] = { ...cards[i], front: card.front, back: card.back, type: card.type };
+  else cards.push(card);
+  await DB.updateDeck(mine.id, { cards });
+  return i < 0;
+}
+
+async function syncNoteCard(note) {
+  if (!bookId) return;
+  const { q, a, quote } = NB.parseQA(note.content);
+  if (!q || !a) return;
+  const isNew = await pushCard({ type: 'basic', front: q, back: a, chapter: note.chapter || '', quote, noteUid: note.uid || String(note.id) });
+  if (isNew) toastMsg(t('Tu respuesta ya es una tarjeta: entra en tu próximo repaso.'));
+}
+
+async function cardFromNote(id) {
+  const n = notes.find(x => x.id === id);
+  nbMenu = null; renderNotebook();
+  if (!n || !bookId) return;
+  const qa = NB.parseQA(n.content);
+  let card = qa.q && qa.a ? { type: 'basic', front: qa.q, back: qa.a, quote: qa.quote } : null;
+  if (!card) {
+    const plain = NB.plainText(n.content).slice(0, 600);
+    if (LLM.hasKey()) {
+      toastMsg(t('Creando la tarjeta…'));
+      try {
+        const raw = await LLM.chatStream({
+          messages: [
+            { role: 'system', content: 'Convierte esta nota de lectura en UNA tarjeta de estudio: una pregunta que se responda de memoria y su respuesta breve. En el idioma de la nota. Devuelve SOLO JSON: {"front":"<pregunta>","back":"<respuesta>"}' },
+            { role: 'user', content: plain },
+          ],
+          maxTokens: 300,
+        });
+        const j = JSON.parse(String(raw || '').match(/\{[\s\S]*\}/)?.[0] || 'null');
+        if (j?.front && j?.back) card = { type: 'basic', front: String(j.front).trim(), back: String(j.back).trim() };
+      } catch { /* sin modelo: hueco determinista */ }
+    }
+    if (!card) {
+      const front = clozeLongestWord(plain.slice(0, 320));
+      if (front) card = { type: 'cloze', front, back: '' };
+    }
+  }
+  if (!card) { toastMsg(t('No se pudo crear la tarjeta con esa nota.'), 'error'); return; }
+  card.chapter = n.chapter || '';
+  card.noteUid = n.uid || String(n.id);
+  const isNew = await pushCard(card);
+  toastMsg(isNew ? t('Tarjeta creada: entra en tu próximo repaso.') : t('Tarjeta actualizada.'));
+}
+
+// Pedir algo al agente desde la libreta: se ve en el chat, como cualquier turno.
+async function askAgent(shown, ask) {
+  showView('chat');
+  if (busy) { setStatus('Espera a que termine la respuesta en curso.'); return; }
+  if (!LLM.hasKey()) { AppSettings.open('agent'); setStatus('Introduce tu API key primero.'); return; }
+  if (!annotatedText) { setStatus('El libro aún no está listo.'); return; }
+  await deliver(shown, ask, { showUser: true });
+}
+
+async function reviewNote(id) {
+  const n = notes.find(x => x.id === id);
+  if (!n) return;
+  const f = fieldOf(n.fieldKey);
+  const label = f?.label || n.fieldKey;
+  nbMenu = null; nbJustSaved = null; renderNotebook();
+  // T3: tras tu tesis, el agente da la suya para contrastar (primero tú, luego él).
+  const contrast = template?.fields.some(x => x.after === n.fieldKey);
+  const ask = `Revisa esta nota de mi libreta, del campo «${label}»${f?.ask ? ` (la pregunta era: «${f.ask}»)` : ''}.
+MI NOTA:
+${NB.plainText(n.content)}
+
+Dime qué está bien y qué falta o flaquea, apoyándote en pasajes del libro con citas. No la reescribas por mí: como mucho, hazme una pregunta que me ayude a mejorarla.${contrast ? ' Después, da TU versión en 3 frases para que la contraste con la mía.' : ''}`;
+  await askAgent(t('Revisa mi nota de «{f}»', { f: label }), ask);
+}
+
+async function buildDeliverable() {
+  const d = template?.deliverable;
+  if (!d || !convo) return;
+  const what = NB.plainText(notes.find(n => n.fieldKey === d.what)?.content || '') || 'un plan de acción';
+  const mine = template.fields.filter(f => isCognitionField(f) && !f.fromGoal).map((f) => {
+    const list = notes.filter(n => n.fieldKey === f.key);
+    if (!list.length) return '';
+    return `## ${f.label}\n` + list.map(n => `- ${NB.plainText(n.content)}${n.chapter ? ` (${n.chapter})` : ''}`).join('\n');
+  }).filter(Boolean).join('\n\n');
+  const concepts = notes.filter(n => { const f = fieldOf(n.fieldKey); return f && !isCognitionField(f); })
+    .map(n => `- ${NB.plainText(n.content)}`).join('\n');
+  const ask = `Con MIS notas de la libreta, construye el entregable que pedí al empezar: «${what}». Mi problema: ${convo.goal}.
+
+MIS NOTAS:
+${mine}
+${concepts ? `\nCONCEPTOS DEL LIBRO QUE APUNTÓ EL AGENTE:\n${concepts}\n` : ''}
+Hazlo concreto y utilizable tal cual (casillas si es una checklist, pasos con plazos si es un plan). Apóyate en el libro con citas donde aporte. No inventes compromisos que no estén en mis notas; si falta algo importante, márcalo como pendiente.`;
+  await askAgent(t('Monta mi entregable: {w}', { w: what.slice(0, 80) }), ask);
 }
 
 // ---- Helpers de render -----------------------------------------------------

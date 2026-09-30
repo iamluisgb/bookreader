@@ -3,6 +3,33 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-09-30 — NB2: plantillas que preguntan en su momento y una libreta que guía
+
+Los campos que escribe el lector (juicio crítico, espejo, plan de acción…) solo existían si abría
+la Libreta por su cuenta: casillas con «—», una frase en cursiva y un botón punteado cada una.
+Nadie las rellenaba. Ahora cada campo dice **cuándo** se pregunta y la libreta enseña **una**
+pregunta pendiente.
+
+- **Plantillas** ([templates.js](app/js/ai/templates.js)): por campo, `when` (inicio / capítulo /
+  final), `ask` (la pregunta), `hint` (la instrucción, como texto de ejemplo) y etiquetas cortas.
+  `fromGoal` oculta lo que repetía el objetivo del onboarding («Problema», «Propósito», «Objetivo
+  artesanal»). T3 pasa a «primero tú»: tesis propia y una frase por capítulo; la tesis del agente
+  (`after`) se enseña cuando existe la tuya. La inmersiva pierde «Highlights sueltos» (ya viven en
+  Subrayados; las notas antiguas se siguen viendo). T6 y HQ&A son `byChapter`.
+- **«Te toca»** ([notebook.js](app/js/ai/notebook.js)): al terminar un capítulo (al entrar en el
+  siguiente) la libreta pide la pregunta de ese capítulo sin interrumpir la lectura (punto de no
+  leído); con el libro terminado, las del final. «Ahora no» la aparta para siempre.
+- **Libreta compacta**: campo vacío = una línea; lo tuyo en tarjeta, lo de la IA en lista que se
+  pliega a partir de 3; sin iconos fijos (menú ⋯: ir al pasaje, revisar con el agente, hacer
+  tarjeta, editar, borrar); tocar el texto edita; cada nota guarda su capítulo (chip que lleva al
+  pasaje) y las plantillas por capítulo se agrupan en capítulos plegables con el actual abierto.
+- **HQ&A → mazo**: al responder, el par P/R entra en el mazo «De tus subrayados» (editar la
+  respuesta actualiza la misma tarjeta, por `noteUid`). El editor de HQ&A ya solo pide la respuesta.
+- **Entregable (T1)**: con plan de acción escrito, «Montarlo con mis notas» pide al agente el
+  artefacto que el lector quería al empezar, a partir de sus notas.
+
+Tests: [notebook.spec.ts](tests/notebook.spec.ts).
+
 ## 2026-09-30 — Flashcards: dominio del concepto vs dominio del ejemplo
 
 Los libros técnicos ilustran con worked examples de otro dominio (*Knowledge Graphs and LLMs

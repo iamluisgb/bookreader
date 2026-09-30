@@ -7,6 +7,16 @@
 // (recuperación mecánica); 'user' = COGNICIÓN, lo genera el usuario (efecto de generación /
 // active recall) y la IA NO lo escribe, solo pregunta y revisa. Un campo sin `fill` se trata
 // como 'agent' (compatibilidad).
+//
+// NB2 · La libreta guía en vez de esperar. Por campo (todo opcional; las propias no lo usan):
+//   label    : nombre corto. `hint`: la instrucción, como texto de ejemplo del campo vacío.
+//   when     : cuándo se te pregunta ('inicio' | 'capitulo' | 'final' = libro terminado).
+//   ask      : la pregunta de ese momento (tarjeta «Te toca» de la libreta).
+//   fromGoal : repite el objetivo del onboarding → no se pide dos veces (se oculta vacío).
+//   after    : campo de la IA que solo se enseña cuando existe el tuyo (primero tú).
+//   toDeck   : el par P/R respondido pasa al mazo del libro (HQ&A).
+// Por plantilla: `byChapter` (la libreta se agrupa por capítulo) y `deliverable` (botón
+// final que monta el artefacto con tus notas).
 import * as Custom from './custom-templates.js';
 import { t as tr } from '../i18n.js';
 
@@ -29,12 +39,17 @@ export const TEMPLATES = [
     ideal: tr('Libros técnicos, de negocio o metodológicos. Lectura de minería.'),
     goalPrompt: tr('¿Qué problema o cuello de botella te hizo abrir este libro?'),
     agentRole: tr('Filtra el libro hacia el problema del usuario: atenúa lo introductorio/anecdótico y resalta métodos directamente aplicables.'),
+    // La recompensa de T1: con tus notas, el agente monta el artefacto que pediste al empezar.
+    deliverable: { what: 'artefacto_salida', from: ['plan_accion'] },
     fields: [
-      { key: 'problema_actual',      label: tr('Problema actual'), type: 'text', fill: 'user' },
-      { key: 'artefacto_salida',     label: tr('Artefacto de salida esperado (checklist / plan / arquitectura)'), type: 'text', fill: 'user' },
-      { key: 'conceptos_frameworks', label: tr('Conceptos y frameworks del autor (relevantes al problema)'), type: 'list', fill: 'agent' },
-      { key: 'por_que_importa',      label: tr('Por qué importa para MI problema'), type: 'text', fill: 'user' },
-      { key: 'plan_accion',          label: tr('Plan de acción (3 días + 2 semanas)'), type: 'list', fill: 'user' },
+      { key: 'problema_actual',      label: tr('Problema'), type: 'text', fill: 'user', fromGoal: true },
+      { key: 'artefacto_salida',     label: tr('Qué quiero tener al terminar'), hint: tr('Una checklist, un plan, una arquitectura…'), type: 'text', fill: 'user',
+        when: 'inicio', ask: tr('¿Qué quieres tener en la mano al terminar el libro?') },
+      { key: 'conceptos_frameworks', label: tr('Conceptos del autor'), hint: tr('Solo los que sirven para tu problema'), type: 'list', fill: 'agent' },
+      { key: 'por_que_importa',      label: tr('Qué me sirve'), hint: tr('Lo de este capítulo que aplica a tu problema'), type: 'text', fill: 'user',
+        when: 'capitulo', ask: tr('¿Qué de este capítulo te sirve para tu problema?') },
+      { key: 'plan_accion',          label: tr('Plan de acción'), hint: tr('Qué haces en 3 días y qué en 2 semanas'), type: 'list', fill: 'user',
+        when: 'final', ask: tr('¿Qué vas a hacer en los próximos 3 días? ¿Y en 2 semanas?') },
     ],
   },
   {
@@ -45,6 +60,8 @@ export const TEMPLATES = [
     ideal: tr('Documentación, libros de texto, conceptos complejos.'),
     goalPrompt: tr('¿Qué concepto o tema necesitas comprender y memorizar?'),
     agentRole: tr('Cuando el usuario subraya un dato, genera la Pregunta conceptual que responde; la Respuesta la escribe el usuario con sus palabras.'),
+    // Libreta por capítulos. El cierre de capítulo es el repaso de memoria del chat (IA2).
+    byChapter: true,
     fields: [
       // Un solo campo por par: el Highlight y la Question las pone la IA, la Answer la
       // escribes tú (fill:'user'). Mantenerlo en un campo conserva el emparejamiento H-Q-A.
@@ -52,7 +69,8 @@ export const TEMPLATES = [
       // andamio —su parte (H+Q) sí, la del usuario (la Answer) SIEMPRE en blanco—. Es lo
       // que ya hacía el subrayado (generateHQA); con el flag también puede hacerlo desde
       // el chat cuando se le pide, sin romper el efecto de generación.
-      { key: 'hqa', label: tr('Subrayado → pregunta → tu respuesta'), type: 'list', fill: 'user', aiScaffold: true },
+      // toDeck: al responder, el par P/R pasa al mazo del libro (NB2).
+      { key: 'hqa', label: tr('Preguntas y respuestas'), hint: tr('Subraya un pasaje: el agente propone la pregunta y la respuesta es tuya'), type: 'list', fill: 'user', aiScaffold: true, toDeck: true },
     ],
   },
   {
@@ -64,10 +82,18 @@ export const TEMPLATES = [
     goalPrompt: tr('¿Qué quieres obtener de una lectura crítica de este libro?'),
     agentRole: tr('Guía las 4 preguntas de Adler. En el juicio actúa como sparring (aporta contraargumentos), no des veredictos: el juicio es del lector.'),
     fields: [
-      { key: 'mapa_global',    label: tr('Mapa global (tesis central en 3 frases)'), type: 'text', fill: 'agent' },
-      { key: 'anatomia',       label: tr('Anatomía del argumento (pilares y sub-argumentos)'), type: 'text', fill: 'agent' },
-      { key: 'juicio_critico', label: tr('Juicio crítico (¿dónde flaquea la lógica? sesgos, datos)'), type: 'text', fill: 'user' },
-      { key: 'y_que',          label: tr('¿Y qué? (qué cambia en cómo pienso o actúo)'), type: 'text', fill: 'user' },
+      // Primero tú, luego el agente: formular la tesis ES la lectura analítica (Adler). La
+      // versión del agente (mapa_global) se enseña cuando existe la tuya (`after`).
+      { key: 'afirmacion',     label: tr('Qué afirma cada capítulo'), hint: tr('Una frase por capítulo'), type: 'list', fill: 'user',
+        when: 'capitulo', ask: tr('¿Qué afirma el autor en este capítulo? Una frase.') },
+      { key: 'tesis',          label: tr('Mi tesis del libro'), hint: tr('La tesis central en 3 frases, antes de ver la del agente'), type: 'text', fill: 'user',
+        when: 'final', ask: tr('¿Cuál es la tesis del libro en 3 frases? Luego verás la del agente para contrastar.') },
+      { key: 'mapa_global',    label: tr('La tesis según el agente'), type: 'text', fill: 'agent', after: 'tesis' },
+      { key: 'anatomia',       label: tr('Anatomía del argumento'), hint: tr('Pilares y sub-argumentos'), type: 'text', fill: 'agent' },
+      { key: 'juicio_critico', label: tr('Juicio crítico'), hint: tr('¿Dónde flaquea la lógica? ¿Sesgos, datos?'), type: 'text', fill: 'user',
+        when: 'final', ask: tr('¿Dónde flaquea la lógica del autor? ¿Sesgos, datos que faltan?') },
+      { key: 'y_que',          label: tr('¿Y qué?'), hint: tr('Qué cambia en cómo pienso o actúo'), type: 'text', fill: 'user',
+        when: 'final', ask: tr('¿Qué cambia en cómo piensas o actúas después de este libro?') },
     ],
   },
   {
@@ -79,10 +105,12 @@ export const TEMPLATES = [
     goalPrompt: tr('¿Qué patrón o área de tu vida quieres transformar? / ¿qué quieres aprender de este personaje?'),
     agentRole: tr('Localiza y resume el crisol (el momento de máxima tensión o la idea que desafía). El espejo y el experimento los genera el usuario: confróntalo, no los escribas.'),
     fields: [
-      { key: 'proposito',    label: tr('Propósito (qué quiero transformar / aprender)'), type: 'text', fill: 'user' },
-      { key: 'crisol',       label: tr('El crisol (momento de tensión o idea que incomoda)'), type: 'list', fill: 'agent' },
-      { key: 'espejo',       label: tr('El espejo (qué haría yo en una encrucijada equivalente)'), type: 'text', fill: 'user' },
-      { key: 'experimento',  label: tr('El experimento (el cambio concreto que hago mañana)'), type: 'text', fill: 'user' },
+      { key: 'proposito',    label: tr('Propósito'), type: 'text', fill: 'user', fromGoal: true },
+      { key: 'crisol',       label: tr('El crisol'), hint: tr('El momento de tensión o la idea que incomoda'), type: 'list', fill: 'agent' },
+      { key: 'espejo',       label: tr('El espejo'), hint: tr('Qué haría yo en una encrucijada equivalente'), type: 'text', fill: 'user',
+        when: 'final', ask: tr('¿Qué harías tú en una encrucijada equivalente?') },
+      { key: 'experimento',  label: tr('El experimento'), hint: tr('El cambio concreto que hago mañana'), type: 'text', fill: 'user',
+        when: 'final', ask: tr('¿Qué cambio concreto vas a probar mañana?') },
     ],
   },
   {
@@ -93,10 +121,12 @@ export const TEMPLATES = [
     ideal: tr('Ficción y cualquier lectura por placer. Fricción cero.'),
     goalPrompt: tr('¿Qué esperas de esta lectura? (opcional)'),
     agentRole: tr('Acompaña sin interrumpir. La síntesis es opcional y siempre posterior: resúmenes solo al terminar o por sesión, si se piden.'),
+    // Sin «Highlights sueltos»: los subrayados ya viven en su panel. Las notas antiguas de
+    // ese campo se siguen mostrando (la libreta pinta cualquier campo con notas).
     fields: [
-      { key: 'highlights', label: tr('Highlights sueltos'), type: 'list', fill: 'agent' },
-      { key: 'resumen',    label: tr('Resumen al terminar (opcional)'), type: 'text', fill: 'agent' },
-      { key: 'nota_libre', label: tr('Nota libre (opcional)'), type: 'list', fill: 'user' },
+      { key: 'resumen',    label: tr('Resumen'), hint: tr('Solo si lo pides al terminar'), type: 'text', fill: 'agent' },
+      { key: 'nota_libre', label: tr('Nota libre'), hint: tr('Lo que quieras recordar'), type: 'list', fill: 'user',
+        when: 'final', ask: tr('¿Algo que quieras recordar de este libro?') },
     ],
   },
   {
@@ -112,12 +142,14 @@ export const TEMPLATES = [
     ideal: tr('Libros con código: ML/IA, sistemas, compiladores, "from scratch".'),
     goalPrompt: tr('¿Qué quieres ser capaz de construir al terminar el libro?'),
     agentRole: tr('Trata el libro como un proyecto que se construye: prioriza el mecanismo sobre la narrativa, explica las estructuras de datos y sus dimensiones, y cuando aparezca una fórmula ofrece verla con números pequeños. No des por entendido lo que no se ha implementado.'),
+    byChapter: true,
     fields: [
-      { key: 'que_construyo',    label: tr('Qué construye este capítulo (la pieza y para qué sirve)'), type: 'text', fill: 'agent' },
-      { key: 'piezas_clave',     label: tr('Piezas clave del código (qué hace cada una)'), type: 'list', fill: 'agent' },
-      { key: 'formas_datos',     label: tr('Formas y tipos: qué entra, qué sale, con qué dimensiones'), type: 'list', fill: 'agent' },
-      { key: 'donde_me_atasque', label: tr('Dónde me atasqué (y qué lo desatascó)'), type: 'list', fill: 'user' },
-      { key: 'lo_implemento',    label: tr('Lo implemento yo antes de seguir (sin mirar el libro)'), type: 'text', fill: 'user' },
+      { key: 'que_construyo',    label: tr('Qué construye el capítulo'), hint: tr('La pieza y para qué sirve'), type: 'text', fill: 'agent' },
+      { key: 'piezas_clave',     label: tr('Piezas clave del código'), type: 'list', fill: 'agent' },
+      { key: 'formas_datos',     label: tr('Formas y tipos'), hint: tr('Qué entra, qué sale, con qué dimensiones'), type: 'list', fill: 'agent' },
+      { key: 'lo_implemento',    label: tr('Lo implemento yo'), hint: tr('Sin mirar el libro'), type: 'text', fill: 'user',
+        when: 'capitulo', ask: tr('¿Has implementado la pieza de este capítulo sin mirar el libro? ¿Qué te costó?') },
+      { key: 'donde_me_atasque', label: tr('Dónde me atasqué'), hint: tr('Y qué lo desatascó'), type: 'list', fill: 'user' },
     ],
   },
   {
@@ -130,11 +162,12 @@ export const TEMPLATES = [
     goalPrompt: tr('¿Qué quieres "robarle" al autor? (ritmo, personajes, worldbuilding...)'),
     agentRole: tr('Analiza la técnica del autor (estructura, ritmo, gestión de la información, estilo) para que el usuario la imite.'),
     fields: [
-      { key: 'objetivo_artesanal',  label: tr('Objetivo artesanal'), type: 'text', fill: 'user' },
+      { key: 'objetivo_artesanal',  label: tr('Objetivo artesanal'), type: 'text', fill: 'user', fromGoal: true },
       { key: 'estructura_ritmo',    label: tr('Estructura y ritmo'), type: 'list', fill: 'agent' },
       { key: 'gestion_informacion', label: tr('Gestión de la información'), type: 'list', fill: 'agent' },
-      { key: 'laboratorio_palabras',label: tr('Laboratorio de palabras (frases brillantes)'), type: 'list', fill: 'agent' },
-      { key: 'experimento',         label: tr('Mi propio experimento'), type: 'text', fill: 'user' },
+      { key: 'laboratorio_palabras',label: tr('Laboratorio de palabras'), hint: tr('Frases brillantes'), type: 'list', fill: 'agent' },
+      { key: 'experimento',         label: tr('Mi experimento'), hint: tr('La técnica que pruebo en mi escritura'), type: 'text', fill: 'user',
+        when: 'final', ask: tr('¿Qué técnica del autor vas a probar en tu propia escritura?') },
     ],
   },
 ];
