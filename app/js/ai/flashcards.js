@@ -123,19 +123,21 @@ async function renderSetup() {
     <label class="fc-label" id="fc-scope-label">${t('Contenido')}</label>
     <div id="fc-scope"></div>
     <label class="fc-label">${t('Tipo de tarjeta')}</label>
+    <p class="fc-sublabel">${t('Tarjetas de texto')} · <span class="fc-sublabel-note">${t('la cantidad se reparte entre los tipos que marques')}</span></p>
     <div class="fc-types">
       <label class="fc-type"><input type="checkbox" name="fc-type" value="basic" checked>
-        <span><b>${t('Pregunta → Respuesta')}</b><small>${t('Clásicas. Para conceptos y definiciones.')}</small></span></label>
+        <span><b>${t('Pregunta → Respuesta')}</b><small>${t('Conceptos y definiciones.')}</small></span></label>
       <label class="fc-type"><input type="checkbox" name="fc-type" value="cloze">
-        <span><b>${t('Cloze (huecos)')}</b><small>${t('Frases con el dato clave oculto {{c1::así}}.')}</small></span></label>
+        <span><b>${t('Cloze (huecos)')}</b><small>${t('Una frase con el dato clave oculto.')}</small></span></label>
     </div>
+    <p class="fc-sublabel">${t('Tarjetas visuales')} · <span class="fc-sublabel-note">${t('se suman aparte')}</span></p>
     <div class="fc-types fc-vtypes">
       <label class="fc-type"><input type="checkbox" name="fc-vtype" value="occlusion">
-        <span><b>${t('Oclusión de figuras')}</b></span></label>
+        <span><b>${t('Oclusión de figuras')}</b><small>${t('Tapamos una parte de un diagrama del libro.')}</small></span></label>
       <label class="fc-type"><input type="checkbox" name="fc-vtype" value="diagram">
-        <span><b>${t('Diagrama')}</b></span></label>
+        <span><b>${t('Diagrama')}</b><small>${t('El agente dibuja el esquema y falta un paso.')}</small></span></label>
       <label class="fc-type"><input type="checkbox" name="fc-vtype" value="drawing">
-        <span><b>${t('Dibujo de memoria')}</b></span></label>
+        <span><b>${t('Dibujo de memoria')}</b><small>${t('Dibujas el proceso y el agente revisa tu boceto.')}</small></span></label>
     </div>
     <p class="ai-ob-sub" id="fc-vhint" hidden>${t('Las figuras se extraen del libro en la primera generación: la primera vez tarda más.')}</p>
     <label class="fc-label" for="fc-count">${t('Cantidad')}</label>

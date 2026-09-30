@@ -726,7 +726,20 @@ body.has-taskchip .ai-taskchip.is-study { bottom: 74px; }
 .fc-combo-list li.is-sel { color: var(--accent); font-weight: 600; }
 .fc-combo-empty { color: var(--text-soft); cursor: default; }
 .fc-combo-empty:hover { background: none; }
-.fc-types { display: flex; gap: 10px; }
+/* Selector de tipos: rejilla con separación REAL entre filas (antes eran dos filas
+   flex pegadas) y tarjetas de la misma altura por fila. En pantallas estrechas las
+   visuales caen a 2+1 en vez de apretarse de tres en tres. */
+.fc-types { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.fc-vtypes { margin-top: 10px; }
+/* En el ancho real de este modal (≈640 px) las tres visuales entran en una fila; antes
+   entraban dos y la tercera quedaba huérfana media fila. En móvil se apilan, que es como
+   se leen bien las descripciones. */
+@media (max-width: 620px) {
+  .fc-types { grid-template-columns: 1fr; }
+}
+.fc-sublabel { margin: 12px 0 6px; font-size: 11px; font-weight: 600; letter-spacing: .04em;
+  text-transform: uppercase; color: var(--text-faint); }
+.fc-sublabel-note { font-weight: 400; text-transform: none; letter-spacing: 0; }
 .fc-type {
   flex: 1; display: flex; gap: 10px; align-items: flex-start; cursor: pointer;
   background: var(--surface-0); border: 1px solid var(--border); border-radius: var(--r-md); padding: 12px;
