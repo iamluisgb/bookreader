@@ -591,10 +591,13 @@ test('buildDrawingCardMessages y parseDrawingCards: consigna en español, rúbri
       },
     };
   }, { chapter: CHAPTER_TEXT });
-  // Prompt: consigna con "Dibujá de memoria", rúbrica de 3..7 pasos, rastreable y español.
+  // Prompt: consigna con "Dibuja de memoria" (español neutro, sin voseo), rúbrica de 3..7
+  // pasos, rastreable y español.
   expect(msgs).toHaveLength(1);
   expect(msgs[0].role).toBe('system');
-  expect(msgs[0].content).toContain('Dibujá de memoria');
+  expect(msgs[0].content).toContain('Dibuja de memoria');
+  expect(msgs[0].content).not.toContain('Dibujá');
+  expect(msgs[0].content).not.toMatch(/\bgenerá\b|\belegí\b/);
   expect(msgs[0].content).toContain('hasta 2');
   expect(msgs[0].content).toContain('entre 3 y 7');
   expect(msgs[0].content).toContain('rúbrica');

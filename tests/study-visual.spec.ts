@@ -160,6 +160,36 @@ test('diagram: el label del nodo de respuesta se tapa en el frente y vuelve al v
   await expect(back).toContainText('La cola: contrapeso');
 });
 
+// Las clases d-box/d-txt/d-cap/d-line las exige el prompt del diagrama (visual-cards.js) y
+// el SVG llega sin estilos: sin la hoja en modern.css, rect/text caen al fill NEGRO por
+// defecto del SVG — cajas negras con texto negro (defecto de campo con captura).
+test('diagram: los nodos d-box/d-txt usan el tema, no el negro por defecto del SVG', async ({ page }) => {
+  await page.goto('/index.html');
+  await seedProLicense(page);
+  await seedVisualDeck(page, {
+    bookId: 'bk-vis4',
+    cards: [{
+      type: 'diagram',
+      front: '¿Qué sigue?',
+      back: 'La salida.',
+      svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 60">'
+        + '<rect class="d-box" x="10" y="10" width="100" height="20" rx="6"/>'
+        + '<text class="d-txt" x="20" y="25">Paso</text></svg>',
+      answerNodeId: '',
+    }],
+    figure: null,
+  });
+  await page.reload();
+  await page.locator('.lib-study-chip').click();
+  const overlay = page.locator('#ai-study');
+  const front = overlay.locator('.study-face--front');
+  await expect(front.locator('.d-box')).toBeVisible();
+  const boxFill = await front.locator('.d-box').evaluate(el => getComputedStyle(el).fill);
+  const txtFill = await front.locator('.d-txt').evaluate(el => getComputedStyle(el).fill);
+  expect(boxFill, 'd-box sin estilo cae al fill negro del SVG').not.toBe('rgb(0, 0, 0)');
+  expect(txtFill, 'd-txt sin estilo cae al fill negro del SVG').not.toBe('rgb(0, 0, 0)');
+});
+
 test('diagram con script en el SVG: placeholder y ningún <script> en el DOM', async ({ page }) => {
   await page.goto('/index.html');
   await seedProLicense(page);

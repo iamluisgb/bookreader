@@ -98,6 +98,12 @@ test('cloze: el frente oculta la respuesta y el volteo la revela resaltada', asy
   const overlay = page.locator('#ai-study');
   // Huecos: […] sin pista, [cómo] con pista; la respuesta NO está en el frente.
   await expect(overlay.locator('.study-q')).toHaveText('Raft elige un […] por [cómo].');
+  // Layout: .study-q es un flex row (modern.css); el frente debe ser UN solo item de flujo.
+  // Si los fragmentos del cloze se vuelven items sueltos, cada uno se parte en columna.
+  await expect(overlay.locator('.study-q > *')).toHaveCount(1);
+  const qbox = overlay.locator('.study-q > *').first();
+  await expect.soft(qbox).toHaveClass(/study-qtext/);
+  await expect.soft(qbox).toHaveCSS('display', 'block');
   await overlay.locator('.study-flip').click();
   await expect(overlay.locator('.study-a')).toContainText('Raft elige un líder por mayoría.');
   await expect(overlay.locator('.study-a .study-cloze.is-revealed').first()).toHaveText('líder');
@@ -211,6 +217,34 @@ test('al voltear se ve el pasaje del libro que respalda la tarjeta', async ({ pa
   await expect(quote).toContainText('I');            // el capítulo, como cabecera de la cita
   // El salto al libro sigue estando, pero ya como secundario.
   await expect(overlay.locator('.study-src')).toBeVisible();
+});
+
+// El toque sobre el pasaje plegado abre la cita SIN deshacer el flip: el summary vive
+// dentro de .study-a y el click burbujeaba al toggle de la tarjeta (defecto de campo).
+test('abrir y cerrar "Ver el pasaje del libro" no voltea la tarjeta', async ({ page }) => {
+  await page.goto('/index.html');
+  await seedProLicense(page);
+  await page.evaluate(async () => {
+    const DB: any = await import('/js/ai/db.js');
+    await DB.put('bookText', {
+      bookId: 'bk-pg', segVersion: 1, blockCount: 1, tokenEstimate: 10,
+      annotatedText: '## I\n[[a1]] Pasaje de prueba para el plegado.\n',
+    });
+    await DB.addDeck({
+      bookId: 'bk-pg', name: 'Con pasaje', cardType: 'basic', scope: '',
+      cards: [{ type: 'basic', front: '¿P?', back: 'R.', chapter: 'I', src: 'a1' }],
+    });
+  });
+  await page.evaluate(async () => (await import('/js/ai/study.js') as any).openToday());
+  const overlay = page.locator('#ai-study');
+  await overlay.locator('.study-flip').click();
+  const summary = overlay.locator('.study-passage-wrap summary');
+  await summary.click();
+  await expect(overlay.locator('.study-passage')).toBeVisible();   // la cita se abre…
+  await expect(overlay.locator('.study-card3d')).toHaveClass(/is-flipped/);  // …y sigue girada
+  await summary.click();
+  await expect(overlay.locator('.study-passage')).toBeHidden();    // cerrar también: sin flip
+  await expect(overlay.locator('.study-card3d')).toHaveClass(/is-flipped/);
 });
 
 test('sin libro segmentado no se inventa cita ni se rompe el volteo', async ({ page }) => {

@@ -440,11 +440,14 @@ const CLOZE_RE = /\{\{c\d+::((?:(?!::|\}\}).)*)(?:::((?:(?!\}\}).)*))?\}\}/g;
 // Nota: el replace corre sobre el texto YA escapado, así que los grupos capturados llegan
 // escapados — insertarlos tal cual es seguro.
 function frontHtml(card) {
-  if (card.type === 'cloze') {
-    return escapeHtml(card.front).replace(CLOZE_RE, (_, _ans, hint) =>
-      `<span class="study-cloze">[${hint || '…'}]</span>`);
-  }
-  return escapeHtml(card.front) + visualHtml(card, 'front');
+  const inner = card.type === 'cloze'
+    ? escapeHtml(card.front).replace(CLOZE_RE, (_, _ans, hint) =>
+      `<span class="study-cloze">[${hint || '…'}]</span>`)
+    : escapeHtml(card.front) + visualHtml(card, 'front');
+  // Un ÚNICO hijo para .study-q: en modern.css es un flex row (centrado vertical) y los
+  // fragmentos de un cloze como items sueltos se repartían en columnas estrechas a los
+  // lados del hueco. Como un solo item, el texto fluye en línea y el hueco es inline.
+  return `<span class="study-qtext">${inner}</span>`;
 }
 
 // ---- Tarjetas visuales (WU6) --------------------------------------------------
@@ -942,7 +945,10 @@ function renderCard() {
     // El canvas es para dibujar, no para girar: un trazo no voltea la tarjeta. Y el toque
     // es un TOGGLE: con la tarjeta girada, tap vuelve al frente (unflip). El avance sigue
     // siendo solo por nota: botones de grade, teclas 1..4 o swipe con la tarjeta girada.
-    if (e.target.closest('button, a, textarea, canvas')) return;
+    // `details` (el pasaje plegado) igual que en wireSwipe: abrir/cerrar el pasaje NO es
+    // girar — el summary dentro de .study-a burbujeaba y deshacía el flip con el pasaje
+    // dentro, que es justo lo que el usuario quería ver.
+    if (e.target.closest('button, a, details, summary, textarea, canvas')) return;
     if (!flipped) flip(); else unflip();
   });
   wireSwipe(b.querySelector('.study-card3d'));

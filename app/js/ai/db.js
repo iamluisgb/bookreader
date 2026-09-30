@@ -438,6 +438,10 @@ function sameCard(a, b) {
   const norm = (c) => JSON.stringify({
     front: c.front, back: c.back, type: c.type, chapter: c.chapter, src: c.src,
     srs: c.srs || null, suspended: !!c.suspended, deleted: !!c.deleted,
+    // domain (post-filtro de dominio, odd/tasks/flashcards-dominio.md): sin él, etiquetar
+    // no sella updatedAt y el sync del otro dispositivo pisa la etiqueta — el mismo caso
+    // de suspended (P24).
+    domain: c.domain || '',
     figureKey: c.figureKey || null,
     occludedLabel: c.occludedLabel || null,
     bbox: normBbox(c.bbox),
