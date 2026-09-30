@@ -3,6 +3,29 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-09-30 — EPUB: la posición ya no retrocede en doble página ni se pisa por sync
+
+Reportado con «El pez en el agua»: al volver al día siguiente el libro no abría donde se
+dejó, y la ficha de un subrayado llevaba bien y luego retrocedía unas páginas.
+
+- **Causa 1, doble página**: el inicio de una doble página cae en la costura entre columnas
+  y epub.js, al volver a mostrarlo dentro de la sección ya maquetada, lo sitúa al final de la
+  doble página ANTERIOR. Medido en ese libro a 1440 px: 24 de 25 inicios retrocedían (0 de 21
+  en página simple). Como el inicio de página es lo que se guarda como posición y lo que usan
+  el re-anclaje y el pin de re-paginado, cualquier reflujo —cerrar la barra lateral, que en
+  doble página sí ocupa ancho; abrir o cerrar el agente; la fuente que llega tarde— dejaba al
+  lector una doble página atrás. Arreglo: `displayCfi()` comprueba tras cada `display` que el
+  CFI quede a la vista y corrige una página hacia donde esté.
+- **Causa 2, ancla equivocada tras un salto**: tras saltar a un subrayado, marcador, cita o
+  la posición restaurada, el re-paginado se anclaba al inicio de la página y no al destino.
+  Ahora, mientras no se pase página, el pin es el destino del salto.
+- **Causa 3, sync**: abrir un libro re-guardaba su posición restaurada con la hora actual,
+  así que en el LWW del sync una posición vieja «ganaba» solo por haber abierto el libro en
+  otro dispositivo. Una posición sin cambios ya no se re-sella.
+
+Tests: [spread-position.spec.ts](tests/spread-position.spec.ts) (los de la barra lateral y el
+sello fallan sin el arreglo).
+
 ## 2026-09-30 — NB2: plantillas que preguntan en su momento y una libreta que guía
 
 Los campos que escribe el lector (juicio crítico, espejo, plan de acción…) solo existían si abría

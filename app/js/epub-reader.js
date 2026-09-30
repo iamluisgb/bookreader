@@ -53,6 +53,38 @@ let navSeq = 0;
 // Último re-anclaje en vuelo, para poder esperarlo desde los tests.
 let reanchorTask = Promise.resolve();
 
+// Destino del último SALTO (marcador, subrayado, cita, índice, barra de progreso o la
+// posición restaurada al abrir) y la navegación en la que se hizo. Mientras el lector no se
+// mueva de ahí (`jumpSeq === navSeq`), un re-paginado se ancla a ESTE CFI y no al inicio de
+// la página. El inicio de página es un mal ancla justo después de un salto: el pasaje queda
+// en mitad de la página y, al re-paginar a otro ancho —cerrar la barra lateral en doble
+// página, abrir o cerrar el panel del agente—, `display(inicio)` enseña la página que
+// CONTIENE ese inicio, que a menudo es la anterior. Medido en «El pez en el agua», doble
+// página a 1440 px: ficha del subrayado → aterriza bien (loc 742) → la barra se cierra → loc
+// 738, una doble página atrás, con el subrayado fuera de la vista.
+let jumpCfi = null;
+let jumpSeq = -1;
+function markJump(cfi, seq) { jumpCfi = cfi || null; jumpSeq = seq; }
+
+// `rendition.display(cfi)` y comprobar que el CFI ha quedado A LA VISTA; si no, una página
+// de corrección hacia donde esté. Hace falta porque en DOBLE PÁGINA epub.js deja el inicio de
+// una doble página en la ANTERIOR: el inicio cae en la costura entre columnas y su rectángulo
+// se mide al final de la columna previa. Medido en «El pez en el agua» a 1440 px: re-mostrar
+// el inicio de la doble página actual retrocedía una doble página en 24 de 25 casos (0 de 21
+// en página simple). Y el inicio de página es justo lo que se guarda como posición: de ahí
+// que el libro abriera «unas páginas antes» al día siguiente y que la ficha de un subrayado
+// llevara bien y luego retrocediera al re-paginar.
+async function displayCfi(cfi) {
+  await rendition.display(cfi);
+  if (typeof cfi !== 'string' || !cfi.startsWith('epubcfi(') || !rendition) return;
+  try {
+    const loc = rendition.currentLocation();
+    const C = new window.ePub.CFI();
+    if (loc && loc.end && loc.end.cfi && C.compare(cfi, loc.end.cfi) > 0) await rendition.next();
+    else if (loc && loc.start && loc.start.cfi && C.compare(cfi, loc.start.cfi) < 0) await rendition.prev();
+  } catch (e) { /* sin ubicación todavía: queda el display tal cual */ }
+}
+
 // Libera el pin de posición (lo llama toda navegación real del usuario).
 function releasePin() { pinnedCfi = null; clearTimeout(resizeTimer); resizeTimer = null; }
 
@@ -140,7 +172,7 @@ async function reanchorWhenSettled(cfi, seq) {
   if (seq !== navSeq || !rendition || contentDoc() !== doc) return;
   navSnapshot(ancho === inicial ? 'asent(=)' : 'asent(!=)', cfi);
   if (ancho === inicial) return;            // no hubo reflujo: donde estamos es donde toca
-  try { await rendition.display(cfi); } catch (e) { /* el CFI ya no resuelve */ }
+  try { await displayCfi(cfi); } catch (e) { /* el CFI ya no resuelve */ }
   navSnapshot('re-anclado', cfi);
 }
 
@@ -165,8 +197,10 @@ function resizeToContainer() {
 // guardaba. Medido en pantalla completa: entrar movía la posición de /80 a /58 y salir de
 // /58 a /48 — hacia atrás y ACUMULATIVO, un poco en cada alternancia.
 export function resize() {
-  resizeToContainer();
+  // El pin ANTES del re-ajuste inmediato: si el 'relocated' de ese re-ajuste llegara antes
+  // de fijarlo, se adoptaría como posición el inicio de la página re-maquetada (anterior).
   scheduleResize();
+  resizeToContainer();
 }
 
 // ---- Navegación táctil sobre el contenido ---------------------------------
@@ -661,7 +695,7 @@ function scheduleResize() {
     // mantenemos hasta que el usuario navegue. Así ni los reflows intermedios ni un
     // 'relocated' tardío (que llega tras asentar, a veces mucho después en móviles
     // lentos) pueden mover currentCfi hacia atrás.
-    if (pinnedCfi == null) pinnedCfi = currentCfi;
+    if (pinnedCfi == null) pinnedCfi = (jumpCfi && jumpSeq === navSeq) ? jumpCfi : currentCfi;
     resizeTimer = setTimeout(async () => {
       resizeTimer = null;
       resizeToContainer();
@@ -670,11 +704,10 @@ function scheduleResize() {
         // display(pinnedCfi) muestra la página que CONTIENE el pin. Su 'relocated' (y
         // cualquiera posterior por el reflow) queda IGNORADO mientras el pin siga puesto,
         // así que currentCfi no deriva. El pin se libera en la próxima navegación real.
-        try { await rendition.display(pinnedCfi); }
+        try { await displayCfi(pinnedCfi); }
         catch (e) { /* CFI inválido tras el reflow */ }
         navSnapshot('pin/resize', pinnedCfi);
-        currentCfi = pinnedCfi;
-        saveLastPosition();
+        if (pinnedCfi) { currentCfi = pinnedCfi; saveLastPosition(); }
       }
     }, 250);
 }
@@ -822,7 +855,7 @@ export function applyReadingMode() {
   updateReaderScale();
   if (cfi) {
     pinnedCfi = cfi;   // fija hasta la próxima navegación (ignora el relocated del re-display)
-    Promise.resolve(rendition.display(cfi)).catch(() => {});
+    displayCfi(cfi).catch(() => {});
   }
   window.dispatchEvent(new CustomEvent('reader:flow-changed'));
 }
@@ -903,6 +936,7 @@ export async function load(arrayBuffer, onProgress, bookId = null) {
   lastChapterLabel = null;
   pinnedCfi = null;
   restoredSaved = false;
+  jumpCfi = null;
 
   console.log('Creating ePub book from ArrayBuffer...');
   // epub.js (+ jszip) se carga aquí, no en el arranque: hasta que no se abre un EPUB
@@ -995,13 +1029,15 @@ export async function load(arrayBuffer, onProgress, bookId = null) {
     startCfi = Storage.get('lastPosition_' + bookKey()) || null;
   } catch (e) { /* sin posición guardada */ }
   try {
-    await rendition.display(startCfi || undefined);
+    if (startCfi) await displayCfi(startCfi);
+    else await rendition.display();
   } catch (e) {
     console.warn('CFI guardado no válido, abriendo al principio:', e);
     startCfi = null;
     await rendition.display();
   }
   restoredSaved = !!startCfi;
+  if (startCfi) markJump(startCfi, navSeq);
   console.log('Book displayed');
 
   // La posición restaurada sufre el mismo reflujo tardío que un salto a marcador: es LA
@@ -1222,13 +1258,15 @@ export async function seekToFraction(f) {
   if (!rendition || !book) return;
   ReadingLog.markJump();     // arrastrar la barra de progreso tampoco
   const seq = ++navSeq;
+  markJump(null, seq);
   const frac = Math.min(1, Math.max(0, f));
   let cfi = null;
   try {
     if (book.locations && book.locations.cfiFromPercentage) cfi = book.locations.cfiFromPercentage(frac);
   } catch (e) { /* sin localizaciones */ }
   if (cfi) {
-    try { await rendition.display(cfi); } catch (e) { /* CFI no válido */ }
+    markJump(cfi, seq);
+    try { await displayCfi(cfi); } catch (e) { /* CFI no válido */ }
     reanchorTask = reanchorWhenSettled(cfi, seq);
   }
 }
@@ -1276,6 +1314,11 @@ export function flushLastPosition() {
   if (book && currentCfi) {
     try {
       const key = bookKey();
+      // Misma posición que la guardada → no se re-sella. Abrir un libro re-emite su posición
+      // restaurada; sellarla con la hora actual la convertía en «la más reciente» para el LWW
+      // del sync, y abrir el libro en un dispositivo con la posición vieja (o que se abra solo
+      // al arrancar) pisaba la buena del otro: al día siguiente abría donde no lo dejaste.
+      if (Storage.get('lastPosition_' + key) === currentCfi) return;
       Storage.set('lastPosition_' + key, currentCfi);
       // Sello para el LWW del sync (la posición es un escalar sin updatedAt propio)
       Storage.set('lastPositionAt_' + key, Date.now());
@@ -1309,10 +1352,11 @@ export async function goTo(cfi) {
   releasePin();
   ReadingLog.markJump();     // índice, marcador, subrayado o cita: navegar no es leer
   const seq = ++navSeq;
+  markJump(cfi, seq);
   if (!rendition) return;
   NavDebug.reset(`goTo  vp=${window.innerWidth}x${window.innerHeight} dpr=${window.devicePixelRatio} coarse=${COARSE}`);
   navSnapshot('antes', cfi);
-  await rendition.display(cfi);
+  await displayCfi(cfi);
   navSnapshot('display#1', cfi);
   // epub.js mal-pagina a veces el PRIMER display dentro de una sección larga recién
   // maquetada: calcula la posición antes de que asienten las columnas y el objetivo cae
@@ -1322,7 +1366,7 @@ export async function goTo(cfi) {
   // acertó, el segundo es un no-op sin salto visible.
   await new Promise(r => requestAnimationFrame(() => r()));
   if (seq !== navSeq || !rendition) return;
-  await rendition.display(cfi);
+  await displayCfi(cfi);
   navSnapshot('display#2', cfi);
   if (NavDebug.enabled()) setTimeout(() => navSnapshot('final+4s', cfi), 4000);
   // Y un tercer anclaje cuando el contenido asiente de verdad (fuente, imágenes). NO se
