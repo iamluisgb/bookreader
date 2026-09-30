@@ -213,6 +213,34 @@ test('al voltear se ve el pasaje del libro que respalda la tarjeta', async ({ pa
   await expect(overlay.locator('.study-src')).toBeVisible();
 });
 
+// El toque sobre el pasaje plegado abre la cita SIN deshacer el flip: el summary vive
+// dentro de .study-a y el click burbujeaba al toggle de la tarjeta (defecto de campo).
+test('abrir y cerrar "Ver el pasaje del libro" no voltea la tarjeta', async ({ page }) => {
+  await page.goto('/index.html');
+  await seedProLicense(page);
+  await page.evaluate(async () => {
+    const DB: any = await import('/js/ai/db.js');
+    await DB.put('bookText', {
+      bookId: 'bk-pg', segVersion: 1, blockCount: 1, tokenEstimate: 10,
+      annotatedText: '## I\n[[a1]] Pasaje de prueba para el plegado.\n',
+    });
+    await DB.addDeck({
+      bookId: 'bk-pg', name: 'Con pasaje', cardType: 'basic', scope: '',
+      cards: [{ type: 'basic', front: '¿P?', back: 'R.', chapter: 'I', src: 'a1' }],
+    });
+  });
+  await page.evaluate(async () => (await import('/js/ai/study.js') as any).openToday());
+  const overlay = page.locator('#ai-study');
+  await overlay.locator('.study-flip').click();
+  const summary = overlay.locator('.study-passage-wrap summary');
+  await summary.click();
+  await expect(overlay.locator('.study-passage')).toBeVisible();   // la cita se abre…
+  await expect(overlay.locator('.study-card3d')).toHaveClass(/is-flipped/);  // …y sigue girada
+  await summary.click();
+  await expect(overlay.locator('.study-passage')).toBeHidden();    // cerrar también: sin flip
+  await expect(overlay.locator('.study-card3d')).toHaveClass(/is-flipped/);
+});
+
 test('sin libro segmentado no se inventa cita ni se rompe el volteo', async ({ page }) => {
   await page.goto('/index.html');
   await seedProLicense(page);

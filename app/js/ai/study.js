@@ -942,7 +942,10 @@ function renderCard() {
     // El canvas es para dibujar, no para girar: un trazo no voltea la tarjeta. Y el toque
     // es un TOGGLE: con la tarjeta girada, tap vuelve al frente (unflip). El avance sigue
     // siendo solo por nota: botones de grade, teclas 1..4 o swipe con la tarjeta girada.
-    if (e.target.closest('button, a, textarea, canvas')) return;
+    // `details` (el pasaje plegado) igual que en wireSwipe: abrir/cerrar el pasaje NO es
+    // girar — el summary dentro de .study-a burbujeaba y deshacía el flip con el pasaje
+    // dentro, que es justo lo que el usuario quería ver.
+    if (e.target.closest('button, a, details, summary, textarea, canvas')) return;
     if (!flipped) flip(); else unflip();
   });
   wireSwipe(b.querySelector('.study-card3d'));
