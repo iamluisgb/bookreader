@@ -100,6 +100,31 @@ body.ai-unread #ai-toggle::after, body.ai-unread .ai-fab::after { background: #e
 body.ai-busy #ai-toggle::after, body.ai-busy .ai-fab::after {
   background: var(--accent); animation: ai-dot-pulse 1.2s ease-in-out infinite;
 }
+
+/* Lo mismo para los JOBS de fondo (resumen/mapa/flashcards) mientras se LEE: el chip
+   flotante no se muestra sobre el texto (agent.css) y el estado viaja al punto del botón
+   del agente — pulso = generando, verde = listo, rojo = error. Fuera del lector el chip
+   ya es la señal y estos puntos no se pintan (solo aplican con body.reading implícito en
+   el toggle que hace jobs-ui.js). */
+body.reading.ai-jobs-busy #ai-toggle, body.reading.ai-jobs-busy .ai-fab,
+body.reading.ai-jobs-unread #ai-toggle, body.reading.ai-jobs-unread .ai-fab,
+body.reading.ai-jobs-err #ai-toggle, body.reading.ai-jobs-err .ai-fab { position: relative; }
+body.reading.ai-jobs-busy #ai-toggle::after, body.reading.ai-jobs-busy .ai-fab::after,
+body.reading.ai-jobs-unread #ai-toggle::after, body.reading.ai-jobs-unread .ai-fab::after,
+body.reading.ai-jobs-err #ai-toggle::after, body.reading.ai-jobs-err .ai-fab::after {
+  content: ''; position: absolute; top: 6px; right: 6px;
+  width: 9px; height: 9px; border-radius: 50%;
+  border: 1.5px solid var(--surface-1); pointer-events: none;
+}
+body.reading.ai-jobs-busy .ai-fab::after, body.reading.ai-jobs-unread .ai-fab::after,
+body.reading.ai-jobs-err .ai-fab::after {
+  top: 5px; right: 5px; width: 14px; height: 14px; border: 2px solid var(--surface-0);
+}
+body.reading.ai-jobs-unread #ai-toggle::after, body.reading.ai-jobs-unread .ai-fab::after { background: var(--accent); }
+body.reading.ai-jobs-err #ai-toggle::after, body.reading.ai-jobs-err .ai-fab::after { background: #e5484d; }
+body.reading.ai-jobs-busy #ai-toggle::after, body.reading.ai-jobs-busy .ai-fab::after {
+  background: var(--accent); animation: ai-dot-pulse 1.2s ease-in-out infinite;
+}
 @keyframes ai-dot-pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .35; transform: scale(.65); } }
 
 /* ---- Tablet y móvil (<1024): el agente se superpone, no empuja el lector ---- */

@@ -22,18 +22,29 @@ function modalOpen(kind) {
   return !!document.getElementById(kind === 'summary' ? 'ai-summary' : 'ai-mindmap');
 }
 
+// Leyendo, el texto es intocable: ni chip flotante ni toast encima. La señal viaja como
+// un PUNTO al botón del agente (#ai-toggle/.ai-fab, CSS en main-late.css) — pulso mientras
+// genera, verde al terminar, rojo si falló. Fuera del lector, chip y toast como siempre.
+function isReading() { return document.body.classList.contains('reading'); }
+
 function render(job) {
   renderChip(job);
+  const reading = isReading();
+  document.body.classList.toggle('ai-jobs-busy', reading && job?.status === 'running');
+  // Sin lastNotifiedId (se asigna recién abajo): con un solo job activo, el status basta
+  // para el punto de "listo/error sin abrir"; el próximo job lo apaga al empezar.
+  document.body.classList.toggle('ai-jobs-unread', reading && job?.status === 'done');
+  document.body.classList.toggle('ai-jobs-err', reading && job?.status === 'error');
   if (!job || job.status === 'running' || job.id === lastNotifiedId) return;
   // Aviso una sola vez por job. Si su modal ya está abierto, él mismo muestra el resultado.
   lastNotifiedId = job.id;
   if (modalOpen(job.kind)) return;
   const name = NAMES[job.kind] || t('Documento');
   if (job.status === 'done') {
-    toast({ message: t('{name} listo', { name }), actionLabel: `${t('Ver')} ${name.toLowerCase()}`, kind: 'success', onAction: () => openers[job.kind]?.() });
     try { navigator.vibrate?.(30); } catch { /* sin soporte */ }
+    if (!reading) toast({ message: t('{name} listo', { name }), actionLabel: `${t('Ver')} ${name.toLowerCase()}`, kind: 'success', onAction: () => openers[job.kind]?.() });
   } else if (job.status === 'error') {
-    toast({ message: t('No se pudo generar {name}', { name: name.toLowerCase() }), actionLabel: t('Reintentar'), kind: 'error', onAction: () => Jobs.retry(job) });
+    if (!reading) toast({ message: t('No se pudo generar {name}', { name: name.toLowerCase() }), actionLabel: t('Reintentar'), kind: 'error', onAction: () => Jobs.retry(job) });
   }
 }
 

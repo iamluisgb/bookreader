@@ -65,13 +65,29 @@ test('seguir leyendo mientras genera, aviso al terminar y reabrir', async ({ pag
   await page.click('#sum-keep');                                  // suelta el modal
   await expect(page.locator('#ai-summary')).toHaveCount(0);       // modal cerrado
 
-  // Chip flotante de progreso mientras sigue en segundo plano.
-  await expect(page.locator('.ai-taskchip')).toBeVisible({ timeout: 3000 });
+  // Leyendo, el chip NO flota sobre el texto: pulso en el botón del agente.
+  await expect(page.locator('.ai-taskchip')).toBeHidden({ timeout: 3000 });
+  await expect(page.locator('body')).toHaveClass(/ai-jobs-busy/);
 
-  // Toast de aviso al terminar, con acción "Ver resumen".
-  const toast = page.locator('.ai-toast');
-  await expect(toast).toContainText('Resumen listo', { timeout: 15000 });
-  await toast.locator('.ai-toast-action').click();
+  // Al terminar: punto verde (sin leer) en el botón del agente, sin toast sobre el texto.
+  await expect(page.locator('body')).toHaveClass(/ai-jobs-unread/, { timeout: 15000 });
+  await expect(page.locator('.ai-toast')).toHaveCount(0);
+  const accent = await page.evaluate(() => {
+    const probe = document.createElement('span'); probe.style.color = 'var(--accent)';
+    document.body.appendChild(probe);
+    const bg = getComputedStyle(document.querySelector('#ai-toggle'), '::after').backgroundColor;
+    const out = [bg, getComputedStyle(probe).color];
+    probe.remove();
+    return out;
+  });
+  expect(accent[0]).toBe(accent[1]);   // el punto pinta exactamente el verde acento
+
+  // Salir del lector: el chip reaparece con "Ver resumen" y reabre directo el resultado.
+  await page.evaluate(() => document.body.classList.remove('reading'));
+  const chip = page.locator('.ai-taskchip');
+  await expect(chip).toBeVisible({ timeout: 3000 });
+  await expect(chip).toContainText('Ver resumen');
+  await chip.click();
 
   // Reabre directo en el resultado (no en la configuración).
   await expect(page.locator('#ai-summary .sum-doc')).toContainText('pueblo de muertos', { timeout: 5000 });
@@ -82,6 +98,36 @@ test('seguir leyendo mientras genera, aviso al terminar y reabrir', async ({ pag
   await openArtifactFromStudio(page, 'summary');
   await expect(page.locator('#ai-summary .sum-doc')).toContainText('pueblo de muertos', { timeout: 3000 });
   await expect(page.locator('#ai-summary #sum-generate')).toHaveCount(0);   // no es la vista de setup
+});
+
+// Mientras se LEE (body.reading), el chip flotante y el toast NO invaden el texto: el
+// estado viaja como un punto al botón del agente (pulso → verde). El punto se marca con
+// clases en body (ai-jobs-busy/ai-jobs-unread) que jobs-ui.js sincroniza en cada emit.
+test('leyendo, la generación avisa con el punto del botón, sin chip ni toast', async ({ page }) => {
+  await setup(page);
+  await page.evaluate(() => document.body.classList.add('reading'));
+  await openFromStudio(page, 'summary');
+  await page.waitForSelector('#ai-summary', { timeout: 5000 });
+  await page.click('#sum-generate');
+  await page.click('#sum-keep');
+
+  // Generando: pulso en el botón del agente, chip y toast ausentes.
+  await expect(page.locator('body')).toHaveClass(/ai-jobs-busy/, { timeout: 3000 });
+  await expect(page.locator('.ai-taskchip')).toBeHidden();
+  await expect(page.locator('.ai-toast')).toHaveCount(0);
+
+  // Al terminar: punto verde (ai-jobs-unread), sin toast, chip no reaparece mientras lee.
+  await expect(page.locator('body')).toHaveClass(/ai-jobs-unread/, { timeout: 15000 });
+  await expect(page.locator('.ai-toast')).toHaveCount(0);
+  await expect(page.locator('.ai-taskchip')).toBeHidden();
+
+  // Saliendo del lector: el chip vuelve (seguía en el DOM) y el punto se apaga (CSS:
+  // los ai-jobs-* solo pintan con body.reading, aunque la clase quede sin limpiar).
+  await page.evaluate(() => document.body.classList.remove('reading'));
+  await expect(page.locator('.ai-taskchip')).toBeVisible({ timeout: 3000 });
+  const dot = await page.evaluate(() => getComputedStyle(document.querySelector('#ai-toggle'), '::after').backgroundColor);
+  const accent = await page.evaluate(() => getComputedStyle(document.body).getPropertyValue('--accent').trim());
+  expect(dot).not.toBe(accent);
 });
 
 test('el resumen se persiste en IndexedDB y se restaura al reabrir el libro', async ({ page }) => {
@@ -115,6 +161,9 @@ test('cancelar desde el chip detiene la generación', async ({ page }) => {
   await page.click('#sum-generate');
   await expect(page.locator('#ai-summary')).toContainText('Generando resumen', { timeout: 5000 });
   await page.click('#sum-keep');
+  // Cancelar: mientras se lee el chip está oculto — se sale del lector (o se abre el panel)
+  // y el chip reaparece con su botón de cancelar.
+  await page.evaluate(() => document.body.classList.remove('reading'));
   const chip = page.locator('.ai-taskchip');
   await expect(chip).toBeVisible({ timeout: 3000 });
   await chip.locator('.ai-taskchip-x').click();          // cancelar
