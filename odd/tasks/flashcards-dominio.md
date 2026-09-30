@@ -42,7 +42,15 @@ en el código como tal.
 
 | WU | Commit | Nota |
 |---|---|---|
-| — | — | — |
+| WU1 | `943aae7` | hint de objetivo en onboarding (panel.js + i18n) |
+| WU2a | `eebd264` | módulo puro domain-tags.js + spec (RED→GREEN) |
+| WU2b/c | `bc7d6cf` | UI de revisión (chips + descarte), whitelist `domain` en `sameCard`, i18n, CHANGELOG |
+
+Verificación: spec de dominios 5/5 y suites de mazos 18/18 · `npm run lint` 0 errores
+(6 warnings pre-existentes) · `npm test` completo: 685/691; los 6 fallos se auditados
+contra `main`: los 2 de preset de modelo (`llm.spec`, `model-probe`) son pre-existentes
+en main; los otros 4 pasan al repetirse con este árbol (flaky por carga paralela).
+**Regresión neta del cambio: 0.**
 
 ## Pendientes / no-goals
 
