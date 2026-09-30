@@ -86,6 +86,8 @@ export function indexBackup(backup) {
         bookmarks: [],
         notes: [],
         convos: [],
+        decks: [],
+        artifacts: [],
         lastPositionAt: null,
         meta: null,
       };
@@ -121,6 +123,16 @@ export function indexBackup(backup) {
     if (bookId) entryOf(bookId).notes.push(n);
   }
 
+  // Mazos y artefactos del Studio: desde la v1.1 del backup viajan en `ai` como arrays
+  // planos (el layout los tiene POR libro; el backup, sueltos). Un backup viejo no los
+  // trae; en ese caso `hasAgentData` queda en false y las tools ni se anuncian.
+  for (const d of Array.isArray(ai.decks) ? ai.decks : []) {
+    if (d && d.bookId) entryOf(d.bookId).decks.push(d);
+  }
+  for (const a of Array.isArray(ai.artifacts) ? ai.artifacts : []) {
+    if (a && a.bookId) entryOf(a.bookId).artifacts.push(a);
+  }
+
   return books;
 }
 
@@ -131,6 +143,10 @@ export function indexBackup(backup) {
  */
 export function createBackupFileSource({ path, readFile = fsReadFile }) {
   let cache = null;
+  // Capacidad DETECTADA al cargar, no declarada: el backup de hoy lleva mazos y artefactos
+  // (buildBackup() los exporta desde el fix de backup completo) y el de antes no. Se anuncia
+  // la tool solo si la fuente puede responderla, igual que `reading_stats`.
+  let hasAgentData = false;
 
   async function index() {
     if (cache) return cache;
@@ -146,6 +162,7 @@ export function createBackupFileSource({ path, readFile = fsReadFile }) {
     } catch (e) {
       throw new SourceError('El backup «' + path + '» no es JSON válido: ' + e.message);
     }
+    hasAgentData = Array.isArray(parsed?.ai?.decks) || Array.isArray(parsed?.ai?.artifacts);
     cache = indexBackup(parsed);
     return cache;
   }
@@ -167,8 +184,12 @@ export function createBackupFileSource({ path, readFile = fsReadFile }) {
     kind: 'backup-file',
     // El backup no lleva el registro de lectura: la tool `reading_stats` no se registra.
     hasReadingStats: false,
-    // Y tampoco mazos ni artefactos (buildBackup() no los exporta): sin `hasAgentData`.
-    hasAgentData: false,
+    // Detectada: un backup con `ai.decks`/`ai.artifacts` (formato actual) las anuncia; uno
+    // viejo, sin esos campos, no. Hasta `ping()`/`index()` vale false y por eso el servidor
+    // valida la fuente al arrancar, antes de servir la lista de tools.
+    get hasAgentData() {
+      return hasAgentData;
+    },
     describe() {
       return 'backup-file:' + path;
     },
@@ -199,6 +220,18 @@ export function createBackupFileSource({ path, readFile = fsReadFile }) {
       const entry = (await index()).get(bookId);
       if (!entry) throw new UnknownBookError(bookId);
       return project(entry).highlights;
+    },
+    /** Mazos de flashcards del libro (con su estado de repaso), sin tombstones. */
+    async decks(bookId) {
+      const entry = (await index()).get(bookId);
+      if (!entry) throw new UnknownBookError(bookId);
+      return liveItems(entry.decks);
+    },
+    /** Artefactos del Studio del libro (resúmenes, mapas, infografías), sin tombstones. */
+    async artifacts(bookId) {
+      const entry = (await index()).get(bookId);
+      if (!entry) throw new UnknownBookError(bookId);
+      return liveItems(entry.artifacts);
     },
     async getNotes(bookId) {
       const entry = (await index()).get(bookId);

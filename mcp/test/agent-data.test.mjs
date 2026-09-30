@@ -149,6 +149,20 @@ async function backupFile() {
   return path;
 }
 
+/**
+ * Un backup del formato ACTUAL: el mismo fichero más `ai.decks` / `ai.artifacts` planos
+ * (así los exporta la app desde el fix de backup completo). La capacidad se DETECTA, así
+ * que con estos campos las tools vuelven a anunciarse.
+ */
+async function backupFileWithAgentData() {
+  const dir = await mkdtemp(join(tmpdir(), 'bookreader-mcp-agent-bk2-'));
+  const path = join(dir, 'backup.json');
+  const backup = buildBackupFixture();
+  backup.ai = { ...backup.ai, decks: [DECK_1, DECK_2], artifacts: [ARTIFACT_1, ARTIFACT_2, ARTIFACT_3] };
+  await writeFile(path, JSON.stringify(backup), 'utf8');
+  return path;
+}
+
 test('las tools de mazos y artefactos solo se anuncian si la fuente trae hasAgentData', () => {
   const capable = { kind: 'stub', hasReadingStats: true, hasAgentData: true };
   const names = (s) => toolsFor(s).map((t) => t.name);
@@ -178,6 +192,41 @@ test('con la fuente viva el servidor anuncia las cuatro; con el backup, ninguna'
     const res = await bak.call('list_decks', {});
     assert.equal(res.isError, true, 'llamada a mano sobre backup: isError, no crash');
     assert.match(res.text, /Tool desconocida/);
+  } finally {
+    await bak.close();
+  }
+});
+
+test('un backup del formato actual (con mazos y artefactos) vuelve a anunciarlas', async () => {
+  const bak = await connect(['--backup', await backupFileWithAgentData()]);
+  try {
+    const names = await bak.toolNames();
+    for (const n of NEW_TOOLS) assert.ok(names.includes(n), n + ' anunciada: el backup trae los datos');
+
+    const decks = await bak.call('list_decks', { bookId: BOOK_1.id });
+    assert.equal(decks.isError, false, decks.text);
+    const book = decks.json.books.find((b) => b.bookId === BOOK_1.id);
+    assert.equal(book.deckCount, 2);
+    const d1 = book.decks.find((d) => d.deckId === DECK_1.id);
+    assert.deepEqual(
+      { cards: d1.cards, due: d1.due, new: d1.new, suspended: d1.suspended },
+      { cards: 4, due: 2, new: 1, suspended: 1 },
+      'mismos contadores que con el layout: la fuente cambia, la semántica no',
+    );
+
+    const deck = await bak.call('get_deck', { bookId: BOOK_1.id, deckId: DECK_1.id });
+    assert.equal(deck.isError, false, deck.text);
+    assert.equal(deck.json.total, 4);
+    assert.ok(deck.json.cards.some((c) => /cobertura/.test(c.front)), 'el texto viaja con get_deck');
+
+    const arts = await bak.call('list_artifacts', { bookId: BOOK_1.id, kind: 'mindmap' });
+    assert.equal(arts.isError, false, arts.text);
+    assert.equal(arts.json.artifacts.length, 1);
+    assert.equal(arts.json.artifacts[0].kind, 'mindmap');
+
+    // El secreto plantado sigue sin asomar por esta fuente.
+    assert.deepEqual(findForbidden(JSON.stringify(arts.json)), []);
+    assert.deepEqual(findForbidden(JSON.stringify(deck.json)), []);
   } finally {
     await bak.close();
   }

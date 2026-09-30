@@ -10,7 +10,10 @@
 //     quemar un hueco de dispositivo nuevo (mitiga la purga de storage de Safari/ITP;
 //     ver docs/GUIA_MONETIZACION.md, paso 6).
 //   - IndexedDB IA: conversaciones, mensajes, notas de libreta, relevancia, metadatos
-//     de libros.
+//     de libros, mazos de flashcards (con su estado de repaso FSRS) y artefactos del
+//     Studio (resúmenes, mapas mentales, infografías, figuras). Los mazos y artefactos
+//     van A PROPÓSITO: son datos del usuario que no se pueden regenerar (los artefactos
+//     cacheados son un coste LLM ya pagado).
 // Qué NO incluye (a propósito):
 //   - La API key (`ai_key`): es un secreto, no se escribe a un fichero descargable.
 //   - El texto segmentado/anclas (`bookText`/`anchors`): voluminoso y regenerable al
@@ -28,7 +31,7 @@ const SECRET_KEYS = ['ai_key', 'drive_refresh_token'];  // secretos: jamás a un
 // Identidad de ESTE equipo: restaurar una copia en otro dispositivo no puede clonarla, o
 // ambos escribirían la misma fila del registro de lectura (ver sync/layout.js · SKIP_KEYS).
 const LOCAL_ONLY_KEYS = ['device_id'];
-const AI_STORES = ['convos', 'messages', 'notes', 'ratings', 'books'];
+const AI_STORES = ['convos', 'messages', 'notes', 'ratings', 'books', 'decks', 'artifacts'];
 
 // ---- Export ----------------------------------------------------------------
 

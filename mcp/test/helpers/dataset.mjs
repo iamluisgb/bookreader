@@ -267,8 +267,9 @@ export function buildLayoutFiles(base = 'bookreader/') {
     messages: id === BOOK_1.id ? MESSAGES : [],
     notes: id === BOOK_1.id ? NOTES : [],
     ratings: [],
-    // Artefactos del Studio y mazos: están en el layout y NO se exponen en F1/F2 (ni falta):
-    // van aquí para que quede claro que el MCP los ignora a propósito.
+    // Artefactos del Studio y mazos en el LAYOUT (F2). El MCP sí los expone desde la
+    // extensión de mazos/artefactos; el backup de este fixture no los lleva (formato viejo)
+    // y por eso F1 no anuncia esas tools — es justo el caso que prueba el gating.
     artifacts:
       id === BOOK_1.id
         ? [

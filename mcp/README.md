@@ -15,7 +15,7 @@ Dos fuentes, la misma superficie de tools:
 | Credenciales | Ninguna | Refresh token de Google (o una carpeta copiada) |
 | Datos | Foto del momento | Vivos |
 | `reading_stats` | **No existe** (el backup no lleva el registro de lectura) | Sí |
-| `list_decks`, `get_deck`, `list_artifacts`, `get_artifact` | **No existen** (el backup no lleva mazos ni artefactos) | Sí |
+| `list_decks`, `get_deck`, `list_artifacts`, `get_artifact` | Sí, **si el backup es del formato actual** (lleva `ai.decks`/`ai.artifacts`); un backup viejo no las anuncia | Sí |
 | Títulos | Solo si el libro pasó por el agente (`title: null` si no) | Del manifest (que siempre tiene lo que importó) |
 
 Prueba F1 primero: responde si el caso de uso aporta algo antes de pagar el peaje de Drive.
@@ -30,9 +30,12 @@ La fuente de backup es una **foto**, y eso tiene consecuencias que conviene sabe
    (`app/js/reading-log.js`) y `buildBackup()` no lo incluye. Por eso `reading_stats` **no se
    anuncia** con esta fuente: una tool que siempre contesta «no hay datos» es peor que una tool que
    no existe, porque el modelo la llama.
-2. **Tampoco hay mazos ni artefactos del Studio.** `buildBackup()` exporta `convos, messages,
-   notes, ratings, books` y nada más: `list_decks`, `get_deck`, `list_artifacts` y `get_artifact`
-   **no se anuncian** con esta fuente (mismo criterio que `reading_stats`).
+2. **Los mazos y artefactos dependen del formato del backup.** Desde el arreglo de backup
+   completo, `buildBackup()` exporta también `decks` y `artifacts`, así que un backup **nuevo** sí
+   los trae y las cuatro tools se anuncian. Un backup **viejo** (exportado antes de ese cambio) no
+   los lleva y el MCP no las anuncia — la capacidad se **detecta** en el fichero, no se declara
+   (mismo criterio que `reading_stats`: una tool que siempre contesta «no hay datos» es peor que
+   una tool que no existe).
 3. **Puede no haber títulos.** El backup no lleva la biblioteca (está en IndexedDB), así que el
    título solo existe si el libro pasó por el agente. Si no, `list_books` devuelve `title: null` y
    el cliente usa el `id`.

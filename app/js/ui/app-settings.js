@@ -1092,7 +1092,7 @@ function wireProfileForm(content) {
 function dataHtml() {
   return `<div class="appset-section">
     <h3 class="appset-h3">${t('Datos')}</h3>
-    <p class="appset-muted">${t('Copia de seguridad de tus datos para guardarla o migrar a otro dispositivo: ajustes, subrayados, marcadores, plantillas propias, conversaciones y libretas. <strong>No</strong> incluye la API key ni los archivos de los libros.')}</p>
+    <p class="appset-muted">${t('Copia de seguridad de tus datos para guardarla o migrar a otro dispositivo: ajustes, subrayados, marcadores, plantillas propias, conversaciones, libretas, mazos de flashcards y artefactos del Studio. <strong>No</strong> incluye la API key ni los archivos de los libros.')}</p>
     <button id="appset-export-json" class="primary-btn appset-save">${icon('share', { size: 15 })} ${t('Descargar backup (JSON)')}</button>
     <button id="appset-export-md" class="appset-tpl-cancel appset-data-md">${icon('note', { size: 15 })} ${t('Descargar resumen (Markdown)')}</button>
 

@@ -80,6 +80,88 @@ test('el botón de exportar del panel descarga un .md', async ({ page }) => {
   expect(download.suggestedFilename()).toMatch(/\.md$/);
 });
 
+test('el backup round-trip conserva mazos (con estado FSRS) y artefactos del Studio', async ({ page }) => {
+  await page.goto('/index.html');
+  const result = await page.evaluate(async () => {
+    const DB = await import('/js/ai/db.js');
+    const Backup = await import('/js/backup.js');
+
+    // Mazo con una tarjeta ya repasada (estado FSRS) y una nueva (sin srs).
+    await DB.addDeck({
+      bookId: 'book-bk-rt', name: 'Mazo round-trip', cardType: 'qa', scope: 'cap 1',
+      cards: [
+        { front: '¿P1?', back: 'R1', srs: { stability: 3.5, difficulty: 5.2, due: Date.now() - 86400000, reps: 2, lapses: 0, state: 'review' } },
+        { front: '¿P2?', back: 'R2' },
+      ],
+    });
+    // Artefacto del Studio (mapa mental) con su resultado cacheado.
+    await DB.putArtifact({
+      bookId: 'book-bk-rt', kind: 'mindmap',
+      result: { nodes: [{ id: 'n1', label: 'Raíz' }], edges: [] },
+    });
+
+    const backup = JSON.parse(JSON.stringify(await Backup.buildBackup()));
+
+    // Simular un dispositivo limpio: vaciar las dos tiendas antes de restaurar.
+    await new Promise((resolve, reject) => {
+      const req = indexedDB.open('bookreader_ai', 7);
+      req.onsuccess = () => {
+        const db = req.result;
+        const tx = db.transaction(['decks', 'artifacts'], 'readwrite');
+        tx.objectStore('decks').clear();
+        tx.objectStore('artifacts').clear();
+        tx.oncomplete = () => { db.close(); resolve(null); };
+        tx.onerror = () => reject(tx.error);
+      };
+      req.onerror = () => reject(req.error);
+    });
+
+    await Backup.importBackup(backup);
+    const decks = await DB.getAll('decks');
+    const artifacts = await DB.getAll('artifacts');
+    const deck = decks.find(d => d.name === 'Mazo round-trip');
+    const art = artifacts.find(a => a.kind === 'mindmap');
+    return {
+      deckCards: deck ? deck.cards.map(c => ({ front: c.front, srs: c.srs || null })) : null,
+      artifact: art ? { kind: art.kind, result: art.result } : null,
+    };
+  });
+
+  // El mazo completo sobrevive: dos tarjetas, con y sin estado FSRS.
+  expect(result.deckCards).toHaveLength(2);
+  const graded = result.deckCards.find(c => c.front === '¿P1?');
+  expect(graded.srs).toMatchObject({ stability: 3.5, state: 'review' });
+  expect(result.deckCards.find(c => c.front === '¿P2?').srs).toBeNull();
+  // El artefacto sobrevive con su resultado intacto.
+  expect(result.artifact).toEqual({ kind: 'mindmap', result: { nodes: [{ id: 'n1', label: 'Raíz' }], edges: [] } });
+});
+
+test('importar un backup viejo (sin mazos ni artefactos) no rompe', async ({ page }) => {
+  await page.goto('/index.html');
+  const result = await page.evaluate(async () => {
+    const DB = await import('/js/ai/db.js');
+    const Backup = await import('/js/backup.js');
+
+    await DB.addDeck({
+      bookId: 'book-bk-old', name: 'Mazo preexistente', cardType: 'qa', scope: 'x',
+      cards: [{ front: 'A', back: 'B' }],
+    });
+
+    // Backup de una versión anterior: la clave `ai` existe pero sin `decks`/`artifacts`.
+    const oldBackup = {
+      format: 'bookreader-backup', version: 1, exportedAt: new Date().toISOString(),
+      localStorage: {},
+      ai: { convos: [], messages: [], notes: [], ratings: [], books: [] },
+    };
+    const r = await Backup.importBackup(oldBackup);
+    // El mazo preexistente no se toca (la importación fusiona, no borra).
+    const decks = await DB.getAllDecks();
+    return { localKeys: r.localKeys, aiRecords: r.aiRecords, kept: decks.filter(d => d.name === 'Mazo preexistente').length };
+  });
+  expect(result.aiRecords).toBe(0);
+  expect(result.kept).toBe(1);
+});
+
 test('buildConvoMarkdown: solo libreta (sin chat)', async ({ page }) => {
   await page.goto('/index.html');
   const md = await page.evaluate(async () => {

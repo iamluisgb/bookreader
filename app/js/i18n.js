@@ -947,7 +947,7 @@ const EN = {
   'Guardar perfil': 'Save profile',
 
   // app-settings — Datos / Drive / Historial
-  'Copia de seguridad de tus datos para guardarla o migrar a otro dispositivo: ajustes, subrayados, marcadores, plantillas propias, conversaciones y libretas. <strong>No</strong> incluye la API key ni los archivos de los libros.': 'A backup of your data to keep or migrate to another device: settings, highlights, bookmarks, custom templates, conversations and notebooks. It does <strong>not</strong> include the API key or the book files.',
+  'Copia de seguridad de tus datos para guardarla o migrar a otro dispositivo: ajustes, subrayados, marcadores, plantillas propias, conversaciones, libretas, mazos de flashcards y artefactos del Studio. <strong>No</strong> incluye la API key ni los archivos de los libros.': 'A backup of your data to keep or migrate to another device: settings, highlights, bookmarks, custom templates, conversations, notebooks, flashcard decks and Studio artifacts. It does <strong>not</strong> include the API key or the book files.',
   'Descargar backup (JSON)': 'Download backup (JSON)',
   'Descargar resumen (Markdown)': 'Download digest (Markdown)',
   'Importar backup': 'Import backup',
