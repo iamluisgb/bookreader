@@ -435,6 +435,12 @@ test('drawing review sin modelo de visión: cero red, nota tenue y la rúbrica d
     cards: [{ type: 'drawing', front: 'Dibujá el ciclo del agua.', back: '', steps: PLAN_5 }],
     figure: null,
   });
+  // «Sin visión» hoy NO es «sin modelo guardado»: `effectiveVisionModel()` cae al preset del
+  // proveedor, y el preset de nan declara deepseek-v4-flash. El caso sin visión es un proveedor
+  // que no declara modelo multimodal (Groq), que es cuando la app apaga la función de verdad.
+  await page.evaluate(() => {
+    localStorage.setItem('bookreader_ai_base_url', JSON.stringify('https://api.groq.com/openai/v1'));
+  });
   await page.reload();
   await stubFetchCounter(page);
   await page.locator('.lib-study-chip').click();
