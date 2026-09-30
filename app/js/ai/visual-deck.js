@@ -182,6 +182,66 @@ export function pickLabeledFigure(labels, occludedLabel) {
 }
 
 // ---------------------------------------------------------------------------
+// Validador determinista de oclusiones (WU1).
+// ---------------------------------------------------------------------------
+
+// Palabras vacías (artículos, conjunciones, preposiciones y números en letra, en
+// inglés y español) que NO cuentan como palabras clave de una etiqueta. Lista
+// corta y fija a propósito: acá no hace falta un tokenizador, solo evitar que
+// 'the'/'que'/'para' hagan pasar un dorso genérico.
+const STOPWORDS = new Set([
+  'the', 'a', 'an', 'and', 'or', 'of', 'to', 'in', 'on', 'for', 'that',
+  'with', 'from', 'this', 'one', 'two', 'can',
+  'el', 'los', 'las', 'del', 'que', 'con', 'para', 'una', 'uno', 'dos',
+  'tres', 'cuatro', 'en', 'y', 'o', 'al', 'su',
+]);
+
+// ¿El dorso (fact) responde el contenido de la etiqueta tapada (label)?
+// Regla: normalizar ambos con normalizeText (sin caso ni tildes) y aceptar si
+//   (a) el dorso contiene la etiqueta normalizada COMPLETA, o
+//   (b) al menos la MITAD de las palabras clave de la etiqueta aparecen en el
+//       dorso. Palabras clave = tokens de 3+ caracteres que no estén en
+//       STOPWORDS.
+// ¿Por qué mitad y no todas? Un dorso rara vez cita textual una etiqueta
+// multi-palabra (la parafrasea, la pluraliza o gira el orden): exigir todas
+// rechazaría dorsi correctos. El substring en (b) tolera plurales y sufijos
+// ('queue' casa con 'queues'); a cambio puede sobre-casar, aceptable para un
+// filtro determinista que solo decide si el dorso HABLA del contenido tapado.
+// Devuelve false cuando no se puede verificar: dorso o etiqueta vacíos, o
+// etiqueta sin palabras clave útiles (todo stop-word o demasiado corta).
+// NUNCA lanza.
+export function answersLabel(fact, label) {
+  const factNorm = normalizeText(fact);
+  const labelNorm = normalizeText(label);
+  if (!factNorm || !labelNorm) return false;
+  if (factNorm.includes(labelNorm)) return true;
+  const keywords = labelNorm.split(' ').filter(w => w.length >= 3 && !STOPWORDS.has(w));
+  if (!keywords.length) return false;
+  const hits = keywords.filter(w => factNorm.includes(w)).length;
+  return hits * 2 >= keywords.length;
+}
+
+// Descarta tarjetas cuyo dorso normalizado ya usó una tarjeta ANTERIOR del mismo
+// lote (se queda la primera): dos tarjetas con el mismo dorso no aportan dos
+// veces. Las entradas sin dorso utilizable pasan de largo acá (quien las saca
+// del mazo es sanitizeVisualCards). Devuelve un array NUEVO. NUNCA lanza: no
+// array → [].
+export function dedupeFacts(cards) {
+  const list = Array.isArray(cards) ? cards : [];
+  const seen = new Set();
+  const out = [];
+  for (const card of list) {
+    const key = card && typeof card === 'object' ? normalizeText(card.back) : '';
+    if (key) {
+      if (seen.has(key)) continue;   // dorso ya usado: queda la primera
+      seen.add(key);
+    }
+    out.push(card);
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
 // Orquestador.
 // ---------------------------------------------------------------------------
 
@@ -212,7 +272,7 @@ export async function buildVisualCards({
   bookTitle = '',
 } = {}) {
   const selected = (Array.isArray(types) ? types : []).filter(isVisualType);
-  const stats = { figures: 0, grounded: 0, occlusion: 0, diagram: 0, drawing: 0, skipped: 0 };
+  const stats = { figures: 0, grounded: 0, occlusion: 0, diagram: 0, drawing: 0, skipped: 0, rejectedFacts: 0 };
   const raw = [];
   // Solo figuras con clave: sin artifact key no hay tarjeta de oclusión que
   // referencie la imagen (la UI la carga desde el store por figureKey).
@@ -292,6 +352,14 @@ export async function buildVisualCards({
         if (!label) { stats.skipped++; continue; }
         const bbox = bboxToCanonical(label.bbox);
         if (!bbox) { stats.skipped++; continue; }
+        // WU1: el dorso TIENE que responder la etiqueta tapada (la resuelta por
+        // pickLabeledFigure, que normaliza igual que answersLabel). Un dorso
+        // genérico produce una tarjeta que no se puede contestar: peor que no
+        // enviarla. Se descarta y suma a rejectedFacts.
+        if (!answersLabel(card && card.contextFact, label.text)) {
+          stats.rejectedFacts++;
+          continue;
+        }
         raw.push({
           type: 'occlusion',
           front: card.question,
@@ -338,7 +406,16 @@ export async function buildVisualCards({
     }
   }
 
-  const cards = sanitizeVisualCards(raw);
+  // WU1: dorsos repetidos. Dos tarjetas de oclusión con el mismo dorso
+  // normalizado no aportan dos veces: se queda la primera y las demás suman a
+  // rejectedFacts. Se aplica sobre TODAS las candidatas de oclusión de la
+  // corrida (no por figura): el dorso genérico suele repetirse entre figuras.
+  const occlusionCandidates = raw.filter(c => c.type === 'occlusion');
+  const uniqueOcclusions = dedupeFacts(occlusionCandidates);
+  stats.rejectedFacts += occlusionCandidates.length - uniqueOcclusions.length;
+  const toSanitize = uniqueOcclusions.concat(raw.filter(c => c.type !== 'occlusion'));
+
+  const cards = sanitizeVisualCards(toSanitize);
   for (const card of cards) stats[card.type]++;
   return { cards, stats };
 }

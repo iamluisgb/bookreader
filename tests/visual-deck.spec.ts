@@ -27,10 +27,12 @@ const CLEAN_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 240"
   + '</svg>';
 
 // Respuesta del prompt 2 (tool-call forzado de create_occlusion_cards): dos
-// tarjetas cuyas occludedLabel existen en LABELS y una que no (Buffer).
+// tarjetas cuyas occludedLabel existen en LABELS y una que no (Buffer). Desde
+// WU1 los contextFact RESPONDEN su etiqueta: un dorso genérico sería descartado
+// por el validador antes de llegar al mazo.
 const OCCLUSION_JSON = JSON.stringify({ cards: [
-  { occludedLabel: 'Message queue', question: '¿Qué desacopla al productor del consumidor?', contextFact: 'El buffer desacopla ambos ritmos.', difficulty: 'hard' },
-  { occludedLabel: 'consumer', question: '¿Quién extrae los mensajes?', contextFact: 'El consumidor extrae después.', difficulty: 'easy' },
+  { occludedLabel: 'Message queue', question: '¿Qué desacopla al productor del consumidor?', contextFact: 'La message queue (buffer central) desacopla ambos ritmos.', difficulty: 'hard' },
+  { occludedLabel: 'consumer', question: '¿Quién extrae los mensajes?', contextFact: 'El consumer extrae los mensajes después del productor.', difficulty: 'easy' },
   { occludedLabel: 'Buffer', question: 'q', contextFact: 'f' },
 ] });
 
@@ -190,14 +192,17 @@ test('sanitizeVisualCards: campos obligatorios por tipo, dedupe por front, cap y
 
 // buildVisualCards solo occlusion, figuras que YA traen labels: ni una llamada
 // al modelo de visión (todo body sin image_url) y una tarjeta por oclusión con
-// figureKey, bbox canónico del label elegido y type 'occlusion'.
+// figureKey, bbox canónico del label elegido y type 'occlusion'. Los dorsos de
+// las dos tarjetas válidas responden su etiqueta (WU1): si no, el validador las
+// descartaría y esta prueba del contrato de figuraKey/bbox no podría correr.
 test('buildVisualCards (solo occlusion, con labels): sin llamadas de visión y tarjetas con figureKey+bbox', async ({ page }) => {
   // La figura trae además un label SIN bbox ('Ghost'): el texto pasa el filtro de
-  // visual-cards.js, pero sin coordenadas no hay tarjeta → stats.skipped sube acá.
+  // visual-cards.js, pero sin coordenadas no hay tarjeta → stats.skipped sube acá
+  // (antes del validador de dorso, que corre después del chequeo de bbox).
   const figure = { ...FIGURE_WITH_LABELS, labels: [...LABELS, { text: 'Ghost', bbox: null }] };
   const occlusionJson = JSON.stringify({ cards: [
-    { occludedLabel: 'Message queue', question: '¿Qué desacopla al productor del consumidor?', contextFact: 'El buffer desacopla ambos ritmos.', difficulty: 'hard' },
-    { occludedLabel: 'consumer', question: '¿Quién extrae los mensajes?', contextFact: 'El consumidor extrae después.', difficulty: 'easy' },
+    { occludedLabel: 'Message queue', question: '¿Qué desacopla al productor del consumidor?', contextFact: 'La message queue desacopla ambos ritmos.', difficulty: 'hard' },
+    { occludedLabel: 'consumer', question: '¿Quién extrae los mensajes?', contextFact: 'El consumer extrae después.', difficulty: 'easy' },
     { occludedLabel: 'Ghost', question: 'q', contextFact: 'f' },
   ] });
   await setupDeckStub(page, [occlusionJson]);
@@ -207,11 +212,11 @@ test('buildVisualCards (solo occlusion, con labels): sin llamadas de visión y t
     return VD.buildVisualCards({ types: ['occlusion', 'basic'], chapterText: chapter, figures: [figure], bookTitle: 'Libro' });
   }, { figure, chapter: CHAPTER_TEXT, occlusionJson });
   expect(res.cards).toEqual([
-    { type: 'occlusion', front: '¿Qué desacopla al productor del consumidor?', back: 'El buffer desacopla ambos ritmos.', figureKey: 'book:figures:f1', bbox: { x: 350, y: 30, w: 111, h: 16 }, occludedLabel: 'Message queue', chapter: '', src: '' },
+    { type: 'occlusion', front: '¿Qué desacopla al productor del consumidor?', back: 'La message queue desacopla ambos ritmos.', figureKey: 'book:figures:f1', bbox: { x: 350, y: 30, w: 111, h: 16 }, occludedLabel: 'Message queue', chapter: '', src: '' },
     // 'consumer' casa sin caso con la label 'Consumer'.
-    { type: 'occlusion', front: '¿Quién extrae los mensajes?', back: 'El consumidor extrae después.', figureKey: 'book:figures:f1', bbox: { x: 668, y: 55, w: 73, h: 16 }, occludedLabel: 'consumer', chapter: '', src: '' },
+    { type: 'occlusion', front: '¿Quién extrae los mensajes?', back: 'El consumer extrae después.', figureKey: 'book:figures:f1', bbox: { x: 668, y: 55, w: 73, h: 16 }, occludedLabel: 'consumer', chapter: '', src: '' },
   ]);
-  expect(res.stats).toEqual({ figures: 1, grounded: 0, occlusion: 2, diagram: 0, drawing: 0, skipped: 1 });
+  expect(res.stats).toEqual({ figures: 1, grounded: 0, occlusion: 2, diagram: 0, drawing: 0, skipped: 1, rejectedFacts: 0 });
   const state = await page.evaluate(() => (window as any).__vd);
   expect(state.calls).toHaveLength(1);                    // UNA llamada de pedagogía
   expect(state.calls[0].tools[0].function.name).toBe('create_occlusion_cards');
@@ -254,7 +259,7 @@ test('buildVisualCards (figura sin labels): grounding primero, y con labels vac�
     return VD.buildVisualCards({ types: ['occlusion'], chapterText: chapter, figures: [figure] });
   }, { figure: FIGURE_WITHOUT_LABELS, chapter: CHAPTER_TEXT });
   expect(res2.cards).toEqual([]);
-  expect(res2.stats).toEqual({ figures: 1, grounded: 0, occlusion: 0, diagram: 0, drawing: 0, skipped: 1 });
+  expect(res2.stats).toEqual({ figures: 1, grounded: 0, occlusion: 0, diagram: 0, drawing: 0, skipped: 1, rejectedFacts: 0 });
   const state2 = await page.evaluate(() => (window as any).__vd);
   expect(state2.calls).toHaveLength(2);   // 2 intentos de visión, 0 de pedagogía
   expect(state2.calls.every((b: any) => b.model === 'vision-test')).toBe(true);
@@ -277,7 +282,7 @@ test('buildVisualCards (tres tipos): mazo mixto, una llamada por familia y fases
   }, { figure: FIGURE_WITH_LABELS, chapter: CHAPTER_TEXT });
   const types = res.cards.map((c: any) => c.type);
   expect(types).toEqual(['occlusion', 'occlusion', 'diagram', 'drawing']);
-  expect(res.stats).toEqual({ figures: 1, grounded: 0, occlusion: 2, diagram: 1, drawing: 1, skipped: 0 });
+  expect(res.stats).toEqual({ figures: 1, grounded: 0, occlusion: 2, diagram: 1, drawing: 1, skipped: 0, rejectedFacts: 0 });
   expect(res.cards[2].svg).toContain('<svg');
   expect(res.cards[2].answerNodeId).toBe('tgt');
   expect(res.cards[3].steps).toHaveLength(3);
@@ -311,7 +316,7 @@ test('buildVisualCards: error HTTP en el grounding de una figura no corta la cor
   }, { chapter: CHAPTER_TEXT, figure: FIGURE_WITH_LABELS });
   expect(res.cards).toHaveLength(2);
   expect(res.cards.every((c: any) => c.figureKey === 'book:figures:f1')).toBe(true);
-  expect(res.stats).toEqual({ figures: 2, grounded: 0, occlusion: 2, diagram: 0, drawing: 0, skipped: 1 });
+  expect(res.stats).toEqual({ figures: 2, grounded: 0, occlusion: 2, diagram: 0, drawing: 0, skipped: 1, rejectedFacts: 0 });
   const state = await page.evaluate(() => (window as any).__vd);
   expect(state.calls).toHaveLength(2);   // grounding fallido + oclusión de la 2ª figura
 });
@@ -449,4 +454,126 @@ test('buildVisualCards: figura con dataUrl indescifrable se saltea sin llamar al
   const state = await page.evaluate(() => (window as any).__vd);
   expect(state.calls).toHaveLength(0);   // ni grounding ni pedagogía
   expect(JSON.stringify(state.calls)).not.toContain('image_url');
+});
+
+// ---------------------------------------------------------------------------
+// WU1: validador determinista de oclusiones. Con los datos reales del backup
+// (2026-09-30), 0 de 6 dorsi mencionaban el contenido de la etiqueta tapada y
+// dos tarjetas compartían exactamente el mismo dorso genérico: una tarjeta cuya
+// respuesta no está en el dorso no se puede contestar, y es peor que no enviarla.
+// ---------------------------------------------------------------------------
+
+// Núcleo puro del validador con los CASOS REALES del backup: el dorso del
+// granjero no responde la etiqueta de la barca, y el dorso genérico del grafo no
+// responde SUBCLASSOF. Cuando el dorso nombra la etiqueta, pasa.
+test('answersLabel: casos reales — dorso genérico no responde, dorso que nombra la etiqueta sí', async ({ page }) => {
+  await page.goto('/index.html');
+  await seedProLicense(page);
+  const res = await inPage(page, async () => {
+    const VD = await import('/js/ai/visual-deck.js');
+    return {
+      // Caso barca: el dorso genérico del granjero NO responde la etiqueta tapada.
+      boat: VD.answersLabel(
+        'El granjero no puede dejar a la oveja sola en ninguno de los dos lados.',
+        'The boat can hold one person and one animal.'),
+      // Caso SUBCLASSOF: dorso genérico sobre el grafo de conocimiento.
+      subclassGeneric: VD.answersLabel(
+        'El capítulo explica que el grafo de conocimiento «contains entities and relationships».',
+        'SUBCLASSOF'),
+      // La misma etiqueta, ahora nombrada en el dorso: pasa.
+      subclassNamed: VD.answersLabel(
+        'La relación SUBCLASSOF indica subclase de otra clase en la ontología.',
+        'SUBCLASSOF'),
+      // Etiqueta corta multi-palabra nombrada en el dorso.
+      diabetes: VD.answersLabel(
+        'La diabetes mellitus tipo 2 es un trastorno del metabolismo.',
+        'Diabetes mellitus'),
+      // Sin caso ni tildes: la comparación pasa igual.
+      accents: VD.answersLabel('la configuracion basica del sistema', 'Configuración'),
+      // Vacíos o basura: no se puede verificar → false.
+      emptyFact: VD.answersLabel('', 'Productor'),
+      emptyLabel: VD.answersLabel('El productor publica mensajes.', '   '),
+      garbage: VD.answersLabel(null, undefined),
+    };
+  });
+  expect(res.boat).toBe(false);
+  expect(res.subclassGeneric).toBe(false);
+  expect(res.subclassNamed).toBe(true);
+  expect(res.diabetes).toBe(true);
+  expect(res.accents).toBe(true);
+  expect(res.emptyFact).toBe(false);
+  expect(res.emptyLabel).toBe(false);
+  expect(res.garbage).toBe(false);
+});
+
+// Dorsos repetidos: se queda la PRIMERA tarjeta de cada dorso normalizado (sin
+// caso ni tildes). Las entradas sin dorso utilizable pasan de largo acá: quien
+// las saca del mazo es sanitizeVisualCards.
+test('dedupeFacts: el dorso repetido (sin caso ni tildes) deja pasar solo la primera', async ({ page }) => {
+  await page.goto('/index.html');
+  await seedProLicense(page);
+  const res = await inPage(page, async () => {
+    const VD = await import('/js/ai/visual-deck.js');
+    return {
+      dup: VD.dedupeFacts([
+        { front: 'q1', back: 'El buffer desacopla ambos ritmos.' },
+        { front: 'q2', back: 'EL BUFFER desacopla ambos RITMOS!' },   // mismo dorso normalizado
+        { front: 'q3', back: 'El consumidor extrae después.' },
+      ]),
+      distintos: VD.dedupeFacts([
+        { front: 'q1', back: 'Primer dorso.' },
+        { front: 'q2', back: 'Segundo dorso distinto.' },
+      ]),
+      vacio: VD.dedupeFacts([]),
+      basura: VD.dedupeFacts(['x', null, 42] as any),
+    };
+  });
+  expect(res.dup.map((c: any) => c.front)).toEqual(['q1', 'q3']);   // q2 repite el dorso de q1
+  expect(res.distintos).toHaveLength(2);
+  expect(res.vacio).toEqual([]);
+  expect(res.basura).toEqual(['x', null, 42]);   // pasan de largo: los filtra sanitize
+});
+
+// Extremo a extremo: (a) un dorso que responde su etiqueta sobrevive, (b) un
+// dorso genérico se descarta y (c) un dorso que repite el de (a) también. Solo
+// UNA tarjeta llega al mazo y stats.rejectedFacts === 2.
+test('buildVisualCards: el validador descarta el dorso genérico y el repetido (rejectedFacts = 2)', async ({ page }) => {
+  const occJson = JSON.stringify({ cards: [
+    // (a) responde su etiqueta: sobrevive.
+    { occludedLabel: 'Message queue', question: '¿Qué desacopla al productor del consumidor?', contextFact: 'La message queue desacopla al productor del consumidor.', difficulty: 'hard' },
+    // (b) dorso genérico real del backup: no menciona 'Producer' → descartada.
+    { occludedLabel: 'Producer', question: '¿Quién publica los mensajes?', contextFact: 'El granjero no puede dejar a la oveja sola en ninguno de los dos lados.', difficulty: 'easy' },
+    // (c) responde su etiqueta PERO repite el dorso de (a) → descartada por dedupe.
+    { occludedLabel: 'Message queue', question: '¿Quién consume de la cola?', contextFact: 'La message queue desacopla al productor del consumidor.', difficulty: 'medium' },
+  ] });
+  await setupDeckStub(page, [occJson]);
+  const res = await inPage(page, async ({ figure, chapter }: any) => {
+    const VD = await import('/js/ai/visual-deck.js');
+    return VD.buildVisualCards({ types: ['occlusion'], chapterText: chapter, figures: [figure] });
+  }, { figure: FIGURE_WITH_LABELS, chapter: CHAPTER_TEXT });
+  expect(res.cards).toEqual([
+    { type: 'occlusion', front: '¿Qué desacopla al productor del consumidor?', back: 'La message queue desacopla al productor del consumidor.', figureKey: 'book:figures:f1', bbox: { x: 350, y: 30, w: 111, h: 16 }, occludedLabel: 'Message queue', chapter: '', src: '' },
+  ]);
+  expect(res.stats).toEqual({ figures: 1, grounded: 0, occlusion: 1, diagram: 0, drawing: 0, skipped: 0, rejectedFacts: 2 });
+  const state = await page.evaluate(() => (window as any).__vd);
+  expect(state.calls).toHaveLength(1);   // solo la llamada de pedagogía
+});
+
+// Guardia de regresión: grounding sin labels (no devuelve nada) → no se produce
+// NINGUNA tarjeta y no se cuela una con dorso vacío (no hubo candidatas que
+// validar: rejectedFacts queda en 0 y skipped refleja la figura salteada).
+test('buildVisualCards: figura sin labels útiles no produce tarjetas ni dorsi vacíos', async ({ page }) => {
+  await setupDeckStub(page, ['{"labels":[]}']);
+  const res = await inPage(page, async ({ chapter }: any) => {
+    const VD = await import('/js/ai/visual-deck.js');
+    return VD.buildVisualCards({
+      types: ['occlusion'],
+      chapterText: chapter,
+      figures: [{ key: 'book:figures:f11', dataUrl: 'data:image/jpeg;base64,CCCC', width: 810, height: 130, labels: [] }],
+    });
+  }, { chapter: CHAPTER_TEXT });
+  expect(res.cards).toEqual([]);
+  expect(res.stats).toEqual({ figures: 1, grounded: 0, occlusion: 0, diagram: 0, drawing: 0, skipped: 1, rejectedFacts: 0 });
+  const state = await page.evaluate(() => (window as any).__vd);
+  expect(state.calls.every((b: any) => b.model === 'vision-test')).toBe(true);   // solo grounding, 0 pedagogía
 });
