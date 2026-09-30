@@ -781,6 +781,11 @@ const EN = {
   'No queda ninguna tarjeta que exportar.': 'No cards left to export.',
   'No se pudo exportar: {msg}': 'Could not export: {msg}',
 
+  // Post-filtro de dominio en la revisión (odd/tasks/flashcards-dominio.md) + hint del
+  // onboarding que enseña a excluir el dominio de los ejemplos del objetivo del lector.
+  'Consejo: di qué quieres quedarte y qué ignorar. Ej.: «Técnicas de grafos de conocimiento y LLMs; ignora los ejemplos biomédicos».':
+    'Tip: say what you want to keep and what to ignore. E.g. "Knowledge graph techniques and LLMs; ignore the biomedical examples".',
+
   // summary / mindmap / studio / jobs
   'Resumen del libro': 'Book summary',
   'El agente resume el contenido en puntos clave, cada uno citando su pasaje. Clic en una cita para saltar al libro.': 'The agent summarizes the content into key points, each citing its passage. Click a citation to jump to the book.',

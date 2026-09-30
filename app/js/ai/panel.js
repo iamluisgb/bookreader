@@ -1036,6 +1036,7 @@ function openOnboarding(opts = {}) {
       <h2>${chosenTemplate.name}</h2>
       <p class="ai-ob-sub">${chosenTemplate.goalPrompt}</p>
       <textarea id="ai-ob-goal" class="ai-ob-goal" rows="3" placeholder="${t('Tu objetivo...')}"></textarea>
+      <p class="ai-ob-sub">${t('Consejo: di qué quieres quedarte y qué ignorar. Ej.: «Técnicas de grafos de conocimiento y LLMs; ignora los ejemplos biomédicos».')}</p>
       ${artesanoOptIn}
       <button id="ai-ob-start" class="primary-btn ai-ob-start">${t('Empezar a leer con objetivo')}</button>`;
     body.querySelector('.ai-ob-back').addEventListener('click', renderObjectives);
