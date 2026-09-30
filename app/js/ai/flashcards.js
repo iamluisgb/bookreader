@@ -24,6 +24,8 @@ import { getBook } from '../library/store.js';
 import { ensureBookFigures } from './visual-figures.js';
 import { buildVisualCards, VISUAL_TYPES } from './visual-deck.js';
 import { chapterList, suggestPlan, MAX_PLAN_CHAPTERS } from './card-plan.js';
+import { normalizeDomain, parseDomainSuggestions, groupCardsByDomain, domainTagMessages } from './domain-tags.js';
+import { toast } from './toast.js';
 import * as PdfReader from '../pdf-reader.js';
 
 // Generación por TROZOS (map-reduce): el material se divide en trozos de ~CHUNK_TOKENS
@@ -1175,6 +1177,17 @@ function renderReview(deck) {
   if (!b) return;
   // Una tarjeta suspendida en el repaso (P24 F3) se marca aquí y se puede reactivar: sin
   // esta puerta, suspender sería un viaje de ida.
+  // Post-filtro de dominio (odd/tasks/flashcards-dominio.md): una pasada opt-in de
+  // etiquetado + chips de dominio con descarte por lote. NUNCA corre tras generar (coste
+  // sorpresa) ni toca el prompt de generación: es filtrado por el lector, no del modelo.
+  const domGroups = groupCardsByDomain(DB.cardsOf(deck)).filter(g => g.domain);
+  // Chip pill con estilos inline a propósito: la fila reutiliza .fc-export (flex con gap)
+  // y no hay CSS nuevo para el chip en sí.
+  const domainChip = (g) => `
+    <span class="fc-dom-chip" style="display:inline-flex;align-items:center;gap:6px;background:var(--btn-bg);color:var(--btn-ink);border-radius:var(--r-pill);padding:3px 10px;font-size:13px;">${escapeHtml(g.domain)} (${g.indices.length})
+      <button class="fc-dom-del" data-domain="${escapeHtml(g.domain)}" title="${t('Quitar todas las tarjetas de este dominio')}" aria-label="${t('Quitar todas las tarjetas de este dominio')}"
+        style="border:0;background:none;color:inherit;cursor:pointer;display:inline-flex;padding:0 0 0 2px;">${icon('xmark', { size: 11 })}</button>
+    </span>`;
   const cardRow = (c, i) => `
     <div class="fc-item${c.suspended ? ' is-suspended' : ''}" data-i="${i}">
       <div class="fc-item-fields">
@@ -1189,6 +1202,10 @@ function renderReview(deck) {
     <button class="ai-ob-back">${icon('chevron-left', { size: 16 })}<span>${t('Volver')}</span></button>
     <h2>${t('{n} tarjetas', { n: DB.cardsOf(deck).length })}</h2>
     <p class="ai-ob-sub">${t('Revisa y edita antes de exportar. Mazo en Anki:')} <b>${escapeHtml(deck.name)}</b></p>
+    <div class="fc-export fc-domain-bar">
+      <button id="fc-domtag" class="ai-ob-back" title="${t('Etiqueta cada tarjeta con su tema: una llamada barata al modelo')}">${t('Agrupar por dominio')}</button>
+      ${domGroups.map(domainChip).join('')}
+    </div>
     <div class="fc-list">${deck.cards.map((c, i) => (c.deleted ? '' : cardRow(c, i))).join('')}</div>
     <div class="fc-export">
       ${deck.id ? `<button id="fc-study" class="primary-btn">${icon('cards', { size: 16 })} ${t('Estudiar ahora')}<small></small></button>` : ''}
@@ -1240,6 +1257,56 @@ function renderReview(deck) {
     if (h2) h2.textContent = t('{n} tarjetas', { n: deck.cards.length });
   });
   b.querySelector('.fc-list').addEventListener('focusout', syncFromDom);
+
+  // Descarte por lote de un dominio: el espejo del fc-del de a una tarjeta. Se persiste
+  // vía updateDeck para que las quitadas queden como tombstones y el borrado viaje por
+  // sync en vez de resucitar en el siguiente merge. El h2 y los chips se refrescan con
+  // el re-render completo.
+  b.querySelector('.fc-domain-bar').addEventListener('click', (e) => {
+    const del = e.target.closest('.fc-dom-del');
+    if (!del) return;
+    syncFromDom();   // las ediciones pendientes del DOM entran antes de tocar el array
+    const dom = del.dataset.domain;
+    deck.cards = deck.cards.filter(c => normalizeDomain(c.domain) !== dom);
+    if (deck.id) DB.updateDeck(deck.id, { cards: deck.cards });
+    renderReview(deck);
+  });
+
+  // Pasada de etiquetado (opt-in, UNA llamada barata al modelo lite): frentes + capítulos
+  // → etiqueta de dominio por tarjeta. Fallo → toast y SIN cambio de estado: un mazo sin
+  // etiquetar es exactamente el estado anterior, y el lector puede reintentar.
+  b.querySelector('#fc-domtag').addEventListener('click', async (e) => {
+    const btn = e.currentTarget;
+    syncFromDom();   // se etiquetan los frentes tal y como están editados ahora
+    const cards = DB.cardsOf(deck);
+    if (!cards.length) return;
+    const idle = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = t('Agrupando…');
+    try {
+      const fronts = cards.map(c => c.front);
+      const { system, user } = domainTagMessages(
+        fronts, cards.map(c => c.chapter || ''), detectLang(fronts.join(' ')));
+      // Misma vía que las pasadas de texto (LLM.chatStream) pero al modelo lite, como la
+      // expansión de consulta: la salida es un array JSON corto, no hace falta el principal.
+      const raw = await LLM.chatStream({
+        messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
+        model: LLM.getLiteModel(),
+        maxTokens: Math.min(4096, 600 + fronts.length * 40),
+      });
+      const labels = parseDomainSuggestions(raw, fronts.length);
+      if (!labels.length) throw new Error('respuesta sin etiquetas utilizables');
+      // Etiquetas en orden sobre las tarjetas visibles; las que falten quedan sin dominio.
+      cards.forEach((c, i) => { c.domain = normalizeDomain(labels[i] || ''); });
+      if (deck.id) await DB.updateDeck(deck.id, { cards: deck.cards });
+      renderReview(deck);
+    } catch (err) {
+      console.warn('Etiquetado de dominio falló:', err);
+      toast({ message: t('No se pudieron agrupar las tarjetas') });
+      btn.disabled = false;
+      btn.innerHTML = idle;
+    }
+  });
 
   // F1 · Estudiar sin salir. El mazo YA está en IndexedDB, así que la pantalla de "listo"
   // era la única superficie que no ofrecía repasarlo: empujaba fuera de la app (exportar a

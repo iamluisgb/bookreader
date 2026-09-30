@@ -3,6 +3,23 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-09-30 — Flashcards: dominio del concepto vs dominio del ejemplo
+
+Los libros técnicos ilustran con worked examples de otro dominio (*Knowledge Graphs and LLMs
+in Action* usa genómica y transcriptoma): las tarjetas salen fieles al pasaje pero fuera de
+objetivo — preguntan biología cuando el lector estudia grafos. Dos remedios que no tocan el
+prompt de generación (contrato EV5 intacto):
+
+- **El onboarding enseña el objetivo**: bajo el textarea del objetivo hay un consejo con un
+  ejemplo de exclusión de dominio («…ignora los ejemplos biomédicos») — el prompt ya inyecta
+  el objetivo del lector; faltaba enseñar a usarlo.
+- **Post-filtro de dominio en la revisión**: botón «Agrupar por dominio» etiqueta cada tarjeta
+  con su tema (UNA llamada barata al modelo lite, frentes + capítulos, salida JSON tolerante
+  en [domain-tags.js](app/js/ai/domain-tags.js)) y pinta chips `Dominio (n)`: el × de un chip
+  descarta todas las tarjetas de ese dominio de una vez, persistiendo tombstones vía
+  `updateDeck` para que el borrado viaje por sync. Es acción explícita del lector — nunca
+  corre tras generar, sin coste sorpresa.
+
 ## 2026-09-29 — Flashcards: varios tipos de texto a la vez y el plan de tarjetas por capítulo
 
 Hasta hoy el generador de texto era **de un solo tipo por corrida**: el radio de P→R / Cloze no

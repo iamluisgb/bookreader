@@ -785,6 +785,11 @@ const EN = {
   // onboarding que enseña a excluir el dominio de los ejemplos del objetivo del lector.
   'Consejo: di qué quieres quedarte y qué ignorar. Ej.: «Técnicas de grafos de conocimiento y LLMs; ignora los ejemplos biomédicos».':
     'Tip: say what you want to keep and what to ignore. E.g. "Knowledge graph techniques and LLMs; ignore the biomedical examples".',
+  'Agrupar por dominio': 'Group by domain',
+  'Agrupando…': 'Grouping…',
+  'No se pudieron agrupar las tarjetas': 'Could not group the cards',
+  'Quitar todas las tarjetas de este dominio': 'Remove all cards in this domain',
+  'Etiqueta cada tarjeta con su tema: una llamada barata al modelo': 'Labels each card with its topic: one cheap model call',
 
   // summary / mindmap / studio / jobs
   'Resumen del libro': 'Book summary',
