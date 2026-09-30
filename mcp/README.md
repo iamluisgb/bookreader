@@ -15,6 +15,7 @@ Dos fuentes, la misma superficie de tools:
 | Credenciales | Ninguna | Refresh token de Google (o una carpeta copiada) |
 | Datos | Foto del momento | Vivos |
 | `reading_stats` | **No existe** (el backup no lleva el registro de lectura) | Sí |
+| `list_decks`, `get_deck`, `list_artifacts`, `get_artifact` | **No existen** (el backup no lleva mazos ni artefactos) | Sí |
 | Títulos | Solo si el libro pasó por el agente (`title: null` si no) | Del manifest (que siempre tiene lo que importó) |
 
 Prueba F1 primero: responde si el caso de uso aporta algo antes de pagar el peaje de Drive.
@@ -29,10 +30,13 @@ La fuente de backup es una **foto**, y eso tiene consecuencias que conviene sabe
    (`app/js/reading-log.js`) y `buildBackup()` no lo incluye. Por eso `reading_stats` **no se
    anuncia** con esta fuente: una tool que siempre contesta «no hay datos» es peor que una tool que
    no existe, porque el modelo la llama.
-2. **Puede no haber títulos.** El backup no lleva la biblioteca (está en IndexedDB), así que el
+2. **Tampoco hay mazos ni artefactos del Studio.** `buildBackup()` exporta `convos, messages,
+   notes, ratings, books` y nada más: `list_decks`, `get_deck`, `list_artifacts` y `get_artifact`
+   **no se anuncian** con esta fuente (mismo criterio que `reading_stats`).
+3. **Puede no haber títulos.** El backup no lleva la biblioteca (está en IndexedDB), así que el
    título solo existe si el libro pasó por el agente. Si no, `list_books` devuelve `title: null` y
    el cliente usa el `id`.
-3. **Lo que lees durante la sesión no aparece** hasta que vuelvas a exportar el backup.
+4. **Lo que lees durante la sesión no aparece** hasta que vuelvas a exportar el backup.
 
 Lo que sí trae: subrayados (con su nota al margen), marcadores, notas de libreta con su contexto de
 conversación y los metadatos del agente.
@@ -86,10 +90,18 @@ node cli.mjs --dir ~/bookreader-layout reading_stats '{"range":"7d"}'
 | `get_notes` | `bookId`, `limit?`, `offset?` | Notas de libreta con `fieldKey`, etiqueta, objetivo y conversación de origen. |
 | `search_highlights` | `query`, `bookId?`, `limit?` | Busca en el texto de los subrayados y en sus notas, sin distinguir mayúsculas ni acentos. Todos los términos deben aparecer (AND). |
 | `reading_stats` | `range?`, `bookId?`, `groupBy?` | **Solo F2.** Minutos, palabras y unidades de lectura real, con desglose por día/semana/mes y por libro. |
+| `list_decks` | `bookId?` | **Solo F2.** Mazos de flashcards con contadores de repaso: tarjetas, vencidas hoy, nuevas y suspendidas. Sin el texto de las tarjetas. |
+| `get_deck` | `bookId`, `deckId?` o `scope?`, `limit?` | **Solo F2.** Las tarjetas de un mazo: frente, dorso, capítulo, suspensión y estado SRS (`due`, `reps`, `stability`, `difficulty`). |
+| `list_artifacts` | `bookId?`, `kind?` | **Solo F2.** Qué salió del Studio (summary, mindmap, infographic, figures), con una `preview` de como mucho 200 caracteres: nunca el contenido entero. |
+| `get_artifact` | `bookId`, `key` | **Solo F2.** El `result` completo de un artefacto, serializado, con tope de 20000 caracteres (`truncated: true` y `totalChars` si se recorta). |
 
 Los resultados van como JSON en el contenido de la tool. Los errores esperables (libro
-desconocido, argumento que falta, rango que no existe) se devuelven como resultado con `isError` y
-un mensaje que el modelo puede leer y corregir: la sesión no se cae.
+o mazo desconocido, argumento que falta, rango que no existe) se devuelven como resultado con
+`isError` y un mensaje que el modelo puede leer y corregir: la sesión no se cae.
+
+Mazos y artefactos **exigen la fuente viva** (`--dir` o Drive): los lleva cada `books/<id>.json`
+del layout de sync, y el backup de la app no los exporta. Con `--backup` esas cuatro tools ni
+siquiera se anuncian — mismo criterio que `reading_stats`.
 
 ### `reading_stats`, en detalle
 
@@ -215,7 +227,7 @@ Entorno: `BOOKREADER_MCP_BACKUP`, `BOOKREADER_MCP_DIR`, `BOOKREADER_MCP_BASE`,
 cd mcp && npm test      # o, desde la raíz del repo: npm run test:mcp
 ```
 
-`node --test`, sin navegador y sin red: 80 tests. Fixtures con la forma real de la app (backup y
+`node --test`, sin navegador y sin red: 96 tests. Fixtures con la forma real de la app (backup y
 layout), un cliente MCP de verdad hablando con el servidor como proceso hijo, un doble de la API de
 Drive, un test de paridad entre las dos fuentes y las comprobaciones de que los secretos y el
 `deviceId` no salen.

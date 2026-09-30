@@ -115,6 +115,8 @@ export function createDriveSource({ provider, base = DEFAULT_BASE, cacheMs = 150
       bookmarks: [],
       notes: [],
       convos: [],
+      decks: [],
+      artifacts: [],
       lastPositionAt: null,
       meta: null,
     };
@@ -137,6 +139,8 @@ export function createDriveSource({ provider, base = DEFAULT_BASE, cacheMs = 150
     entry.bookmarks = local['bookmarks_' + id];
     entry.notes = raw.notes;
     entry.convos = raw.convos;
+    entry.decks = raw.decks;
+    entry.artifacts = raw.artifacts;
     entry.lastPositionAt = Number(local['lastPositionAt_' + id]) || null;
     entry.meta = raw.meta || null;
     c.entries.set(id, entry);
@@ -161,6 +165,8 @@ export function createDriveSource({ provider, base = DEFAULT_BASE, cacheMs = 150
     kind: 'drive',
     // El registro de lectura viaja en settings.json (P25 F3): aquí SÍ hay estadísticas.
     hasReadingStats: true,
+    // El layout lleva mazos y artefactos del Studio en cada books/<id>.json (el backup no).
+    hasAgentData: true,
     describe() {
       return 'drive:' + base;
     },
@@ -207,6 +213,18 @@ export function createDriveSource({ provider, base = DEFAULT_BASE, cacheMs = 150
       const entry = await entryFrom(await load(), bookId);
       if (!entry) throw new UnknownBookError(bookId);
       return project(entry).notes;
+    },
+    /** Mazos del libro, ya sin tombstones. Solo en la fuente viva: el backup no los lleva. */
+    async decks(bookId) {
+      const entry = await entryFrom(await load(), bookId);
+      if (!entry) throw new UnknownBookError(bookId);
+      return liveItems(entry.decks);
+    },
+    /** Artefactos del Studio del libro (resúmenes, mapas, infografías), sin tombstones. */
+    async artifacts(bookId) {
+      const entry = await entryFrom(await load(), bookId);
+      if (!entry) throw new UnknownBookError(bookId);
+      return liveItems(entry.artifacts);
     },
     /** Días de lectura del layout, sin `key` ni `deviceId` (ver redact.mjs). */
     async readingDays() {

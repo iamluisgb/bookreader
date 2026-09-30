@@ -167,6 +167,8 @@ export function createBackupFileSource({ path, readFile = fsReadFile }) {
     kind: 'backup-file',
     // El backup no lleva el registro de lectura: la tool `reading_stats` no se registra.
     hasReadingStats: false,
+    // Y tampoco mazos ni artefactos (buildBackup() no los exporta): sin `hasAgentData`.
+    hasAgentData: false,
     describe() {
       return 'backup-file:' + path;
     },

@@ -39,7 +39,7 @@ test('F1 anuncia cuatro tools y NO anuncia reading_stats', async () => {
   }
 });
 
-test('F2 anuncia la misma superficie más reading_stats', async () => {
+test('F2 anuncia la misma superficie más reading_stats, mazos y artefactos', async () => {
   const c = await connect(DIR);
   try {
     assert.deepEqual(await c.toolNames(), [
@@ -48,6 +48,11 @@ test('F2 anuncia la misma superficie más reading_stats', async () => {
       'get_notes',
       'search_highlights',
       'reading_stats',
+      // Solo la fuente viva lleva `decks` y `artifacts` en books/<id>.json (ver README).
+      'list_decks',
+      'get_deck',
+      'list_artifacts',
+      'get_artifact',
     ]);
   } finally {
     await c.close();
