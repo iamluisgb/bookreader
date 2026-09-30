@@ -176,7 +176,7 @@ comparación o jerarquía. Si el concepto no la tiene, responde SOLO:
 {"usable":false,"reason":"<motivo breve en español>"}
 y nada más. Mejor un "no" honesto que un diagrama forzado.
 
-Si SÍ la tiene, generá un SVG autocontenido que cumpla TODAS estas reglas:
+Si SÍ la tiene, genera un SVG autocontenido que cumpla TODAS estas reglas:
 - viewBox="0 0 720 H" con H entre 180 y 280 (relación de aspecto apaisada, sin px fijos fuera del viewBox).
 - Clases obligatorias: "d-box" en las cajas, "d-txt" en los textos, "d-cap" en los rótulos de
   flechas/leyendas, "d-line" en las líneas y flechas.
@@ -211,8 +211,8 @@ TEXTO DEL CAPÍTULO (única fuente permitida para el contenido):
 ${String(chapterText ?? '')}
 """
 
-TAREA: elegí hasta ${count} conceptos DISTINTOS del capítulo que tengan ESTRUCTURA RELACIONAL
-(secuencia, flujo, comparación o jerarquía) y generá un diagrama por concepto en este mismo
+TAREA: elige hasta ${count} conceptos DISTINTOS del capítulo que tengan ESTRUCTURA RELACIONAL
+(secuencia, flujo, comparación o jerarquía) y genera un diagrama por concepto en este mismo
 turno (seleccionar y generar en la misma pasada evita una llamada por concepto).
 Mejor menos diagramas que diagramas forzados: un concepto sin estructura relacional se deja afuera.
 
@@ -538,20 +538,21 @@ ${String(chapterText ?? '')}
 """
 
 REGLAS (obligatorias):
-- Elegí hasta ${count} PROCESOS o SECUENCIAS del capítulo que valga la pena dibujar de memoria:
+- Elige hasta ${count} PROCESOS o SECUENCIAS del capítulo que valga la pena dibujar de memoria:
   algo con pasos ordenados (un flujo, un ciclo, una transformación). Si no hay ninguno,
   devuelve {"cards":[]}. Mejor cero tarjetas que una mala.
-- "question": la consigna en ESPAÑOL, empezando con "Dibujá de memoria ..." y AUTOCONTENIDA
+- "question": la consigna en ESPAÑOL NEUTRO (sin voseo: «dibuja», no «dibujá»), empezando
+  con "Dibuja de memoria ..." y AUTOCONTENIDA
   (se entiende sin tener el libro delante).
 - "steps": entre 3 y 7 pasos ORDENADOS y concretos del proceso, con los nombres de los
   componentes conectados (no frases genéricas tipo "paso 1"). Son la rúbrica con la que
   después se revisa el boceto del lector.
 - "contextFact": UN dato del capítulo que ayude a recordar el proceso, rastreable al texto
   del capítulo: debe poder SUBRAYARSE en él. Prohibido inventar datos que el texto no diga.
-- TODO lo visible para el usuario va en ESPAÑOL.
+- TODO lo visible para el usuario va en ESPAÑOL NEUTRO (sin voseo).
 
 FORMATO (obligatorio): responde SOLO con un objeto JSON válido, sin markdown ni texto alrededor:
-{"cards":[{"question":"Dibujá de memoria ...","steps":["paso 1","paso 2","paso 3"],"contextFact":"..."}]}`;
+{"cards":[{"question":"Dibuja de memoria ...","steps":["paso 1","paso 2","paso 3"],"contextFact":"..."}]}`;
 }
 
 // Mensajes de texto para el prompt 4: consigna de dibujo de memoria + rúbrica de pasos.
