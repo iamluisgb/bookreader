@@ -487,6 +487,9 @@ body.reading :is(.reader-header, .reader-footer):hover > * { opacity: 1; }
   font-family: var(--font-reader); font-size: clamp(22px, 3.4vw, 28px); font-weight: 600; line-height: 1.35;
 }
 .study-tap { margin: 0; text-align: center; font-size: 12.5px; color: var(--text-faint); }
+/* El frente completo como UN solo item del flex de .study-q: los fragmentos de un cloze
+   como items sueltos se repartían en columnas a los lados del hueco (study.js frontHtml). */
+.study-qtext { display: block; width: 100%; }
 .study-qmini { font-size: var(--fs-sm); color: var(--text-soft); font-weight: 500; }
 .study-screen .study-a { border-top: none; padding-top: 0; font-size: 19px; line-height: 1.55; color: var(--text); }
 .study-screen .study-face--back .study-a { font-family: var(--font-ui); }

@@ -440,11 +440,14 @@ const CLOZE_RE = /\{\{c\d+::((?:(?!::|\}\}).)*)(?:::((?:(?!\}\}).)*))?\}\}/g;
 // Nota: el replace corre sobre el texto YA escapado, así que los grupos capturados llegan
 // escapados — insertarlos tal cual es seguro.
 function frontHtml(card) {
-  if (card.type === 'cloze') {
-    return escapeHtml(card.front).replace(CLOZE_RE, (_, _ans, hint) =>
-      `<span class="study-cloze">[${hint || '…'}]</span>`);
-  }
-  return escapeHtml(card.front) + visualHtml(card, 'front');
+  const inner = card.type === 'cloze'
+    ? escapeHtml(card.front).replace(CLOZE_RE, (_, _ans, hint) =>
+      `<span class="study-cloze">[${hint || '…'}]</span>`)
+    : escapeHtml(card.front) + visualHtml(card, 'front');
+  // Un ÚNICO hijo para .study-q: en modern.css es un flex row (centrado vertical) y los
+  // fragmentos de un cloze como items sueltos se repartían en columnas estrechas a los
+  // lados del hueco. Como un solo item, el texto fluye en línea y el hueco es inline.
+  return `<span class="study-qtext">${inner}</span>`;
 }
 
 // ---- Tarjetas visuales (WU6) --------------------------------------------------

@@ -98,6 +98,12 @@ test('cloze: el frente oculta la respuesta y el volteo la revela resaltada', asy
   const overlay = page.locator('#ai-study');
   // Huecos: […] sin pista, [cómo] con pista; la respuesta NO está en el frente.
   await expect(overlay.locator('.study-q')).toHaveText('Raft elige un […] por [cómo].');
+  // Layout: .study-q es un flex row (modern.css); el frente debe ser UN solo item de flujo.
+  // Si los fragmentos del cloze se vuelven items sueltos, cada uno se parte en columna.
+  await expect(overlay.locator('.study-q > *')).toHaveCount(1);
+  const qbox = overlay.locator('.study-q > *').first();
+  await expect.soft(qbox).toHaveClass(/study-qtext/);
+  await expect.soft(qbox).toHaveCSS('display', 'block');
   await overlay.locator('.study-flip').click();
   await expect(overlay.locator('.study-a')).toContainText('Raft elige un líder por mayoría.');
   await expect(overlay.locator('.study-a .study-cloze.is-revealed').first()).toHaveText('líder');
