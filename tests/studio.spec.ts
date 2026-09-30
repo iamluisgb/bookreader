@@ -170,6 +170,58 @@ function flashGroup(page: any) {
   return page.locator('#ai-view-studio .studio-group[data-kind="flashcards"]');
 }
 
+// Dos mazos CON vencidas hoy cada uno (srs a mano, mismo patrón que seedDecks):
+// Capítulo 1 → 2 para hoy (nueva + vencida hoy), Capítulo 2 → 2 para hoy (nueva + vencida hoy).
+async function seedDecksTwoDue(page: any, bookId: string) {
+  const today = await page.evaluate(async () => (await import('/js/ai/srs.js') as any).dayOf(Date.now()));
+  await page.evaluate(async ({ bookId, today }: any) => {
+    const DB: any = await import('/js/ai/db.js');
+    const future = (n: number) => ({ reps: 3, lapses: 0, ease: 2.5, interval: 10, due: today + n, lastReview: Date.now() });
+    await DB.addDeck({
+      bookId, name: '', cardType: 'basic', scope: 'Capítulo 1',
+      cards: [
+        { type: 'basic', front: 'p1', back: 'r1', chapter: '' },
+        { type: 'basic', front: 'p2', back: 'r2', chapter: '', srs: future(0) },
+        { type: 'basic', front: 'p3', back: 'r3', chapter: '', srs: future(5) },
+      ],
+    });
+    await DB.addDeck({
+      bookId, name: '', cardType: 'basic', scope: 'Capítulo 2',
+      cards: [
+        { type: 'basic', front: 'q1', back: 's1', chapter: '' },
+        { type: 'basic', front: 'q2', back: 's2', chapter: '', srs: future(0) },
+      ],
+    });
+  }, { bookId, today });
+}
+
+// Mazo único sin nada vencido (todo a futuro): el tile lista filas pero sin «Estudiar todo».
+async function seedDeckNothingDue(page: any, bookId: string) {
+  const today = await page.evaluate(async () => (await import('/js/ai/srs.js') as any).dayOf(Date.now()));
+  await page.evaluate(async ({ bookId, today }: any) => {
+    const DB: any = await import('/js/ai/db.js');
+    const future = (n: number) => ({ reps: 3, lapses: 0, ease: 2.5, interval: 10, due: today + n, lastReview: Date.now() });
+    await DB.addDeck({
+      bookId, name: 'Libro', cardType: 'basic', scope: 'Capítulo 3',
+      cards: [
+        { type: 'basic', front: 'f1', back: 'g1', chapter: '', srs: future(4) },
+        { type: 'basic', front: 'f2', back: 'g2', chapter: '', srs: future(9) },
+      ],
+    });
+  }, { bookId, today });
+}
+
+// Recorre la sesión calificando «bien» y devuelve los nombres de mazo vistos, en orden.
+async function playThrough(page: any, study: any, n: number) {
+  const seen: string[] = [];
+  for (let i = 0; i < n; i++) {
+    seen.push(((await study.locator('.study-deckname').first().textContent()) || '').trim());
+    await study.locator('.study-card3d').click();
+    await study.locator('.study-grade[data-rate="good"]').click();
+  }
+  return seen;
+}
+
 test('Studio: el tile de Flashcards lista los mazos del libro con resumen y acciones', async ({ page }) => {
   await setupEs(page);
   await seedDecks(page, await currentBookId(page));
@@ -237,6 +289,46 @@ test('Studio: la papelera pide confirmación y borra el mazo de IndexedDB', asyn
     return (await DB.getDecks(bookId)).map((d: any) => d.scope);
   }, bookId);
   expect(remaining).toEqual(['Capítulo 2']);
+});
+
+test('Studio: «Estudiar todo · N» repasa lo vencido de TODOS los mazos del libro', async ({ page }) => {
+  await setupEs(page);
+  await seedDecksTwoDue(page, await currentBookId(page));
+
+  await page.click('.ai-tab[data-view="studio"]');
+  const group = flashGroup(page);
+
+  // Acción primaria del tile con la suma de vencidas (2 + 2).
+  const all = group.locator('[data-act="study-book"]');
+  await expect(all).toBeVisible();
+  await expect(all).toContainText('Estudiar todo · 4');
+
+  // Abre la sesión del libro (scope book) con el título del libro.
+  await all.click();
+  const study = page.locator('#ai-study');
+  await expect(study).toBeVisible();
+  await expect(study.locator('.study-title')).toHaveText('Pedro Páramo');
+  await expect(study.locator('.study-left')).toHaveText('4 pendientes');
+
+  // La cola mezcla los DOS mazos: recorriéndola entera aparecen ambos capítulos.
+  const seen = await playThrough(page, study, 4);
+  await expect(study.locator('.study-end h2')).toHaveText('¡Repaso completado!');
+  expect(seen).toEqual(expect.arrayContaining(['Capítulo 1', 'Capítulo 2']));
+
+  // Cerrar vuelve al Studio (onClose re-renderiza).
+  await study.locator('.ai-ob-close').click();
+  await expect(study).toHaveCount(0);
+  await expect(group.locator('.studio-card.studio-generated')).toHaveCount(2);
+});
+
+test('Studio: sin nada vencido hoy, el tile NO ofrece «Estudiar todo»', async ({ page }) => {
+  await setupEs(page);
+  await seedDeckNothingDue(page, await currentBookId(page));
+
+  await page.click('.ai-tab[data-view="studio"]');
+  const group = flashGroup(page);
+  await expect(group.locator('.studio-card.studio-generated')).toHaveCount(1);   // la fila del mazo sigue
+  await expect(group.locator('[data-act="study-book"]')).toHaveCount(0);
 });
 
 test('Studio: sin mazos, el tile de Flashcards sigue siendo la invitación vacía con «Crear»', async ({ page }) => {

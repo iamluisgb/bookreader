@@ -16,7 +16,7 @@ import { t } from '../i18n.js';
 import * as Jobs from './jobs.js';
 import * as DB from './db.js';
 import { deckSummary } from './deck-manager.js';
-import { open as openStudy } from './study.js';
+import { open as openStudy, openToday as openStudyToday } from './study.js';
 import { icon } from '../ui/icons.js';
 import { escapeHtml } from '../ui/escape.js';
 import { confirmBox } from '../ui/dialog.js';
@@ -118,8 +118,14 @@ function decksBody(decks) {
   let cards = 0, due = 0;
   for (const d of decks) { const s = deckSummary(d); cards += s.total; due += s.due; }
   const summary = `<p class="studio-meta studio-deck-summary">${t('Mazos: {n} · Tarjetas: {c} · Para hoy: {d}', { n: decks.length, c: cards, d: due })}</p>`;
+  // Acción primaria del tile con algo vencido hoy: repasa TODO el libro de una vez.
+  // Mismo mecanismo que la biblioteca (Study.openToday con scope de libro): alias-aware,
+  // tope de nuevas y gate Pro incluidos. Sin vencidas no se ofrece: no hay sesión vacía.
+  const studyAll = due
+    ? `<button class="studio-gen studio-all" data-act="study-book">${icon('cards', { size: 15 })} ${t('Estudiar todo · {n}', { n: due })}</button>`
+    : '';
   const manage = `<button class="studio-manage" data-act="manage">${t('Gestionar mazos')}</button>`;
-  return summary + decks.map(deckRow).join('') + manage;
+  return summary + studyAll + decks.map(deckRow).join('') + manage;
 }
 
 function group(ty, ctx, job, decks) {
@@ -197,6 +203,11 @@ async function onClick(e) {
       const deck = list.find(x => x.id === deckId);
       if (deck) openStudy({ decks: [deck], title: deck.scope || deck.name || t('Mazo'), onClose: () => render() });
     });
+    return;
+  }
+  if (act === 'study-book') {
+    // «Estudiar todo»: lo vencido de TODOS los mazos del libro, resuelto por Study.openToday.
+    openStudyToday({ scope: { type: 'book', bookId: ctx.bookId }, title: ctx.bookTitle || t('Libro'), onClose: () => render() });
     return;
   }
   if (act === 'del-deck') {

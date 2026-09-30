@@ -361,6 +361,13 @@ body.ai-open .reader-main { margin-right: var(--ai-panel-width); }
   margin-left: auto; display: inline-flex; align-items: center; gap: 5px;
   font-size: 12px; font-weight: 600; color: var(--accent); white-space: nowrap;
 }
+/* «Estudiar todo · N» es LA acción del grupo cuando hay vencidas: relleno acentuado
+   para que no compita con las secundarias (Nuevo / Gestionar / Estudiar por mazo). */
+.studio-gen.studio-all {
+  justify-content: center; background: var(--accent); border-color: var(--accent);
+  color: var(--on-accent); font-weight: 600;
+}
+.studio-gen.studio-all:hover { filter: brightness(1.06); }
 .studio-deck-summary { margin: 0 2px 8px; }
 .studio-manage {
   display: inline-flex; align-items: center; cursor: pointer; margin-top: 2px;

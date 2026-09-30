@@ -1098,6 +1098,7 @@ const EN = {
   '{name}, {n} libros con sus subestanterías': '{name}, {n} books including sub-shelves',
   'Opciones': 'Options',
   'Repasar hoy · {n}': 'Review today · {n}',
+  'Estudiar todo · {n}': 'Study all · {n}',
   'Todo': 'All',
   'Todos': 'All',
   'Abrir': 'Open',

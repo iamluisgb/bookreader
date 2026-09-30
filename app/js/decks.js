@@ -111,11 +111,20 @@ function renderList(decks, books) {
 
   const { groups, orphans } = DM.groupDecks(decks, books);
 
-  const bookSections = groups.map(g => `
+  const bookSections = groups.map(g => {
+    const due = g.decks.reduce((n, d) => n + (sums.get(d.id)?.due || 0), 0);
+    // Misma acción que el tile de Flashcards del Studio: repasar TODO lo vencido del
+    // libro con Study.openToday (scope de libro). Sin vencidas no se ofrece.
+    const studyAll = due
+      ? `<button class="studio-gen dk-study-all studio-all" data-act="dk-study-book" data-book="${escapeHtml(g.bookId)}">${icon('cards', { size: 15 })} ${t('Estudiar todo · {n}', { n: due })}</button>`
+      : '';
+    return `
     <div class="dk-book">
       <div class="dk-book-h">${escapeHtml(g.title || t('Libro sin título'))}</div>
+      ${studyAll}
       ${g.decks.map(d => deckRow(d, sums.get(d.id))).join('')}
-    </div>`).join('');
+    </div>`;
+  }).join('');
 
   // Reparación manual (Fase 1): los mazos cuyo libro ya no está en la
   // biblioteca. «Asignar a…» mueve TODOS los mazos de ese libro ausente —
@@ -251,6 +260,14 @@ async function onListClick(e) {
     // Mazo re-leído de IndexedDB: el cache puede traer tarjetas viejas.
     const deck = (await AiDB.getAllDecks()).find(d => String(d.id) === String(id));
     if (deck) Study.open({ decks: [deck], title: deck.name || t('Estudiar'), onClose: () => paint() });
+    return;
+  }
+  if (a === 'dk-study-book') {
+    // «Estudiar todo» del libro: openToday resuelve los mazos del ámbito (alias-aware)
+    // y aplica tope de nuevas + gate Pro, igual que el repaso de la biblioteca.
+    const bookId = act.dataset.book;
+    const book = (await Store.getAllBooks().catch(() => [])).find(b => b.id === bookId);
+    Study.openToday({ scope: { type: 'book', bookId }, title: book?.title || t('Libro sin título'), onClose: () => paint() });
     return;
   }
   if (a === 'dk-del') { await deleteDeckFlow(act.closest('.dk-row')?.dataset.deck); return; }
