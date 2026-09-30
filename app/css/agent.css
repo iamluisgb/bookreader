@@ -354,6 +354,21 @@ body.ai-open .reader-main { margin-right: var(--ai-panel-width); }
 }
 .studio-gen:hover { background: var(--accent-soft); }
 .studio-link { background: none; border: none; color: var(--accent); cursor: pointer; font: inherit; font-size: inherit; padding: 0 0 0 2px; }
+/* Fila de mazo (grupo Flashcards): nombre + contador, mismas .studio-card que los artefactos */
+.studio-deck-name { display: block; font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 2px; }
+/* La fila del mazo se estudia al pulsarla: sin esta pista, la fila parece solo informativa. */
+.studio-deck-go {
+  margin-left: auto; display: inline-flex; align-items: center; gap: 5px;
+  font-size: 12px; font-weight: 600; color: var(--accent); white-space: nowrap;
+}
+.studio-deck-summary { margin: 0 2px 8px; }
+.studio-manage {
+  display: inline-flex; align-items: center; cursor: pointer; margin-top: 2px;
+  padding: 5px 12px; font-size: 12.5px; font-weight: 600;
+  border: 1px solid var(--border); border-radius: var(--r-sm);
+  background: transparent; color: var(--text-soft);
+}
+.studio-manage:hover { background: var(--surface-3); color: var(--text); }
 /* Estados en curso / error, dentro del grupo del tipo */
 .studio-running, .studio-error { flex-direction: column; align-items: stretch; gap: 8px; padding: 12px 14px; }
 .studio-errmsg { color: #dc2626; }

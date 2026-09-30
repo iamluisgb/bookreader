@@ -528,6 +528,14 @@ const EN = {
   'Preparando el libro… la generación estará lista en unos segundos.': 'Preparing the book… generation will be ready in a few seconds.',
   'Se borrará este artefacto. Los demás se conservan y podrás generar nuevos cuando quieras.': 'This artifact will be deleted. The others are kept, and you can generate new ones anytime.',
 
+  // studio.js · mazos de flashcards en el tile del Studio
+  'Mazos: {n} · Tarjetas: {c} · Para hoy: {d}': 'Decks: {n} · Cards: {c} · Due today: {d}',
+  '{n} tarjetas · {m} para hoy': '{n} cards · {m} due today',
+  '{n} tarjeta · {m} para hoy': '{n} card · {m} due today',
+  'Gestionar mazos': 'Manage decks',
+  'Borrar este mazo': 'Delete this deck',
+  'Se borrará este mazo con todas sus tarjetas y su estado de repaso. Esta acción no se puede deshacer.': 'This deck will be deleted with all its cards and its review progress. This action cannot be undone.',
+
   // study.js
   'Repaso de hoy': 'Today’s review',
   'Ver en el libro': 'See in the book',

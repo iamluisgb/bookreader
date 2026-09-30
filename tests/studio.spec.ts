@@ -118,3 +118,134 @@ test('Studio conserva el historial: generar dos no sobrescribe; borrar uno deja 
   expect(visible).toBe(1);
   expect(raw).toBe(2);            // el tombstone sigue ahí hasta que caduque
 });
+
+// ---------------------------------------------------------------------------
+// Flashcards con mazos: el tile lista los mazos del libro (store `decks`), no
+// el historial de jobs. Se siembran dos mazos vía db.js (mismo camino que
+// producción) y se recorre: resumen + filas, estudiar un mazo, borrarlo, y el
+// caso sin mazos que conserva la invitación vacía.
+// ---------------------------------------------------------------------------
+
+// El idioma por defecto del navegador de Playwright es en-US; fijamos español
+// ANTES de que la app arranque (addInitScript corre en cada navegación) para
+// poder asertar sobre las cadenas de la UI tal cual las escribe el código.
+async function setupEs(page: any) {
+  await page.addInitScript(() => localStorage.setItem('bookreader_lang', 'es'));
+  await setup(page);
+}
+
+async function currentBookId(page: any) {
+  return page.evaluate(async () => {
+    const DB: any = await import('/js/ai/db.js');
+    return (await DB.getAll('books'))[0].id;
+  });
+}
+
+async function seedDecks(page: any, bookId: string) {
+  const today = await page.evaluate(async () => (await import('/js/ai/srs.js') as any).dayOf(Date.now()));
+  await page.evaluate(async ({ bookId, today }: any) => {
+    const DB: any = await import('/js/ai/db.js');
+    const future = (n: number) => ({ reps: 3, lapses: 0, ease: 2.5, interval: 10, due: today + n, lastReview: Date.now() });
+    // Mazo con tarjetas para hoy: una nueva (sin srs) y una vencida hoy; la futura no cuenta.
+    await DB.addDeck({
+      bookId, name: 'Libro', cardType: 'basic', scope: 'Capítulo 1',
+      cards: [
+        { type: 'basic', front: 'nueva', back: 'sin agendar', chapter: '' },
+        { type: 'basic', front: 'vencida', back: 'para hoy', chapter: '', srs: future(0) },
+        { type: 'basic', front: 'futura', back: 'no toca', chapter: '', srs: future(5) },
+      ],
+    });
+    // Mazo sin nada vencido: las dos agendadas a futuro.
+    await DB.addDeck({
+      bookId, name: 'Libro', cardType: 'basic', scope: 'Capítulo 2',
+      cards: [
+        { type: 'basic', front: 'a1', back: 'b1', chapter: '', srs: future(3) },
+        { type: 'basic', front: 'a2', back: 'b2', chapter: '', srs: future(9) },
+      ],
+    });
+  }, { bookId, today });
+}
+
+function flashGroup(page: any) {
+  return page.locator('#ai-view-studio .studio-group[data-kind="flashcards"]');
+}
+
+test('Studio: el tile de Flashcards lista los mazos del libro con resumen y acciones', async ({ page }) => {
+  await setupEs(page);
+  await seedDecks(page, await currentBookId(page));
+
+  await page.click('.ai-tab[data-view="studio"]');
+  const group = flashGroup(page);
+  await expect(group).toBeVisible();
+
+  // Resumen: 2 mazos, 5 tarjetas, 2 para hoy (la nueva y la vencida del mazo 1).
+  await expect(group.locator('.studio-deck-summary')).toHaveText('Mazos: 2 · Tarjetas: 5 · Para hoy: 2');
+
+  // Una fila por mazo, con «N tarjetas · M para hoy».
+  const rows = group.locator('.studio-card.studio-generated');
+  await expect(rows).toHaveCount(2);
+  await expect(rows.filter({ hasText: 'Capítulo 1' })).toContainText('3 tarjetas · 2 para hoy');
+  await expect(rows.filter({ hasText: 'Capítulo 2' })).toContainText('2 tarjetas · 0 para hoy');
+
+  // Head con «Nuevo» y acceso al gestor de mazos; SIN invitación vacía.
+  await expect(group.locator('.studio-new[data-kind="flashcards"]')).toBeVisible();
+  await expect(group.locator('[data-act="manage"]')).toHaveText('Gestionar mazos');
+  await expect(group.locator('.studio-empty')).toHaveCount(0);
+
+  // El resto de tipos no cambian: el resumen sigue siendo una invitación vacía.
+  await expect(page.locator('#ai-view-studio .studio-empty [data-act="gen"][data-kind="summary"]')).toBeVisible();
+});
+
+test('Studio: clic en la fila de un mazo abre el Modo Estudiar con ese mazo', async ({ page }) => {
+  await setupEs(page);
+  await seedDecks(page, await currentBookId(page));
+
+  await page.click('.ai-tab[data-view="studio"]');
+  const row = flashGroup(page).locator('.studio-card.studio-generated').filter({ hasText: 'Capítulo 1' });
+  await row.locator('[data-act="study"]').click();
+
+  const study = page.locator('#ai-study');
+  await expect(study).toBeVisible();
+  await expect(study.locator('.study-title')).toHaveText('Capítulo 1');
+  // El mazo estudiado es el del scope: en la cola entran sus 2 para hoy (nueva + vencida).
+  await expect(study.locator('.study-left')).toHaveText('2 pendientes');
+
+  // Cerrar vuelve al Studio con los datos frescos (misma fila).
+  await study.locator('.ai-ob-close').click();
+  await expect(study).toHaveCount(0);
+  await expect(flashGroup(page).locator('.studio-card.studio-generated')).toHaveCount(2);
+});
+
+test('Studio: la papelera pide confirmación y borra el mazo de IndexedDB', async ({ page }) => {
+  await setupEs(page);
+  const bookId = await currentBookId(page);
+  await seedDecks(page, bookId);
+
+  await page.click('.ai-tab[data-view="studio"]');
+  const rows = flashGroup(page).locator('.studio-card.studio-generated');
+  await rows.filter({ hasText: 'Capítulo 1' }).locator('.studio-del').click();
+
+  // Confirmación con mensaje propio (mazo + estado de repaso).
+  await expect(page.locator('.dlg-card')).toContainText('estado de repaso');
+  await page.locator('.dlg-ok').click();
+
+  // La fila desaparece y el mazo ya no está en IndexedDB (getDecks filtra tombstones).
+  await expect(rows).toHaveCount(1);
+  await expect(rows.filter({ hasText: 'Capítulo 2' })).toBeVisible();
+  const remaining = await page.evaluate(async (bookId: any) => {
+    const DB: any = await import('/js/ai/db.js');
+    return (await DB.getDecks(bookId)).map((d: any) => d.scope);
+  }, bookId);
+  expect(remaining).toEqual(['Capítulo 2']);
+});
+
+test('Studio: sin mazos, el tile de Flashcards sigue siendo la invitación vacía con «Crear»', async ({ page }) => {
+  await setupEs(page);
+
+  await page.click('.ai-tab[data-view="studio"]');
+  const group = flashGroup(page);
+  await expect(group.locator('.studio-empty')).toBeVisible();
+  await expect(group.locator('.studio-empty [data-act="gen"][data-kind="flashcards"]')).toHaveText(/Crear/);
+  await expect(group.locator('.studio-new[data-kind="flashcards"]')).toHaveCount(0);
+  await expect(group.locator('.studio-card.studio-generated')).toHaveCount(0);
+});
