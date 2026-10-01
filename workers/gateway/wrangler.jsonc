@@ -9,7 +9,14 @@
   "vars": {
     // Orígenes permitidos por CORS (dev + producción de las dos apps que sirve el
     // gateway: bookreader y arete), separados por comas.
-    "ALLOWED_ORIGINS": "http://localhost:8000,http://localhost:8888,https://bookreader.raiatech.com,https://arete.raiatech.com,https://arete-6a8.pages.dev,https://luisgonzalezbernal.com",
+    //
+    // El match de `corsHeaders()` es por IGUALDAD EXACTA de string: un origen que falte
+    // aquí no recibe un error legible sino una respuesta sin ACAO válido, y el navegador
+    // lo convierte en un «Failed to fetch» opaco. El dominio *.pages.dev del proyecto es
+    // un destino real de deploy (`npm run deploy:pages`), no un preview: sin él, la demo
+    // y el medidor de cupo quedaban muertos en ese despliegue (visto en el emulador).
+    // El test `config.test.mjs` fija esta lista.
+    "ALLOWED_ORIGINS": "http://localhost:8000,http://localhost:8888,https://bookreader.raiatech.com,https://bookreader-2h5.pages.dev,https://arete.raiatech.com,https://arete-6a8.pages.dev,https://luisgonzalezbernal.com",
     // F3 · demo self-service: cuota por token y disyuntores globales diarios.
     //
     // nan es TARIFA PLANA, así que estos números no protegen una factura: protegen de
