@@ -769,6 +769,7 @@ async function prepareBook() {
     }
 
     segReady = true; segBlocks = seg.blockCount;
+    repaintCites();
     refreshStatus();
     if (document.getElementById('sidebar')?.classList.contains('open')) maybeAttenuate();
   } catch (e) {
@@ -2737,12 +2738,30 @@ function appendBubble(role, text, asHtml) {
   div.className = 'ai-msg ai-msg-' + role;
   div.innerHTML = `<div class="ai-bubble"><div class="ai-bubble-text"></div></div>`;
   const node = div.querySelector('.ai-bubble-text');
+  // Markdown CRUDO de la respuesta (con sus `[[aN]]`): hace falta para repintar las citas
+  // cuando el libro termina de segmentarse. Ver repaintCites().
+  if (asHtml && role === 'assistant' && text) div.dataset.rawText = text;
   if (asHtml) node.innerHTML = renderWithCitations(text, anchors);
   else node.textContent = text;
   els.messages.appendChild(div);
   if (asHtml && role === 'assistant' && text) addMessageActions(div, text, '');
   scrollDown();
   return div;
+}
+
+// Al abrir el panel se restaura la conversación (activateConvo → restoreChat) ANTES de que
+// prepareBook() segmente el libro y llene `anchors`. renderWithCitations() con el mapa vacío
+// no produce chips —y citeReplace() borra los `[[aN]]`—, así que las respuestas de una
+// conversación restaurada se quedaban sin citas clicables para siempre. Aquí se repintan
+// las burbujas que guardaron su markdown crudo, una vez las anclas existen.
+function repaintCites() {
+  if (!anchors.size) return;
+  for (const div of els.messages.querySelectorAll('.ai-msg-assistant')) {
+    const raw = div.dataset.rawText;
+    if (!raw) continue;                       // en streaming o ya sin citas pendientes
+    const text = div.querySelector('.ai-bubble-text');
+    if (text) text.innerHTML = renderWithCitations(raw, anchors);
+  }
 }
 
 function setStatus(s) {
