@@ -802,7 +802,7 @@ function appHtml() {
   const limit = Study.newLimit();
   return `<div class="appset-section">
     <h3 class="appset-h3">${t('Aplicación')}</h3>
-    <label class="appset-label" for="appset-lang">${t('Idioma')} · Language</label>
+    <label class="appset-label" for="appset-lang">${lang === 'es' ? `${t('Idioma')} · Language` : t('Idioma')}</label>
     <select id="appset-lang" class="appset-input">
       <option value="en"${lang === 'en' ? ' selected' : ''}>English</option>
       <option value="es"${lang === 'es' ? ' selected' : ''}>Español</option>
