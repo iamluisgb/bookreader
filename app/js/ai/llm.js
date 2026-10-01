@@ -729,7 +729,7 @@ export async function requestDemoToken() {
   try {
     res = await fetch(GATEWAY_BASE_URL.replace(/\/v1$/, '') + '/demo-token', { method: 'POST' });
   } catch (e) {
-    throw new Error(t('No se pudo contactar el servicio de la demo. Revisa tu conexión e inténtalo otra vez.'));
+    throw new Error(t('No se pudo contactar el servicio de la demo. Revisa tu conexión e inténtalo otra vez.'), { cause: e });
   }
   const body = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(body?.error?.message || `HTTP ${res.status}`);
