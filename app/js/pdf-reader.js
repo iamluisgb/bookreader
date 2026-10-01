@@ -20,6 +20,7 @@ let lazyObserver = null;         // observer del render perezoso en modo scroll
 // sobre la que onScroll decide cuál está centrada, en vez de recorrer el documento.
 const cercanas = new Set();
 let scrollRaf = 0;
+let jumpGuardUntil = 0;   // fin de la guardia anti-"corrección" tras un salto programático
 
 // ---- Cola de render con prioridad ------------------------------------------
 //
@@ -1154,6 +1155,9 @@ function onScroll() {
   if (scrollRaf) return;
   scrollRaf = requestAnimationFrame(() => {
     scrollRaf = 0;
+    // Guardia de salto programático: el observer aún no entregó el lote nuevo; derivar
+    // la página centrada ahora usaría cercanas rancias y desharía el salto.
+    if (Date.now() < jumpGuardUntil) return;
     const container = document.getElementById('pdf-container');
     if (!container) return;
     const cr = container.getBoundingClientRect();
@@ -1464,8 +1468,16 @@ async function move(page) {
     // Desplazar hasta la página; el observer la pinta si aún no lo estaba.
     const container = document.getElementById('pdf-container');
     const target = container?.querySelector(`.pdf-page[data-page="${page}"]`);
-    if (target) { const cr = container.getBoundingClientRect(), tr = target.getBoundingClientRect(); container.scrollTop += tr.top - cr.top; }
-    setCurrentPage(page);
+    if (target) {
+      const cr = container.getBoundingClientRect(), tr = target.getBoundingClientRect();
+      container.scrollTop += tr.top - cr.top;
+      // Salto INSTANTÁNEO de varias pantallas: el IntersectionObserver tarda un lote en
+      // enterarse, y mientras tanto onScroll derivaría la página centrada del lote VIEJO
+      // (cercanas, aún en la posición de origen) y "corregiría" el salto a una vecina —
+      // con libros grandes, de vuelta al principio. La guardia ignora esos frames.
+      jumpGuardUntil = Date.now() + 400;
+      setCurrentPage(page);
+    }
   } else if (spreadOn()) {
     await renderSpread(page);
   } else {
