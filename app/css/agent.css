@@ -671,8 +671,12 @@ a tamaño real en este lienzo con scroll, o se descarga. La medida se maneja por
 .ai-taskchip.is-done { border-color: var(--accent); }
 .ai-taskchip.is-error { border-color: #ef4444; }
 /* Leyendo, el chip NO flota sobre el texto: la señal viaja al punto del botón del
-   agente (main-late.css). Al salir del lector, el chip reaparece solo (sigue en el DOM). */
-body.reading .ai-taskchip { display: none; }
+   agente (main-late.css). Al salir del lector, el chip reaparece solo (sigue en el DOM).
+   EXCEPCIÓN: el chip de "Volver al repaso" (is-study) NO es un aviso de fondo —es una
+   sesión que el usuario minimizó a propósito para consultar el libro— y es su única
+   vuelta a ella: escondiéndolo, releer una frase costaba la cola y el contador del
+   repaso (justo lo que P10 F2 vino a arreglar). */
+body.reading .ai-taskchip:not(.is-study) { display: none; }
 .ai-taskchip-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ai-taskchip-spin {
   width: 15px; height: 15px; flex: none; border-radius: 50%;

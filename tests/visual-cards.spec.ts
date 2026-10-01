@@ -632,5 +632,8 @@ test('generateDrawingCards: rúbrica válida via stream → { cards: [...] }', a
   const state = await page.evaluate(() => (window as any).__vc);
   expect(state.calls).toHaveLength(1);
   expect(state.calls[0].stream).toBe(true);
-  expect(state.calls[0].messages[0].content).toContain('Dibujá de memoria');
+  // El prompt pide la consigna en español NEUTRO (antes pedía voseo y las tarjetas
+  // salían con «Dibujá», que no es el registro del producto).
+  expect(state.calls[0].messages[0].content).toContain('Dibuja de memoria');
+  expect(state.calls[0].messages[0].content).toContain('ESPAÑOL NEUTRO');
 });

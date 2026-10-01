@@ -335,7 +335,12 @@ test('cerrar el modal no cancela la generación: el chip la recoge al terminar',
   await expect(page.locator('#ai-flashcards')).toHaveCount(0);
 
   const chip = page.locator('.ai-taskchip');
-  await expect(chip).toContainText('Flashcards');
+  // Mientras se LEE (body.reading) el chip flotante no invade el texto: el estado viaja
+  // como punto en el botón del agente. El chip vuelve al salir del lector (mismo contrato
+  // que fija jobs.spec.ts).
+  await expect(page.locator('body')).toHaveClass(/ai-jobs-unread/, { timeout: 20000 });
+  await expect(chip).toBeHidden();
+  await page.evaluate(() => document.body.classList.remove('reading'));
   await expect(chip).toContainText('Ver flashcards', { timeout: 20000 });
 
   // El mazo está en `decks`, ya completo, y el chip reabre directo en la revisión.
