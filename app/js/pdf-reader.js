@@ -1541,6 +1541,8 @@ export function revealRegion(page, rect, reservedBottomPx = 0) {
   const visibleH = Math.max(80, cr.height - reservedBottomPx);
   const centerInPage = (rect.y + rect.h / 2) * wr.height;
   const target = (wr.top - cr.top) + container.scrollTop + centerInPage - visibleH / 2;
+  // Un target no finito (rect corrupto) haría scrollTo(NaN) = volver al tope del libro.
+  if (!Number.isFinite(target)) return;
   container.scrollTo({ top: Math.max(0, target), behavior: 'smooth' });
 }
 

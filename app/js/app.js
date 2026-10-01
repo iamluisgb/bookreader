@@ -1130,9 +1130,13 @@ async function highlightPdfPassage(page, passageText) {
 
 // Caja que envuelve a todos los rects de un pasaje. Un pasaje son varias líneas, y
 // centrar solo la primera deja el resto fuera justo cuando la franja es estrecha.
+// Los rects fraccionales vienen de fractionalFromRects con campos {left, top, width,
+// height} — NO {y, h}: leer r.y daba undefined → Math.min() = NaN → scrollTo(NaN) y el
+// navegador interpreta NaN como 0, es decir, de vuelta a la página 1 (en paginado el
+// contenedor ya está en scrollTop 0 y el bug era invisible; en scroll, catastrófico).
 function boundingRect(rects) {
-  const top = Math.min(...rects.map(r => r.y));
-  const bottom = Math.max(...rects.map(r => r.y + r.h));
+  const top = Math.min(...rects.map(r => r.top));
+  const bottom = Math.max(...rects.map(r => r.top + r.height));
   return { y: top, h: bottom - top };
 }
 
