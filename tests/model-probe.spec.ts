@@ -74,6 +74,7 @@ test('«Modelo rápido» vacío prueba el que se usaría de verdad y lo nombra',
   await page.locator('#appset-baseurl').fill('https://api.nan.builders/v1');
   await page.locator('#appset-lmodel').fill('');            // vacío = automático
   await page.locator('#appset-probe-appset-lmodel').click();
-  // "vacío" deja de ser una caja negra: dice cuál ha usado (el liteModel del preset de nan).
-  await expect(page.locator('#appset-probe-appset-lmodel-hint')).toContainText('qwen3.6');
+  // "vacío" deja de ser una caja negra: dice cuál ha usado (el liteModel del preset de nan,
+  // deepseek-v4-flash desde el sondeo IA7 F3; 'qwen3.6' quedó roto en silencio).
+  await expect(page.locator('#appset-probe-appset-lmodel-hint')).toContainText('deepseek-v4-flash');
 });

@@ -165,7 +165,9 @@ test('getLiteModel resuelve: explícito → preset del proveedor → modelo prin
     out.custom = L.getLiteModel();
     return out;
   });
-  expect(r.nanDefault).toBe('qwen3.6');
+  // El liteModel del preset de nan es deepseek-v4-flash desde el sondeo IA7 F3 (2026-09-22);
+  // 'qwen3.6' quedó roto en silencio. Ver la nota en llm.js.
+  expect(r.nanDefault).toBe('deepseek-v4-flash');
   expect(r.explicit).toBe('mi-lite');
   expect(r.openai).toBe('modelo-principal');
   expect(r.custom).toBe('modelo-principal');
