@@ -1135,6 +1135,7 @@ const EN = {
   'Un cupo de llamadas de prueba con el modelo de la casa, sin registro. Cuando se acabe, pon tu propia key (BYOK) — o configúrala ya abajo.': 'A quota of trial calls with the house model, no sign-up. When it runs out, add your own key (BYOK) — or set it up below right away.',
   'Creando tu demo…': 'Creating your demo…',
   'No se pudo activar la demo: {msg}': 'Could not enable the demo: {msg}',
+  'No se pudo contactar el servicio de la demo. Revisa tu conexión e inténtalo otra vez.': 'Could not reach the demo service. Check your connection and try again.',
   // traspaso de la demo a otro dispositivo (F3.1)
   'Usar esta demo en otro dispositivo': 'Use this demo on another device',
   'Abre este enlace en el otro dispositivo y la demo queda lista allí. El cupo es del enlace, no del dispositivo: los dos gastan de la misma bolsa.': 'Open this link on the other device and the demo is set up there. The quota belongs to the link, not the device: both draw from the same pot.',

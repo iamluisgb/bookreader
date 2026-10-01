@@ -720,7 +720,17 @@ function apiErrMsg(bodyText) {
 // MON1 F3 · Pide un token demo al gateway y AUTOCONFIGURA el proveedor (base URL +
 // key + modelo alias). El usuario no ve token ni URLs: pulsa un botón y pregunta.
 export async function requestDemoToken() {
-  const res = await fetch(GATEWAY_BASE_URL.replace(/\/v1$/, '') + '/demo-token', { method: 'POST' });
+  // Un fallo de red o una respuesta sin el CORS correcto llegan aquí como TypeError
+  // («Failed to fetch»), indistinguibles entre sí desde el navegador. Antes se filtraba
+  // ese texto crudo a la UI: en el deploy de Pages, donde el origen no estaba permitido,
+  // el usuario leía «Failed to fetch» en vez de algo accionable. Se traduce a un mensaje
+  // honesto, sin inventar la causa.
+  let res;
+  try {
+    res = await fetch(GATEWAY_BASE_URL.replace(/\/v1$/, '') + '/demo-token', { method: 'POST' });
+  } catch (e) {
+    throw new Error(t('No se pudo contactar el servicio de la demo. Revisa tu conexión e inténtalo otra vez.'));
+  }
   const body = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(body?.error?.message || `HTTP ${res.status}`);
   setBaseUrl(GATEWAY_BASE_URL);

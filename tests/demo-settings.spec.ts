@@ -100,6 +100,19 @@ test('un token del gateway con otra base URL se repara al cargar', async ({ page
 // La fila de la API key lleva ojo + copiar en las dos vistas: en password a secas la
 // key era invisible e incopiable, y quien la recibe pegada (un token de demo, por
 // ejemplo) no puede verificarla ni llevarla a otro dispositivo.
+test('un fallo de red en la demo no filtra «Failed to fetch»', async ({ page }) => {
+  // Visto en el emulador: con el origen bloqueado por CORS, el fetch del token lanzaba
+  // TypeError y la UI enseñaba el texto crudo del navegador («Failed to fetch»), que no
+  // le dice nada al usuario ni sugiere qué hacer.
+  await page.route('**/demo-token', (route) => route.abort('failed'));
+  await abrirAgente(page);
+  await page.locator('#appset-demo-btn').click();
+  const hint = page.locator('#appset-demo-hint');
+  await expect(hint).toContainText('No se pudo contactar el servicio de la demo');
+  await expect(hint).not.toContainText('Failed to fetch');
+  await expect(page.locator('#appset-demo-btn')).toBeEnabled();   // se puede reintentar
+});
+
 test('el ojo revela y oculta la API key, y hay botón de copiar', async ({ page }) => {
   await seed(page, { ai_base_url: NAN, ai_key: 'sk-mi-key-secreta-123', ai_model: 'm1' });
   await abrirAgente(page);
