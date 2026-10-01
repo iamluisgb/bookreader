@@ -963,6 +963,12 @@ async function restoreChat() {
     if (!m.offline) history.push({ role: m.role, content: m.content });
     appendBubble(m.role, m.content, m.role === 'assistant');
   }
+  // Si la segmentación ya terminó (arrancó antes que este restaurado), `anchors` ya está
+  // lleno y las burbujas de arriba habrán salido con sus chips. Si NO, esto no hace nada
+  // y el repintado lo hará prepareBook() al terminar. Cubrir los dos órdenes evita la
+  // carrera entre la carga del libro y la restauración del chat (el chip desaparecía
+  // según quién llegara segundo).
+  repaintCites();
   renderOfflineChip();
   scrollDown();
 }
