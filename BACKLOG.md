@@ -697,9 +697,13 @@ Un libro suelto es una estantería de uno: mismo formato, `books: [ … ]` con u
   título en uno de tres estados: **lo tienes** (anclado) · **consíguelo** (enlace de origen) ·
   **solo notas** (sin fichero coincidente). Abrir un libro tuyo cuyo hash coincide enciende su carril
   compartido.
-- **Ficheros de libro: no viajan por defecto.** Casilla opcional *incluir PDFs de acceso abierto* solo
-  para entradas con DOI/arXiv. Los libros no, nunca: es la línea entre compartir apuntes y distribuir
-  libros.
+- **Ficheros de libro: SÍ viajan, por defecto** (revisado 2026-10-02 a petición de Luis; la versión
+  anterior decía «nunca»). El `.bookreader` es un **ZIP**: `dossier.json` + `files/<bookId>.<ext>`
+  (STORE, sin recomprimir). El receptor abre el dossier y tiene libro y notas a la vez, y al importar se
+  verifica que el SHA-256 de cada fichero sea su `bookId` (si no, se descarta). Casilla desmarcable, con
+  el peso a la vista. Las fichas fantasma (fichero solo en Drive) van sin libro; se avisa en la casilla.
+  *Riesgo aceptado:* pasar libros comerciales es responsabilidad de quien comparte; BookReader no sube
+  nada a ningún servidor, el fichero va de persona a persona.
 - **Foto, no documento vivo.** El fichero es el estado de hoy; reenviarlo sustituye la estantería ajena
   anterior del mismo autor + nombre (no la mezcla). Lo vivo —seguir investigando y que el otro vea lo
   nuevo— exige una carpeta de Drive compartida, y el sync actual vive en `appDataFolder`, que **no se
@@ -746,11 +750,13 @@ Con BYOK el daño se limita a gastar tu clave y mentirte, pero el usuario tiene 
 - **F1 — Exportar dossier** `S` · **✓ 2026-10-02** (estantería; falta la entrada de libro suelto y editar el
   enlace de origen a mano — hoy solo se detecta arXiv por el nombre del fichero): «Compartir estantería» en el menú de la estantería (y «Compartir» en la
   cabecera del panel para un libro suelto, junto al export `.md` de
-  [P8](#p8--exportar-libretas-y-conversaciones--fase-1--m)). Casillas: subrayados / libretas / chat /
-  artefactos / PDFs de acceso abierto. Campo de enlace de origen (DOI/arXiv) por libro, precargado si se
+  [P8](#p8--exportar-libretas-y-conversaciones--fase-1--m)). Casillas: libros (con su peso) / subrayados /
+  libretas / chat / artefactos / mazos. Campo de enlace de origen (DOI/arXiv) por libro, precargado si se
   puede sacar de los metadatos del PDF.
-- **F2 — Importar + carril** `M`: store `shared`, estantería ajena con los tres estados por título, regla de
-  hash, libreta ajena en **solo lectura**.
+- **F2 — Importar + carril** `M`: «Abrir dossier…» en la biblioteca (+ arrastrar). Los libros del paquete
+  entran en TU biblioteca (si ya lo tienes, mismo hash, no se duplica) en una estantería «<nombre> · de X»;
+  lo ajeno (subrayados, libretas, artefactos, mazos) va al store `shared`. Estados por título: *lo tienes* /
+  *consíguelo* / *solo notas* (estos dos, solo para lo que llegó sin fichero). Libreta ajena en **solo lectura**.
   Distinción visual **por trazo, no por barra lateral**: lo ajeno con línea inferior punteada del color
   original, lo propio con fondo sólido. Filtro "Míos · De X" en la sidebar de subrayados.
 - **F3 — Método** `S`: mismo sobre, `kind: 'method'`, con la pantalla de revisión del prompt.

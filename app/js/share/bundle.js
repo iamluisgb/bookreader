@@ -8,8 +8,12 @@
 //     exacto sin que el libro viaje. Un libro suelto es una estantería de uno.
 //   - method: perfil + plantilla, sin libro (F3, aún no).
 //
+// El sobre va dentro de un ZIP (share/container.js): `dossier.json` + `files/<bookId>.<ext>`.
+// Los libros viajan si se marca `files` (por defecto sí): el receptor abre el dossier y
+// tiene el libro y las notas a la vez. Sin `files`, o con un libro que no está en este
+// dispositivo (ficha fantasma), queda `source` para que lo consiga por su cuenta.
+//
 // Lo que NO viaja, a propósito:
-//   - El fichero del libro. El receptor lo consigue por su cuenta (`source`).
 //   - Tombstones, uids, updatedAt: son maquinaria del sync propio. Lo importado vive en
 //     un carril aparte y no se fusiona con lo tuyo (en EPUB uid = cfi: mezclarlo pisaría
 //     tus subrayados del mismo pasaje).
@@ -18,11 +22,19 @@
 export const FORMAT = 'bookreader-bundle';
 export const VERSION = 1;
 export const KINDS = ['dossier'];
-export const PARTS = ['highlights', 'notebooks', 'chat', 'artifacts', 'decks'];
+export const PARTS = ['files', 'highlights', 'notebooks', 'chat', 'artifacts', 'decks'];
+export const DOSSIER_ENTRY = 'dossier.json';
 
-// Tope de cordura al leer. Un dossier de una estantería grande con artefactos ronda
-// los cientos de KB; 50 MB solo lo pasa algo que no es un dossier.
+// Tope de cordura al leer el JSON (los libros van aparte, en el ZIP). Un dossier de una
+// estantería grande con artefactos ronda los cientos de KB; 50 MB solo lo pasa algo que
+// no es un dossier.
 export const MAX_BYTES = 50 * 1024 * 1024;
+
+// Ruta del fichero de un libro dentro del paquete. El nombre ES el hash: al importar se
+// comprueba que el SHA-256 de los bytes coincide, y un fichero que no casa se descarta.
+export function fileEntry(bookId, format) {
+  return `files/${bookId}.${format === 'pdf' ? 'pdf' : 'epub'}`;
+}
 
 const ARXIV_ID = /(?:^|[^\d])(\d{4}\.\d{4,5})(v\d+)?(?:[^\d]|$)/;
 
@@ -84,19 +96,22 @@ function templatesUsed(books, customTemplates) {
 
 // Construye el dossier.
 //   shelf: { name }
-//   books: [{ book, highlights, convos: [{ convo, notes, messages }], artifacts, decks }]
-//          — `book` es el registro de la biblioteca (o de la capa IA si no está en ella).
+//   books: [{ book, hasFile, highlights, convos: [{ convo, notes, messages }], artifacts, decks }]
+//          — `book` es el registro de la biblioteca; `hasFile`, si su binario está aquí y
+//          por tanto puede ir en el paquete.
 //   parts: subconjunto de PARTS.
 //   customTemplates: las plantillas propias del usuario (para incrustar las usadas).
 export function build({ shelf, books, parts = PARTS, author = '', customTemplates = [], now = Date.now() }) {
   const want = new Set(parts);
-  const outBooks = (books || []).map(({ book, highlights, convos, artifacts, decks }) => {
+  const outBooks = (books || []).map(({ book, hasFile, highlights, convos, artifacts, decks }) => {
     const b = {
       bookId: book.id,
       title: book.title || '',
       author: book.author || '',
       format: book.format || null,
       source: sourceOf(book),
+      file: want.has('files') && hasFile ? fileEntry(book.id, book.format) : null,
+      size: book.size || null,
     };
     if (want.has('highlights')) b.highlights = live(highlights).map(highlightOut);
     if (want.has('notebooks')) {
@@ -126,23 +141,25 @@ export function build({ shelf, books, parts = PARTS, author = '', customTemplate
 export function counts(bundle) {
   const per = (bundle?.books || []).map(b => ({
     bookId: b.bookId,
+    files: b.file ? 1 : 0,
+    bytes: b.file ? (b.size || 0) : 0,
     highlights: (b.highlights || []).length,
     notes: (b.notebooks || []).reduce((n, nb) => n + nb.notes.length, 0),
     artifacts: (b.artifacts || []).length,
     cards: (b.decks || []).reduce((n, d) => n + d.cards.length, 0),
   }));
   const total = per.reduce((acc, c) => {
-    for (const k of ['highlights', 'notes', 'artifacts', 'cards']) acc[k] += c[k];
+    for (const k of Object.keys(acc)) acc[k] += c[k];
     return acc;
-  }, { highlights: 0, notes: 0, artifacts: 0, cards: 0 });
-  return { per, total, empty: !Object.values(total).some(Boolean) };
+  }, { files: 0, bytes: 0, highlights: 0, notes: 0, artifacts: 0, cards: 0 });
+  return { per, total, empty: !total.files && !total.highlights && !total.notes && !total.artifacts && !total.cards };
 }
 
 // Nombre de fichero: «knowledge-graphs.bookreader». Lo que cuenta es que la extensión
 // sea reconocible en un chat; el contenido es JSON.
 export function filename(bundle) {
   const slug = (bundle?.shelf?.name || 'estanteria')
-    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
     .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60);
   return `${slug || 'estanteria'}.bookreader`;
 }
@@ -170,6 +187,9 @@ export function validate(obj) {
     if (!isStr(b.bookId) || !/^[0-9a-f]{64}$/.test(b.bookId)) errs.push(`${at}: bookId inválido`);
     if (!isStr(b.title)) errs.push(`${at}: título inválido`);
     if (b.source != null && !(isStr(b.source) && /^https?:\/\//i.test(b.source))) errs.push(`${at}: enlace de origen inválido`);
+    // La ruta se recalcula, no se cree: un `file` que no es exactamente la esperada
+    // (`../`, otro libro) podría señalar una entrada ajena del ZIP.
+    if (b.file != null && b.file !== fileEntry(b.bookId, b.format)) errs.push(`${at}: ruta de fichero inválida`);
     for (const k of ['highlights', 'notebooks', 'artifacts', 'decks']) {
       if (b[k] != null && !Array.isArray(b[k])) errs.push(`${at}: ${k} no es una lista`);
     }

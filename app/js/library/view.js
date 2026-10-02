@@ -1101,14 +1101,22 @@ async function shareShelf(shelf) {
     await alertBox(t('Esta estantería no tiene libros.'), { title: t('Compartir estantería') });
     return;
   }
+  // Lo que pesa son los libros: el tamaño va en la casilla, antes de mandar 400 MB por
+  // error. Las fichas fantasma (el fichero solo está en Drive) no pueden ir en el paquete.
+  const local = books.filter(b => Store.hasFile(b));
+  const ghosts = books.length - local.length;
+  const bytes = local.reduce((n, b) => n + (b.size || 0), 0);
+  let filesLabel = t('Los libros (PDF/EPUB)') + (bytes ? ' · ' + humanSize(bytes) : '');
+  if (ghosts) filesLabel += ' · ' + t('{n} sin fichero en este dispositivo', { n: ghosts });
   const res = await formBox({
     title: t('Compartir estantería'),
     message: books.length === 1
-      ? t('Se comparte lo que has sacado del libro, no el libro: quien lo reciba necesita su propia copia. Si es el mismo fichero, verá tus notas en su sitio.')
-      : t('Se comparte lo que has sacado de {n} libros, no los libros: quien lo reciba necesita su propia copia. Si es el mismo fichero, verá tus notas en su sitio.', { n: books.length }),
+      ? t('Se comparte el libro con lo que has sacado de él. Quien lo reciba lo abre en BookReader y ve tus notas en su sitio.')
+      : t('Se comparten {n} libros con lo que has sacado de ellos. Quien lo reciba lo abre en BookReader y ve tus notas en su sitio.', { n: books.length }),
     fields: [
-      { name: 'parts', label: 'Incluir', type: 'checks', value: ['highlights', 'notebooks', 'artifacts', 'decks'],
+      { name: 'parts', label: 'Incluir', type: 'checks', value: [...(local.length ? ['files'] : []), 'highlights', 'notebooks', 'artifacts', 'decks'],
         options: [
+          ...(local.length ? [{ value: 'files', label: filesLabel }] : []),
           { value: 'highlights', label: t('Subrayados y notas') },
           { value: 'notebooks', label: t('Libretas') },
           { value: 'chat', label: t('Conversaciones con el agente') },
@@ -1124,12 +1132,12 @@ async function shareShelf(shelf) {
   const parts = res.parts || [];
   if (!parts.length) return;
   Share.setAuthor(res.author);
-  const bundle = await Share.buildShelfDossier(shelf.id, { parts, author: res.author });
-  if (Bundle.counts(bundle).empty) {
+  const pkg = await Share.packShelf(shelf.id, { parts, author: res.author });
+  if (Bundle.counts(pkg.bundle).empty) {
     await alertBox(t('Ningún libro de esta estantería tiene todavía nada de lo elegido.'), { title: t('Compartir estantería') });
     return;
   }
-  const how = await Share.deliver(bundle);
+  const how = await Share.deliver(pkg);
   if (how !== 'cancelled') track('share_shelf', how);
 }
 

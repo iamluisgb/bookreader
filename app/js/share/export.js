@@ -7,6 +7,7 @@ import * as Shelves from '../library/shelves.js';
 import * as DB from '../ai/db.js';
 import * as CustomTemplates from '../ai/custom-templates.js';
 import * as Bundle from './bundle.js';
+import * as Container from './container.js';
 
 const AUTHOR_KEY = 'share_author';
 
@@ -34,6 +35,7 @@ async function gatherBook(book, withChat) {
   })));
   return {
     book,
+    hasFile: Store.hasFile(book),
     highlights: Storage.get('highlights_' + book.id, []) || [],
     convos: withNotes,
     artifacts,
@@ -50,13 +52,34 @@ export async function buildShelfDossier(shelfId, { parts = Bundle.PARTS, author 
   return Bundle.build({ shelf, books: gathered, parts, author, customTemplates: CustomTemplates.getAll() });
 }
 
+// Binario de un libro como Blob. Se lee de uno en uno con getRaw (no con getAllRecords,
+// que suelta el `file` a propósito); los importados antes de la migración a Blob siguen
+// con ArrayBuffer.
+async function fileOf(bookId, format) {
+  const rec = await Store.getRaw(bookId);
+  if (!rec || !Store.hasFile(rec)) return null;
+  const type = format === 'pdf' ? 'application/pdf' : 'application/epub+zip';
+  return rec.file instanceof Blob ? rec.file : new Blob([rec.file], { type });
+}
+
+// El paquete listo para mandar: { bundle, blob, name }.
+export async function packShelf(shelfId, opts) {
+  const bundle = await buildShelfDossier(shelfId, opts);
+  const files = new Map();
+  for (const b of bundle.books) {
+    if (!b.file) continue;
+    const blob = await fileOf(b.bookId, b.format);
+    // Pudo liberarse entre leer la lista y empaquetar: va sin fichero, no rompe el envío.
+    if (blob) files.set(b.bookId, blob); else b.file = null;
+  }
+  return { bundle, blob: await Container.pack(bundle, files), name: Bundle.filename(bundle) };
+}
+
 // Web Share con el fichero donde lo haya (móvil: WhatsApp, AirDrop…) y descarga en el
 // resto. Mismo contrato que exportBook/sharePng: cancelar no es fallar.
 // Devuelve 'shared' | 'downloaded' | 'cancelled'.
-export async function deliver(bundle) {
-  const name = Bundle.filename(bundle);
-  const blob = new Blob([Bundle.serialize(bundle)], { type: 'application/json' });
-  const file = new File([blob], name, { type: 'application/json' });
+export async function deliver({ blob, name }) {
+  const file = new File([blob], name, { type: Container.MIME });
   if (navigator.canShare && navigator.canShare({ files: [file] })) {
     try {
       await navigator.share({ files: [file] });

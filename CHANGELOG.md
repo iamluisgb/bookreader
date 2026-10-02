@@ -3,6 +3,18 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-10-02 — P24: los libros viajan dentro del dossier
+
+El `.bookreader` pasa de JSON a **ZIP**: `dossier.json` + `files/<bookId>.pdf|epub`
+([`share/container.js`](app/js/share/container.js)). Quien lo recibe tendrá libro y notas a la vez.
+- Casilla «Los libros (PDF/EPUB) · <peso>», marcada por defecto; avisa de cuántos no pueden ir
+  porque su fichero solo está en Drive (fichas fantasma).
+- Libros sin recomprimir (STORE): un EPUB ya es un ZIP y un PDF ya va comprimido.
+- `unpack()` ya existe para F2: solo lee las entradas que el sobre declara (la ruta se
+  recalcula, no se cree) y **descarta un libro cuyo SHA-256 no sea su `bookId`**.
+
+SW `v141`.
+
 ## 2026-10-02 — P24 F0+F1: compartir una estantería como dossier
 
 Caso: una investigación sobre *knowledge graphs* (varios papers y libros con subrayados,

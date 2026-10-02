@@ -4,29 +4,36 @@ import { test, expect, Page } from '@playwright/test';
 // varios papers y libros con subrayados, libretas y artefactos del agente que se le
 // quiere pasar a otra persona. Lo que se fija aquí:
 //   - el formato (bundle.js, puro): qué viaja y qué NO (tombstones, calendario de
-//     repaso, el libro), y que lo que no es un dossier se rechaza en la puerta;
+//     repaso), y que lo que no es un dossier se rechaza en la puerta;
+//   - el paquete (container.js): los libros van dentro del ZIP y salen con los mismos
+//     bytes; uno cuyos bytes no dan su bookId se descarta;
 //   - el flujo desde el menú de la estantería: el fichero que sale lleva lo elegido de
 //     TODOS los libros de la estantería, y nada de los que no están en ella.
 //
 // Se siembra IndexedDB después de que la app arranque: sensible al timing bajo carga.
 test.describe.configure({ retries: 2 });
 
-const A = 'a'.repeat(64);   // paper con todo
-const B = 'b'.repeat(64);   // libro de la estantería sin nada
+const B = 'b'.repeat(64);   // libro de la estantería sin nada, y sin fichero aquí (fantasma)
 const C = 'c'.repeat(64);   // libro FUERA de la estantería, con subrayados
 
+// A es el paper con todo, y su id es el hash de sus bytes de verdad: es lo que el
+// receptor comprobará al desempaquetar.
 async function seed(page: Page) {
-  return page.evaluate(async ({ A, B, C }) => {
+  return page.evaluate(async ({ B, C }) => {
     const Store: any = await import('/js/library/store.js');
     const DB: any = await import('/js/ai/db.js');
     const Storage: any = await import('/js/storage.js');
     const Custom: any = await import('/js/ai/custom-templates.js');
     const kg = await Store.addShelf('Knowledge graphs');
     const now = Date.now();
+    const bytes = new Uint8Array(4096);
+    for (let i = 0; i < bytes.length; i++) bytes[i] = (i * 37 + 11) % 251;
+    const A = await DB.hashBuffer(bytes.buffer.slice(0));
     await Store.putBook({ id: A, title: 'Knowledge Graphs (survey)', author: 'Hogan et al.', format: 'pdf',
-      fileName: '2003.02320v6.pdf', status: 'reading', addedAt: now, shelfIds: [kg.id] });
-    await Store.putBook({ id: B, title: 'Graph Databases', author: 'Robinson', format: 'epub',
-      status: 'unread', addedAt: now, shelfIds: [kg.id] });
+      fileName: '2003.02320v6.pdf', size: bytes.length, status: 'reading', addedAt: now, shelfIds: [kg.id],
+      file: new Blob([bytes], { type: 'application/pdf' }) });
+    await Store.putBook({ id: B, title: 'Graph Databases', author: 'Robinson', format: 'epub', size: 9999,
+      status: 'unread', addedAt: now, shelfIds: [kg.id], file: null, blob: { path: 'bookreader/files/' + B, size: 9999 } });
     await Store.putBook({ id: C, title: 'Rayuela', author: 'Cortázar', format: 'epub',
       status: 'reading', addedAt: now, shelfIds: [] });
 
@@ -46,16 +53,16 @@ async function seed(page: Page) {
     await DB.addDeck({ bookId: A, name: 'KG básico', cards: [
       { front: '¿Qué es un triple?', back: 'sujeto-predicado-objeto', srs: { reps: 3, due: 99999 } },
     ] });
-    return { shelfId: kg.id, tplId: tpl.id };
-  }, { A, B, C });
+    return { shelfId: kg.id, tplId: tpl.id, A };
+  }, { B, C });
 }
 
-test('formato: viaja lo vivo, sin calendario ni tombstones; el libro no', async ({ page }) => {
+test('formato: viaja lo vivo, sin calendario ni tombstones', async ({ page }) => {
   await page.goto('/');
-  const { shelfId, tplId } = await seed(page);
+  const { shelfId, tplId, A } = await seed(page);
   const bundle = await page.evaluate(async (shelfId) => {
     const Share: any = await import('/js/share/export.js');
-    return Share.buildShelfDossier(shelfId, { parts: ['highlights', 'notebooks', 'artifacts', 'decks'], author: 'Luis' });
+    return Share.buildShelfDossier(shelfId, { parts: ['files', 'highlights', 'notebooks', 'artifacts', 'decks'], author: 'Luis' });
   }, shelfId);
 
   expect(bundle.format).toBe('bookreader-bundle');
@@ -69,6 +76,7 @@ test('formato: viaja lo vivo, sin calendario ni tombstones; el libro no', async 
   // arXiv reconocido por el nombre del fichero: es lo que permite al receptor bajarse
   // el MISMO PDF y que el hash coincida.
   expect(a.source).toBe('https://arxiv.org/abs/2003.02320v6');
+  expect(a.file).toBe(`files/${A}.pdf`);
   expect(a.highlights).toHaveLength(1);
   expect(a.highlights[0]).toMatchObject({ text: 'A knowledge graph is…', page: 3, note: 'definición clave' });
   expect(a.highlights[0].uid).toBeUndefined();
@@ -82,7 +90,8 @@ test('formato: viaja lo vivo, sin calendario ni tombstones; el libro no', async 
   expect(bundle.templates.map((t: any) => t.id)).toEqual([tplId]);
 
   const b = bundle.books.find((x: any) => x.bookId === B);
-  expect(b).toMatchObject({ highlights: [], notebooks: [], artifacts: [], decks: [], source: null });
+  // B es una ficha fantasma: su fichero está en Drive, no aquí, así que no puede ir.
+  expect(b).toMatchObject({ file: null, highlights: [], notebooks: [], artifacts: [], decks: [], source: null });
 
   // Ida y vuelta por texto: lo que se exporta es lo que se puede leer.
   const back = await page.evaluate(async (text) => {
@@ -90,6 +99,46 @@ test('formato: viaja lo vivo, sin calendario ni tombstones; el libro no', async 
     return Bundle.parse(text);
   }, JSON.stringify(bundle));
   expect(back).toEqual(bundle);
+});
+
+test('paquete: el libro viaja dentro del ZIP con los mismos bytes; uno manipulado se descarta', async ({ page }) => {
+  await page.goto('/');
+  const { shelfId, A } = await seed(page);
+  const out = await page.evaluate(async ({ shelfId, A }) => {
+    const Share: any = await import('/js/share/export.js');
+    const Container: any = await import('/js/share/container.js');
+    const DB: any = await import('/js/ai/db.js');
+    const pkg = await Share.packShelf(shelfId, { author: 'Luis' });
+    const JSZip = (window as any).JSZip;   // lo ha cargado el empaquetado
+    const ok = await Container.unpack(pkg.blob);
+    const got = ok.files.get(A);
+
+    // Mismo paquete con otros bytes bajo el nombre de A: el hash no casa → fuera.
+    const zip = await JSZip.loadAsync(pkg.blob);
+    zip.file(`files/${A}.pdf`, new Uint8Array([1, 2, 3]));
+    const bad = await Container.unpack(await zip.generateAsync({ type: 'blob' }));
+
+    let notZip = null;
+    try { await Container.unpack(new Blob(['{"format":"bookreader-bundle"}'])); } catch (e: any) { notZip = e.message; }
+    return {
+      name: pkg.name,
+      entries: Object.keys(zip.files).sort(),
+      size: got ? got.size : 0,
+      hash: got ? await DB.hashBuffer(await got.arrayBuffer()) : null,
+      okRejected: ok.rejected,
+      badFiles: bad.files.size,
+      badRejected: bad.rejected,
+      notZip,
+    };
+  }, { shelfId, A });
+  expect(out.name).toBe('knowledge-graphs.bookreader');
+  expect(out.entries).toEqual(['dossier.json', 'files/', `files/${A}.pdf`]);
+  expect(out.size).toBe(4096);
+  expect(out.hash).toBe(A);
+  expect(out.okRejected).toEqual([]);
+  expect(out.badFiles).toBe(0);
+  expect(out.badRejected).toEqual([A]);
+  expect(out.notZip).toContain('no es un dossier');
 });
 
 test('formato: lo que no es un dossier se rechaza con el motivo', async ({ page }) => {
@@ -104,6 +153,7 @@ test('formato: lo que no es un dossier se rechaza con el motivo', async ({ page 
       future: tryParse(JSON.stringify({ ...ok, version: 99 })),
       badId: tryParse(JSON.stringify({ ...ok, books: [{ bookId: '../etc', title: 'x' }] })),
       badSource: tryParse(JSON.stringify({ ...ok, books: [{ bookId: 'a'.repeat(64), title: 'x', source: 'javascript:alert(1)' }] })),
+      badFile: tryParse(JSON.stringify({ ...ok, books: [{ bookId: 'a'.repeat(64), title: 'x', format: 'pdf', file: '../../sw.js' }] })),
       noAnchor: tryParse(JSON.stringify({ ...ok, books: [{ bookId: 'a'.repeat(64), title: 'x', highlights: [{ text: 'y' }] }] })),
       empty: tryParse(JSON.stringify(ok)),
     };
@@ -113,13 +163,14 @@ test('formato: lo que no es un dossier se rechaza con el motivo', async ({ page 
   expect(errs.future).toContain('posterior a la soportada');
   expect(errs.badId).toContain('bookId inválido');
   expect(errs.badSource).toContain('enlace de origen inválido');
+  expect(errs.badFile).toContain('ruta de fichero inválida');
   expect(errs.noAnchor).toContain('sin ancla');
   expect(errs.empty).toBeNull();
 });
 
 test('desde el menú de la estantería: elegir partes y descargar el .bookreader', async ({ page }) => {
   await page.goto('/');
-  await seed(page);
+  const { A } = await seed(page);
   await page.reload();
 
   const row = page.locator('.lib-rail-row', { has: page.locator('.lib-rail-name', { hasText: /^Knowledge graphs$/ }) });
@@ -127,7 +178,12 @@ test('desde el menú de la estantería: elegir partes y descargar el .bookreader
   await row.locator('.lib-rail-kebab').click();
   await page.locator('.lib-menu-item[data-act="share"]').click();
 
-  // Diálogo: por defecto todo menos el chat. Se marca el chat también.
+  // Diálogo: por defecto todo menos el chat. Los libros dicen cuánto pesan y cuántos
+  // no pueden ir. Se marca el chat también.
+  const files = page.locator('.dlg-check', { has: page.locator('input[value="files"]') });
+  await expect(files.locator('input')).toBeChecked();
+  await expect(files).toContainText('4 KB');
+  await expect(files).toContainText('1 sin fichero en este dispositivo');
   await expect(page.locator('.dlg-check input[value="chat"]')).not.toBeChecked();
   await expect(page.locator('.dlg-check input[value="artifacts"]')).toBeChecked();
   await page.locator('.dlg-check input[value="chat"]').check();
@@ -139,9 +195,16 @@ test('desde el menú de la estantería: elegir partes y descargar el .bookreader
   ]);
   expect(download.suggestedFilename()).toBe('knowledge-graphs.bookreader');
   const fs = await import('fs/promises');
-  const bundle = JSON.parse(await fs.readFile((await download.path())!, 'utf8'));
+  const b64 = (await fs.readFile((await download.path())!)).toString('base64');
+  const { bundle, nFiles } = await page.evaluate(async (b64) => {
+    const Container: any = await import('/js/share/container.js');
+    const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+    const r = await Container.unpack(new Blob([bytes]));
+    return { bundle: r.bundle, nFiles: r.files.size };
+  }, b64);
+  expect(nFiles).toBe(1);
   expect(bundle.author).toBe('Luis');
-  expect(bundle.parts).toEqual(['highlights', 'notebooks', 'chat', 'artifacts', 'decks']);
+  expect(bundle.parts).toEqual(['files', 'highlights', 'notebooks', 'chat', 'artifacts', 'decks']);
   const a = bundle.books.find((b: any) => b.bookId === A);
   expect(a.notebooks[0].messages.map((m: any) => m.content)).toEqual(['¿Qué es RDF?']);
   expect(a.artifacts).toHaveLength(1);
