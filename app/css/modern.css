@@ -916,11 +916,17 @@ button.ai-nb-chap:hover { color: var(--text); background: var(--fill-strong); }
 .ai-nb-more {
   width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center;
   border: none; background: none; color: var(--text-faint); border-radius: 50%; cursor: pointer;
-  opacity: 0.55; transition: opacity var(--transition-fast), background var(--transition-fast);
+  opacity: 0.75; transition: opacity var(--transition-fast), background var(--transition-fast);
 }
 .ai-nb-note:hover .ai-nb-more, .ai-nb-more[aria-expanded="true"], .ai-nb-more:focus-visible { opacity: 1; }
 .ai-nb-more:hover { background: var(--fill); color: var(--text); }
 @media (hover: none) { .ai-nb-more { opacity: 1; } }
+/* Táctil: 44 px de área (DESIGN.md §3) sin mover nada: el icono sigue pequeño y el margen
+   negativo absorbe el tamaño extra. */
+@media (pointer: coarse) {
+  .ai-nb-more, .ai-nb-field-head .ai-nb-add { width: 44px; height: 44px; margin: -9px; }
+  .ai-nb-field-head .ai-nb-add { margin-left: auto; margin-right: -9px; }
+}
 .ai-nb-menu {
   position: absolute; right: 8px; top: calc(100% - 6px); z-index: 5; min-width: 200px;
   background: var(--surface-0); border: 1px solid var(--border-soft); border-radius: var(--r-md);

@@ -69,6 +69,9 @@ let addingField = null;      // campo donde se añade una nota nueva
 let nbExpanded = new Set();
 let nbMenu = null;
 let nbJustSaved = null;
+// Borradores de la libreta, por campo/nota (ver captureNbDrafts). Sobreviven a repintados.
+let nbDrafts = new Map();
+let nbMenuFocus = false;      // al abrir un menú ⋯, llevar el foco a su primera opción
 let bookFinished = false;
 let attenuationDone = false;  // atenuación de capítulos aplicada para este libro
 let registeredRendition = null; // rendition con el listener de subrayado registrado
@@ -160,6 +163,7 @@ export function init(opts) {
   });
   els.messages.addEventListener('click', onMessagesClick);
   els.noteView.addEventListener('click', onNotebookClick);
+  els.noteView.addEventListener('keydown', onNotebookKey);
   els.noteView.addEventListener('toggle', onNotebookToggle, true);
 
   // Selector de conversaciones.
@@ -662,7 +666,7 @@ export async function setBook(b, id, title, opts = {}) {
   convo = null; template = null; history = []; notes = [];
   ia2LastChapter = null; ia2Seen = new Set();   // IA2: reinicia el repaso por libro
   editingId = null; addingField = null; attenuationDone = false;
-  nbExpanded = new Set(); nbMenu = null; nbJustSaved = null; bookFinished = false;
+  nbExpanded = new Set(); nbMenu = null; nbJustSaved = null; bookFinished = false; nbDrafts = new Map();
   nbAddChapter = null; nbOpenChapters = new Set();
   clearChapterAttenuation();
   annotatedText = ''; anchors = new Map();
@@ -833,7 +837,7 @@ async function activateConvo() {
   renderConvoBar();
   clearRef();
   notes = convo ? await DB.getNotes(convo.id) : [];
-  nbMenu = null; nbJustSaved = null;
+  nbMenu = null; nbJustSaved = null; nbDrafts = new Map();
   renderNotebook();
   refreshFinished();
   await restoreChat();
@@ -1182,6 +1186,10 @@ async function send() {
   // que entre ANCLADO en el extracto (sin esto, "¿qué significa esto?" no lo recuperaba).
   await deliver(aug, q, { showUser: true, ref });
 }
+
+// Solo para tests: un repintado de la libreta como los que llegan solos (extractor,
+// HQ&A, cambio de capítulo). Es lo que borraba los borradores.
+export function __renderNotebookForTest() { renderNotebook(); }
 
 // Solo para tests (inspección visual): adjunta zonas ya recortadas sin gestos.
 export function __setZonesForTest(zones) {
@@ -2388,7 +2396,7 @@ function noteHtml(n, { showChapter = true } = {}) {
       <div class="ai-nb-note-meta">
         ${unanswered ? `<button class="ai-nb-answer ai-nb-edit" data-id="${n.id}">${t('Responder')}</button>` : ''}
         ${chip}
-        <button class="ai-nb-more" data-id="${n.id}" aria-label="${t('Más acciones')}" aria-expanded="${nbMenu === n.id}">${icon('ellipsis', { size: 16 })}</button>
+        <button class="ai-nb-more" data-id="${n.id}" aria-label="${t('Más acciones')}" aria-haspopup="menu" aria-expanded="${nbMenu === n.id}">${icon('ellipsis', { size: 16 })}</button>
       </div>
       ${menu}
     </div>`;
@@ -2424,7 +2432,7 @@ function fieldBlock(f, list, { chapter = null, pending = null } = {}) {
       </header>
       ${shown.map(n => noteHtml(n, { showChapter: chapter == null })).join('')}
       ${folded ? `<button class="ai-nb-expand" data-key="${escapeHtml(foldKey)}">${t('Ver {n} más', { n: list.length - NB_FOLD })}</button>` : ''}
-      ${adding ? editorHtml(`data-field="${f.key}"`, '', f.hint) : ''}
+      ${adding ? editorHtml(`data-field="${f.key}"${chapAttr}`, '', f.hint) : ''}
     </section>`;
 }
 
@@ -2460,6 +2468,50 @@ function deliverHtml() {
       <div class="ai-nb-deliver-txt"><b>${t('Tu entregable')}</b><span>${escapeHtml(what ? what.slice(0, 90) : t('Lo que querías tener al terminar'))}</span></div>
       <button class="ai-nb-deliver-btn">${icon('sparkles', { size: 15 })}<span>${t('Montarlo con mis notas')}</span></button>
     </div>`;
+}
+
+// ---- Borradores a salvo ------------------------------------------------------
+// renderNotebook reescribe la libreta entera, y la repintan cosas que llegan solas: termina
+// el extractor automático, termina HQ&A, cambia el capítulo, el libro pasa a terminado. Sin
+// esto, lo que estuvieras escribiendo en «Te toca» o en un editor se perdía en ese instante
+// (auditoría de libretas, P5). Antes de repintar se guarda el texto de cada textarea abierto
+// por una clave estable (qué pregunta, qué nota, qué campo) y después se devuelve, con el
+// foco y el cursor donde estaban. Un borrador de un editor que ya no se ve se conserva y
+// vuelve cuando ese editor reaparece; se olvida al guardar o cancelar.
+function nbDraftKey(ta) {
+  const toca = ta.closest('.ai-nb-toca');
+  if (toca) return `toca|${toca.dataset.field}|${toca.dataset.chapter || ''}`;
+  const ed = ta.closest('.ai-nb-editor');
+  if (!ed) return null;
+  return ed.dataset.id ? `ed|${ed.dataset.id}` : `add|${ed.dataset.field}|${ed.dataset.chapter || ''}`;
+}
+
+function captureNbDrafts() {
+  let focus = null;
+  for (const ta of els.noteView.querySelectorAll('textarea')) {
+    const key = nbDraftKey(ta);
+    if (!key) continue;
+    if (ta.value !== ta.defaultValue) nbDrafts.set(key, ta.value); else nbDrafts.delete(key);
+    if (document.activeElement === ta) focus = { key, start: ta.selectionStart, end: ta.selectionEnd };
+  }
+  return focus;
+}
+
+function restoreNbDrafts(focus) {
+  for (const ta of els.noteView.querySelectorAll('textarea')) {
+    const key = nbDraftKey(ta);
+    if (key && nbDrafts.has(key)) ta.value = nbDrafts.get(key);
+    if (focus && key === focus.key) {
+      ta.focus();
+      try { ta.setSelectionRange(focus.start, focus.end); } catch { /* textarea sin selección */ }
+    }
+  }
+}
+
+function forgetNbDraft(el) {
+  const ta = el?.closest('.ai-nb-toca, .ai-nb-editor')?.querySelector('textarea');
+  const key = ta && nbDraftKey(ta);
+  if (key) nbDrafts.delete(key);
 }
 
 function renderNotebook() {
@@ -2507,6 +2559,7 @@ function renderNotebook() {
     body = fields.map(f => fieldBlock(f, byField[f.key] || [], { pending })).join('');
   }
 
+  const focus = captureNbDrafts();
   els.noteView.innerHTML = `
     <div class="ai-nb-goal"><span class="ai-nb-goal-label">${icon('target', { size: 15 })} ${t('Objetivo')}</span><span class="ai-nb-goal-value">${escapeHtml(convo.goal)}</span></div>
     <div class="ai-nb-tpl">${escapeHtml(template.name)}</div>
@@ -2514,6 +2567,12 @@ function renderNotebook() {
     ${deliverHtml()}
     <div class="ai-nb-fields">${body}</div>
   `;
+  restoreNbDrafts(focus);
+  // Menú ⋯ recién abierto: el foco entra en él (teclado y lectores de pantalla).
+  if (nbMenu != null && nbMenuFocus) {
+    nbMenuFocus = false;
+    els.noteView.querySelector('.ai-nb-menu [role="menuitem"]')?.focus();
+  }
 }
 
 function focusEditor() {
@@ -2525,6 +2584,29 @@ function onNotebookToggle(e) {
   if (!d.classList?.contains('ai-nb-chapter')) return;
   const label = d.dataset.chapter || '';
   if (d.open) nbOpenChapters.add(label); else nbOpenChapters.delete(label);
+}
+
+// Menú ⋯ con teclado: flechas para moverse, Escape para cerrar y volver al ⋯ (P5 de la
+// auditoría: tenía role="menu" pero no respondía a nada).
+function onNotebookKey(e) {
+  if (nbMenu == null) return;
+  const menu = els.noteView.querySelector('.ai-nb-menu');
+  if (!menu) return;
+  if (e.key === 'Escape') {
+    e.preventDefault();
+    const id = nbMenu;
+    nbMenu = null; renderNotebook();
+    els.noteView.querySelector(`.ai-nb-more[data-id="${id}"]`)?.focus();
+    return;
+  }
+  if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp' && e.key !== 'Home' && e.key !== 'End') return;
+  const items = [...menu.querySelectorAll('[role="menuitem"]')];
+  if (!items.length) return;
+  e.preventDefault();
+  const i = items.indexOf(document.activeElement);
+  const next = e.key === 'Home' ? 0 : e.key === 'End' ? items.length - 1
+    : e.key === 'ArrowDown' ? (i + 1) % items.length : (i - 1 + items.length) % items.length;
+  items[next].focus();
 }
 
 async function onNotebookClick(e) {
@@ -2543,6 +2625,8 @@ async function onNotebookClick(e) {
     const val = input.value.trim();
     if (!val) { input.focus(); return; }
     const note = await saveNote(box.dataset.field, val, extractCites(val, []), box.dataset.chapter || currentChapter());
+    forgetNbDraft(box);
+    input.value = input.defaultValue;   // lo guardado ya no es borrador
     nbJustSaved = note.id;
     afterNoteSaved(note);
     renderNotebook();
@@ -2552,6 +2636,7 @@ async function onNotebookClick(e) {
   if (tocaSkip) {
     const box = tocaSkip.closest('.ai-nb-toca');
     if (convo) NB.skipPrompt(convo.id, box.dataset.field, box.dataset.chapter);
+    forgetNbDraft(box);
     nbJustSaved = null;
     renderNotebook();
     return;
@@ -2579,15 +2664,30 @@ async function onNotebookClick(e) {
     } else if (val && field) {
       saved = await saveNote(field, val, extractCites(val, []), nbAddChapter ?? currentChapter());
     }
+    forgetNbDraft(editor);
+    editor.querySelector('.ai-nb-input').value = editor.querySelector('.ai-nb-input').defaultValue;
     editingId = null; addingField = null; nbAddChapter = null;
     if (saved) afterNoteSaved(saved);
     renderNotebook();
     return;
   }
-  if (e.target.closest('.ai-nb-cancel')) { editingId = null; addingField = null; nbAddChapter = null; renderNotebook(); return; }
+  const cancel = e.target.closest('.ai-nb-cancel');
+  if (cancel) {
+    const editor = cancel.closest('.ai-nb-editor');
+    forgetNbDraft(editor);
+    editor.querySelector('.ai-nb-input').value = editor.querySelector('.ai-nb-input').defaultValue;
+    editingId = null; addingField = null; nbAddChapter = null; renderNotebook(); return;
+  }
 
   const more = e.target.closest('.ai-nb-more');
-  if (more) { const id = Number(more.dataset.id); nbMenu = nbMenu === id ? null : id; renderNotebook(); return; }
+  if (more) {
+    const id = Number(more.dataset.id);
+    nbMenu = nbMenu === id ? null : id;
+    nbMenuFocus = nbMenu != null;
+    renderNotebook();
+    if (nbMenu == null) els.noteView.querySelector(`.ai-nb-more[data-id="${id}"]`)?.focus();
+    return;
+  }
 
   const edit = e.target.closest('.ai-nb-edit');
   if (edit) { editingId = Number(edit.dataset.id); addingField = null; nbMenu = null; renderNotebook(); focusEditor(); return; }

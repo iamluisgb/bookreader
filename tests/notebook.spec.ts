@@ -216,3 +216,46 @@ test('al pasar de capítulo leyendo, la libreta pregunta por el que terminaste',
   await expect(toca).toHaveAttribute('data-field', 'por_que_importa');
   await expect(toca).not.toHaveAttribute('data-chapter', '');
 });
+
+// Auditoría de libretas, P5 · Un repintado que llega solo (el extractor, HQ&A, un cambio de
+// capítulo) reescribía la libreta entera y se llevaba lo que estabas escribiendo.
+test('lo que escribes sobrevive a un repintado, con el foco y el cursor donde estaban', async ({ page }) => {
+  await openNotebook(page, { tpl: 't1-extraccion', goal: 'Mi pipeline pierde eventos' });
+  const input = nb(page).locator('.ai-nb-toca-input');
+  await input.fill('Una checklist de réplica a medio');
+  await input.evaluate((el: HTMLTextAreaElement) => el.setSelectionRange(4, 4));
+  await page.evaluate(async () => (await import('/js/ai/panel.js') as any).__renderNotebookForTest());
+  await expect(input).toHaveValue('Una checklist de réplica a medio');
+  await expect(input).toBeFocused();
+  expect(await input.evaluate((el: HTMLTextAreaElement) => el.selectionStart)).toBe(4);
+
+  // Lo mismo en el editor de una nota nueva.
+  await nb(page).locator('.ai-nb-slot').first().click();
+  const ed = nb(page).locator('.ai-nb-editor .ai-nb-input');
+  await ed.fill('Nota a medias');
+  await page.evaluate(async () => (await import('/js/ai/panel.js') as any).__renderNotebookForTest());
+  await expect(ed).toHaveValue('Nota a medias');
+
+  // Cancelar SÍ lo olvida: volver a abrir el campo empieza en blanco.
+  await nb(page).locator('.ai-nb-cancel').click();
+  await nb(page).locator('.ai-nb-slot').first().click();
+  await expect(nb(page).locator('.ai-nb-editor .ai-nb-input')).toHaveValue('');
+});
+
+test('menú ⋯ con teclado: entra el foco, flechas, y Escape vuelve al ⋯', async ({ page }) => {
+  await openNotebook(page, { tpl: 't1-extraccion', goal: 'Mi pipeline', notes: [{ f: 'por_que_importa', c: 'Porque pierdo eventos' }] });
+  const more = nb(page).locator('.ai-nb-more').first();
+  await expect(more).toHaveAttribute('aria-haspopup', 'menu');
+  await more.focus();
+  await page.keyboard.press('Enter');
+  const items = nb(page).locator('.ai-nb-menu [role="menuitem"]');
+  await expect(items.first()).toBeFocused();
+  await page.keyboard.press('ArrowDown');
+  await expect(items.nth(1)).toBeFocused();
+  await page.keyboard.press('ArrowUp');
+  await page.keyboard.press('ArrowUp');
+  await expect(items.last()).toBeFocused();                     // da la vuelta
+  await page.keyboard.press('Escape');
+  await expect(nb(page).locator('.ai-nb-menu')).toHaveCount(0);
+  await expect(nb(page).locator('.ai-nb-more').first()).toBeFocused();
+});
