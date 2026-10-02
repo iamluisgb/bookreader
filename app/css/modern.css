@@ -999,6 +999,46 @@ button.ai-nb-chap:hover { color: var(--text); background: var(--fill-strong); }
 /* Cita aún sin ancla (el libro se está preparando): presente, pero apagada. */
 .ai-cite.is-pending { opacity: 0.45; cursor: default; pointer-events: none; }
 
+/* Auditoría de libretas · Q6/Q7/Q8 */
+/* Campo del agente vacío: una línea con su acción, no una promesa. */
+.ai-nb-slot.is-agent-slot { cursor: default; }
+.ai-nb-slot.is-agent-slot:hover { background: none; border-color: var(--border); }
+.ai-nb-fill-btn {
+  margin-left: auto; display: inline-flex; align-items: center; gap: 5px; flex: none;
+  background: var(--accent-soft); color: var(--accent); border: none; border-radius: var(--r-pill);
+  font: inherit; font-size: var(--fs-xs); font-weight: 600; padding: 4px 10px; cursor: pointer;
+}
+.ai-nb-fill-btn:hover:not(:disabled) { background: var(--accent); color: var(--on-accent); }
+.ai-nb-fill-btn:disabled { opacity: 0.6; cursor: default; }
+.ai-nb-slot.is-agent-slot .ai-nb-add {
+  width: 28px; height: 28px; padding: 0; border: none; border-radius: 50%; flex: none;
+  display: inline-flex; align-items: center; justify-content: center; background: none; color: var(--text-faint);
+}
+.ai-nb-slot.is-agent-slot .ai-nb-add:hover { background: var(--fill); color: var(--text); }
+/* HQ&A vacía: la tarjeta que enseña el gesto. */
+.ai-nb-howto { background: var(--fill); border-radius: var(--r-lg); padding: 14px 16px; margin-bottom: 14px; }
+.ai-nb-howto-title { margin: 0 0 8px; font-size: var(--fs-sm); font-weight: 600; color: var(--text); }
+.ai-nb-howto-steps { margin: 0 0 12px; padding-left: 20px; display: grid; gap: 4px; font-size: var(--fs-sm); color: var(--text-soft); line-height: 1.45; }
+.ai-nb-try {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--btn-bg); color: var(--btn-ink); border: none; border-radius: var(--r-pill);
+  font: inherit; font-size: var(--fs-sm); font-weight: 600; padding: 7px 14px; cursor: pointer;
+}
+.ai-nb-try:hover:not(:disabled) { background: var(--btn-bg-hover); }
+.ai-nb-try:disabled { opacity: 0.6; cursor: default; }
+.ai-nb-cands { display: grid; gap: 6px; }
+.ai-nb-cands-head { margin: 0 0 2px; font-size: var(--fs-xs); color: var(--text-faint); }
+.ai-nb-cand {
+  text-align: left; background: var(--surface-0); border: 1px solid var(--border-soft); border-radius: var(--r-md);
+  padding: 9px 12px; font: inherit; font-size: var(--fs-sm); font-style: italic; color: var(--text); cursor: pointer; line-height: 1.45;
+}
+.ai-nb-cand:hover { border-color: var(--accent); }
+/* El extractor automático falló: salida para reintentar. */
+.ai-act-retry {
+  margin-left: 8px; background: none; border: none; padding: 0; cursor: pointer;
+  color: var(--accent); font: inherit; font-weight: 600;
+}
+
 /* Capítulos (plantillas por capítulo) */
 .ai-nb-chapter { border-top: 1px solid var(--border-soft); }
 .ai-nb-chapter:last-child { border-bottom: 1px solid var(--border-soft); }

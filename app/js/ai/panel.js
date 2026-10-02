@@ -71,7 +71,9 @@ let nbMenu = null;
 let nbJustSaved = null;
 // Borradores de la libreta, por campo/nota (ver captureNbDrafts). Sobreviven a repintados.
 let nbDrafts = new Map();
-let nbMenuFocus = false;      // al abrir un menú ⋯, llevar el foco a su primera opción
+let nbMenuFocus = false;
+let nbFilling = null;         // «campo|capítulo» que el agente está rellenando (Q6)
+let nbCandidates = null;      // HQ&A vacía: { chapter, loading, items: [{ id, text }] } (Q7)      // al abrir un menú ⋯, llevar el foco a su primera opción
 let bookFinished = false;
 let attenuationDone = false;  // atenuación de capítulos aplicada para este libro
 let registeredRendition = null; // rendition con el listener de subrayado registrado
@@ -667,6 +669,7 @@ export async function setBook(b, id, title, opts = {}) {
   ia2LastChapter = null; ia2Seen = new Set();   // IA2: reinicia el repaso por libro
   editingId = null; addingField = null; attenuationDone = false;
   nbExpanded = new Set(); nbMenu = null; nbJustSaved = null; bookFinished = false; nbDrafts = new Map();
+  nbFilling = null; nbCandidates = null;
   nbAddChapter = null; nbOpenChapters = new Set();
   clearChapterAttenuation();
   annotatedText = ''; anchors = new Map();
@@ -719,7 +722,7 @@ async function onReaderSelection(cfiRange, contents) {
   await generateHQA(text, cfiRange);
 }
 
-async function generateHQA(text, cfiRange) {
+async function generateHQA(text, cfiRange, { chapter } = {}) {
   hqaBusy = true;
   setStatus('Generando la pregunta del subrayado…');
   try {
@@ -740,7 +743,7 @@ P: <pregunta>` },
     const out = await LLM.chatStream({ messages });
     const q = (out.match(/P:\s*(.+)/i)?.[1] || '').trim();
     const content = t('> {text}\n\n**P:** {q}\n**R:** {r}', { text, q: q || '—', r: answerBlank() });
-    await saveNote('hqa', content, [cfiRange]);
+    await saveNote('hqa', content, [cfiRange], chapter || currentChapter());
     renderNotebook();
     markNotebookUnread();
     setStatus('Pregunta añadida — escribe tu respuesta en la libreta');
@@ -2294,6 +2297,14 @@ hay nada que merezca guardarse, no llames a ninguna herramienta.` },
   } catch (e) {
     console.error('Extracción falló:', e);
     el.innerHTML = act('xmark', t('No se pudo guardar en la libreta'));
+    // En modo automático el indicador se quedaba así, sin salida (auditoría Q8).
+    if (!isBtn) {
+      const retry = document.createElement('button');
+      retry.className = 'ai-act-retry';
+      retry.textContent = t('Reintentar');
+      retry.addEventListener('click', () => extractToNotebook(answerText, question, el));
+      el.appendChild(retry);
+    }
   } finally {
     // Solo el botón se restaura para poder reintentar; el indicador auto se queda.
     if (isBtn) setTimeout(() => { el.disabled = false; el.innerHTML = act('note', t('A la libreta')); }, 2500);
@@ -2431,8 +2442,23 @@ function fieldBlock(f, list, { chapter = null, pending = null } = {}) {
       : '';
   }
   if (!list.length && !adding && pending?.field.key === f.key) return '';   // ya está en «Te toca»
+  // HQ&A sin ninguna pregunta todavía: en vez de una línea que invita a escribir (y lo que
+  // escribas ahí no es P/R ni llega al mazo), la tarjeta que enseña el gesto (Q7).
+  if (f.aiScaffold && !adding && !notes.some(n => n.fieldKey === f.key)) return hqaHowtoHtml();
+  // Campo del agente vacío: decía «lo apunta el agente», pero solo apuntaba si chateabas.
+  // Ahora es una acción (Q6). Con el libro aún sin preparar no hay de dónde sacar nada:
+  // el campo no se enseña hasta entonces.
+  if (!list.length && !adding && !mine) {
+    if (!segReady) return '';
+    const busyHere = nbFilling === `${f.key}|${chapter ?? ''}`;
+    return `<div class="ai-nb-slot is-agent-slot">
+      <span class="ai-nb-slot-label">${escapeHtml(f.label)}</span>
+      <button class="ai-nb-fill-btn" data-fill="${f.key}"${chapAttr}${busyHere || nbFilling ? ' disabled' : ''}>${icon('sparkles', { size: 13 })}<span>${busyHere ? t('Buscando en el libro…') : t('Pedir al agente')}</span></button>
+      <button class="ai-nb-add" data-field="${f.key}"${chapAttr} aria-label="${t('Escribirla yo')}" title="${t('Escribirla yo')}">${icon('plus', { size: 15 })}</button>
+    </div>`;
+  }
   if (!list.length && !adding) {
-    const when = mine ? NB.whenLabel(f.when) : t('lo apunta el agente');
+    const when = NB.whenLabel(f.when);
     return `<button class="ai-nb-slot${mine ? ' is-mine' : ''}" data-field="${f.key}"${chapAttr}>
       <span class="ai-nb-slot-label">${escapeHtml(f.label)}</span>
       <span class="ai-nb-slot-when">${escapeHtml(when)}</span>
@@ -2532,6 +2558,105 @@ function forgetNbDraft(el) {
   if (key) nbDrafts.delete(key);
 }
 
+// ---- Q7 · HQ&A vacía: enseñar el gesto ----------------------------------------
+function hqaHowtoHtml() {
+  const c = nbCandidates;
+  const list = c?.items?.length
+    ? `<div class="ai-nb-cands"><p class="ai-nb-cands-head">${t('Elige una frase de «{c}»:', { c: escapeHtml(c.chapter) })}</p>${c.items.map((it, i) => `<button class="ai-nb-cand" data-i="${i}">«${escapeHtml(it.text)}»</button>`).join('')}</div>`
+    : '';
+  return `
+    <div class="ai-nb-howto">
+      <p class="ai-nb-howto-title">${t('Cómo funciona')}</p>
+      <ol class="ai-nb-howto-steps">
+        <li>${t('Selecciona una frase del libro y pulsa «Hazme la pregunta».')}</li>
+        <li>${t('El agente te hace una pregunta sobre ella.')}</li>
+        <li>${t('Respondes con tus palabras: es lo que fija lo aprendido.')}</li>
+        <li>${t('Tu respuesta entra en tu mazo de repaso.')}</li>
+      </ol>
+      ${list || `<button class="ai-nb-try"${c?.loading || !segReady ? ' disabled' : ''}>${icon('sparkles', { size: 14 })}<span>${c?.loading ? t('Buscando frases…') : t('Probar con este capítulo')}</span></button>`}
+    </div>`;
+}
+
+// El capítulo «de verdad» más cercano: el actual si tiene texto; si no (cubierta), el
+// primero del índice que lo tenga.
+function textChapter() {
+  ensureIndex();
+  const cur = currentChapter();
+  if (cur && !Retrieval.isBoilerplate(cur) && Retrieval.passagesByChapter(cur).length) return cur;
+  return (tocLabels || []).find(l => !Retrieval.isBoilerplate(l) && Retrieval.passagesByChapter(l).length) || '';
+}
+
+// Pasajes de un capítulo (o del libro) recortados a un presupuesto, repartidos por igual.
+function passagesBudget(chapter, maxChars = 18000) {
+  ensureIndex();
+  const all = chapter ? Retrieval.passagesByChapter(chapter) : Retrieval.allPassages();
+  let total = 0;
+  for (const p of all) total += p.text.length + 8;
+  if (total <= maxChars) return all;
+  const step = total / maxChars;
+  return all.filter((_, i) => Math.floor(i / step) !== Math.floor((i - 1) / step));
+}
+
+async function proposeHqaCandidates() {
+  if (!(await needKey())) return;
+  if (!segReady) { setStatus('El libro aún no está listo.'); return; }
+  const chapter = textChapter();
+  if (!chapter) { toastMsg(t('No encuentro un capítulo con texto para proponer frases.'), 'error'); return; }
+  nbCandidates = { chapter, loading: true, items: [] };
+  renderNotebook();
+  try {
+    const ps = passagesBudget(chapter, 14000);
+    const out = await LLM.chatStream({
+      messages: [
+        { role: 'system', content: `Eliges frases para estudiar con el método HQ&A. De los PASAJES, escoge las 3 frases LITERALES (copiadas tal cual, máx. 220 caracteres cada una) más importantes para el objetivo del usuario. Devuelve exactamente 3 líneas, sin nada más, con este formato:\n[[aN]] <frase literal>` },
+        { role: 'user', content: `OBJETIVO: ${convo?.goal || ''}\n\nPASAJES:\n${ps.map(p => `[[${p.id}]] ${p.text}`).join('\n')}` },
+      ],
+      maxTokens: 500,
+    });
+    const items = String(out || '').split('\n')
+      .map(l => /^\s*(?:[-*]\s*)?\[\[(a\d+)\]\]\s*(.+)$/.exec(l))
+      .filter(Boolean).map(m => ({ id: m[1], text: m[2].replace(/^[«"“]|[»"”]$/g, '').trim() }))
+      .filter(it => it.text && anchors.has(it.id)).slice(0, 3);
+    nbCandidates = items.length ? { chapter, loading: false, items } : null;
+    if (!items.length) toastMsg(t('No se pudieron proponer frases. Prueba seleccionando una en el libro.'), 'error');
+  } catch (e) {
+    nbCandidates = null;
+    toastMsg(t('No se pudieron proponer frases: {msg}', { msg: e.message }), 'error');
+  }
+  renderNotebook();
+}
+
+// ---- Q6 · «Pedir al agente» en un campo del agente vacío ------------------------
+async function fillFieldFromBook(fieldKey, chapter) {
+  const f = fieldOf(fieldKey);
+  if (!f || isCognitionField(f)) return;          // nunca en tus campos: la frontera IA / tú
+  if (!(await needKey())) return;
+  if (!segReady) { setStatus('El libro aún no está listo.'); return; }
+  const scope = chapter || textChapter();
+  nbFilling = `${fieldKey}|${chapter ?? ''}`;
+  renderNotebook();
+  try {
+    const ps = passagesBudget(scope);
+    const out = await LLM.chatStream({
+      messages: [
+        { role: 'system', content: `Rellenas el campo «${f.label}»${f.hint ? ` (${f.hint})` : ''} de la libreta de lectura de un usuario. Su objetivo: «${convo?.goal || ''}». Usa SOLO los PASAJES. Devuelve de 2 a 5 viñetas, una por línea, empezando por «- », concisas y cada una con la cita [[aN]] del pasaje en que se apoya. Escribe en el idioma de los pasajes. Si nada sirve para ese campo, responde solo: NADA` },
+        { role: 'user', content: `PASAJES${scope ? ` (${scope})` : ''}:\n${ps.map(p => `[[${p.id}]] ${p.text}`).join('\n')}` },
+      ],
+      maxTokens: 800,
+    });
+    const items = String(out || '').split('\n')
+      .map(l => l.replace(/^\s*[-*•]\s*/, '').trim())
+      .filter(l => l && !/^NADA\.?$/i.test(l)).slice(0, 5);
+    for (const it of items) await saveNote(fieldKey, it, extractCites(it, []), chapter ?? scope ?? currentChapter());
+    if (!items.length) toastMsg(t('El agente no encontró nada para «{f}» en este tramo del libro.', { f: f.label }));
+  } catch (e) {
+    toastMsg(t('No se pudo pedir al agente: {msg}', { msg: e.message }), 'error');
+  } finally {
+    nbFilling = null;
+    renderNotebook();
+  }
+}
+
 // «3 notas · 1 por responder»: lo que queda por hacer en el capítulo se lee sin abrirlo
 // (auditoría Q5). Lo pendiente va en texto y color, sin barra.
 function chapterCount(list) {
@@ -2564,14 +2689,14 @@ function renderNotebook() {
   const cur = currentChapter();
   const pending = NB.pendingPrompt(template, notes, { convoId: convo?.id, finished: bookFinished });
 
-  let body;
+  let body = null;
   if (template.byChapter && (cur || notes.some(n => n.chapter))) {
     // La cubierta, los créditos, el índice… no son «Ahora» ni abren un grupo con líneas
     // vacías: no hay nada que apuntar de ellos (auditoría Q5; en T6 la «Cubierta» pintaba
     // cinco, tres de ellas «lo apunta el agente»).
     const curIsText = !!cur && !Retrieval.isBoilerplate(cur);
     const groups = NB.groupByChapter(notes, { order: tocLabels, current: curIsText ? cur : '' });
-    body = groups.map((g) => {
+    body = !groups.length ? null : groups.map((g) => {
       const isCur = curIsText && g.chapter === cur;
       const inner = fields.map((f) => {
         const list = g.notes.filter(n => n.fieldKey === f.key);
@@ -2586,9 +2711,9 @@ function renderNotebook() {
           <div class="ai-nb-chapter-body">${inner}</div>
         </details>`;
     }).join('');
-  } else {
-    body = fields.map(f => fieldBlock(f, byField[f.key] || [], { pending })).join('');
   }
+  // Sin grupos (aún en la cubierta, sin notas): la libreta plana, con sus estados vacíos.
+  if (body == null) body = fields.map(f => fieldBlock(f, byField[f.key] || [], { pending })).join('');
 
   const focus = captureNbDrafts();
   els.noteView.innerHTML = `
@@ -2723,7 +2848,20 @@ async function onNotebookClick(e) {
   const edit = e.target.closest('.ai-nb-edit');
   if (edit) { editingId = Number(edit.dataset.id); addingField = null; nbMenu = null; renderNotebook(); focusEditor(); return; }
 
-  const add = e.target.closest('.ai-nb-add, .ai-nb-slot:not(.is-locked)');
+  const fill = e.target.closest('.ai-nb-fill-btn');
+  if (fill) { fillFieldFromBook(fill.dataset.fill, fill.dataset.chapter ?? null); return; }
+  if (e.target.closest('.ai-nb-try')) { proposeHqaCandidates(); return; }
+  const cand = e.target.closest('.ai-nb-cand');
+  if (cand && nbCandidates) {
+    const it = nbCandidates.items[Number(cand.dataset.i)];
+    if (!it) return;
+    nbCandidates.items = nbCandidates.items.filter(x => x !== it);
+    if (!nbCandidates.items.length) nbCandidates = null;
+    await generateHQA(it.text, anchors.get(it.id)?.cfi || it.id, { chapter: anchors.get(it.id)?.chapter });
+    return;
+  }
+
+  const add = e.target.closest('.ai-nb-add, .ai-nb-slot:not(.is-locked):not(.is-agent-slot)');
   if (add) {
     addingField = add.dataset.field; nbAddChapter = add.dataset.chapter ?? null;
     editingId = null; nbMenu = null;

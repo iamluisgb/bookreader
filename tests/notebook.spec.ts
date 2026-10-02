@@ -22,7 +22,13 @@ async function openNotebook(page: Page, seed: Seed) {
   const ids = await page.evaluate(async (seed) => {
     const DB = await import('/js/ai/db.js');
     const Store = await import('/js/library/store.js');
-    const books = await Store.getAllBooks();
+    // El libro se guarda en la biblioteca un instante DESPUÉS de que el iframe exista:
+    // leerla de inmediato a veces la encontraba vacía (fallo intermitente del helper).
+    let books: any[] = [];
+    for (let i = 0; i < 100 && !books.length; i++) {
+      books = await Store.getAllBooks();
+      if (!books.length) await new Promise(r => setTimeout(r, 100));
+    }
     const c = await DB.createConvo(books[0].id, seed.tpl, seed.goal);
     for (const n of seed.notes || []) await DB.addNote(c.id, n.f, n.c, n.cfi ? [n.cfi] : [], n.ch ? { chapter: n.ch } : {});
     if (seed.done) localStorage.setItem('bookreader_nb_done_chapter', JSON.stringify({ [c.id]: seed.done }));
@@ -235,7 +241,7 @@ test('lo que escribes sobrevive a un repintado, con el foco y el cursor donde es
   expect(await input.evaluate((el: HTMLTextAreaElement) => el.selectionStart)).toBe(4);
 
   // Lo mismo en el editor de una nota nueva.
-  await nb(page).locator('.ai-nb-slot').first().click();
+  await nb(page).locator('.ai-nb-slot.is-mine').first().click();
   const ed = nb(page).locator('.ai-nb-editor .ai-nb-input');
   await ed.fill('Nota a medias');
   await page.evaluate(async () => (await import('/js/ai/panel.js') as any).__renderNotebookForTest());
@@ -243,7 +249,7 @@ test('lo que escribes sobrevive a un repintado, con el foco y el cursor donde es
 
   // Cancelar SÍ lo olvida: volver a abrir el campo empieza en blanco.
   await nb(page).locator('.ai-nb-cancel').click();
-  await nb(page).locator('.ai-nb-slot').first().click();
+  await nb(page).locator('.ai-nb-slot.is-mine').first().click();
   await expect(nb(page).locator('.ai-nb-editor .ai-nb-input')).toHaveValue('');
 });
 
@@ -301,4 +307,46 @@ test('una cita sin ancla espera apagada mientras el libro se prepara; después, 
   expect(out.pending).toContain('ai-cite is-pending');
   expect(out.invented).not.toContain('ai-cite');
   expect(out.ok).toContain('data-id="a1"');
+});
+
+// Auditoría de libretas · Q6/Q7: estados vacíos honestos. El modelo se simula según lo que
+// se le pide (rellenar un campo, proponer frases, hacer la pregunta HQ&A).
+async function stubModel(page: Page) {
+  await page.route('**/chat/completions', (route) => {
+    const sys = JSON.parse(route.request().postData() || '{}').messages?.[0]?.content || '';
+    const out = /Rellenas el campo/.test(sys) ? '- Idempotencia del consumidor [[a1]]\n- Outbox transaccional [[a2]]'
+      : /Eliges frases/.test(sys) ? '[[a1]] Vine a Comala porque me dijeron que acá vivía mi padre.\n[[a2]] Un tal Pedro Páramo.'
+      : 'P: ¿Por qué vino Juan Preciado a Comala?';
+    const body = 'data: ' + JSON.stringify({ choices: [{ delta: { content: out }, finish_reason: null }] }) + '\n\ndata: [DONE]\n\n';
+    return route.fulfill({ status: 200, headers: { 'Content-Type': 'text/event-stream' }, body });
+  });
+}
+
+test('campo del agente vacío: «Pedir al agente» lo rellena desde el libro, con citas', async ({ page }) => {
+  await stubModel(page);
+  await openNotebook(page, { tpl: 't1-extraccion', goal: 'Mi pipeline pierde eventos' });
+  // Ya no promete «lo apunta el agente»: ofrece la acción (cuando el libro está listo).
+  await expect(nb(page)).not.toContainText('lo apunta el agente');
+  const btn = nb(page).locator('.ai-nb-fill-btn[data-fill="conceptos_frameworks"]');
+  await expect(btn).toBeVisible({ timeout: 30000 });
+  await btn.click();
+  const field = nb(page).locator('.ai-nb-field.is-agent', { hasText: 'Conceptos del autor' });
+  await expect(field.locator('.ai-nb-note')).toHaveCount(2);
+  await expect(field.locator('.ai-nb-note').first()).toContainText('Idempotencia del consumidor');
+  await expect(field.locator('.ai-cite').first()).toBeVisible();     // la cita al pasaje
+});
+
+test('HQ&A vacía enseña el gesto y propone frases del capítulo; elegir una crea la pregunta', async ({ page }) => {
+  await stubModel(page);
+  await openNotebook(page, { tpl: 'hqa', goal: 'Memorizar' });
+  const howto = nb(page).locator('.ai-nb-howto');
+  await expect(howto).toContainText('Selecciona una frase del libro');
+  await expect(howto.locator('.ai-nb-try')).toBeEnabled({ timeout: 30000 });
+  await howto.locator('.ai-nb-try').click();
+  const cands = nb(page).locator('.ai-nb-cand');
+  await expect(cands).toHaveCount(2);
+  await cands.first().click();
+  // La pregunta aparece como nota HQ&A sin responder, y la tarjeta de ayuda se va.
+  await expect(nb(page).locator('.ai-nb-note.is-unanswered')).toContainText('¿Por qué vino Juan Preciado a Comala?');
+  await expect(nb(page).locator('.ai-nb-howto')).toHaveCount(0);
 });
