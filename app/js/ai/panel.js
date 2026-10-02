@@ -228,7 +228,7 @@ export function setOpen(open) {
   // Abrir el agente ES la intención de usarlo: sin clave, la demo se pide ya, mientras se
   // elige el objetivo, y no al primer envío (que esperaría a la red sin explicar por qué).
   if (!LLM.hasKey()) void LLM.ensureKey();
-  if (book && !convo) openOnboarding();   // primer uso del agente con este libro
+  if (book && !convo) openOnboarding({ auto: true });   // primer uso del agente con este libro
   else if (convo) { focusInput(); if (segReady) maybeHintFlashcards(); }
 }
 export function isOpen() { return document.body.classList.contains('ai-open'); }
@@ -719,6 +719,12 @@ export async function setBook(b, id, title, opts = {}) {
   if (convos.length) {
     convo = convos[0];                 // getConvos viene ordenado por lastUsedAt desc
     template = getTemplate(convo.templateId);
+    // Carrera: si el agente se abrió ANTES de que llegaran las conversaciones del libro,
+    // enseñó «elige un objetivo» y, al llegar la que ya tenías, el onboarding se quedaba
+    // encima tapando la libreta y el chat. Se cierra con su propio botón (suelta el teclado
+    // y devuelve el foco), solo si se abrió por eso.
+    const ob = document.getElementById('ai-onboarding');
+    if (ob?.dataset.auto) ob.querySelector('.ai-ob-close')?.click();
     await activateConvo();
     if (mySeq !== bookSeq) return;
   }
@@ -1025,6 +1031,9 @@ function openOnboarding(opts = {}) {
   overlay = document.createElement('div');
   overlay.id = 'ai-onboarding';
   overlay.className = 'ai-onboarding';
+  // Abierto SOLO porque aún no había conversación (no porque el usuario pidiera una nueva):
+  // si la que ya tenía llega después, este onboarding sobra (ver setBook).
+  if (opts.auto) overlay.dataset.auto = '1';
   overlay.innerHTML = `
     <div class="ai-ob-card" role="dialog" aria-modal="true" aria-label="${t('Elegir objetivo de lectura')}">
       <button class="ai-ob-close" title="${t('Cerrar')}" aria-label="${t('Cerrar')}">${icon('xmark', { size: 18 })}</button>
@@ -1981,7 +1990,9 @@ async function deliver(aug, question, { showUser = true, ref = null, systemExtra
       // `systemExtra` = instrucciones de MODO para este turno (p. ej. el ejemplo
       // numérico). Van al final del system para pesar más que las genéricas, y solo
       // afectan a este turno: no se persisten ni contaminan los siguientes.
-      { role: 'system', content: systemPrompt(convo?.goal, template, Profiles.getActive(), { tocLabels: ctx.tocLabels, hasBookSummary: !!bookSummaryMd, transversal: !!ctx.transversal })
+      { role: 'system', content: systemPrompt(convo?.goal, template, Profiles.getActive(), { tocLabels: ctx.tocLabels, hasBookSummary: !!bookSummaryMd, transversal: !!ctx.transversal,
+        // F2 · el agente lee lo que has escrito (≈1,5 k tokens como mucho; apagable en Ajustes).
+        notebookDigest: LLM.getReadNotebook() ? NB.notebookDigest(template, notes, { chapter: currentChapter() }) : '' })
         + (systemExtra ? `\n\n${systemExtra}` : '') },
     ];
     if (bookSummaryMd) {

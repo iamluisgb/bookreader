@@ -9,10 +9,13 @@ import path from 'path';
 const EPUB_PATH = path.join(__dirname, 'test.epub');
 const PDF_PATH = path.join(__dirname, 'test-multipage.pdf');
 
+// Devuelve cuántas veces se pidió una PREGUNTA HQ&A (no cualquier llamada: al cruzar de
+// capítulo, HQ&A hace además su repaso de capítulo en el chat, y eso es otra cosa).
 async function stubModel(page: Page) {
   let calls = 0;
   await page.route('**/chat/completions', (route) => {
-    calls++;
+    const sys = JSON.parse(route.request().postData() || '{}').messages?.[0]?.content || '';
+    if (/método HQ&A/.test(sys)) calls++;
     const body = 'data: ' + JSON.stringify({ choices: [{ delta: { content: 'P: ¿Qué busca Juan Preciado?' }, finish_reason: null }] }) + '\n\ndata: [DONE]\n\n';
     return route.fulfill({ status: 200, headers: { 'Content-Type': 'text/event-stream' }, body });
   });
@@ -48,20 +51,18 @@ async function openWithConvo(page: Page, tpl: string) {
   await page.evaluate(async () => { (await import('/js/ai/panel.js') as any).setOpen(true); });
 }
 
-// Mismo gesto que highlight-edit.spec.ts: una página con prosa y un párrafo seleccionado.
+// Seleccionar un párrafo dentro del iframe del EPUB hasta que la app reacciona. El gesto se
+// repite y, si la página no tiene prosa, AVANZA: bajo carga el lector restaura la posición
+// guardada tarde y puede volver a la cubierta después de que el test ya hubiera avanzado.
 async function selectInEpub(page: Page) {
-  await expect.poll(async () => page.evaluate(async () => {
-    const doc = (document.querySelector('#epub-container iframe') as HTMLIFrameElement)?.contentDocument;
-    if ((doc?.body?.textContent || '').trim().length > 60) return true;
-    await (await import('/js/epub-reader.js') as any).next();
-    return false;
-  }), { timeout: 30000 }).toBe(true);
-  const gesto = () => page.evaluate(() => {
+  const gesto = () => page.evaluate(async () => {
     const doc = (document.querySelector('#epub-container iframe') as HTMLIFrameElement)?.contentDocument;
     const p = doc?.body && [...doc.body.querySelectorAll('p')].find(el => (el.textContent || '').trim().length > 40);
-    if (!p) return;
+    if (!p) { try { await (await import('/js/epub-reader.js') as any).next(); } catch { /* aún cargando */ } return; }
     const w = doc.createTreeWalker(p, 4);
-    const tn = w.nextNode() as Text;
+    let tn = w.nextNode() as Text | null;
+    while (tn && tn.length < 20) tn = w.nextNode() as Text | null;
+    if (!tn) return;
     const range = doc.createRange();
     range.setStart(tn, 0); range.setEnd(tn, Math.min(tn.length, 60));
     const sel = doc.defaultView!.getSelection()!;
@@ -69,12 +70,11 @@ async function selectInEpub(page: Page) {
     doc.dispatchEvent(new Event('selectionchange', { bubbles: true }));
     doc.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
   });
-  await gesto();
   await expect.poll(async () => {
     if (await page.locator('#highlight-tooltip').isVisible()) return true;
     await gesto();
     return false;
-  }, { timeout: 20000 }).toBe(true);
+  }, { timeout: 30000 }).toBe(true);
 }
 
 const notes = (page: Page) => page.evaluate(async () => {
@@ -116,7 +116,7 @@ test('HQ&A: seleccionar ya no crea notas sola; «Hazme la pregunta» sí', async
   await openWithConvo(page, 'hqa');
   await selectInEpub(page);
   await page.waitForTimeout(1200);
-  expect(calls()).toBe(0);                                  // nadie llamó al modelo
+  expect(calls()).toBe(0);                                  // nadie pidió una pregunta
   expect((await notes(page)).length).toBe(0);
 
   const btn = page.locator('#sel-notebook');
@@ -165,4 +165,31 @@ test('PDF: el fragmento a la libreta guarda su página y vuelve a ella', async (
   const saved = (await notes(page)).find((n: any) => n.f === 'por_que_importa')!;
   expect(saved.src).toContain('page:1');
   await expect(nb.locator('.ai-nb-loc')).toContainText('pág. 1');
+});
+
+// Carrera real (salió con la suite bajo carga): abrir el agente ANTES de que llegue la
+// conversación que ya tenías enseña «elige un objetivo»; al llegar, ese onboarding se
+// quedaba encima tapando la libreta y el chat. Ahora se cierra solo.
+test('el onboarding abierto por adelantarse a la conversación se cierra cuando esta llega', async ({ page }) => {
+  await page.goto('/index.html');
+  await page.evaluate(() => localStorage.setItem('bookreader_ai_key', JSON.stringify('sk-test')));
+  await page.reload();
+  await page.setInputFiles('#file-input', EPUB_PATH);
+  await page.waitForFunction(() => !!document.querySelector('#toc-list a'), null, { timeout: 30000 });
+  // Sin conversación aún: el agente abre el onboarding (por adelantarse).
+  await page.evaluate(async () => { (await import('/js/ai/panel.js') as any).setOpen(true); });
+  await expect(page.locator('#ai-onboarding')).toBeVisible();
+  // La conversación «llega»: existe en la base y el panel carga las del libro, como hace
+  // app.js al abrirlo (aquí, DESPUÉS de haber abierto el agente: la carrera).
+  await page.evaluate(async () => {
+    const DB: any = await import('/js/ai/db.js');
+    const Store: any = await import('/js/library/store.js');
+    const ER: any = await import('/js/epub-reader.js');
+    const panel: any = await import('/js/ai/panel.js');
+    const books = await Store.getAllBooks();
+    await DB.createConvo(books[0].id, 't1-extraccion', 'Entender Comala');
+    await panel.setBook(ER.getBook(), books[0].id, ER.getTitle(), { author: ER.getAuthor() });
+  });
+  await expect(page.locator('#ai-onboarding')).toHaveCount(0, { timeout: 15000 });
+  await expect(page.locator('#ai-tabs')).toBeVisible();
 });

@@ -1329,6 +1329,7 @@ const EN = {
   'Hazme la pregunta': 'Ask me',
   'Llevar este fragmento a tu libreta': 'Take this passage to your notebook',
   '¿En qué campo lo apuntas?': 'Which field does it go in?',
+  'Que el agente lea lo que escribo en la libreta': 'Let the agent read what I write in my notebook',
   'Incluir': 'Include',
   'Subrayados y notas': 'Highlights and notes',
   'Libretas': 'Notebooks',

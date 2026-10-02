@@ -46,8 +46,9 @@ Hoy hay ~12 variables planas. Pasamos a un sistema con escalas semánticas:
 - **Motion:** `--ease`, `--dur-fast/normal`; respetar `prefers-reduced-motion`.
 
 Temas: **claro**, **oscuro** (rediseñado, menos saturado) y **sepia** (solo lectura).
-Acento por defecto propuesto: índigo/azul calmado (afinar el `#4a90d9` actual hacia algo más
-sobrio) — *a confirmar*.
+Acento: **esmeralda sobrio** — `--accent: #178046` en claro (AA como texto y como fondo con
+blanco), `#32d074` en oscuro y `#1f9d54` en sepia (ver `css/themes.css`). Sustituyó al índigo
+que se propuso al principio (§6.1); el token manda, no este texto.
 
 ---
 
@@ -120,8 +121,9 @@ Detalles técnicos móviles: `100dvh` (no `100vh`), `env(safe-area-inset-*)` par
 
 ## 6. Decisiones tomadas (2026-06-29)
 
-1. **Estética:** NotebookLM — neutro calmado. Superficies blancas/grises sutiles, acento
-   **índigo `#5B6CFF`**, tarjetas redondeadas, mucho aire.
+1. **Estética:** NotebookLM — neutro calmado. Superficies blancas/grises sutiles, tarjetas
+   redondeadas, mucho aire. El acento se decidió índigo `#5B6CFF` y **después pasó a esmeralda**
+   (`#178046` claro, `#32d074` oscuro): es el que usa la app (§2).
 2. **Tema por defecto:** **seguir el sistema** (`prefers-color-scheme`), con override manual
    a claro/oscuro/sepia.
 3. **Navegación móvil:** **FAB + drawers** — lector limpio, FAB 🤖 abre el agente, icono/gesto

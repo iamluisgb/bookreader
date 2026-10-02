@@ -3,6 +3,37 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-10-02 — Libretas: las cinco recomendaciones principales de la auditoría UX
+
+Ver [`docs/AUDITORIA_LIBRETAS.md`](docs/AUDITORIA_LIBRETAS.md). Cinco tramos:
+
+1. **Borradores a salvo y menú accesible** (Q9, Q10). Lo que escribes en «Te toca» o en un
+   editor sobrevive a los repintados que llegan solos (extractor, HQ&A, cambio de capítulo),
+   con el foco y el cursor; se olvida al guardar o cancelar. Menú ⋯ con flechas, Escape y
+   foco de vuelta; 44 px táctiles.
+2. **Legibilidad** (Q1–Q5). Notas de la IA en una línea; sin ubicación, el ⋯ va a la
+   esquina. Una sola ubicación por nota («↗ pág. 12»), a un toque y también dentro de su
+   capítulo. Las citas `[[aN]]` ya no desaparecen mientras se prepara el libro (chip apagado;
+   `renderWithCitations(…, { pending })`). Respuesta HQ&A vacía como placeholder, no Markdown.
+   Cabecera «2 notas · 1 por responder»; la cubierta y los créditos no son «Ahora».
+3. **Estados vacíos honestos** (Q6–Q8). «Pedir al agente» rellena un campo de la IA desde el
+   capítulo, con citas (antes prometía «lo apunta el agente»). HQ&A vacía enseña el gesto y
+   propone 3 frases del capítulo. «Reintentar» si falla el guardado automático.
+4. **Del fragmento a la libreta** (F1). «A la libreta» en la barra de selección (EPUB, PDF y
+   táctil): el fragmento entra en el campo que eliges, con su pasaje (CFI o `page:N`). Con HQ&A
+   se llama «Hazme la pregunta» y **sustituye al disparo automático**: ninguna selección crea
+   notas sola. Arreglado de paso: editar una nota le quitaba su enlace al pasaje.
+5. **El agente lee tu libreta** (F2). Un resumen de lo que TÚ has escrito (cognición; en HQ&A,
+   pregunta + tu respuesta), primero el capítulo en curso, con tope de ~6.000 caracteres,
+   entra en el prompt de sistema. Interruptor en Ajustes → Agente.
+
+Arreglado de paso (salió con la suite bajo carga): si se abría el agente ANTES de que llegara
+la conversación que ya existía para el libro, se enseñaba «elige un objetivo» y, al llegar la
+conversación, ese onboarding se quedaba encima tapando la libreta y el chat. Ahora el
+onboarding abierto por adelantarse se cierra solo al llegar la conversación.
+
+DESIGN.md: el acento es esmeralda, no índigo. SW `v154`.
+
 ## 2026-10-02 — Perfil y modelo se eligen en el composer; botón al inicio de la respuesta
 
 Cambiar de modelo o de perfil obligaba a salir de la conversación a Ajustes. Ahora, como en la

@@ -357,6 +357,7 @@ function agentSimpleHtml() {
     <p class="appset-muted" id="appset-simple-model"></p>
     <p class="appset-model-hint" id="appset-simple-hint" hidden></p>
     <label class="appset-check"><input type="checkbox" id="appset-auto"${LLM.getAutoExtract() ? ' checked' : ''} /> ${t('Rellenar la libreta automáticamente')}</label>
+    <label class="appset-check"><input type="checkbox" id="appset-readnb"${LLM.getReadNotebook() ? ' checked' : ''} /> ${t('Que el agente lea lo que escribo en la libreta')}</label>
     <button id="appset-save" class="primary-btn appset-save">${t('Guardar')}</button>
     <p class="appset-saved" id="appset-saved" hidden>${icon('check', { size: 14 })} ${t('Guardado')}</p>
     <p class="appset-privacy">${icon('shield', { size: 13 })} ${t('Tu API key se guarda solo en este navegador. Para responder, el contenido del libro se envía al proveedor que configures.')}</p>
@@ -419,6 +420,7 @@ function agentHtml() {
     <label class="appset-label" for="appset-key">API key</label>
     ${apiKeyRowHtml()}
     <label class="appset-check"><input type="checkbox" id="appset-auto"${LLM.getAutoExtract() ? ' checked' : ''} /> ${t('Rellenar la libreta automáticamente')}</label>
+    <label class="appset-check"><input type="checkbox" id="appset-readnb"${LLM.getReadNotebook() ? ' checked' : ''} /> ${t('Que el agente lea lo que escribo en la libreta')}</label>
     <button id="appset-save" class="primary-btn appset-save">${t('Guardar')}</button>
     <p class="appset-saved" id="appset-saved" hidden>${icon('check', { size: 14 })} ${t('Guardado')}</p>
     <p class="appset-privacy">${icon('shield', { size: 13 })} ${t('Tu API key se guarda solo en este navegador. Para responder, el contenido del libro se envía al proveedor que configures.')}</p>
@@ -475,6 +477,7 @@ function wireAgentSimple(content) {
     // hay proveedor al que cambiar: se conserva la demo y se guarda lo que sí es suyo.
     if (!key && LLM.isDemo()) {
       LLM.setAutoExtract(content.querySelector('#appset-auto').checked);
+    { const rn = content.querySelector('#appset-readnb'); if (rn) LLM.setReadNotebook(rn.checked); }
       if (hint) {
         hint.hidden = false;
         hint.textContent = t('Sigues con la demo. Para cambiar de proveedor, pega su API key aquí.');
@@ -494,6 +497,7 @@ function wireAgentSimple(content) {
     // navegador, que funciona siempre; quien quiera el suyo lo escribe en avanzadas.
     LLM.setSttModel('');
     LLM.setAutoExtract(content.querySelector('#appset-auto').checked);
+    { const rn = content.querySelector('#appset-readnb'); if (rn) LLM.setReadNotebook(rn.checked); }
     agentDraft = null;
     const ok = content.querySelector('#appset-saved');
     if (ok) { ok.hidden = false; setTimeout(() => { ok.hidden = true; }, 1800); }
@@ -789,6 +793,7 @@ function saveAgentForm(content, baseUrl, model) {
   LLM.setSttModel(content.querySelector('#appset-smodel').value);
   LLM.setLiteModel(content.querySelector('#appset-lmodel').value);
   LLM.setAutoExtract(content.querySelector('#appset-auto').checked);
+    { const rn = content.querySelector('#appset-readnb'); if (rn) LLM.setReadNotebook(rn.checked); }
   agentDraft = null;
   window.dispatchEvent(new CustomEvent('appsettings:agent-saved'));
 }

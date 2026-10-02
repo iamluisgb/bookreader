@@ -1,5 +1,9 @@
 # Auditoría UX/UI de las libretas
 
+> **Estado (2026-10-02, tarde):** implementadas las cinco del Top 5 —F1, Q1–Q5, Q6–Q7, F2,
+> Q9–Q10— más Q8 y el arreglo de DESIGN.md (ver CHANGELOG). Pendientes: Q11 (contador en la
+> pestaña) y los cambios de fondo F3–F8.
+>
 > 2026-10-02. Solo recomendaciones: no hay cambios de código. Se ha mirado la interfaz real con
 > Playwright (EPUB `tests/test.epub`, licencia Pro simulada, `chat/completions` stubbeado), en
 > escritorio 1300×820 y en móvil 390×844, con cinco plantillas (T1, HQ&A, T3, T5 y T6), en claro y

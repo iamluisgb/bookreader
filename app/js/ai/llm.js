@@ -330,6 +330,10 @@ export async function probeModel({ kind = 'text', model, baseUrl, key, signal } 
 // Auto-extracción a la libreta tras cada respuesta (por defecto activada).
 export function getAutoExtract() { return Storage.get('ai_auto_extract', true); }
 export function setAutoExtract(v) { Storage.set('ai_auto_extract', !!v); }
+// F2 · ¿El agente lee un resumen de lo que has escrito en tu libreta? Sí por defecto; se
+// puede apagar (cuesta tokens y es contenido tuyo que va al proveedor).
+export function getReadNotebook() { return Storage.get('ai_read_notebook', true) !== false; }
+export function setReadNotebook(v) { Storage.set('ai_read_notebook', !!v); }
 
 // ---- Cola de llamadas: prioridad + serialización solo donde hace falta -------
 // nan rechazaba peticiones concurrentes a la misma key (daba "network error") — ya no,

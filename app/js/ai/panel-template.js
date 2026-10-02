@@ -165,5 +165,11 @@ expresa mejor como lista anidada o pasos numerados.
 
 Principio rector — información ≠ cognición. Ayuda a APRENDER, no sustituyas el aprendizaje.
 La libreta del usuario tiene estos campos:
-${notebook}`;
+${notebook}${opts.notebookDigest ? `
+
+LO QUE EL USUARIO HA ESCRITO EN SU LIBRETA (resumen; es suyo):
+${opts.notebookDigest}
+Úsalo para conectar con lo que ya piensa («como apuntaste en…»), para no preguntarle lo que ya
+respondió y para señalar con tacto si algo choca con el libro (con su cita). No lo repitas entero
+ni lo corrijas sin que lo pida: sus notas son su trabajo, no un borrador tuyo.` : ''}`;
 }

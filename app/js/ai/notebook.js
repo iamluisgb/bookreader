@@ -106,3 +106,41 @@ export function plainText(content) {
     .replace(/\s+/g, ' ')
     .trim();
 }
+
+// ---- Lo que el agente sabe de tu libreta (auditoría de libretas, F2) -------------------
+// Antes el agente recibía los CAMPOS de la libreta pero no su contenido: no podía decir
+// «como apuntaste en el capítulo 2…», ni darse cuenta de que algo ya lo habías respondido.
+// Esto resume lo que TÚ has escrito (los campos de cognición; en HQ&A, la pregunta con tu
+// respuesta) dentro de un presupuesto fijo: primero lo del capítulo en curso, luego lo más
+// reciente. Lo de la IA no entra: ya sale del libro y gastaría presupuesto en repetirse.
+// Devuelve '' si no hay nada tuyo.
+export function notebookDigest(template, notes, { chapter = '', maxChars = 6000, perNote = 400 } = {}) {
+  if (!template || !Array.isArray(notes) || !notes.length) return '';
+  const fieldOf = (k) => template.fields.find(f => f.key === k);
+  const lines = [];
+  for (const n of notes) {
+    const f = fieldOf(n.fieldKey);
+    if (!f || !isCognitionField(f) || n.deleted) continue;
+    let text;
+    if (f.aiScaffold) {
+      const { q, a } = parseQA(n.content);
+      if (!q || !a) continue;                 // sin tu respuesta todavía no hay nada tuyo
+      text = `P: ${plainText(q)} → R: ${plainText(a)}`;
+    } else {
+      text = plainText(n.content);
+    }
+    if (!text) continue;
+    if (text.length > perNote) text = text.slice(0, perNote - 1) + '…';
+    const where = n.chapter ? ` · ${n.chapter}` : '';
+    lines.push({ here: !!chapter && n.chapter === chapter, ts: n.ts || n.updatedAt || 0, line: `- [${f.label}${where}] ${text}` });
+  }
+  lines.sort((a, b) => (b.here - a.here) || (b.ts - a.ts));
+  const out = [];
+  let used = 0;
+  for (const l of lines) {
+    if (used + l.line.length > maxChars) break;
+    out.push(l.line);
+    used += l.line.length + 1;
+  }
+  return out.join('\n');
+}

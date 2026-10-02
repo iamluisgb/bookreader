@@ -350,3 +350,67 @@ test('HQ&A vacía enseña el gesto y propone frases del capítulo; elegir una cr
   await expect(nb(page).locator('.ai-nb-note.is-unanswered')).toContainText('¿Por qué vino Juan Preciado a Comala?');
   await expect(nb(page).locator('.ai-nb-howto')).toHaveCount(0);
 });
+
+// Auditoría de libretas · F2: el agente lee (un resumen acotado de) lo que has escrito.
+test('notebookDigest: lo tuyo, primero el capítulo en curso, sin lo de la IA y dentro del presupuesto', async ({ page }) => {
+  await page.goto('/index.html');
+  const out = await page.evaluate(async () => {
+    const NB: any = await import('/js/ai/notebook.js');
+    const T: any = await import('/js/ai/templates.js');
+    const hqa = T.getTemplate('hqa');
+    const t1 = T.getTemplate('t1-extraccion');
+    const notes = [
+      { fieldKey: 'por_que_importa', content: 'Viejo, capítulo 1', chapter: 'C1', ts: 1 },
+      { fieldKey: 'por_que_importa', content: 'Del capítulo 2', chapter: 'C2', ts: 0 },
+      { fieldKey: 'conceptos_frameworks', content: 'Esto es de la IA', ts: 5 },
+    ];
+    return {
+      t1: NB.notebookDigest(t1, notes, { chapter: 'C2' }),
+      hqa: NB.notebookDigest(hqa, [
+        { fieldKey: 'hqa', content: '> x\n\n**P:** ¿Sin responder?\n**R:** _(escribe tu respuesta)_' },
+        { fieldKey: 'hqa', content: '> y\n\n**P:** ¿Qué es Comala?\n**R:** Un pueblo de ánimas' },
+      ]),
+      tight: NB.notebookDigest(t1, notes, { maxChars: 40 }),
+      empty: NB.notebookDigest(t1, [{ fieldKey: 'conceptos_frameworks', content: 'solo IA' }]),
+    };
+  });
+  const lines = out.t1.split('\n');
+  expect(lines[0]).toContain('Del capítulo 2');          // el capítulo en curso, primero
+  expect(out.t1).toContain('Viejo, capítulo 1');
+  expect(out.t1).not.toContain('Esto es de la IA');       // lo de la IA no entra
+  expect(out.hqa).toBe('- [Preguntas y respuestas] P: ¿Qué es Comala? → R: Un pueblo de ánimas');
+  expect(out.tight.split('\n')).toHaveLength(1);           // el presupuesto manda
+  expect(out.empty).toBe('');
+});
+
+test('al chatear, el agente recibe lo que has escrito; con el interruptor apagado, no', async ({ page }) => {
+  const systems: string[] = [];
+  await page.route('**/chat/completions', (route) => {
+    const msgs = JSON.parse(route.request().postData() || '{}').messages || [];
+    systems.push(msgs.filter((m: any) => m.role === 'system').map((m: any) => m.content).join('\n'));
+    const body = 'data: ' + JSON.stringify({ choices: [{ delta: { content: 'ok' }, finish_reason: null }] }) + '\n\ndata: [DONE]\n\n';
+    return route.fulfill({ status: 200, headers: { 'Content-Type': 'text/event-stream' }, body });
+  });
+  await page.addInitScript(() => localStorage.setItem('bookreader_ai_auto_extract', 'false'));
+  await openNotebook(page, { tpl: 't1-extraccion', goal: 'Mi pipeline', notes: [{ f: 'por_que_importa', c: 'Mi idea propia: acks=all siempre' }] });
+  await expect(page.locator('#ai-status')).toContainText('Listo', { timeout: 30000 });
+  const ask = async (q: string) => {
+    const before = systems.length;
+    await page.locator('.ai-tab[data-view="chat"]').click();
+    await page.fill('#ai-input', q);
+    await page.locator('#ai-send').click();
+    // La primera llamada puede ser la expansión de la búsqueda (BM25): se espera a la de
+    // la respuesta, que es la que lleva el objetivo.
+    const main = () => systems.slice(before).find(x => x.includes('OBJETIVO DEL USUARIO')) || '';
+    await expect.poll(main, { timeout: 20000 }).not.toBe('');
+    return main();
+  };
+  const on = await ask('¿Qué opinas?');
+  expect(on).toContain('LO QUE EL USUARIO HA ESCRITO EN SU LIBRETA');
+  expect(on).toContain('Mi idea propia: acks=all siempre');
+
+  await page.evaluate(() => localStorage.setItem('bookreader_ai_read_notebook', 'false'));
+  await expect(page.locator('#ai-send')).toBeEnabled();
+  const off = await ask('¿Y ahora?');
+  expect(off).not.toContain('Mi idea propia');
+});
