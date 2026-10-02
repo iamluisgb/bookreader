@@ -753,7 +753,9 @@ Con BYOK el daño se limita a gastar tu clave y mentirte, pero el usuario tiene 
   [P8](#p8--exportar-libretas-y-conversaciones--fase-1--m)). Casillas: libros (con su peso) / subrayados /
   libretas / chat / artefactos / mazos. Campo de enlace de origen (DOI/arXiv) por libro, precargado si se
   puede sacar de los metadatos del PDF.
-- **F2 — Importar + carril** `M`: «Abrir dossier…» en la biblioteca (+ arrastrar). Los libros del paquete
+- **F2 — Importar + carril** `M` · **✓ 2026-10-02** (entrada: «Subir archivos» acepta `.bookreader`; faltan
+  arrastrar a la biblioteca, abrirlo desde WhatsApp con el *file handler* de la PWA y borrar un dossier
+  importado desde la UI. La lista ajena va agrupada «De X» bajo la tuya, sin filtro): «Abrir dossier…» en la biblioteca (+ arrastrar). Los libros del paquete
   entran en TU biblioteca (si ya lo tienes, mismo hash, no se duplica) en una estantería «<nombre> · de X»;
   lo ajeno (subrayados, libretas, artefactos, mazos) va al store `shared`. Estados por título: *lo tienes* /
   *consíguelo* / *solo notas* (estos dos, solo para lo que llegó sin fichero). Libreta ajena en **solo lectura**.

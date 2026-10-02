@@ -168,15 +168,18 @@ export function render() {
     container.innerHTML = `<p class="studio-hint">${t('Abre un libro para generar y ver sus artefactos.')}</p>`;
     return;
   }
-  DB.getDecks(ctx.bookId)
-    .catch(() => [])            // sin mazos legibles, el tile cae a la invitación vacía
-    .then(decks => {
+  Promise.all([
+    DB.getDecks(ctx.bookId).catch(() => []),   // sin mazos legibles, el tile cae a la invitación vacía
+    // P24 · Lo que llegó en un dossier para este libro (vacío casi siempre).
+    import('../share/studio-shared.js').then(m => m.sectionHtml(ctx.bookId)).catch(() => ''),
+  ]).then(([decks, sharedHtml]) => {
       if (seq !== renderSeq) return;
       const job = Jobs.activeJob();
       container.innerHTML =
         `<div class="studio-book">${escapeHtml(ctx.bookTitle || t('Libro'))}</div>` +
         (ctx.segReady ? '' : `<p class="studio-hint">${t('Preparando el libro… la generación estará lista en unos segundos.')}</p>`) +
-        `<div class="studio-grid">${TYPES.map(ty => group(ty, ctx, job, decks)).join('')}</div>`;
+        `<div class="studio-grid">${TYPES.map(ty => group(ty, ctx, job, decks)).join('')}</div>` +
+        sharedHtml;
     });
 }
 
@@ -189,6 +192,11 @@ async function onClick(e) {
   const deckId = Number(btn.dataset.deck);
   const ctx = getCtx();
 
+  if (act.startsWith('shared-')) {
+    const Shared = await import('../share/studio-shared.js');
+    await Shared.onClick(btn, { bookId: ctx.bookId, open: openFn, anchors: ctx.anchors, onCite: ctx.onCite, rerender: render });
+    return;
+  }
   if (act === 'open') {
     const entry = Jobs.list(ctx.bookId, kind).find(x => x.key === key);
     openFn(kind, entry ? { artifact: entry } : {});

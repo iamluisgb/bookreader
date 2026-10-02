@@ -1625,3 +1625,12 @@ body.ai-open #sync-badge { right: calc(var(--ai-panel-width) + 14px); }
   .anal-card { border-radius: 16px 16px 0 0; max-height: 92vh; }
   .anal-hero-n { font-size: 40px; }
 }
+
+/* P24 · Lo que llegó en un dossier para este libro: debajo del mosaico propio, con la
+   misma tarjeta. El visor de libreta ajena reutiliza el modal de resumen (.sum-card). */
+.studio-shared { margin-top: 12px; }
+.studio-adopt { align-self: center; margin-right: 10px; }
+.shared-nb-field { margin-top: 18px; }
+.shared-nb-field h3 { font-size: 13px; font-weight: 600; margin: 0 0 8px; color: var(--text-faint); }
+.shared-nb-note { font-size: 14px; line-height: 1.55; margin-bottom: 10px; }
+.shared-nb-note p { margin: 0 0 6px; }

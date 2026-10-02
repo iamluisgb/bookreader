@@ -3,6 +3,28 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-10-02 — P24 F2: importar un dossier y ver lo ajeno
+
+Quien recibe un `.bookreader` lo abre con **Subir archivos**.
+- **Revisión antes de aceptar** ([`share/import-ui.js`](app/js/share/import-ui.js)): de quién viene
+  («según el fichero»), cuánto trae y qué pasa con cada libro — *ya lo tienes* / *nuevo · 3 MB* /
+  *trae el fichero que te faltaba* / *sin fichero: consíguelo en arxiv.org/…* / *solo notas* — con
+  casillas para quedarse con parte.
+- **Al importar** ([`share/import.js`](app/js/share/import.js)): los libros entran en tu biblioteca
+  (el mismo hash no se duplica; tu ficha no se toca) dentro de la estantería «<nombre> · <de>».
+  Lo ajeno va a una base propia, `bookreader_shared` ([`share/store.js`](app/js/share/store.js)),
+  fuera del sync y del backup. Reimportar el mismo dossier lo **sustituye**.
+- **En el lector**: los subrayados ajenos se pintan con **trazo punteado** de su color (underline en
+  EPUB, capa propia en PDF) y salen en la barra lateral bajo «De Luis», sin editar ni borrar. Un
+  subrayado tuyo en el mismo pasaje convive con el ajeno.
+- **En el Studio** ([`share/studio-shared.js`](app/js/share/studio-shared.js)): sección «De Luis» con
+  sus artefactos (se abren con el mismo visor; las citas llevan al pasaje porque el libro es el
+  mismo fichero), sus libretas en un visor de **solo lectura** (su plantilla no entra en las tuyas:
+  inyectaría texto en tu prompt) y sus mazos con **Añadir a mis mazos** (calendario nuevo).
+
+Tests: [share-dossier](tests/share-dossier.spec.ts) (dos lectores, dos contextos),
+[share-reader](tests/share-reader.spec.ts), [share-studio](tests/share-studio.spec.ts). SW `v144`.
+
 ## 2026-10-02 — P24: los libros viajan dentro del dossier
 
 El `.bookreader` pasa de JSON a **ZIP**: `dossier.json` + `files/<bookId>.pdf|epub`

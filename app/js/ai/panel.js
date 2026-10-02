@@ -172,7 +172,7 @@ export function init(opts) {
       else if (kind === 'flashcards') openFlashcards();
       else if (kind === 'feynman') openFeynman();
     },
-    getContext: () => ({ bookId, bookTitle, segReady }),
+    getContext: () => ({ bookId, bookTitle, segReady, anchors, onCite: navigateCite }),
   });
   document.addEventListener('click', (e) => {
     if (convoMenuEl && !convoMenuEl.contains(e.target) && !e.target.closest('#ai-convo-btn')) closeConvoMenu();
