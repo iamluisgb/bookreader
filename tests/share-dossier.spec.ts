@@ -212,3 +212,94 @@ test('desde el menú de la estantería: elegir partes y descargar el .bookreader
   // El nombre se recuerda para la próxima vez.
   expect(await page.evaluate(() => localStorage.getItem('bookreader_share_author'))).toBe('"Luis"');
 });
+
+// F2 · Dos lectores de verdad (dos contextos de navegador, dos IndexedDB). Luis comparte
+// su estantería; Ana ya tenía el paper A con un subrayado suyo en la MISMA página.
+test('importar: los libros entran en la biblioteca, lo ajeno va aparte y lo tuyo queda intacto', async ({ browser }, testInfo) => {
+  const luis = await (await browser.newContext()).newPage();
+  await luis.goto('/');
+  const { shelfId, A } = await seed(luis);
+  // D: un EPUB que Ana no tiene → entra nuevo en su biblioteca.
+  const { D, b64 } = await luis.evaluate(async (shelfId) => {
+    const Store: any = await import('/js/library/store.js');
+    const DB: any = await import('/js/ai/db.js');
+    const Share: any = await import('/js/share/export.js');
+    const bytes = new Uint8Array(3000).map((_, i) => (i * 13 + 5) % 253);
+    const D = await DB.hashBuffer(bytes.buffer.slice(0));
+    await Store.putBook({ id: D, title: 'Linked Data', author: 'Heath', format: 'epub', size: bytes.length,
+      addedAt: Date.now(), status: 'unread', shelfIds: [shelfId], file: new Blob([bytes]) });
+    const pkg = await Share.packShelf(shelfId, { author: 'Luis' });
+    const buf = new Uint8Array(await pkg.blob.arrayBuffer());
+    let bin = ''; for (const x of buf) bin += String.fromCharCode(x);
+    return { D, b64: btoa(bin) };
+  }, shelfId);
+  const fs = await import('fs/promises');
+  const file = testInfo.outputPath('knowledge-graphs.bookreader');
+  await fs.writeFile(file, Buffer.from(b64, 'base64'));
+
+  const ana = await (await browser.newContext()).newPage();
+  await ana.goto('/');
+  // Ana tiene A (mismos bytes que Luis → mismo id) y un subrayado propio en la pág. 3.
+  await ana.evaluate(async (A) => {
+    const Store: any = await import('/js/library/store.js');
+    const Storage: any = await import('/js/storage.js');
+    const bytes = new Uint8Array(4096);
+    for (let i = 0; i < bytes.length; i++) bytes[i] = (i * 37 + 11) % 251;
+    await Store.putBook({ id: A, title: 'KG survey (mi copia)', format: 'pdf', size: 4096, addedAt: Date.now(),
+      status: 'reading', shelfIds: [], file: new Blob([bytes]) });
+    Storage.set('highlights_' + A, [{ uid: 'mio', id: 'mio', page: 3, rects: [], text: 'mi subrayado', color: '#a5d6a7', timestamp: 1 }]);
+  }, A);
+  await ana.reload();
+
+  const importOnce = async (linkedData: string) => {
+    await ana.locator('#file-input').setInputFiles(file);
+    const dlg = ana.locator('.dlg-card');
+    await expect(dlg.locator('.dlg-title')).toHaveText('Abrir «Knowledge graphs»');
+    await expect(dlg).toContainText('De Luis (según el fichero). 1 subrayado · 1 nota de libreta · 1 artefacto · 1 tarjeta');
+    await expect(dlg).toContainText('Knowledge Graphs (survey) — ya lo tienes');
+    await expect(dlg).toContainText(`Linked Data — ${linkedData}`);
+    await expect(dlg).toContainText('Graph Databases — sin fichero: solo notas');
+    await dlg.getByRole('button', { name: 'Importar' }).click();
+    await expect(ana.locator('.dlg-card')).toContainText('Listo: 3 libros en la estantería «Knowledge graphs · Luis».');
+    await ana.locator('.dlg-card').getByRole('button', { name: 'Entendido' }).click();
+  };
+  await importOnce('nuevo');
+
+  const state = async () => ana.evaluate(async ({ A, D }) => {
+    const Store: any = await import('/js/library/store.js');
+    const Storage: any = await import('/js/storage.js');
+    const Shared: any = await import('/js/share/store.js');
+    const shelves = await Store.getShelves();
+    const kg = shelves.find((s: any) => s.name === 'Knowledge graphs · Luis');
+    const a = await Store.getRaw(A);
+    const d = await Store.getRaw(D);
+    const all = await Shared.getAll();
+    const sa = (await Shared.forBook(A))[0];
+    return {
+      shelves: shelves.length,
+      aTitle: a.title, aInShelf: a.shelfIds.includes(kg.id),
+      dHasFile: Store.hasFile(d), dInShelf: d.shelfIds.includes(kg.id),
+      mine: Storage.get('highlights_' + A, []).map((h: any) => h.text),
+      shared: all.length,
+      sharedA: { from: sa.from, highlights: sa.highlights.map((h: any) => h.text), notes: sa.notebooks[0].notes.length,
+        artifacts: sa.artifacts.length, templates: sa.templates.length },
+    };
+  }, { A, D });
+
+  const first = await state();
+  expect(first.aTitle).toBe('KG survey (mi copia)');          // su ficha no se toca
+  expect(first.aInShelf).toBe(true);
+  expect(first.dHasFile).toBe(true);
+  expect(first.dInShelf).toBe(true);
+  expect(first.mine).toEqual(['mi subrayado']);               // lo suyo, intacto
+  expect(first.shared).toBe(3);                               // A, B y D en el carril ajeno
+  expect(first.sharedA).toEqual({ from: 'Luis', highlights: ['A knowledge graph is…'], notes: 1, artifacts: 1, templates: 1 });
+
+  // Reimportar el mismo dossier SUSTITUYE: ni libros, ni estanterías ni notas duplicadas.
+  // (Y ahora Linked Data ya está en su biblioteca.)
+  await importOnce('ya lo tienes');
+  const second = await state();
+  expect(second.shared).toBe(3);
+  expect(second.shelves).toBe(first.shelves);
+  expect(second.sharedA.highlights).toHaveLength(1);
+});

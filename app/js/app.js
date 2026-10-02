@@ -1316,8 +1316,15 @@ function initDragDrop() {
 }
 
 async function loadFile(file) {
-  const buffer = await file.arrayBuffer();
   const ext = file.name.split('.').pop().toLowerCase();
+  // P24: un dossier compartido no es un libro que abrir, es material que importar
+  // (libros + notas ajenas). Su pantalla va aparte y se carga solo si hace falta.
+  if (ext === 'bookreader') {
+    const { importDossier } = await import('./share/import-ui.js');
+    if (await importDossier(file)) goToLibrary();
+    return;
+  }
+  const buffer = await file.arrayBuffer();
 
   if (ext !== 'epub' && ext !== 'pdf') {
     await alertBox('Formato no soportado. Usa archivos .epub o .pdf');
