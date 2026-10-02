@@ -79,6 +79,7 @@ export async function apply(p, ids = p.books.map(b => b.entry.bookId), now = Dat
 
   await Shared.replaceDossier(p.key, chosen.map(({ entry }) => ({
     bookId: entry.bookId,
+    shelfId: shelf.id,   // para poder quitarlo desde el menú de esa estantería
     title: entry.title,
     source: entry.source || null,
     from: p.bundle.author || '',

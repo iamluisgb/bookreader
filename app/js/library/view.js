@@ -19,6 +19,7 @@ import { track } from '../ui/usage-log.js';
 let host = null;                 // #library
 let onOpenBook = () => {};
 let onAddBook = () => {};
+let onDropFile = () => {};
 let onOpenSettings = () => {};
 
 // Selección de estanterías. Un conjunto, no un valor: las estanterías son
@@ -70,6 +71,7 @@ export function init(opts = {}) {
   host = document.getElementById('library');
   onOpenBook = opts.onOpenBook || (() => {});
   onAddBook = opts.onAddBook || (() => {});
+  onDropFile = opts.onDropFile || (() => {});
   onOpenSettings = opts.onOpenSettings || (() => {});
   host.addEventListener('click', onClick);
   // «Continuar leyendo» es un botón (role/tabindex): Intro y Espacio lo abren.
@@ -865,7 +867,18 @@ function endDrag() {
   host.querySelector('.lib-card.is-dragging')?.classList.remove('is-dragging');
 }
 
+// ¿Trae ficheros de FUERA (el escritorio, el Finder)? Distinto del arrastre de una
+// ficha al rail, que es interno y lleva `dragBookId`.
+const bringsFiles = (e) => !dragBookId && !!e.dataTransfer && [...(e.dataTransfer.types || [])].includes('Files');
+
 function onDragOver(e) {
+  if (bringsFiles(e)) {
+    // Soltar un EPUB, un PDF o un dossier en cualquier punto de la biblioteca.
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+    host.classList.add('is-file-over');
+    return;
+  }
   if (!dragBookId) return;
   const row = e.target.closest('[data-drop-shelf]');
   if (!row) { if (dropRow) { dropRow.classList.remove('is-drop-target'); dropRow = null; } return; }
@@ -879,6 +892,7 @@ function onDragOver(e) {
 }
 
 function onDragLeave(e) {
+  if (!e.relatedTarget || !host.contains(e.relatedTarget)) host.classList.remove('is-file-over');
   if (!dropRow) return;
   if (!e.relatedTarget || !dropRow.contains(e.relatedTarget)) {
     dropRow.classList.remove('is-drop-target');
@@ -887,6 +901,15 @@ function onDragLeave(e) {
 }
 
 async function onDrop(e) {
+  host.classList.remove('is-file-over');
+  const files = e.dataTransfer?.files;
+  if (!dragBookId && files && files.length) {
+    e.preventDefault();
+    // Uno a uno y en orden: abrir un libro o importar un dossier son pantallas, no se
+    // pueden solapar. Lo que no sea EPUB/PDF/dossier lo rechaza el propio loadFile.
+    for (const f of files) await onDropFile(f);
+    return;
+  }
   const row = e.target.closest('[data-drop-shelf]');
   const id = dragBookId || (e.dataTransfer ? e.dataTransfer.getData('text/plain') : '');
   endDrag();
@@ -1043,6 +1066,12 @@ async function openShelfMenu(id, anchor) {
   if (!shelf) return;
   const smart = Shelves.isSmart(shelf);
   const inFilter = selection.has(id);
+  // P24 · ¿Llegó material ajeno a esta estantería (un dossier importado)? Leer la base del
+  // carril ajeno aquí es barato: son unos pocos registros, sin binarios.
+  let dossiers = [];
+  try { dossiers = await (await import('../share/store.js')).dossiersForShelf(id); } catch (e) { /* sin base */ }
+  const dossierItems = dossiers.map((d, i) => `<button class="lib-menu-item danger" data-act="unshare" data-i="${i}">${icon('xmark', { size: 16 })}<span>${
+    d.from ? t('Quitar lo de {name}…', { name: escapeHtml(d.from) }) : t('Quitar lo compartido…')}</span></button>`).join('');
   buildMenu(anchor, `
     <button class="lib-menu-item" data-act="filter">${icon(inFilter ? 'xmark' : 'plus', { size: 16 })}<span>${inFilter ? t('Quitar del filtro') : t('Añadir al filtro')}</span></button>
     <div class="lib-menu-sep"></div>
@@ -1053,8 +1082,19 @@ async function openShelfMenu(id, anchor) {
     <div class="lib-menu-sep"></div>
     <button class="lib-menu-item" data-act="share">${icon('share', { size: 16 })}<span>${t('Compartir estantería…')}</span></button>
     <div class="lib-menu-sep"></div>
+    ${dossierItems}
     <button class="lib-menu-item danger" data-act="delete">${icon('trash', { size: 16 })}<span>${t('Eliminar estantería')}</span></button>
-  `, async (act) => {
+  `, async (act, item) => {
+    if (act === 'unshare') {
+      const d = dossiers[Number(item.dataset.i)];
+      const who = d.from || t('otra persona');
+      const ok = await confirmBox(d.books === 1
+        ? t('Se quitan los subrayados, libretas, artefactos y mazos de {name} en este libro. El libro sigue en tu biblioteca, y los mazos que ya añadiste a los tuyos se quedan.', { name: who })
+        : t('Se quitan los subrayados, libretas, artefactos y mazos de {name} en estos {n} libros. Los libros siguen en tu biblioteca, y los mazos que ya añadiste a los tuyos se quedan.', { name: who, n: d.books }),
+        { title: t('Quitar lo de {name}', { name: who }), okText: 'Quitar', danger: true });
+      if (ok) await (await import('../share/store.js')).removeDossier(d.key);
+      return;
+    }
     if (act === 'filter') {
       // La vía táctil para cruzar estanterías: en el rail eso es ⌘/Ctrl+clic,
       // que en un móvil no existe.

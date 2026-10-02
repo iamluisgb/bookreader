@@ -127,6 +127,8 @@ document.addEventListener('DOMContentLoaded', () => {
   // por su cuenta, nunca lanza y es idempotente.
   void repairOrphanDecks().catch(() => {});
   initRouter();
+  // Ficheros compartidos desde otra app (Android) o abiertos con doble clic (PWA de escritorio).
+  import('./inbox.js').then(m => m.init(loadFile)).catch(e => console.warn('inbox:', e));
   registerServiceWorker();
   calentarModulosGrandes();
 });
@@ -486,6 +488,7 @@ function initLibrary() {
   Library.init({
     onOpenBook: openLibraryBook,
     onAddBook: () => document.getElementById('file-input').click(),
+    onDropFile: (file) => loadFile(file),
     onOpenSettings: () => openAppSettings(),
   });
   document.getElementById('open-app-settings')?.addEventListener('click', () => openAppSettings('agent'));
@@ -1282,6 +1285,13 @@ function initSidebar() {
 // ============ FILE HANDLING ============
 function initFileHandling() {
   const fileInput = document.getElementById('file-input');
+  // iOS traduce cada extensión de `accept` a un tipo del sistema (UTI) y `.bookreader` no es
+  // ninguno: el selector lo deja en gris y el dossier no se puede elegir. Allí va sin filtro;
+  // loadFile rechaza igualmente lo que no sea EPUB, PDF o dossier. (iPadOS se presenta
+  // como Mac: lo delata la pantalla táctil.)
+  const ios = /iPad|iPhone|iPod/.test(navigator.userAgent)
+    || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  if (ios) fileInput.removeAttribute('accept');
 
   fileInput.addEventListener('change', async (e) => {
     const file = e.target.files[0];
@@ -1327,7 +1337,7 @@ async function loadFile(file) {
   const buffer = await file.arrayBuffer();
 
   if (ext !== 'epub' && ext !== 'pdf') {
-    await alertBox('Formato no soportado. Usa archivos .epub o .pdf');
+    await alertBox('Formato no soportado. Usa archivos .epub, .pdf o .bookreader (dossier compartido).');
     return;
   }
 

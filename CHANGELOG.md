@@ -3,6 +3,21 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-10-02 — P24: más puertas de entrada del dossier, y una de salida
+
+- **Soltar ficheros en la biblioteca**: un EPUB, un PDF o un `.bookreader` arrastrado desde el
+  escritorio, en cualquier punto (contorno punteado mientras se arrastra).
+- **Compartir → BookReader** (Android): `share_target` en el manifest. El service worker recibe el
+  POST, deja el fichero en la caché `bookreader-inbox` (que la limpieza de versiones no toca) y
+  redirige a `./?inbox=1`; [`inbox.js`](app/js/inbox.js) lo recoge y lo pasa a `loadFile`.
+- **Doble clic en el escritorio**: `file_handlers` + `launchQueue` con la PWA instalada (Chrome).
+- **iOS**: el selector va sin `accept`, porque `.bookreader` no es un tipo que iOS conozca y lo dejaba
+  en gris. Sin verificar en un iPhone.
+- **Quitar un dossier**: «Quitar lo de Luis…» en el menú de la estantería a la que llegó. Los libros
+  y los mazos ya adoptados se quedan.
+
+Tests: [share-inbox.spec.ts](tests/share-inbox.spec.ts). SW `v145`.
+
 ## 2026-10-02 — P24 F2: importar un dossier y ver lo ajeno
 
 Quien recibe un `.bookreader` lo abre con **Subir archivos**.

@@ -9,7 +9,7 @@
 // Coste aceptado en v1: lo importado no viaja entre tus dispositivos; se reimporta.
 //
 // Un registro por (dossier, libro):
-//   { id: `${dossierKey}::${bookId}`, dossierKey, bookId, from, shelfName, importedAt,
+//   { id: `${dossierKey}::${bookId}`, dossierKey, bookId, shelfId, from, shelfName, importedAt,
 //     title, highlights, notebooks, artifacts, decks, templates }
 
 const DB_NAME = 'bookreader_shared';
@@ -70,6 +70,19 @@ export function forBook(bookId) {
 
 export function getAll() {
   return run('readonly', s => s.getAll()).then(list => list || []);
+}
+
+// Dossiers que llegaron a una estantería: [{ key, from, shelfName, books }]. Lo usa el
+// menú de la estantería para ofrecer quitarlos.
+export async function dossiersForShelf(shelfId) {
+  const out = new Map();
+  for (const r of await getAll()) {
+    if (r.shelfId !== shelfId) continue;
+    const d = out.get(r.dossierKey) || { key: r.dossierKey, from: r.from || '', shelfName: r.shelfName || '', books: 0 };
+    d.books++;
+    out.set(r.dossierKey, d);
+  }
+  return [...out.values()];
 }
 
 export function removeDossier(key) {

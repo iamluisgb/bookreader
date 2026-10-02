@@ -356,6 +356,9 @@ body.in-library .ai-fab { display: none; }
   overflow: hidden; background: var(--surface-1);
 }
 .lib-layout { display: flex; height: 100%; }
+/* Ficheros arrastrados desde fuera (EPUB, PDF o dossier): la biblioteca entera es la
+   zona de soltar. Contorno por dentro, para no mover nada de sitio. */
+.library.is-file-over { outline: 2px dashed var(--accent); outline-offset: -8px; }
 
 /* ---- Rail izquierdo ---- */
 .lib-rail {

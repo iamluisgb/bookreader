@@ -1,4 +1,6 @@
-const CACHE_NAME = 'bookreader-v144';
+const CACHE_NAME = 'bookreader-v145';
+// Ficheros compartidos con la app (share target) a la espera de que la app los recoja.
+const INBOX = 'bookreader-inbox';
 const ASSETS = [
   './',
   './index.html',
@@ -64,6 +66,7 @@ const ASSETS = [
   './js/highlights.js',
   './js/highlights-ui.js',
   './js/share-card.js',
+  './js/inbox.js',
   './js/share/bundle.js',
   './js/share/container.js',
   './js/share/export.js',
@@ -221,7 +224,8 @@ self.addEventListener('activate', (event) => {
       // (STATIC_CACHE) sobrevive: su contenido no puede quedar obsoleto sin cambiar
       // de URL, y rehacerla era el grueso del coste de cada despliegue.
       Promise.all(keys
-        .filter(k => k !== CACHE_NAME && k !== STATIC_CACHE)
+        // INBOX tampoco: puede tener un fichero compartido esperando a que la app arranque.
+        .filter(k => k !== CACHE_NAME && k !== STATIC_CACHE && k !== INBOX)
         .map(k => caches.delete(k)))
     )
   );
@@ -264,10 +268,34 @@ async function cacheFirst(req, cache) {
   return res;
 }
 
+// Share target (manifest.json): Android entrega aquí, por POST multipart, lo que se comparte
+// con BookReader desde otra app. No hay página que lo reciba todavía, así que el fichero se
+// deja en la caché INBOX y se redirige a la app, que lo recoge al arrancar (js/inbox.js).
+async function recibirCompartido(event) {
+  try {
+    const form = await event.request.formData();
+    const cache = await caches.open(INBOX);
+    let i = 0;
+    for (const f of form.getAll('file')) {
+      if (!(f instanceof File)) continue;
+      await cache.put(new Request(`./__inbox/${Date.now()}-${i++}`), new Response(f, {
+        headers: { 'Content-Type': f.type || 'application/octet-stream', 'X-File-Name': encodeURIComponent(f.name || 'fichero') },
+      }));
+    }
+  } catch (e) {
+    console.warn('share-target:', e);
+  }
+  return Response.redirect('./?inbox=1', 303);
+}
+
 self.addEventListener('fetch', (event) => {
   const req = event.request;
   let url;
   try { url = new URL(req.url); } catch { return; }
+  if (req.method === 'POST' && url.origin === self.location.origin && url.pathname.endsWith('/share-target')) {
+    event.respondWith(recibirCompartido(event));
+    return;
+  }
   if (req.method !== 'GET' || url.origin !== self.location.origin || !url.protocol.startsWith('http')) {
     return;
   }
