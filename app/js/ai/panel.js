@@ -18,7 +18,7 @@ import * as Hints from '../ui/hints.js';
 import { escapeHtml } from '../ui/escape.js';
 import { confirmBox, promptBox } from '../ui/dialog.js';
 import * as AppSettings from '../ui/app-settings.js';
-import { renderWithCitations, setCitePageResolver } from './render.js';
+import { renderWithCitations, setCitePageResolver, citeLabel, citePage } from './render.js';
 
 // UI1 · Los chips de cita muestran la página; en EPUB se calcula desde el CFI con las
 // localizaciones del lector (null si aún no están: el chip cae al capítulo).
@@ -2375,11 +2375,21 @@ function noteHtml(n, { showChapter = true } = {}) {
     return editorHtml(`data-id="${n.id}"`, n.content, f?.hint);
   }
   const navCfi = (n.sourceCfis || []).find(c => typeof c === 'string' && c.startsWith('epubcfi'));
-  const chip = showChapter && n.chapter
-    ? (navCfi
-      ? `<button class="ai-nb-chap ai-nb-goto" data-cfi="${escapeHtml(navCfi)}">${escapeHtml(n.chapter)}</button>`
-      : `<span class="ai-nb-chap">${escapeHtml(n.chapter)}</span>`)
-    : '';
+  // UNA sola ubicación por nota, siempre a un toque (auditoría Q2). Antes competían el chip
+  // de la cita y el del capítulo, y dentro de los grupos por capítulo el enlace al pasaje
+  // quedaba a dos toques en el menú ⋯.
+  //   - con pasaje (CFI): «↗ pág. 12» (o el capítulo, si no hay página) → salta al pasaje;
+  //   - sin pasaje pero con citas en el texto: la cita ya es la ubicación, nada más;
+  //   - sin nada: el capítulo como etiqueta, salvo dentro de su propio grupo.
+  const hasCite = /\[\[a\d+\]\]/.test(n.content || '');
+  let chip = '';
+  if (navCfi) {
+    const page = citePage({ cfi: navCfi });
+    const label = page ? t('pág. {n}', { n: page }) : (showChapter && n.chapter ? citeLabel('', { chapter: n.chapter }) : t('Ir al pasaje'));
+    chip = `<button class="ai-nb-loc ai-nb-goto" data-cfi="${escapeHtml(navCfi)}" title="${t('Ir al pasaje')}">${icon('arrow-up-right', { size: 12 })}<span>${escapeHtml(label)}</span></button>`;
+  } else if (!hasCite && showChapter && n.chapter) {
+    chip = `<span class="ai-nb-chap">${escapeHtml(n.chapter)}</span>`;
+  }
   const mine = isCognitionField(f);
   const unanswered = qa && qa.q && !qa.a;
   const menu = nbMenu === n.id ? `
@@ -2390,11 +2400,19 @@ function noteHtml(n, { showChapter = true } = {}) {
         <button class="ai-nb-edit" role="menuitem" data-id="${n.id}">${icon('pencil', { size: 15 })}<span>${t('Editar')}</span></button>
         <button class="ai-nb-del" role="menuitem" data-id="${n.id}">${icon('trash', { size: 15 })}<span>${t('Borrar')}</span></button>
       </div>` : '';
+  // HQ&A sin responder: la línea «R:» es un botón con su placeholder, no el marcador
+  // Markdown «_(escribe tu respuesta)_» a la vista (auditoría Q4).
+  const body = unanswered ? String(n.content || '').replace(/\n?\*\*(?:R|A):\*\*[\s\S]*$/, '') : n.content;
+  const answerPh = unanswered
+    ? `<button class="ai-nb-answer-ph ai-nb-edit" data-id="${n.id}"><b>${t('R:')}</b> <span>${t('Tu respuesta…')}</span></button>`
+    : '';
+  // Sin ubicación que enseñar, la fila meta es solo el ⋯: va a la esquina y no ocupa línea
+  // propia (auditoría Q1: una nota de una línea ocupaba ~65 px).
+  const bare = !chip;
   return `
-    <div class="ai-nb-note${mine ? ' is-mine' : ''}${unanswered ? ' is-unanswered' : ''}" data-id="${n.id}">
-      <div class="ai-nb-note-text" data-id="${n.id}">${renderWithCitations(n.content, anchors)}</div>
-      <div class="ai-nb-note-meta">
-        ${unanswered ? `<button class="ai-nb-answer ai-nb-edit" data-id="${n.id}">${t('Responder')}</button>` : ''}
+    <div class="ai-nb-note${mine ? ' is-mine' : ''}${unanswered ? ' is-unanswered' : ''}${bare ? ' has-bare-meta' : ''}" data-id="${n.id}">
+      <div class="ai-nb-note-text" data-id="${n.id}">${renderWithCitations(body, anchors, { pending: !anchors.size })}${answerPh}</div>
+      <div class="ai-nb-note-meta${bare ? ' is-bare' : ''}">
         ${chip}
         <button class="ai-nb-more" data-id="${n.id}" aria-label="${t('Más acciones')}" aria-haspopup="menu" aria-expanded="${nbMenu === n.id}">${icon('ellipsis', { size: 16 })}</button>
       </div>
@@ -2514,6 +2532,15 @@ function forgetNbDraft(el) {
   if (key) nbDrafts.delete(key);
 }
 
+// «3 notas · 1 por responder»: lo que queda por hacer en el capítulo se lee sin abrirlo
+// (auditoría Q5). Lo pendiente va en texto y color, sin barra.
+function chapterCount(list) {
+  if (!list.length) return '';
+  const pend = list.filter((n) => { const f = fieldOf(n.fieldKey); if (!f?.aiScaffold) return false; const qa = NB.parseQA(n.content); return qa.q && !qa.a; }).length;
+  const total = list.length === 1 ? t('1 nota') : t('{n} notas', { n: list.length });
+  return `<span class="ai-nb-chapter-n">${total}${pend ? ` · <span class="ai-nb-chapter-pend">${t('{n} por responder', { n: pend })}</span>` : ''}</span>`;
+}
+
 function renderNotebook() {
   // Conversación huérfana: su plantilla ya no existe (p. ej. tras consolidar a T1–T5).
   // No rompemos: avisamos y ofrecemos elegir un objetivo nuevo.
@@ -2539,9 +2566,13 @@ function renderNotebook() {
 
   let body;
   if (template.byChapter && (cur || notes.some(n => n.chapter))) {
-    const groups = NB.groupByChapter(notes, { order: tocLabels, current: cur });
+    // La cubierta, los créditos, el índice… no son «Ahora» ni abren un grupo con líneas
+    // vacías: no hay nada que apuntar de ellos (auditoría Q5; en T6 la «Cubierta» pintaba
+    // cinco, tres de ellas «lo apunta el agente»).
+    const curIsText = !!cur && !Retrieval.isBoilerplate(cur);
+    const groups = NB.groupByChapter(notes, { order: tocLabels, current: curIsText ? cur : '' });
     body = groups.map((g) => {
-      const isCur = g.chapter === cur;
+      const isCur = curIsText && g.chapter === cur;
       const inner = fields.map((f) => {
         const list = g.notes.filter(n => n.fieldKey === f.key);
         const addingHere = addingField === f.key && nbAddChapter === g.chapter;
@@ -2551,7 +2582,7 @@ function renderNotebook() {
       const open = isCur || groups.length === 1 || nbOpenChapters.has(g.chapter) || nbAddChapter === g.chapter;
       return `
         <details class="ai-nb-chapter" data-chapter="${escapeHtml(g.chapter)}"${open ? ' open' : ''}>
-          <summary>${icon('chevron-right', { size: 14 })}<span class="ai-nb-chapter-name">${escapeHtml(g.chapter || t('Sin capítulo'))}</span>${isCur ? `<span class="ai-nb-chapter-now">${t('Ahora')}</span>` : ''}<span class="ai-nb-chapter-n">${g.notes.length || ''}</span></summary>
+          <summary>${icon('chevron-right', { size: 14 })}<span class="ai-nb-chapter-name">${escapeHtml(g.chapter || t('Sin capítulo'))}</span>${isCur ? `<span class="ai-nb-chapter-now">${t('Ahora')}</span>` : ''}${chapterCount(g.notes)}</summary>
           <div class="ai-nb-chapter-body">${inner}</div>
         </details>`;
     }).join('');
@@ -2867,7 +2898,7 @@ function appendBubble(role, text, asHtml) {
   // Markdown CRUDO de la respuesta (con sus `[[aN]]`): hace falta para repintar las citas
   // cuando el libro termina de segmentarse. Ver repaintCites().
   if (asHtml && role === 'assistant' && text) div.dataset.rawText = text;
-  if (asHtml) node.innerHTML = renderWithCitations(text, anchors);
+  if (asHtml) node.innerHTML = renderWithCitations(text, anchors, { pending: !anchors.size });
   else node.textContent = text;
   els.messages.appendChild(div);
   if (asHtml && role === 'assistant' && text) addMessageActions(div, text, '');
@@ -2882,6 +2913,8 @@ function appendBubble(role, text, asHtml) {
 // las burbujas que guardaron su markdown crudo, una vez las anclas existen.
 function repaintCites() {
   if (!anchors.size) return;
+  // La libreta también: sus citas se pintaron «pendientes» mientras no había anclas.
+  if (template) renderNotebook();
   for (const div of els.messages.querySelectorAll('.ai-msg-assistant')) {
     const raw = div.dataset.rawText;
     if (!raw) continue;                       // en streaming o ya sin citas pendientes

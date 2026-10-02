@@ -8,7 +8,7 @@ import path from 'path';
 
 const EPUB_PATH = path.join(__dirname, 'test.epub');
 
-type Seed = { tpl: string; goal: string; notes?: { f: string; c: string; ch?: string }[]; done?: string; finished?: boolean };
+type Seed = { tpl: string; goal: string; notes?: { f: string; c: string; ch?: string; cfi?: string }[]; done?: string; finished?: boolean };
 
 async function openNotebook(page: Page, seed: Seed) {
   await page.goto('/index.html');
@@ -24,7 +24,7 @@ async function openNotebook(page: Page, seed: Seed) {
     const Store = await import('/js/library/store.js');
     const books = await Store.getAllBooks();
     const c = await DB.createConvo(books[0].id, seed.tpl, seed.goal);
-    for (const n of seed.notes || []) await DB.addNote(c.id, n.f, n.c, [], n.ch ? { chapter: n.ch } : {});
+    for (const n of seed.notes || []) await DB.addNote(c.id, n.f, n.c, n.cfi ? [n.cfi] : [], n.ch ? { chapter: n.ch } : {});
     if (seed.done) localStorage.setItem('bookreader_nb_done_chapter', JSON.stringify({ [c.id]: seed.done }));
     if (seed.finished) await Store.updateBook(books[0].id, { status: 'finished' });
     return { convoId: c.id, bookId: books[0].id };
@@ -103,8 +103,11 @@ test('HQ&A: tu respuesta pasa al mazo y editarla actualiza la misma tarjeta', as
     notes: [{ f: 'hqa', c: '> Comala es un pueblo de muertos.\n\n**P:** ¿Qué es Comala?\n**R:** _(escribe tu respuesta)_', ch: 'CAPÍTULO 1' }],
   });
   const group = nb(page).locator('.ai-nb-chapter[data-chapter="CAPÍTULO 1"]');
-  await group.locator('summary').click();
-  await group.locator('.ai-nb-answer').click();
+  // Único capítulo con notas (la «Cubierta» no cuenta): sale abierto.
+  await expect(group).toHaveAttribute('open', '');
+  // Sin responder: la línea «R:» es un placeholder que se toca, no Markdown a la vista.
+  await expect(group.locator('.ai-nb-note-text')).not.toContainText('escribe tu respuesta');
+  await group.locator('.ai-nb-answer-ph').click();
   // Solo se edita la respuesta: la pregunta queda a la vista.
   await expect(nb(page).locator('.ai-nb-editor-q')).toContainText('¿Qué es Comala?');
   await nb(page).locator('.ai-nb-input').fill('Un pueblo de ánimas');
@@ -132,12 +135,14 @@ test('plantilla por capítulos: notas agrupadas y el capítulo actual abierto', 
     ],
   });
   const groups = nb(page).locator('.ai-nb-chapter');
-  await expect(groups).toHaveCount(3);                      // actual (Cubierta) + 2 con notas
-  await expect(groups.first().locator('.ai-nb-chapter-now')).toBeVisible();
-  await expect(groups.first()).toHaveAttribute('open', '');
+  // El libro está en la «Cubierta»: no es un capítulo con texto, así que ni es «Ahora» ni
+  // abre un grupo con líneas vacías (antes pintaba cinco). Solo los dos con notas.
+  await expect(groups).toHaveCount(2);
+  await expect(nb(page).locator('.ai-nb-chapter-now')).toHaveCount(0);
+  await expect(nb(page).locator('.ai-nb-chapter[data-chapter="Cubierta"]')).toHaveCount(0);
   const c1 = nb(page).locator('.ai-nb-chapter[data-chapter="CAPÍTULO 1"]');
   await expect(c1).not.toHaveAttribute('open', '');
-  await expect(c1.locator('.ai-nb-chapter-n')).toHaveText('1');
+  await expect(c1.locator('.ai-nb-chapter-n')).toHaveText('1 nota');
   await c1.locator('summary').click();
   await expect(c1.locator('.ai-nb-note-text')).toHaveText('Un tokenizador BPE');
   // La nota dentro de su capítulo no repite el capítulo.
@@ -258,4 +263,42 @@ test('menú ⋯ con teclado: entra el foco, flechas, y Escape vuelve al ⋯', as
   await page.keyboard.press('Escape');
   await expect(nb(page).locator('.ai-nb-menu')).toHaveCount(0);
   await expect(nb(page).locator('.ai-nb-more').first()).toBeFocused();
+});
+
+// Auditoría de libretas · Q1–Q5: legibilidad.
+test('cabecera de capítulo con lo pendiente y ubicación a un toque', async ({ page }) => {
+  await openNotebook(page, {
+    tpl: 'hqa', goal: 'Memorizar',
+    notes: [
+      { f: 'hqa', c: '> Comala.\n\n**P:** ¿Qué es Comala?\n**R:** _(escribe tu respuesta)_', ch: 'CAPÍTULO 1' },
+      { f: 'hqa', c: '> Pedro.\n\n**P:** ¿Quién es Pedro?\n**R:** El padre', ch: 'CAPÍTULO 1', cfi: 'epubcfi(/6/8!/4/2/1:0)' },
+    ],
+  });
+  const c1 = nb(page).locator('.ai-nb-chapter[data-chapter="CAPÍTULO 1"]');
+  // Lo que queda por hacer se lee sin abrir el capítulo.
+  await expect(c1.locator('summary .ai-nb-chapter-n')).toHaveText('2 notas · 1 por responder');
+  await expect(c1).toHaveAttribute('open', '');
+  // La nota con pasaje enseña UNA ubicación, a un toque, también dentro de su grupo; la del
+  // capítulo no se repite.
+  const withCfi = c1.locator('.ai-nb-note', { hasText: '¿Quién es Pedro?' });
+  await expect(withCfi.locator('.ai-nb-loc')).toBeVisible();
+  await expect(withCfi.locator('.ai-nb-chap')).toHaveCount(0);
+  // Sin ubicación, la fila meta no ocupa línea: el ⋯ va a la esquina.
+  const bare = c1.locator('.ai-nb-note', { hasText: '¿Qué es Comala?' });
+  await expect(bare.locator('.ai-nb-note-meta')).toHaveClass(/is-bare/);
+});
+
+test('una cita sin ancla espera apagada mientras el libro se prepara; después, si no existe, se quita', async ({ page }) => {
+  await page.goto('/index.html');
+  const out = await page.evaluate(async () => {
+    const { renderWithCitations }: any = await import('/js/ai/render.js');
+    return {
+      pending: renderWithCitations('Comala [[a3]]', new Map(), { pending: true }),
+      invented: renderWithCitations('Comala [[a3]]', new Map([['a1', { chapter: 'C1' }]])),
+      ok: renderWithCitations('Comala [[a1]]', new Map([['a1', { chapter: 'C1' }]]), { pending: true }),
+    };
+  });
+  expect(out.pending).toContain('ai-cite is-pending');
+  expect(out.invented).not.toContain('ai-cite');
+  expect(out.ok).toContain('data-id="a1"');
 });

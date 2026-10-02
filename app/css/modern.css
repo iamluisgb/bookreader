@@ -969,6 +969,36 @@ button.ai-nb-chap:hover { color: var(--text); background: var(--fill-strong); }
 .ai-nb-editor-q blockquote { margin: 0 0 6px; padding: 0; font-style: italic; color: var(--text-faint); }
 .ai-nb-editor-q p { margin: 0; color: var(--text); }
 
+/* Auditoría de libretas · Q1/Q2/Q4 */
+/* Nota de la IA: una línea, con la ubicación y el ⋯ a la derecha, sin fila propia. */
+.ai-nb-field.is-agent .ai-nb-note { display: flex; align-items: flex-start; gap: 8px; }
+.ai-nb-field.is-agent .ai-nb-note-text { flex: 1; min-width: 0; }
+.ai-nb-field.is-agent .ai-nb-note-meta { margin-top: 0; flex: none; min-height: 0; }
+/* Nota tuya sin ubicación: el ⋯ va a la esquina y el texto le deja sitio. */
+.ai-nb-note-meta.is-bare { position: absolute; top: 4px; right: 4px; margin: 0; min-height: 0; }
+.ai-nb-note.is-mine.has-bare-meta .ai-nb-note-text { padding-right: 26px; }
+.ai-nb-field.is-agent .ai-nb-note-meta.is-bare { position: static; }
+/* Ubicación: «↗ pág. 12», a un toque. Con la nota delante para ganar a la regla vieja de
+   agent.css que hace de todo .ai-nb-goto un cuadrado de icono de 28 px. */
+.ai-nb-note .ai-nb-loc {
+  display: inline-flex; align-items: center; justify-content: flex-start; gap: 3px;
+  width: auto; height: auto; max-width: 160px;
+  font-size: var(--fs-xs); font-weight: 500; color: var(--accent); background: var(--accent-soft);
+  border: none; border-radius: var(--r-pill); padding: 2px 8px; cursor: pointer; white-space: nowrap;
+}
+.ai-nb-note .ai-nb-loc span { overflow: hidden; text-overflow: ellipsis; }
+.ai-nb-note .ai-nb-loc:hover { background: var(--accent); color: var(--on-accent); }
+/* Respuesta pendiente de HQ&A: un placeholder que se toca para responder. */
+.ai-nb-answer-ph {
+  display: flex; gap: 6px; align-items: baseline; width: 100%; margin-top: 6px;
+  background: var(--fill); border: none; border-radius: var(--r-sm); padding: 7px 10px;
+  font: inherit; font-size: var(--fs-sm); color: var(--text-faint); text-align: left; cursor: text;
+}
+.ai-nb-answer-ph b { color: var(--text-soft); }
+.ai-nb-answer-ph:hover { background: var(--fill-strong, var(--fill)); color: var(--text-soft); }
+/* Cita aún sin ancla (el libro se está preparando): presente, pero apagada. */
+.ai-cite.is-pending { opacity: 0.45; cursor: default; pointer-events: none; }
+
 /* Capítulos (plantillas por capítulo) */
 .ai-nb-chapter { border-top: 1px solid var(--border-soft); }
 .ai-nb-chapter:last-child { border-bottom: 1px solid var(--border-soft); }
@@ -981,6 +1011,7 @@ button.ai-nb-chap:hover { color: var(--text); background: var(--fill-strong); }
 .ai-nb-chapter[open] > summary .icon { transform: rotate(90deg); }
 .ai-nb-chapter-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ai-nb-chapter-now { font-size: var(--fs-xs); font-weight: 600; color: var(--accent); }
-.ai-nb-chapter-n { font-size: var(--fs-xs); color: var(--text-faint); font-weight: 500; min-width: 1ch; text-align: right; }
+.ai-nb-chapter-n { font-size: var(--fs-xs); color: var(--text-faint); font-weight: 500; min-width: 1ch; text-align: right; white-space: nowrap; }
+.ai-nb-chapter-pend { color: var(--accent); font-weight: 600; }
 .ai-nb-chapter-body { padding: 2px 0 8px; }
 @media (prefers-reduced-motion: reduce) { .ai-nb-chapter > summary .icon { transition: none; } }
