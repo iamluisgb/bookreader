@@ -673,7 +673,7 @@ disponible; y la **variante vertical 9:16** para stories.
 > soporta transformaciones 3D ni pasaría la CSP. Habría que **redibujar la escena en canvas 2D con la
 > proyección a mano** — una segunda implementación entera, no una reutilización.
 
-### P24 — Compartir material entre lectores (dossier y método) · `M` · **distribución**
+### P24 — Compartir material entre lectores (dossier de estantería y método) · `M` · **distribución**
 
 Pasarle a otra persona lo que has sacado de un libro: subrayados + libreta. Sin backend, sin cuentas:
 un **fichero** que se manda por donde ya se manda todo (el grupo de la clase). A diferencia de
@@ -681,10 +681,34 @@ un **fichero** que se manda por donde ya se manda todo (el grupo de la clase). A
 que comparten una **imagen** que se ve igual sin la app, aquí lo compartido **no sirve sin BookReader**
 → bucle de invitación real, no impresiones.
 
+**Ámbito: la estantería, no el libro** (revisado 2026-10-02). El caso que lo motivó: una investigación
+sobre *knowledge graphs* con varios papers y libros, cada uno con subrayados, notas y libretas, que se
+quiere pasar a otra persona. La unidad es **la investigación**, y en BookReader eso ya existe: la
+**estantería** ([`library/store.js`](app/js/library/store.js): `shelves` + `shelfIds`), que ya es ámbito
+de repaso ([P12](#p12--flashcards-por-libro-y-por-estantería-selector-de-repaso--✓-sm)) y de conversación.
+Un libro suelto es una estantería de uno: mismo formato, `books: [ … ]` con una entrada.
+- **Por libro** viaja: metadatos (título, autores, formato y, si es un paper, **DOI / URL de arXiv**),
+  `bookId`, subrayados, notas, libretas y, opcional, artefactos del agente (store `artifacts` de
+  [`ai/db.js`](app/js/ai/db.js): resúmenes, tarjetas).
+- **El enlace de origen es lo que hace funcionar los papers:** quien recibe descarga el mismo PDF, el
+  SHA-256 coincide y las notas se pintan en el pasaje exacto. En libros, otra edición → modo lectura
+  (ver *Regla de hash*).
+- **Al recibir** aparece una estantería ajena («Knowledge graphs · según el fichero: Luis») con cada
+  título en uno de tres estados: **lo tienes** (anclado) · **consíguelo** (enlace de origen) ·
+  **solo notas** (sin fichero coincidente). Abrir un libro tuyo cuyo hash coincide enciende su carril
+  compartido.
+- **Ficheros de libro: no viajan por defecto.** Casilla opcional *incluir PDFs de acceso abierto* solo
+  para entradas con DOI/arXiv. Los libros no, nunca: es la línea entre compartir apuntes y distribuir
+  libros.
+- **Foto, no documento vivo.** El fichero es el estado de hoy; reenviarlo sustituye la estantería ajena
+  anterior del mismo autor + nombre (no la mezcla). Lo vivo —seguir investigando y que el otro vea lo
+  nuevo— exige una carpeta de Drive compartida, y el sync actual vive en `appDataFolder`, que **no se
+  puede compartir**: otro scope/proveedor, otro ítem. Se aborda solo si la foto circula.
+
 **Son DOS documentos, no uno.** Comparten sobre (`{ format: 'bookreader-bundle', version, kind,
 exportedAt, author }`) y el 80% del código; separarlos desde el día uno es lo que permite **ver cuál de
 los dos se mueve**, que es la pregunta abierta de verdad:
-- **Dossier** (`kind: 'dossier'`) — atado a un libro por `bookId`. Contiene texto de obra ajena.
+- **Dossier** (`kind: 'dossier'`) — una estantería: N libros, cada uno atado por `bookId`. Contiene texto de obra ajena.
 - **Método** (`kind: 'method'`) — perfil de agente + plantilla, **sin libro**. Reutilizable en cualquier
   lectura, no contiene una línea de nadie → es lo único de aquí que se podría **vender** sin recibir un
   DMCA, y con coste marginal cero (el comprador pone su key BYOK y su libro).
@@ -719,14 +743,20 @@ Con BYOK el daño se limita a gastar tu clave y mentirte, pero el usuario tiene 
 **Fases:**
 - **F0 — Formato** `S`: `js/share/bundle.js` con `build()`/`parse()`/`validate()`, funciones puras sin DOM.
   Hermano de [`backup.js`](app/js/backup.js), reusando su `download()` CSP-safe.
-- **F1 — Exportar dossier** `S`: botón "Compartir" en la cabecera del panel, junto al export `.md` de
-  [P8](#p8--exportar-libretas-y-conversaciones--fase-1--m). Casillas: incluir chat / incluir subrayados.
-- **F2 — Importar + carril** `M`: store `shared`, regla de hash, libreta ajena en **solo lectura**.
+- **F1 — Exportar dossier** `S`: «Compartir estantería» en el menú de la estantería (y «Compartir» en la
+  cabecera del panel para un libro suelto, junto al export `.md` de
+  [P8](#p8--exportar-libretas-y-conversaciones--fase-1--m)). Casillas: subrayados / libretas / chat /
+  artefactos / PDFs de acceso abierto. Campo de enlace de origen (DOI/arXiv) por libro, precargado si se
+  puede sacar de los metadatos del PDF.
+- **F2 — Importar + carril** `M`: store `shared`, estantería ajena con los tres estados por título, regla de
+  hash, libreta ajena en **solo lectura**.
   Distinción visual **por trazo, no por barra lateral**: lo ajeno con línea inferior punteada del color
   original, lo propio con fondo sólido. Filtro "Míos · De X" en la sidebar de subrayados.
 - **F3 — Método** `S`: mismo sobre, `kind: 'method'`, con la pantalla de revisión del prompt.
 - **Test que justifica el diseño:** round-trip con `test.epub` — exportar, importar en perfil limpio,
   verificar que aparece en el carril compartido y que **los subrayados propios del mismo CFI siguen intactos**.
+  Segundo test: estantería de dos libros donde el receptor tiene solo uno → uno *lo tienes* (pintado) y
+  otro *solo notas*.
 
 **Fuera de alcance en v1, explícitamente:** enlaces/servidor, cuentas, pagos, firma de autoría, versiones,
 licencias. Un formato de intercambio entre dos personas y un formato de catálogo son cosas distintas;
