@@ -3,6 +3,23 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-10-02 — Perfil y modelo se eligen en el composer; botón al inicio de la respuesta
+
+Cambiar de modelo o de perfil obligaba a salir de la conversación a Ajustes. Ahora, como en la
+web de Hermes, el composer tiene texto arriba y un pie con **perfil ▾ · modelo ▾** a la izquierda
+y ver · micro · enviar a la derecha ([`ai/composer-picks.js`](app/js/ai/composer-picks.js)).
+- **Modelo**: los del proveedor configurado (más el elegido en avanzadas, si no está en la lista);
+  la siguiente pregunta ya lo usa. En la demo, el menú lo dice y ofrece «Usar mi propia API key…».
+- **Perfil**: los perfiles guardados y «Sin perfil». Sin perfil activo el botón es solo el icono
+  (la etiqueta cortaba al modelo en un panel de 380 px). Crear o editar sigue en Ajustes: el menú
+  lleva allí.
+- **Ir al inicio de la última respuesta**: botón redondo abajo a la derecha del chat. Aparece
+  cuando el principio de la última respuesta no se ve y lleva a él; la flecha apunta hacia donde
+  está.
+
+Sustituye al chip de perfil de la barra de conversación (que solo abría Ajustes). Tests:
+[composer-picks.spec.ts](tests/composer-picks.spec.ts). SW `v149`.
+
 ## 2026-10-02 — Onboarding desde cero: el agente arranca con la demo, sin configurar nada
 
 Sin API key, abrir el agente pide la demo sola ([`LLM.ensureKey`](app/js/ai/llm.js), ADR-051) y lo

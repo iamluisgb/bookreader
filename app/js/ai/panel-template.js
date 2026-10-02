@@ -23,7 +23,6 @@ export const TEMPLATE = () => `
        selector, que es justo lo que dice de qué conversación se trata—. -->
   <div class="ai-toolbar">
     <div id="ai-convobar" class="ai-convobar" style="display:none">
-      <button id="ai-profile-chip" class="ai-profile-chip" style="display:none" title="${t('Perfil del agente')}"></button>
       <button id="ai-convo-btn" class="ai-convo-btn" title="${t('Cambiar de conversación')}">
         ${icon('bubble', { size: 15 })}<span id="ai-convo-label" class="ai-convo-label">${t('Conversación')}</span>${icon('chevron-down', { size: 14 })}
       </button>
@@ -39,6 +38,8 @@ export const TEMPLATE = () => `
   </div>
   <div id="ai-view-chat" class="ai-view active">
     <div id="ai-messages" class="ai-messages" role="log" aria-live="polite" aria-relevant="additions text" aria-label="${t('Conversación con el agente')}"></div>
+    <!-- Ir al inicio de la última respuesta (ver mountJump en ai/composer-picks.js). -->
+    <button id="ai-jump" class="ai-jump" hidden title="${t('Ir al inicio de la última respuesta')}" aria-label="${t('Ir al inicio de la última respuesta')}">${icon('arrow-up', { size: 18 })}</button>
     <div id="ai-ref" class="ai-ref" style="display:none">
       <span class="ai-ref-ico">${icon('note', { size: 15 })}</span>
       <span id="ai-ref-text" class="ai-ref-text"></span>
@@ -62,6 +63,11 @@ export const TEMPLATE = () => `
     <div class="ai-composer">
       <div class="ai-compose-box">
         <textarea id="ai-input" rows="1" placeholder="${t('Pregunta sobre el libro...')}"></textarea>
+        <!-- Pie del composer, como en la web de Hermes: a la izquierda lo que se ELIGE a mitad
+             de conversación (perfil · modelo, ver ai/composer-picks.js); a la derecha, las
+             acciones de siempre. -->
+        <div class="ai-compose-foot">
+        <div id="ai-picks" class="ai-picks"></div>
         <div class="ai-composer-btns">
           <!-- Un solo botón de visión: abre el overlay sobre la página y allí se elige el
                alcance (arrastrar una zona · "Toda la página"). Ver pickZone() en panel.js. -->
@@ -70,6 +76,7 @@ export const TEMPLATE = () => `
             <button id="ai-mic" class="ai-see ai-mic" title="${t('Dictar')}" aria-label="${t('Dictar')}" aria-pressed="false" style="display:none">${icon('mic', { size: 16 })}</button>
             <button id="ai-send" class="ai-send" title="${t('Enviar')}" aria-label="${t('Enviar')}">${icon('arrow-up', { size: 18 })}</button>
           </div>
+        </div>
         </div>
       </div>
     </div>

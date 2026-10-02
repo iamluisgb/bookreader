@@ -205,7 +205,9 @@ body:not(.ai-open) #ai-panel { box-shadow: none; }
 .ai-composer { padding: 10px 14px 14px; border-top: none; background: transparent; }
 .ai-compose-box {
   flex: 1; min-width: 0;
-  display: flex; align-items: flex-end; gap: 6px;
+  /* Columna: el texto ocupa el ancho entero y el pie (perfil · modelo | ver · micro ·
+     enviar) va debajo, como en la web de Hermes. */
+  display: flex; flex-direction: column; align-items: stretch; gap: 2px;
   padding: 6px 6px 6px 14px;
   background: var(--surface-0);
   border: 1px solid var(--border);
@@ -223,7 +225,7 @@ body:not(.ai-open) #ai-panel { box-shadow: none; }
   font-size: var(--fs-md); line-height: 1.45; resize: none;
 }
 .ai-composer .ai-compose-box textarea:focus { border: none; outline: none; }
-.ai-compose-box .ai-composer-btns { flex-direction: row; align-items: center; gap: 4px; }
+.ai-compose-box .ai-composer-btns { flex-direction: row; align-items: center; gap: 4px; margin-left: auto; }
 .ai-compose-box .ai-composer-row { flex: none; gap: 4px; align-items: center; }
 .ai-compose-box .ai-see { height: 32px; padding: 0 10px; border-radius: 16px; font-size: 12.5px; background: transparent; color: var(--text-soft); }
 .ai-compose-box .ai-see:hover { background: var(--fill); color: var(--text); }

@@ -1,6 +1,7 @@
 // Panel del agente: onboarding (objetivo + plantilla), chat en streaming con citas
 // [[aN]] clicables, y libreta estructurada que el agente rellena vía tool-use.
 // E1/E2/E3/E5/E6 del backlog. Estado persistido en IndexedDB (E4).
+import * as Picks from './composer-picks.js';
 import * as LLM from './llm.js';
 import { segmentBook } from './segment.js';
 import { segmentPdf } from './segment-pdf.js';
@@ -97,7 +98,7 @@ export function init(opts) {
     chatView: $('#ai-view-chat'), noteView: $('#ai-view-notebook'), studioView: $('#ai-view-studio'),
     messages: $('#ai-messages'), input: $('#ai-input'), send: $('#ai-send'), see: $('#ai-see'), close: $('#ai-close'),
     convobar: $('#ai-convobar'), convoBtn: $('#ai-convo-btn'), convoLabel: $('#ai-convo-label'),
-    ref: $('#ai-ref'), refText: $('#ai-ref-text'), profileChip: $('#ai-profile-chip'),
+    ref: $('#ai-ref'), refText: $('#ai-ref-text'),
     imgref: $('#ai-imgref'), imgrefText: $('#ai-imgref-text'),
     zones: $('#ai-zones'), mic: $('#ai-mic'), quota: $('#ai-quota'),
   });
@@ -134,7 +135,9 @@ export function init(opts) {
   window.addEventListener('reader:chapter-changed', (e) => onChapterChanged(e.detail?.label));
   updateProfileChip();
   // Abrir Ajustes en la sección Perfiles al tocar el chip.
-  els.profileChip.addEventListener('click', () => AppSettings.open('profiles'));
+  // Perfil y modelo se eligen en el propio composer; Ajustes queda para configurar.
+  Picks.mount(document.getElementById('ai-picks'), { settings: (section) => AppSettings.open(section) });
+  Picks.mountJump(els.messages, document.getElementById('ai-jump'));
   els.send.addEventListener('click', send);
   // Un solo punto de entrada a la visión: abre el overlay, y allí se elige el alcance
   // (arrastrar una zona o "Toda la página"). Antes eran dos botones —"Ver" y "Zona"— que
@@ -820,15 +823,9 @@ function refreshStatus() {
 
 // Chip del perfil de agente activo (P1): muestra su nombre y abre Ajustes → Perfiles.
 // Oculto si no hay perfil activo.
+// El perfil activo se pinta en el selector del composer (ai/composer-picks.js).
 function updateProfileChip() {
-  if (!els.profileChip) return;
-  const p = Profiles.getActive();
-  if (p) {
-    els.profileChip.innerHTML = `${icon('user', { size: 13 })}<span>${escapeHtml(p.name)}</span>`;
-    els.profileChip.style.display = 'flex';
-  } else {
-    els.profileChip.style.display = 'none';
-  }
+  Picks.render();
 }
 
 async function activateConvo() {

@@ -151,23 +151,6 @@ body.ai-open .reader-main { margin-right: var(--ai-panel-width); }
   border-bottom: 1px solid var(--border-soft);
 }
 
-/* Chip del perfil de agente activo (P1): clicable, abre Ajustes → Perfiles. Vive en la
-   fila de la barra de conversación (ver panel-template.js), así que no lleva márgenes
-   propios y encoge con ellipsis para no empujar al selector de conversación. */
-.ai-profile-chip {
-  flex: 0 1 auto; min-width: 0;
-  display: flex; align-items: center; gap: 6px;
-  margin: 0; padding: 7px 12px;
-  max-width: 45%;
-  border: 1px solid var(--border); border-radius: var(--r-pill);
-  background: var(--surface-2);
-  font-size: 13px; color: var(--text-soft); cursor: pointer;
-  transition: border-color var(--transition-fast), color var(--transition-fast);
-}
-.ai-profile-chip:hover { border-color: var(--accent); color: var(--text); }
-.ai-profile-chip .icon { flex: none; color: var(--accent); }
-.ai-profile-chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-
 .ai-messages {
   flex: 1;
   overflow-y: auto;
@@ -1634,3 +1617,34 @@ body.ai-open #sync-badge { right: calc(var(--ai-panel-width) + 14px); }
 .shared-nb-field h3 { font-size: 13px; font-weight: 600; margin: 0 0 8px; color: var(--text-faint); }
 .shared-nb-note { font-size: 14px; line-height: 1.55; margin-bottom: 10px; }
 .shared-nb-note p { margin: 0 0 6px; }
+
+/* ==== Composer al estilo de Hermes: texto arriba; debajo, perfil · modelo y las acciones ==== */
+.ai-messages { position: relative; }
+#ai-view-chat { position: relative; }
+.ai-compose-foot { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.ai-picks { display: flex; align-items: center; gap: 2px; flex: 1; min-width: 0; }
+.ai-pick {
+  display: inline-flex; align-items: center; gap: 5px; min-width: 0;
+  height: 30px; padding: 0 8px; border: none; border-radius: 15px;
+  background: transparent; color: var(--text-soft); font: inherit; font-size: 12.5px; cursor: pointer;
+}
+.ai-pick:hover { background: var(--fill, var(--surface-2)); color: var(--text); }
+.ai-pick .icon { flex: none; }
+.ai-pick-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 150px; }
+.ai-pick-label[hidden] { display: none; }
+.ai-pick.is-set { color: var(--accent); }
+.ai-pick-menu { z-index: 1000; max-height: 60vh; overflow-y: auto; }
+.ai-pick-note { padding: 6px 12px 4px; font-size: 11.5px; color: var(--text-faint); }
+
+/* Ir al inicio de la última respuesta: círculo con borde, como en Hermes. La flecha mira
+   hacia donde está ese inicio (arriba por defecto; .is-down la gira). */
+.ai-jump {
+  position: absolute; right: 16px; z-index: 5;
+  width: 38px; height: 38px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--border); background: var(--surface-0); color: var(--text-soft);
+  box-shadow: var(--shadow-1); cursor: pointer;
+}
+.ai-jump:hover { color: var(--text); border-color: var(--accent); }
+.ai-jump .icon { transition: transform var(--transition-fast); }
+.ai-jump.is-down .icon { transform: rotate(180deg); }
