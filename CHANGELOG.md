@@ -3,6 +3,27 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-10-02 — P24 F0+F1: compartir una estantería como dossier
+
+Caso: una investigación sobre *knowledge graphs* (varios papers y libros con subrayados,
+libretas y artefactos) que se quiere pasar a otra persona. Menú de la estantería →
+**Compartir estantería…** → elegir qué incluir → un fichero `<estantería>.bookreader` por la
+hoja del sistema (móvil) o en Descargas (escritorio).
+
+- **Formato** ([`share/bundle.js`](app/js/share/bundle.js), puro): sobre
+  `bookreader-bundle` v1, `kind: 'dossier'`, un libro por entrada atado por `bookId`. Viajan
+  subrayados, libretas (con la plantilla propia incrustada si la usan), chat opcional,
+  artefactos del Studio y mazos **sin** su estado de repaso. No viajan tombstones,
+  uids ni el fichero del libro. `parse()`/`validate()` rechazan lo que no es un dossier
+  (versión futura, `bookId` que no es un hash, enlaces que no son http(s), subrayados sin ancla).
+- **Enlace de origen**: un PDF cuyo nombre trae un id de arXiv (`2003.02320v6.pdf`) sale con
+  su `https://arxiv.org/abs/…`, para que el receptor baje el mismo fichero y el hash coincida.
+- **Lectura** ([`share/export.js`](app/js/share/export.js)): miembros de la estantería por
+  `Shelves.booksIn` (vale también para inteligentes); carga perezosa al pulsar. El nombre del
+  remitente se recuerda (`share_author`).
+
+Falta F2 (importar y el carril aparte). Tests: [share-dossier.spec.ts](tests/share-dossier.spec.ts). SW `v140`.
+
 ## 2026-09-30 — EPUB: la posición ya no retrocede en doble página ni se pisa por sync
 
 Reportado con «El pez en el agua»: al volver al día siguiente el libro no abría donde se

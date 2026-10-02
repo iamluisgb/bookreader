@@ -741,9 +741,10 @@ Con BYOK el daño se limita a gastar tu clave y mentirte, pero el usuario tiene 
 `author` es texto libre y se muestra siempre como *"según el fichero"*, nunca como identidad verificada.
 
 **Fases:**
-- **F0 — Formato** `S`: `js/share/bundle.js` con `build()`/`parse()`/`validate()`, funciones puras sin DOM.
+- **F0 — Formato** `S` · **✓ 2026-10-02**: `js/share/bundle.js` con `build()`/`parse()`/`validate()`, funciones puras sin DOM.
   Hermano de [`backup.js`](app/js/backup.js), reusando su `download()` CSP-safe.
-- **F1 — Exportar dossier** `S`: «Compartir estantería» en el menú de la estantería (y «Compartir» en la
+- **F1 — Exportar dossier** `S` · **✓ 2026-10-02** (estantería; falta la entrada de libro suelto y editar el
+  enlace de origen a mano — hoy solo se detecta arXiv por el nombre del fichero): «Compartir estantería» en el menú de la estantería (y «Compartir» en la
   cabecera del panel para un libro suelto, junto al export `.md` de
   [P8](#p8--exportar-libretas-y-conversaciones--fase-1--m)). Casillas: subrayados / libretas / chat /
   artefactos / PDFs de acceso abierto. Campo de enlace de origen (DOI/arXiv) por libro, precargado si se

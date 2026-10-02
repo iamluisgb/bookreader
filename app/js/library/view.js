@@ -1051,6 +1051,8 @@ async function openShelfMenu(id, anchor) {
     <button class="lib-menu-item" data-act="up">${icon('chevron-up', { size: 16 })}<span>${t('Subir')}</span></button>
     <button class="lib-menu-item" data-act="down">${icon('chevron-down', { size: 16 })}<span>${t('Bajar')}</span></button>
     <div class="lib-menu-sep"></div>
+    <button class="lib-menu-item" data-act="share">${icon('share', { size: 16 })}<span>${t('Compartir estantería…')}</span></button>
+    <div class="lib-menu-sep"></div>
     <button class="lib-menu-item danger" data-act="delete">${icon('trash', { size: 16 })}<span>${t('Eliminar estantería')}</span></button>
   `, async (act) => {
     if (act === 'filter') {
@@ -1069,6 +1071,9 @@ async function openShelfMenu(id, anchor) {
       await editSmartShelf(shelf);
     } else if (act === 'up' || act === 'down') {
       await Store.moveShelf(id, act === 'up' ? -1 : 1);
+    } else if (act === 'share') {
+      await shareShelf(shelf);
+      return;
     } else if (act === 'delete') {
       const msg = smart
         ? t('¿Eliminar la estantería inteligente "{name}"? Los libros no se borran.', { name: shelf.name })
@@ -1080,6 +1085,52 @@ async function openShelfMenu(id, anchor) {
     }
     await render();
   });
+}
+
+// ---- compartir estantería (P24) --------------------------------------------
+
+// Pasarle a otra persona lo que has sacado de una estantería: subrayados, libretas y
+// artefactos de cada libro, en un fichero. Los libros NO viajan: el receptor los
+// consigue por su cuenta y, si su fichero es el mismo (mismo hash), las notas se pintan
+// en su sitio. El módulo se carga al pulsar: no pesa en el arranque de la biblioteca.
+async function shareShelf(shelf) {
+  const Share = await import('../share/export.js');
+  const Bundle = await import('../share/bundle.js');
+  const { books } = await Share.shelfBooks(shelf.id);
+  if (!books.length) {
+    await alertBox(t('Esta estantería no tiene libros.'), { title: t('Compartir estantería') });
+    return;
+  }
+  const res = await formBox({
+    title: t('Compartir estantería'),
+    message: books.length === 1
+      ? t('Se comparte lo que has sacado del libro, no el libro: quien lo reciba necesita su propia copia. Si es el mismo fichero, verá tus notas en su sitio.')
+      : t('Se comparte lo que has sacado de {n} libros, no los libros: quien lo reciba necesita su propia copia. Si es el mismo fichero, verá tus notas en su sitio.', { n: books.length }),
+    fields: [
+      { name: 'parts', label: 'Incluir', type: 'checks', value: ['highlights', 'notebooks', 'artifacts', 'decks'],
+        options: [
+          { value: 'highlights', label: t('Subrayados y notas') },
+          { value: 'notebooks', label: t('Libretas') },
+          { value: 'chat', label: t('Conversaciones con el agente') },
+          { value: 'artifacts', label: t('Artefactos (resúmenes, mapas, infografías…)') },
+          { value: 'decks', label: t('Mazos de tarjetas (sin tu progreso)') },
+        ] },
+      { name: 'author', label: 'Tu nombre (opcional)', type: 'text', value: Share.getAuthor(),
+        placeholder: 'Así verá quién se lo manda' },
+    ],
+    okText: t('Compartir'),
+  });
+  if (!res) return;
+  const parts = res.parts || [];
+  if (!parts.length) return;
+  Share.setAuthor(res.author);
+  const bundle = await Share.buildShelfDossier(shelf.id, { parts, author: res.author });
+  if (Bundle.counts(bundle).empty) {
+    await alertBox(t('Ningún libro de esta estantería tiene todavía nada de lo elegido.'), { title: t('Compartir estantería') });
+    return;
+  }
+  const how = await Share.deliver(bundle);
+  if (how !== 'cancelled') track('share_shelf', how);
 }
 
 // ---- menú de libro ---------------------------------------------------------
