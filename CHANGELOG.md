@@ -3,6 +3,16 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-10-02 — Onboarding desde cero: el agente arranca con la demo, sin configurar nada
+
+Sin API key, abrir el agente pide la demo sola ([`LLM.ensureKey`](app/js/ai/llm.js), ADR-051) y lo
+dice una vez («Demo gratuita activada: 20 consultas…»). Las acciones del agente que antes
+mandaban a Ajustes con «Introduce tu API key primero» intentan la demo primero; solo si no se
+puede (esta red ya tuvo la suya hoy, sin conexión) van a Ajustes, con el motivo, y el fallo se
+recuerda hasta mañana para no insistir al gateway. Primeros pasos baja a dos pasos (importar un
+libro, darle un objetivo) con una nota: «No hace falta configurar nada…». Se pide al USAR el
+agente, no al cargar: la demo es una por red y día. Tests: [demo-auto.spec.ts](tests/demo-auto.spec.ts). SW `v148`.
+
 ## 2026-10-02 — El tipo de fichero se reconoce por su contenido, no por el nombre
 
 Reportado en el móvil: un dossier recibido por WhatsApp daba «Formato no soportado». WhatsApp

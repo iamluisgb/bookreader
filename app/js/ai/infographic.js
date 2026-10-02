@@ -131,8 +131,8 @@ function showError(msg) {
   el.textContent = msg;
 }
 
-function onGenerate() {
-  if (!LLM.hasKey()) {
+async function onGenerate() {
+  if (!(await LLM.ensureKey()).ok) {
     showError(t('Configura tu API key en Ajustes → Agente para generar la infografía.'));
     return;
   }

@@ -1620,3 +1620,27 @@ el gate de densidad de infografía siguen siendo deuda preexistente, no de este 
 declarado vive como ítem en [BACKLOG § P37](BACKLOG.md) (check determinista de una corrida de dos
 tipos: ambos formatos con huecos cloze válidos). Contrato y cierre completos, con tablas, en
 [`odd/tasks/multi-tipo-y-plan-capitulos.md`](odd/tasks/multi-tipo-y-plan-capitulos.md).
+
+---
+
+## ADR-051 — Sin clave, la demo se pide sola al usar el agente (no al cargar la página) · `ACEPTADA`
+
+**Contexto.** Onboarding desde cero: quien abría BookReader sin API key tenía un paso «Configura
+tu clave de IA» en Primeros pasos, y cada acción del agente le mandaba a Ajustes con «Introduce
+tu API key primero». La demo existía (ADR-021) pero detrás de un botón en Ajustes → Agente.
+
+**Decisión.** `LLM.ensureKey()` pide la demo cuando hace falta y no hay clave. Se llama al
+**abrir el panel** (la intención de usar el agente) y en cada puerta que antes exigía clave
+(enviar, acciones rápidas, visión, resumen, mapa, tarjetas, infografía, Feynman). Las peticiones
+concurrentes comparten una; un fallo se recuerda **hasta mañana** y solo entonces se manda a
+Ajustes, con el motivo. Primeros pasos queda en dos pasos (importar, dar un objetivo) y una nota.
+
+**Porqué no al cargar la página.** El gateway da una demo por red y día y tiene un disyuntor de
+emisión diaria: pedirla en cada visita que nunca toca el agente gastaría el cupo global y la
+demo de esa red (quien vuelve mañana desde la misma wifi se la encontraría gastada).
+
+**Consecuencias.**
+- Un navegador automatizado (`navigator.webdriver`) no la pide salvo `bookreader_demo_auto_webdriver`:
+  si no, cada test que abre el agente sin clave gastaría una demo real de producción.
+- La licencia Pro no cambia nada aquí: desbloquea funciones, no trae inferencia (ADR de MON3), así
+  que «sin clave» es la única condición.

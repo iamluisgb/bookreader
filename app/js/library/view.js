@@ -615,19 +615,23 @@ function cardHtml(b) {
 // Checklist de onboarding en la estantería. Los estados se DERIVAN de lo que la
 // app ya sabe — no hay contador propio que se desincronice:
 //   1. hay algún libro importado (Store)
-//   2. hay clave de IA configurada (la misma entrada que lee llm.js)
-//   3. hay alguna conversación con objetivo de lectura (IDB del agente)
-// Cuando los tres están, la tarjeta ni se renderiza: ya no hay nada que enseñar.
+//   2. hay alguna conversación con objetivo de lectura (IDB del agente)
+// Cuando los dos están, la tarjeta ni se renderiza: ya no hay nada que enseñar.
+//
+// «Configura tu clave de IA» era el paso del medio y ya no lo es: sin clave, el agente
+// arranca con la demo, que se pide sola al usarlo (llm.js · ensureKey). Un paso que
+// mandaba a Ajustes a pegar una API key era el peor primer contacto posible. Sin clave,
+// la tarjeta solo lo dice, para que nadie lo busque.
 async function firstStepsHtml(books) {
   const hasBooks = books.length > 0;
   let hasKey = false;
-  try { hasKey = (Storage.get('ai_key', '') || '').trim().length > 0; } catch (e) { /* sin storage: se muestra pendiente */ }
+  try { hasKey = (Storage.get('ai_key', '') || '').trim().length > 0; } catch (e) { /* sin storage: como sin clave */ }
   let hasGoal = false;
   try {
     const convos = await AiDB.getAll('convos');
     hasGoal = (convos || []).some((c) => c && c.goal);
   } catch (e) { /* IDB no disponible: se muestra pendiente */ }
-  if (hasBooks && hasKey && hasGoal) return '';
+  if (hasBooks && hasGoal) return '';
 
   const step = (done, label, act, cta) => `
     <li class="lib-step${done ? ' done' : ''}">
@@ -639,9 +643,9 @@ async function firstStepsHtml(books) {
       <div class="lib-steps-head">${t('Primeros pasos')}</div>
       <ol>
         ${step(hasBooks, t('Importa un libro'), 'add', t('Subir archivos'))}
-        ${step(hasKey, t('Configura tu clave de IA'), 'settings', t('Abrir ajustes'))}
         ${step(hasGoal, t('Dale un objetivo a tu primer libro'), 'openbook', t('Abrir un libro'))}
       </ol>
+      ${hasKey ? '' : `<p class="lib-steps-note">${t('No hace falta configurar nada: el agente arranca con una demo gratuita. Tu propia API key, cuando quieras, en Ajustes.')}</p>`}
     </div>`;
 }
 

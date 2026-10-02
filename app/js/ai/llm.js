@@ -752,6 +752,53 @@ export async function requestDemoToken() {
   return body; // { token, remaining, quota, model }
 }
 
+// ---- Demo automática ----------------------------------------------------------
+// Onboarding desde cero: quien abre BookReader sin clave propia no tiene que encontrar
+// el botón «Probar la demo» en Ajustes. La primera vez que el agente hace falta y no
+// hay clave, se pide la demo sola y se sigue con lo que se estaba haciendo.
+//
+// En el momento de USARLO, no al cargar la página: el gateway da una demo por red y día
+// y tiene un disyuntor de emisión diaria, así que pedirla en cada visita que nunca toca
+// el agente gastaría el cupo para nada (y a quien vuelve mañana con una visita de hoy
+// le diría «esta red ya tiene una demo»).
+//
+// Un fallo (red, «esta red ya tuvo su demo hoy», disyuntor) se recuerda HASTA MAÑANA:
+// sin eso cada pulsación volvería a llamar al gateway para oír lo mismo. Quien llama
+// recibe { ok, auto, error } y decide qué enseñar (normalmente, Ajustes con el motivo).
+const AUTO_FAIL_KEY = 'ai_demo_auto_failed';
+let autoDemo = null;
+
+// Un navegador AUTOMATIZADO (Playwright, un bot que ejecuta JS) no pide demos solo: cada
+// test que abre el agente sin clave gastaría una demo real del gateway de producción, y
+// un rastreador gastaría la de su red. Quien lo necesite (el test de esta función) lo
+// activa con `bookreader_demo_auto_webdriver`.
+const autoAllowed = () => !navigator.webdriver || Storage.get('demo_auto_webdriver', false) === true;
+
+export function ensureKey() {
+  if (hasKey()) return Promise.resolve({ ok: true, auto: false });
+  if (!autoAllowed()) return Promise.resolve({ ok: false, auto: false, error: '' });
+  const day = new Date().toISOString().slice(0, 10);
+  const failed = Storage.get(AUTO_FAIL_KEY, null);
+  if (failed && failed.day === day) return Promise.resolve({ ok: false, auto: false, error: failed.error || '' });
+  // Concurrentes (abrir el panel y pulsar Generar a la vez) comparten UNA petición.
+  if (!autoDemo) {
+    autoDemo = requestDemoToken().then(
+      (body) => {
+        Storage.remove(AUTO_FAIL_KEY);
+        // Los mismos avisos que el botón de Ajustes: el panel repinta estado y cupo.
+        window.dispatchEvent?.(new CustomEvent('appsettings:agent-saved'));
+        window.dispatchEvent?.(new CustomEvent('llm:demo-auto', { detail: body }));
+        return { ok: true, auto: true, remaining: Number(body?.remaining) || null };
+      },
+      (e) => {
+        Storage.set(AUTO_FAIL_KEY, { day, error: e.message });
+        return { ok: false, auto: true, error: e.message };
+      },
+    ).finally(() => { autoDemo = null; });
+  }
+  return autoDemo;
+}
+
 // ---- Traspaso de la demo a otro dispositivo (F3.1) ---------------------------
 // El token NO se enseña como "API key" y eso no cambia (ADR-021: pegarlo suelto contra
 // otro proveedor es el 401 que ya nos costó un bug). Lo que se traspasa es la

@@ -843,9 +843,9 @@ async function buildScopeVisuals({ sel, scopeLabel, bookId, signal, progress }) 
 // Antes vivía dentro del modal y moría con él (`if (!overlay) return`), justo en la
 // generación MÁS lenta de la app (N llamadas encadenadas): el lector tenía que quedarse
 // mirando. El chip de jobs-ui hace visible la promesa de "sigue leyendo".
-function onGenerate() {
+async function onGenerate() {
   const b = body();
-  if (!LLM.hasKey()) { showError(t('Configura tu API key en Ajustes → Agente para generar tarjetas.')); return; }
+  if (!(await LLM.ensureKey()).ok) { showError(t('Configura tu API key en Ajustes → Agente para generar tarjetas.')); return; }
   const scopeLabel = scopeValue;
   const sel = selectedTypes();
   const type = effectiveDeckType(sel);

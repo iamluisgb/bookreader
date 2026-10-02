@@ -577,7 +577,7 @@ async function suggestWithLLM() {
   const b = body();
   const btn = b?.querySelector('#fey-more');
   if (!btn || btn.disabled) return;
-  if (!LLM.hasKey()) { showError(t('Configura tu API key en Ajustes → Agente.')); return; }
+  if (!(await LLM.ensureKey()).ok) { showError(t('Configura tu API key en Ajustes → Agente.')); return; }
   ctx.ensureIndex?.();
   const chapter = ctx.currentChapter || '';
   // Si el capítulo en curso no tiene texto indexado —cubierta, portadilla, una etiqueta del
@@ -683,7 +683,7 @@ async function startSession() {
   const input = body()?.querySelector('#fey-concept');
   const concept = (input?.value || '').trim();
   if (!concept) { showError(t('Escribe el concepto que quieres explicar.')); return; }
-  if (!LLM.hasKey()) { showError(t('Configura tu API key en Ajustes → Agente.')); return; }
+  if (!(await LLM.ensureKey()).ok) { showError(t('Configura tu API key en Ajustes → Agente.')); return; }
 
   renderLoading(t('Preparando las preguntas…'));
   try {

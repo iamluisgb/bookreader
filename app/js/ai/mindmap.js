@@ -278,8 +278,8 @@ REGLAS:
 - "title" es el TEMA CENTRAL que emerge de las viñetas, sintetizado por ti en 2-4 palabras.`;
 }
 
-function onGenerate() {
-  if (!LLM.hasKey()) { showError(t('Configura tu API key en Ajustes → Agente para generar el mapa.')); return; }
+async function onGenerate() {
+  if (!(await LLM.ensureKey()).ok) { showError(t('Configura tu API key en Ajustes → Agente para generar el mapa.')); return; }
   const passages = gatherScope(scopeValue);
   if (!passages.length) { showError(t('Ese contenido no tiene texto indexado; prueba con otro capítulo o el libro entero.')); return; }
   const totalTokens = passages.reduce((n, p) => n + estimateTokens(p.text) + 4, 0);
@@ -810,7 +810,7 @@ function withEnoughContext(seed) {
 async function expandNode(node) {
   const status = popover?.querySelector('.mm-pop-status');
   const setStatus = (msg) => { if (status) status.textContent = msg; };
-  if (!LLM.hasKey()) { setStatus(t('Configura tu API key en Ajustes → Agente.')); return; }
+  if (!(await LLM.ensureKey()).ok) { setStatus(t('Configura tu API key en Ajustes → Agente.')); return; }
   const passages = passagesForNode(node);
   if (!passages.length) { setStatus(t('Este punto no tiene pasajes que ampliar.')); return; }
 

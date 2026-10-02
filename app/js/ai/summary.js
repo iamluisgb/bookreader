@@ -238,8 +238,8 @@ ${langRule(goal)}
 Responde solo el párrafo.`;
 }
 
-function onGenerate() {
-  if (!LLM.hasKey()) { showError(t('Configura tu API key en Ajustes → Agente para generar el resumen.')); return; }
+async function onGenerate() {
+  if (!(await LLM.ensureKey()).ok) { showError(t('Configura tu API key en Ajustes → Agente para generar el resumen.')); return; }
   const depth = DEPTH[depthValue] || DEPTH.estandar;
   const passages = gatherScope(scopeValue, depth.coverage);
   if (!passages.length) { showError(t('Ese contenido no tiene texto indexado; prueba con otro capítulo o el libro entero.')); return; }

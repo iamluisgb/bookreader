@@ -113,6 +113,13 @@ export function init(opts) {
   // gateway en cada llamada, y al guardar Ajustes puede haber dejado de ser demo.
   window.addEventListener('llm:quota', renderQuota);
   window.addEventListener('appsettings:agent-saved', renderQuota);
+  // La demo se activó sola: decirlo UNA vez, con lo que da de sí y cómo salir de ella.
+  window.addEventListener('llm:demo-auto', (e) => {
+    const n = Number(e.detail?.remaining);
+    toastMsg(n > 0
+      ? t('Demo gratuita activada: {n} consultas para probar el agente. Cuando quieras, pon tu propia API key en Ajustes → Agente.', { n })
+      : t('Demo gratuita activada. Cuando quieras, pon tu propia API key en Ajustes → Agente.'));
+  });
   renderQuota();
   $('#ai-ref-clear').addEventListener('click', clearRef);
   $('#ai-imgref-clear').addEventListener('click', clearImageRef);
@@ -185,6 +192,19 @@ export function init(opts) {
   });
 }
 
+// Sin clave propia, el agente usa la demo: se pide sola la primera vez que hace falta
+// (llm.js · ensureKey). Solo si no se puede —esta red ya tuvo su demo hoy, sin conexión—
+// se manda a Ajustes, y con el motivo, no con un «introduce tu API key» a secas.
+async function needKey() {
+  const r = await LLM.ensureKey();
+  if (r.ok) return true;
+  AppSettings.open('agent');
+  setStatus(r.error
+    ? t('No se pudo activar la demo gratuita: {msg} Puedes poner tu propia API key en Ajustes.', { msg: r.error })
+    : 'Introduce tu API key primero.');
+  return false;
+}
+
 export function setOpen(open) {
   // La hoja del agente (css/agent.css) ya no viene en main.css. Normalmente la trae el
   // precalentado en tiempo ocioso de app.js mucho antes de que nadie pulse; esto es la
@@ -195,6 +215,9 @@ export function setOpen(open) {
   if (open) agentUnread = false;          // al abrir se da por leído
   applyAgentBadge();
   if (!open) return;
+  // Abrir el agente ES la intención de usarlo: sin clave, la demo se pide ya, mientras se
+  // elige el objetivo, y no al primer envío (que esperaría a la red sin explicar por qué).
+  if (!LLM.hasKey()) void LLM.ensureKey();
   if (book && !convo) openOnboarding();   // primer uso del agente con este libro
   else if (convo) { focusInput(); if (segReady) maybeHintFlashcards(); }
 }
@@ -367,7 +390,7 @@ export async function quickAction(kind, text) {
   showView('chat');
   if (busy) { setStatus('Espera a que termine la respuesta en curso.'); return; }
   if (!convo) { setRefAndAsk(clean, act.button()); return; }
-  if (!LLM.hasKey()) { AppSettings.open('agent'); setStatus('Introduce tu API key primero.'); return; }
+  if (!(await needKey())) return;
   if (!annotatedText) { setStatus('El libro aún no está listo.'); return; }
 
   // Lo que se ve (y se guarda) es corto; el detalle va en el bloque de sistema.
@@ -1137,7 +1160,7 @@ async function send() {
   const q = els.input.value.trim();
   if (!q && !pendingImages.length) return;
   if (!convo) { setStatus('Elige un objetivo de lectura primero.'); openOnboarding(); return; }
-  if (!LLM.hasKey()) { AppSettings.open('agent'); setStatus('Introduce tu API key primero.'); return; }
+  if (!(await needKey())) return;
 
   // VISIÓN · si hay una captura de página adjunta (botón "Ver"), este turno va con imagen al
   // modelo de visión, con el texto del usuario como petición.
@@ -1287,7 +1310,7 @@ async function explainView() {
 // composer), que es justo por lo que no merecían dos botones separados.
 async function pickZone() {
   if (busy) return;
-  if (!visionReady()) return;
+  if (!(await visionReady())) return;
   // El panel se aparta mientras se marca: en móvil ocupa media pantalla y taparía justo la
   // figura que se quiere recortar.
   setOpen(false);
@@ -1320,10 +1343,10 @@ async function pickZone() {
 }
 
 // Puertas comunes de las acciones de visión (key, conversación, modelo con visión, formato).
-function visionReady() {
+async function visionReady() {
   if (bookFormat !== 'pdf' || !PdfReader.isLoaded()) { setStatus('Disponible al leer un PDF.'); return false; }
   if (!convo) { setStatus('Elige un objetivo de lectura primero.'); openOnboarding(); return false; }
-  if (!LLM.hasKey()) { AppSettings.open('agent'); setStatus('Introduce tu API key primero.'); return false; }
+  if (!(await needKey())) return false;
   if (!LLM.hasVision()) {
     setStatus('Configura un modelo con visión en Ajustes para explicar figuras.');
     AppSettings.open('agent');
@@ -2000,7 +2023,7 @@ async function prepareOffline() {
   if (!book && !bookId) { setStatus('Abre un libro para prepararlo.'); return; }
   if (Offline.isOffline()) { setStatus('Sin conexión: esto hay que prepararlo antes de perderla.'); return; }
   if (!segReady) { setStatus('Preparando el libro… inténtalo en unos segundos.'); return; }
-  if (!LLM.hasKey()) { AppSettings.open('agent'); setStatus('Introduce tu API key primero.'); return; }
+  if (!(await needKey())) return;
 
   const yaHecho = !!Jobs.cached(bookId, 'summary');
   if (!yaHecho && !(await confirmBox(
@@ -2679,7 +2702,7 @@ async function cardFromNote(id) {
 async function askAgent(shown, ask) {
   showView('chat');
   if (busy) { setStatus('Espera a que termine la respuesta en curso.'); return; }
-  if (!LLM.hasKey()) { AppSettings.open('agent'); setStatus('Introduce tu API key primero.'); return; }
+  if (!(await needKey())) return;
   if (!annotatedText) { setStatus('El libro aún no está listo.'); return; }
   await deliver(shown, ask, { showUser: true });
 }

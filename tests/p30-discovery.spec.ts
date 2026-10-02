@@ -81,15 +81,22 @@ test.describe('P30 · hints de descubrimiento', () => {
   });
 
   test('"Primeros pasos" en la estantería se marca con el estado real y desaparece al completar', async ({ page }) => {
-    // Estado recién estrenado: sin libros → la tarjeta muestra los tres pasos pendientes.
+    // Estado recién estrenado: sin libros ni clave → dos pasos pendientes (importar y dar
+    // un objetivo). La clave YA NO es un paso: sin ella el agente arranca con la demo, y
+    // la tarjeta solo lo dice.
     await page.goto('/index.html');
+    const steps = page.locator('.lib-steps');
+    await expect(steps).toBeVisible();
+    await expect(steps.locator('.lib-step')).toHaveCount(2);
+    await expect(steps.locator('.lib-step.done')).toHaveCount(0);
+    await expect(steps.locator('.lib-steps-note')).toContainText('el agente arranca con una demo gratuita');
+
+    // Con clave propia, la nota sobra.
     // Storage (bookreader_*) guarda JSON: la clave ha de serializarse como tal.
     await page.evaluate(() => localStorage.setItem('bookreader_ai_key', JSON.stringify('sk-test')));
     await page.reload();
-    const steps = page.locator('.lib-steps');
-    await expect(steps).toBeVisible();
-    await expect(steps.locator('.lib-step')).toHaveCount(3);
-    await expect(steps.locator('.lib-step.done')).toHaveCount(1); // solo la clave
+    await expect(steps.locator('.lib-step')).toHaveCount(2);
+    await expect(steps.locator('.lib-steps-note')).toHaveCount(0);
 
     // Con un libro importado Y una conversación con objetivo: ya no hay nada que enseñar.
     await page.setInputFiles('#file-input', EPUB_PATH);
