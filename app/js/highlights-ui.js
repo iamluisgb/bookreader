@@ -599,10 +599,13 @@ function deleteWithUndo(hl) {
 // ---- P24 F2 · Subrayados AJENOS (de un dossier importado) ----------------------
 // Viven en share/store.js, no en Highlights: son de otra persona y de solo lectura. Se
 // cargan en memoria al abrir el libro (por su hash de contenido, el mismo `bookId` con
-// el que llegaron) y se pintan con TRAZO —subrayado punteado del color original— en vez
-// de fondo, para que se distingan de los tuyos sin una barra lateral. En EPUB van como
-// anotación `underline`, otro tipo que `highlight`: el mismo CFI subrayado por los dos
-// no choca.
+// el que llegaron) y se pintan IGUAL que se veían en el libro de quien los mandó: relleno
+// de su color. (La primera versión los pintaba con un punteado al pie del renglón para
+// distinguirlos, y no llegaba igual: un amarillo claro punteado casi no se ve, y en los
+// subrayados de un solo rectángulo por párrafo quedaba una raya suelta.) De quién son se
+// dice en la barra lateral y en el tooltip, no en el texto.
+// En EPUB van como anotación `underline` —otro tipo que `highlight`, así el mismo CFI
+// subrayado por los dos no se pisa— pero con el rectángulo relleno y sin la línea.
 let shared = { bookId: null, items: [] };
 
 export function sharedHighlights() {
@@ -634,10 +637,10 @@ function paintSharedEpub() {
     if (!h.cfi) continue;
     try { rendition.annotations.remove(h.cfi, 'underline'); } catch (e) { /* no estaba */ }
     rendition.annotations.underline(h.cfi, {}, () => {}, 'hl-shared', {
-      'stroke': h.color || '#f9a825',
-      'stroke-width': '2',
-      'stroke-dasharray': '4 3',
-      'stroke-opacity': '0.9',
+      'fill': h.color || '#ffeb3b',
+      'fill-opacity': '0.3',
+      'mix-blend-mode': 'multiply',
+      'stroke': 'none',
     });
   }
 }
@@ -692,21 +695,22 @@ export function drawPdfHighlights(page) {
     }
     layer.appendChild(group);
   }
-  // Ajenos encima, como trazo: una línea punteada al pie de cada rect.
+  // Ajenos: el mismo grupo que los tuyos (mismo relleno, misma mezcla), marcados con
+  // .pdf-hl-shared para saber de quién son.
   for (const hl of shared.items) {
     if (hl.page !== page || !(hl.rects || []).length) continue;
     const group = document.createElement('div');
-    group.className = 'pdf-hl-shared';
+    group.className = 'pdf-hl-group pdf-hl-shared';
     group.title = [hl.from && t('De {name}', { name: hl.from }), hl.note].filter(Boolean).join(' — ');
     for (const raw of hl.rects) {
       const r = pdfRectToBox(wrapper, raw);
       const d = document.createElement('div');
-      d.className = 'pdf-hl-under';
+      d.className = 'pdf-hl';
       d.style.left = (r.left * 100) + '%';
       d.style.top = (r.top * 100) + '%';
       d.style.width = (r.width * 100) + '%';
       d.style.height = (r.height * 100) + '%';
-      d.style.borderBottomColor = hl.color || '#f9a825';
+      d.style.background = hl.color || '#ffeb3b';
       group.appendChild(d);
     }
     layer.appendChild(group);

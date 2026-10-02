@@ -4,8 +4,9 @@ import { readFileSync } from 'fs';
 import { createHash } from 'crypto';
 
 // P24 F2 · Lo ajeno en el lector. Un dossier importado deja subrayados de otra persona
-// en su propia base (share/store.js); al abrir ESE libro (mismo hash) se pintan con trazo
-// punteado y salen en la barra lateral bajo «De <nombre>», sin tocar los tuyos.
+// en su propia base (share/store.js); al abrir ESE libro (mismo hash) se pintan IGUAL que
+// en el libro de quien los mandó —relleno de su color— y salen en la barra lateral bajo
+// «De <nombre>», sin tocar los tuyos.
 //
 // El test que justifica el carril aparte (BACKLOG · P24): en EPUB uid = cfi, así que un
 // subrayado ajeno en el MISMO pasaje que uno tuyo, metido en tu lista, lo habría pisado.
@@ -80,7 +81,9 @@ test('EPUB: el subrayado ajeno en el MISMO pasaje que uno tuyo convive con él',
   // Volver al pasaje: el lector restaura la posición, pero se fuerza por si acaso.
   await page.evaluate(async (cfi) => (await import('/js/epub-reader.js') as any).goTo(cfi), mine[0].cfi);
 
-  await expect(page.locator('#epub-container svg g.hl-shared')).toHaveCount(1);
+  const ajeno = page.locator('#epub-container svg g.hl-shared');
+  await expect(ajeno).toHaveCount(1);
+  await expect(ajeno).toHaveAttribute('fill', '#e57373');   // su color, de relleno
   await expect(page.locator('#epub-container svg g.hl')).toHaveCount(1);       // el tuyo, sigue
   const after = await page.evaluate(async () => (await import('/js/highlights.js') as any).getAll());
   expect(after).toEqual(mine);                                                 // tu lista, intacta
@@ -94,7 +97,7 @@ test('EPUB: el subrayado ajeno en el MISMO pasaje que uno tuyo convive con él',
   await expect(list.locator('.highlight-item--shared .highlight-delete')).toHaveCount(0);   // no es tuyo
 });
 
-test('PDF: lo ajeno se pinta como trazo en su página y sale en la lista aunque no tengas subrayados', async ({ page }) => {
+test('PDF: lo ajeno se pinta con su color, como lo tuyo, y sale en la lista aunque no tengas subrayados', async ({ page }) => {
   await page.goto('/index.html');
   await seedShared(page, sha(PDF_PATH), [
     { text: 'una frase del paper', page: 1, rects: [{ x: 0.1, y: 0.2, w: 0.5, h: 0.02 }], color: '#81c784', note: '', chapter: 'Pág. 1' },
@@ -102,8 +105,11 @@ test('PDF: lo ajeno se pinta como trazo en su página y sale en la lista aunque 
   await page.setInputFiles('#file-input', PDF_PATH);
   await page.waitForSelector('#pdf-container canvas', { timeout: 30000 });
 
-  await expect(page.locator('#pdf-container .pdf-page[data-page="1"] .pdf-hl-shared .pdf-hl-under')).toHaveCount(1);
-  await expect(page.locator('#pdf-container .pdf-hl-group')).toHaveCount(0);   // ninguno tuyo
+  const ajeno = page.locator('#pdf-container .pdf-page[data-page="1"] .pdf-hl-group.pdf-hl-shared .pdf-hl');
+  await expect(ajeno).toHaveCount(1);
+  // El color con el que lo subrayó Luis, de relleno: es lo que hace que «llegue igual».
+  await expect(ajeno).toHaveCSS('background-color', 'rgb(129, 199, 132)');
+  await expect(page.locator('#pdf-container .pdf-hl-group:not(.pdf-hl-shared)')).toHaveCount(0);   // ninguno tuyo
   const list = page.locator('#highlights-list');
   await expect(list.locator('.empty-state')).toHaveCount(1);   // la barra está cerrada: se mira el DOM
   await expect(list.locator('.highlight-item--shared')).toContainText('una frase del paper');

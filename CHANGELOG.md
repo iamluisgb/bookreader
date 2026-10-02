@@ -3,6 +3,17 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-10-02 — P24: lo compartido llega igual que se ve en el libro de quien lo manda
+
+Reportado con un dossier real («Técnico/LLM»): en el receptor, los subrayados de *Knowledge Graphs
+and LLMs in Action* salían como un punteado amarillo claro, casi invisible, y en los de un solo
+rectángulo por párrafo era una raya suelta al borde del bloque. Los datos llegaban completos
+(colores, páginas, rects); lo que no era igual era el pintado. Ahora lo ajeno se pinta como lo
+propio —relleno de su color, mismo `.pdf-hl-group`; en EPUB un `underline` con el rect relleno, para
+no pisar tu subrayado del mismo CFI— y en la barra lateral con la misma ficha teñida. De quién es lo
+dicen la cabecera «De X» y el tooltip. Verificado importando el dossier real en un perfil limpio y
+comparando con los mismos subrayados como propios: idénticos. SW `v146`.
+
 ## 2026-10-02 — P24: más puertas de entrada del dossier, y una de salida
 
 - **Soltar ficheros en la biblioteca**: un EPUB, un PDF o un `.bookreader` arrastrado desde el
