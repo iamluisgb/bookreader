@@ -1326,6 +1326,9 @@ const EN = {
   'No se pudieron proponer frases: {msg}': 'Could not suggest sentences: {msg}',
   'El agente no encontró nada para «{f}» en este tramo del libro.': 'The agent found nothing for “{f}” in this part of the book.',
   'No se pudo pedir al agente: {msg}': 'Could not ask the agent: {msg}',
+  'Hazme la pregunta': 'Ask me',
+  'Llevar este fragmento a tu libreta': 'Take this passage to your notebook',
+  '¿En qué campo lo apuntas?': 'Which field does it go in?',
   'Incluir': 'Include',
   'Subrayados y notas': 'Highlights and notes',
   'Libretas': 'Notebooks',
@@ -1443,8 +1446,8 @@ const EN = {
   'Sobre este fragmento del libro:\n«{ref}»\n\n{q}': 'About this passage from the book:\n“{ref}”\n\n{q}',
   'Prefiero solo chatear con el libro': 'I\'d rather just chat with the book',
   // ---- P30 · Descubrimiento (hints, primeros pasos, guía rápida) ----
-  'Con un texto seleccionado puedes <b>preguntar al agente</b>, marcarlo, copiarlo o compartirlo. Prueba «Explícame» o «Por qué importa».':
-    'With a selection you can <b>ask the agent</b> about it, highlight it, copy or share it. Try “Explain this” or “Why it matters”.',
+  'Con un texto seleccionado puedes <b>preguntar al agente</b>, <b>llevarlo a tu libreta</b>, marcarlo, copiarlo o compartirlo. Prueba «Explícame» o «Por qué importa».':
+    'With a selection you can <b>ask the agent</b> about it, <b>take it to your notebook</b>, highlight it, copy or share it. Try “Explain this” or “Why it matters”.',
   '¿Vas a leer en el tren o en el avión? En el menú del agente, <b>«Preparar para sin conexión»</b> deja cacheado el libro para seguir preguntándole sin red.':
     'Reading on a train or a plane? In the agent menu, <b>“Prepare for offline”</b> caches the book so you can keep asking it without a connection.',
   'Esto es el <b>repaso del capítulo</b>: antes de avanzar, el agente te pregunta de memoria lo que acabas de leer. Responde como puedas — la conversación sigue después.':

@@ -177,7 +177,7 @@ function followSelection(rect) {
 // fragmento adjunto, o una de las acciones rápidas, que mandan una petición ya formulada.
 // `getText` es una FUNCIÓN, no una cadena: en PDF el texto puede cambiar entre que se abre la
 // barra y se pulsa la acción (asas de selección), así que se lee al pulsar.
-function wireAgentActions(getText) {
+function wireAgentActions(getText, getAnchor = () => ({})) {
   const on = (id, fn) => {
     const el = document.getElementById(id);
     if (el) el.onclick = () => { fn(getText()); hideHighlightTooltip(); };
@@ -190,6 +190,21 @@ function wireAgentActions(getText) {
   on('sel-explain', conPanel((AiPanel, txt) => AiPanel.quickAction('explain', txt)));
   on('sel-why', conPanel((AiPanel, txt) => AiPanel.quickAction('why', txt)));
   on('sel-card', conPanel((AiPanel, txt) => AiPanel.cardFromSelection(txt)));
+  // A la libreta (o «Hazme la pregunta» con HQ&A): necesita además DÓNDE está el fragmento,
+  // para que la nota vuelva a él. La etiqueta depende de la plantilla de la conversación.
+  const nb = document.getElementById('sel-notebook');
+  if (nb) {
+    nb.onclick = async () => {
+      const txt = getText();
+      const anchor = getAnchor();
+      hideHighlightTooltip();
+      (await import('./ai/panel.js')).selectionToNotebook(txt, anchor);
+    };
+    import('./ai/panel.js').then((m) => {
+      const label = nb.querySelector('.sel-notebook-label');
+      if (label) label.textContent = m.selectionNotebookLabel();
+    }).catch(() => {});
+  }
 }
 
 // ---- Núcleo de la barra ---------------------------------------------------
@@ -237,7 +252,7 @@ function flushNote() {
 
 // Ata los botones comunes al `editor` activo. `getText` es una función: en PDF el texto
 // cambia mientras se arrastran las asas de selección (ver setupPdfSelection).
-function wireToolbar(ed, getText) {
+function wireToolbar(ed, getText, getAnchor) {
   editor = ed;
   const tooltip = document.getElementById('highlight-tooltip');
 
@@ -265,7 +280,7 @@ function wireToolbar(ed, getText) {
     hideHighlightTooltip();
   };
 
-  wireAgentActions(getText);
+  wireAgentActions(getText, getAnchor);
 
   document.getElementById('sel-copy').onclick = async () => {
     try { await navigator.clipboard.writeText(getText()); } catch (e) { /* sin clipboard */ }
@@ -292,7 +307,7 @@ function wireToolbar(ed, getText) {
 function showHighlightTooltip(cfiRange, text, rect) {
   // P30 F2: la barra de selección se estrena sola la primera vez que aparece — el
   // momento exacto en que "seleccionar texto" deja de ser solo subrayar.
-  Hints.maybeShow('sel-actions', t('Con un texto seleccionado puedes <b>preguntar al agente</b>, marcarlo, copiarlo o compartirlo. Prueba «Explícame» o «Por qué importa».'));
+  Hints.maybeShow('sel-actions', t('Con un texto seleccionado puedes <b>preguntar al agente</b>, <b>llevarlo a tu libreta</b>, marcarlo, copiarlo o compartirlo. Prueba «Explícame» o «Por qué importa».'));
 
   const tooltip = document.getElementById('highlight-tooltip');
 
@@ -311,7 +326,7 @@ function showHighlightTooltip(cfiRange, text, rect) {
       renderHighlights();
     },
     remove: null,
-  }, () => text);
+  }, () => text, () => ({ cfi: cfiRange, chapter: EpubReader.getCurrentChapterLabel() }));
 }
 
 export function hideHighlightTooltip() {
@@ -552,7 +567,7 @@ function showPdfSelectionTooltip(cap) {
       renderHighlights();
     },
     remove: null,
-  }, () => current().text);
+  }, () => current().text, () => ({ page: current().page }));
 }
 
 // ---- Modo edición: la barra sobre un subrayado que YA existe ---------------
@@ -573,7 +588,7 @@ function openHighlightEditor(id, rect) {
       renderHighlights();
     },
     remove: () => deleteWithUndo(hl),
-  }, () => hl.text);
+  }, () => hl.text, () => (hl.page != null ? { page: hl.page } : { cfi: hl.cfi, chapter: hl.chapter }));
 }
 
 // Borrar es reversible: un aviso con Deshacer cuesta un clic menos que confirmar cada vez

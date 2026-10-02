@@ -73,10 +73,11 @@ let nbJustSaved = null;
 let nbDrafts = new Map();
 let nbMenuFocus = false;
 let nbFilling = null;         // «campo|capítulo» que el agente está rellenando (Q6)
-let nbCandidates = null;      // HQ&A vacía: { chapter, loading, items: [{ id, text }] } (Q7)      // al abrir un menú ⋯, llevar el foco a su primera opción
+let nbCandidates = null;
+let nbClip = null;            // fragmento llevado a la libreta, a la espera de elegir campo (F1)
+let nbClipLoc = null;         // su localizador, para la nota que se escriba con él      // HQ&A vacía: { chapter, loading, items: [{ id, text }] } (Q7)      // al abrir un menú ⋯, llevar el foco a su primera opción
 let bookFinished = false;
 let attenuationDone = false;  // atenuación de capítulos aplicada para este libro
-let registeredRendition = null; // rendition con el listener de subrayado registrado
 let hqaBusy = false;          // generación HQ&A en curso
 let busy = false, abortCtrl = null;
 let onCite = () => {};
@@ -409,6 +410,34 @@ export async function quickAction(kind, text) {
 
 export function numericExample(text) { return quickAction('numeric', text); }
 
+// ---- F1 · Del fragmento a la libreta ----------------------------------------
+// El botón de la barra de selección se llama según la plantilla: con HQ&A hace la
+// pregunta; con las demás, lleva el fragmento a la libreta para elegir campo.
+function hqaField() { return template?.fields?.find(f => f.aiScaffold) || null; }
+
+export function selectionNotebookLabel() {
+  return hqaField() ? t('Hazme la pregunta') : t('A la libreta');
+}
+
+// anchor: { cfi } en EPUB, { page } en PDF, más { chapter } si se conoce.
+export async function selectionToNotebook(text, anchor = {}) {
+  const clean = String(text || '').replace(/\s+/g, ' ').trim();
+  if (!clean) return;
+  setOpen(true);
+  if (!convo) { setStatus('Elige un objetivo de lectura primero.'); return; }
+  const loc = anchor.cfi || (anchor.page ? `page:${anchor.page}` : null);
+  const chapter = anchor.chapter || currentChapter();
+  showView('notebook');
+  if (hqaField()) {
+    if (!(await needKey())) return;
+    await generateHQA(clean, loc, { chapter });
+    return;
+  }
+  nbClip = { text: clean, loc, chapter };
+  editingId = null; addingField = null; nbMenu = null;
+  renderNotebook();
+}
+
 // Sin conversación todavía: adjuntamos el fragmento y dejamos que el onboarding elija
 // objetivo; el usuario relanza. Mejor que perder la selección en silencio.
 function setRefAndAsk(clean, buttonLabel = t('Con números')) {
@@ -669,7 +698,7 @@ export async function setBook(b, id, title, opts = {}) {
   ia2LastChapter = null; ia2Seen = new Set();   // IA2: reinicia el repaso por libro
   editingId = null; addingField = null; attenuationDone = false;
   nbExpanded = new Set(); nbMenu = null; nbJustSaved = null; bookFinished = false; nbDrafts = new Map();
-  nbFilling = null; nbCandidates = null;
+  nbFilling = null; nbCandidates = null; nbClip = null; nbClipLoc = null;
   nbAddChapter = null; nbOpenChapters = new Set();
   clearChapterAttenuation();
   annotatedText = ''; anchors = new Map();
@@ -697,32 +726,17 @@ export async function setBook(b, id, title, opts = {}) {
   // Segmentar (o cargar de cache) en segundo plano.
   prepareBook();
 
-  // Escuchar subrayados del lector (para el rol HQ&A).
-  registerReaderSelection();
 }
 
-// ---- HQ&A al subrayar (E5.2) -----------------------------------------------
-// Solo con la plantilla HQ&A: subrayar en el lector genera Pregunta + borrador
-// de Respuesta y lo guarda en la libreta, con enlace al pasaje subrayado.
-
-function registerReaderSelection() {
-  try {
-    const r = EpubReader.getRendition?.();
-    if (!r || r === registeredRendition) return;
-    registeredRendition = r;
-    r.on('selected', onReaderSelection);
-  } catch { /* lector no listo */ }
-}
-
-async function onReaderSelection(cfiRange, contents) {
-  if (hqaBusy || !convo || template?.id !== 'hqa') return;
-  let text = '';
-  try { text = (contents?.window?.getSelection()?.toString() || '').trim(); } catch { /* sin acceso */ }
-  if (text.length < 8) return;
-  await generateHQA(text, cfiRange);
-}
+// ---- HQ&A: la pregunta de un fragmento (E5.2) ------------------------------
+// Antes, con la plantilla HQ&A, CUALQUIER selección de ≥ 8 caracteres lanzaba una llamada
+// al modelo y creaba una nota, aunque solo quisieras copiar; y solo en EPUB con ratón (el
+// listener era el `selected` de epub.js: ni PDF ni la selección táctil pasaban por él).
+// Ahora es una acción explícita de la barra de selección —«Hazme la pregunta»—, la misma
+// barra en EPUB, PDF y táctil (selectionToNotebook). Auditoría de libretas, F1.
 
 async function generateHQA(text, cfiRange, { chapter } = {}) {
+  if (hqaBusy) return;          // un doble toque no crea dos preguntas
   hqaBusy = true;
   setStatus('Generando la pregunta del subrayado…');
   try {
@@ -743,7 +757,7 @@ P: <pregunta>` },
     const out = await LLM.chatStream({ messages });
     const q = (out.match(/P:\s*(.+)/i)?.[1] || '').trim();
     const content = t('> {text}\n\n**P:** {q}\n**R:** {r}', { text, q: q || '—', r: answerBlank() });
-    await saveNote('hqa', content, [cfiRange], chapter || currentChapter());
+    await saveNote('hqa', content, [cfiRange].filter(Boolean), chapter || currentChapter());
     renderNotebook();
     markNotebookUnread();
     setStatus('Pregunta añadida — escribe tu respuesta en la libreta');
@@ -2316,7 +2330,15 @@ function markNotebookUnread() {
   if (tab && !tab.classList.contains('active')) tab.classList.add('ai-tab-unread');
 }
 
+// Las anclas [[aN]] de una nota, más sus localizadores de pasaje (un CFI de EPUB o
+// «page:N» de PDF), que no son anclas pero son el enlace al texto: antes se descartaban al
+// editar la nota y esta perdía su «Ir al pasaje».
 function extractCites(content, sourceCfis) {
+  const locators = (sourceCfis || []).filter(s => /^(epubcfi\(|page:\d+$)/.test(String(s)));
+  return [...new Set([...locators, ...extractAnchorIds(content, sourceCfis)])];
+}
+
+function extractAnchorIds(content, sourceCfis) {
   const ids = new Set();
   (sourceCfis || []).forEach(s => String(s).replace(/a\d+/g, m => ids.add(m)));
   (content.match(/a\d+/g) || []).forEach(m => { if (anchors.has(m)) ids.add(m); });
@@ -2385,7 +2407,10 @@ function noteHtml(n, { showChapter = true } = {}) {
     }
     return editorHtml(`data-id="${n.id}"`, n.content, f?.hint);
   }
-  const navCfi = (n.sourceCfis || []).find(c => typeof c === 'string' && c.startsWith('epubcfi'));
+  const epubCfi = (n.sourceCfis || []).find(c => typeof c === 'string' && c.startsWith('epubcfi'));
+  // En PDF el localizador es «page:N»; onCite (goToLocator) entiende el número de página.
+  const pdfPage = !epubCfi && (n.sourceCfis || []).map(c => /^page:(\d+)$/.exec(String(c))).find(Boolean)?.[1];
+  const navCfi = epubCfi || pdfPage || null;
   // UNA sola ubicación por nota, siempre a un toque (auditoría Q2). Antes competían el chip
   // de la cita y el del capítulo, y dentro de los grupos por capítulo el enlace al pasaje
   // quedaba a dos toques en el menú ⋯.
@@ -2395,7 +2420,7 @@ function noteHtml(n, { showChapter = true } = {}) {
   const hasCite = /\[\[a\d+\]\]/.test(n.content || '');
   let chip = '';
   if (navCfi) {
-    const page = citePage({ cfi: navCfi });
+    const page = pdfPage ? Number(pdfPage) : citePage({ cfi: navCfi });
     const label = page ? t('pág. {n}', { n: page }) : (showChapter && n.chapter ? citeLabel('', { chapter: n.chapter }) : t('Ir al pasaje'));
     chip = `<button class="ai-nb-loc ai-nb-goto" data-cfi="${escapeHtml(navCfi)}" title="${t('Ir al pasaje')}">${icon('arrow-up-right', { size: 12 })}<span>${escapeHtml(label)}</span></button>`;
   } else if (!hasCite && showChapter && n.chapter) {
@@ -2499,6 +2524,23 @@ function tocaHtml(p) {
         <button class="ai-nb-toca-save">${t('Guardar')}</button>
         <button class="ai-nb-toca-skip">${t('Ahora no')}</button>
       </div>
+    </div>`;
+}
+
+// F1 · El fragmento que llegó de la barra de selección: ¿a qué campo va? Primero los
+// tuyos (es donde pesa escribir), luego los de la IA.
+function clipHtml() {
+  if (!nbClip) return '';
+  const fs = (template?.fields || []).filter(f => !f.fromGoal && !f.aiScaffold && !f.after);
+  const mine = fs.filter(f => isCognitionField(f));
+  const agent = fs.filter(f => !isCognitionField(f));
+  const chip = (f) => `<button class="ai-nb-clip-field${isCognitionField(f) ? ' is-mine' : ''}" data-field="${f.key}">${escapeHtml(f.label)}</button>`;
+  return `
+    <div class="ai-nb-clip">
+      <blockquote class="ai-nb-clip-quote">«${escapeHtml(nbClip.text.length > 280 ? nbClip.text.slice(0, 280) + '…' : nbClip.text)}»</blockquote>
+      <p class="ai-nb-clip-ask">${t('¿En qué campo lo apuntas?')}</p>
+      <div class="ai-nb-clip-fields">${mine.map(chip).join('')}${agent.map(chip).join('')}</div>
+      <button class="ai-nb-clip-x">${t('Descartar')}</button>
     </div>`;
 }
 
@@ -2696,6 +2738,9 @@ function renderNotebook() {
     // cinco, tres de ellas «lo apunta el agente»).
     const curIsText = !!cur && !Retrieval.isBoilerplate(cur);
     const groups = NB.groupByChapter(notes, { order: tocLabels, current: curIsText ? cur : '' });
+    // Se está añadiendo en un capítulo sin notas ni actual (p. ej. un fragmento de otro
+    // capítulo llevado a la libreta): su grupo tiene que existir para enseñar el editor.
+    if (nbAddChapter && !groups.some(g => g.chapter === nbAddChapter)) groups.unshift({ chapter: nbAddChapter, notes: [] });
     body = !groups.length ? null : groups.map((g) => {
       const isCur = curIsText && g.chapter === cur;
       const inner = fields.map((f) => {
@@ -2719,6 +2764,7 @@ function renderNotebook() {
   els.noteView.innerHTML = `
     <div class="ai-nb-goal"><span class="ai-nb-goal-label">${icon('target', { size: 15 })} ${t('Objetivo')}</span><span class="ai-nb-goal-value">${escapeHtml(convo.goal)}</span></div>
     <div class="ai-nb-tpl">${escapeHtml(template.name)}</div>
+    ${clipHtml()}
     ${tocaHtml(pending)}
     ${deliverHtml()}
     <div class="ai-nb-fields">${body}</div>
@@ -2818,8 +2864,9 @@ async function onNotebookClick(e) {
         saved = note;
       }
     } else if (val && field) {
-      saved = await saveNote(field, val, extractCites(val, []), nbAddChapter ?? currentChapter());
+      saved = await saveNote(field, val, extractCites(val, nbClipLoc ? [nbClipLoc] : []), nbAddChapter ?? currentChapter());
     }
+    nbClipLoc = null;
     forgetNbDraft(editor);
     editor.querySelector('.ai-nb-input').value = editor.querySelector('.ai-nb-input').defaultValue;
     editingId = null; addingField = null; nbAddChapter = null;
@@ -2831,6 +2878,7 @@ async function onNotebookClick(e) {
   if (cancel) {
     const editor = cancel.closest('.ai-nb-editor');
     forgetNbDraft(editor);
+    nbClipLoc = null;
     editor.querySelector('.ai-nb-input').value = editor.querySelector('.ai-nb-input').defaultValue;
     editingId = null; addingField = null; nbAddChapter = null; renderNotebook(); return;
   }
@@ -2847,6 +2895,22 @@ async function onNotebookClick(e) {
 
   const edit = e.target.closest('.ai-nb-edit');
   if (edit) { editingId = Number(edit.dataset.id); addingField = null; nbMenu = null; renderNotebook(); focusEditor(); return; }
+
+  const clipField = e.target.closest('.ai-nb-clip-field');
+  if (clipField && nbClip) {
+    const key = clipField.dataset.field;
+    const chap = template.byChapter ? (nbClip.chapter || null) : null;
+    addingField = key; nbAddChapter = chap; editingId = null;
+    // El editor nace con la cita del fragmento; tu comentario va debajo.
+    nbDrafts.set(`add|${key}|${chap ?? ''}`, `> ${nbClip.text}\n\n`);
+    nbClipLoc = nbClip.loc;
+    nbClip = null;
+    renderNotebook();
+    const ta = els.noteView.querySelector('.ai-nb-editor .ai-nb-input');
+    if (ta) { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }
+    return;
+  }
+  if (e.target.closest('.ai-nb-clip-x')) { nbClip = null; renderNotebook(); return; }
 
   const fill = e.target.closest('.ai-nb-fill-btn');
   if (fill) { fillFieldFromBook(fill.dataset.fill, fill.dataset.chapter ?? null); return; }

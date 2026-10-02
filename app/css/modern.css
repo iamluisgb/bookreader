@@ -1039,6 +1039,20 @@ button.ai-nb-chap:hover { color: var(--text); background: var(--fill-strong); }
   color: var(--accent); font: inherit; font-weight: 600;
 }
 
+/* F1 · El fragmento llegado de la barra de selección, a la espera de campo. */
+.ai-nb-clip { background: var(--surface-0); border: 1px solid var(--border-soft); border-radius: var(--r-lg); box-shadow: var(--shadow-1); padding: 12px 14px; margin-bottom: 14px; }
+.ai-nb-clip-quote { margin: 0 0 10px; font-style: italic; color: var(--text-soft); font-size: var(--fs-sm); line-height: 1.5; }
+.ai-nb-clip-ask { margin: 0 0 8px; font-size: var(--fs-sm); font-weight: 600; color: var(--text); }
+.ai-nb-clip-fields { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.ai-nb-clip-field {
+  background: var(--fill); color: var(--text-soft); border: none; border-radius: var(--r-pill);
+  font: inherit; font-size: var(--fs-sm); padding: 6px 12px; cursor: pointer;
+}
+.ai-nb-clip-field.is-mine { color: var(--text); font-weight: 600; }
+.ai-nb-clip-field:hover { background: var(--accent-soft); color: var(--accent); }
+.ai-nb-clip-x { background: none; border: none; padding: 4px 0; color: var(--text-faint); font: inherit; font-size: var(--fs-xs); cursor: pointer; }
+.ai-nb-clip-x:hover { color: var(--text); }
+
 /* Capítulos (plantillas por capítulo) */
 .ai-nb-chapter { border-top: 1px solid var(--border-soft); }
 .ai-nb-chapter:last-child { border-bottom: 1px solid var(--border-soft); }
