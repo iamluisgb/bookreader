@@ -3,6 +3,14 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-10-02 — El tipo de fichero se reconoce por su contenido, no por el nombre
+
+Reportado en el móvil: un dossier recibido por WhatsApp daba «Formato no soportado». WhatsApp
+no conserva el nombre (`.zip`, `.bookreader.zip`, `DOC-…-WA0003` sin extensión) y `loadFile`
+decidía por la extensión. [`file-kind.js`](app/js/file-kind.js) mira los primeros 64 bytes:
+`%PDF-` → PDF; ZIP cuya primera entrada es `dossier.json` → dossier, `mimetype` → EPUB. La
+extensión solo desempata cuando no hay firma. Vale también para libros renombrados. SW `v147`.
+
 ## 2026-10-02 — P24: lo compartido llega igual que se ve en el libro de quien lo manda
 
 Reportado con un dossier real («Técnico/LLM»): en el receptor, los subrayados de *Knowledge Graphs

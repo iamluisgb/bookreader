@@ -1,3 +1,4 @@
+import { kindOf } from './file-kind.js';
 import * as Settings from './settings.js';
 import * as Bookmarks from './bookmarks.js';
 import * as Highlights from './highlights.js';
@@ -1326,7 +1327,9 @@ function initDragDrop() {
 }
 
 async function loadFile(file) {
-  const ext = file.name.split('.').pop().toLowerCase();
+  // Por el contenido, no por el nombre: lo que llega por WhatsApp puede venir como .zip
+  // o sin extensión (ver file-kind.js).
+  const ext = await kindOf(file);
   // P24: un dossier compartido no es un libro que abrir, es material que importar
   // (libros + notas ajenas). Su pantalla va aparte y se carga solo si hace falta.
   if (ext === 'bookreader') {

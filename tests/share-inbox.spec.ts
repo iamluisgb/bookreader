@@ -90,3 +90,35 @@ test('quitar lo de Luis desde el menú de la estantería', async ({ page }) => {
   await expect(page.locator('.lib-menu')).toBeVisible();
   await expect(page.locator('.lib-menu-item[data-act="unshare"]')).toHaveCount(0);
 });
+
+// Lo que llega por WhatsApp no conserva el nombre: un dossier aparece como «.zip» o sin
+// extensión, y el móvil decía «Formato no soportado». Ahora manda el contenido.
+for (const name of ['tecnico-llm.zip', 'tecnico-llm.bookreader.zip', 'DOC-20261002-WA0003']) {
+  test(`un dossier llamado «${name}» se reconoce por su contenido`, async ({ page }) => {
+    await page.goto('/');
+    const b64 = await makeDossier(page);
+    const fs = await import('fs/promises');
+    const file = test.info().outputPath(name);
+    await fs.writeFile(file, Buffer.from(b64, 'base64'));
+    await page.locator('#file-input').setInputFiles(file);
+    await expect(dialog(page).locator('.dlg-title')).toHaveText('Abrir «KG»');
+  });
+}
+
+test('kindOf: EPUB y PDF reales por su firma, aunque el nombre diga otra cosa', async ({ page }) => {
+  await page.goto('/');
+  const path = await import('path');
+  const fs = await import('fs/promises');
+  const epub = (await fs.readFile(path.join(__dirname, 'test.epub'))).toString('base64');
+  const pdf = (await fs.readFile(path.join(__dirname, 'test.pdf'))).toString('base64');
+  const kinds = await page.evaluate(async ({ epub, pdf }) => {
+    const { kindOf }: any = await import('/js/file-kind.js');
+    const f = (b64: string, name: string) => new File([Uint8Array.from(atob(b64), c => c.charCodeAt(0))], name);
+    return {
+      epubZip: await kindOf(f(epub, 'libro.zip')),
+      pdfNoExt: await kindOf(f(pdf, 'DOC-123')),
+      junk: await kindOf(new File(['hola'], 'notas.txt')),
+    };
+  }, { epub, pdf });
+  expect(kinds).toEqual({ epubZip: 'epub', pdfNoExt: 'pdf', junk: null });
+});
