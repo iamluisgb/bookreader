@@ -491,6 +491,24 @@ html, body {
 }
 
 .highlight-item .highlight-share:hover { color: var(--accent); }
+
+/* P24 · Lo ajeno en la lista: la ficha va con contorno punteado en vez de fondo teñido,
+   la misma gramática que en el texto (trazo = de otra persona). */
+.highlight-shared-head {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  margin: 18px 0 8px;
+}
+.highlight-item--shared {
+  background: transparent;
+  border: 1.5px dashed color-mix(in srgb, var(--hl-color, var(--border)) 70%, transparent);
+}
+.highlight-item--shared:hover {
+  background: color-mix(in srgb, var(--hl-color, var(--surface-2)) 10%, transparent);
+}
 .highlight-item .highlight-delete:hover {
   color: #e53935;
 }
@@ -1121,6 +1139,24 @@ body:not(.scroll-mode) .epub-container .epub-view {
   position: absolute;
   border-radius: 2px;
 }
+/* P24 · Subrayado AJENO (de un dossier importado): trazo punteado al pie del renglón, sin
+   fondo. Se distingue del tuyo por la forma, no por un tono más: así conviven en el mismo
+   pasaje y se leen los dos. */
+.pdf-hl-shared {
+  position: absolute;
+  inset: 0;
+}
+.pdf-hl-under {
+  position: absolute;
+  border-bottom: 2px dashed;
+  box-sizing: border-box;
+}
+/* Lo mismo en EPUB: epub.js pinta cada renglón de un `underline` como un rect + una
+   línea, y el trazo del grupo lo heredan los dos — sin esto sale una caja punteada. El
+   pane de anotaciones vive en el documento padre, así que este CSS le llega. */
+#epub-container svg g.hl-shared rect { stroke: none; }
+/* Y la línea trae su propio stroke negro de epub.js: que herede el color del grupo. */
+#epub-container svg g.hl-shared line { stroke: inherit; stroke-width: inherit; stroke-dasharray: inherit; stroke-opacity: inherit; }
 
 /* ============ AI PANEL ============ */
 /* ============ GUARDIA HASTA QUE LLEGUE agent.css ============

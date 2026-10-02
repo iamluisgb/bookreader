@@ -596,6 +596,52 @@ function deleteWithUndo(hl) {
   });
 }
 
+// ---- P24 F2 · Subrayados AJENOS (de un dossier importado) ----------------------
+// Viven en share/store.js, no en Highlights: son de otra persona y de solo lectura. Se
+// cargan en memoria al abrir el libro (por su hash de contenido, el mismo `bookId` con
+// el que llegaron) y se pintan con TRAZO —subrayado punteado del color original— en vez
+// de fondo, para que se distingan de los tuyos sin una barra lateral. En EPUB van como
+// anotación `underline`, otro tipo que `highlight`: el mismo CFI subrayado por los dos
+// no choca.
+let shared = { bookId: null, items: [] };
+
+export function sharedHighlights() {
+  return shared.items;
+}
+
+// Carga lo ajeno de `bookId`, lo pinta y refresca la lista. Si mientras tanto se abrió
+// otro libro, no pinta nada. La base se importa perezosa: quien no ha importado nunca
+// un dossier no la abre.
+export async function loadSharedHighlights(bookId) {
+  shared = { bookId, items: [] };
+  let records = [];
+  try {
+    const Shared = await import('./share/store.js');
+    records = await Shared.forBook(bookId);
+  } catch (e) { console.warn('No se pudo leer lo compartido:', e); }
+  if (shared.bookId !== bookId) return;
+  shared.items = records.flatMap(r => (r.highlights || []).map((h, i) => ({ ...h, from: r.from, sid: `${r.id}#${i}` })));
+  if (!shared.items.length) return;
+  paintSharedEpub();
+  document.querySelectorAll('#pdf-container .pdf-page[data-page]').forEach(w => drawPdfHighlights(Number(w.dataset.page)));
+  renderHighlights();
+}
+
+function paintSharedEpub() {
+  const rendition = EpubReader.getRendition();
+  if (!rendition) return;
+  for (const h of shared.items) {
+    if (!h.cfi) continue;
+    try { rendition.annotations.remove(h.cfi, 'underline'); } catch (e) { /* no estaba */ }
+    rendition.annotations.underline(h.cfi, {}, () => {}, 'hl-shared', {
+      'stroke': h.color || '#f9a825',
+      'stroke-width': '2',
+      'stroke-dasharray': '4 3',
+      'stroke-opacity': '0.9',
+    });
+  }
+}
+
 // Re-sincroniza UN subrayado con lo que dice el store: sirve para el color nuevo, para el
 // borrado y para deshacerlo. En EPUB hay que quitar la anotación y volver a ponerla (epub.js
 // no re-tiñe una ya pintada); en PDF basta con redibujar la capa de la página.
@@ -646,6 +692,25 @@ export function drawPdfHighlights(page) {
     }
     layer.appendChild(group);
   }
+  // Ajenos encima, como trazo: una línea punteada al pie de cada rect.
+  for (const hl of shared.items) {
+    if (hl.page !== page || !(hl.rects || []).length) continue;
+    const group = document.createElement('div');
+    group.className = 'pdf-hl-shared';
+    group.title = [hl.from && t('De {name}', { name: hl.from }), hl.note].filter(Boolean).join(' — ');
+    for (const raw of hl.rects) {
+      const r = pdfRectToBox(wrapper, raw);
+      const d = document.createElement('div');
+      d.className = 'pdf-hl-under';
+      d.style.left = (r.left * 100) + '%';
+      d.style.top = (r.top * 100) + '%';
+      d.style.width = (r.width * 100) + '%';
+      d.style.height = (r.height * 100) + '%';
+      d.style.borderBottomColor = hl.color || '#f9a825';
+      group.appendChild(d);
+    }
+    layer.appendChild(group);
+  }
 }
 
 function hideHighlightTooltipOnOutside(e) {
@@ -684,6 +749,7 @@ export function applyStoredHighlights() {
   for (const hl of Highlights.getAll()) {
     if (hl && hl.cfi) applyHighlightToRendition(hl.cfi, hl.color);
   }
+  paintSharedEpub();
 }
 
 // Repintado tras un merge remoto, con anotaciones YA pintadas: primero quita
@@ -713,12 +779,11 @@ export function renderHighlights() {
 
   if (exportBtn) exportBtn.disabled = highlights.length === 0;
 
+  list.innerHTML = '';
   if (highlights.length === 0) {
     list.innerHTML = `<p class="empty-state">${t('No hay subrayados aún')}</p>`;
-    return;
   }
 
-  list.innerHTML = '';
   highlights.sort((a, b) => b.timestamp - a.timestamp).forEach(hl => {
     const item = document.createElement('div');
     item.className = 'highlight-item';
@@ -758,4 +823,39 @@ export function renderHighlights() {
 
     list.appendChild(item);
   });
+  renderSharedList(list);
+}
+
+// Lo ajeno, debajo de lo tuyo y agrupado por quién lo manda: se lee y lleva al pasaje,
+// pero no se borra ni se edita (no es tuyo; se quita reimportando o borrando el dossier).
+function renderSharedList(list) {
+  if (!shared.items.length) return;
+  const byFrom = new Map();
+  for (const h of shared.items) {
+    const k = h.from || '';
+    if (!byFrom.has(k)) byFrom.set(k, []);
+    byFrom.get(k).push(h);
+  }
+  for (const [from, items] of byFrom) {
+    const head = document.createElement('div');
+    head.className = 'highlight-shared-head';
+    head.textContent = from ? t('De {name}', { name: from }) : t('Compartidos');
+    list.appendChild(head);
+    for (const hl of items) {
+      const item = document.createElement('div');
+      item.className = 'highlight-item highlight-item--shared';
+      item.style.setProperty('--hl-color', hl.color || '#f9a825');
+      item.innerHTML = `
+        <div class="highlight-text">"${escapeHtml(dehyphenate(hl.text))}"</div>
+        ${hl.note ? `<div class="highlight-note">${icon('note', { size: 13 })}<span>${escapeHtml(hl.note)}</span></div>` : ''}
+        ${hl.chapter ? `<div class="highlight-meta"><span>${escapeHtml(hl.chapter)}</span></div>` : ''}
+      `;
+      item.addEventListener('click', async () => {
+        if (hl.page != null) { await PdfReader.goTo(hl.page); drawPdfHighlights(hl.page); }
+        else if (hl.cfi) await EpubReader.goTo(hl.cfi);
+        document.getElementById('sidebar').classList.remove('open');
+      });
+      list.appendChild(item);
+    }
+  }
 }

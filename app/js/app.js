@@ -9,7 +9,7 @@ import { hydrateIcons } from './ui/icons.js';
 import { countBookWords, countPdfWords, updateProgressDetail, getCurrentPct, WORDS_PER_LOCATION } from './progress.js';
 import * as FeatureGuide from './ui/feature-guide.js';
 import * as ReadingLog from './reading-log.js';
-import { initHighlights, setupHighlights, setupPdfSelection, drawPdfHighlights, renderHighlights, applyStoredHighlights, repaintStoredHighlights, hideHighlightTooltip, pdfHighlightAt, pdfFractionalRects, pdfRectToBox, setBookMeta } from './highlights-ui.js';
+import { initHighlights, loadSharedHighlights, setupHighlights, setupPdfSelection, drawPdfHighlights, renderHighlights, applyStoredHighlights, repaintStoredHighlights, hideHighlightTooltip, pdfHighlightAt, pdfFractionalRects, pdfRectToBox, setBookMeta } from './highlights-ui.js';
 import { initBookmarkButton, updateBookmarkButton, renderBookmarks } from './bookmarks-ui.js';
 import * as Library from './library/view.js';
 import * as LibStore from './library/store.js';
@@ -1464,6 +1464,7 @@ async function loadEpub(buffer, bookId, aiBookId, persist = null) {
     // Render bookmark and highlight lists
     renderBookmarks();
     renderHighlights();
+    loadSharedHighlights(currentBook.id);   // P24: lo de un dossier importado, si lo hay
 
     updateBookmarkButton();
     updateFormatScopedUI();   // modo de lectura guardado + controles que aplican al EPUB
@@ -1544,6 +1545,7 @@ async function loadPdf(buffer, bookId, aiBookId, persist = null, displayTitle = 
     // PDF2/PDF3: seleccionar texto en el PDF → barra (preguntar/subrayar/nota/copiar).
     setupPdfSelection();
     renderHighlights();              // poblar la lista lateral con los subrayados guardados
+    loadSharedHighlights(currentBook.id);   // P24: lo de un dossier importado, si lo hay
     renderBookmarks();               // poblar la lista de marcadores del PDF
     updateBookmarkButton();          // estado del botón para la página inicial
     loadPdfTOC();                    // índice del PDF (outline) en el sidebar

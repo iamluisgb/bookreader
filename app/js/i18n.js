@@ -1278,6 +1278,8 @@ const EN = {
   '1 artefacto': '1 artifact',
   '1 tarjeta': '1 card',
   'Listo: 1 libro en la estantería «{shelf}».': 'Done: 1 book on the shelf “{shelf}”.',
+  'De {name}': 'From {name}',
+  'Compartidos': 'Shared',
   'Incluir': 'Include',
   'Subrayados y notas': 'Highlights and notes',
   'Libretas': 'Notebooks',
