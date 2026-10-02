@@ -760,9 +760,29 @@ Con BYOK el daño se limita a gastar tu clave y mentirte, pero el usuario tiene 
   entran en TU biblioteca (si ya lo tienes, mismo hash, no se duplica) en una estantería «<nombre> · de X»;
   lo ajeno (subrayados, libretas, artefactos, mazos) va al store `shared`. Estados por título: *lo tienes* /
   *consíguelo* / *solo notas* (estos dos, solo para lo que llegó sin fichero). Libreta ajena en **solo lectura**.
-  Distinción visual **por trazo, no por barra lateral**: lo ajeno con línea inferior punteada del color
-  original, lo propio con fondo sólido. Filtro "Míos · De X" en la sidebar de subrayados.
+  ~~Distinción visual por trazo~~ — **revisado 2026-10-02**: lo ajeno se pinta IGUAL que lo propio (relleno
+  de su color); el punteado no «llegaba igual» (amarillo claro casi invisible, raya suelta en los subrayados
+  de un rect por párrafo). De quién es lo dicen la cabecera «De X» de la barra lateral y el tooltip.
 - **F3 — Método** `S`: mismo sobre, `kind: 'method'`, con la pantalla de revisión del prompt.
+- **F4 — Compartir por enlace** `M` · **propuesta, sin decidir**. Hoy el dossier llega por WhatsApp como
+  un fichero que hay que guardar y elegir desde «Subir archivos» (o, en Android con la PWA instalada,
+  mantener pulsado → Compartir → BookReader). Ni Android ni iOS dejan a una PWA abrir un fichero con un
+  toque. Un **enlace** sí: `bookreader.raiatech.com/app/#d=<id>.<clave>` abre la app con la revisión
+  del dossier ya puesta, en iPhone, Android y escritorio, sin instalar nada.
+  - **Cifrado de extremo a extremo**: AES-GCM en el navegador del emisor; la clave va en el fragmento
+    (`#`), que el navegador nunca envía, así que el servidor guarda bytes que no puede leer.
+  - **Caduca** (7 días) y se borra; sin cuentas ni listados — sin el enlace completo no hay nada.
+  - **Infra**: Worker + R2 junto a `workers/gateway` (subida, descarga, purga por cron). Capa gratuita
+    de R2 con el volumen previsto. Límite de tamaño (¿200 MB?; «Técnico/LLM» con libros pesa 66 MB) y,
+    si se pasa, ofrecer el enlace sin libros.
+  - **Decisión pendiente — ¿libros dentro?** Por fichero, los libros van de móvil a móvil. Por enlace,
+    pasan 7 días por almacenamiento nuestro (cifrados e ilegibles para nosotros, pero el enlace es
+    nuestro ante una reclamación de copyright). Alternativa: enlace solo con notas y artefactos; los
+    libros siguen por fichero o por su `source`.
+  - **Choca con un principio**: «los datos del lector nunca pasan por un servidor nuestro» (ADR-036, ADR
+    de sync). El cifrado con la clave en el fragmento es lo que lo hace defendible; antes de implementar,
+    un ADR que lo diga.
+  - El fichero sigue como alternativa (sin red, o para quien no quiera enlace).
 - **Test que justifica el diseño:** round-trip con `test.epub` — exportar, importar en perfil limpio,
   verificar que aparece en el carril compartido y que **los subrayados propios del mismo CFI siguen intactos**.
   Segundo test: estantería de dos libros donde el receptor tiene solo uno → uno *lo tienes* (pintado) y
