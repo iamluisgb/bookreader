@@ -3,6 +3,26 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-10-03 — Cabecera del lector: el botón del índice ya no se mueve
+
+Ver [`docs/AUDITORIA_CABECERA_LECTOR.md`](docs/AUDITORIA_CABECERA_LECTOR.md). Al abrir el índice el
+botón que lo abría saltaba 320 px a la derecha, el título se montaba sobre los iconos en móvil y
+la marca salía dos veces.
+- **Carriles fijos** (F1, F4): «‹ Biblioteca» y el botón del índice, arriba a la izquierda de la
+  ventana; el ✦ del agente, arriba a la derecha. Al abrir cada panel, su botón queda en el mismo
+  píxel y es su cierre (la ✕ sale en escritorio; en cajón, < 1024, se queda).
+- **Cabecera en rejilla** (Q1): el título trunca con el sitio real y se oculta si no cabe.
+- **«‹ Biblioteca»** en vez del logo como volver (Q2); el panel muestra **el libro** —portada,
+  autor, % y tiempo restante— en vez de «BookReader» (Q3, F5).
+- **«Aa»** (icono nuevo `type`) abre los ajustes de lectura en un popover (escritorio) o una hoja
+  (móvil) sobre la página; dejan de ser una pestaña escondida del índice (F2).
+- **Móvil** (F3): ‹ · título · Aa · ⋯; «Más» suma Índice y notas, Buscar, Marcar página y Pantalla
+  completa, y tocar el capítulo del pie abre el índice.
+- **Accesibilidad y atajos** (Q4, Q5): nombres que dicen si abren o cierran, `aria-expanded`;
+  `[` índice y `]` agente, también desde el texto del EPUB. Una sola vía para abrir el panel
+  (`ui/sidebar.js`).
+
+Tests: [reader-header.spec.ts](tests/reader-header.spec.ts). SW `v163`.
 ## 2026-10-03 — Biblioteca en móvil: Ajustes a dos toques y una tira de estanterías que se entiende
 
 Ver [`docs/AUDITORIA_MOVIL_BIBLIOTECA.md`](docs/AUDITORIA_MOVIL_BIBLIOTECA.md). En móvil el rail de

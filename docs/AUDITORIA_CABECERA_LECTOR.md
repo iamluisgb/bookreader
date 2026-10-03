@@ -17,6 +17,10 @@ calma» y un título largo («Designing Data-Intensive Applications: The Big Ide
 inyectado en `#reader-title`). Posiciones medidas con `getBoundingClientRect`. Las cifras de
 abajo salen de ahí (x = borde izquierdo, en px).
 
+**Estado (2026-10-03): implementada entera** — Q1–Q5 y F1–F5 (commits 28ca5f2, 4f05f37, 8a1368c,
+29f86e8, 6d32496; tests en `tests/reader-header.spec.ts`). Pendiente de lo que pide §4: medir uso de
+Buscar y Marcar en móvil ahora que viven en «Más».
+
 ---
 
 ## 1. Diagnóstico
