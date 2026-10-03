@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BookReader · Biblioteca de patrones</title>
+<!-- Biblioteca VIVA: carga las MISMAS hojas que la app, en el mismo orden, así que lo que
+     se ve aquí es lo que se ve en la app. Los valores de los tokens se leen en el
+     navegador (getComputedStyle), no se copian: esta página no puede quedarse desfasada.
+     Uso interno: excluida del deploy (scripts/build-pages.mjs). Ver DESIGN.md §6. -->
+<link rel="stylesheet" href="css/fonts.css">
+<link rel="stylesheet" href="css/themes.css">
+<link rel="stylesheet" href="css/main.css">
+<link rel="stylesheet" href="css/reader.css">
+<link rel="stylesheet" href="css/agent.css">
+<link rel="stylesheet" href="css/modern.css">
+<style>
+  /* El cromo de esta página también usa SOLO tokens. */
+  body.pl { margin: 0; background: var(--surface-0); color: var(--text); font: var(--fs-md)/1.55 var(--font-ui); overflow: auto; height: auto; }
+  .pl-wrap { max-width: 980px; margin: 0 auto; padding: var(--s-8) var(--s-4) 96px; }
+  .pl-top { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: var(--s-4); padding-bottom: var(--s-6); border-bottom: 1px solid var(--border); }
+  .pl-top h1 { margin: 0; font: 600 var(--fs-3xl)/1.1 var(--font-display); }
+  .pl-top p { margin: var(--s-2) 0 0; color: var(--text-soft); max-width: 60ch; }
+  .pl-sec { padding-top: var(--s-8); }
+  .pl-sec > h2 { margin: 0 0 var(--s-1); font-size: var(--fs-xl); }
+  .pl-sec > .pl-why { margin: 0 0 var(--s-5); color: var(--text-soft); max-width: 68ch; }
+  .pl-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: var(--s-3); }
+  .pl-sw { border: 1px solid var(--border); border-radius: var(--r-md); overflow: hidden; background: var(--surface-2); }
+  .pl-sw i { display: block; height: 44px; border-bottom: 1px solid var(--border-soft); }
+  .pl-sw div { padding: var(--s-2) var(--s-3); font: var(--fs-xs)/1.4 var(--font-mono); color: var(--text-soft); }
+  .pl-sw b { display: block; color: var(--text); font-weight: 500; }
+  .pl-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-3); padding: var(--s-5); border: 1px solid var(--border); border-radius: var(--r-lg); background: var(--surface-1); }
+  .pl-spec { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); }
+  .pl-spec td, .pl-spec th { text-align: left; padding: var(--s-2) var(--s-3); border-bottom: 1px solid var(--border-soft); vertical-align: middle; }
+  .pl-spec th { font: 600 var(--fs-2xs)/1 var(--font-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--text-faint); }
+  .pl-spec code, .pl-sec code { font: var(--fs-xs) var(--font-mono); background: var(--fill); padding: 1px 5px; border-radius: var(--r-xs); }
+  .pl-r { width: 56px; height: 36px; background: var(--fill-strong); }
+  .pl-note { margin-top: var(--s-3); font-size: var(--fs-sm); color: var(--text-soft); max-width: 68ch; }
+  .pl-fb { display: inline-flex; align-items: center; gap: var(--s-2); font-weight: 600; }
+  .pl-fb i { width: 10px; height: 10px; border-radius: 50%; background: currentColor; }
+  .pl-scroll { overflow-x: auto; }
+</style>
+</head>
+<body class="pl">
+<div class="pl-wrap">
+  <header class="pl-top">
+    <div>
+      <h1>Biblioteca de patrones</h1>
+      <p>Lo que la app ya usa, con su nombre, su propósito y sus tokens. Si un patrón no está aquí, no existe todavía: añádelo antes de usarlo en una pantalla.</p>
+    </div>
+    <div class="segmented" role="group" aria-label="Tema" id="pl-theme">
+      <button class="segmented-btn active" data-t="">Sistema</button>
+      <button class="segmented-btn" data-t="light">Claro</button>
+      <button class="segmented-btn" data-t="dark">Oscuro</button>
+      <button class="segmented-btn" data-t="sepia">Sepia</button>
+    </div>
+  </header>
+
+  <section class="pl-sec">
+    <h2>Principios</h2>
+    <p class="pl-why">Resumen de DESIGN.md §1. Cuando dos opciones parezcan válidas, decide con estos.</p>
+    <table class="pl-spec">
+      <tr><td><b>El contenido manda</b></td><td>El libro es el héroe; el cromo se atenúa.</td></tr>
+      <tr><td><b>El verde es identidad, no acción</b></td><td>Verde = marca, progreso, citas, selección. Las acciones principales van en tinta.</td></tr>
+      <tr><td><b>Las citas son producto</b></td><td>Chips de cita, subrayados y relevancia son elementos de primer nivel.</td></tr>
+      <tr><td><b>Nada de barras de acento laterales</b></td><td>El estado se marca con fondo, color de texto y peso.</td></tr>
+      <tr><td><b>Solo tokens</b></td><td>Si falta un valor, se crea el token en themes.css. Lo comprueba <code>tests/css-vars.spec.ts</code>.</td></tr>
+    </table>
+  </section>
+
+  <section class="pl-sec">
+    <h2>Color</h2>
+    <p class="pl-why">Superficies y texto por rol; un acento; la marca; y el feedback, separado del acento. Los valores son los del tema activo.</p>
+    <div class="pl-grid" data-swatches="--surface-0 --surface-1 --surface-2 --surface-3 --fill --fill-raised --border --text --text-soft --text-faint --accent --accent-soft --brand --btn-bg --danger --warning --success"></div>
+  </section>
+
+  <section class="pl-sec">
+    <h2>Tipografía</h2>
+    <p class="pl-why">Ocho pasos. La interfaz usa la letra del sistema; la serif de display es de marca (landing) y la del lector, del libro.</p>
+    <div class="pl-scroll"><table class="pl-spec" id="pl-type">
+      <tr><th>Token</th><th>Valor</th><th>Muestra</th></tr>
+    </table></div>
+  </section>
+
+  <section class="pl-sec">
+    <h2>Botón</h2>
+    <p class="pl-why">Lanza una acción. Se nombra por su función, no por la pantalla donde vive.</p>
+    <div class="pl-row">
+      <button class="btn btn--primary primary-btn">Guardar</button>
+      <button class="btn btn--primary primary-btn" disabled>Guardar</button>
+      <button class="btn btn--secondary studio-gen">Generar</button>
+      <button class="btn btn--primary lib-upload">Subir libro</button>
+    </div>
+    <table class="pl-spec" style="margin-top: var(--s-3)">
+      <tr><th>Clase</th><th>Cuándo</th><th>Tokens</th></tr>
+      <tr><td><code>.btn.btn--primary</code></td><td>La acción principal de la vista. Una por vista.</td><td><code>--btn-bg</code> <code>--btn-bg-hover</code> <code>--btn-ink</code> <code>--r-md</code></td></tr>
+      <tr><td><code>.btn.btn--secondary</code></td><td>Acciones de apoyo junto a la principal.</td><td><code>--fill</code> <code>--fill-strong</code> <code>--text</code></td></tr>
+      <tr><td><code>.btn:disabled</code></td><td>Acción no disponible todavía.</td><td>opacidad 0.4</td></tr>
+    </table>
+    <p class="pl-note">Las clases de contexto (<code>.lib-upload</code>, <code>.dlg-ok</code>, <code>.studio-gen</code>…) se quedan como ganchos para JS y tests y para la forma o el tamaño propios de cada sitio. Nunca para color ni estados.</p>
+  </section>
+
+  <section class="pl-sec">
+    <h2>Control segmentado</h2>
+    <p class="pl-why">Elegir una opción entre 2–5 excluyentes que cambian la vista: modo de lectura, ajuste del PDF, pestañas.</p>
+    <div class="pl-row">
+      <div class="segmented" role="group" aria-label="Ejemplo" id="pl-seg">
+        <button class="segmented-btn active">Páginas</button>
+        <button class="segmented-btn">Scroll</button>
+        <button class="segmented-btn">Doble</button>
+      </div>
+    </div>
+    <table class="pl-spec" style="margin-top: var(--s-3)">
+      <tr><th>Clase</th><th>Estado</th><th>Tokens</th></tr>
+      <tr><td><code>.segmented</code></td><td>Pista</td><td><code>--fill</code> <code>--r-sm</code></td></tr>
+      <tr><td><code>.segmented-btn.active</code></td><td>Opción elegida, «levantada»</td><td><code>--fill-raised</code></td></tr>
+    </table>
+  </section>
+
+  <section class="pl-sec">
+    <h2>Chip de cita</h2>
+    <p class="pl-why">Lleva del texto del agente al pasaje del libro. Es producto, no decoración.</p>
+    <div class="pl-row">
+      <span>El autor lo plantea en el capítulo 3 <a class="ai-cite" href="#">a4</a> y lo retoma después <a class="ai-cite" href="#">a9</a>.</span>
+    </div>
+  </section>
+
+  <section class="pl-sec">
+    <h2>Feedback</h2>
+    <p class="pl-why">Color semántico, independiente del acento. Uno por significado.</p>
+    <div class="pl-row">
+      <span class="pl-fb" style="color: var(--danger)"><i></i>Error · <code>--danger</code></span>
+      <span class="pl-fb" style="color: var(--warning)"><i></i>Aviso · <code>--warning</code></span>
+      <span class="pl-fb" style="color: var(--success)"><i></i>Correcto · <code>--success</code></span>
+    </div>
+  </section>
+
+  <section class="pl-sec">
+    <h2>Forma</h2>
+    <p class="pl-why">Radios por tamaño de objeto: más grande, más redondo.</p>
+    <div class="pl-scroll"><table class="pl-spec" id="pl-radius">
+      <tr><th>Token</th><th>Valor</th><th>Muestra</th><th>Para</th></tr>
+    </table></div>
+  </section>
+
+  <section class="pl-sec">
+    <h2>Capas</h2>
+    <p class="pl-why">Quién tapa a quién a nivel de pantalla. Dentro de un componente bastan enteros 1–10.</p>
+    <div class="pl-scroll"><table class="pl-spec" id="pl-z">
+      <tr><th>Token</th><th>Valor</th><th>Para</th></tr>
+    </table></div>
+  </section>
+</div>
+<script>
+(function () {
+  var root = document.documentElement;
+  function val(name) { return getComputedStyle(root).getPropertyValue(name).trim(); }
+  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+
+  function paint() {
+    document.querySelectorAll('[data-swatches]').forEach(function (grid) {
+      grid.innerHTML = grid.dataset.swatches.split(' ').map(function (n) {
+        return '<div class="pl-sw"><i style="background: var(' + n + ')"></i><div><b>' + n + '</b>' + esc(val(n)) + '</div></div>';
+      }).join('');
+    });
+    var type = [['--fs-2xs', 'Contadores, metadatos'], ['--fs-xs', 'Etiquetas, pestañas'], ['--fs-sm', 'Texto secundario'], ['--fs-md', 'Texto de interfaz'],
+      ['--fs-lg', 'Texto de lectura del agente'], ['--fs-xl', 'Títulos de sección'], ['--fs-2xl', 'Títulos de pantalla'], ['--fs-3xl', 'Título de biblioteca']];
+    document.getElementById('pl-type').innerHTML = '<tr><th>Token</th><th>Valor</th><th>Muestra</th></tr>' + type.map(function (t) {
+      return '<tr><td><code>' + t[0] + '</code></td><td>' + esc(val(t[0])) + '</td><td style="font-size: var(' + t[0] + ')">' + t[1] + '</td></tr>';
+    }).join('');
+    var r = [['--r-xs', 'kbd, swatches, barras finas'], ['--r-sm', 'chips, menús, pistas'], ['--r-md', 'botones, campos'], ['--r-lg', 'tarjetas, hojas'], ['--r-xl', 'diálogos, sheets'], ['--r-pill', 'píldoras, insignias']];
+    document.getElementById('pl-radius').innerHTML = '<tr><th>Token</th><th>Valor</th><th>Muestra</th><th>Para</th></tr>' + r.map(function (t) {
+      return '<tr><td><code>' + t[0] + '</code></td><td>' + esc(val(t[0])) + '</td><td><div class="pl-r" style="border-radius: var(' + t[0] + ')"></div></td><td>' + t[1] + '</td></tr>';
+    }).join('');
+    var z = [['--z-content', 'Pantallas completas (biblioteca)'], ['--z-chrome', 'Barras del lector'], ['--z-scrim', 'Velo de drawers'], ['--z-panel', 'Sidebar, panel del agente'],
+      ['--z-popover', 'Menús, barra de selección'], ['--z-modal', 'Ajustes, onboarding'], ['--z-overlay', 'Coachmarks, zoom'], ['--z-tooltip', 'Tooltips'], ['--z-toast', 'Avisos'],
+      ['--z-status', 'Insignia de sync'], ['--z-picker', 'Selector de modelo'], ['--z-dialog', 'Confirmaciones'], ['--z-screen', 'Filtros de pantalla']];
+    document.getElementById('pl-z').innerHTML = '<tr><th>Token</th><th>Valor</th><th>Para</th></tr>' + z.map(function (t) {
+      return '<tr><td><code>' + t[0] + '</code></td><td>' + esc(val(t[0])) + '</td><td>' + t[1] + '</td></tr>';
+    }).join('');
+  }
+
+  function group(el, onPick) {
+    el.addEventListener('click', function (e) {
+      var b = e.target.closest('.segmented-btn'); if (!b) return;
+      el.querySelectorAll('.segmented-btn').forEach(function (x) { x.classList.toggle('active', x === b); });
+      if (onPick) onPick(b);
+    });
+  }
+  group(document.getElementById('pl-seg'));
+  group(document.getElementById('pl-theme'), function (b) {
+    if (b.dataset.t) root.setAttribute('data-theme', b.dataset.t); else root.removeAttribute('data-theme');
+    paint();
+  });
+  document.querySelectorAll('.ai-cite').forEach(function (a) { a.addEventListener('click', function (e) { e.preventDefault(); }); });
+  paint();
+})();
+</script>
+</body>
+</html>

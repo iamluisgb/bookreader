@@ -116,7 +116,7 @@ function renderList(decks, books) {
     // Misma acción que el tile de Flashcards del Studio: repasar TODO lo vencido del
     // libro con Study.openToday (scope de libro). Sin vencidas no se ofrece.
     const studyAll = due
-      ? `<button class="studio-gen dk-study-all studio-all" data-act="dk-study-book" data-book="${escapeHtml(g.bookId)}">${icon('cards', { size: 15 })} ${t('Estudiar todo · {n}', { n: due })}</button>`
+      ? `<button class="btn btn--secondary studio-gen dk-study-all studio-all" data-act="dk-study-book" data-book="${escapeHtml(g.bookId)}">${icon('cards', { size: 15 })} ${t('Estudiar todo · {n}', { n: due })}</button>`
       : '';
     return `
     <div class="dk-book">
@@ -228,7 +228,7 @@ function addFormHtml() {
       </select>
       <input class="dk-input dk-add-front" type="text" placeholder="${t('Frente')}" aria-label="${t('Frente')}">
       <input class="dk-input dk-add-back" type="text" placeholder="${t('Respuesta (opcional)')}" aria-label="${t('Respuesta (opcional)')}">
-      <button class="primary-btn dk-add-btn" data-act="dk-add">${icon('plus', { size: 14 })} ${t('Agregar')}</button>
+      <button class="btn btn--primary primary-btn dk-add-btn" data-act="dk-add">${icon('plus', { size: 14 })} ${t('Agregar')}</button>
     </div>
     <div class="dk-error" data-role="add-error" style="display:none"></div>
   </div>`;

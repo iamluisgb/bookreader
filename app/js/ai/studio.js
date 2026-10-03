@@ -93,7 +93,7 @@ function artifactCard(ty, e) {
 function emptyCard(ty) {
   return `<div class="studio-card studio-empty">
     <p class="studio-value">${escapeHtml(ty.value)}</p>
-    <button class="studio-gen" data-act="gen" data-kind="${ty.kind}">${icon('plus', { size: 15 })} ${ty.stateful ? t('Generar') : t('Crear')}</button>
+    <button class="btn btn--secondary studio-gen" data-act="gen" data-kind="${ty.kind}">${icon('plus', { size: 15 })} ${ty.stateful ? t('Generar') : t('Crear')}</button>
   </div>`;
 }
 
@@ -122,7 +122,7 @@ function decksBody(decks) {
   // Mismo mecanismo que la biblioteca (Study.openToday con scope de libro): alias-aware,
   // tope de nuevas y gate Pro incluidos. Sin vencidas no se ofrece: no hay sesión vacía.
   const studyAll = due
-    ? `<button class="studio-gen studio-all" data-act="study-book">${icon('cards', { size: 15 })} ${t('Estudiar todo · {n}', { n: due })}</button>`
+    ? `<button class="btn btn--secondary studio-gen studio-all" data-act="study-book">${icon('cards', { size: 15 })} ${t('Estudiar todo · {n}', { n: due })}</button>`
     : '';
   const manage = `<button class="studio-manage" data-act="manage">${t('Gestionar mazos')}</button>`;
   return summary + studyAll + decks.map(deckRow).join('') + manage;
@@ -138,7 +138,7 @@ function group(ty, ctx, job, decks) {
   const head = `<div class="studio-group-head">
     <span class="studio-ico">${icon(ty.ico, { size: 16 })}</span>
     <span class="studio-group-name">${escapeHtml(ty.name)}</span>
-    ${(ty.stateful && (items.length || running)) || mineDecks.length ? `<button class="studio-new" data-act="gen" data-kind="${ty.kind}">${icon('plus', { size: 13 })} ${t('Nuevo')}</button>` : ''}
+    ${(ty.stateful && (items.length || running)) || mineDecks.length ? `<button class="btn btn--secondary studio-new" data-act="gen" data-kind="${ty.kind}">${icon('plus', { size: 13 })} ${t('Nuevo')}</button>` : ''}
   </div>`;
 
   let bodyHtml = '';

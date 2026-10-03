@@ -6,8 +6,8 @@
 //
 // La parte delicada NO es cargarla tarde, es cargarla EN SU SITIO. El orden de las hojas
 // lo decide la posición del <link> en el DOM, no cuándo se inserta ni cuándo termina de
-// bajar. Por eso index.html reserva un hueco (`#css-slot-agent`) entre main.css y
-// main-late.css: ahí es donde estaban estas reglas, y ahí es donde se inserta el <link>.
+// bajar. Por eso index.html reserva un hueco (`#css-slot-agent`) justo antes de
+// modern.css (capa de sistema, que empieza por la base tardía): ahí se inserta el <link>.
 // Colgarla del final del head cambiaría quién gana los empates de especificidad contra
 // la cola genérica (foco, tooltips, responsive).
 

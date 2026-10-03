@@ -99,7 +99,7 @@ function renderSetup() {
       <option value="">${t('Libro entero')}</option>
       ${chapters.map(c => `<option value="${escapeHtml(c)}"${c === scopeValue ? ' selected' : ''}>${escapeHtml(c)}</option>`).join('')}
     </select>
-    <button id="mm-generate" class="primary-btn ai-ob-start">${icon('sparkles', { size: 16 })} ${t('Generar mapa')}</button>
+    <button id="mm-generate" class="btn btn--primary primary-btn ai-ob-start">${icon('sparkles', { size: 16 })} ${t('Generar mapa')}</button>
     <div id="mm-error" class="fc-error" style="display:none"></div>`;
   b.querySelector('#mm-scope').addEventListener('change', (e) => { scopeValue = e.target.value; });
   b.querySelector('#mm-generate').addEventListener('click', onGenerate);
@@ -381,7 +381,7 @@ function renderRunning(job) {
     <h2>${t('Generando mapa mental…')}</h2>
     <p class="ai-run-status" id="mm-run-status" role="status"></p>
     <div class="ai-run-actions">
-      <button id="mm-keep" class="primary-btn">${icon('book', { size: 16 })} ${t('Seguir leyendo')}</button>
+      <button id="mm-keep" class="btn btn--primary primary-btn">${icon('book', { size: 16 })} ${t('Seguir leyendo')}</button>
       <button id="mm-cancel" class="ai-ob-back fc-txt-btn">${t('Cancelar')}</button>
     </div>
     <p class="sum-depth-hint">${t('Puedes cerrar esta ventana y seguir leyendo: te avisaremos cuando el mapa esté listo.')}</p>`;
@@ -907,7 +907,7 @@ async function renderResult(tree, scopeName) {
       </div>
     </div>
     <div class="fc-export">
-      <button id="mm-png" class="primary-btn">${icon('download', { size: 16 })} ${t('Descargar PNG')}</button>
+      <button id="mm-png" class="btn btn--primary primary-btn">${icon('download', { size: 16 })} ${t('Descargar PNG')}</button>
       <button id="mm-share" class="ai-ob-back fc-txt-btn" style="display:none">${icon('share', { size: 14 })} ${t('Compartir')}</button>
       <button id="mm-svg" class="ai-ob-back fc-txt-btn">SVG</button>
     </div>

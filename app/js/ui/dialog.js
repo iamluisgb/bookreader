@@ -59,7 +59,7 @@ function build({ kind, title, message, value, placeholder, okText, cancelText, d
         ${isForm ? `<div class="dlg-form">${(fields || []).map(fieldHtml).join('')}</div>` : ''}
         <div class="dlg-actions">
           ${isAlert ? '' : `<button class="dlg-btn dlg-cancel">${escapeHtml(cancelText || t('Cancelar'))}</button>`}
-          <button class="dlg-btn dlg-ok${danger ? ' dlg-danger' : ''}">${escapeHtml(okText || t('Aceptar'))}</button>
+          <button class="btn btn--primary dlg-btn dlg-ok${danger ? ' dlg-danger' : ''}">${escapeHtml(okText || t('Aceptar'))}</button>
         </div>
       </div>`;
     document.body.appendChild(overlay);

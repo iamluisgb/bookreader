@@ -225,7 +225,7 @@ function demoBlockHtml() {
   if (LLM.hasKey()) return '';
   return `
     <div class="appset-demo">
-      <button id="appset-demo-btn" class="primary-btn appset-save">${icon('sparkles', { size: 15 })} ${t('Probar la demo (sin API key)')}</button>
+      <button id="appset-demo-btn" class="btn btn--primary primary-btn appset-save">${icon('sparkles', { size: 15 })} ${t('Probar la demo (sin API key)')}</button>
       <p class="appset-muted">${t('Un cupo de llamadas de prueba con el modelo de la casa, sin registro. Cuando se acabe, pon tu propia key (BYOK) — o configúrala ya abajo.')}</p>
       <p class="appset-model-hint" id="appset-demo-hint" hidden></p>
     </div>`;
@@ -358,7 +358,7 @@ function agentSimpleHtml() {
     <p class="appset-model-hint" id="appset-simple-hint" hidden></p>
     <label class="appset-check"><input type="checkbox" id="appset-auto"${LLM.getAutoExtract() ? ' checked' : ''} /> ${t('Rellenar la libreta automáticamente')}</label>
     <label class="appset-check"><input type="checkbox" id="appset-readnb"${LLM.getReadNotebook() ? ' checked' : ''} /> ${t('Que el agente lea lo que escribo en la libreta')}</label>
-    <button id="appset-save" class="primary-btn appset-save">${t('Guardar')}</button>
+    <button id="appset-save" class="btn btn--primary primary-btn appset-save">${t('Guardar')}</button>
     <p class="appset-saved" id="appset-saved" hidden>${icon('check', { size: 14 })} ${t('Guardado')}</p>
     <p class="appset-privacy">${icon('shield', { size: 13 })} ${t('Tu API key se guarda solo en este navegador. Para responder, el contenido del libro se envía al proveedor que configures.')}</p>
     <button type="button" id="appset-agent-advanced" class="appset-viewlink">${t('Opciones avanzadas')} ${icon('chevron-down', { size: 13 })}</button>
@@ -421,7 +421,7 @@ function agentHtml() {
     ${apiKeyRowHtml()}
     <label class="appset-check"><input type="checkbox" id="appset-auto"${LLM.getAutoExtract() ? ' checked' : ''} /> ${t('Rellenar la libreta automáticamente')}</label>
     <label class="appset-check"><input type="checkbox" id="appset-readnb"${LLM.getReadNotebook() ? ' checked' : ''} /> ${t('Que el agente lea lo que escribo en la libreta')}</label>
-    <button id="appset-save" class="primary-btn appset-save">${t('Guardar')}</button>
+    <button id="appset-save" class="btn btn--primary primary-btn appset-save">${t('Guardar')}</button>
     <p class="appset-saved" id="appset-saved" hidden>${icon('check', { size: 14 })} ${t('Guardado')}</p>
     <p class="appset-privacy">${icon('shield', { size: 13 })} ${t('Tu API key se guarda solo en este navegador. Para responder, el contenido del libro se envía al proveedor que configures.')}</p>
   </div>`;
@@ -874,7 +874,7 @@ function templatesListHtml() {
     <h3 class="appset-h3">${t('Plantillas de libreta')}</h3>
     <p class="appset-muted">${t('Las plantillas de fábrica no se editan. Crea las tuyas: aparecerán en el onboarding del agente junto a ellas.')}</p>
     ${byBlock}
-    <button id="appset-tpl-new" class="primary-btn appset-save">${icon('plus', { size: 15 })} ${t('Crear plantilla')}</button>
+    <button id="appset-tpl-new" class="btn btn--primary primary-btn appset-save">${icon('plus', { size: 15 })} ${t('Crear plantilla')}</button>
   </div>`;
 }
 
@@ -916,7 +916,7 @@ function templateFormHtml(tp) {
     <p class="appset-err" id="tpl-err" hidden></p>
     <div class="appset-tpl-formacts">
       <button id="tpl-cancel" class="appset-tpl-cancel">${t('Cancelar')}</button>
-      <button id="tpl-save" class="primary-btn">${t('Guardar plantilla')}</button>
+      <button id="tpl-save" class="btn btn--primary primary-btn">${t('Guardar plantilla')}</button>
     </div>
   </div>`;
 }
@@ -1013,7 +1013,7 @@ function profilesListHtml() {
           <button class="icon-btn appset-prof-del" data-id="${p.id}" title="${t('Eliminar')}">${icon('trash', { size: 15 })}</button>
         </div>
       </div>`).join('') : `<p class="appset-muted">${t('Aún no hay perfiles.')}</p>`}
-    <button id="appset-prof-new" class="primary-btn appset-save">${icon('plus', { size: 15 })} ${t('Crear perfil')}</button>
+    <button id="appset-prof-new" class="btn btn--primary primary-btn appset-save">${icon('plus', { size: 15 })} ${t('Crear perfil')}</button>
   </div>`;
 }
 
@@ -1060,7 +1060,7 @@ function profileFormHtml(p) {
     <p class="appset-err" id="prof-err" hidden></p>
     <div class="appset-tpl-formacts">
       <button id="prof-cancel" class="appset-tpl-cancel">${t('Cancelar')}</button>
-      <button id="prof-save" class="primary-btn">${t('Guardar perfil')}</button>
+      <button id="prof-save" class="btn btn--primary primary-btn">${t('Guardar perfil')}</button>
     </div>
   </div>`;
 }
@@ -1098,7 +1098,7 @@ function dataHtml() {
   return `<div class="appset-section">
     <h3 class="appset-h3">${t('Datos')}</h3>
     <p class="appset-muted">${t('Copia de seguridad de tus datos para guardarla o migrar a otro dispositivo: ajustes, subrayados, marcadores, plantillas propias, conversaciones, libretas, mazos de flashcards y artefactos del Studio. <strong>No</strong> incluye la API key ni los archivos de los libros.')}</p>
-    <button id="appset-export-json" class="primary-btn appset-save">${icon('share', { size: 15 })} ${t('Descargar backup (JSON)')}</button>
+    <button id="appset-export-json" class="btn btn--primary primary-btn appset-save">${icon('share', { size: 15 })} ${t('Descargar backup (JSON)')}</button>
     <button id="appset-export-md" class="appset-tpl-cancel appset-data-md">${icon('note', { size: 15 })} ${t('Descargar resumen (Markdown)')}</button>
 
     <label class="appset-label" style="margin-top:18px">${t('Importar backup')}</label>
@@ -1108,14 +1108,14 @@ function dataHtml() {
     <label class="appset-label" style="margin-top:18px">Google Drive</label>
     <p class="appset-muted">${t('Guarda tus datos en una carpeta privada de tu propio Drive. El único servidor implicado solo renueva tu permiso de Google: tus libros y notas van directos de tu navegador a tu Drive.')}</p>
     <div id="appset-drive-off">
-      <button id="appset-drive-connect" class="primary-btn appset-save">${icon('upload', { size: 15 })} ${t('Conectar con Google Drive')}</button>
+      <button id="appset-drive-connect" class="btn btn--primary primary-btn appset-save">${icon('upload', { size: 15 })} ${t('Conectar con Google Drive')}</button>
     </div>
     <div id="appset-drive-on" hidden>
       <label class="appset-check"><input type="checkbox" id="appset-drive-files">
         <span>${t('Sincronizar también los archivos de los libros')}</span></label>
       <p class="appset-muted">${t('Tus libros se suben a esa misma carpeta privada y aparecen en el resto de dispositivos listos para descargar. Los de más de {n} MB no se suben solos: se piden desde el menú del libro.', { n: 50 })}</p>
       <p class="appset-muted" id="appset-drive-quota">${t('Consultando espacio…')}</p>
-      <button id="appset-drive-save" class="primary-btn appset-save">${icon('upload', { size: 15 })} ${t('Guardar en Drive')}</button>
+      <button id="appset-drive-save" class="btn btn--primary primary-btn appset-save">${icon('upload', { size: 15 })} ${t('Guardar en Drive')}</button>
       <button id="appset-drive-restore" class="appset-tpl-cancel appset-data-md">${icon('download', { size: 15 })} ${t('Restaurar desde Drive')}</button>
       <button id="appset-drive-history" class="appset-tpl-cancel appset-data-md">${icon('sort', { size: 15 })} ${t('Historial de versiones')}</button>
       <button id="appset-drive-purge" class="appset-tpl-cancel appset-data-md">${icon('trash', { size: 15 })} ${t('Limpiar entradas huérfanas')}</button>
@@ -1124,7 +1124,7 @@ function dataHtml() {
 
     <label class="appset-label" style="margin-top:18px">${t('Sincronización automática')}</label>
     <p class="appset-muted" id="appset-sync-diag"></p>
-    <button id="appset-sync-now" class="primary-btn appset-save">${icon('upload', { size: 15 })} ${t('Sincronizar ahora')}</button>
+    <button id="appset-sync-now" class="btn btn--primary primary-btn appset-save">${icon('upload', { size: 15 })} ${t('Sincronizar ahora')}</button>
     <button id="appset-sync-copy" class="appset-tpl-cancel appset-data-md">${icon('copy', { size: 15 })} ${t('Copiar diagnóstico de sync')}</button>
     <p class="appset-data-msg" id="appset-data-msg" hidden></p>
   </div>`;
@@ -1402,7 +1402,7 @@ function licenseHtml() {
       <p class="appset-lic-state is-pro">${icon('check', { size: 15 })} ${t('BookReader Pro activo')}</p>
       ${keyRowHtml('appset-lic-key', s.key, 'BKRD-XXXX-XXXX-XXXX')}
       <p class="appset-muted">${t('Última verificación: {date}. Sin conexión, tu licencia sigue activa hasta 30 días.', { date: escapeHtml(since) })}</p>
-      <button id="appset-lic-portal" class="primary-btn appset-save">${icon('user', { size: 15 })} ${t('Gestionar dispositivos y recibos')}</button>
+      <button id="appset-lic-portal" class="btn btn--primary primary-btn appset-save">${icon('user', { size: 15 })} ${t('Gestionar dispositivos y recibos')}</button>
       <button id="appset-lic-remove" class="appset-tpl-cancel appset-data-md">${t('Quitar la licencia de este navegador')}</button>
       <p class="appset-muted">${t('Quitar la licencia aquí no libera el hueco de dispositivo: eso se hace en el portal.')}</p>
       ${mockNote}
@@ -1418,7 +1418,7 @@ function licenseHtml() {
     <p class="appset-muted">${t('BookReader Pro desbloquea flashcards con export a Anki, repaso espaciado, mapas mentales, plantillas avanzadas y perfiles. {price}, sin suscripción.', { price: escapeHtml(License.CONFIG.price) })}</p>
     <label class="appset-label" for="appset-lic-key">${t('Clave de licencia')}</label>
     <input id="appset-lic-key" class="appset-input" placeholder="BKRD-XXXX-XXXX-XXXX" autocomplete="off" spellcheck="false" />
-    <button id="appset-lic-activate" class="primary-btn appset-save">${t('Activar en este dispositivo')}</button>
+    <button id="appset-lic-activate" class="btn btn--primary primary-btn appset-save">${t('Activar en este dispositivo')}</button>
     ${License.CONFIG.checkoutUrl ? `<button id="appset-lic-buy" class="appset-tpl-cancel appset-data-md">${t('Conseguir BookReader Pro')}</button>` : ''}
     <p class="appset-err" id="appset-lic-err" hidden></p>
     <p class="appset-muted">${t('La clave llega por email al comprar y siempre puedes recuperarla en el portal de cliente.')}</p>

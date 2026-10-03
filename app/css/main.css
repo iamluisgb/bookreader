@@ -37,7 +37,7 @@ html, body {
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
-  z-index: 100;
+  z-index: var(--z-panel);
   transform: translateX(-100%);
   /* Los paneles que ENTRAN en pantalla usan la curva de salida suave (--transition-panel):
      arrancan rápido y frenan largo. Con la curva simétrica anterior el drawer parecía
@@ -63,7 +63,7 @@ html, body {
 }
 
 .sidebar-header h2 {
-  font-size: 16px;
+  font-size: var(--fs-lg);
   font-weight: 600;
 }
 
@@ -105,7 +105,7 @@ html, body {
   border: none;
   border-bottom: 2px solid transparent;
   color: var(--text-soft);
-  font-size: 12.5px;
+  font-size: var(--fs-sm);
   font-weight: 500;
   cursor: pointer;
   transition: color var(--transition-fast), border-color var(--transition-fast);
@@ -140,7 +140,7 @@ html, body {
 .sidebar-footer-btn {
   display: flex; align-items: center; gap: 9px; width: 100%;
   padding: 9px 12px; border: none; border-radius: var(--r-sm); background: none;
-  color: var(--text-soft); font-size: 14px; text-align: left; cursor: pointer;
+  color: var(--text-soft); font-size: var(--fs-md); text-align: left; cursor: pointer;
   transition: background var(--transition-fast), color var(--transition-fast);
 }
 .sidebar-footer-btn:hover { background: var(--surface-3); color: var(--text); }
@@ -150,7 +150,7 @@ html, body {
   background: none;
   border: none;
   color: var(--text-soft);
-  font-size: 18px;
+  font-size: var(--fs-xl);
   cursor: pointer;
   padding: 4px 8px;
   border-radius: var(--r-sm);
@@ -180,8 +180,8 @@ html, body {
   color: var(--on-accent);
   border: none;
   padding: 12px 24px;
-  border-radius: 8px;
-  font-size: 16px;
+  border-radius: var(--r-sm);
+  font-size: var(--fs-lg);
   cursor: pointer;
   transition: background var(--transition-fast);
 }
@@ -199,24 +199,24 @@ html, body {
   inset: 0;
   pointer-events: none;
   opacity: 0;
-  z-index: 9000;
+  z-index: var(--z-screen);
   transition: opacity 0.15s var(--ease);
 }
-#screen-dim { background: #000; z-index: 9001; }
+#screen-dim { background: #000; z-index: calc(var(--z-screen) + 1); }
 #night-warm { background: #ff8a2b; mix-blend-mode: multiply; }
 
 /* Controles deslizantes con icono + valor (brillo, luz nocturna). */
 .slider-control { display: flex; align-items: center; gap: 10px; }
 .slider-control input[type="range"] { flex: 1; min-width: 0; }
 .slider-ico { color: var(--text-faint); flex: 0 0 auto; display: inline-flex; }
-.slider-value { min-width: 42px; text-align: right; font-size: 14px; color: var(--text-soft); }
+.slider-value { min-width: 42px; text-align: right; font-size: var(--fs-md); color: var(--text-soft); }
 
 /* ============ EMPTY STATES ============ */
 .empty-state {
   color: var(--text-faint);
   text-align: center;
   padding: 24px;
-  font-size: 14px;
+  font-size: var(--fs-md);
 }
 
 /* ============ TOC (v3: jerarquía por grupos, estilo Notion) ============
@@ -233,7 +233,7 @@ html, body {
   color: var(--text);
   text-decoration: none;
   border-radius: var(--r-sm);
-  font-size: 14px;
+  font-size: var(--fs-md);
   line-height: 1.45;
   transition: background var(--transition-fast), color var(--transition-fast);
 }
@@ -254,7 +254,7 @@ html, body {
 
 .toc-list a.subitem {
   padding-left: 22px;
-  font-size: 13px;
+  font-size: var(--fs-sm);
   color: var(--text-soft);
 }
 
@@ -311,7 +311,7 @@ html, body {
 .toc-page {
   flex: none;
   font-variant-numeric: tabular-nums;
-  font-size: 12px;
+  font-size: var(--fs-xs);
   color: var(--text-faint);
 }
 
@@ -325,14 +325,14 @@ html, body {
   background: var(--surface-2);
   color: var(--text);
   font-family: inherit;
-  font-size: 14px;
+  font-size: var(--fs-md);
   transition: border-color var(--transition-fast);
 }
 .search-input:focus {
   outline: none;
   border-color: var(--accent);
 }
-.search-count { color: var(--text-faint); font-size: 12px; padding: 8px 12px; }
+.search-count { color: var(--text-faint); font-size: var(--fs-xs); padding: 8px 12px; }
 .search-results { display: flex; flex-direction: column; }
 .search-hit {
   display: block;
@@ -348,9 +348,9 @@ html, body {
   transition: background var(--transition-fast);
 }
 .search-hit:hover { background: var(--surface-3); }
-.search-hit-ctx { display: block; font-size: 13px; line-height: 1.5; }
-.search-hit-ctx mark { background: var(--accent); color: var(--on-accent); border-radius: 3px; padding: 1px 3px; }
-.search-hit-meta { display: block; margin-top: 4px; font-size: 11px; color: var(--text-faint); }
+.search-hit-ctx { display: block; font-size: var(--fs-sm); line-height: 1.5; }
+.search-hit-ctx mark { background: var(--accent); color: var(--on-accent); border-radius: var(--r-xs); padding: 1px 3px; }
+.search-hit-meta { display: block; margin-top: 4px; font-size: var(--fs-2xs); color: var(--text-faint); }
 
 /* ============ BOOKMARKS (v2) ============ */
 .bookmark-item {
@@ -373,7 +373,7 @@ html, body {
 }
 
 .bookmark-item .bookmark-title {
-  font-size: 13px;
+  font-size: var(--fs-sm);
   font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
@@ -381,12 +381,12 @@ html, body {
 }
 
 .bookmark-item .bookmark-chapter {
-  font-size: 11px;
+  font-size: var(--fs-2xs);
   color: var(--text-faint);
 }
 
 .bookmark-item .bookmark-page {
-  font-size: 11px;
+  font-size: var(--fs-2xs);
   color: var(--text-soft);
   margin-top: 2px;
 }
@@ -397,11 +397,11 @@ html, body {
   color: var(--text-faint);
   cursor: pointer;
   padding: 4px;
-  font-size: 14px;
+  font-size: var(--fs-md);
 }
 
 .bookmark-item .bookmark-delete:hover {
-  color: #e53935;
+  color: var(--danger);
 }
 
 /* ============ HIGHLIGHTS LIST (v2) ============ */
@@ -417,7 +417,7 @@ html, body {
   border: none;
   padding: 8px 14px;
   border-radius: var(--r-sm);
-  font-size: 12px;
+  font-size: var(--fs-xs);
   font-weight: 500;
   cursor: pointer;
   transition: background var(--transition-fast);
@@ -449,7 +449,7 @@ html, body {
 }
 
 .highlight-item .highlight-text {
-  font-size: 13px;
+  font-size: var(--fs-sm);
   font-style: italic;
   line-height: 1.5;
   display: -webkit-box;
@@ -459,7 +459,7 @@ html, body {
 }
 
 .highlight-item .highlight-meta {
-  font-size: 11px;
+  font-size: var(--fs-2xs);
   color: var(--text-faint);
   margin-top: 6px;
   display: flex;
@@ -485,7 +485,7 @@ html, body {
   border: none;
   color: var(--text-faint);
   cursor: pointer;
-  font-size: 12px;
+  font-size: var(--fs-xs);
   display: inline-flex;
   align-items: center;
 }
@@ -495,7 +495,7 @@ html, body {
 /* P24 · Lo ajeno en la lista: la misma ficha teñida que la tuya, bajo su cabecera «De X»
    (eso es lo que dice de quién es). */
 .highlight-shared-head {
-  font-size: 11px;
+  font-size: var(--fs-2xs);
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -504,7 +504,7 @@ html, body {
 }
 
 .highlight-item .highlight-delete:hover {
-  color: #e53935;
+  color: var(--danger);
 }
 
 /* ============ SETTINGS (v2) ============ */
@@ -517,7 +517,7 @@ html, body {
 
 .settings-group label {
   display: block;
-  font-size: 12px;
+  font-size: var(--fs-xs);
   font-weight: 600;
   color: var(--text-soft);
   margin-bottom: 10px;
@@ -539,7 +539,7 @@ html, body {
   border-radius: var(--r-md);
   background: var(--surface-0);
   color: var(--text);
-  font-size: 14px;
+  font-size: var(--fs-md);
   font-weight: 500;
   cursor: pointer;
   transition: border-color var(--transition-fast), background var(--transition-fast), color var(--transition-fast);
@@ -554,7 +554,7 @@ html, body {
   border: 2px solid var(--border);
   border-radius: var(--r-md);
   background: var(--surface-0);
-  font-size: 20px;
+  font-size: var(--fs-xl);
   cursor: pointer;
   transition: border-color var(--transition-fast), transform var(--transition-fast);
 }
@@ -577,7 +577,7 @@ html, body {
 .font-size-control span {
   min-width: 44px;
   text-align: center;
-  font-size: 14px;
+  font-size: var(--fs-md);
   font-weight: 500;
 }
 
@@ -588,7 +588,7 @@ select {
   border-radius: var(--r-md);
   background: var(--surface-0);
   color: var(--text);
-  font-size: 14px;
+  font-size: var(--fs-md);
   transition: border-color var(--transition-fast);
 }
 select:focus {
@@ -612,7 +612,7 @@ input[type="range"] {
 .line-height-control span {
   min-width: 48px;
   text-align: center;
-  font-size: 13px;
+  font-size: var(--fs-sm);
   color: var(--text-soft);
 }
 
@@ -651,7 +651,7 @@ input[type="range"] {
      título centrado NUNCA se solape con ellas (crítico en móvil). */
   max-width: min(calc(100% - 260px), 460px);
   text-align: center;
-  font-size: 15px;
+  font-size: var(--fs-lg);
   font-weight: 600;
   color: var(--text);
   white-space: nowrap;
@@ -707,7 +707,7 @@ body.scroll-mode .reader-viewport { align-items: stretch; justify-content: flex-
   background: none;
   border: none;
   color: var(--text);
-  font-size: 18px;
+  font-size: var(--fs-xl);
   cursor: pointer;
   padding: 8px 12px;
   border-radius: var(--r-sm);
@@ -732,7 +732,7 @@ body.scroll-mode .reader-viewport { align-items: stretch; justify-content: flex-
   align-items: baseline;
   justify-content: space-between;
   gap: var(--s-4);
-  font-size: 12px;
+  font-size: var(--fs-xs);
   line-height: 1;
   color: var(--text-faint);
 }
@@ -827,7 +827,7 @@ body.scroll-mode .reader-viewport { align-items: stretch; justify-content: flex-
   background: var(--surface-1);
   border: 1px solid var(--border);
   box-shadow: var(--shadow-md, 0 4px 16px rgba(0, 0, 0, 0.18));
-  font-size: 12px;
+  font-size: var(--fs-xs);
   line-height: 1.3;
   color: var(--text);
   pointer-events: none;
@@ -844,7 +844,7 @@ body.scroll-mode .reader-viewport { align-items: stretch; justify-content: flex-
 
 /* ============ ZOOM DE IMÁGENES (lightbox) ============ */
 .img-zoom {
-  position: fixed; inset: 0; z-index: 400;
+  position: fixed; inset: 0; z-index: var(--z-overlay);
   display: none; align-items: center; justify-content: center;
   background: rgba(0, 0, 0, 0.92);
   touch-action: none; overflow: hidden; overscroll-behavior: contain;
@@ -1058,7 +1058,7 @@ body:not(.scroll-mode) .epub-container .epub-view {
 .pdf-cite-layer { position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: 3; }
 .pdf-cite-hl {
   position: absolute;
-  border-radius: 2px;
+  border-radius: var(--r-xs);
   background: var(--accent);
   opacity: 0.35;
   mix-blend-mode: multiply;
@@ -1131,7 +1131,7 @@ body:not(.scroll-mode) .epub-container .epub-view {
 /* Rects individuales: color sólido, SIN blend ni opacidad propios (los pone el grupo). */
 .pdf-hl {
   position: absolute;
-  border-radius: 2px;
+  border-radius: var(--r-xs);
 }
 /* P24 · Subrayado AJENO (de un dossier importado): se pinta como los tuyos (mismo
    .pdf-hl-group). En EPUB es un `underline` de epub.js —rect + línea— con el rect relleno:
@@ -1199,7 +1199,7 @@ textarea.is-recording { display: none; }
   cursor: pointer;
 }
 .mic-bar.is-provider .mic-bar-cancel { display: inline-flex; }
-.mic-bar-cancel:hover { color: #e53935; }
+.mic-bar-cancel:hover { color: var(--danger); }
 
 /* Punto latiendo: el "estoy grabando" de toda la vida. Rojo aunque el acento sea verde —
    grabando es grabando, y es el código de color que todo el mundo ya tiene aprendido. */
@@ -1208,14 +1208,14 @@ textarea.is-recording { display: none; }
   height: 9px;
   flex-shrink: 0;
   border-radius: 50%;
-  background: #e53935;
+  background: var(--danger);
   animation: mic-dot 1.3s ease-in-out infinite;
 }
 @keyframes mic-dot { 50% { opacity: 0.25; } }
 
 .mic-bar-time {
   font-variant-numeric: tabular-nums;   /* que el ancho no baile al pasar de 0:09 a 0:10 */
-  font-size: 13px;
+  font-size: var(--fs-sm);
   color: var(--text);
 }
 
@@ -1226,13 +1226,13 @@ textarea.is-recording { display: none; }
 .mic-bar-level i {
   flex: 1;
   height: 4px;
-  border-radius: 2px;
+  border-radius: var(--r-xs);
   background: var(--border);
   transition: height 80ms linear, background-color 80ms linear;
 }
 .mic-bar-level i.on { height: 14px; background: var(--accent); }
 
-.mic-bar-hint { font-size: 12px; color: var(--text-soft); white-space: nowrap; }
+.mic-bar-hint { font-size: var(--fs-xs); color: var(--text-soft); white-space: nowrap; }
 /* Con vúmetro el hueco se queda corto: la pista sobra, el medidor ya lo dice todo. */
 .mic-bar.is-provider .mic-bar-hint { display: none; }
 
@@ -1295,7 +1295,7 @@ textarea.is-recording { display: none; }
 #toc-list a.ai-toc-mid { opacity: 0.7; }
 #toc-list a.ai-toc-high { font-weight: 600; opacity: 1; }
 #toc-list a.ai-toc-high::before {
-  content: '★'; color: var(--accent); margin-right: 6px; font-size: 11px;
+  content: '★'; color: var(--accent); margin-right: 6px; font-size: var(--fs-2xs);
 }
 /* La marca de "estoy aquí" gana a la atenuación por objetivo: da igual lo poco que
    importe el capítulo para el objetivo, si es donde se lee tiene que verse. */
@@ -1303,16 +1303,16 @@ textarea.is-recording { display: none; }
 
 /* P13 · Resumen citado */
 .sum-card { max-width: 680px; max-height: 90vh; overflow-y: auto; }
-.sum-depth-hint { font-size: 12px; color: var(--text-soft); margin: 6px 0 2px; line-height: 1.45; }
+.sum-depth-hint { font-size: var(--fs-xs); color: var(--text-soft); margin: 6px 0 2px; line-height: 1.45; }
 /* Documento del resumen (markdown → HTML): portada, secciones por capítulo y cierre. */
-.sum-doc { font-size: 15px; line-height: 1.65; color: var(--text); }
-.sum-doc h1 { font-size: 20px; margin: 4px 0 10px; }
+.sum-doc { font-size: var(--fs-lg); line-height: 1.65; color: var(--text); }
+.sum-doc h1 { font-size: var(--fs-xl); margin: 4px 0 10px; }
 .sum-doc h2 {
-  font-size: 15px; font-weight: 600; color: var(--text-soft);
+  font-size: var(--fs-lg); font-weight: 600; color: var(--text-soft);
   margin: 22px 0 8px; padding-bottom: 4px; border-bottom: 1px solid var(--border);
 }
 .sum-doc h1 + p {   /* TL;DR: primer párrafo tras el título → tarjeta destacada */
-  font-size: 16px; background: var(--surface-2); border-radius: 12px;
+  font-size: var(--fs-lg); background: var(--surface-2); border-radius: var(--r-md);
   padding: 14px 16px; margin: 8px 0 4px;
 }
 .sum-doc p { margin: 8px 0; }
@@ -1329,8 +1329,8 @@ textarea.is-recording { display: none; }
 /* Chip de la estantería: la cola diaria de repaso (bucle de retorno de P10). */
 .lib-study-chip {
   display: inline-flex; align-items: center; gap: 8px;
-  border: 1px solid var(--accent); border-radius: 999px; background: var(--accent-soft);
-  color: var(--accent); padding: 7px 14px; font-size: 13px; font-weight: 600;
+  border: 1px solid var(--accent); border-radius: var(--r-pill); background: var(--accent-soft);
+  color: var(--accent); padding: 7px 14px; font-size: var(--fs-sm); font-weight: 600;
   cursor: pointer; font-family: inherit; white-space: nowrap;
 }
 .lib-study-chip:hover { background: var(--accent); color: var(--on-accent); }
@@ -1339,12 +1339,12 @@ textarea.is-recording { display: none; }
 .lib-toolbar { position: relative; }
 .lib-study-menu {
   position: absolute;
-  z-index: 50;
+  z-index: calc(var(--z-chrome) + 10);
   min-width: 240px; max-width: 320px;
   max-height: 60vh; overflow-y: auto;
   background: var(--surface-2);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--r-md);
   box-shadow: var(--shadow-3);
   padding: 6px 6px 0;
   display: flex;
@@ -1355,20 +1355,20 @@ textarea.is-recording { display: none; }
    (la última fila quedaba cortada); el aire va como margen del último hijo. */
 .lib-study-menu > :last-child { margin-bottom: 6px; }
 .lib-study-sec {
-  font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
+  font-size: var(--fs-2xs); font-weight: 600; letter-spacing: .04em; text-transform: uppercase;
   color: var(--text-faint); padding: 8px 12px 4px;
 }
 .lib-study-opt {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
-  width: 100%; padding: 9px 12px; border: none; border-radius: 8px;
-  background: none; color: var(--text); font: inherit; font-size: 14px;
+  width: 100%; padding: 9px 12px; border: none; border-radius: var(--r-sm);
+  background: none; color: var(--text); font: inherit; font-size: var(--fs-md);
   cursor: pointer; text-align: left;
 }
 .lib-study-opt:hover { background: var(--surface-3); }
 .lib-study-opt-lbl { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lib-study-opt-n {
-  flex: none; font-size: 12px; font-weight: 600; color: var(--accent);
-  background: var(--accent-soft); border-radius: 999px; padding: 2px 9px;
+  flex: none; font-size: var(--fs-xs); font-weight: 600; color: var(--accent);
+  background: var(--accent-soft); border-radius: var(--r-pill); padding: 2px 9px;
 }
 /* Árbol: estantería = categoría padre (negrita); libro = hijo (sangrado, con guía).
    Los hijos NO se ven deshabilitados: texto a pleno contraste y hover propio, porque
@@ -1383,7 +1383,7 @@ textarea.is-recording { display: none; }
 /* Hogar de la config global de la app (agente + P1/P2/P3). Mismo patrón modal que
    el onboarding; settings de LECTURA siguen en la sidebar. */
 .appset {
-  position: fixed; inset: 0; z-index: 300;
+  position: fixed; inset: 0; z-index: var(--z-modal);
   background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center;
   padding: 20px;
 }
@@ -1392,15 +1392,15 @@ textarea.is-recording { display: none; }
    One-shot, descartables, máximo uno en pantalla. Por debajo de los modales
    (appset 300, diálogos 3000) y por encima de la lectura. */
 .hint-pop {
-  position: fixed; left: 50%; bottom: 84px; z-index: 250;
+  position: fixed; left: 50%; bottom: 84px; z-index: calc(var(--z-popover) + 50);
   transform: translate(-50%, 12px);
   display: flex; align-items: flex-start; gap: 9px;
   max-width: min(480px, calc(100vw - 32px));
   padding: 12px 14px;
   background: var(--surface-1); color: var(--text);
-  border: 1px solid var(--border); border-radius: 12px;
+  border: 1px solid var(--border); border-radius: var(--r-md);
   box-shadow: var(--shadow-3);
-  font-size: 13.5px; line-height: 1.5;
+  font-size: var(--fs-md); line-height: 1.5;
   opacity: 0; visibility: hidden; pointer-events: none;
   transition: opacity 0.25s ease, transform 0.25s ease, visibility 0s linear 0.25s;
 }
@@ -1414,18 +1414,18 @@ textarea.is-recording { display: none; }
   cursor: pointer;
 }
 .hint-pop-close:hover { color: var(--text); }
-@media (max-width: 560px) { .hint-pop { bottom: 96px; } }
+@media (max-width: 600px) { .hint-pop { bottom: 96px; } }
 
 /* ==== Guía rápida "¿qué puedo hacer aquí?" (P30 · F4) ====
    Encima del overlay de ajustes (300) porque desde ahí también se abre. */
 .fguide {
-  position: fixed; inset: 0; z-index: 310;
+  position: fixed; inset: 0; z-index: calc(var(--z-modal) + 10);
   background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center;
   padding: 20px;
 }
 .fguide-card {
   position: relative;
-  background: var(--surface-1); border: 1px solid var(--border); border-radius: 16px;
+  background: var(--surface-1); border: 1px solid var(--border); border-radius: var(--r-lg);
   padding: 26px 28px; width: 100%; max-width: 560px; box-shadow: var(--shadow-3);
   max-height: calc(100vh - 40px); overflow-y: auto;
 }
@@ -1436,15 +1436,15 @@ textarea.is-recording { display: none; }
   cursor: pointer;
 }
 .fguide-close:hover { background: var(--border); color: var(--text); }
-.fguide-h2 { font-size: 19px; font-weight: 700; margin: 0 0 18px; letter-spacing: -0.01em; }
+.fguide-h2 { font-size: var(--fs-xl); font-weight: 700; margin: 0 0 18px; letter-spacing: -0.01em; }
 .fguide-group { margin-top: 16px; }
 .fguide-group h3 {
-  font-size: 11px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase;
+  font-size: var(--fs-2xs); font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase;
   color: var(--accent); margin: 0 0 8px;
 }
 .fguide-group ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
 .fguide-group li {
-  font-size: 14px; color: var(--text-soft); line-height: 1.5;
+  font-size: var(--fs-md); color: var(--text-soft); line-height: 1.5;
   padding-left: 16px; position: relative;
 }
 .fguide-group li::before {
@@ -1460,60 +1460,60 @@ textarea.is-recording { display: none; }
 .dk-card { max-width: 640px; }
 .dk-hero { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 20px; }
 .dk-tile { padding: 10px 12px; border-radius: var(--r-md); background: var(--surface-2); }
-.dk-tile-l { font-size: 11px; color: var(--text-soft); }
-.dk-tile-v { font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.dk-tile-l { font-size: var(--fs-2xs); color: var(--text-soft); }
+.dk-tile-v { font-size: var(--fs-xl); font-weight: 600; font-variant-numeric: tabular-nums; }
 .dk-book-h {
-  font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+  font-size: var(--fs-2xs); font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
   color: var(--text-soft); margin: 18px 0 4px;
 }
-.dk-orphans .dk-book-h { color: var(--danger, #e5484d); }
+.dk-orphans .dk-book-h { color: var(--danger); }
 .dk-row { display: flex; align-items: center; gap: 10px; padding: 9px 0;
   border-bottom: 1px solid var(--border-soft); }
 .dk-row:last-child { border-bottom: none; }
 .dk-row-main { flex: 1; min-width: 0; }
-.dk-row-name { font-size: 14px; font-weight: 500;
+.dk-row-name { font-size: var(--fs-md); font-weight: 500;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dk-row-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
-  margin-top: 2px; font-size: 12px; color: var(--text-soft); }
-.dk-chip { font-size: 11px; padding: 1px 8px; border-radius: 999px;
+  margin-top: 2px; font-size: var(--fs-xs); color: var(--text-soft); }
+.dk-chip { font-size: var(--fs-2xs); padding: 1px 8px; border-radius: var(--r-pill);
   background: var(--surface-3); color: var(--text-soft); flex: none; }
-.dk-badge { font-size: 11px; font-weight: 600; padding: 1px 8px; border-radius: 999px;
+.dk-badge { font-size: var(--fs-2xs); font-weight: 600; padding: 1px 8px; border-radius: var(--r-pill);
   background: var(--accent-soft); color: var(--accent); flex: none; }
 .dk-actions { display: flex; gap: 2px; flex: none; }
-.dk-empty { color: var(--text-soft); font-size: 14px; padding: 24px 0; text-align: center; }
+.dk-empty { color: var(--text-soft); font-size: var(--fs-md); padding: 24px 0; text-align: center; }
 
 /* Detalle de un mazo. */
 .dk-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin: 4px 0 14px; }
-.dk-head-name { font-size: 17px; font-weight: 700; margin: 0;
+.dk-head-name { font-size: var(--fs-lg); font-weight: 700; margin: 0;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.dk-head-meta { font-size: 12px; color: var(--text-soft); }
+.dk-head-meta { font-size: var(--fs-xs); color: var(--text-soft); }
 .dk-add { margin-top: 18px; border-top: 1px solid var(--border-soft); padding-top: 14px;
   display: flex; flex-direction: column; gap: 8px; }
-.dk-add-h { font-size: 13px; font-weight: 600; }
+.dk-add-h { font-size: var(--fs-sm); font-weight: 600; }
 .dk-add-row { display: flex; gap: 8px; flex-wrap: wrap; }
 .dk-input {
-  flex: 1; min-width: 120px; padding: 8px 10px; font: inherit; font-size: 14px;
+  flex: 1; min-width: 120px; padding: 8px 10px; font: inherit; font-size: var(--fs-md);
   border: 1px solid var(--border); border-radius: var(--r-sm);
   background: var(--surface-2); color: var(--text);
 }
 .dk-input:focus { outline: 1px solid var(--accent); }
 .dk-add-btn { flex: none; }
-.dk-error { color: var(--danger, #e5484d); font-size: 13px; }
+.dk-error { color: var(--danger); font-size: var(--fs-sm); }
 
-@media (max-width: 560px) {
-  .dk-card { border-radius: 16px 16px 0 0; max-height: 92vh; }
+@media (max-width: 600px) {
+  .dk-card { border-radius: var(--r-lg) var(--r-lg) 0 0; max-height: 92vh; }
   .dk-hero { gap: 6px; }
-  .dk-tile-v { font-size: 17px; }
+  .dk-tile-v { font-size: var(--fs-lg); }
   .dk-actions { flex-direction: column; }
 }
 /* ---- Selector de modelo (models.dev) ---- */
 .mp-card { width: min(560px, 92vw); }
 .mp-card .appset-input { margin-top: 4px; }
-.mp-source { margin: 8px 0 6px; font-size: 12px; }
-.mp-source.is-error { color: var(--danger, #e5484d); }
+.mp-source { margin: 8px 0 6px; font-size: var(--fs-xs); }
+.mp-source.is-error { color: var(--danger); }
 .mp-list {
   max-height: min(52vh, 420px); overflow-y: auto;
-  border: 1px solid var(--border-soft); border-radius: 10px;
+  border: 1px solid var(--border-soft); border-radius: var(--r-md);
 }
 .mp-item {
   display: block; width: 100%; text-align: left; cursor: pointer;
@@ -1523,17 +1523,17 @@ textarea.is-recording { display: none; }
 .mp-item:last-child { border-bottom: none; }
 .mp-item:hover { background: var(--surface-3); }
 .mp-item.active { background: var(--accent-soft); }
-.mp-name { display: block; font-size: 14px; font-weight: 600; }
-.mp-id { display: block; font-size: 11px; color: var(--text-faint); font-family: var(--font-mono, monospace); word-break: break-all; }
+.mp-name { display: block; font-size: var(--fs-md); font-weight: 600; }
+.mp-id { display: block; font-size: var(--fs-2xs); color: var(--text-faint); font-family: var(--font-mono, monospace); word-break: break-all; }
 .mp-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
 .mp-tag {
-  font-size: 10px; line-height: 1.6; padding: 0 6px; border-radius: var(--r-pill);
+  font-size: var(--fs-2xs); line-height: 1.6; padding: 0 6px; border-radius: var(--r-pill);
   background: var(--surface-3); color: var(--text-soft);
 }
 .mp-cost { font-variant-numeric: tabular-nums; }
 .mp-empty { padding: 14px 12px; margin: 0; }
 
-@media (max-width: 560px) {
+@media (max-width: 600px) {
   .appset { padding: 0; align-items: flex-end; }
 }
 
@@ -1545,7 +1545,7 @@ textarea.is-recording { display: none; }
    375px se salía de la pantalla (447px ya antes de añadir "Con números"). Se acota al
    viewport y la fila de acciones envuelve. */
 .sel-toolbar {
-  position: fixed; z-index: 200;
+  position: fixed; z-index: var(--z-popover);
   display: flex; flex-direction: column;
   max-width: calc(100vw - 20px);
   background: var(--surface-2); border: 1px solid var(--border);
@@ -1595,8 +1595,8 @@ textarea.is-recording { display: none; }
 .sel-quick .icon { color: var(--accent); }
 
 /* Eliminar: destructivo, pero no grita. Solo el icono va en rojo hasta que se apunta. */
-.sel-act--danger:hover { background: var(--danger-soft, var(--surface-3)); color: var(--danger, #e5484d); }
-.sel-act--danger .icon { color: var(--danger, #e5484d); }
+.sel-act--danger:hover { background: color-mix(in srgb, var(--danger) 12%, transparent); color: var(--danger); }
+.sel-act--danger .icon { color: var(--danger); }
 
 /* La nota se escribe dentro de la propia barra, bajo las acciones: se anota mirando el
    pasaje, sin un modal que lo tape. Sin botón Guardar — se guarda al cerrar la barra. */
@@ -1613,7 +1613,7 @@ textarea.is-recording { display: none; }
 /* Nota personal bajo un subrayado en la lista. */
 .highlight-note {
   display: flex; align-items: flex-start; gap: 6px; margin-top: 6px;
-  font-size: 12px; color: var(--text-soft);
+  font-size: var(--fs-xs); color: var(--text-soft);
 }
 .highlight-note .icon { color: var(--text-faint); flex: 0 0 auto; margin-top: 1px; }
 

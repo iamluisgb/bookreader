@@ -1103,7 +1103,7 @@ function openOnboarding(opts = {}) {
       <textarea id="ai-ob-goal" class="ai-ob-goal" rows="3" placeholder="${t('Tu objetivo...')}"></textarea>
       <p class="ai-ob-sub">${t('Consejo: di qué quieres quedarte y qué ignorar. Ej.: «Técnicas de grafos de conocimiento y LLMs; ignora los ejemplos biomédicos».')}</p>
       ${artesanoOptIn}
-      <button id="ai-ob-start" class="primary-btn ai-ob-start">${t('Empezar a leer con objetivo')}</button>`;
+      <button id="ai-ob-start" class="btn btn--primary primary-btn ai-ob-start">${t('Empezar a leer con objetivo')}</button>`;
     body.querySelector('.ai-ob-back').addEventListener('click', renderObjectives);
     const goalEl = body.querySelector('#ai-ob-goal');
     if (!EpubReader.isCoarsePointer()) goalEl.focus();   // móvil: sin teclado hasta que toque
@@ -2401,7 +2401,7 @@ function editorHtml(attr, value, placeholder = '', lead = '') {
       ${lead}
       <textarea class="ai-nb-input" placeholder="${escapeHtml(placeholder || t('Escribe tu nota…'))}">${escapeHtml(value)}</textarea>
       <div class="ai-nb-editor-actions">
-        <button class="ai-nb-save">${t('Guardar')}</button>
+        <button class="btn btn--primary ai-nb-save">${t('Guardar')}</button>
         <button class="ai-nb-cancel">${t('Cancelar')}</button>
       </div>
     </div>`;
@@ -2726,7 +2726,7 @@ function renderNotebook() {
     els.noteView.innerHTML = `
       <div class="ai-nb-orphan">
         <p>${t('Esta conversación usa una plantilla que ya no existe.')}</p>
-        <button id="ai-nb-neworb" class="primary-btn">${t('Elegir un objetivo')}</button>
+        <button id="ai-nb-neworb" class="btn btn--primary primary-btn">${t('Elegir un objetivo')}</button>
       </div>`;
     els.noteView.querySelector('#ai-nb-neworb')?.addEventListener('click', openOnboarding);
     return;

@@ -16,18 +16,14 @@
   <link rel="stylesheet" href="css/fonts.css">
   <link rel="stylesheet" href="css/themes.css">
   <link rel="stylesheet" href="css/main.css">
-  <!-- HUECO para css/agent.css (panel del agente + ajustes, ~63 KB). Lo inserta
-       js/css-loader.js justo aquí, ANTES de main-late.css, que es donde vivían esas
-       reglas dentro de main.css. El orden de las hojas lo fija la posición del <link> en
-       el DOM, no cuándo se inserta, así que la cascada queda igual que estaba. No mover
-       este marcador ni cambiar el orden de los dos <link> que lo rodean. -->
-  <link rel="stylesheet" id="css-slot-agent" href="css/main-late.css">
   <link rel="stylesheet" href="css/reader.css">
   <!-- Temml (fórmulas): usa las fuentes matemáticas del SISTEMA, no descarga tipografías. -->
   <link rel="stylesheet" href="css/temml.css">
-  <!-- UI2–UI4 · capa de sistema (botones, controles, agente, lectura, biblioteca). La ÚLTIMA:
-       aplica los tokens de themes.css por encima de los estilos de cada pantalla. -->
-  <link rel="stylesheet" href="css/modern.css">
+  <!-- HUECO para css/agent.css (panel del agente + ajustes, carga perezosa). Lo inserta
+       js/css-loader.js justo ANTES de modern.css: el orden de las hojas lo fija la posición
+       del <link> en el DOM, no cuándo se inserta. modern.css es la capa de sistema (base
+       tardía + componentes) y debe ganar a agent.css en los empates. No mover. -->
+  <link rel="stylesheet" id="css-slot-agent" href="css/modern.css">
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" id="meta-theme-color" content="#fbfbfd">
   <meta name="mobile-web-app-capable" content="yes">
@@ -54,11 +50,11 @@
     </div>
 
     <!-- Tabs -->
-    <div class="sidebar-tabs">
-      <button class="tab-btn active" data-tab="contents" data-i18n>Contenido</button>
-      <button class="tab-btn" data-tab="search" data-i18n>Buscar</button>
-      <button class="tab-btn" data-tab="bookmarks" data-i18n>Marcadores</button>
-      <button class="tab-btn" data-tab="highlights" data-i18n>Subrayados</button>
+    <div class="segmented sidebar-tabs">
+      <button class="segmented-btn tab-btn active" data-tab="contents" data-i18n>Contenido</button>
+      <button class="segmented-btn tab-btn" data-tab="search" data-i18n>Buscar</button>
+      <button class="segmented-btn tab-btn" data-tab="bookmarks" data-i18n>Marcadores</button>
+      <button class="segmented-btn tab-btn" data-tab="highlights" data-i18n>Subrayados</button>
     </div>
 
     <!-- Tab: Search -->
@@ -126,9 +122,9 @@
            el scroll horizontal y descolocaba la columna al leer. -->
       <div class="settings-group" data-format="pdf">
         <label id="pdf-fit-label" data-i18n>Ajuste</label>
-        <div class="pdf-fit-selector" role="radiogroup" aria-labelledby="pdf-fit-label">
-          <button class="pdf-fit-btn active" data-fit="page" role="radio" aria-checked="true" data-i18n>Página</button>
-          <button class="pdf-fit-btn" data-fit="text" role="radio" aria-checked="false" data-i18n>Texto</button>
+        <div class="segmented pdf-fit-selector" role="radiogroup" aria-labelledby="pdf-fit-label">
+          <button class="segmented-btn pdf-fit-btn active" data-fit="page" role="radio" aria-checked="true" data-i18n>Página</button>
+          <button class="segmented-btn pdf-fit-btn" data-fit="text" role="radio" aria-checked="false" data-i18n>Texto</button>
         </div>
         <p class="settings-hint" data-i18n>«Texto» recorta los márgenes blancos para que la mancha llene el ancho. Se calcula una vez por libro.</p>
       </div>
@@ -188,19 +184,19 @@
 
       <div class="settings-group">
         <label data-i18n>Modo de lectura</label>
-        <div class="reading-mode-selector">
-          <button class="reading-mode-btn active" data-mode="paginated" data-i18n>Páginas</button>
-          <button class="reading-mode-btn" data-mode="spread" data-i18n>Doble</button>
-          <button class="reading-mode-btn" data-mode="scroll">Scroll</button>
+        <div class="segmented reading-mode-selector">
+          <button class="segmented-btn reading-mode-btn active" data-mode="paginated" data-i18n>Páginas</button>
+          <button class="segmented-btn reading-mode-btn" data-mode="spread" data-i18n>Doble</button>
+          <button class="segmented-btn reading-mode-btn" data-mode="scroll">Scroll</button>
         </div>
       </div>
 
       <div class="settings-group" data-format="epub">
         <label data-i18n>Pase de página</label>
-        <div class="reading-mode-selector">
-          <button class="page-turn-btn" data-turn="slide" data-i18n>Deslizar</button>
-          <button class="page-turn-btn active" data-turn="soft" data-i18n>Suave</button>
-          <button class="page-turn-btn" data-turn="none" data-i18n>Ninguno</button>
+        <div class="segmented reading-mode-selector">
+          <button class="segmented-btn page-turn-btn" data-turn="slide" data-i18n>Deslizar</button>
+          <button class="segmented-btn page-turn-btn active" data-turn="soft" data-i18n>Suave</button>
+          <button class="segmented-btn page-turn-btn" data-turn="none" data-i18n>Ninguno</button>
         </div>
       </div>
     </div>

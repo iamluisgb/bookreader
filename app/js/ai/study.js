@@ -995,7 +995,7 @@ function renderEditor(draft = null) {
   f.innerHTML = `
     <div class="study-editbar">
       <button class="ai-ob-back study-edit-cancel">${t('Cancelar')}</button>
-      <button class="primary-btn study-edit-save">${t('Guardar')}</button>
+      <button class="btn btn--primary primary-btn study-edit-save">${t('Guardar')}</button>
     </div>`;
   f.querySelector('.study-edit-cancel').addEventListener('click', renderCard);
   f.querySelector('.study-edit-save').addEventListener('click', () => {
@@ -1140,7 +1140,7 @@ function flip() {
 // en vez de duplicar el markup. `recall` repone el texto que el alumno ya hubiera escrito.
 function renderFrontFoot(b, f, recall = '') {
   if (!b || !f) return;
-  f.innerHTML = `<button class="primary-btn study-flip">${t('Mostrar respuesta')} <kbd>${t('espacio')}</kbd></button>`;
+  f.innerHTML = `<button class="btn btn--primary primary-btn study-flip">${t('Mostrar respuesta')} <kbd>${t('espacio')}</kbd></button>`;
   f.querySelector('.study-flip').addEventListener('click', flip);
   if (!LLM.hasKey()) return;
   b.querySelector('.study-recall')?.remove();
@@ -1436,9 +1436,9 @@ function renderDone(b, f, left) {
   });
   // El tope de nuevas es una recomendación, no una cárcel: quien quiera seguir, sigue.
   f.innerHTML = `<div class="study-end-actions">
-    ${held.length ? `<button class="primary-btn study-more-new">${t('Seguir con {n} nueva{s}', { n: held.length, s: held.length === 1 ? '' : 's' })}</button>` : ''}
+    ${held.length ? `<button class="btn btn--primary primary-btn study-more-new">${t('Seguir con {n} nueva{s}', { n: held.length, s: held.length === 1 ? '' : 's' })}</button>` : ''}
     ${done && oneBook ? `<button class="ai-ob-back study-read">${icon('book', { size: 15 })} ${t('Seguir leyendo')}</button>` : ''}
-    <button class="${held.length ? 'ai-ob-back' : 'primary-btn'} study-flip">${t('Cerrar')}</button>
+    <button class="${held.length ? 'ai-ob-back' : 'btn btn--primary primary-btn'} study-flip">${t('Cerrar')}</button>
   </div>`;
   f.querySelector('.study-flip').addEventListener('click', close);
   f.querySelector('.study-read')?.addEventListener('click', () => {

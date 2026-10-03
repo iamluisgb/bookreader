@@ -119,7 +119,7 @@ function renderSetup() {
     <h2>${t('Infografía del libro')}</h2>
     <p class="ai-ob-lead">${t('El agente recorre el libro entero y compone un póster: la tesis, las ideas clave, los bloques que se repiten y una cita para cerrar.')}</p>
     <p class="sum-depth-hint">${icon('info', { size: 14 })} ${t('Se genera en segundo plano; puedes seguir leyendo. El póster se lee con zoom y se descarga en PNG o SVG.')}</p>
-    <button id="ig-generate" class="primary-btn ai-ob-start">${icon('sparkles', { size: 16 })} ${t('Generar infografía')}</button>
+    <button id="ig-generate" class="btn btn--primary primary-btn ai-ob-start">${icon('sparkles', { size: 16 })} ${t('Generar infografía')}</button>
     <div id="ig-error" class="fc-error" style="display:none"></div>`;
   b.querySelector('#ig-generate').addEventListener('click', onGenerate);
 }
@@ -173,7 +173,7 @@ function renderRunning(job) {
     <h2>${t('Generando la infografía…')}</h2>
     <p class="ai-run-status" id="ig-run-status" role="status"></p>
     <div class="ai-run-actions">
-      <button id="ig-keep" class="primary-btn">${icon('book', { size: 16 })} ${t('Seguir leyendo')}</button>
+      <button id="ig-keep" class="btn btn--primary primary-btn">${icon('book', { size: 16 })} ${t('Seguir leyendo')}</button>
       <button id="ig-cancel" class="ai-ob-back fc-txt-btn">${t('Cancelar')}</button>
     </div>
     <p class="sum-depth-hint">${t('Puedes cerrar esta ventana: te avisaremos cuando el póster esté listo.')}</p>`;
@@ -536,7 +536,7 @@ async function renderResult(data) {
     <div id="ig-view"></div>
     <p class="sum-depth-hint" id="ig-hint"></p>
     <div class="fc-export">
-      <button id="ig-png" class="primary-btn">${icon('download', { size: 16 })} <span id="ig-png-label">${t('Descargar PNG')}</span></button>
+      <button id="ig-png" class="btn btn--primary primary-btn">${icon('download', { size: 16 })} <span id="ig-png-label">${t('Descargar PNG')}</span></button>
       <button id="ig-svg" class="ai-ob-back fc-txt-btn">SVG</button>
       <button id="ig-share" class="ai-ob-back fc-txt-btn" style="display:none">${icon('share', { size: 14 })} ${t('Compartir')}</button>
     </div>

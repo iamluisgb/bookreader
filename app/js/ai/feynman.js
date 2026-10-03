@@ -551,7 +551,7 @@ function renderSetup() {
       <button id="fey-more" class="fey-suggest-btn">${icon('sparkles', { size: 14 })} ${
         concepts.length ? t('Sugerir otros conceptos') : t('Sugerir conceptos')}</button>
     </div>
-    <button id="fey-start" class="primary-btn ai-ob-start">${icon('sparkles', { size: 16 })} ${t('Empezar')}</button>
+    <button id="fey-start" class="btn btn--primary primary-btn ai-ob-start">${icon('sparkles', { size: 16 })} ${t('Empezar')}</button>
     <div id="fey-error" class="fc-error" style="display:none"></div>`;
   b.querySelector('#fey-suggest').addEventListener('click', (e) => {
     const chip = e.target.closest('.fey-chip');
@@ -749,7 +749,7 @@ function renderSession(say) {
         <option value="es"${dictationLang() === 'es' ? ' selected' : ''}>ES</option>
         <option value="en"${dictationLang() === 'en' ? ' selected' : ''}>EN</option>
       </select>` : ''}
-      <button id="fey-send" class="primary-btn">${t('Enviar')}</button>
+      <button id="fey-send" class="btn btn--primary primary-btn">${t('Enviar')}</button>
       <button id="fey-finish" class="appset-tpl-cancel">${t('Ya vale, ¿qué me dejé?')}</button>
     </div>
     <div id="fey-error" class="fc-error" style="display:none"></div>`;
@@ -863,7 +863,7 @@ function renderDiagnosisView(complete = false) {
       : t('{done} de {total} ideas cubiertas en {n} vueltas.', { done, total, n: d.rounds })}</p>
     <div class="fey-diag">${renderDiagnosis(d, ctx.anchors || new Map())}</div>
     <div class="fey-actions">
-      <button id="fey-again" class="primary-btn">${t('Otro concepto')}</button>
+      <button id="fey-again" class="btn btn--primary primary-btn">${t('Otro concepto')}</button>
       <button id="fey-close" class="appset-tpl-cancel">${t('Cerrar')}</button>
     </div>`;
   b.querySelector('#fey-again').addEventListener('click', () => { session = null; renderSetup(); });

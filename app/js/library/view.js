@@ -250,7 +250,7 @@ export async function render() {
           </div>
           ${dropdownHtml('sort', icon('sort', { size: 16 }) + SORT_LABELS[sortBy], SORT_LABELS, sortBy)}
           ${dropdownHtml('progress', PROG_LABELS[filterProgress], PROG_LABELS, filterProgress)}
-          <button class="lib-upload" data-act="add">${icon('upload', { size: 18 })}<span>${t('Subir archivos')}</span></button>
+          <button class="btn btn--primary lib-upload" data-act="add">${icon('upload', { size: 18 })}<span>${t('Subir archivos')}</span></button>
         </div>
         <div class="lib-results">${resultsHtml(list)}</div>
       </section>
@@ -519,7 +519,7 @@ function showStudyChooser(chip, scopes) {
 
 function dropdownHtml(key, label, options, current) {
   return `<div class="lib-dd" data-dd="${key}">
-    <button class="lib-dd-btn">${label}${icon('chevron-down', { size: 15 })}</button>
+    <button class="btn btn--secondary lib-dd-btn">${label}${icon('chevron-down', { size: 15 })}</button>
     <div class="lib-dd-menu">
       ${Object.entries(options).filter(([v]) => !(key === 'progress' && v === 'all') || true).map(([v, lbl]) =>
         `<button class="lib-dd-opt${v === current ? ' active' : ''}" data-dd-val="${v}">
@@ -653,7 +653,7 @@ function emptyHtml(noBooksAtAll) {
   return `<div class="lib-empty">
     <div class="lib-empty-icon">${icon('books', { size: 56 })}</div>
     <p>${noBooksAtAll ? t('Tu biblioteca está vacía.') : t('No hay libros aquí.')}</p>
-    ${noBooksAtAll ? `<button class="lib-upload" data-act="add">${icon('upload', { size: 18 })}<span>${t('Subir tu primer libro')}</span></button>` : ''}
+    ${noBooksAtAll ? `<button class="btn btn--primary lib-upload" data-act="add">${icon('upload', { size: 18 })}<span>${t('Subir tu primer libro')}</span></button>` : ''}
   </div>`;
 }
 

@@ -1,0 +1,31 @@
+/* ============================================================================
+   Tokens de MARCA para las páginas públicas (landing EN/ES, /anki/, /privacy/).
+   Se cargan DESPUÉS de app/css/themes.css, que es la única fuente de los tokens
+   compartidos (superficies, texto, acento, marca, sombras, tipografía). Aquí solo vive
+   lo que la app no tiene: el papel del libro ilustrado, la banda oscura y la sombra
+   del dispositivo del hero. Mismo vocabulario que la app: --surface-*, --text-*.
+   ========================================================================== */
+:root {
+  --surface-alt: #f5f5f7;   /* secciones alternas */
+  --paper: #fdfbf6;
+  --paper-edge: #efe9db;
+  --paper-ink: #2b2517;
+  --band-bg: #111418;
+  --band-ink: #f2f3f5;
+  --band-soft: #a8b0b8;
+  --shadow-hero: 0 18px 50px rgba(20, 28, 40, 0.16);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --surface-alt: var(--surface-1);
+    --paper: #f7f2e4; --paper-edge: #e8e0cc; --paper-ink: #26200f;
+    --band-bg: #0b0e11;
+    --shadow-hero: 0 18px 50px rgba(0, 0, 0, 0.5);
+  }
+}
+:root[data-theme="dark"] {
+  --surface-alt: var(--surface-1);
+  --paper: #f7f2e4; --paper-edge: #e8e0cc; --paper-ink: #26200f;
+  --band-bg: #0b0e11;
+  --shadow-hero: 0 18px 50px rgba(0, 0, 0, 0.5);
+}

@@ -23,7 +23,7 @@ function modalOpen(kind) {
 }
 
 // Leyendo, el texto es intocable: ni chip flotante ni toast encima. La señal viaja como
-// un PUNTO al botón del agente (#ai-toggle/.ai-fab, CSS en main-late.css) — pulso mientras
+// un PUNTO al botón del agente (#ai-toggle/.ai-fab, CSS en modern.css) — pulso mientras
 // genera, verde al terminar, rojo si falló. Fuera del lector, chip y toast como siempre.
 function isReading() { return document.body.classList.contains('reading'); }
 

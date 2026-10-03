@@ -42,7 +42,7 @@ function openPaywall(feature) {
         <p class="pw-price">${t('{price} — sin suscripción, tus datos siguen en tu máquina.', { price: escapeHtml(t(License.CONFIG.price)) })}</p>
         <div class="dlg-actions">
           <button class="dlg-btn dlg-cancel pw-havekey">${t('Ya tengo una licencia')}</button>
-          <button class="dlg-btn dlg-ok pw-buy">${t('Conseguir Pro')}</button>
+          <button class="btn btn--primary dlg-btn dlg-ok pw-buy">${t('Conseguir Pro')}</button>
         </div>
       </div>`;
     document.body.appendChild(overlay);

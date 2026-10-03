@@ -31,10 +31,10 @@ export const TEMPLATE = () => `
     <button id="ai-close" class="icon-btn" title="${t('Cerrar')}">${icon('xmark')}</button>
   </div>
   <div id="ai-status" class="ai-status">${t('Abre un EPUB para empezar.')}</div>
-  <div id="ai-tabs" class="ai-tabs" style="display:none">
-    <button class="ai-tab active" data-view="chat">${icon('bubble', { size: 16 })} Chat</button>
-    <button class="ai-tab" data-view="notebook">${icon('note', { size: 16 })} ${t('Libreta')}</button>
-    <button class="ai-tab" data-view="studio">${icon('sparkles', { size: 16 })} Studio</button>
+  <div id="ai-tabs" class="segmented ai-tabs" style="display:none">
+    <button class="segmented-btn ai-tab active" data-view="chat">${icon('bubble', { size: 16 })} Chat</button>
+    <button class="segmented-btn ai-tab" data-view="notebook">${icon('note', { size: 16 })} ${t('Libreta')}</button>
+    <button class="segmented-btn ai-tab" data-view="studio">${icon('sparkles', { size: 16 })} Studio</button>
   </div>
   <div id="ai-view-chat" class="ai-view active">
     <div id="ai-messages" class="ai-messages" role="log" aria-live="polite" aria-relevant="additions text" aria-label="${t('Conversación con el agente')}"></div>
@@ -71,9 +71,9 @@ export const TEMPLATE = () => `
         <div class="ai-composer-btns">
           <!-- Un solo botón de visión: abre el overlay sobre la página y allí se elige el
                alcance (arrastrar una zona · "Toda la página"). Ver pickZone() en panel.js. -->
-          <button id="ai-see" class="ai-see" title="${t('Enseñarle al agente una figura, una tabla o la página entera')}" style="display:none">${icon('crop', { size: 15 })}<span>${t('Ver')}</span></button>
+          <button id="ai-see" class="btn btn--secondary ai-see" title="${t('Enseñarle al agente una figura, una tabla o la página entera')}" style="display:none">${icon('crop', { size: 15 })}<span>${t('Ver')}</span></button>
           <div class="ai-composer-row">
-            <button id="ai-mic" class="ai-see ai-mic" title="${t('Dictar')}" aria-label="${t('Dictar')}" aria-pressed="false" style="display:none">${icon('mic', { size: 16 })}</button>
+            <button id="ai-mic" class="btn btn--secondary ai-see ai-mic" title="${t('Dictar')}" aria-label="${t('Dictar')}" aria-pressed="false" style="display:none">${icon('mic', { size: 16 })}</button>
             <button id="ai-send" class="ai-send" title="${t('Enviar')}" aria-label="${t('Enviar')}">${icon('arrow-up', { size: 18 })}</button>
           </div>
         </div>

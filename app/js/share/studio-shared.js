@@ -70,7 +70,7 @@ function deckCard(rec, ri, d, i) {
       <span class="studio-deck-name">${escapeHtml(d.scope || d.name || t('Mazo'))}</span>
       <span class="studio-meta">${n === 1 ? t('1 tarjeta') : t('{n} tarjetas', { n })}</span>
     </div>
-    <button class="studio-new studio-adopt" data-act="shared-adopt" data-sid="${ri}:${i}">${icon('plus', { size: 13 })} ${t('Añadir a mis mazos')}</button>
+    <button class="btn btn--secondary studio-new studio-adopt" data-act="shared-adopt" data-sid="${ri}:${i}">${icon('plus', { size: 13 })} ${t('Añadir a mis mazos')}</button>
   </div>`;
 }
 

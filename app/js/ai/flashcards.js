@@ -151,7 +151,7 @@ async function renderSetup() {
     <div id="fc-plan"></div>
     <p class="ai-ob-sub" id="fc-split" hidden></p>
     <div id="fc-dup"></div>
-    <button id="fc-generate" class="primary-btn ai-ob-start">${icon('sparkles', { size: 16 })} ${t('Generar tarjetas')}</button>
+    <button id="fc-generate" class="btn btn--primary primary-btn ai-ob-start">${icon('sparkles', { size: 16 })} ${t('Generar tarjetas')}</button>
     <div id="fc-error" class="fc-error" style="display:none"></div>
     <div id="fc-decks"></div>`;
   mountScopeCombo(b.querySelector('#fc-scope'), options, scopeValue, (v) => {
@@ -1208,8 +1208,8 @@ function renderReview(deck) {
     </div>
     <div class="fc-list">${deck.cards.map((c, i) => (c.deleted ? '' : cardRow(c, i))).join('')}</div>
     <div class="fc-export">
-      ${deck.id ? `<button id="fc-study" class="primary-btn">${icon('cards', { size: 16 })} ${t('Estudiar ahora')}<small></small></button>` : ''}
-      <button id="fc-apkg" class="${deck.id ? 'ai-ob-back' : 'primary-btn'}">${icon('download', { size: 16 })} ${t('Exportar .apkg')}</button>
+      ${deck.id ? `<button id="fc-study" class="btn btn--primary primary-btn">${icon('cards', { size: 16 })} ${t('Estudiar ahora')}<small></small></button>` : ''}
+      <button id="fc-apkg" class="${deck.id ? 'ai-ob-back' : 'btn btn--primary primary-btn'}">${icon('download', { size: 16 })} ${t('Exportar .apkg')}</button>
       <button id="fc-txt" class="ai-ob-back fc-txt-btn" title="${t('Formato de texto que Anki importa (Archivo → Importar)')}">.txt para Anki</button>
       ${deck.cards.some(c => VISUAL_TYPES.includes(c.type))
         // Limitación honesta (WU8): el export de Anki es de TEXTO — la pregunta y el dato
