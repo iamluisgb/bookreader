@@ -134,6 +134,7 @@ const EN = {
   'Abrir sidebar': 'Open sidebar',
   'Índice y notas': 'Contents and notes',
   'Página marcada': 'Page bookmarked',
+  'Ocultar el agente': 'Hide the agent',
   'Abre el índice': 'Opens the contents',
   'Ocultar índice y notas': 'Hide contents and notes',
   'Cerrar el índice': 'Close contents',

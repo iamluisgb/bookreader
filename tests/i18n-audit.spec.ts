@@ -65,7 +65,8 @@ test('auditoría EN: lector + sidebar + biblioteca + panel + modales sin españo
 
   // cerrar onboarding/panel antes de navegar
   await page.locator('#ai-onboarding .ai-ob-close').click().catch(() => {});
-  await page.locator('#ai-close').click().catch(() => {});
+  // ≥ 1024 el ✦ es el cierre del agente (auditoría de la cabecera, F4); no hay ✕.
+  if (await page.evaluate(() => document.body.classList.contains('ai-open'))) await page.locator('#ai-toggle').click();
 
   // 5) biblioteca (crear estantería para poblar el raíl)
   await page.locator('#library-btn').click();

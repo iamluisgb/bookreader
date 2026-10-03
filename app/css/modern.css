@@ -238,7 +238,7 @@ body.reading.ai-jobs-busy #ai-toggle::after, body.reading.ai-jobs-busy .ai-fab::
 
 /* Inmersivo = barras ocultas: se deslizan fuera (el área de lectura no cambia).
    Solo tiene efecto cuando las barras son overlay (móvil, o escritorio en `fs`). */
-body.reading.immersive :is(.reader-header, .reader-nav) { transform: translateY(-100%); }
+body.reading.immersive :is(.reader-header, .reader-nav, .agent-rail) { transform: translateY(-100%); }
 body.reading.immersive .reader-footer { transform: translateY(100%); }
 body.immersive .ai-fab { transform: scale(0); }
 
@@ -1558,7 +1558,8 @@ body.reading.chrome-quiet:not(.fs) :is(.reader-header, .reader-footer) > * {
 body.reading :is(.reader-header, .reader-footer) > * { transition: opacity 0.2s var(--ease); }
 body.reading :is(.reader-header, .reader-footer):hover > * { opacity: 1; }
 /* El carril se calma con la cabecera, salvo sobre el índice abierto (ahí es su cierre). */
-body.reading.chrome-quiet:not(.fs):not(:has(#sidebar.open)) .reader-nav:not(:hover, :focus-within) {
+body.reading.chrome-quiet:not(.fs):not(:has(#sidebar.open)) .reader-nav:not(:hover, :focus-within),
+body.reading.chrome-quiet:not(.fs):not(.ai-open) .agent-rail:not(:hover, :focus-within) {
   opacity: 0;
   transition: opacity 0.6s var(--ease);
 }

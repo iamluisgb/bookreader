@@ -59,6 +59,8 @@ test('Q3: la cabecera del panel muestra el libro, no la marca', async ({ page })
   await page.locator('#sidebar-toggle').click();
   await expect(page.locator('#sidebar-book-title')).not.toHaveText('BookReader');
   await expect(page.locator('#sidebar-book-title')).toHaveText(await page.locator('#reader-title').textContent() as string);
+  // F5: autor · progreso · tiempo restante, y la portada.
+  await expect(page.locator('#sidebar-book-meta')).toHaveText(/ · \d+ % · .*min/);
 });
 
 test('F2: «Aa» abre los ajustes de lectura sobre la página, sin abrir el índice', async ({ page }) => {
@@ -130,4 +132,25 @@ test.describe('F3: cabecera móvil a dieta', () => {
     await expect(page.locator('#sidebar')).toHaveClass(/open/);
     await expect(page.locator('#tab-contents')).toBeVisible();
   });
+});
+
+test('F4: el ✦ del agente no se mueve al abrirlo y es su cierre', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await openBook(page);
+  const ai = page.locator('#ai-toggle');
+  const before = (await ai.boundingBox())!;
+  expect(before.x + before.width).toBeGreaterThan(1440 - 60);          // en la esquina
+  await ai.click();
+  await expect(page.locator('body')).toHaveClass(/ai-open/);
+  await page.waitForTimeout(500);
+  const after = (await ai.boundingBox())!;
+  expect(Math.abs(after.x - before.x)).toBeLessThan(1);
+  await expect(ai).toHaveAttribute('aria-expanded', 'true');
+  await expect(ai).toHaveAccessibleName('Ocultar el agente');
+  await expect(page.locator('#ai-close')).toBeHidden();
+  // «⋯» es el último icono de la cabecera del lector y no queda bajo el ✦.
+  const more = (await page.locator('#reader-more').boundingBox())!;
+  expect(more.x + more.width).toBeLessThan(after.x);
+  await page.keyboard.press(']');
+  await expect(page.locator('body')).not.toHaveClass(/ai-open/);
 });

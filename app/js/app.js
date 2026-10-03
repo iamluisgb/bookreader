@@ -991,10 +991,10 @@ function initImmersive() {
     const quietSoon = () => { clearTimeout(quietT); quietT = setTimeout(quiet, 2500); };
     EpubReader.onActivity(() => { if (inFs()) hideBars(); quietSoon(); });
     document.addEventListener('mousemove', (e) => {
-      if (e.target.closest?.('.reader-header, .reader-nav, .reader-footer, #sidebar, #ai-panel')) wake();
+      if (e.target.closest?.('.reader-header, .reader-nav, .agent-rail, .reader-footer, #sidebar, #ai-panel')) wake();
     }, { passive: true });
     document.addEventListener('focusin', (e) => {
-      if (e.target.closest?.('.reader-header, .reader-nav, .reader-footer')) wake();
+      if (e.target.closest?.('.reader-header, .reader-nav, .agent-rail, .reader-footer')) wake();
     });
 
     // Sincroniza clase/estado/icono con el estado real de fullscreen (clic, Esc, F11).
@@ -1357,7 +1357,10 @@ function paintSidebarBook(meta) {
   const cover = document.getElementById('sidebar-book-cover');
   if (!title) return;
   title.textContent = meta.title || 'BookReader';
-  sub.textContent = [meta.author, bookPct != null && meta.title ? `${Math.round(bookPct)} %` : ''].filter(Boolean).join(' · ');
+  // F5: «Juan Rulfo · 37 % · ~2 h 10 min». El tiempo es el que ya calcula el pie.
+  const reading = bookPct != null && meta.title;
+  const left = reading ? (document.getElementById('progress-time')?.textContent || '').trim() : '';
+  sub.textContent = [meta.author, reading ? `${Math.round(bookPct)} %` : '', left].filter(Boolean).join(' · ');
   if (meta.cover) { cover.src = meta.cover; cover.hidden = false; } else { cover.removeAttribute('src'); cover.hidden = true; }
 }
 
@@ -1384,14 +1387,25 @@ function initBookHeader() {
 
   // F1: el carril es fijo; la cabecera del lector le guarda el hueco con su ancho real (cambia
   // con el idioma, con «Biblioteca» oculta en móvil y con #library-btn fuera de un libro).
-  const nav = document.querySelector('.reader-nav');
-  if (nav && typeof ResizeObserver === 'function') {
-    new ResizeObserver(() => document.documentElement.style.setProperty('--reader-nav-w', `${Math.ceil(nav.getBoundingClientRect().width)}px`)).observe(nav);
-  }
+  // F4: lo mismo para el ✦ del agente a la derecha (--agent-rail-w; 0 en móvil, donde no se pinta).
+  const railWidth = (sel, prop) => {
+    const el = document.querySelector(sel);
+    if (!el || typeof ResizeObserver !== 'function') return;
+    new ResizeObserver(() => document.documentElement.style.setProperty(prop, `${Math.ceil(el.getBoundingClientRect().width)}px`)).observe(el);
+  };
+  railWidth('.reader-nav', '--reader-nav-w');
+  railWidth('.agent-rail', '--agent-rail-w');
 
   // Q4: el botón del agente dice si está abierto.
   const ai = document.getElementById('ai-toggle');
-  const syncAi = () => ai?.setAttribute('aria-expanded', String(document.body.classList.contains('ai-open')));
+  // Con F4 el ✦ es también el cierre del agente: su nombre lo dice.
+  const syncAi = () => {
+    if (!ai) return;
+    const open = document.body.classList.contains('ai-open');
+    const label = open ? t('Ocultar el agente') : t('Agente de IA');
+    ai.setAttribute('aria-expanded', String(open));
+    if (ai.getAttribute('aria-label') !== label) { ai.setAttribute('aria-label', label); ai.dataset.tip = label; }
+  };
   syncAi();
   new MutationObserver(syncAi).observe(document.body, { attributes: true, attributeFilter: ['class'] });
 

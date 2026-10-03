@@ -65,7 +65,7 @@ html, body {
 /* El libro del índice (auditoría de la cabecera, Q3/F5): portada pequeña, título y autor ·
    progreso. Sustituye a «BookReader», que repetía la marca. */
 .sidebar-book { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1; }
-.sidebar-book-cover { width: 26px; height: 36px; border-radius: var(--r-xs); object-fit: cover; flex: none; box-shadow: var(--shadow-1); }
+.sidebar-book-cover { width: 32px; height: 46px; border-radius: var(--r-xs); object-fit: cover; flex: none; box-shadow: var(--shadow-1); }
 .sidebar-book-text { min-width: 0; }
 .sidebar-book-title {
   margin: 0; font-size: var(--fs-md); font-weight: 600; line-height: 1.25;
@@ -714,6 +714,26 @@ input[type="range"] {
 @media (min-width: 1024px) { .reader-nav { z-index: calc(var(--z-panel) + 1); } }
 body.in-library .reader-nav { display: none; }
 .reader-nav-slot { width: var(--reader-nav-w, 0px); }
+
+/* El ✦ del agente, el mismo carril a la derecha (F4). En móvil #ai-toggle no se pinta (está
+   el FAB) y el carril mide 0. */
+.agent-rail {
+  position: fixed; top: 0; right: 12px;
+  height: var(--header-height);
+  display: flex; align-items: center;
+  z-index: calc(var(--z-chrome) + 21);
+  transition: opacity 0.2s var(--ease), transform var(--transition-normal);
+}
+@media (min-width: 1024px) { .agent-rail { z-index: calc(var(--z-panel) + 1); } }
+body.in-library .agent-rail { display: none; }
+.agent-rail-slot { width: var(--agent-rail-w, 0px); flex: none; }
+@media (min-width: 1024px) {
+  body.ai-open .agent-rail-slot { width: 0; }
+  /* La cabecera del agente deja la esquina al ✦, que hace de cierre: fuera su ✕. */
+  #ai-panel .ai-toolbar { min-height: var(--header-height); padding-top: 0; padding-bottom: 0; padding-right: calc(var(--agent-rail-w, 0px) + 16px); }
+  #ai-close { display: none; }
+}
+@media (pointer: coarse) { .agent-rail { top: env(safe-area-inset-top); } }
 @media (min-width: 1024px) {
   body:has(#sidebar.open) .reader-nav-slot { width: 0; }
   /* La cabecera del panel: arriba la franja del carril; debajo, el libro. La ✕ sobra: el

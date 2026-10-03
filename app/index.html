@@ -245,11 +245,12 @@
         <button id="reading-settings" class="icon-btn" aria-label="Ajustes de lectura" aria-haspopup="dialog" aria-expanded="false" aria-controls="reading-pop" data-tip="Ajustes de lectura" data-i18n-attrs="aria-label,data-tip" data-icon="type" disabled></button>
         <button id="immersive-toggle" class="icon-btn" aria-label="Pantalla completa" data-tip="Pantalla completa" data-i18n-attrs="aria-label,data-tip" data-icon="expand" disabled></button>
         <button id="header-search" class="icon-btn" aria-label="Buscar en el libro" data-tip="Buscar" data-i18n-attrs="aria-label,data-tip" data-icon="search" disabled></button>
-        <button id="ai-toggle" class="icon-btn" aria-label="Agente de IA" data-tip="Agente de IA" data-i18n-attrs="aria-label,data-tip" data-icon="sparkles" disabled></button>
         <button id="bookmark-toggle" class="icon-btn" aria-label="Marcar página" data-tip="Marcar página" data-i18n-attrs="aria-label,data-tip" data-tip-align="right" data-icon="bookmark" disabled></button>
         <!-- «Más»: Ajustes generales y Biblioteca a un toque (auditoría móvil, Q7). Los de
              lectura tienen su «Aa» (auditoría de la cabecera, F2). -->
         <button id="reader-more" class="icon-btn" aria-label="Más" aria-haspopup="menu" data-tip="Más" data-i18n-attrs="aria-label,data-tip" data-tip-align="right" data-icon="ellipsis"></button>
+        <!-- Hueco del ✦ del agente (.agent-rail, fijo a la ventana), como .reader-nav-slot. -->
+        <div class="agent-rail-slot" aria-hidden="true"></div>
       </div>
     </header>
 
@@ -303,6 +304,12 @@
   <div id="scrim" class="scrim"></div>
 
   <!-- AI agent panel -->
+  <!-- El ✦ del agente, fijo arriba a la derecha (auditoría de la cabecera, F4): el espejo del
+       carril de navegación. Con el agente abierto queda en el mismo píxel, sobre su cabecera,
+       y es su cierre; así cada panel se abre y se cierra desde el borde por el que entra. -->
+  <div class="agent-rail">
+    <button id="ai-toggle" class="icon-btn" aria-label="Agente de IA" data-tip="Agente de IA" data-tip-align="right" data-i18n-attrs="aria-label,data-tip" data-icon="sparkles" disabled></button>
+  </div>
   <aside id="ai-panel" class="ai-panel"></aside>
 
   <!-- FAB del agente (solo móvil) -->

@@ -262,7 +262,7 @@ test('el coach mark de flashcards aparece una vez y no reaparece', async ({ page
   await expect(page.locator('.ai-coachmark')).toHaveCount(0);
 
   // Cerrar y reabrir el panel (mismo perfil, flag ya puesto) → no reaparece.
-  await page.click('#ai-close');
+  await page.click('#ai-toggle');   // ≥ 1024 el ✦ es el cierre (F4)
   await page.click('#ai-toggle');
   await page.waitForTimeout(400);
   await expect(page.locator('.ai-coachmark')).toHaveCount(0);
