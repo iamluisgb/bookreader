@@ -24,7 +24,7 @@ test.describe('Índice — sección actual', () => {
 
   test('al abrir el sidebar hay exactamente una entrada marcada', async ({ page }) => {
     await loadEpub(page);
-    await page.getByRole('button', { name: 'Abrir sidebar' }).click();
+    await page.getByRole('button', { name: 'Índice y notas', exact: true }).click();
 
     const current = page.locator('#toc-list a.current');
     await expect(current).toHaveCount(1, { timeout: 5000 });
@@ -36,7 +36,7 @@ test.describe('Índice — sección actual', () => {
   // sin clamp, cada entrada larga se volvía una pared de texto de 3 líneas.
   test('las etiquetas largas del índice se recortan a 2 líneas y llevan tooltip', async ({ page }) => {
     await loadEpub(page);
-    await page.getByRole('button', { name: 'Abrir sidebar' }).click();
+    await page.getByRole('button', { name: 'Índice y notas', exact: true }).click();
 
     const label = page.locator('#toc-list a .toc-label').first();
     await expect(label).toBeVisible({ timeout: 5000 });
@@ -49,7 +49,7 @@ test.describe('Índice — sección actual', () => {
 
   test('saltar a otra sección mueve la marca', async ({ page }) => {
     await loadEpub(page);
-    await page.getByRole('button', { name: 'Abrir sidebar' }).click();
+    await page.getByRole('button', { name: 'Índice y notas', exact: true }).click();
 
     const links = page.locator('#toc-list a');
     await expect(links.first()).toBeVisible({ timeout: 5000 });
@@ -92,7 +92,7 @@ test.describe('Índice — sección actual', () => {
     await page.waitForFunction(
       () => !!document.querySelector('#toc-list a[data-toc-page]'), null, { timeout: 30000 });
 
-    await page.getByRole('button', { name: 'Abrir sidebar' }).click();
+    await page.getByRole('button', { name: 'Índice y notas', exact: true }).click();
 
     const current = page.locator('#toc-list a.current');
     await expect(current).toHaveCount(1);

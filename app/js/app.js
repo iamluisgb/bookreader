@@ -7,6 +7,7 @@ import * as PdfReader from './pdf-reader.js';
 import * as Storage from './storage.js';
 import * as AiDB from './ai/db.js';
 import { hydrateIcons, icon } from './ui/icons.js';
+import { setSidebar, toggleSidebar, initSidebarState } from './ui/sidebar.js';
 import { countBookWords, countPdfWords, updateProgressDetail, getCurrentPct, WORDS_PER_LOCATION } from './progress.js';
 import * as FeatureGuide from './ui/feature-guide.js';
 import * as ReadingLog from './reading-log.js';
@@ -515,8 +516,7 @@ function initReaderMore() {
       const act = it.dataset.act;
       close();
       if (act === 'reading') {
-        document.getElementById('sidebar')?.classList.add('open');
-        document.getElementById('reading-settings')?.click();
+        setSidebar(true, 'settings');
       } else if (act === 'general') openAppSettings();
       else if (act === 'library') goToLibrary();
     });
@@ -667,6 +667,8 @@ async function goToLibrary({ fromRoute = false } = {}) {
   } catch (e) { /* Fullscreen API no soportada */ }
   document.getElementById('library-btn').style.display = 'none';
   document.getElementById('reader-title').textContent = 'BookReader';
+  bookPct = null;
+  setBookMeta({ title: '', author: '', cover: '' });
   await Library.render();
   Library.show();
 }
@@ -835,6 +837,7 @@ let pendingProgress = null;   // { bookId, pct } aún no escrito
 
 function saveProgress(pct) {
   if (!currentBook) return;
+  window.dispatchEvent(new CustomEvent('reader:progress', { detail: pct }));
   pendingProgress = { bookId: currentBook.id, pct, format: currentBook.format };
   clearTimeout(progressTimer);
   progressTimer = setTimeout(flushProgress, 800);
@@ -1268,10 +1271,7 @@ function initSearch() {
   document.querySelector('.tab-btn[data-tab="search"]')?.addEventListener('click', () => setTimeout(() => input.focus(), 50));
   // Buscador en la cabecera (estilo Play Books): abre la sidebar en la pestaña
   // Buscar y enfoca el campo, reutilizando el handler de la pestaña.
-  document.getElementById('header-search')?.addEventListener('click', () => {
-    document.getElementById('sidebar').classList.add('open');
-    document.querySelector('.tab-btn[data-tab="search"]')?.click();
-  });
+  document.getElementById('header-search')?.addEventListener('click', () => setSidebar(true, 'search'));
 }
 
 function renderSearchResults(results, query) {
@@ -1304,16 +1304,16 @@ function resetSearch() {
 
 // ============ SIDEBAR ============
 function initSidebar() {
-  const sidebar = document.getElementById('sidebar');
   const toggle = document.getElementById('sidebar-toggle');
   const close = document.getElementById('sidebar-close');
 
-  toggle.addEventListener('click', () => {
-    sidebar.classList.toggle('open');
-    // Al abrir, el índice debe decir dónde se está leyendo y dejarlo a la vista.
-    if (sidebar.classList.contains('open')) markCurrentToc(true);
-  });
-  close.addEventListener('click', () => sidebar.classList.remove('open'));
+  // Una sola vía (ui/sidebar.js): abra quien abra el panel —este botón, la lupa, «Más», un
+  // atajo—, el índice marca dónde se lee y el estado accesible queda al día.
+  initSidebarState();
+  toggle.addEventListener('click', () => toggleSidebar());
+  close.addEventListener('click', () => setSidebar(false));
+  window.addEventListener('sidebar:change', (e) => { if (e.detail.open) markCurrentToc(true); });
+  initBookHeader();
 
   // Tabs. El selector es [data-tab] y no .tab-btn porque el engranaje de la cabecera
   // (Ajustes de lectura) abre otro panel más del mismo conmutador sin ser una pestaña.
@@ -1327,6 +1327,61 @@ function initSidebar() {
       if (btn.dataset.tab === 'contents') markCurrentToc(true);
     });
   });
+}
+
+// ============ CABECERA: el libro en el panel, el título que cabe, atajos ============
+// (auditoría de la cabecera: Q1, Q3, Q4, Q5, F5)
+let bookPct = null;
+function paintSidebarBook(meta) {
+  const title = document.getElementById('sidebar-book-title');
+  const sub = document.getElementById('sidebar-book-meta');
+  const cover = document.getElementById('sidebar-book-cover');
+  if (!title) return;
+  title.textContent = meta.title || 'BookReader';
+  sub.textContent = [meta.author, bookPct != null && meta.title ? `${Math.round(bookPct)} %` : ''].filter(Boolean).join(' · ');
+  if (meta.cover) { cover.src = meta.cover; cover.hidden = false; } else { cover.removeAttribute('src'); cover.hidden = true; }
+}
+
+function initBookHeader() {
+  let meta = { title: '', author: '', cover: '' };
+  window.addEventListener('book:meta', (e) => { meta = e.detail; paintSidebarBook(meta); });
+  window.addEventListener('reader:progress', (e) => { bookPct = e.detail; paintSidebarBook(meta); });
+
+  // Q1: si el título no cabe y a su columna le quedan menos de ~120 px, se oculta (el capítulo ya está
+  // en el pie): mejor nada que «D…».
+  const header = document.getElementById('reader-header');
+  const titleEl = document.getElementById('reader-title');
+  if (header && titleEl && typeof ResizeObserver === 'function') {
+    const fit = () => {
+      titleEl.classList.remove('is-cramped');
+      // Solo si además se recorta: un título corto («Pedro Páramo», 106 px) cabe entero.
+      const clipped = titleEl.scrollWidth > titleEl.clientWidth + 1;
+      titleEl.classList.toggle('is-cramped', clipped && titleEl.clientWidth < 120);
+      titleEl.title = titleEl.textContent;
+    };
+    new ResizeObserver(fit).observe(header);
+    new MutationObserver(fit).observe(titleEl, { childList: true, characterData: true, subtree: true });
+  }
+
+  // Q4: el botón del agente dice si está abierto.
+  const ai = document.getElementById('ai-toggle');
+  const syncAi = () => ai?.setAttribute('aria-expanded', String(document.body.classList.contains('ai-open')));
+  syncAi();
+  new MutationObserver(syncAi).observe(document.body, { attributes: true, attributeFilter: ['class'] });
+
+  // Q5: atajos. `[` índice y notas · `]` agente (como Readwise Reader). Por `e.key` y antes de
+  // mirar modificadores: en un teclado español los corchetes salen con AltGr.
+  const onShortcut = (key) => {
+    if (!document.body.classList.contains('reading')) return false;
+    if (key === '[') { toggleSidebar(); return true; }
+    if (key === ']') { const b = document.getElementById('ai-toggle'); if (b && !b.disabled) b.click(); return true; }
+    return false;
+  };
+  document.addEventListener('keydown', (e) => {
+    if (/^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName) || e.target.isContentEditable) return;
+    if ((e.key === '[' || e.key === ']') && onShortcut(e.key)) e.preventDefault();
+  });
+  window.addEventListener('reader:key', (e) => onShortcut(e.detail));   // desde el iframe del EPUB
 }
 
 // ============ FILE HANDLING ============
@@ -1489,6 +1544,7 @@ async function loadEpub(buffer, bookId, aiBookId, persist = null) {
 
     // Update UI
     document.getElementById('reader-title').textContent = EpubReader.getTitle();
+    setBookMeta({ title: EpubReader.getTitle(), author: EpubReader.getAuthor() });
     document.getElementById('bookmark-toggle').disabled = false;
     document.getElementById('ai-toggle').disabled = false;
     document.getElementById('immersive-toggle').disabled = false;
@@ -1590,6 +1646,7 @@ async function loadPdf(buffer, bookId, aiBookId, persist = null, displayTitle = 
       || (persist ? persist.fileName.replace(/\.[^.]+$/, '') : '')
       || bookId || 'PDF';
     document.getElementById('reader-title').textContent = headerTitle;
+    setBookMeta({ title: headerTitle });
     document.body.classList.add('reading');
     // Móvil (estilo Play Books): arrancar SIN barras (PDF a pantalla completa). Se
     // muestran/ocultan tocando el centro o con el botón ⤢. Las barras son overlay.

@@ -24,9 +24,19 @@ test.describe('BookReader - Inicio', () => {
     await fileChooser.setFiles(EPUB_PATH);
     await expect(page.locator('#epub-container')).toBeVisible({ timeout: 10000 });
 
-    await page.getByRole('button', { name: 'Abrir sidebar' }).click();
+    await page.getByRole('button', { name: 'Índice y notas', exact: true }).click();
     await expect(page.locator('#sidebar')).toHaveClass(/open/);
-    await page.getByRole('button', { name: 'Cerrar sidebar' }).click();
+    // El mismo botón dice ahora que cierra y lo expone (auditoría de la cabecera, Q4).
+    const toggle = page.locator('#sidebar-toggle');
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    await page.getByRole('button', { name: 'Ocultar índice y notas', exact: true }).click();
+    await expect(page.locator('#sidebar')).not.toHaveClass(/open/);
+    await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    // Atajo `[`: abre y cierra igual que el botón.
+    await page.locator('#reader-title').click({ force: true }).catch(() => {});
+    await page.keyboard.press('[');
+    await expect(page.locator('#sidebar')).toHaveClass(/open/);
+    await page.keyboard.press('[');
     await expect(page.locator('#sidebar')).not.toHaveClass(/open/);
   });
 });
@@ -106,7 +116,7 @@ test.describe('BookReader - Sidebar Tabs', () => {
   test('TOC is populated after loading epub', async ({ page }) => {
     await loadEpub(page);
 
-    await page.getByRole('button', { name: 'Abrir sidebar' }).click();
+    await page.getByRole('button', { name: 'Índice y notas', exact: true }).click();
     const tocLinks = page.locator('#toc-list a');
     await expect(tocLinks.first()).toBeVisible({ timeout: 5000 });
     const count = await tocLinks.count();
@@ -130,7 +140,7 @@ test.describe('BookReader - Sidebar Tabs', () => {
     await page.waitForTimeout(200);
 
     // Open sidebar, go to bookmarks tab
-    await page.getByRole('button', { name: 'Abrir sidebar' }).click();
+    await page.getByRole('button', { name: 'Índice y notas', exact: true }).click();
     await page.getByRole('button', { name: 'Marcadores' }).click();
     await page.waitForTimeout(200);
 
@@ -141,7 +151,7 @@ test.describe('BookReader - Sidebar Tabs', () => {
   test('settings tabs switch correctly', async ({ page }) => {
     await loadEpub(page);
 
-    await page.getByRole('button', { name: 'Abrir sidebar' }).click();
+    await page.getByRole('button', { name: 'Índice y notas', exact: true }).click();
 
     // Check all tabs are present
     await page.getByRole('button', { name: 'Contenido' }).click();
@@ -172,7 +182,7 @@ test.describe('BookReader - Settings', () => {
   test('theme changes via settings', async ({ page }) => {
     await loadEpub(page);
 
-    await page.getByRole('button', { name: 'Abrir sidebar' }).click();
+    await page.getByRole('button', { name: 'Índice y notas', exact: true }).click();
     await page.getByRole('button', { name: 'Ajustes de lectura' }).click();
 
     // Por defecto = 'system' (sin atributo data-theme; manda prefers-color-scheme).
@@ -202,7 +212,7 @@ test.describe('BookReader - Settings', () => {
   test('font size controls work', async ({ page }) => {
     await loadEpub(page);
 
-    await page.getByRole('button', { name: 'Abrir sidebar' }).click();
+    await page.getByRole('button', { name: 'Índice y notas', exact: true }).click();
     await page.getByRole('button', { name: 'Ajustes de lectura' }).click();
 
     const fontValue = page.locator('#font-size-value');
@@ -220,7 +230,7 @@ test.describe('BookReader - Settings', () => {
   test('font family select works', async ({ page }) => {
     await loadEpub(page);
 
-    await page.getByRole('button', { name: 'Abrir sidebar' }).click();
+    await page.getByRole('button', { name: 'Índice y notas', exact: true }).click();
     await page.getByRole('button', { name: 'Ajustes de lectura' }).click();
 
     const select = page.locator('#font-family-select');
@@ -234,7 +244,7 @@ test.describe('BookReader - Settings', () => {
   test('settings persist in localStorage', async ({ page }) => {
     await loadEpub(page);
 
-    await page.getByRole('button', { name: 'Abrir sidebar' }).click();
+    await page.getByRole('button', { name: 'Índice y notas', exact: true }).click();
     await page.getByRole('button', { name: 'Ajustes de lectura' }).click();
 
     // Change theme
@@ -263,7 +273,7 @@ test.describe('BookReader - Highlights', () => {
   test('highlights tab shows empty state initially', async ({ page }) => {
     await loadEpub(page);
 
-    await page.getByRole('button', { name: 'Abrir sidebar' }).click();
+    await page.getByRole('button', { name: 'Índice y notas', exact: true }).click();
     await page.getByRole('button', { name: 'Subrayados' }).click();
 
     await expect(page.locator('#highlights-list .empty-state')).toBeVisible();
@@ -285,7 +295,7 @@ test.describe('BookReader - Export', () => {
   test('export button is disabled with no highlights', async ({ page }) => {
     await loadEpub(page);
 
-    await page.getByRole('button', { name: 'Abrir sidebar' }).click();
+    await page.getByRole('button', { name: 'Índice y notas', exact: true }).click();
     await page.getByRole('button', { name: 'Subrayados' }).click();
 
     await expect(page.locator('#export-highlights-btn')).toBeDisabled();
@@ -316,7 +326,7 @@ test.describe('BookReader - Export', () => {
     await fileChooser.setFiles(EPUB_PATH);
     await page.waitForTimeout(3000);
 
-    await page.getByRole('button', { name: 'Abrir sidebar' }).click();
+    await page.getByRole('button', { name: 'Índice y notas', exact: true }).click();
     await page.getByRole('button', { name: 'Subrayados' }).click();
 
     await expect(page.locator('.highlight-item').first()).toBeVisible({ timeout: 5000 });

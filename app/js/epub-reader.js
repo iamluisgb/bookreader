@@ -1014,6 +1014,8 @@ export async function load(arrayBuffer, onProgress, bookId = null) {
     // de lectura (sus teclas no llegan al document padre, donde también se escuchan).
     // Se ignoran con modificadores (Alt+← = atrás del navegador, Shift+← = selección).
     doc.addEventListener('keydown', (e) => {
+      // Atajos de paneles (`[` índice, `]` agente): los atiende app.js.
+      if (e.key === '[' || e.key === ']') { window.dispatchEvent(new CustomEvent('reader:key', { detail: e.key })); return; }
       if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
       if (e.key === 'ArrowLeft') { e.preventDefault(); prev(); }
       else if (e.key === 'ArrowRight') { e.preventDefault(); next(); }

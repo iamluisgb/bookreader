@@ -39,13 +39,21 @@
   <!-- Sidebar -->
   <aside id="sidebar" class="sidebar">
     <div class="sidebar-header">
-      <h2>BookReader</h2>
+      <!-- El libro del índice, no la marca: «BookReader» se repetía junto al logo del lector
+           (dos marcas en 400 px). Lo rellena app.js al abrir un libro. -->
+      <div class="sidebar-book">
+        <img id="sidebar-book-cover" class="sidebar-book-cover" alt="" hidden>
+        <div class="sidebar-book-text">
+          <h2 id="sidebar-book-title" class="sidebar-book-title">BookReader</h2>
+          <p id="sidebar-book-meta" class="sidebar-book-meta"></p>
+        </div>
+      </div>
       <div class="sidebar-header-actions">
         <!-- Ajustes de lectura: no es navegación por el libro (como sí lo son las pestañas),
              es cómo se ve. Por eso vive aquí y no gasta una ranura de la barra. Sigue siendo
              contextual: el panel oculta los grupos que no aplican al formato abierto. -->
         <button id="reading-settings" class="icon-btn" data-tab="settings" aria-label="Ajustes de lectura" data-tip="Ajustes de lectura" data-i18n-attrs="aria-label,data-tip" data-icon="sliders"></button>
-        <button id="sidebar-close" class="icon-btn" aria-label="Cerrar sidebar" data-i18n-attrs="aria-label" data-icon="xmark"></button>
+        <button id="sidebar-close" class="icon-btn" aria-label="Cerrar el índice" data-i18n-attrs="aria-label" data-icon="xmark"></button>
       </div>
     </div>
 
@@ -213,13 +221,16 @@
   <main id="reader-main" class="reader-main">
     <!-- Top bar -->
     <header id="reader-header" class="reader-header">
-      <!-- Imagotipo completo (con tile), no el glyph de línea: es el ancla de marca de la barra. -->
-      <!-- «‹» delante del logo: sin él, el logo parecía marca y no «volver» (auditoría móvil, Q7). -->
-      <button id="library-btn" class="icon-btn brand-btn" aria-label="Volver a la biblioteca" data-tip="Biblioteca" data-i18n-attrs="aria-label,data-tip" data-tip-align="left" style="display:none;"><span class="brand-back" data-icon="chevron-left" data-icon-size="md" aria-hidden="true"></span><svg class="brand-mark" viewBox="0 0 512 512" width="24" height="24" aria-hidden="true" focusable="false"><rect width="512" height="512" rx="118" fill="var(--logo-tile)"/><path d="M288 119 Q288 99 308 99 L396 99 Q416 99 416 119 L416 371 L352 323 L288 371 Z" fill="var(--brand, #22c55e)"/><path d="M98 90 L222 90 Q256 90 256 124 L256 470 C 249 442 233 424 206 414 C 177 403 140 401 100 401 Q64 401 64 365 L64 124 Q64 90 98 90 Z" fill="var(--logo-page)"/></svg></button>
-      <button id="sidebar-toggle" class="icon-btn" aria-label="Abrir sidebar" data-tip="Panel" data-i18n-attrs="aria-label,data-tip" data-tip-align="left" data-icon="panel-left"></button>
+      <!-- Navegación (auditoría de la cabecera): «‹ Biblioteca» y el botón del índice. Volver
+           es una flecha con su palabra, no el logo: un logo arriba a la izquierda se lee como
+           marca, no como «atrás» (Kindle, Play Books, Kobo usan flecha). En móvil, solo «‹». -->
+      <div class="reader-nav">
+        <button id="library-btn" class="reader-back" aria-label="Volver a la biblioteca" data-i18n-attrs="aria-label" style="display:none;"><span data-icon="chevron-left" data-icon-size="lg" aria-hidden="true"></span><span class="reader-back-label" data-i18n>Biblioteca</span></button>
+        <button id="sidebar-toggle" class="icon-btn" aria-label="Índice y notas" aria-expanded="false" aria-controls="sidebar" data-tip="Índice y notas" data-i18n-attrs="aria-label,data-tip" data-tip-align="left" data-icon="panel-left"></button>
+      </div>
       <div id="reader-title" class="reader-title">BookReader</div>
       <div class="header-actions">
-        <button id="immersive-toggle" class="icon-btn" aria-label="Modo lectura" data-tip="Modo lectura" data-i18n-attrs="aria-label,data-tip" data-icon="expand" disabled></button>
+        <button id="immersive-toggle" class="icon-btn" aria-label="Pantalla completa" data-tip="Pantalla completa" data-i18n-attrs="aria-label,data-tip" data-icon="expand" disabled></button>
         <button id="header-search" class="icon-btn" aria-label="Buscar en el libro" data-tip="Buscar" data-i18n-attrs="aria-label,data-tip" data-icon="search" disabled></button>
         <button id="ai-toggle" class="icon-btn" aria-label="Agente de IA" data-tip="Agente de IA" data-i18n-attrs="aria-label,data-tip" data-icon="sparkles" disabled></button>
         <button id="bookmark-toggle" class="icon-btn" aria-label="Marcar página" data-tip="Marcar página" data-i18n-attrs="aria-label,data-tip" data-tip-align="right" data-icon="bookmark" disabled></button>

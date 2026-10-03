@@ -159,7 +159,7 @@ test.describe('Índice con número de página', () => {
     await openBook(page, PDF);
     await page.waitForFunction(() => !!document.querySelector('#toc-list .toc-page'), null, { timeout: 30000 });
     // El índice vive en el sidebar: sin abrirlo, la entrada existe pero no es pulsable.
-    await page.getByRole('button', { name: 'Abrir sidebar' }).click().catch(() => { /* ya abierto */ });
+    await page.getByRole('button', { name: 'Índice y notas', exact: true }).click().catch(() => { /* ya abierto */ });
     const target = page.locator('#toc-list a').nth(4);
     const announced = await target.locator('.toc-page').textContent();
     await target.click();

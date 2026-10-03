@@ -62,10 +62,20 @@ html, body {
   border-bottom: 1px solid var(--border);
 }
 
-.sidebar-header h2 {
-  font-size: var(--fs-lg);
-  font-weight: 600;
+/* El libro del índice (auditoría de la cabecera, Q3/F5): portada pequeña, título y autor ·
+   progreso. Sustituye a «BookReader», que repetía la marca. */
+.sidebar-book { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1; }
+.sidebar-book-cover { width: 26px; height: 36px; border-radius: var(--r-xs); object-fit: cover; flex: none; box-shadow: var(--shadow-1); }
+.sidebar-book-text { min-width: 0; }
+.sidebar-book-title {
+  margin: 0; font-size: var(--fs-md); font-weight: 600; line-height: 1.25;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
+.sidebar-book-meta {
+  margin: 1px 0 0; font-size: var(--fs-xs); color: var(--text-soft); line-height: 1.25;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.sidebar-book-meta:empty { display: none; }
 
 .sidebar-header-actions {
   display: flex;
@@ -167,13 +177,15 @@ html, body {
   cursor: default;
 }
 
-/* Botón-marca (logo → volver a la biblioteca): teñido de acento como identidad,
-   igual que el logo coloreado de Play Books entre iconos neutros. Mantiene el
-   emerald también en hover (solo cambia el fondo). */
-.icon-btn.brand-btn, .icon-btn.brand-btn:hover { color: var(--accent); }
-/* El botón de marca lleva el imagotipo completo (tile + página + cinta), no un
-   glyph de línea: no hereda currentColor, sus colores vienen de --logo-*. */
-.icon-btn.brand-btn .brand-mark { display: block; }
+/* Volver a la biblioteca: «‹ Biblioteca» (auditoría de la cabecera, Q2). Texto en
+   --text-soft que pasa a tinta al pasar; en móvil, solo la flecha (modern.css). */
+.reader-back {
+  display: inline-flex; align-items: center; gap: 2px;
+  height: 36px; padding: 0 10px 0 4px; border: none; border-radius: var(--r-sm);
+  background: none; color: var(--text-soft); font: inherit; font-size: var(--fs-md); font-weight: 500;
+  cursor: pointer; transition: background var(--transition-fast), color var(--transition-fast);
+}
+.reader-back:hover { background: var(--fill); color: var(--text); }
 
 .primary-btn {
   background: var(--accent);
@@ -630,7 +642,12 @@ input[type="range"] {
 /* ============ READER HEADER ============ */
 .reader-header {
   height: var(--header-height);
-  display: flex;
+  /* Rejilla de tres columnas (auditoría de la cabecera, Q1): navegación · título ·
+     acciones. Las islas nunca bajan de su contenido y el título ocupa el centro con
+     `min-width: 0`, así que trunca con el sitio que hay DE VERDAD. Antes el título iba en
+     absolute con un hueco supuesto de 260 px y en móvil se montaba 58 px sobre los iconos. */
+  display: grid;
+  grid-template-columns: minmax(max-content, 1fr) minmax(0, auto) minmax(max-content, 1fr);
   align-items: center;
   padding: 0 12px;
   gap: 12px;
@@ -639,17 +656,12 @@ input[type="range"] {
   flex-shrink: 0;
 }
 
-/* Título del libro: centrado en la cabecera (estilo Apple Books/Kindle), con
-   presencia tipográfica y truncado elegante. Al ir en position:absolute no
-   "empuja" el layout, así que las dos islas de iconos quedan balanceadas a los
-   lados y el hueco central se llena con el título en vez de aire. */
+/* Título del libro: la columna central de la rejilla (centrado en la columna de lectura,
+   como Apple Books). Si le quedan menos de ~120 px se oculta (app.js · fitReaderTitle):
+   el capítulo ya está en el pie. */
 .reader-title {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  /* Ancho limitado a lo que queda libre entre las dos islas de iconos, para que el
-     título centrado NUNCA se solape con ellas (crítico en móvil). */
-  max-width: min(calc(100% - 260px), 460px);
+  min-width: 0;
+  max-width: 460px;
   text-align: center;
   font-size: var(--fs-lg);
   font-weight: 600;
@@ -663,8 +675,10 @@ input[type="range"] {
 .header-actions {
   display: flex;
   gap: 4px;
-  margin-left: auto;      /* empuja las acciones a la derecha (el título ya no ocupa flujo) */
+  justify-self: end;
 }
+.reader-nav { display: flex; align-items: center; gap: 4px; justify-self: start; }
+.reader-title.is-cramped { visibility: hidden; }
 
 /* ============ READER VIEWPORT ============ */
 .reader-viewport {

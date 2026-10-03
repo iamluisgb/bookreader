@@ -25,8 +25,11 @@ const DEFAULT_COLOR = '#ffd54f';
 // Título/autor del libro abierto, para la tarjeta-cita al compartir (P11). Lo fija
 // app.js al abrir (biblioteca o archivo); degrada a vacío si no se conoce.
 let bookMeta = { title: '', author: '', cover: '' };
-export function setBookMeta(m) {
-  bookMeta = { title: (m && m.title) || '', author: (m && m.author) || '', cover: (m && m.cover) || '' };
+// Mezcla: un campo que no viene se conserva. Antes sustituía el objeto entero, y regenerar
+// la portada (`setBookMeta({ cover })`) borraba el título y el autor de la tarjeta-cita.
+export function setBookMeta(m = {}) {
+  for (const k of ['title', 'author', 'cover']) if (m[k] !== undefined) bookMeta[k] = m[k] || '';
+  window.dispatchEvent(new CustomEvent('book:meta', { detail: { ...bookMeta } }));
 }
 
 // Compartir un pasaje como tarjeta-cita PNG (Web Share o descarga).

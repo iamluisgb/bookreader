@@ -195,11 +195,9 @@ export function init(opts) {
     if (convoMenuEl && !convoMenuEl.contains(e.target) && !e.target.closest('#ai-convo-btn')) closeConvoMenu();
   });
 
-  // Atenuación de capítulos: perezosa, al abrir el índice (el handler de app.js
-  // ya alternó la clase 'open' antes de que llegue este listener).
-  document.getElementById('sidebar-toggle')?.addEventListener('click', () => {
-    if (document.getElementById('sidebar')?.classList.contains('open')) maybeAttenuate();
-  });
+  // Atenuación de capítulos: perezosa, al abrir el índice. Por el evento de ui/sidebar.js y
+  // no por el clic del botón: así vale abra quien abra el panel (lupa, «Más», atajo).
+  window.addEventListener('sidebar:change', (e) => { if (e.detail.open) maybeAttenuate(); });
 }
 
 // Sin clave propia, el agente usa la demo: se pide sola la primera vez que hace falta

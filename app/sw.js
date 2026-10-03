@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bookreader-v161';
+const CACHE_NAME = 'bookreader-v162';
 // Ficheros compartidos con la app (share target) a la espera de que la app los recoja.
 const INBOX = 'bookreader-inbox';
 const ASSETS = [
@@ -137,6 +137,7 @@ const ASSETS = [
   './js/ui/text.js',
   './js/ui/when.js',
   './js/ui/icons.js',
+  './js/ui/sidebar.js',
   './js/ui/escape.js',
   './js/ui/svg-fonts.js',
   './js/ui/svg-raster.js',

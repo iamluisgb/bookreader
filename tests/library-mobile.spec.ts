@@ -121,7 +121,8 @@ test('con un libro abierto, «Más» en la cabecera lleva a Ajustes generales y 
   await page.goto('/index.html');
   await page.setInputFiles('#file-input', EPUB_PATH);
   await page.waitForSelector('#epub-container iframe', { timeout: 30000 });
-  await expect(page.locator('#library-btn .brand-back')).toBeVisible();     // «‹» = volver
+  await expect(page.locator('#library-btn')).toBeVisible();                 // «‹ Biblioteca» = volver
+  await expect(page.locator('#library-btn')).toHaveAccessibleName('Volver a la biblioteca');
   await page.locator('#reader-more').click();
   const menu = page.locator('.reader-more-menu');
   await expect(menu.locator('.lib-menu-item')).toHaveText(['Ajustes de lectura', 'Ajustes generales', 'Biblioteca']);
