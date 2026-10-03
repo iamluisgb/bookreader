@@ -3,6 +3,42 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-10-03 — DS1: sistema de diseño según *Design Systems* (A. Kholmatova)
+
+Auditoría del sistema contra los capítulos del libro (principios, patrones funcionales y
+perceptivos, lenguaje compartido, parámetros, biblioteca de patrones) y su plan, entero:
+
+1. **Documentación al día.** [`DESIGN.md`](DESIGN.md) reescrito como referencia viva: 8
+   principios (nuevos: «el verde es identidad, no acción», «solo tokens», «legible antes que
+   sutil»), tabla de tokens, breakpoints, patrones, cascada y gobernanza. `AGENTS.md` dice a
+   los agentes cómo usar tokens y patrones.
+2. **Una sola fuente de tokens.** Landing EN/ES, /anki/ y /privacy/ cargan
+   `app/css/themes.css` + `assets/landing/brand.css` (solo lo propio de marca). Fuera los
+   cuatro bloques de tokens duplicados y el vocabulario paralelo `--ink/--bg/--line`: ahora
+   `--text/--surface-*/--border` en todas partes. `--accent` significa lo mismo en app y
+   landing; el verde de marca es `--brand` (+ `--on-brand`).
+3. **Reglas ejecutables.** `tests/css-vars.spec.ts` falla con tamaños de letra, radios,
+   z-index de pantalla y breakpoints fuera del sistema, con rojos/ámbares/verdes de feedback
+   escritos a mano, y si crecen los hex sueltos de cada hoja (techo que solo baja).
+4. **Patrones por función.** `.btn.btn--primary`, `.btn.btn--secondary` y `.segmented` >
+   `.segmented-btn` sustituyen a las listas de 5 selectores de pantalla en `modern.css`. Las
+   clases de contexto se quedan como ganchos de JS y tests.
+5. **Feedback y capas.** `--danger/--on-danger/--warning/--success` (6 rojos → 1; ya había
+   código que pedía `var(--danger, …)` sin que existiera). Escala `--z-*` de 13 capas con los
+   valores de siempre: no cambia quién tapa a quién. `--fill-raised` sustituye las reglas
+   `[data-theme="dark"]` de los controles segmentados.
+6. **Escala tipográfica.** `--fs-xs` = 12px (el tamaño más usado y no tenía paso; el antiguo
+   11px es `--fs-2xs`) y `--fs-3xl` = 30px. 265 `font-size` y 117 radios a mano → tokens;
+   los fuera de escala van al paso más cercano (15 → 16, 12.5 → 13, 10 → 11…).
+7. **Contraste AA.** `--text-soft/--text-faint` cumplen 4.5:1 en claro, oscuro y sepia; acento
+   sepia `#146f3c`; la landing usa el acento de la app (`#1f9d54` daba 3.5:1).
+8. **Biblioteca de patrones** [`app/patterns.html`](app/patterns.html), viva (mismas hojas,
+   tokens leídos en el navegador, selector de tema) y fuera del deploy, con su contrato en
+   `tests/patterns.spec.ts`.
+9. **Cascada más simple.** `main-late.css` se funde al principio de `modern.css` (la capa de
+   sistema); el hueco de `agent.css` pasa a estar justo antes de ella. Breakpoints 560/620 →
+   600; el de 1001px se queda (va ligado a `epub-reader.js`).
+
 ## 2026-10-02 — Libretas: las cinco recomendaciones principales de la auditoría UX
 
 Ver [`docs/AUDITORIA_LIBRETAS.md`](docs/AUDITORIA_LIBRETAS.md). Cinco tramos:

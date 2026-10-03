@@ -19,11 +19,12 @@ offline con un agente de IA (BYOK) que lee el libro completo según un objetivo.
 
 ## Estructura
 - `index.html` — entry point (CSP, scripts vendorizados).
-- `css/` — main.css (layout), main-late.css (foco/tooltips/responsive), agent.css
-  (panel del agente + ajustes, **carga perezosa**), reader.css (iframe epub),
-  themes.css (tokens/temas). El orden de los tres primeros lo fija el `<head>`:
-  agent.css se inserta en el hueco `#css-slot-agent` para no alterar la cascada
-  (ver `js/css-loader.js`).
+- `css/` — themes.css (tokens y temas, **única fuente**; también la cargan las páginas
+  públicas), main.css (layout por pantalla), reader.css (iframe epub), temml.css (fórmulas),
+  agent.css (panel del agente + ajustes, **carga perezosa**) y modern.css (capa de sistema:
+  base tardía + patrones, va la ÚLTIMA). agent.css se inserta en el hueco `#css-slot-agent`,
+  justo antes de modern.css, para no alterar la cascada (ver `js/css-loader.js`).
+- `patterns.html` — biblioteca de patrones viva (uso interno, fuera del deploy).
 - `js/` — orquestador (`app.js`) + módulos por responsabilidad:
   - lectura: `epub-reader.js`, `pdf-reader.js`, `pdf-axis-lock.js`, `touch-select.js`, `progress.js`
   - análisis: `reading-log.js` (cuenta solo la lectura a ritmo plausible; los saltos no suman)
@@ -42,7 +43,16 @@ offline con un agente de IA (BYOK) que lee el libro completo según un objetivo.
 
 ## Convenciones
 - JS modules via `<script type="module">`. Funciones nombradas, no arrow anónimas en módulos públicos.
-- CSS: variables en `:root`, themes con `[data-theme="sepia"]` etc.
+- CSS: **solo tokens** de `app/css/themes.css` (color, `--fs-*`, `--r-*`, `--z-*`, `--s-*`). Si
+  falta un valor, se crea el token con un comentario de para qué es; nunca un valor a mano.
+  Feedback con `--danger/--warning/--success`, no con el acento. Los temas solo redefinen
+  tokens: nada de `[data-theme]` en componentes. `npm test` lo comprueba
+  (`tests/css-vars.spec.ts`); si te frena, no relajes el test.
+- Componentes: usa el patrón por su nombre de función (`.btn.btn--primary`,
+  `.btn.btn--secondary`, `.segmented` > `.segmented-btn`). Mira primero `app/patterns.html`;
+  si el patrón no existe, créalo en `modern.css` y añádelo ahí. Las clases de contexto
+  (`.lib-upload`, `.dlg-ok`…) son ganchos de JS/tests, no para color ni estados.
+  Principios y tokens: [`DESIGN.md`](DESIGN.md).
 - Config/subrayados en localStorage con prefijo `bookreader_`; datos del agente en IndexedDB.
 - No agregar dependencias sin justificación. Las libs core están vendorizadas (mismo origen → CSP estricta).
 - Escapar SIEMPRE con `js/ui/escape.js` al construir HTML con datos.
