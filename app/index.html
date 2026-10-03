@@ -36,6 +36,16 @@
 <script defer src="js/analytics.js"></script>
 </head>
 <body>
+  <!-- Carril de navegación (auditoría de la cabecera, F1): «‹ Biblioteca» y el botón del
+     índice, fijos arriba a la izquierda de la VENTANA. Al abrir el índice el panel entra
+     por debajo y el botón sigue en el mismo píxel: el que lo abrió lo cierra (Apple Books,
+     Finder). Va fuera de .reader-header porque su backdrop-filter atraparía un `fixed`.
+     Volver es una flecha con su palabra, no el logo (Kindle, Play Books, Kobo). En móvil, «‹». -->
+  <div class="reader-nav">
+    <button id="library-btn" class="reader-back" aria-label="Volver a la biblioteca" data-i18n-attrs="aria-label" style="display:none;"><span data-icon="chevron-left" data-icon-size="lg" aria-hidden="true"></span><span class="reader-back-label" data-i18n>Biblioteca</span></button>
+    <button id="sidebar-toggle" class="icon-btn" aria-label="Índice y notas" aria-expanded="false" aria-controls="sidebar" data-tip="Índice y notas" data-i18n-attrs="aria-label,data-tip" data-tip-align="left" data-icon="panel-left"></button>
+  </div>
+
   <!-- Sidebar -->
   <aside id="sidebar" class="sidebar">
     <div class="sidebar-header">
@@ -221,13 +231,9 @@
   <main id="reader-main" class="reader-main">
     <!-- Top bar -->
     <header id="reader-header" class="reader-header">
-      <!-- Navegación (auditoría de la cabecera): «‹ Biblioteca» y el botón del índice. Volver
-           es una flecha con su palabra, no el logo: un logo arriba a la izquierda se lee como
-           marca, no como «atrás» (Kindle, Play Books, Kobo usan flecha). En móvil, solo «‹». -->
-      <div class="reader-nav">
-        <button id="library-btn" class="reader-back" aria-label="Volver a la biblioteca" data-i18n-attrs="aria-label" style="display:none;"><span data-icon="chevron-left" data-icon-size="lg" aria-hidden="true"></span><span class="reader-back-label" data-i18n>Biblioteca</span></button>
-        <button id="sidebar-toggle" class="icon-btn" aria-label="Índice y notas" aria-expanded="false" aria-controls="sidebar" data-tip="Índice y notas" data-i18n-attrs="aria-label,data-tip" data-tip-align="left" data-icon="panel-left"></button>
-      </div>
+      <!-- Hueco del carril de navegación (.reader-nav, fijo a la ventana): reserva su ancho
+           para que el título siga centrado en la columna de lectura. -->
+      <div class="reader-nav-slot" aria-hidden="true"></div>
       <div id="reader-title" class="reader-title">BookReader</div>
       <div class="header-actions">
         <button id="immersive-toggle" class="icon-btn" aria-label="Pantalla completa" data-tip="Pantalla completa" data-i18n-attrs="aria-label,data-tip" data-icon="expand" disabled></button>

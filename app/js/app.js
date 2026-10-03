@@ -973,10 +973,10 @@ function initImmersive() {
     const quietSoon = () => { clearTimeout(quietT); quietT = setTimeout(quiet, 2500); };
     EpubReader.onActivity(() => { if (inFs()) hideBars(); quietSoon(); });
     document.addEventListener('mousemove', (e) => {
-      if (e.target.closest?.('.reader-header, .reader-footer, #sidebar, #ai-panel')) wake();
+      if (e.target.closest?.('.reader-header, .reader-nav, .reader-footer, #sidebar, #ai-panel')) wake();
     }, { passive: true });
     document.addEventListener('focusin', (e) => {
-      if (e.target.closest?.('.reader-header, .reader-footer')) wake();
+      if (e.target.closest?.('.reader-header, .reader-nav, .reader-footer')) wake();
     });
 
     // Sincroniza clase/estado/icono con el estado real de fullscreen (clic, Esc, F11).
@@ -1361,6 +1361,13 @@ function initBookHeader() {
     };
     new ResizeObserver(fit).observe(header);
     new MutationObserver(fit).observe(titleEl, { childList: true, characterData: true, subtree: true });
+  }
+
+  // F1: el carril es fijo; la cabecera del lector le guarda el hueco con su ancho real (cambia
+  // con el idioma, con «Biblioteca» oculta en móvil y con #library-btn fuera de un libro).
+  const nav = document.querySelector('.reader-nav');
+  if (nav && typeof ResizeObserver === 'function') {
+    new ResizeObserver(() => document.documentElement.style.setProperty('--reader-nav-w', `${Math.ceil(nav.getBoundingClientRect().width)}px`)).observe(nav);
   }
 
   // Q4: el botón del agente dice si está abierto.

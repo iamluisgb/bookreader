@@ -56,7 +56,7 @@ test('auditoría EN: lector + sidebar + biblioteca + panel + modales sin españo
   }
   await page.locator('#reading-settings').click();   // ajustes de lectura: engranaje, no pestaña
   found.push(...leaks(await dumpUiText(page)).map(x => 'reader/sidebar: ' + x));
-  await page.locator('#sidebar-close').click();
+  await page.locator('#sidebar-toggle').click();   // ≥ 1024 la ✕ no está: el botón del carril cierra
 
   // 4) panel del agente + onboarding (plantillas) + studio
   await page.locator('#ai-toggle').click();

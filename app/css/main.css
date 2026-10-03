@@ -677,7 +677,29 @@ input[type="range"] {
   gap: 4px;
   justify-self: end;
 }
-.reader-nav { display: flex; align-items: center; gap: 4px; justify-self: start; }
+/* Carril de navegación (auditoría de la cabecera, F1): fijo a la VENTANA, no a la cabecera.
+   Con el índice cerrado se pinta sobre la cabecera del lector, que le guarda el hueco
+   (.reader-nav-slot, ancho medido en --reader-nav-w); con el índice abierto queda en el mismo
+   píxel sobre la cabecera del panel, que reserva esa franja. Nada se mueve: el panel se
+   desliza por debajo. Capa: en escritorio (≥ 1024) justo encima del panel y por debajo de
+   popovers; en cajón (< 1024) a la altura de las barras, así el cajón y su velo lo tapan. */
+.reader-nav {
+  position: fixed; top: 0; left: 12px;
+  height: var(--header-height);
+  display: flex; align-items: center; gap: 4px;
+  z-index: calc(var(--z-chrome) + 21);
+  transition: opacity 0.2s var(--ease), transform var(--transition-normal);
+}
+@media (min-width: 1024px) { .reader-nav { z-index: calc(var(--z-panel) + 1); } }
+body.in-library .reader-nav { display: none; }
+.reader-nav-slot { width: var(--reader-nav-w, 0px); }
+@media (min-width: 1024px) {
+  body:has(#sidebar.open) .reader-nav-slot { width: 0; }
+  /* La cabecera del panel: arriba la franja del carril; debajo, el libro. La ✕ sobra: el
+     botón del carril, en acento, es el cierre. En cajón (< 1024) se queda: ahí el panel tapa. */
+  .sidebar-header { height: auto; flex-wrap: wrap; padding-top: var(--header-height); padding-bottom: 10px; }
+  #sidebar-close { display: none; }
+}
 .reader-title.is-cramped { visibility: hidden; }
 
 /* ============ READER VIEWPORT ============ */
