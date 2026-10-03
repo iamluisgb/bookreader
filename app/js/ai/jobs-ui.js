@@ -56,12 +56,12 @@ function renderChip(job) {
   if (job.status === 'running') {
     const p = job.progress;
     const label = p.phase === 'reduce' ? `${name} · ${t('redactando…')}` : (p.n ? `${name} ${p.i}/${p.n}` : `${name}…`);
-    chip.innerHTML = `<span class="ai-taskchip-spin" aria-hidden="true"></span><span class="ai-taskchip-label"></span><button class="ai-taskchip-x" title="${t('Cancelar')}" aria-label="${t('Cancelar')}">${icon('xmark', { size: 14 })}</button>`;
+    chip.innerHTML = `<span class="ai-taskchip-spin" aria-hidden="true"></span><span class="ai-taskchip-label"></span><button class="ai-taskchip-x" title="${t('Cancelar')}" aria-label="${t('Cancelar')}">${icon('xmark', { size: 'sm' })}</button>`;
     chip.querySelector('.ai-taskchip-label').textContent = label;
     chip.querySelector('.ai-taskchip-x').onclick = (e) => { e.stopPropagation(); Jobs.cancel(); };
     chip.onclick = () => openers[job.kind]?.();
   } else if (job.status === 'done') {
-    chip.innerHTML = `<span class="ai-taskchip-dot" aria-hidden="true">${icon('check', { size: 13 })}</span><span class="ai-taskchip-label"></span>`;
+    chip.innerHTML = `<span class="ai-taskchip-dot" aria-hidden="true">${icon('check', { size: 'sm' })}</span><span class="ai-taskchip-label"></span>`;
     chip.querySelector('.ai-taskchip-label').textContent = `${t('Ver')} ${name.toLowerCase()}`;
     chip.onclick = () => openers[job.kind]?.();
   } else if (job.status === 'error') {

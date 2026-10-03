@@ -51,7 +51,7 @@ export function open(context) {
   overlay.className = 'ai-onboarding';
   overlay.innerHTML = `
     <div class="ai-ob-card mm-card" role="dialog" aria-modal="true" aria-label="${t('Mapa mental')}">
-      <button class="ai-ob-close" title="${t('Cerrar')}" aria-label="${t('Cerrar')}">${icon('xmark', { size: 18 })}</button>
+      <button class="ai-ob-close" title="${t('Cerrar')}" aria-label="${t('Cerrar')}">${icon('xmark', { size: 'lg' })}</button>
       <div class="ai-ob-body"></div>
     </div>`;
   document.body.appendChild(overlay);
@@ -102,7 +102,7 @@ function renderSetup() {
       <option value="">${t('Libro entero')}</option>
       ${chapters.map(c => `<option value="${escapeHtml(c)}"${c === scopeValue ? ' selected' : ''}>${escapeHtml(c)}</option>`).join('')}
     </select>
-    <button id="mm-generate" class="btn btn--primary primary-btn ai-ob-start">${icon('sparkles', { size: 16 })} ${t('Generar mapa')}</button>
+    <button id="mm-generate" class="btn btn--primary primary-btn ai-ob-start">${icon('sparkles', { size: 'md' })} ${t('Generar mapa')}</button>
     <div id="mm-error" class="fc-error" style="display:none"></div>`;
   b.querySelector('#mm-scope').addEventListener('change', (e) => { scopeValue = e.target.value; });
   b.querySelector('#mm-generate').addEventListener('click', onGenerate);
@@ -384,7 +384,7 @@ function renderRunning(job) {
     <h2>${t('Generando mapa mental…')}</h2>
     <p class="ai-run-status" id="mm-run-status" role="status"></p>
     <div class="ai-run-actions">
-      <button id="mm-keep" class="btn btn--primary primary-btn">${icon('book', { size: 16 })} ${t('Seguir leyendo')}</button>
+      <button id="mm-keep" class="btn btn--primary primary-btn">${icon('book', { size: 'md' })} ${t('Seguir leyendo')}</button>
       <button id="mm-cancel" class="ai-ob-back fc-txt-btn">${t('Cancelar')}</button>
     </div>
     <p class="sum-depth-hint">${t('Puedes cerrar esta ventana y seguir leyendo: te avisaremos cuando el mapa esté listo.')}</p>`;
@@ -734,19 +734,19 @@ function openNodePopover(id) {
   const canCite = !!(node.src && ctx.anchors?.has(node.src));
   const actions = [];
   if (node.childCount > 0) {
-    actions.push(`<button class="mm-pop-act" data-act="fold">${icon(node.collapsed ? 'chevron-down' : 'chevron-up', { size: 14 })} ${node.collapsed ? t('Desplegar') : t('Plegar')}</button>`);
+    actions.push(`<button class="mm-pop-act" data-act="fold">${icon(node.collapsed ? 'chevron-down' : 'chevron-up', { size: 'sm' })} ${node.collapsed ? t('Desplegar') : t('Plegar')}</button>`);
   } else if (node.depth >= 1) {
-    actions.push(`<button class="mm-pop-act" data-act="expand">${icon('sparkles', { size: 14 })} ${t('Expandir')}</button>`);
+    actions.push(`<button class="mm-pop-act" data-act="expand">${icon('sparkles', { size: 'sm' })} ${t('Expandir')}</button>`);
   }
-  if (canCite) actions.push(`<button class="mm-pop-act" data-act="cite">${icon('book', { size: 14 })} ${t('Ir al libro')}</button>`);
-  if (ctx.onAsk) actions.push(`<button class="mm-pop-act" data-act="ask">${icon('sparkles', { size: 14 })} ${t('Preguntar')}</button>`);
+  if (canCite) actions.push(`<button class="mm-pop-act" data-act="cite">${icon('book', { size: 'sm' })} ${t('Ir al libro')}</button>`);
+  if (ctx.onAsk) actions.push(`<button class="mm-pop-act" data-act="ask">${icon('sparkles', { size: 'sm' })} ${t('Preguntar')}</button>`);
 
   popover = document.createElement('div');
   popover.className = 'mm-pop';
   popover.setAttribute('role', 'dialog');
   popover.setAttribute('aria-label', node.full || node.label);
   popover.innerHTML = `
-    <button class="mm-pop-close" aria-label="${t('Cerrar')}">${icon('xmark', { size: 14 })}</button>
+    <button class="mm-pop-close" aria-label="${t('Cerrar')}">${icon('xmark', { size: 'sm' })}</button>
     <h4>${escapeHtml(node.full || node.label)}</h4>
     ${quote ? `<blockquote>${escapeHtml(quote.slice(0, 420))}${quote.length > 420 ? '…' : ''}</blockquote>` : ''}
     <div class="mm-pop-actions">${actions.join('')}</div>
@@ -941,15 +941,15 @@ async function renderResult(tree, scopeName) {
   Jobs.clearActive();          // el usuario está viendo el resultado → retira chip/aviso
   b.innerHTML = `
     <div class="sum-resulthead">
-      <button class="ai-ob-back">${icon('chevron-left', { size: 16 })}<span>${t('Volver')}</span></button>
-      <button id="mm-regen" class="fc-txt-btn">${icon('sparkles', { size: 14 })} ${t('Regenerar')}</button>
+      <button class="ai-ob-back">${icon('chevron-left', { size: 'md' })}<span>${t('Volver')}</span></button>
+      <button id="mm-regen" class="fc-txt-btn">${icon('sparkles', { size: 'sm' })} ${t('Regenerar')}</button>
     </div>
     <h2>${t('Mapa mental')} — ${escapeHtml(scopeName)}</h2>
     <div class="mm-stage">
       <div class="mm-canvas" id="mm-canvas"></div>
       <div class="mm-zoom" role="group" aria-label="${t('Zoom del mapa')}">
         <button id="mm-zoom-out" aria-label="${t('Alejar')}" title="${t('Alejar')}">−</button>
-        <button id="mm-zoom-fit" aria-label="${t('Ajustar')}" title="${t('Ajustar')}">${icon('target', { size: 14 })}</button>
+        <button id="mm-zoom-fit" aria-label="${t('Ajustar')}" title="${t('Ajustar')}">${icon('expand', { size: 'sm' })}</button>
         <button id="mm-zoom-in" aria-label="${t('Acercar')}" title="${t('Acercar')}">+</button>
       </div>
     </div>
@@ -962,8 +962,8 @@ async function renderResult(tree, scopeName) {
       </div>
     </div>
     <div class="fc-export">
-      <button id="mm-png" class="btn btn--primary primary-btn">${icon('download', { size: 16 })} ${t('Descargar PNG')}</button>
-      <button id="mm-share" class="ai-ob-back fc-txt-btn" style="display:none">${icon('share', { size: 14 })} ${t('Compartir')}</button>
+      <button id="mm-png" class="btn btn--primary primary-btn">${icon('download', { size: 'md' })} ${t('Descargar PNG')}</button>
+      <button id="mm-share" class="ai-ob-back fc-txt-btn" style="display:none">${icon('share', { size: 'sm' })} ${t('Compartir')}</button>
       <button id="mm-svg" class="ai-ob-back fc-txt-btn">SVG</button>
     </div>
     <div id="mm-export-error" class="fc-error" style="display:none"></div>`;

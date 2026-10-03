@@ -20,7 +20,7 @@ export function toast({ message, actionLabel, onAction, kind = 'info', timeout =
   el.innerHTML =
     `<span class="ai-toast-msg"></span>` +
     (actionLabel ? `<button class="btn btn--primary ai-toast-action"></button>` : '') +
-    `<button class="ai-toast-close" aria-label="${t('Cerrar')}">${icon('xmark', { size: 14 })}</button>`;
+    `<button class="ai-toast-close" aria-label="${t('Cerrar')}">${icon('xmark', { size: 'sm' })}</button>`;
   el.querySelector('.ai-toast-msg').textContent = message;
   if (actionLabel) el.querySelector('.ai-toast-action').textContent = actionLabel;
   h.appendChild(el);

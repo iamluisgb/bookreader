@@ -47,7 +47,7 @@ function ensureOverlay() {
   overlay.className = 'img-zoom';
   overlay.style.display = 'none';
   overlay.innerHTML = `
-    <button class="img-zoom-close" aria-label="${t('Cerrar')}">${icon('xmark', { size: 22 })}</button>
+    <button class="img-zoom-close" aria-label="${t('Cerrar')}">${icon('xmark', { size: 'xl' })}</button>
     <img class="img-zoom-img" alt="Imagen del libro" draggable="false">`;
   document.body.appendChild(overlay);
   imgEl = overlay.querySelector('.img-zoom-img');

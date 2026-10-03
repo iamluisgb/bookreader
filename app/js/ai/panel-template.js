@@ -15,8 +15,8 @@ export const TEMPLATE = () => `
        flashcards) vivían también aquí como iconos sueltos y se quitaron: su casa es el Studio,
        que además muestra su estado e historial —cosas que un icono no puede decir— y ya era el
        único sitio de los tipos nuevos ("Explícamelo tú" nació sin icono). Sustituye a la antigua cabecera "Agente" (redundante) para dar el máximo
-       alto al chat. El grupo de conversación (#ai-convobar) se oculta sin libro; ⚙ y ✕ siempre
-       visibles (por eso ⚙ lleva margin-left:auto para quedar a la derecha cuando el grupo falta).
+       alto al chat. El grupo de conversación (#ai-convobar) se oculta sin libro; el engranaje y el cierre siempre
+       visibles (por eso el engranaje lleva margin-left:auto para quedar a la derecha cuando el grupo falta).
        "Nueva conversación" y "Exportar" ESTABAN aquí como iconos sueltos y se han bajado al menú
        del selector: son acciones DE la conversación, el menú ya listaba "Nueva conversación…", y
        a 380px de panel los seis controles no caben —el flex aplastaba a cero la etiqueta del
@@ -24,7 +24,7 @@ export const TEMPLATE = () => `
   <div class="ai-toolbar">
     <div id="ai-convobar" class="ai-convobar" style="display:none">
       <button id="ai-convo-btn" class="ai-convo-btn" title="${t('Cambiar de conversación')}">
-        ${icon('bubble', { size: 15 })}<span id="ai-convo-label" class="ai-convo-label">${t('Conversación')}</span>${icon('chevron-down', { size: 14 })}
+        ${icon('bubble', { size: 'md' })}<span id="ai-convo-label" class="ai-convo-label">${t('Conversación')}</span>${icon('chevron-down', { size: 'sm' })}
       </button>
     </div>
     <button id="ai-edit-cfg" class="icon-btn ai-toolbar-cfg" title="${t('Ajustes del agente')}">${icon('gear')}</button>
@@ -32,23 +32,23 @@ export const TEMPLATE = () => `
   </div>
   <div id="ai-status" class="ai-status">${t('Abre un EPUB para empezar.')}</div>
   <div id="ai-tabs" class="segmented ai-tabs" style="display:none">
-    <button class="segmented-btn ai-tab active" data-view="chat">${icon('bubble', { size: 16 })} Chat</button>
-    <button class="segmented-btn ai-tab" data-view="notebook">${icon('note', { size: 16 })} ${t('Libreta')}</button>
-    <button class="segmented-btn ai-tab" data-view="studio">${icon('sparkles', { size: 16 })} Studio</button>
+    <button class="segmented-btn ai-tab active" data-view="chat">${icon('bubble', { size: 'md' })} Chat</button>
+    <button class="segmented-btn ai-tab" data-view="notebook">${icon('notebook', { size: 'md' })} ${t('Libreta')}</button>
+    <button class="segmented-btn ai-tab" data-view="studio">${icon('sparkles', { size: 'md' })} Studio</button>
   </div>
   <div id="ai-view-chat" class="ai-view active">
     <div id="ai-messages" class="ai-messages" role="log" aria-live="polite" aria-relevant="additions text" aria-label="${t('Conversación con el agente')}"></div>
     <!-- Ir al inicio de la última respuesta (ver mountJump en ai/composer-picks.js). -->
-    <button id="ai-jump" class="ai-jump" hidden title="${t('Ir al inicio de la última respuesta')}" aria-label="${t('Ir al inicio de la última respuesta')}">${icon('arrow-up', { size: 18 })}</button>
+    <button id="ai-jump" class="ai-jump" hidden title="${t('Ir al inicio de la última respuesta')}" aria-label="${t('Ir al inicio de la última respuesta')}">${icon('arrow-up', { size: 'lg' })}</button>
     <div id="ai-ref" class="ai-ref" style="display:none">
-      <span class="ai-ref-ico">${icon('note', { size: 15 })}</span>
+      <span class="ai-ref-ico">${icon('note', { size: 'md' })}</span>
       <span id="ai-ref-text" class="ai-ref-text"></span>
-      <button id="ai-ref-clear" class="ai-ref-clear" title="${t('Quitar referencia')}">${icon('xmark', { size: 15 })}</button>
+      <button id="ai-ref-clear" class="ai-ref-clear" title="${t('Quitar referencia')}">${icon('xmark', { size: 'md' })}</button>
     </div>
     <div id="ai-imgref" class="ai-ref ai-imgref" style="display:none">
-      <span class="ai-ref-ico">📷</span>
+      <span class="ai-ref-ico">${icon('crop', { size: 'md' })}</span>
       <span id="ai-imgref-text" class="ai-ref-text"></span>
-      <button id="ai-imgref-clear" class="ai-ref-clear" title="${t('Quitar imagen')}">${icon('xmark', { size: 15 })}</button>
+      <button id="ai-imgref-clear" class="ai-ref-clear" title="${t('Quitar imagen')}">${icon('xmark', { size: 'md' })}</button>
     </div>
     <!-- Zonas recortadas de la página (IA6 v2). Se ven ANTES de enviar: el usuario comprueba
          qué va a mirar el modelo, y puede añadir otra para preguntar por la relación. -->
@@ -71,10 +71,10 @@ export const TEMPLATE = () => `
         <div class="ai-composer-btns">
           <!-- Un solo botón de visión: abre el overlay sobre la página y allí se elige el
                alcance (arrastrar una zona · "Toda la página"). Ver pickZone() en panel.js. -->
-          <button id="ai-see" class="btn btn--secondary ai-see" title="${t('Enseñarle al agente una figura, una tabla o la página entera')}" style="display:none">${icon('crop', { size: 15 })}<span>${t('Ver')}</span></button>
+          <button id="ai-see" class="btn btn--secondary ai-see" title="${t('Enseñarle al agente una figura, una tabla o la página entera')}" style="display:none">${icon('crop', { size: 'md' })}<span>${t('Ver')}</span></button>
           <div class="ai-composer-row">
-            <button id="ai-mic" class="btn btn--secondary ai-see ai-mic" title="${t('Dictar')}" aria-label="${t('Dictar')}" aria-pressed="false" style="display:none">${icon('mic', { size: 16 })}</button>
-            <button id="ai-send" class="ai-send" title="${t('Enviar')}" aria-label="${t('Enviar')}">${icon('arrow-up', { size: 18 })}</button>
+            <button id="ai-mic" class="btn btn--secondary ai-see ai-mic" title="${t('Dictar')}" aria-label="${t('Dictar')}" aria-pressed="false" style="display:none">${icon('mic', { size: 'md' })}</button>
+            <button id="ai-send" class="ai-send" title="${t('Enviar')}" aria-label="${t('Enviar')}">${icon('arrow-up', { size: 'lg' })}</button>
           </div>
         </div>
         </div>

@@ -36,6 +36,10 @@
      interfaz y antes no tenía paso: por eso se escribía a mano. */
   --fs-2xs: 11px; --fs-xs: 12px; --fs-sm: 13px; --fs-md: 14px; --fs-lg: 16px;
   --fs-xl: 20px; --fs-2xl: 26px; --fs-3xl: 30px;
+  /* Iconos (js/ui/icons.js · ICON_SIZES es su espejo; tests/icons.spec.ts los compara):
+     sm en línea con texto pequeño · md botones y menús · lg acciones destacadas ·
+     xl cabecera y lector · display/hero estados vacíos e ilustraciones. */
+  --icon-sm: 14px; --icon-md: 16px; --icon-lg: 20px; --icon-xl: 24px; --icon-display: 32px; --icon-hero: 56px;
 
   /* Layout */
   --sidebar-width: 320px;

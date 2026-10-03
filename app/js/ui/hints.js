@@ -64,9 +64,9 @@ function ensureRoot() {
   root.className = 'hint-pop';
   root.setAttribute('role', 'status');
   root.innerHTML = `
-    <span class="hint-pop-ico">${icon('sparkles', { size: 15 })}</span>
+    <span class="hint-pop-ico">${icon('sparkles', { size: 'md' })}</span>
     <span class="hint-pop-text"></span>
-    <button class="hint-pop-close" aria-label="${t('Entendido')}" title="${t('Entendido')}">${icon('xmark', { size: 13 })}</button>`;
+    <button class="hint-pop-close" aria-label="${t('Entendido')}" title="${t('Entendido')}">${icon('xmark', { size: 'sm' })}</button>`;
   root.querySelector('.hint-pop-close').addEventListener('click', dismiss);
   document.body.appendChild(root);
   return root;

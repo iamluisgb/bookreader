@@ -52,7 +52,7 @@ function openMenu(anchor, html, onPick) {
   });
 }
 
-const check = (on) => `<span class="lib-menu-check">${on ? icon('check', { size: 16 }) : ''}</span>`;
+const check = (on) => `<span class="lib-menu-check">${on ? icon('check', { size: 'md' }) : ''}</span>`;
 
 // ---- Perfil ------------------------------------------------------------------
 
@@ -63,7 +63,7 @@ function openProfileMenu(anchor) {
     ${all.map(p => `<button class="lib-menu-item" data-profile="${escapeHtml(p.id)}">${check(p.id === active)}<span>${escapeHtml(p.name)}</span></button>`).join('')}
     <button class="lib-menu-item" data-profile="">${check(!active)}<span>${t('Sin perfil')}</span></button>
     <div class="lib-menu-sep"></div>
-    <button class="lib-menu-item" data-go="profiles">${icon('gear', { size: 16 })}<span>${all.length ? t('Gestionar perfiles…') : t('Crear un perfil…')}</span></button>
+    <button class="lib-menu-item" data-go="profiles">${icon('gear', { size: 'md' })}<span>${all.length ? t('Gestionar perfiles…') : t('Crear un perfil…')}</span></button>
   `, (d) => {
     if (d.go) { openSettings(d.go); return; }
     Profiles.setActiveId(d.profile || null);
@@ -95,7 +95,7 @@ function openModelMenu(anchor) {
     // La demo trae su propio modelo y no se elige: lo útil aquí es la salida.
     openMenu(anchor, `
       <div class="ai-pick-note">${t('Estás usando la demo gratuita.')}</div>
-      <button class="lib-menu-item" data-go="agent">${icon('gear', { size: 16 })}<span>${t('Usar mi propia API key…')}</span></button>
+      <button class="lib-menu-item" data-go="agent">${icon('gear', { size: 'md' })}<span>${t('Usar mi propia API key…')}</span></button>
     `, (d) => openSettings(d.go));
     return;
   }
@@ -109,7 +109,7 @@ function openModelMenu(anchor) {
     ${modelOptions().map(m => `<button class="lib-menu-item" data-model="${escapeHtml(m)}">${check(m === cur)}<span>${escapeHtml(m)}</span></button>`).join('')}
     ${untested.length ? `<div class="ai-pick-note">${t('Nuevos · sin probar')}</div>${untested.map(m => `<button class="lib-menu-item" data-model="${escapeHtml(m)}">${check(m === cur)}<span>${escapeHtml(m)}</span></button>`).join('')}` : ''}
     <div class="lib-menu-sep"></div>
-    <button class="lib-menu-item" data-go="agent">${icon('gear', { size: 16 })}<span>${t('Más modelos y proveedores…')}</span></button>
+    <button class="lib-menu-item" data-go="agent">${icon('gear', { size: 'md' })}<span>${t('Más modelos y proveedores…')}</span></button>
   `, (d) => {
     if (d.go) { openSettings(d.go); return; }
     LLM.setModel(d.model);
@@ -137,8 +137,8 @@ export function mount(el, { settings }) {
   host = el;
   openSettings = settings || openSettings;
   host.innerHTML = `
-    <button type="button" class="ai-pick" data-pick="profile" title="${t('Perfil del agente')}">${icon('user', { size: 14 })}<span class="ai-pick-label"></span>${icon('chevron-down', { size: 12 })}</button>
-    <button type="button" class="ai-pick" data-pick="model" title="${t('Modelo')}">${icon('sparkles', { size: 14 })}<span class="ai-pick-label"></span>${icon('chevron-down', { size: 12 })}</button>`;
+    <button type="button" class="ai-pick" data-pick="profile" title="${t('Perfil del agente')}">${icon('user', { size: 'sm' })}<span class="ai-pick-label"></span>${icon('chevron-down', { size: 'sm' })}</button>
+    <button type="button" class="ai-pick" data-pick="model" title="${t('Modelo')}">${icon('sparkles', { size: 'sm' })}<span class="ai-pick-label"></span>${icon('chevron-down', { size: 'sm' })}</button>`;
   host.addEventListener('click', (e) => {
     const b = e.target.closest('.ai-pick');
     if (!b) return;

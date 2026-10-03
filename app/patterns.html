@@ -39,6 +39,10 @@
   .pl-fb { display: inline-flex; align-items: center; gap: var(--s-2); font-weight: 600; }
   .pl-fb i { width: 10px; height: 10px; border-radius: 50%; background: currentColor; }
   .pl-scroll { overflow-x: auto; }
+.pl-icons { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; margin-top: 14px; }
+.pl-icon { display: flex; flex-direction: column; gap: 4px; padding: 12px; border: 1px solid var(--border-soft); border-radius: var(--r-md); color: var(--text); }
+.pl-icon b { font-size: var(--fs-xs); font-family: ui-monospace, monospace; font-weight: 500; }
+.pl-icon span { font-size: var(--fs-2xs); color: var(--text-soft); line-height: 1.35; }
 </style>
 </head>
 <body class="pl">
@@ -144,6 +148,15 @@
   </section>
 
   <section class="pl-sec">
+    <h2>Iconos</h2>
+    <p class="pl-why">Un significado por icono, de un solo set (<code>js/ui/icons.js</code>): línea en rejilla de 24, <code>currentColor</code>, sin emoji. El tamaño es un paso de la escala, nunca un número suelto.</p>
+    <div class="pl-scroll"><table class="pl-spec" id="pl-icon-sizes">
+      <tr><th>Paso</th><th>Valor</th><th>Muestra</th><th>Para</th></tr>
+    </table></div>
+    <div class="pl-icons" id="pl-icons"></div>
+  </section>
+
+  <section class="pl-sec">
     <h2>Capas</h2>
     <p class="pl-why">Quién tapa a quién a nivel de pantalla. Dentro de un componente bastan enteros 1–10.</p>
     <div class="pl-scroll"><table class="pl-spec" id="pl-z">
@@ -195,6 +208,24 @@
   document.querySelectorAll('.ai-cite').forEach(function (a) { a.addEventListener('click', function (e) { e.preventDefault(); }); });
   paint();
 })();
+</script>
+<script type="module">
+// La galería sale del propio set: lo que hay aquí es lo que hay en la app.
+import { icon, ICON_NAMES, ICON_SIZES } from './js/ui/icons.js';
+const SIGNIFICA = {
+  sparkles: 'Lo hace la IA (agente, Studio, «Pedir al agente»)', funnel: 'Filtro por regla (estantería inteligente)',
+  help: 'Ayuda, guía rápida', info: 'Nota informativa', pin: 'Fijar (en la tira)', bookmark: 'Marcar página',
+  note: 'Nota suelta (de un subrayado)', notebook: 'La libreta', share: 'Hoja de compartir del sistema',
+  download: 'Guardar un fichero', upload: 'Subir un fichero', cloud: 'Drive, sincronizar', chart: 'Análisis',
+  function: 'Ejemplo con números', target: 'Objetivo, por qué importa', user: 'Tu perfil', users: 'Otra persona, compartido',
+  flame: 'Racha', cards: 'Tarjetas, mazos, repaso', gear: 'Ajustes', sliders: 'Ajustes de lectura', crop: 'Ver: zona o página',
+};
+const usoTam = { sm: 'En línea con texto pequeño, chips', md: 'Botones, menús, filas', lg: 'Acciones destacadas, barra de selección',
+  xl: 'Cabecera y lector', display: 'Confirmaciones, estados', hero: 'Estados vacíos' };
+document.getElementById('pl-icon-sizes').innerHTML += Object.entries(ICON_SIZES).map(([k, v]) =>
+  `<tr><td><code>${k}</code> · <code>--icon-${k}</code></td><td>${v}px</td><td>${icon('books', { size: k })}</td><td>${usoTam[k]}</td></tr>`).join('');
+document.getElementById('pl-icons').innerHTML = ICON_NAMES.filter(n => !n.endsWith('-fill')).map(n =>
+  `<div class="pl-icon" title="${n}">${icon(n, { size: 'xl' })}<b>${n}</b>${SIGNIFICA[n] ? `<span>${SIGNIFICA[n]}</span>` : ''}</div>`).join('');
 </script>
 </body>
 </html>

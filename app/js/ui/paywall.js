@@ -34,7 +34,7 @@ function openPaywall(feature) {
     const overlay = document.createElement('div');
     overlay.className = 'dlg-overlay pw-overlay';
     const rows = Object.entries(FEATURES).map(([id, label]) =>
-      `<li class="pw-feat${id === feature ? ' pw-feat-hot' : ''}">${icon('check', { size: 14 })}<span>${escapeHtml(label())}</span></li>`).join('');
+      `<li class="pw-feat${id === feature ? ' pw-feat-hot' : ''}">${icon('check', { size: 'sm' })}<span>${escapeHtml(label())}</span></li>`).join('');
     overlay.innerHTML = `
       <div class="dlg-card pw-card" role="dialog" aria-modal="true" aria-label="BookReader Pro">
         <h2 class="dlg-title">${t('{feature} es de BookReader Pro', { feature: escapeHtml(FEATURES[feature] ? FEATURES[feature]() : t('Esta función')) })}</h2>

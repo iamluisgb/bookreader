@@ -59,11 +59,11 @@ function ensureOverlay() {
   overlay.innerHTML = `
     <div class="appset-card" role="dialog" aria-modal="true" aria-label="${t('Ajustes generales')}">
       <button class="appset-close" title="${t('Cerrar')}" aria-label="${t('Cerrar')}">${icon('xmark')}</button>
-      <h2 class="appset-h2">${icon('gear', { size: 20 })} ${t('Ajustes generales')}</h2>
+      <h2 class="appset-h2">${icon('gear', { size: 'lg' })} ${t('Ajustes generales')}</h2>
       <div class="appset-body">
         <nav class="appset-nav">
-          ${SECTIONS.map(s => `<button class="appset-nav-item" data-section="${s.id}">${icon(s.ico, { size: 16 })}<span>${s.label()}</span></button>`).join('')}
-          <button class="appset-nav-item appset-nav-guide" data-guide>${icon('sparkles', { size: 16 })}<span>${t('Guía rápida')}</span></button>
+          ${SECTIONS.map(s => `<button class="appset-nav-item" data-section="${s.id}">${icon(s.ico, { size: 'md' })}<span>${s.label()}</span></button>`).join('')}
+          <button class="appset-nav-item appset-nav-guide" data-guide>${icon('help', { size: 'md' })}<span>${t('Guía rápida')}</span></button>
         </nav>
         <div class="appset-content"></div>
       </div>
@@ -238,7 +238,7 @@ function demoBlockHtml() {
   if (LLM.hasKey()) return '';
   return `
     <div class="appset-demo">
-      <button id="appset-demo-btn" class="btn btn--primary primary-btn appset-save">${icon('sparkles', { size: 15 })} ${t('Probar la demo (sin API key)')}</button>
+      <button id="appset-demo-btn" class="btn btn--primary primary-btn appset-save">${icon('sparkles', { size: 'md' })} ${t('Probar la demo (sin API key)')}</button>
       <p class="appset-muted">${t('Un cupo de llamadas de prueba con el modelo de la casa, sin registro. Cuando se acabe, pon tu propia key (BYOK) — o configúrala ya abajo.')}</p>
       <p class="appset-model-hint" id="appset-demo-hint" hidden></p>
     </div>`;
@@ -265,7 +265,7 @@ function demoTransferHtml() {
   return `
     <div class="appset-xfer">
       <button type="button" id="appset-xfer-btn" class="appset-viewlink" aria-expanded="false" aria-controls="appset-xfer-panel">
-        ${icon('share', { size: 13 })} ${t('Usar esta demo en otro dispositivo')}
+        ${icon('share', { size: 'sm' })} ${t('Usar esta demo en otro dispositivo')}
       </button>
       <div class="appset-xfer-panel" id="appset-xfer-panel" hidden>
         <p class="appset-muted">${t('Abre este enlace en el otro dispositivo y la demo queda lista allí. El cupo es del enlace, no del dispositivo: los dos gastan de la misma bolsa.')}</p>
@@ -273,11 +273,11 @@ function demoTransferHtml() {
           <input id="appset-xfer-url" class="appset-input" readonly value="" spellcheck="false" />
           <button type="button" class="appset-discover appset-copy" data-copy="appset-xfer-url">${t('Copiar')}</button>
         </div>
-        <button type="button" id="appset-xfer-share" class="appset-discover appset-xfer-share" hidden>${icon('share', { size: 13 })} ${t('Compartir…')}</button>
+        <button type="button" id="appset-xfer-share" class="appset-discover appset-xfer-share" hidden>${icon('share', { size: 'sm' })} ${t('Compartir…')}</button>
         <p class="appset-model-hint" id="appset-xfer-hint" hidden></p>
         <p class="appset-muted appset-xfer-manual-intro">${t('O cópialo a mano: la API key no sirve sola — solo funciona contra esta Base URL. Los tres campos van juntos, en Ajustes → Agente del otro dispositivo.')}</p>
         ${manual}
-        <p class="appset-privacy">${icon('shield', { size: 13 })} ${t('El enlace lleva tu token: quien lo tenga puede gastarte el cupo. Mándalo solo a tus dispositivos.')}</p>
+        <p class="appset-privacy">${icon('shield', { size: 'sm' })} ${t('El enlace lleva tu token: quien lo tenga puede gastarte el cupo. Mándalo solo a tus dispositivos.')}</p>
       </div>
     </div>`;
 }
@@ -308,8 +308,8 @@ function keyRowHtml(id, value, placeholder) {
   return `
     <div class="appset-model-row appset-key-row">
       <input id="${id}" class="appset-input" type="password" placeholder="${escapeHtml(placeholder)}" autocomplete="off" value="${escapeHtml(value)}" />
-      <button type="button" class="appset-discover appset-key-eye" data-eye="${id}" aria-label="${t('Ver la key')}" title="${t('Ver la key')}">${icon('eye', { size: 15 })}</button>
-      <button type="button" class="appset-discover appset-copy" data-copy="${id}">${icon('copy', { size: 14 })} ${t('Copiar')}</button>
+      <button type="button" class="appset-discover appset-key-eye" data-eye="${id}" aria-label="${t('Ver la key')}" title="${t('Ver la key')}">${icon('eye', { size: 'md' })}</button>
+      <button type="button" class="appset-discover appset-copy" data-copy="${id}">${icon('copy', { size: 'sm' })} ${t('Copiar')}</button>
     </div>`;
 }
 
@@ -327,7 +327,7 @@ function wireKeyAndCopy(content) {
     eye.addEventListener('click', () => {
       const ver = input.type === 'password';
       input.type = ver ? 'text' : 'password';
-      eye.innerHTML = icon(ver ? 'eye-off' : 'eye', { size: 15 });
+      eye.innerHTML = icon(ver ? 'eye-off' : 'eye', { size: 'md' });
       eye.setAttribute('aria-label', t(ver ? 'Ocultar la key' : 'Ver la key'));
       eye.title = t(ver ? 'Ocultar la key' : 'Ver la key');
     });
@@ -356,7 +356,7 @@ function agentSimpleHtml() {
   const provOpts = LLM.allProviders().map(p =>
     `<option value="${p.id}"${p.id === curId ? ' selected' : ''}>${escapeHtml(p.name)}</option>`).join('');
   const demoNote = LLM.isDemo()
-    ? `<p class="appset-muted appset-demo-on">${icon('sparkles', { size: 13 })} ${t('Ahora mismo estás usando la demo. Elige un proveedor y pega tu key para seguir sin cupo.')}</p>`
+    ? `<p class="appset-muted appset-demo-on">${icon('sparkles', { size: 'sm' })} ${t('Ahora mismo estás usando la demo. Elige un proveedor y pega tu key para seguir sin cupo.')}</p>`
     : '';
   return `<div class="appset-section">
     <h3 class="appset-h3">${t('Agente')}</h3>
@@ -372,9 +372,9 @@ function agentSimpleHtml() {
     <label class="appset-check"><input type="checkbox" id="appset-auto"${LLM.getAutoExtract() ? ' checked' : ''} /> ${t('Rellenar la libreta automáticamente')}</label>
     <label class="appset-check"><input type="checkbox" id="appset-readnb"${LLM.getReadNotebook() ? ' checked' : ''} /> ${t('Que el agente lea lo que escribo en la libreta')}</label>
     <button id="appset-save" class="btn btn--primary primary-btn appset-save">${t('Guardar')}</button>
-    <p class="appset-saved" id="appset-saved" hidden>${icon('check', { size: 14 })} ${t('Guardado')}</p>
-    <p class="appset-privacy">${icon('shield', { size: 13 })} ${t('Tu API key se guarda solo en este navegador. Para responder, el contenido del libro se envía al proveedor que configures.')}</p>
-    <button type="button" id="appset-agent-advanced" class="appset-viewlink">${t('Opciones avanzadas')} ${icon('chevron-down', { size: 13 })}</button>
+    <p class="appset-saved" id="appset-saved" hidden>${icon('check', { size: 'sm' })} ${t('Guardado')}</p>
+    <p class="appset-privacy">${icon('shield', { size: 'sm' })} ${t('Tu API key se guarda solo en este navegador. Para responder, el contenido del libro se envía al proveedor que configures.')}</p>
+    <button type="button" id="appset-agent-advanced" class="appset-viewlink">${t('Opciones avanzadas')} ${icon('chevron-down', { size: 'sm' })}</button>
   </div>`;
 }
 
@@ -389,7 +389,7 @@ function agentHtml() {
   const demoBlock = demoBlockHtml();
   return `<div class="appset-section">
     <h3 class="appset-h3">${t('Agente')}</h3>
-    ${LLM.canUseSimple() ? `<button type="button" id="appset-agent-simple" class="appset-viewlink">${icon('chevron-left', { size: 13 })} ${t('Vista simple')}</button>` : ''}
+    ${LLM.canUseSimple() ? `<button type="button" id="appset-agent-simple" class="appset-viewlink">${icon('chevron-left', { size: 'sm' })} ${t('Vista simple')}</button>` : ''}
     ${demoBlock}
     ${demoTransferHtml()}
     <label class="appset-label" for="appset-provider">${t('Proveedor')}</label>
@@ -435,8 +435,8 @@ function agentHtml() {
     <label class="appset-check"><input type="checkbox" id="appset-auto"${LLM.getAutoExtract() ? ' checked' : ''} /> ${t('Rellenar la libreta automáticamente')}</label>
     <label class="appset-check"><input type="checkbox" id="appset-readnb"${LLM.getReadNotebook() ? ' checked' : ''} /> ${t('Que el agente lea lo que escribo en la libreta')}</label>
     <button id="appset-save" class="btn btn--primary primary-btn appset-save">${t('Guardar')}</button>
-    <p class="appset-saved" id="appset-saved" hidden>${icon('check', { size: 14 })} ${t('Guardado')}</p>
-    <p class="appset-privacy">${icon('shield', { size: 13 })} ${t('Tu API key se guarda solo en este navegador. Para responder, el contenido del libro se envía al proveedor que configures.')}</p>
+    <p class="appset-saved" id="appset-saved" hidden>${icon('check', { size: 'sm' })} ${t('Guardado')}</p>
+    <p class="appset-privacy">${icon('shield', { size: 'sm' })} ${t('Tu API key se guarda solo en este navegador. Para responder, el contenido del libro se envía al proveedor que configures.')}</p>
   </div>`;
 }
 
@@ -651,7 +651,7 @@ function wireAgentAdvanced(content) {
     const match = LLM.allProviders().find(p => p.baseUrl.replace(/\/+$/, '') === url);
     if (match && LLM.isCustomProvider(match.id)) {
       provManage.innerHTML = `
-        <p class="appset-muted appset-prov-on">${icon('check', { size: 13 })} ${t('Guardado en tu lista como «{name}».', { name: escapeHtml(match.name) })}</p>
+        <p class="appset-muted appset-prov-on">${icon('check', { size: 'sm' })} ${t('Guardado en tu lista como «{name}».', { name: escapeHtml(match.name) })}</p>
         <button type="button" id="appset-prov-del" class="appset-discover">${t('Quitar de mis proveedores')}</button>`;
       return;
     }
@@ -867,7 +867,7 @@ function templatesListHtml() {
   const byBlock = Object.values(BLOCKS).map(bl => {
     const items = allTemplates().filter(x => x.block === bl.id);
     return `<div class="appset-tpl-block">
-      <div class="appset-tpl-block-h">${icon(bl.icon, { size: 15 })} ${escapeHtml(bl.label)}</div>
+      <div class="appset-tpl-block-h">${icon(bl.icon, { size: 'md' })} ${escapeHtml(bl.label)}</div>
       ${items.map(tp => `
         <div class="appset-tpl-row">
           <div class="appset-tpl-meta">
@@ -876,8 +876,8 @@ function templatesListHtml() {
           </div>
           ${tp.custom
             ? `<div class="appset-tpl-acts">
-                 <button class="icon-btn appset-tpl-edit" data-id="${tp.id}" title="${t('Editar')}">${icon('pencil', { size: 15 })}</button>
-                 <button class="icon-btn appset-tpl-del" data-id="${tp.id}" title="${t('Eliminar')}">${icon('trash', { size: 15 })}</button>
+                 <button class="icon-btn appset-tpl-edit" data-id="${tp.id}" title="${t('Editar')}">${icon('pencil', { size: 'md' })}</button>
+                 <button class="icon-btn appset-tpl-del" data-id="${tp.id}" title="${t('Eliminar')}">${icon('trash', { size: 'md' })}</button>
                </div>`
             : `<span class="appset-tpl-tag">${t('de fábrica')}</span>`}
         </div>`).join('')}
@@ -887,7 +887,7 @@ function templatesListHtml() {
     <h3 class="appset-h3">${t('Plantillas de libreta')}</h3>
     <p class="appset-muted">${t('Las plantillas de fábrica no se editan. Crea las tuyas: aparecerán en el onboarding del agente junto a ellas.')}</p>
     ${byBlock}
-    <button id="appset-tpl-new" class="btn btn--primary primary-btn appset-save">${icon('plus', { size: 15 })} ${t('Crear plantilla')}</button>
+    <button id="appset-tpl-new" class="btn btn--primary primary-btn appset-save">${icon('plus', { size: 'md' })} ${t('Crear plantilla')}</button>
   </div>`;
 }
 
@@ -925,7 +925,7 @@ function templateFormHtml(tp) {
     <div class="appset-tpl-fields">
       ${tp.fields.map(f => templateFieldRow(f)).join('')}
     </div>
-    <button id="tpl-add-field" class="appset-tpl-addfield">${icon('plus', { size: 14 })} ${t('Añadir campo')}</button>
+    <button id="tpl-add-field" class="appset-tpl-addfield">${icon('plus', { size: 'sm' })} ${t('Añadir campo')}</button>
     <p class="appset-err" id="tpl-err" hidden></p>
     <div class="appset-tpl-formacts">
       <button id="tpl-cancel" class="appset-tpl-cancel">${t('Cancelar')}</button>
@@ -946,7 +946,7 @@ function templateFieldRow(f = { key: '', label: '', type: 'text', fill: 'agent' 
       <option value="agent"${!cog ? ' selected' : ''}>${t('IA (info)')}</option>
       <option value="user"${cog ? ' selected' : ''}>${t('Tú (cognición)')}</option>
     </select>
-    <button class="icon-btn appset-tpl-field-del" title="${t('Quitar campo')}">${icon('xmark', { size: 15 })}</button>
+    <button class="icon-btn appset-tpl-field-del" title="${t('Quitar campo')}">${icon('xmark', { size: 'md' })}</button>
   </div>`;
 }
 
@@ -1021,12 +1021,12 @@ function profilesListHtml() {
           <span class="appset-tpl-ideal">${escapeHtml(snippet(p)) || t('Sin contenido')}</span>
         </div>
         <div class="appset-tpl-acts">
-          <button class="appset-prof-activate" data-id="${p.id}">${p.id === activeId ? t('Activo ✓') : t('Activar')}</button>
-          <button class="icon-btn appset-prof-edit" data-id="${p.id}" title="${t('Editar')}">${icon('pencil', { size: 15 })}</button>
-          <button class="icon-btn appset-prof-del" data-id="${p.id}" title="${t('Eliminar')}">${icon('trash', { size: 15 })}</button>
+          <button class="appset-prof-activate" data-id="${p.id}">${p.id === activeId ? `${icon('check', { size: 'sm' })} ${t('Activo')}` : t('Activar')}</button>
+          <button class="icon-btn appset-prof-edit" data-id="${p.id}" title="${t('Editar')}">${icon('pencil', { size: 'md' })}</button>
+          <button class="icon-btn appset-prof-del" data-id="${p.id}" title="${t('Eliminar')}">${icon('trash', { size: 'md' })}</button>
         </div>
       </div>`).join('') : `<p class="appset-muted">${t('Aún no hay perfiles.')}</p>`}
-    <button id="appset-prof-new" class="btn btn--primary primary-btn appset-save">${icon('plus', { size: 15 })} ${t('Crear perfil')}</button>
+    <button id="appset-prof-new" class="btn btn--primary primary-btn appset-save">${icon('plus', { size: 'md' })} ${t('Crear perfil')}</button>
   </div>`;
 }
 
@@ -1111,8 +1111,8 @@ function dataHtml() {
   return `<div class="appset-section">
     <h3 class="appset-h3">${t('Datos')}</h3>
     <p class="appset-muted">${t('Copia de seguridad de tus datos para guardarla o migrar a otro dispositivo: ajustes, subrayados, marcadores, plantillas propias, conversaciones, libretas, mazos de flashcards y artefactos del Studio. <strong>No</strong> incluye la API key ni los archivos de los libros.')}</p>
-    <button id="appset-export-json" class="btn btn--primary primary-btn appset-save">${icon('share', { size: 15 })} ${t('Descargar backup (JSON)')}</button>
-    <button id="appset-export-md" class="appset-tpl-cancel appset-data-md">${icon('note', { size: 15 })} ${t('Descargar resumen (Markdown)')}</button>
+    <button id="appset-export-json" class="btn btn--primary primary-btn appset-save">${icon('download', { size: 'md' })} ${t('Descargar backup (JSON)')}</button>
+    <button id="appset-export-md" class="appset-tpl-cancel appset-data-md">${icon('download', { size: 'md' })} ${t('Descargar resumen (Markdown)')}</button>
 
     <label class="appset-label" style="margin-top:18px">${t('Importar backup')}</label>
     <p class="appset-muted">${t('Restaura desde un JSON. Fusiona: sobrescribe lo que coincida, no borra el resto.')}</p>
@@ -1121,24 +1121,24 @@ function dataHtml() {
     <label class="appset-label" style="margin-top:18px">Google Drive</label>
     <p class="appset-muted">${t('Guarda tus datos en una carpeta privada de tu propio Drive. El único servidor implicado solo renueva tu permiso de Google: tus libros y notas van directos de tu navegador a tu Drive.')}</p>
     <div id="appset-drive-off">
-      <button id="appset-drive-connect" class="btn btn--primary primary-btn appset-save">${icon('upload', { size: 15 })} ${t('Conectar con Google Drive')}</button>
+      <button id="appset-drive-connect" class="btn btn--primary primary-btn appset-save">${icon('cloud', { size: 'md' })} ${t('Conectar con Google Drive')}</button>
     </div>
     <div id="appset-drive-on" hidden>
       <label class="appset-check"><input type="checkbox" id="appset-drive-files">
         <span>${t('Sincronizar también los archivos de los libros')}</span></label>
       <p class="appset-muted">${t('Tus libros se suben a esa misma carpeta privada y aparecen en el resto de dispositivos listos para descargar. Los de más de {n} MB no se suben solos: se piden desde el menú del libro.', { n: 50 })}</p>
       <p class="appset-muted" id="appset-drive-quota">${t('Consultando espacio…')}</p>
-      <button id="appset-drive-save" class="btn btn--primary primary-btn appset-save">${icon('upload', { size: 15 })} ${t('Guardar en Drive')}</button>
-      <button id="appset-drive-restore" class="appset-tpl-cancel appset-data-md">${icon('download', { size: 15 })} ${t('Restaurar desde Drive')}</button>
-      <button id="appset-drive-history" class="appset-tpl-cancel appset-data-md">${icon('sort', { size: 15 })} ${t('Historial de versiones')}</button>
-      <button id="appset-drive-purge" class="appset-tpl-cancel appset-data-md">${icon('trash', { size: 15 })} ${t('Limpiar entradas huérfanas')}</button>
+      <button id="appset-drive-save" class="btn btn--primary primary-btn appset-save">${icon('cloud', { size: 'md' })} ${t('Guardar en Drive')}</button>
+      <button id="appset-drive-restore" class="appset-tpl-cancel appset-data-md">${icon('download', { size: 'md' })} ${t('Restaurar desde Drive')}</button>
+      <button id="appset-drive-history" class="appset-tpl-cancel appset-data-md">${icon('sort', { size: 'md' })} ${t('Historial de versiones')}</button>
+      <button id="appset-drive-purge" class="appset-tpl-cancel appset-data-md">${icon('trash', { size: 'md' })} ${t('Limpiar entradas huérfanas')}</button>
       <button id="appset-drive-disconnect" class="appset-tpl-cancel appset-data-md">${t('Desconectar')}</button>
     </div>
 
     <label class="appset-label" style="margin-top:18px">${t('Sincronización automática')}</label>
     <p class="appset-muted" id="appset-sync-diag"></p>
-    <button id="appset-sync-now" class="btn btn--primary primary-btn appset-save">${icon('upload', { size: 15 })} ${t('Sincronizar ahora')}</button>
-    <button id="appset-sync-copy" class="appset-tpl-cancel appset-data-md">${icon('copy', { size: 15 })} ${t('Copiar diagnóstico de sync')}</button>
+    <button id="appset-sync-now" class="btn btn--primary primary-btn appset-save">${icon('cloud', { size: 'md' })} ${t('Sincronizar ahora')}</button>
+    <button id="appset-sync-copy" class="appset-tpl-cancel appset-data-md">${icon('copy', { size: 'md' })} ${t('Copiar diagnóstico de sync')}</button>
     <p class="appset-data-msg" id="appset-data-msg" hidden></p>
   </div>`;
 }
@@ -1226,7 +1226,7 @@ function wireData(content) {
     try {
       const obj = JSON.parse(await file.text());
       const r = await Backup.importBackup(obj);
-      show(`${icon('check', { size: 14 })} ${t('Importado: {a} ajustes y {b} registros.', { a: r.localKeys, b: r.aiRecords })} <button id="appset-reload" class="appset-data-reload">${t('Recargar para aplicar')}</button>`);
+      show(`${icon('check', { size: 'sm' })} ${t('Importado: {a} ajustes y {b} registros.', { a: r.localKeys, b: r.aiRecords })} <button id="appset-reload" class="appset-data-reload">${t('Recargar para aplicar')}</button>`);
       content.querySelector('#appset-reload').addEventListener('click', () => location.reload());
     } catch (err) {
       show(t('No se pudo importar: {msg}', { msg: err.message }), true);
@@ -1257,7 +1257,7 @@ function wireData(content) {
       const diag = SyncEngine.getDiag();
       return show(t('No se pudo sincronizar: {msg}', { msg: diag.lastError }), true);
     }
-    show(`${icon('check', { size: 14 })} ${t('Sincronizado: {a} ficheros recibidos y {b} libros enviados.', { a: r.pulled, b: r.pushed })}`);
+    show(`${icon('check', { size: 'sm' })} ${t('Sincronizado: {a} ficheros recibidos y {b} libros enviados.', { a: r.pulled, b: r.pushed })}`);
   });
   content.querySelector('#appset-sync-copy').addEventListener('click', async () => {
     try {
@@ -1341,7 +1341,7 @@ function wireDrive(content, show) {
     DriveAuth.connect()
       .then(() => {
         refresh();
-        show(`${icon('check', { size: 14 })} ${t('Drive conectado. La sincronización automática queda activada.')}`);
+        show(`${icon('check', { size: 'sm' })} ${t('Drive conectado. La sincronización automática queda activada.')}`);
         SyncEngine.refreshConnection(); // primer sync inmediato
       })
       .catch(fail('No se pudo conectar'));
@@ -1358,7 +1358,7 @@ function wireDrive(content, show) {
   content.querySelector('#appset-drive-save').addEventListener('click', () => {
     show(t('Guardando en Drive…'));
     DriveSync.saveToDrive((done, total) => show(`${t('Guardando en Drive…')} ${done}/${total}`))
-      .then(r => show(`${icon('check', { size: 14 })} ${t('Guardado en Drive ({n} {libros}).', { n: r.books, libros: r.books === 1 ? t('libro') : t('libros') })}`))
+      .then(r => show(`${icon('check', { size: 'sm' })} ${t('Guardado en Drive ({n} {libros}).', { n: r.books, libros: r.books === 1 ? t('libro') : t('libros') })}`))
       .catch(fail('No se pudo guardar'));
   });
 
@@ -1372,7 +1372,7 @@ function wireDrive(content, show) {
         // que pedía entender un detalle interno; un respiro corto para leer el
         // resultado y la página sola lo aplica. (Importar backup y Recuperar
         // conservan el botón: son flujos donde quedarse a mirar es más habitual.)
-        show(`${icon('check', { size: 14 })} ${t('Restaurado: {a} ajustes y {b} registros. Recargando…', { a: r.keys, b: r.records })}`);
+        show(`${icon('check', { size: 'sm' })} ${t('Restaurado: {a} ajustes y {b} registros. Recargando…', { a: r.keys, b: r.records })}`);
         setTimeout(() => location.reload(), 1500);
       })
       .catch(fail('No se pudo restaurar'));
@@ -1388,7 +1388,7 @@ function wireDrive(content, show) {
     try {
       const r = await Recovery.purgeOrphans();
       SyncEngine.syncNow();   // propaga el manifest limpio al resto de dispositivos
-      show(`${icon('check', { size: 14 })} ${t('Limpieza hecha: {n} {entradas}.', { n: r.removed, entradas: r.removed === 1 ? t('entrada quitada') : t('entradas quitadas') })}`);
+      show(`${icon('check', { size: 'sm' })} ${t('Limpieza hecha: {n} {entradas}.', { n: r.removed, entradas: r.removed === 1 ? t('entrada quitada') : t('entradas quitadas') })}`);
     } catch (e) { fail('No se pudo limpiar')(e); }
   });
 
@@ -1405,17 +1405,17 @@ function wireDrive(content, show) {
 function licenseHtml() {
   const s = License.getState();
   const mockNote = License.isMock()
-    ? `<p class="appset-muted appset-lic-mock">${icon('shield', { size: 13 })} ${t('Modo simulado (aún sin plataforma de pagos): cualquier clave <code>BKRD-…</code> activa Pro para probar.')}</p>`
+    ? `<p class="appset-muted appset-lic-mock">${icon('shield', { size: 'sm' })} ${t('Modo simulado (aún sin plataforma de pagos): cualquier clave <code>BKRD-…</code> activa Pro para probar.')}</p>`
     : '';
 
   if (s && s.key && !s.revoked) {
     const since = s.validatedAt ? new Date(s.validatedAt).toLocaleDateString(getLang()) : '';
     return `<div class="appset-section">
       <h3 class="appset-h3">${t('Licencia')}</h3>
-      <p class="appset-lic-state is-pro">${icon('check', { size: 15 })} ${t('BookReader Pro activo')}</p>
+      <p class="appset-lic-state is-pro">${icon('check', { size: 'md' })} ${t('BookReader Pro activo')}</p>
       ${keyRowHtml('appset-lic-key', s.key, 'BKRD-XXXX-XXXX-XXXX')}
       <p class="appset-muted">${t('Última verificación: {date}. Sin conexión, tu licencia sigue activa hasta 30 días.', { date: escapeHtml(since) })}</p>
-      <button id="appset-lic-portal" class="btn btn--primary primary-btn appset-save">${icon('user', { size: 15 })} ${t('Gestionar dispositivos y recibos')}</button>
+      <button id="appset-lic-portal" class="btn btn--primary primary-btn appset-save">${icon('user', { size: 'md' })} ${t('Gestionar dispositivos y recibos')}</button>
       <button id="appset-lic-remove" class="appset-tpl-cancel appset-data-md">${t('Quitar la licencia de este navegador')}</button>
       <p class="appset-muted">${t('Quitar la licencia aquí no libera el hueco de dispositivo: eso se hace en el portal.')}</p>
       ${mockNote}
@@ -1510,7 +1510,7 @@ function ensureHistoryOverlay() {
   histOverlay.innerHTML = `
     <div class="histov-card" role="dialog" aria-modal="true" aria-labelledby="histov-title">
       <div class="histov-head">
-        <button class="histov-back" type="button" hidden>${icon('chevron-left', { size: 16 })}<span>${t('Volver')}</span></button>
+        <button class="histov-back" type="button" hidden>${icon('chevron-left', { size: 'md' })}<span>${t('Volver')}</span></button>
         <div class="histov-titles">
           <h2 class="histov-title" id="histov-title">${t('Historial de versiones')}</h2>
           <p class="histov-sub"></p>
@@ -1647,7 +1647,7 @@ function openHistory(trigger, show, fail) {
       const r = await Recovery.restoreVersion(bookId, fileId, revisionId);
       SyncEngine.syncNow(); // propaga la recuperación al resto de dispositivos
       closeHistory();
-      show(`${icon('check', { size: 14 })} ${t('Recuperados {n} elementos.', { n: r.recovered })} <button id="appset-rec-reload" class="appset-data-reload">${t('Recargar para aplicar')}</button>`);
+      show(`${icon('check', { size: 'sm' })} ${t('Recuperados {n} elementos.', { n: r.recovered })} <button id="appset-rec-reload" class="appset-data-reload">${t('Recargar para aplicar')}</button>`);
       document.querySelector('#appset-rec-reload')?.addEventListener('click', () => location.reload());
     } catch (e) { fail('No se pudo recuperar')(e); }
   }

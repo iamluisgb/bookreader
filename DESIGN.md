@@ -110,6 +110,29 @@ Catálogo con ejemplos vivos: `app/patterns.html`.
 **Estados:** para código nuevo, `.is-*` (`.is-active`, `.is-busy`, `.is-error`). `.active`
 y `.open` siguen en el código existente; no mezclar los dos en un mismo componente.
 
+### Iconos
+
+Un solo set de línea en `js/ui/icons.js` (rejilla 24×24, `currentColor`, `aria-hidden`; el
+texto o el `aria-label` del botón los nombra). Galería con su significado en
+`patterns.html § Iconos`. Reglas (`tests/icons.spec.ts`):
+
+- **Un significado por icono.** `sparkles` = lo hace la IA; `funnel` = filtro por regla
+  (estantería inteligente); `pin` = fijar; `bookmark` = marcar página; `note` = nota suelta;
+  `notebook` = la libreta; `share` = hoja de compartir del sistema; `download`/`upload` =
+  guardar/subir un fichero; `cloud` = Drive y sincronizar; `chart` = Análisis; `function` =
+  ejemplo con números; `user` = tu perfil; `users` = otra persona; `flame` = racha;
+  `help` = ayuda; `info` = nota informativa. Antes de reutilizar uno para otra cosa, crea
+  otro: dos significados para un dibujo obligan a leer la etiqueta siempre.
+- **Tamaño por paso, nunca en píxeles:** `icon(name, { size: 'md' })`. `sm` 14 (en línea
+  con texto pequeño) · `md` 16 (botones, menús) · `lg` 20 (acciones destacadas) · `xl` 24
+  (cabecera, lector) · `display` 32 · `hero` 56 (estados vacíos). Tokens `--icon-*`; el
+  trazo baja al crecer (1,9 → 1,4).
+- **Sin emoji en la interfaz:** cambian de dibujo en cada sistema y no siguen el tema. La
+  excepción es la tarjeta para compartir (imagen para redes). Las flechas tipográficas de un
+  texto («Ajustes → Agente») no son iconos y se quedan.
+- **Icono nuevo:** dibújalo en la rejilla 24 con trazos `round`, añádelo a `ICONS` con un
+  comentario de para qué es (y qué NO es), y a `SIGNIFICA` en `patterns.html`.
+
 **Añadir un patrón:** 1) mira si ya existe en `patterns.html`; 2) si no, dale un nombre
 por función y defínelo en `modern.css` (§5); 3) añádelo a `patterns.html` y, si tiene
 tokens propios, al contrato de `tests/patterns.spec.ts`.

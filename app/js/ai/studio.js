@@ -27,7 +27,7 @@ import { ago } from '../ui/when.js';
 // store `decks` de IndexedDB (db.js), así que su tile lista esos mazos (ver group/decksBody).
 const TYPES = [
   { kind: 'summary',    ico: 'note',    name: t('Resumen'),      value: t('TL;DR e ideas clave por capítulo, cada una con su cita al pasaje.'), stateful: true },
-  { kind: 'mindmap',    ico: 'columns', name: t('Mapa mental'),  value: t('Mapa por ramas navegable de los conceptos del libro.'),              stateful: true },
+  { kind: 'mindmap',    ico: 'mindmap', name: t('Mapa mental'),  value: t('Mapa por ramas navegable de los conceptos del libro.'),              stateful: true },
   { kind: 'infographic', ico: 'poster', name: t('Infografía'),   value: t('Un póster del libro —tesis, ideas clave y cita— listo para descargar.'), stateful: true },
   { kind: 'flashcards', ico: 'cards',   name: t('Flashcards'),   value: t('Tarjetas de repaso espaciado para exportar a Anki.'),              stateful: false },
   // P18 · El único que NO produce un artefacto: lo produces tú. Va aquí igualmente porque
@@ -77,7 +77,7 @@ function runningCard(job) {
 
 function errorCard() {
   return `<div class="studio-card studio-error">
-    <p class="studio-meta studio-errmsg">⚠ ${t('No se pudo generar.')} <button class="studio-link" data-act="retry">${t('Reintentar')}</button></p>
+    <p class="studio-meta studio-errmsg">${icon('warning', { size: 'sm' })} ${t('No se pudo generar.')} <button class="studio-link" data-act="retry">${t('Reintentar')}</button></p>
   </div>`;
 }
 
@@ -86,14 +86,14 @@ function artifactCard(ty, e) {
     <button class="studio-card-main" data-act="open" data-kind="${ty.kind}" data-key="${escapeHtml(e.key)}">
       <span class="studio-meta">${metaLine(ty.kind, e)}</span>
     </button>
-    <button class="studio-del" data-act="del" data-key="${escapeHtml(e.key)}" title="${t('Borrar')}" aria-label="${t('Borrar este artefacto')}">${icon('trash', { size: 15 })}</button>
+    <button class="studio-del" data-act="del" data-key="${escapeHtml(e.key)}" title="${t('Borrar')}" aria-label="${t('Borrar este artefacto')}">${icon('trash', { size: 'md' })}</button>
   </div>`;
 }
 
 function emptyCard(ty) {
   return `<div class="studio-card studio-empty">
     <p class="studio-value">${escapeHtml(ty.value)}</p>
-    <button class="btn btn--secondary studio-gen" data-act="gen" data-kind="${ty.kind}">${icon('plus', { size: 15 })} ${ty.stateful ? t('Generar') : t('Crear')}</button>
+    <button class="btn btn--secondary studio-gen" data-act="gen" data-kind="${ty.kind}">${icon('plus', { size: 'md' })} ${ty.stateful ? t('Generar') : t('Crear')}</button>
   </div>`;
 }
 
@@ -105,9 +105,9 @@ function deckRow(d) {
     <button class="studio-card-main" data-act="study" data-deck="${escapeHtml(String(d.id))}" title="${t('Estudiar')}">
       <span class="studio-deck-name">${escapeHtml(label)}</span>
       <span class="studio-meta">${meta}</span>
-      <span class="studio-deck-go">${icon('cards', { size: 13 })} ${t('Estudiar')}</span>
+      <span class="studio-deck-go">${icon('cards', { size: 'sm' })} ${t('Estudiar')}</span>
     </button>
-    <button class="studio-del" data-act="del-deck" data-deck="${escapeHtml(String(d.id))}" title="${t('Borrar')}" aria-label="${t('Borrar este mazo')}">${icon('trash', { size: 15 })}</button>
+    <button class="studio-del" data-act="del-deck" data-deck="${escapeHtml(String(d.id))}" title="${t('Borrar')}" aria-label="${t('Borrar este mazo')}">${icon('trash', { size: 'md' })}</button>
   </div>`;
 }
 
@@ -122,7 +122,7 @@ function decksBody(decks) {
   // Mismo mecanismo que la biblioteca (Study.openToday con scope de libro): alias-aware,
   // tope de nuevas y gate Pro incluidos. Sin vencidas no se ofrece: no hay sesión vacía.
   const studyAll = due
-    ? `<button class="btn btn--secondary studio-gen studio-all" data-act="study-book">${icon('cards', { size: 15 })} ${t('Estudiar todo · {n}', { n: due })}</button>`
+    ? `<button class="btn btn--secondary studio-gen studio-all" data-act="study-book">${icon('cards', { size: 'md' })} ${t('Estudiar todo · {n}', { n: due })}</button>`
     : '';
   const manage = `<button class="studio-manage" data-act="manage">${t('Gestionar mazos')}</button>`;
   return summary + studyAll + decks.map(deckRow).join('') + manage;
@@ -136,9 +136,9 @@ function group(ty, ctx, job, decks) {
   const mineDecks = ty.kind === 'flashcards' ? (decks || []) : [];
 
   const head = `<div class="studio-group-head">
-    <span class="studio-ico">${icon(ty.ico, { size: 16 })}</span>
+    <span class="studio-ico">${icon(ty.ico, { size: 'md' })}</span>
     <span class="studio-group-name">${escapeHtml(ty.name)}</span>
-    ${(ty.stateful && (items.length || running)) || mineDecks.length ? `<button class="btn btn--secondary studio-new" data-act="gen" data-kind="${ty.kind}">${icon('plus', { size: 13 })} ${t('Nuevo')}</button>` : ''}
+    ${(ty.stateful && (items.length || running)) || mineDecks.length ? `<button class="btn btn--secondary studio-new" data-act="gen" data-kind="${ty.kind}">${icon('plus', { size: 'sm' })} ${t('Nuevo')}</button>` : ''}
   </div>`;
 
   let bodyHtml = '';

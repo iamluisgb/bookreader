@@ -104,7 +104,7 @@ test('el mensaje que se ve es corto: las instrucciones no ensucian el chat', asy
   }, largo);
 
   const userMsg = await page.locator('.ai-msg-user .ai-bubble-text').last().textContent();
-  expect(userMsg).toContain('🔢');
+  expect(userMsg).toContain('Ejemplo numérico');   // sin emoji: la etiqueta se entiende sola (DESIGN.md § Iconos)
   expect(userMsg!.length).toBeLessThan(220);          // el fragmento va recortado
   expect(userMsg).not.toContain('MODO EJEMPLO');       // las reglas viven en el system
 });

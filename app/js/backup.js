@@ -188,7 +188,7 @@ export async function buildConvoMarkdown(convoId, { includeChat = true, includeN
   if (includeChat && messages && messages.length) {
     out.push(t('## Conversación'), '');
     for (const m of messages) {
-      out.push(`**${m.role === 'user' ? t('🧑 Tú') : t('🤖 Agente')}:**`, '', resolveCites(m.content, anchors).trim(), '');
+      out.push(`**${m.role === 'user' ? t('Tú') : t('Agente')}:**`, '', resolveCites(m.content, anchors).trim(), '');
     }
   }
 

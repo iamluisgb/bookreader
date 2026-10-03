@@ -70,7 +70,7 @@ function deckCard(rec, ri, d, i) {
       <span class="studio-deck-name">${escapeHtml(d.scope || d.name || t('Mazo'))}</span>
       <span class="studio-meta">${n === 1 ? t('1 tarjeta') : t('{n} tarjetas', { n })}</span>
     </div>
-    <button class="btn btn--secondary studio-new studio-adopt" data-act="shared-adopt" data-sid="${ri}:${i}">${icon('plus', { size: 13 })} ${t('Añadir a mis mazos')}</button>
+    <button class="btn btn--secondary studio-new studio-adopt" data-act="shared-adopt" data-sid="${ri}:${i}">${icon('plus', { size: 'sm' })} ${t('Añadir a mis mazos')}</button>
   </div>`;
 }
 
@@ -84,7 +84,7 @@ export async function sectionHtml(bookId) {
     if (!arts.length && !nbs.length && !decks.length) return '';
     const from = rec.from ? t('De {name}', { name: rec.from }) : t('Compartidos');
     return `<div class="studio-group studio-shared" data-from="${escapeHtml(rec.from || '')}">
-      <div class="studio-group-head"><span class="studio-ico">${icon('user', { size: 16 })}</span>
+      <div class="studio-group-head"><span class="studio-ico">${icon('users', { size: 'md' })}</span>
         <span class="studio-group-name">${escapeHtml(from)}</span></div>
       ${arts.map(([a, i]) => artifactCard(rec, ri, a, i)).join('')}
       ${nbs.map((nb, i) => notebookCard(rec, ri, nb, i)).join('')}
@@ -147,7 +147,7 @@ function openNotebook(rec, nb, { anchors, onCite }) {
   overlay.className = 'ai-onboarding';
   overlay.innerHTML = `
     <div class="ai-ob-card sum-card" role="dialog" aria-modal="true" aria-label="${escapeHtml(tpl?.name || t('Libreta'))}">
-      <button class="ai-ob-close" title="${t('Cerrar')}" aria-label="${t('Cerrar')}">${icon('xmark', { size: 18 })}</button>
+      <button class="ai-ob-close" title="${t('Cerrar')}" aria-label="${t('Cerrar')}">${icon('xmark', { size: 'lg' })}</button>
       <div class="ai-ob-body">
         <h2>${escapeHtml(tpl?.name || t('Libreta'))}</h2>
         <p class="ai-ob-sub">${escapeHtml([rec.from && t('De {name}', { name: rec.from }), nb.goal].filter(Boolean).join(' · '))}</p>

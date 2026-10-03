@@ -1948,6 +1948,9 @@ body.reading :is(.reader-header, .reader-footer):hover > * { opacity: 1; }
 .lib-today-body { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
 .lib-today-title { margin: 0; font-size: var(--fs-xl); font-weight: 700; letter-spacing: -0.02em; }
 .lib-today-meta { margin: 0; font-size: var(--fs-sm); color: var(--text-soft); }
+/* Racha: icono `flame` del set (antes 🔥, que cambia de dibujo en cada sistema). */
+.lib-today-streak { display: inline-flex; align-items: center; gap: 3px; vertical-align: -2px; }
+.study-streak { display: inline-flex; align-items: center; gap: 6px; }
 .lib-today-covers { display: flex; margin: 6px 0 2px; }
 .lib-today-covers img, .lib-today-ph {
   width: 26px; height: 38px; border-radius: var(--r-xs); object-fit: cover; box-shadow: 0 1px 3px rgba(0,0,0,0.2);
@@ -1976,6 +1979,7 @@ body.reading :is(.reader-header, .reader-footer):hover > * { opacity: 1; }
 
 /* ----------------------------- Retención visible (T1): racha siempre presente -------------- */
 .study-streakchip {
+  display: inline-flex; align-items: center; gap: 4px;
   flex: none; font-size: var(--fs-sm); font-weight: 700; font-variant-numeric: tabular-nums;
   padding: 4px 10px; border-radius: var(--r-pill); background: var(--fill); color: var(--text);
 }
@@ -2023,7 +2027,7 @@ body.reading :is(.reader-header, .reader-footer):hover > * { opacity: 1; }
   background: color-mix(in srgb, var(--accent) 12%, var(--surface-1));
   border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border-soft));
 }
-.study-milestone-flame { flex: none; font-size: var(--fs-3xl); }
+.study-milestone-flame { flex: none; display: inline-flex; color: var(--accent); }
 .study-milestone-txt { flex: 1; min-width: 0; }
 .study-milestone-txt h3 { margin: 0; font-size: var(--fs-md); color: var(--text); }
 .study-milestone-txt p { margin: 2px 0 0; font-size: var(--fs-sm); color: var(--text-soft); }

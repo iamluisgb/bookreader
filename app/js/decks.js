@@ -55,7 +55,7 @@ function ensureOverlay() {
   overlay.innerHTML = `
     <div class="appset-card dk-card" role="dialog" aria-modal="true" aria-label="${t('Mazos')}">
       <button class="appset-close" title="${t('Cerrar')}" aria-label="${t('Cerrar')}">${icon('xmark')}</button>
-      <h2 class="appset-h2">${icon('cards', { size: 20 })} ${t('Mazos')}</h2>
+      <h2 class="appset-h2">${icon('cards', { size: 'lg' })} ${t('Mazos')}</h2>
       <div class="dk-body"></div>
     </div>`;
   document.body.appendChild(overlay);
@@ -116,7 +116,7 @@ function renderList(decks, books) {
     // Misma acción que el tile de Flashcards del Studio: repasar TODO lo vencido del
     // libro con Study.openToday (scope de libro). Sin vencidas no se ofrece.
     const studyAll = due
-      ? `<button class="btn btn--secondary studio-gen dk-study-all studio-all" data-act="dk-study-book" data-book="${escapeHtml(g.bookId)}">${icon('cards', { size: 15 })} ${t('Estudiar todo · {n}', { n: due })}</button>`
+      ? `<button class="btn btn--secondary studio-gen dk-study-all studio-all" data-act="dk-study-book" data-book="${escapeHtml(g.bookId)}">${icon('cards', { size: 'md' })} ${t('Estudiar todo · {n}', { n: due })}</button>`
       : '';
     return `
     <div class="dk-book">
@@ -169,17 +169,17 @@ function deckRow(deck, sum, extraAction = '') {
       </div>
     </div>
     <div class="dk-actions">
-      <button class="icon-btn" data-act="dk-study" title="${t('Estudiar')}" aria-label="${t('Estudiar')}">${icon('cards', { size: 16 })}</button>
-      <button class="icon-btn" data-act="dk-open" title="${t('Abrir')}" aria-label="${t('Abrir')}">${icon('pencil', { size: 16 })}</button>
+      <button class="icon-btn" data-act="dk-study" title="${t('Estudiar')}" aria-label="${t('Estudiar')}">${icon('cards', { size: 'md' })}</button>
+      <button class="icon-btn" data-act="dk-open" title="${t('Abrir')}" aria-label="${t('Abrir')}">${icon('pencil', { size: 'md' })}</button>
       ${extraAction}
-      <button class="icon-btn" data-act="dk-del" title="${t('Borrar mazo')}" aria-label="${t('Borrar mazo')}">${icon('trash', { size: 16 })}</button>
+      <button class="icon-btn" data-act="dk-del" title="${t('Borrar mazo')}" aria-label="${t('Borrar mazo')}">${icon('trash', { size: 'md' })}</button>
     </div>
   </div>`;
 }
 
 function assignBtn(bookId) {
   return `<button class="icon-btn" data-act="dk-assign" data-book="${escapeHtml(bookId)}"
-    title="${t('Asignar a…')}" aria-label="${t('Asignar a…')}">${icon('books', { size: 16 })}</button>`;
+    title="${t('Asignar a…')}" aria-label="${t('Asignar a…')}">${icon('books', { size: 'md' })}</button>`;
 }
 
 // ---- Vista 2: detalle del mazo ----------------------------------------------
@@ -192,7 +192,7 @@ function renderDetail(deck) {
     sum.suspendidas ? t('{n} suspendidas', { n: sum.suspendidas }) : '',
   ].filter(Boolean).join(' · ');
   return `
-    <button class="ai-ob-back" data-act="dk-back">${icon('chevron-left', { size: 16 })}<span>${t('Volver')}</span></button>
+    <button class="ai-ob-back" data-act="dk-back">${icon('chevron-left', { size: 'md' })}<span>${t('Volver')}</span></button>
     <div class="dk-head">
       <h3 class="dk-head-name">${escapeHtml(deckName(deck))}</h3>
       <span class="dk-chip">${escapeHtml(typeLabel(deck))}</span>
@@ -213,8 +213,8 @@ function cardRow(c, i) {
       <div class="fc-back" contenteditable="true" spellcheck="false" data-ph="${t('Respuesta (opcional)')}">${escapeHtml(c.back)}</div>
     </div>
     <button class="icon-btn fc-susp" data-act="dk-susp" title="${c.suspended ? t('Reactivar: vuelve al repaso') : t('Suspender: no volver a mostrarla')}"
-      aria-label="${c.suspended ? t('Reactivar: vuelve al repaso') : t('Suspender: no volver a mostrarla')}">${icon(c.suspended ? 'undo' : 'eye-off', { size: 15 })}</button>
-    <button class="icon-btn fc-del" data-act="dk-del-card" title="${t('Quitar tarjeta')}" aria-label="${t('Quitar tarjeta')}">${icon('xmark', { size: 15 })}</button>
+      aria-label="${c.suspended ? t('Reactivar: vuelve al repaso') : t('Suspender: no volver a mostrarla')}">${icon(c.suspended ? 'undo' : 'eye-off', { size: 'md' })}</button>
+    <button class="icon-btn fc-del" data-act="dk-del-card" title="${t('Quitar tarjeta')}" aria-label="${t('Quitar tarjeta')}">${icon('xmark', { size: 'md' })}</button>
   </div>`;
 }
 
@@ -228,7 +228,7 @@ function addFormHtml() {
       </select>
       <input class="dk-input dk-add-front" type="text" placeholder="${t('Frente')}" aria-label="${t('Frente')}">
       <input class="dk-input dk-add-back" type="text" placeholder="${t('Respuesta (opcional)')}" aria-label="${t('Respuesta (opcional)')}">
-      <button class="btn btn--primary primary-btn dk-add-btn" data-act="dk-add">${icon('plus', { size: 14 })} ${t('Agregar')}</button>
+      <button class="btn btn--primary primary-btn dk-add-btn" data-act="dk-add">${icon('plus', { size: 'sm' })} ${t('Agregar')}</button>
     </div>
     <div class="dk-error" data-role="add-error" style="display:none"></div>
   </div>`;

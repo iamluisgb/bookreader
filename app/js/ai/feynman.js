@@ -461,7 +461,7 @@ export function open(context) {
   overlay.className = 'ai-onboarding';
   overlay.innerHTML = `
     <div class="ai-ob-card fey-card" role="dialog" aria-modal="true" aria-label="${t('Explícamelo tú')}">
-      <button class="ai-ob-close" title="${t('Cerrar')}" aria-label="${t('Cerrar')}">${icon('xmark', { size: 18 })}</button>
+      <button class="ai-ob-close" title="${t('Cerrar')}" aria-label="${t('Cerrar')}">${icon('xmark', { size: 'lg' })}</button>
       <div class="ai-ob-body"></div>
     </div>`;
   document.body.appendChild(overlay);
@@ -548,10 +548,10 @@ function renderSetup() {
         ? `<p class="fey-hint">${concepts.length ? t('Conceptos de lo que estás leyendo:') : t('Del libro:')}</p>
            <div class="fey-chips">${chips(concepts.length ? concepts : chapters)}</div>`
         : ''}
-      <button id="fey-more" class="fey-suggest-btn">${icon('sparkles', { size: 14 })} ${
+      <button id="fey-more" class="fey-suggest-btn">${icon('sparkles', { size: 'sm' })} ${
         concepts.length ? t('Sugerir otros conceptos') : t('Sugerir conceptos')}</button>
     </div>
-    <button id="fey-start" class="btn btn--primary primary-btn ai-ob-start">${icon('sparkles', { size: 16 })} ${t('Empezar')}</button>
+    <button id="fey-start" class="btn btn--primary primary-btn ai-ob-start">${icon('sparkles', { size: 'md' })} ${t('Empezar')}</button>
     <div id="fey-error" class="fc-error" style="display:none"></div>`;
   b.querySelector('#fey-suggest').addEventListener('click', (e) => {
     const chip = e.target.closest('.fey-chip');
@@ -622,7 +622,7 @@ async function suggestWithLLM() {
     showError(e.message || t('No se pudieron sugerir conceptos.'));
   } finally {
     const again = body()?.querySelector('#fey-more');
-    if (again) { again.disabled = false; again.innerHTML = `${icon('sparkles', { size: 14 })} ${t('Sugerir otros conceptos')}`; }
+    if (again) { again.disabled = false; again.innerHTML = `${icon('sparkles', { size: 'sm' })} ${t('Sugerir otros conceptos')}`; }
   }
 }
 
@@ -744,7 +744,7 @@ function renderSession(say) {
     <textarea id="fey-input" class="fey-input" rows="5"
       placeholder="${t('Explícalo con tus palabras…')}"></textarea>
     <div class="fey-actions">
-      ${micAvailable() ? `<button id="fey-mic" class="appset-tpl-cancel" title="${t('Dictar')}">${icon('mic', { size: 15 })} <span id="fey-mic-label">${t('Dictar')}</span></button>
+      ${micAvailable() ? `<button id="fey-mic" class="appset-tpl-cancel" title="${t('Dictar')}">${icon('mic', { size: 'md' })} <span id="fey-mic-label">${t('Dictar')}</span></button>
       <select id="fey-mic-lang" class="fey-mic-lang" title="${t('Idioma del dictado')}" aria-label="${t('Idioma del dictado')}">
         <option value="es"${dictationLang() === 'es' ? ' selected' : ''}>ES</option>
         <option value="en"${dictationLang() === 'en' ? ' selected' : ''}>EN</option>

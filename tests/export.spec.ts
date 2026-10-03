@@ -36,9 +36,9 @@ test('buildConvoMarkdown: libreta + chat, formato y citas resueltas', async ({ p
   expect(md).toContain('La **tesis** central es X');
   // Chat incluido con ambos roles y su contenido.
   expect(md).toContain('## Conversación');
-  expect(md).toContain('🧑 Tú');
+  expect(md).toContain('**Tú:**');
   expect(md).toContain('¿Qué dice la Figure 6.2?');
-  expect(md).toContain('🤖 Agente');
+  expect(md).toContain('**Agente:**');
   // Citas resueltas a pág.
   expect(md).toContain('(pág. 42)');
   expect(md).not.toContain('[[a5]]');

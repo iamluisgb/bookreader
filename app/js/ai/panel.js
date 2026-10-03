@@ -45,7 +45,7 @@ import * as Offline from './offline.js';
 import { ensurePro } from '../ui/paywall.js';
 
 // Icon + label markup for the small inline action buttons.
-const act = (name, text, size = 15) => `${icon(name, { size })}<span>${text}</span>`;
+const act = (name, text, size = 'md') => `${icon(name, { size })}<span>${text}</span>`;
 
 // Contexto/historial al LLM (ver DECISIONS.md · ADR-007, ADR-010):
 const CTX_BUDGET = 60000;          // tope de tokens de libro por turno normal (lean, barato)
@@ -323,19 +323,19 @@ const QUICK_ACTIONS = {
   numeric: {
     mode: NUMERIC_MODE,
     ask: () => t('Hazme un ejemplo numérico de esto, con números pequeños y concretos.'),
-    label: (ref) => t('🔢 Ejemplo numérico · «{ref}»', { ref }),
+    label: (ref) => t('Ejemplo numérico · «{ref}»', { ref }),
     button: () => t('Con números'),
   },
   explain: {
     mode: EXPLAIN_MODE,
     ask: () => t('Explícame esto en llano, con un ejemplo concreto.'),
-    label: (ref) => t('💡 Explícame · «{ref}»', { ref }),
+    label: (ref) => t('Explícame · «{ref}»', { ref }),
     button: () => t('Explícame'),
   },
   why: {
     mode: WHY_MODE,
     ask: () => t('¿Por qué es importante esto para mi objetivo de lectura?'),
-    label: (ref) => t('🎯 Por qué importa · «{ref}»', { ref }),
+    label: (ref) => t('Por qué importa · «{ref}»', { ref }),
     button: () => t('Por qué importa'),
   },
 };
@@ -483,7 +483,7 @@ function maybeHintFlashcards() {
   hint.className = 'ai-coachmark';
   hint.innerHTML = `
     <span>${t('Convierte este libro en <b>flashcards para Anki</b> desde el Studio.')}</span>
-    <button class="ai-coachmark-x" aria-label="Entendido">${icon('xmark', { size: 14 })}</button>`;
+    <button class="ai-coachmark-x" aria-label="Entendido">${icon('xmark', { size: 'sm' })}</button>`;
   document.body.appendChild(hint);
   flashcardsHintEl = hint;
   // OJO: hay que medir el objetivo con el panel YA COLOCADO. El panel entra deslizándose
@@ -542,7 +542,7 @@ function maybeOfferObjective() {
     <span>${t('¿Estudiando este libro? Elige un <b>objetivo de lectura</b> para activar la libreta y el repaso.')}</span>
     <div class="ai-objnudge-btns">
       <button class="ai-objnudge-go">${t('Elegir objetivo')}</button>
-      <button class="ai-objnudge-x" aria-label="${t('Ahora no')}">${icon('xmark', { size: 14 })}</button>
+      <button class="ai-objnudge-x" aria-label="${t('Ahora no')}">${icon('xmark', { size: 'sm' })}</button>
     </div>`;
   nudge.querySelector('.ai-objnudge-go').addEventListener('click', () => { nudge.remove(); openOnboarding({ upgrade: true }); });
   nudge.querySelector('.ai-objnudge-x').addEventListener('click', () => nudge.remove());
@@ -907,16 +907,16 @@ async function openConvoMenu(anchor) {
       const tpl = getTemplate(c.templateId);
       const active = convo && c.id === convo.id;
       return `<button class="lib-menu-item ai-convo-item" data-id="${c.id}">
-        <span class="lib-menu-check">${active ? icon('check', { size: 16 }) : ''}</span>
+        <span class="lib-menu-check">${active ? icon('check', { size: 'md' }) : ''}</span>
         <span class="ai-convo-item-text"><span class="ai-convo-item-name">${escapeHtml(c.title || tpl?.name || t('Conversación'))}</span><span class="ai-convo-item-goal">${escapeHtml(c.goal || '')}</span></span>
-        <span class="ai-convo-rename" data-rename="${c.id}" title="${t('Renombrar')}">${icon('pencil', { size: 15 })}</span>
-        <span class="ai-convo-del" data-del="${c.id}" title="${t('Eliminar')}">${icon('trash', { size: 15 })}</span>
+        <span class="ai-convo-rename" data-rename="${c.id}" title="${t('Renombrar')}">${icon('pencil', { size: 'md' })}</span>
+        <span class="ai-convo-del" data-del="${c.id}" title="${t('Eliminar')}">${icon('trash', { size: 'md' })}</span>
       </button>`;
     }).join('')}
     <div class="lib-menu-sep"></div>
-    <button class="lib-menu-item" data-act="new">${icon('plus', { size: 16 })}<span>${t('Nueva conversación…')}</span></button>
-    ${convo ? `<button class="lib-menu-item" data-act="export">${icon('share', { size: 16 })}<span>${t('Exportar a Markdown…')}</span></button>` : ''}
-    <button class="lib-menu-item" data-act="offline">${icon('download', { size: 16 })}<span>${t('Preparar para sin conexión…')}</span></button>
+    <button class="lib-menu-item" data-act="new">${icon('plus', { size: 'md' })}<span>${t('Nueva conversación…')}</span></button>
+    ${convo ? `<button class="lib-menu-item" data-act="export">${icon('download', { size: 'md' })}<span>${t('Exportar a Markdown…')}</span></button>` : ''}
+    <button class="lib-menu-item" data-act="offline">${icon('download', { size: 'md' })}<span>${t('Preparar para sin conexión…')}</span></button>
   `;
   document.body.appendChild(menu);
   convoMenuEl = menu;
@@ -1036,7 +1036,7 @@ function openOnboarding(opts = {}) {
   if (opts.auto) overlay.dataset.auto = '1';
   overlay.innerHTML = `
     <div class="ai-ob-card" role="dialog" aria-modal="true" aria-label="${t('Elegir objetivo de lectura')}">
-      <button class="ai-ob-close" title="${t('Cerrar')}" aria-label="${t('Cerrar')}">${icon('xmark', { size: 18 })}</button>
+      <button class="ai-ob-close" title="${t('Cerrar')}" aria-label="${t('Cerrar')}">${icon('xmark', { size: 'lg' })}</button>
       <div class="ai-ob-body"></div>
     </div>`;
   document.body.appendChild(overlay);
@@ -1082,7 +1082,7 @@ function openOnboarding(opts = {}) {
             <span class="ai-ob-tpl-ideal">${t.ideal || t.name}</span>
           </button>`).join('')}
       </div>
-      ${upgrade ? '' : `<button class="ai-ob-quickchat">${icon('bubble', { size: 15 })}<span>${t('Prefiero solo chatear con el libro')}</span></button>`}`;
+      ${upgrade ? '' : `<button class="ai-ob-quickchat">${icon('bubble', { size: 'md' })}<span>${t('Prefiero solo chatear con el libro')}</span></button>`}`;
     body.querySelectorAll('.ai-ob-tpl').forEach(btn =>
       btn.addEventListener('click', () => { chosenTemplate = getTemplate(btn.dataset.tpl); renderGoal(); }));
     body.querySelector('.ai-ob-quickchat')?.addEventListener('click', async () => {
@@ -1097,7 +1097,7 @@ function openOnboarding(opts = {}) {
       ? `<label class="ai-ob-check"><input type="checkbox" id="ai-ob-artesano" /> ${t('Leo para aprender a escribir (modo Artesano)')}</label>`
       : '';
     body.innerHTML = `
-      <button class="ai-ob-back">${icon('chevron-left', { size: 16 })}<span>${t('Volver')}</span></button>
+      <button class="ai-ob-back">${icon('chevron-left', { size: 'md' })}<span>${t('Volver')}</span></button>
       <h2>${chosenTemplate.name}</h2>
       <p class="ai-ob-sub">${chosenTemplate.goalPrompt}</p>
       <textarea id="ai-ob-goal" class="ai-ob-goal" rows="3" placeholder="${t('Tu objetivo...')}"></textarea>
@@ -1441,16 +1441,16 @@ function renderZones() {
     <div class="ai-zone" data-i="${i}" title="${escapeHtml(z.label)}">
       <img src="${z.dataUrl}" alt="${escapeHtml(z.label)}">
       <span class="ai-zone-label">${t('Zona {i}', { i: i + 1 })}</span>
-      <button class="ai-zone-x" title="${t('Quitar zona')}" aria-label="${t('Quitar zona')}">${icon('xmark', { size: 12 })}</button>
+      <button class="ai-zone-x" title="${t('Quitar zona')}" aria-label="${t('Quitar zona')}">${icon('xmark', { size: 'sm' })}</button>
     </div>`).join('') +
     (zones.length < MAX_ZONES
-      ? `<button class="ai-zone-add" id="ai-zone-add">${icon('plus', { size: 14 })}${t('Otra zona')}</button>`
+      ? `<button class="ai-zone-add" id="ai-zone-add">${icon('plus', { size: 'sm' })}${t('Otra zona')}</button>`
       : '');
   // Fila de acciones: el equivalente para imagen de las acciones rápidas del subrayado.
   const acts = document.createElement('div');
   acts.className = 'ai-zone-acts';
   acts.innerHTML = Object.entries(VISION_ACTIONS)
-    .map(([k, a]) => `<button class="sel-act" data-va="${k}">${icon(a.ico, { size: 15 })}${a.label()}</button>`).join('');
+    .map(([k, a]) => `<button class="sel-act" data-va="${k}">${icon(a.ico, { size: 'md' })}${a.label()}</button>`).join('');
   host.appendChild(acts);
   acts.addEventListener('click', (e) => {
     const b = e.target.closest('[data-va]');
@@ -1501,7 +1501,7 @@ async function deliverVision(userText, images, systemExtra = '') {
       ? t('Explícame estas zonas y cómo se relacionan entre sí.')
       : t('Explícame esta zona de la página.'))
     : t('Explícame el contenido de esta página, en especial las figuras, diagramas o tablas que aparezcan.'));
-  const userLabel = `📷 ${list.map((z) => z.label).join(' + ')} · ${instruction}`;
+  const userLabel = `${list.map((z) => z.label).join(' + ')} · ${instruction}`;
 
   appendBubble('user', userLabel, false);
   history.push({ role: 'user', content: userLabel });
@@ -1858,7 +1858,7 @@ async function quizChapter(chapterLabel) {
 `El lector acaba de TERMINAR el capítulo «${chapterLabel}». Eres su tutor de recuerdo activo (método
 HQ&A). Formula UNA sola pregunta breve y conceptual que le haga recuperar la idea principal de ese
 capítulo, alineada a su OBJETIVO. NO des la respuesta: la escribe él. Empieza el mensaje con
-"🔔 Repaso — ". Apóyate en un pasaje citándolo con su ancla [[aN]].
+"Repaso — ". Apóyate en un pasaje citándolo con su ancla [[aN]].
 OBJETIVO: ${convo?.goal || '(sin definir)'}` },
       { role: 'user', content: 'PASAJES DEL CAPÍTULO:\n\n' + formatPassages(passages) },
     ];
@@ -2134,7 +2134,7 @@ function renderOfflineChip() {
     chip.className = 'ai-offline-chip';
     els.messages.parentNode.insertBefore(chip, els.messages.nextSibling);
   }
-  chip.innerHTML = `${icon('bubble', { size: 14 })}<span>${escapeHtml(
+  chip.innerHTML = `${icon('bubble', { size: 'sm' })}<span>${escapeHtml(
     n === 1 ? t('1 pregunta en cola, para cuando vuelva la conexión')
             : t('{n} preguntas en cola, para cuando vuelva la conexión', { n }))}</span>` +
     (Offline.isOffline() ? '' : `<button class="ai-offline-go" type="button">${escapeHtml(t('Responder ahora'))}</button>`);
@@ -2237,7 +2237,7 @@ function addMessageActions(bubble, answerText, question, { autoRun = false, trun
     }
     const ex = document.createElement('button');
     ex.className = 'ai-act ai-extract';
-    ex.innerHTML = act('note', t('A la libreta'));
+    ex.innerHTML = act('notebook', t('A la libreta'));
     ex.addEventListener('click', () => extractToNotebook(answerText, question, ex));
     bar.appendChild(ex);
   }
@@ -2274,13 +2274,13 @@ async function extractToNotebook(answerText, question, el) {
   if (!template) return;
   const isBtn = el.tagName === 'BUTTON';
   if (isBtn) el.disabled = true;
-  el.innerHTML = act('note', t('Apuntando…'));
+  el.innerHTML = act('notebook', t('Apuntando…'));
   // Campos escribibles por la IA: INFO más andamio (HQ&A: la IA pone H+Q, la Answer queda
   // para el usuario). La cognición pura sigue vetada: la genera el usuario, no la IA.
   const fillable = aiWritableFields(template);
   if (!fillable.length) {                       // plantilla 100% cognición (sin andamio)
-    el.innerHTML = act('note', t('Nada que guardar'));
-    if (isBtn) setTimeout(() => { el.disabled = false; el.innerHTML = act('note', t('A la libreta')); }, 2500);
+    el.innerHTML = act('notebook', t('Nada que guardar'));
+    if (isBtn) setTimeout(() => { el.disabled = false; el.innerHTML = act('notebook', t('A la libreta')); }, 2500);
     return;
   }
   const fieldList = fillable.map(f => `- ${f.key}: ${f.label}${f.hint ? ` (${f.hint})` : ''}`).join('\n');
@@ -2314,7 +2314,7 @@ hay nada que merezca guardarse, no llames a ninguna herramienta.` },
       added++;
     }
     renderNotebook();
-    el.innerHTML = added ? act('check', t('{n} a la libreta', { n: added })) : act('note', t('Nada que guardar'));
+    el.innerHTML = added ? act('check', t('{n} a la libreta', { n: added })) : act('notebook', t('Nada que guardar'));
     if (added) {
       if (isBtn) showView('notebook');         // manual: el usuario lo pidió → mostrar
       else markNotebookUnread();               // auto: avisar sin interrumpir el chat
@@ -2332,7 +2332,7 @@ hay nada que merezca guardarse, no llames a ninguna herramienta.` },
     }
   } finally {
     // Solo el botón se restaura para poder reintentar; el indicador auto se queda.
-    if (isBtn) setTimeout(() => { el.disabled = false; el.innerHTML = act('note', t('A la libreta')); }, 2500);
+    if (isBtn) setTimeout(() => { el.disabled = false; el.innerHTML = act('notebook', t('A la libreta')); }, 2500);
   }
 }
 
@@ -2433,7 +2433,7 @@ function noteHtml(n, { showChapter = true } = {}) {
   if (navCfi) {
     const page = pdfPage ? Number(pdfPage) : citePage({ cfi: navCfi });
     const label = page ? t('pág. {n}', { n: page }) : (showChapter && n.chapter ? citeLabel('', { chapter: n.chapter }) : t('Ir al pasaje'));
-    chip = `<button class="ai-nb-loc ai-nb-goto" data-cfi="${escapeHtml(navCfi)}" title="${t('Ir al pasaje')}">${icon('arrow-up-right', { size: 12 })}<span>${escapeHtml(label)}</span></button>`;
+    chip = `<button class="ai-nb-loc ai-nb-goto" data-cfi="${escapeHtml(navCfi)}" title="${t('Ir al pasaje')}">${icon('arrow-up-right', { size: 'sm' })}<span>${escapeHtml(label)}</span></button>`;
   } else if (!hasCite && showChapter && n.chapter) {
     chip = `<span class="ai-nb-chap">${escapeHtml(n.chapter)}</span>`;
   }
@@ -2441,11 +2441,11 @@ function noteHtml(n, { showChapter = true } = {}) {
   const unanswered = qa && qa.q && !qa.a;
   const menu = nbMenu === n.id ? `
       <div class="ai-nb-menu" role="menu">
-        ${navCfi ? `<button class="ai-nb-goto" role="menuitem" data-cfi="${escapeHtml(navCfi)}">${icon('arrow-up-right', { size: 15 })}<span>${t('Ir al pasaje')}</span></button>` : ''}
-        ${mine && !unanswered ? `<button class="ai-nb-review" role="menuitem" data-id="${n.id}">${icon('sparkles', { size: 15 })}<span>${t('Revisar con el agente')}</span></button>` : ''}
-        ${unanswered ? '' : `<button class="ai-nb-card" role="menuitem" data-id="${n.id}">${icon('cards', { size: 15 })}<span>${t('Hacer tarjeta')}</span></button>`}
-        <button class="ai-nb-edit" role="menuitem" data-id="${n.id}">${icon('pencil', { size: 15 })}<span>${t('Editar')}</span></button>
-        <button class="ai-nb-del" role="menuitem" data-id="${n.id}">${icon('trash', { size: 15 })}<span>${t('Borrar')}</span></button>
+        ${navCfi ? `<button class="ai-nb-goto" role="menuitem" data-cfi="${escapeHtml(navCfi)}">${icon('arrow-up-right', { size: 'md' })}<span>${t('Ir al pasaje')}</span></button>` : ''}
+        ${mine && !unanswered ? `<button class="ai-nb-review" role="menuitem" data-id="${n.id}">${icon('sparkles', { size: 'md' })}<span>${t('Revisar con el agente')}</span></button>` : ''}
+        ${unanswered ? '' : `<button class="ai-nb-card" role="menuitem" data-id="${n.id}">${icon('cards', { size: 'md' })}<span>${t('Hacer tarjeta')}</span></button>`}
+        <button class="ai-nb-edit" role="menuitem" data-id="${n.id}">${icon('pencil', { size: 'md' })}<span>${t('Editar')}</span></button>
+        <button class="ai-nb-del" role="menuitem" data-id="${n.id}">${icon('trash', { size: 'md' })}<span>${t('Borrar')}</span></button>
       </div>` : '';
   // HQ&A sin responder: la línea «R:» es un botón con su placeholder, no el marcador
   // Markdown «_(escribe tu respuesta)_» a la vista (auditoría Q4).
@@ -2461,7 +2461,7 @@ function noteHtml(n, { showChapter = true } = {}) {
       <div class="ai-nb-note-text" data-id="${n.id}">${renderWithCitations(body, anchors, { pending: !anchors.size })}${answerPh}</div>
       <div class="ai-nb-note-meta${bare ? ' is-bare' : ''}">
         ${chip}
-        <button class="ai-nb-more" data-id="${n.id}" aria-label="${t('Más acciones')}" aria-haspopup="menu" aria-expanded="${nbMenu === n.id}">${icon('ellipsis', { size: 16 })}</button>
+        <button class="ai-nb-more" data-id="${n.id}" aria-label="${t('Más acciones')}" aria-haspopup="menu" aria-expanded="${nbMenu === n.id}">${icon('ellipsis', { size: 'md' })}</button>
       </div>
       ${menu}
     </div>`;
@@ -2489,8 +2489,8 @@ function fieldBlock(f, list, { chapter = null, pending = null } = {}) {
     const busyHere = nbFilling === `${f.key}|${chapter ?? ''}`;
     return `<div class="ai-nb-slot is-agent-slot">
       <span class="ai-nb-slot-label">${escapeHtml(f.label)}</span>
-      <button class="ai-nb-fill-btn" data-fill="${f.key}"${chapAttr}${busyHere || nbFilling ? ' disabled' : ''}>${icon('sparkles', { size: 13 })}<span>${busyHere ? t('Buscando en el libro…') : t('Pedir al agente')}</span></button>
-      <button class="ai-nb-add" data-field="${f.key}"${chapAttr} aria-label="${t('Escribirla yo')}" title="${t('Escribirla yo')}">${icon('plus', { size: 15 })}</button>
+      <button class="ai-nb-fill-btn" data-fill="${f.key}"${chapAttr}${busyHere || nbFilling ? ' disabled' : ''}>${icon('sparkles', { size: 'sm' })}<span>${busyHere ? t('Buscando en el libro…') : t('Pedir al agente')}</span></button>
+      <button class="ai-nb-add" data-field="${f.key}"${chapAttr} aria-label="${t('Escribirla yo')}" title="${t('Escribirla yo')}">${icon('plus', { size: 'md' })}</button>
     </div>`;
   }
   if (!list.length && !adding) {
@@ -2498,7 +2498,7 @@ function fieldBlock(f, list, { chapter = null, pending = null } = {}) {
     return `<button class="ai-nb-slot${mine ? ' is-mine' : ''}" data-field="${f.key}"${chapAttr}>
       <span class="ai-nb-slot-label">${escapeHtml(f.label)}</span>
       <span class="ai-nb-slot-when">${escapeHtml(when)}</span>
-      ${icon('plus', { size: 15 })}</button>`;
+      ${icon('plus', { size: 'md' })}</button>`;
   }
   const foldKey = `${f.key}|${chapter ?? ''}`;
   const folded = !mine && list.length > NB_FOLD && !nbExpanded.has(foldKey);
@@ -2508,7 +2508,7 @@ function fieldBlock(f, list, { chapter = null, pending = null } = {}) {
       <header class="ai-nb-field-head">
         <span class="ai-nb-field-label">${escapeHtml(f.label)}</span>
         <span class="ai-nb-fill ${mine ? 'is-user' : 'is-agent'}">${mine ? t('tú') : t('IA')}</span>
-        ${adding ? '' : `<button class="ai-nb-add" data-field="${f.key}"${chapAttr} aria-label="${t('Añadir nota')}" title="${t('Añadir nota')}">${icon('plus', { size: 15 })}</button>`}
+        ${adding ? '' : `<button class="ai-nb-add" data-field="${f.key}"${chapAttr} aria-label="${t('Añadir nota')}" title="${t('Añadir nota')}">${icon('plus', { size: 'md' })}</button>`}
       </header>
       ${shown.map(n => noteHtml(n, { showChapter: chapter == null })).join('')}
       ${folded ? `<button class="ai-nb-expand" data-key="${escapeHtml(foldKey)}">${t('Ver {n} más', { n: list.length - NB_FOLD })}</button>` : ''}
@@ -2519,7 +2519,7 @@ function fieldBlock(f, list, { chapter = null, pending = null } = {}) {
 function tocaHtml(p) {
   const saved = nbJustSaved != null && notes.find(n => n.id === nbJustSaved);
   const savedHtml = saved
-    ? `<div class="ai-nb-saved">${icon('check', { size: 15 })}<span>${t('Guardado en «{f}».', { f: escapeHtml(fieldOf(saved.fieldKey)?.label || '') })}</span>${LLM.hasKey() ? `<button class="ai-nb-review" data-id="${saved.id}">${t('Revisar con el agente')}</button>` : ''}</div>`
+    ? `<div class="ai-nb-saved">${icon('check', { size: 'md' })}<span>${t('Guardado en «{f}».', { f: escapeHtml(fieldOf(saved.fieldKey)?.label || '') })}</span>${LLM.hasKey() ? `<button class="ai-nb-review" data-id="${saved.id}">${t('Revisar con el agente')}</button>` : ''}</div>`
     : '';
   if (!p) return savedHtml;
   const f = p.field;
@@ -2563,7 +2563,7 @@ function deliverHtml() {
   return `
     <div class="ai-nb-deliver">
       <div class="ai-nb-deliver-txt"><b>${t('Tu entregable')}</b><span>${escapeHtml(what ? what.slice(0, 90) : t('Lo que querías tener al terminar'))}</span></div>
-      <button class="ai-nb-deliver-btn">${icon('sparkles', { size: 15 })}<span>${t('Montarlo con mis notas')}</span></button>
+      <button class="ai-nb-deliver-btn">${icon('sparkles', { size: 'md' })}<span>${t('Montarlo con mis notas')}</span></button>
     </div>`;
 }
 
@@ -2626,7 +2626,7 @@ function hqaHowtoHtml() {
         <li>${t('Respondes con tus palabras: es lo que fija lo aprendido.')}</li>
         <li>${t('Tu respuesta entra en tu mazo de repaso.')}</li>
       </ol>
-      ${list || `<button class="ai-nb-try"${c?.loading || !segReady ? ' disabled' : ''}>${icon('sparkles', { size: 14 })}<span>${c?.loading ? t('Buscando frases…') : t('Probar con este capítulo')}</span></button>`}
+      ${list || `<button class="ai-nb-try"${c?.loading || !segReady ? ' disabled' : ''}>${icon('sparkles', { size: 'sm' })}<span>${c?.loading ? t('Buscando frases…') : t('Probar con este capítulo')}</span></button>`}
     </div>`;
 }
 
@@ -2763,7 +2763,7 @@ function renderNotebook() {
       const open = isCur || groups.length === 1 || nbOpenChapters.has(g.chapter) || nbAddChapter === g.chapter;
       return `
         <details class="ai-nb-chapter" data-chapter="${escapeHtml(g.chapter)}"${open ? ' open' : ''}>
-          <summary>${icon('chevron-right', { size: 14 })}<span class="ai-nb-chapter-name">${escapeHtml(g.chapter || t('Sin capítulo'))}</span>${isCur ? `<span class="ai-nb-chapter-now">${t('Ahora')}</span>` : ''}${chapterCount(g.notes)}</summary>
+          <summary>${icon('chevron-right', { size: 'sm' })}<span class="ai-nb-chapter-name">${escapeHtml(g.chapter || t('Sin capítulo'))}</span>${isCur ? `<span class="ai-nb-chapter-now">${t('Ahora')}</span>` : ''}${chapterCount(g.notes)}</summary>
           <div class="ai-nb-chapter-body">${inner}</div>
         </details>`;
     }).join('');
@@ -2773,7 +2773,7 @@ function renderNotebook() {
 
   const focus = captureNbDrafts();
   els.noteView.innerHTML = `
-    <div class="ai-nb-goal"><span class="ai-nb-goal-label">${icon('target', { size: 15 })} ${t('Objetivo')}</span><span class="ai-nb-goal-value">${escapeHtml(convo.goal)}</span></div>
+    <div class="ai-nb-goal"><span class="ai-nb-goal-label">${icon('target', { size: 'md' })} ${t('Objetivo')}</span><span class="ai-nb-goal-value">${escapeHtml(convo.goal)}</span></div>
     <div class="ai-nb-tpl">${escapeHtml(template.name)}</div>
     ${clipHtml()}
     ${tocaHtml(pending)}

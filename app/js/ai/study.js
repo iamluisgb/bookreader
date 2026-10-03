@@ -336,7 +336,7 @@ export function open({ decks, title = t('Estudiar'), onClose, onNavigate } = {})
         </button>
         <span class="study-left" aria-live="polite"></span>
         <div class="study-tools"></div>
-        <button class="ai-ob-close" title="${t('Cerrar')}" aria-label="${t('Cerrar')}">${icon('xmark', { size: 18 })}</button>
+        <button class="ai-ob-close" title="${t('Cerrar')}" aria-label="${t('Cerrar')}">${icon('xmark', { size: 'lg' })}</button>
       </div>
       <div class="study-body"></div>
       <div class="study-foot"></div>
@@ -375,9 +375,9 @@ function renderChip() {
   removeChip();
   chip = document.createElement('div');
   chip.className = 'ai-taskchip is-study';
-  chip.innerHTML = `<span class="ai-taskchip-dot" aria-hidden="true">${icon('cards', { size: 13 })}</span>
+  chip.innerHTML = `<span class="ai-taskchip-dot" aria-hidden="true">${icon('cards', { size: 'sm' })}</span>
     <span class="ai-taskchip-label"></span>
-    <button class="ai-taskchip-x" title="${t('Terminar repaso')}" aria-label="${t('Terminar repaso')}">${icon('xmark', { size: 14 })}</button>`;
+    <button class="ai-taskchip-x" title="${t('Terminar repaso')}" aria-label="${t('Terminar repaso')}">${icon('xmark', { size: 'sm' })}</button>`;
   chip.querySelector('.ai-taskchip-label').textContent =
     t('Volver al repaso · {n} pendiente{s}', { n: queue.length, s: queue.length === 1 ? '' : 's' });
   chip.querySelector('.ai-taskchip-x').onclick = (e) => { e.stopPropagation(); close(); };
@@ -697,7 +697,7 @@ async function runSketchReview(card) {
   const ctl = new AbortController();
   sketchCtl = ctl;
   host.hidden = false;
-  host.innerHTML = `<p class="study-review-wait">${icon('sparkles', { size: 14 })} ${t('El agente está revisando tu boceto…')}</p>`;
+  host.innerHTML = `<p class="study-review-wait">${icon('sparkles', { size: 'sm' })} ${t('El agente está revisando tu boceto…')}</p>`;
   try {
     const { review } = await reviewDrawing({
       dataUrl: sketchDataUrl(canvas),
@@ -791,10 +791,10 @@ function renderTools() {
   if (!host) return;
   const hasCard = !editing && !!queue.length;
   const item = (act, ico, label) =>
-    `<button class="study-menu-item" data-act="${act}" role="menuitem">${icon(ico, { size: 15 })}<span>${label}</span></button>`;
+    `<button class="study-menu-item" data-act="${act}" role="menuitem">${icon(ico, { size: 'md' })}<span>${label}</span></button>`;
   host.innerHTML =
-    (undoStack.length ? `<button class="icon-btn study-tool" data-act="undo" title="${t('Deshacer la última nota')} (Z)" aria-label="${t('Deshacer la última nota')}">${icon('undo', { size: 16 })}</button>` : '') +
-    (hasCard ? `<button class="icon-btn study-tool study-more" aria-haspopup="menu" aria-expanded="false" title="${t('Más acciones')}" aria-label="${t('Más acciones')}">${icon('ellipsis', { size: 18 })}</button>
+    (undoStack.length ? `<button class="icon-btn study-tool" data-act="undo" title="${t('Deshacer la última nota')} (Z)" aria-label="${t('Deshacer la última nota')}">${icon('undo', { size: 'md' })}</button>` : '') +
+    (hasCard ? `<button class="icon-btn study-tool study-more" aria-haspopup="menu" aria-expanded="false" title="${t('Más acciones')}" aria-label="${t('Más acciones')}">${icon('ellipsis', { size: 'lg' })}</button>
       <div class="study-menu" role="menu" hidden>
         ${item('edit', 'pencil', t('Editar la tarjeta'))}
         ${LLM.hasKey() ? item('rewrite', 'sparkles', t('Reescribir con el agente')) : ''}
@@ -856,7 +856,7 @@ function refreshHead() {
   const el = overlay?.querySelector('.study-streakchip');
   if (!el) return;
   const streak = Srs.currentStreak(Storage.get(STREAK_KEY));
-  el.textContent = `🔥 ${streak}`;
+  el.innerHTML = `${icon('flame', { size: 'sm' })}<b>${streak}</b>`;
   el.setAttribute('aria-label', t('Racha de {n} día{s}', { n: streak, s: streak === 1 ? '' : 's' }));
   el.classList.toggle('is-zero', !streak);
   el.classList.toggle('is-risky', streak > 0 && !reviewsToday());
@@ -961,9 +961,9 @@ function renderCard() {
 // Aviso de leech: no suspende sola; propone el arreglo, que casi siempre es reformularla.
 function leechHtml(card) {
   if (!Srs.isLeech(card)) return '';
-  return `<div class="study-leech">${icon('warning', { size: 14 })}
+  return `<div class="study-leech">${icon('warning', { size: 'sm' })}
     <span>${t('La has fallado {n} veces. Suele ser señal de que la tarjeta está mal formulada, no de que el tema sea difícil: edítala o suspéndela.', { n: card.srs.lapses })}</span>
-    ${LLM.hasKey() ? `<button class="study-leech-fix" data-act="rewrite">${icon('sparkles', { size: 13 })} ${t('Reescribir con el agente')}</button>` : ''}
+    ${LLM.hasKey() ? `<button class="study-leech-fix" data-act="rewrite">${icon('sparkles', { size: 'sm' })} ${t('Reescribir con el agente')}</button>` : ''}
   </div>`;
 }
 
@@ -984,7 +984,7 @@ function renderEditor(draft = null) {
   const back = draft ? draft.back : (card.back || '');
   b.innerHTML = `
     <div class="study-stage study-stage--edit">
-      ${draft ? `<p class="study-draft-note">${icon('sparkles', { size: 14 })} ${t('Propuesta del agente a partir del pasaje. Revísala y guarda.')}</p>` : ''}
+      ${draft ? `<p class="study-draft-note">${icon('sparkles', { size: 'sm' })} ${t('Propuesta del agente a partir del pasaje. Revísala y guarda.')}</p>` : ''}
       <div class="study-edit">
         <label class="fc-label">${card.type === 'cloze' ? t('Frase con huecos') : t('Pregunta')}</label>
         <div class="fc-front study-edit-f" contenteditable="true" spellcheck="false">${escapeHtml(front)}</div>
@@ -1016,7 +1016,7 @@ async function rewriteCurrent() {
   const { deck, idx } = queue[0];
   const card = deck.cards[idx];
   const b = overlay?.querySelector('.study-body');
-  if (b) b.insertAdjacentHTML('afterbegin', `<p class="study-working">${icon('sparkles', { size: 14 })} ${t('Reescribiendo la tarjeta…')}</p>`);
+  if (b) b.insertAdjacentHTML('afterbegin', `<p class="study-working">${icon('sparkles', { size: 'sm' })} ${t('Reescribiendo la tarjeta…')}</p>`);
   const passage = await passageOf(deck, card);
   try {
     const raw = await LLM.chatStream({
@@ -1189,7 +1189,7 @@ function renderGrades(card) {
       <span class="study-grade-lbl">${lbl}</span><small>${Srs.intervalLabel(prev[r])}</small><kbd>${keys[r]}</kbd>
     </button>`;
   f.innerHTML = `
-    ${card.src ? `<button class="study-src">${icon('book', { size: 15 })} ${t('Ver en el libro')}</button>` : ''}
+    ${card.src ? `<button class="study-src">${icon('book', { size: 'md' })} ${t('Ver en el libro')}</button>` : ''}
     <div class="study-grades${full ? '' : ' is-simple'}">
       ${btn('again', t('Otra vez'), 'is-again')}${full ? btn('hard', t('Difícil'), 'is-hard') : ''}
       ${btn('good', t('Bien'), 'is-good')}${full ? btn('easy', t('Fácil'), 'is-easy') : ''}
@@ -1209,7 +1209,7 @@ async function checkRecall(deck, card, answer) {
   const box = overlay?.querySelector('.study-feedback');
   if (!box) return;
   box.hidden = false;
-  box.innerHTML = `<p class="study-feedback-wait">${icon('sparkles', { size: 14 })} ${t('El agente está corrigiendo tu respuesta…')}</p>`;
+  box.innerHTML = `<p class="study-feedback-wait">${icon('sparkles', { size: 'sm' })} ${t('El agente está corrigiendo tu respuesta…')}</p>`;
   const expected = card.type === 'cloze'
     ? String(card.front).replace(CLOZE_RE, (_, ans) => ans) + (card.back ? `\n${card.back}` : '')
     : `${card.front}\n${card.back || ''}`;
@@ -1255,7 +1255,7 @@ async function showPassage(deck, card) {
   const chapter = card.chapter ? `<span class="study-passage-ch">${escapeHtml(card.chapter)}</span>` : '';
   // Recorte de página: papel, serif y la tarjeta citándolo. Plegado: se abre con un toque.
   a.insertAdjacentHTML('beforeend',
-    `<details class="study-passage-wrap"><summary>${icon('book', { size: 14 })} ${t('Ver el pasaje del libro')}</summary>
+    `<details class="study-passage-wrap"><summary>${icon('book', { size: 'sm' })} ${t('Ver el pasaje del libro')}</summary>
       <blockquote class="study-passage">${chapter}${escapeHtml(text)}</blockquote></details>`);
   a.hidden = false;
 }
@@ -1397,7 +1397,7 @@ function renderDone(b, f, left) {
     <div class="study-end">
       <div class="study-end-icon${done ? ' is-done' : ''}">
         <svg viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="28" class="study-ring-track"/><circle cx="32" cy="32" r="28" class="study-ring-fill"/></svg>
-        ${icon('check', { size: 30 })}
+        ${icon('check', { size: 'display' })}
       </div>
       <h2>${done ? t('¡Repaso completado!') : t('Nada que repasar')}</h2>
       <p>${done
@@ -1408,12 +1408,12 @@ function renderDone(b, f, left) {
         <div><b>${fmtTime(Date.now() - startedAt)}</b><span>${t('de sesión')}</span></div>
         <div><b>${streak}</b><span>${t('días de racha')}</span></div>
       </div>` : ''}
-      ${done && streak ? `<div class="study-streak">${t('🔥 Racha de <b>{n}</b> día{s} estudiando', { n: streak, s: streak === 1 ? '' : 's' })}</div>` : ''}
+      ${done && streak ? `<div class="study-streak">${`${icon('flame', { size: 'sm' })} ${t('Racha de <b>{n}</b> día{s} estudiando', { n: streak, s: streak === 1 ? '' : 's' })}`}</div>` : ''}
       ${milestone ? `<div class="study-milestone" role="status">
-        <span class="study-milestone-flame" aria-hidden="true">🔥</span>
+        <span class="study-milestone-flame" aria-hidden="true">${icon('flame', { size: 'display' })}</span>
         <div class="study-milestone-txt"><h3>${t('¡{n} días de racha!', { n: milestone })}</h3>
           <p>${t('La constancia ya es un hábito. Presúmelo.')}</p></div>
-        <button class="study-share">${icon('share', { size: 15 })} ${t('Compartir')}</button>
+        <button class="study-share">${icon('share', { size: 'md' })} ${t('Compartir')}</button>
       </div>` : ''}
       <div class="study-end-charts">
         <div><h3>${t('Tu racha')}</h3>${heatmapHtml()}</div>
@@ -1437,7 +1437,7 @@ function renderDone(b, f, left) {
   // El tope de nuevas es una recomendación, no una cárcel: quien quiera seguir, sigue.
   f.innerHTML = `<div class="study-end-actions">
     ${held.length ? `<button class="btn btn--primary primary-btn study-more-new">${t('Seguir con {n} nueva{s}', { n: held.length, s: held.length === 1 ? '' : 's' })}</button>` : ''}
-    ${done && oneBook ? `<button class="ai-ob-back study-read">${icon('book', { size: 15 })} ${t('Seguir leyendo')}</button>` : ''}
+    ${done && oneBook ? `<button class="ai-ob-back study-read">${icon('book', { size: 'md' })} ${t('Seguir leyendo')}</button>` : ''}
     <button class="${held.length ? 'ai-ob-back' : 'btn btn--primary primary-btn'} study-flip">${t('Cerrar')}</button>
   </div>`;
   f.querySelector('.study-flip').addEventListener('click', close);

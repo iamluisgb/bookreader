@@ -17,8 +17,10 @@ const ICONS = {
   'arrow-up': '<line x1="12" y1="19" x2="12" y2="5.5"/><polyline points="6.5 11 12 5.5 17.5 11"/>',
   'chevron-down': '<polyline points="5 9.5 12 16 19 9.5"/>',
   'chevron-up': '<polyline points="5 14.5 12 8 19 14.5"/>',
-  upload: '<path d="M12 15V4.5"/><polyline points="7.5 9 12 4.5 16.5 9"/><path d="M5 14v3.5A1.5 1.5 0 0 0 6.5 19h11a1.5 1.5 0 0 0 1.5-1.5V14"/>',
-  download: '<path d="M12 4.5V15"/><polyline points="7.5 10.5 12 15 16.5 10.5"/><path d="M5 14v3.5A1.5 1.5 0 0 0 6.5 19h11a1.5 1.5 0 0 0 1.5-1.5V14"/>',
+  // Subir/bajar un FICHERO: flecha sobre una bandeja. Antes `upload` era una caja con
+  // flecha, el mismo dibujo que `share` (y en iOS esa caja SIGNIFICA compartir).
+  upload: '<line x1="5" y1="19.5" x2="19" y2="19.5"/><path d="M12 15.5V4.5"/><polyline points="7.5 9 12 4.5 16.5 9"/>',
+  download: '<line x1="5" y1="19.5" x2="19" y2="19.5"/><path d="M12 4.5V15.5"/><polyline points="7.5 11 12 15.5 16.5 11"/>',
   // Flashcards: dos tarjetas apiladas.
   cards: '<rect x="7" y="7.5" width="13" height="12" rx="2"/><path d="M4 15V6a2 2 0 0 1 2-2h9"/><line x1="10" y1="12" x2="17" y2="12"/><line x1="10" y1="15.5" x2="14.5" y2="15.5"/>',
   sort: '<line x1="5" y1="7" x2="19" y2="7"/><line x1="7" y1="12" x2="17" y2="12"/><line x1="10" y1="17" x2="14" y2="17"/>',
@@ -31,7 +33,6 @@ const ICONS = {
   // Imagotipo de la app (libro abierto: página con curl + cinta marcapáginas):
   // botón "volver a la biblioteca". Versión de línea del mark en la rejilla 24×24;
   // se tiñe con currentColor (emerald). Mark relleno en app/icons/icon.svg.
-  logo: '<path d="M12 4.2H6.2A1.7 1.7 0 0 0 4.5 5.9v8.5a1.7 1.7 0 0 0 1.7 1.7h1.9c2.1 0 3.9 1.2 3.9 3.2Z"/><path d="M14.3 5.4a1.2 1.2 0 0 1 1.2-1.2h2.9a1.2 1.2 0 0 1 1.2 1.2V15l-2.65-2-2.65 2Z"/>',
 
   // ——— actions ———
   bookmark: '<path d="M6.5 4.5h11a1 1 0 0 1 1 1V20l-6.5-4.3L5.5 20V5.5a1 1 0 0 1 1-1Z"/>',
@@ -79,17 +80,63 @@ const ICONS = {
   // P29 · Infografía: una lámina con su titular, su imagen y sus líneas.
   poster: '<rect x="4" y="3.5" width="16" height="17" rx="2"/><line x1="7" y1="8" x2="17" y2="8"/><rect x="7" y="11.5" width="4.6" height="4.6" rx="1"/><line x1="14" y1="12" x2="17" y2="12"/><line x1="14" y1="15.4" x2="17" y2="15.4"/>',
 
+  // ——— añadidos con la revisión de iconos (2026-10-03): un significado por icono ———
+  // Fijar (estanterías en la tira). El marcapáginas es «marcar página» y nada más.
+  pin: '<path d="M9.5 4h5l-.8 4.7 3.3 2.8H7l3.3-2.8L9.5 4Z"/><line x1="12" y1="11.5" x2="12" y2="20"/>',
+  // Filtro por regla (estanterías inteligentes). `sparkles` queda solo para la IA.
+  funnel: '<path d="M4.5 5h15l-5.8 7v5.4l-3.4 1.8V12L4.5 5Z"/>',
+  // Ayuda / guía rápida.
+  help: '<circle cx="12" cy="12" r="8.5"/><path d="M9.6 9.6a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1.1.8-1.1 1.5v.4"/><line x1="12" y1="16.6" x2="12" y2="16.7"/>',
+  info: '<circle cx="12" cy="12" r="8.5"/><line x1="12" y1="11" x2="12" y2="16.2"/><line x1="12" y1="7.9" x2="12" y2="8"/>',
+  // Nube (Drive, sincronizar). `upload` es subir un fichero desde el dispositivo.
+  cloud: '<path d="M7.5 18.5h9.2a3.8 3.8 0 0 0 .6-7.55 5.3 5.3 0 0 0-10.2-1.2 4.4 4.4 0 0 0 .4 8.75Z"/><polyline points="10 13.6 12 11.6 14 13.6"/><line x1="12" y1="11.6" x2="12" y2="16.4"/>',
+  // La libreta (pestaña, «A la libreta»): con anillas. `note` es una nota suelta.
+  notebook: '<rect x="6.5" y="3.5" width="13" height="17" rx="2"/><line x1="4" y1="8" x2="8.5" y2="8"/><line x1="4" y1="12" x2="8.5" y2="12"/><line x1="4" y1="16" x2="8.5" y2="16"/><line x1="11.5" y1="8.5" x2="16.5" y2="8.5"/><line x1="11.5" y1="12" x2="15.5" y2="12"/>',
+  // Fórmula / ejemplo con números (ƒx). `chart` es Análisis.
+  function: '<path d="M13.8 4.5h-.6c-1.6 0-2.5.9-2.8 2.5L8.4 19.5"/><line x1="7.2" y1="10" x2="13.2" y2="10"/><line x1="14.6" y1="13" x2="19.6" y2="19"/><line x1="19.6" y1="13" x2="14.6" y2="19"/>',
+  // Otra persona / material compartido. `user` es tu perfil.
+  users: '<circle cx="9" cy="8.5" r="3"/><path d="M3.8 19.2a5.2 5.2 0 0 1 10.4 0"/><circle cx="16.6" cy="9.6" r="2.4"/><path d="M15.6 14.3a4.5 4.5 0 0 1 4.9 4.9"/>',
+  // Racha. Sustituye al emoji 🔥, que cambia de dibujo en cada sistema.
+  flame: '<path d="M12 20.5c3.3 0 5.8-2.4 5.8-5.7 0-3.5-2.6-5.2-3.5-8.3-.5 1.9-1.4 3-2.6 3.6.3-2.6-.8-4.9-3-6.6.2 3.4-3.5 5.7-3.5 10.2 0 3.7 2.9 6.8 6.8 6.8Z"/>',
+  // Mapa mental: un nodo y sus ramas (antes `columns`, que es un edificio con columnas).
+  mindmap: '<circle cx="12" cy="12" r="2.6"/><circle cx="5" cy="6" r="1.8"/><circle cx="19" cy="6" r="1.8"/><circle cx="5" cy="18" r="1.8"/><circle cx="19" cy="18" r="1.8"/><line x1="9.9" y1="10.4" x2="6.4" y2="7.2"/><line x1="14.1" y1="10.4" x2="17.6" y2="7.2"/><line x1="9.9" y1="13.6" x2="6.4" y2="16.8"/><line x1="14.1" y1="13.6" x2="17.6" y2="16.8"/>',
+  'arrow-down': '<line x1="12" y1="5" x2="12" y2="18.5"/><polyline points="6.5 13 12 18.5 17.5 13"/>',
+
   // ——— theme glyphs (used inside swatches when helpful) ———
   sun: '<circle cx="12" cy="12" r="4"/><line x1="12" y1="3" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="21"/><line x1="3" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="21" y2="12"/><line x1="5.6" y1="5.6" x2="7" y2="7"/><line x1="17" y1="17" x2="18.4" y2="18.4"/><line x1="18.4" y1="5.6" x2="17" y2="7"/><line x1="7" y1="17" x2="5.6" y2="18.4"/>',
   moon: '<path d="M20 13.5A8 8 0 1 1 10.5 4 6.4 6.4 0 0 0 20 13.5Z"/>',
 };
 
-// Build an <svg> string. Defaults match a 22px line icon; `filled` swaps to the
-// solid variant when one exists.
-export function icon(name, { size = 22, strokeWidth = 1.7, filled = false } = {}) {
+// ---- Escala de tamaños (DS1) ----------------------------------------------------
+// Seis pasos con nombre, como la tipográfica: `icon(name, { size: 'md' })`. Espejo de los
+// tokens `--icon-*` de themes.css (tests/icons.spec.ts comprueba que coinciden y que nadie
+// pasa un número suelto). El trazo baja un poco al crecer el icono, como SF Symbols: con un
+// trazo fijo, a 14 px el icono pesaba más que el texto de al lado y a 56 px se quedaba fino.
+export const ICON_SIZES = { sm: 14, md: 16, lg: 20, xl: 24, display: 32, hero: 56 };
+const STROKE = { sm: 1.9, md: 1.8, lg: 1.7, xl: 1.7, display: 1.5, hero: 1.4 };
+
+function resolveSize(size) {
+  if (typeof size === 'string' && ICON_SIZES[size]) return { px: ICON_SIZES[size], stroke: STROKE[size] };
+  const n = Number(size) || ICON_SIZES.xl;
+  return { px: n, stroke: n <= 15 ? 1.9 : n <= 17 ? 1.8 : n <= 24 ? 1.7 : 1.5 };
+}
+
+const warned = new Set();
+
+// Build an <svg> string. `size`: un paso de ICON_SIZES (por defecto `xl`, el de la cabecera);
+// `filled` swaps to the solid variant when one exists.
+export function icon(name, { size = 'xl', strokeWidth, filled = false } = {}) {
   const key = filled && ICONS[name + '-fill'] ? name + '-fill' : name;
   const body = ICONS[key];
-  if (!body) return '';
+  if (!body) {
+    // Antes devolvía '' en silencio: `info` no existía y la nota del Resumen salía sin
+    // icono sin que nadie lo notara.
+    if (!warned.has(name)) { warned.add(name); console.warn(`icon(): no existe el icono «${name}»`); }
+    return '';
+  }
+  const r = resolveSize(size);
+  size = r.px;
+  strokeWidth = strokeWidth ?? r.stroke;
   return `<svg class="icon" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${strokeWidth}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${body}</svg>`;
 }
 
@@ -97,6 +144,8 @@ export function icon(name, { size = 22, strokeWidth = 1.7, filled = false } = {}
 // construyen como CADENA en vez de como DOM (el póster de la infografía, P29): ahí un
 // `<svg>` anidado no hereda trazo ni admite `currentColor`, así que se inserta el cuerpo
 // dentro de un `<g>` con su propio `stroke` y `transform`. Devuelve '' si no existe.
+export const ICON_NAMES = Object.keys(ICONS);
+
 export function iconBody(name) {
   return ICONS[name] || '';
 }
@@ -119,7 +168,8 @@ export function hydrateIcons(root = document) {
   root.querySelectorAll('[data-icon]').forEach((el) => {
     const name = el.getAttribute('data-icon');
     if (!name) return;
-    const size = parseInt(el.getAttribute('data-icon-size') || '', 10) || undefined;
+    const raw = el.getAttribute('data-icon-size') || '';
+    const size = ICON_SIZES[raw] ? raw : (parseInt(raw, 10) || undefined);
     const filled = el.getAttribute('data-icon-filled') === 'true';
     el.innerHTML = icon(name, { size, filled });
   });

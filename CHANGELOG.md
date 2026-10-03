@@ -24,6 +24,28 @@ pantallas de deslizar), sin marca de la estantería elegida y con el ⋯ dentro 
 - **44 px** de área táctil: chips, ⋯ de libro, buscador, desplegables, subir y la cabecera del lector.
 
 Tests: [library-mobile.spec.ts](tests/library-mobile.spec.ts). SW `v157`.
+## 2026-10-03 — Iconos: un significado por icono, escala de tamaños y sin emoji
+
+Revisión del set (`js/ui/icons.js`) y de los emojis de la interfaz, dentro del DS1:
+- **Un significado por icono.** `sparkles` era a la vez la IA, las estanterías inteligentes y
+  la guía rápida; `share` también «descargar backup»; `upload` también «sincronizar con
+  Drive»; `note` también la libreta; `chart` también «Con números»; `target` también
+  «Ajustar»; el marcapáginas también «fijar en la tira». Iconos nuevos en la misma rejilla:
+  `funnel`, `help`, `info` (se usaba y no existía: la nota del Resumen salía sin icono),
+  `pin`, `cloud`, `notebook`, `function`, `users`, `flame`, `mindmap`, `arrow-down`.
+  `upload`/`download` pasan a flecha sobre bandeja (eran el mismo dibujo que `share`).
+- **Escala de tamaños** como tokens: `sm` 14 · `md` 16 · `lg` 20 · `xl` 24 · `display` 32 ·
+  `hero` 56 (`--icon-*` en themes.css; había 12 tamaños), con el trazo bajando al crecer.
+  281 llamadas migradas. `icon()` avisa si el nombre no existe.
+- **Sin emoji en la interfaz:** 🔢💡🎯📷 fuera de las etiquetas; ⚠ y ✓ → iconos; 🔥 → `flame`
+  (en la tarjeta para compartir se queda: es una imagen para redes); 🔔 fuera del prompt del
+  repaso; ★ del índice → punto de acento; 🧑/🤖 del Markdown exportado → «Tú:»/«Agente:».
+- **Galería** en `patterns.html § Iconos` con el significado de cada uno; reglas en
+  DESIGN.md y AGENTS.md; `tests/icons.spec.ts` (nombres que existen, tamaños por paso, escala
+  = tokens CSS, sin emoji).
+
+SW `v160`.
+
 ## 2026-10-03 — nan: los modelos se eligen de una lista, no se escriben a mano
 
 nan responde a `GET /v1/models` (13 modelos hoy) pero **sin cabeceras CORS**, ni en la

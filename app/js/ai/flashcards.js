@@ -71,7 +71,7 @@ export function open(context) {
   overlay.className = 'ai-onboarding';
   overlay.innerHTML = `
     <div class="ai-ob-card fc-card" role="dialog" aria-modal="true" aria-label="${t('Flashcards para Anki')}">
-      <button class="ai-ob-close" title="${t('Cerrar')}" aria-label="${t('Cerrar')}">${icon('xmark', { size: 18 })}</button>
+      <button class="ai-ob-close" title="${t('Cerrar')}" aria-label="${t('Cerrar')}">${icon('xmark', { size: 'lg' })}</button>
       <div class="ai-ob-body"></div>
     </div>`;
   document.body.appendChild(overlay);
@@ -145,13 +145,13 @@ async function renderSetup() {
     <label class="fc-label" for="fc-count">${t('Cantidad')}</label>
     <div class="fc-count-row">
       <select id="fc-count" class="fc-select">${COUNTS.map(n => `<option ${n === defaultCount ? 'selected' : ''}>${n}</option>`).join('')}</select>
-      <button id="fc-plan-btn" type="button" class="fc-plan-btn" hidden>${icon('sparkles', { size: 14 })} ${t('Sugerir cantidades')}</button>
+      <button id="fc-plan-btn" type="button" class="fc-plan-btn" hidden>${icon('sparkles', { size: 'sm' })} ${t('Sugerir cantidades')}</button>
     </div>
     <p class="ai-ob-sub fc-plan-note" id="fc-plan-note" hidden>${t('El plan manda: se ignora la cantidad de arriba.')}</p>
     <div id="fc-plan"></div>
     <p class="ai-ob-sub" id="fc-split" hidden></p>
     <div id="fc-dup"></div>
-    <button id="fc-generate" class="btn btn--primary primary-btn ai-ob-start">${icon('sparkles', { size: 16 })} ${t('Generar tarjetas')}</button>
+    <button id="fc-generate" class="btn btn--primary primary-btn ai-ob-start">${icon('sparkles', { size: 'md' })} ${t('Generar tarjetas')}</button>
     <div id="fc-error" class="fc-error" style="display:none"></div>
     <div id="fc-decks"></div>`;
   mountScopeCombo(b.querySelector('#fc-scope'), options, scopeValue, (v) => {
@@ -353,7 +353,7 @@ function mountScopeCombo(host, options, selected, onChange) {
   host.innerHTML = `
     <button type="button" class="fc-combo-btn" aria-haspopup="listbox" aria-expanded="false">
       <span class="fc-combo-val">${escapeHtml(labelOf(selected))}</span>
-      ${icon('chevron-down', { size: 16 })}
+      ${icon('chevron-down', { size: 'md' })}
     </button>
     <div class="fc-combo-pop" hidden>
       ${withSearch ? `<input class="fc-combo-search" type="text" placeholder="${t('Buscar capítulo…')}" aria-label="${t('Buscar capítulo')}">` : ''}
@@ -416,10 +416,10 @@ async function renderDeckList() {
           <span class="fc-deck-meta">${t('{a} nuevas · {b} aprendiendo · {c} maduras', { a: st.nuevas, b: st.aprendiendo, c: st.maduras })}${st.suspendidas ? ` · ${t('{n} suspendidas', { n: st.suspendidas })}` : ''}</span>
         </div>
         <button class="fc-deck-study" data-act="study" title="${t('Repasar con repetición espaciada')}">
-          ${icon('cards', { size: 14 })} ${t('Estudiar')}${due ? ` <span class="fc-deck-due">${due}</span>` : ''}
+          ${icon('cards', { size: 'sm' })} ${t('Estudiar')}${due ? ` <span class="fc-deck-due">${due}</span>` : ''}
         </button>
-        <button class="icon-btn" data-act="review" title="${t('Revisar y exportar')}">${icon('pencil', { size: 15 })}</button>
-        <button class="icon-btn" data-act="delete" title="${t('Borrar mazo')}">${icon('trash', { size: 15 })}</button>
+        <button class="icon-btn" data-act="review" title="${t('Revisar y exportar')}">${icon('pencil', { size: 'md' })}</button>
+        <button class="icon-btn" data-act="delete" title="${t('Borrar mazo')}">${icon('trash', { size: 'md' })}</button>
       </div>`;
     }).join('')}`;
   holder.onclick = async (e) => {
@@ -1103,7 +1103,7 @@ function onJobUpdate(job) {
   if (!overlay || !ctx) return;
   const btn = body()?.querySelector('#fc-generate');
   if (!job || job.kind !== 'flashcards' || job.bookId !== ctx.bookId) {
-    if (btn) { btn.disabled = false; btn.innerHTML = `${icon('sparkles', { size: 16 })} ${t('Generar tarjetas')}`; }
+    if (btn) { btn.disabled = false; btn.innerHTML = `${icon('sparkles', { size: 'md' })} ${t('Generar tarjetas')}`; }
     return;
   }
   generating = job.status === 'running';
@@ -1117,7 +1117,7 @@ function onJobUpdate(job) {
     return;
   }
   if (job.status === 'error') {
-    if (btn) { btn.disabled = false; btn.innerHTML = `${icon('sparkles', { size: 16 })} ${t('Generar tarjetas')}`; }
+    if (btn) { btn.disabled = false; btn.innerHTML = `${icon('sparkles', { size: 'md' })} ${t('Generar tarjetas')}`; }
     showError(job.error?.message || t('No se pudo generar el mazo.'));
     return;
   }
@@ -1186,7 +1186,7 @@ function renderReview(deck) {
   const domainChip = (g) => `
     <span class="fc-dom-chip" style="display:inline-flex;align-items:center;gap:6px;background:var(--btn-bg);color:var(--btn-ink);border-radius:var(--r-pill);padding:3px 10px;font-size:13px;">${escapeHtml(g.domain)} (${g.indices.length})
       <button class="fc-dom-del" data-domain="${escapeHtml(g.domain)}" title="${t('Quitar todas las tarjetas de este dominio')}" aria-label="${t('Quitar todas las tarjetas de este dominio')}"
-        style="border:0;background:none;color:inherit;cursor:pointer;display:inline-flex;padding:0 0 0 2px;">${icon('xmark', { size: 11 })}</button>
+        style="border:0;background:none;color:inherit;cursor:pointer;display:inline-flex;padding:0 0 0 2px;">${icon('xmark', { size: 'sm' })}</button>
     </span>`;
   const cardRow = (c, i) => `
     <div class="fc-item${c.suspended ? ' is-suspended' : ''}" data-i="${i}">
@@ -1195,11 +1195,11 @@ function renderReview(deck) {
         <div class="fc-back" contenteditable="true" spellcheck="false" data-ph="${deck.cardType === 'cloze' ? t('Extra (opcional)') : t('Respuesta')}">${escapeHtml(c.back)}</div>
       </div>
       <button class="icon-btn fc-susp" data-act="susp" title="${c.suspended ? t('Reactivar: vuelve al repaso') : t('Suspender: no volver a mostrarla')}"
-        aria-label="${c.suspended ? t('Reactivar: vuelve al repaso') : t('Suspender: no volver a mostrarla')}">${icon(c.suspended ? 'undo' : 'eye-off', { size: 15 })}</button>
-      <button class="icon-btn fc-del" title="${t('Quitar tarjeta')}">${icon('xmark', { size: 15 })}</button>
+        aria-label="${c.suspended ? t('Reactivar: vuelve al repaso') : t('Suspender: no volver a mostrarla')}">${icon(c.suspended ? 'undo' : 'eye-off', { size: 'md' })}</button>
+      <button class="icon-btn fc-del" title="${t('Quitar tarjeta')}">${icon('xmark', { size: 'md' })}</button>
     </div>`;
   b.innerHTML = `
-    <button class="ai-ob-back">${icon('chevron-left', { size: 16 })}<span>${t('Volver')}</span></button>
+    <button class="ai-ob-back">${icon('chevron-left', { size: 'md' })}<span>${t('Volver')}</span></button>
     <h2>${t('{n} tarjetas', { n: DB.cardsOf(deck).length })}</h2>
     <p class="ai-ob-sub">${t('Revisa y edita antes de exportar. Mazo en Anki:')} <b>${escapeHtml(deck.name)}</b></p>
     <div class="fc-export fc-domain-bar">
@@ -1208,8 +1208,8 @@ function renderReview(deck) {
     </div>
     <div class="fc-list">${deck.cards.map((c, i) => (c.deleted ? '' : cardRow(c, i))).join('')}</div>
     <div class="fc-export">
-      ${deck.id ? `<button id="fc-study" class="btn btn--primary primary-btn">${icon('cards', { size: 16 })} ${t('Estudiar ahora')}<small></small></button>` : ''}
-      <button id="fc-apkg" class="${deck.id ? 'ai-ob-back' : 'btn btn--primary primary-btn'}">${icon('download', { size: 16 })} ${t('Exportar .apkg')}</button>
+      ${deck.id ? `<button id="fc-study" class="btn btn--primary primary-btn">${icon('cards', { size: 'md' })} ${t('Estudiar ahora')}<small></small></button>` : ''}
+      <button id="fc-apkg" class="${deck.id ? 'ai-ob-back' : 'btn btn--primary primary-btn'}">${icon('download', { size: 'md' })} ${t('Exportar .apkg')}</button>
       <button id="fc-txt" class="ai-ob-back fc-txt-btn" title="${t('Formato de texto que Anki importa (Archivo → Importar)')}">.txt para Anki</button>
       ${deck.cards.some(c => VISUAL_TYPES.includes(c.type))
         // Limitación honesta (WU8): el export de Anki es de TEXTO — la pregunta y el dato

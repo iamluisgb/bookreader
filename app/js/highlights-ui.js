@@ -809,12 +809,12 @@ export function renderHighlights() {
     item.style.setProperty('--hl-color', hl.color);   // tiñe la ficha (ver .highlight-item)
     item.innerHTML = `
       <div class="highlight-text">"${escapeHtml(dehyphenate(hl.text))}"</div>
-      ${hl.note ? `<div class="highlight-note">${icon('note', { size: 13 })}<span>${escapeHtml(hl.note)}</span></div>` : ''}
+      ${hl.note ? `<div class="highlight-note">${icon('note', { size: 'sm' })}<span>${escapeHtml(hl.note)}</span></div>` : ''}
       <div class="highlight-meta">
         ${hl.chapter ? `<span>${escapeHtml(hl.chapter)}</span>` : ''}
         ${hl.timestamp ? `<span class="highlight-when" title="${escapeHtml(fullWhen(hl.timestamp))}">${escapeHtml(whenLabel(hl.timestamp))}</span>` : ''}
-        <button class="highlight-share" title="Compartir">${icon('share', { size: 15 })}</button>
-        <button class="highlight-delete" title="Eliminar">${icon('xmark', { size: 16 })}</button>
+        <button class="highlight-share" title="Compartir">${icon('share', { size: 'md' })}</button>
+        <button class="highlight-delete" title="Eliminar">${icon('xmark', { size: 'md' })}</button>
       </div>
     `;
 
@@ -866,7 +866,7 @@ function renderSharedList(list) {
       item.style.setProperty('--hl-color', hl.color || '#f9a825');
       item.innerHTML = `
         <div class="highlight-text">"${escapeHtml(dehyphenate(hl.text))}"</div>
-        ${hl.note ? `<div class="highlight-note">${icon('note', { size: 13 })}<span>${escapeHtml(hl.note)}</span></div>` : ''}
+        ${hl.note ? `<div class="highlight-note">${icon('note', { size: 'sm' })}<span>${escapeHtml(hl.note)}</span></div>` : ''}
         ${hl.chapter ? `<div class="highlight-meta"><span>${escapeHtml(hl.chapter)}</span></div>` : ''}
       `;
       item.addEventListener('click', async () => {

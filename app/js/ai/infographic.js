@@ -68,7 +68,7 @@ export function open(context) {
   overlay.className = 'ai-onboarding';
   overlay.innerHTML = `
     <div class="ai-ob-card ig-card" role="dialog" aria-modal="true" aria-label="${t('Infografía del libro')}">
-      <button class="ai-ob-close" title="${t('Cerrar')}" aria-label="${t('Cerrar')}">${icon('xmark', { size: 18 })}</button>
+      <button class="ai-ob-close" title="${t('Cerrar')}" aria-label="${t('Cerrar')}">${icon('xmark', { size: 'lg' })}</button>
       <div class="ai-ob-body"></div>
     </div>`;
   document.body.appendChild(overlay);
@@ -119,8 +119,8 @@ function renderSetup() {
   b.innerHTML = `
     <h2>${t('Infografía del libro')}</h2>
     <p class="ai-ob-lead">${t('El agente recorre el libro entero y compone un póster: la tesis, las ideas clave, los bloques que se repiten y una cita para cerrar.')}</p>
-    <p class="sum-depth-hint">${icon('info', { size: 14 })} ${t('Se genera en segundo plano; puedes seguir leyendo. El póster se lee con zoom y se descarga en PNG o SVG.')}</p>
-    <button id="ig-generate" class="btn btn--primary primary-btn ai-ob-start">${icon('sparkles', { size: 16 })} ${t('Generar infografía')}</button>
+    <p class="sum-depth-hint">${icon('info', { size: 'sm' })} ${t('Se genera en segundo plano; puedes seguir leyendo. El póster se lee con zoom y se descarga en PNG o SVG.')}</p>
+    <button id="ig-generate" class="btn btn--primary primary-btn ai-ob-start">${icon('sparkles', { size: 'md' })} ${t('Generar infografía')}</button>
     <div id="ig-error" class="fc-error" style="display:none"></div>`;
   b.querySelector('#ig-generate').addEventListener('click', onGenerate);
 }
@@ -174,7 +174,7 @@ function renderRunning(job) {
     <h2>${t('Generando la infografía…')}</h2>
     <p class="ai-run-status" id="ig-run-status" role="status"></p>
     <div class="ai-run-actions">
-      <button id="ig-keep" class="btn btn--primary primary-btn">${icon('book', { size: 16 })} ${t('Seguir leyendo')}</button>
+      <button id="ig-keep" class="btn btn--primary primary-btn">${icon('book', { size: 'md' })} ${t('Seguir leyendo')}</button>
       <button id="ig-cancel" class="ai-ob-back fc-txt-btn">${t('Cancelar')}</button>
     </div>
     <p class="sum-depth-hint">${t('Puedes cerrar esta ventana: te avisaremos cuando el póster esté listo.')}</p>`;
@@ -524,8 +524,8 @@ async function renderResult(data) {
   const fmtBtn = (f, label) => `<button type="button" data-f="${f}" aria-pressed="${igFormat === f}">${label}</button>`;
   b.innerHTML = `
     <div class="sum-resulthead">
-      <button class="ai-ob-back">${icon('chevron-left', { size: 16 })}<span>${t('Volver')}</span></button>
-      <button id="ig-regen" class="fc-txt-btn">${icon('sparkles', { size: 14 })} ${t('Regenerar')}</button>
+      <button class="ai-ob-back">${icon('chevron-left', { size: 'md' })}<span>${t('Volver')}</span></button>
+      <button id="ig-regen" class="fc-txt-btn">${icon('sparkles', { size: 'sm' })} ${t('Regenerar')}</button>
     </div>
     <h2>${t('Infografía')} — ${escapeHtml(ctx.bookTitle || t('Libro'))}</h2>
     <div class="mm-format-row">
@@ -537,9 +537,9 @@ async function renderResult(data) {
     <div id="ig-view"></div>
     <p class="sum-depth-hint" id="ig-hint"></p>
     <div class="fc-export">
-      <button id="ig-png" class="btn btn--primary primary-btn">${icon('download', { size: 16 })} <span id="ig-png-label">${t('Descargar PNG')}</span></button>
+      <button id="ig-png" class="btn btn--primary primary-btn">${icon('download', { size: 'md' })} <span id="ig-png-label">${t('Descargar PNG')}</span></button>
       <button id="ig-svg" class="ai-ob-back fc-txt-btn">SVG</button>
-      <button id="ig-share" class="ai-ob-back fc-txt-btn" style="display:none">${icon('share', { size: 14 })} ${t('Compartir')}</button>
+      <button id="ig-share" class="ai-ob-back fc-txt-btn" style="display:none">${icon('share', { size: 'sm' })} ${t('Compartir')}</button>
     </div>
     <div id="ig-export-error" class="fc-error" style="display:none"></div>`;
   b.querySelector('.ai-ob-back').addEventListener('click', renderSetup);
@@ -579,7 +579,7 @@ async function renderResult(data) {
       view.innerHTML = `
         <div class="ig-bar" role="group" aria-label="${t('Zoom del póster')}">
           <button id="ig-out" aria-label="${t('Alejar')}" title="${t('Alejar')}">−</button>
-          <button id="ig-fit" aria-label="${t('Ajustar')}" title="${t('Ajustar')}">${icon('target', { size: 14 })}</button>
+          <button id="ig-fit" aria-label="${t('Ajustar')}" title="${t('Ajustar')}">${icon('expand', { size: 'sm' })}</button>
           <button id="ig-100" aria-label="${t('Tamaño real')}" title="${t('Tamaño real')}">1:1</button>
           <button id="ig-in" aria-label="${t('Acercar')}" title="${t('Acercar')}">+</button>
           <span class="ig-hint">${t('Arrastra para mover')}</span>

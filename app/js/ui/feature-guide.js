@@ -62,7 +62,7 @@ function render() {
   overlay.style.display = 'none';
   overlay.innerHTML = `
     <div class="fguide-card" role="dialog" aria-modal="true" aria-label="${t('¿Qué puedes hacer aquí?')}">
-      <button class="fguide-close" title="${t('Cerrar')}" aria-label="${t('Cerrar')}">${icon('xmark', { size: 15 })}</button>
+      <button class="fguide-close" title="${t('Cerrar')}" aria-label="${t('Cerrar')}">${icon('xmark', { size: 'md' })}</button>
       <h2 class="fguide-h2">${t('¿Qué puedes hacer aquí?')}</h2>
       <div class="fguide-body"></div>
     </div>`;

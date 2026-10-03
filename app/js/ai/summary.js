@@ -45,7 +45,7 @@ export function open(context) {
   overlay.className = 'ai-onboarding';
   overlay.innerHTML = `
     <div class="ai-ob-card sum-card" role="dialog" aria-modal="true" aria-label="${t('Resumen del libro')}">
-      <button class="ai-ob-close" title="${t('Cerrar')}" aria-label="${t('Cerrar')}">${icon('xmark', { size: 18 })}</button>
+      <button class="ai-ob-close" title="${t('Cerrar')}" aria-label="${t('Cerrar')}">${icon('xmark', { size: 'lg' })}</button>
       <div class="ai-ob-body"></div>
     </div>`;
   document.body.appendChild(overlay);
@@ -99,7 +99,7 @@ function renderSetup() {
       ${Object.entries(DEPTH).map(([k, d]) => `<option value="${k}"${k === depthValue ? ' selected' : ''}>${d.label}</option>`).join('')}
     </select>
     <p class="sum-depth-hint">${t('Estándar y Detallado organizan el resumen por capítulos, con introducción y cierre. Más profundidad = más cobertura y más llamadas al modelo.')}</p>
-    <button id="sum-generate" class="btn btn--primary primary-btn ai-ob-start">${icon('sparkles', { size: 16 })} ${t('Generar resumen')}</button>
+    <button id="sum-generate" class="btn btn--primary primary-btn ai-ob-start">${icon('sparkles', { size: 'md' })} ${t('Generar resumen')}</button>
     <div id="sum-error" class="fc-error" style="display:none"></div>`;
   b.querySelector('#sum-scope').addEventListener('change', (e) => { scopeValue = e.target.value; });
   b.querySelector('#sum-depth').addEventListener('change', (e) => { depthValue = e.target.value; });
@@ -319,7 +319,7 @@ function renderRunning(job) {
     <h2>${t('Generando resumen…')}</h2>
     <p class="ai-run-status" id="sum-run-status" role="status"></p>
     <div class="ai-run-actions">
-      <button id="sum-keep" class="btn btn--primary primary-btn">${icon('book', { size: 16 })} ${t('Seguir leyendo')}</button>
+      <button id="sum-keep" class="btn btn--primary primary-btn">${icon('book', { size: 'md' })} ${t('Seguir leyendo')}</button>
       <button id="sum-cancel" class="ai-ob-back fc-txt-btn">${t('Cancelar')}</button>
     </div>
     <p class="sum-depth-hint">${t('Puedes cerrar esta ventana y seguir leyendo: te avisaremos cuando el resumen esté listo.')}</p>`;
@@ -425,13 +425,13 @@ function renderResult(md, scopeName) {
   const anchors = ctx.anchors || new Map();
   b.innerHTML = `
     <div class="sum-resulthead">
-      <button class="ai-ob-back">${icon('chevron-left', { size: 16 })}<span>${t('Volver')}</span></button>
-      <button id="sum-regen" class="fc-txt-btn">${icon('sparkles', { size: 14 })} ${t('Regenerar')}</button>
+      <button class="ai-ob-back">${icon('chevron-left', { size: 'md' })}<span>${t('Volver')}</span></button>
+      <button id="sum-regen" class="fc-txt-btn">${icon('sparkles', { size: 'sm' })} ${t('Regenerar')}</button>
     </div>
     <div class="sum-doc">${renderWithCitations(md, anchors)}</div>
     <div class="fc-export">
-      <button id="sum-copy" class="btn btn--primary primary-btn">${icon('copy', { size: 16 })} ${t('Copiar')}</button>
-      <button id="sum-md" class="ai-ob-back fc-txt-btn">${icon('download', { size: 15 })} Markdown</button>
+      <button id="sum-copy" class="btn btn--primary primary-btn">${icon('copy', { size: 'md' })} ${t('Copiar')}</button>
+      <button id="sum-md" class="ai-ob-back fc-txt-btn">${icon('download', { size: 'md' })} Markdown</button>
     </div>`;
   b.querySelector('.ai-ob-back').addEventListener('click', renderSetup);
   b.querySelector('#sum-regen').addEventListener('click', renderSetup);
@@ -447,8 +447,8 @@ function renderResult(md, scopeName) {
   copyBtn.addEventListener('click', async () => {
     try {
       await navigator.clipboard.writeText(lastMarkdown);
-      copyBtn.innerHTML = `${icon('check', { size: 16 })} ${t('Copiado')}`;
-      setTimeout(() => { copyBtn.innerHTML = `${icon('copy', { size: 16 })} ${t('Copiar')}`; }, 1500);
+      copyBtn.innerHTML = `${icon('check', { size: 'md' })} ${t('Copiado')}`;
+      setTimeout(() => { copyBtn.innerHTML = `${icon('copy', { size: 'md' })} ${t('Copiar')}`; }, 1500);
     } catch (e) { /* sin clipboard */ }
   });
   b.querySelector('#sum-md').addEventListener('click', () => {

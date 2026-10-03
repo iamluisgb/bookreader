@@ -125,7 +125,7 @@ function ensureOverlay() {
   overlay.innerHTML = `
     <div class="appset-card anal-card" role="dialog" aria-modal="true" aria-label="${t('Análisis')}">
       <button class="appset-close" title="${t('Cerrar')}" aria-label="${t('Cerrar')}">${icon('xmark')}</button>
-      <h2 class="appset-h2">${icon('chart', { size: 20 })} ${t('Análisis')}</h2>
+      <h2 class="appset-h2">${icon('chart', { size: 'lg' })} ${t('Análisis')}</h2>
       <div class="anal-body"></div>
     </div>`;
   document.body.appendChild(overlay);
@@ -175,7 +175,7 @@ function renderTabs() {
 // Es la primera vez que alguien ve la sección y la pregunta que trae es justo esa.
 function renderEmpty() {
   return `<div class="anal-empty">
-    ${icon('chart', { size: 32 })}
+    ${icon('chart', { size: 'display' })}
     <p class="anal-empty-h">${t('Todavía no hay lectura que contar en este periodo')}</p>
     <p class="anal-empty-p">${t('Solo cuenta lo que se leyó a ritmo humano: pasar páginas buscando algo, o dejar el libro abierto, no suma.')}</p>
   </div>`;
@@ -245,7 +245,7 @@ function renderBooks(d) {
     <div class="anal-book">
       ${b.cover
         ? `<img class="anal-book-cover" src="${escapeHtml(b.cover)}" alt="">`
-        : `<span class="anal-book-cover anal-book-cover--none">${icon('book', { size: 14 })}</span>`}
+        : `<span class="anal-book-cover anal-book-cover--none">${icon('book', { size: 'sm' })}</span>`}
       <div class="anal-book-txt">
         <div class="anal-book-t">${escapeHtml(b.title)}</div>
         <div class="anal-book-s">${escapeHtml(t('{n} pág.', { n: b.units }))}</div>

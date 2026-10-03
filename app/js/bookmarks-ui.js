@@ -76,7 +76,7 @@ export function renderBookmarks() {
         <div class="bookmark-chapter">${escapeHtml(bm.chapter)}</div>
         ${pageLabel ? `<div class="bookmark-page">${escapeHtml(pageLabel)}</div>` : ''}
       </div>
-      <button class="bookmark-delete" title="Eliminar">${icon('xmark', { size: 16 })}</button>
+      <button class="bookmark-delete" title="Eliminar">${icon('xmark', { size: 'md' })}</button>
     `;
 
     item.querySelector('.bookmark-info').addEventListener('click', async () => {

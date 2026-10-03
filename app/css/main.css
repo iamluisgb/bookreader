@@ -1294,8 +1294,10 @@ textarea.is-recording { display: none; }
 #toc-list a.ai-toc-low { opacity: 0.4; }
 #toc-list a.ai-toc-mid { opacity: 0.7; }
 #toc-list a.ai-toc-high { font-weight: 600; opacity: 1; }
+/* Un punto de acento, no '★': el carácter cambia de dibujo (y de grosor) según el sistema. */
 #toc-list a.ai-toc-high::before {
-  content: '★'; color: var(--accent); margin-right: 6px; font-size: var(--fs-2xs);
+  content: ''; display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+  background: var(--accent); vertical-align: middle; margin-right: 7px;
 }
 /* La marca de "estoy aquí" gana a la atenuación por objetivo: da igual lo poco que
    importe el capítulo para el objetivo, si es donde se lee tiene que verse. */

@@ -227,9 +227,9 @@ export async function render() {
   host.innerHTML = `
     <div class="lib-layout">
       <aside class="lib-rail" aria-label="${t('Estanterías')}">
-        ${fixedRowHtml('all', `<span class="lib-rail-thumb lib-rail-thumb--all">${icon('books', { size: 15 })}</span>`,
+        ${fixedRowHtml('all', `<span class="lib-rail-thumb lib-rail-thumb--all">${icon('books', { size: 'md' })}</span>`,
           t('Libros'), books.length, !selection.size)}
-        ${fixedRowHtml('none', `<span class="lib-rail-thumb lib-rail-thumb--none">${icon('book', { size: 14 })}</span>`,
+        ${fixedRowHtml('none', `<span class="lib-rail-thumb lib-rail-thumb--none">${icon('book', { size: 'sm' })}</span>`,
           t('Sin estantería'), noShelfCount, selection.has('none'))}
 
         ${manual.length ? `<div class="lib-rail-section">${t('Estanterías')}</div>
@@ -238,10 +238,10 @@ export async function render() {
         ${smart.length ? `<div class="lib-rail-section">${t('Automáticas')}</div>
         ${Shelves.shelfRows(smart).map(railRowHtml).join('')}` : ''}
 
-        <button class="lib-rail-create" data-act="newshelfmenu">${icon('plus', { size: 16 })}<span>${t('Nueva estantería')}</span></button>
-        <button class="lib-rail-create lib-rail-analysis" data-act="analysis">${icon('chart', { size: 16 })}<span>${t('Análisis')}</span></button>
-        <button class="lib-rail-create lib-rail-decks" data-act="decks">${icon('cards', { size: 16 })}<span>${t('Mazos')}</span></button>
-        <button class="lib-rail-create lib-rail-settings" data-act="settings">${icon('gear', { size: 16 })}<span>${t('Ajustes generales')}</span></button>
+        <button class="lib-rail-create" data-act="newshelfmenu">${icon('plus', { size: 'md' })}<span>${t('Nueva estantería')}</span></button>
+        <button class="lib-rail-create lib-rail-analysis" data-act="analysis">${icon('chart', { size: 'md' })}<span>${t('Análisis')}</span></button>
+        <button class="lib-rail-create lib-rail-decks" data-act="decks">${icon('cards', { size: 'md' })}<span>${t('Mazos')}</span></button>
+        <button class="lib-rail-create lib-rail-settings" data-act="settings">${icon('gear', { size: 'md' })}<span>${t('Ajustes generales')}</span></button>
       </aside>
 
       <section class="lib-main">
@@ -249,20 +249,20 @@ export async function render() {
         <div class="lib-head">
           <h1 class="lib-h1">${escapeHtml(currentTitle())}</h1>
           ${headShelfKebab(shelves)}
-          <button class="lib-more" data-act="more" aria-haspopup="dialog" aria-label="${t('Más: ajustes, análisis, mazos…')}" title="${t('Más')}">${icon('menu', { size: 22 })}</button>
+          <button class="lib-more" data-act="more" aria-haspopup="dialog" aria-label="${t('Más: ajustes, análisis, mazos…')}" title="${t('Más')}">${icon('menu', { size: 'xl' })}</button>
         </div>
         ${await firstStepsHtml(books)}
         <div class="lib-top">${continueHtml(books)}<div class="lib-today-slot"></div><span class="lib-streak-slot"></span></div>
         ${filterChipsHtml()}
         <div class="lib-toolbar">
           <div class="lib-search-box">
-            ${icon('search', { size: 16 })}
+            ${icon('search', { size: 'md' })}
             <input type="search" class="lib-search" placeholder="${t('Buscar libro…')}" value="${escapeHtml(query)}"
               autocomplete="off" spellcheck="false" aria-label="${t('Buscar libro por título o autor')}">
           </div>
-          ${dropdownHtml('sort', icon('sort', { size: 16 }) + SORT_LABELS[sortBy], SORT_LABELS, sortBy)}
+          ${dropdownHtml('sort', icon('sort', { size: 'md' }) + SORT_LABELS[sortBy], SORT_LABELS, sortBy)}
           ${dropdownHtml('progress', PROG_LABELS[filterProgress], PROG_LABELS, filterProgress)}
-          <button class="btn btn--primary lib-upload" data-act="add">${icon('upload', { size: 18 })}<span>${t('Subir archivos')}</span></button>
+          <button class="btn btn--primary lib-upload" data-act="add">${icon('upload', { size: 'lg' })}<span>${t('Subir archivos')}</span></button>
         </div>
         <div class="lib-results">${resultsHtml(list)}</div>
       </section>
@@ -309,7 +309,7 @@ function chipHtml(row) {
       data-row-key="${escapeHtml(row.key)}" data-row-label="${escapeHtml(row.label)}"
       data-shelf-ids="${escapeHtml(row.shelfIds.join(','))}"${row.shelf ? ` data-shelf-id="${escapeHtml(row.shelf.id)}"` : ''}
       title="${escapeHtml(full)}" aria-pressed="${active}" aria-label="${escapeHtml(countLabel(full, count))}">
-      ${smart ? icon('sparkles', { size: 13 }) : ''}<span class="lib-schip-name">${escapeHtml(row.label)}</span><span class="lib-schip-count" aria-hidden="true">${count}</span>
+      ${smart ? icon('funnel', { size: 'sm' }) : ''}<span class="lib-schip-name">${escapeHtml(row.label)}</span><span class="lib-schip-count" aria-hidden="true">${count}</span>
     </button>`;
 }
 
@@ -328,8 +328,8 @@ function stripHtml(manual, smart, total, noShelfCount) {
     ${fixed('all', t('Libros'), total, !selection.size)}
     ${fixed('none', t('Sin estantería'), noShelfCount, selection.has('none'))}
     ${picked.map(k => chipHtml(byKey.get(k))).join('')}
-    ${rows.length ? `<button class="lib-schip lib-schip--more" data-act="shelfsheet" aria-haspopup="dialog">${t('Estanterías')}<span class="lib-schip-count" aria-hidden="true">${rows.length}</span>${icon('chevron-down', { size: 14 })}</button>`
-      : `<button class="lib-schip lib-schip--more" data-act="newshelfmenu">${icon('plus', { size: 14 })}${t('Nueva estantería')}</button>`}
+    ${rows.length ? `<button class="lib-schip lib-schip--more" data-act="shelfsheet" aria-haspopup="dialog">${t('Estanterías')}<span class="lib-schip-count" aria-hidden="true">${rows.length}</span>${icon('chevron-down', { size: 'sm' })}</button>`
+      : `<button class="lib-schip lib-schip--more" data-act="newshelfmenu">${icon('plus', { size: 'sm' })}${t('Nueva estantería')}</button>`}
   </nav>`;
 }
 
@@ -341,7 +341,7 @@ function headShelfKebab(shelves) {
   const shelf = shelves.find(s => s.id === key);
   if (!shelf) return '';
   return `<button class="lib-rail-kebab lib-head-kebab" data-shelf-menu="${escapeHtml(shelf.id)}"
-    aria-label="${escapeHtml(t('Opciones de {name}', { name: Shelves.segments(shelf.name).pop() }))}">${icon('ellipsis', { size: 20 })}</button>`;
+    aria-label="${escapeHtml(t('Opciones de {name}', { name: Shelves.segments(shelf.name).pop() }))}">${icon('ellipsis', { size: 'lg' })}</button>`;
 }
 
 // Tras cada render: la tira conserva su desplazamiento, el chip activo queda a la vista
@@ -385,7 +385,7 @@ function openSheet(title, inner, onAct) {
   el.innerHTML = `<div class="lib-sheet" role="dialog" aria-modal="true" aria-label="${escapeHtml(title)}">
       <div class="lib-sheet-grip" aria-hidden="true"></div>
       <div class="lib-sheet-head"><h2>${escapeHtml(title)}</h2>
-        <button class="lib-sheet-x" aria-label="${t('Cerrar')}">${icon('xmark', { size: 20 })}</button></div>
+        <button class="lib-sheet-x" aria-label="${t('Cerrar')}">${icon('xmark', { size: 'lg' })}</button></div>
       <div class="lib-sheet-body">${inner}</div>
     </div>`;
   document.body.appendChild(el);
@@ -400,14 +400,14 @@ function openSheet(title, inner, onAct) {
 
 // «Más»: lo que en escritorio está al pie del rail.
 function openMoreSheet(anchor) {
-  const row = (act, ico, label) => `<button class="lib-sheet-row" data-act="${act}">${icon(ico, { size: 18 })}<span>${escapeHtml(label)}</span>${icon('chevron-right', { size: 16 })}</button>`;
+  const row = (act, ico, label) => `<button class="lib-sheet-row" data-act="${act}">${icon(ico, { size: 'lg' })}<span>${escapeHtml(label)}</span>${icon('chevron-right', { size: 'md' })}</button>`;
   openSheet(t('Más'), `
     ${row('settings', 'gear', t('Ajustes generales'))}
     ${row('analysis', 'chart', t('Análisis'))}
     ${row('decks', 'cards', t('Mazos'))}
     <div class="lib-sheet-sep"></div>
     ${row('newshelfmenu', 'plus', t('Nueva estantería'))}
-    ${row('guide', 'sparkles', t('Guía rápida'))}`, async (e) => {
+    ${row('guide', 'help', t('Guía rápida'))}`, async (e) => {
     const b = e.target.closest('[data-act]');
     if (!b) return;
     const act = b.dataset.act;
@@ -435,12 +435,12 @@ async function openShelfSheet() {
     return `<div class="lib-sheet-shelf" style="--depth:${row.depth}">
       <input type="checkbox" class="lib-sheet-check" data-cross="${escapeHtml(row.key)}" data-row-label="${escapeHtml(row.label)}" data-shelf-ids="${escapeHtml(row.shelfIds.join(','))}"${on ? ' checked' : ''} aria-label="${escapeHtml(t('Cruzar con {name}', { name: row.label }))}">
       <button class="lib-sheet-pick" data-row-key="${escapeHtml(row.key)}" data-row-label="${escapeHtml(row.label)}" data-shelf-ids="${escapeHtml(row.shelfIds.join(','))}">
-        ${isSmart ? `<span class="lib-sheet-mark is-smart">${icon('sparkles', { size: 13 })}</span>` : (row.kind === 'group' ? '<span class="lib-sheet-mark is-group"></span>' : shelfMarkHtml(row.label))}
+        ${isSmart ? `<span class="lib-sheet-mark is-smart">${icon('funnel', { size: 'sm' })}</span>` : (row.kind === 'group' ? '<span class="lib-sheet-mark is-group"></span>' : shelfMarkHtml(row.label))}
         <span class="lib-sheet-name">${escapeHtml(row.label)}</span>
-        ${row.shelf && pins.includes(row.shelf.id) ? `<span class="lib-sheet-pin" title="${t('Fijada en la tira')}">${icon('bookmark-fill', { size: 12 })}</span>` : ''}
+        ${row.shelf && pins.includes(row.shelf.id) ? `<span class="lib-sheet-pin" title="${t('Fijada en la tira')}">${icon('pin', { size: 'sm' })}</span>` : ''}
         <span class="lib-sheet-count">${count}</span>
       </button>
-      ${row.shelf ? `<button class="lib-rail-kebab lib-sheet-kebab" data-shelf-menu="${escapeHtml(row.shelf.id)}" aria-label="${escapeHtml(t('Opciones de {name}', { name: row.label }))}">${icon('ellipsis', { size: 18 })}</button>` : '<span class="lib-sheet-kebab"></span>'}
+      ${row.shelf ? `<button class="lib-rail-kebab lib-sheet-kebab" data-shelf-menu="${escapeHtml(row.shelf.id)}" aria-label="${escapeHtml(t('Opciones de {name}', { name: row.label }))}">${icon('ellipsis', { size: 'lg' })}</button>` : '<span class="lib-sheet-kebab"></span>'}
     </div>`;
   };
   const multi = [...selection.keys()].filter(k => k !== 'none').length > 1;
@@ -448,7 +448,7 @@ async function openShelfSheet() {
     ${multi ? `<button class="lib-sheet-mode" data-act="togglemode">${matchAllShelves ? t('Libros en TODAS las marcadas') : t('Libros en ALGUNA de las marcadas')} · ${t('cambiar')}</button>` : ''}
     ${manual.length ? `<div class="lib-sheet-section">${t('Estanterías')}</div>${Shelves.shelfRows(manual).map(rowHtml).join('')}` : ''}
     ${smart.length ? `<div class="lib-sheet-section">${t('Automáticas')}</div>${Shelves.shelfRows(smart).map(rowHtml).join('')}` : ''}
-    <div class="lib-sheet-foot"><button class="lib-sheet-new" data-act="newshelfmenu">${icon('plus', { size: 16 })}<span>${t('Nueva estantería')}</span></button></div>`,
+    <div class="lib-sheet-foot"><button class="lib-sheet-new" data-act="newshelfmenu">${icon('plus', { size: 'md' })}<span>${t('Nueva estantería')}</span></button></div>`,
   async (e) => {
     const kebab = e.target.closest('.lib-sheet-kebab[data-shelf-menu]');
     if (kebab) { e.stopPropagation(); closeSheet(); await openShelfMenu(kebab.dataset.shelfMenu, host.querySelector('.lib-head') || host); return; }
@@ -537,13 +537,13 @@ function railRowHtml(row) {
     ? `<button class="lib-rail-twisty" data-collapse="${escapeHtml(row.path)}"
         aria-expanded="${shut ? 'false' : 'true'}"
         aria-label="${escapeHtml(shut ? t('Desplegar {name}', { name: row.label }) : t('Plegar {name}', { name: row.label }))}"
-        >${icon(shut ? 'chevron-right' : 'chevron-down', { size: 14 })}</button>`
+        >${icon(shut ? 'chevron-right' : 'chevron-down', { size: 'sm' })}</button>`
     : '<span class="lib-rail-twisty" aria-hidden="true"></span>';
 
   const mark = row.kind === 'group'
     ? '<span class="lib-rail-thumb lib-rail-thumb--group" aria-hidden="true"></span>'
     : (smart
-      ? `<span class="lib-rail-thumb lib-rail-thumb--smart" aria-hidden="true">${icon('sparkles', { size: 15 })}</span>`
+      ? `<span class="lib-rail-thumb lib-rail-thumb--smart" aria-hidden="true">${icon('funnel', { size: 'md' })}</span>`
       : shelfMarkHtml(row.label));
 
   // En la tira horizontal de móvil no hay indentación que valga, así que la
@@ -558,7 +558,7 @@ function railRowHtml(row) {
   const kebab = row.shelf
     ? `<button class="lib-rail-kebab" data-shelf-menu="${escapeHtml(row.shelf.id)}"
         title="${t('Opciones')}" aria-label="${escapeHtml(t('Opciones de {name}', { name: row.label }))}"
-        >${icon('ellipsis', { size: 18 })}</button>`
+        >${icon('ellipsis', { size: 'lg' })}</button>`
     : '';
 
   // Soltar un libro encima solo tiene sentido en una estantería MANUAL: en una
@@ -613,7 +613,7 @@ function filterChipsHtml() {
   if (selection.size < 1 || selection.has('none')) return '';
   const chips = [...selection].map(([key, entry]) =>
     `<span class="lib-chip">${escapeHtml(entry.label)}
-      <button class="lib-chip-x" data-unselect="${escapeHtml(key)}" aria-label="${t('Quitar del filtro')}">${icon('xmark', { size: 13 })}</button>
+      <button class="lib-chip-x" data-unselect="${escapeHtml(key)}" aria-label="${t('Quitar del filtro')}">${icon('xmark', { size: 'sm' })}</button>
     </span>`).join('');
   const mode = selection.size > 1
     ? `<button class="lib-chip lib-chip-mode" data-act="togglemode" title="${t('Cambiar entre Y (en todas) y O (en alguna)')}">
@@ -635,7 +635,7 @@ function paintStreakChip() {
   if (!streak) { slot.innerHTML = ''; return; }
   const risky = !Study.reviewsToday();
   slot.innerHTML = `<span class="lib-streakchip${risky ? ' is-risky' : ''}" `
-    + `aria-label="${t('Racha de {n} día{s}', { n: streak, s: streak === 1 ? '' : 's' })}">🔥 <b>${streak}</b></span>`;
+    + `aria-label="${t('Racha de {n} día{s}', { n: streak, s: streak === 1 ? '' : 's' })}">${icon('flame', { size: 'sm' })}<b>${streak}</b></span>`;
 }
 
 async function paintStudyChip() {
@@ -665,16 +665,16 @@ async function paintStudyChip() {
     <div class="lib-today-ring" aria-hidden="true">
       <svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="26" class="lib-ring-track"/>
       <circle cx="32" cy="32" r="26" class="lib-ring-fill" style="stroke-dasharray:${C.toFixed(1)};stroke-dashoffset:${(C * (1 - pct)).toFixed(1)}"/></svg>
-      <span>${cards ? cards : icon('check', { size: 20 })}</span>
+      <span>${cards ? cards : icon('check', { size: 'lg' })}</span>
     </div>
     <div class="lib-today-body">
       <p class="lib-hero-kicker">${t('Repaso de hoy')}</p>
       <h2 class="lib-today-title">${cards ? t('{n} tarjeta{s}', { n: cards, s: cards === 1 ? '' : 's' }) : t('Hecho por hoy')}</h2>
-      <p class="lib-today-meta">${cards ? t('~{n} min', { n: mins }) : t('{n} repasada{s}', { n: doneToday, s: doneToday === 1 ? '' : 's' })}${streak ? ` · ${t('🔥 {n} día{s}', { n: streak, s: streak === 1 ? '' : 's' })}` : ''}</p>
+      <p class="lib-today-meta">${cards ? t('~{n} min', { n: mins }) : t('{n} repasada{s}', { n: doneToday, s: doneToday === 1 ? '' : 's' })}${streak ? ` · <span class="lib-today-streak">${icon('flame', { size: 'sm' })}${t('{n} día{s}', { n: streak, s: streak === 1 ? '' : 's' })}</span>` : ''}</p>
       ${covers ? `<div class="lib-today-covers">${covers}</div>` : ''}
       ${cards ? `<div class="lib-today-actions">
-        <button class="lib-study-chip">${icon('cards', { size: 16 })}<span>${t('Repasar hoy · {n}', { n: cards })}</span></button>
-        <button class="lib-study-pick" title="${t('Elegir qué repasar')}">${t('Elegir')}${icon('chevron-down', { size: 14 })}</button>
+        <button class="lib-study-chip">${icon('cards', { size: 'md' })}<span>${t('Repasar hoy · {n}', { n: cards })}</span></button>
+        <button class="lib-study-pick" title="${t('Elegir qué repasar')}">${t('Elegir')}${icon('chevron-down', { size: 'sm' })}</button>
       </div>` : ''}
     </div>
   </section>`;
@@ -747,11 +747,11 @@ function showStudyChooser(chip, scopes) {
 
 function dropdownHtml(key, label, options, current) {
   return `<div class="lib-dd" data-dd="${key}">
-    <button class="btn btn--secondary lib-dd-btn">${label}${icon('chevron-down', { size: 15 })}</button>
+    <button class="btn btn--secondary lib-dd-btn">${label}${icon('chevron-down', { size: 'md' })}</button>
     <div class="lib-dd-menu">
       ${Object.entries(options).filter(([v]) => !(key === 'progress' && v === 'all') || true).map(([v, lbl]) =>
         `<button class="lib-dd-opt${v === current ? ' active' : ''}" data-dd-val="${v}">
-          <span class="lib-dd-check">${v === current ? icon('check', { size: 15 }) : ''}</span>${escapeHtml(key === 'progress' && v === 'all' ? t('Todos') : lbl)}
+          <span class="lib-dd-check">${v === current ? icon('check', { size: 'md' }) : ''}</span>${escapeHtml(key === 'progress' && v === 'all' ? t('Todos') : lbl)}
         </button>`).join('')}
     </div>
   </div>`;
@@ -790,7 +790,7 @@ function continueHtml(books) {
           <div class="lib-progressbar"><span style="width:${pct}%"></span></div>
           <span>${t('{n}% leído', { n: pct })}</span>
         </div>
-        <span class="lib-hero-cta">${t('Seguir leyendo')} ${icon('chevron-right', { size: 15 })}</span>
+        <span class="lib-hero-cta">${t('Seguir leyendo')} ${icon('chevron-right', { size: 'md' })}</span>
       </div>
     </div>
   </section>`;
@@ -801,7 +801,7 @@ function cardHtml(b) {
   const cover = b.cover
     ? `<img class="lib-cover-img" src="${escapeHtml(b.cover)}" alt="">`
     : `<div class="lib-cover-fallback"><span>${escapeHtml(initials(b.title))}</span></div>`;
-  const badge = (b.status === 'finished') ? `<span class="lib-badge">${icon('check', { size: 13 })}</span>` : '';
+  const badge = (b.status === 'finished') ? `<span class="lib-badge">${icon('check', { size: 'sm' })}</span>` : '';
 
   // Ficha FANTASMA: el libro está en tu biblioteca pero su fichero no está en
   // este dispositivo. Se distingue de un libro normal (portada atenuada) y
@@ -815,7 +815,7 @@ function cardHtml(b) {
   } else if (ghost && b.blob && b.blob.path) {
     overlay = `<div class="lib-dl">
       <button class="lib-dl-btn" data-download="${escapeHtml(b.id)}" title="${t('Descargar a este dispositivo')}">
-        ${icon('download', { size: 16 })}<span>${escapeHtml(humanSize(b.size))}</span>
+        ${icon('download', { size: 'md' })}<span>${escapeHtml(humanSize(b.size))}</span>
       </button>
     </div>`;
   } else if (ghost) {
@@ -828,7 +828,7 @@ function cardHtml(b) {
         ${cover}
         ${badge}
         ${overlay}
-        <button class="lib-kebab" data-id="${b.id}" title="${t('Más')}" aria-label="${t('Más opciones')}">${icon('ellipsis', { size: 20 })}</button>
+        <button class="lib-kebab" data-id="${b.id}" title="${t('Más')}" aria-label="${t('Más opciones')}">${icon('ellipsis', { size: 'lg' })}</button>
       </div>
       <div class="lib-progressbar"><span style="width:${pct}%"></span></div>
       <div class="lib-mastery" data-mastery="${escapeHtml(b.id)}" hidden>
@@ -863,7 +863,7 @@ async function firstStepsHtml(books) {
 
   const step = (done, label, act, cta) => `
     <li class="lib-step${done ? ' done' : ''}">
-      <span class="lib-step-mark" aria-hidden="true">${done ? icon('check', { size: 12 }) : ''}</span>
+      <span class="lib-step-mark" aria-hidden="true">${done ? icon('check', { size: 'sm' }) : ''}</span>
       <span class="lib-step-label">${escapeHtml(label)}${!done && act ? ` <button class="lib-step-go" data-act="${act}">${escapeHtml(cta)}</button>` : ''}</span>
     </li>`;
   return `
@@ -879,9 +879,9 @@ async function firstStepsHtml(books) {
 
 function emptyHtml(noBooksAtAll) {
   return `<div class="lib-empty">
-    <div class="lib-empty-icon">${icon('books', { size: 56 })}</div>
+    <div class="lib-empty-icon">${icon('books', { size: 'hero' })}</div>
     <p>${noBooksAtAll ? t('Tu biblioteca está vacía.') : t('No hay libros aquí.')}</p>
-    ${noBooksAtAll ? `<button class="btn btn--primary lib-upload" data-act="add">${icon('upload', { size: 18 })}<span>${t('Subir tu primer libro')}</span></button>` : ''}
+    ${noBooksAtAll ? `<button class="btn btn--primary lib-upload" data-act="add">${icon('upload', { size: 'lg' })}<span>${t('Subir tu primer libro')}</span></button>` : ''}
   </div>`;
 }
 
@@ -937,7 +937,7 @@ function computeList() {
 function resultsHtml(list) {
   if (list.length) return `<div class="lib-grid">${list.map(cardHtml).join('')}</div>`;
   if (query.trim()) {
-    return `<div class="lib-empty"><div class="lib-empty-icon">${icon('search', { size: 56 })}</div>
+    return `<div class="lib-empty"><div class="lib-empty-icon">${icon('search', { size: 'hero' })}</div>
       <p>${t('Ningún libro coincide con «{q}».', { q: escapeHtml(query.trim()) })}</p></div>`;
   }
   return emptyHtml(allBooks.length === 0);
@@ -1221,9 +1221,9 @@ function openCreateMenu(anchor) {
   closeMenu();
   buildMenu(anchor, `
     <div class="lib-menu-label">${t('Nueva estantería')}</div>
-    <button class="lib-menu-item" data-act="manual">${icon('pencil', { size: 16 })}
+    <button class="lib-menu-item" data-act="manual">${icon('pencil', { size: 'md' })}
       <span>${t('Estantería')}<small>${t('Eliges tú los libros')}</small></span></button>
-    <button class="lib-menu-item" data-act="smart">${icon('sparkles', { size: 16 })}
+    <button class="lib-menu-item" data-act="smart">${icon('funnel', { size: 'md' })}
       <span>${t('Inteligente')}<small>${t('Los elige una regla')}</small></span></button>
   `, async (act) => {
     if (act === 'manual') await createShelf();
@@ -1306,24 +1306,24 @@ async function openShelfMenu(id, anchor) {
   // carril ajeno aquí es barato: son unos pocos registros, sin binarios.
   let dossiers = [];
   try { dossiers = await (await import('../share/store.js')).dossiersForShelf(id); } catch (e) { /* sin base */ }
-  const dossierItems = dossiers.map((d, i) => `<button class="lib-menu-item danger" data-act="unshare" data-i="${i}">${icon('xmark', { size: 16 })}<span>${
+  const dossierItems = dossiers.map((d, i) => `<button class="lib-menu-item danger" data-act="unshare" data-i="${i}">${icon('xmark', { size: 'md' })}<span>${
     d.from ? t('Quitar lo de {name}…', { name: escapeHtml(d.from) }) : t('Quitar lo compartido…')}</span></button>`).join('');
   buildMenu(anchor, `
-    <button class="lib-menu-item" data-act="filter">${icon(inFilter ? 'xmark' : 'plus', { size: 16 })}<span>${inFilter ? t('Quitar del filtro') : t('Añadir al filtro')}</span></button>
+    <button class="lib-menu-item" data-act="filter">${icon(inFilter ? 'xmark' : 'plus', { size: 'md' })}<span>${inFilter ? t('Quitar del filtro') : t('Añadir al filtro')}</span></button>
     <div class="lib-menu-sep"></div>
-    <button class="lib-menu-item" data-act="rename">${icon('pencil', { size: 16 })}<span>${t('Renombrar')}</span></button>
-    ${smart ? `<button class="lib-menu-item" data-act="rule">${icon('sparkles', { size: 16 })}<span>${t('Editar regla')}</span></button>` : ''}
+    <button class="lib-menu-item" data-act="rename">${icon('pencil', { size: 'md' })}<span>${t('Renombrar')}</span></button>
+    ${smart ? `<button class="lib-menu-item" data-act="rule">${icon('funnel', { size: 'md' })}<span>${t('Editar regla')}</span></button>` : ''}
     ${isMobile()
       // En la tira horizontal «Subir/Bajar» significaba izquierda/derecha. En móvil, lo que
       // ordena la tira es fijar.
-      ? `<button class="lib-menu-item" data-act="pin">${icon(pinnedShelves().includes(id) ? 'xmark' : 'bookmark', { size: 16 })}<span>${pinnedShelves().includes(id) ? t('Quitar de la tira') : t('Fijar en la tira')}</span></button>`
-      : `<button class="lib-menu-item" data-act="up">${icon('chevron-up', { size: 16 })}<span>${t('Subir')}</span></button>
-    <button class="lib-menu-item" data-act="down">${icon('chevron-down', { size: 16 })}<span>${t('Bajar')}</span></button>`}
+      ? `<button class="lib-menu-item" data-act="pin">${icon(pinnedShelves().includes(id) ? 'xmark' : 'pin', { size: 'md' })}<span>${pinnedShelves().includes(id) ? t('Quitar de la tira') : t('Fijar en la tira')}</span></button>`
+      : `<button class="lib-menu-item" data-act="up">${icon('arrow-up', { size: 'md' })}<span>${t('Subir')}</span></button>
+    <button class="lib-menu-item" data-act="down">${icon('arrow-down', { size: 'md' })}<span>${t('Bajar')}</span></button>`}
     <div class="lib-menu-sep"></div>
-    <button class="lib-menu-item" data-act="share">${icon('share', { size: 16 })}<span>${t('Compartir estantería…')}</span></button>
+    <button class="lib-menu-item" data-act="share">${icon('share', { size: 'md' })}<span>${t('Compartir estantería…')}</span></button>
     <div class="lib-menu-sep"></div>
     ${dossierItems}
-    <button class="lib-menu-item danger" data-act="delete">${icon('trash', { size: 16 })}<span>${t('Eliminar estantería')}</span></button>
+    <button class="lib-menu-item danger" data-act="delete">${icon('trash', { size: 'md' })}<span>${t('Eliminar estantería')}</span></button>
   `, async (act, item) => {
     if (act === 'unshare') {
       const d = dossiers[Number(item.dataset.i)];
@@ -1581,37 +1581,37 @@ async function openBookMenu(id, anchor) {
   const canFree = local && (uploaded || Blobs.canTransfer());
   let storage = '';
   if (!local && uploaded) {
-    storage = `<button class="lib-menu-item" data-act="download">${icon('download', { size: 16 })}<span>${t('Descargar a este dispositivo')}</span></button>`;
+    storage = `<button class="lib-menu-item" data-act="download">${icon('download', { size: 'md' })}<span>${t('Descargar a este dispositivo')}</span></button>`;
   } else if (local) {
     const size = humanSize(book.size);
     const label = canShareFile(book.format)
       ? (size ? t('Compartir archivo ({size})…', { size }) : t('Compartir archivo…'))
       : (size ? t('Exportar archivo ({size})…', { size }) : t('Exportar archivo…'));
-    storage += `<button class="lib-menu-item" data-act="export">${icon('share', { size: 16 })}<span>${label}</span></button>`;
+    storage += `<button class="lib-menu-item" data-act="export">${icon('share', { size: 'md' })}<span>${label}</span></button>`;
     if (!uploaded && (book.size || 0) > Blobs.MAX_AUTO_UPLOAD) {
-      storage += `<button class="lib-menu-item" data-act="upload">${icon('upload', { size: 16 })}<span>${t('Subir a Drive ({size})', { size: humanSize(book.size) })}</span></button>`;
+      storage += `<button class="lib-menu-item" data-act="upload">${icon('cloud', { size: 'md' })}<span>${t('Subir a Drive ({size})', { size: humanSize(book.size) })}</span></button>`;
     }
     if (canFree) {
-      storage += `<button class="lib-menu-item" data-act="undownload">${icon('xmark', { size: 16 })}<span>${t('Quitar descarga de este dispositivo')}</span></button>`;
+      storage += `<button class="lib-menu-item" data-act="undownload">${icon('xmark', { size: 'md' })}<span>${t('Quitar descarga de este dispositivo')}</span></button>`;
     }
   }
 
   buildMenu(anchor, `
-    <button class="lib-menu-item" data-act="open">${icon('book', { size: 16 })}<span>${local ? t('Abrir') : t('Descargar y abrir')}</span></button>
-    <button class="lib-menu-item" data-act="finish">${icon('check', { size: 16 })}<span>${finished ? t('Marcar como no leído') : t('Marcar como terminado')}</span></button>
+    <button class="lib-menu-item" data-act="open">${icon('book', { size: 'md' })}<span>${local ? t('Abrir') : t('Descargar y abrir')}</span></button>
+    <button class="lib-menu-item" data-act="finish">${icon('check', { size: 'md' })}<span>${finished ? t('Marcar como no leído') : t('Marcar como terminado')}</span></button>
     ${storage ? `<div class="lib-menu-sep"></div>${storage}` : ''}
     <div class="lib-menu-sep"></div>
     <div class="lib-menu-label">${t('Estanterías')}</div>
     ${manualShelves.length
       ? manualShelves.map(s => `<button class="lib-menu-item" data-act="shelf" data-shelf="${s.id}">
-          <span class="lib-menu-check">${inShelf.has(s.id) ? icon('check', { size: 16 }) : ''}</span><span>${escapeHtml(s.name)}</span></button>`).join('')
+          <span class="lib-menu-check">${inShelf.has(s.id) ? icon('check', { size: 'md' }) : ''}</span><span>${escapeHtml(s.name)}</span></button>`).join('')
       : `<div class="lib-menu-empty">${t('Aún no hay estanterías')}</div>`}
     ${smartShelves.length
-      ? `<div class="lib-menu-note">${icon('sparkles', { size: 13 })}<span>${t('En {names} entra solo, por su regla.', { names: smartShelves.map(s => s.name).join(', ') })}</span></div>`
+      ? `<div class="lib-menu-note">${icon('funnel', { size: 'sm' })}<span>${t('En {names} entra solo, por su regla.', { names: smartShelves.map(s => s.name).join(', ') })}</span></div>`
       : ''}
-    <button class="lib-menu-item" data-act="newshelf">${icon('plus', { size: 16 })}<span>${t('Nueva estantería…')}</span></button>
+    <button class="lib-menu-item" data-act="newshelf">${icon('plus', { size: 'md' })}<span>${t('Nueva estantería…')}</span></button>
     <div class="lib-menu-sep"></div>
-    <button class="lib-menu-item danger" data-act="delete">${icon('trash', { size: 16 })}<span>${t('Eliminar')}</span></button>
+    <button class="lib-menu-item danger" data-act="delete">${icon('trash', { size: 'md' })}<span>${t('Eliminar')}</span></button>
   `, async (act, item) => {
     if (act === 'open') { await openCard(id); return; }
     if (act === 'download') { await startDownload(id); return; }

@@ -54,6 +54,9 @@ offline con un agente de IA (BYOK) que lee el libro completo según un objetivo.
   si el patrón no existe, créalo en `modern.css` y añádelo ahí. Las clases de contexto
   (`.lib-upload`, `.dlg-ok`…) son ganchos de JS/tests, no para color ni estados.
   Principios y tokens: [`DESIGN.md`](DESIGN.md).
+- Iconos: solo los de `js/ui/icons.js`, con tamaño por paso (`icon('x', { size: 'md' })`, nunca
+  un número) y **un significado por icono** (tabla en DESIGN.md § Iconos). Sin emoji en la
+  interfaz. `tests/icons.spec.ts` lo comprueba.
 - Config/subrayados en localStorage con prefijo `bookreader_`; datos del agente en IndexedDB.
 - No agregar dependencias sin justificación. Las libs core están vendorizadas (mismo origen → CSP estricta).
 - Escapar SIEMPRE con `js/ui/escape.js` al construir HTML con datos.

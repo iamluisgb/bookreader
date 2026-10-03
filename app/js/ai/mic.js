@@ -36,7 +36,7 @@ function buildBar({ onCancel, onDone }) {
     <span class="mic-bar-time" role="timer">0:00</span>
     <span class="mic-bar-level" aria-hidden="true">${'<i></i>'.repeat(14)}</span>
     <span class="mic-bar-hint" role="status">${t('Escuchando…')}</span>
-    <button type="button" class="mic-bar-stop" title="${t('Parar')}" aria-label="${t('Parar')}">${icon('check', { size: 18 })}</button>`;
+    <button type="button" class="mic-bar-stop" title="${t('Parar')}" aria-label="${t('Parar')}">${icon('check', { size: 'lg' })}</button>`;
   bar.querySelector('.mic-bar-cancel').addEventListener('click', onCancel);
   bar.querySelector('.mic-bar-stop').addEventListener('click', onDone);
   return bar;
