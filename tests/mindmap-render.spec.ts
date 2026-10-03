@@ -193,3 +193,47 @@ test('el CSS de export lleva Inter embebida como data: URI', async ({ page }) =>
   expect(css).toContain('font-weight:600');
   expect(css.length).toBeGreaterThan(20000);   // son las fuentes de verdad, no un stub
 });
+
+// El PNG del mapa y de la infografía salía SIN TEXTO: el SVG lleva Inter embebida y, al
+// cargarlo como <img>, `decode()` resuelve antes de que la fuente cargue — el texto se pinta
+// invisible y se rasterizaba así (líneas y tarjetas, ni una letra). js/ui/svg-raster.js espera
+// a que el pintado se estabilice. Se cuentan píxeles de tinta en la cabecera (el título).
+test('el PNG exportado lleva el texto pintado (fuente embebida)', async ({ page }) => {
+  await page.goto('/');
+  const ink = await page.evaluate(async () => {
+    const R: any = await import('/js/ai/mindmap-render.js');
+    const { interFaceCss } = await import('/js/ui/svg-fonts.js');
+    const { rasterizeSvg } = await import('/js/ui/svg-raster.js');
+    const tree = { title: 'Libro', branches: ['Rama A', 'Rama B'].map((l) => ({ label: l, children: [{ label: l + ' idea', src: 'a0' }] })) };
+    const lay = R.layout(tree, { sides: 2 });
+    const { svg, width, height } = R.renderPoster(lay, { format: 'landscape', fontCss: await interFaceCss(), header: { title: 'Título del libro', kicker: 'Mapa mental' } });
+    const blob = await rasterizeSvg(svg, width, height, { scale: 1 });
+    const img = new Image(); img.src = URL.createObjectURL(blob); await img.decode();
+    const c = document.createElement('canvas'); c.width = width; c.height = 260;
+    const g = c.getContext('2d')!; g.drawImage(img, 0, 0);
+    const d = g.getImageData(0, 0, width, 260).data;
+    let n = 0;
+    for (let i = 0; i < d.length; i += 4) if (d[i] < 80 && d[i + 1] < 80 && d[i + 2] < 80) n++;
+    return n;
+  });
+  expect(ink).toBeGreaterThan(1500);
+});
+
+// Sin portada, la cabecera reservaba un alto fijo y dejaba una banda vacía: el mapa empezaba
+// muy abajo y salía más pequeño de lo que cabe. Ahora empieza donde acaba la cabecera.
+test('sin portada, el mapa del póster empieza donde acaba la cabecera', async ({ page }) => {
+  await page.goto('/');
+  const r = await page.evaluate(async () => {
+    const R: any = await import('/js/ai/mindmap-render.js');
+    // Mapa ALTO (8 ramas × 6 ideas): queda limitado por el alto disponible.
+    const tree = { title: 'Libro', branches: 'ABCDEFGH'.split('').map((l) => ({ label: l, children: [1, 2, 3, 4, 5, 6].map((i) => ({ label: l + i, src: 'a0' })) })) };
+    const lay = R.layout(tree, { sides: 1 });
+    const { svg } = R.renderPoster(lay, { format: 'portrait', header: { title: 'Libro', author: 'Autora', kicker: 'Mapa mental' } });
+    const inner = svg.querySelector(':scope > svg');
+    const top = Number(inner.getAttribute('y'));
+    const h = Number(inner.getAttribute('height'));
+    return { top, h };
+  });
+  // Con la reserva fija, el hueco del mapa medía 1350 − 64 − 44 − 314 = 928 px de alto.
+  expect(r.h).toBeGreaterThan(960);
+});

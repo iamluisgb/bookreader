@@ -3,6 +3,23 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-10-03 — Mapa mental: legible en el móvil y PNG con texto
+
+1. **El PNG salía sin texto** (vertical y horizontal; también la infografía). El SVG lleva
+   Inter embebida y `img.decode()` resuelve antes de que la fuente cargue: se rasterizaba con
+   el texto invisible. Nuevo `js/ui/svg-raster.js` (compartido) espera a que el pintado se
+   estabilice, y las `@font-face` embebidas llevan `font-display: swap`.
+2. **Móvil**: el lienzo tiene alto propio (antes el SVG se encajaba al ancho: 317×133 px e
+   ideas a 5 px), el árbol va a un lado en pantallas estrechas y la vista inicial se acerca
+   hasta que las ideas miden 12 px; «Ajustar» da el mapa entero. La hoja del modal ocupa casi
+   toda la pantalla. En escritorio se mantiene la vista completa.
+3. **Póster**: el mapa empieza donde acaba la cabecera (sin portada quedaba una banda vacía
+   de 100–150 px); en vertical sale ~10 % más grande.
+4. **Etiquetas recortadas** acaban en «…» y sin palabras colgando («Fiabilidad,
+   escalabilidad y» → «Fiabilidad, escalabilidad…»).
+5. **Plegar** funcionaba una sola vez: cada repintado añadía otro juego de escuchadores al
+   lienzo, y el segundo clic plegaba y desplegaba a la vez (y la rueda hacía zoom doble).
+
 ## 2026-10-03 — DS1: sistema de diseño según *Design Systems* (A. Kholmatova)
 
 Auditoría del sistema contra los capítulos del libro (principios, patrones funcionales y

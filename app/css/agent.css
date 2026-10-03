@@ -591,11 +591,19 @@ a tamaño real en este lienzo con scroll, o se descarga. La medida se maneja por
 .mm-canvas {
   margin: 8px 0; border: 1px solid var(--border); border-radius: var(--r-md);
   overflow: hidden; touch-action: none; cursor: grab; background: var(--surface-2);
+  /* Alto FIJO: el SVG lo llena y el zoom/pan hacen el resto (ver initialView en mindmap.js).
+     Con alto automático el mapa se encajaba al ancho y en móvil quedaba en una franja. */
+  height: clamp(320px, 62vh, 720px);
 }
 .mm-canvas:active { cursor: grabbing; }
 /* `>` DELIBERADO: el panel de detalle vive dentro del escenario y sus iconos son <svg>.
    Sin el hijo directo, `width: 100%` los inflaba al ancho del lienzo. */
-.mm-canvas > svg { display: block; width: 100%; height: auto; }
+.mm-canvas > svg { display: block; width: 100%; height: 100%; }
+/* Móvil: la hoja del mapa usa casi toda la pantalla y el lienzo, la mayor parte de ella. */
+@media (max-width: 767px) {
+  .mm-card.mm-card--wide { height: 92dvh; max-width: 100%; }
+  .mm-canvas { height: max(360px, 56dvh); }
+}
 .mm-node:hover .mm-hit { stroke: var(--accent); }
 .mm-idea:hover .mm-hit { fill: var(--surface-3); stroke: none; }
 .mm-node:focus-visible, .mm-fold:focus-visible { outline: none; }

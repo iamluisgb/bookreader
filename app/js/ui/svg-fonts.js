@@ -48,7 +48,7 @@ async function faceCss(family, { weight, url }) {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`${url}: ${res.status}`);
   const b64 = toBase64(await res.arrayBuffer());
-  return `@font-face{font-family:'${family}';font-style:normal;font-weight:${weight};` +
+  return `@font-face{font-family:'${family}';font-style:normal;font-weight:${weight};font-display:swap;` +
     `src:url(data:font/woff2;base64,${b64}) format('woff2');}`;
 }
 

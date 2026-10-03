@@ -138,6 +138,7 @@ const ASSETS = [
   './js/ui/icons.js',
   './js/ui/escape.js',
   './js/ui/svg-fonts.js',
+  './js/ui/svg-raster.js',
   './js/ui/dialog.js',
   './js/ui/paywall.js',
   './js/ui/app-settings.js',

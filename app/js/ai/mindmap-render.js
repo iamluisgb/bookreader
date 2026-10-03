@@ -457,8 +457,8 @@ export function renderSvg(lay, {
 // Horizontal 16:9 (presentaciones, X, LinkedIn) y vertical 4:5 (feed de Instagram y LinkedIn
 // en el móvil). El vertical usa el árbol a un solo lado: a dos lados quedaría muy ancho.
 export const FORMATS = {
-  landscape: { w: 1920, h: 1080, sides: 2, margin: 72, head: 170, coverH: 128, titleFs: 40 },
-  portrait: { w: 1080, h: 1350, sides: 1, margin: 64, head: 250, coverH: 214, titleFs: 42 },
+  landscape: { w: 1920, h: 1080, sides: 2, margin: 72, head: 170, gap: 36, coverH: 128, titleFs: 40 },
+  portrait: { w: 1080, h: 1350, sides: 1, margin: 64, head: 250, gap: 36, coverH: 214, titleFs: 42 },
 };
 
 // Cabecera con la portada del libro, título, autor y un antetítulo; el mapa, escalado para
@@ -505,10 +505,14 @@ export function renderPoster(lay, { format = 'landscape', theme = POSTER, fontCs
   titleLines.forEach((l, i) => svg.appendChild(text(tx, y + (i + 1) * lineH - 8, l, { size: F.titleFs, weight: 700, fill: theme.ink })));
   y += titleLines.length * lineH;
   if (header.author) svg.appendChild(text(tx, y + 28, header.author, { size: 24, fill: theme.muted }));
+  if (header.author) y += 36;
 
   // Mapa: el SVG normal anidado, escalado para caber (con tope, para que un mapa pequeño no
-  // salga gigante).
-  const top = m + F.head, bottom = H - m - 44;
+  // salga gigante). Empieza donde ACABA la cabecera, no a una altura fija: sin portada, la
+  // reserva fija (`head`) dejaba una banda vacía de 100–150 px y el mapa salía más pequeño de
+  // lo necesario — en el vertical, con texto de ~11 px en una imagen de 1080.
+  const headBottom = Math.max(header.cover ? m + F.coverH : 0, y);
+  const top = Math.min(m + F.head, headBottom + F.gap), bottom = H - m - 44;
   const bw = W - m * 2, bh = bottom - top;
   const sc = Math.min(bw / lay.width, bh / lay.height, 1.6);
   const mw = lay.width * sc, mh = lay.height * sc;

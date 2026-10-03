@@ -20,6 +20,7 @@ import { buildChunks } from './flashcards.js';
 import { icon } from '../ui/icons.js';
 import { escapeHtml } from '../ui/escape.js';
 import { interFaceCss } from '../ui/svg-fonts.js';
+import { rasterizeSvg } from '../ui/svg-raster.js';
 import * as Render from './mindmap-render.js';
 import { getBook } from '../library/store.js';
 
@@ -414,12 +415,19 @@ function renderRunning(job) {
 // por capítulos (nunca a ramas anónimas "Ideas N", que vacían de sentido el mapa).
 // Recorta a `maxChars` por FRONTERA DE PALABRA (sin "…"): garantiza que la etiqueta quepa en
 // la píldora sin que wrapLabel la trunque con puntos suspensivos. El texto completo va al tooltip.
-function clampWords(s, maxChars) {
+// Palabras que no pueden cerrar una etiqueta recortada: «Fiabilidad, escalabilidad y» o
+// «Esquema en lectura frente a esquema en» se leían como un error, no como un resumen.
+const DANGLING = /\s+(?:y|e|o|u|ni|de|del|la|las|el|los|un|una|a|al|en|con|por|para|sin|sobre|entre|frente|que|como|su|sus|tu|tus|mi|mis|se|lo|and|or|of|the|a|an|to|in|on|for|with|by|vs\.?)$/i;
+
+export function clampWords(s, maxChars) {
   s = String(s || '').trim();
   if (s.length <= maxChars) return s;
   const cut = s.slice(0, maxChars);
   const sp = cut.lastIndexOf(' ');
-  return (sp > 6 ? cut.slice(0, sp) : cut).trim();
+  let out = (sp > 6 ? cut.slice(0, sp) : cut).trim().replace(/[\s,;:.\-–—]+$/, '');
+  for (let i = 0; i < 3 && DANGLING.test(out); i++) out = out.replace(DANGLING, '').replace(/[\s,;:]+$/, '');
+  // El corte se marca: el texto completo está en el detalle del nodo (`full`).
+  return out + '…';
 }
 
 // Valida/normaliza el árbol del modelo. Devuelve null si no es usable, para que el llamante
@@ -543,27 +551,71 @@ function zoomAt(px, py, factor) {
   applyView();
 }
 
-function zoomCenter(factor) {
-  if (!lastLayout) return;
-  zoomAt(lastLayout.width / 2, lastLayout.height / 2, factor);
+// El lienzo tiene un alto FIJO y el SVG lo llena (`xMinYMin meet`): una unidad del mapa mide
+// `fitScale()` píxeles con zoom 1. Antes el SVG se encajaba al ANCHO del lienzo con alto
+// automático: en un móvil, un mapa de 1.500 px de ancho quedaba al 22 % — texto de 5 px en
+// una franja de 130 px de alto.
+function canvasBox() {
+  const holder = body()?.querySelector('#mm-canvas');
+  return { w: holder?.clientWidth || 1, h: holder?.clientHeight || 1 };
+}
+function fitScale() {
+  if (!lastLayout) return 1;
+  const { w, h } = canvasBox();
+  return Math.min(w / lastLayout.width, h / lastLayout.height);
 }
 
-function resetView() { view = { k: 1, tx: 0, ty: 0 }; applyView(); }
+function zoomCenter(factor) {
+  if (!lastLayout) return;
+  const s = fitScale(), { w, h } = canvasBox();
+  zoomAt(w / 2 / s, h / 2 / s, factor);
+}
+
+// «Ajustar»: el mapa entero, centrado.
+function resetView() {
+  const s = fitScale(), { w, h } = canvasBox();
+  view = { k: 1, tx: lastLayout ? (w / s - lastLayout.width) / 2 : 0, ty: lastLayout ? (h / s - lastLayout.height) / 2 : 0 };
+  applyView();
+}
+
+// Vista inicial. Ancho (escritorio, dos lados): el mapa entero, como siempre; hay rueda y
+// botones para acercarse. Estrecho (móvil, un lado): el mapa entero dejaba las ideas en ~5 px,
+// así que se abre con el zoom justo para que midan MIN_TEXT_PX, encuadrando la columna de
+// ramas e ideas desde arriba (el título del libro ya está en la cabecera del modal).
+// «Ajustar» sigue dando la vista completa.
+const MIN_TEXT_PX = 12, IDEA_FS = 15;
+function initialView() {
+  if (!lastLayout) return;
+  const s = fitScale();
+  if (lastLayout.sides !== 1 || IDEA_FS * s >= MIN_TEXT_PX) { resetView(); return; }
+  const k = clampK(MIN_TEXT_PX / (IDEA_FS * s));
+  const branchX = Math.min(...lastLayout.nodes.filter(n => n.depth === 1).map(n => n.x - n.size.w / 2));
+  view = { k, tx: 12 / s - k * (lastLayout.ox + branchX), ty: 8 / s };
+  applyView();
+}
 
 function paintMap() {
   const holder = body()?.querySelector('#mm-canvas');
   if (!holder || !lastTree) return;
   const theme = screenTheme();
-  lastLayout = Render.layout(lastTree, { collapsed });
+  // Estrecho (móvil): árbol a UN lado, más alto que ancho, que es la forma de la pantalla.
+  const sides = holder.clientWidth < 600 ? 1 : 2;
+  lastLayout = Render.layout(lastTree, { collapsed, sides });
+  lastLayout.sides = sides;
   const built = Render.renderSvg(lastLayout, {
     theme, interactive: true,
     title: t('Mapa mental de {scope}', { scope: lastScope || '' }),
   });
   lastSvg = built.svg;
+  lastSvg.setAttribute('preserveAspectRatio', 'xMinYMin meet');
+  lastSvg.style.cssText = 'display:block;width:100%;height:100%';
   holder.style.background = theme.bg;
   holder.replaceChildren(lastSvg);
   applyView();
-  wireCanvas(holder);
+  // Una sola vez por lienzo: paintMap se repite al plegar, expandir o girar la pantalla, y
+  // cada llamada añadía OTRO juego de escuchadores — tras plegar una rama, la rueda hacía
+  // zoom doble y el segundo toque en el círculo plegaba y desplegaba a la vez.
+  if (!holder.dataset.wired) { holder.dataset.wired = '1'; wireCanvas(holder); }
 }
 
 // Puntero unificado (ratón, dedo y lápiz): arrastrar = pan, dos dedos = pinza, rueda = zoom.
@@ -610,7 +662,7 @@ function wireCanvas(holder) {
     }
     // Pan: el desplazamiento va en píxeles de pantalla; hay que pasarlo a unidades del
     // viewBox, que es donde se aplica el transform.
-    const scale = lastLayout && holder.clientWidth ? lastLayout.width / holder.clientWidth : 1;
+    const scale = 1 / fitScale();
     view.tx += dx * scale; view.ty += dy * scale;
     applyView();
   });
@@ -919,8 +971,20 @@ async function renderResult(tree, scopeName) {
   b.querySelector('#mm-zoom-fit').addEventListener('click', resetView);
 
   await fontsReady();
-  if (!body()?.querySelector('#mm-canvas')) return;    // el modal se cerró mientras cargaba
+  const holder = body()?.querySelector('#mm-canvas');
+  if (!holder) return;    // el modal se cerró mientras cargaba
   paintMap();
+  initialView();
+  // Girar el móvil o redimensionar puede cambiar de uno a dos lados: se repinta y se
+  // re-encuadra. Con el mismo número de lados, la vista del usuario se respeta.
+  let lastW = holder.clientWidth;
+  new ResizeObserver(() => {
+    const w = holder.clientWidth;
+    if (!w || !lastLayout || (w < 600) === (lastW < 600)) { lastW = w; return; }
+    lastW = w;
+    paintMap();
+    initialView();
+  }).observe(holder);
 
   const slug = (s) => (s || 'mapa').replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '').slice(0, 50);
   const name = (ext) => `bookreader-mapa-${slug(scopeName)}-${shareFormat === 'portrait' ? 'vertical' : 'horizontal'}.${ext}`;
@@ -1006,24 +1070,7 @@ function imageAspect(src) {
 
 async function exportPng() {
   const { svg, width, height } = await buildExport();
-  const xml = new XMLSerializer().serializeToString(svg);
-  // `unescape` está deprecado; `TextEncoder` + base64 por trozos hace lo mismo sin él y
-  // aguanta los mapas grandes.
-  const bytes = new TextEncoder().encode(xml);
-  let bin = '';
-  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
-  const img = new Image();
-  img.src = 'data:image/svg+xml;base64,' + btoa(bin);
-  await img.decode();
-  // 2× para que se vea nítido al compartir, con tope: un mapa grande a 2× podía pedir un
-  // lienzo que el navegador rechaza en silencio (y devolvía un PNG vacío).
-  const scale = Math.min(2, Math.max(1, 4200 / Math.max(width, height)));
-  const canvas = document.createElement('canvas');
-  canvas.width = Math.round(width * scale);
-  canvas.height = Math.round(height * scale);
-  canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-  return new Promise((res, rej) =>
-    canvas.toBlob(b => (b ? res(b) : rej(new Error('toBlob null'))), 'image/png'));
+  return rasterizeSvg(svg, width, height);
 }
 
 function download(filename, data, mime) {

@@ -19,6 +19,7 @@ import { renderSvg, renderSlides, renderStory, ensureFonts, ACCENTS, POSTER, SLI
 import { citePage } from './render.js';
 import { imagesToPdf } from '../ui/pdf-images.js';
 import { posterFaceCss } from '../ui/svg-fonts.js';
+import { rasterizeSvg } from '../ui/svg-raster.js';
 import { icon } from '../ui/icons.js';
 import { escapeHtml } from '../ui/escape.js';
 import { getBook } from '../library/store.js';
@@ -721,22 +722,10 @@ function slug(s) {
   return (s || 'libro').replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '').slice(0, 50).toLowerCase();
 }
 
-async function rasterize(svg, width, height, { type = 'image/png', scale: fixed = null } = {}) {
-  const xml = new XMLSerializer().serializeToString(svg);
-  const bytes = new TextEncoder().encode(xml);
-  let bin = '';
-  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
-  const img = new Image();
-  img.src = `data:image/svg+xml;base64,${btoa(bin)}`;
-  await img.decode();
-  const scale = fixed || Math.min(2, Math.max(1, 4200 / Math.max(width, height)));
-  const canvas = document.createElement('canvas');
-  canvas.width = Math.round(width * scale);
-  canvas.height = Math.round(height * scale);
-  const g = canvas.getContext('2d');
-  if (type === 'image/jpeg') { g.fillStyle = '#ffffff'; g.fillRect(0, 0, canvas.width, canvas.height); }
-  g.drawImage(img, 0, 0, canvas.width, canvas.height);
-  return new Promise((res, rej) => canvas.toBlob((bl) => (bl ? res(bl) : rej(new Error('toBlob null'))), type, 0.92));
+// Rasterizado compartido con el mapa mental: espera a que la fuente embebida cargue (si no,
+// el PNG salía sin texto). Ver js/ui/svg-raster.js.
+function rasterize(svg, width, height, { type = 'image/png', scale = null } = {}) {
+  return rasterizeSvg(svg, width, height, { type, scale });
 }
 
 function download(filename, data, mime) {

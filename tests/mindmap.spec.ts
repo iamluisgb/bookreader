@@ -172,6 +172,36 @@ test('plegar una rama esconde sus hijos', async ({ page }) => {
   await page.locator('.mm-pop .mm-pop-act[data-act="fold"]').click();
   await expect(page.locator('.mm-canvas')).not.toContainText('Juan Preciado');
   await expect(page.locator('.mm-canvas')).toContainText('Personajes');
+
+  // Y el círculo vuelve a desplegarla. Cada repintado añadía OTRO juego de escuchadores al
+  // lienzo, así que tras plegar una vez el clic llegaba dos veces: plegaba y desplegaba a la
+  // vez y parecía no hacer nada.
+  await page.locator('.mm-fold[data-id="r.0"]').click();
+  await expect(page.locator('.mm-canvas')).toContainText('Juan Preciado');
+  await page.locator('.mm-fold[data-id="r.0"]').click();
+  await expect(page.locator('.mm-canvas')).not.toContainText('Juan Preciado');
+});
+
+// En el móvil el SVG se encajaba al ANCHO del lienzo con alto automático: el mapa entero en
+// una franja de ~130 px y las ideas a ~5 px. Ahora el lienzo tiene alto propio, el árbol va a
+// un lado y la vista inicial se acerca hasta que las ideas se leen.
+test('en el móvil el mapa abre legible, en un lienzo alto', async ({ page }) => {
+  await setup(page);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await openFromStudio(page, 'mindmap');
+  await page.waitForSelector('#ai-mindmap', { timeout: 5000 });
+  await page.click('#mm-generate');
+  await page.waitForSelector('.mm-canvas svg', { timeout: 20000 });
+  const r = await page.evaluate(() => {
+    const c = document.querySelector('#mm-canvas')!.getBoundingClientRect();
+    const fs = [...document.querySelectorAll('.mm-canvas .mm-idea text')].map((t) => {
+      const svg = t as SVGTextElement;
+      return Number(svg.getAttribute('font-size')) * (svg.getScreenCTM()?.a || 0);
+    });
+    return { h: c.height, fs: Math.max(...fs) };
+  });
+  expect(r.h).toBeGreaterThan(300);
+  expect(r.fs).toBeGreaterThanOrEqual(11.5);
 });
 
 // "Cubierta" aparecía como rama del mapa porque el filtro de accesorios —el que decide qué
@@ -319,4 +349,19 @@ test('capBulletsFair reparte el cupo entre capítulos', async ({ page }) => {
   expect(r.total).toBe(6);
   expect(r.deB).toBeGreaterThanOrEqual(2);   // B no desaparece
   expect(r.sinCap).toBe(4);
+});
+
+// Las etiquetas largas se recortaban por palabras SIN marcarlo y dejando la frase colgando
+// («Fiabilidad, escalabilidad y»): en pantalla y en el PNG parecía un error.
+test('una etiqueta recortada acaba en «…» y no en una palabra suelta', async ({ page }) => {
+  await page.goto('/index.html');
+  const r = await page.evaluate(async () => {
+    const M: any = await import('/js/ai/mindmap.js');
+    return [
+      M.clampWords('Fiabilidad, escalabilidad y mantenibilidad', 32),
+      M.clampWords('Retardo de replicación y lecturas de tus propias escrituras', 42),
+      M.clampWords('Relacional frente a documental', 42),
+    ];
+  });
+  expect(r).toEqual(['Fiabilidad, escalabilidad…', 'Retardo de replicación y lecturas…', 'Relacional frente a documental']);
 });
