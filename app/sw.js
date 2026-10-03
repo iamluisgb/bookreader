@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bookreader-v155';
+const CACHE_NAME = 'bookreader-v156';
 // Ficheros compartidos con la app (share target) a la espera de que la app los recoja.
 const INBOX = 'bookreader-inbox';
 const ASSETS = [
@@ -132,6 +132,7 @@ const ASSETS = [
   './js/pdf-touch-select.js',
   './js/ai/feynman.js',
   './js/ai/math.js',
+  './js/ai/diagram.js',
   './js/ai/catalog.js',
   './js/ui/text.js',
   './js/ui/when.js',
@@ -154,6 +155,40 @@ const ASSETS = [
   // Temml solo se carga cuando aparece una fórmula, pero se precachea para que ese momento
   // también funcione sin red (es un lector offline: la primera fórmula puede ser en el metro).
   './vendor/temml-0.13.3.min.js',
+  // Mermaid (diagramas del chat, js/ai/diagram.js): SOLO los módulos de sequenceDiagram,
+  // flowchart y timeline con layout dagre (~1 MB, ~300 KB gzip). Los demás tipos no se
+  // vendorizan a propósito: si el modelo pide otro, el bloque se queda como código.
+  './vendor/mermaid-12.1.0/mermaid.esm.min.mjs',
+  './vendor/mermaid-12.1.0/chunks/mermaid.esm.min/chunk-2Z4JPSLF.mjs',
+  './vendor/mermaid-12.1.0/chunks/mermaid.esm.min/chunk-7PWWD3R6.mjs',
+  './vendor/mermaid-12.1.0/chunks/mermaid.esm.min/chunk-AUG3JCRX.mjs',
+  './vendor/mermaid-12.1.0/chunks/mermaid.esm.min/chunk-BOZ75642.mjs',
+  './vendor/mermaid-12.1.0/chunks/mermaid.esm.min/chunk-BZANPUPN.mjs',
+  './vendor/mermaid-12.1.0/chunks/mermaid.esm.min/chunk-D36F7FYG.mjs',
+  './vendor/mermaid-12.1.0/chunks/mermaid.esm.min/chunk-D7X22Q6D.mjs',
+  './vendor/mermaid-12.1.0/chunks/mermaid.esm.min/chunk-F6PIGZHG.mjs',
+  './vendor/mermaid-12.1.0/chunks/mermaid.esm.min/chunk-FNR2RGIF.mjs',
+  './vendor/mermaid-12.1.0/chunks/mermaid.esm.min/chunk-GDOATIN3.mjs',
+  './vendor/mermaid-12.1.0/chunks/mermaid.esm.min/chunk-I2GRRCP3.mjs',
+  './vendor/mermaid-12.1.0/chunks/mermaid.esm.min/chunk-JRPEA5MG.mjs',
+  './vendor/mermaid-12.1.0/chunks/mermaid.esm.min/chunk-JUO4FS6R.mjs',
+  './vendor/mermaid-12.1.0/chunks/mermaid.esm.min/chunk-L2B47AAZ.mjs',
+  './vendor/mermaid-12.1.0/chunks/mermaid.esm.min/chunk-MFYRHTYG.mjs',
+  './vendor/mermaid-12.1.0/chunks/mermaid.esm.min/chunk-MIE3LDYP.mjs',
+  './vendor/mermaid-12.1.0/chunks/mermaid.esm.min/chunk-MOTMN5Z2.mjs',
+  './vendor/mermaid-12.1.0/chunks/mermaid.esm.min/chunk-QVIEFLGF.mjs',
+  './vendor/mermaid-12.1.0/chunks/mermaid.esm.min/chunk-SDIBIOXT.mjs',
+  './vendor/mermaid-12.1.0/chunks/mermaid.esm.min/chunk-SQW7XO2P.mjs',
+  './vendor/mermaid-12.1.0/chunks/mermaid.esm.min/chunk-VSAMGZVZ.mjs',
+  './vendor/mermaid-12.1.0/chunks/mermaid.esm.min/chunk-VZ26ENTH.mjs',
+  './vendor/mermaid-12.1.0/chunks/mermaid.esm.min/chunk-Y4VSPPCQ.mjs',
+  './vendor/mermaid-12.1.0/chunks/mermaid.esm.min/chunk-YF46JFGZ.mjs',
+  './vendor/mermaid-12.1.0/chunks/mermaid.esm.min/chunk-YGFIH6F6.mjs',
+  './vendor/mermaid-12.1.0/chunks/mermaid.esm.min/chunk-ZZ52EIBP.mjs',
+  './vendor/mermaid-12.1.0/chunks/mermaid.esm.min/dagre-HGIH6GME.mjs',
+  './vendor/mermaid-12.1.0/chunks/mermaid.esm.min/flowDiagram-RSBMJUOH.mjs',
+  './vendor/mermaid-12.1.0/chunks/mermaid.esm.min/sequenceDiagram-G32E472T.mjs',
+  './vendor/mermaid-12.1.0/chunks/mermaid.esm.min/timeline-definition-N4ULQHJO.mjs',
   './css/temml.css',
   './css/Temml.woff2',
   './manifest.json',

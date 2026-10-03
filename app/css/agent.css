@@ -418,6 +418,18 @@ body.ai-open .reader-main { margin-right: var(--ai-panel-width); }
 /* Tablas del Markdown del agente. El panel es estrecho → el contenedor hace scroll
    horizontal en vez de desbordar; ver mdToHtml (js/ai/markdown.js). */
 .ai-md-tablewrap { overflow-x: auto; margin: 0 0 8px; }
+/* Diagramas (```mermaid → SVG, ver js/ai/diagram.js). Tamaño NATURAL del diagrama: si no
+   cabe, la caja se desplaza en horizontal como una tabla ancha — encajarlo al ancho dejaba
+   la letra ilegible en el móvil. Antes de pintarse (o si falla) muestra el código. */
+.ai-diagram {
+  margin: 4px 0 8px; padding: var(--s-3); overflow-x: auto;
+  background: var(--surface-1); border: 1px solid var(--border); border-radius: var(--r-md);
+  -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain;
+}
+.ai-diagram > svg { display: block; margin-inline: auto; height: auto; }   /* centrado si cabe; si no, empieza a la izquierda y se desplaza */
+.ai-diagram > .ai-code { margin: 0; border: 0; padding: 0; background: none; }
+.ai-diagram-cites { margin: -2px 0 10px; display: flex; flex-wrap: wrap; gap: 6px; }
+@media (max-width: 600px) { .ai-diagram { padding: var(--s-2); } }
 .ai-md-table { border-collapse: collapse; width: 100%; font-size: var(--fs-sm); }
 .ai-md-table th, .ai-md-table td {
   border: 1px solid var(--border); padding: 5px 9px; text-align: left; vertical-align: top;

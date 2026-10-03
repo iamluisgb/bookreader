@@ -11,6 +11,8 @@ export const BATTERIES = [
     questions: [
       { q: '¿Por qué la simultaneidad de dos sucesos depende del sistema de referencia? Explícalo con el ejemplo del libro.' },
       { q: '¿Qué papel juega el experimento mental del tren y el terraplén en el argumento del libro?' },
+      // Diagramas en el chat (```mermaid → SVG): el modelo debe dibujar y el bloque debe pintarse.
+      { q: 'Explícame con un diagrama el experimento del tren y el terraplén: quién ve qué y en qué orden.', diagram: true },
       { q: '¿Qué dice Einstein en este libro sobre la mecánica cuántica y el entrelazamiento?', trap: true },
     ],
     goldenChapters: ['simultan', 'lorentz', 'gravitation', 'space-time', 'mass'],
@@ -60,6 +62,7 @@ export const BATTERIES = [
     questions: [
       { q: '¿Qué diferencia hay entre merge y rebase, y cuándo desaconseja el libro rebasar?' },
       { q: '¿Cuáles son los tres estados de un fichero en Git y cómo se pasa de uno a otro?' },
+      { q: 'Hazme un diagrama del recorrido de un cambio desde que edito un fichero hasta que queda confirmado.', diagram: true },
       { q: '¿Qué recomienda el libro sobre el comando "git undo" para deshacer commits?', trap: true },
     ],
     goldenChapters: ['branch', 'basics', 'distributed', 'tools'],
@@ -84,6 +87,7 @@ export const BATTERIES = [
     questions: [
       { q: '¿Qué procedimiento y mayorías exige la reforma constitucional agravada del artículo 168?' },
       { q: '¿Cuál es la duración del mandato del Congreso de los Diputados y cuántos miembros puede tener?' },
+      { q: 'Dibújame un esquema con los pasos de la reforma agravada del artículo 168.', diagram: true },
       { q: '¿Qué dice la Constitución sobre la prisión permanente revisable?', trap: true },
     ],
     goldenChapters: ['derechos', 'cortes', 'reforma', 'tribunal constitucional', 'corona'],

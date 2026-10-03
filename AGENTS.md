@@ -37,7 +37,8 @@ offline con un agente de IA (BYOK) que lee el libro completo según un objetivo.
   - utilidades: `js/ui/` (`icons.js`, `escape.js`), `storage.js`
   - biblioteca: `js/library/` (`store.js` IndexedDB, `view.js` pantalla,
     `shelves.js` reglas/árbol/pertenencia — lógica pura, sin DOM ni IDB)
-- `vendor/` — libs vendorizadas (jszip, epub.js, pdf.js + worker). **No se cargan en el
+- `vendor/` — libs vendorizadas (jszip, epub.js, pdf.js + worker, temml, Mermaid recortado a
+  secuencia/flujo/timeline para los diagramas del chat, ver ADR-052). **No se cargan en el
   arranque**: las pide `js/vendor-loader.js` al abrir un libro, y solo la del formato.
 - `sw.js` — service worker (precache + stale-while-revalidate). `manifest.json` — PWA.
 

@@ -3,6 +3,23 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-10-03 — Diagramas en el chat
+
+El agente dibuja: igual que una tabla es Markdown que la app pinta, un diagrama es un bloque
+```mermaid que `js/ai/diagram.js` convierte en SVG (ADR-052). Antes el prompt prohibía los
+diagramas ASCII sin dar alternativa y el agente se disculpaba («No puedo dibujarte un diagrama»).
+
+- Tipos: `sequenceDiagram`, `flowchart TD`, `timeline`. Colores de los tokens del tema (se
+  repintan al cambiarlo), compactos y encajados al ancho con un mínimo legible (~10 px); si no
+  caben, la caja se desplaza como una tabla ancha.
+- Las citas `[[aN]]` salen del diagrama y quedan como chips debajo.
+- Mermaid 12.1 vendorizado y recortado (~1 MB, ~300 KB gzip) con `layout: 'dagre'`; se baja la
+  primera vez que aparece un diagrama y queda precacheado.
+- Seguro ante Mermaid hostil (sin HTML en etiquetas, SVG limpiado); sintaxis rota o tipo no
+  permitido → se queda el código.
+- Evals: una pregunta de diagrama en tres baterías y gates «pregunta de diagrama → diagrama
+  dibujado» y «diagramas que se pintan ≥90%».
+
 ## 2026-10-03 — Mapa mental: legible en el móvil y PNG con texto
 
 1. **El PNG salía sin texto** (vertical y horizontal; también la infografía). El SVG lleva

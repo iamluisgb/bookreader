@@ -1644,3 +1644,32 @@ demo de esa red (quien vuelve mañana desde la misma wifi se la encontraría gas
   si no, cada test que abre el agente sin clave gastaría una demo real de producción.
 - La licencia Pro no cambia nada aquí: desbloquea funciones, no trae inferencia (ADR de MON3), así
   que «sin clave» es la única condición.
+
+## ADR-052 — Diagramas en el chat: el modelo escribe Mermaid y la app lo dibuja · `ACEPTADA`
+
+**Contexto.** El prompt del chat prohibía dibujar («NUNCA dibujes diagramas… con ASCII») sin dar
+alternativa: ante «explícame las limitaciones de TCP con un diagrama» el agente se disculpaba y
+daba una lista. Las tablas no tenían ese problema: el modelo escribe Markdown y la app lo pinta.
+
+**Decisión.** Lo mismo para los diagramas: el modelo escribe un bloque ```mermaid y
+`js/ai/diagram.js` lo convierte en SVG (marcador en `markdown.js` + carga perezosa, el patrón
+de las fórmulas). Solo `sequenceDiagram`, `flowchart` y `timeline`: los que se leen en un móvil.
+Las citas `[[aN]]` salen del bloque y se pintan como chips debajo. Si algo falla, queda el código.
+
+**Alternativas descartadas.**
+- *Motor propio con un JSON propio*: el mejor control de estilo y móvil, pero hay que enseñar el
+  formato en cada prompt (DeepSeek es el que más falla con formatos nuevos) y colocar nodos de un
+  flujo sin cruces es la parte cara.
+- *SVG escrito por el modelo*: muchos tokens y textos que se pisan con modelos pequeños.
+- *Mermaid completo*: 24 MB en npm; la build IIFE son 5,5 MB. Se vendoriza la build ESM
+  recortada a los módulos de los tres tipos (~1 MB, ~300 KB gzip) con `layout: 'dagre'`
+  (sin él baja ELK, +1,6 MB). Un tipo no vendorizado se queda como código, a propósito.
+
+**Seguridad.** Lo escribe un modelo: `securityLevel: 'strict'`, `htmlLabels: false` (con HTML,
+`A["<img src=…>"]` dejaba una `<img>` real que pediría una URL externa) y una limpieza propia del
+SVG (sin `img`, `a`, `on*` ni `href` externos). Lo cubre `tests/diagram.spec.ts`.
+
+**Criterio de revisión.** Los evals miden si las preguntas de diagrama traen uno y si se pinta
+(`check.mjs`: gate ≥90%). Si con el modelo principal falla más del 10% de los bloques, o el estilo
+desentona en el uso real, se sustituye el dibujo por un motor propio para esos tres tipos
+**conservando la sintaxis Mermaid** que el modelo ya escribe.

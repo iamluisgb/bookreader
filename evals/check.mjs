@@ -129,6 +129,13 @@ for (const b of loadBatteries(runDir)) {
     infographic_ratio: igRatio,
     chat_answered: (b.chat || []).filter(c => c.answer).length,
     chat_total: (b.chat || []).length,
+    // Diagramas del chat: las preguntas marcadas `diagram` deben traer un ```mermaid que se
+    // pinte. Es la medida que decide si Mermaid basta o hace falta un motor propio
+    // (decisión 2026-10-03: si falla >10% de los bloques, motor propio con la misma sintaxis).
+    diagram_questions: (b.chat || []).filter(c => c.diagram).length,
+    diagram_questions_drawn: (b.chat || []).filter(c => c.diagram && (c.diagrams || []).includes('1')).length,
+    diagrams_total: (b.chat || []).reduce((n, c) => n + (c.diagrams || []).length, 0),
+    diagrams_ok: (b.chat || []).reduce((n, c) => n + (c.diagrams || []).filter(d => d === '1').length, 0),
   };
   // Gates: fallar cualquiera capa la nota del artefacto en el informe.
   // Tras la validación semántica de anclas (EV1), una tarjeta puede quedar SIN ancla
@@ -150,6 +157,11 @@ for (const b of loadBatteries(runDir)) {
     ...(v2 ? {
       'mindmap generado con ramas': !!mmArt && mmBranches.length >= 2,
       'chat respondió todas': checks.chat_total > 0 && checks.chat_answered === checks.chat_total,
+    } : {}),
+    // Solo en runs que ya preguntan por diagramas (los viejos no tienen el campo).
+    ...(checks.diagram_questions ? {
+      'pregunta de diagrama → diagrama dibujado': checks.diagram_questions_drawn === checks.diagram_questions,
+      'diagramas que se pintan ≥90%': pct(checks.diagrams_ok, checks.diagrams_total) >= 90,
     } : {}),
     ...(v3 ? {
       'infografía generada': !!igArt,

@@ -179,7 +179,7 @@ test.describe('EV1 · generación de artefactos @eval', () => {
         await page.locator('.ai-tab[data-view="chat"]').click();
         await expect(page.locator('#ai-input')).toBeVisible({ timeout: 10000 });
       }
-      for (const { q, trap } of SMOKE ? [] : (battery.questions || [])) {
+      for (const { q, trap, diagram } of SMOKE ? [] : (battery.questions || [])) {
         const before = await page.locator('.ai-msg-assistant .ai-bubble-text').count();
         await page.fill('#ai-input', q);
         await page.click('#ai-send');
@@ -189,7 +189,13 @@ test.describe('EV1 · generación de artefactos @eval', () => {
           await expect(page.locator('#ai-send')).toBeEnabled({ timeout: 300000 });
           await expect(page.locator('.ai-msg-assistant .ai-bubble-text')).toHaveCount(before + 1, { timeout: 10000 });
           const answer = (await page.locator('.ai-msg-assistant .ai-bubble-text').last().innerText()).slice(0, 4000);
-          chat.push({ q, trap: !!trap, answer });
+          // Diagramas (```mermaid): cuántos trajo la respuesta y en qué quedó cada uno —'1'
+          // pintado, 'error' sintaxis rota, 'skip' tipo no permitido—. Se espera a que Mermaid
+          // termine (carga perezosa) antes de leerlos.
+          const last = page.locator('.ai-msg-assistant .ai-bubble-text').last();
+          await page.waitForFunction((el) => !el.querySelector('.ai-diagram:not([data-done])'), await last.elementHandle(), { timeout: 20000 }).catch(() => {});
+          const diagrams = await last.evaluate((el) => [...el.querySelectorAll('.ai-diagram')].map((d) => (d as HTMLElement).dataset.done || 'pendiente'));
+          chat.push({ q, trap: !!trap, diagram: !!diagram, diagrams, answer });
         } catch {
           chat.push({ q, trap: !!trap, answer: '', error: 'el turno no terminó' });
           console.warn(`[eval] ${battery.id}: turno de chat fallido — ${q.slice(0, 60)}…`);
