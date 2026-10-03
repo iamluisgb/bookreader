@@ -60,3 +60,37 @@ test('Q3: la cabecera del panel muestra el libro, no la marca', async ({ page })
   await expect(page.locator('#sidebar-book-title')).not.toHaveText('BookReader');
   await expect(page.locator('#sidebar-book-title')).toHaveText(await page.locator('#reader-title').textContent() as string);
 });
+
+test('F2: «Aa» abre los ajustes de lectura sobre la página, sin abrir el índice', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await openBook(page);
+  const aa = page.getByRole('button', { name: 'Ajustes de lectura' });
+  const pop = page.locator('#reading-pop');
+  await aa.click();
+  await expect(pop).toBeVisible();
+  await expect(aa).toHaveAttribute('aria-expanded', 'true');
+  await expect(page.locator('#sidebar')).not.toHaveClass(/open/);
+  // Anclado bajo el botón, por la derecha.
+  const [b, p] = [(await aa.boundingBox())!, (await pop.boundingBox())!];
+  expect(p.y).toBeGreaterThan(b.y + b.height - 1);
+  expect(Math.abs((p.x + p.width) - (b.x + b.width))).toBeLessThan(2);
+  // Cambiar el tema no lo cierra (se ve el efecto sobre la página).
+  await pop.locator('[data-theme="sepia"]').click();
+  await expect(pop).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(pop).toBeHidden();
+  await expect(aa).toBeFocused();
+  // Ni en el panel ni en «Más».
+  await expect(page.locator('#sidebar #reading-settings, #sidebar #tab-settings')).toHaveCount(0);
+  await page.locator('#reader-more').click();
+  await expect(page.locator('.reader-more-menu')).not.toContainText('Ajustes de lectura');
+});
+
+test('F2: en móvil es una hoja inferior', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await openBook(page);
+  await page.locator('#reading-settings').click();
+  const box = (await page.locator('#reading-pop').boundingBox())!;
+  expect(Math.round(box.y + box.height)).toBe(844);
+  expect(box.width).toBe(390);
+});

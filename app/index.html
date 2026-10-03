@@ -59,10 +59,6 @@
         </div>
       </div>
       <div class="sidebar-header-actions">
-        <!-- Ajustes de lectura: no es navegación por el libro (como sí lo son las pestañas),
-             es cómo se ve. Por eso vive aquí y no gasta una ranura de la barra. Sigue siendo
-             contextual: el panel oculta los grupos que no aplican al formato abierto. -->
-        <button id="reading-settings" class="icon-btn" data-tab="settings" aria-label="Ajustes de lectura" data-tip="Ajustes de lectura" data-i18n-attrs="aria-label,data-tip" data-icon="sliders"></button>
         <button id="sidebar-close" class="icon-btn" aria-label="Cerrar el índice" data-i18n-attrs="aria-label" data-icon="xmark"></button>
       </div>
     </div>
@@ -108,7 +104,25 @@
     </div>
 
     <!-- Tab: Settings -->
-    <div id="tab-settings" class="tab-content">
+    <!-- Pie: acceso a ajustes generales (config global de la app, no de lectura) -->
+    <div class="sidebar-footer">
+      <button id="open-app-settings" class="sidebar-footer-btn">
+        <span data-icon="gear" data-icon-size="md"></span><span data-i18n>Ajustes generales</span>
+      </button>
+    </div>
+  </aside>
+
+  <!-- Main reader area -->
+  <!-- Ajustes de lectura (auditoría de la cabecera, F2): «Aa» abre un popover anclado en
+       escritorio y una hoja inferior en móvil, SOBRE la página: ves el cambio en el texto real
+       y nada se empuja. Antes vivían como quinta pestaña escondida del índice. El contenido
+       sigue siendo contextual: updateFormatScopedUI() oculta los grupos de otro formato. -->
+  <div id="reading-pop" class="reading-pop" role="dialog" aria-labelledby="reading-pop-title" hidden>
+    <div class="reading-pop-head">
+      <h2 id="reading-pop-title" class="reading-pop-title" data-i18n>Ajustes de lectura</h2>
+      <button class="icon-btn reading-pop-x" aria-label="Cerrar" data-i18n-attrs="aria-label" data-icon="xmark"></button>
+    </div>
+    <div id="tab-settings" class="reading-pop-body">
       <div class="settings-group">
         <label data-i18n>Tema</label>
         <div class="theme-selector">
@@ -218,16 +232,8 @@
         </div>
       </div>
     </div>
+  </div>
 
-    <!-- Pie: acceso a ajustes generales (config global de la app, no de lectura) -->
-    <div class="sidebar-footer">
-      <button id="open-app-settings" class="sidebar-footer-btn">
-        <span data-icon="gear" data-icon-size="md"></span><span data-i18n>Ajustes generales</span>
-      </button>
-    </div>
-  </aside>
-
-  <!-- Main reader area -->
   <main id="reader-main" class="reader-main">
     <!-- Top bar -->
     <header id="reader-header" class="reader-header">
@@ -236,12 +242,13 @@
       <div class="reader-nav-slot" aria-hidden="true"></div>
       <div id="reader-title" class="reader-title">BookReader</div>
       <div class="header-actions">
+        <button id="reading-settings" class="icon-btn" aria-label="Ajustes de lectura" aria-haspopup="dialog" aria-expanded="false" aria-controls="reading-pop" data-tip="Ajustes de lectura" data-i18n-attrs="aria-label,data-tip" data-icon="type" disabled></button>
         <button id="immersive-toggle" class="icon-btn" aria-label="Pantalla completa" data-tip="Pantalla completa" data-i18n-attrs="aria-label,data-tip" data-icon="expand" disabled></button>
         <button id="header-search" class="icon-btn" aria-label="Buscar en el libro" data-tip="Buscar" data-i18n-attrs="aria-label,data-tip" data-icon="search" disabled></button>
         <button id="ai-toggle" class="icon-btn" aria-label="Agente de IA" data-tip="Agente de IA" data-i18n-attrs="aria-label,data-tip" data-icon="sparkles" disabled></button>
         <button id="bookmark-toggle" class="icon-btn" aria-label="Marcar página" data-tip="Marcar página" data-i18n-attrs="aria-label,data-tip" data-tip-align="right" data-icon="bookmark" disabled></button>
-        <!-- «Más»: Ajustes de lectura, Ajustes generales y Biblioteca a un toque. Antes Ajustes
-             generales solo estaba al pie del cajón del índice (auditoría móvil, Q7). -->
+        <!-- «Más»: Ajustes generales y Biblioteca a un toque (auditoría móvil, Q7). Los de
+             lectura tienen su «Aa» (auditoría de la cabecera, F2). -->
         <button id="reader-more" class="icon-btn" aria-label="Más" aria-haspopup="menu" data-tip="Más" data-i18n-attrs="aria-label,data-tip" data-tip-align="right" data-icon="ellipsis"></button>
       </div>
     </header>

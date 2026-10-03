@@ -8,6 +8,7 @@ import * as Storage from './storage.js';
 import * as AiDB from './ai/db.js';
 import { hydrateIcons, icon } from './ui/icons.js';
 import { setSidebar, toggleSidebar, initSidebarState } from './ui/sidebar.js';
+import { initReadingPop, isReadingPopOpen } from './ui/reading-pop.js';
 import { countBookWords, countPdfWords, updateProgressDetail, getCurrentPct, WORDS_PER_LOCATION } from './progress.js';
 import * as FeatureGuide from './ui/feature-guide.js';
 import * as ReadingLog from './reading-log.js';
@@ -499,7 +500,6 @@ function initReaderMore() {
     menu.className = 'lib-menu reader-more-menu';
     menu.setAttribute('role', 'menu');
     menu.innerHTML = `
-      <button class="lib-menu-item" role="menuitem" data-act="reading">${icon('sliders', { size: 'md' })}<span>${t('Ajustes de lectura')}</span></button>
       <button class="lib-menu-item" role="menuitem" data-act="general">${icon('gear', { size: 'md' })}<span>${t('Ajustes generales')}</span></button>
       <div class="lib-menu-sep"></div>
       <button class="lib-menu-item" role="menuitem" data-act="library">${icon('library', { size: 'md' })}<span>${t('Biblioteca')}</span></button>`;
@@ -515,9 +515,7 @@ function initReaderMore() {
       if (!it) return;
       const act = it.dataset.act;
       close();
-      if (act === 'reading') {
-        setSidebar(true, 'settings');
-      } else if (act === 'general') openAppSettings();
+      if (act === 'general') openAppSettings();
       else if (act === 'library') goToLibrary();
     });
     menu.addEventListener('keydown', (e) => {
@@ -967,7 +965,8 @@ function initImmersive() {
     // cambia de tamaño, así que el EPUB no se repagina (ver .epub-container.has-desk).
     let quietT = 0;
     const quiet = () => {
-      if (document.body.classList.contains('reading') && !inFs()) document.body.classList.add('chrome-quiet');
+      // Con «Aa» abierto no: su botón es el ancla del popover y se desvanecería debajo.
+      if (document.body.classList.contains('reading') && !inFs() && !isReadingPopOpen()) document.body.classList.add('chrome-quiet');
     };
     const wake = () => { document.body.classList.remove('chrome-quiet'); clearTimeout(quietT); };
     const quietSoon = () => { clearTimeout(quietT); quietT = setTimeout(quiet, 2500); };
@@ -1314,12 +1313,12 @@ function initSidebar() {
   close.addEventListener('click', () => setSidebar(false));
   window.addEventListener('sidebar:change', (e) => { if (e.detail.open) markCurrentToc(true); });
   initBookHeader();
+  initReadingPop();
 
-  // Tabs. El selector es [data-tab] y no .tab-btn porque el engranaje de la cabecera
-  // (Ajustes de lectura) abre otro panel más del mismo conmutador sin ser una pestaña.
-  document.querySelectorAll('[data-tab]').forEach(btn => {
+  // Tabs.
+  document.querySelectorAll('.tab-btn[data-tab]').forEach(btn => {
     btn.addEventListener('click', () => {
-      document.querySelectorAll('[data-tab]').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-btn[data-tab]').forEach(b => b.classList.remove('active'));
       document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
       btn.classList.add('active');
       document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
@@ -1556,6 +1555,7 @@ async function loadEpub(buffer, bookId, aiBookId, persist = null) {
     document.getElementById('ai-toggle').disabled = false;
     document.getElementById('immersive-toggle').disabled = false;
     document.getElementById('header-search').disabled = false;
+    document.getElementById('reading-settings').disabled = false;
 
     // Load TOC
     loadTOC();
@@ -1665,6 +1665,7 @@ async function loadPdf(buffer, bookId, aiBookId, persist = null, displayTitle = 
     document.getElementById('ai-toggle').disabled = false;
     document.getElementById('immersive-toggle').disabled = false;
     document.getElementById('header-search').disabled = false;
+    document.getElementById('reading-settings').disabled = false;
     // PDF2/PDF3: seleccionar texto en el PDF → barra (preguntar/subrayar/nota/copiar).
     setupPdfSelection();
     renderHighlights();              // poblar la lista lateral con los subrayados guardados

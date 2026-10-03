@@ -83,9 +83,30 @@ html, body {
   gap: 2px;
 }
 
-/* El engranaje es un modo del panel, no una acción suelta: cuando los ajustes de lectura
-   están a la vista se tiñe de acento, igual que la pestaña activa. */
-#reading-settings.active, #reading-settings.active:hover { color: var(--accent); }
+/* Ajustes de lectura (auditoría de la cabecera, F2). Escritorio: popover bajo «Aa», sobre la
+   página y sin velo, para ver el cambio en el texto real. Móvil: hoja inferior. */
+#reading-settings[aria-expanded="true"] { color: var(--accent); }
+.reading-pop {
+  position: fixed; z-index: var(--z-popover);
+  width: 320px; max-height: calc(100vh - var(--header-height) - 24px);
+  display: flex; flex-direction: column;
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: var(--r-md); box-shadow: var(--shadow-3);
+}
+.reading-pop[hidden] { display: none; }
+.reading-pop-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 8px 0 16px; flex: none;
+}
+.reading-pop-title { margin: 0; font-size: var(--fs-md); font-weight: 600; }
+.reading-pop-body { overflow-y: auto; padding: 12px 16px 4px; overscroll-behavior: contain; }
+@media (max-width: 767px) {
+  .reading-pop {
+    top: auto; right: 0; bottom: 0; left: 0; width: auto; max-height: 70vh;
+    border-radius: var(--r-xl) var(--r-xl) 0 0; border-bottom: none;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
 
 /* Tabs (v2: más limpias) */
 .sidebar-tabs {

@@ -57,10 +57,10 @@ const ICONS = {
   // abultadas del glifo Feather que se emborronaban a 16–20px).
   // Engranaje de 6 dientes anchos: el de 8 se empastaba a 14-16 px (rail, menús).
   gear: '<path d="M8.80 6.46 L9.80 5.99 L9.90 3.04 L14.10 3.04 L14.20 5.99 L15.20 6.46 L16.11 7.09 L18.71 5.70 L20.81 9.34 L18.30 10.90 L18.40 12.00 L18.30 13.10 L20.81 14.66 L18.71 18.30 L16.11 16.91 L15.20 17.54 L14.20 18.01 L14.10 20.96 L9.90 20.96 L9.80 18.01 L8.80 17.54 L7.89 16.91 L5.29 18.30 L3.19 14.66 L5.70 13.10 L5.60 12.00 L5.70 10.90 L3.19 9.34 L5.29 5.70 L7.89 7.09Z"/><circle cx="12" cy="12" r="2.6"/>',
-  // Deslizadores: ajustes de LECTURA (cómo se ve el libro abierto). Deliberadamente
-  // distinto del engranaje, que queda reservado a los Ajustes generales de la app; con
-  // los dos glifos iguales el pie y la cabecera del sidebar parecían el mismo botón.
-  sliders: '<line x1="3.5" y1="7.5" x2="20.5" y2="7.5"/><line x1="3.5" y1="16.5" x2="20.5" y2="16.5"/><circle cx="9" cy="7.5" r="2.3"/><circle cx="15" cy="16.5" r="2.3"/>',
+  // «Aa»: apariencia del TEXTO del libro abierto (tema, letra, tamaño, modo). Es el glifo
+  // que usan Apple Books, Kindle y Kobo para lo mismo. Distinto del engranaje, reservado a
+  // los Ajustes generales de la app. Sustituye a los deslizadores (auditoría de la cabecera, F2).
+  type: '<path d="M3 17.5 7.5 6.5l4.5 11"/><line x1="4.7" y1="13.5" x2="10.3" y2="13.5"/><path d="M15 11.2a3 3 0 0 1 5.5 1.6v4.7"/><path d="M20.5 14.2c-3.8-.4-6.2.5-6.2 1.9 0 2.2 4.1 2.1 6.2-.3"/>',
 
   // ——— agent / AI ———
   sparkles: '<path d="M12 3.5l1.5 4.2 4.2 1.5-4.2 1.5L12 14.9l-1.5-4.2L6.3 9.2l4.2-1.5L12 3.5Z"/><path d="M18.5 14l.7 1.9 1.9.7-1.9.7-.7 1.9-.7-1.9-1.9-.7 1.9-.7.7-1.9Z"/>',

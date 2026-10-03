@@ -62,6 +62,8 @@ select:focus {
 [data-tip][data-tip-align="right"]::after { left: auto; right: 0; transform: translateX(0) translateY(-2px); }
 [data-tip][data-tip-align="right"]:hover::after,
 [data-tip][data-tip-align="right"]:focus-visible::after { transform: translateX(0) translateY(0); }
+/* Con su popover o menú abierto, el globo sobra y quedaría detrás del propio popover. */
+[data-tip][aria-haspopup][aria-expanded="true"]::after { display: none; }
 /* En pantallas táctiles los tooltips estorban (no hay hover real): se ocultan. */
 @media (hover: none) {
   [data-tip]::after { display: none; }
@@ -279,6 +281,7 @@ body.immersive .ai-fab { transform: scale(0); }
 .icon-btn.is-active { color: var(--accent); }
 /* Toggle en acento cuando su panel está abierto (afordancia de estado). */
 body:has(#sidebar.open) #sidebar-toggle,
+#reading-settings[aria-expanded="true"],
 body.ai-open #ai-toggle { color: var(--accent); }
 
 .nav-btn {
