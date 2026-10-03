@@ -227,9 +227,9 @@ export async function render() {
   host.innerHTML = `
     <div class="lib-layout">
       <aside class="lib-rail" aria-label="${t('Estanterías')}">
-        ${fixedRowHtml('all', `<span class="lib-rail-thumb lib-rail-thumb--all">${icon('books', { size: 'md' })}</span>`,
+        ${fixedRowHtml('all', `<span class="lib-rail-thumb lib-rail-thumb--all">${icon('library', { size: 'md' })}</span>`,
           t('Libros'), books.length, !selection.size)}
-        ${fixedRowHtml('none', `<span class="lib-rail-thumb lib-rail-thumb--none">${icon('book', { size: 'sm' })}</span>`,
+        ${fixedRowHtml('none', `<span class="lib-rail-thumb lib-rail-thumb--none">${icon('inbox', { size: 'md' })}</span>`,
           t('Sin estantería'), noShelfCount, selection.has('none'))}
 
         ${manual.length ? `<div class="lib-rail-section">${t('Estanterías')}</div>
@@ -879,7 +879,7 @@ async function firstStepsHtml(books) {
 
 function emptyHtml(noBooksAtAll) {
   return `<div class="lib-empty">
-    <div class="lib-empty-icon">${icon('books', { size: 'hero' })}</div>
+    <div class="lib-empty-icon">${icon('library', { size: 'hero' })}</div>
     <p>${noBooksAtAll ? t('Tu biblioteca está vacía.') : t('No hay libros aquí.')}</p>
     ${noBooksAtAll ? `<button class="btn btn--primary lib-upload" data-act="add">${icon('upload', { size: 'lg' })}<span>${t('Subir tu primer libro')}</span></button>` : ''}
   </div>`;

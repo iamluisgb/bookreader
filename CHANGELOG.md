@@ -24,6 +24,14 @@ pantallas de deslizar), sin marca de la estantería elegida y con el ⋯ dentro 
 - **44 px** de área táctil: chips, ⋯ de libro, buscador, desplegables, subir y la cabecera del lector.
 
 Tests: [library-mobile.spec.ts](tests/library-mobile.spec.ts). SW `v157`.
+## 2026-10-03 — Iconos de la biblioteca y el engranaje, más claros
+
+«Libros» y «Sin estantería» usaban casi el mismo dibujo (un libro abierto) en gris sobre gris,
+y el engranaje de 8 dientes se empastaba a 14-16 px. Ahora: `library` (lomos en un estante)
+para la biblioteca, `inbox` (bandeja, «sin clasificar») para «Sin estantería» y un engranaje de
+6 dientes anchos; los tres en tinta (legible antes que sutil). Comparados ampliados y a
+tamaño real en claro y oscuro antes de elegir. SW `v161`.
+
 ## 2026-10-03 — Iconos: un significado por icono, escala de tamaños y sin emoji
 
 Revisión del set (`js/ui/icons.js`) y de los emojis de la interfaz, dentro del DS1:

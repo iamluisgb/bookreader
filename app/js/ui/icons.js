@@ -55,7 +55,8 @@ const ICONS = {
   warning: '<path d="M12 4.5 21 19.5H3L12 4.5Z"/><line x1="12" y1="10" x2="12" y2="14.5"/><circle cx="12" cy="17" r="0.9" fill="currentColor" stroke="none"/>',
   // Engranaje geométrico de 8 dientes (dientes definidos, sin las curvas
   // abultadas del glifo Feather que se emborronaban a 16–20px).
-  gear: '<circle cx="12" cy="12" r="3.2"/><path d="M19.19 10.74 21.26 10.38 21.26 13.62 19.19 13.26 17.97 16.2 19.69 17.41 17.41 19.69 16.2 17.97 13.26 19.19 13.62 21.26 10.38 21.26 10.74 19.19 7.8 17.97 6.59 19.69 4.31 17.41 6.03 16.2 4.81 13.26 2.74 13.62 2.74 10.38 4.81 10.74 6.03 7.8 4.31 6.59 6.59 4.31 7.8 6.03 10.74 4.81 10.38 2.74 13.62 2.74 13.26 4.81 16.2 6.03 17.41 4.31 19.69 6.59 17.97 7.8Z"/>',
+  // Engranaje de 6 dientes anchos: el de 8 se empastaba a 14-16 px (rail, menús).
+  gear: '<path d="M8.80 6.46 L9.80 5.99 L9.90 3.04 L14.10 3.04 L14.20 5.99 L15.20 6.46 L16.11 7.09 L18.71 5.70 L20.81 9.34 L18.30 10.90 L18.40 12.00 L18.30 13.10 L20.81 14.66 L18.71 18.30 L16.11 16.91 L15.20 17.54 L14.20 18.01 L14.10 20.96 L9.90 20.96 L9.80 18.01 L8.80 17.54 L7.89 16.91 L5.29 18.30 L3.19 14.66 L5.70 13.10 L5.60 12.00 L5.70 10.90 L3.19 9.34 L5.29 5.70 L7.89 7.09Z"/><circle cx="12" cy="12" r="2.6"/>',
   // Deslizadores: ajustes de LECTURA (cómo se ve el libro abierto). Deliberadamente
   // distinto del engranaje, que queda reservado a los Ajustes generales de la app; con
   // los dos glifos iguales el pie y la cabecera del sidebar parecían el mismo botón.
@@ -100,6 +101,10 @@ const ICONS = {
   flame: '<path d="M12 20.5c3.3 0 5.8-2.4 5.8-5.7 0-3.5-2.6-5.2-3.5-8.3-.5 1.9-1.4 3-2.6 3.6.3-2.6-.8-4.9-3-6.6.2 3.4-3.5 5.7-3.5 10.2 0 3.7 2.9 6.8 6.8 6.8Z"/>',
   // Mapa mental: un nodo y sus ramas (antes `columns`, que es un edificio con columnas).
   mindmap: '<circle cx="12" cy="12" r="2.6"/><circle cx="5" cy="6" r="1.8"/><circle cx="19" cy="6" r="1.8"/><circle cx="5" cy="18" r="1.8"/><circle cx="19" cy="18" r="1.8"/><line x1="9.9" y1="10.4" x2="6.4" y2="7.2"/><line x1="14.1" y1="10.4" x2="17.6" y2="7.2"/><line x1="9.9" y1="13.6" x2="6.4" y2="16.8"/><line x1="14.1" y1="13.6" x2="17.6" y2="16.8"/>',
+  // La biblioteca entera: lomos en un estante. `books`/`book` (libro abierto) son UN libro.
+  library: '<line x1="3.5" y1="20.5" x2="20.5" y2="20.5"/><rect x="5" y="4.5" width="3.8" height="16" rx="1"/><rect x="10" y="7.5" width="3.8" height="13" rx="1"/><path d="M14.9 8.9l3.4-.9 2.9 11.6"/><path d="M15 8.9 17.9 20.5"/>',
+  // Sin clasificar (libros sin estantería): bandeja de entrada.
+  inbox: '<path d="M3.5 13.5 6.2 5.6A1.5 1.5 0 0 1 7.6 4.6h8.8a1.5 1.5 0 0 1 1.4 1l2.7 7.9V18a1.5 1.5 0 0 1-1.5 1.5h-14A1.5 1.5 0 0 1 3.5 18Z"/><path d="M3.5 13.5h4.6l1.4 2.2h5l1.4-2.2h4.6"/>',
   'arrow-down': '<line x1="12" y1="5" x2="12" y2="18.5"/><polyline points="6.5 13 12 18.5 17.5 13"/>',
 
   // ——— theme glyphs (used inside swatches when helpful) ———

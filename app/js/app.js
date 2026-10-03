@@ -501,7 +501,7 @@ function initReaderMore() {
       <button class="lib-menu-item" role="menuitem" data-act="reading">${icon('sliders', { size: 'md' })}<span>${t('Ajustes de lectura')}</span></button>
       <button class="lib-menu-item" role="menuitem" data-act="general">${icon('gear', { size: 'md' })}<span>${t('Ajustes generales')}</span></button>
       <div class="lib-menu-sep"></div>
-      <button class="lib-menu-item" role="menuitem" data-act="library">${icon('books', { size: 'md' })}<span>${t('Biblioteca')}</span></button>`;
+      <button class="lib-menu-item" role="menuitem" data-act="library">${icon('library', { size: 'md' })}<span>${t('Biblioteca')}</span></button>`;
     document.body.appendChild(menu);
     const r = btn.getBoundingClientRect();
     menu.style.display = 'block';

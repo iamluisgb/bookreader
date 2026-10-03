@@ -447,7 +447,9 @@ button.lib-rail-twisty:hover { background: var(--surface-2); color: var(--text);
   color: color-mix(in srgb, hsl(var(--mark-h, 220) 62% 45%) 55%, var(--text));
   font-size: var(--fs-sm); font-weight: 650; line-height: 1;
 }
-.lib-rail-thumb--none .icon { color: var(--text-faint); }
+/* Legible antes que sutil (DS1): los glifos de las vistas del sistema van en tinta, no en
+   gris sobre gris, que a 16 px se perdía. */
+.lib-rail-thumb--none .icon { color: var(--text); }
 .lib-rail-kebab {
   flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center;
   width: 26px; height: 26px; margin-right: 6px; padding: 0;
@@ -500,7 +502,7 @@ button.lib-rail-twisty:hover { background: var(--surface-2); color: var(--text);
   border-top: 1px solid var(--border-soft); border-radius: 0;
   color: var(--text); font-weight: 500;
 }
-.lib-rail-settings .icon { color: var(--text-soft); }
+.lib-rail-settings .icon { color: var(--text); }
 .lib-rail-settings:hover { background: none; color: var(--accent); }
 .lib-rail-settings:hover .icon { color: var(--accent); }
 
@@ -1420,7 +1422,7 @@ input[type="text"], input[type="password"], input[type="search"], input[type="ur
 .lib-rail-item.active { color: var(--text); font-weight: 600; }
 .lib-rail-item.active .lib-rail-ico .icon { color: var(--text); }
 .lib-rail-thumb--all { background: var(--fill); }
-.lib-rail-thumb--all .icon { color: var(--text-soft); }
+.lib-rail-thumb--all .icon { color: var(--text); }
 .lib-rail-settings, .lib-rail-settings:hover { color: var(--text); }
 .appset-nav-item.active { background: var(--fill); color: var(--text); }
 .appset-nav-item.active .icon { color: var(--accent); }

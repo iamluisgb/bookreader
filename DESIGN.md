@@ -120,7 +120,7 @@ texto o el `aria-label` del botón los nombra). Galería con su significado en
   (estantería inteligente); `pin` = fijar; `bookmark` = marcar página; `note` = nota suelta;
   `notebook` = la libreta; `share` = hoja de compartir del sistema; `download`/`upload` =
   guardar/subir un fichero; `cloud` = Drive y sincronizar; `chart` = Análisis; `function` =
-  ejemplo con números; `user` = tu perfil; `users` = otra persona; `flame` = racha;
+  ejemplo con números; `user` = tu perfil; `users` = otra persona; `flame` = racha; `library` = la biblioteca; `inbox` = sin estantería; `book` = un libro;
   `help` = ayuda; `info` = nota informativa. Antes de reutilizar uno para otra cosa, crea
   otro: dos significados para un dibujo obligan a leer la etiqueta siempre.
 - **Tamaño por paso, nunca en píxeles:** `icon(name, { size: 'md' })`. `sm` 14 (en línea
