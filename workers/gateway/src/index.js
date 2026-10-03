@@ -188,6 +188,10 @@ export default {
       if (url.pathname === '/quota' && request.method === 'GET') {
         return withCors(await handleQuota(request, env), cors);
       }
+      const cat = /^\/catalog\/([a-z0-9-]+)$/.exec(url.pathname);
+      if (cat && request.method === 'GET') {
+        return withCors(await handleCatalog(request, env, ctx, cat[1]), cors);
+      }
       return withCors(oaiError(404, 'not_found', 'Unknown endpoint.'), cors);
     } catch (e) {
       // Nunca filtrar detalles internos; el error real queda en observability.
@@ -208,6 +212,56 @@ async function handleModels(request, env) {
   // modelos que van a devolver 403 en cuanto se elijan.
   const data = aliasesFor(tok.product).map((id) => ({ id, object: 'model', owned_by: tok.product }));
   return json(200, { object: 'list', data });
+}
+
+// GET /catalog/:provider — los modelos que ofrece un proveedor, para que el cliente BYOK los
+// enseñe en un desplegable en vez de pedir que se escriban a mano.
+//
+// Existe porque nan responde a `GET /v1/models` SIN cabeceras CORS: el navegador no puede
+// leer esa lista aunque el usuario tenga su clave. Aquí se pide con NUESTRA clave y se sirve
+// con CORS. La clave del usuario no pasa por el gateway (regla BYOK): el catálogo es el mismo
+// para todos. Lo que solo ve una cuenta premium (p. ej. `glm5.3`) no sale aquí; para eso el
+// cliente conserva el campo de texto. Público y sin cuota: se cachea UNA HORA en el edge, así
+// que el proveedor recibe como mucho una petición por hora y colo.
+//
+// `kind` sale del nombre: el cliente solo ofrece los `chat` en el selector de modelo.
+export function modelKind(id) {
+  const s = String(id).toLowerCase();
+  if (/embed/.test(s)) return 'embedding';
+  if (/rerank/.test(s)) return 'rerank';
+  if (/whisper|stt|transcri/.test(s)) return 'stt';
+  if (/kokoro|tts|speech/.test(s)) return 'tts';
+  if (/flux|image|sdxl|diffusion/.test(s)) return 'image';
+  return 'chat';
+}
+
+const CATALOG_TTL = 3600;
+
+async function handleCatalog(request, env, ctx, providerId) {
+  const provider = PROVIDERS[providerId];
+  if (!provider) return oaiError(404, 'unknown_provider', 'Unknown provider.');
+  const cache = typeof caches !== 'undefined' ? caches.default : null;
+  const key = new Request(new URL(`/catalog/${providerId}`, request.url).toString(), { method: 'GET' });
+  const hit = cache && await cache.match(key);
+  if (hit) return hit;
+
+  const baseUrl = env[provider.urlEnv] || provider.baseUrl;
+  const upstream = await fetch(`${baseUrl}/models`, {
+    headers: { 'Authorization': `Bearer ${env[provider.keyEnv]}` },
+  });
+  if (!upstream.ok) return oaiError(502, 'upstream_error', `The provider answered ${upstream.status}.`);
+  const body = await upstream.json().catch(() => null);
+  const list = Array.isArray(body?.data) ? body.data : [];
+  const models = list
+    .filter((m) => m && typeof m.id === 'string' && m.id.length <= 80)
+    .map((m) => ({ id: m.id, kind: modelKind(m.id) }))
+    .sort((a, b) => a.id.localeCompare(b.id));
+  const res = new Response(JSON.stringify({ provider: providerId, updatedAt: new Date().toISOString(), models }), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json', 'Cache-Control': `public, max-age=${CATALOG_TTL}` },
+  });
+  if (cache) ctx?.waitUntil?.(cache.put(key, res.clone()));
+  return res;
 }
 
 // GET /quota — estado del token SIN gastar una llamada. Existe para el traspaso de la

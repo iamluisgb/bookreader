@@ -136,6 +136,18 @@ async function fetchPickerModels(provider, { baseUrl, key }) {
     } catch (e) { /* CORS o key inválida: quedan los curados */ }
   }
   const curated = (provider && provider.models) || [];
+  // nan: su lista viene del gateway (con CORS). Primero los probados; los nuevos, marcados.
+  if (provider?.catalogUrl) {
+    // null = el gateway no respondió y nunca lo hizo: se dice «verificados», no «de nan».
+    const got = await LLM.refreshProviderCatalog(provider);
+    const extra = LLM.untestedModels(provider);
+    if (got) {
+      return {
+        models: [...curated.map(id => ({ id, name: id })), ...extra.map(id => ({ id, name: t('{id} · nuevo, sin probar', { id }) }))],
+        source: 'gateway',
+      };
+    }
+  }
   return { models: curated.map(id => ({ id, name: id })), source: 'preset' };
 }
 
@@ -143,6 +155,7 @@ const SOURCE_NOTE = {
   catalog: () => t('Catálogo de models.dev — nombres y capacidades. No se envía nada tuyo.'),
   provider: () => t('Lista que devuelve tu proveedor.'),
   preset: () => t('Modelos verificados por nosotros: este proveedor no deja consultar su lista desde el navegador.'),
+  gateway: () => t('Modelos de nan, actualizados cada pocas horas. Los «sin probar» son nuevos: puede que tu cuenta no tenga acceso.'),
 };
 
 // `need`: 'text' | 'vision'. En visión se filtra a los que aceptan imágenes; solo se

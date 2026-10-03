@@ -24,6 +24,25 @@ pantallas de deslizar), sin marca de la estantería elegida y con el ⋯ dentro 
 - **44 px** de área táctil: chips, ⋯ de libro, buscador, desplegables, subir y la cabecera del lector.
 
 Tests: [library-mobile.spec.ts](tests/library-mobile.spec.ts). SW `v157`.
+## 2026-10-03 — nan: los modelos se eligen de una lista, no se escriben a mano
+
+nan responde a `GET /v1/models` (13 modelos hoy) pero **sin cabeceras CORS**, ni en la
+respuesta ni en el preflight: el navegador no puede leerla aunque el usuario tenga su key. Su
+documentación (`/docs`, `/docs/models`, `/docs/api`) no ofrece otra vía pública.
+- **Gateway** (`workers/gateway` · `GET /catalog/:provider`): pide `/models` con NUESTRA clave,
+  clasifica cada modelo (`chat`, `embedding`, `rerank`, `stt`, `tts`, `image`) y lo sirve con
+  CORS y una hora de caché en el edge. Público, sin cuota y sin la key del usuario (regla BYOK).
+- **App**: la lista de nan sale de ahí (cacheada 6 h). Primero los modelos probados; los nuevos
+  del catálogo, como «nuevo · sin probar» (nan lista modelos a los que una cuenta puede no
+  tener acceso: `minimax-h3` devuelve 401 con nuestra key). En el selector de Ajustes y en el
+  menú de modelo del chat. Sin gateway, «modelos verificados», como antes.
+- **Lista probada al día** (respuesta, tools e imagen, 2026-10-03): `deepseek-v4-flash`,
+  `qwen3.8-flash`, `glm5.3-flash`, `qwen3.6`, `gemma4` (no llamó a la herramienta) y
+  `mimo-v2.6-flash` (contestó en chino a una pregunta en español). Modelo, lite y visión por
+  defecto no cambian: eso pasa por las evals.
+
+SW `v159`.
+
 ## 2026-10-03 — Mapa mental: dos remates de la revisión
 
 - `clampWords` cuenta la «…» dentro del máximo: la etiqueta recortada medía un carácter más

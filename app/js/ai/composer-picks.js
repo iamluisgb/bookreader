@@ -86,7 +86,7 @@ function modelOptions() {
   const p = LLM.currentProvider();
   const list = [...(p?.models || [])];
   const cur = LLM.getModel();
-  if (cur && !list.includes(cur)) list.unshift(cur);   // uno elegido en avanzadas también sale
+  if (cur && !list.includes(cur) && !LLM.untestedModels(p).includes(cur)) list.unshift(cur);   // uno elegido en avanzadas también sale
   return list;
 }
 
@@ -101,9 +101,13 @@ function openModelMenu(anchor) {
   }
   const cur = LLM.getModel();
   const name = LLM.currentProvider()?.name;
+  const untested = LLM.untestedModels();
+  // Se refresca en segundo plano para la próxima vez (cacheado 6 h).
+  LLM.refreshProviderCatalog().catch(() => {});
   openMenu(anchor, `
     ${name ? `<div class="ai-pick-note">${escapeHtml(name)}</div>` : ''}
     ${modelOptions().map(m => `<button class="lib-menu-item" data-model="${escapeHtml(m)}">${check(m === cur)}<span>${escapeHtml(m)}</span></button>`).join('')}
+    ${untested.length ? `<div class="ai-pick-note">${t('Nuevos · sin probar')}</div>${untested.map(m => `<button class="lib-menu-item" data-model="${escapeHtml(m)}">${check(m === cur)}<span>${escapeHtml(m)}</span></button>`).join('')}` : ''}
     <div class="lib-menu-sep"></div>
     <button class="lib-menu-item" data-go="agent">${icon('gear', { size: 16 })}<span>${t('Más modelos y proveedores…')}</span></button>
   `, (d) => {

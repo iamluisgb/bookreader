@@ -53,7 +53,12 @@ export const PROVIDERS = [
   // ("This API key does not have access to the requested model") para ese modelo.
   // deepseek-v4-flash está verificado con esa key Y acepta imágenes (petición real con
   // imagen). No usar 'deepseek-v4-flash-0731': con esta key también responde 401.
-  { id: 'nan',        name: 'nan.builders',      baseUrl: 'https://api.nan.builders/v1',   models: ['deepseek-v4-flash', 'qwen3.6', 'gemma4'], liteModel: 'deepseek-v4-flash', visionModel: 'deepseek-v4-flash', concurrent: true, discover: false },
+  // models: los de chat que hemos PROBADO con una key real (2026-10-03: respuesta, tools y una
+  // imagen de prueba). gemma4 no llamó a la herramienta; mimo-v2.6-flash contestó en chino a
+  // una pregunta en español. Los nuevos que publique nan salen solos por `catalogUrl` (ver
+  // refreshProviderCatalog), marcados como «sin probar». Modelo, lite y visión por defecto NO
+  // cambian aquí: eso pasa por las evals (docs/EVALS.md).
+  { id: 'nan',        name: 'nan.builders',      baseUrl: 'https://api.nan.builders/v1',   models: ['deepseek-v4-flash', 'qwen3.8-flash', 'glm5.3-flash', 'qwen3.6', 'gemma4', 'mimo-v2.6-flash'], liteModel: 'deepseek-v4-flash', visionModel: 'deepseek-v4-flash', concurrent: true, discover: false, catalogUrl: GATEWAY_BASE_URL.replace(/\/v1$/, '') + '/catalog/nan' },
   { id: 'openai',     name: 'OpenAI',     baseUrl: 'https://api.openai.com/v1',     models: ['gpt-4o', 'gpt-4o-mini', 'o4-mini'], concurrent: true, catalogId: 'openai' },
   // Verificado contra la API real el 2026-08-02 (tests/provider-contract.spec.ts):
   // `claude-3.7-sonnet` y `gemini-2.0-flash-001` ya NO existen en el catálogo, así que
@@ -61,6 +66,37 @@ export const PROVIDERS = [
   { id: 'openrouter', name: 'OpenRouter', baseUrl: 'https://openrouter.ai/api/v1',  models: ['google/gemini-2.5-flash', 'google/gemini-2.5-flash-lite', 'deepseek/deepseek-chat-v3.1', 'anthropic/claude-haiku-4.5'], liteModel: 'google/gemini-2.5-flash-lite', visionModel: 'google/gemini-2.5-flash', concurrent: true, catalogId: 'openrouter' },
   { id: 'groq',       name: 'Groq',       baseUrl: 'https://api.groq.com/openai/v1', models: ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant'], concurrent: true, catalogId: 'groq' },
 ];
+
+// ---- Catálogo del proveedor vía gateway ------------------------------------------
+// nan no deja leer su `/models` desde el navegador (sin CORS). El gateway lo pide con su
+// propia clave y lo sirve con CORS (workers/gateway · /catalog/nan): la key del usuario no
+// sale de aquí. Se guarda 6 h. Lo que el catálogo trae y no está en `models` (los probados)
+// es «nuevo, sin probar»: puede no funcionar con tu cuenta (nan lista modelos premium).
+const CATALOG_TTL_MS = 6 * 60 * 60 * 1000;
+const catalogKey = (p) => 'ai_catalog_' + p.id;
+
+export async function refreshProviderCatalog(p = currentProvider(), { force = false } = {}) {
+  if (!p?.catalogUrl) return [];
+  const cached = Storage.get(catalogKey(p), null);
+  if (!force && cached && Date.now() - cached.at < CATALOG_TTL_MS) return cached.models;
+  try {
+    const res = await fetch(p.catalogUrl);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const body = await res.json();
+    const models = (body.models || []).filter(m => m && m.kind === 'chat' && typeof m.id === 'string').map(m => m.id);
+    Storage.set(catalogKey(p), { at: Date.now(), models });
+    return models;
+  } catch (e) {
+    return cached?.models || null;    // sin red: lo último conocido; null = nunca lo hubo
+  }
+}
+
+// Los del catálogo que no hemos probado (síncrono: lo último guardado).
+export function untestedModels(p = currentProvider()) {
+  if (!p?.catalogUrl) return [];
+  const known = new Set(p.models || []);
+  return (Storage.get(catalogKey(p), null)?.models || []).filter(id => !known.has(id));
+}
 
 export function getKey()        { return Storage.get('ai_key', '') || ''; }
 export function setKey(k)        { Storage.set('ai_key', k || ''); }

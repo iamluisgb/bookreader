@@ -91,18 +91,42 @@ test('el slot de visión solo ofrece modelos que aceptan imágenes', async ({ pa
   await expect(page.locator('.mp-item .mp-id')).toHaveText('acme/ve-y-usa-herramientas');
 });
 
-// nan: ni está en models.dev ni deja enumerar sus modelos (CORS). El selector cae en los
-// curados y lo DICE, en vez de enseñar un error. Y no dispara peticiones condenadas.
+// nan: ni está en models.dev ni deja enumerar sus modelos (CORS). Su lista viene del
+// gateway (/catalog/nan); si el gateway tampoco responde, el selector cae en los curados y
+// lo DICE, en vez de enseñar un error. Y no dispara peticiones condenadas.
 test('sin catálogo ni /models, el selector cae en los modelos verificados', async ({ page }) => {
   const catalogHits = await stubCatalog(page);
   let modelsHits = 0;
   await page.route('**/v1/models', (route) => { modelsHits++; return route.abort(); });
+  await page.route('**/catalog/nan', (route) => route.abort());
 
   await abrirAvanzada(page, 'nan');
   await page.locator('#appset-model-discover').click();
 
   await expect(page.locator('.mp-source')).toContainText(/verificados|verified/);
-  await expect(page.locator('.mp-item')).toHaveCount(3);
+  await expect(page.locator('.mp-item')).toHaveCount(6);
   expect(catalogHits()).toBe(0);   // nan no declara catalogId
   expect(modelsHits).toBe(0);      // `discover: false` evita la petición que iba a fallar
+});
+
+// nan, con el gateway: los probados primero y los nuevos del catálogo, marcados «sin probar»
+// (nan lista modelos a los que tu cuenta puede no tener acceso, como `minimax-h3`). La key
+// del usuario no va al gateway: el catálogo es público.
+test('nan: el catálogo del gateway añade los nuevos, marcados como sin probar', async ({ page }) => {
+  await stubCatalog(page);
+  const auths: (string | null)[] = [];
+  await page.route('**/catalog/nan', (route) => {
+    auths.push(route.request().headers()['authorization'] || null);
+    return route.fulfill({ json: { provider: 'nan', models: [
+      { id: 'deepseek-v4-flash', kind: 'chat' }, { id: 'qwen3.8-flash', kind: 'chat' },
+      { id: 'minimax-h3', kind: 'chat' }, { id: 'whisper', kind: 'stt' }, { id: 'flux-2-klein', kind: 'image' },
+    ] } });
+  });
+  await abrirAvanzada(page, 'nan');
+  await page.locator('#appset-model-discover').click();
+  await expect(page.locator('.mp-source')).toContainText('sin probar');
+  await expect(page.locator('.mp-item')).toHaveCount(7);                 // 6 probados + 1 nuevo de chat
+  await expect(page.locator('.mp-item').last()).toContainText('minimax-h3 · nuevo, sin probar');
+  await expect(page.locator('.mp-item', { hasText: 'whisper' })).toHaveCount(0);   // no es de chat
+  expect(auths.every(a => a === null)).toBe(true);
 });
