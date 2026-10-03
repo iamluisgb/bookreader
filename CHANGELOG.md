@@ -24,6 +24,16 @@ pantallas de deslizar), sin marca de la estantería elegida y con el ⋯ dentro 
 - **44 px** de área táctil: chips, ⋯ de libro, buscador, desplegables, subir y la cabecera del lector.
 
 Tests: [library-mobile.spec.ts](tests/library-mobile.spec.ts). SW `v157`.
+## 2026-10-03 — Mapa mental: dos remates de la revisión
+
+- `clampWords` cuenta la «…» dentro del máximo: la etiqueta recortada medía un carácter más
+  de lo que cabe en la píldora y `wrapLabel` podía ponerle una segunda «…». El comentario
+  decía «sin "…"» y ya no era verdad.
+- Un solo `ResizeObserver` por modal: cada `renderResult` (regenerar, abrir otro del
+  historial) dejaba otro vivo; ahora se desconecta antes de crear el nuevo y al cerrar.
+
+SW `v158`.
+
 ## 2026-10-03 — Diagramas en el chat
 
 El agente dibuja: igual que una tabla es Markdown que la app pinta, un diagrama es un bloque

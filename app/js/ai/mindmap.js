@@ -62,9 +62,11 @@ export function open(context) {
   route();
 }
 
+let resizeObs = null;   // re-encuadre al girar/redimensionar (ver renderResult)
 function onKey(e) { if (e.key === 'Escape' && overlay) closeModal(); }
 function closeModal() {
   document.removeEventListener('keydown', onKey);
+  resizeObs?.disconnect(); resizeObs = null;
   if (runUnsub) { runUnsub(); runUnsub = null; }
   if (overlay) { overlay.remove(); overlay = null; }
 }
@@ -413,8 +415,9 @@ function renderRunning(job) {
 
 // Valida/normaliza el árbol temático del modelo; si falta o es inválido, cae a un mapa
 // por capítulos (nunca a ramas anónimas "Ideas N", que vacían de sentido el mapa).
-// Recorta a `maxChars` por FRONTERA DE PALABRA (sin "…"): garantiza que la etiqueta quepa en
-// la píldora sin que wrapLabel la trunque con puntos suspensivos. El texto completo va al tooltip.
+// Recorta a `maxChars` por FRONTERA DE PALABRA y marca el corte con «…», CONTADO dentro del
+// máximo: así la etiqueta sigue cabiendo en la píldora y wrapLabel no la vuelve a truncar
+// (una segunda «…»). El texto completo va al detalle del nodo.
 // Palabras que no pueden cerrar una etiqueta recortada: «Fiabilidad, escalabilidad y» o
 // «Esquema en lectura frente a esquema en» se leían como un error, no como un resumen.
 const DANGLING = /\s+(?:y|e|o|u|ni|de|del|la|las|el|los|un|una|a|al|en|con|por|para|sin|sobre|entre|frente|que|como|su|sus|tu|tus|mi|mis|se|lo|and|or|of|the|a|an|to|in|on|for|with|by|vs\.?)$/i;
@@ -422,7 +425,7 @@ const DANGLING = /\s+(?:y|e|o|u|ni|de|del|la|las|el|los|un|una|a|al|en|con|por|p
 export function clampWords(s, maxChars) {
   s = String(s || '').trim();
   if (s.length <= maxChars) return s;
-  const cut = s.slice(0, maxChars);
+  const cut = s.slice(0, maxChars - 1);   // un hueco para la «…»
   const sp = cut.lastIndexOf(' ');
   let out = (sp > 6 ? cut.slice(0, sp) : cut).trim().replace(/[\s,;:.\-–—]+$/, '');
   for (let i = 0; i < 3 && DANGLING.test(out); i++) out = out.replace(DANGLING, '').replace(/[\s,;:]+$/, '');
@@ -978,13 +981,17 @@ async function renderResult(tree, scopeName) {
   // Girar el móvil o redimensionar puede cambiar de uno a dos lados: se repinta y se
   // re-encuadra. Con el mismo número de lados, la vista del usuario se respeta.
   let lastW = holder.clientWidth;
-  new ResizeObserver(() => {
+  // Uno solo: renderResult se repite (regenerar, abrir otro del historial) y cada llamada
+  // dejaba otro observador vivo sobre un lienzo que ya no estaba. Se suelta también al cerrar.
+  resizeObs?.disconnect();
+  resizeObs = new ResizeObserver(() => {
     const w = holder.clientWidth;
     if (!w || !lastLayout || (w < 600) === (lastW < 600)) { lastW = w; return; }
     lastW = w;
     paintMap();
     initialView();
-  }).observe(holder);
+  });
+  resizeObs.observe(holder);
 
   const slug = (s) => (s || 'mapa').replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '').slice(0, 50);
   const name = (ext) => `bookreader-mapa-${slug(scopeName)}-${shareFormat === 'portrait' ? 'vertical' : 'horizontal'}.${ext}`;

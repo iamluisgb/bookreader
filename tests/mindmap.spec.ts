@@ -364,4 +364,12 @@ test('una etiqueta recortada acaba en «…» y no en una palabra suelta', async
     ];
   });
   expect(r).toEqual(['Fiabilidad, escalabilidad…', 'Retardo de replicación y lecturas…', 'Relacional frente a documental']);
+  // La «…» cuenta dentro del máximo: si no, la etiqueta se salía de la píldora y wrapLabel
+  // le ponía otra.
+  const lens = await page.evaluate(async () => {
+    const M: any = await import('/js/ai/mindmap.js');
+    const long = 'palabra '.repeat(20);
+    return [8, 20, 32, 42].map(n => [n, M.clampWords(long, n).length]);
+  });
+  for (const [max, len] of lens) expect(len).toBeLessThanOrEqual(max);
 });
