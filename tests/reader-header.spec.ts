@@ -94,3 +94,40 @@ test('F2: en móvil es una hoja inferior', async ({ page }) => {
   expect(Math.round(box.y + box.height)).toBe(844);
   expect(box.width).toBe(390);
 });
+
+test.describe('F3: cabecera móvil a dieta', () => {
+  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+
+  test('‹ · título · Aa · ⋯, y lo demás en «Más»', async ({ page }) => {
+    await openBook(page);
+    const visibles = await page.evaluate(() =>
+      [...document.querySelectorAll('.reader-nav button, .header-actions button')]
+        .filter(b => (b as HTMLElement).offsetParent !== null).map(b => b.id));
+    expect(visibles).toEqual(['library-btn', 'reading-settings', 'reader-more']);
+    await expect(page.locator('#reader-title')).toBeVisible();
+
+    await page.evaluate(() => document.body.classList.remove('immersive'));   // móvil arranca inmersivo
+    await page.locator('#reader-more').click();
+    const menu = page.locator('.reader-more-menu');
+    await expect(menu.locator('.lib-menu-item')).toHaveText(
+      ['Índice y notas', 'Buscar', 'Marcar página', 'Pantalla completa', 'Ajustes generales', 'Biblioteca']);
+    // Marcar desde «Más» y que el menú lo diga la próxima vez.
+    await menu.locator('[data-act="bookmark"]').click();
+    await expect(page.locator('#bookmark-toggle')).toHaveClass(/is-active/);
+    await page.locator('#reader-more').click();
+    await expect(page.locator('.reader-more-menu [data-act="bookmark"]')).toHaveText('Página marcada');
+    await page.locator('.reader-more-menu [data-act="search"]').click();
+    await expect(page.locator('#sidebar')).toHaveClass(/open/);
+    await expect(page.locator('#tab-search')).toBeVisible();
+  });
+
+  test('tocar el capítulo del pie abre el índice', async ({ page }) => {
+    await openBook(page);
+    const chapter = page.locator('#progress-chapter');
+    await expect(chapter).not.toBeEmpty();
+    await page.evaluate(() => document.body.classList.remove('immersive'));
+    await chapter.click();
+    await expect(page.locator('#sidebar')).toHaveClass(/open/);
+    await expect(page.locator('#tab-contents')).toBeVisible();
+  });
+});

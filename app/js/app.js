@@ -499,7 +499,22 @@ function initReaderMore() {
     menu = document.createElement('div');
     menu.className = 'lib-menu reader-more-menu';
     menu.setAttribute('role', 'menu');
-    menu.innerHTML = `
+    // Móvil (auditoría de la cabecera, F3): la cabecera se queda en ‹ · título · Aa · ⋯ y lo
+    // demás entra aquí. Cada fila pulsa el botón de cabecera que sustituye (oculto por CSS),
+    // así no hay una segunda lógica para marcar, buscar o ir a pantalla completa.
+    const mobile = window.matchMedia('(max-width: 767px)').matches;
+    const marked = document.getElementById('bookmark-toggle')?.classList.contains('is-active');
+    const inFsNow = !!(document.fullscreenElement || document.webkitFullscreenElement);
+    const row = (act, ico, label, opts = {}) =>
+      `<button class="lib-menu-item" role="menuitem" data-act="${act}">${icon(ico, { size: 'md', ...opts })}<span>${label}</span></button>`;
+    const mobileRows = mobile ? [
+      row('contents', 'panel-left', t('Índice y notas')),
+      row('search', 'search', t('Buscar')),
+      row('bookmark', 'bookmark', marked ? t('Página marcada') : t('Marcar página'), { filled: marked }),
+      row('fullscreen', inFsNow ? 'compress' : 'expand', inFsNow ? t('Salir de pantalla completa') : t('Pantalla completa')),
+      '<div class="lib-menu-sep"></div>',
+    ].join('') : '';
+    menu.innerHTML = mobileRows + `
       <button class="lib-menu-item" role="menuitem" data-act="general">${icon('gear', { size: 'md' })}<span>${t('Ajustes generales')}</span></button>
       <div class="lib-menu-sep"></div>
       <button class="lib-menu-item" role="menuitem" data-act="library">${icon('library', { size: 'md' })}<span>${t('Biblioteca')}</span></button>`;
@@ -515,7 +530,11 @@ function initReaderMore() {
       if (!it) return;
       const act = it.dataset.act;
       close();
-      if (act === 'general') openAppSettings();
+      if (act === 'contents') setSidebar(true, 'contents');
+      else if (act === 'search') setSidebar(true, 'search');
+      else if (act === 'bookmark') document.getElementById('bookmark-toggle')?.click();
+      else if (act === 'fullscreen') document.getElementById('immersive-toggle')?.click();
+      else if (act === 'general') openAppSettings();
       else if (act === 'library') goToLibrary();
     });
     menu.addEventListener('keydown', (e) => {
@@ -1314,6 +1333,7 @@ function initSidebar() {
   window.addEventListener('sidebar:change', (e) => { if (e.detail.open) markCurrentToc(true); });
   initBookHeader();
   initReadingPop();
+  initFooterChapter();
 
   // Tabs.
   document.querySelectorAll('.tab-btn[data-tab]').forEach(btn => {
@@ -1772,6 +1792,16 @@ function setFooterChapter(link) {
   const label = link ? (link.querySelector('.toc-label')?.textContent || '').trim() : '';
   el.textContent = label;
   el.title = label;   // el nombre completo cuando el truncado lo corta
+}
+
+// Tocar el capítulo del pie abre el índice (auditoría de la cabecera, F3; como Play Books):
+// en móvil el botón del índice vive en «Más», y el pie ya dice dónde estás.
+function initFooterChapter() {
+  const el = document.getElementById('progress-chapter');
+  if (!el) return;
+  const open = () => { if (el.textContent.trim()) setSidebar(true, 'contents'); };
+  el.addEventListener('click', open);
+  el.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } });
 }
 
 // Fila del índice: etiqueta + número de página a la derecha. `page` null → solo la

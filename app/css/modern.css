@@ -1261,6 +1261,11 @@ body.region-selecting { user-select: none; }
 @media (max-width: 767px) {
   .reader-back { width: 44px; height: 44px; padding: 0; justify-content: center; }
   .reader-back-label { display: none; }
+  /* Cabecera a dieta (auditoría de la cabecera, F3): ‹ · título · Aa · ⋯. El índice, Buscar,
+     Marcar página y Pantalla completa pasan a «Más» (los botones siguen en el DOM: «Más»
+     los pulsa); el índice también se abre tocando el capítulo del pie; el agente, en su FAB. */
+  .reader-nav #sidebar-toggle,
+  .header-actions :is(#immersive-toggle, #header-search, #bookmark-toggle) { display: none; }
 }
 .reader-more-menu { position: fixed; z-index: var(--z-popover); min-width: 220px; }
 /* Táctil: botones de la cabecera del lector a 44 px (DESIGN.md). */

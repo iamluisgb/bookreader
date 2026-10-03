@@ -805,6 +805,10 @@ body.scroll-mode .reader-viewport { align-items: stretch; justify-content: flex-
   color: var(--text-soft);
   font-weight: 500;
 }
+/* Abre el índice (F3). Sin capítulo no hay nada que tocar. */
+.progress-chapter:not(:empty) { cursor: pointer; border-radius: var(--r-xs); }
+.progress-chapter:not(:empty):hover { color: var(--text); }
+.progress-chapter:empty { pointer-events: none; }
 
 /* Cifras: página · % · tiempo restante, en un solo bloque atenuado y con cifras de
    ancho fijo para que no bailen al avanzar. El separador es CSS (no texto) para no
