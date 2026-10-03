@@ -91,6 +91,13 @@ export function init(opts = {}) {
   host.addEventListener('dragover', onDragOver);
   host.addEventListener('dragleave', onDragLeave);
   host.addEventListener('drop', onDrop);
+  host.addEventListener('pointerdown', onChipPointerDown);
+  host.addEventListener('pointermove', onChipPointerMove, { passive: true });
+  host.addEventListener('pointerup', onChipPointerEnd);
+  host.addEventListener('pointercancel', onChipPointerEnd);
+  // La pulsación larga ya abrió el menú: el clic que llega al soltar no filtra.
+  host.addEventListener('click', (e) => { if (swallowClick) { swallowClick = false; e.stopPropagation(); e.preventDefault(); } }, true);
+  host.addEventListener('contextmenu', (e) => { if (e.target.closest('.lib-schip[data-shelf-id]')) e.preventDefault(); });
   document.addEventListener('click', (e) => {
     if (menuEl && !menuEl.contains(e.target) && !e.target.closest('.lib-kebab, .lib-rail-kebab')) closeMenu();
     if (!e.target.closest('.lib-dd')) host.querySelectorAll('.lib-dd.open').forEach(d => d.classList.remove('open'));
@@ -238,7 +245,12 @@ export async function render() {
       </aside>
 
       <section class="lib-main">
-        <h1 class="lib-h1">${escapeHtml(currentTitle())}</h1>
+        ${stripHtml(manual, smart, books.length, noShelfCount)}
+        <div class="lib-head">
+          <h1 class="lib-h1">${escapeHtml(currentTitle())}</h1>
+          ${headShelfKebab(shelves)}
+          <button class="lib-more" data-act="more" aria-haspopup="dialog" aria-label="${t('Más: ajustes, análisis, mazos…')}" title="${t('Más')}">${icon('menu', { size: 22 })}</button>
+        </div>
         ${await firstStepsHtml(books)}
         <div class="lib-top">${continueHtml(books)}<div class="lib-today-slot"></div><span class="lib-streak-slot"></span></div>
         ${filterChipsHtml()}
@@ -256,9 +268,225 @@ export async function render() {
       </section>
     </div>
   `;
+  syncStrip();        // móvil: el chip activo a la vista y los fundidos de la tira
   paintStudyChip();   // async, no bloquea el render de la rejilla
   paintMastery();     // ídem: dominio por libro, se pinta cuando llega la consulta
 }
+
+// ---- Móvil: tira corta de estanterías, cabecera y hojas (auditoría móvil) ---------
+// En escritorio el rail es la navegación entera y se queda como está. En móvil ese
+// mismo rail, puesto en horizontal, se convertía en una tira de 2.200 px con Ajustes al
+// final (a cinco pantallas de deslizar), sin marca de cuál estaba elegida y con el ⋯
+// dentro de cada chip. Ahora, en móvil (< 768 px, por CSS):
+//   - una tira CORTA: Libros · Sin estantería · las fijadas, la elegida y las últimas
+//     usadas (hasta STRIP_SHELVES) · «Estanterías ▾», que abre la hoja con todas;
+//   - una cabecera con el título, el ⋯ de la estantería elegida y «Más» (Ajustes,
+//     Análisis, Mazos, Nueva estantería, Guía rápida).
+// Los chips llevan los mismos data-* que las filas del rail, así que seleccionar pasa
+// por el mismo selectRail; pero NO su clase: con .lib-rail-item, los selectores del rail
+// de escritorio encontraban también los chips (ocultos) de la tira.
+const STRIP_SHELVES = 4;
+const PIN_KEY = 'lib_pinned_shelves';
+const RECENT_KEY = 'lib_recent_shelves';
+const readList = (k) => { try { const v = JSON.parse(localStorage.getItem(k) || '[]'); return Array.isArray(v) ? v : []; } catch { return []; } };
+const writeList = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* storage bloqueado */ } };
+export function pinnedShelves() { return readList(PIN_KEY); }
+function togglePinned(id) {
+  const cur = readList(PIN_KEY);
+  writeList(PIN_KEY, cur.includes(id) ? cur.filter(x => x !== id) : [...cur, id]);
+}
+function rememberRecent(key) {
+  writeList(RECENT_KEY, [key, ...readList(RECENT_KEY).filter(k => k !== key)].slice(0, 8));
+}
+const isMobile = () => window.matchMedia?.('(max-width: 767px)').matches;
+
+function chipHtml(row) {
+  const active = selection.has(row.key);
+  const count = memberIdsOf(row.shelfIds).size;
+  const smart = row.shelf && Shelves.isSmart(row.shelf);
+  const full = row.path || row.label;   // «Técnico/LLM»: el nombre entero va en el title y en la voz
+  return `<button class="lib-schip${active ? ' active' : ''}"
+      data-row-key="${escapeHtml(row.key)}" data-row-label="${escapeHtml(row.label)}"
+      data-shelf-ids="${escapeHtml(row.shelfIds.join(','))}"${row.shelf ? ` data-shelf-id="${escapeHtml(row.shelf.id)}"` : ''}
+      title="${escapeHtml(full)}" aria-pressed="${active}" aria-label="${escapeHtml(countLabel(full, count))}">
+      ${smart ? icon('sparkles', { size: 13 }) : ''}<span class="lib-schip-name">${escapeHtml(row.label)}</span><span class="lib-schip-count" aria-hidden="true">${count}</span>
+    </button>`;
+}
+
+function stripHtml(manual, smart, total, noShelfCount) {
+  const rows = [...Shelves.shelfRows(manual), ...Shelves.shelfRows(smart)];
+  const byKey = new Map(rows.map(r => [r.key, r]));
+  const pinned = pinnedShelves().filter(k => byKey.has(k));
+  const picked = [];
+  const add = (k) => { if (byKey.has(k) && !picked.includes(k)) picked.push(k); };
+  pinned.forEach(add);
+  [...selection.keys()].forEach(add);                 // la elegida siempre a la vista
+  for (const k of readList(RECENT_KEY)) { if (picked.length >= Math.max(STRIP_SHELVES, pinned.length)) break; add(k); }
+  const fixed = (key, name, n, active) => `<button class="lib-schip${active ? ' active' : ''}" data-shelf="${key}"
+      aria-pressed="${active}" aria-label="${escapeHtml(countLabel(name, n))}"><span class="lib-schip-name">${escapeHtml(name)}</span><span class="lib-schip-count" aria-hidden="true">${n}</span></button>`;
+  return `<nav class="lib-strip" aria-label="${t('Estanterías')}">
+    ${fixed('all', t('Libros'), total, !selection.size)}
+    ${fixed('none', t('Sin estantería'), noShelfCount, selection.has('none'))}
+    ${picked.map(k => chipHtml(byKey.get(k))).join('')}
+    ${rows.length ? `<button class="lib-schip lib-schip--more" data-act="shelfsheet" aria-haspopup="dialog">${t('Estanterías')}<span class="lib-schip-count" aria-hidden="true">${rows.length}</span>${icon('chevron-down', { size: 14 })}</button>`
+      : `<button class="lib-schip lib-schip--more" data-act="newshelfmenu">${icon('plus', { size: 14 })}${t('Nueva estantería')}</button>`}
+  </nav>`;
+}
+
+// ⋯ de la estantería elegida, junto al título: sus opciones, a la vista (en móvil el
+// chip solo filtra; también se abren con pulsación larga sobre él).
+function headShelfKebab(shelves) {
+  if (selection.size !== 1) return '';
+  const [key] = selection.keys();
+  const shelf = shelves.find(s => s.id === key);
+  if (!shelf) return '';
+  return `<button class="lib-rail-kebab lib-head-kebab" data-shelf-menu="${escapeHtml(shelf.id)}"
+    aria-label="${escapeHtml(t('Opciones de {name}', { name: Shelves.segments(shelf.name).pop() }))}">${icon('ellipsis', { size: 20 })}</button>`;
+}
+
+// Tras cada render: la tira conserva su desplazamiento, el chip activo queda a la vista
+// (antes volvía al principio y el elegido se perdía fuera) y los fundidos dicen hacia
+// dónde hay más.
+let stripScroll = 0;
+function syncStrip() {
+  const strip = host.querySelector('.lib-strip');
+  if (!strip) return;
+  strip.scrollLeft = stripScroll;
+  const active = strip.querySelector('.lib-schip.active');
+  if (active) {
+    const a = active.getBoundingClientRect(), b = strip.getBoundingClientRect();
+    if (a.left < b.left || a.right > b.right) {
+      strip.scrollLeft += (a.left + a.width / 2) - (b.left + b.width / 2);
+    }
+  }
+  const fades = () => {
+    stripScroll = strip.scrollLeft;
+    strip.classList.toggle('has-left', strip.scrollLeft > 2);
+    strip.classList.toggle('has-right', strip.scrollLeft + strip.clientWidth < strip.scrollWidth - 2);
+  };
+  strip.addEventListener('scroll', fades, { passive: true });
+  fades();
+}
+
+// ---- Hojas inferiores (en escritorio, diálogo centrado) ---------------------------
+let sheetEl = null;
+function closeSheet() {
+  if (!sheetEl) return;
+  sheetEl.remove();
+  sheetEl = null;
+  document.removeEventListener('keydown', onSheetKey, true);
+}
+function onSheetKey(e) { if (e.key === 'Escape') { e.preventDefault(); closeSheet(); } }
+function openSheet(title, inner, onAct) {
+  closeSheet();
+  closeMenu();
+  const el = document.createElement('div');
+  el.className = 'lib-sheet-overlay';
+  el.innerHTML = `<div class="lib-sheet" role="dialog" aria-modal="true" aria-label="${escapeHtml(title)}">
+      <div class="lib-sheet-grip" aria-hidden="true"></div>
+      <div class="lib-sheet-head"><h2>${escapeHtml(title)}</h2>
+        <button class="lib-sheet-x" aria-label="${t('Cerrar')}">${icon('xmark', { size: 20 })}</button></div>
+      <div class="lib-sheet-body">${inner}</div>
+    </div>`;
+  document.body.appendChild(el);
+  sheetEl = el;
+  el.addEventListener('click', async (e) => {
+    if (e.target === el || e.target.closest('.lib-sheet-x')) { closeSheet(); return; }
+    await onAct(e);
+  });
+  document.addEventListener('keydown', onSheetKey, true);
+  el.querySelector('.lib-sheet-body button, .lib-sheet-body input')?.focus();
+}
+
+// «Más»: lo que en escritorio está al pie del rail.
+function openMoreSheet(anchor) {
+  const row = (act, ico, label) => `<button class="lib-sheet-row" data-act="${act}">${icon(ico, { size: 18 })}<span>${escapeHtml(label)}</span>${icon('chevron-right', { size: 16 })}</button>`;
+  openSheet(t('Más'), `
+    ${row('settings', 'gear', t('Ajustes generales'))}
+    ${row('analysis', 'chart', t('Análisis'))}
+    ${row('decks', 'cards', t('Mazos'))}
+    <div class="lib-sheet-sep"></div>
+    ${row('newshelfmenu', 'plus', t('Nueva estantería'))}
+    ${row('guide', 'sparkles', t('Guía rápida'))}`, async (e) => {
+    const b = e.target.closest('[data-act]');
+    if (!b) return;
+    const act = b.dataset.act;
+    closeSheet();
+    if (act === 'settings') onOpenSettings();
+    else if (act === 'analysis') import('../analysis.js').then(m => m.open()).catch(err => console.warn('analysis:', err));
+    else if (act === 'decks') import('../decks.js').then(m => m.open()).catch(err => console.warn('decks:', err));
+    else if (act === 'newshelfmenu') openCreateMenu(anchor);
+    else if (act === 'guide') import('../ui/feature-guide.js').then(m => m.open()).catch(err => console.warn('guide:', err));
+  });
+}
+
+// «Estanterías ▾»: el rail de escritorio en vertical. Tocar el nombre elige esa
+// estantería y cierra; la casilla la AÑADE al cruce (la selección múltiple que en
+// escritorio es ⌘+clic y en táctil no existía más que escondida en el ⋯).
+async function openShelfSheet() {
+  const shelves = await Store.getShelves();
+  const manual = shelves.filter(s => !Shelves.isSmart(s));
+  const smart = shelves.filter(s => Shelves.isSmart(s));
+  const pins = pinnedShelves();
+  const rowHtml = (row) => {
+    const on = selection.has(row.key);
+    const count = memberIdsOf(row.shelfIds).size;
+    const isSmart = row.shelf && Shelves.isSmart(row.shelf);
+    return `<div class="lib-sheet-shelf" style="--depth:${row.depth}">
+      <input type="checkbox" class="lib-sheet-check" data-cross="${escapeHtml(row.key)}" data-row-label="${escapeHtml(row.label)}" data-shelf-ids="${escapeHtml(row.shelfIds.join(','))}"${on ? ' checked' : ''} aria-label="${escapeHtml(t('Cruzar con {name}', { name: row.label }))}">
+      <button class="lib-sheet-pick" data-row-key="${escapeHtml(row.key)}" data-row-label="${escapeHtml(row.label)}" data-shelf-ids="${escapeHtml(row.shelfIds.join(','))}">
+        ${isSmart ? `<span class="lib-sheet-mark is-smart">${icon('sparkles', { size: 13 })}</span>` : (row.kind === 'group' ? '<span class="lib-sheet-mark is-group"></span>' : shelfMarkHtml(row.label))}
+        <span class="lib-sheet-name">${escapeHtml(row.label)}</span>
+        ${row.shelf && pins.includes(row.shelf.id) ? `<span class="lib-sheet-pin" title="${t('Fijada en la tira')}">${icon('bookmark-fill', { size: 12 })}</span>` : ''}
+        <span class="lib-sheet-count">${count}</span>
+      </button>
+      ${row.shelf ? `<button class="lib-rail-kebab lib-sheet-kebab" data-shelf-menu="${escapeHtml(row.shelf.id)}" aria-label="${escapeHtml(t('Opciones de {name}', { name: row.label }))}">${icon('ellipsis', { size: 18 })}</button>` : '<span class="lib-sheet-kebab"></span>'}
+    </div>`;
+  };
+  const multi = [...selection.keys()].filter(k => k !== 'none').length > 1;
+  openSheet(t('Estanterías'), `
+    ${multi ? `<button class="lib-sheet-mode" data-act="togglemode">${matchAllShelves ? t('Libros en TODAS las marcadas') : t('Libros en ALGUNA de las marcadas')} · ${t('cambiar')}</button>` : ''}
+    ${manual.length ? `<div class="lib-sheet-section">${t('Estanterías')}</div>${Shelves.shelfRows(manual).map(rowHtml).join('')}` : ''}
+    ${smart.length ? `<div class="lib-sheet-section">${t('Automáticas')}</div>${Shelves.shelfRows(smart).map(rowHtml).join('')}` : ''}
+    <div class="lib-sheet-foot"><button class="lib-sheet-new" data-act="newshelfmenu">${icon('plus', { size: 16 })}<span>${t('Nueva estantería')}</span></button></div>`,
+  async (e) => {
+    const kebab = e.target.closest('.lib-sheet-kebab[data-shelf-menu]');
+    if (kebab) { e.stopPropagation(); closeSheet(); await openShelfMenu(kebab.dataset.shelfMenu, host.querySelector('.lib-head') || host); return; }
+    const cross = e.target.closest('.lib-sheet-check');
+    if (cross) {
+      const key = cross.dataset.cross;
+      selection.delete('none');
+      if (cross.checked) selection.set(key, { label: cross.dataset.rowLabel, ids: cross.dataset.shelfIds.split(',').filter(Boolean) });
+      else selection.delete(key);
+      await render();
+      await openShelfSheet();          // repinta la hoja (el modo Y/O aparece con dos)
+      return;
+    }
+    const pick = e.target.closest('.lib-sheet-pick');
+    if (pick) { closeSheet(); await selectRail(pick); return; }
+    if (e.target.closest('[data-act="togglemode"]')) { matchAllShelves = !matchAllShelves; await render(); await openShelfSheet(); return; }
+    if (e.target.closest('[data-act="newshelfmenu"]')) { closeSheet(); openCreateMenu(host.querySelector('.lib-more') || host); }
+  });
+}
+
+// Pulsación larga sobre un chip de estantería = sus opciones. No es descubrible sola:
+// por eso la acompaña el ⋯ junto al título. Tras la pulsación larga se traga el clic.
+let pressTimer = 0, pressStart = null, swallowClick = false;
+function onChipPointerDown(e) {
+  const chip = e.target.closest('.lib-schip[data-shelf-id]');
+  if (!chip || e.button > 0) return;
+  pressStart = { x: e.clientX, y: e.clientY };
+  clearTimeout(pressTimer);
+  pressTimer = setTimeout(() => {
+    swallowClick = true;
+    openShelfMenu(chip.dataset.shelfId, chip);
+  }, 500);
+}
+function onChipPointerMove(e) {
+  if (!pressStart) return;
+  if (Math.abs(e.clientX - pressStart.x) > 10 || Math.abs(e.clientY - pressStart.y) > 10) { clearTimeout(pressTimer); pressStart = null; }
+}
+function onChipPointerEnd() { clearTimeout(pressTimer); pressStart = null; }
 
 // Marca de una estantería: INICIAL sobre un tono derivado del nombre, no la
 // portada de un libro suyo. Una portada a 28px no se reconoce, CAMBIA sola al
@@ -787,6 +1015,9 @@ async function onClick(e) {
   }
 
   if (e.target.closest('[data-act="settings"]')) { onOpenSettings(); return; }
+  const more = e.target.closest('[data-act="more"]');
+  if (more) { openMoreSheet(more); return; }
+  if (e.target.closest('[data-act="shelfsheet"]')) { await openShelfSheet(); return; }
   // P30 F3: el paso "dale un objetivo a tu primer libro" abre el libro más reciente.
   if (e.target.closest('[data-act="openbook"]')) {
     track('steps:go', 'openbook');
@@ -834,7 +1065,7 @@ async function onClick(e) {
   if (shelfMenu) { e.stopPropagation(); await openShelfMenu(shelfMenu.dataset.shelfMenu, shelfMenu); return; }
 
   // Seleccionar estantería / grupo / "Libros"
-  const railItem = e.target.closest('.lib-rail-item');
+  const railItem = e.target.closest('.lib-rail-item, .lib-schip[data-shelf], .lib-schip[data-row-key]');
   if (railItem && !e.target.closest('.lib-rail-create')) { await selectRail(railItem, e); return; }
 
   // Botón de descarga de una ficha fantasma (no abre el libro)
@@ -974,6 +1205,7 @@ async function selectRail(el, ev) {
 
   const key = el.dataset.rowKey;
   const entry = { label: el.dataset.rowLabel || '', ids: (el.dataset.shelfIds || '').split(',').filter(Boolean) };
+  rememberRecent(key);   // la tira móvil enseña las últimas usadas
   if (ev && (ev.metaKey || ev.ctrlKey || ev.shiftKey)) {
     selection.delete('none');
     if (selection.has(key)) selection.delete(key); else selection.set(key, entry);
@@ -1081,8 +1313,12 @@ async function openShelfMenu(id, anchor) {
     <div class="lib-menu-sep"></div>
     <button class="lib-menu-item" data-act="rename">${icon('pencil', { size: 16 })}<span>${t('Renombrar')}</span></button>
     ${smart ? `<button class="lib-menu-item" data-act="rule">${icon('sparkles', { size: 16 })}<span>${t('Editar regla')}</span></button>` : ''}
-    <button class="lib-menu-item" data-act="up">${icon('chevron-up', { size: 16 })}<span>${t('Subir')}</span></button>
-    <button class="lib-menu-item" data-act="down">${icon('chevron-down', { size: 16 })}<span>${t('Bajar')}</span></button>
+    ${isMobile()
+      // En la tira horizontal «Subir/Bajar» significaba izquierda/derecha. En móvil, lo que
+      // ordena la tira es fijar.
+      ? `<button class="lib-menu-item" data-act="pin">${icon(pinnedShelves().includes(id) ? 'xmark' : 'bookmark', { size: 16 })}<span>${pinnedShelves().includes(id) ? t('Quitar de la tira') : t('Fijar en la tira')}</span></button>`
+      : `<button class="lib-menu-item" data-act="up">${icon('chevron-up', { size: 16 })}<span>${t('Subir')}</span></button>
+    <button class="lib-menu-item" data-act="down">${icon('chevron-down', { size: 16 })}<span>${t('Bajar')}</span></button>`}
     <div class="lib-menu-sep"></div>
     <button class="lib-menu-item" data-act="share">${icon('share', { size: 16 })}<span>${t('Compartir estantería…')}</span></button>
     <div class="lib-menu-sep"></div>
@@ -1118,6 +1354,8 @@ async function openShelfMenu(id, anchor) {
     } else if (act === 'share') {
       await shareShelf(shelf);
       return;
+    } else if (act === 'pin') {
+      togglePinned(id);
     } else if (act === 'delete') {
       const msg = smart
         ? t('¿Eliminar la estantería inteligente "{name}"? Los libros no se borran.', { name: shelf.name })

@@ -1,5 +1,9 @@
 # Auditoría — navegación móvil de la biblioteca
 
+> **Estado (2026-10-02, tarde):** implementados Q1–Q7 y F1 (ver CHANGELOG). Pendientes: Q8
+> («Primeros pasos» descartable), F2 (barra inferior, solo con datos), F4 (Atrás del sistema cierra
+> la hoja) y «Organizar» (reordenar) en la hoja de estanterías.
+
 Fecha: 2026-10-02. Alcance: la biblioteca en móvil (< 768 px) y el camino a Ajustes generales,
 Análisis, Mazos y «Nueva estantería», también desde un libro abierto. No incluye el lector por
 dentro ni los paneles del agente.

@@ -3,6 +3,27 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-10-03 — Biblioteca en móvil: Ajustes a dos toques y una tira de estanterías que se entiende
+
+Ver [`docs/AUDITORIA_MOVIL_BIBLIOTECA.md`](docs/AUDITORIA_MOVIL_BIBLIOTECA.md). En móvil el rail de
+escritorio, puesto en horizontal, era una tira de 2.200 px con Ajustes generales al final (a cinco
+pantallas de deslizar), sin marca de la estantería elegida y con el ⋯ dentro de cada chip.
+- **Tira corta propia de móvil** (`.lib-strip`; el rail de escritorio no cambia): Libros · Sin
+  estantería · las fijadas, la elegida y las últimas usadas (hasta 4) · «Estanterías ▾».
+- **«Estanterías ▾»** abre una hoja con el árbol, secciones Estanterías/Automáticas (con su ✦),
+  contadores, **casillas para cruzar** (y el Y/O al marcar dos), ⋯ por fila y «+ Nueva estantería».
+- **La elegida, en tinta** y centrada en la tira; la tira conserva su desplazamiento entre
+  repintados y el fundido sale solo del lado por el que hay más.
+- **Cabecera** con el título, el ⋯ de la estantería elegida pegado a él y **«Más» (≡)**: Ajustes
+  generales, Análisis, Mazos, Nueva estantería y Guía rápida, en una hoja inferior.
+- El ⋯ sale del chip: opciones por el ⋯ del título o con **pulsación larga** sobre el chip. En
+  móvil el menú cambia «Subir/Bajar» (que en horizontal eran izquierda/derecha) por **«Fijar en la
+  tira»**.
+- **Lector**: «Más» en la cabecera (Ajustes de lectura, Ajustes generales, Biblioteca) y «‹»
+  delante del logo, que ahora se lee como volver.
+- **44 px** de área táctil: chips, ⋯ de libro, buscador, desplegables, subir y la cabecera del lector.
+
+Tests: [library-mobile.spec.ts](tests/library-mobile.spec.ts). SW `v157`.
 ## 2026-10-03 — Diagramas en el chat
 
 El agente dibuja: igual que una tabla es Markdown que la app pinta, un diagrama es un bloque

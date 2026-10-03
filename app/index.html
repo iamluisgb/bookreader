@@ -214,7 +214,8 @@
     <!-- Top bar -->
     <header id="reader-header" class="reader-header">
       <!-- Imagotipo completo (con tile), no el glyph de línea: es el ancla de marca de la barra. -->
-      <button id="library-btn" class="icon-btn brand-btn" aria-label="Volver a la biblioteca" data-tip="Biblioteca" data-i18n-attrs="aria-label,data-tip" data-tip-align="left" style="display:none;"><svg class="brand-mark" viewBox="0 0 512 512" width="24" height="24" aria-hidden="true" focusable="false"><rect width="512" height="512" rx="118" fill="var(--logo-tile)"/><path d="M288 119 Q288 99 308 99 L396 99 Q416 99 416 119 L416 371 L352 323 L288 371 Z" fill="var(--brand, #22c55e)"/><path d="M98 90 L222 90 Q256 90 256 124 L256 470 C 249 442 233 424 206 414 C 177 403 140 401 100 401 Q64 401 64 365 L64 124 Q64 90 98 90 Z" fill="var(--logo-page)"/></svg></button>
+      <!-- «‹» delante del logo: sin él, el logo parecía marca y no «volver» (auditoría móvil, Q7). -->
+      <button id="library-btn" class="icon-btn brand-btn" aria-label="Volver a la biblioteca" data-tip="Biblioteca" data-i18n-attrs="aria-label,data-tip" data-tip-align="left" style="display:none;"><span class="brand-back" data-icon="chevron-left" data-icon-size="16" aria-hidden="true"></span><svg class="brand-mark" viewBox="0 0 512 512" width="24" height="24" aria-hidden="true" focusable="false"><rect width="512" height="512" rx="118" fill="var(--logo-tile)"/><path d="M288 119 Q288 99 308 99 L396 99 Q416 99 416 119 L416 371 L352 323 L288 371 Z" fill="var(--brand, #22c55e)"/><path d="M98 90 L222 90 Q256 90 256 124 L256 470 C 249 442 233 424 206 414 C 177 403 140 401 100 401 Q64 401 64 365 L64 124 Q64 90 98 90 Z" fill="var(--logo-page)"/></svg></button>
       <button id="sidebar-toggle" class="icon-btn" aria-label="Abrir sidebar" data-tip="Panel" data-i18n-attrs="aria-label,data-tip" data-tip-align="left" data-icon="panel-left"></button>
       <div id="reader-title" class="reader-title">BookReader</div>
       <div class="header-actions">
@@ -222,6 +223,9 @@
         <button id="header-search" class="icon-btn" aria-label="Buscar en el libro" data-tip="Buscar" data-i18n-attrs="aria-label,data-tip" data-icon="search" disabled></button>
         <button id="ai-toggle" class="icon-btn" aria-label="Agente de IA" data-tip="Agente de IA" data-i18n-attrs="aria-label,data-tip" data-icon="sparkles" disabled></button>
         <button id="bookmark-toggle" class="icon-btn" aria-label="Marcar página" data-tip="Marcar página" data-i18n-attrs="aria-label,data-tip" data-tip-align="right" data-icon="bookmark" disabled></button>
+        <!-- «Más»: Ajustes de lectura, Ajustes generales y Biblioteca a un toque. Antes Ajustes
+             generales solo estaba al pie del cajón del índice (auditoría móvil, Q7). -->
+        <button id="reader-more" class="icon-btn" aria-label="Más" aria-haspopup="menu" data-tip="Más" data-i18n-attrs="aria-label,data-tip" data-tip-align="right" data-icon="ellipsis"></button>
       </div>
     </header>
 

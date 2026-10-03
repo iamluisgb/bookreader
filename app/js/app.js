@@ -6,7 +6,7 @@ import * as EpubReader from './epub-reader.js';
 import * as PdfReader from './pdf-reader.js';
 import * as Storage from './storage.js';
 import * as AiDB from './ai/db.js';
-import { hydrateIcons } from './ui/icons.js';
+import { hydrateIcons, icon } from './ui/icons.js';
 import { countBookWords, countPdfWords, updateProgressDetail, getCurrentPct, WORDS_PER_LOCATION } from './progress.js';
 import * as FeatureGuide from './ui/feature-guide.js';
 import * as ReadingLog from './reading-log.js';
@@ -122,6 +122,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initReaderReflow();
   initPanelResize();
   initLibrary();
+  initReaderMore();
   // WU1 · Reparación de mazos huérfanos al arrancar: un mazo cuyo libro cambió
   // de identidad (borrado y re-descargado, alias canónico) reaparece en su
   // libro sin que el usuario haga nada. No bloquea el render: lee la biblioteca
@@ -478,6 +479,51 @@ function addResizer(panel, cls, cfg, widthFromEvent) {
     document.documentElement.style.removeProperty(cfg.cssVar);
     Storage.remove(cfg.key);
     reflowReader();
+  });
+}
+
+// ============ «MÁS» DEL LECTOR (auditoría móvil, Q7) ============
+// Con un libro abierto, Ajustes generales solo estaba al pie del cajón del índice, detrás
+// del icono de panel. Ahora: ⋯ a la derecha de la cabecera → Ajustes de lectura, Ajustes
+// generales, Biblioteca. Mismo componente de menú que la biblioteca (.lib-menu).
+function initReaderMore() {
+  const btn = document.getElementById('reader-more');
+  if (!btn) return;
+  let menu = null;
+  const close = () => { menu?.remove(); menu = null; btn.setAttribute('aria-expanded', 'false'); document.removeEventListener('click', onOutside, true); };
+  const onOutside = (e) => { if (menu && !menu.contains(e.target) && e.target !== btn && !btn.contains(e.target)) close(); };
+  btn.addEventListener('click', () => {
+    if (menu) { close(); return; }
+    menu = document.createElement('div');
+    menu.className = 'lib-menu reader-more-menu';
+    menu.setAttribute('role', 'menu');
+    menu.innerHTML = `
+      <button class="lib-menu-item" role="menuitem" data-act="reading">${icon('sliders', { size: 16 })}<span>${t('Ajustes de lectura')}</span></button>
+      <button class="lib-menu-item" role="menuitem" data-act="general">${icon('gear', { size: 16 })}<span>${t('Ajustes generales')}</span></button>
+      <div class="lib-menu-sep"></div>
+      <button class="lib-menu-item" role="menuitem" data-act="library">${icon('books', { size: 16 })}<span>${t('Biblioteca')}</span></button>`;
+    document.body.appendChild(menu);
+    const r = btn.getBoundingClientRect();
+    menu.style.display = 'block';
+    menu.style.top = (r.bottom + 6) + 'px';
+    menu.style.right = Math.max(8, window.innerWidth - r.right) + 'px';
+    btn.setAttribute('aria-expanded', 'true');
+    menu.querySelector('.lib-menu-item')?.focus();
+    menu.addEventListener('click', (e) => {
+      const it = e.target.closest('[data-act]');
+      if (!it) return;
+      const act = it.dataset.act;
+      close();
+      if (act === 'reading') {
+        document.getElementById('sidebar')?.classList.add('open');
+        document.getElementById('reading-settings')?.click();
+      } else if (act === 'general') openAppSettings();
+      else if (act === 'library') goToLibrary();
+    });
+    menu.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') { close(); btn.focus(); }
+    });
+    setTimeout(() => document.addEventListener('click', onOutside, true));
   });
 }
 
