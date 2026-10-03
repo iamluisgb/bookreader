@@ -54,11 +54,15 @@
 .bk-paper { background: linear-gradient(to right, rgba(60, 45, 20, 0.1), transparent 14%), var(--paper); }
 .bk-face.back.bk-paper { background: linear-gradient(to left, rgba(60, 45, 20, 0.1), transparent 14%), var(--paper); }
 .bk-lines::after { content: ""; position: absolute; inset: 14% 12% 16% 12%; background: repeating-linear-gradient(to bottom, rgba(43, 37, 23, 0.13) 0 3px, transparent 3px 11px); }
-.bk-cover-front {
-  background:
-    linear-gradient(to right, rgba(255, 255, 255, 0.08) 0 3.5%, rgba(0, 0, 0, 0.22) 3.5% 5%, transparent 5%),
-    var(--cover-img, none) center / cover no-repeat,
-    #1c2127;
+/* La portada es un <img>, no una url() en una custom property: una url() relativa dentro de
+   una variable se resuelve contra la hoja que la USA (esta), así que bajo /bookreader/ pedía
+   …/assets/landing/assets/landing/covers/… (404). El src de un <img> se resuelve contra la
+   página, que es lo que se quiere. El brillo y la sombra del lomo van encima, en ::after. */
+.bk-cover-front { background: #1c2127; }
+.bk-cover-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+.bk-cover-front::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(to right, rgba(255, 255, 255, 0.08) 0 3.5%, rgba(0, 0, 0, 0.22) 3.5% 5%, transparent 5%);
 }
 .bk-cover-back { background: repeating-linear-gradient(45deg, #e6dfcc 0 6px, #ece6d5 6px 12px); }
 .bk-base {

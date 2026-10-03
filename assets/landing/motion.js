@@ -93,7 +93,9 @@
   function kickHero() { if (!raf) raf = requestAnimationFrame(heroLoop); }
 
   function fillHero(b) {
-    cover.style.setProperty('--cover-img', 'url("' + b.cover + '")');
+    // Ruta RELATIVA a la página (la landing también se sirve bajo /bookreader/ en otro
+    // dominio): el src de un <img> se resuelve contra el documento. Ver .bk-cover-img.
+    cover.querySelector('.bk-cover-img').src = b.cover;
     stage.setAttribute('aria-label', b.stageLabel);
     $('#bk-ch').textContent = b.hero.ch;
     $('#bk-p1').textContent = b.hero.p1;
