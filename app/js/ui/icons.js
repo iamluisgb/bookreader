@@ -28,6 +28,10 @@ const ICONS = {
   compress: '<polyline points="4 9 9 9 9 4"/><polyline points="20 9 15 9 15 4"/><polyline points="15 20 15 15 20 15"/><polyline points="9 20 9 15 4 15"/>',
   // Toggles de panel lateral (estilo NotebookLM): marco + divisor del lado.
   'panel-left': '<rect x="3.5" y="4" width="17" height="16" rx="2.3"/><line x1="9.5" y1="4" x2="9.5" y2="20"/>',
+  // Panel ampliado: el divisor pegado a la izquierda (el panel derecho ocupa casi todo) y
+  // una flecha hacia donde crece. Ampliar el agente (ai/maximize.js); no es ⤢, que es
+  // pantalla completa del navegador.
+  'panel-wide': '<rect x="3.5" y="4" width="17" height="16" rx="2.3"/><line x1="7.5" y1="4" x2="7.5" y2="20"/><polyline points="14 9 11 12 14 15"/>',
   'panel-right': '<rect x="3.5" y="4" width="17" height="16" rx="2.3"/><line x1="14.5" y1="4" x2="14.5" y2="20"/>',
   search: '<circle cx="11" cy="11" r="6.5"/><line x1="15.8" y1="15.8" x2="20.5" y2="20.5"/>',
   // Imagotipo de la app (libro abierto: página con curl + cinta marcapáginas):

@@ -3,6 +3,16 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-10-04 — Ampliar el agente
+
+Botón nuevo en la barra del agente (icono `panel-wide`, escritorio y tablet): el panel ocupa la
+ventana menos una franja del libro y el chat, la Libreta y el Studio se centran a ~760 px. El libro
+se **tapa, no se encoge** (no repagina ni pierde la posición). Se vuelve con el mismo botón, `Esc`,
+un clic en la franja, `⌘/Ctrl+Shift+.` o **pulsando una cita**, que lleva al pasaje. No se recuerda:
+al cerrar el agente o cambiar de libro vuelve al ancho del tirador. En móvil no cambia nada (la hoja
+ya tiene altura completa). Recomendación del agente de UX/UI. Tests:
+[ai-max.spec.ts](tests/ai-max.spec.ts). SW `v167`.
+
 ## 2026-10-04 — Título y autor editables
 
 Los libros traen a menudo «Título: el subtítulo larguísimo» o «Apellido, Nombre». Ahora se cambian

@@ -35,6 +35,41 @@
 }
 
 body.ai-open #ai-panel { transform: translateX(0); }
+
+/* Agente ampliado (ai/maximize.js). El panel crece por encima del lector, que NO cambia de
+   margen: el libro se tapa, no se repagina. Queda una franja del libro (--ai-max-gutter) que
+   devuelve al ancho normal; el contenido se centra a un ancho de lectura. */
+:root { --ai-max-gutter: 72px; --ai-max-measure: 760px; }
+/* El ancho solo se anima al ampliar/volver (clase temporal): con la transición siempre
+   puesta, arrastrar el tirador iría a rebufo del cursor. */
+body.ai-max-anim #ai-panel { transition: transform var(--transition-panel), width var(--transition-panel); }
+#ai-panel .ai-max-btn { display: none; }
+.ai-max-strip { display: none; }
+@media (min-width: 768px) {
+  #ai-panel .ai-max-btn { display: inline-flex; }
+  .ai-max-btn[aria-pressed="true"] { color: var(--accent); }
+  body.ai-open.ai-max #ai-panel { width: calc(100vw - var(--ai-max-gutter)); box-shadow: var(--shadow-3); }
+  body.ai-max #ai-panel .panel-resizer { display: none; }
+  /* El carril de navegación quedaría encima de la barra del agente ampliado. */
+  body.ai-max .reader-nav { visibility: hidden; }
+  body.ai-max #ai-panel :is(.ai-messages, .ai-composer, #ai-view-notebook, #ai-view-studio) {
+    padding-left: max(16px, calc((100% - var(--ai-max-measure)) / 2));
+    padding-right: max(16px, calc((100% - var(--ai-max-measure)) / 2));
+  }
+  body.ai-max #ai-panel .ai-convobar { flex: 0 1 var(--ai-max-measure); }
+  body.ai-max #ai-panel :is(.ai-status, .ai-tabs) { width: min(100% - 32px, var(--ai-max-measure)); margin-left: auto; margin-right: auto; box-sizing: border-box; }
+  .ai-max-strip {
+    display: block; position: fixed; top: 0; bottom: 0; left: 0; width: var(--ai-max-gutter);
+    z-index: var(--z-panel); border: none; padding: 0; cursor: pointer;
+    background: color-mix(in srgb, var(--surface-0) 35%, transparent);
+  }
+  .ai-max-strip:hover { background: color-mix(in srgb, var(--surface-0) 10%, transparent); }
+  /* Lo que se colocaba junto al panel se recoloca sobre la franja. */
+  body.ai-max .ai-taskchip { right: calc(100vw - var(--ai-max-gutter) + 20px); }
+  body.ai-max #sync-badge { right: calc(100vw - var(--ai-max-gutter) + 14px); }
+}
+@media (min-width: 768px) and (max-width: 1023px) { :root { --ai-max-gutter: 56px; } }
+@media (prefers-reduced-motion: reduce) { body.ai-max-anim #ai-panel { transition: none; } }
 body.ai-open .reader-main { margin-right: var(--ai-panel-width); }
 
 /* ---- Tiradores para redimensionar los paneles (solo escritorio) ----

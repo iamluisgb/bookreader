@@ -28,6 +28,7 @@ export const TEMPLATE = () => `
       </button>
     </div>
     <button id="ai-edit-cfg" class="icon-btn ai-toolbar-cfg" title="${t('Ajustes del agente')}">${icon('gear')}</button>
+    <button id="ai-max" class="icon-btn ai-max-btn" aria-pressed="false" aria-label="${t('Ampliar agente')}" title="${t('Ampliar agente')}">${icon('panel-wide')}</button>
     <button id="ai-close" class="icon-btn" title="${t('Cerrar')}">${icon('xmark')}</button>
   </div>
   <div id="ai-status" class="ai-status">${t('Abre un EPUB para empezar.')}</div>

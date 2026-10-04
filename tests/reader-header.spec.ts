@@ -157,6 +157,10 @@ test('F4: el ✦ del agente no se mueve al abrirlo y es su cierre', async ({ pag
 
 test('marca al leer: logo de carga solo si tarda, y «BookReader · de Raiatech» al pie de «Más»', async ({ page }) => {
   await page.goto('/index.html');
+  // La biblioteca, ya pintada: mientras arranca quita y pone `in-library`, y el logo de carga
+  // lo tomaría por «volver a la biblioteca».
+  await expect(page.locator('.lib-h1')).toBeVisible();
+  await page.waitForTimeout(300);
   const splash = page.locator('.book-splash');
   // Carga lenta (simulada): aparece tras el retardo y se va al entrar en lectura.
   await page.evaluate(async () => {

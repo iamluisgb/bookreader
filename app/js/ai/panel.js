@@ -14,6 +14,7 @@ import { loadAgentCss } from '../css-loader.js';
 import { getTemplate, objectiveTemplates, isValidField, aiWritableFields, isAiWritable, isCognitionField, ARTESANO_ID, INMERSIVA_ID } from './templates.js';
 import { icon } from '../ui/icons.js';
 import { t } from '../i18n.js';
+import { initAiMax, setAiMax } from './maximize.js';
 import * as Hints from '../ui/hints.js';
 import { escapeHtml } from '../ui/escape.js';
 import { confirmBox, promptBox } from '../ui/dialog.js';
@@ -95,9 +96,13 @@ let ia2LastChapter = null;
 let ia2Seen = new Set();
 
 export function init(opts) {
-  onCite = opts.onCite || (() => {});
+  // Toda cita (chat, Libreta, Studio) devuelve al libro: con el agente ampliado, primero
+  // vuelve a su ancho y luego navega (ai/maximize.js).
+  const goCite = opts.onCite || (() => {});
+  onCite = (...args) => { setAiMax(false); return goCite(...args); };
   els.panel = document.getElementById('ai-panel');
   els.panel.innerHTML = TEMPLATE();
+  initAiMax();
   const $ = (s) => els.panel.querySelector(s);
   Object.assign(els, {
     status: $('#ai-status'), tabs: $('#ai-tabs'),
@@ -684,6 +689,7 @@ export async function setBook(b, id, title, opts = {}) {
   // Cancela un resumen/mapa en segundo plano del libro anterior: su índice ya no aplica.
   Jobs.cancelForBookChange(id || null);
   busy = false;
+  setAiMax(false);   // cambiar de libro: el modo ampliado no se arrastra
   book = b; bookId = id || null; bookTitle = title || 'Libro';
   // Autor: solo para firmar los artefactos que se publican (mapa mental, tarjeta-cita).
   bookAuthor = opts.author || '';

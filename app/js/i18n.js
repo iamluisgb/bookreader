@@ -135,6 +135,8 @@ const EN = {
   'Índice y notas': 'Contents and notes',
   'Página marcada': 'Page bookmarked',
   'de Raiatech': 'by Raiatech',
+  'Ampliar agente': 'Expand agent',
+  'Volver al lado del libro': 'Back beside the book',
   'Editar título y autor': 'Edit title and author',
   'Título y autor': 'Title and author',
   'Quitar subtítulo': 'Remove subtitle',
