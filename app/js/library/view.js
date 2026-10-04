@@ -1311,6 +1311,9 @@ async function openShelfMenu(id, anchor) {
   // carril ajeno aquí es barato: son unos pocos registros, sin binarios.
   let dossiers = [];
   try { dossiers = await (await import('../share/store.js')).dossiersForShelf(id); } catch (e) { /* sin base */ }
+  // P24 F4 · Enlaces que creaste desde ESTE dispositivo para esta estantería (y siguen vivos).
+  let myLinks = [];
+  try { myLinks = (await import('../share/link.js')).linksFor(id); } catch (e) { /* sin storage */ }
   const dossierItems = dossiers.map((d, i) => `<button class="lib-menu-item danger" data-act="unshare" data-i="${i}">${icon('xmark', { size: 'md' })}<span>${
     d.from ? t('Quitar lo de {name}…', { name: escapeHtml(d.from) }) : t('Quitar lo compartido…')}</span></button>`).join('');
   buildMenu(anchor, `
@@ -1326,6 +1329,7 @@ async function openShelfMenu(id, anchor) {
     <button class="lib-menu-item" data-act="down">${icon('arrow-down', { size: 'md' })}<span>${t('Bajar')}</span></button>`}
     <div class="lib-menu-sep"></div>
     <button class="lib-menu-item" data-act="share">${icon('share', { size: 'md' })}<span>${t('Compartir estantería…')}</span></button>
+    ${myLinks.length ? `<button class="lib-menu-item" data-act="links">${icon('xmark', { size: 'md' })}<span>${t('Retirar enlaces ({n})…', { n: myLinks.length })}</span></button>` : ''}
     <div class="lib-menu-sep"></div>
     ${dossierItems}
     <button class="lib-menu-item danger" data-act="delete">${icon('trash', { size: 'md' })}<span>${t('Eliminar estantería')}</span></button>
@@ -1358,6 +1362,9 @@ async function openShelfMenu(id, anchor) {
       await Store.moveShelf(id, act === 'up' ? -1 : 1);
     } else if (act === 'share') {
       await shareShelf(shelf);
+      return;
+    } else if (act === 'links') {
+      await revokeShelfLinks(shelf, myLinks);
       return;
     } else if (act === 'pin') {
       togglePinned(id);
@@ -1452,6 +1459,27 @@ async function shareShelf(shelf) {
   if (how !== 'cancelled') track('share_shelf', how);
 }
 
+// Retirar enlaces de una estantería: se borran del servidor al momento (quien los tenga ya
+// no puede abrirlos). Lo ya importado por otros se queda en sus bibliotecas.
+async function revokeShelfLinks(shelf, links) {
+  const day = (ts) => new Date(ts).toLocaleDateString(undefined, { day: 'numeric', month: 'long' });
+  const res = await formBox({
+    title: t('Enlaces de «{name}»', { name: shelf.name }),
+    message: t('Quien tenga el enlace puede abrir la estantería hasta que caduque. Al retirarlo se borra al momento; lo que ya hayan importado se queda en su biblioteca.'),
+    fields: [{ name: 'ids', label: 'Retirar', type: 'checks', value: links.map(l => l.id),
+      options: links.map(l => ({ value: l.id, label: t('Creado el {a} · caduca el {b}', { a: day(l.createdAt), b: day(l.expiresAt) }) })) }],
+    okText: t('Retirar'),
+  });
+  if (!res || !(res.ids || []).length) return;
+  const Link = await import('../share/link.js');
+  let failed = 0;
+  for (const l of links.filter(x => res.ids.includes(x.id))) {
+    try { await Link.revokeLink(l); } catch { failed++; }
+  }
+  if (failed) await alertBox(t('No se pudo retirar {n} enlace(s). Comprueba la conexión y vuelve a probar.', { n: failed }), { title: t('Compartir estantería') });
+  else track('share_link_revoke', String(res.ids.length));
+}
+
 // Sube el dossier cifrado y entrega el enlace: hoja de compartir del sistema en móvil
 // (WhatsApp, Telegram…), portapapeles en escritorio.
 async function shareShelfLink(Link, pkg, shelf, Share) {
@@ -1480,6 +1508,7 @@ async function shareShelfLink(Link, pkg, shelf, Share) {
     return;
   }
   dismiss();
+  Link.rememberLink(out, { shelfId: shelf.id, shelfName: shelf.name });
   const text = t('Te paso mi estantería «{name}» de BookReader, con mis notas:', { name: shelf.name });
   const date = new Date(out.expiresAt).toLocaleDateString(undefined, { day: 'numeric', month: 'long' });
   const coarse = window.matchMedia?.('(pointer: coarse)').matches;
@@ -1496,7 +1525,7 @@ async function shareShelfLink(Link, pkg, shelf, Share) {
   try { await navigator.clipboard.writeText(`${text} ${out.url}`); copied = true; } catch { /* sin permiso */ }
   track('share_shelf', 'link');
   await alertBox(copied
-    ? t('Enlace copiado. Pégalo donde quieras: quien lo abra verá la estantería y podrá guardarla. Caduca el {date}.', { date })
+    ? t('Enlace copiado. Pégalo donde quieras: quien lo abra verá la estantería y podrá guardarla. Caduca el {date}; puedes retirarlo antes desde el menú de la estantería.', { date })
     : t('Este es el enlace (caduca el {date}): {url}', { date, url: out.url }),
   { title: t('Compartir estantería') });
 }

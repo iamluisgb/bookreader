@@ -21,6 +21,10 @@ async function stubShare(ctx: BrowserContext, store: Store, seen: { uploads: Buf
         body: JSON.stringify({ id, expiresAt: Date.now() + 7 * 864e5, deleteToken: 'tok' }) });
     }
     const id = req.url().split('/').pop()!;
+    if (req.method() === 'DELETE') {
+      store.delete(id);
+      return route.fulfill({ status: 200, headers: { 'Content-Type': 'application/json', ...cors }, body: '{"ok":true}' });
+    }
     const b = store.get(id);
     if (!b) return route.fulfill({ status: 410, headers: cors, body: '{"error":"expired"}' });
     return route.fulfill({ status: 200, headers: { 'Content-Type': 'application/octet-stream', ...cors }, body: b });
@@ -127,4 +131,63 @@ test('sin servidor de enlaces: ofrece mandarla como fichero sin empezar de nuevo
     page.getByRole('button', { name: 'Mandar fichero' }).click(),
   ]);
   expect(download.suggestedFilename()).toBe('knowledge-graphs.bookreader');
+});
+
+test('retirar el enlace desde el menú de la estantería: quien lo abra después ya no puede', async ({ browser }) => {
+  const store: Store = new Map();
+  const ctx = await browser.newContext({ permissions: ['clipboard-read', 'clipboard-write'] });
+  try {
+    await stubShare(ctx, store, { uploads: [] });
+    const p = await ctx.newPage();
+    await p.goto('/');
+    await seed(p);
+    await p.reload();
+    const row = p.locator('.lib-rail-row', { has: p.locator('.lib-rail-name', { hasText: /^Knowledge graphs$/ }) });
+    await row.hover();
+    await row.locator('.lib-rail-kebab').click();
+    await p.locator('.lib-menu-item[data-act="share"]').click();
+    await p.getByRole('button', { name: 'Compartir', exact: true }).click();
+    await expect(p.locator('.dlg-card')).toContainText('puedes retirarlo antes');
+    const url = (await p.evaluate(() => navigator.clipboard.readText())).match(/https?:\/\/\S+/)![0];
+    await p.locator('.dlg-ok').click();
+    expect(store.size).toBe(1);
+
+    await row.hover();
+    await row.locator('.lib-rail-kebab').click();
+    await p.locator('.lib-menu-item[data-act="links"]').click();
+    await expect(p.locator('.dlg-card')).toContainText('caduca el');
+    await p.getByRole('button', { name: 'Retirar' }).click();
+    await expect.poll(() => store.size).toBe(0);
+
+    const other = await browser.newContext();
+    await stubShare(other, store, { uploads: [] });
+    const q = await other.newPage();
+    await q.goto(url.replace(/^https?:\/\/[^/]+/, ''));
+    await expect(q.locator('.dlg-card')).toContainText('ha caducado o lo han retirado');
+    await other.close();
+    // Y el menú ya no ofrece retirarlo.
+    await row.hover();
+    await row.locator('.lib-rail-kebab').click();
+    await expect(p.locator('.lib-menu-item[data-act="links"]')).toHaveCount(0);
+  } finally { await ctx.close(); }
+});
+
+test('la puerta /s/: vista previa propia y redirige a la app con el fragmento intacto', async ({ page }) => {
+  const frag = '#d=' + 'A'.repeat(22) + '.' + 'k'.repeat(43);
+  // Servidor de la raíz del repo (landings, /s/ y /app/). La app, ya en /app/, pide al
+  // servidor de enlaces ESE id: prueba de que el fragmento sobrevivió a la redirección.
+  const pedidos: string[] = [];
+  await page.route('**/v1/share/**', (route) => {
+    pedidos.push(route.request().url());
+    return route.fulfill({ status: 410, headers: { 'Access-Control-Allow-Origin': '*' }, body: '{}' });
+  });
+  const html = await (await page.request.get('http://localhost:8899/s/')).text();
+  expect(html).toContain('og:title" content="Te han compartido una estantería en BookReader"');
+  expect(html).toContain('og-estanteria-compartida.png');
+  expect(html).not.toContain('/u/s.js');                 // sin analítica: aquí la URL lleva la clave
+  await page.goto('http://localhost:8899/s/' + frag);
+  await expect.poll(() => pedidos.length, { timeout: 15000 }).toBeGreaterThan(0);
+  expect(pedidos[0]).toMatch(new RegExp('/v1/share/' + 'A'.repeat(22) + '$'));
+  expect(new URL(page.url()).pathname).toBe('/app/');
+  expect(page.url()).not.toContain('d=');                // y la clave ya no está en la barra
 });

@@ -25,7 +25,7 @@ const dist = join(root, 'dist');
 
 // `u/` es el tracker de Umami (ver u/s.js): se sirve desde la raíz del dominio propio
 // porque la CSP de la app (`script-src 'self'`) no deja cargarlo de otro origen.
-const PUBLIC = ['index.html', 'sw.js', 'app', 'es', 'anki', 'privacy', 'assets', 'u'];
+const PUBLIC = ['index.html', 'sw.js', 'app', 'es', 'anki', 'privacy', 'assets', 'u', 's'];
 
 // Rutas que NO se despliegan aunque cuelguen de PUBLIC. Siguen en el repo; lo que se
 // corta es publicarlas.

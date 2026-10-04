@@ -3,6 +3,19 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-10-04 — Enlaces que dan ganas de abrir
+
+- **Vista previa propia.** El enlace es ahora `bookreader.raiatech.com/s/#d=…`: `/s/` es una
+  página con su tarjeta («Te han compartido una estantería en BookReader», imagen 1200×630) que
+  WhatsApp, Telegram o iMessage enseñan al pegarlo, y redirige al momento a la app con el
+  fragmento intacto. Genérica a propósito: el servidor no sabe qué hay en la estantería. Sin
+  analítica.
+- **Retirar un enlace** desde el menú de la estantería («Retirar enlaces (n)…»): se borra del
+  servidor al momento. Los enlaces creados se recuerdan en este dispositivo (con su token).
+- **Portadas en el dossier:** lo importado llega con su portada, no con las iniciales.
+- **Privacidad:** la analítica (Umami) ya no recibe el fragmento de la URL, donde van la clave
+  de un enlace, el token de la demo y el libro abierto. SW `v177`.
+
 ## 2026-10-04 — Compartir una estantería por enlace (P24 F4)
 
 «Compartir estantería» ofrece ahora, por defecto, un **enlace** que se abre con un toque en

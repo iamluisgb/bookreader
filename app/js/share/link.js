@@ -45,11 +45,14 @@ export async function decrypt(buffer, keyB64) {
   return new Blob([plain], { type: 'application/zip' });
 }
 
-// Enlace de la app en este despliegue (local, pages.dev o producción): el receptor abre la
-// misma app que el emisor. En un origen raro (file://) cae a producción.
+// Enlace que se comparte. Desplegado (la app vive en /app/), por la puerta /s/: una página con
+// su propia vista previa («Te han compartido una estantería») para WhatsApp y compañía, que
+// redirige a /app/ con el fragmento. En local (la app en la raíz) va directo a la app. En un
+// origen raro (file://), a producción.
 function appUrl() {
   const { origin, pathname } = location;
-  if (!/^https?:/.test(origin)) return APP_URL;
+  if (!/^https?:/.test(origin)) return APP_URL.replace(/\/app\/$/, '/s/');
+  if (/^\/app\//.test(pathname)) return origin + '/s/';
   return origin + pathname.replace(/[^/]*$/, '');
 }
 
@@ -91,4 +94,36 @@ export async function fetchLink({ id, key }) {
   if (!res.ok) throw Object.assign(new Error('network'), { code: 'network' });
   try { return await decrypt(await res.arrayBuffer(), key); }
   catch (e) { throw Object.assign(new Error('broken'), { code: 'broken' }); }
+}
+
+// ---- Enlaces creados en este dispositivo ------------------------------------------------
+// Para poder retirarlos: el `deleteToken` solo lo tiene quien subió. Se guardan en este
+// navegador (no viajan por el sync: el token es una credencial, y el enlace lleva la clave).
+const MINE_KEY = 'bookreader_shared_links';
+
+function readMine() {
+  try {
+    const v = JSON.parse(localStorage.getItem(MINE_KEY) || '[]');
+    return Array.isArray(v) ? v.filter((l) => l && l.id && l.expiresAt > Date.now()) : [];
+  } catch { return []; }
+}
+function writeMine(list) {
+  try { localStorage.setItem(MINE_KEY, JSON.stringify(list.slice(-100))); } catch { /* sin storage: solo no se podrá retirar */ }
+}
+
+export function rememberLink({ id, deleteToken, expiresAt, url }, { shelfId, shelfName }) {
+  writeMine([...readMine(), { id, deleteToken, expiresAt, url, shelfId, shelfName, createdAt: Date.now() }]);
+}
+
+export function linksFor(shelfId) {
+  const list = readMine();
+  writeMine(list);   // de paso, fuera los caducados
+  return list.filter((l) => l.shelfId === shelfId);
+}
+
+// Lo borra del servidor al momento: quien tenga el enlace ya no puede abrirlo.
+export async function revokeLink(link) {
+  const res = await fetch(`${base()}/share/${link.id}`, { method: 'DELETE', headers: { 'X-Delete-Token': link.deleteToken } });
+  if (!res.ok) throw Object.assign(new Error('revoke'), { code: res.status === 403 ? 'forbidden' : 'network' });
+  writeMine(readMine().filter((l) => l.id !== link.id));
 }
