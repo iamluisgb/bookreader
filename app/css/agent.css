@@ -610,7 +610,7 @@ body.ai-open .reader-main { margin-right: var(--ai-panel-width); }
 /* P14 · Mapa mental */
 /* Setup/en curso: tarjeta cómoda como la del resumen. El resultado (SVG grande) la ensancha. */
 .mm-card { max-width: 680px; max-height: 92vh; overflow: auto; }
-.mm-card.mm-card--wide { max-width: 92vw; width: 900px; }
+.mm-card.mm-card--wide { max-width: 96vw; width: 1400px; max-height: 96vh; }
 /* El mapa no tiene el texto de ayuda que en el resumen separa el select del botón: dale aire. */
 .mm-card .ai-ob-start { margin-top: 20px; }
 /* F5 · El lienzo es un escenario con zoom/pan: `overflow: hidden` porque quien recorta ahora
@@ -643,7 +643,9 @@ a tamaño real en este lienzo con scroll, o se descarga. La medida se maneja por
   overflow: hidden; touch-action: none; cursor: grab; background: var(--surface-2);
   /* Alto FIJO: el SVG lo llena y el zoom/pan hacen el resto (ver initialView en mindmap.js).
      Con alto automático el mapa se encajaba al ancho y en móvil quedaba en una franja. */
-  height: clamp(320px, 62vh, 720px);
+  /* El resto de la tarjeta (cabecera, título, ayuda, formato, exportar) ocupa ~320 px: el
+     lienzo se queda con todo lo demás, hasta un tope. */
+  height: clamp(320px, calc(96vh - 320px), 1100px);
 }
 .mm-canvas:active { cursor: grabbing; }
 /* `>` DELIBERADO: el panel de detalle vive dentro del escenario y sus iconos son <svg>.

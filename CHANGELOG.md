@@ -3,6 +3,16 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-10-04 — Infografía y mapa mental: lo que se comparte, sin botones muertos
+
+- **Sin citas en lo que se comparte.** La infografía deja de poner «p. N» en cada idea (no se
+  puede pulsar en una imagen y, con fuentes sin páginas, salía «p. 1» en todas). El mapa mental
+  pinta el icono del libro solo en el mapa interactivo: ni en el póster, ni en el PNG, ni en el SVG.
+- **«Vertical» se ve.** El formato del mapa repinta la vista a un solo lado, como el póster que
+  se va a descargar; antes solo cambiaba la imagen y parecía que el botón no hacía nada.
+- **El mapa aprovecha la pantalla:** el modal pasa de 900 px a hasta 1.400 px (96 % del ancho) y
+  el lienzo se queda con todo el alto que deja el resto. SW `v170`.
+
 ## 2026-10-04 — Compartir diagramas
 
 Cada diagrama (en el chat y en la libreta) lleva **«Copiar imagen»** —PNG al portapapeles en

@@ -373,3 +373,27 @@ test('una etiqueta recortada acaba en «…» y no en una palabra suelta', async
   });
   for (const [max, len] of lens) expect(len).toBeLessThanOrEqual(max);
 });
+
+// «Vertical» cambia lo que se ve, no solo lo que se descarga: el árbol pasa a un solo lado
+// (todas las ramas a la derecha de la raíz), igual que en el póster vertical. Y el lienzo
+// aprovecha la pantalla.
+test('el formato Vertical repinta el mapa a un lado, y el lienzo usa la pantalla', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('bookreader_mm_format', 'landscape'));
+  await setup(page);
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await openFromStudio(page, 'mindmap');
+  await page.waitForSelector('#ai-mindmap', { timeout: 5000 });
+  await page.click('#mm-generate');
+  await page.waitForSelector('.mm-canvas svg', { timeout: 20000 });
+  const sides = () => page.evaluate(() => {
+    const root = document.querySelector('.mm-node.mm-root, .mm-node[data-id="r"]') as SVGGraphicsElement | null;
+    const rx = root ? root.getBoundingClientRect().x : 0;
+    const xs = [...document.querySelectorAll('.mm-branch')].map(b => b.getBoundingClientRect().x);
+    return new Set(xs.map(x => (x > rx ? 'der' : 'izq'))).size;
+  });
+  expect(await sides()).toBe(2);
+  await page.click('.mm-format button[data-f="portrait"]');
+  await expect.poll(sides).toBe(1);
+  const h = await page.locator('.mm-canvas').evaluate(e => e.getBoundingClientRect().height);
+  expect(h).toBeGreaterThan(600);                     // antes: tope de 62vh/720 en un modal de 900
+});

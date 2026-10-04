@@ -237,3 +237,20 @@ test('sin portada, el mapa del póster empieza donde acaba la cabecera', async (
   // Con la reserva fija, el hueco del mapa medía 1350 − 64 − 44 − 314 = 928 px de alto.
   expect(r.h).toBeGreaterThan(960);
 });
+
+test('la cita (icono del libro) solo en el mapa interactivo: ni en el póster ni en el SVG exportado', async ({ page }) => {
+  await page.goto('/');
+  const r = await page.evaluate(async () => {
+    const R: any = await import('/js/ai/mindmap-render.js');
+    const tree = { title: 'Libro', branches: ['A', 'B'].map((l) => ({ label: l, children: [1, 2].map((i) => ({ label: l + i, src: 'a0' })) })) };
+    const lay = R.layout(tree, { sides: 2 });
+    return {
+      screen: R.renderSvg(lay, { interactive: true }).svg.querySelectorAll('.mm-go').length,
+      plain: R.renderSvg(lay, {}).svg.querySelectorAll('.mm-go').length,
+      poster: R.renderPoster(lay, { format: 'landscape', header: { title: 'Libro' } }).svg.querySelectorAll('.mm-go').length,
+    };
+  });
+  expect(r.screen).toBe(4);
+  expect(r.plain).toBe(0);
+  expect(r.poster).toBe(0);
+});

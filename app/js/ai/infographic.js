@@ -16,7 +16,6 @@ import * as Jobs from './jobs.js';
 import { buildChunks } from './flashcards.js';
 import { bookScopePassages } from './summary.js';
 import { renderSvg, renderSlides, renderStory, ensureFonts, ACCENTS, POSTER, SLIDE } from './infographic-render.js';
-import { citePage } from './render.js';
 import { imagesToPdf } from '../ui/pdf-images.js';
 import { posterFaceCss } from '../ui/svg-fonts.js';
 import { rasterizeSvg } from '../ui/svg-raster.js';
@@ -548,12 +547,13 @@ async function renderResult(data) {
   // Las medidas solo son buenas con las dos familias YA cargadas (ver ensureFonts).
   await ensureFonts();
   const cover = await coverFor(ctx.bookId, ctx.bookTitle, ctx.bookAuthor);
-  // Página de cada idea desde su ancla («p. 42»): el mismo resolutor que los chips del chat.
-  const withPage = (it) => ({ ...it, page: it.src && ctx.anchors ? citePage(ctx.anchors.get(it.src)) : null });
+  // Sin página por idea: la infografía es una imagen para compartir y una «p. 42» que no se
+  // puede pulsar —o «p. 1» en todas, si la fuente no tiene páginas— es ruido con aspecto de
+  // botón. La cita sigue viva dentro de la app (chat, libreta, mapa mental).
   const payload = {
     ...data,
     ...cover,
-    ideas: (data.ideas || []).map(withPage),
+    ideas: (data.ideas || []).map(({ page, ...it }) => it),
     title: ctx.bookTitle || t('Libro'),
     author: ctx.bookAuthor || '',
     footer: { mark: 'BookReader', url: 'bookreader.raiatech.com' },

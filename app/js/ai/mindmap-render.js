@@ -335,7 +335,8 @@ function drawIdea(parent, n, color, { theme, interactive, tooltip }) {
   const ink = n.depth === 2 ? theme.ink : theme.muted;
   n.lines.forEach((l, i) => g.appendChild(text(tx, b0 + i * n.lh, l, { size: n.fs, fill: ink, anchor })));
   // La cita a la vista: un indicador pequeño al final de la última línea. Tocarlo va al libro.
-  if (n.src) {
+  // Solo en el mapa interactivo: en el póster, el PNG o el SVG no se puede tocar y es ruido.
+  if (n.src && interactive) {
     const lastW = n.widths[n.widths.length - 1];
     const by = b0 + (n.lines.length - 1) * n.lh - 12;
     const bx = n.side > 0 ? n.xi + 2 + lastW + 6 : n.xi - 2 - lastW - 6 - BADGE_W;

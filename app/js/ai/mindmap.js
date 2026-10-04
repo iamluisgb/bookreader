@@ -601,8 +601,10 @@ function paintMap() {
   const holder = body()?.querySelector('#mm-canvas');
   if (!holder || !lastTree) return;
   const theme = screenTheme();
-  // Estrecho (móvil): árbol a UN lado, más alto que ancho, que es la forma de la pantalla.
-  const sides = holder.clientWidth < 600 ? 1 : 2;
+  // A UN lado (más alto que ancho) en móvil o con el formato «Vertical»: lo que se ve es lo
+  // que se va a exportar. Antes el formato solo cambiaba la imagen descargada y la vista no
+  // reaccionaba, y parecía que el botón no hacía nada.
+  const sides = holder.clientWidth < 600 || shareFormat === 'portrait' ? 1 : 2;
   lastLayout = Render.layout(lastTree, { collapsed, sides });
   lastLayout.sides = sides;
   const built = Render.renderSvg(lastLayout, {
@@ -999,6 +1001,8 @@ async function renderResult(tree, scopeName) {
     shareFormat = btn.dataset.f;
     try { localStorage.setItem('bookreader_mm_format', shareFormat); } catch { /* sin storage: solo esta sesión */ }
     b.querySelectorAll('.mm-format button').forEach(o => o.setAttribute('aria-pressed', String(o === btn)));
+    paintMap();
+    initialView();
   }));
   b.querySelector('#mm-svg').addEventListener('click', async () => {
     const { svg } = await buildExport();

@@ -103,6 +103,8 @@ test.describe('P29 · infografía de punta a punta', () => {
     for (const needle of ['Comala', 'LA LLEGADA', 'VOCES', 'CLAVES', 'RECUERDA', 'IDEA FINAL']) {
       expect(xml).toContain(needle);
     }
+    // Sin «p. N» por idea: en una imagen para compartir no se puede pulsar y era ruido.
+    expect(xml).not.toMatch(/>p\. \d+</);
     // Un póster, no un muro: la densidad sigue dentro del presupuesto (IG2: 2,9, ver
     // infographic-render.spec — el póster largo es el formato de leer con zoom o imprimir).
     const ratio = await page
