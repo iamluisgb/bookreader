@@ -18,6 +18,8 @@
 // marcador se queda con el CÓDIGO visible (el bloque de código de siempre). Nunca una
 // respuesta rota ni vacía.
 
+import { icon } from '../ui/icons.js';
+import { t } from '../i18n.js';
 const SRC = '../../vendor/mermaid-12.1.0/mermaid.esm.min.mjs';
 export const ALLOWED = /^\s*(sequenceDiagram|flowchart|graph|timeline)\b/;
 
@@ -38,6 +40,11 @@ function escapeText(s) {
 function toHex(s) {
   return [...new TextEncoder().encode(s)].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
+// El código Mermaid de un diagrama pintado (sin las citas, que van como chips debajo).
+export function diagramCode(figure) {
+  return fromHex(figure?.dataset?.src || '');
+}
+
 function fromHex(h) {
   const bytes = new Uint8Array((h.match(/../g) || []).map((x) => parseInt(x, 16)));
   return new TextDecoder().decode(bytes);
@@ -180,6 +187,13 @@ function paint(el, svg) {
   scrub(el);
   const s = el.querySelector('svg');
   if (s) { s.setAttribute('role', 'img'); fitWidth(s); }
+  // En el chat, cada diagrama lleva sus acciones (las atiende panel.js por delegación). Fuera
+  // del chat (resumen, Feynman, la propia libreta) no: ahí no hay a dónde mandarlo.
+  if (el.closest('#ai-messages')) {
+    el.insertAdjacentHTML('beforeend', `<div class="ai-diagram-actions">
+      <button type="button" class="ai-act" data-dg-act="notebook">${icon('notebook', { size: 'md' })}<span>${t('A la libreta')}</span></button>
+    </div>`);
+  }
 }
 
 // Encaja al ancho de la caja, pero sin bajar de MIN_SCALE (letra de ~10 px con la base de 15 px): si así no cabe,

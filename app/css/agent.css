@@ -464,6 +464,9 @@ body.ai-open .reader-main { margin-right: var(--ai-panel-width); }
 .ai-diagram > svg { display: block; margin-inline: auto; height: auto; }   /* centrado si cabe; si no, empieza a la izquierda y se desplaza */
 .ai-diagram > .ai-code { margin: 0; border: 0; padding: 0; background: none; }
 .ai-diagram-cites { margin: -2px 0 10px; display: flex; flex-wrap: wrap; gap: 6px; }
+/* Acciones del diagrama (solo en el chat, ver diagram.js · paint). Pegadas a la izquierda
+   aunque el diagrama ancho se desplace en horizontal. */
+.ai-diagram-actions { position: sticky; left: 0; display: flex; gap: 6px; flex-wrap: wrap; margin-top: var(--s-2); }
 @media (max-width: 600px) { .ai-diagram { padding: var(--s-2); } }
 .ai-md-table { border-collapse: collapse; width: 100%; font-size: var(--fs-sm); }
 .ai-md-table th, .ai-md-table td {

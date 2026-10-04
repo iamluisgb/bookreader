@@ -15,6 +15,7 @@ import { getTemplate, objectiveTemplates, isValidField, aiWritableFields, isAiWr
 import { icon } from '../ui/icons.js';
 import { t } from '../i18n.js';
 import { initAiMax, setAiMax } from './maximize.js';
+import { diagramCode } from './diagram.js';
 import * as Hints from '../ui/hints.js';
 import { escapeHtml } from '../ui/escape.js';
 import { confirmBox, promptBox } from '../ui/dialog.js';
@@ -2299,6 +2300,7 @@ A partir de la respuesta del agente y el objetivo del usuario, guarda en la libr
 valor real. Llama a upsert_note una vez por nota. fieldKey debe ser uno de estos:
 ${fieldList}
 ${scaffoldNote}Escribe content en el idioma de la conversación, conciso, conservando las citas [[aN]] que aparezcan.
+No copies los bloques \`\`\`mermaid: los diagramas se guardan aparte, íntegros.
 Si el usuario pidió explícitamente guardar, guarda al menos la entrada principal de la respuesta. Si no
 hay nada que merezca guardarse, no llames a ninguna herramienta.` },
     { role: 'user', content:
@@ -2317,6 +2319,7 @@ hay nada que merezca guardarse, no llames a ninguna herramienta.` },
       await saveNote(fieldKey, content, cites);
       added++;
     }
+    added += await saveAnswerDiagrams(answerText, question);
     renderNotebook();
     el.innerHTML = added ? act('check', t('{n} a la libreta', { n: added })) : act('notebook', t('Nada que guardar'));
     if (added) {
@@ -3091,8 +3094,67 @@ Hazlo concreto y utilizable tal cual (casillas si es una checklist, pasos con pl
 // ---- Helpers de render -----------------------------------------------------
 
 function onMessagesClick(e) {
+  const dg = e.target.closest('[data-dg-act="notebook"]');
+  if (dg) { saveDiagramToNotebook(dg); return; }
   const cite = e.target.closest('.ai-cite');
   if (cite) navigateCite(cite.dataset.id);
+}
+
+// ---- Diagramas a la libreta ------------------------------------------------------------
+// Un diagrama se guarda ÍNTEGRO (su bloque Mermaid), no resumido: la libreta pinta el mismo
+// Markdown que el chat, así que se vuelve a ver dibujado, y al exportar viaja como bloque
+// `mermaid` que Obsidian, GitHub o Notion dibujan solos.
+const MERMAID_BLOCK = /```mermaid[^\n]*\n([\s\S]*?)```/g;
+
+// Campo donde van: el primer campo de información de la plantilla (nunca uno de cognición:
+// esos los escribe el usuario).
+function diagramField() {
+  return aiWritableFields(template).find(f => !isCognitionField(f)) || null;
+}
+
+function diagramNoteContent(code, cites, question) {
+  const q = (question || '').replace(/\s+/g, ' ').trim();
+  const title = q ? `**${t('Diagrama')}:** ${q.length > 140 ? q.slice(0, 139) + '…' : q}\n\n` : '';
+  const chips = cites.length ? `\n${cites.map(id => `[[${id}]]`).join(' ')}` : '';
+  return `${title}\`\`\`mermaid\n${code.trim()}\n\`\`\`${chips}`;
+}
+
+const noteHasDiagram = (code) => notes.some(n => (n.content || '').includes(code.trim()));
+
+async function saveDiagramToNotebook(btn) {
+  const fig = btn.closest('.ai-diagram');
+  const code = diagramCode(fig);
+  const field = template && diagramField();
+  if (!code || !field) { btn.innerHTML = act('notebook', t('Elige un objetivo para tener libreta')); return; }
+  if (noteHasDiagram(code)) { btn.innerHTML = act('check', t('Ya está en la libreta')); return; }
+  btn.disabled = true;
+  const chipsEl = fig.nextElementSibling?.matches('.ai-diagram-cites') ? fig.nextElementSibling : null;
+  const cites = [...(chipsEl?.querySelectorAll('.ai-cite') || [])].map(c => c.dataset.id).filter(Boolean);
+  const prev = fig.closest('.ai-msg')?.previousElementSibling;
+  const question = prev?.classList.contains('ai-msg-user') ? prev.textContent : '';
+  const content = diagramNoteContent(code, cites, question);
+  await saveNote(field.key, content, extractCites(content, cites));
+  renderNotebook();
+  markNotebookUnread();
+  btn.innerHTML = act('check', t('En la libreta'));
+}
+
+// Tras la extracción con IA de «A la libreta»: los diagramas de la respuesta que el modelo
+// no guardó tal cual, se guardan aparte e íntegros. Devuelve cuántos.
+async function saveAnswerDiagrams(answerText, question) {
+  const field = diagramField();
+  if (!field) return 0;
+  let n = 0;
+  for (const m of String(answerText || '').matchAll(MERMAID_BLOCK)) {
+    const raw = m[1];
+    const cites = [...new Set(raw.match(/a\d+/g) || [])].filter(id => anchors.has(id));
+    const code = raw.replace(/\[\[a\d+\]\]/g, '').trim();
+    if (!code || noteHasDiagram(code)) continue;
+    const content = diagramNoteContent(code, cites, question);
+    await saveNote(field.key, content, extractCites(content, cites));
+    n++;
+  }
+  return n;
 }
 
 function navigateCite(id) {

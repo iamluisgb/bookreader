@@ -3,6 +3,15 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-10-04 — Diagramas a la libreta
+
+«A la libreta» resumía la respuesta con la IA y un diagrama resumido se perdía. Ahora los bloques
+```mermaid de la respuesta se guardan **íntegros** como nota aparte (con la pregunta como título y
+sus citas), y el extractor tiene orden de no copiarlos. Cada diagrama del chat lleva además su
+propio **«A la libreta»**. En la libreta se vuelve a dibujar, y al exportar a Markdown viaja como
+bloque `mermaid` intacto (la resolución de citas ya no toca los bloques de código). Tests:
+[diagram-notebook.spec.ts](tests/diagram-notebook.spec.ts). SW `v168`.
+
 ## 2026-10-04 — Ampliar el agente
 
 Botón nuevo en la barra del agente (icono `panel-wide`, escritorio y tablet): el panel ocupa la

@@ -200,7 +200,14 @@ export async function buildConvoMarkdown(convoId, { includeChat = true, includeN
 // de anclas del libro. Si no hay anclas (libro sin segmentar) deja el texto tal cual.
 function resolveCites(text, anchors) {
   if (!anchors || !anchors.size) return text || '';
-  return (text || '').replace(/\[\[(a\d+)\]\]|\b(a\d+)\b/g, (m, p1, p2) => {
+  // Los bloques de código (un diagrama ```mermaid guardado en la libreta) van tal cual: un
+  // nodo llamado `a1` no es una cita, y sustituirlo rompería el diagrama exportado.
+  return (text || '').split(/(```[\s\S]*?```)/g)
+    .map((part, i) => (i % 2 ? part : resolveCitesIn(part, anchors))).join('');
+}
+
+function resolveCitesIn(text, anchors) {
+  return text.replace(/\[\[(a\d+)\]\]|\b(a\d+)\b/g, (m, p1, p2) => {
     const a = anchors.get(p1 || p2);
     if (!a) return m;
     if (a.page != null) return t('(pág. {n})', { n: a.page });
