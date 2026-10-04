@@ -103,7 +103,7 @@ function templatesUsed(books, customTemplates) {
 //   customTemplates: las plantillas propias del usuario (para incrustar las usadas).
 export function build({ shelf, books, parts = PARTS, author = '', customTemplates = [], now = Date.now() }) {
   const want = new Set(parts);
-  const outBooks = (books || []).map(({ book, hasFile, highlights, convos, artifacts, decks }) => {
+  const outBooks = (books || []).map(({ book, hasFile, highlights, convos, artifacts, decks, cover }) => {
     const b = {
       bookId: book.id,
       title: book.title || '',
@@ -113,6 +113,9 @@ export function build({ shelf, books, parts = PARTS, author = '', customTemplate
       file: want.has('files') && hasFile ? fileEntry(book.id, book.format) : null,
       size: book.size || null,
     };
+    // Miniatura de la portada (la prepara export.js): sin ella, lo importado salía con las
+    // iniciales hasta abrir cada libro, que es justo lo primero que se ve al recibirlo.
+    if (isCover(cover)) b.cover = cover;
     if (want.has('highlights')) b.highlights = live(highlights).map(highlightOut);
     if (want.has('notebooks')) {
       b.notebooks = (convos || [])
@@ -168,6 +171,12 @@ export function serialize(bundle) {
   return JSON.stringify(bundle);
 }
 
+// Portada válida: una imagen en data URL de tamaño de miniatura (las de sync rondan 30–60 KB).
+export const MAX_COVER_CHARS = 300 * 1024;
+export function isCover(v) {
+  return typeof v === 'string' && /^data:image\/(jpeg|png|webp);base64,/.test(v) && v.length <= MAX_COVER_CHARS;
+}
+
 // Devuelve la lista de problemas (vacía = válido). Es una frontera de confianza: el
 // fichero viene de otra persona. Importar es DATOS, nunca ejecución, y lo que no encaje
 // con la forma esperada se rechaza en vez de "arreglarse" a medias.
@@ -187,6 +196,7 @@ export function validate(obj) {
     if (!isStr(b.bookId) || !/^[0-9a-f]{64}$/.test(b.bookId)) errs.push(`${at}: bookId inválido`);
     if (!isStr(b.title)) errs.push(`${at}: título inválido`);
     if (b.source != null && !(isStr(b.source) && /^https?:\/\//i.test(b.source))) errs.push(`${at}: enlace de origen inválido`);
+    if (b.cover != null && !isCover(b.cover)) errs.push(`${at}: portada inválida`);
     // La ruta se recalcula, no se cree: un `file` que no es exactamente la esperada
     // (`../`, otro libro) podría señalar una entrada ajena del ZIP.
     if (b.file != null && b.file !== fileEntry(b.bookId, b.format)) errs.push(`${at}: ruta de fichero inválida`);

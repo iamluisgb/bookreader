@@ -141,6 +141,22 @@ test('paquete: el libro viaja dentro del ZIP con los mismos bytes; uno manipulad
   expect(out.notZip).toContain('no es un dossier');
 });
 
+test('formato: la portada viaja como miniatura y una que no es imagen se rechaza', async ({ page }) => {
+  await page.goto('/');
+  const r = await page.evaluate(async () => {
+    const B: any = await import('/js/share/bundle.js');
+    const book = { id: 'a'.repeat(64), title: 'T', format: 'epub' };
+    const ok = B.build({ shelf: { name: 'S' }, books: [{ book, hasFile: false, cover: 'data:image/jpeg;base64,AAAA' }], parts: [] });
+    const bad = { ...ok, books: [{ ...ok.books[0], cover: 'javascript:alert(1)' }] };
+    const big = { ...ok, books: [{ ...ok.books[0], cover: 'data:image/jpeg;base64,' + 'A'.repeat(400 * 1024) }] };
+    return { cover: ok.books[0].cover, okErrs: B.validate(ok), bad: B.validate(bad), big: B.validate(big) };
+  });
+  expect(r.cover).toBe('data:image/jpeg;base64,AAAA');
+  expect(r.okErrs).toEqual([]);
+  expect(r.bad.join()).toContain('portada inválida');
+  expect(r.big.join()).toContain('portada inválida');
+});
+
 test('formato: lo que no es un dossier se rechaza con el motivo', async ({ page }) => {
   await page.goto('/');
   const errs = await page.evaluate(async () => {

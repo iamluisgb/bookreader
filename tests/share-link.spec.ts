@@ -37,9 +37,11 @@ async function seed(page: Page) {
     for (let i = 0; i < bytes.length; i++) bytes[i] = (i * 37 + 11) % 251;
     const A = await DB.hashBuffer(bytes.buffer.slice(0));
     const now = Date.now();
+    const c = document.createElement('canvas'); c.width = 60; c.height = 90;
+    const ctx = c.getContext('2d')!; ctx.fillStyle = '#c0392b'; ctx.fillRect(0, 0, 60, 90);
     await Store.putBook({ id: A, title: 'Knowledge Graphs (survey)', author: 'Hogan et al.', format: 'pdf',
       fileName: 'kg.pdf', size: bytes.length, status: 'reading', addedAt: now, shelfIds: [kg.id],
-      file: new Blob([bytes], { type: 'application/pdf' }) });
+      cover: c.toDataURL('image/jpeg', 0.8), file: new Blob([bytes], { type: 'application/pdf' }) });
     Storage.set('highlights_' + A, [{ uid: 'u1', id: 'p1', page: 3, rects: [{ x: 0.1, y: 0.2, w: 0.5, h: 0.02 }],
       text: 'A knowledge graph is…', color: '#ffeb3b', timestamp: now, updatedAt: now }]);
     return { A };
@@ -91,9 +93,10 @@ test('enlace: se cifra, se abre en otro navegador y la estantería llega con lib
     const got = await p2.evaluate(async (A) => {
       const Store: any = await import('/js/library/store.js');
       const b = await Store.getBook(A);
-      return { title: b?.title, hasFile: Store.hasFile(b) };
+      return { title: b?.title, hasFile: Store.hasFile(b), cover: /^data:image\/jpeg;base64,/.test(b?.cover || '') };
     }, A);
-    expect(got).toEqual({ title: 'Knowledge Graphs (survey)', hasFile: true });
+    // Con su portada desde el primer momento (antes salían las iniciales hasta abrirlo).
+    expect(got).toEqual({ title: 'Knowledge Graphs (survey)', hasFile: true, cover: true });
   } finally {
     await emisor.close(); await receptor.close();
   }

@@ -54,15 +54,15 @@ export async function apply(p, ids = p.books.map(b => b.entry.bookId), now = Dat
 
   for (const { entry, file, state } of chosen) {
     if (state === 'new') {
-      // Ficha mínima: la portada sale sola al abrirlo por primera vez (app.js ·
-      // backfillCover regenera la que falta).
+      // Ficha mínima, con la miniatura de portada del dossier. Los dossiers viejos no la
+      // traen: entonces sale al abrirlo por primera vez (app.js · backfillCover).
       const raw = await Store.getRaw(entry.bookId);   // un tombstone se resucita, no se duplica
       await Store.putBook({
         ...(raw || {}),
         id: entry.bookId, title: entry.title, author: entry.author || '', format: entry.format,
         fileName: `${entry.title || 'libro'}.${entry.format === 'pdf' ? 'pdf' : 'epub'}`,
         size: file.size, addedAt: now, progress: 0, lastCfi: null, status: 'unread',
-        shelfIds: [shelf.id], cover: '', coverThumb: null,
+        shelfIds: [shelf.id], cover: entry.cover || raw?.cover || '', coverThumb: null,
         file: new Blob([file], { type: mimeOf(entry.format) }),
         deleted: false, deletedAt: 0,
       });
@@ -72,6 +72,10 @@ export async function apply(p, ids = p.books.map(b => b.entry.bookId), now = Dat
       await Store.toggleBookShelf(entry.bookId, shelf.id, true);
     } else if (state === 'have') {
       await Store.toggleBookShelf(entry.bookId, shelf.id, true);
+    }
+    // Lo que ya tenías sin portada (llegó por sync, o nunca se abrió) la toma del dossier.
+    if (entry.cover && (state === 'have' || state === 'attach')) {
+      await Store.patchBook(entry.bookId, (cur) => (cur.cover ? {} : { cover: entry.cover }), { stamp: false });
     }
     // missing: no hay ficha que crear (sería un libro sin fichero ni copia en Drive que
     // nadie puede abrir). Sus notas quedan en el carril y aparecen al conseguirlo.

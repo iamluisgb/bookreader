@@ -48,7 +48,13 @@ export async function buildShelfDossier(shelfId, { parts = Bundle.PARTS, author 
   if (!shelf) throw new Error('Estantería no encontrada');
   const withChat = parts.includes('chat');
   const gathered = [];
-  for (const b of books) gathered.push(await gatherBook(b, withChat));   // en serie: IDB no gana nada en paralelo
+  const { makeThumb } = await import('../sync/library-sync.js');
+  for (const b of books) {
+    const g = await gatherBook(b, withChat);   // en serie: IDB no gana nada en paralelo
+    // Miniatura (la misma que viaja por el sync): la portada original puede pesar MB.
+    g.cover = b.cover ? await makeThumb(b.cover).catch(() => null) : null;
+    gathered.push(g);
+  }
   return Bundle.build({ shelf, books: gathered, parts, author, customTemplates: CustomTemplates.getAll() });
 }
 
