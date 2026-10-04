@@ -379,6 +379,25 @@ body.in-library .ai-fab { display: none; }
 .brand-mark { flex: none; display: block; }
 .brand-name { font-size: var(--fs-lg); font-weight: 700; letter-spacing: -0.01em; color: var(--text); }
 .lib-head-mark { display: none; }
+/* Logo de carga al abrir un libro (ui/brand.js · startBookSplash): sobre el área de lectura,
+   bajo la cabecera y sin capturar clics. */
+.book-splash {
+  position: fixed; inset: 0; z-index: calc(var(--z-chrome) - 1);
+  display: flex; align-items: center; justify-content: center;
+  background: var(--page-bg, var(--surface-0)); pointer-events: none;
+  animation: book-splash-in 0.25s var(--ease) both;
+}
+.book-splash.is-out { opacity: 0; transition: opacity 0.25s var(--ease); }
+.book-splash .brand-mark { width: var(--icon-hero); height: var(--icon-hero); }
+@keyframes book-splash-in { from { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .book-splash, .book-splash.is-out { animation: none; transition: none; } }
+/* Pie de «Más»: quién hace la app y qué build corre. Discreto, lejos de los controles. */
+.reader-more-brand {
+  display: flex; align-items: center; gap: 8px; padding: 6px 10px 4px;
+  font-size: var(--fs-2xs); color: var(--text-faint);
+}
+.reader-more-ver { margin-left: auto; font-variant-numeric: tabular-nums; }
+.reader-more-ver:empty { display: none; }
 @media (max-width: 767px) { .lib-head-mark { display: block; margin-right: 10px; } }
 .lib-rail {
   flex: 0 0 264px; width: 264px; height: 100%;

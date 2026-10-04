@@ -154,3 +154,32 @@ test('F4: el ✦ del agente no se mueve al abrirlo y es su cierre', async ({ pag
   await page.keyboard.press(']');
   await expect(page.locator('body')).not.toHaveClass(/ai-open/);
 });
+
+test('marca al leer: logo de carga solo si tarda, y «BookReader · de Raiatech» al pie de «Más»', async ({ page }) => {
+  await page.goto('/index.html');
+  // Carga lenta (simulada): aparece tras el retardo y se va al entrar en lectura.
+  const r = await page.evaluate(async () => {
+    const B: any = await import('/js/ui/brand.js');
+    document.body.classList.remove('reading');
+    B.startBookSplash({ delay: 50 });
+    await new Promise(res => setTimeout(res, 120));
+    const shown = !!document.querySelector('.book-splash');
+    document.body.classList.add('reading');
+    await new Promise(res => setTimeout(res, 400));
+    const gone = !document.querySelector('.book-splash');
+    // Carga rápida: termina antes del retardo y no destella nada.
+    document.body.classList.remove('reading');
+    const stop = B.startBookSplash({ delay: 300 });
+    stop();
+    await new Promise(res => setTimeout(res, 350));
+    return { shown, gone, flash: !!document.querySelector('.book-splash') };
+  });
+  expect(r).toEqual({ shown: true, gone: true, flash: false });
+
+  await page.setInputFiles('#file-input', EPUB_PATH);
+  await page.waitForSelector('#epub-container iframe', { timeout: 30000 });
+  await expect(page.locator('.book-splash')).toHaveCount(0);
+  await page.locator('#reader-more').click();
+  await expect(page.locator('.reader-more-brand')).toContainText('BookReader · de Raiatech');
+  await expect(page.locator('.reader-more-brand svg')).toHaveCount(1);
+});

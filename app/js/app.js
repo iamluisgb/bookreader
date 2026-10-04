@@ -9,6 +9,7 @@ import * as AiDB from './ai/db.js';
 import { hydrateIcons, icon } from './ui/icons.js';
 import { setSidebar, toggleSidebar, initSidebarState } from './ui/sidebar.js';
 import { initReadingPop, isReadingPopOpen } from './ui/reading-pop.js';
+import { brandMark, startBookSplash, buildVersion } from './ui/brand.js';
 import { countBookWords, countPdfWords, updateProgressDetail, getCurrentPct, WORDS_PER_LOCATION } from './progress.js';
 import * as FeatureGuide from './ui/feature-guide.js';
 import * as ReadingLog from './reading-log.js';
@@ -517,8 +518,11 @@ function initReaderMore() {
     menu.innerHTML = mobileRows + `
       <button class="lib-menu-item" role="menuitem" data-act="general">${icon('gear', { size: 'md' })}<span>${t('Ajustes generales')}</span></button>
       <div class="lib-menu-sep"></div>
-      <button class="lib-menu-item" role="menuitem" data-act="library">${icon('library', { size: 'md' })}<span>${t('Biblioteca')}</span></button>`;
+      <button class="lib-menu-item" role="menuitem" data-act="library">${icon('library', { size: 'md' })}<span>${t('Biblioteca')}</span></button>
+      <div class="lib-menu-sep"></div>
+      <div class="reader-more-brand">${brandMark(16)}<span>BookReader · ${t('de Raiatech')}</span><span class="reader-more-ver"></span></div>`;
     document.body.appendChild(menu);
+    buildVersion().then(v => { const s = menu?.querySelector('.reader-more-ver'); if (s && v) s.textContent = v; });
     const r = btn.getBoundingClientRect();
     menu.style.display = 'block';
     menu.style.top = (r.bottom + 6) + 'px';
@@ -699,6 +703,7 @@ function openLibraryBook(record) {
 // Abre un libro de la biblioteca. `fromRoute`: la apertura viene de resolver la URL, así
 // que NO se re-escribe la ruta. `loc`: posición de la URL (tiene prioridad sobre lastCfi).
 async function openBookRecord(record, { fromRoute = false, loc = null } = {}) {
+  startBookSplash();
   try {
     Library.hide();
     // La lib del formato empieza a bajar YA, en paralelo con leer el fichero de
@@ -1494,6 +1499,7 @@ async function loadFile(file) {
   Bookmarks.migrateBook([fileBaseId, id], annotId); Bookmarks.setBook(annotId);
   Highlights.migrateBook([fileBaseId, id], annotId); Highlights.setBook(annotId);
   currentBook = { id, fileBaseId, format: ext };
+  startBookSplash();
   Library.hide();
   // Botón de volver a la biblioteca visible desde YA (la carga puede tardar y el
   // usuario tiene que poder salir siempre). goToLibrary lo vuelve a ocultar.
