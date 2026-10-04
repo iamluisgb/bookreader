@@ -3,6 +3,16 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-10-04 — Índice de EPUB con el nav en una subcarpeta
+
+Con «El Turrero Post» el índice no navegaba. El nav estaba en `text/nav.xhtml` y sus enlaces son
+relativos a esa carpeta (`turra-1.xhtml`), como manda EPUB 3, pero epub.js no los resuelve: el
+capítulo se llamaba `text/turra-1.xhtml` y el clic no encontraba nada. Ahora se resuelven al abrir
+el libro (`normalizeNavHrefs`). Y el capítulo actual se busca en todos los niveles del índice, no
+solo en el primero: en un índice agrupado (años, partes sin enlace) no se marcaba la entrada, no
+salía en el pie y el agente no se enteraba del cambio de capítulo. Test con un EPUB mínimo de esa
+forma: [toc-nav-subdir.spec.ts](tests/toc-nav-subdir.spec.ts). SW `v171`.
+
 ## 2026-10-04 — Infografía y mapa mental: lo que se comparte, sin botones muertos
 
 - **Sin citas en lo que se comparte.** La infografía deja de poner «p. N» en cada idea (no se

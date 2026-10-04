@@ -947,6 +947,7 @@ export async function load(arrayBuffer, onProgress, bookId = null) {
   console.log('Waiting for book.ready...');
   await book.ready;
   console.log('Book ready');
+  try { normalizeNavHrefs(book); } catch (e) { console.warn('índice: no se pudieron normalizar los enlaces', e); }
 
   // Migrar AQUÍ y no más abajo: es el primer punto donde existen a la vez el `book` (del
   // que sale la clave vieja) y el id canónico, y el modo de lectura se lee ya en el
@@ -1273,6 +1274,41 @@ export async function seekToFraction(f) {
   }
 }
 
+// Enlaces del índice relativos a SU documento. El EPUB 3 dice que los href del nav se
+// resuelven respecto al propio nav; epub.js los deja tal cual. Con el nav en una subcarpeta
+// (`text/nav.xhtml`, como en «El Turrero Post»), el índice pide `turra-1.xhtml` y el capítulo
+// se llama `text/turra-1.xhtml`: no lo encuentra y el clic no hace nada. Y no solo el clic:
+// marcar el capítulo actual, el del pie y el repaso del agente comparan con esos mismos href.
+// Se resuelven una vez, en sitio, para todos. Un href que ya casa con el spine no se toca.
+export function normalizeNavHrefs(b) {
+  const navPath = b?.packaging?.navPath || '';
+  const dir = navPath.includes('/') ? navPath.slice(0, navPath.lastIndexOf('/') + 1) : '';
+  const toc = b?.navigation?.toc;
+  if (!dir || !toc) return 0;
+  const inSpine = (h) => !!b.spine.get(h.split('#')[0]);
+  const resolve = (href) => {
+    const [path, frag] = href.split('#');
+    const parts = [];
+    for (const seg of (dir + path).split('/')) {
+      if (seg === '..') parts.pop();
+      else if (seg && seg !== '.') parts.push(seg);
+    }
+    return parts.join('/') + (frag != null ? '#' + frag : '');
+  };
+  let fixed = 0;
+  const walk = (items) => {
+    for (const it of items || []) {
+      if (it.href && !inSpine(it.href)) {
+        const r = resolve(it.href);
+        if (inSpine(r)) { it.href = r; fixed++; }
+      }
+      walk(it.subitems);
+    }
+  };
+  walk(toc);
+  return fixed;
+}
+
 function updateChapterInfo() {
   if (!rendition || !book) return;
   const nav = book.navigation;
@@ -1281,8 +1317,18 @@ function updateChapterInfo() {
   const location = rendition.currentLocation();
   if (!location || !location.start) return;
 
+  // La entrada del índice de esta sección, en CUALQUIER nivel: con el primer nivel solo, un
+  // índice agrupado (años, partes sin enlace propio) nunca casaba y no había capítulo.
   const href = location.start.href;
-  const chapter = nav.toc.find(t => t.href.includes(href));
+  let chapter = null;
+  const walk = (items) => {
+    for (const t of items || []) {
+      if (chapter) return;
+      if (t.href && t.href.includes(href)) { chapter = t; return; }
+      walk(t.subitems);
+    }
+  };
+  walk(nav.toc);
   const label = chapter?.label?.trim();
   if (label && onChapterCallback) onChapterCallback(label);
   // IA2 · Emitir SOLO en cambio real de capítulo (updateChapterInfo se llama en cada
