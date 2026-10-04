@@ -133,6 +133,10 @@ document.addEventListener('DOMContentLoaded', () => {
   // por su cuenta, nunca lanza y es idempotente.
   void repairOrphanDecks().catch(() => {});
   initRouter();
+  // P24 F4 · Estantería compartida por enlace (#d=<id>.<clave>): al arrancar y si se pega
+  // con la app abierta.
+  recibirEnlaceCompartido();
+  window.addEventListener('hashchange', recibirEnlaceCompartido);
   // Ficheros compartidos desde otra app (Android) o abiertos con doble clic (PWA de escritorio).
   import('./inbox.js').then(m => m.init(loadFile)).catch(e => console.warn('inbox:', e));
   registerServiceWorker();
@@ -229,6 +233,39 @@ function registerServiceWorker() {
       console.warn('No se pudo registrar el Service Worker (offline no disponible):', e);
     });
   });
+}
+
+// ============ ESTANTERÍA COMPARTIDA POR ENLACE (P24 F4) ============
+// El enlace trae en el fragmento el id del paquete y su CLAVE. Se quita de la URL antes de
+// usarlo (como el de la demo): la clave no debe quedarse en el historial ni colarse en un
+// enlace que el usuario copie después. Descargar + descifrar y luego la misma revisión que
+// al abrir un fichero `.bookreader`.
+async function recibirEnlaceCompartido() {
+  const { parseLinkHash, fetchLink } = await import('./share/link.js');
+  const link = parseLinkHash();
+  if (!link) return;
+  const p = new URLSearchParams(location.hash.replace(/^#/, ''));
+  p.delete('d');
+  const rest = p.toString();
+  history.replaceState({}, '', location.pathname + location.search + (rest ? '#' + rest : ''));
+  const { toast } = await import('./ai/toast.js');
+  const dismiss = toast({ message: t('Abriendo la estantería compartida…'), timeout: 0 });
+  let blob;
+  try {
+    blob = await fetchLink(link);
+  } catch (e) {
+    dismiss();
+    await alertBox(e.code === 'expired'
+      ? t('Este enlace ha caducado o lo han retirado. Pide que te lo vuelvan a mandar.')
+      : e.code === 'broken'
+        ? t('El enlace está incompleto: puede que se cortara al copiarlo. Ábrelo desde el mensaje original.')
+        : t('No se pudo descargar la estantería. Comprueba la conexión y vuelve a abrir el enlace.'),
+    { title: t('Estantería compartida') });
+    return;
+  }
+  dismiss();
+  const { importDossier } = await import('./share/import-ui.js');
+  if (await importDossier(new File([blob], 'enlace.bookreader', { type: 'application/zip' }))) goToLibrary();
 }
 
 // ============ TRASPASO DE LA DEMO ENTRE DISPOSITIVOS ============

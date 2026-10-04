@@ -1673,3 +1673,35 @@ SVG (sin `img`, `a`, `on*` ni `href` externos). Lo cubre `tests/diagram.spec.ts`
 (`check.mjs`: gate ≥90%). Si con el modelo principal falla más del 10% de los bloques, o el estilo
 desentona en el uso real, se sustituye el dibujo por un motor propio para esos tres tipos
 **conservando la sintaxis Mermaid** que el modelo ya escribe.
+
+## ADR-053 — Compartir por enlace: el dossier pasa por un servidor nuestro, pero cifrado de extremo a extremo · `ACEPTADA`
+
+**Contexto.** P24 compartía una estantería como fichero `.bookreader`. Por WhatsApp llega un ZIP que
+hay que guardar y subir a mano: ni Android ni iOS dejan a una PWA abrir un fichero con un toque. Un
+enlace sí se abre con un toque en cualquier móvil, y es lo que hace que una biblioteca compartida
+circule (viralidad, 2026-10-04). Pero un enlace necesita que el paquete esté en algún sitio, y la
+app tenía un principio: los datos del lector no pasan por un servidor nuestro.
+
+**Decisión.** Un Worker propio, `workers/share`, con R2 detrás, separado del gateway de IA.
+- El dossier se **cifra en el navegador del emisor** (AES-GCM 256, clave aleatoria por enlace). Se
+  sube solo el texto cifrado. La clave va en el **fragmento** del enlace
+  (`/app/#d=<id>.<clave>`), que el navegador no envía nunca: el servidor guarda bytes que no puede
+  leer, y ni siquiera ve títulos, autores ni cuántos libros hay.
+- Id de 128 bits aleatorios; sin cuentas ni listados. Caduca a los **7 días** (410 al descargar lo
+  caducado y purga diaria por cron). Quien sube recibe un token para revocarlo (se guarda su hash).
+- Subida anónima con **límite por IP** (10/min) y **tope de 100 MB** (el del cuerpo de petición de
+  Workers). Si con libros se pasa, la app ofrece el enlace sin libros o el fichero.
+- Los **libros van** si caben (por fichero ya viajaban por defecto, a petición del dueño). Pasan 7
+  días por nuestro almacenamiento, cifrados e ilegibles para nosotros.
+- El fichero sigue como alternativa en el mismo diálogo (sin red, o para quien no quiera servidor).
+
+**Por qué es compatible con el principio.** Lo que el principio protege es que no podamos leer ni
+perfilar lo que el lector hace. Con la clave en el fragmento no podemos; guardamos un blob opaco que
+desaparece solo. No guardamos IP (solo cuenta para el límite).
+
+**Alternativas.** Drive de quien comparte (sin servidor nuestro, pero solo vale a quien tiene Drive
+y pelea con ficheros grandes; queda para una estantería «viva»). Todo en el enlace (solo cabe algo
+pequeño; WhatsApp rompe enlaces enormes). Sin cifrar (más simple, inaceptable).
+
+**Riesgo aceptado.** Una reclamación de copyright sobre un libro compartido apunta a un enlace
+nuestro, aunque no podamos ver qué contiene; la caducidad corta y la revocación lo acotan.

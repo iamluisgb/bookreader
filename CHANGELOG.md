@@ -3,6 +3,17 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-10-04 — Compartir una estantería por enlace (P24 F4)
+
+«Compartir estantería» ofrece ahora, por defecto, un **enlace** que se abre con un toque en
+cualquier móvil o navegador, sin guardar ni subir ningún fichero. El dossier se **cifra en el
+navegador** (AES-GCM) y se sube cifrado a un Worker propio con R2 (`workers/share`); la clave va en
+el fragmento del enlace (`/app/#d=<id>.<clave>`), que nunca llega al servidor. Caduca en 7 días.
+Los libros van dentro si el paquete cabe en 100 MB; si no, enlace sin libros o fichero. Si no se
+puede crear el enlace, se ofrece mandar el fichero sin empezar de nuevo. Al abrirlo, la clave se
+borra de la URL y se entra en la misma revisión que al importar un fichero. Decisión: ADR-053.
+Tests: [share-link.spec.ts](tests/share-link.spec.ts), `npm run test:share`. SW `v173`.
+
 ## 2026-10-04 — El repaso del capítulo se ve
 
 Con el agente cerrado, el repaso del capítulo (HQ&A) solo enseñaba el aviso «el agente te

@@ -1412,20 +1412,91 @@ async function shareShelf(shelf) {
         ] },
       { name: 'author', label: 'Tu nombre (opcional)', type: 'text', value: Share.getAuthor(),
         placeholder: 'Así verá quién se lo manda' },
+      // P24 F4: el enlace se abre con un toque en cualquier móvil; el fichero hay que guardarlo
+      // y subirlo. El fichero sigue para quien no quiera que pase por un servidor (aunque
+      // vaya cifrado) o no tenga red.
+      { name: 'how', label: 'Cómo', type: 'select', value: 'link',
+        options: { link: 'Enlace (se abre con un toque, caduca en 7 días)', file: 'Fichero .bookreader' } },
     ],
     okText: t('Compartir'),
   });
   if (!res) return;
-  const parts = res.parts || [];
+  let parts = res.parts || [];
   if (!parts.length) return;
   Share.setAuthor(res.author);
-  const pkg = await Share.packShelf(shelf.id, { parts, author: res.author });
+  let pkg = await Share.packShelf(shelf.id, { parts, author: res.author });
   if (Bundle.counts(pkg.bundle).empty) {
     await alertBox(t('Ningún libro de esta estantería tiene todavía nada de lo elegido.'), { title: t('Compartir estantería') });
     return;
   }
+  if (res.how === 'link') {
+    const Link = await import('../share/link.js');
+    // Con los libros puede pasar del tope del enlace (100 MB): enlace sin libros, o fichero.
+    if (pkg.blob.size > Link.MAX_LINK_BYTES && parts.includes('files')) {
+      const alt = await formBox({
+        title: t('Compartir estantería'),
+        message: t('Con los libros pesa {size}, más de lo que cabe en un enlace (100 MB).', { size: humanSize(pkg.blob.size) }),
+        fields: [{ name: 'alt', label: 'Qué hago', type: 'select', value: 'nobooks',
+          options: { nobooks: 'Enlace sin los libros (notas, libretas y artefactos)', file: 'Fichero con los libros' } }],
+        okText: t('Continuar'),
+      });
+      if (!alt) return;
+      if (alt.alt === 'file') { const how = await Share.deliver(pkg); if (how !== 'cancelled') track('share_shelf', how); return; }
+      parts = parts.filter(x => x !== 'files');
+      pkg = await Share.packShelf(shelf.id, { parts, author: res.author });
+    }
+    await shareShelfLink(Link, pkg, shelf, Share);
+    return;
+  }
   const how = await Share.deliver(pkg);
   if (how !== 'cancelled') track('share_shelf', how);
+}
+
+// Sube el dossier cifrado y entrega el enlace: hoja de compartir del sistema en móvil
+// (WhatsApp, Telegram…), portapapeles en escritorio.
+async function shareShelfLink(Link, pkg, shelf, Share) {
+  const { toast } = await import('../ai/toast.js');
+  const dismiss = toast({ message: t('Preparando el enlace…'), timeout: 0 });
+  let out;
+  try {
+    out = await Link.createLink(pkg.blob);
+  } catch (e) {
+    dismiss();
+    if (e.code === 'rate_limited') {
+      await alertBox(t('Has creado muchos enlaces seguidos. Espera un minuto y vuelve a probar.'), { title: t('Compartir estantería') });
+      return;
+    }
+    // Sin enlace (sin red, servidor caído o demasiado grande): el paquete ya está hecho, se
+    // ofrece mandarlo como fichero en vez de obligar a empezar de nuevo.
+    const asFile = await confirmBox(e.code === 'too_large'
+      ? t('Es demasiado grande para un enlace. ¿La mando como fichero?')
+      : t('No se pudo crear el enlace. ¿La mando como fichero?'),
+    { title: t('Compartir estantería'), okText: t('Mandar fichero') });
+    if (!asFile) return;
+    const how = await Share.deliver(pkg);
+    if (how !== 'cancelled') track('share_shelf', how);
+    return;
+  }
+  dismiss();
+  const text = t('Te paso mi estantería «{name}» de BookReader, con mis notas:', { name: shelf.name });
+  const date = new Date(out.expiresAt).toLocaleDateString(undefined, { day: 'numeric', month: 'long' });
+  const coarse = window.matchMedia?.('(pointer: coarse)').matches;
+  if (coarse && navigator.share) {
+    try {
+      await navigator.share({ title: shelf.name, text, url: out.url });
+      track('share_shelf', 'link');
+      return;
+    } catch (e) {
+      if (e?.name === 'AbortError') return;
+    }
+  }
+  let copied = false;
+  try { await navigator.clipboard.writeText(`${text} ${out.url}`); copied = true; } catch { /* sin permiso */ }
+  track('share_shelf', 'link');
+  await alertBox(copied
+    ? t('Enlace copiado. Pégalo donde quieras: quien lo abra verá la estantería y podrá guardarla. Caduca el {date}.', { date })
+    : t('Este es el enlace (caduca el {date}): {url}', { date, url: out.url }),
+  { title: t('Compartir estantería') });
 }
 
 // ---- menú de libro ---------------------------------------------------------

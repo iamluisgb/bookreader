@@ -1,0 +1,28 @@
+// P24 F4 · Compartir por enlace: almacén de dossiers CIFRADOS (ADR-053).
+// Deploy: `npx wrangler deploy` desde este directorio. Requiere R2 activado en la cuenta y
+// el bucket creado una vez: `npx wrangler r2 bucket create bookreader-shares`.
+{
+  "name": "bookreader-share",
+  "main": "src/index.js",
+  "compatibility_date": "2026-07-01",
+  "observability": { "enabled": true, "head_sampling_rate": 1 },
+  "vars": {
+    // Mismos orígenes que el gateway (igualdad exacta de string, ver su wrangler.jsonc).
+    "ALLOWED_ORIGINS": "http://localhost:8000,http://localhost:8888,https://bookreader.raiatech.com,https://bookreader-2h5.pages.dev",
+    // 100 MB: el tope de cuerpo de petición de Workers en el plan gratuito. Un dossier con
+    // libros que se pase se ofrece sin libros (o como fichero) en la app.
+    "MAX_BYTES": "104857600",
+    // Días que vive un enlace. La purga diaria (cron) borra lo caducado; además la descarga
+    // de algo caducado responde 410 aunque la purga aún no haya pasado.
+    "TTL_DAYS": "7"
+  },
+  "r2_buckets": [
+    { "binding": "SHARES", "bucket_name": "bookreader-shares" }
+  ],
+  // Anti-abuso: subir es anónimo (el enlace es para viralidad: sin cuentas), así que se
+  // limita por IP. 10 subidas por minuto da para compartir a mano de sobra.
+  "ratelimits": [
+    { "name": "UPLOADS", "namespace_id": "2401", "simple": { "limit": 10, "period": 60 } }
+  ],
+  "triggers": { "crons": ["23 3 * * *"] }
+}

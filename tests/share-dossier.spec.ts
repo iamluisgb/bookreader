@@ -188,6 +188,8 @@ test('desde el menú de la estantería: elegir partes y descargar el .bookreader
   await expect(page.locator('.dlg-check input[value="artifacts"]')).toBeChecked();
   await page.locator('.dlg-check input[value="chat"]').check();
   await page.locator('.dlg-input[data-field="author"]').fill('Luis');
+  // El enlace es lo que se ofrece primero (P24 F4); aquí se prueba el fichero.
+  await page.locator('.dlg-input[data-field="how"]').selectOption('file');
 
   const [download] = await Promise.all([
     page.waitForEvent('download'),
