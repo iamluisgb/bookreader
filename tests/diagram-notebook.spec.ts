@@ -83,8 +83,9 @@ test('el diagrama del chat va a la libreta entero, y allí se dibuja', async ({ 
   await expect(note).toHaveCount(1);
   await expect(note.locator('.ai-diagram > svg')).toBeVisible({ timeout: 20000 });
   await expect(note).toContainText('Explícame con un diagrama');      // la pregunta como título
-  // En la libreta no lleva el botón (no hay a dónde mandarlo).
-  await expect(note.locator('[data-dg-act]')).toHaveCount(0);
+  // En la libreta: compartir sí, «A la libreta» no (ya está).
+  await expect(note.locator('[data-dg-act="notebook"]')).toHaveCount(0);
+  await expect(note.locator('[data-dg-act="png"]')).toHaveCount(1);
 
   // Exportar a Markdown: el diagrama viaja como bloque ```mermaid intacto (Obsidian, GitHub
   // o Notion lo dibujan), aunque un nodo se llame como una cita (`a1`).
@@ -122,4 +123,39 @@ test('«A la libreta» de la respuesta: la IA resume el texto y el diagrama se g
   });
   expect(contents.some(c => c.includes('cuello de botella'))).toBe(true);
   await expect(page.locator('#ai-view-notebook .ai-nb-note-text .ai-diagram > svg')).toBeVisible({ timeout: 20000 });
+});
+
+test('compartir: la imagen sale en claro, con firma, y el código como bloque mermaid', async ({ page, context }) => {
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.goto('/index.html');
+  // Tema oscuro activo: la imagen debe salir clara igualmente.
+  await page.evaluate(() => { document.documentElement.dataset.theme = 'dark'; });
+  const r = await page.evaluate(async (code) => {
+    const D: any = await import('/js/ai/diagram.js');
+    window.dispatchEvent(new CustomEvent('book:meta', { detail: { title: 'Redes de computadoras' } }));
+    const blob: Blob = await D.diagramPng(code);
+    const bmp = await createImageBitmap(blob);
+    const c = document.createElement('canvas'); c.width = bmp.width; c.height = bmp.height;
+    const ctx = c.getContext('2d')!; ctx.drawImage(bmp, 0, 0);
+    const corner = [...ctx.getImageData(4, 4, 1, 1).data];
+    return { type: blob.type, w: bmp.width, h: bmp.height, corner };
+  }, DIAGRAM.split('\n').slice(1, -1).join('\n'));
+  expect(r.type).toBe('image/png');
+  expect(r.corner.slice(0, 3)).toEqual([255, 255, 255]);          // fondo claro
+  expect(r.w).toBeGreaterThanOrEqual(1040);                        // doble resolución
+
+  // Los botones, sobre un diagrama del chat.
+  await page.evaluate(async (md) => {
+    const R: any = await import('/js/ai/render.js');
+    const box = document.createElement('div'); box.id = 'ai-messages';
+    box.innerHTML = `<div class="ai-msg ai-msg-assistant">${R.renderWithCitations(md, new Map())}</div>`;
+    document.body.appendChild(box);
+  }, DIAGRAM);
+  const fig = page.locator('#ai-messages .ai-diagram');
+  await expect(fig.locator(':scope > svg')).toBeVisible({ timeout: 20000 });
+  await fig.locator('[data-dg-act="code"]').click();
+  await expect(fig.locator('[data-dg-act="code"]')).toContainText('Copiado');
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(DIAGRAM);
+  await fig.locator('[data-dg-act="png"]').click();
+  await expect(fig.locator('[data-dg-act="png"]')).toContainText(/Imagen copiada|Descargado/);
 });

@@ -3,6 +3,14 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-10-04 — Compartir diagramas
+
+Cada diagrama (en el chat y en la libreta) lleva **«Copiar imagen»** —PNG al portapapeles en
+escritorio, hoja de compartir del sistema en móvil— y **«Copiar Mermaid»** (el bloque, que Notion,
+Obsidian o GitHub dibujan solos). La imagen sale **siempre en claro**, a doble resolución, con margen
+y una firma discreta «BookReader · título del libro». Sin portapapeles de imágenes, se descarga.
+Icono nuevo `image`. Tests en [diagram-notebook.spec.ts](tests/diagram-notebook.spec.ts). SW `v169`.
+
 ## 2026-10-04 — Diagramas a la libreta
 
 «A la libreta» resumía la respuesta con la IA y un diagrama resumido se perdía. Ahora los bloques

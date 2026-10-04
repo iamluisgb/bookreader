@@ -189,9 +189,14 @@ function paint(el, svg) {
   if (s) { s.setAttribute('role', 'img'); fitWidth(s); }
   // En el chat, cada diagrama lleva sus acciones (las atiende panel.js por delegación). Fuera
   // del chat (resumen, Feynman, la propia libreta) no: ahí no hay a dónde mandarlo.
-  if (el.closest('#ai-messages')) {
+  // Compartir (imagen y Mermaid) vale en el chat y en la libreta; «A la libreta», solo en el chat.
+  const inChat = !!el.closest('#ai-messages');
+  if (inChat || el.closest('#ai-view-notebook')) {
+    const coarse = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
     el.insertAdjacentHTML('beforeend', `<div class="ai-diagram-actions">
-      <button type="button" class="ai-act" data-dg-act="notebook">${icon('notebook', { size: 'md' })}<span>${t('A la libreta')}</span></button>
+      ${inChat ? `<button type="button" class="ai-act" data-dg-act="notebook">${icon('notebook', { size: 'md' })}<span>${t('A la libreta')}</span></button>` : ''}
+      <button type="button" class="ai-act" data-dg-act="png">${icon(coarse ? 'share' : 'image', { size: 'md' })}<span>${coarse ? t('Compartir') : t('Copiar imagen')}</span></button>
+      <button type="button" class="ai-act" data-dg-act="code">${icon('copy', { size: 'md' })}<span>${t('Copiar Mermaid')}</span></button>
     </div>`);
   }
 }
@@ -220,3 +225,152 @@ if (typeof MutationObserver === 'function' && typeof document !== 'undefined') {
     hydrateDiagrams();
   }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 }
+
+// ---- Compartir un diagrama -------------------------------------------------------------
+// «Copiar imagen» (escritorio: PNG al portapapeles, se pega en Notion, Slack, WhatsApp…) o
+// «Compartir» (móvil: hoja del sistema), y «Copiar Mermaid» (el código, editable en Notion,
+// Obsidian o GitHub, que lo dibujan solos).
+//
+// La imagen sale SIEMPRE en tema claro, aunque se lea en oscuro o sepia: en redes y en los
+// apuntes de otros un diagrama oscuro queda fuera de sitio. A doble resolución, con margen y
+// una firma discreta abajo («BookReader · título del libro»), como la tarjeta-cita.
+const LIGHT = {
+  key: 'share-light',
+  vars: {
+    darkMode: false, fontFamily: 'system-ui, -apple-system, "Segoe UI", sans-serif', fontSize: '15px',
+    background: '#ffffff', mainBkg: '#ffffff', primaryColor: '#ffffff', primaryTextColor: '#1d1d1f',
+    primaryBorderColor: '#c9ccd2', secondaryColor: '#f2f4f7', tertiaryColor: '#ffffff',
+    lineColor: '#5f5f64', textColor: '#1d1d1f', nodeTextColor: '#1d1d1f', titleColor: '#1d1d1f',
+    edgeLabelBackground: '#ffffff', clusterBkg: '#f2f4f7', clusterBorder: '#c9ccd2',
+    actorBkg: '#ffffff', actorBorder: '#c9ccd2', actorTextColor: '#1d1d1f', actorLineColor: '#5f5f64',
+    signalColor: '#1d1d1f', signalTextColor: '#1d1d1f', labelBoxBkgColor: '#f2f4f7', labelBoxBorderColor: '#c9ccd2',
+    labelTextColor: '#1d1d1f', loopTextColor: '#1d1d1f', noteBkgColor: '#f2f4f7', noteBorderColor: '#c9ccd2',
+    noteTextColor: '#1d1d1f', activationBkgColor: '#f2f4f7', activationBorderColor: '#c9ccd2',
+    sequenceNumberColor: '#ffffff', cScale0: '#ffffff', cScale1: '#f2f4f7', cScale2: '#ffffff',
+  },
+};
+const SHARE_SCALE = 2;
+const PAD = 48;
+const FOOT = 56;
+
+let shareTitle = '';
+if (typeof window !== 'undefined') {
+  window.addEventListener('book:meta', (e) => { shareTitle = e.detail?.title || ''; });
+}
+
+function loadImage(src) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error('img'));
+    img.src = src;
+  });
+}
+
+// SVG del diagrama en tema claro, con su tamaño natural.
+async function lightSvg(code) {
+  const mermaid = await loadMermaid();
+  configure(mermaid, LIGHT);
+  try {
+    const { svg } = await mermaid.render('ai-mmd-share-' + (++seq), code);
+    const box = document.createElement('div');
+    box.innerHTML = svg;
+    scrub(box);
+    const s = box.querySelector('svg');
+    const vb = s.viewBox.baseVal;
+    const w = Math.ceil(vb?.width || parseFloat(s.getAttribute('width')) || 600);
+    const h = Math.ceil(vb?.height || parseFloat(s.getAttribute('height')) || 400);
+    s.setAttribute('width', w);
+    s.setAttribute('height', h);
+    s.removeAttribute('style');
+    s.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+    return { markup: new XMLSerializer().serializeToString(s), w, h };
+  } finally {
+    configuredKey = '';      // el siguiente diagrama del chat vuelve a los colores del tema
+  }
+}
+
+const MARK = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" rx="118" fill="#111418"/>'
+  + '<path d="M288 119 Q288 99 308 99 L396 99 Q416 99 416 119 L416 371 L352 323 L288 371 Z" fill="#22c55e"/>'
+  + '<path d="M98 90 L222 90 Q256 90 256 124 L256 470 C 249 442 233 424 206 414 C 177 403 140 401 100 401 Q64 401 64 365 L64 124 Q64 90 98 90 Z" fill="#f8fafc"/></svg>';
+const svgUrl = (markup) => 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(markup);
+
+export async function diagramPng(code, { title = shareTitle } = {}) {
+  const { markup, w, h } = await lightSvg(code);
+  const [img, mark] = await Promise.all([loadImage(svgUrl(markup)), loadImage(svgUrl(MARK))]);
+  const W = Math.max(w + PAD * 2, 520), H = h + PAD * 2 + FOOT;
+  const canvas = document.createElement('canvas');
+  canvas.width = W * SHARE_SCALE; canvas.height = H * SHARE_SCALE;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(SHARE_SCALE, SHARE_SCALE);
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, W, H);
+  ctx.drawImage(img, Math.round((W - w) / 2), PAD, w, h);
+  // Firma: logo + «BookReader · título», en gris, sobre una línea fina.
+  const y = H - FOOT + 8;
+  ctx.fillStyle = '#e6e8eb';
+  ctx.fillRect(PAD, y - 8, W - PAD * 2, 1);
+  ctx.drawImage(mark, PAD, y + 8, 20, 20);
+  ctx.font = '600 14px system-ui, -apple-system, "Segoe UI", sans-serif';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#1d1d1f';
+  ctx.fillText('BookReader', PAD + 28, y + 18);
+  let x = PAD + 28 + ctx.measureText('BookReader').width;
+  if (title) {
+    ctx.font = '400 14px system-ui, -apple-system, "Segoe UI", sans-serif';
+    ctx.fillStyle = '#6b6f76';
+    const max = W - PAD - x - 12;
+    let tt = ' · ' + title;
+    while (tt.length > 4 && ctx.measureText(tt).width > max) tt = tt.slice(0, -2);
+    if (tt !== ' · ' + title) tt = tt.trimEnd() + '…';
+    ctx.fillText(tt, x, y + 18);
+  }
+  return new Promise((resolve, reject) =>
+    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('png'))), 'image/png'));
+}
+
+const touch = () => typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
+
+async function flash(btn, ico, label) {
+  const prev = btn.innerHTML;
+  btn.innerHTML = `${icon(ico, { size: 'md' })}<span>${label}</span>`;
+  setTimeout(() => { if (btn.isConnected) btn.innerHTML = prev; }, 2000);
+}
+
+async function onShareClick(e) {
+  const btn = e.target.closest('[data-dg-act="png"], [data-dg-act="code"]');
+  if (!btn) return;
+  const fig = btn.closest('.ai-diagram');
+  const code = diagramCode(fig);
+  if (!code) return;
+  if (btn.dataset.dgAct === 'code') {
+    try {
+      await navigator.clipboard.writeText('```mermaid\n' + code.trim() + '\n```');
+      flash(btn, 'check', t('Copiado'));
+    } catch { flash(btn, 'warning', t('No se pudo copiar')); }
+    return;
+  }
+  // Imagen. En móvil, hoja de compartir del sistema; en escritorio, al portapapeles (la
+  // promesa va DENTRO del ClipboardItem: Safari exige crearlo en el mismo gesto).
+  const png = diagramPng(code);
+  if (touch()) {
+    try {
+      const { sharePng } = await import('../share-card.js');
+      const how = await sharePng(await png, 'bookreader-diagrama.png');
+      if (how === 'downloaded') flash(btn, 'check', t('Descargado'));
+    } catch { flash(btn, 'warning', t('No se pudo generar la imagen')); }
+    return;
+  }
+  try {
+    if (!window.ClipboardItem || !navigator.clipboard?.write) throw new Error('sin portapapeles');
+    await navigator.clipboard.write([new ClipboardItem({ 'image/png': png })]);
+    flash(btn, 'check', t('Imagen copiada'));
+  } catch {
+    try {
+      const { sharePng } = await import('../share-card.js');
+      await sharePng(await png, 'bookreader-diagrama.png');      // sin portapapeles: descarga
+      flash(btn, 'check', t('Descargado'));
+    } catch { flash(btn, 'warning', t('No se pudo generar la imagen')); }
+  }
+}
+if (typeof document !== 'undefined') document.addEventListener('click', onShareClick);

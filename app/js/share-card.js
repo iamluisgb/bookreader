@@ -154,7 +154,7 @@ export async function buildQuoteCard({ quote, title, author, cover }) {
 
 // Comparte un blob PNG (Web Share con ficheros si el navegador lo soporta; si no, descarga).
 // Devuelve 'shared' | 'downloaded' | 'cancelled'. Común a la tarjeta-cita y la de racha.
-async function sharePng(blob, filename) {
+export async function sharePng(blob, filename) {
   const file = new File([blob], filename, { type: 'image/png' });
   if (navigator.canShare && navigator.canShare({ files: [file] })) {
     try {

@@ -32,6 +32,8 @@ const ICONS = {
   // una flecha hacia donde crece. Ampliar el agente (ai/maximize.js); no es ⤢, que es
   // pantalla completa del navegador.
   'panel-wide': '<rect x="3.5" y="4" width="17" height="16" rx="2.3"/><line x1="7.5" y1="4" x2="7.5" y2="20"/><polyline points="14 9 11 12 14 15"/>',
+  // Imagen (marco con montaña y sol): copiar/compartir un diagrama como PNG.
+  image: '<rect x="3.5" y="4.5" width="17" height="15" rx="2.3"/><circle cx="9" cy="9.5" r="1.6"/><path d="M20.5 15.5l-4.8-4.8L5 19.5"/>',
   'panel-right': '<rect x="3.5" y="4" width="17" height="16" rx="2.3"/><line x1="14.5" y1="4" x2="14.5" y2="20"/>',
   search: '<circle cx="11" cy="11" r="6.5"/><line x1="15.8" y1="15.8" x2="20.5" y2="20.5"/>',
   // Imagotipo de la app (libro abierto: página con curl + cinta marcapáginas):

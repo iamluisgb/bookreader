@@ -2974,9 +2974,10 @@ async function onNotebookClick(e) {
 
   if (e.target.closest('.ai-nb-deliver-btn')) { buildDeliverable(); return; }
 
-  // Tocar el texto de una nota la edita (salvo enlaces y citas, ya atendidos arriba).
+  // Tocar el texto de una nota la edita (salvo enlaces, citas —ya atendidas arriba— y las
+  // acciones de un diagrama, que las atiende diagram.js).
   const txt = e.target.closest('.ai-nb-note-text');
-  if (txt && !e.target.closest('a') && !window.getSelection()?.toString()) {
+  if (txt && !e.target.closest('a, .ai-diagram-actions') && !window.getSelection()?.toString()) {
     editingId = Number(txt.dataset.id); addingField = null;
     renderNotebook(); focusEditor();
   }
