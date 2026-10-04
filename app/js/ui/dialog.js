@@ -31,8 +31,15 @@ function fieldHtml(f) {
         <span>${escapeHtml(o.label)}</span></label>`).join('');
     return `<div class="dlg-field">${label}<div class="dlg-checks">${opts || `<span class="dlg-field-empty">${escapeHtml(t(f.emptyText || 'Nada que elegir'))}</span>`}</div></div>`;
   }
+  // Texto con `hint` (una línea gris bajo el campo) y `suggestions` ([{label, value}]):
+  // botones que rellenan el campo (p. ej. «Quitar subtítulo», «Restaurar el original»).
+  const hint = f.hint ? `<div class="dlg-field-hint">${escapeHtml(f.hint)}</div>` : '';
+  const sugg = (f.suggestions || []).length
+    ? `<div class="dlg-suggs">${f.suggestions.map(s =>
+        `<button type="button" class="dlg-sugg" data-sugg-for="${f.name}" data-sugg-value="${escapeHtml(s.value)}">${escapeHtml(s.label)}</button>`).join('')}</div>`
+    : '';
   return `<div class="dlg-field">${label}<input class="dlg-input" id="${id}" type="text" data-field="${f.name}"
-    value="${escapeHtml(f.value == null ? '' : String(f.value))}" placeholder="${escapeHtml(t(f.placeholder || ''))}"></div>`;
+    value="${escapeHtml(f.value == null ? '' : String(f.value))}" placeholder="${escapeHtml(t(f.placeholder || ''))}">${hint}${sugg}</div>`;
 }
 
 function build({ kind, title, message, value, placeholder, okText, cancelText, danger, fields }) {
@@ -98,7 +105,7 @@ function build({ kind, title, message, value, placeholder, okText, cancelText, d
       if (e.key === 'Escape') { e.preventDefault(); onCancel(); return; }
       if (e.key === 'Enter' && (isAlert || isPrompt || isForm || document.activeElement === okBtn)) {
         // En prompt/alert, Enter confirma (salvo que el foco esté en Cancelar).
-        if (document.activeElement !== cancelBtn) { e.preventDefault(); onOk(); return; }
+        if (document.activeElement !== cancelBtn && !document.activeElement?.dataset?.suggFor) { e.preventDefault(); onOk(); return; }
       }
       if (e.key !== 'Tab') return;
       const f = [...card.querySelectorAll('button, input, select')].filter(el => el.offsetParent !== null);
@@ -110,6 +117,12 @@ function build({ kind, title, message, value, placeholder, okText, cancelText, d
     document.addEventListener('keydown', onKey, true);
 
     overlay.addEventListener('mousedown', (e) => { if (e.target === overlay) onCancel(); });
+    card.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-sugg-for]');
+      if (!b) return;
+      const field = card.querySelector(`[data-field="${b.dataset.suggFor}"]`);
+      if (field) { field.value = b.dataset.suggValue; field.focus(); }
+    });
     okBtn.addEventListener('click', onOk);
     cancelBtn?.addEventListener('click', onCancel);
 

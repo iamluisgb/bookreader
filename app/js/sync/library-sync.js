@@ -48,7 +48,7 @@ const THUMB_PREFIX = 'v2|';
 
 // Campos que solo conoce quien tiene el fichero: no se pierden porque el otro
 // lado gane el LWW por haber tocado el progreso (ver mergeMaps · monotone).
-const MONOTONE = ['title', 'author', 'format', 'fileName', 'fileBaseId', 'size', 'blob', 'addedAt'];
+const MONOTONE = ['title', 'author', 'origTitle', 'origAuthor', 'format', 'fileName', 'fileBaseId', 'size', 'blob', 'addedAt'];
 
 // ---- Miniaturas -------------------------------------------------------------
 
@@ -100,6 +100,9 @@ async function thumbFor(record) {
 function bookEntry(b) {
   return {
     title: b.title || '', author: b.author || '', format: b.format || '',
+    // Lo que trae el fichero, si el usuario renombró el libro (library/book-meta.js).
+    ...(b.origTitle != null ? { origTitle: b.origTitle } : {}),
+    ...(b.origAuthor != null ? { origAuthor: b.origAuthor } : {}),
     fileName: b.fileName || '', fileBaseId: b.fileBaseId || '',
     size: b.size || 0, addedAt: b.addedAt || 0,
     status: b.status || 'unread', progress: b.progress || 0,

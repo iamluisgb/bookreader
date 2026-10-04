@@ -9,6 +9,7 @@ import * as DriveAuth from '../sync/drive-auth.js';
 import { ensurePro } from '../ui/paywall.js';
 import { icon } from '../ui/icons.js';
 import { brandMark, brandLockup } from '../ui/brand.js';
+import { editBookMeta } from './book-meta.js';
 import { t, getLang } from '../i18n.js';
 import { escapeHtml } from '../ui/escape.js';
 import { confirmBox, promptBox, alertBox, formBox } from '../ui/dialog.js';
@@ -929,7 +930,8 @@ function norm(s) { return (s || '').toLowerCase().normalize('NFD').replace(/[̀-
 function matchQuery(b) {
   const q = norm(query.trim());
   if (!q) return true;
-  return norm(b.title).includes(q) || norm(b.author).includes(q);
+  // También por el título y el autor del fichero, si el usuario los cambió.
+  return [b.title, b.author, b.origTitle, b.origAuthor].some(v => norm(v).includes(q));
 }
 // Lista visible = estantería · progreso · búsqueda, ordenada. Compartida por el
 // render completo y el refiltrado en vivo del buscador.
@@ -1602,6 +1604,7 @@ async function openBookMenu(id, anchor) {
   buildMenu(anchor, `
     <button class="lib-menu-item" data-act="open">${icon('book', { size: 'md' })}<span>${local ? t('Abrir') : t('Descargar y abrir')}</span></button>
     <button class="lib-menu-item" data-act="finish">${icon('check', { size: 'md' })}<span>${finished ? t('Marcar como no leído') : t('Marcar como terminado')}</span></button>
+    <button class="lib-menu-item" data-act="meta">${icon('pencil', { size: 'md' })}<span>${t('Editar título y autor')}</span></button>
     ${storage ? `<div class="lib-menu-sep"></div>${storage}` : ''}
     <div class="lib-menu-sep"></div>
     <div class="lib-menu-label">${t('Estanterías')}</div>
@@ -1617,6 +1620,7 @@ async function openBookMenu(id, anchor) {
     <button class="lib-menu-item danger" data-act="delete">${icon('trash', { size: 'md' })}<span>${t('Eliminar')}</span></button>
   `, async (act, item) => {
     if (act === 'open') { await openCard(id); return; }
+    if (act === 'meta') { if (await editBookMeta(book)) await render(); return; }
     if (act === 'download') { await startDownload(id); return; }
     if (act === 'export') { await exportBook(id); return; }
     if (act === 'upload') {

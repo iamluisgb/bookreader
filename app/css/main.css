@@ -66,7 +66,13 @@ html, body {
    progreso. Sustituye a «BookReader», que repetía la marca. */
 .sidebar-book { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1; }
 .sidebar-book-cover { width: 32px; height: 46px; border-radius: var(--r-xs); object-fit: cover; flex: none; box-shadow: var(--shadow-1); }
-.sidebar-book-text { min-width: 0; }
+.sidebar-book-text {
+  min-width: 0; display: flex; flex-direction: column; align-items: flex-start; text-align: left;
+  border: none; background: none; color: inherit; font: inherit; cursor: pointer;
+  padding: 4px 6px; margin: -4px -6px; border-radius: var(--r-sm); max-width: 100%;
+}
+.sidebar-book-text:hover { background: var(--fill); }
+.sidebar-book-title, .sidebar-book-meta { display: block; max-width: 100%; }
 .sidebar-book-title {
   margin: 0; font-size: var(--fs-md); font-weight: 600; line-height: 1.25;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;

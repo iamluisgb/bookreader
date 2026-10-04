@@ -1022,6 +1022,13 @@ button.lib-rail-twisty:hover { background: var(--surface-2); color: var(--text);
 .dlg-form { margin-top: var(--s-4); max-height: min(56vh, 460px); overflow-y: auto; }
 .dlg-field + .dlg-field { margin-top: var(--s-3); }
 .dlg-field-lbl { display: block; font-size: var(--fs-sm); color: var(--text-soft); margin-bottom: 4px; }
+.dlg-field-hint { margin-top: 4px; font-size: var(--fs-xs); color: var(--text-faint); overflow-wrap: anywhere; }
+.dlg-suggs { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.dlg-sugg {
+  border: 1px solid var(--border); background: none; color: var(--text-soft); cursor: pointer;
+  font: inherit; font-size: var(--fs-xs); padding: 3px 10px; border-radius: var(--r-pill);
+}
+.dlg-sugg:hover { color: var(--text); background: var(--fill); }
 .dlg-field .dlg-input { margin-top: 0; }
 .dlg-field-empty { font-size: var(--fs-sm); color: var(--text-faint); }
 .dlg-checks {

@@ -47,7 +47,8 @@ export function initHighlights() {
 
   // Export button
   document.getElementById('export-highlights-btn')?.addEventListener('click', () => {
-    const title = EpubReader.isLoaded() ? EpubReader.getTitle() : 'PDF';
+    // El título que se ve (el del usuario si lo cambió), no el de los metadatos.
+    const title = bookMeta.title || (EpubReader.isLoaded() ? EpubReader.getTitle() : 'PDF');
     const result = Highlights.exportJSON(title);
     if (!result) {
       alertBox('No hay subrayados para exportar');

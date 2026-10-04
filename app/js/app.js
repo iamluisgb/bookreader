@@ -10,6 +10,7 @@ import { hydrateIcons, icon } from './ui/icons.js';
 import { setSidebar, toggleSidebar, initSidebarState } from './ui/sidebar.js';
 import { initReadingPop, isReadingPopOpen } from './ui/reading-pop.js';
 import { brandMark, startBookSplash, buildVersion } from './ui/brand.js';
+import { mergeFileMeta, editBookMeta } from './library/book-meta.js';
 import { countBookWords, countPdfWords, updateProgressDetail, getCurrentPct, WORDS_PER_LOCATION } from './progress.js';
 import * as FeatureGuide from './ui/feature-guide.js';
 import * as ReadingLog from './reading-log.js';
@@ -817,6 +818,16 @@ async function backfillCover(record) {
   Library.render();
 }
 
+// Título y autor que se enseñan al abrir: los de la ficha si existe (el usuario pudo
+// cambiarlos), si no los del fichero.
+async function shownMeta(id, fileTitle, fileAuthor) {
+  let rec = null;
+  try { rec = await LibStore.getBook(id); } catch (e) { /* sin biblioteca: los del fichero */ }
+  return rec && rec.title
+    ? { title: rec.title, author: rec.author ?? fileAuthor ?? '' }
+    : { title: fileTitle, author: fileAuthor || '' };
+}
+
 // Guardar/actualizar un libro recién abierto desde un archivo (con portada).
 async function persistToLibrary(id, buffer, format, fileName, fileBaseId) {
   try {
@@ -826,8 +837,11 @@ async function persistToLibrary(id, buffer, format, fileName, fileBaseId) {
     // base, y el libro recién importado desaparecía en el siguiente render.
     const raw = await LibStore.getRaw(id);
     const existing = raw && !raw.deleted ? raw : null;
-    const title = format === 'pdf' ? (fileName.replace(/\.[^.]+$/, '')) : EpubReader.getTitle();
-    const author = format === 'pdf' ? '' : EpubReader.getAuthor();
+    const fileTitle = format === 'pdf' ? (fileName.replace(/\.[^.]+$/, '')) : EpubReader.getTitle();
+    const fileAuthor = format === 'pdf' ? '' : EpubReader.getAuthor();
+    // Reabrir el fichero no pisa el título/autor que el usuario puso (library/book-meta.js).
+    const names = mergeFileMeta(existing, fileTitle, fileAuthor);
+    const { title, author } = names;
     // Portada: EPUB de sus metadatos; PDF renderizando su página 1 (ya está cargado).
     const cover = (format === 'pdf') ? await PdfReader.renderCoverDataUrl() : await EpubReader.getCoverDataUrl();
     // Meta para la tarjeta-cita (P11) — solo si este libro sigue siendo el actual
@@ -835,7 +849,7 @@ async function persistToLibrary(id, buffer, format, fileName, fileBaseId) {
     if (currentBook && currentBook.id === id) setBookMeta({ title, author, cover });
     const base = existing || { id, addedAt: Date.now(), progress: 0, lastCfi: null, status: 'unread', shelfIds: [] };
     await LibStore.putBook({
-      ...base, id, title, author, cover: cover || base.cover || '',
+      ...base, id, ...names, cover: cover || base.cover || '',
       format, fileName, fileBaseId, size: buffer.byteLength,
       // Blob y no ArrayBuffer: es lo que hace barata cada escritura posterior
       // de la ficha (ver migrateFileToBlob).
@@ -1374,6 +1388,19 @@ function initBookHeader() {
   window.addEventListener('book:meta', (e) => { meta = e.detail; paintSidebarBook(meta); });
   window.addEventListener('reader:progress', (e) => { bookPct = e.detail; paintSidebarBook(meta); });
 
+  // Renombrar (library/book-meta.js): si es el libro abierto, la cabecera y el panel lo
+  // dicen ya. Desde el lector se edita tocando el libro en la cabecera del índice.
+  window.addEventListener('book:renamed', (e) => {
+    if (!currentBook || currentBook.id !== e.detail.id) return;
+    document.getElementById('reader-title').textContent = e.detail.title;
+    setBookMeta({ title: e.detail.title, author: e.detail.author });
+  });
+  document.getElementById('sidebar-book-edit')?.addEventListener('click', async () => {
+    if (!currentBook) return;
+    const rec = await LibStore.getBook(currentBook.id);
+    if (rec) await editBookMeta(rec);
+  });
+
   // Q1: si el título no cabe y a su columna le quedan menos de ~120 px, se oculta (el capítulo ya está
   // en el pie): mejor nada que «D…».
   const header = document.getElementById('reader-header');
@@ -1577,7 +1604,9 @@ async function loadEpub(buffer, bookId, aiBookId, persist = null) {
     // biblioteca ANTES del guard de aborto: aunque el usuario salga o abra otro
     // libro a mitad de carga, este queda guardado y su segmentación cacheada bajo
     // SU id (el panel aísla segmentaciones tardías; ver book-switch.spec.ts).
-    (await panel()).setBook(EpubReader.getBook(), aiBookId, EpubReader.getTitle(), { author: EpubReader.getAuthor() });
+    // Título y autor que se ven: los del usuario si los cambió, si no los del fichero.
+    const shown = await shownMeta(aiBookId, EpubReader.getTitle(), EpubReader.getAuthor());
+    (await panel()).setBook(EpubReader.getBook(), aiBookId, shown.title, { author: shown.author });
     if (persist) {
       await persistToLibrary(aiBookId, buffer, 'epub', persist.fileName, bookId);
       Library.render();
@@ -1589,8 +1618,8 @@ async function loadEpub(buffer, bookId, aiBookId, persist = null) {
     if (seq !== epubLoadSeq || !currentBook || currentBook.id !== aiBookId) return false;
 
     // Update UI
-    document.getElementById('reader-title').textContent = EpubReader.getTitle();
-    setBookMeta({ title: EpubReader.getTitle(), author: EpubReader.getAuthor() });
+    document.getElementById('reader-title').textContent = shown.title;
+    setBookMeta({ title: shown.title, author: shown.author });
     document.getElementById('bookmark-toggle').disabled = false;
     document.getElementById('ai-toggle').disabled = false;
     document.getElementById('immersive-toggle').disabled = false;
@@ -1675,7 +1704,8 @@ async function loadPdf(buffer, bookId, aiBookId, persist = null, displayTitle = 
     // Alimentar al agente y (si viene de un archivo) guardar en biblioteca ANTES del
     // guard de aborto: aunque el usuario salga o abra otro libro a mitad de carga,
     // este queda guardado y su segmentación cacheada bajo SU id.
-    (await panel()).setBook(PdfReader.getDocument(), aiBookId, bookId || 'PDF', { format: 'pdf' });
+    const shownPdf = await shownMeta(aiBookId, displayTitle || (persist ? persist.fileName.replace(/\.[^.]+$/, '') : '') || bookId || 'PDF', '');
+    (await panel()).setBook(PdfReader.getDocument(), aiBookId, shownPdf.title, { format: 'pdf', author: shownPdf.author });
     if (persist) {
       await persistToLibrary(aiBookId, buffer, 'pdf', persist.fileName, bookId);
       Library.render();
@@ -1689,11 +1719,9 @@ async function loadPdf(buffer, bookId, aiBookId, persist = null, displayTitle = 
     // Cabecera = título del libro, igual que en EPUB (la página va en el pie, junto al
     // % y la barra: repetirla arriba era ruido). Sin título conocido, el nombre del
     // fichero sin extensión, que es justo lo que guarda la biblioteca.
-    const headerTitle = displayTitle
-      || (persist ? persist.fileName.replace(/\.[^.]+$/, '') : '')
-      || bookId || 'PDF';
+    const headerTitle = shownPdf.title;
     document.getElementById('reader-title').textContent = headerTitle;
-    setBookMeta({ title: headerTitle });
+    setBookMeta({ title: headerTitle, author: shownPdf.author });
     document.body.classList.add('reading');
     // Móvil (estilo Play Books): arrancar SIN barras (PDF a pantalla completa). Se
     // muestran/ocultan tocando el centro o con el botón ⤢. Las barras son overlay.

@@ -53,10 +53,11 @@
            (dos marcas en 400 px). Lo rellena app.js al abrir un libro. -->
       <div class="sidebar-book">
         <img id="sidebar-book-cover" class="sidebar-book-cover" alt="" hidden>
-        <div class="sidebar-book-text">
-          <h2 id="sidebar-book-title" class="sidebar-book-title">BookReader</h2>
-          <p id="sidebar-book-meta" class="sidebar-book-meta"></p>
-        </div>
+        <!-- Tocar el libro edita su título y autor (library/book-meta.js). -->
+        <button id="sidebar-book-edit" class="sidebar-book-text" aria-label="Editar título y autor" data-tip="Editar título y autor" data-i18n-attrs="aria-label,data-tip" data-tip-align="left">
+          <span id="sidebar-book-title" class="sidebar-book-title">BookReader</span>
+          <span id="sidebar-book-meta" class="sidebar-book-meta"></span>
+        </button>
       </div>
       <div class="sidebar-header-actions">
         <button id="sidebar-close" class="icon-btn" aria-label="Cerrar el índice" data-i18n-attrs="aria-label" data-icon="xmark"></button>

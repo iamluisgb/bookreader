@@ -3,6 +3,16 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-10-04 — Título y autor editables
+
+Los libros traen a menudo «Título: el subtítulo larguísimo» o «Apellido, Nombre». Ahora se cambian
+desde el ⋯ del libro en la biblioteca («Editar título y autor») o tocando el libro en la cabecera
+del índice, con atajos para **quitar el subtítulo**, **poner el autor en orden natural** y
+**restaurar el original**. Lo que el usuario escribe se ve en toda la app (tarjeta, cabecera, panel,
+agente, exportaciones, dossier) y viaja por el sync; el original se guarda aparte
+(`origTitle`/`origAuthor`), la búsqueda encuentra el libro por los dos y **reabrir el fichero no
+pisa el cambio**. Tests: [book-meta.spec.ts](tests/book-meta.spec.ts). SW `v165`.
+
 ## 2026-10-03 — Cabecera del lector: el botón del índice ya no se mueve
 
 Ver [`docs/AUDITORIA_CABECERA_LECTOR.md`](docs/AUDITORIA_CABECERA_LECTOR.md). Al abrir el índice el
