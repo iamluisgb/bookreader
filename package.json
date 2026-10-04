@@ -19,6 +19,7 @@
     "perf": "playwright test --grep @perf",
     "test:gateway": "node --test workers/gateway/test/*.test.mjs",
     "test:share": "node --test workers/share/test/*.test.mjs",
+    "share:usage": "node scripts/share-usage.mjs",
     "test:ai": "playwright test --grep @live",
     "test:provider": "playwright test tests/provider-contract.spec.ts --grep @live",
     "eval:fixtures": "node evals/fetch-fixtures.mjs && node scripts/make-magazine.mjs",

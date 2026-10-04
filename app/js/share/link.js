@@ -54,7 +54,8 @@ function appUrl() {
 }
 
 // Cifra y sube. Devuelve { url, expiresAt, id, deleteToken }. Errores con `code`:
-// 'too_large' (pasa del tope), 'rate_limited', 'network'.
+// 'too_large' (pasa del tope), 'rate_limited', 'capacity' (el servidor llegó a su tope del
+// mes: se niega antes de que R2 cobre, ver workers/share), 'network'.
 export async function createLink(zipBlob) {
   const { blob, key } = await encrypt(zipBlob);
   if (blob.size > MAX_LINK_BYTES) throw Object.assign(new Error('too_large'), { code: 'too_large' });
@@ -63,7 +64,8 @@ export async function createLink(zipBlob) {
     res = await fetch(base() + '/share', { method: 'POST', body: blob, headers: { 'Content-Type': 'application/octet-stream' } });
   } catch (e) { throw Object.assign(new Error('network'), { code: 'network' }); }
   if (!res.ok) {
-    const code = res.status === 413 ? 'too_large' : res.status === 429 ? 'rate_limited' : 'network';
+    const code = res.status === 413 ? 'too_large' : res.status === 429 ? 'rate_limited'
+      : res.status === 507 || res.status === 503 ? 'capacity' : 'network';
     throw Object.assign(new Error(code), { code });
   }
   const { id, expiresAt, deleteToken } = await res.json();
@@ -78,12 +80,14 @@ export function parseLinkHash(hash = location.hash) {
 }
 
 // Descarga y descifra. Errores con `code`: 'expired' (caducado o revocado), 'broken' (la
-// clave no abre el paquete: enlace cortado al copiarlo), 'network'.
+// clave no abre el paquete: enlace cortado al copiarlo), 'busy' (tope del mes del servidor),
+// 'network'.
 export async function fetchLink({ id, key }) {
   let res;
   try { res = await fetch(`${base()}/share/${id}`); }
   catch (e) { throw Object.assign(new Error('network'), { code: 'network' }); }
   if (res.status === 404 || res.status === 410) throw Object.assign(new Error('expired'), { code: 'expired' });
+  if (res.status === 503) throw Object.assign(new Error('busy'), { code: 'busy' });
   if (!res.ok) throw Object.assign(new Error('network'), { code: 'network' });
   try { return await decrypt(await res.arrayBuffer(), key); }
   catch (e) { throw Object.assign(new Error('broken'), { code: 'broken' }); }

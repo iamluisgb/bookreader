@@ -1694,6 +1694,13 @@ app tenía un principio: los datos del lector no pasan por un servidor nuestro.
 - Los **libros van** si caben (por fichero ya viajaban por defecto, a petición del dueño). Pasan 7
   días por nuestro almacenamiento, cifrados e ilegibles para nosotros.
 - El fichero sigue como alternativa en el mismo diálogo (sin red, o para quien no quiera servidor).
+- **Nunca pagar.** R2 cobra al pasar de 10 GB, 1 M de operaciones de clase A o 10 M de clase B al
+  mes. Un D1 lleva la cuenta (cada enlace con su tamaño y un contador mensual de operaciones) y el
+  Worker se niega **al 80 %** (8 GB, 800 k, 8 M): reserva en D1 con un `INSERT` condicionado antes
+  de tocar R2, y responde 507/503 al llegar. La purga lee de D1 en vez de listar R2 (listar es
+  clase A). Si D1 falla, 503: nunca R2 a ciegas. D1 y Workers del plan gratuito no cobran (al pasar
+  su límite, fallan). La app, ante el tope, ofrece mandar el fichero. `npm run share:usage` enseña
+  el gasto frente a lo gratis; el cron diario lo deja en los logs con `alert: true` desde el 50 %.
 
 **Por qué es compatible con el principio.** Lo que el principio protege es que no podamos leer ni
 perfilar lo que el lector hace. Con la clave en el fragmento no podemos; guardamos un blob opaco que

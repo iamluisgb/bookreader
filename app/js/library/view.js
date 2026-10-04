@@ -1470,7 +1470,9 @@ async function shareShelfLink(Link, pkg, shelf, Share) {
     // ofrece mandarlo como fichero en vez de obligar a empezar de nuevo.
     const asFile = await confirmBox(e.code === 'too_large'
       ? t('Es demasiado grande para un enlace. ¿La mando como fichero?')
-      : t('No se pudo crear el enlace. ¿La mando como fichero?'),
+      : e.code === 'capacity'
+        ? t('Ahora mismo no se pueden crear más enlaces. ¿La mando como fichero?')
+        : t('No se pudo crear el enlace. ¿La mando como fichero?'),
     { title: t('Compartir estantería'), okText: t('Mandar fichero') });
     if (!asFile) return;
     const how = await Share.deliver(pkg);

@@ -12,7 +12,9 @@ el fragmento del enlace (`/app/#d=<id>.<clave>`), que nunca llega al servidor. C
 Los libros van dentro si el paquete cabe en 100 MB; si no, enlace sin libros o fichero. Si no se
 puede crear el enlace, se ofrece mandar el fichero sin empezar de nuevo. Al abrirlo, la clave se
 borra de la URL y se entra en la misma revisión que al importar un fichero. Decisión: ADR-053.
-Tests: [share-link.spec.ts](tests/share-link.spec.ts), `npm run test:share`. SW `v173`.
+**Nunca pagar R2:** el Worker lleva la cuenta en D1 y se niega al 80 % de lo gratis (8 GB, 800 k
+escrituras y 8 M lecturas al mes); la app, ante el tope, ofrece el fichero. `npm run share:usage`
+enseña el gasto. Tests: [share-link.spec.ts](tests/share-link.spec.ts), `npm run test:share`. SW `v174`.
 
 ## 2026-10-04 — El repaso del capítulo se ve
 

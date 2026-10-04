@@ -764,7 +764,7 @@ Con BYOK el daño se limita a gastar tu clave y mentirte, pero el usuario tiene 
   de su color); el punteado no «llegaba igual» (amarillo claro casi invisible, raya suelta en los subrayados
   de un rect por párrafo). De quién es lo dicen la cabecera «De X» de la barra lateral y el tooltip.
 - **F3 — Método** `S`: mismo sobre, `kind: 'method'`, con la pantalla de revisión del prompt.
-- **F4 — Compartir por enlace** `M` · **hecho 2026-10-04, pendiente de desplegar el Worker** (falta activar R2 en la cuenta de Cloudflare; ver [ADR-053](DECISIONS.md)). Decidido: opción A (Worker + R2, cifrado de extremo a extremo, 7 días), libros dentro si caben en 100 MB. Pendiente: revocar desde la app (el Worker ya acepta `DELETE` con el token), vista previa del enlace en WhatsApp. Hoy el dossier llega por WhatsApp como
+- **F4 — Compartir por enlace** `M` · **hecho y desplegado 2026-10-04** (Worker `bookreader-share` + R2 + D1 con topes al 80 % de lo gratis; ver [ADR-053](DECISIONS.md)). Decidido: opción A (Worker + R2, cifrado de extremo a extremo, 7 días), libros dentro si caben en 100 MB. Pendiente: revocar desde la app (el Worker ya acepta `DELETE` con el token), vista previa del enlace en WhatsApp. Hoy el dossier llega por WhatsApp como
   un fichero que hay que guardar y elegir desde «Subir archivos» (o, en Android con la PWA instalada,
   mantener pulsado → Compartir → BookReader). Ni Android ni iOS dejan a una PWA abrir un fichero con un
   toque. Un **enlace** sí: `bookreader.raiatech.com/app/#d=<id>.<clave>` abre la app con la revisión

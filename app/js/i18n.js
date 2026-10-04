@@ -149,6 +149,8 @@ const EN = {
   'Has creado muchos enlaces seguidos. Espera un minuto y vuelve a probar.': 'You created many links in a row. Wait a minute and try again.',
   'No se pudo crear el enlace. ¿La mando como fichero?': 'Could not create the link. Send it as a file?',
   'Mandar fichero': 'Send file',
+  'Ahora mismo no se pueden crear más enlaces. ¿La mando como fichero?': 'No more links can be created right now. Send it as a file?',
+  'Ahora mismo no se puede descargar la estantería. Vuelve a abrir el enlace más tarde.': 'The shelf cannot be downloaded right now. Open the link again later.',
   'Te paso mi estantería «{name}» de BookReader, con mis notas:': 'Here is my BookReader shelf “{name}”, with my notes:',
   'Enlace copiado. Pégalo donde quieras: quien lo abra verá la estantería y podrá guardarla. Caduca el {date}.': 'Link copied. Paste it anywhere: whoever opens it will see the shelf and can save it. Expires on {date}.',
   'Este es el enlace (caduca el {date}): {url}': 'Here is the link (expires on {date}): {url}',

@@ -259,6 +259,8 @@ async function recibirEnlaceCompartido() {
       ? t('Este enlace ha caducado o lo han retirado. Pide que te lo vuelvan a mandar.')
       : e.code === 'broken'
         ? t('El enlace está incompleto: puede que se cortara al copiarlo. Ábrelo desde el mensaje original.')
+        : e.code === 'busy'
+          ? t('Ahora mismo no se puede descargar la estantería. Vuelve a abrir el enlace más tarde.')
         : t('No se pudo descargar la estantería. Comprueba la conexión y vuelve a abrir el enlace.'),
     { title: t('Estantería compartida') });
     return;

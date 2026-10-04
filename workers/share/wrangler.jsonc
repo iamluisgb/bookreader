@@ -14,8 +14,23 @@
     "MAX_BYTES": "104857600",
     // Días que vive un enlace. La purga diaria (cron) borra lo caducado; además la descarga
     // de algo caducado responde 410 aunque la purga aún no haya pasado.
-    "TTL_DAYS": "7"
+    "TTL_DAYS": "7",
+    // NUNCA PAGAR: topes al 80 % de lo gratis de R2 (10 GB, 1 M clase A/mes, 10 M clase B/mes).
+    // Al llegar, el Worker se niega (507/503) y la app ofrece mandar el fichero. Ver src/index.js.
+    "CAP_STORAGE_BYTES": "8589934592",
+    "CAP_CLASS_A": "800000",
+    "CAP_CLASS_B": "8000000"
   },
+  // Cuenta de lo que hay en R2 y de las operaciones del mes (R2 no la da barata).
+  // Secret: `npx wrangler secret put USAGE_TOKEN` (para /v1/usage y `npm run share:usage`).
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "bookreader-share",
+      "database_id": "1efbae0f-9088-4164-baac-fded22667638",
+      "migrations_dir": "./migrations"
+    }
+  ],
   "r2_buckets": [
     { "binding": "SHARES", "bucket_name": "bookreader-shares" }
   ],
