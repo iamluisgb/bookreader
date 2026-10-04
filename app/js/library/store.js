@@ -37,7 +37,7 @@ const DB_VERSION = 1;
 
 // Campos que viajan en library.json. Un cambio en cualquiera de ellos bumpea
 // `updatedAt`; un cambio en el resto (lastOpenedAt, lastCfi, file…) no.
-const SYNCED_FIELDS = ['title', 'author', 'origTitle', 'origAuthor', 'format', 'fileName', 'fileBaseId', 'size',
+const SYNCED_FIELDS = ['title', 'author', 'origTitle', 'origAuthor', 'metaAt', 'format', 'fileName', 'fileBaseId', 'size',
   'addedAt', 'status', 'progress', 'shelfIds', 'blob', 'deleted', 'deletedAt'];
 
 let dbPromise = null;

@@ -63,7 +63,14 @@ export function mergeCollections(local = [], remote = []) {
 //     null al tocar su progreso (mismo criterio que el "título pegajoso" del
 //     engine).
 // En un registro con tombstone no se rescata nada: borrado es borrado.
-export function mergeMaps(local = {}, remote = {}, { monotone = [] } = {}) {
+//
+// `stamped` son grupos de campos con SU PROPIO sello ({ at, fields }): se resuelven por ese
+// sello y no por el `updatedAt` del registro. Caso real: el título y el autor que el usuario
+// edita (`metaAt`). Con LWW por registro, un dispositivo que solo avanzó de página DESPUÉS de
+// que otro renombrara el libro —pero sin haber bajado el cambio— ganaba con el nombre viejo.
+// Los campos de un grupo sellado tampoco pasan por `monotone`: vaciarlos a propósito (un
+// autor borrado) es una edición, no un dato que falte.
+export function mergeMaps(local = {}, remote = {}, { monotone = [], stamped = [] } = {}) {
   const out = {};
   for (const id of new Set([...Object.keys(local || {}), ...Object.keys(remote || {})])) {
     const l = (local || {})[id];
@@ -75,8 +82,15 @@ export function mergeMaps(local = {}, remote = {}, { monotone = [] } = {}) {
     const win = pickNewer(l, r);
     const lose = win === l ? r : l;
     const rec = { ...win };
+    const sealed = new Set();
     if (!rec.deleted) {
+      for (const { at, fields } of stamped) {
+        const wa = win[at] || 0, la = lose[at] || 0;
+        if (la > wa) { rec[at] = la; for (const f of fields) rec[f] = lose[f]; }
+        if (wa || la) fields.forEach(f => sealed.add(f));
+      }
       for (const f of monotone) {
+        if (sealed.has(f)) continue;
         if ((rec[f] === undefined || rec[f] === null || rec[f] === '') && lose[f] != null && lose[f] !== '') {
           rec[f] = lose[f];
         }

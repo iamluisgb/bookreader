@@ -57,11 +57,18 @@ export async function collectTitles(remoteBooks) {
   for (const [id, info] of Object.entries(remoteBooks || {})) {
     if (info && info.title) titles[id] = info.title;
   }
+  // La identidad es el título DEL FICHERO (origTitle), no el que el usuario le puso: si
+  // renombra el libro en un dispositivo, las dos descargas del mismo libro tienen que seguir
+  // agrupándose. Por eso la biblioteca va primero y el meta del agente (que guarda el título
+  // visible) solo rellena huecos.
   try {
-    for (const b of (await DB.getAll('books')) || []) if (b && b.id && b.title) titles[b.id] = b.title;
+    for (const b of (await LibStore.getAllBooks()) || []) {
+      const ft = b && (b.origTitle || b.title);
+      if (b && b.id && ft) titles[b.id] = ft;
+    }
   } catch (e) { /* IDB no disponible */ }
   try {
-    for (const b of (await LibStore.getAllBooks()) || []) if (b && b.id && b.title && !titles[b.id]) titles[b.id] = b.title;
+    for (const b of (await DB.getAll('books')) || []) if (b && b.id && b.title && !titles[b.id]) titles[b.id] = b.title;
   } catch (e) { /* IDB no disponible */ }
   return titles;
 }

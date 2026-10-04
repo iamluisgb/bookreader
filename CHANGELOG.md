@@ -11,7 +11,11 @@ del índice, con atajos para **quitar el subtítulo**, **poner el autor en orden
 **restaurar el original**. Lo que el usuario escribe se ve en toda la app (tarjeta, cabecera, panel,
 agente, exportaciones, dossier) y viaja por el sync; el original se guarda aparte
 (`origTitle`/`origAuthor`), la búsqueda encuentra el libro por los dos y **reabrir el fichero no
-pisa el cambio**. Tests: [book-meta.spec.ts](tests/book-meta.spec.ts). SW `v165`.
+pisa el cambio**. En el sync, título y autor llevan **su propio sello** (`metaAt`): un dispositivo
+que avanzó de página sin haber bajado el renombrado ya no lo pisa, y vaciar el autor a propósito no
+lo rellena el otro. El reconocimiento del mismo libro con distinto hash sigue yendo por el título
+del fichero, así renombrar no lo rompe. Tests: [book-meta.spec.ts](tests/book-meta.spec.ts),
+[sync-book-meta.spec.ts](tests/sync-book-meta.spec.ts). SW `v166`.
 
 ## 2026-10-03 — Cabecera del lector: el botón del índice ya no se mueve
 

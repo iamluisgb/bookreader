@@ -184,10 +184,16 @@ export async function buildSnapshot() {
   // identidad (mismo libro, distinto hash) y los subrayados no se cruzaban.
   const titles = {};
   try {
-    for (const b of (await LibStore.getAllBooks()) || []) if (b && b.id && b.title) titles[b.id] = b.title;
+    // Título del FICHERO (origTitle) si el usuario renombró el libro: el manifest lo usa
+    // para reconocer el mismo libro con distinto hash (aliases.js), y eso no debe depender
+    // de cómo lo haya llamado cada uno.
+    for (const b of (await LibStore.getAllBooks()) || []) {
+      const ft = b && (b.origTitle || b.title);
+      if (b && b.id && ft) titles[b.id] = ft;
+    }
   } catch (e) { /* IDB no disponible */ }
   for (const b of meta || []) {
-    if (b.title) titles[b.id] = b.title;
+    if (b.title && !titles[b.id]) titles[b.id] = b.title;
     if (books[b.id]) books[b.id].meta = b;
   }
 

@@ -48,6 +48,9 @@ const THUMB_PREFIX = 'v2|';
 
 // Campos que solo conoce quien tiene el fichero: no se pierden porque el otro
 // lado gane el LWW por haber tocado el progreso (ver mergeMaps · monotone).
+// Título y autor editados por el usuario: se resuelven por su propio sello (metaAt), no por
+// el del registro, que mueve cualquier pase de página (ver mergeMaps · stamped).
+const STAMPED = [{ at: 'metaAt', fields: ['title', 'author'] }];
 const MONOTONE = ['title', 'author', 'origTitle', 'origAuthor', 'format', 'fileName', 'fileBaseId', 'size', 'blob', 'addedAt'];
 
 // ---- Miniaturas -------------------------------------------------------------
@@ -103,6 +106,7 @@ function bookEntry(b) {
     // Lo que trae el fichero, si el usuario renombró el libro (library/book-meta.js).
     ...(b.origTitle != null ? { origTitle: b.origTitle } : {}),
     ...(b.origAuthor != null ? { origAuthor: b.origAuthor } : {}),
+    ...(b.metaAt ? { metaAt: b.metaAt } : {}),
     fileName: b.fileName || '', fileBaseId: b.fileBaseId || '',
     size: b.size || 0, addedAt: b.addedAt || 0,
     status: b.status || 'unread', progress: b.progress || 0,
@@ -165,7 +169,7 @@ export async function applyLibrary(remote) {
   const shelfById = {};
   for (const s of localShelves) { localShelfMap[s.id] = shelfEntry(s); shelfById[s.id] = s; }
 
-  const mergedBooks = mergeMaps(localBookMap, remote.books || {}, { monotone: MONOTONE });
+  const mergedBooks = mergeMaps(localBookMap, remote.books || {}, { monotone: MONOTONE, stamped: STAMPED });
   const mergedShelves = mergeMaps(localShelfMap, remote.shelves || {}, { monotone: ['name', 'createdAt'] });
 
   let changed = 0;

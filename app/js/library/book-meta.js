@@ -72,7 +72,9 @@ export async function editBookMeta(book) {
   const title = (res.title || '').trim() || origTitle;
   const author = (res.author || '').trim();
   if (title === book.title && author === (book.author || '')) return false;
-  await Store.updateBook(book.id, { title, author, origTitle, origAuthor });
+  // metaAt: sello propio del título/autor, para que en el sync no lo pise otro dispositivo
+  // que solo avanzó de página (sync/merge.js · stamped).
+  await Store.updateBook(book.id, { title, author, origTitle, origAuthor, metaAt: Date.now() });
   window.dispatchEvent(new CustomEvent('book:renamed', { detail: { id: book.id, title, author } }));
   return true;
 }
