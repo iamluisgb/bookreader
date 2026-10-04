@@ -373,6 +373,13 @@ body.in-library .ai-fab { display: none; }
 .library.is-file-over { outline: 2px dashed var(--accent); outline-offset: -8px; }
 
 /* ---- Rail izquierdo ---- */
+/* Marca en la biblioteca (es la pantalla de entrada; el lector ya no la lleva). Escritorio:
+   logo + nombre arriba del rail. Móvil (sin rail): solo el logo, delante del título. */
+.brand-lockup { display: flex; align-items: center; gap: 10px; padding: 2px var(--s-2) var(--s-4); }
+.brand-mark { flex: none; display: block; }
+.brand-name { font-size: var(--fs-lg); font-weight: 700; letter-spacing: -0.01em; color: var(--text); }
+.lib-head-mark { display: none; }
+@media (max-width: 767px) { .lib-head-mark { display: block; margin-right: 10px; } }
 .lib-rail {
   flex: 0 0 264px; width: 264px; height: 100%;
   display: flex; flex-direction: column;

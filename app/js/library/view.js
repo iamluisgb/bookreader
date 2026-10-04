@@ -8,6 +8,7 @@ import * as Blobs from '../sync/blobs.js';
 import * as DriveAuth from '../sync/drive-auth.js';
 import { ensurePro } from '../ui/paywall.js';
 import { icon } from '../ui/icons.js';
+import { brandMark, brandLockup } from '../ui/brand.js';
 import { t, getLang } from '../i18n.js';
 import { escapeHtml } from '../ui/escape.js';
 import { confirmBox, promptBox, alertBox, formBox } from '../ui/dialog.js';
@@ -227,6 +228,7 @@ export async function render() {
   host.innerHTML = `
     <div class="lib-layout">
       <aside class="lib-rail" aria-label="${t('Estanterías')}">
+        ${brandLockup(24)}
         ${fixedRowHtml('all', `<span class="lib-rail-thumb lib-rail-thumb--all">${icon('library', { size: 'md' })}</span>`,
           t('Libros'), books.length, !selection.size)}
         ${fixedRowHtml('none', `<span class="lib-rail-thumb lib-rail-thumb--none">${icon('inbox', { size: 'md' })}</span>`,
@@ -247,6 +249,7 @@ export async function render() {
       <section class="lib-main">
         ${stripHtml(manual, smart, books.length, noShelfCount)}
         <div class="lib-head">
+          ${brandMark(28, 'brand-mark lib-head-mark')}
           <h1 class="lib-h1">${escapeHtml(currentTitle())}</h1>
           ${headShelfKebab(shelves)}
           <button class="lib-more" data-act="more" aria-haspopup="dialog" aria-label="${t('Más: ajustes, análisis, mazos…')}" title="${t('Más')}">${icon('menu', { size: 'xl' })}</button>
