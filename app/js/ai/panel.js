@@ -1846,9 +1846,9 @@ function onChapterChanged(label) {
 
 async function quizChapter(chapterLabel) {
   if (busy) return;
-  // P30 F2: la primera interrupción de IA2 es un momento de descubrimiento gratis —
-  // pero solo si se entiende de dónde viene, que si no parece un bug.
-  Hints.maybeShow('hqa', t('Esto es el <b>repaso del capítulo</b>: antes de avanzar, el agente te pregunta de memoria lo que acabas de leer. Responde como puedas — la conversación sigue después.'));
+  // El aviso sale cuando la pregunta YA existe (ver showRecapPop). Antes salía aquí, antes de
+  // saber si habría repaso, y la pregunta acababa en el panel cerrado: el lector veía «el
+  // agente te pregunta…» y ninguna pregunta.
   const mySeq = bookSeq;   // guard: no persistir el repaso si el usuario cambia de libro
   ensureIndex();
   const passages = capPassages(Retrieval.passagesByChapter(chapterLabel), 12000);
@@ -1879,13 +1879,57 @@ OBJETIVO: ${convo?.goal || '(sin definir)'}` },
     textNode.innerHTML = renderWithCitations(finalText, anchors);
     history.push({ role: 'assistant', content: finalText });
     if (convo) DB.addMessage(convo.id, 'assistant', finalText);
-    if (!isOpen()) { agentUnread = true; applyAgentBadge(); }
+    if (!isOpen()) { agentUnread = true; applyAgentBadge(); showRecapPop(finalText); }
+    else Hints.maybeShow('hqa', t('Esto es el <b>repaso del capítulo</b>: antes de avanzar, el agente te pregunta de memoria lo que acabas de leer. Responde como puedas — la conversación sigue después.'));
   } catch (e) {
     console.warn('IA2 repaso de capítulo falló:', e);
     bubble.remove();
   } finally {
     busy = false; els.send.disabled = false; scrollDown();
   }
+}
+
+// Repaso del capítulo con el agente cerrado: la pregunta, a la vista, con «Responder» (abre
+// el agente con el foco en el campo) y «Ahora no» (se queda en el chat, con el punto en ✦).
+// La primera vez añade una línea que explica qué es, como hacía el hint.
+let recapPop = null;
+function showRecapPop(questionMd) {
+  recapPop?.remove();
+  const q = String(questionMd || '')
+    .replace(/\[\[a\d+\]\]/g, '').replace(/[*_`>#]/g, '').replace(/^\s*Repaso\s*[—–-]\s*/i, '')
+    .replace(/\s+/g, ' ').trim();
+  const short = q.length > 240 ? q.slice(0, 239).trimEnd() + '…' : q;
+  const first = !Hints.isSeen('hqa');
+  const el = document.createElement('div');
+  el.className = 'hint-pop recap-pop';
+  el.setAttribute('role', 'status');
+  el.innerHTML = `
+    <span class="hint-pop-ico">${icon('sparkles', { size: 'md' })}</span>
+    <div class="recap-pop-body">
+      <div class="recap-pop-kicker">${t('Repaso del capítulo')}</div>
+      <p class="recap-pop-q"></p>
+      ${first ? `<p class="recap-pop-why">${t('Antes de avanzar, el agente te pregunta de memoria lo que acabas de leer. Responde como puedas.')}</p>` : ''}
+      <div class="recap-pop-acts">
+        <button type="button" class="btn btn--primary recap-pop-go">${t('Responder')}</button>
+        <button type="button" class="dlg-btn recap-pop-later">${t('Ahora no')}</button>
+      </div>
+    </div>`;
+  el.querySelector('.recap-pop-q').textContent = short;
+  const close = () => { clearTimeout(timer); el.classList.remove('show'); setTimeout(() => el.remove(), 300); if (recapPop === el) recapPop = null; };
+  el.querySelector('.recap-pop-go').addEventListener('click', () => {
+    close();
+    setOpen(true);
+    showView('chat');
+    scrollDown();
+    els.input?.focus();
+  });
+  el.querySelector('.recap-pop-later').addEventListener('click', close);
+  document.body.appendChild(el);
+  requestAnimationFrame(() => el.classList.add('show'));
+  Hints.markSeen('hqa');
+  recapPop = el;
+  // No caduca rápido (es una pregunta, no un aviso), pero tampoco se queda para siempre.
+  const timer = setTimeout(close, 60000);
 }
 
 // Un turno con el LLM: construye el contexto (IA5), lo streamea y pinta la respuesta.

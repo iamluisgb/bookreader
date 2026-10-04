@@ -3,6 +3,15 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-10-04 — El repaso del capítulo se ve
+
+Con el agente cerrado, el repaso del capítulo (HQ&A) solo enseñaba el aviso «el agente te
+pregunta…» —y antes de saber si habría pregunta—, mientras la pregunta se quedaba en el panel
+cerrado. Ahora el aviso sale cuando la pregunta existe y la trae: «Repaso del capítulo», la
+pregunta, **Responder** (abre el agente con el foco en el campo) y **Ahora no** (se queda en el
+chat con el punto en ✦). La segmentación toma la etiqueta del índice en todos sus niveles. Test:
+[chapter-recap.spec.ts](tests/chapter-recap.spec.ts). SW `v172`.
+
 ## 2026-10-04 — Índice de EPUB con el nav en una subcarpeta
 
 Con «El Turrero Post» el índice no navegaba. El nav estaba en `text/nav.xhtml` y sus enlaces son

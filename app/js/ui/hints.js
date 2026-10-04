@@ -43,7 +43,7 @@ function persistSeen() {
 
 export function isSeen(id) { return seen.indexOf(id) !== -1; }
 
-function markSeen(id) {
+export function markSeen(id) {
   if (seen.indexOf(id) === -1) { seen.push(id); persistSeen(); }
 }
 

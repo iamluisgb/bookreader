@@ -137,6 +137,8 @@ const EN = {
   'de Raiatech': 'by Raiatech',
   'Ampliar agente': 'Expand agent',
   'Ya está en la libreta': 'Already in the notebook',
+  'Repaso del capítulo': 'Chapter review',
+  'Antes de avanzar, el agente te pregunta de memoria lo que acabas de leer. Responde como puedas.': 'Before moving on, the agent asks you to recall what you just read. Answer as best you can.',
   'Copiar imagen': 'Copy image',
   'Copiar Mermaid': 'Copy Mermaid',
   'Imagen copiada': 'Image copied',

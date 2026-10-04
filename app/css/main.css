@@ -1504,6 +1504,12 @@ textarea.is-recording { display: none; }
 }
 .hint-pop-close:hover { color: var(--text); }
 @media (max-width: 600px) { .hint-pop { bottom: 96px; } }
+/* Repaso del capítulo con el agente cerrado (ai/panel.js · showRecapPop). */
+.recap-pop-body { min-width: 0; }
+.recap-pop-kicker { font-size: var(--fs-xs); font-weight: 600; color: var(--accent); letter-spacing: 0.02em; }
+.recap-pop-q { margin: 2px 0 0; font-weight: 500; }
+.recap-pop-why { margin: 6px 0 0; font-size: var(--fs-sm); color: var(--text-soft); }
+.recap-pop-acts { display: flex; gap: 8px; margin-top: 10px; }
 
 /* ==== Guía rápida "¿qué puedo hacer aquí?" (P30 · F4) ====
    Encima del overlay de ajustes (300) porque desde ahí también se abre. */

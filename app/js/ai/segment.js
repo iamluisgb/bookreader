@@ -135,9 +135,17 @@ function findTocLabel(book, href) {
   const toc = book.navigation?.toc;
   if (!toc) return null;
   const base = href.split('#')[0].split('/').pop();
-  const hit = toc.find(t => {
-    const th = (t.href || '').split('#')[0].split('/').pop();
-    return th && base && th === base;
-  });
+  // En todos los niveles: con un índice agrupado (años, partes sin enlace) el primer nivel
+  // no casa nunca y cada sección se quedaba con su encabezado en vez de la etiqueta.
+  let hit = null;
+  const walk = (items) => {
+    for (const t of items || []) {
+      if (hit) return;
+      const th = (t.href || '').split('#')[0].split('/').pop();
+      if (th && base && th === base) { hit = t; return; }
+      walk(t.subitems);
+    }
+  };
+  walk(toc);
   return hit ? hit.label.trim() : null;
 }
