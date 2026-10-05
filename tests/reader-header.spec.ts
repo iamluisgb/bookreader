@@ -112,7 +112,7 @@ test.describe('F3: cabecera móvil a dieta', () => {
     await page.locator('#reader-more').click();
     const menu = page.locator('.reader-more-menu');
     await expect(menu.locator('.lib-menu-item')).toHaveText(
-      ['Índice y notas', 'Buscar', 'Marcar página', 'Pantalla completa', 'Ajustes generales', 'Biblioteca']);
+      ['Índice y notas', 'Buscar', 'Marcar página', 'Pantalla completa', 'Compartir libro…', 'Ajustes generales', 'Biblioteca']);
     // Marcar desde «Más» y que el menú lo diga la próxima vez.
     await menu.locator('[data-act="bookmark"]').click();
     await expect(page.locator('#bookmark-toggle')).toHaveClass(/is-active/);

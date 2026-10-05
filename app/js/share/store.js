@@ -48,7 +48,9 @@ function run(mode, fn) {
 // fichero (no una identidad verificada), así que esto ordena, no autentica.
 export function dossierKey(bundle) {
   const norm = (s) => String(s || '').trim().toLowerCase();
-  return `${norm(bundle.author)}|${norm(bundle.shelf?.name)}`;
+  // Un libro suelto no choca con una estantería de la misma persona que se llame igual.
+  const name = bundle.scope === 'book' ? `libro:${norm(bundle.shelf?.name)}` : norm(bundle.shelf?.name);
+  return `${norm(bundle.author)}|${name}`;
 }
 
 // Sustituye todo lo de un dossier por `records`, en una transacción: o queda lo nuevo
@@ -81,6 +83,17 @@ export async function dossiersForShelf(shelfId) {
     const d = out.get(r.dossierKey) || { key: r.dossierKey, from: r.from || '', shelfName: r.shelfName || '', books: 0 };
     d.books++;
     out.set(r.dossierKey, d);
+  }
+  return [...out.values()];
+}
+
+// Libros sueltos compartidos contigo que tocan a este libro: [{ key, from }]. Lo usa el menú
+// del libro para ofrecer quitarlos (no tienen estantería desde la que hacerlo).
+export async function bookDossiersFor(bookId) {
+  const out = new Map();
+  for (const r of await getAll()) {
+    if (r.bookId !== bookId || r.scope !== 'book') continue;
+    out.set(r.dossierKey, { key: r.dossierKey, from: r.from || '', books: 1 });
   }
   return [...out.values()];
 }

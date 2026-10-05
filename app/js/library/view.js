@@ -1364,7 +1364,7 @@ async function openShelfMenu(id, anchor) {
       await shareShelf(shelf);
       return;
     } else if (act === 'links') {
-      await revokeShelfLinks(shelf, myLinks);
+      await revokeLinks(shelf.name, myLinks);
       return;
     } else if (act === 'pin') {
       togglePinned(id);
@@ -1381,29 +1381,68 @@ async function openShelfMenu(id, anchor) {
   });
 }
 
-// ---- compartir estantería (P24) --------------------------------------------
+// ---- compartir: estantería o libro (P24) -----------------------------------
 
-// Pasarle a otra persona lo que has sacado de una estantería: subrayados, libretas y
-// artefactos de cada libro, en un fichero. Los libros NO viajan: el receptor los
-// consigue por su cuenta y, si su fichero es el mismo (mismo hash), las notas se pintan
-// en su sitio. El módulo se carga al pulsar: no pesa en el arranque de la biblioteca.
+// Pasarle a otra persona un libro o una estantería con lo que has sacado de ellos:
+// subrayados, libretas, artefactos y mazos, y los libros si caben. Por enlace (cifrado, F4)
+// o como fichero `.bookreader`. `target`: { kind: 'shelf' | 'book', id, name }. Un libro
+// suelto es el mismo dossier con un solo libro (`scope: 'book'`): quien lo recibe no tiene
+// que cargar con una estantería «Título · de X». Los módulos se cargan al pulsar.
+const SHARE_TXT = {
+  shelf: {
+    title: () => t('Compartir estantería'),
+    empty: () => t('Ningún libro de esta estantería tiene todavía nada de lo elegido.'),
+    asFile: (code) => code === 'too_large' ? t('Es demasiado grande para un enlace. ¿La mando como fichero?')
+      : code === 'capacity' ? t('Ahora mismo no se pueden crear más enlaces. ¿La mando como fichero?')
+        : t('No se pudo crear el enlace. ¿La mando como fichero?'),
+    text: (name) => t('Te paso mi estantería «{name}» de BookReader, con mis notas:', { name }),
+    copied: (date) => t('Enlace copiado. Pégalo donde quieras: quien lo abra verá la estantería y podrá guardarla. Caduca el {date}; puedes retirarlo antes desde el menú de la estantería.', { date }),
+  },
+  book: {
+    title: () => t('Compartir libro'),
+    empty: () => t('Este libro no tiene todavía nada de lo elegido.'),
+    asFile: (code) => code === 'too_large' ? t('Es demasiado grande para un enlace. ¿Lo mando como fichero?')
+      : code === 'capacity' ? t('Ahora mismo no se pueden crear más enlaces. ¿Lo mando como fichero?')
+        : t('No se pudo crear el enlace. ¿Lo mando como fichero?'),
+    text: (name) => t('Te paso «{name}» en BookReader, con mis notas:', { name }),
+    copied: (date) => t('Enlace copiado. Pégalo donde quieras: quien lo abra tendrá el libro con tus notas. Caduca el {date}; puedes retirarlo antes desde el menú del libro.', { date }),
+  },
+};
+
 async function shareShelf(shelf) {
+  return shareDossier({ kind: 'shelf', id: shelf.id, name: shelf.name });
+}
+
+// Un libro suelto (menú del libro y «Más» del lector).
+export async function shareBook(bookId) {
+  const rec = (await Store.getAllRecords()).find(r => r.id === bookId && !r.deleted);
+  if (!rec) return;
+  return shareDossier({ kind: 'book', id: rec.id, name: rec.title || t('Libro') });
+}
+
+async function shareDossier(target) {
+  const T = SHARE_TXT[target.kind];
   const Share = await import('../share/export.js');
   const Bundle = await import('../share/bundle.js');
-  const { books } = await Share.shelfBooks(shelf.id);
-  if (!books.length) {
-    await alertBox(t('Esta estantería no tiene libros.'), { title: t('Compartir estantería') });
-    return;
+  let books;
+  if (target.kind === 'book') {
+    books = (await Store.getAllRecords()).filter(r => r.id === target.id && !r.deleted);
+  } else {
+    ({ books } = await Share.shelfBooks(target.id));
+    if (!books.length) {
+      await alertBox(t('Esta estantería no tiene libros.'), { title: T.title() });
+      return;
+    }
   }
   // Lo que pesa son los libros: el tamaño va en la casilla, antes de mandar 400 MB por
   // error. Las fichas fantasma (el fichero solo está en Drive) no pueden ir en el paquete.
   const local = books.filter(b => Store.hasFile(b));
   const ghosts = books.length - local.length;
   const bytes = local.reduce((n, b) => n + (b.size || 0), 0);
-  let filesLabel = t('Los libros (PDF/EPUB)') + (bytes ? ' · ' + humanSize(bytes) : '');
-  if (ghosts) filesLabel += ' · ' + t('{n} sin fichero en este dispositivo', { n: ghosts });
+  let filesLabel = (target.kind === 'book' ? t('El libro (PDF/EPUB)') : t('Los libros (PDF/EPUB)')) + (bytes ? ' · ' + humanSize(bytes) : '');
+  if (ghosts) filesLabel += ' · ' + (target.kind === 'book' ? t('sin fichero en este dispositivo') : t('{n} sin fichero en este dispositivo', { n: ghosts }));
   const res = await formBox({
-    title: t('Compartir estantería'),
+    title: T.title(),
     message: books.length === 1
       ? t('Se comparte el libro con lo que has sacado de él. Quien lo reciba lo abre en BookReader y ve tus notas en su sitio.')
       : t('Se comparten {n} libros con lo que has sacado de ellos. Quien lo reciba lo abre en BookReader y ve tus notas en su sitio.', { n: books.length }),
@@ -1431,40 +1470,42 @@ async function shareShelf(shelf) {
   let parts = res.parts || [];
   if (!parts.length) return;
   Share.setAuthor(res.author);
-  let pkg = await Share.packShelf(shelf.id, { parts, author: res.author });
+  const pack = (opts) => (target.kind === 'book' ? Share.packBook(target.id, opts) : Share.packShelf(target.id, opts));
+  let pkg = await pack({ parts, author: res.author });
   if (Bundle.counts(pkg.bundle).empty) {
-    await alertBox(t('Ningún libro de esta estantería tiene todavía nada de lo elegido.'), { title: t('Compartir estantería') });
+    await alertBox(T.empty(), { title: T.title() });
     return;
   }
+  const event = target.kind === 'book' ? 'share_book' : 'share_shelf';
   if (res.how === 'link') {
     const Link = await import('../share/link.js');
     // Con los libros puede pasar del tope del enlace (100 MB): enlace sin libros, o fichero.
     if (pkg.blob.size > Link.MAX_LINK_BYTES && parts.includes('files')) {
       const alt = await formBox({
-        title: t('Compartir estantería'),
+        title: T.title(),
         message: t('Con los libros pesa {size}, más de lo que cabe en un enlace (100 MB).', { size: humanSize(pkg.blob.size) }),
         fields: [{ name: 'alt', label: 'Qué hago', type: 'select', value: 'nobooks',
           options: { nobooks: 'Enlace sin los libros (notas, libretas y artefactos)', file: 'Fichero con los libros' } }],
         okText: t('Continuar'),
       });
       if (!alt) return;
-      if (alt.alt === 'file') { const how = await Share.deliver(pkg); if (how !== 'cancelled') track('share_shelf', how); return; }
+      if (alt.alt === 'file') { const how = await Share.deliver(pkg); if (how !== 'cancelled') track(event, how); return; }
       parts = parts.filter(x => x !== 'files');
-      pkg = await Share.packShelf(shelf.id, { parts, author: res.author });
+      pkg = await pack({ parts, author: res.author });
     }
-    await shareShelfLink(Link, pkg, shelf, Share);
+    await shareLink(Link, pkg, target, Share);
     return;
   }
   const how = await Share.deliver(pkg);
-  if (how !== 'cancelled') track('share_shelf', how);
+  if (how !== 'cancelled') track(event, how);
 }
 
-// Retirar enlaces de una estantería: se borran del servidor al momento (quien los tenga ya
-// no puede abrirlos). Lo ya importado por otros se queda en sus bibliotecas.
-async function revokeShelfLinks(shelf, links) {
+// Retirar enlaces de una estantería o un libro: se borran del servidor al momento (quien los
+// tenga ya no puede abrirlos). Lo ya importado por otros se queda en sus bibliotecas.
+async function revokeLinks(name, links) {
   const day = (ts) => new Date(ts).toLocaleDateString(undefined, { day: 'numeric', month: 'long' });
   const res = await formBox({
-    title: t('Enlaces de «{name}»', { name: shelf.name }),
+    title: t('Enlaces de «{name}»', { name }),
     message: t('Quien tenga el enlace puede abrir la estantería hasta que caduque. Al retirarlo se borra al momento; lo que ya hayan importado se queda en su biblioteca.'),
     fields: [{ name: 'ids', label: 'Retirar', type: 'checks', value: links.map(l => l.id),
       options: links.map(l => ({ value: l.id, label: t('Creado el {a} · caduca el {b}', { a: day(l.createdAt), b: day(l.expiresAt) }) })) }],
@@ -1476,46 +1517,45 @@ async function revokeShelfLinks(shelf, links) {
   for (const l of links.filter(x => res.ids.includes(x.id))) {
     try { await Link.revokeLink(l); } catch { failed++; }
   }
-  if (failed) await alertBox(t('No se pudo retirar {n} enlace(s). Comprueba la conexión y vuelve a probar.', { n: failed }), { title: t('Compartir estantería') });
+  if (failed) await alertBox(t('No se pudo retirar {n} enlace(s). Comprueba la conexión y vuelve a probar.', { n: failed }), { title: t('Enlaces compartidos') });
   else track('share_link_revoke', String(res.ids.length));
 }
 
 // Sube el dossier cifrado y entrega el enlace: hoja de compartir del sistema en móvil
 // (WhatsApp, Telegram…), portapapeles en escritorio.
-async function shareShelfLink(Link, pkg, shelf, Share) {
+async function shareLink(Link, pkg, target, Share) {
+  const T = SHARE_TXT[target.kind];
+  const event = target.kind === 'book' ? 'share_book' : 'share_shelf';
   const { toast } = await import('../ai/toast.js');
   const dismiss = toast({ message: t('Preparando el enlace…'), timeout: 0 });
   let out;
   try {
-    out = await Link.createLink(pkg.blob);
+    out = await Link.createLink(pkg.blob, { kind: target.kind });
   } catch (e) {
     dismiss();
     if (e.code === 'rate_limited') {
-      await alertBox(t('Has creado muchos enlaces seguidos. Espera un minuto y vuelve a probar.'), { title: t('Compartir estantería') });
+      await alertBox(t('Has creado muchos enlaces seguidos. Espera un minuto y vuelve a probar.'), { title: T.title() });
       return;
     }
     // Sin enlace (sin red, servidor caído o demasiado grande): el paquete ya está hecho, se
     // ofrece mandarlo como fichero en vez de obligar a empezar de nuevo.
-    const asFile = await confirmBox(e.code === 'too_large'
-      ? t('Es demasiado grande para un enlace. ¿La mando como fichero?')
-      : e.code === 'capacity'
-        ? t('Ahora mismo no se pueden crear más enlaces. ¿La mando como fichero?')
-        : t('No se pudo crear el enlace. ¿La mando como fichero?'),
-    { title: t('Compartir estantería'), okText: t('Mandar fichero') });
+    const asFile = await confirmBox(T.asFile(e.code), { title: T.title(), okText: t('Mandar fichero') });
     if (!asFile) return;
     const how = await Share.deliver(pkg);
-    if (how !== 'cancelled') track('share_shelf', how);
+    if (how !== 'cancelled') track(event, how);
     return;
   }
   dismiss();
-  Link.rememberLink(out, { shelfId: shelf.id, shelfName: shelf.name });
-  const text = t('Te paso mi estantería «{name}» de BookReader, con mis notas:', { name: shelf.name });
+  Link.rememberLink(out, target.kind === 'book'
+    ? { kind: 'book', bookId: target.id, shelfName: target.name }
+    : { kind: 'shelf', shelfId: target.id, shelfName: target.name });
+  const text = T.text(target.name);
   const date = new Date(out.expiresAt).toLocaleDateString(undefined, { day: 'numeric', month: 'long' });
   const coarse = window.matchMedia?.('(pointer: coarse)').matches;
   if (coarse && navigator.share) {
     try {
-      await navigator.share({ title: shelf.name, text, url: out.url });
-      track('share_shelf', 'link');
+      await navigator.share({ title: target.name, text, url: out.url });
+      track(event, 'link');
       return;
     } catch (e) {
       if (e?.name === 'AbortError') return;
@@ -1523,11 +1563,11 @@ async function shareShelfLink(Link, pkg, shelf, Share) {
   }
   let copied = false;
   try { await navigator.clipboard.writeText(`${text} ${out.url}`); copied = true; } catch { /* sin permiso */ }
-  track('share_shelf', 'link');
+  track(event, 'link');
   await alertBox(copied
-    ? t('Enlace copiado. Pégalo donde quieras: quien lo abra verá la estantería y podrá guardarla. Caduca el {date}; puedes retirarlo antes desde el menú de la estantería.', { date })
+    ? T.copied(date)
     : t('Este es el enlace (caduca el {date}): {url}', { date, url: out.url }),
-  { title: t('Compartir estantería') });
+  { title: T.title() });
 }
 
 // ---- menú de libro ---------------------------------------------------------
@@ -1675,6 +1715,10 @@ async function openBookMenu(id, anchor) {
   const smartShelves = shelves.filter(s => Shelves.isSmart(s) && Shelves.booksIn([book], s).length);
   const finished = book.status === 'finished';
   const local = Store.hasFile(book);
+  // P24 · Compartido como libro suelto: tus enlaces de este libro y lo que otros te pasaron.
+  let bookLinks = [], bookDossiers = [];
+  try { bookLinks = (await import('../share/link.js')).linksForBook(id); } catch (e) { /* sin storage */ }
+  try { bookDossiers = await (await import('../share/store.js')).bookDossiersFor(id); } catch (e) { /* sin base */ }
   const uploaded = !!(book.blob && book.blob.path);
 
   // Bloque de almacenamiento: traer el fichero, liberarlo de este dispositivo o
@@ -1707,6 +1751,10 @@ async function openBookMenu(id, anchor) {
     <button class="lib-menu-item" data-act="open">${icon('book', { size: 'md' })}<span>${local ? t('Abrir') : t('Descargar y abrir')}</span></button>
     <button class="lib-menu-item" data-act="finish">${icon('check', { size: 'md' })}<span>${finished ? t('Marcar como no leído') : t('Marcar como terminado')}</span></button>
     <button class="lib-menu-item" data-act="meta">${icon('pencil', { size: 'md' })}<span>${t('Editar título y autor')}</span></button>
+    <button class="lib-menu-item" data-act="sharebook">${icon('share', { size: 'md' })}<span>${t('Compartir libro…')}</span></button>
+    ${bookLinks.length ? `<button class="lib-menu-item" data-act="booklinks">${icon('xmark', { size: 'md' })}<span>${t('Retirar enlaces ({n})…', { n: bookLinks.length })}</span></button>` : ''}
+    ${bookDossiers.map((d, i) => `<button class="lib-menu-item danger" data-act="unsharebook" data-i="${i}">${icon('xmark', { size: 'md' })}<span>${
+      d.from ? t('Quitar lo de {name}…', { name: escapeHtml(d.from) }) : t('Quitar lo compartido…')}</span></button>`).join('')}
     ${storage ? `<div class="lib-menu-sep"></div>${storage}` : ''}
     <div class="lib-menu-sep"></div>
     <div class="lib-menu-label">${t('Estanterías')}</div>
@@ -1723,6 +1771,16 @@ async function openBookMenu(id, anchor) {
   `, async (act, item) => {
     if (act === 'open') { await openCard(id); return; }
     if (act === 'meta') { if (await editBookMeta(book)) await render(); return; }
+    if (act === 'sharebook') { await shareBook(id); return; }
+    if (act === 'booklinks') { await revokeLinks(book.title || t('Libro'), bookLinks); return; }
+    if (act === 'unsharebook') {
+      const d = bookDossiers[Number(item.dataset.i)];
+      const who = d.from || t('otra persona');
+      const ok = await confirmBox(t('Se quitan los subrayados, libretas, artefactos y mazos de {name} en este libro. El libro sigue en tu biblioteca, y los mazos que ya añadiste a los tuyos se quedan.', { name: who }),
+        { title: t('Quitar lo de {name}', { name: who }), okText: 'Quitar', danger: true });
+      if (ok) await (await import('../share/store.js')).removeDossier(d.key);
+      return;
+    }
     if (act === 'download') { await startDownload(id); return; }
     if (act === 'export') { await exportBook(id); return; }
     if (act === 'upload') {

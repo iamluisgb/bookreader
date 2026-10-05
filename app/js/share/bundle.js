@@ -101,7 +101,10 @@ function templatesUsed(books, customTemplates) {
 //          por tanto puede ir en el paquete.
 //   parts: subconjunto de PARTS.
 //   customTemplates: las plantillas propias del usuario (para incrustar las usadas).
-export function build({ shelf, books, parts = PARTS, author = '', customTemplates = [], now = Date.now() }) {
+// `scope`: 'shelf' (una estantería) o 'book' (un libro suelto). Con 'book' el receptor mete el
+// libro en su biblioteca sin crear una estantería «Título · de X», que con uno solo sobra.
+export const SCOPES = ['shelf', 'book'];
+export function build({ shelf, books, parts = PARTS, author = '', customTemplates = [], now = Date.now(), scope = 'shelf' }) {
   const want = new Set(parts);
   const outBooks = (books || []).map(({ book, hasFile, highlights, convos, artifacts, decks, cover }) => {
     const b = {
@@ -133,6 +136,9 @@ export function build({ shelf, books, parts = PARTS, author = '', customTemplate
     exportedAt: new Date(now).toISOString(),
     author: String(author || '').trim().slice(0, 80),
     shelf: { name: String(shelf?.name || '').trim() || 'Estantería' },
+    // Solo cuando no es lo de siempre: un dossier de estantería queda byte-idéntico al de antes,
+    // y una app anterior que no conozca `scope` crea la estantería y no se rompe.
+    ...(scope === 'book' ? { scope: 'book' } : {}),
     parts: PARTS.filter(p => want.has(p)),
     templates: templatesUsed(outBooks, customTemplates),
     books: outBooks,
@@ -188,6 +194,8 @@ export function validate(obj) {
   if (!Number.isInteger(obj.version) || obj.version < 1) errs.push('versión inválida');
   else if (obj.version > VERSION) errs.push(`versión ${obj.version} posterior a la soportada (${VERSION})`);
   if (!KINDS.includes(obj.kind)) errs.push(`tipo «${obj.kind}» no soportado`);
+  if (obj.scope != null && !SCOPES.includes(obj.scope)) errs.push(`alcance «${obj.scope}» no soportado`);
+  if (obj.scope === 'book' && Array.isArray(obj.books) && obj.books.length !== 1) errs.push('un dossier de libro lleva un libro');
   if (!Array.isArray(obj.books)) { errs.push('falta la lista de libros'); return errs; }
   if (obj.templates != null && !Array.isArray(obj.templates)) errs.push('plantillas inválidas');
   obj.books.forEach((b, i) => {

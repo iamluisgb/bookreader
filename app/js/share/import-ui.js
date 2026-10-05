@@ -56,6 +56,11 @@ export async function importDossier(file) {
   if (!res || !(res.books || []).length) return null;
   const out = await Import.apply(p, res.books);
   const shelf = Import.shelfNameFor(p.bundle);
+  if (out.scope === 'book') {
+    await alertBox(t('Listo: «{title}» está en tu biblioteca, con lo de {name}.', { title: p.bundle.shelf?.name || '', name: p.bundle.author || t('quien te lo manda') }),
+      { title: t('Abrir dossier') });
+    return out;
+  }
   await alertBox(out.books === 1
     ? t('Listo: 1 libro en la estantería «{shelf}».', { shelf })
     : t('Listo: {n} libros en la estantería «{shelf}».', { n: out.books, shelf }),

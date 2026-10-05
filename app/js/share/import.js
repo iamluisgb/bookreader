@@ -49,7 +49,10 @@ const mimeOf = (format) => (format === 'pdf' ? 'application/pdf' : 'application/
 // Escribe los libros elegidos (`ids`; por defecto todos). Devuelve un resumen.
 export async function apply(p, ids = p.books.map(b => b.entry.bookId), now = Date.now()) {
   const chosen = p.books.filter(b => ids.includes(b.entry.bookId));
-  const shelf = await ensureShelf(shelfNameFor(p.bundle));
+  // Un libro suelto entra sin estantería: «Título · de X» con un solo libro sobra.
+  const isBook = p.bundle.scope === 'book';
+  const shelf = isBook ? null : await ensureShelf(shelfNameFor(p.bundle));
+  const shelfIds = shelf ? [shelf.id] : [];
   const added = [];
 
   for (const { entry, file, state } of chosen) {
@@ -62,16 +65,16 @@ export async function apply(p, ids = p.books.map(b => b.entry.bookId), now = Dat
         id: entry.bookId, title: entry.title, author: entry.author || '', format: entry.format,
         fileName: `${entry.title || 'libro'}.${entry.format === 'pdf' ? 'pdf' : 'epub'}`,
         size: file.size, addedAt: now, progress: 0, lastCfi: null, status: 'unread',
-        shelfIds: [shelf.id], cover: entry.cover || raw?.cover || '', coverThumb: null,
+        shelfIds, cover: entry.cover || raw?.cover || '', coverThumb: null,
         file: new Blob([file], { type: mimeOf(entry.format) }),
         deleted: false, deletedAt: 0,
       });
       added.push(entry.bookId);
     } else if (state === 'attach') {
       await Store.patchBook(entry.bookId, { file: new Blob([file], { type: mimeOf(entry.format) }) }, { stamp: false });
-      await Store.toggleBookShelf(entry.bookId, shelf.id, true);
+      if (shelf) await Store.toggleBookShelf(entry.bookId, shelf.id, true);
     } else if (state === 'have') {
-      await Store.toggleBookShelf(entry.bookId, shelf.id, true);
+      if (shelf) await Store.toggleBookShelf(entry.bookId, shelf.id, true);
     }
     // Lo que ya tenías sin portada (llegó por sync, o nunca se abrió) la toma del dossier.
     if (entry.cover && (state === 'have' || state === 'attach')) {
@@ -83,7 +86,8 @@ export async function apply(p, ids = p.books.map(b => b.entry.bookId), now = Dat
 
   await Shared.replaceDossier(p.key, chosen.map(({ entry }) => ({
     bookId: entry.bookId,
-    shelfId: shelf.id,   // para poder quitarlo desde el menú de esa estantería
+    shelfId: shelf ? shelf.id : null,   // para poder quitarlo desde el menú de esa estantería
+    scope: isBook ? 'book' : 'shelf',   // un libro suelto se quita desde el menú del libro
     title: entry.title,
     source: entry.source || null,
     from: p.bundle.author || '',
@@ -96,5 +100,5 @@ export async function apply(p, ids = p.books.map(b => b.entry.bookId), now = Dat
     templates: p.bundle.templates || [],
   })));
 
-  return { shelfId: shelf.id, added: added.length, books: chosen.length };
+  return { shelfId: shelf ? shelf.id : null, added: added.length, books: chosen.length, scope: isBook ? 'book' : 'shelf' };
 }

@@ -556,6 +556,7 @@ function initReaderMore() {
       '<div class="lib-menu-sep"></div>',
     ].join('') : '';
     menu.innerHTML = mobileRows + `
+      <button class="lib-menu-item" role="menuitem" data-act="sharebook">${icon('share', { size: 'md' })}<span>${t('Compartir libro…')}</span></button>
       <button class="lib-menu-item" role="menuitem" data-act="general">${icon('gear', { size: 'md' })}<span>${t('Ajustes generales')}</span></button>
       <div class="lib-menu-sep"></div>
       <button class="lib-menu-item" role="menuitem" data-act="library">${icon('library', { size: 'md' })}<span>${t('Biblioteca')}</span></button>
@@ -578,6 +579,7 @@ function initReaderMore() {
       else if (act === 'search') setSidebar(true, 'search');
       else if (act === 'bookmark') document.getElementById('bookmark-toggle')?.click();
       else if (act === 'fullscreen') document.getElementById('immersive-toggle')?.click();
+      else if (act === 'sharebook') { if (currentBook) Library.shareBook(currentBook.id); }
       else if (act === 'general') openAppSettings();
       else if (act === 'library') goToLibrary();
     });

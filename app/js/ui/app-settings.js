@@ -1223,7 +1223,7 @@ async function paintLinks(content) {
   box.innerHTML = links.map(l => `
     <div class="appset-link" data-id="${escapeHtml(l.id)}">
       <div class="appset-link-text">
-        <div class="appset-link-name">${escapeHtml(l.shelfName || t('Estantería'))}</div>
+        <div class="appset-link-name">${escapeHtml(l.kind === 'book' ? t('Libro: {name}', { name: l.shelfName || '' }) : (l.shelfName || t('Estantería')))}</div>
         <div class="appset-link-meta">${escapeHtml(t('Creado el {a} · caduca el {b}', { a: day(l.createdAt), b: day(l.expiresAt) }))}<span class="appset-link-opens"></span></div>
       </div>
       <button class="appset-tpl-cancel appset-link-copy" data-act="copy">${icon('copy', { size: 'md' })} ${t('Copiar')}</button>

@@ -58,6 +58,22 @@ export async function buildShelfDossier(shelfId, { parts = Bundle.PARTS, author 
   return Bundle.build({ shelf, books: gathered, parts, author, customTemplates: CustomTemplates.getAll() });
 }
 
+// Un libro suelto (con lo que has sacado de él): el mismo dossier, con un solo libro y
+// `scope: 'book'`. El «nombre de la estantería» es el título del libro.
+export async function buildBookDossier(bookId, { parts = Bundle.PARTS, author = getAuthor() } = {}) {
+  const book = (await Store.getAllRecords()).find(r => r.id === bookId && !r.deleted);
+  if (!book) throw new Error('Libro no encontrado');
+  const { makeThumb } = await import('../sync/library-sync.js');
+  const g = await gatherBook(book, parts.includes('chat'));
+  g.cover = book.cover ? await makeThumb(book.cover).catch(() => null) : null;
+  return Bundle.build({ shelf: { name: book.title || 'Libro' }, books: [g], parts, author,
+    customTemplates: CustomTemplates.getAll(), scope: 'book' });
+}
+
+export async function packBook(bookId, opts) {
+  return packBundle(await buildBookDossier(bookId, opts));
+}
+
 // Binario de un libro como Blob. Se lee de uno en uno con getRaw (no con getAllRecords,
 // que suelta el `file` a propósito); los importados antes de la migración a Blob siguen
 // con ArrayBuffer.
@@ -70,7 +86,10 @@ async function fileOf(bookId, format) {
 
 // El paquete listo para mandar: { bundle, blob, name }.
 export async function packShelf(shelfId, opts) {
-  const bundle = await buildShelfDossier(shelfId, opts);
+  return packBundle(await buildShelfDossier(shelfId, opts));
+}
+
+async function packBundle(bundle) {
   const files = new Map();
   for (const b of bundle.books) {
     if (!b.file) continue;

@@ -280,3 +280,86 @@ test('el sync aplica la fusión al traer los ajustes de otro dispositivo', async
   });
   expect(ids).toEqual(['movil', 'pc']);       // antes: «solo si falta en local» → el del PC no llegaba
 });
+
+test('un libro suelto por enlace: entra sin estantería nueva, con sus notas, y se puede quitar', async ({ browser }) => {
+  const store: Store = new Map();
+  const emisor = await browser.newContext({ permissions: ['clipboard-read', 'clipboard-write'] });
+  const receptor = await browser.newContext();
+  try {
+    await stubShare(emisor, store, { uploads: [] });
+    await stubShare(receptor, store, { uploads: [] });
+    const p1 = await emisor.newPage();
+    await p1.goto('/');
+    const { A } = await seed(p1);
+    await p1.reload();
+    // Desde el menú ⋯ del libro.
+    const card = p1.locator(`.lib-grid .lib-card[data-id="${A}"]`);
+    await card.hover();
+    await card.locator('.lib-kebab').click();
+    await p1.locator('.lib-menu-item[data-act="sharebook"]').click();
+    await expect(p1.locator('.dlg-card')).toContainText('Compartir libro');
+    await p1.locator('.dlg-input[data-field="author"]').fill('Luis');
+    await p1.getByRole('button', { name: 'Compartir', exact: true }).click();
+    await expect(p1.locator('.dlg-card')).toContainText('tendrá el libro con tus notas');
+    const url = (await p1.evaluate(() => navigator.clipboard.readText())).match(/https?:\/\/\S+/)![0];
+    expect(await p1.evaluate(() => navigator.clipboard.readText())).toContain('Te paso «Knowledge Graphs (survey)» en BookReader');
+    await p1.locator('.dlg-ok').click();
+
+    const p2 = await receptor.newPage();
+    await p2.goto(url.replace(/^https?:\/\/[^/]+/, ''));
+    await expect(p2.locator('.dlg-card')).toContainText('Abrir «Knowledge Graphs (survey)»', { timeout: 20000 });
+    await p2.getByRole('button', { name: 'Importar' }).click();
+    await expect(p2.locator('.dlg-card')).toContainText('está en tu biblioteca, con lo de Luis');
+    const got = await p2.evaluate(async (A) => {
+      const Store: any = await import('/js/library/store.js');
+      const Shared: any = await import('/js/share/store.js');
+      const b = await Store.getBook(A);
+      return { shelves: (await Store.getShelves()).length, shelfIds: b.shelfIds, hasFile: Store.hasFile(b),
+        notes: (await Shared.forBook(A)).flatMap((r: any) => r.highlights).length };
+    }, A);
+    expect(got).toEqual({ shelves: 0, shelfIds: [], hasFile: true, notes: 1 });
+    await p2.locator('.dlg-ok').click();
+
+    // «Quitar lo de Luis…» desde el menú del libro.
+    const card2 = p2.locator(`.lib-grid .lib-card[data-id="${A}"]`);
+    await card2.hover();
+    await card2.locator('.lib-kebab').click();
+    await p2.locator('.lib-menu-item[data-act="unsharebook"]').click();
+    await p2.locator('.dlg-ok').click();
+    await expect.poll(() => p2.evaluate(async (A) => (await (await import('/js/share/store.js')).forBook(A)).length, A)).toBe(0);
+
+    // Y en Ajustes del emisor sale como «Libro: …».
+    await p1.evaluate(async () => (await import('/js/ui/app-settings.js')).open('data'));
+    await expect(p1.locator('.appset-link-name')).toHaveText('Libro: Knowledge Graphs (survey)');
+  } finally { await emisor.close(); await receptor.close(); }
+});
+
+test('formato: un dossier de libro lleva exactamente un libro', async ({ page }) => {
+  await page.goto('/');
+  const errs = await page.evaluate(async () => {
+    const B: any = await import('/js/share/bundle.js');
+    const one = B.build({ shelf: { name: 'T' }, books: [{ book: { id: 'a'.repeat(64), title: 'T' } }], parts: [], scope: 'book' });
+    const two = { ...one, books: [one.books[0], { ...one.books[0], bookId: 'b'.repeat(64) }] };
+    const shelfLike = B.build({ shelf: { name: 'S' }, books: [], parts: [] });
+    return { one: B.validate(one), two: B.validate(two), scope: one.scope, shelfScope: 'scope' in shelfLike };
+  });
+  expect(errs.one).toEqual([]);
+  expect(errs.two.join()).toContain('un dossier de libro lleva un libro');
+  expect(errs.scope).toBe('book');
+  expect(errs.shelfScope).toBe(false);          // el de estantería, igual que antes
+});
+
+test('la puerta /s/libro/: su propia tarjeta y redirige a la app con el fragmento', async ({ page }) => {
+  const frag = '#d=' + 'B'.repeat(22) + '.' + 'k'.repeat(43);
+  const pedidos: string[] = [];
+  await page.route('**/v1/share/**', (route) => {
+    pedidos.push(route.request().url());
+    return route.fulfill({ status: 410, headers: { 'Access-Control-Allow-Origin': '*' }, body: '{}' });
+  });
+  const html = await (await page.request.get('http://localhost:8899/s/libro/')).text();
+  expect(html).toContain('og:title" content="Te han compartido un libro en BookReader"');
+  expect(html).toContain('og-libro-compartido.png');
+  await page.goto('http://localhost:8899/s/libro/' + frag);
+  await expect.poll(() => pedidos.length, { timeout: 15000 }).toBeGreaterThan(0);
+  expect(pedidos[0]).toMatch(new RegExp('/v1/share/' + 'B'.repeat(22) + '$'));
+});

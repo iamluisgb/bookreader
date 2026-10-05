@@ -45,21 +45,22 @@ export async function decrypt(buffer, keyB64) {
   return new Blob([plain], { type: 'application/zip' });
 }
 
-// Enlace que se comparte. Desplegado (la app vive en /app/), por la puerta /s/: una página con
-// su propia vista previa («Te han compartido una estantería») para WhatsApp y compañía, que
-// redirige a /app/ con el fragmento. En local (la app en la raíz) va directo a la app. En un
-// origen raro (file://), a producción.
-function appUrl() {
+// Enlace que se comparte. Desplegado (la app vive en /app/), por la puerta /s/ (estantería) o
+// /s/libro/ (un libro): páginas con su propia vista previa para WhatsApp y compañía, que
+// redirigen a /app/ con el fragmento. La ruta solo dice «es un libro»; qué libro va cifrado.
+// En local (la app en la raíz) va directo a la app. En un origen raro (file://), a producción.
+function appUrl(kind = 'shelf') {
   const { origin, pathname } = location;
-  if (!/^https?:/.test(origin)) return APP_URL.replace(/\/app\/$/, '/s/');
-  if (/^\/app\//.test(pathname)) return origin + '/s/';
+  const gate = kind === 'book' ? '/s/libro/' : '/s/';
+  if (!/^https?:/.test(origin)) return APP_URL.replace(/\/app\/$/, gate);
+  if (/^\/app\//.test(pathname)) return origin + gate;
   return origin + pathname.replace(/[^/]*$/, '');
 }
 
 // Cifra y sube. Devuelve { url, expiresAt, id, deleteToken }. Errores con `code`:
 // 'too_large' (pasa del tope), 'rate_limited', 'capacity' (el servidor llegó a su tope del
 // mes: se niega antes de que R2 cobre, ver workers/share), 'network'.
-export async function createLink(zipBlob) {
+export async function createLink(zipBlob, { kind = 'shelf' } = {}) {
   const { blob, key } = await encrypt(zipBlob);
   if (blob.size > MAX_LINK_BYTES) throw Object.assign(new Error('too_large'), { code: 'too_large' });
   let res;
@@ -72,7 +73,7 @@ export async function createLink(zipBlob) {
     throw Object.assign(new Error(code), { code });
   }
   const { id, expiresAt, deleteToken } = await res.json();
-  return { id, expiresAt, deleteToken, url: `${appUrl()}#d=${id}.${key}` };
+  return { id, expiresAt, deleteToken, url: `${appUrl(kind)}#d=${id}.${key}` };
 }
 
 // `#d=<id>.<clave>` del fragmento actual, o null.
@@ -131,8 +132,10 @@ export function mergeSharedLinks(local, remote) {
   return changed ? [...byId.values()].sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)) : null;
 }
 
-export function rememberLink({ id, deleteToken, expiresAt, url }, { shelfId, shelfName }) {
-  writeAll([...readAll(), { id, deleteToken, expiresAt, url, shelfId, shelfName, createdAt: Date.now() }]);
+// `kind`: 'shelf' (con shelfId) o 'book' (con bookId). `shelfName` es el nombre que se enseña
+// en la lista: el de la estantería o el título del libro.
+export function rememberLink({ id, deleteToken, expiresAt, url }, { kind = 'shelf', shelfId = null, bookId = null, shelfName }) {
+  writeAll([...readAll(), { id, deleteToken, expiresAt, url, kind, shelfId, bookId, shelfName, createdAt: Date.now() }]);
 }
 
 // Todos tus enlaces vivos (sin retirar), los más nuevos primero.
@@ -143,7 +146,11 @@ export function myLinks() {
 }
 
 export function linksFor(shelfId) {
-  return myLinks().filter((l) => l.shelfId === shelfId);
+  return myLinks().filter((l) => l.kind !== 'book' && l.shelfId === shelfId);
+}
+
+export function linksForBook(bookId) {
+  return myLinks().filter((l) => l.kind === 'book' && l.bookId === bookId);
 }
 
 // Lo borra del servidor al momento: quien tenga el enlace ya no puede abrirlo.

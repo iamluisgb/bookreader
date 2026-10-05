@@ -125,7 +125,7 @@ test('con un libro abierto, «Más» en la cabecera lleva a Ajustes generales y 
   await expect(page.locator('#library-btn')).toHaveAccessibleName('Volver a la biblioteca');
   await page.locator('#reader-more').click();
   const menu = page.locator('.reader-more-menu');
-  await expect(menu.locator('.lib-menu-item')).toHaveText(['Ajustes generales', 'Biblioteca']);
+  await expect(menu.locator('.lib-menu-item')).toHaveText(['Compartir libro…', 'Ajustes generales', 'Biblioteca']);
   await menu.locator('[data-act="general"]').click();
   await expect(page.locator('#app-settings')).toBeVisible();
   await page.keyboard.press('Escape');

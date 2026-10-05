@@ -3,6 +3,16 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-10-05 — Compartir un libro suelto
+
+«Compartir libro…» en el menú ⋯ del libro y en «Más» del lector: el mismo diálogo y las mismas
+opciones que una estantería (enlace cifrado o fichero, qué partes, tu nombre), con un solo libro.
+Quien lo recibe lo tiene en su biblioteca **sin** una estantería «Título · de X» (el dossier lleva
+`scope: 'book'`; una app anterior lo ignora y crea la estantería de siempre). Sus notas, en el
+carril de siempre, se quitan desde el menú del libro («Quitar lo de X…»). El enlace va por
+`/s/libro/`, con su tarjeta «Te han compartido un libro». En Ajustes → Datos sale como
+«Libro: título», y el menú del libro ofrece retirar sus enlaces. SW `v180`.
+
 ## 2026-10-05 — Administrar tus enlaces compartidos
 
 - **Ajustes → Datos → Enlaces compartidos:** todos tus enlaces vivos, de qué estantería son,
