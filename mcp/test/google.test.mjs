@@ -12,7 +12,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createGoogleAuth, readRefreshTokenFile, AUTH_WORKER_URL } from '../src/auth/google.mjs';
+import { createGoogleAuth, readRefreshTokenFile, AUTH_WORKER_URL, APP_ORIGIN } from '../src/auth/google.mjs';
 import { createGoogleDriveProvider } from '../src/providers/google-drive.mjs';
 import { createDriveSource } from '../src/sources/drive.mjs';
 import { SourceError } from '../src/errors.mjs';
@@ -39,7 +39,7 @@ function driveStub(files = buildLayoutFiles(), { refreshToken = 'rt-ok' } = {}) 
   const calls = [];
   const fetchImpl = async (url, options = {}) => {
     const u = new URL(String(url));
-    calls.push({ host: u.hostname, path: u.pathname, q: u.searchParams.get('q') || '', method: options.method || 'GET' });
+    calls.push({ host: u.hostname, path: u.pathname, q: u.searchParams.get('q') || '', method: options.method || 'GET', origin: (options.headers || {}).Origin || null });
     if (u.hostname === new URL(AUTH_WORKER_URL).hostname) {
       const body = JSON.parse(options.body || '{}');
       if (body.refresh_token !== refreshToken) return jsonRes({ error: 'invalid_grant' }, 400);
@@ -79,6 +79,17 @@ test('auth: el refresh token se cambia por un access token y se reutiliza mientr
 
   await auth.getAccessToken(true);
   assert.equal(calls.filter((c) => c.path === '/auth/refresh').length, 3);
+
+  // El Worker (workers/auth) responde 403 a quien no manda un Origin de su lista. Un navegador
+  // lo pone solo; Node no, y sin él este camino nunca funcionó contra el Drive de verdad.
+  assert.equal(calls.find((c) => c.path === '/auth/refresh').origin, APP_ORIGIN);
+});
+
+test('auth: el Origin del Worker se puede sobreescribir (desarrollo en localhost)', async () => {
+  const { fetchImpl, calls } = driveStub();
+  const auth = createGoogleAuth({ refreshToken: 'rt-ok', fetchImpl, origin: 'http://localhost:8000' });
+  await auth.getAccessToken();
+  assert.equal(calls.find((c) => c.path === '/auth/refresh').origin, 'http://localhost:8000');
 });
 
 test('auth: un refresh token revocado se cuenta como «reconecta», no como bucle de error', async () => {

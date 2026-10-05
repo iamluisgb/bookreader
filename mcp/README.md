@@ -222,7 +222,12 @@ un segundo cliente OAuth: es el camino que ya existe. El token no se escribe en 
 
 Entorno: `BOOKREADER_MCP_BACKUP`, `BOOKREADER_MCP_DIR`, `BOOKREADER_MCP_BASE`,
 `BOOKREADER_MCP_CACHE_MS`, `BOOKREADER_DRIVE_REFRESH_TOKEN`, `BOOKREADER_DRIVE_REFRESH_TOKEN_FILE`,
-`BOOKREADER_DRIVE_ACCESS_TOKEN`.
+`BOOKREADER_DRIVE_ACCESS_TOKEN`, `BOOKREADER_APP_ORIGIN`.
+
+`BOOKREADER_APP_ORIGIN` es el `Origin` con el que el MCP llama al Worker de auth. **El Worker lo
+exige** (mira su `ALLOWED_ORIGINS`), y un navegador lo pone solo pero Node no: sin él responde
+`403 Forbidden` antes de llegar a Google. Por defecto es `https://bookreader.raiatech.com`; para
+desarrollo en local, `BOOKREADER_APP_ORIGIN=http://localhost:8000`.
 
 ## Tests
 

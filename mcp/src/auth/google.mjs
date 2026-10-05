@@ -17,6 +17,11 @@ import { readFile as fsReadFile } from 'node:fs/promises';
 import { SourceError } from '../errors.mjs';
 
 export const AUTH_WORKER_URL = 'https://bookreader-auth.luisgonzalezb93.workers.dev';
+// El Worker (workers/auth) solo atiende a orígenes de su lista `ALLOWED_ORIGINS`, y la mira en
+// la cabecera `Origin` — que un navegador pone sola pero Node no. Sin ella responde 403
+// «Forbidden» antes de llegar a Google. Se manda el origen de producción de la app; se puede
+// sobreescribir con BOOKREADER_APP_ORIGIN (p. ej. `http://localhost:8000` en desarrollo).
+export const APP_ORIGIN = process.env.BOOKREADER_APP_ORIGIN || 'https://bookreader.raiatech.com';
 const TIMEOUT_MS = 30000;
 
 /** Lee el fichero del refresh token. Se recorta el salto de línea final (echo > fichero). */
@@ -40,6 +45,7 @@ export function createGoogleAuth({
   accessToken = null,
   fetchImpl = fetch,
   worker = AUTH_WORKER_URL,
+  origin = APP_ORIGIN,
   now = Date.now,
 } = {}) {
   let token = accessToken || null;
@@ -58,7 +64,7 @@ export function createGoogleAuth({
       }
       const res = await fetchImpl(worker + '/auth/refresh', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Origin: origin },
         body: JSON.stringify({ refresh_token: refreshToken }),
         signal: AbortSignal.timeout(TIMEOUT_MS),
       });
