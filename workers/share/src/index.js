@@ -132,6 +132,8 @@ async function download(id, env, cors) {
   if (!(await spend(env, 'b'))) { await refused(env); return json({ error: 'capacity' }, 503, cors); }
   const obj = await env.SHARES.get(KEY(id));
   if (!obj) return json({ error: 'not_found' }, 404, cors);
+  // Una apertura más (lo ve quien lo creó). Solo el número: ni quién ni desde dónde.
+  await env.DB.prepare('UPDATE shares SET opens = opens + 1 WHERE id = ?').bind(id).run();
   return new Response(obj.body, {
     status: 200,
     headers: {
@@ -151,6 +153,26 @@ async function remove(id, request, env, cors) {
   await env.SHARES.delete(KEY(id));
   await env.DB.prepare('DELETE FROM shares WHERE id = ?').bind(id).run();
   return json({ ok: true }, 200, cors);
+}
+
+// Estado de los enlaces de quien los creó: aperturas y caducidad. Solo con el deleteToken de
+// cada uno (prueba de que es suyo). Una consulta a D1; R2 no se toca.
+//   POST /v1/share/stats  { links: [{ id, token }] }  →  { [id]: { opens, expiresAt } | null }
+const MAX_STATS = 100;
+async function stats(request, env, cors) {
+  if (!cors['Access-Control-Allow-Origin']) return json({ error: 'origin' }, 403, cors);
+  let body;
+  try { body = await request.json(); } catch { return json({ error: 'bad_request' }, 400, cors); }
+  const links = (Array.isArray(body?.links) ? body.links : []).slice(0, MAX_STATS)
+    .filter((l) => l && ID_RE.test(l.id) && typeof l.token === 'string');
+  const out = {};
+  for (const l of links) {
+    const row = await env.DB.prepare('SELECT del_hash, opens, expires_at FROM shares WHERE id = ?').bind(l.id).first();
+    out[l.id] = row && row.del_hash === (await sha256Hex(l.token)) && row.expires_at > Date.now()
+      ? { opens: row.opens, expiresAt: row.expires_at }
+      : null;   // no existe, caducó, se retiró… o no es tuyo: lo mismo para quien pregunta
+  }
+  return json(out, 200, cors);
 }
 
 // Purga diaria desde D1 (sin listar R2, que es clase A). Borrar en R2 es gratis.
@@ -187,6 +209,7 @@ export default {
     const { pathname } = new URL(request.url);
     try {
       if (pathname === '/v1/share' && request.method === 'POST') return await upload(request, env, cors);
+      if (pathname === '/v1/share/stats' && request.method === 'POST') return await stats(request, env, cors);
       if (pathname === '/v1/usage' && request.method === 'GET') {
         const auth = request.headers.get('Authorization') || '';
         if (!env.USAGE_TOKEN || auth !== `Bearer ${env.USAGE_TOKEN}`) return json({ error: 'forbidden' }, 403);

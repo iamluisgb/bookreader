@@ -1702,6 +1702,13 @@ app tenía un principio: los datos del lector no pasan por un servidor nuestro.
   su límite, fallan). La app, ante el tope, ofrece mandar el fichero. `npm run share:usage` enseña
   el gasto frente a lo gratis; el cron diario lo deja en los logs con `alert: true` desde el 50 %.
 
+- **Administrar los enlaces** (2026-10-05). Quien crea un enlace guarda su `deleteToken` y la
+  URL (con la clave) en sus ajustes; viajan en `settings.json` a **su** Drive como el resto de sus
+  datos, fusionados por unión y con marca de retirado, así que puede copiarlos o retirarlos desde
+  cualquiera de sus dispositivos (Ajustes → Datos → Enlaces compartidos). El servidor cuenta las
+  **aperturas** de cada enlace (solo el número; ni quién ni desde dónde) y solo se las enseña a
+  quien presenta el token.
+
 **Por qué es compatible con el principio.** Lo que el principio protege es que no podamos leer ni
 perfilar lo que el lector hace. Con la clave en el fragmento no podemos; guardamos un blob opaco que
 desaparece solo. No guardamos IP (solo cuenta para el límite).

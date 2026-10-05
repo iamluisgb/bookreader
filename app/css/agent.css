@@ -1071,6 +1071,14 @@ body.has-taskchip .ai-taskchip.is-study { bottom: 74px; }
 }
 .appset-privacy .icon { flex: none; margin-top: 1px; }
 .appset-muted { color: var(--text-soft); font-size: var(--fs-sm); line-height: 1.6; margin-bottom: 10px; }
+/* Enlaces compartidos (Ajustes → Datos). */
+.appset-links { display: flex; flex-direction: column; gap: 8px; margin-bottom: 6px; }
+.appset-link { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--r-md); }
+.appset-link-text { flex: 1; min-width: 0; }
+.appset-link-name { font-weight: 600; font-size: var(--fs-md); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.appset-link-meta { font-size: var(--fs-xs); color: var(--text-soft); }
+.appset-links .appset-tpl-cancel { margin: 0; flex: none; }
+@media (max-width: 600px) { .appset-link { flex-wrap: wrap; } .appset-link-text { flex-basis: 100%; } }
 /* Salto entre la vista simple y la avanzada del Agente. Deliberadamente discreto:
    es una salida para quien la busca, no una invitación a configurar cosas. */
 .appset-viewlink {

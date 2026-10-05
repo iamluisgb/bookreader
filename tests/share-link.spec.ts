@@ -7,11 +7,21 @@ import { test, expect, Page, BrowserContext } from '@playwright/test';
 test.describe.configure({ retries: 1 });
 
 type Store = Map<string, Buffer>;
+// Aperturas por almacén simulado (cada test el suyo: los ids se repiten entre tests).
+const opensOf = new WeakMap<Store, Map<string, number>>();
 
 async function stubShare(ctx: BrowserContext, store: Store, seen: { uploads: Buffer[] }) {
+  if (!opensOf.has(store)) opensOf.set(store, new Map());
+  const opens = opensOf.get(store)!;
   await ctx.route('**/v1/share**', async (route) => {
     const req = route.request();
     const cors = { 'Access-Control-Allow-Origin': '*' };
+    if (req.method() === 'POST' && req.url().endsWith('/stats')) {
+      const { links } = JSON.parse(req.postData() || '{}');
+      const out: any = {};
+      for (const l of links) out[l.id] = store.has(l.id) ? { opens: opens.get(l.id) || 0, expiresAt: Date.now() + 5 * 864e5 } : null;
+      return route.fulfill({ status: 200, headers: { 'Content-Type': 'application/json', ...cors }, body: JSON.stringify(out) });
+    }
     if (req.method() === 'POST') {
       const body = req.postDataBuffer()!;
       seen.uploads.push(body);
@@ -27,6 +37,7 @@ async function stubShare(ctx: BrowserContext, store: Store, seen: { uploads: Buf
     }
     const b = store.get(id);
     if (!b) return route.fulfill({ status: 410, headers: cors, body: '{"error":"expired"}' });
+    opens.set(id, (opens.get(id) || 0) + 1);
     return route.fulfill({ status: 200, headers: { 'Content-Type': 'application/octet-stream', ...cors }, body: b });
   });
 }
@@ -190,4 +201,82 @@ test('la puerta /s/: vista previa propia y redirige a la app con el fragmento in
   expect(pedidos[0]).toMatch(new RegExp('/v1/share/' + 'A'.repeat(22) + '$'));
   expect(new URL(page.url()).pathname).toBe('/app/');
   expect(page.url()).not.toContain('d=');                // y la clave ya no está en la barra
+});
+
+test('tus enlaces en Ajustes → Datos: aperturas, copiar y retirar', async ({ browser }) => {
+  const store: Store = new Map();
+  const ctx = await browser.newContext({ permissions: ['clipboard-read', 'clipboard-write'] });
+  try {
+    await stubShare(ctx, store, { uploads: [] });
+    const p = await ctx.newPage();
+    await p.goto('/');
+    await seed(p);
+    await p.reload();
+    const row = p.locator('.lib-rail-row', { has: p.locator('.lib-rail-name', { hasText: /^Knowledge graphs$/ }) });
+    await row.hover();
+    await row.locator('.lib-rail-kebab').click();
+    await p.locator('.lib-menu-item[data-act="share"]').click();
+    await p.getByRole('button', { name: 'Compartir', exact: true }).click();
+    const url = (await (async () => { await expect(p.locator('.dlg-card')).toContainText('Enlace copiado'); return p.evaluate(() => navigator.clipboard.readText()); })()).match(/https?:\/\/\S+/)![0];
+    await p.locator('.dlg-ok').click();
+    // Dos aperturas desde otro navegador.
+    const other = await browser.newContext();
+    await stubShare(other, store, { uploads: [] });
+    for (let i = 0; i < 2; i++) {
+      const q = await other.newPage();
+      await q.goto(url.replace(/^https?:\/\/[^/]+/, ''));
+      await expect(q.locator('.dlg-card')).toContainText('Abrir «Knowledge graphs»');
+      await q.close();
+    }
+    await other.close();
+
+    await p.evaluate(async () => (await import('/js/ui/app-settings.js')).open('data'));
+    const item = p.locator('.appset-link');
+    await expect(item).toHaveCount(1);
+    await expect(item).toContainText('Knowledge graphs');
+    await expect(item.locator('.appset-link-opens')).toHaveText(' · abierto 2 veces');
+    await p.evaluate(() => navigator.clipboard.writeText(''));
+    await item.locator('[data-act="copy"]').click();
+    expect(await p.evaluate(() => navigator.clipboard.readText())).toBe(url);
+    await item.locator('[data-act="revoke"]').click();
+    await p.locator('.dlg-ok').click();
+    await expect(p.locator('.appset-link')).toHaveCount(0);
+    expect(store.size).toBe(0);
+  } finally { await ctx.close(); }
+});
+
+test('la lista de enlaces se fusiona entre dispositivos y lo retirado no reaparece', async ({ page }) => {
+  await page.goto('/');
+  const r = await page.evaluate(async () => {
+    const L: any = await import('/js/share/link.js');
+    const fut = Date.now() + 864e5;
+    const a = { id: 'a', deleteToken: 't', expiresAt: fut, createdAt: 1 };
+    const b = { id: 'b', deleteToken: 't', expiresAt: fut, createdAt: 2 };
+    const viejo = { id: 'v', deleteToken: 't', expiresAt: Date.now() - 1, createdAt: 0 };
+    return {
+      union: L.mergeSharedLinks([a], [b]).map((x: any) => x.id),
+      igual: L.mergeSharedLinks([a, b], [b]),
+      retirado: L.mergeSharedLinks([a, b], [{ ...b, revoked: true }]).find((x: any) => x.id === 'b').revoked,
+      noResucita: L.mergeSharedLinks([{ ...a, revoked: true }], [a]),
+      caducado: L.mergeSharedLinks([a, viejo], []).map((x: any) => x.id),
+    };
+  });
+  expect(r.union).toEqual(['a', 'b']);
+  expect(r.igual).toBeNull();                 // nada que escribir
+  expect(r.retirado).toBe(true);
+  expect(r.noResucita).toBeNull();            // el retirado local se queda retirado
+  expect(r.caducado).toEqual(['a']);
+});
+
+test('el sync aplica la fusión al traer los ajustes de otro dispositivo', async ({ page }) => {
+  await page.goto('/');
+  const ids = await page.evaluate(async () => {
+    const Storage: any = await import('/js/storage.js');
+    const Layout: any = await import('/js/sync/layout.js');
+    const fut = Date.now() + 864e5;
+    Storage.set('shared_links', [{ id: 'movil', deleteToken: 't', expiresAt: fut, createdAt: 1 }]);
+    await Layout.restoreSnapshot({ settings: { shared_links: [{ id: 'pc', deleteToken: 't', expiresAt: fut, createdAt: 2 }] } }, { mode: 'merge' });
+    return Storage.get('shared_links').map((l: any) => l.id);
+  });
+  expect(ids).toEqual(['movil', 'pc']);       // antes: «solo si falta en local» → el del PC no llegaba
 });

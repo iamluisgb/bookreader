@@ -1135,6 +1135,10 @@ function dataHtml() {
       <button id="appset-drive-disconnect" class="appset-tpl-cancel appset-data-md">${t('Desconectar')}</button>
     </div>
 
+    <label class="appset-label" style="margin-top:18px">${t('Enlaces compartidos')}</label>
+    <p class="appset-muted">${t('Las estanterías que has compartido por enlace y siguen abiertas. Retirar un enlace lo borra al momento; lo que ya hayan importado se queda en su biblioteca. Con Drive conectado, la lista es la misma en todos tus dispositivos.')}</p>
+    <div id="appset-links" class="appset-links"></div>
+
     <label class="appset-label" style="margin-top:18px">${t('Sincronización automática')}</label>
     <p class="appset-muted" id="appset-sync-diag"></p>
     <button id="appset-sync-now" class="btn btn--primary primary-btn appset-save">${icon('cloud', { size: 'md' })} ${t('Sincronizar ahora')}</button>
@@ -1205,7 +1209,57 @@ async function syncDiagReport() {
   };
 }
 
+// P24 F4 · Tus enlaces compartidos: copiar, retirar y cuántas veces se han abierto.
+async function paintLinks(content) {
+  const box = content.querySelector('#appset-links');
+  if (!box) return;
+  const Link = await import('../share/link.js');
+  const links = Link.myLinks();
+  if (!links.length) {
+    box.innerHTML = `<p class="appset-muted">${t('Aún no has compartido ninguna estantería por enlace. Se hace desde el menú de la estantería.')}</p>`;
+    return;
+  }
+  const day = (ts) => new Date(ts).toLocaleDateString(undefined, { day: 'numeric', month: 'long' });
+  box.innerHTML = links.map(l => `
+    <div class="appset-link" data-id="${escapeHtml(l.id)}">
+      <div class="appset-link-text">
+        <div class="appset-link-name">${escapeHtml(l.shelfName || t('Estantería'))}</div>
+        <div class="appset-link-meta">${escapeHtml(t('Creado el {a} · caduca el {b}', { a: day(l.createdAt), b: day(l.expiresAt) }))}<span class="appset-link-opens"></span></div>
+      </div>
+      <button class="appset-tpl-cancel appset-link-copy" data-act="copy">${icon('copy', { size: 'md' })} ${t('Copiar')}</button>
+      <button class="appset-tpl-cancel appset-link-revoke" data-act="revoke">${icon('xmark', { size: 'md' })} ${t('Retirar')}</button>
+    </div>`).join('');
+  box.onclick = async (e) => {
+    const btn = e.target.closest('[data-act]');
+    const row = btn?.closest('.appset-link');
+    const link = row && links.find(x => x.id === row.dataset.id);
+    if (!link) return;
+    if (btn.dataset.act === 'copy') {
+      try { await navigator.clipboard.writeText(link.url); btn.innerHTML = `${icon('check', { size: 'md' })} ${t('Copiado')}`; }
+      catch { btn.textContent = link.url; }
+      return;
+    }
+    if (!(await confirmBox(t('Quien tenga el enlace de «{name}» ya no podrá abrirlo. Lo que ya hayan importado se queda en su biblioteca.', { name: link.shelfName || '' }),
+      { title: t('Retirar enlace'), okText: t('Retirar'), danger: true }))) return;
+    try { await Link.revokeLink(link); }
+    catch { await confirmBox(t('No se pudo retirar. Comprueba la conexión y vuelve a probar.'), { title: t('Retirar enlace') }); return; }
+    paintLinks(content);
+  };
+  // Aperturas, según el servidor. Lo que ya no está allí (caducó o se retiró desde otro
+  // sitio) se marca retirado aquí también.
+  const st = await Link.linkStats(links);
+  for (const l of links) {
+    const row = box.querySelector(`.appset-link[data-id="${CSS.escape(l.id)}"]`);
+    if (!row || !(l.id in st)) continue;
+    if (st[l.id] === null) { row.remove(); continue; }
+    const n = st[l.id].opens;
+    row.querySelector('.appset-link-opens').textContent = ' · ' + (n === 1 ? t('abierto 1 vez') : t('abierto {n} veces', { n }));
+  }
+  if (!box.querySelector('.appset-link')) paintLinks(content);
+}
+
 function wireData(content) {
+  paintLinks(content);
   const msg = content.querySelector('#appset-data-msg');
   const show = (html, error = false) => {
     msg.innerHTML = html;

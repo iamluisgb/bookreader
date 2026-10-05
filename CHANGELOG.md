@@ -3,6 +3,16 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-10-05 — Administrar tus enlaces compartidos
+
+- **Ajustes → Datos → Enlaces compartidos:** todos tus enlaces vivos, de qué estantería son,
+  cuándo caducan y **cuántas veces se han abierto**, con «Copiar» y «Retirar».
+- **En todos tus dispositivos:** la lista viaja con el sync de Drive y se fusiona (unión por
+  enlace; lo retirado en uno queda retirado en todos). Antes, solo el dispositivo que lo creó
+  podía retirarlo.
+- El servidor cuenta aperturas (solo el número) y solo se las da a quien tiene el token del
+  enlace. Migración `0002_opens`. SW `v178`.
+
 ## 2026-10-04 — Enlaces que dan ganas de abrir
 
 - **Vista previa propia.** El enlace es ahora `bookreader.raiatech.com/s/#d=…`: `/s/` es una

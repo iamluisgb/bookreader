@@ -96,34 +96,72 @@ export async function fetchLink({ id, key }) {
   catch (e) { throw Object.assign(new Error('broken'), { code: 'broken' }); }
 }
 
-// ---- Enlaces creados en este dispositivo ------------------------------------------------
-// Para poder retirarlos: el `deleteToken` solo lo tiene quien subió. Se guardan en este
-// navegador (no viajan por el sync: el token es una credencial, y el enlace lleva la clave).
+// ---- Tus enlaces ---------------------------------------------------------------------
+// Para administrarlos hace falta su `deleteToken` (solo lo tiene quien subió). La lista vive
+// en los ajustes (localStorage `bookreader_shared_links`) y por tanto viaja en settings.json
+// a TU Drive con el sync, como el resto de tus datos: desde cualquiera de tus dispositivos
+// puedes copiarlos o retirarlos. Al fusionar dispositivos se UNEN (mergeSharedLinks); retirar
+// deja una marca (`revoked`) para que el retirado no reaparezca desde el otro lado.
 const MINE_KEY = 'bookreader_shared_links';
 
-function readMine() {
+const alive = (l) => l && l.id && l.expiresAt > Date.now();
+
+function readAll() {
   try {
     const v = JSON.parse(localStorage.getItem(MINE_KEY) || '[]');
-    return Array.isArray(v) ? v.filter((l) => l && l.id && l.expiresAt > Date.now()) : [];
+    return Array.isArray(v) ? v.filter(alive) : [];
   } catch { return []; }
 }
-function writeMine(list) {
-  try { localStorage.setItem(MINE_KEY, JSON.stringify(list.slice(-100))); } catch { /* sin storage: solo no se podrá retirar */ }
+function writeAll(list) {
+  try { localStorage.setItem(MINE_KEY, JSON.stringify(list.slice(-200))); } catch { /* sin storage */ }
+}
+
+// Unión por id; si cualquiera de los dos lo retiró, queda retirado. Fuera lo caducado (el
+// servidor ya no lo tiene). Devuelve null si lo local ya está al día (no escribir de más).
+export function mergeSharedLinks(local, remote) {
+  const L = Array.isArray(local) ? local.filter(alive) : [];
+  const R = Array.isArray(remote) ? remote.filter(alive) : [];
+  const byId = new Map(L.map((l) => [l.id, l]));
+  let changed = L.length !== (Array.isArray(local) ? local.length : 0);
+  for (const r of R) {
+    const l = byId.get(r.id);
+    if (!l) { byId.set(r.id, r); changed = true; }
+    else if (r.revoked && !l.revoked) { byId.set(r.id, { ...l, revoked: true, revokedAt: r.revokedAt || Date.now() }); changed = true; }
+  }
+  return changed ? [...byId.values()].sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0)) : null;
 }
 
 export function rememberLink({ id, deleteToken, expiresAt, url }, { shelfId, shelfName }) {
-  writeMine([...readMine(), { id, deleteToken, expiresAt, url, shelfId, shelfName, createdAt: Date.now() }]);
+  writeAll([...readAll(), { id, deleteToken, expiresAt, url, shelfId, shelfName, createdAt: Date.now() }]);
+}
+
+// Todos tus enlaces vivos (sin retirar), los más nuevos primero.
+export function myLinks() {
+  const all = readAll();
+  writeAll(all);   // de paso, fuera los caducados
+  return all.filter((l) => !l.revoked).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
 }
 
 export function linksFor(shelfId) {
-  const list = readMine();
-  writeMine(list);   // de paso, fuera los caducados
-  return list.filter((l) => l.shelfId === shelfId);
+  return myLinks().filter((l) => l.shelfId === shelfId);
 }
 
 // Lo borra del servidor al momento: quien tenga el enlace ya no puede abrirlo.
 export async function revokeLink(link) {
   const res = await fetch(`${base()}/share/${link.id}`, { method: 'DELETE', headers: { 'X-Delete-Token': link.deleteToken } });
   if (!res.ok) throw Object.assign(new Error('revoke'), { code: res.status === 403 ? 'forbidden' : 'network' });
-  writeMine(readMine().filter((l) => l.id !== link.id));
+  writeAll(readAll().map((l) => (l.id === link.id ? { ...l, revoked: true, revokedAt: Date.now() } : l)));
+}
+
+// Aperturas y caducidad, según el servidor: { [id]: { opens, expiresAt } | null }. null =
+// ya no está (caducó o se retiró desde otro sitio). Sin red, {}.
+export async function linkStats(links) {
+  if (!links.length) return {};
+  try {
+    const res = await fetch(`${base()}/share/stats`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ links: links.map((l) => ({ id: l.id, token: l.deleteToken })) }),
+    });
+    return res.ok ? await res.json() : {};
+  } catch { return {}; }
 }

@@ -14,6 +14,7 @@ import * as DB from '../ai/db.js';
 import * as LibStore from '../library/store.js';
 import * as ReadingLog from '../reading-log.js';
 import { mergeCollections } from './merge.js';
+import { mergeSharedLinks } from '../share/link.js';
 
 export const SCHEMA_VERSION = 1;
 export const BASE = 'bookreader/';
@@ -114,6 +115,7 @@ const STREAK_KEY = 'study_streak';
 // libro, y porque settings.json ya se sube en cuanto su huella cambia — un fichero nuevo
 // habría que enseñárselo al engine, al guardado manual y al restaurar. Ver P25 F3.
 const READING_KEY = 'reading_days';
+const SHARED_LINKS_KEY = 'shared_links';
 export function mergeStreak(local, remote) {
   if (!remote || !remote.lastDay) return null;
   if (!local || !local.lastDay) return remote;
@@ -276,6 +278,13 @@ export async function restoreSnapshot({ settings = {}, books = {} }, { mode = 'r
     }
     if (k === STREAK_KEY) {
       const merged = mergeStreak(Storage.get(k, null), v);
+      if (merged) { Storage.set(k, merged); keys++; }
+      continue;
+    }
+    // Tus enlaces compartidos (P24 F4): unión entre dispositivos, y un retirado en uno queda
+    // retirado en todos. Con la regla general, el segundo dispositivo nunca vería los del primero.
+    if (k === SHARED_LINKS_KEY) {
+      const merged = mergeSharedLinks(Storage.get(k, null), v);
       if (merged) { Storage.set(k, merged); keys++; }
       continue;
     }

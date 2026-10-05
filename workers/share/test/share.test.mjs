@@ -165,3 +165,22 @@ test('CORS: preflight con los métodos y la cabecera del token', async () => {
   assert.match(r.headers.get('Access-Control-Allow-Methods'), /DELETE/);
   assert.match(r.headers.get('Access-Control-Allow-Headers'), /X-Delete-Token/);
 });
+
+test('aperturas: cada descarga suma una, y solo las ve quien tiene el token', async () => {
+  const e = env();
+  const { id, deleteToken } = await (await subir(e)).json();
+  for (let i = 0; i < 3; i++) await worker.fetch(req('GET', '/v1/share/' + id), e);
+  const statsReq = (links) => worker.fetch(new Request('https://share.test/v1/share/stats', {
+    method: 'POST', headers: { ...ORIGIN, 'Content-Type': 'application/json' }, body: JSON.stringify({ links }) }), e);
+  const ok = await (await statsReq([{ id, token: deleteToken }])).json();
+  assert.equal(ok[id].opens, 3);
+  assert.ok(ok[id].expiresAt > Date.now());
+  const ajeno = await (await statsReq([{ id, token: 'otro' }])).json();
+  assert.equal(ajeno[id], null);
+  // Retirado: null también.
+  await worker.fetch(req('DELETE', '/v1/share/' + id, { headers: { 'X-Delete-Token': deleteToken } }), e);
+  assert.equal((await (await statsReq([{ id, token: deleteToken }])).json())[id], null);
+  // Sin origen permitido, no.
+  const sinOrigen = await worker.fetch(new Request('https://share.test/v1/share/stats', { method: 'POST', body: '{"links":[]}' }), e);
+  assert.equal(sinOrigen.status, 403);
+});
