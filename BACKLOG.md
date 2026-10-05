@@ -2669,3 +2669,41 @@ varias decenas de páginas. Se reabre solo si se cumple una de dos condiciones:
 **Y la pregunta estratégica sigue en pie:** en EPUB **nadie gana el mercado por rendimiento** — es
 higiene, no diferenciación. La ventaja de BookReader es el agente sobre el libro entero. Los datos de
 F0 dicen que la higiene ya está hecha.
+
+### TEC10 — Auditoría de seguridad (2026-10-05) · `S`–`M` · **pendiente**
+
+Revisión con el workflow de seguridad del contenedor. Informe completo:
+[`docs/security-audit-2026-10-05.md`](docs/security-audit-2026-10-05.md). Veredicto: **nada crítico**;
+dos medios que conviene cerrar antes de crecer, y deuda menor.
+
+**1 · XSS latente en el render de markdown (Medio, CONFIRMADO).** `esc()` en
+[`js/ai/markdown.js`](app/js/ai/markdown.js) escapa `& < >` pero **no las comillas**, y la URL de un
+enlace `[x](url)` se inserta cruda en `<a href="$2">`. Una `"` cierra el atributo e inyecta otros
+(p. ej. `onmouseover`). Reproducido ejecutando la función real:
+`mdToHtml('…[e](https://evil/"onmouseover="alert\`document.domain\`)')` → `<a href="https://evil/"
+onmouseover="alert\`document.domain\`" …>`. Importa porque la salida viene del LLM y el LLM lee el
+contenido del libro → un EPUB/PDF hostil puede fabricar el enlace (prompt injection).
+
+- **Por qué Medio y no Crítico (no inflar):** el CSP `script-src 'self' 'wasm-unsafe-eval'` **no**
+  lleva `'unsafe-inline'`, así que el navegador bloquea los handlers inline. Hoy el impacto es
+  inyección de atributos / spoofing de UI, no ejecución — pero queda **a una directiva de CSP** de
+  ser Alto, y el `drive_refresh_token` vive en `localStorage`.
+- **Fix (2 líneas):** escapar también `"` y `'` en `esc()` (o reusar [`js/ui/escape.js`](app/js/ui/escape.js),
+  que es lo que manda AGENTS.md: «escapar SIEMPRE con `escape.js`») y `encodeURI` en el `href`.
+
+**2 · Faltan headers de seguridad (Medio).** `dist/_headers` solo define `Cache-Control`; no hay
+`X-Frame-Options`/`frame-ancestors` (clickjacking), `X-Content-Type-Options: nosniff` ni
+`Referrer-Policy`. El CSP va por `<meta>`, que no puede expresar `frame-ancestors`. HSTS a confirmar
+en Cloudflare. Fix: añadirlos en `dist/_headers` (o `_headers` de Pages).
+
+**3 · Menores (Bajo).**
+- Gateway CORS cae a `allowed[0] || '*'` para orígenes no permitidos en vez de omitir `ACAO`
+  ([`workers/gateway/src/index.js`](workers/gateway/src/index.js) `corsHeaders`); incoherente con
+  `share`/`auth`, que sí lo omiten. Quitar el `|| '*'`.
+- `redirect_uri` reenviado a Google sin allowlist propia ([`workers/auth/src/index.js`](workers/auth/src/index.js)).
+- Comparaciones de token no constantes en `share` (`usage`, `stats`).
+
+**Sin hallazgos (verificado, no reworkear):** `.env` nunca commiteado ni en `dist/` (build con lista
+blanca), `npm audit` limpio (raíz y `mcp`), CORS con allowlist y fail-closed en `share`/`auth`, diseño
+de compartir por enlace (id de 128 bits, clave en el fragmento, bytes cifrados), CSP estricta en
+scripts, Mermaid `securityLevel: 'strict'`, `drive_refresh_token`/`ai_key` excluidos de backup y sync.
