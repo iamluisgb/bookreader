@@ -3,6 +3,13 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-10-05 — El composer del chat vuelve a crecer al escribir
+
+- Regresión del composer en cápsula (UI3): el `flex: 1` del textarea pisaba la altura
+  inline que fija `fitInput()` y el campo se quedaba en una línea visible. Ahora crece
+  hasta su tope (~6 líneas) y vuelve a una al enviar, como siempre fue la intención.
+  Tests: [composer-grow.spec.ts](tests/composer-grow.spec.ts).
+
 ## 2026-10-05 — Tu biblioteca, para agentes: WebMCP (experimental) y el MCP local por título
 
 - **WebMCP** (ADR-054): con un navegador que lo soporte y el interruptor de Ajustes → Aplicación
