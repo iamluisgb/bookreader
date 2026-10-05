@@ -242,3 +242,10 @@ Drive, un test de paridad entre las dos fuentes y las comprobaciones de que los 
 - En F1 el servidor no habla con la red: stdio y el fichero, nada más. En F2 solo habla con la API
   de Drive (para leer tus datos) y con el Worker del token (para renovar el permiso).
 - Todo lo que devuelven las tools pasa por `src/redact.mjs` (ver la tabla de arriba).
+
+
+## Por título
+
+`get_highlights` y `get_notes` aceptan `book` (título o parte, sin tildes ni mayúsculas) en vez de
+`bookId`: `node mcp/cli.mjs --backup backup.json get_highlights '{"book":"pedro paramo"}'`. Si casa
+con varios libros, el error trae los candidatos con su id.

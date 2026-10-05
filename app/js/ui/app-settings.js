@@ -838,10 +838,21 @@ function appHtml() {
       <option value="full"${Study.gradingMode() === 'full' ? ' selected' : ''}>${t('Cuatro: Otra vez · Difícil · Bien · Fácil')}</option>
     </select>
     <p class="appset-muted">${t('Con dos botones se decide más rápido y el algoritmo (FSRS) funciona igual de bien. Las teclas 1–4 valen siempre.')}</p>
+    ${webmcpSupported() ? `
+    <label class="appset-label">${t('Agentes del navegador (WebMCP, experimental)')}</label>
+    <label class="appset-check"><input type="checkbox" id="appset-webmcp"${webmcpEnabled() ? ' checked' : ''} /> ${t('Dejar que un agente del navegador lea mi biblioteca')}</label>
+    <p class="appset-muted">${t('Un agente que funcione en este navegador podrá pedir, mientras BookReader esté abierto, la lista de libros, los subrayados, las libretas, buscar en un libro y exportarlo a Markdown. Solo lectura: no puede cambiar nada. Todo sale de este dispositivo directamente al agente.')}</p>` : ''}
   </div>`;
 }
 
+// WebMCP: el interruptor solo existe en navegadores que lo traen (hoy, Chrome experimental).
+const webmcpSupported = () => !!((typeof document !== 'undefined' && document.modelContext) || (typeof navigator !== 'undefined' && navigator.modelContext));
+const webmcpEnabled = () => Storage.get('webmcp_enabled', false) === true;
+
 function wireApp(content) {
+  content.querySelector('#appset-webmcp')?.addEventListener('change', async (e) => {
+    (await import('../webmcp.js')).setEnabled(e.target.checked);
+  });
   content.querySelector('#appset-lang').addEventListener('change', (e) => {
     setLang(e.target.value);
     location.reload();

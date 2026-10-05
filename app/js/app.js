@@ -137,6 +137,9 @@ document.addEventListener('DOMContentLoaded', () => {
   // con la app abierta.
   recibirEnlaceCompartido();
   window.addEventListener('hashchange', recibirEnlaceCompartido);
+  // WebMCP (experimental): herramientas de solo lectura para agentes del navegador. El módulo
+  // solo se carga si el navegador lo trae; registra si el usuario lo activó en Ajustes.
+  if (document.modelContext || navigator.modelContext) import('./webmcp.js').then(m => m.init()).catch(e => console.warn('webmcp:', e));
   // Ficheros compartidos desde otra app (Android) o abiertos con doble clic (PWA de escritorio).
   import('./inbox.js').then(m => m.init(loadFile)).catch(e => console.warn('inbox:', e));
   registerServiceWorker();

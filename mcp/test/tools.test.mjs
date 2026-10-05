@@ -133,3 +133,22 @@ test('una tool vetada por la fuente no se ejecuta aunque se llame a mano', async
   assert.match(res.content[0].text, /Tool desconocida/);
   assert.ok(!calls.includes('readingDays'), 'ni siquiera se molesta a la fuente');
 });
+
+// «Los subrayados de Pedro Páramo»: por título, sin pasar por list_books.
+test('get_highlights y get_notes: aceptan el título del libro (book) además del id', async () => {
+  const titles = { b1: 'Pedro Páramo', b2: 'Designing Data-Intensive Applications', b3: 'Designing Interfaces' };
+  const { source, calls } = stubSource({ async titles() { calls.push('titles'); return titles; } });
+  assert.equal(payload(await callTool(source, 'get_highlights', { book: 'pedro paramo' })).bookId, 'b1');
+  assert.ok(calls.includes('getHighlights:b1'));
+  assert.equal(payload(await callTool(source, 'get_notes', { book: 'Data-Intensive' })).bookId, 'b2');
+  // Ambiguo, inexistente o sin libro: error con lo necesario para corregir, no una adivinanza.
+  const amb = await callTool(source, 'get_highlights', { book: 'designing' });
+  assert.equal(amb.isError, true);
+  assert.match(amb.content[0].text, /casa con varios libros.*Designing Data-Intensive.*Designing Interfaces/);
+  assert.match((await callTool(source, 'get_highlights', { book: 'Quijote' })).content[0].text, /Ningún libro se llama «Quijote»/);
+  assert.match((await callTool(source, 'get_highlights', {})).content[0].text, /pasa «bookId».*o «book»/);
+  // Con id, como siempre (sin leer títulos de más).
+  calls.length = 0;
+  assert.equal(payload(await callTool(source, 'get_highlights', { bookId: 'b3' })).bookId, 'b3');
+  assert.ok(!calls.includes('titles'));
+});

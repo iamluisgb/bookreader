@@ -1719,3 +1719,21 @@ pequeño; WhatsApp rompe enlaces enormes). Sin cifrar (más simple, inaceptable)
 
 **Riesgo aceptado.** Una reclamación de copyright sobre un libro compartido apunta a un enlace
 nuestro, aunque no podamos ver qué contiene; la caducidad corta y la revocación lo acotan.
+
+## ADR-054 — WebMCP: BookReader se ofrece como herramienta de solo lectura a agentes del navegador, apagado por defecto · `ACEPTADA`
+
+**Contexto.** Queremos la mejor integración entre lectura y bases de conocimiento (Obsidian…).
+WebMCP (borrador del W3C CG; Chrome tras opción experimental / origin trial, 2026) deja que una
+página declare herramientas que un agente del navegador llama. Hoy ningún agente de uso general lo
+consume (Gemini en Chrome, anunciado) y la API ya cambió de sitio (`navigator` → `document`).
+
+**Decisión.** Capa experimental y barata, no la base de la integración: `app/js/webmcp.js` registra
+cinco herramientas de **solo lectura** (`list_books`, `get_highlights`, `get_notebook`,
+`search_book`, `export_markdown`) que leen los datos locales de la pestaña. Solo si el navegador lo
+trae **y** el usuario lo activa (Ajustes → Aplicación; el interruptor no aparece donde no hay
+soporte). Libro por id o por título; si es ambiguo, error con candidatos. La integración de verdad
+con Obsidian va por vías estables (exportación Markdown, carpeta del vault, `obsidian://`) y, para
+agentes de escritorio, por el MCP local (ADR-036), que ahora también acepta el libro por título.
+
+**Por qué apagado.** Exponer la biblioteca a un agente es una decisión del lector; el modelo de
+amenaza de WebMCP incluye inyección de prompts y agentes engañados.

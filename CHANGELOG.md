@@ -3,6 +3,16 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-10-05 — Tu biblioteca, para agentes: WebMCP (experimental) y el MCP local por título
+
+- **WebMCP** (ADR-054): con un navegador que lo soporte y el interruptor de Ajustes → Aplicación
+  activado, un agente del navegador puede pedir `list_books`, `get_highlights`, `get_notebook`,
+  `search_book` y `export_markdown` (Markdown con frontmatter, subrayados y libreta, para Obsidian).
+  Solo lectura, desde los datos del dispositivo, mientras la pestaña está abierta. Apagado por
+  defecto. Tests: [webmcp.spec.ts](tests/webmcp.spec.ts) con un `modelContext` simulado.
+- **MCP local:** `get_highlights` y `get_notes` aceptan `book` (título o parte) además de
+  `bookId`: «los subrayados de Pedro Páramo» funciona sin pasar antes por `list_books`. SW `v181`.
+
 ## 2026-10-05 — Compartir un libro suelto
 
 «Compartir libro…» en el menú ⋯ del libro y en «Más» del lector: el mismo diálogo y las mismas
