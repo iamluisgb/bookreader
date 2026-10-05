@@ -1737,3 +1737,20 @@ agentes de escritorio, por el MCP local (ADR-036), que ahora también acepta el 
 
 **Por qué apagado.** Exponer la biblioteca a un agente es una decisión del lector; el modelo de
 amenaza de WebMCP incluye inyección de prompts y agentes engañados.
+
+## ADR-055 — El tema vive en DOS sitios: Ajustes generales → Aplicación y los ajustes de lectura · `ACEPTADA`
+
+**Contexto.** El tema tiñe toda la app (`data-theme` en `<html>` y tokens de `themes.css`:
+estantería, análisis, panel del agente, ajustes; hasta el `theme-color` de la PWA), pero el
+único selector estaba en los ajustes de lectura (`#reading-pop`), que solo existen con un libro
+abierto. La decisión de «Ajustes generales» (BACKLOG) excluyó el tema por vivir en la sidebar
+contextual — y así quedó atrapado: desde la estantería no se podía poner la app en noche.
+
+**Decisión.** Enmienda parcial, no revocación. El tema es el único ajuste de la sidebar de
+lectura que ES apariencia global de la app, así que se expone en **Ajustes generales →
+Aplicación** (junto al idioma, su misma familia) **y** se conserva el acceso rápido en los
+ajustes de lectura: cambiar a noche mientras se lee es un gesto contextual que no debe exigir
+abrir ajustes generales. Una sola fuente de verdad (`settings.js`): `set()` persiste y
+`applySettings()` sincroniza el estado activo de todos los `.theme-btn` del documento. Los
+demás ajustes de lectura (fuente, ancho, papel, brillo, luz nocturna) siguen siendo solo
+contextuales: dependen del libro, el tema no.

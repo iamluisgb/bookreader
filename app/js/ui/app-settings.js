@@ -2,7 +2,10 @@
 // "Ajustes generales", hogar de P1–P3). Config que NO depende del libro abierto:
 // el Agente (API key/modelo/auto-rellenar, antes en #ai-config del panel) y, en el
 // futuro, Perfiles (P1), Plantillas (P2) y Datos/export-import (P3). Las settings de
-// LECTURA (tema/fuente/ancho) NO viven aquí: siguen en la sidebar, contextual del libro.
+// LECTURA (fuente/ancho/papel/brillo) NO viven aquí: siguen en la sidebar, contextual
+// del libro. EXCEPCIÓN: el TEMA sí vive también aquí — tiñe toda la app (estantería,
+// análisis, agente), no solo el libro; vive en ambos sitios y comparte fuente de verdad
+// (settings.js sincroniza todos los .theme-btn).
 //
 // Patrón: overlay tipo #ai-onboarding, construido bajo demanda y montado en <body>.
 // Punto de entrada desde la estantería y desde el pie de la sidebar. Al guardar la
@@ -29,6 +32,7 @@ import { escapeHtml } from './escape.js';
 import { confirmBox } from './dialog.js';
 import { ago } from './when.js';
 import { t, getLang, setLang } from '../i18n.js';
+import * as Settings from '../settings.js';
 import { loadAgentCss } from '../css-loader.js';
 
 const SECTIONS = [
@@ -826,6 +830,14 @@ function appHtml() {
       <option value="es"${lang === 'es' ? ' selected' : ''}>Español</option>
     </select>
     <p class="appset-muted">${t('Idioma de la interfaz. El agente responde en el idioma en el que le escribas. Cambiarlo recarga la app.')}</p>
+    <label class="appset-label">${t('Tema')}</label>
+    <div class="theme-selector" role="group" aria-label="${t('Tema')}">
+      <button class="theme-btn theme-swatch swatch-system" data-theme="system" title="${t('Auto (sistema)')}" aria-label="${t('Auto (sistema)')}"></button>
+      <button class="theme-btn theme-swatch swatch-light" data-theme="light" title="${t('Claro')}" aria-label="${t('Claro')}"></button>
+      <button class="theme-btn theme-swatch swatch-sepia" data-theme="sepia" title="${t('Sepia')}" aria-label="${t('Sepia')}"></button>
+      <button class="theme-btn theme-swatch swatch-dark" data-theme="dark" title="${t('Oscuro')}" aria-label="${t('Oscuro')}"></button>
+    </div>
+    <p class="appset-muted">${t('Tiñe toda la app: estantería, análisis y agente. También puedes cambiarlo leyendo, en los ajustes de lectura.')}</p>
     <label class="appset-label" for="appset-newlimit">${t('Tarjetas nuevas por sesión')}</label>
     <select id="appset-newlimit" class="appset-input">
       ${[10, 20, 30, 50].map(n => `<option value="${n}"${limit === n ? ' selected' : ''}>${n}</option>`).join('')}
@@ -863,6 +875,14 @@ function wireApp(content) {
   content.querySelector('#appset-grading').addEventListener('change', (e) => {
     Storage.set('study_grading', e.target.value === 'full' ? 'full' : 'simple');
   });
+  // Tema: el wiring de settings.js corre al importar (antes de que exista este overlay),
+  // así que estos botones necesitan su propio listener. Settings.set() persiste y
+  // applySettings() sincroniza el estado activo de TODOS los .theme-btn (los de la
+  // sidebar de lectura incluidos): una sola fuente de verdad.
+  content.querySelectorAll('.theme-btn').forEach(btn => {
+    btn.addEventListener('click', () => Settings.set('theme', btn.dataset.theme));
+  });
+  Settings.applySettings();  // pinta el swatch activo al abrir la sección
 }
 
 // ---- Sección Plantillas (P2) ----------------------------------------------

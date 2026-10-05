@@ -382,7 +382,9 @@ ser necesaria.
 
 > **Decisión de diseño — "Ajustes generales" (hogar de P1–P3).** P1, P2 y P3 son config
 > **global de la app** (no dependen del libro abierto), así que NO van en la sidebar *Ajustes*
-> (que es contextual de lectura: tema/fuente/ancho). Su hogar es un **overlay de ajustes
+> (que es contextual de lectura: fuente/ancho/papel/brillo; el TEMA es la excepción — tiñe
+> toda la app y también vive en Ajustes generales → Aplicación, ver ADR-055). Su hogar es un
+> **overlay de ajustes
 > generales** —como el patrón ya existente `#ai-onboarding`— anclado a la **estantería**
 > (`#library`, el estado *home* sin libro), con dos puntos de entrada: un engranaje en la
 > cabecera de la estantería **y** otro en el pie de la sidebar mientras se lee (accesible desde
