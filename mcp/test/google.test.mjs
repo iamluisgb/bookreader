@@ -15,8 +15,8 @@ import { join } from 'node:path';
 import { createGoogleAuth, readRefreshTokenFile, AUTH_WORKER_URL, APP_ORIGIN } from '../src/auth/google.mjs';
 import { createGoogleDriveProvider } from '../src/providers/google-drive.mjs';
 import { createDriveSource } from '../src/sources/drive.mjs';
-import { SourceError } from '../src/errors.mjs';
-import { buildLayoutFiles, BOOK_1 } from './helpers/dataset.mjs';
+import { SourceError, UnknownBookError } from '../src/errors.mjs';
+import { buildLayoutFiles, BOOK_1, BOOK_2 } from './helpers/dataset.mjs';
 
 function jsonRes(body, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
@@ -182,4 +182,36 @@ test('de punta a punta: la fuente F2 funciona contra el doble de Drive', async (
   assert.equal(stats.length, 4);
   assert.ok(calls.some((c) => c.q.includes("name='bookreader/settings.json'")));
   assert.ok(calls.filter((c) => c.path.startsWith('/drive/v3/files/')).length >= 2, 'leyó por alt=media');
+});
+
+test('fuente F2: con library.json manda el catálogo — sin fantasmas ni borrados', async () => {
+  const files = buildLayoutFiles();
+  // Fantasma: sigue en el manifest (con su fichero de datos) pero NO está en la biblioteca.
+  // Es el caso real de un libro borrado cuyo `books/<id>.json` quedó en el sync.
+  const PHANTOM = 'abcdef0123456789';
+  files['bookreader/manifest.json'].books[PHANTOM] = {
+    file: `books/${PHANTOM}.json`, title: 'Libro fantasma', updatedAt: 1,
+  };
+  files[`bookreader/books/${PHANTOM}.json`] = {
+    local: {}, convos: [], messages: [], notes: [], ratings: [], artifacts: [], decks: [], meta: null,
+  };
+  // Catálogo: BOOK_1 vivo (con título del catálogo), BOOK_2 BORRADO aunque tenga fichero y manifest.
+  files['bookreader/library.json'] = {
+    schemaVersion: 1,
+    books: {
+      [BOOK_1.id]: { title: 'Título del catálogo', deleted: false, shelfIds: ['sh_x'], status: 'reading' },
+      [BOOK_2.id]: { title: 'Borrado', deleted: true, deletedAt: 1 },
+    },
+    shelves: {},
+  };
+  const { fetchImpl } = driveStub(files);
+  const auth = createGoogleAuth({ refreshToken: 'rt-ok', fetchImpl });
+  const provider = createGoogleDriveProvider({ getAccessToken: (f) => auth.getAccessToken(f), fetchImpl });
+  const source = createDriveSource({ provider, cacheMs: 0 });
+
+  const books = await source.listBooks();
+  assert.deepEqual(books.map((b) => b.id), [BOOK_1.id], 'solo el vivo del catálogo');
+  assert.equal(books[0].title, 'Título del catálogo');
+  await assert.rejects(() => source.getHighlights(BOOK_2.id), (e) => e instanceof UnknownBookError);
+  await assert.rejects(() => source.getHighlights(PHANTOM), (e) => e instanceof UnknownBookError);
 });

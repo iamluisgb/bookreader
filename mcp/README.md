@@ -11,12 +11,16 @@ Dos fuentes, la misma superficie de tools:
 
 | | **F1 · backup** | **F2 · layout de sync** |
 | --- | --- | --- |
-| De dónde lee | El JSON de «Descargar backup (JSON)» | `manifest.json`, `settings.json`, `books/<id>.json` |
+| De dónde lee | El JSON de «Descargar backup (JSON)» | `library.json` (el catálogo), `manifest.json`, `settings.json`, `books/<id>.json` |
 | Credenciales | Ninguna | Refresh token de Google (o una carpeta copiada) |
 | Datos | Foto del momento | Vivos |
 | `reading_stats` | **No existe** (el backup no lleva el registro de lectura) | Sí |
 | `list_decks`, `get_deck`, `list_artifacts`, `get_artifact` | Sí, **si el backup es del formato actual** (lleva `ai.decks`/`ai.artifacts`); un backup viejo no las anuncia | Sí |
-| Títulos | Solo si el libro pasó por el agente (`title: null` si no) | Del manifest (que siempre tiene lo que importó) |
+| Títulos | Solo si el libro pasó por el agente (`title: null` si no) | Del catálogo (`library.json`); sin él, del manifest |
+
+F2 lista los libros desde `library.json` —el catálogo: es el que sabe **qué libros tienes** y cuáles están
+borrados (`deleted`)—, no desde `manifest.json`, que es el índice de los ficheros de datos de lectura.
+Sin `library.json` (layout viejo) cae al manifest.
 
 Prueba F1 primero: responde si el caso de uso aporta algo antes de pagar el peaje de Drive.
 

@@ -156,20 +156,20 @@ test('drive: la caché evita releer y caduca con el TTL', async () => {
 
   await source.listBooks();
   const cold = provider.reads;
-  assert.equal(cold, 3, 'manifest + un fichero por libro');
+  assert.equal(cold, 4, 'manifest + catálogo + un fichero por libro');
   await source.listBooks();
   assert.equal(provider.reads, cold, 'segunda llamada dentro del TTL: cero lecturas');
 
   now += 6000;
   await source.listBooks();
-  assert.equal(provider.reads, cold + 3, 'pasado el TTL se vuelve a leer');
+  assert.equal(provider.reads, cold + 4, 'pasado el TTL se vuelve a leer');
 });
 
-test('drive: titles() cuesta una sola lectura (el manifest ya tiene los títulos)', async () => {
+test('drive: titles() cuesta una lectura del manifest y otra del catálogo', async () => {
   const provider = countReads(createMemoryProvider(buildLayoutFiles()));
   const source = createDriveSource({ provider, cacheMs: 0 });
   await source.titles();
-  assert.equal(provider.reads, 1);
+  assert.equal(provider.reads, 2, 'manifest + library.json');
 });
 
 test('drive: cacheMs=0 desactiva la caché (fuente siempre viva)', async () => {
@@ -178,7 +178,7 @@ test('drive: cacheMs=0 desactiva la caché (fuente siempre viva)', async () => {
   const source = createDriveSource({ provider, cacheMs: 0 });
   await source.listBooks();
   await source.listBooks();
-  assert.equal(provider.reads, 6);
+  assert.equal(provider.reads, 8);
 });
 
 test('drive: una escritura remota se ve al caducar la caché', async () => {

@@ -2,6 +2,8 @@
 // (app/js/sync/layout.js):
 //
 //   <base>manifest.json      índice { schemaVersion, books: { id: { file, title, updatedAt } } }
+//   <base>library.json       catálogo real { schemaVersion, books: { id: {...deleted, shelfIds,
+//                            status, title} }, shelves: {...} }  ← manda para QUÉ libros hay
 //   <base>settings.json      ajustes globales + plantillas propias + `reading_days`
 //   <base>books/<id>.json    local (subrayados, marcadores, posición), convos, mensajes,
 //                            notas, ratings, artefactos y mazos
@@ -49,7 +51,7 @@ export function isSafeBookFile(file) {
  */
 export function createDriveSource({ provider, base = DEFAULT_BASE, cacheMs = 15000, now = Date.now }) {
   /**
-   * @typedef {{ at: number, manifest: any, entries: Map<string, any>, settings: any }} Load
+   * @typedef {{ at: number, manifest: any, library: any, entries: Map<string, any>, settings: any }} Load
    * @type {Load|null}
    */
   let cache = null;
@@ -80,14 +82,24 @@ export function createDriveSource({ provider, base = DEFAULT_BASE, cacheMs = 150
   async function load() {
     if (fresh()) return cache;
     if (!loading) {
-      loading = readJson(base + 'manifest.json').then((raw) => {
+      loading = (async () => {
+        const raw = await readJson(base + 'manifest.json');
         if (!raw || typeof raw !== 'object' || !raw.books || typeof raw.books !== 'object') {
           throw new SourceError(
             'No hay un manifest.json utilizable en «' + base + '»: ¿sync activado alguna vez?',
           );
         }
-        return { at: now(), manifest: raw, entries: new Map(), settings: null };
-      });
+        // El catálogo manda para QUÉ libros hay (incluye `deleted`). Es OPCIONAL: si falta o no
+        // se puede leer (layout viejo, raíz que no es carpeta), se cae al manifest sin más.
+        let library = null;
+        try {
+          library = await readJson(base + 'library.json');
+        } catch {
+          library = null;
+        }
+        const hasLibrary = library && typeof library.books === 'object' && library.books !== null;
+        return { at: now(), manifest: raw, library: hasLibrary ? library : null, entries: new Map(), settings: null };
+      })();
       loading.then(
         (c) => {
           cache = c;
@@ -104,13 +116,24 @@ export function createDriveSource({ provider, base = DEFAULT_BASE, cacheMs = 150
   /** Un libro del load dado: así una tool paga UNA lectura de manifest aunque recorra 40 libros. */
   async function entryFrom(c, id) {
     const info = c.manifest.books[id];
-    if (!info) return null;
+    const libBook = c.library ? c.library.books[id] : null;
+    // Con `library.json`, él manda: es el catálogo, y trae los tombstones. Un id que no está
+    // —o está borrado— NO es de la biblioteca, aunque su fichero de datos siga en el manifest:
+    // es el caso que metía libros fantasma (y borrados) en `list_books`.
+    if (c.library) {
+      if (!libBook || libBook.deleted) return null;
+    } else if (!info) {
+      return null;
+    }
     const cached = c.entries.get(id);
     if (cached) return cached;
 
+    const file = (info && info.file) || 'books/' + id + '.json';
     const entry = {
       id,
-      title: info.title || null,
+      title: (libBook && libBook.title) || (info && info.title) || null,
+      status: (libBook && libBook.status) || null,
+      shelfIds: (libBook && libBook.shelfIds) || [],
       highlights: [],
       bookmarks: [],
       notes: [],
@@ -120,13 +143,13 @@ export function createDriveSource({ provider, base = DEFAULT_BASE, cacheMs = 150
       lastPositionAt: null,
       meta: null,
     };
-    if (!isSafeBookFile(info.file)) {
+    if (!isSafeBookFile(file)) {
       // Ruta que no cumple el patrón del layout: no se lee y se dice por qué en list_books.
-      entry.error = 'manifest: ruta de libro no permitida (' + String(info.file) + ')';
+      entry.error = 'manifest: ruta de libro no permitida (' + String(file) + ')';
       c.entries.set(id, entry);
       return entry;
     }
-    const path = base + info.file;
+    const path = base + file;
     const raw = await readJson(path);
     if (!raw) {
       entry.error = 'falta ' + path;
@@ -134,7 +157,7 @@ export function createDriveSource({ provider, base = DEFAULT_BASE, cacheMs = 150
       return entry;
     }
     const local = raw.local || {};
-    entry.title = info.title || (raw.meta && raw.meta.title) || null;
+    entry.title = (libBook && libBook.title) || (info && info.title) || (raw.meta && raw.meta.title) || null;
     entry.highlights = local['highlights_' + id];
     entry.bookmarks = local['bookmarks_' + id];
     entry.notes = raw.notes;
@@ -182,9 +205,12 @@ export function createDriveSource({ provider, base = DEFAULT_BASE, cacheMs = 150
      */
     async listBooks() {
       const c = await load();
+      // Con catálogo, la lista sale de él (vivos); sin él, del manifest (layout viejo).
+      const ids = c.library ? Object.keys(c.library.books) : Object.keys(c.manifest.books);
       const out = [];
-      for (const id of Object.keys(c.manifest.books)) {
+      for (const id of ids) {
         const entry = await entryFrom(c, id);
+        if (!entry) continue;
         const summary = summarizeBook(entry);
         if (entry.error) summary.error = entry.error;
         out.push(summary);
@@ -197,9 +223,16 @@ export function createDriveSource({ provider, base = DEFAULT_BASE, cacheMs = 150
       if (!entry) throw new UnknownBookError(bookId);
       return { id: entry.id, title: entry.title || (entry.meta && entry.meta.title) || null };
     },
-    /** Títulos por id, del manifest: ni una lectura de más (el manifest ya los tiene). */
+    /** Títulos por id, del catálogo (o del manifest si no lo hay): ni una lectura de más. */
     async titles() {
       const c = await load();
+      if (c.library) {
+        return Object.fromEntries(
+          Object.entries(c.library.books)
+            .filter(([, b]) => b && !b.deleted)
+            .map(([id, b]) => [id, b.title || null]),
+        );
+      }
       return Object.fromEntries(
         Object.entries(c.manifest.books).map(([id, info]) => [id, (info && info.title) || null]),
       );
