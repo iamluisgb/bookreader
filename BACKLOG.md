@@ -2707,3 +2707,42 @@ en Cloudflare. Fix: añadirlos en `dist/_headers` (o `_headers` de Pages).
 blanca), `npm audit` limpio (raíz y `mcp`), CORS con allowlist y fail-closed en `share`/`auth`, diseño
 de compartir por enlace (id de 128 bits, clave en el fragmento, bytes cifrados), CSP estricta en
 scripts, Mermaid `securityLevel: 'strict'`, `drive_refresh_token`/`ai_key` excluidos de backup y sync.
+
+### TEC11 — Performance y fiabilidad de las piezas críticas: cerrar la brecha a nivel staff · `M`–`L` · **pendiente**
+
+**El caso.** Revisión de arquitectura (2026-10-05) de las cuatro piezas con más superficie de la app
+—segmentación, motor de sync, lector PDF y pipeline del agente—. Las cuatro están a nivel **senior
+alto**; lo que las separa de staff no es criterio ni features, sino **presupuesto medido, degradación
+explícita y cobertura de los modos de fallo**. No hay que reescribirlas: hay que medir lo que no está
+medido y blindar los huecos que ya se conocen.
+
+**Segmentación** ([`segment.js`](app/js/ai/segment.js), [`segment-pdf.js`](app/js/ai/segment-pdf.js)).
+- **Perf:** cede el hilo (`scheduler.yield`, lotes de 200 bloques) pero sigue en el hilo principal; un
+  libro grande lo congela a saltos. Candidata a **Web Worker**; mientras tanto, **presupuesto de peor
+  caso** en el arnés para EPUB y PDF grandes.
+- **Dato:** el estado intermedio es un **string** `[[aN]] texto` que cada consumidor re-parsea con
+  regex ([`retrieval.js`](app/js/ai/retrieval.js), [`context.js`](app/js/ai/context.js)). Persistir
+  **pasajes estructurados** quita el round-trip y el acoplamiento formato↔parsers.
+- **Fiabilidad:** el fallo de una sección o página se traga (`console.warn` + `continue`) sin registrar
+  **cuánto** se perdió. Exponer cobertura (bloques leídos vs. fallidos).
+
+**Motor de sync** ([`sync/`](app/js/sync)) — la pieza más compleja de la app.
+- **Fiabilidad:** la convergencia descansa en invariantes sutiles (contadores monótonos, digests,
+  tombstones). Falta un test de **convergencia multi-dispositivo** —fuzz de ciclos pull/push
+  concurrentes—; hoy solo hay casos sueltos con proveedores simulados ([ADR-038](DECISIONS.md)).
+- **Presupuesto:** ni el coste por ciclo (peticiones + bytes) ni la tasa de «ciclos que convergen sin
+  reescritura» están medidos.
+
+**Lector PDF** ([`pdf-reader.js`](app/js/pdf-reader.js)).
+- **Perf:** el arnés mide el lector **EPUB** (TEC3/TEC4); falta la **paridad para PDF** (cola de render
+  por prioridad, ghosts, zoom de dos capas sin re-render).
+- **Fiabilidad:** es la pieza con más estado mutable de módulo (`active`, `claimSeq`, `zoom`,
+  `jumpGuardUntil`…); los tests son E2E y no hay invariantes de la cola de render/zoom.
+
+**Pipeline del agente** ([`ai/`](app/js/ai)).
+- La **calidad** ya tiene presupuesto ([`npm run eval`](docs/EVALS.md), EV5). Falta el de
+  **fiabilidad**: tasa de fallback a BM25, 5xx/524, cola offline ([ADR-035](DECISIONS.md)).
+
+**Contrato (EV5).** Cada pieza escribe su baseline medido + métrica primaria + time-box **antes** de
+tocarla, igual que un ítem de calidad. Sin baseline no se «optimiza»; y lo que ya tiene presupuesto
+(EPUB, evals) no se reworkea.
