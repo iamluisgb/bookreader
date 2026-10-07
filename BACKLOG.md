@@ -2746,3 +2746,125 @@ medido y blindar los huecos que ya se conocen.
 **Contrato (EV5).** Cada pieza escribe su baseline medido + métrica primaria + time-box **antes** de
 tocarla, igual que un ítem de calidad. Sin baseline no se «optimiza»; y lo que ya tiene presupuesto
 (EPUB, evals) no se reworkea.
+
+---
+
+_TEC12–TEC18 salen de una auditoría de capacidades del navegador (2026-10-07). Los números son de
+carga fría sobre `bookreader-2h5.pages.dev` con la caché HTTP desactivada
+(`performance.getEntriesByType('resource')`, `decodedBodySize`/`transferSize`) y del recuento de
+`ASSETS` en [`sw.js`](app/sw.js) a `v181`. El soporte de cada API está leído de
+`@mdn/browser-compat-data@8.1.4`, no de memoria._
+
+### TEC12 — El lector no retiene la pantalla encendida · `S` · **bug**
+
+**El caso.** No hay una sola llamada a `navigator.wakeLock` en `app/js/`. El lector espera el gesto y
+lo que dure el brillo, y nada más: al rato la pantalla se apaga **a mitad de capítulo**. Es la
+capacidad que más se echa en falta de las que faltan, y la más barata de todas.
+
+**Qué hacer.** Pedir el lock al abrir el libro, liberarlo al cerrarlo, y **volver a pedirlo** en
+`visibilitychange === 'visible'`: el navegador suelta el lock solo al ocultar la pestaña, así que sin
+el re-pedido el lector se queda sin él en cuanto el usuario cambia de app una vez.
+
+El patrón ya está resuelto en el repo hermano `arete` — `js/ui/set-runner.js`, `js/ui/training-timer.js`
+y `js/ui/running-tracker.js` lo usan.
+
+Soporte: Chrome 84 · Safari 16.4 · Firefox 126 · iOS Safari 18.4. Por debajo la API no existe y no
+pasa nada (`if ('wakeLock' in navigator)`).
+
+### TEC13 — Un trabajo que termina con la app cerrada no deja señal · `S`
+
+**El caso.** [`ai/jobs.js`](app/js/ai/jobs.js) promete (L2) "puedes seguir leyendo, y se le avisa al
+terminar", y el aviso **dentro** de la app está bien pensado: [`jobs-ui.js`](app/js/ai/jobs-ui.js)
+L25-26 — leyendo, ni chip ni toast, un **punto** al botón del agente (pulso → verde/rojo); fuera del
+lector, chip y toast.
+
+Lo que no existe es señal alguna **fuera** de la página. Un resumen map-reduce de libro entero es
+justo el trabajo que el usuario lanza y deja aparcado; si bloquea el móvil, termina en silencio.
+
+**La vía que encaja con lo que ya hay: el badge.** [`ai/study.js`](app/js/ai/study.js) L1458-1466 ya
+usa `setAppBadge` para las tarjetas pendientes, con un criterio explícito y bueno — *"el recordatorio
+que no necesita notificaciones"*. Extenderlo a "trabajo terminado" cubre el caso sin pedir permiso
+alguno y sin salir del patrón de la casa. `showNotification` desde el **service worker** es la
+alternativa más fuerte (Chrome 20 · iOS 16.4), a cambio de pedir permiso — y con una regla: pedirlo
+al arrancar el trabajo, no al abrir la app, o el usuario lo rechaza por reflejo y lo quema.
+
+**Ojo con quién lo lanza:** si el cliente ya no está, `new Notification()` desde la página no dispara;
+tiene que salir del worker.
+
+### TEC14 — El precache son 5,95 MB y desactiva el lazy-load por formato · `M`
+
+**La medición.** 191 ficheros / **5,95 MB** en el `ASSETS` de [`sw.js`](app/sw.js) a `v181`, antes de
+que el usuario abra un solo libro.
+
+| Fichero | Peso |
+|---|---|
+| `vendor/pdf.worker-3.11.174.min.js` | 1,06 MB |
+| `vendor/mermaid-12.1.0/**` | ~1,1 MB |
+| `vendor/sql-wasm-1.13.0.wasm` | 644 KB |
+| `vendor/pdf-3.11.174.min.js` | 312 KB |
+| `vendor/epub-0.3.93.min.js` | 218 KB |
+| `js/ai/panel.js` | 168 KB |
+| `vendor/temml-0.13.3.min.js` | 163 KB |
+
+**El problema.** [`js/vendor-loader.js`](app/js/vendor-loader.js) ya carga por formato y bajo demanda
+—"las pide al abrir un libro, y solo la del formato" (AGENTS.md)— pero el worker precachea
+**exactamente esos mismos ficheros** en `install`, así que la pereza no llega a existir: se paga todo
+en la primera visita, que es cuando el usuario todavía no ha mostrado ninguna intención.
+
+**Qué hacer.** Precache en dos niveles: el shell (HTML, CSS, módulos propios) en `install`; los vendor
+pesados a una caché de runtime, calentada al primer uso de cada formato. Versionar el shell y **no**
+la de descargas: perder un fichero que el usuario pidió «Preparar para sin conexión» (OFF1) por subir
+un string es el fallo caro de este rediseño. Además hay un test que vigila la coherencia
+(`sw-precache.spec.ts`), así que el cambio tiene red.
+
+**Esto no es TEC11.** Aquella revisión mide las cuatro piezas críticas; aquí se habla del coste de
+instalación y de la primera visita. Comparten la regla, eso sí: **contrato EV5 antes de tocar**
+(baseline medido + métrica primaria + time-box) — [`npm run perf`](tests/perf.spec.ts) (TEC3) es el
+arnés. Sin baseline no se «optimiza».
+
+**Y que no se confunda con lo archivado.** Esto **no** reabre el `modulepreload`: aquel veredicto
+medía el grafo de módulos ES en **155 ms** (TEC4) y sigue en pie. Aquí son bytes de red en la primera
+visita y el parseo de pdf.js y mermaid, que es otra cosa.
+
+### TEC15 — View Transitions al abrir y cerrar libro · `S`
+
+**El caso.** Abrir un libro es el corte más duro de la app: se cambia el layout entero y se repinta el
+iframe del EPUB. `document.startViewTransition()` (Chrome 111 · Safari 18 · Firefox 144) da un
+cross-fade nativo con una línea, **degrada solo** donde no exista y no necesita polyfill.
+
+**A vigilar.** No dar `view-transition-name` al contenedor del iframe: al tomar la captura del estado
+nuevo su primer pintado puede no estar listo y se cuela un frame en blanco. Que la transición cruce
+el **shell** (estantería ↔ lector) y el iframe aparezca ya montado.
+
+### TEC16 — `content-visibility: auto` en las listas largas · `S`
+
+Biblioteca, subrayados, marcadores, resultados de búsqueda y el selector de mazos pintan todas sus
+filas aunque estén fuera de pantalla. `content-visibility: auto` (Chrome 85 · Safari 18 · Firefox 125)
+deja que el navegador se salte layout y pintado de lo que no se ve. Con `contain-intrinsic-size`
+puesto, o la barra de scroll baila al desplazarse rápido.
+
+### TEC17 — Manifest: `id`, `shortcuts` y `display_override` · `S`
+
+Al manifest le faltan tres cosas que ya cuestan cero:
+
+- **`id`** (Chrome 96 · Safari 17). Sin él, la identidad de la app instalada se deriva de `start_url`:
+  mover algún día la página de arranque deja **huérfanas** las instalaciones que ya existen. Ponerlo
+  ahora es gratis; ponerlo después no las arregla.
+- **`shortcuts`** (Chrome 96 · Safari 17.4). «Continuar lectura» en la pulsación larga del icono — la
+  acción que el usuario quiere el 90 % de las veces.
+- **`display_override`** (solo Chromium). Habilita `window-controls-overlay` en escritorio.
+
+**Ojo con `file_handlers`, que ya está declarado.** Funciona en escritorio (Chrome 102) pero **Chrome
+Android no lo soporta** (`chrome_android: false` en BCD). En Android la vía que funciona para "abrir
+este .epub" es `share_target`, que ya está — no construir asociación de ficheros en Android sobre esa
+clave.
+
+### TEC18 — File System Access para export e import · `M` · **solo Chromium**
+
+`.bookreader` y el `.apkg` de Anki salen hoy por descarga. `showSaveFilePicker` (Chrome/Edge 86 ·
+Chrome Android 132; **sin** Safari ni Firefox) permite elegir destino, y con `showDirectoryPicker` +
+un handle recordado, apuntar la biblioteca a una carpeta real del disco en vez de depender solo de
+Drive para la copia local.
+
+**Solo mejora progresiva**: el camino de descarga se queda como fallback. En iOS Safari estas APIs no
+existen y no hay negociación posible.
