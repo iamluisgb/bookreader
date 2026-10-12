@@ -22,3 +22,7 @@ evals/runs/
 
 # Salida de build para Cloudflare Pages (scripts/build-pages.mjs)
 dist/
+
+# Vídeos y capturas de emulador (se regeneran)
+reels/
+.em-shots/
