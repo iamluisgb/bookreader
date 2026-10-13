@@ -673,16 +673,25 @@ button.lib-rail-twisty:hover { background: var(--surface-2); color: var(--text);
   grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
 }
 .lib-card { cursor: pointer; }
+/* La portada va ENTERA, con su proporción real: `object-fit: cover` en una caja 2:3 se
+   comía los bordes de las que no son 2:3 (en O'Reilly, la marca y la banda de edición).
+   El hueco sí es 2:3 y fijo, para que la rejilla no baile; la portada se apoya en su
+   base, como en una estantería. Hasta 2:3 basta CSS; las más estrechas encogen de
+   ancho con `--ar` (ancho/alto), que pone view.js al cargar la imagen. */
+.lib-cover-slot {
+  aspect-ratio: 2 / 3; container-type: inline-size;
+  display: flex; align-items: flex-end; justify-content: center;
+}
 .lib-cover {
-  position: relative; aspect-ratio: 2 / 3; border-radius: var(--r-md);
+  position: relative; width: min(100%, calc(150cqw * var(--ar, 1))); border-radius: var(--r-md);
   overflow: hidden; background: var(--surface-3); box-shadow: var(--shadow-1);
   transition: transform var(--transition-fast), box-shadow var(--transition-fast);
 }
 .lib-card:hover .lib-cover { transform: translateY(-4px); box-shadow: var(--shadow-2); }
 .lib-card:active .lib-cover { transform: scale(0.98); }
-.lib-cover-img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.lib-cover-img { width: 100%; height: auto; display: block; }
 .lib-cover-fallback {
-  width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;
+  width: 100%; aspect-ratio: 2 / 3; display: flex; align-items: center; justify-content: center;
   background: linear-gradient(150deg, var(--accent), var(--accent-hover));
   color: #fff; font-size: var(--fs-3xl); font-weight: 700;
 }
@@ -1629,12 +1638,11 @@ body.reading.chrome-quiet:not(.fs):not(.ai-open) .agent-rail:not(:hover, :focus-
 .lib-hero:hover { box-shadow: var(--shadow-2); }
 .lib-hero:hover .lib-hero-cover { transform: translateY(-3px) rotate(-0.6deg); }
 .lib-hero-cover {
-  flex: none; width: 128px; aspect-ratio: 2 / 3; border-radius: var(--r-xs); overflow: hidden;
+  flex: none; width: 128px; border-radius: var(--r-xs); overflow: hidden;
   background: var(--surface-3);
   box-shadow: 0 2px 4px rgba(0,0,0,0.10), 0 18px 36px rgba(0,0,0,0.18);
   transition: transform var(--transition-normal);
 }
-.lib-hero-cover .lib-cover-img, .lib-hero-cover .lib-cover-fallback { width: 100%; height: 100%; }
 .lib-hero-body { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
 .lib-hero-kicker { margin: 0; font-size: var(--fs-xs); font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-faint); }
 .lib-hero-title { margin: 0; font-size: var(--fs-2xl); font-weight: 700; letter-spacing: -0.02em; line-height: 1.15; color: var(--text); }

@@ -85,6 +85,14 @@ export function init(opts = {}) {
     openCard(hero.dataset.id);
   });
   host.addEventListener('input', onInput);
+  // La portada se pinta entera, con su proporción. CSS lo resuelve solo hasta 2:3; una
+  // más estrecha (y alta) necesita su ratio para encoger de ancho en vez de desbordar el
+  // hueco. `load` no burbujea: se escucha en captura.
+  host.addEventListener('load', (e) => {
+    const img = e.target;
+    if (!img.classList?.contains('lib-cover-img') || !img.naturalHeight) return;
+    img.parentElement.style.setProperty('--ar', img.naturalWidth / img.naturalHeight);
+  }, true);
   // Arrastrar una ficha sobre una estantería del rail para meterla ahí: el
   // gesto que cualquiera prueba en una biblioteca. Delegado en el host porque
   // la rejilla y el rail se repintan enteros en cada render.
@@ -828,12 +836,12 @@ function cardHtml(b) {
 
   return `
     <div class="lib-card${ghost ? ' is-ghost' : ''}${transfer ? ' is-transferring' : ''}" data-id="${b.id}" draggable="true">
-      <div class="lib-cover">
+      <div class="lib-cover-slot"><div class="lib-cover">
         ${cover}
         ${badge}
         ${overlay}
         <button class="lib-kebab" data-id="${b.id}" title="${t('Más')}" aria-label="${t('Más opciones')}">${icon('ellipsis', { size: 'lg' })}</button>
-      </div>
+      </div></div>
       <div class="lib-progressbar"><span style="width:${pct}%"></span></div>
       <div class="lib-mastery" data-mastery="${escapeHtml(b.id)}" hidden>
         <span class="lib-mastery-bar"><span class="lib-mastery-fill"></span></span><span class="lib-mastery-lbl"></span>

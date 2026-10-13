@@ -3,6 +3,14 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-10-13 — Las portadas de la biblioteca se ven enteras
+
+- La rejilla metía cada portada en una caja 2:3 con `object-fit: cover`, y las que no son 2:3
+  perdían los bordes (en O'Reilly, la marca y la banda de edición). Ahora el hueco sigue siendo
+  2:3, para que la rejilla no baile, pero la portada va entera con su proporción y apoyada en la
+  base, como en una estantería. Las más estrechas que 2:3 encogen de ancho. «Continuar leyendo»
+  también la enseña entera.
+
 ## 2026-10-05 — El composer del chat vuelve a crecer al escribir
 
 - Regresión del composer en cápsula (UI3): el `flex: 1` del textarea pisaba la altura
