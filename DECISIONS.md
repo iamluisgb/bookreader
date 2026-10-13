@@ -1754,3 +1754,85 @@ abrir ajustes generales. Una sola fuente de verdad (`settings.js`): `set()` pers
 `applySettings()` sincroniza el estado activo de todos los `.theme-btn` del documento. Los
 demás ajustes de lectura (fuente, ancho, papel, brillo, luz nocturna) siguen siendo solo
 contextuales: dependen del libro, el tema no.
+
+## ADR-056 — Sync de BookReader: sync gestionado dentro de la suscripción, con el patrón de compartir · `PROPUESTA`
+
+**Contexto.** Hoy el sync es Pro (pago único) y va contra el Google Drive del propio usuario (P7,
+ADR-024). Funciona, pero pide una cuenta de Google y pelea con los límites de Drive: el N+1 de
+`files.list` del BACKLOG y los libros de más de 50 MB que no suben. La suscripción de ADR-031 ya
+pone la inferencia (vía nan en la prueba gratuita). La propuesta es que **también ponga el sync**:
+sin Drive, sin configurar nada, «simplemente funciona». La duda de partida (2026-10-13) era si
+puede ir sobre lo mismo que compartir por enlace (`workers/share`, ADR-053).
+
+**Decisión (propuesta).** Sí al **patrón**, no al mismo Worker.
+
+1. **Worker y bucket propios: `workers/sync` con R2 `bookreader-sync` y D1 `bookreader-sync`.** De
+   `share` se copia el código y las reglas: R2 detrás de un Worker, la cuenta de uso en D1 (R2 no
+   la da barata), reserva antes de escribir, **nunca listar R2**, retención cero en los logs. Pero
+   va separado, para que un sync lleno no tumbe los enlaces (ni al revés) y cada gasto se vea por su
+   lado (`npm run sync:usage`, hermano de `share:usage`).
+
+2. **Va en la suscripción, no en el pago único.** Es lo que ya decide ADR-031 §1: un coste recurrente
+   no se financia con un pago único. El sync por Drive se queda en Pro: no nos cuesta nada y es el
+   discurso BYOS. Quedan tres salidas: sin sync (gratis) · Drive (Pro) · Sync de BookReader
+   (suscripción).
+
+3. **Identidad: la licencia, sin cuentas.** Igual que el token Pro (ADR-031 §5): `POST /sync-token`
+   recibe la license key, la valida **server-side** contra Polar y devuelve un token `br-sync-…`. El
+   espacio del usuario en R2 es `u/<hash(license_key)>/…`. Cuando la suscripción caduca, el token
+   deja de renovarse: los datos se pueden **leer y exportar** durante 30 días y después se purgan
+   (y se avisa antes).
+
+4. **Cifrado de extremo a extremo con una clave que NO sale de la licencia.** La license key llega
+   al servidor, así que una clave derivada de ella la podríamos descifrar nosotros. La clave de sync
+   es aleatoria, se genera en el primer dispositivo y pasa a los demás con un **enlace de
+   emparejamiento**, con la clave en el fragmento (`#pair=…`): el mismo truco que compartir (ADR-053)
+   y que el traspaso de la demo (ADR-032). Para no perderla, se ofrece guardarla como **frase de
+   recuperación** (o en un fichero). **Riesgo aceptado y dicho en la UI:** quien pierde todos sus
+   dispositivos y la frase pierde lo sincronizado. Es el precio de que no podamos leerlo.
+
+5. **Un proveedor más en el motor: `BookReaderProvider`.** Implementa la interfaz de `SYNC_PLAN.md`
+   (`list`/`read`/`write` con `ifMatch`/`remove`, más `readBinary`/`writeBinary`). El `ifMatch` se
+   hace con las **escrituras condicionadas de R2** (`onlyIf` por etag), y un 412 vuelve al motor como
+   ya hace con Drive. `list` **no** lista R2 (listar es clase A): el Worker responde desde el índice
+   en D1 (path, etag, tamaño, fecha), que además da la cuota por usuario sin coste.
+   **Prerrequisito:** hoy el motor no es agnóstico. `engine.js`, `blobs.js` y `recovery.js` importan
+   `drive-provider.js` directamente (unas 26 llamadas `Drive.*`). Hay que pasarlos a un proveedor
+   activo antes de escribir el segundo, y eso también deja hecho el camino de WebDAV.
+
+6. **Historial de versiones.** `recovery.js` usa las revisiones de Drive, y R2 no tiene versiones. El
+   Worker guarda las **N últimas versiones** de `settings.json` y de cada `books/<id>.json`
+   (`…/v/<ts>`, apuntadas en D1). Ocupan KB, cuentan contra la cuota del usuario y se purgan por
+   antigüedad.
+
+7. **Cuotas por usuario, no solo del servicio.** Cada licencia tiene un tope de almacenamiento (datos
+   + versiones + libros) y un límite de escrituras por minuto (el motor ya agrupa los pushes con
+   debounce de 4 s). Al tope, el sync de **datos** sigue y los **libros** dejan de subir, con el
+   motivo a la vista (la lección del BACKLOG de P7: «Solo notas» sin decir por qué).
+
+**❓ La decisión abierta: «nunca pagar» frente a un servicio de pago.** ADR-053 se niega al 80 % de lo
+gratis de R2, y en algo gratuito y viral es lo correcto: el enlace falla y se ofrece el fichero. En
+un servicio de pago, llegar al tope significa que **el sync de un cliente que paga deja de
+funcionar**. Dos opciones:
+
+- **(A) Se paga R2 pasado lo gratis, y lo pagan los suscriptores.** Los topes globales pasan a ser una
+  alarma (aviso al 50 % y al 80 %, como el cron de `share`) más un tope de gasto alto como seguro, y
+  lo que manda son las cuotas por usuario. R2 cuesta unos 0,015 $/GB-mes, 4,50 $ por millón de
+  escrituras y 0,36 $ por millón de lecturas, sin coste de salida. Un usuario con 2 GB de libros
+  cuesta unos 0,03 $ al mes: es ruido frente a cualquier precio de suscripción. **Recomendada.**
+- **(B) También dentro de lo gratis, siempre.** Solo cabe si el sync gestionado se limita a los
+  **datos pequeños** (anotaciones, progreso, artefactos, flashcards: KB por usuario) y los libros
+  siguen por Drive. Techo aproximado: unas 50 escrituras al día por usuario activo dan el tope de
+  800 k al mes hacia los **500 usuarios activos**. Los 8 GB no son el límite para los datos, pero sí
+  lo serían con libros (unos 100 usuarios con biblioteca).
+
+**Dependencias.** MON2 en producción: Polar sigue **simulado**, y sin licencias reales no hay a
+quién emitir el token. La suscripción de ADR-031 (también `PROPUESTA`), con su precio puesto **tras
+medir** el coste de inferencia por usuario activo. Este ADR solo añade una línea de coste más
+pequeña a esa cuenta.
+
+**Alternativas.** El mismo Worker `share` con un prefijo (menos código, pero los topes y el gasto se
+mezclan, y cualquier cambio del sync arriesga la viralidad). Dexie Cloud o Supabase con cifrado
+(`LAUNCH_PLAN.md` lo apuntaba: otra cuenta, otro coste fijo y otro proveedor que vigilar, cuando lo
+nuestro ya está montado en Cloudflare). Sin cifrar (más simple, inaceptable: rompe lo que promete
+la landing). Clave derivada de la licencia (sin emparejamiento, pero podríamos leer los datos).

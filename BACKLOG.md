@@ -2229,6 +2229,43 @@ o solo demo? · ~~¿cuenta de Cloudflare disponible?~~ (sí: desplegado) · ~~me
 en nan~~ → **instrumentado en F1.2**; queda *leer* los datos tras unos días de tráfico y ajustar
 `DEMO_QUOTA`/`MAX_DAILY_CALLS` con ellos.
 
+### MON4 — Sync de BookReader: sync gestionado en la suscripción · `L` · **plan ([ADR-056](DECISIONS.md))**
+
+**El caso.** Quien paga la suscripción (inferencia vía nan) se lleva también el sync: sin Google Drive
+y sin configurar nada. Va sobre el patrón de compartir por enlace (R2 + contabilidad en D1 + cifrado
+de extremo a extremo), en un Worker aparte. Diseño y alternativas en
+[ADR-056](DECISIONS.md#adr-056--sync-de-bookreader-sync-gestionado-dentro-de-la-suscripción-con-el-patrón-de-compartir--propuesta).
+
+**Bloqueado por:** decidir **A/B** (¿se paga R2 pasado lo gratis cuando lo pagan suscriptores?) ·
+MON2 en producción (Polar real) · la suscripción de ADR-031 con precio.
+
+**Fases:**
+- **F0 — Motor agnóstico** · `M` · *se puede hacer ya, y vale también para WebDAV (P7 F3).*
+  `engine.js`, `blobs.js` y `recovery.js` dejan de importar `drive-provider.js` y hablan con un
+  proveedor activo (`sync/provider.js`). Sin cambio de comportamiento: todos los tests de sync en verde
+  con Drive.
+- **F1 — Worker `workers/sync`** · `M`. R2 `bookreader-sync` + D1 `bookreader-sync` (índice por
+  usuario: path, etag, tamaño, fecha; versiones; contadores mensuales). `POST /sync-token` contra
+  Polar; `GET/PUT/DELETE /v1/o/<path>` con `If-Match` → `onlyIf` de R2; `GET /v1/list` desde D1, nunca
+  listando R2. Cuota por usuario, límite de escrituras por minuto y retención cero. `npm run sync:usage`
+  y alerta del cron al 50 %. Tests con Miniflare, como `share`.
+- **F2 — Cifrado y emparejamiento** · `M`. Clave AES-GCM aleatoria por usuario. Se cifra en el
+  navegador cada objeto, ruta incluida (hash de la ruta con la clave), para que el servidor no vea ni
+  títulos ni ids de libro. Enlace de emparejamiento `#pair=…` y frase de recuperación. La UI explica
+  qué se pierde sin ella.
+- **F3 — `BookReaderProvider` con datos pequeños** · `M`. Ajustes → Sync con las tres salidas (sin sync ·
+  Drive · BookReader). Sincroniza todo menos los ficheros de libro. Historial de versiones desde las
+  N copias del Worker. **Con la opción B, aquí se acaba.**
+- **F4 — Ficheros de libro** · `M` · *solo con la opción A.* `readBinary`/`writeBinary` con cuota de GB
+  por usuario y subida por partes (multipart de R2) para los libros de más de 100 MB, el tope de
+  cuerpo de Workers. Al tope, el motivo a la vista en la tarjeta del libro.
+- **F5 — Migrar desde Drive** · `S`. «Pasar mi sync de Drive a BookReader» en un paso: pull de Drive,
+  push al nuevo proveedor y desconectar Drive. Y al revés, para quien cancela.
+
+**Métrica:** suscriptores con el sync de BookReader activo y conflictos/412 por semana (la salud del
+motor con el proveedor nuevo). **Riesgo:** pérdida de la clave → pérdida de datos. Se mitiga con la
+frase de recuperación y diciéndolo claro; no se mitiga guardando la clave nosotros.
+
 ---
 
 ## 🔧 Técnico (calidad / seguridad / perf / bugs)
