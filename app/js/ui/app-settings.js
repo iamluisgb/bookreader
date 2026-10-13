@@ -533,6 +533,9 @@ function wireDemoButton(content) {
     try {
       const r = await LLM.requestDemoToken();
       window.dispatchEvent(new CustomEvent('appsettings:agent-saved'));
+      // La demo trae la prueba de Pro: aquí no hay aviso de «demo activada» que la mencione.
+      const trial = License.trialNote();
+      if (trial) import('../ai/toast.js').then(({ toast }) => toast({ message: trial, timeout: 9000 })).catch(() => {});
       selectSection('agent');   // re-render: campos rellenos, botón fuera
       const ok = overlay.querySelector('#appset-saved');
       if (ok) { ok.hidden = false; setTimeout(() => { ok.hidden = true; }, 2500); }
@@ -1510,9 +1513,22 @@ function licenseHtml() {
   const revokedNote = s && s.revoked
     ? `<p class="appset-err">${t('Tu licencia dejó de ser válida (¿reembolso o revocación?). Tus datos siguen intactos; la app vuelve al plan Free.')}</p>`
     : '';
+  // Prueba de Pro (llega con la demo del agente): en curso, o ya terminada.
+  const trial = License.getTrial();
+  const trialNote = License.isTrial()
+    ? `<p class="appset-lic-state is-pro">${icon('check', { size: 'md' })} ${t('Prueba de BookReader Pro: te quedan {days} días (hasta el {date}).', {
+        days: License.trialDaysLeft(),
+        date: escapeHtml(new Date(trial.until).toLocaleDateString(getLang())),
+      })}</p>`
+    : trial
+      ? `<p class="appset-muted">${t('Tu prueba de BookReader Pro terminó el {date}. Tus flashcards, mapas y libretas siguen ahí.', {
+          date: escapeHtml(new Date(trial.until).toLocaleDateString(getLang())),
+        })}</p>`
+      : '';
   return `<div class="appset-section">
     <h3 class="appset-h3">${t('Licencia')}</h3>
     ${revokedNote}
+    ${trialNote}
     <p class="appset-muted">${t('BookReader Pro desbloquea flashcards con export a Anki, repaso espaciado, mapas mentales, plantillas avanzadas y perfiles. {price}, sin suscripción.', { price: escapeHtml(License.CONFIG.price) })}</p>
     <label class="appset-label" for="appset-lic-key">${t('Clave de licencia')}</label>
     <input id="appset-lic-key" class="appset-input" placeholder="BKRD-XXXX-XXXX-XXXX" autocomplete="off" spellcheck="false" />

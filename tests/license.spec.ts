@@ -220,3 +220,46 @@ test('settings has a Licencia section that activates a mock key end-to-end', asy
   await page.waitForSelector('.appset-lic-state.is-pro');
   expect(await page.textContent('#app-settings')).toContain('Copy');
 });
+
+// Prueba de Pro: la demo del agente regala Pro durante 100 días, una vez por navegador.
+test('trial: requesting the demo grants 100 days of Pro, once per browser', async ({ page }) => {
+  await page.route('**/demo-token', (route) => route.fulfill({
+    status: 200, headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token: 'br-demo-trial', remaining: 30, quota: 30, model: 'bookreader-fast' }),
+  }));
+  const r = await page.evaluate(async () => {
+    const L = await import('/js/license.js');
+    const LLM = await import('/js/ai/llm.js');
+    const before = L.isPro();
+    await LLM.requestDemoToken();
+    const first = L.getTrial();
+    const day = 24 * 60 * 60 * 1000;
+    // Una segunda demo (otro día) no la renueva.
+    const again = L.startTrial(Date.now() + 5 * day);
+    return {
+      before, after: L.isPro(), trial: L.isTrial(), license: L.hasLicense(),
+      days: Math.round((first.until - first.start) / day), left: L.trialDaysLeft(),
+      again, sameStart: L.getTrial().start === first.start,
+      proAtDay99: L.isPro(first.start + 99 * day), proAtDay100: L.isPro(first.start + 100 * day),
+    };
+  });
+  expect(r.before).toBe(false);
+  expect(r.after).toBe(true);
+  expect(r.trial).toBe(true);
+  expect(r.license).toBe(false);          // la prueba no es una licencia
+  expect(r.days).toBe(100);
+  expect(r.left).toBe(100);
+  expect(r.again).toBe(false);
+  expect(r.sameStart).toBe(true);
+  expect(r.proAtDay99).toBe(true);
+  expect(r.proAtDay100).toBe(false);
+});
+
+test('trial: an expired trial falls back to Free and Settings says so', async ({ page }) => {
+  await page.evaluate(() => {
+    const day = 24 * 60 * 60 * 1000;
+    localStorage.setItem('bookreader_pro_trial', JSON.stringify({ start: Date.now() - 101 * day, until: Date.now() - day }));
+  });
+  const pro = await page.evaluate(async () => (await import('/js/license.js')).isPro());
+  expect(pro).toBe(false);
+});

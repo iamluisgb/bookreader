@@ -3,6 +3,17 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-10-13 — La demo trae 100 días de BookReader Pro
+
+- Activar la demo del agente (sola, desde Ajustes o con el enlace de traspaso) empieza una prueba de
+  Pro de 100 días: flashcards con export a Anki, repaso espaciado, mapas mentales, plantillas
+  avanzadas y perfiles. Una vez por navegador: una demo nueva no la renueva. Quien ya tenía la demo
+  la recibe al abrir el agente. El aviso de «demo activada» la menciona con su fecha de fin, y
+  Ajustes → Licencia dice los días que quedan o cuándo terminó. Vive aparte de la licencia
+  (`pro_trial`): no es una key ni ocupa un hueco de activación. `License.isPro()` = licencia o prueba.
+- La demo no respondía: el gateway seguía con la key de nan revocada tras la rotación del 12-oct
+  (401 «Invalid API key»). Secreto `NAN_API_KEY` actualizado; no hacía falta desplegar.
+
 ## 2026-10-13 — Fuera el modo Artesano
 
 - Se retira la casilla «Leo para aprender a escribir (modo Artesano)» de la Lectura inmersiva, y la

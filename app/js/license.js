@@ -21,7 +21,7 @@
 //   BKRD-…-REVOKED → se comporta como key revocada (reembolso)
 //   BKRD-…-LIMIT   → activate devuelve "límite de activaciones alcanzado"
 // Pasar a producción = rellenar organizationId/checkoutUrl/portalUrl. Nada más.
-import { t } from './i18n.js';
+import { t, getLang } from './i18n.js';
 import * as Storage from './storage.js';
 
 export const CONFIG = {
@@ -34,6 +34,14 @@ export const CONFIG = {
 
 export const OFFLINE_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;   // 30 días
 const STORE_KEY = 'license';
+
+// Prueba de Pro: activar la demo del agente regala Pro durante TRIAL_DAYS. Es una vez por
+// navegador: el registro se queda al caducar, así que una demo nueva (otro día, otra red)
+// no la renueva. Vive aparte de la licencia porque no es una key: no se valida contra
+// nadie ni ocupa un hueco de activación.
+export const TRIAL_DAYS = 100;
+const TRIAL_KEY = 'pro_trial';
+const DAY_MS = 24 * 60 * 60 * 1000;
 const MOCK_RE = /^BKRD-[A-Z0-9-]{4,}$/i;
 
 export function isMock() {
@@ -58,12 +66,54 @@ function setState(state) {
   window.dispatchEvent(new CustomEvent('license:changed', { detail: { pro: isPro() } }));
 }
 
-// Pro = hay key no revocada con validación buena dentro de la ventana offline.
-// Una key que caducó la ventana no se borra: la próxima validación con red la reactiva.
+// Pro = licencia válida o prueba en curso.
 export function isPro(now = Date.now()) {
+  return hasLicense(now) || isTrial(now);
+}
+
+// Hay key no revocada con validación buena dentro de la ventana offline.
+// Una key que caducó la ventana no se borra: la próxima validación con red la reactiva.
+export function hasLicense(now = Date.now()) {
   const s = getState();
   if (!s || !s.key || s.revoked) return false;
   return typeof s.validatedAt === 'number' && now - s.validatedAt < OFFLINE_WINDOW_MS;
+}
+
+// ---- Prueba de Pro -------------------------------------------------------------
+
+export function getTrial() {
+  return Storage.get(TRIAL_KEY, null);
+}
+
+export function isTrial(now = Date.now()) {
+  const tr = getTrial();
+  return !!tr && typeof tr.until === 'number' && now < tr.until;
+}
+
+// Días que le quedan a la prueba (0 si no hay o caducó). Redondea hacia arriba: el último
+// día cuenta como «queda 1 día», no como 0.
+export function trialDaysLeft(now = Date.now()) {
+  const tr = getTrial();
+  if (!tr || typeof tr.until !== 'number' || now >= tr.until) return 0;
+  return Math.ceil((tr.until - now) / DAY_MS);
+}
+
+// Empieza la prueba si este navegador no la ha tenido nunca. Devuelve true solo cuando la
+// empieza ahora. `announce` pide a app.js un aviso propio; sin él, quien la empieza la
+// menciona en su propio aviso (el de «demo activada»), para no apilar dos.
+export function startTrial(now = Date.now(), { announce = false } = {}) {
+  if (getTrial()) return false;
+  Storage.set(TRIAL_KEY, { start: now, until: now + TRIAL_DAYS * DAY_MS });
+  window.dispatchEvent(new CustomEvent('license:changed', { detail: { pro: isPro(now), trialStarted: true, announce } }));
+  return true;
+}
+
+// La frase que se añade a los avisos de demo activada mientras dura la prueba ('' si no).
+export function trialNote(now = Date.now()) {
+  if (!isTrial(now)) return '';
+  return t('Incluye BookReader Pro gratis hasta el {date}: flashcards, repaso, mapas mentales, plantillas avanzadas y perfiles.', {
+    date: new Date(getTrial().until).toLocaleDateString(getLang()),
+  });
 }
 
 // Label legible de la activación: es lo que el usuario ve en el portal de Polar al

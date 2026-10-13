@@ -315,6 +315,10 @@ const EN = {
 
   // app.js
   'Tu licencia Pro dejó de ser válida. Tus datos siguen intactos.': 'Your Pro license is no longer valid. Your data is untouched.',
+  'Con la demo tienes BookReader Pro gratis {days} días: flashcards, repaso, mapas mentales, plantillas avanzadas y perfiles.': 'The demo comes with {days} days of BookReader Pro for free: flashcards, spaced review, mind maps, advanced templates and profiles.',
+  'Incluye BookReader Pro gratis hasta el {date}: flashcards, repaso, mapas mentales, plantillas avanzadas y perfiles.': 'Includes BookReader Pro for free until {date}: flashcards, spaced review, mind maps, advanced templates and profiles.',
+  'Prueba de BookReader Pro: te quedan {days} días (hasta el {date}).': 'BookReader Pro trial: {days} days left (until {date}).',
+  'Tu prueba de BookReader Pro terminó el {date}. Tus flashcards, mapas y libretas siguen ahí.': 'Your BookReader Pro trial ended on {date}. Your flashcards, maps and notebooks are still there.',
   'Este libro no está en tu biblioteca en este dispositivo.': 'This book is not in your library on this device.',
   'Arrastra para ajustar el ancho · doble clic: restablecer': 'Drag to adjust width · double-click to reset',
   'No se pudo abrir el libro guardado.': 'Could not open the saved book.',
