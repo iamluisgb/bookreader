@@ -37,6 +37,10 @@ const CARD_PAD_X = 14, DOT = 10, CARD_H_MIN = 40;
 const GAP_ROOT = 60;      // del borde del centro a la tarjeta de rama
 const GAP_BRANCH = 46;    // de la rama a sus ideas (deja sitio al círculo de plegado)
 const GAP_LEAF = 42;      // de una idea a sus sub-ideas (ídem)
+const TRUNK_IN = 28;      // vertical: del borde izquierdo de la raíz al tronco
+const TRUNK_TOP = 30;     // vertical: de la raíz a la primera rama
+const TRUNK_OUT = 34;     // vertical: del tronco a la tarjeta de rama
+const ELBOW = 14;         // vertical: radio del codo con que cada rama sale del tronco
 const GAP_Y = { 1: 26, 2: 10, default: 6 };
 const FOLD_R = 10, FOLD_OFF = 16;
 const BADGE_W = 20, BADGE_H = 16;
@@ -203,9 +207,23 @@ export function layout(tree, { collapsed = new Set(), palette = PALETTE, sides =
   const root = list[0];
   root.x = 0; root.y = 0; root.side = 0;
   const branches = root.kids.map(id => byId.get(id));
-  // `sides: 1` (póster vertical) pone todas las ramas a la derecha: una sola columna alta.
-  const cut = sides === 1 ? branches.length : Math.ceil(branches.length / 2);
-  [[branches.slice(0, cut), 1], [branches.slice(cut), -1]].forEach(([col, side]) => {
+  // `sides: 1` (vertical: póster 4:5 y pantalla estrecha) es una columna alta, y con la raíz a
+  // media altura a su izquierda, la vista abierta desde arriba no la enseñaba: las ramas
+  // colgaban de líneas que salían del borde. Ahora la raíz va ARRIBA y las ramas cuelgan de un
+  // tronco vertical que baja desde ella: se lee de arriba abajo, como un índice.
+  let trunk = null;
+  if (sides === 1) {
+    const tx = -root.size.w / 2 + TRUNK_IN;
+    let y = root.size.h / 2 + TRUNK_TOP;
+    for (const b of branches) {
+      const h = subH.get(b.id);
+      place(b, tx + TRUNK_OUT, y + h / 2, 1);
+      y += h + gap(1);
+    }
+    if (branches.length) trunk = { x: tx, y0: root.size.h / 2, y1: branches[branches.length - 1].y - ELBOW };
+  }
+  const cut = Math.ceil(branches.length / 2);
+  if (sides !== 1) [[branches.slice(0, cut), 1], [branches.slice(cut), -1]].forEach(([col, side]) => {
     if (!col.length) return;
     const total = col.reduce((a, b) => a + subH.get(b.id), 0) + gap(1) * (col.length - 1);
     let y = -total / 2;
@@ -233,7 +251,7 @@ export function layout(tree, { collapsed = new Set(), palette = PALETTE, sides =
   }
   const pad = 44;
   return {
-    nodes: list, byId, edges,
+    nodes: list, byId, edges, trunk,
     width: Math.round(maxX - minX + pad * 2),
     height: Math.round(maxY - minY + pad * 2),
     ox: -minX + pad, oy: -minY + pad,
@@ -422,8 +440,23 @@ export function renderSvg(lay, {
   viewport.appendChild(root);
 
   const rootNode = lay.nodes[0];
+  // Vertical: el tronco es neutro (es de todas las ramas) y cada rama sale de él con su color.
+  if (lay.trunk) {
+    const { x, y0, y1 } = lay.trunk;
+    root.appendChild(el('line', {
+      x1: x, y1: y0, x2: x, y2: y1, stroke: theme.muted, 'stroke-opacity': 0.45, 'stroke-width': 2.5, 'stroke-linecap': 'round',
+    }));
+  }
   for (const e of lay.edges) {
     const n = e.to, c = colorOf(n);
+    if (n.depth === 1 && lay.trunk) {
+      const x = lay.trunk.x;
+      root.appendChild(el('path', {
+        d: `M ${x} ${n.y - ELBOW} Q ${x} ${n.y} ${x + ELBOW} ${n.y} L ${n.xi} ${n.y}`,
+        fill: 'none', stroke: c, 'stroke-width': 2.5, 'stroke-linecap': 'round',
+      }));
+      continue;
+    }
     if (n.depth === 1) {
       const x0 = n.side * rootNode.size.w / 2;
       root.appendChild(el('path', { d: taperPath(x0, 0, n.xi, n.y, 4, 2.5), fill: c, stroke: 'none' }));

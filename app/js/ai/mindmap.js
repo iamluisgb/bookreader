@@ -458,7 +458,7 @@ function buildTree(tree, scopeName) {
     }).filter(br => br.children.length);
     // P14 F2 · Un árbol de UNA rama no es un mapa (el eval lo cazó en el PDF): mejor el
     // fallback por capítulos, que garantiza estructura fiel al libro.
-    if (branches.length >= 2) return { title: String(tree.title || scopeName).slice(0, 44), branches };
+    if (branches.length >= 2) return { title: clampWords(String(tree.title || scopeName), 44), branches };
   }
   return null;
 }
@@ -488,7 +488,7 @@ function chapterFallback(bullets, scopeName) {
   const branches = order.slice(0, 8).map(ch => ({
     label: clampWords(tidyChapter(ch), 32), full: ch, children: groups.get(ch).slice(0, 6),
   }));
-  return { title: scopeName.slice(0, 44), branches };
+  return { title: clampWords(scopeName, 44), branches };
 }
 
 function showError(msg) {
@@ -582,18 +582,23 @@ function resetView() {
 }
 
 // Vista inicial. Ancho (escritorio, dos lados): el mapa entero, como siempre; hay rueda y
-// botones para acercarse. Estrecho (móvil, un lado): el mapa entero dejaba las ideas en ~5 px,
-// así que se abre con el zoom justo para que midan MIN_TEXT_PX, encuadrando la columna de
-// ramas e ideas desde arriba (el título del libro ya está en la cabecera del modal).
-// «Ajustar» sigue dando la vista completa.
+// botones para acercarse. Vertical (móvil o formato «Vertical»): el mapa entero dejaba las
+// ideas en ~5 px, así que se abre con el zoom justo para que midan MIN_TEXT_PX, desde ARRIBA
+// (la raíz va en cabeza: ver `layout`) y centrado si a ese zoom cabe a lo ancho — pegado a la
+// izquierda dejaba medio lienzo vacío en escritorio. «Ajustar» sigue dando la vista completa.
 const MIN_TEXT_PX = 12, IDEA_FS = 15;
 function initialView() {
   if (!lastLayout) return;
   const s = fitScale();
   if (lastLayout.sides !== 1 || IDEA_FS * s >= MIN_TEXT_PX) { resetView(); return; }
   const k = clampK(MIN_TEXT_PX / (IDEA_FS * s));
-  const branchX = Math.min(...lastLayout.nodes.filter(n => n.depth === 1).map(n => n.x - n.size.w / 2));
-  view = { k, tx: 12 / s - k * (lastLayout.ox + branchX), ty: 8 / s };
+  const { w } = canvasBox();
+  const root = lastLayout.nodes[0];
+  const left = Math.min(...lastLayout.nodes.map(n => n.x - n.size.w / 2));
+  const right = Math.max(...lastLayout.nodes.map(n => n.x + n.size.w / 2 + (n.childCount ? 30 : 0)));
+  const free = w - (right - left) * k * s;
+  const x0 = free > 24 ? free / 2 : 12;              // en px de pantalla
+  view = { k, tx: x0 / s - k * (lastLayout.ox + left), ty: 12 / s - k * (lastLayout.oy - root.size.h / 2) };
   applyView();
 }
 

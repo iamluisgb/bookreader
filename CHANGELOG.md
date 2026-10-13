@@ -3,6 +3,17 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-10-13 — El mapa mental en vertical se lee de arriba abajo
+
+- En «Vertical» (y en el móvil) el árbol era una columna alta con la raíz a media altura a su
+  izquierda. La vista se abría desde arriba, así que la raíz quedaba fuera: las ramas colgaban
+  de líneas que salían del borde, la columna iba pegada a la izquierda con medio lienzo vacío
+  en escritorio. Ahora la raíz va arriba y las ramas cuelgan de un tronco vertical, cada una
+  con su color. La vista se abre desde la raíz y centrada si cabe a lo ancho. El póster
+  vertical (4:5) usa la misma disposición.
+- El tema central se recortaba con un `slice(0, 44)` a media palabra y sin «…». Ahora pasa por
+  `clampWords`, como las ramas y las ideas.
+
 ## 2026-10-13 — Las portadas de la biblioteca se ven enteras
 
 - La rejilla metía cada portada en una caja 2:3 con `object-fit: cover`, y las que no son 2:3

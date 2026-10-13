@@ -394,6 +394,12 @@ test('el formato Vertical repinta el mapa a un lado, y el lienzo usa la pantalla
   expect(await sides()).toBe(2);
   await page.click('.mm-format button[data-f="portrait"]');
   await expect.poll(sides).toBe(1);
+  // La raíz va ARRIBA, encima de todas las ramas: a media altura quedaba fuera de la vista.
+  const rootAbove = await page.evaluate(() => {
+    const root = document.querySelector('.mm-node.mm-root')!.getBoundingClientRect();
+    return [...document.querySelectorAll('.mm-branch')].every(b => b.getBoundingClientRect().top > root.bottom);
+  });
+  expect(rootAbove).toBe(true);
   const h = await page.locator('.mm-canvas').evaluate(e => e.getBoundingClientRect().height);
   expect(h).toBeGreaterThan(600);                     // antes: tope de 62vh/720 en un modal de 900
 });
