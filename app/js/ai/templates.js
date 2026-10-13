@@ -153,8 +153,9 @@ export const TEMPLATES = [
     ],
   },
   {
-    // Modo avanzado "Artesano": opt-in dentro de T5 (leo para aprender a escribir). No se
-    // muestra como objetivo en el onboarding; se selecciona con la casilla de la pantalla T5.
+    // "Artesano" (leer ficción como escritor): RETIRADO el 2026-10-13. Ya no se ofrece en
+    // ningún sitio (ni en el onboarding ni en Ajustes → Plantillas), pero se conserva para que
+    // las libretas creadas con él sigan abriéndose con sus campos.
     id: 'artesano',
     block: 'humanista',
     name: tr('Artesano del Texto'),
@@ -172,7 +173,7 @@ export const TEMPLATES = [
   },
 ];
 
-// Id del modo avanzado Artesano y de la Lectura Inmersiva (la que lo ofrece como opt-in).
+// Id del Artesano (retirado, ver arriba) y de la Lectura Inmersiva.
 export const ARTESANO_ID = 'artesano';
 export const INMERSIVA_ID = 't5-inmersiva';
 
@@ -186,8 +187,8 @@ export function getTemplate(id) {
   return allTemplates().find(t => t.id === id) || null;
 }
 
-// Plantillas que se ofrecen como OBJETIVO en el onboarding: las 5 de fábrica (excluye el
-// Artesano, que es opt-in dentro de T5) más las propias del usuario.
+// Plantillas que se ofrecen (onboarding y Ajustes → Plantillas): las de fábrica salvo el
+// Artesano, que está retirado, más las propias del usuario.
 export function objectiveTemplates() {
   return [...TEMPLATES.filter(t => t.id !== ARTESANO_ID), ...Custom.getAll()];
 }

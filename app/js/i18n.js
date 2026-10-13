@@ -1492,7 +1492,6 @@ const EN = {
   'Generado': 'Generated',
   'Elegir objetivo': 'Choose a goal',
   'Ahora no': 'Not now',
-  'Leo para aprender a escribir (modo Artesano)': 'I read to learn how to write (Craftsman mode)',
   'Tu objetivo...': 'Your goal...',
   'Empezar a leer con objetivo': 'Start reading with a goal',
   'Esta conversación usa una plantilla que ya no existe.': 'This conversation uses a template that no longer exists.',

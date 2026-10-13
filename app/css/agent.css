@@ -563,12 +563,6 @@ body.ai-open .reader-main { margin-right: var(--ai-panel-width); }
 }
 .ai-ob-goal:focus { outline: none; border-color: var(--accent); }
 .ai-ob-start { width: 100%; }
-/* Opt-in del modo Artesano dentro de la Lectura Inmersiva. */
-.ai-ob-check {
-  display: flex; align-items: center; gap: 8px;
-  font-size: var(--fs-md); color: var(--text-soft);
-  margin: -8px 0 20px; cursor: pointer;
-}
 /* Atajo de baja fricción: "solo chatear" bajo la lista de objetivos. */
 .ai-ob-quickchat {
   display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%;

@@ -13,7 +13,7 @@
 import * as LLM from '../ai/llm.js';
 import * as FeatureGuide from './feature-guide.js';
 import * as Catalog from '../ai/catalog.js';
-import { BLOCKS, allTemplates } from '../ai/templates.js';
+import { BLOCKS, objectiveTemplates } from '../ai/templates.js';
 import * as CustomTpl from '../ai/custom-templates.js';
 import * as DriveAuth from '../sync/drive-auth.js';
 import * as DriveSync from '../sync/drive-sync.js';
@@ -896,7 +896,7 @@ function renderTemplates(content) {
 
 function templatesListHtml() {
   const byBlock = Object.values(BLOCKS).map(bl => {
-    const items = allTemplates().filter(x => x.block === bl.id);
+    const items = objectiveTemplates().filter(x => x.block === bl.id);
     return `<div class="appset-tpl-block">
       <div class="appset-tpl-block-h">${icon(bl.icon, { size: 'md' })} ${escapeHtml(bl.label)}</div>
       ${items.map(tp => `

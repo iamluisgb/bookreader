@@ -11,7 +11,7 @@ import * as PdfReader from '../pdf-reader.js';
 import * as RegionSelect from '../region-select.js';
 import { SHEET_SNAPS, SHEET_KEY, applySheetSnap, getSheetSnap, restoreSheetSnap, syncSplit, sheetReservedPx } from './sheet-height.js';
 import { loadAgentCss } from '../css-loader.js';
-import { getTemplate, objectiveTemplates, isValidField, aiWritableFields, isAiWritable, isCognitionField, ARTESANO_ID, INMERSIVA_ID } from './templates.js';
+import { getTemplate, objectiveTemplates, isValidField, aiWritableFields, isAiWritable, isCognitionField, INMERSIVA_ID } from './templates.js';
 import { icon } from '../ui/icons.js';
 import { t } from '../i18n.js';
 import { initAiMax, setAiMax } from './maximize.js';
@@ -1097,17 +1097,12 @@ function openOnboarding(opts = {}) {
   };
 
   const renderGoal = () => {
-    // Opt-in Artesano: solo en la Lectura Inmersiva (leer ficción como escritor).
-    const artesanoOptIn = chosenTemplate.id === INMERSIVA_ID
-      ? `<label class="ai-ob-check"><input type="checkbox" id="ai-ob-artesano" /> ${t('Leo para aprender a escribir (modo Artesano)')}</label>`
-      : '';
     body.innerHTML = `
       <button class="ai-ob-back">${icon('chevron-left', { size: 'md' })}<span>${t('Volver')}</span></button>
       <h2>${chosenTemplate.name}</h2>
       <p class="ai-ob-sub">${chosenTemplate.goalPrompt}</p>
       <textarea id="ai-ob-goal" class="ai-ob-goal" rows="3" placeholder="${t('Tu objetivo...')}"></textarea>
       <p class="ai-ob-sub">${t('Consejo: di qué quieres quedarte y qué ignorar. Ej.: «Técnicas de grafos de conocimiento y LLMs; ignora los ejemplos biomédicos».')}</p>
-      ${artesanoOptIn}
       <button id="ai-ob-start" class="btn btn--primary primary-btn ai-ob-start">${t('Empezar a leer con objetivo')}</button>`;
     body.querySelector('.ai-ob-back').addEventListener('click', renderObjectives);
     const goalEl = body.querySelector('#ai-ob-goal');
@@ -1116,9 +1111,7 @@ function openOnboarding(opts = {}) {
       const goal = goalEl.value.trim();
       // T5 (placer) no exige objetivo; el resto sí (es el ancla de la relevancia y la libreta).
       if (!goal && chosenTemplate.id !== INMERSIVA_ID) { goalEl.focus(); return; }
-      // Si marcó el opt-in, la plantilla real pasa a ser el Artesano.
-      const artesano = body.querySelector('#ai-ob-artesano')?.checked;
-      const finalTemplate = artesano ? getTemplate(ARTESANO_ID) : chosenTemplate;
+      const finalTemplate = chosenTemplate;
       // Gate Pro (MON2): HQ&A es la plantilla avanzada de pago; las demás siguen libres.
       if (finalTemplate.id === 'hqa' && !(await ensurePro('hqa'))) return;
       template = finalTemplate;

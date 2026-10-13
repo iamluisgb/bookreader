@@ -3,6 +3,12 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-10-13 — Fuera el modo Artesano
+
+- Se retira la casilla «Leo para aprender a escribir (modo Artesano)» de la Lectura inmersiva, y la
+  plantilla Artesano del Texto deja de salir en Ajustes → Plantillas. La plantilla sigue definida
+  en `templates.js`, oculta, para que las libretas creadas con ella se sigan abriendo con sus campos.
+
 ## 2026-10-13 — El mapa mental en vertical se lee de arriba abajo
 
 - En «Vertical» (y en el móvil) el árbol era una columna alta con la raíz a media altura a su
