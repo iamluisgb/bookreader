@@ -32,9 +32,9 @@ const GROUPS = [
     id: 'selection',
     title: () => t('Con un texto seleccionado'),
     items: [
-      'Preguntar al agente sobre el fragmento',
-      'Explícame · Por qué importa · Con números',
-      'Subrayar con color y añadir una nota',
+      'Preguntar al agente sobre el fragmento, o empezar a escribir',
+      'Explícame · Por qué importa · Qué significa aquí · Dónde más lo trata · La objeción más fuerte · Con números',
+      'Subrayar de un toque (con el último color) y añadir una nota',
       'Zona: recortar una figura o ecuación y enviársela al agente (PDF)',
       'Copiar y compartir (tarjeta-cita)',
     ],

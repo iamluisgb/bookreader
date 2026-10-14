@@ -256,13 +256,21 @@ function applyAgentBadge() {
 
 // Adjuntar un pasaje seleccionado en el lector como referencia de la próxima
 // pregunta (botón "Preguntar al agente" de la barra de selección).
-export function quoteSelection(text) {
+// `initial` (P38): la primera tecla que el usuario escribió con la selección activa —escribir
+// con algo seleccionado es preguntar—; entra en el composer y el cursor queda detrás.
+export function quoteSelection(text, initial = '') {
   const clean = (text || '').replace(/\s+/g, ' ').trim();
   if (!clean) return;
   setOpen(true);
   showView('chat');
   if (!convo) { pendingQuoteOnActivate = clean; return; } // se aplica tras el onboarding
   setRef(clean);
+  if (initial && els.input) {
+    els.input.value = initial;
+    fitInput();
+    els.input.focus();
+    els.input.setSelectionRange(initial.length, initial.length);
+  }
 }
 
 // EJEMPLO NUMÉRICO · Lo que separa "he leído la fórmula" de "la entiendo" es verla
@@ -323,6 +331,48 @@ El usuario ha marcado un fragmento y quiere saber qué peso tiene PARA SU OBJETI
    atención. Vale más un "puedes saltártelo" honesto que un elogio de todo.
 4. Breve: 120 palabras como mucho. Cita [[aN]] cuando conectes con otras partes del libro.`;
 
+// P38 · Los tres enfoques que faltaban en la barra (vistos en Gloss). Cada uno responde a
+// una pregunta distinta de Explícame, y la regla que lo separa de él va escrita en el modo.
+
+// «Qué significa aquí»: la palabra como la usa ESTE autor. La definición de diccionario el
+// lector ya la puede buscar; lo que no puede es saber qué carga le da el libro.
+const DEFINE_MODE = `MODO QUÉ SIGNIFICA AQUÍ (para este turno).
+El usuario ha marcado una palabra o expresión y quiere saber qué significa EN ESTE LIBRO. Reglas:
+1. Primero, en una o dos frases, el sentido con que la usa el autor en este pasaje. Si coincide
+   con el de diccionario, dilo en una línea y no te extiendas.
+2. Si el libro la DEFINE o la usa de forma propia en otro sitio, cítalo con [[aN]]. Si no la
+   define, no lo inventes: dilo.
+3. Si en el libro cambia de sentido o se confunde con otro término cercano, señálalo.
+4. Muy breve: 90 palabras como mucho. Sin ejemplos largos: para eso está «Explícame».`;
+
+// «Dónde más lo trata»: el valor es la LISTA de sitios, no otra explicación. Un pasaje que ya
+// es el seleccionado o su vecino inmediato no aporta: el lector lo tiene delante.
+const RELATED_MODE = `MODO DÓNDE MÁS LO TRATA (para este turno).
+El usuario ha marcado un fragmento y quiere saber en qué OTROS lugares del libro se trata esa
+misma idea. Reglas:
+1. Responde con una lista de 3 a 5 pasajes del extracto, cada uno con su cita [[aN]] y UNA
+   línea que diga qué añade ese pasaje respecto al fragmento: lo define, lo amplía, lo aplica,
+   lo matiza o lo contradice.
+2. NO cites el pasaje que contiene el fragmento ni el que va justo antes o después: el lector
+   ya lo tiene delante.
+3. Ordena por utilidad para entender el fragmento, no por orden de aparición.
+4. Si el extracto no tiene otros pasajes sobre esto, dilo en una línea. No rellenes con pasajes
+   que solo comparten una palabra.
+5. Sin introducción ni resumen final: solo la lista.`;
+
+// «La objeción más fuerte»: la crítica que haría alguien que sabe del tema, y si el libro
+// responde. La regla 3 evita el «hay quien opina distinto» que no dice nada.
+const COUNTER_MODE = `MODO OBJECIÓN MÁS FUERTE (para este turno).
+El usuario ha marcado un fragmento y quiere la crítica más seria que se le puede hacer. Reglas:
+1. Formula LA objeción más fuerte (una, no una lista) que haría un experto informado en el
+   tema. Concreta: qué supuesto falla, qué caso no cubre o qué evidencia la contradice.
+2. Di si el propio libro la anticipa o responde, con [[aN]]. Si no lo hace, dilo.
+3. Nada de «algunos críticos piensan…» sin decir qué piensan. Si el fragmento es una
+   definición o un dato sin tesis que discutir, dilo en una línea y señala, si existe, la
+   tesis del libro que se apoya en él.
+4. Cierra con una línea: cuánto daña la objeción al argumento (poco, bastante, mucho) y por qué.
+5. Breve: 160 palabras como mucho.`;
+
 // Acciones rápidas de la barra de selección. Todas comparten el mismo camino (`deliver`), así
 // que heredan retrieval, citas, historial, persistencia y export; lo único propio de cada una
 // es su bloque de sistema y la etiqueta que se guarda en la conversación.
@@ -344,6 +394,24 @@ const QUICK_ACTIONS = {
     ask: () => t('¿Por qué es importante esto para mi objetivo de lectura?'),
     label: (ref) => t('Por qué importa · «{ref}»', { ref }),
     button: () => t('Por qué importa'),
+  },
+  define: {
+    mode: DEFINE_MODE,
+    ask: () => t('¿Qué significa esto aquí, tal como lo usa el autor?'),
+    label: (ref) => t('Qué significa aquí · «{ref}»', { ref }),
+    button: () => t('Qué significa aquí'),
+  },
+  related: {
+    mode: RELATED_MODE,
+    ask: () => t('¿Dónde más trata el libro esta idea?'),
+    label: (ref) => t('Dónde más lo trata · «{ref}»', { ref }),
+    button: () => t('Dónde más lo trata'),
+  },
+  counter: {
+    mode: COUNTER_MODE,
+    ask: () => t('¿Cuál es la objeción más fuerte a esto?'),
+    label: (ref) => t('La objeción más fuerte · «{ref}»', { ref }),
+    button: () => t('La objeción más fuerte'),
   },
 };
 

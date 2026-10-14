@@ -1552,7 +1552,7 @@ body.ai-open #sync-badge { right: calc(var(--ai-panel-width) + 14px); }
 }
 .ai-zone-acts .sel-act {
   border: 1px solid var(--border); border-radius: var(--r-pill);
-  padding: 5px 12px; font-size: var(--fs-2xs); gap: 6px;
+  min-height: 0; padding: 5px 12px; font-size: var(--fs-2xs); gap: 6px;
 }
 .ai-zone-acts .sel-act .icon { color: var(--accent); }
 

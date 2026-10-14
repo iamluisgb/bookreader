@@ -328,33 +328,57 @@
   <button id="ai-fab" class="ai-fab" aria-label="Abrir agente" title="Agente" data-i18n-attrs="aria-label,title" data-icon="sparkles" data-icon-size="xl"></button>
 
   <!-- Highlight tooltip -->
+  <!-- P38 · Barra de selección compacta (inspirada en Gloss): UNA fila con lo de un toque y
+       el resto detrás de ⋯, cada opción en dos líneas (qué haces · qué recibes). Qué acciones
+       del agente van en la fila y cuáles en el menú lo decide highlights-ui.js al abrirla
+       (según lo seleccionado y el ancho): los botones se MUEVEN entre `.sel-row` y
+       `.sel-menu`, así que cada uno existe una sola vez y conserva su id. En escritorio la
+       barra flota sobre la selección; en táctil va fija abajo (`.is-docked`). -->
   <div id="highlight-tooltip" class="sel-toolbar" style="display:none;">
-    <button id="sel-ask" class="sel-ask"><span class="sel-ask-ico" data-icon="sparkles" data-icon-size="lg"></span><span data-i18n>Preguntar al agente</span></button>
-    <!-- Acciones rápidas: un composer vacío es una barrera. Cada una manda una petición ya
-         formulada sobre el fragmento, sin escribir nada. "Por qué importa" usa el OBJETIVO
-         de lectura del libro, que es lo que un lector con PDF genérico no puede tener. -->
-    <div class="sel-row sel-quick">
-      <button id="sel-explain" class="sel-act" title="Explicar este fragmento en llano, con un ejemplo" data-i18n-attrs="title"><span data-icon="bubble" data-icon-size="md"></span><span data-i18n>Explícame</span></button>
-      <button id="sel-why" class="sel-act" title="Qué peso tiene esto para tu objetivo de lectura" data-i18n-attrs="title"><span data-icon="target" data-icon-size="md"></span><span data-i18n>Por qué importa</span></button>
+    <div class="sel-row" id="sel-row">
+      <button id="sel-ask" class="sel-act sel-ask" title="Escribe una pregunta sobre lo seleccionado" data-i18n-attrs="title"><span data-icon="sparkles" data-icon-size="md"></span><span class="sel-lbl" data-i18n>Preguntar</span><span class="sel-caret" aria-hidden="true"></span></button>
+      <span class="sel-sep" aria-hidden="true"></span>
+      <span class="sel-slot" id="sel-slot"></span>
+      <button id="sel-more" class="sel-act sel-icon-btn" aria-label="Más acciones" title="Más acciones" aria-haspopup="menu" aria-expanded="false" data-i18n-attrs="aria-label,title"><span data-icon="ellipsis" data-icon-size="md"></span></button>
+      <span class="sel-sep" aria-hidden="true"></span>
+      <!-- Subrayar de un toque con el último color usado; el punto dice cuál es. En modo
+           edición (subrayado ya hecho) se cambia por los cuatro colores y Eliminar. -->
+      <button id="sel-mark" class="sel-act sel-icon-btn" aria-label="Subrayar" title="Subrayar" data-i18n-attrs="aria-label,title"><span data-icon="highlighter" data-icon-size="md"></span><span class="sel-mark-dot" aria-hidden="true"></span></button>
+      <div class="sel-colors" id="sel-colors-edit"></div>
+      <button id="sel-note" class="sel-act sel-icon-btn" aria-label="Nota" title="Nota" data-i18n-attrs="aria-label,title"><span data-icon="note" data-icon-size="md"></span></button>
+      <!-- Solo al pulsar un subrayado YA hecho (la barra en modo edición). -->
+      <button id="sel-delete" class="sel-act sel-icon-btn sel-act--danger" aria-label="Eliminar" title="Eliminar" data-i18n-attrs="aria-label,title" hidden><span data-icon="trash" data-icon-size="md"></span></button>
+    </div>
+    <div class="sel-menu" id="sel-menu" role="menu" hidden>
+      <div class="sel-menu-ai" id="sel-menu-ai">
+        <!-- Acciones del agente: un composer vacío es una barrera, cada una manda una petición
+             ya formulada sobre el fragmento. "Por qué importa" usa el OBJETIVO de lectura del
+             libro, que es lo que un lector con PDF genérico no puede tener. -->
+        <button id="sel-explain" class="sel-act" role="menuitem" data-quick="explain"><span data-icon="bubble" data-icon-size="md"></span><span class="sel-txt"><span class="sel-lbl" data-i18n>Explícame</span><span class="sel-sub" data-i18n>En llano y con un ejemplo</span></span></button>
+        <button id="sel-why" class="sel-act" role="menuitem" data-quick="why"><span data-icon="target" data-icon-size="md"></span><span class="sel-txt"><span class="sel-lbl" data-i18n>Por qué importa</span><span class="sel-sub" data-i18n>Qué peso tiene para tu objetivo</span></span></button>
+        <button id="sel-define" class="sel-act" role="menuitem" data-quick="define"><span data-icon="define" data-icon-size="md"></span><span class="sel-txt"><span class="sel-lbl" data-i18n data-short="Qué significa">Qué significa aquí</span><span class="sel-sub" data-i18n>La palabra, tal como la usa el autor</span></span></button>
+        <button id="sel-related" class="sel-act" role="menuitem" data-quick="related"><span data-icon="related" data-icon-size="md"></span><span class="sel-txt"><span class="sel-lbl" data-i18n data-short="Dónde más">Dónde más lo trata</span><span class="sel-sub" data-i18n>Otros pasajes del libro sobre esto</span></span></button>
+        <button id="sel-counter" class="sel-act" role="menuitem" data-quick="counter"><span data-icon="scale" data-icon-size="md"></span><span class="sel-txt"><span class="sel-lbl" data-i18n data-short="Objeción">La objeción más fuerte</span><span class="sel-sub" data-i18n>Lo que diría un crítico, y si el libro responde</span></span></button>
+        <button id="sel-numeric" class="sel-act" role="menuitem" data-quick="numeric" title="Ver esta fórmula o algoritmo ejecutado con números pequeños" data-i18n-attrs="title"><span data-icon="function" data-icon-size="md"></span><span class="sel-txt"><span class="sel-lbl" data-i18n>Con números</span><span class="sel-sub" data-i18n>La fórmula, hecha a mano con números pequeños</span></span></button>
+      </div>
+      <div class="sel-menu-sep" aria-hidden="true"></div>
       <!-- ST2 · Lo subrayado, a tarjeta de repaso (hueco en el término clave, con su cita). -->
-      <button id="sel-card" class="sel-act" title="Crear una tarjeta de repaso con este fragmento" data-i18n-attrs="title"><span data-icon="cards" data-icon-size="md"></span><span data-i18n>Tarjeta</span></button>
+      <button id="sel-card" class="sel-act" role="menuitem"><span data-icon="cards" data-icon-size="md"></span><span class="sel-txt"><span class="sel-lbl" data-i18n>Tarjeta</span><span class="sel-sub" data-i18n>Entra en tu repaso, con su cita</span></span></button>
       <!-- Auditoría de libretas, F1 · El fragmento a la libreta. Con HQ&A se llama «Hazme la
            pregunta» (la etiqueta la pone highlights-ui al abrir la barra, según la plantilla). -->
-      <button id="sel-notebook" class="sel-act" title="Llevar este fragmento a tu libreta" data-i18n-attrs="title"><span data-icon="notebook" data-icon-size="md"></span><span class="sel-notebook-label" data-i18n>A la libreta</span></button>
-    </div>
-    <div class="sel-row">
-      <div class="sel-colors">
-        <button class="highlight-color" data-color="#ffd54f" style="background:#ffd54f;" title="Amarillo" data-i18n-attrs="title"></button>
-        <button class="highlight-color" data-color="#81c784" style="background:#81c784;" title="Verde" data-i18n-attrs="title"></button>
-        <button class="highlight-color" data-color="#64b5f6" style="background:#64b5f6;" title="Azul" data-i18n-attrs="title"></button>
-        <button class="highlight-color" data-color="#f06292" style="background:#f06292;" title="Rosa" data-i18n-attrs="title"></button>
+      <button id="sel-notebook" class="sel-act" role="menuitem"><span data-icon="notebook" data-icon-size="md"></span><span class="sel-txt"><span class="sel-lbl sel-notebook-label" data-i18n>A la libreta</span><span class="sel-sub" data-i18n>A un campo de tu libreta, con su pasaje</span></span></button>
+      <button id="sel-copy" class="sel-act" role="menuitem"><span data-icon="copy" data-icon-size="md"></span><span class="sel-txt"><span class="sel-lbl" data-i18n>Copiar</span><span class="sel-sub" data-i18n>Con el libro y el capítulo</span></span></button>
+      <button id="sel-share" class="sel-act" role="menuitem"><span data-icon="share" data-icon-size="md"></span><span class="sel-txt"><span class="sel-lbl" data-i18n>Compartir</span><span class="sel-sub" data-i18n>Como tarjeta-cita, en imagen</span></span></button>
+      <div class="sel-menu-sep" aria-hidden="true"></div>
+      <!-- Los cuatro colores. En selección viven aquí (subrayar con OTRO color lo fija como
+           el de un toque); en modo edición se mueven a la fila (`#sel-colors-edit`). -->
+      <div class="sel-colors" id="sel-colors">
+        <span class="sel-colors-lbl" data-i18n>Subrayar en</span>
+        <button class="highlight-color" data-color="#ffd54f" style="background:#ffd54f;" title="Amarillo" aria-label="Amarillo" data-i18n-attrs="title,aria-label"></button>
+        <button class="highlight-color" data-color="#81c784" style="background:#81c784;" title="Verde" aria-label="Verde" data-i18n-attrs="title,aria-label"></button>
+        <button class="highlight-color" data-color="#64b5f6" style="background:#64b5f6;" title="Azul" aria-label="Azul" data-i18n-attrs="title,aria-label"></button>
+        <button class="highlight-color" data-color="#f06292" style="background:#f06292;" title="Rosa" aria-label="Rosa" data-i18n-attrs="title,aria-label"></button>
       </div>
-      <button id="sel-numeric" class="sel-act" title="Ver esta fórmula o algoritmo ejecutado con números pequeños" data-i18n-attrs="title"><span data-icon="function" data-icon-size="md"></span><span data-i18n>Con números</span></button>
-      <button id="sel-note" class="sel-act"><span data-icon="note" data-icon-size="md"></span><span data-i18n>Nota</span></button>
-      <button id="sel-copy" class="sel-act"><span data-icon="copy" data-icon-size="md"></span><span data-i18n>Copiar</span></button>
-      <button id="sel-share" class="sel-act"><span data-icon="share" data-icon-size="md"></span><span data-i18n>Compartir</span></button>
-      <!-- Solo al pulsar un subrayado YA hecho (la barra en modo edición). -->
-      <button id="sel-delete" class="sel-act sel-act--danger" hidden><span data-icon="trash" data-icon-size="md"></span><span data-i18n>Eliminar</span></button>
     </div>
     <!-- La nota se escribe AQUÍ, no en un modal: anotas mirando el pasaje. Se guarda sola
          al cerrar la barra, así que no hay botón Guardar ni estado "sin guardar". -->

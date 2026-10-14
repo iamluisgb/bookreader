@@ -1444,7 +1444,12 @@ el ruido que P25 evita. Antes de implementar cualquiera de los tres puntos, mira
 `usage-log` (P30·F5): si nadie llega a «Mes», el año no lo pide nadie.
 
 
-### P38 — La barra de selección, rehecha: compacta, y enfoques con lo que vas a recibir · `M` · **inspirado en Gloss**
+### P38 — La barra de selección, rehecha: compacta, y enfoques con lo que vas a recibir · `M` · **F1+F2 ✓ (2026-10-14)** · inspirado en Gloss
+
+**Entregado (ver CHANGELOG 2026-10-14):** F1 y F2. **Queda:** la variante sin clave de «Dónde más
+lo trata» (ranking local de pasajes), el contrato de EV5 en la batería del eval (que los enfoques
+nuevos no se confundan con Explícame) y F3, que sigue siendo dudoso. Y revisar con el `usage-log`
+qué dos acciones del agente merecen la fila: hoy son Explícame y Por qué importa por defecto.
 
 **Referencia.** [Gloss](https://www.usegloss.io/) (revisado el 2026-10-14) es un lector de textos
 sueltos con una sola función: seleccionas una línea y le preguntas a la IA. Su menú de selección

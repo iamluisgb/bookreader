@@ -183,7 +183,14 @@ test('al desplazarse, el resaltado sigue pegado al texto', async ({ page }) => {
   const enPantalla = await page.evaluate(() =>
     document.querySelector('#ts-overlay .ts-hi')!.getBoundingClientRect().top > 0);
   expect(enPantalla, 'la selección se salió de la pantalla: el caso medido sería el del recorte').toBe(true);
-  expect(Math.abs(despues.barra - antes.barra), 'la barra se quedó atrás').toBeLessThan(2);
+  // P38: en táctil la barra va FIJA ABAJO (no persigue la selección), salvo que la selección
+  // baje hasta donde estaría; entonces flota y sí la acompaña.
+  const fija = await page.evaluate(() => {
+    const tt = document.getElementById('highlight-tooltip')!;
+    return { docked: tt.classList.contains('is-docked'), bottom: tt.getBoundingClientRect().bottom, vh: innerHeight };
+  });
+  if (fija.docked) expect(fija.bottom, 'la barra fija no está abajo').toBeGreaterThan(fija.vh - 30);
+  else expect(Math.abs(despues.barra - antes.barra), 'la barra se quedó atrás').toBeLessThan(2);
 });
 
 // La selección NATIVA auto-desplazaba al llegar al borde; al tomar el control eso se perdió,

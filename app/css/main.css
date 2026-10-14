@@ -1633,61 +1633,101 @@ textarea.is-recording { display: none; }
 }
 
 
-/* ============ HIGHLIGHT TOOLTIP (v2) ============ */
-/* Barra de selección de texto (estilo O'Reilly): preguntar al agente arriba;
-   colores + nota + copiar abajo. */
-/* La barra crece con el número de acciones y es `fixed`: sin un tope, en un móvil de
-   375px se salía de la pantalla (447px ya antes de añadir "Con números"). Se acota al
-   viewport y la fila de acciones envuelve. */
+/* ============ HIGHLIGHT TOOLTIP (v3 · P38) ============ */
+/* Barra de selección compacta (inspirada en Gloss): UNA fila con lo de un toque
+   —Preguntar, una o dos acciones del agente, ⋯, subrayar, nota— y el resto en un menú de
+   dos líneas (qué haces · qué recibes). La fila no envuelve: si no cabe, highlights-ui.js
+   (fitRow) devuelve acciones al menú. En táctil va fija abajo (.is-docked). */
 .sel-toolbar {
   position: fixed; z-index: var(--z-popover);
   display: flex; flex-direction: column;
   max-width: calc(100vw - 20px);
   background: var(--surface-2); border: 1px solid var(--border);
   border-radius: var(--r-md); box-shadow: var(--shadow-3);
-  overflow: hidden;
 }
-.sel-ask {
-  display: flex; align-items: center; gap: 10px;
-  padding: 12px 18px; border: none; background: none; cursor: pointer;
-  color: var(--text); font-size: var(--fs-md); font-weight: 600; text-align: left;
+.sel-toolbar.is-docked {
+  left: var(--s-2); right: var(--s-2); top: auto;
+  bottom: calc(var(--s-2) + env(safe-area-inset-bottom));
+  max-width: none;
+  flex-direction: column-reverse;   /* la nota se abre ENCIMA de la fila, no bajo el borde */
+}
+.sel-row {
+  display: flex; align-items: center; gap: 2px;
+  flex-wrap: nowrap; overflow: hidden;
+  padding: var(--s-1);
+}
+.sel-slot { display: contents; }
+.sel-sep { flex: none; width: 1px; height: 20px; margin: 0 var(--s-1); background: var(--border-soft); }
+.sel-act {
+  display: flex; align-items: center; gap: var(--s-2); flex: none;
+  min-height: 40px; padding: 0 var(--s-3);
+  border: none; border-radius: var(--r-sm);
+  background: none; cursor: pointer; color: var(--text);
+  font-size: var(--fs-sm); font-weight: 500; white-space: nowrap;
   transition: background var(--transition-fast);
 }
-.sel-ask:hover { background: var(--surface-3); }
-.sel-ask .icon { color: var(--accent); }
-.sel-row {
-  display: flex; align-items: stretch; gap: 0;
-  flex-wrap: wrap;
-  border-top: 1px solid var(--border-soft);
+.sel-act:hover, .sel-act:focus-visible { background: var(--surface-3); }
+.sel-act .icon { color: var(--text-soft); flex: none; }
+/* Lo del agente lleva el icono en acento: son turnos del agente, no utilidades del subrayado. */
+.sel-ask .icon, .sel-act[data-quick] .icon { color: var(--accent); }
+.sel-ask { font-weight: 600; }
+.sel-icon-btn { width: 40px; padding: 0; justify-content: center; position: relative; }
+#sel-more[aria-expanded="true"] { background: var(--surface-3); }
+/* «Preguntar▏»: el cursor dice que basta con empezar a escribir (solo escritorio). */
+.sel-caret { width: 1.5px; height: 1.1em; margin-left: -4px; background: var(--accent); animation: sel-caret 1.1s steps(1) infinite; }
+@keyframes sel-caret { 50% { opacity: 0; } }
+@media (pointer: coarse) { .sel-caret { display: none; } }
+@media (prefers-reduced-motion: reduce) { .sel-caret { animation: none; } }
+/* Sin sitio ni para una acción: «Preguntar» se queda en icono. */
+.sel-toolbar.is-tight .sel-ask .sel-lbl, .sel-toolbar.is-tight .sel-caret { display: none; }
+.sel-toolbar.is-tight .sel-ask { padding: 0 var(--s-2); }
+/* En la fila solo se ve la etiqueta; la segunda línea es del menú. */
+.sel-txt { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; }
+.sel-row .sel-sub { display: none; }
+/* El punto de color del botón de subrayar: el último usado, que es el que pondrá. */
+.sel-mark-dot {
+  position: absolute; right: 8px; bottom: 8px;
+  width: 8px; height: 8px; border-radius: 50%;
+  box-shadow: 0 0 0 1.5px var(--surface-2);
 }
-/* Al envolver, el separador vertical del primer botón de cada línea sobra; se sustituye
-   por el horizontal de la propia línea. */
-.sel-row > .sel-act { border-top: 1px solid transparent; }
-.sel-colors { display: flex; align-items: center; gap: 8px; padding: 10px 14px; }
+
+/* Menú ⋯: se abre hacia arriba (no tapa la selección, que está debajo de la barra) o hacia
+   abajo si no cabe; highlights-ui.js fija el `left`. */
+.sel-menu {
+  position: absolute; bottom: calc(100% + var(--s-2));
+  width: max-content; min-width: 260px; max-width: min(340px, calc(100vw - 16px));
+  max-height: min(70vh, 520px); overflow-y: auto;
+  padding: var(--s-1);
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: var(--r-md); box-shadow: var(--shadow-3);
+}
+.sel-menu.opens-down { bottom: auto; top: calc(100% + var(--s-2)); }
+/* Fija abajo hay casi toda la pantalla encima: que el menú quepa entero, colores incluidos. */
+.sel-toolbar.is-docked .sel-menu { max-height: calc(100dvh - 96px); }
+/* En táctil, botones algo más estrechos: así cabe una acción del agente junto a Preguntar. */
+.sel-toolbar.is-docked .sel-row .sel-act { padding: 0 var(--s-2); }
+.sel-toolbar.is-docked .sel-icon-btn { width: 36px; padding: 0; }
+.sel-menu-ai { display: contents; }
+.sel-menu .sel-act { width: 100%; align-items: flex-start; padding: var(--s-2) var(--s-3); white-space: normal; text-align: left; }
+.sel-menu .sel-act .icon { margin-top: 2px; }
+.sel-menu .sel-lbl { font-weight: 500; color: var(--text); }
+.sel-sub { font-size: var(--fs-xs); font-weight: 400; color: var(--text-soft); line-height: 1.4; }
+.sel-menu-sep { height: 1px; margin: var(--s-1) var(--s-2); background: var(--border-soft); }
+
+.sel-colors { display: flex; align-items: center; gap: var(--s-2); flex: none; }
+.sel-menu .sel-colors { padding: var(--s-2) var(--s-3); }
+.sel-row .sel-colors { padding: 0 var(--s-2); }
+.sel-colors:empty { display: none; }
+.sel-colors-lbl { flex: 1; font-size: var(--fs-xs); color: var(--text-soft); }
 .highlight-color {
   width: 24px; height: 24px; border: 2px solid transparent; border-radius: 50%;
-  cursor: pointer; padding: 0;
+  cursor: pointer; padding: 0; flex: none;
   transition: transform var(--transition-fast), border-color var(--transition-fast);
 }
 .highlight-color:hover { transform: scale(1.15); border-color: var(--text); }
 /* Editando un subrayado ya hecho: su color va marcado con un anillo (el mismo recurso que
    el hover, fijo). Así se ve de qué color es sin salir a la lista. */
 .highlight-color.is-current { border-color: var(--text); transform: scale(1.15); }
-.sel-act {
-  display: flex; align-items: center; gap: 8px;
-  padding: 10px 16px; border: none; border-left: 1px solid var(--border-soft);
-  background: none; cursor: pointer; color: var(--text); font-size: var(--fs-sm); font-weight: 500;
-  transition: background var(--transition-fast);
-}
-.sel-act:hover { background: var(--surface-3); }
-.sel-act .icon { color: var(--text-soft); }
-
-/* Acciones rápidas: mismo peso visual que el resto de la barra, pero con el icono teñido
-   de acento — son turnos del agente, no utilidades del subrayado. Cada botón ocupa la
-   mitad para que se lean como un par y no como el principio de una lista larga. */
-.sel-quick > .sel-act { flex: 1 1 0; justify-content: center; }
-.sel-quick > .sel-act:first-child { border-left: none; }
-.sel-quick .icon { color: var(--accent); }
 
 /* Eliminar: destructivo, pero no grita. Solo el icono va en rojo hasta que se apunta. */
 .sel-act--danger:hover { background: color-mix(in srgb, var(--danger) 12%, transparent); color: var(--danger); }
@@ -1696,6 +1736,7 @@ textarea.is-recording { display: none; }
 /* La nota se escribe dentro de la propia barra, bajo las acciones: se anota mirando el
    pasaje, sin un modal que lo tape. Sin botón Guardar — se guarda al cerrar la barra. */
 .sel-note-box { border-top: 1px solid var(--border-soft); padding: 10px 12px; }
+.sel-toolbar.is-docked .sel-note-box { border-top: none; border-bottom: 1px solid var(--border-soft); }
 .sel-note-box textarea {
   display: block; width: 100%; min-width: 240px; box-sizing: border-box;
   padding: 8px 10px; resize: vertical;

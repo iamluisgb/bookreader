@@ -209,3 +209,34 @@ test('las acciones rápidas están en la barra y cada una activa su modo', async
   // Y la regla que permite decir "esto puedes saltártelo" en vez de justificarlo todo.
   expect(sys).toContain('SECUNDARIO');
 });
+
+// P38 · Los tres enfoques nuevos del menú ⋯ van por el mismo camino; cada uno lleva su modo,
+// y en cada modo la regla que lo separa de «Explícame» (si no, serían el mismo botón).
+test('P38: «Qué significa aquí», «Dónde más lo trata» y «La objeción más fuerte» activan su modo', async ({ page }) => {
+  test.setTimeout(120000);
+  await openWithAgent(page);
+  const frag = 'La atención causal impide que una posición atienda a las siguientes.';
+  const run = (kind: string) => page.evaluate(async ([k, f]) => {
+    const m: any = await import('/js/ai/panel.js');
+    await m.quickAction(k, f);
+    return (window as any).__lastSystem as string;
+  }, [kind, frag]);
+
+  let sys = await run('define');
+  expect(sys).toContain('MODO QUÉ SIGNIFICA AQUÍ');
+  expect(sys).toContain('EN ESTE LIBRO');
+  expect(sys).toContain('no lo inventes');
+
+  sys = await run('related');
+  expect(sys).toContain('MODO DÓNDE MÁS LO TRATA');
+  expect(sys).toContain('NO cites el pasaje que contiene el fragmento');
+  expect(sys).toContain('solo la lista');
+
+  sys = await run('counter');
+  expect(sys).toContain('MODO OBJECIÓN MÁS FUERTE');
+  expect(sys).toContain('LA objeción más fuerte');
+  expect(sys).toContain('cuánto daña');
+
+  // Cada turno queda en la conversación con su etiqueta, como las demás acciones.
+  await expect(page.locator('#ai-messages')).toContainText('La objeción más fuerte · «');
+});

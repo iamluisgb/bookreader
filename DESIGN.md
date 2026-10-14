@@ -121,7 +121,8 @@ texto o el `aria-label` del botón los nombra). Galería con su significado en
   `notebook` = la libreta; `share` = hoja de compartir del sistema; `download`/`upload` =
   guardar/subir un fichero; `cloud` = Drive y sincronizar; `chart` = Análisis; `function` =
   ejemplo con números; `user` = tu perfil; `users` = otra persona; `flame` = racha; `library` = la biblioteca; `inbox` = sin estantería; `book` = un libro;
-  `help` = ayuda; `info` = nota informativa. Antes de reutilizar uno para otra cosa, crea
+  `help` = ayuda; `info` = nota informativa; `highlighter` = subrayar; `define` = qué significa
+  aquí; `related` = dónde más lo trata el libro; `scale` = la objeción más fuerte. Antes de reutilizar uno para otra cosa, crea
   otro: dos significados para un dibujo obligan a leer la etiqueta siempre.
 - **Tamaño por paso, nunca en píxeles:** `icon(name, { size: 'md' })`. `sm` 14 (en línea
   con texto pequeño) · `md` 16 (botones, menús) · `lg` 20 (acciones destacadas) · `xl` 24

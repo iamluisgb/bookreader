@@ -60,7 +60,8 @@ async function highlightInEpub(page: Page) {
     await gesto();
     return false;
   }, { timeout: 20000 }).toBe(true);
-  await page.locator('.highlight-color[data-color="#64b5f6"]').click();
+  await page.locator('#sel-more').click();   // P38: los colores, en el menú ⋯
+  await page.locator('#sel-menu .highlight-color[data-color="#64b5f6"]').click();
   await expect(page.locator('#epub-container svg g.hl')).toHaveCount(1);
 }
 

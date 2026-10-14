@@ -86,6 +86,7 @@ test('«A la libreta»: el fragmento entra en el campo que eliges, con su pasaje
   await stubModel(page);
   await openWithConvo(page, 't1-extraccion');
   await selectInEpub(page);
+  await page.locator('#sel-more').click();   // P38: «A la libreta» está en el menú ⋯
   const btn = page.locator('#sel-notebook');
   await expect(btn).toContainText('A la libreta');
   await btn.click();
@@ -119,6 +120,7 @@ test('HQ&A: seleccionar ya no crea notas sola; «Hazme la pregunta» sí', async
   expect(calls()).toBe(0);                                  // nadie pidió una pregunta
   expect((await notes(page)).length).toBe(0);
 
+  await page.locator('#sel-more').click();   // P38: «A la libreta» está en el menú ⋯
   const btn = page.locator('#sel-notebook');
   await expect(btn).toContainText('Hazme la pregunta');
   await btn.click();
@@ -157,6 +159,7 @@ test('PDF: el fragmento a la libreta guarda su página y vuelve a ella', async (
     await gesto();
     return false;
   }, { timeout: 20000 }).toBe(true);
+  await page.locator('#sel-more').click();
   await page.locator('#sel-notebook').click();
   const nb = page.locator('#ai-view-notebook');
   await nb.locator('.ai-nb-clip-field[data-field="por_que_importa"]').click();

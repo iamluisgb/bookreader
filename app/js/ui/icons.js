@@ -112,6 +112,16 @@ const ICONS = {
   // Sin clasificar (libros sin estantería): bandeja de entrada.
   inbox: '<path d="M3.5 13.5 6.2 5.6A1.5 1.5 0 0 1 7.6 4.6h8.8a1.5 1.5 0 0 1 1.4 1l2.7 7.9V18a1.5 1.5 0 0 1-1.5 1.5h-14A1.5 1.5 0 0 1 3.5 18Z"/><path d="M3.5 13.5h4.6l1.4 2.2h5l1.4-2.2h4.6"/>',
   'arrow-down': '<line x1="12" y1="5" x2="12" y2="18.5"/><polyline points="6.5 13 12 18.5 17.5 13"/>',
+  // ——— P38 · barra de selección compacta ———
+  // Subrayar (rotulador sobre la línea de texto). `pencil` es editar; `note`, la nota.
+  highlighter: '<path d="M13 5.5 18.5 11l-7 7H6v-5.5Z"/><line x1="10" y1="8.5" x2="15.5" y2="14"/><line x1="4" y1="20.5" x2="20" y2="20.5"/>',
+  // «Qué significa aquí»: una palabra recuadrada dentro de su línea. No es `type` (Aa), que es
+  // la apariencia del texto.
+  define: '<line x1="3.5" y1="5.5" x2="14" y2="5.5"/><line x1="3.5" y1="12" x2="5.5" y2="12"/><rect x="7.5" y="9" width="9" height="6" rx="1.5"/><line x1="18.5" y1="12" x2="20.5" y2="12"/><line x1="3.5" y1="18.5" x2="20.5" y2="18.5"/>',
+  // «Dónde más lo trata»: dos pasajes unidos ida y vuelta. No es `mindmap` (nodo y ramas).
+  related: '<rect x="3.5" y="4" width="7" height="9" rx="1.5"/><rect x="13.5" y="11" width="7" height="9" rx="1.5"/><path d="M7 16.5c0 2 1.5 3 3.5 3h1"/><path d="M17 7.5c0-2-1.5-3-3.5-3h-1"/>',
+  // «La objeción más fuerte»: la balanza, sopesar a favor y en contra.
+  scale: '<line x1="12" y1="4" x2="12" y2="20"/><line x1="8" y1="20" x2="16" y2="20"/><line x1="5" y1="7" x2="19" y2="7"/><path d="M5 7 2.5 13a2.5 2.5 0 0 0 5 0Z"/><path d="M19 7l-2.5 6a2.5 2.5 0 0 0 5 0Z"/>',
 
   // ——— theme glyphs (used inside swatches when helpful) ———
   sun: '<circle cx="12" cy="12" r="4"/><line x1="12" y1="3" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="21"/><line x1="3" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="21" y2="12"/><line x1="5.6" y1="5.6" x2="7" y2="7"/><line x1="17" y1="17" x2="18.4" y2="18.4"/><line x1="18.4" y1="5.6" x2="17" y2="7"/><line x1="7" y1="17" x2="5.6" y2="18.4"/>',

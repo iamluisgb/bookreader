@@ -62,7 +62,7 @@ test('PDF2: seleccionar texto muestra "Preguntar al agente" y abre el panel', as
   await selectPdfText(page);
 
   await expect(page.locator('#highlight-tooltip')).toBeVisible();
-  await expect(page.locator('#highlight-tooltip .sel-colors')).toBeVisible();  // subrayar (PDF3)
+  await expect(page.locator('#sel-mark')).toBeVisible();  // subrayar de un toque (PDF3; P38)
   await expect(page.locator('#sel-note')).toBeVisible();
   await expect(page.locator('#sel-ask')).toBeVisible();
 
@@ -108,8 +108,8 @@ test('PDF3: subrayar en PDF crea overlay, lo persiste y lo re-pinta', async ({ p
   await selectPdfText(page);
   await expect(page.locator('#highlight-tooltip')).toBeVisible();
 
-  // Subrayar en el primer color.
-  await page.locator('#highlight-tooltip .highlight-color').first().click();
+  // Subrayar de un toque (P38: con el último color, amarillo de entrada).
+  await page.locator('#sel-mark').click();
 
   // Overlay pintado sobre el canvas.
   await expect(page.locator('#pdf-container .pdf-hl').first()).toBeVisible();
@@ -137,7 +137,7 @@ test('PDF3-scroll: el subrayado en modo scroll queda por encima del canvas (no l
   await openPdf(page);
   await page.evaluate(async () => { const P: any = await import('/js/pdf-reader.js'); await P.setReadingMode('scroll'); await new Promise(r => setTimeout(r, 500)); });
   await selectPdfText(page);
-  await page.locator('#highlight-tooltip .highlight-color').first().click();
+  await page.locator('#sel-mark').click();
   await expect(page.locator('#pdf-container .pdf-hl').first()).toBeVisible();
   // Invariante del fix: la capa de subrayados se apila por ENCIMA del scaler (canvas),
   // pase lo que pase con el orden en el DOM.
@@ -170,7 +170,7 @@ test('PDF4: alternar a scroll monta y renderiza páginas, y persiste el modo', a
 
   // Subrayar sigue funcionando en scroll (usa el data-page del wrapper).
   await selectPdfText(page);
-  await page.locator('#highlight-tooltip .highlight-color').first().click();
+  await page.locator('#sel-mark').click();
   await expect(page.locator('#pdf-container .pdf-page[data-page="1"] .pdf-hl').first()).toBeVisible();
 
   // Volver a paginado quita la clase de scroll.
@@ -885,7 +885,7 @@ test.describe('PDF papel (tinte + noche)', () => {
   test('en «Noche» los subrayados cambian a screen (con multiply serían invisibles)', async ({ page }) => {
     await openPdf(page);
     await selectPdfText(page);
-    await page.locator('#highlight-tooltip .highlight-color').first().click();
+    await page.locator('#sel-mark').click();
     await expect(page.locator('#pdf-container .pdf-hl').first()).toBeVisible();
 
     const claro = await page.evaluate(() => getComputedStyle(

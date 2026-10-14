@@ -3,6 +3,38 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-10-14 — La barra de selección, compacta y con tres enfoques nuevos (P38 F1+F2)
+
+Inspirada en la de [Gloss](https://www.usegloss.io/). Antes eran 11 botones en dos filas; ahora es
+**una fila** y lo demás está detrás de **⋯**, en un menú donde cada opción tiene dos líneas: lo que
+haces y lo que vas a recibir.
+
+- **Fila:** `Preguntar▏` · una o dos acciones del agente · ⋯ · subrayar · nota. Qué acciones del agente
+  van en la fila depende de lo seleccionado: con una palabra suelta va primero «Qué significa»; con
+  una fórmula, código o cifras, «Con números»; con prosa, Explícame y Por qué importa. Si no caben
+  (móvil, etiquetas en inglés), vuelven al menú una a una (`fitRow`), y en la fila la etiqueta es
+  la corta (`data-short`). Los botones se mueven entre la fila y el menú: cada uno existe una vez y
+  conserva su id.
+- **Tres enfoques nuevos** (`QUICK_ACTIONS` de `ai/panel.js`, con su modo de sistema): **Qué
+  significa aquí** (la palabra como la usa este autor, no la de diccionario), **Dónde más lo trata**
+  (3–5 pasajes citados con lo que añade cada uno, sin el propio ni el vecino) y **La objeción más
+  fuerte** (una, concreta, si el libro responde y cuánto daña).
+- **Subrayar es un toque** con el último color usado; el punto del icono dice cuál. Los cuatro
+  colores están en el menú, y elegir otro lo deja como el de un toque. En modo edición (al pulsar un
+  subrayado hecho) los colores y Eliminar van en la fila y el agente pasa al menú.
+- **Escribir con algo seleccionado es preguntar** (escritorio): la primera tecla abre el chat con el
+  fragmento adjunto, y lo que se teclea mientras se abre el panel no se pierde. Escape cierra el
+  menú y después la barra.
+- **En táctil la barra va fija abajo**, a lo ancho, y el menú se abre hacia arriba con altura para
+  caber entero. Si la selección baja hasta donde estaría la barra, flota sobre ella como en
+  escritorio. El aviso de primera vez se retira al abrir ⋯, para no montarse encima del menú (el
+  fallo de Gloss).
+- **Copiar** lleva la referencia: «texto» — título, autor · capítulo (o página).
+- Iconos nuevos: `highlighter`, `define`, `related`, `scale`. SW `v185`.
+- «Con números» sigue en el menú aunque lo seleccionado no parezca una fórmula (el BACKLOG decía
+  ocultarlo): el detector es una heurística y un falso negativo le quitaría la acción al lector
+  técnico; el modo ya responde bien cuando no hay nada calculable.
+
 ## 2026-10-13 — La demo trae 100 días de BookReader Pro
 
 - Activar la demo del agente (sola, desde Ajustes o con el enlace de traspaso) empieza una prueba de

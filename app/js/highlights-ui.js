@@ -19,8 +19,20 @@ import { whenLabel, fullWhen } from './ui/when.js';
 import { toScreen, anchorRect } from './ui/frame-rect.js';
 import * as PdfTextSelect from './pdf-text-select.js';
 import * as PdfTouchSelect from './pdf-touch-select.js';
+import * as Storage from './storage.js';
 
 const DEFAULT_COLOR = '#ffd54f';
+const COLORS = ['#ffd54f', '#81c784', '#64b5f6', '#f06292'];
+// P38 · Subrayar es un toque con el ÚLTIMO color usado (el punto del botón dice cuál). Elegir
+// otro en el menú, o recolorear un subrayado, lo cambia.
+const LAST_COLOR_KEY = 'hl_last_color';
+function lastColor() {
+  const c = Storage.get(LAST_COLOR_KEY, DEFAULT_COLOR);
+  return COLORS.includes(c) ? c : DEFAULT_COLOR;
+}
+function rememberColor(c) {
+  if (COLORS.includes(c)) Storage.set(LAST_COLOR_KEY, c);
+}
 
 // Título/autor del libro abierto, para la tarjeta-cita al compartir (P11). Lo fija
 // app.js al abrir (biblioteca o archivo); degrada a vacío si no se conoce.
@@ -128,13 +140,20 @@ function removeTempSelection(rendition) {
 // positionTooltip porque al desplazarse hay que recolocarla en cada frame, y ahí volver a
 // pasar por el display/visibility/rAF haría parpadear.
 function placeTooltip(tooltip, rect) {
-  const tw = tooltip.offsetWidth, th = tooltip.offsetHeight;
-  const cx = rect.left + rect.width / 2;
+  const th = tooltip.offsetHeight;
   // La barra se ANCLA en la primera línea (horizontalmente) pero esquiva la selección
   // ENTERA (verticalmente): con varias líneas, ponerla debajo del ancla la dejaba encima
   // del resto de lo marcado, tapando el texto y sin poder alargar la selección.
   const bandaTop = rect.blockTop != null ? rect.blockTop : rect.top;
   const bandaBottom = rect.blockBottom != null ? rect.blockBottom : rect.top + rect.height;
+  // P38 · En táctil la barra va FIJA ABAJO, a lo ancho: no persigue al dedo ni choca con
+  // los tiradores. Si la selección baja hasta donde estaría la barra, flota como en
+  // escritorio, porque taparía justo lo que se acaba de marcar.
+  const docked = isDockable() && bandaBottom < window.innerHeight - th - 24;
+  tooltip.classList.toggle('is-docked', docked);
+  if (docked) { tooltip.style.left = ''; tooltip.style.top = ''; return; }
+  const tw = tooltip.offsetWidth;
+  const cx = rect.left + rect.width / 2;
   const arriba = bandaTop - th - 10;
   const abajo = bandaBottom + 10;
   let top;
@@ -152,7 +171,10 @@ function placeTooltip(tooltip, rect) {
 function positionTooltip(tooltip, rect) {
   tooltip.style.display = 'flex';
   tooltip.style.visibility = 'hidden';
+  // Docked de entrada (si toca): así se mide el ancho real de la fila antes de encajarla.
+  tooltip.classList.toggle('is-docked', isDockable());
   requestAnimationFrame(() => {
+    fitRow();
     // Sin rect no hay nada mejor que el centro; antes se llegaba aquí en silencio siempre
     // que la lectura de la selección fallaba, y la barra aparecía arriba en medio sin
     // relación con lo marcado. Ahora se avisa, porque es un fallo, no un caso normal.
@@ -160,6 +182,7 @@ function positionTooltip(tooltip, rect) {
       placeTooltip(tooltip, rect);
     } else {
       console.warn('barra de selección sin rect: se coloca centrada');
+      tooltip.classList.remove('is-docked');
       const tw = tooltip.offsetWidth, th = tooltip.offsetHeight;
       tooltip.style.left = Math.max(10, window.innerWidth / 2 - tw / 2) + 'px';
       tooltip.style.top = Math.max(10, Math.min(100, window.innerHeight - th - 10)) + 'px';
@@ -178,22 +201,21 @@ function followSelection(rect) {
 }
 
 // Acciones de agente de la barra de selección (idénticas en EPUB y PDF): preguntar con el
-// fragmento adjunto, o una de las acciones rápidas, que mandan una petición ya formulada.
-// `getText` es una FUNCIÓN, no una cadena: en PDF el texto puede cambiar entre que se abre la
-// barra y se pulsa la acción (asas de selección), así que se lee al pulsar.
+// fragmento adjunto, o una de las acciones rápidas (`data-quick`), que mandan una petición ya
+// formulada. `getText` es una FUNCIÓN, no una cadena: en PDF el texto puede cambiar entre que
+// se abre la barra y se pulsa la acción (asas de selección), así que se lee al pulsar.
 function wireAgentActions(getText, getAnchor = () => ({})) {
-  const on = (id, fn) => {
-    const el = document.getElementById(id);
+  const on = (el, fn) => {
     if (el) el.onclick = () => { fn(getText()); hideHighlightTooltip(); };
   };
   // El panel del agente se carga con `import()` (no pesa en el arranque, ver app.js);
   // el módulo se espera DENTRO del handler, no al importar este fichero.
   const conPanel = (fn) => async (txt) => fn(await import('./ai/panel.js'), txt);
-  on('sel-ask', conPanel((AiPanel, txt) => AiPanel.quoteSelection(txt)));
-  on('sel-numeric', conPanel((AiPanel, txt) => AiPanel.quickAction('numeric', txt)));
-  on('sel-explain', conPanel((AiPanel, txt) => AiPanel.quickAction('explain', txt)));
-  on('sel-why', conPanel((AiPanel, txt) => AiPanel.quickAction('why', txt)));
-  on('sel-card', conPanel((AiPanel, txt) => AiPanel.cardFromSelection(txt)));
+  on(document.getElementById('sel-ask'), conPanel((AiPanel, txt) => AiPanel.quoteSelection(txt)));
+  document.querySelectorAll('#highlight-tooltip [data-quick]').forEach((btn) => {
+    on(btn, conPanel((AiPanel, txt) => AiPanel.quickAction(btn.dataset.quick, txt)));
+  });
+  on(document.getElementById('sel-card'), conPanel((AiPanel, txt) => AiPanel.cardFromSelection(txt)));
   // A la libreta (o «Hazme la pregunta» con HQ&A): necesita además DÓNDE está el fragmento,
   // para que la nota vuelva a él. La etiqueta depende de la plantilla de la conversación.
   const nb = document.getElementById('sel-notebook');
@@ -209,6 +231,190 @@ function wireAgentActions(getText, getAnchor = () => ({})) {
       if (label) label.textContent = m.selectionNotebookLabel();
     }).catch(() => {});
   }
+  // Escribir con algo seleccionado ES preguntar (escritorio): la primera tecla abre el chat
+  // con el fragmento adjunto y entra en el composer. Sin clic y sin buscar el botón.
+  // Lo que se teclea mientras el panel se abre (el import es asíncrono) se recoge aquí y entra
+  // entero en el composer: quien escribe rápido no pierde letras.
+  typeToAsk = (initial) => {
+    const txt = getText();
+    const docs = keyDocs.slice();
+    let typed = initial;
+    const grab = (e) => {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.key.length === 1) typed += e.key;
+      else if (e.key === 'Backspace') typed = typed.slice(0, -1);
+      else return;
+      e.preventDefault(); e.stopPropagation();
+    };
+    const release = () => docs.forEach((d) => { try { d.removeEventListener('keydown', grab, true); } catch (e) { /* iframe ya ido */ } });
+    hideHighlightTooltip();
+    docs.forEach((d) => d.addEventListener('keydown', grab, true));
+    import('./ai/panel.js')
+      .then((m) => { release(); m.quoteSelection(txt, typed); })
+      .catch(() => release());
+  };
+}
+
+// ---- P38 · Composición de la barra ------------------------------------------
+// Las acciones del agente se reparten entre la fila (lo de un toque) y el menú ⋯ cada vez que
+// se abre la barra, según lo seleccionado: con una palabra suelta lo útil es qué significa;
+// con una fórmula, verla con números; con prosa, explicarla y por qué importa. Los botones se
+// MUEVEN (cada uno existe una vez, con su id), no se duplican.
+const MENU_ORDER = ['explain', 'why', 'define', 'related', 'counter', 'numeric'];
+
+function looksNumeric(text) {
+  return /[=<>^∑∏∫√≈≤≥×÷∂∇πθλσμ]|\b[a-z]_\{?\w|\w\([\w, ]*\)|[{}]|\d\s*[-+*/%]\s*\d/i.test(text);
+}
+
+function priorities(text) {
+  const words = (text.match(/[\p{L}\p{N}][\p{L}\p{N}'’-]*/gu) || []).length;
+  if (words > 0 && words <= 3) return ['define', 'explain', 'why'];
+  if (looksNumeric(text)) return ['explain', 'numeric', 'why'];
+  return ['explain', 'why'];
+}
+
+function isDockable() {
+  return !!(EpubReader.isCoarsePointer && EpubReader.isCoarsePointer());
+}
+
+function layoutToolbar(mode, text) {
+  const tooltip = document.getElementById('highlight-tooltip');
+  const slot = document.getElementById('sel-slot');
+  const menuAi = document.getElementById('sel-menu-ai');
+  const quick = (k) => tooltip.querySelector(`[data-quick="${k}"]`);
+  closeMenu();
+  tooltip.classList.remove('is-tight');
+  tooltip.classList.toggle('is-editing', mode === 'edit');
+  // En modo edición la fila es del subrayado (colores, nota, borrar): el agente, al menú.
+  // Si no, hasta dos acciones del agente junto a Preguntar; fitRow quita las que no quepan
+  // (en un móvil suele quedar una).
+  const slots = mode === 'edit' ? 0 : 2;
+  const inline = priorities(text || '').slice(0, slots);
+  for (const k of inline) slot.appendChild(quick(k));
+  for (const k of MENU_ORDER) if (!inline.includes(k)) menuAi.appendChild(quick(k));
+  shortLabels();
+
+  const swatches = [...tooltip.querySelectorAll('.highlight-color')];
+  const home = document.getElementById(mode === 'edit' ? 'sel-colors-edit' : 'sel-colors');
+  for (const sw of swatches) home.appendChild(sw);
+  document.getElementById('sel-colors').hidden = mode === 'edit';
+  document.getElementById('sel-mark').hidden = mode === 'edit';
+  paintMarkDot();
+}
+
+// Si la fila no cabe (móvil estrecho, etiquetas largas en inglés), las acciones del agente
+// vuelven al menú una a una, y como último recurso «Preguntar» se queda en icono.
+function fitRow() {
+  const row = document.getElementById('sel-row');
+  const slot = document.getElementById('sel-slot');
+  const menuAi = document.getElementById('sel-menu-ai');
+  const tooltip = document.getElementById('highlight-tooltip');
+  const overflows = () => row.scrollWidth > row.clientWidth + 1;
+  const cands = [...slot.children];
+  shortLabels();
+  while (overflows() && slot.lastElementChild) menuAi.appendChild(slot.lastElementChild);
+  // Si no ha cabido ninguna, la primera que quepa SOLA (la prioritaria puede ser la más larga).
+  if (!slot.children.length && cands.length > 1) {
+    for (const c of cands) {
+      slot.appendChild(c); shortLabels();
+      if (!overflows()) break;
+      menuAi.appendChild(c);
+    }
+  }
+  for (const k of MENU_ORDER) {
+    const b = menuAi.querySelector(`[data-quick="${k}"]`);
+    if (b) menuAi.appendChild(b);
+  }
+  shortLabels();
+  if (overflows()) tooltip.classList.add('is-tight');
+}
+
+// En la fila, la etiqueta corta (`data-short`) si la hay: «Qué significa aquí» no cabe junto
+// a Preguntar en un móvil y «Qué significa» sí. En el menú, la completa. La primera vez se
+// guarda la completa ya traducida, que es lo que translateDom dejó en el botón.
+function shortLabels() {
+  document.querySelectorAll('#highlight-tooltip .sel-lbl[data-short]').forEach((lbl) => {
+    if (!lbl.dataset.full) lbl.dataset.full = lbl.textContent;
+    lbl.textContent = lbl.closest('#sel-slot') ? t(lbl.dataset.short) : lbl.dataset.full;
+  });
+}
+
+function paintMarkDot() {
+  const dot = document.querySelector('#sel-mark .sel-mark-dot');
+  if (dot) dot.style.background = lastColor();
+}
+
+function openMenu() {
+  const tooltip = document.getElementById('highlight-tooltip');
+  const menu = document.getElementById('sel-menu');
+  const more = document.getElementById('sel-more');
+  closeNoteBox();
+  menu.hidden = false;
+  more.setAttribute('aria-expanded', 'true');
+  // Hacia ARRIBA si cabe (la barra ya está sobre la selección y el menú no la tapa); si no,
+  // hacia donde haya más hueco, y con la altura de ese hueco (el menú hace scroll): con la
+  // barra a media pantalla no cabe entero ni arriba ni abajo. Fija abajo, siempre arriba.
+  menu.style.maxHeight = '';
+  const tr = tooltip.getBoundingClientRect();
+  const mh = menu.offsetHeight, mw = menu.offsetWidth;
+  const above = tr.top - 16, below = window.innerHeight - tr.bottom - 16;
+  const up = tooltip.classList.contains('is-docked') || mh <= above || above >= below;
+  menu.classList.toggle('opens-down', !up);
+  if (mh > (up ? above : below)) menu.style.maxHeight = Math.max(160, up ? above : below) + 'px';
+  // Alineado a la derecha de la barra (donde está ⋯) sin salirse de la pantalla.
+  const left = Math.max(8, Math.min(tr.right - mw, window.innerWidth - mw - 8));
+  menu.style.left = (left - tr.left) + 'px';
+  // El aviso de primera vez se monta encima del menú en un móvil: ya ha cumplido.
+  Hints.dismissIf('sel-actions');
+  menu.querySelector('.sel-act:not([hidden])')?.focus({ preventScroll: true });
+}
+
+function closeMenu() {
+  const menu = document.getElementById('sel-menu');
+  if (!menu || menu.hidden) return;
+  menu.hidden = true;
+  document.getElementById('sel-more')?.setAttribute('aria-expanded', 'false');
+}
+
+let typeToAsk = null;   // lo fija wireAgentActions con el `getText` de la barra activa
+let keyDocs = [];       // documentos donde escuchamos el teclado mientras la barra está abierta
+
+function onToolbarKey(e) {
+  if (!isTooltipVisible()) return;
+  if (e.key === 'Escape') {
+    const menu = document.getElementById('sel-menu');
+    if (menu && !menu.hidden) closeMenu(); else hideHighlightTooltip();
+    e.preventDefault(); e.stopPropagation();
+    return;
+  }
+  const tg = e.target;
+  if (tg && (/^(INPUT|SELECT|TEXTAREA)$/.test(tg.tagName) || tg.isContentEditable)) return;
+  if (e.ctrlKey || e.metaKey || e.altKey || isDockable()) return;
+  if (e.key.length !== 1 || /\s|[[\]?]/.test(e.key)) return;   // atajos del lector y teclas de control, no
+  if (!typeToAsk) return;
+  e.preventDefault(); e.stopPropagation();
+  typeToAsk(e.key);
+}
+
+function listenKeys(docs) {
+  unlistenKeys();
+  keyDocs = docs.filter(Boolean);
+  for (const d of keyDocs) d.addEventListener('keydown', onToolbarKey, true);
+}
+
+function unlistenKeys() {
+  for (const d of keyDocs) { try { d.removeEventListener('keydown', onToolbarKey, true); } catch (e) { /* iframe ya ido */ } }
+  keyDocs = [];
+}
+
+// Copiar con la referencia: un pasaje pegado en otra parte sin decir de dónde sale pierde la
+// mitad de su valor.
+function withCitation(text, anchor = {}) {
+  const where = anchor.page != null ? t('Pág. {n}', { n: anchor.page }) : (anchor.chapter || '');
+  const src = [bookMeta.title, bookMeta.author].filter(Boolean).join(', ');
+  const ref = [src, where].filter(Boolean).join(' · ');
+  const quote = dehyphenate(text);
+  return ref ? `“${quote}”\n— ${ref}` : quote;
 }
 
 // ---- Núcleo de la barra ---------------------------------------------------
@@ -259,18 +465,30 @@ function flushNote() {
 function wireToolbar(ed, getText, getAnchor) {
   editor = ed;
   const tooltip = document.getElementById('highlight-tooltip');
+  layoutToolbar(ed.remove ? 'edit' : 'select', getText());
 
   tooltip.querySelectorAll('.highlight-color').forEach(btn => {
     // En modo edición, el color que ya tiene el subrayado va marcado.
     btn.classList.toggle('is-current', !!ed.color && btn.dataset.color === ed.color);
     btn.onclick = () => {
+      rememberColor(btn.dataset.color);
       ed.commit({ color: btn.dataset.color, note: flushNote() });
       hideHighlightTooltip();
     };
   });
 
+  document.getElementById('sel-mark').onclick = () => {
+    ed.commit({ color: lastColor(), note: flushNote() });
+    hideHighlightTooltip();
+  };
+
+  document.getElementById('sel-more').onclick = () => {
+    if (document.getElementById('sel-menu').hidden) openMenu(); else closeMenu();
+  };
+
   const noteBtn = document.getElementById('sel-note');
   noteBtn.onclick = () => {
+    closeMenu();
     const box = document.getElementById('sel-note-box');
     if (box.hidden) openNoteBox();
     else { ed.commit({ note: flushNote() }); closeNoteBox(); }
@@ -287,7 +505,7 @@ function wireToolbar(ed, getText, getAnchor) {
   wireAgentActions(getText, getAnchor);
 
   document.getElementById('sel-copy').onclick = async () => {
-    try { await navigator.clipboard.writeText(getText()); } catch (e) { /* sin clipboard */ }
+    try { await navigator.clipboard.writeText(withCitation(getText(), getAnchor ? getAnchor() : {})); } catch (e) { /* sin clipboard */ }
     hideHighlightTooltip();
   };
 
@@ -296,6 +514,10 @@ function wireToolbar(ed, getText, getAnchor) {
     hideHighlightTooltip();
     shareHighlight(txt);
   };
+
+  // Teclado: Escape cierra; escribir pregunta. En el EPUB el foco está dentro del iframe, y
+  // sus teclas no llegan al documento padre.
+  listenKeys([document, lastSelWin && lastSelWin.document]);
 
   // Cerrar al hacer clic fuera. El retardo evita que el propio clic que abre la barra
   // (o el que suelta la selección) la cierre en el mismo tick. El temporizador se GUARDA:
@@ -311,7 +533,7 @@ function wireToolbar(ed, getText, getAnchor) {
 function showHighlightTooltip(cfiRange, text, rect) {
   // P30 F2: la barra de selección se estrena sola la primera vez que aparece — el
   // momento exacto en que "seleccionar texto" deja de ser solo subrayar.
-  Hints.maybeShow('sel-actions', t('Con un texto seleccionado puedes <b>preguntar al agente</b>, <b>llevarlo a tu libreta</b>, marcarlo, copiarlo o compartirlo. Prueba «Explícame» o «Por qué importa».'));
+  Hints.maybeShow('sel-actions', t('Con un texto seleccionado puedes <b>preguntar al agente</b> (o empezar a escribir), subrayarlo o anotarlo. En <b>⋯</b> tienes más: qué significa, dónde más lo trata el libro, la objeción más fuerte, tu libreta…'));
 
   const tooltip = document.getElementById('highlight-tooltip');
 
@@ -324,7 +546,7 @@ function showHighlightTooltip(cfiRange, text, rect) {
     // Escribir una nota sin elegir color subraya igual: la nota vive EN un subrayado.
     commit: ({ color, note }) => {
       removeTempSelection();   // quitar el temporal antes de pintar el definitivo
-      const c = color || DEFAULT_COLOR;
+      const c = color || lastColor();
       Highlights.add(cfiRange, text, c, EpubReader.getCurrentChapterLabel(), note || '');
       applyHighlightToRendition(cfiRange, c);
       renderHighlights();
@@ -338,7 +560,10 @@ export function hideHighlightTooltip() {
   const pending = flushNote();
   if (pending !== undefined && editor) editor.commit({ note: pending });
   editor = null;
+  typeToAsk = null;
+  unlistenKeys();
   closeNoteBox();
+  closeMenu();
   document.getElementById('highlight-tooltip').style.display = 'none';
   clearTimeout(outsideTimer);
   document.removeEventListener('click', hideHighlightTooltipOnOutside);
@@ -566,7 +791,7 @@ function showPdfSelectionTooltip(cap) {
     commit: ({ color, note }) => {
       const { page, rects, text } = current();
       if (createdId) Highlights.update(createdId, { color, note });
-      else createdId = Highlights.addPdf(page, rects, text, color || DEFAULT_COLOR, t('Pág. {n}', { n: page }), note || '');
+      else createdId = Highlights.addPdf(page, rects, text, color || lastColor(), t('Pág. {n}', { n: page }), note || '');
       drawPdfHighlights(page);
       renderHighlights();
     },

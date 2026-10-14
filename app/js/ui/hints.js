@@ -92,6 +92,12 @@ function dismiss() {
   if (next) setTimeout(() => { if (!current) show(next.id, next.html); }, 400);
 }
 
+// Retira el aviso `id` si es el que está en pantalla (ya ha cumplido: el usuario está usando
+// justo lo que anunciaba). Cuenta como visto.
+export function dismissIf(id) {
+  if (current && current.id === id) dismiss();
+}
+
 function hide() {
   if (root) root.classList.remove('show');
   current = null;
