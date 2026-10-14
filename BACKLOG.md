@@ -1444,7 +1444,7 @@ el ruido que P25 evita. Antes de implementar cualquiera de los tres puntos, mira
 `usage-log` (P30·F5): si nadie llega a «Mes», el año no lo pide nadie.
 
 
-### P38 — La barra de selección, rehecha: enfoques con lo que vas a recibir · `M` · **inspirado en Gloss**
+### P38 — La barra de selección, rehecha: compacta, y enfoques con lo que vas a recibir · `M` · **inspirado en Gloss**
 
 **Referencia.** [Gloss](https://www.usegloss.io/) (revisado el 2026-10-14) es un lector de textos
 sueltos con una sola función: seleccionas una línea y le preguntas a la IA. Su menú de selección
@@ -1477,15 +1477,35 @@ nueva que montar.
     Es la primera acción de la barra que serviría sin clave de IA.
   - **«Qué significa aquí»** (selección de 1–3 palabras): el término **como lo usa este autor**, no
     la definición de diccionario, y dónde lo define el libro si lo hace.
-- **F2 — Menú contextual en dos líneas** `M`. «Preguntar al agente» abre una lista de enfoques. Cada
-  opción tiene icono, la pregunta y debajo lo que vas a recibir; arriba hay un campo para escribir
-  una pregunta propia. La barra principal se queda con lo de un toque: colores, Nota, Copiar y las
-  **dos** acciones de IA que más se usen (decidirlo con el `usage-log` de P30·F5, no a ojo). El menú
-  depende de lo seleccionado:
-  - 1–3 palabras → «Qué significa aquí» va primero.
-  - Fórmula, código o números → «Con números» va primero. Si no hay nada de eso, no aparece.
-  - Pasaje largo → Explícame / Por qué importa / Objeción.
-  En móvil es *bottom sheet* (el patrón `ai-sheet` ya existe; mismo criterio que la última línea de [P6](#p6--mejoras-de-subrayados--sm)).
+- **F2 — Barra compacta de una fila que se despliega con ⋯** `M`. Así es la de Gloss, vista en el
+  navegador el 2026-10-14 (escritorio 1280 px y móvil 390 px):
+  - **Una sola píldora oscura con 6 elementos:** `Ask▏` · Explain · Simplify · ⋯ · subrayar · nota.
+    Cabe en 390 px sin partirse.
+  - **Ask lleva un cursor:** seleccionas y **empiezas a escribir**, sin pulsar nada («Select any
+    passage, then just start typing to ask»). La pregunta libre cuesta cero clics.
+  - **Subrayar es un toque** con el último color usado; un punto de color en el icono dice cuál es.
+    Los 4 colores no ocupan sitio en la barra.
+  - **⋯ abre un menú en dos líneas** (icono, nombre y lo que vas a recibir): Define · Fact-check ·
+    Related · Counterpoint, una raya, y Copy quote («With the title and paragraph number»).
+  - **En escritorio flota sobre la selección; en móvil va fija abajo** y el menú se abre hacia arriba,
+    así que no tapa el texto seleccionado ni choca con el menú nativo del sistema.
+  - Un fallo suyo que no hay que copiar: en móvil, el aviso de primera vez se monta encima del menú.
+
+  **Para nosotros**, de 11 botones en dos filas a una fila:
+  `Preguntar▏` · Explícame · Por qué importa · ⋯ · subrayar (último color) · nota.
+  - En ⋯, en dos líneas: Qué significa aquí · Dónde más lo trata el libro · La objeción más fuerte ·
+    Con números (solo si hay fórmula, código o cifras) · raya · Tarjeta · A la libreta · Copiar
+    (con libro y capítulo) · Compartir.
+  - El color se cambia manteniendo pulsado subrayar, o desde el subrayado ya hecho (la barra en
+    modo edición, con Eliminar, ya existe).
+  - Las dos acciones visibles junto a Preguntar se eligen con el `usage-log` de P30·F5, no a ojo.
+    Si «Tarjeta» o «A la libreta» se usan más que «Por qué importa», suben ellas.
+  - Lo que pide la selección: con 1–3 palabras, «Qué significa aquí» pasa a la fila visible.
+  - Móvil: la píldora fija abajo sustituye a la barra flotante. Resuelve de paso la última línea
+    de [P6](#p6--mejoras-de-subrayados--sm), que pedía *bottom sheet*.
+  - Escribir directamente tras seleccionar choca con el teclado en móvil: allí `Preguntar` abre el
+    composer con el foco. En escritorio, cualquier tecla imprimible con selección activa empieza la
+    pregunta, menos los atajos que ya existen en el lector.
 - **F3 — Respuesta corta en el sitio** `M` · **dudoso, probar antes de decidir**. Lo de Gloss es que
   la respuesta sale en el margen y no te saca de la lectura. Probaría un popover anclado a la
   selección para los enfoques breves («Qué significa aquí», Explícame corto), con «Seguir en el
@@ -1501,7 +1521,7 @@ con Explícame**: un juez que reciba las dos respuestas al mismo pasaje tiene qu
 Para «Dónde más lo trata el libro», que ≥ 3 de los pasajes citados no sean el pasaje seleccionado
 ni el inmediatamente vecino. Time-box: F1 en un día.
 
-**Lo que NO es esta épica:** más botones. El número total de acciones visibles de un toque no sube.
+**Lo que NO es esta épica:** más botones. La barra visible baja de 11 botones a 6.
 Lo nuevo entra en el menú y lo poco usado sale de la barra.
 
 ### P39 — Longitud de la respuesta, elegida por el lector · `S` · **inspirado en Gloss**
