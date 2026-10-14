@@ -1201,6 +1201,11 @@ flashcards y `sync/blobs.js` funcionan tal cual porque el registro dice `format:
 - **F4 — Varios ficheros a la vez** `S`: soltar una carpeta de apuntes y que entren todos. Barato una
   vez F1 existe, y es lo que convierte «probé uno» en «migré mi carpeta».
 
+**Referencia (2026-10-14):** [Gloss](https://www.usegloss.io/) entra por aquí: pegar texto con ⌘V en
+cualquier sitio, abrir `.txt`/`.md`/PDF o pegar el enlace de un artículo (lo resuelve en su servidor,
+`/api/import`). Confirma el orden de fases: pegar texto cabe en F2 (es el mismo camino que un `.txt`), es barato y es lo que más se usa;
+el enlace web (F3) necesita servidor, igual que ellos.
+
 **Lo que NO es esta épica:** escribir apuntes **dentro** de BookReader. Eso es un editor, es otra
 épica, y hoy lo más parecido son las notas de subrayado y los campos `fill: 'user'` de las libretas
 ([`templates.js`](app/js/ai/templates.js)). Aquí solo se **lee lo tuyo**; si la señal aparece
@@ -1437,6 +1442,100 @@ escope cuando los listados crecen. Orden de llegada según duela, no según cale
 estantería o formato — responden preguntas que nadie se hace al abrir la pantalla, y añaden justo
 el ruido que P25 evita. Antes de implementar cualquiera de los tres puntos, mirar el
 `usage-log` (P30·F5): si nadie llega a «Mes», el año no lo pide nadie.
+
+
+### P38 — La barra de selección, rehecha: enfoques con lo que vas a recibir · `M` · **inspirado en Gloss**
+
+**Referencia.** [Gloss](https://www.usegloss.io/) (revisado el 2026-10-14) es un lector de textos
+sueltos con una sola función: seleccionas una línea y le preguntas a la IA. Su menú de selección
+está mejor resuelto que el nuestro. Cada opción tiene **dos líneas**: la pregunta que haces y debajo
+**lo que vas a recibir**. Por ejemplo, «What does this word mean here?» → «The word, as this author
+uses it», o «Where else does the text take this up?» → «Where else the text takes this up». Los
+enfoques que trae son: qué significa aquí, dilo más simple, la objeción más fuerte, dónde más lo
+trata el texto y ¿sigue siendo válido? (este último busca en la web). La respuesta sale **en el
+margen**, con citas al texto.
+
+**El hueco nuestro.** La barra (`app/index.html`, `#highlight-tooltip`) tiene 11 botones en dos filas
+sin orden: tres preguntas al agente (Explícame, Por qué importa, Con números), tres de guardar
+(Tarjeta, A la libreta, Nota) y utilidades (colores, Copiar, Compartir). «Con números» sale siempre,
+aunque hayas seleccionado una frase de novela. La etiqueta de un botón dice qué haces, no qué
+recibes, y el `title` con esa información no se ve en móvil.
+
+**Lo barato ya existe.** Todas las acciones rápidas pasan por `QUICK_ACTIONS` en
+[`panel.js`](app/js/ai/panel.js) → `deliver()`, así que heredan retrieval, citas, historial y export.
+Un enfoque nuevo son 3 cosas: su `MODE` de sistema, su `ask` y su etiqueta. No hay arquitectura
+nueva que montar.
+
+**Fases:**
+- **F1 — Enfoques nuevos** `S`. Se añaden a `QUICK_ACTIONS` con su modo:
+  - **«La objeción más fuerte»**: qué le diría un crítico informado a este pasaje, y si el propio
+    libro responde a esa crítica más adelante (con `[[aN]]`). Si no hay una objeción seria, se dice.
+    Encaja con el lector técnico y con el investigador de [P22](#p22--vertical-investigador-papers-y-base-de-conocimiento--l).
+  - **«Dónde más lo trata el libro»**: lista de 3–5 pasajes con cita `[[aN]]` y una línea por pasaje
+    explicando qué añade cada uno. Usa el retrieval que ya existe. **Variante sin clave:** el ranking
+    de pasajes funciona sin LLM, solo con embeddings o con el índice de búsqueda de [P5](#p5--búsqueda-de-texto-en-el-libro--m).
+    Es la primera acción de la barra que serviría sin clave de IA.
+  - **«Qué significa aquí»** (selección de 1–3 palabras): el término **como lo usa este autor**, no
+    la definición de diccionario, y dónde lo define el libro si lo hace.
+- **F2 — Menú contextual en dos líneas** `M`. «Preguntar al agente» abre una lista de enfoques. Cada
+  opción tiene icono, la pregunta y debajo lo que vas a recibir; arriba hay un campo para escribir
+  una pregunta propia. La barra principal se queda con lo de un toque: colores, Nota, Copiar y las
+  **dos** acciones de IA que más se usen (decidirlo con el `usage-log` de P30·F5, no a ojo). El menú
+  depende de lo seleccionado:
+  - 1–3 palabras → «Qué significa aquí» va primero.
+  - Fórmula, código o números → «Con números» va primero. Si no hay nada de eso, no aparece.
+  - Pasaje largo → Explícame / Por qué importa / Objeción.
+  En móvil es *bottom sheet* (el patrón `ai-sheet` ya existe; mismo criterio que la última línea de [P6](#p6--mejoras-de-subrayados--sm)).
+- **F3 — Respuesta corta en el sitio** `M` · **dudoso, probar antes de decidir**. Lo de Gloss es que
+  la respuesta sale en el margen y no te saca de la lectura. Probaría un popover anclado a la
+  selección para los enfoques breves («Qué significa aquí», Explícame corto), con «Seguir en el
+  chat» para pasarlo a la conversación. Riesgo: un tercer sitio donde vive una respuesta (panel,
+  libreta y popover), y sin historial si no se pasa al chat. Hacer primero un prototipo en
+  `patterns.html`.
+- **Fuera por ahora: «¿Sigue siendo válido?».** Exige búsqueda web. Hoy no la tenemos, el modelo es
+  BYOK y la CSP es de mismo origen. Si el gateway de [MON1](#mon1--gateway-de-tokens-propios-proxy-openai-compatible-sobre-nan--ml--f1-) llega a dar búsqueda,
+  se retoma como opt-in. Para libros técnicos de hace 5 años es muy valioso.
+
+**Contrato (EV5) antes de F1:** medir con la batería del eval que cada enfoque nuevo **no se repite
+con Explícame**: un juez que reciba las dos respuestas al mismo pasaje tiene que distinguirlas.
+Para «Dónde más lo trata el libro», que ≥ 3 de los pasajes citados no sean el pasaje seleccionado
+ni el inmediatamente vecino. Time-box: F1 en un día.
+
+**Lo que NO es esta épica:** más botones. El número total de acciones visibles de un toque no sube.
+Lo nuevo entra en el menú y lo poco usado sale de la barra.
+
+### P39 — Longitud de la respuesta, elegida por el lector · `S` · **inspirado en Gloss**
+
+Gloss tiene tres niveles como ajuste global: «A sentence or three», «About a paragraph» y «Room for
+nuance, up to a short paragraph or two». Ataca la queja de que el agente se enrolla. Nosotros fijamos
+la longitud dentro de cada modo (`WHY_MODE`: 120 palabras como mucho) y en el prompt general.
+
+- **F1** `S`: segmentado de tres niveles en Ajustes generales → Agente (*Breve · Normal · Con
+  matices*). Se inyecta como una línea al final del bloque de sistema y **pisa** los topes de cada
+  modo. Por defecto, *Normal* (= lo de hoy, sin cambio de comportamiento).
+- **F2** `S` · si la señal lo pide: cambiarlo por conversación desde la cabecera del panel.
+- **Excepciones:** artefactos (resumen, mapa, póster) y libretas tienen su propia forma y no lo
+  heredan. Solo afecta a chat y acciones rápidas.
+- **Contrato:** el eval mide la longitud media por nivel; *Breve* ≤ 60 % de *Normal*, sin que baje la
+  pertinencia de citas por debajo de su valla en `evals/budgets.mjs`.
+
+### P40 — Biblioteca vacía con libros de ejemplo y preguntas listas · `S`–`M` · **activación**
+
+Hoy la estantería vacía dice «Tu biblioteca está vacía.» (`emptyHtml` en
+[`library/view.js`](app/js/library/view.js)) y nada más. Gloss abre con una biblioteca de muestra de
+dominio público (Schopenhauer, Thoreau, Huxley…), y cada texto trae **3–4 preguntas preparadas** que
+se pulsan sin escribir («Is he being elitist?», «What has science learned since 1868?»). El usuario
+ve el producto funcionando en el primer minuto, antes de tener un libro propio a mano.
+
+- **F1** `S`: 2 EPUB de dominio público y cortos (uno de ensayo y uno técnico o científico, en ES y
+  EN según el idioma), servidos desde el propio origen, con un botón «Probar con un libro de
+  ejemplo» en la estantería vacía. Se marcan como `sample: true` y se pueden quitar con un toque. No
+  viajan por el sync, para no ensuciar la biblioteca de otro dispositivo.
+- **F2** `S`: al abrir uno, las preguntas preparadas salen como chips en el panel del agente. Exige
+  clave: si no hay, la primera pulsación lleva al onboarding de la clave. Esta es la medida: cuántos
+  llegan a la clave desde aquí.
+- **Peso:** los EPUB no van al precache (TEC14 ya lo tiene en 5,95 MB). Se descargan al pulsar.
+- **Relación con P30:** «Primeros pasos» puede apuntar aquí en vez de a «sube un libro».
 
 ---
 
@@ -1699,6 +1798,24 @@ seguir leyendo"* sin necesidad de un cartel que la anuncie.
 - **Presupuesto de coste en dinero** · `S`. Declarado fuera de alcance a propósito en la spec: la
   UI avisa el número de llamadas estimadas (capítulos × tipos), no su coste en dinero. Queda
   apuntado por si alguien lo pide; el aviso de llamadas cubre la decisión de lanzar o no.
+
+### P41 — Repaso de subrayados, sin convertirlos en tarjetas · `M` · **bucle de retención**
+
+El repaso de hoy es de **tarjetas** (P10, FSRS en P19): exige crear la tarjeta y responder. Gloss (y
+Readwise antes) devuelve **los subrayados tal cual**: «Today, from your highlights», con una
+frecuencia que se espacia («In a few days, then less often»), y un gesto para sacar un subrayado del
+repaso sin borrarlo («It stays a highlight, but leaves the review»). Pide mucho menos esfuerzo y le
+sirve al lector que no quiere estudiar, que es la mayoría (ver el hueco de retención en P10).
+
+- **F1** `M`: 3–5 subrayados al día en la tarjeta «Hoy» de la biblioteca, con la cita, el libro y
+  «Ver en el libro». Espaciado simple por subrayado (1 d → 3 d → 7 d → 21 d…) guardado junto al
+  subrayado. No usa el scheduler de tarjetas: es mostrar, no evaluar.
+- **F2** `S`: dos gestos por subrayado: «Fuera del repaso» (sigue siendo subrayado) y «A tarjeta»
+  (reusa `cardFromSelection`, que ya existe). Así el subrayado que de verdad quieres retener pasa a
+  FSRS sin pasos intermedios.
+- **Sync:** el estado de repaso viaja con el subrayado, igual que el color y la nota.
+- **Medida:** días con al menos un subrayado visto, frente a los días con repaso de tarjetas, en el
+  `usage-log`. Si no sube la frecuencia de vuelta a la app, no se sigue.
 
 ### P24 — Higiene de la sesión de repaso · **✓ entregada** (2026-08-01) · F1–F4
 
