@@ -349,6 +349,9 @@
       <!-- Solo al pulsar un subrayado YA hecho (la barra en modo edición). -->
       <button id="sel-delete" class="sel-act sel-icon-btn sel-act--danger" aria-label="Eliminar" title="Eliminar" data-i18n-attrs="aria-label,title" hidden><span data-icon="trash" data-icon-size="md"></span></button>
     </div>
+    <!-- Paleta al pasar por encima del subrayador (escritorio): los cuatro colores sin abrir
+         ⋯. En táctil no hay hover y los colores van en el menú. -->
+    <div class="sel-palette" id="sel-palette" role="group" aria-label="Color del subrayado" data-i18n-attrs="aria-label" hidden></div>
     <div class="sel-menu" id="sel-menu" role="menu" hidden>
       <div class="sel-menu-ai" id="sel-menu-ai">
         <!-- Acciones del agente: un composer vacío es una barrera, cada una manda una petición
@@ -369,9 +372,10 @@
       <button id="sel-notebook" class="sel-act" role="menuitem"><span data-icon="notebook" data-icon-size="md"></span><span class="sel-txt"><span class="sel-lbl sel-notebook-label" data-i18n>A la libreta</span><span class="sel-sub" data-i18n>A un campo de tu libreta, con su pasaje</span></span></button>
       <button id="sel-copy" class="sel-act" role="menuitem"><span data-icon="copy" data-icon-size="md"></span><span class="sel-txt"><span class="sel-lbl" data-i18n>Copiar</span><span class="sel-sub" data-i18n>Con el libro y el capítulo</span></span></button>
       <button id="sel-share" class="sel-act" role="menuitem"><span data-icon="share" data-icon-size="md"></span><span class="sel-txt"><span class="sel-lbl" data-i18n>Compartir</span><span class="sel-sub" data-i18n>Como tarjeta-cita, en imagen</span></span></button>
-      <div class="sel-menu-sep" aria-hidden="true"></div>
-      <!-- Los cuatro colores. En selección viven aquí (subrayar con OTRO color lo fija como
-           el de un toque); en modo edición se mueven a la fila (`#sel-colors-edit`). -->
+      <div class="sel-menu-sep" id="sel-colors-sep" aria-hidden="true"></div>
+      <!-- Los cuatro colores (un solo juego, que highlights-ui.js mueve): en táctil viven aquí;
+           en escritorio, en la paleta del subrayador; en modo edición, en la fila
+           (`#sel-colors-edit`). Subrayar con OTRO color lo fija como el de un toque. -->
       <div class="sel-colors" id="sel-colors">
         <span class="sel-colors-lbl" data-i18n>Subrayar en</span>
         <button class="highlight-color" data-color="#ffd54f" style="background:#ffd54f;" title="Amarillo" aria-label="Amarillo" data-i18n-attrs="title,aria-label"></button>

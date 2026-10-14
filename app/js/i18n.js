@@ -230,6 +230,7 @@ const EN = {
   'Escribe una pregunta sobre lo seleccionado': 'Type a question about the selection',
   'Subrayar': 'Highlight',
   'Subrayar en': 'Highlight in',
+  'Color del subrayado': 'Highlight colour',
   'En llano y con un ejemplo': 'In plain words, with an example',
   'Qué peso tiene para tu objetivo': 'How much it matters for your goal',
   'Qué significa aquí': 'What it means here',

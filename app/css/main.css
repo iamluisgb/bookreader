@@ -1714,6 +1714,18 @@ textarea.is-recording { display: none; }
 .sel-sub { font-size: var(--fs-xs); font-weight: 400; color: var(--text-soft); line-height: 1.4; }
 .sel-menu-sep { height: 1px; margin: var(--s-1) var(--s-2); background: var(--border-soft); }
 
+/* Paleta del subrayador: una píldora con los cuatro colores sobre el botón (o bajo él si no
+   cabe arriba). highlights-ui.js fija el `left`. */
+.sel-palette {
+  position: absolute; bottom: calc(100% + var(--s-2));
+  display: flex; gap: var(--s-2); padding: var(--s-2) var(--s-3);
+  background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: var(--r-pill); box-shadow: var(--shadow-3);
+}
+.sel-palette.opens-down { bottom: auto; top: calc(100% + var(--s-2)); }
+/* Puente invisible entre el botón y la paleta: cruzar el hueco no cuenta como salir. */
+.sel-palette::after { content: ''; position: absolute; left: 0; right: 0; top: 100%; height: var(--s-3); }
+.sel-palette.opens-down::after { top: auto; bottom: 100%; }
 .sel-colors { display: flex; align-items: center; gap: var(--s-2); flex: none; }
 .sel-menu .sel-colors { padding: var(--s-2) var(--s-3); }
 .sel-row .sel-colors { padding: 0 var(--s-2); }

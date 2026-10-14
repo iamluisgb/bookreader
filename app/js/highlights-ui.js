@@ -294,10 +294,15 @@ function layoutToolbar(mode, text) {
   for (const k of MENU_ORDER) if (!inline.includes(k)) menuAi.appendChild(quick(k));
   shortLabels();
 
+  // Un solo juego de colores, que vive donde se usa: en la fila al editar, en la paleta del
+  // subrayador en escritorio (aparece al pasar por encima) y en el menú en táctil.
+  hidePalette();
   const swatches = [...tooltip.querySelectorAll('.highlight-color')];
-  const home = document.getElementById(mode === 'edit' ? 'sel-colors-edit' : 'sel-colors');
+  const homeId = mode === 'edit' ? 'sel-colors-edit' : (isDockable() ? 'sel-colors' : 'sel-palette');
+  const home = document.getElementById(homeId);
   for (const sw of swatches) home.appendChild(sw);
-  document.getElementById('sel-colors').hidden = mode === 'edit';
+  document.getElementById('sel-colors').hidden = homeId !== 'sel-colors';
+  document.getElementById('sel-colors-sep').hidden = homeId !== 'sel-colors';
   document.getElementById('sel-mark').hidden = mode === 'edit';
   paintMarkDot();
 }
@@ -344,11 +349,45 @@ function paintMarkDot() {
   if (dot) dot.style.background = lastColor();
 }
 
+// ---- Paleta del subrayador (escritorio) ----
+// Pasar por encima del botón de subrayar enseña los cuatro colores; pulsarlo sigue siendo
+// subrayar con el último. Se cierra con un respiro al salir, para que dé tiempo a llegar del
+// botón a la paleta sin que desaparezca por el camino.
+let paletteTimer = 0;
+
+function showPalette() {
+  const palette = document.getElementById('sel-palette');
+  const mark = document.getElementById('sel-mark');
+  const tooltip = document.getElementById('highlight-tooltip');
+  clearTimeout(paletteTimer);
+  if (!palette || !palette.children.length || mark.hidden || !isTooltipVisible()) return;
+  if (!palette.hidden) return;
+  closeMenu();
+  palette.hidden = false;
+  const tr = tooltip.getBoundingClientRect(), mr = mark.getBoundingClientRect();
+  const pw = palette.offsetWidth, ph = palette.offsetHeight;
+  const left = Math.max(8, Math.min(mr.left + mr.width / 2 - pw / 2, window.innerWidth - pw - 8));
+  palette.style.left = (left - tr.left) + 'px';
+  palette.classList.toggle('opens-down', tr.top - ph - 8 < 8);
+}
+
+function hidePaletteSoon() {
+  clearTimeout(paletteTimer);
+  paletteTimer = setTimeout(hidePalette, 250);
+}
+
+function hidePalette() {
+  clearTimeout(paletteTimer);
+  const palette = document.getElementById('sel-palette');
+  if (palette) palette.hidden = true;
+}
+
 function openMenu() {
   const tooltip = document.getElementById('highlight-tooltip');
   const menu = document.getElementById('sel-menu');
   const more = document.getElementById('sel-more');
   closeNoteBox();
+  hidePalette();
   menu.hidden = false;
   more.setAttribute('aria-expanded', 'true');
   // Hacia ARRIBA si cabe (la barra ya está sobre la selección y el menú no la tapa); si no,
@@ -477,10 +516,17 @@ function wireToolbar(ed, getText, getAnchor) {
     };
   });
 
-  document.getElementById('sel-mark').onclick = () => {
+  const mark = document.getElementById('sel-mark');
+  const palette = document.getElementById('sel-palette');
+  mark.onclick = () => {
     ed.commit({ color: lastColor(), note: flushNote() });
     hideHighlightTooltip();
   };
+  mark.onmouseenter = showPalette;
+  mark.onmouseleave = hidePaletteSoon;
+  mark.onfocus = () => { if (mark.matches(':focus-visible')) showPalette(); };   // teclado, no el clic
+  palette.onmouseenter = () => clearTimeout(paletteTimer);
+  palette.onmouseleave = hidePaletteSoon;
 
   document.getElementById('sel-more').onclick = () => {
     if (document.getElementById('sel-menu').hidden) openMenu(); else closeMenu();
@@ -564,6 +610,7 @@ export function hideHighlightTooltip() {
   unlistenKeys();
   closeNoteBox();
   closeMenu();
+  hidePalette();
   document.getElementById('highlight-tooltip').style.display = 'none';
   clearTimeout(outsideTimer);
   document.removeEventListener('click', hideHighlightTooltipOnOutside);

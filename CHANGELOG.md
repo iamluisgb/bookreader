@@ -19,8 +19,9 @@ haces y lo que vas a recibir.
   significa aquí** (la palabra como la usa este autor, no la de diccionario), **Dónde más lo trata**
   (3–5 pasajes citados con lo que añade cada uno, sin el propio ni el vecino) y **La objeción más
   fuerte** (una, concreta, si el libro responde y cuánto daña).
-- **Subrayar es un toque** con el último color usado; el punto del icono dice cuál. Los cuatro
-  colores están en el menú, y elegir otro lo deja como el de un toque. En modo edición (al pulsar un
+- **Subrayar es un toque** con el último color usado; el punto del icono dice cuál. En escritorio,
+  pasar por encima del subrayador enseña una paleta con los cuatro colores (como en Gloss); en
+  táctil, sin hover, los colores van en el menú ⋯. Elegir otro lo deja como el de un toque. En modo edición (al pulsar un
   subrayado hecho) los colores y Eliminar van en la fila y el agente pasa al menú.
 - **Escribir con algo seleccionado es preguntar** (escritorio): la primera tecla abre el chat con el
   fragmento adjunto, y lo que se teclea mientras se abre el panel no se pierde. Escape cierra el

@@ -142,8 +142,8 @@ test.describe('Subrayado · edición desde el lector', () => {
   test('EPUB: pulsar el subrayado reabre la barra con su color y su nota', async ({ page }) => {
     await openEpub(page);
     await selectInEpub(page);
-    await page.locator('#sel-more').click();   // P38: los colores, en el menú ⋯
-    await page.locator('#sel-menu .highlight-color[data-color="#81c784"]').click();
+    await page.locator('#sel-mark').hover();   // P38: los colores, en la paleta del subrayador
+    await page.locator('#sel-palette .highlight-color[data-color="#81c784"]').click();
     await expect(page.locator('#highlight-tooltip')).toBeHidden();
 
     // Pulsar el resaltado pintado sobre el texto.
@@ -169,8 +169,8 @@ test.describe('Subrayado · edición desde el lector', () => {
   test('EPUB: Eliminar quita el subrayado y Deshacer lo devuelve', async ({ page }) => {
     await openEpub(page);
     await selectInEpub(page);
-    await page.locator('#sel-more').click();   // P38: los colores, en el menú ⋯
-    await page.locator('#sel-menu .highlight-color[data-color="#64b5f6"]').click();
+    await page.locator('#sel-mark').hover();   // P38: los colores, en la paleta del subrayador
+    await page.locator('#sel-palette .highlight-color[data-color="#64b5f6"]').click();
 
     await page.locator('#epub-container svg g.hl').first().click({ force: true });
     await page.locator('#sel-delete').click();
@@ -210,8 +210,8 @@ test.describe('Subrayado · edición desde el lector', () => {
       return false;
     }, { message: 'la barra de selección no apareció en el PDF', timeout: 20000 }).toBe(true);
     await expect(page.locator('#sel-delete')).toBeHidden();   // aún no hay subrayado
-    await page.locator('#sel-more').click();   // P38: los colores, en el menú ⋯
-    await page.locator('#sel-menu .highlight-color[data-color="#f06292"]').click();
+    await page.locator('#sel-mark').hover();   // P38: los colores, en la paleta del subrayador
+    await page.locator('#sel-palette .highlight-color[data-color="#f06292"]').click();
     await expect(page.locator('#pdf-container .pdf-hl-group')).toHaveCount(1);
 
     // Pulsar en el centro del subrayado pintado (la capa no captura eventos: el hit-test

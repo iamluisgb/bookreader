@@ -94,13 +94,22 @@ test('una palabra suelta: «Qué significa aquí» pasa a la fila', async ({ pag
 test('subrayar es un toque con el último color usado', async ({ page }) => {
   await openEpub(page);
   await selectInEpub(page);
-  // Primera vez: amarillo. Elegir verde en el menú lo deja como el de un toque.
-  await page.locator('#sel-more').click();
-  await page.locator('#sel-menu .highlight-color[data-color="#81c784"]').click();
+  // Primera vez: amarillo. Pasar por encima del subrayador enseña los colores, y elegir
+  // verde lo deja como el de un toque.
+  await expect(page.locator('#sel-palette')).toBeHidden();
+  await page.locator('#sel-mark').hover();
+  await expect(page.locator('#sel-palette')).toBeVisible();
+  // En escritorio los colores están en la paleta, no repetidos en el menú.
+  await expect(page.locator('#sel-colors')).toBeHidden();
+  await page.locator('#sel-palette .highlight-color[data-color="#81c784"]').click();
   await expect(page.locator('#highlight-tooltip')).toBeHidden();
 
   // Otro pasaje (una palabra suelta): uno con el mismo CFI se reutilizaría.
   await selectInEpub(page, { word: true });
+  await page.locator('#sel-mark').hover();
+  await expect(page.locator('#sel-palette')).toBeVisible();
+  await page.locator('#sel-ask').hover();
+  await expect(page.locator('#sel-palette')).toBeHidden();
   const dot = await page.$eval('#sel-mark .sel-mark-dot', d => getComputedStyle(d).backgroundColor);
   expect(dot).toBe('rgb(129, 199, 132)');
   await page.locator('#sel-mark').click();
@@ -183,5 +192,6 @@ test.describe('móvil', () => {
     expect(m.bottom).toBeLessThanOrEqual(geo.vh);
     expect(m.sh).toBeLessThanOrEqual(m.ch + 1);
     await expect(page.locator('#sel-menu .highlight-color').first()).toBeVisible();
+    await expect(page.locator('#sel-palette .highlight-color')).toHaveCount(0);
   });
 });
