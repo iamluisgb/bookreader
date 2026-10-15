@@ -1842,6 +1842,178 @@ sirve al lector que no quiere estudiar, que es la mayoría (ver el hueco de rete
 - **Medida:** días con al menos un subrayado visto, frente a los días con repaso de tarjetas, en el
   `usage-log`. Si no sube la frecuencia de vuelta a la app, no se sigue.
 
+### P42 — El ajuste que sobrevive: registro de intentos y corrección propia tras el fallo · `M` · **práctica deliberada**
+
+**Contexto (2026-10-15).** Revisión del producto contra la definición operativa de práctica
+deliberada de Justin Skycak (Math Academy): repetición *consciente* sobre tareas en el borde de
+lo que sabes, con un ciclo **acción → feedback → ajuste** en cada repetición, a gran volumen y con
+medición objetiva del rendimiento. Lo que compone son los ajustes, no las repeticiones. Por qué
+ahora: el repaso ya tiene volumen (FSRS, P19; sesión rehecha, ST2) y ya corrige lo que escribes
+(`checkRecall`, [`study.js:1206-1243`](app/js/ai/study.js#L1206-L1243)), pero **nada de eso deja
+rastro**. Cualquier ítem de calidad del aprendizaje (niveles de práctica, P21 F2, el Feynman con
+memoria) necesita primero saber qué pasó en cada intento.
+
+**Diagnóstico.**
+1. **El ajuste no sobrevive.** El texto escrito y la nota sugerida viven en `recallText`/`suggested`
+   ([`study.js:299-300`](app/js/ai/study.js#L299-L300)) y se borran en cada tarjeta
+   ([`:913-914`](app/js/ai/study.js#L913-L914)). «Otra vez» re-encola **la misma tarjeta idéntica**
+   ([`:1315`](app/js/ai/study.js#L1315)): es repetición sin ajuste, justo lo que el texto llama
+   «hacerlo mal». El Feynman tampoco recuerda nada: no importa `db.js`
+   ([`feynman.js:27-37`](app/js/ai/feynman.js#L27-L37)) y la sesión es una variable del módulo
+   ([`:447-453`](app/js/ai/feynman.js#L447-L453)).
+2. **No hay historial de intentos.** `card.srs` es estado, no historia
+   ([`srs.js:28-29`](app/js/ai/srs.js#L28-L29)). Sin un registro por intento no se puede responder
+   «¿mejora este lector?».
+3. **La única medida del alumno se basa en la nota que se pone él mismo, y además está mal
+   etiquetada.** `study_log` dice guardar «aciertos a la primera»
+   ([`study.js:266-269`](app/js/ai/study.js#L266-L269)), pero suma `ok` en cada nota que no sea
+   «otra vez» ([`:1313`](app/js/ai/study.js#L1313)). Una tarjeta fallada y luego acertada cuenta
+   1 de 2, no 0 de 1, y el heatmap pinta eso como retención
+   ([`:1352-1366`](app/js/ai/study.js#L1352-L1366)). El dominio sale de intervalos, que también
+   dependen de la autoevaluación ([`srs.js:204-218`](app/js/ai/srs.js#L204-L218)).
+4. **La racha mezcla reconocer con producir.** Solo `gradeCurrent` la mueve
+   ([`study.js:1312`](app/js/ai/study.js#L1312)), y girar la tarjeta y ponerse «Bien» cuenta igual
+   que escribir la respuesta y que la corrijan. La unidad que compone (el ciclo con ajuste) no se
+   cuenta en ninguna parte. P25 ya distingue leer de rastrear; falta distinguir practicar de mirar.
+5. **Dos filosofías en conflicto, resuelto a medias.** La especificación de HQ&A dice que la IA
+   redacte «un borrador de la Columna 3 para que el usuario solo tenga que refinarlo»
+   ([`templates.md:15`](templates.md)). El código ya no lo hace: genera solo la pregunta y deja la
+   respuesta al lector ([`panel.js:825-833`](app/js/ai/panel.js#L825-L833)). El Feynman «por
+   defecto solo pregunta» ([`feynman.js:19-22`](app/js/ai/feynman.js#L19-L22)). El único sitio
+   donde el agente sigue **redactando primero** es «Reescribir con el agente»
+   ([`study.js:1011-1041`](app/js/ai/study.js#L1011-L1041)), que el aviso de tarjeta problemática
+   (leech) ofrece como primera opción ([`:961-968`](app/js/ai/study.js#L961-L968)).
+
+**Decisión de producto que este ítem fija: el agente pregunta y juzga; nunca redacta primero.** Una
+propuesta del agente solo aparece **después** de un intento del lector. Aplica a todo artefacto de
+práctica; los de consumo (resumen, mapa) no son práctica y no entran.
+
+**Hipótesis.** Si tras un fallo el lector escribe su corrección, el agente la valida contra el
+pasaje y **esa corrección viaja con la tarjeta** a la siguiente repetición, el ajuste se retiene
+mejor que repitiendo la tarjeta idéntica. Efecto colateral buscado: las tarjetas problemáticas son
+sobre todo tarjetas del LLM mal formuladas ([`srs.js:39-46`](app/js/ai/srs.js#L39-L46)), y una capa
+redactada por el lector ataca esa causa.
+
+**F1 · Registro de intentos y medida honesta · `S`–`M`** *(sin cambio visible salvo el heatmap)*
+- Store `attempts` en la BD del agente (`DB_VERSION` 7 → 8,
+  [`db.js:27`](app/js/ai/db.js#L27)). Solo se añade, nunca se edita. Registro:
+  `{uid, cardUid, deckUid, bookId, ts, mode: 'reveal'|'written', verdict: 'good'|'partial'|'wrong'|null,
+  exact: bool|null, grade, prevInterval, latencyMs, arm: null}`. La clave es `card.uid`, que ya
+  existe por el sync ([`db.js:351-354`](app/js/ai/db.js#L351-L354)), no la posición en el mazo.
+- `mode` es el sustrato de los niveles de práctica (reconocer frente a recordar): se registra, no se
+  usa todavía.
+- `exact` (solo cloze): comparación local normalizada del hueco. **Solo mide**: la llamada de
+  corrección al modelo no se toca.
+- `gradeCurrent` y `checkRecall` escriben el intento, y «deshacer» lo retira
+  ([`study.js:1091-1105`](app/js/ai/study.js#L1091-L1105)).
+- **Arreglo del heatmap:** `ok` pasa a contar solo la primera nota de cada tarjeta en el día, el
+  mismo criterio que `failedOnce` ([`:1316`](app/js/ai/study.js#L1316)).
+- Un **run con nombre** de 3 semanas, solo registrando: es el baseline del contrato.
+
+**F2 · El fallo lleva a corrección, no a la misma tarjeta · `M`** *(con brazo de control)*
+- Tras «Otra vez» en una tarjeta de texto (básica o cloze; las visuales tienen su propia revisión),
+  un paso **«Tu corrección»** muestra el comentario del agente (si hubo intento escrito) y el
+  pasaje. El lector escribe con sus palabras qué le faltó. El agente **solo juzga** contra el
+  pasaje: veredicto y una frase. Si la acepta, se guarda como `card.mine = {text, ts, attemptUid}`.
+- `mine` **no sustituye** `front`/`back`: se muestra encima de la respuesta original al girar, y el
+  original sigue a un toque. Una reformulación equivocada nunca borra el material del libro.
+- **Escritura por nivel, no universal.** La tarjeta fallada exige respuesta escrita al volver, en la
+  misma sesión y en su siguiente día. El resto del repaso sigue igual de rápido. Escribir cuesta
+  ciclos, y aquí entra solo donde aporta.
+- **Brazo de control:** el hash de `card.uid` asigna cada tarjeta fallada a `ajuste` o `control`
+  (50/50, estable entre dispositivos, sin estado). En `control` no hay paso de corrección, **pero sí
+  la misma exigencia de escribir al volver**: los brazos difieren solo en el ajuste y el resultado
+  se observa igual en los dos. Se analiza por brazo asignado, aunque el lector se salte el paso.
+- **La regla aplicada:** el aviso de leech ofrece primero «Reformúlala tú» (pregunta y respuesta,
+  juzgadas contra el pasaje). «Reescribir con el agente» solo aparece después de ese intento.
+- Sin API key no hay juez, así que no hay `mine` ni experimento (`arm: null`). La reformulación sin
+  validar no se guarda en la tarjeta.
+
+**F3 · Contar lo que compone · `S`**
+- **Ciclos válidos por libro y semana**, separados de la lectura, en la pantalla de análisis
+  ([`analysis.js`](app/js/analysis.js), P25): *intento escrito con veredicto* y *fallo con
+  corrección aceptada*. Los repasos de solo girar se cuentan aparte, no se suman.
+- El cierre de sesión enseña ciclos con ajuste junto al «a la primera», que ya será honesto.
+- La curva del atleta (acierto escrito diferido por semana) solo se pinta cuando la semana tenga
+  N suficiente. Con menos datos, la pantalla lo dice en vez de dibujar ruido.
+
+**Piezas.**
+- [`app/js/ai/db.js`](app/js/ai/db.js): store `attempts`, `addAttempt`/`getAttempts(bookId)` y
+  `card.mine` en el merge tarjeta a tarjeta.
+- [`app/js/ai/study.js`](app/js/ai/study.js): registro en `gradeCurrent`/`checkRecall`/`undo`,
+  paso «Tu corrección», escritura obligatoria en las tarjetas falladas, `mine` en `backHtml`, y
+  leech con la nueva regla.
+- [`app/js/sync/layout.js`](app/js/sync/layout.js): `attempts` viaja **por unión de `uid`**, sin
+  conflicto posible porque nunca se editan. Mismo criterio que `reading_days`
+  ([`layout.js:113-117`](app/js/sync/layout.js#L113-L117),
+  [`:272-278`](app/js/sync/layout.js#L272-L278)).
+- [`app/js/backup.js`](app/js/backup.js): `attempts` en `AI_STORES` (L34). Es la única vía por la que
+  los datos salen del dispositivo, y solo si el usuario exporta (mismo principio que `usage-log.js`).
+- `evals/learning.mjs`: calcula las métricas del contrato desde un backup exportado. Sin API.
+- [`app/js/analysis.js`](app/js/analysis.js): sección «Practicado» (F3).
+- [`templates.md`](templates.md): alinear el rol del agente de la plantilla 2 con el código
+  (pregunta sí, borrador de respuesta no).
+- Tests deterministas: comparador de cloze con casos dorados (acentos, mayúsculas, artículos),
+  asignación de brazo estable y deshacer que retira el intento.
+
+**Riesgos.**
+- **Fijar un error en la tarjeta.** Una corrección equivocada que se repite se convierte en un
+  error aprendido. Mitigación: juez contra el pasaje, `mine` como capa y nunca como reemplazo.
+- **Inflar la propia métrica.** El lector reproduce mejor sus palabras. Por eso la primaria es el
+  hueco de cloze (determinista, no depende de `mine`) y el juez de las básicas corrige siempre
+  contra el pasaje y la respuesta original, **sin ver `mine`**.
+- **Estrangular el volumen.** El paso de corrección cuesta tiempo y una llamada por fallo. Hay una
+  valla de volumen en la secundaria (b).
+- **N pequeño.** Con un solo lector haciendo dogfooding puede no llegarse a la potencia. Se declara
+  tendencia, no se fuerza.
+- **Contaminación entre brazos.** El mismo lector aprende a corregirse también en `control`. Eso
+  sesga hacia no ver efecto, nunca hacia uno falso.
+- **Crecimiento del store.** ~150 B por intento; 50 al día dan ~3 MB al año. Compactar lo de más de
+  12 meses a agregados si molesta.
+
+**Medida.** Lo que el usuario nota: su tarjeta fallada vuelve con *su* corrección, y la pantalla de
+análisis separa lo practicado de lo mirado. Lo que decide si el ítem sigue: el contrato.
+
+**Contrato (antes de implementar)** — formato de [`docs/EVALS.md` § EV5](docs/EVALS.md):
+- **Batería:** no aplica la de personas (esa mide al agente; esto mide al lector). Cohorte = uso
+  real en dogfooding, leído desde un backup exportado con `evals/learning.mjs`. Más el test
+  determinista del comparador de cloze.
+- **Métrica primaria (determinista):** `retencion_ajuste_cloze`. De las tarjetas cloze falladas en
+  un intento escrito (la **primera** falla de cada tarjeta en la ventana: una observación por
+  tarjeta), el % con `exact` correcto en su primer intento escrito de **un día posterior**. Se
+  compara `ajuste` frente a `control`. **Umbral: ≥ +15 pp** con **≥ 150 tarjetas por brazo**.
+  Potencia (α = 0,05 bilateral, 1−β = 0,8):
+  n por brazo = (1,96 + 0,84)² · [p₀(1−p₀) + p₁(1−p₁)] / (p₁ − p₀)².
+  Con p₀ = 0,60 → p₁ = 0,75 salen **≈ 149**; con p₀ = 0,50 → 0,65, **≈ 167**. Detectar +10 pp
+  pediría **≈ 350 por brazo**, fuera del alcance realista de un dogfooding, y por eso el umbral es
+  15 y no 10. p₀ se fija con el control concurrente; si F1 da otra cifra, n se recalcula con la
+  fórmula **antes** de abrir F2.
+- **Baseline: no existe.** `study_log` no sirve (autoevaluado y mal etiquetado, ver Diagnóstico 3).
+  Primer paso: el run `learn-baseline-2026-11` (F1, 3 semanas, sin tocar la experiencia), que
+  mide: acierto honesto a la primera, % de intentos escritos, brecha entre «Bien» autoevaluado y
+  veredicto escrito, y **tarjetas cloze falladas por semana**. Esta última dimensiona la ventana de
+  F2: si a ese ritmo no se llega a 150 por brazo en 6 semanas, la primaria pasa a **tendencia sin
+  gate** (regla 2 de EV5) antes de empezar, no después.
+- **Secundarias (tendencia, no gate):**
+  (a) lo mismo en tarjetas básicas, con veredicto del juez contra el original (ruido ±0,4-0,5);
+  (b) **valla de volumen:** el paso de corrección ≤ 15 % del tiempo de sesión en el brazo `ajuste`;
+  (c) ciclos válidos por libro y semana (F3);
+  (d) incidencia de tarjetas problemáticas por brazo, a largo plazo, que es la hipótesis de H1;
+  (e) acierto escrito a la primera con intervalo previo ≥ 7 d (la curva del atleta).
+- **Time-box:** F1 = 3 semanas de baseline. F2 = **una** ventana de hasta 6 semanas o hasta
+  150 por brazo, y **una segunda** solo si la primera queda en el umbral con n recalculado. Si no
+  se mueve, se clasifica (volumen insuficiente / el ajuste no se retiene / el juez rechaza las
+  correcciones / tarjetas irrecuperables) y se cierra con el hallazgo. F1 y F3 se quedan aunque F2
+  no entre: el registro y la medida honesta valen por sí solos.
+- **Si se verifica:** el brazo `ajuste` pasa al 100 %, se retira la asignación, y el resultado y
+  el run se anotan en `docs/EVALS.md` como primera medida del lector, no del agente.
+
+**Queda fuera a propósito:** tocar FSRS o su retención objetivo 0,9 · implementar el modelo de
+niveles de práctica por concepto (aquí solo se registra `mode` como sustrato) · persistir el Feynman
+y pasar sus expectativas no cubiertas a tarjetas (el store admitirá `kind` cuando llegue) · P17,
+P21 F1-F2 y P41 · sustituir la llamada de corrección de cloze por la comparación local (aquí solo
+mide) · cambiar la semántica de la racha.
+
 ### P24 — Higiene de la sesión de repaso · **✓ entregada** (2026-08-01) · F1–F4
 
 > **Entregada entera.** Ver CHANGELOG 2026-08-01. Cuatro arreglos de la sesión, ninguno
