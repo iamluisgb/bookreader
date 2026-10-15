@@ -162,11 +162,13 @@ test('cada nota deja un intento con sus campos, y deshacer lo retira', async ({ 
     grade: 'good',
     prevInterval: null, // tarjeta nueva
     arm: null,
+    answer: null, // girada sin escribir: no hay texto que guardar
   });
   expect(typeof a.uid).toBe('string');
   expect(a.latencyMs).toBeGreaterThanOrEqual(0);
   expect(Math.abs(a.ts - Date.now())).toBeLessThan(60000);
   expect(Object.keys(a).sort()).toEqual([
+    'answer',
     'arm',
     'bookId',
     'cardUid',
@@ -213,6 +215,42 @@ test('respuesta escrita en un cloze: modo written, exact local y veredicto del a
   await expect.poll(async () => (await attempts(page)).length).toBe(1);
   const [a] = await attempts(page);
   expect(a).toMatchObject({ mode: 'written', exact: true, verdict: 'good', grade: 'good' });
+  expect(a.answer).toBe('raft.'); // el texto tal cual lo escribió (sin los espacios de los extremos)
+});
+
+test('el texto escrito se guarda (recortado a 500); el intento solo mirando lo deja en null', async ({
+  page,
+}) => {
+  await page.goto('/index.html');
+  await seedProLicense(page);
+  await page.evaluate(() => localStorage.setItem('bookreader_ai_key', JSON.stringify('test-key')));
+  await seed(page, [
+    { type: 'basic', front: 'uno', back: 'r1', chapter: '' },
+    { type: 'basic', front: 'dos', back: 'r2', chapter: '' },
+    { type: 'basic', front: 'tres', back: 'r3', chapter: '' },
+  ]);
+  const overlay = await openSession(page);
+  await stubVerdict(page, 'bien');
+
+  // La cola se baraja: lo que se prueba va por POSICIÓN, no por tarjeta.
+  const LONG = 'x'.repeat(480) + 'FIN-DEL-TOPE' + 'y'.repeat(100); // 592 caracteres
+  const answers = ['Un algoritmo de consenso', LONG, ''];
+  for (const text of answers) {
+    if (text) await overlay.locator('.study-recall-input').fill(text);
+    await overlay.locator('.study-flip').click();
+    await overlay.locator('.study-grade.is-good').click();
+  }
+  await expect(overlay.locator('.study-end h2')).toBeVisible();
+
+  await expect.poll(async () => (await attempts(page)).length).toBe(3);
+  const byMode = (await attempts(page)).map((x) => ({ mode: x.mode, answer: x.answer }));
+  // (a) escrito → el texto; (b) solo mirando → null.
+  expect(byMode).toContainEqual({ mode: 'written', answer: 'Un algoritmo de consenso' });
+  expect(byMode).toContainEqual({ mode: 'reveal', answer: null });
+  // (c) más de 500 caracteres → se recorta a los 500 primeros.
+  const long = byMode.find((x) => x.answer && x.answer.startsWith('xxx'));
+  expect(long!.answer).toHaveLength(500);
+  expect(long!.answer).toBe(LONG.slice(0, 500));
 });
 
 test('el veredicto que llega DESPUÉS de la nota se guarda en el mismo intento', async ({

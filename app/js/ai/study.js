@@ -337,6 +337,7 @@ function attemptRecord(d) {
     uid: d.uid, cardUid: d.cardUid, deckUid: d.deckUid, bookId: d.bookId, ts: d.ts,
     mode: d.mode, verdict: d.verdict, exact: d.exact, grade: d.grade,
     prevInterval: d.prevInterval, latencyMs: d.latencyMs, arm: null,
+    answer: d.answer ?? null,
   };
 }
 
@@ -1223,6 +1224,10 @@ function flip() {
   const d = ensureDraft(deck, idx);
   d.mode = recallText ? 'written' : 'reveal';
   d.exact = recallText && card.type === 'cloze' ? clozeExact(card.front, recallText) : null;
+  // El TEXTO escrito, para que la medida se pueda re-juzgar fuera de la app con un juez fijo
+  // (contrato de P42). Sin él, ninguna decisión sobre cómo puntuar se podría revisar después.
+  // Tope de 500: una respuesta de tarjeta es corta, y el registro viaja en sync y backup.
+  d.answer = recallText ? recallText.slice(0, 500) : null;
   d.verdict = null;
   d.pending = false;
   overlay.querySelector('.study-recall')?.remove();
