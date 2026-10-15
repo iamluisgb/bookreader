@@ -1896,9 +1896,11 @@ redactada por el lector ataca esa causa.
 
 **F1 · Registro de intentos y medida honesta · `S`–`M`** *(sin cambio visible salvo el heatmap)*
 - Store `attempts` en la BD del agente (`DB_VERSION` 7 → 8,
-  [`db.js:27`](app/js/ai/db.js#L27)). Solo se añade, nunca se edita. Registro:
+  [`db.js:27`](app/js/ai/db.js#L27)). Solo se añade, nunca se edita. Registro (13 campos):
   `{uid, cardUid, deckUid, bookId, ts, mode: 'reveal'|'written', verdict: 'good'|'partial'|'wrong'|null,
-  exact: bool|null, grade, prevInterval, latencyMs, arm: null}`. La clave es `card.uid`, que ya
+  exact: bool|null, grade, prevInterval, latencyMs, arm: null, answer: string|null}`. `answer` es el
+  texto escrito, recortado a 500 caracteres (`null` si solo se giró): sin él, la medida no se podría
+  re-juzgar fuera de la app (ver Contrato). La clave es `card.uid`, que ya
   existe por el sync ([`db.js:351-354`](app/js/ai/db.js#L351-L354)), no la posición en el mazo.
 - `mode` es el sustrato de los niveles de práctica (reconocer frente a recordar): se registra, no se
   usa todavía.
@@ -1974,32 +1976,71 @@ redactada por el lector ataca esa causa.
 **Medida.** Lo que el usuario nota: su tarjeta fallada vuelve con *su* corrección, y la pantalla de
 análisis separa lo practicado de lo mirado. Lo que decide si el ítem sigue: el contrato.
 
-**Contrato (antes de implementar)** — formato de [`docs/EVALS.md` § EV5](docs/EVALS.md):
-- **Batería:** no aplica la de personas (esa mide al agente; esto mide al lector). Cohorte = uso
-  real en dogfooding, leído desde un backup exportado con `evals/learning.mjs`. Más el test
-  determinista del comparador de cloze.
-- **Métrica primaria (determinista):** `retencion_ajuste_cloze`. De las tarjetas cloze falladas en
-  un intento escrito (la **primera** falla de cada tarjeta en la ventana: una observación por
-  tarjeta), el % con `exact` correcto en su primer intento escrito de **un día posterior**. Se
-  compara `ajuste` frente a `control`. **Umbral: ≥ +15 pp** con **≥ 150 tarjetas por brazo**.
-  Potencia (α = 0,05 bilateral, 1−β = 0,8):
-  n por brazo = (1,96 + 0,84)² · [p₀(1−p₀) + p₁(1−p₁)] / (p₁ − p₀)².
-  Con p₀ = 0,60 → p₁ = 0,75 salen **≈ 149**; con p₀ = 0,50 → 0,65, **≈ 167**. Detectar +10 pp
-  pediría **≈ 350 por brazo**, fuera del alcance realista de un dogfooding, y por eso el umbral es
-  15 y no 10. p₀ se fija con el control concurrente; si F1 da otra cifra, n se recalcula con la
-  fórmula **antes** de abrir F2.
-- **Baseline: no existe.** `study_log` no sirve (autoevaluado y mal etiquetado, ver Diagnóstico 3).
-  Primer paso: el run `learn-baseline-2026-11` (F1, 3 semanas, sin tocar la experiencia), que
-  mide: acierto honesto a la primera, % de intentos escritos, brecha entre «Bien» autoevaluado y
-  veredicto escrito, y **tarjetas cloze falladas por semana**. Esta última dimensiona la ventana de
-  F2: si a ese ritmo no se llega a 150 por brazo en 6 semanas, la primaria pasa a **tendencia sin
-  gate** (regla 2 de EV5) antes de empezar, no después.
+**Contrato (antes de implementar)** — formato de [`docs/EVALS.md` § EV5](docs/EVALS.md).
+*Revisado el 2026-10-15, antes de arrancar el baseline:* la primaria era `exact` sobre cloze, y
+`exact` solo perdona la forma (`consenso` ≠ `acuerdo`). Eso no es solo ruido: en F2 el brazo `ajuste`
+entrena a decirlo con palabras propias (`mine`), así que el error **cae más en un brazo que en el
+otro** y podía tapar un efecto real. Se cambia ahora porque ahora es barato: no hay datos ni análisis.
+- **Batería:** no aplica la de personas (esa mide al agente; esto mide al lector). Cohorte = uso real en
+  dogfooding, leído desde un backup exportado. **Pieza necesaria antes de *analizar* el baseline,
+  no antes de arrancarlo:** `evals/learning.mjs` (sigue sin existir). Más el test determinista del
+  comparador de cloze.
+- **Métrica primaria (juez fijo, congelado):** `retencion_ajuste`. De las tarjetas de texto (cloze
+  y básicas) falladas en un intento escrito (la **primera** falla de cada tarjeta en la ventana: una
+  observación por tarjeta), el % juzgado correcto en su primer intento escrito de **un día
+  posterior**. Se compara `ajuste` frente a `control`, **estratificado por tipo** (cloze / básica) y
+  con el resultado de cada tipo publicado aparte. El juez:
+  - corre **fuera de la app**, en `evals/learning.mjs`, sobre el texto guardado en `answer`;
+  - es siempre el **mismo modelo y el mismo prompt**, y los dos entran en la **clave de caché**;
+    temperature 0;
+  - es **ciego al brazo y nunca ve `mine`**: compara la respuesta contra el hueco o el dorso
+    ORIGINAL de la tarjeta y su pasaje;
+  - su veredicto se **congela en caché por `uid` del intento**: lo juzgado no se re-juzga. Cambiar de
+    modelo o de prompt es un juez nuevo con clave nueva, y entonces se re-juzga TODO, nunca una mezcla.
+  El `verdict` que guarda la app no sirve de primaria: lo da el modelo que el lector tenga en ese
+  momento (BYOK), y un cambio de modelo a mitad de ventana rompe la comparación entre semanas. Queda
+  como diagnóstico.
+- **Umbral y N, con el ruido del juez dentro.** El juez se equivoca con sensibilidad Se y
+  especificidad Sp. Si el error no depende del brazo (por eso es ciego), el contraste sigue siendo
+  válido, pero la diferencia observada se **encoge** por el factor J = Se + Sp − 1:
+  p_obs = Se·p + (1 − Sp)·(1 − p), y Δ_obs = J·Δ. Con n por brazo =
+  (1,96 + 0,84)² · [p₀(1−p₀) + p₁(1−p₁)] / (p₁ − p₀)² sobre las proporciones *observadas*
+  (α = 0,05 bilateral, 1−β = 0,8), para un efecto real de 0,60 → 0,75:
+  juez perfecto **≈ 149**; Se = Sp = 0,95 (J = 0,90) **≈ 190**; Se = Sp = 0,90 (J = 0,80) **≈ 250**.
+  El umbral de producto sigue siendo **+15 pp sobre el efecto corregido** (Δ_obs / J, con Se y Sp
+  estimados en la regla (a)); el contraste de hipótesis se hace sobre lo observado. Que entren las
+  básicas sube el volumen y compensa parte de esa N extra. Se y Sp salen de ~100 etiquetas, así que
+  su intervalo es ancho: se usa el **extremo pesimista** del intervalo para fijar N.
 - **Secundarias (tendencia, no gate):**
-  (a) lo mismo en tarjetas básicas, con veredicto del juez contra el original (ruido ±0,4-0,5);
+  (a) **`exact` sobre cloze, el suelo determinista**, publicado siempre junto a la primaria; y
+  **control del juez**: un intento con `exact = true` que el juez da por malo es un error del juez y
+  se cuenta como tal;
   (b) **valla de volumen:** el paso de corrección ≤ 15 % del tiempo de sesión en el brazo `ajuste`;
   (c) ciclos válidos por libro y semana (F3);
   (d) incidencia de tarjetas problemáticas por brazo, a largo plazo, que es la hipótesis de H1;
   (e) acierto escrito a la primera con intervalo previo ≥ 7 d (la curva del atleta).
+- **Baseline: no existe.** `study_log` no sirve (autoevaluado y mal etiquetado, ver Diagnóstico 3).
+  Primer paso: el run `learn-baseline-2026-11` (F1, 3 semanas, sin tocar la experiencia). Mide:
+  acierto honesto a la primera, % de intentos escritos **por tipo**, brecha entre «Bien»
+  autoevaluado y veredicto, **tarjetas de texto falladas por semana** (dimensiona la ventana de
+  F2), y lo que piden las reglas de abajo.
+- **Reglas de revisión, PRE-REGISTRADAS** (fijadas hoy, antes de mirar el baseline; se aplican en
+  este orden al cerrarlo):
+  (a) **Fiabilidad del juez.** ~100 respuestas escritas del baseline etiquetadas a mano,
+  estratificadas por `exact` × juez (las cuatro casillas, no una muestra al azar que saldría casi
+  toda de la diagonal). De ahí salen κ, Se y Sp. **Si κ < 0,7**, el juez no vale: la primaria pasa
+  a `exact` sobre los cloze **literales** (plazos, artículos, cifras, enumeraciones) y F2 corre como
+  **tendencia sin gate**.
+  (b) **¿Hay paráfrasis?** Si **menos del 5 %** de las cloze escritas son paráfrasis correctas
+  (juez «bien» con `exact` falso), el sesgo es despreciable en la práctica: `exact` vuelve a ser la
+  primaria por simple y determinista, sobre cloze, con la N original (≈ 150-167 por brazo). El juez
+  pasa a secundaria.
+  (c) **Volumen.** Si al ritmo medido de intentos escritos fallados no se llega a la N que toque
+  (la de (a)/(b)) en 6 semanas, F2 empieza como **tendencia sin gate**: antes de abrir, no después.
+- **Privacidad.** `answer` es texto escrito por el lector. Sale del dispositivo exactamente por
+  donde ya salen sus notas y sus mensajes: **su** sync (`books/<id>.json` en su Drive) y **su**
+  backup. El juez de `learning.mjs` lo lee del backup que exporta quien analiza; nunca hay envío
+  automático.
 - **Time-box:** F1 = 3 semanas de baseline. F2 = **una** ventana de hasta 6 semanas o hasta
   150 por brazo, y **una segunda** solo si la primera queda en el umbral con n recalculado. Si no
   se mueve, se clasifica (volumen insuficiente / el ajuste no se retiene / el juez rechaza las
@@ -2012,7 +2053,9 @@ análisis separa lo practicado de lo mirado. Lo que decide si el ítem sigue: el
 niveles de práctica por concepto (aquí solo se registra `mode` como sustrato) · persistir el Feynman
 y pasar sus expectativas no cubiertas a tarjetas (el store admitirá `kind` cuando llegue) · P17,
 P21 F1-F2 y P41 · sustituir la llamada de corrección de cloze por la comparación local (aquí solo
-mide) · cambiar la semántica de la racha.
+mide) · cambiar la semántica de la racha · la mejora de generación al estilo Math Academy (huecos
+cuya literal ES la respuesta: término, fecha, cifra), que es trabajo futuro del prompt de
+generación de tarjetas y no de la medida.
 
 ### P24 — Higiene de la sesión de repaso · **✓ entregada** (2026-08-01) · F1–F4
 
