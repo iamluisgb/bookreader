@@ -13,7 +13,9 @@
 //     de libros, mazos de flashcards (con su estado de repaso FSRS) y artefactos del
 //     Studio (resúmenes, mapas mentales, infografías, figuras). Los mazos y artefactos
 //     van A PROPÓSITO: son datos del usuario que no se pueden regenerar (los artefactos
-//     cacheados son un coste LLM ya pagado).
+//     cacheados son un coste LLM ya pagado). También el registro de intentos del repaso
+//     (P42): la historia de cada nota, que es de donde sale la medida del aprendizaje y
+//     solo deja el dispositivo si el usuario exporta.
 // Qué NO incluye (a propósito):
 //   - La API key (`ai_key`): es un secreto, no se escribe a un fichero descargable.
 //   - El texto segmentado/anclas (`bookText`/`anchors`): voluminoso y regenerable al
@@ -31,7 +33,7 @@ const SECRET_KEYS = ['ai_key', 'drive_refresh_token'];  // secretos: jamás a un
 // Identidad de ESTE equipo: restaurar una copia en otro dispositivo no puede clonarla, o
 // ambos escribirían la misma fila del registro de lectura (ver sync/layout.js · SKIP_KEYS).
 const LOCAL_ONLY_KEYS = ['device_id'];
-const AI_STORES = ['convos', 'messages', 'notes', 'ratings', 'books', 'decks', 'artifacts'];
+const AI_STORES = ['convos', 'messages', 'notes', 'ratings', 'books', 'decks', 'artifacts', 'attempts'];
 
 // ---- Export ----------------------------------------------------------------
 
@@ -73,6 +75,8 @@ async function importAi(ai) {
   for (const store of AI_STORES) {
     const records = ai?.[store];
     if (!Array.isArray(records)) continue;
+    // Los intentos no se editan nunca (P42): se UNEN por uid, no se reescriben.
+    if (store === 'attempts') { n += await DB.mergeAttempts(records); continue; }
     for (const r of records) { await DB.put(store, r); n++; }
   }
   return n;

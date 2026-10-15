@@ -26,6 +26,7 @@ import { segmentBook } from './segment.js';
 import { segmentPdf } from './segment-pdf.js';
 import { loadEpubJs, loadPdfJs } from '../vendor-loader.js';
 import { sanitizeSvg, reviewDrawing } from './visual-cards.js';
+import { CLOZE_RE, clozeExact } from './cloze-check.js';
 
 // Racha de estudio (F3): {count, lastDay}, global de la app (no por libro).
 const STREAK_KEY = 'study_streak';
@@ -264,19 +265,34 @@ const GRADING_KEY = 'study_grading';
 export function gradingMode() { return Storage.get(GRADING_KEY, 'simple') === 'full' ? 'full' : 'simple'; }
 
 // Registro diario de repasos para el calendario de la racha (últimos 120 días).
-// Entrada: { n: repasos, ok: aciertos a la primera } — el día ya no solo dice CUÁNTO se
-// repasó sino CÓMO fue (retención verdadera, T5). Legacy: número plano migrado al escribir.
+// Entrada: { n: repasos, ok: aciertos a la primera, c: tarjetas distintas repasadas } — el día
+// no solo dice CUÁNTO se repasó sino CÓMO fue (retención verdadera, T5).
+//   - `n` cuenta TODAS las notas (incluidos los «otra vez» re-encolados): es lo que llena la
+//     meta diaria y la intensidad del calendario.
+//   - `ok` y `c` cuentan solo la PRIMERA nota de cada tarjeta en el día (P42 F1, mismo
+//     criterio que `failedOnce`): retención = ok / c. Antes `ok` sumaba cualquier nota que no
+//     fuera «otra vez» y se dividía por `n`, así que una tarjeta fallada y luego acertada
+//     contaba 1 de 2 en vez de 0 de 1.
+// Legacy: número plano → { n, ok: null }; entradas sin `c` (semántica vieja) no pintan
+// retención, porque su `ok` medía otra cosa.
 const LOG_KEY = 'study_log';
 function readLog() {
   const log = Storage.get(LOG_KEY, {}) || {};
   for (const k of Object.keys(log)) if (typeof log[k] === 'number') log[k] = { n: log[k], ok: null };
   return log;
 }
-function bumpLog(delta, okDelta = 0, now = Date.now()) {
+function bumpLog(delta, okDelta = 0, cardsDelta = 0, now = Date.now()) {
   const log = readLog();
   const day = Srs.dayOf(now);
-  const e = log[day] || { n: 0, ok: 0 };
-  log[day] = { n: Math.max(0, e.n + delta), ok: Math.max(0, (e.ok ?? 0) + okDelta) };
+  const e = log[day] || { n: 0, ok: 0, c: 0 };
+  // Si HOY ya tenía una entrada con la semántica vieja (sin `c`), su `ok` no es comparable:
+  // el recuento de aciertos y tarjetas arranca de cero; los repasos (`n`) se conservan.
+  const fresh = e.c == null;
+  log[day] = {
+    n: Math.max(0, e.n + delta),
+    ok: Math.max(0, (fresh ? 0 : e.ok ?? 0) + okDelta),
+    c: Math.max(0, (fresh ? 0 : e.c) + cardsDelta),
+  };
   const keys = Object.keys(log).map(Number).sort((a, b) => a - b);
   while (keys.length > 120) delete log[keys.shift()];
   Storage.set(LOG_KEY, log);
@@ -298,6 +314,81 @@ let animating = false;
 let sessionBooks = new Set();
 let recallText = '';     // lo que el usuario escribió como respuesta (recuerdo activo)
 let suggested = null;    // nota sugerida por el agente al corregir
+let draft = null;        // intento en curso de la tarjeta visible (P42 F1, ver más abajo)
+
+// ---- Registro de intentos (P42 F1) ----------------------------------------------
+// Cada nota deja UN registro inmutable en el store `attempts` (db.js). Se arma en dos tiempos:
+// al girar se sabe CÓMO se respondió (escrito o solo mirando, y el `exact` del cloze) y al
+// poner la nota se sabe QUÉ nota y CUÁNTO tardó. El veredicto del agente (`checkRecall`) puede
+// llegar después de la nota: entonces el registro espera a que llegue y lo escribe checkRecall,
+// porque un registro que no se edita no se puede completar más tarde.
+const VERDICT_WAIT_MS = 60000;   // si el veredicto no llega, se guarda sin él antes que perderlo
+
+// Borrador del intento de la tarjeta (deck, idx). Se conserva mientras la tarjeta siga a la vista
+// sin nota (editar, girar y volver no reinician el cronómetro); una nota lo cierra.
+function ensureDraft(deck, idx) {
+  if (draft && !draft.graded && draft.deck === deck && draft.idx === idx) return draft;
+  draft = { deck, idx, shownAt: Date.now(), mode: 'reveal', exact: null, verdict: null, seq: 0, pending: false };
+  return draft;
+}
+
+function attemptRecord(d) {
+  return {
+    uid: d.uid, cardUid: d.cardUid, deckUid: d.deckUid, bookId: d.bookId, ts: d.ts,
+    mode: d.mode, verdict: d.verdict, exact: d.exact, grade: d.grade,
+    prevInterval: d.prevInterval, latencyMs: d.latencyMs, arm: null,
+  };
+}
+
+function commitAttempt(d) {
+  if (!d || d.cancelled || d.committed) return;
+  d.committed = true;
+  clearTimeout(d.timer);
+  // Medir nunca puede romper el repaso: un fallo de IndexedDB se avisa en consola y ya.
+  DB.addAttempt(attemptRecord(d)).catch((e) => console.warn('study: no se pudo guardar el intento', e));
+}
+
+// Cierra el intento de la tarjeta que se está calificando. Devuelve el borrador (va a la pila de
+// deshacer) o null si no había ninguno.
+function finishAttempt(deck, idx, rating, prevSrs, now) {
+  const d = draft && !draft.graded && draft.deck === deck && draft.idx === idx ? draft : null;
+  if (!d) return null;
+  const card = deck.cards[idx] || {};
+  Object.assign(d, {
+    graded: true,
+    uid: crypto.randomUUID(),
+    cardUid: card.uid || null,
+    deckUid: deck.uid || null,
+    bookId: deck.bookId || null,
+    ts: now,
+    grade: rating,
+    // Intervalo justo ANTES de esta nota; null = tarjeta nueva (0 sería «re-aprendiendo»).
+    prevInterval: prevSrs ? (prevSrs.interval || 0) : null,
+    latencyMs: Math.max(0, now - d.shownAt),
+  });
+  if (d.pending) d.timer = setTimeout(() => commitAttempt(d), VERDICT_WAIT_MS);
+  else commitAttempt(d);
+  return d;
+}
+
+// Llega el veredicto del agente. Solo cuenta el de la ÚLTIMA corrección pedida para este
+// intento (girar, volver y girar otra vez lanza otra).
+function settleVerdict(d, seq, verdict) {
+  if (!d || seq !== d.seq || !d.pending || d.committed) return;
+  d.verdict = verdict;
+  d.pending = false;
+  if (d.graded) commitAttempt(d);
+}
+
+// Deshacer la nota retira su intento: si ya se escribió, se borra; si esperaba el veredicto,
+// ya no se escribirá. IndexedDB ordena las transacciones del mismo store, así que un borrado
+// pedido después de la escritura se aplica después aunque ella siga en vuelo.
+function retractAttempt(d) {
+  if (!d) return;
+  d.cancelled = true;
+  clearTimeout(d.timer);
+  if (d.committed) DB.deleteAttempt(d.uid).catch((e) => console.warn('study: no se pudo retirar el intento', e));
+}
 
 // `decks`: mazos a repasar (solo entran sus tarjetas vencidas).
 // `onNavigate`: se llama al saltar a la fuente ("ver en el libro") para que quien abrió
@@ -399,6 +490,7 @@ function close() {
   held = [];
   undoStack = [];
   editing = false;
+  draft = null;                // un intento que espera veredicto se sigue escribiendo solo
   passageCache.clear();        // el texto anotado de un libro son MB: no sobrevive a la sesión
   syncBadge();
   if (onCloseCb) { const cb = onCloseCb; onCloseCb = null; cb(); }
@@ -435,7 +527,7 @@ function onKey(e) {
 // ---- Render de la tarjeta -------------------------------------------------------
 
 // Cloze {{cN::respuesta(::pista)}} → hueco en el frente; revelado resaltado al voltear.
-const CLOZE_RE = /\{\{c\d+::((?:(?!::|\}\}).)*)(?:::((?:(?!\}\}).)*))?\}\}/g;
+// CLOZE_RE vive en cloze-check.js: el comparador de P42 y el render leen los MISMOS huecos.
 
 // Nota: el replace corre sobre el texto YA escapado, así que los grupos capturados llegan
 // escapados — insertarlos tal cual es seguro.
@@ -920,6 +1012,7 @@ function renderCard() {
 
   const { deck, idx } = queue[0];
   const card = deck.cards[idx];
+  ensureDraft(deck, idx);
   flipped = false;
   const behind = Math.min(queue.length - 1, 3);
   b.innerHTML = `
@@ -1096,7 +1189,8 @@ function undo() {
   u.deck.cards[u.idx] = card;
   if (u.deck.id) DB.updateDeck(u.deck.id, { cards: u.deck.cards });
   if (u.streak) Storage.set(STREAK_KEY, u.streak); else Storage.remove(STREAK_KEY);
-  bumpLog(-1, firstTry > (u.firstTry ?? firstTry) ? -1 : 0);   // si deshago un acierto, bajo `ok`
+  bumpLog(-1, -(u.okDelta || 0), -(u.cardsDelta || 0));   // revierte EXACTAMENTE lo que sumó la nota
+  retractAttempt(u.attempt);
   queue = u.queue;
   done = u.done;
   graded = u.graded ?? graded;
@@ -1124,6 +1218,13 @@ function flip() {
   mountVisuals(a, deck, card);
   const input = overlay.querySelector('.study-recall-input');
   recallText = input ? input.value.trim() : '';
+  // P42 F1 · Cómo se respondió: escribiendo o solo mirando. `exact` es la comparación local
+  // del hueco (solo cloze y solo con respuesta escrita); no cambia nada de lo que se ve.
+  const d = ensureDraft(deck, idx);
+  d.mode = recallText ? 'written' : 'reveal';
+  d.exact = recallText && card.type === 'cloze' ? clozeExact(card.front, recallText) : null;
+  d.verdict = null;
+  d.pending = false;
   overlay.querySelector('.study-recall')?.remove();
   overlay.querySelector('.study-card3d')?.classList.add('is-flipped');
   overlay.querySelector('.study-card')?.classList.add('is-flipped');
@@ -1208,6 +1309,11 @@ function renderGrades(card) {
 async function checkRecall(deck, card, answer) {
   const box = overlay?.querySelector('.study-feedback');
   if (!box) return;
+  // El intento de esta tarjeta queda a la espera del veredicto (P42 F1): si la nota llega
+  // antes, es esta función la que lo escribe cuando el agente responda.
+  const d = draft && draft.deck === deck && !draft.graded ? draft : null;
+  const seq = d ? ++d.seq : 0;
+  if (d) d.pending = true;
   box.hidden = false;
   box.innerHTML = `<p class="study-feedback-wait">${icon('sparkles', { size: 'sm' })} ${t('El agente está corrigiendo tu respuesta…')}</p>`;
   const expected = card.type === 'cloze'
@@ -1224,6 +1330,9 @@ Devuelve SOLO un JSON: {"veredicto": "bien" | "a medias" | "mal", "comentario": 
       ],
       maxTokens: 300,
     });
+    // El veredicto se apunta en el intento ANTES de mirar si la tarjeta sigue a la vista: si el
+    // lector ya puso la nota, este es justo el caso que el registro estaba esperando.
+    settleVerdict(d, seq, recordedVerdict(raw));
     if (!overlay || !flipped || queue[0]?.deck.cards[queue[0].idx] !== card) return;   // ya se pasó de tarjeta (o volvió al frente)
     const m = String(raw || '').match(/\{[\s\S]*\}/);
     const j = m ? JSON.parse(m[0]) : {};
@@ -1238,8 +1347,23 @@ Devuelve SOLO un JSON: {"veredicto": "bien" | "a medias" | "mal", "comentario": 
       <p>${escapeHtml(String(j.comentario || ''))}</p>`;
     renderGrades(card);
   } catch {
+    settleVerdict(d, seq, null);   // sin respuesta del agente: el intento se guarda sin veredicto
     box.innerHTML = `<p class="study-feedback-wait">${t('No se pudo corregir ahora. Compárala tú con la respuesta.')}</p>`;
   }
+}
+
+// Veredicto PARA EL REGISTRO (P42 F1). Más estricto que el de la pantalla, que trata cualquier
+// respuesta ilegible como «Aún no»: aquí lo que no dice «bien», «a medias» o «mal» es null. Una
+// respuesta vacía del modelo no es un fallo del lector, y contarla como tal ensuciaría la medida.
+function recordedVerdict(raw) {
+  try {
+    const m = String(raw || '').match(/\{[\s\S]*\}/);
+    const v = String((m ? JSON.parse(m[0]) : {}).veredicto || '').toLowerCase().trim();
+    if (v.startsWith('bien')) return 'good';
+    if (v.includes('medias')) return 'partial';
+    if (v.startsWith('mal')) return 'wrong';
+  } catch { /* JSON roto: sin veredicto */ }
+  return null;
 }
 
 async function showPassage(deck, card) {
@@ -1298,10 +1422,19 @@ function wireSwipe(el) {
 
 function gradeCurrent(rating) {
   if (!queue.length || editing || animating) return;
+  const now = Date.now();
+  const prevSrs = queue[0].deck.cards[queue[0].idx].srs;
+  // ¿Primera nota de esta tarjeta HOY? (P42 F1) Si su último repaso fue hoy, ya se contó:
+  // un «otra vez» re-encolado, otra sesión del mismo día u otro dispositivo. Mismo criterio
+  // que `failedOnce`, pero por día y no por sesión — el calendario es de días.
+  const firstToday = !(prevSrs && prevSrs.lastReview && Srs.dayOf(prevSrs.lastReview) === Srs.dayOf(now));
+  const okDelta = firstToday && rating !== 'again' ? 1 : 0;   // «otra vez» no es acierto (T5)
+  const cardsDelta = firstToday ? 1 : 0;
+  const attempt = finishAttempt(queue[0].deck, queue[0].idx, rating, prevSrs, now);
   // Foto de la sesión ANTES de tocar nada: es lo que restaura "deshacer".
   pushUndo({
     queue: queue.slice(), done, graded, firstTry, deck: queue[0].deck, idx: queue[0].idx,
-    srs: queue[0].deck.cards[queue[0].idx].srs, streak: Storage.get(STREAK_KEY),
+    srs: prevSrs, streak: Storage.get(STREAK_KEY), okDelta, cardsDelta, attempt,
   });
   const entry = queue.shift();
   const { deck, idx } = entry;
@@ -1310,7 +1443,7 @@ function gradeCurrent(rating) {
   // Se persiste TRAS CADA tarjeta y con el array COMPLETO (tombstones incluidos).
   if (deck.id) DB.updateDeck(deck.id, { cards: deck.cards });
   Storage.set(STREAK_KEY, Srs.bumpStreak(Storage.get(STREAK_KEY)));   // repaso de hoy → racha
-  bumpLog(1, rating === 'again' ? 0 : 1);   // «otra vez» no es acierto a la primera (T5)
+  bumpLog(1, okDelta, cardsDelta);
   graded++;
   if (rating === 'again') { queue.push(entry); failedOnce.add(key); }
   else { done++; if (!failedOnce.has(key)) firstTry++; }
@@ -1348,7 +1481,8 @@ function fmtTime(ms) {
 
 // Calendario de la racha: las últimas 5 semanas, un cuadro por día (más oscuro = más repasos).
 // El subrayado inferior dice la CALIDAD del día (retención a la primera, T5): verde ≥85%,
-// ámbar 70–85%, rojo <70%. Días sin datos de acierto (legacy) quedan sin subrayado.
+// ámbar 70–85%, rojo <70%. Retención = aciertos a la primera / tarjetas distintas del día
+// (`ok / c`, ver readLog). Días sin `c` (legacy o semántica vieja) quedan sin subrayado.
 function heatmapHtml(now = Date.now()) {
   const log = readLog();
   const today = Srs.dayOf(now);
@@ -1357,8 +1491,9 @@ function heatmapHtml(now = Date.now()) {
     const e = log[d];
     const n = typeof e === 'number' ? e : e?.n || 0;
     const ok = e && typeof e === 'object' ? e.ok : null;
+    const cards = e && typeof e === 'object' ? e.c : null;
     const lvl = n === 0 ? 0 : n < 10 ? 1 : n < 25 ? 2 : 3;
-    const ret = ok == null ? null : (n ? ok / n : null);
+    const ret = ok == null || !cards ? null : ok / cards;
     const retCls = ret == null ? '' : ret >= 0.85 ? ' ret-good' : ret >= 0.7 ? ' ret-mid' : ' ret-low';
     const title = n === 0 ? '' : ret == null ? `${n}` : `${n} · ${Math.round(ret * 100)}%`;
     cells.push(`<span class="study-heat-cell lvl-${lvl}${retCls}${d === today ? ' is-today' : ''}" title="${title}"></span>`);

@@ -13,6 +13,8 @@
 //   decks    (keyPath id, ++)  -> { id, bookId, name, cardType, scope, cards, createdAt } [index: bookId]
 //   artifacts(keyPath key)     -> { key:`${bookId}:${kind}`, bookId, kind, result, params, segVersion, createdAt } [index: bookId]
 //   locations(keyPath bookId)  -> { bookId, json }  — locations de epub.js ya serializadas
+//   attempts (keyPath uid)     -> { uid, cardUid, deckUid, bookId, ts, mode, verdict, exact, grade,
+//                                   prevInterval, latencyMs, arm }  [index: bookId, cardUid]
 //
 // v4: una conversación (convo) por objetivo; varias por libro. messages/notes
 // se indexan por convoId. Las conversaciones antiguas (sessions, una por libro)
@@ -22,9 +24,10 @@
 // (coste LLM) al reabrir o recargar. Se validan contra SEG_VERSION.
 // v7: locations — el índice de posiciones de epub.js, serializado. Generarlo recorre el
 // libro ENTERO y se rehacía en CADA apertura; guardado, la segunda apertura es inmediata.
+// v8: attempts — un registro por nota del repaso (P42 F1). Solo se añade: nunca se edita.
 
 const DB_NAME = 'bookreader_ai';
-const DB_VERSION = 7;
+const DB_VERSION = 8;
 
 let dbPromise = null;
 
@@ -68,6 +71,13 @@ function open() {
         a.createIndex('bookId', 'bookId', { unique: false });
       }
       if (!db.objectStoreNames.contains('locations')) db.createObjectStore('locations', { keyPath: 'bookId' });
+      // v8 · Con `uid` como clave (no autoincremental): el registro es global desde que nace,
+      // así que fusionar entre dispositivos es unir sin reasignar ids (ver mergeAttempts).
+      if (!db.objectStoreNames.contains('attempts')) {
+        const at = db.createObjectStore('attempts', { keyPath: 'uid' });
+        at.createIndex('bookId', 'bookId', { unique: false });
+        at.createIndex('cardUid', 'cardUid', { unique: false });
+      }
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
@@ -125,7 +135,7 @@ function readModifyWrite(s, key, patch) {
 // Stores que participan en el sync: sus escrituras de usuario avisan al
 // SyncEngine (que hace push con debounce). Las escrituras del propio sync
 // (mergeRecords) NO avisan — evita el bucle push→pull→push.
-const SYNCED_STORES = ['messages', 'notes', 'convos', 'ratings', 'artifacts', 'decks'];
+const SYNCED_STORES = ['messages', 'notes', 'convos', 'ratings', 'artifacts', 'decks', 'attempts'];
 
 function notifySync(store) {
   if (!SYNCED_STORES.includes(store)) return;
@@ -577,6 +587,55 @@ function mergeCards(local = [], remote = []) {
 function sameCardList(a, b) {
   if ((a || []).length !== (b || []).length) return false;
   return JSON.stringify(a) === JSON.stringify(b);
+}
+
+// Intentos del repaso (P42 F1) ----------------------------------------------
+//
+// Un registro por NOTA puesta en el repaso: qué tarjeta, cómo se respondió (`mode`: girar y
+// mirar, o escribir), qué dijo el corrector (`verdict` del modelo, `exact` del comparador local
+// de cloze) y qué nota puso el lector. Es la historia que `card.srs` no guarda (solo el estado),
+// y sin ella no hay forma de saber si alguien mejora. Ver BACKLOG · P42.
+//
+// INMUTABLE: solo `add`, nunca `put`. Un intento es un hecho que pasó; corregirlo a posteriori
+// convertiría la medida en una opinión. La única baja es «deshacer» (deleteAttempt), que retira
+// una nota que el lector dio por error — el mismo gesto que ya restaura el estado SRS.
+
+export function addAttempt(record) {
+  return tx('attempts', 'readwrite', s => reqP(s.add(record))).then(r => {
+    notifySync('attempts');
+    return r;
+  });
+}
+
+export function deleteAttempt(uid) {
+  if (!uid) return Promise.resolve();
+  return tx('attempts', 'readwrite', s => reqP(s.delete(uid))).then(r => {
+    notifySync('attempts');
+    return r;
+  });
+}
+
+export function getAttempts(bookId) {
+  return tx('attempts', 'readonly', s => reqP(s.index('bookId').getAll(bookId)))
+    .then(list => (list || []).sort((a, b) => (a.ts || 0) - (b.ts || 0)));
+}
+
+// Sync · Unión por `uid`. Como nunca se editan, no hay conflicto que resolver: lo que falte
+// aquí se añade y lo que ya está se deja tal cual (mismo criterio que los días de lectura).
+// Un solo await (las claves) y después solo escrituras, como mergeRecords.
+export function mergeAttempts(records) {
+  if (!records || !records.length) return Promise.resolve(0);
+  return tx('attempts', 'readwrite', s => reqP(s.getAllKeys()).then(keys => {
+    const have = new Set(keys);
+    let written = 0;
+    for (const r of records) {
+      if (!r || !r.uid || have.has(r.uid)) continue;
+      have.add(r.uid);   // el mismo uid dos veces en un lote: el segundo `add` abortaría todo
+      s.add(r);
+      written++;
+    }
+    return written;
+  }));
 }
 
 // Relevancia de capítulos vs objetivo ---------------------------------------

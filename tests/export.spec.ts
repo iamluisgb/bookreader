@@ -104,7 +104,7 @@ test('el backup round-trip conserva mazos (con estado FSRS) y artefactos del Stu
 
     // Simular un dispositivo limpio: vaciar las dos tiendas antes de restaurar.
     await new Promise((resolve, reject) => {
-      const req = indexedDB.open('bookreader_ai', 7);
+      const req = indexedDB.open('bookreader_ai');   // sin versión: la vigente (v8 desde P42)
       req.onsuccess = () => {
         const db = req.result;
         const tx = db.transaction(['decks', 'artifacts'], 'readwrite');

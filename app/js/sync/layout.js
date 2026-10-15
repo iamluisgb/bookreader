@@ -3,8 +3,9 @@
 //   bookreader/manifest.json      índice { schemaVersion, books: { id: {file, title, updatedAt} } }
 //   bookreader/settings.json      ajustes globales + plantillas propias
 //   bookreader/books/<id>.json    subrayados, marcadores, posición, convos, mensajes, notas,
-//                                 ratings, artefactos del Studio (resúmenes / mapas mentales)
-//                                 y mazos de flashcards con su estado de repaso
+//                                 ratings, artefactos del Studio (resúmenes / mapas mentales),
+//                                 mazos de flashcards con su estado de repaso y el registro de
+//                                 intentos del repaso (P42)
 //
 // Un blob único global es lo que hace mal arete (todo o nada, pisa cambios).
 // Particionar por libro aísla los conflictos y evita re-subir lo que no cambió.
@@ -67,7 +68,7 @@ export function stable(value) {
 // distinto orden en cada lado) y se ignora todo lo que es local por naturaleza —
 // el `id` autoincremental, que colisiona, y los escalares (posición, modo de lectura),
 // que no se fusionan por unión y harían rebotar el push para siempre.
-const DIGEST_STORES = ['convos', 'messages', 'notes', 'ratings', 'artifacts', 'decks'];
+const DIGEST_STORES = ['convos', 'messages', 'notes', 'ratings', 'artifacts', 'decks', 'attempts'];
 // Stores con id autoincremental: el id NO viaja (es local) y un registro sin uid no es
 // mergeable, así que el otro dispositivo nunca lo aceptará. Contar cualquiera de las dos
 // cosas dejaría el digest permanentemente distinto en los dos lados → push en bucle.
@@ -138,7 +139,7 @@ function maxUpdatedAt(...lists) {
 export async function buildSnapshot() {
   const settings = {};
   const books = {};
-  const bookOf = (id) => (books[id] = books[id] || { local: {}, convos: [], messages: [], notes: [], ratings: [], artifacts: [], decks: [], meta: null });
+  const bookOf = (id) => (books[id] = books[id] || { local: {}, convos: [], messages: [], notes: [], ratings: [], artifacts: [], decks: [], attempts: [], meta: null });
 
   for (const [key, value] of Object.entries(Storage.getAll(''))) {
     if (SECRET_KEYS.includes(key) || SKIP_KEYS.includes(key)) continue;
@@ -152,9 +153,9 @@ export async function buildSnapshot() {
     settings[READING_KEY] = await ReadingLog.exportDays();
   } catch (e) { /* sin IndexedDB: se sube el resto igual */ }
 
-  const [convos, messages, notes, ratings, artifacts, decks, meta] = await Promise.all([
+  const [convos, messages, notes, ratings, artifacts, decks, attempts, meta] = await Promise.all([
     DB.getAll('convos'), DB.getAll('messages'), DB.getAll('notes'), DB.getAll('ratings'),
-    DB.getAll('artifacts'), DB.getAll('decks'), DB.getAll('books'),
+    DB.getAll('artifacts'), DB.getAll('decks'), DB.getAll('attempts'), DB.getAll('books'),
   ]);
   const convoBook = Object.fromEntries((convos || []).map(c => [c.id, c.bookId]));
   for (const c of convos || []) if (c.bookId) bookOf(c.bookId).convos.push(c);
@@ -174,6 +175,11 @@ export async function buildSnapshot() {
   // preparar el libro en el PC y estudiar en el móvil). Viajan CRUDOS, con el estado
   // de repaso dentro de cada tarjeta y con los tombstones de mazo y de tarjeta.
   for (const d of decks || []) if (d.bookId) bookOf(d.bookId).decks.push(d);
+  // Intentos del repaso (P42 F1): en el fichero del LIBRO, junto a los mazos de los que salen,
+  // y no en settings.json como los días de lectura — es una historia que crece con cada nota y
+  // settings.json se re-sube entero en cuanto cambia cualquier ajuste. El criterio de fusión
+  // sí es el de los días de lectura: unión, nunca LWW (ver restoreSnapshot).
+  for (const a of attempts || []) if (a.bookId) bookOf(a.bookId).attempts.push(a);
   // ratings: keyPath `bookId` pero la clave real hoy es el convoId (ver db.js).
   for (const r of ratings || []) {
     const b = convoBook[r.bookId] || (books[r.bookId] ? r.bookId : null);
@@ -309,6 +315,10 @@ export async function restoreSnapshot({ settings = {}, books = {} }, { mode = 'r
     // Mazos: casan por uid como messages/notes, pero sus TARJETAS se fusionan una a una
     // (el estado de repaso vive dentro) — ver mergeDecks.
     records += await DB.mergeDecks(b.decks);
+    // Intentos: unión por uid, en cualquier modo (también 'restore'). No se editan nunca, así
+    // que no hay nada que decidir; pisar lo local perdería lo repasado aquí desde la última
+    // subida, igual que pasaría con los días de lectura.
+    records += await DB.mergeAttempts(b.attempts);
     for (const r of b.ratings || []) { await DB.put('ratings', r); records++; }
     if (b.meta) { await DB.put('books', b.meta); records++; }
   }

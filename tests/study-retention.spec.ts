@@ -145,11 +145,14 @@ test('heatmap: subrayado por retención a la primera y migración del log legacy
     const d = new Date();
     const today = Math.floor((d.getTime() - d.getTimezoneOffset() * 60000) / 86400000); // mismo dayOf que srs.js
     const y = today - 1;
+    // P42 F1: retención = ok / c (tarjetas distintas del día). Las entradas sin `c` llevan la
+    // semántica vieja de `ok` y no pintan retención.
     localStorage.setItem('bookreader_study_log', JSON.stringify({
-      [today]: { n: 8, ok: 4 },       // mutará con el repaso de la sesión (→ 9 · 56%)
-      [y]: { n: 10, ok: 9 },          // 90% → verde
-      [today - 2]: { n: 8, ok: 4 },   // 50% estable → rojo
-      [today - 3]: 12,                // legacy: número plano → sin subrayado
+      [today]: { n: 8, ok: 4 },              // semántica vieja HOY: el recuento arranca de cero al repasar
+      [y]: { n: 12, ok: 9, c: 10 },          // 90% → verde
+      [today - 2]: { n: 10, ok: 4, c: 8 },   // 50% → rojo
+      [today - 3]: 12,                       // legacy: número plano → sin subrayado
+      [today - 4]: { n: 6, ok: 5 },          // semántica vieja (sin `c`) → sin subrayado
     }));
     return { today, y };
   });
@@ -167,11 +170,14 @@ test('heatmap: subrayado por retención a la primera y migración del log legacy
   // Tras repasar la única tarjeta, renderCard pasa a la pantalla final: ahí está el heatmap
   // (el .study-flip del pie AHORA es «Cerrar»: no se vuelve a tocar).
   const heat = overlay.locator('.study-heat');
-  await expect(heat.locator('.study-heat-cell.ret-good[title="10 · 90%"]')).toHaveCount(1);
-  await expect(heat.locator('.study-heat-cell.ret-low[title="8 · 50%"]')).toHaveCount(1);
-  // Hoy: 8 repasos · 4 aciertos + 1 acierto de esta sesión → 5/9 = 56% → rojo.
-  await expect(heat.locator('.study-heat-cell.ret-low.is-today[title="9 · 56%"]')).toHaveCount(1);
+  await expect(heat.locator('.study-heat-cell.ret-good[title="12 · 90%"]')).toHaveCount(1);
+  await expect(heat.locator('.study-heat-cell.ret-low[title="10 · 50%"]')).toHaveCount(1);
+  // Hoy: los 8 repasos se conservan (meta), pero el `ok` viejo no se mezcla con el nuevo:
+  // la única tarjeta de esta sesión, acertada a la primera → 1/1 = 100% → verde.
+  await expect(heat.locator('.study-heat-cell.ret-good.is-today[title="9 · 100%"]')).toHaveCount(1);
 
   // Legacy: 12 repasos, sin datos de acierto → sin subrayado, tooltip plano.
   await expect(heat.locator('.study-heat-cell:not([class*="ret-"])[title="12"]')).toHaveCount(1);
+  // Semántica vieja (sin `c`): tampoco pinta retención.
+  await expect(heat.locator('.study-heat-cell:not([class*="ret-"])[title="6"]')).toHaveCount(1);
 });
