@@ -167,10 +167,12 @@ test('cada nota deja un intento con sus campos, y deshacer lo retira', async ({ 
   expect(typeof a.uid).toBe('string');
   expect(a.latencyMs).toBeGreaterThanOrEqual(0);
   expect(Math.abs(a.ts - Date.now())).toBeLessThan(60000);
+  expect(a.cardHash).toMatch(/^[0-9a-f]{8}$/); // huella del contenido de la tarjeta (P42)
   expect(Object.keys(a).sort()).toEqual([
     'answer',
     'arm',
     'bookId',
+    'cardHash',
     'cardUid',
     'deckUid',
     'exact',

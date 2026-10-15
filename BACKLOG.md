@@ -1896,11 +1896,13 @@ redactada por el lector ataca esa causa.
 
 **F1 · Registro de intentos y medida honesta · `S`–`M`** *(sin cambio visible salvo el heatmap)*
 - Store `attempts` en la BD del agente (`DB_VERSION` 7 → 8,
-  [`db.js:27`](app/js/ai/db.js#L27)). Solo se añade, nunca se edita. Registro (13 campos):
+  [`db.js:27`](app/js/ai/db.js#L27)). Solo se añade, nunca se edita. Registro (14 campos):
   `{uid, cardUid, deckUid, bookId, ts, mode: 'reveal'|'written', verdict: 'good'|'partial'|'wrong'|null,
-  exact: bool|null, grade, prevInterval, latencyMs, arm: null, answer: string|null}`. `answer` es el
-  texto escrito, recortado a 500 caracteres (`null` si solo se giró): sin él, la medida no se podría
-  re-juzgar fuera de la app (ver Contrato). La clave es `card.uid`, que ya
+  exact: bool|null, grade, prevInterval, latencyMs, arm: null, answer: string|null, cardHash: string}`.
+  `answer` es el texto escrito, recortado a 500 caracteres (`null` si solo se giró): sin él, la medida
+  no se podría re-juzgar fuera de la app (ver Contrato). `cardHash` es la huella del frente y el dorso
+  EN el momento del intento (FNV-1a, detección de cambio, no criptografía): si la tarjeta se edita
+  después, el juez lo detecta comparando con la tarjeta actual del backup. La clave es `card.uid`, que ya
   existe por el sync ([`db.js:351-354`](app/js/ai/db.js#L351-L354)), no la posición en el mazo.
 - `mode` es el sustrato de los niveles de práctica (reconocer frente a recordar): se registra, no se
   usa todavía.
@@ -1995,6 +1997,9 @@ otro** y podía tapar un efecto real. Se cambia ahora porque ahora es barato: no
     temperature 0;
   - es **ciego al brazo y nunca ve `mine`**: compara la respuesta contra el hueco o el dorso
     ORIGINAL de la tarjeta y su pasaje;
+  - los intentos cuya `cardHash` ya no coincide con la huella de la tarjeta actual (se editó
+    después del intento) se **excluyen** de la primaria y se cuentan aparte: el juez no puede
+    puntuar una respuesta contra un texto que no era el que el lector vio;
   - su veredicto se **congela en caché por `uid` del intento**: lo juzgado no se re-juzga. Cambiar de
     modelo o de prompt es un juez nuevo con clave nueva, y entonces se re-juzga TODO, nunca una mezcla.
   El `verdict` que guarda la app no sirve de primaria: lo da el modelo que el lector tenga en ese

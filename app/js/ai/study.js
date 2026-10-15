@@ -338,7 +338,25 @@ function attemptRecord(d) {
     mode: d.mode, verdict: d.verdict, exact: d.exact, grade: d.grade,
     prevInterval: d.prevInterval, latencyMs: d.latencyMs, arm: null,
     answer: d.answer ?? null,
+    cardHash: d.cardHash ?? null,
   };
+}
+
+// Huella del CONTENIDO de la tarjeta en el momento del intento (P42): el juez del contrato
+// compara la respuesta contra el frente y el dorso de la tarjeta, así que si la tarjeta se
+// edita después, los intentos anteriores ya no se pueden juzgar contra ella. Con la huella,
+// quien analiza el backup recalcula sobre la tarjeta actual y detecta los intentos afectados.
+// FNV-1a a 32 bits: no es criptografía, es detección de cambio. codePointAt y no charCodeAt
+// para que la huella sea idéntica en el navegador y en Node ante un carácter fuera del BMP.
+function cardFingerprint(front, back) {
+  let h = 0x811c9dc5;
+  for (const text of [String(front || ''), '\u0000', String(back || '')]) {
+    for (const ch of text) {
+      h ^= ch.codePointAt(0);
+      h = Math.imul(h, 0x01000193) >>> 0;
+    }
+  }
+  return h.toString(16).padStart(8, '0');
 }
 
 function commitAttempt(d) {
@@ -363,6 +381,7 @@ function finishAttempt(deck, idx, rating, prevSrs, now) {
     bookId: deck.bookId || null,
     ts: now,
     grade: rating,
+    cardHash: cardFingerprint(card.front, card.back),
     // Intervalo justo ANTES de esta nota; null = tarjeta nueva (0 sería «re-aprendiendo»).
     prevInterval: prevSrs ? (prevSrs.interval || 0) : null,
     latencyMs: Math.max(0, now - d.shownAt),
