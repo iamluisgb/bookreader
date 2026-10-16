@@ -32,6 +32,8 @@ offline con un agente de IA (BYOK) que lee el libro completo según un objetivo.
   - sidebar: `bookmarks.js`/`bookmarks-ui.js`, `highlights.js`/`highlights-ui.js`, `settings.js`
   - agente IA: `js/ai/` (`panel.js`, `panel-template.js`, `llm.js`, `segment.js`, `db.js`,
     `templates.js`, `render.js`, `markdown.js`, `attenuation.js`)
+  - widgets de estudio: `js/ai/widgets/` (`core.js` carcasa común, un módulo por tipo:
+    `matrix.js`). El agente rellena un spec JSON; el motor es nuestro (ADR-057, P43)
   - sync: `js/sync/` (`engine.js` orquesta; `layout.js`/`merge.js` datos; `library-sync.js`
     biblioteca; `blobs.js` ficheros de libro; `drive-*.js` proveedor)
   - utilidades: `js/ui/` (`icons.js`, `escape.js`), `storage.js`

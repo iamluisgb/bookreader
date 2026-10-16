@@ -3,6 +3,24 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-10-16 — Widgets de estudio: carcasa común y «Rellena la matriz» (P43 F1)
+
+Primera pieza de [P43](BACKLOG.md): siete tipos de widget que el agente rellena con un JSON para
+cualquier libro y la app corrige sin juez. Sale de la investigación
+[`docs/INVESTIGACION_WIDGETS.md`](docs/INVESTIGACION_WIDGETS.md) y de la [ADR-057](DECISIONS.md).
+
+- **Carcasa común** ([`app/js/ai/widgets/core.js`](app/js/ai/widgets/core.js), pura): validación
+  del spec, `verifyQuotes` (cada cita tiene que estar literal en el capítulo; se perdonan comillas,
+  acentos, mayúsculas y las palabras partidas al final de línea del PDF), `specHash`, el registro de
+  intento para el store `attempts` de P42 (`mode: 'widget'`) y las tarjetas de lo fallado.
+- **Tipo «Rellena la matriz»** ([`matrix.js`](app/js/ai/widgets/matrix.js)): filas de conceptos que
+  se confunden, columnas de atributos con opciones cerradas, hasta la mitad de las celdas dadas. El
+  lector rellena todo antes de comprobar, puede marcar «Dudo» por celda, y ve cada fallo con el
+  porqué y la cita; los fallos que dio por seguros van primero.
+- Patrón vivo en `patterns.html` (con un ejemplo de DDIA) y tests en `tests/widgets.spec.ts`.
+- **Sin superficie todavía**: el motor existe y está probado, pero ninguna pantalla lo abre. La
+  generación por el agente (F2, con su contrato) y la superficie en la libreta (F3) vienen después.
+
 ## 2026-10-14 — La barra de selección, compacta y con tres enfoques nuevos (P38 F1+F2)
 
 Inspirada en la de [Gloss](https://www.usegloss.io/). Antes eran 11 botones en dos filas; ahora es

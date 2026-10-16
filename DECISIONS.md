@@ -1836,3 +1836,30 @@ mezclan, y cualquier cambio del sync arriesga la viralidad). Dexie Cloud o Supab
 (`LAUNCH_PLAN.md` lo apuntaba: otra cuenta, otro coste fijo y otro proveedor que vigilar, cuando lo
 nuestro ya está montado en Cloudflare). Sin cifrar (más simple, inaceptable: rompe lo que promete
 la landing). Clave derivada de la licencia (sin emparejamiento, pero podríamos leer los datos).
+
+## ADR-057 — Widgets de estudio: el agente rellena un spec y el motor es nuestro · `ACEPTADA`
+
+**Contexto.** P43 añade widgets de práctica (matriz, predecir, ordenar, problema con números…).
+[P9 F3](BACKLOG.md#p9--skills--artefactos-plataforma-extensible-de-salidas-del-agente--l--futuro)
+preveía que el agente escribiera artefactos HTML y pintarlos en un `<iframe sandbox>` sin red. Para
+la práctica eso tiene dos problemas: un widget hecho por el modelo no se puede **corregir** de forma
+fiable (la respuesta correcta sería lo que diga su JS), y la investigación
+([`docs/INVESTIGACION_WIDGETS.md`](docs/INVESTIGACION_WIDGETS.md)) muestra que lo que funciona son
+pocos formatos, repetidos y corregidos por código: es lo que hace Khan Academy con Perseus.
+
+**Decisión.**
+1. El agente produce **datos** (un spec JSON por tipo), nunca HTML ni código. Cada tipo tiene un
+   motor nuestro en `app/js/ai/widgets/` que valida, pinta y corrige. Todo texto del spec se escapa.
+2. Cada ítem corregible lleva la **cita literal** del pasaje (`cite.quote`, y `cite.src` si hay
+   ancla). Antes de enseñar un widget se comprueba que la cita está en el texto del capítulo
+   (`verifyQuotes`). Un spec que no pasa no se enseña.
+3. El intento va al store `attempts` de P42 con el mismo registro que el repaso (`mode: 'widget'`,
+   `widget: {type, correct, total, confidentMisses}`, `cardHash` = huella del spec). Así viaja por
+   sync y backup sin código nuevo, y el análisis lo distingue por `mode`.
+4. Lo fallado (y lo acertado con duda) se convierte en tarjetas básicas con la forma del mazo.
+5. Para la práctica, esto **sustituye** al sandbox de P9 F3. El sandbox sigue abierto para
+   artefactos de consumo (P9), que no se corrigen.
+
+**Consecuencias.** Un tipo nuevo cuesta código nuestro, no un prompt: es deliberado (pocos tipos,
+bien hechos). Los motores de dominio a medida, como los cuatro prototipos de DDIA, quedan fuera del
+producto hasta que los datos digan que un dominio se repite.

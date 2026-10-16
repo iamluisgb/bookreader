@@ -2384,3 +2384,49 @@ button.ai-nb-chap:hover { color: var(--text); background: var(--fill-strong); }
 .ai-nb-chapter-pend { color: var(--accent); font-weight: 600; }
 .ai-nb-chapter-body { padding: 2px 0 8px; }
 @media (prefers-reduced-motion: reduce) { .ai-nb-chapter > summary .icon { transition: none; } }
+
+/* ============================================================================
+   Widgets de estudio (P43). Carcasa común + tipo «Rellena la matriz». El estado de cada celda
+   (acierto, fallo) se marca con fondo suave del color semántico, nunca con una barra lateral.
+   La rejilla desliza dentro de su caja: con 4–5 columnas no cabe a 360 px.
+   ========================================================================== */
+.wgt { display: grid; gap: var(--s-3); }
+.wgt-title { margin: 0; font-size: var(--fs-lg); font-weight: 600; }
+.wgt-prompt { margin: 0; color: var(--text-soft); font-size: var(--fs-sm); }
+.wgt-scroll { overflow-x: auto; }
+.wgt-grid { border-collapse: separate; border-spacing: var(--s-1); font-size: var(--fs-sm); }
+.wgt-grid th { text-align: left; font-weight: 600; color: var(--text-soft); font-size: var(--fs-xs); padding: var(--s-1) var(--s-2); vertical-align: bottom; }
+.wgt-grid tbody th { color: var(--text); font-size: var(--fs-sm); vertical-align: middle; min-width: 7em; }
+.wgt-cell { background: var(--surface-1); border-radius: var(--r-sm); padding: var(--s-2); vertical-align: top; min-width: 8em; }
+.wgt-cell .segmented { flex-wrap: wrap; }
+/* Las opciones de una celda pueden ser frases («Uno espera o se interbloquea»): bajan de línea en
+   vez de pisarse, que es lo que hacía el nowrap de .segmented-btn. */
+.wgt-cell .segmented-btn { font-size: var(--fs-xs); padding: 5px 8px; white-space: normal; flex: 1 1 auto; line-height: 1.25; }
+.wgt-given { background: var(--fill); }
+.wgt-val { font-weight: 600; }
+.wgt-tag { display: block; font-size: var(--fs-2xs); color: var(--text-faint); }
+.wgt-unsure { display: inline-flex; align-items: center; gap: 4px; margin-top: var(--s-1); font-size: var(--fs-2xs); color: var(--text-soft); cursor: pointer; }
+.wgt-ok { background: color-mix(in srgb, var(--success) 14%, transparent); }
+.wgt-ko { background: color-mix(in srgb, var(--danger) 12%, transparent); }
+.wgt-fix { margin-top: var(--s-1); font-size: var(--fs-xs); font-weight: 600; color: var(--danger); }
+.wgt-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2) var(--s-3); }
+.wgt-hint { font-size: var(--fs-xs); color: var(--text-soft); }
+.wgt-result { display: grid; gap: var(--s-2); }
+.wgt-score { margin: 0; font-weight: 600; }
+.wgt-note { margin: 0; font-size: var(--fs-sm); color: var(--text-soft); }
+.wgt-misses { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s-3); }
+.wgt-miss { background: var(--surface-1); border-radius: var(--r-md); padding: var(--s-3); display: grid; gap: var(--s-1); font-size: var(--fs-sm); }
+.wgt-miss p { margin: 0; }
+.wgt-sure { font-size: var(--fs-2xs); font-weight: 600; color: var(--warning); }
+.wgt-quote { margin: 0; color: var(--text-soft); font-style: italic; }
+/* Estrecho: la tabla pasa a una tarjeta por concepto (fila), con cada atributo etiquetado. Con
+   scroll lateral se perdía la columna de los conceptos, que es lo que da sentido a cada celda. */
+@media (max-width: 600px) {
+  .wgt-grid, .wgt-grid tbody, .wgt-grid tr, .wgt-grid th, .wgt-grid td { display: block; }
+  .wgt-grid thead { display: none; }
+  .wgt-grid { border-spacing: 0; }
+  .wgt-grid tr { display: grid; gap: var(--s-2); padding-block: var(--s-2); }
+  .wgt-grid tbody th { font-size: var(--fs-md); padding: 0; }
+  .wgt-cell { min-width: 0; }
+  .wgt-cell::before { content: attr(data-label); display: block; font-size: var(--fs-xs); font-weight: 600; color: var(--text-soft); margin-bottom: var(--s-1); }
+}

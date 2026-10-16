@@ -163,6 +163,11 @@
       <tr><th>Token</th><th>Valor</th><th>Para</th></tr>
     </table></div>
   </section>
+  <section class="pl-sec">
+    <h2>Widget de estudio · Rellena la matriz</h2>
+    <p class="pl-why">P43. El agente rellena el spec; el motor es nuestro. Compromiso antes de ver, «Dudo» por celda y el porqué con la cita de cada fallo. Ejemplo de DDIA, cap. 8.</p>
+    <div id="pl-wgt-matrix"></div>
+  </section>
 </div>
 <script>
 (function () {
@@ -228,6 +233,29 @@ document.getElementById('pl-icon-sizes').innerHTML += Object.entries(ICON_SIZES)
   `<tr><td><code>${k}</code> · <code>--icon-${k}</code></td><td>${v}px</td><td>${icon('books', { size: k })}</td><td>${usoTam[k]}</td></tr>`).join('');
 document.getElementById('pl-icons').innerHTML = ICON_NAMES.filter(n => !n.endsWith('-fill')).map(n =>
   `<div class="pl-icon" title="${n}">${icon(n, { size: 'xl' })}<b>${n}</b>${SIGNIFICA[n] ? `<span>${SIGNIFICA[n]}</span>` : ''}</div>`).join('');
+</script>
+<script type="module">
+// P43 · Ejemplo vivo del widget de matriz, con el motor real.
+import { renderMatrix } from './js/ai/widgets/matrix.js';
+const Q_SER = 'Automatically preventing write skew requires true serializable isolation';
+renderMatrix(document.getElementById('pl-wgt-matrix'), {
+  type: 'matrix', version: 1, bookId: 'ddia', chapter: 'Chapter 8. Transactions',
+  title: 'Niveles de aislamiento frente a dos carreras',
+  prompt: 'Para cada nivel, ¿evita la anomalía? Marca «Dudo» si no lo tienes claro.',
+  rows: [{ id: 'rc', label: 'Read committed' }, { id: 'si', label: 'Snapshot isolation' }, { id: 'ser', label: 'Serializable' }],
+  columns: [
+    { id: 'lu', label: '¿Evita lost updates?', options: ['Sí', 'No', 'Según el motor'] },
+    { id: 'ws', label: '¿Evita write skew?', options: ['Sí', 'No'] },
+  ],
+  cells: [
+    { row: 'rc', col: 'lu', answer: 'No', given: true },
+    { row: 'ser', col: 'lu', answer: 'Sí', given: true },
+    { row: 'si', col: 'lu', answer: 'Según el motor', why: 'Algunas implementaciones lo detectan y abortan (el repeatable read de PostgreSQL); otras no (MySQL/InnoDB).', cite: { quote: 'The automatic detection of lost updates that you find in some implementations of snapshot isolation' } },
+    { row: 'rc', col: 'ws', answer: 'No', why: 'Cada transacción escribe su propia fila: no hay lock en común ni conflicto que detectar.', cite: { quote: Q_SER } },
+    { row: 'si', col: 'ws', answer: 'No', why: 'Las dos leen del mismo snapshot, ven dos médicos y siguen adelante.', cite: { quote: 'Since the database is using snapshot isolation, both checks return 2' } },
+    { row: 'ser', col: 'ws', answer: 'Sí', why: 'Solo la serializabilidad de verdad impide la write skew sin cambiar la aplicación.', cite: { quote: Q_SER } },
+  ],
+});
 </script>
 </body>
 </html>

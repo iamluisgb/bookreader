@@ -1595,4 +1595,13 @@ const EN = {
   'Repaso al terminar cada capítulo y modo Feynman': 'Chapter-end review and Feynman mode',
   'Preparar el libro para preguntarle sin conexión': 'Prepare the book to answer offline',
   'Sync entre dispositivos con tu propio Google Drive (Ajustes generales)': 'Sync devices through your own Google Drive (App settings)',
+  // Widgets de estudio (P43)
+  'Dada': 'Given',
+  'Dudo': 'Not sure',
+  'Rellena todas las celdas para comprobar': 'Fill in every cell to check',
+  'Era: {answer}': 'It was: {answer}',
+  'Ibas seguro': 'You were sure',
+  '{n} de {total} bien': '{n} of {total} right',
+  'Fallaste {n} estando seguro. Son los que más se corrigen al repasarlos: van primero.': 'You missed {n} while sure. Those are the ones review fixes best, so they come first.',
+  'Todo bien.': 'All right.',
 };

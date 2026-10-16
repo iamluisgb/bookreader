@@ -2062,6 +2062,80 @@ mide) · cambiar la semántica de la racha · la mejora de generación al estilo
 cuya literal ES la respuesta: término, fecha, cifra), que es trabajo futuro del prompt de
 generación de tarjetas y no de la medida.
 
+### P43 — Widgets de estudio: siete tipos que el agente rellena para cualquier libro · `L` · **F1 ✓ (2026-10-16)**
+
+**Contexto (2026-10-16).** Cuatro prototipos a mano sobre DDIA (anomalías, lease, rebalanceo,
+timeout, en el lab) gustaron, pero cada uno lleva su propio motor y no valen para otro libro. La
+investigación [`docs/INVESTIGACION_WIDGETS.md`](docs/INVESTIGACION_WIDGETS.md) elige **siete tipos
+genéricos**: el agente rellena un JSON, la app lo pinta con un motor propio y lo corrige sin juez
+salvo en el tipo 7. Lo que más mueve el aprendizaje es **comprometerse antes de ver** (predecir:
+explicaciones correctas 22 % → 30 %, Crouch 2004) y **construir** (matriz conceptos × atributos,
+d = 1.07, Fiorella y Mayer 2016). El tutor por chat no basta: en el ensayo de Khanmigo, el 17 % de
+las sesiones con error tuvieron un mensaje al tutor (NBER w35620).
+
+**Decisión de arquitectura** ([ADR-057](DECISIONS.md)): el agente produce **datos**, nunca HTML ni
+código. El motor de cada tipo es nuestro y escapa todo. Para la práctica, esto sustituye al
+`<iframe sandbox>` de [P9 F3](#p9--skills--artefactos-plataforma-extensible-de-salidas-del-agente--l--futuro).
+
+**Los siete tipos** (orden de construcción):
+
+| # | Tipo | Se corrige | Estado |
+|---|---|---|---|
+| 2 | Rellena la matriz | celda a celda, exacto | **F1 ✓** |
+| 1 | Predice y comprueba | fila de una tabla de casos | — |
+| 3 | Ordena la secuencia | orden, exacto o parcial | — |
+| 4 | Problema con números (y reto con restricciones) | fórmula en mini-lenguaje seguro | — |
+| 5 | Pregunta con distractores que enseñan | clave, con feedback por opción | — |
+| 6 | Recuerda con tus palabras | comparador local (P42) y juez si no coincide | existe en parte (cloze) |
+| 7 | Explícaselo a alguien | juez con rúbrica | existe (Feynman) |
+
+«Encuentra el error» es un modo de 1, 3 y 4, no un tipo. Las preguntas antes del capítulo (P17) son
+5 y 6 en modo «antes de leer».
+
+**Carcasa común** ([`app/js/ai/widgets/core.js`](app/js/ai/widgets/core.js)), la misma para todos:
+spec con `type`, `version`, `bookId`, `chapter`, `title`, `prompt` y citas por ítem; compromiso
+antes de revelar; feedback con el porqué y la cita; intento en el store `attempts` de P42
+(`mode: 'widget'`, `widget: {type, specHash}`, `answer` como JSON recortado a 500); tarjetas
+básicas para lo fallado, que vuelven con FSRS.
+
+**Contrato (antes de implementar F2).**
+- Batería: 20 capítulos de 3 libros de géneros distintos (técnico, ciencia o economía, humanidades),
+  elegidos por Luis de su biblioteca. Por qué: la pregunta es si el tipo generaliza, no si sale
+  bien en DDIA.
+- Métrica primaria: `widget_spec_valid` ≥ 85 %, % de specs generados que pasan `validate*` **y**
+  `verifyQuotes` contra el texto del capítulo. **Determinista.**
+- Baseline: no existe. El primer paso de F2 es correr la batería con el prompt v1 y sin reintentos
+  (run con nombre); hasta entonces no se toca el prompt.
+- Secundaria (tendencia, no gate): % de celdas que un revisor humano da por correctas frente al
+  pasaje, sobre una muestra de 5 specs por libro.
+- Time-box: 3 ciclos de prompt. Si no llega, se clasifica el fallo (cobertura, citas inventadas,
+  celdas ambiguas) y se cierra con el hallazgo.
+
+**F1 · Carcasa común + tipo «Rellena la matriz» · `M`** · ✓ (2026-10-16)
+- `core.js` (puro): validación común, `verifyQuotes(spec, text)` con la normalización de
+  `cloze-check.js`, `specHash` (FNV-1a), registro de intento y tarjetas de lo fallado.
+- `matrix.js`: `validateMatrix`, `scoreMatrix`, `matrixCards` (puros) y `renderMatrix` (DOM). Filas
+  = conceptos, columnas = atributos con opciones cerradas; algunas celdas vienen dadas (como los
+  mapas parcialmente rellenos); el lector rellena el resto, marca su seguridad, comprueba y ve el
+  porqué con la cita de cada celda fallada.
+- Patrón en `patterns.html`, estilos en `modern.css` (solo tokens), cadenas por `t()` con EN.
+- Tests deterministas en `tests/widgets.spec.ts`.
+- **Sin superficie en la app todavía:** el motor existe y se prueba, pero nadie lo abre. Eso es F3.
+
+**F2 · Generación por el agente · `M`** *(con el contrato de arriba)*
+- Prompt que pide el JSON de la matriz para un capítulo, con citas literales; parseo tolerante y
+  validación; un reintento si la validación falla, con el error concreto.
+- Comprobación de ida y vuelta (Alberti 2019): otro modelo rellena la matriz solo con el pasaje; las
+  celdas en que no coincide se marcan dudosas y no se enseñan.
+- Run de la batería → baseline → hasta 3 ciclos.
+
+**F3 · Superficie · `M`**
+- Dónde aparece: en la libreta, como un «Te toca» más al cerrar un capítulo (una pausa por capítulo,
+  regla de NB2), y desde la estantería en el repaso.
+- Tarjetas de lo fallado al mazo del libro; el intento al análisis (P42 F3, «ciclos válidos»).
+
+**F4+ · Los demás tipos**, en el orden de la tabla, cada uno con su contrato.
+
 ### P24 — Higiene de la sesión de repaso · **✓ entregada** (2026-08-01) · F1–F4
 
 > **Entregada entera.** Ver CHANGELOG 2026-08-01. Cuatro arreglos de la sesión, ninguno
