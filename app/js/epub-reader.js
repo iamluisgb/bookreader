@@ -740,6 +740,32 @@ export function init() {
 // re-pagina → el texto de la página no cambia y no se pierde la posición. La escala va
 // en el viewport (ancestro), no en #epub-container, para no chocar con el swipe. En
 // escritorio no aplica (allí las barras van en flujo / fullscreen).
+// Deshace el encogido de `updateReaderScale` en un rectángulo medido en pantalla. epub.js
+// decide en qué página está y a cuál saltar mezclando el rectángulo del contenedor y de las
+// vistas (que el `transform: scale` del viewport encoge) con el de los rangos DENTRO del
+// iframe (que no se encoge). Con las barras visibles esa mezcla da una página equivocada:
+// medido en un Pixel 7 en horizontal, con las barras a la vista cada salto a un subrayado
+// aterrizaba entre 1 y 7 páginas antes (0 de 4 a la vista; con las barras ocultas, 4 de 4) y
+// abrir la barra lateral —que obliga a mostrarlas— movía la lectura hacia atrás y se quedaba.
+const ESCALA_VIEWPORT = /translateY\(([\d.]+)px\) scale\(([\d.]+)\)/;
+function sinEscala(r) {
+  const vp = document.getElementById('reader-viewport');
+  const m = vp && ESCALA_VIEWPORT.exec(vp.style.transform);
+  if (!m) return r;
+  const ty = Number(m[1]), s = Number(m[2]);
+  const vr = vp.getBoundingClientRect();
+  const ox = vp.offsetWidth / 2;                 // transform-origin: 50% 0
+  const izq = vr.left - ox * (1 - s), arriba = vr.top - ty;
+  return new DOMRect(izq + ox + (r.left - izq - ox) / s, arriba + (r.top - arriba - ty) / s,
+    r.width / s, r.height / s);
+}
+function medirSinEscala(el) {
+  if (!el || el.__sinEscala) return;
+  const nativo = el.getBoundingClientRect.bind(el);
+  el.getBoundingClientRect = () => sinEscala(nativo());
+  el.__sinEscala = true;
+}
+
 export function updateReaderScale() {
   const vp = document.getElementById('reader-viewport');
   if (!vp) return;
@@ -1002,6 +1028,12 @@ export async function load(arrayBuffer, onProgress, bookId = null) {
       if (current.includes('allow-scripts')) {
         iframe.setAttribute('sandbox', current.replace(/\s*allow-scripts/g, '').trim());
       }
+    }
+    if (doc && doc.defaultView && doc.defaultView.frameElement) {
+      const iframe = doc.defaultView.frameElement;
+      medirSinEscala(iframe);
+      medirSinEscala(iframe.parentElement);                   // .epub-view
+      medirSinEscala(iframe.closest('.epub-container'));
     }
     // Also inject theme directly into the content document
     injectThemeIntoContent(contents);

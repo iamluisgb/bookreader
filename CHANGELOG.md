@@ -3,6 +3,16 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-10-16 — Posición en móvil con las barras a la vista
+
+Reportado con «El pez en el agua» en un Pixel 7 y una tablet Samsung: abrir la barra de índice y
+notas movía la página, y pulsar un subrayado llevaba a otra hoja. Causa: al mostrar las barras en
+móvil el lector encoge el viewport con `transform: scale`, y epub.js mezclaba rectángulos
+encogidos (contenedor y vistas) con los del iframe (sin encoger), así que se equivocaba de página.
+Con las barras visibles, 0 de 4 saltos a un subrayado caían a la vista; con ellas ocultas, 4 de 4.
+`epub-reader.js` ahora mide contenedor, vistas e iframe deshaciendo ese encogido
+(`medirSinEscala`). Test: `tests/reader-scale-position.spec.ts`.
+
 ## 2026-10-16 — Widgets de estudio: carcasa común y «Rellena la matriz» (P43 F1)
 
 Primera pieza de [P43](BACKLOG.md): siete tipos de widget que el agente rellena con un JSON para
