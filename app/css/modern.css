@@ -216,8 +216,12 @@ body.reading.ai-jobs-busy #ai-toggle::after, body.reading.ai-jobs-busy .ai-fab::
        auto-ocultan y reaparecen al mover el ratón.
    En ventana de escritorio las barras se quedan en el flujo normal (flex): el área
    de lectura se ajusta entre ellas y se ve TODO el texto sin gestos. */
+/* Las barras overlay se miden contra el lector, no contra la ventana: con el agente
+   abierto el lector se encoge (margin-right) y, sin esto, el pie seguía de 0 a 100vw y el
+   panel tapaba la página, el % y el botón de página siguiente. */
 @media (pointer: coarse) {
   .reader-nav { top: env(safe-area-inset-top); }
+  body.reading .reader-main { position: relative; }
   body.reading .reader-header,
   body.reading .reader-footer { position: absolute; left: 0; right: 0; z-index: calc(var(--z-chrome) + 20); }
   body.reading .reader-header { top: 0; }
@@ -225,6 +229,7 @@ body.reading.ai-jobs-busy #ai-toggle::after, body.reading.ai-jobs-busy .ai-fab::
 }
 
 @media (pointer: fine) {
+  body.reading.fs .reader-main { position: relative; }
   body.reading.fs .reader-header,
   body.reading.fs .reader-footer { position: absolute; left: 0; right: 0; z-index: calc(var(--z-chrome) + 20); }
   body.reading.fs .reader-header { top: 0; }
