@@ -3,6 +3,15 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-10-18 — Desplegar con la app abierta ya no deja botones muertos
+
+Tras desplegar P44, Análisis no se abría en el móvil: la PWA seguía viva con los módulos del
+arranque en memoria (`srs.js` viejo) y el `analysis.js` nuevo, cargado al pulsar, pedía exportaciones
+que el viejo no tenía. La importación fallaba y el error solo iba a la consola. Ahora un fallo de
+código desfasado (SyntaxError de enlazado o módulo que no carga) muestra el mismo «Hay una versión
+nueva · Actualizar»: con `cargar()` (`ui/brand.js`) en las acciones del menú y una red global para
+los `await import()` sin capturar. `code-desfasado.spec.ts` lo simula sirviendo un módulo incompatible.
+
 ## 2026-10-18 — Análisis del estudio: retención real, lo que te queda de cada libro y FSRS a tu medida (P44)
 
 La pantalla de Análisis cuenta ahora también el estudio, con lo que ya guardaba el registro de

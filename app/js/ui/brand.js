@@ -88,4 +88,43 @@ export function vigilarBuild(onNueva) {
     if (ahora && ahora !== base) { avisado = true; onNueva(); }
   };
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') comprobar(); });
+  avisoDesfase = onNueva;
+  // Red para las cargas diferidas que no pasan por `cargar` (un `await import()` dentro de un
+  // manejador): su rechazo llega aquí sin capturar.
+  window.addEventListener('unhandledrejection', (e) => {
+    if (!esDesfase(e.reason)) return;
+    e.preventDefault();
+    console.warn('código desfasado:', e.reason);
+    avisarDesfase();
+  });
+}
+
+// CÓDIGO DESFASADO. Si se despliega con la app abierta, la página conserva en memoria los
+// módulos que cargó al arrancar (el navegador los guarda por URL y no los vuelve a pedir), pero
+// los que se cargan al pulsar algo (Análisis, Mazos…) llegan NUEVOS. Si el nuevo importa algo
+// que el viejo no exporta, la importación falla y el botón no hace nada: el error solo se veía
+// en la consola. Se reconoce por el SyntaxError de enlazado (cada motor lo redacta a su manera)
+// o por el fallo de red de un módulo, y se avisa con el mismo «Hay una versión nueva ·
+// Actualizar»: recargar es lo único que lo arregla.
+const RE_DESFASE = /does not provide an export|import not found|binding name .* is not found|dynamically imported module|Importing a module script failed/i;
+export function esDesfase(err) {
+  return !!err && (err instanceof SyntaxError || RE_DESFASE.test(String(err.message || err)));
+}
+let avisoDesfase = null;
+let ultimoAviso = 0;
+function avisarDesfase() {
+  if (!avisoDesfase || Date.now() - ultimoAviso < 3000) return;   // un toque, un aviso
+  ultimoAviso = Date.now();
+  avisoDesfase();
+}
+
+// Carga diferida de un módulo para una acción del usuario: `cargar(() => import('./x.js'), 'x')`.
+// Si falla por código desfasado, avisa para actualizar; nunca rechaza (la promesa se queda
+// pendiente), así quien llama solo escribe el `.then` del caso bueno.
+export function cargar(loader, etiqueta) {
+  return loader().catch((err) => {
+    console.warn(`${etiqueta}:`, err);
+    if (esDesfase(err)) avisarDesfase();
+    return new Promise(() => {});
+  });
 }

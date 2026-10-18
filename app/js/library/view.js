@@ -8,7 +8,7 @@ import * as Blobs from '../sync/blobs.js';
 import * as DriveAuth from '../sync/drive-auth.js';
 import { ensurePro } from '../ui/paywall.js';
 import { icon } from '../ui/icons.js';
-import { brandMark, brandLockup } from '../ui/brand.js';
+import { brandMark, brandLockup, cargar } from '../ui/brand.js';
 import { editBookMeta } from './book-meta.js';
 import { t, getLang } from '../i18n.js';
 import { escapeHtml } from '../ui/escape.js';
@@ -427,10 +427,10 @@ function openMoreSheet(anchor) {
     const act = b.dataset.act;
     closeSheet();
     if (act === 'settings') onOpenSettings();
-    else if (act === 'analysis') import('../analysis.js').then(m => m.open()).catch(err => console.warn('analysis:', err));
-    else if (act === 'decks') import('../decks.js').then(m => m.open()).catch(err => console.warn('decks:', err));
+    else if (act === 'analysis') cargar(() => import('../analysis.js'), 'analysis').then(m => m.open());
+    else if (act === 'decks') cargar(() => import('../decks.js'), 'decks').then(m => m.open());
     else if (act === 'newshelfmenu') openCreateMenu(anchor);
-    else if (act === 'guide') import('../ui/feature-guide.js').then(m => m.open()).catch(err => console.warn('guide:', err));
+    else if (act === 'guide') cargar(() => import('../ui/feature-guide.js'), 'guide').then(m => m.open());
   });
 }
 
@@ -1051,13 +1051,13 @@ async function onClick(e) {
   // Carga perezosa: el Análisis arrastra el registro de lectura, la libreta y el SRS, y
   // nada de eso hace falta para pintar la estantería (que es la pantalla de arranque).
   if (e.target.closest('[data-act="analysis"]')) {
-    import('../analysis.js').then(m => m.open()).catch(err => console.warn('analysis:', err));
+    cargar(() => import('../analysis.js'), 'analysis').then(m => m.open());
     return;
   }
   // El gestor de mazos también entra perezoso: agrupa IndexedDB + biblioteca y
   // nada de eso hace falta para pintar la estantería.
   if (e.target.closest('[data-act="decks"]')) {
-    import('../decks.js').then(m => m.open()).catch(err => console.warn('decks:', err));
+    cargar(() => import('../decks.js'), 'decks').then(m => m.open());
     return;
   }
 

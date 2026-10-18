@@ -22,6 +22,7 @@ import { confirmBox } from '../ui/dialog.js';
 import { ensurePro } from '../ui/paywall.js';
 import * as LLM from './llm.js';
 import { bookLook } from '../ui/book-accent.js';
+import { cargar } from '../ui/brand.js';
 import { toast } from './toast.js';
 import { segmentBook } from './segment.js';
 import { segmentPdf } from './segment-pdf.js';
@@ -1539,7 +1540,7 @@ function renderDone(b, f, left) {
   // sesión y lleva allí a quien quiera ver la tendencia.
   b.querySelector('.study-progress-link')?.addEventListener('click', () => {
     close();
-    import('../analysis.js').then(m => m.open()).catch(err => console.warn('analysis:', err));
+    cargar(() => import('../analysis.js'), 'analysis').then(m => m.open());
   });
   b.querySelector('.study-share')?.addEventListener('click', async (e) => {
     const btn = e.currentTarget;
