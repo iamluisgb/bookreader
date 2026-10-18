@@ -75,11 +75,13 @@ test('a mitad de capítulo: barras, laterales y cambios de tamaño no cambian de
     expect(s.href).toBe(a.href);
     expect(Math.abs(s.top - a.top), `toque central ${k}`).toBeLessThan(2);
   }
-  // Lateral derecho: desplaza, nunca cambia de capítulo.
+  // Lateral: en scroll no desplaza ni cambia de capítulo; solo alterna las barras como el centro.
+  const barras0 = await page.evaluate(() => document.body.classList.contains('immersive'));
   await page.touchscreen.tap(z.der, 400); await page.waitForTimeout(1000);
   const b = await estado(page);
   expect(b.href).toBe(a.href);
-  expect(b.top).toBeGreaterThan(a.top + 200);
+  expect(Math.abs(b.top - a.top), 'el lateral no desplaza').toBeLessThan(2);
+  expect(await page.evaluate(() => document.body.classList.contains('immersive'))).toBe(!barras0);
   // Cambios de tamaño reales (barras del sistema, giro): mismo capítulo y mismo párrafo.
   for (const [w, h] of [[1340, 870], [1340, 800], [800, 1340], [1340, 800]]) {
     await page.setViewportSize({ width: w, height: h });
@@ -124,7 +126,7 @@ test('saltar a un pasaje de un capítulo intermedio se queda en ese capítulo', 
   expect((await estado(page)).href).toBe(ch2);
 });
 
-test('la selección sobrevive al scroll, a los laterales y a las barras, y sigue pegada al texto', async ({ page }) => {
+test('la selección sobrevive al scroll, a las barras y al cambio de alto, y sigue pegada al texto', async ({ page }) => {
   await abrir(page);
   const cdp = await page.context().newCDPSession(page);
   // La nota en caja, a la vista.
@@ -173,11 +175,6 @@ test('la selección sobrevive al scroll, a los laterales y a las barras, y sigue
   await comprobar('al seleccionar');
   await deslizar(cdp, page, 250);
   await comprobar('tras deslizar');
-  const z = await zonas(page);
-  await page.touchscreen.tap(z.der, 450); await page.waitForTimeout(1000);
-  await comprobar('tras el lateral derecho');
-  await page.touchscreen.tap(z.izq, 450); await page.waitForTimeout(1000);
-  await comprobar('tras el lateral izquierdo');
   // Las barras aparecen/desaparecen (p. ej. otro gesto): ya no redimensiona ni repinta.
   await page.evaluate(() => document.body.classList.toggle('immersive')); await page.waitForTimeout(700);
   await comprobar('tras alternar las barras');

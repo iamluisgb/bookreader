@@ -3,6 +3,13 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-10-18 — Modo scroll: el lateral ya no desplaza
+
+A petición del usuario: en scroll se avanza deslizando, y un toque en cualquier sitio del texto
+solo muestra u oculta las barras (antes el lateral desplazaba una pantalla). `tapZone` devuelve
+siempre 'center' en scroll; con una selección abierta, tocar la cierra, como en paginado. Las
+flechas ←/→ del teclado siguen desplazando. En paginado los laterales no cambian.
+
 ## 2026-10-18 — Modo scroll: la causa real del salto de capítulo y de la selección perdida
 
 Reproducido en emulación de tablet con un EPUB de estructura O'Reilly (`tests/oreilly-like.epub`,

@@ -187,13 +187,11 @@ export function hasSelection() { return !!(active && active.range); }
 // Para los tests: el rango seleccionado (en el documento del libro).
 export function selectedRange() { return active && active.range ? active.range : null; }
 
-function tapZone(x, doc) {
+function tapZone(x) {
+  // En scroll no hay laterales: el toque solo muestra u oculta las barras (se avanza deslizando).
+  if (document.body.classList.contains('scroll-mode')) return 'center';
   const cont = document.getElementById('epub-container');
-  // En scroll el iframe es la «hoja» (más estrecha que el contenedor en una tablet): medir
-  // contra el contenedor dejaba la zona derecha fuera de la hoja, inalcanzable.
-  const hoja = document.body.classList.contains('scroll-mode') && doc && doc.documentElement
-    ? doc.documentElement.clientWidth : 0;
-  const w = hoja || (cont && cont.clientWidth) || window.innerWidth || 1;
+  const w = (cont && cont.clientWidth) || window.innerWidth || 1;
   const within = ((x % w) + w) % w;
   const f = within / w;
   // Bordes del 20%: tocar por el centro no debe pasar página (solo alternar barras).
@@ -298,15 +296,7 @@ export function attach(contents) {
     const t = e.changedTouches[0];
     const dx = t ? t.clientX - downX : 0;
     const quick = !moved && Date.now() - downT < 500;
-    if (active && active.range) {
-      if (!quick) return;
-      // En scroll, un toque en el lateral AVANZA/RETROCEDE una pantalla y la selección sigue:
-      // hay quien quiere subrayar más de lo que cabe en pantalla. Cualquier otro toque cierra.
-      const zone = t ? tapZone(t.clientX, doc) : 'center';
-      if (callbacks.keepOnEdgeTap && callbacks.keepOnEdgeTap(zone)) { callbacks.onTap(zone); return; }
-      dismiss();
-      return;
-    }
+    if (active && active.range) { if (quick) dismiss(); return; }  // tocar fuera cierra
 
     // Fin del arrastre de página: el consumidor decide girar o volver (bounce)
     // según el umbral. El long-press ya separó antes los "mantener pulsado".
@@ -314,7 +304,7 @@ export function attach(contents) {
 
     if (quick && t) {
       if (e.target.closest && e.target.closest('#br-end .br-end-btn')) return;   // botón del panel de fin de capítulo
-      const zone = tapZone(t.clientX, doc);
+      const zone = tapZone(t.clientX);
       // Toque central sobre una imagen → abrir zoom. En los bordes se pasa página
       // igualmente (para páginas que son una imagen a sangre completa).
       if (zone === 'center') {

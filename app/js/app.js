@@ -1127,10 +1127,7 @@ function initImmersive() {
   // selección está abierta, el toque solo la cierra.
   EpubReader.onTap((zone) => {
     const tip = document.getElementById('highlight-tooltip');
-    // Con la barra de selección abierta el toque solo la cierra… salvo en scroll, donde el
-    // lateral desplaza y la selección sigue (para subrayar más de lo que cabe en pantalla).
-    const lateralEnScroll = (zone === 'prev' || zone === 'next') && EpubReader.getReadingMode() === 'scroll';
-    if (tip && tip.style.display !== 'none' && !lateralEnScroll) { hideHighlightTooltip(); return; }
+    if (tip && tip.style.display !== 'none') { hideHighlightTooltip(); return; }
     if (zone === 'prev') EpubReader.tapPrev();
     else if (zone === 'next') EpubReader.tapNext();
     else if (zone === 'center') setImmersive(!document.body.classList.contains('immersive'));
