@@ -310,7 +310,8 @@ function togglePinned(id) {
 function rememberRecent(key) {
   writeList(RECENT_KEY, [key, ...readList(RECENT_KEY).filter(k => k !== key)].slice(0, 8));
 }
-const isMobile = () => window.matchMedia?.('(max-width: 767px)').matches;
+// Móvil = estrecho, o táctil y bajo (el móvil en horizontal). La MISMA consulta que el CSS.
+const isMobile = () => window.matchMedia?.('(max-width: 767px), (max-height: 500px) and (pointer: coarse)').matches;
 
 function chipHtml(row) {
   const active = selection.has(row.key);

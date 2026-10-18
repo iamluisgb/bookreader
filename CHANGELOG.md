@@ -3,6 +3,18 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-10-18 — Biblioteca: «Continuar leyendo» y «Repaso de hoy» caben en el móvil en horizontal
+
+Reportado en un Pixel en horizontal (~915×412): la biblioteca decidía su diseño solo por ancho y
+entraba en el de escritorio (rail fijo de un tercio, «Continuar» y «Hoy» en dos columnas); la
+tarjeta de continuar se quedaba con ~250 px y el título de escritorio —palabra por línea, cortado—
+y era más alta que la pantalla. Ahora: (1) táctil y bajo (`max-height: 500px`) = móvil (tira de
+estanterías; misma consulta en `isMobile()` de `library/view.js`); (2) container queries en las dos
+tarjetas: se compactan según su ancho real, el título va a 2–3 líneas con «…» y nunca se parte;
+(3) en pantallas bajas, una fila compacta y buscador + filtros en una sola fila: la primera portada
+se ve sin desplazarse. De paso: en móvil el título «Libros» salía a `fs-3xl` porque una regla
+posterior pisaba la del bloque móvil. Test: `tests/library-top-fit.spec.ts` (falla con lo anterior).
+
 ## 2026-10-18 — Los despliegues llegan al momento aunque Cloudflare cachee 4 h
 
 En `bookreader.raiatech.com` la zona de Cloudflare aplica un «Browser Cache TTL» de 4 h a JS y

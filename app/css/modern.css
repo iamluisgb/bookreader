@@ -402,7 +402,7 @@ body.in-library .ai-fab { display: none; }
 }
 .reader-more-ver { margin-left: auto; font-variant-numeric: tabular-nums; }
 .reader-more-ver:empty { display: none; }
-@media (max-width: 767px) { .lib-head-mark { display: block; margin-right: 10px; } }
+@media (max-width: 767px), (max-height: 500px) and (pointer: coarse) { .lib-head-mark { display: block; margin-right: 10px; } }
 .lib-rail {
   flex: 0 0 264px; width: 264px; height: 100%;
   display: flex; flex-direction: column;
@@ -913,8 +913,11 @@ button.lib-rail-twisty:hover { background: var(--surface-2); color: var(--text);
   border: none; border-radius: var(--r-pill); background: var(--btn-bg); color: var(--btn-ink); font: inherit; font-size: var(--fs-sm); font-weight: 600; cursor: pointer;
 }
 
-/* ---- Móvil: el rail pasa a tira horizontal de chips ---- */
-@media (max-width: 767px) {
+/* ---- Móvil: el rail pasa a tira horizontal de chips ----
+   También el móvil EN HORIZONTAL (pantalla táctil baja): con ~915×412 entraba por ancho en el
+   diseño de escritorio, con el rail fijo comiéndose un tercio y la portada partida en dos
+   columnas estrechas. */
+@media (max-width: 767px), (max-height: 500px) and (pointer: coarse) {
   /* Auditoría móvil: el rail entero en horizontal era una tira de 2.200 px con Ajustes al
      final. En móvil va la tira CORTA (.lib-strip) y lo demás sale por «Más». */
   .lib-layout > .lib-rail { display: none; }
@@ -1660,7 +1663,7 @@ body.reading.chrome-quiet:not(.fs):not(.ai-open) .agent-rail:not(:hover, :focus-
   background: var(--btn-bg); color: var(--btn-ink);
   font-size: var(--fs-sm); font-weight: 600;
 }
-@media (max-width: 767px) {
+@media (max-width: 767px), (max-height: 500px) and (pointer: coarse) {
   /* La tira de estanterías se desliza: un fundido al final lo dice (antes cortaba «Aju…»
      sin ninguna pista de que había más). */
   .lib-rail {
@@ -1675,6 +1678,9 @@ body.reading.chrome-quiet:not(.fs):not(.ai-open) .agent-rail:not(:hover, :focus-
   /* Buscador a todo el ancho; debajo, filtros y subir en una fila. */
   .lib-toolbar { flex-wrap: wrap; row-gap: 10px; }
   .lib-search-box { flex: 1 1 100%; max-width: none; }
+  /* El `.lib-h1 { fs-3xl }` de la sección Biblioteca (más arriba) pisaba el fs-xl del bloque
+     móvil principal, que va antes en la hoja: en el móvil «Libros» salía enorme. */
+  .lib-h1 { font-size: var(--fs-xl); }
   .lib-hero { gap: 16px; padding: 14px; border-radius: var(--r-lg); }
   .lib-hero-cover { width: 84px; }
   .lib-hero-title { font-size: var(--fs-xl); }
@@ -2038,10 +2044,67 @@ body.reading.chrome-quiet:not(.fs):not(.ai-open) .agent-rail:not(:hover, :focus-
   padding: 9px 12px; border-radius: var(--r-pill);
 }
 .lib-study-pick:hover { background: var(--fill-strong); }
-@media (max-width: 767px) {
+@media (max-width: 767px), (max-height: 500px) and (pointer: coarse) {
   .lib-top.has-today:has(.lib-continue) { grid-template-columns: 1fr; }
   .lib-today { padding: 14px; gap: 14px; border-radius: var(--r-lg); }
   .lib-today-ring { width: 70px; height: 70px; }
+}
+
+/* -------------------------- Biblioteca: «Continuar» y «Hoy» se adaptan a SU ancho ---------
+   El tamaño de estas tarjetas depende del rail, de si está «Hoy» al lado y de la pantalla: con
+   media queries por ancho de ventana, un móvil en horizontal o una ventana mediana las dejaban
+   con 250 px y la portada y el título de escritorio (título a palabra por línea y cortado).
+   Con container queries cada tarjeta se compacta según el sitio que tiene de verdad. */
+.lib-continue { container: hero / inline-size; }
+.lib-today-slot { container: today / inline-size; min-width: 0; }
+/* El título nunca se corta a mitad de palabra: como mucho tres líneas y «…». */
+.lib-hero-title {
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3;
+  overflow: hidden; overflow-wrap: break-word; hyphens: auto;
+}
+.lib-hero-body { flex: 1; }
+@container hero (max-width: 520px) {
+  .lib-hero { gap: 16px; padding: 14px; border-radius: var(--r-lg); }
+  .lib-hero-cover { width: 72px; }
+  .lib-hero-title { font-size: var(--fs-lg); line-height: 1.2; -webkit-line-clamp: 2; line-clamp: 2; }
+  .lib-hero-author { font-size: var(--fs-sm); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .lib-hero-progress { margin-top: 4px; }
+  .lib-hero-progress .lib-progressbar { width: auto; flex: 1; max-width: 160px; }
+  /* La tarjeta entera abre el libro: el botón sobra cuando falta sitio. */
+  .lib-hero-cta { display: none; }
+}
+@container hero (max-width: 300px) {
+  .lib-hero { gap: 12px; padding: 12px; }
+  .lib-hero-cover { width: 56px; }
+  .lib-hero-kicker { display: none; }
+}
+@container today (max-width: 380px) {
+  .lib-today { gap: 14px; padding: 14px; border-radius: var(--r-lg); }
+  .lib-today-ring { width: 56px; height: 56px; }
+  .lib-today-ring span { font-size: var(--fs-lg); }
+  .lib-today-title { font-size: var(--fs-lg); }
+  .lib-today-covers { display: none; }
+  .lib-today-actions { margin-top: 6px; }
+  .lib-today .lib-study-chip, .lib-study-pick { padding: 8px 12px; }
+}
+@container today (max-width: 260px) {
+  /* El anillo repite el número del título: sin sitio, fuera. */
+  .lib-today-ring { display: none; }
+}
+/* Móvil en horizontal (táctil y bajo): «Continuar» y «Hoy» en UNA fila compacta, para que las
+   primeras portadas de la biblioteca se vean sin desplazarse. */
+@media (max-height: 500px) and (pointer: coarse) {
+  .lib-main { padding-top: var(--s-3); }
+  .lib-head { margin-bottom: var(--s-2); }
+  /* Hay ancho de sobra: buscador y filtros en una fila (en el móvil vertical van en dos). */
+  .lib-toolbar { margin-bottom: var(--s-3); flex-wrap: nowrap; }
+  .lib-search-box { flex: 1 1 auto; }
+  .lib-top { margin-bottom: 18px; gap: 12px; }
+  .lib-hero-cta { display: none; }   /* la tarjeta entera abre el libro */
+  .lib-top.has-today:has(.lib-continue) { grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); }
+  .lib-hero-cover { width: 56px; }
+  .lib-hero-kicker { display: none; }
+  .lib-today-covers { display: none; }
 }
 
 /* ----------------------------- Retención visible (T1): racha siempre presente -------------- */
