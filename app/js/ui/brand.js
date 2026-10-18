@@ -57,6 +57,8 @@ export function startBookSplash({ delay = 300, max = 20000 } = {}) {
 let buildStamp;
 let buildAlArrancar = null;     // promesa del commit servido al ARRANCAR: el del código que corre
 async function leerBuild() {
+  // En local no hay build.json (lo escribe el despliegue): pedirlo solo ensucia la consola con un 404.
+  if (/^(localhost|127\.|\[::1\])/.test(location.hostname)) return '';
   try {
     const r = await fetch('/build.json', { cache: 'no-store' });
     const j = (r.ok && (r.headers.get('content-type') || '').includes('json')) ? await r.json() : null;

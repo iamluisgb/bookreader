@@ -259,13 +259,12 @@ body.immersive .ai-fab { transform: scale(0); }
        updateReaderScale). Solo transform: no re-pagina, el texto no se mueve. */
     transition: transform var(--transition-normal);
   }
-  /* En modo scroll no encogemos el texto: cuando las barras overlay están visibles
-     (no inmersivo) reservamos su alto para que la primera/última línea no queden
-     ocultas mientras se hace scroll. */
-  body.scroll-mode.reading:not(.immersive) .reader-viewport {
-    padding-top: var(--header-height);
-    padding-bottom: var(--footer-height);
-  }
+  /* En modo scroll las barras son overlay y el área de lectura NO cambia de tamaño al
+     mostrarlas u ocultarlas. Antes se reservaba su alto con padding aquí, y cada toque que
+     alternaba las barras redimensionaba el lector: epub.js vaciaba y repintaba el capítulo
+     (adiós selección) y el re-anclaje acababa en el capítulo siguiente. El hueco para que la
+     primera y la última línea no queden bajo las barras va DENTRO del documento del libro
+     (ver injectThemeIntoContent), donde no redimensiona nada. */
 }
 
 

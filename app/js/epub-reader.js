@@ -77,12 +77,51 @@ function markJump(cfi, seq) { jumpCfi = cfi || null; jumpSeq = seq; }
 async function displayCfi(cfi) {
   await rendition.display(cfi);
   if (typeof cfi !== 'string' || !cfi.startsWith('epubcfi(') || !rendition) return;
+  // En scroll, display(cfi) ya deja el CFI arriba del todo y no hay «página» que corregir.
+  // Y la corrección es PELIGROSA: next()/prev() en scroll pasan de SECCIÓN. Con la ubicación
+  // aún sin asentar tras un repintado, el CFI parecía «después del final» y el lector saltaba
+  // al inicio del capítulo siguiente (o al anterior desde goTo). Ver scroll-tablet.spec.ts.
+  if (getReadingMode() === 'scroll') return;
   try {
     const loc = rendition.currentLocation();
     const C = new window.ePub.CFI();
     if (loc && loc.end && loc.end.cfi && C.compare(cfi, loc.end.cfi) > 0) await rendition.next();
     else if (loc && loc.start && loc.start.cfi && C.compare(cfi, loc.start.cfi) < 0) await rendition.prev();
   } catch (e) { /* sin ubicación todavía: queda el display tal cual */ }
+}
+
+// Re-anclaje en modo SCROLL tras un cambio de tamaño. Al redimensionar, epub.js vacía y repinta
+// la sección; `display(cfi)` calculaba el desplazamiento con el contenido aún sin medir (la
+// vista crece al cargar) y lo recortaba, así que cada cambio de tamaño dejaba al lector más
+// arriba —medido: de 3570 px a 712 en tres giros—. Aquí se espera a que la altura del contenido
+// deje de cambiar y se desplaza el contenedor hasta el elemento anclado, sin repintar nada.
+async function anchorScrollTo(cfi) {
+  const sc = () => document.querySelector('#epub-container .epub-container');
+  const frame = () => new Promise(r => requestAnimationFrame(() => r()));
+  let h = -1, estable = 0;
+  for (let i = 0; i < 90 && estable < 4; i++) {         // ~1,5 s como mucho
+    await frame();
+    const el = sc(); const now = el ? el.scrollHeight : -1;
+    estable = now === h ? estable + 1 : 0; h = now;
+  }
+  const el = sc();
+  const contents = rendition && rendition.getContents()[0];
+  let range;
+  try { range = contents && contents.range(cfi); } catch (e) { range = null; }
+  if (!el || !contents || !range) { await rendition.display(cfi); return; }   // otra sección: mostrarla
+  const ifr = contents.document.defaultView.frameElement;
+  // Un CFI de nodo (sin desplazamiento: el que deja un salto desde el índice o un subrayado)
+  // da un rango colapsado al inicio de un elemento, y su rectángulo es 0×0 en el origen:
+  // el anclaje acababa en lo alto del capítulo. Entonces se mide el nodo.
+  let r = range.getBoundingClientRect();
+  if (!r.width && !r.height) {
+    const c = range.startContainer;
+    const n = c.nodeType === 1 ? (c.childNodes[range.startOffset] || c) : c.parentElement;
+    const elNode = n && n.nodeType === 1 ? n : n && n.parentElement;
+    if (elNode) r = elNode.getBoundingClientRect();
+  }
+  const enContenido = ifr.getBoundingClientRect().top - el.getBoundingClientRect().top + el.scrollTop + r.top;
+  el.scrollTop = Math.max(0, enContenido);
 }
 
 // Libera el pin de posición (lo llama toda navegación real del usuario).
@@ -709,7 +748,11 @@ function scheduleResize() {
         // display(pinnedCfi) muestra la página que CONTIENE el pin. Su 'relocated' (y
         // cualquiera posterior por el reflow) queda IGNORADO mientras el pin siga puesto,
         // así que currentCfi no deriva. El pin se libera en la próxima navegación real.
-        try { await displayCfi(pinnedCfi); }
+        // En scroll no se usa display(): ver anchorScrollTo.
+        try {
+          if (getReadingMode() === 'scroll') await anchorScrollTo(pinnedCfi);
+          else await displayCfi(pinnedCfi);
+        }
         catch (e) { /* CFI inválido tras el reflow */ }
         navSnapshot('pin/resize', pinnedCfi);
         if (pinnedCfi) { currentCfi = pinnedCfi; saveLastPosition(); }
@@ -1046,7 +1089,7 @@ export async function load(arrayBuffer, onProgress, bookId = null) {
     // navegar. Sin esto el ancla del último SALTO (posición restaurada, índice) seguía vigente
     // (`jumpSeq === navSeq`) y al abrir un panel el lector volvía a ese punto en vez de a lo
     // que estaba leyendo.
-    const alScrollear = () => { if (getReadingMode() === 'scroll') navSeq++; };
+    const alScrollear = () => { if (getReadingMode() === 'scroll') userScrolled(); };
     doc.addEventListener('wheel', alScrollear, { passive: true });
     doc.addEventListener('touchmove', alScrollear, { passive: true });
     doc.addEventListener('keydown', (e) => {
@@ -1139,7 +1182,9 @@ function wireScrollTracking() {
   let timer = 0;
   sc.addEventListener('scroll', () => {
     lastScrollAt = Date.now();
-    if (getReadingMode() !== 'scroll' || !rendition || pinnedCfi != null) return;
+    // Sin mirar el pin: epub.js, al redimensionar, repinta en SU última ubicación
+    // (rendition.location), y tiene que ser la real. currentCfi sí respeta el pin (relocated).
+    if (getReadingMode() !== 'scroll' || !rendition) return;
     clearTimeout(timer);
     timer = setTimeout(() => { try { rendition.reportLocation(); } catch (e) { /* sin vista aún */ } }, 150);
   }, { passive: true });
@@ -1244,6 +1289,16 @@ function literataFontFaces() {
   ].join('');
 }
 
+// Modo scroll en táctil: las barras son overlay y el área de lectura no cambia de tamaño al
+// mostrarlas. Para que la primera línea del capítulo y la última no queden debajo, el hueco va
+// dentro del documento.
+function scrollBarsGap() {
+  if (!COARSE || getReadingMode() !== 'scroll') return '';
+  const css = getComputedStyle(document.documentElement);
+  const px = (n) => parseInt(css.getPropertyValue(n), 10) || 52;
+  return `body { padding-top: ${px('--header-height') + 6}px !important; padding-bottom: ${px('--footer-height') + 6}px !important; }`;
+}
+
 function injectThemeIntoContent(contents) {
   const settings = Settings.getAll();
   const colors = getThemeColors();
@@ -1285,6 +1340,7 @@ function injectThemeIntoContent(contents) {
         line-height: ${settings.lineHeight} !important;
       }
       p { margin-bottom: 0.8em !important; }
+      ${scrollBarsGap()}
       #br-end { margin: 3em 0 0; padding: 1.5em 0 6em; border-top: 1px solid ${colors.text}33;
         text-align: center; -webkit-user-select: none; user-select: none; }
       #br-end p.br-end-lead, #br-end p.br-end-title { margin: 0 0 1em !important; opacity: .65; text-align: center !important;
@@ -1470,11 +1526,27 @@ window.addEventListener('pagehide', flushLastPosition);
 //    (con solape, para no perder la línea de lectura) y nunca cambian de capítulo: el cambio
 //    es una decisión explícita (botón del pie o panel de fin de capítulo).
 const SCROLL_TAP_FRACTION = 0.9;
+// Desplazarse en scroll ES navegar: libera el pin de un reflujo anterior (si no, 'relocated'
+// seguía ignorado y la posición se congelaba en el punto del último cambio de tamaño, al que
+// volvía el siguiente) y caduca el ancla del último salto.
+function userScrolled() { releasePin(); navSeq++; }
+
+// Alto de las barras overlay que tapan el texto ahora mismo (táctil, barras a la vista).
+function barsOverlap() {
+  if (!COARSE || document.body.classList.contains('immersive')) return 0;
+  const css = getComputedStyle(document.documentElement);
+  const px = (n) => parseInt(css.getPropertyValue(n), 10) || 52;
+  return px('--header-height') + px('--footer-height');
+}
+
 function scrollTapStep(dir) {
+  userScrolled();
   const sc = document.querySelector('#epub-container .epub-container');
   if (!sc || sc.scrollHeight <= sc.clientHeight) return;
   const reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
-  sc.scrollBy({ top: (dir === 'next' ? 1 : -1) * sc.clientHeight * SCROLL_TAP_FRACTION,
+  // Lo que se ve de verdad: con las barras a la vista, lo que tapan no cuenta.
+  const visible = Math.max(sc.clientHeight / 2, sc.clientHeight - barsOverlap());
+  sc.scrollBy({ top: (dir === 'next' ? 1 : -1) * visible * SCROLL_TAP_FRACTION,
     behavior: reduce ? 'auto' : 'smooth' });
 }
 

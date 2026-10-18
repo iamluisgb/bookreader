@@ -151,7 +151,25 @@ function finalize() {
   if (!text) { dismiss(); return; }
   let cfiRange = '';
   try { cfiRange = active.contents.cfiFromRange(active.range); } catch (e) {}
+  active.cfi = cfiRange;
   callbacks.onSelect({ cfiRange, text, rect: screenRect(active.range) });
+}
+
+// Reconstruye la selección en el documento recién pintado de la MISMA sección (ver attach).
+function trasladarSeleccion(contents) {
+  let cfi = active.cfi || '';
+  try { if (!cfi) cfi = active.contents.cfiFromRange(active.range); } catch (e) { cfi = ''; }
+  // Solo si el CFI es de la sección que se acaba de pintar (no al cambiar de capítulo).
+  const base = contents.cfiBase ? `epubcfi(${contents.cfiBase}!` : null;
+  if (!cfi || !base || !cfi.startsWith(base)) { dismiss(); return; }
+  let r;
+  try { r = contents.range(cfi); } catch (e) { r = null; }
+  if (!r || r.collapsed) { dismiss(); return; }
+  const anchorEnFinal = active.anchor && active.anchor.node === active.range.endContainer;
+  active = { contents, doc: contents.document, range: r, anchor: null, cfi };
+  if (anchorEnFinal) active.anchor = { node: r.endContainer, offset: r.endOffset };
+  else active.anchor = { node: r.startContainer, offset: r.startOffset };
+  seguir();
 }
 
 // El `return` corta un ciclo: `hideHighlightTooltip` llama a `clearSelection` → aquí, y
@@ -166,6 +184,8 @@ export function dismiss() {
 }
 
 export function hasSelection() { return !!(active && active.range); }
+// Para los tests: el rango seleccionado (en el documento del libro).
+export function selectedRange() { return active && active.range ? active.range : null; }
 
 function tapZone(x, doc) {
   const cont = document.getElementById('epub-container');
@@ -202,6 +222,13 @@ document.addEventListener('scroll', (e) => {
 
 export function attach(contents) {
   const doc = contents.document;
+  // epub.js repinta la sección al redimensionar (en una tablet basta con que aparezca la barra
+  // de tareas del sistema): la selección quedaba en el documento viejo, invisible o descolocada.
+  // Se reconstruye en el documento nuevo desde su CFI; si no se puede, se cierra limpia.
+  if (active && active.doc !== doc) {
+    const viejo = active.doc.defaultView && active.doc.defaultView.frameElement;
+    if (!(viejo && viejo.isConnected)) trasladarSeleccion(contents);
+  }
   injectStyles(doc);
   doc.addEventListener('scroll', alMoverse, { passive: true });
   if (doc.defaultView) doc.defaultView.addEventListener('scroll', alMoverse, { passive: true });

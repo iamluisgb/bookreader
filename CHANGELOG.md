@@ -3,6 +3,23 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-10-18 — Modo scroll: la causa real del salto de capítulo y de la selección perdida
+
+Reproducido en emulación de tablet con un EPUB de estructura O'Reilly (`tests/oreilly-like.epub`,
+`tests/scroll-tablet.spec.ts`; los cinco casos fallan con 10250d9 y pasan ahora). La cadena:
+(1) en scroll, mostrar/ocultar las barras cambiaba el alto del lector (padding en `modern.css`),
+y la barra de tareas de la tablet cambia el alto de la ventana: epub.js vacía y repinta la
+sección. (2) El re-anclaje usaba `displayCfi`, cuya corrección de doble página llama a
+`rendition.next()/prev()`: en scroll eso pasa de SECCIÓN → inicio del capítulo siguiente (y
+`goTo` podía ir al anterior). (3) El pin del reflujo solo se liberaba con navegación explícita:
+durante el scroll la posición se congelaba y el siguiente re-anclaje volvía atrás. (4) Re-anclar
+con `display()` recortaba el desplazamiento con el contenido sin medir. (5) La selección se
+quedaba en el documento repintado. Arreglos: barras overlay en scroll (el hueco va dentro del
+documento), sin corrección en scroll, el scroll del usuario libera el pin, `anchorScrollTo`
+espera a que el contenido se asiente y desplaza sin repintar, y la selección se reconstruye en el
+documento nuevo desde su CFI (solo si es de la misma sección). Además `build.json` no se pide en
+local (el aviso de versión nueva metía un 404 en consola y rompía dos tests).
+
 ## 2026-10-18 — Modo scroll: el panel de fin ya no se acciona con el lateral; el resaltado viaja con el texto
 
 (1) El botón «Siguiente» del panel de fin de capítulo ocupaba todo el ancho: al llegar al final
