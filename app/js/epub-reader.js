@@ -664,7 +664,7 @@ function registerTapHandler(contents) {
     lastTouchEnd = Date.now();
     if (moved || Date.now() - st > 500) return;     // arrastre o pulsación larga
     if (hasSelection(win)) return;                  // hubo selección → no navegar
-    if (e.target.closest && e.target.closest('#br-end')) return;   // panel de fin de capítulo
+    if (e.target.closest && e.target.closest('#br-end .br-end-btn')) return;   // botón del panel de fin
     const t = e.changedTouches[0]; if (!t) return;
     onTapCb(tapZone(t.clientX, doc));
   }, { passive: true });
@@ -674,7 +674,7 @@ function registerTapHandler(contents) {
   doc.addEventListener('click', (e) => {
     if (Date.now() - lastTouchEnd < 700) return;    // clic sintetizado por touch
     if (hasSelection(win)) return;
-    if (e.target.closest && e.target.closest('#br-end')) return;
+    if (e.target.closest && e.target.closest('#br-end .br-end-btn')) return;
     const img = e.target && e.target.closest && e.target.closest('img');
     if (img) { onImageTapCb(img); return; }         // clic en imagen → zoom
     onTapCb('click');
@@ -1131,12 +1131,14 @@ export async function load(arrayBuffer, onProgress, bookId = null) {
 // en el inicio del capítulo: abrir el panel del agente (cambia el ancho) devolvía al principio
 // y al reabrir el libro se perdía lo leído. Seguimos el scroll del contenedor y pedimos a
 // epub.js que reporte la ubicación (debounced: una vez que el dedo/rueda se calma).
+let lastScrollAt = 0;
 function wireScrollTracking() {
   const sc = document.querySelector('#epub-container .epub-container');
   if (!sc || sc.dataset.brScroll) return;
   sc.dataset.brScroll = '1';
   let timer = 0;
   sc.addEventListener('scroll', () => {
+    lastScrollAt = Date.now();
     if (getReadingMode() !== 'scroll' || !rendition || pinnedCfi != null) return;
     clearTimeout(timer);
     timer = setTimeout(() => { try { rendition.reportLocation(); } catch (e) { /* sin vista aún */ } }, 150);
@@ -1288,7 +1290,7 @@ function injectThemeIntoContent(contents) {
       #br-end p.br-end-lead, #br-end p.br-end-title { margin: 0 0 1em !important; opacity: .65; text-align: center !important;
         font-size: .85em !important; }
       #br-end p.br-end-title { opacity: 1; font-size: 1.1em !important; font-weight: 600; }
-      #br-end .br-end-btn { display: block; width: 100%; min-height: 48px; padding: 12px 16px;
+      #br-end .br-end-btn { display: block; width: 60%; min-width: 14em; max-width: 26em; margin: 0 auto; min-height: 48px; padding: 12px 16px;
         border: 0; border-radius: 12px; cursor: pointer; font: inherit; font-size: .95em;
         font-weight: 600; background: ${colors.text}; color: ${colors.bg}; }
       #br-end .br-end-btn:focus-visible { outline: 2px solid ${colors.text}; outline-offset: 3px; }
@@ -1545,7 +1547,8 @@ function injectEndPanel(contents) {
       const nt = tocTitleOf(nextSec);
       const btn = mk('button', 'br-end-btn', nt ? t('Siguiente: {c}', { c: nt }) : t('Siguiente capítulo'));
       btn.type = 'button';
-      btn.addEventListener('click', () => next());
+      // Un toque que solo frena la inercia del scroll no es una decisión de cambiar de capítulo.
+      btn.addEventListener('click', () => { if (Date.now() - lastScrollAt > 450) next(); });
       el.appendChild(btn);
     } else {
       el.appendChild(mk('p', 'br-end-title', t('Has terminado el libro')));

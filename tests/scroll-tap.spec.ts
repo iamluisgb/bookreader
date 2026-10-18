@@ -50,6 +50,7 @@ test('el panel de fin de capítulo está al final y su botón pasa al siguiente 
   const btn = frame.locator('#br-end .br-end-btn');
   await expect(btn).toHaveCount(1);
   await btn.scrollIntoViewIfNeeded();
+  await page.waitForTimeout(700);   // un clic pegado a un scroll se ignora (frenar la inercia)
   await btn.click();
   await page.waitForTimeout(1200);
   expect((await st(page)).href).not.toBe(a.href);
@@ -62,4 +63,37 @@ test('los botones del pie pasan de capítulo en scroll', async ({ page }) => {
   await page.evaluate(async () => { (await import('/js/epub-reader.js') as any).next(); });
   await page.waitForTimeout(1200);
   expect((await st(page)).href).not.toBe(a.href);
+});
+
+// El caso real en tablet: se llega al final del capítulo pulsando el lateral para seguir y el
+// dedo cae encima del panel. El lateral NO debe pasar de capítulo (antes el botón ocupaba todo
+// el ancho y el toque lo accionaba).
+test.describe('tablet', () => {
+  test.use({ viewport: { width: 1280, height: 800 }, hasTouch: true, isMobile: true });
+
+  test('pulsar el lateral sobre el panel de fin de capítulo no cambia de capítulo', async ({ page }) => {
+    await page.goto('/');
+    await page.setInputFiles('#file-input', EPUB_PATH);
+    await page.waitForSelector('#epub-container iframe', { state: 'attached', timeout: 30000 });
+    await page.evaluate(async () => {
+      const R: any = await import('/js/epub-reader.js');
+      R.setReadingMode('scroll');
+      await new Promise(r => setTimeout(r, 1500));
+    });
+    const a = await st(page);
+    const frame = page.frameLocator('#epub-container iframe').first();
+    await frame.locator('#br-end').scrollIntoViewIfNeeded();
+    await page.evaluate(() => { const sc: any = document.querySelector('#epub-container .epub-container'); sc.scrollTop = sc.scrollHeight; });
+    await page.waitForTimeout(800);
+    const box = await frame.locator('#br-end .br-end-btn').boundingBox();
+    const ifr = await page.locator('#epub-container iframe').boundingBox();
+    expect(box && ifr).toBeTruthy();
+    // lateral derecho de la hoja, a la altura del botón
+    await page.touchscreen.tap(ifr!.x + ifr!.width - 25, box!.y + box!.height / 2);
+    await page.touchscreen.tap(ifr!.x + 25, box!.y + box!.height / 2);
+    await page.waitForTimeout(1200);
+    expect((await st(page)).href).toBe(a.href);
+    // el botón mide menos que la hoja: no alcanza las zonas laterales
+    expect(box!.width).toBeLessThan(ifr!.width * 0.7);
+  });
 });

@@ -29,16 +29,25 @@ export const IDENTIDAD = { x: 0, y: 0, sx: 1, sy: 1 };
 
 let overlay = null;
 
-export function ensureOverlay() {
-  if (overlay) return overlay;
-  overlay = document.createElement('div');
-  overlay.id = 'ts-overlay';
-  overlay.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:150;display:none;';
-  overlay.innerHTML = `
+// `host`: elemento que hace scroll y donde vive la capa. Dentro de él la capa se desplaza CON el
+// contenido (el compositor lo mueve entero, sin un frame de retraso); fuera, `fixed` en pantalla
+// y a repintar por eventos. En scroll de EPUB hay que usar el host: con la capa fija, durante la
+// inercia del scroll el resaltado iba por detrás del texto.
+export function ensureOverlay(host) {
+  if (overlay && !overlay.isConnected) overlay = null;
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'ts-overlay';
+    overlay.innerHTML = `
     <div class="ts-hilayer"></div>
     <div class="ts-handle ts-start"></div>
     <div class="ts-handle ts-end"></div>`;
-  document.body.appendChild(overlay);
+  }
+  const parent = host || document.body;
+  if (overlay.parentNode !== parent) parent.appendChild(overlay);
+  if (host && getComputedStyle(host).position === 'static') host.style.position = 'relative';
+  const display = overlay.style.display || 'none';
+  overlay.style.cssText = `position:${host ? 'absolute' : 'fixed'};inset:0;pointer-events:none;z-index:150;display:${display};`;
   if (!document.getElementById('ts-overlay-style')) {
     const s = document.createElement('style');
     s.id = 'ts-overlay-style';
@@ -82,8 +91,8 @@ function aPantalla(rect, tr) {
 // pasan ya calculados —y no el rango— porque en el PDF una selección de varias líneas NO es
 // un rango del DOM: el orden de los spans en el DOM no es el de la página, así que se
 // construye recorriendo las líneas en orden VISUAL (ver pdf-touch-select.js).
-export function draw(rects, tr) {
-  const o = ensureOverlay();
+export function draw(rects, tr, host) {
+  const o = ensureOverlay(host);
   o.style.display = 'block';
 
   const hl = o.querySelector('.ts-hilayer');

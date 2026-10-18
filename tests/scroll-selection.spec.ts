@@ -54,6 +54,8 @@ test('la selección táctil sigue al texto al hacer scroll', async ({ page }) =>
   await page.waitForTimeout(500);
   const hi = page.locator('#ts-overlay .ts-hi').first();
   await expect(hi).toBeAttached({ timeout: 5000 });
+  // La capa vive dentro del contenedor que hace scroll: viaja con el texto sin retraso.
+  await expect(page.locator('#epub-container .epub-container #ts-overlay')).toHaveCount(1);
   const y0 = (await hi.boundingBox())!.y;
   await page.evaluate(() => { (document.querySelector('#epub-container .epub-container') as any).scrollTop += 120; });
   await page.waitForTimeout(500);

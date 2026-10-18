@@ -3,6 +3,17 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-10-18 — Modo scroll: el panel de fin ya no se acciona con el lateral; el resaltado viaja con el texto
+
+(1) El botón «Siguiente» del panel de fin de capítulo ocupaba todo el ancho: al llegar al final
+pulsando el lateral para seguir, el dedo caía encima y pasaba de capítulo (reproducido en tablet:
+`scroll-tap.spec.ts`, «pulsar el lateral sobre el panel»). Ahora mide el 60 % centrado, solo el
+botón ignora los toques de navegación (el resto del panel deja que el lateral desplace) y un clic
+pegado a un scroll (el toque que frena la inercia) se ignora. (2) La capa de selección era `fixed`
+y se repintaba por frame: con el scroll inercial del compositor iba por detrás del texto. En
+scroll de EPUB la capa vive ahora dentro del contenedor que hace scroll, en coordenadas de
+contenido, y se mueve con el texto sin retraso (`ensureOverlay(host)`). PDF sigue con capa fija.
+
 ## 2026-10-18 — Modo scroll: la selección sobrevive al lateral y la app avisa de versión nueva
 
 (1) Con una selección activa, tocar el lateral solo cerraba la selección; ahora en scroll el

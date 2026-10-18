@@ -70,9 +70,21 @@ const expandToWord = Engine.expandToWord;
 const orderedRange = Engine.orderedRange;
 
 // --- dibujo (capa del padre, coords de pantalla) ----------------------------
+// En scroll de EPUB la capa vive DENTRO del contenedor que hace scroll y se dibuja en
+// coordenadas de contenido (ver ensureOverlay). Para detectar tiradores seguimos usando
+// coordenadas de pantalla (`frameTransform`): se miden en el momento del toque.
+function scrollerHost() {
+  return document.body.classList.contains('scroll-mode')
+    ? document.querySelector('#epub-container .epub-container') : null;
+}
+function contentTransform(sc) {
+  const t = frameTransform(), r = sc.getBoundingClientRect();
+  return { x: t.x - r.left - sc.clientLeft + sc.scrollLeft, y: t.y - r.top - sc.clientTop + sc.scrollTop, sx: t.sx, sy: t.sy };
+}
 function draw() {
   if (!active || !active.range) return;
-  Engine.draw(Engine.usableRects(active.range), frameTransform());
+  const host = scrollerHost();
+  Engine.draw(Engine.usableRects(active.range), host ? contentTransform(host) : frameTransform(), host);
 }
 
 function hitHandle(x, y) {
@@ -90,20 +102,27 @@ function setActive(contents, range) {
 // del compositor en táctil), un reflujo, la barra de acciones al aparecer, un panel. Los
 // eventos de scroll/resize no cubren todos esos caminos y el resaltado se quedaba donde estaba
 // mientras el texto se iba. Una sola medida por frame y solo con selección activa.
-let siguiendo = 0, huella = '';
-function huellaActual() {
-  if (!active || !active.range) return '';
+let siguiendo = 0, huellaDibujo = '', huellaPantalla = '';
+const redondea = (...v) => v.map(n => Math.round(n * 10)).join();
+// Dos huellas: la del DIBUJO (en scroll de EPUB está en coordenadas de contenido y no cambia al
+// desplazarse: la capa viaja con el contenido) y la de PANTALLA (la barra de acciones sí debe
+// seguir al texto).
+function huellas() {
+  if (!active || !active.range) return ['', ''];
   const b = active.range.getBoundingClientRect();
-  const f = frameTransform();
-  return [b.top, b.left, b.width, b.height, f.x, f.y, f.sx, f.sy].map(n => Math.round(n * 10)).join();
+  const f = frameTransform(), host = scrollerHost();
+  const c = host ? contentTransform(host) : f;
+  return [redondea(b.top, b.left, b.width, b.height, c.x, c.y, c.sx, c.sy),
+          redondea(b.top, b.left, b.width, b.height, f.x, f.y, f.sx, f.sy)];
 }
 function seguir() {
   if (siguiendo) return;
-  huella = huellaActual();
+  [huellaDibujo, huellaPantalla] = huellas();
   const tick = () => {
     if (!active || !active.range) { siguiendo = 0; return; }
-    const h = huellaActual();
-    if (h !== huella) { huella = h; draw(); const r = screenRect(active.range); if (r) callbacks.onMove(r); }
+    const [d, p] = huellas();
+    if (d !== huellaDibujo) { huellaDibujo = d; draw(); }
+    if (p !== huellaPantalla) { huellaPantalla = p; const r = screenRect(active.range); if (r) callbacks.onMove(r); }
     siguiendo = requestAnimationFrame(tick);
   };
   siguiendo = requestAnimationFrame(tick);
@@ -267,7 +286,7 @@ export function attach(contents) {
     if (swiping) { swiping = false; callbacks.onSwipeEnd(dx); return; }
 
     if (quick && t) {
-      if (e.target.closest && e.target.closest('#br-end')) return;   // panel de fin de capítulo (scroll)
+      if (e.target.closest && e.target.closest('#br-end .br-end-btn')) return;   // botón del panel de fin de capítulo
       const zone = tapZone(t.clientX, doc);
       // Toque central sobre una imagen → abrir zoom. En los bordes se pasa página
       // igualmente (para páginas que son una imagen a sangre completa).
