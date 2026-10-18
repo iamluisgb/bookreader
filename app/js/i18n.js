@@ -218,6 +218,8 @@ const EN = {
   'o arrastra un archivo aquí': 'or drag a file here',
   'Página anterior': 'Previous page',
   'Página siguiente': 'Next page',
+  'Hay una versión nueva de BookReader.': 'There is a new version of BookReader.',
+  'Actualizar': 'Update',
   'Capítulo anterior': 'Previous chapter',
   'Capítulo siguiente': 'Next chapter',
   'Siguiente capítulo': 'Next chapter',

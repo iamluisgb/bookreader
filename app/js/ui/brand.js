@@ -55,12 +55,35 @@ export function startBookSplash({ delay = 300, max = 20000 } = {}) {
 // Pie del menú «Más»: quién hace la app y qué versión corre. La versión es el commit del
 // build (build.json, lo escribe scripts/build-pages.mjs); en local no existe y no se muestra.
 let buildStamp;
-export async function buildVersion() {
-  if (buildStamp !== undefined) return buildStamp;
+let buildAlArrancar = null;     // promesa del commit servido al ARRANCAR: el del código que corre
+async function leerBuild() {
   try {
     const r = await fetch('/build.json', { cache: 'no-store' });
     const j = (r.ok && (r.headers.get('content-type') || '').includes('json')) ? await r.json() : null;
-    buildStamp = j && /^[0-9a-f]{40}$/.test(j.commit) ? j.commit.slice(0, 7) : '';
-  } catch { buildStamp = ''; }
+    return j && /^[0-9a-f]{40}$/.test(j.commit) ? j.commit : '';
+  } catch { return ''; }
+}
+export async function buildVersion() {
+  if (buildStamp !== undefined) return buildStamp;
+  buildAlArrancar ||= leerBuild();
+  buildStamp = (await buildAlArrancar).slice(0, 7);
   return buildStamp;
+}
+
+// En móvil la PWA queda viva en segundo plano días y al volver NO recarga el JS: seguía
+// ejecutando una versión vieja mientras el menú (que pedía build.json al abrirse) decía la
+// nueva. Se fija el commit al arrancar y, al volver a primer plano, se compara con el servido:
+// si difiere, `onNueva()` avisa. Como mucho una consulta cada 30 s.
+export function vigilarBuild(onNueva) {
+  buildAlArrancar ||= leerBuild();
+  let ultima = 0, avisado = false;
+  const comprobar = async () => {
+    if (avisado || Date.now() - ultima < 30000) return;
+    ultima = Date.now();
+    const base = await buildAlArrancar;
+    if (!base) return;
+    const ahora = await leerBuild();
+    if (ahora && ahora !== base) { avisado = true; onNueva(); }
+  };
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') comprobar(); });
 }

@@ -9,7 +9,7 @@ import * as AiDB from './ai/db.js';
 import { hydrateIcons, icon } from './ui/icons.js';
 import { setSidebar, toggleSidebar, initSidebarState } from './ui/sidebar.js';
 import { initReadingPop, isReadingPopOpen } from './ui/reading-pop.js';
-import { brandMark, startBookSplash, buildVersion } from './ui/brand.js';
+import { brandMark, startBookSplash, buildVersion, vigilarBuild } from './ui/brand.js';
 import { mergeFileMeta, editBookMeta } from './library/book-meta.js';
 import { countBookWords, countPdfWords, updateProgressDetail, getCurrentPct, WORDS_PER_LOCATION } from './progress.js';
 import * as FeatureGuide from './ui/feature-guide.js';
@@ -242,6 +242,12 @@ function initLicense() {
 // tras el arranque (no bloquea el primer render) y falla en silencio donde no esté disponible
 // (p. ej. contexto no seguro): la app sigue funcionando online igual.
 function registerServiceWorker() {
+  vigilarBuild(() => toast({
+    message: t('Hay una versión nueva de BookReader.'),
+    actionLabel: t('Actualizar'),
+    onAction: () => { try { EpubReader.flushLastPosition(); } catch (e) { /* sin libro */ } location.reload(); },
+    timeout: 0,
+  }));
   if (!('serviceWorker' in navigator)) return;
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('sw.js').catch((e) => {
@@ -1121,7 +1127,10 @@ function initImmersive() {
   // selección está abierta, el toque solo la cierra.
   EpubReader.onTap((zone) => {
     const tip = document.getElementById('highlight-tooltip');
-    if (tip && tip.style.display !== 'none') { hideHighlightTooltip(); return; }
+    // Con la barra de selección abierta el toque solo la cierra… salvo en scroll, donde el
+    // lateral desplaza y la selección sigue (para subrayar más de lo que cabe en pantalla).
+    const lateralEnScroll = (zone === 'prev' || zone === 'next') && EpubReader.getReadingMode() === 'scroll';
+    if (tip && tip.style.display !== 'none' && !lateralEnScroll) { hideHighlightTooltip(); return; }
     if (zone === 'prev') EpubReader.tapPrev();
     else if (zone === 'next') EpubReader.tapNext();
     else if (zone === 'center') setImmersive(!document.body.classList.contains('immersive'));

@@ -231,6 +231,7 @@ export function isCoarsePointer() { return COARSE; }
 if (COARSE) {
   TouchSelect.configure({
     onTap: (zone) => onTapCb(zone),
+    keepOnEdgeTap: (zone) => (zone === 'prev' || zone === 'next') && getReadingMode() === 'scroll',
     onImageTap: (img) => onImageTapCb(img),
     onSelect: (sel) => onSelectCb(sel),
     onDismiss: () => onSelectDismissCb(),
@@ -629,13 +630,15 @@ function syncPageBg() {
 function hasSelection(win) {
   try { return !!(win.getSelection && win.getSelection().toString().trim()); } catch (e) { return false; }
 }
-function tapZone(x) {
+function tapZone(x, doc) {
   // epub.js dispone las páginas en una tira horizontal y traslada el contenido,
   // así que clientX incluye el desplazamiento de la página (p. ej. 2*ancho + x).
   // La posición DENTRO de la página visible es clientX % anchoPágina, y el ancho
   // de página = ancho del contenedor (estable, leído desde el documento padre).
   const cont = document.getElementById('epub-container');
-  const w = (cont && cont.clientWidth) || window.innerWidth || 1;
+  // En scroll el iframe es la «hoja», más estrecha que el contenedor en una tablet.
+  const hoja = getReadingMode() === 'scroll' && doc && doc.documentElement ? doc.documentElement.clientWidth : 0;
+  const w = hoja || (cont && cont.clientWidth) || window.innerWidth || 1;
   const within = ((x % w) + w) % w;
   const f = within / w;
   return f < 0.2 ? 'prev' : f > 0.8 ? 'next' : 'center';
@@ -663,7 +666,7 @@ function registerTapHandler(contents) {
     if (hasSelection(win)) return;                  // hubo selección → no navegar
     if (e.target.closest && e.target.closest('#br-end')) return;   // panel de fin de capítulo
     const t = e.changedTouches[0]; if (!t) return;
-    onTapCb(tapZone(t.clientX));
+    onTapCb(tapZone(t.clientX, doc));
   }, { passive: true });
 
   // Escritorio: un clic en el libro (no sintetizado por un toque) solo sirve

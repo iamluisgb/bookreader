@@ -3,6 +3,18 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-10-18 — Modo scroll: la selección sobrevive al lateral y la app avisa de versión nueva
+
+(1) Con una selección activa, tocar el lateral solo cerraba la selección; ahora en scroll el
+lateral desplaza y la selección sigue (se puede subrayar más de lo que cabe en pantalla); el
+resto de toques la cierran. (2) En una tablet la hoja (iframe) es más estrecha que el
+contenedor y `tapZone` medía contra el contenedor: la zona derecha quedaba fuera de la hoja,
+inalcanzable. Ahora mide contra la hoja en scroll. (3) La PWA queda viva en segundo plano y no
+recarga el JS al volver, mientras la etiqueta del menú (que pedía `build.json` al abrirse)
+decía la versión nueva: se podía estar probando código viejo. `vigilarBuild` fija el commit al
+arrancar y avisa «Hay una versión nueva · Actualizar» al volver a primer plano si el servido
+difiere; la etiqueta ya es la del código que corre.
+
 ## 2026-10-18 — Modo scroll: segunda vuelta tras probarlo en la tablet
 
 Seguían los dos fallos. (1) El reflujo se ancla al destino del último SALTO (posición restaurada
