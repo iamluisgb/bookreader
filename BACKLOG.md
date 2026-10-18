@@ -1424,10 +1424,10 @@ existir para que la feature se entienda, el bug probablemente sea de la feature.
 
 ---
 
-### P31 — Análisis con historia: escope y rangos · señal-driven · `S` · **1 y 3 ✓ con P44 (2026-10-18)**
+### P31 — Análisis con historia: escope y rangos · señal-driven · `S` · **✓ (2026-10-18, con P44 y P45)**
 
-*Entregados con [P44](#p44--análisis-del-estudio-retención-real-memoria-por-libro-carga-y-fsrs-personal--m---entregada-2026-10-18--f1f5):* el tope de 5 libros con «Ver todos» y el filtro por libro al tocar
-su fila. **Queda el punto 2** (Año/Todo), con su misma condición.
+*Entregados:* el tope de 5 libros con «Ver todos» y el filtro por libro (P44); Año y Todo, y el
+filtro por estantería que aquí se descartaba (P45, a petición del usuario: era la señal).
 
 **Seguimiento de P25** (el registro ya guarda y sincroniza ~400 días; la pantalla enseña máximo
 30). No es un panel de filtros: el rango sigue siendo el ÚNICO interruptor, y lo que se añade es
@@ -2168,6 +2168,19 @@ cuatro preguntas con datos que ya existían (store `attempts` de P42 F1 y `card.
 día es ruido; `study_log` queda solo con `n` para la meta), comparativas, histogramas de D/S y la
 retrievabilidad media. **Queda:** medir con uso real si alguien llega a los 400 repasos y si acepta
 sus parámetros; el tamaño del optimizador (338 KB de wasm) solo se descarga al pulsar el botón.
+
+### P45 — Análisis navegable: periodos de calendario, año, estantería e historia de un libro · `M` · **✓ entregada (2026-10-18)**
+
+Pedido por el usuario tras P44: revisar la semana o el mes pasados, ver un año, filtrar por estantería
+y ver cómo se ha ido leyendo un libro. **Periodos de calendario** (día, semana de lunes a domingo, mes,
+año, todo) con flechas y «volver a ahora»; la flecha se apaga antes del primer dato. **Comparación
+solo contigo** y con el periodo anterior, recortado al mismo tramo si el actual va a medias, y nunca
+contra un periodo sin registro. **Año y todo** con columnas por mes (o por año) que llevan a ese mes al
+tocarlas, y «N libros empezados · M terminados» (`finishedAt`, que el store sella desde ahora al
+pasar a terminado y viaja por sync). **Selector de ámbito** (biblioteca, estantería —también las
+inteligentes— o libro) que filtra lectura, estudio y carga, con «Repasar esta estantería/este libro».
+**Un libro entero:** al elegirlo se abre en «Todo», con ritmo (palabras/min), semanas, terminado en N
+días o por dónde vas, y la curva de páginas acumuladas. Tests: `analysis-periods.spec.ts`.
 
 ### P24 — Higiene de la sesión de repaso · **✓ entregada** (2026-08-01) · F1–F4
 

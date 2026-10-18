@@ -38,7 +38,7 @@ const DB_VERSION = 1;
 // Campos que viajan en library.json. Un cambio en cualquiera de ellos bumpea
 // `updatedAt`; un cambio en el resto (lastOpenedAt, lastCfi, file…) no.
 const SYNCED_FIELDS = ['title', 'author', 'origTitle', 'origAuthor', 'metaAt', 'format', 'fileName', 'fileBaseId', 'size',
-  'addedAt', 'status', 'progress', 'shelfIds', 'blob', 'deleted', 'deletedAt'];
+  'addedAt', 'status', 'progress', 'finishedAt', 'shelfIds', 'blob', 'deleted', 'deletedAt'];
 
 let dbPromise = null;
 
@@ -160,6 +160,7 @@ export async function putBook(record, { stamp = true } = {}) {
 
   const prev = (stamp || stripped) ? await getRaw(next.id) : null;
   if (stripped && next.file === undefined && prev) next.file = prev.file;
+  stampFinished(prev, next);
   let changed = false;
   if (stamp) {
     changed = syncedChanged(prev, next);
@@ -202,6 +203,7 @@ export async function patchBook(id, patch, { stamp = true } = {}) {
     const stripped = typeof rec.hasLocalFile === 'boolean';
     delete rec.hasLocalFile;
     if (stripped && campos.file === undefined) rec.file = cur.file;
+    stampFinished(cur, rec);
     if (stamp) {
       changed = syncedChanged(cur, rec);
       if (changed) rec.updatedAt = Date.now();
@@ -245,6 +247,19 @@ export async function purgeDeleted(before) {
   const gone = (await getAllRecords()).filter(b => b.deleted && (b.deletedAt || 0) < before);
   await Promise.all(gone.map(b => tx('books', 'readwrite', s => reqP(s.delete(b.id)))));
   return gone.length;
+}
+
+// Cuándo se terminó (Análisis, P45): se sella al PASAR a «terminado», venga del progreso o de
+// marcarlo a mano, y se borra si deja de estarlo. Lo que ya estaba terminado antes de que
+// existiera el campo se queda sin fecha: no hay de dónde sacarla. Un registro que ya trae su
+// `finishedAt` (llega por sync) se respeta.
+function stampFinished(prev, next) {
+  if (next.status === 'finished') {
+    if (!next.finishedAt && prev && prev.status !== 'finished') next.finishedAt = Date.now();
+    else if (!next.finishedAt && prev?.finishedAt) next.finishedAt = prev.finishedAt;
+  } else if (next.finishedAt) {
+    next.finishedAt = null;
+  }
 }
 
 // Estado de lectura derivado del progreso, sin pisar "finished" manual.

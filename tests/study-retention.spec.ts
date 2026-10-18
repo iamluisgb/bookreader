@@ -140,6 +140,8 @@ test('hito de racha: se celebra al cruzar 7 y comparte una tarjeta PNG', async (
 });
 
 test('contador del día: el log legacy cuenta para la meta, y el cierre lleva a Análisis', async ({ page }) => {
+  // Domingo: «hace 3 días» cae en esta semana de calendario (Análisis, P45).
+  await page.clock.setFixedTime(new Date('2026-10-18T12:00:00'));
   await page.goto('/index.html');
   await seedProLicense(page);
   await page.evaluate(() => {

@@ -110,6 +110,7 @@ function bookEntry(b) {
     fileName: b.fileName || '', fileBaseId: b.fileBaseId || '',
     size: b.size || 0, addedAt: b.addedAt || 0,
     status: b.status || 'unread', progress: b.progress || 0,
+    ...(b.finishedAt ? { finishedAt: b.finishedAt } : {}),
     shelfIds: b.shelfIds || [],
     blob: b.blob || null,
     deleted: !!b.deleted, deletedAt: b.deletedAt || 0,

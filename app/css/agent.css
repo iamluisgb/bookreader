@@ -1616,6 +1616,7 @@ body.ai-open #sync-badge { right: calc(var(--ai-panel-width) + 14px); }
   color: var(--text-soft); font-size: var(--fs-sm); font-weight: 500; cursor: pointer;
   transition: background var(--transition-fast), color var(--transition-fast);
 }
+.anal-tab { white-space: nowrap; }
 .anal-tab.active { background: var(--surface-1); color: var(--text); font-weight: 600; box-shadow: var(--shadow-1); }
 
 /* La cifra que lidera. Una sola por vista: es la respuesta a "cuánto he leído". */
@@ -1708,9 +1709,45 @@ body.ai-open #sync-badge { right: calc(var(--ai-panel-width) + 14px); }
   color: var(--warning); cursor: pointer; }
 .anal-fix:hover { text-decoration: underline; }
 
-.anal-scope { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; margin-bottom: 16px; }
-.anal-scope-back { margin: 0; }
-.anal-scope-t { flex: 1; min-width: 0; font-size: var(--fs-lg); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* P45 · Cabecera: ámbito (biblioteca, estantería o libro) → rango → periodo con flechas. */
+.anal-head { display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px; }
+.anal-head .anal-tabs { margin-bottom: 0; }
+.anal-scope { position: relative; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.anal-scope-pick { display: inline-flex; align-items: center; gap: 6px; min-width: 0; max-width: 100%;
+  height: 32px; padding: 0 12px; border: 1px solid var(--border); border-radius: var(--r-pill);
+  background: var(--surface-1); color: var(--text); font: inherit; font-size: var(--fs-sm); font-weight: 500; cursor: pointer; }
+.anal-scope-pick:hover { background: var(--surface-2); }
+.anal-scope-pick.is-set { border-color: var(--accent); }
+.anal-scope-t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.anal-scope-x { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px;
+  border: none; border-radius: var(--r-pill); background: var(--surface-2); color: var(--text-soft); cursor: pointer; }
+.anal-scope-study { margin-left: auto; }
+.anal-pick-menu { position: absolute; top: calc(100% + 6px); left: 0; z-index: 5; width: min(320px, 100%);
+  max-height: 50vh; overflow-y: auto; padding: 6px; border: 1px solid var(--border); border-radius: var(--r-md);
+  background: var(--surface-1); box-shadow: var(--shadow-2); }
+.anal-pick-h { padding: 8px 10px 4px; font-size: var(--fs-2xs); font-weight: 600; color: var(--text-faint); }
+.anal-pick-item { display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 10px; border: none;
+  border-radius: var(--r-sm); background: none; color: var(--text); font: inherit; font-size: var(--fs-sm);
+  text-align: left; cursor: pointer; }
+.anal-pick-item:hover { background: var(--surface-2); }
+.anal-pick-item.is-on { font-weight: 600; color: var(--accent); }
+.anal-nav { display: flex; align-items: center; gap: 4px; }
+.anal-nav-btn:disabled { opacity: 0.3; cursor: default; }
+.anal-nav-l { font-size: var(--fs-md); font-weight: 600; padding: 0 4px; }
+.anal-nav-now { border: none; background: none; color: var(--text); font: inherit; font-size: var(--fs-md); font-weight: 600;
+  cursor: pointer; text-decoration: underline dotted var(--text-faint); text-underline-offset: 4px; }
+.anal-delta { margin-top: 4px; font-size: var(--fs-sm); color: var(--text-soft); }
+.anal-delta.is-up { color: var(--success); }
+.anal-books-line { margin-top: 2px; font-size: var(--fs-sm); color: var(--text-soft); }
+.anal-history { margin: 0 0 12px; font-size: var(--fs-sm); color: var(--text-soft); line-height: 1.5; }
+.anal-curve { margin: 0 0 14px; }
+.anal-curve svg { display: block; width: 100%; height: 80px; }
+.anal-curve-area { fill: var(--accent-soft); }
+.anal-curve-line { fill: none; stroke: var(--accent); stroke-width: 2; vector-effect: non-scaling-stroke; stroke-linejoin: round; }
+.anal-curve-x { display: flex; justify-content: space-between; font-size: var(--fs-2xs); color: var(--text-faint); margin-top: 4px; }
+.anal-col[data-go] { cursor: pointer; }
+.anal-col[data-go]:hover .anal-col-fill { opacity: 0.8; }
+.anal-col.is-future .anal-col-x { opacity: 0.45; }
 
 .anal-fc-h { margin-top: 14px; }
 .anal-fc { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; height: 96px; }

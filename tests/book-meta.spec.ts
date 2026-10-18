@@ -11,6 +11,8 @@ async function importAndBack(page: Page) {
   await page.setInputFiles('#file-input', EPUB_PATH);
   await page.waitForSelector('#epub-container iframe', { timeout: 30000 });
   await page.evaluate(() => document.body.classList.remove('immersive'));
+  // El título del lector se pinta un instante DESPUÉS del iframe: leído antes, valía «BookReader».
+  await expect(page.locator('#reader-title')).not.toHaveText('BookReader');
   const fileTitle = (await page.locator('#reader-title').textContent())!.trim();
   await page.locator('#library-btn').click();
   await expect(page.locator('.lib-h1')).toBeVisible();
@@ -68,6 +70,8 @@ test('editar desde el lector y restaurar el original', async ({ page }) => {
   await page.goto('/index.html');
   await page.setInputFiles('#file-input', EPUB_PATH);
   await page.waitForSelector('#epub-container iframe', { timeout: 30000 });
+  // El título del lector se pinta un instante DESPUÉS del iframe: leído antes, valía «BookReader».
+  await expect(page.locator('#reader-title')).not.toHaveText('BookReader');
   const fileTitle = (await page.locator('#reader-title').textContent())!.trim();
   await page.evaluate(() => document.body.classList.remove('immersive'));
   await page.locator('#sidebar-toggle').click();

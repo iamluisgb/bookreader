@@ -4,6 +4,12 @@ import { test, expect } from '@playwright/test';
 // escribe la app (reading-log con reloj inyectado), no escribiendo IndexedDB a mano: así
 // el test también cubre que lo sembrado sea lo que el contador habría contado.
 
+// Reloj fijo en un DOMINGO (P45: la semana es de calendario, de lunes a domingo): así los
+// siete días sembrados hacia atrás caen siempre en «esta semana», corra el test cuando corra.
+test.beforeEach(async ({ page }) => {
+  await page.clock.setFixedTime(new Date('2026-10-18T12:00:00'));
+});
+
 async function seed(page: any) {
   await page.evaluate(async () => {
     const RL: any = await import('/js/reading-log.js');
@@ -40,7 +46,7 @@ test('collect: junta lectura, subrayados y libros del periodo', async ({ page })
   await seed(page);
   const d: any = await page.evaluate(async () => {
     const A: any = await import('/js/analysis.js');
-    const x = await A.collect(7);
+    const x = await A.collect({ range: 'week' });
     return { ms: x.ms, units: x.units, activeDays: x.activeDays, series: x.series.length,
              highlights: x.highlights, books: x.books.map((b: any) => [b.title, b.ms]) };
   });
@@ -66,9 +72,9 @@ test('la pantalla enseña la cifra, el desglose y una columna por día', async (
   await expect(page.locator('.anal-book')).toHaveCount(2);
   await expect(page.locator('.anal-book').first()).toContainText('El infinito en un junco');
 
-  // El rango cambia la ventana: en "Mes" hay 30 columnas y la cifra no baja.
+  // El rango cambia la ventana: en "Mes" hay una columna por día del mes y la cifra no baja.
   await page.click('[data-range="month"]');
-  await expect(page.locator('.anal-col')).toHaveCount(30);
+  await expect(page.locator('.anal-col')).toHaveCount(31);   // octubre, de calendario
   await expect(page.locator('.anal-hero-n')).toHaveText('2 h');
 });
 

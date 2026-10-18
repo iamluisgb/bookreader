@@ -337,8 +337,13 @@ export function unitCount(v) {
 // Agregado de los últimos `days` días naturales, este incluido. Suma entre dispositivos:
 // por eso el merge de F3 puede ser una unión de registros sin tocar estas cuentas.
 export async function summary(days = 7, now = Date.now()) {
-  const from = dayKey(now - (days - 1) * 86400000);
-  const recs = (await getRecords()).filter(r => r.day >= from && r.day <= dayKey(now));
+  return summaryBetween(dayKey(now - (days - 1) * 86400000), dayKey(now));
+}
+
+// Lo mismo entre dos días naturales cualesquiera, ambos incluidos ('YYYY-MM-DD'): los periodos
+// navegables de Análisis (semana pasada, octubre, 2025…), P45.
+export async function summaryBetween(from, to) {
+  const recs = (await getRecords()).filter(r => r.day >= from && r.day <= to);
   const out = { ms: 0, words: 0, units: 0, days: 0, books: {}, byDay: {} };
   for (const rec of recs) {
     for (const [bookId, v] of Object.entries(rec.books || {})) {

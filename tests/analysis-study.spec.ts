@@ -181,7 +181,7 @@ test('por libro: memoria de hoy, «Revisar» lleva a las tarjetas difíciles y l
   await expect(page.locator('#analysis .anal-study .anal-tile').first()).toContainText('2');
   await expect(page.locator('#analysis .anal-mem--big')).toContainText('~2 de 3');
   await page.click('#analysis [data-act="all-books"]');
-  await expect(page.locator('#analysis .anal-scope')).toHaveCount(0);
+  await expect(page.locator('#analysis .anal-scope-t')).toHaveText('Toda la biblioteca');
   await expect(page.locator('#analysis .anal-book')).toHaveCount(2);
 
   // «Revisar» abre el mazo con la tarjeta que cuesta señalada.

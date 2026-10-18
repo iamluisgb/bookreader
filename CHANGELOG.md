@@ -3,6 +3,17 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-10-18 — Análisis navegable: semana pasada, año, estanterías y la historia de cada libro (P45)
+
+Análisis deja de mirar solo «los últimos N días». Los periodos son de calendario (día, semana de lunes
+a domingo, mes, año y todo) y se recorren con flechas. Bajo la cifra, la comparación con el periodo
+anterior, recortado al mismo tramo si el actual va a medias («−54 min que la semana pasada a estas
+alturas»), y nunca contra un periodo sin datos. El año y «todo» pintan una columna por mes que lleva a
+ese mes al tocarla, y cuentan libros empezados y terminados (fecha de terminado guardada desde hoy y
+sincronizada). Un selector arriba filtra todo a una estantería o a un libro; un libro se abre en
+«Todo» con su ritmo, sus semanas, cuándo se terminó o por dónde vas, y la curva de avance. Tocar fuera
+del selector lo cierra. Tests: `analysis-periods.spec.ts` (nuevo) y los de Análisis con el reloj fijo.
+
 ## 2026-10-18 — Desplegar con la app abierta ya no deja botones muertos
 
 Tras desplegar P44, Análisis no se abría en el móvil: la PWA seguía viva con los módulos del
