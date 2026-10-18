@@ -143,6 +143,14 @@ const alMoverse = rafThrottle(() => {
   if (r) callbacks.onMove(r);
 });
 window.addEventListener('resize', alMoverse);
+// En modo scroll el que se desplaza es el contenedor de epub.js (en el documento padre), no el
+// iframe: sus eventos 'scroll' no llegan al listener del iframe, y la capa de selección
+// (fixed, coordenadas de pantalla) se quedaba clavada mientras el texto se iba. El scroll no
+// burbujea, de ahí la captura.
+document.addEventListener('scroll', (e) => {
+  const t = e.target;
+  if (t && t.closest && t.closest('#epub-container')) alMoverse();
+}, { capture: true, passive: true });
 
 export function attach(contents) {
   const doc = contents.document;

@@ -1098,6 +1098,7 @@ export async function load(arrayBuffer, onProgress, bookId = null) {
   // fired yet when returning to an already-rendered (e.g. bookmarked) page,
   // so the bookmark button can read a stale CFI without this.
   rendition.on('rendered', () => {
+    wireScrollTracking();
     if (pinnedCfi == null) {
       try {
         const loc = rendition.currentLocation();
@@ -1110,6 +1111,23 @@ export async function load(arrayBuffer, onProgress, bookId = null) {
 
   if (claimSeq !== mine) active = false;   // otro lector tomó la pantalla mientras cargaba
   return book;
+}
+
+// En modo scroll epub.js no emite 'relocated' al desplazarse DENTRO de un capítulo (solo al
+// cambiar de sección), así que la posición, el progreso y el ancla de los reflujos se quedaban
+// en el inicio del capítulo: abrir el panel del agente (cambia el ancho) devolvía al principio
+// y al reabrir el libro se perdía lo leído. Seguimos el scroll del contenedor y pedimos a
+// epub.js que reporte la ubicación (debounced: una vez que el dedo/rueda se calma).
+function wireScrollTracking() {
+  const sc = document.querySelector('#epub-container .epub-container');
+  if (!sc || sc.dataset.brScroll) return;
+  sc.dataset.brScroll = '1';
+  let timer = 0;
+  sc.addEventListener('scroll', () => {
+    if (getReadingMode() !== 'scroll' || !rendition || pinnedCfi != null) return;
+    clearTimeout(timer);
+    timer = setTimeout(() => { try { rendition.reportLocation(); } catch (e) { /* sin vista aún */ } }, 150);
+  }, { passive: true });
 }
 
 // Entrada de capítulo: un fundido corto al renderizarse una sección nueva (saltar desde

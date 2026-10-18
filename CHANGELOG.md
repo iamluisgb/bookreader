@@ -3,6 +3,16 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-10-18 — Modo scroll: posición y selección siguen al scroll
+
+Dos fallos del mismo origen: en scroll el que se desplaza es el contenedor de epub.js, no el
+iframe. (1) epub.js no emite `relocated` al desplazarse dentro del capítulo, así que la posición
+guardada era el inicio del capítulo: abrir el panel del agente (cambia el ancho) devolvía al
+principio y reabrir el libro perdía lo leído. `wireScrollTracking` pide `reportLocation()` al
+parar el scroll. (2) La capa de selección táctil (fixed) solo escuchaba el scroll del iframe y
+se quedaba clavada; ahora escucha también el del contenedor. Tests: `scroll-resize.spec.ts`,
+`scroll-selection.spec.ts`.
+
 ## 2026-10-18 — Modo scroll: el capítulo solo cambia a propósito
 
 Leyendo EPUB técnicos en scroll, un toque lateral saltaba de capítulo (epub.js solo desplaza
