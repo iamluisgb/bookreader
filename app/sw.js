@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bookreader-v193';
+const CACHE_NAME = 'bookreader-v194';
 // Ficheros compartidos con la app (share target) a la espera de que la app los recoja.
 const INBOX = 'bookreader-inbox';
 const ASSETS = [
@@ -258,7 +258,10 @@ async function precache(cache, urls, { soloSiFalta = false } = {}) {
   await Promise.all(urls.map(async (url) => {
     try {
       if (soloSiFalta && await cache.match(url)) return;
-      await cache.add(url);
+      // `reload`: descargar del servidor, no de la caché HTTP del navegador. Con el «Browser
+      // Cache TTL» de 4 h de la zona, una caché versionada NUEVA se llenaba con el JS VIEJO
+      // y subir CACHE_NAME no servía de nada.
+      await cache.add(new Request(url, { cache: 'reload' }));
     } catch { fallidos.push(url); }
   }));
   if (fallidos.length) console.warn('[sw] no se pudieron precachear:', fallidos);
@@ -296,7 +299,11 @@ function isImmutableAsset(pathname) {
 
 async function networkFirst(req, cache) {
   try {
-    const res = await fetch(req);
+    // `no-cache`: revalidar SIEMPRE con el servidor (un 304 si no ha cambiado). Sin esto, el
+    // navegador servía el código desde su caché HTTP: en el dominio propio la zona de Cloudflare
+    // pisa las cabeceras con un «Browser Cache TTL» de 4 h, y tras un despliegue los móviles
+    // seguían horas con el JS viejo mientras la etiqueta de versión ya decía la nueva.
+    const res = await fetch(req, { cache: 'no-cache' });
     if (res && res.ok) cache.put(req, res.clone());
     return res;
   } catch {

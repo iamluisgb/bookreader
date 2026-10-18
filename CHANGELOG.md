@@ -3,6 +3,16 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-10-18 — Los despliegues llegan al momento aunque Cloudflare cachee 4 h
+
+En `bookreader.raiatech.com` la zona de Cloudflare aplica un «Browser Cache TTL» de 4 h a JS y
+CSS (pisa las cabeceras: en `pages.dev` van con `max-age=0`). El service worker pedía el código
+con `fetch(req)` y precacheaba con `cache.add(url)`, las dos vía caché HTTP: tras un despliegue
+los dispositivos seguían hasta 4 h con el JS viejo —incluso tras subir CACHE_NAME, porque la
+caché nueva se llenaba con lo viejo— mientras la etiqueta de versión (`build.json`, sin caché)
+decía la nueva. Ahora network-first usa `cache: 'no-cache'` (revalida, 304 si no cambió) y el
+precache `cache: 'reload'`.
+
 ## 2026-10-18 — Modo scroll: el lateral ya no desplaza
 
 A petición del usuario: en scroll se avanza deslizando, y un toque en cualquier sitio del texto
