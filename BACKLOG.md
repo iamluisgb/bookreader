@@ -2706,6 +2706,23 @@ frase de recuperación y diciéndolo claro; no se mitiga guardando la clave noso
 
 ## 🔧 Técnico (calidad / seguridad / perf / bugs)
 
+### TEC25 — Cloudflare: que `bookreader.raiatech.com` respete las cabeceras de caché · `S`
+
+**El caso.** La zona `raiatech.com` tiene el «Browser Cache TTL» por defecto (4 h, verificado por la
+API: `14400`), que **pisa** las cabeceras de la app: en el dominio propio JS y CSS llegan con
+`max-age=14400`; en `pages.dev`, con `max-age=0`. El 2026-10-18 eso tuvo a la tablet y al móvil
+horas con JS viejo mientras la etiqueta de versión decía la nueva. El service worker ya lo esquiva
+(`17c9a6a`: network-first con `cache: 'no-cache'`, precache con `reload`), pero la PRIMERA visita
+de alguien nuevo, sin service worker, aún puede llevarse JS de hasta 4 h tras un despliegue.
+
+**Qué hacer (en el panel; el token del `.env` no tiene permiso de Cache Rules ni de DNS):**
+Caching → Cache Rules → regla «BookReader: respetar cabeceras» → *Hostname equals
+`bookreader.raiatech.com`* → **Browser TTL: Respect origin TTL**. No cambiar el ajuste de toda la
+zona sin ver antes qué otros sitios cuelgan de ella.
+
+**Hecho cuando** `curl -sI https://bookreader.raiatech.com/app/js/app.js` devuelve
+`cache-control: public, max-age=0, must-revalidate`.
+
 ### TEC1 — Revisar el lector PDF · **✓** _(ex T11)_
 **Hecho** (ver CHANGELOG). Desbloquea la épica [PDF — paridad de features](#-pdf--paridad-de-features-con-epub).
 Antes 0 cobertura E2E; ahora [`tests/pdf.spec.ts`](tests/pdf.spec.ts) con fixture propia (`tests/test.pdf`).
