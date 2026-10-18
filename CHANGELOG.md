@@ -3,6 +3,16 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-10-18 — Modo scroll: segunda vuelta tras probarlo en la tablet
+
+Seguían los dos fallos. (1) El reflujo se ancla al destino del último SALTO (posición restaurada
+al abrir, índice) mientras `jumpSeq === navSeq`, y desplazarse en scroll no movía `navSeq`:
+abrir el agente devolvía al punto del salto, antes de lo que leías. Ahora un `wheel`,
+`touchmove` o tecla de scroll en el lector avanza `navSeq`. (2) La capa de selección se
+repintaba solo por eventos de scroll/resize; ahora comprueba cada frame, con selección activa,
+que sigue sobre el texto (`seguir()` en `touch-select.js`), lo mueva lo que lo mueva. Test:
+caso «tras un salto» de `scroll-resize.spec.ts`.
+
 ## 2026-10-18 — Modo scroll: posición y selección siguen al scroll
 
 Dos fallos del mismo origen: en scroll el que se desplaza es el contenedor de epub.js, no el

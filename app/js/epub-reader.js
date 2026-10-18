@@ -1039,6 +1039,16 @@ export async function load(arrayBuffer, onProgress, bookId = null) {
       medirSinEscala(iframe.parentElement);                   // .epub-view
       medirSinEscala(iframe.closest('.epub-container'));
     }
+    // Scroll del lector en modo scroll: mover el texto con el dedo, la rueda o el teclado es
+    // navegar. Sin esto el ancla del último SALTO (posición restaurada, índice) seguía vigente
+    // (`jumpSeq === navSeq`) y al abrir un panel el lector volvía a ese punto en vez de a lo
+    // que estaba leyendo.
+    const alScrollear = () => { if (getReadingMode() === 'scroll') navSeq++; };
+    doc.addEventListener('wheel', alScrollear, { passive: true });
+    doc.addEventListener('touchmove', alScrollear, { passive: true });
+    doc.addEventListener('keydown', (e) => {
+      if (['PageDown', 'PageUp', 'ArrowDown', 'ArrowUp', ' ', 'Home', 'End'].includes(e.key)) alScrollear();
+    });
     // Also inject theme directly into the content document
     injectThemeIntoContent(contents);
     injectEndPanel(contents);

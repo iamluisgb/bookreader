@@ -82,6 +82,31 @@ function hitHandle(x, y) {
 
 function setActive(contents, range) {
   active = { contents, doc: contents.document, range, anchor: null };
+  seguir();
+}
+
+// Mientras hay selección, comprueba cada frame que la capa sigue sobre el texto y la repinta
+// si el texto o el iframe se han movido, venga de donde venga: scroll (también el asíncrono
+// del compositor en táctil), un reflujo, la barra de acciones al aparecer, un panel. Los
+// eventos de scroll/resize no cubren todos esos caminos y el resaltado se quedaba donde estaba
+// mientras el texto se iba. Una sola medida por frame y solo con selección activa.
+let siguiendo = 0, huella = '';
+function huellaActual() {
+  if (!active || !active.range) return '';
+  const b = active.range.getBoundingClientRect();
+  const f = frameTransform();
+  return [b.top, b.left, b.width, b.height, f.x, f.y, f.sx, f.sy].map(n => Math.round(n * 10)).join();
+}
+function seguir() {
+  if (siguiendo) return;
+  huella = huellaActual();
+  const tick = () => {
+    if (!active || !active.range) { siguiendo = 0; return; }
+    const h = huellaActual();
+    if (h !== huella) { huella = h; draw(); const r = screenRect(active.range); if (r) callbacks.onMove(r); }
+    siguiendo = requestAnimationFrame(tick);
+  };
+  siguiendo = requestAnimationFrame(tick);
 }
 
 function updateEndpoint(which, x, y) {
