@@ -50,8 +50,8 @@ test('estantería → chip Repasar hoy → sesión completa con persistencia SRS
   await expect(overlay.locator('.study-a')).toHaveText(ANSWERS[first]);
   // ST2 · Dos botones por defecto (Otra vez / Bien); las cuatro notas en Ajustes.
   await expect(overlay.locator('.study-grade')).toHaveCount(2);
-  // Los botones anuncian el intervalo previsto EN PALABRAS (tarjeta nueva, FSRS: bien = 3 días).
-  await expect(overlay.locator('.study-grade.is-good small')).toHaveText('3 días');
+  // Los botones anuncian el intervalo previsto EN PALABRAS (tarjeta nueva, FSRS-6: bien = 2 días).
+  await expect(overlay.locator('.study-grade.is-good small')).toHaveText('2 días');
   await overlay.locator('.study-grade.is-good').click();
 
   // Tarjeta 2 por teclado: espacio voltea, "1" = otra vez → se re-encola…
@@ -77,7 +77,7 @@ test('estantería → chip Repasar hoy → sesión completa con persistencia SRS
   const decks = await page.evaluate(async () => (await import('/js/ai/db.js') as any).getAllDecks());
   const byFront = Object.fromEntries(decks[0].cards.map((c: any) => [c.front, c]));
   expect(byFront[first].srs.reps).toBe(1);
-  expect(byFront[first].srs.due).toBe(today + 3);   // FSRS-5: nueva + bien = 3 días
+  expect(byFront[first].srs.due).toBe(today + 2);   // FSRS-6: nueva + bien = S0 2,31 → 2 días
   expect(byFront[second].srs.reps).toBe(1);
   expect(byFront[second].srs.lapses).toBe(1);
   expect(byFront['futura'].srs.due).toBe(today + 5);

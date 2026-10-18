@@ -32,9 +32,9 @@ test('FSRS: ciclo de vida de una tarjeta y fallo (lapse)', async ({ page }) => {
     };
   }, T0);
 
-  expect(r.first.interval).toBe(3);                       // FSRS-5: S0(bien) ≈ 3,17 días
+  expect(r.first.interval).toBe(2);                       // FSRS-6: S0(bien) ≈ 2,31 días
   expect(r.first.reps).toBe(1);
-  expect(r.first.dueDelta).toBe(3);
+  expect(r.first.dueDelta).toBe(2);
   expect(r.first.hasDSR).toBe(true);
   expect(r.grows).toBe(true);
   expect(r.lapse).toEqual({ reps: 0, interval: 0, lapses: 1, dueIsToday: true, smaller: true });
@@ -85,7 +85,7 @@ test('isDue/dueCount/deckStats y previews de intervalo en palabras', async ({ pa
   expect(r.due).toBe(3);
   expect(r.dueFlags).toEqual([true, true, false, true]);
   expect(r.stats).toEqual({ total: 4, nuevas: 1, aprendiendo: 1, maduras: 2, due: 3, suspendidas: 0 });
-  expect(r.prev).toEqual({ again: 0, hard: 1, good: 3, easy: 16 });   // nueva: FSRS-5 por defecto
+  expect(r.prev).toEqual({ again: 0, hard: 1, good: 2, easy: 8 });    // nueva: FSRS-6 por defecto
   expect(r.labels).toEqual(['ahora', 'mañana', '6 días', '2 meses', '1.1 años']);
   expect(r.capped).toBe(365);                             // techo de un año
 });
@@ -198,4 +198,28 @@ test('buildQueue: tope de nuevas, barajado y hermanas separadas', async ({ page 
   expect(r.sinTopeLen).toBe(35);
   expect(r.barajada).toBe(true);
   expect(r.adyacentes).toBe(0);            // ninguna pareja del mismo pasaje seguida
+});
+
+// P44 · FSRS-6 contrastado con fsrs-rs (el motor de Anki, vía fsrs-browser 6.6): mismos
+// parámetros de serie y las mismas transiciones de estabilidad y dificultad. Valores sacados
+// de `Fsrs.nextStates(S, D, 0.9, días)` del WebAssembly vendorizado.
+test('FSRS-6: las transiciones coinciden con fsrs-rs', async ({ page }) => {
+  await page.goto('/index.html');
+  const out = await page.evaluate(async () => {
+    const S: any = await import('/js/ai/srs.js');
+    const g = { again: 1, hard: 2, good: 3, easy: 4 } as any;
+    const cases: [number | null, number | null, number, string][] = [
+      [null, null, 0, 'good'], [3, 5, 0, 'hard'], [3, 5, 3, 'good'], [10, 7, 12, 'again'],
+      [50, 2, 40, 'easy'], [0.5, 6, 0, 'again'], [200, 4, 500, 'good'],
+    ];
+    return cases.map(([s, d, el, r]) => S.nextMemory(s ? { stability: s, difficulty: d } : null, g[r], el));
+  });
+  const ref = [
+    [2.3065, 2.1181], [3, 6.666], [11.0758, 4.9902], [1.3931, 8.9991],
+    [250.9347, 1.0], [0.1858, 8.6705], [758.9649, 3.9912],
+  ];
+  out.forEach((m: any, i: number) => {
+    expect(m.stability).toBeCloseTo(ref[i][0], 3);
+    expect(m.difficulty).toBeCloseTo(ref[i][1], 3);
+  });
 });

@@ -875,6 +875,9 @@ body.has-taskchip .ai-taskchip.is-study { bottom: 74px; }
    apaga en vez de tacharse — el texto hay que poder leerlo para decidir si arreglarla. */
 .fc-item.is-suspended { background: var(--surface-2); }
 .fc-item.is-suspended .fc-item-fields { opacity: 0.5; }
+/* Tarjeta que cuesta (P43 F2): se llega desde «Revisar» de Análisis. Fondo teñido, nunca una
+   barra lateral de acento. */
+.fc-item.is-problem { background: color-mix(in srgb, var(--warning) 12%, var(--surface-1)); }
 .fc-item-fields { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
 .fc-front, .fc-back { font-size: var(--fs-md); line-height: 1.45; border-radius: var(--r-sm); padding: 2px 4px; }
 .fc-front { font-weight: 600; }
@@ -1620,7 +1623,7 @@ body.ai-open #sync-badge { right: calc(var(--ai-panel-width) + 14px); }
 .anal-hero-n { font-size: 48px; font-weight: 700; letter-spacing: -0.03em; line-height: 1.05; }
 .anal-hero-l { margin-top: 4px; font-size: var(--fs-sm); color: var(--text-soft); }
 
-.anal-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(92px, 1fr)); gap: 8px; }
+.anal-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(76px, 1fr)); gap: 8px; }
 .anal-tile { padding: 10px 12px; border-radius: var(--r-md); background: var(--surface-2); }
 .anal-tile-l { font-size: var(--fs-2xs); color: var(--text-soft); }
 .anal-tile-v { font-size: var(--fs-xl); font-weight: 600; font-variant-numeric: tabular-nums; }
@@ -1634,7 +1637,7 @@ body.ai-open #sync-badge { right: calc(var(--ai-panel-width) + 14px); }
    reparte el ancho); la BARRA se acota a 24px dentro de ella y el resto de la banda es
    aire. Si se acotara la columna, siete barras se amontonaban a la izquierda dejando
    media gráfica vacía. */
-.anal-col { flex: 1; min-width: 0; height: 100%;
+.anal-col { flex: 1; min-width: 0; height: 100%; position: relative; padding-top: 16px; box-sizing: border-box;
   display: flex; flex-direction: column; justify-content: flex-end; gap: 5px; }
 .anal-col:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--r-xs); }
 .anal-col-track { flex: 1; display: flex; align-items: flex-end; }
@@ -1643,6 +1646,11 @@ body.ai-open #sync-badge { right: calc(var(--ai-panel-width) + 14px); }
   border-radius: var(--r-xs) var(--r-xs) 0 0;     /* punta redondeada, base cuadrada sobre la línea */
 }
 .anal-col-top { font-size: var(--fs-2xs); color: var(--text-soft); white-space: nowrap; text-align: center; }
+/* La cifra del día más alto va FUERA del flujo: si ocupara sitio en su columna, la barra del
+   máximo saldría más baja que otra de igual valor. Todas las columnas reservan el mismo hueco
+   arriba (padding-top) para ella. */
+.anal-col-top { position: absolute; top: 0; left: 50%; transform: translateX(-50%); }
+.anal-tile-sub { font-size: var(--fs-xs); font-weight: 400; color: var(--text-soft); }
 .anal-col-x { font-size: var(--fs-2xs); color: var(--text-faint, var(--text-soft)); text-align: center; height: 12px; }
 .anal-cols { border-bottom: 1px solid var(--border-soft); padding-bottom: 0; }
 
@@ -1665,6 +1673,60 @@ body.ai-open #sync-badge { right: calc(var(--ai-panel-width) + 14px); }
   gap: 8px; padding: 28px 12px; color: var(--text-soft); }
 .anal-empty-h { font-size: var(--fs-lg); font-weight: 600; color: var(--text); margin: 0; }
 .anal-empty-p { font-size: var(--fs-sm); margin: 0; max-width: 340px; line-height: 1.5; }
+
+/* P43 · Estudio, memoria por libro, lo que viene y ajuste del algoritmo. Mismo lenguaje que
+   la lectura: una cifra que lidera por bloque, baldosas y columnas; secciones separadas por
+   aire y una línea fina, sin tarjetas dentro de la tarjeta. */
+.anal-sec { margin-top: 22px; }
+.anal-sec + .anal-sec, .anal-books + .anal-sec { padding-top: 18px; border-top: 1px solid var(--border-soft); }
+.anal-sec-h { margin: 0 0 10px; font-size: var(--fs-md); font-weight: 600; }
+.anal-tabs + .anal-sec, .anal-scope + .anal-sec { margin-top: 0; }
+.anal-hero--sm .anal-hero-n { font-size: var(--fs-3xl); }
+.anal-muted { margin: 6px 0 0; font-size: var(--fs-sm); color: var(--text-soft); line-height: 1.5; }
+.anal-faint { color: var(--text-faint); font-weight: 400; }
+
+.anal-ret, .anal-calib { margin-top: 14px; padding: 12px 14px; border-radius: var(--r-md); background: var(--surface-2); }
+.anal-ret-h { font-size: var(--fs-xs); font-weight: 600; color: var(--text-soft); }
+.anal-ret-row { display: flex; align-items: baseline; gap: 10px; margin-top: 2px; }
+.anal-ret-n { font-size: var(--fs-2xl); font-weight: 700; font-variant-numeric: tabular-nums; }
+.anal-ret-goal { font-size: var(--fs-sm); color: var(--text-soft); }
+.anal-ret-split { display: flex; gap: 14px; font-size: var(--fs-sm); color: var(--text-soft); }
+.anal-ret-split b { color: var(--text); font-variant-numeric: tabular-nums; }
+.anal-calib p { margin: 4px 0 0; font-size: var(--fs-sm); line-height: 1.5; }
+
+.anal-book[data-book] { cursor: pointer; border-radius: var(--r-sm); }
+.anal-book[data-book]:hover { background: var(--surface-2); }
+.anal-book[data-book]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.anal-more { margin-top: 10px; }
+.anal-mem { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; margin-top: 4px; }
+.anal-mem-bar { flex: 0 0 64px; height: 5px; border-radius: var(--r-pill); background: var(--surface-3); overflow: hidden; }
+.anal-mem-fill { display: block; height: 100%; background: var(--accent); border-radius: inherit; }
+.anal-mem-l { font-size: var(--fs-xs); color: var(--text-soft); }
+.anal-mem--big .anal-mem-bar { flex-basis: 100%; height: 8px; }
+.anal-mem--big .anal-mem-l { font-size: var(--fs-md); color: var(--text); }
+.anal-fix { border: none; background: none; padding: 0; font: inherit; font-size: var(--fs-xs); font-weight: 600;
+  color: var(--warning); cursor: pointer; }
+.anal-fix:hover { text-decoration: underline; }
+
+.anal-scope { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; margin-bottom: 16px; }
+.anal-scope-back { margin: 0; }
+.anal-scope-t { flex: 1; min-width: 0; font-size: var(--fs-lg); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.anal-fc-h { margin-top: 14px; }
+.anal-fc { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; height: 96px; }
+.anal-fc-col { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; }
+.anal-fc-track { flex: 1; width: 100%; display: flex; align-items: flex-end; justify-content: center; }
+.anal-fc-bar { width: 60%; max-width: 24px; border-radius: var(--r-xs) var(--r-xs) 0 0; background: var(--accent-soft); }
+.anal-fc-n { font-size: var(--fs-2xs); color: var(--text-soft); font-variant-numeric: tabular-nums; height: 12px; }
+.anal-fc-day { font-size: var(--fs-2xs); color: var(--text-faint); text-transform: capitalize; white-space: nowrap; }
+.anal-warn { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; margin-top: 14px; padding: 10px 12px;
+  border-radius: var(--r-md); font-size: var(--fs-sm); line-height: 1.5;
+  background: color-mix(in srgb, var(--warning) 14%, var(--surface-1)); }
+.anal-warn--ok { background: var(--surface-2); color: var(--text-soft); }
+
+.anal-fsrs p { margin: 0 0 6px; font-size: var(--fs-sm); line-height: 1.5; }
+.anal-fsrs-bar { display: block; width: 100%; max-width: 240px; flex: none; }
+.anal-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 
 @media (max-width: 600px) {
   .anal-card { border-radius: var(--r-lg) var(--r-lg) 0 0; max-height: 92vh; }

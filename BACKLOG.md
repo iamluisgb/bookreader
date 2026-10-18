@@ -1424,7 +1424,10 @@ existir para que la feature se entienda, el bug probablemente sea de la feature.
 
 ---
 
-### P31 — Análisis con historia: escope y rangos · señal-driven · `S`
+### P31 — Análisis con historia: escope y rangos · señal-driven · `S` · **1 y 3 ✓ con P44 (2026-10-18)**
+
+*Entregados con [P44](#p44--análisis-del-estudio-retención-real-memoria-por-libro-carga-y-fsrs-personal--m---entregada-2026-10-18--f1f5):* el tope de 5 libros con «Ver todos» y el filtro por libro al tocar
+su fila. **Queda el punto 2** (Año/Todo), con su misma condición.
 
 **Seguimiento de P25** (el registro ya guarda y sincroniza ~400 días; la pantalla enseña máximo
 30). No es un panel de filtros: el rango sigue siendo el ÚNICO interruptor, y lo que se añade es
@@ -1933,7 +1936,9 @@ redactada por el lector ataca esa causa.
 - Sin API key no hay juez, así que no hay `mine` ni experimento (`arm: null`). La reformulación sin
   validar no se guarda en la tarjeta.
 
-**F3 · Contar lo que compone · `S`**
+**F3 · Contar lo que compone · `S`** · *en parte con P44 (2026-10-18): Análisis separa «Practicado»
+(escrito o ejercicio) de «Solo girar» y enseña la calibración nota propia/veredicto. Falta «fallo con
+corrección aceptada», que depende de F2.*
 - **Ciclos válidos por libro y semana**, separados de la lectura, en la pantalla de análisis
   ([`analysis.js`](app/js/analysis.js), P25): *intento escrito con veredicto* y *fallo con
   corrección aceptada*. Los repasos de solo girar se cuentan aparte, no se suman.
@@ -2135,6 +2140,34 @@ básicas para lo fallado, que vuelven con FSRS.
 - Tarjetas de lo fallado al mazo del libro; el intento al análisis (P42 F3, «ciclos válidos»).
 
 **F4+ · Los demás tipos**, en el orden de la tabla, cada uno con su contrato.
+
+### P44 — Análisis del estudio: retención real, memoria por libro, carga y FSRS personal · `M` · **✓ entregada (2026-10-18)** · F1–F5
+
+Investigación y propuesta: [`docs/INVESTIGACION_ANALISIS.md`](docs/INVESTIGACION_ANALISIS.md). La
+pantalla de Análisis (P25) contaba solo lectura; el estudio estaba repartido entre el cierre de sesión
+y la biblioteca, y medido con un «% a la primera» que es rendimiento, no memoria. Ahora responde
+cuatro preguntas con datos que ya existían (store `attempts` de P42 F1 y `card.srs`):
+
+- **F1 · Estudio:** tiempo de repaso (latencias con tope), repasos, días, racha, **retención real**
+  (criterio de Anki: primera nota del día de tarjetas con intervalo previo ≥ 1, jóvenes/maduras,
+  frente al 90 %; valla de 30 repasos) y practicado frente a solo girar.
+- **F2 · Por libro:** «Recuerdas ~k de n tarjetas» = Σ retrievabilidad (el «conocimiento estimado»
+  de Anki), tarjetas que cuestan (≥ 3 fallos) con «Revisar» que abre el mazo señalándolas, y la
+  fila filtra la pantalla al libro con «Repasar este libro». La biblioteca usa la misma cifra
+  (sustituye al «dominio» ponderado por intervalo de T2).
+- **F3 · Lo que viene:** vencidas (+ nuevas aparte), previsión de 7 días, carga media (Σ 1/intervalo)
+  y, si lo que viene supera un 30 % el ritmo habitual, «Pausar nuevas hoy» (solo ese día).
+- **F4 · Ajustado a tu memoria:** FSRS-5 → **FSRS-6** (contrastado con fsrs-rs) y optimizador de
+  fsrs-rs en WebAssembly (`vendor/fsrs-browser-6.6.0`, en un worker, sin hilos ni COOP/COEP). Se
+  ofrece desde 400 repasos de historias completas; enseña la mejora de predicción y los repasos de
+  los próximos 30 días con los de serie y con los tuyos, y solo aplica si se acepta.
+- **F5 · Calibración:** en respuestas escritas juzgadas (≥ 20), «te pones bien en el X %, el agente
+  las da por buenas en el Y %».
+
+**Fuera, a propósito:** el calendario por retención del día del cierre de sesión (la retención de un
+día es ruido; `study_log` queda solo con `n` para la meta), comparativas, histogramas de D/S y la
+retrievabilidad media. **Queda:** medir con uso real si alguien llega a los 400 repasos y si acepta
+sus parámetros; el tamaño del optimizador (338 KB de wasm) solo se descarga al pulsar el botón.
 
 ### P24 — Higiene de la sesión de repaso · **✓ entregada** (2026-08-01) · F1–F4
 

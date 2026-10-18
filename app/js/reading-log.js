@@ -342,9 +342,12 @@ export async function summary(days = 7, now = Date.now()) {
   const out = { ms: 0, words: 0, units: 0, days: 0, books: {}, byDay: {} };
   for (const rec of recs) {
     for (const [bookId, v] of Object.entries(rec.books || {})) {
-      const b = out.books[bookId] || (out.books[bookId] = { ms: 0, words: 0, units: 0 });
+      const b = out.books[bookId] || (out.books[bookId] = { ms: 0, words: 0, units: 0, byDay: {} });
       const n = unitCount(v);
       b.ms += v.ms; b.words += v.words; b.units += n;
+      // Serie del libro (P44: Análisis filtrado a un libro, P31 punto 3).
+      const bd = b.byDay[rec.day] || (b.byDay[rec.day] = { ms: 0, units: 0 });
+      bd.ms += v.ms; bd.units += n;
       const d = out.byDay[rec.day] || (out.byDay[rec.day] = { ms: 0, words: 0, units: 0 });
       d.ms += v.ms; d.words += v.words; d.units += n;
       out.ms += v.ms; out.words += v.words; out.units += n;

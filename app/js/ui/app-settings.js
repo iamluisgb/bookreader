@@ -824,7 +824,7 @@ function saveAgentForm(content, baseUrl, model) {
 
 function appHtml() {
   const lang = getLang();
-  const limit = Study.newLimit();
+  const limit = Study.configuredNewLimit();
   return `<div class="appset-section">
     <h3 class="appset-h3">${t('Aplicación')}</h3>
     <label class="appset-label" for="appset-lang">${lang === 'es' ? `${t('Idioma')} · Language` : t('Idioma')}</label>

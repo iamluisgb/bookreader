@@ -49,33 +49,62 @@ export function dueCount(cards, now = Date.now()) {
   return (cards || []).filter(c => isDue(c, now)).length;
 }
 
-// ---- FSRS-5 (P19) ------------------------------------------------------------------
+// ---- FSRS-6 (P19; FSRS-5 → FSRS-6 con P44) -------------------------------------------
 // Sustituye a SM-2: con parámetros por defecto y sin historial ya predice el recuerdo mejor
 // que SM-2 en el 99,5 % de los usuarios y pide un 20-30 % menos de repasos para la misma
 // retención (ver BACKLOG · P19). Modelo DSR: cada tarjeta guarda su ESTABILIDAD (días hasta
 // que la probabilidad de recordarla baja al 90 %) y su DIFICULTAD (1–10). El intervalo es la
-// estabilidad: con retención objetivo 0,9 y esta curva, I = S.
+// estabilidad: con retención objetivo 0,9, I = S (la curva está calibrada para eso).
+//
+// FSRS-6 añade dos parámetros a FSRS-5: el 20, la caída de la curva del olvido, que deja de
+// ser fija (−0,5) y se aprende de cada persona; y el 19, que amortigua los repasos del mismo
+// día. Se cambió para poder usar los parámetros PERSONALES que calcula el optimizador
+// (`fsrs-params.js`), que es FSRS-6. Las fórmulas están contrastadas con fsrs-rs (el motor de
+// Anki) en tests/srs.spec.ts. La estabilidad y la dificultad significan lo mismo en las dos
+// versiones: las tarjetas ya programadas siguen sin migración.
 //
 // Compatibilidad: el estado sigue siendo `{reps, lapses, interval, due, lastReview}` (+ `ease`
 // heredado, que ya no se usa) y se AÑADEN `stability` y `difficulty`. Una tarjeta programada
 // con SM-2 se convierte al vuelo en su primer repaso: la estabilidad sale de su intervalo
 // (lo que el SM-2 ya había aprendido de ella) y la dificultad, de su ease.
-const W = [0.40255, 1.18385, 3.173, 15.69105, 7.1949, 0.5345, 1.4604, 0.0046, 1.54575, 0.1192,
-  1.01925, 1.9395, 0.11, 0.29605, 2.2698, 0.2315, 2.9898, 0.51655, 0.6621];
-const DECAY = -0.5;
-const FACTOR = 19 / 81;
+export const DEFAULT_PARAMETERS = Object.freeze([0.212, 1.2931, 2.3065, 8.2956, 6.4133, 0.8334,
+  3.0194, 0.001, 1.8722, 0.1666, 0.796, 1.4835, 0.0614, 0.2629, 1.6483, 0.6014, 1.8729, 0.5425,
+  0.0912, 0.0658, 0.1542]);
+let W = DEFAULT_PARAMETERS;
 const G = { again: 1, hard: 2, good: 3, easy: 4 };
 const clampD = (d) => Math.min(10, Math.max(1, d));
 
-export function retrievability(elapsedDays, stability) {
-  return Math.pow(1 + FACTOR * Math.max(0, elapsedDays) / stability, DECAY);
+// Parámetros en uso. Solo se aceptan 21 números finitos: cualquier otra cosa (un fichero de
+// sync viejo, un valor a medio escribir) deja los de serie, que nunca programan mal.
+export function setParameters(w) {
+  W = Array.isArray(w) && w.length === 21 && w.every(Number.isFinite) ? w.slice() : DEFAULT_PARAMETERS;
 }
-const initS = (g) => Math.max(W[g - 1], 0.1);
-const initD = (g) => clampD(W[4] - Math.exp(W[5] * (g - 1)) + 1);
+export function parameters() { return W; }
+export function usingDefaults() { return W === DEFAULT_PARAMETERS; }
+
+// Ejecuta `fn` con otros parámetros y restaura los de antes: para comparar los de serie con
+// los personales sobre la misma historia sin tocar el estado global (todo es síncrono).
+export function withParameters(w, fn) {
+  const prev = W;
+  setParameters(w);
+  try { return fn(); } finally { W = prev; }
+}
+
+const decay = () => -W[20];
+const factor = () => Math.pow(0.9, 1 / decay()) - 1;
+
+export function retrievability(elapsedDays, stability) {
+  return Math.pow(1 + factor() * Math.max(0, elapsedDays) / stability, decay());
+}
+const initS = (g) => Math.max(W[g - 1], 0.001);
+const rawInitD = (g) => W[4] - Math.exp(W[5] * (g - 1)) + 1;
+const initD = (g) => clampD(rawInitD(g));
 function nextD(d, g) {
   const delta = -W[6] * (g - 3);
   const dp = d + delta * (10 - d) / 9;                    // cambio lineal amortiguado
-  return clampD(W[7] * initD(4) + (1 - W[7]) * dp);       // reversión a la media
+  // Reversión a la media hacia la dificultad inicial de «fácil» SIN acotar (como fsrs-rs):
+  // acotada a 1 se desviaba unas milésimas en cada repaso.
+  return clampD(W[7] * rawInitD(4) + (1 - W[7]) * dp);
 }
 function recallS(d, s, r, g) {
   const hard = g === 2 ? W[15] : 1;
@@ -84,11 +113,17 @@ function recallS(d, s, r, g) {
 }
 function forgetS(d, s, r) {
   const f = W[11] * Math.pow(d, -W[12]) * (Math.pow(s + 1, W[13]) - 1) * Math.exp((1 - r) * W[14]);
-  return Math.min(f, s);
+  // Tras un fallo la estabilidad no puede quedar por encima de la que daría el repaso de
+  // corto plazo con «otra vez» (cota de FSRS-6).
+  return Math.min(f, s / Math.exp(W[17] * W[18]));
 }
 // Repaso en el MISMO día (el «otra vez» re-encolado en la sesión): la curva no ha tenido
-// tiempo de caer, así que la estabilidad se ajusta por el término de corto plazo de FSRS-5.
-const shortS = (s, g) => s * Math.exp(W[17] * (g - 3 + W[18]));
+// tiempo de caer, así que la estabilidad se ajusta por el término de corto plazo. En FSRS-6
+// solo «otra vez» la baja en el mismo día, y cuanto más estable, menos sube.
+function shortS(s, g) {
+  const inc = Math.exp(W[17] * (g - 3 + W[18])) * Math.pow(s, -W[19]);
+  return s * (g >= 2 ? Math.max(inc, 1) : inc);
+}
 
 // Estado FSRS de partida para una tarjeta ya programada con SM-2.
 function migrate(s) {
@@ -100,20 +135,34 @@ function migrate(s) {
   };
 }
 
+// Estabilidad de una tarjeta para leerla (no para programarla): la suya, o la que tendría
+// migrada desde SM-2. null = nueva (sin memoria que medir).
+export function stabilityOf(srs) {
+  if (!srs || !(srs.reps > 0 || srs.stability || srs.lastReview)) return null;
+  return migrate({ ...srs }).stability || null;
+}
+
+// Siguiente estado de memoria {S, D} desde {S, D} (null = tarjeta nueva) tras `elapsed` días.
+// Es la transición pura de FSRS, sin intervalos ni contadores: la usan `grade` y el
+// optimizador para repasar una historia con otros parámetros.
+export function nextMemory(state, g, elapsed) {
+  if (!state || !state.stability) return { stability: initS(g), difficulty: initD(g) };
+  const { stability: s, difficulty: d } = state;
+  if (elapsed === 0) return { stability: shortS(s, g), difficulty: nextD(d, g) };
+  const r = retrievability(elapsed, s);
+  return {
+    stability: g === 1 ? forgetS(d, s, r) : recallS(d, s, r, g),
+    difficulty: nextD(d, g),
+  };
+}
+
 function core(srs, rating, now) {
   const today = dayOf(now);
   const g = G[rating] || 3;
   let s = migrate({ ...(srs || newState(now)) });
   const elapsed = s.lastReview ? Math.max(0, today - dayOf(s.lastReview)) : 0;
-  let S, D;
-  if (!s.stability) { S = initS(g); D = initD(g); }
-  else if (elapsed === 0) { S = shortS(s.stability, g); D = nextD(s.difficulty, g); }
-  else {
-    const r = retrievability(elapsed, s.stability);
-    D = nextD(s.difficulty, g);
-    S = g === 1 ? forgetS(s.difficulty, s.stability, r) : recallS(s.difficulty, s.stability, r, g);
-  }
-  s = { ...s, stability: +S.toFixed(4), difficulty: +D.toFixed(4) };
+  const m = nextMemory(s.stability ? s : null, g, elapsed);
+  s = { ...s, stability: +m.stability.toFixed(4), difficulty: +m.difficulty.toFixed(4) };
   return { s, today, g };
 }
 
@@ -201,18 +250,46 @@ export function deckStats(cards, now = Date.now()) {
   return st;
 }
 
-// Dominio de un libro (retención T2): % del material dominado, ponderado por estabilidad.
-// Madura (intervalo ≥ 21d, mismo criterio que deckStats) vale 1; lo que se está aprendiendo
-// vale su intervalo/21; lo nuevo, 0. Las suspendidas cuentan con su peso: es material ya
-// aprendido que alguien aparcó, no ignorado. `mastery` ∈ [0, 1] — el % lo pone la vista.
-export function deckMastery(cards) {
-  let total = 0, w = 0, maduras = 0, aprendiendo = 0, nuevas = 0;
+// Lo que se recuerda HOY de un conjunto de tarjetas (P44 F2; sustituye al «dominio» de T2,
+// que ponderaba por intervalo). Es el «conocimiento estimado» de Anki: la suma de la
+// probabilidad de recordar cada tarjeta ahora mismo, con la misma curva que programa.
+//   known      Σ R de las tarjetas con memoria: «tarjetas que recordarías hoy».
+//   total      todas las vivas, nuevas incluidas: una nueva vale 0, no se sabe todavía.
+//   share      known / total ∈ [0, 1]: lo que se sabe del material del libro.
+// Las suspendidas cuentan con su R: es material aprendido que alguien aparcó, no ignorado.
+// Una tarjeta repasada hoy mismo vale su R a 0 días (1).
+export function knowledge(cards, now = Date.now()) {
+  const today = dayOf(now);
+  let total = 0, known = 0, studied = 0, nuevas = 0;
   for (const c of cards || []) {
-    if (!c || c.deleted) continue;             // tombstone: no cuenta en el desglose
+    if (!c || c.deleted) continue;             // tombstone: no cuenta
     total++;
-    if (!c.srs || c.srs.reps === 0) { nuevas++; continue; }
-    if (c.srs.interval >= 21) { maduras++; w += 1; }
-    else { aprendiendo++; w += Math.max(0, Math.min(1, (c.srs.interval || 0) / 21)); }
+    const S = stabilityOf(c.srs);
+    if (!S) { nuevas++; continue; }
+    studied++;
+    const elapsed = c.srs.lastReview ? Math.max(0, today - dayOf(c.srs.lastReview)) : Math.max(0, today - (c.srs.due - (c.srs.interval || 0)));
+    known += retrievability(elapsed, S);
   }
-  return { total, mastery: total ? w / total : 0, maduras, aprendiendo, nuevas };
+  return { total, known, studied, nuevas, share: total ? known / total : 0 };
+}
+
+// Tarjetas que cuestan (P44 F2): falladas 3 veces o más. Es antes que el umbral de leech (8)
+// a propósito: el leech avisa EN el repaso; aquí se busca arreglarlas antes de llegar a eso,
+// y casi siempre están mal formuladas (ver isLeech).
+export const PROBLEM_LAPSES = 3;
+export function isProblem(card) {
+  if (!card || card.deleted || card.suspended) return false;
+  return (card.srs?.lapses || 0) >= PROBLEM_LAPSES;
+}
+
+// Carga diaria media que añaden las tarjetas en rotación (criterio de Anki): cada tarjeta
+// aporta 1/intervalo repasos al día. Una de intervalo 1 suma un repaso diario; una de 30,
+// uno al mes. Las nuevas no cargan hasta que entran.
+export function dailyLoad(cards) {
+  let load = 0;
+  for (const c of cards || []) {
+    if (!c || c.deleted || c.suspended || !c.srs || !(c.srs.reps > 0 || c.srs.stability)) continue;
+    load += 1 / Math.max(1, c.srs.interval || 1);
+  }
+  return load;
 }

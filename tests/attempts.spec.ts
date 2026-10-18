@@ -280,9 +280,13 @@ test('el veredicto que llega DESPUÉS de la nota se guarda en el mismo intento',
   expect(a).toMatchObject({ mode: 'written', exact: false, verdict: 'partial', grade: 'again' });
 });
 
-// ---- Heatmap: el `ok` cuenta la PRIMERA nota de cada tarjeta en el día ------------
+// ---- Contador del día y retención real ----------------------------------------------
+// El contador del día (`study_log`) cuenta TODAS las notas: llena la meta. La retención ya no
+// sale de él sino de los intentos (P44), con el criterio de Anki: la PRIMERA nota de cada
+// tarjeta en el día y solo de tarjetas ya aprendidas. Antes de P44 esto lo medía un `ok/c` del
+// contador para pintar un calendario por retención del día, que se retiró.
 
-test('heatmap: un fallo y luego un acierto en la misma tarjeta cuenta 0 de 1, no 1 de 2', async ({
+test('contador del día: cada nota suma, deshacer resta, y los intentos reflejan solo lo que queda', async ({
   page,
 }) => {
   await page.goto('/index.html');
@@ -305,21 +309,19 @@ test('heatmap: un fallo y luego un acierto en la misma tarjeta cuenta 0 de 1, no
   await page.keyboard.press('3');
   await expect(overlay.locator('.study-end h2')).toBeVisible();
 
-  // 3 notas, 2 tarjetas, 1 acertada a la primera → 50 %. Con la semántica vieja era 2/3.
-  expect(await todayLog(page)).toEqual({ n: 3, ok: 1, c: 2 });
-  await expect(overlay.locator('.study-heat-cell.is-today.ret-low[title="3 · 50%"]')).toHaveCount(
-    1,
-  );
+  expect(await todayLog(page)).toEqual({ n: 3 });
+  // El calendario por retención del día ya no está en el cierre: hay un enlace a Análisis.
+  await expect(overlay.locator('.study-heat')).toHaveCount(0);
+  await expect(overlay.locator('.study-progress-link')).toBeVisible();
 
-  // Deshacer revierte EXACTAMENTE lo que sumó cada nota.
-  await overlay.locator('.study-tools [data-act="undo"]').click(); // X «bien» (no era la primera)
-  expect(await todayLog(page)).toEqual({ n: 2, ok: 1, c: 2 });
-  await overlay.locator('.study-tools [data-act="undo"]').click(); // Y «bien» (primera, acierto)
-  expect(await todayLog(page)).toEqual({ n: 1, ok: 0, c: 1 });
+  await overlay.locator('.study-tools [data-act="undo"]').click();
+  expect(await todayLog(page)).toEqual({ n: 2 });
+  await overlay.locator('.study-tools [data-act="undo"]').click();
+  expect(await todayLog(page)).toEqual({ n: 1 });
   await expect.poll(async () => (await attempts(page)).length).toBe(1);
 });
 
-test('heatmap: una tarjeta ya repasada hoy (otra sesión) no vuelve a contar', async ({ page }) => {
+test('una tarjeta ya repasada hoy (otra sesión) deja intento de re-aprendizaje, que no cuenta como retención', async ({ page }) => {
   await page.goto('/index.html');
   await seedProLicense(page);
   const today = await page.evaluate(async () =>
@@ -350,12 +352,14 @@ test('heatmap: una tarjeta ya repasada hoy (otra sesión) no vuelve a contar', a
   await page.keyboard.press('3');
   await expect(overlay.locator('.study-end h2')).toBeVisible();
 
-  expect(await todayLog(page)).toEqual({ n: 1, ok: 0, c: 0 });
-  // Sin tarjetas nuevas en el día no hay retención que pintar: el cuadro va sin subrayado.
-  await expect(
-    overlay.locator('.study-heat-cell.is-today:not([class*="ret-"])[title="1"]'),
-  ).toHaveCount(1);
+  expect(await todayLog(page)).toEqual({ n: 1 });
   await expect.poll(async () => (await attempts(page)).map((x) => x.prevInterval)).toEqual([0]);
+  const ret = await page.evaluate(async () => {
+    const S: any = await import('/js/ai/study-stats.js');
+    const DB: any = await import('/js/ai/db.js');
+    return S.trueRetention(await DB.getAll('attempts')).all.n;
+  });
+  expect(ret).toBe(0);   // intervalo previo 0: re-aprendiendo, no «tocaba»
 });
 
 // ---- Sync, backup y subida de versión ----------------------------------------------

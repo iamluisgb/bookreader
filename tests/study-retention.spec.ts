@@ -55,21 +55,22 @@ test('la racha se ve en la biblioteca con estado en riesgo y pasa a encendida al
   await expect(chip).not.toHaveClass(/is-risky/);
 });
 
-test('la ficha del libro muestra la barra de dominio ponderada por estabilidad FSRS', async ({ page }) => {
+test('la ficha del libro muestra lo que se recuerda hoy (Σ retrievabilidad / tarjetas)', async ({ page }) => {
   await page.goto('/index.html');
   await seedProLicense(page);
-  // 4 tarjetas: 2 maduras (peso 1 cada una), 1 aprendiendo (intervalo 7 → 7/21), 1 nueva (0).
-  // Dominio = (1 + 1 + 1/3 + 0) / 4 = 58%.
-  const mk = (interval, reps) => ({ type: 'basic', front: 'q', back: 'a', chapter: '', src: '',
-    srs: reps ? { reps, lapses: 0, interval, due: 0, lastReview: 1, stability: interval, difficulty: 5 } : undefined });
-  await seedDeck(page, { cards: [mk(30, 5), mk(45, 6), mk(7, 2), { type: 'basic', front: 'q2', back: 'a2', chapter: '', src: '' }] });
+  // P44 F2: 4 tarjetas. 2 repasadas hoy (R = 1), 1 con estabilidad 10 repasada hace 10 días
+  // (R = 0,9: la estabilidad es justo eso) y 1 nueva (0). Recuerdo = (1 + 1 + 0,9 + 0) / 4 = 73%.
+  const now = Date.now();
+  const mk = (stability, ago) => ({ type: 'basic', front: 'q', back: 'a', chapter: '', src: '',
+    srs: { reps: 3, lapses: 0, interval: Math.round(stability), due: 0, lastReview: now - ago * 86400000, stability, difficulty: 5 } });
+  await seedDeck(page, { cards: [mk(30, 0), mk(45, 0), mk(10, 10), { type: 'basic', front: 'q2', back: 'a2', chapter: '', src: '' }] });
   await page.reload();
 
   const bar = page.locator('.lib-card[data-id="bk-ret"] .lib-mastery');
   await expect(bar).toBeVisible();
-  await expect(bar.locator('.lib-mastery-lbl')).toHaveText('58% dominado');
-  await expect(bar.locator('.lib-mastery-fill')).toHaveAttribute('style', /width:\s*58%/);
-  await expect(bar).toHaveAttribute('title', /2 maduras/);
+  await expect(bar.locator('.lib-mastery-lbl')).toHaveText('73% recordado');
+  await expect(bar.locator('.lib-mastery-fill')).toHaveAttribute('style', /width:\s*73%/);
+  await expect(bar).toHaveAttribute('title', 'Recuerdas ~3 de 4 tarjetas');
 });
 
 test('meta diaria: anillo con repaso de hoy / meta, ajustable al click', async ({ page }) => {
@@ -138,46 +139,33 @@ test('hito de racha: se celebra al cruzar 7 y comparte una tarjeta PNG', async (
   expect(png.h).toBe(1080);
 });
 
-test('heatmap: subrayado por retención a la primera y migración del log legacy', async ({ page }) => {
+test('contador del día: el log legacy cuenta para la meta, y el cierre lleva a Análisis', async ({ page }) => {
   await page.goto('/index.html');
   await seedProLicense(page);
-  const seedLog = await page.evaluate(() => {
+  await page.evaluate(() => {
     const d = new Date();
     const today = Math.floor((d.getTime() - d.getTimezoneOffset() * 60000) / 86400000); // mismo dayOf que srs.js
-    const y = today - 1;
-    // P42 F1: retención = ok / c (tarjetas distintas del día). Las entradas sin `c` llevan la
-    // semántica vieja de `ok` y no pintan retención.
+    // Formas viejas del contador: objeto con ok/c y número plano. Solo cuenta `n`.
     localStorage.setItem('bookreader_study_log', JSON.stringify({
-      [today]: { n: 8, ok: 4 },              // semántica vieja HOY: el recuento arranca de cero al repasar
-      [y]: { n: 12, ok: 9, c: 10 },          // 90% → verde
-      [today - 2]: { n: 10, ok: 4, c: 8 },   // 50% → rojo
-      [today - 3]: 12,                       // legacy: número plano → sin subrayado
-      [today - 4]: { n: 6, ok: 5 },          // semántica vieja (sin `c`) → sin subrayado
+      [today]: { n: 8, ok: 4 },
+      [today - 3]: 12,
     }));
-    return { today, y };
   });
   await seedDeck(page);
   await page.reload();
   await page.locator('.lib-study-chip').click();
   const overlay = page.locator('#ai-study');
 
-  // Los repasos de HOY ya cuentan para la meta (8 del log) y siguen contando tras repasar.
   await expect(overlay.locator('.study-goal-n')).toHaveText('8/20');
   await overlay.locator('.study-flip').click();
   await overlay.locator('.study-grade[data-rate="good"]').click();
   await expect(overlay.locator('.study-goal-n')).toHaveText('9/20');
 
-  // Tras repasar la única tarjeta, renderCard pasa a la pantalla final: ahí está el heatmap
-  // (el .study-flip del pie AHORA es «Cerrar»: no se vuelve a tocar).
-  const heat = overlay.locator('.study-heat');
-  await expect(heat.locator('.study-heat-cell.ret-good[title="12 · 90%"]')).toHaveCount(1);
-  await expect(heat.locator('.study-heat-cell.ret-low[title="10 · 50%"]')).toHaveCount(1);
-  // Hoy: los 8 repasos se conservan (meta), pero el `ok` viejo no se mezcla con el nuevo:
-  // la única tarjeta de esta sesión, acertada a la primera → 1/1 = 100% → verde.
-  await expect(heat.locator('.study-heat-cell.ret-good.is-today[title="9 · 100%"]')).toHaveCount(1);
-
-  // Legacy: 12 repasos, sin datos de acierto → sin subrayado, tooltip plano.
-  await expect(heat.locator('.study-heat-cell:not([class*="ret-"])[title="12"]')).toHaveCount(1);
-  // Semántica vieja (sin `c`): tampoco pinta retención.
-  await expect(heat.locator('.study-heat-cell:not([class*="ret-"])[title="6"]')).toHaveCount(1);
+  // Pantalla final: «Ver tu progreso» cierra el repaso y abre Análisis, donde está el estudio.
+  await overlay.locator('.study-progress-link').click();
+  await expect(overlay).toHaveCount(0);
+  await expect(page.locator('#analysis .anal-study')).toBeVisible();
+  // Semana: los 8 de hoy del log viejo quedan tapados por el día con intentos (1 repaso), y el
+  // día de hace 3 días, sin intentos, aporta sus 12. Un día nunca se cuenta dos veces.
+  await expect(page.locator('#analysis .anal-study .anal-tile').first()).toContainText('13');
 });

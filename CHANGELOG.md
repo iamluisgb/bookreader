@@ -3,6 +3,23 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-10-18 — Análisis del estudio: retención real, lo que te queda de cada libro y FSRS a tu medida (P44)
+
+La pantalla de Análisis cuenta ahora también el estudio, con lo que ya guardaba el registro de
+intentos (P42 F1). **Estudio:** tiempo de repaso con tope por tarjeta, repasos, racha, retención real
+al estilo Anki (frente al 90 %, jóvenes/maduras, desde 30 repasos), practicado frente a solo girar y,
+con 20 respuestas escritas juzgadas, la calibración entre tu nota y la del agente. **Por libro:**
+«Recuerdas ~k de n tarjetas» (Σ retrievabilidad), tarjetas que cuestan con «Revisar» (abre el mazo
+señalándolas), tope de 5 con «Ver todos» y filtro por libro al tocar la fila (P31 puntos 1 y 3). **Lo
+que viene:** previsión de 7 días, carga media y «Pausar nuevas hoy» si no cabe en tu ritmo.
+**Ajustado a tu memoria:** el repaso pasa de FSRS-5 a FSRS-6 (transiciones contrastadas con fsrs-rs en
+`srs.spec.ts`) y, con 400 repasos de historias completas, el optimizador de fsrs-rs corre en el
+dispositivo (WebAssembly en un worker) y enseña qué cambia antes de aplicarlo. La biblioteca enseña
+«% recordado» con la misma cifra. El cierre de sesión pierde el calendario y la previsión (ahora en
+Análisis, enlace «Ver tu progreso»); `study_log` guarda solo el contador del día. Una tarjeta nueva
+con «bien» va a 2 días (FSRS-6) en vez de 3. Tests: `analysis-study.spec.ts` (nuevo) y los de SRS,
+estudio, intentos y retención actualizados.
+
 ## 2026-10-18 — Biblioteca: una sola fila de verdad (racha y botones), vista en el Pixel real
 
 Con el marcado real seguían dos cosas que la simulación no tenía: el chip de racha era un tercer

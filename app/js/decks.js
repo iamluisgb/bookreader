@@ -29,6 +29,7 @@ let overlay = null;
 let mode = 'list';        // 'list' (grupos) | 'deck' (detalle de un mazo)
 let deckId = null;        // mazo abierto en modo detalle
 let currentDeck = null;   // referencia viva para los handlers del detalle
+let focusIdx = new Set(); // tarjetas a señalar en el detalle (openDeck)
 
 const body = () => overlay?.querySelector('.dk-body');
 
@@ -42,8 +43,19 @@ export async function open() {
   await paint();
 }
 
+// Abre un mazo en su detalle, con las tarjetas `focus` (índices) marcadas: lo usa Análisis
+// (P44 F2) para llevar directo a las tarjetas que cuestan. La marca se va al volver a la lista.
+export async function openDeck(id, { focus = [] } = {}) {
+  mode = 'deck';
+  deckId = id;
+  focusIdx = new Set(focus);
+  await open();
+  overlay.querySelector('.fc-item.is-problem')?.scrollIntoView({ block: 'center' });
+}
+
 export function close() {
   if (overlay) overlay.style.display = 'none';
+  focusIdx = new Set();
 }
 
 function ensureOverlay() {
@@ -207,7 +219,7 @@ function renderDetail(deck) {
 // Misma fila que el modal de flashcards (renderReview): frente/dorso editables
 // en el sitio, suspender/reactivar y quitar.
 function cardRow(c, i) {
-  return `<div class="fc-item${c.suspended ? ' is-suspended' : ''}" data-i="${i}">
+  return `<div class="fc-item${c.suspended ? ' is-suspended' : ''}${focusIdx.has(i) ? ' is-problem' : ''}" data-i="${i}">
     <div class="fc-item-fields">
       <div class="fc-front" contenteditable="true" spellcheck="false">${escapeHtml(c.front)}</div>
       <div class="fc-back" contenteditable="true" spellcheck="false" data-ph="${t('Respuesta (opcional)')}">${escapeHtml(c.back)}</div>
@@ -316,7 +328,7 @@ async function onDetailClick(e) {
   const act = e.target.closest('[data-act]');
   if (!act || !currentDeck) return;
   const a = act.dataset.act;
-  if (a === 'dk-back') { mode = 'list'; deckId = null; await paint(); return; }
+  if (a === 'dk-back') { mode = 'list'; deckId = null; focusIdx = new Set(); await paint(); return; }
   if (a === 'dk-susp') {
     syncCardsFromDom(body());
     const i = parseInt(act.closest('.fc-item').dataset.i, 10);

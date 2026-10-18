@@ -1,5 +1,10 @@
 # Análisis: lectura y estudio en una sola pantalla
 
+> **Estado:** implementado el 18-oct-2026 como P44 (BACKLOG). Diferencias con esta propuesta: el
+> «cuadro de estudio» del cierre de sesión se retiró en vez de moverse (Análisis pinta repasos por día,
+> sin color por retención del día); `study_log` se queda como contador del día de este dispositivo
+> (lo necesita la meta al instante) y todo lo analizado sale de `attempts`.
+
 Investigación del 18-oct-2026. Pregunta: cómo mejorar la sección de Análisis
 ([`analysis.js`](../app/js/analysis.js), P25) y cómo meter en ella el estudio de flashcards, a
 partir de lo que hacen los líderes y de lo que dice la investigación. Respeta las decisiones de

@@ -15,6 +15,7 @@ import { escapeHtml } from '../ui/escape.js';
 import { confirmBox, promptBox, alertBox, formBox } from '../ui/dialog.js';
 import * as AiDB from '../ai/db.js';
 import * as Srs from '../ai/srs.js';
+import * as FsrsParams from '../ai/fsrs-params.js';
 import * as Storage from '../storage.js';
 import { track } from '../ui/usage-log.js';
 
@@ -311,7 +312,7 @@ function rememberRecent(key) {
   writeList(RECENT_KEY, [key, ...readList(RECENT_KEY).filter(k => k !== key)].slice(0, 8));
 }
 // Móvil = estrecho, o táctil y bajo (el móvil en horizontal). La MISMA consulta que el CSS.
-const isMobile = () => window.matchMedia?.('(max-width: 767px), (max-height: 500px) and (pointer: coarse)').matches;
+const isMobile = () => window.matchMedia?.('(max-width: 767px), (max-height: 480px) and (pointer: coarse)').matches;
 
 function chipHtml(row) {
   const active = selection.has(row.key);
@@ -971,12 +972,13 @@ function paintResults() {
   }
 }
 
-// Dominio por libro (T2 retención): una sola pasada por TODOS los mazos, agrupados por
-// libro. Es la visualización que un SRS genérico no puede dar — pero un lector sí: conecta
-// el repaso diario con el objetivo real («¿cuánto de este libro dominó?»). Sin mazo, oculta.
+// Recuerdo por libro (T2 retención; P44 F2): una sola pasada por TODOS los mazos, agrupados
+// por libro. Es la visualización que un SRS genérico no puede dar — pero un lector sí: conecta
+// el repaso diario con el objetivo real («¿cuánto de este libro me queda?»). Sin mazo, oculta.
 let masterySeq = 0;
 async function paintMastery() {
   const seq = ++masterySeq;
+  FsrsParams.applyStored();   // la curva del olvido puede ser la personal (P44 F4)
   let decks;
   try { decks = await AiDB.getAllDecks(); } catch { return; }
   const byBook = new Map();
@@ -990,13 +992,15 @@ async function paintMastery() {
   if (!wrap) return;
   for (const el of wrap.querySelectorAll('[data-mastery]')) {
     if (seq !== masterySeq || !el.isConnected) return;   // llegó otro render: la vista manda
-    const m = Srs.deckMastery(byBook.get(el.dataset.mastery) || []);
+    // Lo que se recuerda HOY (P44 F2), la misma cifra que «Por libro» en Análisis: Σ de la
+    // probabilidad de recordar cada tarjeta / tarjetas del libro (las nuevas valen 0).
+    const m = Srs.knowledge(byBook.get(el.dataset.mastery) || []);
     if (!m.total) { el.hidden = true; continue; }
-    const pct = Math.round(m.mastery * 100);
+    const pct = Math.round(m.share * 100);
     el.hidden = false;
     el.querySelector('.lib-mastery-fill').style.width = `${pct}%`;
-    el.querySelector('.lib-mastery-lbl').textContent = t('{n}% dominado', { n: pct });
-    el.title = t('{a} maduras · {b} aprendiendo · {c} nuevas', { a: m.maduras, b: m.aprendiendo, c: m.nuevas });
+    el.querySelector('.lib-mastery-lbl').textContent = t('{n}% recordado', { n: pct });
+    el.title = t('Recuerdas ~{k} de {n} tarjetas', { k: Math.round(m.known), n: m.total });
   }
 }
 function sortBooks(list) {

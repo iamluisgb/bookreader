@@ -10,6 +10,7 @@
 import { t } from '../i18n.js';
 import * as DB from './db.js';
 import * as Srs from './srs.js';
+import * as FsrsParams from './fsrs-params.js';
 import * as Storage from '../storage.js';
 import * as Store from '../library/store.js';
 import { shareStreak } from '../share-card.js';
@@ -74,10 +75,24 @@ export function setDailyGoal(n) {
   return v;
 }
 
-export function newLimit() {
+// Tope configurado (lo que enseña Ajustes).
+export function configuredNewLimit() {
   const v = Storage.get(NEW_LIMIT_KEY, DEFAULT_NEW_LIMIT);
   return Number.isFinite(v) && v >= 0 ? v : DEFAULT_NEW_LIMIT;
 }
+// Tope de la sesión de hoy: el configurado, o -1 (ninguna nueva) si hoy están en pausa.
+// -1 y no 0, porque 0 ya significa «sin tope».
+export function newLimit(now = Date.now()) {
+  return newPausedToday(now) ? -1 : configuredNewLimit();
+}
+
+// Pausa de las nuevas SOLO HOY (P44 F3): la acción del aviso de carga de Análisis. Guarda el
+// día, así que mañana se levanta sola; el tope configurado no se toca. Avisar, nunca bloquear:
+// al acabar la sesión siguen ofreciéndose las nuevas que se quedaron fuera.
+const NEW_PAUSE_KEY = 'study_new_pause';
+export function newPausedToday(now = Date.now()) { return Storage.get(NEW_PAUSE_KEY, null) === Srs.dayOf(now); }
+export function pauseNewToday(now = Date.now()) { Storage.set(NEW_PAUSE_KEY, Srs.dayOf(now)); }
+export function resumeNewToday() { Storage.remove(NEW_PAUSE_KEY); }
 
 let overlay = null;
 let onCloseCb = null;
@@ -249,7 +264,8 @@ export function buildQueue(decks, { now = Date.now(), newLimit: limit = 0, rng =
   shuffle(news, rng);
   // El tope solo recorta NUEVAS: lo ya empezado vence hoy porque el scheduler lo decidió,
   // y aplazarlo es justo lo que rompe la programación.
-  const heldNew = limit > 0 ? news.splice(limit) : [];
+  // -1 = nuevas en pausa hoy (newLimit): todas se quedan fuera, ofrecidas al terminar.
+  const heldNew = limit > 0 ? news.splice(limit) : limit < 0 ? news.splice(0) : [];
   return { queue: spreadSiblings(shuffle(revs.concat(news), rng)), held: heldNew };
 }
 
@@ -264,35 +280,23 @@ export function buildQueue(decks, { now = Date.now(), newLimit: limit = 0, rng =
 const GRADING_KEY = 'study_grading';
 export function gradingMode() { return Storage.get(GRADING_KEY, 'simple') === 'full' ? 'full' : 'simple'; }
 
-// Registro diario de repasos para el calendario de la racha (últimos 120 días).
-// Entrada: { n: repasos, ok: aciertos a la primera, c: tarjetas distintas repasadas } — el día
-// no solo dice CUÁNTO se repasó sino CÓMO fue (retención verdadera, T5).
-//   - `n` cuenta TODAS las notas (incluidos los «otra vez» re-encolados): es lo que llena la
-//     meta diaria y la intensidad del calendario.
-//   - `ok` y `c` cuentan solo la PRIMERA nota de cada tarjeta en el día (P42 F1, mismo
-//     criterio que `failedOnce`): retención = ok / c. Antes `ok` sumaba cualquier nota que no
-//     fuera «otra vez» y se dividía por `n`, así que una tarjeta fallada y luego acertada
-//     contaba 1 de 2 en vez de 0 de 1.
-// Legacy: número plano → { n, ok: null }; entradas sin `c` (semántica vieja) no pintan
-// retención, porque su `ok` medía otra cosa.
+// Repasos por día (últimos 120): `{ n }`, TODAS las notas del día, «otra vez» re-encolados
+// incluidos. Llena la meta diaria y avisa de la racha en riesgo, que necesitan la cifra al
+// momento y sin IndexedDB. Es el contador de ESTE dispositivo: lo que se analiza (retención,
+// tiempo, práctica) sale del store `attempts`, que viaja por sync (ver ai/study-stats.js).
+// Hasta P44 guardaba además `ok` y `c` para colorear un calendario por retención del día, que
+// se quitó: la retención de un solo día es ruido. Las entradas viejas los conservan y se
+// ignoran; un número plano (legacy) vale como `n`.
 const LOG_KEY = 'study_log';
-function readLog() {
-  const log = Storage.get(LOG_KEY, {}) || {};
-  for (const k of Object.keys(log)) if (typeof log[k] === 'number') log[k] = { n: log[k], ok: null };
-  return log;
+export function readLog() {
+  return Storage.get(LOG_KEY, {}) || {};
 }
-function bumpLog(delta, okDelta = 0, cardsDelta = 0, now = Date.now()) {
+function bumpLog(delta, now = Date.now()) {
   const log = readLog();
   const day = Srs.dayOf(now);
-  const e = log[day] || { n: 0, ok: 0, c: 0 };
-  // Si HOY ya tenía una entrada con la semántica vieja (sin `c`), su `ok` no es comparable:
-  // el recuento de aciertos y tarjetas arranca de cero; los repasos (`n`) se conservan.
-  const fresh = e.c == null;
-  log[day] = {
-    n: Math.max(0, e.n + delta),
-    ok: Math.max(0, (fresh ? 0 : e.ok ?? 0) + okDelta),
-    c: Math.max(0, (fresh ? 0 : e.c) + cardsDelta),
-  };
+  const e = log[day];
+  const n = typeof e === 'number' ? e : e?.n || 0;
+  log[day] = { n: Math.max(0, n + delta) };
   const keys = Object.keys(log).map(Number).sort((a, b) => a - b);
   while (keys.length > 120) delete log[keys.shift()];
   Storage.set(LOG_KEY, log);
@@ -415,6 +419,7 @@ function retractAttempt(d) {
 // la sesión cierre lo suyo (p. ej. el modal de flashcards) antes de mostrar el libro.
 export function open({ decks, title = t('Estudiar'), onClose, onNavigate } = {}) {
   close();
+  FsrsParams.applyStored();   // parámetros personales (P44 F4), por si llegaron por sync
   onCloseCb = onClose || null;
   onNavigateCb = onNavigate || null;
   const built = buildQueue(decks, { now: Date.now(), newLimit: newLimit() });
@@ -1209,7 +1214,7 @@ function undo() {
   u.deck.cards[u.idx] = card;
   if (u.deck.id) DB.updateDeck(u.deck.id, { cards: u.deck.cards });
   if (u.streak) Storage.set(STREAK_KEY, u.streak); else Storage.remove(STREAK_KEY);
-  bumpLog(-1, -(u.okDelta || 0), -(u.cardsDelta || 0));   // revierte EXACTAMENTE lo que sumó la nota
+  bumpLog(-1);   // revierte lo que sumó la nota
   retractAttempt(u.attempt);
   queue = u.queue;
   done = u.done;
@@ -1448,17 +1453,11 @@ function gradeCurrent(rating) {
   if (!queue.length || editing || animating) return;
   const now = Date.now();
   const prevSrs = queue[0].deck.cards[queue[0].idx].srs;
-  // ¿Primera nota de esta tarjeta HOY? (P42 F1) Si su último repaso fue hoy, ya se contó:
-  // un «otra vez» re-encolado, otra sesión del mismo día u otro dispositivo. Mismo criterio
-  // que `failedOnce`, pero por día y no por sesión — el calendario es de días.
-  const firstToday = !(prevSrs && prevSrs.lastReview && Srs.dayOf(prevSrs.lastReview) === Srs.dayOf(now));
-  const okDelta = firstToday && rating !== 'again' ? 1 : 0;   // «otra vez» no es acierto (T5)
-  const cardsDelta = firstToday ? 1 : 0;
   const attempt = finishAttempt(queue[0].deck, queue[0].idx, rating, prevSrs, now);
   // Foto de la sesión ANTES de tocar nada: es lo que restaura "deshacer".
   pushUndo({
     queue: queue.slice(), done, graded, firstTry, deck: queue[0].deck, idx: queue[0].idx,
-    srs: prevSrs, streak: Storage.get(STREAK_KEY), okDelta, cardsDelta, attempt,
+    srs: prevSrs, streak: Storage.get(STREAK_KEY), attempt,
   });
   const entry = queue.shift();
   const { deck, idx } = entry;
@@ -1467,7 +1466,7 @@ function gradeCurrent(rating) {
   // Se persiste TRAS CADA tarjeta y con el array COMPLETO (tombstones incluidos).
   if (deck.id) DB.updateDeck(deck.id, { cards: deck.cards });
   Storage.set(STREAK_KEY, Srs.bumpStreak(Storage.get(STREAK_KEY)));   // repaso de hoy → racha
-  bumpLog(1, okDelta, cardsDelta);
+  bumpLog(1);
   graded++;
   if (rating === 'again') { queue.push(entry); failedOnce.add(key); }
   else { done++; if (!failedOnce.has(key)) firstTry++; }
@@ -1503,48 +1502,6 @@ function fmtTime(ms) {
   return s < 60 ? t('{n} s', { n: s }) : t('{m} min {s} s', { m: Math.floor(s / 60), s: s % 60 });
 }
 
-// Calendario de la racha: las últimas 5 semanas, un cuadro por día (más oscuro = más repasos).
-// El subrayado inferior dice la CALIDAD del día (retención a la primera, T5): verde ≥85%,
-// ámbar 70–85%, rojo <70%. Retención = aciertos a la primera / tarjetas distintas del día
-// (`ok / c`, ver readLog). Días sin `c` (legacy o semántica vieja) quedan sin subrayado.
-function heatmapHtml(now = Date.now()) {
-  const log = readLog();
-  const today = Srs.dayOf(now);
-  const cells = [];
-  for (let d = today - 34; d <= today; d++) {
-    const e = log[d];
-    const n = typeof e === 'number' ? e : e?.n || 0;
-    const ok = e && typeof e === 'object' ? e.ok : null;
-    const cards = e && typeof e === 'object' ? e.c : null;
-    const lvl = n === 0 ? 0 : n < 10 ? 1 : n < 25 ? 2 : 3;
-    const ret = ok == null || !cards ? null : ok / cards;
-    const retCls = ret == null ? '' : ret >= 0.85 ? ' ret-good' : ret >= 0.7 ? ' ret-mid' : ' ret-low';
-    const title = n === 0 ? '' : ret == null ? `${n}` : `${n} · ${Math.round(ret * 100)}%`;
-    cells.push(`<span class="study-heat-cell lvl-${lvl}${retCls}${d === today ? ' is-today' : ''}" title="${title}"></span>`);
-  }
-  return `<div class="study-heat" aria-label="${t('Repasos de las últimas 5 semanas')}">${cells.join('')}</div>`;
-}
-
-// Previsión: cuántas tarjetas vencen cada uno de los próximos 7 días (de todos los mazos).
-async function forecastHtml(now = Date.now()) {
-  const decks = await DB.getAllDecks().catch(() => []);
-  const today = Srs.dayOf(now);
-  const days = Array(7).fill(0);
-  for (const d of decks) for (const c of d.cards || []) {
-    if (!c || c.deleted || c.suspended || !c.srs) continue;
-    const k = c.srs.due - today;
-    if (k >= 1 && k <= 7) days[k - 1]++;
-  }
-  const max = Math.max(1, ...days);
-  const names = [t('mañana')].concat([2, 3, 4, 5, 6, 7].map((k) => {
-    const dt = new Date(now + k * 86400000);
-    return dt.toLocaleDateString(undefined, { weekday: 'short' }).replace('.', '');
-  }));
-  return `<div class="study-forecast" aria-label="${t('Tarjetas de los próximos 7 días')}">
-    ${days.map((n, i) => `<div class="study-fc-col"><span class="study-fc-n">${n || ''}</span><span class="study-fc-bar" style="height:${Math.round((n / max) * 100)}%"></span><span class="study-fc-day">${escapeHtml(names[i])}</span></div>`).join('')}
-  </div>`;
-}
-
 function renderDone(b, f, left) {
   if (left) left.textContent = '';
   const streak = Srs.currentStreak(Storage.get(STREAK_KEY));
@@ -1574,17 +1531,16 @@ function renderDone(b, f, left) {
           <p>${t('La constancia ya es un hábito. Presúmelo.')}</p></div>
         <button class="study-share">${icon('share', { size: 'md' })} ${t('Compartir')}</button>
       </div>` : ''}
-      <div class="study-end-charts">
-        <div><h3>${t('Tu racha')}</h3>${heatmapHtml()}</div>
-        <div><h3>${t('Próximos días')}</h3><div class="study-forecast-slot"></div></div>
-      </div>
+      ${done ? `<button class="study-progress-link" data-act="progress">${icon('chart', { size: 'sm' })} ${t('Ver tu progreso')}</button>` : ''}
       ${held.length ? `<p class="study-held">${t('Quedan <b>{n}</b> tarjeta{s} nueva{s} fuera del tope de hoy.', { n: held.length, s: held.length === 1 ? '' : 's' })}</p>` : ''}
     </div>`;
-  forecastHtml().then((html) => {
-    const slot = b.querySelector('.study-forecast-slot');
-    if (slot) slot.innerHTML = html;
-  });
   const oneBook = sessionBooks.size === 1 ? [...sessionBooks][0] : null;
+  // El calendario y la previsión viven en Análisis (P44): el cierre se queda con lo de ESTA
+  // sesión y lleva allí a quien quiera ver la tendencia.
+  b.querySelector('.study-progress-link')?.addEventListener('click', () => {
+    close();
+    import('../analysis.js').then(m => m.open()).catch(err => console.warn('analysis:', err));
+  });
   b.querySelector('.study-share')?.addEventListener('click', async (e) => {
     const btn = e.currentTarget;
     btn.disabled = true;
