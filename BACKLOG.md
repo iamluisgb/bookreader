@@ -2706,7 +2706,7 @@ frase de recuperación y diciéndolo claro; no se mitiga guardando la clave noso
 
 ## 🔧 Técnico (calidad / seguridad / perf / bugs)
 
-### TEC25 — Cloudflare: que `bookreader.raiatech.com` respete las cabeceras de caché · `S`
+### TEC19 — Cloudflare: que `bookreader.raiatech.com` respete las cabeceras de caché · `S`
 
 **El caso.** La zona `raiatech.com` tiene el «Browser Cache TTL» por defecto (4 h, verificado por la
 API: `14400`), que **pisa** las cabeceras de la app: en el dominio propio JS y CSS llegan con
