@@ -654,6 +654,10 @@ function paintStreakChip() {
 async function paintStudyChip() {
   const slot = host && host.querySelector('.lib-today-slot');
   if (!slot) return;
+  // El hueco de la racha puede estar dentro de la tarjeta (ver abajo): sacarlo antes de
+  // repintarla, o el `innerHTML = ''` se lo llevaría por delante.
+  const streakSlot = host.querySelector('.lib-streak-slot');
+  if (streakSlot && slot.contains(streakSlot)) slot.closest('.lib-top')?.appendChild(streakSlot);
   paintStreakChip();              // la racha se pinta aunque no haya nada vencido hoy
   const [{ cards, decks }, doneToday] = await Promise.all([Study.dueToday(), Promise.resolve(Study.reviewsToday())]);
   Study.syncBadge();
@@ -667,7 +671,6 @@ async function paintStudyChip() {
   const total = cards + doneToday;
   const pct = total ? doneToday / total : 1;
   const C = 2 * Math.PI * 26;
-  const streak = Study.currentStreak();
   const mins = Math.max(1, Math.round((cards * 8) / 60));
   const books = await Promise.all([...new Set(decks.map(d => d.bookId).filter(Boolean))].slice(0, 4)
     .map(id => Store.getBook(id).catch(() => null)));
@@ -683,7 +686,7 @@ async function paintStudyChip() {
     <div class="lib-today-body">
       <p class="lib-hero-kicker">${t('Repaso de hoy')}</p>
       <h2 class="lib-today-title">${cards ? t('{n} tarjeta{s}', { n: cards, s: cards === 1 ? '' : 's' }) : t('Hecho por hoy')}</h2>
-      <p class="lib-today-meta">${cards ? t('~{n} min', { n: mins }) : t('{n} repasada{s}', { n: doneToday, s: doneToday === 1 ? '' : 's' })}${streak ? ` · <span class="lib-today-streak">${icon('flame', { size: 'sm' })}${t('{n} día{s}', { n: streak, s: streak === 1 ? '' : 's' })}</span>` : ''}</p>
+      <p class="lib-today-meta">${cards ? t('~{n} min', { n: mins }) : t('{n} repasada{s}', { n: doneToday, s: doneToday === 1 ? '' : 's' })}</p>
       ${covers ? `<div class="lib-today-covers">${covers}</div>` : ''}
       ${cards ? `<div class="lib-today-actions">
         <button class="lib-study-chip">${icon('cards', { size: 'md' })}<span>${t('Repasar hoy · {n}', { n: cards })}</span></button>
@@ -691,6 +694,9 @@ async function paintStudyChip() {
       </div>` : ''}
     </div>
   </section>`;
+  // La racha, dentro de la tarjeta: en la línea de minutos, sin abrir una fila propia en la rejilla.
+  const meta = slot.querySelector('.lib-today-meta');
+  if (streakSlot && meta) meta.appendChild(streakSlot);
   const chip = slot.querySelector('.lib-study-chip');
   // Empezar repasa TODO, sin desplegable. Elegir un libro o una estantería es secundario.
   chip?.addEventListener('click', (e) => {

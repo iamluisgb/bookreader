@@ -3,6 +3,17 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-10-18 — Biblioteca: una sola fila de verdad (racha y botones), vista en el Pixel real
+
+Con el marcado real seguían dos cosas que la simulación no tenía: el chip de racha era un tercer
+elemento de la rejilla y abría una fila solo para él (repitiendo el «· 1 día» de la tarjeta de
+repaso), y con los iconos «Elegir» bajaba a otra línea y el repaso quedaba más alto que
+«Continuar». Ahora el hueco de la racha se mueve a la línea de minutos de «Repaso de hoy»
+(`paintStudyChip`; conserva su estado «en riesgo», T1) y la tarjeta ya no repite la racha; en
+pantallas bajas fuera el anillo y los rótulos (repiten el título) y los botones van en una fila;
+y las dos tarjetas miden lo mismo. `library-top-fit.spec.ts` mide además racha y botones con
+iconos.
+
 ## 2026-10-18 — Biblioteca: «Continuar leyendo» y «Repaso de hoy» caben en el móvil en horizontal
 
 Reportado en un Pixel en horizontal (~915×412): la biblioteca decidía su diseño solo por ancho y

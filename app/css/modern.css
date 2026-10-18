@@ -2006,6 +2006,8 @@ body.reading.chrome-quiet:not(.fs):not(.ai-open) .agent-rail:not(:hover, :focus-
 /* ------------------------------------------------ Biblioteca: «Hoy» junto a «Continuar» --- */
 .lib-top { display: grid; gap: 18px; margin: 4px 0 28px; }
 .lib-top .lib-continue { margin: 0; }
+/* Las dos tarjetas de la fila, a la misma altura (la de repaso ya ocupaba el alto de la fila). */
+.lib-top .lib-continue, .lib-top .lib-hero { height: 100%; }
 .lib-top.has-today:has(.lib-continue) { grid-template-columns: minmax(0, 1.6fr) minmax(280px, 1fr); }
 .lib-today-slot:empty { display: none; }
 .lib-today {
@@ -2093,7 +2095,16 @@ body.reading.chrome-quiet:not(.fs):not(.ai-open) .agent-rail:not(:hover, :focus-
 }
 /* Móvil en horizontal (táctil y bajo): «Continuar» y «Hoy» en UNA fila compacta, para que las
    primeras portadas de la biblioteca se vean sin desplazarse. */
+/* Racha: el chip (con su estado «en riesgo») va SIEMPRE a la vista, pero como tercer elemento de
+   la rejilla abría una fila más solo para él. Con tarjeta de repaso, su hueco se mueve a la línea
+   de minutos de la tarjeta (paintStudyChip), donde antes iba «· N días» repetido. */
+.lib-today-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; }
+.lib-today-meta .lib-streak-slot { display: inline-flex; }
 @media (max-height: 500px) and (pointer: coarse) {
+  /* Sin alto que regalar: el anillo repite el número del título; fuera, y los dos botones caben
+     en una fila (con «Elegir» debajo, el repaso era más alto que «Continuar»). */
+  .lib-today-ring { display: none; }
+  .lib-today-actions { flex-wrap: nowrap; }
   .lib-main { padding-top: var(--s-3); }
   .lib-head { margin-bottom: var(--s-2); }
   /* Hay ancho de sobra: buscador y filtros en una fila (en el móvil vertical van en dos). */
@@ -2103,7 +2114,8 @@ body.reading.chrome-quiet:not(.fs):not(.ai-open) .agent-rail:not(:hover, :focus-
   .lib-hero-cta { display: none; }   /* la tarjeta entera abre el libro */
   .lib-top.has-today:has(.lib-continue) { grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); }
   .lib-hero-cover { width: 56px; }
-  .lib-hero-kicker { display: none; }
+  /* Rótulos fuera en las dos tarjetas: el título ya dice qué es cada una. */
+  .lib-hero-kicker, .lib-today .lib-hero-kicker { display: none; }
   .lib-today-covers { display: none; }
 }
 
