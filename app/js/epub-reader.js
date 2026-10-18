@@ -1416,15 +1416,34 @@ document.addEventListener('visibilitychange', () => {
 });
 window.addEventListener('pagehide', flushLastPosition);
 
+// En modo scroll, epub.js (flow 'scrolled-doc') no desplaza: next()/prev() saltan de sección.
+// Un toque lateral debe mover una pantalla (con solape, para no perder la línea de lectura) y
+// pasar de capítulo solo al llegar al final/principio de la sección actual.
+const SCROLL_TAP_FRACTION = 0.9;
+function scrollTapStep(dir) {
+  if (getReadingMode() !== 'scroll') return false;
+  const sc = document.querySelector('#epub-container .epub-container');
+  if (!sc || sc.scrollHeight <= sc.clientHeight) return false;
+  const atEnd = sc.scrollTop + sc.clientHeight >= sc.scrollHeight - 2;
+  const atStart = sc.scrollTop <= 2;
+  if (dir === 'next' ? atEnd : atStart) return false;
+  const reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  sc.scrollBy({ top: (dir === 'next' ? 1 : -1) * sc.clientHeight * SCROLL_TAP_FRACTION,
+    behavior: reduce ? 'auto' : 'smooth' });
+  return true;
+}
+
 export function prev() {
   releasePin();
   navSeq++;
+  if (scrollTapStep('prev')) return;
   if (rendition) rendition.prev();
 }
 
 export function next() {
   releasePin();
   navSeq++;
+  if (scrollTapStep('next')) return;
   if (rendition) rendition.next();
 }
 
