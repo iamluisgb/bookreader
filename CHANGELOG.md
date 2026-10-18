@@ -3,6 +3,17 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-10-18 — Modo scroll: el capítulo solo cambia a propósito
+
+Leyendo EPUB técnicos en scroll, un toque lateral saltaba de capítulo (epub.js solo desplaza
+dentro de la sección en paginado) y se perdía el resto, con su código y diagramas. Ahora el toque
+lateral y las flechas ←/→ **solo desplazan** una pantalla (90 %, con solape) y nunca cambian de
+capítulo (`tapPrev`/`tapNext`). El capítulo cambia con los botones del pie (que en scroll dicen
+«Capítulo anterior/siguiente») o con el **panel de fin de capítulo**, inyectado al final del
+documento: «Fin de «X»» y botón «Siguiente: Y»; en el último capítulo, «Has terminado el libro»
+y volver a la biblioteca. Va al final del body para no mover los índices de los CFI. Test:
+`tests/scroll-tap.spec.ts`.
+
 ## 2026-10-16 — Posición en móvil con las barras a la vista
 
 Reportado con «El pez en el agua» en un Pixel 7 y una tablet Samsung: abrir la barra de índice y

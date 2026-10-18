@@ -732,6 +732,7 @@ async function goToLibrary({ fromRoute = false } = {}) {
   await ReadingLog.endBook();               // y el tramo de lectura abierto (P25)
   currentBook = null;                       // ya no hay libro abierto (para el router)
   document.body.classList.remove('reading', 'immersive', 'fs', 'scroll-mode');   // salir del modo lectura
+  EpubReader.syncNavLabels();
   // Cerrar las sidebars de la vista de libro (índice + agente): no deben verse sobre
   // la biblioteca (van en z-index alto, por encima de la vista de estantería).
   document.getElementById('sidebar')?.classList.remove('open');
@@ -1121,8 +1122,8 @@ function initImmersive() {
   EpubReader.onTap((zone) => {
     const tip = document.getElementById('highlight-tooltip');
     if (tip && tip.style.display !== 'none') { hideHighlightTooltip(); return; }
-    if (zone === 'prev') EpubReader.prev();
-    else if (zone === 'next') EpubReader.next();
+    if (zone === 'prev') EpubReader.tapPrev();
+    else if (zone === 'next') EpubReader.tapNext();
     else if (zone === 'center') setImmersive(!document.body.classList.contains('immersive'));
     // 'click' (escritorio, sin barra abierta) → no hace nada
   });
@@ -1509,6 +1510,7 @@ function initBookHeader() {
     if (/^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName) || e.target.isContentEditable) return;
     if ((e.key === '[' || e.key === ']') && onShortcut(e.key)) e.preventDefault();
   });
+  window.addEventListener('reader:close-book', () => goToLibrary());   // botón «Volver» del fin de libro
   window.addEventListener('reader:key', (e) => onShortcut(e.detail));   // desde el iframe del EPUB
 }
 
@@ -2167,10 +2169,10 @@ function initNavigation() {
     if (e.key === '?') { FeatureGuide.toggle(); return; }
     if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
     if (e.key === 'ArrowLeft') {
-      if (EpubReader.isLoaded()) EpubReader.prev();
+      if (EpubReader.isLoaded()) EpubReader.tapPrev();
       else if (PdfReader.isLoaded()) PdfReader.prev();
     } else if (e.key === 'ArrowRight') {
-      if (EpubReader.isLoaded()) EpubReader.next();
+      if (EpubReader.isLoaded()) EpubReader.tapNext();
       else if (PdfReader.isLoaded()) PdfReader.next();
     }
   });

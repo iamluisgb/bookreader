@@ -222,6 +222,7 @@ export function attach(contents) {
     if (swiping) { swiping = false; callbacks.onSwipeEnd(dx); return; }
 
     if (quick && t) {
+      if (e.target.closest && e.target.closest('#br-end')) return;   // panel de fin de capítulo (scroll)
       const zone = tapZone(t.clientX);
       // Toque central sobre una imagen → abrir zoom. En los bordes se pasa página
       // igualmente (para páginas que son una imagen a sangre completa).

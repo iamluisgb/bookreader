@@ -661,6 +661,7 @@ function registerTapHandler(contents) {
     lastTouchEnd = Date.now();
     if (moved || Date.now() - st > 500) return;     // arrastre o pulsación larga
     if (hasSelection(win)) return;                  // hubo selección → no navegar
+    if (e.target.closest && e.target.closest('#br-end')) return;   // panel de fin de capítulo
     const t = e.changedTouches[0]; if (!t) return;
     onTapCb(tapZone(t.clientX));
   }, { passive: true });
@@ -670,6 +671,7 @@ function registerTapHandler(contents) {
   doc.addEventListener('click', (e) => {
     if (Date.now() - lastTouchEnd < 700) return;    // clic sintetizado por touch
     if (hasSelection(win)) return;
+    if (e.target.closest && e.target.closest('#br-end')) return;
     const img = e.target && e.target.closest && e.target.closest('img');
     if (img) { onImageTapCb(img); return; }         // clic en imagen → zoom
     onTapCb('click');
@@ -868,6 +870,7 @@ export function setReadingMode(mode) {
 export function applyReadingMode() {
   const mode = getReadingMode();
   document.body.classList.toggle('scroll-mode', mode === 'scroll');
+  syncNavLabels();
   if (!rendition) return;
   const cfi = currentCfi;
   try { rendition.flow(mode === 'scroll' ? 'scrolled-doc' : 'paginated'); } catch (e) { /* flow no disponible */ }
@@ -1004,6 +1007,7 @@ export async function load(arrayBuffer, onProgress, bookId = null) {
   // Modo de lectura recordado para ESTE libro (paginado por defecto; scroll para técnicos).
   const readingMode = getReadingMode();
   document.body.classList.toggle('scroll-mode', readingMode === 'scroll');
+  syncNavLabels();
   rendition = book.renderTo(container, {
     width: '100%',
     height: '100%',
@@ -1037,6 +1041,7 @@ export async function load(arrayBuffer, onProgress, bookId = null) {
     }
     // Also inject theme directly into the content document
     injectThemeIntoContent(contents);
+    injectEndPanel(contents);
     // Táctil: módulo de selección propia (mantener pulsado = palabra, arrastrar
     // tiradores = extender) que además gestiona los toques de navegación.
     // Escritorio: selección nativa + toques/clics para navegar.
@@ -1050,8 +1055,8 @@ export async function load(arrayBuffer, onProgress, bookId = null) {
       // Atajos de paneles (`[` índice, `]` agente): los atiende app.js.
       if (e.key === '[' || e.key === ']') { window.dispatchEvent(new CustomEvent('reader:key', { detail: e.key })); return; }
       if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
-      if (e.key === 'ArrowLeft') { e.preventDefault(); prev(); }
-      else if (e.key === 'ArrowRight') { e.preventDefault(); next(); }
+      if (e.key === 'ArrowLeft') { e.preventDefault(); tapPrev(); }
+      else if (e.key === 'ArrowRight') { e.preventDefault(); tapNext(); }
     });
   });
 
@@ -1247,6 +1252,15 @@ function injectThemeIntoContent(contents) {
         line-height: ${settings.lineHeight} !important;
       }
       p { margin-bottom: 0.8em !important; }
+      #br-end { margin: 3em 0 0; padding: 1.5em 0 6em; border-top: 1px solid ${colors.text}33;
+        text-align: center; -webkit-user-select: none; user-select: none; }
+      #br-end p.br-end-lead, #br-end p.br-end-title { margin: 0 0 1em !important; opacity: .65; text-align: center !important;
+        font-size: .85em !important; }
+      #br-end p.br-end-title { opacity: 1; font-size: 1.1em !important; font-weight: 600; }
+      #br-end .br-end-btn { display: block; width: 100%; min-height: 48px; padding: 12px 16px;
+        border: 0; border-radius: 12px; cursor: pointer; font: inherit; font-size: .95em;
+        font-weight: 600; background: ${colors.text}; color: ${colors.bg}; }
+      #br-end .br-end-btn:focus-visible { outline: 2px solid ${colors.text}; outline-offset: 3px; }
     `;
     doc.head.appendChild(style);
     doc.body.style.background = colors.bg;
@@ -1417,34 +1431,100 @@ document.addEventListener('visibilitychange', () => {
 window.addEventListener('pagehide', flushLastPosition);
 
 // En modo scroll, epub.js (flow 'scrolled-doc') no desplaza: next()/prev() saltan de sección.
-// Un toque lateral debe mover una pantalla (con solape, para no perder la línea de lectura) y
-// pasar de capítulo solo al llegar al final/principio de la sección actual.
+// Por eso hay DOS familias de navegación:
+//  - prev()/next(): pasar página (paginado) o CAPÍTULO (scroll). Las usan los botones del pie.
+//  - tapPrev()/tapNext(): toques laterales y flechas. En scroll SOLO desplazan una pantalla
+//    (con solape, para no perder la línea de lectura) y nunca cambian de capítulo: el cambio
+//    es una decisión explícita (botón del pie o panel de fin de capítulo).
 const SCROLL_TAP_FRACTION = 0.9;
 function scrollTapStep(dir) {
-  if (getReadingMode() !== 'scroll') return false;
   const sc = document.querySelector('#epub-container .epub-container');
-  if (!sc || sc.scrollHeight <= sc.clientHeight) return false;
-  const atEnd = sc.scrollTop + sc.clientHeight >= sc.scrollHeight - 2;
-  const atStart = sc.scrollTop <= 2;
-  if (dir === 'next' ? atEnd : atStart) return false;
+  if (!sc || sc.scrollHeight <= sc.clientHeight) return;
   const reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
   sc.scrollBy({ top: (dir === 'next' ? 1 : -1) * sc.clientHeight * SCROLL_TAP_FRACTION,
     behavior: reduce ? 'auto' : 'smooth' });
-  return true;
 }
 
 export function prev() {
   releasePin();
   navSeq++;
-  if (scrollTapStep('prev')) return;
   if (rendition) rendition.prev();
 }
 
 export function next() {
   releasePin();
   navSeq++;
-  if (scrollTapStep('next')) return;
   if (rendition) rendition.next();
+}
+
+export function tapPrev() {
+  if (getReadingMode() === 'scroll') return scrollTapStep('prev');
+  prev();
+}
+
+export function tapNext() {
+  if (getReadingMode() === 'scroll') return scrollTapStep('next');
+  next();
+}
+
+// Los botones del pie pasan capítulo en scroll y página en el resto: que el lector de
+// pantalla lo diga.
+export function syncNavLabels() {
+  const cap = !!book && getReadingMode() === 'scroll';
+  const pv = document.getElementById('prev-btn'), nx = document.getElementById('next-btn');
+  if (pv) pv.setAttribute('aria-label', t(cap ? 'Capítulo anterior' : 'Página anterior'));
+  if (nx) nx.setAttribute('aria-label', t(cap ? 'Capítulo siguiente' : 'Página siguiente'));
+}
+
+// ---- Panel de fin de capítulo (modo scroll) ---------------------------------
+// Al final del documento, como continuación del texto: dice que se acabó el capítulo y
+// ofrece el siguiente. Va al FINAL del body (no al principio) para no desplazar los índices
+// de los hijos del body, de los que dependen los CFI guardados. El iframe no tiene scripts,
+// así que el clic se engancha desde aquí.
+function tocTitleOf(section) {
+  if (!section) return '';
+  const walk = (items) => {
+    for (const it of items || []) {
+      let s = null;
+      try { s = it.href && book.spine.get(it.href.split('#')[0]); } catch (e) { /* href raro */ }
+      if (s && s.index === section.index && it.label) return it.label.trim();
+      const sub = walk(it.subitems);
+      if (sub) return sub;
+    }
+    return '';
+  };
+  return walk(book?.navigation?.toc);
+}
+
+function injectEndPanel(contents) {
+  try {
+    const doc = contents.document;
+    if (!doc || !doc.body) return;
+    doc.getElementById('br-end')?.remove();
+    if (getReadingMode() !== 'scroll') return;
+    const section = book.spine.get(contents.sectionIndex);
+    const nextSec = section && section.next();
+    const here = tocTitleOf(section);
+    const el = doc.createElement('div');
+    el.id = 'br-end';
+    el.setAttribute('role', 'navigation');
+    const mk = (tag, cls, txt) => { const n = doc.createElement(tag); if (cls) n.className = cls; n.textContent = txt; return n; };
+    el.appendChild(mk('p', 'br-end-lead', here ? t('Fin de «{c}»', { c: here }) : t('Fin del capítulo')));
+    if (nextSec) {
+      const nt = tocTitleOf(nextSec);
+      const btn = mk('button', 'br-end-btn', nt ? t('Siguiente: {c}', { c: nt }) : t('Siguiente capítulo'));
+      btn.type = 'button';
+      btn.addEventListener('click', () => next());
+      el.appendChild(btn);
+    } else {
+      el.appendChild(mk('p', 'br-end-title', t('Has terminado el libro')));
+      const btn = mk('button', 'br-end-btn', t('Volver a la biblioteca'));
+      btn.type = 'button';
+      btn.addEventListener('click', () => window.dispatchEvent(new CustomEvent('reader:close-book')));
+      el.appendChild(btn);
+    }
+    doc.body.appendChild(el);
+  } catch (e) { /* el panel nunca puede estorbar la lectura */ }
 }
 
 export async function goTo(cfi) {
