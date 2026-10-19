@@ -1817,4 +1817,6 @@ const EN = {
   '¿Eliminar "{title}" de la biblioteca? Se borrará en todos tus dispositivos sincronizados, junto con su copia en el sync.': 'Delete "{title}" from your library? It will be removed on all your synced devices, along with its copy in the sync.',
   'No se pudo activar': 'Could not turn it on',
   'No se pudo empezar de cero': 'Could not start over',
+  'Sin subir: sync lleno': 'Not uploaded: sync full',
+  'Subir al sync ({size})': 'Upload to sync ({size})',
 };

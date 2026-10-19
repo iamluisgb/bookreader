@@ -19,9 +19,11 @@ import { fetchBinary, TRANSFER_TIMEOUT_MS } from './net.js';
 const KEYCHECK = 'bookreader/keycheck';
 // Lo que guarda versiones: lo mismo que Drive da por revisiones y recovery.js sabe restaurar.
 const VERSIONED = /(^|\/)(settings\.json|books\/[^/]+\.json)$/;
-// Por debajo de esto un fichero va en un solo PUT; el Worker corta en 100 MB (el tope de cuerpo
-// de Workers) y el cifrado añade 28 bytes por trozo de 4 MB.
-const SINGLE_MAX = 96 * 1024 * 1024;
+// Por debajo de `singleMax` un fichero va en un solo PUT; el Worker corta en 100 MB (el tope de
+// cuerpo de Workers) y el cifrado añade 28 bytes por trozo de 4 MB. Por encima, por partes de
+// `partSegs` trozos cifrados enteros: todas miden lo mismo salvo la última (R2 lo exige).
+// Mutables solo para los tests, que no van a cifrar 100 MB para probar las partes.
+export const limits = { singleMax: 96 * 1024 * 1024, partSegs: 8 };
 
 async function ids(path) {
   const k = await A.keys();
@@ -124,37 +126,32 @@ export async function readBinary(path, onProgress = null) {
 
 export async function writeBinary(path, data, { mime = 'application/octet-stream', onProgress = null } = {}) {
   const blob = data instanceof Blob ? data : new Blob([data], { type: mime });
-  if (C.encryptedSize(blob.size) > SINGLE_MAX) return writeMultipart(path, blob, onProgress);
+  if (C.encryptedSize(blob.size) > limits.singleMax) return writeMultipart(path, blob, onProgress);
   const r = await put(path, blob, { kind: 'file' });
   if (onProgress) onProgress(blob.size, blob.size);
   return { etag: r.etag, size: blob.size };
 }
 
-// Libros de más de ~96 MB: subida por partes (F4). Cada parte son PART_SEGS trozos cifrados
-// enteros, así que todas miden lo mismo salvo la última (R2 lo exige).
-const PART_SEGS = 8;
-
+// Libros de más de ~96 MB: subida por partes (F4).
 async function writeMultipart(path, blob, onProgress) {
   const { k, pid } = await ids(path);
   const total = C.encryptedSize(blob.size);
-  const start = await A.api('/v1/mp/' + pid, {
-    method: 'POST',
-    headers: { 'X-Name': await C.encryptName(k, path), 'X-Kind': 'file', 'X-Total-Size': String(total) },
-  });
+  const start = await A.api('/v1/mp/' + pid, { method: 'POST', headers: { 'X-Total-Size': String(total) } });
   if (!start.ok) throw await fail(start);
   const { uploadId } = await start.json();
   const segs = C.segmentCount(blob.size);
   const parts = [];
   try {
-    for (let s = 0, n = 1; s < segs; s += PART_SEGS, n++) {
-      const body = await C.encryptRange(k, pid, blob, s, s + PART_SEGS);
+    for (let s = 0, n = 1; s < segs; s += limits.partSegs, n++) {
+      const body = await C.encryptRange(k, pid, blob, s, s + limits.partSegs);
       const res = await A.api(`/v1/mp/${pid}/${uploadId}/${n}`, { method: 'PUT', body }, { timeoutMs: TRANSFER_TIMEOUT_MS });
       if (!res.ok) throw await fail(res);
       parts.push({ partNumber: n, etag: (await res.json()).etag });
-      if (onProgress) onProgress(Math.min(blob.size, (s + PART_SEGS) * 4 * 1024 * 1024), blob.size);
+      if (onProgress) onProgress(Math.min(blob.size, (s + limits.partSegs) * 4 * 1024 * 1024), blob.size);
     }
     const done = await A.api(`/v1/mp/${pid}/${uploadId}/complete`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ parts }),
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ parts, name: await C.encryptName(k, path) }),
     });
     if (!done.ok) throw await fail(done);
     return { etag: String((await done.json()).etag), size: blob.size };

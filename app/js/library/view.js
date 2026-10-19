@@ -128,7 +128,9 @@ function onBlobProgress(e) {
   if (!d.id) return;
   if (d.state === 'done' || d.state === 'error') {
     transfers.delete(d.id);
-    if (d.state === 'error' && d.message) alertBox(d.message, { title: t('Sincronización') });
+    // Sin espacio para subir no es un error que haya que cerrar con un clic: la tarjeta de
+    // cada libro afectado lo dice (Blobs.uploadBlockReason). El resto sí avisa.
+    if (d.state === 'error' && d.message && !d.quota) alertBox(d.message, { title: t('Sincronización') });
     if (isOpen()) render();
     return;
   }
@@ -840,6 +842,9 @@ function cardHtml(b) {
     </div>`;
   } else if (ghost) {
     overlay = `<div class="lib-dl"><span class="lib-dl-note">${t('Solo notas')}</span></div>`;
+  } else if (Blobs.uploadBlockReason(b.id)) {
+    const why = Blobs.uploadBlockReason(b.id);
+    overlay = `<div class="lib-dl"><span class="lib-dl-note lib-dl-blocked" title="${escapeHtml(why)}">${t('Sin subir: sync lleno')}</span></div>`;
   }
 
   return `
@@ -1769,7 +1774,10 @@ async function openBookMenu(id, anchor) {
       : (size ? t('Exportar archivo ({size})…', { size }) : t('Exportar archivo…'));
     storage += `<button class="lib-menu-item" data-act="export">${icon('share', { size: 'md' })}<span>${label}</span></button>`;
     if (!uploaded && (book.size || 0) > Blobs.MAX_AUTO_UPLOAD) {
-      storage += `<button class="lib-menu-item" data-act="upload">${icon('cloud', { size: 'md' })}<span>${t('Subir a Drive ({size})', { size: humanSize(book.size) })}</span></button>`;
+      const upLabel = SyncProvider.activeId() === 'drive'
+        ? t('Subir a Drive ({size})', { size: humanSize(book.size) })
+        : t('Subir al sync ({size})', { size: humanSize(book.size) });
+      storage += `<button class="lib-menu-item" data-act="upload">${icon('cloud', { size: 'md' })}<span>${upLabel}</span></button>`;
     }
     if (canFree) {
       storage += `<button class="lib-menu-item" data-act="undownload">${icon('xmark', { size: 'md' })}<span>${t('Quitar descarga de este dispositivo')}</span></button>`;

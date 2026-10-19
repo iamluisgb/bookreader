@@ -34,6 +34,10 @@ const MANUAL_KEY = 'blob_manual_uploads';  // ids que el usuario mandó subir pe
 const ENABLED_KEY = 'sync_files';          // interruptor general de sync de ficheros
 
 const downloadQueue = [];
+// Libros que NO se subieron por falta de espacio, con el motivo. La tarjeta lo enseña (la
+// lección de P7: «Solo notas» sin decir por qué). Se vacía al empezar cada pasada: si el
+// espacio se liberó, el siguiente intento lo dirá.
+const blocked = new Map();
 let inFlight = null; // promesa de la pasada en curso (null si la cola está parada)
 let current = null;  // { id, dir, loaded, total }
 
@@ -66,6 +70,10 @@ export function setEnabled(on) {
 // usuario); por el sync de BookReader lo decide la suscripción. El de metadatos va siempre.
 export function canTransfer() {
   return Provider.isConnected() && Provider.canTransferFiles() && isEnabled();
+}
+
+export function uploadBlockReason(id) {
+  return blocked.get(id) || '';
 }
 
 export function currentTransfer() {
@@ -203,10 +211,12 @@ async function uploadOne(meta) {
     emit({ id: meta.id, dir: 'up', state: 'done', loaded: meta.size || 0, total: meta.size || 0 });
     return true;
   } catch (e) {
-    emit({ id: meta.id, dir: 'up', state: 'error', message: transferMessage(e) });
+    const quota = Provider.isQuotaError(e);
+    if (quota) blocked.set(meta.id, transferMessage(e));
+    emit({ id: meta.id, dir: 'up', state: 'error', message: transferMessage(e), quota });
     // Cuota llena: no seguir intentando con el resto de la cola, se dará el
     // mismo error con cada libro y solo sirve para quemar peticiones.
-    if (Provider.isQuotaError(e)) throw e;
+    if (quota) throw e;
     return false;
   } finally {
     current = null;
@@ -242,9 +252,19 @@ async function drain() {
     await downloadOne(id);
   }
   for (const record of await pendingRemovals()) await removeOne(record);
-  for (const record of await pendingUploads()) {
+  blocked.clear();
+  const uploads = await pendingUploads();
+  for (let i = 0; i < uploads.length; i++) {
     if (downloadQueue.length) break;   // llegó una petición del usuario: atenderla ya
-    await uploadOne(record);
+    try {
+      await uploadOne(uploads[i]);
+    } catch (e) {
+      // Al tope: los que quedan tampoco van a caber. Se apuntan con el mismo motivo para que
+      // sus tarjetas lo digan, y se corta aquí.
+      for (const r of uploads.slice(i + 1)) blocked.set(r.id, transferMessage(e));
+      window.dispatchEvent(new CustomEvent('bookreader:library-changed'));
+      throw e;
+    }
   }
   // Si entraron descargas mientras subíamos, vaciarlas antes de soltar el lock.
   if (downloadQueue.length) await drain();

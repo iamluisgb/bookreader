@@ -319,6 +319,103 @@ async function putObject(path, request, env, cors, who, now = Date.now()) {
   return json({ etag, size: len }, 200, { ...cors, ETag: etag });
 }
 
+// ---- Subida por partes (F4) ----------------------------------------------------------------
+//
+// Para los libros que no caben en un PUT (100 MB de cuerpo en Workers). Mismo modelo que un PUT:
+// se reserva la cuota con el tamaño TOTAL antes de empezar, las partes van a una clave nueva y
+// al completar se mueve el puntero. El identificador de la subida que ve el cliente es el etag
+// que tendrá el fichero (aleatorio), no el uploadId de R2: ese se queda en D1.
+//
+//   POST   /v1/mp/<ruta>                      X-Total-Size  → { uploadId }
+//   PUT    /v1/mp/<ruta>/<uploadId>/<n>       una parte     → { etag }
+//   POST   /v1/mp/<ruta>/<uploadId>/complete  { parts, name } → { etag, size }
+//   DELETE /v1/mp/<ruta>/<uploadId>         abandonar (libera la cuota)
+
+async function mpStart(path, request, env, cors, who, now = Date.now()) {
+  if (who.readOnly) return json({ error: 'read_only' }, 403, cors);
+  const c = config(env);
+  if (!c.filesEnabled) return json({ error: 'files_disabled' }, 403, cors);
+  const total = Number(request.headers.get('X-Total-Size') || 0);
+  if (!total) return json({ error: 'length_required' }, 411, cors);
+  if (env.WRITES) {
+    const { success } = await env.WRITES.limit({ key: who.user });
+    if (!success) return json({ error: 'rate_limited' }, 429, cors);
+  }
+  const etag = randomId();
+  const key = blobKey(who.user, path, etag);
+  const why = await reserve(env, { key, user: who.user, path, size: total, kind: 'file' }, now);
+  if (why) { await refused(env, now); return json({ error: why }, 507, cors); }
+  if (!(await spend(env, 'a', now))) {
+    await env.DB.prepare('DELETE FROM blobs WHERE key = ?').bind(key).run();
+    await refused(env, now);
+    return json({ error: 'capacity' }, 507, cors);
+  }
+  const up = await env.SYNC.createMultipartUpload(key, { httpMetadata: { contentType: 'application/octet-stream' } });
+  await env.DB.prepare('UPDATE blobs SET upload_id = ? WHERE key = ?').bind(up.uploadId, key).run();
+  return json({ uploadId: etag }, 200, cors);
+}
+
+async function pendingUpload(env, who, path, handle) {
+  const key = blobKey(who.user, path, handle);
+  const row = await env.DB.prepare(`SELECT key, size, received, upload_id FROM blobs WHERE key = ? AND user = ? AND state = 'pending' AND upload_id IS NOT NULL`)
+    .bind(key, who.user).first();
+  return row;
+}
+
+async function mpPart(path, handle, n, request, env, cors, who, now = Date.now()) {
+  if (who.readOnly) return json({ error: 'read_only' }, 403, cors);
+  const c = config(env);
+  const row = await pendingUpload(env, who, path, handle);
+  if (!row) return json({ error: 'not_found' }, 404, cors);
+  const len = Number(request.headers.get('Content-Length') || 0);
+  if (!len) return json({ error: 'length_required' }, 411, cors);
+  if (len > c.maxBytes) return json({ error: 'too_large', max: c.maxBytes }, 413, cors);
+  // Lo que llega no puede pasar de lo reservado: es lo que se contó contra la cuota.
+  const ok = await env.DB.prepare('UPDATE blobs SET received = received + ? WHERE key = ? AND received + ? <= size RETURNING key')
+    .bind(len, row.key, len).first();
+  if (!ok) return json({ error: 'too_large' }, 413, cors);
+  if (!(await spend(env, 'a', now))) {
+    await env.DB.prepare('UPDATE blobs SET received = received - ? WHERE key = ?').bind(len, row.key).run();
+    await refused(env, now);
+    return json({ error: 'capacity' }, 507, cors);
+  }
+  const part = await env.SYNC.resumeMultipartUpload(row.key, row.upload_id).uploadPart(n, request.body);
+  return json({ etag: part.etag, partNumber: part.partNumber }, 200, cors);
+}
+
+async function mpComplete(path, handle, request, env, cors, who, now = Date.now()) {
+  if (who.readOnly) return json({ error: 'read_only' }, 403, cors);
+  const row = await pendingUpload(env, who, path, handle);
+  if (!row) return json({ error: 'not_found' }, 404, cors);
+  let body;
+  try { body = await request.json(); } catch { return json({ error: 'bad_request' }, 400, cors); }
+  const parts = (Array.isArray(body?.parts) ? body.parts : [])
+    .filter((p) => Number.isInteger(p?.partNumber) && typeof p?.etag === 'string')
+    .sort((a, b) => a.partNumber - b.partNumber);
+  const name = typeof body?.name === 'string' ? body.name : '';
+  if (!parts.length || name.length > NAME_MAX) return json({ error: 'bad_request' }, 400, cors);
+  if (!(await spend(env, 'a', now))) { await refused(env, now); return json({ error: 'capacity' }, 507, cors); }
+  const obj = await env.SYNC.resumeMultipartUpload(row.key, row.upload_id).complete(parts);
+  const size = obj.size ?? row.received;
+  // El tamaño real (no el declarado) es el que queda en la cuota.
+  await env.DB.prepare('UPDATE blobs SET size = ? WHERE key = ?').bind(size, row.key).run();
+  const r = await commit(env, { user: who.user, path, name, key: row.key, etag: handle, size, kind: 'file' }, now);
+  if (!r.ok) {
+    await dropBlob(env, row.key);
+    return json({ error: 'precondition_failed' }, 412, cors);
+  }
+  await retire(env, { user: who.user, path, old: r.old, keepVersions: false });
+  return json({ etag: handle, size }, 200, cors);
+}
+
+async function mpAbort(path, handle, env, cors, who) {
+  const row = await pendingUpload(env, who, path, handle);
+  if (!row) return json({ ok: true }, 200, cors);
+  try { await env.SYNC.resumeMultipartUpload(row.key, row.upload_id).abort(); } catch { /* ya no existía */ }
+  await dropBlob(env, row.key);
+  return json({ ok: true }, 200, cors);
+}
+
 async function getObject(path, env, cors, who) {
   // D1 primero: lo que no existe se contesta sin gastar una lectura de R2.
   const row = await env.DB.prepare('SELECT key, etag, name, size, updated_at FROM objects WHERE user = ? AND path = ?').bind(who.user, path).first();
@@ -495,7 +592,19 @@ export default {
       if (pathname === '/v1/list' && method === 'GET') return await listObjects(env, cors, who);
       if (pathname === '/v1/all' && method === 'DELETE') { await wipeUser(env, who.user); return json({ ok: true }, 200, cors); }
 
-      let m = pathname.match(/^\/v1\/(o|meta|versions)\/([^/]+)(?:\/([^/]+))?$/);
+      const mp = pathname.match(/^\/v1\/mp\/([^/]+)(?:\/([^/]+)(?:\/([^/]+))?)?$/);
+      if (mp && PATH_RE.test(mp[1])) {
+        const [, path, handle, step] = mp;
+        if (!handle && method === 'POST') return await mpStart(path, request, env, cors, who);
+        if (handle && ID_RE.test(handle)) {
+          if (!step && method === 'DELETE') return await mpAbort(path, handle, env, cors, who);
+          if (step === 'complete' && method === 'POST') return await mpComplete(path, handle, request, env, cors, who);
+          if (/^[1-9]\d{0,3}$/.test(step || '') && method === 'PUT') return await mpPart(path, handle, Number(step), request, env, cors, who);
+        }
+        return json({ error: 'not_found' }, 404, cors);
+      }
+
+      const m = pathname.match(/^\/v1\/(o|meta|versions)\/([^/]+)(?:\/([^/]+))?$/);
       if (m && PATH_RE.test(m[2])) {
         const [, kind, path, sub] = m;
         if (kind === 'o' && !sub) {

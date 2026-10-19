@@ -264,6 +264,75 @@ test('límite de escrituras por usuario y minuto', async () => {
   assert.equal(e.SYNC._ops.put, 0);
 });
 
+// ---- Subida por partes (F4) -----------------------------------------------------------
+
+async function mp(e, token, path, sizes, { total, name = 'n' } = {}) {
+  const start = await worker.fetch(req('POST', '/v1/mp/' + path, { token, headers: { 'X-Total-Size': String(total ?? sizes.reduce((a, b) => a + b, 0)) } }), e);
+  if (start.status !== 200) return { start };
+  const { uploadId } = await start.json();
+  const parts = [];
+  for (let i = 0; i < sizes.length; i++) {
+    const r = await worker.fetch(req('PUT', `/v1/mp/${path}/${uploadId}/${i + 1}`, { token, body: bytes(sizes[i], i + 1) }), e);
+    if (r.status !== 200) return { start, uploadId, part: r };
+    parts.push({ partNumber: i + 1, etag: (await r.json()).etag });
+  }
+  const done = await worker.fetch(req('POST', `/v1/mp/${path}/${uploadId}/complete`, { token, body: JSON.stringify({ parts, name }) }), e);
+  return { start, uploadId, done };
+}
+
+test('POR PARTES: el fichero entero se lee como uno, con su nombre; cuenta contra la cuota de ficheros', async () => {
+  const e = env();
+  const { token } = await login(e);
+  const r = await mp(e, token, P1, [3, 3, 2], { name: 'libro-cifrado' });
+  assert.equal(r.done.status, 200);
+  const { etag, size } = await r.done.json();
+  assert.equal(size, 8);
+  const g = await get(e, token, P1);
+  assert.equal(g.headers.get('ETag'), etag);
+  assert.equal(g.headers.get('X-Name'), 'libro-cifrado');
+  assert.deepEqual([...new Uint8Array(await g.arrayBuffer())], [1, 1, 1, 2, 2, 2, 3, 3]);
+  const st = await (await worker.fetch(req('GET', '/v1/status', { token }), e)).json();
+  assert.equal(st.used.files, 8);
+  assert.equal(e.SYNC._ops.list, 0);
+});
+
+test('POR PARTES: la cuota se reserva al empezar; no se puede subir más de lo declarado', async () => {
+  const e = env({ FILE_QUOTA_BYTES: '10' });
+  const { token } = await login(e);
+  const lleno = await mp(e, token, P1, [6, 6]);                        // 12 > 10
+  assert.equal(lleno.start.status, 507);
+  assert.equal((await lleno.start.json()).error, 'quota');
+  const tramposo = await mp(e, token, P2, [4, 4], { total: 5 });       // declara 5, manda 8
+  assert.equal(tramposo.part.status, 413);
+});
+
+test('POR PARTES: abandonar libera la cuota y la purga limpia lo que nadie terminó', async () => {
+  const e = env({ FILE_QUOTA_BYTES: '10' });
+  const { token } = await login(e);
+  const s1 = await worker.fetch(req('POST', '/v1/mp/' + P1, { token, headers: { 'X-Total-Size': '8' } }), e);
+  const { uploadId } = await s1.json();
+  assert.equal((await mp(e, token, P2, [4])).start.status, 507);       // 8 reservados + 4 > 10
+  assert.equal((await worker.fetch(req('DELETE', `/v1/mp/${P1}/${uploadId}`, { token }), e)).status, 200);
+  assert.equal((await mp(e, token, P2, [4])).done.status, 200);
+  assert.equal(e.SYNC._uploads.size, 0);
+
+  await worker.fetch(req('POST', '/v1/mp/' + P1, { token, headers: { 'X-Total-Size': '3' } }), e);
+  assert.equal(e.SYNC._uploads.size, 1);
+  const p = await purge(e, Date.now() + 2 * 86400000);
+  assert.equal(p.pending, 1);
+  assert.equal(e.SYNC._uploads.size, 0);
+});
+
+test('POR PARTES: sin ficheros en el plan o en solo lectura, no se empieza', async () => {
+  const off = env({ FILES_ENABLED: '0' });
+  const s = await login(off);
+  assert.equal((await mp(off, s.token, P1, [3])).start.status, 403);
+  const e = env();
+  const { token } = await login(e);
+  e.DB._raw.prepare('UPDATE tokens SET read_only = 1').run();
+  assert.equal((await mp(e, token, P1, [3])).start.status, 403);
+});
+
 // ---- Suscripción caducada --------------------------------------------------------------
 
 test('CADUCA LA SUSCRIPCIÓN: solo lectura durante GRACE_DAYS, después 403 y la purga lo borra', async () => {
