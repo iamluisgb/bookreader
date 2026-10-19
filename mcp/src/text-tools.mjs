@@ -23,6 +23,11 @@ const LINE = /^\[\[(a\d+)\]\]\s?(.*)$/;
 const STOP = new Set(('the of and to in is it that for on as with be by this are was or an at from which ' +
   'de la el en y que los las del un una por con se para al lo su como mas o').split(' '));
 
+// Una palabra que sale más veces que esto casi no puntúa en BM25 (su idf es ~0) y es la que
+// más CPU cuesta (una línea que localizar por aparición): se deja de contar. Medido en el Worker:
+// una búsqueda de palabras muy comunes pasaba de 90 ms de CPU.
+const MAX_HITS_PER_TERM = 1500;
+
 const words = (s) => (s.match(/\S+/g) || []).length;
 
 const NO_TEXT =
@@ -138,7 +143,12 @@ export function searchLines(text, query, { passages, avgChars }, limit) {
   if (!terms.length) throw new ToolError('«query» no tiene ninguna palabra que buscar (las muy comunes no cuentan).');
   const hits = new Map();   // inicio de línea → Map(término → veces)
   const df = new Map();
+  let skipped = 0;
   for (const t of terms) {
+    // Contar primero, barato (solo indexOf): si es una palabra de casi todas las líneas, fuera.
+    let count = 0;
+    for (let pos = text.indexOf(t); pos >= 0 && count <= MAX_HITS_PER_TERM; pos = text.indexOf(t, pos + t.length)) count++;
+    if (count > MAX_HITS_PER_TERM) { skipped++; continue; }
     const lines = new Set();
     for (let pos = text.indexOf(t); pos >= 0; pos = text.indexOf(t, pos + t.length)) {
       const prev = text.charCodeAt(pos - 1);
@@ -152,6 +162,7 @@ export function searchLines(text, query, { passages, avgChars }, limit) {
     }
     df.set(t, lines.size);
   }
+  if (skipped === terms.length) throw new ToolError('Esas palabras salen en casi todo el libro: busca algo más concreto.');
   const N = Math.max(1, passages);
   const avg = Math.max(1, avgChars);
   const k1 = 1.2;
