@@ -3,6 +3,16 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-10-19 — La matriz funciona con el modelo real; motor del tipo «pregunta con distractores» (P43)
+
+Probada por la app con el modelo real, la matriz salía vacía: el modelo gastaba todos los tokens
+razonando. Ahora se pide sin razonamiento (al proveedor nan directo y por el gateway, que lo reenvía
+solo a las rutas que lo admiten) y llega en ~9 s. Una respuesta fuera de las opciones de su columna
+se repara en código. Batería de 20 capítulos con esta configuración: 95 % a la primera, 100 % con el
+reintento. Además, el motor y el eval del tipo 5 (preguntas con distractores que enseñan, cada
+opción con su porqué): 86 % de preguntas válidas a la primera (valla 85 %), todavía sin superficie.
+Tests: `mcq.spec.ts` (nuevo), `widgets.spec.ts` y el del gateway.
+
 ## 2026-10-19 — La matriz para rellenar, desde el menú de flashcards (P43 F2–F3)
 
 El primer widget de estudio llega a la app. En Flashcards, con un capítulo elegido, la sección

@@ -2067,7 +2067,7 @@ mide) · cambiar la semántica de la racha · la mejora de generación al estilo
 cuya literal ES la respuesta: término, fecha, cifra), que es trabajo futuro del prompt de
 generación de tarjetas y no de la medida.
 
-### P43 — Widgets de estudio: siete tipos que el agente rellena para cualquier libro · `L` · **F1–F3 ✓ (2026-10-19)**
+### P43 — Widgets de estudio: siete tipos que el agente rellena para cualquier libro · `L` · **F1–F3 ✓ · F4a ✓ (2026-10-19)**
 
 **Contexto (2026-10-16).** Cuatro prototipos a mano sobre DDIA (anomalías, lease, rebalanceo,
 timeout, en el lab) gustaron, pero cada uno lleva su propio motor y no valen para otro libro. La
@@ -2190,7 +2190,27 @@ antes de implementar)*
     desacuerdo marca la pregunta como dudosa) ≥ 85 %; a ciegas, sin el capítulo, lo más bajo posible
     (al azar ≈ 27–33 %); señal «la correcta es la más larga» (el truco clásico de examen).
   - Time-box: 3 ciclos de prompt.
-- F4a motor puro y eval (esta entrega); F4b la superficie (tipo de tarjeta en el menú y en el repaso).
+- **F4a · ✓ (2026-10-19)** motor puro [`mcq.js`](app/js/ai/widgets/mcq.js) (validación por pregunta,
+  corrección, barajado estable, señales), generación
+  [`generate-mcq.js`](app/js/ai/widgets/generate-mcq.js) (reintento solo de las preguntas que
+  fallan; entero si no hay spec usable) y eval [`evals/mcq.mjs`](evals/mcq.mjs). Tests en
+  `tests/mcq.spec.ts`. Todavía sin superficie.
+
+  | Run | Prompt | 1.ª respuesta | Tras reintento | Ida y vuelta | A ciegas |
+  |---|---|---|---|---|---|
+  | baseline-v1 | v1 | **86 %** (86/100) | 90 % | 100 % | 97 % (azar 25 %) |
+  | c1-v2 | v2 (falsas que un experto sostendría; correcta no «la más prudente»; opciones ≤ 120) | **86 %** | 90 % | 100 % | 98 % |
+
+  **Contrato cumplido** (≥ 85 %). Fallos: opciones o enunciados largos (4) y JSON con una llave de
+  menos (2 capítulos), que arregla el reintento entero. La correcta más larga baja de 5/90 a 2/90
+  con v2.
+  **Hallazgo:** a ciegas, el solver acierta el 97–98 % en los cuatro libros, y el prompt no lo mueve.
+  Con textos tan conocidos (Pro Git, Einstein, Mill, la Constitución) no se puede separar «el modelo
+  se sabe el libro» de «los distractores son flojos». Para medirlo hace falta en la batería un libro
+  poco conocido o posterior al corte del modelo. Hasta entonces, no gastar los ciclos 2–3 en esto.
+- **F4b · Superficie** `M`: «Pregunta con distractores» como tipo de tarjeta de texto en el menú
+  (junto a P→R y Cloze), tarjeta `mcq` en el repaso (opciones barajadas, compromiso antes de ver,
+  feedback de la elegida y cita), campos en la whitelist de `sameCard`, export a Anki como texto.
 
 **F5+ · Los demás tipos**, cada uno con su contrato y su batería, en este orden (revisado el
 2026-10-19): **5 · distractores que enseñan** (es atómico: entra como tipo de tarjeta en FSRS, no

@@ -19,7 +19,7 @@
 import { normalizeAnswer } from '../cloze-check.js';
 
 export const WIDGET_VERSION = 1;
-export const WIDGET_TYPES = ['matrix'];
+export const WIDGET_TYPES = ['matrix', 'mcq'];
 
 // Una cita más corta no prueba nada (casaría en cualquier texto); una más larga suele ser un
 // párrafo parafraseado, no una cita.
