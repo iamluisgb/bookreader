@@ -12,6 +12,7 @@
 //      pagar por adelantado un mapa gigante que nadie lee.
 // La geometría vive en `mindmap-render.js` (pura, sin red ni IDB).
 import { t } from '../i18n.js';
+import { clampWords, buildMindmapTree } from './artifact-schema.js';
 import * as LLM from './llm.js';
 import * as Retrieval from './retrieval.js';
 import * as Jobs from './jobs.js';
@@ -415,52 +416,15 @@ function renderRunning(job) {
 
 // Valida/normaliza el árbol temático del modelo; si falta o es inválido, cae a un mapa
 // por capítulos (nunca a ramas anónimas "Ideas N", que vacían de sentido el mapa).
-// Recorta a `maxChars` por FRONTERA DE PALABRA y marca el corte con «…», CONTADO dentro del
-// máximo: así la etiqueta sigue cabiendo en la píldora y wrapLabel no la vuelve a truncar
-// (una segunda «…»). El texto completo va al detalle del nodo.
-// Palabras que no pueden cerrar una etiqueta recortada: «Fiabilidad, escalabilidad y» o
-// «Esquema en lectura frente a esquema en» se leían como un error, no como un resumen.
-const DANGLING = /\s+(?:y|e|o|u|ni|de|del|la|las|el|los|un|una|a|al|en|con|por|para|sin|sobre|entre|frente|que|como|su|sus|tu|tus|mi|mis|se|lo|and|or|of|the|a|an|to|in|on|for|with|by|vs\.?)$/i;
-
-export function clampWords(s, maxChars) {
-  s = String(s || '').trim();
-  if (s.length <= maxChars) return s;
-  const cut = s.slice(0, maxChars - 1);   // un hueco para la «…»
-  const sp = cut.lastIndexOf(' ');
-  let out = (sp > 6 ? cut.slice(0, sp) : cut).trim().replace(/[\s,;:.\-–—]+$/, '');
-  for (let i = 0; i < 3 && DANGLING.test(out); i++) out = out.replace(DANGLING, '').replace(/[\s,;:]+$/, '');
-  // El corte se marca: el texto completo está en el detalle del nodo (`full`).
-  return out + '…';
-}
+// El recorte de etiquetas (clampWords) y la forma del árbol viven en artifact-schema.js: es
+// lo mismo que aplica el MCP cuando un agente crea un mapa, y los renderers no re-normalizan.
+export { clampWords };
 
 // Valida/normaliza el árbol del modelo. Devuelve null si no es usable, para que el llamante
 // decida — antes caía directo al fallback aquí dentro, y eso impedía darle una segunda
 // oportunidad al modelo.
 function buildTree(tree, scopeName) {
-  const cleanSrc = (s) => (typeof s === 'string' && (s.match(/a\d+/) || [])[0]) || '';
-  // Cada hoja guarda una etiqueta CORTA visible + el texto completo (`full`) para el detalle.
-  // RECURSIVA desde F6: un mapa expandido tiene nietos, y al reabrirlo desde IndexedDB pasa
-  // otra vez por aquí — sin recursión, expandir se perdía al cerrar el modal.
-  const asLeaf = (raw, depth = 0) => {
-    const full = String(raw.label ?? raw).replace(/\s*\[\[a\d+\]\]\s*$/, '').trim();
-    const leaf = { label: clampWords(full, 42), src: cleanSrc(raw.src), full };
-    const kids = depth < 2 && Array.isArray(raw.children) ? raw.children : [];
-    if (kids.length) leaf.children = kids.slice(0, 6).map(k => asLeaf(k, depth + 1)).filter(c => c.label);
-    return leaf;
-  };
-  if (tree && Array.isArray(tree.branches) && tree.branches.length) {
-    const branches = tree.branches.slice(0, 8).map((br, i) => {
-      const label = String(br.label || t('Rama {n}', { n: i + 1 })).trim();
-      return {
-        label: clampWords(label, 32), full: label,
-        children: (Array.isArray(br.children) ? br.children : []).slice(0, 6).map(asLeaf).filter(c => c.label),
-      };
-    }).filter(br => br.children.length);
-    // P14 F2 · Un árbol de UNA rama no es un mapa (el eval lo cazó en el PDF): mejor el
-    // fallback por capítulos, que garantiza estructura fiel al libro.
-    if (branches.length >= 2) return { title: clampWords(String(tree.title || scopeName), 44), branches };
-  }
-  return null;
+  return buildMindmapTree(tree, scopeName, { branchLabel: (i) => t('Rama {n}', { n: i + 1 }) });
 }
 
 // Acorta un título de capítulo para usarlo como rótulo de rama: quita el numeral inicial

@@ -11,6 +11,7 @@
 // que el Studio lo lista, lo reabre y lo borra sin saber que existe.
 
 import { t } from '../i18n.js';
+import { LIMITS, parseJson, normalizeInfographic } from './artifact-schema.js';
 import * as LLM from './llm.js';
 import * as Jobs from './jobs.js';
 import { buildChunks } from './flashcards.js';
@@ -27,25 +28,8 @@ const KIND = 'infographic';
 const BOOK_TOKENS = 30000; // cobertura de libro entero (igual que el mapa)
 const MAX_MAP_CALLS = 3; // techo de llamadas del barrido: la paciencia tiene un límite
 
-// Techos del esquema. Son GATES, no estética: a un modelo al que se le piden «ideas clave» le
-// salen veinte, y veinte ideas convierten el póster en un muro.
-export const LIMITS = {
-  ideas: 8,
-  panels: 3,
-  panelItems: 4,
-  aside: 2,
-  thesis: 260,
-  head: 48,
-  body: 170,
-  quote: 170,
-  attribution: 90,
-};
-
-// Iconos por posición (el modelo no conoce nuestro set). Determinista: misma ranura, mismo
-// icono. Evita además el problema de la v1 del prototipo, donde `chart` salía cuatro veces.
-const IDEA_ICONS = ['target', 'chart', 'user', 'note', 'undo', 'warning', 'books', 'sparkles'];
-const STEP_ICONS = ['sparkles', 'chart', 'columns', 'target', 'books', 'gear', 'check', 'undo'];
-const COL_ICONS = ['columns', 'chart', 'books', 'undo', 'target', 'note', 'gear', 'warning'];
+// Techos e iconos del esquema: artifact-schema.js (los comparte el MCP).
+export { LIMITS };
 
 let ctx = null; // { bookId, bookTitle, bookAuthor, goal, ensureIndex, anchors, mode, viewArtifact }
 let overlay = null;
@@ -309,122 +293,13 @@ async function runInfographic({ chunks, goal, scopeName, signal, progress, backg
   return out;
 }
 
-// ---- Normalización (pura, testeable) -----------------------------------------
+// ---- Normalización (pura, en artifact-schema.js) ------------------------------------
 
-function str(v) {
-  return typeof v === 'string' ? v.replace(/\s+/g, ' ').trim() : '';
-}
+export { parseJson };
 
-function clamp(s, max) {
-  s = str(s);
-  if (s.length <= max) return s;
-  const cut = s.slice(0, max);
-  const sp = cut.lastIndexOf(' ');
-  return `${(sp > max * 0.6 ? cut.slice(0, sp) : cut).replace(/[\s.,;:]+$/, '')}…`;
-}
-
-// El modelo a veces envuelve el JSON en ```json ... ``` o añade una frase antes. Se busca el
-// primer objeto balanceado en vez de fiarse de `JSON.parse` a la primera.
-export function parseJson(raw) {
-  let s = String(raw || '').trim();
-  const fence = s.match(/```(?:json)?\s*([\s\S]*?)```/i);
-  if (fence) s = fence[1].trim();
-  const start = s.indexOf('{');
-  if (start < 0) return null;
-  let depth = 0;
-  for (let i = start; i < s.length; i++) {
-    if (s[i] === '{') depth++;
-    else if (s[i] === '}') {
-      depth--;
-      if (depth === 0) {
-        try {
-          return JSON.parse(s.slice(start, i + 1));
-        } catch {
-          return null;
-        }
-      }
-    }
-  }
-  return null;
-}
-
-// Recorta y da forma al JSON del modelo. Devuelve el contenido del póster (sin portada ni
-// título: eso lo pone la app, que es quien los tiene). `invalid` cuenta las anclas que no
-// existen en el libro — es la señal que mide el contrato de P29, aunque el póster no las pinte.
+// Recorta y da forma al JSON del modelo (ver artifact-schema.js · normalizeInfographic).
 export function normalize(raw, anchors = null) {
-  const o = typeof raw === 'string' ? parseJson(raw) : raw || {};
-  const list = (v) => (Array.isArray(v) ? v : []);
-  const invalid = { count: 0 };
-
-  const takeSrc = (src) => {
-    const s = str(src).replace(/^\[\[|\]\]$/g, '');
-    if (!s) return '';
-    if (anchors && !anchors.has(s)) {
-      invalid.count++;
-      return '';
-    }
-    return s;
-  };
-
-  const ideas = list(o.ideas)
-    .map((it, i) => ({
-      ico: IDEA_ICONS[i % IDEA_ICONS.length],
-      head: clamp(it && (it.head || it.title), LIMITS.head),
-      body: clamp(it && (it.body || it.text), LIMITS.body),
-      src: takeSrc(it && it.src),
-    }))
-    .filter((it) => it.head && it.body)
-    .slice(0, LIMITS.ideas);
-
-  const kindOf = (k) => (['flow', 'cols', 'rows'].includes(k) ? k : null);
-  const panels = list(o.panels)
-    .map((p) => {
-      const kind = kindOf(p && p.kind);
-      if (!kind) return null;
-      const icons = kind === 'flow' ? STEP_ICONS : kind === 'rows' ? null : COL_ICONS;
-      const items = list(p.items)
-        .map((it, i) => {
-          const base = { src: takeSrc(it && it.src) };
-          if (kind === 'rows') return { tag: clamp(it && (it.tag || it.head), 40), body: clamp(it && it.body, LIMITS.body), ...base };
-          return {
-            ico: icons[i % icons.length],
-            head: clamp(it && (it.head || it.title), LIMITS.head),
-            sub: clamp(it && it.sub, 40),
-            body: clamp(it && it.body, LIMITS.body),
-            ...base,
-          };
-        })
-        .filter((it) => (kind === 'rows' ? it.tag && it.body : it.head && it.body))
-        .slice(0, LIMITS.panelItems);
-      if (!items.length) return null;
-      return { kind, title: clamp(p && p.title, LIMITS.head), items };
-    })
-    .filter(Boolean)
-    .slice(0, LIMITS.panels);
-
-  const aside = list(o.aside)
-    .map((a, i) => ({
-      ico: i === 0 ? 'note' : 'target',
-      label: clamp(a && (a.label || a.head), 40),
-      body: clamp(a && a.body, LIMITS.body),
-    }))
-    .filter((a) => a.label && a.body)
-    .slice(0, LIMITS.aside);
-
-  const quote = o.quote || {};
-  return {
-    kicker: clamp(o.kicker, 70),
-    thesis: clamp(o.thesis, LIMITS.thesis),
-    ideasTitle: clamp(o.ideasTitle, 40) || t('Ideas clave'),
-    ideas,
-    panels,
-    aside,
-    quote: {
-      text: clamp(quote.text, LIMITS.quote),
-      attribution: clamp(quote.attribution, LIMITS.attribution),
-    },
-    invalid,
-  };
+  return normalizeInfographic(raw, anchors, { ideasTitle: t('Ideas clave') });
 }
 
 // ---- Acento y portada --------------------------------------------------------

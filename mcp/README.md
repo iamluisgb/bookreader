@@ -101,9 +101,43 @@ node cli.mjs --dir ~/bookreader-layout reading_stats '{"range":"7d"}'
 | `search_highlights` | `query`, `bookId?`, `limit?` | Busca en el texto de los subrayados y en sus notas, sin distinguir mayúsculas ni acentos. Todos los términos deben aparecer (AND). |
 | `reading_stats` | `range?`, `bookId?`, `groupBy?` | **Solo F2.** Minutos, palabras y unidades de lectura real, con desglose por día/semana/mes y por libro. |
 | `list_decks` | `bookId?` | **Solo F2.** Mazos de flashcards con contadores de repaso: tarjetas, vencidas hoy, nuevas y suspendidas. Sin el texto de las tarjetas. |
-| `get_deck` | `bookId`, `deckId?` o `scope?`, `limit?` | **Solo F2.** Las tarjetas de un mazo: frente, dorso, capítulo, suspensión y estado SRS (`due`, `reps`, `stability`, `difficulty`). |
+| `get_deck` | `bookId`, `deckUid?` (o `deckId?`/`scope?`), `limit?` | **Solo F2.** Las tarjetas de un mazo: frente, dorso, capítulo, suspensión y estado SRS (`due`, `reps`, `stability`, `difficulty`). Mejor por `deckUid`: el `deckId` numérico cambia de un dispositivo a otro. |
 | `list_artifacts` | `bookId?`, `kind?` | **Solo F2.** Qué salió del Studio (summary, mindmap, infographic, figures), con una `preview` de como mucho 200 caracteres: nunca el contenido entero. |
 | `get_artifact` | `bookId`, `key` | **Solo F2.** El `result` completo de un artefacto, serializado, con tope de 20000 caracteres (`truncated: true` y `totalChars` si se recorta). |
+
+**Con el sync de BookReader**, según los permisos del token (Ajustes → Datos → Agentes):
+
+| Tool | Permiso | Qué hace |
+| --- | --- | --- |
+| `get_toc` | texto | Capítulos de un libro con su tamaño en palabras. |
+| `read_chapter` | texto | Un capítulo por páginas (~6000 palabras; `offset`/`nextOffset`), con las anclas `[[aN]]` de la app. |
+| `search_book` | texto | Los pasajes que mejor responden a una búsqueda (BM25), con ancla y capítulo. |
+| `add_cards` | escritura | Tarjetas nuevas (basic o cloze) en un mazo, validadas como en la app. |
+| `update_cards` | escritura | Cambia anverso, reverso, tipo, capítulo o suspensión. **El repaso se conserva.** |
+| `delete_cards` | escritura | Borra tarjetas (tombstone: el borrado llega a todos los dispositivos). |
+| `create_deck` | escritura | Un mazo nuevo para un libro o capítulo, con sus primeras tarjetas si se quiere. |
+| `create_mindmap` | escritura | Un mapa mental en el Studio (2–8 ramas, hasta 6 conceptos cada una). |
+| `create_infographic` | escritura | Una infografía con la plantilla de la app (tesis, ideas, paneles, cita). |
+| `create_summary` | escritura | Un resumen por capítulos, con viñetas que citan el pasaje. |
+| `delete_artifact` | escritura | Borra un mapa, infografía o resumen (tombstone). |
+
+Los artefactos se CREAN siempre (el Studio guarda el historial de cada tipo): mejorar un mapa
+es crear otro y borrar el viejo si sobra. Pasan por los mismos techos que los que genera la app
+(`app/js/ai/artifact-schema.js`, compartido), y sus citas (`src`) solo se guardan si existen en
+el texto del libro; las demás se quitan y se cuentan (`citationsDropped`).
+
+Todas las de escritura aceptan `dry_run: true` (el antes y el después, sin escribir). Escriben
+como un dispositivo más: leen el fichero del libro con su etag, lo cambian, lo cifran y lo
+guardan solo si nadie escribió entre medias (si alguien lo hizo, se relee y se reaplica); la
+versión anterior queda en el historial de la app. Cada tarjeta tocada lleva `editedBy`
+(«agent:<nombre del token>»). Texto y repaso se funden por separado en los dispositivos
+(`textAt`/`srsAt`, app/js/ai/db.js · mergeCardPair): reescribir una tarjeta mientras el móvil la
+repasa sin conexión no pierde ninguna de las dos cosas.
+
+El texto de los libros lo sube la app solo si algún agente tiene ese permiso, y solo de los
+libros que ya ha troceado (al usar en ellos el agente, la búsqueda o el estudio). Formato en
+`app/js/sync/book-text-build.js`: pensado para que ninguna tool lea el libro entero (el Worker
+tiene muy poco tiempo de CPU por petición).
 
 Los resultados van como JSON en el contenido de la tool. Los errores esperables (libro
 o mazo desconocido, argumento que falta, rango que no existe) se devuelven como resultado con

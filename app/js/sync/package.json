@@ -1,4 +1,0 @@
-{
-  "//": "Solo para Node: el MCP (mcp/) importa sync-crypto.js. No se publica (scripts/build-pages.mjs).",
-  "type": "module"
-}

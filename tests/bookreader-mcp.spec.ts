@@ -193,3 +193,55 @@ test('Agente con permiso de texto: la app sube el texto troceado y el agente lo 
   const found = await tool('search_book', { bookId: 'ddia', query: 'doctors on call', limit: 1 });
   expect(found.results[0]).toMatchObject({ id: 'a47', chapterTitle: 'Chapter 8. Transactions', text: 'Two doctors on call both go off call: that is write skew.' });
 });
+
+// Artefactos de un agente: llegan al dispositivo por el sync, el Studio los ve (getArtifacts
+// filtra por SEG_VERSION) y los renderers de la app los pintan.
+test('Agente crea un mapa mental y una infografía: llegan al Studio del dispositivo y se pintan', async ({ page }) => {
+  const server = await createSyncServer();
+  await installSyncServer(page, server);
+  await enableSyncPreview(page);
+  await seedBookReaderSync(page);
+  await page.goto('/');
+  await page.evaluate(async () => {
+    await (await import('/js/sync/bookreader-auth.js')).enable();
+    const Store = await import('/js/library/store.js');
+    const buf = new Uint8Array(1024).map((_, i) => (i * 5) % 251);
+    await Store.putBook({ id: 'ddia', title: 'Designing Data-Intensive Applications', author: 'Kleppmann', format: 'epub', fileName: 'ddia.epub', file: buf.buffer, size: buf.length, addedAt: Date.now(), progress: 0, status: 'reading', shelfIds: [] });
+    await (await import('/js/sync/engine.js')).syncNow();
+  });
+  await page.evaluate(async () => (await import('/js/ui/app-settings.js')).open('data'));
+  await page.locator('#appset-br-agent-create').click();
+  await page.locator('.dlg-overlay [data-field="name"]').fill('Claude');
+  await page.locator('.dlg-overlay [data-check="scopes"][value="write"]').check();
+  await page.locator('.dlg-overlay .dlg-ok').click();
+  await expect(page.locator('#appset-br-agent-token')).toContainText('br-mcp-');
+  const token = (await page.locator('#appset-br-agent-token').textContent())!.trim();
+  const tool = async (name: string, args: any) => {
+    const res = await server.worker.fetch(new Request(SYNC_URL + '/mcp', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } }),
+    }), server.env);
+    const r = (await res.json()).result;
+    expect(r.isError ?? false, r.content[0].text).toBe(false);
+    return JSON.parse(r.content[0].text);
+  };
+  await tool('create_mindmap', { book: 'designing', title: 'Transacciones', branches: [
+    { label: 'Anomalías', children: [{ label: 'Write skew' }, { label: 'Lost update' }] },
+    { label: 'Aislamiento', children: [{ label: 'Snapshot isolation' }] },
+  ] });
+  await tool('create_infographic', { book: 'designing', thesis: 'Las transacciones son un contrato de seguridad.', ideas: [{ head: 'ACID', body: 'Un conjunto de garantías.' }] });
+
+  const out = await page.evaluate(async () => {
+    await (await import('/js/sync/engine.js')).syncNow();
+    const DB = await import('/js/ai/db.js');
+    const arts = await DB.getArtifacts('ddia');
+    const mm = arts.find((a: any) => a.kind === 'mindmap');
+    const ig = arts.find((a: any) => a.kind === 'infographic');
+    const MR = await import('/js/ai/mindmap-render.js');
+    const IR = await import('/js/ai/infographic-render.js');
+    const svgMap = MR.renderSvg(MR.layout(mm.result)).svg.outerHTML;
+    const svgInfo = new XMLSerializer().serializeToString(IR.renderSvg(ig.result, { title: 'DDIA' }).svg);
+    return { kinds: arts.map((a: any) => a.kind).sort(), by: mm.params.by, map: svgMap.includes('Write skew') && svgMap.includes('Transacciones'), info: svgInfo.includes('ACID') };
+  });
+  expect(out).toEqual({ kinds: ['infographic', 'mindmap'], by: 'agent:Claude', map: true, info: true });
+});

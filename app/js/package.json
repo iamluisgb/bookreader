@@ -1,0 +1,4 @@
+{
+  "//": "Solo para Node: el MCP (mcp/) y el Worker importan módulos puros de la app (sync-crypto.js, book-text-build.js, artifact-schema.js). No se publica (scripts/build-pages.mjs).",
+  "type": "module"
+}

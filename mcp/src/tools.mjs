@@ -16,6 +16,7 @@ import { aggregateReading, RANGES, GROUP_BY } from './stats.mjs';
 import { resolveBookArg, fold } from './book-arg.mjs';
 import { WRITE_TOOLS } from './write-tools.mjs';
 import { TEXT_TOOLS } from './text-tools.mjs';
+import { ARTIFACT_TOOLS } from './artifact-tools.mjs';
 
 const LIMIT_DEFAULT = 50;
 const LIMIT_MAX = 500;
@@ -583,6 +584,7 @@ export const ALL_TOOLS = [
   GET_ARTIFACT,
   ...TEXT_TOOLS,
   ...WRITE_TOOLS,
+  ...ARTIFACT_TOOLS,
 ];
 
 /**
