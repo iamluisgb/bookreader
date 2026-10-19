@@ -6,6 +6,8 @@
 //
 //   ai_key                la API key del agente (BYOK): secreto del usuario.
 //   drive_refresh_token   el permiso permanente sobre su Drive.
+//   sync_key / sync_token la clave del sync de BookReader (abre todo lo sincronizado) y su
+//                         token de sesión (MON4).
 //   device_id             no es inocuo y no es solo «estado local»: es la mitad de la clave
 //                         con la que cada equipo escribe SUS días de lectura
 //                         (`${día}|${deviceId}`, P25 F3). Si se clona, dos equipos escriben
@@ -27,10 +29,10 @@
 // queda solo con `day`, `updatedAt` y `books`.
 
 /** Secretos que jamás salen del dispositivo (mismo criterio que app/js/backup.js). */
-export const SECRET_KEYS = ['ai_key', 'drive_refresh_token'];
+export const SECRET_KEYS = ['ai_key', 'drive_refresh_token', 'sync_key', 'sync_token'];
 
 /** Estado puramente local, sin sentido en otro dispositivo (mismo criterio que layout.js). */
-export const LOCAL_ONLY_KEYS = ['device_id', 'sync_state', 'sync_schema_migrated'];
+export const LOCAL_ONLY_KEYS = ['device_id', 'sync_state', 'sync_schema_migrated', 'sync_provider'];
 
 /**
  * Claves que el MCP ni lee ni devuelve, a ningún nivel de profundidad. `deviceId` es la

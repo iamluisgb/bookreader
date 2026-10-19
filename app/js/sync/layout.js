@@ -30,14 +30,15 @@ const BOOK_PREFIXES = ['highlights', 'bookmarks', 'lastPosition', 'lastPositionA
 const SCALAR_AT = { lastPosition: 'lastPositionAt', pdfLastPage: 'pdfLastPageAt' };
 const AT_PREFIXES = Object.values(SCALAR_AT);
 // Secretos que jamás salen del dispositivo (mismo criterio que backup.js).
-const SECRET_KEYS = ['ai_key', 'drive_refresh_token'];
+const SECRET_KEYS = ['ai_key', 'drive_refresh_token', 'sync_key', 'sync_token'];
 // Estado puramente local, sin sentido en otro dispositivo. `device_id` es el caso
 // peligroso y no solo inútil: es la mitad de la clave con la que cada equipo escribe SUS
 // días de lectura (`${día}|${deviceId}`, P25 F3). Si viaja, el segundo dispositivo lo
 // adopta al rellenar ajustes que le faltan, los dos pasan a escribir la MISMA fila y la
 // partición por dispositivo —lo único que hace que fusionar sea unir— se deshace en
 // silencio: uno de los dos deja de contar.
-const SKIP_KEYS = ['sync_schema_migrated', 'sync_state', 'device_id'];
+// `sync_provider` es la elección de ESTE equipo (Drive o el sync de BookReader).
+const SKIP_KEYS = ['sync_schema_migrated', 'sync_state', 'device_id', 'sync_provider'];
 
 function splitKey(key) {
   for (const p of BOOK_PREFIXES) {

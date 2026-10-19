@@ -1739,4 +1739,11 @@ const EN = {
   // MON4 · Sync de BookReader
   'Tu plan del sync de BookReader no incluye los archivos de los libros, o has llegado a su tope de espacio. Tus notas siguen sincronizando.':
     'Your BookReader Sync plan does not include book files, or you have reached its storage limit. Your notes keep syncing.',
+  'El sync de BookReader aún no está disponible.': 'BookReader Sync is not available yet.',
+  'El servidor del sync no responde ({status}).': 'The sync server is not responding ({status}).',
+  'Has llegado al tope de espacio del sync de BookReader.': 'You have reached your BookReader Sync storage limit.',
+  'El sync de BookReader está al límite ahora mismo. Se reintentará más tarde.': 'BookReader Sync is at capacity right now. It will retry later.',
+  'Sync de BookReader: error {status}.': 'BookReader Sync: error {status}.',
+  'Esa clave no es la de tu sync. Compruébala o usa el enlace de otro dispositivo.': 'That key does not match your sync. Check it or use the link from another device.',
+  'La clave de recuperación no está completa o tiene un error. Revísala.': 'The recovery key is incomplete or has a typo. Check it.',
 };
