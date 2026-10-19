@@ -1,6 +1,6 @@
 import { test, expect, Page, BrowserContext } from '@playwright/test';
 import { installDriveMocks, seedDriveToken, createDriveState } from './drive-mock';
-import { createSyncServer, installSyncServer, seedBookReaderSync, enableSyncPreview } from './bookreader-sync-mock';
+import { createSyncServer, installSyncServer, seedBookReaderSync, enableSyncPreview, SYNC_URL } from './bookreader-sync-mock';
 import { seedProLicense } from './pro-license';
 
 // MON4 F5 · «Pasar mi sync de Drive a BookReader» en un paso, y al revés para quien cancela.
@@ -172,5 +172,62 @@ test.describe('MON4 F5 — pasar el sync de un proveedor a otro', () => {
     await expect(a.locator('#appset-br-on')).toBeVisible();
     expect(server.env.DB._raw.prepare('SELECT COUNT(*) AS n FROM objects').get().n).toBeGreaterThan(3);
     await pc.close();
+  });
+
+  test('un libro que falla por la red: se reintenta; si sigue fallando, Drive no se desconecta y se pasa después', async ({ browser }) => {
+    const drive = createDriveState();
+    const server = await createSyncServer({ FILES_ENABLED: '1' });
+
+    // La tablet deja en Drive un libro que el PC no tiene en local.
+    const tablet = await browser.newContext();
+    await installDriveMocks(tablet, drive);
+    await seedDriveToken(tablet);
+    const t = await tablet.newPage();
+    await t.goto('/');
+    await seedProLicense(t);
+    const soloEnDrive = await importBook(t, 'Conversación en La Catedral', 9);
+    await sync(t);
+    await flushBlobs(t);
+
+    const pc = await browser.newContext();
+    await installDriveMocks(pc, drive);
+    await seedDriveToken(pc);
+    await installSyncServer(pc, server);
+    await pc.addInitScript(() => {
+      localStorage.setItem('bookreader_license', JSON.stringify({ key: 'BKRD-TEST-RED', activationId: 'm', validatedAt: Date.now(), revoked: false }));
+    });
+    await enableSyncPreview(pc);
+    // La red del móvil: toda subida de fichero de libro al sync se corta.
+    let cortar = true;
+    let cortadas = 0;
+    await pc.route(SYNC_URL + '/v1/o/**', async (route) => {
+      const r = route.request();
+      if (cortar && r.method() === 'PUT' && r.headers()['x-kind'] === 'file') { cortadas++; return route.abort('failed'); }
+      return route.fallback();
+    });
+    const a = await pc.newPage();
+    await a.goto('/');
+    await a.evaluate(async () => { (await import('/js/sync/switch.js')).COPY_WAITS_MS.splice(0, 9, 10, 10); });
+    await sync(a);
+    await a.evaluate(async () => (await import('/js/ui/app-settings.js')).open('data'));
+    await a.locator('#appset-sync-choice [data-p="bookreader"]').click();
+    await a.locator('#appset-br-enable').click();
+    await a.locator('.dlg-overlay .dlg-ok').click();
+    await expect(a.locator('#appset-data-msg')).toContainText('no se pudieron pasar por un fallo de red', { timeout: 20000 });
+    expect(cortadas).toBe(3);   // el intento y dos reintentos
+    expect(await a.evaluate(() => !!localStorage.getItem('bookreader_drive_refresh_token'))).toBe(true);
+    const retry = a.locator('#appset-br-from-drive');
+    await expect(retry).toBeVisible();
+
+    // Vuelve la red: el botón lo pasa y, sin nada pendiente, desconecta Drive.
+    cortar = false;
+    await retry.click();
+    await expect(a.locator('#appset-data-msg')).toContainText('Archivos de libros pasados: 1', { timeout: 20000 });
+    await expect(a.locator('#appset-data-msg')).toContainText('se desconecta de Drive');
+    expect(await a.evaluate(() => localStorage.getItem('bookreader_drive_refresh_token'))).toBeNull();
+    await expect(retry).toBeHidden();
+    expect(server.env.DB._raw.prepare("SELECT COUNT(*) AS n FROM objects WHERE kind = 'file'").get().n).toBe(1);
+    expect(soloEnDrive).toBeTruthy();
+    for (const c of [tablet, pc]) await c.close();
   });
 });

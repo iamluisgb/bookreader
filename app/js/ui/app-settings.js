@@ -1209,6 +1209,7 @@ function dataHtml() {
           <button id="appset-br-recovery-copy" class="appset-tpl-cancel appset-data-md">${icon('copy', { size: 'md' })} ${t('Copiar')}</button>
           <button id="appset-br-recovery-save" class="appset-tpl-cancel appset-data-md">${icon('download', { size: 'md' })} ${t('Guardar en un fichero')}</button>
         </div>
+        <button id="appset-br-from-drive" class="appset-tpl-cancel appset-data-md" hidden>${icon('cloud', { size: 'md' })} ${t('Pasar los libros que faltan')}</button>
         <button id="appset-br-history" class="appset-tpl-cancel appset-data-md">${icon('sort', { size: 'md' })} ${t('Historial de versiones')}</button>
         <button id="appset-br-to-drive" class="appset-tpl-cancel appset-data-md">${icon('cloud', { size: 'md' })} ${t('Pasar mi sync a Google Drive')}</button>
         <button id="appset-br-disconnect" class="appset-tpl-cancel appset-data-md">${t('Desconectar este dispositivo')}</button>
@@ -1620,13 +1621,16 @@ async function runMigration(from, to, show) {
     let msg = t('Hecho: tu sync está ahora en {name}.', { name: SyncProvider.get(to).label });
     if (r.copied) msg += ' ' + t('Archivos de libros pasados: {n}.', { n: r.copied });
     if (r.skipped) msg += ' ' + t('{n} archivos de libros se quedan donde estaban: el sync nuevo no los admite o está lleno.', { n: r.skipped });
+    if (r.failed) msg += ' ' + failedFilesText(r.failed);
     show(`${icon('check', { size: 'sm' })} ${msg}`);
-    return true;
+    return r;
   } catch (e) {
     show(t('No se pudo pasar el sync: {msg}', { msg: e.message === 'reconnect' ? reconnectText() : e.message }), true);
-    return false;
+    return null;
   }
 }
+
+const failedFilesText = (n) => t('{n} archivos de libros no se pudieron pasar por un fallo de red. Siguen en Google Drive, que se queda conectado para reintentarlo con «Pasar los libros que faltan».', { n });
 
 // ---- Sync de BookReader (MON4 F3) ------------------------------------------------
 
@@ -1649,6 +1653,7 @@ function wireBookReaderSync(content, show) {
   const refresh = () => {
     const st = state();
     for (const [k, el] of Object.entries(blocks)) el.hidden = k !== st;
+    $('appset-br-from-drive').hidden = !(st === 'on' && DriveAuth.isConnected());
     if (st === 'on') paintStatus();
   };
 
@@ -1676,9 +1681,10 @@ function wireBookReaderSync(content, show) {
     needsKey = false;
     const fromDrive = SyncProvider.activeId() === 'drive' && DriveAuth.isConnected();
     if (fromDrive) {
-      if (await runMigration('drive', 'bookreader', show)) {
-        DriveAuth.disconnect();
-      }
+      // Drive se desconecta solo si no se ha quedado ningún libro por pasar: si no, sería la
+      // única copia de esos ficheros y no habría desde dónde reintentarlo.
+      const r = await runMigration('drive', 'bookreader', show);
+      if (r && !r.failed) DriveAuth.disconnect();
     } else {
       show(t('Sincronizando…'));
       const r = await SyncSwitch.activate('bookreader');
@@ -1758,6 +1764,26 @@ function wireBookReaderSync(content, show) {
   });
 
   $('appset-br-history').addEventListener('click', (e) => openHistory(e.currentTarget, show, fail));
+
+  // Lo que la migración no pudo pasar por la red, desde el Drive que se quedó conectado.
+  $('appset-br-from-drive').addEventListener('click', async (e) => {
+    const btn = e.currentTarget;
+    btn.disabled = true;
+    try {
+      const r = await SyncSwitch.copyFiles('drive', 'bookreader', null,
+        (p) => p.step === 'files' && show(t('Pasando los archivos de los libros: {a} de {b}…', { a: p.done + 1, b: p.total })));
+      let msg = t('Archivos de libros pasados: {n}.', { n: r.copied });
+      if (r.skipped) msg += ' ' + t('{n} archivos de libros se quedan donde estaban: el sync nuevo no los admite o está lleno.', { n: r.skipped });
+      if (r.failed) msg += ' ' + failedFilesText(r.failed);
+      else { DriveAuth.disconnect(); msg += ' ' + t('Ya no queda nada en Drive por pasar: este dispositivo se desconecta de Drive.'); }
+      show(`${icon('check', { size: 'sm' })} ${msg}`, !!r.failed);
+    } catch (err) {
+      show(t('No se pudo pasar el sync: {msg}', { msg: err.message === 'reconnect' ? reconnectText() : err.message }), true);
+    } finally {
+      btn.disabled = false;
+      refresh();
+    }
+  });
 
   $('appset-br-to-drive').addEventListener('click', () => {
     // Pasar a Drive empieza por conectar Drive: es el botón del panel de Drive, que ya sabe
