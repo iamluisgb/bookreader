@@ -2919,8 +2919,14 @@ en nan~~ → **instrumentado en F1.2**; queda *leer* los datos tras unos días d
 > 5. `LAUNCHED = true` en `app/js/sync/bookreader-auth.js`: hasta entonces la opción no se ve en
 >    Ajustes sin la vista previa.
 >
-> **MCP:** lee también el sync de BookReader (`--pair-file` con el enlace de emparejamiento; ver
-> `mcp/README.md`). **Pendiente o fuera:** los límites de D1 del plan gratuito (100 k escrituras
+> **MCP:** lee también el sync de BookReader: local (`--pair-file`) y **remoto** en el Worker
+> (`/mcp`, tokens de agente desde Ajustes → Datos → Agentes, con permisos de escritura y de texto).
+> Escribe tarjetas, mazos y artefactos del Studio, y lee el texto troceado de los libros (ver
+> `mcp/README.md`). **Pendiente:** OAuth para los conectores de claude.ai (borrador sin commitear
+> en `~/workspace/scratch/bookreader-oauth-wip/` del lab; su migración será la 0005), notas de la
+> libreta por MCP, y vigilar la CPU del Worker: las tools del MCP gastan 13–32 ms por petición,
+> por encima de los 10 ms nominales del plan gratuito (Cloudflare no las corta hoy; si empezara
+> a dar 1102, el plan de pago de Workers son 5 $/mes). **Pendiente o fuera:** los límites de D1 del plan gratuito (100 k escrituras
 > al día, unas 5 por PUT) dan un techo parecido al de R2: ~400 usuarios activos con 50
 > escrituras al día cada uno; pasarlo pide el plan de pago de Workers.
 

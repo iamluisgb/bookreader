@@ -3,6 +3,18 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-10-19 — El MCP remoto escribe y lee los libros (MON4)
+
+El MCP de BookReader se sirve también desde el Worker del sync (`/mcp`), con tokens de agente
+que se crean y revocan en Ajustes → Datos → Agentes. La clave del sync se guarda cifrada con el
+propio token. Tres permisos: leer siempre; escribir (tarjetas, mazos, mapas mentales,
+infografías y resúmenes, con `dry_run`, versión anterior en el historial y `editedBy`); y leer
+el texto de los libros (`get_toc`, `read_chapter`, `search_book`), que la app sube troceado y
+cifrado solo si algún agente lo puede leer. Para que un agente pueda reescribir tarjetas sin
+pisar repasos, las tarjetas funden texto y repaso por separado (`textAt`/`srsAt`). La forma de
+los artefactos sale de un módulo puro compartido por la app y el MCP (`artifact-schema.js`), y
+el CLI tiene `--remote` para agentes sin cliente MCP (pi en Hermes).
+
 ## 2026-10-19 — Sync de BookReader: primera prueba real, y el MCP lo lee (MON4)
 
 El Worker `bookreader-sync` está desplegado **en prueba**: sin Polar, solo entran las licencias del
