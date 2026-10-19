@@ -1,0 +1,62 @@
+// MON4 · Sync de BookReader: el sync gestionado de la suscripción (ADR-056).
+// Deploy: `npx wrangler deploy` desde este directorio. Una vez, antes:
+//   npx wrangler r2 bucket create bookreader-sync
+//   npx wrangler d1 create bookreader-sync      (y pegar aquí su database_id)
+//   npx wrangler d1 migrations apply bookreader-sync --remote
+//   npx wrangler secret put USAGE_TOKEN         (para /v1/usage y `npm run sync:usage`)
+//   npx wrangler secret put USER_SALT           (opcional; se fija UNA vez y no se cambia)
+// NO desplegar hasta que MON2 esté en producción: sin POLAR_ORG_ID el Worker no emite tokens.
+{
+  "name": "bookreader-sync",
+  "main": "src/index.js",
+  "compatibility_date": "2026-07-01",
+  "observability": { "enabled": true, "head_sampling_rate": 1 },
+  "vars": {
+    // Mismos orígenes que `share` y el gateway (igualdad exacta de string).
+    "ALLOWED_ORIGINS": "http://localhost:8000,http://localhost:8888,https://bookreader.raiatech.com,https://bookreader-2h5.pages.dev",
+    // Licencias: org de Polar (público) y, si hay varios productos, los benefits que dan sync
+    // (separados por comas). Vacíos = el Worker no emite tokens (503 not_configured).
+    "POLAR_ORG_ID": "",
+    "SYNC_BENEFIT_IDS": "",
+    // ── ADR-056, la decisión A/B ──────────────────────────────────────────────────────────
+    // Topes GLOBALES, al 80 % de lo gratis de R2 (10 GB, 1 M clase A/mes, 10 M clase B/mes),
+    // como `share`. Con estos valores el sync NO COBRA NUNCA (opción B): al tope se niega
+    // (507/503) y el cliente lo dice. La opción A es subirlos y dejar que manden las cuotas
+    // por usuario: R2 cuesta ~0,015 $/GB-mes, 4,50 $/M escrituras, 0,36 $/M lecturas.
+    "CAP_STORAGE_BYTES": "8589934592",
+    "CAP_CLASS_A": "800000",
+    "CAP_CLASS_B": "8000000",
+    // Ficheros de libro en el sync gestionado (F4). "0" = solo datos (opción B: los libros
+    // siguen por Drive). "1" = también libros, con FILE_QUOTA_BYTES por usuario.
+    "FILES_ENABLED": "0",
+    // Cuotas POR USUARIO. Datos = notas, ajustes, mazos… y sus versiones (KB por libro).
+    "DATA_QUOTA_BYTES": "268435456",
+    "FILE_QUOTA_BYTES": "2147483648",
+    // 100 MB: el tope de cuerpo de petición de Workers. Los libros más grandes van por partes.
+    "MAX_BYTES": "104857600",
+    // Versiones que se guardan de cada fichero de datos, y cuánto viven como mucho.
+    "MAX_VERSIONS": "10",
+    "VERSION_DAYS": "30",
+    // Días de solo lectura tras caducar la suscripción. Después, la purga lo borra todo.
+    "GRACE_DAYS": "30",
+    "TOKEN_HOURS": "24"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "bookreader-sync",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "./migrations"
+    }
+  ],
+  "r2_buckets": [
+    { "binding": "SYNC", "bucket_name": "bookreader-sync" }
+  ],
+  // Escrituras por usuario y minuto (el motor agrupa con debounce de 4 s: 60 sobra), y
+  // emisión de tokens por IP (cada una llama a Polar).
+  "ratelimits": [
+    { "name": "WRITES", "namespace_id": "2402", "simple": { "limit": 60, "period": 60 } },
+    { "name": "TOKENS", "namespace_id": "2403", "simple": { "limit": 10, "period": 60 } }
+  ],
+  "triggers": { "crons": ["41 3 * * *"] }
+}
