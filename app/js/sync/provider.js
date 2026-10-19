@@ -28,6 +28,8 @@ import * as Storage from '../storage.js';
 import * as License from '../license.js';
 import * as Drive from './drive-provider.js';
 import * as DriveAuth from './drive-auth.js';
+import * as BookReader from './bookreader-provider.js';
+import * as BookReaderAuth from './bookreader-auth.js';
 
 const ACTIVE_KEY = 'sync_provider';
 
@@ -48,6 +50,25 @@ const IMPLS = {
       connectToDownload: () => t('Conecta con Google Drive en Ajustes para descargar tus libros en este dispositivo.'),
       connectToUpload: () => t('Conecta con Google Drive en Ajustes para subir tus libros.'),
       deleteEverywhere: (title) => t('¿Eliminar "{title}" de la biblioteca? Se borrará en todos tus dispositivos sincronizados, junto con la copia de Drive.', { title }),
+    },
+  },
+  bookreader: {
+    ...BookReader,
+    id: 'bookreader',
+    label: 'BookReader',
+    isConnected: BookReaderAuth.isConnected,
+    // Por el sync de BookReader decide el servidor: la suscripción incluye ficheros o no
+    // (ADR-056, opción A/B), y al tope de cuota los libros dejan de subir.
+    canTransferFiles: () => BookReaderAuth.filesAllowed(),
+    text: {
+      missingFile: () => t('El fichero ya no está en el sync de BookReader.'),
+      quotaFull: () => t('Has llegado al tope de espacio del sync de BookReader. Tus notas siguen sincronizando; los libros nuevos ya no se suben.'),
+      reconnect: () => t('Tu suscripción no está activa. El sync de BookReader queda en solo lectura.'),
+      newerSchema: () => t('Lo sincronizado es de una versión más nueva de BookReader.'),
+      notUploaded: () => t('Este libro se sincronizó desde otro dispositivo, pero su archivo aún no se ha subido. Ábrelo allí una vez para subirlo.'),
+      connectToDownload: () => t('Activa la sincronización en Ajustes para descargar tus libros en este dispositivo.'),
+      connectToUpload: () => t('Activa la sincronización en Ajustes para subir tus libros.'),
+      deleteEverywhere: (title) => t('¿Eliminar "{title}" de la biblioteca? Se borrará en todos tus dispositivos sincronizados, junto con su copia en el sync.', { title }),
     },
   },
 };

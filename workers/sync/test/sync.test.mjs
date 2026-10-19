@@ -140,6 +140,20 @@ test('IF-MATCH ATÓMICO: si otro escribe mientras subo, pierdo con 412 y mi copi
   assert.equal(n, 1);
 });
 
+test('IF-NONE-MATCH *: crear solo si no existe; si otro lo creó antes, 412', async () => {
+  const e = env();
+  const { token } = await login(e);
+  assert.equal((await put(e, token, P1, 3, { 'If-None-Match': '*' })).status, 200);
+  const r = await put(e, token, P1, 4, { 'If-None-Match': '*' });
+  assert.equal(r.status, 412);
+  // Y en la carrera: el otro lo crea mientras mi subida está en R2.
+  let otro;
+  e.SYNC.onPut = async () => { otro = await put(e, token, P2, 9, { 'If-None-Match': '*' }); };
+  const mio = await put(e, token, P2, 4, { 'If-None-Match': '*' });
+  assert.equal(otro.status, 200);
+  assert.equal(mio.status, 412);
+});
+
 test('sin X-Keep-Versions, sobrescribir borra la clave anterior; con él, quedan las N últimas', async () => {
   const e = env({ MAX_VERSIONS: '3', DATA_QUOTA_BYTES: '100000' });
   const { token } = await login(e);

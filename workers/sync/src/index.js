@@ -69,7 +69,7 @@ export function corsHeaders(request, env) {
   const allowed = String(env.ALLOWED_ORIGINS || '').split(',').map((s) => s.trim()).filter(Boolean);
   const h = {
     'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-    'Access-Control-Allow-Headers': 'Authorization, Content-Type, If-Match, X-Name, X-Kind, X-Keep-Versions, X-Total-Size',
+    'Access-Control-Allow-Headers': 'Authorization, Content-Type, If-Match, If-None-Match, X-Name, X-Kind, X-Keep-Versions, X-Total-Size',
     'Access-Control-Expose-Headers': 'ETag, X-Name, X-Size',
     'Access-Control-Max-Age': '86400',
     Vary: 'Origin',
@@ -235,14 +235,18 @@ function readMeta(request) {
   // El etag que el cliente vio la última vez. Sin él, la escritura no es condicional (igual que
   // el proveedor de Drive con ifMatch undefined).
   const ifMatch = (request.headers.get('If-Match') || '').replace(/^"|"$/g, '') || null;
-  return { name, kind, keepVersions, ifMatch };
+  // `If-None-Match: *` = crear solo si no existe. El motor lo manda cuando no conoce etag de la
+  // ruta: dos dispositivos que crean el mismo fichero a la vez no se pisan, uno recibe 412.
+  const mustCreate = !ifMatch && (request.headers.get('If-None-Match') || '').trim() === '*';
+  return { name, kind, keepVersions, ifMatch, mustCreate };
 }
 
 // Mueve el puntero de `path` a la clave nueva, si el etag actual sigue siendo el esperado.
 // Devuelve { ok, old } (old = fila anterior, o null). Las claves sobrantes las limpia quien llama.
-async function commit(env, { user, path, name, key, etag, size, kind, ifMatch }, now = Date.now()) {
+async function commit(env, { user, path, name, key, etag, size, kind, ifMatch, mustCreate }, now = Date.now()) {
   const old = await env.DB.prepare('SELECT key, etag FROM objects WHERE user = ? AND path = ?').bind(user, path).first();
   if (ifMatch && old && old.etag !== ifMatch) return { ok: false, old };
+  if (mustCreate && old) return { ok: false, old };
   let row;
   if (old) {
     // CAS sobre lo que se acaba de leer: si otro escribió entre medias, no se toca.
@@ -287,9 +291,9 @@ async function putObject(path, request, env, cors, who, now = Date.now()) {
     if (!success) return json({ error: 'rate_limited' }, 429, cors);
   }
   // Antes de gastar nada: un If-Match que ya no coincide es un 412 sin tocar R2.
-  if (meta.ifMatch) {
+  if (meta.ifMatch || meta.mustCreate) {
     const cur = await env.DB.prepare('SELECT etag FROM objects WHERE user = ? AND path = ?').bind(who.user, path).first();
-    if (cur && cur.etag !== meta.ifMatch) return json({ error: 'precondition_failed', etag: cur.etag }, 412, cors);
+    if (cur && (meta.mustCreate || cur.etag !== meta.ifMatch)) return json({ error: 'precondition_failed', etag: cur.etag }, 412, cors);
   }
   const etag = randomId();
   const key = blobKey(who.user, path, etag);
@@ -306,7 +310,7 @@ async function putObject(path, request, env, cors, who, now = Date.now()) {
     await env.DB.prepare('DELETE FROM blobs WHERE key = ?').bind(key).run();
     throw e;
   }
-  const r = await commit(env, { user: who.user, path, name: meta.name, key, etag, size: len, kind: meta.kind, ifMatch: meta.ifMatch }, now);
+  const r = await commit(env, { user: who.user, path, name: meta.name, key, etag, size: len, kind: meta.kind, ifMatch: meta.ifMatch, mustCreate: meta.mustCreate }, now);
   if (!r.ok) {
     await dropBlob(env, key);
     return json({ error: 'precondition_failed', etag: r.old && r.old.etag }, 412, cors);

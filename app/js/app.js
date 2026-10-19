@@ -26,6 +26,7 @@ import { alertBox } from './ui/dialog.js';
 import { rangeForText } from './pdf-locate.js';
 import { migrateSchema, purgeExpiredTombstones } from './sync/schema.js';
 import * as SyncEngine from './sync/engine.js';
+import * as SyncProvider from './sync/provider.js';
 import * as Aliases from './sync/aliases.js';
 import { THUMB_WIDTH } from './sync/library-sync.js';
 import * as License from './license.js';
@@ -104,6 +105,9 @@ document.addEventListener('DOMContentLoaded', () => {
   // Enlace de traspaso de la demo (`#demo=br-…`). Se atiende ANTES del router para que
   // el token salga de la URL cuanto antes; ver más abajo.
   recibirDemoDelEnlace();
+  // MON4 · Enlace de emparejamiento del sync de BookReader (`#pair=…`): lo mismo, la clave
+  // sale de la URL antes que nada.
+  recibirEmparejamiento();
   // Fase 0 sync: backfill de uid/updatedAt en datos previos + purga de
   // tombstones caducados. Asíncrono y no bloqueante; idempotente.
   migrateSchema()
@@ -160,6 +164,9 @@ function initSyncEngine() {
     error: t('Sync con errores'),
     off: t('Sync desconectado'),
   };
+  // En el sync de BookReader, 'reconnect' no es el permiso de Google sino la suscripción o la
+  // clave: el botón lleva a Ajustes → Datos igual, pero no puede decir «Drive».
+  const reconnectLabel = () => (SyncProvider.activeId() === 'drive' ? t('Reconectar Drive') : t('Revisar el sync'));
   window.addEventListener('bookreader:sync-status', (e) => {
     const s = e.detail;
     // Sync invisible (estilo Play Books): ni "Sincronizando…" en cada ciclo ni
@@ -173,7 +180,7 @@ function initSyncEngine() {
     if (s === 'error' && SyncEngine.getDiag().consecutive < SyncEngine.ERROR_BADGE_AFTER) visible = false;
     if (s === 'off' && !SyncEngine.hasSyncHistory()) visible = false;
     badge.dataset.state = s;
-    badge.textContent = labels[s] || '';
+    badge.textContent = s === 'reconnect' ? reconnectLabel() : (labels[s] || '');
     badge.hidden = !visible;
   });
   // Cualquier badge de sync con problema lleva a Ajustes → Datos (reconectar o
@@ -290,6 +297,49 @@ async function recibirEnlaceCompartido() {
   dismiss();
   const { importDossier } = await import('./share/import-ui.js');
   if (await importDossier(new File([blob], 'enlace.bookreader', { type: 'application/zip' }))) goToLibrary();
+}
+
+// ============ EMPAREJAR EL SYNC DE BOOKREADER (MON4 F2) ============
+// `#pair=<clave>.<licencia>` lo genera Ajustes → Datos en un dispositivo con el sync activo.
+// Trae la clave del sync y la licencia: este dispositivo queda sincronizando sin teclear
+// nada. Se saca de la URL ANTES de usarlo (es la credencial). Si este dispositivo ya tenía su
+// sync en Drive, no se cambia aquí: se le manda a Ajustes, donde se ofrece pasarlo.
+async function recibirEmparejamiento() {
+  const BRAuth = await import('./sync/bookreader-auth.js');
+  const pair = BRAuth.consumePairLink();
+  if (!pair) return;
+  const title = t('Sincronización');
+  if (pair.broken) {
+    await alertBox(t('El enlace está incompleto: puede que se cortara al copiarlo. Vuelve a copiarlo desde el otro dispositivo.'), { title });
+    return;
+  }
+  const { toast } = await import('./ai/toast.js');
+  const dismiss = toast({ message: t('Emparejando este dispositivo…'), timeout: 0 });
+  try {
+    if (!BRAuth.licenseKey() && pair.license) await License.activate(pair.license);
+    await BRAuth.useKey(pair.raw);
+    const DriveAuth = await import('./sync/drive-auth.js');
+    if (SyncProvider.activeId() === 'drive' && DriveAuth.isConnected()) {
+      dismiss();
+      await alertBox(t('Clave guardada. Este dispositivo sincroniza con Google Drive: para pasarlo al sync de BookReader, ve a Ajustes → Datos.'), { title });
+      return;
+    }
+    const { activate } = await import('./sync/switch.js');
+    const r = await activate('bookreader');
+    dismiss();
+    if (r === 'error') {
+      await alertBox(t('Emparejado, pero el primer sync falló: {msg}', { msg: SyncEngine.getDiag().lastError }), { title });
+      return;
+    }
+    toast({ message: t('Dispositivo emparejado. Tus notas y tu progreso ya están aquí.') });
+  } catch (e) {
+    dismiss();
+    await alertBox(e.code === 'wrong_key'
+      ? t('Esa clave no es la de tu sync. Compruébala o usa el enlace de otro dispositivo.')
+      : e.message === 'reconnect'
+        ? t('Tu suscripción no está activa. El sync de BookReader queda en solo lectura.')
+        : t('No se pudo emparejar: {msg}', { msg: e.message }), { title });
+  }
 }
 
 // ============ TRASPASO DE LA DEMO ENTRE DISPOSITIVOS ============

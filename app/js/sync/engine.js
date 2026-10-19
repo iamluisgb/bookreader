@@ -115,6 +115,15 @@ export function hasSyncHistory() {
   return !st.diag.intentionalOff && !!(st.diag.lastOkAt || st.manifestEtag);
 }
 
+// Al cambiar de proveedor (MON4), lo que este dispositivo sabe del remoto deja de valer: los
+// etags del anterior no existen en el nuevo y, mandados como If-Match, darían 412 para
+// siempre. Se olvida todo lo acordado con el remoto (no el diagnóstico): el siguiente ciclo
+// baja lo que haya, lo fusiona y sube lo local entero. El merge es idempotente.
+export function resetRemoteState() {
+  const st = loadState();
+  Storage.set(STATE_KEY, { manifestEtag: null, books: {}, digests: {}, diag: st.diag });
+}
+
 // Desconexión a propósito (botón "Desconectar"): no es un síntoma, no avisa.
 // La reconexión la deshace refreshConnection().
 export function setIntentionalOff(v) {

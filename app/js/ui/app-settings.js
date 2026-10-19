@@ -18,6 +18,9 @@ import * as CustomTpl from '../ai/custom-templates.js';
 import * as DriveAuth from '../sync/drive-auth.js';
 import * as DriveSync from '../sync/drive-sync.js';
 import * as Drive from '../sync/drive-provider.js';
+import * as SyncProvider from '../sync/provider.js';
+import * as BRAuth from '../sync/bookreader-auth.js';
+import * as SyncSwitch from '../sync/switch.js';
 import * as Blobs from '../sync/blobs.js';
 import * as SyncEngine from '../sync/engine.js';
 import * as Recovery from '../sync/recovery.js';
@@ -1152,25 +1155,68 @@ function dataHtml() {
     <p class="appset-muted">${t('Restaura desde un JSON. Fusiona: sobrescribe lo que coincida, no borra el resto.')}</p>
     <input type="file" id="appset-import-file" class="appset-input" accept="application/json,.json" />
 
-    <label class="appset-label" style="margin-top:18px">Google Drive</label>
-    <p class="appset-muted">${t('Guarda tus datos en una carpeta privada de tu propio Drive. El único servidor implicado solo renueva tu permiso de Google: tus libros y notas van directos de tu navegador a tu Drive.')}</p>
-    <div id="appset-drive-off">
-      <button id="appset-drive-connect" class="btn btn--primary primary-btn appset-save">${icon('cloud', { size: 'md' })} ${t('Conectar con Google Drive')}</button>
+    <label class="appset-label" style="margin-top:18px">${t('Sincronización entre dispositivos')}</label>
+    <div class="segmented appset-sync-choice" role="group" aria-label="${t('Sincronización entre dispositivos')}" id="appset-sync-choice">
+      <button type="button" class="segmented-btn" data-p="none">${t('Sin sync')}</button>
+      <button type="button" class="segmented-btn" data-p="drive">Google Drive</button>
+      <button type="button" class="segmented-btn" data-p="bookreader">BookReader</button>
     </div>
-    <div id="appset-drive-on" hidden>
-      <label class="appset-check"><input type="checkbox" id="appset-drive-files">
-        <span>${t('Sincronizar también los archivos de los libros')}</span></label>
-      <p class="appset-muted">${t('Tus libros se suben a esa misma carpeta privada y aparecen en el resto de dispositivos listos para descargar. Los de más de {n} MB no se suben solos: se piden desde el menú del libro.', { n: 50 })}</p>
-      <p class="appset-muted" id="appset-drive-quota">${t('Consultando espacio…')}</p>
-      <button id="appset-drive-save" class="btn btn--primary primary-btn appset-save">${icon('cloud', { size: 'md' })} ${t('Guardar en Drive')}</button>
-      <button id="appset-drive-restore" class="appset-tpl-cancel appset-data-md">${icon('download', { size: 'md' })} ${t('Restaurar desde Drive')}</button>
-      <button id="appset-drive-history" class="appset-tpl-cancel appset-data-md">${icon('sort', { size: 'md' })} ${t('Historial de versiones')}</button>
-      <button id="appset-drive-purge" class="appset-tpl-cancel appset-data-md">${icon('trash', { size: 'md' })} ${t('Limpiar entradas huérfanas')}</button>
-      <button id="appset-drive-disconnect" class="appset-tpl-cancel appset-data-md">${t('Desconectar')}</button>
+    <div id="appset-sync-pane-none" class="appset-sync-pane" hidden>
+      <p class="appset-muted">${t('Tus datos se quedan solo en este dispositivo. Descarga un backup de vez en cuando.')}</p>
+      <button id="appset-sync-off" class="appset-tpl-cancel appset-data-md" hidden>${t('Dejar de sincronizar en este dispositivo')}</button>
+    </div>
+    <div id="appset-sync-pane-drive" class="appset-sync-pane" hidden>
+      <p class="appset-muted">${t('Guarda tus datos en una carpeta privada de tu propio Drive. El único servidor implicado solo renueva tu permiso de Google: tus libros y notas van directos de tu navegador a tu Drive.')}</p>
+      <div id="appset-drive-off">
+        <button id="appset-drive-connect" class="btn btn--primary primary-btn appset-save">${icon('cloud', { size: 'md' })} ${t('Conectar con Google Drive')}</button>
+      </div>
+      <div id="appset-drive-on" hidden>
+        <label class="appset-check"><input type="checkbox" id="appset-drive-files">
+          <span>${t('Sincronizar también los archivos de los libros')}</span></label>
+        <p class="appset-muted">${t('Tus libros se suben a esa misma carpeta privada y aparecen en el resto de dispositivos listos para descargar. Los de más de {n} MB no se suben solos: se piden desde el menú del libro.', { n: 50 })}</p>
+        <p class="appset-muted" id="appset-drive-quota">${t('Consultando espacio…')}</p>
+        <button id="appset-drive-save" class="btn btn--primary primary-btn appset-save">${icon('cloud', { size: 'md' })} ${t('Guardar en Drive')}</button>
+        <button id="appset-drive-restore" class="appset-tpl-cancel appset-data-md">${icon('download', { size: 'md' })} ${t('Restaurar desde Drive')}</button>
+        <button id="appset-drive-history" class="appset-tpl-cancel appset-data-md">${icon('sort', { size: 'md' })} ${t('Historial de versiones')}</button>
+        <button id="appset-drive-purge" class="appset-tpl-cancel appset-data-md">${icon('trash', { size: 'md' })} ${t('Limpiar entradas huérfanas')}</button>
+        <button id="appset-drive-disconnect" class="appset-tpl-cancel appset-data-md">${t('Desconectar')}</button>
+      </div>
+    </div>
+    <div id="appset-sync-pane-bookreader" class="appset-sync-pane" hidden>
+      <p class="appset-muted">${t('Incluido en la suscripción, sin cuentas ni nada que configurar. Tus datos salen cifrados de este dispositivo con una clave que solo tienen tus dispositivos: ni nosotros podemos leerlos.')}</p>
+      <div id="appset-br-nolicense" hidden>
+        <p class="appset-muted">${t('Necesitas la suscripción de BookReader. Si ya la tienes, activa tu clave en Licencia.')}</p>
+        <button id="appset-br-license" class="appset-tpl-cancel appset-data-md">${t('Ir a Licencia')}</button>
+      </div>
+      <div id="appset-br-off" hidden>
+        <button id="appset-br-enable" class="btn btn--primary primary-btn appset-save">${icon('cloud', { size: 'md' })} ${t('Activar el sync de BookReader')}</button>
+      </div>
+      <div id="appset-br-pair" hidden>
+        <p class="appset-muted">${t('Ya tienes datos sincronizados desde otro dispositivo. Para leerlos aquí hace falta su clave: abre en este dispositivo el enlace de «Enlace para otro dispositivo», o escribe tu clave de recuperación.')}</p>
+        <input type="text" id="appset-br-code" class="appset-input" placeholder="XXXX-XXXX-XXXX-…" autocomplete="off" autocapitalize="characters" spellcheck="false" />
+        <button id="appset-br-usecode" class="btn btn--primary primary-btn appset-save">${t('Usar la clave')}</button>
+        <button id="appset-br-startover" class="appset-tpl-cancel appset-data-md">${icon('trash', { size: 'md' })} ${t('Perdí la clave: empezar de cero')}</button>
+      </div>
+      <div id="appset-br-on" hidden>
+        <p class="appset-muted" id="appset-br-status">${t('Consultando espacio…')}</p>
+        <label class="appset-check" id="appset-br-files-row" hidden><input type="checkbox" id="appset-br-files">
+          <span>${t('Sincronizar también los archivos de los libros')}</span></label>
+        <button id="appset-br-pairlink" class="btn btn--primary primary-btn appset-save">${icon('copy', { size: 'md' })} ${t('Enlace para otro dispositivo')}</button>
+        <button id="appset-br-recovery" class="appset-tpl-cancel appset-data-md">${icon('eye', { size: 'md' })} ${t('Clave de recuperación')}</button>
+        <div id="appset-br-recovery-box" class="appset-br-recovery" hidden>
+          <p class="appset-muted">${t('Guárdala fuera de BookReader (en tu gestor de contraseñas, por ejemplo). Si pierdes todos tus dispositivos y esta clave, lo sincronizado no se puede recuperar: es el precio de que nadie más pueda leerlo.')}</p>
+          <code id="appset-br-recovery-code" class="appset-br-code"></code>
+          <button id="appset-br-recovery-copy" class="appset-tpl-cancel appset-data-md">${icon('copy', { size: 'md' })} ${t('Copiar')}</button>
+          <button id="appset-br-recovery-save" class="appset-tpl-cancel appset-data-md">${icon('download', { size: 'md' })} ${t('Guardar en un fichero')}</button>
+        </div>
+        <button id="appset-br-history" class="appset-tpl-cancel appset-data-md">${icon('sort', { size: 'md' })} ${t('Historial de versiones')}</button>
+        <button id="appset-br-to-drive" class="appset-tpl-cancel appset-data-md">${icon('cloud', { size: 'md' })} ${t('Pasar mi sync a Google Drive')}</button>
+        <button id="appset-br-disconnect" class="appset-tpl-cancel appset-data-md">${t('Desconectar este dispositivo')}</button>
+      </div>
     </div>
 
     <label class="appset-label" style="margin-top:18px">${t('Enlaces compartidos')}</label>
-    <p class="appset-muted">${t('Las estanterías que has compartido por enlace y siguen abiertas. Retirar un enlace lo borra al momento; lo que ya hayan importado se queda en su biblioteca. Con Drive conectado, la lista es la misma en todos tus dispositivos.')}</p>
+    <p class="appset-muted">${t('Las estanterías que has compartido por enlace y siguen abiertas. Retirar un enlace lo borra al momento; lo que ya hayan importado se queda en su biblioteca. Con el sync activo, la lista es la misma en todos tus dispositivos.')}</p>
     <div id="appset-links" class="appset-links"></div>
 
     <label class="appset-label" style="margin-top:18px">${t('Sincronización automática')}</label>
@@ -1186,15 +1232,23 @@ function dataHtml() {
 // "no sincroniza". Esta línea dice en qué estado está, y el volcado copiable
 // trae lo que hace falta para diagnosticarlo fuera del dispositivo.
 
+// El aviso de «hay que hacer algo» depende del proveedor: en Drive es el permiso de Google;
+// en el sync de BookReader, la suscripción (o la clave).
+function reconnectText() {
+  return SyncProvider.activeId() === 'drive'
+    ? t('El permiso de Google caducó o fue revocado. Vuelve a conectar con Drive.')
+    : SyncProvider.text('reconnect');
+}
+
 function syncStateText() {
-  if (!DriveAuth.isConnected()) return t('Desconectado de Drive.');
+  if (!SyncProvider.isConnected()) {
+    return SyncProvider.activeId() === 'drive' ? t('Desconectado de Drive.') : t('El sync de BookReader no está activo en este dispositivo.');
+  }
   const st = SyncEngine.getStatus();
   if (st === 'syncing') return t('Sincronizando…');
   const diag = SyncEngine.getDiag();
   if (diag.lastErrorAt > diag.lastOkAt && diag.lastError) {
-    const msg = diag.lastError === 'reconnect'
-      ? t('El permiso de Google caducó o fue revocado. Vuelve a conectar con Drive.')
-      : diag.lastError;
+    const msg = diag.lastError === 'reconnect' ? reconnectText() : diag.lastError;
     return t('Error: {msg} ({when}).', { msg, when: ago(diag.lastErrorAt) });
   }
   if (diag.lastOkAt) return t('Último sync correcto: {when}.', { when: ago(diag.lastOkAt) });
@@ -1228,12 +1282,14 @@ async function syncDiagReport() {
     reachability = {
       googleapis: await probe('https://www.googleapis.com/'),
       authWorker: await probe(DriveAuth.WORKER_URL + '/'),
+      syncWorker: await probe(BRAuth.WORKER_URL + '/'),
     };
   } catch (e) { /* la sonda es best-effort: no debe romper el informe */ }
   return {
     at: new Date().toISOString(),
     status: SyncEngine.getStatus(),
-    connected: DriveAuth.isConnected(),
+    provider: SyncProvider.activeId(),
+    connected: SyncProvider.isConnected(),
     filesSync: Blobs.isEnabled(),
     pro: License.isPro(),
     diag: SyncEngine.getDiag(),
@@ -1339,7 +1395,7 @@ function wireData(content) {
     show(t('Sincronizando…'));
     const r = await SyncEngine.syncNow();
     paintDiag();
-    if (r === 'off') return show(t('No está conectado a Drive.'), true);
+    if (r === 'off') return show(SyncProvider.activeId() === 'drive' ? t('No está conectado a Drive.') : t('El sync de BookReader no está activo en este dispositivo.'), true);
     if (r === 'locked') return show(t('Otra pestaña está sincronizando. Prueba en unos segundos.'));
     if (r === 'error') {
       const diag = SyncEngine.getDiag();
@@ -1366,7 +1422,9 @@ function wireDrive(content, show) {
   const filesCheck = content.querySelector('#appset-drive-files');
   const quotaEl = content.querySelector('#appset-drive-quota');
   const refresh = () => {
-    const on = DriveAuth.isConnected();
+    // «Conectado» aquí es Drive conectado Y elegido: con el token de Google aún guardado pero
+    // el sync en BookReader, este bloque ofrece volver a Drive, no sus botones.
+    const on = DriveAuth.isConnected() && SyncProvider.activeId() === 'drive';
     offBlock.hidden = on;
     onBlock.hidden = !on;
     filesCheck.checked = Blobs.isEnabled();
@@ -1424,15 +1482,24 @@ function wireDrive(content, show) {
     }
   };
 
-  content.querySelector('#appset-drive-connect').addEventListener('click', () => {
+  content.querySelector('#appset-drive-connect').addEventListener('click', async () => {
+    // Venir del sync de BookReader es cambiar de proveedor: se ofrece pasar lo sincronizado.
+    const fromBR = SyncProvider.activeId() === 'bookreader' && BRAuth.isConnected();
+    if (fromBR && !(await confirmBox(t('Tu sync está ahora en BookReader. Al conectar Drive se pasa todo a Drive (también los archivos de los libros, si los tienes allí) y este dispositivo deja de usar el sync de BookReader.'),
+      { title: t('Pasar mi sync a Google Drive'), okText: t('Conectar y pasar') }))) return;
     show(t('Abriendo la ventana de Google…'));
-    DriveAuth.connect()
-      .then(() => {
-        refresh();
-        show(`${icon('check', { size: 'sm' })} ${t('Drive conectado. La sincronización automática queda activada.')}`);
-        SyncEngine.refreshConnection(); // primer sync inmediato
-      })
-      .catch(fail('No se pudo conectar'));
+    try {
+      await DriveAuth.connect();
+    } catch (e) { fail('No se pudo conectar')(e); return; }
+    refresh();
+    if (fromBR) {
+      await runMigration('bookreader', 'drive', show);
+      BRAuth.disconnect();
+    } else {
+      show(`${icon('check', { size: 'sm' })} ${t('Drive conectado. La sincronización automática queda activada.')}`);
+      SyncSwitch.activate('drive');   // primer sync inmediato
+    }
+    syncChoiceRepaint();
   });
 
   content.querySelector('#appset-drive-disconnect').addEventListener('click', () => {
@@ -1440,6 +1507,7 @@ function wireDrive(content, show) {
     DriveAuth.disconnect();
     SyncEngine.refreshConnection();
     refresh();
+    syncChoiceRepaint();
     show(t('Drive desconectado. Tus datos siguen en tu Drive y en este dispositivo.'));
   });
 
@@ -1481,6 +1549,233 @@ function wireDrive(content, show) {
   });
 
   wireRecovery(content, show, fail);
+  wireSyncChoice(content, show, fail);
+  wireBookReaderSync(content, show, fail);
+}
+
+// ---- Elegir el sync (MON4 F3): sin sync · Google Drive · BookReader --------------
+// El control segmentado solo ENSEÑA un panel; nada cambia hasta pulsar el botón de ese
+// panel. Al abrir la sección se marca el proveedor que está en uso (o «Sin sync»).
+
+let syncChoiceRepaint = () => {};
+
+function currentChoice() {
+  return SyncProvider.isConnected() ? SyncProvider.activeId() : 'none';
+}
+
+function wireSyncChoice(content, show) {
+  const seg = content.querySelector('#appset-sync-choice');
+  const panes = {
+    none: content.querySelector('#appset-sync-pane-none'),
+    drive: content.querySelector('#appset-sync-pane-drive'),
+    bookreader: content.querySelector('#appset-sync-pane-bookreader'),
+  };
+  const offBtn = content.querySelector('#appset-sync-off');
+  let shown = currentChoice();
+  const paint = () => {
+    for (const [id, el] of Object.entries(panes)) el.hidden = id !== shown;
+    seg.querySelectorAll('.segmented-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.p === shown);
+      b.setAttribute('aria-pressed', String(b.dataset.p === shown));
+    });
+    offBtn.hidden = !SyncProvider.isConnected();
+  };
+  seg.addEventListener('click', (e) => {
+    const b = e.target.closest('.segmented-btn');
+    if (!b) return;
+    shown = b.dataset.p;
+    paint();
+    content.dispatchEvent(new CustomEvent('appset:sync-pane', { detail: shown }));
+  });
+  offBtn.addEventListener('click', () => {
+    SyncEngine.setIntentionalOff(true);
+    if (SyncProvider.activeId() === 'drive') DriveAuth.disconnect();
+    else BRAuth.disconnect();
+    SyncEngine.refreshConnection();
+    show(t('Este dispositivo ya no sincroniza. Lo sincronizado sigue donde estaba.'));
+    syncChoiceRepaint();
+  });
+  syncChoiceRepaint = () => {
+    if (!content.isConnected) return;
+    shown = currentChoice() === 'none' && shown !== 'none' ? shown : currentChoice();
+    paint();
+    content.dispatchEvent(new CustomEvent('appset:sync-pane', { detail: shown }));
+  };
+  paint();
+}
+
+// Pasar lo sincronizado de un proveedor a otro (F5), con el progreso en la línea de mensajes.
+async function runMigration(from, to, show) {
+  const steps = {
+    pull: () => t('Trayendo lo último de tu sync actual…'),
+    push: () => t('Subiendo tus datos al sync nuevo…'),
+    files: (p) => t('Pasando los archivos de los libros: {a} de {b}…', { a: p.done + 1, b: p.total }),
+    done: () => t('Terminando…'),
+  };
+  try {
+    const r = await SyncSwitch.migrate(from, to, (p) => show(steps[p.step](p)));
+    let msg = t('Hecho: tu sync está ahora en {name}.', { name: SyncProvider.get(to).label });
+    if (r.copied) msg += ' ' + t('Archivos de libros pasados: {n}.', { n: r.copied });
+    if (r.skipped) msg += ' ' + t('{n} archivos de libros se quedan donde estaban: el sync nuevo no los admite o está lleno.', { n: r.skipped });
+    show(`${icon('check', { size: 'sm' })} ${msg}`);
+    return true;
+  } catch (e) {
+    show(t('No se pudo pasar el sync: {msg}', { msg: e.message === 'reconnect' ? reconnectText() : e.message }), true);
+    return false;
+  }
+}
+
+// ---- Sync de BookReader (MON4 F3) ------------------------------------------------
+
+function wireBookReaderSync(content, show) {
+  const $ = (id) => content.querySelector('#' + id);
+  const blocks = { nolicense: $('appset-br-nolicense'), off: $('appset-br-off'), pair: $('appset-br-pair'), on: $('appset-br-on') };
+  const statusEl = $('appset-br-status');
+  const filesRow = $('appset-br-files-row');
+  const filesCheck = $('appset-br-files');
+  let needsKey = false;
+
+  const mb = (n) => (n / (1024 * 1024)).toFixed(1) + ' MB';
+  const day = (ts) => new Date(ts).toLocaleDateString(getLang(), { day: 'numeric', month: 'long' });
+
+  const state = () => {
+    if (!BRAuth.licenseKey()) return 'nolicense';
+    if (needsKey) return 'pair';
+    return SyncProvider.activeId() === 'bookreader' && BRAuth.isConnected() ? 'on' : 'off';
+  };
+  const refresh = () => {
+    const st = state();
+    for (const [k, el] of Object.entries(blocks)) el.hidden = k !== st;
+    if (st === 'on') paintStatus();
+  };
+
+  async function paintStatus() {
+    statusEl.textContent = t('Consultando espacio…');
+    try {
+      const st = await BRAuth.status();
+      let txt = t('Ocupas {used} de datos (más {versions} de versiones anteriores).', { used: mb(st.used.data), versions: mb(st.used.versions) });
+      if (st.files) txt += ' ' + t('Archivos de libros: {used} de {quota}.', { used: mb(st.used.files), quota: mb(st.quota.files) });
+      else txt += ' ' + t('Tu plan sincroniza notas, progreso y estudio; los archivos de los libros no.');
+      if (st.readOnly) {
+        txt = t('Tu suscripción no está activa: el sync queda en solo lectura hasta el {date}, y después se borra. Pasa tu sync a Google Drive o descarga un backup antes.', { date: day(st.purgeAt) }) + ' ' + txt;
+      }
+      statusEl.textContent = txt;
+      filesRow.hidden = !st.files || st.readOnly;
+      filesCheck.checked = Blobs.isEnabled();
+    } catch (e) {
+      statusEl.textContent = e && e.message === 'reconnect' ? SyncProvider.get('bookreader').text.reconnect() : t('No se pudo consultar el sync: {msg}', { msg: e.message });
+    }
+  }
+
+  // Ya está la clave: activar el proveedor. Si el sync estaba en Drive, se pasa todo (F5) y
+  // Drive se desconecta; si no, basta con el primer ciclo.
+  async function finishEnable() {
+    needsKey = false;
+    const fromDrive = SyncProvider.activeId() === 'drive' && DriveAuth.isConnected();
+    if (fromDrive) {
+      if (await runMigration('drive', 'bookreader', show)) {
+        DriveAuth.disconnect();
+      }
+    } else {
+      show(t('Sincronizando…'));
+      const r = await SyncSwitch.activate('bookreader');
+      if (r === 'error') show(t('No se pudo sincronizar: {msg}', { msg: SyncEngine.getDiag().lastError }), true);
+      else show(`${icon('check', { size: 'sm' })} ${t('Sync de BookReader activado. A partir de ahora se sincroniza solo.')}`);
+    }
+    refresh();
+    syncChoiceRepaint();
+  }
+
+  const fail = (prefix) => (e) => show(t(prefix) + ': ' + (e.message === 'reconnect' ? SyncProvider.get('bookreader').text.reconnect() : e.message), true);
+
+  $('appset-br-license').addEventListener('click', () => selectSection('license'));
+
+  $('appset-br-enable').addEventListener('click', async () => {
+    if (SyncProvider.activeId() === 'drive' && DriveAuth.isConnected() &&
+      !(await confirmBox(t('Tu sync está ahora en Google Drive. Se pasa todo al sync de BookReader (también los archivos de los libros, si tu plan los incluye) y este dispositivo se desconecta de Drive. Lo que hay en tu Drive no se borra.'),
+        { title: t('Pasar mi sync a BookReader'), okText: t('Pasar a BookReader') }))) return;
+    show(t('Activando…'));
+    try {
+      const r = await BRAuth.enable();
+      if (r.state === 'needs-key') { needsKey = true; refresh(); show(t('Hace falta la clave de tu sync.')); return; }
+      await finishEnable();
+    } catch (e) { fail('No se pudo activar')(e); }
+  });
+
+  $('appset-br-usecode').addEventListener('click', async () => {
+    show(t('Comprobando la clave…'));
+    try {
+      await BRAuth.useRecoveryCode($('appset-br-code').value);
+      $('appset-br-code').value = '';
+      await finishEnable();
+    } catch (e) { show(e.message, true); }
+  });
+
+  $('appset-br-startover').addEventListener('click', async () => {
+    if (!(await confirmBox(t('Se borra TODO lo que hay en tu sync de BookReader y se empieza con una clave nueva. Lo de este dispositivo se sube de nuevo; lo que solo estaba en el sync se pierde. No se puede deshacer.'),
+      { title: t('Empezar de cero'), okText: t('Borrar y empezar'), danger: true }))) return;
+    try {
+      await BRAuth.startOver();
+      await finishEnable();
+    } catch (e) { fail('No se pudo empezar de cero')(e); }
+  });
+
+  $('appset-br-pairlink').addEventListener('click', async () => {
+    const link = BRAuth.pairingLink();
+    try {
+      await navigator.clipboard.writeText(link);
+      show(t('Enlace copiado. Ábrelo en tu otro dispositivo: lleva tu clave, así que mándatelo solo a ti.'));
+    } catch {
+      show(escapeHtml(link));
+    }
+  });
+
+  $('appset-br-recovery').addEventListener('click', async () => {
+    const box = $('appset-br-recovery-box');
+    if (!box.hidden) { box.hidden = true; return; }
+    $('appset-br-recovery-code').textContent = await BRAuth.recoveryCode();
+    box.hidden = false;
+  });
+  $('appset-br-recovery-copy').addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText($('appset-br-recovery-code').textContent); show(t('Clave copiada.')); }
+    catch (e) { show(t('No se pudo copiar: {msg}', { msg: e.message }), true); }
+  });
+  $('appset-br-recovery-save').addEventListener('click', async () => {
+    Backup.downloadText('bookreader-clave-de-sync.txt',
+      t('Clave de recuperación del sync de BookReader') + '\n\n' + (await BRAuth.recoveryCode()) + '\n\n' +
+      t('Quien tenga esta clave y tu licencia puede leer lo que sincronizas. Guárdala en un sitio seguro.') + '\n', 'text/plain');
+  });
+
+  filesCheck.addEventListener('change', () => {
+    Blobs.setEnabled(filesCheck.checked);
+    show(filesCheck.checked
+      ? t('Los archivos de tus libros se subirán al sync en segundo plano.')
+      : t('Se dejarán de subir archivos. Los que ya están en el sync siguen ahí.'));
+    if (filesCheck.checked) Blobs.schedule();
+  });
+
+  $('appset-br-history').addEventListener('click', (e) => openHistory(e.currentTarget, show, fail));
+
+  $('appset-br-to-drive').addEventListener('click', () => {
+    // Pasar a Drive empieza por conectar Drive: es el botón del panel de Drive, que ya sabe
+    // migrar cuando el sync está en BookReader.
+    content.querySelector('#appset-sync-choice .segmented-btn[data-p="drive"]').click();
+    content.querySelector('#appset-drive-connect').click();
+  });
+
+  $('appset-br-disconnect').addEventListener('click', async () => {
+    if (!(await confirmBox(t('Este dispositivo deja de sincronizar y olvida la clave del sync. Lo sincronizado sigue en el resto de tus dispositivos; para volver aquí, usa el enlace de otro dispositivo o tu clave de recuperación.'),
+      { title: t('Desconectar este dispositivo'), okText: t('Desconectar') }))) return;
+    SyncEngine.setIntentionalOff(true);
+    BRAuth.disconnect();
+    SyncEngine.refreshConnection();
+    refresh();
+    syncChoiceRepaint();
+    show(t('Desconectado. Tus datos siguen en este dispositivo.'));
+  });
+
+  content.addEventListener('appset:sync-pane', (e) => { if (e.detail === 'bookreader') refresh(); });
+  refresh();
 }
 
 // ---- Sección Licencia (MON2: BookReader Pro vía Polar) ----------------------
@@ -1620,7 +1915,7 @@ function ensureHistoryOverlay() {
       </div>
       <div class="histov-search-wrap"><input type="search" class="histov-search" placeholder="${t('Buscar libro…')}" aria-label="${t('Buscar libro')}" /></div>
       <div class="histov-list"></div>
-      <p class="histov-foot appset-muted">${t('Drive conserva las copias de cada libro unos 30 días.')}</p>
+      <p class="histov-foot appset-muted"></p>
     </div>`;
   document.body.appendChild(histOverlay);
   histOverlay.querySelector('.histov-close').addEventListener('click', closeHistory);
@@ -1643,6 +1938,10 @@ function openHistory(trigger, show, fail) {
   const ov = ensureHistoryOverlay();
   histReturnFocus = trigger || null;
   ov.style.display = 'flex';
+  const onDrive = SyncProvider.activeId() === 'drive';
+  ov.querySelector('.histov-foot').textContent = onDrive
+    ? t('Drive conserva las copias de cada libro unos 30 días.')
+    : t('El sync de BookReader guarda las últimas copias de cada libro durante 30 días.');
 
   const backBtn = ov.querySelector('.histov-back');
   const titleEl = ov.querySelector('.histov-title');
@@ -1678,11 +1977,15 @@ function openHistory(trigger, show, fail) {
     try {
       books = (await Recovery.listBooks()).map(b => ({ ...b, clean: Recovery.cleanTitle(b.title) }));
       if (!books.length) {
-        list.innerHTML = `<p class="appset-muted histov-empty">${t('Aún no hay copias en Drive. Pulsa “Guardar en Drive” para empezar a tener historial.')}</p>`;
+        list.innerHTML = `<p class="appset-muted histov-empty">${onDrive
+          ? t('Aún no hay copias en Drive. Pulsa “Guardar en Drive” para empezar a tener historial.')
+          : t('Aún no hay copias. Se guardan solas a medida que sincronizas.')}</p>`;
         return;
       }
       searchWrap.hidden = books.length < 8;   // buscador solo cuando de verdad hace falta
-      subEl.textContent = t('{n} {libros} con copias en Drive', { n: books.length, libros: books.length === 1 ? t('libro') : t('libros') });
+      subEl.textContent = onDrive
+        ? t('{n} {libros} con copias en Drive', { n: books.length, libros: books.length === 1 ? t('libro') : t('libros') })
+        : t('{n} {libros} con copias', { n: books.length, libros: books.length === 1 ? t('libro') : t('libros') });
       paintBooks('');
       (searchWrap.hidden ? list.querySelector('.histov-book') : search)?.focus();
     } catch (e) { fail('No se pudo cargar el historial')(e); closeHistory(); }

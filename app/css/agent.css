@@ -1169,6 +1169,14 @@ body.has-taskchip .ai-taskchip.is-study { bottom: 74px; }
   display: flex; align-items: center; justify-content: center; gap: 6px;
   width: 100%; margin-top: 8px;
 }
+/* MON4 · Elegir el sync (sin sync · Drive · BookReader) y la clave de recuperación. */
+.appset-sync-choice { width: 100%; margin-bottom: var(--s-3); }
+.appset-sync-choice .segmented-btn { flex: 1; }
+.appset-br-recovery { margin-top: var(--s-2); }
+.appset-br-code {
+  display: block; padding: var(--s-2) var(--s-3); border-radius: var(--r-sm); background: var(--fill);
+  font-family: var(--font-mono); font-size: var(--fs-sm); line-height: 1.6; word-break: break-all; user-select: all;
+}
 .appset-data-msg { margin: 12px 0 0; font-size: var(--fs-sm); color: var(--text-soft); line-height: 1.6; }
 .appset-data-msg.is-error { color: var(--danger); }
 .appset-data-msg .icon { vertical-align: -2px; color: var(--accent); }
