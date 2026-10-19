@@ -2913,6 +2913,8 @@ en nan~~ → **instrumentado en F1.2**; queda *leer* los datos tras unos días d
 >    (este, una sola vez: cambiarlo deja huérfanos los datos de todos).
 > 4. `npx wrangler deploy` desde `workers/sync` y probar en sandbox de Polar de punta a punta.
 > 5. Humo con dos dispositivos reales (móvil + escritorio) y una migración desde Drive real.
+> 6. `LAUNCHED = true` en `app/js/sync/bookreader-auth.js`: hasta entonces la opción no se ve en
+>    Ajustes (vista previa: `localStorage.bookreader_sync_preview = 'true'`).
 >
 > **Pendiente o fuera:** el MCP (P28 F2) lee el Drive del usuario y no sabe leer el sync de
 > BookReader (habría que darle la clave). Los límites de D1 del plan gratuito (100 k escrituras
