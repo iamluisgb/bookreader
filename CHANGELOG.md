@@ -3,6 +3,23 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-10-19 — Sync de BookReader: el sync gestionado de la suscripción, cifrado (MON4, código)
+
+Una tercera salida en Ajustes → Datos, junto a «Sin sync» y Google Drive: el sync de BookReader,
+sin cuentas de Google ni nada que configurar. Va sobre un Worker propio (`workers/sync`, R2 + índice
+en D1) que valida la licencia contra Polar en el servidor. Todo sale cifrado del navegador con una
+clave aleatoria que el servidor no ve nunca: ni contenidos, ni títulos, ni ids de libro. Los demás
+dispositivos se emparejan con un enlace (`#pair=`) o con la clave de recuperación. Las escrituras
+condicionales son atómicas (un CAS en D1 sobre claves inmutables de R2), así que dos dispositivos que
+escriben a la vez ya no se pisan: uno recibe 412 y reintenta fusionando. Guarda las últimas versiones
+de cada libro para el historial. Con la suscripción caducada queda en solo lectura 30 días y después
+se purga. Los ficheros de libro van por partes si pasan de 100 MB, y al tope de cuota la tarjeta del
+libro dice por qué no se subió. «Pasar mi sync de Drive a BookReader», y al revés, en un paso. **No
+está desplegado**: falta Polar real (MON2) y decidir la opción A/B de ADR-056, que queda en
+`workers/sync/wrangler.jsonc` (por defecto, B: topes al 80 % de lo gratis y sin ficheros). Tests:
+`npm run test:sync` (Worker) y `bookreader-sync*.spec.ts` y `sync-crypto.spec.ts` (contra el Worker
+real en el proceso del test).
+
 ## 2026-10-19 — El repaso no te adelanta capítulos; preguntas en el plan y matriz al terminar (P43 F5)
 
 El repaso de hoy deja de mezclar tarjetas de capítulos que no has leído. Al avanzar en un EPUB, los

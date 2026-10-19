@@ -37,7 +37,9 @@ offline con un agente de IA (BYOK) que lee el libro completo según un objetivo.
     flashcards). El agente rellena un spec JSON; el motor es nuestro (ADR-057, P43). Los ejercicios
     viven en `deck.exercises`, aparte de las tarjetas (ADR-058)
   - sync: `js/sync/` (`engine.js` orquesta; `layout.js`/`merge.js` datos; `library-sync.js`
-    biblioteca; `blobs.js` ficheros de libro; `drive-*.js` proveedor)
+    biblioteca; `blobs.js` ficheros de libro). El motor habla con `provider.js`, que delega en el
+    proveedor elegido: `drive-*.js` (Google Drive) o `bookreader-*.js` (sync de BookReader, MON4,
+    con `sync-crypto.js` cifrando todo en el navegador). `switch.js` cambia y migra de uno a otro.
   - utilidades: `js/ui/` (`icons.js`, `escape.js`), `storage.js`
   - biblioteca: `js/library/` (`store.js` IndexedDB, `view.js` pantalla,
     `shelves.js` reglas/árbol/pertenencia — lógica pura, sin DOM ni IDB)
@@ -85,5 +87,9 @@ offline con un agente de IA (BYOK) que lee el libro completo según un objetivo.
   contra regresiones de calidad, hermana de la de `npm run perf`. Antes de tocar prompts,
   retrieval o modelo, escribe el **contrato** del ítem (baseline medido, métrica primaria,
   time-box): [`docs/EVALS.md` § EV5](docs/EVALS.md).
+- Workers de Cloudflare en `workers/` (`auth`, `gateway`, `share`, `sync`), cada uno con su
+  `wrangler.jsonc` y sus tests: `npm run test:gateway` · `test:share` · `test:sync`. Los E2E del
+  sync de BookReader corren el Worker real dentro del proceso del test
+  (`tests/bookreader-sync-mock.ts`), no una imitación.
 - `npm run lint` (ESLint) · `npm run format` (Prettier).
 - El test "export after highlight" depende de que el epub de prueba se llame `test.epub` (bookId `test`).

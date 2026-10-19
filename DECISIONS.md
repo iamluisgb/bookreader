@@ -1755,7 +1755,7 @@ abrir ajustes generales. Una sola fuente de verdad (`settings.js`): `set()` pers
 demás ajustes de lectura (fuente, ancho, papel, brillo, luz nocturna) siguen siendo solo
 contextuales: dependen del libro, el tema no.
 
-## ADR-056 — Sync de BookReader: sync gestionado dentro de la suscripción, con el patrón de compartir · `PROPUESTA`
+## ADR-056 — Sync de BookReader: sync gestionado dentro de la suscripción, con el patrón de compartir · `ACEPTADA (código; A/B abierta)`
 
 **Contexto.** Hoy el sync es Pro (pago único) y va contra el Google Drive del propio usuario (P7,
 ADR-024). Funciona, pero pide una cuenta de Google y pelea con los límites de Drive: el N+1 de
@@ -1830,6 +1830,29 @@ funcionar**. Dos opciones:
 quién emitir el token. La suscripción de ADR-031 (también `PROPUESTA`), con su precio puesto **tras
 medir** el coste de inferencia por usuario activo. Este ADR solo añade una línea de coste más
 pequeña a esa cuenta.
+
+**Implementación (2026-10-19, MON4 F0–F5).** Lo que cambió al escribirlo, y por qué:
+
+- **Escrituras sobre claves inmutables y CAS en D1, no `onlyIf` de R2.** Cada PUT va a una clave
+  nueva (`u/<usuario>/<ruta>/<id>`) y luego se mueve el puntero en D1 con un `UPDATE … WHERE etag =`
+  lo leído. El `If-Match` es atómico igual, pero además quien lee nunca ve un objeto a medio
+  escribir, el perdedor de una carrera se limpia borrando su clave (gratis), y las versiones del §6
+  salen sin copiar nada: la clave anterior pasa a 'version' en vez de borrarse. Cuesta lo mismo:
+  una escritura de clase A por PUT.
+- **`If-None-Match: *` cuando el motor no conoce el etag.** El motor hace el pull antes del push en
+  el mismo ciclo, así que no conocer el etag de una ruta significa que no existía al listar. Con
+  Drive, dos dispositivos que creaban el mismo fichero a la vez se pisaban hasta el ciclo
+  siguiente; aquí uno recibe 412 y reintenta fusionando.
+- **El enlace de emparejamiento lleva también la licencia** (`#pair=<clave>.<licencia>`): un
+  dispositivo con otra licencia caería en otro espacio y quedaría «emparejado» con nada. Si ya tiene
+  otra, se le pregunta.
+- **Las versiones se piden por fichero** (`X-Keep-Versions`): el servidor no puede saber qué es un
+  libro y qué es la biblioteca, porque las rutas le llegan como HMAC.
+- **La opción A/B queda como configuración** del Worker (`CAP_*`, `FILES_ENABLED`), con B por
+  defecto: sin tocar nada, no se paga nunca. Pasar a A es cambiar números, no código.
+- **Un techo más que el de R2: D1.** Su plan gratuito da 100 k escrituras al día y cada PUT hace unas
+  cinco: unos 400 usuarios activos a 50 escrituras al día. Es del mismo orden que el de R2 en la
+  opción B, y se levanta con el plan de pago de Workers (5 $/mes).
 
 **Alternativas.** El mismo Worker `share` con un prefijo (menos código, pero los topes y el gasto se
 mezclan, y cualquier cambio del sync arriesga la viralidad). Dexie Cloud o Supabase con cifrado
