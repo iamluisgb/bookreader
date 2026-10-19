@@ -13,7 +13,9 @@
 
 import { ToolError, SourceError, UnknownBookError } from './errors.mjs';
 import { aggregateReading, RANGES, GROUP_BY } from './stats.mjs';
+import { resolveBookArg, fold } from './book-arg.mjs';
 import { WRITE_TOOLS } from './write-tools.mjs';
+import { TEXT_TOOLS } from './text-tools.mjs';
 
 const LIMIT_DEFAULT = 50;
 const LIMIT_MAX = 500;
@@ -39,25 +41,6 @@ function requireString(args, name) {
     throw new ToolError('Falta el argumento obligatorio «' + name + '» (texto no vacío).');
   }
   return v.trim();
-}
-
-// El libro, por `bookId` o por `book` (título o parte, sin tildes ni mayúsculas). Así «los
-// subrayados de Pedro Páramo» funciona sin pasar antes por list_books. Si el título casa con
-// varios, error con los candidatos: mejor que el modelo pregunte que adivinar.
-export async function resolveBookArg(source, args) {
-  const id = typeof args.bookId === 'string' ? args.bookId.trim() : '';
-  if (id) return id;
-  const q = typeof args.book === 'string' ? fold(args.book.trim()) : '';
-  if (!q) throw new ToolError('Falta el libro: pasa «bookId» (de list_books) o «book» (su título).');
-  const titles = await source.titles();
-  const entries = Object.entries(titles).filter(([, t]) => t);
-  const exact = entries.filter(([, t]) => fold(t) === q);
-  const hits = exact.length ? exact : entries.filter(([, t]) => fold(t).includes(q));
-  if (hits.length === 1) return hits[0][0];
-  const list = (hits.length ? hits : entries).slice(0, 15).map(([bid, t]) => `${t} (${bid})`).join('; ');
-  throw new ToolError(hits.length
-    ? `«${args.book}» casa con varios libros: ${list}. Repite con su bookId.`
-    : `Ningún libro se llama «${args.book}». Hay: ${list || 'ninguno con título'}.`);
 }
 
 function optionalString(args, name) {
@@ -157,12 +140,6 @@ function previewOf(result, max) {
 // ---- Búsqueda --------------------------------------------------------------
 
 /** Sin acentos y en minúsculas: «diseño» y «diseno» son la misma palabra. */
-export function fold(s) {
-  return String(s || '')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase();
-}
 
 function termsOf(query) {
   return fold(query).split(/\s+/).filter(Boolean);
@@ -604,6 +581,7 @@ export const ALL_TOOLS = [
   GET_DECK,
   LIST_ARTIFACTS,
   GET_ARTIFACT,
+  ...TEXT_TOOLS,
   ...WRITE_TOOLS,
 ];
 

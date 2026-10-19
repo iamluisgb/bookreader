@@ -56,7 +56,9 @@ export async function createSource(config, deps = {}) {
   if (config.source === 'bookreader') {
     const { raw, license } = deps.pair || (await readPairFile(config.pairFile, readFile));
     const provider = createBookReaderSyncProvider({ raw, license, fetchImpl, workerUrl: deps.workerUrl });
-    return createDriveSource({ provider, base: config.base, cacheMs: config.cacheMs, kind: 'bookreader' });
+    // Con el enlace de emparejamiento, la clave es del usuario y se descifra en su máquina: el
+    // texto de los libros (si la app lo subió) se puede leer sin más permiso.
+    return Object.assign(createDriveSource({ provider, base: config.base, cacheMs: config.cacheMs, kind: 'bookreader' }), { canReadText: true });
   }
 
   throw new ConfigError('Fuente no soportada: ' + config.source);

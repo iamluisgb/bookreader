@@ -138,9 +138,18 @@ export async function getToken(force = false) {
   }
   Storage.set(TOKEN_KEY, {
     token: data.token, expiresAt: data.expiresAt, readOnly: !!data.readOnly,
-    files: !!data.files, purgeAt: data.purgeAt || null, checkedAt: Date.now(),
+    files: !!data.files, bookText: !!data.bookText, purgeAt: data.purgeAt || null, checkedAt: Date.now(),
   });
   return data.token;
+}
+
+// ¿Subir el texto de los libros al sync? Solo si algún agente puede leerlo (un token con permiso
+// 'text'): lo dice el servidor al dar el token, y este dispositivo lo sabe al momento si es él
+// quien crea ese token. Ver book-text.js.
+const BOOK_TEXT_LOCAL = 'sync_book_text';
+export function bookTextWanted() {
+  const s = tokenInfo();
+  return !!((s && s.bookText) || Storage.get(BOOK_TEXT_LOCAL, false));
 }
 
 // Petición al Worker con el token; un 401 (token caducado o purgado) se renueva una vez.
@@ -335,6 +344,10 @@ export async function createMcpToken(name, { days = 90, scopes = [] } = {}) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name, days, scopes, key: Storage.get(KEY_KEY), license: licenseKey() }),
   });
+  if (res.ok && scopes.includes('text')) {
+    Storage.set(BOOK_TEXT_LOCAL, true);
+    window.dispatchEvent(new CustomEvent('bookreader:book-text-wanted'));
+  }
   if (!res.ok) {
     const e = await apiError(res);
     if (e.reason === 'too_many') e.message = t('Ya tienes 20 agentes conectados. Revoca alguno para crear otro.');

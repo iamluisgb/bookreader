@@ -129,3 +129,67 @@ test('Agente con escritura: su edición y un repaso hecho sin sincronizar sobrev
   const deck = JSON.parse((await remote.json()).result.content[0].text);
   expect({ front: deck.cards[0].front, reps: deck.cards[0].srs?.reps }).toEqual({ front: card.front, reps: 1 });
 });
+
+// Texto de los libros: al crear un agente con permiso para leerlo, la app sube el texto ya
+// troceado de sus libros (sync/book-text.js) y el agente lo lee y lo busca con sus anclas.
+test('Agente con permiso de texto: la app sube el texto troceado y el agente lo lee y lo busca', async ({ page }) => {
+  const server = await createSyncServer();
+  await installSyncServer(page, server);
+  await enableSyncPreview(page);
+  await seedBookReaderSync(page);
+  await page.goto('/');
+  await page.evaluate(async () => {
+    await (await import('/js/sync/bookreader-auth.js')).enable();
+    const Store = await import('/js/library/store.js');
+    const buf = new Uint8Array(1024).map((_, i) => (i * 3) % 251);
+    await Store.putBook({ id: 'ddia', title: 'Designing Data-Intensive Applications', author: 'Kleppmann', format: 'epub', fileName: 'ddia.epub', file: buf.buffer, size: buf.length, addedAt: Date.now(), progress: 0, status: 'reading', shelfIds: [] });
+    await (await import('/js/sync/engine.js')).syncNow();
+    // El libro, troceado como lo deja segment.js.
+    const DB = await import('/js/ai/db.js');
+    const anchors = new Map();
+    const lines: string[] = [];
+    let n = 0;
+    for (const ch of ['Chapter 7. Replication', 'Chapter 8. Transactions']) {
+      lines.push('', '## ' + ch);
+      for (let i = 0; i < 40; i++) {
+        const id = 'a' + n++;
+        anchors.set(id, { cfi: 'epubcfi(/6/2!/4/' + n + ')', chapter: ch, href: 'x.html' });
+        lines.push(`[[${id}]] ${ch === 'Chapter 8. Transactions' && i === 7 ? 'Two doctors on call both go off call: that is write skew.' : 'Paragraph ' + i + ' about logs and nodes.'}`);
+      }
+    }
+    await DB.saveSegmented('ddia', 'Designing Data-Intensive Applications', { annotatedText: lines.join('\n'), anchors, tokenEstimate: 1000, blockCount: n });
+  });
+  // Sin agentes que lo pidan, no se sube: el texto no está en el servidor.
+  const textCalls = () => server.calls.filter((c) => c.startsWith('PUT /v1/o/')).length;
+  const putsBefore = textCalls();
+  await page.evaluate(async () => (await import('/js/sync/book-text.js')).backfill());
+  expect(textCalls()).toBe(putsBefore);
+
+  await page.evaluate(async () => (await import('/js/ui/app-settings.js')).open('data'));
+  await page.locator('#appset-br-agent-create').click();
+  await page.locator('.dlg-overlay [data-field="name"]').fill('Claude');
+  await page.locator('.dlg-overlay [data-check="scopes"][value="text"]').check();
+  await page.locator('.dlg-overlay .dlg-ok').click();
+  await expect(page.locator('#appset-br-agent-token')).toContainText('br-mcp-');
+  const token = (await page.locator('#appset-br-agent-token').textContent())!.trim();
+  const call = async (name: string, args: any) => {
+    const res = await server.worker.fetch(new Request(SYNC_URL + '/mcp', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } }),
+    }), server.env);
+    return (await res.json()).result;
+  };
+  const tool = async (name: string, args: any) => {
+    const r = await call(name, args);
+    expect(r.isError ?? false, r.content[0].text).toBe(false);
+    return JSON.parse(r.content[0].text);
+  };
+  // La subida va sola tras crear el token: se espera a que el índice esté.
+  await expect.poll(async () => !(await call('get_toc', { bookId: 'ddia' })).isError, { timeout: 15000 }).toBe(true);
+  const toc = await tool('get_toc', { book: 'designing' });
+  expect(toc.chapters.map((c: any) => [c.title, c.passages])).toEqual([['Chapter 7. Replication', 40], ['Chapter 8. Transactions', 40]]);
+  const ch = await tool('read_chapter', { bookId: 'ddia', chapter: 'transactions' });
+  expect(ch.text.split('\n')[0]).toBe('[[a40]] Paragraph 0 about logs and nodes.');
+  const found = await tool('search_book', { bookId: 'ddia', query: 'doctors on call', limit: 1 });
+  expect(found.results[0]).toMatchObject({ id: 'a47', chapterTitle: 'Chapter 8. Transactions', text: 'Two doctors on call both go off call: that is write skew.' });
+});

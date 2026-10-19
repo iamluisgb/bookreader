@@ -775,6 +775,8 @@ export async function saveSegmented(bookId, title, seg) {
     blockCount: seg.blockCount,
   });
   await put('anchors', { bookId, entries: [...seg.anchors.entries()] });
+  // El sync de BookReader puede subir este texto para los agentes (sync/book-text.js).
+  if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('bookreader:segmented', { detail: { bookId } }));
 }
 
 // Artefactos generados (resumen, mapa mental) --------------------------------

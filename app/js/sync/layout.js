@@ -38,7 +38,8 @@ const SECRET_KEYS = ['ai_key', 'drive_refresh_token', 'sync_key', 'sync_token'];
 // partición por dispositivo —lo único que hace que fusionar sea unir— se deshace en
 // silencio: uno de los dos deja de contar.
 // `sync_provider` es la elección de ESTE equipo (Drive o el sync de BookReader).
-const SKIP_KEYS = ['sync_schema_migrated', 'sync_state', 'device_id', 'sync_provider'];
+// `sync_book_text` (subir el texto de los libros) y `sync_text_state` (qué texto ya subió) también.
+const SKIP_KEYS = ['sync_schema_migrated', 'sync_state', 'device_id', 'sync_provider', 'sync_book_text', 'sync_text_state'];
 
 function splitKey(key) {
   for (const p of BOOK_PREFIXES) {

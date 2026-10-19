@@ -196,8 +196,13 @@ async function issueToken(request, env, cors, now = Date.now()) {
   const expiresAt = now + c.tokenHours * 60 * 60 * 1000;
   await env.DB.prepare('INSERT INTO tokens (hash, user, expires_at, read_only) VALUES (?, ?, ?, ?)')
     .bind(await sha256Hex(token), user, expiresAt, readOnly ? 1 : 0).run();
+  // ¿Algún agente puede leer el texto de los libros? Entonces los dispositivos lo suben al sync
+  // (bookreader/text/<id>.json, app/js/sync/book-text.js); si no, no gastan espacio en ello.
+  const textToken = await env.DB.prepare(
+    `SELECT 1 AS x FROM mcp_tokens WHERE user = ? AND expires_at > ? AND (',' || scopes || ',') LIKE '%,text,%' LIMIT 1`,
+  ).bind(user, now).first();
   return json({
-    token, expiresAt, readOnly, files: c.filesEnabled,
+    token, expiresAt, readOnly, files: c.filesEnabled, bookText: !!textToken,
     lapsedAt, purgeAt: lapsedAt ? lapsedAt + c.graceDays * DAY : null,
   }, 200, cors);
 }

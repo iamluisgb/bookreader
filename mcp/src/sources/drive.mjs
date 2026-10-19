@@ -263,6 +263,23 @@ export function createDriveSource({ provider, base = DEFAULT_BASE, cacheMs = 150
       return liveItems(entry.artifacts);
     },
     /**
+     * El texto del libro que sube la app (sync/book-text.js; formato en book-text-build.js):
+     * `bookText` da el índice (`text/<id>.json`) y `bookTextFile` un trozo o la búsqueda, en
+     * texto plano. null si no están. Solo los piden las tools de texto (permiso `text`).
+     */
+    async bookText(bookId) {
+      const c = await load();
+      if (!(await entryFrom(c, bookId))) throw new UnknownBookError(bookId);
+      if (!/^[A-Za-z0-9._-]+$/.test(bookId)) return null;
+      const r = await provider.read(base + 'text/' + bookId + '.json');
+      return r ? JSON.parse(r.content) : null;
+    },
+    async bookTextFile(bookId, name) {
+      if (!/^[A-Za-z0-9._-]+$/.test(bookId) || !/^(p\d{1,4}|search)\.txt$/.test(name)) return null;
+      const r = await provider.read(base + 'text/' + bookId + '/' + name);
+      return r ? r.content : null;
+    },
+    /**
      * Cambia el fichero de un libro. Solo existe si el proveedor sabe escribir (`update`: el del
      * sync de BookReader, en el Worker); el de Drive y el de disco son de solo lectura. `mutate`
      * recibe el JSON SIN redactar (o null si el libro aún no tiene fichero) y devuelve

@@ -32,7 +32,7 @@ const VERSION = 1;
 const SECRET_KEYS = ['ai_key', 'drive_refresh_token', 'sync_key', 'sync_token'];  // secretos: jamás a un fichero descargable
 // Identidad de ESTE equipo: restaurar una copia en otro dispositivo no puede clonarla, o
 // ambos escribirían la misma fila del registro de lectura (ver sync/layout.js · SKIP_KEYS).
-const LOCAL_ONLY_KEYS = ['device_id', 'sync_provider'];
+const LOCAL_ONLY_KEYS = ['device_id', 'sync_provider', 'sync_book_text', 'sync_text_state'];
 const AI_STORES = ['convos', 'messages', 'notes', 'ratings', 'books', 'decks', 'artifacts', 'attempts'];
 
 // ---- Export ----------------------------------------------------------------

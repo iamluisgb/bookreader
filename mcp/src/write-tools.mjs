@@ -15,7 +15,7 @@
 // Todas aceptan `dry_run`: devuelven el antes y el después sin escribir nada.
 
 import { ToolError } from './errors.mjs';
-import { resolveBookArg, fold } from './tools.mjs';
+import { resolveBookArg, fold } from './book-arg.mjs';
 
 const MAX_CARDS = 100;
 const MAX_TEXT = 4000;

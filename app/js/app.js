@@ -212,6 +212,8 @@ function initSyncEngine() {
   });
 
   SyncEngine.start();
+  // El texto de los libros para los agentes (MCP), si alguno puede leerlo.
+  import('./sync/book-text.js').then(m => m.start()).catch(() => {});
 }
 
 // Licencia Pro (MON2): revalida en background al arrancar — nunca bloquea (offline, la
