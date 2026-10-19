@@ -32,7 +32,7 @@ import * as Study from '../ai/study.js';
 import { ensurePro } from './paywall.js';
 import { icon } from './icons.js';
 import { escapeHtml } from './escape.js';
-import { confirmBox } from './dialog.js';
+import { confirmBox, promptBox } from './dialog.js';
 import { ago } from './when.js';
 import { t, getLang, setLang } from '../i18n.js';
 import * as Settings from '../settings.js';
@@ -1211,6 +1211,18 @@ function dataHtml() {
         </div>
         <button id="appset-br-from-drive" class="appset-tpl-cancel appset-data-md" hidden>${icon('cloud', { size: 'md' })} ${t('Pasar los libros que faltan')}</button>
         <button id="appset-br-history" class="appset-tpl-cancel appset-data-md">${icon('sort', { size: 'md' })} ${t('Historial de versiones')}</button>
+        <label class="appset-label" style="margin-top:14px">${t('Agentes (MCP)')}</label>
+        <p class="appset-muted">${t('Deja que un agente de IA (Claude Code, Claude Desktop, Hermes…) lea tu biblioteca: subrayados, notas, estadísticas y mazos. Solo puede leer. Para responderle, el servidor descifra lo que pide mientras dura cada consulta: crea un token por agente y revócalo cuando ya no lo uses.')}</p>
+        <div id="appset-br-agents" class="appset-links"></div>
+        <div id="appset-br-agent-new" class="appset-br-recovery" hidden>
+          <p class="appset-muted">${t('Token para «{name}». Cópialo ahora: no se vuelve a enseñar.', { name: '<span id="appset-br-agent-name"></span>' })}</p>
+          <code id="appset-br-agent-token" class="appset-br-code"></code>
+          <button id="appset-br-agent-copy" class="appset-tpl-cancel appset-data-md">${icon('copy', { size: 'md' })} ${t('Copiar token')}</button>
+          <p class="appset-muted">${t('En Claude Code:')}</p>
+          <code id="appset-br-agent-cmd" class="appset-br-code"></code>
+          <button id="appset-br-agent-copycmd" class="appset-tpl-cancel appset-data-md">${icon('copy', { size: 'md' })} ${t('Copiar comando')}</button>
+        </div>
+        <button id="appset-br-agent-create" class="appset-tpl-cancel appset-data-md">${icon('plus', { size: 'md' })} ${t('Conectar un agente')}</button>
         <button id="appset-br-to-drive" class="appset-tpl-cancel appset-data-md">${icon('cloud', { size: 'md' })} ${t('Pasar mi sync a Google Drive')}</button>
         <button id="appset-br-disconnect" class="appset-tpl-cancel appset-data-md">${t('Desconectar este dispositivo')}</button>
       </div>
@@ -1654,8 +1666,35 @@ function wireBookReaderSync(content, show) {
     const st = state();
     for (const [k, el] of Object.entries(blocks)) el.hidden = k !== st;
     $('appset-br-from-drive').hidden = !(st === 'on' && DriveAuth.isConnected());
-    if (st === 'on') paintStatus();
+    if (st === 'on') { paintStatus(); paintAgents(); }
   };
+
+  // Agentes con acceso por MCP: nombre, último uso, caducidad y revocar.
+  async function paintAgents() {
+    const box = $('appset-br-agents');
+    const day = (ts) => new Date(ts).toLocaleDateString(getLang(), { day: 'numeric', month: 'long' });
+    let tokens;
+    try { tokens = await BRAuth.mcpTokens(); }
+    catch (e) { box.innerHTML = `<p class="appset-muted">${escapeHtml(t('No se pudo consultar: {msg}', { msg: e.message }))}</p>`; return; }
+    box.innerHTML = tokens.map(tk => `
+      <div class="appset-link" data-id="${escapeHtml(tk.id)}">
+        <div class="appset-link-text">
+          <div class="appset-link-name">${escapeHtml(tk.name)}</div>
+          <div class="appset-link-meta">${escapeHtml((tk.lastUsedAt ? t('Usado {when}', { when: ago(tk.lastUsedAt) }) : t('Sin usar todavía')) + ' · ' + t('caduca el {date}', { date: day(tk.expiresAt) }))}</div>
+        </div>
+        <button class="appset-tpl-cancel" data-act="revoke">${icon('xmark', { size: 'md' })} ${t('Revocar')}</button>
+      </div>`).join('');
+    box.onclick = async (e) => {
+      const row = e.target.closest('[data-act="revoke"]')?.closest('.appset-link');
+      const tk = row && tokens.find(x => x.id === row.dataset.id);
+      if (!tk) return;
+      if (!(await confirmBox(t('«{name}» dejará de poder leer tu biblioteca al momento.', { name: tk.name }),
+        { title: t('Revocar acceso'), okText: t('Revocar'), danger: true }))) return;
+      try { await BRAuth.revokeMcpToken(tk.id); show(t('Acceso de «{name}» revocado.', { name: tk.name })); }
+      catch (err) { show(t('No se pudo revocar: {msg}', { msg: err.message }), true); }
+      paintAgents();
+    };
+  }
 
   async function paintStatus() {
     statusEl.textContent = t('Consultando espacio…');
@@ -1764,6 +1803,26 @@ function wireBookReaderSync(content, show) {
   });
 
   $('appset-br-history').addEventListener('click', (e) => openHistory(e.currentTarget, show, fail));
+
+  $('appset-br-agent-create').addEventListener('click', async () => {
+    const name = ((await promptBox(t('¿Qué agente es? Te servirá para reconocerlo en la lista y revocarlo.'),
+      { title: t('Conectar un agente'), placeholder: t('Claude Code en el portátil'), okText: t('Crear token') })) || '').trim();
+    if (!name) return;
+    try {
+      const tk = await BRAuth.createMcpToken(name);
+      $('appset-br-agent-name').textContent = tk.name;
+      $('appset-br-agent-token').textContent = tk.token;
+      $('appset-br-agent-cmd').textContent = `claude mcp add --transport http bookreader ${BRAuth.MCP_URL} --header "Authorization: Bearer ${tk.token}"`;
+      $('appset-br-agent-new').hidden = false;
+      paintAgents();
+    } catch (e) { fail('No se pudo crear el token')(e); }
+  });
+  const copyFrom = (id) => async () => {
+    try { await navigator.clipboard.writeText($(id).textContent); show(t('Copiado.')); }
+    catch (e) { show(t('No se pudo copiar: {msg}', { msg: e.message }), true); }
+  };
+  $('appset-br-agent-copy').addEventListener('click', copyFrom('appset-br-agent-token'));
+  $('appset-br-agent-copycmd').addEventListener('click', copyFrom('appset-br-agent-cmd'));
 
   // Lo que la migración no pudo pasar por la red, desde el Drive que se quedó conectado.
   $('appset-br-from-drive').addEventListener('click', async (e) => {

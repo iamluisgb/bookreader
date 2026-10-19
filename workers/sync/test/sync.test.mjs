@@ -390,7 +390,7 @@ test('purga: tokens caducados, versiones viejas y subidas que nunca terminaron',
   e.DB._raw.prepare(`INSERT INTO blobs (key, user, path, size, kind, state, created_at) VALUES ('u/x/y/z', 'x', 'y', 9, 'file', 'pending', 0)`).run();
   const later = Date.now() + 31 * 86400000;
   const p = await purge(e, later);
-  assert.deepEqual(p, { tokens: 1, users: 0, versions: 1, pending: 1 });
+  assert.deepEqual(p, { tokens: 1, mcpTokens: 0, users: 0, versions: 1, pending: 1 });
   assert.equal(e.SYNC._m.size, 1);   // queda la versión actual
 });
 

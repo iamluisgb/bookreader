@@ -312,3 +312,36 @@ export function consumePairLink() {
     return { broken: true };
   }
 }
+
+// ---- Agentes (MCP remoto) ------------------------------------------------------------------
+//
+// Un token deja a un agente (Claude Code, Hermes…) leer la biblioteca por MCP en MCP_URL. Para
+// eso el servidor necesita la clave del sync: se la manda AQUÍ, una vez, y la guarda cifrada con
+// el propio token (workers/sync/src/mcp.js). El token se enseña una sola vez.
+
+export const MCP_URL = WORKER_URL + '/mcp';
+
+export async function mcpTokens() {
+  const res = await api('/v1/mcp-tokens');
+  if (!res.ok) throw await apiError(res);
+  return (await res.json()).tokens;
+}
+
+export async function createMcpToken(name, days = 90) {
+  const res = await api('/v1/mcp-tokens', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, days, key: Storage.get(KEY_KEY), license: licenseKey() }),
+  });
+  if (!res.ok) {
+    const e = await apiError(res);
+    if (e.reason === 'too_many') e.message = t('Ya tienes 20 agentes conectados. Revoca alguno para crear otro.');
+    throw e;
+  }
+  return res.json();
+}
+
+export async function revokeMcpToken(id) {
+  const res = await api('/v1/mcp-tokens/' + encodeURIComponent(id), { method: 'DELETE' });
+  if (!res.ok) throw await apiError(res);
+}

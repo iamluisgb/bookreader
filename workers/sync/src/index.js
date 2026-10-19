@@ -30,6 +30,8 @@
 // - Privacidad: no se registran rutas, nombres, contenidos ni IP. El servidor guarda bytes
 //   cifrados con una clave que nunca le llega.
 
+import { mcpRoute, createTokenRoute, listTokensRoute, revokeTokenRoute } from './mcp.js';
+
 const DAY = 24 * 60 * 60 * 1000;
 const PATH_RE = /^[A-Za-z0-9_-]{16,64}$/;
 const ID_RE = /^[A-Za-z0-9_-]{22}$/;
@@ -96,7 +98,7 @@ export async function spend(env, cls, now = Date.now()) {
   return !!row;
 }
 
-async function refused(env, now = Date.now()) {
+export async function refused(env, now = Date.now()) {
   try {
     await env.DB.prepare(
       `INSERT INTO usage (month, refused) VALUES (?, 1) ON CONFLICT(month) DO UPDATE SET refused = refused + 1`,
@@ -518,6 +520,8 @@ export async function wipeUser(env, user) {
     for (const r of results) await env.DB.prepare('DELETE FROM blobs WHERE key = ?').bind(r.key).run();
   }
   await env.DB.prepare('DELETE FROM objects WHERE user = ?').bind(user).run();
+  // Los tokens de agentes llevan la clave vieja: con un sync nuevo no servirían de nada.
+  await env.DB.prepare('DELETE FROM mcp_tokens WHERE user = ?').bind(user).run();
 }
 
 // ---- Mantenimiento y gasto -----------------------------------------------------------------
@@ -529,9 +533,11 @@ export async function wipeUser(env, user) {
 //   - reservas que nunca se completaron (subidas cortadas) de hace más de un día.
 export async function purge(env, now = Date.now()) {
   const c = config(env);
-  const out = { tokens: 0, users: 0, versions: 0, pending: 0 };
+  const out = { tokens: 0, mcpTokens: 0, users: 0, versions: 0, pending: 0 };
   const t = await env.DB.prepare('DELETE FROM tokens WHERE expires_at < ? RETURNING hash').bind(now).all();
   out.tokens = (t.results || []).length;
+  const mt = await env.DB.prepare('DELETE FROM mcp_tokens WHERE expires_at < ? RETURNING id').bind(now).all();
+  out.mcpTokens = (mt.results || []).length;
 
   const { results: gone = [] } = await env.DB.prepare('SELECT id FROM users WHERE lapsed_at IS NOT NULL AND lapsed_at < ?')
     .bind(now - c.graceDays * DAY).all();
@@ -592,6 +598,7 @@ export default {
         if (!env.USAGE_TOKEN || auth !== `Bearer ${env.USAGE_TOKEN}`) return json({ error: 'forbidden' }, 403);
         return json(await usage(env), 200);
       }
+      if (pathname === '/mcp') return await mcpRoute(request, env);
       if (!pathname.startsWith('/v1/')) return json({ error: 'not_found' }, 404, cors);
 
       const who = await authenticate(request, env);
@@ -600,6 +607,12 @@ export default {
       if (pathname === '/v1/status' && method === 'GET') return json(await status(env, who), 200, cors);
       if (pathname === '/v1/list' && method === 'GET') return await listObjects(env, cors, who);
       if (pathname === '/v1/all' && method === 'DELETE') { await wipeUser(env, who.user); return json({ ok: true }, 200, cors); }
+      if (pathname === '/v1/mcp-tokens') {
+        if (method === 'GET') return await listTokensRoute(env, cors, who);
+        if (method === 'POST') return await createTokenRoute(request, env, cors, who);
+      }
+      const mt = pathname.match(/^\/v1\/mcp-tokens\/([A-Za-z0-9_-]{22})$/);
+      if (mt && method === 'DELETE') return await revokeTokenRoute(mt[1], env, cors, who);
 
       const mp = pathname.match(/^\/v1\/mp\/([^/]+)(?:\/([^/]+)(?:\/([^/]+))?)?$/);
       if (mp && PATH_RE.test(mp[1])) {
