@@ -2141,11 +2141,20 @@ básicas para lo fallado, que vuelven con FSRS.
   | baseline-v1 | v1, con razonamiento | 70 % (6 sin JSON: el razonamiento agota los tokens) | 95 % | 100 % (149/149) |
   | c1-nothink | v1, sin razonamiento | **90 %** | 100 % | 95 % (198/208) |
   | c2-v2 | v2 (opciones cortas, que se repitan) | **85 %** | 95 % | 88 % (138/157, 10 specs) |
+  | c3-v2-nothink | v2, sin razonamiento, con `repairAnswers` (**lo que usa la app**) | **95 %** | 100 % | — |
 
   c2 quita las dos señales que hacían la matriz trivial (columna de emparejar 15/20 → 0/19,
   opciones largas 10/20 → 0/19) a cambio de bajar a la valla justa. **Pendiente:** a ciegas, sin el
   capítulo, el solver acierta el 82 % de las celdas de c2: muchas matrices se responden con cultura
   general. Es la señal para el siguiente ciclo de prompt, no un bloqueo.
+- **En la app, sin razonamiento** (2026-10-19). La primera prueba real por la app falló siempre: con
+  el razonamiento encendido, `deepseek-v4-flash` gastaba los 12 000 tokens pensando (45 000
+  caracteres) y el content llegaba vacío. La llamada de la matriz pide ahora `thinking: false`
+  (`llm.js` lo manda solo al preset nan y al gateway, que lo reenvía solo a las rutas de deepseek)
+  y tarda ~9 s. `repairAnswers` arregla en código la respuesta que no está entre las opciones de su
+  columna («Ninguna» en Pro Git, repetida en el reintento): la normaliza o la añade si cabe.
+- Calidad vista en la matriz real de Pro Git «Git Basics»: columnas con «No aplica» y opciones de
+  dos familias mezcladas en una columna. Candidatas para el siguiente ciclo de prompt.
 - La ida y vuelta se queda en el eval; en la app no se hace (dobla el coste de cada matriz). Si los
   intentos reales muestran celdas que todo el mundo falla, se mira ahí.
 
@@ -2164,7 +2173,26 @@ básicas para lo fallado, que vuelven con FSRS.
   intentos muestran que se rehace; (b) el «Te toca» de la libreta, cuando haya más tipos; (c) medir
   con uso real cuántas matrices pedidas se hacen.
 
-**F4+ · Los demás tipos**, cada uno con su contrato y su batería, en este orden (revisado el
+**F4 · Tipo 5 «Pregunta con distractores que enseñan» · `M`** *(contrato escrito el 2026-10-19,
+antes de implementar)*
+- Forma: por capítulo, un conjunto de 5 preguntas de **aplicación** (no de definición), cada una con
+  3–4 opciones, **exactamente una correcta**, feedback por opción (por qué esa opción es o no es) y
+  la cita literal que sostiene la correcta. Las opciones se barajan al pintar. Es atómico: cada
+  pregunta será una tarjeta del mazo con FSRS (no un ejercicio como la matriz).
+- Contrato:
+  - Batería: los mismos 20 capítulos de 4 libros que la matriz.
+  - Métrica primaria: `mcq_item_valid` ≥ 85 %, % de las preguntas pedidas (5 × 20) que pasan
+    `validateMcqItem` **y** `verifyQuotes` a la primera respuesta. Por pregunta y no por capítulo:
+    una pregunta mala se descarta y las demás valen. **Determinista.**
+  - Baseline: prompt `mcq-v1`, sin razonamiento (como la app), un reintento solo con las preguntas
+    que fallen. Run con nombre; hasta tenerlo no se toca el prompt.
+  - Secundarias (tendencia, no valla): ida y vuelta (otro modelo con el capítulo elige la clave: un
+    desacuerdo marca la pregunta como dudosa) ≥ 85 %; a ciegas, sin el capítulo, lo más bajo posible
+    (al azar ≈ 27–33 %); señal «la correcta es la más larga» (el truco clásico de examen).
+  - Time-box: 3 ciclos de prompt.
+- F4a motor puro y eval (esta entrega); F4b la superficie (tipo de tarjeta en el menú y en el repaso).
+
+**F5+ · Los demás tipos**, cada uno con su contrato y su batería, en este orden (revisado el
 2026-10-19): **5 · distractores que enseñan** (es atómico: entra como tipo de tarjeta en FSRS, no
 como ejercicio), **1 · predice y comprueba**, y **3 · ordena** y **4 · números** según el uso de la
 matriz. Los tipos 1–4 son ejercicios del mazo (ADR-058); 5 y 6 son tarjetas.

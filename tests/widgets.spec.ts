@@ -244,6 +244,32 @@ test('generate: parseo tolerante, campos que no decide el modelo, errores para e
   expect(r.flags).toEqual([{ kind: 'fuga', where: 'si|lu' }, { kind: 'constante', where: 'ws' }]);
 });
 
+test('repairAnswers: normaliza mayúsculas, añade la opción que falta si cabe y si no la deja para el reintento', async ({ page }) => {
+  await page.goto('/index.html');
+  const r = await page.evaluate(async (SPEC) => {
+    const G: any = await import('/js/ai/widgets/generate.js');
+    const M: any = await import('/js/ai/widgets/matrix.js');
+    const { type, version, bookId, chapter, ...fromModel } = SPEC;
+    const set = (k: string, v: string) => ({ ...fromModel, cells: fromModel.cells.map((c: any) => (`${c.row}|${c.col}` === k ? { ...c, answer: v } : c)) });
+    const caso = G.finishSpec(set('si|ws', '  no '), {});
+    const nueva = G.finishSpec(set('rc|ws', 'Ninguna'), {});
+    const full = { ...fromModel, columns: fromModel.columns.map((c: any) => (c.id === 'ws' ? { ...c, options: ['Sí', 'No', 'A', 'B', 'C'] } : c)) };
+    const llena = G.finishSpec({ ...full, cells: full.cells.map((c: any) => (`${c.row}|${c.col}` === 'rc|ws' ? { ...c, answer: 'Ninguna' } : c)) }, {});
+    return {
+      caso: caso.cells.find((c: any) => c.row === 'si' && c.col === 'ws').answer,
+      nuevaOpts: nueva.columns.find((c: any) => c.id === 'ws').options,
+      nuevaOk: M.validateMatrix(nueva),
+      original: fromModel.columns.find((c: any) => c.id === 'ws').options,
+      llena: M.validateMatrix(llena).filter((e: string) => e.includes('no es una opción')).length,
+    };
+  }, SPEC);
+  expect(r.caso).toBe('No');
+  expect(r.nuevaOpts).toEqual(['Sí', 'No', 'Ninguna']);
+  expect(r.nuevaOk).toEqual([]);
+  expect(r.original).toEqual(['Sí', 'No']);   // no muta el spec de entrada
+  expect(r.llena).toBe(1);
+});
+
 test('patterns.html: el ejemplo vivo de la matriz se pinta sin errores', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));

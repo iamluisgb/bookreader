@@ -76,10 +76,34 @@ export function parseSpec(raw) {
 }
 
 // Completa lo que no decide el modelo. No toca lo demás: si el modelo puso otro type, gana el
-// nuestro (pedimos una matriz).
+// nuestro (pedimos una matriz). Además repara las respuestas fuera de sus opciones (repairAnswers).
 export function finishSpec(spec, { bookId, chapter } = {}) {
   if (!spec || typeof spec !== 'object' || Array.isArray(spec)) return spec;
-  return { ...spec, type: 'matrix', version: WIDGET_VERSION, bookId: bookId ?? null, chapter: chapter ?? '' };
+  return repairAnswers({ ...spec, type: 'matrix', version: WIDGET_VERSION, bookId: bookId ?? null, chapter: chapter ?? '' });
+}
+
+// Respuesta que no es una de las opciones de su columna (medido en la app el 19-oct: «Ninguna»
+// en Pro Git, repetido en el reintento). Si casa salvo mayúsculas y espacios, se usa el texto de
+// la opción; si no, y la columna tiene sitio, se añade como opción: sigue siendo cerrada y la
+// sostiene su cita. Sin sitio se deja, y validateMatrix lo nombra para el reintento.
+export function repairAnswers(spec) {
+  if (!Array.isArray(spec.columns) || !Array.isArray(spec.cells)) return spec;
+  const columns = spec.columns.map((c) => (c && Array.isArray(c.options) ? { ...c, options: [...c.options] } : c));
+  const byId = new Map(columns.filter((c) => c && c.id).map((c) => [c.id, c]));
+  const canon = (x) => String(x ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
+  const cells = spec.cells.map((cell) => {
+    const col = cell && byId.get(cell.col);
+    if (!col || !Array.isArray(col.options) || typeof cell.answer !== 'string' || !cell.answer.trim()) return cell;
+    if (col.options.includes(cell.answer)) return cell;
+    const same = col.options.find((o) => canon(o) === canon(cell.answer));
+    if (same) return { ...cell, answer: same };
+    if (col.options.length < MATRIX_LIMITS.options[1]) {
+      col.options.push(cell.answer.trim());
+      return { ...cell, answer: cell.answer.trim() };
+    }
+    return cell;
+  });
+  return { ...spec, columns, cells };
 }
 
 // Errores de un spec ya completado: validación del tipo y, si pasa, citas que no están en el

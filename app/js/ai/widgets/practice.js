@@ -16,15 +16,16 @@ import { widgetAttempt } from './core.js';
 import { renderMatrix, matrixCards } from './matrix.js';
 import { matrixMessages, parseSpec, finishSpec, specErrors, retryMessages } from './generate.js';
 
-// Holgado: con razonamiento, el modelo gasta del mismo cupo antes de escribir el JSON (en el
-// eval, 8000 se quedaban cortos en 1 de cada 4 capítulos con el razonamiento encendido).
-const MAX_TOKENS = 12000;
+// Sin razonamiento: con él, deepseek-v4-flash gasta todo el cupo pensando y no escribe el JSON
+// (medido en la app el 19-oct: 45 000 caracteres de razonamiento y content vacío, con 12 000
+// tokens). Sin él, el eval c1-nothink dio 90 % a la primera. 8000 cabe bajo el techo del gateway.
+const MAX_TOKENS = 8000;
 
 // Una llamada y, si el spec no vale, un reintento con los errores concretos (el mismo ciclo que
 // mide evals/widgets.mjs). Si tampoco vale, falla: un spec que no pasa no se enseña.
 export async function generateMatrix({ chapter, text, bookId, lang = getLang(), signal, background = false }) {
   const messages = matrixMessages({ chapter, text, lang });
-  const ask = (msgs) => LLM.chatStream({ messages: msgs, maxTokens: MAX_TOKENS, signal, background });
+  const ask = (msgs) => LLM.chatStream({ messages: msgs, maxTokens: MAX_TOKENS, thinking: false, signal, background });
   const check = (raw) => {
     const spec = finishSpec(parseSpec(raw), { bookId, chapter });
     return { spec, errors: specErrors(spec, text) };
@@ -33,7 +34,7 @@ export async function generateMatrix({ chapter, text, bookId, lang = getLang(), 
   let res = check(raw);
   if (res.errors.length) res = check(await ask(retryMessages(messages, raw, res.errors)));
   if (res.errors.length) {
-    console.warn('practice: la matriz no pasó la validación', res.errors);
+    console.warn(`practice: la matriz no pasó la validación: ${res.errors.slice(0, 8).join(' · ')}`);
     throw new Error(t('La matriz no salió bien (citas o formato). Vuelve a intentarlo.'));
   }
   const now = Date.now();

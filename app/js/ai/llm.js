@@ -59,7 +59,7 @@ export const PROVIDERS = [
   // una pregunta en español. Los nuevos que publique nan salen solos por `catalogUrl` (ver
   // refreshProviderCatalog), marcados como «sin probar». Modelo, lite y visión por defecto NO
   // cambian aquí: eso pasa por las evals (docs/EVALS.md).
-  { id: 'nan',        name: 'nan.builders',      baseUrl: 'https://api.nan.builders/v1',   models: ['deepseek-v4-flash', 'qwen3.8-flash', 'glm5.3-flash', 'qwen3.6', 'gemma4', 'mimo-v2.6-flash'], liteModel: 'deepseek-v4-flash', visionModel: 'deepseek-v4-flash', concurrent: true, discover: false, catalogUrl: GATEWAY_BASE_URL.replace(/\/v1$/, '') + '/catalog/nan' },
+  { id: 'nan',        name: 'nan.builders',      baseUrl: 'https://api.nan.builders/v1',   models: ['deepseek-v4-flash', 'qwen3.8-flash', 'glm5.3-flash', 'qwen3.6', 'gemma4', 'mimo-v2.6-flash'], liteModel: 'deepseek-v4-flash', visionModel: 'deepseek-v4-flash', concurrent: true, discover: false, thinkingOff: true, catalogUrl: GATEWAY_BASE_URL.replace(/\/v1$/, '') + '/catalog/nan' },
   { id: 'openai',     name: 'OpenAI',     baseUrl: 'https://api.openai.com/v1',     models: ['gpt-4o', 'gpt-4o-mini', 'o4-mini'], concurrent: true, catalogId: 'openai' },
   // Verificado contra la API real el 2026-08-02 (tests/provider-contract.spec.ts):
   // `claude-3.7-sonnet` y `gemini-2.0-flash-001` ya NO existen en el catálogo, así que
@@ -523,9 +523,17 @@ async function fetchRetrying(url, opts, { retries = 3 } = {}) {
   throw lastErr;
 }
 
+// P43 · Cuerpo extra para pedir que el modelo NO razone. Solo donde está verificado: el preset
+// que declara `thinkingOff` (nan) y el gateway, que lo reenvía únicamente a las rutas que lo
+// admiten. En los demás proveedores no se manda nada (un campo desconocido puede ser un 400).
+function thinkingOffBody() {
+  return isDemo() || currentProvider()?.thinkingOff ? { thinking: { type: 'disabled' } } : {};
+}
+
 // `model` (opcional) permite a una tarea concreta usar otro modelo (p. ej. el lite en
 // query-expand/attenuation); sin él, el modelo principal de Ajustes.
-async function _chatStream({ messages, onToken, onReasoning, onDone, signal, maxTokens = MAX_TOKENS, model }) {
+// `thinking: false` pide respuesta sin razonamiento donde se puede (ver thinkingOffBody).
+async function _chatStream({ messages, onToken, onReasoning, onDone, signal, maxTokens = MAX_TOKENS, model, thinking = true }) {
   const key = getKey().trim();
   if (!key) throw new Error(t('Falta la API key.'));
 
@@ -540,6 +548,7 @@ async function _chatStream({ messages, onToken, onReasoning, onDone, signal, max
       messages,
       stream: true,
       max_tokens: maxTokens,
+      ...(thinking === false ? thinkingOffBody() : {}),
     }),
     signal,
   });

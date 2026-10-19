@@ -41,7 +41,8 @@ export const ROUTING = {
     product: 'bookreader',
     provider: 'nan',
     model: 'deepseek-v4-flash',
-    caps: { tools: true, vision: false },
+    // thinkingOff: el modelo acepta `thinking: {type: 'disabled'}` (ver forwardThinking).
+    caps: { tools: true, vision: false, thinkingOff: true },
   },
   // Visión del producto: deepseek-v4-flash tiene entrada de imagen verificada y la key
   // del gateway tiene acceso. Antes apuntaba a mimo-v2.5, que responde 401 con la key
@@ -51,7 +52,7 @@ export const ROUTING = {
     product: 'bookreader',
     provider: 'nan',
     model: 'deepseek-v4-flash',
-    caps: { tools: false, vision: true },
+    caps: { tools: false, vision: true, thinkingOff: true },
   },
   // Llamadas auxiliares del cliente (query-expand, attenuation): modelo pequeño y
   // rápido (~0.8s vs ~3s del fast, que gasta tokens razonando donde no aporta).
@@ -94,7 +95,8 @@ export const ROUTING = {
     product: 'arete',
     provider: 'nan',
     model: 'deepseek-v4-flash',
-    caps: { tools: true, vision: false },
+    // thinkingOff: el modelo acepta `thinking: {type: 'disabled'}` (ver forwardThinking).
+    caps: { tools: true, vision: false, thinkingOff: true },
   },
   // Visión: qwen3.6 y no mimo-v2.5 porque es el que arete tiene verificado para leer
   // capturas de entrenos (ver su js/ai/llm.js) — y además acepta tools.
@@ -133,6 +135,15 @@ const PROVIDERS = {
 };
 
 const MAX_TOKENS_CAP = 8192; // mismo techo que usa el cliente; nadie lo sube desde fuera
+
+// P43 · El cliente puede pedir que el modelo NO razone (la matriz de práctica: con razonamiento,
+// deepseek-v4-flash gasta todo el cupo pensando y no llega a escribir el JSON). Solo se reenvía
+// el apagado, y solo a rutas que lo admiten: encenderlo o darle presupuesto no es cosa del
+// cliente, y apagarlo solo abarata la llamada.
+export function forwardThinking(body, route) {
+  return route?.caps?.thinkingOff && body?.thinking?.type === 'disabled'
+    ? { thinking: { type: 'disabled' } } : {};
+}
 
 // Techos de ENTRADA. `MAX_TOKENS_CAP` solo acota la salida: sin esto, una llamada
 // puede llevar megas de mensajes y sigue contando **1** contra la cuota y contra
@@ -345,6 +356,7 @@ async function handleChat(request, env, ctx) {
     },
     body: JSON.stringify({
       ...pick(body, PASSTHROUGH),
+      ...forwardThinking(body, route),
       model: route.model,
       max_tokens: Math.min(Number(body.max_tokens) || MAX_TOKENS_CAP, MAX_TOKENS_CAP),
     }),

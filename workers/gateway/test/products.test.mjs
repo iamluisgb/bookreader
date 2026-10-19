@@ -186,3 +186,12 @@ test('el disyuntor diario cuenta las dos apps juntas: es un solo presupuesto', a
   assert.equal(tercera.status, 403);
   assert.equal((await tercera.json()).error.code, 'demo_paused');
 });
+
+// P43 · «Sin razonamiento»: solo el apagado, y solo a rutas que lo admiten.
+test('thinking: se reenvía el apagado a deepseek y nada más', async () => {
+  const { body } = await pedirDemo('bookreader');
+  await chat(body.token, 'bookreader-fast', { thinking: { type: 'disabled' } });
+  await chat(body.token, 'bookreader-fast', { thinking: { type: 'enabled', budget_tokens: 99999 } });
+  await chat(body.token, 'bookreader-lite', { thinking: { type: 'disabled' } });
+  assert.deepEqual(upstream.map((u) => u.body.thinking), [{ type: 'disabled' }, undefined, undefined]);
+});
