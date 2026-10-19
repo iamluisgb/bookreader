@@ -214,12 +214,16 @@ export async function enable() {
 }
 
 // Usa una clave que llega de fuera (enlace o clave de recuperación). Comprueba que abre lo que
-// hay ANTES de guardarla: si no, lanza con code 'wrong_key' y no toca nada.
+// hay ANTES de guardarla: si no, lanza y no toca nada.
+//   - 'wrong_key': hay datos y esta clave no los abre.
+//   - 'empty': con ESTA licencia no hay nada sincronizado. Una clave de fuera siempre viene de
+//     un sync que existe, así que eso significa que este dispositivo está con otra licencia: si
+//     se aceptara, quedaría «emparejado» con un espacio vacío, sin cruzarse nunca con el otro.
 export async function useKey(raw) {
   const k = await C.importKeys(raw);
   const ok = await keyOpens(k);
   if (ok === false) throw Object.assign(new Error(t('Esa clave no es la de tu sync. Compruébala o usa el enlace de otro dispositivo.')), { code: 'wrong_key' });
-  if (ok === null) await writeKeycheck(k);
+  if (ok === null) throw Object.assign(new Error(t('Con la licencia de este dispositivo no hay nada sincronizado. Usa en los dos la misma licencia.')), { code: 'empty' });
   setKey(raw);
 }
 

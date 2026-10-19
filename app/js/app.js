@@ -22,7 +22,7 @@ import * as ChapterGate from './ai/chapter-gate.js';
 import * as Search from './search.js';
 import { escapeHtml } from './ui/escape.js';
 import { openImageZoom } from './image-zoom.js';
-import { alertBox } from './ui/dialog.js';
+import { alertBox, confirmBox } from './ui/dialog.js';
 import { rangeForText } from './pdf-locate.js';
 import { migrateSchema, purgeExpiredTombstones } from './sync/schema.js';
 import * as SyncEngine from './sync/engine.js';
@@ -316,7 +316,15 @@ async function recibirEmparejamiento() {
   const { toast } = await import('./ai/toast.js');
   const dismiss = toast({ message: t('Emparejando este dispositivo…'), timeout: 0 });
   try {
-    if (!BRAuth.licenseKey() && pair.license) await License.activate(pair.license);
+    // El sync va con la licencia del enlace: con otra, este dispositivo caería en otro espacio.
+    if (pair.license && pair.license !== BRAuth.licenseKey()) {
+      if (BRAuth.licenseKey()) {
+        dismiss();
+        const ok = await confirmBox(t('Este dispositivo tiene otra licencia. Para sincronizar con el dispositivo del enlace se usará la suya.'), { title, okText: t('Usar la del enlace') });
+        if (!ok) return;
+      }
+      await License.activate(pair.license);
+    }
     await BRAuth.useKey(pair.raw);
     const DriveAuth = await import('./sync/drive-auth.js');
     if (SyncProvider.activeId() === 'drive' && DriveAuth.isConnected()) {
@@ -334,8 +342,8 @@ async function recibirEmparejamiento() {
     toast({ message: t('Dispositivo emparejado. Tus notas y tu progreso ya están aquí.') });
   } catch (e) {
     dismiss();
-    await alertBox(e.code === 'wrong_key'
-      ? t('Esa clave no es la de tu sync. Compruébala o usa el enlace de otro dispositivo.')
+    await alertBox(e.code === 'wrong_key' || e.code === 'empty'
+      ? e.message
       : e.message === 'reconnect'
         ? t('Tu suscripción no está activa. El sync de BookReader queda en solo lectura.')
         : t('No se pudo emparejar: {msg}', { msg: e.message }), { title });

@@ -1819,4 +1819,7 @@ const EN = {
   'No se pudo empezar de cero': 'Could not start over',
   'Sin subir: sync lleno': 'Not uploaded: sync full',
   'Subir al sync ({size})': 'Upload to sync ({size})',
+  'Con la licencia de este dispositivo no hay nada sincronizado. Usa en los dos la misma licencia.': 'There is nothing synced under this device\'s license. Use the same license on both.',
+  'Este dispositivo tiene otra licencia. Para sincronizar con el dispositivo del enlace se usará la suya.': 'This device has a different license. To sync with the device from the link, its license will be used.',
+  'Usar la del enlace': 'Use the link\'s license',
 };

@@ -129,6 +129,31 @@ test.describe('MON4 F2 — cifrado y emparejamiento', () => {
     await movil.close();
   });
 
+  test('una clave de otro sync en un dispositivo con OTRA licencia no se acepta (espacio vacío)', async ({ browser }) => {
+    const server = await createSyncServer();
+    const pc = await browser.newContext();
+    const otro = await browser.newContext();
+    for (const c of [pc, otro]) await installSyncServer(c, server);
+    await seedBookReaderSync(pc, 'BKRD-LIC-AAAA');
+    await seedBookReaderSync(otro, 'BKRD-LIC-BBBB');
+    const a = await pc.newPage();
+    await a.goto('/');
+    const raw = await a.evaluate(async () => {
+      await (await import('/js/sync/bookreader-auth.js')).enable();
+      return localStorage.getItem('bookreader_sync_key');
+    });
+    const b = await otro.newPage();
+    await b.goto('/');
+    const r = await b.evaluate(async (raw) => {
+      const A = await import('/js/sync/bookreader-auth.js');
+      const C = await import('/js/sync/sync-crypto.js');
+      try { await A.useKey(C.fromB64url(JSON.parse(raw!))); return 'entró'; } catch (e: any) { return e.code + ':' + A.hasKey(); }
+    }, raw);
+    expect(r).toBe('empty:false');
+    await pc.close();
+    await otro.close();
+  });
+
   test('la clave del sync y su token no salen en el backup ni en el sync', async ({ page }) => {
     await page.goto('/');
     const r = await page.evaluate(async () => {
