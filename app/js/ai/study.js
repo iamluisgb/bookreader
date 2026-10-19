@@ -28,6 +28,7 @@ import { segmentBook } from './segment.js';
 import { segmentPdf } from './segment-pdf.js';
 import { loadEpubJs, loadPdfJs } from '../vendor-loader.js';
 import { sanitizeSvg, reviewDrawing } from './visual-cards.js';
+import { shuffledOptions } from './widgets/mcq.js';
 import { CLOZE_RE, clozeExact } from './cloze-check.js';
 
 // Racha de estudio (F3): {count, lastDay}, global de la app (no por libro).
@@ -541,6 +542,12 @@ function onKey(e) {
   const current = queue[0];
   if (!current || animating) return;
   if (!flipped && (e.key === ' ' || e.key === 'Enter')) { e.preventDefault(); flip(); return; }
+  const cur = current.deck.cards[current.idx];
+  if (!flipped && cur && cur.type === 'mcq' && /^[1-4]$/.test(e.key)) {
+    const id = ensureDraft(current.deck, current.idx).order?.[Number(e.key) - 1];
+    if (id) { e.preventDefault(); pickOption(id); }
+    return;
+  }
   if (flipped) {
     // Las cuatro teclas valen siempre; en modo simple el 2 también es «bien».
     const map = gradingMode() === 'full'
@@ -557,7 +564,8 @@ function onKey(e) {
 
 // Nota: el replace corre sobre el texto YA escapado, así que los grupos capturados llegan
 // escapados — insertarlos tal cual es seguro.
-function frontHtml(card) {
+function frontHtml(card, d = null) {
+  if (card.type === 'mcq') return mcqFrontHtml(card, d);
   const inner = card.type === 'cloze'
     ? escapeHtml(card.front).replace(CLOZE_RE, (_, _ans, hint) =>
       `<span class="study-cloze">[${hint || '…'}]</span>`)
@@ -566,6 +574,43 @@ function frontHtml(card) {
   // fragmentos de un cloze como items sueltos se repartían en columnas estrechas a los
   // lados del hueco. Como un solo item, el texto fluye en línea y el hueco es inline.
   return `<span class="study-qtext">${inner}</span>`;
+}
+
+// ---- Pregunta con distractores (P43 F4b) ------------------------------------------
+// Las opciones salen en el orden barajado del borrador (estable mientras la tarjeta está a la
+// vista y distinto en cada repaso, por `reps`). Elegir una ES girar: compromiso antes de ver.
+// Las teclas 1–4 eligen. Al girar se ven todas con su porqué; la cita va en «Ver el pasaje».
+function mcqOrder(card) {
+  const options = Array.isArray(card.options) ? card.options : [];
+  return shuffledOptions({ id: card.uid || card.front, stem: card.front, options }, card.srs?.reps || 0).map((o) => o.id);
+}
+
+function mcqFrontHtml(card, d) {
+  const order = d?.order || mcqOrder(card);
+  const byId = new Map((card.options || []).map((o) => [o.id, o]));
+  const opts = order.map((id, i) => `<button type="button" class="study-mcq-opt" data-opt="${escapeHtml(id)}"><kbd>${i + 1}</kbd><span>${escapeHtml(byId.get(id)?.text || '')}</span></button>`).join('');
+  return `<div class="study-qtext study-mcq-q"><p class="study-mcq-stem">${escapeHtml(card.front)}</p><div class="study-mcq" role="group" aria-label="${t('Opciones')}">${opts}</div></div>`;
+}
+
+function mcqBackHtml(card, d) {
+  const order = d?.order || mcqOrder(card);
+  const byId = new Map((card.options || []).map((o) => [o.id, o]));
+  const items = order.map((id) => {
+    const o = byId.get(id);
+    if (!o) return '';
+    const cls = o.correct ? ' is-right' : id === d?.choice ? ' is-wrong' : '';
+    const tag = o.correct ? t('Correcta') : id === d?.choice ? t('Tu respuesta') : '';
+    return `<li class="study-mcq-fb${cls}"><div class="study-mcq-fb-h">${escapeHtml(o.text)}${tag ? ` <span class="study-mcq-tag">${tag}</span>` : ''}</div><p>${escapeHtml(o.feedback || '')}</p></li>`;
+  }).join('');
+  return `<ul class="study-mcq-list">${items}</ul>`;
+}
+
+function pickOption(id) {
+  if (!overlay || flipped || !queue.length || animating) return;
+  const { deck, idx } = queue[0];
+  const d = ensureDraft(deck, idx);
+  d.choice = id;
+  flip();
 }
 
 // ---- Tarjetas visuales (WU6) --------------------------------------------------
@@ -915,7 +960,7 @@ function renderTools() {
     (hasCard ? `<button class="icon-btn study-tool study-more" aria-haspopup="menu" aria-expanded="false" title="${t('Más acciones')}" aria-label="${t('Más acciones')}">${icon('ellipsis', { size: 'lg' })}</button>
       <div class="study-menu" role="menu" hidden>
         ${item('edit', 'pencil', t('Editar la tarjeta'))}
-        ${LLM.hasKey() ? item('rewrite', 'sparkles', t('Reescribir con el agente')) : ''}
+        ${LLM.hasKey() && queue[0]?.deck.cards[queue[0].idx]?.type !== 'mcq' ? item('rewrite', 'sparkles', t('Reescribir con el agente')) : ''}
         ${item('suspend', 'eye-off', t('Suspender: no volver a mostrarla'))}
         ${item('delete', 'trash', t('Borrar la tarjeta'))}
       </div>` : '');
@@ -1038,7 +1083,8 @@ function renderCard() {
 
   const { deck, idx } = queue[0];
   const card = deck.cards[idx];
-  ensureDraft(deck, idx);
+  const dr = ensureDraft(deck, idx);
+  if (card.type === 'mcq' && !dr.order) dr.order = mcqOrder(card);
   flipped = false;
   const behind = Math.min(queue.length - 1, 3);
   b.innerHTML = `
@@ -1048,7 +1094,7 @@ function renderCard() {
         <div class="study-face study-face--front">
           ${metaHtml(deck, card)}
           ${leechHtml(card)}
-          <div class="study-q">${frontHtml(card)}</div>
+          <div class="study-q">${frontHtml(card, dr)}</div>
           <p class="study-tap">${t('Toca la tarjeta para girarla')}</p>
         </div>
         <div class="study-face study-face--back">
@@ -1069,6 +1115,10 @@ function renderCard() {
     // dentro, que es justo lo que el usuario quería ver.
     if (e.target.closest('button, a, details, summary, textarea, canvas')) return;
     if (!flipped) flip(); else unflip();
+  });
+  b.querySelector('.study-mcq')?.addEventListener('click', (e) => {
+    const o = e.target.closest('[data-opt]');
+    if (o) pickOption(o.dataset.opt);
   });
   wireSwipe(b.querySelector('.study-card3d'));
   wireDrawingCanvas(b.querySelector('.study-draw-canvas'));
@@ -1238,7 +1288,7 @@ function flip() {
   const { deck, idx } = queue[0];
   const card = deck.cards[idx];
   const a = overlay.querySelector('.study-a');
-  const html = backHtml(card);
+  const html = card.type === 'mcq' ? mcqBackHtml(card, ensureDraft(deck, idx)) : backHtml(card);
   a.innerHTML = html;
   a.hidden = !html;
   mountVisuals(a, deck, card);
@@ -1255,6 +1305,15 @@ function flip() {
   d.answer = recallText ? recallText.slice(0, 500) : null;
   d.verdict = null;
   d.pending = false;
+  // P43 F4b · Opción elegida: se corrige sola (exact) y la nota se sugiere. Sin elegir (girar sin
+  // responder) cuenta como «solo mirar», igual que una tarjeta de texto.
+  if (card.type === 'mcq' && d.choice) {
+    const ok = !!(card.options || []).find((o) => o.id === d.choice)?.correct;
+    d.mode = 'choice';
+    d.exact = ok;
+    d.answer = d.choice;
+    suggested = ok ? 'good' : 'again';
+  }
   overlay.querySelector('.study-recall')?.remove();
   overlay.querySelector('.study-card3d')?.classList.add('is-flipped');
   overlay.querySelector('.study-card')?.classList.add('is-flipped');
@@ -1273,6 +1332,8 @@ function renderFrontFoot(b, f, recall = '') {
   if (!b || !f) return;
   f.innerHTML = `<button class="btn btn--primary primary-btn study-flip">${t('Mostrar respuesta')} <kbd>${t('espacio')}</kbd></button>`;
   f.querySelector('.study-flip').addEventListener('click', flip);
+  const cur = queue[0] && queue[0].deck.cards[queue[0].idx];
+  if (cur && cur.type === 'mcq') return;   // se responde eligiendo una opción, no escribiendo
   if (!LLM.hasKey()) return;
   b.querySelector('.study-recall')?.remove();
   b.insertAdjacentHTML('beforeend', `

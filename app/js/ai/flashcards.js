@@ -28,6 +28,7 @@ import { normalizeDomain, parseDomainSuggestions, groupCardsByDomain, domainTagM
 import { toast } from './toast.js';
 import * as PdfReader from '../pdf-reader.js';
 import * as Practice from './widgets/practice.js';
+import { MCQ_COUNT } from './widgets/generate-mcq.js';
 
 // Generación por TROZOS (map-reduce): el material se divide en trozos de ~CHUNK_TOKENS
 // y cada llamada produce SOLO las tarjetas de su trozo (cupo proporcional). Así ninguna
@@ -135,6 +136,10 @@ async function renderSetup() {
       <label class="fc-type"><input type="checkbox" name="fc-type" value="cloze">
         <span><b>${t('Cloze (huecos)')}</b><small>${t('Una frase con el dato clave oculto.')}</small></span></label>
     </div>
+    <div class="fc-types fc-qtypes">
+      <label class="fc-type"><input type="checkbox" name="fc-qtype" value="mcq">
+        <span><b>${t('Pregunta con opciones')}</b><small>${t('Un caso del capítulo y opciones que explican su error. {n} por capítulo, aparte.', { n: MCQ_COUNT })}</small></span></label>
+    </div>
     <p class="fc-sublabel">${t('Tarjetas visuales')} · <span class="fc-sublabel-note">${t('se suman aparte')}</span></p>
     <div class="fc-types fc-vtypes">
       <label class="fc-type"><input type="checkbox" name="fc-vtype" value="occlusion">
@@ -150,7 +155,7 @@ async function renderSetup() {
       <label class="fc-type"><input type="checkbox" name="fc-ptype" value="matrix">
         <span><b>${t('Matriz para rellenar')}</b><small>${t('Comparas los conceptos del capítulo que se confunden.')}</small></span></label>
     </div>
-    <p class="ai-ob-sub" id="fc-phint" hidden>${t('La matriz es de un capítulo: elígelo en Contenido.')}</p>
+    <p class="ai-ob-sub" id="fc-phint" hidden>${t('Las preguntas con opciones y la matriz son de un capítulo: elígelo en Contenido.')}</p>
     <label class="fc-label" for="fc-count">${t('Cantidad')}</label>
     <div class="fc-count-row">
       <select id="fc-count" class="fc-select">${COUNTS.map(n => `<option ${n === defaultCount ? 'selected' : ''}>${n}</option>`).join('')}</select>
@@ -171,7 +176,7 @@ async function renderSetup() {
   });
   b.querySelector('#fc-generate').addEventListener('click', onGenerate);
   b.querySelector('#fc-plan-btn').addEventListener('click', onSuggestPlan);
-  b.querySelectorAll('input[name="fc-type"], input[name="fc-vtype"], input[name="fc-ptype"]').forEach(el =>
+  b.querySelectorAll('input[name="fc-type"], input[name="fc-vtype"], input[name="fc-ptype"], input[name="fc-qtype"]').forEach(el =>
     el.addEventListener('change', () => { refreshGenerateState(); refreshSplitHint(); refreshDupNote(); refreshPlanFooter(); }));
   b.querySelector('#fc-count').addEventListener('change', refreshSplitHint);
   refreshGenerateState();
@@ -194,16 +199,18 @@ function selectedTypes() {
   const practice = scopeValue && !planState
     ? [...(b?.querySelectorAll('input[name="fc-ptype"]:checked') || [])].map(el => el.value).filter(v => PRACTICE_TYPES.includes(v))
     : [];
-  return { text, visual, practice };
+  // Las preguntas con opciones, igual: se generan por capítulo.
+  const mcq = !!scopeValue && !planState && !!b?.querySelector('input[name="fc-qtype"][value="mcq"]')?.checked;
+  return { text, visual, practice, mcq };
 }
 
 // Tipo con el que se etiqueta el mazo: "mixed" cuando se combina más de una cosa (dos
 // tipos de texto, o texto con visuales); si no, el único tipo elegido. Sin nada (botón
 // deshabilitado) cae a "basic" para no propagar un array vacío.
 function effectiveDeckType(sel) {
-  const picked = sel.text.length + sel.visual.length;
+  const picked = sel.text.length + sel.visual.length + (sel.mcq ? 1 : 0);
   if (picked >= 2) return 'mixed';
-  return sel.text[0] || sel.visual[0] || 'basic';
+  return sel.text[0] || sel.visual[0] || (sel.mcq ? 'mcq' : 'basic');
 }
 
 // Reparte el total ENTRE los tipos de texto elegidos: el total es la SUMA y las partes
@@ -224,11 +231,11 @@ function refreshGenerateState() {
   const btn = b?.querySelector('#fc-generate');
   const hint = b?.querySelector('#fc-vhint');
   const sel = selectedTypes();
-  if (btn) btn.disabled = !sel.text.length && !sel.visual.length && !sel.practice.length;
+  if (btn) btn.disabled = !sel.text.length && !sel.visual.length && !sel.practice.length && !sel.mcq;
   if (hint) hint.hidden = !sel.visual.length;
   // Con el libro entero (o un plan) la matriz no se puede pedir: se apaga y se dice por qué.
   const chapterScope = !!scopeValue && !planState;
-  b?.querySelectorAll('input[name="fc-ptype"]').forEach(el => { el.disabled = !chapterScope; });
+  b?.querySelectorAll('input[name="fc-ptype"], input[name="fc-qtype"]').forEach(el => { el.disabled = !chapterScope; });
   const phint = b?.querySelector('#fc-phint');
   if (phint) phint.hidden = chapterScope;
 }
@@ -431,7 +438,7 @@ async function renderDeckList() {
       <div class="fc-deck" data-id="${d.id}">
         <div class="fc-deck-info">
           <span class="fc-deck-name">${escapeHtml(d.scope || t('Libro entero'))}</span>
-          <span class="fc-deck-meta">${t('{n} tarjetas', { n: DB.cardsOf(d).length })} · ${d.cardType === 'cloze' ? 'cloze' : 'P→R'} · ${new Date(d.createdAt).toLocaleDateString()}${DB.exercisesOf(d).length ? ` · ${t('matriz para practicar')}` : ''}</span>
+          <span class="fc-deck-meta">${t('{n} tarjetas', { n: DB.cardsOf(d).length })} · ${d.cardType === 'cloze' ? 'cloze' : d.cardType === 'mcq' ? t('opciones') : 'P→R'} · ${new Date(d.createdAt).toLocaleDateString()}${DB.exercisesOf(d).length ? ` · ${t('matriz para practicar')}` : ''}</span>
           <span class="fc-deck-meta">${t('{a} nuevas · {b} aprendiendo · {c} maduras', { a: st.nuevas, b: st.aprendiendo, c: st.maduras })}${st.suspendidas ? ` · ${t('{n} suspendidas', { n: st.suspendidas })}` : ''}</span>
         </div>
         ${DB.exercisesOf(d).length ? `<button class="icon-btn fc-deck-practice" data-act="practice" title="${t('Practicar la matriz')}" aria-label="${t('Practicar la matriz')}">${icon('grid', { size: 'md' })}</button>` : ''}
@@ -914,8 +921,9 @@ async function onGenerate() {
   // índice es global y el lector puede cambiar de libro antes de que el job llegue aquí. Las
   // citas se verifican contra el capítulo ENTERO.
   const wantsMatrix = !planRows && sel.practice.includes('matrix') && !!scopeLabel;
-  const matrixText = wantsMatrix ? Retrieval.passagesByChapter(scopeLabel).map(p => p.text).join('\n\n') : '';
-  if (wantsMatrix && !matrixText.trim()) { showError(t('Ese contenido no tiene texto indexado; prueba con otro capítulo o con el libro entero.')); return; }
+  const wantsMcq = !planRows && sel.mcq && !!scopeLabel;
+  const matrixText = wantsMatrix || wantsMcq ? Retrieval.passagesByChapter(scopeLabel).map(p => p.text).join('\n\n') : '';
+  if ((wantsMatrix || wantsMcq) && !matrixText.trim()) { showError(t('Ese contenido no tiene texto indexado; prueba con otro capítulo o con el libro entero.')); return; }
 
   showError('');
 
@@ -1092,9 +1100,22 @@ async function onGenerate() {
           textOf: (id) => byId.get(id),   // valida que el pasaje respalde la tarjeta (EV1)
         });
       }
-      // Mazo final: texto + visuales, deduplicadas por frente normalizado.
+      // P43 F4b · Preguntas con opciones del capítulo (sin ancla: llevan su cita en `quote`). Si
+      // fallan y se pidió algo más, el resto sigue; solas, su fallo es el del trabajo.
+      let mcqCards = [], mcqError = null;
+      if (wantsMcq) {
+        progress(0, 1, 'mcq');
+        try {
+          mcqCards = await Practice.generateMcqCards({ chapter: scopeLabel, text: matrixText, signal, background });
+        } catch (e) {
+          if (e.name === 'AbortError') throw e;
+          mcqError = e.message || String(e);
+        }
+        progress(1, 1, 'mcq');
+      }
+      // Mazo final: texto + preguntas + visuales, deduplicadas por frente normalizado.
       const seenFronts = new Set();
-      cards = cards.concat(vres ? vres.cards : []).filter(c => {
+      cards = cards.concat(mcqCards, vres ? vres.cards : []).filter(c => {
         const k = normFront(c.front);
         if (k && seenFronts.has(k)) return false;
         if (k) seenFronts.add(k);
@@ -1120,7 +1141,8 @@ async function onGenerate() {
         const saved = bookId ? (await DB.getDecks(bookId)).find(d => d.id === deck.id) : deck;
         return { deckId: deck.id || null, deck: saved || deck, generated: 0, requested: 0, failed, blocks: chunks.length, practiceOnly: true };
       }
-      if (!cards.length && !target0 && practiceError && !wantsText && !sel.visual.length) throw new Error(practiceError);
+      if (!cards.length && !target0 && practiceError && !wantsText && !sel.visual.length && !wantsMcq) throw new Error(practiceError);
+      if (!cards.length && !target0 && mcqError && !wantsText && !sel.visual.length) throw new Error(mcqError);
       if (!cards.length && !target0) {
         if (!sel.text.length && sel.visual.length === 1 && sel.visual[0] === 'occlusion') {
           throw new Error(t('No se encontraron figuras en este libro, así que no hay tarjetas de oclusión que generar.'));
@@ -1144,14 +1166,14 @@ async function onGenerate() {
           || { ...merged, cardType: patch.cardType || existing.cardType };
         return { deckId: existing.id, deck,
           generated: fresh.length, requested: count,
-          failed, blocks: chunks.length, merged: true, dropped: cards.length - fresh.length, practiceError,
+          failed, blocks: chunks.length, merged: true, dropped: cards.length - fresh.length, practiceError, mcqError,
           ...(vres ? { visual: vres.stats } : {}) };
       }
       const deck = { bookId, name, cardType: type, scope: scopeLabel, cards, exercises: exercise ? [exercise] : [], createdAt: Date.now() };
       if (bookId) deck.id = await DB.addDeck(deck);
       // Releído: addDeck pone los uid de tarjetas y ejercicios, y «Practicar» los necesita.
       const saved = bookId ? (await DB.getDecks(bookId)).find(d => d.id === deck.id) : null;
-      return { deckId: deck.id || null, deck: saved || deck, generated: cards.length, requested: count, failed, blocks: chunks.length, practiceError,
+      return { deckId: deck.id || null, deck: saved || deck, generated: cards.length, requested: wantsText ? count : cards.length, failed, blocks: chunks.length, practiceError, mcqError,
         ...(vres ? { visual: vres.stats } : {}) };
     },
   });
@@ -1197,7 +1219,7 @@ function onJobUpdate(job) {
       showError(msg);
       return;
     }
-    const { deck, generated, requested, failed, blocks, merged, dropped, practiceOnly, practiceError } = job.result;
+    const { deck, generated, requested, failed, blocks, merged, dropped, practiceOnly, practiceError, mcqError } = job.result;
     // P43 F3 · Solo se pidió la matriz: no hay tarjetas que revisar, se abre para hacerla.
     if (practiceOnly) {
       if (btn) { btn.disabled = false; btn.innerHTML = `${icon('sparkles', { size: 'md' })} ${t('Generar tarjetas')}`; }
@@ -1207,8 +1229,11 @@ function onJobUpdate(job) {
       return;
     }
     renderReview(deck);
-    if (practiceError) {
-      showError(t('Las tarjetas están; la matriz no salió: {err}', { err: practiceError }));
+    if (practiceError || mcqError) {
+      showError([
+        practiceError ? t('Las tarjetas están; la matriz no salió: {err}', { err: practiceError }) : '',
+        mcqError ? t('Las preguntas con opciones no salieron: {err}', { err: mcqError }) : '',
+      ].filter(Boolean).join(' '));
     } else if (merged) {                             // fusión: "menos de las pedidas" es lo esperado
       showError(generated
         ? t('Añadidas {a} tarjetas nuevas al mazo', { a: generated })
@@ -1439,5 +1464,13 @@ function renderReview(deck) {
 
 // Tags de Anki por tarjeta: la app y el capítulo de origen (filtrables en Anki).
 function withTags(deck) {
-  return (c) => ({ ...c, tags: ['bookreader', c.chapter || deck.scope || ''] });
+  return (c) => ({ ...ankiCard(c), tags: ['bookreader', c.chapter || deck.scope || ''] });
+}
+
+// Anki no tiene tipo de opción múltiple: la pregunta viaja como básica con las opciones en el
+// frente (a, b, c…) y la correcta con su porqué en el dorso. El feedback de las falsas no viaja.
+export function ankiCard(c) {
+  if (c.type !== 'mcq' || !Array.isArray(c.options)) return c;
+  const opts = c.options.map((o, i) => `${'abcd'[i] || i + 1}) ${o.text}`).join('\n');
+  return { ...c, type: 'basic', front: `${c.front}\n\n${opts}` };
 }

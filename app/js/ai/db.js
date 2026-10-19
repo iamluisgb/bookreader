@@ -490,6 +490,9 @@ function sameCard(a, b) {
     svg: c.svg || null,
     answerNodeId: c.answerNodeId || null,
     steps: Array.isArray(c.steps) ? c.steps : [],
+    // P43 F4b · Pregunta con distractores: opciones con su feedback y la cita.
+    options: Array.isArray(c.options) ? c.options : [],
+    quote: c.quote || null,
   });
   return norm(a) === norm(b);
 }

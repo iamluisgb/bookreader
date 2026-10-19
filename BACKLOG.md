@@ -2067,7 +2067,7 @@ mide) · cambiar la semántica de la racha · la mejora de generación al estilo
 cuya literal ES la respuesta: término, fecha, cifra), que es trabajo futuro del prompt de
 generación de tarjetas y no de la medida.
 
-### P43 — Widgets de estudio: siete tipos que el agente rellena para cualquier libro · `L` · **F1–F3 ✓ · F4a ✓ (2026-10-19)**
+### P43 — Widgets de estudio: siete tipos que el agente rellena para cualquier libro · `L` · **F1–F4 ✓ (2026-10-19)**
 
 **Contexto (2026-10-16).** Cuatro prototipos a mano sobre DDIA (anomalías, lease, rebalanceo,
 timeout, en el lab) gustaron, pero cada uno lleva su propio motor y no valen para otro libro. La
@@ -2223,9 +2223,20 @@ antes de implementar)*
   empuja a trivialidades del texto (cifras, nombres), que la investigación desaconseja. Se vuelve al
   v2 (mejor validez) y no se gasta el ciclo 3. Lo que decide ahora es el uso real: el % de acierto
   a la primera de los lectores en el registro de intentos (P42). Si es ~100 %, la pregunta no enseña.
-- **F4b · Superficie** `M`: «Pregunta con distractores» como tipo de tarjeta de texto en el menú
-  (junto a P→R y Cloze), tarjeta `mcq` en el repaso (opciones barajadas, compromiso antes de ver,
-  feedback de la elegida y cita), campos en la whitelist de `sameCard`, export a Anki como texto.
+- **F4b · Superficie · ✓ (2026-10-19)**. «Pregunta con opciones» en el menú de flashcards, junto a
+  los tipos de texto: con un capítulo de alcance, 5 por capítulo, aparte del total. Tarjeta `mcq`
+  del mazo (`front` enunciado, `back` la correcta y su porqué, `options` con el feedback de cada
+  una, `quote` la cita): atómica, con FSRS. En el repaso, elegir una opción (o las teclas 1–4) es
+  girar; las opciones salen barajadas, distinto en cada repaso; al girar se ven todas con su porqué
+  y la cita en «Ver el pasaje del libro», y la nota se sugiere (bien / otra vez). El intento va con
+  `mode: 'choice'` y `exact` (cuenta como practicado en Análisis). A Anki viaja como básica con las
+  opciones en el frente. Probado con el modelo real en *SRE* 2.ª ed., «Learning from Incidents»:
+  5 preguntas en 13 s.
+  - De paso, dos fallos del repaso que destapó una tarjeta larga: la tarjeta desbordaba por encima
+    y por debajo de las notas (el cuerpo encogía por debajo de su contenido) y en escritorio la
+    pantalla no se desplazaba; y un nombre de mazo largo se aplastaba en una columna en la cabecera.
+  - **Queda:** medir con uso real el acierto a la primera (el registro de intentos lo guarda); si
+    ronda el 100 %, las preguntas no enseñan. Y el plan por capítulos (libro entero) no las ofrece.
 
 **F5+ · Los demás tipos**, cada uno con su contrato y su batería, en este orden (revisado el
 2026-10-19): **5 · distractores que enseñan** (es atómico: entra como tipo de tarjeta en FSRS, no

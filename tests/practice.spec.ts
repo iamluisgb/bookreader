@@ -23,8 +23,10 @@ async function stubLLM(page) {
         const sys = (body.messages || []).find((m: any) => m.role === 'system')?.content || '';
         if (body.stream) {
           const isMatrix = sys.includes('MATRIZ');
+          const isMcq = sys.includes('opción múltiple');
           if (isMatrix) (window as any).__calls.matrix++;
-          const out = isMatrix ? JSON.stringify((window as any).__matrix) : '[]';
+          if (isMcq) (window as any).__calls.mcq = ((window as any).__calls.mcq || 0) + 1;
+          const out = isMatrix ? JSON.stringify((window as any).__matrix) : isMcq ? JSON.stringify((window as any).__mcq) : '[]';
           const chunks = [
             `data: ${JSON.stringify({ choices: [{ delta: { content: out }, finish_reason: null }] })}\n\n`,
             'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n\n',
@@ -164,4 +166,72 @@ test('mergeDeckPair: los ejercicios se funden por uid y un mazo sin ellos no reb
   expect(r.merged).toEqual([{ correct: 2, total: 4, ts: 5 }]);
   expect(r.added).toBe(2);
   expect(r.gone).toEqual([]);
+});
+
+test('preguntas con opciones: se generan para un capítulo, se responden eligiendo y el intento se corrige solo', async ({ page }) => {
+  await setup(page);
+  await openFromStudio(page, 'flashcards');
+  await page.waitForSelector('#ai-flashcards', { timeout: 5000 });
+  const mcqBox = page.locator('input[name="fc-qtype"][value="mcq"]');
+  await expect(mcqBox).toBeDisabled();                      // libro entero: no
+  const combo = page.locator('#fc-scope .fc-combo-btn');
+  await combo.click();
+  const opt = page.locator('#fc-scope .fc-combo-list li').nth(1);
+  const chapter = ((await opt.textContent()) || '').trim();
+  await opt.click();
+  await expect(mcqBox).toBeEnabled();
+
+  await page.evaluate(async (chapter) => {
+    const R: any = await import('/js/ai/retrieval.js');
+    const text = R.passagesByChapter(chapter).map((p: any) => p.text).join('\n\n');
+    const q = (at: number) => text.slice(at, at + 60).trim();
+    const item = (id: string, at: number, stem: string) => ({ id, stem, cite: { quote: q(at) }, options: [
+      { id: 'a', text: 'Va a Comala a buscar a su padre', correct: true, feedback: 'Se lo prometió a su madre.' },
+      { id: 'b', text: 'Va a Comala a vender unas tierras', correct: false, feedback: 'No hay tierras que vender.' },
+      { id: 'c', text: 'Va a Comala a casarse', correct: false, feedback: 'Nadie lo espera para eso.' },
+    ] });
+    (window as any).__mcq = { title: 'Juan', prompt: 'Elige', items: [
+      item('q1', 0, '¿Por qué viaja Juan Preciado?'),
+      { ...item('q2', 100, 'Pregunta con una cita inventada'), cite: { quote: 'esta cita no está en el capítulo de ninguna forma' } },
+    ] };
+  }, chapter);
+
+  await page.locator('input[name="fc-type"][value="basic"]').uncheck();
+  await mcqBox.check();
+  await page.click('#fc-generate');
+  // La pregunta con la cita inventada se descarta (tras su reintento, que devuelve lo mismo).
+  await expect(page.locator('#ai-flashcards h2')).toHaveText('1 tarjetas', { timeout: 15000 });
+  expect(await page.evaluate(() => (window as any).__calls.mcq)).toBe(2);
+
+  await page.click('#fc-study');
+  const study = page.locator('#ai-study');
+  await expect(study.locator('.study-mcq-opt')).toHaveCount(3);
+  await expect(study.locator('.study-recall-input')).toHaveCount(0);   // se responde eligiendo
+  await study.locator('.study-mcq-opt', { hasText: 'casarse' }).click();
+  await expect(study.locator('.study-mcq-fb.is-wrong')).toContainText('Va a Comala a casarse');
+  await expect(study.locator('.study-mcq-fb.is-right')).toContainText('Se lo prometió a su madre.');
+  await expect(study.locator('.study-grade.is-again')).toHaveClass(/is-suggested/);
+  await study.locator('.study-grade.is-again').click();
+
+  const att = await page.evaluate(async () => {
+    const DB: any = await import('/js/ai/db.js');
+    const deck = (await DB.getAllDecks())[0];
+    const a = (await DB.getAttempts(deck.bookId)).pop();
+    const card = DB.cardsOf(deck)[0];
+    return { a: { mode: a.mode, exact: a.exact, answer: a.answer, grade: a.grade }, type: deck.cardType, card: { type: card.type, quote: !!card.quote, options: card.options.length } };
+  });
+  expect(att.a).toEqual({ mode: 'choice', exact: false, answer: 'c', grade: 'again' });
+  expect(att.type).toBe('mcq');
+  expect(att.card).toEqual({ type: 'mcq', quote: true, options: 3 });
+});
+
+test('ankiCard: la pregunta con opciones viaja a Anki como básica con las opciones en el frente', async ({ page }) => {
+  await page.goto('/index.html');
+  const r = await page.evaluate(async () => {
+    const F: any = await import('/js/ai/flashcards.js');
+    const c = { type: 'mcq', front: '¿Qué pasa?', back: 'A\n\nporque sí', options: [{ id: 'x', text: 'A', correct: true }, { id: 'y', text: 'B', correct: false }] };
+    return { mcq: F.ankiCard(c), basic: F.ankiCard({ type: 'basic', front: 'f', back: 'b' }) };
+  });
+  expect(r.mcq).toMatchObject({ type: 'basic', front: '¿Qué pasa?\n\na) A\nb) B', back: 'A\n\nporque sí' });
+  expect(r.basic).toEqual({ type: 'basic', front: 'f', back: 'b' });
 });

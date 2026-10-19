@@ -15,6 +15,7 @@ import { escapeHtml } from '../../ui/escape.js';
 import { widgetAttempt } from './core.js';
 import { renderMatrix, matrixCards } from './matrix.js';
 import { matrixMessages, parseSpec, finishSpec, specErrors, retryMessages } from './generate.js';
+import { mcqMessages, finishMcq, itemResults, mcqSpecErrors, retryMcqMessages, mergeRetry } from './generate-mcq.js';
 
 // Sin razonamiento: con él, deepseek-v4-flash gasta todo el cupo pensando y no escribe el JSON
 // (medido en la app el 19-oct: 45 000 caracteres de razonamiento y content vacío, con 12 000
@@ -39,6 +40,44 @@ export async function generateMatrix({ chapter, text, bookId, lang = getLang(), 
   }
   const now = Date.now();
   return { type: 'matrix', spec: res.spec, createdAt: now, last: null };
+}
+
+// P43 F4b · Preguntas con distractores de un capítulo → tarjetas `mcq` del mazo (atómicas, con
+// FSRS). Mismo ciclo que el eval (evals/mcq.mjs): sin razonamiento; si el spec entero no vale, se
+// pide entero otra vez; si fallan preguntas sueltas, solo esas. Las que sigan mal se descartan.
+export async function generateMcqCards({ chapter, text, lang = getLang(), signal, background = false }) {
+  const messages = mcqMessages({ chapter, text, lang });
+  const ask = (msgs) => LLM.chatStream({ messages: msgs, maxTokens: MAX_TOKENS, thinking: false, signal, background });
+  const raw = await ask(messages);
+  let spec = finishMcq(parseSpec(raw), { chapter });
+  const whole = mcqSpecErrors(spec);
+  if (whole.length) {
+    spec = finishMcq(parseSpec(await ask(retryMessages(messages, raw, whole))), { chapter });
+    if (mcqSpecErrors(spec).length) throw new Error(t('Las preguntas no salieron bien. Vuelve a intentarlo.'));
+  } else {
+    const failed = itemResults(spec, text).filter((r) => r.errors.length);
+    if (failed.length) spec = mergeRetry(spec, finishMcq(parseSpec(await ask(retryMcqMessages(messages, raw, failed))) || {}, {}));
+  }
+  const ok = new Set(itemResults(spec, text).filter((r) => !r.errors.length).map((r) => r.id));
+  const cards = spec.items.filter((it) => it && ok.has(it.id)).map((it) => mcqCard(it, chapter));
+  if (!cards.length) throw new Error(t('Las preguntas no salieron bien. Vuelve a intentarlo.'));
+  return cards;
+}
+
+// Tarjeta del mazo: `front` el enunciado, `back` la correcta y su porqué (lo que viaja a Anki y lo
+// que ve el editor), `options` con el feedback de cada una y `quote` la cita literal, que el repaso
+// enseña como «Ver el pasaje del libro».
+export function mcqCard(item, chapter) {
+  const right = item.options.find((o) => o.correct);
+  return {
+    type: 'mcq',
+    front: item.stem.trim(),
+    back: [right.text, right.feedback].filter(Boolean).join('\n\n'),
+    options: item.options.map(({ id, text, correct, feedback }) => ({ id, text, correct, feedback })),
+    quote: item.cite.quote.trim(),
+    chapter: chapter || '',
+    src: '',
+  };
 }
 
 // El ejercicio que se ofrece al pulsar «Practicar»: el más reciente.

@@ -58,12 +58,12 @@ export function trueRetention(attempts) {
   return out;
 }
 
-// Practicado (escrito o ejercicio) frente a solo girar.
+// Practicado (escrito, opción elegida o ejercicio) frente a solo girar.
 export function practiceSplit(attempts) {
   let practiced = 0, revealed = 0, judged = 0;
   for (const a of attempts || []) {
     if (!a) continue;
-    if (a.mode === 'widget') { practiced++; judged++; }
+    if (a.mode === 'widget' || a.mode === 'choice') { practiced++; judged++; }
     else if (a.mode === 'written') { practiced++; if (a.verdict) judged++; }
     else if (a.grade) revealed++;
   }

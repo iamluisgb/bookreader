@@ -3,6 +3,17 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-10-19 — Preguntas con opciones que explican su error (P43 F4)
+
+Nuevo tipo de tarjeta en Flashcards: «Pregunta con opciones». Con un capítulo elegido, el agente
+escribe 5 preguntas de aplicación con 3–4 opciones; cada opción lleva por qué es o no es la correcta,
+y la correcta, la cita literal del capítulo (una pregunta cuya cita no está en el libro se
+descarta). En el repaso se responde tocando una opción (o con 1–4): al girar se ven todas con su
+porqué, se marca la tuya y la correcta, y la nota se sugiere. Las opciones cambian de orden en cada
+repaso. A Anki viajan como tarjeta básica con las opciones en el frente. Además, el repaso deja de
+cortar las tarjetas largas: empujan las notas y la pantalla se desplaza, también en escritorio, y
+el nombre largo de un mazo ocupa dos líneas como mucho. Tests: `practice.spec.ts`.
+
 ## 2026-10-19 — La matriz funciona con el modelo real; motor del tipo «pregunta con distractores» (P43)
 
 Probada por la app con el modelo real, la matriz salía vacía: el modelo gastaba todos los tokens
