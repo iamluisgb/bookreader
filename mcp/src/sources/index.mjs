@@ -2,7 +2,7 @@
 //
 // La interfaz que cumplen las dos (y que la tool consume sin saber más):
 //
-//   kind             'backup-file' | 'drive'
+//   kind             'backup-file' | 'drive' | 'bookreader' (el layout, desde el sync de BookReader)
 //   hasReadingStats  si la fuente lleva el registro de lectura (F1 no; F2 sí)
 //   describe()       identificación corta para resultados y mensajes de error
 //   ping()           validación barata de arranque (falla antes de aceptar ninguna tool)
@@ -19,6 +19,7 @@ import { createDriveSource } from './drive.mjs';
 import { createFsProvider } from '../providers/fs.mjs';
 import { createGoogleDriveProvider } from '../providers/google-drive.mjs';
 import { createGoogleAuth, readRefreshTokenFile } from '../auth/google.mjs';
+import { createBookReaderSyncProvider, readPairFile } from '../providers/bookreader-sync.mjs';
 
 /**
  * Construye la fuente de la configuración. `deps` es inyectable para los tests (fetch falso,
@@ -50,6 +51,12 @@ export async function createSource(config, deps = {}) {
     });
     const provider = createGoogleDriveProvider({ getAccessToken: (f) => auth.getAccessToken(f), fetchImpl });
     return createDriveSource({ provider, base: config.base, cacheMs: config.cacheMs });
+  }
+
+  if (config.source === 'bookreader') {
+    const { raw, license } = deps.pair || (await readPairFile(config.pairFile, readFile));
+    const provider = createBookReaderSyncProvider({ raw, license, fetchImpl, workerUrl: deps.workerUrl });
+    return createDriveSource({ provider, base: config.base, cacheMs: config.cacheMs, kind: 'bookreader' });
   }
 
   throw new ConfigError('Fuente no soportada: ' + config.source);

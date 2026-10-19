@@ -18,14 +18,22 @@ test('--dir implica la fuente drive con proveedor local', () => {
 });
 
 test('sin fuente no arranca: mensaje con la ayuda, no un error críptico', () => {
-  assert.throws(() => parseConfig([], {}), (e) => e instanceof ConfigError && /--backup o --dir/.test(e.message));
+  assert.throws(() => parseConfig([], {}), (e) => e instanceof ConfigError && /--backup, --dir o --pair-file/.test(e.message));
 });
 
 test('las dos fuentes a la vez es ambiguo', () => {
   assert.throws(
     () => parseConfig(['--backup', 'b.json', '--dir', 'layout'], {}),
-    /no las dos/,
+    /una sola fuente/,
   );
+  assert.throws(() => parseConfig(['--dir', 'layout', '--pair-file', 'p'], {}), /una sola fuente/);
+});
+
+test('la fuente bookreader: se deduce de --pair-file (o del entorno) y lo exige', () => {
+  assert.equal(parseConfig(['--pair-file', 'p'], {}).source, 'bookreader');
+  assert.equal(parseConfig([], { BOOKREADER_SYNC_PAIR_FILE: 'p' }).pairFile, 'p');
+  assert.throws(() => parseConfig(['--source', 'bookreader'], {}), /--pair-file/);
+  assert.throws(() => parseConfig(['--source', 'bookreader', '--pair-file', 'p', '--dir', 'x'], {}), /no lo mezcles/);
 });
 
 test('la fuente drive exige credenciales o carpeta local', () => {

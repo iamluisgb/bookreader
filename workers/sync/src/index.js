@@ -154,7 +154,11 @@ export async function checkLicense(env, key, fetchImpl = fetch) {
 }
 
 async function issueToken(request, env, cors, now = Date.now()) {
-  if (!cors['Access-Control-Allow-Origin']) return json({ error: 'origin' }, 403, cors);
+  // Desde un navegador, solo los orígenes de la app: otra web no puede usar una licencia
+  // aunque la tenga. Sin `Origin` no es un navegador sino un programa del usuario (el MCP de
+  // BookReader, en mcp/), que ya necesita la licencia y la clave: falsificar la cabecera le
+  // costaría lo mismo, así que pedirla no protegería nada.
+  if (request.headers.has('Origin') && !cors['Access-Control-Allow-Origin']) return json({ error: 'origin' }, 403, cors);
   if (env.TOKENS) {
     const ip = request.headers.get('CF-Connecting-IP') || 'anon';
     const { success } = await env.TOKENS.limit({ key: ip });

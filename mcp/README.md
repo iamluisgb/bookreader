@@ -24,6 +24,9 @@ Sin `library.json` (layout viejo) cae al manifest.
 
 Prueba F1 primero: responde si el caso de uso aporta algo antes de pagar el peaje de Drive.
 
+El layout de F2 puede estar en Google Drive o en el **sync de BookReader** (MON4, cifrado de
+extremo a extremo): misma lectura, mismas tools. Ver «La fuente del sync de BookReader», abajo.
+
 ---
 
 ## F1 · la limitación, primero
@@ -211,22 +214,52 @@ El refresh token se manda al **mismo Worker de Cloudflare que usa la app**
 custodia el `client_secret` y devuelve un access token. No hay un segundo servidor de confianza ni
 un segundo cliente OAuth: es el camino que ya existe. El token no se escribe en ningún log.
 
+## La fuente del sync de BookReader
+
+Para quien sincroniza con BookReader en vez de con Drive (MON4). El servidor del sync no ve nada en
+claro, así que el MCP hace lo mismo que un dispositivo emparejado: pide un token con tu **licencia**
+y descifra en local con la **clave** del sync. Las dos van en el enlace de emparejamiento.
+
+1. En la app: Ajustes → Datos → **Enlace para otro dispositivo** (se copia al portapapeles).
+2. Guárdalo en un fichero que solo puedas leer tú. El MCP **se niega a arrancar** si el fichero lo
+   pueden leer otros usuarios de la máquina:
+
+   ```bash
+   mkdir -p ~/.config/bookreader && umask 077
+   read -rs -p 'Enlace: ' L && printf %s "$L" > ~/.config/bookreader/sync-pair; unset L; echo
+   ```
+
+3. Regístralo:
+
+   ```bash
+   claude mcp add --scope user bookreader -- node /ruta/absoluta/bookreader/mcp/server.mjs \
+     --pair-file ~/.config/bookreader/sync-pair
+   ```
+
+Ese fichero da acceso de lectura a **todo** tu sync: trátalo como una contraseña. Si se filtra, en la
+app → **Empezar de cero** cambia la clave (y el enlace viejo deja de servir).
+
+El cifrado no se replica: el MCP importa `app/js/sync/sync-crypto.js`, el mismo módulo que usa la
+app. Habla solo con el Worker del sync (`bookreader-sync.luisgonzalezb93.workers.dev`), sin
+cabecera `Origin`: el Worker la exige a los navegadores, no a los programas del usuario.
+
 ## Opciones
 
 ```
 --backup <fichero.json>    fuente F1: el backup de la app
 --dir <carpeta>            fuente F2 con proveedor local: carpeta con el layout de sync
---source <backup-file|drive>
+--source <backup-file|drive|bookreader>
 --base <prefijo>           prefijo del layout en el proveedor (por defecto `bookreader/`)
 --cache-ms <n>             TTL de la caché del proveedor (por defecto 15000; 0 la desactiva)
 --access-token <token>     access token de Google para una prueba de una hora
 --refresh-token-file <p>   fichero con el refresh token de la app
+--pair-file <p>            fuente bookreader: fichero (modo 600) con el enlace de emparejamiento
 --help, --version
 ```
 
 Entorno: `BOOKREADER_MCP_BACKUP`, `BOOKREADER_MCP_DIR`, `BOOKREADER_MCP_BASE`,
 `BOOKREADER_MCP_CACHE_MS`, `BOOKREADER_DRIVE_REFRESH_TOKEN`, `BOOKREADER_DRIVE_REFRESH_TOKEN_FILE`,
-`BOOKREADER_DRIVE_ACCESS_TOKEN`, `BOOKREADER_APP_ORIGIN`.
+`BOOKREADER_DRIVE_ACCESS_TOKEN`, `BOOKREADER_APP_ORIGIN`, `BOOKREADER_SYNC_PAIR_FILE`.
 
 `BOOKREADER_APP_ORIGIN` es el `Origin` con el que el MCP llama al Worker de auth. **El Worker lo
 exige** (mira su `ALLOWED_ORIGINS`), y un navegador lo pone solo pero Node no: sin él responde
@@ -239,7 +272,9 @@ desarrollo en local, `BOOKREADER_APP_ORIGIN=http://localhost:8000`.
 cd mcp && npm test      # o, desde la raíz del repo: npm run test:mcp
 ```
 
-`node --test`, sin navegador y sin red: 96 tests. Fixtures con la forma real de la app (backup y
+`node --test`, sin navegador y sin red: 106 tests. La fuente del sync de BookReader se prueba
+contra el Worker de verdad (`workers/sync/src`, sobre el arnés de sus tests) con datos cifrados como
+los cifra la app, y tiene que devolver lo mismo que el layout en claro. Fixtures con la forma real de la app (backup y
 layout), un cliente MCP de verdad hablando con el servidor como proceso hijo, un doble de la API de
 Drive, un test de paridad entre las dos fuentes y las comprobaciones de que los secretos y el
 `deviceId` no salen.
@@ -249,7 +284,8 @@ Drive, un test de paridad entre las dos fuentes y las comprobaciones de que los 
 - Los datos se leen del fichero o del Drive **del usuario**, en la máquina del usuario; no se
   copian a ningún sitio.
 - En F1 el servidor no habla con la red: stdio y el fichero, nada más. En F2 solo habla con la API
-  de Drive (para leer tus datos) y con el Worker del token (para renovar el permiso).
+  de Drive (para leer tus datos) y con el Worker del token (para renovar el permiso). Con el sync
+  de BookReader, solo con su Worker, y lo que baja se descifra en tu máquina.
 - Todo lo que devuelven las tools pasa por `src/redact.mjs` (ver la tabla de arriba).
 
 

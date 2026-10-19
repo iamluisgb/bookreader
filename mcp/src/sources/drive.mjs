@@ -46,10 +46,13 @@ export function isSafeBookFile(file) {
 /**
  * Fuente F2 sobre un proveedor con el layout de sync.
  *
+ * `kind` nombra el sitio del layout en resultados y mensajes: 'drive' (Drive o una carpeta) o
+ * 'bookreader' (el sync de BookReader, MON4). El layout y la lectura son los mismos.
+ *
  * @param {{ provider: { read(path: string): Promise<{ content: string }|null> },
- *           base?: string, cacheMs?: number, now?: () => number }} opts
+ *           base?: string, cacheMs?: number, now?: () => number, kind?: string }} opts
  */
-export function createDriveSource({ provider, base = DEFAULT_BASE, cacheMs = 15000, now = Date.now }) {
+export function createDriveSource({ provider, base = DEFAULT_BASE, cacheMs = 15000, now = Date.now, kind = 'drive' }) {
   /**
    * @typedef {{ at: number, manifest: any, library: any, entries: Map<string, any>, settings: any }} Load
    * @type {Load|null}
@@ -185,18 +188,18 @@ export function createDriveSource({ provider, base = DEFAULT_BASE, cacheMs = 150
   }
 
   return {
-    kind: 'drive',
+    kind,
     // El registro de lectura viaja en settings.json (P25 F3): aquí SÍ hay estadísticas.
     hasReadingStats: true,
     // El layout lleva mazos y artefactos del Studio en cada books/<id>.json (el backup no).
     hasAgentData: true,
     describe() {
-      return 'drive:' + base;
+      return kind + ':' + base;
     },
     /** Comprueba que hay manifest utilizable (una lectura) para fallar al arrancar, no al usar. */
     async ping() {
       await load();
-      return { kind: 'drive', detail: base };
+      return { kind, detail: base };
     },
     /**
      * Resumen de todos los libros. Cuesta una lectura por libro: los contadores no están en

@@ -275,7 +275,7 @@ test('una tool que no existe tampoco tumba la sesión', async () => {
 test('arranque: sin fuente, con fuente rota o con flags mezclados sale con código y por stderr', async () => {
   const sinFuente = await run([]);
   assert.equal(sinFuente.code, 2);
-  assert.match(sinFuente.stderr, /--backup o --dir/);
+  assert.match(sinFuente.stderr, /--backup, --dir o --pair-file/);
   assert.equal(sinFuente.stdout, '', 'stdout es EL CANAL: ni una línea de más');
 
   const roto = await run(['--backup', resolve(FIXTURES, 'no-existe.json')]);
@@ -289,7 +289,7 @@ test('arranque: sin fuente, con fuente rota o con flags mezclados sale con códi
 
   const mezcla = await run(['--backup', 'b.json', '--dir', 'd']);
   assert.equal(mezcla.code, 2);
-  assert.match(mezcla.stderr, /no las dos/);
+  assert.match(mezcla.stderr, /una sola fuente/);
 });
 
 test('--help y --version salen por stderr sin ensuciar stdout ni esperar a un cliente', async () => {

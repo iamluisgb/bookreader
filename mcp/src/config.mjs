@@ -9,15 +9,17 @@
 //   --cache-ms <n>            TTL de la caché del proveedor Drive (por defecto 15000)
 //   --access-token <token>    access token de Google para una prueba puntual (caduca en 1 h)
 //   --refresh-token-file <p>  fichero con el refresh token de la app (modo 600)
+//   --pair-file <p>           fuente bookreader: fichero con el enlace de emparejamiento del
+//                             sync de BookReader (MON4; lleva licencia y clave, modo 600)
 //   --help / --version
 //
 // El refresh token también entra por BOOKREADER_DRIVE_REFRESH_TOKEN, y el backup por
-// BOOKREADER_MCP_BACKUP — así el registro en Claude Desktop no lleva la ruta en el JSON.
+// BOOKREADER_MCP_BACKUP, y el enlace del sync de BookReader por BOOKREADER_SYNC_PAIR_FILE — así el registro en Claude Desktop no lleva la ruta en el JSON.
 
 export const VERSION = '1.0.0';
 export const DEFAULT_BASE = 'bookreader/';
 export const DEFAULT_CACHE_MS = 15000;
-export const SOURCES = ['backup-file', 'drive'];
+export const SOURCES = ['backup-file', 'drive', 'bookreader'];
 
 export class ConfigError extends Error {}
 
@@ -30,6 +32,7 @@ const TAKES_VALUE = new Set([
   '--cache-ms',
   '--access-token',
   '--refresh-token-file',
+  '--pair-file',
 ]);
 
 export function usage() {
@@ -40,21 +43,26 @@ export function usage() {
     '  node mcp/server.mjs --backup <backup.json>        (F1: instantánea del backup)',
     '  node mcp/server.mjs --dir <carpeta-del-layout>    (F2: layout de sync en disco)',
     '  node mcp/server.mjs --source drive                (F2: Drive real, requiere token)',
+    '  node mcp/server.mjs --pair-file <fichero>         (sync de BookReader, cifrado)',
     '',
     'Opciones:',
     '  --backup <fichero>         JSON de backup producido por la app (Ajustes > Exportar).',
     '  --dir <carpeta>            Carpeta que contiene bookreader/manifest.json y compañía.',
-    '  --source backup-file|drive Fuerza la fuente (si no, se deduce de --backup o --dir).',
+    '  --source backup-file|drive|bookreader',
+    '                             Fuerza la fuente (si no, se deduce de --backup, --dir o --pair-file).',
     '  --base <prefijo>           Prefijo del layout en el proveedor (por defecto bookreader/).',
     '  --cache-ms <n>             TTL de la caché de Drive en ms (0 la desactiva; 15000 por defecto).',
     '  --access-token <token>     Access token de Google para una prueba de una hora.',
     '  --refresh-token-file <p>   Fichero con el refresh token de la app.',
+    '  --pair-file <p>            Fichero (modo 600) con el enlace de emparejamiento del sync de',
+    '                             BookReader: Ajustes > Datos > «Enlace para otro dispositivo».',
     '  --help                     Esta ayuda.',
     '  --version                  Versión.',
     '',
     'Entorno: BOOKREADER_MCP_BACKUP · BOOKREADER_MCP_DIR · BOOKREADER_MCP_BASE ·',
     'BOOKREADER_MCP_CACHE_MS · BOOKREADER_DRIVE_REFRESH_TOKEN ·',
-    'BOOKREADER_DRIVE_REFRESH_TOKEN_FILE · BOOKREADER_DRIVE_ACCESS_TOKEN',
+    'BOOKREADER_DRIVE_REFRESH_TOKEN_FILE · BOOKREADER_DRIVE_ACCESS_TOKEN ·',
+    'BOOKREADER_SYNC_PAIR_FILE',
   ].join('\n');
 }
 
@@ -98,6 +106,7 @@ export function parseConfig(argv = [], env = {}) {
   const refreshToken = envOr(env, 'BOOKREADER_DRIVE_REFRESH_TOKEN');
   const refreshTokenFile = args['refresh-token-file'] || envOr(env, 'BOOKREADER_DRIVE_REFRESH_TOKEN_FILE');
   const accessToken = args['access-token'] || envOr(env, 'BOOKREADER_DRIVE_ACCESS_TOKEN');
+  const pairFile = args['pair-file'] || envOr(env, 'BOOKREADER_SYNC_PAIR_FILE');
 
   let source = args.source || null;
   if (source && !SOURCES.includes(source)) {
@@ -105,13 +114,24 @@ export function parseConfig(argv = [], env = {}) {
   }
   // Sin --source, la fuente se deduce de lo que el usuario dio. Dos a la vez es ambiguo.
   if (!source) {
-    if (backupPath && layoutDir) {
-      throw new ConfigError('Dime una sola fuente: --backup o --dir, no las dos.');
+    if ([backupPath, layoutDir, pairFile].filter(Boolean).length > 1) {
+      throw new ConfigError('Dime una sola fuente: --backup, --dir o --pair-file.');
     }
     if (backupPath) source = 'backup-file';
     else if (layoutDir) source = 'drive';
+    else if (pairFile) source = 'bookreader';
   }
-  if (!source) throw new ConfigError('No sé de dónde leer. Usa --backup o --dir.\n\n' + usage());
+  if (!source) throw new ConfigError('No sé de dónde leer. Usa --backup, --dir o --pair-file.\n\n' + usage());
+
+  if (source === 'bookreader' && !pairFile) {
+    throw new ConfigError(
+      'La fuente bookreader necesita --pair-file <fichero> con el enlace de emparejamiento\n' +
+        '(en la app: Ajustes > Datos > «Enlace para otro dispositivo»).',
+    );
+  }
+  if (source === 'bookreader' && (backupPath || layoutDir)) {
+    throw new ConfigError('--pair-file es de la fuente bookreader: no lo mezcles con --backup ni --dir.');
+  }
 
   if (source === 'backup-file' && !backupPath) {
     throw new ConfigError('La fuente backup-file necesita --backup <fichero.json>.');
@@ -148,5 +168,6 @@ export function parseConfig(argv = [], env = {}) {
     accessToken: accessToken || null,
     refreshToken: refreshToken || null,
     refreshTokenFile: refreshTokenFile || null,
+    pairFile: pairFile || null,
   };
 }

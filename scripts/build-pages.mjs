@@ -36,7 +36,9 @@ const PUBLIC = ['index.html', 'sw.js', 'app', 'es', 'anki', 'privacy', 'assets',
 // `infographic-proto.html`—, a las que no enlaza ni la app, ni la web, ni los tests: se
 // quedan fuera con ellas, porque publicar la página sin sus imágenes sería peor que no
 // publicarla.
-const EXCLUIDOS = ['app/_proto', 'app/patterns.html', 'app/shelf-proto.html', 'app/share-demo.html', 'app/infographic-proto.html'];
+// `app/js/sync/package.json` solo existe para que Node (el MCP) cargue sync-crypto.js como
+// módulo sin avisos: la app no lo usa.
+const EXCLUIDOS = ['app/_proto', 'app/patterns.html', 'app/shelf-proto.html', 'app/share-demo.html', 'app/infographic-proto.html', 'app/js/sync/package.json'];
 
 // Cabeceras de Cloudflare Pages. Sin este fichero, Pages sirve TODO con
 // `cache-control: public, max-age=0, must-revalidate`, incluidas las libs versionadas

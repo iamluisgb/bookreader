@@ -3,6 +3,17 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-10-19 — Sync de BookReader: primera prueba real, y el MCP lo lee (MON4)
+
+El Worker `bookreader-sync` está desplegado **en prueba**: sin Polar, solo entran las licencias del
+secret `TEST_LICENSES`, con topes de 1 GB/100 k/1 M para no pasar, junto a `share`, de lo gratis de R2
+de la cuenta. La opción se ve en la app con `?sync-preview=1`. La primera migración real (31 libros
+desde Drive, en un Android) sacó un fallo: una subida que se cortaba por la red dejaba ese libro
+atrás y Drive se desconectaba igual, sin forma de reintentarlo. Ahora cada libro se reintenta, Drive
+no se desconecta mientras quede algo por pasar y Ajustes ofrece «Pasar los libros que faltan». El
+MCP (P28) tiene una tercera fuente, `bookreader`: con el enlace de emparejamiento en un fichero de
+modo 600, lee y descifra en local el sync de BookReader con las mismas tools que Drive.
+
 ## 2026-10-19 — Sync de BookReader: el sync gestionado de la suscripción, cifrado (MON4, código)
 
 Una tercera salida en Ajustes → Datos, junto a «Sin sync» y Google Drive: el sync de BookReader,

@@ -43,6 +43,13 @@ test('token: la licencia de prueba da un token de escritura; sin Polar configura
   const sinMock = env({ ALLOW_MOCK_LICENSES: '' });
   assert.equal((await login(sinMock)).status, 503);
   assert.equal((await login(sinMock)).error, 'not_configured');
+  // Origen: una web ajena no saca token; un programa sin Origin (el MCP), sí.
+  const conOrigen = (origin) => worker.fetch(new Request('https://sync.test/v1/sync-token', {
+    method: 'POST', headers: { 'Content-Type': 'application/json', ...(origin ? { Origin: origin } : {}) },
+    body: JSON.stringify({ license: 'BKRD-TEST-0001' }),
+  }), e);
+  assert.equal((await conOrigen('https://evil.example')).status, 403);
+  assert.equal((await conOrigen(null)).status, 200);
   // Cuentas de prueba (TEST_LICENSES): solo esas keys exactas, aun sin Polar.
   const prueba = env({ ALLOW_MOCK_LICENSES: '', TEST_LICENSES: 'BKRD-LUIS-AAAA, BKRD-OTRA-BBBB' });
   assert.equal((await login(prueba, 'BKRD-LUIS-AAAA')).status, 200);

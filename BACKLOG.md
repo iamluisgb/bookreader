@@ -2919,8 +2919,8 @@ en nan~~ → **instrumentado en F1.2**; queda *leer* los datos tras unos días d
 > 5. `LAUNCHED = true` en `app/js/sync/bookreader-auth.js`: hasta entonces la opción no se ve en
 >    Ajustes sin la vista previa.
 >
-> **Pendiente o fuera:** el MCP (P28 F2) lee el Drive del usuario y no sabe leer el sync de
-> BookReader (habría que darle la clave). Los límites de D1 del plan gratuito (100 k escrituras
+> **MCP:** lee también el sync de BookReader (`--pair-file` con el enlace de emparejamiento; ver
+> `mcp/README.md`). **Pendiente o fuera:** los límites de D1 del plan gratuito (100 k escrituras
 > al día, unas 5 por PUT) dan un techo parecido al de R2: ~400 usuarios activos con 50
 > escrituras al día cada uno; pasarlo pide el plan de pago de Workers.
 
