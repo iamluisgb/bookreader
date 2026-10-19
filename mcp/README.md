@@ -214,7 +214,34 @@ El refresh token se manda al **mismo Worker de Cloudflare que usa la app**
 custodia el `client_secret` y devuelve un access token. No hay un segundo servidor de confianza ni
 un segundo cliente OAuth: es el camino que ya existe. El token no se escribe en ningún log.
 
-## La fuente del sync de BookReader
+## El MCP remoto (sin instalar nada)
+
+Con el sync de BookReader, el MCP también se sirve desde el Worker del sync:
+`https://bookreader-sync.luisgonzalezb93.workers.dev/mcp` (MCP por HTTP). Mismas tools.
+
+1. En la app: Ajustes → Datos → **Agentes (MCP)** → **Conectar un agente**. Le das un nombre y
+   te enseña un token `br-mcp-…` **una sola vez**, con el comando de Claude Code ya hecho:
+
+   ```bash
+   claude mcp add --transport http bookreader https://bookreader-sync.luisgonzalezb93.workers.dev/mcp \
+     --header "Authorization: Bearer br-mcp-…"
+   ```
+
+2. Para agentes sin cliente MCP (pi, en Hermes), la terminal:
+
+   ```bash
+   export BOOKREADER_MCP_TOKEN=br-mcp-…      # o --token-file <fichero de modo 600>
+   node mcp/cli.mjs --remote tools
+   node mcp/cli.mjs --remote search_highlights '{"query":"consenso"}'
+   ```
+
+**Qué ve el servidor.** Para responder, el Worker necesita la clave del sync: la app se la manda
+al crear el token y él la guarda cifrada con una clave que se deriva del propio token (del token
+solo guarda el hash). Sin el token no se puede descifrar; con él, el Worker descifra lo que pide
+el agente mientras dura cada consulta. Es menos privado que el MCP local de abajo, a cambio de no
+instalar nada. Cada token se revoca en la app al momento; caduca a los 90 días; «Empezar de cero»
+los anula todos. La licencia se revalida cada día.
+
 
 Para quien sincroniza con BookReader en vez de con Drive (MON4). El servidor del sync no ve nada en
 claro, así que el MCP hace lo mismo que un dispositivo emparejado: pide un token con tu **licencia**
