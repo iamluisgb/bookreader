@@ -1736,4 +1736,7 @@ const EN = {
   '{n} de {total} bien': '{n} of {total} right',
   'Fallaste {n} estando seguro. Son los que más se corrigen al repasarlos: van primero.': 'You missed {n} while sure. Those are the ones review fixes best, so they come first.',
   'Todo bien.': 'All right.',
+  // MON4 · Sync de BookReader
+  'Tu plan del sync de BookReader no incluye los archivos de los libros, o has llegado a su tope de espacio. Tus notas siguen sincronizando.':
+    'Your BookReader Sync plan does not include book files, or you have reached its storage limit. Your notes keep syncing.',
 };

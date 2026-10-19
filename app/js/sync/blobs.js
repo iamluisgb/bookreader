@@ -18,9 +18,7 @@
 import { t } from '../i18n.js';
 import * as Storage from '../storage.js';
 import * as LibStore from '../library/store.js';
-import * as Drive from './drive-provider.js';
-import * as DriveAuth from './drive-auth.js';
-import * as License from '../license.js';
+import * as Provider from './provider.js';
 import { hashBlob } from './hash-blob.js';
 import { BASE } from './layout.js';
 
@@ -64,10 +62,10 @@ export function setEnabled(on) {
   Storage.set(ENABLED_KEY, !!on);
 }
 
-// El sync de ficheros es Pro; el de metadatos (Fase A) es gratis. Es la línea
-// natural: los binarios son la parte que cuesta cuota y ancho de banda.
+// El sync de ficheros depende del proveedor: por Drive es Pro (gasta la cuota del propio
+// usuario); por el sync de BookReader lo decide la suscripción. El de metadatos va siempre.
 export function canTransfer() {
-  return DriveAuth.isConnected() && License.isPro() && isEnabled();
+  return Provider.isConnected() && Provider.canTransferFiles() && isEnabled();
 }
 
 export function currentTransfer() {
@@ -123,12 +121,12 @@ async function downloadOne(id) {
   current = { id, dir: 'down', loaded: 0, total: record.size || 0 };
   emit({ ...current, state: 'running' });
   try {
-    const r = await Drive.readBinary(path, (loaded, total) => {
+    const r = await Provider.readBinary(path, (loaded, total) => {
       current = { id, dir: 'down', loaded, total: total || record.size || 0 };
       emit({ ...current, state: 'running' });
     });
     if (!r) {
-      emit({ id, dir: 'down', state: 'error', message: t('El fichero ya no está en Drive.') });
+      emit({ id, dir: 'down', state: 'error', message: Provider.text('missingFile') });
       return false;
     }
     // Verificación de integridad: el id ES el hash del fichero, así que
@@ -184,13 +182,13 @@ async function uploadOne(meta) {
   try {
     // Write-once: si otro dispositivo ya lo subió, basta con apuntar al fichero.
     // Re-subir gastaría cuota y ancho de banda para producir bytes idénticos.
-    const already = await Drive.exists(path);
+    const already = await Provider.exists(path);
     if (!already) {
       // El binario se lee AQUÍ, uno a uno: la lista de pendientes viene sin
       // ficheros justamente para no tener toda la biblioteca en memoria.
       const record = await LibStore.getRaw(meta.id);
       if (!record || !record.file) return false;
-      await Drive.writeBinary(path, record.file, {
+      await Provider.writeBinary(path, record.file, {
         mime: MIME[record.format] || 'application/octet-stream',
         onProgress: (loaded, total) => {
           current = { id: record.id, dir: 'up', loaded, total };
@@ -208,7 +206,7 @@ async function uploadOne(meta) {
     emit({ id: meta.id, dir: 'up', state: 'error', message: transferMessage(e) });
     // Cuota llena: no seguir intentando con el resto de la cola, se dará el
     // mismo error con cada libro y solo sirve para quemar peticiones.
-    if (Drive.isQuotaError(e)) throw e;
+    if (Provider.isQuotaError(e)) throw e;
     return false;
   } finally {
     current = null;
@@ -217,7 +215,7 @@ async function uploadOne(meta) {
 
 async function removeOne(record) {
   try {
-    await Drive.remove(record.blob.path);
+    await Provider.remove(record.blob.path);
   } catch (e) {
     if (!e || e.code !== 404) return false; // ya no estaba: sigue adelante
   }
@@ -230,9 +228,9 @@ async function removeOne(record) {
 // ---- Runner ------------------------------------------------------------------
 
 function transferMessage(e) {
-  if (Drive.isQuotaError(e)) return t('Tu Google Drive está lleno. Libera espacio para seguir sincronizando libros.');
+  if (Provider.isQuotaError(e)) return Provider.text('quotaFull');
   if (e && e.code === 'timeout') return t('La transferencia se quedó sin respuesta. Se reintentará.');
-  if (e && e.message === 'reconnect') return t('El permiso de Google caducó. Vuelve a conectar con Drive.');
+  if (e && e.message === 'reconnect') return Provider.text('reconnect');
   return (e && e.message) || t('No se pudo transferir el fichero.');
 }
 

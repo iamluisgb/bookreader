@@ -11,7 +11,7 @@
 // conserva lo que hayas añadido desde entonces. Reversible: puedes volver a
 // borrar lo recuperado.
 
-import * as Drive from './drive-provider.js';
+import * as Provider from './provider.js';
 import * as Storage from '../storage.js';
 import * as DB from '../ai/db.js';
 import { mergeCollections } from './merge.js';
@@ -32,7 +32,7 @@ export function cleanTitle(raw) {
 
 // Libros con datos en Drive (título + id), leído del manifest.
 export async function listBooks() {
-  const m = await Drive.read(BASE + 'manifest.json');
+  const m = await Provider.read(BASE + 'manifest.json');
   if (!m) return [];
   const manifest = JSON.parse(m.content);
   // title = null cuando el manifest no lo trae (libros que solo tienen subrayados/marcadores,
@@ -53,7 +53,7 @@ const isCanonicalId = (id) => /^[0-9a-f]{64}$/i.test(id);
 // ser datos reales de otro dispositivo). Destructivo: pierde subrayados/marcadores viejos que
 // nunca se migraron y colgaran de esos ids. Devuelve cuántas entradas se quitaron.
 export async function purgeOrphans() {
-  const m = await Drive.read(BASE + 'manifest.json');
+  const m = await Provider.read(BASE + 'manifest.json');
   const manifest = m ? JSON.parse(m.content) : { books: {} };
   const remoteOrphans = Object.keys(manifest.books || {}).filter(id => !isCanonicalId(id));
 
@@ -77,21 +77,21 @@ export async function purgeOrphans() {
 
   // 2) Borra de Drive los ficheros de libro huérfanos y quítalos del manifest.
   for (const id of remoteOrphans) {
-    try { await Drive.remove(bookPath(id)); } catch { /* puede no existir ya */ }
+    try { await Provider.remove(bookPath(id)); } catch { /* puede no existir ya */ }
     delete manifest.books[id];
   }
 
   // 3) Reescribe el manifest sin los huérfanos (ifMatch: si un sync escribió en medio, falla y se
   //    reintenta en vez de pisarlo).
   if (m && remoteOrphans.length) {
-    await Drive.write(BASE + 'manifest.json', JSON.stringify(manifest), { ifMatch: m.etag });
+    await Provider.write(BASE + 'manifest.json', JSON.stringify(manifest), { ifMatch: m.etag });
   }
   return { removed: ids.size, ids: [...ids] };
 }
 
 // Versiones de un libro, más recientes primero.
 export async function listVersions(bookId) {
-  const r = await Drive.listRevisions(bookPath(bookId));
+  const r = await Provider.listRevisions(bookPath(bookId));
   if (!r) return [];
   return r.revisions
     .map(v => ({ id: v.id, fileId: r.fileId, modifiedTime: v.modifiedTime, size: Number(v.size) || 0 }))
@@ -114,7 +114,7 @@ function countAlive(book) {
 
 // Resumen de una versión sin aplicarla (para identificar cuál restaurar).
 export async function previewVersion(fileId, revisionId) {
-  const text = await Drive.readRevision(fileId, revisionId);
+  const text = await Provider.readRevision(fileId, revisionId);
   return countAlive(JSON.parse(text));
 }
 
@@ -127,7 +127,7 @@ function reassert(item, now) {
 }
 
 export async function restoreVersion(bookId, fileId, revisionId) {
-  const text = await Drive.readRevision(fileId, revisionId);
+  const text = await Provider.readRevision(fileId, revisionId);
   const book = JSON.parse(text);
   const now = Date.now();
   let recovered = 0;

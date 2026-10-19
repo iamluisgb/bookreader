@@ -5,7 +5,7 @@ import * as Store from './store.js';
 import * as Shelves from './shelves.js';
 import * as Study from '../ai/study.js';
 import * as Blobs from '../sync/blobs.js';
-import * as DriveAuth from '../sync/drive-auth.js';
+import * as SyncProvider from '../sync/provider.js';
 import { ensurePro } from '../ui/paywall.js';
 import { icon } from '../ui/icons.js';
 import { brandMark, brandLockup, cargar } from '../ui/brand.js';
@@ -1190,17 +1190,27 @@ async function openCard(id) {
   if (!book) return;
   if (Store.hasFile(book)) { onOpenBook(book); return; }
   if (book.blob && book.blob.path) await startDownload(id, { open: true });
-  else await alertBox(t('Este libro se sincronizó desde otro dispositivo, pero su archivo aún no está en Drive. Ábrelo allí una vez para subirlo.'), { title: t('Archivo no disponible') });
+  else await alertBox(SyncProvider.text('notUploaded'), { title: t('Archivo no disponible') });
 }
 
-// Descarga con las tres puertas en orden: Drive conectado, licencia Pro y cola.
+// La puerta de los ficheros de libro depende del proveedor: por Drive es Pro (paywall en el
+// momento de la intención); por el sync de BookReader la abre la suscripción, y si no la
+// abre, se dice por qué en vez de enseñar el paywall del pago único.
+async function ensureFiles() {
+  if (SyncProvider.activeId() === 'drive') return ensurePro('files');
+  if (SyncProvider.canTransferFiles()) return true;
+  await alertBox(t('Tu plan del sync de BookReader no incluye los archivos de los libros, o has llegado a su tope de espacio. Tus notas siguen sincronizando.'), { title: t('Sincronización') });
+  return false;
+}
+
+// Descarga con las tres puertas en orden: sync conectado, permiso de ficheros y cola.
 async function startDownload(id, { open = false } = {}) {
   if (Blobs.isQueued(id)) return;
-  if (!DriveAuth.isConnected()) {
-    await alertBox(t('Conecta con Google Drive en Ajustes para descargar tus libros en este dispositivo.'), { title: t('Sincronización') });
+  if (!SyncProvider.isConnected()) {
+    await alertBox(SyncProvider.text('connectToDownload'), { title: t('Sincronización') });
     return;
   }
-  if (!(await ensurePro('files'))) return;
+  if (!(await ensureFiles())) return;
   // Un libro de cientos de MB no es una descarga cualquiera: son minutos de
   // datos y un buen mordisco al almacenamiento del móvil. Se pregunta, como
   // hace Play Books, en vez de empezar y que el usuario lo descubra por la
@@ -1713,8 +1723,8 @@ async function removeBook(book, canFree) {
     if (!choice) return false;
     if (choice.scope === 'device') return freeDownload(book);
   }
-  const msg = DriveAuth.isConnected()
-    ? t('¿Eliminar "{title}" de la biblioteca? Se borrará en todos tus dispositivos sincronizados, junto con la copia de Drive.', { title: book.title })
+  const msg = SyncProvider.isConnected()
+    ? SyncProvider.text('deleteEverywhere', book.title)
     : t('¿Eliminar "{title}" de la biblioteca? Esto borra el archivo guardado.', { title: book.title });
   if (!(await confirmBox(msg, { title: t('Eliminar libro'), okText: t('Eliminar'), danger: true }))) return false;
   await Store.deleteBook(book.id);
@@ -1803,11 +1813,11 @@ async function openBookMenu(id, anchor) {
     if (act === 'download') { await startDownload(id); return; }
     if (act === 'export') { await exportBook(id); return; }
     if (act === 'upload') {
-      if (!DriveAuth.isConnected()) {
-        await alertBox(t('Conecta con Google Drive en Ajustes para subir tus libros.'), { title: t('Sincronización') });
+      if (!SyncProvider.isConnected()) {
+        await alertBox(SyncProvider.text('connectToUpload'), { title: t('Sincronización') });
         return;
       }
-      if (!(await ensurePro('files'))) return;
+      if (!(await ensureFiles())) return;
       Blobs.markManualUpload(id);
       Blobs.schedule();
       return;

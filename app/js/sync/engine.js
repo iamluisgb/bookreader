@@ -14,9 +14,7 @@
 // Multi-pestaña: Web Locks — solo una pestaña sincroniza a la vez.
 // Estado: evento 'bookreader:sync-status' con 'off|syncing|ok|error|reconnect'.
 
-import { t } from '../i18n.js';
-import * as Drive from './drive-provider.js';
-import * as DriveAuth from './drive-auth.js';
+import * as Provider from './provider.js';
 import * as Highlights from '../highlights.js';
 import * as Bookmarks from '../bookmarks.js';
 import * as Storage from '../storage.js';
@@ -128,7 +126,7 @@ export function setIntentionalOff(v) {
 // Un cambio local (subrayado, nota, posición…): push con debounce.
 export function notifyLocalChange() {
   if (applyingRemote) return;
-  if (!DriveAuth.isConnected()) return;
+  if (!Provider.isConnected()) return;
   if (running) {
     pendingChange = true;
     return;
@@ -145,25 +143,25 @@ async function cycle() {
   const save = () => Storage.set(STATE_KEY, st);
 
   // 1) PULL — manifest + libros con etag remoto distinto al último visto.
-  const m = await Drive.read(BASE + 'manifest.json');
+  const m = await Provider.read(BASE + 'manifest.json');
   let remoteManifest = null;
   let pulledBooks = 0;
   // Versiones de TODO lo que hay en remoto, en una sola petición (el listado de
   // Drive trae ya la de cada fichero). Es la referencia que decide qué bajar:
   // la asigna el proveedor en cada escritura y no puede retroceder, a
   // diferencia de los sellos de tiempo del manifest (ver 1a).
-  const remoteFiles = await Drive.list(BASE);
+  const remoteFiles = await Provider.list(BASE);
   const remoteEtags = new Map(remoteFiles.map(f => [f.path, String(f.etag)]));
   const isFresh = (path) => remoteEtags.has(path) && remoteEtags.get(path) !== String(st.books[path] || '');
   if (m) {
     remoteManifest = JSON.parse(m.content);
     if ((remoteManifest.schemaVersion || 0) > SCHEMA_VERSION) {
-      throw new Error(t('Lo guardado en Drive es de una versión más nueva de BookReader.'));
+      throw new Error(Provider.text('newerSchema'));
     }
     let merged = 0;
     for (const f of remoteFiles.filter(x => x.path.startsWith(BASE + 'books/'))) {
       if (st.books[f.path] === f.etag) continue;
-      const file = await Drive.read(f.path);
+      const file = await Provider.read(f.path);
       if (!file) continue;
       const id = f.path.slice((BASE + 'books/').length).replace(/\.json$/, '');
       const remoteBook = JSON.parse(file.content);
@@ -212,7 +210,7 @@ async function cycle() {
   let libraryChanged = false;
   let pulledLibrary = 0;
   if (isFresh(LIBRARY_PATH)) {
-    const f = await Drive.read(LIBRARY_PATH);
+    const f = await Provider.read(LIBRARY_PATH);
     if (f) {
       const remoteLibrary = JSON.parse(f.content);
       applyingRemote = true;
@@ -229,7 +227,7 @@ async function cycle() {
     save();
   }
   if (isFresh(COVERS_PATH)) {
-    const f = await Drive.read(COVERS_PATH);
+    const f = await Provider.read(COVERS_PATH);
     if (f) {
       const remoteCovers = JSON.parse(f.content);
       applyingRemote = true;
@@ -274,7 +272,7 @@ async function cycle() {
   // —no es una unión simétrica como la de biblioteca—, el que se lo salta se queda con
   // los suyos y ya no vuelve a haber quien los cruce. Ahorrarse la petición sale caro
   // justo aquí.
-  const remoteSettings = await Drive.read(SETTINGS_PATH);
+  const remoteSettings = await Provider.read(SETTINGS_PATH);
   let pulledSettings = 0;
   if (remoteSettings && String(remoteSettings.etag) !== String(st.books[SETTINGS_PATH] || '')) {
     applyingRemote = true;
@@ -329,7 +327,7 @@ async function cycle() {
     const digest = bookDigest(snap.books[id]);
     const agreed = st.digests[path];
     if (info.updatedAt <= remoteAt && agreed !== undefined && digest === agreed) continue;
-    const w = await Drive.write(path, JSON.stringify(snap.books[id]), { ifMatch: st.books[path] });
+    const w = await Provider.write(path, JSON.stringify(snap.books[id]), { ifMatch: st.books[path] });
     st.books[path] = w.etag;
     st.digests[path] = digest;
     save();
@@ -349,7 +347,7 @@ async function cycle() {
     const fp = fingerprint(content);
     st[stateKey] = fp;
     if (fp === agreedFp) return { at: remoteAt || 0, pushed: false };
-    const w = await Drive.write(path, JSON.stringify(content), { ifMatch: st.books[path] });
+    const w = await Provider.write(path, JSON.stringify(content), { ifMatch: st.books[path] });
     st.books[path] = w.etag;
     return { at: Date.now(), pushed: true };
   }
@@ -382,7 +380,7 @@ async function cycle() {
   let settingsAt = (remoteManifest && remoteManifest.settingsUpdatedAt) || 0;
   let settingsPushed = false;
   if (settingsFp !== st.settingsHash) {
-    const w = await Drive.write(SETTINGS_PATH, JSON.stringify(snap.settings), { ifMatch: st.books[SETTINGS_PATH] });
+    const w = await Provider.write(SETTINGS_PATH, JSON.stringify(snap.settings), { ifMatch: st.books[SETTINGS_PATH] });
     st.books[SETTINGS_PATH] = w.etag;
     st.settingsHash = settingsFp;
     settingsAt = Date.now();
@@ -404,7 +402,7 @@ async function cycle() {
   snap.manifest.settingsUpdatedAt = settingsAt;
 
   if (pushed || titleHealed || library.pushed || covers.pushed || settingsPushed || !m) {
-    const w = await Drive.write(BASE + 'manifest.json', JSON.stringify(snap.manifest), { ifMatch: m ? m.etag : undefined });
+    const w = await Provider.write(BASE + 'manifest.json', JSON.stringify(snap.manifest), { ifMatch: m ? m.etag : undefined });
     st.manifestEtag = w.etag;
     save();
   }
@@ -473,7 +471,7 @@ async function runOnce() {
 // promesa mentirosa — resolvía sin haber sincronizado nada. Lo usan el botón de
 // Ajustes y los tests, justo donde esa mentira más duele.
 export function syncNow() {
-  if (!DriveAuth.isConnected()) {
+  if (!Provider.isConnected()) {
     setStatus('off');
     return Promise.resolve('off');
   }
@@ -486,7 +484,7 @@ export function syncNow() {
 // un ciclo en curso no encadenan otro — sería tráfico por nada. Marcan que
 // quedaron cambios y el propio ciclo se reprograma al terminar.
 function syncSoon() {
-  if (!DriveAuth.isConnected()) {
+  if (!Provider.isConnected()) {
     setStatus('off');
     return;
   }
@@ -501,7 +499,7 @@ function syncSoon() {
 
 // Reevalúa la conexión (tras Conectar/Desconectar en Ajustes).
 export function refreshConnection() {
-  if (DriveAuth.isConnected()) {
+  if (Provider.isConnected()) {
     setIntentionalOff(false);
     syncNow();
   } else {
