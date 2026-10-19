@@ -20,6 +20,15 @@ import * as C from './sync-crypto.js';
 // Exportado para la sonda de alcanzabilidad del diagnóstico y para los tests.
 export const WORKER_URL = 'https://bookreader-sync.luisgonzalezb93.workers.dev';
 
+// El Worker aún NO está desplegado (MON4: falta Polar real y la decisión A/B). Mientras tanto la
+// opción no se enseña en Ajustes: sería un botón que falla. Para probarla, en la consola:
+// localStorage.setItem('bookreader_sync_preview', 'true'). Al desplegar, LAUNCHED = true.
+const LAUNCHED = false;
+
+export function available() {
+  return LAUNCHED || Storage.get('sync_preview', false) === true;
+}
+
 const KEY_KEY = 'sync_key';        // secreto: excluido del backup y del sync (SECRET_KEYS)
 const TOKEN_KEY = 'sync_token';    // secreto: { token, expiresAt, readOnly, files, purgeAt }
 const KEYCHECK_PATH = 'bookreader/keycheck';

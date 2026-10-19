@@ -1571,6 +1571,9 @@ function wireSyncChoice(content, show) {
     bookreader: content.querySelector('#appset-sync-pane-bookreader'),
   };
   const offBtn = content.querySelector('#appset-sync-off');
+  // Sin el Worker desplegado no se ofrece (ver bookreader-auth · available), salvo a quien ya
+  // lo está usando.
+  if (!BRAuth.available() && currentChoice() !== 'bookreader') seg.querySelector('[data-p="bookreader"]').hidden = true;
   let shown = currentChoice();
   const paint = () => {
     for (const [id, el] of Object.entries(panes)) el.hidden = id !== shown;

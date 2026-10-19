@@ -55,3 +55,9 @@ export async function seedBookReaderSync(target: Page | BrowserContext, license 
     if (!localStorage.getItem('bookreader_sync_provider')) localStorage.setItem('bookreader_sync_provider', JSON.stringify('bookreader'));
   }, license);
 }
+
+// La opción aún no se enseña en producción (bookreader-auth · LAUNCHED): los tests de la UI la
+// activan con la vista previa.
+export async function enableSyncPreview(target: Page | BrowserContext) {
+  await target.addInitScript(() => localStorage.setItem('bookreader_sync_preview', 'true'));
+}

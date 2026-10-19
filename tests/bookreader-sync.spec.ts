@@ -1,5 +1,5 @@
 import { test, expect, Page } from '@playwright/test';
-import { createSyncServer, installSyncServer, seedBookReaderSync, SyncServer } from './bookreader-sync-mock';
+import { createSyncServer, installSyncServer, seedBookReaderSync, enableSyncPreview, SyncServer } from './bookreader-sync-mock';
 
 // MON4 F3 · El motor de sync (el MISMO de Drive) sobre el sync de BookReader, contra el
 // Worker real en el proceso del test. Lo que se comprueba:
@@ -198,11 +198,19 @@ test.describe('MON4 F3 — sync de BookReader de punta a punta', () => {
     await movil.close();
   });
 
+  test('sin lanzar, la opción BookReader no se enseña en Ajustes', async ({ page }) => {
+    await page.goto('/');
+    await page.evaluate(async () => (await import('/js/ui/app-settings.js')).open('data'));
+    await expect(page.locator('#appset-sync-choice [data-p="drive"]')).toBeVisible();
+    await expect(page.locator('#appset-sync-choice [data-p="bookreader"]')).toBeHidden();
+  });
+
   test('Ajustes → Datos: elegir BookReader, activarlo, enlace y clave de recuperación', async ({ page, context }) => {
     // Como en producción por defecto (ADR-056 opción B): sin ficheros de libro.
     const server = await createSyncServer({ FILES_ENABLED: '0' });
     await installSyncServer(page, server);
     await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    await enableSyncPreview(page);
     await page.addInitScript(() => {
       localStorage.setItem('bookreader_license', JSON.stringify({ key: 'BKRD-TEST-UI', activationId: 'm', validatedAt: Date.now(), revoked: false }));
     });
@@ -240,7 +248,7 @@ test.describe('MON4 F3 — sync de BookReader de punta a punta', () => {
     const server = await createSyncServer();
     const pc = await browser.newContext();
     const otro = await browser.newContext();
-    for (const c of [pc, otro]) { await installSyncServer(c, server); await seedBookReaderSync(c); }
+    for (const c of [pc, otro]) { await installSyncServer(c, server); await seedBookReaderSync(c); await enableSyncPreview(c); }
     const a = await pc.newPage();
     await a.goto('/');
     const code = await a.evaluate(async () => {

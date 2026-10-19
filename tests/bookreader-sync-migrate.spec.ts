@@ -1,6 +1,6 @@
 import { test, expect, Page, BrowserContext } from '@playwright/test';
 import { installDriveMocks, seedDriveToken, createDriveState } from './drive-mock';
-import { createSyncServer, installSyncServer, seedBookReaderSync } from './bookreader-sync-mock';
+import { createSyncServer, installSyncServer, seedBookReaderSync, enableSyncPreview } from './bookreader-sync-mock';
 import { seedProLicense } from './pro-license';
 
 // MON4 F5 · «Pasar mi sync de Drive a BookReader» en un paso, y al revés para quien cancela.
@@ -155,6 +155,7 @@ test.describe('MON4 F5 — pasar el sync de un proveedor a otro', () => {
     await pc.addInitScript(() => {
       localStorage.setItem('bookreader_license', JSON.stringify({ key: 'BKRD-TEST-UIM', activationId: 'm', validatedAt: Date.now(), revoked: false }));
     });
+    await enableSyncPreview(pc);
     const a = await pc.newPage();
     await a.goto('/');
     await addHighlight(a, 'libro-u', 'por la UI');
