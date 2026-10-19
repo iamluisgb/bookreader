@@ -438,8 +438,10 @@ function stampCards(before, after, now) {
     const old = prev.get(uid);
     const same = old && sameCard(old, c);
     const card = { ...c, uid, updatedAt: same ? (old.updatedAt || now) : now };
-    if (!old || !sameContent(old, c)) card.textAt = now;
-    else if (old.textAt) card.textAt = old.textAt;
+    if (!old || !sameContent(old, c)) {
+      card.textAt = now;
+      if (old && card.editedBy && card.editedBy === old.editedBy) delete card.editedBy;
+    } else if (old.textAt) card.textAt = old.textAt;
     else delete card.textAt;
     if (old && JSON.stringify(old.srs || null) !== JSON.stringify(c.srs || null)) card.srsAt = now;
     else if (old && old.srsAt) card.srsAt = old.srsAt;
@@ -483,8 +485,10 @@ function stampExercises(before, after, now) {
 // (ausente → null / []): una tarjeta de texto legada y su re-guardado idéntico siguen
 // siendo "iguales" y NO se re-sellan en cada sync.
 // Lo que es CONTENIDO de la tarjeta (todo lo de sameCard menos el repaso). Va con `textAt`.
+// `editedBy` («agent:<nombre>») lo pone el MCP al escribir y viaja con el contenido; si después
+// la edita el lector, se va (stampCards).
 export const CARD_CONTENT = ['front', 'back', 'type', 'chapter', 'src', 'suspended', 'domain', 'figureKey',
-  'occludedLabel', 'bbox', 'svg', 'answerNodeId', 'steps', 'options', 'quote'];
+  'occludedLabel', 'bbox', 'svg', 'answerNodeId', 'steps', 'options', 'quote', 'editedBy'];
 
 function sameContent(a, b) {
   return sameCard({ ...a, srs: null }, { ...b, srs: null });

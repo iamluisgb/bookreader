@@ -327,11 +327,13 @@ export async function mcpTokens() {
   return (await res.json()).tokens;
 }
 
-export async function createMcpToken(name, days = 90) {
+// `scopes`: además de leer ('read', siempre), 'write' (tarjetas, mazos y artefactos) y 'text'
+// (el texto de los libros). Solo los que el usuario marque.
+export async function createMcpToken(name, { days = 90, scopes = [] } = {}) {
   const res = await api('/v1/mcp-tokens', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name, days, key: Storage.get(KEY_KEY), license: licenseKey() }),
+    body: JSON.stringify({ name, days, scopes, key: Storage.get(KEY_KEY), license: licenseKey() }),
   });
   if (!res.ok) {
     const e = await apiError(res);

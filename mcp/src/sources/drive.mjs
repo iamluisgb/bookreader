@@ -262,6 +262,25 @@ export function createDriveSource({ provider, base = DEFAULT_BASE, cacheMs = 150
       if (!entry) throw new UnknownBookError(bookId);
       return liveItems(entry.artifacts);
     },
+    /**
+     * Cambia el fichero de un libro. Solo existe si el proveedor sabe escribir (`update`: el del
+     * sync de BookReader, en el Worker); el de Drive y el de disco son de solo lectura. `mutate`
+     * recibe el JSON SIN redactar (o null si el libro aún no tiene fichero) y devuelve
+     * `{ next, result }`; con `next` null no se escribe. Tras escribir, la caché se tira: la
+     * siguiente lectura ya ve el cambio.
+     */
+    writeBook: provider.update
+      ? async (bookId, mutate, opts = {}) => {
+          const c = await load();
+          if (!(await entryFrom(c, bookId))) throw new UnknownBookError(bookId);
+          const info = c.manifest.books[bookId];
+          const file = (info && info.file) || 'books/' + bookId + '.json';
+          if (!isSafeBookFile(file)) throw new SourceError('Ruta de libro no permitida: ' + file);
+          const out = await provider.update(base + file, mutate, opts);
+          if (!opts.dryRun) cache = null;
+          return out;
+        }
+      : undefined,
     /** Días de lectura del layout, sin `key` ni `deviceId` (ver redact.mjs). */
     async readingDays() {
       const c = await load();

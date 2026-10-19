@@ -32,7 +32,7 @@ import * as Study from '../ai/study.js';
 import { ensurePro } from './paywall.js';
 import { icon } from './icons.js';
 import { escapeHtml } from './escape.js';
-import { confirmBox, promptBox } from './dialog.js';
+import { confirmBox, formBox } from './dialog.js';
 import { ago } from './when.js';
 import { t, getLang, setLang } from '../i18n.js';
 import * as Settings from '../settings.js';
@@ -1680,7 +1680,12 @@ function wireBookReaderSync(content, show) {
       <div class="appset-link" data-id="${escapeHtml(tk.id)}">
         <div class="appset-link-text">
           <div class="appset-link-name">${escapeHtml(tk.name)}</div>
-          <div class="appset-link-meta">${escapeHtml((tk.lastUsedAt ? t('Usado {when}', { when: ago(tk.lastUsedAt) }) : t('Sin usar todavía')) + ' · ' + t('caduca el {date}', { date: day(tk.expiresAt) }))}</div>
+          <div class="appset-link-meta">${escapeHtml([
+            (tk.scopes || []).includes('write') ? t('Lee y escribe') : t('Solo lee'),
+            (tk.scopes || []).includes('text') ? t('con el texto de los libros') : '',
+            tk.lastUsedAt ? t('usado {when}', { when: ago(tk.lastUsedAt) }) : t('sin usar todavía'),
+            t('caduca el {date}', { date: day(tk.expiresAt) }),
+          ].filter(Boolean).join(' · '))}</div>
         </div>
         <button class="appset-tpl-cancel" data-act="revoke">${icon('xmark', { size: 'md' })} ${t('Revocar')}</button>
       </div>`).join('');
@@ -1805,11 +1810,22 @@ function wireBookReaderSync(content, show) {
   $('appset-br-history').addEventListener('click', (e) => openHistory(e.currentTarget, show, fail));
 
   $('appset-br-agent-create').addEventListener('click', async () => {
-    const name = ((await promptBox(t('¿Qué agente es? Te servirá para reconocerlo en la lista y revocarlo.'),
-      { title: t('Conectar un agente'), placeholder: t('Claude Code en el portátil'), okText: t('Crear token') })) || '').trim();
+    const form = await formBox({
+      title: t('Conectar un agente'),
+      message: t('Siempre puede leer tus libros, subrayados, notas y mazos. Lo demás, solo si lo marcas.'),
+      okText: t('Crear token'),
+      fields: [
+        { name: 'name', label: t('¿Qué agente es?'), placeholder: t('Claude Code en el portátil'), hint: t('Te servirá para reconocerlo en la lista y revocarlo.') },
+        { name: 'scopes', type: 'checks', label: t('Además puede…'), value: [], options: [
+          { value: 'write', label: t('Cambiar mis mazos y tarjetas, y crear mapas mentales, infografías y resúmenes') },
+          { value: 'text', label: t('Leer el texto de mis libros') },
+        ] },
+      ],
+    });
+    const name = ((form && form.name) || '').trim();
     if (!name) return;
     try {
-      const tk = await BRAuth.createMcpToken(name);
+      const tk = await BRAuth.createMcpToken(name, { scopes: form.scopes || [] });
       $('appset-br-agent-name').textContent = tk.name;
       $('appset-br-agent-token').textContent = tk.token;
       $('appset-br-agent-cmd').textContent = `claude mcp add --transport http bookreader ${BRAuth.MCP_URL} --header "Authorization: Bearer ${tk.token}"`;

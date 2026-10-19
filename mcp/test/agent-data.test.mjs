@@ -299,7 +299,7 @@ test('get_deck y list_decks contestan los errores con isError, nunca revientan',
 
     const noId = await client.call('get_deck', { bookId: BOOK_1.id });
     assert.equal(noId.isError, true);
-    assert.match(noId.text, /deckId/);
+    assert.match(noId.text, /deckUid/);
 
     const unknown = await client.call('get_deck', { bookId: BOOK_1.id, scope: 'no-existe' });
     assert.equal(unknown.isError, true);

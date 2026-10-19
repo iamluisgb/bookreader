@@ -306,28 +306,39 @@ async function putObject(path, request, env, cors, who, now = Date.now()) {
     const cur = await env.DB.prepare('SELECT etag FROM objects WHERE user = ? AND path = ?').bind(who.user, path).first();
     if (cur && (meta.mustCreate || cur.etag !== meta.ifMatch)) return json({ error: 'precondition_failed', etag: cur.etag }, 412, cors);
   }
+  const w = await writeBytes(env, { user: who.user, path, body: request.body, size: len, ...meta }, now);
+  if (w.error === 'precondition_failed') return json({ error: w.error, etag: w.current }, 412, cors);
+  if (w.error) return json({ error: w.error }, 507, cors);
+  return json({ etag: w.etag, size: len }, 200, { ...cors, ETag: w.etag });
+}
+
+// La escritura de un objeto, sin HTTP: reserva la cuota, sube a una clave nueva, mueve el
+// puntero con CAS y retira la clave anterior (como versión si se pide). La usan el PUT de los
+// dispositivos y el MCP cuando un agente escribe (src/mcp.js). Devuelve { etag } o { error }
+// ('quota' | 'capacity' | 'precondition_failed', con `current` = el etag que hay).
+export async function writeBytes(env, { user, path, name, body, size, kind = 'data', ifMatch = null, mustCreate = false, keepVersions = false }, now = Date.now()) {
   const etag = randomId();
-  const key = blobKey(who.user, path, etag);
-  const why = await reserve(env, { key, user: who.user, path, size: len, kind: meta.kind }, now);
-  if (why) { await refused(env, now); return json({ error: why }, 507, cors); }
+  const key = blobKey(user, path, etag);
+  const why = await reserve(env, { key, user, path, size, kind }, now);
+  if (why) { await refused(env, now); return { error: why }; }
   if (!(await spend(env, 'a', now))) {
     await env.DB.prepare('DELETE FROM blobs WHERE key = ?').bind(key).run();
     await refused(env, now);
-    return json({ error: 'capacity' }, 507, cors);
+    return { error: 'capacity' };
   }
   try {
-    await env.SYNC.put(key, request.body, { httpMetadata: { contentType: 'application/octet-stream' } });
+    await env.SYNC.put(key, body, { httpMetadata: { contentType: 'application/octet-stream' } });
   } catch (e) {
     await env.DB.prepare('DELETE FROM blobs WHERE key = ?').bind(key).run();
     throw e;
   }
-  const r = await commit(env, { user: who.user, path, name: meta.name, key, etag, size: len, kind: meta.kind, ifMatch: meta.ifMatch, mustCreate: meta.mustCreate }, now);
+  const r = await commit(env, { user, path, name, key, etag, size, kind, ifMatch, mustCreate }, now);
   if (!r.ok) {
     await dropBlob(env, key);
-    return json({ error: 'precondition_failed', etag: r.old && r.old.etag }, 412, cors);
+    return { error: 'precondition_failed', current: r.old && r.old.etag };
   }
-  await retire(env, { user: who.user, path, old: r.old, keepVersions: meta.keepVersions });
-  return json({ etag, size: len }, 200, { ...cors, ETag: etag });
+  await retire(env, { user, path, old: r.old, keepVersions });
+  return { etag };
 }
 
 // ---- Subida por partes (F4) ----------------------------------------------------------------

@@ -5,13 +5,15 @@
 // el esquema y lo que de verdad devuelve la tool se leen en el mismo sitio.
 //
 // Reglas de la casa:
-//   - Nada de escritura. F3 está fuera de P28.
+//   - Aquí, solo lectura. Lo que escribe (tarjetas, mazos) vive en write-tools.mjs y solo se
+//     anuncia con una fuente que sabe escribir y un token que lo permite (`canWrite`).
 //   - Un error de la petición (libro desconocido, rango inválido) NO revienta la sesión: se
 //     devuelve como resultado con isError, en texto que el modelo pueda leer y corregir.
 //   - El payload va como JSON en un bloque de texto. Un solo formato, sin sorpresas.
 
 import { ToolError, SourceError, UnknownBookError } from './errors.mjs';
 import { aggregateReading, RANGES, GROUP_BY } from './stats.mjs';
+import { WRITE_TOOLS } from './write-tools.mjs';
 
 const LIMIT_DEFAULT = 50;
 const LIMIT_MAX = 500;
@@ -42,7 +44,7 @@ function requireString(args, name) {
 // El libro, por `bookId` o por `book` (título o parte, sin tildes ni mayúsculas). Así «los
 // subrayados de Pedro Páramo» funciona sin pasar antes por list_books. Si el título casa con
 // varios, error con los candidatos: mejor que el modelo pregunte que adivinar.
-async function resolveBookArg(source, args) {
+export async function resolveBookArg(source, args) {
   const id = typeof args.bookId === 'string' ? args.bookId.trim() : '';
   if (id) return id;
   const q = typeof args.book === 'string' ? fold(args.book.trim()) : '';
@@ -111,6 +113,7 @@ function deckRow(deck, today) {
     if (isDue(c, today)) due++;
   }
   return {
+    deckUid: deck.uid || null,
     deckId: deck.id,
     name: deck.name || null,
     scope: deck.scope || null,
@@ -154,7 +157,7 @@ function previewOf(result, max) {
 // ---- Búsqueda --------------------------------------------------------------
 
 /** Sin acentos y en minúsculas: «diseño» y «diseno» son la misma palabra. */
-function fold(s) {
+export function fold(s) {
   return String(s || '')
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
@@ -440,7 +443,8 @@ const GET_DECK = {
     type: 'object',
     properties: {
       bookId: { type: 'string', description: 'Id del libro, tal como sale en `list_books`.' },
-      deckId: { type: 'string', description: 'Id del mazo (uno de los dos: `deckId` o `scope`).' },
+      deckUid: { type: 'string', description: 'Uid del mazo (de `list_decks`): el identificador estable.' },
+      deckId: { type: 'string', description: 'Id numérico del mazo (cambia de un dispositivo a otro: mejor `deckUid`).' },
       scope: { type: 'string', description: 'Ámbito del mazo dentro del libro (uno de los dos).' },
       limit: {
         type: 'integer',
@@ -454,16 +458,19 @@ const GET_DECK = {
   },
   async run(source, args) {
     const bookId = requireString(args, 'bookId');
+    const deckUid = optionalString(args, 'deckUid');
     const deckId = optionalString(args, 'deckId');
     const scope = optionalString(args, 'scope');
-    if (!deckId && !scope) {
+    if (!deckUid && !deckId && !scope) {
       throw new ToolError(
-        'Falta identificar el mazo: pasa «deckId» (sale en `list_decks`) o «scope».',
+        'Falta identificar el mazo: pasa «deckUid» (sale en `list_decks`) o «scope».',
       );
     }
     const limit = optionalInt(args, 'limit', { min: 1, max: DECK_LIMIT_MAX, def: DECK_LIMIT_DEFAULT });
     const decks = await source.decks(bookId);
-    const deck = deckId
+    const deck = deckUid
+      ? decks.find((d) => d && d.uid === deckUid)
+      : deckId
       ? decks.find((d) => String(d && d.id) === String(deckId))
       : decks.find((d) => ((d && d.scope) || '') === scope);
     if (!deck) {
@@ -483,6 +490,7 @@ const GET_DECK = {
       source: source.kind,
       bookId,
       bookTitle: (await source.bookInfo(bookId)).title,
+      deckUid: deck.uid || null,
       deckId: deck.id,
       name: deck.name || null,
       scope: deck.scope || null,
@@ -596,6 +604,7 @@ export const ALL_TOOLS = [
   GET_DECK,
   LIST_ARTIFACTS,
   GET_ARTIFACT,
+  ...WRITE_TOOLS,
 ];
 
 /**

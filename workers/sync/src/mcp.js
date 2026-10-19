@@ -26,7 +26,8 @@
 import * as C from '../../../app/js/sync/sync-crypto.js';
 import { createDriveSource } from '../../../mcp/src/sources/drive.mjs';
 import { toolsFor, callTool } from '../../../mcp/src/tools.mjs';
-import { spend, refused, sha256Hex, randomId, config, checkLicense, userIdOf } from './index.js';
+import { SourceError } from '../../../mcp/src/errors.mjs';
+import { spend, refused, sha256Hex, randomId, config, checkLicense, userIdOf, writeBytes } from './index.js';
 
 const DAY = 24 * 60 * 60 * 1000;
 export const MCP_TOKEN_PREFIX = 'br-mcp-';
@@ -37,6 +38,10 @@ const NAME_MAX = 60;
 const LICENSE_RECHECK_MS = DAY;
 const LAST_USED_EVERY_MS = 60 * 60 * 1000;   // `last_used_at` se escribe como mucho una vez por hora
 const PROTOCOLS = ['2025-06-18', '2025-03-26', '2024-11-05'];
+// Permisos de un token. 'read' va siempre; los otros, solo si el usuario los marca al crearlo.
+export const SCOPES = ['read', 'write', 'text'];
+const WRITE_RETRIES = 3;
+const VERSIONED = /\/books\/[^/]+\.json$/;   // como bookreader-provider.js: el fichero del libro guarda versiones
 const SERVER_INFO = { name: 'bookreader', title: 'BookReader', version: '1.0.0' };
 const INSTRUCTIONS = [
   'Lee la biblioteca de BookReader del usuario: libros, subrayados, notas de libreta, estadísticas',
@@ -59,7 +64,8 @@ async function wrapKeyOf(secret) {
   );
 }
 
-const secretOf = (token) => C.fromB64url(token.slice(MCP_TOKEN_PREFIX.length));
+// El secreto de un token o de un código OAuth: los bytes aleatorios tras el prefijo.
+export const secretOf = (token) => C.fromB64url(token.slice(token.indexOf('-', 3) + 1));
 
 export async function wrap(token, props) {
   const iv = crypto.getRandomValues(new Uint8Array(12));
@@ -82,14 +88,21 @@ export function newToken() {
 
 // Guarda un token nuevo para `user`. Lo usan los tokens personales y, con kind 'oauth', el
 // flujo OAuth (cada conexión de claude.ai es un token más, revocable igual).
-export async function storeToken(env, { user, name, kind = 'pat', raw, license, days = DEFAULT_DAYS }, now = Date.now()) {
+export function normScopes(list) {
+  const set = new Set(['read']);
+  for (const s of Array.isArray(list) ? list : []) if (SCOPES.includes(s)) set.add(s);
+  return SCOPES.filter((s) => set.has(s));
+}
+
+export async function storeToken(env, { user, name, kind = 'pat', raw, license, days = DEFAULT_DAYS, scopes = ['read'] }, now = Date.now()) {
   const token = newToken();
   const id = randomId();
   const expiresAt = now + days * DAY;
+  const sc = normScopes(scopes);
   await env.DB.prepare(
-    `INSERT INTO mcp_tokens (id, user, hash, name, kind, wrapped, created_at, expires_at, checked_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-  ).bind(id, user, await sha256Hex(token), name, kind, await wrap(token, { k: C.b64url(raw), l: license }), now, expiresAt, now).run();
-  return { id, token, name, kind, createdAt: now, expiresAt };
+    `INSERT INTO mcp_tokens (id, user, hash, name, kind, wrapped, created_at, expires_at, checked_at, scopes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).bind(id, user, await sha256Hex(token), name, kind, await wrap(token, { k: C.b64url(raw), l: license }), now, expiresAt, now, sc.join(',')).run();
+  return { id, token, name, kind, scopes: sc, createdAt: now, expiresAt };
 }
 
 // ---- Gestión desde la app (con la sesión del sync) -------------------------------------------
@@ -110,12 +123,12 @@ export async function createTokenRoute(request, env, cors, who, now = Date.now()
   if (!(await keyOpens(env, who.user, raw))) return json({ error: 'wrong_key' }, 403, cors);
   const n = await env.DB.prepare('SELECT COUNT(*) AS n FROM mcp_tokens WHERE user = ? AND expires_at > ?').bind(who.user, now).first();
   if (n.n >= MAX_TOKENS) return json({ error: 'too_many' }, 409, cors);
-  return json(await storeToken(env, { user: who.user, name, raw, license, days }, now), 200, cors);
+  return json(await storeToken(env, { user: who.user, name, raw, license, days, scopes: body?.scopes }, now), 200, cors);
 }
 
 // La clave tiene que abrir este sync: con otra, el agente vería una biblioteca vacía y nadie
 // sabría por qué. Basta con que la ruta del manifest exista (su id es un HMAC con la clave).
-async function keyOpens(env, user, raw) {
+export async function keyOpens(env, user, raw) {
   const pid = await C.pathId(await C.importKeys(raw), 'bookreader/manifest.json');
   const any = await env.DB.prepare('SELECT 1 AS x FROM objects WHERE user = ? LIMIT 1').bind(user).first();
   if (!any) return true;   // sync vacío: no hay con qué comprobarla
@@ -124,10 +137,13 @@ async function keyOpens(env, user, raw) {
 
 export async function listTokensRoute(env, cors, who, now = Date.now()) {
   const { results = [] } = await env.DB.prepare(
-    `SELECT id, name, kind, created_at, expires_at, last_used_at FROM mcp_tokens WHERE user = ? AND expires_at > ? ORDER BY created_at DESC`,
+    `SELECT id, name, kind, scopes, created_at, expires_at, last_used_at FROM mcp_tokens WHERE user = ? AND expires_at > ? ORDER BY created_at DESC`,
   ).bind(who.user, now).all();
   return json({
-    tokens: results.map((r) => ({ id: r.id, name: r.name, kind: r.kind, createdAt: r.created_at, expiresAt: r.expires_at, lastUsedAt: r.last_used_at })),
+    tokens: results.map((r) => ({
+      id: r.id, name: r.name, kind: r.kind, scopes: String(r.scopes || 'read').split(','),
+      createdAt: r.created_at, expiresAt: r.expires_at, lastUsedAt: r.last_used_at,
+    })),
   }, 200, cors);
 }
 
@@ -141,7 +157,7 @@ export async function revokeTokenRoute(id, env, cors, who) {
 // Token → { user, raw, license } o un motivo para negarse. Revalida la licencia si toca.
 export async function authenticateAgent(env, token, now = Date.now(), fetchImpl = fetch) {
   if (!token.startsWith(MCP_TOKEN_PREFIX)) return { error: 'unauthorized' };
-  const row = await env.DB.prepare('SELECT id, user, wrapped, expires_at, last_used_at, checked_at FROM mcp_tokens WHERE hash = ?')
+  const row = await env.DB.prepare('SELECT id, user, name, scopes, wrapped, expires_at, last_used_at, checked_at FROM mcp_tokens WHERE hash = ?')
     .bind(await sha256Hex(token)).first();
   if (!row || row.expires_at <= now) return { error: 'unauthorized' };
   let props;
@@ -163,14 +179,59 @@ export async function authenticateAgent(env, token, now = Date.now(), fetchImpl 
   if (!row.last_used_at || now - row.last_used_at > LAST_USED_EVERY_MS) {
     await env.DB.prepare('UPDATE mcp_tokens SET last_used_at = ? WHERE id = ?').bind(now, row.id).run();
   }
-  return { user: row.user, raw: C.fromB64url(props.k), license: props.l };
+  return {
+    user: row.user, raw: C.fromB64url(props.k), license: props.l, name: row.name,
+    scopes: new Set(String(row.scopes || 'read').split(',')),
+    // Suscripción caducada (en el plazo de gracia): se lee, no se escribe. Como el sync.
+    readOnly: !!u.lapsed_at,
+  };
 }
 
-// El proveedor del layout para la fuente de mcp/: lee de R2 y descifra aquí.
-export function r2Provider(env, user, raw) {
+// El proveedor del layout para la fuente de mcp/: lee de R2 y descifra aquí. Con `canWrite`,
+// también escribe (`update`): como un dispositivo más, leer con su etag, cambiar, cifrar y
+// guardar solo si nadie escribió entre medias (CAS en D1); si alguien lo hizo, se relee y se
+// vuelve a aplicar el cambio. Los dispositivos lo bajan en su próximo ciclo y lo funden.
+export function r2Provider(env, user, raw, { canWrite = false } = {}) {
   let keysP = null;
   const keys = () => (keysP ||= C.importKeys(raw));
+
+  async function readRaw(path) {
+    const k = await keys();
+    const pid = await C.pathId(k, path);
+    const row = await env.DB.prepare('SELECT key, etag, name FROM objects WHERE user = ? AND path = ?').bind(user, pid).first();
+    if (!row) return { k, pid, row: null, value: null };
+    if (!(await spend(env, 'b'))) {
+      await refused(env);
+      throw Object.assign(new Error('capacity'), { capacity: true });
+    }
+    const obj = await env.SYNC.get(row.key);
+    if (!obj) return { k, pid, row: null, value: null };
+    return { k, pid, row, value: JSON.parse(await C.decryptText(k, pid, await new Response(obj.body).blob())) };
+  }
+
+  const update = async (path, mutate, { dryRun = false } = {}) => {
+    if (env.WRITES && !dryRun) {
+      const { success } = await env.WRITES.limit({ key: user });
+      if (!success) throw new SourceError('Demasiadas escrituras seguidas: espera un minuto y repite.');
+    }
+    for (let attempt = 0; attempt <= WRITE_RETRIES; attempt++) {
+      const { k, pid, row, value } = await readRaw(path);
+      const { next, result } = await mutate(value);
+      if (dryRun || !next) return result;
+      const body = new Uint8Array(await (await C.encrypt(k, pid, JSON.stringify(next))).arrayBuffer());
+      const w = await writeBytes(env, {
+        user, path: pid, name: row ? row.name : await C.encryptName(k, path), body, size: body.length, kind: 'data',
+        ifMatch: row ? row.etag : null, mustCreate: !row, keepVersions: VERSIONED.test(path),
+      });
+      if (!w.error) return result;
+      if (w.error === 'quota') throw new SourceError('El sync de BookReader está lleno: no cabe el cambio.');
+      if (w.error !== 'precondition_failed') throw Object.assign(new Error('capacity'), { capacity: true });
+    }
+    throw new SourceError('Otro dispositivo está escribiendo en este libro ahora mismo: repite en unos segundos.');
+  };
+
   return {
+    ...(canWrite ? { update } : {}),
     async read(path) {
       const k = await keys();
       const pid = await C.pathId(k, path);
@@ -239,8 +300,11 @@ export async function mcpRoute(request, env, { resourceMetadata = null } = {}) {
 
   let body;
   try { body = await request.json(); } catch { return json(rpcError(null, -32700, 'Parse error'), 400); }
-  // Una fuente por petición: la caché del layout vive lo que vive la petición.
-  const source = createDriveSource({ provider: r2Provider(env, who.user, who.raw), kind: 'bookreader', cacheMs: 60000 });
+  // Una fuente por petición: la caché del layout vive lo que vive la petición. Lo que el token
+  // permite decide qué tools se anuncian (toolsFor mira estas marcas).
+  const canWrite = who.scopes.has('write') && !who.readOnly;
+  const source = createDriveSource({ provider: r2Provider(env, who.user, who.raw, { canWrite }), kind: 'bookreader', cacheMs: 60000 });
+  Object.assign(source, { canWrite, canReadText: who.scopes.has('text'), agentName: who.name });
   try {
     const batch = Array.isArray(body);
     const out = (await Promise.all((batch ? body : [body]).map((m) => handleMessage(m, source)))).filter(Boolean);
