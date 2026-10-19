@@ -80,7 +80,8 @@ export function lastJsonObject(text) {
 // Cliente mínimo de nan: no-streaming, UA de navegador (Cloudflare da 403/1010 a UAs
 // no-navegador), reintentos simples en transitorios. Llamar SIEMPRE en secuencia:
 // nan rechaza concurrencia con la misma key.
-export async function nanChat({ model, messages, maxTokens = 4096, temperature = 0 }) {
+// `extra`: campos más del cuerpo (p. ej. `thinking: {type: 'disabled'}` para apagar el razonamiento).
+export async function nanChat({ model, messages, maxTokens = 4096, temperature = 0, extra = {} }) {
   const key = process.env.NAN_API_KEY;
   if (!key) throw new Error('NAN_API_KEY no definida (crea .env a partir de .env.example)');
   for (let attempt = 0; ; attempt++) {
@@ -93,7 +94,7 @@ export async function nanChat({ model, messages, maxTokens = 4096, temperature =
           'Content-Type': 'application/json',
           'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)',
         },
-        body: JSON.stringify({ model, messages, max_tokens: maxTokens, temperature, stream: false }),
+        body: JSON.stringify({ model, messages, max_tokens: maxTokens, temperature, stream: false, ...extra }),
       });
     } catch (e) {
       // Red caída / reset del proveedor (ECONNRESET): transitorio, mismo trato que un 5xx.

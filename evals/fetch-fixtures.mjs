@@ -30,6 +30,20 @@ const FIXTURES = [
     minBytes: 100_000,
     note: 'Constitución Española consolidada (BOE, texto legal público)',
   },
+  // P43 F2: batería de widgets (evals/widgets-battery.mjs). El HTML del BOE trae los títulos
+  // separados; el PDF de arriba sigue siendo el de P3.
+  {
+    file: 'p3-constitucion.html',
+    url: 'https://www.boe.es/buscar/act.php?id=BOE-A-1978-31229&tn=1&p=20240217',
+    minBytes: 200_000,
+    note: 'Constitución Española consolidada, versión HTML (BOE)',
+  },
+  {
+    file: 'p5-onliberty.epub',
+    url: 'https://www.gutenberg.org/cache/epub/34901/pg34901-images.epub',
+    minBytes: 300_000,
+    note: 'J. S. Mill — On Liberty (Gutenberg #34901, dominio público)',
+  },
 ];
 
 await mkdir(DIR, { recursive: true });

@@ -208,6 +208,42 @@ test('renderMatrix: no se comprueba hasta rellenarlo todo, marca cada celda y ex
   expect(commits[0].ans['si|ws']).toEqual({ value: 'Sí', unsure: true });
 });
 
+test('generate: parseo tolerante, campos que no decide el modelo, errores para el reintento y señales de calidad', async ({ page }) => {
+  await page.goto('/index.html');
+  const r = await page.evaluate(async ({ SPEC, CHAPTER_TEXT }) => {
+    const G: any = await import('/js/ai/widgets/generate.js');
+    const { type, version, bookId, chapter, ...fromModel } = SPEC;
+    const json = JSON.stringify(fromModel);
+    const wrapped = `<think>{"borrador": 1}</think>Aquí va:\n\`\`\`json\n${json.replace(/}]}$/, '},]}')}\n\`\`\``;
+    const parsed = G.parseSpec(wrapped);
+    const done = G.finishSpec({ ...parsed, type: 'quiz' }, { bookId: 'bk', chapter: 'Ch 8' });
+    const invented = G.finishSpec(JSON.parse(json.replace('both checks return 2', 'both checks return 3')), { bookId: 'bk' });
+    const msgs = G.matrixMessages({ chapter: 'Ch 8', text: 'x'.repeat(G.CHAPTER_CHAR_CAP + 50) });
+    const leak = { ...done, rows: [{ id: 'rc', label: 'Read committed' }, { id: 'si', label: 'Snapshot isolation, según el motor' }] };
+    return {
+      parsed: !!parsed && parsed.rows.length === 2,
+      none: G.parseSpec('no hay json'),
+      meta: [done.type, done.version, done.bookId, done.chapter],
+      ok: G.specErrors(done, CHAPTER_TEXT),
+      invented: G.specErrors(invented, CHAPTER_TEXT),
+      nothing: G.specErrors(null, CHAPTER_TEXT),
+      capped: msgs[1].content.length < G.CHAPTER_CHAR_CAP + 200,
+      retry: G.retryMessages(msgs, 'resp', ['e1']).map((m: any) => m.role),
+      flags: G.qualityFlags(leak),
+    };
+  }, { SPEC, CHAPTER_TEXT });
+  expect(r.parsed).toBe(true);
+  expect(r.none).toBeNull();
+  expect(r.meta).toEqual(['matrix', 1, 'bk', 'Ch 8']);
+  expect(r.ok).toEqual([]);
+  expect(r.invented).toEqual(['celda si|ws: la cita no aparece literal en el capítulo']);
+  expect(r.nothing).toEqual(['la respuesta no contiene un objeto JSON']);
+  expect(r.capped).toBe(true);
+  expect(r.retry).toEqual(['system', 'user', 'assistant', 'user']);
+  // ws es «No» en las dos filas (constante); «según el motor» está en la etiqueta de si (fuga).
+  expect(r.flags).toEqual([{ kind: 'fuga', where: 'si|lu' }, { kind: 'constante', where: 'ws' }]);
+});
+
 test('patterns.html: el ejemplo vivo de la matriz se pinta sin errores', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));

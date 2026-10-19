@@ -2067,7 +2067,7 @@ mide) · cambiar la semántica de la racha · la mejora de generación al estilo
 cuya literal ES la respuesta: término, fecha, cifra), que es trabajo futuro del prompt de
 generación de tarjetas y no de la medida.
 
-### P43 — Widgets de estudio: siete tipos que el agente rellena para cualquier libro · `L` · **F1 ✓ (2026-10-16)**
+### P43 — Widgets de estudio: siete tipos que el agente rellena para cualquier libro · `L` · **F1–F2 ✓ (2026-10-16)**
 
 **Contexto (2026-10-16).** Cuatro prototipos a mano sobre DDIA (anomalías, lease, rebalanceo,
 timeout, en el lab) gustaron, pero cada uno lleva su propio motor y no valen para otro libro. La
@@ -2127,12 +2127,27 @@ básicas para lo fallado, que vuelven con FSRS.
 - Tests deterministas en `tests/widgets.spec.ts`.
 - **Sin superficie en la app todavía:** el motor existe y se prueba, pero nadie lo abre. Eso es F3.
 
-**F2 · Generación por el agente · `M`** *(con el contrato de arriba)*
-- Prompt que pide el JSON de la matriz para un capítulo, con citas literales; parseo tolerante y
-  validación; un reintento si la validación falla, con el error concreto.
-- Comprobación de ida y vuelta (Alberti 2019): otro modelo rellena la matriz solo con el pasaje; las
-  celdas en que no coincide se marcan dudosas y no se enseñan.
-- Run de la batería → baseline → hasta 3 ciclos.
+**F2 · Generación por el agente · `M`** · ✓ (2026-10-16, contrato cumplido)
+- [`generate.js`](app/js/ai/widgets/generate.js) (puro): prompt de la matriz con citas literales,
+  parseo tolerante (`<think>`, ```` ```json ````, comas colgantes), `finishSpec` pone lo que no decide
+  el modelo, `specErrors` = `validateMatrix` + `verifyQuotes`, un reintento con los errores
+  concretos y `qualityFlags` (columna constante, respuesta en la etiqueta, columna de emparejar,
+  opciones largas). La app y el eval usan el mismo módulo.
+- Eval [`evals/widgets.mjs`](evals/widgets.mjs) sobre 20 capítulos de 4 libros (Pro Git,
+  Relativity, On Liberty, Constitución), con `deepseek-v4-flash`:
+
+  | Run | Prompt | 1.ª respuesta | Tras reintento | Ida y vuelta |
+  |---|---|---|---|---|
+  | baseline-v1 | v1, con razonamiento | 70 % (6 sin JSON: el razonamiento agota los tokens) | 95 % | 100 % (149/149) |
+  | c1-nothink | v1, sin razonamiento | **90 %** | 100 % | 95 % (198/208) |
+  | c2-v2 | v2 (opciones cortas, que se repitan) | **85 %** | 95 % | 88 % (138/157, 10 specs) |
+
+  c2 quita las dos señales que hacían la matriz trivial (columna de emparejar 15/20 → 0/19,
+  opciones largas 10/20 → 0/19) a cambio de bajar a la valla justa. **Pendiente:** a ciegas, sin el
+  capítulo, el solver acierta el 82 % de las celdas de c2: muchas matrices se responden con cultura
+  general. Es la señal para el siguiente ciclo de prompt, no un bloqueo.
+- La ida y vuelta se queda en el eval; en la app no se hace (dobla el coste de cada matriz). Si los
+  intentos reales muestran celdas que todo el mundo falla, se mira ahí.
 
 **F3 · Superficie · `M`**
 - Dónde aparece: en la libreta, como un «Te toca» más al cerrar un capítulo (una pausa por capítulo,
