@@ -419,6 +419,13 @@ export function updateDeck(id, patch) {
 
 // Reconcilia la lista entrante contra la guardada: sella lo que cambió, asigna uid a
 // lo nuevo y conserva como tombstone lo que desapareció.
+//
+// Además de `updatedAt` (cualquier cambio), dos sellos por PARTE de la tarjeta, para que el
+// merge las funda por separado (mergeCardPair): `textAt` cuando cambia el contenido (anverso,
+// reverso, tipo, suspensión…) y `srsAt` cuando cambia el repaso (incluido deshacerlo). Sin
+// ellos, editar una tarjeta en un sitio y repasarla en otro perdía uno de los dos trabajos:
+// ganaba la tarjeta entera más reciente. Con el MCP que escribe (un agente reescribe tarjetas
+// mientras el móvil las repasa sin conexión) ese caso deja de ser raro.
 function stampCards(before, after, now) {
   const prev = new Map();
   for (const c of before || []) if (c && c.uid) prev.set(c.uid, c);
@@ -430,7 +437,13 @@ function stampCards(before, after, now) {
     seen.add(uid);
     const old = prev.get(uid);
     const same = old && sameCard(old, c);
-    out.push({ ...c, uid, updatedAt: same ? (old.updatedAt || now) : now });
+    const card = { ...c, uid, updatedAt: same ? (old.updatedAt || now) : now };
+    if (!old || !sameContent(old, c)) card.textAt = now;
+    else if (old.textAt) card.textAt = old.textAt;
+    else delete card.textAt;
+    if (old && JSON.stringify(old.srs || null) !== JSON.stringify(c.srs || null)) card.srsAt = now;
+    else if (old && old.srsAt) card.srsAt = old.srsAt;
+    out.push(card);
   }
   for (const [uid, old] of prev) {
     if (seen.has(uid)) continue;
@@ -469,6 +482,14 @@ function stampExercises(before, after, now) {
 // sella y la copia vieja del otro dispositivo lo pisa. Se normalizan defensivamente
 // (ausente → null / []): una tarjeta de texto legada y su re-guardado idéntico siguen
 // siendo "iguales" y NO se re-sellan en cada sync.
+// Lo que es CONTENIDO de la tarjeta (todo lo de sameCard menos el repaso). Va con `textAt`.
+export const CARD_CONTENT = ['front', 'back', 'type', 'chapter', 'src', 'suspended', 'domain', 'figureKey',
+  'occludedLabel', 'bbox', 'svg', 'answerNodeId', 'steps', 'options', 'quote'];
+
+function sameContent(a, b) {
+  return sameCard({ ...a, srs: null }, { ...b, srs: null });
+}
+
 function sameCard(a, b) {
   // bbox canónico con claves fijas: dos representaciones del mismo rectángulo
   // ({x,y,w,h} canónico o array del modelo) no deben leerse como cambio.
@@ -589,7 +610,7 @@ export function mergeDeckPair(local, remote) {
   // Metadatos (nombre, tipo, ámbito, borrado del mazo entero): LWW, con el borrado
   // ganando el empate — misma regla determinista que mergeCollections.
   const win = ru > lu || (ru === lu && remote.deleted && !local.deleted) ? remote : local;
-  const cards = mergeCards(local.cards, remote.cards);
+  const cards = mergeCards(local.cards, remote.cards, mergeCardPair);
   // Los ejercicios (P43 F3) se funden igual que las tarjetas: por uid y LWW por ejercicio, para
   // que el resultado de una matriz hecha en el móvil no lo pise una edición del mazo en el PC.
   const exercises = mergeCards(local.exercises, remote.exercises);
@@ -598,7 +619,7 @@ export function mergeDeckPair(local, remote) {
   return { ...win, cards: win.deleted ? [] : cards, exercises: win.deleted ? [] : exercises, updatedAt: Math.max(lu, ru) };
 }
 
-function mergeCards(local = [], remote = []) {
+function mergeCards(local = [], remote = [], pair = null) {
   const byUid = new Map();
   for (const c of local || []) if (c && c.uid) byUid.set(c.uid, c);
   const out = [];
@@ -608,6 +629,7 @@ function mergeCards(local = [], remote = []) {
     seen.add(r.uid);
     const l = byUid.get(r.uid);
     if (!l) { out.push(r); continue; }
+    if (pair) { out.push(pair(l, r)); continue; }
     const lu = l.updatedAt || 0;
     const ru = r.updatedAt || 0;
     if (ru > lu || (ru === lu && r.deleted && !l.deleted)) out.push(r);
@@ -616,6 +638,35 @@ function mergeCards(local = [], remote = []) {
   for (const l of local || []) {
     if (l && l.uid && !seen.has(l.uid)) out.push(l);
     else if (l && !l.uid) out.push(l);        // pre-backfill: nunca se descarta
+  }
+  return out;
+}
+
+// Una tarjeta presente en los dos lados. Primero, la regla de siempre (LWW por `updatedAt`,
+// con el borrado ganando el empate): decide si la tarjeta vive y es la base. Después, si las
+// dos viven, el contenido viene del lado con el `textAt` más reciente y el repaso del lado con
+// el `srsAt` más reciente. Tarjetas anteriores a los sellos: `textAt` 0 y, para el repaso, la
+// fecha del último repaso; con los dos a 0, se queda la base (el comportamiento de antes).
+export function mergeCardPair(l, r) {
+  const lu = l.updatedAt || 0;
+  const ru = r.updatedAt || 0;
+  const base = ru > lu || (ru === lu && r.deleted && !l.deleted) ? r : l;
+  const other = base === r ? l : r;
+  if (base.deleted || other.deleted) return base;
+  const textAt = (c) => c.textAt || 0;
+  const srsAt = (c) => c.srsAt || (c.srs && c.srs.lastReview) || 0;
+  let out = base;
+  if (textAt(other) > textAt(base)) {
+    out = { ...out, textAt: other.textAt };
+    for (const k of CARD_CONTENT) {
+      if (other[k] === undefined) delete out[k];
+      else out[k] = other[k];
+    }
+  }
+  if (srsAt(other) > srsAt(base)) {
+    out = { ...out, srs: other.srs };
+    if (other.srsAt) out.srsAt = other.srsAt;
+    if (!other.srs) delete out.srs;
   }
   return out;
 }

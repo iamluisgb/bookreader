@@ -453,3 +453,71 @@ test.describe('unidades del merge de mazos', () => {
     expect(fronts).toEqual(['v', 'y']);
   });
 });
+
+// MCP de escritura · Contenido y repaso se funden POR SEPARADO (mergeCardPair). El caso que lo
+// pide: un agente reescribe una tarjeta (servidor) mientras el móvil, sin conexión, la repasa con
+// el texto viejo. Con la tarjeta entera como unidad, uno de los dos trabajos se perdía.
+test.describe('merge de tarjetas por partes: texto y repaso', () => {
+  test('edición del agente + repaso posterior sin conexión: se quedan los dos, en los dos sentidos', async ({ page }) => {
+    await page.goto('/');
+    const out = await page.evaluate(async () => {
+      const DB: any = await import('/js/ai/db.js');
+      const deck = (cards: any[], updatedAt: number) => ({ uid: 'd', id: 1, bookId: 'b', name: 'M', cardType: 'basic', createdAt: 1, updatedAt, cards });
+      const agente = deck([{ uid: 'c1', front: 'Pregunta mejor', back: 'Respuesta mejor', textAt: 2000, updatedAt: 2000, srs: { reps: 1, lastReview: 500 } }], 2000);
+      const movil = deck([{ uid: 'c1', front: 'Vieja', back: 'vieja', updatedAt: 3000, srsAt: 3000, srs: { reps: 2, lastReview: 3000 } }], 3000);
+      return [DB.mergeDeckPair(movil, agente), DB.mergeDeckPair(agente, movil)]
+        .map((m: any) => ({ front: m.cards[0].front, back: m.cards[0].back, reps: m.cards[0].srs.reps }));
+    });
+    expect(out).toEqual([
+      { front: 'Pregunta mejor', back: 'Respuesta mejor', reps: 2 },
+      { front: 'Pregunta mejor', back: 'Respuesta mejor', reps: 2 },
+    ]);
+  });
+
+  test('deshacer un repaso gana aunque deje la tarjeta sin repaso', async ({ page }) => {
+    await page.goto('/');
+    const srs = await page.evaluate(async () => {
+      const DB: any = await import('/js/ai/db.js');
+      const deck = (cards: any[], updatedAt: number) => ({ uid: 'd', id: 1, bookId: 'b', name: 'M', cardType: 'basic', createdAt: 1, updatedAt, cards });
+      const otro = deck([{ uid: 'c1', front: 'A', updatedAt: 3000, srsAt: 3000, srs: { reps: 1, lastReview: 3000 } }], 3000);
+      const deshecho = deck([{ uid: 'c1', front: 'A', updatedAt: 4000, srsAt: 4000 }], 4000);
+      return [DB.mergeDeckPair(otro, deshecho).cards[0].srs ?? null, DB.mergeDeckPair(deshecho, otro)?.cards[0].srs ?? null];
+    });
+    expect(srs).toEqual([null, null]);
+  });
+
+  test('una tarjeta borrada no resucita por un repaso más viejo', async ({ page }) => {
+    await page.goto('/');
+    const del = await page.evaluate(async () => {
+      const DB: any = await import('/js/ai/db.js');
+      const deck = (cards: any[], updatedAt: number) => ({ uid: 'd', id: 1, bookId: 'b', name: 'M', cardType: 'basic', createdAt: 1, updatedAt, cards });
+      const borrada = deck([{ uid: 'c1', front: '', deleted: true, deletedAt: 5000, updatedAt: 5000, textAt: 5000 }], 5000);
+      const repasada = deck([{ uid: 'c1', front: 'A', updatedAt: 4000, srsAt: 4000, srs: { reps: 3, lastReview: 4000 } }], 4000);
+      return DB.mergeDeckPair(repasada, borrada).cards[0].deleted;
+    });
+    expect(del).toBe(true);
+  });
+
+  test('updateDeck sella textAt solo al cambiar el contenido, y srsAt solo al cambiar el repaso', async ({ page }) => {
+    await page.goto('/');
+    const out = await page.evaluate(async () => {
+      const DB: any = await import('/js/ai/db.js');
+      const t0 = Date.now() - 60000;
+      await DB.put('decks', { bookId: 'sellos', uid: 's1', name: 'S', cardType: 'basic', createdAt: t0, updatedAt: t0, cards: [
+        { uid: 'k', type: 'basic', front: 'A', back: 'a', updatedAt: t0, textAt: t0 },
+      ] });
+      const get = async () => (await DB.getAll('decks')).find((d: any) => d.bookId === 'sellos');
+      const d0 = await get();
+      await DB.updateDeck(d0.id, { cards: [{ ...d0.cards[0], srs: { reps: 1, lastReview: Date.now() } }] });
+      const d1 = await get();
+      await new Promise(r => setTimeout(r, 5));
+      await DB.updateDeck(d1.id, { cards: [{ ...d1.cards[0], front: 'A editada' }] });
+      const d2 = await get();
+      return {
+        repasoNoTocaTexto: d1.cards[0].textAt === t0 && d1.cards[0].srsAt > t0,
+        edicionNoTocaRepaso: d2.cards[0].srsAt === d1.cards[0].srsAt && d2.cards[0].textAt > d1.cards[0].srsAt - 1,
+      };
+    });
+    expect(out).toEqual({ repasoNoTocaTexto: true, edicionNoTocaRepaso: true });
+  });
+});
