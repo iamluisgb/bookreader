@@ -52,10 +52,12 @@
   "r2_buckets": [
     { "binding": "SYNC", "bucket_name": "bookreader-sync" }
   ],
-  // Escrituras por usuario y minuto (el motor agrupa con debounce de 4 s: 60 sobra), y
-  // emisión de tokens por IP (cada una llama a Polar).
+  // Escrituras por usuario y minuto, y emisión de tokens por IP (cada una llama a Polar). El uso
+  // normal son unas pocas por minuto (el motor agrupa con debounce de 4 s); el tope está para
+  // la primera subida de una biblioteca grande o una migración, que son ráfagas de un fichero
+  // por libro. Al pasarlo, el cliente espera y reintenta (bookreader-auth.js · api).
   "ratelimits": [
-    { "name": "WRITES", "namespace_id": "2402", "simple": { "limit": 60, "period": 60 } },
+    { "name": "WRITES", "namespace_id": "2402", "simple": { "limit": 300, "period": 60 } },
     { "name": "TOKENS", "namespace_id": "2403", "simple": { "limit": 10, "period": 60 } }
   ],
   "triggers": { "crons": ["41 3 * * *"] }

@@ -1822,4 +1822,5 @@ const EN = {
   'Con la licencia de este dispositivo no hay nada sincronizado. Usa en los dos la misma licencia.': 'There is nothing synced under this device\'s license. Use the same license on both.',
   'Este dispositivo tiene otra licencia. Para sincronizar con el dispositivo del enlace se usará la suya.': 'This device has a different license. To sync with the device from the link, its license will be used.',
   'Usar la del enlace': 'Use the link\'s license',
+  'La clave de este dispositivo ya no es la de tu sync (¿se empezó de cero en otro?). Desconecta este dispositivo y vuelve a emparejarlo.': 'This device\'s key no longer matches your sync (did you start over on another one?). Disconnect this device and pair it again.',
 };

@@ -92,9 +92,15 @@ function authError(code) {
   return e;
 }
 
+// Un token de solo lectura se vuelve a pedir cada READ_ONLY_RECHECK_MS aunque no haya
+// caducado: quien renueva la suscripción no debe esperar a que venza el de 24 h para volver a
+// escribir.
+const READ_ONLY_RECHECK_MS = 15 * 60 * 1000;
+
 export async function getToken(force = false) {
   const s = tokenInfo();
-  if (!force && s && s.token && s.expiresAt - 60000 > Date.now()) return s.token;
+  const stale = s && s.readOnly && Date.now() - (s.checkedAt || 0) > READ_ONLY_RECHECK_MS;
+  if (!force && !stale && s && s.token && s.expiresAt - 60000 > Date.now()) return s.token;
   const license = licenseKey();
   if (!license) throw authError('no_license');
   const res = await fetchWithTimeout(WORKER_URL + '/v1/sync-token', {
@@ -116,23 +122,36 @@ export async function getToken(force = false) {
   }
   Storage.set(TOKEN_KEY, {
     token: data.token, expiresAt: data.expiresAt, readOnly: !!data.readOnly,
-    files: !!data.files, purgeAt: data.purgeAt || null,
+    files: !!data.files, purgeAt: data.purgeAt || null, checkedAt: Date.now(),
   });
   return data.token;
 }
 
 // Petición al Worker con el token; un 401 (token caducado o purgado) se renueva una vez.
+//
+// Un 429 (límite de escrituras por minuto) se espera y se reintenta: la primera subida de una
+// biblioteca grande, o una migración, son ráfagas legítimas de cientos de ficheros, y fallar
+// el ciclo entero por eso sería peor que tardar un poco más. El cuerpo es un Blob, así que se
+// puede reenviar tal cual.
+const RATE_WAITS_MS = [1000, 3000, 8000, 15000, 30000];
+
 export async function api(path, options = {}, { timeoutMs, retry = true } = {}) {
-  const token = await getToken();
-  const res = await fetchWithTimeout(WORKER_URL + path, {
-    ...options,
-    headers: { ...(options.headers || {}), Authorization: 'Bearer ' + token },
-  }, timeoutMs);
-  if (res.status === 401 && retry) {
-    await getToken(true);
-    return api(path, options, { timeoutMs, retry: false });
+  for (let attempt = 0; ; attempt++) {
+    const token = await getToken();
+    const res = await fetchWithTimeout(WORKER_URL + path, {
+      ...options,
+      headers: { ...(options.headers || {}), Authorization: 'Bearer ' + token },
+    }, timeoutMs);
+    if (res.status === 401 && retry) {
+      await getToken(true);
+      return api(path, options, { timeoutMs, retry: false });
+    }
+    if (res.status === 429 && attempt < RATE_WAITS_MS.length) {
+      await new Promise(r => setTimeout(r, RATE_WAITS_MS[attempt] * (0.75 + Math.random() * 0.5)));
+      continue;
+    }
+    return res;
   }
-  return res;
 }
 
 export async function apiError(res) {

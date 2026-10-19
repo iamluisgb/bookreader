@@ -12,6 +12,7 @@
 //   - Historial: el Worker guarda las últimas versiones de settings.json y de cada libro (se
 //     piden con X-Keep-Versions). `fileId` es la propia ruta.
 
+import { t } from '../i18n.js';
 import * as A from './bookreader-auth.js';
 import * as C from './sync-crypto.js';
 import { fetchBinary, TRANSFER_TIMEOUT_MS } from './net.js';
@@ -49,11 +50,20 @@ export async function list(prefix = '') {
   const { items = [] } = await res.json();
   const k = await A.keys();
   const out = [];
+  let readable = 0;
   for (const it of items) {
     let path;
     try { path = await C.decryptName(k, it.name); } catch { continue; }
+    readable++;
     if (path === KEYCHECK || !path.startsWith(prefix)) continue;
     out.push({ path, etag: String(it.etag), modifiedTime: new Date(it.updatedAt).toISOString(), size: Number(it.size || 0) });
+  }
+  // Hay datos y esta clave no abre ninguno: en otro dispositivo se empezó de cero con una clave
+  // nueva. Seguir escribiendo con la vieja crearía un sync paralelo que nadie más lee.
+  if (items.length && !readable) {
+    const err = new Error(t('La clave de este dispositivo ya no es la de tu sync (¿se empezó de cero en otro?). Desconecta este dispositivo y vuelve a emparejarlo.'));
+    err.code = 'wrong_key';
+    throw err;
   }
   return out;
 }

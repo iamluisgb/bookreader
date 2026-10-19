@@ -97,6 +97,32 @@ test.describe('MON4 F3 — sync de BookReader de punta a punta', () => {
     await movil.close();
   });
 
+  test('ráfagas: un 429 del límite por minuto se espera y se reintenta', async ({ page }) => {
+    const server = await createSyncServer();
+    let cerrado = 2;   // las dos primeras escrituras chocan con el límite
+    server.env.WRITES = { limit: async () => ({ success: cerrado-- <= 0 }) };
+    await installSyncServer(page, server);
+    await seedBookReaderSync(page);
+    await page.goto('/');
+    await page.evaluate(async () => (await import('/js/sync/bookreader-auth.js')).enable());
+    await addHighlight(page, 'libro-429', 'epubcfi(/6/2!/4/2)', 'aguanta');
+    expect((await syncNow(page)).pushed).toBe(1);
+    expect(server.calls.filter(c => c.startsWith('PUT')).length).toBeGreaterThan(server.env.DB._raw.prepare('SELECT COUNT(*) AS n FROM objects').get().n);
+  });
+
+  test('si en otro dispositivo se empezó de cero, este no sigue escribiendo con la clave vieja', async ({ browser }) => {
+    const server = await createSyncServer();
+    const { pc, movil, a, b } = await twoDevices(browser, server);
+    await syncNow(a);
+    await a.evaluate(async () => (await import('/js/sync/bookreader-auth.js')).startOver());
+    await syncNow(a);
+    const r = await syncNow(b);
+    expect(r).toBe('error');
+    expect((await b.evaluate(async () => (await import('/js/sync/engine.js')).getDiag())).lastError).toContain('ya no es la de tu sync');
+    await pc.close();
+    await movil.close();
+  });
+
   test('historial de versiones: las copias del Worker se listan y se restauran', async ({ page }) => {
     const server = await createSyncServer();
     await installSyncServer(page, server);
@@ -156,6 +182,18 @@ test.describe('MON4 F3 — sync de BookReader de punta a punta', () => {
     // Y lo del móvil no llegó al servidor.
     await syncNow(a);
     expect(await highlights(a, 'libro-z')).toEqual(['antes de caducar']);
+
+    // Renueva: el servidor vuelve a dar escritura y el móvil la recupera sin esperar 24 h
+    // (el token de solo lectura se revisa a los 15 minutos; aquí se adelanta el reloj).
+    server.env.DB._raw.prepare('UPDATE users SET lapsed_at = NULL').run();
+    await b.evaluate(() => {
+      const s = JSON.parse(localStorage.getItem('bookreader_sync_token')!);
+      s.checkedAt = Date.now() - 16 * 60 * 1000;
+      localStorage.setItem('bookreader_sync_token', JSON.stringify(s));
+    });
+    expect((await syncNow(b)).pushed).toBeGreaterThan(0);
+    await syncNow(a);
+    expect(await highlights(a, 'libro-z')).toEqual(['antes de caducar', 'después']);
     await pc.close();
     await movil.close();
   });
