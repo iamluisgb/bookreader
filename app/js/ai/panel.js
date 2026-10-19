@@ -96,6 +96,11 @@ let pendingQuoteOnActivate = null; // cola: pasaje a adjuntar tras crear/activar
 // IA2 · Repaso al terminar capítulo ("Pepito Grillo"). Ver DECISIONS.md · ADR-013.
 let ia2LastChapter = null;
 let ia2Seen = new Set();
+// P43 · Al terminar un capítulo, la libreta ofrece su matriz (sin interrumpir: punto de no leído).
+// { chapter, status: 'idle' | 'loading' | 'error', error }. «Ahora no» la quita para ese capítulo.
+let matrixOffer = null;
+let matrixSkipped = new Set();
+const MATRIX_MIN_CHARS = 4000;   // un capítulo más corto no da para comparar conceptos
 
 export function init(opts) {
   // Toda cita (chat, Libreta, Studio) devuelve al libro: con el agente ampliado, primero
@@ -772,6 +777,7 @@ export async function setBook(b, id, title, opts = {}) {
   clearImageRef();
   convo = null; template = null; history = []; notes = [];
   ia2LastChapter = null; ia2Seen = new Set();   // IA2: reinicia el repaso por libro
+  matrixOffer = null; matrixSkipped = new Set();
   editingId = null; addingField = null; attenuationDone = false;
   nbExpanded = new Set(); nbMenu = null; nbJustSaved = null; bookFinished = false; nbDrafts = new Map();
   nbFilling = null; nbCandidates = null; nbClip = null; nbClipLoc = null;
@@ -1285,6 +1291,7 @@ async function send() {
 // Solo para tests: un repintado de la libreta como los que llegan solos (extractor,
 // HQ&A, cambio de capítulo). Es lo que borraba los borradores.
 export function __renderNotebookForTest() { renderNotebook(); }
+export function __ensureIndexForTest() { ensureIndex(); }
 
 // Solo para tests (inspección visual): adjunta zonas ya recortadas sin gestos.
 export function __setZonesForTest(zones) {
@@ -1894,6 +1901,7 @@ function onChapterChanged(label) {
   if (ia2Seen.has(label)) return;       // ya visto (volver atrás): no repasar
   ia2Seen.add(label);
   if (!prev) return;                     // primer capítulo del libro: nada que repasar aún
+  offerMatrix(prev);
   // NB2 · capítulo terminado: si la plantilla pregunta algo por capítulo, la libreta lo
   // enseña en «Te toca» (sin interrumpir la lectura: solo el punto de no leído).
   if (convo && template?.fields?.some(f => f.when === 'capitulo' && isCognitionField(f))) {
@@ -1906,6 +1914,57 @@ function onChapterChanged(label) {
   if (template?.id !== 'hqa') return;    // IA2 solo con la plantilla de recuerdo activo
   if (!convo || !LLM.hasKey() || busy || !segReady) return;
   quizChapter(prev);
+}
+
+// P43 · La matriz del capítulo que acabas de terminar, ofrecida en la libreta. Solo con agente
+// configurado, en capítulos de texto con chicha y una vez por capítulo.
+function offerMatrix(chapter) {
+  if (!LLM.hasKey() || !template || matrixSkipped.has(chapter) || Retrieval.isBoilerplate(chapter)) return;
+  ensureIndex();
+  const chars = Retrieval.passagesByChapter(chapter).reduce((n, p) => n + p.text.length, 0);
+  if (chars < MATRIX_MIN_CHARS) return;
+  matrixOffer = { chapter, status: 'idle' };
+  renderNotebook();
+  markNotebookUnread();
+  if (!isOpen()) { agentUnread = true; applyAgentBadge(); }
+}
+
+function matrixOfferHtml() {
+  const o = matrixOffer;
+  if (!o) return '';
+  const loading = o.status === 'loading';
+  return `
+    <div class="ai-nb-toca ai-nb-matrix" data-chapter="${escapeHtml(o.chapter)}">
+      <div class="ai-nb-toca-head"><span class="ai-nb-toca-tag">${t('Práctica')}</span><span class="ai-nb-toca-ctx">${t('Has terminado «{c}»', { c: escapeHtml(o.chapter) })}</span></div>
+      <p class="ai-nb-toca-q">${t('¿Una matriz con los conceptos del capítulo que se confunden? Son 2–3 minutos y lo que falles pasa a tarjetas.')}</p>
+      ${o.status === 'error' ? `<p class="ai-nb-matrix-err">${escapeHtml(o.error || t('No salió. Vuelve a intentarlo.'))}</p>` : ''}
+      <div class="ai-nb-toca-actions">
+        <button class="ai-nb-toca-save ai-nb-matrix-go"${loading ? ' disabled' : ''}>${loading ? `<span class="ai-typing">${t('Preparando la matriz…')}</span>` : t('Practicar')}</button>
+        <button class="ai-nb-toca-skip ai-nb-matrix-skip"${loading ? ' disabled' : ''}>${t('Ahora no')}</button>
+      </div>
+    </div>`;
+}
+
+async function startMatrix(chapter) {
+  if (!matrixOffer || matrixOffer.status === 'loading') return;
+  const mySeq = bookSeq;
+  matrixOffer = { chapter, status: 'loading' };
+  renderNotebook();
+  try {
+    const Practice = await import('./widgets/practice.js');
+    ensureIndex();
+    const text = Retrieval.passagesByChapter(chapter).map(p => p.text).join('\n\n');
+    const { deck, exercise } = await Practice.chapterMatrix({ bookId, bookTitle, chapter, text });
+    if (mySeq !== bookSeq) return;      // cambió de libro mientras se generaba
+    matrixOffer = null;
+    renderNotebook();
+    Practice.open({ deck, exercise });
+  } catch (e) {
+    if (mySeq !== bookSeq) return;
+    console.warn('Matriz del capítulo:', e);
+    matrixOffer = { chapter, status: 'error', error: e.message };
+    renderNotebook();
+  }
 }
 
 async function quizChapter(chapterLabel) {
@@ -2892,6 +2951,7 @@ function renderNotebook() {
     <div class="ai-nb-tpl">${escapeHtml(template.name)}</div>
     ${clipHtml()}
     ${tocaHtml(pending)}
+    ${matrixOfferHtml()}
     ${deliverHtml()}
     <div class="ai-nb-fields">${body}</div>
   `;
@@ -2943,6 +3003,17 @@ async function onNotebookClick(e) {
   // Un menú ⋯ abierto se cierra con cualquier clic fuera de él.
   if (nbMenu != null && !e.target.closest('.ai-nb-menu, .ai-nb-more')) {
     nbMenu = null; renderNotebook(); return;
+  }
+
+  // P43 · Matriz del capítulo terminado (va antes que «Te toca»: comparte sus clases de estilo).
+  const mGo = e.target.closest('.ai-nb-matrix-go');
+  if (mGo) { startMatrix(mGo.closest('.ai-nb-matrix').dataset.chapter); return; }
+  const mSkip = e.target.closest('.ai-nb-matrix-skip');
+  if (mSkip) {
+    matrixSkipped.add(mSkip.closest('.ai-nb-matrix').dataset.chapter);
+    matrixOffer = null;
+    renderNotebook();
+    return;
   }
 
   // «Te toca»

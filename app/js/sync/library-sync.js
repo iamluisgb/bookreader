@@ -112,6 +112,9 @@ function bookEntry(b) {
     status: b.status || 'unread', progress: b.progress || 0,
     ...(b.finishedAt ? { finishedAt: b.finishedAt } : {}),
     shelfIds: b.shelfIds || [],
+    // Solo si existen: un registro sin ellos se serializa igual que antes (sin push de más).
+    ...(Array.isArray(b.chapterOrder) ? { chapterOrder: b.chapterOrder } : {}),
+    ...(Array.isArray(b.chaptersDone) ? { chaptersDone: b.chaptersDone } : {}),
     blob: b.blob || null,
     deleted: !!b.deleted, deletedAt: b.deletedAt || 0,
     updatedAt: b.updatedAt || 0,

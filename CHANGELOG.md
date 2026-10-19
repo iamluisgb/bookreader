@@ -3,6 +3,16 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-10-19 — El repaso no te adelanta capítulos; preguntas en el plan y matriz al terminar (P43 F5)
+
+El repaso de hoy deja de mezclar tarjetas de capítulos que no has leído. Al avanzar en un EPUB, los
+capítulos que dejas atrás quedan anotados en la ficha del libro (viaja con el sync), y las tarjetas
+nuevas de los demás esperan; al terminar la sesión se dice cuántas. Abrir un mazo a mano sigue
+enseñándolo entero, y un libro terminado lo desbloquea todo. El plan por capítulos ofrece ahora las
+preguntas con opciones, sacadas de la cifra de cada capítulo para que el total no cambie. Y al pasar
+al capítulo siguiente, la libreta propone la matriz del que acabas de terminar, sin interrumpir la
+lectura. Tests: `chapter-gate.spec.ts`, `chapter-matrix.spec.ts` y `card-plan-ui.spec.ts`.
+
 ## 2026-10-19 — Preguntas con opciones que explican su error (P43 F4)
 
 Nuevo tipo de tarjeta en Flashcards: «Pregunta con opciones». Con un capítulo elegido, el agente

@@ -105,6 +105,21 @@ async function stubPlanLLM(page, plannerPayload: string) {
           return new Response(s, { status: 200, headers: { 'Content-Type': 'text/event-stream' } });
         }
         // Pasadas de tarjetas: tool-call con el cupo EXACTO que pide el prompt.
+        // P43 · Preguntas con opciones: tantas como pide el prompt, citando el capítulo pedido.
+        if (body.stream && /opción múltiple/.test(sys)) {
+          (window as any).__plan.mcq = ((window as any).__plan.mcq || 0) + 1;
+          const user = (body.messages || []).find((m: any) => m.role === 'user')?.content || '';
+          const ch = (user.match(/^Capítulo: (.*)$/m) || [])[1] || '';
+          const n = parseInt((sys.match(/Escribe (\d+) preguntas/) || [])[1] || '0', 10);
+          const items = Array.from({ length: n }, (_, i) => ({ id: `q${i + 1}`, stem: `Caso ${i + 1} de ${ch}`, cite: { quote: `contenido de estudio del capítulo ${ch}: definiciones` },
+            options: [{ id: 'a', text: 'Bien', correct: true, feedback: 'Por esto.' }, { id: 'b', text: 'Mal', correct: false, feedback: 'No.' }, { id: 'c', text: 'Peor', correct: false, feedback: 'Tampoco.' }] }));
+          const sse = [
+            `data: ${JSON.stringify({ choices: [{ delta: { content: JSON.stringify({ title: 'T', prompt: 'P', items }) }, finish_reason: null }] })}\n\n`,
+            'data: [DONE]\n\n',
+          ];
+          const s = new ReadableStream({ start(c) { const e = new TextEncoder(); sse.forEach(x => c.enqueue(e.encode(x))); c.close(); } });
+          return new Response(s, { status: 200, headers: { 'Content-Type': 'text/event-stream' } });
+        }
         if ((body.tools || []).some((t: any) => t.function?.name === 'create_flashcards')) {
           (window as any).__plan.gen++;
           (window as any).__plan.prompts.push(body.messages.map((m: any) => m.content).join('\n'));
@@ -230,4 +245,37 @@ test('generar con plan crea un mazo POR CAPÍTULO y salta el capítulo a 0', asy
     expect(p).not.toContain('## Cap C');
     expect(p).not.toContain('capítulo Cap C');
   }
+});
+
+// P43 · Preguntas con opciones en el plan: salen DE la cifra de cada fila (un tercio, 1–5), el
+// total del plan no cambia y el coste suma una llamada por capítulo.
+test('plan con preguntas con opciones: salen de la cifra de cada capítulo y el total se mantiene', async ({ page }) => {
+  await seedPlanBook(page);
+  await openPlanModal(page);
+  const mcqBox = page.locator('input[name="fc-qtype"][value="mcq"]');
+  await expect(mcqBox).toBeDisabled();                  // libro entero sin plan: no
+  await stubPlanLLM(page, PLAN_JSON);
+  await page.selectOption('#fc-count', '10');
+  await page.click('#fc-plan-btn');
+  await expect(page.locator('.fc-plan-row')).toHaveCount(3);
+  await expect(mcqBox).toBeEnabled();                   // con plan: sí
+  await expect(page.locator('input[name="fc-ptype"][value="matrix"]')).toBeDisabled();
+  await mcqBox.check();
+  await expect(page.locator('.fc-plan-cost')).toContainText('≈ 6 llamadas');
+  await page.click('#fc-generate');
+  await expect(page.locator('#fc-error')).toContainText('Plan aplicado: 10 de 10 tarjetas', { timeout: 30000 });
+  const decks = await page.evaluate(async () => (await import('/js/ai/db.js') as any).getAllDecks());
+  const kinds = (scope: string) => {
+    const d = decks.find((x: any) => x.scope === scope);
+    return d.cards.reduce((o: any, c: any) => ({ ...o, [c.type]: (o[c.type] || 0) + 1 }), {});
+  };
+  expect(kinds('Cap A')).toEqual({ basic: 4, mcq: 2 });
+  expect(kinds('Cap B')).toEqual({ basic: 2, mcq: 1 });
+  expect(kinds('Cap C')).toEqual({ mcq: 1 });
+  expect(await page.evaluate(() => (window as any).__plan.mcq)).toBe(3);
+  const split = await page.evaluate(async () => {
+    const F: any = await import('/js/ai/flashcards.js');
+    return [F.planMcqSplit(6, true), F.planMcqSplit(30, true), F.planMcqSplit(1, true), F.planMcqSplit(12, false), F.planMcqSplit(0, true)];
+  });
+  expect(split).toEqual([{ mcq: 2, text: 4 }, { mcq: 5, text: 25 }, { mcq: 1, text: 0 }, { mcq: 8, text: 0 }, { mcq: 0, text: 0 }]);
 });

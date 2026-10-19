@@ -2067,7 +2067,7 @@ mide) · cambiar la semántica de la racha · la mejora de generación al estilo
 cuya literal ES la respuesta: término, fecha, cifra), que es trabajo futuro del prompt de
 generación de tarjetas y no de la medida.
 
-### P43 — Widgets de estudio: siete tipos que el agente rellena para cualquier libro · `L` · **F1–F4 ✓ (2026-10-19)**
+### P43 — Widgets de estudio: siete tipos que el agente rellena para cualquier libro · `L` · **F1–F5 ✓ (2026-10-19)**
 
 **Contexto (2026-10-16).** Cuatro prototipos a mano sobre DDIA (anomalías, lease, rebalanceo,
 timeout, en el lab) gustaron, pero cada uno lleva su propio motor y no valen para otro libro. La
@@ -2236,7 +2236,26 @@ antes de implementar)*
     y por debajo de las notas (el cuerpo encogía por debajo de su contenido) y en escritorio la
     pantalla no se desplazaba; y un nombre de mazo largo se aplastaba en una columna en la cabecera.
   - **Queda:** medir con uso real el acierto a la primera (el registro de intentos lo guarda); si
-    ronda el 100 %, las preguntas no enseñan. Y el plan por capítulos (libro entero) no las ofrece.
+    ronda el 100 %, las preguntas no enseñan.
+
+**F5 · Plan por capítulos y capítulos sin leer · ✓ (2026-10-19)**
+- **Las tarjetas nuevas esperan a que leas su capítulo** ([`chapter-gate.js`](app/js/ai/chapter-gate.js)).
+  Al entrar en un capítulo del índice (EPUB), los anteriores quedan leídos en la ficha del libro
+  (`chapterOrder`, `chaptersDone`, sincronizados); el que lees aún no. El **repaso de hoy**
+  (biblioteca, ámbitos, globo de la PWA) retiene las nuevas de capítulos sin leer y al terminar
+  dice cuántas esperan; las ya empezadas siguen su calendario. Abrir un mazo a mano desde
+  Flashcards no filtra. Sin datos (PDF, EPUB sin reabrir) no se filtra nada; un libro terminado
+  lo desbloquea todo. Las tarjetas cuyo capítulo no es una entrada del índice tampoco se filtran.
+- **Preguntas con opciones en el plan**: con el plan activo se pueden pedir; salen DE la cifra de
+  cada fila (un tercio, 1–5; la fila entera, hasta 8, si no hay tipos de texto), así que el total
+  del plan no cambia, y el coste estimado suma una llamada por capítulo (`planMcqSplit`).
+- **La matriz, al terminar un capítulo**, no en el plan: al pasar al siguiente, la libreta ofrece
+  «¿Una matriz con los conceptos del capítulo que se confunden?» (sin interrumpir: punto de no
+  leído). «Practicar» abre la de ese capítulo si ya existe o la genera (~9 s) y la guarda en su
+  mazo; «Ahora no» la quita para ese capítulo. Solo con agente, capítulos de texto (no
+  preliminares) y de 4 000 caracteres o más. Con la plantilla HQ&A coincide con el repaso del
+  capítulo (aviso flotante); si molesta, se ofrece solo una de las dos.
+- Tests: `chapter-gate.spec.ts`, `chapter-matrix.spec.ts` y el del plan en `card-plan-ui.spec.ts`.
 
 **F5+ · Los demás tipos**, cada uno con su contrato y su batería, en este orden (revisado el
 2026-10-19): **5 · distractores que enseñan** (es atómico: entra como tipo de tarjeta en FSRS, no

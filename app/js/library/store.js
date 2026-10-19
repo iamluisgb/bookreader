@@ -38,7 +38,9 @@ const DB_VERSION = 1;
 // Campos que viajan en library.json. Un cambio en cualquiera de ellos bumpea
 // `updatedAt`; un cambio en el resto (lastOpenedAt, lastCfi, file…) no.
 const SYNCED_FIELDS = ['title', 'author', 'origTitle', 'origAuthor', 'metaAt', 'format', 'fileName', 'fileBaseId', 'size',
-  'addedAt', 'status', 'progress', 'finishedAt', 'shelfIds', 'blob', 'deleted', 'deletedAt'];
+  'addedAt', 'status', 'progress', 'finishedAt', 'shelfIds', 'blob', 'deleted', 'deletedAt',
+  // Capítulos ya leídos (ai/chapter-gate.js): deciden qué tarjetas nuevas entran en el repaso.
+  'chapterOrder', 'chaptersDone'];
 
 let dbPromise = null;
 

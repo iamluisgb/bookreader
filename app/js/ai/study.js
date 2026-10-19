@@ -29,6 +29,7 @@ import { segmentPdf } from './segment-pdf.js';
 import { loadEpubJs, loadPdfJs } from '../vendor-loader.js';
 import { sanitizeSvg, reviewDrawing } from './visual-cards.js';
 import { shuffledOptions } from './widgets/mcq.js';
+import { lockerFor } from './chapter-gate.js';
 import { CLOZE_RE, clozeExact } from './cloze-check.js';
 
 // Racha de estudio (F3): {count, lastDay}, global de la app (no por libro).
@@ -101,6 +102,7 @@ let onCloseCb = null;
 let onNavigateCb = null;
 let queue = [];          // [{deck, idx}] pendientes de la sesión (los "otra vez" se re-encolan)
 let held = [];           // nuevas que el tope dejó fuera (se pueden pedir al terminar)
+let waiting = 0;         // nuevas de capítulos que aún no has leído (chapter-gate.js)
 let undoStack = [];      // [{queue, done, deck, idx, srs, streak}] para deshacer la última nota
 let done = 0;            // tarjetas superadas en la sesión (no cuenta los "otra vez")
 let editing = false;     // la tarjeta actual está abierta en el editor inline
@@ -139,12 +141,27 @@ async function decksForScope(scope) {
   return decks;
 }
 
+// Bloqueo de las tarjetas nuevas de capítulos sin leer, con las fichas de la biblioteca
+// (chapter-gate.js). Los mazos guardan a veces un id viejo del libro: se compara el canónico.
+// El último cargado se guarda: `open()` es síncrona y lo usa tal cual (la biblioteca lo carga al
+// pintar «Repaso de hoy»), y lo refresca en segundo plano.
+let lastLocker = () => false;
+export async function loadLocker() {
+  try { lastLocker = lockerFor(await Store.getAllBooks(), canonicalOf); } catch { /* sin biblioteca: sin bloqueo */ }
+  return lastLocker;
+}
+
+// Vencidas que SÍ salen hoy: sin las nuevas de capítulos que aún no has leído.
+export function dueAvailable(deck, locked, now = Date.now()) {
+  return (deck.cards || []).filter((c) => c && !c.deleted && Srs.isDue(c, now) && !locked(c, deck)).length;
+}
+
 // Vencidas hoy en el ámbito dado (por defecto, todo): total y mazos implicados.
 export async function dueToday(scope, now = Date.now()) {
-  const decks = await decksForScope(scope);
+  const [decks, locked] = await Promise.all([decksForScope(scope), loadLocker()]);
   let cards = 0, withDue = [];
   for (const d of decks) {
-    const n = Srs.dueCount(d.cards, now);
+    const n = dueAvailable(d, locked, now);
     if (n) { cards += n; withDue.push(d); }
   }
   return { cards, decks: withDue };
@@ -156,7 +173,7 @@ export async function dueToday(scope, now = Date.now()) {
 export async function openToday({ scope, title, onClose } = {}) {
   if (!(await ensurePro('study'))) return;
   const { decks } = await dueToday(scope);
-  open({ decks, title: title || t('Repaso de hoy'), onClose });
+  open({ decks, title: title || t('Repaso de hoy'), onClose, gate: true });
 }
 
 // Ámbitos de repaso con tarjetas vencidas hoy (para el selector, árbol estilo Anki): total
@@ -166,6 +183,7 @@ export async function studyScopes(now = Date.now()) {
   const [decks, books, shelves] = await Promise.all([
     DB.getAllDecks(), Store.getAllBooks(), Store.getShelves(),
   ]);
+  const locked = lockerFor(books, canonicalOf);
   // Identidad de cada libro de la biblioteca resuelta a su id canónico: un mazo
   // guardado bajo un alias del libro cuenta como ESA columna, no como otra.
   const libCanonical = new Map(books.map(b => [canonicalOf(b.id), b]));
@@ -173,7 +191,7 @@ export async function studyScopes(now = Date.now()) {
   const orphanDecks = [];
   let total = 0;
   for (const d of decks) {
-    const n = Srs.dueCount(d.cards, now);
+    const n = dueAvailable(d, locked, now);
     if (!n) continue;
     total += n;
     const cid = canonicalOf(d.bookId);
@@ -255,11 +273,15 @@ function hasVisualPayload(c) {
     || (Array.isArray(c.steps) && c.steps.length > 0);
 }
 
-export function buildQueue(decks, { now = Date.now(), newLimit: limit = 0, rng = Math.random } = {}) {
+// `locked(card, deck)`: tarjetas nuevas de capítulos sin leer (chapter-gate.js). No entran; se
+// cuentan en `waiting` para decirlo al terminar.
+export function buildQueue(decks, { now = Date.now(), newLimit: limit = 0, rng = Math.random, locked = () => false } = {}) {
   const news = [], revs = [];
+  let waiting = 0;
   for (const deck of decks || []) {
     (deck.cards || []).forEach((c, idx) => {
       if (!c || (!c.front && !hasVisualPayload(c)) || !Srs.isDue(c, now)) return;
+      if (locked(c, deck)) { waiting++; return; }
       (c.srs && c.srs.reps > 0 ? revs : news).push({ deck, idx, src: c.src || '' });
     });
   }
@@ -268,7 +290,7 @@ export function buildQueue(decks, { now = Date.now(), newLimit: limit = 0, rng =
   // y aplazarlo es justo lo que rompe la programación.
   // -1 = nuevas en pausa hoy (newLimit): todas se quedan fuera, ofrecidas al terminar.
   const heldNew = limit > 0 ? news.splice(limit) : limit < 0 ? news.splice(0) : [];
-  return { queue: spreadSiblings(shuffle(revs.concat(news), rng)), held: heldNew };
+  return { queue: spreadSiblings(shuffle(revs.concat(news), rng)), held: heldNew, waiting };
 }
 
 // ---- Sesión -------------------------------------------------------------------
@@ -419,14 +441,17 @@ function retractAttempt(d) {
 // `decks`: mazos a repasar (solo entran sus tarjetas vencidas).
 // `onNavigate`: se llama al saltar a la fuente ("ver en el libro") para que quien abrió
 // la sesión cierre lo suyo (p. ej. el modal de flashcards) antes de mostrar el libro.
-export function open({ decks, title = t('Estudiar'), onClose, onNavigate } = {}) {
+// `gate`: retener las nuevas de capítulos sin leer (chapter-gate.js). Lo pide el repaso de hoy;
+// abrir un mazo a mano desde Flashcards no filtra: lo has pedido tú, aunque sea del capítulo que lees.
+export function open({ decks, title = t('Estudiar'), onClose, onNavigate, gate = false } = {}) {
   close();
   FsrsParams.applyStored();   // parámetros personales (P44 F4), por si llegaron por sync
   onCloseCb = onClose || null;
   onNavigateCb = onNavigate || null;
-  const built = buildQueue(decks, { now: Date.now(), newLimit: newLimit() });
+  const built = buildQueue(decks, { now: Date.now(), newLimit: newLimit(), locked: gate ? lastLocker : undefined });
   queue = built.queue;
   held = built.held;
+  waiting = built.waiting;
   undoStack = [];
   done = 0;
   graded = 0;
@@ -467,6 +492,18 @@ export function open({ decks, title = t('Estudiar'), onClose, onNavigate } = {})
   });
   document.addEventListener('keydown', onKey);
   renderCard();
+  // Filtro fresco de capítulos leídos: si cambia la cola y aún no se ha puesto ninguna nota, se
+  // rehace (lo normal es que el guardado ya estuviera al día y no cambie nada).
+  const session = overlay;
+  if (gate) loadLocker().then((locked) => {
+    if (overlay !== session || graded || flipped || editing) return;
+    const fresh = buildQueue(decks, { now: Date.now(), newLimit: newLimit(), locked });
+    if (fresh.waiting === waiting && fresh.queue.length === queue.length) return;
+    queue = fresh.queue;
+    held = fresh.held;
+    waiting = fresh.waiting;
+    renderCard();
+  });
 }
 
 export function isOpen() { return !!overlay && !minimized; }
@@ -515,6 +552,7 @@ function close() {
   removeChip();
   queue = [];
   held = [];
+  waiting = 0;
   undoStack = [];
   editing = false;
   draft = null;                // un intento que espera veredicto se sigue escribiendo solo
@@ -1595,6 +1633,7 @@ function renderDone(b, f, left) {
       </div>` : ''}
       ${done ? `<button class="study-progress-link" data-act="progress">${icon('chart', { size: 'sm' })} ${t('Ver tu progreso')}</button>` : ''}
       ${held.length ? `<p class="study-held">${t('Quedan <b>{n}</b> tarjeta{s} nueva{s} fuera del tope de hoy.', { n: held.length, s: held.length === 1 ? '' : 's' })}</p>` : ''}
+      ${waiting ? `<p class="study-held study-waiting">${waiting === 1 ? t('<b>1</b> tarjeta nueva espera a que leas su capítulo.') : t('<b>{n}</b> tarjetas nuevas esperan a que leas su capítulo.', { n: waiting })}</p>` : ''}
     </div>`;
   const oneBook = sessionBooks.size === 1 ? [...sessionBooks][0] : null;
   // El calendario y la previsión viven en Análisis (P44): el cierre se queda con lo de ESTA

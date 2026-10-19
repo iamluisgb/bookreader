@@ -45,8 +45,8 @@ export async function generateMatrix({ chapter, text, bookId, lang = getLang(), 
 // P43 F4b · Preguntas con distractores de un capítulo → tarjetas `mcq` del mazo (atómicas, con
 // FSRS). Mismo ciclo que el eval (evals/mcq.mjs): sin razonamiento; si el spec entero no vale, se
 // pide entero otra vez; si fallan preguntas sueltas, solo esas. Las que sigan mal se descartan.
-export async function generateMcqCards({ chapter, text, lang = getLang(), signal, background = false }) {
-  const messages = mcqMessages({ chapter, text, lang });
+export async function generateMcqCards({ chapter, text, lang = getLang(), count, signal, background = false }) {
+  const messages = mcqMessages({ chapter, text, lang, ...(count ? { count } : {}) });
   const ask = (msgs) => LLM.chatStream({ messages: msgs, maxTokens: MAX_TOKENS, thinking: false, signal, background });
   const raw = await ask(messages);
   let spec = finishMcq(parseSpec(raw), { chapter });
@@ -59,7 +59,7 @@ export async function generateMcqCards({ chapter, text, lang = getLang(), signal
     if (failed.length) spec = mergeRetry(spec, finishMcq(parseSpec(await ask(retryMcqMessages(messages, raw, failed))) || {}, {}));
   }
   const ok = new Set(itemResults(spec, text).filter((r) => !r.errors.length).map((r) => r.id));
-  const cards = spec.items.filter((it) => it && ok.has(it.id)).map((it) => mcqCard(it, chapter));
+  const cards = spec.items.filter((it) => it && ok.has(it.id)).map((it) => mcqCard(it, chapter)).slice(0, count || Infinity);
   if (!cards.length) throw new Error(t('Las preguntas no salieron bien. Vuelve a intentarlo.'));
   return cards;
 }
@@ -78,6 +78,30 @@ export function mcqCard(item, chapter) {
     chapter: chapter || '',
     src: '',
   };
+}
+
+// P43 · Matriz al terminar un capítulo (la libreta la ofrece al pasar al siguiente). Si ya hay una
+// de ese capítulo en algún mazo del libro, esa; si no, se genera y se guarda en el mazo del
+// capítulo (o en uno nuevo, sin tarjetas: irán las de lo que se falle). Devuelve { deck, exercise }.
+export async function chapterMatrix({ bookId, bookTitle, chapter, text, signal }) {
+  const decks = await DB.getDecks(bookId);
+  for (const d of decks) {
+    const ex = DB.exercisesOf(d).filter((e) => e.spec && e.spec.chapter === chapter)
+      .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))[0];
+    if (ex) return { deck: d, exercise: ex };
+  }
+  const exercise = await generateMatrix({ chapter, text, bookId, signal });
+  const home = decks.find((d) => (d.scope || '') === chapter);
+  let id;
+  if (home) {
+    await DB.updateDeck(home.id, { exercises: DB.exercisesOf(home).concat(exercise) });
+    id = home.id;
+  } else {
+    const book = String(bookTitle || '').replace(/::/g, ':');
+    id = await DB.addDeck({ bookId, name: book ? `${book} — ${chapter.replace(/::/g, ':')}` : chapter, cardType: 'basic', scope: chapter, cards: [], exercises: [exercise] });
+  }
+  const deck = (await DB.getDecks(bookId)).find((d) => d.id === id);
+  return { deck, exercise: latestExercise(deck) };
 }
 
 // El ejercicio que se ofrece al pulsar «Practicar»: el más reciente.

@@ -199,8 +199,8 @@ function selectedTypes() {
   const practice = scopeValue && !planState
     ? [...(b?.querySelectorAll('input[name="fc-ptype"]:checked') || [])].map(el => el.value).filter(v => PRACTICE_TYPES.includes(v))
     : [];
-  // Las preguntas con opciones, igual: se generan por capítulo.
-  const mcq = !!scopeValue && !planState && !!b?.querySelector('input[name="fc-qtype"][value="mcq"]')?.checked;
+  // Las preguntas con opciones se generan por capítulo: con un capítulo de alcance o con el plan.
+  const mcq = (!!scopeValue || !!planState) && !!b?.querySelector('input[name="fc-qtype"][value="mcq"]')?.checked;
   return { text, visual, practice, mcq };
 }
 
@@ -211,6 +211,16 @@ function effectiveDeckType(sel) {
   const picked = sel.text.length + sel.visual.length + (sel.mcq ? 1 : 0);
   if (picked >= 2) return 'mixed';
   return sel.text[0] || sel.visual[0] || (sel.mcq ? 'mcq' : 'basic');
+}
+
+// Plan por capítulo con preguntas con opciones (P43): salen DE la cifra de la fila, no encima, para
+// que el total del plan siga siendo el elegido. Un tercio (1–5) si hay tipos de texto; si no, la
+// fila entera (hasta 8, el tope de un juego de preguntas). Pura.
+export function planMcqSplit(cards, hasText) {
+  const n = Math.max(0, Math.floor(Number(cards) || 0));
+  if (!n) return { mcq: 0, text: 0 };
+  const mcq = hasText ? Math.min(5, Math.max(1, Math.round(n / 3)), n) : Math.min(8, n);
+  return { mcq, text: hasText ? n - mcq : 0 };
 }
 
 // Reparte el total ENTRE los tipos de texto elegidos: el total es la SUMA y las partes
@@ -235,9 +245,15 @@ function refreshGenerateState() {
   if (hint) hint.hidden = !sel.visual.length;
   // Con el libro entero (o un plan) la matriz no se puede pedir: se apaga y se dice por qué.
   const chapterScope = !!scopeValue && !planState;
-  b?.querySelectorAll('input[name="fc-ptype"], input[name="fc-qtype"]').forEach(el => { el.disabled = !chapterScope; });
+  b?.querySelectorAll('input[name="fc-ptype"]').forEach(el => { el.disabled = !chapterScope; });
+  b?.querySelectorAll('input[name="fc-qtype"]').forEach(el => { el.disabled = !chapterScope && !planState; });
   const phint = b?.querySelector('#fc-phint');
-  if (phint) phint.hidden = chapterScope;
+  if (phint) {
+    phint.hidden = chapterScope;
+    phint.textContent = planState
+      ? t('Con el plan, las preguntas salen de la cifra de cada capítulo. La matriz es de un capítulo: elígelo en Contenido.')
+      : t('Las preguntas con opciones y la matriz son de un capítulo: elígelo en Contenido.');
+  }
 }
 
 // Con dos tipos de texto el total se divide entre pasadas: se lo decimos ANTES de
@@ -298,6 +314,7 @@ function refreshPlanUI() {
   if (btn) btn.hidden = !!scopeValue || !!planState;
   const note = b.querySelector('#fc-plan-note');
   if (note) note.hidden = !planState;
+  refreshGenerateState();   // con el plan, las preguntas con opciones se pueden pedir (P43)
 }
 
 // Tabla editable: nombre + motivo del agente por fila, número editable, total vivo y
@@ -342,7 +359,7 @@ function refreshPlanFooter() {
   const sum = planState.plan.reduce((s, r) => s + r.cards, 0);
   total.textContent = t('{n} en total', { n: sum });
   const sel = selectedTypes();
-  let calls = planState.plan.filter(r => r.cards > 0).length * sel.text.length;
+  let calls = planState.plan.filter(r => r.cards > 0).length * (sel.text.length + (sel.mcq ? 1 : 0));
   for (const v of sel.visual) calls += VISUAL_CALL_CAPS[v] || 0;
   const cost = b.querySelector('.fc-plan-cost');
   if (cost) cost.textContent = t('≈ {n} llamadas al modelo', { n: calls });
@@ -944,7 +961,9 @@ async function onGenerate() {
         let frontsSeen = [];                 // frentes ya generados en capítulos previos
         let done = 0;
         for (const row of planRows) {
-          const chChunks = buildChunks(Retrieval.passagesByChapter(row.name));
+          const chPassages = Retrieval.passagesByChapter(row.name);
+          const chChunks = buildChunks(chPassages);
+          const split = sel.mcq ? planMcqSplit(row.cards, sel.text.length > 0) : { mcq: 0, text: row.cards };
           let generated = 0, failed, deckId = null;   // failed siempre se asigna abajo
           if (!chChunks.length) {
             failed = 1;                      // el capítulo no tiene texto indexado
@@ -958,21 +977,34 @@ async function onGenerate() {
               const seedFronts = existing
                 ? DB.cardsOf(existing).map(c => c.front).concat(frontsSeen)
                 : frontsSeen;
-              const res = await runTextPasses({
-                chunks: chChunks, count: row.cards, sel, goal, seedFronts, mode, signal, background,
-                onProgress: (d, n, ph) => progress(Math.min(done + d, requested), requested, ph),
-              });
+              const res = split.text > 0 && sel.text.length
+                ? await runTextPasses({
+                  chunks: chChunks, count: split.text, sel, goal, seedFronts, mode, signal, background,
+                  onProgress: (d, n, ph) => progress(Math.min(done + d, requested), requested, ph),
+                })
+                : { cards: [], failed: 0, mode };
               mode = res.mode;
               failed = res.failed;
-              if (res.cards.length) {
-                // Solo las tarjetas de TEXTO llevan ancla (las visuales van aparte).
-                const withSrc = attachSources(res.cards.slice(0, row.cards), {
+              // Preguntas con opciones del capítulo: si fallan, el capítulo sigue con lo demás.
+              let mcqCards = [];
+              if (split.mcq) {
+                try {
+                  mcqCards = await Practice.generateMcqCards({ chapter: row.name, text: chPassages.map(p => p.text).join('\n\n'), count: split.mcq, signal, background });
+                } catch (e) {
+                  if (e.name === 'AbortError') throw e;
+                  console.warn(`Flashcards: las preguntas de "${row.name}" fallaron:`, e);
+                  failed += 1;
+                }
+              }
+              if (res.cards.length || mcqCards.length) {
+                // Solo las tarjetas de TEXTO llevan ancla (las preguntas llevan su cita en `quote`).
+                const withSrc = attachSources(res.cards.slice(0, split.text), {
                   validIds: new Set(byId.keys()),
                   search: (q, k) => (Retrieval.hasIndex(bookId) ? Retrieval.search(q, k) : []),
                   textOf: (id) => byId.get(id),
                 });
                 const seen = new Set(existing ? DB.cardsOf(existing).map(c => normFront(c.front)) : []);
-                const fresh = withSrc.filter(c => {
+                const fresh = withSrc.concat(mcqCards).filter(c => {
                   const k = normFront(c.front);
                   if (k && seen.has(k)) return false;
                   if (k) seen.add(k);

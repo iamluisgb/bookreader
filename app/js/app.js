@@ -18,6 +18,7 @@ import { initHighlights, loadSharedHighlights, setupHighlights, setupPdfSelectio
 import { initBookmarkButton, updateBookmarkButton, renderBookmarks } from './bookmarks-ui.js';
 import * as Library from './library/view.js';
 import * as LibStore from './library/store.js';
+import * as ChapterGate from './ai/chapter-gate.js';
 import * as Search from './search.js';
 import { escapeHtml } from './ui/escape.js';
 import { openImageZoom } from './image-zoom.js';
@@ -934,6 +935,19 @@ async function persistToLibrary(id, buffer, format, fileName, fileBaseId) {
 // libro para que el flush funcione aunque currentBook ya sea null (salida a biblioteca).
 let pendingProgress = null;   // { bookId, pct } aún no escrito
 
+// Capítulos ya leídos (ai/chapter-gate.js). `onChapter` se llama en cada render: solo se escribe
+// cuando cambia el capítulo, y `advance` devuelve null si no queda nada nuevo atrás.
+let lastRecordedChapter = null;
+function recordChapter(label) {
+  const key = currentBook && `${currentBook.id}|${label}`;   // dos libros pueden tener «Preface»
+  if (!currentBook || currentBook.format === 'pdf' || !label || key === lastRecordedChapter) return;
+  lastRecordedChapter = key;
+  const order = ChapterGate.flattenToc(EpubReader.getNavigation()?.toc);
+  const bookId = currentBook.id;
+  LibStore.patchBook(bookId, (prev) => ChapterGate.advance(prev, order, label) || {})
+    .catch((e) => console.warn('No se pudo guardar el capítulo leído:', e));
+}
+
 function saveProgress(pct) {
   if (!currentBook) return;
   window.dispatchEvent(new CustomEvent('reader:progress', { detail: pct }));
@@ -1644,6 +1658,7 @@ async function loadEpub(buffer, bookId, aiBookId, persist = null) {
       updateBookmarkButton();
       updateProgressDetail(undefined, totalWords);
       markCurrentToc();                // mantener viva la marca del índice
+      recordChapter(label);            // lo que queda atrás desbloquea sus tarjetas nuevas
     });
 
     // Reading mode: barras como overlay (ver CSS de `body.reading`); el área de

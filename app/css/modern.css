@@ -2248,6 +2248,9 @@ body.reading.chrome-quiet:not(.fs):not(.ai-open) .agent-rail:not(:hover, :focus-
 }
 .ai-nb-toca-ctx { font-size: var(--fs-2xs); color: var(--text-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ai-nb-toca-q { font-size: var(--fs-lg); font-weight: 600; line-height: 1.35; color: var(--text); margin: 0 0 10px; }
+/* P43 · Oferta de la matriz del capítulo: misma tarjeta que «Te toca»; el fallo, en texto. */
+.ai-nb-matrix .ai-nb-toca-q { font-size: var(--fs-md); font-weight: 500; }
+.ai-nb-matrix-err { margin: 0 0 10px; font-size: var(--fs-sm); color: var(--danger); }
 .ai-nb-toca-input {
   width: 100%; min-height: 76px; resize: vertical; box-sizing: border-box;
   border: none; border-radius: var(--r-md); background: var(--fill); color: var(--text);
