@@ -388,7 +388,16 @@ export function getAllDecks() {
 export function addDeck(deck) {
   const now = Date.now();
   const cards = (deck.cards || []).map(c => ({ uid: crypto.randomUUID(), updatedAt: now, ...c }));
-  return put('decks', { uid: crypto.randomUUID(), ...deck, cards, createdAt: now, updatedAt: now });
+  const exercises = (deck.exercises || []).map(e => ({ uid: crypto.randomUUID(), updatedAt: now, ...e }));
+  return put('decks', { uid: crypto.randomUUID(), ...deck, cards, exercises, createdAt: now, updatedAt: now });
+}
+
+// Ejercicios de práctica del mazo (P43 F3): una matriz u otro widget por capítulo, con su spec y
+// el último resultado. Van APARTE de `cards` a propósito: no entran en la cola de FSRS, ni en el
+// export a Anki, ni en ninguna cuenta de tarjetas. Lo que el lector falla en un ejercicio sí se
+// convierte en tarjetas básicas del mazo. Forma: { uid, type, spec, createdAt, updatedAt, last }.
+export function exercisesOf(deck) {
+  return (deck?.exercises || []).filter(e => e && !e.deleted && e.spec);
 }
 
 // `patch.cards`, si viene, es la lista COMPLETA de tarjetas visibles del mazo:
@@ -403,6 +412,7 @@ export function updateDeck(id, patch) {
     if (!cur) return null;
     const next = { ...cur, ...patch, id, updatedAt: Date.now() };
     if (patch && patch.cards) next.cards = stampCards(cur.cards, patch.cards, next.updatedAt);
+    if (patch && patch.exercises) next.exercises = stampExercises(cur.exercises, patch.exercises, next.updatedAt);
     return next;
   })).then(r => { notifySync('decks'); return r; });
 }
@@ -427,6 +437,26 @@ function stampCards(before, after, now) {
     // Ya era tombstone: se respeta su deletedAt para que la purga no se reinicie.
     out.push(old.deleted ? old : { ...old, front: '', back: '', srs: old.srs, deleted: true, deletedAt: now, updatedAt: now });
   }
+  return out;
+}
+
+// Lo mismo para los ejercicios, sin whitelist: un ejercicio solo cambia por su spec o por su
+// último resultado, y los dos cuentan. Aquí no hay borrado (un ejercicio se va con su mazo), así
+// que lo que no venga se conserva tal cual.
+function stampExercises(before, after, now) {
+  const prev = new Map();
+  for (const e of before || []) if (e && e.uid) prev.set(e.uid, e);
+  const out = [];
+  const seen = new Set();
+  for (const e of after || []) {
+    if (!e) continue;
+    const uid = e.uid || crypto.randomUUID();
+    seen.add(uid);
+    const old = prev.get(uid);
+    const same = old && JSON.stringify({ ...old, updatedAt: 0 }) === JSON.stringify({ ...e, uid, updatedAt: 0 });
+    out.push({ ...e, uid, updatedAt: same ? (old.updatedAt || now) : now });
+  }
+  for (const [uid, old] of prev) if (!seen.has(uid)) out.push(old);
   return out;
 }
 
@@ -470,7 +500,7 @@ export function deleteDeck(id) {
   return tx('decks', 'readwrite', s => readModifyWrite(s, id, (cur) => {
     if (!cur) return null;
     const now = Date.now();
-    return { ...cur, cards: [], deleted: true, deletedAt: now, updatedAt: now };
+    return { ...cur, cards: [], exercises: [], deleted: true, deletedAt: now, updatedAt: now };
   })).then(r => { notifySync('decks'); return r; });
 }
 
@@ -557,9 +587,12 @@ export function mergeDeckPair(local, remote) {
   // ganando el empate — misma regla determinista que mergeCollections.
   const win = ru > lu || (ru === lu && remote.deleted && !local.deleted) ? remote : local;
   const cards = mergeCards(local.cards, remote.cards);
-  const changed = win !== local || !sameCardList(local.cards, cards);
+  // Los ejercicios (P43 F3) se funden igual que las tarjetas: por uid y LWW por ejercicio, para
+  // que el resultado de una matriz hecha en el móvil no lo pise una edición del mazo en el PC.
+  const exercises = mergeCards(local.exercises, remote.exercises);
+  const changed = win !== local || !sameCardList(local.cards, cards) || !sameCardList(local.exercises || [], exercises);
   if (!changed) return null;
-  return { ...win, cards: win.deleted ? [] : cards, updatedAt: Math.max(lu, ru) };
+  return { ...win, cards: win.deleted ? [] : cards, exercises: win.deleted ? [] : exercises, updatedAt: Math.max(lu, ru) };
 }
 
 function mergeCards(local = [], remote = []) {

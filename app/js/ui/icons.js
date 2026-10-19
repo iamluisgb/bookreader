@@ -105,6 +105,9 @@ const ICONS = {
   users: '<circle cx="9" cy="8.5" r="3"/><path d="M3.8 19.2a5.2 5.2 0 0 1 10.4 0"/><circle cx="16.6" cy="9.6" r="2.4"/><path d="M15.6 14.3a4.5 4.5 0 0 1 4.9 4.9"/>',
   // Racha. Sustituye al emoji 🔥, que cambia de dibujo en cada sistema.
   flame: '<path d="M12 20.5c3.3 0 5.8-2.4 5.8-5.7 0-3.5-2.6-5.2-3.5-8.3-.5 1.9-1.4 3-2.6 3.6.3-2.6-.8-4.9-3-6.6.2 3.4-3.5 5.7-3.5 10.2 0 3.7 2.9 6.8 6.8 6.8Z"/>',
+  // P43 · Ejercicio de práctica (la matriz para rellenar): una tabla con cabecera. NO es Análisis
+  // (`chart`) ni el mazo (`cards`).
+  grid: '<rect x="3.5" y="4.5" width="17" height="15" rx="2"/><line x1="3.5" y1="9.5" x2="20.5" y2="9.5"/><line x1="3.5" y1="14.5" x2="20.5" y2="14.5"/><line x1="9.5" y1="4.5" x2="9.5" y2="19.5"/>',
   // Mapa mental: un nodo y sus ramas (antes `columns`, que es un edificio con columnas).
   mindmap: '<circle cx="12" cy="12" r="2.6"/><circle cx="5" cy="6" r="1.8"/><circle cx="19" cy="6" r="1.8"/><circle cx="5" cy="18" r="1.8"/><circle cx="19" cy="18" r="1.8"/><line x1="9.9" y1="10.4" x2="6.4" y2="7.2"/><line x1="14.1" y1="10.4" x2="17.6" y2="7.2"/><line x1="9.9" y1="13.6" x2="6.4" y2="16.8"/><line x1="14.1" y1="13.6" x2="17.6" y2="16.8"/>',
   // La biblioteca entera: lomos en un estante. `books`/`book` (libro abierto) son UN libro.

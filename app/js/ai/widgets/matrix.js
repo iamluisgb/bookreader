@@ -159,7 +159,7 @@ export function renderMatrix(root, spec, { onCommit, onCite } = {}) {
     <p class="wgt-prompt">${escapeHtml(spec.prompt)}</p>
     <div class="wgt-scroll"><table class="wgt-grid"><thead><tr><td></td>${head}</tr></thead><tbody>${body}</tbody></table></div>
     <div class="wgt-actions">
-      <button type="button" class="btn btn--primary wgt-commit" disabled>${escapeHtml(t('Comprobar'))}</button>
+      <button type="button" class="btn btn--primary primary-btn wgt-commit" disabled>${escapeHtml(t('Comprobar'))}</button>
       <span class="wgt-hint">${escapeHtml(t('Rellena todas las celdas para comprobar'))}</span>
     </div>
     <div class="wgt-result" hidden></div>`;

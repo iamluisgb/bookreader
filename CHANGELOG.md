@@ -3,6 +3,19 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-10-19 — La matriz para rellenar, desde el menú de flashcards (P43 F2–F3)
+
+El primer widget de estudio llega a la app. En Flashcards, con un capítulo elegido, la sección
+«Práctica · Matriz para rellenar» pide al agente una matriz de los conceptos del capítulo que se
+confunden: filas de conceptos, columnas de atributos con opciones cerradas y una cita literal del
+libro por celda. Solo se enseña si valida y todas sus citas están en el capítulo (un reintento con
+los errores concretos). Se rellena, se marca lo que se duda, se comprueba y cada fallo explica el
+porqué con la cita. Lo fallado o dudado entra al mazo como tarjetas básicas, que vuelven con la
+repetición espaciada; la matriz no es una tarjeta y no entra en el repaso ni en Anki ([ADR-058](DECISIONS.md)).
+El intento cuenta en Análisis como práctica. Generación medida antes en 20 capítulos de cuatro
+libros: 85 % válida a la primera, 95 % con el reintento. Tests: `practice.spec.ts` (nuevo) y
+`widgets.spec.ts`.
+
 ## 2026-10-18 — Análisis navegable: semana pasada, año, estanterías y la historia de cada libro (P45)
 
 Análisis deja de mirar solo «los últimos N días». Los periodos son de calendario (día, semana de lunes

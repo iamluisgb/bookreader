@@ -1863,3 +1863,27 @@ pocos formatos, repetidos y corregidos por código: es lo que hace Khan Academy 
 **Consecuencias.** Un tipo nuevo cuesta código nuestro, no un prompt: es deliberado (pocos tipos,
 bien hechos). Los motores de dominio a medida, como los cuatro prototipos de DDIA, quedan fuera del
 producto hasta que los datos digan que un dominio se repite.
+
+## ADR-058 — Los ejercicios de práctica viven en el mazo, aparte de las tarjetas · `ACEPTADA`
+
+**Contexto.** P43 F3 saca la matriz a la app. Hay que decidir dónde vive y cuándo vuelve. Una
+matriz son 6–20 respuestas y 2–3 minutos; FSRS programa preguntas sueltas con una nota cada una, y
+P44 calcula retención y tiempo de repaso suponiendo una respuesta por tarjeta. Repetir la misma
+matriz entera, además, acaba enseñando dónde está cada respuesta.
+
+**Decisión.**
+1. Se pide desde el **menú de tipos de flashcards** («Práctica · Matriz para rellenar»), solo con un
+   capítulo de alcance, y corre en el mismo trabajo en segundo plano que las tarjetas.
+2. Se guarda en el mazo de ese capítulo, en **`deck.exercises`** (`{uid, type, spec, createdAt,
+   updatedAt, last}`), no en `deck.cards`. Así no entra en la cola de FSRS, ni en el export a Anki,
+   ni en ninguna cuenta de tarjetas, sin tocar a quien las lee.
+3. El sync la funde **por uid y LWW por ejercicio**, con el mismo `mergeCards` de las tarjetas: el
+   resultado hecho en el móvil no lo pisa una edición del mazo en el PC. Un mazo sin `exercises`
+   equivale a `[]` (no rebota en el sync).
+4. Al comprobar: el intento va a `attempts` (`mode: 'widget'`, ya excluido de las cuentas de
+   tarjetas en P44) y lo fallado o dudado entra al mazo como tarjetas básicas, que sí vuelven con
+   FSRS. El ejercicio guarda solo `last` (aciertos de la última vez).
+
+**Consecuencias.** La superficie llega sin pantalla nueva. El «Te toca» de la libreta al cerrar un
+capítulo queda para cuando haya más tipos. Volver a la matriz con solo las celdas flojas en blanco
+(desde el repaso de hoy) es el siguiente paso si los intentos muestran que la gente la rehace.

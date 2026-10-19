@@ -2492,3 +2492,7 @@ button.ai-nb-chap:hover { color: var(--text); background: var(--fill-strong); }
   .wgt-cell { min-width: 0; }
   .wgt-cell::before { content: attr(data-label); display: block; font-size: var(--fs-xs); font-weight: 600; color: var(--text-soft); margin-bottom: var(--s-1); }
 }
+/* P43 F3 · La matriz como ejercicio del mazo: modal más ancho que el de flashcards (la rejilla
+   tiene 4–5 columnas) y con su propio scroll. */
+.wgt-practice-card { max-width: 860px; max-height: 90vh; overflow-y: auto; }
+.wgt-practice-ctx { margin-top: 0; padding-right: var(--s-8); }   /* hueco para la × */

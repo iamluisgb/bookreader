@@ -27,6 +27,7 @@ import { chapterList, suggestPlan, MAX_PLAN_CHAPTERS } from './card-plan.js';
 import { normalizeDomain, parseDomainSuggestions, groupCardsByDomain, domainTagMessages } from './domain-tags.js';
 import { toast } from './toast.js';
 import * as PdfReader from '../pdf-reader.js';
+import * as Practice from './widgets/practice.js';
 
 // Generación por TROZOS (map-reduce): el material se divide en trozos de ~CHUNK_TOKENS
 // y cada llamada produce SOLO las tarjetas de su trozo (cupo proporcional). Así ninguna
@@ -45,6 +46,8 @@ const MAX_PREV_FRONTS = 40;   // nº de frentes previos que se pasan al siguient
 const TEXT_TYPES = ['basic', 'cloze'];
 // Nombre del tipo DENTRO de los prompts (contenido para el modelo, no UI: no pasa por t()).
 const TYPE_NAMES = { basic: 'Pregunta → Respuesta', cloze: 'Cloze (huecos)' };
+// P43 F3 · Ejercicios de práctica (widgets). Uno por capítulo: necesitan un capítulo de alcance.
+const PRACTICE_TYPES = ['matrix'];
 
 let ctx = null;        // { bookId, bookTitle, goal, tocLabels, currentChapter, ensureIndex }
 let overlay = null;
@@ -88,7 +91,7 @@ export function open(context) {
 }
 
 function onKey(e) {
-  if (Study.isOpen()) return;   // el overlay de estudio va encima: su ESC no cierra este modal
+  if (Study.isOpen() || Practice.isOpen()) return;   // el overlay de estudio va encima: su ESC no cierra este modal
   if (e.key === 'Escape' && overlay) closeModal();
 }
 
@@ -142,6 +145,12 @@ async function renderSetup() {
         <span><b>${t('Dibujo de memoria')}</b><small>${t('Dibujas el proceso y el agente revisa tu boceto.')}</small></span></label>
     </div>
     <p class="ai-ob-sub" id="fc-vhint" hidden>${t('Las figuras se extraen del libro en la primera generación: la primera vez tarda más.')}</p>
+    <p class="fc-sublabel">${t('Práctica')} · <span class="fc-sublabel-note">${t('lo que falles pasa a tarjetas')}</span></p>
+    <div class="fc-types fc-ptypes">
+      <label class="fc-type"><input type="checkbox" name="fc-ptype" value="matrix">
+        <span><b>${t('Matriz para rellenar')}</b><small>${t('Comparas los conceptos del capítulo que se confunden.')}</small></span></label>
+    </div>
+    <p class="ai-ob-sub" id="fc-phint" hidden>${t('La matriz es de un capítulo: elígelo en Contenido.')}</p>
     <label class="fc-label" for="fc-count">${t('Cantidad')}</label>
     <div class="fc-count-row">
       <select id="fc-count" class="fc-select">${COUNTS.map(n => `<option ${n === defaultCount ? 'selected' : ''}>${n}</option>`).join('')}</select>
@@ -158,10 +167,11 @@ async function renderSetup() {
     scopeValue = v;
     clearPlan();        // un plan de libro entero no sirve para otro alcance (WU5)
     refreshDupNote();
+    refreshGenerateState();   // la práctica solo vale con un capítulo
   });
   b.querySelector('#fc-generate').addEventListener('click', onGenerate);
   b.querySelector('#fc-plan-btn').addEventListener('click', onSuggestPlan);
-  b.querySelectorAll('input[name="fc-type"], input[name="fc-vtype"]').forEach(el =>
+  b.querySelectorAll('input[name="fc-type"], input[name="fc-vtype"], input[name="fc-ptype"]').forEach(el =>
     el.addEventListener('change', () => { refreshGenerateState(); refreshSplitHint(); refreshDupNote(); refreshPlanFooter(); }));
   b.querySelector('#fc-count').addEventListener('change', refreshSplitHint);
   refreshGenerateState();
@@ -180,7 +190,11 @@ function selectedTypes() {
   const text = TEXT_TYPES.filter(tp => b?.querySelector(`input[name="fc-type"][value="${tp}"]`)?.checked);
   const visual = [...(b?.querySelectorAll('input[name="fc-vtype"]:checked') || [])]
     .map(el => el.value).filter(v => VISUAL_TYPES.includes(v));
-  return { text, visual };
+  // La práctica cuenta solo con un capítulo de alcance (y por tanto sin plan de libro entero).
+  const practice = scopeValue && !planState
+    ? [...(b?.querySelectorAll('input[name="fc-ptype"]:checked') || [])].map(el => el.value).filter(v => PRACTICE_TYPES.includes(v))
+    : [];
+  return { text, visual, practice };
 }
 
 // Tipo con el que se etiqueta el mazo: "mixed" cuando se combina más de una cosa (dos
@@ -210,8 +224,13 @@ function refreshGenerateState() {
   const btn = b?.querySelector('#fc-generate');
   const hint = b?.querySelector('#fc-vhint');
   const sel = selectedTypes();
-  if (btn) btn.disabled = !sel.text.length && !sel.visual.length;
+  if (btn) btn.disabled = !sel.text.length && !sel.visual.length && !sel.practice.length;
   if (hint) hint.hidden = !sel.visual.length;
+  // Con el libro entero (o un plan) la matriz no se puede pedir: se apaga y se dice por qué.
+  const chapterScope = !!scopeValue && !planState;
+  b?.querySelectorAll('input[name="fc-ptype"]').forEach(el => { el.disabled = !chapterScope; });
+  const phint = b?.querySelector('#fc-phint');
+  if (phint) phint.hidden = chapterScope;
 }
 
 // Con dos tipos de texto el total se divide entre pasadas: se lo decimos ANTES de
@@ -412,9 +431,10 @@ async function renderDeckList() {
       <div class="fc-deck" data-id="${d.id}">
         <div class="fc-deck-info">
           <span class="fc-deck-name">${escapeHtml(d.scope || t('Libro entero'))}</span>
-          <span class="fc-deck-meta">${t('{n} tarjetas', { n: DB.cardsOf(d).length })} · ${d.cardType === 'cloze' ? 'cloze' : 'P→R'} · ${new Date(d.createdAt).toLocaleDateString()}</span>
+          <span class="fc-deck-meta">${t('{n} tarjetas', { n: DB.cardsOf(d).length })} · ${d.cardType === 'cloze' ? 'cloze' : 'P→R'} · ${new Date(d.createdAt).toLocaleDateString()}${DB.exercisesOf(d).length ? ` · ${t('matriz para practicar')}` : ''}</span>
           <span class="fc-deck-meta">${t('{a} nuevas · {b} aprendiendo · {c} maduras', { a: st.nuevas, b: st.aprendiendo, c: st.maduras })}${st.suspendidas ? ` · ${t('{n} suspendidas', { n: st.suspendidas })}` : ''}</span>
         </div>
+        ${DB.exercisesOf(d).length ? `<button class="icon-btn fc-deck-practice" data-act="practice" title="${t('Practicar la matriz')}" aria-label="${t('Practicar la matriz')}">${icon('grid', { size: 'md' })}</button>` : ''}
         <button class="fc-deck-study" data-act="study" title="${t('Repasar con repetición espaciada')}">
           ${icon('cards', { size: 'sm' })} ${t('Estudiar')}${due ? ` <span class="fc-deck-due">${due}</span>` : ''}
         </button>
@@ -437,6 +457,10 @@ async function renderDeckList() {
         onClose: () => renderDeckList(),
         onNavigate: () => closeModal(),
       });
+    }
+    if (btn.dataset.act === 'practice') {
+      const ex = Practice.latestExercise(deck);
+      if (ex) Practice.open({ deck, exercise: ex, onClose: () => renderDeckList() });
     }
     if (btn.dataset.act === 'review') renderReview(deck);
     if (btn.dataset.act === 'delete' &&
@@ -886,6 +910,12 @@ async function onGenerate() {
   const name = deckName(scopeLabel);
   const byId = new Map(Retrieval.allPassages().map(p => [p.id, p.text]));
   const target = b.querySelector('#fc-merge')?.checked ? mergeInto : null;
+  // P43 F3 · Texto del capítulo para la matriz, capturado ahora por lo mismo que `byId`: el
+  // índice es global y el lector puede cambiar de libro antes de que el job llegue aquí. Las
+  // citas se verifican contra el capítulo ENTERO.
+  const wantsMatrix = !planRows && sel.practice.includes('matrix') && !!scopeLabel;
+  const matrixText = wantsMatrix ? Retrieval.passagesByChapter(scopeLabel).map(p => p.text).join('\n\n') : '';
+  if (wantsMatrix && !matrixText.trim()) { showError(t('Ese contenido no tiene texto indexado; prueba con otro capítulo o con el libro entero.')); return; }
 
   showError('');
 
@@ -1039,6 +1069,19 @@ async function onGenerate() {
       const vres = sel.visual.length
         ? await buildScopeVisuals({ sel, scopeLabel, bookId, signal, progress })
         : null;
+      // P43 F3 · La matriz del capítulo, al final y dentro del MISMO job. Si falla no tira las
+      // tarjetas: se avisa y ya. Sola (sin tarjetas pedidas), su fallo sí es el del trabajo.
+      let exercise = null, practiceError = null;
+      if (wantsMatrix) {
+        progress(0, 1, 'matrix');
+        try {
+          exercise = await Practice.generateMatrix({ chapter: scopeLabel, text: matrixText, bookId, signal, background });
+        } catch (e) {
+          if (e.name === 'AbortError') throw e;
+          practiceError = e.message || String(e);
+        }
+        progress(1, 1, 'matrix');
+      }
       // Solo las tarjetas de TEXTO llevan ancla: las visuales traen src '' y no hay pasaje
       // que las respalde — el validador de anclas las descartaría a todas.
       if (cards.length) {
@@ -1063,6 +1106,21 @@ async function onGenerate() {
       // Con SOLO oclusión pedida y mazo vacío el motivo es otro: sin figuras no hay tarjetas
       // — hay que decirlo, no simular éxito con un mazo vacío.
       const target0 = target ? (await DB.getDecks(bookId)).find(x => x.id === target) : null;
+      // Solo la matriz (sin tarjetas): va al mazo de ese capítulo si ya existe; si no, a uno nuevo
+      // sin tarjetas, donde irán las de lo que se falle.
+      if (!cards.length && exercise) {
+        const home = target0 || (await DB.getDecks(bookId)).find(d => (d.scope || '') === scopeLabel);
+        if (home) {
+          await DB.updateDeck(home.id, { exercises: DB.exercisesOf(home).concat(exercise) });
+          const deck = (await DB.getDecks(bookId)).find(d => d.id === home.id);
+          return { deckId: home.id, deck, generated: 0, requested: 0, failed, blocks: chunks.length, practiceOnly: true };
+        }
+        const deck = { bookId, name, cardType: 'basic', scope: scopeLabel, cards: [], exercises: [exercise], createdAt: Date.now() };
+        if (bookId) deck.id = await DB.addDeck(deck);
+        const saved = bookId ? (await DB.getDecks(bookId)).find(d => d.id === deck.id) : deck;
+        return { deckId: deck.id || null, deck: saved || deck, generated: 0, requested: 0, failed, blocks: chunks.length, practiceOnly: true };
+      }
+      if (!cards.length && !target0 && practiceError && !wantsText && !sel.visual.length) throw new Error(practiceError);
       if (!cards.length && !target0) {
         if (!sel.text.length && sel.visual.length === 1 && sel.visual[0] === 'occlusion') {
           throw new Error(t('No se encontraron figuras en este libro, así que no hay tarjetas de oclusión que generar.'));
@@ -1080,15 +1138,20 @@ async function onGenerate() {
         // Tipos: si lo que entra no es del tipo declarado del mazo, el mazo pasa a mixto.
         const patch = { cards: merged.cards };
         if (existing.cardType !== type) patch.cardType = 'mixed';
+        if (exercise) patch.exercises = DB.exercisesOf(existing).concat(exercise);
         await DB.updateDeck(existing.id, patch);
-        return { deckId: existing.id, deck: { ...merged, cardType: patch.cardType || existing.cardType },
+        const deck = (await DB.getDecks(bookId)).find(d => d.id === existing.id)
+          || { ...merged, cardType: patch.cardType || existing.cardType };
+        return { deckId: existing.id, deck,
           generated: fresh.length, requested: count,
-          failed, blocks: chunks.length, merged: true, dropped: cards.length - fresh.length,
+          failed, blocks: chunks.length, merged: true, dropped: cards.length - fresh.length, practiceError,
           ...(vres ? { visual: vres.stats } : {}) };
       }
-      const deck = { bookId, name, cardType: type, scope: scopeLabel, cards, createdAt: Date.now() };
+      const deck = { bookId, name, cardType: type, scope: scopeLabel, cards, exercises: exercise ? [exercise] : [], createdAt: Date.now() };
       if (bookId) deck.id = await DB.addDeck(deck);
-      return { deckId: deck.id || null, deck, generated: cards.length, requested: count, failed, blocks: chunks.length,
+      // Releído: addDeck pone los uid de tarjetas y ejercicios, y «Practicar» los necesita.
+      const saved = bookId ? (await DB.getDecks(bookId)).find(d => d.id === deck.id) : null;
+      return { deckId: deck.id || null, deck: saved || deck, generated: cards.length, requested: count, failed, blocks: chunks.length, practiceError,
         ...(vres ? { visual: vres.stats } : {}) };
     },
   });
@@ -1134,9 +1197,19 @@ function onJobUpdate(job) {
       showError(msg);
       return;
     }
-    const { deck, generated, requested, failed, blocks, merged, dropped } = job.result;
+    const { deck, generated, requested, failed, blocks, merged, dropped, practiceOnly, practiceError } = job.result;
+    // P43 F3 · Solo se pidió la matriz: no hay tarjetas que revisar, se abre para hacerla.
+    if (practiceOnly) {
+      if (btn) { btn.disabled = false; btn.innerHTML = `${icon('sparkles', { size: 'md' })} ${t('Generar tarjetas')}`; }
+      renderDeckList();
+      const ex = Practice.latestExercise(deck);
+      if (ex) Practice.open({ deck, exercise: ex, onClose: () => renderDeckList() });
+      return;
+    }
     renderReview(deck);
-    if (merged) {                             // fusión: "menos de las pedidas" es lo esperado
+    if (practiceError) {
+      showError(t('Las tarjetas están; la matriz no salió: {err}', { err: practiceError }));
+    } else if (merged) {                             // fusión: "menos de las pedidas" es lo esperado
       showError(generated
         ? t('Añadidas {a} tarjetas nuevas al mazo', { a: generated })
           + (dropped ? ` (${t('{n} descartadas por repetidas', { n: dropped })})` : '') + '.'
@@ -1209,6 +1282,7 @@ function renderReview(deck) {
     <div class="fc-list">${deck.cards.map((c, i) => (c.deleted ? '' : cardRow(c, i))).join('')}</div>
     <div class="fc-export">
       ${deck.id ? `<button id="fc-study" class="btn btn--primary primary-btn">${icon('cards', { size: 'md' })} ${t('Estudiar ahora')}<small></small></button>` : ''}
+      ${deck.id && DB.exercisesOf(deck).length ? `<button id="fc-practice" class="ai-ob-back">${icon('grid', { size: 'md' })} ${t('Practicar la matriz')}</button>` : ''}
       <button id="fc-apkg" class="${deck.id ? 'ai-ob-back' : 'btn btn--primary primary-btn'}">${icon('download', { size: 'md' })} ${t('Exportar .apkg')}</button>
       <button id="fc-txt" class="ai-ob-back fc-txt-btn" title="${t('Formato de texto que Anki importa (Archivo → Importar)')}">.txt para Anki</button>
       ${deck.cards.some(c => VISUAL_TYPES.includes(c.type))
@@ -1313,6 +1387,19 @@ function renderReview(deck) {
   // Anki) justo donde P10 quería retener. El botón dice CUÁNTAS tarjetas va a encolar —
   // recién generadas están todas vencidas, y meterse en una sesión de 30 sin avisar es una
   // sorpresa desagradable.
+  // P43 F3 · Al cerrar la práctica se relee el mazo: pueden haber entrado tarjetas de lo fallado.
+  b.querySelector('#fc-practice')?.addEventListener('click', () => {
+    syncFromDom();
+    const ex = Practice.latestExercise(deck);
+    if (!ex) return;
+    Practice.open({
+      deck, exercise: ex,
+      onClose: async () => {
+        const fresh = (await DB.getDecks(deck.bookId)).find(d => d.id === deck.id);
+        if (overlay && fresh) renderReview(fresh);
+      },
+    });
+  });
   const studyBtn = b.querySelector('#fc-study');
   if (studyBtn) {
     const due = Srs.dueCount(DB.cardsOf(deck));

@@ -2067,7 +2067,7 @@ mide) · cambiar la semántica de la racha · la mejora de generación al estilo
 cuya literal ES la respuesta: término, fecha, cifra), que es trabajo futuro del prompt de
 generación de tarjetas y no de la medida.
 
-### P43 — Widgets de estudio: siete tipos que el agente rellena para cualquier libro · `L` · **F1–F2 ✓ (2026-10-16)**
+### P43 — Widgets de estudio: siete tipos que el agente rellena para cualquier libro · `L` · **F1–F3 ✓ (2026-10-19)**
 
 **Contexto (2026-10-16).** Cuatro prototipos a mano sobre DDIA (anomalías, lease, rebalanceo,
 timeout, en el lab) gustaron, pero cada uno lleva su propio motor y no valen para otro libro. La
@@ -2149,12 +2149,25 @@ básicas para lo fallado, que vuelven con FSRS.
 - La ida y vuelta se queda en el eval; en la app no se hace (dobla el coste de cada matriz). Si los
   intentos reales muestran celdas que todo el mundo falla, se mira ahí.
 
-**F3 · Superficie · `M`**
-- Dónde aparece: en la libreta, como un «Te toca» más al cerrar un capítulo (una pausa por capítulo,
-  regla de NB2), y desde la estantería en el repaso.
-- Tarjetas de lo fallado al mazo del libro; el intento al análisis (P42 F3, «ciclos válidos»).
+**F3 · Superficie · `M`** · ✓ (2026-10-19, [ADR-058](DECISIONS.md))
+- Dónde aparece: en el **menú de tipos de flashcards**, sección «Práctica · Matriz para rellenar»,
+  solo con un capítulo de alcance. Cambio frente al plan de la libreta: reutiliza el trabajo en
+  segundo plano y el sitio donde ya se decide estudiar un libro, sin pantalla nueva.
+- La matriz es un ejercicio del mazo (`deck.exercises`), no una tarjeta: no entra en FSRS ni en
+  Anki. Se abre sola si solo se pidió la matriz; si no, «Practicar la matriz» en la revisión y en la
+  fila del mazo (icono `grid`), con «La última vez: k de n».
+- Al comprobar: intento a `attempts` (`mode: 'widget'`), lo fallado o dudado al mazo como tarjetas
+  básicas (sin repetir frentes) y el resultado en el ejercicio. Sync por uid.
+- [`practice.js`](app/js/ai/widgets/practice.js); test de punta a punta en
+  [`tests/practice.spec.ts`](tests/practice.spec.ts) con el modelo simulado.
+- **Queda:** (a) rehacer la matriz desde el repaso de hoy con solo las celdas flojas en blanco, si los
+  intentos muestran que se rehace; (b) el «Te toca» de la libreta, cuando haya más tipos; (c) medir
+  con uso real cuántas matrices pedidas se hacen.
 
-**F4+ · Los demás tipos**, en el orden de la tabla, cada uno con su contrato.
+**F4+ · Los demás tipos**, cada uno con su contrato y su batería, en este orden (revisado el
+2026-10-19): **5 · distractores que enseñan** (es atómico: entra como tipo de tarjeta en FSRS, no
+como ejercicio), **1 · predice y comprueba**, y **3 · ordena** y **4 · números** según el uso de la
+matriz. Los tipos 1–4 son ejercicios del mazo (ADR-058); 5 y 6 son tarjetas.
 
 ### P44 — Análisis del estudio: retención real, memoria por libro, carga y FSRS personal · `M` · **✓ entregada (2026-10-18)** · F1–F5
 
@@ -2196,6 +2209,74 @@ pasar a terminado y viaja por sync). **Selector de ámbito** (biblioteca, estant
 inteligentes— o libro) que filtra lectura, estudio y carga, con «Repasar esta estantería/este libro».
 **Un libro entero:** al elegirlo se abre en «Todo», con ritmo (palabras/min), semanas, terminado en N
 días o por dónde vas, y la curva de páginas acumuladas. Tests: `analysis-periods.spec.ts`.
+
+### P46 — Preguntar desde la tarjeta: el agente dentro del repaso · `F1 S` + `F2 M` · **aprendizaje basado en evidencia**
+
+**El caso (2026-10-19).** Estudiando con las tarjetas la duda no espera: por qué esta respuesta es
+esta, de dónde sale, en qué se diferencia de lo de al lado. Hoy la única salida es minimizar el
+repaso (F2 de [ST2](#st2--la-sesión-de-repaso-rediseñada--entregada-2026-09-28-ver-changelog)), abrir
+el libro, preguntar en el panel y volver con la cola a medias y la duda ya medio olvidada. Poder
+preguntar en el sitio, sin abandonar la tarjeta.
+
+**Lo que ordena el diseño es el riesgo, no la feature.** Esta épica existe por
+[Bastani et al. (2025)](https://www.pnas.org/doi/10.1073/pnas.2422633122): GPT-4 **sin
+guardarraíles** durante la práctica dio **+127 % resolviendo ejercicios y −17 % en el examen**. Un
+chat libre encima de la tarjeta es exactamente ese brazo del experimento. Así que esto **no es una
+caja de chat en el repaso**: son tres puertas, y la primera regla es que el agente nunca responde lo
+que la tarjeta pregunta.
+
+1. **«¿Por qué?» tras el veredicto** — solo cuando ya has intentado responder y has fallado o
+   dudado. Explica la respuesta con el pasaje de origen citado. Antes de intentar, no existe.
+2. **Preguntar por contexto** (menú `⋯`, junto a «Reescribir con el agente»): «¿en qué se diferencia
+   de Raft?», «¿esto no contradice el capítulo 6?». BM25 sobre los pasajes del libro, con el pasaje
+   de la tarjeta como semilla; respuesta citada y acotada.
+3. **Rechazo explícito** a «dame la respuesta»: devuelve la pregunta al lector («¿qué crees tú que
+   es?») en vez de contestarla. Es la frontera ICAP de la épica — tú produces, él comprueba.
+
+**Lo que ya existe y hace esto barato.**
+- El hueco `.study-tools` de la cabecera y su menú ya están, con `LLM.hasKey()` como puerta.
+- `LLM.chatStream` ya se usa desde el repaso (`rewriteCurrent`) sin pasar por el panel.
+- `passageOf(deck, card)` y `passagesFor(bookId)` dan el texto del libro desde `bookText` en
+  IndexedDB, **sin lector abierto** — que es la condición real: la cola del día cruza libros y
+  ninguno tiene por qué estar indexado. `ensureSegmented` cubre el mazo llegado por sync, que aquí
+  no trae anclas. El BM25 ya está hecho ([`retrieval.js`](app/js/ai/retrieval.js): `buildIndex(key,
+  passages)` + `search(query, k)`), aunque mantiene **un índice global a la vez**: en una cola que
+  cruza libros hay que reconstruirlo al cambiar de libro — milisegundos, cacheado por `bookId`.
+- `markdown.js` pinta la respuesta y `cloze-check.js` sabe qué es el hueco, así que no se filtra.
+
+**Lo que cuesta (por eso no es `S`).**
+- **El panel no se reutiliza.** [`panel.js`](app/js/ai/panel.js) exige el objeto epub vivo
+  (`setBook` + `segReady` + anchors) y guarda conversaciones por libro; el repaso no tiene lector
+  abierto. Abrir el libro en segundo plano para poder usar el panel obligaría a parsear el EPUB/PDF
+  entero por cada duda. Chat propio, efímero, sin libreta ni plantillas.
+- **Teclado.** `onKey` es global: espacio voltea, 1-4 califican, Z deshace. `typingInRecall` ya
+  protege el input de respuesta; hay que extender el mismo guard al del chat, o escribir una
+  pregunta califica la tarjeta a media frase.
+- **Fuga de la respuesta.** El contexto natural de la tarjeta incluye `back`; si se inyecta antes
+  del veredicto, el primer «¿por qué?» contesta justo lo que la tarjeta pregunta. El bloque de
+  contexto tiene que ser distinto antes y después de voltear.
+- **Ritmo y coste:** una llamada por duda. Tope por sesión y, si el uso lo pide, modelo barato.
+
+**F1 · «¿Por qué?» tras fallar · `S`.** Veredicto negativo → botón en el veredicto y en la tarjeta
+de leech, con el pasaje de origen y la respuesta en el contexto. Un solo turno, sin historial. Test
+de punta a punta con el modelo simulado, como [`practice.spec.ts`](tests/practice.spec.ts).
+
+**F2 · Preguntar con retrieval · `M`.** Caja de una pregunta con BM25 sobre `passagesFor`, citas al
+pasaje dentro del propio panel (no salto al lector: abrir el libro mata la sesión), guardarraíl del
+punto 3 y tope por sesión.
+
+**F3 · Si el uso lo justifica.** Guardar la duda como nota de la libreta del libro, convertir «no
+recuerdo ni por qué» en tarjeta nueva, y extender [OFF1](#off1--preguntar-al-libro-sin-cobertura--2026-09-11-m):
+sin red, responder con los pasajes locales como ya hace el panel.
+
+**Contrato (EV5, antes de escribir el prompt).** Baseline: dudas por sesión que hoy se consultan
+fuera del repaso (instrumentar primero, 2 semanas). Métrica primaria: **precisión de la explicación
+sobre el pasaje** (juez fijo: la cita existe en el libro y responde a la pregunta). Control
+obligatorio: con el veredicto pendiente, **0 %** de respuestas que contengan la respuesta de la
+tarjeta. Time-box: 2 semanas; si no llega a ~10 dudas/semana, F2 en tendencia y se queda F1.
+
+**Fuera, a propósito:** varias tarjetas en una misma pregunta, chat con historial largo dentro del
+repaso (la libreta ya existe para eso) y sustituir el «Reescribir con el agente» que ya está.
 
 ### P24 — Higiene de la sesión de repaso · **✓ entregada** (2026-08-01) · F1–F4
 
