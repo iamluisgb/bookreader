@@ -47,6 +47,7 @@ test('token: la licencia de prueba da un token de escritura; sin Polar configura
   const prueba = env({ ALLOW_MOCK_LICENSES: '', TEST_LICENSES: 'BKRD-LUIS-AAAA, BKRD-OTRA-BBBB' });
   assert.equal((await login(prueba, 'BKRD-LUIS-AAAA')).status, 200);
   assert.equal((await login(prueba, 'BKRD-OTRA-BBBB')).status, 200);
+  assert.equal((await login(prueba, 'bkrd-luis-aaaa')).status, 200);
   assert.equal((await login(prueba, 'BKRD-LUIS-AAAB')).error, 'not_configured');
 });
 
