@@ -82,8 +82,23 @@ function constitucion() {
   });
 }
 
+// SRE 2.ª ed. (O'Reilly, 16-sep-2026): posterior al corte de los modelos. Los otros cuatro son
+// textos famosos que el solver se sabe, y con ellos «a ciegas» mide memoria del libro, no si la
+// pregunta obliga a leer (P43 F4). Tiene copyright: NO se versiona ni se descarga; es local, de la
+// biblioteca de Luis. Si no está, la batería sigue con los cuatro de siempre.
+function sre2() {
+  if (!fs.existsSync(path.join(FIX, 'p6-sre2.epub'))) return [];
+  return [
+    ['ch02', 'Chapter 2. The Value of Reliability'],
+    ['ch08', 'Chapter 8. Service Level Objectives'],
+    ['ch11', 'Chapter 11. Learning from Incidents'],
+    ['ch20', 'Chapter 20. How SRE Supports AI'],
+    ['ch21', 'Chapter 21. How AI Supports SRE'],
+  ].map(([f, chapter]) => ({ book: 'sre2', lang: 'en', genre: 'técnico reciente', id: `sre2:${f}`, chapter, text: htmlText(unzip('p6-sre2.epub', `OEBPS/${f}.html`)) }));
+}
+
 export function loadWidgetBattery() {
-  return [...progit(), ...relativity(), ...onLiberty(), ...constitucion()];
+  return [...progit(), ...relativity(), ...onLiberty(), ...constitucion(), ...sre2()];
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

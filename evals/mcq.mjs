@@ -166,7 +166,7 @@ function summary(results) {
     results.some((r) => r.retry) ? `- tras un reintento de las que fallan: ${pct(vf, asked)} % (${vf}/${asked})` : null,
     `- capítulos sin spec usable a la 1.ª: ${specFail}/${n}`,
     `- errores por pregunta a la 1.ª: ${Object.entries(errKinds).map(([k, v]) => `${k} ${v}`).join(', ') || 'ninguno'}`,
-    allFlags.length ? `- señales en las válidas: correcta más larga en ${fc('larga')}/${allFlags.length}, comodín en ${fc('comodin')}/${allFlags.length}, eco del enunciado en ${fc('eco')}/${allFlags.length}` : null,
+    allFlags.length ? `- señales en las válidas: correcta más larga en ${fc('larga')}/${allFlags.length}, comodín en ${fc('comodin')}/${allFlags.length}, eco del enunciado en ${fc('eco')}/${allFlags.length}, falsas absolutas y correcta matizada en ${fc('absolutas')}/${allFlags.length}` : null,
     rt.length ? `- ida y vuelta (${SOLVER}): con el capítulo elige la clave en el ${pct(agree, tot)} % (${agree}/${tot}); a ciegas acierta el ${pct(blind, btot)} % (al azar: ${pct(chance, btot)} %)` : null,
     '', '| Libro | 1.ª | Tras reintento |', '|---|---|---|',
     ...books.map((b) => { const rs = results.filter((r) => r.book === b); return `| ${b} | ${rs.reduce((a, r) => a + r.first.valid, 0)}/${rs.length * MCQ_COUNT} | ${rs.reduce((a, r) => a + (r.retry || r.first).valid, 0)}/${rs.length * MCQ_COUNT} |`; }),

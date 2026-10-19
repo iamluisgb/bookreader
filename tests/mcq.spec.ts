@@ -56,6 +56,7 @@ test('scoreMcqItem, barajado estable y señales de calidad', async ({ page }) =>
     const ids = (s: number) => M.shuffledOptions(base, s).map((o: any) => o.id).join('');
     const seeds = new Set([0, 1, 2, 3, 4, 5, 6, 7].map(ids));
     const larga = { ...base, options: base.options.map((o: any) => (o.correct ? { ...o, text: o.text + ', porque las dos transacciones leen el mismo estado y ninguna ve la otra' } : o)) };
+    const absolutas = { ...base, options: [base.options[0], { ...base.options[1], text: 'La base de datos rechaza siempre la segunda baja' }, { ...base.options[2], text: 'Nunca se va ninguno de los dos' }] };
     const comodin = { ...base, options: [...base.options.slice(0, 2), { ...base.options[2], text: 'Ninguna de las anteriores' }] };
     return {
       bien: M.scoreMcqItem(base, 'a'),
@@ -64,7 +65,7 @@ test('scoreMcqItem, barajado estable y señales de calidad', async ({ page }) =>
       estable: ids(3) === ids(3),
       varia: seeds.size > 1,
       completo: ids(5).split('').sort().join(''),
-      flags: [M.mcqItemFlags(base), M.mcqItemFlags(larga), M.mcqItemFlags(comodin)],
+      flags: [M.mcqItemFlags(base), M.mcqItemFlags(larga), M.mcqItemFlags(comodin), M.mcqItemFlags(absolutas)],
     };
   }, { base: item() });
   expect(r.bien).toMatchObject({ ok: true, choice: 'a', answer: 'a', feedback: 'Cada una lee el mismo snapshot.' });
@@ -73,7 +74,7 @@ test('scoreMcqItem, barajado estable y señales de calidad', async ({ page }) =>
   expect(r.estable).toBe(true);
   expect(r.varia).toBe(true);
   expect(r.completo).toBe('abc');
-  expect(r.flags).toEqual([[], ['larga'], ['comodin']]);
+  expect(r.flags).toEqual([[], ['larga'], ['comodin'], ['absolutas']]);
 });
 
 test('generate-mcq: ids que faltan, validez por pregunta con la cita y reintento solo de las malas', async ({ page }) => {

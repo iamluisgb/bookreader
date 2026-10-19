@@ -10,6 +10,7 @@ versionan (tamaño); se descargan con `node evals/fetch-fixtures.mjs`.
 | `p3-constitucion.pdf` | P3 opositor | Constitución Española (consolidada) | [BOE-A-1978-31229](https://www.boe.es/buscar/act.php?id=BOE-A-1978-31229) | Texto legal público (art. 13 LPI: sin derechos de autor) |
 | `p3-constitucion.html` | P43 widgets (legal) | La misma, versión HTML con los títulos separados | [BOE-A-1978-31229](https://www.boe.es/buscar/act.php?id=BOE-A-1978-31229) | Texto legal público |
 | `p5-onliberty.epub` | P43 widgets (humanidades) | *On Liberty*, J. S. Mill | [Gutenberg #34901](https://www.gutenberg.org/ebooks/34901) | Dominio público |
+| `p6-sre2.epub` | P43 widgets (técnico reciente) | *Site Reliability Engineering*, 2.ª ed. (O'Reilly, sep-2026) | Biblioteca de Luis; **no se descarga** | Con copyright: solo en local, nunca en git. Posterior al corte de los modelos |
 | `../../tests/test.epub` | P4 no-ficción/literatura | *Pedro Páramo* (fixture histórico del repo) | ya versionado | fixture de test |
 
 El golden de retrieval de IA7 ([`tests/retrieval-hyde.spec.ts`](../../tests/retrieval-hyde.spec.ts))

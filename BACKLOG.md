@@ -2205,9 +2205,24 @@ antes de implementar)*
   menos (2 capítulos), que arregla el reintento entero. La correcta más larga baja de 5/90 a 2/90
   con v2.
   **Hallazgo:** a ciegas, el solver acierta el 97–98 % en los cuatro libros, y el prompt no lo mueve.
-  Con textos tan conocidos (Pro Git, Einstein, Mill, la Constitución) no se puede separar «el modelo
-  se sabe el libro» de «los distractores son flojos». Para medirlo hace falta en la batería un libro
-  poco conocido o posterior al corte del modelo. Hasta entonces, no gastar los ciclos 2–3 en esto.
+  Primera hipótesis: memoria de textos famosos. **Descartada** con un libro posterior al corte de los
+  modelos, *SRE* 2.ª ed. (O'Reilly, 16-sep-2026; 5 capítulos, fixture local con copyright, nunca en
+  git):
+
+  | Run (SRE 2.ª ed.) | Prompt | 1.ª | Tras reintento | Ida y vuelta | A ciegas |
+  |---|---|---|---|---|---|
+  | sre2-v2 | v2 | 100 % (25/25) | — | 100 % | **96 %** |
+  | sre2-c2-v3 | v3 (todas las opciones con el mismo tono, falsas que fallan en un punto) | 84 % | 100 % | 100 % | **100 %** |
+  | matriz, config. de la app | matrix-v2 | 100 % (5/5) | — | 88 % (3 caps.) | 68 % (13/15 SLO, 4/15 incidentes) |
+
+  Las falsas del v2 eran tajantes («obligatorio», «nunca») y la correcta la matizada: nueva señal
+  `absolutas` (6/25 en v2, 4/25 en v3). Pero con el v3 las preguntas son buenas (sesgo
+  retrospectivo, parche como puente…) y el solver las acierta igual: el libro enseña el buen criterio
+  del oficio y un modelo fuerte ya lo tiene. **Conclusión del ciclo 2:** «a ciegas con un modelo
+  fuerte» mide «lo respondería un experto», no «lo respondería quien no leyó»; bajarlo con el prompt
+  empuja a trivialidades del texto (cifras, nombres), que la investigación desaconseja. Se vuelve al
+  v2 (mejor validez) y no se gasta el ciclo 3. Lo que decide ahora es el uso real: el % de acierto
+  a la primera de los lectores en el registro de intentos (P42). Si es ~100 %, la pregunta no enseña.
 - **F4b · Superficie** `M`: «Pregunta con distractores» como tipo de tarjeta de texto en el menú
   (junto a P→R y Cloze), tarjeta `mcq` en el repaso (opciones barajadas, compromiso antes de ver,
   feedback de la elegida y cita), campos en la whitelist de `sameCard`, export a Anki como texto.

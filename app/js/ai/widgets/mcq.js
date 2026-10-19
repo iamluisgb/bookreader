@@ -106,7 +106,10 @@ export function shuffledOptions(item, seed = 0) {
 //   larga: la correcta es claramente más larga que la media de las falsas (el truco de examen).
 //   comodin: «todas las anteriores», «ninguna de las anteriores»: se responden por descarte.
 //   eco: la correcta repite literalmente un trozo largo del enunciado.
+//   absolutas: la mayoría de las falsas son tajantes («siempre», «nunca», «obligatorio»…) y la
+//     correcta no: se acierta eligiendo la matizada sin haber leído (visto en SRE 2.ª ed., 19-oct).
 export const LONG_RATIO = 1.5;
+const ABSOLUTE = /\b(siempre|nunca|jamás|obligatori[oa]s?|ningún|ninguna|nada|todos?|todas?|cualquier|únicamente|solo|sólo|exclusivamente|always|never|must|only|any|all|none|every)\b/i;
 const WILDCARD = /\b(todas las anteriores|ninguna de las anteriores|all of the above|none of the above)\b/i;
 export function mcqItemFlags(item) {
   const flags = [];
@@ -116,6 +119,7 @@ export function mcqItemFlags(item) {
   const mean = wrong.reduce((a, o) => a + o.text.length, 0) / wrong.length;
   if (right.text.length > mean * LONG_RATIO) flags.push('larga');
   if (item.options.some((o) => WILDCARD.test(o.text))) flags.push('comodin');
+  if (!ABSOLUTE.test(right.text) && wrong.filter((o) => ABSOLUTE.test(o.text)).length * 2 > wrong.length) flags.push('absolutas');
   const words = right.text.toLowerCase().split(/\s+/).filter((w) => w.length > 3);
   for (let i = 0; i + 4 <= words.length; i++) {
     if (item.stem.toLowerCase().includes(words.slice(i, i + 4).join(' '))) { flags.push('eco'); break; }
