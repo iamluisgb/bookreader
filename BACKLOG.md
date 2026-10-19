@@ -2900,21 +2900,24 @@ o solo demo? · ~~¿cuenta de Cloudflare disponible?~~ (sí: desplegado) · ~~me
 en nan~~ → **instrumentado en F1.2**; queda *leer* los datos tras unos días de tráfico y ajustar
 `DEMO_QUOTA`/`MAX_DAILY_CALLS` con ellos.
 
-### MON4 — Sync de BookReader: sync gestionado en la suscripción · `L` · **código hecho, sin desplegar ([ADR-056](DECISIONS.md))**
+### MON4 — Sync de BookReader: sync gestionado en la suscripción · `L` · **código hecho, desplegado en prueba ([ADR-056](DECISIONS.md))**
 
 > **Estado (2026-10-19):** F0–F5 en código y en verde (`npm run test:sync`, `bookreader-sync*.spec.ts`,
-> `sync-crypto.spec.ts`; ver CHANGELOG). La UI ya ofrece la opción en Ajustes → Datos, pero el Worker
-> **no está desplegado** y sin él la opción no funciona. **Para producción, en orden:**
+> `sync-crypto.spec.ts`; ver CHANGELOG). **El Worker está desplegado en PRUEBA:** bucket R2 y D1
+> `bookreader-sync` creados, migraciones aplicadas, secrets `USER_SALT` y `USAGE_TOKEN` puestos (sus
+> valores, en `~/workspace/.env`). Sin `POLAR_ORG_ID` solo entran las keys exactas del secret
+> `TEST_LICENSES` (la de Luis); el resto recibe `not_configured`. Topes de prueba: 1 GB, 100 k y 1 M,
+> para que con los de `share` (8 GB, 800 k, 8 M) no se pase de lo gratis de la cuenta; libros
+> activados. La opción se ve con `?sync-preview=1`. **Para lanzar, en orden:**
 > 1. MON2 en producción (Polar real) y la suscripción de ADR-031 con su producto y su benefit.
-> 2. Decidir A/B y dejarlo en `workers/sync/wrangler.jsonc`: `CAP_*` (subir = opción A) y
->    `FILES_ENABLED` (`1` = también libros). Por defecto, B.
-> 3. Crear el bucket R2 y la D1 `bookreader-sync`, pegar el `database_id`, aplicar migraciones,
->    las vars `POLAR_ORG_ID` y `SYNC_BENEFIT_IDS`, y los secrets `USAGE_TOKEN` y `USER_SALT`
->    (este, una sola vez: cambiarlo deja huérfanos los datos de todos).
-> 4. `npx wrangler deploy` desde `workers/sync` y probar en sandbox de Polar de punta a punta.
-> 5. Humo con dos dispositivos reales (móvil + escritorio) y una migración desde Drive real.
-> 6. `LAUNCHED = true` en `app/js/sync/bookreader-auth.js`: hasta entonces la opción no se ve en
->    Ajustes (vista previa: `localStorage.bookreader_sync_preview = 'true'`).
+> 2. Decidir A/B y dejarlo en `workers/sync/wrangler.jsonc`: `CAP_*` y `FILES_ENABLED`. Lo gratis de
+>    R2 es POR CUENTA: con B, repartirlo entre `share` y `sync` (p. ej., 4 GB/400 k/4 M cada uno) y
+>    desplegar los dos.
+> 3. Las vars `POLAR_ORG_ID` y `SYNC_BENEFIT_IDS`; `npx wrangler deploy` desde `workers/sync` y
+>    probar en sandbox de Polar de punta a punta. `TEST_LICENSES` se puede borrar o dejar.
+> 4. Humo con dos dispositivos reales (móvil + escritorio) y una migración desde Drive real.
+> 5. `LAUNCHED = true` en `app/js/sync/bookreader-auth.js`: hasta entonces la opción no se ve en
+>    Ajustes sin la vista previa.
 >
 > **Pendiente o fuera:** el MCP (P28 F2) lee el Drive del usuario y no sabe leer el sync de
 > BookReader (habría que darle la clave). Los límites de D1 del plan gratuito (100 k escrituras

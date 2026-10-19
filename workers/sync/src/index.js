@@ -117,7 +117,11 @@ export async function userIdOf(env, licenseKey) {
 //   - 'not_subscribed': key válida de un producto sin sync (el pago único de Pro, p. ej.).
 // Modo simulado SOLO con ALLOW_MOCK_LICENSES=1 (dev y tests): las keys BKRD-… valen como en
 // license.js, -REVOKED caduca y -NOSUB es un Pro sin suscripción.
+// TEST_LICENSES (secret, keys exactas separadas por comas): cuentas de prueba en producción
+// antes de Polar. Solo esas; cualquier otra key sigue el camino normal.
 export async function checkLicense(env, key, fetchImpl = fetch) {
+  const testKeys = String(env.TEST_LICENSES || '').split(',').map((s) => s.trim()).filter(Boolean);
+  if (testKeys.includes(key)) return 'granted';
   if (String(env.ALLOW_MOCK_LICENSES || '') === '1' && /^BKRD-[A-Z0-9-]{4,}$/i.test(key)) {
     if (/-REVOKED$/i.test(key)) return 'lapsed';
     if (/-NOSUB$/i.test(key)) return 'not_subscribed';

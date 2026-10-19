@@ -20,10 +20,17 @@ import * as C from './sync-crypto.js';
 // Exportado para la sonda de alcanzabilidad del diagnóstico y para los tests.
 export const WORKER_URL = 'https://bookreader-sync.luisgonzalezb93.workers.dev';
 
-// El Worker aún NO está desplegado (MON4: falta Polar real y la decisión A/B). Mientras tanto la
-// opción no se enseña en Ajustes: sería un botón que falla. Para probarla, en la consola:
-// localStorage.setItem('bookreader_sync_preview', 'true'). Al desplegar, LAUNCHED = true.
+// El Worker está desplegado EN PRUEBA: sin Polar real solo entran las licencias de su secret
+// TEST_LICENSES (MON4). Mientras tanto la opción no se enseña en Ajustes: para el resto sería un
+// botón que falla. Para probarla, visitar la app con `?sync-preview=1` (`=0` la quita), o en la
+// consola: localStorage.setItem('bookreader_sync_preview', 'true'). Al lanzar, LAUNCHED = true.
 const LAUNCHED = false;
+
+try {
+  const q = new URLSearchParams(location.search).get('sync-preview');
+  if (q === '1') Storage.set('sync_preview', true);
+  if (q === '0') Storage.remove('sync_preview');
+} catch { /* sin localStorage: simplemente sin vista previa */ }
 
 export function available() {
   return LAUNCHED || Storage.get('sync_preview', false) === true;

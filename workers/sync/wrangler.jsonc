@@ -5,7 +5,8 @@
 //   npx wrangler d1 migrations apply bookreader-sync --remote
 //   npx wrangler secret put USAGE_TOKEN         (para /v1/usage y `npm run sync:usage`)
 //   npx wrangler secret put USER_SALT           (opcional; se fija UNA vez y no se cambia)
-// NO desplegar hasta que MON2 esté en producción: sin POLAR_ORG_ID el Worker no emite tokens.
+// Desplegado el 19-oct-2026 en PRUEBA: sin POLAR_ORG_ID solo entran las keys del secret
+// TEST_LICENSES (`npx wrangler secret put TEST_LICENSES`). Al lanzar, ver BACKLOG · MON4.
 {
   "name": "bookreader-sync",
   "main": "src/index.js",
@@ -23,15 +24,18 @@
     // como `share`. Con estos valores el sync NO COBRA NUNCA (opción B): al tope se niega
     // (507/503) y el cliente lo dice. La opción A es subirlos y dejar que manden las cuotas
     // por usuario: R2 cuesta ~0,015 $/GB-mes, 4,50 $/M escrituras, 0,36 $/M lecturas.
-    "CAP_STORAGE_BYTES": "8589934592",
-    "CAP_CLASS_A": "800000",
-    "CAP_CLASS_B": "8000000",
+    // Lo gratis es POR CUENTA y `share` ya se queda con su 80 % (8 GB, 800 k, 8 M): en prueba,
+    // el sync va con 1 GB, 100 k y 1 M para que los dos juntos no pasen de lo gratis. Al lanzar
+    // hay que repartir entre los dos (p. ej., 4 GB/400 k/4 M cada uno) y desplegar ambos.
+    "CAP_STORAGE_BYTES": "1073741824",
+    "CAP_CLASS_A": "100000",
+    "CAP_CLASS_B": "1000000",
     // Ficheros de libro en el sync gestionado (F4). "0" = solo datos (opción B: los libros
     // siguen por Drive). "1" = también libros, con FILE_QUOTA_BYTES por usuario.
-    "FILES_ENABLED": "0",
+    "FILES_ENABLED": "1",
     // Cuotas POR USUARIO. Datos = notas, ajustes, mazos… y sus versiones (KB por libro).
     "DATA_QUOTA_BYTES": "268435456",
-    "FILE_QUOTA_BYTES": "2147483648",
+    "FILE_QUOTA_BYTES": "805306368",
     // 100 MB: el tope de cuerpo de petición de Workers. Los libros más grandes van por partes.
     "MAX_BYTES": "104857600",
     // Versiones que se guardan de cada fichero de datos, y cuánto viven como mucho.
@@ -45,7 +49,7 @@
     {
       "binding": "DB",
       "database_name": "bookreader-sync",
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      "database_id": "78ef8d36-4eed-44e5-b0ff-322470b089bc",
       "migrations_dir": "./migrations"
     }
   ],

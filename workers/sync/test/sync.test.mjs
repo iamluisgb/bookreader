@@ -43,6 +43,11 @@ test('token: la licencia de prueba da un token de escritura; sin Polar configura
   const sinMock = env({ ALLOW_MOCK_LICENSES: '' });
   assert.equal((await login(sinMock)).status, 503);
   assert.equal((await login(sinMock)).error, 'not_configured');
+  // Cuentas de prueba (TEST_LICENSES): solo esas keys exactas, aun sin Polar.
+  const prueba = env({ ALLOW_MOCK_LICENSES: '', TEST_LICENSES: 'BKRD-LUIS-AAAA, BKRD-OTRA-BBBB' });
+  assert.equal((await login(prueba, 'BKRD-LUIS-AAAA')).status, 200);
+  assert.equal((await login(prueba, 'BKRD-OTRA-BBBB')).status, 200);
+  assert.equal((await login(prueba, 'BKRD-LUIS-AAAB')).error, 'not_configured');
 });
 
 test('token: un Pro sin suscripción no entra; una key revocada sin datos tampoco', async () => {

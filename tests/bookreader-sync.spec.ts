@@ -203,6 +203,14 @@ test.describe('MON4 F3 — sync de BookReader de punta a punta', () => {
     await page.evaluate(async () => (await import('/js/ui/app-settings.js')).open('data'));
     await expect(page.locator('#appset-sync-choice [data-p="drive"]')).toBeVisible();
     await expect(page.locator('#appset-sync-choice [data-p="bookreader"]')).toBeHidden();
+    // ?sync-preview=1 la enseña (y se queda); =0 la vuelve a esconder.
+    await page.goto('/?sync-preview=1');
+    await page.goto('/');
+    await page.evaluate(async () => (await import('/js/ui/app-settings.js')).open('data'));
+    await expect(page.locator('#appset-sync-choice [data-p="bookreader"]')).toBeVisible();
+    await page.goto('/?sync-preview=0');
+    await page.evaluate(async () => (await import('/js/ui/app-settings.js')).open('data'));
+    await expect(page.locator('#appset-sync-choice [data-p="bookreader"]')).toBeHidden();
   });
 
   test('Ajustes → Datos: elegir BookReader, activarlo, enlace y clave de recuperación', async ({ page, context }) => {
