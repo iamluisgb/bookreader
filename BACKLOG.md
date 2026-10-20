@@ -378,9 +378,9 @@ ser necesaria.
 
 ---
 
-### IA10 — Pregúntale a tu biblioteca: búsqueda en todos los libros para agentes · `L` · **plan (2026-10-20)**
+### IA10 — Pregúntale a tu biblioteca: búsqueda en todos los libros para agentes · `L` · **F0 ✓ (2026-10-20)**
 
-> Decisiones en [ADR-059](DECISIONS.md) (`PROPUESTA` hasta cerrar F0). Hermana de
+> Decisiones en [ADR-059](DECISIONS.md) (`ACEPTADA` con las medidas de F0). Hermana de
 > [IA9](#ia9--retrieval-multi-fuente-cruzar-libros-papers-y-posts--m): IA9 cruza fuentes **dentro
 > de la app**; IA10 lo hace para un agente externo por el MCP remoto (P28 + MON4). Comparten el
 > núcleo de ranking (F2), no la plomería.
@@ -463,8 +463,11 @@ sin abrir, y por significado. No se arregla estirando `search_book`; hace falta 
 - **Secundarias:**
   - pasaje esperado en el top-3 de su libro ≥ 70 %;
   - **≤ 3 llamadas** por pregunta (hoy, 9);
-  - CPU p95 de `search_library` ≤ 10 ms en `wrangler tail`;
-  - lecturas R2 por consulta ≤ 1 + nº de términos;
+  - CPU p95 de `search_library` ≤ 40 ms en `wrangler tail`, y ningún 1102 con 10 consultas en
+    paralelo. Revisado en F0: el plan decía ≤ 10 ms, pero solo el coste fijo de autenticar ya son
+    unos 10 ms.
+  - ≤ 40 lecturas R2 por consulta (el plan decía ≤ 1 + términos, pero los bloques de texto de los
+    pasajes también cuentan);
   - escrituras R2 por libro importado ≤ 20.
 - **Baseline:** el flujo de hoy (list_books, search_highlights y search_book por candidato), medido
   sobre la misma batería **antes** de F1, con nombre de run.
@@ -472,11 +475,27 @@ sin abrir, y por significado. No se arregla estirando `search_book`; hace falta 
   se abre con ese dato; si llega, F5 se cierra con hallazgo.
 
 **Fases:**
-- **F0 — Medir y decidir** `S`
-  - Escribir la batería y medir el baseline.
-  - Spike en el Worker desplegado: CPU de descifrar y buscar por MB de `search.txt`, y tamaño real
-    del texto por libro (los 32).
-  - Con esos números, elegir el diseño del índice (B) y pasar ADR-059 a `ACEPTADA`.
+- **F0 — Medir y decidir** `S` · **✓ (2026-10-20)**
+  - Batería de 20 preguntas en `evals/private/ia10-library.json`, revisada por Luis. El runner
+    reproducible es [`evals/ia10-baseline.mjs`](evals/ia10-baseline.mjs).
+  - **Baseline** (runs `ia10-f0-baseline-2026-10-20` e `ia10-baseline-2026-10-20`):
+    - recall de libros @5: **65–70 %**, según cuántas búsquedas se pierdan por el 1102 (72 en el
+      segundo run, aun con reintentos);
+    - al menos un libro esperado en el top-5: 85–90 %;
+    - **55 llamadas y 38 s por pregunta**.
+  - En el primer run, los 13 fallos fueron **11 de cobertura** (16 de 32 libros sin texto) y **2 de ranking** (Harness, el
+    libro pequeño, queda por debajo de los grandes).
+  - **CPU** (`wrangler tail`): `search_book` gasta unos 10 ms fijos más unos 10 ms por MB, hasta
+    41 ms en el libro de 3 MB. **Con 10 a la vez sobre ese libro, 3 dan el error 1102**, y en la
+    batería salieron 540.
+  - La búsqueda solo casa la palabra exacta: en Essential GraphRAG, «ontology» da 0 y «ontologies»
+    da 1.
+  - Diseño fijado en ADR-059:
+    - 64 particiones, una base y hasta 4 deltas, compactadas en el dispositivo;
+    - stemmer EN/ES;
+    - BM25 por libro, con el libro ordenado por sus mejores pasajes y no por cuántos aciertos tiene;
+    - almacén de pasajes en bloques de 16 KB leídos por rango.
+  - Aparte, `list_books` gastó **97 ms** de CPU y 4,5 s; mirarlo junto a F3.
 - **F1 — Todos los libros con texto** `M`
   - Sacar `ensureSegmented` de `study.js` a un módulo compartido.
   - Cola de fondo: un libro cada vez, en `requestIdleCallback`, se pausa si el lector abre un libro,
@@ -490,9 +509,12 @@ sin abrir, y por significado. No se arregla estirando `search_book`; hace falta 
   - **Cupo:** el texto cuenta en el almacenamiento del usuario. Antes de subir se comprueba el tope,
     y si no cabe se avisa, sin bloquear la app.
 - **F2 — Índice de la biblioteca** `M`–`L`
-  - Constructor puro (`sync/library-index-build.js`): términos plegados → postings `(bookId, aN, tf)`
-    más estadísticas por libro (pasajes, longitud media y df), particionado según F0. Versionado con
-    `INDEX_FORMAT`.
+  - Constructor puro (`sync/library-index-build.js`): términos plegados y **reducidos a su raíz**
+    (stemmer EN/ES compartido) → postings `(bookId, aN, tf)` más estadísticas por libro (pasajes,
+    longitud media y df).
+  - **64 particiones, base más ≤ 4 deltas**, compactación en el dispositivo y lápidas al borrar
+    (ADR-059). Versionado con `INDEX_FORMAT`.
+  - Almacén de pasajes por libro: bloques de 16 KB sellados por separado y leídos por rango.
   - **Se actualiza por libro**: alta, re-segmentación (`SEG_VERSION`) y **baja**. Borrar un libro
     borra su rastro del índice; es un requisito, no una mejora.
   - El texto de las particiones va cifrado como el resto (`sync-crypto.js`, `pathId`).

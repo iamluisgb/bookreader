@@ -1911,7 +1911,7 @@ matriz entera, además, acaba enseñando dónde está cada respuesta.
 capítulo queda para cuando haya más tipos. Volver a la matriz con solo las celdas flojas en blanco
 (desde el repaso de hoy) es el siguiente paso si los intentos muestran que la gente la rehace.
 
-## ADR-059 — Buscar en toda la biblioteca: el índice se construye en el dispositivo y el Worker solo lee particiones · `PROPUESTA (se acepta al cerrar IA10 F0)`
+## ADR-059 — Buscar en toda la biblioteca: el índice se construye en el dispositivo y el Worker solo lee particiones · `ACEPTADA (2026-10-20, medidas de IA10 F0)`
 
 **Contexto.** Un agente externo, por el MCP remoto (P28 y MON4), quiere preguntar a toda la
 biblioteca: «¿qué tenemos sobre ontologías?». El texto del sync se diseñó para leer un libro
@@ -1940,6 +1940,53 @@ primera prueba real necesitó 9 llamadas, eligió candidatos adivinando por el t
    - Quién los calcula requiere decisión explícita del dueño del producto, porque el texto sale hacia
      un tercero.
 5. **Un núcleo puro de ranking** compartido por el MCP (Node y Worker) y por IA9 en la app.
+
+**Medidas de F0 (2026-10-20, runs `ia10-f0-baseline-2026-10-20` e `ia10-baseline-2026-10-20`) y lo que fijan.**
+- **CPU de `search_book` en producción** (`wrangler tail`): unos 10 ms fijos más unos 10 ms por MB
+  del `search.txt` (Harness, 0,2 MB: 11–12 ms; SRE, 1,8 MB: 28–43 ms; El Turrero Post, 3 MB:
+  31–41 ms).
+  - **Con 10 peticiones en paralelo sobre el libro de 3 MB, 3 acaban en el error 1102** («Worker
+    exceeded resource limits»).
+  - En la batería, con 4 a la vez, hubo 540 y 622 respuestas 1102 en los dos runs; en el
+    segundo, **72 búsquedas se perdieron aun con 3 reintentos**.
+  - Recorrer libros en el Worker ya falla hoy, no solo a futuro.
+- **Tamaño:** 16 libros con texto suman 2,46 M palabras (unos 15 MB de búsqueda plegada); la
+  biblioteca entera, unos 30 MB.
+- **Baseline con las tools de hoy:**
+  - 55 llamadas y 38 s por pregunta;
+  - recall de libros @5: 70 % y 65 % (la diferencia son las búsquedas perdidas por el 1102);
+  - al menos un libro esperado en el top-5: 90 % y 85 %.
+  - En el primer run, de los 13 fallos, **11 son de cobertura** (el libro no tiene texto) y **2 de ranking**: Harness
+    Engineering (0,2 MB) queda por debajo de libros grandes, porque contar aciertos premia el
+    volumen.
+- **La búsqueda solo casa la palabra exacta:** en Essential GraphRAG, «ontology» da 0 y
+  «ontologies» da 1.
+
+**Con eso, el diseño queda así:**
+1. **Postings por término en 64 particiones**, por hash del término raíz.
+   - Una **base** más hasta 4 **deltas**: cada libro nuevo o re-segmentado es un delta de 1 fichero.
+   - Al quinto, el dispositivo compacta: baja las 64 particiones y los deltas, los funde y los sube.
+     Fundir usa el propio índice, no los textos, así que vale en un equipo que no tiene todos los
+     libros.
+   - Coste amortizado: unas 17 escrituras por libro.
+   - Borrar un libro deja una lápida en el manifiesto (la consulta lo ignora al momento) y fuerza una
+     compactación, que lo borra de verdad.
+2. **Raíces, no palabras:** un stemmer ligero EN/ES en el núcleo compartido, el mismo al indexar y al
+   consultar.
+3. **Estadísticas BM25 por libro** (pasajes, longitud media y df por libro): el idf no se mezcla entre
+   libros. El libro se ordena por sus mejores pasajes normalizados, no por cuántos aciertos tiene;
+   los 2 fallos de ranking son la prueba de que contar no vale.
+4. **El texto de los pasajes devueltos** sale de un almacén por libro: un solo objeto con bloques de
+   16 KB sellados por separado (el esquema de `sync-crypto.js`, con bloque pequeño). El Worker lee
+   solo los bloques que necesita, con lecturas por rango de R2. Cuesta 1 escritura más por libro.
+5. **Presupuestos que sustituyen a los del plan:**
+   - CPU p95 de `search_library` ≤ 40 ms (lo que hoy gasta un `search_book` grande), y **ningún
+     1102 con 10 consultas en paralelo**;
+   - ≤ 40 lecturas R2 por consulta (particiones, deltas, manifiesto y bloques);
+   - ≤ 20 escrituras R2 por libro, amortizadas.
+
+   El «≤ 10 ms» del plan no se puede cumplir: solo el coste fijo de autenticar y descifrar la clave
+   ya son unos 10 ms.
 
 **Alternativas descartadas.**
 - **Recorrer el `search.txt` de cada libro en el Worker.** Es simple, pero el coste crece con la
