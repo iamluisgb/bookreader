@@ -80,6 +80,9 @@ export async function apply(p, ids = p.books.map(b => b.entry.bookId), now = Dat
     if (entry.cover && (state === 'have' || state === 'attach')) {
       await Store.patchBook(entry.bookId, (cur) => (cur.cover ? {} : { cover: entry.cover }), { stamp: false });
     }
+    if (state === 'new' || state === 'attach') {
+      window.dispatchEvent(new CustomEvent('bookreader:book-imported', { detail: { bookId: entry.bookId } }));
+    }
     // missing: no hay ficha que crear (sería un libro sin fichero ni copia en Drive que
     // nadie puede abrir). Sus notas quedan en el carril y aparecen al conseguirlo.
   }

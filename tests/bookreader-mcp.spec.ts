@@ -304,6 +304,34 @@ test('Texto para agentes: un libro que solo está en el sync se trocea sin queda
   await movil.context.close();
 });
 
+// Un libro recién importado avisa a la cola (bookreader:book-imported): su texto y su índice se
+// preparan al cerrar el lector, sin esperar al siguiente sync.
+test('Texto para agentes: un libro importado se prepara y se indexa al cerrar el lector', async ({ page }) => {
+  const server = await createSyncServer();
+  await installSyncServer(page, server);
+  await enableSyncPreview(page);
+  await seedBookReaderSync(page);
+  await page.goto('/');
+  await page.evaluate(async () => {
+    await (await import('/js/sync/bookreader-auth.js')).enable();
+    await (await import('/js/sync/engine.js')).syncNow();
+    await (await import('/js/sync/bookreader-auth.js')).createMcpToken('Claude', { scopes: ['text'] });
+    (window as any).__imported = [];
+    window.addEventListener('bookreader:book-imported', (e: any) => (window as any).__imported.push(e.detail.bookId));
+  });
+  await page.setInputFiles('#file-input', path.join(__dirname, 'test.epub'));
+  await expect.poll(() => page.evaluate(() => (window as any).__imported.length)).toBe(1);
+  const id = await page.evaluate(() => (window as any).__imported[0]);
+  expect(await page.evaluate(async (id) => !!(await (await import('/js/library/store.js')).getBook(id)), id)).toBe(true);
+  await page.locator('#library-btn').click();
+  const coverage = () => page.evaluate(async () => (await import('/js/sync/book-text.js')).coverage());
+  await expect.poll(async () => (await coverage()).indexed, { timeout: 30000 }).toBe(1);
+  // Reabrir el mismo fichero no es un libro nuevo.
+  await page.setInputFiles('#file-input', path.join(__dirname, 'test.epub'));
+  await page.waitForTimeout(1000);
+  expect(await page.evaluate(() => (window as any).__imported.length)).toBe(1);
+});
+
 // IA10 F2 · Tras el texto, el índice de la biblioteca: el libro se indexa desde el texto del
 // servidor, se puede buscar (núcleo de library-index-build.js sobre lo cifrado) y su pasaje sale
 // del almacén por bloques. Al borrar el libro, se van su índice, su almacén y su texto.

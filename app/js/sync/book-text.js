@@ -15,8 +15,10 @@
 // IA10 F1 · Todos los libros, no solo los abiertos: `fill` trocea en segundo plano cada libro
 // (ai/segment-file.js), de uno en uno, en reposo y nunca con el lector abierto. Si el fichero no
 // está en este equipo pero sí en el sync, lo baja solo para trocearlo y no lo guarda
-// (blobs.js · fetchForText): el texto no depende de qué equipo tenga qué libros. Qué está subido lo dice el servidor (los índices `text/<id>.json` y su
-// versión), no el localStorage de cada equipo: así dos equipos no trocean el mismo libro.
+// (blobs.js · fetchForText): el texto no depende de qué equipo tenga qué libros. Un libro recién
+// importado no espera al siguiente sync (`bookAdded`). Qué está subido lo dice el servidor (los
+// índices `text/<id>.json` y su versión), no el localStorage de cada equipo: así dos equipos no
+// trocean el mismo libro.
 // `coverage` lo cuenta para Ajustes → Datos → Agentes.
 
 import * as Provider from './provider.js';
@@ -29,6 +31,7 @@ const STATE_KEY = 'sync_text_state';   // { [bookId]: huella del texto ya subido
 const REMOTE_KEY = 'sync_text_remote'; // { [bookId]: { etag, v, segVersion } } índices remotos ya leídos
 const FAILED_KEY = 'sync_text_failed'; // { [bookId]: { seg, why } } no dio texto con esta SEG_VERSION
 let running = null;
+let again = false;                     // llegó un libro nuevo con la cola en marcha: otra pasada al acabar
 let quotaFull = false;
 const uploading = new Map();           // bookId → Promise: el evento y la cola no suben dos veces
 const unfetchable = new Set();         // libros cuyo fichero no se pudo bajar del sync (en esta sesión)
@@ -221,8 +224,21 @@ export function backfill() {
       }
     }
     return n;
-  })().finally(() => { running = null; progress(); });
+  })().finally(() => {
+    running = null;
+    progress();
+    if (again) { again = false; backfill(); }
+  });
   return running;
+}
+
+// Un libro recién importado: su texto se prepara ya, no al siguiente sync. Si la cola está en
+// marcha (con la lista de libros ya leída), da otra pasada al terminar. El libro nuevo es el más
+// reciente, así que va el primero; con el lector abierto, la cola espera a que se cierre.
+export function bookAdded() {
+  if (!enabled()) return;
+  if (running) again = true;
+  else backfill();
 }
 
 // IA10 F2 · Tras el texto, el índice de la biblioteca (library-index.js): los libros con texto
@@ -281,6 +297,7 @@ export async function coverage() {
 export function start() {
   window.addEventListener('bookreader:segmented', (e) => { upload(e.detail.bookId).catch(err => console.warn('book-text:', err.message)); });
   window.addEventListener('bookreader:book-text-wanted', () => { backfill(); });
+  window.addEventListener('bookreader:book-imported', () => { bookAdded(); });
   // Tras cada ciclo de sync bien acabado (y con él, un token que dice si algún agente lo quiere).
   window.addEventListener('bookreader:sync-status', (e) => { if (e.detail === 'ok') backfill(); });
 }
