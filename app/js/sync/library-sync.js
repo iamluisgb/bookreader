@@ -50,7 +50,14 @@ const THUMB_PREFIX = 'v2|';
 // lado gane el LWW por haber tocado el progreso (ver mergeMaps · monotone).
 // Título y autor editados por el usuario: se resuelven por su propio sello (metaAt), no por
 // el del registro, que mueve cualquier pase de página (ver mergeMaps · stamped).
-const STAMPED = [{ at: 'metaAt', fields: ['title', 'author'] }];
+// Lo mismo para las estanterías de cada libro (`shelvesAt`) y su estado puesto a mano
+// (`statusAt`, con su `finishedAt`): un pase de página en otro dispositivo no los revierte
+// (library/store.js · stampGroups). Es lo que deja a un agente organizar la biblioteca por MCP.
+const STAMPED = [
+  { at: 'metaAt', fields: ['title', 'author'] },
+  { at: 'shelvesAt', fields: ['shelfIds'] },
+  { at: 'statusAt', fields: ['status', 'finishedAt'] },
+];
 const MONOTONE = ['title', 'author', 'origTitle', 'origAuthor', 'format', 'fileName', 'fileBaseId', 'size', 'blob', 'addedAt'];
 
 // ---- Miniaturas -------------------------------------------------------------
@@ -110,8 +117,10 @@ function bookEntry(b) {
     fileName: b.fileName || '', fileBaseId: b.fileBaseId || '',
     size: b.size || 0, addedAt: b.addedAt || 0,
     status: b.status || 'unread', progress: b.progress || 0,
+    ...(b.statusAt ? { statusAt: b.statusAt } : {}),
     ...(b.finishedAt ? { finishedAt: b.finishedAt } : {}),
     shelfIds: b.shelfIds || [],
+    ...(b.shelvesAt ? { shelvesAt: b.shelvesAt } : {}),
     // Solo si existen: un registro sin ellos se serializa igual que antes (sin push de más).
     ...(Array.isArray(b.chapterOrder) ? { chapterOrder: b.chapterOrder } : {}),
     ...(Array.isArray(b.chaptersDone) ? { chaptersDone: b.chaptersDone } : {}),

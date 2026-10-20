@@ -38,7 +38,7 @@ const DB_VERSION = 1;
 // Campos que viajan en library.json. Un cambio en cualquiera de ellos bumpea
 // `updatedAt`; un cambio en el resto (lastOpenedAt, lastCfi, file…) no.
 const SYNCED_FIELDS = ['title', 'author', 'origTitle', 'origAuthor', 'metaAt', 'format', 'fileName', 'fileBaseId', 'size',
-  'addedAt', 'status', 'progress', 'finishedAt', 'shelfIds', 'blob', 'deleted', 'deletedAt',
+  'addedAt', 'status', 'statusAt', 'progress', 'finishedAt', 'shelfIds', 'shelvesAt', 'blob', 'deleted', 'deletedAt',
   // Capítulos ya leídos (ai/chapter-gate.js): deciden qué tarjetas nuevas entran en el repaso.
   'chapterOrder', 'chaptersDone'];
 
@@ -165,6 +165,7 @@ export async function putBook(record, { stamp = true } = {}) {
   stampFinished(prev, next);
   let changed = false;
   if (stamp) {
+    stampGroups(prev, next);
     changed = syncedChanged(prev, next);
     if (changed) next.updatedAt = Date.now();
     else if (prev && !next.updatedAt) next.updatedAt = prev.updatedAt;
@@ -207,6 +208,7 @@ export async function patchBook(id, patch, { stamp = true } = {}) {
     if (stripped && campos.file === undefined) rec.file = cur.file;
     stampFinished(cur, rec);
     if (stamp) {
+      stampGroups(cur, rec);
       changed = syncedChanged(cur, rec);
       if (changed) rec.updatedAt = Date.now();
       else if (!rec.updatedAt) rec.updatedAt = cur.updatedAt;
@@ -261,6 +263,21 @@ function stampFinished(prev, next) {
     else if (!next.finishedAt && prev?.finishedAt) next.finishedAt = prev.finishedAt;
   } else if (next.finishedAt) {
     next.finishedAt = null;
+  }
+}
+
+// Sellos de grupo (ver sync/merge.js · mergeMaps · stamped). Pasar una página cambia el
+// `updatedAt` del libro, y con LWW por registro eso pisaba en el sync lo que otro dispositivo (o
+// un agente por MCP) acababa de decidir sobre él. Como con el título (`metaAt`):
+//   - `shelvesAt`: cualquier cambio de estanterías. La app nunca las cambia sola.
+//   - `statusAt`: solo el estado puesto A MANO. El que se deriva del progreso al leer
+//     (statusFor) no sella: no debe ganarle a una decisión explícita hecha en otro sitio.
+function stampGroups(prev, next) {
+  if (!prev) return;
+  const now = Date.now();
+  if (JSON.stringify(prev.shelfIds || []) !== JSON.stringify(next.shelfIds || [])) next.shelvesAt = now;
+  if ((prev.status || 'unread') !== (next.status || 'unread') && next.status !== statusFor(next.progress || 0, prev.status)) {
+    next.statusAt = now;
   }
 }
 
