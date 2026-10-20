@@ -26,3 +26,6 @@ dist/
 # Vídeos y capturas de emulador (se regeneran)
 reels/
 .em-shots/
+
+# Baterías con la biblioteca personal (IA10): fuera del repo público
+evals/private/

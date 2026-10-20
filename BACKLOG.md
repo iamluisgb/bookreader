@@ -378,6 +378,172 @@ ser necesaria.
 
 ---
 
+### IA10 — Pregúntale a tu biblioteca: búsqueda en todos los libros para agentes · `L` · **plan (2026-10-20)**
+
+> Decisiones en [ADR-059](DECISIONS.md) (`PROPUESTA` hasta cerrar F0). Hermana de
+> [IA9](#ia9--retrieval-multi-fuente-cruzar-libros-papers-y-posts--m): IA9 cruza fuentes **dentro
+> de la app**; IA10 lo hace para un agente externo por el MCP remoto (P28 + MON4). Comparten el
+> núcleo de ranking (F2), no la plomería.
+
+**El caso (medido el 2026-10-20 con el MCP remoto).** «¿Qué tenemos sobre ontologías?»:
+- Hicieron falta **9 llamadas**. El agente eligió los candidatos **adivinando por el título**.
+- De los 5 candidatos sin leer, **4 no tenían texto en el sync**: Building Knowledge Graphs,
+  Agentic GraphRAG, Data Mesh y DDD Distilled. Son justo los libros que más interesaba consultar.
+- Essential GraphRAG dio **0 resultados** para «ontology»: la búsqueda es por palabras.
+- La respuesta solo pudo salir de los dos libros ya trabajados.
+
+**El diagnóstico.** El texto del sync se diseñó para que un agente lea **un** libro contigo:
+- se trocea al **abrirlo** (`sync/book-text.js`: «se sube en cuanto se trocea»);
+- se busca libro a libro (`search_book` descifra el `search.txt` de ese libro);
+- y solo por palabras.
+
+«¿Qué dice mi biblioteca de X?» es otro caso de uso: **toda** la biblioteca, incluidos los libros
+sin abrir, y por significado. No se arregla estirando `search_book`; hace falta una capa nueva.
+
+**Lo que ya existe y se reutiliza (no se reinventa):**
+- Formato del texto en el sync y plegado `foldSearch`: `sync/book-text-build.js`, puro y compartido
+  app ↔ MCP.
+- **Trocear sin abrir el lector:** `ensureSegmented` en `ai/study.js` ya parsea el EPUB/PDF sin IA,
+  para la cola de repaso.
+- Reglas de IA9 que aplican tal cual:
+  - ids cualificados `bookId:aN`;
+  - puntuar **por fuente** y mezclar en round-robin, porque el idf de índices distintos no se
+    compara y un top-k global lo acapara el libro más verboso.
+- Expansión de la consulta (IA7): ES→EN de 0/5 a 4/5 en DDIA.
+- Arnés de recall@k (`tests/retrieval.spec.ts`) y el contrato EV5.
+
+**Las restricciones que mandan sobre el diseño (números, no opiniones):**
+1. **CPU del Worker: 10 ms** por petición en el plan gratuito. Las tools de hoy ya gastan 13–32 ms
+   (ver MON4: vigilar el 1102).
+   - Descifrar y recorrer el `search.txt` de 30 libros en cada consulta no cabe.
+   - Tampoco el coseno sobre todos los pasajes: 60k × 1024 floats son ~245 MB.
+2. **R2:** el sync en prueba va con `CAP_CLASS_A` 100k/mes y 1 GB (`workers/sync/wrangler.jsonc`),
+   y lo gratis se comparte con `share`. **Nunca se paga.**
+   - Un índice que reescriba 256 ficheros por libro importado agota las escrituras con pocos
+     usuarios.
+3. **Cifrado de extremo a extremo:** el Worker solo lee el texto con un token `text`, descifrando
+   en memoria durante la petición (`mcp.js · unwrap`).
+   - Nada de una base vectorial en claro (Vectorize): **los embeddings se pueden invertir** y dejan
+     ver el texto.
+   - Mandar el texto a un proveedor de embeddings es una decisión de privacidad explícita, no un
+     detalle técnico.
+
+**Diseño (resumen; el porqué, en ADR-059):**
+- **A — El índice se construye en el dispositivo, al importar el libro, no al abrirlo.**
+  - Un trabajo de fondo trocea todo libro con fichero en el equipo.
+  - El Worker no construye nada.
+- **B — Un índice de biblioteca particionado por término.**
+  - Una consulta lee unos pocos ficheros pequeños: uno por término, más uno de estadísticas.
+  - No descifra libros enteros.
+  - La forma exacta (cuántas particiones, base más deltas por libro y compactación) se decide en F0
+    con medidas de CPU y de operaciones R2.
+- **C — Resultados agrupados por libro**, con k pasajes por libro.
+  - Cada pasaje lleva capítulo, ancla y la marca «lo subrayaste».
+  - Hay un apartado **«no buscado»** con cada libro que no entró y por qué: sin texto, fichero en
+    otro equipo o índice viejo.
+  - El agente no puede afirmar «no hay nada» sin saber qué se quedó fuera.
+- **D — La semántica, primero por el agente que llama.** El cliente del MCP ya es un LLM.
+  - `search_library` acepta `queries[]` (hasta 5) y su descripción le pide sinónimos y los términos
+    en el idioma del libro. Es IA7 hecho por quien llama, gratis.
+  - Los embeddings solo entran si la medición de F4 enseña un hueco.
+- **E — Los subrayados y notas puntúan.** Lo que el lector marcó pesa más, y se dice.
+- **F — Un núcleo puro de ranking compartido**, como `book-text-build.js`.
+  - Lo usan el MCP (Node y Worker) y, más adelante, IA9 en la app.
+  - Así hay una sola implementación del BM25 por fuente y de la mezcla.
+
+**Contrato (EV5, antes de escribir código):**
+- **Batería:** 15–20 preguntas reales sobre la biblioteca de Luis.
+  - Cada una con los **libros** esperados y, cuando se pueda, el ancla.
+  - Mezcla: concepto en español sobre libros en inglés («ontologías»), término exacto («Raft»),
+    paráfrasis («cómo acordar entre réplicas») y tema transversal («evaluar agentes»).
+  - **Va fuera del repo** (`evals/private/`, en `.gitignore`), porque el repo es público y la
+    biblioteca es personal.
+  - Gemela pública con libros de dominio público para CI.
+- **Métrica primaria:** recall de libros @5 ≥ 90 % (está en los 5 primeros libros devueltos).
+- **Secundarias:**
+  - pasaje esperado en el top-3 de su libro ≥ 70 %;
+  - **≤ 3 llamadas** por pregunta (hoy, 9);
+  - CPU p95 de `search_library` ≤ 10 ms en `wrangler tail`;
+  - lecturas R2 por consulta ≤ 1 + nº de términos;
+  - escrituras R2 por libro importado ≤ 20.
+- **Baseline:** el flujo de hoy (list_books, search_highlights y search_book por candidato), medido
+  sobre la misma batería **antes** de F1, con nombre de run.
+- **Time-box:** F0–F4 en 2 ciclos de medición. Si con `queries[]` la primaria no llega al 90 %, F5
+  se abre con ese dato; si llega, F5 se cierra con hallazgo.
+
+**Fases:**
+- **F0 — Medir y decidir** `S`
+  - Escribir la batería y medir el baseline.
+  - Spike en el Worker desplegado: CPU de descifrar y buscar por MB de `search.txt`, y tamaño real
+    del texto por libro (los 32).
+  - Con esos números, elegir el diseño del índice (B) y pasar ADR-059 a `ACEPTADA`.
+- **F1 — Todos los libros con texto** `M`
+  - Sacar `ensureSegmented` de `study.js` a un módulo compartido.
+  - Cola de fondo: un libro cada vez, en `requestIdleCallback`, se pausa si el lector abre un libro,
+    y se reanuda.
+  - Arranca al conectar un token con `text` y tras cada sync bien acabado (los mismos disparadores
+    que `backfill`).
+  - **Estado visible en Ajustes → Datos → Agentes:** «Texto para agentes: 28 de 32 libros», y cuáles
+    faltan y por qué. El caso típico: el fichero solo está en otro equipo.
+  - **Varios equipos:** qué está subido lo dice el servidor (las huellas en el índice del texto), no
+    el `localStorage` de cada uno. Así dos equipos no trocean ni suben el mismo libro.
+  - **Cupo:** el texto cuenta en el almacenamiento del usuario. Antes de subir se comprueba el tope,
+    y si no cabe se avisa, sin bloquear la app.
+- **F2 — Índice de la biblioteca** `M`–`L`
+  - Constructor puro (`sync/library-index-build.js`): términos plegados → postings `(bookId, aN, tf)`
+    más estadísticas por libro (pasajes, longitud media y df), particionado según F0. Versionado con
+    `INDEX_FORMAT`.
+  - **Se actualiza por libro**: alta, re-segmentación (`SEG_VERSION`) y **baja**. Borrar un libro
+    borra su rastro del índice; es un requisito, no una mejora.
+  - El texto de las particiones va cifrado como el resto (`sync-crypto.js`, `pathId`).
+  - Tests de propiedad: un índice construido de golpe ≡ uno construido libro a libro, y añadir y
+    quitar un libro deja el índice como estaba.
+- **F3 — `search_library` en el MCP** `M`
+  - Argumentos:
+    - `query` o `queries[]` (≤ 5);
+    - `shelf` opcional, para limitar el ámbito a una estantería, como en P12 e IA9 D;
+    - `perBook` (3 por defecto) y `books` (8 por defecto).
+  - Devuelve por libro: puntuación, pasajes (`bookId:aN`, capítulo, texto con contexto) y
+    `highlighted`. Fuera de los libros, `notSearched`.
+  - Funciona en el MCP remoto (Worker) y en el local (Node), con el mismo núcleo. Permiso `text`.
+  - La descripción de la tool enseña el método: expandir la pregunta y después `read_chapter` sobre
+    lo prometedor.
+  - Test de presupuesto: una consulta de 5 términos sobre 40 libros sintéticos no pasa de N lecturas
+    ni de 10 ms de CPU medidos en Miniflare.
+- **F4 — Medir y decidir la semántica** `S`
+  - La batería entera contra producción: `queries[]` ON y OFF.
+  - Resultado en el CHANGELOG con el nombre del run.
+- **F5 — Router semántico (condicional)** `L`
+  - **Solo si F4 enseña el hueco.**
+  - Vectores **por sección, no por pasaje** (~100 por libro), truncados a 256 dimensiones (MRL de
+    `qwen3-embedding`) e int8: ~25 KB por libro, cifrados.
+  - El router elige secciones candidatas y BM25 busca dentro.
+  - Antes, decidir quién calcula los embeddings: el proveedor BYOK, o el gateway (MON1) en la
+    suscripción. **Esta decisión necesita el sí explícito de Luis**, porque el texto sale hacia un
+    tercero.
+- **F6 — En la app (opcional)**
+  - IA9 usa el núcleo de F2 para la conversación con ámbito «esta estantería».
+  - Si «Pregúntale a tu biblioteca» se vende como parte de la suscripción (ADR-031, MON4), es
+    decisión de producto con su propio ítem.
+
+**Riesgos:**
+- **CPU 1102:** la tool corta por presupuesto (lee menos particiones y lo dice en `notSearched`),
+  nunca falla a medias.
+- **Índice viejo tras re-segmentar:** las anclas cambian. La huella del texto va en el índice, y si
+  no casa, ese libro sale en `notSearched` hasta reconstruirlo.
+- **Inyección de instrucciones:** el texto de los libros no es de fiar; la salida va marcada como
+  contenido, como en `read_chapter`.
+- **Coste en el móvil:** trocear 30 libros gasta batería. Va de uno en uno, en reposo, y se puede
+  pausar.
+
+**Fuera de alcance:**
+- Descubrir libros fuera de la biblioteca.
+- Una base vectorial en claro.
+- El plan de pago de Workers.
+- Buscar en libros cuyo fichero no está en ningún equipo del usuario.
+
+---
+
 ## 🎨 Producto / UX
 
 > **Decisión de diseño — "Ajustes generales" (hogar de P1–P3).** P1, P2 y P3 son config

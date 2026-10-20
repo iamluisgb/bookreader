@@ -1910,3 +1910,48 @@ matriz entera, además, acaba enseñando dónde está cada respuesta.
 **Consecuencias.** La superficie llega sin pantalla nueva. El «Te toca» de la libreta al cerrar un
 capítulo queda para cuando haya más tipos. Volver a la matriz con solo las celdas flojas en blanco
 (desde el repaso de hoy) es el siguiente paso si los intentos muestran que la gente la rehace.
+
+## ADR-059 — Buscar en toda la biblioteca: el índice se construye en el dispositivo y el Worker solo lee particiones · `PROPUESTA (se acepta al cerrar IA10 F0)`
+
+**Contexto.** Un agente externo, por el MCP remoto (P28 y MON4), quiere preguntar a toda la
+biblioteca: «¿qué tenemos sobre ontologías?». El texto del sync se diseñó para leer un libro
+(`search_book` descifra el `search.txt` de ese libro) y solo existe para los libros ya abiertos. La
+primera prueba real necesitó 9 llamadas, eligió candidatos adivinando por el título y no pudo leer
+4 de 5. Tres límites mandan:
+- la CPU del Worker gratuito (10 ms);
+- las escrituras R2 del sync (100k al mes, compartidas, y nunca se paga);
+- el cifrado de extremo a extremo (el Worker solo descifra con un token `text` y en memoria).
+
+**Decisión.**
+1. **El dispositivo construye; el Worker solo lee.**
+   - El troceado y el índice se hacen en la app, en segundo plano y al importar.
+   - El Worker no reconstruye ni recorre libros enteros en una consulta.
+2. **Un índice de biblioteca particionado por término**, cifrado como el resto del sync.
+   - Una consulta lee una partición por término y un fichero de estadísticas.
+   - El número de particiones y si hay deltas por libro con compactación los fijan las medidas de
+     F0: CPU por MB y operaciones R2 por importación.
+3. **Se puntúa por libro y se mezcla por libro** (IA9 C), con ids `bookId:aN`.
+   - La respuesta incluye siempre qué libros **no** se buscaron y por qué.
+4. **La semántica la pone primero el agente que llama.** `search_library` acepta varias consultas
+   y la tool le pide expandirlas.
+   - Los embeddings solo entran si la batería lo justifica.
+   - En ese caso van por sección, cuantizados y cifrados; nunca en una base vectorial en claro, porque
+     un embedding deja reconstruir el texto.
+   - Quién los calcula requiere decisión explícita del dueño del producto, porque el texto sale hacia
+     un tercero.
+5. **Un núcleo puro de ranking** compartido por el MCP (Node y Worker) y por IA9 en la app.
+
+**Alternativas descartadas.**
+- **Recorrer el `search.txt` de cada libro en el Worker.** Es simple, pero el coste crece con la
+  biblioteca y ya hoy rompe los 10 ms.
+- **Vectorize o una base vectorial gestionada.** Rompe el cifrado de extremo a extremo y el tope
+  gratuito: 60k pasajes × 1024 dimensiones superan lo gratis.
+- **Plan de pago de Workers.** Contra la regla de no pagar; además, no arregla la cobertura de texto.
+- **Construir el índice en el Worker al subir el texto.** El Worker tendría que descifrar libros
+  enteros, otra vez sin CPU.
+
+**Consecuencias.**
+- La cobertura (cuántos libros tienen texto) pasa a ser algo que el lector ve y que se mide.
+- Borrar un libro tiene que borrar su rastro del índice.
+- El formato del índice es un contrato versionado (`INDEX_FORMAT`), como `TEXT_FORMAT`.
+- Detalle y fases en BACKLOG · IA10.
