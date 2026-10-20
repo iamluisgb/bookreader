@@ -17,7 +17,7 @@
 
 import { ToolError } from './errors.mjs';
 import { fold } from './book-arg.mjs';
-import { cleanRule, hasRule, booksIn, segments, RULE_FIELDS, SEP } from '../../app/js/library/shelves.js';
+import { cleanRule, hasRule, booksIn, segments, renumber, levelNodes, RULE_FIELDS, SEP } from '../../app/js/library/shelves.js';
 
 const STATUSES = ['unread', 'reading', 'finished'];
 const MAX_ITEMS = 500;
@@ -356,34 +356,55 @@ const REORDER_SHELVES = {
   name: 'reorder_shelves',
   title: 'Ordenar estanterías',
   description:
-    'Fija el orden de las estanterías de UN nivel del árbol (las que cuelgan del mismo padre): ' +
-    '`order` es la lista de esas estanterías en el orden deseado; las que no nombres van detrás, ' +
-    'en el orden que tenían.',
+    'Fija el orden de UN nivel del árbol (lo que cuelga del mismo padre): `order` es la lista en ' +
+    'el orden deseado, de estanterías o de carpetas («Técnico», que existe solo porque hay ' +
+    '«Técnico/…»); lo que no nombres va detrás, en el orden que tenía. Una carpeta se mueve con ' +
+    'todo lo que lleva dentro.',
   capability: 'canOrganize',
   inputSchema: {
     type: 'object',
-    properties: { order: { type: 'array', items: { type: 'string' }, description: 'Ids o nombres completos, todas del mismo nivel.' }, ...DRY },
+    properties: { order: { type: 'array', items: { type: 'string' }, description: 'Ids o rutas completas («Técnico», «Técnico/ML»), todas del mismo nivel.' }, ...DRY },
     required: ['order'],
     additionalProperties: false,
   },
   run: (source, args) => onLibrary(source, args, (lib, now, undo) => {
-    const wanted = (Array.isArray(args.order) ? args.order : []).map((r) => findShelf(lib, r));
-    if (!wanted.length) throw new ToolError('«order» no puede ir vacío.');
-    const parent = parentOf(wanted[0].name);
-    if (wanted.some((s) => parentOf(s.name) !== parent)) throw new ToolError('Todas tienen que ser del mismo nivel (mismo padre en el nombre).');
-    const siblings = liveShelves(lib).filter((s) => parentOf(s.name) === parent)
-      .sort((a, b) => (a.order ?? 1e9) - (b.order ?? 1e9) || (a.createdAt || 0) - (b.createdAt || 0));
-    const seq = [...wanted, ...siblings.filter((s) => !wanted.some((w) => w.id === s.id))];
-    let n = 0;
-    seq.forEach((s, i) => {
-      if (lib.shelves[s.id].order === i) return;
-      keepShelf(undo, s.id, lib.shelves[s.id]);
-      lib.shelves[s.id] = { ...lib.shelves[s.id], order: i, updatedAt: now };
-      n++;
-    });
-    return { changed: n > 0, result: { parent: parent || null, order: seq.map((s) => s.name) }, summary: { shelvesChanged: n } };
+    const refs = Array.isArray(args.order) ? args.order : [];
+    if (!refs.length) throw new ToolError('«order» no puede ir vacío.');
+    const live = liveShelves(lib);
+    const wanted = refs.map((r) => nodePathOf(lib, live, r));
+    const parent = parentOf(wanted[0]);
+    if (wanted.some((p) => parentOf(p) !== parent)) throw new ToolError('Todas tienen que ser del mismo nivel (mismo padre en el nombre).');
+    const level = levelNodes(live, parent).map((n) => n.path);
+    const seq = [...new Set([...wanted, ...level])];
+    // Una sola numeración para toda la biblioteca (shelves.js · renumber): un grupo se coloca
+    // por el menor `order` de lo que lleva dentro, comparado con el de sus hermanas.
+    const patches = renumber(live, (at, nodes) => at === parent ? seq.map((p) => nodes.find((n) => n.path === p)) : nodes);
+    for (const { id, order } of patches) {
+      keepShelf(undo, id, lib.shelves[id]);
+      lib.shelves[id] = { ...lib.shelves[id], order, updatedAt: now };
+    }
+    const label = (p) => p.split(SEP).pop();
+    return { changed: patches.length > 0, result: { parent: parent || null, order: seq.map(label) }, summary: { shelvesChanged: patches.length } };
   }),
 };
+
+// La ruta del nodo de un nivel: una estantería (id o nombre) o una carpeta que solo existe
+// porque hay estanterías debajo («Técnico» con «Técnico/ML»).
+function nodePathOf(lib, live, ref) {
+  try {
+    return segments(findShelf(lib, ref, 'order').name).join(SEP);
+  } catch (e) {
+    const q = typeof ref === 'string' ? fold(segments(ref).join(SEP)) : '';
+    for (const s of live) {
+      const parts = segments(s.name);
+      for (let i = 1; i < parts.length; i++) {
+        const path = parts.slice(0, i).join(SEP);
+        if (fold(path) === q) return path;
+      }
+    }
+    throw e;
+  }
+}
 
 const DELETE_SHELF = {
   name: 'delete_shelf',

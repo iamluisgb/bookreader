@@ -154,3 +154,18 @@ test('inteligentes y orden: regla por nombres, solo sobre normales; reorder del 
   assert.equal(rn.json.after.name, 'Técnico/Favoritos');
   assert.equal((await s.readLib()).shelves.sh_fav.createdAt, 2, 'mismo id y misma estantería');
 });
+
+test('reorder de una carpeta: «Libros» (solo existe por «Libros/…») se coloca con todo lo que lleva dentro', async () => {
+  const s = await seeded();
+  const t = await s.token(['library']);
+  await tool(s.e, t, 'create_shelf', { name: 'Libros/Ensayo' });
+  await tool(s.e, t, 'create_shelf', { name: 'Libros/Novela' });
+  const r = await tool(s.e, t, 'reorder_shelves', { order: ['Favoritos', 'libros', 'Técnico'] });
+  assert.deepEqual(r.json.order, ['Favoritos', 'Libros', 'Técnico', 'Técnico pendientes']);
+  const lib = await s.readLib();
+  const byName = Object.fromEntries(Object.values(lib.shelves).map((x) => [x.name, x.order]));
+  // Una sola secuencia, en el orden del rail: la carpeta ocupa el hueco de sus estanterías.
+  assert.deepEqual(byName, { Favoritos: 0, 'Libros/Ensayo': 1, 'Libros/Novela': 2, Técnico: 3, 'Técnico pendientes': 4 });
+  const mixed = await tool(s.e, t, 'reorder_shelves', { order: ['Libros/Novela', 'Favoritos'] });
+  assert.ok(mixed.isError && /mismo nivel/.test(mixed.text));
+});

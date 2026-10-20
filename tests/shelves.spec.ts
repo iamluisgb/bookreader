@@ -132,6 +132,33 @@ test('reorder: mueve entre hermanas del mismo nivel y numera la secuencia entera
   expect(out.otraSola).toEqual([]);
 });
 
+test('reorder: una estantería de la raíz salta un grupo, y la numeración es una sola para todo el árbol', async ({ page }) => {
+  const out = await page.evaluate(async () => {
+    const S = await import('/js/library/shelves.js');
+    // Sin numeración global, mover dentro de «Técnico» dejaba ML con order 0, empatado
+    // con «Ahora» (0) en la raíz: el grupo saltaba arriba.
+    const shelves = [
+      { id: 'ahora', name: 'Ahora', createdAt: 1, order: 0 },
+      { id: 'ml', name: 'Técnico/ML', createdAt: 2, order: 1 },
+      { id: 'sis', name: 'Técnico/Sistemas', createdAt: 3, order: 2 },
+      { id: 'neg', name: 'Negocio', createdAt: 4, order: 3 },
+    ];
+    const apply = (patches: any[]) => {
+      const next = shelves.map(s => ({ ...s }));
+      for (const p of patches) Object.assign(next.find(s => s.id === p.id)!, p);
+      return S.shelfRows(next).map((r: any) => r.label);
+    };
+    return {
+      bajaML: apply(S.reorder(shelves, 'sis', -1)),
+      subeNegocio: apply(S.reorder(shelves, 'neg', -1)),
+      nivel: S.levelNodes(shelves, '').map((n: any) => n.label),
+    };
+  });
+  expect(out.bajaML).toEqual(['Ahora', 'Técnico', 'Sistemas', 'ML', 'Negocio']);
+  expect(out.subeNegocio).toEqual(['Ahora', 'Negocio', 'Técnico', 'ML', 'Sistemas']);
+  expect(out.nivel).toEqual(['Ahora', 'Técnico', 'Negocio']);
+});
+
 test('cleanRule tira los campos vacíos: la regla que viaja en el sync no lleva ruido', async ({ page }) => {
   const out = await page.evaluate(async () => {
     const S = await import('/js/library/shelves.js');

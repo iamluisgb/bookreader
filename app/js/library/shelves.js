@@ -221,23 +221,54 @@ function descendantIds(node) {
 // ---- Reordenar --------------------------------------------------------------
 
 // Mueve una estantería entre sus HERMANAS (mismo nivel del árbol) y devuelve los
-// parches `{ id, order }` a persistir. Reasigna la secuencia entera del nivel en
-// vez de intercambiar dos valores: así un nivel que aún no tenía `order` (todas
-// ordenadas por fecha de creación) queda numerado de una vez, y no hay empates.
+// parches `{ id, order }` a persistir. Las hermanas son NODOS: una estantería de la
+// raíz puede saltar por encima de un grupo («Técnico», que solo existe por
+// «Técnico/ML»). Después se renumera todo con `renumber`.
 export function reorder(shelves, id, delta) {
   const target = (shelves || []).find(s => s.id === id);
   if (!target) return [];
-  const parentOf = (s) => segments(s.name).slice(0, -1).join(SEP);
-  const parent = parentOf(target);
-  const siblings = shelves.filter(s => parentOf(s) === parent).sort(cmpShelves);
-  const i = siblings.findIndex(s => s.id === id);
+  const path = segments(target.name).join(SEP);
+  const parent = segments(target.name).slice(0, -1).join(SEP);
+  const level = levelNodes(shelves, parent).map(n => n.path);
+  const i = level.indexOf(path);
   const j = i + delta;
-  if (i < 0 || j < 0 || j >= siblings.length) return [];
-  siblings.splice(j, 0, siblings.splice(i, 1)[0]);
-  return siblings
-    .map((s, idx) => ({ id: s.id, order: idx }))
-    .filter(p => {
-      const s = siblings.find(x => x.id === p.id);
-      return s.order !== p.order;
-    });
+  if (i < 0 || j < 0 || j >= level.length) return [];
+  level.splice(j, 0, level.splice(i, 1)[0]);
+  return renumber(shelves, (at, nodes) => at === parent ? level.map(p => nodes.find(n => n.path === p)) : nodes);
+}
+
+// Numera TODAS las estanterías en el orden en que el rail las pinta (en profundidad:
+// la estantería, luego lo que cuelga de ella). Un grupo se coloca por el menor
+// `order` de su subárbol, y ese número se compara con el de sus hermanas: si cada
+// nivel numerase 0..n por su cuenta, «Técnico/ML» (0) empataría con la primera
+// estantería de la raíz (0) y el grupo saltaría de sitio. Con una sola secuencia
+// global, el orden de cada nivel y el de los grupos son coherentes.
+// `place(parentPath, nodes)` puede devolver los nodos de un nivel en otro orden.
+// Devuelve solo los parches de las que cambian.
+export function renumber(shelves, place = (_, nodes) => nodes) {
+  const out = [];
+  let seq = 0;
+  const walk = (nodes, parent) => {
+    for (const n of place(parent, nodes) || nodes) {
+      for (const s of n.shelves) {
+        if (s.order !== seq) out.push({ id: s.id, order: seq });
+        seq++;
+      }
+      walk(n.children, n.path);
+    }
+  };
+  walk(buildNodes(shelves), '');
+  return out;
+}
+
+// Los nodos (estanterías y grupos) que cuelgan de `parent` («» = la raíz), en el
+// orden del rail: `{ path, label, shelfIds }`. Para ordenar un nivel por nombre.
+export function levelNodes(shelves, parent = '') {
+  let nodes = buildNodes(shelves);
+  for (const part of parent ? parent.split(SEP) : []) {
+    const n = nodes.find(x => x.label === part);
+    if (!n) return [];
+    nodes = n.children;
+  }
+  return nodes.map(n => ({ path: n.path, label: n.label, shelfIds: descendantIds(n) }));
 }

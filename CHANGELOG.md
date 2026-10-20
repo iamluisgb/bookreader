@@ -16,6 +16,12 @@ Arreglos del MCP tras la primera prueba de verdad: los mazos, los artefactos y l
 aceptan el libro por título (`book`), como los subrayados; y un argumento que una tool no conoce
 es un error, no un filtro ignorado (`list_decks` con `book` listaba toda la biblioteca).
 
+El orden de las estanterías es ahora una sola secuencia para todo el árbol, en el orden del rail.
+Antes cada nivel se numeraba 0..n por su cuenta y una carpeta («Técnico», que existe solo por
+«Técnico/…») se colocaba por el menor número de lo que lleva dentro: al reordenar dentro de ella
+empataba con la primera estantería de la raíz y saltaba de sitio. En la app, una estantería de la
+raíz ya puede subir o bajar por encima de una carpeta; por MCP, `reorder_shelves` acepta carpetas.
+
 ## 2026-10-19 — El MCP remoto escribe y lee los libros (MON4)
 
 El MCP de BookReader se sirve también desde el Worker del sync (`/mcp`), con tokens de agente
