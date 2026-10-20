@@ -25,7 +25,6 @@
 
 import { t } from '../i18n.js';
 import * as Storage from '../storage.js';
-import * as License from '../license.js';
 import * as Drive from './drive-provider.js';
 import * as DriveAuth from './drive-auth.js';
 import * as BookReader from './bookreader-provider.js';
@@ -39,8 +38,8 @@ const IMPLS = {
     id: 'drive',
     label: 'Google Drive',
     isConnected: DriveAuth.isConnected,
-    // Los ficheros de libro por Drive son Pro: gastan la cuota del propio usuario.
-    canTransferFiles: () => License.isPro(),
+    // Los ficheros de libro por Drive son gratis (ADR-060): gastan la cuota del propio usuario.
+    canTransferFiles: () => true,
     text: {
       missingFile: () => t('El fichero ya no está en Drive.'),
       quotaFull: () => t('Tu Google Drive está lleno. Libera espacio para seguir sincronizando libros.'),

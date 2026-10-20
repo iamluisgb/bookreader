@@ -6,7 +6,6 @@ import * as Shelves from './shelves.js';
 import * as Study from '../ai/study.js';
 import * as Blobs from '../sync/blobs.js';
 import * as SyncProvider from '../sync/provider.js';
-import { ensurePro } from '../ui/paywall.js';
 import { icon } from '../ui/icons.js';
 import { brandMark, brandLockup, cargar } from '../ui/brand.js';
 import { editBookMeta } from './book-meta.js';
@@ -1198,11 +1197,9 @@ async function openCard(id) {
   else await alertBox(SyncProvider.text('notUploaded'), { title: t('Archivo no disponible') });
 }
 
-// La puerta de los ficheros de libro depende del proveedor: por Drive es Pro (paywall en el
-// momento de la intención); por el sync de BookReader la abre la suscripción, y si no la
-// abre, se dice por qué en vez de enseñar el paywall del pago único.
+// La puerta de los ficheros de libro: por Drive siempre está abierta (ADR-060); por el sync
+// de BookReader la abre la suscripción, y si no la abre, se dice por qué.
 async function ensureFiles() {
-  if (SyncProvider.activeId() === 'drive') return ensurePro('files');
   if (SyncProvider.canTransferFiles()) return true;
   await alertBox(t('Tu plan del sync de BookReader no incluye los archivos de los libros, o has llegado a su tope de espacio. Tus notas siguen sincronizando.'), { title: t('Sincronización') });
   return false;

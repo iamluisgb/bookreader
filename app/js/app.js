@@ -221,18 +221,7 @@ function initSyncEngine() {
 // se avisa una vez y la app degrada a Free sin tocar ningún dato.
 function initLicense() {
   window.addEventListener('license:changed', (e) => {
-    // La prueba de Pro llega con la demo. Los avisos de «demo activada» ya la mencionan;
-    // este es para quien la recibe sin pedir demo (ya la tenía de antes).
-    if (e.detail.trialStarted) {
-      if (!e.detail.announce) return;
-      toast({
-        message: t('Con la demo tienes BookReader Pro gratis {days} días: flashcards, repaso, mapas mentales, plantillas avanzadas y perfiles.', { days: License.TRIAL_DAYS }),
-        actionLabel: t('Ver licencia'),
-        onAction: () => openAppSettings('license'),
-        timeout: 10000,
-      });
-      return;
-    }
+    if (e.detail.trialStarted) return;
     // Solo la revocación remota avisa (quitar la licencia a mano ya es acción del usuario).
     if (!e.detail.pro && License.getState()?.revoked) {
       toast({
@@ -245,6 +234,22 @@ function initLicense() {
     }
   });
   License.validateOnStartup();
+  initTrial();
+}
+
+// Prueba inversa de Pro (ADR-060): empieza al abrir la app por primera vez y lo de Pro
+// simplemente funciona. No se anuncia con un aviso: competía con los de las acciones
+// («Deshacer») justo al importar. Se ve en Ajustes → Licencia, y avisa una vez a
+// TRIAL_WARN_DAYS del final. Con licencia, nada.
+function initTrial() {
+  License.startTrial();
+  const left = License.trialDaysLeft();
+  if (License.hasLicense() || left === 0 || left > License.TRIAL_WARN_DAYS || License.getTrial().warned) return;
+  License.markTrial('warned');
+  toast({
+    message: t('Tu prueba de BookReader Pro acaba en {n} días. Lo que has creado se queda: tarjetas, mapas y libretas.', { n: left }),
+    actionLabel: t('Ver licencia'), onAction: () => openAppSettings('license'), timeout: 10000,
+  });
 }
 
 // PWA offline: registra el Service Worker (precache + stale-while-revalidate, ver sw.js).
@@ -393,7 +398,7 @@ async function importarDemo(token) {
     const quedan = Number(info.remaining);
     toast({
       message: quedan > 0
-        ? [t('Demo activada en este dispositivo: quedan {n} preguntas. El cupo es del enlace, así que se comparte con el otro dispositivo.', { n: quedan }), License.trialNote()].filter(Boolean).join(' ')
+        ? t('Demo activada en este dispositivo: quedan {n} preguntas. El cupo es del enlace, así que se comparte con el otro dispositivo.', { n: quedan })
         : t('Esa demo ya está agotada. Pon tu propia API key en Ajustes → Agente para seguir usando el agente.'),
       actionLabel: t('Ajustes'),
       onAction: () => openAppSettings('agent'),

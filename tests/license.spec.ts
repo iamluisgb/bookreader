@@ -221,8 +221,9 @@ test('settings has a Licencia section that activates a mock key end-to-end', asy
   expect(await page.textContent('#app-settings')).toContain('Copy');
 });
 
-// Prueba de Pro: la demo del agente regala Pro durante 100 días, una vez por navegador.
-test('trial: requesting the demo grants 100 days of Pro, once per browser', async ({ page }) => {
+// Prueba inversa de Pro (ADR-060): 60 días desde la primera apertura, una vez por navegador.
+test('trial: the first open grants 60 days of Pro, once per browser, and the demo does not touch it', async ({ page }) => {
+  await page.reload();   // beforeEach borró el almacenamiento: esta es la primera apertura
   await page.route('**/demo-token', (route) => route.fulfill({
     status: 200, headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ token: 'br-demo-trial', remaining: 30, quota: 30, model: 'bookreader-fast' }),
@@ -230,29 +231,73 @@ test('trial: requesting the demo grants 100 days of Pro, once per browser', asyn
   const r = await page.evaluate(async () => {
     const L = await import('/js/license.js');
     const LLM = await import('/js/ai/llm.js');
-    const before = L.isPro();
-    await LLM.requestDemoToken();
     const first = L.getTrial();
     const day = 24 * 60 * 60 * 1000;
-    // Una segunda demo (otro día) no la renueva.
+    await LLM.requestDemoToken();
     const again = L.startTrial(Date.now() + 5 * day);
     return {
-      before, after: L.isPro(), trial: L.isTrial(), license: L.hasLicense(),
+      pro: L.isPro(), trial: L.isTrial(), license: L.hasLicense(), plus: L.isPlus(),
       days: Math.round((first.until - first.start) / day), left: L.trialDaysLeft(),
       again, sameStart: L.getTrial().start === first.start,
-      proAtDay99: L.isPro(first.start + 99 * day), proAtDay100: L.isPro(first.start + 100 * day),
+      proAtDay59: L.isPro(first.start + 59 * day), proAtDay60: L.isPro(first.start + 60 * day),
     };
   });
-  expect(r.before).toBe(false);
-  expect(r.after).toBe(true);
+  expect(r.pro).toBe(true);
   expect(r.trial).toBe(true);
   expect(r.license).toBe(false);          // la prueba no es una licencia
-  expect(r.days).toBe(100);
-  expect(r.left).toBe(100);
+  expect(r.plus).toBe(false);             // ni da Plus
+  expect(r.days).toBe(60);
+  expect(r.left).toBe(60);
   expect(r.again).toBe(false);
   expect(r.sameStart).toBe(true);
-  expect(r.proAtDay99).toBe(true);
-  expect(r.proAtDay100).toBe(false);
+  expect(r.proAtDay59).toBe(true);
+  expect(r.proAtDay60).toBe(false);
+});
+
+test('trial: it warns once, on opening, near the end', async ({ page }) => {
+  // A 5 días del final avisa al abrir, y solo la primera vez.
+  await page.evaluate(() => {
+    const day = 24 * 60 * 60 * 1000;
+    localStorage.setItem('bookreader_pro_trial', JSON.stringify({ start: Date.now() - 55 * day, until: Date.now() + 5 * day }));
+  });
+  await page.reload();
+  const warn = page.locator('.ai-toast', { hasText: 'acaba en 5 días' });
+  await expect(warn).toBeVisible();
+  await page.reload();
+  await page.waitForTimeout(500);
+  await expect(warn).toHaveCount(0);
+});
+
+test('plans: a Plus key opens Plus and Pro, a Pro key only Pro; the real API reads the benefit', async ({ page }) => {
+  const r = await page.evaluate(async () => {
+    const L = await import('/js/license.js');
+    await L.activate('BKRD-PLUS-0001');
+    const plus = { pro: L.isPro(), plus: L.isPlus() };
+    await L.activate('BKRD-PRO-0001');
+    const pro = { pro: L.isPro(), plus: L.isPlus() };
+    L.CONFIG.organizationId = 'org-123';
+    L.CONFIG.plusBenefitIds = ['ben-plus'];
+    window.fetch = async () => new Response(JSON.stringify({ id: 'act-1', license_key: { benefit_id: 'ben-plus' } }), { status: 200 });
+    await L.activate('POLAR-KEY-1');
+    const real = L.isPlus();
+    window.fetch = async () => new Response(JSON.stringify({ id: 'lk-1', benefit_id: 'ben-pro' }), { status: 200 });
+    await L.validateOnStartup();
+    return { plus, pro, real, afterValidate: { pro: L.isPro(), plus: L.isPlus() } };
+  });
+  expect(r.plus).toEqual({ pro: true, plus: true });
+  expect(r.pro).toEqual({ pro: true, plus: false });
+  expect(r.real).toBe(true);
+  expect(r.afterValidate).toEqual({ pro: true, plus: false });
+});
+
+test('Drive: book files sync without Pro', async ({ page }) => {
+  const r = await page.evaluate(async () => {
+    const L = await import('/js/license.js');
+    const P = await import('/js/sync/provider.js');
+    return { pro: L.isPro(), files: P.canTransferFiles(), active: P.activeId() };
+  });
+  expect(r.pro).toBe(false);
+  expect(r.files).toBe(true);
 });
 
 test('trial: an expired trial falls back to Free and Settings says so', async ({ page }) => {

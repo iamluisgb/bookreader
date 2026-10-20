@@ -447,8 +447,7 @@ const EN = {
 
   // app.js
   'Tu licencia Pro dejó de ser válida. Tus datos siguen intactos.': 'Your Pro license is no longer valid. Your data is untouched.',
-  'Con la demo tienes BookReader Pro gratis {days} días: flashcards, repaso, mapas mentales, plantillas avanzadas y perfiles.': 'The demo comes with {days} days of BookReader Pro for free: flashcards, spaced review, mind maps, advanced templates and profiles.',
-  'Incluye BookReader Pro gratis hasta el {date}: flashcards, repaso, mapas mentales, plantillas avanzadas y perfiles.': 'Includes BookReader Pro for free until {date}: flashcards, spaced review, mind maps, advanced templates and profiles.',
+  'Tu prueba de BookReader Pro acaba en {n} días. Lo que has creado se queda: tarjetas, mapas y libretas.': 'Your BookReader Pro trial ends in {n} days. What you made stays: cards, maps and notebooks.',
   'Prueba de BookReader Pro: te quedan {days} días (hasta el {date}).': 'BookReader Pro trial: {days} days left (until {date}).',
   'Tu prueba de BookReader Pro terminó el {date}. Tus flashcards, mapas y libretas siguen ahí.': 'Your BookReader Pro trial ended on {date}. Your flashcards, maps and notebooks are still there.',
   'Este libro no está en tu biblioteca en este dispositivo.': 'This book is not in your library on this device.',
@@ -1312,8 +1311,9 @@ const EN = {
   'Recuperados {n} elementos.': 'Recovered {n} items.',
 
   // app-settings — Licencia / paywall
-  'Modo simulado (aún sin plataforma de pagos): cualquier clave <code>BKRD-…</code> activa Pro para probar.': 'Simulated mode (no payment platform yet): any <code>BKRD-…</code> key activates Pro for testing.',
+  'Modo simulado (aún sin plataforma de pagos): cualquier clave <code>BKRD-…</code> activa Pro para probar, y <code>BKRD-PLUS-…</code>, Plus.': 'Simulated mode (no payment platform yet): any <code>BKRD-…</code> key activates Pro for testing, and <code>BKRD-PLUS-…</code>, Plus.',
   'BookReader Pro activo': 'BookReader Pro active',
+  'BookReader Plus activo (incluye Pro)': 'BookReader Plus active (includes Pro)',
   'Última verificación: {date}. Sin conexión, tu licencia sigue activa hasta 30 días.': 'Last check: {date}. Offline, your license stays active for up to 30 days.',
   'Gestionar dispositivos y recibos': 'Manage devices and receipts',
   'Quitar la licencia de este navegador': 'Remove the license from this browser',
@@ -1601,7 +1601,6 @@ const EN = {
   'La transferencia se quedó sin respuesta. Se reintentará.': 'The transfer stalled. It will be retried.',
   'El permiso de Google caducó. Vuelve a conectar con Drive.': 'Your Google permission expired. Reconnect Drive.',
   'No se pudo transferir el fichero.': 'Could not transfer the file.',
-  'Tu biblioteca en todos tus dispositivos': 'Your library on all your devices',
   'Sincronizar también los archivos de los libros': 'Sync book files too',
   'Tus libros se suben a esa misma carpeta privada y aparecen en el resto de dispositivos listos para descargar. Los de más de {n} MB no se suben solos: se piden desde el menú del libro.':
     'Your books upload to that same private folder and show up on your other devices ready to download. Books over {n} MB are not uploaded automatically: request them from the book menu.',

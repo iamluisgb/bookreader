@@ -195,13 +195,13 @@ export function backfill() {
       forget(b.id);   // el servidor no lo tiene: lo que diga este equipo ya no vale
       if (!ready) {
         await idle();
+        // El fichero bajado no se guarda: solo hace falta para trocearlo, y muere con este bloque.
         let file = null;
         if (!here) {
           try { file = await Blobs.fetchForText(b); } catch (e) { console.warn('book-text:', e.message); break; }
           if (!file) { unfetchable.add(b.id); progress(); continue; }
         }
         const ok = await SegmentFile.ensureSegmented(b.id, null, { file });
-        file = null;   // el fichero bajado no se guarda: solo hacía falta para trocearlo
         if (!ok) { markFailed(b.id, DB.SEG_VERSION, 'parse'); progress(); continue; }
       }
       const text = ready ? local : await DB.get('bookText', b.id);

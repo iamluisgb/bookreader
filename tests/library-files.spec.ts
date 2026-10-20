@@ -148,28 +148,34 @@ test.describe('Biblioteca y archivos entre dos dispositivos', () => {
     }
   });
 
-  test('sin licencia Pro la ficha llega igual, pero el archivo no se sube ni se descarga', async ({ browser }) => {
+  test('sin Pro (ni prueba) los archivos suben y bajan igual por Drive (ADR-060)', async ({ browser }) => {
     const drive = createDriveState();
     const pc = await browser.newContext();
     const movil = await browser.newContext();
+    const sinPrueba = (page: Page) => page.evaluate(() => {
+      const day = 24 * 60 * 60 * 1000;
+      localStorage.setItem('bookreader_pro_trial', JSON.stringify({ start: Date.now() - 61 * day, until: Date.now() - day }));
+    });
     try {
-      // Fase A (metadatos) es gratis; los binarios son la parte de pago.
       const pcPage = await bootDevice(pc, drive, { pro: false });
+      await sinPrueba(pcPage);
+      expect(await pcPage.evaluate(async () => (await import('/js/license.js')).isPro())).toBe(false);
       const id = await importBook(pcPage, 'Sin Pro', 3);
       await sync(pcPage);
       await flushBlobs(pcPage);
       await sync(pcPage);
 
       const subidos = [...drive.store.keys()].filter(k => k.startsWith('bookreader/files/'));
-      expect(subidos).toHaveLength(0);
+      expect(subidos).toHaveLength(1);
 
       const movilPage = await bootDevice(movil, drive, { pro: false });
+      await sinPrueba(movilPage);
       await sync(movilPage);
       const enMovil = await libraryOf(movilPage);
-      expect(enMovil).toHaveLength(1);          // la biblioteca SÍ viaja gratis
+      expect(enMovil).toHaveLength(1);
       expect(enMovil[0].id).toBe(id);
       expect(enMovil[0].ghost).toBe(true);
-      expect(enMovil[0].uploaded).toBe(false);  // y no hay nada que descargar
+      expect(enMovil[0].uploaded).toBe(true);   // hay archivo que descargar
     } finally {
       await pc.close(); await movil.close();
     }

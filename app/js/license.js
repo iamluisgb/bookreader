@@ -1,5 +1,6 @@
-// license.js — BookReader Pro: licencias de Polar (MON2, ver BACKLOG y
-// docs/GUIA_MONETIZACION.md). Sin backend: los endpoints de license keys del customer
+// license.js — BookReader Pro y Plus: licencias de Polar (MON2 y MON5, ver BACKLOG,
+// ADR-060 y docs/GUIA_MONETIZACION.md). Plus incluye Pro: cualquier licencia válida abre Pro,
+// y la de Plus abre además lo que nos cuesta mantener (sync de BookReader, IA y MCP remoto). Sin backend: los endpoints de license keys del customer
 // portal de Polar son públicos y con CORS abierto (verificado 2026-07-15), se llaman
 // directos desde el navegador. Aquí NO hay DOM: el paywall vive en ui/paywall.js y la
 // gestión en ui/app-settings.js (sección Licencia).
@@ -20,8 +21,9 @@
 // mismo contrato (mismos errores, mismos estados). Keys especiales para probar la UI:
 //   BKRD-…-REVOKED → se comporta como key revocada (reembolso)
 //   BKRD-…-LIMIT   → activate devuelve "límite de activaciones alcanzado"
+//   BKRD-PLUS-…    → licencia de Plus
 // Pasar a producción = rellenar organizationId/checkoutUrl/portalUrl. Nada más.
-import { t, getLang } from './i18n.js';
+import { t } from './i18n.js';
 import * as Storage from './storage.js';
 
 export const CONFIG = {
@@ -30,16 +32,19 @@ export const CONFIG = {
   checkoutUrl: '',         // Checkout Link del dashboard (discount pre-aplicado)
   portalUrl: 'https://polar.sh',   // portal de cliente (recuperar key, desactivar dispositivos)
   price: '$29 · pago único',
+  plusBenefitIds: [],      // benefits de Polar que son Plus (el resto de licencias, Pro)
 };
 
 export const OFFLINE_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;   // 30 días
 const STORE_KEY = 'license';
 
-// Prueba de Pro: activar la demo del agente regala Pro durante TRIAL_DAYS. Es una vez por
-// navegador: el registro se queda al caducar, así que una demo nueva (otro día, otra red)
-// no la renueva. Vive aparte de la licencia porque no es una key: no se valida contra
-// nadie ni ocupa un hueco de activación.
-export const TRIAL_DAYS = 100;
+// Prueba inversa de Pro (ADR-060): la primera vez que se abre la app hay Pro durante
+// TRIAL_DAYS, y al acabar se vuelve a Free sin perder lo creado. Es una vez por navegador: el
+// registro se queda al caducar. Vive aparte de la licencia porque no es una key: no se valida
+// contra nadie ni ocupa un hueco de activación. Quien la empezó con la demo (antes duraba 100
+// días) conserva la suya.
+export const TRIAL_DAYS = 60;
+export const TRIAL_WARN_DAYS = 7;
 const TRIAL_KEY = 'pro_trial';
 const DAY_MS = 24 * 60 * 60 * 1000;
 const MOCK_RE = /^BKRD-[A-Z0-9-]{4,}$/i;
@@ -71,6 +76,11 @@ export function isPro(now = Date.now()) {
   return hasLicense(now) || isTrial(now);
 }
 
+// Licencia de Plus válida.
+export function isPlus(now = Date.now()) {
+  return hasLicense(now) && getState().plan === 'plus';
+}
+
 // Hay key no revocada con validación buena dentro de la ventana offline.
 // Una key que caducó la ventana no se borra: la próxima validación con red la reactiva.
 export function hasLicense(now = Date.now()) {
@@ -99,21 +109,18 @@ export function trialDaysLeft(now = Date.now()) {
 }
 
 // Empieza la prueba si este navegador no la ha tenido nunca. Devuelve true solo cuando la
-// empieza ahora. `announce` pide a app.js un aviso propio; sin él, quien la empieza la
-// menciona en su propio aviso (el de «demo activada»), para no apilar dos.
-export function startTrial(now = Date.now(), { announce = false } = {}) {
+// empieza ahora. Sin aviso: app.js la anuncia cuando hay un libro con el que probarla.
+export function startTrial(now = Date.now()) {
   if (getTrial()) return false;
   Storage.set(TRIAL_KEY, { start: now, until: now + TRIAL_DAYS * DAY_MS });
-  window.dispatchEvent(new CustomEvent('license:changed', { detail: { pro: isPro(now), trialStarted: true, announce } }));
+  window.dispatchEvent(new CustomEvent('license:changed', { detail: { pro: isPro(now), trialStarted: true } }));
   return true;
 }
 
-// La frase que se añade a los avisos de demo activada mientras dura la prueba ('' si no).
-export function trialNote(now = Date.now()) {
-  if (!isTrial(now)) return '';
-  return t('Incluye BookReader Pro gratis hasta el {date}: flashcards, repaso, mapas mentales, plantillas avanzadas y perfiles.', {
-    date: new Date(getTrial().until).toLocaleDateString(getLang()),
-  });
+// Los avisos de la prueba se dan una vez: `markTrial('warned')`.
+export function markTrial(field) {
+  const tr = getTrial();
+  if (tr && !tr[field]) Storage.set(TRIAL_KEY, { ...tr, [field]: true });
 }
 
 // Label legible de la activación: es lo que el usuario ve en el portal de Polar al
@@ -156,13 +163,21 @@ async function classify4xx(res) {
 
 // ---- Activate / Validate -------------------------------------------------------
 
+// El plan sale del benefit de Polar que emitió la key (activate lo trae en `license_key`;
+// validate, en la propia respuesta).
+function planOf(licenseKey) {
+  return licenseKey && CONFIG.plusBenefitIds.includes(licenseKey.benefit_id) ? 'plus' : 'pro';
+}
+
+const mockPlan = (key) => (/^BKRD-PLUS-/i.test(key) ? 'plus' : 'pro');
+
 export async function activate(rawKey) {
   const key = (rawKey || '').trim();
   if (!key) throw licError('invalid', t('Introduce tu clave de licencia.'));
 
   if (isMock()) {
     const r = await mockCall('activate', key);
-    setState({ key, activationId: r.activationId, validatedAt: Date.now(), revoked: false });
+    setState({ key, activationId: r.activationId, validatedAt: Date.now(), revoked: false, plan: mockPlan(key) });
     return;
   }
 
@@ -178,7 +193,7 @@ export async function activate(rawKey) {
   }
   if (res.ok) {
     const data = await res.json();
-    setState({ key, activationId: data.id, validatedAt: Date.now(), revoked: false });
+    setState({ key, activationId: data.id, validatedAt: Date.now(), revoked: false, plan: planOf(data.license_key) });
     return;
   }
   if (res.status >= 400 && res.status < 500) throw await classify4xx(res);
@@ -195,7 +210,7 @@ export async function validateOnStartup() {
   if (isMock()) {
     try {
       await mockCall('validate', s.key);
-      setState({ ...s, validatedAt: Date.now() });
+      setState({ ...s, validatedAt: Date.now(), plan: mockPlan(s.key) });
     } catch (e) {
       if (e.code === 'invalid') setState({ ...s, revoked: true });
     }
@@ -212,8 +227,11 @@ export async function validateOnStartup() {
   } catch {
     return;   // sin red: la última validación buena vale (hasta 30 días)
   }
-  if (res.ok) setState({ ...s, validatedAt: Date.now() });
-  else if (res.status >= 400 && res.status < 500) setState({ ...s, revoked: true });
+  if (res.ok) {
+    let data = null;
+    try { data = await res.json(); } catch { /* sin cuerpo: se queda el plan que había */ }
+    setState({ ...s, validatedAt: Date.now(), plan: data ? planOf(data) : s.plan });
+  } else if (res.status >= 400 && res.status < 500) setState({ ...s, revoked: true });
   // 5xx: transitorio del servidor, tratar como sin red.
 }
 

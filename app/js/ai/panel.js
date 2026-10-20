@@ -28,7 +28,6 @@ setCitePageResolver((cfi) => EpubReader.getPageInfo(cfi)?.page || null);
 import { computeChapterRelevance, applyChapterAttenuation, clearChapterAttenuation } from './attenuation.js';
 import { estimateTokens } from './context.js';
 import * as Retrieval from './retrieval.js';
-import * as License from '../license.js';
 import { TEMPLATE, systemPrompt } from './panel-template.js';
 import * as Profiles from './profiles.js';
 import * as Backup from '../backup.js';
@@ -138,8 +137,7 @@ export function init(opts) {
     const demo = n > 0
       ? t('Demo gratuita activada: {n} consultas para probar el agente. Cuando quieras, pon tu propia API key en Ajustes → Agente.', { n })
       : t('Demo gratuita activada. Cuando quieras, pon tu propia API key en Ajustes → Agente.');
-    const trial = License.trialNote();
-    toastMsg(trial ? `${demo} ${trial}` : demo, 'info', trial ? 9000 : 4000);
+    toastMsg(demo, 'info', 4000);
   });
   renderQuota();
   $('#ai-ref-clear').addEventListener('click', clearRef);

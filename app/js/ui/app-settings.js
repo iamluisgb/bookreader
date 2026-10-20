@@ -540,9 +540,6 @@ function wireDemoButton(content) {
     try {
       const r = await LLM.requestDemoToken();
       window.dispatchEvent(new CustomEvent('appsettings:agent-saved'));
-      // La demo trae la prueba de Pro: aquí no hay aviso de «demo activada» que la mencione.
-      const trial = License.trialNote();
-      if (trial) import('../ai/toast.js').then(({ toast }) => toast({ message: trial, timeout: 9000 })).catch(() => {});
       selectSection('agent');   // re-render: campos rellenos, botón fuera
       const ok = overlay.querySelector('#appset-saved');
       if (ok) { ok.hidden = false; setTimeout(() => { ok.hidden = true; }, 2500); }
@@ -1476,12 +1473,6 @@ function wireDrive(content, show) {
   }
 
   filesCheck.addEventListener('change', async () => {
-    // Activarlo es empezar a consumir cuota de Drive del usuario: se pide Pro en
-    // el momento de la intención, no al primer fallo silencioso de subida.
-    if (filesCheck.checked && !(await ensurePro('files'))) {
-      filesCheck.checked = false;
-      return;
-    }
     Blobs.setEnabled(filesCheck.checked);
     show(filesCheck.checked
       ? t('Los archivos de tus libros se subirán a Drive en segundo plano.')
@@ -1967,14 +1958,14 @@ function wireBookReaderSync(content, show) {
 function licenseHtml() {
   const s = License.getState();
   const mockNote = License.isMock()
-    ? `<p class="appset-muted appset-lic-mock">${icon('shield', { size: 'sm' })} ${t('Modo simulado (aún sin plataforma de pagos): cualquier clave <code>BKRD-…</code> activa Pro para probar.')}</p>`
+    ? `<p class="appset-muted appset-lic-mock">${icon('shield', { size: 'sm' })} ${t('Modo simulado (aún sin plataforma de pagos): cualquier clave <code>BKRD-…</code> activa Pro para probar, y <code>BKRD-PLUS-…</code>, Plus.')}</p>`
     : '';
 
   if (s && s.key && !s.revoked) {
     const since = s.validatedAt ? new Date(s.validatedAt).toLocaleDateString(getLang()) : '';
     return `<div class="appset-section">
       <h3 class="appset-h3">${t('Licencia')}</h3>
-      <p class="appset-lic-state is-pro">${icon('check', { size: 'md' })} ${t('BookReader Pro activo')}</p>
+      <p class="appset-lic-state is-pro">${icon('check', { size: 'md' })} ${s.plan === 'plus' ? t('BookReader Plus activo (incluye Pro)') : t('BookReader Pro activo')}</p>
       ${keyRowHtml('appset-lic-key', s.key, 'BKRD-XXXX-XXXX-XXXX')}
       <p class="appset-muted">${t('Última verificación: {date}. Sin conexión, tu licencia sigue activa hasta 30 días.', { date: escapeHtml(since) })}</p>
       <button id="appset-lic-portal" class="btn btn--primary primary-btn appset-save">${icon('user', { size: 'md' })} ${t('Gestionar dispositivos y recibos')}</button>
@@ -1987,7 +1978,7 @@ function licenseHtml() {
   const revokedNote = s && s.revoked
     ? `<p class="appset-err">${t('Tu licencia dejó de ser válida (¿reembolso o revocación?). Tus datos siguen intactos; la app vuelve al plan Free.')}</p>`
     : '';
-  // Prueba de Pro (llega con la demo del agente): en curso, o ya terminada.
+  // Prueba de Pro (empieza al abrir la app por primera vez): en curso, o ya terminada.
   const trial = License.getTrial();
   const trialNote = License.isTrial()
     ? `<p class="appset-lic-state is-pro">${icon('check', { size: 'md' })} ${t('Prueba de BookReader Pro: te quedan {days} días (hasta el {date}).', {

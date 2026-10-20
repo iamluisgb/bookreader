@@ -3218,7 +3218,7 @@ frase de recuperación y diciéndolo claro; no se mitiga guardando la clave noso
 
 ## 🔧 Técnico (calidad / seguridad / perf / bugs)
 
-### MON5 — Planes y precios: gratis, Pro y Plus · `M` · **decidido ([ADR-060](DECISIONS.md)), sin código**
+### MON5 — Planes y precios: gratis, Pro y Plus · `M` · **tareas 1–3 ✓ (2026-10-20), resto pendiente ([ADR-060](DECISIONS.md))**
 
 > Gratis (lector, agente con tu key, **sync por Drive con libros**, MCP local) · **Pro** 29 $ una vez
 > (19 $ las primeras 72 h) · **Plus** 7 $/mes o 60 $/año: todo lo de Pro + sync de BookReader + IA
@@ -3226,11 +3226,12 @@ frase de recuperación y diciéndolo claro; no se mitiga guardando la clave noso
 > [`docs/INVESTIGACION_PRECIOS.md`](docs/INVESTIGACION_PRECIOS.md).
 
 **Tareas:**
-1. **Drive sin gate.** Quitar `ensurePro('files')` (`app/js/ui/app-settings.js`, `app/js/library/view.js`)
+1. ✓ **Drive sin gate.** Quitar `ensurePro('files')` (`app/js/ui/app-settings.js`, `app/js/library/view.js`)
    y `files` de la lista del paywall (`app/js/ui/paywall.js`). Libros incluidos.
-2. **Licencia con planes.** `license.js` distingue free · pro · plus · trial-pro · trial-plus, con
-   caducidad. `isPro()` es verdadero con Plus activo y con la prueba de Pro.
-3. **Prueba inversa de Pro (60 días).** Arranca en la primera apertura. Al acabar, lo creado sigue
+2. ✓ **Licencia con planes.** `license.js` guarda el plan de cada licencia (`isPlus()`): en simulado,
+   `BKRD-PLUS-…`; con Polar, el benefit de la key (`CONFIG.plusBenefitIds`). `isPro()` es verdadero
+   con Plus y con la prueba de Pro. La prueba de Plus es la tarea 4.
+3. ✓ **Prueba inversa de Pro (60 días).** Arranca en la primera apertura. Al acabar, lo creado sigue
    legible y exportable. Aviso a 7 días del final.
 4. **Prueba de Plus (60 días) al haber intención:** «Conectar con Claude», activar el sync o agotar
    la demo. Tope propio en el Worker: unos 2 GB y 1 $ de inferencia en total. Ver cómo emitirla

@@ -7,7 +7,6 @@
 // HTTPS. `script-src 'self'` sigue intacto, así que la key no es exfiltrable por
 // scripts inyectados.
 import * as Storage from '../storage.js';
-import * as License from '../license.js';
 import { t } from '../i18n.js';
 import { GATEWAY_BASE_URL, isGatewayUrl as esUrlGateway, repairGatewayConfig } from './gateway-repair.js';
 
@@ -799,9 +798,6 @@ export async function requestDemoToken() {
   // no aparece de golpe a mitad de la primera respuesta.
   const total = Number(body.quota ?? body.remaining);
   if (total > 0) Storage.set(QUOTA_KEY, { remaining: Number(body.remaining), total });
-  // La demo trae la prueba de Pro (100 días, una vez por navegador): así se prueba
-  // también lo que hace el agente con flashcards, repaso, mapas, plantillas y perfiles.
-  License.startTrial();
   return body; // { token, remaining, quota, model }
 }
 
@@ -908,10 +904,6 @@ export async function importDemoToken(token) {
   const total = Number(info.quota ?? info.remaining);
   if (total > 0) Storage.set(QUOTA_KEY, { remaining: Number(info.remaining), total });
   window.dispatchEvent?.(new CustomEvent('llm:quota', { detail: getQuota() }));
-  License.startTrial();   // el dispositivo que recibe la demo también estrena la prueba
   return info;
 }
 
-// Quien ya tenía la demo antes de que existiera la prueba de Pro (2026-10-13) la estrena al
-// cargar el agente: no tiene por qué pedir otra demo para recibirla. Una vez por navegador.
-if (isDemo() && hasKey()) License.startTrial(Date.now(), { announce: true });

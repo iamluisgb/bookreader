@@ -101,6 +101,8 @@ test.describe('P30 · hints de descubrimiento', () => {
     // Con un libro importado Y una conversación con objetivo: ya no hay nada que enseñar.
     await page.setInputFiles('#file-input', EPUB_PATH);
     await page.waitForSelector('#epub-container iframe', { timeout: 30000 });
+    // El lector se pinta antes de que el libro acabe de guardarse en la biblioteca.
+    await expect.poll(() => page.evaluate(async () => (await (await import('/js/library/store.js')).getAllBooks()).length)).toBe(1);
     await page.evaluate(async () => {
       const { createConvo } = await import('/js/ai/db.js');
       const { getAllBooks } = await import('/js/library/store.js');

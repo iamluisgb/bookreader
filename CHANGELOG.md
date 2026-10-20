@@ -3,6 +3,22 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-10-20 — Planes y precios en la app: Drive gratis, prueba de Pro de 60 días y licencias de Plus (MON5)
+
+Primera parte de [ADR-060](DECISIONS.md), la que no depende de Polar:
+- **El sync por Drive sube y baja los libros sin Pro.** Se quitan el paywall de la casilla de
+  ficheros y el de descargar un libro. Pro ya no anuncia «tu biblioteca en todos tus
+  dispositivos».
+- **Prueba inversa de Pro.** Empieza al abrir la app por primera vez, dura 60 días y ya no va
+  ligada a la demo del agente. Se ve en Ajustes → Licencia y avisa una vez a 7 días del final
+  (anunciarla al importar el primer libro chocaba con el aviso de «Deshacer»). Quien la empezó con la demo conserva sus 100 días.
+- **Licencias de Plus.** `license.js` sabe el plan de cada licencia: en simulado, las claves
+  `BKRD-PLUS-…`; con Polar, el benefit de la key (`CONFIG.plusBenefitIds`). Plus incluye Pro, y
+  Ajustes → Licencia dice cuál está activo.
+
+Pendiente en MON5: la prueba de Plus en el Worker, «Pro tuyo tras 12 meses», el paywall de Plus y
+la página de precios.
+
 ## 2026-10-20 — Pregúntale a tu biblioteca: búsqueda en todos los libros para agentes (IA10 F0–F3)
 
 Un agente puede preguntar a toda la biblioteca en una llamada («¿qué tenemos sobre
