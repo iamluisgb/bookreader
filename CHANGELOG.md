@@ -3,6 +3,15 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-10-20 — Un agente organiza la biblioteca, y se deshace desde la app (MON4)
+
+Con el permiso «Organizar mi biblioteca», un agente mueve libros entre estanterías, crea
+(anidadas e inteligentes), renombra, ordena y borra estanterías, y cambia título, autor y estado
+de los libros. Las estanterías y el estado de cada libro tienen ahora su propio sello en el merge
+(`shelvesAt`, `statusAt`, como el título con `metaAt`): un pase de página en otro dispositivo ya no
+revierte una reorganización, sea de un agente o de la propia app. Cada cambio de un agente guarda
+su deshacer cifrado con la clave del usuario, y Ajustes → Datos → Agentes lo deshace.
+
 ## 2026-10-19 — El MCP remoto escribe y lee los libros (MON4)
 
 El MCP de BookReader se sirve también desde el Worker del sync (`/mcp`), con tokens de agente
