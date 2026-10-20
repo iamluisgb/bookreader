@@ -900,7 +900,7 @@ el mismo contrato contra otro proveedor BYOK. Se apoya en `probeModel` y en los 
 `llm.js`, no en peticiones duplicadas — salvo el test de concurrencia, que llama a `fetch` a pelo
 **a propósito**: la cola de ADR-027 serializaría justo lo que se quiere medir.
 
-## ADR-031 — Tres fuentes de inferencia, saldo en dinero y el token Pro sale de la licencia · `PROPUESTA`
+## ADR-031 — Tres fuentes de inferencia, saldo en dinero y el token Pro sale de la licencia · `PROPUESTA` (§1 superado por ADR-060)
 
 **Contexto.** MON1 dejó el gateway (ADR-021) sirviendo una demo. MON3 añade una segunda forma de
 pagar: **pago único** por las features premium (sync, biblioteca en todos los dispositivos,
@@ -1755,7 +1755,7 @@ abrir ajustes generales. Una sola fuente de verdad (`settings.js`): `set()` pers
 demás ajustes de lectura (fuente, ancho, papel, brillo, luz nocturna) siguen siendo solo
 contextuales: dependen del libro, el tema no.
 
-## ADR-056 — Sync de BookReader: sync gestionado dentro de la suscripción, con el patrón de compartir · `ACEPTADA (código; A/B abierta)`
+## ADR-056 — Sync de BookReader: sync gestionado dentro de la suscripción, con el patrón de compartir · `ACEPTADA` (A/B → A y Drive gratis en ADR-060)
 
 **Contexto.** Hoy el sync es Pro (pago único) y va contra el Google Drive del propio usuario (P7,
 ADR-024). Funciona, pero pide una cuenta de Google y pelea con los límites de Drive: el N+1 de
@@ -2002,3 +2002,84 @@ primera prueba real necesitó 9 llamadas, eligió candidatos adivinando por el t
 - Borrar un libro tiene que borrar su rastro del índice.
 - El formato del índice es un contrato versionado (`INDEX_FORMAT`), como `TEXT_FORMAT`.
 - Detalle y fases en BACKLOG · IA10.
+
+## ADR-060 — Planes y precios: gratis, Pro de pago único y Plus por suscripción · `PENDIENTE`
+
+**Contexto.** El producto ya cobra en tres frentes que se habían decidido por separado. Pro es un
+pago único (MON2). La suscripción pone la inferencia (ADR-031) y el sync gestionado (ADR-056). El
+MCP remoto con `search_library` (IA10) también tiene coste: CPU del Worker y lecturas de R2. Faltaba
+juntarlo en una oferta con precio. El 2026-10-20 se investigaron precios y estrategias de venta
+de apps comparables (Obsidian, Readwise, Raycast, Granola, Nova): informe con fuentes en
+[`docs/INVESTIGACION_PRECIOS.md`](docs/INVESTIGACION_PRECIOS.md), cuya propuesta es más
+compleja que la decidida aquí. La primera versión tenía más de diez reglas (precios de lanzamiento, descuentos por
+país, referidos…), y se recortó por una prueba: cada plan se tiene que poder explicar en una frase.
+
+**Decisión.**
+
+1. **Tres planes, una frase cada uno.**
+   - **Gratis:** lees, subrayas, usas el agente con tu propia key y sincronizas por **tu Drive**,
+     libros incluidos.
+   - **Pro, 29 $ una vez (19 $ las primeras 72 h):** conviertes tus libros en conocimiento
+     (tarjetas y Anki, repaso, mapas, infografías, plantillas avanzadas y perfiles). Para siempre.
+   - **Plus, 7 $/mes o 60 $/año:** todo lo de Pro, y nosotros nos encargamos del resto: el sync de
+     BookReader, la IA incluida y Claude o ChatGPT conectados a tu biblioteca (MCP remoto).
+2. **El sync por Drive pasa a ser gratis.** No nos cuesta nada y así «sincronizar» deja de
+   aparecer en dos planes. Pro queda como «el plan del que estudia» y Plus como «el del que no
+   quiere configurar nada». El MCP local de solo lectura también es gratis.
+3. **Plus incluye Pro, y tras 12 meses pagados Pro es tuyo para siempre.** Supera ADR-031 §1,
+   que separaba los dos productos. El peligro era que la inferencia entrara en un pago único, y
+   eso sigue sin pasar. En la otra dirección no cuesta nada, y pedir 29 $ más la suscripción
+   espanta. La regla de los 12 meses quita el miedo a perderlo todo al cancelar, que es la queja
+   clásica contra las suscripciones de apps locales.
+4. **El MCP es el titular de Plus, no un plan aparte.** La landing vende «tu biblioteca entera
+   dentro de Claude y ChatGPT», no un «sync gestionado».
+5. **Pruebas de 60 días, sin tarjeta.**
+   - **Pro:** prueba inversa. Todo usuario nuevo tiene Pro 60 días y luego vuelve a gratis sin
+     perder lo que creó (lo creado se puede leer y exportar).
+   - **Plus:** empieza cuando hay intención (pulsar «Conectar con Claude», activar el sync o agotar
+     la demo), no al instalar. Lleva un tope propio para que no salga gratis encadenar pruebas:
+     unos 2 GB y 1 $ de inferencia en total.
+   - **Aviso** a 7 días del final, y al terminar, 30 días para leer y exportar (ADR-056 §3).
+6. **Tope de la IA de Plus: el 25 % del ingreso neto, unos 1,50 $ de coste al mes.** Se muestra
+   en respuestas, nunca en tokens. Al llegar al tope no se rompe nada ni se cobra extra: se ofrece
+   la propia key o esperar al mes siguiente. Se revisa con datos reales a las 4 semanas.
+7. **Fuera del lanzamiento:**
+   - licencias de por vida (con la inferencia y R2, Plus de por vida pierde dinero seguro);
+   - descuentos por país;
+   - el descuento a quien ya tiene Pro (lo cubre el punto 3);
+   - el precio de lanzamiento de Plus;
+   - referidos.
+
+   Se añaden cuando lo pidan los datos. Estudiantes, el −40 %, sí.
+8. **R2 se paga si se pasa de lo gratis (ADR-056, opción A).** Con suscriptores que pagan, un
+   sync que se corta al tope global no vale. Las cuotas por usuario son las que mandan. El plan de
+   pago de Workers (5 $/mes) entra al lanzar Plus, por la CPU del MCP y los límites de D1.
+
+**Porqué de los precios.**
+- **Referencias:** Obsidian Sync cuesta 4–8 $/mes en anual solo por el sync, y Readwise, 9,99 $
+  en anual o 12,99 $ al mes. Plus a 5 $/mes en anual queda por debajo de los dos y no parece «el
+  barato».
+- **Comisión de Polar:** los 0,50 $ fijos son el 13 % de un cobro de 6 $ y el 6 % de uno de 60 $,
+  por eso se empuja el anual.
+- **Riesgo aceptado: la prueba de 60 días es más larga que la de las referencias** (Readwise da
+  30, y en apps de suscripción la conversión no mejora pasados 10–16 días). Más días de Plus son
+  más coste sin cobrar, por eso la prueba lleva su propio tope. Se mide (punto siguiente).
+
+**Consecuencias.**
+- **ADR-031 §1 queda superado.** El resto de ADR-031 sigue igual: saldo en dinero, token Pro
+  emitido contra la licencia y la UI que elige fuente.
+- **Lo que se mide los primeros 3 meses:**
+  - conversión a Pro y a Plus al acabar la prueba;
+  - qué parte de Plus va en anual;
+  - el coste de IA por usuario de Plus (p50 y p95);
+  - qué parte llega al tope;
+  - churn y reembolsos.
+
+  Umbrales y acciones en BACKLOG · MON5.
+- **El código pendiente va en MON5:**
+  - Drive sin gate;
+  - estado de prueba con caducidad en `license.js`;
+  - Plus ⊃ Pro;
+  - la regla de los 12 meses (hay que ver qué expone Polar);
+  - el paywall de una sola oferta por función;
+  - la página de precios.

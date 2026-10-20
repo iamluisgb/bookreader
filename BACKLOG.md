@@ -3182,8 +3182,8 @@ y sin configurar nada. Va sobre el patrón de compartir por enlace (R2 + contabi
 de extremo a extremo), en un Worker aparte. Diseño y alternativas en
 [ADR-056](DECISIONS.md#adr-056--sync-de-bookreader-sync-gestionado-dentro-de-la-suscripción-con-el-patrón-de-compartir--aceptada-código-ab-abierta).
 
-**El despliegue está bloqueado por:** decidir **A/B** (¿se paga R2 pasado lo gratis cuando lo pagan
-suscriptores?) · MON2 en producción (Polar real) · la suscripción de ADR-031 con precio.
+**El despliegue está bloqueado por:** MON2 en producción (Polar real) · MON5 (planes y pruebas en la
+licencia). A/B y precio ya decididos en [ADR-060](DECISIONS.md): opción A, Plus a 7 $/mes o 60 $/año.
 
 **Fases:**
 - **F0 — Motor agnóstico** · `M` · **✓** · *vale también para WebDAV (P7 F3).*
@@ -3217,6 +3217,43 @@ frase de recuperación y diciéndolo claro; no se mitiga guardando la clave noso
 ---
 
 ## 🔧 Técnico (calidad / seguridad / perf / bugs)
+
+### MON5 — Planes y precios: gratis, Pro y Plus · `M` · **decidido ([ADR-060](DECISIONS.md)), sin código**
+
+> Gratis (lector, agente con tu key, **sync por Drive con libros**, MCP local) · **Pro** 29 $ una vez
+> (19 $ las primeras 72 h) · **Plus** 7 $/mes o 60 $/año: todo lo de Pro + sync de BookReader + IA
+> incluida + MCP remoto. Pruebas de 60 días sin tarjeta. Investigación en
+> [`docs/INVESTIGACION_PRECIOS.md`](docs/INVESTIGACION_PRECIOS.md).
+
+**Tareas:**
+1. **Drive sin gate.** Quitar `ensurePro('files')` (`app/js/ui/app-settings.js`, `app/js/library/view.js`)
+   y `files` de la lista del paywall (`app/js/ui/paywall.js`). Libros incluidos.
+2. **Licencia con planes.** `license.js` distingue free · pro · plus · trial-pro · trial-plus, con
+   caducidad. `isPro()` es verdadero con Plus activo y con la prueba de Pro.
+3. **Prueba inversa de Pro (60 días).** Arranca en la primera apertura. Al acabar, lo creado sigue
+   legible y exportable. Aviso a 7 días del final.
+4. **Prueba de Plus (60 días) al haber intención:** «Conectar con Claude», activar el sync o agotar
+   la demo. Tope propio en el Worker: unos 2 GB y 1 $ de inferencia en total. Ver cómo emitirla
+   sin cuentas (¿licencia de prueba en Polar ligada a un email?).
+5. **Pro tuyo tras 12 meses de Plus.** Ver si Polar expone la antigüedad de la suscripción o si
+   hay que emitir un benefit de Pro al renovar.
+6. **Paywall de una sola oferta.** Las funciones de estudio ofrecen Pro, y el sync, el MCP y la IA
+   ofrecen Plus. La tabla de tres planes solo vive en la página de precios.
+7. **Página de precios** con una frase por plan y la línea de los topes: «IA incluida para uso
+   normal; si un mes te pasas, sigues con tu propia key».
+8. **Lanzar Plus:**
+   - el plan de pago de Workers;
+   - en ADR-056, la opción A (los `CAP_*` como alarma; mandan las cuotas por usuario);
+   - el tope de IA (unos 1,50 $ al mes) en el gateway (ADR-031).
+
+**Métricas (3 primeros meses) → acción:**
+- **Conversión de la prueba de Pro:** <1 % con más de 500 activos → revisar el paywall; >5 % → Pro a 39 $.
+- **Conversión de la prueba de Plus:** <10 % → acortarla (60 días es más que lo habitual: riesgo aceptado).
+- **Plus en anual:** <40 % → reforzar el anual en el paywall.
+- **Coste de IA por usuario de Plus:** p95 >2 $ → bajar el tope o cambiar de modelo, nunca en silencio.
+- **Plus que llega al tope:** >10 % → subirlo.
+- **Churn de Plus:** >8 %/mes → encuesta al cancelar.
+- **Reembolsos:** >5 % → la promesa no es la que el producto da.
 
 ### TEC19 — Cloudflare: que `bookreader.raiatech.com` respete las cabeceras de caché · `S`
 
