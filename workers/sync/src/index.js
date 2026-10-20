@@ -86,15 +86,17 @@ const json = (obj, status, cors = {}) => new Response(JSON.stringify(obj), {
 
 // ---- Gasto global (lo mismo que `share`) -------------------------------------------------
 
-// Cuenta UNA operación de la clase dada si no se ha llegado al tope del mes. Atómico.
-export async function spend(env, cls, now = Date.now()) {
+// Cuenta `n` operaciones de la clase dada si caben en el tope del mes (todas o ninguna). Atómico.
+// Varias a la vez para no pagar una escritura en D1 por cada lectura de un lote (los bloques
+// del índice de la biblioteca, IA10).
+export async function spend(env, cls, now = Date.now(), n = 1) {
   const col = cls === 'a' ? 'class_a' : 'class_b';
   const cap = cls === 'a' ? config(env).classA : config(env).classB;
   const row = await env.DB.prepare(
-    `INSERT INTO usage (month, ${col}) VALUES (?, 1)
-     ON CONFLICT(month) DO UPDATE SET ${col} = ${col} + 1 WHERE ${col} < ?
+    `INSERT INTO usage (month, ${col}) VALUES (?, ?)
+     ON CONFLICT(month) DO UPDATE SET ${col} = ${col} + ? WHERE ${col} + ? <= ?
      RETURNING ${col} AS n`,
-  ).bind(monthOf(now), cap).first();
+  ).bind(monthOf(now), n, n, n, cap).first();
   return !!row;
 }
 

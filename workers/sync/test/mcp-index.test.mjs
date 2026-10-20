@@ -46,8 +46,11 @@ test('lee solo los bloques pedidos, con una lectura por rango cada uno', async (
   const s = await seeded();
   const p = r2Provider(s.e, s.user, s.raw);
   const before = s.e.SYNC._ops.get;
+  const used = () => s.e.DB._raw.prepare('SELECT COALESCE(SUM(class_b), 0) AS n FROM usage').get().n;
+  const spent = used();
   const out = await p.readBlocks(PATH, [spec(s.offsets, 1), spec(s.offsets, 4)]);
   assert.equal(s.e.SYNC._ops.get - before, 2);
+  assert.equal(used() - spent, 2, 'el tope mensual cuenta cada bloque, reservados de una vez');
   assert.match(out[0], /^10\tbloque 1: x{3001}\n$/);
   assert.match(out[1], /^40\tbloque 4: x{3004}\n$/);
   assert.equal(await p.readBlocks('bookreader/index/s/otro.bin', [spec(s.offsets, 0)]), null);

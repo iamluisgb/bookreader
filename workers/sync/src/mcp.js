@@ -310,12 +310,13 @@ export function r2Provider(env, user, raw, { canWrite = false, agent = null } = 
       const pid = await C.pathId(k, path);
       const row = await env.DB.prepare('SELECT key FROM objects WHERE user = ? AND path = ?').bind(user, pid).first();
       if (!row) return null;
+      // Una reserva para todo el lote: una escritura en D1, no una por bloque.
+      if (!(await spend(env, 'b', Date.now(), specs.length))) {
+        await refused(env);
+        throw Object.assign(new Error('capacity'), { capacity: true });
+      }
       const dec = new TextDecoder();
       return Promise.all(specs.map(async ({ i, count, offset, length }) => {
-        if (!(await spend(env, 'b'))) {
-          await refused(env);
-          throw Object.assign(new Error('capacity'), { capacity: true });
-        }
         const obj = await env.SYNC.get(row.key, { range: { offset, length } });
         if (!obj) throw new SourceError('Falta el almacén de pasajes: reconstruye el índice desde la app.');
         return dec.decode(await C.openBlock(k, pid, new Uint8Array(await new Response(obj.body).arrayBuffer()), i, count));

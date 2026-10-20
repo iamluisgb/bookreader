@@ -100,23 +100,26 @@ const SEARCH_LIBRARY = {
     const books = Object.fromEntries(Object.entries(manifest.books || {}).filter(([id]) => titleOf.has(id) && inScope(id)));
     const found = await searchIndex(read, '', { ...manifest, books }, queries, { perBook, books: nBooks });
 
-    // El texto de los pasajes: bloques del almacén, por libro, mientras quepan en el presupuesto.
-    const out = [];
+    // El texto de los pasajes: bloques del almacén. El presupuesto se reparte en el orden del
+    // ranking y luego se leen todos los libros a la vez.
     let cut = false;
-    for (const b of found.books) {
-      const meta = books[b.bookId];
-      const { starts = [], offsets = [] } = meta.store || {};
+    const plan = found.books.map((b) => {
+      const { starts = [], offsets = [] } = books[b.bookId].store || {};
       const count = offsets.length - 1;
       const need = [...new Set(b.passages.map((p) => blockOf(starts, p.n)).filter((i) => i >= 0 && i < count))];
-      const room = MAX_READS - reads;
-      const take = need.slice(0, Math.max(0, room));
+      const take = need.slice(0, Math.max(0, MAX_READS - reads));
       if (take.length < need.length) cut = true;
-      let blocks = [];
-      if (take.length) {
-        reads += take.length;
-        blocks = (await source.indexBlocks(b.bookId, take.map((i) => ({ i, count, offset: offsets[i], length: offsets[i + 1] - offsets[i] })))) || [];
-      }
-      const text = new Map(take.map((i, k) => [i, blocks[k]]));
+      reads += take.length;
+      return { take, specs: take.map((i) => ({ i, count, offset: offsets[i], length: offsets[i + 1] - offsets[i] })) };
+    });
+    const fetched = await Promise.all(found.books.map((b, k) =>
+      plan[k].take.length ? source.indexBlocks(b.bookId, plan[k].specs) : []));
+    const out = [];
+    for (const [k, b] of found.books.entries()) {
+      const meta = books[b.bookId];
+      const { starts = [] } = meta.store || {};
+      const blocks = fetched[k] || [];
+      const text = new Map(plan[k].take.map((i, j) => [i, blocks[j]]));
       out.push({
         bookId: b.bookId,
         title: titleOf.get(b.bookId) || meta.title || null,
