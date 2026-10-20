@@ -400,3 +400,40 @@ test('una tool de mazos vetada por la fuente no se ejecuta aunque se la llame a 
   assert.match(res.content[0].text, /Tool desconocida/);
   assert.equal(asked, false, 'ni siquiera se molesta a la fuente');
 });
+
+// Los mazos y artefactos se piden también por título (`book`), como los subrayados; y un
+// argumento que la tool no conoce es un error, no un filtro ignorado en silencio.
+function titledSource() {
+  const decks = { b1: [{ uid: 'u1', id: 1, name: 'Transacciones', scope: 'Cap 8', cards: [] }], b2: [] };
+  return {
+    kind: 'stub',
+    hasAgentData: true,
+    titles: async () => ({ b1: 'Designing Data-Intensive Applications', b2: 'Pedro Páramo' }),
+    bookInfo: async (id) => ({ title: id === 'b1' ? 'Designing Data-Intensive Applications' : 'Pedro Páramo' }),
+    decks: async (id) => decks[id] || [],
+    artifacts: async () => [],
+  };
+}
+
+test('list_decks y get_deck aceptan el título del libro', async () => {
+  const source = titledSource();
+  const list = JSON.parse((await callTool(source, 'list_decks', { book: 'data-intensive' })).content[0].text);
+  assert.deepEqual(list.books.map((b) => b.bookId), ['b1']);
+  const deck = JSON.parse((await callTool(source, 'get_deck', { book: 'Data-Intensive', deckUid: 'u1' })).content[0].text);
+  assert.equal(deck.bookId, 'b1');
+  assert.equal(deck.name, 'Transacciones');
+  const arts = JSON.parse((await callTool(source, 'list_artifacts', { book: 'paramo' })).content[0].text);
+  assert.equal(arts.total, 0);
+});
+
+test('get_deck sin el mazo nombra el deckUid pedido y los uids que hay', async () => {
+  const res = await callTool(titledSource(), 'get_deck', { bookId: 'b1', deckUid: 'nope' });
+  assert.equal(res.isError, true);
+  assert.match(res.content[0].text, /deckUid «nope».*u1 \(«Transacciones»\)/);
+});
+
+test('un argumento desconocido se rechaza con los que sí acepta', async () => {
+  const res = await callTool(titledSource(), 'list_decks', { libro: 'x' });
+  assert.equal(res.isError, true);
+  assert.match(res.content[0].text, /desconocido.*«libro».*Acepta: bookId, book/);
+});

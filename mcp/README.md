@@ -96,14 +96,16 @@ node cli.mjs --dir ~/bookreader-layout reading_stats '{"range":"7d"}'
 | Tool | Argumentos | Qué devuelve |
 | --- | --- | --- |
 | `list_books` | — | Libros con contadores (subrayados, marcadores, notas, conversaciones), última actividad y última posición. |
-| `get_highlights` | `bookId`, `limit?`, `offset?` | Subrayados del libro con texto, nota, capítulo/página, color y CFI. |
-| `get_notes` | `bookId`, `limit?`, `offset?` | Notas de libreta con `fieldKey`, etiqueta, objetivo y conversación de origen. |
-| `search_highlights` | `query`, `bookId?`, `limit?` | Busca en el texto de los subrayados y en sus notas, sin distinguir mayúsculas ni acentos. Todos los términos deben aparecer (AND). |
-| `reading_stats` | `range?`, `bookId?`, `groupBy?` | **Solo F2.** Minutos, palabras y unidades de lectura real, con desglose por día/semana/mes y por libro. |
-| `list_decks` | `bookId?` | **Solo F2.** Mazos de flashcards con contadores de repaso: tarjetas, vencidas hoy, nuevas y suspendidas. Sin el texto de las tarjetas. |
-| `get_deck` | `bookId`, `deckUid?` (o `deckId?`/`scope?`), `limit?` | **Solo F2.** Las tarjetas de un mazo: frente, dorso, capítulo, suspensión y estado SRS (`due`, `reps`, `stability`, `difficulty`). Mejor por `deckUid`: el `deckId` numérico cambia de un dispositivo a otro. |
-| `list_artifacts` | `bookId?`, `kind?` | **Solo F2.** Qué salió del Studio (summary, mindmap, infographic, figures), con una `preview` de como mucho 200 caracteres: nunca el contenido entero. |
-| `get_artifact` | `bookId`, `key` | **Solo F2.** El `result` completo de un artefacto, serializado, con tope de 20000 caracteres (`truncated: true` y `totalChars` si se recorta). |
+| `get_highlights` | `bookId` o `book`, `limit?`, `offset?` | Subrayados del libro con texto, nota, capítulo/página, color y CFI. |
+| `get_notes` | `bookId` o `book`, `limit?`, `offset?` | Notas de libreta con `fieldKey`, etiqueta, objetivo y conversación de origen. |
+| `search_highlights` | `query`, `bookId?`/`book?`, `limit?` | Busca en el texto de los subrayados y en sus notas, sin distinguir mayúsculas ni acentos. Todos los términos deben aparecer (AND). |
+| `reading_stats` | `range?`, `bookId?`/`book?`, `groupBy?` | **Solo F2.** Minutos, palabras y unidades de lectura real, con desglose por día/semana/mes y por libro. |
+| `list_decks` | `bookId?`/`book?` | **Solo F2.** Mazos de flashcards con contadores de repaso: tarjetas, vencidas hoy, nuevas y suspendidas. Sin el texto de las tarjetas. |
+| `get_deck` | `bookId` o `book`, `deckUid?` (o `deckId?`/`scope?`), `limit?` | **Solo F2.** Las tarjetas de un mazo: frente, dorso, capítulo, suspensión y estado SRS (`due`, `reps`, `stability`, `difficulty`). Mejor por `deckUid`: el `deckId` numérico cambia de un dispositivo a otro. |
+| `list_artifacts` | `bookId?`/`book?`, `kind?` | **Solo F2.** Qué salió del Studio (summary, mindmap, infographic, figures), con una `preview` de como mucho 200 caracteres: nunca el contenido entero. |
+| `get_artifact` | `bookId` o `book`, `key` | **Solo F2.** El `result` completo de un artefacto, serializado, con tope de 20000 caracteres (`truncated: true` y `totalChars` si se recorta). |
+
+`book` es el título o parte de él, sin tildes ni mayúsculas; si casa con varios libros, la tool lo dice con los candidatos. Un argumento que la tool no conoce es un error que lista los que sí acepta: antes se ignoraba y el filtro no se aplicaba.
 
 **Con el sync de BookReader**, según los permisos del token (Ajustes → Datos → Agentes):
 

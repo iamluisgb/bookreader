@@ -29,3 +29,9 @@ export async function resolveBookArg(source, args) {
     ? `«${args.book}» casa con varios libros: ${list}. Repite con su bookId.`
     : `Ningún libro se llama «${args.book}». Hay: ${list || 'ninguno con título'}.`);
 }
+
+// Igual, para las tools donde el libro es un filtro opcional: sin `bookId` ni `book`, null.
+export async function optionalBookArg(source, args) {
+  const given = (k) => typeof args[k] === 'string' && args[k].trim();
+  return given('bookId') || given('book') ? resolveBookArg(source, args) : null;
+}

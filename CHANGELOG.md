@@ -12,6 +12,10 @@ de los libros. Las estanterías y el estado de cada libro tienen ahora su propio
 revierte una reorganización, sea de un agente o de la propia app. Cada cambio de un agente guarda
 su deshacer cifrado con la clave del usuario, y Ajustes → Datos → Agentes lo deshace.
 
+Arreglos del MCP tras la primera prueba de verdad: los mazos, los artefactos y las estadísticas
+aceptan el libro por título (`book`), como los subrayados; y un argumento que una tool no conoce
+es un error, no un filtro ignorado (`list_decks` con `book` listaba toda la biblioteca).
+
 ## 2026-10-19 — El MCP remoto escribe y lee los libros (MON4)
 
 El MCP de BookReader se sirve también desde el Worker del sync (`/mcp`), con tokens de agente

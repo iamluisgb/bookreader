@@ -13,7 +13,7 @@
 
 import { ToolError, SourceError, UnknownBookError } from './errors.mjs';
 import { aggregateReading, RANGES, GROUP_BY } from './stats.mjs';
-import { resolveBookArg, fold } from './book-arg.mjs';
+import { resolveBookArg, optionalBookArg, fold } from './book-arg.mjs';
 import { WRITE_TOOLS } from './write-tools.mjs';
 import { TEXT_TOOLS } from './text-tools.mjs';
 import { ARTIFACT_TOOLS } from './artifact-tools.mjs';
@@ -285,6 +285,7 @@ const SEARCH_HIGHLIGHTS = {
     properties: {
       query: { type: 'string', description: 'Lo que se busca. Varias palabras = todas tienen que aparecer.' },
       bookId: { type: 'string', description: 'Opcional: limita la búsqueda a un libro.' },
+      book: { type: 'string', description: 'O el título del libro (o parte de él), si no sabes su id.' },
       limit: { type: 'integer', minimum: 1, maximum: LIMIT_MAX, description: 'Máximo a devolver (50 por defecto).' },
     },
     required: ['query'],
@@ -292,7 +293,7 @@ const SEARCH_HIGHLIGHTS = {
   },
   async run(source, args) {
     const query = requireString(args, 'query');
-    const bookId = optionalString(args, 'bookId');
+    const bookId = await optionalBookArg(source, args);
     const limit = optionalInt(args, 'limit', { min: 1, max: LIMIT_MAX, def: LIMIT_DEFAULT });
     const terms = termsOf(query);
     if (!terms.length) throw new ToolError('La consulta no tiene ningún término buscable.');
@@ -351,6 +352,7 @@ const READING_STATS = {
         description: 'Ventana: today, 7d, 30d, 90d, 365d o all (7d por defecto).',
       },
       bookId: { type: 'string', description: 'Opcional: limita las cuentas a un libro.' },
+      book: { type: 'string', description: 'O el título del libro (o parte de él), si no sabes su id.' },
       groupBy: {
         type: 'string',
         enum: GROUP_BY,
@@ -361,7 +363,7 @@ const READING_STATS = {
   },
   async run(source, args) {
     const range = optionalString(args, 'range') || '7d';
-    const bookId = optionalString(args, 'bookId');
+    const bookId = await optionalBookArg(source, args);
     const groupBy = optionalString(args, 'groupBy') || 'day';
     const titles = await source.titles();
     // Mismo criterio que en la búsqueda: un `bookId` que no existe es un error, no un cero.
@@ -387,11 +389,12 @@ const LIST_DECKS = {
     type: 'object',
     properties: {
       bookId: { type: 'string', description: 'Opcional: limita el listado a un libro.' },
+      book: { type: 'string', description: 'O el título del libro (o parte de él), si no sabes su id.' },
     },
     additionalProperties: false,
   },
   async run(source, args) {
-    const bookId = optionalString(args, 'bookId');
+    const bookId = await optionalBookArg(source, args);
     const today = dayOf(Date.now());
     const titles = await source.titles();
     const ids = bookId ? [bookId] : Object.keys(titles);
@@ -415,13 +418,14 @@ const GET_DECK = {
   description:
     'Las tarjetas de UN mazo: frente, dorso, capítulo de origen, si está suspendida y su ' +
     'estado de repaso (`due`, `reps`, `stability`, `difficulty`; una tarjeta sin `srs` es ' +
-    'nueva). El mazo se identifica por `deckId` (sale en `list_decks`) o por `scope` (el ' +
+    'nueva). El mazo se identifica por `deckUid` (sale en `list_decks`) o por `scope` (el ' +
     'ámbito del libro para el que se generó). Con `limit` se pagina un mazo grande.',
   capability: 'hasAgentData',
   inputSchema: {
     type: 'object',
     properties: {
       bookId: { type: 'string', description: 'Id del libro, tal como sale en `list_books`.' },
+      book: { type: 'string', description: 'O el título del libro (o parte de él), si no sabes su id.' },
       deckUid: { type: 'string', description: 'Uid del mazo (de `list_decks`): el identificador estable.' },
       deckId: { type: 'string', description: 'Id numérico del mazo (cambia de un dispositivo a otro: mejor `deckUid`).' },
       scope: { type: 'string', description: 'Ámbito del mazo dentro del libro (uno de los dos).' },
@@ -432,11 +436,10 @@ const GET_DECK = {
         description: 'Máximo de tarjetas a devolver (100 por defecto, 500 como tope).',
       },
     },
-    required: ['bookId'],
     additionalProperties: false,
   },
   async run(source, args) {
-    const bookId = requireString(args, 'bookId');
+    const bookId = await resolveBookArg(source, args);
     const deckUid = optionalString(args, 'deckUid');
     const deckId = optionalString(args, 'deckId');
     const scope = optionalString(args, 'scope');
@@ -454,11 +457,11 @@ const GET_DECK = {
       : decks.find((d) => ((d && d.scope) || '') === scope);
     if (!deck) {
       const disponibles = decks
-        .map((d) => (d && d.id != null ? String(d.id) : '(sin id)') + (d.name ? ' («' + d.name + '»)' : ''))
+        .map((d) => (d && d.uid ? d.uid : d && d.id != null ? String(d.id) : '(sin id)') + (d.name ? ' («' + d.name + '»)' : ''))
         .join(', ');
       throw new ToolError(
         'No hay un mazo que coincida con ' +
-          (deckId ? 'deckId «' + deckId + '»' : 'scope «' + scope + '»') +
+          (deckUid ? 'deckUid «' + deckUid + '»' : deckId ? 'deckId «' + deckId + '»' : 'scope «' + scope + '»') +
           ' en ese libro.' +
           (disponibles ? ' Mazos disponibles: ' + disponibles + '.' : ' El libro no tiene mazos.'),
       );
@@ -496,6 +499,7 @@ const LIST_ARTIFACTS = {
     type: 'object',
     properties: {
       bookId: { type: 'string', description: 'Opcional: limita el listado a un libro.' },
+      book: { type: 'string', description: 'O el título del libro (o parte de él), si no sabes su id.' },
       kind: {
         type: 'string',
         description: 'Opcional: filtra por tipo de artefacto (summary, mindmap, infographic, figures).',
@@ -504,7 +508,7 @@ const LIST_ARTIFACTS = {
     additionalProperties: false,
   },
   async run(source, args) {
-    const bookId = optionalString(args, 'bookId');
+    const bookId = await optionalBookArg(source, args);
     const kind = optionalString(args, 'kind');
     const titles = await source.titles();
     const ids = bookId ? [bookId] : Object.keys(titles);
@@ -539,13 +543,14 @@ const GET_ARTIFACT = {
     type: 'object',
     properties: {
       bookId: { type: 'string', description: 'Id del libro al que pertenece el artefacto.' },
+      book: { type: 'string', description: 'O el título del libro (o parte de él), si no sabes su id.' },
       key: { type: 'string', description: 'Clave del artefacto, tal como sale en `list_artifacts`.' },
     },
-    required: ['bookId', 'key'],
+    required: ['key'],
     additionalProperties: false,
   },
   async run(source, args) {
-    const bookId = requireString(args, 'bookId');
+    const bookId = await resolveBookArg(source, args);
     const key = requireString(args, 'key');
     const artifacts = await source.artifacts(bookId);
     const artifact = artifacts.find((a) => String(a && a.key) === String(key));
@@ -629,7 +634,18 @@ export async function callTool(source, name, rawArgs) {
     return errorResult('Tool desconocida: «' + name + '». Disponibles: ' + disponibles + '.');
   }
   try {
-    const payload = await tool.run(source, asObject(rawArgs));
+    const args = asObject(rawArgs);
+    // Un argumento que la tool no conoce se rechaza: ignorarlo devolvía otra cosa sin avisar
+    // (list_decks con `book` listaba toda la biblioteca).
+    const props = tool.inputSchema && tool.inputSchema.properties;
+    if (props && tool.inputSchema.additionalProperties === false) {
+      const unknown = Object.keys(args).filter((k) => !Object.hasOwn(props, k));
+      if (unknown.length) {
+        throw new ToolError('Argumento desconocido para ' + tool.name + ': ' + unknown.map((k) => '«' + k + '»').join(', ') +
+          '. Acepta: ' + Object.keys(props).join(', ') + '.');
+      }
+    }
+    const payload = await tool.run(source, args);
     return {
       content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }],
     };
