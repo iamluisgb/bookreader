@@ -215,6 +215,9 @@ export function createDriveSource({ provider, base = DEFAULT_BASE, cacheMs = 150
         const entry = await entryFrom(c, id);
         if (!entry) continue;
         const summary = summarizeBook(entry);
+        // Lo que ya está en el catálogo, sin lecturas de más: autor, estado y estanterías.
+        const lb = c.library && c.library.books[id];
+        if (lb) Object.assign(summary, { author: lb.author || null, status: lb.status || 'unread', progress: lb.progress || 0, shelfIds: lb.shelfIds || [] });
         if (entry.error) summary.error = entry.error;
         out.push(summary);
       }
@@ -262,6 +265,21 @@ export function createDriveSource({ provider, base = DEFAULT_BASE, cacheMs = 150
       if (!entry) throw new UnknownBookError(bookId);
       return liveItems(entry.artifacts);
     },
+    /** El catálogo (library.json: libros y estanterías), o null en un layout viejo. */
+    async library() {
+      return (await load()).library;
+    },
+    /**
+     * Cambia el catálogo (library.json): estanterías y organización de los libros. Como
+     * `writeBook`, solo con un proveedor que escribe; `mutate` recibe el JSON sin redactar.
+     */
+    writeLibrary: provider.update
+      ? async (mutate, opts = {}) => {
+          const out = await provider.update(base + 'library.json', mutate, opts);
+          if (!opts.dryRun) cache = null;
+          return out;
+        }
+      : undefined,
     /**
      * El texto del libro que sube la app (sync/book-text.js; formato en book-text-build.js):
      * `bookText` da el índice (`text/<id>.json`) y `bookTextFile` un trozo o la búsqueda, en

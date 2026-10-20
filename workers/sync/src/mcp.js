@@ -39,9 +39,13 @@ const LICENSE_RECHECK_MS = DAY;
 const LAST_USED_EVERY_MS = 60 * 60 * 1000;   // `last_used_at` se escribe como mucho una vez por hora
 const PROTOCOLS = ['2025-06-18', '2025-03-26', '2024-11-05'];
 // Permisos de un token. 'read' va siempre; los otros, solo si el usuario los marca al crearlo.
-export const SCOPES = ['read', 'write', 'text'];
+export const SCOPES = ['read', 'write', 'text', 'library'];
+const CHANGES_KEPT_DAYS = 30;
+const UNDO_MAX_BYTES = 512 * 1024;
 const WRITE_RETRIES = 3;
-const VERSIONED = /\/books\/[^/]+\.json$/;   // como bookreader-provider.js: el fichero del libro guarda versiones
+// Como bookreader-provider.js: el fichero del libro guarda versiones. Y library.json cuando
+// escribe un agente (los dispositivos no las piden para él).
+const VERSIONED = /\/(books\/[^/]+|library)\.json$/;
 const SERVER_INFO = { name: 'bookreader', title: 'BookReader', version: '1.0.0' };
 const INSTRUCTIONS = [
   'Lee la biblioteca de BookReader del usuario: libros, subrayados, notas de libreta, estadísticas',
@@ -55,6 +59,49 @@ const json = (obj, status, headers = {}) => new Response(JSON.stringify(obj), {
 });
 
 // ---- La clave, cifrada con el token ----------------------------------------------------------
+
+// ---- Cambios de agentes que se pueden deshacer ----------------------------------------------
+
+export const undoPath = (changeId) => 'bookreader/undo/' + changeId;
+
+async function recordChange(env, k, { user, agent, target, summary, undo }, now = Date.now()) {
+  const id = randomId();
+  const pid = await C.pathId(k, undoPath(id));
+  const bytes = new Uint8Array(await (await C.encrypt(k, pid, JSON.stringify(undo))).arrayBuffer());
+  if (bytes.length > UNDO_MAX_BYTES) return null;   // un cambio enorme se queda sin deshacer (lo dice el resultado)
+  await env.DB.prepare(
+    `INSERT INTO mcp_changes (id, user, token_id, agent, target, summary, undo, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).bind(id, user, agent.tokenId || null, agent.name || 'MCP', target, JSON.stringify(summary), C.b64url(bytes), now).run();
+  return id;
+}
+
+// GET /v1/mcp-changes: los últimos cambios de agentes (para la lista con «Deshacer»).
+export async function listChangesRoute(env, cors, who, now = Date.now()) {
+  const { results = [] } = await env.DB.prepare(
+    `SELECT id, agent, target, summary, created_at, undone_at FROM mcp_changes WHERE user = ? AND created_at > ? ORDER BY created_at DESC LIMIT 20`,
+  ).bind(who.user, now - CHANGES_KEPT_DAYS * DAY).all();
+  return json({
+    changes: results.map((r) => ({ id: r.id, agent: r.agent, target: r.target, summary: JSON.parse(r.summary), createdAt: r.created_at, undoneAt: r.undone_at })),
+  }, 200, cors);
+}
+
+// GET /v1/mcp-changes/<id>/undo: el `undo` cifrado (lo descifra y lo aplica la app).
+export async function getUndoRoute(id, env, cors, who) {
+  const r = await env.DB.prepare('SELECT undo, undone_at FROM mcp_changes WHERE id = ? AND user = ?').bind(id, who.user).first();
+  if (!r) return json({ error: 'not_found' }, 404, cors);
+  return json({ undo: r.undo, undoneAt: r.undone_at }, 200, cors);
+}
+
+// POST /v1/mcp-changes/<id>/undone: la app ya lo deshizo.
+export async function markUndoneRoute(id, env, cors, who, now = Date.now()) {
+  await env.DB.prepare('UPDATE mcp_changes SET undone_at = ? WHERE id = ? AND user = ? AND undone_at IS NULL').bind(now, id, who.user).run();
+  return json({ ok: true }, 200, cors);
+}
+
+export async function purgeChanges(env, now = Date.now()) {
+  const r = await env.DB.prepare('DELETE FROM mcp_changes WHERE created_at < ? RETURNING id').bind(now - CHANGES_KEPT_DAYS * DAY).all();
+  return (r.results || []).length;
+}
 
 async function wrapKeyOf(secret) {
   const base = await crypto.subtle.importKey('raw', secret, 'HKDF', false, ['deriveKey']);
@@ -180,7 +227,7 @@ export async function authenticateAgent(env, token, now = Date.now(), fetchImpl 
     await env.DB.prepare('UPDATE mcp_tokens SET last_used_at = ? WHERE id = ?').bind(now, row.id).run();
   }
   return {
-    user: row.user, raw: C.fromB64url(props.k), license: props.l, name: row.name,
+    tokenId: row.id, user: row.user, raw: C.fromB64url(props.k), license: props.l, name: row.name,
     scopes: new Set(String(row.scopes || 'read').split(',')),
     // Suscripción caducada (en el plazo de gracia): se lee, no se escribe. Como el sync.
     readOnly: !!u.lapsed_at,
@@ -191,7 +238,10 @@ export async function authenticateAgent(env, token, now = Date.now(), fetchImpl 
 // también escribe (`update`): como un dispositivo más, leer con su etag, cambiar, cifrar y
 // guardar solo si nadie escribió entre medias (CAS en D1); si alguien lo hizo, se relee y se
 // vuelve a aplicar el cambio. Los dispositivos lo bajan en su próximo ciclo y lo funden.
-export function r2Provider(env, user, raw, { canWrite = false } = {}) {
+// `mutate` puede devolver también `undo` (los valores anteriores de lo que cambió) y `summary`
+// (contadores): entonces el cambio queda en mcp_changes, con el `undo` cifrado con la clave del
+// usuario, y la app lo puede deshacer (Ajustes → Datos → Agentes).
+export function r2Provider(env, user, raw, { canWrite = false, agent = null } = {}) {
   let keysP = null;
   const keys = () => (keysP ||= C.importKeys(raw));
 
@@ -216,14 +266,20 @@ export function r2Provider(env, user, raw, { canWrite = false } = {}) {
     }
     for (let attempt = 0; attempt <= WRITE_RETRIES; attempt++) {
       const { k, pid, row, value } = await readRaw(path);
-      const { next, result } = await mutate(value);
+      const { next, result, undo, summary } = await mutate(value);
       if (dryRun || !next) return result;
       const body = new Uint8Array(await (await C.encrypt(k, pid, JSON.stringify(next))).arrayBuffer());
       const w = await writeBytes(env, {
         user, path: pid, name: row ? row.name : await C.encryptName(k, path), body, size: body.length, kind: 'data',
         ifMatch: row ? row.etag : null, mustCreate: !row, keepVersions: VERSIONED.test(path),
       });
-      if (!w.error) return result;
+      if (!w.error) {
+        if (undo && agent) {
+          const changeId = await recordChange(env, k, { user, agent, target: 'library', summary: summary || {}, undo });
+          return { ...result, changeId };
+        }
+        return result;
+      }
       if (w.error === 'quota') throw new SourceError('El sync de BookReader está lleno: no cabe el cambio.');
       if (w.error !== 'precondition_failed') throw Object.assign(new Error('capacity'), { capacity: true });
     }
@@ -303,8 +359,10 @@ export async function mcpRoute(request, env, { resourceMetadata = null } = {}) {
   // Una fuente por petición: la caché del layout vive lo que vive la petición. Lo que el token
   // permite decide qué tools se anuncian (toolsFor mira estas marcas).
   const canWrite = who.scopes.has('write') && !who.readOnly;
-  const source = createDriveSource({ provider: r2Provider(env, who.user, who.raw, { canWrite }), kind: 'bookreader', cacheMs: 60000 });
-  Object.assign(source, { canWrite, canReadText: who.scopes.has('text'), agentName: who.name });
+  const canOrganize = who.scopes.has('library') && !who.readOnly;
+  const provider = r2Provider(env, who.user, who.raw, { canWrite: canWrite || canOrganize, agent: { tokenId: who.tokenId, name: who.name } });
+  const source = createDriveSource({ provider, kind: 'bookreader', cacheMs: 60000 });
+  Object.assign(source, { canWrite, canOrganize, canReadText: who.scopes.has('text'), agentName: who.name });
   try {
     const batch = Array.isArray(body);
     const out = (await Promise.all((batch ? body : [body]).map((m) => handleMessage(m, source)))).filter(Boolean);

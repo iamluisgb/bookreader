@@ -356,6 +356,13 @@ export async function createMcpToken(name, { days = 90, scopes = [] } = {}) {
   return res.json();
 }
 
+// Los últimos cambios de agentes en la biblioteca (para «Deshacer»: sync/agent-undo.js).
+export async function mcpChanges() {
+  const res = await api('/v1/mcp-changes');
+  if (!res.ok) throw await apiError(res);
+  return (await res.json()).changes;
+}
+
 export async function revokeMcpToken(id) {
   const res = await api('/v1/mcp-tokens/' + encodeURIComponent(id), { method: 'DELETE' });
   if (!res.ok) throw await apiError(res);

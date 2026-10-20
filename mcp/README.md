@@ -120,6 +120,19 @@ node cli.mjs --dir ~/bookreader-layout reading_stats '{"range":"7d"}'
 | `create_infographic` | escritura | Una infografía con la plantilla de la app (tesis, ideas, paneles, cita). |
 | `create_summary` | escritura | Un resumen por capítulos, con viñetas que citan el pasaje. |
 | `delete_artifact` | escritura | Borra un mapa, infografía o resumen (tombstone). |
+| `list_shelves` | — | Estanterías (anidadas con «/», inteligentes con su regla) y cuántos libros tiene cada una. `list_books` trae autor, estado y `shelfIds`. |
+| `move_books` | biblioteca | Mete y saca libros de estanterías, en lote (por id o por título). |
+| `update_books` | biblioteca | Título, autor y estado (unread/reading/finished) de libros, en lote. |
+| `create_shelf` | biblioteca | Estantería normal (con libros, si se quiere), anidada o inteligente (`rule`). |
+| `update_shelf` | biblioteca | Renombrar (también moverla en el árbol) o cambiar su regla. El id no cambia. |
+| `reorder_shelves` | biblioteca | El orden de las estanterías de un nivel. |
+| `delete_shelf` | biblioteca | Borra una estantería: los libros salen de ella y las reglas que la citan se limpian. |
+
+Organizar la biblioteca pide su propio permiso («Organizar mi biblioteca»). Cada libro tocado
+lleva el sello de su grupo (`shelvesAt`, `statusAt`, `metaAt`), así que un pase de página en otro
+dispositivo que aún no bajó el cambio no lo revierte. Cada cambio guarda su deshacer: los valores
+anteriores de lo que tocó, cifrados con la clave del sync. En la app, Ajustes → Datos → Agentes
+lista los cambios recientes con «Deshacer», que solo revierte lo que hizo el agente.
 
 Los artefactos se CREAN siempre (el Studio guarda el historial de cada tipo): mejorar un mapa
 es crear otro y borrar el viejo si sobra. Pasan por los mismos techos que los que genera la app

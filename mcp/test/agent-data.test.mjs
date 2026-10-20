@@ -16,7 +16,7 @@ import { findForbidden } from '../src/redact.mjs';
 import { callTool, findTool, toolsFor } from '../src/tools.mjs';
 import { BOOK_1, BOOK_2, buildBackupFixture, buildLayoutFiles } from './helpers/dataset.mjs';
 
-const NEW_TOOLS = ['list_decks', 'get_deck', 'list_artifacts', 'get_artifact'];
+const NEW_TOOLS = ['list_decks', 'get_deck', 'list_artifacts', 'get_artifact', 'list_shelves'];
 
 // El secreto plantado: una clave vetada DENTRO de una tarjeta y de un artefacto. `scrub()` la
 // tiene que borrar a cualquier profundidad antes de que el payload llegue a la tool.
@@ -166,7 +166,7 @@ async function backupFileWithAgentData() {
 test('las tools de mazos y artefactos solo se anuncian si la fuente trae hasAgentData', () => {
   const capable = { kind: 'stub', hasReadingStats: true, hasAgentData: true };
   const names = (s) => toolsFor(s).map((t) => t.name);
-  assert.equal(names(capable).length, 9);
+  assert.equal(names(capable).length, 10);
   for (const n of NEW_TOOLS) {
     assert.ok(names(capable).includes(n), n + ' anunciada con la fuente viva');
     assert.ok(!names({ ...capable, hasAgentData: false }).includes(n), n + ' oculta sin hasAgentData');

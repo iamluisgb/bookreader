@@ -245,3 +245,76 @@ test('Agente crea un mapa mental y una infografía: llegan al Studio del disposi
   });
   expect(out).toEqual({ kinds: ['infographic', 'mindmap'], by: 'agent:Claude', map: true, info: true });
 });
+
+// Organizar la biblioteca: el agente crea una estantería con el libro dentro y lo marca
+// terminado; el dispositivo, sin haberlo bajado, pasa una página. Tras el sync se conserva lo
+// del agente (shelvesAt/statusAt) Y el progreso. Después, «Deshacer» desde Ajustes revierte el
+// último cambio del agente aquí y en el servidor.
+test('Agente organiza la biblioteca: sobrevive a un pase de página sin sincronizar, y se deshace desde la app', async ({ page }) => {
+  const server = await createSyncServer();
+  await installSyncServer(page, server);
+  await enableSyncPreview(page);
+  await seedBookReaderSync(page);
+  await page.goto('/');
+  await page.evaluate(async () => {
+    await (await import('/js/sync/bookreader-auth.js')).enable();
+    const Store = await import('/js/library/store.js');
+    const buf = new Uint8Array(1024).map((_, i) => (i * 11) % 251);
+    await Store.putBook({ id: 'ddia', title: 'Designing Data-Intensive Applications', author: 'Kleppmann', format: 'epub', fileName: 'ddia.epub', file: buf.buffer, size: buf.length, addedAt: Date.now(), progress: 20, status: 'reading', shelfIds: [] });
+    await (await import('/js/sync/engine.js')).syncNow();
+  });
+  await page.evaluate(async () => (await import('/js/ui/app-settings.js')).open('data'));
+  await page.locator('#appset-br-agent-create').click();
+  await page.locator('.dlg-overlay [data-field="name"]').fill('Claude');
+  await page.locator('.dlg-overlay [data-check="scopes"][value="library"]').check();
+  await page.locator('.dlg-overlay .dlg-ok').click();
+  await expect(page.locator('#appset-br-agent-token')).toContainText('br-mcp-');
+  const token = (await page.locator('#appset-br-agent-token').textContent())!.trim();
+  await expect(page.locator('#appset-br-agents')).toContainText('organiza la biblioteca');
+  const tool = async (name: string, args: any) => {
+    const res = await server.worker.fetch(new Request(SYNC_URL + '/mcp', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } }),
+    }), server.env);
+    const r = (await res.json()).result;
+    expect(r.isError ?? false, r.content[0].text).toBe(false);
+    return JSON.parse(r.content[0].text);
+  };
+
+  // 1) El dispositivo deja de sincronizar; 2) el agente organiza; 3) el dispositivo lee.
+  await page.evaluate(async () => (await import('/js/sync/engine.js')).setIntentionalOff(true));
+  const shelf = await tool('create_shelf', { name: 'Técnico/Bases de datos', books: ['designing'] });
+  await tool('update_books', { changes: [{ bookId: 'ddia', status: 'finished' }] });
+  await page.waitForTimeout(20);
+  const local = await page.evaluate(async () => {
+    const S: any = await import('/js/library/store.js');
+    await S.updateBook('ddia', (cur: any) => ({ progress: 25, status: S.statusFor(25, cur.status) }));
+    const E = await import('/js/sync/engine.js');
+    E.setIntentionalOff(false);
+    await E.syncNow(); await E.syncNow();
+    const b = await S.getBook('ddia');
+    const sh = (await S.getShelves()).map((x: any) => x.name);
+    return { shelfIds: b.shelfIds, status: b.status, progress: b.progress, shelves: sh };
+  });
+  expect(local).toEqual({ shelfIds: [shelf.shelfId], status: 'finished', progress: 25, shelves: ['Técnico/Bases de datos'] });
+
+  // Deshacer el último cambio (el estado) desde Ajustes.
+  await page.evaluate(async () => (await import('/js/ui/app-settings.js')).open('data'));
+  const rows = page.locator('#appset-br-changes .appset-link');
+  await expect(rows).toHaveCount(2);
+  await expect(rows.first()).toContainText('Claude · 1 libros');
+  await rows.first().locator('[data-act="undo"]').click();
+  await page.locator('.dlg-overlay .dlg-ok').click();
+  await expect(page.locator('#appset-data-msg')).toContainText('Deshecho');
+  await expect(rows.first()).toContainText('deshecho');
+  const after = await page.evaluate(async () => {
+    const E = await import('/js/sync/engine.js');
+    await E.syncNow();
+    const S: any = await import('/js/library/store.js');
+    const b = await S.getBook('ddia');
+    return { status: b.status, shelfIds: b.shelfIds, finished: !!b.finishedAt };
+  });
+  expect(after).toEqual({ status: 'reading', shelfIds: [shelf.shelfId], finished: false });
+  const remote = (await tool('list_books', {})).books.find((b: any) => b.id === 'ddia');
+  expect(remote.status).toBe('reading');
+});

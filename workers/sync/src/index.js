@@ -30,7 +30,7 @@
 // - Privacidad: no se registran rutas, nombres, contenidos ni IP. El servidor guarda bytes
 //   cifrados con una clave que nunca le llega.
 
-import { mcpRoute, createTokenRoute, listTokensRoute, revokeTokenRoute } from './mcp.js';
+import { mcpRoute, createTokenRoute, listTokensRoute, revokeTokenRoute, listChangesRoute, getUndoRoute, markUndoneRoute, purgeChanges } from './mcp.js';
 
 const DAY = 24 * 60 * 60 * 1000;
 const PATH_RE = /^[A-Za-z0-9_-]{16,64}$/;
@@ -538,6 +538,7 @@ export async function wipeUser(env, user) {
   await env.DB.prepare('DELETE FROM objects WHERE user = ?').bind(user).run();
   // Los tokens de agentes llevan la clave vieja: con un sync nuevo no servirían de nada.
   await env.DB.prepare('DELETE FROM mcp_tokens WHERE user = ?').bind(user).run();
+  await env.DB.prepare('DELETE FROM mcp_changes WHERE user = ?').bind(user).run();
 }
 
 // ---- Mantenimiento y gasto -----------------------------------------------------------------
@@ -554,6 +555,7 @@ export async function purge(env, now = Date.now()) {
   out.tokens = (t.results || []).length;
   const mt = await env.DB.prepare('DELETE FROM mcp_tokens WHERE expires_at < ? RETURNING id').bind(now).all();
   out.mcpTokens = (mt.results || []).length;
+  out.mcpChanges = await purgeChanges(env, now);
 
   const { results: gone = [] } = await env.DB.prepare('SELECT id FROM users WHERE lapsed_at IS NOT NULL AND lapsed_at < ?')
     .bind(now - c.graceDays * DAY).all();
@@ -627,6 +629,10 @@ export default {
         if (method === 'GET') return await listTokensRoute(env, cors, who);
         if (method === 'POST') return await createTokenRoute(request, env, cors, who);
       }
+      if (pathname === '/v1/mcp-changes' && method === 'GET') return await listChangesRoute(env, cors, who);
+      const mc = pathname.match(/^\/v1\/mcp-changes\/([A-Za-z0-9_-]{22})\/(undo|undone)$/);
+      if (mc && mc[2] === 'undo' && method === 'GET') return await getUndoRoute(mc[1], env, cors, who);
+      if (mc && mc[2] === 'undone' && method === 'POST') return await markUndoneRoute(mc[1], env, cors, who);
       const mt = pathname.match(/^\/v1\/mcp-tokens\/([A-Za-z0-9_-]{22})$/);
       if (mt && method === 'DELETE') return await revokeTokenRoute(mt[1], env, cors, who);
 

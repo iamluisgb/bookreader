@@ -53,6 +53,8 @@ test('F2 anuncia la misma superficie más reading_stats, mazos y artefactos', as
       'get_deck',
       'list_artifacts',
       'get_artifact',
+      // Y el catálogo: las estanterías (lectura; organizarlas pide permiso).
+      'list_shelves',
     ]);
   } finally {
     await c.close();

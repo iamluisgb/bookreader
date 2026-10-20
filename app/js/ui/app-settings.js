@@ -1214,6 +1214,7 @@ function dataHtml() {
         <label class="appset-label" style="margin-top:14px">${t('Agentes (MCP)')}</label>
         <p class="appset-muted">${t('Deja que un agente de IA (Claude Code, Claude Desktop, Hermes…) lea tu biblioteca: subrayados, notas, estadísticas y mazos. Solo puede leer. Para responderle, el servidor descifra lo que pide mientras dura cada consulta: crea un token por agente y revócalo cuando ya no lo uses.')}</p>
         <div id="appset-br-agents" class="appset-links"></div>
+        <div id="appset-br-changes" class="appset-links" hidden></div>
         <div id="appset-br-agent-new" class="appset-br-recovery" hidden>
           <p class="appset-muted">${t('Token para «{name}». Cópialo ahora: no se vuelve a enseñar.', { name: '<span id="appset-br-agent-name"></span>' })}</p>
           <code id="appset-br-agent-token" class="appset-br-code"></code>
@@ -1683,6 +1684,7 @@ function wireBookReaderSync(content, show) {
           <div class="appset-link-meta">${escapeHtml([
             (tk.scopes || []).includes('write') ? t('Lee y escribe') : t('Solo lee'),
             (tk.scopes || []).includes('text') ? t('con el texto de los libros') : '',
+            (tk.scopes || []).includes('library') ? t('organiza la biblioteca') : '',
             tk.lastUsedAt ? t('usado {when}', { when: ago(tk.lastUsedAt) }) : t('sin usar todavía'),
             t('caduca el {date}', { date: day(tk.expiresAt) }),
           ].filter(Boolean).join(' · '))}</div>
@@ -1698,6 +1700,45 @@ function wireBookReaderSync(content, show) {
       try { await BRAuth.revokeMcpToken(tk.id); show(t('Acceso de «{name}» revocado.', { name: tk.name })); }
       catch (err) { show(t('No se pudo revocar: {msg}', { msg: err.message }), true); }
       paintAgents();
+    };
+    paintChanges();
+  }
+
+  // Lo que los agentes cambiaron en la biblioteca, con «Deshacer» (sync/agent-undo.js).
+  async function paintChanges() {
+    const box = $('appset-br-changes');
+    let changes;
+    try { changes = (await BRAuth.mcpChanges()).filter(c => c.target === 'library'); }
+    catch { box.hidden = true; return; }
+    box.hidden = !changes.length;
+    if (!changes.length) return;
+    const what = (sm) => [
+      sm.books ? t('{n} libros', { n: sm.books }) : '',
+      sm.shelvesCreated ? t('{n} estanterías nuevas', { n: sm.shelvesCreated }) : '',
+      sm.shelvesChanged ? t('{n} estanterías cambiadas', { n: sm.shelvesChanged }) : '',
+      sm.shelvesDeleted ? t('{n} estanterías borradas', { n: sm.shelvesDeleted }) : '',
+    ].filter(Boolean).join(', ') || t('sin cambios');
+    box.innerHTML = `<p class="appset-muted">${t('Cambios recientes de agentes en tu biblioteca')}</p>` + changes.map(c => `
+      <div class="appset-link" data-id="${escapeHtml(c.id)}">
+        <div class="appset-link-text">
+          <div class="appset-link-name">${escapeHtml(c.agent)} · ${escapeHtml(what(c.summary || {}))}</div>
+          <div class="appset-link-meta">${escapeHtml(ago(c.createdAt))}${c.undoneAt ? ' · ' + escapeHtml(t('deshecho')) : ''}</div>
+        </div>
+        ${c.undoneAt ? '' : `<button class="appset-tpl-cancel" data-act="undo">${icon('undo', { size: 'md' })} ${t('Deshacer')}</button>`}
+      </div>`).join('');
+    box.onclick = async (e) => {
+      const row = e.target.closest('[data-act="undo"]')?.closest('.appset-link');
+      const ch = row && changes.find(x => x.id === row.dataset.id);
+      if (!ch) return;
+      if (!(await confirmBox(t('Los libros y estanterías que tocó «{name}» vuelven a como estaban antes de ese cambio. Si los has cambiado tú después, también se revierte.', { name: ch.agent }),
+        { title: t('Deshacer el cambio del agente'), okText: t('Deshacer') }))) return;
+      try {
+        const { undoChange } = await import('../sync/agent-undo.js');
+        const r = await undoChange(ch.id);
+        show(r.already ? t('Ese cambio ya estaba deshecho.') : t('Deshecho: {books} libros y {shelves} estanterías como estaban.', { books: r.books, shelves: r.shelves }));
+        SyncEngine.syncNow();
+      } catch (err) { show(t('No se pudo deshacer: {msg}', { msg: err.message }), true); }
+      paintChanges();
     };
   }
 
@@ -1819,6 +1860,7 @@ function wireBookReaderSync(content, show) {
         { name: 'scopes', type: 'checks', label: t('Además puede…'), value: [], options: [
           { value: 'write', label: t('Cambiar mis mazos y tarjetas, y crear mapas mentales, infografías y resúmenes') },
           { value: 'text', label: t('Leer el texto de mis libros') },
+          { value: 'library', label: t('Organizar mi biblioteca: estanterías, estado y títulos de los libros') },
         ] },
       ],
     });
