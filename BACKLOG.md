@@ -378,7 +378,7 @@ ser necesaria.
 
 ---
 
-### IA10 — Pregúntale a tu biblioteca: búsqueda en todos los libros para agentes · `L` · **F0 ✓ · F1 ✓ · F2 ✓ (2026-10-20)**
+### IA10 — Pregúntale a tu biblioteca: búsqueda en todos los libros para agentes · `L` · **F0 ✓ · F1 ✓ · F2 ✓ · F3 ✓ (2026-10-20); falta medir en el Worker con tu índice**
 
 > Decisiones en [ADR-059](DECISIONS.md) (`ACEPTADA` con las medidas de F0). Hermana de
 > [IA9](#ia9--retrieval-multi-fuente-cruzar-libros-papers-y-posts--m): IA9 cruza fuentes **dentro
@@ -575,6 +575,21 @@ sin abrir, y por significado. No se arregla estirando `search_book`; hace falta 
     lo prometedor.
   - Test de presupuesto: una consulta de 5 términos sobre 40 libros sintéticos no pasa de N lecturas
     ni de 10 ms de CPU medidos en Miniflare.
+  - **Hecho (2026-10-20):**
+    - **Dónde:** `mcp/src/library-search.mjs`, en el MCP remoto (Worker, desplegado) y en el
+      local. La fuente lee el índice con `indexFile` e `indexBlocks`.
+    - **Presupuesto:** `MAX_READS` = 40. Si los pasajes no caben, salen sin texto y la respuesta
+      lo dice en `notes`.
+    - **`notSearched`:** los libros de la biblioteca (o de la estantería) que no están en el índice.
+    - **`shelf`:** incluye las subestanterías y las inteligentes (`booksIn`).
+    - **Desviación del plan:** no se marca `highlighted` por pasaje. Saberlo obliga a leer el
+      fichero de cada libro (con conversaciones, a veces megas), y no cabe en la CPU del
+      Worker. La descripción manda a `search_highlights`.
+    - **Tests:** `workers/sync/test/mcp-index.test.mjs`, con un dispositivo que indexa con
+      `createIndexer` cifrando como la app y un agente por `/mcp`. La consulta de prueba gasta 7
+      lecturas de R2.
+    - **Pendiente:** CPU p95 y la prueba de 10 consultas en paralelo contra el Worker real, en
+      cuanto un equipo de Luis construya el índice. Va con F4.
 - **F4 — Medir y decidir la semántica** `S`
   - La batería entera contra producción: `queries[]` ON y OFF.
   - Resultado en el CHANGELOG con el nombre del run.

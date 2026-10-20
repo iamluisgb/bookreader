@@ -298,6 +298,21 @@ export function createDriveSource({ provider, base = DEFAULT_BASE, cacheMs = 150
       return r ? r.content : null;
     },
     /**
+     * El índice de toda la biblioteca (IA10; formato en app/js/sync/library-index-build.js):
+     * `indexFile` da un fichero de `index/` en texto plano (el manifiesto, una partición o un
+     * delta) y `indexBlocks` bloques sueltos del almacén de pasajes de un libro (`specs` del
+     * manifiesto). null si no están, o si el proveedor no lee por bloques.
+     */
+    async indexFile(rel) {
+      if (!/^index\/(manifest\.json|b[a-z0-9]+\/\d{1,2}\.txt|d\/[a-z0-9]+\.txt)$/.test(rel)) return null;
+      const r = await provider.read(base + rel);
+      return r ? r.content : null;
+    },
+    async indexBlocks(bookId, specs) {
+      if (!/^[A-Za-z0-9._-]+$/.test(bookId) || typeof provider.readBlocks !== 'function') return null;
+      return provider.readBlocks(base + 'index/s/' + bookId + '.bin', specs);
+    },
+    /**
      * Cambia el fichero de un libro. Solo existe si el proveedor sabe escribir (`update`: el del
      * sync de BookReader, en el Worker); el de Drive y el de disco son de solo lectura. `mutate`
      * recibe el JSON SIN redactar (o null si el libro aún no tiene fichero) y devuelve

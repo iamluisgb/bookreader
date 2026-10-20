@@ -24,7 +24,7 @@ const MAX_ITEMS = 500;
 const NAME_MAX = 120;
 
 const liveShelves = (lib) => Object.entries(lib.shelves || {}).filter(([, s]) => s && !s.deleted).map(([id, s]) => ({ id, ...s }));
-const liveBooks = (lib) => Object.entries(lib.books || {}).filter(([, b]) => b && !b.deleted).map(([id, b]) => ({ id, ...b }));
+export const liveBooks = (lib) => Object.entries(lib.books || {}).filter(([, b]) => b && !b.deleted).map(([id, b]) => ({ id, ...b }));
 const newShelfId = () => 'sh_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 const parentOf = (name) => segments(name).slice(0, -1).join(SEP);
 
@@ -42,7 +42,7 @@ function cleanName(v, label = 'name') {
 }
 
 // Una estantería por id o por nombre completo («Técnico/ML», sin tildes ni mayúsculas).
-function findShelf(lib, ref, label = 'shelf') {
+export function findShelf(lib, ref, label = 'shelf') {
   if (typeof ref !== 'string' || !ref.trim()) throw new ToolError('Falta «' + label + '»: su id (de list_shelves) o su nombre completo.');
   const live = liveShelves(lib);
   const byId = live.find((s) => s.id === ref.trim());

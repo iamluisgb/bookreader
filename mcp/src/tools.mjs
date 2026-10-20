@@ -16,6 +16,7 @@ import { aggregateReading, RANGES, GROUP_BY } from './stats.mjs';
 import { resolveBookArg, optionalBookArg, fold } from './book-arg.mjs';
 import { WRITE_TOOLS } from './write-tools.mjs';
 import { TEXT_TOOLS } from './text-tools.mjs';
+import { LIBRARY_SEARCH_TOOLS } from './library-search.mjs';
 import { ARTIFACT_TOOLS } from './artifact-tools.mjs';
 import { LIBRARY_TOOLS } from './library-tools.mjs';
 
@@ -589,6 +590,7 @@ export const ALL_TOOLS = [
   LIST_ARTIFACTS,
   GET_ARTIFACT,
   ...TEXT_TOOLS,
+  ...LIBRARY_SEARCH_TOOLS,
   ...WRITE_TOOLS,
   ...ARTIFACT_TOOLS,
   ...LIBRARY_TOOLS,

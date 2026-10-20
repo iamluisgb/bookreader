@@ -51,7 +51,8 @@ const INSTRUCTIONS = [
   'Lee la biblioteca de BookReader del usuario: libros, subrayados, notas de libreta, estadísticas',
   'de lectura, mazos de estudio y lo creado con el agente de la app. Es de solo lectura.',
   'Empieza por `list_books` para conocer los bookIds; `get_highlights` y `get_notes` aceptan',
-  'también `book` con parte del título.',
+  'también `book` con parte del título. Para preguntar a toda la biblioteca («¿qué tenemos sobre',
+  'X?»), `search_library` (si el token puede leer el texto de los libros).',
 ].join(' ');
 
 const json = (obj, status, headers = {}) => new Response(JSON.stringify(obj), {

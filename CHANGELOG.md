@@ -3,6 +3,30 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-10-20 — Pregúntale a tu biblioteca: búsqueda en todos los libros para agentes (IA10 F0–F3)
+
+Un agente puede preguntar a toda la biblioteca en una llamada («¿qué tenemos sobre
+ontologías?») con `search_library`. Devuelve los libros que mejor tratan el tema, cada uno con sus
+mejores pasajes (ancla, capítulo y texto), y dice qué libros no se buscaron y por qué. Acepta
+varias formulaciones a la vez y se puede limitar a una estantería.
+
+Para eso, la app prepara en segundo plano el texto de **todos** los libros, no solo de los
+abiertos. Lo hace de uno en uno, en reposo y nunca con el lector abierto. Después construye un
+índice de la biblioteca, cifrado como el resto del sync (ADR-059):
+- 64 particiones por término, con deltas por libro y compactación en el dispositivo;
+- raíces EN/ES, así que «ontologies» encuentra «ontology»;
+- un almacén de pasajes en bloques que el Worker lee por rango.
+
+Ajustes → Datos → Agentes cuenta cuántos libros tienen texto y cuántos están en el índice, y
+dice por qué faltan los demás. Borrar un libro quita su texto y su índice del servidor.
+
+**Baseline medido antes de empezar** (F0, run `ia10-baseline-2026-10-20`, 20 preguntas reales):
+- recall de libros @5 del 65–70 %;
+- 55 llamadas y unos 40 s por pregunta;
+- errores 1102 del Worker al buscar libro a libro en paralelo.
+
+La medida con `search_library` es IA10 F4.
+
 ## 2026-10-20 — Un agente organiza la biblioteca, y se deshace desde la app (MON4)
 
 Con el permiso «Organizar mi biblioteca», un agente mueve libros entre estanterías, crea
