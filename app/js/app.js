@@ -986,6 +986,8 @@ async function persistToLibrary(id, buffer, format, fileName, fileBaseId) {
       // La miniatura se recalcula: la portada puede haber cambiado.
       coverThumb: cover ? null : (base.coverThumb || null),
     });
+    // Un libro nuevo: su texto para agentes se prepara ya (sync/book-text.js).
+    if (!existing) window.dispatchEvent(new CustomEvent('bookreader:book-imported', { detail: { bookId: id } }));
   } catch (e) {
     console.warn('No se pudo guardar en la biblioteca (¿espacio?):', e);
   }
