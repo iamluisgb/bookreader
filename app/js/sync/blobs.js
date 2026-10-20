@@ -121,6 +121,18 @@ export function cancelDownload(id) {
   if (i >= 0) downloadQueue.splice(i, 1);
 }
 
+// IA10 · El fichero de un libro que no está en este equipo, solo para trocearlo y subir su texto
+// (book-text.js): se baja y se verifica igual, pero NO se guarda. Sin pasar por la cola de
+// descargas: no es algo que el usuario pidió ni debe salir en la tarjeta. null si no está en el
+// remoto, si no hay sync de ficheros o si no es el fichero que se esperaba.
+export async function fetchForText(record) {
+  if (!record || !canTransfer() || !(record.blob && record.blob.path)) return null;
+  const r = await Provider.readBinary(record.blob.path);
+  if (!r) return null;
+  if (/^[0-9a-f]{64}$/i.test(record.id) && (await hashBlob(r.blob)) !== record.id) return null;
+  return r.blob;
+}
+
 async function downloadOne(id) {
   const record = await LibStore.getBook(id);
   if (!record || LibStore.hasFile(record)) return false;

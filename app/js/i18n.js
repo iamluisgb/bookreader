@@ -1787,7 +1787,7 @@ const EN = {
   'No cabe más texto en tu sync. Libera espacio y se seguirá preparando.': 'Your sync has no room for more text. Free some space and preparation will resume.',
   'Preparando {n} en segundo plano (nunca mientras lees).': 'Preparing {n} in the background (never while you read).',
   '{n} pendientes: se preparan tras el próximo sync.': '{n} pending: they are prepared after the next sync.',
-  'Sin el fichero en este equipo: {list}. Se preparan desde el equipo que lo tenga.': 'File not on this device: {list}. They are prepared from the device that has it.',
+  'Sin el fichero en este equipo ni en el sync: {list}. Se preparan desde el equipo que lo tenga.': 'File neither on this device nor in your sync: {list}. They are prepared from the device that has it.',
   'Sin texto que leer (un PDF escaneado, por ejemplo): {list}.': 'No readable text (a scanned PDF, for example): {list}.',
   'y {n} más': 'and {n} more',
   'Preparar ahora': 'Prepare now',

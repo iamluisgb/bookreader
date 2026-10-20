@@ -13,8 +13,9 @@
 // fichero para agentes, no para dispositivos.
 //
 // IA10 F1 · Todos los libros, no solo los abiertos: `fill` trocea en segundo plano cada libro
-// con fichero en este equipo (ai/segment-file.js), de uno en uno, en reposo y nunca con el
-// lector abierto. Qué está subido lo dice el servidor (los índices `text/<id>.json` y su
+// (ai/segment-file.js), de uno en uno, en reposo y nunca con el lector abierto. Si el fichero no
+// está en este equipo pero sí en el sync, lo baja solo para trocearlo y no lo guarda
+// (blobs.js · fetchForText): el texto no depende de qué equipo tenga qué libros. Qué está subido lo dice el servidor (los índices `text/<id>.json` y su
 // versión), no el localStorage de cada equipo: así dos equipos no trocean el mismo libro.
 // `coverage` lo cuenta para Ajustes → Datos → Agentes.
 
@@ -30,6 +31,7 @@ const FAILED_KEY = 'sync_text_failed'; // { [bookId]: { seg, why } } no dio text
 let running = null;
 let quotaFull = false;
 const uploading = new Map();           // bookId → Promise: el evento y la cola no suben dos veces
+const unfetchable = new Set();         // libros cuyo fichero no se pudo bajar del sync (en esta sesión)
 
 export const pathOf = (bookId) => BASE + 'text/' + bookId + '.json';
 
@@ -158,6 +160,9 @@ function idle() {
 // texto, y algo de cifrado. Basta para no empezar una subida que no cabe.
 const estimate = (annotatedText) => Math.ceil(annotatedText.length * 2.2);
 
+// Su fichero se puede bajar del sync para trocearlo (y no falló ya en esta sesión).
+const inSync = (b, Blobs) => !unfetchable.has(b.id) && !!(b.blob && b.blob.path) && Blobs.canTransfer();
+
 // Trocea y sube, de uno en uno, cada libro de la biblioteca sin texto actual en el servidor.
 // Se para si se apaga el permiso, si no cabe (avisa en Ajustes, no bloquea nada) o ante un error
 // de red: el siguiente sync bien acabado lo retoma donde quedó.
@@ -165,8 +170,8 @@ export function backfill() {
   if (!enabled()) return Promise.resolve(0);
   if (running) return running;
   running = (async () => {
-    const [DB, Store, SegmentFile] = await Promise.all([
-      import('../ai/db.js'), import('../library/store.js'), import('../ai/segment-file.js'),
+    const [DB, Store, SegmentFile, Blobs] = await Promise.all([
+      import('../ai/db.js'), import('../library/store.js'), import('../ai/segment-file.js'), import('./blobs.js'),
     ]);
     quotaFull = false;
     const remote = await remoteTexts();
@@ -182,11 +187,19 @@ export function backfill() {
       if (fresh(remote[b.id], DB.SEG_VERSION) || failed[b.id]?.seg === DB.SEG_VERSION) continue;
       const local = await DB.get('bookText', b.id);
       const ready = !!local && local.segVersion === DB.SEG_VERSION;
-      if (!ready && !Store.hasFile(b)) continue;
+      const here = Store.hasFile(b);
+      if (!ready && !here && !inSync(b, Blobs)) continue;
       forget(b.id);   // el servidor no lo tiene: lo que diga este equipo ya no vale
       if (!ready) {
         await idle();
-        if (!(await SegmentFile.ensureSegmented(b.id))) { markFailed(b.id, DB.SEG_VERSION, 'parse'); progress(); continue; }
+        let file = null;
+        if (!here) {
+          try { file = await Blobs.fetchForText(b); } catch (e) { console.warn('book-text:', e.message); break; }
+          if (!file) { unfetchable.add(b.id); progress(); continue; }
+        }
+        const ok = await SegmentFile.ensureSegmented(b.id, null, { file });
+        file = null;   // el fichero bajado no se guarda: solo hacía falta para trocearlo
+        if (!ok) { markFailed(b.id, DB.SEG_VERSION, 'parse'); progress(); continue; }
       }
       const text = ready ? local : await DB.get('bookText', b.id);
       if (!text || !text.annotatedText || !text.annotatedText.trim()) { markFailed(b.id, DB.SEG_VERSION, 'empty'); progress(); continue; }
@@ -239,10 +252,10 @@ async function removeText(bookId) {
 }
 
 // Para Ajustes → Datos → Agentes: cuántos libros puede leer un agente y por qué faltan los demás.
-// `why`: 'pending' (en cola), 'file' (el fichero no está en este equipo), 'parse' (no se pudo
+// `why`: 'pending' (en cola), 'file' (el fichero no está ni en este equipo ni en el sync), 'parse' (no se pudo
 // abrir) o 'empty' (no tiene texto: un PDF escaneado, por ejemplo).
 export async function coverage() {
-  const [DB, Store] = await Promise.all([import('../ai/db.js'), import('../library/store.js')]);
+  const [DB, Store, Blobs] = await Promise.all([import('../ai/db.js'), import('../library/store.js'), import('./blobs.js')]);
   const [books, remote] = await Promise.all([Store.getAllBooks(), remoteTexts()]);
   const failed = Storage.get(FAILED_KEY, {}) || {};
   const missing = [];
@@ -251,7 +264,7 @@ export async function coverage() {
     if (fresh(remote[b.id], DB.SEG_VERSION)) { ok++; continue; }
     const f = failed[b.id]?.seg === DB.SEG_VERSION ? failed[b.id].why : null;
     const local = !f && await DB.get('bookText', b.id);
-    const why = f || (Store.hasFile(b) || (local && local.segVersion === DB.SEG_VERSION) ? 'pending' : 'file');
+    const why = f || (Store.hasFile(b) || inSync(b, Blobs) || (local && local.segVersion === DB.SEG_VERSION) ? 'pending' : 'file');
     missing.push({ id: b.id, title: b.title || '', why });
   }
   let indexed = 0;

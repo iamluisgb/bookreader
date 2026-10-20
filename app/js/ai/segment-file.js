@@ -14,16 +14,18 @@ const inFlight = new Map();   // bookId → Promise<boolean> (dos que piden el m
 
 // true si el libro queda troceado (ya lo estaba o se acaba de trocear); false si el fichero
 // no está en este dispositivo o no se pudo parsear.
-export async function ensureSegmented(bookId, onStatus) {
+export async function ensureSegmented(bookId, onStatus, { file = null } = {}) {
   if (!bookId) return false;
   if (await DB.loadSegmented(bookId)) return true;
   if (inFlight.has(bookId)) return inFlight.get(bookId);
   const job = (async () => {
     try {
       const record = await Store.getBook(bookId);
-      if (!record || !Store.hasFile(record)) return false;
+      // `file`: el fichero bajado del sync solo para esto (book-text.js), si este equipo no lo tiene.
+      const src = record && (Store.hasFile(record) ? record.file : file);
+      if (!src) return false;
       onStatus?.(t('Preparando el libro…'));
-      const buf = record.file instanceof ArrayBuffer ? record.file.slice(0) : await record.file.arrayBuffer();
+      const buf = src instanceof ArrayBuffer ? src.slice(0) : await src.arrayBuffer();
       let seg;
       if (record.format === 'pdf') {
         const pdfjs = await loadPdfJs();

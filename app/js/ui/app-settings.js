@@ -1728,7 +1728,7 @@ function wireBookReaderSync(content, show) {
     if (cov.ok) lines.push(t('{n} en el índice para buscar en toda la biblioteca.', { n: cov.indexed }));
     if (cov.quotaFull) lines.push(t('No cabe más texto en tu sync. Libera espacio y se seguirá preparando.'));
     else if (pending.length) lines.push(cov.running ? t('Preparando {n} en segundo plano (nunca mientras lees).', { n: pending.length }) : t('{n} pendientes: se preparan tras el próximo sync.', { n: pending.length }));
-    if (file.length) lines.push(t('Sin el fichero en este equipo: {list}. Se preparan desde el equipo que lo tenga.', { list: titles(file) }));
+    if (file.length) lines.push(t('Sin el fichero en este equipo ni en el sync: {list}. Se preparan desde el equipo que lo tenga.', { list: titles(file) }));
     if (bad.length) lines.push(t('Sin texto que leer (un PDF escaneado, por ejemplo): {list}.', { list: titles(bad) }));
     box.hidden = false;
     box.innerHTML = `<p class="appset-muted"><strong>${escapeHtml(t('Texto para agentes: {ok} de {total} libros.', { ok: cov.ok, total: cov.total }))}</strong></p>`

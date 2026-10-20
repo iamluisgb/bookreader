@@ -246,6 +246,64 @@ test('Texto para agentes: la cola trocea los libros sin abrir y Ajustes cuenta l
   await expect(page.locator('#appset-br-text')).toContainText('«En el portátil»');
 });
 
+// Un libro que este equipo nunca descargó, pero cuyo fichero está en el sync: la cola lo baja
+// solo para trocearlo, sube su texto y NO lo guarda (el equipo no se llena de libros).
+test('Texto para agentes: un libro que solo está en el sync se trocea sin quedarse en el equipo', async ({ browser }) => {
+  const server = await createSyncServer({ FILES_ENABLED: '1' });
+  const epub = readFileSync(path.join(__dirname, 'test.epub')).toString('base64');
+  const boot = async (pair = '') => {
+    const context = await browser.newContext();
+    await installSyncServer(context, server);
+    await enableSyncPreview(context);
+    await seedBookReaderSync(context);
+    const page = await context.newPage();
+    await page.goto('/' + pair);
+    return { context, page };
+  };
+  const pc = await boot();
+  const { pair, id } = await pc.page.evaluate(async (b64) => {
+    const A = await import('/js/sync/bookreader-auth.js');
+    await A.enable();
+    await A.getToken(true);   // trae `files` del servidor
+    const Store = await import('/js/library/store.js');
+    const DB = await import('/js/ai/db.js');
+    const buf = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+    const id = await DB.hashBuffer(buf.buffer.slice(0));
+    await Store.putBook({ id, title: 'Solo en el sync', author: 'X', format: 'epub', fileName: 'a.epub', file: buf.buffer, size: buf.length, addedAt: Date.now(), progress: 0, status: 'unread', shelfIds: [] });
+    await (await import('/js/sync/engine.js')).syncNow();
+    await (await import('/js/sync/blobs.js')).flush();
+    await (await import('/js/sync/engine.js')).syncNow();
+    const link = A.pairingLink();
+    return { pair: link.slice(link.indexOf('#')), id };
+  }, epub);
+  await pc.context.close();   // el PC ya no está: el texto lo tiene que preparar el otro equipo
+
+  const movil = await boot(pair);
+  const { page } = movil;
+  await expect.poll(() => page.evaluate(() => !!localStorage.getItem('bookreader_sync_key'))).toBe(true);
+  const downloads: string[] = [];
+  await page.exposeFunction('__blobEvent', (s: string) => downloads.push(s));
+  await page.evaluate(async () => {
+    window.addEventListener('bookreader:blob-progress', (e: any) => { if (e.detail.dir === 'down') (window as any).__blobEvent(e.detail.state); });
+    await (await import('/js/sync/engine.js')).syncNow();
+    await (await import('/js/sync/bookreader-auth.js')).createMcpToken('Claude', { scopes: ['text'] });
+  });
+  const coverage = () => page.evaluate(async () => {
+    const BT = await import('/js/sync/book-text.js');
+    await BT.backfill();
+    return BT.coverage();
+  });
+  await expect.poll(async () => (await coverage()).ok, { timeout: 30000 }).toBe(1);
+  const local = await page.evaluate(async (id) => {
+    const Store = await import('/js/library/store.js');
+    const DB = await import('/js/ai/db.js');
+    return { file: Store.hasFile(await Store.getRaw(id)), text: !!(await DB.get('bookText', id)) };
+  }, id);
+  expect(local).toEqual({ file: false, text: true });
+  expect(downloads).toEqual([]);   // no pasa por la cola de descargas ni sale en la tarjeta
+  await movil.context.close();
+});
+
 // IA10 F2 · Tras el texto, el índice de la biblioteca: el libro se indexa desde el texto del
 // servidor, se puede buscar (núcleo de library-index-build.js sobre lo cifrado) y su pasaje sale
 // del almacén por bloques. Al borrar el libro, se van su índice, su almacén y su texto.
