@@ -1791,6 +1791,7 @@ const EN = {
   'Sin texto que leer (un PDF escaneado, por ejemplo): {list}.': 'No readable text (a scanned PDF, for example): {list}.',
   'y {n} más': 'and {n} more',
   'Preparar ahora': 'Prepare now',
+  '{n} en el índice para buscar en toda la biblioteca.': '{n} in the index for searching the whole library.',
   'Siempre puede leer tus libros, subrayados, notas y mazos. Lo demás, solo si lo marcas.': 'It can always read your books, highlights, notes and decks. Anything else, only if you tick it.',
   '¿Qué agente es?': 'Which agent is it?',
   'Te servirá para reconocerlo en la lista y revocarlo.': 'It helps you recognise it in the list and revoke it.',

@@ -143,6 +143,43 @@ export async function decryptText(keys, pid, data) {
   return (await decrypt(keys, pid, data)).text();
 }
 
+// ---- Bloques sellados por separado (IA10 · almacén de pasajes) -------------------------------
+//
+// Un objeto hecho de bloques pequeños de tamaño libre, cada uno `iv ‖ AES-GCM(bloque)` con la
+// ruta, su posición y el TOTAL como datos asociados (otro prefijo que el de los trozos de 4 MB,
+// para que uno no pase por el otro). Quien sabe dónde empieza cada bloque (`offsets`, que va en
+// el manifiesto del índice) lee y abre solo los que necesita, con una lectura por rango. El
+// servidor no puede cambiar un bloque de sitio, mezclar dos objetos ni quitar el final.
+
+const blockAad = (pid, i, count) => enc.encode(`${pid}:blk:${i}:${count}`);
+
+/** Sella `blocks` (Uint8Array[]) para `pid`. Devuelve { body, offsets } (offsets.length = n + 1). */
+export async function sealBlocks(keys, pid, blocks) {
+  const out = [];
+  const offsets = [0];
+  for (const [i, plain] of blocks.entries()) {
+    const iv = crypto.getRandomValues(new Uint8Array(IV));
+    const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv, additionalData: blockAad(pid, i, blocks.length) }, keys.enc, plain));
+    const sealed = new Uint8Array(IV + ct.length);
+    sealed.set(iv);
+    sealed.set(ct, IV);
+    out.push(sealed);
+    offsets.push(offsets[offsets.length - 1] + sealed.length);
+  }
+  const body = new Uint8Array(offsets[offsets.length - 1]);
+  out.forEach((b, i) => body.set(b, offsets[i]));
+  return { body, offsets };
+}
+
+/** Abre el bloque `i` de `count` (sus bytes sellados, tal como los dio la lectura por rango). */
+export async function openBlock(keys, pid, sealed, i, count) {
+  if (sealed.length < IV + TAG) throw new Error('cifrado corrupto');
+  return new Uint8Array(await crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv: sealed.subarray(0, IV), additionalData: blockAad(pid, i, count) },
+    keys.enc, sealed.subarray(IV),
+  ));
+}
+
 // ---- Clave de recuperación ------------------------------------------------------------------
 //
 // La clave en Crockford base32 (sin letras que se confundan: ni I, L, O ni U), en grupos de 4

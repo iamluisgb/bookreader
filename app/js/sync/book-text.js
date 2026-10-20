@@ -201,9 +201,41 @@ export function backfill() {
       }
       progress();
     }
+    if (!quotaFull && enabled()) {
+      try { n += await refreshIndex(DB, Store); } catch (e) {
+        if (Provider.isQuotaError(e)) quotaFull = true;
+        else console.warn('library-index:', e.message);
+      }
+    }
     return n;
   })().finally(() => { running = null; progress(); });
   return running;
+}
+
+// IA10 F2 · Tras el texto, el índice de la biblioteca (library-index.js): los libros con texto
+// al día que aún no están indexados, y fuera los borrados (su índice y su texto).
+async function refreshIndex(DB, Store) {
+  const indexer = await (await import('./library-index.js')).forApp();
+  if (!indexer) return 0;
+  const remote = await remoteTexts();
+  const records = await Store.getAllRecords();
+  const deleted = new Set(records.filter(r => r.deleted).map(r => r.id));
+  for (const id of Object.keys(remote)) if (deleted.has(id)) await removeText(id);
+  const current = Object.fromEntries(Object.entries(remote).filter(([, r]) => fresh(r, DB.SEG_VERSION)));
+  const books = records.filter(r => !r.deleted);
+  const n = await indexer.refresh({
+    books, remote: current, deleted, stop: () => !enabled(),
+    between: async () => { await idle(); progress(); },
+  });
+  progress();
+  return n;
+}
+
+// Un libro borrado de la biblioteca: su texto se va del servidor.
+async function removeText(bookId) {
+  for (const f of await Provider.list(BASE + 'text/' + bookId + '/')) await Provider.remove(f.path).catch(() => {});
+  await Provider.remove(pathOf(bookId)).catch(() => {});
+  forget(bookId);
 }
 
 // Para Ajustes → Datos → Agentes: cuántos libros puede leer un agente y por qué faltan los demás.
@@ -222,7 +254,15 @@ export async function coverage() {
     const why = f || (Store.hasFile(b) || (local && local.segVersion === DB.SEG_VERSION) ? 'pending' : 'file');
     missing.push({ id: b.id, title: b.title || '', why });
   }
-  return { total: books.length, ok, missing, quotaFull, running: !!running };
+  let indexed = 0;
+  try {
+    const indexer = await (await import('./library-index.js')).forApp();
+    if (indexer) {
+      const m = await indexer.manifest();
+      indexed = books.filter(b => remote[b.id] && m.books[b.id]?.toc === remote[b.id].etag).length;
+    }
+  } catch { /* sin índice todavía */ }
+  return { total: books.length, ok, indexed, missing, quotaFull, running: !!running };
 }
 
 export function start() {

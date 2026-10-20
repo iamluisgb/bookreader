@@ -10,6 +10,7 @@ const DEFAULT_MODIFIED = '2026-09-22T10:00:00.000Z';
 export function createMemoryProvider(files = {}, { modifiedTime = DEFAULT_MODIFIED } = {}) {
   /** @type {Map<string, { content: string, etag: string, modifiedTime: string }>} */
   const store = new Map();
+  const bins = new Map();   // ruta → bytes de un fichero por bloques (writeBlocks), en claro
 
   function put(path, content) {
     const text = typeof content === 'string' ? content : JSON.stringify(content, null, 2);
@@ -21,17 +22,14 @@ export function createMemoryProvider(files = {}, { modifiedTime = DEFAULT_MODIFI
   return {
     /** Ficheros del proveedor, ordenados (para inspección en tests). */
     paths() {
-      return [...store.keys()].sort();
+      return [...store.keys(), ...bins.keys()].sort();
     },
     async list(prefix = '') {
-      return [...store.entries()]
-        .filter(([path]) => path.startsWith(prefix))
-        .map(([path, f]) => ({
-          path,
-          etag: f.etag,
-          modifiedTime: f.modifiedTime,
-          size: f.content.length,
-        }))
+      return [
+        ...[...store.entries()].map(([path, f]) => ({ path, etag: f.etag, modifiedTime: f.modifiedTime, size: f.content.length })),
+        ...[...bins.entries()].map(([path, b]) => ({ path, etag: etagOf(String(b.length) + path), modifiedTime, size: b.length })),
+      ]
+        .filter((f) => f.path.startsWith(prefix))
         .sort((a, b) => (a.path < b.path ? -1 : 1));
     },
     async read(path) {
@@ -44,6 +42,23 @@ export function createMemoryProvider(files = {}, { modifiedTime = DEFAULT_MODIFI
     },
     async remove(path) {
       store.delete(path);
+      bins.delete(path);
+    },
+    // Ficheros por bloques (el almacén de pasajes del índice, IA10): aquí van en claro,
+    // concatenados; `offsets` dice dónde empieza cada uno.
+    async writeBlocks(path, blocks) {
+      const offsets = [0];
+      for (const b of blocks) offsets.push(offsets[offsets.length - 1] + b.length);
+      const body = new Uint8Array(offsets[offsets.length - 1]);
+      blocks.forEach((b, i) => body.set(b, offsets[i]));
+      bins.set(path, body);
+      return { etag: etagOf(String(body.length) + path), offsets };
+    },
+    async readBlocks(path, specs) {
+      const body = bins.get(path);
+      if (!body) return null;
+      const dec = new TextDecoder();
+      return specs.map(({ offset, length }) => dec.decode(body.subarray(offset, offset + length)));
     },
   };
 }

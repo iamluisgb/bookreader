@@ -119,5 +119,18 @@ export function createBookReaderSyncProvider({ raw, license, fetchImpl = fetch, 
         );
       }
     },
+    // Bloques sueltos de un fichero sellado por bloques (el almacén de pasajes, IA10). En local
+    // no hay prisa de CPU: se baja entero y se abren solo los pedidos.
+    async readBlocks(path, specs) {
+      const k = await keys();
+      const pid = await C.pathId(k, path);
+      const res = await request('/v1/o/' + pid);
+      if (res.status === 404) return null;
+      if (!res.ok) throw new SourceError('Sync de BookReader ' + res.status + ' al leer ' + path + '.');
+      const body = new Uint8Array(await res.arrayBuffer());
+      const dec = new TextDecoder();
+      return Promise.all(specs.map(async ({ i, count, offset, length }) =>
+        dec.decode(await C.openBlock(k, pid, body.subarray(offset, offset + length), i, count))));
+    },
   };
 }

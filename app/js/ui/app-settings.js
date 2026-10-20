@@ -1725,6 +1725,7 @@ function wireBookReaderSync(content, show) {
     const titles = (list) => list.slice(0, 6).map(m => '«' + m.title + '»').join(', ') + (list.length > 6 ? ' ' + t('y {n} más', { n: list.length - 6 }) : '');
     const lines = [];
     const pending = by('pending'), file = by('file'), bad = [...by('parse'), ...by('empty')];
+    if (cov.ok) lines.push(t('{n} en el índice para buscar en toda la biblioteca.', { n: cov.indexed }));
     if (cov.quotaFull) lines.push(t('No cabe más texto en tu sync. Libera espacio y se seguirá preparando.'));
     else if (pending.length) lines.push(cov.running ? t('Preparando {n} en segundo plano (nunca mientras lees).', { n: pending.length }) : t('{n} pendientes: se preparan tras el próximo sync.', { n: pending.length }));
     if (file.length) lines.push(t('Sin el fichero en este equipo: {list}. Se preparan desde el equipo que lo tenga.', { list: titles(file) }));

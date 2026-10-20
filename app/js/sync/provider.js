@@ -119,6 +119,9 @@ export function writeBinary(path, data, opts) { return active().writeBinary(path
 export function listRevisions(path) { return active().listRevisions(path); }
 export function readRevision(fileId, revisionId) { return active().readRevision(fileId, revisionId); }
 export function appUsage(prefix) { return active().appUsage(prefix); }
+// Solo el sync de BookReader (el índice de la biblioteca para agentes, IA10).
+export function canWriteBlocks() { return typeof active().writeBlocks === 'function'; }
+export function writeBlocks(path, blocks) { return active().writeBlocks(path, blocks); }
 
 // Un error de cuota de CUALQUIER proveedor: la cola de ficheros no debe seguir intentando
 // con el resto de libros tras uno de estos, venga de donde venga.

@@ -246,6 +246,77 @@ test('Texto para agentes: la cola trocea los libros sin abrir y Ajustes cuenta l
   await expect(page.locator('#appset-br-text')).toContainText('«En el portátil»');
 });
 
+// IA10 F2 · Tras el texto, el índice de la biblioteca: el libro se indexa desde el texto del
+// servidor, se puede buscar (núcleo de library-index-build.js sobre lo cifrado) y su pasaje sale
+// del almacén por bloques. Al borrar el libro, se van su índice, su almacén y su texto.
+test('Índice de la biblioteca: se construye tras el texto, se busca, y borrar el libro lo quita todo', async ({ page }) => {
+  const server = await createSyncServer();
+  await installSyncServer(page, server);
+  await enableSyncPreview(page);
+  await seedBookReaderSync(page);
+  await page.goto('/');
+  const epub = readFileSync(path.join(__dirname, 'test.epub')).toString('base64');
+  await page.evaluate(async (b64) => {
+    await (await import('/js/sync/bookreader-auth.js')).enable();
+    const Store = await import('/js/library/store.js');
+    const buf = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+    await Store.putBook({ id: 'libro', title: 'Libro', author: 'X', format: 'epub', fileName: 'a.epub', file: buf.buffer, size: buf.length, addedAt: Date.now(), progress: 0, status: 'unread', shelfIds: [] });
+    await (await import('/js/sync/engine.js')).syncNow();
+    await (await import('/js/sync/bookreader-auth.js')).createMcpToken('Claude', { scopes: ['text'] });
+  }, epub);
+  const coverage = () => page.evaluate(async () => {
+    const BT = await import('/js/sync/book-text.js');
+    await BT.backfill();
+    return BT.coverage();
+  });
+  await expect.poll(async () => (await coverage()).indexed, { timeout: 30000 }).toBe(1);
+
+  // Buscar con lo que está en el servidor: una palabra de un pasaje real del libro.
+  const found = await page.evaluate(async () => {
+    const Provider = await import('/js/sync/provider.js');
+    const { BASE } = await import('/js/sync/layout.js');
+    const X = await import('/js/sync/library-index-build.js');
+    const DB = await import('/js/ai/db.js');
+    const text = (await DB.get('bookText', 'libro')).annotatedText;
+    const line = text.split('\n').find((l: string) => /^\[\[a\d+\]\] .{80,}/.test(l))!;
+    const n = Number(/^\[\[a(\d+)\]\]/.exec(line)![1]);
+    const word = line.slice(line.indexOf(' ') + 1).split(/\W+/).filter((w: string) => w.length > 7)[0];
+    const m = JSON.parse((await Provider.read(X.manifestPath(BASE)))!.content);
+    const read = async (p: string) => (await Provider.read(p))?.content ?? null;
+    const r = await X.searchIndex(read, BASE, m, [word], { perBook: 50 });
+    const meta = m.books.libro;
+    const i = X.blockOf(meta.store.starts, n);
+    const o = meta.store.offsets;
+    // El almacén, abierto como lo abre el MCP (bloque a bloque), da el pasaje tal cual.
+    const C = await import('/js/sync/sync-crypto.js');
+    const A = await import('/js/sync/bookreader-auth.js');
+    const k = await A.keys();
+    const pid = await C.pathId(k, X.storePath(BASE, 'libro'));
+    const res = await A.api('/v1/o/' + pid);
+    const body = new Uint8Array(await res.arrayBuffer());
+    const block = new TextDecoder().decode(await C.openBlock(k, pid, body.subarray(o[i], o[i + 1]), i, o.length - 1));
+    return {
+      hit: r.books[0]?.bookId, hasPassage: r.books[0]?.passages.some((p: any) => p.n === n),
+      passage: X.passageIn(block, n), expected: line.slice(line.indexOf(' ') + 1),
+    };
+  });
+  expect(found.hit).toBe('libro');
+  expect(found.hasPassage).toBe(true);
+  expect(found.passage).toBe(found.expected);
+
+  // Borrar el libro: fuera del índice, sin almacén y sin texto en el servidor.
+  const left = await page.evaluate(async () => {
+    await (await import('/js/library/store.js')).deleteBook('libro');
+    await (await import('/js/sync/book-text.js')).backfill();
+    const Provider = await import('/js/sync/provider.js');
+    const { BASE } = await import('/js/sync/layout.js');
+    const m = JSON.parse((await Provider.read(BASE + 'index/manifest.json'))!.content);
+    const files = (await Provider.list(BASE)).map((f: any) => f.path).filter((p: string) => p.includes('/text/') || p.includes('/index/s/'));
+    return { books: Object.keys(m.books), files };
+  });
+  expect(left).toEqual({ books: [], files: [] });
+});
+
 // Artefactos de un agente: llegan al dispositivo por el sync, el Studio los ve (getArtifacts
 // filtra por SEG_VERSION) y los renderers de la app los pintan.
 test('Agente crea un mapa mental y una infografía: llegan al Studio del dispositivo y se pintan', async ({ page }) => {

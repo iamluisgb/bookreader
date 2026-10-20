@@ -301,6 +301,25 @@ export function r2Provider(env, user, raw, { canWrite = false, agent = null } = 
       if (!obj) return null;
       return { content: await C.decryptText(k, pid, await new Response(obj.body).blob()) };
     },
+    // Bloques sueltos de un fichero sellado por bloques (el almacén de pasajes, IA10): una
+    // lectura por rango de R2 por bloque, y solo se descifran esos. `specs`: [{ i, count,
+    // offset, length }] (el mapa va en el manifiesto del índice).
+    async readBlocks(path, specs) {
+      const k = await keys();
+      const pid = await C.pathId(k, path);
+      const row = await env.DB.prepare('SELECT key FROM objects WHERE user = ? AND path = ?').bind(user, pid).first();
+      if (!row) return null;
+      const dec = new TextDecoder();
+      return Promise.all(specs.map(async ({ i, count, offset, length }) => {
+        if (!(await spend(env, 'b'))) {
+          await refused(env);
+          throw Object.assign(new Error('capacity'), { capacity: true });
+        }
+        const obj = await env.SYNC.get(row.key, { range: { offset, length } });
+        if (!obj) throw new SourceError('Falta el almacén de pasajes: reconstruye el índice desde la app.');
+        return dec.decode(await C.openBlock(k, pid, new Uint8Array(await new Response(obj.body).arrayBuffer()), i, count));
+      }));
+    },
   };
 }
 

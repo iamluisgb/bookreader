@@ -34,7 +34,14 @@ export function fakeR2() {
       m.set(key, bytes);
       return { key, size: bytes.length };
     },
-    async get(key) { ops.get++; const b = m.get(key); return b ? { body: new Blob([b]).stream(), size: b.length } : null; },
+    async get(key, opts = {}) {
+      ops.get++;
+      const b = m.get(key);
+      if (!b) return null;
+      const r = opts.range;
+      const slice = r ? b.subarray(r.offset || 0, r.length !== undefined ? (r.offset || 0) + r.length : undefined) : b;
+      return { body: new Blob([slice]).stream(), size: b.length };
+    },
     async delete(keys) { for (const k of [].concat(keys)) m.delete(k); },
     async list() { ops.list++; throw new Error('listar R2 es clase A: no se usa'); },
     async createMultipartUpload(key) {

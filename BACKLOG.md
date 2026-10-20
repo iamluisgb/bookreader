@@ -378,7 +378,7 @@ ser necesaria.
 
 ---
 
-### IA10 — Pregúntale a tu biblioteca: búsqueda en todos los libros para agentes · `L` · **F0 ✓ · F1 ✓ (2026-10-20)**
+### IA10 — Pregúntale a tu biblioteca: búsqueda en todos los libros para agentes · `L` · **F0 ✓ · F1 ✓ · F2 ✓ (2026-10-20)**
 
 > Decisiones en [ADR-059](DECISIONS.md) (`ACEPTADA` con las medidas de F0). Hermana de
 > [IA9](#ia9--retrieval-multi-fuente-cruzar-libros-papers-y-posts--m): IA9 cruza fuentes **dentro
@@ -532,6 +532,37 @@ sin abrir, y por significado. No se arregla estirando `search_book`; hace falta 
   - El texto de las particiones va cifrado como el resto (`sync-crypto.js`, `pathId`).
   - Tests de propiedad: un índice construido de golpe ≡ uno construido libro a libro, y añadir y
     quitar un libro deja el índice como estaba.
+  - **Hecho (2026-10-20):**
+    - **Núcleo puro** en `sync/library-index-build.js`:
+      - raíces y palabras vacías EN/ES;
+      - postings con delta en base 36, `*tf` y la longitud del pasaje en una letra (escala log);
+      - ficheros con tabla de libros, y en los deltas, secciones por partición;
+      - almacén y `searchIndex`, con BM25 por libro, idf de la biblioteca y `focus`.
+    - **Constructor** `sync/library-index.js` (`createIndexer(io, base)`, sin navegador):
+      - indexa desde el texto del servidor, no el local, para que las anclas sean las que lee el
+        agente;
+      - un alta son 3 escrituras;
+      - compacta al pasar de 4 deltas, con una generación nueva y el manifiesto por CAS;
+      - la baja es una lápida más compactación;
+      - un barrido quita lo huérfano con más de 10 min.
+    - **En la cola de `book-text.js`**, tras el texto: indexa lo nuevo y da de baja los libros
+      borrados, también su texto, que era lo pendiente de F1. Ajustes cuenta cuántos hay en el
+      índice.
+    - **Almacén:** `sync-crypto.js · sealBlocks/openBlock`, con la ruta, la posición y el total como
+      datos asociados.
+      - `writeBlocks` en el proveedor de la app.
+      - `readBlocks` en el Worker (rango de R2), en el MCP local y en el de memoria.
+    - **Tests:**
+      - `mcp/test/library-index.test.mjs` (10);
+      - `workers/sync/test/mcp-index.test.mjs` (rango y manipulación);
+      - `tests/bookreader-mcp.spec.ts` · «Índice de la biblioteca…».
+    - **Escala**, con una biblioteca sintética de 32 libros y 5M palabras Zipf (`scratch/ia10/scale.mjs`):
+      - 15,2 escrituras por libro;
+      - particiones de 213 KB de media (658 KB la mayor), deltas de unos 490 KB y manifiesto de
+        43 KB;
+      - una consulta de 5 frases y 15 términos: 14 lecturas, 7 ms de CPU p50 y 24 ms p95 en Node,
+        sin descifrar.
+      - La medida en el Worker de verdad va en F3.
 - **F3 — `search_library` en el MCP** `M`
   - Argumentos:
     - `query` o `queries[]` (≤ 5);

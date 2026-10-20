@@ -108,6 +108,20 @@ export async function write(path, content, { ifMatch } = {}) {
   return { etag };
 }
 
+// Un fichero de bloques sellados por separado (el almacén de pasajes del índice, IA10 ·
+// sync-crypto.js · sealBlocks): el MCP lee solo los bloques que necesita. Pisa lo que haya: se
+// regenera entero desde el texto del libro. Devuelve { etag, offsets }.
+export async function writeBlocks(path, blocks) {
+  const { k, pid } = await ids(path);
+  const { body, offsets } = await C.sealBlocks(k, pid, blocks);
+  const headers = { 'X-Name': await C.encryptName(k, path), 'X-Kind': 'data' };
+  const cur = await exists(path);
+  if (cur) headers['If-Match'] = cur.etag;
+  const res = await A.api('/v1/o/' + pid, { method: 'PUT', headers, body: new Blob([body]) }, { timeoutMs: TRANSFER_TIMEOUT_MS });
+  if (!res.ok) throw await fail(res);
+  return { etag: String((await res.json()).etag), offsets };
+}
+
 export async function remove(path) {
   const { pid } = await ids(path);
   const res = await A.api('/v1/o/' + pid, { method: 'DELETE' });
