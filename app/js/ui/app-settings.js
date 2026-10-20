@@ -54,6 +54,9 @@ let profDraft = null;   // borrador en edición de la sección Perfiles (null = 
 // esa sección está abierta: lo re-ejecuta cada cambio de estado del motor.
 let syncDiagPainter = null;
 window.addEventListener('bookreader:sync-status', () => { if (syncDiagPainter) syncDiagPainter(); });
+// Ídem para «Texto para agentes» (Datos → Agentes): la cola de book-text.js avisa a cada libro.
+let bookTextPainter = null;
+window.addEventListener('bookreader:book-text-progress', () => { if (bookTextPainter) bookTextPainter(); });
 
 const oneLine = (s) => (s || '').replace(/\s+/g, ' ').trim();
 
@@ -97,6 +100,7 @@ function ensureOverlay() {
 
 function selectSection(id) {
   syncDiagPainter = null; // la sección anterior dejó de estar abierta
+  bookTextPainter = null;
   overlay.querySelectorAll('.appset-nav-item').forEach(b =>
     b.classList.toggle('active', b.dataset.section === id));
   const content = overlay.querySelector('.appset-content');
@@ -1214,6 +1218,7 @@ function dataHtml() {
         <label class="appset-label" style="margin-top:14px">${t('Agentes (MCP)')}</label>
         <p class="appset-muted">${t('Deja que un agente de IA (Claude Code, Claude Desktop, Hermes…) lea tu biblioteca: subrayados, notas, estadísticas y mazos. Solo puede leer. Para responderle, el servidor descifra lo que pide mientras dura cada consulta: crea un token por agente y revócalo cuando ya no lo uses.')}</p>
         <div id="appset-br-agents" class="appset-links"></div>
+        <div id="appset-br-text" hidden></div>
         <div id="appset-br-changes" class="appset-links" hidden></div>
         <div id="appset-br-agent-new" class="appset-br-recovery" hidden>
           <p class="appset-muted">${t('Token para «{name}». Cópialo ahora: no se vuelve a enseñar.', { name: '<span id="appset-br-agent-name"></span>' })}</p>
@@ -1702,6 +1707,33 @@ function wireBookReaderSync(content, show) {
       paintAgents();
     };
     paintChanges();
+    paintBookText();
+  }
+
+  // IA10 F1 · Cuántos libros puede leer un agente (los tokens con permiso de texto) y por qué
+  // faltan los demás. La cola que los prepara corre sola tras cada sync (sync/book-text.js).
+  let textTimer = null;
+  async function paintBookText() {
+    const box = $('appset-br-text');
+    if (!box) return;
+    bookTextPainter = () => { clearTimeout(textTimer); textTimer = setTimeout(paintBookText, 1500); };
+    if (!BRAuth.bookTextWanted()) { box.hidden = true; return; }
+    const BookText = await import('../sync/book-text.js');
+    let cov;
+    try { cov = await BookText.coverage(); } catch { box.hidden = true; return; }
+    const by = (why) => cov.missing.filter(m => m.why === why);
+    const titles = (list) => list.slice(0, 6).map(m => '«' + m.title + '»').join(', ') + (list.length > 6 ? ' ' + t('y {n} más', { n: list.length - 6 }) : '');
+    const lines = [];
+    const pending = by('pending'), file = by('file'), bad = [...by('parse'), ...by('empty')];
+    if (cov.quotaFull) lines.push(t('No cabe más texto en tu sync. Libera espacio y se seguirá preparando.'));
+    else if (pending.length) lines.push(cov.running ? t('Preparando {n} en segundo plano (nunca mientras lees).', { n: pending.length }) : t('{n} pendientes: se preparan tras el próximo sync.', { n: pending.length }));
+    if (file.length) lines.push(t('Sin el fichero en este equipo: {list}. Se preparan desde el equipo que lo tenga.', { list: titles(file) }));
+    if (bad.length) lines.push(t('Sin texto que leer (un PDF escaneado, por ejemplo): {list}.', { list: titles(bad) }));
+    box.hidden = false;
+    box.innerHTML = `<p class="appset-muted"><strong>${escapeHtml(t('Texto para agentes: {ok} de {total} libros.', { ok: cov.ok, total: cov.total }))}</strong></p>`
+      + lines.map(l => `<p class="appset-muted">${escapeHtml(l)}</p>`).join('')
+      + (pending.length && !cov.running && !cov.quotaFull ? `<button id="appset-br-text-now" class="appset-tpl-cancel appset-data-md">${icon('upload', { size: 'md' })} ${t('Preparar ahora')}</button>` : '');
+    $('appset-br-text-now')?.addEventListener('click', () => { BookText.backfill(); paintBookText(); });
   }
 
   // Lo que los agentes cambiaron en la biblioteca, con «Deshacer» (sync/agent-undo.js).

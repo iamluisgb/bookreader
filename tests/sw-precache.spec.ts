@@ -27,7 +27,8 @@ test('todo módulo de la app está en el precache del service worker', () => {
   // —y desde el arreglo del build ni siquiera pueden desplegarse, porque dist/
   // sale de HEAD—, así que exigirlos aquí sería ruido. El test salta justo
   // cuando el módulo se commitea, que es el momento en que empieza a importar.
-  const modulos = git('git ls-files app/js').map(f => f.replace(/^app\//, ''));
+  // app/js/package.json solo existe para Node (el MCP importa módulos puros) y no se publica.
+  const modulos = git('git ls-files app/js').filter(f => f.endsWith('.js')).map(f => f.replace(/^app\//, ''));
   const enPrecache = new Set(assets());
   const faltan = modulos.filter(m => !enPrecache.has(m));
 

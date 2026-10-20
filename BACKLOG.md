@@ -378,7 +378,7 @@ ser necesaria.
 
 ---
 
-### IA10 — Pregúntale a tu biblioteca: búsqueda en todos los libros para agentes · `L` · **F0 ✓ (2026-10-20)**
+### IA10 — Pregúntale a tu biblioteca: búsqueda en todos los libros para agentes · `L` · **F0 ✓ · F1 ✓ (2026-10-20)**
 
 > Decisiones en [ADR-059](DECISIONS.md) (`ACEPTADA` con las medidas de F0). Hermana de
 > [IA9](#ia9--retrieval-multi-fuente-cruzar-libros-papers-y-posts--m): IA9 cruza fuentes **dentro
@@ -508,6 +508,18 @@ sin abrir, y por significado. No se arregla estirando `search_book`; hace falta 
     el `localStorage` de cada uno. Así dos equipos no trocean ni suben el mismo libro.
   - **Cupo:** el texto cuenta en el almacenamiento del usuario. Antes de subir se comprueba el tope,
     y si no cabe se avisa, sin bloquear la app.
+  - **Hecho (2026-10-20):**
+    - `ai/segment-file.js` trocea sin lector; lo usan `study.js` y la cola.
+    - `sync/book-text.js · backfill` es ahora la cola: recorre la biblioteca, no solo lo troceado.
+      Espera en reposo y, con el lector abierto, hasta que se cierre (observa la clase `reading`).
+    - El servidor manda: lista `text/*.json` (D1, sin operaciones R2) y lee solo los índices cuyo
+      etag cambió, para saber su `TEXT_FORMAT` y `SEG_VERSION`.
+    - Un libro que no da texto (no se abre, o un PDF escaneado) se anota con su `SEG_VERSION` y no
+      se reintenta en cada sync.
+    - `coverage()` alimenta «Texto para agentes: X de N libros» con los que faltan agrupados por
+      motivo, y un botón «Preparar ahora».
+    - Test: `tests/bookreader-mcp.spec.ts` · «Texto para agentes…».
+  - **Pendiente, para F2:** borrar el texto de un libro dado de baja; va con las lápidas del índice.
 - **F2 — Índice de la biblioteca** `M`–`L`
   - Constructor puro (`sync/library-index-build.js`): términos plegados y **reducidos a su raíz**
     (stemmer EN/ES compartido) → postings `(bookId, aN, tf)` más estadísticas por libro (pasajes,

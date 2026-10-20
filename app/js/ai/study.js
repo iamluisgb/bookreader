@@ -24,9 +24,7 @@ import * as LLM from './llm.js';
 import { bookLook } from '../ui/book-accent.js';
 import { cargar } from '../ui/brand.js';
 import { toast } from './toast.js';
-import { segmentBook } from './segment.js';
-import { segmentPdf } from './segment-pdf.js';
-import { loadEpubJs, loadPdfJs } from '../vendor-loader.js';
+import * as SegmentFile from './segment-file.js';
 import { sanitizeSvg, reviewDrawing } from './visual-cards.js';
 import { shuffledOptions } from './widgets/mcq.js';
 import { lockerFor } from './chapter-gate.js';
@@ -111,7 +109,6 @@ let minimized = false;   // sesión viva pero oculta (se fue a ver la fuente en 
 let chip = null;         // chip "Volver al repaso" mientras está minimizada
 const anchorsCache = new Map();   // bookId → Map(aN → {cfi, href, page, chapter})
 const passageCache = new Map();   // bookId → Map(aN → texto del pasaje) — se suelta al cerrar
-const segInFlight = new Map();    // bookId → Promise<boolean> segmentación en curso (dedupe)
 
 // ---- Cola diaria (para el chip de la estantería) -----------------------------
 
@@ -1716,38 +1713,12 @@ async function passagesFor(bookId) {
 // Segmenta el libro en este dispositivo si aún no lo está. El sync mueve mazos entre
 // dispositivos pero NO el libro segmentado (bookText/anchors): una tarjeta llegada por sync
 // tiene `src` pero aquí no hay anclas — ni pasaje (F3) ni salto a la fuente (F2). La
-// segmentación es local y barata (parsea el EPUB/PDF sin IA) y el resultado persiste, así
-// que se regenera a demanda la primera vez que hace falta y queda para siempre.
+// segmentación es local y barata (parsea el EPUB/PDF sin IA, ai/segment-file.js) y el
+// resultado persiste, así que se regenera a demanda la primera vez que hace falta.
 async function ensureSegmented(bookId, onStatus) {
-  if (!bookId) return false;
-  if (await DB.loadSegmented(bookId)) {
-    anchorsCache.delete(bookId); passageCache.delete(bookId);
-    return true;
-  }
-  if (segInFlight.has(bookId)) return segInFlight.get(bookId);
-  const job = (async () => {
-    try {
-      const record = await Store.getBook(bookId);
-      if (!record || !Store.hasFile(record)) return false;
-      onStatus?.(t('Preparando el libro…'));
-      const buf = record.file instanceof ArrayBuffer ? record.file.slice(0) : await record.file.arrayBuffer();
-      let seg;
-      if (record.format === 'pdf') {
-        const pdfjs = await loadPdfJs();
-        const doc = await pdfjs.getDocument({ data: new Uint8Array(buf) }).promise;
-        try { seg = await segmentPdf(doc, onStatus); } finally { doc.destroy(); }
-      } else {
-        const ePub = await loadEpubJs();
-        const book = ePub(buf);
-        try { seg = await segmentBook(book, onStatus); } finally { book.destroy?.(); }
-      }
-      await DB.saveSegmented(bookId, record.title, seg);
-      anchorsCache.delete(bookId); passageCache.delete(bookId);
-      return true;
-    } catch { return false; }
-  })();
-  segInFlight.set(bookId, job);
-  try { return await job; } finally { segInFlight.delete(bookId); }
+  const ok = await SegmentFile.ensureSegmented(bookId, onStatus);
+  if (ok) { anchorsCache.delete(bookId); passageCache.delete(bookId); }
+  return ok;
 }
 
 // Salta a la página/CFI de origen de la tarjeta vía el deep-link del router

@@ -9,9 +9,14 @@
 // pasaje como lo hace la app.
 //
 // Solo se sube si hay un agente que pueda leerlo (bookreader-auth · bookTextWanted) y con el
-// sync de BookReader activo. Un libro sin trocear aún no tiene texto: se sube en cuanto se
-// trocea (al usar el agente, la búsqueda o el estudio en él). El motor de sync no lo baja nunca
-// (solo mira books/): es un fichero para agentes, no para dispositivos.
+// sync de BookReader activo. El motor de sync no lo baja nunca (solo mira books/): es un
+// fichero para agentes, no para dispositivos.
+//
+// IA10 F1 · Todos los libros, no solo los abiertos: `fill` trocea en segundo plano cada libro
+// con fichero en este equipo (ai/segment-file.js), de uno en uno, en reposo y nunca con el
+// lector abierto. Qué está subido lo dice el servidor (los índices `text/<id>.json` y su
+// versión), no el localStorage de cada equipo: así dos equipos no trocean el mismo libro.
+// `coverage` lo cuenta para Ajustes → Datos → Agentes.
 
 import * as Provider from './provider.js';
 import * as BRAuth from './bookreader-auth.js';
@@ -20,7 +25,11 @@ import { BASE } from './layout.js';
 import { buildTextFiles, TEXT_FORMAT } from './book-text-build.js';
 
 const STATE_KEY = 'sync_text_state';   // { [bookId]: huella del texto ya subido } (solo local)
+const REMOTE_KEY = 'sync_text_remote'; // { [bookId]: { etag, v, segVersion } } índices remotos ya leídos
+const FAILED_KEY = 'sync_text_failed'; // { [bookId]: { seg, why } } no dio texto con esta SEG_VERSION
 let running = null;
+let quotaFull = false;
+const uploading = new Map();           // bookId → Promise: el evento y la cola no suben dos veces
 
 export const pathOf = (bookId) => BASE + 'text/' + bookId + '.json';
 
@@ -57,7 +66,14 @@ async function put(path, content) {
 }
 
 // Sube el texto de un libro si cambió desde la última vez. Devuelve true si subió algo.
-export async function upload(bookId) {
+export function upload(bookId) {
+  if (uploading.has(bookId)) return uploading.get(bookId);
+  const job = uploadNow(bookId).finally(() => uploading.delete(bookId));
+  uploading.set(bookId, job);
+  return job;
+}
+
+async function uploadNow(bookId) {
   if (!enabled()) return false;
   const DB = await import('../ai/db.js');
   const [text, meta, anch] = await Promise.all([DB.get('bookText', bookId), DB.get('books', bookId), DB.get('anchors', bookId)]);
@@ -81,20 +97,132 @@ export async function upload(bookId) {
   return true;
 }
 
-// Todo lo ya troceado en este dispositivo que aún no esté subido, de uno en uno.
+// Qué libros tienen texto en el servidor, y con qué versión. Lista los nombres (D1, sin tocar
+// R2) y solo lee los índices que cambiaron desde la última vez (por etag).
+async function remoteTexts() {
+  const dir = BASE + 'text/';
+  const files = await Provider.list(dir);
+  const cache = Storage.get(REMOTE_KEY, {}) || {};
+  const next = {};
+  for (const f of files) {
+    const m = /^([^/]+)\.json$/.exec(f.path.slice(dir.length));
+    if (!m) continue;
+    let r = cache[m[1]];
+    if (!r || r.etag !== f.etag) {
+      try {
+        const toc = JSON.parse((await Provider.read(f.path)).content);
+        r = { etag: f.etag, v: toc.v, segVersion: toc.segVersion };
+      } catch { continue; }
+    }
+    next[m[1]] = r;
+  }
+  Storage.set(REMOTE_KEY, next);
+  return next;
+}
+
+const fresh = (r, segVersion) => !!r && r.v === TEXT_FORMAT && r.segVersion === segVersion;
+
+function markFailed(bookId, seg, why) {
+  Storage.set(FAILED_KEY, { ...(Storage.get(FAILED_KEY, {}) || {}), [bookId]: { seg, why } });
+}
+
+function forget(bookId) {
+  const state = Storage.get(STATE_KEY, {}) || {};
+  if (!(bookId in state)) return;
+  delete state[bookId];
+  Storage.set(STATE_KEY, state);
+}
+
+const progress = () => window.dispatchEvent(new CustomEvent('bookreader:book-text-progress'));
+
+// Espera a un momento tranquilo: nunca con un libro abierto (trocear compite con el lector por
+// la CPU y la memoria) y, si el navegador lo sabe, cuando esté ocioso.
+function idle() {
+  return new Promise((resolve) => {
+    const go = () => {
+      if (window.requestIdleCallback) window.requestIdleCallback(() => resolve(), { timeout: 5000 });
+      else setTimeout(resolve, 200);
+    };
+    const body = document.body;
+    if (!body.classList.contains('reading')) { go(); return; }
+    const watch = new MutationObserver(() => {
+      if (body.classList.contains('reading')) return;
+      watch.disconnect();
+      go();
+    });
+    watch.observe(body, { attributes: true, attributeFilter: ['class'] });
+  });
+}
+
+// Lo que ocupa en el servidor el texto de un libro: los trozos más la búsqueda, casi dos veces el
+// texto, y algo de cifrado. Basta para no empezar una subida que no cabe.
+const estimate = (annotatedText) => Math.ceil(annotatedText.length * 2.2);
+
+// Trocea y sube, de uno en uno, cada libro de la biblioteca sin texto actual en el servidor.
+// Se para si se apaga el permiso, si no cabe (avisa en Ajustes, no bloquea nada) o ante un error
+// de red: el siguiente sync bien acabado lo retoma donde quedó.
 export function backfill() {
   if (!enabled()) return Promise.resolve(0);
   if (running) return running;
   running = (async () => {
-    const DB = await import('../ai/db.js');
-    const all = await DB.getAll('bookText');
+    const [DB, Store, SegmentFile] = await Promise.all([
+      import('../ai/db.js'), import('../library/store.js'), import('../ai/segment-file.js'),
+    ]);
+    quotaFull = false;
+    const remote = await remoteTexts();
+    const failed = Storage.get(FAILED_KEY, {}) || {};
+    let room = Infinity;
+    try {
+      const st = await BRAuth.status();
+      room = st.quota.data - st.used.data - st.used.versions;
+    } catch { /* sin estado, el servidor dirá 'quota' si no cabe */ }
     let n = 0;
-    for (const t of all || []) {
-      try { if (await upload(t.bookId)) n++; } catch (e) { console.warn('book-text:', e.message); break; }
+    for (const b of await Store.getAllBooks()) {
+      if (!enabled()) break;
+      if (fresh(remote[b.id], DB.SEG_VERSION) || failed[b.id]?.seg === DB.SEG_VERSION) continue;
+      const local = await DB.get('bookText', b.id);
+      const ready = !!local && local.segVersion === DB.SEG_VERSION;
+      if (!ready && !Store.hasFile(b)) continue;
+      forget(b.id);   // el servidor no lo tiene: lo que diga este equipo ya no vale
+      if (!ready) {
+        await idle();
+        if (!(await SegmentFile.ensureSegmented(b.id))) { markFailed(b.id, DB.SEG_VERSION, 'parse'); progress(); continue; }
+      }
+      const text = ready ? local : await DB.get('bookText', b.id);
+      if (!text || !text.annotatedText || !text.annotatedText.trim()) { markFailed(b.id, DB.SEG_VERSION, 'empty'); progress(); continue; }
+      const size = estimate(text.annotatedText);
+      if (size > room) { quotaFull = true; break; }
+      try {
+        if (await upload(b.id)) { n++; room -= size; }
+      } catch (e) {
+        if (Provider.isQuotaError(e)) quotaFull = true;
+        else console.warn('book-text:', e.message);
+        break;
+      }
+      progress();
     }
     return n;
-  })().finally(() => { running = null; });
+  })().finally(() => { running = null; progress(); });
   return running;
+}
+
+// Para Ajustes → Datos → Agentes: cuántos libros puede leer un agente y por qué faltan los demás.
+// `why`: 'pending' (en cola), 'file' (el fichero no está en este equipo), 'parse' (no se pudo
+// abrir) o 'empty' (no tiene texto: un PDF escaneado, por ejemplo).
+export async function coverage() {
+  const [DB, Store] = await Promise.all([import('../ai/db.js'), import('../library/store.js')]);
+  const [books, remote] = await Promise.all([Store.getAllBooks(), remoteTexts()]);
+  const failed = Storage.get(FAILED_KEY, {}) || {};
+  const missing = [];
+  let ok = 0;
+  for (const b of books) {
+    if (fresh(remote[b.id], DB.SEG_VERSION)) { ok++; continue; }
+    const f = failed[b.id]?.seg === DB.SEG_VERSION ? failed[b.id].why : null;
+    const local = !f && await DB.get('bookText', b.id);
+    const why = f || (Store.hasFile(b) || (local && local.segVersion === DB.SEG_VERSION) ? 'pending' : 'file');
+    missing.push({ id: b.id, title: b.title || '', why });
+  }
+  return { total: books.length, ok, missing, quotaFull, running: !!running };
 }
 
 export function start() {

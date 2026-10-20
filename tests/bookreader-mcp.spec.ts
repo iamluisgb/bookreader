@@ -1,4 +1,6 @@
 import { test, expect } from '@playwright/test';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import { createSyncServer, installSyncServer, seedBookReaderSync, enableSyncPreview, SYNC_URL } from './bookreader-sync-mock';
 
 // MON4 · El MCP remoto desde la app: Ajustes → Datos → Agentes. Se crea un token, un agente lo
@@ -192,6 +194,56 @@ test('Agente con permiso de texto: la app sube el texto troceado y el agente lo 
   expect(ch.text.split('\n')[0]).toBe('[[a40]] Paragraph 0 about logs and nodes.');
   const found = await tool('search_book', { bookId: 'ddia', query: 'doctors on call', limit: 1 });
   expect(found.results[0]).toMatchObject({ id: 'a47', chapterTitle: 'Chapter 8. Transactions', text: 'Two doctors on call both go off call: that is write skew.' });
+});
+
+// IA10 F1 · Todos los libros con texto, no solo los abiertos: la cola trocea en segundo plano
+// los que nunca se abrieron, espera si el lector está abierto, y cuenta en Ajustes los que
+// faltan y por qué. Qué está subido lo dice el servidor, no el equipo.
+test('Texto para agentes: la cola trocea los libros sin abrir y Ajustes cuenta la cobertura', async ({ page }) => {
+  const server = await createSyncServer();
+  await installSyncServer(page, server);
+  await enableSyncPreview(page);
+  await seedBookReaderSync(page);
+  await page.goto('/');
+  const epub = readFileSync(path.join(__dirname, 'test.epub')).toString('base64');
+  await page.evaluate(async (b64) => {
+    await (await import('/js/sync/bookreader-auth.js')).enable();
+    const Store = await import('/js/library/store.js');
+    const buf = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+    const base = { author: 'X', format: 'epub', addedAt: Date.now(), progress: 0, status: 'unread', shelfIds: [] };
+    await Store.putBook({ ...base, id: 'sin-abrir', title: 'Nunca abierto', fileName: 'a.epub', file: buf.buffer.slice(0), size: buf.length });
+    // Una ficha sin fichero: el libro está en otro equipo.
+    await Store.putBook({ ...base, id: 'en-otro', title: 'En el portátil', fileName: 'b.epub', size: 10 });
+    await (await import('/js/sync/engine.js')).syncNow();
+    document.body.classList.add('reading');   // con el lector abierto, la cola espera
+    await (await import('/js/sync/bookreader-auth.js')).createMcpToken('Claude', { scopes: ['text'] });
+  }, epub);
+  const segmented = () => page.evaluate(async () => !!(await (await import('/js/ai/db.js')).get('bookText', 'sin-abrir')));
+  await page.waitForTimeout(1500);
+  expect(await segmented()).toBe(false);
+  await page.evaluate(() => document.body.classList.remove('reading'));
+  await expect.poll(segmented, { timeout: 20000 }).toBe(true);
+
+  const coverage = () => page.evaluate(async () => {
+    const BT = await import('/js/sync/book-text.js');
+    await BT.backfill();
+    return BT.coverage();
+  });
+  await expect.poll(async () => (await coverage()).ok, { timeout: 15000 }).toBe(1);
+  expect((await coverage()).missing).toEqual([{ id: 'en-otro', title: 'En el portátil', why: 'file' }]);
+
+  // Otro equipo (sin memoria local de lo subido) no vuelve a subirlo: manda el servidor.
+  const puts = () => server.calls.filter((c) => c.startsWith('PUT /v1/o/')).length;
+  const before = puts();
+  await page.evaluate(async () => {
+    localStorage.removeItem('bookreader_sync_text_state');
+    await (await import('/js/sync/book-text.js')).backfill();
+  });
+  expect(puts()).toBe(before);
+
+  await page.evaluate(async () => (await import('/js/ui/app-settings.js')).open('data'));
+  await expect(page.locator('#appset-br-text')).toContainText('Texto para agentes: 1 de 2 libros.');
+  await expect(page.locator('#appset-br-text')).toContainText('«En el portátil»');
 });
 
 // Artefactos de un agente: llegan al dispositivo por el sync, el Studio los ve (getArtifacts
