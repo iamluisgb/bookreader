@@ -24,8 +24,10 @@
     // compartida degrade el servicio a todos. Por eso la cuota por token es generosa
     // (que la demo se acabe a mitad de un libro es perder al usuario, no ahorrar) y el
     // techo diario se queda como red de seguridad, holgado sobre el tráfico real
-    // (~74 llamadas en todo el histórico).
-    "DEMO_QUOTA": "100",
+    // (~74 llamadas en todo el histórico). 500 desde el 2026-10-20: con la prueba de Pro
+    // de 60 días (ADR-060), la demo tiene que durar lo que dura la prueba, y con 100 nadie
+    // pasó de 33.
+    "DEMO_QUOTA": "500",
     "MAX_DAILY_TOKENS": "200",
     "MAX_DAILY_CALLS": "5000"
   },

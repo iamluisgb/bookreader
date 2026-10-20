@@ -3075,7 +3075,7 @@ self-service (F3), Turnstile si hiciera falta, allowlist de modelos y tope de `m
   emisión diaria (`MAX_DAILY_TOKENS`) y disyuntor de llamadas demo/día (`MAX_DAILY_CALLS`) que
   acota el gasto máximo aunque el abuso sea distribuido. Botón "Probar la demo (sin API key)" en
   Ajustes → Agente (visible solo sin key): autoconfigura base URL + token + alias sin que el
-  usuario vea nada. Cuota por token: 30 llamadas (`DEMO_QUOTA`). Pendiente de F3: el botón en el
+  usuario vea nada. Cuota por token: 500 llamadas desde 2026-10-20 (`DEMO_QUOTA`; antes 30 y 100). Pendiente de F3: el botón en el
   onboarding del propio panel (hoy el flujo sin key ya desemboca en Ajustes → Agente) y Turnstile
   si aparece abuso con scripts.
 - **F3.1 — Traspaso entre dispositivos** `S` · **✓** _(2026-08-23, ver CHANGELOG · ADR-032)_: la
