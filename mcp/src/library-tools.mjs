@@ -17,7 +17,7 @@
 
 import { ToolError } from './errors.mjs';
 import { fold } from './book-arg.mjs';
-import { cleanRule, hasRule, booksIn, segments, renumber, levelNodes, RULE_FIELDS, SEP } from '../../app/js/library/shelves.js';
+import { cleanRule, hasRule, booksIn, segments, renumber, levelNodes, shelfRows, RULE_FIELDS, SEP } from '../../app/js/library/shelves.js';
 
 const STATUSES = ['unread', 'reading', 'finished'];
 const MAX_ITEMS = 500;
@@ -166,9 +166,10 @@ const LIST_SHELVES = {
     const lib = await source.library();
     if (!lib) throw new ToolError('Esta biblioteca no tiene catálogo (library.json).');
     const books = liveBooks(lib);
-    const shelves = liveShelves(lib);
-    const key = (s) => [...segments(s.name).slice(0, -1), ''].join(SEP);
-    shelves.sort((a, b) => key(a).localeCompare(key(b)) || (a.order ?? 1e9) - (b.order ?? 1e9) || (a.createdAt || 0) - (b.createdAt || 0) || fold(a.name).localeCompare(fold(b.name)));
+    // El orden del rail, tal cual lo pinta la app (las filas de grupo no son estanterías).
+    const live = liveShelves(lib);
+    const byId = new Map(live.map((s) => [s.id, s]));
+    const shelves = shelfRows(live).filter((r) => r.shelf).map((r) => byId.get(r.shelf.id));
     const manual = new Set(shelves.filter((s) => !hasRule(s.rule)).map((s) => s.id));
     return {
       source: source.kind, books: books.length,

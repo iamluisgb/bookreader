@@ -166,6 +166,8 @@ test('reorder de una carpeta: «Libros» (solo existe por «Libros/…») se col
   const byName = Object.fromEntries(Object.values(lib.shelves).map((x) => [x.name, x.order]));
   // Una sola secuencia, en el orden del rail: la carpeta ocupa el hueco de sus estanterías.
   assert.deepEqual(byName, { Favoritos: 0, 'Libros/Ensayo': 1, 'Libros/Novela': 2, Técnico: 3, 'Técnico pendientes': 4 });
+  const list = await tool(s.e, t, 'list_shelves', {});
+  assert.deepEqual(list.json.shelves.map((x) => x.name), ['Favoritos', 'Libros/Ensayo', 'Libros/Novela', 'Técnico', 'Técnico pendientes'], 'list_shelves, en el orden del rail');
   const mixed = await tool(s.e, t, 'reorder_shelves', { order: ['Libros/Novela', 'Favoritos'] });
   assert.ok(mixed.isError && /mismo nivel/.test(mixed.text));
 });
