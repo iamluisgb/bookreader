@@ -101,7 +101,7 @@ test('subida completa de un EPUB de varios trozos: cifrado en su ruta, alta en l
   assert.ok(out.changeId);
 
   assert.equal(s.e.SYNC._ops.parts, 2, 'a R2 por partes de dos trozos: 8 MB + el resto');
-  assert.equal(s.e.SYNC._ops.put - putsBefore, 1, 'el libro nunca va entero de una vez: el único put es library.json');
+  assert.equal(s.e.SYNC._ops.put - putsBefore, 2, 'dos puts pequeños: library.json y la ficha books/<id>.json (el libro nunca va entero de una vez)');
   const file = await s.read(`bookreader/files/${id}.epub`);
   assert.equal(sha(new Uint8Array(await file.arrayBuffer())), id, 'el fichero se descifra a los mismos bytes');
   const b = (await s.readLib()).books[id];
@@ -109,6 +109,13 @@ test('subida completa de un EPUB de varios trozos: cifrado en su ruta, alta en l
     [b.title, b.author, b.format, b.fileName, b.size, b.status, b.deleted, b.blob.path, b.origTitle],
     ['Mi libro', 'Autora', 'epub', 'Mi libro.epub', bytes.length, 'unread', false, `bookreader/files/${id}.epub`, ''],
   );
+  // La ficha del libro (books/<id>.json) es lo que el motor de sync usa para materializarlo en la
+  // app: sin ella la entrada sale en la biblioteca pero el libro no abre.
+  const rec = JSON.parse(await (await s.read(`bookreader/books/${id}.json`)).text());
+  assert.equal(rec.schemaVersion, 1);
+  assert.deepEqual(rec.local, {}, 'nace sin anotaciones');
+  assert.deepEqual([rec.meta.id, rec.meta.title, rec.meta.author, rec.meta.format], [id, 'Mi libro', 'Autora', 'epub']);
+
   assert.equal(s.e.DB._raw.prepare(`SELECT kind FROM blobs WHERE size > ?`).get(MB).kind, 'file', 'cuenta en la cuota de libros');
 
   const ch = await s.changes();

@@ -33,6 +33,23 @@ const DRM_MARKS = ['META-INF/rights.xml', 'META-INF/sinf.xml', 'META-INF/license
 
 const BASE = 'bookreader/';   // como app/js/sync/layout.js (que no se puede importar aquí: tira de IndexedDB)
 const LIB = BASE + 'library.json';
+const BOOK = (id) => BASE + 'books/' + id + '.json';
+// SCHEMA_VERSION de app/js/sync/layout.js (que no se puede importar aquí: tira de IndexedDB).
+const BOOK_SCHEMA = 1;
+
+// El motor de sync materializa la biblioteca desde books/<id>.json (app/js/sync/engine.js): la
+// ficha sola en library.json deja el libro en la lista pero sin nada que abrir. Se crea vacía,
+// igual que la de un libro recién importado, y si ya existe (anotaciones de otro dispositivo) no
+// se toca.
+function ensureBookRecord(provider, meta) {
+  return provider.update(BOOK(meta.sha256), (value) => (value ? { next: null } : {
+    next: {
+      schemaVersion: BOOK_SCHEMA,
+      local: {}, convos: [], messages: [], notes: [], ratings: [], artifacts: [], decks: [], attempts: [],
+      meta: { id: meta.sha256, title: meta.title || null, author: meta.author || null, format: meta.format, size: meta.size },
+    },
+  }));
+}
 const mb = (n) => Math.round(n / 1048576) + ' MB';
 export const uploadMaxBytes = (env) => {
   const v = env.MCP_UPLOAD_MAX_BYTES;
@@ -83,6 +100,7 @@ export function uploadsFor(env, who, source, origin, now = () => Date.now()) {
       const stored = await env.DB.prepare('SELECT 1 AS x FROM objects WHERE user = ? AND path = ?').bind(who.user, pid).first();
       if (stored) {
         const out = await source.writeLibrary((value) => libraryChange(value, meta, path, now()));
+        await ensureBookRecord(r2Provider(env, who.user, who.raw, { canWrite: true, agent: { tokenId: who.tokenId, name: who.name } }), meta);
         return { ...out, message: 'El fichero ya estaba en el sync: el libro vuelve a la biblioteca sin subir nada.' };
       }
 
@@ -198,7 +216,9 @@ async function ingest(env, row, secret, body) {
   }
 
   const provider = r2Provider(env, row.user, raw, { canWrite: true, agent: { tokenId: row.token_id, name: row.agent } });
-  return provider.update(LIB, (value) => libraryChange(value, meta, path, Date.now()));
+  const out = await provider.update(LIB, (value) => libraryChange(value, meta, path, Date.now()));
+  await ensureBookRecord(provider, meta);
+  return out;
 }
 
 // Lee el cuerpo en trozos de C.SEG, comprueba formato, DRM y hash, y cifra cada trozo según
