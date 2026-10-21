@@ -3155,6 +3155,7 @@ en nan~~ → **instrumentado en F1.2**; queda *leer* los datos tras unos días d
 > `TEST_LICENSES` (la de Luis); el resto recibe `not_configured`. Topes de prueba: 1 GB, 100 k y 1 M,
 > para que con los de `share` (8 GB, 800 k, 8 M) no se pase de lo gratis de la cuenta; libros
 > activados. La opción se ve con `?sync-preview=1`. **Para lanzar, en orden:**
+> 0. Resolver la CPU del MCP (ver «la CPU del Worker» abajo): partir el layout o plan de pago.
 > 1. MON2 en producción (Polar real) y la suscripción de ADR-031 con su producto y su benefit.
 > 2. Decidir A/B y dejarlo en `workers/sync/wrangler.jsonc`: `CAP_*` y `FILES_ENABLED`. Lo gratis de
 >    R2 es POR CUENTA: con B, repartirlo entre `share` y `sync` (p. ej., 4 GB/400 k/4 M cada uno) y
@@ -3176,9 +3177,17 @@ en nan~~ → **instrumentado en F1.2**; queda *leer* los datos tras unos días d
 > libro de 95 MB solo se ven en workerd: `wrangler tail`), subir por MCP libros de más de 100 MB
 > (varios PUT y un paso final que relea y descifre el fichero entero para comprobar el hash: pide
 > el plan de pago de Workers, que llega con Plus), notas de la
-> libreta por MCP, y vigilar la CPU del Worker: las tools del MCP gastan 13–32 ms por petición,
-> por encima de los 10 ms nominales del plan gratuito (Cloudflare no las corta hoy; si empezara
-> a dar 1102, el plan de pago de Workers son 5 $/mes). **Pendiente o fuera:** los límites de D1 del plan gratuito (100 k escrituras
+> libreta por MCP, y la CPU del Worker: las tools del MCP gastan 13–32 ms por petición, por
+> encima de los 10 ms del plan gratuito. **Ya corta:** el 20-oct, de 08:36 a 10:00 UTC, un agente
+> llamó a `/mcp` una vez por segundo y Cloudflare cortó 1.187 llamadas (correo «hit the free tier
+> CPU time limit»). Desde `e998c77`: tope de 60 llamadas a tools por token y minuto (`MCP_CALLS`,
+> error que el agente lee) y dos líneas JSON por petición en Workers Logs (`mcp: call|done`,
+> tools, carpetas leídas y bytes; sin argumentos) para cruzarlas con la CPU. **Siguiente:** con
+> esos datos, aligerar la tool que más gaste (claves derivadas en memoria del isolate, `move_books`
+> y compañía en lote). **Bloquea el lanzamiento:** cada llamada descifra y parsea el JSON entero
+> (`library.json`, el libro), y eso crece con la biblioteca: o se parte en objetos pequeños
+> (cambia el layout del sync, app y Worker) o el plan de pago de Workers (5 $/mes, 30 s de CPU).
+> Vender el sync sobre 10 ms no se sostiene con bibliotecas grandes. **Pendiente o fuera:** los límites de D1 del plan gratuito (100 k escrituras
 > al día, unas 5 por PUT) dan un techo parecido al de R2: ~400 usuarios activos con 50
 > escrituras al día cada uno; pasarlo pide el plan de pago de Workers.
 
