@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { createSyncServer, installSyncServer, seedBookReaderSync, enableSyncPreview, SYNC_URL } from './bookreader-sync-mock';
 
@@ -526,4 +527,69 @@ test('Agente organiza la biblioteca: sobrevive a un pase de página sin sincroni
   expect(after).toEqual({ status: 'reading', shelfIds: [shelf.shelfId], finished: false });
   const remote = (await tool('list_books', {})).books.find((b: any) => b.id === 'ddia');
   expect(remote.status).toBe('reading');
+});
+
+// Subir un libro: el agente pide la URL (create_book_upload) y sube el EPUB con un PUT, sin
+// pasar por la app. El dispositivo lo ve como cualquier libro subido desde otro equipo (ficha
+// sin fichero), lo descarga verificando el hash, y «Deshacer» lo borra aquí y del sync.
+test('Agente sube un libro: aparece en la biblioteca, se descarga, y se deshace desde la app', async ({ page }) => {
+  const server = await createSyncServer({ FILES_ENABLED: '1' });
+  await installSyncServer(page, server);
+  await enableSyncPreview(page);
+  await seedBookReaderSync(page);
+  await page.goto('/');
+  const bytes = readFileSync(path.join(__dirname, 'test.epub'));
+  const sha256 = createHash('sha256').update(bytes).digest('hex');
+  await page.evaluate(async () => {
+    const A = await import('/js/sync/bookreader-auth.js');
+    await A.enable();
+    await A.getToken(true);   // trae `files` del servidor
+    await (await import('/js/sync/engine.js')).syncNow();
+  });
+  await page.evaluate(async () => (await import('/js/ui/app-settings.js')).open('data'));
+  await page.locator('#appset-br-agent-create').click();
+  await page.locator('.dlg-overlay [data-field="name"]').fill('Claude');
+  await page.locator('.dlg-overlay [data-check="scopes"][value="upload"]').check();
+  await page.locator('.dlg-overlay .dlg-ok').click();
+  await expect(page.locator('#appset-br-agent-token')).toContainText('br-mcp-');
+  const token = (await page.locator('#appset-br-agent-token').textContent())!.trim();
+  await expect(page.locator('#appset-br-agents')).toContainText('sube libros');
+
+  const res = await server.worker.fetch(new Request(SYNC_URL + '/mcp', {
+    method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'create_book_upload', arguments: { fileName: 'test.epub', size: bytes.length, sha256 } } }),
+  }), server.env);
+  const created = JSON.parse((await res.json()).result.content[0].text);
+  expect(created.status).toBe('pending');
+  const put = await server.worker.fetch(new Request(created.upload.url, {
+    method: 'PUT', body: new Uint8Array(bytes), headers: { 'Content-Length': String(bytes.length) },
+  }), server.env);
+  expect(put.status).toBe(200);
+  expect((await put.json()).status).toBe('added');
+
+  const local = await page.evaluate(async (id) => {
+    await (await import('/js/sync/engine.js')).syncNow();
+    const S: any = await import('/js/library/store.js');
+    const ghost = S.isGhost(await S.getBook(id));
+    // downloadOne re-hashea lo bajado: si no fuera el fichero subido, no lo guardaría.
+    await (await import('/js/sync/blobs.js')).requestDownload(id);
+    return { ghost, file: S.hasFile(await S.getRaw(id)) };
+  }, sha256);
+  expect(local).toEqual({ ghost: true, file: true });
+
+  await page.evaluate(async () => (await import('/js/ui/app-settings.js')).open('data'));
+  const rows = page.locator('#appset-br-changes .appset-link');
+  await expect(rows.first()).toContainText('Claude · 1 libros subidos');
+  await rows.first().locator('[data-act="undo"]').click();
+  await page.locator('.dlg-overlay .dlg-ok').click();
+  await expect(page.locator('#appset-data-msg')).toContainText('Deshecho');
+  const gone = await page.evaluate(async (id) => {
+    await (await import('/js/sync/engine.js')).syncNow();
+    await (await import('/js/sync/blobs.js')).flush();
+    const S: any = await import('/js/library/store.js');
+    return !(await S.getBook(id));
+  }, sha256);
+  expect(gone).toBe(true);
+  const files = (server.env.DB as any)._raw.prepare(`SELECT COUNT(*) AS n FROM objects WHERE kind = 'file'`).get().n;
+  expect(files).toBe(0);
 });

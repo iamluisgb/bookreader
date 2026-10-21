@@ -18,7 +18,7 @@
 //   - el servidor no puede cambiar un fichero por otro, reordenar trozos ni cortar el final
 //     sin que el descifrado falle.
 
-const SEG = 4 * 1024 * 1024;
+export const SEG = 4 * 1024 * 1024;
 const IV = 12;
 const TAG = 16;
 export const SEG_ENC = SEG + IV + TAG;
@@ -82,8 +82,9 @@ export function encryptedSize(n) {
   return n + segs * (IV + TAG);
 }
 
-// Cifra el trozo `i` (de `count`) de `plain`, que ya viene cortado.
-async function sealSegment(keys, pid, i, count, plain) {
+// Cifra el trozo `i` (de `count`) de `plain`, que ya viene cortado. Exportada para el Worker,
+// que cifra un libro que le llega en claro trozo a trozo según entra (subida por MCP).
+export async function sealSegment(keys, pid, i, count, plain) {
   const iv = crypto.getRandomValues(new Uint8Array(IV));
   const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv, additionalData: aad(pid, i, i === count - 1) }, keys.enc, plain));
   const out = new Uint8Array(IV + ct.length);

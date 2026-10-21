@@ -3,6 +3,20 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-10-21 — Un agente sube libros a la biblioteca por MCP
+
+Con el permiso nuevo «Subir libros», un agente (Claude Code, opencode, pi) añade un EPUB o PDF
+del disco a la biblioteca en dos pasos: `create_book_upload` declara nombre, tamaño y SHA-256 y
+devuelve una URL de un solo uso; el agente sube el fichero con un PUT (`curl -T`). Los bytes no
+pasan por el modelo.
+- El Worker comprueba tamaño, formato, DRM y hash, cifra con la clave del sync y guarda el
+  fichero donde lo guarda la app. El libro aparece en los dispositivos como uno subido desde
+  otro equipo y se descarga al abrirlo.
+- El mismo libro no se duplica (el id es el hash) y la cuota se comprueba antes de subir.
+- Ajustes → Datos → Agentes enseña el alta con «Deshacer», que borra el libro y su fichero.
+- Máximo de 50 MB por libro. claude.ai en la web no puede hacer el PUT: ahí se sigue subiendo
+  desde la app.
+
 ## 2026-10-20 — Planes y precios en la app: Drive gratis, prueba de Pro de 60 días y licencias de Plus (MON5)
 
 Primera parte de [ADR-060](DECISIONS.md), la que no depende de Polar:

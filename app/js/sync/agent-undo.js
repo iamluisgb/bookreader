@@ -50,6 +50,13 @@ export async function applyUndo(undo, now = Date.now()) {
     shelves++;
   }
   for (const [id, prev] of Object.entries((undo && undo.books) || {})) {
+    if (prev === null) {
+      // Lo subió el agente: fuera, como borrarlo en la app (blobs.js quita también el fichero
+      // del sync, que la ficha borrada sigue apuntando con `blob`).
+      const cur = await LibStore.getBook(id);
+      if (cur && !cur.deleted) { await LibStore.deleteBook(id); books++; }
+      continue;
+    }
     const r = await LibStore.updateBook(id, (cur) => {
       if (cur.deleted) return {};
       const patch = { shelfIds: prev.shelfIds || [] };

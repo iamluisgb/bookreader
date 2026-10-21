@@ -1681,6 +1681,7 @@ function wireBookReaderSync(content, show) {
             (tk.scopes || []).includes('write') ? t('Lee y escribe') : t('Solo lee'),
             (tk.scopes || []).includes('text') ? t('con el texto de los libros') : '',
             (tk.scopes || []).includes('library') ? t('organiza la biblioteca') : '',
+            (tk.scopes || []).includes('upload') ? t('sube libros') : '',
             tk.lastUsedAt ? t('usado {when}', { when: ago(tk.lastUsedAt) }) : t('sin usar todavía'),
             t('caduca el {date}', { date: day(tk.expiresAt) }),
           ].filter(Boolean).join(' · '))}</div>
@@ -1737,6 +1738,7 @@ function wireBookReaderSync(content, show) {
     box.hidden = !changes.length;
     if (!changes.length) return;
     const what = (sm) => [
+      sm.booksAdded ? t('{n} libros subidos', { n: sm.booksAdded }) : '',
       sm.books ? t('{n} libros', { n: sm.books }) : '',
       sm.shelvesCreated ? t('{n} estanterías nuevas', { n: sm.shelvesCreated }) : '',
       sm.shelvesChanged ? t('{n} estanterías cambiadas', { n: sm.shelvesChanged }) : '',
@@ -1885,6 +1887,7 @@ function wireBookReaderSync(content, show) {
           { value: 'write', label: t('Cambiar mis mazos y tarjetas, y crear mapas mentales, infografías y resúmenes') },
           { value: 'text', label: t('Leer el texto de mis libros') },
           { value: 'library', label: t('Organizar mi biblioteca: estanterías, estado y títulos de los libros') },
+          { value: 'upload', label: t('Subir libros (EPUB y PDF) a mi biblioteca') },
         ] },
       ],
     });

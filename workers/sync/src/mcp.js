@@ -21,13 +21,15 @@
 //
 // PROTOCOLO: MCP sobre HTTP «streamable», sin estado y sin SSE. Cada POST lleva un mensaje
 // JSON-RPC (o un lote) y la respuesta es JSON. No hay sesiones ni notificaciones del servidor:
-// todas las tools son de lectura y responden en una petición.
+// todas las tools responden en una petición. Los bytes de un libro que se sube no van por aquí,
+// sino por un PUT aparte a una URL de un solo uso (upload.js).
 
 import * as C from '../../../app/js/sync/sync-crypto.js';
 import { createDriveSource } from '../../../mcp/src/sources/drive.mjs';
 import { toolsFor, callTool } from '../../../mcp/src/tools.mjs';
 import { SourceError } from '../../../mcp/src/errors.mjs';
 import { spend, refused, sha256Hex, randomId, config, checkLicense, userIdOf, writeBytes } from './index.js';
+import { uploadsFor } from './upload.js';
 
 const DAY = 24 * 60 * 60 * 1000;
 export const MCP_TOKEN_PREFIX = 'br-mcp-';
@@ -39,7 +41,7 @@ const LICENSE_RECHECK_MS = DAY;
 const LAST_USED_EVERY_MS = 60 * 60 * 1000;   // `last_used_at` se escribe como mucho una vez por hora
 const PROTOCOLS = ['2025-06-18', '2025-03-26', '2024-11-05'];
 // Permisos de un token. 'read' va siempre; los otros, solo si el usuario los marca al crearlo.
-export const SCOPES = ['read', 'write', 'text', 'library'];
+export const SCOPES = ['read', 'write', 'text', 'library', 'upload'];
 const CHANGES_KEPT_DAYS = 30;
 const UNDO_MAX_BYTES = 512 * 1024;
 const WRITE_RETRIES = 3;
@@ -49,7 +51,8 @@ const VERSIONED = /\/(books\/[^/]+|library)\.json$/;
 const SERVER_INFO = { name: 'bookreader', title: 'BookReader', version: '1.0.0' };
 const INSTRUCTIONS = [
   'Lee la biblioteca de BookReader del usuario: libros, subrayados, notas de libreta, estadísticas',
-  'de lectura, mazos de estudio y lo creado con el agente de la app. Es de solo lectura.',
+  'de lectura, mazos de estudio y lo creado con el agente de la app. Lo que puede cambiar',
+  '(mazos, estanterías, subir libros) depende de los permisos del token: lo dicen las tools.',
   'Empieza por `list_books` para conocer los bookIds; `get_highlights` y `get_notes` aceptan',
   'también `book` con parte del título. Para preguntar a toda la biblioteca («¿qué tenemos sobre',
   'X?»), `search_library` (si el token puede leer el texto de los libros).',
@@ -381,9 +384,11 @@ export async function mcpRoute(request, env, { resourceMetadata = null } = {}) {
   // permite decide qué tools se anuncian (toolsFor mira estas marcas).
   const canWrite = who.scopes.has('write') && !who.readOnly;
   const canOrganize = who.scopes.has('library') && !who.readOnly;
-  const provider = r2Provider(env, who.user, who.raw, { canWrite: canWrite || canOrganize, agent: { tokenId: who.tokenId, name: who.name } });
+  const canUpload = who.scopes.has('upload') && !who.readOnly;
+  const provider = r2Provider(env, who.user, who.raw, { canWrite: canWrite || canOrganize || canUpload, agent: { tokenId: who.tokenId, name: who.name } });
   const source = createDriveSource({ provider, kind: 'bookreader', cacheMs: 60000 });
-  Object.assign(source, { canWrite, canOrganize, canReadText: who.scopes.has('text'), agentName: who.name });
+  Object.assign(source, { canWrite, canOrganize, canUpload, canReadText: who.scopes.has('text'), agentName: who.name });
+  if (canUpload) source.uploads = uploadsFor(env, who, source, new URL(request.url).origin);
   try {
     const batch = Array.isArray(body);
     const out = (await Promise.all((batch ? body : [body]).map((m) => handleMessage(m, source)))).filter(Boolean);

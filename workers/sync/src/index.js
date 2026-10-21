@@ -31,6 +31,7 @@
 //   cifrados con una clave que nunca le llega.
 
 import { mcpRoute, createTokenRoute, listTokensRoute, revokeTokenRoute, listChangesRoute, getUndoRoute, markUndoneRoute, purgeChanges } from './mcp.js';
+import { UPLOAD_RE, uploadRoute, purgeUploads } from './upload.js';
 
 const DAY = 24 * 60 * 60 * 1000;
 const PATH_RE = /^[A-Za-z0-9_-]{16,64}$/;
@@ -541,6 +542,7 @@ export async function wipeUser(env, user) {
   // Los tokens de agentes llevan la clave vieja: con un sync nuevo no servirían de nada.
   await env.DB.prepare('DELETE FROM mcp_tokens WHERE user = ?').bind(user).run();
   await env.DB.prepare('DELETE FROM mcp_changes WHERE user = ?').bind(user).run();
+  await env.DB.prepare('DELETE FROM mcp_uploads WHERE user = ?').bind(user).run();
 }
 
 // ---- Mantenimiento y gasto -----------------------------------------------------------------
@@ -558,6 +560,7 @@ export async function purge(env, now = Date.now()) {
   const mt = await env.DB.prepare('DELETE FROM mcp_tokens WHERE expires_at < ? RETURNING id').bind(now).all();
   out.mcpTokens = (mt.results || []).length;
   out.mcpChanges = await purgeChanges(env, now);
+  out.mcpUploads = await purgeUploads(env, now);
 
   const { results: gone = [] } = await env.DB.prepare('SELECT id FROM users WHERE lapsed_at IS NOT NULL AND lapsed_at < ?')
     .bind(now - c.graceDays * DAY).all();
@@ -619,6 +622,9 @@ export default {
         return json(await usage(env), 200);
       }
       if (pathname === '/mcp') return await mcpRoute(request, env);
+      // La subida de un libro por MCP: sin token, la URL de un solo uso es la credencial.
+      const up = pathname.match(UPLOAD_RE);
+      if (up) return await uploadRoute(up[1], up[2], request, env);
       if (!pathname.startsWith('/v1/')) return json({ error: 'not_found' }, 404, cors);
 
       const who = await authenticate(request, env);

@@ -130,12 +130,27 @@ node cli.mjs --dir ~/bookreader-layout reading_stats '{"range":"7d"}'
 | `update_shelf` | biblioteca | Renombrar (también moverla en el árbol) o cambiar su regla. El id no cambia. |
 | `reorder_shelves` | biblioteca | El orden de las estanterías de un nivel. |
 | `delete_shelf` | biblioteca | Borra una estantería: los libros salen de ella y las reglas que la citan se limpian. |
+| `create_book_upload` | subir | Paso 1 de subir un EPUB o PDF: con nombre, tamaño y SHA-256, devuelve una URL de un solo uso para el PUT (o `exists` si ya está). |
+| `get_book_upload` | subir | Cómo quedó una subida: `pending`, `done`, `failed` (con el motivo) o `expired`. |
 
 Organizar la biblioteca pide su propio permiso («Organizar mi biblioteca»). Cada libro tocado
 lleva el sello de su grupo (`shelvesAt`, `statusAt`, `metaAt`), así que un pase de página en otro
 dispositivo que aún no bajó el cambio no lo revierte. Cada cambio guarda su deshacer: los valores
 anteriores de lo que tocó, cifrados con la clave del sync. En la app, Ajustes → Datos → Agentes
 lista los cambios recientes con «Deshacer», que solo revierte lo que hizo el agente.
+
+Subir libros pide su propio permiso («Subir libros»). Los bytes no pasan por el modelo ni por
+JSON-RPC: `create_book_upload` devuelve una URL de un solo uso (15 minutos, ese tamaño, ese hash)
+y el agente sube el fichero con un PUT (`curl -sS -T libro.epub "<url>"`). El Worker comprueba
+tamaño, formato (cabecera de zip o `%PDF-`), DRM (Adobe, Apple, LCP) y SHA-256, lo cifra trozo a
+trozo con la clave del sync, lo guarda en `files/<sha>.<ext>` como la app y lo da de alta en
+`library.json`. El bookId es el hash, así que el mismo libro no se duplica; si el fichero ya
+estaba en el sync, vuelve a la biblioteca sin subir nada. La cuota se comprueba antes de dar la
+URL. En la URL va un secreto: D1 guarda su hash y, cifrados con él, la clave y lo declarado (sin
+títulos ni hashes en claro). Máximo `MCP_UPLOAD_MAX_BYTES` (50 MB: el Worker tiene 128 MB de
+memoria). El alta se deshace desde la app como los cambios de biblioteca. La portada la saca la
+app la primera vez que abre el libro. Código en `src/upload-tools.mjs` y
+`workers/sync/src/upload.js`.
 
 Los artefactos se CREAN siempre (el Studio guarda el historial de cada tipo): mejorar un mapa
 es crear otro y borrar el viejo si sobra. Pasan por los mismos techos que los que genera la app
