@@ -136,3 +136,36 @@ test('protocolo: notificaciones 202, método desconocido, lotes, GET 405 y Origi
   assert.equal((await rpc(s.e, token, 'ping', {}, { Origin: 'https://evil.example' })).status, 403);
   assert.equal((await rpc(s.e, 'br-mcp-inventado', 'ping')).status, 401);
 });
+
+test('más llamadas por minuto de las que deja MCP_CALLS: error que lee el agente, sin tocar R2', async () => {
+  let quedan = 2;
+  const s = await seeded(baseEnv({ DATA_QUOTA_BYTES: String(10 * 1024 * 1024), MAX_BYTES: String(10 * 1024 * 1024),
+    MCP_CALLS: { limit: async () => ({ success: quedan-- > 0 }) } }));
+  const { token } = await (await createToken(s)).json();
+  for (let i = 0; i < 2; i++) assert.ok(toolJson(await rpc(s.e, token, 'tools/call', { name: 'list_books', arguments: {} })).books);
+
+  const gets = s.e.SYNC._ops.get;
+  const r = await rpc(s.e, token, 'tools/call', { name: 'list_books', arguments: {} });
+  assert.equal(r.status, 200);
+  assert.equal(r.body.result.isError, true);
+  assert.match(r.body.result.content[0].text, /Espera un minuto/);
+  assert.equal(s.e.SYNC._ops.get, gets);
+  // Lo que no gasta (initialize, tools/list) sigue contestando.
+  assert.ok((await rpc(s.e, token, 'tools/list')).body.result.tools.length);
+});
+
+test('cada llamada deja en el log las tools y lo leído, sin argumentos ni rutas con ids', async () => {
+  const s = await seeded();
+  const { token } = await (await createToken(s)).json();
+  const lineas = [];
+  const log = console.log;
+  console.log = (x) => lineas.push(String(x));
+  try {
+    await rpc(s.e, token, 'tools/call', { name: 'get_highlights', arguments: { bookId: BOOK_1.id } });
+  } finally { console.log = log; }
+  const [antes, despues] = lineas.map((l) => JSON.parse(l));
+  assert.deepEqual(antes.tools, ['get_highlights']);
+  assert.equal(despues.mcp, 'done');
+  assert.ok(despues.bytes > 0 && despues.reads.length > 0);
+  assert.ok(!lineas.join().includes(BOOK_1.id));
+});

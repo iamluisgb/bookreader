@@ -62,7 +62,8 @@
   // por libro. Al pasarlo, el cliente espera y reintenta (bookreader-auth.js · api).
   "ratelimits": [
     { "name": "WRITES", "namespace_id": "2402", "simple": { "limit": 300, "period": 60 } },
-    { "name": "TOKENS", "namespace_id": "2403", "simple": { "limit": 10, "period": 60 } }
+    { "name": "TOKENS", "namespace_id": "2403", "simple": { "limit": 10, "period": 60 } },
+    { "name": "MCP_CALLS", "namespace_id": "2404", "simple": { "limit": 60, "period": 60 } }
   ],
   "triggers": { "crons": ["41 3 * * *"] }
 }

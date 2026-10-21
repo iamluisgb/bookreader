@@ -45,6 +45,12 @@ export const SCOPES = ['read', 'write', 'text', 'library', 'upload'];
 const CHANGES_KEPT_DAYS = 30;
 const UNDO_MAX_BYTES = 512 * 1024;
 const WRITE_RETRIES = 3;
+// Más llamadas a tools que esto por token y minuto (MCP_CALLS en wrangler.jsonc) se contestan
+// con un error que el agente lee, sin tocar R2. El 20-oct un agente llamó una vez por segundo
+// durante hora y media; cada llamada se pasaba de los 10 ms de CPU, Cloudflare la cortaba sin
+// respuesta y el cliente volvía a intentarlo.
+const TOO_MANY_CALLS = 'Demasiadas llamadas seguidas a BookReader con este token (más de 60 por minuto). ' +
+  'Espera un minuto antes de seguir y no repitas en bucle la misma llamada.';
 // Como bookreader-provider.js: el fichero del libro guarda versiones. Y library.json cuando
 // escribe un agente (los dispositivos no las piden para él).
 const VERSIONED = /\/(books\/[^/]+|library)\.json$/;
@@ -245,9 +251,12 @@ export async function authenticateAgent(env, token, now = Date.now(), fetchImpl 
 // `mutate` puede devolver también `undo` (los valores anteriores de lo que cambió) y `summary`
 // (contadores): entonces el cambio queda en mcp_changes, con el `undo` cifrado con la clave del
 // usuario, y la app lo puede deshacer (Ajustes → Datos → Agentes).
-export function r2Provider(env, user, raw, { canWrite = false, agent = null } = {}) {
+// `trace`, si llega, apunta qué se leyó y cuánto pesaba (lo registra mcpRoute).
+export function r2Provider(env, user, raw, { canWrite = false, agent = null, trace = null } = {}) {
   let keysP = null;
   const keys = () => (keysP ||= C.importKeys(raw));
+  // Solo la carpeta: los ids de libros y mazos no salen a los logs.
+  const note = (path, bytes) => trace && trace.push({ path: path.split('/').slice(0, 2).join('/'), bytes });
 
   async function readRaw(path) {
     const k = await keys();
@@ -260,6 +269,7 @@ export function r2Provider(env, user, raw, { canWrite = false, agent = null } = 
     }
     const obj = await env.SYNC.get(row.key);
     if (!obj) return { k, pid, row: null, value: null };
+    note(path, obj.size);
     return { k, pid, row, value: JSON.parse(await C.decryptText(k, pid, await new Response(obj.body).blob())) };
   }
 
@@ -303,6 +313,7 @@ export function r2Provider(env, user, raw, { canWrite = false, agent = null } = 
       }
       const obj = await env.SYNC.get(row.key);
       if (!obj) return null;
+      note(path, obj.size);
       return { content: await C.decryptText(k, pid, await new Response(obj.body).blob()) };
     },
     // Bloques sueltos de un fichero sellado por bloques (el almacén de pasajes, IA10): una
@@ -319,6 +330,7 @@ export function r2Provider(env, user, raw, { canWrite = false, agent = null } = 
         throw Object.assign(new Error('capacity'), { capacity: true });
       }
       const dec = new TextDecoder();
+      note(path, specs.reduce((n, s) => n + s.length, 0));
       return Promise.all(specs.map(async ({ i, count, offset, length }) => {
         const obj = await env.SYNC.get(row.key, { range: { offset, length } });
         if (!obj) throw new SourceError('Falta el almacén de pasajes: reconstruye el índice desde la app.');
@@ -353,6 +365,9 @@ async function handleMessage(msg, source) {
     case 'tools/list':
       return { jsonrpc: '2.0', id: msg.id, result: { tools: toolsFor(source) } };
     case 'tools/call':
+      if (source.overLimit && await source.overLimit()) {
+        return { jsonrpc: '2.0', id: msg.id, result: { content: [{ type: 'text', text: TOO_MANY_CALLS }], isError: true } };
+      }
       return { jsonrpc: '2.0', id: msg.id, result: await callTool(source, p.name, p.arguments) };
     default:
       return rpcError(msg.id, -32601, 'Method not found: ' + msg.method);
@@ -385,17 +400,35 @@ export async function mcpRoute(request, env, { resourceMetadata = null } = {}) {
   const canWrite = who.scopes.has('write') && !who.readOnly;
   const canOrganize = who.scopes.has('library') && !who.readOnly;
   const canUpload = who.scopes.has('upload') && !who.readOnly;
-  const provider = r2Provider(env, who.user, who.raw, { canWrite: canWrite || canOrganize || canUpload, agent: { tokenId: who.tokenId, name: who.name } });
+  const reads = [];
+  const provider = r2Provider(env, who.user, who.raw, { canWrite: canWrite || canOrganize || canUpload, agent: { tokenId: who.tokenId, name: who.name }, trace: reads });
   const source = createDriveSource({ provider, kind: 'bookreader', cacheMs: 60000 });
   Object.assign(source, { canWrite, canOrganize, canUpload, canReadText: who.scopes.has('text'), agentName: who.name });
   if (canUpload) source.uploads = uploadsFor(env, who, source, new URL(request.url).origin);
+  let limited = 0;
+  if (env.MCP_CALLS) {
+    source.overLimit = async () => {
+      const { success } = await env.MCP_CALLS.limit({ key: who.tokenId });
+      if (!success) limited++;
+      return !success;
+    };
+  }
+  const batch = Array.isArray(body);
+  // Qué pidió el agente, para Workers Logs, que pone al lado la CPU de la petición. Una línea
+  // antes de trabajar (si Cloudflare la corta, es la que queda) y otra al acabar con lo leído.
+  // Ni argumentos ni contenido: solo nombres de tools y tamaños.
+  const tools = (batch ? body : [body]).filter((m) => m?.method === 'tools/call').map((m) => String(m.params?.name || '?'));
+  if (tools.length) console.log(JSON.stringify({ mcp: 'call', token: who.tokenId, tools }));
   try {
-    const batch = Array.isArray(body);
     const out = (await Promise.all((batch ? body : [body]).map((m) => handleMessage(m, source)))).filter(Boolean);
     if (!out.length) return new Response(null, { status: 202 });
     return json(batch ? out : out[0], 200);
   } catch (e) {
     if (e.capacity) return json({ error: 'capacity' }, 503);
     throw e;
+  } finally {
+    if (tools.length) {
+      console.log(JSON.stringify({ mcp: 'done', token: who.tokenId, tools, limited, reads, bytes: reads.reduce((n, r) => n + (r.bytes || 0), 0) }));
+    }
   }
 }
