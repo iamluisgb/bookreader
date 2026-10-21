@@ -45,7 +45,8 @@ export function cleanUploadArgs(args, { maxBytes }) {
   const size = args.size;
   if (!Number.isInteger(size) || size <= 0) throw new ToolError('«size» tiene que ser el tamaño del fichero en bytes (entero).');
   if (size > maxBytes) {
-    throw new ToolError(`El fichero pasa del máximo para subir por agente (${Math.round(maxBytes / 1048576)} MB). Súbelo desde la app.`);
+    throw new ToolError(`El fichero pasa del máximo para subir por agente (${Math.round(maxBytes / 1048576)} MB: Cloudflare corta ` +
+      'las peticiones más grandes). Que lo suba el usuario desde la app, que lo manda por partes.');
   }
   const sha256 = typeof args.sha256 === 'string' ? args.sha256.trim().toLowerCase() : '';
   if (!/^[0-9a-f]{64}$/.test(sha256)) throw new ToolError('«sha256» tiene que ser el SHA-256 del fichero en hexadecimal (`sha256sum libro.epub`).');

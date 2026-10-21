@@ -215,9 +215,15 @@ export function createDriveSource({ provider, base = DEFAULT_BASE, cacheMs = 150
         const entry = await entryFrom(c, id);
         if (!entry) continue;
         const summary = summarizeBook(entry);
-        // Lo que ya está en el catálogo, sin lecturas de más: autor, estado y estanterías.
+        // Lo que ya está en el catálogo, sin lecturas de más: autor, estado, estanterías, y el
+        // fichero (formato, bytes y si está en el sync para que otro dispositivo lo baje).
         const lb = c.library && c.library.books[id];
-        if (lb) Object.assign(summary, { author: lb.author || null, status: lb.status || 'unread', progress: lb.progress || 0, shelfIds: lb.shelfIds || [] });
+        if (lb) {
+          Object.assign(summary, {
+            author: lb.author || null, status: lb.status || 'unread', progress: lb.progress || 0, shelfIds: lb.shelfIds || [],
+            format: lb.format || null, size: lb.size || null, fileInSync: !!(lb.blob && lb.blob.path),
+          });
+        }
         if (entry.error) summary.error = entry.error;
         out.push(summary);
       }

@@ -8,15 +8,17 @@
 // su hash y, cifrados con él, la clave del sync y lo declarado. El PUT no lleva token: quien
 // tiene la URL puede subir ESE fichero (ese tamaño, ese hash) una vez, en 15 minutos, y nada más.
 //
-// MEMORIA Y CPU. Lo que entra se corta en trozos de 4 MB (los de sync-crypto) y se cifra según
-// llega; en memoria solo queda el cifrado, para subirlo a R2 de una vez. De ahí el máximo
-// (MCP_UPLOAD_MAX_BYTES, 50 MB por defecto): los Workers tienen 128 MB. El hash y el cifrado
-// gastan CPU, unos 2-3 ms por MB: por encima de los 10 ms del plan gratis (como el resto del MCP).
+// MEMORIA Y CPU. Lo que entra se corta en trozos de 4 MB (los de sync-crypto), se cifra según
+// llega y va a R2 por partes de dos trozos (index.js · writeStreamed): en memoria nunca hay más
+// de unos 12 MB. El máximo (MCP_UPLOAD_MAX_BYTES, 95 MB) lo pone Cloudflare: corta las peticiones
+// de más de 100 MB en los planes Free y Pro. Lo que pase de ahí se sube desde la app, que ya va
+// por partes. El hash y el cifrado gastan CPU, unos 2-3 ms por MB: por encima de los 10 ms del
+// plan gratis (como el resto del MCP).
 
 import * as C from '../../../app/js/sync/sync-crypto.js';
 import { ToolError } from '../../../mcp/src/errors.mjs';
 import { addBook, bookFile } from '../../../mcp/src/upload-tools.mjs';
-import { config, randomId, sha256Hex, writeBytes } from './index.js';
+import { config, randomId, sha256Hex, writeStreamed } from './index.js';
 import { r2Provider, wrap, unwrap } from './mcp.js';
 
 const MINUTE = 60 * 1000;
@@ -26,6 +28,7 @@ const SECRET_PREFIX = 'br-up-';   // solo para derivar la clave de `wrap` (mcp.j
 export const UPLOAD_RE = /^\/v1\/upload\/([A-Za-z0-9_-]{22})\/([A-Za-z0-9_-]{43})$/;
 // Marcas de DRM en el directorio del zip (va al final del EPUB): Adobe, Apple y Readium LCP.
 // `encryption.xml` solo no lo es: lo usan también las fuentes ofuscadas de EPUB normales.
+const SEGS_PER_PART = 2;   // partes de R2 de ~8 MB: todas iguales salvo la última, y de más de 5 MB
 const DRM_MARKS = ['META-INF/rights.xml', 'META-INF/sinf.xml', 'META-INF/license.lcpl'];
 
 const BASE = 'bookreader/';   // como app/js/sync/layout.js (que no se puede importar aquí: tira de IndexedDB)
@@ -33,7 +36,7 @@ const LIB = BASE + 'library.json';
 const mb = (n) => Math.round(n / 1048576) + ' MB';
 export const uploadMaxBytes = (env) => {
   const v = env.MCP_UPLOAD_MAX_BYTES;
-  return v === undefined || v === '' ? 50 * 1024 * 1024 : Number(v);
+  return v === undefined || v === '' ? 95 * 1024 * 1024 : Number(v);
 };
 
 class UploadError extends Error {
@@ -181,14 +184,14 @@ async function ingest(env, row, secret, body) {
   const path = BASE + bookFile(meta.sha256, meta.format);
   const pid = await C.pathId(k, path);
 
-  const parts = await encryptStream(k, pid, body, meta);
-
   const stored = await env.DB.prepare('SELECT 1 AS x FROM objects WHERE user = ? AND path = ?').bind(row.user, pid).first();
-  if (!stored) {
-    const enc = new Blob(parts);
-    const w = await writeBytes(env, {
-      user: row.user, path: pid, name: await C.encryptName(k, path), body: enc, size: enc.size, kind: 'file', mustCreate: true,
-    });
+  if (stored) {
+    // Otro lo subió después de create_book_upload: se comprueba lo recibido y no se guarda.
+    await encryptStream(k, pid, body, meta, null);
+  } else {
+    const w = await writeStreamed(env, {
+      user: row.user, path: pid, name: await C.encryptName(k, path), size: C.encryptedSize(meta.size), kind: 'file', mustCreate: true,
+    }, (part) => encryptStream(k, pid, body, meta, part));
     // precondition_failed: otro lo subió entre medias. Es el mismo fichero (mismo hash): vale.
     if (w.error === 'quota') throw new UploadError('quota', 507, FAIL_TEXT.quota);
     if (w.error === 'capacity') throw new UploadError('capacity', 507, FAIL_TEXT.capacity);
@@ -199,20 +202,28 @@ async function ingest(env, row, secret, body) {
 }
 
 // Lee el cuerpo en trozos de C.SEG, comprueba formato, DRM y hash, y cifra cada trozo según
-// llega. Devuelve los trozos cifrados (en orden). Lanza UploadError si algo no cuadra.
-async function encryptStream(k, pid, body, meta) {
+// llega. Los cifrados salen por `part` de SEGS_PER_PART en SEGS_PER_PART; la última parte, solo
+// con el hash ya comprobado (si no cuadra, la subida se aborta sin completarse). Con `part`
+// null solo comprueba. Lanza UploadError si algo no cuadra.
+async function encryptStream(k, pid, body, meta, part) {
   const count = C.segmentCount(meta.size);
   const hash = hasher();
-  const parts = [];
+  let sealed = 0;
+  let pending = [];
+  const flush = async () => {
+    if (part && pending.length) await part(pending.length === 1 ? pending[0] : concat(pending));
+    pending = [];
+  };
   let seg = new Uint8Array(Math.min(C.SEG, meta.size));
   let fill = 0;
   let total = 0;
   const seal = async () => {
-    const i = parts.length;
+    const i = sealed++;
     if (i === 0) checkFormat(seg, meta.format);
     if (i === count - 1 && meta.format === 'epub') checkDrm(seg);
     await hash.update(seg);
-    parts.push(await C.sealSegment(k, pid, i, count, seg));
+    if (part) pending.push(await C.sealSegment(k, pid, i, count, seg));
+    if (pending.length === SEGS_PER_PART && sealed < count) await flush();
     const left = meta.size - total;
     seg = new Uint8Array(Math.min(C.SEG, left));
     fill = 0;
@@ -237,7 +248,14 @@ async function encryptStream(k, pid, body, meta) {
   }
   if (total !== meta.size) throw new UploadError('size_mismatch', 400, FAIL_TEXT.size_mismatch);
   if ((await hash.hex()) !== meta.sha256) throw new UploadError('hash_mismatch', 422, FAIL_TEXT.hash_mismatch);
-  return parts;
+  await flush();
+}
+
+function concat(chunks) {
+  const out = new Uint8Array(chunks.reduce((n, c) => n + c.length, 0));
+  let o = 0;
+  for (const c of chunks) { out.set(c, o); o += c.length; }
+  return out;
 }
 
 function checkFormat(first, format) {

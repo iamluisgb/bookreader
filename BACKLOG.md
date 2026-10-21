@@ -3173,7 +3173,9 @@ en nan~~ → **instrumentado en F1.2**; queda *leer* los datos tras unos días d
 > texto troceado de los libros (ver `mcp/README.md`). **Pendiente:** OAuth para los conectores de
 > claude.ai (borrador sin commitear en `~/workspace/scratch/bookreader-oauth-wip/` del lab; su
 > migración pasa a ser la 0007), probar la subida por MCP en producción (DigestStream y CPU de un
-> libro de 50 MB solo se ven en workerd: `wrangler tail`), notas de la
+> libro de 95 MB solo se ven en workerd: `wrangler tail`), subir por MCP libros de más de 100 MB
+> (varios PUT y un paso final que relea y descifre el fichero entero para comprobar el hash: pide
+> el plan de pago de Workers, que llega con Plus), notas de la
 > libreta por MCP, y vigilar la CPU del Worker: las tools del MCP gastan 13–32 ms por petición,
 > por encima de los 10 ms nominales del plan gratuito (Cloudflare no las corta hoy; si empezara
 > a dar 1102, el plan de pago de Workers son 5 $/mes). **Pendiente o fuera:** los límites de D1 del plan gratuito (100 k escrituras

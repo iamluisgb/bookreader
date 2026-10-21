@@ -14,8 +14,10 @@ pasan por el modelo.
   otro equipo y se descarga al abrirlo.
 - El mismo libro no se duplica (el id es el hash) y la cuota se comprueba antes de subir.
 - Ajustes → Datos → Agentes enseña el alta con «Deshacer», que borra el libro y su fichero.
-- Máximo de 50 MB por libro. claude.ai en la web no puede hacer el PUT: ahí se sigue subiendo
-  desde la app.
+- Máximo de 95 MB por libro: el Worker cifra y sube a R2 por partes según llega, y Cloudflare
+  corta las peticiones de más de 100 MB. Los más grandes, y todo lo de claude.ai en la web (que no
+  puede hacer el PUT), se suben desde la app.
+- `list_books` dice también el formato, el tamaño en bytes y si el fichero está en el sync.
 
 ## 2026-10-20 — Planes y precios en la app: Drive gratis, prueba de Pro de 60 días y licencias de Plus (MON5)
 

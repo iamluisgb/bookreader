@@ -93,12 +93,15 @@ test('subida completa de un EPUB de varios trozos: cifrado en su ruta, alta en l
   const row = s.e.DB._raw.prepare('SELECT * FROM mcp_uploads').get();
   assert.ok(!JSON.stringify(row).includes('Mi libro') && !JSON.stringify(row).includes(id));
 
+  const putsBefore = s.e.SYNC._ops.put;
   const res = await call(s.e, 'PUT', pathOf(c.json.upload.url), { body: bytes });
   const out = await res.json();
   assert.equal(res.status, 200, JSON.stringify(out));
   assert.deepEqual([out.status, out.bookId, out.title], ['added', id, 'Mi libro']);
   assert.ok(out.changeId);
 
+  assert.equal(s.e.SYNC._ops.parts, 2, 'a R2 por partes de dos trozos: 8 MB + el resto');
+  assert.equal(s.e.SYNC._ops.put - putsBefore, 1, 'el libro nunca va entero de una vez: el único put es library.json');
   const file = await s.read(`bookreader/files/${id}.epub`);
   assert.equal(sha(new Uint8Array(await file.arrayBuffer())), id, 'el fichero se descifra a los mismos bytes');
   const b = (await s.readLib()).books[id];
@@ -128,6 +131,8 @@ test('sin título, el del nombre del fichero (y la app lo cambia por el del EPUB
   assert.equal((await call(s.e, 'PUT', pathOf(c.json.upload.url), { body: bytes })).status, 200);
   const b = (await s.readLib()).books[sha(bytes)];
   assert.deepEqual([b.title, b.author, 'origTitle' in b], ['el principito', '', false]);
+  const lb = (await tool(s.e, t, 'list_books', {})).json.books.find((x) => x.id === sha(bytes));
+  assert.deepEqual([lb.format, lb.size, lb.fileInSync], ['epub', 5000, true], 'list_books dice formato, tamaño y si está en el sync');
 });
 
 test('el PUT rechaza lo que no es lo declarado, y la subida queda «failed» con el motivo', async () => {
@@ -161,6 +166,12 @@ test('el PUT rechaza lo que no es lo declarado, y la subida queda «failed» con
   s.e.DB._raw.prepare('UPDATE mcp_uploads SET expires_at = 1 WHERE id = ?').run(ok.uploadId);
   assert.equal((await call(s.e, 'PUT', pathOf(ok.upload.url), { body: bytes })).status, 410);
   assert.equal((await tool(s.e, t, 'get_book_upload', { uploadId: ok.uploadId })).json.state, 'expired');
+
+  // Uno grande con el hash mal: las partes ya subidas se abortan y la cuota se libera.
+  const big = fakeEpub(9 * MB);
+  const bad2 = (await tool(s.e, t, 'create_book_upload', { fileName: 'g.epub', size: big.length, sha256: 'c'.repeat(64) })).json;
+  assert.equal((await call(s.e, 'PUT', pathOf(bad2.upload.url), { body: big })).status, 422);
+  assert.equal(s.e.SYNC._uploads.size, 0, 'la subida por partes se abortó');
 
   assert.equal(s.e.DB._raw.prepare(`SELECT COUNT(*) AS n FROM blobs WHERE kind = 'file'`).get().n, 0, 'nada se guardó');
   assert.deepEqual((await s.readLib()).books, {});

@@ -147,8 +147,9 @@ trozo con la clave del sync, lo guarda en `files/<sha>.<ext>` como la app y lo d
 `library.json`. El bookId es el hash, así que el mismo libro no se duplica; si el fichero ya
 estaba en el sync, vuelve a la biblioteca sin subir nada. La cuota se comprueba antes de dar la
 URL. En la URL va un secreto: D1 guarda su hash y, cifrados con él, la clave y lo declarado (sin
-títulos ni hashes en claro). Máximo `MCP_UPLOAD_MAX_BYTES` (50 MB: el Worker tiene 128 MB de
-memoria). El alta se deshace desde la app como los cambios de biblioteca. La portada la saca la
+títulos ni hashes en claro). Va a R2 por partes según se cifra, así que en memoria no hay más de
+unos 12 MB. Máximo `MCP_UPLOAD_MAX_BYTES` (95 MB): Cloudflare corta las peticiones de más de
+100 MB en los planes Free y Pro; lo que pase de ahí se sube desde la app. El alta se deshace desde la app como los cambios de biblioteca. La portada la saca la
 app la primera vez que abre el libro. Código en `src/upload-tools.mjs` y
 `workers/sync/src/upload.js`.
 

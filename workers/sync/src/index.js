@@ -349,6 +349,47 @@ export async function writeBytes(env, { user, path, name, body, size, kind = 'da
   return { etag };
 }
 
+// Como writeBytes, pero por partes y sin tener el objeto entero en memoria: `fill(part)` llama a
+// `part(bytes)` con cada parte según la produce (todas del mismo tamaño salvo la última, como pide
+// R2). Se reserva `size` (el tamaño final exacto) antes de nada. Si `fill` lanza, se aborta la
+// subida, se libera la cuota y se relanza. La usa la subida de libros por MCP (src/upload.js).
+// Devuelve { etag } o { error } como writeBytes.
+export async function writeStreamed(env, { user, path, name, size, kind = 'file', mustCreate = false }, fill, now = Date.now()) {
+  const etag = randomId();
+  const key = blobKey(user, path, etag);
+  const why = await reserve(env, { key, user, path, size, kind }, now);
+  if (why) { await refused(env, now); return { error: why }; }
+  let up = null;
+  try {
+    const parts = [];
+    const part = async (bytes) => {
+      if (!(await spend(env, 'a', now))) { await refused(env, now); throw Object.assign(new Error('capacity'), { capacity: true }); }
+      if (!up) {
+        up = await env.SYNC.createMultipartUpload(key, { httpMetadata: { contentType: 'application/octet-stream' } });
+        await env.DB.prepare('UPDATE blobs SET upload_id = ? WHERE key = ?').bind(up.uploadId, key).run();
+      }
+      const p = await up.uploadPart(parts.length + 1, bytes);
+      parts.push({ partNumber: p.partNumber, etag: p.etag });
+    };
+    await fill(part);
+    if (!up) throw new Error('sin partes');
+    if (!(await spend(env, 'a', now))) { await refused(env, now); throw Object.assign(new Error('capacity'), { capacity: true }); }
+    await up.complete(parts);
+  } catch (e) {
+    if (up) { try { await up.abort(); } catch { /* ya no existía */ } }
+    await env.DB.prepare('DELETE FROM blobs WHERE key = ?').bind(key).run();
+    if (e.capacity) return { error: 'capacity' };
+    throw e;
+  }
+  const r = await commit(env, { user, path, name, key, etag, size, kind, mustCreate }, now);
+  if (!r.ok) {
+    await dropBlob(env, key);
+    return { error: 'precondition_failed', current: r.old && r.old.etag };
+  }
+  await retire(env, { user, path, old: r.old, keepVersions: false });
+  return { etag };
+}
+
 // ---- Subida por partes (F4) ----------------------------------------------------------------
 //
 // Para los libros que no caben en un PUT (100 MB de cuerpo en Workers). Mismo modelo que un PUT:

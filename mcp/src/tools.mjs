@@ -190,7 +190,8 @@ const LIST_BOOKS = {
   description:
     'Devuelve los libros de la biblioteca del lector con cuántos subrayados, marcadores y ' +
     'notas de libreta tiene cada uno, y cuándo fue la última actividad. Empieza siempre por ' +
-    'aquí para saber qué bookIds existen.\n\n' +
+    'aquí para saber qué bookIds existen. Con catálogo (sync), también autor, estado, ' +
+    'estanterías, formato, tamaño en bytes (`size`) y si el fichero está en el sync (`fileInSync`).\n\n' +
     'Ojo con el título: en la fuente de backup (`--backup`) solo hay título para los libros ' +
     'que pasaron por el agente, así que puede venir `null` — usa el `id` entonces.',
   inputSchema: { type: 'object', properties: {}, additionalProperties: false },
