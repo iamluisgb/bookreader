@@ -1273,6 +1273,7 @@ function freeWrapper(wrapper) {
   const canvas = wrapper.querySelector('canvas');
   if (canvas) { canvas.width = 0; canvas.height = 0; }
   const tl = wrapper.querySelector('.textLayer'); if (tl) tl.innerHTML = '';
+  const ll = wrapper.querySelector('.pdf-link-layer'); if (ll) ll.innerHTML = '';
   const hl = wrapper.querySelector('.pdf-hl-layer'); if (hl) hl.innerHTML = '';
   wrapper.dataset.rendered = '';
 }
@@ -1343,6 +1344,7 @@ async function renderInto(wrapper, num, { anunciar = true } = {}) {
   }
 
   await renderTextLayer(page, viewport, scaler);
+  await renderLinkLayer(page, viewport, scaler);
   wrapper.dataset.rendered = '1';
   // Una página pintada por adelantado no está en pantalla: ni pide parche de
   // detalle (se lo pedirá al entrar) ni debe anunciarse, o app.js iría a pintar
@@ -1390,6 +1392,107 @@ async function renderTextLayer(page, viewport, wrapper) {
   } catch (e) {
     console.warn('Could not render PDF text layer:', e);
   }
+}
+
+// Enlaces del PDF (anotaciones /Link): los internos de los libros de O'Reilly
+// ("see Chapter 3", "Figure 2-1") y las URLs clicables. Sin esta capa el clic caía
+// en la capa de texto y no hacía nada. Cada enlace es un <a> encima del texto en
+// unidades fit, así que escala con el .pdf-scaler como el resto. El clic NO lo
+// sigue el <a>: lo resuelve linkAt() desde app.js, que también avisa para volver.
+async function renderLinkLayer(page, viewport, wrapper) {
+  let layer = wrapper.querySelector('.pdf-link-layer');
+  if (!layer) {
+    layer = document.createElement('div');
+    layer.className = 'pdf-link-layer';
+    wrapper.appendChild(layer);
+  }
+  layer.innerHTML = '';
+  let annots;
+  try { annots = await page.getAnnotations({ intent: 'display' }); } catch { return; }
+  for (const a of annots || []) {
+    if (a.subtype !== 'Link' || !a.rect) continue;
+    const url = safeUrl(a.url || a.unsafeUrl);
+    const dest = a.dest ?? null;
+    const action = a.action || null;          // NextPage, PrevPage, FirstPage, LastPage
+    if (!url && dest == null && !action) continue;
+    const [x1, y1, x2, y2] = viewport.convertToViewportRectangle(a.rect);
+    const el = document.createElement('a');
+    el.className = 'pdf-link';
+    el.style.left = Math.min(x1, x2) + 'px';
+    el.style.top = Math.min(y1, y2) + 'px';
+    el.style.width = Math.abs(x2 - x1) + 'px';
+    el.style.height = Math.abs(y2 - y1) + 'px';
+    if (url) {
+      el.href = url;
+      el.target = '_blank';
+      el.rel = 'noopener noreferrer';
+      el.title = url;
+    } else {
+      el.href = '#';
+      if (dest != null) el._dest = dest;
+      if (action) el.dataset.action = action;
+    }
+    layer.appendChild(el);
+  }
+}
+
+// Solo esquemas inocuos: un PDF puede traer javascript: o file: en sus enlaces.
+function safeUrl(u) {
+  if (!u || typeof u !== 'string') return null;
+  let s = u.trim();
+  if (/^www\./i.test(s)) s = 'https://' + s;
+  return /^(https?:|mailto:)/i.test(s) ? s : null;
+}
+
+const URL_IN_TEXT = /(?:https?:\/\/|www\.)[^\s<>"'«»]+/gi;
+
+// URL escrita como texto, sin anotación (muchos PDFs la imprimen y ya): mira qué
+// carácter hay bajo el punto en la capa de texto y si cae dentro de una URL.
+function textUrlAt(x, y) {
+  let node = null, off = 0;
+  if (document.caretPositionFromPoint) {
+    const p = document.caretPositionFromPoint(x, y);
+    if (p) { node = p.offsetNode; off = p.offset; }
+  } else if (document.caretRangeFromPoint) {
+    const r = document.caretRangeFromPoint(x, y);
+    if (r) { node = r.startContainer; off = r.startOffset; }
+  }
+  if (!node || node.nodeType !== 3 || !node.parentElement?.closest('.textLayer')) return null;
+  const text = node.textContent;
+  for (const m of text.matchAll(URL_IN_TEXT)) {
+    const raw = m[0].replace(/[.,;:!?)\]}]+$/, '');
+    if (off >= m.index && off <= m.index + raw.length) return safeUrl(raw);
+  }
+  return null;
+}
+
+// ¿Hay un enlace bajo este punto de pantalla? → { url } | { page } | null.
+// Lo usan el clic (para seguirlo) y el toque de app.js (para no alternar las barras).
+export async function linkAt(x, y, target = document.elementFromPoint(x, y)) {
+  if (!pdfDoc) return null;
+  const a = target?.closest?.('.pdf-link');
+  if (a) {
+    if (a.getAttribute('href') !== '#') return { url: a.href };
+    const pageEl = a.closest('.pdf-page');
+    const from = +(pageEl?.dataset.page) || currentPage;
+    let page = null;
+    if (a._dest != null) page = await destToPage(a._dest);
+    else switch (a.dataset.action) {
+      case 'NextPage': page = from + 1; break;
+      case 'PrevPage': page = from - 1; break;
+      case 'FirstPage': page = 1; break;
+      case 'LastPage': page = totalPages; break;
+    }
+    return page ? { page } : null;
+  }
+  const url = textUrlAt(x, y);
+  return url ? { url } : null;
+}
+
+// Versión síncrona para decidir en el touchend sin esperar a resolver el destino.
+export function hasLinkAt(x, y) {
+  const el = document.elementFromPoint(x, y);
+  return !!(el?.closest?.('.pdf-link') || textUrlAt(x, y));
 }
 
 function saveLastPage() {

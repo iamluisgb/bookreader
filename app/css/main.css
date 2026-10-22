@@ -1189,6 +1189,19 @@ body:not(.scroll-mode) .epub-container .epub-view {
   }
 }
 
+/* Enlaces del PDF (internos y URLs): cajas invisibles sobre la capa de texto, como en el
+   visor de pdf.js. Encima del texto para que el clic llegue al <a>. */
+.pdf-link-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.pdf-link {
+  position: absolute;
+  pointer-events: auto;
+  cursor: pointer;
+}
+
 /* PDF3 · Overlay de subrayados: rectángulos (coords fraccionales → px) sobre el canvas.
    Multiply para que se vea como un marcador sobre el texto. No captura eventos: la capa de
    texto de encima sigue siendo seleccionable. */

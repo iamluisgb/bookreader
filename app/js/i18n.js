@@ -586,6 +586,7 @@ const EN = {
   'Configura un modelo con visión en Ajustes para explicar figuras.': 'Set a vision model in Settings to explain figures.',
   'Espera a que la página termine de renderizarse.': 'Wait for the page to finish rendering.',
   'Página {n}': 'Page {n}',
+  'Volver a la pág. {n}': 'Back to p. {n}',
   'Imagen de la página adjunta — escribe tu pregunta y pulsa Enviar.': 'Page image attached — type your question and press Send.',
   'Explícame el contenido de esta página, en especial las figuras, diagramas o tablas que aparezcan.': 'Explain the content of this page, especially any figures, diagrams or tables.',
   'mirando la página…': 'looking at the page…',

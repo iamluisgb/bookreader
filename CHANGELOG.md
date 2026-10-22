@@ -3,6 +3,19 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-10-22 — Los enlaces de los PDF funcionan
+
+El lector de PDF pintaba la página y la capa de texto, pero nunca leía las anotaciones `/Link`: en
+los libros de O'Reilly las remisiones («see Chapter 3», «Figure 2-1») y las URLs no hacían nada.
+
+- **Capa de enlaces** (`renderLinkLayer` en `pdf-reader.js`): un `<a>` invisible por anotación,
+  encima del texto. Los internos resuelven su destino (también los destinos con nombre, como los
+  de O'Reilly) y saltan de página; las URLs se abren en otra pestaña. Solo `http(s):` y `mailto:`.
+- **URLs en texto plano**: si el PDF imprime la URL sin anotación, al pincharla se detecta en la
+  capa de texto (`textUrlAt`) y se abre igual.
+- **Volver**: tras un salto interno sale un aviso «Volver a la pág. N».
+- En táctil, tocar un enlace lo sigue y no alterna las barras.
+- Tests: `tests/pdf-links.spec.ts` con `tests/test-links.pdf`.
 ## 2026-10-22 — El alta por MCP crea la ficha del libro (`books/<id>.json`)
 
 La subida por MCP dejaba el libro en la biblioteca pero sin el fichero que el motor de sync usa

@@ -1219,6 +1219,7 @@ function initImmersive() {
   EpubReader.onImageTap((img) => openImageZoom(img));
 
   initPdfTap();
+  initPdfLinks();
 }
 
 // PDF: tocar el centro alterna las barras (estilo Play Books), como el center-tap del EPUB.
@@ -1233,6 +1234,8 @@ function initPdfTap() {
   let sx = 0, sy = 0, st = 0, valid = false;
   container.addEventListener('touchstart', (e) => {
     if (e.touches.length !== 1) { valid = false; return; }
+    // Tocar un enlace lo sigue (lo hace el click de initPdfLinks): no alterna las barras.
+    if (PdfReader.hasLinkAt(e.touches[0].clientX, e.touches[0].clientY)) { valid = false; return; }
     valid = true; st = Date.now();
     sx = e.touches[0].clientX; sy = e.touches[0].clientY;
   }, { passive: true });
@@ -1255,6 +1258,35 @@ function initPdfTap() {
     if (onHighlight()) return;                         // el toque va a abrir la barra de edición
     setImmersive(!document.body.classList.contains('immersive'));
   }, { passive: true });
+}
+
+// PDF: seguir los enlaces del libro. Los internos saltan de página y dejan un aviso
+// para volver a donde estabas (un libro técnico remite a figuras y capítulos y luego
+// quieres seguir leyendo); las URLs se abren en otra pestaña.
+function initPdfLinks() {
+  const container = document.getElementById('pdf-container');
+  if (!container || container.dataset.linksWired) return;
+  container.dataset.linksWired = '1';
+  let dismissBack = null;
+  container.addEventListener('click', async (e) => {
+    const sel = window.getSelection();
+    if (sel && !sel.isCollapsed) return;               // arrastró para seleccionar
+    const enAncla = e.target.closest?.('.pdf-link');
+    if (enAncla) e.preventDefault();                   // lo seguimos nosotros, no el <a>
+    const hit = await PdfReader.linkAt(e.clientX, e.clientY, e.target);
+    if (!hit) return;
+    if (hit.url) { window.open(hit.url, '_blank', 'noopener,noreferrer'); return; }
+    const from = PdfReader.getCurrentPage();
+    if (hit.page === from) return;
+    await PdfReader.goTo(hit.page);
+    dismissBack?.();
+    dismissBack = toast({
+      message: t('Página {n}', { n: hit.page }),
+      actionLabel: t('Volver a la pág. {n}', { n: from }),
+      onAction: () => { dismissBack = null; PdfReader.goTo(from); },
+      timeout: 10000,
+    });
+  });
 }
 
 // ============ AI PANEL ============
