@@ -47,7 +47,20 @@ const EXCLUIDOS = ['app/_proto', 'app/patterns.html', 'app/shelf-proto.html', 'a
 // (pdf-3.11.174.min.js) y una versión nueva es una URL nueva. Las fuentes y los iconos
 // NO llevan versión en el nombre, así que se quedan en una semana: recorta el tráfico
 // repetido sin dejar a nadie clavado con un icono viejo si se cambia.
-const HEADERS = `/app/vendor/*
+// Headers de seguridad para todo el sitio (TEC10, hallazgo 2). El CSP de la app va
+// por <meta> en index.html, y <meta> NO puede expresar `frame-ancestors`: por eso
+// hay una segunda política AQUÍ con solo esa directiva. Dos políticas CSP se suman
+// (se aplican las dos), así que esto no relaja la del <meta>.
+// HSTS sin `includeSubDomains` a propósito: raiatech.com sirve más apps y no se
+// hereda una decisión de un año a los subdominios de todas.
+const HEADERS = `/*
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+  Content-Security-Policy: frame-ancestors 'none'
+  Strict-Transport-Security: max-age=31536000
+
+/app/vendor/*
   Cache-Control: public, max-age=31536000, immutable
 
 /app/fonts/*

@@ -731,9 +731,8 @@ async function getToken(request, env) {
 
 function corsHeaders(request, env) {
   const origin = request.headers.get('Origin') || '';
-  const allowed = (env.ALLOWED_ORIGINS || '').split(',').map((s) => s.trim());
-  return {
-    'Access-Control-Allow-Origin': allowed.includes(origin) ? origin : allowed[0] || '*',
+  const allowed = (env.ALLOWED_ORIGINS || '').split(',').map((s) => s.trim()).filter(Boolean);
+  const headers = {
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Authorization, Content-Type',
     // Sin exponerlas, el navegador las recibe pero NO deja que el JS las lea: el
@@ -741,6 +740,10 @@ function corsHeaders(request, env) {
     'Access-Control-Expose-Headers': 'X-Quota-Remaining, X-Quota-Total',
     'Vary': 'Origin',
   };
+  // Origen no permitido = sin ACAO. Caer al primero de la lista (o a '*') servía
+  // la respuesta a un origen ajeno; `share`/`auth` ya lo omiten en ese caso.
+  if (allowed.includes(origin)) headers['Access-Control-Allow-Origin'] = origin;
+  return headers;
 }
 
 function withCors(response, cors) {
