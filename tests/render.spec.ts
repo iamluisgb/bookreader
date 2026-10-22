@@ -55,3 +55,26 @@ test('mdToHtml renderiza tablas GFM como <table>', async ({ page }) => {
   expect(html).not.toContain('|---|');   // la fila separadora no aparece como texto
   expect(html).not.toMatch(/\|\s*Modelo\s*\|/);   // ni la cabecera con pipes crudos
 });
+
+// TEC10 · La salida del agente es contenido NO confiable (el LLM lee el libro, así que
+// un EPUB hostil puede fabricar el enlace). Antes, la URL se metía cruda en href y una
+// `"` cerraba el atributo e inyectaba otros (`onmouseover=…`). Se comprueba sobre el DOM:
+// el <a> solo puede tener href/target/rel.
+test('la URL de un enlace del modelo no inyecta atributos', async ({ page }) => {
+  await page.goto('/');
+  const r = await page.evaluate(async () => {
+    const M = await import('/js/ai/markdown.js');
+    const box = document.createElement('div');
+    box.innerHTML = M.mdToHtml('[e](https://evil/"onmouseover="alert(1))');
+    const a = box.querySelector('a');
+    if (!a) return null;
+    return {
+      attrs: [...a.attributes].map((x) => x.name).sort(),
+      html: a.outerHTML,
+    };
+  });
+  expect(r).not.toBeNull();
+  expect(r!.attrs).toEqual(['href', 'rel', 'target']);           // ni onmouseover ni nada más
+  expect(r!.html).toContain('&quot;onmouseover=&quot;');         // la comilla va escapada
+  expect(r!.html).not.toMatch(/\son[a-z]+=/);                    // ningún handler inline
+});
