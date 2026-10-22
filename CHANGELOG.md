@@ -3,6 +3,18 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-10-22 — El alta por MCP crea la ficha del libro (`books/<id>.json`)
+
+La subida por MCP dejaba el libro en la biblioteca pero sin el fichero que el motor de sync usa
+para materializarlo ([[engine.js]] `books/<id>.json`): el libro aparecía en la lista y no abría.
+Ahora el alta crea esa ficha vacía en los dos caminos —el PUT y el libro cuyo fichero ya estaba en
+el sync— y no la toca si ya existe por tener anotaciones de otro dispositivo.
+- Se detectó comparando entradas: todos los libros de la biblioteca tenían `error` vacío salvo los
+  subidos por MCP, que decían «falta bookreader/books/<id>.json».
+- Test nuevo: la ficha existe tras la subida, se descifra y lleva id, título, autor y formato.
+- Desplegado en el Worker `bookreader-sync` el 22-oct-2026 (versión `726f163a`); verificada una
+  subida real posterior, que ya nace con su ficha.
+
 ## 2026-10-21 — Un agente sube libros a la biblioteca por MCP
 
 Con el permiso nuevo «Subir libros», un agente (Claude Code, opencode, pi) añade un EPUB o PDF
