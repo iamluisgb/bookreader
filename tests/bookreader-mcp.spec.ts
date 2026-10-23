@@ -593,3 +593,113 @@ test('Agente sube un libro: aparece en la biblioteca, se descarga, y se deshace 
   const files = (server.env.DB as any)._raw.prepare(`SELECT COUNT(*) AS n FROM objects WHERE kind = 'file'`).get().n;
   expect(files).toBe(0);
 });
+
+// Borrar libros (delete_books): el dispositivo baja el tombstone, suelta su copia y borra el
+// fichero del sync, como si lo hubiera borrado en otro equipo. «Deshacer» repone la ficha
+// entera. Si el dispositivo aún no había bajado el borrado, vuelve con su fichero; si ya lo
+// había hecho, vuelve sin él (hay que subirlo otra vez).
+async function agentWithScope(page, scope: string) {
+  await page.evaluate(async () => (await import('/js/ui/app-settings.js')).open('data'));
+  await page.locator('#appset-br-agent-create').click();
+  await page.locator('.dlg-overlay [data-field="name"]').fill('Claude');
+  await page.locator(`.dlg-overlay [data-check="scopes"][value="${scope}"]`).check();
+  await page.locator('.dlg-overlay .dlg-ok').click();
+  await expect(page.locator('#appset-br-agent-token')).toContainText('br-mcp-');
+  return (await page.locator('#appset-br-agent-token').textContent())!.trim();
+}
+
+async function seedDeviceBook(page) {
+  await page.evaluate(async () => {
+    const A = await import('/js/sync/bookreader-auth.js');
+    await A.enable();
+    await A.getToken(true);
+    const Store = await import('/js/library/store.js');
+    const buf = new Uint8Array(1024).map((_, i) => (i * 11) % 251);
+    await Store.putBook({ id: 'ddia', title: 'Designing Data-Intensive Applications', author: 'Kleppmann', format: 'epub', fileName: 'ddia.epub', file: buf.buffer, size: buf.length, addedAt: Date.now(), progress: 20, status: 'reading', shelfIds: [] });
+    await (await import('/js/sync/engine.js')).syncNow();
+    await (await import('/js/sync/blobs.js')).flush();
+    await (await import('/js/sync/engine.js')).syncNow();
+  });
+}
+
+async function undoFirst(page, text: string) {
+  await page.evaluate(async () => (await import('/js/ui/app-settings.js')).open('data'));
+  const rows = page.locator('#appset-br-changes .appset-link');
+  await expect(rows.first()).toContainText(text);
+  await rows.first().locator('[data-act="undo"]').click();
+  await page.locator('.dlg-overlay .dlg-ok').click();
+  await expect(page.locator('#appset-data-msg')).toContainText('Deshecho');
+}
+
+function mcpTool(server, token: string) {
+  return async (name: string, args: any) => {
+    const res = await server.worker.fetch(new Request(SYNC_URL + '/mcp', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } }),
+    }), server.env);
+    const r = (await res.json()).result;
+    expect(r.isError ?? false, r.content[0].text).toBe(false);
+    return JSON.parse(r.content[0].text);
+  };
+}
+
+const fileCount = (server) => (server.env.DB as any)._raw.prepare(`SELECT COUNT(*) AS n FROM objects WHERE kind = 'file'`).get().n;
+
+test('Agente borra un libro: el dispositivo lo suelta y borra el fichero; «Deshacer» repone la ficha', async ({ page }) => {
+  const server = await createSyncServer({ FILES_ENABLED: '1' });
+  await installSyncServer(page, server);
+  await enableSyncPreview(page);
+  await seedBookReaderSync(page);
+  await page.goto('/');
+  await seedDeviceBook(page);
+  expect(fileCount(server)).toBe(1);
+  const token = await agentWithScope(page, 'delete');
+  await expect(page.locator('#appset-br-agents')).toContainText('borra libros');
+  const tool = mcpTool(server, token);
+  expect((await tool('delete_books', { books: ['designing'] })).deleted[0].bookId).toBe('ddia');
+
+  const gone = await page.evaluate(async () => {
+    await (await import('/js/sync/engine.js')).syncNow();
+    await (await import('/js/sync/blobs.js')).flush();
+    const S: any = await import('/js/library/store.js');
+    return { visible: !!(await S.getBook('ddia')), file: S.hasFile(await S.getRaw('ddia')) };
+  });
+  expect(gone).toEqual({ visible: false, file: false });
+  expect(fileCount(server)).toBe(0);
+
+  await undoFirst(page, 'Claude · 1 libros borrados');
+  const back = await page.evaluate(async () => {
+    await (await import('/js/sync/engine.js')).syncNow();
+    const S: any = await import('/js/library/store.js');
+    const b = await S.getBook('ddia');
+    return b && { author: b.author, status: b.status, ghost: S.isGhost(b), blob: b.blob || null };
+  });
+  expect(back).toEqual({ author: 'Kleppmann', status: 'reading', ghost: true, blob: null });
+  expect((await tool('list_books', {})).books.some((b: any) => b.id === 'ddia')).toBe(true);
+});
+
+test('Agente borra un libro y se deshace antes de que el dispositivo sincronice: vuelve con su fichero', async ({ page }) => {
+  const server = await createSyncServer({ FILES_ENABLED: '1' });
+  await installSyncServer(page, server);
+  await enableSyncPreview(page);
+  await seedBookReaderSync(page);
+  await page.goto('/');
+  await seedDeviceBook(page);
+  const token = await agentWithScope(page, 'delete');
+  await page.evaluate(async () => (await import('/js/sync/engine.js')).setIntentionalOff(true));
+  await mcpTool(server, token)('delete_books', { bookIds: ['ddia'] });
+
+  await undoFirst(page, 'Claude · 1 libros borrados');
+  const kept = await page.evaluate(async () => {
+    const E = await import('/js/sync/engine.js');
+    E.setIntentionalOff(false);
+    await E.syncNow(); await E.syncNow();
+    await (await import('/js/sync/blobs.js')).flush();
+    const S: any = await import('/js/library/store.js');
+    const b = await S.getBook('ddia');
+    return b && { file: S.hasFile(await S.getRaw('ddia')), blob: !!(b.blob && b.blob.path) };
+  });
+  expect(kept).toEqual({ file: true, blob: true });
+  expect(fileCount(server)).toBe(1);
+  expect((await mcpTool(server, token)('list_books', {})).books.some((b: any) => b.id === 'ddia')).toBe(true);
+});

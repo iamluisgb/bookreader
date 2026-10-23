@@ -446,4 +446,44 @@ const DELETE_SHELF = {
   }),
 };
 
-export const LIBRARY_TOOLS = [LIST_SHELVES, MOVE_BOOKS, UPDATE_BOOKS, CREATE_SHELF, UPDATE_SHELF, REORDER_SHELVES, DELETE_SHELF];
+// Borrar libros, como «Borrar» en la app (library/store.js · deleteBook): la ficha queda como
+// tombstone, sin metadatos. Cada dispositivo, al bajarlo, suelta su copia y el primero borra el
+// fichero del sync (sync/blobs.js). Los subrayados, notas y mazos (books/<id>.json) no se tocan:
+// el id es el hash del fichero, así que si vuelve el mismo fichero, vuelve todo.
+// Con su propio permiso («Borrar libros», `canDelete`) y menos libros por llamada que el resto.
+// El deshacer guarda la ficha ENTERA (`restore`): la app la repone; el fichero, solo si sigue en
+// el sync (si un dispositivo ya lo borró, el libro vuelve sin él y hay que subirlo otra vez).
+const MAX_DELETE = 50;
+const DELETE_BOOKS = {
+  name: 'delete_books',
+  title: 'Borrar libros',
+  description:
+    'Borra libros de la biblioteca en todos los dispositivos, como «Borrar» en la app: sale de la ' +
+    'biblioteca y su fichero se libera del sync. Sus subrayados, notas y mazos se conservan y ' +
+    'vuelven si se sube el mismo fichero. Hasta ' + MAX_DELETE + ' por llamada. Usa antes `dry_run` ' +
+    'para enseñar al usuario qué se borra. El usuario lo puede deshacer en la app (Ajustes → Datos → ' +
+    'Agentes), pero si algún dispositivo ya ha sincronizado, el fichero hay que volver a subirlo.',
+  capability: 'canDelete',
+  inputSchema: {
+    type: 'object',
+    properties: { ...BOOKS_PROPS, ...DRY },
+    additionalProperties: false,
+  },
+  run: (source, args) => onLibrary(source, args, (lib, now, undo) => {
+    const books = findBooks(lib, args);
+    if (books.length > MAX_DELETE) throw new ToolError('Como mucho ' + MAX_DELETE + ' libros por llamada.');
+    undo.restore = {};
+    for (const b of books) {
+      const { id, ...entry } = b;
+      undo.restore[id] = entry;
+      lib.books[id] = { title: b.title || '', format: b.format || '', blob: b.blob || null, deleted: true, deletedAt: now, updatedAt: now };
+    }
+    return {
+      changed: true,
+      result: { deleted: books.map((b) => ({ bookId: b.id, title: b.title || null, author: b.author || null })) },
+      summary: { booksDeleted: books.length },
+    };
+  }),
+};
+
+export const LIBRARY_TOOLS = [LIST_SHELVES, MOVE_BOOKS, UPDATE_BOOKS, CREATE_SHELF, UPDATE_SHELF, REORDER_SHELVES, DELETE_SHELF, DELETE_BOOKS];

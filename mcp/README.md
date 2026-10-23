@@ -132,6 +132,7 @@ node cli.mjs --dir ~/bookreader-layout reading_stats '{"range":"7d"}'
 | `delete_shelf` | biblioteca | Borra una estantería: los libros salen de ella y las reglas que la citan se limpian. |
 | `create_book_upload` | subir | Paso 1 de subir un EPUB o PDF: con nombre, tamaño y SHA-256, devuelve una URL de un solo uso para el PUT (o `exists` si ya está). |
 | `get_book_upload` | subir | Cómo quedó una subida: `pending`, `done`, `failed` (con el motivo) o `expired`. |
+| `delete_books` | borrar | Borra libros (por id o título, hasta 50) como «Borrar» en la app. Subrayados, notas y mazos se conservan. |
 
 Organizar la biblioteca pide su propio permiso («Organizar mi biblioteca»). Cada libro tocado
 lleva el sello de su grupo (`shelvesAt`, `statusAt`, `metaAt`), así que un pase de página en otro
@@ -152,6 +153,14 @@ unos 12 MB. Máximo `MCP_UPLOAD_MAX_BYTES` (95 MB): Cloudflare corta las peticio
 100 MB en los planes Free y Pro; lo que pase de ahí se sube desde la app. El alta se deshace desde la app como los cambios de biblioteca. La portada la saca la
 app la primera vez que abre el libro. Código en `src/upload-tools.mjs` y
 `workers/sync/src/upload.js`.
+
+Borrar libros pide su propio permiso («Borrar libros»), desmarcado al crear el token. Hace lo
+mismo que «Borrar» en la app: deja la ficha de `library.json` como tombstone. Cada dispositivo,
+al bajarlo, suelta su copia, y el primero borra el fichero del sync. `books/<id>.json`
+(subrayados, notas, mazos) no se toca: el bookId es el hash del fichero, así que si se vuelve a
+subir el mismo libro, vuelve todo. El deshacer guarda la ficha entera y la app la repone. El
+fichero solo vuelve si sigue en el sync: si un dispositivo ya sincronizó y lo borró, el libro
+vuelve a la biblioteca sin fichero y hay que subirlo otra vez.
 
 Los artefactos se CREAN siempre (el Studio guarda el historial de cada tipo): mejorar un mapa
 es crear otro y borrar el viejo si sobra. Pasan por los mismos techos que los que genera la app

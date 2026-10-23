@@ -3,6 +3,21 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-10-23 — Un agente puede borrar libros por MCP
+
+La contraria de la subida. Permiso nuevo «Borrar libros» (scope `delete`), desmarcado al crear el
+token: los tokens que ya existen no pueden borrar.
+
+- **`delete_books`** (`mcp/src/library-tools.mjs`): hasta 50 libros por llamada, por id o título,
+  con `dry_run`. Hace lo mismo que «Borrar» en la app: la ficha de `library.json` queda como
+  tombstone; cada dispositivo suelta su copia y el primero borra el fichero del sync. Subrayados,
+  notas y mazos (`books/<id>.json`) se conservan y vuelven si se sube el mismo fichero.
+- **Deshacer** (Ajustes → Datos → Agentes): el cambio guarda la ficha entera, cifrada, y
+  `agent-undo.js` la repone sellada ahora para que gane al tombstone. El fichero vuelve solo si
+  sigue en el sync; si un dispositivo ya lo borró, el libro vuelve sin él.
+- Tests: `workers/sync/test/mcp-library.test.mjs` y dos casos de punta a punta en
+  `tests/bookreader-mcp.spec.ts` (deshacer antes y después de que el dispositivo sincronice).
+
 ## 2026-10-22 — Los enlaces de los PDF funcionan
 
 El lector de PDF pintaba la página y la capa de texto, pero nunca leía las anotaciones `/Link`: en

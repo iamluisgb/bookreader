@@ -171,3 +171,31 @@ test('reorder de una carpeta: «Libros» (solo existe por «Libros/…») se col
   const mixed = await tool(s.e, t, 'reorder_shelves', { order: ['Libros/Novela', 'Favoritos'] });
   assert.ok(mixed.isError && /mismo nivel/.test(mixed.text));
 });
+
+test('delete_books: permiso propio, dry_run sin rastro, tombstone como la app y la ficha entera en el deshacer', async () => {
+  const s = await seeded();
+  assert.ok(!(await toolNames(s.e, await s.token(['library', 'upload', 'write']))).includes('delete_books'));
+  const t = await s.token(['delete']);
+  assert.ok((await toolNames(s.e, t)).includes('delete_books'));
+
+  const dry = await tool(s.e, t, 'delete_books', { books: ['pedro'], dry_run: true });
+  assert.deepEqual(dry.json.deleted, [{ bookId: BOOK_2.id, title: 'Pedro Páramo', author: 'Juan Rulfo' }]);
+  assert.equal((await s.readLib()).books[BOOK_2.id].deleted, false);
+  assert.equal((await s.changes()).length, 0);
+
+  const d = await tool(s.e, t, 'delete_books', { bookIds: [BOOK_1.id] });
+  assert.equal(d.isError, false, d.text);
+  const b = (await s.readLib()).books[BOOK_1.id];
+  assert.equal(b.deleted, true);
+  assert.ok(b.deletedAt > 10 && b.updatedAt === b.deletedAt);
+  assert.equal(b.author, undefined);   // como deleteBook: el tombstone no lleva metadatos
+  const [ch] = await s.changes();
+  assert.deepEqual(ch.summary, { booksDeleted: 1 });
+  const u = (await s.undoOf(d.json.changeId)).value;
+  assert.equal(u.restore[BOOK_1.id].author, 'Kleppmann');
+  assert.deepEqual(u.restore[BOOK_1.id].shelfIds, ['sh_tec']);
+  // Ya borrado: no se borra dos veces.
+  const again = await tool(s.e, t, 'delete_books', { bookIds: [BOOK_1.id] });
+  assert.ok(again.isError && /ningún libro/.test(again.text));
+  assert.ok(!(await tool(s.e, t, 'list_books', {})).json.books.some((x) => x.id === BOOK_1.id));
+});

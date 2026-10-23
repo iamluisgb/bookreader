@@ -12,6 +12,7 @@
 import * as BRAuth from './bookreader-auth.js';
 import * as C from './sync-crypto.js';
 import * as LibStore from '../library/store.js';
+import * as Provider from './provider.js';
 
 const undoPath = (changeId) => 'bookreader/undo/' + changeId;   // como mcp.js · undoPath
 
@@ -65,6 +66,20 @@ export async function applyUndo(undo, now = Date.now()) {
       return patch;
     });
     if (r) books++;
+  }
+  // Libros que borró el agente (delete_books): la ficha entera, sellada ahora para que gane al
+  // tombstone en el merge. El fichero solo si sigue en el sync; si no, `blob` vacío: el
+  // dispositivo que aún lo tenga lo vuelve a subir, y si no lo tiene nadie, queda la ficha.
+  for (const [id, prev] of Object.entries((undo && undo.restore) || {})) {
+    const cur = await LibStore.getRaw(id);
+    const path = (cur && !cur.deleted && cur.blob && cur.blob.path) || (prev.blob && prev.blob.path) || null;
+    let blob = null;
+    if (path) {
+      try { if (await Provider.exists(path)) blob = (cur && !cur.deleted && cur.blob) || prev.blob; } catch { /* sin red: se repone sin él */ }
+    }
+    const base = cur && !cur.deleted ? cur : { ...prev, id };
+    await LibStore.putBook({ ...base, id, blob, deleted: false, deletedAt: 0, updatedAt: now }, { stamp: false });
+    books++;
   }
   return { books, shelves };
 }

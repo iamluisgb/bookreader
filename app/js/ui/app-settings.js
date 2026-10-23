@@ -1682,6 +1682,7 @@ function wireBookReaderSync(content, show) {
             (tk.scopes || []).includes('text') ? t('con el texto de los libros') : '',
             (tk.scopes || []).includes('library') ? t('organiza la biblioteca') : '',
             (tk.scopes || []).includes('upload') ? t('sube libros') : '',
+            (tk.scopes || []).includes('delete') ? t('borra libros') : '',
             tk.lastUsedAt ? t('usado {when}', { when: ago(tk.lastUsedAt) }) : t('sin usar todavía'),
             t('caduca el {date}', { date: day(tk.expiresAt) }),
           ].filter(Boolean).join(' · '))}</div>
@@ -1739,6 +1740,7 @@ function wireBookReaderSync(content, show) {
     if (!changes.length) return;
     const what = (sm) => [
       sm.booksAdded ? t('{n} libros subidos', { n: sm.booksAdded }) : '',
+      sm.booksDeleted ? t('{n} libros borrados', { n: sm.booksDeleted }) : '',
       sm.books ? t('{n} libros', { n: sm.books }) : '',
       sm.shelvesCreated ? t('{n} estanterías nuevas', { n: sm.shelvesCreated }) : '',
       sm.shelvesChanged ? t('{n} estanterías cambiadas', { n: sm.shelvesChanged }) : '',
@@ -1888,6 +1890,7 @@ function wireBookReaderSync(content, show) {
           { value: 'text', label: t('Leer el texto de mis libros') },
           { value: 'library', label: t('Organizar mi biblioteca: estanterías, estado y títulos de los libros') },
           { value: 'upload', label: t('Subir libros (EPUB y PDF) a mi biblioteca') },
+          { value: 'delete', label: t('Borrar libros de mi biblioteca (no sus subrayados ni notas)') },
         ] },
       ],
     });

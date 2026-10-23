@@ -41,7 +41,7 @@ const LICENSE_RECHECK_MS = DAY;
 const LAST_USED_EVERY_MS = 60 * 60 * 1000;   // `last_used_at` se escribe como mucho una vez por hora
 const PROTOCOLS = ['2025-06-18', '2025-03-26', '2024-11-05'];
 // Permisos de un token. 'read' va siempre; los otros, solo si el usuario los marca al crearlo.
-export const SCOPES = ['read', 'write', 'text', 'library', 'upload'];
+export const SCOPES = ['read', 'write', 'text', 'library', 'upload', 'delete'];
 const CHANGES_KEPT_DAYS = 30;
 const UNDO_MAX_BYTES = 512 * 1024;
 const WRITE_RETRIES = 3;
@@ -58,7 +58,7 @@ const SERVER_INFO = { name: 'bookreader', title: 'BookReader', version: '1.0.0' 
 const INSTRUCTIONS = [
   'Lee la biblioteca de BookReader del usuario: libros, subrayados, notas de libreta, estadísticas',
   'de lectura, mazos de estudio y lo creado con el agente de la app. Lo que puede cambiar',
-  '(mazos, estanterías, subir libros) depende de los permisos del token: lo dicen las tools.',
+  '(mazos, estanterías, subir o borrar libros) depende de los permisos del token: lo dicen las tools.',
   'Empieza por `list_books` para conocer los bookIds; `get_highlights` y `get_notes` aceptan',
   'también `book` con parte del título. Para preguntar a toda la biblioteca («¿qué tenemos sobre',
   'X?»), `search_library` (si el token puede leer el texto de los libros).',
@@ -400,10 +400,11 @@ export async function mcpRoute(request, env, { resourceMetadata = null } = {}) {
   const canWrite = who.scopes.has('write') && !who.readOnly;
   const canOrganize = who.scopes.has('library') && !who.readOnly;
   const canUpload = who.scopes.has('upload') && !who.readOnly;
+  const canDelete = who.scopes.has('delete') && !who.readOnly;
   const reads = [];
-  const provider = r2Provider(env, who.user, who.raw, { canWrite: canWrite || canOrganize || canUpload, agent: { tokenId: who.tokenId, name: who.name }, trace: reads });
+  const provider = r2Provider(env, who.user, who.raw, { canWrite: canWrite || canOrganize || canUpload || canDelete, agent: { tokenId: who.tokenId, name: who.name }, trace: reads });
   const source = createDriveSource({ provider, kind: 'bookreader', cacheMs: 60000 });
-  Object.assign(source, { canWrite, canOrganize, canUpload, canReadText: who.scopes.has('text'), agentName: who.name });
+  Object.assign(source, { canWrite, canOrganize, canUpload, canDelete, canReadText: who.scopes.has('text'), agentName: who.name });
   if (canUpload) source.uploads = uploadsFor(env, who, source, new URL(request.url).origin);
   let limited = 0;
   if (env.MCP_CALLS) {
