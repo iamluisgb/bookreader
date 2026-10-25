@@ -64,6 +64,28 @@ function pickChapter(chapters, arg) {
   throw new ToolError(hits.length ? `«${arg}» casa con varios capítulos: ${list}.` : `Ningún capítulo se llama «${arg}». Hay: ${list}.`);
 }
 
+// El texto de UN capítulo para quien escribe (write-tools: la cita de una pregunta con opciones
+// tiene que estar en el capítulo, y el `src` de una tarjeta, ser uno de sus pasajes). `null` si
+// el libro no tiene texto en el sync o el capítulo no se encuentra: decide quien llama.
+export async function chapterText(source, bookId, chapter) {
+  if (!source.canReadText || !source.bookText) return null;
+  const toc = await source.bookText(bookId);
+  if (!toc || toc.v !== TEXT_FORMAT || !Array.isArray(toc.chapters) || !toc.chapters.length) return null;
+  let ci;
+  try { ci = pickChapter(toc.chapters, chapter); } catch { return null; }
+  const ch = toc.chapters[ci];
+  const next = toc.chapters[ci + 1];
+  const raw = await source.bookTextFile(bookId, 'p' + ch.part + '.txt');
+  if (raw === null) return null;
+  const anchors = new Set();
+  const texts = [];
+  for (const l of chapterLines(raw, ch.from, next && next.part === ch.part ? next.from : null)) {
+    const m = LINE.exec(l);
+    if (m) { anchors.add(m[1]); texts.push(m[2]); }
+  }
+  return { title: ch.title, text: texts.join('\n'), anchors };
+}
+
 const BOOK_PROPS = {
   bookId: { type: 'string', description: 'Id del libro (de `list_books`).' },
   book: { type: 'string', description: 'O el título del libro (o parte).' },

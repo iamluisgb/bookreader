@@ -115,7 +115,7 @@ node cli.mjs --dir ~/bookreader-layout reading_stats '{"range":"7d"}'
 | `read_chapter` | texto | Un capítulo por páginas (~6000 palabras; `offset`/`nextOffset`), con las anclas `[[aN]]` de la app. |
 | `search_book` | texto | Los pasajes que mejor responden a una búsqueda (BM25), con ancla y capítulo. |
 | `search_library` | texto | Busca en TODOS los libros a la vez (índice que construye la app, IA10): los libros que mejor tratan el tema con sus pasajes, varias formulaciones (`queries`), filtro por estantería y `notSearched`. |
-| `add_cards` | escritura | Tarjetas nuevas (basic o cloze) en un mazo, validadas como en la app. |
+| `add_cards` | escritura | Tarjetas nuevas (basic, cloze o mcq) en un mazo, validadas como en la app; la cita de una mcq y el `src` se comprueban contra el texto del capítulo. |
 | `update_cards` | escritura | Cambia anverso, reverso, tipo, capítulo o suspensión. **El repaso se conserva.** |
 | `delete_cards` | escritura | Borra tarjetas (tombstone: el borrado llega a todos los dispositivos). |
 | `create_deck` | escritura | Un mazo nuevo para un libro o capítulo, con sus primeras tarjetas si se quiere. |
