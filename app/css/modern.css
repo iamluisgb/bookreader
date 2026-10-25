@@ -1584,6 +1584,14 @@ body:not(.ai-open) #ai-panel { box-shadow: none; }
 .studio-generated { background: var(--surface-1); border-radius: var(--r-md); }
 .studio-generated + .studio-generated { margin-top: 6px; }
 .studio-del { border-left: none; }
+/* P43 · Botón de la matriz en la fila del mazo: icono y palabra, porque solo el icono no se
+   entendía como «practicar». Mismo acento que «Estudiar», que es la otra acción de la fila. */
+.studio-practice {
+  flex: none; display: inline-flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 2px; padding: 0 var(--s-2); background: none; border: none; cursor: pointer;
+  color: var(--accent); font-size: var(--fs-xs); font-weight: 600;
+}
+.studio-practice:hover { background: var(--surface-3); }
 
 /* Aviso de una vez (coachmark): tinta, como un tooltip del sistema. */
 .ai-coachmark { border-radius: var(--r-md); }

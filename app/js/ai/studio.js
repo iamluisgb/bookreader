@@ -101,12 +101,22 @@ function deckRow(d) {
   const s = deckSummary(d);
   const label = d.scope || d.name || t('Mazo');
   const meta = t(s.total === 1 ? '{n} tarjeta · {m} para hoy' : '{n} tarjetas · {m} para hoy', { n: s.total, m: s.due });
+  // P43 · Las matrices del mazo (deck.exercises), una por botón y en orden de creación: antes
+  // solo se llegaba a ellas por «Nuevo» → lista de mazos del generador, y nadie las encontraba.
+  const matrices = DB.exercisesOf(d).slice().sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+  const practice = matrices.map((ex, i) => {
+    const name = (ex.spec && ex.spec.title) || t('Matriz');
+    // Con dos o más, numeradas: dos «Matriz» iguales no se distinguen (el título va en el title).
+    const label = matrices.length > 1 ? `${t('Matriz')} ${i + 1}` : t('Matriz');
+    return `<button class="studio-practice" data-act="practice" data-deck="${escapeHtml(String(d.id))}" data-ex="${escapeHtml(String(ex.uid || ''))}" title="${escapeHtml(t('Practicar la matriz: {title}', { title: name }))}" aria-label="${escapeHtml(t('Practicar la matriz: {title}', { title: name }))}">${icon('grid', { size: 'md' })}<span>${label}</span></button>`;
+  }).join('');
   return `<div class="studio-card studio-generated">
     <button class="studio-card-main" data-act="study" data-deck="${escapeHtml(String(d.id))}" title="${t('Estudiar')}">
       <span class="studio-deck-name">${escapeHtml(label)}</span>
       <span class="studio-meta">${meta}</span>
       <span class="studio-deck-go">${icon('cards', { size: 'sm' })} ${t('Estudiar')}</span>
     </button>
+    ${practice}
     <button class="studio-del" data-act="del-deck" data-deck="${escapeHtml(String(d.id))}" title="${t('Borrar')}" aria-label="${t('Borrar este mazo')}">${icon('trash', { size: 'md' })}</button>
   </div>`;
 }
@@ -205,6 +215,14 @@ async function onClick(e) {
   if (act === 'gen') { openFn(kind, { mode: 'setup' }); return; }
   if (act === 'cancel') { Jobs.cancel(); render(); return; }
   if (act === 'retry') { const j = Jobs.activeJob(); if (j) Jobs.retry(j); return; }
+  if (act === 'practice') {
+    // Se relee el mazo (el resultado de la última vez puede venir de otro dispositivo).
+    const list = await DB.getDecks(ctx.bookId);
+    const deck = list.find(x => x.id === deckId);
+    const ex = deck && DB.exercisesOf(deck).find(x => x.uid === btn.dataset.ex);
+    if (ex) (await import('./widgets/practice.js')).open({ deck, exercise: ex, onClose: () => render() });
+    return;
+  }
   if (act === 'study') {
     // Se relee el mazo de IndexedDB (fresco, con el SRS al día) y se estudia SOLO ese.
     DB.getDecks(ctx.bookId).then(list => {

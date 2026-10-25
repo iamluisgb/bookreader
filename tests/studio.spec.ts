@@ -341,3 +341,40 @@ test('Studio: sin mazos, el tile de Flashcards sigue siendo la invitación vací
   await expect(group.locator('.studio-new[data-kind="flashcards"]')).toHaveCount(0);
   await expect(group.locator('.studio-card.studio-generated')).toHaveCount(0);
 });
+
+test('Studio: un mazo con matrices enseña un botón «Matriz» por cada una y abre la que se pulsa', async ({ page }) => {
+  await setupEs(page);
+  const bookId = await currentBookId(page);
+  await page.evaluate(async (bookId: string) => {
+    const DB: any = await import('/js/ai/db.js');
+    const spec = (title: string, createdAt: number) => ({ type: 'matrix', spec: {
+      type: 'matrix', version: 1, bookId, chapter: 'Capítulo 1', title, prompt: 'Compara',
+      rows: [{ id: 'r1', label: 'Fila 1' }, { id: 'r2', label: 'Fila 2' }],
+      columns: [{ id: 'c1', label: 'Col 1', options: ['Sí', 'No'] }],
+      cells: [
+        { row: 'r1', col: 'c1', answer: 'Sí', why: 'porque sí', cite: { quote: 'una cita del libro' } },
+        { row: 'r2', col: 'c1', answer: 'No', why: 'porque no', cite: { quote: 'otra cita del libro' } },
+      ] }, createdAt, last: null });
+    await DB.addDeck({ bookId, name: 'Libro', cardType: 'basic', scope: 'Capítulo 1',
+      cards: [{ type: 'basic', front: 'a', back: 'b', chapter: '' }],
+      exercises: [spec('Aislamiento', 1), spec('Serializabilidad', 2)] });
+    await DB.addDeck({ bookId, name: 'Libro', cardType: 'basic', scope: 'Capítulo 2',
+      cards: [{ type: 'basic', front: 'c', back: 'd', chapter: '' }] });
+  }, bookId);
+
+  await page.click('.ai-tab[data-view="studio"]');
+  const rows = flashGroup(page).locator('.studio-card.studio-generated');
+  const withMatrix = rows.filter({ hasText: 'Capítulo 1' });
+  await expect(withMatrix.locator('[data-act="practice"]')).toHaveCount(2);
+  await expect(withMatrix.locator('[data-act="practice"]').first()).toHaveAttribute('title', 'Practicar la matriz: Aislamiento');
+  await expect(withMatrix.locator('[data-act="practice"]')).toHaveText(['Matriz 1', 'Matriz 2']);
+  await expect(rows.filter({ hasText: 'Capítulo 2' }).locator('[data-act="practice"]')).toHaveCount(0);
+
+  await withMatrix.locator('[data-act="practice"]').nth(1).click();
+  const practice = page.locator('#ai-practice');
+  await expect(practice).toBeVisible();
+  await expect(practice.locator('.wgt-title')).toHaveText('Serializabilidad');
+  await practice.locator('.ai-ob-close').click();
+  await expect(practice).toHaveCount(0);
+  await expect(flashGroup(page).locator('.studio-card.studio-generated')).toHaveCount(2);
+});

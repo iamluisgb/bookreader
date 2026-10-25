@@ -1713,6 +1713,8 @@ const EN = {
   'Las tarjetas están; la matriz no salió: {err}': 'The cards are ready; the matrix failed: {err}',
   'matriz para practicar': 'matrix to practice',
   'Practicar la matriz': 'Practice the matrix',
+  'Practicar la matriz: {title}': 'Practice the matrix: {title}',
+  'Matriz': 'Matrix',
   'Practicar': 'Practice',
   'La última vez: {n} de {total}': 'Last time: {n} of {total}',
   '{n} tarjetas al mazo con lo que fallaste o dudaste: vuelven en el repaso.': '{n} cards added to the deck from what you missed or doubted: they come back in review.',
