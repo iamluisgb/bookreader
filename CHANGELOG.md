@@ -3,6 +3,25 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-10-25 — El MCP crea preguntas con opciones y enlaza cada tarjeta a su pasaje
+
+Hasta ahora un agente solo podía crear tarjetas `basic` y `cloze`, y todas se guardaban con `src`
+vacío: en el repaso no tenían «Ver el pasaje del libro».
+
+- **`type: 'mcq'`** en `add_cards` y `create_deck` (`mcp/src/write-tools.mjs`): la pregunta con
+  opciones de P43 F4, con la forma que guarda la app (`widgets/practice.js · mcqCard`) y validada
+  con su mismo `validateMcqItem`. La cita (`quote`) se busca con `verifyQuotes` en el texto del
+  capítulo **antes** de escribir: si no está, o el token no tiene permiso de texto, la pregunta no
+  entra. No se editan con `update_cards`, como las visuales.
+- **`src`** en todas las tarjetas: un ancla `aN` de `read_chapter`, comprobada contra los pasajes
+  de su capítulo. `update_cards` la cambia sin tocar el repaso. Helper nuevo `chapterText` en
+  `mcp/src/text-tools.mjs`.
+- Tests: `workers/sync/test/mcp-write-mcq.test.mjs` (cita inventada, cita de otro capítulo, dos
+  correctas, sin feedback, sin permiso de texto, `src` de otro capítulo). `test:sync` 75/75 y
+  `test:mcp` 122/122.
+- Desplegado `bookreader-sync`, versión `bf72a2ed-264b-44ef-b85f-7c4aeb0847ba`. Primer uso: mazos
+  de los capítulos 1–11 de DDIA (223 tarjetas, 36 preguntas con opciones, todas con pasaje).
+
 ## 2026-10-23 — Un agente puede borrar libros por MCP
 
 La contraria de la subida. Permiso nuevo «Borrar libros» (scope `delete`), desmarcado al crear el
