@@ -2837,7 +2837,7 @@ en esas tarjetas en el siguiente repaso. Time-box: 2 ciclos de prompt para el ma
 **Riesgo:** que se sienta como un examen al abrir el capítulo. Se mitiga con una sola línea, nunca un
 modal, y con apagarlo en un toque.
 
-### P53 — El MCP lee intentos y ejercicios: medir el estudio desde fuera · `S`
+### P53 — El MCP lee intentos y ejercicios: medir el estudio desde fuera · `S` · **✓ (2026-10-25, ver CHANGELOG)**
 
 **El hueco.** Todas las decisiones abiertas del grupo de aprendizaje dependen del uso real: si las
 preguntas con opciones se aciertan siempre (P43 F4), cuántas matrices pedidas se hacen (P43 F3), si
