@@ -2508,6 +2508,31 @@ antes de implementar)*
 como ejercicio), **1 · predice y comprueba**, y **3 · ordena** y **4 · números** según el uso de la
 matriz. Los tipos 1–4 son ejercicios del mazo (ADR-058); 5 y 6 son tarjetas.
 
+**Revisión (2026-10-25): la generación está resuelta; falta saber si enseñan.**
+- **Hecho:** carcasa, tipos 2 y 5 con su contrato de generación cumplido (95 % y 86 % de specs
+  válidos a la primera), superficie en el menú de flashcards, la matriz ofrecida al terminar un
+  capítulo y las tarjetas nuevas que esperan a que se lea su capítulo.
+- **Sin dato de uso.** Las dos preguntas que el propio ítem deja al uso real («cuántas matrices
+  pedidas se hacen» y «acierto a la primera en las preguntas con opciones; si ronda el 100 %, no
+  enseñan») no tienen respuesta. Mirado por el MCP el 2026-10-25, la única biblioteca real (la de
+  Luis) tiene 18 mazos y **ninguna tarjeta `mcq`**. El mazo más reciente (DDIA, cap. 8, 37 tarjetas)
+  tiene la mayoría con 0–1 repasos y vencidas desde el ~20-oct. El MCP no expone `deck.exercises`
+  ni `attempts`, así que de las matrices no se sabe nada desde fuera: eso lo arregla
+  [P53](#p53--el-mcp-lee-intentos-y-ejercicios-medir-el-estudio-desde-fuera--s).
+- **El tipo con más evidencia sigue sin hacer.** La investigación ponía primero «predice y
+  comprueba» (comprometerse antes de ver: 22 % → 30 % de explicaciones correctas). Se adelantó el 5
+  por el vertical opositor. Es razonable, pero el diferencial frente a NotebookLM sigue siendo el 1.
+- **Reglas de la investigación que faltan:** la 4 (si el lector falla más de la mitad, bajar un
+  escalón o dar el ejemplo resuelto) y la 5 (volver con **otra variante**). Hoy la pregunta con
+  opciones vuelve igual, solo barajada, y la matriz se rehace entera (F3 «queda» a).
+- **Las dos señales «a ciegas» (82 % en matriz, 97 % en opciones)** dicen que un modelo fuerte las
+  responde sin el capítulo. No prueban que un lector también: la medida buena es el acierto a la
+  primera de lectores reales, y para eso hace falta uso.
+- **Orden propuesto:** P53 (medir) → usar la matriz y las opciones dos semanas en libros reales
+  → con datos, la regla 5 (variantes) en las preguntas con opciones, que es barata → tipo 1 junto con
+  [P50](#p50--el-modelo-del-libro-un-diagrama-base-que-vuelve--m--singapur-bar-model--después-de-p49).
+  Los tipos 3 y 4, después del 1.
+
 ### P44 — Análisis del estudio: retención real, memoria por libro, carga y FSRS personal · `M` · **✓ entregada (2026-10-18)** · F1–F5
 
 Investigación y propuesta: [`docs/INVESTIGACION_ANALISIS.md`](docs/INVESTIGACION_ANALISIS.md). La
@@ -2668,6 +2693,10 @@ que esta épica dice que falta (tú produces, él comprueba).
 > no aplica a un lector adulto: los exámenes de alto riesgo, la cultura de academias y la lectura
 > guiada de STELLAR. Quedan cuatro piezas. Las dos primeras son de **representación** (cómo se explica)
 > y las dos últimas de **secuencia** (qué se practica y cuándo).
+>
+> **Orden (2026-10-25, tras revisar P43):** P53 primero, porque sin medir no se puede decidir nada
+> de lo demás. Luego P49 (barato, se nota en cada respuesta) y P51 (usa lo que ya está hecho). P50
+> va con el tipo 1 de P43. P52 queda para cuando haya fallos que avisar: hoy el repaso está parado.
 
 ### P49 — Escalera concreto → dibujo → definición en «Explícame» · `S` · **Singapur (CPA)**
 
@@ -2724,6 +2753,9 @@ no comparten nada. El lector tiene que volver a leer cada dibujo.
   ensayo de ideas sueltas), así que «no hay» es una respuesta válida y no se inventa uno.
 - **F2** `M`: con modelo, el escalón 2 de P49 y los widgets 1 y 3 parten de él: se resaltan nodos o
   aristas en vez de dibujar otro diagrama. El spec lleva `{ base: 'book-model', highlight: [...] }`.
+  **El sitio natural es el tipo 1 de P43 (predice y comprueba)**, que necesita un escenario con
+  actores y una traza. Si se construye el tipo 1, el modelo del libro es su escenario y se hacen
+  juntos, no en dos ítems.
 - **F3**, si F2 funciona: tarjetas visuales ([P35](#p35--tarjetas-visuales-lo-que-quedó-pendiente-de-la-primera-entrega--m-acumulado))
   sobre el modelo: «¿qué nodo falla aquí?».
 
@@ -2735,7 +2767,7 @@ Time-box: 2 ciclos.
 **Riesgo:** forzar un modelo a un libro que no lo tiene. El control negativo del contrato existe para
 eso.
 
-### P51 — Pocas ideas grandes y tarjetas que suben de nivel · `M` · **Singapur (espiral)** · *depende de [P42](#p42--el-ajuste-que-sobrevive-registro-de-intentos-y-corrección-propia-tras-el-fallo--m--práctica-deliberada)*
+### P51 — Pocas ideas grandes y tarjetas que suben de nivel · `M` · **Singapur (espiral)** · *sobre P42 F1 y P43, ya entregados*
 
 **Qué es.** Dos ideas del currículo de Singapur. «Teach Less, Learn More» (2004): menos temas, más a
 fondo. Y la espiral de Bruner: el mismo concepto vuelve más tarde, pero con más dificultad. FSRS ya
@@ -2747,17 +2779,20 @@ sigue pidiendo lo mismo.
    editables por el lector. El plan por capítulo ([`card-plan.js`](app/js/ai/card-plan.js)) las
    usa como criterio: una tarjeta de detalle que no cuelga de ninguna idea grande baja de
    prioridad. Esto es el «menos temas» aplicado al mazo, que hoy crece con cada dato del libro.
-2. **Escalera por idea** `M`: recordar → aplicar (widget 1 o 4) → transferir (un caso fuera del
-   libro). Cuando FSRS da por estables las tarjetas de recordar de una idea (estabilidad por encima
+2. **Escalera por idea** `M`: recordar → aplicar → transferir (un caso fuera del libro). El
+   escalón de aplicar **ya existe**: la pregunta con opciones de P43 F4 se genera como pregunta de
+   aplicación y la matriz contrasta conceptos. No hay que esperar a los tipos 1 y 4. Cuando FSRS da por estables las tarjetas de recordar de una idea (estabilidad por encima
    de un umbral), el siguiente repaso de esa idea es un ejercicio del nivel siguiente. Si se falla,
    se baja un escalón y no se reinicia la tarjeta.
 3. **Se ve en el análisis** `S`: por libro, en qué escalón está cada idea grande
    ([P44](#p44--análisis-del-estudio-retención-real-memoria-por-libro-carga-y-fsrs-personal--m---entregada-2026-10-18--f1f5)).
    Es una medida de dominio más honesta que «tarjetas al día».
 
-**Por qué depende de P42.** El escalón de una idea se calcula con los intentos registrados, y hoy
-el intento se borra en cada tarjeta. P42 ya menciona los «niveles de práctica» como el uso futuro
-del campo `mode`. Este ítem es esa razón de producto.
+**Lo que ya está hecho (P42 F1).** El store `attempts` registra cada intento con `mode`
+(`reveal`, `written`, `choice`, `widget`), `verdict` y `exact`, y viaja por sync. P42 lo dejó escrito
+como «sustrato de los niveles de práctica: se registra, no se usa todavía». Este ítem es el que lo
+usa. Lo nuevo es la **idea grande** como clave común a tarjetas, preguntas con opciones y celdas de
+matriz, para poder decir «de esta idea recuerdas y aplicas, pero no transfieres».
 
 **Contrato (EV5, antes de la pieza 2).** Baseline: tras P42, % de intentos de aplicación (widgets)
 acertados sobre ideas cuyas tarjetas de recuerdo están estables. Métrica primaria: con la escalera
@@ -2801,6 +2836,29 @@ en esas tarjetas en el siguiente repaso. Time-box: 2 ciclos de prompt para el ma
 
 **Riesgo:** que se sienta como un examen al abrir el capítulo. Se mitiga con una sola línea, nunca un
 modal, y con apagarlo en un toque.
+
+### P53 — El MCP lee intentos y ejercicios: medir el estudio desde fuera · `S`
+
+**El hueco.** Todas las decisiones abiertas del grupo de aprendizaje dependen del uso real: si las
+preguntas con opciones se aciertan siempre (P43 F4), cuántas matrices pedidas se hacen (P43 F3), si
+la escalera de P51 sube o se atasca y si los avisos de P52 llevan a repasar. Los datos ya existen y
+ya viajan por sync (`attempts` y `deck.exercises`, en
+[`sync/layout.js`](app/js/sync/layout.js)), pero el MCP no los enseña: `get_deck` devuelve tarjetas
+y su `srs`, y nada más. Hoy, para saber si un widget enseña, hay que abrir la app y mirar Análisis a
+mano.
+
+**Qué hacer.**
+- `get_attempts` (solo lectura): intentos por libro o mazo y rango, con `mode`, `verdict`, `exact`,
+  `grade` y `latencyMs`. `answer` solo si el token puede leer texto.
+- `get_deck` añade `exercises` (tipo, capítulo, «la última vez: k de n», fecha).
+- Un resumen ya calculado: acierto a la primera por `mode` y por tipo de widget, y matrices
+  generadas frente a hechas.
+
+**Por qué ahora.** Cuesta poco y convierte cada pregunta pendiente de P43 en algo que un agente
+puede responder en una llamada. Sin esto, los contratos de P49-P52 se miden a ojo.
+
+**Fuera, a propósito:** escribir intentos desde el MCP. Un intento lo hace el lector; si un agente
+pudiera escribirlos, la medida dejaría de valer.
 
 ### P21 — Vertical opositor: del estudio al examen · `L` · **el nicho que [`LAUNCH_PLAN.md`](LAUNCH_PLAN.md#L75) señala**
 
