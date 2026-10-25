@@ -50,6 +50,8 @@ function bookText() {
 const ATTEMPTS = [
   { uid: 't1', cardUid: 'c1', deckUid: DECK_UID, bookId: BOOK_1.id, ts: 1000, mode: 'written', verdict: 'wrong', exact: null, grade: 1, answer: 'no sé' },
   { uid: 't2', cardUid: 'c1', deckUid: DECK_UID, bookId: BOOK_1.id, ts: 2000, mode: 'written', verdict: 'good', exact: null, grade: 3, answer: 'dos médicos' },
+  { uid: 't4', cardUid: 'c1', deckUid: DECK_UID, bookId: BOOK_1.id, ts: 2500, mode: 'reveal', verdict: null, exact: null, grade: 'again' },
+  { uid: 't5', cardUid: 'c1', deckUid: DECK_UID, bookId: BOOK_1.id, ts: 2600, mode: 'reveal', verdict: null, exact: null, grade: 'good' },
   { uid: 't3', cardUid: null, deckUid: null, bookId: BOOK_1.id, ts: 3000, mode: 'widget', verdict: 'partial', exact: false, cardHash: 'deadbeef', widget: { type: 'matrix', correct: 3, total: 4 } },
 ];
 
@@ -237,16 +239,18 @@ test('get_attempts: resumen por modo con el acierto a la primera, matrices hecha
   const rw = await s.token(['write', 'text']);
   const all = await tool(s.e, rw, 'get_attempts', { bookId: BOOK_1.id });
   assert.ok(!all.isError, all.text);
-  assert.equal(all.json.total, 3);
+  assert.equal(all.json.total, 5);
+  const rv = all.json.summary.byMode.reveal;
+  assert.deepEqual([rv.attempts, rv.judged, rv.correct], [2, 2, 1], 'la nota llega en texto, como la guarda study.js');
   const w = all.json.summary.byMode.written;
   assert.deepEqual([w.attempts, w.correct, w.correctRate], [2, 1, 50]);
   assert.deepEqual([w.firstTry.cards, w.firstTry.correct, w.firstTry.rate], [1, 0, 0], 'el primer intento de c1 fue fallado');
   assert.deepEqual(all.json.summary.matrixCells, { correct: 3, total: 4, rate: 75 });
   assert.equal(all.json.attempts[0].ts, 3000, 'los más recientes primero');
-  assert.equal(all.json.attempts.find((a) => a.cardUid === 'c1').answer, 'dos médicos');
+  assert.equal(all.json.attempts.find((a) => a.mode === 'written' && a.ok).answer, 'dos médicos');
 
   const del = await tool(s.e, rw, 'get_attempts', { bookId: BOOK_1.id, deckUid: DECK_UID });
-  assert.equal(del.json.total, 2, 'con mazo: sus tarjetas y solo las matrices de ese mazo');
+  assert.equal(del.json.total, 4, 'con mazo: sus tarjetas y solo las matrices de ese mazo');
   await tool(s.e, rw, 'add_exercise', { bookId: BOOK_1.id, deckUid: DECK_UID, ...MATRIX });
   assert.deepEqual((await tool(s.e, rw, 'get_attempts', { bookId: BOOK_1.id, deckUid: DECK_UID, limit: 0 })).json.summary.exercises.generated, 1);
 

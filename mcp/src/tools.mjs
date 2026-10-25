@@ -517,11 +517,14 @@ function exerciseRow(e) {
 
 // Si un intento salió bien, según su modo: `choice` y `widget` por la corrección exacta,
 // `written` por el veredicto del agente, `reveal` por la nota que se puso el propio lector
-// (autoevaluado: se dice aparte en el resumen).
+// (autoevaluado: se dice aparte en el resumen). La nota es la de FSRS en texto (study.js:
+// again · hard · good · easy); «hard» es recordar con esfuerzo, así que cuenta como acierto,
+// como en Anki.
+const GRADE_OK = { again: false, hard: true, good: true, easy: true };
 function attemptOk(a) {
   if (a.mode === 'choice' || a.mode === 'widget') return a.exact === true;
   if (a.mode === 'written') return a.verdict === 'good';
-  if (a.mode === 'reveal') return typeof a.grade === 'number' ? a.grade >= 3 : null;
+  if (a.mode === 'reveal') return a.grade in GRADE_OK ? GRADE_OK[a.grade] : null;
   return null;
 }
 
@@ -592,7 +595,7 @@ const GET_ATTEMPTS = {
       m.correctRate = rate(m.correct, m.judged);
       m.firstTry.rate = rate(m.firstTry.correct, m.firstTry.cards);
     }
-    if (byMode.reveal) byMode.reveal.note = 'autoevaluado: la nota (3 o 4) la pone el propio lector';
+    if (byMode.reveal) byMode.reveal.note = 'autoevaluado: la nota (hard, good o easy cuentan como acierto) la pone el propio lector';
     const cells = all.filter((a) => a.mode === 'widget' && a.widget).reduce((s, a) => ({ correct: s.correct + (a.widget.correct || 0), total: s.total + (a.widget.total || 0) }), { correct: 0, total: 0 });
     const done = new Set(all.filter((a) => a.mode === 'widget').map((a) => a.cardHash));
     const exercises = [...exByHash.entries()].map(([h, { e, deckUid: du }]) => ({ uid: e.uid || null, deckUid: du, chapter: (e.spec && e.spec.chapter) || null, done: done.has(h) }));
