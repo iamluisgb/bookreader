@@ -20,6 +20,7 @@ import { LIBRARY_SEARCH_TOOLS } from './library-search.mjs';
 import { ARTIFACT_TOOLS } from './artifact-tools.mjs';
 import { LIBRARY_TOOLS } from './library-tools.mjs';
 import { UPLOAD_TOOLS } from './upload-tools.mjs';
+import { specHash } from '../../app/js/ai/widgets/core.js';
 
 const LIMIT_DEFAULT = 50;
 const LIMIT_MAX = 500;
@@ -123,6 +124,9 @@ function cardRow(c) {
     back: c.back || '',
     chapter: c.chapter || null,
     src: c.src || null,
+    ...(c.type === 'mcq' && Array.isArray(c.options)
+      ? { options: c.options.map((o) => ({ text: o.text, correct: Boolean(o.correct), feedback: o.feedback || '' })), quote: c.quote || null }
+      : {}),
     suspended: Boolean(c.suspended),
     srs: c.srs
       ? {
@@ -485,6 +489,141 @@ const GET_DECK = {
       returned: page.length,
       truncated: cards.length > page.length,
       cards: page,
+      exercises: liveExercises(deck).map(exerciseRow),
+    };
+  },
+};
+
+// Los ejercicios del mazo (P43, ADR-058: la matriz vive en `deck.exercises`, no es tarjeta).
+function liveExercises(deck) {
+  return (Array.isArray(deck.exercises) ? deck.exercises : []).filter((e) => e && !e.deleted && e.spec);
+}
+function exerciseRow(e) {
+  const sp = e.spec || {};
+  return {
+    uid: e.uid || null,
+    type: e.type || sp.type || null,
+    chapter: sp.chapter || null,
+    title: sp.title || null,
+    rows: Array.isArray(sp.rows) ? sp.rows.map((r) => r.label) : [],
+    columns: Array.isArray(sp.columns) ? sp.columns.map((c) => c.label) : [],
+    cells: Array.isArray(sp.cells) ? sp.cells.length : 0,
+    given: Array.isArray(sp.cells) ? sp.cells.filter((c) => c.given).length : 0,
+    last: e.last ? { correct: e.last.correct, total: e.last.total, ts: e.last.ts ?? null } : null,
+    createdAt: e.createdAt ?? null,
+    editedBy: e.editedBy || null,
+  };
+}
+
+// Si un intento salió bien, según su modo: `choice` y `widget` por la corrección exacta,
+// `written` por el veredicto del agente, `reveal` por la nota que se puso el propio lector
+// (autoevaluado: se dice aparte en el resumen).
+function attemptOk(a) {
+  if (a.mode === 'choice' || a.mode === 'widget') return a.exact === true;
+  if (a.mode === 'written') return a.verdict === 'good';
+  if (a.mode === 'reveal') return typeof a.grade === 'number' ? a.grade >= 3 : null;
+  return null;
+}
+
+const ATTEMPT_LIMIT_DEFAULT = 100;
+const ATTEMPT_LIMIT_MAX = 500;
+
+const GET_ATTEMPTS = {
+  name: 'get_attempts',
+  title: 'Intentos de repaso y de ejercicios',
+  description:
+    'Lo que el lector ha practicado de UN libro (registro de intentos): cada repaso de tarjeta y ' +
+    'cada ejercicio, con su modo (`reveal` = solo girar y autoevaluarse, `written` = escribió la ' +
+    'respuesta, `choice` = pregunta con opciones, `widget` = ejercicio como la matriz), si salió ' +
+    'bien y la latencia. Trae un `summary` ya calculado: por modo, el acierto total y el acierto ' +
+    'A LA PRIMERA (el primer intento de cada tarjeta), y las matrices generadas frente a las ' +
+    'hechas. Es lo que dice si un tipo de pregunta enseña: si el acierto a la primera ronda el ' +
+    '100 %, no enseña. Filtra por `deckUid`, `mode` y `days`. Solo lectura.',
+  capability: 'hasAttempts',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      bookId: { type: 'string', description: 'Id del libro, tal como sale en `list_books`.' },
+      book: { type: 'string', description: 'O el título del libro (o parte de él), si no sabes su id.' },
+      deckUid: { type: 'string', description: 'Solo los intentos de las tarjetas de este mazo (y sus ejercicios).' },
+      mode: { type: 'string', enum: ['reveal', 'written', 'choice', 'widget'], description: 'Solo un modo.' },
+      days: { type: 'integer', minimum: 1, maximum: 3650, description: 'Solo los de los últimos N días.' },
+      limit: { type: 'integer', minimum: 0, maximum: ATTEMPT_LIMIT_MAX, description: 'Intentos a listar, los más recientes primero (100 por defecto; 0 = solo el resumen).' },
+    },
+    additionalProperties: false,
+  },
+  async run(source, args) {
+    const bookId = await resolveBookArg(source, args);
+    const deckUid = optionalString(args, 'deckUid');
+    const mode = optionalString(args, 'mode');
+    const limit = optionalInt(args, 'limit', { min: 0, max: ATTEMPT_LIMIT_MAX, def: ATTEMPT_LIMIT_DEFAULT });
+    const days = optionalInt(args, 'days', { min: 1, max: 3650, def: 0 });
+    const decks = await source.decks(bookId);
+    const scoped = deckUid ? decks.filter((d) => d && d.uid === deckUid) : decks;
+    if (deckUid && !scoped.length) throw new ToolError('No hay ningún mazo con deckUid «' + deckUid + '» en ese libro.');
+    // Las tarjetas y los ejercicios del ámbito: el intento de un ejercicio no lleva deckUid,
+    // se reconoce por la huella de su spec (core.js · specHash, la misma que guarda la app).
+    const cardInfo = new Map();
+    for (const d of scoped) for (const c of liveCards(d.cards)) cardInfo.set(c.uid, { type: c.type || 'basic', deckUid: d.uid });
+    const exByHash = new Map();
+    for (const d of scoped) for (const e of liveExercises(d)) exByHash.set(specHash(e.spec), { e, deckUid: d.uid });
+    const since = days ? Date.now() - days * 86400000 : 0;
+    const all = (await source.attempts(bookId))
+      .filter((a) => (a.cardUid ? cardInfo.has(a.cardUid) : a.mode === 'widget' ? (!deckUid || exByHash.has(a.cardHash)) : !deckUid))
+      .filter((a) => !mode || a.mode === mode)
+      .filter((a) => !since || (a.ts || 0) >= since)
+      .sort((x, y) => (x.ts || 0) - (y.ts || 0));
+
+    const byMode = {};
+    const seen = new Set();
+    for (const a of all) {
+      const m = (byMode[a.mode || 'unknown'] ||= { attempts: 0, correct: 0, judged: 0, firstTry: { cards: 0, correct: 0 } });
+      const ok = attemptOk(a);
+      m.attempts++;
+      if (ok !== null) { m.judged++; if (ok) m.correct++; }
+      const k = a.cardUid || (a.mode === 'widget' ? 'w:' + a.cardHash : null);
+      if (k && !seen.has(k)) {
+        seen.add(k);
+        if (ok !== null) { m.firstTry.cards++; if (ok) m.firstTry.correct++; }
+      }
+    }
+    const rate = (n, d) => (d ? Math.round((n / d) * 1000) / 10 : null);
+    for (const m of Object.values(byMode)) {
+      m.correctRate = rate(m.correct, m.judged);
+      m.firstTry.rate = rate(m.firstTry.correct, m.firstTry.cards);
+    }
+    if (byMode.reveal) byMode.reveal.note = 'autoevaluado: la nota (3 o 4) la pone el propio lector';
+    const cells = all.filter((a) => a.mode === 'widget' && a.widget).reduce((s, a) => ({ correct: s.correct + (a.widget.correct || 0), total: s.total + (a.widget.total || 0) }), { correct: 0, total: 0 });
+    const done = new Set(all.filter((a) => a.mode === 'widget').map((a) => a.cardHash));
+    const exercises = [...exByHash.entries()].map(([h, { e, deckUid: du }]) => ({ uid: e.uid || null, deckUid: du, chapter: (e.spec && e.spec.chapter) || null, done: done.has(h) }));
+
+    const rows = all.slice().reverse().slice(0, limit).map((a) => ({
+      ts: a.ts ?? null,
+      mode: a.mode || null,
+      ok: attemptOk(a),
+      verdict: a.verdict ?? null,
+      exact: a.exact ?? null,
+      grade: a.grade ?? null,
+      latencyMs: a.latencyMs ?? null,
+      cardUid: a.cardUid || null,
+      cardType: a.cardUid && cardInfo.has(a.cardUid) ? cardInfo.get(a.cardUid).type : null,
+      deckUid: a.cardUid && cardInfo.has(a.cardUid) ? cardInfo.get(a.cardUid).deckUid : (exByHash.get(a.cardHash) || {}).deckUid || null,
+      ...(a.widget ? { widget: { type: a.widget.type, correct: a.widget.correct, total: a.widget.total } } : {}),
+      // Lo que escribió el lector es texto suyo: solo con el permiso de leer texto.
+      ...(source.canReadText && a.answer != null ? { answer: a.answer } : {}),
+    }));
+    return {
+      source: source.kind,
+      bookId,
+      bookTitle: (await source.bookInfo(bookId)).title,
+      total: all.length,
+      returned: rows.length,
+      summary: {
+        byMode,
+        matrixCells: cells.total ? { ...cells, rate: rate(cells.correct, cells.total) } : null,
+        exercises: { generated: exercises.length, done: exercises.filter((x) => x.done).length, list: exercises },
+      },
+      attempts: rows,
     };
   },
 };
@@ -589,6 +728,7 @@ export const ALL_TOOLS = [
   READING_STATS,
   LIST_DECKS,
   GET_DECK,
+  GET_ATTEMPTS,
   LIST_ARTIFACTS,
   GET_ARTIFACT,
   ...TEXT_TOOLS,

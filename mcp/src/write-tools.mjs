@@ -18,7 +18,8 @@ import { ToolError } from './errors.mjs';
 import { resolveBookArg, fold } from './book-arg.mjs';
 import { chapterText } from './text-tools.mjs';
 import { validateMcqItem, MCQ_LIMITS } from '../../app/js/ai/widgets/mcq.js';
-import { verifyQuotes } from '../../app/js/ai/widgets/core.js';
+import { verifyQuotes, WIDGET_VERSION } from '../../app/js/ai/widgets/core.js';
+import { validateMatrix, matrixCites, MATRIX_LIMITS } from '../../app/js/ai/widgets/matrix.js';
 
 const MAX_CARDS = 100;
 const MAX_TEXT = 4000;
@@ -399,4 +400,131 @@ const CREATE_DECK = {
   })),
 };
 
-export const WRITE_TOOLS = [ADD_CARDS, UPDATE_CARDS, DELETE_CARDS, CREATE_DECK];
+// ─── Ejercicios (P43, ADR-058): la matriz vive en `deck.exercises`, no es una tarjeta ─────────
+// La forma, la de widgets/practice.js · generateMatrix ({ type, spec, createdAt, last }), con el
+// `uid` y el `updatedAt` que pone db.js al guardarla. El spec se valida con validateMatrix y las
+// citas de cada celda se buscan en el texto del capítulo, como hace la app con lo que genera.
+
+const exView = (e) => ({
+  uid: e.uid, type: e.type, chapter: e.spec.chapter || null, title: e.spec.title,
+  rows: e.spec.rows.map((r) => r.label), columns: e.spec.columns.map((c) => c.label),
+  cells: e.spec.cells.length, given: e.spec.cells.filter((c) => c.given).length,
+});
+
+const ADD_EXERCISE = {
+  name: 'add_exercise',
+  title: 'Añadir una matriz para rellenar a un mazo',
+  description:
+    'Añade a un mazo un ejercicio «Rellena la matriz» (P43): filas = conceptos que se confunden, ' +
+    'columnas = atributos con respuestas cerradas, una celda por fila × columna. El lector rellena ' +
+    'las celdas no dadas y la app corrige celda a celda; lo fallado pasa al mazo como tarjetas. ' +
+    'Cada celda no dada lleva `why` (por qué es esa respuesta) y `cite.quote`, una cita LITERAL del ' +
+    'capítulo que se comprueba contra el texto (y `cite.src`, su ancla aN, si la sabes). Como mucho ' +
+    'la mitad de las celdas dadas (`given: true`). Necesita el permiso de leer el texto. Con `dry_run`, solo lo enseña.',
+  capability: 'canWrite',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      ...BOOK_PROPS, ...DECK_PROPS,
+      chapter: { type: 'string', description: 'Capítulo (por defecto, el ámbito del mazo). Las citas se buscan en él.' },
+      title: { type: 'string', description: 'Título corto del ejercicio.' },
+      prompt: { type: 'string', description: 'La consigna para el lector (qué tiene que comparar).' },
+      rows: {
+        type: 'array', minItems: MATRIX_LIMITS.rows[0], maxItems: MATRIX_LIMITS.rows[1],
+        items: { type: 'object', properties: { id: { type: 'string' }, label: { type: 'string' } }, required: ['id', 'label'], additionalProperties: false },
+      },
+      columns: {
+        type: 'array', minItems: MATRIX_LIMITS.columns[0], maxItems: MATRIX_LIMITS.columns[1],
+        items: {
+          type: 'object',
+          properties: {
+            id: { type: 'string' }, label: { type: 'string' },
+            options: { type: 'array', minItems: MATRIX_LIMITS.options[0], maxItems: MATRIX_LIMITS.options[1], items: { type: 'string' } },
+          },
+          required: ['id', 'label', 'options'],
+          additionalProperties: false,
+        },
+      },
+      cells: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            row: { type: 'string' }, col: { type: 'string' },
+            answer: { type: 'string', description: 'Una de las opciones de su columna, tal cual.' },
+            given: { type: 'boolean', description: 'true: la celda viene rellena (sin why ni cita).' },
+            why: { type: 'string' },
+            cite: {
+              type: 'object',
+              properties: { quote: { type: 'string' }, src: { type: 'string' } },
+              required: ['quote'],
+              additionalProperties: false,
+            },
+          },
+          required: ['row', 'col', 'answer'],
+          additionalProperties: false,
+        },
+      },
+      ...DRY_RUN,
+    },
+    required: ['deckUid', 'title', 'prompt', 'rows', 'columns', 'cells'],
+    additionalProperties: false,
+  },
+  async run(source, args) {
+    const bookId = await resolveBookArg(source, args);
+    const chapter = (typeof args.chapter === 'string' && args.chapter.trim()) || await scopeOfDeck(source, args)(bookId);
+    const spec = {
+      type: 'matrix', version: WIDGET_VERSION, bookId, chapter,
+      title: typeof args.title === 'string' ? args.title.trim() : args.title,
+      prompt: typeof args.prompt === 'string' ? args.prompt.trim() : args.prompt,
+      rows: args.rows, columns: args.columns,
+      cells: Array.isArray(args.cells) ? args.cells.map((c) => (c && c.given ? { row: c.row, col: c.col, answer: c.answer, given: true } : c)) : args.cells,
+    };
+    const errors = validateMatrix(spec);
+    if (errors.length) throw new ToolError('La matriz no es válida: ' + errors.slice(0, 12).join('; ') + '.');
+    const t = chapter ? await chapterText(source, bookId, chapter) : null;
+    if (!t) {
+      throw new ToolError('Una matriz necesita el texto del capítulo para comprobar sus citas (permiso «text» y el ' +
+        'libro troceado en el sync) y un capítulo que exista («chapter» o el ámbito del mazo).');
+    }
+    const missing = verifyQuotes(matrixCites(spec), t.text);
+    if (missing.length) throw new ToolError('Estas celdas citan algo que no está en «' + t.title + '»: ' + missing.join(', ') + '. Copia la cita literal de read_chapter.');
+    const badSrc = spec.cells.filter((c) => c.cite && c.cite.src && !t.anchors.has(String(c.cite.src))).map((c) => c.row + '|' + c.col);
+    if (badSrc.length) throw new ToolError('Estas celdas apuntan a un pasaje que no es de «' + t.title + '»: ' + badSrc.join(', ') + '.');
+    return onBook(source, args, (book, now) => {
+      const deck = findDeck(book, args);
+      const ex = { uid: crypto.randomUUID(), type: 'matrix', spec, createdAt: now, updatedAt: now, last: null, editedBy: agentOf(source) };
+      deck.exercises = (Array.isArray(deck.exercises) ? deck.exercises : []).concat(ex);
+      deck.updatedAt = now;
+      return { changed: true, result: { deckUid: deck.uid, added: exView(ex) } };
+    });
+  },
+};
+
+const DELETE_EXERCISE = {
+  name: 'delete_exercise',
+  title: 'Borrar un ejercicio',
+  description:
+    'Borra un ejercicio (una matriz) de un mazo por su `uid` (sale en get_deck · exercises). El ' +
+    'borrado llega a todos los dispositivos; las tarjetas que salieron de él se quedan.',
+  capability: 'canWrite',
+  inputSchema: {
+    type: 'object',
+    properties: { ...BOOK_PROPS, ...DECK_PROPS, uid: { type: 'string' }, ...DRY_RUN },
+    required: ['deckUid', 'uid'],
+    additionalProperties: false,
+  },
+  run: (source, args) => onBook(source, args, (book, now) => {
+    const deck = findDeck(book, args);
+    const list = Array.isArray(deck.exercises) ? deck.exercises : [];
+    const i = list.findIndex((e) => e && e.uid === args.uid && !e.deleted);
+    if (i < 0) throw new ToolError('No hay ningún ejercicio vivo con uid «' + args.uid + '» en el mazo.');
+    const deleted = exView(list[i]);
+    list[i] = { uid: list[i].uid, type: list[i].type, deleted: true, deletedAt: now, updatedAt: now, editedBy: agentOf(source) };
+    deck.exercises = list;
+    deck.updatedAt = now;
+    return { changed: true, result: { deckUid: deck.uid, deleted } };
+  }),
+};
+
+export const WRITE_TOOLS = [ADD_CARDS, UPDATE_CARDS, DELETE_CARDS, CREATE_DECK, ADD_EXERCISE, DELETE_EXERCISE];

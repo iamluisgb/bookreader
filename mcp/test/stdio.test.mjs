@@ -51,6 +51,8 @@ test('F2 anuncia la misma superficie más reading_stats, mazos y artefactos', as
       // Solo la fuente viva lleva `decks` y `artifacts` en books/<id>.json (ver README).
       'list_decks',
       'get_deck',
+      // El registro de intentos (P42) también viaja en books/<id>.json.
+      'get_attempts',
       'list_artifacts',
       'get_artifact',
       // Y el catálogo: las estanterías (lectura; organizarlas pide permiso).

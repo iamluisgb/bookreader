@@ -101,7 +101,8 @@ node cli.mjs --dir ~/bookreader-layout reading_stats '{"range":"7d"}'
 | `search_highlights` | `query`, `bookId?`/`book?`, `limit?` | Busca en el texto de los subrayados y en sus notas, sin distinguir mayúsculas ni acentos. Todos los términos deben aparecer (AND). |
 | `reading_stats` | `range?`, `bookId?`/`book?`, `groupBy?` | **Solo F2.** Minutos, palabras y unidades de lectura real, con desglose por día/semana/mes y por libro. |
 | `list_decks` | `bookId?`/`book?` | **Solo F2.** Mazos de flashcards con contadores de repaso: tarjetas, vencidas hoy, nuevas y suspendidas. Sin el texto de las tarjetas. |
-| `get_deck` | `bookId` o `book`, `deckUid?` (o `deckId?`/`scope?`), `limit?` | **Solo F2.** Las tarjetas de un mazo: frente, dorso, capítulo, suspensión y estado SRS (`due`, `reps`, `stability`, `difficulty`). Mejor por `deckUid`: el `deckId` numérico cambia de un dispositivo a otro. |
+| `get_deck` | `bookId` o `book`, `deckUid?` (o `deckId?`/`scope?`), `limit?` | **Solo F2.** Las tarjetas de un mazo: frente, dorso, capítulo, suspensión y estado SRS (`due`, `reps`, `stability`, `difficulty`), las opciones de las `mcq` y los ejercicios del mazo (`exercises`: matrices con su «la última vez»). Mejor por `deckUid`: el `deckId` numérico cambia de un dispositivo a otro. |
+| `get_attempts` | `bookId` o `book`, `deckUid?`, `mode?`, `days?`, `limit?` | **Solo F2.** Intentos de repaso y de ejercicios de un libro (P42) con un resumen: acierto total y **a la primera** por modo, celdas de matriz acertadas y matrices generadas frente a hechas. Lo escrito por el lector, solo con permiso de texto. |
 | `list_artifacts` | `bookId?`/`book?`, `kind?` | **Solo F2.** Qué salió del Studio (summary, mindmap, infographic, figures), con una `preview` de como mucho 200 caracteres: nunca el contenido entero. |
 | `get_artifact` | `bookId` o `book`, `key` | **Solo F2.** El `result` completo de un artefacto, serializado, con tope de 20000 caracteres (`truncated: true` y `totalChars` si se recorta). |
 
@@ -116,9 +117,11 @@ node cli.mjs --dir ~/bookreader-layout reading_stats '{"range":"7d"}'
 | `search_book` | texto | Los pasajes que mejor responden a una búsqueda (BM25), con ancla y capítulo. |
 | `search_library` | texto | Busca en TODOS los libros a la vez (índice que construye la app, IA10): los libros que mejor tratan el tema con sus pasajes, varias formulaciones (`queries`), filtro por estantería y `notSearched`. |
 | `add_cards` | escritura | Tarjetas nuevas (basic, cloze o mcq) en un mazo, validadas como en la app; la cita de una mcq y el `src` se comprueban contra el texto del capítulo. |
-| `update_cards` | escritura | Cambia anverso, reverso, tipo, capítulo o suspensión. **El repaso se conserva.** |
+| `update_cards` | escritura | Cambia anverso, reverso, tipo, capítulo, pasaje (`src`) o suspensión. **El repaso se conserva.** |
 | `delete_cards` | escritura | Borra tarjetas (tombstone: el borrado llega a todos los dispositivos). |
 | `create_deck` | escritura | Un mazo nuevo para un libro o capítulo, con sus primeras tarjetas si se quiere. |
+| `add_exercise` | escritura | Una matriz para rellenar (P43) en un mazo, validada como en la app; las citas de cada celda se comprueban contra el texto del capítulo. |
+| `delete_exercise` | escritura | Borra una matriz de un mazo (tombstone); las tarjetas que salieron de ella se quedan. |
 | `create_mindmap` | escritura | Un mapa mental en el Studio (2–8 ramas, hasta 6 conceptos cada una). |
 | `create_infographic` | escritura | Una infografía con la plantilla de la app (tesis, ideas, paneles, cita). |
 | `create_summary` | escritura | Un resumen por capítulos, con viñetas que citan el pasaje. |

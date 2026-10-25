@@ -1,6 +1,7 @@
-// Las preguntas con opciones (P43 F4) y el pasaje (`src`) desde el MCP que escribe: la forma que
-// guarda la app (widgets/practice.js · mcqCard), validada con su mismo código, y la cita y el
-// ancla comprobadas contra el TEXTO del capítulo antes de escribir.
+// Los widgets de estudio (P43) desde el MCP: preguntas con opciones (tarjetas `mcq`), el pasaje
+// (`src`), matrices para rellenar (`deck.exercises`) y la lectura de intentos (P53). La forma es
+// la que guarda la app, validada con su mismo código, y las citas y anclas se comprueban contra
+// el TEXTO del capítulo antes de escribir.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -45,6 +46,13 @@ function bookText() {
   };
 }
 
+// Dos repasos de c1 (el primero fallado) y una matriz que nadie del mazo tiene (otro hash).
+const ATTEMPTS = [
+  { uid: 't1', cardUid: 'c1', deckUid: DECK_UID, bookId: BOOK_1.id, ts: 1000, mode: 'written', verdict: 'wrong', exact: null, grade: 1, answer: 'no sé' },
+  { uid: 't2', cardUid: 'c1', deckUid: DECK_UID, bookId: BOOK_1.id, ts: 2000, mode: 'written', verdict: 'good', exact: null, grade: 3, answer: 'dos médicos' },
+  { uid: 't3', cardUid: null, deckUid: null, bookId: BOOK_1.id, ts: 3000, mode: 'widget', verdict: 'partial', exact: false, cardHash: 'deadbeef', widget: { type: 'matrix', correct: 3, total: 4 } },
+];
+
 function files() {
   const out = { ...buildLayoutFiles(), ...bookText() };
   const book = JSON.parse(JSON.stringify(out[BOOK_PATH]));
@@ -52,6 +60,7 @@ function files() {
     id: 34, uid: DECK_UID, bookId: BOOK_1.id, name: 'Transacciones', scope: 'Chapter 8. Transactions', cardType: 'mixed', createdAt: 1, updatedAt: 1,
     cards: [{ uid: 'c1', type: 'basic', front: 'What is write skew?', back: 'Two transactions update different objects.', src: '', updatedAt: 1, srs: { reps: 3, due: 20800, lastReview: 1000 } }],
   }];
+  book.attempts = ATTEMPTS;
   out[BOOK_PATH] = book;
   return out;
 }
@@ -160,4 +169,89 @@ test('src: un pasaje de otro capítulo se rechaza; create_deck con pasaje; updat
   const mcqUid = (await tool(s.e, rw, 'add_cards', { bookId: BOOK_1.id, deckUid: DECK_UID, cards: [MCQ] })).json.added[0].uid;
   const edit = await tool(s.e, rw, 'update_cards', { bookId: BOOK_1.id, deckUid: DECK_UID, changes: [{ uid: mcqUid, front: 'otra' }] });
   assert.ok(edit.isError && /no se editan desde aquí/.test(edit.text), 'una mcq no se edita desde aquí');
+});
+
+const MATRIX = {
+  title: 'Anomalies',
+  prompt: 'Which anomaly is this?',
+  rows: [{ id: 'skew', label: 'Write skew' }, { id: 'lost', label: 'Lost update' }],
+  columns: [{ id: 'obj', label: 'Objects written', options: ['Same', 'Different'] }, { id: 'ex', label: 'Example', options: ['Doctors', 'Counter'] }],
+  cells: [
+    { row: 'skew', col: 'obj', answer: 'Different', why: 'Each doctor updates their own row.', cite: { quote: SKEW, src: 'a62' } },
+    { row: 'skew', col: 'ex', answer: 'Doctors', why: 'The on-call example.', cite: { quote: SKEW } },
+    { row: 'lost', col: 'obj', answer: 'Same', given: true },
+    { row: 'lost', col: 'ex', answer: 'Counter', why: 'Two increments.', cite: { quote: 'Paragraph 3 of Chapter 8. Transactions talks about databases.' } },
+  ],
+};
+
+test('add_exercise: la matriz entra en deck.exercises con la forma de la app; get_deck la enseña; delete deja tombstone', async () => {
+  const s = await seeded();
+  const rw = await s.token(['write', 'text']);
+  const r = await tool(s.e, rw, 'add_exercise', { bookId: BOOK_1.id, deckUid: DECK_UID, ...MATRIX });
+  assert.ok(!r.isError, r.text);
+  assert.equal(r.json.added.cells, 4);
+  const deck = (await s.readBook()).decks.find((d) => d.uid === DECK_UID);
+  const ex = deck.exercises[0];
+  assert.equal(ex.type, 'matrix');
+  assert.equal(ex.spec.type, 'matrix');
+  assert.equal(ex.spec.version, 1);
+  assert.equal(ex.spec.chapter, 'Chapter 8. Transactions');
+  assert.equal(ex.last, null);
+  assert.deepEqual(ex.spec.cells[2], { row: 'lost', col: 'obj', answer: 'Same', given: true });
+  assert.equal(deck.cards.length, 1, 'las tarjetas no se tocan');
+
+  const got = await tool(s.e, rw, 'get_deck', { bookId: BOOK_1.id, deckUid: DECK_UID });
+  assert.deepEqual(got.json.exercises.map((e) => [e.uid, e.cells, e.given]), [[ex.uid, 4, 1]]);
+
+  const del = await tool(s.e, rw, 'delete_exercise', { bookId: BOOK_1.id, deckUid: DECK_UID, uid: ex.uid });
+  assert.ok(!del.isError, del.text);
+  const after = (await s.readBook()).decks.find((d) => d.uid === DECK_UID).exercises[0];
+  assert.ok(after.deleted && !after.spec);
+  assert.equal((await tool(s.e, rw, 'get_deck', { bookId: BOOK_1.id, deckUid: DECK_UID })).json.exercises.length, 0);
+});
+
+test('add_exercise rechaza citas que no están, demasiadas celdas dadas, respuestas fuera de las opciones y sin texto', async () => {
+  const s = await seeded();
+  const rw = await s.token(['write', 'text']);
+  const before = JSON.stringify((await s.readBook()).decks);
+  const cita = await tool(s.e, rw, 'add_exercise', { bookId: BOOK_1.id, deckUid: DECK_UID, ...MATRIX,
+    cells: MATRIX.cells.map((c) => (c.row === 'lost' && c.col === 'ex' ? { ...c, cite: { quote: 'Counters are always safe in every database ever made.' } } : c)) });
+  assert.ok(cita.isError && /lost\|ex/.test(cita.text), cita.text);
+  const dadas = await tool(s.e, rw, 'add_exercise', { bookId: BOOK_1.id, deckUid: DECK_UID, ...MATRIX,
+    cells: MATRIX.cells.map((c) => ({ row: c.row, col: c.col, answer: c.answer, given: true })) });
+  assert.ok(dadas.isError && /demasiadas celdas dadas/.test(dadas.text), dadas.text);
+  const fuera = await tool(s.e, rw, 'add_exercise', { bookId: BOOK_1.id, deckUid: DECK_UID, ...MATRIX,
+    cells: MATRIX.cells.map((c, i) => (i === 0 ? { ...c, answer: 'Both' } : c)) });
+  assert.ok(fuera.isError && /no es una opción de su columna/.test(fuera.text), fuera.text);
+  const ancla = await tool(s.e, rw, 'add_exercise', { bookId: BOOK_1.id, deckUid: DECK_UID, ...MATRIX,
+    cells: MATRIX.cells.map((c, i) => (i === 0 ? { ...c, cite: { quote: SKEW, src: 'a3' } } : c)) });
+  assert.ok(ancla.isError && /pasaje que no es de/.test(ancla.text), ancla.text);
+  const w = await s.token(['write']);
+  const sinTexto = await tool(s.e, w, 'add_exercise', { bookId: BOOK_1.id, deckUid: DECK_UID, ...MATRIX });
+  assert.ok(sinTexto.isError && /necesita el texto del capítulo/.test(sinTexto.text));
+  assert.equal(JSON.stringify((await s.readBook()).decks), before);
+});
+
+test('get_attempts: resumen por modo con el acierto a la primera, matrices hechas y respuestas solo con permiso de texto', async () => {
+  const s = await seeded();
+  const rw = await s.token(['write', 'text']);
+  const all = await tool(s.e, rw, 'get_attempts', { bookId: BOOK_1.id });
+  assert.ok(!all.isError, all.text);
+  assert.equal(all.json.total, 3);
+  const w = all.json.summary.byMode.written;
+  assert.deepEqual([w.attempts, w.correct, w.correctRate], [2, 1, 50]);
+  assert.deepEqual([w.firstTry.cards, w.firstTry.correct, w.firstTry.rate], [1, 0, 0], 'el primer intento de c1 fue fallado');
+  assert.deepEqual(all.json.summary.matrixCells, { correct: 3, total: 4, rate: 75 });
+  assert.equal(all.json.attempts[0].ts, 3000, 'los más recientes primero');
+  assert.equal(all.json.attempts.find((a) => a.cardUid === 'c1').answer, 'dos médicos');
+
+  const del = await tool(s.e, rw, 'get_attempts', { bookId: BOOK_1.id, deckUid: DECK_UID });
+  assert.equal(del.json.total, 2, 'con mazo: sus tarjetas y solo las matrices de ese mazo');
+  await tool(s.e, rw, 'add_exercise', { bookId: BOOK_1.id, deckUid: DECK_UID, ...MATRIX });
+  assert.deepEqual((await tool(s.e, rw, 'get_attempts', { bookId: BOOK_1.id, deckUid: DECK_UID, limit: 0 })).json.summary.exercises.generated, 1);
+
+  const soloLeer = await s.token([]);
+  const sin = await tool(s.e, soloLeer, 'get_attempts', { bookId: BOOK_1.id });
+  assert.ok(!sin.isError, sin.text);
+  assert.ok(sin.json.attempts.every((a) => !('answer' in a)), 'sin permiso de texto no viaja lo que escribió');
 });

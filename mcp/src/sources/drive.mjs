@@ -143,6 +143,7 @@ export function createDriveSource({ provider, base = DEFAULT_BASE, cacheMs = 150
       convos: [],
       decks: [],
       artifacts: [],
+      attempts: [],
       lastPositionAt: null,
       meta: null,
     };
@@ -167,6 +168,7 @@ export function createDriveSource({ provider, base = DEFAULT_BASE, cacheMs = 150
     entry.convos = raw.convos;
     entry.decks = raw.decks;
     entry.artifacts = raw.artifacts;
+    entry.attempts = Array.isArray(raw.attempts) ? raw.attempts : [];
     entry.lastPositionAt = Number(local['lastPositionAt_' + id]) || null;
     entry.meta = raw.meta || null;
     c.entries.set(id, entry);
@@ -193,6 +195,8 @@ export function createDriveSource({ provider, base = DEFAULT_BASE, cacheMs = 150
     hasReadingStats: true,
     // El layout lleva mazos y artefactos del Studio en cada books/<id>.json (el backup no).
     hasAgentData: true,
+    // Y el registro de intentos de P42 (store `attempts`, solo se añade, nunca se edita).
+    hasAttempts: true,
     describe() {
       return kind + ':' + base;
     },
@@ -264,6 +268,12 @@ export function createDriveSource({ provider, base = DEFAULT_BASE, cacheMs = 150
       const entry = await entryFrom(await load(), bookId);
       if (!entry) throw new UnknownBookError(bookId);
       return liveItems(entry.decks);
+    },
+    /** Intentos de repaso y de ejercicios del libro (P42), tal cual: no tienen tombstones. */
+    async attempts(bookId) {
+      const entry = await entryFrom(await load(), bookId);
+      if (!entry) throw new UnknownBookError(bookId);
+      return Array.isArray(entry.attempts) ? entry.attempts.filter((a) => a && typeof a === 'object') : [];
     },
     /** Artefactos del Studio del libro (resúmenes, mapas, infografías), sin tombstones. */
     async artifacts(bookId) {
