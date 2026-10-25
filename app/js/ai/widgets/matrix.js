@@ -133,6 +133,9 @@ export function renderMatrix(root, spec, { onCommit, onCite } = {}) {
   const cellOf = new Map(spec.cells.map((c) => [key(c.row, c.col), c]));
   let committed = false;
 
+  // Columna con más de dos opciones, o con alguna larga: las opciones se apilan, una por línea.
+  // En fila se partían en dos renglones desiguales y no se leía qué iba con qué.
+  const stacked = (col) => col.options.length > 2 || col.options.some((o) => String(o).length > 16);
   const optionButtons = (cell, col) => col.options.map((o) =>
     `<button type="button" class="segmented-btn" data-k="${escapeHtml(key(cell.row, cell.col))}" data-v="${escapeHtml(o)}" aria-pressed="false">${escapeHtml(o)}</button>`).join('');
 
@@ -141,12 +144,13 @@ export function renderMatrix(root, spec, { onCommit, onCite } = {}) {
     const tds = spec.columns.map((c) => {
       const cell = cellOf.get(key(r.id, c.id));
       if (cell.given) {
-        return `<td class="wgt-cell wgt-given" data-label="${escapeHtml(c.label)}"><span class="wgt-val">${escapeHtml(cell.answer)}</span><span class="wgt-tag">${escapeHtml(t('Dada'))}</span></td>`;
+        // La dada es una pista, no una pregunta: texto discreto, sin la caja de las que se rellenan.
+        return `<td class="wgt-cell wgt-given" data-label="${escapeHtml(c.label)}"><span class="wgt-val">${escapeHtml(cell.answer)}</span> <span class="wgt-tag">${escapeHtml(t('Dada'))}</span></td>`;
       }
       const k = escapeHtml(key(r.id, c.id));
       return `<td class="wgt-cell" data-k="${k}" data-label="${escapeHtml(c.label)}">
-        <div class="segmented wgt-opts" role="group" aria-label="${escapeHtml(`${r.label} · ${c.label}`)}">${optionButtons(cell, c)}</div>
-        <label class="wgt-unsure"><input type="checkbox" data-unsure="${k}"> ${escapeHtml(t('Dudo'))}</label>
+        <div class="segmented wgt-opts${stacked(c) ? ' wgt-opts--stack' : ''}" role="group" aria-label="${escapeHtml(`${r.label} · ${c.label}`)}">${optionButtons(cell, c)}</div>
+        <label class="wgt-unsure" hidden><input type="checkbox" data-unsure="${k}"> ${escapeHtml(t('Dudo'))}</label>
         <div class="wgt-fix" hidden></div>
       </td>`;
     }).join('');
@@ -184,6 +188,9 @@ export function renderMatrix(root, spec, { onCommit, onCite } = {}) {
       sib.classList.toggle('active', on);
       sib.setAttribute('aria-pressed', String(on));
     }
+    // «Dudo» solo tiene sentido con una respuesta: aparece al elegir (antes, una casilla por celda).
+    const unsure = b.closest('.wgt-cell').querySelector('.wgt-unsure');
+    if (unsure) unsure.hidden = false;
     refresh();
   });
   root.addEventListener('change', (e) => {
