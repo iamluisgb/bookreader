@@ -3,6 +3,22 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-10-25 — El MCP crea matrices y lee los intentos (P53)
+
+- **`add_exercise`** / **`delete_exercise`** (`mcp/src/write-tools.mjs`): una matriz para rellenar
+  en `deck.exercises`, con la forma de `widgets/practice.js · generateMatrix` y validada con
+  `validateMatrix`. Las citas de cada celda se buscan con `verifyQuotes` en el texto del capítulo
+  y los `src` se comprueban contra sus pasajes. Borrar deja tombstone.
+- **`get_attempts`** (`mcp/src/tools.mjs`, fuente de Drive/sync): el store `attempts` de P42 con un
+  resumen por modo (acierto total y **a la primera**), celdas de matriz acertadas y matrices
+  generadas frente a hechas. La nota de «solo girar» llega en texto (`again`/`hard`/`good`/`easy`;
+  las tres últimas cuentan como acierto). Lo escrito por el lector, solo con permiso de texto.
+- **`get_deck`** trae `exercises` y las opciones de las `mcq`.
+- Tests: `workers/sync/test/mcp-write-mcq.test.mjs` (7 casos). `test:sync` 78/78, `test:mcp` 122/122.
+- Desplegado `bookreader-sync`, versión `423cdded-e76d-4da8-8c27-315df6e02237`. Primer uso: 9
+  matrices en DDIA (capítulos 3–10). Primer dato real: 19 repasos de DDIA, 53 % de acierto a la
+  primera, autoevaluado.
+
 ## 2026-10-25 — El MCP crea preguntas con opciones y enlaza cada tarjeta a su pasaje
 
 Hasta ahora un agente solo podía crear tarjetas `basic` y `cloze`, y todas se guardaban con `src`
