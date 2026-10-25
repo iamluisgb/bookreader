@@ -2662,6 +2662,146 @@ prometía y `feynman.js` no implementa—. Es el siguiente paso natural: convier
 "producto de una generación masiva" en algo que crece mientras lees, y es el escalón ICAP
 que esta épica dice que falta (tú produces, él comprueba).
 
+> **Grupo Singapur (2026-10-25).** Los cuatro ítems siguientes (P49-P52) salen de revisar qué se puede
+> coger del sistema educativo de Singapur. Se descartó lo que ya teníamos (preguntar antes de leer en
+> P17, Feynman, FSRS, calibración en P44 F5, ejemplos resueltos que se retiran en P43 tipo 4) y lo que
+> no aplica a un lector adulto: los exámenes de alto riesgo, la cultura de academias y la lectura
+> guiada de STELLAR. Quedan cuatro piezas. Las dos primeras son de **representación** (cómo se explica)
+> y las dos últimas de **secuencia** (qué se practica y cuándo).
+
+### P49 — Escalera concreto → dibujo → definición en «Explícame» · `S` · **Singapur (CPA)**
+
+**Qué es.** El método CPA de Singapore Math (concreto, pictórico, abstracto; viene de los tres modos
+de Bruner) aplicado a la respuesta del agente. «Explícame» deja de dar un párrafo y responde en tres
+escalones: (1) un **caso concreto** sacado del libro, con cita; (2) un **diagrama** que lo dibuja
+(Mermaid, que ya pinta [`diagram.js`](app/js/ai/diagram.js)); (3) la **definición** del autor, con
+cita. Se lee de arriba abajo y se para cuando se entiende.
+
+**Por qué.** La revisión de *concreteness fading* (Fyfe, McNeil, Son y Goldstone, *Educational
+Psychology Review*, 2014) encuentra que ir de lo concreto a lo abstracto supera tanto a empezar por lo
+abstracto como a quedarse en lo concreto. Los libros técnicos suelen ir al revés: definición primero y
+ejemplo después, si lo hay. Cuando un lector selecciona algo para pedir que se lo expliquen es
+justo porque la definición no le ha bastado.
+
+**Por qué es barato.** Un enfoque de la barra son tres cosas: su `MODE`, su `ask` y su etiqueta
+([P38](#p38--la-barra-de-selección-rehecha-compacta-y-enfoques-con-lo-que-vas-a-recibir--m--f1f2--2026-10-14--inspirado-en-gloss)).
+No hay que crear un enfoque nuevo: se reescribe el `MODE` de Explícame. Así no crece la barra y no
+aparece un «Explícame con dibujo» que haya que distinguir del otro.
+
+**Reglas.**
+- El escalón 2 es opcional: si el concepto no tiene forma (una definición jurídica, una frase de
+  novela), se salta. Un diagrama decorativo es peor que ninguno.
+- El caso concreto tiene que **venir del libro** con su ancla `[[aN]]`. Si el libro no trae ningún
+  ejemplo, el agente lo dice y propone uno marcado como suyo. Nunca lo presenta como del autor.
+- *Expertise reversal* (Kalyuga): al que ya sabe, lo concreto le estorba. Por eso la definición va
+  **plegada al final y no se elimina**, y el orden no se fuerza en «Dilo más simple» ni en la objeción.
+
+**Contrato (EV5, antes de tocar el prompt).** Baseline: la batería de Explícame del eval con el
+`MODE` actual (run con nombre). Métrica primaria: % de respuestas cuyo caso concreto tiene cita
+válida al libro (juez fijo: el ancla existe y el pasaje contiene el ejemplo) **≥ 80 %**. Secundarias:
+la longitud media no crece más de un 30 % y no se confunde con los demás enfoques (el control
+pendiente de P38). Time-box: 2 ciclos de prompt. Si no llega, se queda el `MODE` de hoy.
+
+### P50 — El modelo del libro: un diagrama base que vuelve · `M` · **Singapur (bar model)** · *después de P49*
+
+**Qué es.** El modelo de barras de Singapur no vale por el dibujo, vale porque **siempre es el mismo**.
+El alumno lo usa en cien problemas distintos y deja de gastar esfuerzo en entender la
+representación: solo piensa el problema. Para un libro sería esto: **un diagrama base por libro** (en
+DDIA, el líder y las réplicas con su log; en un libro de contabilidad, el balance de dos columnas; en
+uno de negociación, las dos partes con sus intereses y su BATNA). Las respuestas, las tarjetas
+visuales y los widgets lo reutilizan y solo cambian lo que marcan.
+
+**El hueco.** Hoy cada artefacto dibuja desde cero: el diagrama de una respuesta del chat, el mapa
+mental ([P14](#p14--mapa-mental---l--artefacto-de-marketing)), la infografía
+([P29](#p29--infografía-del-libro-el-póster-resumen--ml---entregada-2026-09-20--artefacto-de-marketing))
+y los widgets de [P43](#p43--widgets-de-estudio-siete-tipos-que-el-agente-rellena-para-cualquier-libro--l--f1f5--2026-10-19)
+no comparten nada. El lector tiene que volver a leer cada dibujo.
+
+**Diseño (en la línea de ADR-057: el agente produce datos, el motor es nuestro).**
+- **F1** `S`–`M`: al terminar la segmentación, una llamada propone el modelo: **nodos con nombre +
+  relaciones + el tipo Mermaid** (de los tres permitidos), guardado en la ficha del libro y con
+  sync. El lector lo ve en la ficha y puede rechazarlo. Muchos libros no tienen modelo (novela,
+  ensayo de ideas sueltas), así que «no hay» es una respuesta válida y no se inventa uno.
+- **F2** `M`: con modelo, el escalón 2 de P49 y los widgets 1 y 3 parten de él: se resaltan nodos o
+  aristas en vez de dibujar otro diagrama. El spec lleva `{ base: 'book-model', highlight: [...] }`.
+- **F3**, si F2 funciona: tarjetas visuales ([P35](#p35--tarjetas-visuales-lo-que-quedó-pendiente-de-la-primera-entrega--m-acumulado))
+  sobre el modelo: «¿qué nodo falla aquí?».
+
+**Contrato (EV5, antes de F1).** Golden de 6 libros de la biblioteca (3 con modelo evidente y 3 sin
+modelo). Métrica primaria: en los 3 con modelo, que un juez fijo lo acepte como la representación
+que usa el propio autor (≥ 2/3), y en los 3 sin modelo, que el agente devuelva «no hay» (3/3).
+Time-box: 2 ciclos.
+
+**Riesgo:** forzar un modelo a un libro que no lo tiene. El control negativo del contrato existe para
+eso.
+
+### P51 — Pocas ideas grandes y tarjetas que suben de nivel · `M` · **Singapur (espiral)** · *depende de [P42](#p42--el-ajuste-que-sobrevive-registro-de-intentos-y-corrección-propia-tras-el-fallo--m--práctica-deliberada)*
+
+**Qué es.** Dos ideas del currículo de Singapur. «Teach Less, Learn More» (2004): menos temas, más a
+fondo. Y la espiral de Bruner: el mismo concepto vuelve más tarde, pero con más dificultad. FSRS ya
+resuelve **cuándo** vuelve una tarjeta. Nada decide **a qué nivel** vuelve: una tarjeta consolidada
+sigue pidiendo lo mismo.
+
+**Piezas.**
+1. **Ideas grandes del libro** `S`: entre 5 y 8 por libro, con cita, propuestas por el agente y
+   editables por el lector. El plan por capítulo ([`card-plan.js`](app/js/ai/card-plan.js)) las
+   usa como criterio: una tarjeta de detalle que no cuelga de ninguna idea grande baja de
+   prioridad. Esto es el «menos temas» aplicado al mazo, que hoy crece con cada dato del libro.
+2. **Escalera por idea** `M`: recordar → aplicar (widget 1 o 4) → transferir (un caso fuera del
+   libro). Cuando FSRS da por estables las tarjetas de recordar de una idea (estabilidad por encima
+   de un umbral), el siguiente repaso de esa idea es un ejercicio del nivel siguiente. Si se falla,
+   se baja un escalón y no se reinicia la tarjeta.
+3. **Se ve en el análisis** `S`: por libro, en qué escalón está cada idea grande
+   ([P44](#p44--análisis-del-estudio-retención-real-memoria-por-libro-carga-y-fsrs-personal--m---entregada-2026-10-18--f1f5)).
+   Es una medida de dominio más honesta que «tarjetas al día».
+
+**Por qué depende de P42.** El escalón de una idea se calcula con los intentos registrados, y hoy
+el intento se borra en cada tarjeta. P42 ya menciona los «niveles de práctica» como el uso futuro
+del campo `mode`. Este ítem es esa razón de producto.
+
+**Contrato (EV5, antes de la pieza 2).** Baseline: tras P42, % de intentos de aplicación (widgets)
+acertados sobre ideas cuyas tarjetas de recuerdo están estables. Métrica primaria: con la escalera
+activa, ese % no cae y los ejercicios de nivel 2 a 4 semanas superan al grupo sin escalera (dentro
+del mismo usuario, ideas alternas). Time-box: 4 semanas de uso real; si no hay volumen, se queda en
+tendencia.
+
+**Fuera, a propósito:** bloquear tarjetas hasta dominar las anteriores (ver P52: se avisa, no se
+bloquea) y puntos o niveles de juego.
+
+### P52 — Prerrequisitos que avisan antes del capítulo · `M` · **Singapur (dominio antes de avanzar)**
+
+**Qué es.** En Singapur no se pasa de tema hasta dominar el anterior, y el Learning Support Programme
+detecta pronto a quien se queda atrás. Aquí no se bloquea nada (la lectura nunca se interrumpe y una
+sola pausa por capítulo, ver [NB2](templates.md)), pero se puede avisar. Al abrir el capítulo 7, si
+depende de un concepto del 3 que el lector ha fallado dos veces en el repaso, aparece **una línea**:
+«El cap. 7 usa *quorum*; lo fallaste el martes · [Repasar 2 min] [Seguir]».
+
+**Por qué aquí.** Es la misma ventaja que [P17](#p17--preguntas-antes-de-leer-efecto-pretesting--m--evidencia-fuerte-nadie-lo-tiene):
+solo un lector sabe a la vez **qué viene después** en el libro y **qué ha fallado** el lector. Un
+Anki no conoce el libro y un chat con el PDF no conoce tus fallos.
+
+**Lo que ya existe.**
+- [`chapter-gate.js`](app/js/ai/chapter-gate.js) ya tiene `chapterOrder` y `chaptersDone` en la ficha
+  sincronizada y detecta la entrada en un capítulo (`advance`). El disparador está hecho.
+- Las tarjetas guardan su capítulo y su pasaje, y FSRS sabe cuáles se fallan.
+
+**Lo que falta.**
+- **F1** `S`–`M`: el **mapa de dependencias** se calcula una vez por libro. Por capítulo, qué
+  conceptos de capítulos anteriores usa, con cita al pasaje donde los usa. Va en la ficha del libro,
+  con el mismo cuidado de presupuesto que el plan de tarjetas (títulos + muestra, no el libro entero).
+- **F2** `S`: el aviso. Concepto requerido ∩ tarjetas con ≥ 2 fallos o *lapses* recientes. Como
+  mucho uno por capítulo. «Seguir» lo recuerda para ese capítulo. «Repasar» abre un repaso corto
+  con esas tarjetas y vuelve al punto de lectura.
+- Si el libro no tiene mazo, no hay aviso. No se pregunta nada para averiguarlo.
+
+**Contrato (EV5, antes de F1).** Golden: 2 libros técnicos con dependencias marcadas a mano (≥ 10
+pares capítulo → concepto). Métrica primaria: precisión del mapa ≥ 80 % (que no avise de lo que no
+hace falta; el recall importa menos). En uso real: % de avisos que acaban en «Repasar» y el acierto
+en esas tarjetas en el siguiente repaso. Time-box: 2 ciclos de prompt para el mapa.
+
+**Riesgo:** que se sienta como un examen al abrir el capítulo. Se mitiga con una sola línea, nunca un
+modal, y con apagarlo en un toque.
+
 ### P21 — Vertical opositor: del estudio al examen · `L` · **el nicho que [`LAUNCH_PLAN.md`](LAUNCH_PLAN.md#L75) señala**
 
 **Contexto (2026-07-27).** El plan de lanzamiento nombra el pivote — *"pivotar el mensaje 100% a
@@ -3227,6 +3367,31 @@ licencia). A/B y precio ya decididos en [ADR-060](DECISIONS.md): opción A, Plus
 **Métrica:** suscriptores con el sync de BookReader activo y conflictos/412 por semana (la salud del
 motor con el proveedor nuevo). **Riesgo:** pérdida de la clave → pérdida de datos. Se mitiga con la
 frase de recuperación y diciéndolo claro; no se mitiga guardando la clave nosotros.
+
+---
+
+### MON6 — Formación bonificada (FUNDAE) como canal para equipos · `S` (investigar) · **tentativo** · **distribución**
+
+> **Tentativo (2026-10-25).** Sale de la misma revisión que P49-P52. Singapur da a cada adulto un
+> crédito para formarse (SkillsFuture). En España, el equivalente para empresas es el crédito de
+> formación bonificada que gestiona FUNDAE. **No está verificado** que un lector con IA pueda entrar
+> como acción formativa bonificable: eso es lo primero que hay que averiguar.
+
+**La idea.** Vender a empresas un «plan de lectura técnica para el equipo» (estantería común,
+mazos, análisis de progreso por persona) pagado con el crédito de formación que ya tienen y que muchas
+no gastan. Es B2B, con un comprador que tiene presupuesto asignado: lo contrario de convencer a lectores
+sueltos.
+
+**Lo que hay que saber antes de escribir código (F0, solo investigación):**
+- Si encaja como formación bonificada (modalidad e-learning/teleformación, requisitos de plataforma,
+  registro de horas y seguimiento) o si exige una entidad organizadora intermedia.
+- Qué informe pide FUNDAE. El análisis de lectura ([P25](#p25--sección-de-análisis-lo-leído-de-verdad--m---entregada-2026-09-12--f1f3))
+  y el del estudio (P44) ya miden tiempo real y retención por libro; puede que baste con exportarlos.
+- Si los datos por persona chocan con la privacidad local-first. El empleado tendría que elegir qué
+  comparte con la empresa.
+
+**Decisión al cerrar F0:** si exige ser centro acreditado o una plataforma LMS completa, se descarta.
+Si basta con una consultora que gestione la bonificación, el ítem pasa a ser de ventas, no de producto.
 
 ---
 
