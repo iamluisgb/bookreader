@@ -1867,12 +1867,12 @@ body.reading.chrome-quiet:not(.fs):not(.ai-open) .agent-rail:not(:hover, :focus-
 .study-cloze.is-revealed { color: var(--text); background: color-mix(in srgb, var(--book) 16%, transparent); border-radius: var(--r-xs) var(--r-xs) 0 0; }
 .study-screen .study-extra { font-size: var(--fs-md); }
 .study-leech { align-items: center; flex-wrap: wrap; }
-.study-leech-fix, .study-src {
+.study-leech-fix, .study-src, .study-why-btn, .study-why-improve {
   border: none; background: var(--fill); color: var(--text); font: inherit; font-size: var(--fs-sm); font-weight: 600;
   border-radius: var(--r-pill); padding: 5px 11px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
 }
 .study-src { align-self: center; margin: 0 auto 2px; }
-.study-src:hover, .study-leech-fix:hover { background: var(--fill-strong); }
+.study-src:hover, .study-leech-fix:hover, .study-why-btn:hover, .study-why-improve:hover { background: var(--fill-strong); }
 .study-src:disabled { opacity: 0.55; cursor: default; }   /* segmentando el libro en caliente */
 
 /* El pasaje citado, como recorte de página: papel, serif y plegado por defecto. */
@@ -1887,14 +1887,27 @@ body.reading.chrome-quiet:not(.fs):not(.ai-open) .agent-rail:not(:hover, :focus-
 
 /* Recuerdo activo: escribe tu respuesta y el agente la corrige. */
 .study-recall { width: 100%; max-width: 620px; margin: 8px auto 0; }
-.study-recall-input {
+.study-recall-input, .study-why-input {
   width: 100%; resize: none; min-height: 44px; max-height: 140px;
   padding: 11px 16px; border-radius: var(--r-lg); border: 1px solid var(--border);
   background: var(--surface-0); color: var(--text); font: inherit; font-size: var(--fs-md);
 }
-.study-recall-input:focus { outline: none; border-color: color-mix(in srgb, var(--book) 60%, var(--border)); box-shadow: 0 0 0 3px color-mix(in srgb, var(--book) 16%, transparent); }
-.study-feedback { border-radius: var(--r-md); padding: 12px 14px; background: var(--fill); font-size: var(--fs-sm); line-height: 1.5; }
+.study-recall-input:focus, .study-why-input:focus { outline: none; border-color: color-mix(in srgb, var(--book) 60%, var(--border)); box-shadow: 0 0 0 3px color-mix(in srgb, var(--book) 16%, transparent); }
+.study-feedback, .study-why-out { border-radius: var(--r-md); padding: 12px 14px; background: var(--fill); font-size: var(--fs-sm); line-height: 1.5; }
 .study-feedback p { margin: 6px 0 0; }
+
+/* P46 · «¿Por qué?» y el salto al libro, en una fila dentro del dorso; la duda se responde ahí. */
+.study-why { display: flex; flex-direction: column; gap: var(--s-2); margin-top: var(--s-2); }
+.study-why[hidden] { display: none; }
+.study-why-row { display: flex; justify-content: center; flex-wrap: wrap; gap: var(--s-2); }
+.study-why-row .study-src { margin: 0; }
+.study-why-form { display: flex; gap: var(--s-2); align-items: flex-end; width: 100%; }
+.study-why-form .study-why-send { flex: none; }
+.study-why-out { text-align: left; font-size: var(--fs-md); user-select: text; }
+.study-why-out .study-why-q { margin: 0 0 6px; color: var(--text-soft); font-style: italic; }
+.study-why-a > :first-child { margin-top: 0; }
+.study-why-a > :last-child { margin-bottom: 0; }
+.study-why-improve { margin-top: var(--s-2); }
 .study-feedback-wait { margin: 0 !important; color: var(--text-soft); display: flex; gap: 6px; align-items: center; }
 .study-feedback-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
 .study-feedback-tag { font-weight: 700; font-size: var(--fs-xs); letter-spacing: 0.04em; text-transform: uppercase; padding: 2px 8px; border-radius: var(--r-pill); }

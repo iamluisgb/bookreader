@@ -7,7 +7,7 @@
 //
 // El estado de scheduling (`card.srs`) se persiste TRAS CADA tarjeta, no al final:
 // cerrar a media sesión no pierde nada.
-import { t } from '../i18n.js';
+import { t, uiLangName } from '../i18n.js';
 import * as DB from './db.js';
 import * as Srs from './srs.js';
 import * as FsrsParams from './fsrs-params.js';
@@ -24,6 +24,7 @@ import * as LLM from './llm.js';
 import { bookLook } from '../ui/book-accent.js';
 import { cargar } from '../ui/brand.js';
 import { toast } from './toast.js';
+import { mdToHtml } from './markdown.js';
 import * as SegmentFile from './segment-file.js';
 import { sanitizeSvg, reviewDrawing } from './visual-cards.js';
 import { shuffledOptions } from './widgets/mcq.js';
@@ -340,6 +341,9 @@ let sessionBooks = new Set();
 let recallText = '';     // lo que el usuario escribió como respuesta (recuerdo activo)
 let suggested = null;    // nota sugerida por el agente al corregir
 let draft = null;        // intento en curso de la tarjeta visible (P42 F1, ver más abajo)
+let asked = 0;           // dudas preguntadas al agente en la sesión (P46: tienen tope)
+let whyCtl = null;       // AbortController de la duda en vuelo: pasar de tarjeta la corta
+const ASK_LIMIT = 20;    // dudas por sesión: más que eso ya no es repasar, es releer el libro
 
 // ---- Registro de intentos (P42 F1) ----------------------------------------------
 // Cada nota deja UN registro inmutable en el store `attempts` (db.js). Se arma en dos tiempos:
@@ -364,6 +368,7 @@ function attemptRecord(d) {
     prevInterval: d.prevInterval, latencyMs: d.latencyMs, arm: null,
     answer: d.answer ?? null,
     cardHash: d.cardHash ?? null,
+    asked: !!d.asked,   // P46: se preguntó al agente antes de poner la nota
   };
 }
 
@@ -454,6 +459,7 @@ export function open({ decks, title = t('Estudiar'), onClose, onNavigate, gate =
   graded = 0;
   firstTry = 0;
   failedOnce = new Set();
+  asked = 0;
   sessionBooks = new Set((decks || []).map(d => d.bookId).filter(Boolean));
   startedAt = Date.now();
   streakAtStart = Srs.currentStreak(Storage.get(STREAK_KEY));
@@ -543,6 +549,7 @@ function removeChip() {
 
 function close() {
   abortSketchReview();
+  abortWhy();
   document.removeEventListener('keydown', onKey);
   if (overlay) { overlay.remove(); overlay = null; }
   minimized = false;
@@ -562,6 +569,12 @@ function typingInRecall(e) {
   return e.target && e.target.closest && e.target.closest('.study-recall-input');
 }
 
+// La caja de la duda (P46) maneja su propio Intro; aquí solo se aparta para que escribir
+// «2» no califique la tarjeta a media frase.
+function typingInWhy(e) {
+  return e.target && e.target.closest && e.target.closest('.study-why-input');
+}
+
 function onKey(e) {
   if (!overlay) return;
   // Editando: el teclado es del editor (Escape cancela la edición, no la sesión).
@@ -569,6 +582,10 @@ function onKey(e) {
   // Escribiendo la respuesta: Intro (sin mayúsculas) comprueba; el resto es texto.
   if (typingInRecall(e)) {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); flip(); }
+    if (e.key === 'Escape') { e.preventDefault(); e.target.blur(); }
+    return;
+  }
+  if (typingInWhy(e)) {
     if (e.key === 'Escape') { e.preventDefault(); e.target.blur(); }
     return;
   }
@@ -583,6 +600,7 @@ function onKey(e) {
     if (id) { e.preventDefault(); pickOption(id); }
     return;
   }
+  if (flipped && e.key === '?' && LLM.hasKey()) { e.preventDefault(); openWhy(); return; }
   if (flipped) {
     // Las cuatro teclas valen siempre; en modo simple el 2 también es «bien».
     const map = gradingMode() === 'full'
@@ -1106,6 +1124,7 @@ function renderCard() {
   const left = overlay?.querySelector('.study-left');
   if (!b || !f) return;
   abortSketchReview();   // nueva tarjeta: la revisión del boceto anterior ya no pinta
+  abortWhy();
   editing = false;
   animating = false;
   recallText = '';
@@ -1137,6 +1156,7 @@ function renderCard() {
           <div class="study-qmini">${card.type === 'cloze' ? '' : escapeHtml(card.front)}</div>
           <div class="study-a" hidden></div>
           <div class="study-feedback" hidden></div>
+          <div class="study-why" hidden></div>
         </div>
       </div>
     </div>`;
@@ -1148,7 +1168,8 @@ function renderCard() {
     // `details` (el pasaje plegado) igual que en wireSwipe: abrir/cerrar el pasaje NO es
     // girar — el summary dentro de .study-a burbujeaba y deshacía el flip con el pasaje
     // dentro, que es justo lo que el usuario quería ver.
-    if (e.target.closest('button, a, details, summary, textarea, canvas')) return;
+    // La duda (P46) tampoco: su respuesta se lee y se selecciona sin perder la tarjeta.
+    if (e.target.closest('button, a, details, summary, textarea, canvas, .study-why')) return;
     if (!flipped) flip(); else unflip();
   });
   b.querySelector('.study-mcq')?.addEventListener('click', (e) => {
@@ -1215,21 +1236,31 @@ function renderEditor(draft = null) {
 // Reescribir con el agente: las tarjetas las escribe un LLM y la que se falla una y otra vez
 // suele estar mal formulada. El agente la reformula a partir de su pasaje y la propuesta se
 // abre en el editor para confirmarla.
-async function rewriteCurrent() {
+// `doubt` (P46): la duda que surgió al repasarla y lo que contestó el agente. Una duda suele
+// decir que a la tarjeta le falta explicación, así que el encargo cambia: misma pregunta,
+// dorso que resuelva la duda.
+async function rewriteCurrent(doubt = null) {
   if (!queue.length || !LLM.hasKey()) return;
   const { deck, idx } = queue[0];
   const card = deck.cards[idx];
   const b = overlay?.querySelector('.study-body');
-  if (b) b.insertAdjacentHTML('afterbegin', `<p class="study-working">${icon('sparkles', { size: 'sm' })} ${t('Reescribiendo la tarjeta…')}</p>`);
+  if (b) b.insertAdjacentHTML('afterbegin', `<p class="study-working">${icon('sparkles', { size: 'sm' })} ${doubt ? t('Mejorando la explicación…') : t('Reescribiendo la tarjeta…')}</p>`);
   const passage = await passageOf(deck, card);
+  const task = doubt
+    ? `Eres un experto en tarjetas de memoria. Al repasar esta tarjeta, el alumno tuvo una DUDA y el profesor se la resolvió. Mejora la tarjeta para que esa duda no vuelva a surgir: conserva la pregunta salvo que sea ambigua y amplía "back" con lo que faltaba, en una o dos frases cortas apoyadas en el pasaje. Mantén el idioma de la tarjeta.`
+    : `Eres un experto en tarjetas de memoria. Reescribe esta tarjeta para que sea CLARA y ATÓMICA: una sola pregunta, sin ambigüedad, con una respuesta corta que esté en el pasaje. Mantén el idioma de la tarjeta.`;
+  const cloze = doubt
+    ? 'Es una tarjeta de HUECOS: conserva "front" con sus huecos {{cN::respuesta}} y pon la explicación en "back".'
+    : 'Es una tarjeta de HUECOS: "front" debe ser una frase con UN hueco en formato {{c1::respuesta}} y "back" puede ir vacío.';
+  const extra = doubt ? `\n\nDUDA DEL ALUMNO\n${doubt.question || '(¿por qué es esta la respuesta?)'}\n\nRESPUESTA DEL PROFESOR\n${doubt.answer}` : '';
   try {
     const raw = await LLM.chatStream({
       messages: [
         { role: 'system', content:
-`Eres un experto en tarjetas de memoria. Reescribe esta tarjeta para que sea CLARA y ATÓMICA: una sola pregunta, sin ambigüedad, con una respuesta corta que esté en el pasaje. Mantén el idioma de la tarjeta.
-${card.type === 'cloze' ? 'Es una tarjeta de HUECOS: "front" debe ser una frase con UN hueco en formato {{c1::respuesta}} y "back" puede ir vacío.' : '"front" es la pregunta y "back" la respuesta.'}
+`${task}
+${card.type === 'cloze' ? cloze : '"front" es la pregunta y "back" la respuesta.'}
 Devuelve SOLO un JSON: {"front": "...", "back": "..."}` },
-        { role: 'user', content: `TARJETA ACTUAL\nfront: ${card.front}\nback: ${card.back || ''}\n\nPASAJE DEL LIBRO\n${passage || '(no disponible)'}` },
+        { role: 'user', content: `TARJETA ACTUAL\nfront: ${card.front}\nback: ${card.back || ''}\n\nPASAJE DEL LIBRO\n${passage || '(no disponible)'}${extra}` },
       ],
       maxTokens: 500,
     });
@@ -1357,6 +1388,7 @@ function flip() {
   if ((card.src && deck.bookId) || card.quote) showPassage(deck, card);
   if (recallText) checkRecall(deck, card, recallText);
   if (card.type === 'drawing') runSketchReview(card);
+  renderWhy(deck, card);
   renderGrades(card);
 }
 
@@ -1399,6 +1431,9 @@ function unflip() {
   const fb = overlay.querySelector('.study-feedback');
   if (fb) { fb.innerHTML = ''; fb.hidden = true; }
   abortSketchReview();   // la revisión del boceto no sigue pintando con el frente visible
+  abortWhy();
+  const why = overlay.querySelector('.study-why');
+  if (why) { why.innerHTML = ''; why.hidden = true; }
   suggested = null;
   overlay.querySelector('.study-card3d')?.classList.remove('is-flipped');
   overlay.querySelector('.study-card')?.classList.remove('is-flipped');
@@ -1416,7 +1451,6 @@ function renderGrades(card) {
       <span class="study-grade-lbl">${lbl}</span><small>${Srs.intervalLabel(prev[r])}</small><kbd>${keys[r]}</kbd>
     </button>`;
   f.innerHTML = `
-    ${card.src ? `<button class="study-src">${icon('book', { size: 'md' })} ${t('Ver en el libro')}</button>` : ''}
     <div class="study-grades${full ? '' : ' is-simple'}">
       ${btn('again', t('Otra vez'), 'is-again')}${full ? btn('hard', t('Difícil'), 'is-hard') : ''}
       ${btn('good', t('Bien'), 'is-good')}${full ? btn('easy', t('Fácil'), 'is-easy') : ''}
@@ -1426,8 +1460,6 @@ function renderGrades(card) {
     const g = e.target.closest('[data-rate]');
     if (g) gradeCurrent(g.dataset.rate);
   });
-  const { deck } = queue[0];
-  f.querySelector('.study-src')?.addEventListener('click', (e) => goToSource(deck, card, e.currentTarget));
 }
 
 // Recuerdo activo: el agente compara lo que escribiste con la respuesta y el pasaje, te dice
@@ -1510,6 +1542,132 @@ async function showPassage(deck, card) {
   a.hidden = false;
 }
 
+// ---- P46 · «¿Por qué?»: preguntar al agente desde la tarjeta girada -------------------
+// Solo existe con la tarjeta girada: la respuesta ya está a la vista, así que el agente no
+// puede adelantarla y no hace falta guardarraíl. Un turno, sin historial, dentro del dorso:
+// es una aclaración, no una conversación (para eso está el panel del libro). La nota no se
+// toca ni se sugiere; el intento se apunta como `asked` para medir si esas tarjetas se olvidan
+// más. El salto al libro vive en la misma fila: el pie queda solo para las notas.
+
+function abortWhy() {
+  if (whyCtl) { whyCtl.abort(); whyCtl = null; }
+}
+
+function renderWhy(deck, card) {
+  const box = overlay?.querySelector('.study-why');
+  if (!box) return;
+  const ask = LLM.hasKey();
+  if (!ask && !card.src) return;
+  box.innerHTML = `
+    <div class="study-why-row">
+      ${ask ? `<button class="study-why-btn" title="${t('Pregúntale al agente por esta tarjeta')} (?)">${icon('sparkles', { size: 'sm' })} ${t('¿Por qué?')}</button>` : ''}
+      ${card.src ? `<button class="study-src">${icon('book', { size: 'sm' })} ${t('Abrir en el libro')}</button>` : ''}
+    </div>`;
+  box.hidden = false;
+  box.querySelector('.study-why-btn')?.addEventListener('click', openWhy);
+  box.querySelector('.study-src')?.addEventListener('click', (e) => goToSource(deck, card, e.currentTarget));
+}
+
+// Abre la caja de la duda. Vacía e Intro = «explícame por qué es esta la respuesta».
+function openWhy() {
+  const box = overlay?.querySelector('.study-why');
+  if (!box || !flipped || !queue.length || !LLM.hasKey()) return;
+  let form = box.querySelector('.study-why-form');
+  if (!form) {
+    box.querySelector('.study-why-btn')?.remove();
+    box.insertAdjacentHTML('beforeend', `
+      <div class="study-why-form">
+        <textarea class="study-why-input" rows="1" placeholder="${t('¿Qué no te cuadra? Vacío, te explica la respuesta')}" aria-label="${t('Tu duda')}"></textarea>
+        <button class="btn btn--secondary study-why-send">${t('Preguntar')}</button>
+      </div>`);
+    form = box.querySelector('.study-why-form');
+    const input = form.querySelector('.study-why-input');
+    input.addEventListener('input', () => {
+      input.style.height = 'auto';
+      input.style.height = Math.min(input.scrollHeight, 140) + 'px';
+    });
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); askWhy(input.value.trim()); }
+    });
+    form.querySelector('.study-why-send').addEventListener('click', () => askWhy(input.value.trim()));
+  }
+  form.querySelector('.study-why-input')?.focus();
+}
+
+// Lo que ya sabemos de cómo te va con esta tarjeta: fallos y los últimos intentos.
+async function attemptsContext(deck, card) {
+  const lines = [];
+  const lapses = card.srs?.lapses || 0;
+  if (lapses) lines.push(`La ha olvidado ${lapses} ${lapses === 1 ? 'vez' : 'veces'}.`);
+  if (!card.uid || !deck.bookId) return lines.join('\n');
+  try {
+    const mine = (await DB.getAttempts(deck.bookId)).filter((a) => a.cardUid === card.uid).slice(-3);
+    for (const a of mine) {
+      const how = a.answer ? `respondió «${a.answer}»${a.verdict ? ` (veredicto: ${a.verdict})` : ''}` : 'solo miró';
+      lines.push(`- ${new Date(a.ts).toISOString().slice(0, 10)}: ${how}, nota ${a.grade}`);
+    }
+  } catch { /* sin historial: se pregunta igual */ }
+  return lines.join('\n');
+}
+
+async function askWhy(question) {
+  if (!queue.length || !flipped || !LLM.hasKey()) return;
+  const box = overlay?.querySelector('.study-why');
+  if (!box) return;
+  const { deck, idx } = queue[0];
+  const card = deck.cards[idx];
+  let out = box.querySelector('.study-why-out');
+  if (!out) {
+    box.insertAdjacentHTML('beforeend', '<div class="study-why-out" aria-live="polite"></div>');
+    out = box.querySelector('.study-why-out');
+  }
+  if (asked >= ASK_LIMIT) {
+    out.innerHTML = `<p class="study-feedback-wait">${t('Has llegado al tope de {n} preguntas por sesión.', { n: ASK_LIMIT })}</p>`;
+    return;
+  }
+  abortWhy();
+  const ctl = new AbortController();
+  whyCtl = ctl;
+  asked++;
+  const d = ensureDraft(deck, idx);
+  d.asked = true;
+  box.querySelector('.study-why-form')?.remove();
+  out.innerHTML = `${question ? `<p class="study-why-q">${escapeHtml(question)}</p>` : ''}
+    <p class="study-feedback-wait">${icon('sparkles', { size: 'sm' })} ${t('El agente está pensando…')}</p>`;
+  const expected = card.type === 'cloze'
+    ? String(card.front).replace(CLOZE_RE, (_, ans) => ans) + (card.back ? `\n${card.back}` : '')
+    : `${card.front}\n${card.back || ''}`;
+  const [passage, history] = await Promise.all([passageOf(deck, card), attemptsContext(deck, card)]);
+  const yours = d.answer ? `\n\nLO QUE RESPONDIÓ AHORA\n${d.answer}${d.verdict ? ` (veredicto: ${d.verdict})` : ''}` : '';
+  let acc = '';
+  try {
+    await LLM.chatStream({
+      messages: [
+        { role: 'system', content:
+`Eres un profesor que resuelve dudas durante un repaso con tarjetas de memoria. El alumno ya ha visto la respuesta de la tarjeta; ahora no entiende algo. Resuelve SU duda en 2 a 5 frases, apoyándote en el PASAJE DEL LIBRO. Si la respuesta no está en el pasaje, dilo y contesta con lo que sabes, marcándolo. No repitas la tarjeta ni hagas preámbulos. Si su historial muestra que confunde algo de forma repetida, señálalo en una frase. Responde en el idioma de la duda; si no hay duda escrita, en ${uiLangName()}.` },
+        { role: 'user', content: `LIBRO\n${deck.name || ''}${card.chapter ? ` · ${card.chapter}` : ''}\n\nTARJETA Y RESPUESTA\n${expected}\n\nPASAJE DEL LIBRO\n${passage || '(no disponible)'}${history ? `\n\nHISTORIAL DEL ALUMNO CON ESTA TARJETA\n${history}` : ''}${yours}\n\nDUDA\n${question || '¿Por qué es esta la respuesta? Explícamelo.'}` },
+      ],
+      maxTokens: 600,
+      signal: ctl.signal,
+      onToken: (tok) => {
+        if (ctl.signal.aborted) return;
+        acc += tok;
+        out.innerHTML = `${question ? `<p class="study-why-q">${escapeHtml(question)}</p>` : ''}<div class="study-why-a">${mdToHtml(acc)}</div>`;
+      },
+    });
+    if (ctl.signal.aborted || whyCtl !== ctl) return;
+    whyCtl = null;
+    if (!acc.trim()) throw new Error('empty');
+    out.insertAdjacentHTML('beforeend',
+      `<button class="study-why-improve">${icon('sparkles', { size: 'sm' })} ${t('Mejorar la explicación')}</button>`);
+    out.querySelector('.study-why-improve').addEventListener('click', () => rewriteCurrent({ question, answer: acc }));
+  } catch {
+    if (ctl.signal.aborted || whyCtl !== ctl) return;
+    whyCtl = null;
+    out.innerHTML = `<p class="study-feedback-wait">${t('No se pudo responder ahora.')}</p>`;
+  }
+}
+
 // Deslizar la tarjeta ya girada: izquierda = otra vez, derecha = bien. Con umbral y vuelta a su
 // sitio si no se llega (un toque o un arrastre corto no califica por error).
 function wireSwipe(el) {
@@ -1521,7 +1679,7 @@ function wireSwipe(el) {
   // exigiendo la tarjeta girada: sin ver la respuesta no se califica.
   el.addEventListener('dragstart', (e) => e.preventDefault());
   el.addEventListener('pointerdown', (e) => {
-    if (!flipped || animating || e.target.closest('button, a, details, textarea, canvas')) return;
+    if (!flipped || animating || e.target.closest('button, a, details, textarea, canvas, .study-why')) return;
     x0 = e.clientX; dx = 0;
     el.setPointerCapture?.(e.pointerId);
     el.classList.add('is-dragging');

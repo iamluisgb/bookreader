@@ -3,6 +3,28 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-10-26 — «¿Por qué?»: preguntar al agente desde la tarjeta (P46 F1)
+
+Una duda en mitad del repaso obligaba a minimizarlo, abrir el libro y preguntar en el panel.
+Ahora se resuelve en la propia tarjeta.
+
+- **«¿Por qué?»** en el dorso, o la tecla **`?`**, con la tarjeta girada y una API key configurada.
+  Abre una caja para escribir la duda; si la dejas vacía, el agente explica la respuesta. Un solo
+  turno, en streaming, dentro del dorso. El contexto es la tarjeta, el pasaje, el libro y el
+  capítulo, los fallos y los tres últimos intentos con esa tarjeta y lo que acabas de responder.
+  Antes de girar no existe, así que el agente no puede adelantar la respuesta.
+- **«Mejorar la explicación»** tras la respuesta: `rewriteCurrent` recibe la duda y lo que
+  contestó el agente, conserva la pregunta y amplía el dorso. La propuesta se abre en el editor sin
+  guardar.
+- **La nota no se toca ni se sugiere.** El intento lleva `asked: true` (store `attempts`) para medir
+  si las tarjetas con duda se olvidan más. Tope de 20 dudas por sesión.
+- **«Ver en el libro» sale del pie** y pasa al dorso, al lado de «¿Por qué?», como «Abrir en el
+  libro». El pie queda solo para las notas, y ya no hay dos botones casi iguales («Ver el pasaje
+  del libro» despliega el texto; «Abrir en el libro» te lleva a él).
+- Teclado: escribir la duda no califica (la caja se aparta de `onKey`, como la del recuerdo) y la
+  `?` global de la guía rápida no se abre encima del repaso.
+- Tests: `tests/study-why.spec.ts` (2 casos, modelo simulado).
+
 ## 2026-10-25 — El MCP crea matrices y lee los intentos (P53)
 
 - **`add_exercise`** / **`delete_exercise`** (`mcp/src/write-tools.mjs`): una matriz para rellenar

@@ -163,6 +163,7 @@ test('cada nota deja un intento con sus campos, y deshacer lo retira', async ({ 
     prevInterval: null, // tarjeta nueva
     arm: null,
     answer: null, // girada sin escribir: no hay texto que guardar
+    asked: false, // no se preguntó «¿Por qué?» (P46)
   });
   expect(typeof a.uid).toBe('string');
   expect(a.latencyMs).toBeGreaterThanOrEqual(0);
@@ -171,6 +172,7 @@ test('cada nota deja un intento con sus campos, y deshacer lo retira', async ({ 
   expect(Object.keys(a).sort()).toEqual([
     'answer',
     'arm',
+    'asked',
     'bookId',
     'cardHash',
     'cardUid',

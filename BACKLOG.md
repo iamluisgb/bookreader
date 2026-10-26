@@ -2574,7 +2574,15 @@ inteligentes— o libro) que filtra lectura, estudio y carga, con «Repasar esta
 **Un libro entero:** al elegirlo se abre en «Todo», con ritmo (palabras/min), semanas, terminado en N
 días o por dónde vas, y la curva de páginas acumuladas. Tests: `analysis-periods.spec.ts`.
 
-### P46 — Preguntar desde la tarjeta: el agente dentro del repaso · `F1 S` + `F2 M` · **aprendizaje basado en evidencia**
+### P46 — Preguntar desde la tarjeta: el agente dentro del repaso · `F1 S` + `F2 M` · **F1 ✓ entregada (2026-10-26)** · **aprendizaje basado en evidencia**
+
+> **F1 entregada (ver CHANGELOG 2026-10-26), con dos cambios sobre lo escrito abajo.** (1) La
+> puerta no es fallar: «¿Por qué?» sale **siempre que la tarjeta está girada**. El veredicto solo
+> existe si escribes la respuesta, y en el modo «revelar», el habitual, el botón casi nunca habría
+> salido. (2) Sin guardarraíl de «no te doy la respuesta»: antes de girar el botón no existe y
+> después la respuesta ya está a la vista, así que no hay nada que filtrar. El control de 0 % de
+> fuga del contrato se cumple por construcción. Falta: el baseline del contrato (dudas/semana,
+> ahora medibles con `asked` en `attempts`) antes de decidir F2.
 
 **El caso (2026-10-19).** Estudiando con las tarjetas la duda no espera: por qué esta respuesta es
 esta, de dónde sale, en qué se diferencia de lo de al lado. Hoy la única salida es minimizar el
@@ -2621,7 +2629,7 @@ que la tarjeta pregunta.
   contexto tiene que ser distinto antes y después de voltear.
 - **Ritmo y coste:** una llamada por duda. Tope por sesión y, si el uso lo pide, modelo barato.
 
-**F1 · «¿Por qué?» tras fallar · `S`.** Veredicto negativo → botón en el veredicto y en la tarjeta
+**F1 · «¿Por qué?» tras fallar · `S` · ✓ (con la puerta en «girada», ver la nota de arriba).** Veredicto negativo → botón en el veredicto y en la tarjeta
 de leech, con el pasaje de origen y la respuesta en el contexto. Un solo turno, sin historial. Test
 de punta a punta con el modelo simulado, como [`practice.spec.ts`](tests/practice.spec.ts).
 

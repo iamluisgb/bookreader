@@ -2286,7 +2286,8 @@ function initNavigation() {
     if (e.target.id === 'progress-container') return;   // el slider gestiona sus propias flechas
     // P30 F4: '?' abre la guía rápida («¿qué puedo hacer aquí?»). Va ANTES del guard
     // de modificadores: en la mayoría de teclados '?' ES Shift+'/' y si no, no llega.
-    if (e.key === '?') { FeatureGuide.toggle(); return; }
+    // En el repaso, '?' es «¿Por qué?» (P46): la guía no se abre encima de la tarjeta.
+    if (e.key === '?') { if (!document.querySelector('#ai-study:not([hidden])')) FeatureGuide.toggle(); return; }
     if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
     if (e.key === 'ArrowLeft') {
       if (EpubReader.isLoaded()) EpubReader.tapPrev();
