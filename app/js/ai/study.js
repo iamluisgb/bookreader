@@ -25,6 +25,7 @@ import { bookLook } from '../ui/book-accent.js';
 import { cargar } from '../ui/brand.js';
 import { toast } from './toast.js';
 import { mdToHtml } from './markdown.js';
+import { whyMessages, neighborPassages } from './why-prompt.js';
 import * as SegmentFile from './segment-file.js';
 import { sanitizeSvg, reviewDrawing } from './visual-cards.js';
 import { shuffledOptions } from './widgets/mcq.js';
@@ -1568,7 +1569,13 @@ function renderWhy(deck, card) {
   box.querySelector('.study-src')?.addEventListener('click', (e) => goToSource(deck, card, e.currentTarget));
 }
 
-// Abre la caja de la duda. Vacía e Intro = «explícame por qué es esta la respuesta».
+// Preguntas de un toque (why-prompt.js · WHY_KINDS): la duda vaga «¿por qué?» solo se puede
+// contestar repitiendo la tarjeta; estas piden algo que la tarjeta no tiene.
+function whyKinds() {
+  return [['example', t('Dame un ejemplo')], ['alternative', t('¿Qué descarta?')], ['matters', t('¿Por qué importa?')]];
+}
+
+// Abre la caja de la duda. Vacía e Intro = «explícame lo que la tarjeta no dice».
 function openWhy() {
   const box = overlay?.querySelector('.study-why');
   if (!box || !flipped || !queue.length || !LLM.hasKey()) return;
@@ -1577,10 +1584,17 @@ function openWhy() {
     box.querySelector('.study-why-btn')?.remove();
     box.insertAdjacentHTML('beforeend', `
       <div class="study-why-form">
-        <textarea class="study-why-input" rows="1" placeholder="${t('¿Qué no te cuadra? Vacío, te explica la respuesta')}" aria-label="${t('Tu duda')}"></textarea>
-        <button class="btn btn--secondary study-why-send">${t('Preguntar')}</button>
+        <div class="study-why-kinds">${whyKinds().map(([k, label]) => `<button class="study-why-kind" data-kind="${k}">${label}</button>`).join('')}</div>
+        <div class="study-why-ask">
+          <textarea class="study-why-input" rows="1" placeholder="${t('O escribe tu duda')}" aria-label="${t('Tu duda')}"></textarea>
+          <button class="study-why-send">${t('Preguntar')}</button>
+        </div>
       </div>`);
     form = box.querySelector('.study-why-form');
+    form.querySelector('.study-why-kinds').addEventListener('click', (e) => {
+      const k = e.target.closest('[data-kind]');
+      if (k) askWhy(k.textContent, k.dataset.kind);
+    });
     const input = form.querySelector('.study-why-input');
     input.addEventListener('input', () => {
       input.style.height = 'auto';
@@ -1610,7 +1624,7 @@ async function attemptsContext(deck, card) {
   return lines.join('\n');
 }
 
-async function askWhy(question) {
+async function askWhy(question, kind = '') {
   if (!queue.length || !flipped || !LLM.hasKey()) return;
   const box = overlay?.querySelector('.study-why');
   if (!box) return;
@@ -1637,16 +1651,23 @@ async function askWhy(question) {
   const expected = card.type === 'cloze'
     ? String(card.front).replace(CLOZE_RE, (_, ans) => ans) + (card.back ? `\n${card.back}` : '')
     : `${card.front}\n${card.back || ''}`;
-  const [passage, history] = await Promise.all([passageOf(deck, card), attemptsContext(deck, card)]);
-  const yours = d.answer ? `\n\nLO QUE RESPONDIÓ AHORA\n${d.answer}${d.verdict ? ` (veredicto: ${d.verdict})` : ''}` : '';
+  const [passage, history, around] = await Promise.all([
+    passageOf(deck, card),
+    attemptsContext(deck, card),
+    card.src && deck.bookId ? passagesFor(deck.bookId).then((m) => neighborPassages(m, card.src)).catch(() => ({})) : {},
+  ]);
+  const yours = d.answer ? `${d.answer}${d.verdict ? ` (veredicto: ${d.verdict})` : ''}` : '';
   let acc = '';
   try {
     await LLM.chatStream({
-      messages: [
-        { role: 'system', content:
-`Eres un profesor que resuelve dudas durante un repaso con tarjetas de memoria. El alumno ya ha visto la respuesta de la tarjeta; ahora no entiende algo. Resuelve SU duda en 2 a 5 frases, apoyándote en el PASAJE DEL LIBRO. Si la respuesta no está en el pasaje, dilo y contesta con lo que sabes, marcándolo. No repitas la tarjeta ni hagas preámbulos. Si su historial muestra que confunde algo de forma repetida, señálalo en una frase. Responde en el idioma de la duda; si no hay duda escrita, en ${uiLangName()}.` },
-        { role: 'user', content: `LIBRO\n${deck.name || ''}${card.chapter ? ` · ${card.chapter}` : ''}\n\nTARJETA Y RESPUESTA\n${expected}\n\nPASAJE DEL LIBRO\n${passage || '(no disponible)'}${history ? `\n\nHISTORIAL DEL ALUMNO CON ESTA TARJETA\n${history}` : ''}${yours}\n\nDUDA\n${question || '¿Por qué es esta la respuesta? Explícamelo.'}` },
-      ],
+      messages: whyMessages({
+        book: deck.name || '', chapter: card.chapter || '', expected, passage,
+        before: around.before, after: around.after, history, yours, question: kind ? '' : question, kind,
+        lang: uiLangName(),
+      }),
+      // Sin razonamiento: con él, el modelo gastaba el tope pensando y la respuesta salía vacía
+      // o cortada (eval why-2026-10-26). Y en mitad de un repaso, esperar 20 s no vale.
+      thinking: false,
       maxTokens: 600,
       signal: ctl.signal,
       onToken: (tok) => {

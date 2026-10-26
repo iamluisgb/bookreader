@@ -41,7 +41,7 @@ async function seed(page) {
     const DB: any = await import('/js/ai/db.js');
     await DB.put('bookText', {
       bookId: BOOK_ID, segVersion: 5, blockCount: 1, tokenEstimate: 20,
-      annotatedText: '## 9\n[[a1]] Three-phase commit assumes a network with bounded delay.',
+      annotatedText: '## 9\n[[a0]] Two-phase commit blocks if the coordinator dies.\n[[a1]] Three-phase commit assumes a network with bounded delay.\n[[a2]] Real networks have unbounded delays.',
     });
     await DB.addDeck({
       bookId: BOOK_ID, name: 'DDIA', cardType: 'basic', scope: '',
@@ -91,6 +91,8 @@ test('«¿Por qué?» responde en el dorso, no califica al escribir y apunta el 
   const ask = await page.evaluate(() => (window as any).__why.bodies.find((b: any) =>
     b.messages[0].content.includes('resuelve dudas')).messages[1].content);
   expect(ask).toContain('Three-phase commit assumes');   // el pasaje
+  expect(ask).toContain('Antes: Two-phase commit blocks');      // y sus vecinos (P46 v2)
+  expect(ask).toContain('Después: Real networks have unbounded');
   expect(ask).toContain('¿y con 2 nodos?');              // la duda
   expect(ask).toContain('Retardo acotado.');             // la respuesta, ya vista
 
@@ -105,7 +107,16 @@ test('«¿Por qué?» responde en el dorso, no califica al escribir y apunta el 
   expect(improve).toContain('¿y con 2 nodos?');
   await overlay.locator('.study-edit-cancel').click();
 
+  // Las preguntas de un toque mandan su encargo, no la etiqueta.
   await overlay.locator('.study-flip').click();
+  await overlay.locator('.study-why-btn').click();
+  await overlay.locator('.study-why-kind[data-kind="example"]').click();
+  await expect(overlay.locator('.study-why-q')).toHaveText('Dame un ejemplo');
+  await expect(overlay.locator('.study-why-a')).toContainText('retardo acotado');
+  const chip = await page.evaluate(() => (window as any).__why.bodies.filter((b: any) =>
+    b.messages[0].content.includes('resuelve dudas')).at(-1).messages[1].content);
+  expect(chip).toContain('Dame un ejemplo concreto y pequeño');
+
   await overlay.locator('.study-grade[data-rate="good"]').click();
   await expect.poll(async () => page.evaluate(async (BOOK_ID) =>
     ((await (await import('/js/ai/db.js') as any).getAttempts(BOOK_ID)) || []).map((a: any) => a.asked), BOOK_ID)).toEqual([true]);

@@ -3,6 +3,36 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-10-26 — «¿Por qué?» v2: cita del libro, nada de repetir la tarjeta (P46)
+
+La primera respuesta real (sort-merge join en DDIA) repetía el dorso con otras palabras, no citaba
+el libro y salía en un bloque. La pregunta por defecto, «¿por qué es esta la respuesta?», solo se
+podía contestar repitiéndola.
+
+- **Prompt v2** en `app/js/ai/why-prompt.js` (puro, lo comparten la app y la eval). La respuesta
+  empieza con una cita literal del pasaje (`> …`), cada frase añade algo que la tarjeta no dice y
+  lo que no sale del libro va marcado «(fuera del libro)». Con la caja vacía pide lo que la
+  tarjeta no dice.
+- **Tres preguntas de un toque**: «Dame un ejemplo», «¿Qué descarta?» y «¿Por qué importa?».
+- **Más contexto**: los pasajes de antes y de después del de la tarjeta.
+- **Sin razonamiento** (`thinking: false`): con él, el modelo gastaba los 600 tokens pensando y
+  la respuesta salía vacía o cortada (18 de 50 en el primer run de la eval).
+- **Eval** `node evals/why.mjs <run>`: 10 tarjetas de DDIA escritas sobre párrafos reales, v1
+  (desplegada) contra v2 con la caja vacía y con cada botón. Generador `deepseek-v4-flash`, juez
+  `glm5.3-flash`. Run `2026-10-26b`:
+
+  | | cita literal | frases nuevas | errores | palabras |
+  |---|---|---|---|---|
+  | v1 | 0 % | 46 % | 0 | 92 |
+  | v2 (caja vacía) | 100 % | 86 % | 0 | 98 |
+  | v2 · ejemplo | 90 % | 88 % | 1 | 96 |
+  | v2 · descarta | 100 % | 81 % | 0 | 84 |
+  | v2 · importa | 100 % | 91 % | 0 | 89 |
+
+  El tope de 80 palabras no se cumple (con listas y código salen ~90). El juez no devolvió dato
+  en 5 de 50 respuestas, que no cuentan. El único error: marcar «(fuera del libro)» algo que el
+  libro explica en el párrafo siguiente.
+
 ## 2026-10-26 — «¿Por qué?»: preguntar al agente desde la tarjeta (P46 F1)
 
 Una duda en mitad del repaso obligaba a minimizarlo, abrir el libro y preguntar en el panel.
