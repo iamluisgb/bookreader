@@ -380,7 +380,6 @@ function getPdfjs() {
   if (pdfjsLib) return pdfjsLib;
   // El bundle (vendorizado) lo expone como window.pdfjsLib o window["pdfjs-dist/build/pdf"]
   pdfjsLib = window.pdfjsLib || window['pdfjs-dist/build/pdf'] || window['pdfjsLib'];
-  if (pdfjsLib) configurarWorker();
   return pdfjsLib;
 }
 
@@ -390,15 +389,6 @@ async function ensurePdfjs() {
   if (getPdfjs()) return pdfjsLib;
   await loadPdfJs();
   return getPdfjs();
-}
-
-function configurarWorker() {
-  try {
-    // Worker local (mismo origen): funciona offline y bajo CSP worker-src 'self'.
-    pdfjsLib.GlobalWorkerOptions.workerSrc = 'vendor/pdf.worker-3.11.174.min.js';
-  } catch(e) {
-    console.warn('pdf.js worker setup error:', e);
-  }
 }
 
 // "Cargado" = hay documento Y es el lector que está en pantalla (ver deactivate y el

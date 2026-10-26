@@ -43,9 +43,17 @@ export async function loadEpubJs() {
   return window.ePub;
 }
 
+// El worker se fija AQUÍ, para todo el que use pdf.js (lector, trocear en segundo plano,
+// figuras). Sin workerSrc, pdf.js deduce pdf-3.11.174.worker.min.js —no existe— y, al
+// fallar, apaga los workers y memoriza el fallo: ningún PDF abre ya hasta recargar.
 export async function loadPdfJs() {
   if (!getPdfGlobal()) await loadScript('vendor/pdf-3.11.174.min.js');
-  return getPdfGlobal();
+  const lib = getPdfGlobal();
+  // Worker local (mismo origen): funciona offline y bajo CSP worker-src 'self'.
+  if (lib && !lib.GlobalWorkerOptions.workerSrc) {
+    lib.GlobalWorkerOptions.workerSrc = 'vendor/pdf.worker-3.11.174.min.js';
+  }
+  return lib;
 }
 
 // El bundle vendorizado se expone con tres nombres distintos según cómo se empaquetó.
