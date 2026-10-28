@@ -59,14 +59,21 @@ export const ROUTING = {
   //
   // `free`: NO descuenta cuota. El usuario no pide estas llamadas ni las percibe, así
   // que cobrárselas hacía que el contador bajara de dos en dos por una sola pregunta
-  // — con el cupo en porcentaje eso se lee directamente como un timo. Son qwen3.6 y
-  // el proveedor es tarifa plana: lo que cuestan no es el problema. Siguen contando
-  // para los disyuntores diarios, que son antiabuso y no presupuesto.
+  // — con el cupo en porcentaje eso se lee directamente como un timo. El proveedor es
+  // tarifa plana: lo que cuestan no es el problema. Siguen contando para los disyuntores
+  // diarios, que son antiabuso y no presupuesto.
+  //
+  // qwen3.8-flash y no qwen3.6: el 3.6 se volvió un modelo de razonamiento que gasta el
+  // presupuesto entero pensando y devuelve `content` VACÍO con finish_reason 'length'
+  // (medido 2026-10-28 con el tope del carril: 0 caracteres de respuesta). Falla en
+  // silencio, que es lo peor para una llamada que nadie ve. `thinkingOff` importa aquí
+  // más que en ningún sitio: con `thinking: {type: 'disabled'}` el 3.8-flash responde
+  // con 1 token de salida y sin traza, que es todo lo que este carril necesita.
   'bookreader-lite': {
     product: 'bookreader',
     provider: 'nan',
-    model: 'qwen3.6',
-    caps: { tools: true, vision: false },
+    model: 'qwen3.8-flash',
+    caps: { tools: true, vision: false, thinkingOff: true },
     free: true,
   },
   // Dictado por proveedor (voz → texto). `kind: 'stt'` porque NO es un modelo de chat:
@@ -98,12 +105,14 @@ export const ROUTING = {
     // thinkingOff: el modelo acepta `thinking: {type: 'disabled'}` (ver forwardThinking).
     caps: { tools: true, vision: false, thinkingOff: true },
   },
-  // Visión: qwen3.6 y no mimo-v2.5 porque es el que arete tiene verificado para leer
-  // capturas de entrenos (ver su js/ai/llm.js) — y además acepta tools.
+  // Visión: qwen3.8-flash y no mimo-v2.5 porque es el que arete tiene verificado para
+  // leer capturas de entrenos (ver su js/ai/llm.js) — y además acepta tools. Era
+  // qwen3.6 hasta el 2026-10-28: el 3.8-flash se midió antes de cambiar (describe una
+  // imagen de 16×16 y devuelve el color correcto, y emite tool_calls bien formados).
   'arete-vision': {
     product: 'arete',
     provider: 'nan',
-    model: 'qwen3.6',
+    model: 'qwen3.8-flash',
     caps: { tools: true, vision: true },
   },
 };

@@ -55,7 +55,7 @@ test('las llamadas auxiliares no descuentan cupo, pero sí exigen tenerlo', asyn
   const aux = await chat(body.token, 'bookreader-lite');
   assert.equal(aux.status, 200);
   assert.equal(aux.headers.get('X-Quota-Remaining'), '3', 'el alias lite es gratis');
-  assert.equal(upstream[0].body.model, 'qwen3.6');
+  assert.equal(upstream[0].body.model, 'qwen3.8-flash');
 
   // Agotar el cupo con las que sí cuentan y comprobar que la auxiliar deja de pasar:
   // media app funcionando con el cupo agotado sería inexplicable para el usuario.
@@ -188,10 +188,13 @@ test('el disyuntor diario cuenta las dos apps juntas: es un solo presupuesto', a
 });
 
 // P43 · «Sin razonamiento»: solo el apagado, y solo a rutas que lo admiten.
-test('thinking: se reenvía el apagado a deepseek y nada más', async () => {
+// bookreader-lite entra desde el 2026-10-28: qwen3.8-flash acepta `thinking: {type:'disabled'}`
+// (medido: responde con 1 token de salida y sin traza), y sin el apagado se pasa ~2,4 s
+// razonando en una llamada que el usuario no ve. El `enabled` nunca se reenvía.
+test('thinking: se reenvía el apagado a las rutas que lo admiten y nada más', async () => {
   const { body } = await pedirDemo('bookreader');
   await chat(body.token, 'bookreader-fast', { thinking: { type: 'disabled' } });
   await chat(body.token, 'bookreader-fast', { thinking: { type: 'enabled', budget_tokens: 99999 } });
   await chat(body.token, 'bookreader-lite', { thinking: { type: 'disabled' } });
-  assert.deepEqual(upstream.map((u) => u.body.thinking), [{ type: 'disabled' }, undefined, undefined]);
+  assert.deepEqual(upstream.map((u) => u.body.thinking), [{ type: 'disabled' }, undefined, { type: 'disabled' }]);
 });

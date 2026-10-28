@@ -3,6 +3,29 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-10-28 — El carril lite y la visión de arete pasan a qwen3.8-flash
+
+`qwen3.6` dejó de ser un modelo que responde: hoy es de razonamiento y **gasta el presupuesto
+entero pensando**, devolviendo `content` vacío con `finish_reason: 'length'`. Medido el 2026-10-28
+con el tope del carril lite: `qwen3.6` → 0 caracteres de respuesta (222 de traza) mientras
+`qwen3.8-flash` → «OK» correcto. Falla **en silencio**, y en `bookreader-lite` (query-expand,
+atenuación) nadie lo ve: no hay pantalla que muestre la llamada.
+
+- **`bookreader-lite` → `qwen3.8-flash`** y `caps.thinkingOff: true`. Con
+  `thinking: {type: 'disabled'}` responde con **1 token de salida** y sin traza (1,7 s la primera
+  llamada); sin ese apagado razona ~2,4 s para decir «OK». Sigue siendo `free` (no descuenta cupo).
+- **`arete-vision` → `qwen3.8-flash`**: verificado antes de cambiar, describe una imagen de 16×16 y
+  acierta el color («Azul»), y emite `tool_calls` bien formados.
+- **Test de `thinking` actualizado** (`products.test.mjs`): el apagado ahora también se reenvía a
+  `bookreader-lite`; el `enabled` sigue sin reenviarse nunca. `npm run test:gateway` 56/56.
+- Desplegado `bookreader-gateway`, versión `c6bf7cb0-4b90-49df-897b-64a18c0d2586`. Humo en
+  producción: `arete-vision` con imagen real → «Azul» (200, 2,9 s); `arete-fast` intacto.
+  `bookreader-lite` no se pudo ejercitar en vivo desde el lab (su demo del día ya estaba gastada);
+  queda cubierto por el test del alias y por las sondas directas contra nan.
+- **Pendiente, fuera de este cambio:** el preset `nan` de `app/js/ai/llm.js` sigue ofreciendo
+  `qwen3.6` en su lista de modelos, que hoy es una trampa para quien use su propia key; y la pista
+  de Ajustes (`app-settings.js` + `i18n.js`) aún dice «en nan usa qwen3.6».
+
 ## 2026-10-26 — «¿Por qué?» v2: cita del libro, nada de repetir la tarjeta (P46)
 
 La primera respuesta real (sort-merge join en DDIA) repetía el dorso con otras palabras, no citaba
