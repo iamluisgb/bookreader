@@ -6,7 +6,9 @@ import { join } from 'path';
 // una ruta que empieza por «/» apunta a la raíz de ESE dominio y da 404. Así se perdieron
 // las portadas del libro en 3D. Las páginas públicas y su JS/CSS solo usan rutas relativas.
 const PAGES = ['index.html', 'es/index.html', 'anki/index.html', 'privacy/index.html',
-  'assets/landing/motion.js', 'assets/landing/motion.css', 'assets/landing/brand.css'];
+  'why/index.html', 'es/por-que/index.html',
+  'assets/landing/motion.js', 'assets/landing/motion.css', 'assets/landing/brand.css',
+  'assets/landing/map.js', 'assets/landing/map.css', 'assets/landing/why.css'];
 
 test('las páginas públicas no usan rutas absolutas a recursos propios', () => {
   const bad: string[] = [];

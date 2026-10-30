@@ -3,6 +3,31 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-10-30 — Landing: diagrama de lo que trae, luz de lectura, preguntas al agente y manifiesto
+
+Ideas sacadas de savvia.studio (plan en `workspace/docs/plan-elevar-webs-savvia-2026-10-30.md`).
+Lo que más a plantilla sonaba eran las cuatro tarjetas con viñetas de «Everything in the box».
+
+- **«Everything in the box» es un diagrama** (`assets/landing/map.css` + `map.js`): lo que
+  pones (EPUB/PDF, subrayados, objetivo, preguntas) → tu libro → siete salidas. Cada salida enseña
+  su mini-demo en la tarjeta del centro (preguntar con cita, Explícame, Zona, Feynman, tarjetas,
+  pregunta de fin de capítulo, Anki/Markdown); sin tocar, pasa sola de una a otra mientras se ve.
+  Lo básico del lector queda en una línea al pie. Lo de «Sin conexión y tuyo» pasa a la banda de
+  valores. Regla P30 · F5 intacta: las mismas features en EN y ES.
+- **«Read at night, too»**: al bajar, la misma página pasa de Light a Sepia y a Dark con luz
+  cálida, con los colores de `themes.css` y el mismo overlay naranja en multiply que `#night-warm`.
+  Sin movimiento, tres páginas quietas.
+- **Las preguntas como conversación con el agente**, con su cita (Privacidad, Por qué), y una
+  firma: «BookReader is made by Luis González», con enlace a su web y a las issues. Texto fijo.
+  La respuesta ES de «¿Dónde se guardan mis libros?» decía que no había sync; ahora dice lo mismo
+  que la EN (anotaciones por tu Google Drive).
+- **Manifiesto**: `/why/` y `/es/por-que/` (`assets/landing/why.css`), enlazado desde la banda de
+  valores, la FAQ y el pie. `why` añadido a `PUBLIC` de `scripts/build-pages.mjs`.
+- **Cifras públicas: no.** Los evals dan notas de juez (pertinencia de citas 3-4/5), no una
+  medida reproducible; no se enseña ninguna hasta tenerla.
+- Tests: `tests/landing-map.spec.ts` (3) y las rutas nuevas en `landing-paths.spec.ts`; las
+  specs `landing-*` 11/11 en verde.
+
 ## 2026-10-28 — El carril lite y la visión de arete pasan a qwen3.8-flash
 
 `qwen3.6` dejó de ser un modelo que responde: hoy es de razonamiento y **gasta el presupuesto

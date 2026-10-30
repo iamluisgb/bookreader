@@ -162,26 +162,10 @@ if (!window.matchMedia || !matchMedia('(prefers-reduced-motion: reduce)').matche
   .values .seal { margin-top: 34px; font: 600 clamp(17px, 2vw, 21px) var(--font-display); color: var(--band-ink); }
   .values .seal span { color: var(--brand); }
 
-  /* ---- "Y además" + FAQ ---- */
-  /* ---- What's in the box (P30 · F5): inventario por momento de lectura.
-       Regla: una feature entra aquí y también en es/index.html (y en la guía in-app) o en ninguna. ---- */
-  .box-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 22px; max-width: 920px; margin: clamp(36px, 5vh, 52px) auto 0; text-align: left; }
-  .box-group { background: var(--surface-2); border: 1px solid var(--border); border-radius: 16px; padding: 20px 22px 22px; }
-  .box-group h3 { margin: 0 0 10px; font: 600 11.5px var(--font-ui); letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); }
-  .box-group ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 7px; }
-  .box-group li { font-size: 14.5px; color: var(--text-soft); line-height: 1.5; padding-left: 21px; position: relative; }
-  .box-group li b { color: var(--text); font-weight: 600; }
-  .box-group li::before { content: ""; position: absolute; left: 0; top: 7.5px; width: 10px; height: 10px; border-radius: 50%; background: var(--accent-soft); box-shadow: inset 0 0 0 2px var(--brand); }
-  @media (max-width: 720px) { .box-grid { grid-template-columns: 1fr; } }
-
-  .faq { max-width: 720px; margin: clamp(40px, 6vh, 60px) auto 0; text-align: left; }
-  .faq details { border-top: 1px solid var(--border); }
-  .faq details:last-of-type { border-bottom: 1px solid var(--border); }
-  .faq summary { cursor: pointer; list-style: none; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 19px 2px; font: 600 15.5px var(--font-ui); }
-  .faq summary::-webkit-details-marker { display: none; }
-  .faq summary::after { content: "+"; font: 400 22px var(--font-display); color: var(--accent); transition: transform 0.2s ease; flex: none; }
-  .faq details[open] summary::after { transform: rotate(45deg); }
-  .faq .ans { padding: 0 2px 20px; font-size: 15px; color: var(--text-soft); max-width: 62ch; }
+  .values .values-more { margin-top: 18px; font-size: 16px; }
+  .values .values-more b { color: var(--band-ink); }
+  .values-why { margin: 18px 0 0; font: 600 15px var(--font-ui); }
+  .values-why a { color: var(--brand); }
 
   footer { border-top: 1px solid var(--border); padding: 28px 0 36px; }
   .foot-in { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; font: 400 13px var(--font-ui); color: var(--text-faint); }
@@ -193,6 +177,7 @@ if (!window.matchMedia || !matchMedia('(prefers-reduced-motion: reduce)').matche
   }
 </style>
 <link rel="stylesheet" href="assets/landing/motion.css">
+<link rel="stylesheet" href="assets/landing/map.css">
 <link rel="preload" as="image" href="assets/landing/covers/ddia-2e.webp">
 <!-- Umami Analytics: solo carga en producción (servimos el tracker en /u/s.js); en localhost/tests, nada -->
 <script>
@@ -407,13 +392,34 @@ if (location.hostname === 'bookreader.raiatech.com') {
   </div>
 </section>
 
+<!-- Beat 5b · La luz de lectura (map.css / map.js): la misma página de Light a Sepia y a Dark con luz cálida -->
+<section class="beat alt night" id="night">
+  <div class="wrap">
+    <div class="beat-copy">
+      <h2>Read at night, too.</h2>
+      <p class="support">Three themes, paper tones, brightness and a <b>warm light</b> for late reading. The same page, the way your eyes want it.</p>
+    </div>
+    <div class="night-stage">
+      <div class="night-page" aria-hidden="true"><div class="page-ch">Transactions</div><p>This pattern of read-modify-write can cause lost updates. An atomic compare-and-set operation avoids the lost update by only allowing the write if the value has not changed since you last read it.</p><span class="night-warm"></span><span class="night-dim"></span></div>
+      <div class="night-steps" aria-hidden="true"><span>Light</span><span>Sepia</span><span>Dark + warm light</span></div>
+      <div class="night-static" role="img" aria-label="The same page in the Light, Sepia and Dark themes, the last one with warm light">
+        <div class="night-page" style="background:#fff;color:#1d1d1f"><div class="page-ch">Light</div><p>An atomic compare-and-set operation avoids the lost update.</p></div>
+        <div class="night-page" style="background:#f7f1e3;color:#3f382e"><div class="page-ch">Sepia</div><p>An atomic compare-and-set operation avoids the lost update.</p></div>
+        <div class="night-page" style="background:#121214;color:#f5f5f7"><div class="page-ch">Dark + warm light</div><p>An atomic compare-and-set operation avoids the lost update.</p><span class="night-warm" style="opacity:.32"></span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- Beat 6 · Los valores -->
 <section class="beat values">
   <div class="wrap">
     <div class="beat-copy">
       <h2>Your books are yours. So are your questions.</h2>
       <p class="support">No account. No server. Nobody in between. Everything lives on your device, and you can take it with you anytime.</p>
+      <p class="support values-more">Installable, so reading, highlighting and reviewing work offline. Sync through <b>your own Google Drive</b>. A full backup whenever you want.</p>
       <p class="seal">Private by design. <span>That's BookReader.</span></p>
+      <p class="values-why"><a href="why/" data-umami-event="Why">Why it’s built this way →</a></p>
     </div>
     <div class="strata-stage" role="img" aria-label="Everything stays in layers inside your device: your books, highlights and notes, flashcards and progress, and your AI key">
       <div class="strata" id="strata" aria-hidden="true">
@@ -427,56 +433,86 @@ if (location.hostname === 'bookreader.raiatech.com') {
   </div>
 </section>
 
-<!-- What's in the box + FAQ -->
+<!-- What's in the box: un diagrama (map.css / map.js). Regla de P30 · F5: una feature entra aquí
+     y también en es/index.html (y en la guía in-app) o en ninguna. -->
 <section class="beat alt">
   <div class="wrap">
     <div class="beat-copy">
       <h2>Everything in the box.</h2>
-      <p class="support">The whole toolkit, grouped by the moment you need it — nothing buried in menus.</p>
+      <p class="support">Your book in the middle. What you bring on the left, what it gives you back on the right. Tap one to see it.</p>
     </div>
-    <div class="box-grid">
-      <div class="box-group">
-        <h3>While you read</h3>
-        <ul>
-          <li><b>Immersive mode</b>, page by page or continuous scroll.</li>
-          <li><b>In-book search</b>, bookmarks, highlights & notes.</li>
-          <li>Three reading themes, paper tones, <b>brightness & warm light</b>.</li>
-          <li>Typography tuned your way: font, size, columns, line height.</li>
-          <li>Remaining <b>reading time</b>, per chapter and per book.</li>
-        </ul>
+    <figure class="bmap" id="bmap">
+      <ul class="bmap-col bmap-in" aria-label="What you bring">
+        <li><b>EPUB</b> or <b>PDF</b></li>
+        <li>Your <b>highlights</b> &amp; notes</li>
+        <li>Your <b>reading goal</b></li>
+        <li>Your <b>questions</b></li>
+      </ul>
+      <div class="bmap-core">
+        <div class="bmap-head"><img src="assets/landing/covers/ddia-2e.webp" alt="" width="34" height="50" loading="lazy" decoding="async"><div><b>Designing Data-Intensive Applications</b><small>Example book</small></div></div>
+        <div class="bmap-demo" data-demo="ask">
+          <span class="bmap-tag">Ask the agent</span>
+          <div class="bubble q">Why does my counter lose increments?</div>
+          <div class="bubble a">Two requests read the same value and the second write wipes out the first. The book's fix is compare-and-set.</div>
+          <span class="chip"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4.5h7a2 2 0 0 1 2 2V20a2.5 2.5 0 0 0-2.5-2H5V4.5Z"/><path d="M19 4.5h-3a2 2 0 0 0-2 2V20a2.5 2.5 0 0 1 2.5-2H19V4.5Z"/></svg> Transactions · tap to verify</span>
+        </div>
+        <div class="bmap-demo" data-demo="explain" hidden>
+          <span class="bmap-tag">Explain this</span>
+          <p class="quote">Even with w + r &gt; n, there are edge cases where <mark>stale values are returned</mark>.</p>
+          <div class="row"><span class="chip">Explain this</span><span class="chip">Why it matters</span><span class="chip">With numbers</span></div>
+          <div class="bubble a">A quorum guarantees overlap only if writes land on the usual nodes. With a sloppy quorum they may not, so a read can miss the newest value.</div>
+        </div>
+        <div class="bmap-demo" data-demo="zone" hidden>
+          <span class="bmap-tag">Zone · PDF</span>
+          <svg class="fig" viewBox="0 0 300 92" aria-hidden="true"><rect x="22" y="30" width="62" height="34" rx="5" fill="none" stroke="#8a7f68"/><rect x="120" y="14" width="62" height="28" rx="5" fill="none" stroke="#8a7f68"/><rect x="120" y="54" width="62" height="28" rx="5" fill="none" stroke="#8a7f68"/><path d="M84 47 L120 28 M84 47 L120 68" stroke="#8a7f68"/><text x="53" y="51" font-size="10" text-anchor="middle" fill="#5f5244">leader</text><text x="151" y="32" font-size="10" text-anchor="middle" fill="#5f5244">follower 1</text><text x="151" y="72" font-size="10" text-anchor="middle" fill="#5f5244">follower 2</text><ellipse cx="151" cy="68" rx="46" ry="21" fill="none" stroke="#22c55e" stroke-width="2" stroke-dasharray="5 4"/></svg>
+          <div class="bubble a">You circled follower 2: it's behind the leader, so a read there can still return the old value. That's replication lag.</div>
+        </div>
+        <div class="bmap-demo" data-demo="feynman" hidden>
+          <span class="bmap-tag">Feynman mode</span>
+          <div class="bubble q">Compare-and-set locks the row so nobody else can write.</div>
+          <div class="bubble a">Not quite. It doesn't lock anything: the write only goes through if the value hasn't changed since you read it. Try again with that in mind.</div>
+          <span class="chip"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4.5h7a2 2 0 0 1 2 2V20a2.5 2.5 0 0 0-2.5-2H5V4.5Z"/><path d="M19 4.5h-3a2 2 0 0 0-2 2V20a2.5 2.5 0 0 1 2.5-2H19V4.5Z"/></svg> Transactions</span>
+        </div>
+        <div class="bmap-demo" data-demo="cards" hidden>
+          <span class="bmap-tag">Flashcards</span>
+          <p class="quote"><b>What does linearizability promise?</b><br>The system behaves as if there were one copy of the data.</p>
+          <span class="grade-row" aria-hidden="true"><span class="grade">Again<small>&lt;10m</small></span><span class="grade">Hard<small>3d</small></span><span class="grade g3">Good<small>6d</small></span><span class="grade">Easy<small>13d</small></span></span>
+        </div>
+        <div class="bmap-demo" data-demo="recall" hidden>
+          <span class="bmap-tag">End of chapter</span>
+          <div class="bubble a">You finished <b>Replication</b>. One question before you go: what is a sloppy quorum?</div>
+          <div class="bubble q">Writes go to whatever nodes are reachable, not the usual ones…</div>
+        </div>
+        <div class="bmap-demo" data-demo="export" hidden>
+          <span class="bmap-tag">Export</span>
+          <div class="row"><span class="file">DDIA.apkg<small>Anki deck</small></span><span class="file">DDIA-notes.md<small>Highlights &amp; notes</small></span></div>
+          <div class="bubble a">Your cards keep their page, so they still point back to the book in Anki.</div>
+        </div>
       </div>
-      <div class="box-group">
-        <h3>When something doesn't click</h3>
-        <ul>
-          <li><b>Ask the agent</b>: it knows the whole book and your reading goal.</li>
-          <li>Select a passage: «<b>Explain this</b>», «Why it matters», «With numbers».</li>
-          <li><b>Zone</b>: circle a figure or equation, get it explained (PDF).</li>
-          <li>Every answer <b>cites its page</b> — tap and verify.</li>
-          <li><b>Feynman mode</b>: you explain it, the book checks you.</li>
-        </ul>
-      </div>
-      <div class="box-group">
-        <h3>To make it stick</h3>
-        <ul>
-          <li><b>Flashcards</b> from the book, with spaced repetition.</li>
-          <li><b>Study mode</b> with streaks, across books and shelves.</li>
-          <li>A recall question when you <b>finish each chapter</b>.</li>
-          <li>Notebook templates; export to <b>Anki & Markdown</b>.</li>
-          <li>An honest <b>analysis</b> of what you really read.</li>
-        </ul>
-      </div>
-      <div class="box-group">
-        <h3>Offline & yours</h3>
-        <ul>
-          <li><b>Prepare for offline</b>: read and ask the book on the plane.</li>
-          <li>Installable <b>PWA</b> — reading, highlighting, reviewing without connection.</li>
-          <li>Sync between devices via <b>your own Google Drive</b>.</li>
-          <li><b>Full backup</b>, export anytime. No account, ever.</li>
-        </ul>
-      </div>
+      <ul class="bmap-col bmap-out" aria-label="What you get back">
+        <li><button type="button" data-demo="ask" aria-pressed="true"><b>Ask the agent</b>, with citations</button></li>
+        <li><button type="button" data-demo="explain" aria-pressed="false"><b>Explain this</b> on any passage</button></li>
+        <li><button type="button" data-demo="zone" aria-pressed="false"><b>Zone</b>: circle a figure (PDF)</button></li>
+        <li><button type="button" data-demo="feynman" aria-pressed="false"><b>Feynman mode</b>: you explain it</button></li>
+        <li><button type="button" data-demo="cards" aria-pressed="false"><b>Flashcards</b> with spaced review</button></li>
+        <li><button type="button" data-demo="recall" aria-pressed="false">A question at <b>each chapter's end</b></button></li>
+        <li><button type="button" data-demo="export" aria-pressed="false">Export to <b>Anki &amp; Markdown</b></button></li>
+      </ul>
+      <svg class="bmap-lines" aria-hidden="true"></svg>
+      <figcaption>And the reader basics: <b>immersive mode</b>, in-book search, bookmarks, typography your way, <b>study mode</b> with streaks, remaining reading time and an honest analysis of what you really read.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<!-- Preguntas: la conversación con el agente (map.css). Texto fijo: no llama a ningún modelo. -->
+<section class="beat">
+  <div class="wrap">
+    <div class="beat-copy">
+      <h2>Ask before you open it.</h2>
     </div>
     <div class="faq">
-      <details>
+      <div class="faq-head"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.5l1.5 4.2 4.2 1.5-4.2 1.5L12 14.9l-1.5-4.2L6.3 9.2l4.2-1.5L12 3.5Z"/><path d="M18.5 14l.7 1.9 1.9.7-1.9.7-.7 1.9-.7-1.9-1.9-.7 1.9-.7.7-1.9Z"/></svg> Agent · answers from what BookReader is</div>
+      <details open>
         <summary>How much does it cost?</summary>
         <p class="ans">The app is free. The agent runs on your own AI key (BYOK): you pay your provider only for what you use — no middleman, no subscription.</p>
       </details>
@@ -494,16 +530,20 @@ if (location.hostname === 'bookreader.raiatech.com') {
       </details>
       <details>
         <summary>Where are my books stored?</summary>
-        <p class="ans">In your browser's storage, on your device. They are never uploaded anywhere. You can sync annotations through your own Google Drive and export a full backup anytime.</p>
+        <p class="ans">In your browser's storage, on your device. They are never uploaded anywhere. You can sync annotations through your own Google Drive and export a full backup anytime.<br><a class="cite" href="privacy/"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4.5h7a2 2 0 0 1 2 2V20a2.5 2.5 0 0 0-2.5-2H5V4.5Z"/><path d="M19 4.5h-3a2 2 0 0 0-2 2V20a2.5 2.5 0 0 1 2.5-2H19V4.5Z"/></svg> Privacy</a></p>
       </details>
       <details>
         <summary>Are the agent's answers reliable?</summary>
-        <p class="ans">The agent answers from passages of the book and cites every claim. The citation is your verify button: one tap and you're on the page. If the book doesn't cover something, it says so instead of filling in.</p>
+        <p class="ans">The agent answers from passages of the book and cites every claim. The citation is your verify button: one tap and you're on the page. If the book doesn't cover something, it says so instead of filling in.<br><a class="cite" href="why/"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4.5h7a2 2 0 0 1 2 2V20a2.5 2.5 0 0 0-2.5-2H5V4.5Z"/><path d="M19 4.5h-3a2 2 0 0 0-2 2V20a2.5 2.5 0 0 1 2.5-2H19V4.5Z"/></svg> Why BookReader</a></p>
       </details>
       <details>
         <summary>Does it work offline?</summary>
         <p class="ans">Reading, highlighting and reviewing cards: yes, it's an installable PWA. The agent needs a connection to talk to your AI provider.</p>
       </details>
+      <div class="maker">
+        <img src="assets/landing/luis.webp" alt="Luis González" width="52" height="52" loading="lazy" decoding="async">
+        <p>BookReader is made by <b>Luis González</b>, in Spain. A question, an idea or a bug? <a href="https://luisgonzalezbernal.com/" data-umami-event="Contact">Write to me</a> or <a href="https://github.com/iamluisgb/bookreader/issues" data-umami-event="Issue">open an issue</a>.</p>
+      </div>
     </div>
   </div>
 </section>
@@ -530,7 +570,7 @@ if (location.hostname === 'bookreader.raiatech.com') {
       <svg width="19" height="19" viewBox="0 0 512 512" aria-hidden="true" focusable="false"><rect width="512" height="512" rx="118" fill="#111418"/><path d="M288 119 Q288 99 308 99 L396 99 Q416 99 416 119 L416 371 L352 323 L288 371 Z" fill="#22c55e"/><path d="M98 90 L222 90 Q256 90 256 124 L256 470 C 249 442 233 424 206 414 C 177 403 140 401 100 401 Q64 401 64 365 L64 124 Q64 90 98 90 Z" fill="#f8fafc"/></svg>
       BookReader
     </span>
-    <span>EPUB · PDF reader with a reading agent — local-first, BYOK · © 2026 Luis González · <a href="es/">Español</a></span>
+    <span>EPUB · PDF reader with a reading agent — local-first, BYOK · © 2026 Luis González · <a href="why/">Why BookReader</a> · <a href="es/">Español</a></span>
   </div>
 </footer>
 
@@ -698,5 +738,6 @@ if (location.hostname === 'bookreader.raiatech.com') {
 }
 </script>
 <script src="assets/landing/motion.js" defer></script>
+<script src="assets/landing/map.js" defer></script>
 </body>
 </html>
