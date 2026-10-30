@@ -33,7 +33,7 @@ if (!window.matchMedia || !matchMedia('(prefers-reduced-motion: reduce)').matche
 <link rel="icon" href="../app/icons/favicon.ico" sizes="32x32">
 <link rel="icon" href="../app/icons/icon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="../app/css/themes.css">
-<link rel="stylesheet" href="../assets/landing/brand.css">
+<link rel="stylesheet" href="../assets/landing/brand.css?v=20261030b">
 <style>
   @font-face { font-family: 'Inter'; font-weight: 400; font-display: swap; src: url(../app/fonts/inter-400.woff2) format('woff2'); }
   @font-face { font-family: 'Inter'; font-weight: 600; font-display: swap; src: url(../app/fonts/inter-600.woff2) format('woff2'); }
@@ -165,8 +165,8 @@ if (!window.matchMedia || !matchMedia('(prefers-reduced-motion: reduce)').matche
       .page { border-right: 0; border-bottom: 1px solid var(--paper-edge); }
     }
 </style>
-<link rel="stylesheet" href="../assets/landing/motion.css">
-<link rel="stylesheet" href="../assets/landing/map.css">
+<link rel="stylesheet" href="../assets/landing/motion.css?v=20261030b">
+<link rel="stylesheet" href="../assets/landing/map.css?v=20261030b">
 <link rel="preload" as="image" href="../assets/landing/covers/ddia-2e.webp">
 <!-- Umami Analytics: solo carga en producción (servimos el tracker en /u/s.js); en localhost/tests, nada -->
 <script>
@@ -292,7 +292,7 @@ if (location.hostname === 'bookreader.raiatech.com') {
 </section>
 
 <!-- Beat 5 · La memoria -->
-<section class="beat">
+<section class="beat alt">
   <div class="wrap">
     <div class="beat-copy">
       <p class="feature-name">Repaso citado</p>
@@ -358,7 +358,7 @@ if (location.hostname === 'bookreader.raiatech.com') {
 </section>
 
 <!-- Beat 5b · La luz de lectura (map.css / map.js): la misma página de Claro a Sepia y a Oscuro con luz cálida -->
-<section class="beat alt night" id="night">
+<section class="beat night" id="night">
   <div class="wrap">
     <div class="beat-copy">
       <h2>Lee también de noche.</h2>
@@ -488,7 +488,7 @@ if (location.hostname === 'bookreader.raiatech.com') {
 </section>
 
 <!-- Beat 7 · El cierre -->
-<section class="beat">
+<section class="beat alt">
   <div class="wrap">
     <div class="beat-copy">
       <div class="shelf" id="shelf" aria-hidden="true"><span class="spine" style="--h:96px;--c:#cfd5dc"></span><span class="spine" style="--h:118px;--c:#9aa7b4"></span><span class="spine mine" id="spine-mine" style="--c:#f4f3ef;--ci:#111418">DDIA · 2nd ed.</span><span class="spine" style="--h:104px;--c:#e3d9c6"></span><span class="spine" style="--h:128px;--c:#5d6b78"></span></div>
@@ -676,7 +676,7 @@ if (location.hostname === 'bookreader.raiatech.com') {
  }
 }
 </script>
-<script src="../assets/landing/motion.js" defer></script>
-<script src="../assets/landing/map.js" defer></script>
+<script src="../assets/landing/motion.js?v=20261030b" defer></script>
+<script src="../assets/landing/map.js?v=20261030b" defer></script>
 </body>
 </html>

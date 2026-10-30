@@ -230,6 +230,8 @@
         ? 'translateX(' + o * 30 + 'px) translateY(' + (Math.abs(o) * 12 + k * 2) + 'px) translateZ(' + -k * 22 + 'px) rotateZ(' + o * 5 + 'deg)'
         : 'translateY(' + -k * 6 + 'px) translateZ(' + -k * 22 + 'px) rotateZ(' + (k % 2 ? 1 : -1) * k * 1.2 + 'deg)';
       el.tabIndex = k === 0 ? 0 : -1;
+      // Solo la de arriba recibe el toque: en el móvil, abanicadas, una de detrás se quedaba con él
+      el.style.pointerEvents = k === 0 ? '' : 'none';
       el.setAttribute('aria-hidden', k === 0 ? 'false' : 'true');
     });
   }

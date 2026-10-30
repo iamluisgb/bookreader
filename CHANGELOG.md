@@ -3,6 +3,24 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-10-30 (3) — Landing en el móvil: mazo que no giraba, hueco y caché
+
+Reportado por Luis desde el móvil (oscuro, ES): un hueco grande bajo la escena de preguntar y
+las tarjetas no giraban.
+
+- **Las tarjetas no giraban al tocarlas** (reproducido en producción con un Pixel 7 emulado):
+  abanicadas, una tarjeta de DETRÁS se quedaba el toque (`intercepts pointer events`). Ahora
+  solo la de arriba recibe eventos (`placeDeck`, `pointer-events`).
+- **Caché mezclada**: el HTML va con `max-age=0` y los JS/CSS de la landing con 4 h. Tras el
+  despliegue, un móvil juntó el HTML nuevo con el `motion.js` viejo, que buscaba el beat 4 ya
+  quitado y se rompía antes de enganchar el mazo. Todos los `assets/landing/*.js|css` llevan
+  ya `?v=` en las cuatro páginas públicas, y un test lo exige.
+- **El hueco**: al quitar el beat 4 (fondo alterno) quedaron juntas dos secciones del mismo
+  fondo y se sumaban sus márgenes (220 px sin nada). Fondos alternos otra vez: el mazo y el
+  cierre pasan a `alt`, la luz de noche deja de serlo.
+- Tests: `landing-map` suma el toque del mazo en móvil y la regla de `?v=`. Specs
+  `landing-*` 13/13.
+
 ## 2026-10-30 (2) — Landing sin repeticiones
 
 El mismo pasaje de compare-and-set salía seis veces y dos escenas seguidas enseñaban la misma página.
