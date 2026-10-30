@@ -440,7 +440,7 @@ function agentHtml() {
       <button type="button" id="appset-probe-appset-lmodel" class="appset-discover" data-kind="text" data-for="appset-lmodel">${t('Probar')}</button>
     </div>
     <p id="appset-probe-appset-lmodel-hint" class="appset-model-hint" hidden></p>
-    <p class="appset-muted">${t('Para las llamadas auxiliares del agente (preparar búsquedas, puntuar capítulos): un modelo pequeño responde igual de bien y mucho más rápido. Vacío = automático (en nan usa <code>qwen3.6</code>; en otros proveedores, el modelo principal).')}</p>
+    <p class="appset-muted">${t('Para las llamadas auxiliares del agente (preparar búsquedas, puntuar capítulos): un modelo pequeño responde igual de bien y mucho más rápido. Vacío = automático (en nan usa <code>deepseek-v4-flash</code>; en otros proveedores, el modelo principal).')}</p>
     <label class="appset-label" for="appset-key">API key</label>
     ${apiKeyRowHtml()}
     <label class="appset-check"><input type="checkbox" id="appset-auto"${LLM.getAutoExtract() ? ' checked' : ''} /> ${t('Rellenar la libreta automáticamente')}</label>

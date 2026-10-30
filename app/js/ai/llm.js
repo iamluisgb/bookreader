@@ -58,7 +58,10 @@ export const PROVIDERS = [
   // una pregunta en español. Los nuevos que publique nan salen solos por `catalogUrl` (ver
   // refreshProviderCatalog), marcados como «sin probar». Modelo, lite y visión por defecto NO
   // cambian aquí: eso pasa por las evals (docs/EVALS.md).
-  { id: 'nan',        name: 'nan.builders',      baseUrl: 'https://api.nan.builders/v1',   models: ['deepseek-v4-flash', 'qwen3.8-flash', 'glm5.3-flash', 'qwen3.6', 'gemma4', 'mimo-v2.6-flash'], liteModel: 'deepseek-v4-flash', visionModel: 'deepseek-v4-flash', concurrent: true, discover: false, thinkingOff: true, catalogUrl: GATEWAY_BASE_URL.replace(/\/v1$/, '') + '/catalog/nan' },
+  // retired: qwen3.6 y gemma4 salen de la lista (2026-10-30): con el tope de 1400 tokens de la
+  // infografía gastan todo en razonar y devuelven content vacío (finish_reason 'length'), así que
+  // la infografía fallaba siempre. Quien los tenga guardados pasa al modelo por defecto.
+  { id: 'nan',        name: 'nan.builders',      baseUrl: 'https://api.nan.builders/v1',   models: ['deepseek-v4-flash', 'qwen3.8-flash', 'glm5.3-flash', 'mimo-v2.6-flash'], retired: ['qwen3.6', 'gemma4'], liteModel: 'deepseek-v4-flash', visionModel: 'deepseek-v4-flash', concurrent: true, discover: false, thinkingOff: true, catalogUrl: GATEWAY_BASE_URL.replace(/\/v1$/, '') + '/catalog/nan' },
   { id: 'openai',     name: 'OpenAI',     baseUrl: 'https://api.openai.com/v1',     models: ['gpt-4o', 'gpt-4o-mini', 'o4-mini'], concurrent: true, catalogId: 'openai' },
   // Verificado contra la API real el 2026-08-02 (tests/provider-contract.spec.ts):
   // `claude-3.7-sonnet` y `gemini-2.0-flash-001` ya NO existen en el catálogo, así que
@@ -94,19 +97,27 @@ export async function refreshProviderCatalog(p = currentProvider(), { force = fa
 // Los del catálogo que no hemos probado (síncrono: lo último guardado).
 export function untestedModels(p = currentProvider()) {
   if (!p?.catalogUrl) return [];
-  const known = new Set(p.models || []);
+  const known = new Set([...(p.models || []), ...(p.retired || [])]);
   return (Storage.get(catalogKey(p), null)?.models || []).filter(id => !known.has(id));
 }
 
 export function getKey()        { return Storage.get('ai_key', '') || ''; }
 export function setKey(k)        { Storage.set('ai_key', k || ''); }
-export function getModel()      { return Storage.get('ai_model', DEFAULT_MODEL) || DEFAULT_MODEL; }
+// Un modelo retirado del preset (ver `retired`) no se respeta aunque esté guardado.
+const isRetired = (m) => !!m && (currentProvider()?.retired || []).includes(m);
+export function getModel() {
+  const m = Storage.get('ai_model', DEFAULT_MODEL) || DEFAULT_MODEL;
+  return isRetired(m) ? DEFAULT_MODEL : m;
+}
 export function setModel(m)      { Storage.set('ai_model', (m || '').trim() || DEFAULT_MODEL); }
 // Modelo LITE (opcional): para llamadas auxiliares baratas/sensibles a latencia
 // (query-expand, attenuation). Resolución: ajuste explícito del usuario → liteModel del
 // preset del proveedor → alias lite del gateway (demo) → modelo principal. Las tareas
 // que importan (chat, resumen, flashcards, mindmap) NUNCA pasan por aquí.
-export function getLiteModelSetting() { return (Storage.get('ai_model_lite', '') || '').trim(); }
+export function getLiteModelSetting() {
+  const m = (Storage.get('ai_model_lite', '') || '').trim();
+  return isRetired(m) ? '' : m;
+}
 export function setLiteModel(m)  { Storage.set('ai_model_lite', (m || '').trim()); }
 export function getLiteModel() {
   const explicit = getLiteModelSetting();

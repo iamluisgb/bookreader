@@ -271,3 +271,25 @@ test('un proveedor concurrente despacha en paralelo', async ({ page }) => {
   });
   expect(r.peak).toBeGreaterThan(1);
 });
+
+test('un modelo retirado del preset de nan cae al modelo por defecto aunque esté guardado', async ({ page }) => {
+  await page.goto('/');
+  const r = await page.evaluate(async () => {
+    const L = await import('/js/ai/llm.js');
+    L.setBaseUrl('https://api.nan.builders/v1');
+    const out: Record<string, string> = {};
+    // qwen3.6 y gemma4 devuelven content vacío con topes cortos (infografía): retirados.
+    L.setModel('qwen3.6');
+    out.main = L.getModel();
+    L.setLiteModel('gemma4');
+    out.lite = L.getLiteModel();
+    L.setModel('glm5.3-flash');
+    out.kept = L.getModel();
+    // Fuera de nan, el mismo id se respeta: el retiro es del preset, no global.
+    L.setBaseUrl('https://ejemplo.com/v1');
+    L.setModel('qwen3.6');
+    out.custom = L.getModel();
+    return out;
+  });
+  expect(r).toEqual({ main: 'deepseek-v4-flash', lite: 'deepseek-v4-flash', kept: 'glm5.3-flash', custom: 'qwen3.6' });
+});
