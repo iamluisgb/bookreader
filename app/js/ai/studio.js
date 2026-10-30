@@ -75,9 +75,13 @@ function runningCard(job) {
   </div>`;
 }
 
-function errorCard() {
+// El motivo real (429, error del modelo, JSON inválido…) va debajo: sin él, un fallo repetido
+// en la tablet no se puede diagnosticar.
+function errorCard(job) {
+  const why = job && job.error && job.error.message;
   return `<div class="studio-card studio-error">
     <p class="studio-meta studio-errmsg">${icon('warning', { size: 'sm' })} ${t('No se pudo generar.')} <button class="studio-link" data-act="retry">${t('Reintentar')}</button></p>
+    ${why ? `<p class="studio-meta studio-errwhy">${escapeHtml(String(why).slice(0, 300))}</p>` : ''}
   </div>`;
 }
 
@@ -155,7 +159,7 @@ function group(ty, ctx, job, decks) {
   if (mineDecks.length) bodyHtml = decksBody(mineDecks);
   else {
     if (running) bodyHtml += runningCard(job);
-    else if (errored) bodyHtml += errorCard();
+    else if (errored) bodyHtml += errorCard(job);
     if (items.length) bodyHtml += items.map(e => artifactCard(ty, e)).join('');
     else if (!running && !errored) bodyHtml += emptyCard(ty);
   }
