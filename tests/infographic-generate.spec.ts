@@ -116,6 +116,14 @@ test.describe('P29 · infografía de punta a punta', () => {
     expect(ratio).toBeLessThan(2.9);
     await expect(page.locator('#ig-png')).toBeVisible();
 
+    // El color lo elige el lector: repinta con ese acento y se guarda en el artefacto.
+    const violet = '#6d28d9';
+    expect(xml).not.toContain(violet);
+    await page.click(`.ig-swatch[data-c="${violet}"]`);
+    await expect(page.locator(`.ig-swatch[data-c="${violet}"]`)).toHaveAttribute('aria-pressed', 'true');
+    const svgXml = () => page.locator('#ig-canvas svg').evaluate((s) => new XMLSerializer().serializeToString(s as SVGSVGElement));
+    expect(await svgXml()).toContain(violet);
+
     // Al cerrar, el artefacto está en el historial (y se puede reabrir).
     await page.locator('#ai-infographic .ai-ob-close').click();
     const card = page.locator('.studio-card.studio-generated [data-kind="infographic"]');
@@ -123,6 +131,9 @@ test.describe('P29 · infografía de punta a punta', () => {
     await card.click();
     // Se recuerda el último formato elegido (póster).
     await expect(page.locator('#ig-canvas svg')).toBeVisible({ timeout: 10000 });
+    // …y con el color elegido.
+    await expect(page.locator(`.ig-swatch[data-c="${violet}"]`)).toHaveAttribute('aria-pressed', 'true');
+    expect(await svgXml()).toContain(violet);
 
     expect(errors).toEqual([]);
   });

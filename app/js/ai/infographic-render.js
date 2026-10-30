@@ -516,23 +516,46 @@ function asideBlock(items, x, y, w, sz, theme, { stacked = false } = {}) {
   }
 }
 
+// Ancho de un texto del pie, que va con letter-spacing 1.4 (measure no lo cuenta).
+function spacedWidth(text, size) {
+  return measure(text, size, 600, FONT) + text.length * 1.4;
+}
+
+// «LIBRO · AUTOR» en una línea de `room` px: si no cabe, solo el libro; si tampoco, el libro
+// recortado con elipsis. Nunca invade el bloque de la derecha.
+function fitFooterLeft(title, author, room, size) {
+  const T = String(title || '').toUpperCase();
+  const A = String(author || '').toUpperCase();
+  const both = [T, A].filter(Boolean).join(' · ');
+  if (!both || room <= 0) return '';
+  if (spacedWidth(both, size) <= room) return both;
+  let s = T || A;
+  if (spacedWidth(s, size) <= room) return s;
+  while (s.length > 1 && spacedWidth(`${s}…`, size) > room) s = s.slice(0, -1);
+  s = s.replace(/[\s·…]+$/, '');
+  return s ? `${s}…` : '';
+}
+
 // Pie con procedencia: libro · autor a la izquierda; logo + marca + url a la derecha.
 function footerRow(data, x, y, w, color, size, { onDark = false } = {}) {
   const ft = data.footer;
   if (!ft) return '';
   const ftObj = typeof ft === 'object' ? ft : null;
   const mark = String((ftObj ? ftObj.mark : ft) || 'BookReader').toUpperCase();
-  const who = [ftObj && ftObj.title ? ftObj.title : data.title, ftObj && ftObj.author ? ftObj.author : data.author]
-    .filter(Boolean).join(' · ').toUpperCase();
   const url = ftObj && ftObj.url ? ftObj.url : '';
   const foot = { size, lineH: size, weight: 600, fill: color, spacing: 1.4, opacity: onDark ? 0.75 : 0.85 };
   let out = '';
-  if (who) out += textEl([who], x, y, foot);
   const right = [mark, url].filter(Boolean).join('  ·  ');
-  const rw = measure(right, size, 600, FONT) + right.length * 1.4;
-  out += textEl([right], x + w, y, { ...foot, anchor: 'end' });
+  const rw = spacedWidth(right, size);
   const L = size * 1.9;
-  out += logo(x + w - rw - L - 12, y - L * 0.78, L);
+  const logoX = x + w - rw - L - 12;
+  // Lo de la izquierda cabe en lo que deja el bloque de la derecha (logo incluido): con un
+  // autor largo («Javier Recuenco y Miguel Ángel Uriondo») se montaba encima del logo.
+  const room = logoX - x - size * 1.5;
+  const left = fitFooterLeft(ftObj && ftObj.title ? ftObj.title : data.title, ftObj && ftObj.author ? ftObj.author : data.author, room, size);
+  if (left) out += textEl([left], x, y, foot);
+  out += textEl([right], x + w, y, { ...foot, anchor: 'end' });
+  out += logo(logoX, y - L * 0.78, L);
   return out;
 }
 

@@ -355,6 +355,35 @@ test.describe('P29 · render de la infografía', () => {
     expect(bad).toEqual([]);
   });
 
+  // El pie con un libro y autores largos (Personotecnia, 2026-10-30) montaba «LIBRO · AUTOR»
+  // sobre el logo y la marca. En los tres formatos, el texto de la izquierda acaba antes del logo.
+  test('el pie con un autor largo no se monta sobre el logo', async ({ page }) => {
+    await page.goto('/');
+    const bad = await page.evaluate(async (data) => {
+      const M: any = await import('/js/ai/infographic-render.js');
+      await M.ensureFonts();
+      const d = { ...data, title: 'Personotecnia', author: 'Javier Recuenco y Miguel Ángel Uriondo de la Fuente', footer: { mark: 'BookReader', url: 'bookreader.raiatech.com' } };
+      const outs = [['póster', M.renderSvg(d)], ['story', M.renderStory(d)], ...M.renderSlides(d).map((x: any, i: number) => [`slide ${i + 1}`, x])];
+      const out: string[] = [];
+      for (const [name, r] of outs) {
+        document.body.appendChild(r.svg);
+        const logos = Array.from(r.svg.querySelectorAll('g[transform*="scale"]')) as SVGGraphicsElement[];
+        for (const t of Array.from(r.svg.querySelectorAll('text')) as SVGTextElement[]) {
+          if (!/^PERSONOTECNIA/.test(t.textContent || '')) continue;
+          const tb = t.getBoundingClientRect();
+          for (const g of logos) {
+            const gb = g.getBoundingClientRect();
+            const sameRow = gb.top < tb.bottom && gb.bottom > tb.top;
+            if (sameRow && tb.right > gb.left - 1) out.push(`${name}: «${t.textContent}»`);
+          }
+        }
+        r.svg.remove();
+      }
+      return out;
+    }, FULL);
+    expect(bad).toEqual([]);
+  });
+
   // IG2 · Cada idea con página la enseña («p. 42»): la prueba de que no se inventa nada.
   test('las ideas con página la muestran', async ({ page }) => {
     await page.goto('/');

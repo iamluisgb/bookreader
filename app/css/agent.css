@@ -890,6 +890,10 @@ body.has-taskchip .ai-taskchip.is-study { bottom: 74px; }
 .mm-format-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 4px 0 12px; }
 .mm-format-label { font-size: var(--fs-sm); font-weight: 600; color: var(--text); }
 .mm-format-row .mm-format { margin: 0; }
+.ig-colors { display: flex; flex-wrap: wrap; gap: 8px; }
+.ig-swatch { width: 28px; height: 28px; border-radius: 50%; border: 0; padding: 0; cursor: pointer; background: var(--sw); box-shadow: inset 0 0 0 1px rgba(0,0,0,0.12); }
+.ig-swatch[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--surface, #fff), 0 0 0 4px var(--sw); }
+.ig-swatch:focus-visible { outline: 2px solid var(--text); outline-offset: 3px; }
 .mm-format button { border: 0; background: none; color: var(--text-soft); font: inherit; font-size: var(--fs-sm); font-weight: 500; padding: 6px 12px; border-radius: var(--r-pill); cursor: pointer; }
 .mm-format button[aria-pressed="true"] { background: var(--fill-raised); color: var(--text); box-shadow: var(--shadow-1); }
 .fc-export { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }

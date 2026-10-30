@@ -25,6 +25,8 @@ import { escapeHtml } from '../ui/escape.js';
 import { getBook } from '../library/store.js';
 
 const KIND = 'infographic';
+// Nombres de ACCENTS, en su orden (infographic-render.js): el selector de color los lee en voz alta.
+const ACCENT_NAMES = ['Verde', 'Turquesa', 'Cian', 'Azul', 'Índigo', 'Violeta', 'Granate', 'Ámbar'];
 const BOOK_TOKENS = 30000; // cobertura de libro entero (igual que el mapa)
 const MAX_MAP_CALLS = 3; // techo de llamadas del barrido: la paciencia tiene un límite
 
@@ -62,7 +64,7 @@ export function open(context) {
   document.addEventListener('keydown', onKey);
 
   // Abrir desde el historial salta el setup; generar nuevo (o sin artefacto) enseña el setup.
-  if (ctx.viewArtifact) renderResult(ctx.viewArtifact.result);
+  if (ctx.viewArtifact) renderResult(ctx.viewArtifact.result, ctx.viewArtifact.key);
   else route();
 }
 
@@ -72,7 +74,7 @@ function onKey(e) {
 
 function route() {
   const entry = ctx.mode === 'setup' ? null : Jobs.cached(ctx.bookId, KIND);
-  if (entry && !ctx.mode) renderResult(entry.result);
+  if (entry && !ctx.mode) renderResult(entry.result, entry.key);
   else renderSetup();
 }
 
@@ -184,7 +186,7 @@ function renderRunning(job) {
         runUnsub = null;
       }
       const c = Jobs.cached(ctx.bookId, KIND);
-      renderResult(c ? c.result : j.result);
+      renderResult(c ? c.result : j.result, c && c.key);
     } else if (j.status === 'error') {
       if (runUnsub) {
         runUnsub();
@@ -389,7 +391,9 @@ async function coverFor(bookId, bookTitle, bookAuthor) {
 
 // ---- Vista 3: resultado ------------------------------------------------------
 
-async function renderResult(data) {
+// `key` = el artefacto guardado: el color elegido se escribe en él (Jobs.update, sin entrada
+// nueva en el historial), así se reabre con el mismo color.
+async function renderResult(data, key = null) {
   const b = body();
   if (!b) return;
   Jobs.clearActive();
@@ -406,6 +410,12 @@ async function renderResult(data) {
       <span class="mm-format-label" id="ig-format-label">${t('Formato')}</span>
       <div class="mm-format ig-format" role="group" aria-labelledby="ig-format-label">
         ${fmtBtn('carousel', t('Carrusel 4:5'))}${fmtBtn('story', t('Story 9:16'))}${fmtBtn('poster', t('Póster'))}
+      </div>
+    </div>
+    <div class="mm-format-row">
+      <span class="mm-format-label" id="ig-color-label">${t('Color')}</span>
+      <div class="ig-colors" role="group" aria-labelledby="ig-color-label">
+        ${ACCENTS.map((hex, i) => `<button type="button" class="ig-swatch" data-c="${hex}" style="--sw:${hex}" aria-pressed="${(data.accent || POSTER.accent) === hex}" aria-label="${t(ACCENT_NAMES[i])}" title="${t(ACCENT_NAMES[i])}"></button>`).join('')}
       </div>
     </div>
     <div id="ig-view"></div>
@@ -485,6 +495,19 @@ async function renderResult(data) {
       : t('Una imagen de 1080×1920 para stories.');
   };
   paint();
+
+  // El acento lo propone la portada (pickAccent), pero el lector manda: la paleta es la misma
+  // (todos con AA sobre el papel), así que cualquier elección sigue siendo legible.
+  b.querySelectorAll('.ig-swatch').forEach((btn) => btn.addEventListener('click', () => {
+    const hex = btn.dataset.c;
+    if (payload.accent === hex) return;
+    payload.accent = hex;
+    data = { ...data, accent: hex };
+    if (key) Jobs.update(key, data);
+    b.querySelectorAll('.ig-swatch').forEach((o) => o.setAttribute('aria-pressed', String(o === btn)));
+    exportError('');
+    paint();
+  }));
 
   b.querySelectorAll('.ig-format button').forEach((btn) => btn.addEventListener('click', () => {
     igFormat = btn.dataset.f;
