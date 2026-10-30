@@ -12,7 +12,7 @@ test.describe('landing · diagrama, luz de lectura y manifiesto', () => {
     page.on('pageerror', (e) => errors.push(e.message));
     await page.goto(BASE + '/');
     await page.locator('#bmap').scrollIntoViewIfNeeded();
-    await expect(page.locator('.bmap-demo[data-demo="ask"]')).toBeVisible();
+    await expect(page.locator('.bmap-demo[data-demo="explain"]')).toBeVisible();
     for (const k of ['zone', 'feynman', 'export']) {
       await page.locator(`.bmap-out button[data-demo="${k}"]`).click();
       await expect(page.locator(`.bmap-out button[data-demo="${k}"]`)).toHaveAttribute('aria-pressed', 'true');
@@ -20,7 +20,7 @@ test.describe('landing · diagrama, luz de lectura y manifiesto', () => {
       await expect(page.locator('.bmap-demo:visible')).toHaveCount(1);
     }
     // las líneas: una por entrada y una por salida
-    await expect(page.locator('.bmap-lines path')).toHaveCount(4 + 7);
+    await expect(page.locator('.bmap-lines path')).toHaveCount(4 + 5);
     expect(errors).toEqual([]);
   });
 

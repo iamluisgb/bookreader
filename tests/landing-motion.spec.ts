@@ -14,7 +14,7 @@ test.describe('landing · un libro por público', () => {
     await expect(page.locator('.picker button[data-book="fa"]')).toHaveAttribute('aria-pressed', 'true');
     await expect(page).toHaveURL(/[?&]para=medicine/);
     await expect(page.locator('#bk-ch')).toHaveText('Cardiovascular · Physiology');
-    await expect(page.locator('#proof-mark')).toContainText('bradykinin');
+    await expect(page.locator('#ask-mark')).toContainText('bradykinin');
     await expect(page.locator('#deck .face-q').first()).toContainText('ACE inhibitors');
     await expect(page.locator('#spine-mine')).toHaveText('First Aid · Step 1');
     expect(errors).toEqual([]);
@@ -43,7 +43,7 @@ test.describe('landing · un libro por público', () => {
     await page.goto(BASE + '/');
     await expect(page.locator('html')).not.toHaveClass(/motion/);
     await expect(page.locator('#bk-a')).toContainText('one copy of the data');
-    await expect(page.locator('#proof')).toHaveClass(/marked/);
+    await expect(page.locator('#ask')).toHaveClass(/marked/);
     const heroHeight = await page.locator('#hero').evaluate((el) => el.getBoundingClientRect().height);
     expect(heroHeight).toBeLessThan(1400); // sin el recorrido de scroll de 230vh
     await ctx.close();

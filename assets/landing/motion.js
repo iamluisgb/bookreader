@@ -2,8 +2,8 @@
 // Landing · movimiento en 3D y un libro por público (P32).
 //
 // Un solo objeto, el libro, hace de hilo: se abre solo al cargar (hero), se nubla (beat 2),
-// contesta (beat 3), señala su línea (beat 4), se reparte en tarjetas (beat 5) y vuelve a la
-// estantería (cierre). El libro lo elige el visitante o el enlace de la campaña (?para=).
+// contesta y su cita señala la línea que lo dice (beat 3; antes eran dos escenas con la misma
+// página), se reparte en tarjetas (beat 5) y vuelve a la estantería (cierre). El libro lo elige el visitante o el enlace de la campaña (?para=).
 //
 // El contenido de cada libro vive en la página (<script id="books-data">), en su idioma.
 // Sin `.motion` en <html> (menos movimiento pedido) todo se pinta en su estado final.
@@ -143,24 +143,57 @@
 
   /* ------------------------------------------- Beat 3 · la página contesta */
   var ask = $('#ask');
-  var askQ = $('#ask-q'), askA = $('#ask-a'), askCite = $('#ask-cite');
+  var askQ = $('#ask-q'), askA = $('#ask-a'), askCite = $('#ask-cite'), askMark = $('#ask-mark');
+  var askPath = $('#ask-path'), askDot = $('#ask-dot');
   var askRun = 0, askSeen = false;
   function fillAsk(b) {
     $('#ask-ch').textContent = b.ask.ch;
     $('#ask-before').textContent = b.ask.before;
-    $('#ask-mark').textContent = b.ask.mark;
+    askMark.textContent = b.ask.mark;
     askQ.textContent = b.ask.q;
     askA.textContent = b.ask.a;
-    askCite.lastChild.textContent = ' ' + b.ask.cite;
+    askCite.lastChild.textContent = ' ' + b.ask.cite + ' — ' + b.ask.verify;
     askRun++;
     askQ.classList.remove('hide'); askCite.classList.remove('hide');
     if (motion && askSeen) playAsk();
+    else drawThread(ask.classList.contains('marked') ? 1 : 0);
+  }
+  // El hilo sale de la cita (en el chat) y llega al final de la línea marcada (en la página).
+  function drawThread(progress) {
+    var box = ask.getBoundingClientRect();
+    var rects = askMark.getClientRects();
+    if (!rects.length || !box.width) return;
+    var last = rects[rects.length - 1];
+    var c = askCite.getBoundingClientRect();
+    var x1 = c.left - box.left - 4, y1 = c.top + c.height / 2 - box.top;
+    var x2 = last.right - box.left + 3, y2 = last.top + last.height / 2 - box.top;
+    var bx = Math.max(36, Math.abs(x1 - x2) * 0.45);
+    askPath.setAttribute('d', 'M' + x1 + ',' + y1 + ' C' + (x1 - bx) + ',' + y1 + ' ' + (x2 + bx) + ',' + y2 + ' ' + x2 + ',' + y2);
+    var len = askPath.getTotalLength();
+    askPath.style.strokeDasharray = len;
+    askPath.style.strokeDashoffset = len * (1 - progress);
+    var pt = askPath.getPointAtLength(len * progress);
+    askDot.setAttribute('cx', pt.x);
+    askDot.setAttribute('cy', pt.y);
+    askDot.style.opacity = progress > 0 ? 1 : 0;
+  }
+  function playThread(id) {
+    ask.classList.remove('marked');
+    var t0 = performance.now();
+    (function step(now) {
+      if (id !== askRun) return;
+      var t = clamp((now - t0) / 750);
+      drawThread(ease(t));
+      if (t < 1) requestAnimationFrame(step);
+      else ask.classList.add('marked');
+    })(t0);
   }
   function playAsk() {
     var id = ++askRun;
     var b = BOOKS[current];
     var words = b.ask.a.split(' ');
     askQ.classList.add('hide'); askCite.classList.add('hide'); askA.textContent = '';
+    ask.classList.remove('marked'); drawThread(0);
     wait(300).then(function () {
       if (id !== askRun) return;
       askQ.classList.remove('hide');
@@ -178,59 +211,9 @@
       });
     }).then(function () {
       askA.classList.remove('caret');
-      if (id === askRun) askCite.classList.remove('hide');
-    });
-  }
-
-  /* --------------------------------------- Beat 4 · la cita señala su línea */
-  var proof = $('#proof');
-  var proofMark = $('#proof-mark'), proofCite = $('#proof-cite');
-  var proofPath = $('#proof-path'), proofDot = $('#proof-dot');
-  var proofRun = 0;
-  function fillProof(b) {
-    $('#proof-ch').textContent = b.ask.ch;
-    $('#proof-before').textContent = b.ask.before;
-    proofMark.textContent = b.ask.mark;
-    $('#proof-cite-text').textContent = b.ask.cite + ' — ' + b.ask.verify;
-    drawThread(proof.classList.contains('linked') || !motion ? 1 : 0);
-  }
-  function drawThread(progress) {
-    var box = proof.getBoundingClientRect();
-    var rects = proofMark.getClientRects();
-    if (!rects.length) return;
-    var last = rects[rects.length - 1];
-    var c = proofCite.getBoundingClientRect();
-    var page = proof.querySelector('.page').getBoundingClientRect();
-    var x1 = c.right - box.left + 4, y1 = c.top + c.height / 2 - box.top;
-    var x2 = last.right - box.left + 3, y2 = last.top + last.height / 2 - box.top;
-    var bend = Math.min(page.right - box.left + 48, document.documentElement.clientWidth - box.left - 10);
-    proofPath.setAttribute('d', 'M' + x1 + ',' + y1 + ' C' + bend + ',' + y1 + ' ' + bend + ',' + y2 + ' ' + x2 + ',' + y2);
-    var len = proofPath.getTotalLength();
-    proofPath.style.strokeDasharray = len;
-    proofPath.style.strokeDashoffset = len * (1 - progress);
-    var pt = proofPath.getPointAtLength(len * progress);
-    proofDot.setAttribute('cx', pt.x);
-    proofDot.setAttribute('cy', pt.y);
-    proofDot.style.opacity = progress > 0 ? 1 : 0;
-  }
-  function playProof() {
-    var id = ++proofRun;
-    proof.classList.remove('linked', 'marked');
-    drawThread(0);
-    wait(80).then(function () {
-      if (id !== proofRun) return;
-      proof.classList.add('linked');
-      return wait(850);
-    }).then(function () {
-      if (id !== proofRun) return;
-      var t0 = performance.now();
-      (function step(now) {
-        if (id !== proofRun) return;
-        var t = clamp((now - t0) / 750);
-        drawThread(ease(t));
-        if (t < 1) requestAnimationFrame(step);
-        else proof.classList.add('marked');
-      })(t0);
+      if (id !== askRun) return;
+      askCite.classList.remove('hide');
+      return wait(700).then(function () { if (id === askRun) playThread(id); });
     });
   }
 
@@ -280,7 +263,6 @@
     fillHero(b);
     fillDense(b);
     fillAsk(b);
-    fillProof(b);
     fillDeck(b);
     fillShelf(b);
     $$('.picker button').forEach(function (btn) { btn.setAttribute('aria-pressed', String(btn.dataset.book === key)); });
@@ -322,7 +304,7 @@
 
   if (!motion) {
     renderHero(1);
-    proof.classList.add('linked', 'marked');
+    ask.classList.add('marked');
     drawThread(1);
     window.addEventListener('resize', function () { drawThread(1); });
     return;
@@ -347,7 +329,7 @@
   }, { passive: true });
   window.addEventListener('resize', function () {
     renderDense();
-    if (proof.classList.contains('marked')) drawThread(1);
+    if (ask.classList.contains('marked')) drawThread(1);
   });
 
   if (finePointer) {
@@ -359,20 +341,10 @@
     });
     stage.addEventListener('pointerleave', function () { tiltT.x = 0; tiltT.y = 0; kickHero(); });
 
-    // Everything in the box: una inclinación leve, nada más; es el bloque de consulta.
-    $$('.box-group').forEach(function (g) {
-      g.addEventListener('pointermove', function (e) {
-        var r = g.getBoundingClientRect();
-        var x = (e.clientX - r.left) / r.width - 0.5, y = (e.clientY - r.top) / r.height - 0.5;
-        g.style.transform = 'perspective(900px) rotateX(' + (-y * 3).toFixed(2) + 'deg) rotateY(' + (x * 3).toFixed(2) + 'deg)';
-      });
-      g.addEventListener('pointerleave', function () { g.style.transform = ''; });
-    });
   }
 
   onView(ask, 0.5, function (vis) { if (vis && !askSeen) { askSeen = true; playAsk(); } });
-  var proofSeen = false;
-  onView(proof, 0.6, function (vis) { if (vis && !proofSeen) { proofSeen = true; playProof(); } });
+  askCite.addEventListener('click', function () { playThread(++askRun); });
   onView(deck, 0.55, function (vis) { if (vis !== fanned) { fanned = vis; placeDeck(); } });
 
   // Privacidad: las capas se separan al entrar y se juntan al salir.

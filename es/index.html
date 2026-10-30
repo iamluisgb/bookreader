@@ -115,15 +115,11 @@ if (!window.matchMedia || !matchMedia('(prefers-reduced-motion: reduce)').matche
   .dense .fade { opacity: 0.45; }
 
   /* ---- Beat 4 · la cita como gesto ---- */
-  .proof { position: relative; max-width: 560px; margin-inline: auto; padding-bottom: 22px; }
-  .proof .page { border: 1px solid var(--paper-edge); border-radius: 14px; box-shadow: var(--shadow-2); }
-  .proof .cite-big {
     position: absolute; left: 50%; bottom: 0; transform: translateX(-50%);
     display: inline-flex; align-items: center; gap: 8px; font: 600 14px var(--font-ui);
     color: var(--accent); background: var(--surface-2); border: 1px solid var(--border);
     border-radius: 999px; padding: 11px 20px; box-shadow: var(--shadow-hero); white-space: nowrap;
   }
-  .proof .cite-big svg { color: var(--brand); flex: none; }
 
   /* ---- Beat 5 · la tarjeta (Repaso citado) ---- */
   .feature-name { font: 600 12px var(--font-ui); letter-spacing: 0.16em; text-transform: uppercase; color: var(--accent); margin-bottom: 16px; }
@@ -167,8 +163,7 @@ if (!window.matchMedia || !matchMedia('(prefers-reduced-motion: reduce)').matche
 
   @media (max-width: 760px) {
       .page { border-right: 0; border-bottom: 1px solid var(--paper-edge); }
-    .proof .cite-big { white-space: normal; width: max-content; max-width: 92%; text-align: center; }
-  }
+    }
 </style>
 <link rel="stylesheet" href="../assets/landing/motion.css">
 <link rel="stylesheet" href="../assets/landing/map.css">
@@ -272,7 +267,7 @@ if (location.hostname === 'bookreader.raiatech.com') {
   <div class="wrap">
     <div class="beat-copy">
       <h2>Ahora la página responde.</h2>
-      <p class="support">Pregunta lo que no entiendes, como lo preguntarías tú. El agente se sabe el libro entero, conoce tu objetivo, y te lo explica <b>a tu nivel</b>, hasta que hace clic.</p>
+      <p class="support">Pregunta lo que no entiendes, como lo preguntarías tú. El agente se sabe el libro entero y tu objetivo, y te lo explica <b>a tu nivel</b>. No se inventa nada: cada respuesta cita la página, y un toque te lleva a la frase que lo dice.</p>
     </div>
     <div class="beat-visual">
       <div class="ask" id="ask">
@@ -290,31 +285,7 @@ if (location.hostname === 'bookreader.raiatech.com') {
           <div class="bubble a" id="ask-a">Dos peticiones leen el mismo valor, las dos suman uno y la segunda escritura pisa a la primera. La solución del libro es el compare-and-set: la escritura solo se hace si el valor no ha cambiado desde que lo leíste.</div>
           <span class="cite" id="ask-cite"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4.5h7a2 2 0 0 1 2 2V20a2.5 2.5 0 0 0-2.5-2H5V4.5Z"/><path d="M19 4.5h-3a2 2 0 0 0-2 2V20a2.5 2.5 0 0 1 2.5-2H19V4.5Z"/></svg> Transactions</span>
         </div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- Beat 4 · La confianza -->
-<section class="beat alt">
-  <div class="wrap">
-    <div class="beat-copy">
-      <h2>No se inventa nada. Todo sale del libro.</h2>
-      <p class="support">Cada explicación lleva su cita. Tócala y compruébalo en el libro, palabra por palabra.</p>
-    </div>
-    <div class="beat-visual">
-      <div class="proof" id="proof">
-        <div class="page">
-          <div class="page-ch" id="proof-ch">Transactions</div>
-          <div class="page-text">
-            <p><span id="proof-before">This pattern of read-modify-write can cause lost updates. </span><mark id="proof-mark">An atomic compare-and-set operation avoids the lost update by only allowing the write if the value has not changed since you last read it.</mark></p>
-          </div>
-        </div>
-        <span class="cite-big" id="proof-cite">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4.5h7a2 2 0 0 1 2 2V20a2.5 2.5 0 0 0-2.5-2H5V4.5Z"/><path d="M19 4.5h-3a2 2 0 0 0-2 2V20a2.5 2.5 0 0 1 2.5-2H19V4.5Z"/></svg>
-          <span id="proof-cite-text">Transactions — toca y compruébalo</span>
-        </span>
-        <svg class="proof-link" aria-hidden="true"><path id="proof-path" d=""/><circle id="proof-dot" r="4" cx="-10" cy="-10"/></svg>
+        <svg class="ask-link" aria-hidden="true"><path id="ask-path" d=""/><circle id="ask-dot" r="4" cx="-10" cy="-10"/></svg>
       </div>
     </div>
   </div>
@@ -394,12 +365,12 @@ if (location.hostname === 'bookreader.raiatech.com') {
       <p class="support">Tres temas, tonos de papel, brillo y una <b>luz cálida</b> para leer tarde. La misma página, como la quieren tus ojos.</p>
     </div>
     <div class="night-stage">
-      <div class="night-page" aria-hidden="true"><div class="page-ch">Transactions</div><p>This pattern of read-modify-write can cause lost updates. An atomic compare-and-set operation avoids the lost update by only allowing the write if the value has not changed since you last read it.</p><span class="night-warm"></span><span class="night-dim"></span></div>
+      <div class="night-page" aria-hidden="true"><div class="page-ch">23:40</div><p>Es tarde y el capítulo casi se acaba. La página se ha vuelto oscura y cálida para que tus ojos aguanten los últimos párrafos.</p><span class="night-warm"></span><span class="night-dim"></span></div>
       <div class="night-steps" aria-hidden="true"><span>Claro</span><span>Sepia</span><span>Oscuro + luz cálida</span></div>
       <div class="night-static" role="img" aria-label="La misma página en los temas Claro, Sepia y Oscuro, el último con luz cálida">
-        <div class="night-page" style="background:#fff;color:#1d1d1f"><div class="page-ch">Claro</div><p>An atomic compare-and-set operation avoids the lost update.</p></div>
-        <div class="night-page" style="background:#f7f1e3;color:#3f382e"><div class="page-ch">Sepia</div><p>An atomic compare-and-set operation avoids the lost update.</p></div>
-        <div class="night-page" style="background:#121214;color:#f5f5f7"><div class="page-ch">Oscuro + luz cálida</div><p>An atomic compare-and-set operation avoids the lost update.</p><span class="night-warm" style="opacity:.32"></span></div>
+        <div class="night-page" style="background:#fff;color:#1d1d1f"><div class="page-ch">Claro</div><p>Es tarde. ¿Un capítulo más?</p></div>
+        <div class="night-page" style="background:#f7f1e3;color:#3f382e"><div class="page-ch">Sepia</div><p>Es tarde. ¿Un capítulo más?</p></div>
+        <div class="night-page" style="background:#121214;color:#f5f5f7"><div class="page-ch">Oscuro + luz cálida</div><p>Es tarde. ¿Un capítulo más?</p><span class="night-warm" style="opacity:.32"></span></div>
       </div>
     </div>
   </div>
@@ -413,7 +384,7 @@ if (location.hostname === 'bookreader.raiatech.com') {
       <p class="support">Sin cuenta. Sin servidor. Sin nadie en medio. Todo vive en tu dispositivo, y te lo puedes llevar cuando quieras.</p>
       <p class="support values-more">Instalable, así que leer, subrayar y repasar funciona sin conexión. Sincroniza con <b>tu propio Google Drive</b>. Un backup completo cuando quieras.</p>
       <p class="seal">Privacidad. <span>Así es BookReader.</span></p>
-      <p class="values-why"><a href="por-que/" data-umami-event="Why">Por qué está hecho así →</a></p>
+      <p class="values-why"><a href="../privacy/">La privacidad, en detalle</a> · <a href="por-que/" data-umami-event="Why">Por qué está hecho así</a></p>
     </div>
     <div class="strata-stage" role="img" aria-label="Todo se queda en capas dentro de tu dispositivo: tus libros, subrayados y notas, tarjetas y progreso, y tu clave de IA">
       <div class="strata" id="strata" aria-hidden="true">
@@ -433,7 +404,7 @@ if (location.hostname === 'bookreader.raiatech.com') {
   <div class="wrap">
     <div class="beat-copy">
       <h2>Todo lo que trae.</h2>
-      <p class="support">Tu libro en el centro. A la izquierda, lo que tú pones; a la derecha, lo que te devuelve. Toca una para verla.</p>
+      <p class="support">El agente y las tarjetas ya los has visto. Esto es el resto: a la izquierda, lo que tú pones; a la derecha, lo que te devuelve tu libro. Toca una para verla.</p>
     </div>
     <figure class="bmap" id="bmap">
       <ul class="bmap-col bmap-in" aria-label="Lo que tú pones">
@@ -444,13 +415,7 @@ if (location.hostname === 'bookreader.raiatech.com') {
       </ul>
       <div class="bmap-core">
         <div class="bmap-head"><img src="../assets/landing/covers/ddia-2e.webp" alt="" width="34" height="50" loading="lazy" decoding="async"><div><b>Designing Data-Intensive Applications</b><small>Libro de ejemplo</small></div></div>
-        <div class="bmap-demo" data-demo="ask">
-          <span class="bmap-tag">Pregunta al agente</span>
-          <div class="bubble q">¿Por qué mi contador pierde incrementos?</div>
-          <div class="bubble a">Dos peticiones leen el mismo valor y la segunda escritura borra la primera. El libro lo arregla con compare-and-set.</div>
-          <span class="chip"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4.5h7a2 2 0 0 1 2 2V20a2.5 2.5 0 0 0-2.5-2H5V4.5Z"/><path d="M19 4.5h-3a2 2 0 0 0-2 2V20a2.5 2.5 0 0 1 2.5-2H19V4.5Z"/></svg> Transactions · toca y verifica</span>
-        </div>
-        <div class="bmap-demo" data-demo="explain" hidden>
+        <div class="bmap-demo" data-demo="explain">
           <span class="bmap-tag">Explícame</span>
           <p class="quote">Even with w + r &gt; n, there are edge cases where <mark>stale values are returned</mark>.</p>
           <div class="row"><span class="chip">Explícame</span><span class="chip">Por qué importa</span><span class="chip">Con números</span></div>
@@ -463,14 +428,8 @@ if (location.hostname === 'bookreader.raiatech.com') {
         </div>
         <div class="bmap-demo" data-demo="feynman" hidden>
           <span class="bmap-tag">Modo Feynman</span>
-          <div class="bubble q">El compare-and-set bloquea la fila para que nadie más escriba.</div>
-          <div class="bubble a">No exactamente. No bloquea nada: la escritura solo entra si el valor no ha cambiado desde que lo leíste. Prueba otra vez con eso en mente.</div>
-          <span class="chip"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4.5h7a2 2 0 0 1 2 2V20a2.5 2.5 0 0 0-2.5-2H5V4.5Z"/><path d="M19 4.5h-3a2 2 0 0 0-2 2V20a2.5 2.5 0 0 1 2.5-2H19V4.5Z"/></svg> Transactions</span>
-        </div>
-        <div class="bmap-demo" data-demo="cards" hidden>
-          <span class="bmap-tag">Flashcards</span>
-          <p class="quote"><b>¿Qué promete la linealizabilidad?</b><br>Que el sistema se comporta como si hubiera una sola copia de los datos.</p>
-          <span class="grade-row" aria-hidden="true"><span class="grade">Otra vez<small>&lt;10m</small></span><span class="grade">Difícil<small>3d</small></span><span class="grade g3">Bien<small>6d</small></span><span class="grade">Fácil<small>13d</small></span></span>
+          <div class="bubble q">Hacer hash de la clave reparte la carga por igual, así ningún nodo se satura.</div>
+          <div class="bubble a">Casi siempre. Pero si una clave recibe la mayoría de peticiones, todas siguen cayendo en el mismo nodo. Prueba otra vez pensando en la cuenta de un famoso.</div>
         </div>
         <div class="bmap-demo" data-demo="recall" hidden>
           <span class="bmap-tag">Fin de capítulo</span>
@@ -484,11 +443,9 @@ if (location.hostname === 'bookreader.raiatech.com') {
         </div>
       </div>
       <ul class="bmap-col bmap-out" aria-label="Lo que te devuelve">
-        <li><button type="button" data-demo="ask" aria-pressed="true"><b>Pregunta al agente</b>, con citas</button></li>
-        <li><button type="button" data-demo="explain" aria-pressed="false"><b>Explícame</b> cualquier pasaje</button></li>
+        <li><button type="button" data-demo="explain" aria-pressed="true"><b>Explícame</b> cualquier pasaje</button></li>
         <li><button type="button" data-demo="zone" aria-pressed="false"><b>Zona</b>: rodea una figura (PDF)</button></li>
         <li><button type="button" data-demo="feynman" aria-pressed="false"><b>Modo Feynman</b>: tú lo explicas</button></li>
-        <li><button type="button" data-demo="cards" aria-pressed="false"><b>Flashcards</b> con repaso espaciado</button></li>
         <li><button type="button" data-demo="recall" aria-pressed="false">Una pregunta al <b>terminar cada capítulo</b></button></li>
         <li><button type="button" data-demo="export" aria-pressed="false">Exporta a <b>Anki y Markdown</b></button></li>
       </ul>
@@ -521,18 +478,6 @@ if (location.hostname === 'bookreader.raiatech.com') {
       <details>
         <summary>¿Qué IA puedo usar?</summary>
         <p class="ans">Cualquier proveedor con API OpenAI-compatible: configuras la URL, tu clave y el modelo que quieras. Sin el agente, BookReader sigue siendo un lector completo.</p>
-      </details>
-      <details>
-        <summary>¿Dónde se guardan mis libros?</summary>
-        <p class="ans">En el almacenamiento de tu navegador, en tu dispositivo. No se suben a ningún sitio. Puedes sincronizar las anotaciones con tu propio Google Drive y exportar un backup completo cuando quieras.<br><a class="cite" href="../privacy/"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4.5h7a2 2 0 0 1 2 2V20a2.5 2.5 0 0 0-2.5-2H5V4.5Z"/><path d="M19 4.5h-3a2 2 0 0 0-2 2V20a2.5 2.5 0 0 1 2.5-2H19V4.5Z"/></svg> Privacidad</a></p>
-      </details>
-      <details>
-        <summary>¿Las respuestas del agente son fiables?</summary>
-        <p class="ans">El agente responde a partir de pasajes del libro y cita cada afirmación. La cita es tu botón de verificar: un toque y estás en la página. Si el libro no cubre algo, lo reconoce en lugar de rellenar.<br><a class="cite" href="por-que/"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4.5h7a2 2 0 0 1 2 2V20a2.5 2.5 0 0 0-2.5-2H5V4.5Z"/><path d="M19 4.5h-3a2 2 0 0 0-2 2V20a2.5 2.5 0 0 1 2.5-2H19V4.5Z"/></svg> Por qué BookReader</a></p>
-      </details>
-      <details>
-        <summary>¿Funciona sin conexión?</summary>
-        <p class="ans">Leer, subrayar y repasar tarjetas: sí, es una PWA instalable. El agente necesita conexión para hablar con tu proveedor de IA.</p>
       </details>
       <div class="maker">
         <img src="../assets/landing/luis.webp" alt="Luis González" width="52" height="52" loading="lazy" decoding="async">

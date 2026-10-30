@@ -3,6 +3,23 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-10-30 (2) — Landing sin repeticiones
+
+El mismo pasaje de compare-and-set salía seis veces y dos escenas seguidas enseñaban la misma página.
+
+- **«Now the page answers back» y «It makes nothing up» son ahora una sola escena**
+  (`motion.js`). Al acabar la respuesta, el hilo va de la cita del chat al final del pasaje y
+  el pasaje se marca. Tocar la cita lo repite. En móvil, apilado, no hay hilo: el pasaje marcado
+  basta. Fuera el beat 4, su CSS y la inclinación de `.box-group`, que ya no existía.
+- **El diagrama solo trae lo que no se ve en otra escena**: Explícame, Zona, Feynman (ahora con
+  otro tema, el reparto por hash), fin de capítulo y exportar. Fuera preguntar y tarjetas.
+- **Luz de noche** con un texto que no es del libro («It’s late…»).
+- **Preguntas**: fuera «¿Dónde se guardan mis libros?», «¿Funciona sin conexión?» y «¿Son
+  fiables las respuestas?», que repetían la banda de privacidad y la escena de la cita. El
+  enlace a Privacidad pasa a esa banda; el del manifiesto queda en la banda y en el pie.
+- Tests: `landing-motion` mira ahora `#ask` y `#ask-mark`; `landing-map`, 4 + 5 líneas.
+  Specs `landing-*` 11/11.
+
 ## 2026-10-30 — Landing: diagrama de lo que trae, luz de lectura, preguntas al agente y manifiesto
 
 Ideas sacadas de savvia.studio (plan en `workspace/docs/plan-elevar-webs-savvia-2026-10-30.md`).
