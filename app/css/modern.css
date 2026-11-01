@@ -1069,17 +1069,6 @@ button.lib-rail-twisty:hover { background: var(--surface-2); color: var(--text);
 .dlg-danger { background: var(--danger); border-color: var(--danger); color: var(--on-danger); }
 .dlg-danger:hover { background: color-mix(in srgb, var(--danger) 85%, #000); border-color: color-mix(in srgb, var(--danger) 85%, #000); }
 
-/* ==== Paywall Pro (ui/paywall.js) — misma familia visual que los diálogos ==== */
-.pw-card { max-width: 460px; }
-.pw-list { list-style: none; margin: var(--s-4) 0 0; padding: 0; display: grid; gap: 8px; }
-.pw-feat {
-  display: flex; align-items: center; gap: 8px;
-  font-size: var(--fs-md); color: var(--text-soft);
-}
-.pw-feat svg { color: var(--accent); flex: none; }
-.pw-feat-hot { color: var(--text); font-weight: 600; }
-.pw-price { margin-top: var(--s-4); font-size: var(--fs-sm); color: var(--text-soft); }
-
 /* ==== Badge de estado del sync (Fase 2) ==== */
 #sync-badge {
   position: fixed;

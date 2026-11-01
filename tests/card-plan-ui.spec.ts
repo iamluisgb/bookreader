@@ -1,5 +1,4 @@
 import { test, expect } from '@playwright/test';
-import { seedProLicense } from './pro-license';
 
 // WU5 · Plan de tarjetas por capítulo: UI editable (tabla con números del agente, total
 // vivo, coste honesto, «Quitar plan») y generación POR CAPÍTULO (un mazo por capítulo
@@ -30,7 +29,6 @@ const PLAN_JSON = JSON.stringify({
 // fetch se instala DESPUÉS de seedPlanBook (el reload lo limpiaría).
 async function seedPlanBook(page) {
   await page.goto('/index.html');
-  await seedProLicense(page);
   await page.evaluate(() => {
     localStorage.setItem('bookreader_ai_key', JSON.stringify('test-key'));
   });

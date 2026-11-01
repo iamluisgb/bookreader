@@ -1,6 +1,5 @@
 import { test, expect } from '@playwright/test';
 import path from 'path';
-import { seedProLicense } from './pro-license';
 import { openFromStudio } from './studio-nav';
 
 // P43 F3 · La matriz como opción del menú de flashcards: se pide para un capítulo, el agente
@@ -44,7 +43,6 @@ async function stubLLM(page) {
 
 async function setup(page) {
   await page.goto('/index.html');
-  await seedProLicense(page);
   await page.evaluate(() => {
     localStorage.setItem('bookreader_ai_key', JSON.stringify('test-key'));
     localStorage.setItem('bookreader_flashcards_hint_seen', 'true');

@@ -1,5 +1,4 @@
 import { test, expect } from '@playwright/test';
-import { seedProLicense } from './pro-license';
 
 // P42 F1 · Registro de intentos del repaso — E2E determinista (sin LLM real).
 // Cubre: el comparador local de cloze (casos dorados), el registro que deja cada nota, el
@@ -139,7 +138,6 @@ test('comparador de cloze: lo que perdona es la forma, nunca el contenido', asyn
 
 test('cada nota deja un intento con sus campos, y deshacer lo retira', async ({ page }) => {
   await page.goto('/index.html');
-  await seedProLicense(page);
   await seed(page, [
     { type: 'basic', front: '¿Qué es Raft?', back: 'Un algoritmo de consenso.', chapter: '' },
   ]);
@@ -203,7 +201,6 @@ test('respuesta escrita en un cloze: modo written, exact local y veredicto del a
   page,
 }) => {
   await page.goto('/index.html');
-  await seedProLicense(page);
   await page.evaluate(() => localStorage.setItem('bookreader_ai_key', JSON.stringify('test-key')));
   await seed(page, [
     { type: 'cloze', front: 'El algoritmo de consenso es {{c1::Raft}}.', back: '', chapter: '' },
@@ -226,7 +223,6 @@ test('el texto escrito se guarda (recortado a 500); el intento solo mirando lo d
   page,
 }) => {
   await page.goto('/index.html');
-  await seedProLicense(page);
   await page.evaluate(() => localStorage.setItem('bookreader_ai_key', JSON.stringify('test-key')));
   await seed(page, [
     { type: 'basic', front: 'uno', back: 'r1', chapter: '' },
@@ -261,7 +257,6 @@ test('el veredicto que llega DESPUÉS de la nota se guarda en el mismo intento',
   page,
 }) => {
   await page.goto('/index.html');
-  await seedProLicense(page);
   await page.evaluate(() => localStorage.setItem('bookreader_ai_key', JSON.stringify('test-key')));
   await seed(page, [{ type: 'cloze', front: 'Capital: {{c1::Madrid}}', back: '', chapter: '' }]);
   const overlay = await openSession(page);
@@ -292,7 +287,6 @@ test('contador del día: cada nota suma, deshacer resta, y los intentos reflejan
   page,
 }) => {
   await page.goto('/index.html');
-  await seedProLicense(page);
   await seed(page, [
     { type: 'basic', front: 'uno', back: 'r1', chapter: '' },
     { type: 'basic', front: 'dos', back: 'r2', chapter: '' },
@@ -325,7 +319,6 @@ test('contador del día: cada nota suma, deshacer resta, y los intentos reflejan
 
 test('una tarjeta ya repasada hoy (otra sesión) deja intento de re-aprendizaje, que no cuenta como retención', async ({ page }) => {
   await page.goto('/index.html');
-  await seedProLicense(page);
   const today = await page.evaluate(async () =>
     ((await import('/js/ai/srs.js')) as any).dayOf(Date.now()),
   );

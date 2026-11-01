@@ -1,5 +1,4 @@
 import { test, expect } from '@playwright/test';
-import { seedProLicense } from './pro-license';
 
 // P46 F1 · «¿Por qué?»: con la tarjeta girada se pregunta al agente (stub) sin salir del repaso.
 // Antes de girar no existe; escribir la duda no califica; la respuesta sale en el dorso con el
@@ -52,7 +51,6 @@ async function seed(page) {
 
 test('«¿Por qué?» responde en el dorso, no califica al escribir y apunta el intento', async ({ page }) => {
   await page.goto('/index.html');
-  await seedProLicense(page);
   await page.evaluate(() => localStorage.setItem('bookreader_ai_key', JSON.stringify('test-key')));
   await page.reload();
   await stubLLM(page);
@@ -124,7 +122,6 @@ test('«¿Por qué?» responde en el dorso, no califica al escribir y apunta el 
 
 test('sin agente no hay «¿Por qué?», pero el salto al libro sigue', async ({ page }) => {
   await page.goto('/index.html');
-  await seedProLicense(page);
   await seed(page);
   await page.evaluate(async () => (await import('/js/ai/study.js') as any).openToday());
   const overlay = page.locator('#ai-study');

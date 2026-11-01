@@ -1,6 +1,5 @@
 import { test, expect } from '@playwright/test';
 import path from 'path';
-import { seedProLicense } from './pro-license';
 test.use({ locale: 'en-US' });
 
 const EPUB_PATH = path.join(__dirname, 'test.epub');
@@ -78,7 +77,6 @@ test('auditoría EN: lector + sidebar + biblioteca + panel + modales sin españo
   await page.keyboard.press('Escape');
 
   // 6) modo Estudiar (Pro): sembrar licencia mock + un mazo con una tarjeta vencida
-  await seedProLicense(page);
   await page.evaluate(async () => {
     const DB = await import('/js/ai/db.js');
     await DB.addDeck({

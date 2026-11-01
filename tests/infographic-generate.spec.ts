@@ -1,5 +1,4 @@
 import { test, expect } from '@playwright/test';
-import { seedProLicense } from './pro-license';
 import path from 'path';
 
 // P29 · De punta a punta, con el LLM stubbeado (mismo patrón que studio.spec): el Studio ofrece
@@ -68,7 +67,6 @@ test.describe('P29 · infografía de punta a punta', () => {
     page.on('pageerror', (e) => errors.push(String(e)));
 
     await page.goto('/index.html');
-    await seedProLicense(page);
     await page.evaluate((k) => localStorage.setItem('bookreader_ai_key', JSON.stringify(k)), 'test-key');
     await page.reload();
     await stubLLM(page);

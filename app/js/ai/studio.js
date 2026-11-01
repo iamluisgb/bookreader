@@ -134,7 +134,7 @@ function decksBody(decks) {
   const summary = `<p class="studio-meta studio-deck-summary">${t('Mazos: {n} · Tarjetas: {c} · Para hoy: {d}', { n: decks.length, c: cards, d: due })}</p>`;
   // Acción primaria del tile con algo vencido hoy: repasa TODO el libro de una vez.
   // Mismo mecanismo que la biblioteca (Study.openToday con scope de libro): alias-aware,
-  // tope de nuevas y gate Pro incluidos. Sin vencidas no se ofrece: no hay sesión vacía.
+  // tope de nuevas incluido. Sin vencidas no se ofrece: no hay sesión vacía.
   const studyAll = due
     ? `<button class="btn btn--secondary studio-gen studio-all" data-act="study-book">${icon('cards', { size: 'md' })} ${t('Estudiar todo · {n}', { n: due })}</button>`
     : '';

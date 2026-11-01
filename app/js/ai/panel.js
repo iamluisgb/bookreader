@@ -44,7 +44,6 @@ import * as Storage from '../storage.js';
 import * as NB from './notebook.js';
 import * as QueryExpand from './query-expand.js';
 import * as Offline from './offline.js';
-import { ensurePro } from '../ui/paywall.js';
 
 // Icon + label markup for the small inline action buttons.
 const act = (name, text, size = 'md') => `${icon(name, { size })}<span>${text}</span>`;
@@ -634,7 +633,6 @@ async function openFlashcards() {
   dismissFlashcardsHint();
   if (!book && !bookId) { setStatus('Abre un libro para crear flashcards.'); return; }
   if (!segReady) { setStatus('Preparando el libro… inténtalo en unos segundos.'); return; }
-  if (!(await ensurePro('flashcards'))) return;   // gate Pro (MON2)
   // IA8 · Los scores de atenuación (si el objetivo ya puntuó el TOC) guían el muestreo
   // del libro entero: más cupo a capítulos relevantes al objetivo. Best-effort.
   let chapterScores = null;
@@ -675,7 +673,6 @@ function openSummary(opts) {
 async function openFeynman() {
   if (!book && !bookId) { setStatus('Abre un libro para explicar un concepto.'); return; }
   if (!segReady) { setStatus('Preparando el libro… inténtalo en unos segundos.'); return; }
-  if (!(await ensurePro('feynman'))) return;   // gate Pro (MON2)
   Feynman.open({
     bookId, bookTitle,
     tocLabels,
@@ -690,9 +687,6 @@ async function openFeynman() {
 async function openMindMap(opts) {
   if (!book && !bookId) { setStatus('Abre un libro para generar el mapa mental.'); return; }
   if (!segReady) { setStatus('Preparando el libro… inténtalo en unos segundos.'); return; }
-  // Gate Pro (MON2): generar es Pro; abrir un artefacto YA generado sigue libre
-  // (si la licencia caduca nadie pierde lo que ya tenía).
-  if (!(opts && opts.artifact) && !(await ensurePro('mindmap'))) return;
   MindMap.open({
     bookId, bookTitle, bookAuthor,
     goal: convo?.goal || '',
@@ -707,11 +701,10 @@ async function openMindMap(opts) {
   });
 }
 
-// P29 · Infografía del libro. Generar es Pro; reabrir un artefacto ya generado sigue libre.
+// P29 · Infografía del libro.
 async function openInfographic(opts) {
   if (!book && !bookId) { setStatus('Abre un libro para generar la infografía.'); return; }
   if (!segReady) { setStatus('Preparando el libro… inténtalo en unos segundos.'); return; }
-  if (!(opts && opts.artifact) && !(await ensurePro('infographic'))) return;
   Infographic.open({
     bookId, bookTitle, bookAuthor,
     goal: convo?.goal || '',
@@ -1187,8 +1180,6 @@ function openOnboarding(opts = {}) {
       // T5 (placer) no exige objetivo; el resto sí (es el ancla de la relevancia y la libreta).
       if (!goal && chosenTemplate.id !== INMERSIVA_ID) { goalEl.focus(); return; }
       const finalTemplate = chosenTemplate;
-      // Gate Pro (MON2): HQ&A es la plantilla avanzada de pago; las demás siguen libres.
-      if (finalTemplate.id === 'hqa' && !(await ensurePro('hqa'))) return;
       template = finalTemplate;
       if (upgrade && convo) {
         // Añadir objetivo a la conversación existente SIN perder el chat: actualiza en sitio.

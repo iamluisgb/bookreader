@@ -1,5 +1,4 @@
 import { test, expect } from '@playwright/test';
-import { seedProLicense } from './pro-license';
 
 // P12 · Selector de repaso: dueToday por ámbito (todo | libro | estantería) y
 // studyScopes (ámbitos con vencidas). Se siembran mazos y estanterías en IndexedDB.
@@ -71,7 +70,6 @@ test.describe('P12 · ámbitos de repaso', () => {
 
   test('el chip "Repasar hoy" abre el árbol estantería→libros', async ({ page }) => {
     await page.goto('/');
-    await seedProLicense(page);   // features Pro gateadas (MON2): el test ejercita la feature
     await seed(page);
     await page.goto('/');   // re-render de la biblioteca → pinta el chip con el total
     const chip = page.locator('.lib-study-chip');
@@ -99,7 +97,6 @@ test.describe('P12 · ámbitos de repaso', () => {
   // ambos mazos, sin duplicados ni huérfanos; y la sesión del libro incluye sus tarjetas.
   test('mazo con bookId aliased: cuenta como el libro canónico y entra en su sesión', async ({ page }) => {
     await page.goto('/');
-    await seedProLicense(page);
     const ids = await page.evaluate(async () => {
       const DB: any = await import('/js/ai/db.js');
       const Store: any = await import('/js/library/store.js');
@@ -136,7 +133,6 @@ test.describe('P12 · ámbitos de repaso', () => {
   // ahora tiene su propia sección y su fila abre una sesión con exactamente sus tarjetas.
   test('mazo huérfano: su propia sección en el picker y sesión con solo sus tarjetas', async ({ page }) => {
     await page.goto('/');
-    await seedProLicense(page);
     await page.evaluate(async () => {
       const DB: any = await import('/js/ai/db.js');
       const dueCard = { uid: crypto.randomUUID(), front: 'q', back: 'a' };
@@ -163,7 +159,6 @@ test.describe('P12 · ámbitos de repaso', () => {
   test('el menú del picker no se sale del viewport angosto', async ({ page }) => {
     await page.setViewportSize({ width: 420, height: 800 });
     await page.goto('/');
-    await seedProLicense(page);
     await seed(page);
     await page.goto('/');
     await page.locator('.lib-study-pick').click();
@@ -181,7 +176,6 @@ test.describe('P12 · ámbitos de repaso', () => {
   // contenido de las filas de estantería (la guía de anidación queda en el CSS de hijos).
   test('las filas de estantería no llevan el marcador decorativo ▸', async ({ page }) => {
     await page.goto('/');
-    await seedProLicense(page);
     await seed(page);
     await page.goto('/');
     await page.locator('.lib-study-pick').click();

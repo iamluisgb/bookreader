@@ -1,5 +1,4 @@
 import { test, expect } from '@playwright/test';
-import { seedProLicense } from './pro-license';
 
 // Tarjetas visuales (WU5d): FUENTE de figuras por libro. Sin UI ni LLM: se importa el
 // módulo dentro de la página y se ejercita con documentos pdf.js falsos (operator lists
@@ -8,7 +7,6 @@ import { seedProLicense } from './pro-license';
 
 test('cropRectFromCanvas: recorta y reescala; rect degenerado y canvas vacío → null', async ({ page }) => {
   await page.goto('/index.html');
-  await seedProLicense(page);
   const res = await page.evaluate(async () => {
     const F: any = await import('/js/ai/visual-figures.js');
     const decodeSize = (url: string) => new Promise((resolve, reject) => {
@@ -46,7 +44,6 @@ test('cropRectFromCanvas: recorta y reescala; rect degenerado y canvas vacío �
 
 test('renderPageCanvas: canvas offscreen con lado mayor = maxPx; render que rechaza → null', async ({ page }) => {
   await page.goto('/index.html');
-  await seedProLicense(page);
   const res = await page.evaluate(async () => {
     const F: any = await import('/js/ai/visual-figures.js');
     const renderCalls: any[] = [];
@@ -87,7 +84,6 @@ test('renderPageCanvas: canvas offscreen con lado mayor = maxPx; render que rech
 
 test('figuresForPdf: detecta, renderiza solo páginas con imágenes y persiste con dimensiones', async ({ page }) => {
   await page.goto('/index.html');
-  await seedProLicense(page);
   const res = await page.evaluate(async () => {
     const F: any = await import('/js/ai/visual-figures.js');
     // Decodifica un data URL para medir sus dimensiones reales.
@@ -155,7 +151,6 @@ test('figuresForPdf: detecta, renderiza solo páginas con imágenes y persiste c
 
 test('figuresForPdf: maxFigures corta y reporta truncated', async ({ page }) => {
   await page.goto('/index.html');
-  await seedProLicense(page);
   const res = await page.evaluate(async () => {
     const F: any = await import('/js/ai/visual-figures.js');
     const OPS = { save: 10, restore: 11, transform: 12, paintImageXObject: 85 };
@@ -181,7 +176,6 @@ test('figuresForPdf: maxFigures corta y reporta truncated', async ({ page }) => 
 
 test('figuresForEpub: zip real con jszip, guarda con source epub y caption del capítulo', async ({ page }) => {
   await page.goto('/index.html');
-  await seedProLicense(page);
   const res = await page.evaluate(async () => {
     // PNG aleatorio "chico" pero >= MIN_IMAGE_BYTES (8 KB): píxeles aleatorios comprimen
     // mal, así que un canvas 160x120 con ruido pasa el filtro de collectEpubFigures.
@@ -240,7 +234,6 @@ test('figuresForEpub: zip real con jszip, guarda con source epub y caption del c
 
 test('ensureBookFigures: figuras en el store → cached true y cero extracción', async ({ page }) => {
   await page.goto('/index.html');
-  await seedProLicense(page);
   const res = await page.evaluate(async () => {
     const F: any = await import('/js/ai/visual-figures.js');
     const FIG: any = await import('/js/ai/figures.js');
@@ -261,7 +254,6 @@ test('ensureBookFigures: figuras en el store → cached true y cero extracción'
 
 test('ensureBookFigures: PDF sin documento abierto → reason no-document, sin extraer', async ({ page }) => {
   await page.goto('/index.html');
-  await seedProLicense(page);
   const res = await page.evaluate(async () => {
     const F: any = await import('/js/ai/visual-figures.js');
     // Sin deps.getDocument: cae al lector real, que en esta página no tiene PDF abierto.
@@ -274,7 +266,6 @@ test('ensureBookFigures: PDF sin documento abierto → reason no-document, sin e
 
 test('ensureBookFigures: EPUB sin figuras + deps.readBytes → extrae y guarda (cached false)', async ({ page }) => {
   await page.goto('/index.html');
-  await seedProLicense(page);
   const res = await page.evaluate(async () => {
     const noisyPngBytes = () => {
       const c = document.createElement('canvas');

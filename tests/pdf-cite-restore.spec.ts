@@ -1,5 +1,4 @@
 import { test, expect, Page } from '@playwright/test';
-import { seedProLicense } from './pro-license';
 import { stubChat, abrirPdfConAgente, preguntarYEsperarCita, irAPagina, pagina } from './cite-helpers';
 
 // Regresión de la CITA del agente en un PDF: el camino REAL de un click del usuario —
@@ -9,7 +8,6 @@ import { stubChat, abrirPdfConAgente, preguntarYEsperarCita, irAPagina, pagina }
 
 test('repro: cita del agente en PDF navega a la página del pasaje', async ({ page }) => {
   await page.goto('/index.html');
-  await seedProLicense(page);
   await page.evaluate((k) => localStorage.setItem('bookreader_ai_key', JSON.stringify(k)), 'test-key');
   await page.reload();
   await stubChat(page);
@@ -42,7 +40,6 @@ test('repro: cita del agente en PDF navega a la página del pasaje', async ({ pa
 // tras asentarse el scroll suave.
 test('cita del agente en PDF modo scroll aterriza y permanece en la página citada', async ({ page }) => {
   await page.goto('/index.html');
-  await seedProLicense(page);
   await page.evaluate((k) => localStorage.setItem('bookreader_ai_key', JSON.stringify(k)), 'test-key');
   await page.reload();
   await stubChat(page);
@@ -80,7 +77,6 @@ test('cita del agente en PDF modo scroll aterriza y permanece en la página cita
 // reaparezca y siga navegando.
 test('una conversación restaurada conserva sus chips de cita', async ({ page }) => {
   await page.goto('/index.html');
-  await seedProLicense(page);
   await page.evaluate((k) => localStorage.setItem('bookreader_ai_key', JSON.stringify(k)), 'test-key');
   await page.reload();
   await stubChat(page);

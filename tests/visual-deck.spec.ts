@@ -1,5 +1,4 @@
 import { test, expect } from '@playwright/test';
-import { seedProLicense } from './pro-license';
 
 // Tarjetas visuales (WU5b): orquestación del mazo visual (visual-deck.js). Los
 // módulos se importan dentro de la página (misma convención que
@@ -56,7 +55,6 @@ const FIGURE_WITHOUT_LABELS = { key: 'book:figures:f2', dataUrl: DATA_URL, width
 //   - number → respuesta HTTP con ese status (para simular errores del proveedor).
 async function setupDeckStub(page, items: (string | number)[]) {
   await page.goto('/index.html');
-  await seedProLicense(page);
   await page.evaluate(() => {
     localStorage.setItem('bookreader_ai_key', JSON.stringify('test-key'));
     localStorage.setItem('bookreader_ai_vision_model', JSON.stringify('vision-test'));
@@ -105,7 +103,6 @@ async function inPage(page, fn: (arg: any) => Promise<any>, arg?: any) {
 
 test('VISUAL_TYPES e isVisualType: los tres tipos válidos y rechazo de lo demás', async ({ page }) => {
   await page.goto('/index.html');
-  await seedProLicense(page);
   const res = await inPage(page, async () => {
     const VD = await import('/js/ai/visual-deck.js');
     return {
@@ -121,7 +118,6 @@ test('VISUAL_TYPES e isVisualType: los tres tipos válidos y rechazo de lo demá
 
 test('pickLabeledFigure: coincide sin caso ni tildes y devuelve null si la etiqueta no está', async ({ page }) => {
   await page.goto('/index.html');
-  await seedProLicense(page);
   const res = await inPage(page, async (labels: any) => {
     const VD = await import('/js/ai/visual-deck.js');
     return {
@@ -143,7 +139,6 @@ test('pickLabeledFigure: coincide sin caso ni tildes y devuelve null si la etiqu
 
 test('sanitizeVisualCards: campos obligatorios por tipo, dedupe por front, cap y basura → []', async ({ page }) => {
   await page.goto('/index.html');
-  await seedProLicense(page);
   const res = await inPage(page, async (clean: string) => {
     const VD = await import('/js/ai/visual-deck.js');
     const occ = { type: 'occlusion', front: '¿Qué desacopla?', back: 'El buffer.', figureKey: 'b:figures:f1', bbox: { x: 71, y: 56, w: 66, h: 15 }, occludedLabel: 'Producer' };
@@ -324,7 +319,6 @@ test('buildVisualCards: error HTTP en el grounding de una figura no corta la cor
 // AbortError del signal propaga: buildVisualCards rechaza con name 'AbortError'.
 test('buildVisualCards: el abort del signal propaga AbortError', async ({ page }) => {
   await page.goto('/index.html');
-  await seedProLicense(page);
   await page.evaluate(() => {
     localStorage.setItem('bookreader_ai_key', JSON.stringify('test-key'));
     localStorage.setItem('bookreader_ai_vision_model', JSON.stringify('vision-test'));
@@ -359,7 +353,6 @@ test('buildVisualCards: el abort del signal propaga AbortError', async ({ page }
 // onerror daría null y este test fallaría.
 test('figureSize: width/height finitos se devuelven sin decodificar (el dataUrl no se toca)', async ({ page }) => {
   await page.goto('/index.html');
-  await seedProLicense(page);
   const res = await inPage(page, async () => {
     const VD = await import('/js/ai/visual-deck.js');
     return VD.figureSize({ key: 'book:figures:f1', dataUrl: 'data:image/jpeg;base64,ZZZZ', width: 810, height: 130, labels: [] });
@@ -371,7 +364,6 @@ test('figureSize: width/height finitos se devuelven sin decodificar (el dataUrl 
 // decodifica con un <img> y las dimensiones naturales son exactas.
 test('figureSize: dataUrl real de canvas 40x30 decodifica exactamente {width: 40, height: 30}', async ({ page }) => {
   await page.goto('/index.html');
-  await seedProLicense(page);
   const res = await inPage(page, async () => {
     const VD = await import('/js/ai/visual-deck.js');
     const c = document.createElement('canvas');
@@ -387,7 +379,6 @@ test('figureSize: dataUrl real de canvas 40x30 decodifica exactamente {width: 40
 // si el timeout interno de 5 s estuviera roto, el test tardaría más de ~6 s).
 test('figureSize: dataUrl basura devuelve null sin colgar el test', async ({ page }) => {
   await page.goto('/index.html');
-  await seedProLicense(page);
   const res = await inPage(page, async () => {
     const VD = await import('/js/ai/visual-deck.js');
     const t0 = Date.now();
@@ -468,7 +459,6 @@ test('buildVisualCards: figura con dataUrl indescifrable se saltea sin llamar al
 // responde SUBCLASSOF. Cuando el dorso nombra la etiqueta, pasa.
 test('answersLabel: casos reales — dorso genérico no responde, dorso que nombra la etiqueta sí', async ({ page }) => {
   await page.goto('/index.html');
-  await seedProLicense(page);
   const res = await inPage(page, async () => {
     const VD = await import('/js/ai/visual-deck.js');
     return {
@@ -511,7 +501,6 @@ test('answersLabel: casos reales — dorso genérico no responde, dorso que nomb
 // las saca del mazo es sanitizeVisualCards.
 test('dedupeFacts: el dorso repetido (sin caso ni tildes) deja pasar solo la primera', async ({ page }) => {
   await page.goto('/index.html');
-  await seedProLicense(page);
   const res = await inPage(page, async () => {
     const VD = await import('/js/ai/visual-deck.js');
     return {

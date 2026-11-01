@@ -1,5 +1,4 @@
 import { test, expect } from '@playwright/test';
-import { seedProLicense } from './pro-license';
 
 // WU4 · Planificador de tarjetas por capítulo: lista de capítulos, reparto proporcional
 // (fallback), prompt del planificador, parseo tolerante y — el corazón — la validación
@@ -264,7 +263,6 @@ test('validatePlan: exact agent plan passes untouched; empty plan stays empty', 
 async function setupStreamStub(page: any, payloads: string | string[]) {
   const chunks = Array.isArray(payloads) ? payloads : [payloads];
   await page.goto('/index.html');
-  await seedProLicense(page);
   await page.evaluate(async () => {
     localStorage.setItem('bookreader_ai_key', JSON.stringify('test-key'));
   });
@@ -335,7 +333,6 @@ test('suggestPlan: garbage twice → "proportional" with the proportional number
 
 test('suggestPlan: network error → "fallback-error" with the message in notes and proportional plan', async ({ page }) => {
   await page.goto('/index.html');
-  await seedProLicense(page);
   await page.evaluate(async () => {
     localStorage.setItem('bookreader_ai_key', JSON.stringify('test-key'));
     window.fetch = async () => { throw new TypeError('network down'); };
@@ -353,7 +350,6 @@ test('suggestPlan: network error → "fallback-error" with the message in notes 
 
 test('suggestPlan: a user abort propagates the AbortError and does not retry', async ({ page }) => {
   await page.goto('/index.html');
-  await seedProLicense(page);
   await page.evaluate(async () => {
     localStorage.setItem('bookreader_ai_key', JSON.stringify('test-key'));
     (window as any).__cp = { calls: 0 };

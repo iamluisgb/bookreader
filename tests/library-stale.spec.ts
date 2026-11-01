@@ -1,6 +1,5 @@
 import { test, expect, BrowserContext, Page } from '@playwright/test';
 import { installDriveMocks, seedDriveToken, createDriveState, DriveState, DriveMock } from './drive-mock';
-import { seedProLicense } from './pro-license';
 
 // REGRESIÓN: "descargué libros en el móvil y en la tablet no aparecían".
 //
@@ -26,7 +25,6 @@ async function bootDevice(context: BrowserContext, state: DriveState): Promise<{
   await seedDriveToken(context);
   const page = await context.newPage();
   await page.goto('/');
-  await seedProLicense(page);
   return { page, drive };
 }
 

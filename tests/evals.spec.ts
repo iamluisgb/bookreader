@@ -1,5 +1,4 @@
 import { test, expect } from '@playwright/test';
-import { seedProLicense } from './pro-license';
 import { BATTERIES } from '../evals/batteries.mjs';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -54,7 +53,6 @@ test.describe('EV1 · generación de artefactos @eval', () => {
       const t0 = Date.now();
 
       await page.goto('/index.html');
-      await seedProLicense(page);   // flashcards/resumen son Pro (MON2)
       await page.evaluate(({ k, m }) => {
         localStorage.setItem('bookreader_ai_key', JSON.stringify(k));
         localStorage.setItem('bookreader_ai_model', JSON.stringify(m));

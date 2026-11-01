@@ -1,5 +1,4 @@
 import { test, expect } from '@playwright/test';
-import { seedProLicense } from './pro-license';
 
 // WU2 · Capa de datos del gestor de mazos (feature "gestor de mazos").
 //
@@ -18,7 +17,6 @@ function deck(id: number, bookId: string, name: string, createdAt: number, cards
 test.describe('Gestor de mazos (WU2)', () => {
   test('groupDecks: agrupa por libro canónico, ordena y separa huérfanos', async ({ page }) => {
     await page.goto('/index.html');
-    await seedProLicense(page);
     const res = await page.evaluate(async ({ HASH_A, HASH_B }) => {
       const deck = (id: number, bookId: string, name: string, createdAt: number, cards: any[] = []) =>
         ({ id, uid: `u${id}`, bookId, name, scope: '', cardType: 'basic', createdAt, cards });
@@ -66,7 +64,6 @@ test.describe('Gestor de mazos (WU2)', () => {
 
   test('groupDecks: grupos ordenados por título y entrada malformada no rompe', async ({ page }) => {
     await page.goto('/index.html');
-    await seedProLicense(page);
     const res = await page.evaluate(async ({ HASH_A, HASH_B }) => {
       const deck = (id: number, bookId: string, name: string, createdAt: number, cards: any[] = []) =>
         ({ id, uid: `u${id}`, bookId, name, scope: '', cardType: 'basic', createdAt, cards });
@@ -86,7 +83,6 @@ test.describe('Gestor de mazos (WU2)', () => {
 
   test('deckSummary: cubos SRS y porTipo; una suspendida no cuenta como vencida', async ({ page }) => {
     await page.goto('/index.html');
-    await seedProLicense(page);
     const res = await page.evaluate(async () => {
       const deck = (id: number, bookId: string, name: string, createdAt: number, cards: any[] = []) =>
         ({ id, uid: `u${id}`, bookId, name, scope: '', cardType: 'basic', createdAt, cards });
@@ -117,7 +113,6 @@ test.describe('Gestor de mazos (WU2)', () => {
 
   test('validateCardInput: los cinco motivos, duplicado sin tildes ni mayúsculas', async ({ page }) => {
     await page.goto('/index.html');
-    await seedProLicense(page);
     const res = await page.evaluate(async () => {
       const DM: any = await import('/js/ai/deck-manager.js');
       return {
@@ -142,7 +137,6 @@ test.describe('Gestor de mazos (WU2)', () => {
 
   test('makeCard: forma exacta con uid no vacío y updatedAt pasado por parámetro', async ({ page }) => {
     await page.goto('/index.html');
-    await seedProLicense(page);
     const res = await page.evaluate(async () => {
       const DM: any = await import('/js/ai/deck-manager.js');
       const now = 1700000000000;
@@ -161,7 +155,6 @@ test.describe('Gestor de mazos (WU2)', () => {
 
   test('mutaciones puras: agregar, quitar, suspender y editar sin tocar el original', async ({ page }) => {
     await page.goto('/index.html');
-    await seedProLicense(page);
     const res = await page.evaluate(async () => {
       const deck = (id: number, bookId: string, name: string, createdAt: number, cards: any[] = []) =>
         ({ id, uid: `u${id}`, bookId, name, scope: '', cardType: 'basic', createdAt, cards });

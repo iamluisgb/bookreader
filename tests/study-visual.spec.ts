@@ -1,5 +1,4 @@
 import { test, expect } from '@playwright/test';
-import { seedProLicense } from './pro-license';
 
 // WU6 · Render por tipo de tarjeta visual en la sesión de estudio (odd/tasks/tarjetas-visuales.md):
 //  - occlusion: figura del store de artefactos + caja ocluidora en % del bbox
@@ -60,7 +59,6 @@ async function makeFigureDataUrl(page: any, width: number, height: number): Prom
 
 test('occlusion: caja posicionada por bbox en el frente y revelada con la respuesta al voltear', async ({ page }) => {
   await page.goto('/index.html');
-  await seedProLicense(page);
   const dataUrl = await makeFigureDataUrl(page, 200, 100);
   await seedVisualDeck(page, {
     bookId: 'bk-vis1',
@@ -101,7 +99,6 @@ test('occlusion con figura ausente: placeholder visible y sin errores', async ({
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(String(e)));
   await page.goto('/index.html');
-  await seedProLicense(page);
   await seedVisualDeck(page, {
     bookId: 'bk-vis2',
     cards: [{
@@ -128,7 +125,6 @@ test('occlusion con figura ausente: placeholder visible y sin errores', async ({
 
 test('diagram: el label del nodo de respuesta se tapa en el frente y vuelve al voltear', async ({ page }) => {
   await page.goto('/index.html');
-  await seedProLicense(page);
   await seedVisualDeck(page, {
     bookId: 'bk-vis3',
     cards: [{
@@ -165,7 +161,6 @@ test('diagram: el label del nodo de respuesta se tapa en el frente y vuelve al v
 // defecto del SVG — cajas negras con texto negro (defecto de campo con captura).
 test('diagram: los nodos d-box/d-txt usan el tema, no el negro por defecto del SVG', async ({ page }) => {
   await page.goto('/index.html');
-  await seedProLicense(page);
   await seedVisualDeck(page, {
     bookId: 'bk-vis4',
     cards: [{
@@ -192,7 +187,6 @@ test('diagram: los nodos d-box/d-txt usan el tema, no el negro por defecto del S
 
 test('diagram con script en el SVG: placeholder y ningún <script> en el DOM', async ({ page }) => {
   await page.goto('/index.html');
-  await seedProLicense(page);
   await seedVisualDeck(page, {
     bookId: 'bk-vis4',
     cards: [{
@@ -216,7 +210,6 @@ test('diagram con script en el SVG: placeholder y ningún <script> en el DOM', a
 
 test('drawing: dos trazos acumulan, Deshacer saca una, Limpiar vacía, y el dorso lista los pasos', async ({ page }) => {
   await page.goto('/index.html');
-  await seedProLicense(page);
   await seedVisualDeck(page, {
     bookId: 'bk-vis5',
     cards: [{
@@ -263,7 +256,6 @@ test('drawing: dos trazos acumulan, Deshacer saca una, Limpiar vacía, y el dors
 
 test('buildQueue: tarjeta visual sin front entra a la cola; sin front y sin visual, no', async ({ page }) => {
   await page.goto('/index.html');
-  await seedProLicense(page);
   await page.reload();
   const result = await page.evaluate(async () => {
     const Study: any = await import('/js/ai/study.js');
@@ -292,7 +284,6 @@ const PLAN_5 = ['Evaporación del agua', 'Condensación en nubes', 'Precipitaci�
 // visual-cards.spec.ts: chatVision los exige).
 async function setupVision(page): Promise<void> {
   await page.goto('/index.html');
-  await seedProLicense(page);
   await page.evaluate(() => {
     localStorage.setItem('bookreader_ai_key', JSON.stringify('test-key'));
     localStorage.setItem('bookreader_ai_vision_model', JSON.stringify('vision-test'));
@@ -459,7 +450,6 @@ test('drawing review: respuesta basura → UN reintento y la nota tenue sin romp
 
 test('drawing review sin modelo de visión: cero red, nota tenue y la rúbrica de siempre', async ({ page }) => {
   await page.goto('/index.html');
-  await seedProLicense(page);
   await seedVisualDeck(page, {
     bookId: 'bk-vis7d',
     cards: [{ type: 'drawing', front: 'Dibujá el ciclo del agua.', back: '', steps: PLAN_5 }],

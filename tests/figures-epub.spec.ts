@@ -1,6 +1,5 @@
 import { test, expect } from '@playwright/test';
 import { readFileSync } from 'node:fs';
-import { seedProLicense } from './pro-license';
 
 // Tarjetas visuales (WU4b): detección y extracción de figuras en EPUB. Sin UI ni LLM: se
 // importa el módulo dentro de la página y se ejercitan las funciones puras con datos
@@ -14,7 +13,6 @@ const TINY_PNG_B64 =
 
 test('isImagePath y mimeOf: extensiones, mayúsculas, query y no-imágenes', async ({ page }) => {
   await page.goto('/index.html');
-  await seedProLicense(page);
   const res = await page.evaluate(async () => {
     const F: any = await import('/js/ai/figures-epub.js');
     const cases = [
@@ -58,7 +56,6 @@ test('isImagePath y mimeOf: extensiones, mayúsculas, query y no-imágenes', asy
 
 test('resolveHref: relativos, raíz del zip, absolutos y descartes', async ({ page }) => {
   await page.goto('/index.html');
-  await seedProLicense(page);
   const res = await page.evaluate(async () => {
     const F: any = await import('/js/ai/figures-epub.js');
     const base = 'OEBPS/xhtml/ch1.xhtml';
@@ -102,7 +99,6 @@ test('resolveHref: relativos, raíz del zip, absolutos y descartes', async ({ pa
 
 test('refsFromXhtml: img, svg image con xlink:href e href; data: se descarta', async ({ page }) => {
   await page.goto('/index.html');
-  await seedProLicense(page);
   const refs = await page.evaluate(async (html: string) => {
     const F: any = await import('/js/ai/figures-epub.js');
     return F.refsFromXhtml(html, { chapterPath: 'OEBPS/xhtml/ch1.xhtml' });
@@ -125,7 +121,6 @@ test('refsFromXhtml: img, svg image con xlink:href e href; data: se descarta', a
 
 test('entriesFromZip + zipReader: entradas con tamaño, texto e imagen desde JSZip real', async ({ page }) => {
   await page.goto('/index.html');
-  await seedProLicense(page);
   const res = await page.evaluate(async (pngB64: string) => {
     const VL: any = await import('/js/vendor-loader.js');
     const JSZip = await VL.loadJsZip();
@@ -160,7 +155,6 @@ test('entriesFromZip + zipReader: entradas con tamaño, texto e imagen desde JSZ
 
 test('collectEpubFigures: filtros de tamaño, capítulo compartido, fallos de lectura y orden', async ({ page }) => {
   await page.goto('/index.html');
-  await seedProLicense(page);
   const res = await page.evaluate(async (minBytes: number) => {
     const F: any = await import('/js/ai/figures-epub.js');
     const entries = [
@@ -211,7 +205,6 @@ test('collectEpubFigures: filtros de tamaño, capítulo compartido, fallos de le
 
 test('extractAndSaveEpubFigures: save fallido va a failed sin cortar; progreso y payload', async ({ page }) => {
   await page.goto('/index.html');
-  await seedProLicense(page);
   const res = await page.evaluate(async () => {
     const F: any = await import('/js/ai/figures-epub.js');
     const entries = [
@@ -262,7 +255,6 @@ test('extractAndSaveEpubFigures: save fallido va a failed sin cortar; progreso y
 test('integración real: extrae las 2 figuras del EPUB con JSZip y jszip-reader reales', async ({ page }) => {
   const b64 = readFileSync('tests/test.epub').toString('base64');
   await page.goto('/index.html');
-  await seedProLicense(page);
   const figures = await page.evaluate(async (data: string) => {
     const VL: any = await import('/js/vendor-loader.js');
     const JSZip = await VL.loadJsZip();

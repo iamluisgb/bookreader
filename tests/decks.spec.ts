@@ -1,5 +1,4 @@
 import { test, expect } from '@playwright/test';
-import { seedProLicense } from './pro-license';
 
 // WU3 · Pantalla «Mazos» de la biblioteca: entrada desde el rail, grupos por
 // libro, reparación de huérfanos («Asignar a…»), detalle del mazo (crear a
@@ -65,7 +64,6 @@ async function openDecks(page) {
 test.describe('Pantalla Mazos (gestor de mazos)', () => {
   test('el botón del rail abre el gestor y lista el mazo bajo su libro', async ({ page }) => {
     await page.goto('/');
-    await seedProLicense(page);
     await seed(page);
     await page.goto('/');   // re-render de la biblioteca con los datos sembrados
     await expect(page.locator('[data-act="decks"]')).toBeVisible();
@@ -81,7 +79,6 @@ test.describe('Pantalla Mazos (gestor de mazos)', () => {
 
   test('los huérfanos van a «Mazos sin libro» y «Asignar a…» los reasigna', async ({ page }) => {
     await page.goto('/');
-    await seedProLicense(page);
     await seed(page);
     await page.goto('/');
     await openDecks(page);
@@ -113,7 +110,6 @@ test.describe('Pantalla Mazos (gestor de mazos)', () => {
 
   test('crear tarjeta a mano: P→R se guarda; cloze sin hueco y duplicado dan error', async ({ page }) => {
     await page.goto('/');
-    await seedProLicense(page);
     await seed(page);
     await page.goto('/');
     await openDecks(page);
@@ -151,7 +147,6 @@ test.describe('Pantalla Mazos (gestor de mazos)', () => {
 
   test('editar el frente en el sitio y quitar una tarjeta persisten', async ({ page }) => {
     await page.goto('/');
-    await seedProLicense(page);
     await seed(page);
     await page.goto('/');
     await openDecks(page);
@@ -176,7 +171,6 @@ test.describe('Pantalla Mazos (gestor de mazos)', () => {
 
   test('«Estudiar todo · N» en la cabecera del libro repasa lo vencido de todos sus mazos', async ({ page }) => {
     await page.goto('/');
-    await seedProLicense(page);
     await seedTwoDueDecks(page);
     await page.goto('/');
     await openDecks(page);
@@ -213,7 +207,6 @@ test.describe('Pantalla Mazos (gestor de mazos)', () => {
 
   test('sin tarjetas vencidas hoy, la cabecera del libro NO ofrece «Estudiar todo»', async ({ page }) => {
     await page.goto('/');
-    await seedProLicense(page);
     await seedFutureDecks(page);
     await page.goto('/');
     await openDecks(page);
@@ -228,7 +221,6 @@ test.describe('Pantalla Mazos (gestor de mazos)', () => {
 
   test('suspender una tarjeta la marca y deja de contar como vencida', async ({ page }) => {
     await page.goto('/');
-    await seedProLicense(page);
     await seed(page);
     await page.goto('/');
     await openDecks(page);

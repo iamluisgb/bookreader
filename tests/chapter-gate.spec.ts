@@ -1,6 +1,5 @@
 import { test, expect } from '@playwright/test';
 import path from 'path';
-import { seedProLicense } from './pro-license';
 
 // Las tarjetas NUEVAS de un capítulo no entran en el repaso de hoy hasta que lo has dejado atrás
 // (ai/chapter-gate.js). Abrir un mazo a mano no filtra. El lector registra los capítulos que
@@ -43,7 +42,6 @@ test('chapter-gate: avanzar solo suma lo de atrás; bloquea las nuevas de capít
 
 test('repaso de hoy: las nuevas del capítulo sin leer esperan; abrir el mazo a mano no filtra', async ({ page }) => {
   await page.goto('/index.html');
-  await seedProLicense(page);
   await page.evaluate(async () => {
     const DB: any = await import('/js/ai/db.js');
     const Lib: any = await import('/js/library/store.js');

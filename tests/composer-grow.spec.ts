@@ -1,6 +1,5 @@
 import { test, expect } from '@playwright/test';
 import path from 'path';
-import { seedProLicense } from './pro-license';
 
 const EPUB_PATH = path.join(__dirname, 'test.epub');
 
@@ -11,7 +10,6 @@ const EPUB_PATH = path.join(__dirname, 'test.epub');
 
 async function setup(page: import('@playwright/test').Page) {
   await page.goto('/index.html');
-  await seedProLicense(page);
   await page.evaluate(() => {
     localStorage.setItem('bookreader_ai_key', JSON.stringify('test-key'));
   });

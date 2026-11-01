@@ -3,6 +3,22 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-11-01 (2) — Pro pasa a ser gratis; solo queda Plus, a 8 €/mes (ADR-061)
+
+Todo lo que era BookReader Pro se abre sin licencia ni prueba: tarjetas, preguntas con opciones,
+matrices, repaso, análisis del estudio, mapas, infografías, Feynman, la plantilla de pregunta y
+respuesta, y los perfiles.
+
+- **Fuera** `app/js/ui/paywall.js` (y su CSS `.pw-*`), los seis `ensurePro(…)`, la prueba inversa de
+  60 días (`startTrial`, `pro_trial`, el aviso a 7 días) e `isPro()`.
+- **La licencia es la de Plus.** `isPlus()` = licencia válida; se quitan los planes por benefit
+  (`plusBenefitIds`, `planOf`). Ajustes → Licencia explica Plus (8 € al mes: Claude o ChatGPT
+  conectados a tu biblioteca, sync de BookReader e IA incluida). El evento `license:changed`
+  lleva `{ plus }`.
+- **Landing:** «¿Cuánto cuesta?» dice que todo es gratis, tarjetas y repaso incluidos.
+- **Tests:** fuera `tests/pro-license.ts` y sus ~150 llamadas; `license.spec.ts` comprueba que no
+  hay paywall ni prueba. `sw.js` → `bookreader-v229`.
+
 ## 2026-11-01 — Landing: «Practicar» sustituye a «Read at night, too»
 
 Los temas y la luz cálida los trae cualquier lector, y la sección no contaba nada de la promesa

@@ -1,5 +1,4 @@
 import { test, expect, type Page, type Locator } from '@playwright/test';
-import { seedProLicense } from './pro-license';
 
 // Interacción de la tarjeta en la sesión de estudio:
 //  - el toque es un TOGGLE (frente ↔ dorso), sin re-render (el lienzo conserva trazas)
@@ -54,7 +53,6 @@ async function makeFigureDataUrl(page: Page, width: number, height: number): Pro
 
 async function openSession(page: Page, cards: any[], figure?: { dataUrl: string; width: number; height: number } | null) {
   await page.goto('/index.html');
-  await seedProLicense(page);
   await seed(page, cards, figure);
   await page.reload();
   await page.locator('.lib-study-chip').click();
@@ -110,7 +108,6 @@ test('tap en la tarjeta alterna: frente → dorso → frente', async ({ page }) 
 
 test('tocar «Mostrar respuesta» y el textarea de recuerdo no alterna de más', async ({ page }) => {
   await page.goto('/index.html');
-  await seedProLicense(page);
   // Con api key hay bloque de recuerdo (textarea) antes de girar.
   await page.evaluate(() => localStorage.setItem('bookreader_ai_key', JSON.stringify('test-key')));
   await seed(page, [{ type: 'basic', front: '¿Quién escribió El Quijote?', back: 'Cervantes.' }]);

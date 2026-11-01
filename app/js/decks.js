@@ -276,7 +276,7 @@ async function onListClick(e) {
   }
   if (a === 'dk-study-book') {
     // «Estudiar todo» del libro: openToday resuelve los mazos del ámbito (alias-aware)
-    // y aplica tope de nuevas + gate Pro, igual que el repaso de la biblioteca.
+    // y aplica tope de nuevas, igual que el repaso de la biblioteca.
     const bookId = act.dataset.book;
     const book = (await Store.getAllBooks().catch(() => [])).find(b => b.id === bookId);
     Study.openToday({ scope: { type: 'book', bookId }, title: book?.title || t('Libro sin título'), onClose: () => paint() });

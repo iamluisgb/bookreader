@@ -29,7 +29,6 @@ import * as Backup from '../backup.js';
 import * as License from '../license.js';
 import * as Storage from '../storage.js';
 import * as Study from '../ai/study.js';
-import { ensurePro } from './paywall.js';
 import { icon } from './icons.js';
 import { escapeHtml } from './escape.js';
 import { confirmBox, formBox } from './dialog.js';
@@ -1074,9 +1073,6 @@ function notifyProfileChange() {
 
 function wireProfilesList(content) {
   content.querySelector('#appset-prof-new').addEventListener('click', async () => {
-    // Gate Pro (MON2): crear perfiles es Pro; usar/activar los ya existentes sigue libre
-    // (nadie pierde lo que ya tenía si su licencia caduca).
-    if (!(await ensurePro('profiles'))) return;
     profDraft = Profiles.blank(); renderProfiles(content);
   });
   content.querySelectorAll('.appset-prof-activate').forEach(b =>
@@ -1307,7 +1303,7 @@ async function syncDiagReport() {
     provider: SyncProvider.activeId(),
     connected: SyncProvider.isConnected(),
     filesSync: Blobs.isEnabled(),
-    pro: License.isPro(),
+    plus: License.isPlus(),
     diag: SyncEngine.getDiag(),
     reachability,
     storage,
@@ -1954,8 +1950,8 @@ function wireBookReaderSync(content, show) {
   refresh();
 }
 
-// ---- Sección Licencia (MON2: BookReader Pro vía Polar) ----------------------
-// Estados: Free (input para activar + compra), Pro (key enmascarada + gestión de
+// ---- Sección Licencia (BookReader Plus vía Polar, ADR-061) ----------------------
+// Estados: sin licencia (input para activar + compra), Plus (key enmascarada + gestión de
 // dispositivos en el portal), revocada (aviso + reactivar). Los datos nunca se tocan.
 
 // La clave nunca se muestra en claro por defecto: va en un input de tipo password con ojo
@@ -1964,14 +1960,14 @@ function wireBookReaderSync(content, show) {
 function licenseHtml() {
   const s = License.getState();
   const mockNote = License.isMock()
-    ? `<p class="appset-muted appset-lic-mock">${icon('shield', { size: 'sm' })} ${t('Modo simulado (aún sin plataforma de pagos): cualquier clave <code>BKRD-…</code> activa Pro para probar, y <code>BKRD-PLUS-…</code>, Plus.')}</p>`
+    ? `<p class="appset-muted appset-lic-mock">${icon('shield', { size: 'sm' })} ${t('Modo simulado (aún sin plataforma de pagos): cualquier clave <code>BKRD-…</code> activa Plus para probar.')}</p>`
     : '';
 
   if (s && s.key && !s.revoked) {
     const since = s.validatedAt ? new Date(s.validatedAt).toLocaleDateString(getLang()) : '';
     return `<div class="appset-section">
       <h3 class="appset-h3">${t('Licencia')}</h3>
-      <p class="appset-lic-state is-pro">${icon('check', { size: 'md' })} ${s.plan === 'plus' ? t('BookReader Plus activo (incluye Pro)') : t('BookReader Pro activo')}</p>
+      <p class="appset-lic-state is-pro">${icon('check', { size: 'md' })} ${t('BookReader Plus activo')}</p>
       ${keyRowHtml('appset-lic-key', s.key, 'BKRD-XXXX-XXXX-XXXX')}
       <p class="appset-muted">${t('Última verificación: {date}. Sin conexión, tu licencia sigue activa hasta 30 días.', { date: escapeHtml(since) })}</p>
       <button id="appset-lic-portal" class="btn btn--primary primary-btn appset-save">${icon('user', { size: 'md' })} ${t('Gestionar dispositivos y recibos')}</button>
@@ -1982,29 +1978,16 @@ function licenseHtml() {
   }
 
   const revokedNote = s && s.revoked
-    ? `<p class="appset-err">${t('Tu licencia dejó de ser válida (¿reembolso o revocación?). Tus datos siguen intactos; la app vuelve al plan Free.')}</p>`
+    ? `<p class="appset-err">${t('Tu licencia dejó de ser válida (¿reembolso o revocación?). Tus datos siguen intactos y la app sigue entera, sin lo de Plus.')}</p>`
     : '';
-  // Prueba de Pro (empieza al abrir la app por primera vez): en curso, o ya terminada.
-  const trial = License.getTrial();
-  const trialNote = License.isTrial()
-    ? `<p class="appset-lic-state is-pro">${icon('check', { size: 'md' })} ${t('Prueba de BookReader Pro: te quedan {days} días (hasta el {date}).', {
-        days: License.trialDaysLeft(),
-        date: escapeHtml(new Date(trial.until).toLocaleDateString(getLang())),
-      })}</p>`
-    : trial
-      ? `<p class="appset-muted">${t('Tu prueba de BookReader Pro terminó el {date}. Tus flashcards, mapas y libretas siguen ahí.', {
-          date: escapeHtml(new Date(trial.until).toLocaleDateString(getLang())),
-        })}</p>`
-      : '';
   return `<div class="appset-section">
     <h3 class="appset-h3">${t('Licencia')}</h3>
     ${revokedNote}
-    ${trialNote}
-    <p class="appset-muted">${t('BookReader Pro desbloquea flashcards con export a Anki, repaso espaciado, mapas mentales, plantillas avanzadas y perfiles. {price}, sin suscripción.', { price: escapeHtml(License.CONFIG.price) })}</p>
+    <p class="appset-muted">${t('Todo BookReader es gratis. Plus ({price}) añade lo que nos cuesta mantener: Claude o ChatGPT conectados a tu biblioteca, el sync de BookReader sin configurar Drive y la IA incluida.', { price: escapeHtml(t(License.CONFIG.price)) })}</p>
     <label class="appset-label" for="appset-lic-key">${t('Clave de licencia')}</label>
     <input id="appset-lic-key" class="appset-input" placeholder="BKRD-XXXX-XXXX-XXXX" autocomplete="off" spellcheck="false" />
     <button id="appset-lic-activate" class="btn btn--primary primary-btn appset-save">${t('Activar en este dispositivo')}</button>
-    ${License.CONFIG.checkoutUrl ? `<button id="appset-lic-buy" class="appset-tpl-cancel appset-data-md">${t('Conseguir BookReader Pro')}</button>` : ''}
+    ${License.CONFIG.checkoutUrl ? `<button id="appset-lic-buy" class="appset-tpl-cancel appset-data-md">${t('Conseguir BookReader Plus')}</button>` : ''}
     <p class="appset-err" id="appset-lic-err" hidden></p>
     <p class="appset-muted">${t('La clave llega por email al comprar y siempre puedes recuperarla en el portal de cliente.')}</p>
     ${mockNote}
@@ -2012,7 +1995,7 @@ function licenseHtml() {
 }
 
 function wireLicense(content) {
-  // Ojo + Copiar de la fila de clave activa (Pro). El binder es el mismo que el del Agente:
+  // Ojo + Copiar de la fila de clave activa (Plus). El binder es el mismo que el del Agente:
   // sin esto, la fila de licencia se quedaba sin ojo ni Copiar — el binder no llegaba a
   // esta sección.
   wireKeyAndCopy(content);
@@ -2021,7 +2004,7 @@ function wireLicense(content) {
     portal.addEventListener('click', () => window.open(License.CONFIG.portalUrl, '_blank', 'noopener'));
     content.querySelector('#appset-lic-remove').addEventListener('click', async () => {
       if (await confirmBox(
-        'La app volverá al plan Free en este navegador. Tus datos no se tocan y podrás reactivar con la misma clave.',
+        'Este navegador se queda sin lo de Plus. Tus datos no se tocan y podrás reactivar con la misma clave.',
         { title: 'Quitar licencia', okText: 'Quitar' })) {
         License.removeLocal();
         selectSection('license');

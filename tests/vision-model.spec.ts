@@ -1,5 +1,4 @@
 import { test, expect } from '@playwright/test';
-import { seedProLicense } from './pro-license';
 
 // Resolución del modelo de visión EFECTIVO (effectiveVisionModel). El bug que fija este
 // spec: `_chatVision` y `hasVision()` miraban SOLO el ajuste guardado (`ai_vision_model`),
@@ -36,7 +35,6 @@ async function visionState(page: any) {
 test('ajuste de visión vacío + nan → usa el visionModel del preset', async ({ page }) => {
   await seed(page, { ai_base_url: NAN, ai_key: 'sk-test', ai_model: 'deepseek-v4-flash' });
   await page.goto('/index.html');
-  await seedProLicense(page);
   const r = await visionState(page);
   // Rescate 1: vacío → el preset declara deepseek-v4-flash (verificado con imágenes).
   expect(r.effective).toBe('deepseek-v4-flash');
@@ -46,7 +44,6 @@ test('ajuste de visión vacío + nan → usa el visionModel del preset', async (
 test('ajuste vacío + proveedor SIN visión declarada (groq) → sin visión', async ({ page }) => {
   await seed(page, { ai_base_url: GROQ, ai_key: 'sk-test', ai_model: 'llama-3.3-70b-versatile' });
   await page.goto('/index.html');
-  await seedProLicense(page);
   const r = await visionState(page);
   // Sin visionModel en el preset no hay rescate posible: la visión sigue desactivada.
   expect(r.effective).toBe('');
@@ -63,7 +60,6 @@ test('alias del gateway guardado + base URL BYOK → se ignora y cae al preset',
     ai_vision_model: 'bookreader-vision',
   });
   await page.goto('/index.html');
-  await seedProLicense(page);
   const r = await visionState(page);
   // Rescate 2: el alias solo existe en el gateway; fuera de la demo se usa el preset.
   expect(r.effective).toBe('deepseek-v4-flash');
@@ -78,7 +74,6 @@ test('alias del gateway guardado + base URL del gateway (demo) → el alias se r
     ai_vision_model: 'bookreader-vision',
   });
   await page.goto('/index.html');
-  await seedProLicense(page);
   const r = await visionState(page);
   // En la demo el alias SÍ es válido: el gateway lo enruta a su modelo multimodal.
   expect(r.effective).toBe('bookreader-vision');
@@ -92,7 +87,6 @@ test('un modelo explícito del usuario se respeta en ambos modos', async ({ page
     ai_vision_model: 'mi-vision-propia',
   });
   await page.goto('/index.html');
-  await seedProLicense(page);
   const byok = await visionState(page);
   expect(byok.effective).toBe('mi-vision-propia');
   expect(byok.hasVision).toBe(true);
@@ -113,7 +107,6 @@ test('un modelo explícito del usuario se respeta en ambos modos', async ({ page
 test('chatVision manda el modelo EFECTIVO en el body y conserva la imagen', async ({ page }) => {
   await seed(page, { ai_base_url: NAN, ai_key: 'sk-test', ai_model: 'deepseek-v4-flash' });
   await page.goto('/index.html');
-  await seedProLicense(page);
   // Stub de /chat/completions (mismo estilo que visual-cards.spec.ts): registra el body
   // y responde un content fijo. El ajuste de visión queda VACÍO: el body debe llevar el
   // modelo del preset, no el vacío guardado.

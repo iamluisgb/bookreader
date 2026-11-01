@@ -216,16 +216,15 @@ function initSyncEngine() {
   import('./sync/book-text.js').then(m => m.start()).catch(() => {});
 }
 
-// Licencia Pro (MON2): revalida en background al arrancar — nunca bloquea (offline, la
-// última validación buena vale 30 días). Si el servidor la da por revocada (reembolso),
-// se avisa una vez y la app degrada a Free sin tocar ningún dato.
+// Licencia de Plus (ADR-061): revalida en background al arrancar — nunca bloquea (offline,
+// la última validación buena vale 30 días). Si el servidor la da por revocada (reembolso),
+// se avisa una vez y la app vuelve al plan gratuito sin tocar ningún dato.
 function initLicense() {
   window.addEventListener('license:changed', (e) => {
-    if (e.detail.trialStarted) return;
     // Solo la revocación remota avisa (quitar la licencia a mano ya es acción del usuario).
-    if (!e.detail.pro && License.getState()?.revoked) {
+    if (!e.detail.plus && License.getState()?.revoked) {
       toast({
-        message: t('Tu licencia Pro dejó de ser válida. Tus datos siguen intactos.'),
+        message: t('Tu licencia de Plus dejó de ser válida. Tus datos siguen intactos.'),
         actionLabel: t('Ver licencia'),
         onAction: () => openAppSettings('license'),
         kind: 'error',
@@ -234,22 +233,6 @@ function initLicense() {
     }
   });
   License.validateOnStartup();
-  initTrial();
-}
-
-// Prueba inversa de Pro (ADR-060): empieza al abrir la app por primera vez y lo de Pro
-// simplemente funciona. No se anuncia con un aviso: competía con los de las acciones
-// («Deshacer») justo al importar. Se ve en Ajustes → Licencia, y avisa una vez a
-// TRIAL_WARN_DAYS del final. Con licencia, nada.
-function initTrial() {
-  License.startTrial();
-  const left = License.trialDaysLeft();
-  if (License.hasLicense() || left === 0 || left > License.TRIAL_WARN_DAYS || License.getTrial().warned) return;
-  License.markTrial('warned');
-  toast({
-    message: t('Tu prueba de BookReader Pro acaba en {n} días. Lo que has creado se queda: tarjetas, mapas y libretas.', { n: left }),
-    actionLabel: t('Ver licencia'), onAction: () => openAppSettings('license'), timeout: 10000,
-  });
 }
 
 // PWA offline: registra el Service Worker (precache + stale-while-revalidate, ver sw.js).

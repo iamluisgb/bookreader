@@ -1,5 +1,4 @@
 import { test, expect } from '@playwright/test';
-import { seedProLicense } from './pro-license';
 import path from 'path';
 import fs from 'fs';
 import { openFromStudio } from './studio-nav';
@@ -69,7 +68,6 @@ async function stubLLM(page, content: string, delayMs = 0) {
 // Abre el epub, pasa el onboarding y deja el panel listo (patrón de panel.spec.ts).
 async function setup(page, canned = JSON.stringify(CANNED_CARDS), delayMs = 0) {
   await page.goto('/index.html');
-  await seedProLicense(page);   // features Pro gateadas (MON2): el test ejercita la feature
   await page.evaluate((k) => {
     localStorage.setItem('bookreader_ai_key', JSON.stringify(k));
     localStorage.setItem('bookreader_flashcards_hint_seen', 'true');   // coach mark aparte

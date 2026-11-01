@@ -1,5 +1,4 @@
 import { test, expect } from '@playwright/test';
-import { seedProLicense } from './pro-license';
 
 // Retención visible (feature retencion-visual): lo que hoy es invisible no motiva.
 // T1 · chip de racha persistente: se ve en la biblioteca y en el header de la sesión
@@ -29,7 +28,6 @@ async function seedStreak(page, streak: { count: number; lastDay: number }) {
 test('la racha se ve en la biblioteca con estado en riesgo y pasa a encendida al repasar', async ({ page }) => {
   const yesterday = Math.floor((Date.now() - 86400000) / 86400000);
   await page.goto('/index.html');
-  await seedProLicense(page);
   await seedStreak(page, { count: 6, lastDay: yesterday });
   await seedDeck(page);
   await page.reload();
@@ -57,7 +55,6 @@ test('la racha se ve en la biblioteca con estado en riesgo y pasa a encendida al
 
 test('la ficha del libro muestra lo que se recuerda hoy (Σ retrievabilidad / tarjetas)', async ({ page }) => {
   await page.goto('/index.html');
-  await seedProLicense(page);
   // P44 F2: 4 tarjetas. 2 repasadas hoy (R = 1), 1 con estabilidad 10 repasada hace 10 días
   // (R = 0,9: la estabilidad es justo eso) y 1 nueva (0). Recuerdo = (1 + 1 + 0,9 + 0) / 4 = 73%.
   const now = Date.now();
@@ -75,7 +72,6 @@ test('la ficha del libro muestra lo que se recuerda hoy (Σ retrievabilidad / ta
 
 test('meta diaria: anillo con repaso de hoy / meta, ajustable al click', async ({ page }) => {
   await page.goto('/index.html');
-  await seedProLicense(page);
   await seedDeck(page, { cards: [
     { type: 'basic', front: 'q1', back: 'a1', chapter: '', src: '' },
     { type: 'basic', front: 'q2', back: 'a2', chapter: '', src: '' },
@@ -109,7 +105,6 @@ test('meta diaria: anillo con repaso de hoy / meta, ajustable al click', async (
 
 test('hito de racha: se celebra al cruzar 7 y comparte una tarjeta PNG', async ({ page }) => {
   await page.goto('/index.html');
-  await seedProLicense(page);
   // Racha cruda 6: al repasar hoy pasa a 7 y esta sesión cruza el hito → celebración.
   const yesterday = Math.floor((Date.now() - 86400000) / 86400000);
   await seedStreak(page, { count: 6, lastDay: yesterday });
@@ -143,7 +138,6 @@ test('contador del día: el log legacy cuenta para la meta, y el cierre lleva a 
   // Domingo: «hace 3 días» cae en esta semana de calendario (Análisis, P45).
   await page.clock.setFixedTime(new Date('2026-10-18T12:00:00'));
   await page.goto('/index.html');
-  await seedProLicense(page);
   await page.evaluate(() => {
     const d = new Date();
     const today = Math.floor((d.getTime() - d.getTimezoneOffset() * 60000) / 86400000); // mismo dayOf que srs.js

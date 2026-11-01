@@ -1,6 +1,5 @@
 import { test, expect, BrowserContext, Page } from '@playwright/test';
 import { installDriveMocks, seedDriveToken, createDriveState, DriveState } from './drive-mock';
-import { seedProLicense } from './pro-license';
 import { createHash } from 'crypto';
 
 // Sync de BIBLIOTECA y de ARCHIVOS entre dos dispositivos reales (contextos
@@ -11,12 +10,11 @@ import { createHash } from 'crypto';
 // Antes de esto solo viajaban las anotaciones: en el segundo dispositivo los
 // subrayados llegaban a un libro que no existía en su biblioteca.
 
-async function bootDevice(context: BrowserContext, state: DriveState, { pro = true } = {}): Promise<Page> {
+async function bootDevice(context: BrowserContext, state: DriveState): Promise<Page> {
   await installDriveMocks(context, state);
   await seedDriveToken(context);
   const page = await context.newPage();
   await page.goto('/');
-  if (pro) await seedProLicense(page);
   return page;
 }
 
@@ -143,39 +141,6 @@ test.describe('Biblioteca y archivos entre dos dispositivos', () => {
       await expect(card.locator('.lib-dl-fill')).toHaveAttribute('style', /width:\s*50%/);
       await expect(card.locator('.lib-dl-lbl')).toHaveText('Descargando…');
       expect((await libraryOf(movilPage))[0].ghost).toBe(true);
-    } finally {
-      await pc.close(); await movil.close();
-    }
-  });
-
-  test('sin Pro (ni prueba) los archivos suben y bajan igual por Drive (ADR-060)', async ({ browser }) => {
-    const drive = createDriveState();
-    const pc = await browser.newContext();
-    const movil = await browser.newContext();
-    const sinPrueba = (page: Page) => page.evaluate(() => {
-      const day = 24 * 60 * 60 * 1000;
-      localStorage.setItem('bookreader_pro_trial', JSON.stringify({ start: Date.now() - 61 * day, until: Date.now() - day }));
-    });
-    try {
-      const pcPage = await bootDevice(pc, drive, { pro: false });
-      await sinPrueba(pcPage);
-      expect(await pcPage.evaluate(async () => (await import('/js/license.js')).isPro())).toBe(false);
-      const id = await importBook(pcPage, 'Sin Pro', 3);
-      await sync(pcPage);
-      await flushBlobs(pcPage);
-      await sync(pcPage);
-
-      const subidos = [...drive.store.keys()].filter(k => k.startsWith('bookreader/files/'));
-      expect(subidos).toHaveLength(1);
-
-      const movilPage = await bootDevice(movil, drive, { pro: false });
-      await sinPrueba(movilPage);
-      await sync(movilPage);
-      const enMovil = await libraryOf(movilPage);
-      expect(enMovil).toHaveLength(1);
-      expect(enMovil[0].id).toBe(id);
-      expect(enMovil[0].ghost).toBe(true);
-      expect(enMovil[0].uploaded).toBe(true);   // hay archivo que descargar
     } finally {
       await pc.close(); await movil.close();
     }
@@ -376,7 +341,6 @@ test.describe('Quitar la descarga de un solo dispositivo', () => {
       const pcPage = await bootDevice(pc, drive);
       const id = await importBook(pcPage, 'Para hacer hueco', 5);
       await pcPage.reload();
-      await seedProLicense(pcPage);
       await pcPage.reload();
 
       const menu = await menuOf(pcPage);
@@ -470,7 +434,6 @@ test.describe('Quitar la descarga de un solo dispositivo', () => {
       await installDriveMocks(solo, drive);
       const page = await solo.newPage();
       await page.goto('/');
-      await seedProLicense(page);
       await importBook(page, 'Sin red', 9);
       await page.reload();
 

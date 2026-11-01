@@ -1,5 +1,4 @@
 import { test, expect } from '@playwright/test';
-import { seedProLicense } from './pro-license';
 
 // Tarjetas visuales (WU2): capa de datos pura (validación/normalización de etiquetas y
 // persistencia de figuras). Sin UI ni LLM: se importan los módulos dentro de la página y
@@ -12,7 +11,6 @@ async function inPage(page, fn: (arg: any) => Promise<any>, arg?: any) {
 
 test('clampBbox: clampea a enteros dentro de límites, tolera 2px de exceso y descarta inválidos', async ({ page }) => {
   await page.goto('/index.html');
-  await seedProLicense(page);
   const res = await inPage(page, async () => {
     const F = await import('/js/ai/figures.js');
     return {
@@ -44,7 +42,6 @@ test('clampBbox: clampea a enteros dentro de límites, tolera 2px de exceso y de
 
 test('normalizeText y dedupeLabels: fusiona por texto (caso/tildes) y por solape de boxes', async ({ page }) => {
   await page.goto('/index.html');
-  await seedProLicense(page);
   const res = await inPage(page, async () => {
     const F = await import('/js/ai/figures.js');
     const norm = F.normalizeText('¡Hóla,  Mun_do!');
@@ -75,7 +72,6 @@ test('normalizeText y dedupeLabels: fusiona por texto (caso/tildes) y por solape
 
 test('parseLabelsResponse: JSON limpio, con fences y prosa, truncado sin lanzar, y bboxes fuera de imagen', async ({ page }) => {
   await page.goto('/index.html');
-  await seedProLicense(page);
   const res = await inPage(page, async () => {
     const F = await import('/js/ai/figures.js');
     const clean = F.parseLabelsResponse(
@@ -106,7 +102,6 @@ test('parseLabelsResponse: JSON limpio, con fences y prosa, truncado sin lanzar,
 
 test('figureRectToBox: rect fraccional 0..1 a píxeles enteros sobre página 612x792, con clamp', async ({ page }) => {
   await page.goto('/index.html');
-  await seedProLicense(page);
   const res = await inPage(page, async () => {
     const F = await import('/js/ai/figures.js');
     return {
@@ -123,7 +118,6 @@ test('figureRectToBox: rect fraccional 0..1 a píxeles enteros sobre página 612
 
 test('persistencia: saveFigure → getFigures devuelve la figura con sus campos; deleteFigure la quita', async ({ page }) => {
   await page.goto('/index.html');
-  await seedProLicense(page);
   // bookId único por corrida: cada worker usa su propio libro y no se pisan entre tests.
   const bookId = `bk-figures-${Date.now()}-${Math.floor(Math.random() * 1e9)}`;
   const { key, figures } = await inPage(page, async (bookId: string) => {

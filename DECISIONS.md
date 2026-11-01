@@ -2003,7 +2003,7 @@ primera prueba real necesitó 9 llamadas, eligió candidatos adivinando por el t
 - El formato del índice es un contrato versionado (`INDEX_FORMAT`), como `TEXT_FORMAT`.
 - Detalle y fases en BACKLOG · IA10.
 
-## ADR-060 — Planes y precios: gratis, Pro de pago único y Plus por suscripción · `PENDIENTE`
+## ADR-060 — Planes y precios: gratis, Pro de pago único y Plus por suscripción · `SUPERADA por ADR-061`
 
 **Contexto.** El producto ya cobra en tres frentes que se habían decidido por separado. Pro es un
 pago único (MON2). La suscripción pone la inferencia (ADR-031) y el sync gestionado (ADR-056). El
@@ -2083,3 +2083,37 @@ país, referidos…), y se recortó por una prueba: cada plan se tiene que poder
   - la regla de los 12 meses (hay que ver qué expone Polar);
   - el paywall de una sola oferta por función;
   - la página de precios.
+
+## ADR-061 — Pro pasa a ser gratis; el único plan de pago es Plus, a 8 €/mes · `ACEPTADA (2026-11-01)`
+
+**Contexto.** ADR-060 tenía tres planes: gratis, Pro (29 $ una vez) y Plus (7 $/mes). Pro nunca se
+llegó a vender: Polar sigue en modo simulado y nadie tiene una licencia real. Mientras tanto el
+cuello de botella es que la app llegue a gente, no cobrar la primera semana, y el paywall de Pro se
+ponía justo delante de lo que mejor enseña el producto: tarjetas, preguntas con opciones, repaso y
+memoria medida. Lo que nos cuesta dinero de verdad es lo de Plus (R2, CPU del Worker del MCP y la
+inferencia), no lo de Pro, que corre entero en el dispositivo.
+
+**Decisión.**
+1. **Todo lo que era Pro es gratis**, sin prueba ni caducidad: tarjetas de todos los tipos y export a
+   Anki, repaso FSRS, análisis del estudio, mapas mentales, infografías, Feynman, plantillas
+   avanzadas y perfiles. Se borran el paywall (`ui/paywall.js`), la prueba inversa de 60 días y
+   `isPro()`.
+2. **Un solo plan de pago: Plus, 8 €/mes.** Una frase: *«Tu biblioteca entera dentro de Claude y
+   ChatGPT, sin configurar nada»*. Incluye el MCP remoto (el titular, como fijaba ADR-060 §4), el sync
+   de BookReader y la IA incluida. Cualquier licencia válida es de Plus.
+3. **Se mantiene de ADR-060:** sync por Drive y MCP local gratis (§2), prueba de Plus de 60 días al
+   haber intención con su tope propio (§5), tope de IA del 25 % del ingreso neto (§6, ahora unos
+   1,70 € al mes), lo que queda fuera del lanzamiento (§7) y R2 de pago si hace falta (§8).
+4. **Se cae de ADR-060:** Pro de pago, su precio de lanzamiento, «Plus incluye Pro» y «Pro tuyo
+   tras 12 meses» (ya no hay nada que quedarse), y la métrica de conversión de Pro.
+
+**Pendiente de decidir:** el precio anual. La comisión fija de Polar pesa mucho más en un cobro de
+8 € que en uno anual (ADR-060, «Porqué de los precios»). Propuesta: **80 €/año** (dos meses gratis).
+Y comprobar que Polar cobra en euros; si solo cobra en dólares, el precio equivalente.
+
+**Consecuencias.**
+- La landing puede decir «todo es gratis» sin asterisco, y la página de precios tiene dos columnas.
+- Hasta que se lance Plus no hay ingresos. Es el precio aceptado de quitar el freno a la adopción.
+- La métrica que sustituye a la conversión de Pro: usuarios que crean su primer mazo y vuelven a
+  repasar la semana siguiente. Es la audiencia a la que luego se ofrece Plus.
+

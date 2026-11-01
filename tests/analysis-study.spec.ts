@@ -1,5 +1,4 @@
 import { test, expect } from '@playwright/test';
-import { seedProLicense } from './pro-license';
 
 // P44 — Análisis del estudio: retención real, memoria por libro, lo que viene, calibración y
 // el ajuste del algoritmo a tu memoria. Los intentos se siembran en el store `attempts` con la
@@ -127,7 +126,6 @@ test('pausar las nuevas de hoy: la cola se queda sin nuevas y Ajustes sigue ense
 
 test('el bloque de estudio: retención con valla de N, practicado y calibración', async ({ page }) => {
   await page.goto('/index.html');
-  await seedProLicense(page);
   const cards = Array.from({ length: 40 }, (_, i) => card(`c${i}`, { reps: 2, lapses: 0, interval: 5, due: 0, lastReview: Date.now(), stability: 5, difficulty: 5 }));
   await seedBook(page, { bookId: 'bk-a', title: 'Designing Data', cards });
 
@@ -156,7 +154,6 @@ test('el bloque de estudio: retención con valla de N, practicado y calibración
 
 test('por libro: memoria de hoy, «Revisar» lleva a las tarjetas difíciles y la fila filtra la pantalla', async ({ page }) => {
   await page.goto('/index.html');
-  await seedProLicense(page);
   const today = await page.evaluate(async () => ((await import('/js/ai/srs.js')) as any).dayOf(Date.now()));
   const now = Date.now();
   await seedBook(page, {
@@ -193,7 +190,6 @@ test('por libro: memoria de hoy, «Revisar» lleva a las tarjetas difíciles y l
 
 test('lo que viene: previsión, carga y aviso con «Pausar nuevas hoy» cuando no cabe', async ({ page }) => {
   await page.goto('/index.html');
-  await seedProLicense(page);
   const today = await page.evaluate(async () => ((await import('/js/ai/srs.js')) as any).dayOf(Date.now()));
   const now = Date.now();
   // 30 tarjetas venciendo cada uno de los próximos 7 días; ritmo habitual de 10 al día.
@@ -227,7 +223,6 @@ test('los bloques de estudio están traducidos (EN)', async ({ page }) => {
   await page.goto('/index.html');
   await page.evaluate(() => localStorage.setItem('bookreader_lang', 'en'));
   await page.reload();
-  await seedProLicense(page);
   const today = await page.evaluate(async () => ((await import('/js/ai/srs.js')) as any).dayOf(Date.now()));
   await seedBook(page, { bookId: 'bk-a', title: 'Designing Data', cards: [card('a1', { reps: 2, lapses: 3, interval: 5, due: today + 2, lastReview: Date.now(), stability: 5, difficulty: 5 })] });
   await seedAttempts(page, [att({ card: 'a1' })]);
@@ -287,7 +282,6 @@ async function seedForgetfulHistory(page: any, cardsN: number) {
 
 test('ajuste a tu memoria: por debajo del mínimo dice cuánto falta', async ({ page }) => {
   await page.goto('/index.html');
-  await seedProLicense(page);
   await seedForgetfulHistory(page, 20);                     // 20 × 5 = 100 repasos entrenables
   await page.click('[data-act="analysis"]');
   await expect(page.locator('#analysis .anal-fsrs')).toContainText('Llevas 100');
@@ -297,7 +291,6 @@ test('ajuste a tu memoria: por debajo del mínimo dice cuánto falta', async ({ 
 test('ajuste a tu memoria: calcula en el dispositivo, enseña qué cambia y solo aplica si se acepta', async ({ page }) => {
   test.setTimeout(120000);
   await page.goto('/index.html');
-  await seedProLicense(page);
   await seedForgetfulHistory(page, 120);                    // 600 repasos entrenables
   await page.click('[data-act="analysis"]');
   const sec = page.locator('#analysis .anal-fsrs');

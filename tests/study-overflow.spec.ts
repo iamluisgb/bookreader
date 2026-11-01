@@ -1,5 +1,4 @@
 import { test, expect } from '@playwright/test';
-import { seedProLicense } from './pro-license';
 
 // ST2 · Regresión de producción (reporte del 2026-09-28): con un mazo cuyo nombre es el
 // título completo del fichero (pegote de 130+ caracteres):
@@ -12,7 +11,6 @@ import { seedProLicense } from './pro-license';
 test('mazo con nombre larguísimo: sin desborde y con giro real', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 856 });
   await page.goto('/index.html');
-  await seedProLicense(page);
   await page.evaluate(async () => {
     const DB: any = await import('/js/ai/db.js');
     const Lib: any = await import('/js/library/store.js');

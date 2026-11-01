@@ -1,7 +1,6 @@
 import { test, expect } from '@playwright/test';
 import fs from 'fs';
 import path from 'path';
-import { seedProLicense } from './pro-license';
 
 // Regresión del reporte del 2026-09-28: mazos que llegan por sync tienen `card.src`, pero
 // el libro segmentado (bookText/anchors) NO viaja por sync — así «Ver en el libro» caía en
@@ -37,7 +36,6 @@ async function seedBookConMazo(page, { bookId, withFile, src = 'a1' }) {
 
 test('sin segmentación local, «Ver en el libro» segmenta y abre por deep-link', async ({ page }) => {
   await page.goto('/index.html');
-  await seedProLicense(page);
   await seedBookConMazo(page, { bookId: 'bk-seg', withFile: true });
   await page.reload();
   await page.locator('.lib-study-chip').click();
@@ -60,7 +58,6 @@ test('sin segmentación local, «Ver en el libro» segmenta y abre por deep-link
 
 test('al voltear una tarjeta de libro sin segmentar, aparece el pasaje tras generarlo', async ({ page }) => {
   await page.goto('/index.html');
-  await seedProLicense(page);
   await seedBookConMazo(page, { bookId: 'bk-seg2', withFile: true });
   await page.reload();
   await page.locator('.lib-study-chip').click();
@@ -73,7 +70,6 @@ test('al voltear una tarjeta de libro sin segmentar, aparece el pasaje tras gene
 
 test('libro fantasma (fichero no está aquí): aviso visible y la sesión sigue', async ({ page }) => {
   await page.goto('/index.html');
-  await seedProLicense(page);
   await seedBookConMazo(page, { bookId: 'bk-ghost', withFile: false });
   await page.reload();
   await page.locator('.lib-study-chip').click();

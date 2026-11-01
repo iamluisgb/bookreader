@@ -1,5 +1,4 @@
 import { test, expect } from '@playwright/test';
-import { seedProLicense } from './pro-license';
 
 // P45 — Análisis navegable: periodos de calendario con flechas, año y «todo», comparación con
 // el periodo anterior, filtro por estantería y la historia de un libro. Reloj fijo en el

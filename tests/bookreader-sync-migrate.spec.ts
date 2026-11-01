@@ -1,7 +1,6 @@
 import { test, expect, Page, BrowserContext } from '@playwright/test';
 import { installDriveMocks, seedDriveToken, createDriveState } from './drive-mock';
 import { createSyncServer, installSyncServer, seedBookReaderSync, enableSyncPreview, SYNC_URL } from './bookreader-sync-mock';
-import { seedProLicense } from './pro-license';
 
 // MON4 F5 · «Pasar mi sync de Drive a BookReader» en un paso, y al revés para quien cancela.
 // Lo que no puede pasar: que algo se quede atrás. Ni lo que otro dispositivo subió a Drive y
@@ -43,7 +42,6 @@ test.describe('MON4 F5 — pasar el sync de un proveedor a otro', () => {
     await seedDriveToken(tablet);
     const t = await tablet.newPage();
     await t.goto('/');
-    await seedProLicense(t);
     const soloEnDrive = await importBook(t, 'La casa verde', 5);
     await addHighlight(t, 'libro-m', 'de la tablet');
     await sync(t);
@@ -184,7 +182,6 @@ test.describe('MON4 F5 — pasar el sync de un proveedor a otro', () => {
     await seedDriveToken(tablet);
     const t = await tablet.newPage();
     await t.goto('/');
-    await seedProLicense(t);
     const soloEnDrive = await importBook(t, 'Conversación en La Catedral', 9);
     await sync(t);
     await flushBlobs(t);

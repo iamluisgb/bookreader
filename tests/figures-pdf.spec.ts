@@ -1,6 +1,5 @@
 import { test, expect } from '@playwright/test';
 import { readFileSync } from 'node:fs';
-import { seedProLicense } from './pro-license';
 
 // Tarjetas visuales (WU4): detección de figuras PDF (rects de imágenes raster en la
 // operator list) + pipeline de recorte/persistencia. Sin UI ni LLM: se importa el módulo
@@ -36,7 +35,6 @@ async function inPage(page: any, fn: (arg: any) => Promise<any>, arg?: any) {
 
 test('mulMatrix: la identidad no altera y un producto conocido es correcto', async ({ page }) => {
   await page.goto('/index.html');
-  await seedProLicense(page);
   const res = await inPage(page, async () => {
     const M = await import('/js/ai/figures-pdf.js');
     const I = [1, 0, 0, 1, 0, 0];
@@ -62,7 +60,6 @@ test('mulMatrix: la identidad no altera y un producto conocido es correcto', asy
 
 test('imageRectsFromOps: una imagen pintada da el rect fraccional con Y invertido', async ({ page }) => {
   await page.goto('/index.html');
-  await seedProLicense(page);
   const rect = await inPage(page, async (arg) => {
     const M = await import('/js/ai/figures-pdf.js');
     // Imagen de 200x150 con esquina inferior-izquierda en (100,300) en unidades PDF.
@@ -82,7 +79,6 @@ test('imageRectsFromOps: una imagen pintada da el rect fraccional con Y invertid
 
 test('imageRectsFromOps: save/restore anidado restaura el CTM previo', async ({ page }) => {
   await page.goto('/index.html');
-  await seedProLicense(page);
   const rects = await inPage(page, async (arg) => {
     const M = await import('/js/ai/figures-pdf.js');
     // save → transform externa → save → transform interna (absurda) → restore → paint.
@@ -101,7 +97,6 @@ test('imageRectsFromOps: save/restore anidado restaura el CTM previo', async ({ 
 
 test('imageRectsFromOps: filtros de lado mínimo, área máxima, dedupe y malformados', async ({ page }) => {
   await page.goto('/index.html');
-  await seedProLicense(page);
   const res = await inPage(page, async (arg) => {
     const M = await import('/js/ai/figures-pdf.js');
     const run = (pairs: any[], opts?: any) => M.imageRectsFromOps(
@@ -149,7 +144,6 @@ test('imageRectsFromOps: filtros de lado mínimo, área máxima, dedupe y malfor
 
 test('extractPageFigures: recorta cada rect superviviente con el crop inyectado', async ({ page }) => {
   await page.goto('/index.html');
-  await seedProLicense(page);
   const res = await inPage(page, async (arg) => {
     const M = await import('/js/ai/figures-pdf.js');
     const stubPage = { getOperatorList: async () => ({ fnArray: arg.fnArray, argsArray: arg.argsArray }) };
@@ -175,7 +169,6 @@ test('extractPageFigures: recorta cada rect superviviente con el crop inyectado'
 
 test('extractPageFigures: un crop que falla se omite y los demás siguen', async ({ page }) => {
   await page.goto('/index.html');
-  await seedProLicense(page);
   const res = await inPage(page, async (arg) => {
     const M = await import('/js/ai/figures-pdf.js');
     const stubPage = { getOperatorList: async () => ({ fnArray: arg.fnArray, argsArray: arg.argsArray }) };
@@ -208,7 +201,6 @@ test('extractPageFigures: un crop que falla se omite y los demás siguen', async
 
 test('extractPageFigures: signal abortada ⇒ rechaza con AbortError', async ({ page }) => {
   await page.goto('/index.html');
-  await seedProLicense(page);
   const name = await inPage(page, async (arg) => {
     const M = await import('/js/ai/figures-pdf.js');
     const stubPage = { getOperatorList: async () => ({ fnArray: arg.fnArray, argsArray: arg.argsArray }) };
@@ -239,7 +231,6 @@ test('extractPageFigures: signal abortada ⇒ rechaza con AbortError', async ({ 
 
 test('extractBookFigures: recorre secuencial, reporta progreso y respeta el orden', async ({ page }) => {
   await page.goto('/index.html');
-  await seedProLicense(page);
   const res = await inPage(page, async (arg) => {
     const M = await import('/js/ai/figures-pdf.js');
     const pageOps = { OPS: arg.OPS };
@@ -282,7 +273,6 @@ test('extractBookFigures: recorre secuencial, reporta progreso y respeta el orde
 
 test('extractBookFigures: un save que rechaza va a failed sin cortar la corrida', async ({ page }) => {
   await page.goto('/index.html');
-  await seedProLicense(page);
   const res = await inPage(page, async (arg) => {
     const M = await import('/js/ai/figures-pdf.js');
     const pages = [
@@ -318,7 +308,6 @@ test('extractBookFigures: un save que rechaza va a failed sin cortar la corrida'
 test('integración real: encuentra la figura del PDF con pdf.js y descarta la página sin imágenes', async ({ page }) => {
   const b64 = readFileSync('tests/test-figure.pdf').toString('base64');
   await page.goto('/index.html');
-  await seedProLicense(page);
   const out = await page.evaluate(async (data: string) => {
     const VL: any = await import('/js/vendor-loader.js');
     const lib = await VL.loadPdfJs();

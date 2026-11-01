@@ -446,10 +446,7 @@ const EN = {
   'Entendido': 'Got it',
 
   // app.js
-  'Tu licencia Pro dejó de ser válida. Tus datos siguen intactos.': 'Your Pro license is no longer valid. Your data is untouched.',
-  'Tu prueba de BookReader Pro acaba en {n} días. Lo que has creado se queda: tarjetas, mapas y libretas.': 'Your BookReader Pro trial ends in {n} days. What you made stays: cards, maps and notebooks.',
-  'Prueba de BookReader Pro: te quedan {days} días (hasta el {date}).': 'BookReader Pro trial: {days} days left (until {date}).',
-  'Tu prueba de BookReader Pro terminó el {date}. Tus flashcards, mapas y libretas siguen ahí.': 'Your BookReader Pro trial ended on {date}. Your flashcards, maps and notebooks are still there.',
+  'Tu licencia de Plus dejó de ser válida. Tus datos siguen intactos.': 'Your Plus license is no longer valid. Your data is untouched.',
   'Este libro no está en tu biblioteca en este dispositivo.': 'This book is not in your library on this device.',
   'Arrastra para ajustar el ancho · doble clic: restablecer': 'Drag to adjust width · double-click to reset',
   'No se pudo abrir el libro guardado.': 'Could not open the saved book.',
@@ -797,18 +794,12 @@ const EN = {
   '_(Conversación vacía.)_': '_(Empty conversation.)_',
   '(pág. {n})': '(p. {n})',
 
-  // license.js / paywall.js
+  // license.js
   'Esta licencia ya está activa en el máximo de dispositivos.': 'This license is already active on the maximum number of devices.',
   'La licencia no es válida o fue revocada.': 'The license is not valid or was revoked.',
   'Introduce tu clave de licencia.': 'Enter your license key.',
   'Sin conexión. Inténtalo cuando tengas red.': 'No connection. Try again when you are online.',
   'El servidor de licencias no responde. Inténtalo en un rato.': 'The license server is not responding. Try again later.',
-  '$29 · pago único': '$29 · one-time payment',
-  'Flashcards con export a Anki': 'Flashcards with Anki export',
-  'Perfiles del agente reutilizables': 'Reusable agent profiles',
-  'Esta función': 'This feature',
-  '{feature} es de BookReader Pro': '{feature} is part of BookReader Pro',
-  '{price} — sin suscripción, tus datos siguen en tu máquina.': '{price} — no subscription, your data stays on your machine.',
 
   // highlights-ui.js / bookmarks-ui.js / epub-reader.js
   'No se pudo generar la imagen para compartir.': 'Could not generate the image to share.',
@@ -1331,19 +1322,19 @@ const EN = {
   'Recuperar': 'Recover',
   'Recuperados {n} elementos.': 'Recovered {n} items.',
 
-  // app-settings — Licencia / paywall
-  'Modo simulado (aún sin plataforma de pagos): cualquier clave <code>BKRD-…</code> activa Pro para probar, y <code>BKRD-PLUS-…</code>, Plus.': 'Simulated mode (no payment platform yet): any <code>BKRD-…</code> key activates Pro for testing, and <code>BKRD-PLUS-…</code>, Plus.',
-  'BookReader Pro activo': 'BookReader Pro active',
-  'BookReader Plus activo (incluye Pro)': 'BookReader Plus active (includes Pro)',
+  // app-settings — Licencia
+  'Modo simulado (aún sin plataforma de pagos): cualquier clave <code>BKRD-…</code> activa Plus para probar.': 'Simulated mode (no payment platform yet): any <code>BKRD-…</code> key activates Plus for testing.',
+  'BookReader Plus activo': 'BookReader Plus active',
   'Última verificación: {date}. Sin conexión, tu licencia sigue activa hasta 30 días.': 'Last check: {date}. Offline, your license stays active for up to 30 days.',
   'Gestionar dispositivos y recibos': 'Manage devices and receipts',
   'Quitar la licencia de este navegador': 'Remove the license from this browser',
   'Quitar la licencia aquí no libera el hueco de dispositivo: eso se hace en el portal.': 'Removing the license here does not free the device slot: that is done in the portal.',
-  'Tu licencia dejó de ser válida (¿reembolso o revocación?). Tus datos siguen intactos; la app vuelve al plan Free.': 'Your license is no longer valid (refund or revocation?). Your data is untouched; the app goes back to the Free plan.',
-  'BookReader Pro desbloquea flashcards con export a Anki, repaso espaciado, mapas mentales, plantillas avanzadas y perfiles. {price}, sin suscripción.': 'BookReader Pro unlocks flashcards with Anki export, spaced repetition, mind maps, advanced templates and profiles. {price}, no subscription.',
+  'Tu licencia dejó de ser válida (¿reembolso o revocación?). Tus datos siguen intactos y la app sigue entera, sin lo de Plus.': 'Your license is no longer valid (refund or revocation?). Your data is untouched and the whole app still works, without Plus.',
+  'Todo BookReader es gratis. Plus ({price}) añade lo que nos cuesta mantener: Claude o ChatGPT conectados a tu biblioteca, el sync de BookReader sin configurar Drive y la IA incluida.': 'All of BookReader is free. Plus ({price}) adds what costs us to run: Claude or ChatGPT connected to your library, BookReader sync without setting up Drive, and AI included.',
+  '8 € al mes': '€8 a month',
+  'Conseguir BookReader Plus': 'Get BookReader Plus',
   'Clave de licencia': 'License key',
   'Activar en este dispositivo': 'Activate on this device',
-  'Conseguir BookReader Pro': 'Get BookReader Pro',
   'La clave llega por email al comprar y siempre puedes recuperarla en el portal de cliente.': 'The key arrives by email when you buy, and you can always recover it in the customer portal.',
   'Activando…': 'Activating…',
   '¿Borraste datos de navegación o reinstalaste? Libera un dispositivo en': 'Did you clear browsing data or reinstall? Free up a device in',
@@ -1351,12 +1342,7 @@ const EN = {
   'y reintenta': 'and try again',
   'Quitar licencia': 'Remove license',
   'Quitar': 'Remove',
-  'La app volverá al plan Free en este navegador. Tus datos no se tocan y podrás reactivar con la misma clave.': 'The app will go back to the Free plan in this browser. Your data is untouched and you can reactivate with the same key.',
-  'Repaso espaciado (quizzes)': 'Spaced repetition (quizzes)',
-  'Mapas mentales navegables': 'Navigable mind maps',
-  'Plantillas avanzadas, como Pregunta y respuesta': 'Advanced templates, like Question and answer',
-  'Ya tengo una licencia': 'I already have a license',
-  'Conseguir Pro': 'Get Pro',
+  'Este navegador se queda sin lo de Plus. Tus datos no se tocan y podrás reactivar con la misma clave.': 'This browser loses Plus. Your data is untouched and you can reactivate with the same key.',
   'Pregunta y respuesta': 'Question and answer',
   'Datos': 'Data',
   'Licencia': 'License',

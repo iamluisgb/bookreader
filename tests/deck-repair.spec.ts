@@ -1,5 +1,4 @@
 import { test, expect } from '@playwright/test';
-import { seedProLicense } from './pro-license';
 
 // WU1 · Reparación de identidad de mazos (feature "gestor de mazos").
 //
@@ -42,7 +41,6 @@ async function decksOf(page: any) {
 test.describe('Reparación de identidad de mazos', () => {
   test('matchDecksByTitle: huérfano con título único se propone; ambiguo, sin libro y con libro no', async ({ page }) => {
     await page.goto('/index.html');
-    await seedProLicense(page);
     const res = await page.evaluate(async ({ HASH_A, HASH_B, HASH_D, HASH_E }) => {
       const DR: any = await import('/js/ai/deck-repair.js');
       const S: any = await import('/js/storage.js');
@@ -79,7 +77,6 @@ test.describe('Reparación de identidad de mazos', () => {
 
   test('repairOrphanDecks reasigna el huérfano y es idempotente (no re-sella updatedAt)', async ({ page }) => {
     await page.goto('/index.html');
-    await seedProLicense(page);
     await seedBook(page, HASH_A, 'Clean Code');
     await seedDeck(page, 'clean-code.epub', 'Clean Code');
 
@@ -109,7 +106,6 @@ test.describe('Reparación de identidad de mazos', () => {
 
   test('título ambiguo: el mazo NO se mueve y cuenta como skipped', async ({ page }) => {
     await page.goto('/index.html');
-    await seedProLicense(page);
     await seedBook(page, HASH_A, 'Clean Code');
     await seedBook(page, HASH_B, 'Clean Code');   // dos libros, mismo título
     await seedDeck(page, 'clean-code.epub', 'Clean Code');
@@ -127,7 +123,6 @@ test.describe('Reparación de identidad de mazos', () => {
 
   test('reconcile: el mazo guardado bajo el id que se vuelve alias pasa al canónico', async ({ page }) => {
     await page.goto('/index.html');
-    await seedProLicense(page);
     await seedDeck(page, HASH_B, 'Mismo Título');   // A < B: B será el alias de A
 
     await page.evaluate(async ({ HASH_A, HASH_B }) => {
@@ -141,7 +136,6 @@ test.describe('Reparación de identidad de mazos', () => {
 
   test('arranque: un mazo huérfano se repara solo al recargar la app', async ({ page }) => {
     await page.goto('/index.html');
-    await seedProLicense(page);
     await seedBook(page, HASH_A, 'Clean Code');
     await seedDeck(page, 'clean-code.epub', 'Clean Code');
 

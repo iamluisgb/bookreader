@@ -1,5 +1,4 @@
 import { test, expect } from '@playwright/test';
-import { seedProLicense } from './pro-license';
 
 // Tarjetas visuales (WU3): constructores de prompts, parsers tolerantes, validador de
 // SVG y los llamadores finos (grounding + oclusión). Los módulos se importan dentro de
@@ -33,7 +32,6 @@ async function inPage(page, fn: (arg: any) => Promise<any>, arg?: any) {
 // en window.__vc.calls y responde con `payload` como content del mensaje.
 async function setupLLMStub(page, payload: string) {
   await page.goto('/index.html');
-  await seedProLicense(page);
   await page.evaluate(() => {
     localStorage.setItem('bookreader_ai_key', JSON.stringify('test-key'));
     localStorage.setItem('bookreader_ai_vision_model', JSON.stringify('vision-test'));
@@ -62,7 +60,6 @@ async function setupLLMStub(page, payload: string) {
 // la herramienta y fuerza la escalera al fallback de texto).
 async function setupOcclusionStub(page, cardsJson: string, streamText: string, noToolCall = false) {
   await page.goto('/index.html');
-  await seedProLicense(page);
   await page.evaluate(() => {
     localStorage.setItem('bookreader_ai_key', JSON.stringify('test-key'));
   });
@@ -97,7 +94,6 @@ async function setupOcclusionStub(page, cardsJson: string, streamText: string, n
 
 test('buildGroundingMessages: prompt 1 con contrato JSON, medidas en píxeles y regla de omisión', async ({ page }) => {
   await page.goto('/index.html');
-  await seedProLicense(page);
   const msgs = await inPage(page, async (dataUrl: string) => {
     const VC = await import('/js/ai/visual-cards.js');
     return VC.buildGroundingMessages({ dataUrl, width: 810, height: 130 });
@@ -120,7 +116,6 @@ test('buildGroundingMessages: prompt 1 con contrato JSON, medidas en píxeles y 
 
 test('buildOcclusionMessages y buildDiagramMessages: regla de Mayer, español y reglas del SVG', async ({ page }) => {
   await page.goto('/index.html');
-  await seedProLicense(page);
   const { occ, dia } = await inPage(page, async ({ labels, chapter }: any) => {
     const VC = await import('/js/ai/visual-cards.js');
     return {
@@ -158,7 +153,6 @@ test('buildOcclusionMessages y buildDiagramMessages: regla de Mayer, español y 
 
 test('buildOcclusionMessages: el contextFact debe responder la pregunta y nombrar lo tapado (WU3)', async ({ page }) => {
   await page.goto('/index.html');
-  await seedProLicense(page);
   const msgs = await inPage(page, async ({ labels, chapter }: any) => {
     const VC = await import('/js/ai/visual-cards.js');
     return VC.buildOcclusionMessages({ labels, chapterText: chapter, figureCaption: 'Fig. 3' });
@@ -180,7 +174,6 @@ test('buildOcclusionMessages: el contextFact debe responder la pregunta y nombra
 
 test('parseGroundingResponse: labels + kind normalizado; kind ausente o desconocido → \'\'', async ({ page }) => {
   await page.goto('/index.html');
-  await seedProLicense(page);
   const res = await inPage(page, async () => {
     const VC = await import('/js/ai/visual-cards.js');
     // JSON envuelto en prosa y fences (modelos reasoning) con kind y labels.
@@ -212,7 +205,6 @@ test('parseGroundingResponse: labels + kind normalizado; kind ausente o desconoc
 
 test('parseOcclusionCards: prosa/fences, string de tool-call, filtro por labels y saneo de campos', async ({ page }) => {
   await page.goto('/index.html');
-  await seedProLicense(page);
   const res = await inPage(page, async () => {
     const VC = await import('/js/ai/visual-cards.js');
     const allowed = ['Message queue', 'Consumer'];
@@ -265,7 +257,6 @@ test('parseOcclusionCards: prosa/fences, string de tool-call, filtro por labels 
 
 test('sanitizeSvg: acepta SVG limpio con el nodo de respuesta y rechaza scripts, handlers, javascript:, foreignObject y XML roto', async ({ page }) => {
   await page.goto('/index.html');
-  await seedProLicense(page);
   const res = await inPage(page, async ({ clean }: any) => {
     const VC = await import('/js/ai/visual-cards.js');
     return {
@@ -297,7 +288,6 @@ test('sanitizeSvg: acepta SVG limpio con el nodo de respuesta y rechaza scripts,
 
 test('parseDiagramResponse: gate usable:false, camino útil con SVG, SVG inválido y basura', async ({ page }) => {
   await page.goto('/index.html');
-  await seedProLicense(page);
   const res = await inPage(page, async ({ clean }: any) => {
     const VC = await import('/js/ai/visual-cards.js');
     // El gate del modelo: sin estructura relacional, no hay diagrama.
@@ -369,7 +359,6 @@ test('groundFigure: envía imagen + dimensiones con max_tokens≥4000, parsea la
 
 test('groundFigure: un abort del usuario propaga el AbortError y no reintenta', async ({ page }) => {
   await page.goto('/index.html');
-  await seedProLicense(page);
   await page.evaluate(() => {
     localStorage.setItem('bookreader_ai_key', JSON.stringify('test-key'));
     localStorage.setItem('bookreader_ai_vision_model', JSON.stringify('vision-test'));
@@ -400,7 +389,6 @@ test('groundFigure: un abort del usuario propaga el AbortError y no reintenta', 
 async function setupStreamStub(page, payloads: string | string[]) {
   const chunks = Array.isArray(payloads) ? payloads : [payloads];
   await page.goto('/index.html');
-  await seedProLicense(page);
   await page.evaluate(() => {
     localStorage.setItem('bookreader_ai_key', JSON.stringify('test-key'));
   });
@@ -466,7 +454,6 @@ test('generateOcclusions: llamada forzada a create_occlusion_cards, tarjetas fil
 
 test('buildDiagramBatchMessages: pide count diagramas, gate relacional, reglas de viewBox/clases y español', async ({ page }) => {
   await page.goto('/index.html');
-  await seedProLicense(page);
   const msgs = await inPage(page, async ({ chapter }: any) => {
     const VC = await import('/js/ai/visual-cards.js');
     return VC.buildDiagramBatchMessages({ chapterText: chapter, count: 3 });
@@ -493,7 +480,6 @@ test('buildDiagramBatchMessages: pide count diagramas, gate relacional, reglas d
 
 test('parseDiagramBatchResponse: lote válido, inválidas descartadas sin tirar las demás, cap, dedupe y truncado', async ({ page }) => {
   await page.goto('/index.html');
-  await seedProLicense(page);
   const res = await inPage(page, async ({ clean }: any) => {
     const VC = await import('/js/ai/visual-cards.js');
     const d1 = { concept: 'Flujo de mensajes', svg: clean, answerNodeId: 'tgt', question: '¿Qué desacopla al productor del consumidor?', contextFact: 'El buffer desacopla ambos ritmos.' };
@@ -571,7 +557,6 @@ test('generateDiagrams: lote usable en 1 intento; basura la primera vez → exac
 
 test('buildDrawingCardMessages y parseDrawingCards: consigna en español, rúbrica de ≥3 pasos, descartes y cap', async ({ page }) => {
   await page.goto('/index.html');
-  await seedProLicense(page);
   const { msgs, parsed } = await inPage(page, async ({ chapter }: any) => {
     const VC = await import('/js/ai/visual-cards.js');
     const msgs = VC.buildDrawingCardMessages({ chapterText: chapter, count: 2 });

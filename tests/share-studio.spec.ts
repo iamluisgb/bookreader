@@ -2,7 +2,6 @@ import { test, expect } from '@playwright/test';
 import path from 'path';
 import { readFileSync } from 'fs';
 import { createHash } from 'crypto';
-import { seedProLicense } from './pro-license';
 
 // P24 F2 · Lo ajeno en el Studio del agente: el resumen de Luis se abre con el mismo visor
 // que los tuyos (y sus citas llevan al pasaje: es el mismo fichero), su libreta se lee en
@@ -13,7 +12,6 @@ const BOOK = createHash('sha256').update(readFileSync(EPUB_PATH)).digest('hex');
 
 async function setup(page) {
   await page.goto('/index.html');
-  await seedProLicense(page);   // la plantilla HQ&A es Pro (MON2): el test ejercita lo compartido, no el gate
   await page.evaluate((k) => localStorage.setItem('bookreader_ai_key', JSON.stringify(k)), 'test-key');
   await page.evaluate(async (bookId) => {
     const Shared: any = await import('/js/share/store.js');

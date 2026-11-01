@@ -3463,40 +3463,37 @@ Si basta con una consultora que gestione la bonificación, el ítem pasa a ser d
 
 ## 🔧 Técnico (calidad / seguridad / perf / bugs)
 
-### MON5 — Planes y precios: gratis, Pro y Plus · `M` · **tareas 1–3 ✓ (2026-10-20), resto pendiente ([ADR-060](DECISIONS.md))**
+### MON5 — Planes y precios: gratis y Plus · `M` · **Pro gratis ✓ (2026-11-01), resto pendiente ([ADR-061](DECISIONS.md))**
 
-> Gratis (lector, agente con tu key, **sync por Drive con libros**, MCP local) · **Pro** 29 $ una vez
-> (19 $ las primeras 72 h) · **Plus** 7 $/mes o 60 $/año: todo lo de Pro + sync de BookReader + IA
-> incluida + MCP remoto. Pruebas de 60 días sin tarjeta. Investigación en
-> [`docs/INVESTIGACION_PRECIOS.md`](docs/INVESTIGACION_PRECIOS.md).
+> **Gratis:** todo lo que hace la app en el dispositivo (lector, agente con tu key, tarjetas, repaso,
+> mapas, infografías, perfiles), **sync por Drive con libros** y MCP local. **Plus, 8 €/mes**
+> (anual por decidir; propuesta 80 €/año): Claude o ChatGPT conectados a tu biblioteca (MCP remoto),
+> sync de BookReader e IA incluida. Prueba de Plus de 60 días sin tarjeta. ADR-061 supera ADR-060;
+> investigación en [`docs/INVESTIGACION_PRECIOS.md`](docs/INVESTIGACION_PRECIOS.md).
 
 **Tareas:**
-1. ✓ **Drive sin gate.** Quitar `ensurePro('files')` (`app/js/ui/app-settings.js`, `app/js/library/view.js`)
-   y `files` de la lista del paywall (`app/js/ui/paywall.js`). Libros incluidos.
-2. ✓ **Licencia con planes.** `license.js` guarda el plan de cada licencia (`isPlus()`): en simulado,
-   `BKRD-PLUS-…`; con Polar, el benefit de la key (`CONFIG.plusBenefitIds`). `isPro()` es verdadero
-   con Plus y con la prueba de Pro. La prueba de Plus es la tarea 4.
-3. ✓ **Prueba inversa de Pro (60 días).** Arranca en la primera apertura. Al acabar, lo creado sigue
-   legible y exportable. Aviso a 7 días del final.
+1. ✓ **Drive sin gate** (2026-10-20).
+2. ✓ **Pro gratis** (2026-11-01, ADR-061). Fuera `ui/paywall.js`, la prueba inversa de Pro e
+   `isPro()`. Cualquier licencia válida es de Plus (`isPlus()`); en simulado, cualquier `BKRD-…`.
+3. **Precio anual y moneda.** Decidir el anual y comprobar que Polar cobra en euros.
 4. **Prueba de Plus (60 días) al haber intención:** «Conectar con Claude», activar el sync o agotar
-   la demo. Tope propio en el Worker: unos 2 GB y 1 $ de inferencia en total. Ver cómo emitirla
+   la demo. Tope propio en el Worker: unos 2 GB y 1 € de inferencia en total. Ver cómo emitirla
    sin cuentas (¿licencia de prueba en Polar ligada a un email?).
-5. **Pro tuyo tras 12 meses de Plus.** Ver si Polar expone la antigüedad de la suscripción o si
-   hay que emitir un benefit de Pro al renovar.
-6. **Paywall de una sola oferta.** Las funciones de estudio ofrecen Pro, y el sync, el MCP y la IA
-   ofrecen Plus. La tabla de tres planes solo vive en la página de precios.
-7. **Página de precios** con una frase por plan y la línea de los topes: «IA incluida para uso
-   normal; si un mes te pasas, sigues con tu propia key».
-8. **Lanzar Plus:**
+5. **Paywall de Plus**, solo donde hay intención: conectar un agente, activar el sync de BookReader
+   o agotar la demo de IA.
+6. **Página de precios** con dos columnas (Gratis y Plus) y la línea de los topes: «IA incluida para
+   uso normal; si un mes te pasas, sigues con tu propia key».
+7. **Lanzar Plus:**
    - el plan de pago de Workers;
    - en ADR-056, la opción A (los `CAP_*` como alarma; mandan las cuotas por usuario);
-   - el tope de IA (unos 1,50 $ al mes) en el gateway (ADR-031).
+   - el tope de IA (unos 1,70 € al mes) en el gateway (ADR-031).
 
 **Métricas (3 primeros meses) → acción:**
-- **Conversión de la prueba de Pro:** <1 % con más de 500 activos → revisar el paywall; >5 % → Pro a 39 $.
+- **Activación del estudio:** quien crea su primer mazo y vuelve a repasar la semana siguiente. Es
+  la audiencia a la que se ofrece Plus.
 - **Conversión de la prueba de Plus:** <10 % → acortarla (60 días es más que lo habitual: riesgo aceptado).
-- **Plus en anual:** <40 % → reforzar el anual en el paywall.
-- **Coste de IA por usuario de Plus:** p95 >2 $ → bajar el tope o cambiar de modelo, nunca en silencio.
+- **Plus en anual** (cuando exista): <40 % → reforzar el anual en el paywall.
+- **Coste de IA por usuario de Plus:** p95 >2 € → bajar el tope o cambiar de modelo, nunca en silencio.
 - **Plus que llega al tope:** >10 % → subirlo.
 - **Churn de Plus:** >8 %/mes → encuesta al cancelar.
 - **Reembolsos:** >5 % → la promesa no es la que el producto da.

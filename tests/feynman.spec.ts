@@ -4,7 +4,6 @@
 // se puede inventar lo que "te dejaste".
 import { test, expect, Page } from '@playwright/test';
 import path from 'path';
-import { seedProLicense } from './pro-license';
 
 const EPUB = path.join(__dirname, 'test.epub');
 const GW = 'https://bookreader-gateway.luisgonzalezb93.workers.dev/v1';
@@ -206,7 +205,6 @@ test('el ciclo completo funciona contra un modelo real @live', async ({ page }) 
   // Camino real: Studio → tarjeta "Explícamelo tú". Importa hacerlo así y no llamando a
   // Feynman.open() a mano: el `ensureIndex` que pasa el panel es lo que construye el índice
   // de pasajes, y sin él la extracción de expectativas no tiene de dónde sacarlas.
-  await seedProLicense(page);
   await page.locator('.ai-tab[data-view="studio"]').click();
   await page.locator('[data-act="gen"][data-kind="feynman"]').click();
 
@@ -433,7 +431,6 @@ test('sugerir conceptos: presupuesto holgado, fallo legible y se puede reintenta
     };
   });
 
-  await seedProLicense(page);
   await page.locator('.ai-tab[data-view="studio"]').click();
   await page.locator('[data-act="gen"][data-kind="feynman"]').click();
   await page.waitForSelector('#fey-more', { timeout: 10000 });
