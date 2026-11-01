@@ -47,6 +47,36 @@ test.describe('landing · diagrama, práctica y manifiesto', () => {
     await expect(page.locator('#quiz .quiz-opt')).toHaveCount(4);
   });
 
+  test('Plus: la lista de espera manda el email al worker y dice que está hecho', async ({ page }) => {
+    let sent: any = null;
+    await page.route('**/v1/waitlist', async (route) => {
+      sent = JSON.parse(route.request().postData() || '{}');
+      await route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true}' });
+    });
+    await page.goto(BASE + '/es/?lang=es');
+    const form = page.locator('#plus-form');
+    await form.scrollIntoViewIfNeeded();
+    await form.locator('input[type="email"]').fill('nope');
+    await form.locator('button').click();
+    await expect(form.locator('.plus-msg')).toHaveText('Ese email no parece correcto.');
+    expect(sent).toBeNull();
+    await form.locator('input[type="email"]').fill('ana@example.com');
+    await form.locator('button').click();
+    await expect(form).toHaveClass(/done/);
+    await expect(form.locator('.plus-msg')).toContainText('Hecho');
+    expect(sent).toEqual({ email: 'ana@example.com', lang: 'es', website: '' });
+  });
+
+  test('Plus: si el worker falla, el formulario lo dice y deja reintentar', async ({ page }) => {
+    await page.route('**/v1/waitlist', (route) => route.fulfill({ status: 503, body: '{}' }));
+    await page.goto(BASE + '/');
+    const form = page.locator('#plus-form');
+    await form.locator('input[type="email"]').fill('ana@example.com');
+    await form.locator('button').click();
+    await expect(form.locator('.plus-msg')).toHaveText('Couldn’t save it. Try again in a minute.');
+    await expect(form.locator('button')).toBeEnabled();
+  });
+
   test('el manifiesto existe en inglés y en español, enlazado desde la portada', async ({ page }) => {
     await page.goto(BASE + '/');
     await expect(page.locator('footer a[href="why/"]')).toHaveCount(1);

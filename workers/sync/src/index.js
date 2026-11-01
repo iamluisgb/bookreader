@@ -158,6 +158,30 @@ export async function checkLicense(env, key, fetchImpl = fetch) {
   return 'granted';
 }
 
+// ---- Lista de espera de Plus (ADR-061) ------------------------------------------------------
+
+// Pública (sin token): la llama el formulario de la landing. Solo desde los orígenes de la app,
+// con tope por IP y un campo trampa para bots. Siempre contesta lo mismo, esté o no ya apuntado,
+// para que no sirva para averiguar si un email está en la lista.
+const EMAIL_RE = /^[^\s@]{1,64}@[^\s@]+\.[^\s@]{2,}$/;
+async function joinWaitlist(request, env, cors, now = Date.now()) {
+  if (!cors['Access-Control-Allow-Origin']) return json({ error: 'origin' }, 403, cors);
+  if (env.WAITLIST) {
+    const ip = request.headers.get('CF-Connecting-IP') || 'anon';
+    const { success } = await env.WAITLIST.limit({ key: ip });
+    if (!success) return json({ error: 'rate_limited' }, 429, cors);
+  }
+  let body;
+  try { body = await request.json(); } catch { return json({ error: 'bad_request' }, 400, cors); }
+  if (body?.website) return json({ ok: true }, 200, cors);   // campo trampa: solo lo rellena un bot
+  const email = typeof body?.email === 'string' ? body.email.trim().toLowerCase() : '';
+  if (email.length > 254 || !EMAIL_RE.test(email)) return json({ error: 'email' }, 400, cors);
+  const lang = body?.lang === 'es' ? 'es' : 'en';
+  await env.DB.prepare('INSERT INTO waitlist (email, lang, created_at) VALUES (?, ?, ?) ON CONFLICT(email) DO NOTHING')
+    .bind(email, lang, now).run();
+  return json({ ok: true }, 200, cors);
+}
+
 async function issueToken(request, env, cors, now = Date.now()) {
   // Desde un navegador, solo los orígenes de la app: otra web no puede usar una licencia
   // aunque la tenga. Sin `Origin` no es un navegador sino un programa del usuario (el MCP de
@@ -633,6 +657,7 @@ export async function purge(env, now = Date.now()) {
 export async function usage(env, now = Date.now()) {
   const st = await env.DB.prepare('SELECT COUNT(DISTINCT user) AS users, COALESCE(SUM(size), 0) AS bytes FROM blobs').first();
   const active = await env.DB.prepare('SELECT COUNT(*) AS n FROM users WHERE lapsed_at IS NULL').first();
+  const wl = await env.DB.prepare('SELECT COUNT(*) AS n FROM waitlist').first();
   const u = await env.DB.prepare('SELECT class_a, class_b, refused FROM usage WHERE month = ?').bind(monthOf(now)).first()
     || { class_a: 0, class_b: 0, refused: 0 };
   const c = config(env);
@@ -644,6 +669,7 @@ export async function usage(env, now = Date.now()) {
     classA: { ops: u.class_a, cap: c.classA, pctOfFree: pct(u.class_a, FREE.classA) },
     classB: { ops: u.class_b, cap: c.classB, pctOfFree: pct(u.class_b, FREE.classB) },
     refused: u.refused,
+    waitlist: wl.n,
   };
 }
 
@@ -657,6 +683,7 @@ export default {
     const method = request.method;
     try {
       if (pathname === '/v1/sync-token' && method === 'POST') return await issueToken(request, env, cors);
+      if (pathname === '/v1/waitlist' && method === 'POST') return await joinWaitlist(request, env, cors);
       if (pathname === '/v1/usage' && method === 'GET') {
         const auth = request.headers.get('Authorization') || '';
         if (!env.USAGE_TOKEN || auth !== `Bearer ${env.USAGE_TOKEN}`) return json({ error: 'forbidden' }, 403);

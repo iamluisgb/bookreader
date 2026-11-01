@@ -63,7 +63,9 @@
   "ratelimits": [
     { "name": "WRITES", "namespace_id": "2402", "simple": { "limit": 300, "period": 60 } },
     { "name": "TOKENS", "namespace_id": "2403", "simple": { "limit": 10, "period": 60 } },
-    { "name": "MCP_CALLS", "namespace_id": "2404", "simple": { "limit": 60, "period": 60 } }
+    { "name": "MCP_CALLS", "namespace_id": "2404", "simple": { "limit": 60, "period": 60 } },
+    // Lista de espera de Plus: apuntarse desde una IP, como mucho 5 veces por minuto.
+    { "name": "WAITLIST", "namespace_id": "2405", "simple": { "limit": 5, "period": 60 } }
   ],
   "triggers": { "crons": ["41 3 * * *"] }
 }

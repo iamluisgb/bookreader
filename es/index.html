@@ -166,7 +166,7 @@ if (!window.matchMedia || !matchMedia('(prefers-reduced-motion: reduce)').matche
     }
 </style>
 <link rel="stylesheet" href="../assets/landing/motion.css?v=20261030b">
-<link rel="stylesheet" href="../assets/landing/map.css?v=20261101a">
+<link rel="stylesheet" href="../assets/landing/map.css?v=20261101b">
 <link rel="preload" as="image" href="../assets/landing/covers/ddia-2e.webp">
 <!-- Umami Analytics: solo carga en producción (servimos el tracker en /u/s.js); en localhost/tests, nada -->
 <script>
@@ -467,8 +467,44 @@ if (location.hostname === 'bookreader.raiatech.com') {
   </div>
 </section>
 
+<!-- Plus · próximamente (ADR-061): el MCP es el titular. Lista de espera → bookreader-sync /v1/waitlist (map.js). -->
+<section class="beat" id="plus">
+  <div class="wrap">
+    <div class="beat-copy">
+      <p class="feature-name">BookReader Plus · Muy pronto</p>
+      <h2>Tu biblioteca entera, dentro de Claude.</h2>
+      <p class="support">Conecta Claude a tus libros y pregúntale a todos a la vez. Te contesta con pasajes de tus propios libros, cada uno con su cita, y puede convertir un capítulo en tarjetas que aparecen en BookReader.</p>
+    </div>
+    <div class="plus-stage">
+      <div class="plus-chat" role="img" aria-label="Ejemplo: Claude responde una pregunta con pasajes de dos libros de tu biblioteca">
+        <div class="panel-head"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.5l1.5 4.2 4.2 1.5-4.2 1.5L12 14.9l-1.5-4.2L6.3 9.2l4.2-1.5L12 3.5Z"/></svg> Claude<span class="panel-status">Respuesta de ejemplo</span></div>
+        <div class="bubble q">¿Qué dicen mis libros sobre la consistencia en sistemas distribuidos?</div>
+        <p class="plus-tool">Ha buscado en tu biblioteca · 2 libros, 6 pasajes</p>
+        <div class="bubble a">Tus dos libros coinciden en lo esencial: cuanto más fuerte es la garantía, más coordinación cuesta. <b>DDIA</b> explica la linealizabilidad como si hubiera una sola copia de los datos. <b>Database Internals</b> repasa los modelos más débiles, de causal a eventual, y lo que cada uno te ahorra.</div>
+        <div class="plus-cites"><span class="cite"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4.5h7a2 2 0 0 1 2 2V20a2.5 2.5 0 0 0-2.5-2H5V4.5Z"/><path d="M19 4.5h-3a2 2 0 0 0-2 2V20a2.5 2.5 0 0 1 2.5-2H19V4.5Z"/></svg> DDIA · Consistency and Consensus</span><span class="cite"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4.5h7a2 2 0 0 1 2 2V20a2.5 2.5 0 0 0-2.5-2H5V4.5Z"/><path d="M19 4.5h-3a2 2 0 0 0-2 2V20a2.5 2.5 0 0 1 2.5-2H19V4.5Z"/></svg> Database Internals · Consistency Models</span></div>
+      </div>
+      <div class="plus-side">
+        <ul class="plus-list">
+          <li><b>Claude, conectado a tu biblioteca</b><span>Busca en todos tus libros, tus subrayados y tus notas. Pídele un mazo a partir de un capítulo.</span></li>
+          <li><b>Sync de BookReader</b><span>En todos tus dispositivos, sin configurar Drive.</span></li>
+          <li><b>IA incluida</b><span>Sin clave que configurar. Si un mes te pasas, sigues con la tuya.</span></li>
+        </ul>
+        <p class="plus-priv">Va cifrado desde tu dispositivo. Nuestro servidor solo lee un libro cuando das permiso a Claude, y solo en memoria.</p>
+        <p class="plus-price"><b>8 € al mes.</b> Todo lo demás de esta página sigue siendo gratis.</p>
+        <form class="plus-form" id="plus-form" novalidate data-ok="Hecho. Te escribiremos una vez, cuando salga Plus." data-bad="Ese email no parece correcto." data-err="No se pudo guardar. Inténtalo en un minuto.">
+          <label class="sr-only" for="plus-email">Tu email</label>
+          <input id="plus-email" name="email" type="email" autocomplete="email" required placeholder="tu@ejemplo.com">
+          <input class="plus-trap" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
+          <button type="submit" class="btn-primary">Avísame</button>
+          <p class="plus-msg" role="status" aria-live="polite"></p>
+        </form>
+        <p class="plus-fine">Un solo email cuando salga Plus. Nada más. <a href="../privacy/">Privacidad</a></p>
+      </div>
+    </div>
+  </div>
+</section>
 <!-- Preguntas: la conversación con el agente (map.css). Texto fijo: no llama a ningún modelo. -->
-<section class="beat">
+<section class="beat alt">
   <div class="wrap">
     <div class="beat-copy">
       <h2>Pregúntale antes de abrirlo.</h2>
@@ -500,7 +536,7 @@ if (location.hostname === 'bookreader.raiatech.com') {
 </section>
 
 <!-- Beat 7 · El cierre -->
-<section class="beat alt">
+<section class="beat">
   <div class="wrap">
     <div class="beat-copy">
       <div class="shelf" id="shelf" aria-hidden="true"><span class="spine" style="--h:96px;--c:#cfd5dc"></span><span class="spine" style="--h:118px;--c:#9aa7b4"></span><span class="spine mine" id="spine-mine" style="--c:#f4f3ef;--ci:#111418">DDIA · 2nd ed.</span><span class="spine" style="--h:104px;--c:#e3d9c6"></span><span class="spine" style="--h:128px;--c:#5d6b78"></span></div>
@@ -689,6 +725,6 @@ if (location.hostname === 'bookreader.raiatech.com') {
 }
 </script>
 <script src="../assets/landing/motion.js?v=20261030b" defer></script>
-<script src="../assets/landing/map.js?v=20261101a" defer></script>
+<script src="../assets/landing/map.js?v=20261101b" defer></script>
 </body>
 </html>

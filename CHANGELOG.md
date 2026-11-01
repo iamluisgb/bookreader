@@ -3,6 +3,24 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-11-01 (3) — Landing: Plus, próximamente, con lista de espera
+
+- **Sección «Your whole library, inside Claude»** (EN/ES), entre «Everything in the box» y las
+  preguntas. El MCP es el titular (ADR-060 §4, ADR-061): Claude contesta con pasajes citados de
+  dos libros (respuesta de ejemplo, etiquetada). Al lado, lo que trae (Claude conectado, sync de
+  BookReader, IA incluida), la línea de privacidad propia de Plus («el servidor solo lee un libro
+  cuando das permiso a Claude, y solo en memoria») y el precio: 8 €/mes.
+- **Lista de espera**: `POST /v1/waitlist` en `bookreader-sync`, sin token. Solo desde los
+  orígenes de la app, 5 por IP y minuto (ratelimit `WAITLIST`, namespace 2405), campo trampa para
+  bots y la misma respuesta esté o no apuntado. Guarda email, idioma y fecha (migración
+  `0007_waitlist.sql`); `/v1/usage` cuenta cuántos hay. Exportar:
+  `npx wrangler d1 execute bookreader-sync --remote --command "SELECT * FROM waitlist"`.
+- La página de privacidad explica qué pasa con ese email.
+- Tests: `workers/sync/test/waitlist.test.mjs` (3) y dos en `landing-map.spec.ts`. `test:sync` 81/81.
+- Desplegado `bookreader-sync` `f69c1831-14ae-44c3-b5c8-370e3f63d442`, con la migración aplicada
+  en remoto. Probado en producción: preflight, origen ajeno 403, email malo 400, alta 200 (y
+  borrada).
+
 ## 2026-11-01 (2) — Pro pasa a ser gratis; solo queda Plus, a 8 €/mes (ADR-061)
 
 Todo lo que era BookReader Pro se abre sin licencia ni prueba: tarjetas, preguntas con opciones,

@@ -91,4 +91,25 @@
       io.observe(mem);
     } else mem.classList.add('in');
   }
+
+  /* ------------------------------------------------- Plus: lista de espera */
+  var form = document.getElementById('plus-form');
+  if (form) {
+    var WAITLIST = 'https://bookreader-sync.luisgonzalezb93.workers.dev/v1/waitlist';
+    var msg = form.querySelector('.plus-msg'), btn = form.querySelector('button');
+    var say = function (text, ok) { msg.textContent = text; msg.classList.toggle('ok', !!ok); };
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var email = form.email.value.trim();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) { say(form.dataset.bad); form.email.focus(); return; }
+      btn.disabled = true; say('');
+      fetch(WAITLIST, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email, lang: document.documentElement.lang === 'es' ? 'es' : 'en', website: form.website.value }),
+      }).then(function (r) {
+        if (r.ok) { form.classList.add('done'); say(form.dataset.ok, true); if (window.umami) window.umami.track('Waitlist'); return; }
+        say(r.status === 400 ? form.dataset.bad : form.dataset.err); btn.disabled = false;
+      }).catch(function () { say(form.dataset.err); btn.disabled = false; });
+    });
+  }
 })();

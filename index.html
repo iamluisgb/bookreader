@@ -172,7 +172,7 @@ if (!window.matchMedia || !matchMedia('(prefers-reduced-motion: reduce)').matche
     }
 </style>
 <link rel="stylesheet" href="assets/landing/motion.css?v=20261030b">
-<link rel="stylesheet" href="assets/landing/map.css?v=20261101a">
+<link rel="stylesheet" href="assets/landing/map.css?v=20261101b">
 <link rel="preload" as="image" href="assets/landing/covers/ddia-2e.webp">
 <!-- Umami Analytics: solo carga en producción (servimos el tracker en /u/s.js); en localhost/tests, nada -->
 <script>
@@ -473,8 +473,44 @@ if (location.hostname === 'bookreader.raiatech.com') {
   </div>
 </section>
 
+<!-- Plus · próximamente (ADR-061): el MCP es el titular. Lista de espera → bookreader-sync /v1/waitlist (map.js). -->
+<section class="beat" id="plus">
+  <div class="wrap">
+    <div class="beat-copy">
+      <p class="feature-name">BookReader Plus · Coming soon</p>
+      <h2>Your whole library, inside Claude.</h2>
+      <p class="support">Connect Claude to your books and ask across all of them at once. It answers with passages from your own books, each one cited, and it can turn a chapter into flashcards that show up in BookReader.</p>
+    </div>
+    <div class="plus-stage">
+      <div class="plus-chat" role="img" aria-label="Example: Claude answers a question with passages from two books in your library">
+        <div class="panel-head"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.5l1.5 4.2 4.2 1.5-4.2 1.5L12 14.9l-1.5-4.2L6.3 9.2l4.2-1.5L12 3.5Z"/></svg> Claude<span class="panel-status">Example answer</span></div>
+        <div class="bubble q">What do my books say about consistency in distributed systems?</div>
+        <p class="plus-tool">Searched your library · 2 books, 6 passages</p>
+        <div class="bubble a">Your two books agree on the core idea: the stronger the guarantee, the more coordination it costs. <b>DDIA</b> frames linearizability as acting as if there were one copy of the data. <b>Database Internals</b> lays out the weaker models, from causal to eventual, and what each one lets you skip.</div>
+        <div class="plus-cites"><span class="cite"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4.5h7a2 2 0 0 1 2 2V20a2.5 2.5 0 0 0-2.5-2H5V4.5Z"/><path d="M19 4.5h-3a2 2 0 0 0-2 2V20a2.5 2.5 0 0 1 2.5-2H19V4.5Z"/></svg> DDIA · Consistency and Consensus</span><span class="cite"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4.5h7a2 2 0 0 1 2 2V20a2.5 2.5 0 0 0-2.5-2H5V4.5Z"/><path d="M19 4.5h-3a2 2 0 0 0-2 2V20a2.5 2.5 0 0 1 2.5-2H19V4.5Z"/></svg> Database Internals · Consistency Models</span></div>
+      </div>
+      <div class="plus-side">
+        <ul class="plus-list">
+          <li><b>Claude, connected to your library</b><span>Search every book, your highlights and your notes. Ask it to build a deck from a chapter.</span></li>
+          <li><b>BookReader sync</b><span>Every device, without setting up Drive.</span></li>
+          <li><b>AI included</b><span>No key to set up. If you go over in a month, you carry on with your own.</span></li>
+        </ul>
+        <p class="plus-priv">Encrypted on your device. Our server only reads a book when you let Claude, and only in memory.</p>
+        <p class="plus-price"><b>€8 a month.</b> Everything else on this page stays free.</p>
+        <form class="plus-form" id="plus-form" novalidate data-ok="Done. We’ll write once, when Plus is out." data-bad="That email doesn’t look right." data-err="Couldn’t save it. Try again in a minute.">
+          <label class="sr-only" for="plus-email">Your email</label>
+          <input id="plus-email" name="email" type="email" autocomplete="email" required placeholder="you@example.com">
+          <input class="plus-trap" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
+          <button type="submit" class="btn-primary">Notify me</button>
+          <p class="plus-msg" role="status" aria-live="polite"></p>
+        </form>
+        <p class="plus-fine">One email when Plus is out. Nothing else. <a href="privacy/">Privacy</a></p>
+      </div>
+    </div>
+  </div>
+</section>
 <!-- Preguntas: la conversación con el agente (map.css). Texto fijo: no llama a ningún modelo. -->
-<section class="beat">
+<section class="beat alt">
   <div class="wrap">
     <div class="beat-copy">
       <h2>Ask before you open it.</h2>
@@ -506,7 +542,7 @@ if (location.hostname === 'bookreader.raiatech.com') {
 </section>
 
 <!-- Beat 7 · El cierre -->
-<section class="beat alt">
+<section class="beat">
   <div class="wrap">
     <div class="beat-copy">
       <div class="shelf" id="shelf" aria-hidden="true"><span class="spine" style="--h:96px;--c:#cfd5dc"></span><span class="spine" style="--h:118px;--c:#9aa7b4"></span><span class="spine mine" id="spine-mine" style="--c:#f4f3ef;--ci:#111418">DDIA · 2nd ed.</span><span class="spine" style="--h:104px;--c:#e3d9c6"></span><span class="spine" style="--h:128px;--c:#5d6b78"></span></div>
@@ -695,6 +731,6 @@ if (location.hostname === 'bookreader.raiatech.com') {
 }
 </script>
 <script src="assets/landing/motion.js?v=20261030b" defer></script>
-<script src="assets/landing/map.js?v=20261101a" defer></script>
+<script src="assets/landing/map.js?v=20261101b" defer></script>
 </body>
 </html>

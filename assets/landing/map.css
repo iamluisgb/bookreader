@@ -6,6 +6,8 @@
    · .quiz   — practicar (1-nov-2026, sustituye a la luz de lectura): una pregunta con opciones
                como las de la app (P43 F4); al elegir, cada opción enseña su porqué y la cita.
                Al lado, «Recuerdas ~k de n tarjetas» por libro (P44), con datos de ejemplo.
+   · .plus   — Plus, próximamente (ADR-061): Claude respondiendo con tu biblioteca y la lista de
+               espera, que va a bookreader-sync /v1/waitlist.
    · .faq    — las preguntas como conversación con el agente: la pregunta es tu globo, la
                respuesta lleva su cita, como en la app. Siguen siendo <details>.
    Rutas relativas siempre (tests/landing-paths.spec.ts).
@@ -90,6 +92,41 @@ html.motion .mem.in .mem-bar i { transform: none; }
 .mem-n { font: 400 12.5px var(--font-ui); color: var(--text-soft); }
 .mem-note { margin: 12px 0 0; font: 400 13.5px/1.5 var(--font-ui); color: var(--text-soft); }
 @media (max-width: 760px) { .quiz-stage { grid-template-columns: 1fr; } }
+
+/* -------------------------------------------------------------------- plus */
+.plus-stage { max-width: 1000px; margin: clamp(40px, 6vh, 60px) auto 0; display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  gap: 28px; align-items: start; text-align: left; }
+.plus-chat { background: var(--surface-2); border: 1px solid var(--border); border-radius: 18px; box-shadow: var(--shadow-hero);
+  padding: 0 0 18px; display: flex; flex-direction: column; gap: 10px; overflow: hidden; }
+.plus-chat .panel-head { display: flex; align-items: center; gap: 8px; padding: 12px 18px; border-bottom: 1px solid var(--border);
+  font: 600 13px var(--font-ui); }
+.plus-chat .panel-head svg { color: var(--brand); }
+.plus-chat .panel-status { margin-left: auto; font-weight: 400; color: var(--text-faint); }
+.plus-chat .bubble { margin: 0 18px; }
+.plus-tool { margin: 0 18px; font: 500 12px var(--font-ui); color: var(--text-faint); }
+.plus-tool::before { content: "\2713"; color: var(--accent); margin-right: 6px; }
+.plus-cites { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 18px; }
+.plus-cites .cite { margin-top: 0; }
+.plus-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
+.plus-list li { display: grid; gap: 3px; }
+.plus-list b { font: 600 15.5px var(--font-ui); color: var(--text); }
+.plus-list span { font: 400 14.5px/1.5 var(--font-ui); color: var(--text-soft); }
+.plus-priv { margin: 18px 0 0; padding-top: 16px; border-top: 1px solid var(--border); font: 400 14px/1.5 var(--font-ui); color: var(--text-soft); }
+.plus-price { margin: 12px 0 0; font: 400 15px var(--font-ui); color: var(--text-soft); }
+.plus-price b { color: var(--text); }
+.plus-form { margin-top: 16px; display: flex; flex-wrap: wrap; gap: 8px; }
+.plus-form input[type="email"] { flex: 1 1 200px; min-width: 0; padding: 11px 14px; border: 1px solid var(--border); border-radius: 999px;
+  background: var(--surface-0); color: var(--text); font: 400 15px var(--font-ui); }
+.plus-form input[type="email"]:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.plus-form .btn-primary { border: 0; cursor: pointer; }
+.plus-form .btn-primary[disabled] { opacity: 0.6; cursor: default; }
+.plus-msg { flex-basis: 100%; margin: 2px 0 0; min-height: 1.4em; font: 500 13.5px var(--font-ui); color: var(--text-soft); }
+.plus-msg.ok { color: var(--accent); }
+.plus-form.done input, .plus-form.done button { display: none; }
+.plus-trap, .sr-only { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.plus-fine { margin: 6px 0 0; font: 400 12.5px var(--font-ui); color: var(--text-faint); }
+.plus-fine a { color: inherit; text-decoration: underline; }
+@media (max-width: 800px) { .plus-stage { grid-template-columns: 1fr; } }
 
 /* ---------------------------------------------------- preguntas como conversación */
 .faq { max-width: 760px; margin: clamp(48px, 7vh, 72px) auto 0; text-align: left; display: grid; gap: 14px; }
