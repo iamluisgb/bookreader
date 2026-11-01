@@ -166,7 +166,7 @@ if (!window.matchMedia || !matchMedia('(prefers-reduced-motion: reduce)').matche
     }
 </style>
 <link rel="stylesheet" href="../assets/landing/motion.css?v=20261030b">
-<link rel="stylesheet" href="../assets/landing/map.css?v=20261030b">
+<link rel="stylesheet" href="../assets/landing/map.css?v=20261101a">
 <link rel="preload" as="image" href="../assets/landing/covers/ddia-2e.webp">
 <!-- Umami Analytics: solo carga en producción (servimos el tracker en /u/s.js); en localhost/tests, nada -->
 <script>
@@ -357,25 +357,37 @@ if (location.hostname === 'bookreader.raiatech.com') {
   </div>
 </section>
 
-<!-- Beat 5b · La luz de lectura (map.css / map.js): la misma página de Claro a Sepia y a Oscuro con luz cálida -->
-<section class="beat night" id="night">
+<!-- Beat 5b · Practicar (map.css / map.js): una pregunta con opciones de verdad, cada opción explica su porqué, y lo que recuerdas de cada libro -->
+<section class="beat" id="quiz">
   <div class="wrap">
     <div class="beat-copy">
-      <h2>Lee también de noche.</h2>
-      <p class="support">Tres temas, tonos de papel, brillo y una <b>luz cálida</b> para leer tarde. La misma página, como la quieren tus ojos.</p>
+      <p class="feature-name">Práctica que explica</p>
+      <h2>Equivócate. Y entiende por qué.</h2>
+      <p class="support">El agente escribe preguntas a partir del capítulo, con opciones que suenan bien. Elige una y <b>cada opción te dice por qué</b> es o no es la respuesta, con la frase del libro que lo zanja.</p>
     </div>
-    <div class="night-stage">
-      <div class="night-page" aria-hidden="true"><div class="page-ch">23:40</div><p>Es tarde y el capítulo casi se acaba. La página se ha vuelto oscura y cálida para que tus ojos aguanten los últimos párrafos.</p><span class="night-warm"></span><span class="night-dim"></span></div>
-      <div class="night-steps" aria-hidden="true"><span>Claro</span><span>Sepia</span><span>Oscuro + luz cálida</span></div>
-      <div class="night-static" role="img" aria-label="La misma página en los temas Claro, Sepia y Oscuro, el último con luz cálida">
-        <div class="night-page" style="background:#fff;color:#1d1d1f"><div class="page-ch">Claro</div><p>Es tarde. ¿Un capítulo más?</p></div>
-        <div class="night-page" style="background:#f7f1e3;color:#3f382e"><div class="page-ch">Sepia</div><p>Es tarde. ¿Un capítulo más?</p></div>
-        <div class="night-page" style="background:#121214;color:#f5f5f7"><div class="page-ch">Oscuro + luz cálida</div><p>Es tarde. ¿Un capítulo más?</p><span class="night-warm" style="opacity:.32"></span></div>
+    <div class="quiz-stage">
+      <div class="quiz" role="group" aria-label="Pregunta de ejemplo con opciones: toca una para ver por qué">
+        <span class="face-tag">DDIA · Replication</span>
+        <p class="quiz-q">Un usuario guarda su perfil, recarga la página y ve la versión antigua. ¿Qué garantía falta?</p>
+        <ul class="quiz-opts">
+          <li><button type="button" class="quiz-opt" data-ok="1" aria-pressed="false"><span class="quiz-l">Leer lo que escribes (read-after-write)</span><span class="quiz-why">Correcto. Un usuario siempre debería ver lo que acaba de escribir. La recarga fue a una réplica que aún no se había puesto al día. <q class="quiz-quote">In this situation, we need read-after-write consistency, also known as read-your-writes consistency.</q></span></button></li>
+          <li><button type="button" class="quiz-opt" data-ok="0" aria-pressed="false"><span class="quiz-l">Linealizabilidad</span><span class="quiz-why">Lo arreglaría, pero es más de lo que hace falta: el usuario tiene que ver sus escrituras, no las de todos a la vez.</span></button></li>
+          <li><button type="button" class="quiz-opt" data-ok="0" aria-pressed="false"><span class="quiz-l">Lecturas monótonas</span><span class="quiz-why">Eso evita que el tiempo vaya hacia atrás entre dos lecturas. Aquí el problema es no ver tu propia escritura.</span></button></li>
+          <li><button type="button" class="quiz-opt" data-ok="0" aria-pressed="false"><span class="quiz-l">Consistencia eventual</span><span class="quiz-why">Es lo que ya tienes: la réplica se pondrá al día, solo que no antes de recargar.</span></button></li>
+        </ul>
+        <p class="quiz-foot"><span class="quiz-hint">Elige una respuesta</span><span class="src-chip quiz-cite" hidden><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4.5h7a2 2 0 0 1 2 2V20a2.5 2.5 0 0 0-2.5-2H5V4.5Z"/><path d="M19 4.5h-3a2 2 0 0 0-2 2V20a2.5 2.5 0 0 1 2.5-2H19V4.5Z"/></svg> Míralo en el libro · <span class="src-cite">Replication</span></span></p>
+      </div>
+      <div class="mem">
+        <p class="mem-h"><b>Tu memoria, medida</b><small>Datos de ejemplo</small></p>
+        <ul>
+          <li><span class="mem-t">Designing Data-Intensive Applications</span><span class="mem-bar"><i style="width:73%"></i></span><span class="mem-n">Recuerdas ~38 de 52 tarjetas</span></li>
+          <li><span class="mem-t">Database Internals</span><span class="mem-bar"><i style="width:40%"></i></span><span class="mem-n">Recuerdas ~12 de 30 tarjetas</span></li>
+        </ul>
+        <p class="mem-note">Después, el repaso te dice cuánto recuerdas de cada libro y qué tarjetas te están costando.</p>
       </div>
     </div>
   </div>
 </section>
-
 <!-- Beat 6 · Los valores -->
 <section class="beat values">
   <div class="wrap">
@@ -450,7 +462,7 @@ if (location.hostname === 'bookreader.raiatech.com') {
         <li><button type="button" data-demo="export" aria-pressed="false">Exporta a <b>Anki y Markdown</b></button></li>
       </ul>
       <svg class="bmap-lines" aria-hidden="true"></svg>
-      <figcaption>Y lo básico de un lector: <b>modo inmersivo</b>, búsqueda en el libro, marcadores, tipografía a tu gusto, <b>modo Estudiar</b> con racha, tiempo de lectura restante y un análisis honesto de lo que leíste de verdad.</figcaption>
+      <figcaption>Y lo básico de un lector: <b>modo inmersivo</b>, búsqueda en el libro, marcadores, tipografía a tu gusto, <b>temas de noche con luz cálida</b>, <b>modo Estudiar</b> con racha, tiempo de lectura restante y un análisis honesto de lo que leíste de verdad.</figcaption>
     </figure>
   </div>
 </section>
@@ -677,6 +689,6 @@ if (location.hostname === 'bookreader.raiatech.com') {
 }
 </script>
 <script src="../assets/landing/motion.js?v=20261030b" defer></script>
-<script src="../assets/landing/map.js?v=20261030b" defer></script>
+<script src="../assets/landing/map.js?v=20261101a" defer></script>
 </body>
 </html>

@@ -1,4 +1,4 @@
-// Landing · el diagrama de «Everything in the box» y la escena de la luz de lectura (ver map.css).
+// Landing · el diagrama de «Everything in the box» y la pregunta con opciones de «Practicar» (ver map.css).
 // Sin dependencias; los textos están en el HTML de cada idioma, aquí solo hay lógica.
 (function () {
   'use strict';
@@ -68,32 +68,27 @@
     show(0);
   }
 
-  /* ---------------------------------------------------------- luz de lectura */
-  var stage = document.getElementById('night');
-  if (stage && motion) {
-    var page = stage.querySelector('.night-stage > .night-page');
-    var warm = page.querySelector('.night-warm'), dim = page.querySelector('.night-dim');
-    var steps = [].slice.call(stage.querySelectorAll('.night-steps span'));
-    // Light → Sepia → Dark, los mismos colores que app/css/themes.css
-    var STOPS = [[[255, 255, 255], [29, 29, 31]], [[247, 241, 227], [63, 56, 46]], [[18, 18, 20], [245, 245, 247]]];
-    var mix = function (a, b, t) { return 'rgb(' + a.map(function (v, i) { return Math.round(v + (b[i] - v) * t); }).join(',') + ')'; };
-    var paint = function () {
-      var r = page.getBoundingClientRect(), vh = window.innerHeight;
-      // 0 con la página entrando por abajo (85 % de la pantalla), 1 cuando su borde de arriba llega al 25 %:
-      // el cambio se ve entero mientras la página está a la vista
-      var p = Math.max(0, Math.min(1, (vh * 0.85 - r.top) / (vh * 0.6)));
-      var s = p * 2, i = Math.min(1, Math.floor(s)), t = Math.min(1, s - i);
-      t = Math.max(0, Math.min(1, (t - 0.25) / 0.5)); // cada tema se queda un rato quieto antes de pasar al siguiente
-      page.style.background = mix(STOPS[i][0], STOPS[i + 1][0], t);
-      page.style.color = mix(STOPS[i][1], STOPS[i + 1][1], t);
-      var w = Math.max(0, Math.min(1, (p - 0.72) / 0.22)); // la luz cálida entra ya de noche
-      warm.style.opacity = (0.32 * w).toFixed(3); dim.style.opacity = (0.12 * w).toFixed(3);
-      var on = p < 0.25 ? 0 : p < 0.75 ? 1 : 2;
-      steps.forEach(function (el, j) { el.classList.toggle('on', j === on); });
-    };
-    var ticking = false;
-    window.addEventListener('scroll', function () { if (!ticking) { ticking = true; requestAnimationFrame(function () { ticking = false; paint(); }); } }, { passive: true });
-    window.addEventListener('resize', paint);
-    paint();
+  /* ------------------------------------------------------------- practicar */
+  var quiz = document.querySelector('#quiz .quiz');
+  if (quiz) {
+    var opts = [].slice.call(quiz.querySelectorAll('.quiz-opt'));
+    var mine = document.documentElement.lang === 'es' ? 'tu respuesta' : 'your answer';
+    opts.forEach(function (b) {
+      b.addEventListener('click', function () {
+        if (quiz.classList.contains('done')) return;
+        b.setAttribute('aria-pressed', 'true');
+        b.querySelector('.quiz-l').setAttribute('data-mine', mine);
+        quiz.classList.add('done');
+        quiz.querySelector('.quiz-cite').hidden = false;
+        if (window.umami) window.umami.track('Quiz', { right: b.dataset.ok === '1' });
+      });
+    });
+  }
+  var mem = document.querySelector('#quiz .mem');
+  if (mem) {
+    if ('IntersectionObserver' in window) {
+      var io = new IntersectionObserver(function (es) { if (es[0].isIntersecting) { mem.classList.add('in'); io.disconnect(); } }, { threshold: 0.4 });
+      io.observe(mem);
+    } else mem.classList.add('in');
   }
 })();

@@ -172,7 +172,7 @@ if (!window.matchMedia || !matchMedia('(prefers-reduced-motion: reduce)').matche
     }
 </style>
 <link rel="stylesheet" href="assets/landing/motion.css?v=20261030b">
-<link rel="stylesheet" href="assets/landing/map.css?v=20261030b">
+<link rel="stylesheet" href="assets/landing/map.css?v=20261101a">
 <link rel="preload" as="image" href="assets/landing/covers/ddia-2e.webp">
 <!-- Umami Analytics: solo carga en producción (servimos el tracker en /u/s.js); en localhost/tests, nada -->
 <script>
@@ -363,25 +363,37 @@ if (location.hostname === 'bookreader.raiatech.com') {
   </div>
 </section>
 
-<!-- Beat 5b · La luz de lectura (map.css / map.js): la misma página de Light a Sepia y a Dark con luz cálida -->
-<section class="beat night" id="night">
+<!-- Beat 5b · Practicar (map.css / map.js): una pregunta con opciones de verdad, cada opción explica su porqué, y lo que recuerdas de cada libro -->
+<section class="beat" id="quiz">
   <div class="wrap">
     <div class="beat-copy">
-      <h2>Read at night, too.</h2>
-      <p class="support">Three themes, paper tones, brightness and a <b>warm light</b> for late reading. The same page, the way your eyes want it.</p>
+      <p class="feature-name">Practice that explains</p>
+      <h2>Get it wrong. Find out why.</h2>
+      <p class="support">The agent writes questions from the chapter, with options that sound right. Pick one and <b>every option tells you why</b> it is or isn’t the answer, with the line from the book that settles it.</p>
     </div>
-    <div class="night-stage">
-      <div class="night-page" aria-hidden="true"><div class="page-ch">11:40 pm</div><p>It’s late, and the chapter is almost over. The page has gone dark and warm, so your eyes can stay for the last few paragraphs.</p><span class="night-warm"></span><span class="night-dim"></span></div>
-      <div class="night-steps" aria-hidden="true"><span>Light</span><span>Sepia</span><span>Dark + warm light</span></div>
-      <div class="night-static" role="img" aria-label="The same page in the Light, Sepia and Dark themes, the last one with warm light">
-        <div class="night-page" style="background:#fff;color:#1d1d1f"><div class="page-ch">Light</div><p>It’s late. One more chapter?</p></div>
-        <div class="night-page" style="background:#f7f1e3;color:#3f382e"><div class="page-ch">Sepia</div><p>It’s late. One more chapter?</p></div>
-        <div class="night-page" style="background:#121214;color:#f5f5f7"><div class="page-ch">Dark + warm light</div><p>It’s late. One more chapter?</p><span class="night-warm" style="opacity:.32"></span></div>
+    <div class="quiz-stage">
+      <div class="quiz" role="group" aria-label="Example question with options: tap one to see why">
+        <span class="face-tag">DDIA · Replication</span>
+        <p class="quiz-q">A user saves their profile, reloads the page and sees the old version. Which guarantee is missing?</p>
+        <ul class="quiz-opts">
+          <li><button type="button" class="quiz-opt" data-ok="1" aria-pressed="false"><span class="quiz-l">Read-after-write consistency</span><span class="quiz-why">Right. A user should always see what they just wrote. The reload hit a follower that hadn’t caught up yet. <q class="quiz-quote">In this situation, we need read-after-write consistency, also known as read-your-writes consistency.</q></span></button></li>
+          <li><button type="button" class="quiz-opt" data-ok="0" aria-pressed="false"><span class="quiz-l">Linearizability</span><span class="quiz-why">It would fix it, but it’s more than you need: the user has to see their own writes, not everyone’s at once.</span></button></li>
+          <li><button type="button" class="quiz-opt" data-ok="0" aria-pressed="false"><span class="quiz-l">Monotonic reads</span><span class="quiz-why">That stops time going backwards between two reads. Here the problem is not seeing your own write.</span></button></li>
+          <li><button type="button" class="quiz-opt" data-ok="0" aria-pressed="false"><span class="quiz-l">Eventual consistency</span><span class="quiz-why">That’s what you already have: the follower will catch up, just not before the reload.</span></button></li>
+        </ul>
+        <p class="quiz-foot"><span class="quiz-hint">Pick an answer</span><span class="src-chip quiz-cite" hidden><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 4.5h7a2 2 0 0 1 2 2V20a2.5 2.5 0 0 0-2.5-2H5V4.5Z"/><path d="M19 4.5h-3a2 2 0 0 0-2 2V20a2.5 2.5 0 0 1 2.5-2H19V4.5Z"/></svg> See it in the book · <span class="src-cite">Replication</span></span></p>
+      </div>
+      <div class="mem">
+        <p class="mem-h"><b>Your memory, measured</b><small>Example data</small></p>
+        <ul>
+          <li><span class="mem-t">Designing Data-Intensive Applications</span><span class="mem-bar"><i style="width:73%"></i></span><span class="mem-n">You remember ~38 of 52 cards</span></li>
+          <li><span class="mem-t">Database Internals</span><span class="mem-bar"><i style="width:40%"></i></span><span class="mem-n">You remember ~12 of 30 cards</span></li>
+        </ul>
+        <p class="mem-note">Then the review tells you how much of each book you still remember, and which cards are costing you.</p>
       </div>
     </div>
   </div>
 </section>
-
 <!-- Beat 6 · Los valores -->
 <section class="beat values">
   <div class="wrap">
@@ -456,7 +468,7 @@ if (location.hostname === 'bookreader.raiatech.com') {
         <li><button type="button" data-demo="export" aria-pressed="false">Export to <b>Anki &amp; Markdown</b></button></li>
       </ul>
       <svg class="bmap-lines" aria-hidden="true"></svg>
-      <figcaption>And the reader basics: <b>immersive mode</b>, in-book search, bookmarks, typography your way, <b>study mode</b> with streaks, remaining reading time and an honest analysis of what you really read.</figcaption>
+      <figcaption>And the reader basics: <b>immersive mode</b>, in-book search, bookmarks, typography your way, <b>night themes with warm light</b>, <b>study mode</b> with streaks, remaining reading time and an honest analysis of what you really read.</figcaption>
     </figure>
   </div>
 </section>
@@ -683,6 +695,6 @@ if (location.hostname === 'bookreader.raiatech.com') {
 }
 </script>
 <script src="assets/landing/motion.js?v=20261030b" defer></script>
-<script src="assets/landing/map.js?v=20261030b" defer></script>
+<script src="assets/landing/map.js?v=20261101a" defer></script>
 </body>
 </html>

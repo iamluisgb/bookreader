@@ -3,6 +3,20 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-11-01 — Landing: «Practicar» sustituye a «Read at night, too»
+
+Los temas y la luz cálida los trae cualquier lector, y la sección no contaba nada de la promesa
+(«lo que lees se queda contigo»). En su sitio, dos cosas que la web no enseñaba y que la
+competencia no tiene:
+
+- **Una pregunta con opciones de verdad** (P43 F4), interactiva: al elegir, cada opción enseña su
+  porqué, la correcta trae la frase del libro que lo zanja y sale el chip de la cita.
+- **«Tu memoria, medida»**: «Recuerdas ~k de n tarjetas» por libro (P44), con barras y la etiqueta
+  «Datos de ejemplo».
+- Los temas de noche con luz cálida pasan a la línea de «lo básico» del diagrama, en EN y ES.
+- `map.css`/`map.js` → `?v=20261101a`. Tests: `landing-map.spec.ts` (la pregunta explica las cuatro
+  opciones y enseña la cita; sin movimiento, las barras se ven llenas).
+
 ## 2026-10-30 (3) — Landing en el móvil: mazo que no giraba, hueco y caché
 
 Reportado por Luis desde el móvil (oscuro, ES): un hueco grande bajo la escena de preguntar y

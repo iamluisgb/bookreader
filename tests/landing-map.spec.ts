@@ -2,11 +2,11 @@ import { test, expect } from '@playwright/test';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 // Landing (plan savvia, 30-oct-2026): «Everything in the box» es un diagrama cuyas salidas
-// enseñan su mini-demo; la luz de lectura, sin movimiento, son tres páginas quietas; y el
+// enseñan su mini-demo; la pregunta con opciones explica cada opción; y el
 // manifiesto existe en los dos idiomas.
 const BASE = 'http://localhost:8899';
 
-test.describe('landing · diagrama, luz de lectura y manifiesto', () => {
+test.describe('landing · diagrama, práctica y manifiesto', () => {
   test.use({ locale: 'en-US' });
 
   test('cada salida del diagrama enseña su demo y solo la suya', async ({ page }) => {
@@ -26,12 +26,25 @@ test.describe('landing · diagrama, luz de lectura y manifiesto', () => {
     expect(errors).toEqual([]);
   });
 
-  test('sin movimiento, la luz de lectura son tres páginas quietas', async ({ page }) => {
-    await page.emulateMedia({ reducedMotion: 'reduce' });
+  test('la pregunta con opciones: al elegir una, todas explican su porqué y sale la cita', async ({ page }) => {
     await page.goto(BASE + '/');
-    await expect(page.locator('.night-static')).toBeVisible();
-    await expect(page.locator('.night-static .night-page')).toHaveCount(3);
-    await expect(page.locator('.night-stage > .night-page')).toBeHidden();
+    const quiz = page.locator('#quiz .quiz');
+    await quiz.scrollIntoViewIfNeeded();
+    await expect(quiz.locator('.quiz-why').first()).toBeHidden();
+    await expect(quiz.locator('.quiz-cite')).toBeHidden();
+    await quiz.locator('.quiz-opt[data-ok="0"]').first().click();
+    await expect(quiz).toHaveClass(/done/);
+    await expect(quiz.locator('.quiz-why:visible')).toHaveCount(4);
+    await expect(quiz.locator('.quiz-cite')).toBeVisible();
+    await expect(quiz.locator('.quiz-opt[aria-pressed="true"]')).toHaveCount(1);
+  });
+
+  test('sin movimiento, las barras de memoria se ven llenas', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.goto(BASE + '/es/?lang=es');
+    const w = await page.locator('#quiz .mem-bar i').first().evaluate((el) => el.getBoundingClientRect().width);
+    expect(w).toBeGreaterThan(20);
+    await expect(page.locator('#quiz .quiz-opt')).toHaveCount(4);
   });
 
   test('el manifiesto existe en inglés y en español, enlazado desde la portada', async ({ page }) => {

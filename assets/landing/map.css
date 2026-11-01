@@ -3,9 +3,9 @@
    · .bmap   — «Everything in the box» como diagrama: lo que entra → tu libro → lo que sale.
                Pulsar una salida enseña su mini-demo en la tarjeta del centro. Las líneas las
                dibuja map.js en el <svg>; en móvil se apila y las sustituye un trazo vertical.
-   · .night  — la luz de lectura: al bajar, la misma página pasa de Light a Sepia y a Dark con
-               luz cálida. Mismos colores que app/css/themes.css y el mismo overlay naranja en
-               multiply que #night-warm (app/css/main.css). Sin movimiento: tres páginas quietas.
+   · .quiz   — practicar (1-nov-2026, sustituye a la luz de lectura): una pregunta con opciones
+               como las de la app (P43 F4); al elegir, cada opción enseña su porqué y la cita.
+               Al lado, «Recuerdas ~k de n tarjetas» por libro (P44), con datos de ejemplo.
    · .faq    — las preguntas como conversación con el agente: la pregunta es tu globo, la
                respuesta lleva su cita, como en la app. Siguen siendo <details>.
    Rutas relativas siempre (tests/landing-paths.spec.ts).
@@ -58,25 +58,38 @@
   .bmap figcaption { margin-top: 0; }
 }
 
-/* ------------------------------------------------------------ luz de lectura */
-.night-stage { max-width: 760px; margin: clamp(40px, 6vh, 60px) auto 0; display: grid; gap: 16px; }
-.night-page { --day: 1; position: relative; overflow: hidden; border-radius: 16px; border: 1px solid var(--border);
-  box-shadow: var(--shadow-hero); padding: clamp(26px, 4vw, 40px) clamp(24px, 5vw, 52px); text-align: left;
-  font: 400 clamp(15px, 1.7vw, 17px)/1.8 var(--font-display); transition: background 0.2s linear, color 0.2s linear; }
-.night-page .page-ch { color: inherit; opacity: 0.6; }
-.night-page p { margin: 0; }
-.night-warm, .night-dim { position: absolute; inset: 0; pointer-events: none; }
-.night-warm { background: #ff8a2b; mix-blend-mode: multiply; opacity: 0; }
-.night-dim { background: #000; opacity: 0; }
-.night-steps { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; }
-.night-steps span { font: 600 12.5px var(--font-ui); color: var(--text-faint); border: 1px solid var(--border); border-radius: 999px; padding: 5px 12px; transition: all 0.2s ease; }
-.night-steps span.on { color: var(--text); border-color: var(--brand); box-shadow: 0 0 0 3px var(--accent-soft); }
-/* Sin JS o sin movimiento: las tres páginas a la vez, quietas, una al lado de otra. */
-.night-static { display: none; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
-.night-static .night-page { padding: 18px 18px; font-size: 13.5px; }
-html:not(.motion) .night-stage > .night-page, html:not(.motion) .night-steps { display: none; }
-html:not(.motion) .night-static { display: grid; }
-@media (max-width: 720px) { html:not(.motion) .night-static { grid-template-columns: 1fr; } }
+/* ---------------------------------------------------------------- practicar */
+.quiz-stage { max-width: 980px; margin: clamp(40px, 6vh, 60px) auto 0; display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+  gap: 20px; align-items: start; text-align: left; }
+.quiz, .mem { background: var(--surface-2); border: 1px solid var(--border); border-radius: 18px; box-shadow: var(--shadow-hero); padding: 22px 22px 20px; }
+.quiz-q { margin: 12px 0 16px; font: 600 clamp(16px, 1.6vw, 18px)/1.45 var(--font-ui); color: var(--text); }
+.quiz-opts, .mem ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.quiz-opt { width: 100%; display: grid; gap: 4px; text-align: left; cursor: pointer; padding: 11px 14px; border: 1px solid var(--border); border-radius: 12px;
+  background: var(--surface-0); color: var(--text); font: 600 14.5px/1.4 var(--font-ui); transition: border-color 0.15s ease, background 0.15s ease; }
+.quiz:not(.done) .quiz-opt:hover { border-color: var(--brand); }
+.quiz-quote { display: block; margin-top: 6px; font: italic 400 13.5px/1.5 var(--font-display); color: var(--text); quotes: "\201C" "\201D"; }
+.quiz-why { display: none; font: 400 13.5px/1.5 var(--font-ui); color: var(--text-soft); }
+.quiz.done .quiz-opt { cursor: default; }
+.quiz.done .quiz-why { display: block; }
+.quiz.done .quiz-opt[data-ok="1"] { border-color: var(--brand); background: var(--accent-soft); }
+.quiz.done .quiz-opt[aria-pressed="true"][data-ok="0"] { border-color: var(--text-faint); border-style: dashed; }
+.quiz-l::after { font: 600 11px var(--font-ui); margin-left: 8px; color: var(--text-faint); }
+.quiz.done .quiz-opt[data-ok="1"] .quiz-l::after { content: "\2713"; color: var(--accent); }
+.quiz.done .quiz-opt[aria-pressed="true"][data-ok="0"] .quiz-l::after { content: attr(data-mine); }
+.quiz-foot { margin: 14px 0 0; display: flex; min-height: 28px; align-items: center; }
+.quiz-hint { font: 400 13px var(--font-ui); color: var(--text-faint); }
+.quiz.done .quiz-hint, .quiz-cite[hidden] { display: none; }
+.mem-h { margin: 0 0 14px; display: flex; justify-content: space-between; align-items: baseline; gap: 10px; font: 600 14.5px var(--font-ui); }
+.mem-h small { font: 400 12px var(--font-ui); color: var(--text-faint); }
+.mem li { display: grid; gap: 5px; padding: 10px 0; border-top: 1px solid var(--border); }
+.mem-t { font: 600 13.5px/1.3 var(--font-ui); color: var(--text); }
+.mem-bar { height: 6px; border-radius: 999px; background: var(--surface-0); border: 1px solid var(--border); overflow: hidden; }
+.mem-bar i { display: block; height: 100%; background: var(--brand); border-radius: inherit; }
+html.motion .mem-bar i { transform-origin: left; transform: scaleX(0); transition: transform 0.9s cubic-bezier(.2,.7,.2,1); }
+html.motion .mem.in .mem-bar i { transform: none; }
+.mem-n { font: 400 12.5px var(--font-ui); color: var(--text-soft); }
+.mem-note { margin: 12px 0 0; font: 400 13.5px/1.5 var(--font-ui); color: var(--text-soft); }
+@media (max-width: 760px) { .quiz-stage { grid-template-columns: 1fr; } }
 
 /* ---------------------------------------------------- preguntas como conversación */
 .faq { max-width: 760px; margin: clamp(48px, 7vh, 72px) auto 0; text-align: left; display: grid; gap: 14px; }
