@@ -118,6 +118,7 @@ export async function connect() {
   }
   Storage.set(REFRESH_KEY, data.refresh_token);
   storeAccessToken(data);
+  window.brTrack?.('Drive sync on');
   return true;
 }
 

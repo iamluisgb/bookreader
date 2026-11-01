@@ -442,9 +442,21 @@ function retractAttempt(d) {
 // la sesión cierre lo suyo (p. ej. el modal de flashcards) antes de mostrar el libro.
 // `gate`: retener las nuevas de capítulos sin leer (chapter-gate.js). Lo pide el repaso de hoy;
 // abrir un mazo a mano desde Flashcards no filtra: lo has pedido tú, aunque sea del capítulo que lees.
+// Embudo (analytics.js): ¿vuelve a repasar las semanas después de su primer mazo? Semana 0 es
+// la del primer mazo; 4 agrupa el resto. Sin primer mazo en este dispositivo, «?».
+function trackReview() {
+  let week = '?';
+  try {
+    const first = Number(localStorage.getItem('bookreader_track_first_deck'));
+    if (first > 0) week = String(Math.min(4, Math.floor((Date.now() - first) / (7 * 864e5))));
+  } catch { /* sin storage */ }
+  window.brTrack?.('Review session', { week });
+}
+
 export function open({ decks, title = t('Estudiar'), onClose, onNavigate, gate = false } = {}) {
   close();
   FsrsParams.applyStored();   // parámetros personales (P44 F4), por si llegaron por sync
+  trackReview();
   onCloseCb = onClose || null;
   onNavigateCb = onNavigate || null;
   const built = buildQueue(decks, { now: Date.now(), newLimit: newLimit(), locked: gate ? lastLocker : undefined });

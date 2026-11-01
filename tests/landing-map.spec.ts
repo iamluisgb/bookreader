@@ -57,14 +57,15 @@ test.describe('landing · diagrama, práctica y manifiesto', () => {
     const form = page.locator('#plus-form');
     await form.scrollIntoViewIfNeeded();
     await form.locator('input[type="email"]').fill('nope');
-    await form.locator('button').click();
+    await form.locator('button[type="submit"]').click();
     await expect(form.locator('.plus-msg')).toHaveText('Ese email no parece correcto.');
     expect(sent).toBeNull();
     await form.locator('input[type="email"]').fill('ana@example.com');
-    await form.locator('button').click();
+    await form.locator('.plus-want label', { hasText: 'Sync' }).click();
+    await form.locator('button[type="submit"]').click();
     await expect(form).toHaveClass(/done/);
     await expect(form.locator('.plus-msg')).toContainText('Hecho');
-    expect(sent).toEqual({ email: 'ana@example.com', lang: 'es', website: '' });
+    expect(sent).toEqual({ email: 'ana@example.com', lang: 'es', want: 'sync', website: '' });
   });
 
   test('Plus: si el worker falla, el formulario lo dice y deja reintentar', async ({ page }) => {
@@ -72,9 +73,40 @@ test.describe('landing · diagrama, práctica y manifiesto', () => {
     await page.goto(BASE + '/');
     const form = page.locator('#plus-form');
     await form.locator('input[type="email"]').fill('ana@example.com');
-    await form.locator('button').click();
+    await form.locator('button[type="submit"]').click();
     await expect(form.locator('.plus-msg')).toHaveText('Couldn’t save it. Try again in a minute.');
-    await expect(form.locator('button')).toBeEnabled();
+    await expect(form.locator('button[type="submit"]')).toBeEnabled();
+  });
+
+  test('la portada dice qué es, que el agente va sin clave, y tiene CTA a mitad, SEO y 404', async ({ page, request }) => {
+    for (const [path, sub, note] of [
+      ['/?lang=en', 'An EPUB and PDF reader with an AI agent', 'The AI agent works without a key.'],
+      ['/es/?lang=es', 'Un lector de EPUB y PDF con un agente de IA', 'El agente funciona sin clave.'],
+    ]) {
+      await page.goto(BASE + path);
+      await expect(page.locator('.hero-sub')).toContainText(sub);
+      await expect(page.locator('.hero .cta-note')).toHaveText(new RegExp(note.replace('.', '\\.')));
+      await expect(page.locator('a[data-umami-event-where="practice"]')).toHaveCount(1);
+      await expect(page.locator('meta[name="twitter:card"]')).toHaveAttribute('content', 'summary_large_image');
+      const og = await page.locator('meta[property="og:image"]').getAttribute('content');
+      expect(og).toMatch(/\/assets\/landing\/og-(en|es)\.png$/);
+      const ld = JSON.parse(await page.locator('script[type="application/ld+json"]').textContent() || '{}');
+      expect(ld['@type']).toBe('SoftwareApplication');
+      expect(ld.offers.price).toBe('0');
+      // Nada de «sin servidor» ni BYOK a la vista: la demo existe y el gateway es un servidor.
+      const body = await page.locator('body').innerText();
+      expect(body).not.toMatch(/No server|Sin servidor|BYOK/);
+      // El mapa va antes que la privacidad y Plus después: el orden de la historia.
+      const order = await page.locator('[data-beat]').evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset.beat));
+      expect(order).toEqual(['problem', 'agent', 'cards', 'quiz', 'box', 'privacy', 'plus', 'faq', 'close']);
+    }
+    for (const f of ['og-en.png', 'og-es.png']) expect((await request.get(BASE + '/assets/landing/' + f)).ok()).toBe(true);
+    const robots = readFileSync(join(__dirname, '..', 'robots.txt'), 'utf8');
+    expect(robots).toContain('Sitemap: https://bookreader.raiatech.com/sitemap.xml');
+    const sitemap = readFileSync(join(__dirname, '..', 'sitemap.xml'), 'utf8');
+    for (const u of ['/', '/es/', '/why/', '/es/por-que/', '/privacy/']) expect(sitemap).toContain(`<loc>https://bookreader.raiatech.com${u}</loc>`);
+    const build = readFileSync(join(__dirname, '..', 'scripts', 'build-pages.mjs'), 'utf8');
+    for (const f of ['404.html', 'robots.txt', 'sitemap.xml']) expect(build).toContain(`'${f}'`);
   });
 
   test('el manifiesto existe en inglés y en español, enlazado desde la portada', async ({ page }) => {

@@ -1252,6 +1252,7 @@ async function send() {
   if (!q && !pendingImages.length) return;
   if (!convo) { setStatus('Elige un objetivo de lectura primero.'); openOnboarding(); return; }
   if (!(await needKey())) return;
+  window.brTrackOnce?.('first_msg', 'Agent first message', { source: LLM.isDemo() ? 'demo' : 'byok' });
 
   // VISIÓN · si hay una captura de página adjunta (botón "Ver"), este turno va con imagen al
   // modelo de visión, con el texto del usuario como petición.

@@ -313,8 +313,9 @@
   }
 
   renderHero(0);
-  // Arranca cuando el libro está a la vista (al cargar, casi siempre).
-  onView(stage, 0.35, function (vis) {
+  // Arranca cuando el libro está a la vista (al cargar, casi siempre). Con el subtítulo del hero, en
+  // una pantalla de 1280×720 el libro asoma un 34 %: con 0,2 se abre igual sin tener que bajar.
+  onView(stage, 0.2, function (vis) {
     if (!vis || started) return;
     started = true;
     // Si en ese rato ya se eligió otro libro, su cambio manda: no se pisa su animación.

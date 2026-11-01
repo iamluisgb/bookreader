@@ -387,6 +387,10 @@ export function getAllDecks() {
 
 export function addDeck(deck) {
   const now = Date.now();
+  // Embudo (analytics.js): el primer mazo fija la fecha desde la que se cuentan las semanas
+  // del repaso; cada mazo nuevo cuenta.
+  window.brTrackOnce?.('first_deck', 'First deck');
+  window.brTrack?.('Deck created');
   const cards = (deck.cards || []).map(c => ({ uid: crypto.randomUUID(), updatedAt: now, ...c }));
   const exercises = (deck.exercises || []).map(e => ({ uid: crypto.randomUUID(), updatedAt: now, ...e }));
   return put('decks', { uid: crypto.randomUUID(), ...deck, cards, exercises, createdAt: now, updatedAt: now });

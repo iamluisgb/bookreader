@@ -42,3 +42,18 @@ test('con el tope por IP agotado contesta 429', async () => {
   assert.equal((await join(e, { email: 'c@d.com' }, ORIGIN, '9.9.9.9')).status, 429);
   assert.equal((await join(e, { email: 'c@d.com' }, ORIGIN, '1.1.1.1')).status, 200);
 });
+
+test('guarda qué quiere más (o nada) y /api/waitlist es la misma ruta, la del propio dominio', async () => {
+  const e = env();
+  assert.equal((await join(e, { email: 'a@x.com', want: 'claude' })).status, 200);
+  assert.equal((await join(e, { email: 'b@x.com', want: 'otra-cosa' })).status, 200);
+  const r = await worker.fetch(new Request('https://bookreader.raiatech.com/api/waitlist', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'CF-Connecting-IP': '1.2.3.4', Origin: ORIGIN },
+    body: JSON.stringify({ email: 'c@x.com', want: 'sync' }),
+  }), e);
+  assert.equal(r.status, 200);
+  const got = e.DB._raw.prepare('SELECT email, want FROM waitlist ORDER BY email').all().map((x) => ({ ...x }));
+  assert.deepEqual(got, [{ email: 'a@x.com', want: 'claude' }, { email: 'b@x.com', want: null }, { email: 'c@x.com', want: 'sync' }]);
+  assert.deepEqual((await usage(e)).waitlistWants, { claude: 1, none: 1, sync: 1 });
+});

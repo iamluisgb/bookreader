@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /app/
+Disallow: /s/
+
+Sitemap: https://bookreader.raiatech.com/sitemap.xml

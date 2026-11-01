@@ -146,3 +146,31 @@ html.motion .mem.in .mem-bar i { transform: none; }
 .maker img { width: 52px; height: 52px; border-radius: 50%; border: 1px solid var(--border); flex: none; }
 .maker p { margin: 0; font: 400 14.5px/1.5 var(--font-ui); color: var(--text-soft); }
 .maker b { color: var(--text); font-weight: 600; }
+
+/* ---------------------------------------------------- hero: qué es, en una frase */
+.hero-sub { margin-top: 18px; }
+
+/* ------------------------------------- posicionamiento, CTA a mitad y hechos verificables */
+.pos { max-width: 760px; margin: clamp(48px, 7vh, 72px) auto 0; text-align: center; }
+.pos-line { font: 400 clamp(17px, 1.6vw, 19px)/1.55 var(--font-ui); color: var(--text-soft); max-width: 56ch; margin: 0 auto; }
+.pos-line b { color: var(--text); font-weight: 600; }
+.pos .cta-row { margin-top: 24px; }
+.proof { list-style: none; margin: 28px auto 0; padding: 0; display: flex; flex-wrap: wrap; justify-content: center; align-items: center;
+  gap: 10px 22px; font: 400 13.5px var(--font-ui); color: var(--text-faint); }
+.proof li { display: block; }
+.proof .proof-maker { display: inline-flex; align-items: center; gap: 8px; }
+.proof b { color: var(--text-soft); font-weight: 600; }
+.proof a { color: var(--text-soft); text-decoration: underline; text-underline-offset: 3px; }
+.proof img { width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--border); }
+.proof [hidden] { display: none; }
+
+/* ---------------------------------------------------- lista de espera: qué quieren más */
+.plus-want { flex-basis: 100%; border: 0; margin: 2px 0 2px; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.plus-want legend { float: left; margin-right: 6px; font: 500 13px var(--font-ui); color: var(--text-faint); }
+.plus-want label { cursor: pointer; padding: 5px 12px; border: 1px solid var(--border); border-radius: 999px;
+  font: 500 13px var(--font-ui); color: var(--text-soft); transition: border-color 0.15s ease, background 0.15s ease; }
+.plus-want label:hover { border-color: var(--brand); }
+.plus-want input { position: absolute; opacity: 0; pointer-events: none; }
+.plus-want label:has(input:checked) { background: var(--accent-soft); border-color: transparent; color: var(--text); }
+.plus-want label:has(input:focus-visible) { outline: 2px solid var(--brand); outline-offset: 2px; }
+.plus-form.done .plus-want { display: none; }

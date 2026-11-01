@@ -18,14 +18,20 @@
 // clase (o sin JS) cada escena se pinta en su estado final, quieta.
 if (!window.matchMedia || !matchMedia('(prefers-reduced-motion: reduce)').matches) document.documentElement.classList.add('motion');
 </script>
-<title>BookReader — Lo que lees se queda contigo</title>
+<title>BookReader: lector EPUB y PDF con IA y tarjetas de repaso</title>
 <meta name="description" content="El lector EPUB y PDF con un agente que te explica lo que no entiendes, te enseña la página para que lo compruebes y convierte lo importante en repaso para que no se te olvide. Todo en tu navegador.">
 <meta property="og:type" content="website">
-<meta property="og:title" content="BookReader — Lo que lees, por fin, se queda contigo">
+<meta property="og:title" content="BookReader: lector EPUB y PDF con IA y tarjetas de repaso">
 <meta property="og:description" content="Pregunta lo que no entiendes y te lo explica hasta que hace clic. No se inventa nada: cada respuesta sale del libro y puedes comprobarla. Y lo importante vuelve a ti antes de que lo olvides.">
 <meta property="og:url" content="https://bookreader.raiatech.com/es/">
-<meta property="og:image" content="https://bookreader.raiatech.com/app/icons/icon-512.png">
+<meta property="og:image" content="https://bookreader.raiatech.com/assets/landing/og-es.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:locale" content="es_ES">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://bookreader.raiatech.com/assets/landing/og-es.png">
 <meta name="theme-color" content="#22c55e">
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "SoftwareApplication", "name": "BookReader", "url": "https://bookreader.raiatech.com/es/", "applicationCategory": "EducationalApplication", "operatingSystem": "Web browser", "inLanguage": "es", "description": "Lector de EPUB y PDF con un agente de IA que explica pasajes con citas y los convierte en tarjetas de repaso espaciado. Funciona en el navegador, sin cuenta.", "offers": {"@type": "Offer", "price": "0", "priceCurrency": "EUR"}, "author": {"@type": "Person", "name": "Luis González", "url": "https://luisgonzalezbernal.com/"}}</script>
 <link rel="canonical" href="https://bookreader.raiatech.com/es/">
 <link rel="alternate" hreflang="es" href="https://bookreader.raiatech.com/es/">
 <link rel="alternate" hreflang="en" href="https://bookreader.raiatech.com/">
@@ -166,7 +172,7 @@ if (!window.matchMedia || !matchMedia('(prefers-reduced-motion: reduce)').matche
     }
 </style>
 <link rel="stylesheet" href="../assets/landing/motion.css?v=20261030b">
-<link rel="stylesheet" href="../assets/landing/map.css?v=20261101b">
+<link rel="stylesheet" href="../assets/landing/map.css?v=20261101c">
 <link rel="preload" as="image" href="../assets/landing/covers/ddia-2e.webp">
 <!-- Umami Analytics: solo carga en producción (servimos el tracker en /u/s.js); en localhost/tests, nada -->
 <script>
@@ -188,7 +194,7 @@ if (location.hostname === 'bookreader.raiatech.com') {
       BookReader
     </span>
     <span style="display:flex;align-items:center;gap:18px">
-      <a class="nav-lang" href="../?lang=en" style="font:600 13.5px var(--font-ui);color:var(--text-soft)">English</a>
+      <a class="nav-lang" data-umami-event="Language" data-umami-event-to="en" href="../?lang=en" style="font:600 13.5px var(--font-ui);color:var(--text-soft)">English</a>
       <a class="nav-cta" data-umami-event="Open app" data-umami-event-where="nav" href="../app/">Abrir la app</a>
     </span>
   </div>
@@ -201,12 +207,13 @@ if (location.hostname === 'bookreader.raiatech.com') {
       <div class="beat-copy">
         <p class="product-name">BookReader</p>
         <h1>Lo que lees, por fin, se queda contigo.</h1>
+        <p class="support hero-sub">Un lector de EPUB y PDF con un agente de IA que te explica cualquier pasaje, te cita la página de donde sale y convierte lo importante en tarjetas que repasas antes de olvidarlas.</p>
         <div class="cta-row">
           <a class="btn-primary" href="../app/" data-umami-event="Open app" data-umami-event-where="hero">Abrir BookReader
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg>
           </a>
         </div>
-        <p class="cta-note">Gratis. Sin cuenta. En tu navegador.</p>
+        <p class="cta-note">Gratis. Sin cuenta. El agente funciona sin clave.</p>
       </div>
       <div class="picker" role="group" aria-label="Elige un libro para la demo">
         <span class="picker-label">Pruébalo con</span>
@@ -250,7 +257,7 @@ if (location.hostname === 'bookreader.raiatech.com') {
 </header>
 
 <!-- Beat 2 · La empatía -->
-<section class="beat alt">
+<section class="beat alt" data-beat="problem">
   <div class="wrap">
     <div class="beat-copy">
       <h2>Todos nos hemos quedado mirando un párrafo.</h2>
@@ -263,9 +270,10 @@ if (location.hostname === 'bookreader.raiatech.com') {
 </section>
 
 <!-- Beat 3 · La magia -->
-<section class="beat">
+<section class="beat" data-beat="agent">
   <div class="wrap">
     <div class="beat-copy">
+      <p class="feature-name">Agente de lectura con IA · EPUB y PDF</p>
       <h2>Ahora la página responde.</h2>
       <p class="support">Pregunta lo que no entiendes, como lo preguntarías tú. El agente se sabe el libro entero y tu objetivo, y te lo explica <b>a tu nivel</b>. No se inventa nada: cada respuesta cita la página, y un toque te lleva a la frase que lo dice.</p>
     </div>
@@ -292,11 +300,11 @@ if (location.hostname === 'bookreader.raiatech.com') {
 </section>
 
 <!-- Beat 5 · La memoria -->
-<section class="beat alt">
+<section class="beat alt" data-beat="cards">
   <div class="wrap">
     <div class="beat-copy">
-      <p class="feature-name">Repaso citado</p>
-      <h2>Leer es la mitad.</h2>
+      <p class="feature-name">Tarjetas con repaso espaciado</p>
+      <h2>No lo releas. Repásalo.</h2>
       <p class="support">Lo importante se convierte en tarjetas. Vuelven a ti justo antes de que lo olvides. Y cada una recuerda de qué página salió — por si quieres releerla.</p>
     </div>
     <div class="beat-visual">
@@ -358,7 +366,7 @@ if (location.hostname === 'bookreader.raiatech.com') {
 </section>
 
 <!-- Beat 5b · Practicar (map.css / map.js): una pregunta con opciones de verdad, cada opción explica su porqué, y lo que recuerdas de cada libro -->
-<section class="beat" id="quiz">
+<section class="beat" id="quiz" data-beat="quiz">
   <div class="wrap">
     <div class="beat-copy">
       <p class="feature-name">Práctica que explica</p>
@@ -386,33 +394,16 @@ if (location.hostname === 'bookreader.raiatech.com') {
         <p class="mem-note">Después, el repaso te dice cuánto recuerdas de cada libro y qué tarjetas te están costando.</p>
       </div>
     </div>
-  </div>
-</section>
-<!-- Beat 6 · Los valores -->
-<section class="beat values">
-  <div class="wrap">
-    <div class="beat-copy">
-      <h2>Tus libros son tuyos. Tus preguntas, también.</h2>
-      <p class="support">Sin cuenta. Sin servidor. Sin nadie en medio. Todo vive en tu dispositivo, y te lo puedes llevar cuando quieras.</p>
-      <p class="support values-more">Instalable, así que leer, subrayar y repasar funciona sin conexión. Sincroniza con <b>tu propio Google Drive</b>. Un backup completo cuando quieras.</p>
-      <p class="seal">Privacidad. <span>Así es BookReader.</span></p>
-      <p class="values-why"><a href="../privacy/">La privacidad, en detalle</a> · <a href="por-que/" data-umami-event="Why">Por qué está hecho así</a></p>
-    </div>
-    <div class="strata-stage" role="img" aria-label="Todo se queda en capas dentro de tu dispositivo: tus libros, subrayados y notas, tarjetas y progreso, y tu clave de IA">
-      <div class="strata" id="strata" aria-hidden="true">
-          <div class="stratum base" style="--i:0"><b>Tu dispositivo</b><small>Sin cuenta</small></div>
-          <div class="stratum" style="--i:1"><span class="bars"><i></i><i></i><i></i><i></i></span><b>Tus libros</b><small>EPUB y PDF</small></div>
-          <div class="stratum" style="--i:2"><span class="bars"><i></i><i></i><i></i></span><b>Subrayados y notas</b><small>y tus preguntas</small></div>
-          <div class="stratum" style="--i:3"><span class="bars"><i></i><i></i></span><b>Tarjetas y progreso</b><small>repaso espaciado</small></div>
-          <div class="stratum key" style="--i:4"><b>Tu clave de IA</b><small>BYOK</small></div>
-      </div>
+    <div class="pos">
+      <p class="pos-line">Otras herramientas o leen tu libro o te hacen repasar. <b>BookReader hace las dos cosas</b>, en el navegador, sin cuenta, y exporta a Anki.</p>
+      <div class="cta-row"><a class="btn-primary" href="../app/" data-umami-event="Open app" data-umami-event-where="practice">Haz tarjetas con tu libro <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg></a></div>
+      <ul class="proof"><li class="proof-maker"><img src="../assets/landing/luis.webp" alt="" width="28" height="28" loading="lazy" decoding="async"><span>Lo hace <b>Luis González</b>, en España</span></li><li><a href="https://github.com/iamluisgb/bookreader" data-umami-event="GitHub">Código público en GitHub</a></li><li>Repaso con <b>FSRS</b>, el algoritmo que también usa Anki</li><li><span class="proof-upd" hidden>Actualizado el <time></time></span></li></ul>
     </div>
   </div>
 </section>
-
 <!-- Qué trae la caja: un diagrama (map.css / map.js). Regla de P30 · F5: una feature entra aquí
      y también en ../index.html (y en la guía in-app) o en ninguna. -->
-<section class="beat alt">
+<section class="beat alt" data-beat="box">
   <div class="wrap">
     <div class="beat-copy">
       <h2>Todo lo que trae.</h2>
@@ -434,7 +425,7 @@ if (location.hostname === 'bookreader.raiatech.com') {
           <div class="bubble a">Un quórum solo garantiza que lectura y escritura se crucen si las escrituras caen en los nodos de siempre. Con un quórum laxo puede que no, y la lectura se pierde el valor nuevo.</div>
         </div>
         <div class="bmap-demo" data-demo="zone" hidden>
-          <span class="bmap-tag">Zona · PDF</span>
+          <span class="bmap-tag">Rodea una figura · PDF</span>
           <svg class="fig" viewBox="0 0 300 92" aria-hidden="true"><rect x="22" y="30" width="62" height="34" rx="5" fill="none" stroke="#8a7f68"/><rect x="120" y="14" width="62" height="28" rx="5" fill="none" stroke="#8a7f68"/><rect x="120" y="54" width="62" height="28" rx="5" fill="none" stroke="#8a7f68"/><path d="M84 47 L120 28 M84 47 L120 68" stroke="#8a7f68"/><text x="53" y="51" font-size="10" text-anchor="middle" fill="#5f5244">leader</text><text x="151" y="32" font-size="10" text-anchor="middle" fill="#5f5244">follower 1</text><text x="151" y="72" font-size="10" text-anchor="middle" fill="#5f5244">follower 2</text><ellipse cx="151" cy="68" rx="46" ry="21" fill="none" stroke="#22c55e" stroke-width="2" stroke-dasharray="5 4"/></svg>
           <div class="bubble a">Has rodeado el follower 2: va por detrás del líder, así que una lectura ahí aún puede devolver el valor viejo. Es el retraso de replicación.</div>
         </div>
@@ -456,7 +447,7 @@ if (location.hostname === 'bookreader.raiatech.com') {
       </div>
       <ul class="bmap-col bmap-out" aria-label="Lo que te devuelve">
         <li><button type="button" data-demo="explain" aria-pressed="true"><b>Explícame</b> cualquier pasaje</button></li>
-        <li><button type="button" data-demo="zone" aria-pressed="false"><b>Zona</b>: rodea una figura (PDF)</button></li>
+        <li><button type="button" data-demo="zone" aria-pressed="false"><b>Rodea una figura</b> y pregunta (PDF)</button></li>
         <li><button type="button" data-demo="feynman" aria-pressed="false"><b>Modo Feynman</b>: tú lo explicas</button></li>
         <li><button type="button" data-demo="recall" aria-pressed="false">Una pregunta al <b>terminar cada capítulo</b></button></li>
         <li><button type="button" data-demo="export" aria-pressed="false">Exporta a <b>Anki y Markdown</b></button></li>
@@ -467,8 +458,30 @@ if (location.hostname === 'bookreader.raiatech.com') {
   </div>
 </section>
 
-<!-- Plus · próximamente (ADR-061): el MCP es el titular. Lista de espera → bookreader-sync /v1/waitlist (map.js). -->
-<section class="beat" id="plus">
+<!-- Beat 6 · Los valores -->
+<section class="beat values" data-beat="privacy">
+  <div class="wrap">
+    <div class="beat-copy">
+      <h2>Tus libros son tuyos. Tus preguntas, también.</h2>
+      <p class="support">Sin cuenta. Tus libros, notas y tarjetas viven en tu dispositivo, no en un servidor nuestro. A la IA solo le llega el texto de cada pregunta. Y te lo puedes llevar todo cuando quieras.</p>
+      <p class="support values-more">Instalable, así que leer, subrayar y repasar funciona sin conexión. Sincroniza con <b>tu propio Google Drive</b>. Un backup completo cuando quieras.</p>
+      <p class="seal">Privado por diseño. <span>Así es BookReader.</span></p>
+      <p class="values-why"><a href="../privacy/">La privacidad, en detalle</a> · <a href="por-que/" data-umami-event="Why">Por qué está hecho así</a></p>
+    </div>
+    <div class="strata-stage" role="img" aria-label="Todo se queda en capas dentro de tu dispositivo: tus libros, subrayados y notas, tarjetas y progreso, y la IA que elijas">
+      <div class="strata" id="strata" aria-hidden="true">
+          <div class="stratum base" style="--i:0"><b>Tu dispositivo</b><small>Sin cuenta</small></div>
+          <div class="stratum" style="--i:1"><span class="bars"><i></i><i></i><i></i><i></i></span><b>Tus libros</b><small>EPUB y PDF</small></div>
+          <div class="stratum" style="--i:2"><span class="bars"><i></i><i></i><i></i></span><b>Subrayados y notas</b><small>y tus preguntas</small></div>
+          <div class="stratum" style="--i:3"><span class="bars"><i></i><i></i></span><b>Tarjetas y progreso</b><small>repaso espaciado</small></div>
+          <div class="stratum key" style="--i:4"><b>Tu IA</b><small>demo gratis o tu clave</small></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Plus · próximamente (ADR-061): el MCP es el titular. Lista de espera → bookreader-sync, en /api/waitlist del propio dominio (map.js). -->
+<section class="beat" id="plus" data-beat="plus">
   <div class="wrap">
     <div class="beat-copy">
       <p class="feature-name">BookReader Plus · Muy pronto</p>
@@ -495,6 +508,7 @@ if (location.hostname === 'bookreader.raiatech.com') {
           <label class="sr-only" for="plus-email">Tu email</label>
           <input id="plus-email" name="email" type="email" autocomplete="email" required placeholder="tu@ejemplo.com">
           <input class="plus-trap" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
+          <fieldset class="plus-want"><legend>¿Qué te interesa más? (opcional)</legend><label><input type="radio" name="want" value="claude">Claude</label><label><input type="radio" name="want" value="sync">Sync</label><label><input type="radio" name="want" value="ai">IA incluida</label></fieldset>
           <button type="submit" class="btn-primary">Avísame</button>
           <p class="plus-msg" role="status" aria-live="polite"></p>
         </form>
@@ -504,7 +518,7 @@ if (location.hostname === 'bookreader.raiatech.com') {
   </div>
 </section>
 <!-- Preguntas: la conversación con el agente (map.css). Texto fijo: no llama a ningún modelo. -->
-<section class="beat alt">
+<section class="beat alt" data-beat="faq">
   <div class="wrap">
     <div class="beat-copy">
       <h2>Pregúntale antes de abrirlo.</h2>
@@ -513,11 +527,11 @@ if (location.hostname === 'bookreader.raiatech.com') {
       <div class="faq-head"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.5l1.5 4.2 4.2 1.5-4.2 1.5L12 14.9l-1.5-4.2L6.3 9.2l4.2-1.5L12 3.5Z"/><path d="M18.5 14l.7 1.9 1.9.7-1.9.7-.7 1.9-.7-1.9-1.9-.7 1.9-.7.7-1.9Z"/></svg> Agente · responde a partir de lo que es BookReader</div>
       <details open>
         <summary>¿Cuánto cuesta?</summary>
-        <p class="ans">Todo es gratis: el lector, el agente, las tarjetas, el repaso y los mapas. El agente funciona con tu propia clave de IA (BYOK): pagas a tu proveedor solo lo que uses, sin intermediarios ni suscripción.</p>
+        <p class="ans">Todo lo de esta página es gratis: el lector, el agente, las tarjetas, el repaso y los mapas. El agente funciona desde el primer minuto con una demo gratis, sin clave. Si lo usas mucho, pones tu propia clave de IA y pagas a tu proveedor directamente, sin suscripción. El único plan de pago será Plus (8 € al mes, muy pronto).</p>
       </details>
       <details>
         <summary>¿Qué formatos lee?</summary>
-        <p class="ans">EPUB y PDF. El agente lee ambos igual de bien: mismo chat, mismas citas, mismas flashcards.</p>
+        <p class="ans">EPUB y PDF. El agente lee ambos igual de bien: mismo chat, mismas citas, mismas tarjetas.</p>
       </details>
       <details>
         <summary>¿Puedo preguntar en otro idioma que el libro?</summary>
@@ -525,7 +539,27 @@ if (location.hostname === 'bookreader.raiatech.com') {
       </details>
       <details>
         <summary>¿Qué IA puedo usar?</summary>
-        <p class="ans">Cualquier proveedor con API OpenAI-compatible: configuras la URL, tu clave y el modelo que quieras. Sin el agente, BookReader sigue siendo un lector completo.</p>
+        <p class="ans">De entrada, una demo gratis. Después, cualquier proveedor con API compatible con OpenAI: configuras la URL, tu clave y el modelo que quieras. Sin el agente, BookReader sigue siendo un lector completo.</p>
+      </details>
+      <details>
+        <summary>¿Puedo abrir mis libros de Kindle?</summary>
+        <p class="ans">Solo EPUB y PDF sin DRM. Los libros comprados en Kindle están atados a las apps de Amazon. Muchas editoriales técnicas venden sus libros en EPUB y PDF sin DRM.</p>
+      </details>
+      <details>
+        <summary>¿Mis libros se suben a algún sitio?</summary>
+        <p class="ans">No. Se quedan en el almacenamiento de tu navegador. Si activas el sync, van a tu propio Google Drive. El agente solo le manda a la IA el texto que necesita para cada respuesta.</p>
+      </details>
+      <details>
+        <summary>¿Funciona en iPhone?</summary>
+        <p class="ans">Sí. Funciona en Safari. Añádelo a la pantalla de inicio para usarlo como una app y leer sin conexión.</p>
+      </details>
+      <details>
+        <summary>¿Y si BookReader cierra?</summary>
+        <p class="ans">Todo está en tu dispositivo y sigue funcionando sin conexión. Puedes exportar un backup completo, tus tarjetas a Anki y tus notas a Markdown cuando quieras. Y el código es público en GitHub.</p>
+      </details>
+      <details>
+        <summary>¿Por qué no NotebookLM o Anki?</summary>
+        <p class="ans">NotebookLM responde sobre tus documentos, pero no es donde lees ni te dice qué repasar. Anki programa el repaso, pero cada tarjeta la escribes tú. BookReader es el lector, el agente y el repaso en un mismo sitio, y tus tarjetas se exportan a Anki.</p>
       </details>
       <div class="maker">
         <img src="../assets/landing/luis.webp" alt="Luis González" width="52" height="52" loading="lazy" decoding="async">
@@ -536,7 +570,7 @@ if (location.hostname === 'bookreader.raiatech.com') {
 </section>
 
 <!-- Beat 7 · El cierre -->
-<section class="beat">
+<section class="beat" data-beat="close">
   <div class="wrap">
     <div class="beat-copy">
       <div class="shelf" id="shelf" aria-hidden="true"><span class="spine" style="--h:96px;--c:#cfd5dc"></span><span class="spine" style="--h:118px;--c:#9aa7b4"></span><span class="spine mine" id="spine-mine" style="--c:#f4f3ef;--ci:#111418">DDIA · 2nd ed.</span><span class="spine" style="--h:104px;--c:#e3d9c6"></span><span class="spine" style="--h:128px;--c:#5d6b78"></span></div>
@@ -557,7 +591,7 @@ if (location.hostname === 'bookreader.raiatech.com') {
       <svg width="19" height="19" viewBox="0 0 512 512" aria-hidden="true" focusable="false"><rect width="512" height="512" rx="118" fill="#111418"/><path d="M288 119 Q288 99 308 99 L396 99 Q416 99 416 119 L416 371 L352 323 L288 371 Z" fill="#22c55e"/><path d="M98 90 L222 90 Q256 90 256 124 L256 470 C 249 442 233 424 206 414 C 177 403 140 401 100 401 Q64 401 64 365 L64 124 Q64 90 98 90 Z" fill="#f8fafc"/></svg>
       BookReader
     </span>
-    <span>Lector EPUB · PDF con agente de lectura — local-first, BYOK · © 2026 Luis González · <a href="por-que/">Por qué BookReader</a> · <a href="../?lang=en">English</a></span>
+    <span>Lector EPUB y PDF con agente de IA y tarjetas · © 2026 Luis González · <a href="por-que/">Por qué BookReader</a> · <a href="../?lang=en">English</a></span>
   </div>
 </footer>
 
@@ -724,7 +758,7 @@ if (location.hostname === 'bookreader.raiatech.com') {
  }
 }
 </script>
-<script src="../assets/landing/motion.js?v=20261030b" defer></script>
-<script src="../assets/landing/map.js?v=20261101b" defer></script>
+<script src="../assets/landing/motion.js?v=20261101c" defer></script>
+<script src="../assets/landing/map.js?v=20261101c" defer></script>
 </body>
 </html>

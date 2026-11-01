@@ -503,6 +503,8 @@ function readQuota(res) {
   const remaining = Number(res.headers?.get?.('X-Quota-Remaining'));
   const total = Number(res.headers?.get?.('X-Quota-Total'));
   if (!Number.isFinite(remaining) || !Number.isFinite(total) || total <= 0) return;
+  const before = Storage.get(QUOTA_KEY, null);
+  if (remaining <= 0 && !(before && before.remaining <= 0)) window.brTrack?.('Demo exhausted');
   Storage.set(QUOTA_KEY, { remaining, total });
   window.dispatchEvent?.(new CustomEvent('llm:quota', { detail: getQuota() }));
 }

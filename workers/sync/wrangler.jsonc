@@ -45,6 +45,15 @@
     "GRACE_DAYS": "30",
     "TOKEN_HOURS": "24"
   },
+  // La lista de espera de Plus por el propio dominio de la landing (mismo origen, sin workers.dev a
+  // la vista). SOLO esa ruta: el resto de bookreader.raiatech.com sigue siendo Cloudflare Pages.
+  // Con `routes`, wrangler APAGA workers.dev si no se dice: y la app, el MCP y el sync viven en
+  // bookreader-sync.luisgonzalezb93.workers.dev. Nunca quitar estas dos líneas.
+  "workers_dev": true,
+  "preview_urls": false,
+  "routes": [
+    { "pattern": "bookreader.raiatech.com/api/waitlist", "zone_name": "raiatech.com" }
+  ],
   "d1_databases": [
     {
       "binding": "DB",

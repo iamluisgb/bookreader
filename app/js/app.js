@@ -1707,6 +1707,7 @@ async function loadFile(file) {
   }
   if (!currentBook || currentBook.id !== id) return;   // salió durante la carga
   writeRoute(id, currentLoc());   // deep-link del libro recién abierto (pushState)
+  window.brTrack?.('Book imported', { format: ext });   // embudo (analytics.js)
 }
 
 let totalWords = 0;

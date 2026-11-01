@@ -16,3 +16,23 @@
   u.setAttribute('data-exclude-hash', 'true');
   document.head.appendChild(u);
 })();
+
+// Embudo de activación (ADR-061: «crea su primer mazo y vuelve a repasar la semana
+// siguiente»). Los módulos llaman a `window.brTrack(nombre, datos)`; fuera de producción no
+// hay tracker y no hace nada. NUNCA datos personales ni del libro: solo formato, origen o
+// semanas. Si el tracker aún no ha cargado (va con defer), se reintenta una vez.
+window.brTrack = function (name, data) {
+  try {
+    if (window.umami) { window.umami.track(name, data); return; }
+    if (location.hostname !== 'bookreader.raiatech.com') return;
+    setTimeout(function () { try { window.umami && window.umami.track(name, data); } catch (e) { /* nada */ } }, 4000);
+  } catch (e) { /* la analítica nunca rompe la app */ }
+};
+// Una vez por dispositivo: el primer mensaje al agente, el primer mazo. `key` va a localStorage.
+window.brTrackOnce = function (key, name, data) {
+  try {
+    if (localStorage.getItem('bookreader_track_' + key)) return;
+    localStorage.setItem('bookreader_track_' + key, String(Date.now()));
+  } catch (e) { return; }
+  window.brTrack(name, data);
+};

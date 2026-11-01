@@ -3,6 +3,41 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-11-01 (4) — Landing: la auditoría de marketing, aplicada
+
+- **El hero dice qué es**: subtítulo «Un lector de EPUB y PDF con un agente de IA que…» bajo el
+  H1, y la nota del CTA pasa a «Gratis. Sin cuenta. El agente funciona sin clave.» (la demo de
+  ADR-051 existe: la landing ya no asusta con BYOK). El libro del hero se abre con el 20 % a la
+  vista (antes 35 %): con el subtítulo, en 1280×720 asomaba un 34 % y no arrancaba.
+- **Coherencia con la realidad**: fuera «Sin servidor. Sin nadie en medio» (la demo pasa por el
+  gateway y Plus tiene servidor): ahora «tus libros, notas y tarjetas viven en tu dispositivo, no
+  en un servidor nuestro; a la IA solo le llega el texto de cada pregunta». La capa «Tu clave de
+  IA · BYOK» pasa a «Tu IA · demo gratis o tu clave». «Zona» pasa a «Rodea una figura».
+- **Tarjetas**: «Leer es la mitad» → «No lo releas. Repásalo.», con el rótulo «Tarjetas con
+  repaso espaciado». Rótulo nuevo en el agente («Agente de lectura con IA · EPUB y PDF»).
+- **Tras el test**: posicionamiento en una frase frente a NotebookLM/Anki, **CTA a mitad**
+  («Haz tarjetas con tu libro», `where=practice`) y hechos verificables: la firma de Luis, el
+  código público en GitHub, FSRS y «Actualizado el …» (sale de `/build.json`).
+- **Orden**: el mapa «Todo lo que trae» va antes de la privacidad, y Plus después.
+- **FAQ**: coste reescrito (demo gratis, después tu clave, Plus 8 €/mes), y cinco preguntas
+  nuevas: Kindle/DRM, si los libros se suben, iPhone, si BookReader cierra, NotebookLM o Anki.
+- **SEO y compartir**: títulos con categoría («lector EPUB y PDF con IA y tarjetas de repaso»),
+  imagen OG de 1200×630 por idioma (`assets/landing/og-{en,es}.png`), `twitter:card`, JSON-LD
+  `SoftwareApplication` gratis, `robots.txt`, `sitemap.xml` con hreflang y **`404.html`**: Pages
+  ya no contesta 200 con la portada a cualquier ruta (soft 404, y el bucle `/es/es/…`).
+- **Lista de espera**: elección opcional de un clic («¿Qué te interesa más? Claude · Sync · IA
+  incluida», columna `want`, migración 0008, `waitlistWants` en `/v1/usage`) y endpoint en el
+  propio dominio: ruta del Worker `bookreader.raiatech.com/api/waitlist`. Ojo: con `routes`,
+  wrangler apaga workers.dev si no se dice; `workers_dev: true` queda fijado en wrangler.jsonc.
+- **Analítica**: en la landing, `Section seen {beat}`, `Card flip`, `Next card`, `FAQ open`,
+  `Language`, `GitHub`, `Waitlist {want}`, `Waitlist invalid`, `Waitlist error`. En la app, el
+  embudo de activación (ADR-061) con `window.brTrack` (analytics.js, sin datos personales):
+  `Book imported {format}`, `Agent first message {source: demo|byok}`, `Demo exhausted`,
+  `First deck`, `Deck created`, `Review session {week}` (semanas desde el primer mazo) y
+  `Drive sync on`. Cache del SW → v230.
+- Sin hacer, a propósito: «60 días gratis» en Plus (la prueba no está decidida), un libro de
+  ejemplo en español (hace falta texto y portada con permiso) y el vídeo real de 20 s.
+
 ## 2026-11-01 (3) — Landing: Plus, próximamente, con lista de espera
 
 - **Sección «Your whole library, inside Claude»** (EN/ES), entre «Everything in the box» y las

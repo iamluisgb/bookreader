@@ -1,9 +1,12 @@
-// Landing · el diagrama de «Everything in the box» y la pregunta con opciones de «Practicar» (ver map.css).
+// Landing · el diagrama de «Everything in the box», la pregunta con opciones de «Practicar», la lista
+// de espera de Plus, la fecha de actualización y la analítica de la página (ver map.css).
 // Sin dependencias; los textos están en el HTML de cada idioma, aquí solo hay lógica.
 (function () {
   'use strict';
   var motion = document.documentElement.classList.contains('motion');
   var NS = 'http://www.w3.org/2000/svg';
+  // Umami (sin cookies) solo existe en producción; aquí, nada.
+  function track(name, data) { try { if (window.umami) window.umami.track(name, data); } catch (e) { /* nada */ } }
 
   /* ------------------------------------------------------------------ diagrama */
   var fig = document.getElementById('bmap');
@@ -95,21 +98,66 @@
   /* ------------------------------------------------- Plus: lista de espera */
   var form = document.getElementById('plus-form');
   if (form) {
-    var WAITLIST = 'https://bookreader-sync.luisgonzalezb93.workers.dev/v1/waitlist';
+    // En producción, por el propio dominio (ruta del Worker bookreader-sync en raiatech.com):
+    // mismo origen y sin el subdominio de workers.dev a la vista. Fuera (pages.dev, local), directo.
+    var WAITLIST = location.hostname === 'bookreader.raiatech.com'
+      ? '/api/waitlist'
+      : 'https://bookreader-sync.luisgonzalezb93.workers.dev/v1/waitlist';
     var msg = form.querySelector('.plus-msg'), btn = form.querySelector('button');
     var say = function (text, ok) { msg.textContent = text; msg.classList.toggle('ok', !!ok); };
+    var want = function () { var w = form.querySelector('input[name="want"]:checked'); return w ? w.value : ''; };
     form.addEventListener('submit', function (e) {
       e.preventDefault();
       var email = form.email.value.trim();
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) { say(form.dataset.bad); form.email.focus(); return; }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) { say(form.dataset.bad); form.email.focus(); track('Waitlist invalid'); return; }
       btn.disabled = true; say('');
       fetch(WAITLIST, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email, lang: document.documentElement.lang === 'es' ? 'es' : 'en', website: form.website.value }),
+        body: JSON.stringify({ email: email, lang: document.documentElement.lang === 'es' ? 'es' : 'en', want: want(), website: form.website.value }),
       }).then(function (r) {
-        if (r.ok) { form.classList.add('done'); say(form.dataset.ok, true); if (window.umami) window.umami.track('Waitlist'); return; }
+        if (r.ok) { form.classList.add('done'); say(form.dataset.ok, true); track('Waitlist', { want: want() || 'none' }); return; }
         say(r.status === 400 ? form.dataset.bad : form.dataset.err); btn.disabled = false;
-      }).catch(function () { say(form.dataset.err); btn.disabled = false; });
+        track('Waitlist error', { status: r.status });
+      }).catch(function () { say(form.dataset.err); btn.disabled = false; track('Waitlist error', { status: 'network' }); });
     });
+  }
+
+  // ---------------------------------------------------------------- analítica de la página
+  // Qué secciones se ven (dónde se abandona), y los gestos de las demos. Una vez por visita cada
+  // uno: sirve para el embudo, no para contar clics.
+  var seen = {};
+  function once(key, name, data) { if (seen[key]) return; seen[key] = 1; track(name, data); }
+  if ('IntersectionObserver' in window) {
+    var so = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (!e.isIntersecting) return;
+        so.unobserve(e.target);
+        once('s:' + e.target.dataset.beat, 'Section seen', { beat: e.target.dataset.beat });
+      });
+    }, { threshold: 0.35 });
+    Array.prototype.forEach.call(document.querySelectorAll('[data-beat]'), function (el) { so.observe(el); });
+  }
+  document.addEventListener('click', function (e) {
+    var t = e.target.closest ? e.target : e.target.parentElement;
+    if (!t) return;
+    if (t.closest('.fcard')) once('flip', 'Card flip');
+    else if (t.closest('#deck-next')) once('next', 'Next card');
+  });
+  Array.prototype.forEach.call(document.querySelectorAll('.faq details'), function (d, i) {
+    d.addEventListener('toggle', function () { if (d.open && i > 0) once('faq' + i, 'FAQ open', { q: i }); });
+  });
+
+  // «Actualizado el …»: la fecha del último despliegue (build.json lo escribe el build). Sin él
+  // (local), la línea no aparece.
+  var upd = document.querySelector('.proof-upd');
+  if (upd && window.fetch) {
+    fetch('/build.json', { cache: 'no-store' }).then(function (r) { return r.ok ? r.json() : null; }).then(function (b) {
+      var d = b && b.builtAt && new Date(b.builtAt);
+      if (!d || isNaN(d)) return;
+      var tm = upd.querySelector('time');
+      tm.dateTime = b.builtAt.slice(0, 10);
+      tm.textContent = d.toLocaleDateString(document.documentElement.lang === 'es' ? 'es-ES' : 'en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+      upd.hidden = false;
+    }).catch(function () { /* sin fecha */ });
   }
 })();

@@ -164,6 +164,8 @@ export async function checkLicense(env, key, fetchImpl = fetch) {
 // con tope por IP y un campo trampa para bots. Siempre contesta lo mismo, esté o no ya apuntado,
 // para que no sirva para averiguar si un email está en la lista.
 const EMAIL_RE = /^[^\s@]{1,64}@[^\s@]+\.[^\s@]{2,}$/;
+const WANTS = new Set(['claude', 'sync', 'ai']);
+
 async function joinWaitlist(request, env, cors, now = Date.now()) {
   if (!cors['Access-Control-Allow-Origin']) return json({ error: 'origin' }, 403, cors);
   if (env.WAITLIST) {
@@ -177,8 +179,10 @@ async function joinWaitlist(request, env, cors, now = Date.now()) {
   const email = typeof body?.email === 'string' ? body.email.trim().toLowerCase() : '';
   if (email.length > 254 || !EMAIL_RE.test(email)) return json({ error: 'email' }, 400, cors);
   const lang = body?.lang === 'es' ? 'es' : 'en';
-  await env.DB.prepare('INSERT INTO waitlist (email, lang, created_at) VALUES (?, ?, ?) ON CONFLICT(email) DO NOTHING')
-    .bind(email, lang, now).run();
+  // Qué quiere más de Plus (opcional, un clic en la landing): la señal de demanda del lanzamiento.
+  const want = WANTS.has(body?.want) ? body.want : null;
+  await env.DB.prepare('INSERT INTO waitlist (email, lang, created_at, want) VALUES (?, ?, ?, ?) ON CONFLICT(email) DO NOTHING')
+    .bind(email, lang, now, want).run();
   return json({ ok: true }, 200, cors);
 }
 
@@ -658,6 +662,7 @@ export async function usage(env, now = Date.now()) {
   const st = await env.DB.prepare('SELECT COUNT(DISTINCT user) AS users, COALESCE(SUM(size), 0) AS bytes FROM blobs').first();
   const active = await env.DB.prepare('SELECT COUNT(*) AS n FROM users WHERE lapsed_at IS NULL').first();
   const wl = await env.DB.prepare('SELECT COUNT(*) AS n FROM waitlist').first();
+  const wants = await env.DB.prepare('SELECT COALESCE(want, \'none\') AS want, COUNT(*) AS n FROM waitlist GROUP BY 1').all();
   const u = await env.DB.prepare('SELECT class_a, class_b, refused FROM usage WHERE month = ?').bind(monthOf(now)).first()
     || { class_a: 0, class_b: 0, refused: 0 };
   const c = config(env);
@@ -670,6 +675,7 @@ export async function usage(env, now = Date.now()) {
     classB: { ops: u.class_b, cap: c.classB, pctOfFree: pct(u.class_b, FREE.classB) },
     refused: u.refused,
     waitlist: wl.n,
+    waitlistWants: Object.fromEntries((wants.results || []).map(r => [r.want, r.n])),
   };
 }
 
@@ -683,7 +689,9 @@ export default {
     const method = request.method;
     try {
       if (pathname === '/v1/sync-token' && method === 'POST') return await issueToken(request, env, cors);
-      if (pathname === '/v1/waitlist' && method === 'POST') return await joinWaitlist(request, env, cors);
+      // /api/waitlist es la misma, servida por la ruta del Worker en bookreader.raiatech.com (mismo
+      // origen que la landing; ver `routes` en wrangler.jsonc).
+      if ((pathname === '/v1/waitlist' || pathname === '/api/waitlist') && method === 'POST') return await joinWaitlist(request, env, cors);
       if (pathname === '/v1/usage' && method === 'GET') {
         const auth = request.headers.get('Authorization') || '';
         if (!env.USAGE_TOKEN || auth !== `Bearer ${env.USAGE_TOKEN}`) return json({ error: 'forbidden' }, 403);
