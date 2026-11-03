@@ -29,6 +29,11 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 - **Desplegado**: Pages `f2091c1` (`bookreader-v232`).
 - **Fuera**: mapa mental (`mindmap.js · gatherScope`) y tarjetas (`flashcards.js · gatherScope`)
   tienen su propia copia del bucle: ganan el arreglo del TOC, no el reparto dentro del capítulo.
+- **Después, en el mismo día** (`e556470`): la infografía tiene el selector «Contenido» del resumen
+  (libro entero por defecto, o un capítulo). El capítulo va entero si cabe en 30k tokens y, si no,
+  repartido (`chapterPassages`); el prompt sabe que es el póster de un capítulo y el resultado guarda
+  `scope` (cabecera, nombre del fichero, Studio). Test e2e: ningún pasaje de otro capítulo llega al
+  modelo. Desplegado: Pages `d25feec` (`bookreader-v233`).
 
 ## 2026-11-03 — IA11: el índice analítico y las notas ya no tapan al cuerpo en la búsqueda
 
