@@ -13,6 +13,7 @@
 import { ToolError } from './errors.mjs';
 import { resolveBookArg, fold } from './book-arg.mjs';
 import { foldSearch, chapterLines, TEXT_FORMAT } from '../../app/js/sync/book-text-build.js';
+import { isSearchNoise } from '../../app/js/sync/library-index-build.js';
 
 const PAGE_WORDS = 6000;
 const PAGE_WORDS_MAX = 12000;
@@ -160,7 +161,10 @@ const READ_CHAPTER = {
 
 // BM25 sobre el fichero de búsqueda, sin trocearlo entero: cada término se localiza con
 // indexOf (nativo) y solo se puntúan las líneas que casan. Longitud de línea en caracteres.
-export function searchLines(text, query, { passages, avgChars }, limit) {
+// `noise`: índices de capítulo de materia auxiliar (IA11). Sus líneas solo rellenan si el cuerpo no
+// llega a `limit`: el índice analítico ya no tapa al cuerpo, pero un término que solo esté ahí
+// sigue saliendo.
+export function searchLines(text, query, { passages, avgChars }, limit, noise = null) {
   const terms = [...new Set(foldSearch(query).split(' ').filter((w) => w.length > 1 && !STOP.has(w)))];
   if (!terms.length) throw new ToolError('«query» no tiene ninguna palabra que buscar (las muy comunes no cuentan).');
   const hits = new Map();   // inicio de línea → Map(término → veces)
@@ -200,12 +204,14 @@ export function searchLines(text, query, { passages, avgChars }, limit) {
     }
     scored.push({ start, s });
   }
-  scored.sort((x, y) => y.s - x.s);
-  return scored.slice(0, limit).map(({ start, s }) => {
+  const rows = scored.map(({ start, s }) => {
     const tab1 = text.indexOf('\t', start);
     const tab2 = text.indexOf('\t', tab1 + 1);
-    return { id: text.slice(start, tab1), chapter: Number(text.slice(tab1 + 1, tab2)), score: Math.round(s * 100) / 100 };
+    return { id: text.slice(start, tab1), chapter: Number(text.slice(tab1 + 1, tab2)), score: Math.round(s * 100) / 100, s };
   });
+  const aux = (r) => !!noise && noise.has(r.chapter);
+  rows.sort((x, y) => (aux(x) - aux(y)) || (y.s - x.s));
+  return rows.slice(0, limit).map(({ s, ...r }) => r);
 }
 
 const SEARCH_BOOK = {
@@ -231,7 +237,8 @@ const SEARCH_BOOK = {
     const limit = Number.isInteger(args.limit) ? Math.min(SEARCH_MAX, Math.max(1, args.limit)) : SEARCH_DEFAULT;
     const text = await source.bookTextFile(bookId, 'search.txt');
     if (text === null) throw new ToolError(NO_TEXT);
-    const found = searchLines(text, args.query, toc.search || {}, limit);
+    const noise = new Set((toc.chapters || []).flatMap((c, i) => (isSearchNoise(c.title) ? [i] : [])));
+    const found = searchLines(text, args.query, toc.search || {}, limit, noise);
     // El texto original de cada resultado, de su trozo (uno por trozo, aunque salgan varios).
     const parts = new Map();
     const results = [];

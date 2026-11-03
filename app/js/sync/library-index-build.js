@@ -22,6 +22,22 @@
 // Buscar un término es un `indexOf` de su línea: no se parsea el fichero entero.
 
 export const INDEX_FORMAT = 1;
+
+// IA11 · Materia auxiliar que compite con el cuerpo en la búsqueda: el índice analítico, las notas,
+// el glosario, la bibliografía y la tabla de contenidos repiten los términos del libro en líneas
+// cortas, y BM25 premia justo eso (medido el 2026-11-03: el 53,8 % del top 5 de consultas cortas
+// en libros con índice pesado salía de aquí). Título EXACTO, plegado: «Notes» sí, «Field Notes on
+// X» no; «Preface» o «Appendix» son contenido y no entran. Es más estrecho a propósito que
+// `isBoilerplate` de retrieval.js, que sirve para el muestreo de artefactos.
+const SEARCH_NOISE = new Set(['index', 'indice analitico', 'notes', 'notas', 'endnotes', 'glossary', 'glosario',
+  'bibliography', 'bibliografia', 'references', 'referencias', 'works cited',
+  'contents', 'table of contents', 'contents at a glance', 'brief contents',
+  'contenido', 'contenidos', 'indice', 'indice general', 'sumario']);
+export function isSearchNoise(title) {
+  const t = String(title || '').replace(/[^\p{L}\p{N}]+/gu, ' ').normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+  return !!t && SEARCH_NOISE.has(t);
+}
 export const PARTS = 64;
 export const MAX_DELTAS = 4;
 export const BLOCK_BYTES = 16 * 1024;
@@ -384,6 +400,13 @@ export async function searchIndex(read, base, manifest, queries, { perBook = 3, 
   for (const bookId of new Set([...hits.values()].flatMap((m) => [...m.keys()]))) {
     const meta = known[bookId];
     const avgdl = meta.avgdl || 1;
+    // IA11: los pasajes de materia auxiliar no puntúan (ni para el libro ni como pasaje). Aquí no
+    // hay relleno: search_library sirve para elegir libro, y un libro que solo casa en su índice
+    // también casa en su cuerpo.
+    const noise = [];
+    const chs = meta.chapters || [];
+    chs.forEach(([from, t], i) => { if (isSearchNoise(t)) noise.push([from, i + 1 < chs.length ? chs[i + 1][0] : Infinity]); });
+    const isNoise = (n) => noise.some(([a, z]) => n >= a && n < z);
     // Puntuaciones en arrays por número de pasaje (no Maps): una consulta grande suma decenas
     // de miles de postings y en el Worker cada milisegundo cuenta.
     let size = 0;
@@ -402,6 +425,7 @@ export async function searchIndex(read, base, manifest, queries, { perBook = 3, 
         const w = (idf.get(t) || 0) / wsum;
         qfocus += w * Math.min(1, list.length / Math.max(1, 0.02 * meta.n));
         for (const [n, tf, b] of list) {
+          if (noise.length && isNoise(n)) continue;
           const sat = (tf * (K1 + 1)) / (tf + K1 * (1 - B + B * bucketLen(b) / avgdl)) / (K1 + 1);
           if (score[n] === 0) mine.push(n);
           score[n] += w * sat;

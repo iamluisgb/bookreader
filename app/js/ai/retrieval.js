@@ -8,6 +8,8 @@
 // el recorte por objetivo: nombres propios y locators ("capítulo 9", "consensus",
 // "Raft"). Los embeddings + fusión híbrida son la Fase 2 (ver IA5 en el BACKLOG).
 
+import { isSearchNoise } from '../sync/library-index-build.js';
+
 // Stopwords ES+EN (los libros pueden estar en cualquiera de los dos). Lista corta a
 // propósito: quitar el ruido más común sin arriesgar recall en términos de contenido.
 const STOP = new Set((
@@ -162,7 +164,10 @@ export function search(query, k = 40) {
     }
     if (s > 0) out.push({ p, score: s });
   }
-  out.sort((a, b) => b.score - a.score);
+  // IA11: el índice analítico, las notas o la tabla de contenidos sólo rellenan si el cuerpo no
+  // llega a k (mismo criterio que search_book del MCP).
+  const aux = (x) => (isSearchNoise(x.p.chapter) ? 1 : 0);
+  out.sort((a, b) => (aux(a) - aux(b)) || (b.score - a.score));
   return out.slice(0, k).map(x => ({ ...x.p, score: x.score }));
 }
 
