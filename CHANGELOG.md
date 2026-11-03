@@ -3,6 +3,33 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-11-03 — Studio: la muestra de libro entero cubre todo el libro
+
+- **El caso**: la infografía de *Protocols* salió entera de dos capítulos (Luz y Enfoque): 7 ideas
+  con anclas a1607–a1826, ninguna de Sueño, Ejercicio, Estrés, Nutrición ni Crecimiento personal.
+- **Causas** (reproducidas con el texto real del libro por MCP):
+  1. `panel.js` tomaba como capítulos solo el **primer nivel** del TOC del EPUB, y `segment.js` abre
+     capítulo en cualquier nivel. Con un índice anidado (`Chapter 1` > `Sleep Protocol 1…`),
+     `parsePassages` fundía cada protocolo en su parte: 64 capítulos se veían como 12.
+  2. `bookScopePassages` tomaba los **primeros N** pasajes de cada capítulo: 27 por parte, solo la
+     presentación. La última cita de la infografía (a1622) es justo el último pasaje muestreado del
+     capítulo 5.
+  3. El compositor recibía las ideas en lista plana y se quedó con las del tercer trozo; además el
+     trozo fijo de 10k podía dejar un cuarto trozo que `slice(0, 3)` tiraba sin avisar.
+- **El arreglo** (`95857bf`): `tocChapterLabels()` en `segment.js` (mismo criterio que
+  `findTocLabel`: primer nivel + primera entrada de cada fichero del spine); `spreadOrder()` en
+  `summary.js` (bisección dentro de cada capítulo) y fuera Notes/Index (`isSearchNoise`, IA11);
+  `mapChunkTokens()` y `groupCandidates()` en `infographic.js`, con regla de reparto en el prompt.
+  Afecta a la infografía, al resumen de libro entero y al skim transversal del agente.
+- **Medido** en *Protocols*: antes, 12 «capítulos» y el arranque de cada uno; ahora, 58 de 58
+  capítulos de cuerpo, repartidos de punta a punta, en 3 trozos.
+- **Tests**: `tests/book-scope-coverage.spec.ts` (5). Suite completa: los rojos son los de sync (el
+  puerto alternativo del lab), y `css-vars`, `model-picker` y `selection-geometry`, que fallan igual
+  sin este cambio; `pdf-deeplink-scroll` es el flaky conocido (2 de 3 en verde).
+- **Desplegado**: Pages `f2091c1` (`bookreader-v232`).
+- **Fuera**: mapa mental (`mindmap.js · gatherScope`) y tarjetas (`flashcards.js · gatherScope`)
+  tienen su propia copia del bucle: ganan el arreglo del TOC, no el reparto dentro del capítulo.
+
 ## 2026-11-03 — IA11: el índice analítico y las notas ya no tapan al cuerpo en la búsqueda
 
 - **El caso**: `search.txt` lleva todo el texto del libro, y el índice analítico, las notas o la
