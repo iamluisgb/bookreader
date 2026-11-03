@@ -49,6 +49,43 @@ export function speechErrorMessage(code) {
   }
 }
 
+// Chrome en Android NO trae frases sueltas: cada resultado final repite todo lo dicho en la
+// sesión ("hola", "hola probando", "hola probando nota de voz"…) y además `resultIndex`
+// vuelve a señalar resultados ya vistos. Sumar finales a ciegas daba "hola hola probando
+// hola probando nota…". Así que el texto de la sesión se recalcula ENTERO desde la lista
+// en cada evento, y un resultado que empieza por el anterior lo sustituye en vez de sumarse.
+// En escritorio los resultados son frases distintas y pasan tal cual.
+const norm = (s) => s.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+export function joinText(a, b) {
+  a = (a || '').trim(); b = (b || '').trim();
+  return a && b ? `${a} ${b}` : a || b;
+}
+export function mergeResults(results) {
+  const finals = [];
+  let interim = '';
+  for (let i = 0; i < results.length; i++) {
+    const text = (results[i][0]?.transcript || '').trim();
+    if (!text) continue;
+    if (!results[i].isFinal) { interim = mergeInto(interim, text); continue; }
+    const prev = finals[finals.length - 1];
+    if (prev !== undefined && norm(text).startsWith(norm(prev))) finals[finals.length - 1] = text;
+    else if (prev !== undefined && norm(prev).startsWith(norm(text))) { /* repetido más corto */ }
+    else finals.push(text);
+  }
+  const final = finals.join(' ');
+  // El provisional en Android también puede repetir lo ya final: quita ese prefijo.
+  if (interim && final && norm(interim).startsWith(norm(final))) {
+    interim = interim.trim().split(/\s+/).slice(final.trim().split(/\s+/).length).join(' ');
+  }
+  return { final, interim };
+}
+function mergeInto(acc, text) {
+  if (!acc) return text;
+  if (norm(text).startsWith(norm(acc))) return text;
+  if (norm(acc).startsWith(norm(text))) return acc;
+  return `${acc} ${text}`;
+}
+
 // El navegador CORTA el reconocimiento solo tras unos segundos de silencio —y en Android
 // ignora `continuous` casi por completo, terminando en cada frase—. Explicar algo con tus
 // palabras está lleno de pausas para pensar, así que el micro se moría a media explicación
@@ -64,20 +101,20 @@ export function createDictation({ onText, onEnd, onError, lang } = {}) {
   // Acumulado FUERA del reconocedor: cada reinicio crea uno nuevo y su `finalText` empieza
   // vacío. Si viviera dentro, cada pausa borraría todo lo dicho hasta entonces.
   let finalText = '';
-
+  // Texto de la sesión en curso (desde el último start()). Se recalcula entero en cada
+  // evento y solo se pasa a `finalText` al terminar la sesión.
+  let sessionText = '';
   const build = () => {
     const r = new Ctor();
     r.continuous = true;
     r.interimResults = true;
     r.lang = code;
     r.onresult = (ev) => {
-      let interim = '';
-      for (let i = ev.resultIndex; i < ev.results.length; i++) {
-        const res = ev.results[i];
-        if (res.isFinal) finalText += res[0].transcript + ' ';
-        else interim += res[0].transcript;
-      }
-      onText?.(finalText + interim, finalText);
+      const { final, interim } = mergeResults(ev.results);
+      sessionText = final;
+      const done = joinText(finalText, final);
+      // Espacio al final cuando no hay provisional: así se puede seguir tecleando detrás.
+      onText?.(interim ? joinText(done, interim) : (done ? done + ' ' : ''), done);
     };
     r.onerror = (ev) => {
       const code = ev?.error;
@@ -91,6 +128,8 @@ export function createDictation({ onText, onEnd, onError, lang } = {}) {
       onError?.(msg, code);
     };
     r.onend = () => {
+      finalText = joinText(finalText, sessionText);
+      sessionText = '';
       if (wantsRunning) { try { r.start(); } catch (e) { /* aún cerrando: lo reintenta el próximo onend */ } return; }
       onEnd?.(finalText);
     };
@@ -100,6 +139,7 @@ export function createDictation({ onText, onEnd, onError, lang } = {}) {
   return {
     start: () => {
       wantsRunning = true;
+      sessionText = '';
       rec = build();
       // Un `start()` que falla de verdad (sin permiso) lanza igual que un doble arranque.
       // Se distingue por `wantsRunning`: si estamos arrancando, el fallo es real.
