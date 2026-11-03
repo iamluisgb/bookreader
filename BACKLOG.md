@@ -2889,13 +2889,13 @@ consenso») no es fiable. Por eso este diseño **no pide pesos al modelo**: los 
 
 **Diseño.**
 
-1. **Vocabulario de conceptos del libro.** Entre 15 y 40 conceptos con id estable, nombre,
+1. **Vocabulario de conceptos del libro.** Uno por cada 3–5 tarjetas (en DDIA, unos 40–70), con id estable, nombre,
    definición de una línea y capítulo donde aparecen. Hace falta porque las tarjetas se generan por
    capítulo en llamadas separadas ([`card-plan.js`](app/js/ai/card-plan.js)): sin una lista común,
    «quorum» y «quórum de lectura» serían dos conceptos. Las ideas grandes de P51 (5–8) pueden
    agrupar estos conceptos, pero no son lo mismo.
 2. **Etiqueta por tarjeta.** Cada tarjeta lleva `concept` (el concepto que pregunta) y `uses`
-   (0–3 conceptos que la respuesta **necesita usar**). Por ejemplo, «¿Por qué Raft necesita
+   (0–4 conceptos que la respuesta **necesita usar**). Por ejemplo, «¿Por qué Raft necesita
    mayoría?» → `concept: consenso`, `uses: [quorum, líder]`. La etiqueta se puede comprobar con el
    texto de la tarjeta, sin leer el libro. La pregunta que decide si un concepto entra en `uses`
    es: **«¿se puede acertar esta tarjeta sin saber A?»** Si la respuesta es no, entra. Si es «sí,
@@ -2930,15 +2930,15 @@ consenso») no es fiable. Por eso este diseño **no pide pesos al modelo**: los 
 - **F0 — Vocabulario** `S`. Una llamada por libro sobre **las tarjetas que ya tiene el mazo**, no
   sobre el libro: es barato y se ciñe a lo que realmente se repasa. Va en la ficha del libro
   sincronizada, como `chapterOrder` en [`chapter-gate.js`](app/js/ai/chapter-gate.js). La
-  validación es código: ids únicos, sin duplicados por nombre normalizado y tamaño entre 15 y 40.
+  validación es código: ids únicos, sin duplicados por nombre normalizado y tamaño entre tarjetas/5 y tarjetas/3 (tope 80).
 - **F1 — Etiquetado** `S`. Un trabajo que etiqueta los mazos **existentes** (tarjetas y
   vocabulario, sin texto del libro) y añade la etiqueta al generar tarjetas nuevas
   ([`flashcards.js`](app/js/ai/flashcards.js), en el esquema de `front/back/chapter/src`). La
-  validación también es código: los ids existen, `concept ∉ uses` y `uses ≤ 3`. Si una tarjeta no
+  validación también es código: los ids existen, `concept ∉ uses` y `uses ≤ 4`. Si una tarjeta no
   valida, se queda sin etiqueta.
 - **F2 — Golden y contrato (EV5)** `S`. Se etiquetan a mano unas 40 tarjetas reales (DDIA caps.
-  8–9) con `concept` y `uses`. Métrica primaria: **precisión de `uses` ≥ 80 %**, porque un `uses`
-  falso da crédito sin haber repaso detrás y esconde tarjetas. El recall de `uses` debe ser ≥ 50 %,
+  6 y 10, ver «MVP con DDIA») con `concept` y `uses`. Métrica primaria: **precisión de `uses`
+  ≥ 80 %**, porque un `uses` falso da crédito sin haber repaso detrás y esconde tarjetas. El recall de `uses` debe ser ≥ 50 %,
   ya que perder crédito solo cuesta eficiencia. Time-box: 2 ciclos de prompt. Si no se llega, el
   ítem se para aquí y el vocabulario queda para P52 y P51.
 - **F3 — Modo sombra** `S`–`M`. Al calificar ([`study.js` `finishAttempt`](app/js/ai/study.js))
@@ -2953,6 +2953,85 @@ consenso») no es fiable. Por eso este diseño **no pide pesos al modelo**: los 
 
 **MVP = F0 + F1 + F2 + F3.** No cambia la programación de nadie y responde la única pregunta que
 importa: si el crédito implícito es seguro.
+
+**MVP con DDIA (decidido 2026-11-03).** El MVP se hace solo con *Designing Data-Intensive
+Applications*: es técnico, sus capítulos dependen unos de otros y es el libro con más tarjetas.
+Hay que fijarse en tres cosas: el vocabulario es de todo el libro, el crédito cruza mazos y en el
+estado actual casi no hay volumen para medir.
+
+*Estado de partida (MCP, 2026-11-03).* `bookId c0acb8da…80f2`, con **11 mazos, uno por capítulo**
+(caps. 1–11; el 8 es el más grande, con 42 tarjetas), y **203 tarjetas: unas 180 nuevas** (`srs`
+nulo) y unas 23 con algún repaso. Hay **42 intentos en total** (39 `reveal`, con un 60,6 % de
+acierto a la primera, y 3 `choice`) y 9 matrices generadas, ninguna hecha. Todos los mazos tienen
+casi todo vencido.
+
+*Lo que dicen las tarjetas reales (caps. 6 y 10, leídas por el MCP).*
+- **Las dependencias cruzan capítulos.** Las del cap. 10 usan conceptos del 6: «Which replication
+  methods can be linearizable?» necesita líder único, multi-líder, sin líder y quórum. Por eso el
+  vocabulario es **del libro** y el crédito va **entre mazos**. Un vocabulario por mazo no
+  serviría.
+- **Las comparaciones (`X vs Y`) son la fuente natural de «contiene».** Casi un tercio de las
+  tarjetas lo son: «Serializability vs linearizability?», «Lamport/hybrid clocks vs vector
+  clocks?», «Read repair vs hinted handoff?».
+- **Las tarjetas de definición tienen `uses` vacío** («What does linearizability promise?», «What
+  is a version vector?»). Reciben crédito, pero no lo dan, y es lo correcto.
+- **Las de opciones aplican conceptos de otras tarjetas.** «A Raft leader is paused…» aplica
+  quórum y época; «n = 5, w = 3, r = 3…» aplica la condición w + r > n. Son las que más crédito
+  dan.
+- **Ya hay parejas que se confunden.** La de opciones «refreshes twice…» pide distinguir lecturas
+  monótonas, *read-after-write* y *consistent prefix*. Se anotan para «se confunde con», pero no
+  entran en el MVP.
+- **El tope de `uses` es 4, no 3.** La tarjeta de qué métodos de replicación son linealizables
+  necesita 4 conceptos.
+
+*Ejemplos de etiqueta (orientativos; el golden decide).*
+
+| Tarjeta | `concept` | `uses` | A quién da crédito si se acierta |
+|---|---|---|---|
+| Do Lamport timestamps give linearizability? | lamport-clock | linearizability | Las de qué promete la linealizabilidad y sus usos |
+| What is a sloppy quorum, and what does it give up? | sloppy-quorum | quorum-condition | El cloze w + r > n y la de opciones n = 5 |
+| (opciones) A Raft leader is paused… | leader-election-consensus | quorum, epoch | Las de quórum y época |
+| What is a version vector? | version-vector | concurrency | Las de qué es concurrente |
+| What does linearizability promise? | linearizability | — | No da crédito (definición) |
+
+*Golden (F2).* Las 41 tarjetas de los caps. **6 y 10**, que son donde más dependencias hay y donde
+las del 10 usan las del 6. Primero las etiqueta el agente como propuesta y después las corrige
+Luis, todas. Se guarda en `evals/private/`, que está en `.gitignore`: el repo es público y las tarjetas citan
+el libro. El resultado y el nombre del run se anotan en `docs/EVALS.md`. **El golden no puede
+salir del mismo prompt que se evalúa:** se mide la tasa de acuerdo entre la propuesta y la
+corrección, y la métrica de F2 se calcula contra la corrección. El prompt de F1 se itera sobre los
+caps. 1–5 y 7–9, nunca sobre el golden.
+
+*El problema del volumen y cómo se mide igualmente.* Con 180 tarjetas nuevas, casi ninguna puede
+recibir crédito: las que tienen `reps = 0` no reciben. Al ritmo actual, el contrato de acierto de
+F3 → F4 no cierra en 3 semanas. Por eso la medida del MVP tiene tres partes, por orden:
+1. **Simulación sin esperar (F3a)** `S`. Un script en `scripts/` que tome las 203 tarjetas
+   etiquetadas y simule 30 días de repaso con FSRS y la nota «Bien», con y sin crédito. Saca el %
+   de repasos explícitos ahorrados y cuántos enlaces «contiene» se usan. Si el ahorro sale por
+   debajo del 15 % ya con el modelo ideal, se para antes de tocar la app.
+2. **Auditoría de los créditos en sombra (F3b).** Los primeros 30 créditos que registre la sombra
+   se revisan a mano: ¿tiene sentido que acertar X aplace Y? Hace falta un 90 % de créditos
+   razonables. Es la medida de precisión del enlace en uso real, y no necesita volumen.
+3. **Contrato de acierto** (el de abajo). Se queda en tendencia mientras no haya volumen. Para que
+   lo haya, Luis repasa DDIA a diario con el tope de nuevas por defecto durante las 3 semanas. Con
+   unos 15 repasos al día salen unos 300 intentos: suficiente para ver la tendencia, no para
+   cerrar el contrato.
+
+*Orden de trabajo y piezas.*
+1. F0 + F1 como **trabajo de agente** sobre los 11 mazos (una llamada para el vocabulario con las
+   203 tarjetas, y una por mazo para etiquetar). Los campos `concept` y `uses` van en la tarjeta y
+   el vocabulario en la ficha del libro. Hay que comprobar que el sync y `deck-repair.js` conservan
+   los campos nuevos y que el `.apkg` de [`anki-export.js`](app/js/ai/anki-export.js) los ignora.
+2. El golden de F2 sobre los caps. 6 y 10, con la métrica.
+3. La simulación F3a (script), que no toca la app.
+4. La sombra F3b en `finishAttempt`, con el campo `implicit` en el intento, y que el resumen de
+   `get_attempts` cuente los créditos en sombra.
+5. Tests: unitarios del cálculo del peso y de la propagación, que es pura y va en un módulo nuevo
+   junto a `srs.js`. Y uno de `study` que compruebe que en sombra **ningún** `srs` cambia.
+
+*Hecho cuando:* DDIA tiene vocabulario y tarjetas etiquetadas; el golden está corregido y la
+precisión de `uses` medida; la simulación da el % de ahorro; y la sombra registra créditos que se
+pueden leer por el MCP. Con eso se decide F4, o se para.
 
 **Contrato de F3 → F4 (la medida que decide).** Hay que fijarse en las tarjetas que en sombra se
 habrían aplazado (`dueSombra > fecha` en que de verdad se repasaron). Su acierto en ese repaso
