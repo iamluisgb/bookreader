@@ -2868,6 +2868,113 @@ puede responder en una llamada. Sin esto, los contratos de P49-P52 se miden a oj
 **Fuera, a propósito:** escribir intentos desde el MCP. Un intento lo hace el lector; si un agente
 pudiera escribirlos, la medida dejaría de valer.
 
+### P54 — Repaso jerárquico: acertar lo avanzado repasa lo básico · `M`–`L` · **Math Academy (FIRe)** · *MVP = F0–F3, en sombra*
+
+**Contexto (2026-11-03).** Sale de leer *The Math Academy Way* (Skycak), caps. 18 y 29. Su idea
+central para el repaso: cuando resuelves algo avanzado, practicas sin querer lo básico que contiene,
+y eso debería contar como repaso de lo básico. Ellos lo llaman *Fractional Implicit Repetition*
+(FIRe): el acierto **baja** por el grafo con un descuento (crédito implícito) y el fallo **sube**.
+Con eso eliminan repasos redundantes: dicen que la mayoría de sus cursos se aprenden con **una
+revisión explícita por tema** de media (pág. 384).
+
+El libro también dice algo de nosotros: un sistema de tarjetas independientes, como Anki o
+BookReader hoy, está en la **eficiencia mínima teórica** (pág. 385), porque cada repaso tiene que
+hacerse a mano. Y la queja nº1 de la repetición espaciada es la avalancha de repasos (pág. 279).
+Nuestro caso: el 2026-10-25, el mazo de DDIA cap. 8 tenía la mayoría de las tarjetas con 0–1
+repasos y vencidas desde el ~20-oct (ver P43). Si hay que repasar menos, se repasa.
+
+**El problema de fondo es clasificar las dependencias.** El grafo de Math Academy lo hacen a mano
+expertos, con miles de temas de matemáticas. Un LLM que adivina pesos («quorum pesa 0,6 en
+consenso») no es fiable. Por eso este diseño **no pide pesos al modelo**: los calcula.
+
+**Diseño.**
+
+1. **Vocabulario de conceptos del libro.** Entre 15 y 40 conceptos con id estable, nombre,
+   definición de una línea y capítulo donde aparecen. Hace falta porque las tarjetas se generan por
+   capítulo en llamadas separadas ([`card-plan.js`](app/js/ai/card-plan.js)): sin una lista común,
+   «quorum» y «quórum de lectura» serían dos conceptos. Las ideas grandes de P51 (5–8) pueden
+   agrupar estos conceptos, pero no son lo mismo.
+2. **Etiqueta por tarjeta.** Cada tarjeta lleva `concept` (el concepto que pregunta) y `uses`
+   (0–3 conceptos que la respuesta **necesita usar**). Por ejemplo, «¿Por qué Raft necesita
+   mayoría?» → `concept: consenso`, `uses: [quorum, líder]`. La etiqueta se puede comprobar con el
+   texto de la tarjeta, sin leer el libro. La pregunta que decide si un concepto entra en `uses`
+   es: **«¿se puede acertar esta tarjeta sin saber A?»** Si la respuesta es no, entra. Si es «sí,
+   pero ayuda», **no** entra: eso es «requiere entender», que es asunto de P52 y no da crédito.
+3. **Peso calculado, no adivinado.** El peso de «B contiene A» es la fracción de tarjetas de B
+   cuyo `uses` incluye A. Es la definición del libro (pág. 366): la probabilidad de que un problema
+   cualquiera de B incluya uno de A, contada sobre nuestras tarjetas.
+4. **Cuatro relaciones, cada una con su uso:**
+
+| Relación | De dónde sale | Uso |
+|---|---|---|
+| **Contiene** (peso 0–1) | Calculada de las etiquetas `uses` | Crédito implícito (este ítem) |
+| **Requiere entender** (sin crédito) | El capítulo usa el concepto (mapa de P52 F1) | Solo el aviso de P52 |
+| **Equivalente** | El mismo concepto en otro capítulo o libro | Crédito completo en ambos sentidos (fase posterior, entre libros) |
+| **Se confunde con** | El agente marca la pareja | Separar nuevas y preguntas «¿A o B?»; nunca crédito |
+
+**Reglas del crédito (del libro).**
+- **El acierto baja y el fallo sube.** Acertar X da crédito a las tarjetas cuyo `concept` está en
+  `X.uses`, con un factor `c` por tarjeta, porque X ejercita una faceta de A y no todas. Fallar
+  una tarjeta de A adelanta las tarjetas que usan A. La propagación llega como mucho a 2 saltos,
+  usando el peso de «contiene» en el segundo.
+- **Lo implícito vale menos.** Se aplica como un «Bien» de FSRS que solo puede **aplazar** el
+  vencimiento, y nunca adelantarlo: `due' = due + c·w·(dueBien − due)`. FSRS ya da poca
+  estabilidad a un repaso hecho antes de tiempo, así que el descuento viene incorporado.
+- **Las tarjetas difíciles no reciben crédito.** Con 2 o más fallos recientes, con leech o con
+  `reps = 0`, solo cuenta el repaso explícito. El libro hace lo mismo cuando un tema va lento
+  para ese alumno (pág. 263).
+- **Las tarjetas sin etiqueta ni dan ni reciben crédito.** Con datos incompletos, el
+  comportamiento es el de hoy.
+
+**Fases.**
+- **F0 — Vocabulario** `S`. Una llamada por libro sobre **las tarjetas que ya tiene el mazo**, no
+  sobre el libro: es barato y se ciñe a lo que realmente se repasa. Va en la ficha del libro
+  sincronizada, como `chapterOrder` en [`chapter-gate.js`](app/js/ai/chapter-gate.js). La
+  validación es código: ids únicos, sin duplicados por nombre normalizado y tamaño entre 15 y 40.
+- **F1 — Etiquetado** `S`. Un trabajo que etiqueta los mazos **existentes** (tarjetas y
+  vocabulario, sin texto del libro) y añade la etiqueta al generar tarjetas nuevas
+  ([`flashcards.js`](app/js/ai/flashcards.js), en el esquema de `front/back/chapter/src`). La
+  validación también es código: los ids existen, `concept ∉ uses` y `uses ≤ 3`. Si una tarjeta no
+  valida, se queda sin etiqueta.
+- **F2 — Golden y contrato (EV5)** `S`. Se etiquetan a mano unas 40 tarjetas reales (DDIA caps.
+  8–9) con `concept` y `uses`. Métrica primaria: **precisión de `uses` ≥ 80 %**, porque un `uses`
+  falso da crédito sin haber repaso detrás y esconde tarjetas. El recall de `uses` debe ser ≥ 50 %,
+  ya que perder crédito solo cuesta eficiencia. Time-box: 2 ciclos de prompt. Si no se llega, el
+  ítem se para aquí y el vocabulario queda para P52 y P51.
+- **F3 — Modo sombra** `S`–`M`. Al calificar ([`study.js` `finishAttempt`](app/js/ai/study.js))
+  se calcula el crédito que **se habría dado** y se guarda en el intento como
+  `implicit: [{ cardUid, w, dueAntes, dueSombra }]`. **No se toca ningún `srs`.** Los intentos ya
+  viajan por sync y el MCP los lee (`get_attempts`, P53), así que la medida se puede hacer desde
+  fuera.
+- **F4 — Activar** `M`. Detrás de un ajuste, desactivado por defecto, y solo si F3 lo valida.
+  Deshacer una nota deshace también el crédito que dio (pila de deshacer de `study.js`).
+- **Después:** equivalentes entre libros, reutilizar el vocabulario en P52 F1 (avisos), en P51
+  (ideas grandes) y en las parejas «se confunde con».
+
+**MVP = F0 + F1 + F2 + F3.** No cambia la programación de nadie y responde la única pregunta que
+importa: si el crédito implícito es seguro.
+
+**Contrato de F3 → F4 (la medida que decide).** Hay que fijarse en las tarjetas que en sombra se
+habrían aplazado (`dueSombra > fecha` en que de verdad se repasaron). Su acierto en ese repaso
+explícito tiene que ser **igual o mejor**, dentro de 5 puntos, que el de las tarjetas con el mismo
+`prevInterval` que no recibieron crédito. Si es peor, el crédito esconde tarjetas que hacían falta,
+y el registro dice qué conceptos y qué enlaces fallan. Lo secundario es cuántos repasos explícitos
+se habrían ahorrado (% de vencidas que el crédito habría cubierto); si es menos del 15 %, no
+compensa activarlo. `c` se ajusta en sombra: se empieza en 0,5. Time-box: 3 semanas de uso real; si
+no hay volumen, se queda en tendencia y no se activa.
+
+**Riesgos.**
+- **Libros que no son técnicos.** En ensayo o narrativa casi no hay «contiene»: `uses` saldrá
+  vacío y el ítem no hará nada, que es lo correcto.
+- **Etiquetas viejas.** Si se edita una tarjeta, su etiqueta deja de valer. Se borra al editar
+  `front` o `back` (el `cardHash` de `attempts` ya detecta el cambio).
+- **El MCP** puede crear tarjetas (`add_cards`) sin etiqueta. Esas no participan hasta que el
+  trabajo de F1 las etiquete.
+
+**Fuera, a propósito:** pesos escritos a mano o pedidos al modelo; propagar más de 2 saltos;
+adelantar repasos por crédito (solo se aplaza); grafo entre libros en el MVP; tocar la retención
+objetivo de FSRS; cualquier UI más allá del ajuste de F4.
+
 ### P21 — Vertical opositor: del estudio al examen · `L` · **el nicho que [`LAUNCH_PLAN.md`](LAUNCH_PLAN.md#L75) señala**
 
 **Contexto (2026-07-27).** El plan de lanzamiento nombra el pivote — *"pivotar el mensaje 100% a
