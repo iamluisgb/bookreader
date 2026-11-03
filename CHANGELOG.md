@@ -3,6 +3,31 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-11-03 — IA11: el índice analítico y las notas ya no tapan al cuerpo en la búsqueda
+
+- **El caso**: `search.txt` lleva todo el texto del libro, y el índice analítico, las notas o la
+  tabla de contenidos repiten los términos en líneas cortas, que BM25 premia. En *Protocols*,
+  «melatonin», «NSDR» y «resistance training» devolvían los 5 resultados del `Index`; en *SRE 2nd*,
+  «SLO» también.
+- **El arreglo** (`baa3211`): `isSearchNoise(title)` en `app/js/sync/library-index-build.js` (título
+  **exacto** plegado: Index, Notes, Glossary, Bibliografía, Contents…; `Preface` o `Appendix` no).
+  `search_book` y el buscador del agente de la app (`retrieval.js · search`) ponen primero el cuerpo
+  y la materia auxiliar sólo rellena si el cuerpo no llega al límite (un término que sólo esté en el
+  índice sigue saliendo). `search_library` no la puntúa. **Sin re-trocear nada**: se decide con los
+  títulos del TOC al buscar, así que vale para todos los libros ya subidos.
+- **Medido** (contrato EV5, batería privada de 26 consultas cortas en los 7 libros con materia
+  auxiliar ≥5 %, capítulo esperado fijado por el título antes de mirar resultados):
+  run `ia11-baseline-2026-11-03` hit@5 **0,654**, MRR 0,318, 53,8 % del top 5 en materia auxiliar →
+  run `ia11-after-2026-11-03` hit@5 **1,0**, MRR **0,775**, **0 %**. `evals/ia11-baseline.mjs`.
+- **Tests**: `mcp/test/search-noise.test.mjs` (clasificador, orden cuerpo→relleno, término sólo en el
+  índice, `search_library` sin pasajes auxiliares; el último, comprobado contra una mutación que quita
+  el filtro). `test:mcp` 126/126, `test:sync` 82/82, retrieval de la app en verde.
+- **Desplegado**: Worker `bookreader-sync` versión `87d95fb2-bf14-4a8a-8c98-36f0c7d69e78` (desde una
+  copia limpia de HEAD: el bundle del Worker arrastra `app/js/i18n.js` y `ai/widgets/matrix.js`, que
+  tenían cambios sin commitear) y Pages `55e97ac` (`bookreader-v231`).
+- **Fuera**: la materia **delantera sin título** (capítulo 0 sin nombre, «CRONOLOGÍA») sigue
+  puntuando; sale en *Los últimos días de los incas* y no rompe ningún caso de la batería.
+
 ## 2026-11-01 (4) — Landing: la auditoría de marketing, aplicada
 
 - **El hero dice qué es**: subtítulo «Un lector de EPUB y PDF con un agente de IA que…» bajo el
