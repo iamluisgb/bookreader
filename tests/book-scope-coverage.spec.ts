@@ -137,3 +137,22 @@ test('la infografía mete la muestra entera en sus trozos y agrupa ideas por cap
   );
   expect(res.flat).toBe('- **A**: uno. [[a1]]\n- **C**: tres. [[a2]]'); // un solo capítulo: lista plana
 });
+
+test('chapterPassages: el capítulo entero si cabe; si no, repartido y sin titulares', async ({ page }) => {
+  await page.goto('/');
+  const res = await page.evaluate(async () => {
+    const IG = await import('/js/ai/infographic.js');
+    const C = await import('/js/ai/context.js');
+    const SENT = 'Uniform passage with a fixed length so every token cost is equal here.';
+    const list = [{ id: 'a0', text: 'Sleep Protocol 1', chapter: 'Sleep Protocol 1', section: '' }];
+    for (let i = 1; i <= 20; i++) list.push({ id: `a${i}`, text: SENT, chapter: 'Sleep Protocol 1', section: '' });
+    const cost = C.estimateTokens(SENT) + 4;
+    return {
+      all: IG.chapterPassages(list, 1e9).map((p: any) => p.id),
+      four: IG.chapterPassages(list, cost * 4).map((p: any) => p.id),
+    };
+  });
+  expect(res.all.length).toBe(20);
+  expect(res.all[0]).toBe('a1');                       // el titular no entra
+  expect(res.four).toEqual(['a1', 'a6', 'a11', 'a16']); // repartido por el capítulo, en orden
+});

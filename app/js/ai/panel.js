@@ -708,6 +708,7 @@ async function openInfographic(opts) {
   Infographic.open({
     bookId, bookTitle, bookAuthor,
     goal: convo?.goal || '',
+    tocLabels,
     ensureIndex,
     anchors,
     mode: opts && opts.mode,

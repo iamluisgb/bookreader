@@ -15,7 +15,8 @@ import { LIMITS, parseJson, normalizeInfographic } from './artifact-schema.js';
 import * as LLM from './llm.js';
 import * as Jobs from './jobs.js';
 import { buildChunks } from './flashcards.js';
-import { bookScopePassages } from './summary.js';
+import { bookScopePassages, spreadOrder } from './summary.js';
+import * as Retrieval from './retrieval.js';
 import { estimateTokens } from './context.js';
 import { renderSvg, renderSlides, renderStory, ensureFonts, ACCENTS, POSTER, SLIDE } from './infographic-render.js';
 import { imagesToPdf } from '../ui/pdf-images.js';
@@ -34,7 +35,8 @@ const MAX_MAP_CALLS = 3; // techo de llamadas del barrido: la paciencia tiene un
 // Techos e iconos del esquema: artifact-schema.js (los comparte el MCP).
 export { LIMITS };
 
-let ctx = null; // { bookId, bookTitle, bookAuthor, goal, ensureIndex, anchors, mode, viewArtifact }
+let ctx = null; // { bookId, bookTitle, bookAuthor, goal, tocLabels, currentChapter, ensureIndex, anchors, mode, viewArtifact }
+let scopeValue = ''; // '' = libro entero; si no, la etiqueta del capítulo (como en el resumen)
 let overlay = null;
 let runUnsub = null;
 let zoom = null; // null = ajustar; 1 = 1:1
@@ -47,6 +49,7 @@ let igFormat = (() => {
 // ---- Ciclo de vida del modal -------------------------------------------------
 
 export function open(context) {
+  if ((context && context.bookId) !== (ctx && ctx.bookId)) scopeValue = ''; // otro libro: vuelve a «Libro entero»
   ctx = context || {};
   closeModal();
   overlay = document.createElement('div');
@@ -102,12 +105,23 @@ function renderSetup() {
   const b = body();
   if (!b) return;
   setWide(false);
+  ctx.ensureIndex?.();
+  // Mismo selector que el resumen y el mapa: libro entero o un capítulo con texto. Aquí el
+  // valor por defecto es el libro (es la «Infografía del libro»); el capítulo se elige.
+  const chapters = (ctx.tocLabels || []).filter((c) => c && Retrieval.passagesByChapter(c).length);
+  if (!chapters.includes(scopeValue)) scopeValue = '';
   b.innerHTML = `
     <h2>${t('Infografía del libro')}</h2>
-    <p class="ai-ob-lead">${t('El agente recorre el libro entero y compone un póster: la tesis, las ideas clave, los bloques que se repiten y una cita para cerrar.')}</p>
+    <p class="ai-ob-lead">${t('El agente recorre el contenido que elijas y compone un póster: la tesis, las ideas clave, los bloques que se repiten y una cita para cerrar.')}</p>
+    <label class="fc-label" for="ig-scope">${t('Contenido')}</label>
+    <select id="ig-scope" class="fc-select">
+      <option value="">${t('Libro entero')}</option>
+      ${chapters.map((c) => `<option value="${escapeHtml(c)}"${c === scopeValue ? ' selected' : ''}>${escapeHtml(c)}</option>`).join('')}
+    </select>
     <p class="sum-depth-hint">${icon('info', { size: 'sm' })} ${t('Se genera en segundo plano; puedes seguir leyendo. El póster se lee con zoom y se descarga en PNG o SVG.')}</p>
     <button id="ig-generate" class="btn btn--primary primary-btn ai-ob-start">${icon('sparkles', { size: 'md' })} ${t('Generar infografía')}</button>
     <div id="ig-error" class="fc-error" style="display:none"></div>`;
+  b.querySelector('#ig-scope').addEventListener('change', (e) => { scopeValue = e.target.value; });
   b.querySelector('#ig-generate').addEventListener('click', onGenerate);
 }
 
@@ -124,9 +138,12 @@ async function onGenerate() {
     return;
   }
   ctx.ensureIndex?.();
-  const passages = bookScopePassages(ctx.ensureIndex, BOOK_TOKENS);
+  const chapter = scopeValue;
+  const passages = chapter
+    ? chapterPassages(Retrieval.passagesByChapter(chapter), BOOK_TOKENS)
+    : bookScopePassages(ctx.ensureIndex, BOOK_TOKENS);
   if (!passages.length) {
-    showError(t('El libro no tiene texto indexado todavía.'));
+    showError(chapter ? t('Ese capítulo no tiene texto indexado.') : t('El libro no tiene texto indexado todavía.'));
     return;
   }
   // Tope de llamadas (lección de P14 F2: 8 llamadas de 90 s pierden al lector). El trozo se
@@ -136,7 +153,7 @@ async function onGenerate() {
   const chunks = buildChunks(passages, mapChunkTokens(passages)).slice(0, MAX_MAP_CALLS);
   const chapterOf = new Map(passages.map((p) => [p.id, p.chapter || '']));
   const goal = ctx.goal || '';
-  const scopeName = ctx.bookTitle || t('Libro');
+  const scopeName = chapter || ctx.bookTitle || t('Libro');
   showError('');
   Jobs.start({
     bookId: ctx.bookId,
@@ -144,7 +161,7 @@ async function onGenerate() {
     label: t('la infografía'),
     params: { scopeName },
     run: ({ signal, progress, background }) =>
-      runInfographic({ chunks, chapterOf, goal, scopeName, signal, progress, background }),
+      runInfographic({ chunks, chapterOf, goal, scopeName, chapter, signal, progress, background }),
   });
   renderRunning(Jobs.activeJob());
 }
@@ -227,10 +244,10 @@ ${langRule(goal)}${goal ? `\n- Prioriza lo relevante para: «${goal}».` : ''}
 Responde SOLO con las líneas.`;
 }
 
-function composePrompt(goal, scopeName) {
+function composePrompt(goal, scopeName, chapter = '') {
   return `Eres un diseñador editorial. Con estas IDEAS CLAVE (ya extraídas de «${scopeName}», con su
 ancla [[aN]]), compón una INFOGRAFÍA en JSON. Es un póster para leer de un vistazo, no un resumen.
-
+${chapter ? `ÁMBITO: es el póster de UN CAPÍTULO, «${chapter}», no del libro entero. La tesis, el\n"kicker" y la cita hablan de ese capítulo; el "kicker" lo nombra.\n` : ''}
 Devuelve SOLO un objeto JSON con esta forma exacta:
 {
   "kicker": "una línea de encuadre del libro (máx. 60 caracteres)",
@@ -261,7 +278,7 @@ ${langRule(goal)}${goal ? `\n- Enfoca el póster en: «${goal}».` : ''}
 Responde SOLO el JSON, sin markdown ni texto alrededor.`;
 }
 
-async function runInfographic({ chunks, chapterOf = new Map(), goal, scopeName, signal, progress, background = false }) {
+async function runInfographic({ chunks, chapterOf = new Map(), goal, scopeName, chapter = '', signal, progress, background = false }) {
   // 1) Barrido: ideas candidatas con su ancla.
   const candidates = [];
   for (let i = 0; i < chunks.length; i++) {
@@ -286,7 +303,7 @@ async function runInfographic({ chunks, chapterOf = new Map(), goal, scopeName, 
   progress(chunks.length, chunks.length, 'compose');
   const raw = await LLM.chatStream({
     messages: [
-      { role: 'system', content: composePrompt(goal, scopeName) },
+      { role: 'system', content: composePrompt(goal, scopeName, chapter) },
       { role: 'user', content: `IDEAS CLAVE:\n\n${groupCandidates(candidates, chapterOf)}` },
     ],
     maxTokens: 2600,
@@ -298,7 +315,26 @@ async function runInfographic({ chunks, chapterOf = new Map(), goal, scopeName, 
     throw new Error(t('El modelo no devolvió una infografía válida. Vuelve a intentarlo.'));
   }
   out.accent = await pickAccent(ctx.bookId);
+  if (chapter) out.scope = chapter;
   return out;
+}
+
+// Pasajes de UN capítulo: enteros si caben en el presupuesto del barrido; si no, repartidos de
+// punta a punta con el mismo orden de bisección que el libro entero, y en orden de lectura. Fuera
+// los pasajes que son un encabezado (el titular no es una idea). Pura, testeable.
+export function chapterPassages(list, budget = BOOK_TOKENS) {
+  const body = (list || []).filter((p) => !Retrieval.isHeadingPassage(p));
+  const cost = (p) => estimateTokens(p.text) + 4;
+  if (body.reduce((n, p) => n + cost(p), 0) <= budget) return body;
+  const picked = [];
+  let used = 0;
+  for (const i of spreadOrder(body.length)) {
+    const t = cost(body[i]);
+    if (used + t > budget) continue;
+    picked.push(i);
+    used += t;
+  }
+  return picked.sort((a, b) => a - b).map((i) => body[i]);
 }
 
 // Tamaño de trozo para el barrido: el de siempre (10k) si el libro cabe, o lo justo para que la
@@ -446,7 +482,7 @@ async function renderResult(data, key = null) {
       <button class="ai-ob-back">${icon('chevron-left', { size: 'md' })}<span>${t('Volver')}</span></button>
       <button id="ig-regen" class="fc-txt-btn">${icon('sparkles', { size: 'sm' })} ${t('Regenerar')}</button>
     </div>
-    <h2>${t('Infografía')} — ${escapeHtml(ctx.bookTitle || t('Libro'))}</h2>
+    <h2>${t('Infografía')} — ${escapeHtml(ctx.bookTitle || t('Libro'))}${data.scope ? ` · ${escapeHtml(data.scope)}` : ''}</h2>
     <div class="mm-format-row">
       <span class="mm-format-label" id="ig-format-label">${t('Formato')}</span>
       <div class="mm-format ig-format" role="group" aria-labelledby="ig-format-label">
@@ -488,7 +524,7 @@ async function renderResult(data, key = null) {
   if (!body()?.querySelector('#ig-view')) return; // se cerró mientras cargaba
   const fontCss = await posterFaceCss();
   const aria = t('Infografía de {scope}', { scope: ctx.bookTitle || '' });
-  const name = (ext, n = '') => `bookreader-infografia-${slug(ctx.bookTitle || 'libro')}-${igFormat}${n}.${ext}`;
+  const name = (ext, n = '') => `bookreader-infografia-${slug(ctx.bookTitle || 'libro')}${data.scope ? '-' + slug(data.scope) : ''}-${igFormat}${n}.${ext}`;
 
   // Lo pintado del formato actual: SVGs y su tamaño. Se rehace al cambiar de formato.
   let current = null;
