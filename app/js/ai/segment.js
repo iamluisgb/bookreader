@@ -131,6 +131,35 @@ function collapse(s) {
   return (s || '').replace(/\s+/g, ' ').trim();
 }
 
+// Etiquetas de capítulo de un EPUB, con el MISMO criterio con el que `findTocLabel` abre un
+// `## capítulo` al segmentar: las del primer nivel y, de los niveles de dentro, la primera
+// entrada de cada fichero del spine. Antes el panel tomaba solo el primer nivel, y en un
+// índice anidado (Protocols: «Chapter 1» > «Sleep Protocol 1…») `parsePassages` degradaba
+// los protocolos a sección del padre: 64 capítulos se veían como 12 y el muestreo de libro
+// entero se quedaba con la introducción de cada parte (la infografía salió solo de dos).
+// Las entradas de dentro que apuntan al MISMO fichero que una anterior (anclas `#…`) no
+// entran: el segmentador nunca abre capítulo con ellas, así que no tendrían pasajes.
+export function tocChapterLabels(toc) {
+  const out = [];
+  const seenLabel = new Set();
+  const seenFile = new Set();
+  const add = (label) => {
+    if (label && !seenLabel.has(label)) { seenLabel.add(label); out.push(label); }
+  };
+  const walk = (items, top) => {
+    for (const t of items || []) {
+      const label = (t.label || '').trim();
+      const file = (t.href || '').split('#')[0].split('/').pop();
+      const firstOfFile = !!file && !seenFile.has(file);
+      if (file) seenFile.add(file);
+      if (top || firstOfFile) add(label);
+      walk(t.subitems, false);
+    }
+  };
+  walk(toc, true);
+  return out;
+}
+
 function findTocLabel(book, href) {
   const toc = book.navigation?.toc;
   if (!toc) return null;

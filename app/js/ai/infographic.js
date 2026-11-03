@@ -16,6 +16,7 @@ import * as LLM from './llm.js';
 import * as Jobs from './jobs.js';
 import { buildChunks } from './flashcards.js';
 import { bookScopePassages } from './summary.js';
+import { estimateTokens } from './context.js';
 import { renderSvg, renderSlides, renderStory, ensureFonts, ACCENTS, POSTER, SLIDE } from './infographic-render.js';
 import { imagesToPdf } from '../ui/pdf-images.js';
 import { posterFaceCss } from '../ui/svg-fonts.js';
@@ -128,10 +129,12 @@ async function onGenerate() {
     showError(t('El libro no tiene texto indexado todavía.'));
     return;
   }
-  // Tope de llamadas: si el muestreo da más trozos que el presupuesto, se reparten los pasajes
-  // hacia atrás (el barrido cubre el principio del libro y corta; mejor eso que disparar 8
-  // llamadas de 90 s y perder al lector por el camino — lección de P14 F2).
-  const chunks = buildChunks(passages).slice(0, MAX_MAP_CALLS);
+  // Tope de llamadas (lección de P14 F2: 8 llamadas de 90 s pierden al lector). El trozo se
+  // dimensiona para que la muestra ENTERA quepa en MAX_MAP_CALLS: con el tamaño fijo de las
+  // tarjetas, el empaquetado dejaba a veces un cuarto trozo con el final del libro y el
+  // `slice` lo tiraba sin avisar. El `slice` queda solo como red.
+  const chunks = buildChunks(passages, mapChunkTokens(passages)).slice(0, MAX_MAP_CALLS);
+  const chapterOf = new Map(passages.map((p) => [p.id, p.chapter || '']));
   const goal = ctx.goal || '';
   const scopeName = ctx.bookTitle || t('Libro');
   showError('');
@@ -141,7 +144,7 @@ async function onGenerate() {
     label: t('la infografía'),
     params: { scopeName },
     run: ({ signal, progress, background }) =>
-      runInfographic({ chunks, goal, scopeName, signal, progress, background }),
+      runInfographic({ chunks, chapterOf, goal, scopeName, signal, progress, background }),
   });
   renderRunning(Jobs.activeJob());
 }
@@ -250,12 +253,15 @@ LÍMITES (respétalos; si no caben, prioriza):
 - Los rótulos son CORTOS (máx. 6 palabras) y los cuerpos, UNA frase de máx. 20 palabras: esto se
   lee en el móvil, en un carrusel, no es un artículo. La tesis, 2 frases como mucho.
 - En "rows" el orden importa: se dibuja como una escala de menos a más.
+- Si las ideas vienen agrupadas por capítulo (## …), el póster es del LIBRO ENTERO: reparte las
+  ideas entre capítulos del principio, del medio y del final, con 2 ideas como mucho de un mismo
+  capítulo, y que la tesis y los paneles hablen del conjunto, no de una parte.
 NO inventes nada que no esté en las ideas; no repitas la misma idea en dos bloques.
 ${langRule(goal)}${goal ? `\n- Enfoca el póster en: «${goal}».` : ''}
 Responde SOLO el JSON, sin markdown ni texto alrededor.`;
 }
 
-async function runInfographic({ chunks, goal, scopeName, signal, progress, background = false }) {
+async function runInfographic({ chunks, chapterOf = new Map(), goal, scopeName, signal, progress, background = false }) {
   // 1) Barrido: ideas candidatas con su ancla.
   const candidates = [];
   for (let i = 0; i < chunks.length; i++) {
@@ -281,7 +287,7 @@ async function runInfographic({ chunks, goal, scopeName, signal, progress, backg
   const raw = await LLM.chatStream({
     messages: [
       { role: 'system', content: composePrompt(goal, scopeName) },
-      { role: 'user', content: `IDEAS CLAVE:\n\n${candidates.join('\n')}` },
+      { role: 'user', content: `IDEAS CLAVE:\n\n${groupCandidates(candidates, chapterOf)}` },
     ],
     maxTokens: 2600,
     signal,
@@ -293,6 +299,41 @@ async function runInfographic({ chunks, goal, scopeName, signal, progress, backg
   }
   out.accent = await pickAccent(ctx.bookId);
   return out;
+}
+
+// Tamaño de trozo para el barrido: el de siempre (10k) si el libro cabe, o lo justo para que la
+// muestra entera entre en MAX_MAP_CALLS trozos. El margen de un pasaje cubre el hueco que deja
+// el empaquetado al no partir pasajes. Pura, testeable.
+const MAP_CHUNK_TOKENS = 10000;
+export function mapChunkTokens(passages, calls = MAX_MAP_CALLS) {
+  let total = 0, biggest = 0;
+  for (const p of passages || []) {
+    const t = estimateTokens(p.text) + 4;
+    total += t;
+    if (t > biggest) biggest = t;
+  }
+  return Math.max(MAP_CHUNK_TOKENS, Math.ceil(total / calls) + biggest);
+}
+
+// Las ideas candidatas, agrupadas por el capítulo de su ancla y en orden de lectura. Sin esto
+// el compositor recibía una lista plana y se quedaba con las últimas (las del tercer trozo): la
+// infografía de Protocols salió entera de dos capítulos. Con el capítulo a la vista, la regla
+// de reparto de `composePrompt` se puede cumplir. Pura, testeable.
+export function groupCandidates(candidates, chapterOf = new Map()) {
+  const groups = new Map();
+  for (const c of candidates || []) {
+    const m = /\[\[(a\d+)\]\]/.exec(c);
+    const ch = (m && chapterOf.get(m[1])) || '';
+    if (!groups.has(ch)) groups.set(ch, []);
+    groups.get(ch).push(c);
+  }
+  const named = [...groups.keys()].filter(Boolean);
+  if (named.length < 2) return (candidates || []).map((c) => `- ${c}`).join('\n');
+  const out = [];
+  for (const [ch, list] of groups) {
+    out.push(`## ${ch || '(sin capítulo)'}`, ...list.map((c) => `- ${c}`), '');
+  }
+  return out.join('\n').trim();
 }
 
 // ---- Normalización (pura, en artifact-schema.js) ------------------------------------

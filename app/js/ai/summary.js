@@ -6,6 +6,7 @@
 import { t, uiLangName } from '../i18n.js';
 import * as LLM from './llm.js';
 import * as Retrieval from './retrieval.js';
+import { isSearchNoise } from '../sync/library-index-build.js';
 import * as Jobs from './jobs.js';
 import { estimateTokens } from './context.js';
 import { buildChunks } from './flashcards.js';
@@ -110,16 +111,22 @@ function renderSetup() {
 // LIBRO ENTERO con coste acotado (igual que flashcards). Recibe `ensureIdx` para no
 // depender del `ctx` de módulo → lo reutiliza el agente (panel.js) como "skim
 // transversal" cuando el usuario NO autoriza generar el resumen completo.
+// Dentro de cada capítulo el turno i-ésimo NO toma el pasaje i-ésimo sino el de `spreadOrder`:
+// 0, mitad, cuartos, octavos… Con presupuesto corto, tomar los primeros N de cada capítulo
+// dejaba solo su arranque (en Protocols, la presentación de cada parte y ningún protocolo);
+// así la muestra cubre el capítulo de punta a punta y, con presupuesto amplio, sigue
+// cogiéndolo todo. Las notas y el índice analítico (`isSearchNoise`, IA11) tampoco entran:
+// son referencias, no ideas del libro.
 export function bookScopePassages(ensureIdx, budget = BOOK_TOKENS) {
   if (ensureIdx) ensureIdx();
   const byChapter = new Map();
   for (const p of Retrieval.allPassages()) {
-    if (Retrieval.isBoilerplate(p.chapter)) continue;   // fuera cubierta/índice/prólogo/licencias…
+    if (Retrieval.isBoilerplate(p.chapter) || isSearchNoise(p.chapter)) continue;   // fuera cubierta/índice/notas/licencias…
     const k = p.chapter || '';
     if (!byChapter.has(k)) byChapter.set(k, []);
     byChapter.get(k).push(p);
   }
-  const lists = [...byChapter.values()];
+  const lists = [...byChapter.values()].map((list) => spreadOrder(list.length).map((i) => list[i]));
   const picked = []; let used = 0, added = true;
   for (let i = 0; added && used < budget; i++) {
     added = false;
@@ -132,6 +139,22 @@ export function bookScopePassages(ensureIdx, budget = BOOK_TOKENS) {
     }
   }
   return picked.sort((a, b) => Retrieval.anchorNum(a.id) - Retrieval.anchorNum(b.id));
+}
+
+// Orden de visita de 0..n-1 que reparte por bisección (van der Corput en base 2): 0, n/2, n/4,
+// 3n/4… Los primeros k índices quedan repartidos por todo el rango para cualquier k, y la
+// permutación es completa (los que la secuencia no alcanza se añaden al final, en orden).
+export function spreadOrder(n) {
+  const out = [];
+  const seen = new Uint8Array(n);
+  for (let k = 0; out.length < n && k < 4 * n; k++) {
+    let v = 0, f = 0.5;
+    for (let x = k; x; x >>= 1, f /= 2) if (x & 1) v += f;
+    const i = Math.floor(v * n);
+    if (!seen[i]) { seen[i] = 1; out.push(i); }
+  }
+  for (let i = 0; i < n; i++) if (!seen[i]) out.push(i);
+  return out;
 }
 
 // Pasajes del ámbito. Capítulo: enteros. Libro: muestreo round-robin (arriba).

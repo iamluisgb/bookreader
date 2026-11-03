@@ -3,7 +3,7 @@
 // E1/E2/E3/E5/E6 del backlog. Estado persistido en IndexedDB (E4).
 import * as Picks from './composer-picks.js';
 import * as LLM from './llm.js';
-import { segmentBook } from './segment.js';
+import { segmentBook, tocChapterLabels } from './segment.js';
 import { segmentPdf } from './segment-pdf.js';
 import * as DB from './db.js';
 import * as EpubReader from '../epub-reader.js';
@@ -883,7 +883,7 @@ async function prepareBook() {
         ? seg.tocLabels
         : [...new Set([...anchors.values()].map(a => a.chapter).filter(Boolean))];
     } else {
-      tocLabels = (myBook?.navigation?.toc || []).map(t => t.label.trim()).filter(Boolean);
+      tocLabels = tocChapterLabels(myBook?.navigation?.toc);
     }
 
     // PDF escaneado (sin texto seleccionable): el agente no puede leerlo. No dejamos
