@@ -1,0 +1,88 @@
+/* Blog (/blog/ y /es/blog/). Se carga DESPUÉS de why.css, que pone la base de las páginas de
+   lectura (nav, columna serif, pie). Aquí solo lo que un artículo largo necesita además:
+   índice, cajas de evidencia y de «en la app», figuras, tablas, fórmulas y referencias.
+   Solo tokens de themes.css y brand.css; sin barras de acento laterales: las cajas se marcan
+   con fondo y etiqueta. */
+.post { max-width: 700px; }
+.post [id] { scroll-margin-top: 76px; } /* la barra de arriba es fija: que no tape el título al saltar */
+.post .kicker { font: 600 13px var(--font-ui); letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-faint); margin: 0 0 18px; }
+.post .kicker a { color: inherit; }
+.post .meta { font-size: 14px; color: var(--text-faint); margin: 20px 0 0; }
+
+.post .toc { margin: 40px 0 0; padding: 18px 22px; background: var(--surface-alt); border-radius: 14px; }
+.post .toc summary { font: 600 14px var(--font-ui); cursor: pointer; }
+.post .toc ol { margin: 12px 0 2px; padding-left: 22px; font-size: 15px; line-height: 1.7; }
+
+.post h3 { font: 600 1.15rem/1.3 var(--font-display); margin: 30px 0 10px; }
+.post section > ul, .post section > ol { font: 400 18px/1.7 var(--font-display); color: var(--text-soft); padding-left: 24px; margin: 0 0 14px; }
+.post section li { margin: 0 0 6px; }
+.post section b, .post section strong { color: var(--text); font-weight: 600; }
+.post sup a { font: 600 12px var(--font-ui); padding: 0 1px; }
+
+.post .tldr { margin: 36px 0 0; padding: 20px 24px; border: 1px solid var(--border); border-radius: 14px; }
+.post .tldr h2 { font: 600 13px var(--font-ui); letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-faint); margin: 0 0 10px; }
+.post .tldr ul { margin: 0; padding-left: 20px; font: 400 17px/1.65 var(--font-display); color: var(--text-soft); }
+.post .tldr li { margin: 0 0 6px; }
+
+/* Lo que dicen los estudios, con su nivel, y lo que hace la app con ello. */
+.post .evidence, .post .in-app { margin: 22px 0; padding: 16px 20px; border-radius: 12px; font-size: 15.5px; line-height: 1.6; color: var(--text-soft); }
+.post .evidence { background: var(--surface-alt); }
+.post .in-app { border: 1px solid var(--border); }
+.post .evidence p, .post .in-app p { font: inherit; color: inherit; margin: 0 0 8px; }
+.post .evidence p:last-child, .post .in-app p:last-child { margin: 0; }
+.post .in-app ul { margin: 6px 0 0; padding-left: 20px; }
+.post .in-app li { margin: 0 0 5px; }
+.post .label { display: inline-block; font: 600 12px var(--font-ui); letter-spacing: 0.03em; text-transform: uppercase; color: var(--text); margin: 0 8px 6px 0; }
+.post .badge { display: inline-block; font: 600 12px var(--font-ui); padding: 3px 10px; border-radius: 999px; margin: 0 8px 6px 0; background: var(--surface-0); border: 1px solid var(--border); color: var(--text); }
+.post .badge.strong { color: var(--success); border-color: currentColor; }
+.post .badge.moderate { color: var(--warning); border-color: currentColor; }
+.post .badge.tentative { color: var(--text-faint); }
+
+.post .formula { margin: 18px 0; padding: 14px 18px; background: var(--surface-alt); border-radius: 12px; overflow-x: auto; font: 400 15px/1.7 ui-monospace, 'SF Mono', Menlo, Consolas, monospace; color: var(--text); white-space: pre; }
+.post code { font: 400 0.9em ui-monospace, 'SF Mono', Menlo, Consolas, monospace; background: var(--surface-alt); padding: 1px 5px; border-radius: 5px; }
+
+.post figure { margin: 28px 0; }
+.post figcaption { font-size: 14px; line-height: 1.55; color: var(--text-faint); margin-top: 8px; }
+.chart { display: block; width: 100%; height: auto; font-family: var(--font-ui); }
+.chart .c-grid { stroke: var(--border); stroke-width: 1; }
+.chart .c-target { stroke: var(--text-faint); stroke-width: 1.2; stroke-dasharray: 5 5; }
+.chart .c-tick { fill: var(--text-faint); font-size: 12px; }
+.chart .c-ax { fill: var(--text-soft); font-size: 13px; }
+.chart .c-lab { fill: var(--text); font-size: 13px; font-weight: 600; }
+.chart .c-val { fill: var(--text); font-size: 13px; font-weight: 600; }
+.chart .c-line { fill: none; stroke: var(--accent); stroke-width: 2.5; stroke-linecap: round; }
+.chart .c-line1 { opacity: 0.45; }
+.chart .c-line2 { opacity: 0.72; }
+.chart circle.c-line1, .chart circle.c-line2, .chart circle.c-line3 { fill: var(--accent); stroke: none; }
+.chart .c-bar { fill: var(--accent); opacity: 0.4; }
+.chart .c-bar-hi { opacity: 1; }
+
+.post .table-scroll { overflow-x: auto; margin: 22px 0; }
+.post table { width: 100%; border-collapse: collapse; font-size: 15px; line-height: 1.5; min-width: 520px; }
+.post th, .post td { text-align: left; vertical-align: top; padding: 10px 12px; border-bottom: 1px solid var(--border); }
+.post th { font: 600 13px var(--font-ui); color: var(--text-faint); }
+.post td { color: var(--text-soft); }
+.post td:first-child { color: var(--text); font-weight: 600; }
+
+.post .refs { margin-top: 56px; padding-top: 26px; border-top: 1px solid var(--border); }
+.post .refs ol { font-size: 14.5px; line-height: 1.6; color: var(--text-soft); padding-left: 26px; }
+.post .refs li { margin: 0 0 9px; overflow-wrap: anywhere; }
+.post .refs li:target { background: var(--surface-alt); border-radius: 6px; }
+
+/* Índice del blog. */
+.blog-list { list-style: none; margin: 44px 0 0; padding: 0; }
+.blog-list li { padding: 26px 0; border-top: 1px solid var(--border); }
+.blog-list li:last-child { border-bottom: 1px solid var(--border); }
+.blog-list .when { font-size: 13.5px; color: var(--text-faint); margin: 0 0 6px; }
+.blog-list h2 { font: 600 clamp(1.3rem, 2.4vw, 1.5rem)/1.25 var(--font-display); margin: 0 0 8px; }
+.blog-list h2 a { color: var(--text); }
+.blog-list p { font: 400 17px/1.65 var(--font-display); color: var(--text-soft); margin: 0; }
+
+@media (max-width: 560px) {
+  .post .evidence, .post .in-app, .post .tldr, .post .toc { padding: 14px 16px; }
+  .why.post { padding-left: 16px; padding-right: 16px; }
+  /* La gráfica se encoge a la mitad: el texto, no tanto. */
+  .chart .c-tick { font-size: 17px; }
+  .chart .c-ax, .chart .c-val { font-size: 18px; }
+  .chart .c-lab { font-size: 15px; }
+}

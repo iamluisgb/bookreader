@@ -21,6 +21,26 @@
     <xhtml:link rel="alternate" hreflang="es" href="https://bookreader.raiatech.com/es/por-que/"/>
   </url>
   <url>
+    <loc>https://bookreader.raiatech.com/blog/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://bookreader.raiatech.com/blog/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://bookreader.raiatech.com/es/blog/"/>
+  </url>
+  <url>
+    <loc>https://bookreader.raiatech.com/es/blog/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://bookreader.raiatech.com/blog/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://bookreader.raiatech.com/es/blog/"/>
+  </url>
+  <url>
+    <loc>https://bookreader.raiatech.com/blog/science-of-learning/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://bookreader.raiatech.com/blog/science-of-learning/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://bookreader.raiatech.com/es/blog/ciencia-del-aprendizaje/"/>
+  </url>
+  <url>
+    <loc>https://bookreader.raiatech.com/es/blog/ciencia-del-aprendizaje/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://bookreader.raiatech.com/blog/science-of-learning/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://bookreader.raiatech.com/es/blog/ciencia-del-aprendizaje/"/>
+  </url>
+  <url>
     <loc>https://bookreader.raiatech.com/privacy/</loc>
   </url>
 </urlset>

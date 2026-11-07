@@ -27,7 +27,7 @@ const dist = join(root, 'dist');
 // porque la CSP de la app (`script-src 'self'`) no deja cargarlo de otro origen.
 // `404.html` hace que Pages conteste 404 de verdad a las rutas inventadas (sin él servía la portada
 // con 200: soft 404 y bucle /es/es/… en español). `robots.txt` y `sitemap.xml`, para buscadores.
-const PUBLIC = ['index.html', '404.html', 'robots.txt', 'sitemap.xml', 'sw.js', 'app', 'es', 'anki', 'privacy', 'why', 'assets', 'u', 's'];
+const PUBLIC = ['index.html', '404.html', 'robots.txt', 'sitemap.xml', 'sw.js', 'app', 'es', 'anki', 'privacy', 'why', 'blog', 'assets', 'u', 's'];
 
 // Rutas que NO se despliegan aunque cuelguen de PUBLIC. Siguen en el repo; lo que se
 // corta es publicarlas.

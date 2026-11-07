@@ -1,0 +1,386 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The science behind BookReader: how you learn from a book</title>
+<meta name="description" content="Retrieve instead of rereading, space your reviews, explain in your own words, and make mistakes with a safety net. What research says about learning from books and how BookReader applies it, with a look inside FSRS.">
+<meta property="og:type" content="article">
+<meta property="og:title" content="The science behind BookReader: how you learn from a book">
+<meta property="og:description" content="What research says about learning from books and how BookReader applies it: retrieval practice, spaced repetition with FSRS, self-explanation, and the risk of letting AI think for you.">
+<meta property="og:url" content="https://bookreader.raiatech.com/blog/science-of-learning/">
+<meta property="og:image" content="https://bookreader.raiatech.com/assets/landing/og-en.png">
+<meta property="article:published_time" content="2026-11-07">
+<meta name="theme-color" content="#22c55e">
+<link rel="canonical" href="https://bookreader.raiatech.com/blog/science-of-learning/">
+<link rel="alternate" hreflang="en" href="https://bookreader.raiatech.com/blog/science-of-learning/">
+<link rel="alternate" hreflang="es" href="https://bookreader.raiatech.com/es/blog/ciencia-del-aprendizaje/">
+<link rel="icon" href="../../app/icons/favicon.ico" sizes="32x32">
+<link rel="icon" href="../../app/icons/icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../../app/css/themes.css">
+<link rel="stylesheet" href="../../assets/landing/brand.css?v=20261030b">
+<link rel="stylesheet" href="../../assets/landing/why.css?v=20261030b">
+<link rel="stylesheet" href="../../assets/landing/blog.css?v=20261107a">
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"Article","headline":"The science behind BookReader: how you learn from a book","inLanguage":"en","datePublished":"2026-11-07","author":{"@type":"Organization","name":"BookReader"},"publisher":{"@type":"Organization","name":"Raiatech"},"mainEntityOfPage":"https://bookreader.raiatech.com/blog/science-of-learning/"}
+</script>
+<script>
+if (location.hostname === 'bookreader.raiatech.com') {
+  var u = document.createElement('script');
+  u.defer = true; u.src = '/u/s.js';
+  u.setAttribute('data-website-id', '08c1619b-4bb8-471b-9dc9-9b6cda88e8ae');
+  u.setAttribute('data-host-url', 'https://cloud.umami.is');
+  document.head.appendChild(u);
+}
+</script>
+</head>
+<body>
+<nav>
+  <div class="wrap nav-in">
+    <a class="brand" href="../../"><svg width="22" height="22" viewBox="0 0 512 512" aria-hidden="true" focusable="false"><rect width="512" height="512" rx="118" fill="#111418"/><path d="M288 119 Q288 99 308 99 L396 99 Q416 99 416 119 L416 371 L352 323 L288 371 Z" fill="#22c55e"/><path d="M98 90 L222 90 Q256 90 256 124 L256 470 C 249 442 233 424 206 414 C 177 403 140 401 100 401 Q64 401 64 365 L64 124 Q64 90 98 90 Z" fill="#f8fafc"/></svg> BookReader</a>
+    <a class="nav-cta" href="../../app/" data-umami-event="Open app" data-umami-event-where="blog">Open the app</a>
+  </div>
+</nav>
+<main class="why post">
+  <header>
+    <p class="kicker"><a href="../">Blog</a> · Study techniques</p>
+    <h1>The science behind BookReader: how you learn from a book</h1>
+    <p class="lede">Reading a chapter and understanding it is not the same as remembering it a month later. This article gathers what research knows about that gap and explains, piece by piece, how BookReader is built to close it.</p>
+    <p class="meta">November 7, 2026 · 25-minute read · 30 references checked by DOI</p>
+  </header>
+
+  <aside class="tldr">
+    <h2>In five lines</h2>
+    <ul>
+      <li>Trying to remember makes things stick better than rereading, even though rereading feels more like knowing.</li>
+      <li>Spaced review beats massed review, and the best spacing depends on how long you want to remember.</li>
+      <li>Explaining in your own words and asking yourself why helps you understand, not just memorise.</li>
+      <li>An AI that does the work for you improves today’s exercise and worsens tomorrow’s exam.</li>
+      <li>BookReader is built so that you put in the effort and the app schedules it, checks it against the book and measures it.</li>
+    </ul>
+  </aside>
+
+  <details class="toc" open>
+    <summary>In this article</summary>
+    <ol>
+      <li><a href="#forgetting">The problem: forgetting without noticing</a></li>
+      <li><a href="#map">Which techniques work</a></li>
+      <li><a href="#retrieve">Retrieve, don’t reread</a></li>
+      <li><a href="#spacing">Space your reviews</a></li>
+      <li><a href="#fsrs">Inside FSRS</a></li>
+      <li><a href="#mixing">Mixing and separating</a></li>
+      <li><a href="#explain">Explaining in your own words</a></li>
+      <li><a href="#feynman">Feynman mode, in detail</a></li>
+      <li><a href="#errors">Making mistakes with a safety net</a></li>
+      <li><a href="#calibration">Knowing what you know</a></li>
+      <li><a href="#ai">When AI makes you learn less</a></li>
+      <li><a href="#not">What we don’t do</a></li>
+      <li><a href="#next">Next: questions before you read</a></li>
+      <li><a href="#measure">How we measure whether it works</a></li>
+      <li><a href="#routine">A routine for reading this way</a></li>
+    </ol>
+  </details>
+
+  <section>
+    <h2 id="forgetting">1. The problem: forgetting without noticing</h2>
+    <p>In 1885 Hermann Ebbinghaus learned lists of nonsense syllables and measured how much effort it took to relearn them after a delay. He lost a lot, and fast: most of the forgetting happened in the first hours, and then the curve flattened. In 2015 Murre and Dros repeated the experiment with one person who spent 70 hours learning lists and relearning them after 20 minutes, 1 hour, 9 hours, and 1, 2 and 31 days. The curve came out almost identical to Ebbinghaus’s, with one detail: it is not perfectly smooth, and shows a small upward jump from the 24-hour point<sup><a href="#r1">1</a></sup>.</p>
+    <p>Forgetting would be a smaller problem if we noticed it. We don’t. While studying, we judge what we know with the material in front of us, and that familiarity passes for mastery. Koriat and Bjork called it the <em>illusion of competence</em>: when you study a pair of words you see both, and the link feels strong; on the test you only get one, and the other doesn’t come<sup><a href="#r3">3</a></sup>. The review by Bjork, Dunlosky and Kornell sums up two decades of studies in one uncomfortable sentence: people often have a faulty mental model of how they learn, so they choose badly how to study<sup><a href="#r2">2</a></sup>.</p>
+    <p>That leads to the idea behind everything else: <em>desirable difficulties</em>. Robert and Elizabeth Bjork use the term for conditions that make study slower and less pleasant in the short run and, in exchange, improve what stays in the long run: retrieving instead of rereading, spacing, mixing topics<sup><a href="#r4">4</a></sup>. If a technique leaves you feeling that everything flows, be suspicious. If it costs you a little, it probably works.</p>
+  </section>
+
+  <section>
+    <h2 id="map">2. Which techniques work</h2>
+    <p>In 2013 Dunlosky, Rawson, Marsh, Nathan and Willingham published the most cited review of study techniques. They assessed ten, and didn’t stop at whether they helped in the lab: they checked whether the effect held across ages and starting levels, across materials, and across ways of testing<sup><a href="#r5">5</a></sup>. This is the result, with what BookReader does next to it:</p>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Technique</th><th>Utility per Dunlosky et al.</th><th>In BookReader</th></tr></thead>
+        <tbody>
+          <tr><td>Practice testing (retrieval)</td><td>High</td><td>Flashcards, end-of-chapter question, exercises, Feynman mode</td></tr>
+          <tr><td>Distributed practice</td><td>High</td><td>Daily review scheduled with FSRS</td></tr>
+          <tr><td>Elaborative interrogation (“why?”)</td><td>Moderate</td><td>A “Why?” button on every card, with a quote from the book</td></tr>
+          <tr><td>Self-explanation</td><td>Moderate</td><td>Feynman mode and your own answers in the notebook</td></tr>
+          <tr><td>Interleaved practice</td><td>Moderate</td><td>Review shuffled across books and decks</td></tr>
+          <tr><td>Summarisation</td><td>Low</td><td>Summaries exist, as a map before reading, not as study</td></tr>
+          <tr><td>Highlighting</td><td>Low</td><td>Highlights are the starting point: questions and cards come from them</td></tr>
+          <tr><td>Rereading</td><td>Low</td><td>Nothing nudges you to reread: the app asks you instead</td></tr>
+          <tr><td>Keyword mnemonic and imagery</td><td>Low</td><td>Not used</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>Two things stand out. The two techniques people use most, rereading and highlighting, are at the bottom: they don’t hurt, but they don’t consistently improve performance, and they take time that could go elsewhere. And the two at the top are exactly the ones that take the most effort. BookReader has highlights and summaries because people use them and they help you find your way, but it treats them as the input to the process, not the process.</p>
+  </section>
+
+  <section>
+    <h2 id="retrieve">3. Retrieve, don’t reread</h2>
+    <p>The retrieval practice effect (the <em>testing effect</em>) is the strongest finding in all this research. The experiment that brought it into classrooms is Roediger and Karpicke’s, from 2006. Students read prose passages and then either restudied them or took free-recall tests with no feedback. On a final test five minutes later, the restudy group won. After two days and after a week, the group that had tried to recall won clearly. And the detail that matters: restudying made students more confident that they would remember<sup><a href="#r6">6</a></sup>. Rereading makes you feel you know; recalling makes you know.</p>
+    <p>Karpicke and Blunt took it further in <em>Science</em> in 2011. They compared retrieval practice with concept mapping, an elaboration technique widely used in science teaching. Retrieval won on comprehension and inference questions, not only on memory questions, and it won even when the final test was to draw a concept map<sup><a href="#r7">7</a></sup>.</p>
+    <p>Meta-analyses confirm the effect and show when it is larger. Rowland found that tests where you have to produce the answer beat tests where you recognise it among options, and that the effort of retrieval explains much of the effect<sup><a href="#r8">8</a></sup>. Adesope, Trevisan and Sundararajan found that practice tests beat restudying and every other comparison condition<sup><a href="#r9">9</a></sup>. And Pan and Rickard, with 192 effect sizes and over 10,000 participants, found that what you learn this way transfers to questions other than the ones you practised (d = 0.40), especially to application and inference questions. Their warning is useful too: after correcting for publication bias, transfer nearly disappears when practice is pure repetition of the same question<sup><a href="#r10">10</a></sup>.</p>
+    <div class="evidence"><span class="badge strong">Evidence: strong</span><p>Hundreds of experiments and several meta-analyses, with real materials and in classrooms. What is still debated is the mechanism, not the effect.</p></div>
+    <div class="in-app">
+      <p><span class="label">In BookReader</span></p>
+      <ul>
+        <li><b>Cards that come from the book.</b> The agent generates cards from a chapter or the whole book, basic or fill-in-the-blank (<em>cloze</em>), and each one keeps the passage it came from.</li>
+        <li><b>Write the answer.</b> You can flip the card and grade yourself, or write your answer first and have the agent check it. The second is producing; the first, recognising. The app counts them separately and never adds them up, because they aren’t worth the same.</li>
+        <li><b>One question at the end of each chapter.</b> With the HQ&amp;A reading template, when you move on to the next chapter the agent asks you one recall question about the one you just finished, without giving the answer. One per chapter and only going forward, so reading doesn’t turn into an exam.</li>
+        <li><b>No reviewing what you haven’t read.</b> New cards from a chapter don’t enter your review until you have moved past it. Reviewing something you haven’t read is guessing.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section>
+    <h2 id="spacing">4. Space your reviews</h2>
+    <p>Studying the same thing several times in a row works worse than spreading those same sessions over time. This is the distributed practice effect, and Cepeda and colleagues quantified it in 2006 with 839 assessments from 317 experiments. Their main finding is not that spacing helps, which was already known, but that the best gap between sessions grows with how long you want to retain what you learned<sup><a href="#r11">11</a></sup>.</p>
+    <p>In 2008 they measured it at scale: more than 1,350 people learned a set of facts, reviewed them after a gap of up to three and a half months, and were tested up to a year later. To remember something for a week, the best gap was 20 to 40% of that time. To remember it for a year, 5 to 10%<sup><a href="#r12">12</a></sup>. There is no gap that is right for everything, and reviewing too early wastes the review as much as reviewing too late.</p>
+    <p>The practical consequence is that doing this by hand doesn’t scale. With twenty cards you can keep track in a notebook. With two thousand spread across five books you need a program that knows, for each card, when you are about to forget it.</p>
+    <div class="evidence"><span class="badge strong">Evidence: strong</span><p>One of the most replicated effects in psychology, from Ebbinghaus to studies with thousands of participants and one-year retention.</p></div>
+  </section>
+
+  <section>
+    <h2 id="fsrs">5. Inside FSRS</h2>
+    <p>BookReader schedules reviews with FSRS (Free Spaced Repetition Scheduler), version 6, the same algorithm Anki offers. We started with SM-2, SuperMemo’s classic 1987 algorithm, and switched in September 2026 because FSRS predicts better when you will forget and, as a result, asks for fewer reviews to remember the same amount. FSRS grew out of Jarrett Ye’s work on the language app MaiMemo, published at KDD in 2022 with 220 million review logs<sup><a href="#r13">13</a></sup>. This section explains how it works, because it is the heart of the app.</p>
+
+    <h3>Three numbers per card</h3>
+    <p>FSRS describes the memory of each card with three variables, the so-called DSR model:</p>
+    <ul>
+      <li><b>Retrievability (R):</b> the probability that you recall it right now. It falls over time.</li>
+      <li><b>Stability (S):</b> the number of days it takes R to fall from 100% to 90%. It measures how well stored the card is.</li>
+      <li><b>Difficulty (D):</b> from 1 to 10, how hard it is for that card to gain stability.</li>
+    </ul>
+    <p>The FSRS-6 forgetting curve relates R to the elapsed days <code>t</code> and the stability:</p>
+    <div class="formula">R(t, S) = (1 + F · t / S) ^ (−w₂₀)
+
+F = 0.9 ^ (−1 / w₂₀) − 1      →  so that R(S, S) = 0.9</div>
+    <p>The exponent <code>w₂₀</code> controls how flat the curve is. In FSRS-5 it was fixed; in FSRS-6 it is one more parameter, which can be fitted to each person. With the default values (<code>w₂₀</code> = 0.1542), this is what three cards look like:</p>
+    <figure>
+<svg class="chart" viewBox="0 0 640 290" role="img" aria-label="FSRS-6 forgetting curve for three cards with different stability">
+<line class="c-grid" x1="58" x2="548" y1="236.0" y2="236.0"/><text class="c-tick" x="50" y="240.0" text-anchor="end">50%</text>
+<line class="c-grid" x1="58" x2="548" y1="192.0" y2="192.0"/><text class="c-tick" x="50" y="196.0" text-anchor="end">60%</text>
+<line class="c-grid" x1="58" x2="548" y1="148.0" y2="148.0"/><text class="c-tick" x="50" y="152.0" text-anchor="end">70%</text>
+<line class="c-grid" x1="58" x2="548" y1="104.0" y2="104.0"/><text class="c-tick" x="50" y="108.0" text-anchor="end">80%</text>
+<line class="c-grid" x1="58" x2="548" y1="60.0" y2="60.0"/><text class="c-tick" x="50" y="64.0" text-anchor="end">90%</text>
+<line class="c-grid" x1="58" x2="548" y1="16.0" y2="16.0"/><text class="c-tick" x="50" y="20.0" text-anchor="end">100%</text>
+<text class="c-tick" x="58.0" y="256" text-anchor="middle">0</text>
+<text class="c-tick" x="139.7" y="256" text-anchor="middle">10</text>
+<text class="c-tick" x="221.3" y="256" text-anchor="middle">20</text>
+<text class="c-tick" x="303.0" y="256" text-anchor="middle">30</text>
+<text class="c-tick" x="384.7" y="256" text-anchor="middle">40</text>
+<text class="c-tick" x="466.3" y="256" text-anchor="middle">50</text>
+<text class="c-tick" x="548.0" y="256" text-anchor="middle">60</text>
+<line class="c-target" x1="58" x2="548" y1="60.0" y2="60.0"/>
+<path class="c-line c-line1" d="M58.0,16.0 L62.1,26.1 L66.2,34.8 L70.2,42.2 L74.3,48.8 L78.4,54.7 L82.5,60.0 L86.6,64.8 L90.7,69.2 L94.8,73.3 L98.8,77.0 L102.9,80.5 L107.0,83.8 L111.1,86.9 L115.2,89.8 L119.2,92.5 L123.3,95.1 L127.4,97.5 L131.5,99.9 L135.6,102.1 L139.7,104.2 L143.8,106.2 L147.8,108.2 L151.9,110.1 L156.0,111.9 L160.1,113.6 L164.2,115.3 L168.2,116.9 L172.3,118.4 L176.4,119.9 L180.5,121.4 L184.6,122.8 L188.7,124.1 L192.8,125.5 L196.8,126.7 L200.9,128.0 L205.0,129.2 L209.1,130.4 L213.2,131.5 L217.2,132.7 L221.3,133.7 L225.4,134.8 L229.5,135.8 L233.6,136.9 L237.7,137.9 L241.8,138.8 L245.8,139.8 L249.9,140.7 L254.0,141.6 L258.1,142.5 L262.2,143.3 L266.2,144.2 L270.3,145.0 L274.4,145.9 L278.5,146.7 L282.6,147.4 L286.7,148.2 L290.8,149.0 L294.8,149.7 L298.9,150.4 L303.0,151.2 L307.1,151.9 L311.2,152.6 L315.2,153.2 L319.3,153.9 L323.4,154.6 L327.5,155.2 L331.6,155.9 L335.7,156.5 L339.8,157.1 L343.8,157.7 L347.9,158.3 L352.0,158.9 L356.1,159.5 L360.2,160.1 L364.2,160.6 L368.3,161.2 L372.4,161.7 L376.5,162.3 L380.6,162.8 L384.7,163.3 L388.8,163.8 L392.8,164.4 L396.9,164.9 L401.0,165.4 L405.1,165.9 L409.2,166.4 L413.2,166.8 L417.3,167.3 L421.4,167.8 L425.5,168.2 L429.6,168.7 L433.7,169.2 L437.8,169.6 L441.8,170.0 L445.9,170.5 L450.0,170.9 L454.1,171.3 L458.2,171.8 L462.2,172.2 L466.3,172.6 L470.4,173.0 L474.5,173.4 L478.6,173.8 L482.7,174.2 L486.8,174.6 L490.8,175.0 L494.9,175.4 L499.0,175.8 L503.1,176.1 L507.2,176.5 L511.2,176.9 L515.3,177.2 L519.4,177.6 L523.5,178.0 L527.6,178.3 L531.7,178.7 L535.8,179.0 L539.8,179.4 L543.9,179.7 L548.0,180.0"/>
+<circle class="c-dot c-line1" cx="82.5" cy="60.0" r="4"/>
+<text class="c-lab" x="556" y="184.0">S = 3 days</text>
+<path class="c-line c-line2" d="M58.0,16.0 L62.1,18.7 L66.2,21.3 L70.2,23.8 L74.3,26.1 L78.4,28.4 L82.5,30.6 L86.6,32.7 L90.7,34.8 L94.8,36.7 L98.8,38.6 L102.9,40.5 L107.0,42.2 L111.1,44.0 L115.2,45.6 L119.2,47.3 L123.3,48.8 L127.4,50.4 L131.5,51.8 L135.6,53.3 L139.7,54.7 L143.8,56.1 L147.8,57.4 L151.9,58.7 L156.0,60.0 L160.1,61.2 L164.2,62.5 L168.2,63.6 L172.3,64.8 L176.4,65.9 L180.5,67.1 L184.6,68.2 L188.7,69.2 L192.8,70.3 L196.8,71.3 L200.9,72.3 L205.0,73.3 L209.1,74.2 L213.2,75.2 L217.2,76.1 L221.3,77.0 L225.4,77.9 L229.5,78.8 L233.6,79.7 L237.7,80.5 L241.8,81.4 L245.8,82.2 L249.9,83.0 L254.0,83.8 L258.1,84.6 L262.2,85.4 L266.2,86.1 L270.3,86.9 L274.4,87.6 L278.5,88.3 L282.6,89.1 L286.7,89.8 L290.8,90.5 L294.8,91.2 L298.9,91.8 L303.0,92.5 L307.1,93.2 L311.2,93.8 L315.2,94.5 L319.3,95.1 L323.4,95.7 L327.5,96.3 L331.6,96.9 L335.7,97.5 L339.8,98.1 L343.8,98.7 L347.9,99.3 L352.0,99.9 L356.1,100.4 L360.2,101.0 L364.2,101.5 L368.3,102.1 L372.4,102.6 L376.5,103.2 L380.6,103.7 L384.7,104.2 L388.8,104.7 L392.8,105.2 L396.9,105.7 L401.0,106.2 L405.1,106.7 L409.2,107.2 L413.2,107.7 L417.3,108.2 L421.4,108.7 L425.5,109.1 L429.6,109.6 L433.7,110.1 L437.8,110.5 L441.8,111.0 L445.9,111.4 L450.0,111.9 L454.1,112.3 L458.2,112.7 L462.2,113.2 L466.3,113.6 L470.4,114.0 L474.5,114.4 L478.6,114.8 L482.7,115.3 L486.8,115.7 L490.8,116.1 L494.9,116.5 L499.0,116.9 L503.1,117.3 L507.2,117.6 L511.2,118.0 L515.3,118.4 L519.4,118.8 L523.5,119.2 L527.6,119.5 L531.7,119.9 L535.8,120.3 L539.8,120.6 L543.9,121.0 L548.0,121.4"/>
+<circle class="c-dot c-line2" cx="156.0" cy="60.0" r="4"/>
+<text class="c-lab" x="556" y="125.4">S = 12 days</text>
+<path class="c-line c-line3" d="M58.0,16.0 L62.1,16.7 L66.2,17.5 L70.2,18.2 L74.3,18.9 L78.4,19.6 L82.5,20.3 L86.6,21.0 L90.7,21.6 L94.8,22.3 L98.8,23.0 L102.9,23.6 L107.0,24.3 L111.1,24.9 L115.2,25.5 L119.2,26.1 L123.3,26.8 L127.4,27.4 L131.5,28.0 L135.6,28.6 L139.7,29.2 L143.8,29.8 L147.8,30.3 L151.9,30.9 L156.0,31.5 L160.1,32.0 L164.2,32.6 L168.2,33.1 L172.3,33.7 L176.4,34.2 L180.5,34.8 L184.6,35.3 L188.7,35.8 L192.8,36.3 L196.8,36.9 L200.9,37.4 L205.0,37.9 L209.1,38.4 L213.2,38.9 L217.2,39.4 L221.3,39.9 L225.4,40.4 L229.5,40.8 L233.6,41.3 L237.7,41.8 L241.8,42.2 L245.8,42.7 L249.9,43.2 L254.0,43.6 L258.1,44.1 L262.2,44.5 L266.2,45.0 L270.3,45.4 L274.4,45.9 L278.5,46.3 L282.6,46.7 L286.7,47.2 L290.8,47.6 L294.8,48.0 L298.9,48.4 L303.0,48.8 L307.1,49.2 L311.2,49.7 L315.2,50.1 L319.3,50.5 L323.4,50.9 L327.5,51.3 L331.6,51.7 L335.7,52.0 L339.8,52.4 L343.8,52.8 L347.9,53.2 L352.0,53.6 L356.1,54.0 L360.2,54.3 L364.2,54.7 L368.3,55.1 L372.4,55.4 L376.5,55.8 L380.6,56.2 L384.7,56.5 L388.8,56.9 L392.8,57.2 L396.9,57.6 L401.0,57.9 L405.1,58.3 L409.2,58.6 L413.2,59.0 L417.3,59.3 L421.4,59.7 L425.5,60.0 L429.6,60.3 L433.7,60.7 L437.8,61.0 L441.8,61.3 L445.9,61.7 L450.0,62.0 L454.1,62.3 L458.2,62.6 L462.2,62.9 L466.3,63.3 L470.4,63.6 L474.5,63.9 L478.6,64.2 L482.7,64.5 L486.8,64.8 L490.8,65.1 L494.9,65.4 L499.0,65.7 L503.1,66.0 L507.2,66.3 L511.2,66.6 L515.3,66.9 L519.4,67.2 L523.5,67.5 L527.6,67.8 L531.7,68.1 L535.8,68.4 L539.8,68.7 L543.9,68.9 L548.0,69.2"/>
+<circle class="c-dot c-line3" cx="425.5" cy="60.0" r="4"/>
+<text class="c-lab" x="556" y="73.2">S = 45 days</text>
+<text class="c-ax" x="303" y="280" text-anchor="middle">days since last review</text>
+</svg>
+      <figcaption>Probability of recalling a card by days since its last review, for stabilities of 3, 12 and 45 days. The dot marks where each curve crosses 90%, which is when FSRS schedules it again. Computed with the FSRS-6 default parameters.</figcaption>
+    </figure>
+
+    <h3>What happens at each review</h3>
+    <p>When you recall a card, its stability is multiplied. The interesting part is by how much:</p>
+    <div class="formula">S' = S · (1 + e^w₈ · (11 − D) · S^(−w₉) · (e^(w₁₀ · (1 − R)) − 1))</div>
+    <p>There are three terms to read. <code>(11 − D)</code>: easy cards grow more. <code>S^(−w₉)</code>: the more stable a card already is, the less it grows in proportion; memory saturates. And <code>e^(w₁₀ · (1 − R)) − 1</code>: the lower R was at the moment of review, that is, the harder it was to recall, the more stability grows. It is the Bjorks’ desirable difficulty turned into a formula. With the default parameters, for a card with stability 10 and difficulty 5:</p>
+    <figure>
+<svg class="chart" viewBox="0 0 640 276" role="img" aria-label="How much stability grows after a successful recall, by how hard the recall was">
+<line class="c-grid" x1="58" x2="606" y1="220.0" y2="220.0"/><text class="c-tick" x="50" y="224.0" text-anchor="end">×0</text>
+<line class="c-grid" x1="58" x2="606" y1="152.0" y2="152.0"/><text class="c-tick" x="50" y="156.0" text-anchor="end">×5</text>
+<line class="c-grid" x1="58" x2="606" y1="84.0" y2="84.0"/><text class="c-tick" x="50" y="88.0" text-anchor="end">×10</text>
+<line class="c-grid" x1="58" x2="606" y1="16.0" y2="16.0"/><text class="c-tick" x="50" y="20.0" text-anchor="end">×15</text>
+<rect class="c-bar" x="73.7" y="191.7" width="60" height="28.3" rx="4"/>
+<text class="c-val" x="103.7" y="184.7" text-anchor="middle">×2.1</text>
+<text class="c-tick" x="103.7" y="240" text-anchor="middle">95%</text>
+<rect class="c-bar c-bar-hi" x="165.0" y="176.4" width="60" height="43.6" rx="4"/>
+<text class="c-val" x="195.0" y="169.4" text-anchor="middle">×3.2</text>
+<text class="c-tick" x="195.0" y="240" text-anchor="middle">90%</text>
+<rect class="c-bar" x="256.3" y="144.0" width="60" height="76.0" rx="4"/>
+<text class="c-val" x="286.3" y="137.0" text-anchor="middle">×5.6</text>
+<text class="c-tick" x="286.3" y="240" text-anchor="middle">80%</text>
+<rect class="c-bar" x="347.7" y="108.9" width="60" height="111.1" rx="4"/>
+<text class="c-val" x="377.7" y="101.9" text-anchor="middle">×8.2</text>
+<text class="c-tick" x="377.7" y="240" text-anchor="middle">70%</text>
+<rect class="c-bar" x="439.0" y="70.8" width="60" height="149.2" rx="4"/>
+<text class="c-val" x="469.0" y="63.8" text-anchor="middle">×11.0</text>
+<text class="c-tick" x="469.0" y="240" text-anchor="middle">60%</text>
+<rect class="c-bar" x="530.3" y="29.7" width="60" height="190.3" rx="4"/>
+<text class="c-val" x="560.3" y="22.7" text-anchor="middle">×14.0</text>
+<text class="c-tick" x="560.3" y="240" text-anchor="middle">50%</text>
+<text class="c-ax" x="332" y="264" text-anchor="middle">probability of recall at the moment of review</text>
+</svg>
+      <figcaption>Factor by which stability is multiplied after a successful recall, by the card’s probability of recall at review time (S = 10 days, D = 5, FSRS-6 default parameters). Highlighted: BookReader’s operating point.</figcaption>
+    </figure>
+    <p>If waiting longer multiplies stability more, why not always review late? Because waiting also means failing more, and a failure is costly: stability drops, the card comes back the same day, and it counts as forgotten. FSRS finds the balance by setting a <b>desired retention</b>. BookReader uses 90%, and with that target the arithmetic is simple: the interval until the next review is the stability itself, because S is defined as the days until 90%. A card with S = 12 comes back in 12 days.</p>
+    <p>Failures have their own formula, which leaves stability below what you had and never above that of a short-term review. Same-day reviews, such as a failed card coming back at the end of the session, use a separate term: the curve hasn’t had time to fall, so it can’t be treated as a normal review. And difficulty drifts slowly towards an average value, so a bad streak doesn’t doom a card forever.</p>
+
+    <h3>What we know about its accuracy</h3>
+    <p>FSRS is measured on a public benchmark with about 10,000 real Anki collections and some 350 million evaluated reviews. The task is to predict, before each review, the probability that the person will recall the card, training only on their earlier history. With parameters fitted to each user, FSRS-6 reaches a <em>log loss</em> of 0.346, against 0.395 for a prediction that only uses the average success rate (lower is better). Some models predict better: a neural network reaches 0.277, but it has millions of parameters and is trained on thousands of users, while FSRS has 21 and runs in your browser. A moving average of recent results also comes out slightly ahead, but it doesn’t depend on elapsed days, so it can’t decide when to review, which is what a scheduler is for. FSRS-7, the next version, improves a little further; we use FSRS-6 because it is the version the in-app optimizer implements<sup><a href="#r14">14</a></sup>.</p>
+
+    <h3>Your own parameters</h3>
+    <p>The 21 default parameters come from millions of other people’s reviews. With enough history, they can be fitted to you. BookReader includes the optimizer and sets three conditions. It only uses complete histories, from cards whose first review was recorded, because a partial history teaches a curve that isn’t yours. It needs at least 400 reviews, because with fewer the result depends more on chance than on your memory. And it applies nothing on its own: it shows you the prediction error with the default parameters and with yours, and how many reviews you would have next month with each, and you decide. If yours don’t predict better, they aren’t even offered.</p>
+    <div class="in-app">
+      <p><span class="label">In BookReader</span></p>
+      <ul>
+        <li><b>Two buttons by default:</b> “Again” and “Good”. FSRS works well with two grades, and choosing between “Hard” and “Good” on every card is tiring. All four are still available, with the guarantee that a higher grade never schedules fewer days than a lower one.</li>
+        <li><b>A one-year ceiling</b> between reviews and <b>a cap of 20 new cards</b> per session, adjustable. Without a cap, generating three decks of 30 gives you 90 new cards on day one, and on day two you don’t come back. The ones left out aren’t lost: they wait until you want them.</li>
+        <li><b>Cards you keep failing.</b> After 8 lapses the app doesn’t suspend the card on its own: it tells you the card is most likely badly written (ambiguous, two questions in one, an answer that isn’t in the passage) and offers to rewrite it with the agent. A language model writes the cards, and a repeated failure is usually the card’s fault, not yours.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section>
+    <h2 id="mixing">6. Mixing and separating</h2>
+    <p>Interleaved practice means alternating topics or problem types instead of finishing one before moving to the next. The classic experiment is Kornell and Bjork’s: participants studied paintings by different artists, grouped by artist or mixed, and then had to identify the artist of new paintings. Mixing worked better. And, again, participants believed the opposite: they rated blocked study as more effective even after their own test had shown it wasn’t<sup><a href="#r15">15</a></sup>.</p>
+    <p>Brunmair and Richter’s meta-analysis of 59 studies puts numbers and limits on it. The overall effect is moderate (g = 0.42), large for paintings (g = 0.67) and other visual material, small for maths problems (g = 0.34), unclear for expository texts, and negative for word lists (g = −0.39), where blocking works better. Interleaving helps most when categories resemble each other and you have to learn to tell them apart<sup><a href="#r16">16</a></sup>.</p>
+    <div class="evidence"><span class="badge moderate">Evidence: moderate</span><p>Solid for learning to tell similar categories apart; unclear for expository texts, which is much of what you read in a book. We don’t claim more for it than it shows.</p></div>
+    <div class="in-app">
+      <p><span class="label">In BookReader</span></p>
+      <p>The daily review mixes due cards from all your decks and books, and shuffles them. But the main reason is a more modest one: in deck order you always review the same chapter first, and the order becomes a clue (you know the next answer by where the session is). For the same reason, the app separates <em>sibling</em> cards, the ones from the same passage: two cloze cards from the same sentence in a row give each other away.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2 id="explain">7. Explaining in your own words</h2>
+    <p>Michelene Chi’s ICAP framework sorts study activities into four levels by what the learner does: <b>passive</b> (reading, listening), <b>active</b> (highlighting, copying), <b>constructive</b> (generating something that wasn’t in the material: explaining, questioning, comparing) and <b>interactive</b> (constructing in dialogue with someone else). The hypothesis is that learning increases as you go up, and Chi and Wylie test it against studies of note-taking, concept mapping and self-explanation<sup><a href="#r17">17</a></sup>.</p>
+    <p>Self-explanation is the best-studied example of the constructive level. In the original study by Chi and colleagues, 14 eighth-graders were asked to explain to themselves each line of a text on the circulatory system, and 10 others read the text twice. The first group gained more from pretest to posttest, and the students who explained the most were the only ones who ended up with a correct mental model of the system<sup><a href="#r18">18</a></sup>. It is a small study; the later meta-analysis by Bisra and colleagues confirms that prompting self-explanation improves learning across many domains<sup><a href="#r19">19</a></sup>. Fiorella and Mayer group this and other techniques under <em>generative learning</em>: summarising in your own words, drawing, self-explaining, teaching, enacting what you learned<sup><a href="#r20">20</a></sup>.</p>
+    <p>Elaborative interrogation is the minimal version: asking yourself why something is true. Dunlosky rates it of moderate utility, for the same reason as self-explanation: it works in the lab and has been tested little in classrooms<sup><a href="#r5">5</a></sup>.</p>
+    <div class="evidence"><span class="badge moderate">Evidence: moderate</span><p>Consistent lab effects and favourable meta-analyses; fewer studies in real study conditions than retrieval or spacing.</p></div>
+    <div class="in-app">
+      <p><span class="label">In BookReader</span></p>
+      <ul>
+        <li><b>The notebook separates what AI can do from what you have to do.</b> Each field of a reading template is marked as information (the agent can fill it in, because it is mechanical retrieval from the book) or as cognition (you write it, and the agent only asks and reviews). An answer the AI writes for you has no generation effect.</li>
+        <li><b>One question at a time, at the right moment.</b> The notebook isn’t a form: when you start the book, finish a chapter or finish the book, it shows you the one question that’s due.</li>
+        <li><b>Your answers go into the deck.</b> In HQ&amp;A you highlight a passage, a question about it appears (yours or suggested by the agent) and you answer it. That pair becomes a card, and without your answer there is no card: the card is what you said, not what the model would say.</li>
+        <li><b>“Why?” from the card.</b> With the card flipped, you can ask why it is so. The agent answers in a few lines, starts with a literal quote from the passage (the app checks it is in the book) and flags anything that doesn’t come from it.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section>
+    <h2 id="feynman">8. Feynman mode, in detail</h2>
+    <p>The technique attributed to Feynman is simple: if you can’t explain it in plain words, you don’t understand it. BookReader’s Feynman mode asks you to explain a concept from the book, by voice or in writing, and checks your explanation against the book. The naive version of this, “tell me what I got wrong”, fails in known ways, so the design comes from research on tutoring.</p>
+    <h3>Expectations are computed before you speak</h3>
+    <p>AutoTutor, one of the best-studied dialogue tutors, prepares for each question a list of the ideas a good answer should cover and the typical misconceptions, and marks which ones the student covers during the dialogue<sup><a href="#r21">21</a></sup>. BookReader does the same: before you start, it extracts from the book between 3 and 7 expected ideas and the likely mistakes, each with its quote. If the bar is improvised while grading, you get the unfair “you left out X” when X was implicit. Computed beforehand and quoted, the criterion can be audited: you see what was expected and which passage it comes from.</p>
+    <h3>No verdict: it escalates</h3>
+    <p>When an idea is missing, the agent doesn’t tell you at once. It climbs four steps: inviting you to go on (“and why is that?”), giving a hint that points to the area without naming the piece, asking for that piece with a direct question, and only at the end telling you, with its quote. The step is decided by code, from the number of turns you have spent on that same idea, not by the model, which tends to help too early.</p>
+    <h3>By default, it only asks</h3>
+    <p>In a study of human tutoring by Chi and colleagues, tutors were barred from explaining and giving feedback, and could only prompt. Students learned just as well, because they had to construct more on their own<sup><a href="#r22">22</a></sup>. That is why Feynman mode asks, and leaves the full diagnosis for when you request it at the end. If it almost never gives a verdict, it can almost never give an unfair one, and it also costs one model call per turn instead of two.</p>
+    <h3>Neither finer nor coarser</h3>
+    <p>VanLehn reviewed the experiments comparing human tutoring, computer tutoring and no tutoring. He dismantled the figure that AI-tutor marketing keeps repeating (Bloom’s “two sigma”): human tutoring yields d = 0.79 and intelligent tutoring systems 0.76, nearly the same. And he didn’t find that finer interaction, correcting every small step, yielded more<sup><a href="#r23">23</a></sup>. Feynman mode works at the level of ideas: one per turn, not sentence by sentence.</p>
+    <div class="evidence"><span class="badge moderate">Evidence: moderate</span><p>Well-designed tutoring has large, well-measured effects. Whether an AI reproduces it faithfully is what is being studied now; that is why every decision in Feynman mode is written down so it can be measured.</p></div>
+  </section>
+
+  <section>
+    <h2 id="errors">9. Making mistakes with a safety net</h2>
+    <p>Getting a question wrong doesn’t lock in the mistake if you are corrected afterwards. Janet Metcalfe’s review of learning from errors runs against intuition: making a mistake and getting the correction often helps more than not making it, and errors made with high confidence, once corrected, are remembered especially well<sup><a href="#r25">25</a></sup>.</p>
+    <p>Multiple-choice questions are seen as the poor form of practice, because recognising costs less than recalling. Little and Bjork showed it needn’t be so: when the wrong options are competitive and plausible, ruling them out makes you retrieve what you know about them too, and later you answer questions about those options better, even though you were never asked them<sup><a href="#r24">24</a></sup>.</p>
+    <div class="in-app">
+      <p><span class="label">In BookReader</span></p>
+      <ul>
+        <li><b>Questions whose wrong options teach.</b> Each option carries its explanation: why it is right, or where someone who picks it goes wrong. The right one carries a literal quote from the chapter, and the app checks that the quote is in the book before showing you the question.</li>
+        <li><b>No test-taking tricks.</b> The app watches for the usual flaws of badly written questions: the right answer much longer than the others, “all of the above”, a right answer that echoes the question, or sweeping wrong options (“always”, “never”) next to a qualified right one, which you can get without having read.</li>
+        <li><b>What you miss comes back.</b> At the end of a chapter you can do a matrix exercise graded cell by cell. What you miss or hesitate on goes into the deck as a card and comes back with FSRS.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section>
+    <h2 id="calibration">10. Knowing what you know</h2>
+    <p>If the illusion of competence is the underlying problem, the fix starts with measuring it. When you write your answer on a card, two things happen: you grade yourself, and the agent judges whether your answer was right. The analysis screen compares the two. If you pass yourself much more often than the agent does, you are overestimating, and the app tells you with the number.</p>
+    <p>The retention it shows isn’t the flattering kind either. It counts only the reviews that were due, from cards already learned and at least a day after the previous one, and only the first grade of each card in the day: a failed card that comes back at the end of the session and you get right isn’t long-term memory. It separates young cards (interval under 21 days) from mature ones, as Anki does.</p>
+  </section>
+
+  <section>
+    <h2 id="ai">11. When AI makes you learn less</h2>
+    <p>All of the above faces a new threat. In 2025 Bastani and colleagues published in <em>PNAS</em> a field experiment with nearly a thousand high-school maths students. Some practised with GPT-4 in a ChatGPT-like interface, some with a version prompted to safeguard learning, and some without AI. During practice, AI sent grades up: 48% with the standard version and 127% with the safeguarded one. But once access was taken away, those who had practised with the standard version scored 17% lower on the exam than those who never had it. They used it as a crutch. With the safeguarded version, the harm largely disappeared<sup><a href="#r26">26</a></sup>.</p>
+    <p>The same year, Kestin and colleagues published in <em>Scientific Reports</em> a randomised trial with college physics students: an AI tutor built on the same teaching practices as the active-learning classes led students to learn more, in less time, than in those classes<sup><a href="#r27">27</a></sup>. It is one institution and one course, but the conclusion of the two studies together is clear: the variable isn’t whether you use AI, but whether the system lets you do the cognitive work or does it for you.</p>
+    <div class="evidence"><span class="badge tentative">Evidence: tentative</span><p>Few trials so far, with specific populations and subjects. The direction matches everything above: what costs you no effort doesn’t stay.</p></div>
+    <div class="in-app">
+      <p><span class="label">In BookReader</span></p>
+      <p>The rules that come from this are the most important in the app. The agent explains the part you don’t understand so you can go back to the page; it doesn’t summarise the chapter so you can skip it. Every answer comes from passages of the book and carries its quote, and if the book doesn’t cover something, it says so. It doesn’t write for you the notebook fields you have to think through yourself. And the study features are ordered so you produce first and check afterwards, never the other way round.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2 id="not">12. What we don’t do</h2>
+    <p><b>Learning styles.</b> The idea that each person learns best when taught in their style (visual, auditory, kinaesthetic) is widespread. Pashler, McDaniel, Rohrer and Bjork reviewed the evidence in 2008 and set out what an experiment would have to show to validate it: that the method that works best for one style is not the one that works best for another. They found almost no studies with that design, and several of those that had it contradicted the hypothesis<sup><a href="#r28">28</a></sup>. BookReader doesn’t ask for your style. The reading templates change with your <em>goal</em> for the book (preparing for an exam, applying it to a problem, following an argument), because that does change what is worth doing.</p>
+    <p><b>Passing summaries off as study.</b> There are summaries, mind maps and infographics because they help you get your bearings before reading, or come back to a book months later. We don’t sell them as a way to learn: in the ICAP framework they are material the agent produces for you, the lower half of the scale.</p>
+    <p><b>Promising miracle numbers.</b> We don’t say BookReader makes you learn twice as much. We say which techniques it applies, what research says about each, and how we measure whether it works.</p>
+  </section>
+
+  <section>
+    <h2 id="next">13. Next: questions before you read</h2>
+    <p>Asking questions about something you haven’t studied yet seems pointless: you will get almost all of them wrong. But if you then study the material, you remember it better than if you hadn’t been asked. This is the prequestion effect, and Pan and Carpenter review it with texts, videos and lectures<sup><a href="#r30">30</a></sup>. The preregistered meta-analysis by St. Hilaire, Chan and Ahn finds a moderate effect on what was asked (g = 0.54) and almost none on the rest of the material (g = 0.04)<sup><a href="#r29">29</a></sup>. It works by directing attention, so the questions have to be about what matters.</p>
+    <p>A reader is in the best position to do this, because it knows which chapter you are about to open. The idea is that when you start a chapter, the app asks you two or three questions about what you are about to read, with no way to see the answer, and gives them back when you finish. It isn’t in the app yet. When it is, we will write about it here with its first measurements.</p>
+    <div class="evidence"><span class="badge moderate">Evidence: moderate</span><p>A consistent effect on what was asked, limited to that. Classroom studies and studies with long books are still missing.</p></div>
+  </section>
+
+  <section>
+    <h2 id="measure">14. How we measure whether it works</h2>
+    <p>Every grade you give in a review and every exercise you do leaves a record that is never changed afterwards: which card, what you answered, how (written or just flipped), how long it took and what the agent judged. That record travels with sync and underpins everything the app says about your study. Time counted is capped per attempt, so a card left open while you do something else doesn’t inflate the total.</p>
+    <p>To decide whether a change to the app helps people learn, we don’t look at reading time or at whether the experience feels smooth, which is exactly what misleads. We look at card stability several days out and at how many reviews it takes to retain the same amount. Every change to how the app asks, grades or schedules is written down beforehand with its baseline, its metric and its deadline, and judged against them.</p>
+  </section>
+
+  <section>
+    <h2 id="routine">15. A routine for reading this way</h2>
+    <ol>
+      <li><b>Before you start,</b> tell the app what you want to get out of the book. That sets the reading template.</li>
+      <li><b>While you read,</b> highlight what matters and ask the agent about what you don’t understand. Then go back to the page.</li>
+      <li><b>When you finish a chapter,</b> answer the question that’s due without looking at the book. For more practice, generate the cards or the exercise for that chapter.</li>
+      <li><b>Every day,</b> do your review: 10 to 15 minutes is usually enough. Write the answer before flipping the card whenever you can.</li>
+      <li><b>Once a week,</b> pick the concept you know least well and explain it in Feynman mode.</li>
+    </ol>
+    <p>You will notice it takes more effort than rereading. That is the sign it works.</p>
+  </section>
+
+  <section class="refs" aria-labelledby="references">
+    <h2 id="references">References</h2>
+    <ol>
+      <li id="r1">Murre, J. M. J. &amp; Dros, J. (2015). Replication and analysis of Ebbinghaus’ forgetting curve. <em>PLOS ONE</em>, 10(7). <a href="https://doi.org/10.1371/journal.pone.0120644">doi:10.1371/journal.pone.0120644</a></li>
+      <li id="r2">Bjork, R. A., Dunlosky, J. &amp; Kornell, N. (2013). Self-regulated learning: Beliefs, techniques, and illusions. <em>Annual Review of Psychology</em>, 64. <a href="https://doi.org/10.1146/annurev-psych-113011-143823">doi:10.1146/annurev-psych-113011-143823</a></li>
+      <li id="r3">Koriat, A. &amp; Bjork, R. A. (2005). Illusions of competence in monitoring one’s knowledge during study. <em>Journal of Experimental Psychology: Learning, Memory, and Cognition</em>, 31(2). <a href="https://doi.org/10.1037/0278-7393.31.2.187">doi:10.1037/0278-7393.31.2.187</a></li>
+      <li id="r4">Bjork, E. L. &amp; Bjork, R. A. (2011). Making things hard on yourself, but in a good way: Creating desirable difficulties to enhance learning. In <em>Psychology and the Real World</em>. Worth Publishers. <a href="https://bjorklab.psych.ucla.edu/wp-content/uploads/sites/13/2016/04/EBjork_RBjork_2011.pdf">PDF</a></li>
+      <li id="r5">Dunlosky, J., Rawson, K. A., Marsh, E. J., Nathan, M. J. &amp; Willingham, D. T. (2013). Improving students’ learning with effective learning techniques. <em>Psychological Science in the Public Interest</em>, 14(1). <a href="https://doi.org/10.1177/1529100612453266">doi:10.1177/1529100612453266</a></li>
+      <li id="r6">Roediger, H. L. &amp; Karpicke, J. D. (2006). Test-enhanced learning: Taking memory tests improves long-term retention. <em>Psychological Science</em>, 17(3). <a href="https://doi.org/10.1111/j.1467-9280.2006.01693.x">doi:10.1111/j.1467-9280.2006.01693.x</a></li>
+      <li id="r7">Karpicke, J. D. &amp; Blunt, J. R. (2011). Retrieval practice produces more learning than elaborative studying with concept mapping. <em>Science</em>, 331(6018). <a href="https://doi.org/10.1126/science.1199327">doi:10.1126/science.1199327</a></li>
+      <li id="r8">Rowland, C. A. (2014). The effect of testing versus restudy on retention: A meta-analytic review of the testing effect. <em>Psychological Bulletin</em>, 140(6). <a href="https://doi.org/10.1037/a0037559">doi:10.1037/a0037559</a></li>
+      <li id="r9">Adesope, O. O., Trevisan, D. A. &amp; Sundararajan, N. (2017). Rethinking the use of tests: A meta-analysis of practice testing. <em>Review of Educational Research</em>, 87(3). <a href="https://doi.org/10.3102/0034654316689306">doi:10.3102/0034654316689306</a></li>
+      <li id="r10">Pan, S. C. &amp; Rickard, T. C. (2018). Transfer of test-enhanced learning: Meta-analytic review and synthesis. <em>Psychological Bulletin</em>, 144(7). <a href="https://doi.org/10.1037/bul0000151">doi:10.1037/bul0000151</a></li>
+      <li id="r11">Cepeda, N. J., Pashler, H., Vul, E., Wixted, J. T. &amp; Rohrer, D. (2006). Distributed practice in verbal recall tasks: A review and quantitative synthesis. <em>Psychological Bulletin</em>, 132(3). <a href="https://doi.org/10.1037/0033-2909.132.3.354">doi:10.1037/0033-2909.132.3.354</a></li>
+      <li id="r12">Cepeda, N. J., Vul, E., Rohrer, D., Wixted, J. T. &amp; Pashler, H. (2008). Spacing effects in learning: A temporal ridgeline of optimal retention. <em>Psychological Science</em>, 19(11). <a href="https://doi.org/10.1111/j.1467-9280.2008.02209.x">doi:10.1111/j.1467-9280.2008.02209.x</a></li>
+      <li id="r13">Ye, J., Su, J. &amp; Cao, Y. (2022). A stochastic shortest path algorithm for optimizing spaced repetition scheduling. <em>Proceedings of the 28th ACM SIGKDD Conference on Knowledge Discovery and Data Mining</em>. <a href="https://doi.org/10.1145/3534678.3539081">doi:10.1145/3534678.3539081</a></li>
+      <li id="r14">Open Spaced Repetition. <em>SRS Benchmark</em> (retrieved November 7, 2026). <a href="https://github.com/open-spaced-repetition/srs-benchmark">github.com/open-spaced-repetition/srs-benchmark</a></li>
+      <li id="r15">Kornell, N. &amp; Bjork, R. A. (2008). Learning concepts and categories: Is spacing the “enemy of induction”? <em>Psychological Science</em>, 19(6). <a href="https://doi.org/10.1111/j.1467-9280.2008.02127.x">doi:10.1111/j.1467-9280.2008.02127.x</a></li>
+      <li id="r16">Brunmair, M. &amp; Richter, T. (2019). Similarity matters: A meta-analysis of interleaved learning and its moderators. <em>Psychological Bulletin</em>, 145(11). <a href="https://doi.org/10.1037/bul0000209">doi:10.1037/bul0000209</a></li>
+      <li id="r17">Chi, M. T. H. &amp; Wylie, R. (2014). The ICAP framework: Linking cognitive engagement to active learning outcomes. <em>Educational Psychologist</em>, 49(4). <a href="https://doi.org/10.1080/00461520.2014.965823">doi:10.1080/00461520.2014.965823</a></li>
+      <li id="r18">Chi, M. T. H., de Leeuw, N., Chiu, M.-H. &amp; LaVancher, C. (1994). Eliciting self-explanations improves understanding. <em>Cognitive Science</em>, 18(3). <a href="https://doi.org/10.1207/s15516709cog1803_3">doi:10.1207/s15516709cog1803_3</a></li>
+      <li id="r19">Bisra, K., Liu, Q., Nesbit, J. C., Salimi, F. &amp; Winne, P. H. (2018). Inducing self-explanation: A meta-analysis. <em>Educational Psychology Review</em>, 30. <a href="https://doi.org/10.1007/s10648-018-9434-x">doi:10.1007/s10648-018-9434-x</a></li>
+      <li id="r20">Fiorella, L. &amp; Mayer, R. E. (2016). Eight ways to promote generative learning. <em>Educational Psychology Review</em>, 28. <a href="https://doi.org/10.1007/s10648-015-9348-9">doi:10.1007/s10648-015-9348-9</a></li>
+      <li id="r21">Graesser, A. C. et al. (2004). AutoTutor: A tutor with dialogue in natural language. <em>Behavior Research Methods, Instruments, &amp; Computers</em>, 36(2). <a href="https://doi.org/10.3758/BF03195563">doi:10.3758/BF03195563</a></li>
+      <li id="r22">Chi, M. T. H., Siler, S. A., Jeong, H., Yamauchi, T. &amp; Hausmann, R. G. (2001). Learning from human tutoring. <em>Cognitive Science</em>, 25(4). <a href="https://doi.org/10.1207/s15516709cog2504_1">doi:10.1207/s15516709cog2504_1</a></li>
+      <li id="r23">VanLehn, K. (2011). The relative effectiveness of human tutoring, intelligent tutoring systems, and other tutoring systems. <em>Educational Psychologist</em>, 46(4). <a href="https://doi.org/10.1080/00461520.2011.611369">doi:10.1080/00461520.2011.611369</a></li>
+      <li id="r24">Little, J. L. &amp; Bjork, E. L. (2015). Optimizing multiple-choice tests as tools for learning. <em>Memory &amp; Cognition</em>, 43(1). <a href="https://doi.org/10.3758/s13421-014-0452-8">doi:10.3758/s13421-014-0452-8</a></li>
+      <li id="r25">Metcalfe, J. (2017). Learning from errors. <em>Annual Review of Psychology</em>, 68. <a href="https://doi.org/10.1146/annurev-psych-010416-044022">doi:10.1146/annurev-psych-010416-044022</a></li>
+      <li id="r26">Bastani, H. et al. (2025). Generative AI without guardrails can harm learning: Evidence from high school mathematics. <em>PNAS</em>, 122. <a href="https://doi.org/10.1073/pnas.2422633122">doi:10.1073/pnas.2422633122</a></li>
+      <li id="r27">Kestin, G. et al. (2025). AI tutoring outperforms in-class active learning: An RCT introducing a novel research-based design in an authentic educational setting. <em>Scientific Reports</em>, 15. <a href="https://doi.org/10.1038/s41598-025-97652-6">doi:10.1038/s41598-025-97652-6</a></li>
+      <li id="r28">Pashler, H., McDaniel, M., Rohrer, D. &amp; Bjork, R. (2008). Learning styles: Concepts and evidence. <em>Psychological Science in the Public Interest</em>, 9(3). <a href="https://doi.org/10.1111/j.1539-6053.2009.01038.x">doi:10.1111/j.1539-6053.2009.01038.x</a></li>
+      <li id="r29">St. Hilaire, K. J., Chan, J. C. K. &amp; Ahn, D. (2024). Guessing as a learning intervention: A meta-analytic review of the prequestion effect. <em>Psychonomic Bulletin &amp; Review</em>, 31(2). <a href="https://doi.org/10.3758/s13423-023-02353-8">doi:10.3758/s13423-023-02353-8</a></li>
+      <li id="r30">Pan, S. C. &amp; Carpenter, S. K. (2023). Prequestioning and pretesting effects: A review of empirical research, theoretical perspectives, and implications for educational practice. <em>Educational Psychology Review</em>, 35. <a href="https://doi.org/10.1007/s10648-023-09814-5">doi:10.1007/s10648-023-09814-5</a></li>
+    </ol>
+  </section>
+
+  <footer class="sign">
+    <img src="../../assets/landing/luis.webp" alt="" width="52" height="52">
+    <p>BookReader is made by <b>Luis González</b> in Spain. If anything in this article doesn’t match a study or what the app does, it’s a bug: <a href="https://github.com/iamluisgb/bookreader/issues">tell me</a>.</p>
+  </footer>
+  <div class="cta-row"><a class="btn-primary" href="../../app/" data-umami-event="Open app" data-umami-event-where="blog-end">Open BookReader</a></div>
+  <p class="cta-note">Free. No account. In your browser.</p>
+</main>
+<footer class="foot">
+  <div class="wrap"><a href="../../">Home</a> · <a href="../">Blog</a> · <a href="../../why/">Why BookReader</a> · <a href="../../privacy/">Privacy</a> · <a href="../../es/blog/ciencia-del-aprendizaje/">Español</a> · © 2026 Luis González</div>
+</footer>
+</body>
+</html>

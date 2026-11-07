@@ -104,7 +104,7 @@ test.describe('landing · diagrama, práctica y manifiesto', () => {
     const robots = readFileSync(join(__dirname, '..', 'robots.txt'), 'utf8');
     expect(robots).toContain('Sitemap: https://bookreader.raiatech.com/sitemap.xml');
     const sitemap = readFileSync(join(__dirname, '..', 'sitemap.xml'), 'utf8');
-    for (const u of ['/', '/es/', '/why/', '/es/por-que/', '/privacy/']) expect(sitemap).toContain(`<loc>https://bookreader.raiatech.com${u}</loc>`);
+    for (const u of ['/', '/es/', '/why/', '/es/por-que/', '/blog/', '/es/blog/', '/blog/science-of-learning/', '/es/blog/ciencia-del-aprendizaje/', '/privacy/']) expect(sitemap).toContain(`<loc>https://bookreader.raiatech.com${u}</loc>`);
     const build = readFileSync(join(__dirname, '..', 'scripts', 'build-pages.mjs'), 'utf8');
     for (const f of ['404.html', 'robots.txt', 'sitemap.xml']) expect(build).toContain(`'${f}'`);
   });
@@ -116,6 +116,32 @@ test.describe('landing · diagrama, práctica y manifiesto', () => {
     await expect(page.locator('h1')).toHaveText('What you read should stay with you.');
     await page.goto(BASE + '/es/por-que/');
     await expect(page.locator('h1')).toHaveText('Lo que lees debería quedarse contigo.');
+  });
+
+  // El blog: enlazado desde la portada, cada artículo con su gemelo en el otro idioma, cada
+  // cita del texto apuntando a una referencia que existe y cada referencia citada al menos una vez.
+  test('el blog existe en los dos idiomas, con hreflang cruzado y citas que llevan a su referencia', async ({ page }) => {
+    await page.goto(BASE + '/');
+    await expect(page.locator('footer a[href="blog/"]')).toHaveCount(1);
+    const posts = [['/blog/science-of-learning/', '/es/blog/ciencia-del-aprendizaje/']];
+    for (const [en, es] of posts) {
+      for (const [u, other] of [[en, es], [es, en]]) {
+        await page.goto(BASE + u);
+        expect(await page.locator('link[rel="canonical"]').getAttribute('href')).toBe('https://bookreader.raiatech.com' + u);
+        expect(await page.locator(`link[rel="alternate"][href="https://bookreader.raiatech.com${other}"]`).count()).toBe(1);
+        const cited = await page.locator('main sup a').evaluateAll((as) => as.map((a) => a.getAttribute('href')));
+        const refs = await page.locator('.refs li[id]').evaluateAll((ls) => ls.map((l) => '#' + l.id));
+        expect(cited.filter((h) => !refs.includes(h!)), 'citas sin referencia').toEqual([]);
+        expect(refs.filter((r) => !cited.includes(r)), 'referencias sin citar').toEqual([]);
+        await expect(page.locator('.chart')).toHaveCount(2);
+      }
+      await page.goto(BASE + '/es/blog/');
+      await expect(page.locator(`.blog-list a[href="${es.replace('/es/blog/', '')}"]`)).toHaveCount(1);
+      await page.goto(BASE + '/blog/');
+      await expect(page.locator(`.blog-list a[href="${en.replace('/blog/', '')}"]`)).toHaveCount(1);
+    }
+    const build = readFileSync(join(__dirname, '..', 'scripts', 'build-pages.mjs'), 'utf8');
+    expect(build).toContain("'blog'");
   });
 });
 
@@ -135,7 +161,7 @@ test.describe('landing · en el móvil', () => {
 // móvil juntaba HTML nuevo con motion.js viejo, que se rompía y dejaba el mazo sin girar.
 test('los JS y CSS de la landing llevan ?v= en todas las páginas públicas', () => {
   const bad: string[] = [];
-  for (const f of ['index.html', 'es/index.html', 'why/index.html', 'es/por-que/index.html']) {
+  for (const f of ['index.html', 'es/index.html', 'why/index.html', 'es/por-que/index.html', 'blog/index.html', 'es/blog/index.html', 'blog/science-of-learning/index.html', 'es/blog/ciencia-del-aprendizaje/index.html']) {
     const src = readFileSync(join(process.cwd(), f), 'utf8');
     for (const m of src.matchAll(/assets\/landing\/[\w-]+\.(?:js|css)(\?v=\w+)?/g)) if (!m[1]) bad.push(`${f}: ${m[0]}`);
   }
