@@ -1869,8 +1869,11 @@ function positionMenu(anchor) {
   const mw = menuEl.offsetWidth, mh = menuEl.offsetHeight;
   let left = Math.min(r.right - mw, window.innerWidth - mw - 8);
   left = Math.max(8, left);
+  // Debajo del botón si cabe; si no, encima; si tampoco, pegado al borde de abajo. El
+  // CSS topa la altura al viewport, así que siempre cabe entero y el resto es scroll.
   let top = r.bottom + 6;
-  if (top + mh > window.innerHeight - 8) top = Math.max(8, r.top - mh - 6);
+  if (top + mh > window.innerHeight - 8) top = r.top - mh - 6;
+  if (top < 8) top = Math.max(8, window.innerHeight - mh - 8);
   menuEl.style.left = left + 'px';
   menuEl.style.top = top + 'px';
   menuEl.style.visibility = 'visible';
