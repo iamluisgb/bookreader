@@ -236,15 +236,23 @@ function wholePrompt(base) {
       'El usuario lee el libro en la app: nunca le pidas que copie ni pegue texto.');
 }
 
+// IA14_MAX_TOKENS: tope de salida del chat para medir otro valor que el de la app (IA16).
+const MAX_OUT = Number(process.env.IA14_MAX_TOKENS) || undefined;
 async function answer(M, messages) {
   const t0 = Date.now(); let acc = '', truncated = false;
-  const raw = await M.LLM.chatStream({ messages, onToken: (t) => { acc += t; }, onDone: (i) => { truncated = !!i?.truncated; } });
+  const raw = await M.LLM.chatStream({ messages, ...(MAX_OUT ? { maxTokens: MAX_OUT } : {}), onToken: (t) => { acc += t; }, onDone: (i) => { truncated = !!i?.truncated; } });
   return { text: raw || acc, ms: Date.now() - t0, truncated };
 }
 
 // `--arms rag` corre un solo brazo (p. ej. para medir un cambio del RAG contra el baseline).
 const armsAt = process.argv.indexOf('--arms');
 const ARMS = armsAt > 0 ? process.argv[armsAt + 1].split(',') : ['rag', 'whole'];
+// `--types synthesis` filtra por tipo de pregunta; `--reps N` repite cada una (lo aleatorio,
+// como el truncado, se mide con repeticiones y no con una sola pasada).
+const typesAt = process.argv.indexOf('--types');
+const TYPES = typesAt > 0 ? process.argv[typesAt + 1].split(',') : null;
+const repsAt = process.argv.indexOf('--reps');
+const REPS = repsAt > 0 ? Number(process.argv[repsAt + 1]) : 1;
 
 async function cmdRun() {
   const named = process.argv.indexOf('--name');
@@ -254,15 +262,16 @@ async function cmdRun() {
   if (!bat.frozen) throw new Error('la batería no está congelada: corre `gen` primero');
   const M = await appModules();
   const run = fs.existsSync(outFile) ? JSON.parse(fs.readFileSync(outFile, 'utf8'))
-    : { name, model: ANSWER_MODEL, battery: bat.frozen, startedAt: new Date().toISOString(), items: [] };
+    : { name, model: ANSWER_MODEL, maxTokens: MAX_OUT || 'app', battery: bat.frozen, startedAt: new Date().toISOString(), items: [] };
   const done = new Set(run.items.map(i => i.key));
   for (const b of bat.books) {
     const book = loadBook(b.id);
     M.Retrieval.buildIndex(b.id, M.Retrieval.parsePassages(book.annotated, new Map(), book.tocLabels));
     const base = M.Template.systemPrompt(GOAL, null, null, { tocLabels: book.tocLabels });
     for (const [qi, q] of b.questions.entries()) {
-      for (const arm of ARMS) {
-        const key = `${b.id.slice(0, 12)}:${qi}:${arm}`;
+      if (TYPES && !TYPES.includes(q.type)) continue;
+      for (let rep = 0; rep < REPS; rep++) for (const arm of ARMS) {
+        const key = `${b.id.slice(0, 12)}:${qi}:${arm}` + (rep ? `:r${rep}` : '');
         if (done.has(key)) continue;
         let ctx, system, framing, expanded = false;
         if (arm === 'rag') {
@@ -279,7 +288,10 @@ async function cmdRun() {
           system = wholePrompt(base);
           framing = 'LIBRO COMPLETO (cita los pasajes con sus anclas [[aN]]):\n\n';
         }
-        const messages = [{ role: 'system', content: system }, { role: 'user', content: framing + ctx.text }, { role: 'user', content: q.q }];
+        // nan devuelve la MISMA respuesta, en <1 s, a una petición idéntica (medido en IA16: 8 respuestas
+        // distintas de 24). Cada repetición lleva un marcador mínimo para ser una muestra de verdad.
+        const sys = rep ? `${system}\n\n(muestra ${rep})` : system;
+        const messages = [{ role: 'system', content: sys }, { role: 'user', content: framing + ctx.text }, { role: 'user', content: q.q }];
         const a = await answer(M, messages);
         run.items.push({
           key, book: b.id, title: book.title, qi, type: q.type, lang: q.lang, arm, q: q.q,
@@ -368,9 +380,11 @@ function cmdReport() {
     ['Trampa · honesta', (a) => f(rate(by(a, 'trap'), 'honest'))],
     ['Tokens de contexto por pregunta (media)', (a) => Math.round(avg(by(a).map(i => i.ctxTokens)) / 1000) + 'k'],
     ['Latencia (mediana, s)', (a) => { const v = by(a).map(i => i.ms).sort((x, y) => x - y); return f(v[Math.floor(v.length / 2)] / 1000, 1); }],
-    ['Respuestas truncadas', (a) => String(by(a).filter(i => i.truncated).length)],
+    ['Respuestas truncadas', (a) => `${by(a).filter(i => i.truncated).length}/${by(a).length}`],
+    ['Respuestas vacías', (a) => `${by(a).filter(i => !String(i.answer || '').trim()).length}/${by(a).length}`],
+    ['Longitud de respuesta (mediana, caracteres)', (a) => { const v = by(a).map(i => String(i.answer || '').length).sort((x, y) => x - y); return v.length ? String(v[Math.floor(v.length / 2)]) : '—'; }],
   ];
-  console.log(`IA14 · run ${run.name} · modelo ${run.model} · juez ${run.judge || '—'} · ${new Set(run.items.map(i => i.book + i.qi)).size} preguntas\n`);
+  console.log(`IA14 · run ${run.name} · modelo ${run.model} · tope ${run.maxTokens || 'app'} · juez ${run.judge || '—'} · ${new Set(run.items.map(i => i.book + i.qi)).size} preguntas\n`);
   console.log('| Métrica | RAG (hoy) | Libro entero |\n|---|---|---|');
   for (const [label, fn] of rows) console.log(`| ${label} | ${fn('rag')} | ${fn('whole')} |`);
   const gate = by('rag').filter(i => i.agenticGate).length;

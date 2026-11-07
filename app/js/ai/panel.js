@@ -53,6 +53,10 @@ const CTX_BUDGET = 60000;          // tope de tokens de libro por turno normal (
 const CTX_BUDGET_CHAPTER = 110000; // techo cuando el usuario NOMBRA un capítulo (que quepa entero)
 const HISTORY_MSGS = 6;            // mensajes de historial verbatim que se reenvían (ventana)
 const TOKEN_GUARD = 180000;        // por encima de esto, avisar antes de enviar (caso patológico)
+// Tope de SALIDA de una respuesta del chat (IA16). En nan incluye el razonamiento: con el 4096 de
+// llm.js, deepseek-v4-flash razona 2.400–3.700 tokens en una síntesis y la respuesta se cortaba al
+// azar o salía vacía. Solo se paga lo que se genera, así que un techo holgado no encarece nada.
+const CHAT_MAX_TOKENS = 16384;
 
 let els = {};
 let book = null, bookId = null, bookTitle = '', bookAuthor = '';
@@ -2168,15 +2172,24 @@ async function deliver(aug, question, { showUser = true, ref = null, systemExtra
       { role: 'user', content: aug },
     );
 
-    raw = await LLM.chatStream({
-      messages, signal: abortCtrl.signal,
+    const streamOpts = {
+      messages, signal: abortCtrl.signal, maxTokens: CHAT_MAX_TOKENS,
       onToken: (t) => {
         if (thinking) { thinking = false; textNode.textContent = ''; }
         acc += t;
         renderStreaming(textNode, acc);   // Markdown ya formateado mientras llega (throttle a 1 frame)
       },
       onDone: (info) => { truncated = info.truncated; },
-    });
+    };
+    raw = await LLM.chatStream(streamOpts);
+    // El razonamiento se comió todo el tope y no llegó ni una palabra (IA16): un «Continuar» sobre
+    // una burbuja vacía no tiene de dónde seguir. Se repite UNA vez sin razonamiento, que responde
+    // siempre dentro del tope, en vez de dejar al usuario delante de una burbuja en blanco.
+    if (truncated && !String(raw || acc).trim()) {
+      truncated = false; acc = '';
+      textNode.innerHTML = `<span class="ai-typing">${t('pensando…')}</span>`;
+      raw = await LLM.chatStream({ ...streamOpts, thinking: false });
+    }
     cancelStreamingRender();
     if (mySeq !== bookSeq) return;   // el usuario cambió de libro → no pintar/persistir en el convo equivocado
     const finalText = raw || acc;
