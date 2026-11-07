@@ -242,6 +242,10 @@ async function answer(M, messages) {
   return { text: raw || acc, ms: Date.now() - t0, truncated };
 }
 
+// `--arms rag` corre un solo brazo (p. ej. para medir un cambio del RAG contra el baseline).
+const armsAt = process.argv.indexOf('--arms');
+const ARMS = armsAt > 0 ? process.argv[armsAt + 1].split(',') : ['rag', 'whole'];
+
 async function cmdRun() {
   const named = process.argv.indexOf('--name');
   const name = named > 0 ? process.argv[named + 1] : new Date().toISOString().slice(0, 10);
@@ -257,7 +261,7 @@ async function cmdRun() {
     M.Retrieval.buildIndex(b.id, M.Retrieval.parsePassages(book.annotated, new Map(), book.tocLabels));
     const base = M.Template.systemPrompt(GOAL, null, null, { tocLabels: book.tocLabels });
     for (const [qi, q] of b.questions.entries()) {
-      for (const arm of ['rag', 'whole']) {
+      for (const arm of ARMS) {
         const key = `${b.id.slice(0, 12)}:${qi}:${arm}`;
         if (done.has(key)) continue;
         let ctx, system, framing, expanded = false;
@@ -366,7 +370,7 @@ function cmdReport() {
     ['Latencia (mediana, s)', (a) => { const v = by(a).map(i => i.ms).sort((x, y) => x - y); return f(v[Math.floor(v.length / 2)] / 1000, 1); }],
     ['Respuestas truncadas', (a) => String(by(a).filter(i => i.truncated).length)],
   ];
-  console.log(`IA14 · run ${run.name} · modelo ${run.model} · juez ${run.judge || '—'} · ${run.items.length / 2} preguntas\n`);
+  console.log(`IA14 · run ${run.name} · modelo ${run.model} · juez ${run.judge || '—'} · ${new Set(run.items.map(i => i.book + i.qi)).size} preguntas\n`);
   console.log('| Métrica | RAG (hoy) | Libro entero |\n|---|---|---|');
   for (const [label, fn] of rows) console.log(`| ${label} | ${fn('rag')} | ${fn('whole')} |`);
   const gate = by('rag').filter(i => i.agenticGate).length;

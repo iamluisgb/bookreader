@@ -35,7 +35,12 @@ export function shouldExpand({ question, chapterNamed = false, bookLang = null }
   return !chapterNamed;
 }
 
-function systemPrompt(tocLabels) {
+// `bookLang` ('es'|'en', de Retrieval.indexLang): se dice EXPLÍCITO. «En el idioma del libro»
+// sin decir cuál dependía de que el modelo lo dedujera del índice; sin razonamiento (IA15) no lo
+// hacía y devolvía términos en el idioma de la pregunta — en un libro en inglés, BM25 a cero.
+const LANG_NAME = { es: 'español', en: 'inglés' };
+function systemPrompt(tocLabels, bookLang = null) {
+  const langLine = LANG_NAME[bookLang] ? `\nEL LIBRO ESTÁ EN ${LANG_NAME[bookLang].toUpperCase()}: "terms" e "hypothetical" van en ${LANG_NAME[bookLang]}, aunque la pregunta venga en otro idioma.` : '';
   const map = (Array.isArray(tocLabels) ? tocLabels.filter(Boolean) : []).slice(0, 40);
   const hint = map.length ? `\nÍNDICE DEL LIBRO (usa su MISMO idioma y dominio):\n${map.map(t => '- ' + t).join('\n')}` : '';
   return `Preparas una BÚSQUEDA por palabras clave (BM25) dentro de un libro, a partir de la pregunta del usuario.
@@ -44,7 +49,7 @@ NO respondas la pregunta. Devuelve SOLO un objeto JSON compacto (sin markdown, s
   términos técnicos, nombres propios), en el MISMO idioma que el libro.
 - "hypothetical": 1-2 frases con una respuesta plausible a la pregunta, redactadas como si fueran un
   extracto del libro (para recuperar por similitud léxica), en el idioma del libro.
-Ejemplo de forma: {"terms":["...","..."],"hypothetical":"..."}${hint}`;
+Ejemplo de forma: {"terms":["...","..."],"hypothetical":"..."}${langLine}${hint}`;
 }
 
 // Objetos JSON balanceados de un texto (respeta llaves dentro de strings). Devuelve las
@@ -101,8 +106,10 @@ export function expansionQuery(expansion) {
 const CACHE_MAX = 40;
 const cache = new Map();   // normalizada + modelo → { terms, hypothetical }
 
+// Con el idioma del libro: la expansión va en ese idioma (IA15), así que la misma pregunta sobre
+// un libro en español y otro en inglés no puede compartir entrada.
 function cacheKey(q) {
-  return q.toLowerCase().replace(/\s+/g, ' ').trim() + '|' + (LLM.getLiteModel() || '');
+  return q.toLowerCase().replace(/\s+/g, ' ').trim() + '|' + (LLM.getLiteModel() || '') + '|' + (Retrieval.indexLang() || '');
 }
 
 function cacheGet(key) {
@@ -135,10 +142,14 @@ export async function expandQuery(question, { tocLabels = [], signal } = {}) {
     let acc = '';
     const raw = await LLM.chatStream({
       messages: [
-        { role: 'system', content: systemPrompt(tocLabels) },
+        { role: 'system', content: systemPrompt(tocLabels, Retrieval.indexLang()) },
         { role: 'user', content: 'PREGUNTA: ' + q },
       ],
       model: LLM.getLiteModel(),   // auxiliar: modelo rápido (la latencia compite con el timeout)
+      // Sin razonamiento (IA15): con él, deepseek-v4-flash tardaba 8–40 s, pasaba los 7 s del
+      // timeout y la expansión caducaba en silencio (6 de 36 preguntas). Sin él, ~3 s. Sacar
+      // cuatro palabras clave no gana nada pensando.
+      thinking: false,
       signal: ctrl.signal,
       onToken: (t) => { acc += t; },
     });

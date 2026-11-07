@@ -98,3 +98,31 @@ test('una pregunta conceptual dispara la expansión y responde igual (sin regres
   expect(counts.expansion).toBeGreaterThanOrEqual(1);   // la expansión se disparó…
   expect(counts.answer).toBeGreaterThanOrEqual(1);      // …y la respuesta se entregó igual
 });
+
+// IA15 · La expansión va SIN razonamiento. Con él, deepseek-v4-flash tardaba 8–40 s, pasaba los
+// 7 s de EXPAND_TIMEOUT_MS y la expansión caducaba en silencio (medido en IA14: 6 de 36).
+test('la expansión pide la respuesta sin razonamiento al proveedor que lo admite', async ({ page }) => {
+  await page.goto('/index.html');
+  await page.evaluate(() => {
+    localStorage.setItem('bookreader_ai_key', JSON.stringify('test-key'));
+    localStorage.setItem('bookreader_ai_base_url', JSON.stringify('https://api.nan.builders/v1'));
+  });
+  await page.reload();
+  const body = await page.evaluate(async () => {
+    let seen: any = null;
+    window.fetch = async (_url: any, opts: any) => {
+      seen = JSON.parse(opts.body);
+      const e = new TextEncoder();
+      const s = new ReadableStream({ start(c) {
+        c.enqueue(e.encode(`data: ${JSON.stringify({ choices: [{ delta: { content: '{"terms":["Raft"],"hypothetical":"Raft elige un líder."}' }, finish_reason: null }] })}\n\n`));
+        c.enqueue(e.encode('data: [DONE]\n\n')); c.close();
+      } });
+      return new Response(s, { status: 200, headers: { 'Content-Type': 'text/event-stream' } });
+    };
+    const Q: any = await import('/js/ai/query-expand.js');
+    const exp = await Q.expandQuery('¿cómo se elige el líder? ' + Math.random());
+    return { thinking: seen?.thinking, terms: exp?.terms };
+  });
+  expect(body.terms).toEqual(['Raft']);
+  expect(body.thinking).toEqual({ type: 'disabled' });
+});
