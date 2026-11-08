@@ -30,9 +30,20 @@ test('cada página pública lleva en la barra a su gemela, con ?lang=, y declara
       if (u !== '/' && u !== '/es/' && !src.includes(`hreflang="${ol}" href="https://bookreader.raiatech.com${other}"`)) bad.push(`${u}: falta el hreflang de ${other}`);
       if (!src.includes('assets/landing/prefs.js?v=')) bad.push(`${u}: no carga prefs.js`);
       if (!src.includes('class="theme-pick"')) bad.push(`${u}: sin selector de tema`);
+      // El logo de la marca (el mismo que el icono de la app), no el libro de trazo antiguo.
+      const nav = src.slice(src.indexOf('<nav>'), src.indexOf('</nav>'));
+      if (!nav.includes('rx="118"')) bad.push(`${u}: logo antiguo en la barra`);
     }
   }
   expect(bad).toEqual([]);
+});
+
+test('la portada enlaza el artículo de ciencia del aprendizaje desde la sección de tarjetas', () => {
+  for (const [f, href] of [['index.html', 'blog/science-of-learning/'], ['es/index.html', 'blog/ciencia-del-aprendizaje/']]) {
+    const src = readFileSync(join(__dirname, '..', f), 'utf8');
+    const cards = src.slice(src.indexOf('data-beat="cards"'), src.indexOf('data-beat="quiz"'));
+    expect(cards, f).toContain(`href="${href}"`);
+  }
 });
 
 test.describe('con el navegador en español', () => {
