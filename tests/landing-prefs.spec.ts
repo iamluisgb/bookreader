@@ -30,6 +30,14 @@ test('cada página pública lleva en la barra a su gemela, con ?lang=, y declara
       if (u !== '/' && u !== '/es/' && !src.includes(`hreflang="${ol}" href="https://bookreader.raiatech.com${other}"`)) bad.push(`${u}: falta el hreflang de ${other}`);
       if (!src.includes('assets/landing/prefs.js?v=')) bad.push(`${u}: no carga prefs.js`);
       if (!src.includes('class="theme-pick"')) bad.push(`${u}: sin selector de tema`);
+      // Barra: código corto con el nombre completo para lectores de pantalla. Pie: selector completo.
+      const nl = src.match(/<a class="nav-lang"[^>]*>([^<]*)<\/a>/);
+      if (!nl || nl[1] !== ol.toUpperCase() || !/aria-label="(English|Español)"/.test(nl[0])) bad.push(`${u}: la barra no dice ${ol.toUpperCase()} con aria-label`);
+      const lp = src.match(/<span class="lang-pick"[\s\S]*?<\/span><\/span>|<span class="lang-pick"[\s\S]*?<\/a><\/span>/);
+      if (!lp || !lp[0].includes(m[1]) || !lp[0].includes('aria-current="true"')) bad.push(`${u}: el pie no tiene el selector de idioma con la gemela`);
+      const nb = src.match(/<a class="nav-blog" href="([^"]+)"/);
+      const blogHome = u.startsWith('/es/') ? '/es/blog/' : '/blog/';
+      if (!nb || new URL(nb[1], 'https://x' + u).pathname !== blogHome) bad.push(`${u}: «Blog» de la barra no va a ${blogHome}`);
       // El logo de la marca (el mismo que el icono de la app), no el libro de trazo antiguo.
       const nav = src.slice(src.indexOf('<nav>'), src.indexOf('</nav>'));
       if (!nav.includes('rx="118"')) bad.push(`${u}: logo antiguo en la barra`);

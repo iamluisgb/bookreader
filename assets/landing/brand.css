@@ -39,9 +39,20 @@
 .theme-pick button:hover { color: var(--text); }
 .theme-pick button[aria-pressed="true"] { background: var(--surface-alt); color: var(--text); }
 .theme-pick button:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
-.foot-tools { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-top: 14px; }
+.foot-tools { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+footer .foot-in .foot-tools { margin-top: 0; }
 .nav-in { gap: 14px; }
 @media (max-width: 400px) {
   .nav-end { gap: 12px; }
   .nav-end .nav-cta { padding: 8px 13px; }
 }
+/* Barra: el idioma como código (EN/ES) y el blog solo donde sobra sitio. */
+.nav-lang { letter-spacing: 0.04em; }
+.nav-blog { font: 600 13.5px var(--font-ui); color: var(--text-soft); text-decoration: none; }
+.nav-blog:hover { color: var(--text); text-decoration: none; }
+@media (max-width: 640px) { .nav-blog { display: none; } }
+/* Pie: idioma completo junto al tema, con la misma forma de píldora. */
+.lang-pick { display: inline-flex; gap: 2px; padding: 2px; border: 1px solid var(--border); border-radius: 999px; font: 500 12.5px var(--font-ui); }
+.lang-pick > * { padding: 4px 11px; border-radius: 999px; color: var(--text-faint); text-decoration: none; }
+.lang-pick a:hover { color: var(--text); text-decoration: none; }
+.lang-pick [aria-current="true"] { background: var(--surface-alt); color: var(--text); }
