@@ -7,9 +7,9 @@ import { join } from 'path';
 // las portadas del libro en 3D. Las páginas públicas y su JS/CSS solo usan rutas relativas.
 const PAGES = ['index.html', 'es/index.html', 'anki/index.html', 'privacy/index.html',
   'why/index.html', 'es/por-que/index.html',
-  'blog/index.html', 'es/blog/index.html', 'blog/science-of-learning/index.html', 'es/blog/ciencia-del-aprendizaje/index.html',
+  'blog/index.html', 'es/blog/index.html', 'es/privacidad/index.html', 'es/anki/index.html', 'blog/science-of-learning/index.html', 'es/blog/ciencia-del-aprendizaje/index.html',
   'assets/landing/motion.js', 'assets/landing/motion.css', 'assets/landing/brand.css',
-  'assets/landing/map.js', 'assets/landing/map.css', 'assets/landing/why.css', 'assets/landing/blog.css'];
+  'assets/landing/map.js', 'assets/landing/map.css', 'assets/landing/why.css', 'assets/landing/blog.css', 'assets/landing/prefs.js'];
 
 test('las páginas públicas no usan rutas absolutas a recursos propios', () => {
   const bad: string[] = [];

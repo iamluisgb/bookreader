@@ -104,7 +104,7 @@ test.describe('landing · diagrama, práctica y manifiesto', () => {
     const robots = readFileSync(join(__dirname, '..', 'robots.txt'), 'utf8');
     expect(robots).toContain('Sitemap: https://bookreader.raiatech.com/sitemap.xml');
     const sitemap = readFileSync(join(__dirname, '..', 'sitemap.xml'), 'utf8');
-    for (const u of ['/', '/es/', '/why/', '/es/por-que/', '/blog/', '/es/blog/', '/blog/science-of-learning/', '/es/blog/ciencia-del-aprendizaje/', '/privacy/']) expect(sitemap).toContain(`<loc>https://bookreader.raiatech.com${u}</loc>`);
+    for (const u of ['/', '/es/', '/why/', '/es/por-que/', '/blog/', '/es/blog/', '/blog/science-of-learning/', '/es/blog/ciencia-del-aprendizaje/', '/privacy/', '/es/privacidad/', '/anki/', '/es/anki/']) expect(sitemap).toContain(`<loc>https://bookreader.raiatech.com${u}</loc>`);
     const build = readFileSync(join(__dirname, '..', 'scripts', 'build-pages.mjs'), 'utf8');
     for (const f of ['404.html', 'robots.txt', 'sitemap.xml']) expect(build).toContain(`'${f}'`);
   });
@@ -161,7 +161,7 @@ test.describe('landing · en el móvil', () => {
 // móvil juntaba HTML nuevo con motion.js viejo, que se rompía y dejaba el mazo sin girar.
 test('los JS y CSS de la landing llevan ?v= en todas las páginas públicas', () => {
   const bad: string[] = [];
-  for (const f of ['index.html', 'es/index.html', 'why/index.html', 'es/por-que/index.html', 'blog/index.html', 'es/blog/index.html', 'blog/science-of-learning/index.html', 'es/blog/ciencia-del-aprendizaje/index.html']) {
+  for (const f of ['index.html', 'es/index.html', 'why/index.html', 'es/por-que/index.html', 'blog/index.html', 'es/blog/index.html', 'blog/science-of-learning/index.html', 'es/blog/ciencia-del-aprendizaje/index.html', 'privacy/index.html', 'es/privacidad/index.html', 'anki/index.html', 'es/anki/index.html']) {
     const src = readFileSync(join(process.cwd(), f), 'utf8');
     for (const m of src.matchAll(/assets\/landing\/[\w-]+\.(?:js|css)(\?v=\w+)?/g)) if (!m[1]) bad.push(`${f}: ${m[0]}`);
   }

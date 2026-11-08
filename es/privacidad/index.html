@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="../../assets/landing/prefs.js?v=20261108a"></script>
+<title>Privacidad · BookReader</title>
+<meta name="description" content="Qué guarda BookReader en tu dispositivo, qué sale de él, cuándo y adónde va: el agente, el sync, los enlaces para compartir, la analítica y la lista de espera de Plus.">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Privacidad · BookReader">
+<meta property="og:description" content="Qué guarda BookReader en tu dispositivo, qué sale de él, cuándo y adónde va: el agente, el sync, los enlaces para compartir, la analítica y la lista de espera de Plus.">
+<meta property="og:url" content="https://bookreader.raiatech.com/es/privacidad/">
+<meta property="og:image" content="https://bookreader.raiatech.com/app/icons/icon-512.png">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#121214" media="(prefers-color-scheme: dark)">
+<link rel="canonical" href="https://bookreader.raiatech.com/es/privacidad/">
+<link rel="alternate" hreflang="en" href="https://bookreader.raiatech.com/privacy/">
+<link rel="alternate" hreflang="es" href="https://bookreader.raiatech.com/es/privacidad/">
+<link rel="icon" href="../../app/icons/favicon.ico" sizes="32x32">
+<link rel="icon" href="../../app/icons/icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../../app/css/themes.css">
+<link rel="stylesheet" href="../../assets/landing/brand.css?v=20261108a">
+<style>
+  @font-face { font-family: 'Inter'; font-weight: 400; font-display: swap; src: url(../../app/fonts/inter-400.woff2) format('woff2'); }
+  @font-face { font-family: 'Inter'; font-weight: 600; font-display: swap; src: url(../../app/fonts/inter-600.woff2) format('woff2'); }
+  @font-face { font-family: 'Source Serif 4'; font-weight: 400; font-display: swap; src: url(../../app/fonts/source-serif-4-400.woff2) format('woff2'); }
+  @font-face { font-family: 'Source Serif 4'; font-weight: 600; font-display: swap; src: url(../../app/fonts/source-serif-4-600.woff2) format('woff2'); }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0; background: var(--surface-0); color: var(--text);
+    font-family: var(--font-ui); font-size: 17px; line-height: 1.65;
+    -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
+  }
+  .wrap { max-width: 1060px; margin: 0 auto; padding: 0 24px; }
+  a { color: var(--accent); text-decoration: none; }
+  :is(a, button, summary):focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; border-radius: 4px; }
+  p { margin: 0; }
+
+  /* ---- Nav ---- */
+  nav { position: sticky; top: 0; z-index: 40; background: color-mix(in srgb, var(--surface-0) 86%, transparent); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); }
+  .nav-in { display: flex; align-items: center; justify-content: space-between; height: 60px; }
+  .brand { display: flex; align-items: center; gap: 9px; font: 600 16.5px var(--font-ui); color: var(--text); }
+  .brand svg { color: var(--brand); }
+  .nav-cta { font: 600 14px var(--font-ui); background: var(--brand); color: var(--on-brand); padding: 9px 16px; border-radius: 999px; transition: transform 0.15s ease, box-shadow 0.15s ease; }
+  .nav-cta:hover { transform: translateY(-1px); box-shadow: var(--shadow-2); }
+
+  /* ---- Beats: una idea por pantalla ---- */
+  .beat { padding: clamp(88px, 13vh, 150px) 0; text-align: center; }
+  .beat-copy { max-width: 680px; margin: 0 auto; }
+  .product-name { font: 600 14px var(--font-ui); letter-spacing: 0.16em; text-transform: uppercase; color: var(--accent); margin-bottom: 22px; }
+  h1, h2 { font-family: var(--font-display); font-weight: 600; text-wrap: balance; margin: 0; letter-spacing: -0.015em; }
+  h1 { font-size: clamp(2.6rem, 6vw, 4.2rem); line-height: 1.05; }
+  h2 { font-size: clamp(2rem, 4.4vw, 3.1rem); line-height: 1.1; }
+  .support { font-size: clamp(17px, 1.6vw, 19.5px); color: var(--text-soft); max-width: 54ch; margin: 22px auto 0; }
+  .support b { color: var(--text); font-weight: 600; }
+  .cta-row { display: flex; align-items: center; justify-content: center; gap: 18px; margin-top: 36px; flex-wrap: wrap; }
+  .btn-primary {
+    display: inline-flex; align-items: center; gap: 9px;
+    font: 600 16px var(--font-ui); background: var(--brand); color: var(--on-brand);
+    padding: 15px 28px; border-radius: 999px; transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+  .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 10px 26px rgba(34, 197, 94, 0.35); }
+  .cta-note { margin-top: 15px; font-size: 13.5px; color: var(--text-faint); }
+
+  .beat-visual { margin: clamp(44px, 7vh, 72px) auto 0; }
+  .alt { background: var(--surface-alt); border-block: 1px solid var(--border); }
+
+  /* ---- Beat 1 · el producto (lector + agente) ---- */
+  .device { max-width: 880px; margin-inline: auto; background: var(--surface-alt); border: 1px solid var(--border); border-radius: 20px; box-shadow: var(--shadow-hero); overflow: hidden; text-align: left; }
+  .alt .device { background: var(--surface-2); }
+  .device-bar { display: flex; align-items: center; gap: 7px; padding: 12px 15px; border-bottom: 1px solid var(--border); }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--border); }
+  .device-title { margin-left: 8px; font: 600 11.5px var(--font-ui); color: var(--text-faint); }
+  .device-body { display: grid; grid-template-columns: 11fr 10fr; }
+  .page { background: var(--paper); color: var(--paper-ink); padding: 28px 26px 30px; border-right: 1px solid var(--paper-edge); }
+  .page-ch { font: 600 10px var(--font-ui); letter-spacing: 0.12em; text-transform: uppercase; color: #8a7f68; margin-bottom: 14px; }
+  .page-text { font: 400 14px/1.75 var(--font-display); }
+  .page-text p + p { margin-top: 10px; }
+  .page mark { background: var(--accent-soft); color: inherit; padding: 1px 2px; border-radius: 3px; box-shadow: 0 1.5px 0 var(--brand); box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+  .page-num { margin-top: 18px; font: 400 10.5px var(--font-ui); color: #a89c82; text-align: center; }
+  .panel { background: var(--surface-2); display: flex; flex-direction: column; }
+  .panel-head { display: flex; align-items: center; gap: 8px; padding: 13px 16px; border-bottom: 1px solid var(--border); font: 600 12.5px var(--font-ui); }
+  .panel-head svg { color: var(--brand); }
+  .panel-status { margin-left: auto; font: 400 10.5px var(--font-ui); color: var(--text-faint); }
+  .chat { padding: 18px 16px; display: flex; flex-direction: column; gap: 12px; flex: 1; }
+  .bubble { max-width: 92%; font: 400 13px/1.55 var(--font-ui); padding: 10px 14px; border-radius: 14px; text-align: left; }
+  .bubble.q { align-self: flex-end; background: var(--text); color: var(--surface-0); border-bottom-right-radius: 4px; }
+  .bubble.a { align-self: flex-start; border: 1px solid var(--border); border-bottom-left-radius: 4px; color: var(--text); }
+  .cite { display: inline-flex; align-items: center; gap: 6px; margin-top: 9px; font: 600 10.5px var(--font-ui); color: var(--accent); background: var(--accent-soft); border-radius: 999px; padding: 4px 10px; white-space: nowrap; }
+  .cite svg { flex: none; }
+  .composer { margin: 0 16px 16px; border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; display: flex; align-items: center; gap: 8px; }
+  .composer span { font: 400 12.5px var(--font-ui); color: var(--text-faint); flex: 1; text-align: left; }
+  .composer i { width: 26px; height: 26px; border-radius: 8px; background: var(--brand); display: grid; place-items: center; color: var(--on-brand); }
+
+  @keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+  .anim-1, .anim-2, .anim-3 { animation: rise 0.5s ease both; }
+  .anim-1 { animation-delay: 0.6s; }
+  .anim-2 { animation-delay: 1.5s; }
+  .anim-3 { animation-delay: 2.2s; }
+  @media (prefers-reduced-motion: reduce) {
+    .anim-1, .anim-2, .anim-3 { animation: none; }
+    html { scroll-behavior: auto; }
+    .fcard { transition: none !important; }
+  }
+
+  /* ---- Beat 2 · el párrafo que no entra ---- */
+  .dense {
+    max-width: 520px; margin-inline: auto; background: var(--paper); color: var(--paper-ink);
+    border: 1px solid var(--paper-edge); border-radius: 14px; box-shadow: var(--shadow-2);
+    padding: 30px 32px; font: 400 14.5px/1.8 var(--font-display); text-align: left;
+    transform: rotate(-0.6deg);
+  }
+  .dense .fade { opacity: 0.45; }
+
+  /* ---- Beat 4 · la cita como gesto ---- */
+  .proof { position: relative; max-width: 560px; margin-inline: auto; padding-bottom: 22px; }
+  .proof .page { border: 1px solid var(--paper-edge); border-radius: 14px; box-shadow: var(--shadow-2); }
+  .proof .cite-big {
+    position: absolute; left: 50%; bottom: 0; transform: translateX(-50%);
+    display: inline-flex; align-items: center; gap: 8px; font: 600 14px var(--font-ui);
+    color: var(--accent); background: var(--surface-2); border: 1px solid var(--border);
+    border-radius: 999px; padding: 11px 20px; box-shadow: var(--shadow-hero); white-space: nowrap;
+  }
+  .proof .cite-big svg { color: var(--brand); flex: none; }
+
+  /* ---- Beat 5 · la tarjeta (Repaso citado) ---- */
+  .feature-name { font: 600 12px var(--font-ui); letter-spacing: 0.16em; text-transform: uppercase; color: var(--accent); margin-bottom: 16px; }
+  .fcard-zone { perspective: 1200px; max-width: 480px; margin-inline: auto; }
+  .fcard {
+    position: relative; width: 100%; aspect-ratio: 8 / 5.6; cursor: pointer; border: 0; padding: 0;
+    background: none; font-family: inherit; color: var(--text); transform-style: preserve-3d;
+    transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1); text-align: left; display: block;
+  }
+  .fcard.flip { transform: rotateY(180deg); }
+  .face {
+    position: absolute; inset: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden;
+    background: var(--surface-2); border: 1px solid var(--border); border-radius: 18px; box-shadow: var(--shadow-hero);
+    padding: 26px 28px; display: flex; flex-direction: column;
+  }
+  .face.back { transform: rotateY(180deg); }
+  .face-tag { font: 600 10.5px var(--font-ui); letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-faint); }
+  .face-q { font: 600 clamp(17px, 2vw, 21px)/1.35 var(--font-display); margin: auto 0; }
+  .face-hint { font: 400 12.5px var(--font-ui); color: var(--text-faint); }
+  .face-a { font: 400 14.5px/1.55 var(--font-ui); color: var(--text-soft); margin: 14px 0 auto; }
+  .grade-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; margin-top: 16px; }
+  .grade { border: 1px solid var(--border); border-radius: 10px; padding: 7px 4px; text-align: center; font: 600 11px var(--font-ui); }
+  .grade small { display: block; font-weight: 400; color: var(--text-faint); margin-top: 2px; }
+  .grade.g3 { border-color: var(--brand); color: var(--accent); }
+  .src-chip { display: inline-flex; align-items: center; gap: 7px; align-self: flex-start; font: 600 12px var(--font-ui); color: var(--accent); background: var(--accent-soft); border-radius: 999px; padding: 6px 13px; }
+  .fcard-note { margin-top: 18px; font: 400 13px var(--font-ui); color: var(--text-faint); }
+
+  /* ---- Beat 6 · privacidad (valores) ---- */
+  .values { background: var(--band-bg); color: var(--band-ink); }
+  .values .support { color: var(--band-soft); }
+  .values .seal { margin-top: 34px; font: 600 clamp(17px, 2vw, 21px) var(--font-display); color: var(--band-ink); }
+  .values .seal span { color: var(--brand); }
+
+  /* ---- "Y además" + FAQ ---- */
+  .etc { font-size: 15px; color: var(--text-soft); max-width: 60ch; margin: 0 auto; }
+  .etc b { color: var(--text); font-weight: 600; }
+  .faq { max-width: 720px; margin: clamp(40px, 6vh, 60px) auto 0; text-align: left; }
+  .faq details { border-top: 1px solid var(--border); }
+  .faq details:last-of-type { border-bottom: 1px solid var(--border); }
+  .faq summary { cursor: pointer; list-style: none; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 19px 2px; font: 600 15.5px var(--font-ui); }
+  .faq summary::-webkit-details-marker { display: none; }
+  .faq summary::after { content: "+"; font: 400 22px var(--font-display); color: var(--accent); transition: transform 0.2s ease; flex: none; }
+  .faq details[open] summary::after { transform: rotate(45deg); }
+  .faq .ans { padding: 0 2px 20px; font-size: 15px; color: var(--text-soft); max-width: 62ch; }
+
+  footer { border-top: 1px solid var(--border); padding: 28px 0 36px; }
+  .foot-in { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; font: 400 13px var(--font-ui); color: var(--text-faint); }
+  .foot-in .brand { font-size: 14.5px; }
+
+  @media (max-width: 760px) {
+    .device-body { grid-template-columns: 1fr; }
+    .page { border-right: 0; border-bottom: 1px solid var(--paper-edge); }
+    .proof .cite-big { white-space: normal; width: max-content; max-width: 92%; text-align: center; }
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="wrap nav-in">
+    <a class="brand" href="../" style="text-decoration:none">
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4.2H6.2A1.7 1.7 0 0 0 4.5 5.9v8.5a1.7 1.7 0 0 0 1.7 1.7h1.9c2.1 0 3.9 1.2 3.9 3.2Z"/><path d="M14.3 5.4a1.2 1.2 0 0 1 1.2-1.2h2.9a1.2 1.2 0 0 1 1.2 1.2V15l-2.65-2-2.65 2Z"/></svg>
+      BookReader
+    </a>
+    <span class="nav-end"><a class="nav-lang" hreflang="en" lang="en" data-umami-event="Language" data-umami-event-to="en" href="../../privacy/?lang=en">English</a><a class="nav-cta" href="../../app/">Abrir la app</a></span>
+  </div>
+</nav>
+
+<!-- Hero -->
+<header class="beat values">
+  <div class="wrap">
+    <div class="beat-copy">
+      <p class="product-name">Privacidad</p>
+      <h1>Tus libros se quedan en tu dispositivo.</h1>
+      <p class="support">BookReader funciona en tu navegador. Tus libros, subrayados, notas y tarjetas se guardan en tu dispositivo, <b>sin cuenta</b>. Esta página recoge todo lo que sí sale de él: cuándo, adónde va y qué guardamos.</p>
+      <p class="cta-note">Última actualización: 8 de noviembre de 2026.</p>
+    </div>
+  </div>
+</header>
+
+<section class="beat">
+  <div class="wrap">
+    <div class="beat-copy">
+      <p class="feature-name">En tu dispositivo</p>
+      <h2>Leer no sale de tu navegador.</h2>
+      <p class="support">Los libros y las anotaciones viven en el almacenamiento de tu navegador (<b>IndexedDB y localStorage</b>). Leer, subrayar, buscar en el libro y repasar tarjetas pasa en local y funciona sin conexión. Las librerías del lector van con la app, no se cargan de servidores de terceros. Puedes exportarlo todo en una <b>copia JSON</b> cuando quieras.</p>
+    </div>
+  </div>
+</section>
+
+<section class="beat alt">
+  <div class="wrap">
+    <div class="beat-copy">
+      <p class="feature-name">El agente</p>
+      <h2>Cuando preguntas, viajan pasajes. Tú eliges adónde.</h2>
+      <p class="support">Para responder una pregunta o hacer tarjetas, el agente envía <b>tu pregunta y los pasajes relevantes</b> del libro a un modelo de IA. Hay tres formas de usarlo:</p>
+    </div>
+    <div class="faq">
+      <details open>
+        <summary>Sin clave (la demo gratuita)</summary>
+        <p class="ans">Las peticiones pasan por nuestra pasarela, un Worker de Cloudflare, hasta el proveedor del modelo que usamos (hoy, NaN). La pasarela <b>no registra preguntas, pasajes ni respuestas</b>. Para dar una demo por red y día, guarda un hash con sal de tu red (no de tu IP completa) durante 30 días como máximo.</p>
+      </details>
+      <details>
+        <summary>Con tu propia clave</summary>
+        <p class="ans">Las peticiones van <b>directas de tu navegador al proveedor que configures</b>. Nosotros no las vemos. Lo que haga el proveedor con ellas depende de su propia política.</p>
+      </details>
+      <details>
+        <summary>Con un modelo local</summary>
+        <p class="ans">Apunta el agente a cualquier endpoint compatible con OpenAI en tu propio equipo (llama.cpp, Ollama, vLLM…). Entonces no sale nada de tu red.</p>
+      </details>
+    </div>
+  </div>
+</section>
+
+<section class="beat">
+  <div class="wrap">
+    <div class="beat-copy">
+      <p class="feature-name">Sincronizar y compartir</p>
+      <h2>Solo si los activas.</h2>
+    </div>
+    <div class="faq">
+      <details>
+        <summary>Sync con Google Drive</summary>
+        <p class="ans">Tu biblioteca va de tu navegador a una carpeta oculta de la app en <b>tu propio Google Drive</b>. El permiso solo cubre esa carpeta: BookReader no ve el resto de tus archivos. Un pequeño worker nuestro intercambia con Google los tokens de inicio de sesión; no guarda nada y nunca ve tus libros ni tus notas.</p>
+      </details>
+      <details>
+        <summary>Sync de BookReader (Plus)</summary>
+        <p class="ans">Todo se <b>cifra en tu navegador</b> antes de salir, con una clave que nuestro servidor nunca recibe. Guardamos bytes que no podemos leer y no registramos rutas, nombres, contenidos ni direcciones IP. Si la suscripción termina, los datos quedan en solo lectura un tiempo para que puedas exportarlos, y después se borran.</p>
+      </details>
+      <details>
+        <summary>Conectar agentes de IA (MCP, Plus)</summary>
+        <p class="ans">Si creas un token para que un agente como Claude lea tu biblioteca, el servidor necesita tu clave del sync para responderle. La clave se guarda cifrada con ese token, y del token solo se guarda el hash. En cada petición se descifra en memoria, se responde y se olvida. <b>Mientras responde, el servidor ve esos datos en claro.</b> Es una conexión que creas a propósito y que puedes revocar en Ajustes → Datos → Agentes.</p>
+      </details>
+      <details>
+        <summary>Enlaces para compartir</summary>
+        <p class="ans">Lo que compartes se <b>cifra en tu navegador</b>. La clave va en la parte del enlace que sigue a <code>#</code>, que los navegadores nunca envían a los servidores, así que guardamos bytes que no podemos leer. Los enlaces caducan a los 7 días y puedes revocarlos antes. Tu IP solo se usa para limitar las subidas y no se guarda.</p>
+      </details>
+    </div>
+  </div>
+</section>
+
+<section class="beat alt">
+  <div class="wrap">
+    <div class="beat-copy">
+      <h2>El resto de la letra pequeña.</h2>
+    </div>
+    <div class="faq">
+      <details>
+        <summary>¿Usáis analítica?</summary>
+        <p class="ans">Sí, Umami, que <b>no usa cookies</b>. Cuenta visitas a las páginas y unos pocos eventos anónimos, como «creó un primer mazo», para saber si la app es útil. Nunca recibe el contenido de los libros, tus notas ni la parte de la dirección que sigue a <code>#</code>, donde van las claves de los enlaces y el libro que lees. Los datos van a Umami Cloud.</p>
+      </details>
+      <details>
+        <summary>¿Qué pasa con mi email si me apunto a la lista de espera de Plus?</summary>
+        <p class="ans">Se guarda con el idioma de la página, la fecha y el plan que te interesa, y nada más. Lo usamos para un único email cuando salga Plus. Escribe a <a href="mailto:hola@raiatech.com">hola@raiatech.com</a> y lo borramos.</p>
+      </details>
+      <details>
+        <summary>¿Algo más se conecta a internet?</summary>
+        <p class="ans">Solo si lo pides: si abres el selector de modelos en Ajustes, la app descarga el catálogo público de <b>models.dev</b> para listar nombres y capacidades de los modelos. Sin clave, sin contenido del libro, nada sobre ti.</p>
+      </details>
+      <details>
+        <summary>¿Funciona sin conexión?</summary>
+        <p class="ans">Sí, es una app instalable. Leer, subrayar y repasar funcionan sin conexión. Si preguntas al agente sin conexión, te enseña los pasajes del libro más relevantes y responde de verdad cuando vuelves a tener red.</p>
+      </details>
+      <details>
+        <summary>¿Dónde está el código?</summary>
+        <p class="ans">La app y sus workers son públicos en <a href="https://github.com/iamluisgb/bookreader">GitHub</a>, así que puedes comprobar todo lo que dice esta página.</p>
+      </details>
+      <details>
+        <summary>¿Quién es el responsable?</summary>
+        <p class="ans">BookReader lo hace Luis González, en España. Para cualquier pregunta sobre tus datos, o para que borremos algo: <a href="mailto:hola@raiatech.com">hola@raiatech.com</a>.</p>
+      </details>
+    </div>
+  </div>
+</section>
+
+<section class="beat values">
+  <div class="wrap">
+    <div class="beat-copy">
+      <h2>Tu biblioteca, en tu dispositivo.</h2>
+      <div class="cta-row">
+        <a class="btn-primary" href="../../../app/">Abrir BookReader</a>
+      </div>
+      <p class="cta-note">Gratis. Sin cuenta. En tu navegador.</p>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap foot-in">
+    <a class="brand" href="../" style="text-decoration:none">
+      <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4.2H6.2A1.7 1.7 0 0 0 4.5 5.9v8.5a1.7 1.7 0 0 0 1.7 1.7h1.9c2.1 0 3.9 1.2 3.9 3.2Z"/><path d="M14.3 5.4a1.2 1.2 0 0 1 1.2-1.2h2.9a1.2 1.2 0 0 1 1.2 1.2V15l-2.65-2-2.65 2Z"/></svg>
+      BookReader
+    </a>
+    <span>Lector EPUB y PDF con agente de IA y tarjetas · © 2026 Luis González · <a href="../">Inicio</a> · <a href="../../privacy/?lang=en">English</a></span>
+    <span class="theme-pick" role="group" aria-label="Tema"><button type="button" data-pick="system" aria-pressed="false">Auto</button><button type="button" data-pick="light" aria-pressed="false">Claro</button><button type="button" data-pick="dark" aria-pressed="false">Oscuro</button></span>
+  </div>
+</footer>
+
+</body>
+</html>

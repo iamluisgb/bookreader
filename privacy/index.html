@@ -3,19 +3,23 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>BookReader — A private, local-first EPUB & PDF reader with AI</title>
-<meta name="description" content="Read EPUB and PDF with an AI agent that runs 100% client-side. No backend, no account, no tracking. Your own AI key, your own storage, works offline.">
+<script src="../assets/landing/prefs.js?v=20261108a"></script>
+<title>Privacy · BookReader</title>
+<meta name="description" content="What BookReader keeps on your device, what leaves it, when and where it goes: the agent, sync, share links, analytics and the Plus waitlist.">
 <meta property="og:type" content="website">
-<meta property="og:title" content="BookReader — A private, local-first EPUB & PDF reader with AI">
-<meta property="og:description" content="Read EPUB and PDF with an AI agent that runs 100% client-side. No backend, no account, no tracking. Your own AI key, your own storage, works offline.">
+<meta property="og:title" content="Privacy · BookReader">
+<meta property="og:description" content="What BookReader keeps on your device, what leaves it, when and where it goes: the agent, sync, share links, analytics and the Plus waitlist.">
 <meta property="og:url" content="https://bookreader.raiatech.com/privacy/">
 <meta property="og:image" content="https://bookreader.raiatech.com/app/icons/icon-512.png">
-<meta name="theme-color" content="#22c55e">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#121214" media="(prefers-color-scheme: dark)">
 <link rel="canonical" href="https://bookreader.raiatech.com/privacy/">
+<link rel="alternate" hreflang="en" href="https://bookreader.raiatech.com/privacy/">
+<link rel="alternate" hreflang="es" href="https://bookreader.raiatech.com/es/privacidad/">
 <link rel="icon" href="../app/icons/favicon.ico" sizes="32x32">
 <link rel="icon" href="../app/icons/icon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="../app/css/themes.css">
-<link rel="stylesheet" href="../assets/landing/brand.css">
+<link rel="stylesheet" href="../assets/landing/brand.css?v=20261108a">
 <style>
   @font-face { font-family: 'Inter'; font-weight: 400; font-display: swap; src: url(../app/fonts/inter-400.woff2) format('woff2'); }
   @font-face { font-family: 'Inter'; font-weight: 600; font-display: swap; src: url(../app/fonts/inter-600.woff2) format('woff2'); }
@@ -184,7 +188,7 @@
       <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4.2H6.2A1.7 1.7 0 0 0 4.5 5.9v8.5a1.7 1.7 0 0 0 1.7 1.7h1.9c2.1 0 3.9 1.2 3.9 3.2Z"/><path d="M14.3 5.4a1.2 1.2 0 0 1 1.2-1.2h2.9a1.2 1.2 0 0 1 1.2 1.2V15l-2.65-2-2.65 2Z"/></svg>
       BookReader
     </a>
-    <a class="nav-cta" href="../app/">Open the app</a>
+    <span class="nav-end"><a class="nav-lang" hreflang="es" lang="es" data-umami-event="Language" data-umami-event-to="es" href="../es/privacidad/?lang=es">Español</a><a class="nav-cta" href="../app/">Open the app</a></span>
   </div>
 </nav>
 
@@ -192,96 +196,115 @@
 <header class="beat values">
   <div class="wrap">
     <div class="beat-copy">
-      <p class="product-name">BookReader</p>
-      <h1>Your books never leave your machine.</h1>
-      <p class="support">A 100% client-side EPUB &amp; PDF reader with an AI reading agent. <b>No backend. No account. No tracking.</b> Just static files and your browser.</p>
-      <div class="cta-row">
-        <a class="btn-primary" href="../app/">Open BookReader
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg>
-        </a>
-      </div>
-      <p class="cta-note">Free. Works offline as a PWA.</p>
+      <p class="product-name">Privacy</p>
+      <h1>Your books stay on your device.</h1>
+      <p class="support">BookReader runs in your browser. Your books, highlights, notes and cards are stored on your device, with <b>no account</b>. This page lists everything that does leave it: when, where it goes, and what we keep.</p>
+      <p class="cta-note">Last updated: November 8, 2026.</p>
     </div>
   </div>
 </header>
 
-<!-- Beat: cómo funciona -->
 <section class="beat">
   <div class="wrap">
     <div class="beat-copy">
-      <h2>Local-first, verifiably.</h2>
-      <p class="support">Books and annotations live in <b>IndexedDB and localStorage</b>, on your device. The reader libraries are vendored (no CDNs), the CSP is <b>script-src 'self'</b>, and the whole app deploys as static files. Open DevTools and watch the network tab: nothing phones home — the one exception is the public model catalogue, and only if you open the model picker.</p>
+      <p class="feature-name">On your device</p>
+      <h2>Reading never leaves your browser.</h2>
+      <p class="support">Books and annotations live in your browser’s storage (<b>IndexedDB and localStorage</b>). Reading, highlighting, searching the book and reviewing cards all happen locally, and work offline. The reader’s libraries are bundled with the app, not loaded from third-party servers. You can export everything as a <b>JSON backup</b> at any time.</p>
     </div>
   </div>
 </section>
 
-<!-- Beat: BYOK -->
 <section class="beat alt">
   <div class="wrap">
     <div class="beat-copy">
-      <p class="feature-name">Bring your own key</p>
-      <h2>The AI is yours too.</h2>
-      <p class="support">The reading agent runs on <b>your API key against the provider you choose</b> — any OpenAI-compatible endpoint, including a local one. Passages go straight from your browser to your provider when you ask a question. No proxy, no markup, no subscription. Without a key, BookReader is still a complete reader.</p>
+      <p class="feature-name">The agent</p>
+      <h2>When you ask, passages travel. You choose where.</h2>
+      <p class="support">To answer a question or make cards, the agent sends <b>your question and the relevant passages</b> of the book to an AI model. There are three ways to run it:</p>
+    </div>
+    <div class="faq">
+      <details open>
+        <summary>Without a key (the free demo)</summary>
+        <p class="ans">Requests go through our gateway, a Cloudflare Worker, to the model provider we use (today, NaN). The gateway <b>does not log questions, passages or answers</b>. To give one demo per network per day, it stores a salted hash of your network (not your full IP address) for at most 30 days.</p>
+      </details>
+      <details>
+        <summary>With your own key</summary>
+        <p class="ans">Requests go <b>straight from your browser to the provider you configured</b>. We don’t see them. What the provider does with them depends on its own policy.</p>
+      </details>
+      <details>
+        <summary>With a local model</summary>
+        <p class="ans">Point the agent at any OpenAI-compatible endpoint on your own hardware (llama.cpp, Ollama, vLLM…). Then nothing leaves your network.</p>
+      </details>
     </div>
   </div>
 </section>
 
-<!-- Beat: BYOS -->
 <section class="beat">
   <div class="wrap">
     <div class="beat-copy">
-      <p class="feature-name">Bring your own storage</p>
-      <h2>Sync through your own cloud, or not at all.</h2>
-      <p class="support">Cross-device sync uses a private folder in <b>your own Google Drive</b>: data goes browser → your Drive, directly. The only server involved is a stateless token-refresh worker that never sees your books or notes. Prefer zero cloud? Export a full <b>JSON backup</b> anytime.</p>
-    </div>
-  </div>
-</section>
-
-<!-- FAQ -->
-<section class="beat alt">
-  <div class="wrap">
-    <div class="beat-copy">
-      <h2>The fine print, up front.</h2>
+      <p class="feature-name">Sync and sharing</p>
+      <h2>Only if you turn them on.</h2>
     </div>
     <div class="faq">
       <details>
-        <summary>What exactly leaves my device?</summary>
-        <p class="ans">Only what you send to the AI provider you configured, when you use the agent: the relevant book passages and your question. Reading, highlighting, searching and reviewing cards are fully local.</p>
-        <p class="ans">One third party, and only on demand: if you open the model picker in Settings, the app downloads the public catalogue from <b>models.dev</b> to list model names and capabilities. It's a plain GET of a public file — no API key, no book content, nothing about you. Never fetched unless you open that picker.</p>
+        <summary>Sync with Google Drive</summary>
+        <p class="ans">Your library goes from your browser to a hidden app folder in <b>your own Google Drive</b>. The permission only covers that folder: BookReader can’t see your other files. A small worker of ours exchanges the sign-in tokens with Google; it stores nothing and never sees your books or notes.</p>
       </details>
       <details>
-        <summary>What happens to my email if I join the Plus waitlist?</summary>
-        <p class="ans">It's stored on our server with the language of the page and the date, and nothing else. We use it for one email when Plus launches. Write to us and we delete it.</p>
+        <summary>BookReader sync (Plus)</summary>
+        <p class="ans">Everything is <b>encrypted in your browser</b> before it leaves, with a key our server never receives. We store bytes we can’t read, and we don’t log paths, names, contents or IP addresses. When a subscription ends, the data stays read-only for a grace period so you can export it, and is then deleted.</p>
       </details>
       <details>
-        <summary>Can I self-host it?</summary>
-        <p class="ans">Yes. It's a static site — no build step, no database. Serve the files from any web server, GitHub Pages, or your homelab.</p>
+        <summary>Connecting AI agents (MCP, Plus)</summary>
+        <p class="ans">If you create a token so an agent such as Claude can read your library, the server needs your sync key to answer it. The key is stored encrypted with that token, and only the token’s hash is kept. On each request it is decrypted in memory, the answer is sent and it is forgotten. <b>While answering, the server sees that data in plain text.</b> It’s a connection you create on purpose, and you can revoke it in Settings → Data → Agents.</p>
       </details>
       <details>
-        <summary>Can I use a local LLM?</summary>
-        <p class="ans">Yes. Point the agent at any OpenAI-compatible endpoint — including llama.cpp, Ollama or vLLM running on your own hardware. Then nothing leaves your network at all.</p>
-      </details>
-      <details>
-        <summary>Does it work offline?</summary>
-        <p class="ans">Reading, highlighting and reviewing flashcards: yes, it's an installable PWA. The agent needs a connection to reach your AI provider (unless it's local).</p>
-      </details>
-      <details>
-        <summary>Where's the code?</summary>
-        <p class="ans">The reader is open source — vanilla JS, no framework, auditable in an afternoon.</p>
+        <summary>Share links</summary>
+        <p class="ans">What you share is <b>encrypted in your browser</b>. The key travels in the part of the link after the <code>#</code>, which browsers never send to servers, so we store bytes we can’t read. Links expire after 7 days, and you can revoke them sooner. Your IP is used only to rate-limit uploads and isn’t stored.</p>
       </details>
     </div>
   </div>
 </section>
 
-<!-- Cierre -->
+<section class="beat alt">
+  <div class="wrap">
+    <div class="beat-copy">
+      <h2>The rest of the fine print.</h2>
+    </div>
+    <div class="faq">
+      <details>
+        <summary>Do you use analytics?</summary>
+        <p class="ans">Yes, Umami, which uses <b>no cookies</b>. It counts page visits and a few anonymous events, such as “created a first deck”, to know whether the app is useful. It never receives book content, your notes or the part of the address after <code>#</code>, where share keys and the book you’re reading go. The data goes to Umami Cloud.</p>
+      </details>
+      <details>
+        <summary>What happens to my email if I join the Plus waitlist?</summary>
+        <p class="ans">It’s stored with the page language, the date and the plan you’re interested in, and nothing else. We use it for one email when Plus launches. Write to <a href="mailto:hola@raiatech.com">hola@raiatech.com</a> and we delete it.</p>
+      </details>
+      <details>
+        <summary>Anything else that connects to the internet?</summary>
+        <p class="ans">Only on demand: if you open the model picker in Settings, the app downloads the public catalogue from <b>models.dev</b> to list model names and capabilities. No key, no book content, nothing about you.</p>
+      </details>
+      <details>
+        <summary>Does it work offline?</summary>
+        <p class="ans">Yes, it’s an installable app. Reading, highlighting and reviewing work without a connection. If you ask the agent offline, it shows you the most relevant passages from the book and answers properly when you’re back online.</p>
+      </details>
+      <details>
+        <summary>Where’s the code?</summary>
+        <p class="ans">The app and its workers are public on <a href="https://github.com/iamluisgb/bookreader">GitHub</a>, so you can check everything on this page.</p>
+      </details>
+      <details>
+        <summary>Who is responsible?</summary>
+        <p class="ans">BookReader is made by Luis González, in Spain. For any question about your data, or to have something deleted: <a href="mailto:hola@raiatech.com">hola@raiatech.com</a>.</p>
+      </details>
+    </div>
+  </div>
+</section>
+
 <section class="beat values">
   <div class="wrap">
     <div class="beat-copy">
-      <h2>Read like nobody's watching. Because nobody is.</h2>
+      <h2>Your library, on your device.</h2>
       <div class="cta-row">
-        <a class="btn-primary" href="../app/">Open BookReader
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg>
-        </a>
+        <a class="btn-primary" href="../app/">Open BookReader</a>
       </div>
       <p class="cta-note">Free. No account. In your browser.</p>
     </div>
@@ -294,7 +317,8 @@
       <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4.2H6.2A1.7 1.7 0 0 0 4.5 5.9v8.5a1.7 1.7 0 0 0 1.7 1.7h1.9c2.1 0 3.9 1.2 3.9 3.2Z"/><path d="M14.3 5.4a1.2 1.2 0 0 1 1.2-1.2h2.9a1.2 1.2 0 0 1 1.2 1.2V15l-2.65-2-2.65 2Z"/></svg>
       BookReader
     </a>
-    <span>EPUB · PDF reader with a reading agent — local-first, BYOK · © 2026 Luis González · <a href="../">Home</a> · <a href="../es/">Español</a></span>
+    <span>EPUB and PDF reader with an AI agent and flashcards · © 2026 Luis González · <a href="../">Home</a> · <a href="../es/privacidad/?lang=es">Español</a></span>
+    <span class="theme-pick" role="group" aria-label="Theme"><button type="button" data-pick="system" aria-pressed="false">Auto</button><button type="button" data-pick="light" aria-pressed="false">Light</button><button type="button" data-pick="dark" aria-pressed="false">Dark</button></span>
   </div>
 </footer>
 

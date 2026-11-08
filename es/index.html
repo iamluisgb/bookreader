@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="../assets/landing/prefs.js?v=20261108a"></script>
 <script>
 // Conmutador (P16): ?lang=es (viene de elegir "Español" en la landing EN)
 // persiste la preferencia con la misma clave que usa la app.
@@ -30,7 +31,8 @@ if (!window.matchMedia || !matchMedia('(prefers-reduced-motion: reduce)').matche
 <meta property="og:locale" content="es_ES">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:image" content="https://bookreader.raiatech.com/assets/landing/og-es.png">
-<meta name="theme-color" content="#22c55e">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#121214" media="(prefers-color-scheme: dark)">
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "SoftwareApplication", "name": "BookReader", "url": "https://bookreader.raiatech.com/es/", "applicationCategory": "EducationalApplication", "operatingSystem": "Web browser", "inLanguage": "es", "description": "Lector de EPUB y PDF con un agente de IA que explica pasajes con citas y los convierte en tarjetas de repaso espaciado. Funciona en el navegador, sin cuenta.", "offers": {"@type": "Offer", "price": "0", "priceCurrency": "EUR"}, "author": {"@type": "Person", "name": "Luis González", "url": "https://luisgonzalezbernal.com/"}}</script>
 <link rel="canonical" href="https://bookreader.raiatech.com/es/">
 <link rel="alternate" hreflang="es" href="https://bookreader.raiatech.com/es/">
@@ -39,7 +41,7 @@ if (!window.matchMedia || !matchMedia('(prefers-reduced-motion: reduce)').matche
 <link rel="icon" href="../app/icons/favicon.ico" sizes="32x32">
 <link rel="icon" href="../app/icons/icon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="../app/css/themes.css">
-<link rel="stylesheet" href="../assets/landing/brand.css?v=20261030b">
+<link rel="stylesheet" href="../assets/landing/brand.css?v=20261108a">
 <style>
   @font-face { font-family: 'Inter'; font-weight: 400; font-display: swap; src: url(../app/fonts/inter-400.woff2) format('woff2'); }
   @font-face { font-family: 'Inter'; font-weight: 600; font-display: swap; src: url(../app/fonts/inter-600.woff2) format('woff2'); }
@@ -193,8 +195,8 @@ if (location.hostname === 'bookreader.raiatech.com') {
       <svg width="24" height="24" viewBox="0 0 512 512" aria-hidden="true" focusable="false"><rect width="512" height="512" rx="118" fill="#111418"/><path d="M288 119 Q288 99 308 99 L396 99 Q416 99 416 119 L416 371 L352 323 L288 371 Z" fill="#22c55e"/><path d="M98 90 L222 90 Q256 90 256 124 L256 470 C 249 442 233 424 206 414 C 177 403 140 401 100 401 Q64 401 64 365 L64 124 Q64 90 98 90 Z" fill="#f8fafc"/></svg>
       BookReader
     </span>
-    <span style="display:flex;align-items:center;gap:18px">
-      <a class="nav-lang" data-umami-event="Language" data-umami-event-to="en" href="../?lang=en" style="font:600 13.5px var(--font-ui);color:var(--text-soft)">English</a>
+    <span class="nav-end">
+      <a class="nav-lang" hreflang="en" lang="en" data-umami-event="Language" data-umami-event-to="en" href="../?lang=en">English</a>
       <a class="nav-cta" data-umami-event="Open app" data-umami-event-where="nav" href="../app/">Abrir la app</a>
     </span>
   </div>
@@ -466,7 +468,7 @@ if (location.hostname === 'bookreader.raiatech.com') {
       <p class="support">Sin cuenta. Tus libros, notas y tarjetas viven en tu dispositivo, no en un servidor nuestro. A la IA solo le llega el texto de cada pregunta. Y te lo puedes llevar todo cuando quieras.</p>
       <p class="support values-more">Instalable, así que leer, subrayar y repasar funciona sin conexión. Sincroniza con <b>tu propio Google Drive</b>. Un backup completo cuando quieras.</p>
       <p class="seal">Privado por diseño. <span>Así es BookReader.</span></p>
-      <p class="values-why"><a href="../privacy/">La privacidad, en detalle</a> · <a href="por-que/" data-umami-event="Why">Por qué está hecho así</a></p>
+      <p class="values-why"><a href="privacidad/">La privacidad, en detalle</a> · <a href="por-que/" data-umami-event="Why">Por qué está hecho así</a></p>
     </div>
     <div class="strata-stage" role="img" aria-label="Todo se queda en capas dentro de tu dispositivo: tus libros, subrayados y notas, tarjetas y progreso, y la IA que elijas">
       <div class="strata" id="strata" aria-hidden="true">
@@ -512,7 +514,7 @@ if (location.hostname === 'bookreader.raiatech.com') {
           <button type="submit" class="btn-primary">Avísame</button>
           <p class="plus-msg" role="status" aria-live="polite"></p>
         </form>
-        <p class="plus-fine">Un solo email cuando salga Plus. Nada más. <a href="../privacy/">Privacidad</a></p>
+        <p class="plus-fine">Un solo email cuando salga Plus. Nada más. <a href="privacidad/">Privacidad</a></p>
       </div>
     </div>
   </div>
@@ -592,6 +594,7 @@ if (location.hostname === 'bookreader.raiatech.com') {
       BookReader
     </span>
     <span>Lector EPUB y PDF con agente de IA y tarjetas · © 2026 Luis González · <a href="por-que/">Por qué BookReader</a> · <a href="blog/">Blog</a> · <a href="../?lang=en">English</a></span>
+    <span class="theme-pick" role="group" aria-label="Tema"><button type="button" data-pick="system" aria-pressed="false">Auto</button><button type="button" data-pick="light" aria-pressed="false">Claro</button><button type="button" data-pick="dark" aria-pressed="false">Oscuro</button></span>
   </div>
 </footer>
 

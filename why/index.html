@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="../assets/landing/prefs.js?v=20261108a"></script>
 <title>Why BookReader — What you read should stay with you</title>
 <meta name="description" content="Why BookReader exists and the rules it follows: help you understand instead of skipping, make nothing up, make you remember, and keep your books yours.">
 <meta property="og:type" content="article">
@@ -10,14 +11,15 @@
 <meta property="og:description" content="Why BookReader exists and the rules it follows: help you understand instead of skipping, make nothing up, make you remember, and keep your books yours.">
 <meta property="og:url" content="https://bookreader.raiatech.com/why/">
 <meta property="og:image" content="https://bookreader.raiatech.com/app/icons/icon-512.png">
-<meta name="theme-color" content="#22c55e">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#121214" media="(prefers-color-scheme: dark)">
 <link rel="canonical" href="https://bookreader.raiatech.com/why/">
 <link rel="alternate" hreflang="en" href="https://bookreader.raiatech.com/why/">
 <link rel="alternate" hreflang="es" href="https://bookreader.raiatech.com/es/por-que/">
 <link rel="icon" href="../app/icons/favicon.ico" sizes="32x32">
 <link rel="icon" href="../app/icons/icon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="../app/css/themes.css">
-<link rel="stylesheet" href="../assets/landing/brand.css?v=20261030b">
+<link rel="stylesheet" href="../assets/landing/brand.css?v=20261108a">
 <link rel="stylesheet" href="../assets/landing/why.css?v=20261030b">
 <script>
 if (location.hostname === 'bookreader.raiatech.com') {
@@ -33,7 +35,7 @@ if (location.hostname === 'bookreader.raiatech.com') {
 <nav>
   <div class="wrap nav-in">
     <a class="brand" href="../"><svg width="22" height="22" viewBox="0 0 512 512" aria-hidden="true" focusable="false"><rect width="512" height="512" rx="118" fill="#111418"/><path d="M288 119 Q288 99 308 99 L396 99 Q416 99 416 119 L416 371 L352 323 L288 371 Z" fill="#22c55e"/><path d="M98 90 L222 90 Q256 90 256 124 L256 470 C 249 442 233 424 206 414 C 177 403 140 401 100 401 Q64 401 64 365 L64 124 Q64 90 98 90 Z" fill="#f8fafc"/></svg> BookReader</a>
-    <a class="nav-cta" href="../app/" data-umami-event="Open app" data-umami-event-where="why">Open the app</a>
+    <span class="nav-end"><a class="nav-lang" hreflang="es" lang="es" data-umami-event="Language" data-umami-event-to="es" href="../es/por-que/?lang=es">Español</a><a class="nav-cta" href="../app/" data-umami-event="Open app" data-umami-event-where="why">Open the app</a></span>
   </div>
 </nav>
 <main class="why">
@@ -58,7 +60,7 @@ if (location.hostname === 'bookreader.raiatech.com') {
   </section>
   <section>
     <h2>4. Your books are yours.</h2>
-    <p>No account. Your books, notes and cards live on your device, and you can export everything whenever you want. The agent uses your own AI key with the provider you choose, and your questions go straight from your browser to that provider.</p>
+    <p>No account. Your books, notes and cards live on your device, and you can export everything whenever you want. The agent works without a key through our free demo, or with your own key straight to the provider you choose.</p>
     <p>The details, including exactly what does leave your device, are on the <a href="../privacy/">privacy page</a>.</p>
   </section>
   <section>
@@ -73,7 +75,9 @@ if (location.hostname === 'bookreader.raiatech.com') {
   <p class="cta-note">Free. No account. In your browser.</p>
 </main>
 <footer class="foot">
-  <div class="wrap"><a href="../">Home</a> · <a href="../blog/">Blog</a> · <a href="../privacy/">Privacy</a> · <a href="../es/por-que/">Español</a> · © 2026 Luis González</div>
+  <div class="wrap"><a href="../">Home</a> · <a href="../blog/">Blog</a> · <a href="../privacy/">Privacy</a> · <a href="../es/por-que/?lang=es">Español</a> · © 2026 Luis González
+    <div class="foot-tools"><span class="theme-pick" role="group" aria-label="Theme"><button type="button" data-pick="system" aria-pressed="false">Auto</button><button type="button" data-pick="light" aria-pressed="false">Light</button><button type="button" data-pick="dark" aria-pressed="false">Dark</button></span></div>
+  </div>
 </footer>
 </body>
 </html>

@@ -3,18 +3,22 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="../assets/landing/prefs.js?v=20261108a"></script>
 <title>BookReader — Turn any EPUB or PDF into Anki flashcards</title>
-<meta name="description" content="An AI agent reads your book, writes atomic flashcards aligned to your goal, and exports a ready-to-import .apkg. 100% in your browser, with your own AI key.">
+<meta name="description" content="An AI agent reads your book, writes atomic flashcards aligned to your goal, and exports a ready-to-import .apkg. Free, no account, no key needed to start.">
 <meta property="og:type" content="website">
 <meta property="og:title" content="BookReader — Turn any EPUB or PDF into Anki flashcards">
-<meta property="og:description" content="An AI agent reads your book, writes atomic flashcards aligned to your goal, and exports a ready-to-import .apkg. 100% in your browser, with your own AI key.">
+<meta property="og:description" content="An AI agent reads your book, writes atomic flashcards aligned to your goal, and exports a ready-to-import .apkg. Free, no account, no key needed to start.">
 <meta property="og:url" content="https://bookreader.raiatech.com/anki/">
 <meta property="og:image" content="https://bookreader.raiatech.com/app/icons/icon-512.png">
-<meta name="theme-color" content="#22c55e">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#121214" media="(prefers-color-scheme: dark)">
 <link rel="canonical" href="https://bookreader.raiatech.com/anki/">
+<link rel="alternate" hreflang="en" href="https://bookreader.raiatech.com/anki/">
+<link rel="alternate" hreflang="es" href="https://bookreader.raiatech.com/es/anki/">
 <link rel="icon" href="../app/icons/icon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="../app/css/themes.css">
-<link rel="stylesheet" href="../assets/landing/brand.css">
+<link rel="stylesheet" href="../assets/landing/brand.css?v=20261108a">
 <style>
   @font-face { font-family: 'Inter'; font-weight: 400; font-display: swap; src: url(../app/fonts/inter-400.woff2) format('woff2'); }
   @font-face { font-family: 'Inter'; font-weight: 600; font-display: swap; src: url(../app/fonts/inter-600.woff2) format('woff2'); }
@@ -183,7 +187,7 @@
       <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4.2H6.2A1.7 1.7 0 0 0 4.5 5.9v8.5a1.7 1.7 0 0 0 1.7 1.7h1.9c2.1 0 3.9 1.2 3.9 3.2Z"/><path d="M14.3 5.4a1.2 1.2 0 0 1 1.2-1.2h2.9a1.2 1.2 0 0 1 1.2 1.2V15l-2.65-2-2.65 2Z"/></svg>
       BookReader
     </a>
-    <a class="nav-cta" href="../app/">Open the app</a>
+    <span class="nav-end"><a class="nav-lang" hreflang="es" lang="es" data-umami-event="Language" data-umami-event-to="es" href="../es/anki/?lang=es">Español</a><a class="nav-cta" href="../app/">Open the app</a></span>
   </div>
 </nav>
 
@@ -193,13 +197,13 @@
     <div class="beat-copy">
       <p class="product-name">BookReader</p>
       <h1>Turn any book into Anki flashcards.</h1>
-      <p class="support">An AI agent reads your <b>EPUB or PDF</b>, writes atomic cards aligned to what you're studying, and exports a ready-to-import <b>.apkg</b>. Everything runs in your browser — your study material never leaves your machine.</p>
+      <p class="support">An AI agent reads your <b>EPUB or PDF</b>, writes atomic cards aligned to what you're studying, and exports a ready-to-import <b>.apkg</b>. Your books stay in your browser.</p>
       <div class="cta-row">
         <a class="btn-primary" href="../app/">Make flashcards from a book
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg>
         </a>
       </div>
-      <p class="cta-note">Free. No account. Your own AI key (BYOK).</p>
+      <p class="cta-note">Free. No account. The agent works without a key.</p>
     </div>
 
     <div class="beat-visual">
@@ -256,7 +260,7 @@
   <div class="wrap">
     <div class="beat-copy">
       <h2>Review in the app, or export to Anki.</h2>
-      <p class="support">Built-in spaced repetition (SM-2) with a daily queue and streaks — or export a <b>.apkg</b> / .txt and study in Anki like you always do. Your call.</p>
+      <p class="support">Built-in spaced repetition (FSRS, the algorithm Anki offers) with a daily queue and streaks — or export a <b>.apkg</b> / .txt and study in Anki like you always do. Your call.</p>
     </div>
   </div>
 </section>
@@ -270,7 +274,7 @@
     <div class="faq">
       <details>
         <summary>How much does it cost?</summary>
-        <p class="ans">The app is free. The agent runs on your own AI key (BYOK): you pay your provider only for what you use — no middleman, no subscription.</p>
+        <p class="ans">The app is free, and the agent works from the first minute with a free demo, no key needed. If you use it a lot, plug in your own AI key and pay your provider directly, with no subscription.</p>
       </details>
       <details>
         <summary>Which books work?</summary>
@@ -282,7 +286,7 @@
       </details>
       <details>
         <summary>Is my study material uploaded anywhere?</summary>
-        <p class="ans">No. Books live in your browser's storage. When you generate cards, the relevant passages go directly from your browser to the AI provider you configured — and nowhere else.</p>
+        <p class="ans">Your books stay in your browser’s storage. To write cards, the agent sends the relevant passages to an AI model: through our gateway with the free demo (which doesn’t log them), or straight to your provider if you use your own key. The details are on the <a href="../privacy/">privacy page</a>.</p>
       </details>
     </div>
   </div>
@@ -314,7 +318,8 @@
       <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4.2H6.2A1.7 1.7 0 0 0 4.5 5.9v8.5a1.7 1.7 0 0 0 1.7 1.7h1.9c2.1 0 3.9 1.2 3.9 3.2Z"/><path d="M14.3 5.4a1.2 1.2 0 0 1 1.2-1.2h2.9a1.2 1.2 0 0 1 1.2 1.2V15l-2.65-2-2.65 2Z"/></svg>
       BookReader
     </a>
-    <span>EPUB · PDF reader with a reading agent — local-first, BYOK · © 2026 Luis González · <a href="../">Home</a> · <a href="../es/">Español</a></span>
+    <span>EPUB and PDF reader with an AI agent and flashcards · © 2026 Luis González · <a href="../">Home</a> · <a href="../es/anki/?lang=es">Español</a></span>
+    <span class="theme-pick" role="group" aria-label="Theme"><button type="button" data-pick="system" aria-pressed="false">Auto</button><button type="button" data-pick="light" aria-pressed="false">Light</button><button type="button" data-pick="dark" aria-pressed="false">Dark</button></span>
   </div>
 </footer>
 

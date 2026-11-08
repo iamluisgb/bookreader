@@ -42,5 +42,22 @@
   </url>
   <url>
     <loc>https://bookreader.raiatech.com/privacy/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://bookreader.raiatech.com/privacy/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://bookreader.raiatech.com/es/privacidad/"/>
+  </url>
+  <url>
+    <loc>https://bookreader.raiatech.com/es/privacidad/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://bookreader.raiatech.com/privacy/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://bookreader.raiatech.com/es/privacidad/"/>
+  </url>
+  <url>
+    <loc>https://bookreader.raiatech.com/anki/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://bookreader.raiatech.com/anki/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://bookreader.raiatech.com/es/anki/"/>
+  </url>
+  <url>
+    <loc>https://bookreader.raiatech.com/es/anki/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://bookreader.raiatech.com/anki/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://bookreader.raiatech.com/es/anki/"/>
   </url>
 </urlset>

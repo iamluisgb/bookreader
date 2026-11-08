@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="assets/landing/prefs.js?v=20261108a"></script>
 <script>
 // Idioma (P16): mismo criterio y misma clave que la app (bookreader_lang).
 // La preferencia explícita del usuario SIEMPRE gana sobre la detección; sin
@@ -35,7 +36,8 @@ if (!window.matchMedia || !matchMedia('(prefers-reduced-motion: reduce)').matche
 <meta property="og:locale" content="en_US">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:image" content="https://bookreader.raiatech.com/assets/landing/og-en.png">
-<meta name="theme-color" content="#22c55e">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#121214" media="(prefers-color-scheme: dark)">
 <script type="application/ld+json">{"@context": "https://schema.org", "@type": "SoftwareApplication", "name": "BookReader", "url": "https://bookreader.raiatech.com/", "applicationCategory": "EducationalApplication", "operatingSystem": "Web browser", "inLanguage": "en", "description": "EPUB and PDF reader with an AI agent that explains passages with citations and turns them into spaced-repetition flashcards. Runs in the browser, no account.", "offers": {"@type": "Offer", "price": "0", "priceCurrency": "EUR"}, "author": {"@type": "Person", "name": "Luis González", "url": "https://luisgonzalezbernal.com/"}}</script>
 <link rel="canonical" href="https://bookreader.raiatech.com/">
 <link rel="alternate" hreflang="en" href="https://bookreader.raiatech.com/">
@@ -45,7 +47,7 @@ if (!window.matchMedia || !matchMedia('(prefers-reduced-motion: reduce)').matche
 <link rel="icon" href="app/icons/favicon.ico" sizes="32x32">
 <link rel="icon" href="app/icons/icon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="app/css/themes.css">
-<link rel="stylesheet" href="assets/landing/brand.css?v=20261030b">
+<link rel="stylesheet" href="assets/landing/brand.css?v=20261108a">
 <style>
   @font-face { font-family: 'Inter'; font-weight: 400; font-display: swap; src: url(app/fonts/inter-400.woff2) format('woff2'); }
   @font-face { font-family: 'Inter'; font-weight: 600; font-display: swap; src: url(app/fonts/inter-600.woff2) format('woff2'); }
@@ -199,8 +201,8 @@ if (location.hostname === 'bookreader.raiatech.com') {
       <svg width="24" height="24" viewBox="0 0 512 512" aria-hidden="true" focusable="false"><rect width="512" height="512" rx="118" fill="#111418"/><path d="M288 119 Q288 99 308 99 L396 99 Q416 99 416 119 L416 371 L352 323 L288 371 Z" fill="#22c55e"/><path d="M98 90 L222 90 Q256 90 256 124 L256 470 C 249 442 233 424 206 414 C 177 403 140 401 100 401 Q64 401 64 365 L64 124 Q64 90 98 90 Z" fill="#f8fafc"/></svg>
       BookReader
     </span>
-    <span style="display:flex;align-items:center;gap:18px">
-      <a class="nav-lang" data-umami-event="Language" data-umami-event-to="es" href="es/?lang=es" style="font:600 13.5px var(--font-ui);color:var(--text-soft)">Español</a>
+    <span class="nav-end">
+      <a class="nav-lang" hreflang="es" lang="es" data-umami-event="Language" data-umami-event-to="es" href="es/?lang=es">Español</a>
       <a class="nav-cta" data-umami-event="Open app" data-umami-event-where="nav" href="app/">Open the app</a>
     </span>
   </div>
@@ -597,7 +599,8 @@ if (location.hostname === 'bookreader.raiatech.com') {
       <svg width="19" height="19" viewBox="0 0 512 512" aria-hidden="true" focusable="false"><rect width="512" height="512" rx="118" fill="#111418"/><path d="M288 119 Q288 99 308 99 L396 99 Q416 99 416 119 L416 371 L352 323 L288 371 Z" fill="#22c55e"/><path d="M98 90 L222 90 Q256 90 256 124 L256 470 C 249 442 233 424 206 414 C 177 403 140 401 100 401 Q64 401 64 365 L64 124 Q64 90 98 90 Z" fill="#f8fafc"/></svg>
       BookReader
     </span>
-    <span>EPUB &amp; PDF reader with an AI agent and flashcards · © 2026 Luis González · <a href="why/">Why BookReader</a> · <a href="blog/">Blog</a> · <a href="es/">Español</a></span>
+    <span>EPUB &amp; PDF reader with an AI agent and flashcards · © 2026 Luis González · <a href="why/">Why BookReader</a> · <a href="blog/">Blog</a> · <a href="es/?lang=es">Español</a></span>
+    <span class="theme-pick" role="group" aria-label="Theme"><button type="button" data-pick="system" aria-pressed="false">Auto</button><button type="button" data-pick="light" aria-pressed="false">Light</button><button type="button" data-pick="dark" aria-pressed="false">Dark</button></span>
   </div>
 </footer>
 

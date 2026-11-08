@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="../../assets/landing/prefs.js?v=20261108a"></script>
 <title>Por qué BookReader — Que lo que lees se quede contigo</title>
 <meta name="description" content="Por qué existe BookReader y las reglas que sigue: ayudarte a entender en vez de saltarte el libro, no inventar nada, hacer que recuerdes y que tus libros sean tuyos.">
 <meta property="og:type" content="article">
@@ -10,14 +11,15 @@
 <meta property="og:description" content="Por qué existe BookReader y las reglas que sigue: ayudarte a entender en vez de saltarte el libro, no inventar nada, hacer que recuerdes y que tus libros sean tuyos.">
 <meta property="og:url" content="https://bookreader.raiatech.com/es/por-que/">
 <meta property="og:image" content="https://bookreader.raiatech.com/app/icons/icon-512.png">
-<meta name="theme-color" content="#22c55e">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#121214" media="(prefers-color-scheme: dark)">
 <link rel="canonical" href="https://bookreader.raiatech.com/es/por-que/">
 <link rel="alternate" hreflang="en" href="https://bookreader.raiatech.com/why/">
 <link rel="alternate" hreflang="es" href="https://bookreader.raiatech.com/es/por-que/">
 <link rel="icon" href="../../app/icons/favicon.ico" sizes="32x32">
 <link rel="icon" href="../../app/icons/icon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="../../app/css/themes.css">
-<link rel="stylesheet" href="../../assets/landing/brand.css?v=20261030b">
+<link rel="stylesheet" href="../../assets/landing/brand.css?v=20261108a">
 <link rel="stylesheet" href="../../assets/landing/why.css?v=20261030b">
 <script>
 if (location.hostname === 'bookreader.raiatech.com') {
@@ -33,7 +35,7 @@ if (location.hostname === 'bookreader.raiatech.com') {
 <nav>
   <div class="wrap nav-in">
     <a class="brand" href="../../es/"><svg width="22" height="22" viewBox="0 0 512 512" aria-hidden="true" focusable="false"><rect width="512" height="512" rx="118" fill="#111418"/><path d="M288 119 Q288 99 308 99 L396 99 Q416 99 416 119 L416 371 L352 323 L288 371 Z" fill="#22c55e"/><path d="M98 90 L222 90 Q256 90 256 124 L256 470 C 249 442 233 424 206 414 C 177 403 140 401 100 401 Q64 401 64 365 L64 124 Q64 90 98 90 Z" fill="#f8fafc"/></svg> BookReader</a>
-    <a class="nav-cta" href="../../app/" data-umami-event="Open app" data-umami-event-where="why">Abrir la app</a>
+    <span class="nav-end"><a class="nav-lang" hreflang="en" lang="en" data-umami-event="Language" data-umami-event-to="en" href="../../why/?lang=en">English</a><a class="nav-cta" href="../../app/" data-umami-event="Open app" data-umami-event-where="why">Abrir la app</a></span>
   </div>
 </nav>
 <main class="why">
@@ -58,8 +60,8 @@ if (location.hostname === 'bookreader.raiatech.com') {
   </section>
   <section>
     <h2>4. Tus libros son tuyos.</h2>
-    <p>Sin cuenta. Tus libros, notas y tarjetas viven en tu dispositivo, y puedes exportarlo todo cuando quieras. El agente usa tu propia clave de IA con el proveedor que elijas, y tus preguntas van directas de tu navegador a ese proveedor.</p>
-    <p>El detalle, incluido qué sale exactamente de tu dispositivo, está en la <a href="../../privacy/">página de privacidad</a>.</p>
+    <p>Sin cuenta. Tus libros, notas y tarjetas viven en tu dispositivo, y puedes exportarlo todo cuando quieras. El agente funciona sin clave con nuestra demo gratuita, o con tu propia clave, directo al proveedor que elijas.</p>
+    <p>El detalle, incluido qué sale exactamente de tu dispositivo, está en la <a href="../privacidad/">página de privacidad</a>.</p>
   </section>
   <section>
     <h2>5. Lo que no voy a hacer.</h2>
@@ -73,7 +75,9 @@ if (location.hostname === 'bookreader.raiatech.com') {
   <p class="cta-note">Gratis. Sin cuenta. En tu navegador.</p>
 </main>
 <footer class="foot">
-  <div class="wrap"><a href="../">Inicio</a> · <a href="../blog/">Blog</a> · <a href="../../privacy/">Privacidad</a> · <a href="../../why/">English</a> · © 2026 Luis González</div>
+  <div class="wrap"><a href="../">Inicio</a> · <a href="../blog/">Blog</a> · <a href="../privacidad/">Privacidad</a> · <a href="../../why/?lang=en">English</a> · © 2026 Luis González
+    <div class="foot-tools"><span class="theme-pick" role="group" aria-label="Tema"><button type="button" data-pick="system" aria-pressed="false">Auto</button><button type="button" data-pick="light" aria-pressed="false">Claro</button><button type="button" data-pick="dark" aria-pressed="false">Oscuro</button></span></div>
+  </div>
 </footer>
 </body>
 </html>

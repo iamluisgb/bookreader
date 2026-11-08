@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
+<script src="/assets/landing/prefs.js?v=20261108a"></script>
 <title>Page not found · BookReader</title>
 <!-- Página 404 de verdad. Sin ella, Cloudflare Pages servía la portada con 200 para cualquier
      ruta (soft 404): Google indexaba basura y, con el navegador en español, una ruta inventada
@@ -17,6 +18,15 @@
   p { margin: 0 0 6px; color: #4b5563; }
   a { display: inline-block; margin-top: 18px; background: #22c55e; color: #052e16; font-weight: 600; padding: 11px 20px; border-radius: 999px; text-decoration: none; }
   a + a { background: none; color: #15803d; }
+  /* Oscuro: el del sistema o el elegido en la app/web (prefs.js pone data-theme). */
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) body { background: #121214; color: #f2f2f4; }
+    :root:not([data-theme="light"]) p { color: #a1a1a6; }
+    :root:not([data-theme="light"]) a + a { color: #32d074; }
+  }
+  :root[data-theme="dark"] body { background: #121214; color: #f2f2f4; }
+  :root[data-theme="dark"] p { color: #a1a1a6; }
+  :root[data-theme="dark"] a + a { color: #32d074; }
 </style>
 </head>
 <body>

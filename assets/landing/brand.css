@@ -29,3 +29,19 @@
   --band-bg: #0b0e11;
   --shadow-hero: 0 18px 50px rgba(0, 0, 0, 0.5);
 }
+
+/* ---- Idioma y tema: los mismos en todas las páginas públicas (ver prefs.js) ---- */
+.nav-end { display: flex; align-items: center; gap: 18px; }
+.nav-lang { font: 600 13.5px var(--font-ui); color: var(--text-soft); text-decoration: none; }
+.nav-lang:hover { color: var(--text); text-decoration: none; }
+.theme-pick { display: inline-flex; gap: 2px; padding: 2px; border: 1px solid var(--border); border-radius: 999px; }
+.theme-pick button { font: 500 12.5px var(--font-ui); color: var(--text-faint); background: none; border: 0; padding: 4px 11px; border-radius: 999px; cursor: pointer; }
+.theme-pick button:hover { color: var(--text); }
+.theme-pick button[aria-pressed="true"] { background: var(--surface-alt); color: var(--text); }
+.theme-pick button:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.foot-tools { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-top: 14px; }
+.nav-in { gap: 14px; }
+@media (max-width: 400px) {
+  .nav-end { gap: 12px; }
+  .nav-end .nav-cta { padding: 8px 13px; }
+}
