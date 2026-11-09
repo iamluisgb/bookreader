@@ -18,7 +18,7 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 - **Tests**: `tests/probes.spec.ts` (5, tres pasadas en verde). Relacionadas en verde: estudio,
   intentos, Análisis, i18n, precache, sync de biblioteca. `css-vars` falla igual en HEAD (`--sw` y
   los hex de `agent.css`).
-- **Sin desplegar** (`bookreader-v237`). Pendiente en [BACKLOG · P55](BACKLOG.md): validar el juez
+- **Desplegado**: Pages `cf89a5e` (`bookreader-v237`), humo en verde. Pendiente en [BACKLOG · P55](BACKLOG.md): validar el juez
   offline antes de fiarse de la cifra, confianza previa, recuerdo libre.
 
 ## 2026-11-03 — Studio: la muestra de libro entero cubre todo el libro
