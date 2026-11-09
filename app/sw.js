@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bookreader-v236';
+const CACHE_NAME = 'bookreader-v237';
 // Ficheros compartidos con la app (share target) a la espera de que la app los recoja.
 const INBOX = 'bookreader-inbox';
 const ASSETS = [
@@ -139,6 +139,7 @@ const ASSETS = [
   './js/ai/anki-export.js',
   './js/ai/srs.js',
   './js/ai/study-stats.js',
+  './js/ai/probes.js',
   './js/ai/fsrs-params.js',
   './js/ai/fsrs-optimizer.worker.js',
   './js/ai/study.js',

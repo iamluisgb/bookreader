@@ -124,6 +124,8 @@ function bookEntry(b) {
     // Solo si existen: un registro sin ellos se serializa igual que antes (sin push de más).
     ...(Array.isArray(b.chapterOrder) ? { chapterOrder: b.chapterOrder } : {}),
     ...(Array.isArray(b.chaptersDone) ? { chaptersDone: b.chaptersDone } : {}),
+    // Cuándo se dejó atrás cada capítulo (P55): programa las preguntas de comprobación.
+    ...(b.chaptersDoneAt && typeof b.chaptersDoneAt === 'object' ? { chaptersDoneAt: b.chaptersDoneAt } : {}),
     blob: b.blob || null,
     deleted: !!b.deleted, deletedAt: b.deletedAt || 0,
     updatedAt: b.updatedAt || 0,

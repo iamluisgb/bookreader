@@ -1923,6 +1923,24 @@ body.reading.chrome-quiet:not(.fs):not(.ai-open) .agent-rail:not(:hover, :focus-
 .study-draft-note { font-size: var(--fs-sm); color: var(--text-soft); display: flex; gap: 6px; align-items: center; margin: 0 0 8px; }
 .study-stage--edit { background: var(--surface-0); border: 1px solid var(--border); border-radius: var(--r-xl); padding: 22px; }
 
+/* P55 · Pregunta de comprobación: el mismo panel que el editor, no una tarjeta (no gira ni se
+   califica). La etiqueta deja claro que es otra cosa; la pregunta, en la letra de las tarjetas. */
+.study-probe { display: flex; flex-direction: column; gap: var(--s-3); text-align: left; }
+.study-probe-meta { margin: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--s-2); font-size: var(--fs-xs); color: var(--text-soft); }
+.study-probe-tag { font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; padding: 2px 8px; border-radius: var(--r-pill); background: var(--fill); color: var(--text); }
+.study-probe-q { margin: 0; font-family: var(--font-reader); font-size: var(--fs-xl); font-weight: 600; line-height: 1.4; }
+.study-probe-slot { display: flex; flex-direction: column; gap: var(--s-3); }
+.study-probe-note { margin: 0; font-size: var(--fs-sm); color: var(--text-soft); }
+.study-probe-input { max-height: none; }
+.study-probe-expected { background: var(--fill); border-radius: var(--r-md); padding: 12px 14px; font-size: var(--fs-sm); line-height: 1.5; }
+.study-probe-expected p { margin: 4px 0 0; }
+.study-probe-h { font-weight: 600; }
+.study-probe-dispute { margin-top: var(--s-2); }
+.study-probe-dispute[aria-pressed="true"] { background: var(--fill-strong); }
+.study-probe-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--s-2); width: 100%; }
+.study-probe-actions .btn--secondary { padding: 11px 16px; border-radius: var(--r-md); }
+.study-probe-actions .study-probe-skip { margin-right: auto; }
+
 /* Tarjetas visuales (WU6): figura con oclusión, diagrama SVG y lienzo de dibujo. Todo con
    los tokens del tema (surface/border/accent) y con tope de alto para que la tarjeta siga
    cabiendo en el overlay (que ya gestiona su propio overflow). */

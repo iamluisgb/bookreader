@@ -3,6 +3,24 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-11-09 — P55 F1: preguntas de comprobación, la primera cifra que mide aprender
+
+- **El caso**: ninguna cifra de Análisis medía aprendizaje (retención de la misma tarjeta, que FSRS
+  lleva al 90 % por diseño; estimaciones; actividad). Investigación y catálogo de métricas en
+  [`docs/INVESTIGACION_METRICAS_APRENDIZAJE.md`](docs/INVESTIGACION_METRICAS_APRENDIZAJE.md).
+- **Qué hay**: a los ≥ 14 días de dejar atrás un capítulo trabajado (subrayado o tarjetas), el repaso
+  del día trae una pregunta nueva sobre él, tras dos tarjetas. Se responde sin agente ni pasaje; el
+  agente corrige; no se repite ni toca FSRS. Análisis: «Comprensión a las 2 semanas: k de n», con
+  saltadas y correcciones discutidas al lado.
+- **Piezas**: `chapter-gate.js` (`chaptersDoneAt`, sincronizado en la ficha), `probes.js` (nuevo,
+  precacheado), paso propio en `study.js`, `probeStats` en `study-stats.js`, `analysis.js`. Intentos
+  `mode: 'probe'` en `attempts`, fuera de retención, calibración y repasos.
+- **Tests**: `tests/probes.spec.ts` (5, tres pasadas en verde). Relacionadas en verde: estudio,
+  intentos, Análisis, i18n, precache, sync de biblioteca. `css-vars` falla igual en HEAD (`--sw` y
+  los hex de `agent.css`).
+- **Sin desplegar** (`bookreader-v237`). Pendiente en [BACKLOG · P55](BACKLOG.md): validar el juez
+  offline antes de fiarse de la cifra, confianza previa, recuerdo libre.
+
 ## 2026-11-03 — Studio: la muestra de libro entero cubre todo el libro
 
 - **El caso**: la infografía de *Protocols* salió entera de dos capítulos (Luz y Enfoque): 7 ideas

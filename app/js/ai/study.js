@@ -30,6 +30,7 @@ import { sanitizeSvg, reviewDrawing } from './visual-cards.js';
 import { shuffledOptions } from './widgets/mcq.js';
 import { lockerFor } from './chapter-gate.js';
 import { CLOZE_RE, clozeExact } from './cloze-check.js';
+import * as Probes from './probes.js';
 
 // Racha de estudio (F3): {count, lastDay}, global de la app (no por libro).
 const STREAK_KEY = 'study_streak';
@@ -341,6 +342,11 @@ let draft = null;        // intento en curso de la tarjeta visible (P42 F1, ver 
 let asked = 0;           // dudas preguntadas al agente en la sesión (P46: tienen tope)
 let whyCtl = null;       // AbortController de la duda en vuelo: pasar de tarjeta la corta
 const ASK_LIMIT = 20;    // dudas por sesión: más que eso ya no es repasar, es releer el libro
+// P55 · Pregunta de comprobación de la sesión (ai/probes.js): una como mucho, solo en el repaso
+// del día. {cand, q, stage: null|'ask'|'judging'|'result', shownAt, answer, verdict, comment,
+// outcome, disputed, done}. `probeCtl` corta la generación o la corrección al cerrar.
+let probe = null;
+let probeCtl = null;
 
 // ---- Registro de intentos (P42 F1) ----------------------------------------------
 // Cada nota deja UN registro inmutable en el store `attempts` (db.js). Se arma en dos tiempos:
@@ -470,6 +476,7 @@ export function open({ decks, title = t('Estudiar'), onClose, onNavigate, gate =
   failedOnce = new Set();
   asked = 0;
   sessionBooks = new Set((decks || []).map(d => d.bookId).filter(Boolean));
+  probe = null;
   startedAt = Date.now();
   streakAtStart = Srs.currentStreak(Storage.get(STREAK_KEY));
   flipped = false;
@@ -504,6 +511,8 @@ export function open({ decks, title = t('Estudiar'), onClose, onNavigate, gate =
   });
   document.addEventListener('keydown', onKey);
   renderCard();
+  // P55: la pregunta de comprobación se prepara en segundo plano; entra tras las primeras tarjetas.
+  if (gate && LLM.hasKey()) startProbe(overlay);
   // Filtro fresco de capítulos leídos: si cambia la cola y aún no se ha puesto ninguna nota, se
   // rehace (lo normal es que el guardado ya estuviera al día y no cambie nada).
   const session = overlay;
@@ -559,6 +568,7 @@ function removeChip() {
 function close() {
   abortSketchReview();
   abortWhy();
+  finishProbe();
   document.removeEventListener('keydown', onKey);
   if (overlay) { overlay.remove(); overlay = null; }
   minimized = false;
@@ -586,6 +596,7 @@ function typingInWhy(e) {
 
 function onKey(e) {
   if (!overlay) return;
+  if (probeOnScreen()) { onProbeKey(e); return; }
   // Editando: el teclado es del editor (Escape cancela la edición, no la sesión).
   if (editing) { if (e.key === 'Escape') { e.preventDefault(); renderCard(); } return; }
   // Escribiendo la respuesta: Intro (sin mayúsculas) comprueba; el resto es texto.
@@ -1141,6 +1152,7 @@ function renderCard() {
   setProgress();
   refreshHead();
 
+  if (probeDue()) { renderProbe(b, f, left); return; }
   if (!queue.length) { renderDone(b, f, left); renderTools(); return; }
   left.textContent = t('{n} pendiente{s}', { n: queue.length, s: queue.length === 1 ? '' : 's' });
 
@@ -1780,6 +1792,179 @@ function gradeCurrent(rating) {
 }
 
 // ---- Final de sesión --------------------------------------------------------------
+
+// ---- P55 · Pregunta de comprobación -------------------------------------------------
+// Una pregunta NUEVA sobre un capítulo que dejaste atrás hace ≥ 14 días, respondida sin ayuda.
+// Es la medida de aprendizaje de Análisis (ai/probes.js). No es una tarjeta: no gira, no tiene
+// notas, no pasa por FSRS ni por deshacer, y no se puede preguntar al agente ni ver el pasaje
+// hasta haber respondido. Se responde, se dice «no lo sé» o se salta; las tres cierran el
+// capítulo para siempre (saltar no la devuelve mañana: si no, se saltarían las difíciles).
+
+async function startProbe(session) {
+  try {
+    const cand = await Probes.nextCandidate();
+    if (!cand || overlay !== session) return;
+    probeCtl = new AbortController();
+    const q = await Probes.generate(cand, { signal: probeCtl.signal });
+    if (!q || overlay !== session || probe) return;
+    probe = { cand, q, stage: null, done: false };
+    // Si la cola ya se acabó, la pregunta entra antes de la despedida.
+    if (!queue.length && !minimized && !editing) renderCard();
+  } catch (e) {
+    if (e?.name !== 'AbortError') console.warn('study: no se pudo preparar la pregunta de comprobación', e);
+  }
+}
+
+function probeDue() {
+  return !!probe && !probe.done && (probe.stage || graded >= Probes.AFTER_CARDS || !queue.length);
+}
+
+function probeOnScreen() {
+  return !!probe && !probe.done && !!probe.stage && !!overlay?.querySelector('.study-probe');
+}
+
+// Escribe el resultado (una sola vez). Si se cierra la sesión con la pregunta a la vista y sin
+// responder, no se escribe nada: no se ha visto lo suficiente como para cerrar el capítulo.
+// Si se cierra con la corrección ya hecha, sí: el lector ya respondió.
+function finishProbe() {
+  probeCtl?.abort();
+  probeCtl = null;
+  const p = probe;
+  if (!p || p.done || !p.outcome) return;
+  p.done = true;
+  const rec = Probes.recordOf({
+    cand: p.cand, probe: p.q, outcome: p.outcome, answer: p.answer, verdict: p.verdict,
+    disputed: p.disputed, latencyMs: p.latencyMs ?? null,
+  });
+  Probes.record(rec).catch((e) => console.warn('study: no se pudo guardar la pregunta de comprobación', e));
+}
+
+function onProbeKey(e) {
+  if (e.target?.closest?.('.study-probe-input')) {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitProbe(); }
+    if (e.key === 'Escape') { e.preventDefault(); e.target.blur(); }
+    return;
+  }
+  if (e.key === 'Escape') { close(); return; }
+  if (probe?.stage === 'result' && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); continueAfterProbe(); }
+}
+
+function renderProbe(b, f, left) {
+  const p = probe;
+  if (!p.stage) { p.stage = 'ask'; p.shownAt = Date.now(); }
+  const tools = overlay.querySelector('.study-tools');
+  if (tools) tools.innerHTML = '';
+  left.textContent = t('Pregunta de comprobación');
+  const days = Math.max(Probes.DELAY_DAYS, Math.floor((Date.now() - p.cand.readAt) / 864e5));
+  b.innerHTML = `
+    <div class="study-stage study-stage--edit study-probe" role="group" aria-label="${t('Pregunta de comprobación')}">
+      <p class="study-probe-meta"><span class="study-probe-tag">${t('Pregunta de comprobación')}</span>
+        <span class="study-probe-src">${escapeHtml(p.cand.title || t('Sin título'))} · ${escapeHtml(p.cand.chapter)}</span></p>
+      <p class="study-probe-q">${escapeHtml(p.q.question)}</p>
+      <div class="study-probe-slot"></div>
+    </div>`;
+  const slot = b.querySelector('.study-probe-slot');
+  if (p.stage === 'ask') {
+    slot.innerHTML = `
+      <p class="study-probe-note">${t('Leíste este capítulo hace {n} días. Responde sin mirar el libro: esta pregunta no se repite y no cambia tus tarjetas.', { n: days })}</p>
+      <textarea class="study-recall-input study-probe-input" rows="3" placeholder="${t('Tu respuesta, con tus palabras')}" aria-label="${t('Tu respuesta')}"></textarea>`;
+    f.innerHTML = `
+      <div class="study-probe-actions">
+        <button class="btn btn--secondary study-probe-skip" data-probe="skip">${t('Saltar')}</button>
+        <button class="btn btn--secondary" data-probe="dontknow">${t('No lo sé')}</button>
+        <button class="btn btn--primary primary-btn" data-probe="submit" disabled>${t('Comprobar')}</button>
+      </div>`;
+    const input = slot.querySelector('.study-probe-input');
+    if (p.answer) input.value = p.answer;
+    const sync = () => { f.querySelector('[data-probe="submit"]').disabled = !input.value.trim(); };
+    input.addEventListener('input', () => { p.answer = input.value; sync(); });
+    sync();
+    input.focus({ preventScroll: true });
+  } else if (p.stage === 'judging') {
+    slot.innerHTML = `<div class="study-feedback"><p class="study-feedback-wait">${icon('sparkles', { size: 'sm' })} ${t('El agente está corrigiendo tu respuesta…')}</p></div>`;
+    f.innerHTML = '';
+  } else {
+    slot.innerHTML = probeResultHtml(p);
+    f.innerHTML = `<button class="btn btn--primary primary-btn" data-probe="continue">${t('Continuar')}</button>`;
+  }
+  f.onclick = (e) => {
+    const act = e.target.closest('[data-probe]')?.dataset.probe;
+    if (act === 'submit') submitProbe();
+    if (act === 'dontknow') answerProbe('dontknow');
+    if (act === 'skip') answerProbe('skipped');
+    if (act === 'continue') continueAfterProbe();
+  };
+  slot.onclick = (e) => {
+    const btn = e.target.closest('[data-probe="dispute"]');
+    if (!btn) return;
+    p.disputed = !p.disputed;
+    btn.setAttribute('aria-pressed', String(p.disputed));
+    btn.textContent = p.disputed ? t('Anotado: la corrección no es justa') : t('La corrección no es justa');
+  };
+}
+
+function probeResultHtml(p) {
+  const label = { good: t('Bien'), partial: t('A medias'), wrong: t('Aún no') }[p.verdict];
+  const head = p.outcome === 'dontknow'
+    ? `<div class="study-feedback is-wrong"><div class="study-feedback-head"><span class="study-feedback-tag">${t('No lo sé')}</span></div>
+        <p>${t('Cuenta como fallo, que es lo que es: así la cifra dice la verdad.')}</p></div>`
+    : p.verdict
+      ? `<div class="study-feedback is-${p.verdict}">
+          <div class="study-feedback-head"><span class="study-feedback-tag">${label}</span><span class="study-feedback-you">${t('Tu respuesta')}: «${escapeHtml(p.answer)}»</span></div>
+          ${p.comment ? `<p>${escapeHtml(p.comment)}</p>` : ''}
+          <button class="study-why-btn study-probe-dispute" data-probe="dispute" aria-pressed="${p.disputed ? 'true' : 'false'}">${p.disputed ? t('Anotado: la corrección no es justa') : t('La corrección no es justa')}</button>
+        </div>`
+      : `<div class="study-feedback"><p class="study-feedback-wait">${t('No se pudo corregir ahora. Compárala tú con la respuesta; no contará en la cifra.')}</p></div>`;
+  const passage = p.q.passages
+    ? `<details class="study-passage-wrap"><summary>${icon('book', { size: 'sm' })} ${t('Ver el pasaje del libro')}</summary>
+        <blockquote class="study-passage">${escapeHtml(p.q.passages)}</blockquote></details>`
+    : '';
+  return `${head}
+    <div class="study-probe-expected"><div class="study-probe-h">${t('Una buena respuesta')}</div><p>${escapeHtml(p.q.expected)}</p></div>
+    ${passage}`;
+}
+
+async function submitProbe() {
+  const p = probe;
+  const answer = String(p?.answer || '').trim();
+  if (!p || p.stage !== 'ask' || !answer) return;
+  p.answer = answer;
+  p.outcome = 'answered';
+  p.latencyMs = Date.now() - p.shownAt;
+  p.stage = 'judging';
+  renderCard();
+  probeCtl = new AbortController();
+  try {
+    const r = await Probes.judge(p.q, answer, { signal: probeCtl.signal });
+    p.verdict = r.verdict;
+    p.comment = r.comment;
+  } catch (e) {
+    if (e?.name === 'AbortError') return;
+    p.verdict = null;
+  }
+  if (probe !== p || p.done) return;
+  p.stage = 'result';
+  if (overlay && !minimized) renderCard();
+}
+
+function answerProbe(outcome) {
+  const p = probe;
+  if (!p || p.stage !== 'ask') return;
+  p.outcome = outcome;
+  p.latencyMs = Date.now() - p.shownAt;
+  p.answer = null;
+  if (outcome === 'skipped') { continueAfterProbe(); return; }
+  p.verdict = 'wrong';
+  p.stage = 'result';
+  renderCard();
+}
+
+function continueAfterProbe() {
+  finishProbe();
+  const f = overlay?.querySelector('.study-foot');
+  if (f) f.onclick = null;   // el pie vuelve a ser de las tarjetas
+  renderCard();
+}
 
 function fmtTime(ms) {
   const s = Math.max(1, Math.round(ms / 1000));

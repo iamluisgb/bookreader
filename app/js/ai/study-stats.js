@@ -14,11 +14,14 @@
 //   lectura validada de P25.
 // - PRACTICADO frente a SOLO GIRAR (P42 F3): escribir la respuesta o hacer un ejercicio es
 //   practicar; girar la tarjeta y ponerse nota es reconocer. Se cuentan aparte, nunca se suman.
+// - PREGUNTAS DE COMPROBACIÓN (P55, ai/probes.js): `mode: 'probe'`, sin `grade`. Quedan fuera
+//   de la retención, de la calibración y de los repasos; su cifra la da Probes.probeStats.
 import { dayOf, isDue, knowledge, isProblem, dailyLoad } from './srs.js';
 
 export const MATURE_DAYS = 21;
 export const MIN_RETENTION_N = 30;     // por debajo, la retención es ruido: se dice cuántos faltan
 export const MIN_CALIBRATION_N = 20;   // ídem para la calibración (F5)
+export const MIN_PROBE_N = 10;         // ídem para las preguntas de comprobación (P55)
 export const TARGET_RETENTION = 0.9;   // la que programa FSRS (I = S)
 const CARD_CAP_MS = 60000;
 const WIDGET_CAP_MS = 600000;
@@ -89,7 +92,8 @@ export function calibration(attempts) {
 // que un día nunca se cuenta dos veces.
 export function reviewsByDay(attempts, legacy = {}) {
   const by = {};
-  for (const a of attempts || []) if (a) by[dayOf(a.ts)] = (by[dayOf(a.ts)] || 0) + 1;
+  // Las preguntas de comprobación (P55, `mode: 'probe'`) no son repasos: se cuentan aparte.
+  for (const a of attempts || []) if (a && a.mode !== 'probe') by[dayOf(a.ts)] = (by[dayOf(a.ts)] || 0) + 1;
   for (const [k, v] of Object.entries(legacy || {})) {
     const n = typeof v === 'number' ? v : v?.n || 0;
     if (n && !by[k]) by[k] = n;
@@ -151,4 +155,24 @@ export function overloaded(work, pace) {
   if (!pace) return false;
   const avg = work.days.reduce((a, b) => a + b, 0) / work.days.length;
   return avg > pace * 1.3 && avg - pace >= 5;
+}
+
+// P55 · Preguntas de comprobación (ai/probes.js): lo que se enseña en Análisis. Sobre TODAS las
+// preguntas del ámbito, no por periodo: salen de una en una y un periodo no junta las suficientes.
+//   n        respondidas o «no lo sé» (las saltadas no cuentan como intento, se dicen aparte)
+//   good     corregidas «bien»; `partial` y `wrong` aparte
+//   unjudged respondidas sin veredicto (el modelo no contestó): fuera de n
+//   disputed respondidas en las que el lector marcó la corrección como injusta
+export function probeStats(attempts) {
+  const s = { n: 0, good: 0, partial: 0, wrong: 0, skipped: 0, unjudged: 0, disputed: 0, rate: null };
+  for (const a of attempts || []) {
+    if (!a || a.mode !== 'probe' || !a.probe) continue;
+    if (a.probe.outcome === 'skipped') { s.skipped++; continue; }
+    if (!a.verdict) { s.unjudged++; continue; }
+    s.n++;
+    s[a.verdict === 'good' ? 'good' : a.verdict === 'partial' ? 'partial' : 'wrong']++;
+    if (a.probe.disputed) s.disputed++;
+  }
+  s.rate = s.n ? s.good / s.n : null;
+  return s;
 }

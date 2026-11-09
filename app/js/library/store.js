@@ -40,7 +40,9 @@ const DB_VERSION = 1;
 const SYNCED_FIELDS = ['title', 'author', 'origTitle', 'origAuthor', 'metaAt', 'format', 'fileName', 'fileBaseId', 'size',
   'addedAt', 'status', 'statusAt', 'progress', 'finishedAt', 'shelfIds', 'shelvesAt', 'blob', 'deleted', 'deletedAt',
   // Capítulos ya leídos (ai/chapter-gate.js): deciden qué tarjetas nuevas entran en el repaso.
-  'chapterOrder', 'chaptersDone'];
+  'chapterOrder', 'chaptersDone',
+  // Cuándo se dejó atrás cada capítulo (P55, ai/probes.js): programa las preguntas de comprobación.
+  'chaptersDoneAt'];
 
 let dbPromise = null;
 

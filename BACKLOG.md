@@ -3288,6 +3288,74 @@ los rivales ingieren web y texto suelto) → **F3+F4** (baratas, y cierran visib
 **Lo que esta revisión saca del plan, explícitamente:** descubrimiento de papers, más artefactos
 generados por el agente, y vender la privacidad como exclusiva.
 
+### P55 — Preguntas de comprobación: medir lo que se aprende, no lo que se repasa · `M` · **F1 ✓ (2026-11-09)** · *anti-vanidad*
+
+**Contexto (2026-11-09).** Investigación: [`docs/INVESTIGACION_METRICAS_APRENDIZAJE.md`](docs/INVESTIGACION_METRICAS_APRENDIZAJE.md).
+Ninguna cifra de Análisis mide aprendizaje. La retención real es recuerdo de la **misma** tarjeta y
+FSRS la lleva al 90 % por construcción; `knowledge()` es una predicción que crece al añadir tarjetas;
+racha, tiempo y páginas son actividad. La regla que sale de la investigación (§ 6.1): **solo hay
+aprendizaje si la prueba es diferida, sin ayuda y con una pregunta que nunca se vio.** Rendimiento
+durante la práctica y aprendizaje pueden ir en sentidos opuestos (Soderstrom & Bjork 2015); con IA,
+la práctica asistida subió un 48–127 % y el examen sin IA bajó un 17 % o se quedó igual (Bastani et
+al., PNAS 2025).
+
+**Qué es.** Al dejar atrás un capítulo, la app apunta cuándo. A los ≥ 14 días, el repaso del día
+trae **una** pregunta nueva sobre ese capítulo (de aplicación o de «¿por qué?», escrita por el agente
+en ese momento a partir del texto), tras las dos primeras tarjetas. Se responde escribiendo, sin
+agente y sin pasaje; el agente corrige contra la respuesta esperada y los pasajes; la pregunta no
+vuelve nunca y no toca FSRS. Análisis enseña **«Comprensión a las 2 semanas: k de n»** como primera
+cifra del estudio.
+
+**F1 · Entregada (2026-11-09).**
+- [`chapter-gate.js`](app/js/ai/chapter-gate.js) · `advance` fecha `chaptersDoneAt[etiqueta]`: solo
+  el capítulo **inmediatamente anterior** y solo la primera vez (saltar del 1 al 8 por el índice no
+  fecha del 2 al 7). Viaja en la ficha del libro (`SYNCED_FIELDS`, `bookEntry`), así que leer en el
+  móvil y repasar en el ordenador funciona.
+- [`probes.js`](app/js/ai/probes.js): `candidates` (PURA: ≥ 14 días, capítulo **trabajado** —con
+  subrayado o tarjeta— y sin pregunta previa, la más antigua primero), `generate` (solo los pasajes
+  del capítulo, tope 24 k caracteres), `judge`, `recordOf`.
+- [`study.js`](app/js/ai/study.js): paso propio en el repaso del día (`gate`), no una tarjeta: sin
+  girar, sin notas, sin deshacer, sin menú, sin «¿Por qué?». **Comprobar**, **No lo sé** (cuenta como
+  fallo) o **Saltar**; las tres cierran el capítulo para siempre (si saltar la devolviera, se
+  saltarían las difíciles). Cerrar con la pregunta a la vista y sin responder no la gasta.
+- Registro: un intento inmutable en `attempts` con `mode: 'probe'`, sin `grade`, con `probe:
+  {chapter, readAt, delayDays, question, expected, keyIdeas, src, outcome, disputed}`. Sync y backup
+  sin cambios (unión por uid). `study-stats.js` lo deja fuera de retención, calibración, practicado y
+  repasos por día; `probeStats` da la cifra.
+- **Validación del juez on-device**: tras la corrección, «La corrección no es justa» anota `disputed`;
+  Análisis lo enseña al lado de la cifra junto a las saltadas, que son las dos formas de que mienta.
+  Por debajo de 10 respondidas se dice «k de n» con el aviso, sin porcentaje.
+- Tests: [`tests/probes.spec.ts`](tests/probes.spec.ts) (5).
+
+**Pendiente.**
+- **F0 · Validar el juez offline (S, antes de fiarse de la cifra).** En `evals/`: ~50 respuestas
+  reales exportadas por backup, etiquetadas a mano, κ del juez frente a la etiqueta. Regla de la
+  casa (P42): κ < 0,7 → la cifra sale como tendencia y se revisa el prompt. Y la **dificultad de las
+  preguntas**: que no se respondan copiando una frase (muestra a mano de 20).
+- **F2 · Calibración honesta (S–M).** Pedir la confianza **antes** de responder la pregunta («¿la
+  sabes?»: sí / creo / no) y medir AUROC2 + sesgo, no gamma (Masson & Rotello 2009). La pregunta de
+  comprobación es el sitio bueno: diferida y en otra sesión, que es cuando el juicio acierta más.
+- **F3 · Recuerdo libre por capítulo (M).** «Cuéntame lo que recuerdas de X» a ≥ 7 días, puntuado
+  contra las ideas clave del capítulo. Más caro de responder: opcional, desde el libro.
+- **F4 · Efecto dentro del usuario (M).** Aleatorizar por ítem (p. ej. un subrayado pasa a tarjeta
+  o queda de control) y comparar en las preguntas de comprobación. Con n = 1 solo se ven efectos
+  grandes (≈ 300 ítems por brazo para 70 → 80 %): solo como experimento declarado, nunca en pantalla
+  antes de tener el N.
+- **Cifras que bajan de rango** (S): «Recuerdas ~k de n» de la biblioteca (`knowledge()`) se
+  etiqueta como estimación; la racha sale del titular de Análisis.
+
+**Contrato (EV5).** Mide al lector, no al agente: sin batería de personas.
+- Métrica primaria: **% «bien» en preguntas de comprobación** (`probeStats.rate`), con n a la vista.
+  **Juez** (LLM): no se publica como dato hasta F0 (κ ≥ 0,7).
+- Secundarias (coste y honestidad): tasa de saltadas, de discutidas y de «no lo sé»; latencia.
+- Gate de producto: si la tasa de saltadas pasa del 30 % en 4 semanas, la pregunta molesta más de lo
+  que mide → revisar cuándo sale o cuántas.
+
+**Fuera, a propósito.** Más de una pregunta por sesión; preguntas fuera del repaso (al abrir el
+libro); PDF sin índice (no hay capítulos que fechar); fechar capítulos leídos antes de hoy; que la
+pregunta se convierta en tarjeta (dejaría de medir); excluir `asked` de la retención (P46 pregunta
+con la tarjeta YA girada: la nota es de antes de la ayuda, así que no contamina el recuerdo).
+
 ---
 
 ## 📄 PDF — paridad de features con EPUB

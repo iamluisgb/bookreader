@@ -1,5 +1,9 @@
 # Cómo medir aprendizaje real en BookReader (estado del arte, nov. 2026)
 
+> **Estado:** la métrica principal (sonda diferida de transferencia, § 6.2 a) está implementada como
+> **P55 F1** el 9-nov-2026 («preguntas de comprobación», ver [`BACKLOG.md`](../BACKLOG.md)). Lo demás
+> del catálogo sigue como propuesta, con el orden de P55.
+
 Investigación con fuentes primarias para diseñar las métricas de aprendizaje de BookReader sin caer en métricas vanidosas. Parte de lo que ya sabemos (efecto del test, espaciado, pretesting, retención endógena en FSRS, true retention, que el tiempo de lectura no mide aprendizaje) y no lo repite.
 
 Restricción de diseño que condiciona todo: **no hay telemetría ni agregados entre usuarios**. Solo hay métricas on-device por usuario y evals offline sobre backups exportados. Eso descarta casi todo lo que hace la industria (A/B entre usuarios, normas poblacionales, IRT calibrada con miles de personas) y obliga a diseños n=1.

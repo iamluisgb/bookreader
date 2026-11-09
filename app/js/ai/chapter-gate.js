@@ -29,17 +29,30 @@ export function flattenToc(items, out = []) {
 
 // Ficha después de entrar en `current`. Devuelve null si no cambia nada (para no escribir). Solo
 // suma: volver atrás no «des-lee» lo que ya quedó atrás.
-export function advance(book, order, current) {
+//
+// `chaptersDoneAt` (P55, ai/probes.js): {etiqueta: ms} con CUÁNDO se dejó atrás un capítulo, que
+// es lo que programa la pregunta de comprobación a los 14 días. Solo se fecha el capítulo
+// INMEDIATAMENTE anterior, y solo si es la primera vez que queda atrás: saltar del 1 al 8 por el
+// índice da por leídos del 2 al 7 (para el bloqueo de tarjetas), pero no son capítulos leídos de
+// los que tenga sentido preguntar. Tampoco se fecha nada leído antes de que existiera el campo.
+export function advance(book, order, current, now = Date.now()) {
   if (!Array.isArray(order) || !order.length) return null;
   const idx = order.findIndex((l) => norm(l) === norm(current));
   if (idx < 0) return null;
   const prev = Array.isArray(book?.chaptersDone) ? book.chaptersDone : [];
   const have = new Set(prev.map(norm));
   const done = [...prev];
-  for (const l of order.slice(0, idx)) if (!have.has(norm(l))) { done.push(l); have.add(norm(l)); }
+  const fresh = new Set();
+  for (const l of order.slice(0, idx)) if (!have.has(norm(l))) { done.push(l); have.add(norm(l)); fresh.add(l); }
   const sameOrder = JSON.stringify(book?.chapterOrder || null) === JSON.stringify(order);
   if (sameOrder && done.length === prev.length) return null;
-  return { chapterOrder: order, chaptersDone: done };
+  const out = { chapterOrder: order, chaptersDone: done };
+  const last = idx > 0 ? order[idx - 1] : null;
+  if (last && fresh.has(last)) {
+    const at = book?.chaptersDoneAt && typeof book.chaptersDoneAt === 'object' ? book.chaptersDoneAt : {};
+    out.chaptersDoneAt = { ...at, [last]: now };
+  }
+  return out;
 }
 
 // ¿Está bloqueada esta tarjeta? Solo las nuevas (las empezadas siguen su calendario) y solo si su

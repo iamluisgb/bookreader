@@ -284,6 +284,7 @@ export async function collect({ range: kind = 'week', offset: off = 0 } = {}, no
     retention: Stats.trueRetention(ranged),
     practice: Stats.practiceSplit(ranged),
     calibration: Stats.calibration(ranged),
+    probes: Stats.probeStats(attempts),   // P55: sobre todo el ámbito, no el periodo
     series: studySeries,
   };
 
@@ -692,6 +693,7 @@ function renderStudy(d) {
   if (!s.reviews) {
     return `<section class="anal-sec anal-study">
       <h3 class="anal-sec-h">${t('Estudio')}</h3>
+      ${renderProbes(s.probes)}
       <p class="anal-muted">${t('Sin repasos en este periodo.')}</p>
     </section>`;
   }
@@ -711,6 +713,7 @@ function renderStudy(d) {
       ${tile(t('Practicado'), String(s.practice.practiced), t('Escribiendo la respuesta o con un ejercicio'))}
       ${tile(t('Solo girar'), String(s.practice.revealed), t('Girando la tarjeta y poniéndose nota'))}
     </div>
+    ${renderProbes(s.probes)}
     ${renderRetention(s.retention)}
     ${renderCalibration(s.calibration)}
     ${renderColumns(d.cols, 'n', (n) => t('{n} repasos', { n }), t('Repasos'), d)}
@@ -801,6 +804,32 @@ function renderRetention(r) {
     </div>
     <div class="anal-ret-split">${part(t('Jóvenes'), r.young)}${part(t('Maduras'), r.mature)}</div>
     <p class="anal-muted">${escapeHtml(note)}</p>
+  </div>`;
+}
+
+// P55 · Comprensión a las dos semanas: preguntas nuevas sobre capítulos leídos hace ≥ 14 días,
+// respondidas sin ayuda. Es la única cifra de esta pantalla que mide aprender y no repasar, así que
+// va primero. «k de n» y no un porcentaje hasta tener n; las saltadas y las correcciones que el
+// lector discutió, al lado, porque son las dos formas de que la cifra mienta.
+function renderProbes(p) {
+  if (!p || (!p.n && !p.skipped)) return '';
+  const head = `<div class="anal-ret-h">${t('Comprensión a las 2 semanas')}</div>`;
+  const what = t('Preguntas nuevas sobre capítulos que leíste hace dos semanas o más, respondidas sin ayuda.');
+  const extra = [
+    p.partial ? t('{n} a medias', { n: p.partial }) : '',
+    p.skipped ? t('{n} saltadas', { n: p.skipped }) : '',
+    p.disputed ? t('discutiste {n} correcciones', { n: p.disputed }) : '',
+  ].filter(Boolean).join(' · ');
+  if (p.n < Stats.MIN_PROBE_N) {
+    return `<div class="anal-ret anal-ret--pending anal-probes">${head}
+      <p>${t('Bien en <b>{k} de {n}</b>.', { k: p.good, n: p.n })}${extra ? ` <span class="anal-faint">${escapeHtml(extra)}</span>` : ''}</p>
+      <p class="anal-muted">${escapeHtml(what)} ${escapeHtml(t('Con menos de {n} todavía no dice mucho.', { n: Stats.MIN_PROBE_N }))}</p>
+    </div>`;
+  }
+  return `<div class="anal-ret anal-probes">${head}
+    <div class="anal-ret-row"><span class="anal-ret-n">${p.good} / ${p.n}</span><span class="anal-ret-goal">${pct(p.rate)}</span></div>
+    ${extra ? `<div class="anal-ret-split"><span>${escapeHtml(extra)}</span></div>` : ''}
+    <p class="anal-muted">${escapeHtml(what)}</p>
   </div>`;
 }
 
