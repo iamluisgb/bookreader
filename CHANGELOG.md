@@ -14,6 +14,7 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
   por el final. `?probes-test=<libro>` programa ya los capítulos que quedaron atrás.
 - **Tests**: `tests/probes.spec.ts` (8). Relacionadas en verde (90): estudio, intentos, PDF,
   segmentación de PDF, índice, i18n, precache, Análisis.
+- **Desplegado**: Pages `3b9057a` (`bookreader-v238`), humo en verde.
 
 ## 2026-11-09 — P55 F1: preguntas de comprobación, la primera cifra que mide aprender
 
