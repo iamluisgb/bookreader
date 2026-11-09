@@ -108,6 +108,8 @@ document.addEventListener('DOMContentLoaded', () => {
   // MON4 · Enlace de emparejamiento del sync de BookReader (`#pair=…`): lo mismo, la clave
   // sale de la URL antes que nada.
   recibirEmparejamiento();
+  // P55 · Prueba de las preguntas de comprobación (`?probes-test=<libro>`), ver ai/probes.js.
+  programarPreguntasDePrueba();
   // Fase 0 sync: backfill de uid/updatedAt en datos previos + purga de
   // tombstones caducados. Asíncrono y no bloqueante; idempotente.
   migrateSchema()
@@ -998,6 +1000,50 @@ function recordChapter(label) {
     .catch((e) => console.warn('No se pudo guardar el capítulo leído:', e));
 }
 
+// P55 · En PDF el capítulo sale del outline con el criterio de la segmentación (segment-pdf.js ·
+// chapterStarts: raíz única y «Parte N» se saltan), que es la etiqueta de los pasajes y los mazos.
+// Solo se fecha el que queda atrás (chapter-gate.js · stampLeft): el PDF no bloquea tarjetas, así
+// que no lleva `chapterOrder` ni `chaptersDone`.
+let pdfChapters = null;   // { bookId, list: [{label, page}] }
+async function recordPdfChapter(page) {
+  const book = currentBook;
+  if (!book || book.format !== 'pdf') return;
+  if (!pdfChapters || pdfChapters.bookId !== book.id) {
+    const doc = PdfReader.getDocument();
+    const starts = doc ? await import('./ai/segment-pdf.js').then((m) => m.chapterStarts(doc)).catch(() => []) : [];
+    pdfChapters = { bookId: book.id, list: starts.map((c) => ({ label: c.title, page: c.page })) };
+  }
+  if (currentBook !== book) return;
+  let label = null;
+  for (const c of pdfChapters.list) if (c.page <= page) label = c.label;
+  const key = label && `${book.id}|${label}`;
+  if (!label || key === lastRecordedChapter) return;
+  lastRecordedChapter = key;
+  const order = pdfChapters.list.map((c) => c.label);
+  LibStore.patchBook(book.id, (prev) => ChapterGate.stampLeft(prev, order, label) || {})
+    .catch((e) => console.warn('No se pudo guardar el capítulo leído:', e));
+}
+
+async function programarPreguntasDePrueba() {
+  const params = new URLSearchParams(location.search);
+  const q = params.get('probes-test');
+  if (!q) return;
+  params.delete('probes-test');
+  const rest = params.toString();
+  history.replaceState(null, '', location.pathname + (rest ? `?${rest}` : '') + location.hash);
+  try {
+    const Probes = await import('./ai/probes.js');
+    const r = await Probes.backfillForTest(q);
+    const message = !r?.found
+      ? t('No encuentro ningún libro que coincida con «{q}».', { q })
+      : t('«{title}»: {n} capítulos ya leídos programados; {k} con pregunta lista. Saldrá una en cada repaso del día.', { title: r.title, n: r.behind, k: r.ready });
+    toast({ message, timeout: 12000, kind: r?.found ? undefined : 'error' });
+  } catch (e) {
+    console.warn('probes-test:', e);
+    toast({ message: t('No se pudieron programar las preguntas de prueba.'), kind: 'error' });
+  }
+}
+
 function saveProgress(pct) {
   if (!currentBook) return;
   window.dispatchEvent(new CustomEvent('reader:progress', { detail: pct }));
@@ -1849,6 +1895,7 @@ async function loadPdf(buffer, bookId, aiBookId, persist = null, displayTitle = 
       drawPdfHighlights(page);       // PDF3: re-pintar los subrayados de la página
       updateBookmarkButton();        // reflejar si la página actual está marcada
       markCurrentToc();              // mantener viva la marca del índice
+      recordPdfChapter(page);        // P55: el capítulo que queda atrás programa su pregunta
       // Mismo par que en EPUB: tiempo restante en el pie y progreso a la biblioteca
       // (la barra bajo la portada). Sin esto el PDF salía siempre al 0%.
       const pages = PdfReader.getTotalPages();

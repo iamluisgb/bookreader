@@ -222,6 +222,12 @@ async function outlineBoundaries(pdfDoc) {
   return out.filter(b => (seen.has(b.page) ? false : seen.add(b.page)));
 }
 
+// Inicio de cada CAPÍTULO ({title, page}), con el mismo criterio que la segmentación: así la
+// etiqueta que fecha el lector (P55, app.js) es la misma que llevan los pasajes y los mazos.
+export async function chapterStarts(pdfDoc) {
+  return (await outlineBoundaries(pdfDoc)).filter((b) => b.top).map(({ title, page }) => ({ title, page }));
+}
+
 async function destToPage(pdfDoc, dest) {
   try {
     let explicit = dest;

@@ -241,3 +241,99 @@ test('cerrar con la pregunta a la vista y sin responder no la gasta', async ({ p
   await expect(overlay).toHaveCount(0);
   expect((await attempts(page)).filter((a) => a.mode === 'probe').length).toBe(0);
 });
+
+// ---- PDF y prueba ---------------------------------------------------------------------------
+
+test('PDF: stampLeft fecha el anterior una vez; muestras repartidas; capítulos detrás de la posición', async ({ page }) => {
+  await page.goto('/index.html');
+  const r = await page.evaluate(async () => {
+    const G: any = await import('/js/ai/chapter-gate.js');
+    const P: any = await import('/js/ai/probes.js');
+    const order = ['Cover', 'Chapter 1', 'Chapter 2', 'Chapter 3'];
+    const a = G.stampLeft({}, order, 'Chapter 2', 10);
+    const again = G.stampLeft({ chaptersDoneAt: { 'chapter 1': 5 } }, order, 'Chapter 2', 20);
+    const first = G.stampLeft({}, order, 'Cover', 30);
+    const lines = Array.from({ length: 100 }, (_, i) => `[[a${i}]] ${'x'.repeat(90)}`);
+    const sample = P.sampleLines(lines, 2000, 4).trim().split('\n');
+    const short = P.sampleLines(lines.slice(0, 3), 2000);
+    const entries = [
+      ['a1', { page: 1, chapter: 'Chapter 1' }], ['a2', { page: 9, chapter: 'Chapter 1' }],
+      ['a3', { page: 10, chapter: 'Chapter 2' }], ['a4', { page: 19, chapter: 'Chapter 2' }],
+      ['a5', { page: 20, chapter: 'Chapter 3' }], ['a6', { page: 40, chapter: 'Chapter 3' }],
+    ];
+    return {
+      a, again, first,
+      sampleIds: sample.map((l: string) => Number(/a(\d+)/.exec(l)![1])),
+      sampleLen: sample.join('\n').length,
+      short: short.split('\n').filter(Boolean).length,
+      behind: P.behindPdf(entries, 72), // página 28,8 de 40: capítulos 1 y 2 detrás, el 3 a medias
+    };
+  });
+  expect(r.a).toEqual({ chaptersDoneAt: { 'Chapter 1': 10 } });
+  expect(r.again).toBeNull(); // ya fechado (sin mayúsculas)
+  expect(r.first).toBeNull(); // el primero no deja nada atrás
+  // Muestras de las cuatro partes, en orden, dentro del tope.
+  expect(r.sampleLen).toBeLessThanOrEqual(2000);
+  expect(r.sampleIds.some((i: number) => i < 25)).toBe(true);
+  expect(r.sampleIds.some((i: number) => i >= 75)).toBe(true);
+  expect([...r.sampleIds].sort((x: number, y: number) => x - y)).toEqual(r.sampleIds);
+  expect(r.short).toBe(3);
+  expect(r.behind).toEqual(['Chapter 1', 'Chapter 2']);
+});
+
+test('?probes-test=<libro> programa ya los capítulos que quedaron atrás de un PDF', async ({ page }) => {
+  await page.goto('/index.html');
+  await page.evaluate(async ({ BOOK }) => {
+    const DB: any = await import('/js/ai/db.js');
+    const Lib: any = await import('/js/library/store.js');
+    await Lib.putBook({ id: BOOK, title: 'Designing Data-Intensive Applications', format: 'pdf', progress: 72, addedAt: Date.now(), chaptersDoneAt: { 'Chapter 1': 123 } });
+    await DB.put('anchors', {
+      bookId: BOOK,
+      entries: [
+        ['a1', { page: 10, chapter: 'Chapter 1' }], ['a2', { page: 40, chapter: 'Chapter 2' }],
+        ['a3', { page: 80, chapter: 'Chapter 3' }], ['a4', { page: 100, chapter: 'Chapter 4' }],
+      ],
+    });
+    await DB.addDeck({ bookId: BOOK, name: 'x', cardType: 'basic', scope: 'Chapter 2', cards: [{ front: 'q', back: 'a' }] });
+  }, { BOOK });
+  await page.goto('/index.html?probes-test=data-intensive');
+  await expect(page.locator('.ai-toast')).toContainText('2 capítulos ya leídos programados; 1 con pregunta lista');
+  expect(page.url()).not.toContain('probes-test');
+  const at = await page.evaluate(async ({ BOOK }) => {
+    const Lib: any = await import('/js/library/store.js');
+    return (await Lib.getAllBooks()).find((b: any) => b.id === BOOK).chaptersDoneAt;
+  }, { BOOK });
+  expect(at['Chapter 1']).toBe(123); // lo ya fechado no se toca
+  expect(Date.now() - at['Chapter 2']).toBeGreaterThan(14 * DAY);
+  expect(at['Chapter 3']).toBeUndefined(); // a medias: acaba en la página 80 y vas por la 72
+});
+
+test('lector de PDF: entrar en un capítulo del outline fecha el anterior', async ({ page }) => {
+  const fs = await import('fs');
+  const path = await import('path');
+  const PDF = path.join(__dirname, '..', 'evals', 'fixtures', 'p3-constitucion.pdf');
+  test.skip(!fs.existsSync(PDF), 'falta evals/fixtures/p3-constitucion.pdf (npm run eval:fixtures)');
+  await page.goto('/index.html');
+  await page.setInputFiles('#file-input', PDF);
+  await page.waitForSelector('#pdf-container canvas', { timeout: 30000 });
+  await page.waitForFunction(() => !!document.querySelector('#toc-list a[data-toc-page]'), null, { timeout: 30000 });
+  // Raíz única con los capítulos como hijos (patrón BOE): el criterio es el de la segmentación.
+  const target = await page.evaluate(async () => {
+    const R: any = await import('/js/pdf-reader.js');
+    const S: any = await import('/js/ai/segment-pdf.js');
+    const top = await S.chapterStarts(R.getDocument());
+    await R.goTo(top[2].page);
+    return { prev: top[1].title, later: top[3].title, n: top.length };
+  });
+  expect(target.n).toBeGreaterThan(3);
+  await expect.poll(async () => page.evaluate(async () => {
+    const Lib: any = await import('/js/library/store.js');
+    const b = (await Lib.getAllBooks()).find((x: any) => x.format === 'pdf');
+    return b && b.chaptersDoneAt ? Object.keys(b.chaptersDoneAt) : [];
+  }), { timeout: 10000 }).toContain(target.prev);
+  const keys = await page.evaluate(async () => {
+    const Lib: any = await import('/js/library/store.js');
+    return Object.keys((await Lib.getAllBooks()).find((x: any) => x.format === 'pdf').chaptersDoneAt);
+  });
+  expect(keys).not.toContain(target.later);
+});

@@ -3,6 +3,18 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-11-09 — P55: las preguntas de comprobación también en PDF, y prueba con DDIA
+
+- **El caso**: al preparar la prueba con DDIA (PDF, 72 % leído, 11 mazos) salió que el lector de PDF
+  no fechaba capítulos: el bloqueo de tarjetas es solo de EPUB y `recordChapter` saltaba los PDF.
+  DDIA no habría tenido nunca preguntas.
+- **Arreglo**: `recordPdfChapter` en `app.js` + `stampLeft` en `chapter-gate.js`, con el capítulo de
+  `segment-pdf.js · chapterStarts` (el mismo criterio que la segmentación; el outline de primer
+  nivel fallaba con la raíz única del BOE). Capítulos largos: 8 tramos repartidos en vez de cortar
+  por el final. `?probes-test=<libro>` programa ya los capítulos que quedaron atrás.
+- **Tests**: `tests/probes.spec.ts` (8). Relacionadas en verde (90): estudio, intentos, PDF,
+  segmentación de PDF, índice, i18n, precache, Análisis.
+
 ## 2026-11-09 — P55 F1: preguntas de comprobación, la primera cifra que mide aprender
 
 - **El caso**: ninguna cifra de Análisis medía aprendizaje (retención de la misma tarjeta, que FSRS

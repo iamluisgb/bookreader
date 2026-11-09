@@ -55,6 +55,20 @@ export function advance(book, order, current, now = Date.now()) {
   return out;
 }
 
+// PDF (P55): el lector de PDF no lleva `chapterOrder`/`chaptersDone` (el bloqueo de tarjetas es
+// solo de EPUB), pero sí sabe por el outline en qué capítulo de primer nivel está. Al entrar en
+// `current` se fecha el capítulo INMEDIATAMENTE anterior si aún no tenía fecha. Devuelve null si
+// no cambia nada.
+export function stampLeft(book, order, current, now = Date.now()) {
+  if (!Array.isArray(order) || !order.length) return null;
+  const idx = order.findIndex((l) => norm(l) === norm(current));
+  if (idx < 1) return null;
+  const prev = order[idx - 1];
+  const at = book?.chaptersDoneAt && typeof book.chaptersDoneAt === 'object' ? book.chaptersDoneAt : {};
+  if (Object.keys(at).some((l) => norm(l) === norm(prev))) return null;
+  return { chaptersDoneAt: { ...at, [prev]: now } };
+}
+
 // ¿Está bloqueada esta tarjeta? Solo las nuevas (las empezadas siguen su calendario) y solo si su
 // capítulo (el de la tarjeta o, si no lo tiene, el del mazo) es una entrada del índice que aún no
 // has dejado atrás.

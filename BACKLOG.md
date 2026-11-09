@@ -3325,7 +3325,19 @@ cifra del estudio.
 - **Validación del juez on-device**: tras la corrección, «La corrección no es justa» anota `disputed`;
   Análisis lo enseña al lado de la cifra junto a las saltadas, que son las dos formas de que mienta.
   Por debajo de 10 respondidas se dice «k de n» con el aviso, sin porcentaje.
-- Tests: [`tests/probes.spec.ts`](tests/probes.spec.ts) (5).
+- **PDF (mismo día)**: el lector de PDF no fechaba nada (el bloqueo de tarjetas es solo de EPUB) y
+  DDIA, que es PDF, se quedaba sin preguntas. Ahora `app.js · recordPdfChapter` fecha con
+  `chapter-gate.js · stampLeft` el capítulo que queda atrás, con el criterio de capítulo de la
+  segmentación (`segment-pdf.js · chapterStarts`: raíz única y «Parte N» se saltan), que es la
+  etiqueta de los pasajes y los mazos. Sin `chapterOrder`: el PDF sigue sin bloquear tarjetas.
+- **Muestras repartidas**: un capítulo de más de 32 k caracteres (los de DDIA tienen 70–150 k) se
+  manda en 8 tramos seguidos de todo el capítulo (`sampleLines`), no cortado por el final.
+- **Prueba**: `?probes-test=<parte del título o del id>` fecha hace 14 días los capítulos que ya
+  quedaron atrás (EPUB: `chaptersDone`; PDF: capítulos que acaban antes de `progress`, con las
+  páginas del texto segmentado) y avisa de cuántos tienen pregunta lista. Solo los que no tenían
+  fecha.
+- Tests: [`tests/probes.spec.ts`](tests/probes.spec.ts) (8; el del lector de PDF necesita
+  `evals/fixtures/p3-constitucion.pdf`).
 
 **Pendiente.**
 - **F0 · Validar el juez offline (S, antes de fiarse de la cifra).** En `evals/`: ~50 respuestas
@@ -3341,6 +3353,9 @@ cifra del estudio.
   o queda de control) y comparar en las preguntas de comprobación. Con n = 1 solo se ven efectos
   grandes (≈ 300 ítems por brazo para 70 → 80 %): solo como experimento declarado, nunca en pantalla
   antes de tener el N.
+- **Subrayados de PDF como señal de capítulo trabajado (S).** Se guardan con `chapter: «Pág. N»`,
+  así que hoy solo cuentan las tarjetas. Resolver la página al capítulo con `anchors` (`page` →
+  `chapter`).
 - **Cifras que bajan de rango** (S): «Recuerdas ~k de n» de la biblioteca (`knowledge()`) se
   etiqueta como estimación; la racha sale del titular de Análisis.
 
@@ -3352,7 +3367,8 @@ cifra del estudio.
   que mide → revisar cuándo sale o cuántas.
 
 **Fuera, a propósito.** Más de una pregunta por sesión; preguntas fuera del repaso (al abrir el
-libro); PDF sin índice (no hay capítulos que fechar); fechar capítulos leídos antes de hoy; que la
+libro); PDF sin índice (no hay capítulos que fechar); fechar capítulos leídos antes de hoy salvo con
+`?probes-test`; que la
 pregunta se convierta en tarjeta (dejaría de medir); excluir `asked` de la retención (P46 pregunta
 con la tarjeta YA girada: la nota es de antes de la ayuda, así que no contamina el recuerdo).
 

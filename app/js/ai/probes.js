@@ -11,6 +11,7 @@
 //   2. Al abrir el repaso del día, `nextCandidate` busca un capítulo fechado hace ≥ 14 días, en el
 //      que el lector hizo algo (subrayó o tiene tarjetas) y que no tenga ya su pregunta.
 //   3. `generate` la escribe el agente en ese momento, sin enseñarla antes a nadie.
+//      En PDF la fecha la pone app.js con el outline (chapter-gate.js · stampLeft).
 //   4. El lector responde por escrito; `judge` corrige contra la respuesta esperada y el texto.
 //   5. `record` deja UN intento inmutable en `attempts` con `mode: 'probe'`. Viaja por sync como
 //      los demás (unión por uid) y es lo que impide repetir la pregunta en otro dispositivo.
@@ -27,7 +28,8 @@ import { canonicalOf } from '../sync/aliases.js';
 export const DELAY_DAYS = 14;
 export const AFTER_CARDS = 2;       // la pregunta sale tras las primeras tarjetas, no de entrada
 const DAY_MS = 864e5;
-const MAX_CHAPTER_CHARS = 24000;    // ~6 k tokens: un capítulo largo se recorta por el final
+const MAX_CHAPTER_CHARS = 32000;    // ~8 k tokens: de un capítulo más largo se toman muestras repartidas
+const SAMPLE_WINDOWS = 8;
 
 const norm = (s) => String(s || '').trim().replace(/\s+/g, ' ').toLowerCase();
 export const probeKey = (bookId, chapter) => `${canonicalOf(bookId)}|${norm(chapter)}`;
@@ -105,10 +107,24 @@ async function chapterPassages(bookId, chapter) {
   let lines = await read();
   if (!lines && await SegmentFile.ensureSegmented(bookId)) lines = await read();
   if (!lines || !lines.length) return null;
+  return sampleLines(lines, MAX_CHAPTER_CHARS);
+}
+
+// Si el capítulo no cabe, se toman tramos SEGUIDOS de varias partes (inicio, medio, final), en
+// orden: cortar por el final dejaba la pregunta siempre sobre el arranque del capítulo. PURA.
+export function sampleLines(lines, cap, windows = SAMPLE_WINDOWS) {
+  const total = lines.reduce((n, l) => n + l.length + 1, 0);
+  if (total <= cap) return lines.join('\n') + '\n';
+  const per = Math.floor(cap / windows);
+  const size = Math.ceil(lines.length / windows);
   let out = '';
-  for (const l of lines) {
-    if (out.length + l.length > MAX_CHAPTER_CHARS) break;
-    out += l + '\n';
+  for (let w = 0; w < windows; w++) {
+    let used = 0;
+    for (const l of lines.slice(w * size, (w + 1) * size)) {
+      if (used + l.length + 1 > per) break;
+      out += l + '\n';
+      used += l.length + 1;
+    }
   }
   return out;
 }
@@ -214,3 +230,50 @@ export function recordOf({ cand, probe, outcome, answer = null, verdict = null, 
 export function record(rec) {
   return DB.addAttempt(rec);
 }
+
+// ---- Prueba: programar ya las preguntas de un libro ----------------------------------------
+// `?probes-test=<parte del título o del id>` (app.js) fecha hace 14 días los capítulos que ya
+// quedaron atrás de un libro, para no esperar dos semanas a ver la primera pregunta. Solo los que
+// no tenían fecha. Detrás quiere decir: EPUB → `chaptersDone`; PDF → capítulos cuyo texto termina
+// antes de la posición de lectura (`progress`), con las páginas del libro segmentado.
+export function behindPdf(anchorEntries, progress) {
+  const last = new Map();
+  let maxPage = 0;
+  for (const [, a] of anchorEntries || []) {
+    if (!a || !a.chapter || !Number.isFinite(a.page)) continue;
+    last.set(a.chapter, Math.max(last.get(a.chapter) || 0, a.page));
+    maxPage = Math.max(maxPage, a.page);
+  }
+  const cut = (Number(progress) || 0) / 100 * maxPage;
+  return [...last.entries()].filter(([, p]) => p < cut).map(([ch]) => ch);
+}
+
+export async function backfillForTest(query, now = Date.now()) {
+  const q = String(query || '').trim().toLowerCase();
+  if (!q) return null;
+  const books = await Store.getAllBooks();
+  const book = books.find((b) => b && !b.deleted && (String(b.id).startsWith(q) || String(b.title || '').toLowerCase().includes(q)));
+  if (!book) return { found: false };
+  let left;
+  if (book.format === 'pdf') {
+    let anchors = await DB.get('anchors', book.id);
+    if (!anchors && await SegmentFile.ensureSegmented(book.id)) anchors = await DB.get('anchors', book.id);
+    left = behindPdf(anchors?.entries, book.progress);
+  } else {
+    left = Array.isArray(book.chaptersDone) ? book.chaptersDone : [];
+  }
+  const readAt = now - DELAY_DAYS * DAY_MS - 3600e3;
+  let added = 0;
+  await Store.patchBook(book.id, (prev) => {
+    const at = { ...(prev.chaptersDoneAt && typeof prev.chaptersDoneAt === 'object' ? prev.chaptersDoneAt : {}) };
+    const have = new Set(Object.keys(at).map(norm));
+    for (const l of left) if (!have.has(norm(l))) { at[l] = readAt; added++; }
+    return added ? { chaptersDoneAt: at } : {};
+  });
+  const decks = await DB.getAllDecks();
+  const engaged = engagementIndex(Storage.getAll('highlights_'), decks);
+  const ready = candidates([{ ...book, chaptersDoneAt: Object.fromEntries(left.map((l) => [l, readAt])) }],
+    await DB.getAll('attempts'), engaged, now).length;
+  return { found: true, title: book.title || '', behind: left.length, added, ready };
+}
+
