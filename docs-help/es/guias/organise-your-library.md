@@ -59,6 +59,24 @@ año, por libro o por estantería, y ver:
 - Repasos, retención real y preguntas de comprobación de capítulos leídos hace dos semanas o más.
 - La carga que viene, y la opción de **pausar las tarjetas nuevas** si se acumula.
 
+## El algoritmo, ajustado a tu memoria
+
+Con historia suficiente (a partir de unos **400 repasos**), Análisis te ofrece **entrenar el
+algoritmo de repaso con tus datos**: FSRS trae parámetros de serie que ya funcionan bien, pero con
+tu historial pueden afinarse a cómo olvidas tú. No se aplica solo:
+
+1. Se entrena en tu dispositivo y te enseña la comparación — el error de predicción y la carga del
+   próximo mes, con los parámetros de serie y con los tuyos.
+2. **Tú decides**: si no mejora, ni se ofrece; puedes rechazarlo.
+3. Si aceptas, viaja con el sync a tus otros dispositivos, y siempre hay botón para volver a los de
+   serie.
+
+## La historia de un libro
+
+Con el ámbito fijado a **un libro**, «todo» deja de ser un calendario y es la historia completa del
+libro: cuándo lo empezaste, cuántos días te llevó, a qué ritmo real y la **curva de avance**
+página a página. Es la vista para responder «¿este libro lo aproveché o lo arrastré?».
+
 ## Siguiente paso
 
 - [Lee sin conexión](read-offline.md).

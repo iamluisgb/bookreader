@@ -58,6 +58,25 @@ by shelf, and see:
 - Reviews, true retention and check-in questions on chapters read two weeks ago or more.
 - The load ahead, and the option to **pause new cards** if it piles up.
 
+## The algorithm, tuned to your memory
+
+With enough history (from about **400 reviews** on), Insights offers to **train the scheduling
+algorithm on your data**: FSRS ships default parameters that already work well, but your history
+can tune them to how you forget. It is never applied on its own:
+
+1. It trains on your device and shows you the comparison — prediction error and next month's
+   workload, with default parameters versus yours.
+2. **You decide**: if it doesn't improve, it isn't even offered; you can reject it.
+3. If you accept, it travels with sync to your other devices, and there is always a button to go
+   back to the defaults.
+
+## A book's history
+
+With the scope set to **one book**, "all" stops being a calendar and becomes the book's full
+story: when you started it, how many days it took, at what real pace, and the page-by-page
+**progress curve**. It is the view that answers "did I make the most of this book, or did I drag
+it?".
+
 ## Next step
 
 - [Read offline](read-offline.md).
