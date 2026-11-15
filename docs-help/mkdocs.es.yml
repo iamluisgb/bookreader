@@ -31,7 +31,7 @@ theme:
         icon: material/weather-sunny
         name: Cambiar a claro
   features:
-    - navigation.sections
+    - navigation.tracking
     - navigation.indexes
     - navigation.top
     - search.highlight

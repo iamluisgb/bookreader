@@ -139,6 +139,30 @@
 .md-nav {
   font-size: .8rem;
 }
+/* Barra lateral: grupos plegables y filas compactas, como la ayuda de FnF.*/
+.md-nav--primary {
+  font-size: .75rem;
+}
+.md-nav--primary .md-nav__link,
+.md-nav--secondary .md-nav__link {
+  margin-top: 0;
+  padding-top: .26em;
+  padding-bottom: .26em;
+  line-height: 1.32;
+}
+/* El padre de un grupo (con cheurón) pesa un punto más que sus hijos: la
+   jerarquía se ve sin negritas ni cajas. El enlace suelto, normal.*/
+.md-nav--primary .md-nav__item--nested > .md-nav__link {
+  font-weight: 500;
+  letter-spacing: -.005em;
+}
+/* Un grupo abierto respira respecto al siguiente.*/
+.md-nav--primary > .md-nav__list > .md-nav__item {
+  padding-bottom: .5em;
+}
+.md-nav--primary .md-nav__list .md-nav__link:hover {
+  color: var(--br-accent);
+}
 .md-nav__item--active > .md-nav__link,
 .md-nav__link--active {
   color: var(--br-accent);
