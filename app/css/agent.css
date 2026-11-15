@@ -1030,6 +1030,8 @@ body.has-taskchip .ai-taskchip.is-study { bottom: 74px; }
 }
 .appset-nav-item:hover { background: var(--surface-3); }
 .appset-nav-item.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.appset-nav-ext { text-decoration: none; }
+.appset-nav-ext .icon { color: var(--text-faint); }
 .appset-content { flex: 1; min-width: 0; }
 .appset-section { display: flex; flex-direction: column; }
 .appset-h3 { font-size: var(--fs-xl); font-weight: 600; margin-bottom: 12px; }

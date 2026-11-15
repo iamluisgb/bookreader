@@ -53,6 +53,7 @@ The static site and app are served by Cloudflare Pages. The local MCP server can
 | LLM access         | Any OpenAI-compatible endpoint. Presets are in [`app/js/ai/llm.js`](app/js/ai/llm.js); the default provider is nan.builders                                                                                  |
 | MCP server         | Node.js, `@modelcontextprotocol/sdk` ^1.30.1                                                                                                                                                                 |
 | Tests and tooling  | Playwright ^1.61.1, `node:test`, ESLint ^10.6.0, Prettier ^3.9.4, Wrangler ^4.110.0                                                                                                                          |
+| Help site          | MkDocs Material in a local `.venv-docs/`; the generated HTML (`help/`, `es/ayuda/`) is committed so the deploy needs no Python                                                                               |
 
 ## Key engineering decisions
 
@@ -69,6 +70,23 @@ The static site and app are served by Cloudflare Pages. The local MCP server can
 - **Provider contract tests ([ADR-030](DECISIONS.md#adr-030)).** `@live` tests against real models assert capabilities (a `tool_call` came back, the stream parsed), never content, which keeps them stable.
 - **No agent framework ([ADR-023](DECISIONS.md#adr-023--no-adoptar-langgraph-la-orquestación-se-mantiene-hand-rolled--aceptada)).** Orchestration is plain control flow in ES modules. The ADR records the conditions under which this should be reconsidered.
 - **Deploys come from a commit ([`scripts/build-pages.mjs`](scripts/build-pages.mjs)).** The build extracts `HEAD` with `git archive` and copies an allowlist of paths, so uncommitted work and repo-only files cannot be published. It refuses a commit that is not on `origin/main` unless explicitly overridden. It stamps `build.json`, and the post-deploy smoke test asserts that production serves that commit.
+
+## Help site
+
+Public help lives at `/help/` (English) and `/es/ayuda/` (Spanish): 13 articles per language in
+guides, tutorials, explanation and reference, with search. The source is [`docs-help/`](docs-help/)
+(Markdown plus two MkDocs configs); the generated HTML is committed because deploys come from `HEAD`
+and do not install Python. One CSS file dresses Material with the app's tokens, and fonts come from
+`/app/fonts`.
+
+```bash
+python3 -m venv .venv-docs && .venv-docs/bin/pip install mkdocs-material   # once per machine
+npm run help:build                                                        # rebuild both languages
+```
+
+The script also regenerates the help block in `sitemap.xml` and writes both sites to `help/` and
+`es/ayuda/`. The landing and Settings → Full help link here. The decisions and limits are in
+[ADR-063](DECISIONS.md).
 
 ## Testing and evals
 
@@ -150,8 +168,10 @@ workers/
 mcp/                  Local MCP server and CLI
 tests/                Playwright specs and fixtures
 evals/                Batteries, checks, judge, budgets, report
-scripts/              Pages build, test server, usage reports
+scripts/              Pages build, help build, test server, usage reports
 docs/                 Eval method, audits, research, guides
+docs-help/            Source of the public help site (Markdown, MkDocs configs, theme)
+help/ es/ayuda/       Generated help site (committed; /help/ and /es/ayuda/)
 odd/tasks/            Per-task contracts and close-outs
 index.html es/ anki/ why/ privacy/ s/ u/ assets/    Public site pages and assets
 DECISIONS.md          ADRs

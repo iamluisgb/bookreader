@@ -1883,6 +1883,31 @@ existir para que la feature se entienda, el bug probablemente sea de la feature.
 
 ---
 
+### P57 — La ayuda publicada: tareas, no features · `M` · **✓ (2026-11-15)**
+
+**El caso.** La landing cuenta la historia y la app descubre sus features con hints, pero no hay
+documentación: quien se atasca (un PDF sin índice, el sync en otro dispositivo, qué ve la IA) solo
+tiene el correo. FnF ya había resuelto lo mismo con una sección `/ayuda` por cuadrantes (Diátaxis),
+buscador y la marca del sitio; aquí no existía nada.
+
+**Entregado.** Sitio propio en `/help/` (EN) y `/es/ayuda/` (ES), generado con MkDocs Material desde
+[`docs-help/`](docs-help/) y commiteado (el deploy sale de HEAD y no instala Python). Trece artículos
+por lengua, agrupados en **guías** (una tarea), **tutoriales** (un recorrido), **explicación** (el
+porqué) y **referencia** (formatos y límites), con buscador y navegación. El tema es la landing: los
+tokens de `app/css/themes.css`, Inter y Source Serif 4 desde `/app/fonts`, Umami con el mismo guard
+de producción. Hreflang entre las dos lenguas y bloque del sitemap global generado.
+
+**Cómo se mantiene.** Un artículo = un objetivo. Se escribe en Markdown, en las dos lenguas, y se
+reconstruye con `npm run help:build` (usa `.venv-docs/bin/mkdocs` o el `mkdocs` del PATH; el venv no
+se versiona). La lista blanca de [`scripts/build-pages.mjs`](scripts/build-pages.mjs) incluye `help`.
+Enlaces desde las landings (nav y pie) y desde Ajustes → **Ayuda completa**.
+
+**Fuera.** Ayuda embebida en la app (solo el enlace y la guía rápida), capturas de pantalla por
+artículo y una página de novedades. Si aparece una duda que se repite, entra como artículo o como
+sección de uno existente; no se abre un blog.
+
+---
+
 ### P31 — Análisis con historia: escope y rangos · señal-driven · `S` · **✓ (2026-10-18, con P44 y P45)**
 
 *Entregados:* el tope de 5 libros con «Ver todos» y el filtro por libro (P44); Año y Todo, y el

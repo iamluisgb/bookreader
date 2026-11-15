@@ -3,3 +3,10 @@ node_modules/
 test-results/
 playwright-report/
 package-lock.json
+
+# HTML generado por scripts/build-help.mjs
+help/
+es/ayuda/
+
+# Prosa de la ayuda: Prettier desindenta las admoniciones !!! de Material
+docs-help/

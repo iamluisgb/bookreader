@@ -1,0 +1,208 @@
+/* Ayuda de BookReader — Material vestido con los tokens de la app.
+   Una sola copia para las dos lenguas: la publica scripts/build-help.mjs en
+   /help/assets/ayuda.css y la cargan EN y ES. Las fuentes son las de la app
+   (/app/fonts), así el navegador no las descarga dos veces. */
+
+@font-face {
+  font-family: 'Inter';
+  src: url('/app/fonts/inter-400.woff2') format('woff2');
+  font-weight: 400; font-display: swap;
+}
+@font-face {
+  font-family: 'Inter';
+  src: url('/app/fonts/inter-500.woff2') format('woff2');
+  font-weight: 500; font-display: swap;
+}
+@font-face {
+  font-family: 'Inter';
+  src: url('/app/fonts/inter-600.woff2') format('woff2');
+  font-weight: 600; font-display: swap;
+}
+@font-face {
+  font-family: 'Source Serif 4';
+  src: url('/app/fonts/source-serif-4-400.woff2') format('woff2');
+  font-weight: 400; font-display: swap;
+}
+@font-face {
+  font-family: 'Source Serif 4';
+  src: url('/app/fonts/source-serif-4-600.woff2') format('woff2');
+  font-weight: 600; font-display: swap;
+}
+
+:root {
+  --br-accent: #178046;          /* el mismo acento de la app, AA sobre blanco */
+  --br-accent-hover: #126b3a;
+  --br-line: #e5e5ea;
+  --br-bg-alt: #f5f5f7;
+  --br-soft: #5f5f64;
+  --br-ink: #1d1d1f;
+
+  /* Material con la paleta de la app: cabecera en tinta (como los botones
+     principales), acento verde y superficies neutras, no el azul de fábrica. */
+  --md-primary-fg-color: #1d1d1f;
+  --md-primary-fg-color--light: #3a3a3c;
+  --md-primary-fg-color--dark: #000000;
+  --md-primary-bg-color: #ffffff;
+  --md-accent-fg-color: var(--br-accent);
+  --md-typeset-a-color: var(--br-accent);
+  --md-default-bg-color: #ffffff;
+  --md-default-fg-color: var(--br-ink);
+  --md-default-fg-color--light: var(--br-soft);
+  --md-default-fg-color--lighter: #737378;
+  --md-default-fg-color--lightest: #d9d9de;
+  --md-typeset-color: var(--br-ink);
+  --md-code-bg-color: #f5f5f7;
+  --md-code-fg-color: var(--br-ink);
+  --md-typeset-font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --md-text-font: 'Inter';
+  --md-text-font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --md-code-font: ui-monospace, SFMono-Regular, Menlo, monospace;
+  --md-code-font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  --md-footer-bg-color: #f5f5f7;
+  --md-footer-bg-color--dark: #f5f5f7;
+  --md-footer-fg-color: var(--br-ink);
+  --md-footer-fg-color--light: var(--br-soft);
+  --md-footer-fg-color--lighter: #737378;
+}
+
+[data-md-color-scheme="slate"] {
+  --md-hue: 210;
+  --br-line: #2a2a2e;
+  --br-bg-alt: #1a1a1e;
+  --br-soft: #a8a8ad;
+  --br-ink: #e8e8ea;
+
+  --md-primary-fg-color: #0b0e11;
+  --md-primary-fg-color--light: #111418;
+  --md-primary-fg-color--dark: #0b0e11;
+  --md-primary-bg-color: #f2f3f5;
+  --md-accent-fg-color: #32d074;
+  --md-typeset-a-color: #32d074;
+  --md-default-bg-color: #121214;
+  --md-default-fg-color: #e8e8ea;
+  --md-default-fg-color--light: #a8a8ad;
+  --md-default-fg-color--lighter: #85858a;
+  --md-default-fg-color--lightest: #2a2a2e;
+  --md-typeset-color: #e8e8ea;
+  --md-code-bg-color: #1c1c20;
+  --md-code-fg-color: #e8e8ea;
+  --md-footer-bg-color: #0f1113;
+  --md-footer-bg-color--dark: #0f1113;
+  --md-footer-fg-color: #e8e8ea;
+  --md-footer-fg-color--light: #a8a8ad;
+  --md-footer-fg-color--lighter: #85858a;
+}
+
+/* ---- Tipografía: Inter para leer, Source Serif 4 para los títulos ---- */
+.md-typeset {
+  font-size: .92rem;
+  line-height: 1.65;
+}
+.md-typeset h1,
+.md-typeset h2 {
+  font-family: 'Source Serif 4', Georgia, serif;
+  letter-spacing: -.015em;
+  font-weight: 600;
+}
+.md-typeset h1 {
+  font-size: 2rem;
+  margin-bottom: .6em;
+}
+.md-typeset h2 {
+  font-size: 1.35rem;
+  border-bottom: 1px solid var(--br-line);
+  padding-bottom: .28rem;
+}
+.md-typeset h3 {
+  font-weight: 600;
+  letter-spacing: -.01em;
+}
+.md-typeset p,
+.md-typeset li {
+  hyphens: auto;
+}
+
+/* ---- Cabecera, búsqueda y navegación ---- */
+.md-header {
+  box-shadow: none;
+  border-bottom: 1px solid var(--br-line);
+}
+[data-md-color-scheme="slate"] .md-header {
+  border-bottom-color: #232327;
+}
+.md-header__title {
+  font-weight: 600;
+}
+.md-search__form {
+  border-radius: 8px;
+}
+.md-nav {
+  font-size: .8rem;
+}
+.md-nav__item--active > .md-nav__link,
+.md-nav__link--active {
+  color: var(--br-accent);
+}
+[data-md-color-scheme="slate"] .md-nav__item--active > .md-nav__link,
+[data-md-color-scheme="slate"] .md-nav__link--active {
+  color: #32d074;
+}
+
+/* ---- Contenido ---- */
+.md-typeset a {
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+.md-typeset .md-button {
+  font-weight: 600;
+  border-radius: 8px;
+}
+.md-typeset :is(.admonition, details) {
+  border-radius: 10px;
+  box-shadow: none;
+  font-size: .84rem;
+}
+.md-typeset :is(.admonition, details):is(.tip, .hint) {
+  border-left-color: var(--br-accent);
+}
+.md-typeset table:not([class]) {
+  font-size: .82rem;
+  border: 1px solid var(--br-line);
+  border-radius: 8px;
+}
+.md-typeset table:not([class]) th {
+  background: var(--br-bg-alt);
+}
+.md-typeset code {
+  border-radius: 4px;
+}
+
+/* Barra de estado del artículo: cuándo se revisó y para qué versión. */
+.doc-meta {
+  font-size: .72rem;
+  letter-spacing: .01em;
+  color: var(--br-soft);
+  background: var(--br-bg-alt);
+  border: 1px solid var(--br-line);
+  border-radius: 6px;
+  padding: 6px 12px;
+  margin: 0 0 1.4em;
+}
+.doc-meta b {
+  color: var(--br-accent);
+}
+
+/* ---- Pie ---- */
+.md-footer {
+  border-top: 1px solid var(--br-line);
+}
+.md-copyright {
+  color: var(--br-soft);
+}
+.md-copyright a {
+  color: var(--br-accent);
+  text-decoration: none;
+}
+.md-copyright a:hover {
+  text-decoration: underline;
+}

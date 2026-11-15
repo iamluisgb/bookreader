@@ -16,6 +16,9 @@ offline con un agente de IA (BYOK) que lee el libro completo según un objetivo.
 - [`templates.md`](templates.md) — spec de las 6 plantillas de libreta.
 - [`docs/EVALS.md`](docs/EVALS.md) — cómo se mide la calidad del agente, y el **contrato**
   (baseline + métrica + time-box) que todo ítem de calidad escribe antes de implementar.
+- [`docs-help/`](docs-help/) — fuente de la ayuda pública (`/help/` y `/es/ayuda/`): Markdown por
+  tareas, dos configs de MkDocs Material y el CSS de marca. Se reconstruye con
+  `npm run help:build` (ver [ADR-063](DECISIONS.md)).
 
 ## Estructura
 - `index.html` — entry point (CSP, scripts vendorizados).
@@ -47,6 +50,9 @@ offline con un agente de IA (BYOK) que lee el libro completo según un objetivo.
   secuencia/flujo/timeline para los diagramas del chat, ver ADR-052). **No se cargan en el
   arranque**: las pide `js/vendor-loader.js` al abrir un libro, y solo la del formato.
 - `sw.js` — service worker (precache + stale-while-revalidate). `manifest.json` — PWA.
+- `docs-help/` — fuente de la ayuda pública. `help/` y `es/ayuda/` son el HTML **generado** y
+  commiteado (el deploy sale de HEAD y no instala Python); no se edita a mano. `docs/` es
+  documentación interna y NO se publica.
 
 ## Convenciones
 - JS modules via `<script type="module">`. Funciones nombradas, no arrow anónimas en módulos públicos.
@@ -69,6 +75,10 @@ offline con un agente de IA (BYOK) que lee el libro completo según un objetivo.
 
 ## Desarrollo
 - Servir en local: `python3 -m http.server` y abrir `index.html`. No hay build de la app.
+- **Ayuda** (`/help/`, `/es/ayuda/`): `npm run help:build`. Necesita MkDocs Material en
+  `.venv-docs/` (`python3 -m venv .venv-docs && .venv-docs/bin/pip install mkdocs-material`, una vez
+  por máquina) o en el PATH. Escribe en `help/` y `es/ayuda/` y actualiza el bloque de la ayuda del
+  `sitemap.xml`; hay que commitear el HTML resultante. Un artículo = un objetivo, en las dos lenguas.
 - **Deploy** (Cloudflare Pages): `npm run deploy:pages`. El build sale de **HEAD**, no del
   árbol de trabajo — lo que tengas sin commitear no se despliega, y avisa de ello. Rechaza
   un HEAD que no esté en `origin/main` (escape: `DEPLOY_ALLOW_UNPUSHED=1`). El commit

@@ -46,11 +46,14 @@ footer .foot-in .foot-tools { margin-top: 0; }
   .nav-end { gap: 12px; }
   .nav-end .nav-cta { padding: 8px 13px; }
 }
-/* Barra: el idioma como código (EN/ES) y el blog solo donde sobra sitio. */
+/* Barra: el idioma como código (EN/ES), la ayuda y el blog solo donde sobra sitio. */
 .nav-lang { letter-spacing: 0.04em; }
+.nav-help { font: 600 13.5px var(--font-ui); color: var(--text); text-decoration: none; }
+.nav-help:hover { color: var(--accent); text-decoration: none; }
 .nav-blog { font: 600 13.5px var(--font-ui); color: var(--text-soft); text-decoration: none; }
 .nav-blog:hover { color: var(--text); text-decoration: none; }
-@media (max-width: 640px) { .nav-blog { display: none; } }
+@media (max-width: 760px) { .nav-blog { display: none; } }
+@media (max-width: 460px) { .nav-help { display: none; } }
 /* Pie: idioma completo junto al tema, con la misma forma de píldora. */
 .lang-pick { display: inline-flex; gap: 2px; padding: 2px; border: 1px solid var(--border); border-radius: 999px; font: 500 12.5px var(--font-ui); }
 .lang-pick > * { padding: 4px 11px; border-radius: 999px; color: var(--text-faint); text-decoration: none; }

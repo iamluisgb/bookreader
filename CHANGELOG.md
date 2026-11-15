@@ -3,6 +3,32 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-11-15 — La ayuda publicada: /help y /es/ayuda, por tareas y en dos lenguas
+
+- **El caso**: la landing y la app explican features, pero no había documentación. Un PDF sin
+  índice, el sync en otro dispositivo o qué ve la IA se contestaban por correo. FnF ya tenía
+  `/ayuda` por cuadrantes (Diátaxis) con buscador y su marca; BookReader no tenía nada.
+- **Entregado**: sitio propio con **13 artículos por lengua** en `docs-help/` —9 guías, 1 tutorial,
+  2 de explicación y 1 de referencia—, portada por puertas y buscador. MkDocs Material vestido con
+  los tokens de la app (Inter y Source Serif 4 desde `/app/fonts`, un solo
+  [`ayuda.css`](docs-help/theme/ayuda.css)), claro/oscuro y Umami con el guard de producción.
+- **Dos builds para URLs limpias**: `mkdocs.en.yml` → `help/` (`/help/`) y `mkdocs.es.yml` →
+  `es/ayuda/` (`/es/ayuda/`). Mismas rutas en las dos lenguas: `hreflang` recíproco, `x-default` a
+  EN y el selector de idioma apunta a la **misma página**, no a la portada ([`hooks.py`](docs-help/hooks.py)).
+- **Se publica desde HEAD**: el HTML generado se commitea; `npm run help:build`
+  ([`scripts/build-help.mjs`](scripts/build-help.mjs)) usa `.venv-docs/bin/mkdocs` (fuera de git) o
+  el del PATH, copia los dos sitios, retira los `.map` de Material y regenera el bloque de la ayuda
+  en el `sitemap.xml` global. `help` entra en la lista blanca de
+  [`scripts/build-pages.mjs`](scripts/build-pages.mjs).
+- **Se encuentra**: enlaces **Help/Ayuda** en la barra y el pie de las 12 páginas públicas (el blog
+  cede su hueco en móvil), y **Ajustes → Ayuda completa** en la app, que abre la lengua de la
+  interfaz (`/help/` o `/es/ayuda/`).
+- **Verificado**: build `strict` sin avisos, 38 páginas y 2.078 enlaces internos comprobados (0
+  rotos, anclas incluidas), buscador con índice por lengua, selector de idioma página a página,
+  tema oscuro y capturas a 1280 y 390 px. `build:preview` deja `help/` y `es/ayuda/` en `dist/`.
+- **Fuera**: ayuda embebida en la app, capturas por artículo y página de novedades. Decisión y
+  límites en [ADR-063](DECISIONS.md), ítem en [P57](BACKLOG.md).
+
 ## 2026-11-15 — El índice dice la verdad: página de cada ancla, marca por sección y todos los niveles
 
 - **El caso**: «no funciona correctamente el índice en modo scroll», leyendo *Site Reliability

@@ -1579,6 +1579,7 @@ const EN = {
   'Quitar de la tira': 'Unpin from the strip',
   'Fijar en la tira': 'Pin to the strip',
   'Guía rápida': 'Quick guide',
+  'Ayuda completa': 'Full help',
   '{id} · nuevo, sin probar': '{id} · new, untested',
   'Modelos de nan, actualizados cada pocas horas. Los «sin probar» son nuevos: puede que tu cuenta no tenga acceso.': 'Models from nan, refreshed every few hours. The “untested” ones are new: your account may not have access.',
   'Nuevos · sin probar': 'New · untested',

@@ -1,0 +1,96 @@
+site_name: Ayuda de BookReader
+site_url: https://bookreader.raiatech.com/es/ayuda/
+site_description: Ayuda de BookReader — el lector EPUB y PDF con agente de IA y repaso espaciado.
+site_dir: site-es
+docs_dir: es
+strict: true
+
+hooks:
+  - hooks.py
+
+theme:
+  name: material
+  custom_dir: overrides
+  language: es
+  font: false
+  logo: assets/logo.svg
+  favicon: assets/favicon.png
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-night
+        name: Cambiar a oscuro
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-sunny
+        name: Cambiar a claro
+  features:
+    - navigation.sections
+    - navigation.indexes
+    - navigation.top
+    - search.highlight
+    - search.suggest
+    - content.code.copy
+    - toc.follow
+
+plugins:
+  - search:
+      lang: es
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - toc:
+      permalink: true
+
+extra:
+  help_css: /help/assets/ayuda.css
+  self_root: /es/ayuda/
+  other_root: /help/
+  other_lang: en
+  other_name: English
+  x_default_root: /help/
+  og_image: https://bookreader.raiatech.com/assets/landing/og-es.png
+  og_locale: es_ES
+
+copyright: >-
+  <span>BookReader · © 2026 Luis González</span> ·
+  <a href="/es/privacidad/">Privacidad</a> ·
+  <a href="/app/">Abrir BookReader</a>
+
+nav:
+  - Inicio: index.md
+  - Guías:
+      - guias/index.md
+      - Sube un libro: guias/import-a-book.md
+      - Configura el agente: guias/set-up-ai-key.md
+      - Lee un libro: guias/read-a-book.md
+      - Pregúntale al libro: guias/ask-the-book.md
+      - Convierte lo leído en repaso: guias/turn-reading-into-review.md
+      - Ordena tu biblioteca: guias/organise-your-library.md
+      - Lee sin conexión: guias/read-offline.md
+      - Sincroniza y guarda una copia: guias/sync-and-backup.md
+      - Conecta un agente: guias/connect-an-agent.md
+  - Tutoriales:
+      - tutoriales/index.md
+      - Tu primer día: tutoriales/first-day.md
+  - Explicación:
+      - explicacion/index.md
+      - Qué pasa con tus datos: explicacion/your-data.md
+      - Cómo responde el agente: explicacion/how-the-agent-works.md
+  - Referencia:
+      - referencia/index.md
+      - Formatos y límites: referencia/formats-and-limits.md
+  - Abrir BookReader: https://bookreader.raiatech.com/app/

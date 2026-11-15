@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{#
+  La ayuda de BookReader es un sitio estático más del dominio: comparte tokens,
+  fuentes y medición con la landing y la app. Tres cosas que Material no hace solas:
+  hreflang entre las dos lenguas, el CSS de marca (un solo archivo para EN y ES) y
+  Umami, que solo se carga en producción.
+#}
+
+{% block extrahead %}
+  {{ super() }}
+  {% if page %}
+  {% if config.extra.other_root %}
+  <link rel="alternate" hreflang="{{ config.extra.other_lang }}" href="{{ config.extra.other_root }}{{ page.url }}">
+  <link rel="alternate" hreflang="{{ config.theme.language }}" href="{{ config.extra.self_root }}{{ page.url }}">
+  <link rel="alternate" hreflang="x-default" href="{{ config.extra.x_default_root }}{{ page.url }}">
+  {% endif %}
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="{{ config.site_name }}">
+  <meta property="og:title" content="{{ page.title }} · {{ config.site_name }}">
+  <meta property="og:description" content="{{ page.meta.description if page.meta and page.meta.description else config.site_description }}">
+  <meta property="og:url" content="{{ page.canonical_url }}">
+  {% if config.extra.og_image %}
+  <meta property="og:image" content="{{ config.extra.og_image }}">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="{{ config.extra.og_image }}">
+  {% endif %}
+  <meta property="og:locale" content="{{ config.extra.og_locale }}">
+  {% endif %}
+{% endblock %}
+
+{% block styles %}
+  {{ super() }}
+  <link rel="stylesheet" href="{{ config.extra.help_css }}">
+{% endblock %}
+
+{% block scripts %}
+  {{ super() }}
+  <script>
+  // Mismo criterio que la landing: el tracker se sirve desde el dominio propio
+  // (script-src 'self') y solo se carga en producción; en local o en tests, nada.
+  if (location.hostname === 'bookreader.raiatech.com') {
+    var u = document.createElement('script');
+    u.defer = true;
+    u.src = '/u/s.js';
+    u.setAttribute('data-website-id', '08c1619b-4bb8-471b-9dc9-9b6cda88e8ae');
+    u.setAttribute('data-host-url', 'https://cloud.umami.is');
+    document.head.appendChild(u);
+  }
+  </script>
+{% endblock %}

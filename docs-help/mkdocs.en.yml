@@ -1,0 +1,98 @@
+site_name: BookReader Help
+site_url: https://bookreader.raiatech.com/help/
+site_description: Help for BookReader — the EPUB and PDF reader with an AI agent and spaced review.
+site_dir: site-en
+docs_dir: en
+strict: true
+
+hooks:
+  - hooks.py
+
+theme:
+  name: material
+  custom_dir: overrides
+  language: en
+  font: false
+  logo: assets/logo.svg
+  favicon: assets/favicon.png
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light
+  features:
+    - navigation.sections
+    - navigation.indexes
+    - navigation.top
+    - search.highlight
+    - search.suggest
+    - content.code.copy
+    - toc.follow
+
+plugins:
+  - search:
+      lang: en
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - toc:
+      permalink: true
+
+extra:
+  # El CSS vive una sola vez en help/assets/ayuda.css (lo copia scripts/build-help.mjs):
+  # las dos lenguas cargan el mismo archivo y los mismos tokens de la app.
+  help_css: /help/assets/ayuda.css
+  self_root: /help/
+  other_root: /es/ayuda/
+  other_lang: es
+  other_name: Español
+  x_default_root: /help/
+  og_image: https://bookreader.raiatech.com/assets/landing/og-en.png
+  og_locale: en_US
+
+copyright: >-
+  <span>BookReader · © 2026 Luis González</span> ·
+  <a href="/privacy/">Privacy</a> ·
+  <a href="/app/">Open BookReader</a>
+
+nav:
+  - Home: index.md
+  - Guides:
+      - guias/index.md
+      - Import a book: guias/import-a-book.md
+      - Set up the agent: guias/set-up-ai-key.md
+      - Read a book: guias/read-a-book.md
+      - Ask the book: guias/ask-the-book.md
+      - Turn reading into review: guias/turn-reading-into-review.md
+      - Organise your library: guias/organise-your-library.md
+      - Read offline: guias/read-offline.md
+      - Sync and back up: guias/sync-and-backup.md
+      - Connect an AI agent: guias/connect-an-agent.md
+  - Tutorials:
+      - tutoriales/index.md
+      - Your first day: tutoriales/first-day.md
+  - Explanation:
+      - explicacion/index.md
+      - What happens to your data: explicacion/your-data.md
+      - How the agent answers: explicacion/how-the-agent-works.md
+  - Reference:
+      - referencia/index.md
+      - Formats and limits: referencia/formats-and-limits.md
+  - Open BookReader: https://bookreader.raiatech.com/app/

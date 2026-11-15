@@ -60,4 +60,114 @@
     <xhtml:link rel="alternate" hreflang="en" href="https://bookreader.raiatech.com/anki/"/>
     <xhtml:link rel="alternate" hreflang="es" href="https://bookreader.raiatech.com/es/anki/"/>
   </url>
+  <!-- help:start · generado por scripts/build-help.mjs, no editar a mano -->
+  <url>
+    <loc>https://bookreader.raiatech.com/help/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://bookreader.raiatech.com/help/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://bookreader.raiatech.com/es/ayuda/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://bookreader.raiatech.com/help/"/>
+  </url>
+  <url>
+    <loc>https://bookreader.raiatech.com/help/explicacion/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://bookreader.raiatech.com/help/explicacion/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://bookreader.raiatech.com/es/ayuda/explicacion/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://bookreader.raiatech.com/help/explicacion/"/>
+  </url>
+  <url>
+    <loc>https://bookreader.raiatech.com/help/explicacion/how-the-agent-works/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://bookreader.raiatech.com/help/explicacion/how-the-agent-works/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://bookreader.raiatech.com/es/ayuda/explicacion/how-the-agent-works/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://bookreader.raiatech.com/help/explicacion/how-the-agent-works/"/>
+  </url>
+  <url>
+    <loc>https://bookreader.raiatech.com/help/explicacion/your-data/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://bookreader.raiatech.com/help/explicacion/your-data/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://bookreader.raiatech.com/es/ayuda/explicacion/your-data/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://bookreader.raiatech.com/help/explicacion/your-data/"/>
+  </url>
+  <url>
+    <loc>https://bookreader.raiatech.com/help/guias/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://bookreader.raiatech.com/help/guias/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://bookreader.raiatech.com/es/ayuda/guias/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://bookreader.raiatech.com/help/guias/"/>
+  </url>
+  <url>
+    <loc>https://bookreader.raiatech.com/help/guias/ask-the-book/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://bookreader.raiatech.com/help/guias/ask-the-book/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://bookreader.raiatech.com/es/ayuda/guias/ask-the-book/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://bookreader.raiatech.com/help/guias/ask-the-book/"/>
+  </url>
+  <url>
+    <loc>https://bookreader.raiatech.com/help/guias/connect-an-agent/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://bookreader.raiatech.com/help/guias/connect-an-agent/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://bookreader.raiatech.com/es/ayuda/guias/connect-an-agent/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://bookreader.raiatech.com/help/guias/connect-an-agent/"/>
+  </url>
+  <url>
+    <loc>https://bookreader.raiatech.com/help/guias/import-a-book/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://bookreader.raiatech.com/help/guias/import-a-book/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://bookreader.raiatech.com/es/ayuda/guias/import-a-book/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://bookreader.raiatech.com/help/guias/import-a-book/"/>
+  </url>
+  <url>
+    <loc>https://bookreader.raiatech.com/help/guias/organise-your-library/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://bookreader.raiatech.com/help/guias/organise-your-library/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://bookreader.raiatech.com/es/ayuda/guias/organise-your-library/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://bookreader.raiatech.com/help/guias/organise-your-library/"/>
+  </url>
+  <url>
+    <loc>https://bookreader.raiatech.com/help/guias/read-a-book/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://bookreader.raiatech.com/help/guias/read-a-book/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://bookreader.raiatech.com/es/ayuda/guias/read-a-book/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://bookreader.raiatech.com/help/guias/read-a-book/"/>
+  </url>
+  <url>
+    <loc>https://bookreader.raiatech.com/help/guias/read-offline/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://bookreader.raiatech.com/help/guias/read-offline/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://bookreader.raiatech.com/es/ayuda/guias/read-offline/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://bookreader.raiatech.com/help/guias/read-offline/"/>
+  </url>
+  <url>
+    <loc>https://bookreader.raiatech.com/help/guias/set-up-ai-key/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://bookreader.raiatech.com/help/guias/set-up-ai-key/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://bookreader.raiatech.com/es/ayuda/guias/set-up-ai-key/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://bookreader.raiatech.com/help/guias/set-up-ai-key/"/>
+  </url>
+  <url>
+    <loc>https://bookreader.raiatech.com/help/guias/sync-and-backup/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://bookreader.raiatech.com/help/guias/sync-and-backup/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://bookreader.raiatech.com/es/ayuda/guias/sync-and-backup/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://bookreader.raiatech.com/help/guias/sync-and-backup/"/>
+  </url>
+  <url>
+    <loc>https://bookreader.raiatech.com/help/guias/turn-reading-into-review/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://bookreader.raiatech.com/help/guias/turn-reading-into-review/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://bookreader.raiatech.com/es/ayuda/guias/turn-reading-into-review/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://bookreader.raiatech.com/help/guias/turn-reading-into-review/"/>
+  </url>
+  <url>
+    <loc>https://bookreader.raiatech.com/help/referencia/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://bookreader.raiatech.com/help/referencia/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://bookreader.raiatech.com/es/ayuda/referencia/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://bookreader.raiatech.com/help/referencia/"/>
+  </url>
+  <url>
+    <loc>https://bookreader.raiatech.com/help/referencia/formats-and-limits/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://bookreader.raiatech.com/help/referencia/formats-and-limits/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://bookreader.raiatech.com/es/ayuda/referencia/formats-and-limits/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://bookreader.raiatech.com/help/referencia/formats-and-limits/"/>
+  </url>
+  <url>
+    <loc>https://bookreader.raiatech.com/help/tutoriales/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://bookreader.raiatech.com/help/tutoriales/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://bookreader.raiatech.com/es/ayuda/tutoriales/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://bookreader.raiatech.com/help/tutoriales/"/>
+  </url>
+  <url>
+    <loc>https://bookreader.raiatech.com/help/tutoriales/first-day/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://bookreader.raiatech.com/help/tutoriales/first-day/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://bookreader.raiatech.com/es/ayuda/tutoriales/first-day/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://bookreader.raiatech.com/help/tutoriales/first-day/"/>
+  </url>
+  <!-- help:end -->
 </urlset>

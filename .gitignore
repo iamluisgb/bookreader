@@ -23,9 +23,17 @@ evals/runs/
 # Salida de build para Cloudflare Pages (scripts/build-pages.mjs)
 dist/
 
+# Toolchain de la ayuda (MkDocs): el venv es local, el HTML generado (help/, es/ayuda/)
+# sí se versiona porque el deploy sale de HEAD. Ver scripts/build-help.mjs.
+.venv-docs/
+docs-help/site-en/
+docs-help/site-es/
+
 # Vídeos y capturas de emulador (se regeneran)
 reels/
 .em-shots/
 
 # Baterías con la biblioteca personal (IA10): fuera del repo público
 evals/private/
+
+docs-help/__pycache__/

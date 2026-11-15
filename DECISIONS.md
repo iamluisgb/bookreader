@@ -2155,3 +2155,46 @@ de 3 (221 enlaces de 693 entradas).
   Un NCX heredado más profundo (en este libro, 926 entradas en 5 niveles frente a 693 en 3) no se
   usa: es lo que dice la especificación y queda como [P56](BACKLOG.md).
 
+
+## ADR-063 — La ayuda es un sitio estático propio, en dos builds y con el HTML commiteado · `ACEPTADA (2026-11-15)`
+
+**Contexto.** La landing cuenta la historia y la app descubre sus features con hints (P30), pero no
+había documentación. Las dudas que no resuelve un hint —un PDF sin índice, el sync en otro
+dispositivo, qué ve la IA, cómo se conecta un agente— acababan en el correo, una a una. FnF ya
+tenía resuelto lo mismo con una sección `/ayuda` por cuadrantes (Diátaxis), buscador y la marca del
+sitio. Copiar la forma no era el problema: el problema era dónde vive la fuente y cómo se publica
+sin meter un build nuevo en el deploy.
+
+**Decisión.**
+1. **La fuente vive en `docs-help/`**, no en `docs/`: `docs/` es documentación interna y no se
+   publica. Allí van el Markdown, los dos `mkdocs.*.yml`, el CSS, el hook y los overrides.
+2. **MkDocs Material**, con el tema vestido con los tokens de la app. Un solo CSS
+   (`docs-help/theme/ayuda.css`) publicado en `/help/assets/ayuda.css` y compartido por las dos
+   lenguas; las fuentes se piden a `/app/fonts`, así el navegador no las descarga dos veces.
+3. **Dos builds, no un i18n plugin.** `mkdocs.en.yml` y `mkdocs.es.yml` compilan el mismo árbol de
+   rutas a `/help/` y `/es/ayuda/`: URLs limpias, buscador por lengua y `hreflang` recíproco sin
+   prefijos anidados (`/help/es/…`). [`hooks.py`](docs-help/hooks.py) pone en el selector de idioma
+   el enlace a la página equivalente, no a la portada de la otra lengua.
+4. **El HTML generado se commitea** (`help/`, `es/ayuda/`). El deploy sale de `HEAD` con
+   [`scripts/build-pages.mjs`](scripts/build-pages.mjs) y no instala Python; `npm run help:build`
+   reconstruye con el `mkdocs` de `.venv-docs/` (fuera de git) o el del PATH. MkDocs no es
+   dependencia de Node ni de runtime.
+5. **Cuadrantes y una regla.** Guías (una tarea), tutoriales (un recorrido), explicación (el porqué)
+   y referencia (datos). Un artículo = un objetivo; no se mezclan.
+6. **Publicación.** `help` entra en la lista blanca del build (y `es/` ya estaba). El sitemap global
+   gana un bloque generado con los pares EN/ES y `x-default` → EN; los sitemaps por idioma de
+   Material se quedan porque su prefetch los pide. Las landings enlazan desde la barra y el pie, y
+   Ajustes tiene **Ayuda completa**; la ayuda carga Umami con el mismo guard de producción.
+
+**Consecuencias.**
+- Mantener la ayuda es escribir Markdown y ejecutar `npm run help:build`. No toca el build de la app.
+- La versión de Material vive en el venv local y no está fijada: una actualización se ve en el diff
+  del HTML generado, que es la única señal de que conviene revisar la salida.
+- El contenido está duplicado por lengua: una traducción puede quedarse atrás. El selector de idioma
+  y el `hreflang` hacen visible cuál es cuál; no hay forma barata de detectar el desfase.
+- Material pide `sitemap.xml` relativo a la página para su prefetch, así que las páginas internas
+  dejan un 404 de sitemap en la consola. Es de la librería, no rompe nada y no justifica duplicar
+  sitemaps en cada carpeta.
+- **No hay ayuda embebida** en la app: solo el enlace y la guía rápida. Si la ayuda se usa de verdad,
+  el paso siguiente es enlazar el artículo concreto desde cada pantalla, no meter el sitio en un
+  iframe.

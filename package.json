@@ -12,6 +12,7 @@
   "scripts": {
     "build:pages": "node scripts/build-pages.mjs",
     "build:preview": "node scripts/build-pages.mjs --worktree",
+    "help:build": "node scripts/build-help.mjs",
     "deploy:pages": "node scripts/build-pages.mjs --deploy && wrangler pages deploy dist --project-name bookreader --branch main && npm run smoke:deployed",
     "smoke:deployed": "SMOKE_COMMIT=$(git rev-parse HEAD) playwright test --grep @smoke",
     "test": "playwright test --grep-invert \"@live|@eval|@smoke|@race|@perf\"",

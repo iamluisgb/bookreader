@@ -73,6 +73,7 @@ function ensureOverlay() {
         <nav class="appset-nav">
           ${SECTIONS.map(s => `<button class="appset-nav-item" data-section="${s.id}">${icon(s.ico, { size: 'md' })}<span>${s.label()}</span></button>`).join('')}
           <button class="appset-nav-item appset-nav-guide" data-guide>${icon('help', { size: 'md' })}<span>${t('Guía rápida')}</span></button>
+          <a class="appset-nav-item appset-nav-ext" href="${getLang() === 'es' ? '/es/ayuda/' : '/help/'}" target="_blank" rel="noopener">${icon('book', { size: 'md' })}<span>${t('Ayuda completa')}</span></a>
         </nav>
         <div class="appset-content"></div>
       </div>
