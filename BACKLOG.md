@@ -622,6 +622,219 @@ sin abrir, y por significado. No se arregla estirando `search_book`; hace falta 
 - El plan de pago de Workers.
 - Buscar en libros cuyo fichero no está en ningún equipo del usuario.
 
+### IA11 — Materia final fuera del índice de búsqueda · `S`–`M` · **✓ hecho 2026-11-03 (ver CHANGELOG)**
+
+> **Entregado** (`baa3211`, Worker `87d95fb2`, Pages `55e97ac`): decidido al buscar con los títulos
+> del TOC, sin marcar nada al construir (así vale para los libros ya subidos). hit@5 0,654 → 1,0 y
+> materia auxiliar en el top 5 53,8 % → 0 % sobre 26 consultas cortas. Detalle en CHANGELOG.
+
+
+**El caso (medido el 2026-11-02).** `search.txt` lleva una línea por pasaje con **todo** el texto del libro,
+así que el índice analítico del propio libro compite con el cuerpo. En *Protocols* (Huberman),
+`search_book "melatonin"` devolvió **sólo** entradas del capítulo `Index` — ninguna del cuerpo que las
+explica.
+
+**Cuánto pesa, medido por libro** (capítulos cuyo título es exactamente `Index`/`Notes`/`Glossary`/etc.):
+
+| Libro | Basura | Palabras |
+|---|---|---|
+| Protocols | 22,2 % | 52.227 (Notes 41.850 + Index 10.377) |
+| AI Agents: The Definitive Guide | 16,7 % | 15.913 |
+| Agentic GraphRAG | 13,1 % | 15.222 |
+| SRE 2nd | 7,4 % | 22.239 |
+
+**Lo que ya existe.** `searchLines()` ([`mcp/src/text-tools.mjs`](mcp/src/text-tools.mjs)) puntúa BM25
+sobre esas líneas, y el `toc.chapters` que genera
+[`app/js/sync/book-text-build.js`](app/js/sync/book-text-build.js) ya lleva `title` por capítulo: clasificar
+es leer un campo que ya está. En la app el camino equivalente es
+[`js/ai/retrieval.js`](app/js/ai/retrieval.js) (IA5 Fase 1a).
+
+**Diseño.** Al construir `text/<id>.json`, marcar el capítulo `aux: true` con una regla por título
+(`^index|notes|glossary|references|bibliography$`), y en `searchLines` **omitirlos** del puntuado — o
+penalizarlos ×0,2 si se prefiere degradar en vez de excluir. `read_chapter` sigue devolviéndolos si alguien
+los pide: no se borra texto, se deja de premiarlo.
+
+**Contrato (antes de implementar).**
+- Batería: la de IA5 que ya existe **más** una nueva de «queries cortas» (10 preguntas de un término con
+  respuesta conocida en el cuerpo, en libros con índice pesado).
+- Métrica primaria: `recall@5` del ancla del cuerpo. **Determinista** (ancla esperada, no juez).
+- Baseline: **sin medir** — es lo primero que hay que tomar, con la biblioteca de hoy.
+- Time-box: una tarde de medición, una de implementación.
+
+**Fuera, a propósito.** Recortar el texto que ve el humano: el índice del libro le sirve.
+
+### IA12 — Mapa de orientación para libros largos, con capítulos referenciados · `S` · **pendiente de validar**
+
+**El caso.** Antes de preguntar a un libro de 490.000 palabras hace falta saber por dónde entrar, y una
+pasada completa de `read_chapter` se paga en llamadas: **Security Engineering 82** (490.589 palabras, 30
+capítulos >6.000), *El Turrero Post* 81 (520 capítulos), *SRE 2nd* 50.
+
+**Lo que ya existe.** `create_summary` produce un artefacto con `tldr`, `ideas` y hasta **40 secciones**
+(`SUMMARY_LIMITS` en [`js/ai/artifact-schema.js`](app/js/ai/artifact-schema.js)), y el agente lo lee en
+**una** llamada (`get_artifact`). Es el mapa que falta, ya construido.
+
+**Lo que falta.** Las secciones no están **ancoradas a un capítulo**: el mapa dice de qué va el libro pero
+no permite saltar a «capítulo 12». Añadir `chapter: n` por sección (el generador ya sabe en qué capítulo
+cayó cada pasaje que usó) convierte el resumen en índice navegable, para el agente y para ti.
+
+**Fuera, a propósito y explícito.** No es una mejora de retrieval: la búsqueda nunca lee artefactos
+(`searchLines` sólo mira `search.txt`). Se vende como orientación — una llamada en vez de 40-80 — no como
+«respuestas mejores».
+
+### IA13 — Contexto estructural dentro del pasaje (contextual retrieval sin LLM) · `S` · **pendiente de validar**
+
+**El caso.** Un pasaje suelto —«el comité elige un líder y reaplica el log»— no dice de qué capítulo
+habla. La técnica con mejor evidencia publicada para esto es *contextual retrieval* (Anthropic): anteponer
+a cada chunk una frase que lo sitúe en el documento antes de indexarlo. Sus números: **−35 %** de fallos
+de recuperación con embeddings contextuales, **−49 %** al sumar BM25 contextual y **−67 %** con un
+reranker encima. Su versión canónica paga una llamada al modelo por chunk.
+
+**Lo que BookReader ya tiene y los papers no.** El segmentador sabe exactamente en qué capítulo y bajo qué
+encabezado cayó cada pasaje: `book-text-build.js` escribe `aN<TAB>capítulo<TAB>texto` y el TOC lleva los
+títulos. Prefijar `capítulo · sección` al texto plegado del pasaje es la misma idea **sin coste de LLM**,
+y sin embeddings: aprovecha el mapa de capítulos que PDF7/PDF8 arreglan.
+
+**Lo que falta.** (a) decidir el formato del prefijo (sólo título de capítulo, o capítulo + último `##`
+de sección) y si entra en `search.txt` (afecta a la puntuación) o sólo en el ancla que se cita; (b) que el
+prefijo no infle el pasaje hasta romper el corte a ~400 caracteres; (c) medir — el prefijo puede favorecer
+pasajes de capítulos con nombre largo.
+
+**Contrato (antes de implementar).** Batería de IA5 + 10 preguntas cuya respuesta exige saber el capítulo;
+métrica primaria `recall@5` del ancla; **determinista**; baseline sin medir; time-box una tarde.
+
+**Fuera, a propósito.** La versión con LLM (una llamada por chunk): 78.234 pasajes × 57 libros es dinero
+que no compra nada sobre el prefijo barato, y hay que medirlo antes de descartarlo del todo.
+
+### IA14 — Routing por tamaño: si el libro cabe, se entrega entero · `S`–`M` · **medido 2026-11-07: no se implementa**
+
+**El caso.** La recomendación de Anthropic que casi nadie aplica: por debajo de ~200.000 tokens no hace
+falta RAG — se entrega la obra completa, con prompt caching. Medido en la biblioteca (2026-11-02):
+**24 de 56 libros** caben en el presupuesto actual de 60k tokens (≤45.000 palabras), **41** en un modelo
+de 200k (≤100.000) y **49** en una ventana completa (≤200.000). Para esos libros, mejorar el índice es
+trabajo perdido.
+
+**Lo que ya existe.** IA1 dejó el presupuesto de tokens y el **prefijo estable para caching** en
+[`js/ai/context.js`](app/js/ai/context.js) y [`js/ai/panel-template.js`](app/js/ai/panel-template.js);
+`estimateTokens` ya existe y la app conoce el tamaño del libro segmentado. Falta la regla: si
+`tokens(libro) ≤ presupuesto`, no trocear ni recuperar; si no, RAG como hoy.
+
+**Por qué puede fallar y hay que medirlo.** Entregar 60k tokens en cada turno encarece el turno (mitigado
+por caching) y puede diluir la atención del modelo frente a 5 pasajes quirúrgicos. La hipótesis es que en
+un libro que cabe entero, «lo tiene todo» gana a «tiene los 5 mejores trozos»; hay que comprobarlo, no
+asumirlo.
+
+**Contrato (antes de implementar, 2026-11-07).**
+- Batería: `evals/private/ia14-battery.json`, congelada antes de correr. Cuatro libros reales de la
+  biblioteca que caben en 60k tokens (*DDD Distilled*, *Essential GraphRAG*, *Harness Engineering*,
+  *La Revolución de la Comida Real*; 30–37k palabras, tres en inglés y uno en español). Por libro: 6
+  preguntas de dato sobre un pasaje elegido con semilla fija (la mitad en español, como pregunta el
+  usuario), 2 de síntesis de ≥3 capítulos y 1 trampa. La de IA5 no sirve tal cual: sus libros no son
+  los que el usuario lee ni tienen preguntas de síntesis.
+- Brazos, con el código real de la app (`evals/ia14-whole-vs-rag.mjs`): **rag** = `buildContext` de
+  hoy con la expansión IA7 de verdad; **whole** = libro anotado entero con el encuadre «libro
+  completo». Mismo modelo (`deepseek-v4-flash`) y mismo `systemPrompt`.
+- Métrica primaria: en las preguntas de dato, **% de respuestas que citan el pasaje dorado (±1
+  ancla)**. **Determinista.** Gate: whole ≥ rag + 10 puntos.
+- Baseline: el brazo rag del mismo run (`evals/runs/ia14-<fecha>.json`).
+- Secundarias (tendencia, no gate; juez `glm5.3-flash`): nota 0–2 en las de dato, cobertura de puntos
+  clave en síntesis, honestidad en trampas, tokens por pregunta y latencia.
+- Time-box: un run. Si el gate no se cumple, se cierra con el hallazgo y no se implementa.
+- No replicado (se dice en el informe): la ronda agéntica de IA5 1b (se anota cuándo habría saltado),
+  el capítulo del lector y la libreta.
+
+**Resultado (run `ia14-2026-11-07`, 36 preguntas, juez sin razonamiento): gate NO cumplido → no se
+implementa.**
+
+| | RAG (hoy) | Libro entero |
+|---|---|---|
+| Dato · cita el pasaje dorado (±1) — **primaria** | 0,92 | 0,96 |
+| Dato · nota del juez (0–2) | 1,88 | 2,00 |
+| Síntesis · cobertura de puntos clave | 0,97 | 0,63 |
+| Trampa · honesta | 1,00 | 1,00 |
+| Tokens de contexto por pregunta | 19k | 58k |
+| Respuestas truncadas | 0 | 3 |
+
+- +4 puntos en la primaria, menos de los +10 del gate: es **una** pregunta, en español sobre un libro en
+  inglés, en la que el RAG llegó con contexto vacío.
+- El libro entero **empeora la síntesis**: con 50–60k tokens de entrada, `deepseek-v4-flash` razona más y
+  agota `MAX_TOKENS` (3 de 8 respuestas de síntesis cortadas, una vacía). Y eso que el generador de las
+  preguntas de síntesis veía el libro entero, un sesgo a favor de ese brazo.
+- Cuesta 3× tokens por pregunta con la misma latencia mediana (12,9 s).
+
+**El hallazgo que sí mueve algo (ítem aparte):** el fallo del RAG no es de recuperación. `expandQuery`
+(IA7) llama al modelo lite con razonamiento: tarda 8–40 s, pasa el `EXPAND_TIMEOUT_MS` de 7 s y cae en
+silencio a la pregunta cruda. Falló en 6 de 36 preguntas del run, y en una pregunta cruzada de idioma
+eso deja BM25 sin nada. Con `thinking: false` la misma llamada tarda 2,6–3,3 s (medido con las dos
+preguntas que fallaban). Arreglo de una línea en `app/js/ai/query-expand.js`, con su contrato.
+
+**Fuera, a propósito.** Subir el presupuesto sin condición: lo que se entrega de más en un libro grande se
+paga en cada pregunta y tapa lo relevante.
+
+### IA15 — La expansión IA7 sin razonamiento: no caducar en silencio · `S`
+
+**El caso (medido en IA14, 2026-11-07).** `expandQuery` llama al modelo lite con el razonamiento
+encendido (`chatStream` lo trae por defecto). Con `deepseek-v4-flash` eso tarda 8–40 s, pasa el
+`EXPAND_TIMEOUT_MS` de 7 s y devuelve `null`: el turno sigue con la pregunta cruda sin avisar. Falló en
+6 de 36 preguntas, y en una pregunta en español sobre un libro en inglés dejó BM25 sin un solo pasaje.
+Con `thinking: false` la misma llamada tarda 2,6–3,3 s.
+
+**Contrato (antes de implementar).**
+- Batería: la de IA14 (`evals/private/ia14-battery.json`), solo el brazo rag.
+- Métrica primaria: **expansiones que llegan a tiempo**, 30/36 hoy. Gate: ≥35/36. **Determinista.**
+- Guarda (no puede bajar): % de preguntas de dato que citan el pasaje dorado, 0,92 hoy.
+- Baseline: brazo rag de `ia14-2026-11-07`.
+- Secundarias: nota del juez y cobertura de síntesis (tendencia).
+- Time-box: un run.
+
+**Resultado ✓ (2026-11-07, run `ia14-2026-11-07-ia15b`, brazo rag).** Gate cumplido: 36/36 expansiones a
+tiempo (antes 30/36); guarda intacta (cita el pasaje dorado 0,92 → 0,92). Pasaje dorado en el contexto
+0,96 → 1,00; nota del juez en las de dato 1,88 → 2,00 (en español, 1,80 → 2,00). La pregunta cruzada que
+llegaba con contexto vacío pasa de 0 a 2.
+- **Hacía falta un segundo cambio.** Solo con `thinking: false` (run `-ia15`), el modelo devolvía a veces
+  los términos en el idioma de la pregunta y no en el del libro: una pregunta en español sobre *Harness
+  Engineering* bajó de 18k a 1k tokens de contexto. Ahora el prompt dice el idioma del libro
+  (`Retrieval.indexLang()`), y la caché de expansiones lo incluye en la clave.
+- La cobertura de síntesis bajó (0,97 → 0,80) por **respuestas truncadas**, no por la recuperación: el
+  modelo principal razona hasta agotar `MAX_TOKENS = 4096` (`app/js/ai/llm.js`), que incluye el
+  razonamiento. Salen al azar en los dos brazos de IA14 (3 con el libro entero, 1–2 con RAG), y una
+  pregunta de síntesis sale **vacía** en ambos. Ítem aparte: tope de salida o razonamiento acotado en el
+  chat, y qué ve el usuario cuando la respuesta llega vacía: **IA16**.
+
+### IA16 — Respuestas del chat cortadas o vacías por el razonamiento · `S`
+
+**El caso (medido en IA14/IA15, 2026-11-07).** `MAX_TOKENS = 4096` (`app/js/ai/llm.js`) es el tope de
+salida del chat y en nan **incluye el razonamiento**. En una pregunta de síntesis `deepseek-v4-flash`
+razona 2.400–3.700 tokens y escribe ~1.300: queda en el borde y se corta al azar. Si el razonamiento se
+come todo, la burbuja sale **vacía** con un «Continuar» que pide seguir algo que no se escribió. nan
+acepta `max_tokens: 16384` (probado) y solo se paga lo que se genera.
+
+**Contrato (antes de implementar).**
+- Batería: las 8 de síntesis de IA14, brazo rag, **3 repeticiones** por condición (24 respuestas): el
+  truncado es aleatorio y una pasada no lo mide.
+- Métrica primaria: respuestas truncadas + vacías. **Determinista** (`finish_reason: length`). Gate:
+  0 vacías y ≤1/24 truncadas.
+- Baseline: el mismo run con el tope de hoy (4096), tomado en la misma sesión.
+- Guarda: las 24 de dato con el tope nuevo, sin bajar la nota del juez (2,00 en `ia15b`) ni subir más de
+  un 30 % la latencia mediana.
+- Time-box: un run por condición.
+
+**Resultado ✓ (2026-11-07, runs `ia16-syn-4096` / `ia16-syn-16384` / `ia16-needle-16384`).**
+
+| | 4096 (antes) | 16384 |
+|---|---|---|
+| Truncadas | 3/24 | **0/24** |
+| Vacías | 1/24 | **0/24** |
+| Cobertura de síntesis | 0,88 | 0,92 |
+| Latencia mediana (síntesis) | 28,7 s | 30,4 s |
+
+Guarda: nota del juez en las de dato 2,00 → 2,00; latencia mediana 12,4 → 9,5 s. Entregado:
+`CHAT_MAX_TOKENS = 16384` solo en el chat (`panel.js`; los demás llamantes ya fijan su tope), y si aun
+así la respuesta llega vacía y cortada, se repite **una** vez sin razonamiento (test
+`tests/chat-truncation.spec.ts`).
+- **Trampa de medición:** nan devuelve la misma respuesta, en <1 s, a una petición idéntica. La primera
+  pasada con 3 repeticiones dio 8 respuestas distintas de 24. El arnés marca ahora cada repetición en el
+  system prompt; sin eso, «N repeticiones» es una sola muestra contada N veces.
+
 ---
 
 ## 🎨 Producto / UX
@@ -1438,7 +1651,7 @@ flashcards y `sync/blobs.js` funcionan tal cual porque el registro dice `format:
   `ArrayBuffer` determinista. Test: dos llamadas con la misma entrada → mismo hash.
 - **F2 — Markdown y texto plano** `S`: `accept` amplía a `.md,.txt`; conversión con el
   [`markdown.js`](app/js/ai/markdown.js) que **ya existe** para el panel (no se añade dependencia).
-  Título: primer `# H1`, si no el nombre del fichero — y editable desde [P26](#p26--ficha-de-referencia-el-documento-tiene-nombre--sm).
+  Título: primer `# H1`, si no el nombre del fichero — y editable desde [P26](#p26--ficha-de-referencia-el-documento-tiene-nombre--sm--bloquea-p22f7).
 - **F3 — HTML y artículo web** `M`: `.html` de fichero primero (sin red, sin CORS, sin CSP que
   negociar). **Pegar una URL es otra cosa y va aparte**: la CSP es estricta y de mismo origen —
   descargar una página ajena desde el cliente se choca con `connect-src` y con el CORS del sitio.
@@ -1810,6 +2023,104 @@ ve el producto funcionando en el primer minuto, antes de tener un libro propio a
   llegan a la clave desde aquí.
 - **Peso:** los EPUB no van al precache (TEC14 ya lo tiene en 5,95 MB). Se descargan al pulsar.
 - **Relación con P30:** «Primeros pasos» puede apuntar aquí en vez de a «sube un libro».
+
+---
+
+### P47 — Metadatos del libro: serie, editorial, etiquetas e ISBN · `M` · **tentativo, sin decidir**
+
+> **Tentativo (2026-10-22).** Sale de mirar una captura de Calibre-Web: su rail navega por Categorías ·
+> Series · Autores · Editores · Idiomas · Formatos. No está aprobado; se escribe para no perder el
+> hallazgo y poder decidirlo más adelante sin rehacer el reconocimiento.
+
+**Esto no es P26 desde cero, es su mitad de libros.**
+[P26](#p26--ficha-de-referencia-el-documento-tiene-nombre--sm--bloquea-p22f7) ya especifica la tubería: hoja de edición
+en el menú de la tarjeta, campos nuevos en el registro de `books`, entrada en `SYNCED_FIELDS`,
+autorrelleno **como sugerencia visible y nunca en silencio**, y la regla «no se inventan: “No consta” es
+un valor legal». Ese diseño es de papers (`year`, `venue`, `doi`, `url`). Lo que falta es el eje
+**bibliográfico**: `series` (con su número), `publisher`, `tags`, `language`, `isbn`, y poder
+**sustituir la portada**. Duplicar la hoja de edición dos veces es el error a evitar: este ítem aterriza
+con P26 o después, nunca antes.
+
+**Lo que hoy hay, medido.**
+- La hoja solo edita **título y autor**
+  ([`book-meta.js` L61-70](app/js/library/book-meta.js#L61)).
+- `SYNCED_FIELDS` ([`store.js` L40](app/js/library/store.js#L40)) no tiene ninguno de esos campos: lo que
+  no esté ahí **no viaja entre dispositivos** ni bumpea `updatedAt`.
+- `isbn` no aparece ni una vez en `app/`, `workers/` ni `mcp/`.
+- «Series» y «Editorial» no existen ni como cadena de i18n (`app/js/i18n.js`).
+- La portada **se extrae del fichero** ([`app.js` L975](app/js/app.js#L975)) y no se puede cambiar.
+  Calibre sí: es su gesto más usado con libros que vienen sin portada decente.
+
+**El dato que estamos tirando.** El EPUB trae el ISBN en el OPF.
+[`epub-reader.js` L847-851](app/js/epub-reader.js#L847) documenta que `dc:identifier` se usó como clave
+de libro y **se abandonó** (colisionaba entre ediciones y falta en EPUB sin identifier), pero el paquete
+sigue exponiendo `packaging.metadata` justo al lado de las funciones que ya leen `title` y `creator`
+([L1779-1783](app/js/epub-reader.js#L1779)). Recuperar el ISBN es leer un campo que ya está en memoria;
+lo que hay que añadir es **validarlo** (checksum ISBN-10/13), no inventarlo cuando no pase.
+
+**Fases.**
+- **F1** `S`: campos en el registro + `SYNCED_FIELDS` + la hoja de P26 ampliada (serie y número, editorial,
+  etiquetas como lista, idioma, ISBN). Bumpean `updatedAt` → LWW, y una edición manual gana al import,
+  que es la misma regla que
+  [P26·C](#p26--ficha-de-referencia-el-documento-tiene-nombre--sm--bloquea-p22f7).
+- **F2** `S`: ISBN del OPF al importar, validado antes de guardarlo; si no valida, vacío. Nunca el
+  `dc:identifier` crudo, que muchas veces es un UUID de la editorial o un `urn:uuid:`.
+- **F3** `S`–`M`: **portada sustituible**. El camino ya existe entero: `File` → redimensionar → `dataUrl`
+  → `updateBook({ cover, coverThumb: null })`, con la invalidación de la miniatura cacheada ya escrita
+  ([`app.js` L943-946](app/js/app.js#L943)).
+- **F4** `M`: autorrelleno por ISBN contra Open Library / Google Books, **opt-in explícito y solo el
+  ISBN** — misma frontera que
+  [P26·D](#p26--ficha-de-referencia-el-documento-tiene-nombre--sm--bloquea-p22f7) pone con Crossref. A diferencia de un
+  paper, aquí el ISBN no identifica tu copia ni tu lectura.
+
+**EV5:** no aplica (no toca prompts, retrieval ni modelo). Lo que sí se mide: % de libros con serie y
+editorial no vacías, y % con ISBN válido, sobre lo que ya registra `usage-log`.
+
+**Fuera, a propósito:** columnas personalizadas, importar/exportar `.bib`, sinopsis descargada y campos
+inventados. Eso es ser Calibre, y
+[P26](#p26--ficha-de-referencia-el-documento-tiene-nombre--sm--bloquea-p22f7) ya cerró esa puerta.
+
+---
+
+### P48 — El rail navegable: autores, series y etiquetas · `S`–`M` · **tentativo, sin decidir**
+
+> **Tentativo (2026-10-22).** Pareja de P47 y por la misma captura de Calibre-Web. Sin los campos, esta
+> pantalla no tiene nada que listar.
+
+**El hueco.** El rail de Calibre-Web lista «Navegar: Autores · Series · Editores · Idiomas · Formatos»,
+cada uno como un índice con contador. El nuestro tiene «Todos / Sin estantería / Estanterías / Automáticas»
+más cuatro botones ([`view.js` L241-257](app/js/library/view.js#L241)): se navega por **estanterías**, que
+es una organización que el usuario construye a mano.
+
+**Y sin embargo la pieza lógica ya está escrita.** Una vista por autor es una **estantería automática con
+una regla de un solo campo**: [`shelves.js` L72](app/js/library/shelves.js#L72) ya resuelve `matchesRule`
+sobre `RULE_FIELDS` ([L36](app/js/library/shelves.js#L36)), `buildNodes`/`shelfRows` ya construyen el
+árbol con contador, y la selección del rail **ya es un `Map` de filas con ramas** que cruza en Y/O. Un
+autor entra como una fila más, sin tocar el modelo de datos.
+
+**Lo que falta de verdad:**
+- **Campos que agrupar**, es decir P47. Con lo de hoy solo hay `author`, y está sucio («Apellido, Nombre;
+  Editorial»): agrupar por el campo crudo da un autor por variante.
+  [`book-meta.js` L40](app/js/library/book-meta.js#L40) (`naturalAuthor`) ya normaliza; se reutiliza, no
+  se reinventa.
+- **Un segmento «Explorar»** en el rail con tres listas plegables (Autores, Series, Etiquetas), rellenas
+  con un recuento sobre `allBooks` —que ya es la caché del último render— y **tope + buscador**: con 300
+  libros hay 200 autores y una lista plana no se usa. El patrón de tope existe ya para estanterías
+  (`STRIP_SHELVES`).
+- **Decidir qué no es una fila.** Formato o idioma no son navegación útil en una biblioteca de decenas de
+  libros; lo son en una de miles, que es el caso de Calibre. Autores, series y etiquetas sí.
+
+**Coste:** `S` si P47 ya está; `M` si se hace antes, porque habría que sacar autores del campo sucio y sin
+serie no hay segunda lista que enseñar.
+
+**Medida:** sesiones que abren «Explorar» y, sobre todo, si desde ahí se **abre un libro**. Mirar el índice
+y volver a la rejilla es un fracaso disfrazado de uso.
+
+**Fuera, a propósito:** páginas de autor con foto y biografía (eso es un catálogo, no un lector) y
+**OPDS**. El feed OPDS es lo único de Calibre-Web que no se puede copiar barato: el catálogo lo serviría
+el Worker y [`sync-crypto.js`](app/js/sync/sync-crypto.js) cifra biblioteca y binarios **en el
+navegador**, así que un feed navegable exigiría texto en claro en el servidor o un «feed de exportación»
+por dispositivo. No se hace.
 
 ---
 
@@ -3152,7 +3463,7 @@ segmentador de producción [`segment-pdf.js`](app/js/ai/segment-pdf.js).
 >   ellos reconocen fallar.
 > - **Nadie es end-to-end**: Zotero guarda la referencia, los lectores con IA guardan la lectura, y los
 >   investigadores apilan dos herramientas (existe `zotero2readwise` por eso). El lado libre es el de
->   los **metadatos** → [P26](#p26--ficha-de-referencia-el-documento-tiene-nombre--sm).
+>   los **metadatos** → [P26](#p26--ficha-de-referencia-el-documento-tiene-nombre--sm--bloquea-p22f7).
 >
 > **Dónde queda el foso, en una frase:** el momento de la lectura, con citas verificables **y
 > retención**. Readwise cobra por el repaso espaciado y Elicit/SciSpace no retienen nada; aquí
@@ -3266,7 +3577,7 @@ ya montó el patrón `download()` CSP-safe: son formas nuevas, no un sistema nue
 *«Lee aquí, se archiva allí»* se acepta mucho más fácil que *«múdate»*.
 **El CSV es la pieza que más pesa** —las reseñas de Elicit lo señalan como su punto fuerte— y no
 necesita esperar a F6: exportar **una** ficha ya es una fila. Por eso F7 se adelanta a F6. El BibTeX
-depende de tener `year`/`venue`/`doi`, que los pone [P26](#p26--ficha-de-referencia-el-documento-tiene-nombre--sm).
+depende de tener `year`/`venue`/`doi`, que los pone [P26](#p26--ficha-de-referencia-el-documento-tiene-nombre--sm--bloquea-p22f7).
 
 **Ventaja que ya tenemos gratis — pero con el matiz corregido (2026-09-12):** manuscritos sin
 publicar, material de peer review y PDFs de pago. Elicit/SciSpace/Gemini Notebook son servidor: el PDF
@@ -3278,7 +3589,7 @@ del nicho, o la afirmación se cae al primer lector informado.
 
 **Orden (revisado 2026-09-12 tras la investigación de mercado):**
 **F1+F2** (ya no «corrección»: es el eje competitivo — citar la página correcta) →
-[**P26**](#p26--ficha-de-referencia-el-documento-tiene-nombre--sm) (metadatos: el
+[**P26**](#p26--ficha-de-referencia-el-documento-tiene-nombre--sm--bloquea-p22f7) (metadatos: el
 enchufe con el mundo Zotero, y sin ellos no hay BibTeX) →
 [**P27**](#p27--importar-material-suelto-apuntes-artículos-y-notas--m) (requisito de entrada: todos
 los rivales ingieren web y texto suelto) → **F3+F4** (baratas, y cierran visiblemente F1+F2) →
@@ -3459,6 +3770,67 @@ rápido". **Diseño:** detectar encabezados estructurales en el texto extraído 
 como capítulos sintéticos del TOC. De golpe mejoran: resumen (trozos coherentes), atenuación
 (hay capítulos que puntuar), flashcards (ámbito por tema) y anclas. Bonus opositor: cloze sobre
 literales ("Artículo {{c1::168}}"). Cierre: re-run de la batería P3, que ya existe.
+
+### PDF7 — Gate de marcadores: un PDF sin outline no entra a la biblioteca · `S` · **✓ hecho 2026-11-03 (en el workspace)**
+
+> **Entregado.** `tools/pdf_indice.py` relee el PDF tras escribir y sale 1 si el outline quedó vacío o no
+> cuadra (con `set -e`, `render_curso` ya no publica un documento plano); `--check <pdf>` comprueba
+> cualquier PDF (0 · 1 sin outline · 3 con <3 entradas de primer nivel). `tools/br-upload` lo pasa antes
+> de subir y **avisa sin bloquear**; sin PyMuPDF cae a buscar `/Outlines` en los bytes (coincide con
+> PyMuPDF en los 5 PDF probados). **Causa encontrada:** `pdf_indice.py` funcionaba (37 entradas sobre
+> claude-code-dev); las «v2, con talleres» se re-imprimieron fuera de `render_curso` y nada lo detectó.
+> Los 13 libros sin mapa siguen así: re-subirlos deja duplicados (ver «Fuera, a propósito»).
+
+
+**El caso (medido el 2026-11-02 sobre la biblioteca real, 57 libros).** Doce libros llegan al agente con
+**un solo capítulo**: `get_toc` devuelve `chapters: 1`, cada resultado de `search_book` sale con
+`chapterTitle: null` y `read_chapter` no admite «capítulo 3» porque no existe. El agente puede buscar, pero
+no puede decir dónde está lo que encontró ni pedir el entorno del pasaje.
+
+**La causa es de origen, no del lector.** Los 12 son exactamente los PDF que genera el pipeline de
+documentos del workspace (MEAE ×8, Kryterion 2026 ×2, Platzi ×2), todos ≤10.162 palabras. En el origen,
+**19 de los 30 PDF de `~/workspace/artefactos/` tienen `get_toc()` vacío**, incluidos los rotulados «v2,
+con índice»: el «índice» era la página impresa del documento, no marcadores. Contraprueba dentro de la
+misma serie: *MEAE 2025 — Obra completa* es el único con 9 capítulos, porque ese sí conservó el outline.
+
+**Lo que ya existe y se reutiliza.** `tools/pdf_indice.py` escribe el outline (`set_toc` + `saveIncr`) y
+`render_curso` lo encadena como paso 3; [`js/ai/segment-pdf.js`](app/js/ai/segment-pdf.js) lee ese outline
+con `getOutline()` y sólo el nivel superior abre capítulo (PDF1). El eslabón que falta no es el lector: es
+que **nadie comprueba** que el outline exista antes de publicar o de subir.
+
+**Lo que falta.**
+- `pdf_indice.py`: verificar con `doc.get_toc()` que hay ≥1 entrada con página localizada y salir != 0
+  si no. Hoy imprime «N entradas» y nada impide publicar un documento plano.
+- `tools/br-upload`: si el fichero es PDF sin marcadores, avisarlo en la salida (no bloquear: un PDF
+  legítimamente plano existe).
+- Humo: renderizar un resumen de dos clases y comprobar los dos gates.
+
+**Fuera, a propósito.** Re-subir los 12 de hoy: el `bookId` es el SHA-256 y no hay tool de borrado, así
+que cada uno dejaría un duplicado. Además son cortos (≤10k palabras) y `read_chapter` los lee enteros en
+1-2 llamadas: el defecto cuesta, no rompe.
+
+### PDF8 — Índice sintético para documentos planos que no son legales · `M` · **pendiente de validar**
+
+**El caso.** PDF6 sintetiza TOC con patrones de temario y texto legal (`TÍTULO`, `CAPÍTULO`,
+`Artículo N.`, `Tema N`). Un informe, un paper o un resumen propio con encabezados visuales pero sin
+marcadores no casa con ningún patrón y cae a **un capítulo**: mismo síntoma que PDF7, pero sin arreglo en
+origen posible porque el PDF no es nuestro.
+
+**Evidencia.** De los 12 libros con `chapters: 1`, diez son documentos de ese tipo (informes y resúmenes,
+no legislación). `detectHeading` es conservador a propósito — línea corta, patrón al inicio, descartando
+líneas que acaben en número de página — y esa prudencia es correcta: el riesgo aquí no son los falsos
+negativos, es **romper el TOC de los 44 libros que hoy funcionan**.
+
+**Diseño a validar.** Dos señales que `getTextContent()` ya da sin coste: altura de fuente
+(`item.height`, tipografía de encabezado frente a cuerpo) y línea sin puntuación final con longitud
+acotada. Un detector nuevo que **sólo actúa cuando `getOutline()` viene vacío**, exige ≥4 encabezados con
+separación mínima entre ellos, y si no los encuentra se queda con un capítulo como hoy.
+
+**Gate obligatorio antes de implementarlo:** gold set de tres PDF (un resumen MEAE plano, un resumen
+Platzi plano y la Constitución del BOE como no-regresión) y comprobar que ninguno de los 44 libros con TOC
+real cambia de capítulos. Sin ese gate no se toca el segmentador.
+
+**Fuera, a propósito.** OCR y detección de tablas: otro problema (PDF escaneado), no éste.
 
 ---
 
@@ -4228,6 +4600,18 @@ Revisión con el workflow de seguridad del contenedor. Informe completo:
 [`docs/security-audit-2026-10-05.md`](docs/security-audit-2026-10-05.md). Veredicto: **nada crítico**;
 dos medios que conviene cerrar antes de crecer, y deuda menor.
 
+**Estado (2026-10-22): hallazgos 1, 2 y 4 aplicados; sin desplegar.** `esc()` de
+[`markdown.js`](app/js/ai/markdown.js) pasa ya por `escapeHtml` (comillas incluidas) y la URL del
+enlace va con `encodeURI` + comillas forzadas a `%22`/`%27` y `rel="noopener noreferrer"`; el nuevo
+test de [`tests/render.spec.ts`](tests/render.spec.ts) («la URL de un enlace del modelo no inyecta
+atributos») lo fija sobre el DOM, no sobre el string. La constante `HEADERS` de
+[`scripts/build-pages.mjs`](scripts/build-pages.mjs) —origen de `dist/_headers`— lleva `nosniff`,
+`X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`, `frame-ancestors 'none'`
+en una segunda política CSP (el CSP del `<meta>` no puede expresarlo) y HSTS **sin**
+`includeSubDomains` (raiatech.com sirve más apps). `corsHeaders` del gateway ya no cae a
+`allowed[0] || '*'`: sin origen permitido no emite `ACAO`. **Sigue abierto:** 5 (`redirect_uri` sin
+allowlist propia) y 6 (comparaciones no constantes en `share`).
+
 **1 · XSS latente en el render de markdown (Medio, CONFIRMADO).** `esc()` en
 [`js/ai/markdown.js`](app/js/ai/markdown.js) escapa `& < >` pero **no las comillas**, y la URL de un
 enlace `[x](url)` se inserta cruda en `<a href="$2">`. Una `"` cierra el atributo e inyecta otros
@@ -4420,3 +4804,43 @@ Drive para la copia local.
 
 **Solo mejora progresiva**: el camino de descarga se queda como fallback. En iOS Safari estas APIs no
 existen y no hay negociación posible.
+
+### TEC20 — Auditoría del procesado por libro (`tools/br-audit`) · `S` · **✓ hecho 2026-11-03 (en el workspace)**
+
+> **Entregado.** `~/workspace/tools/br-audit` (sobre el cliente de `tools/br-mcp`). Por libro: `get_toc`,
+> `read_chapter` de 200 palabras desde la mitad del capítulo más largo del cuerpo, y `search_book` con la
+> palabra larga más rara de ese trozo como sonda: así la sonda sale del propio libro y no se elige a ojo.
+> Materia auxiliar = título **exacto** de final (`Index`, `Notes`, `Glossary`, `Bibliografía`…) o de
+> delante (`Contents`, `Table of Contents`, `Contents at a Glance`…). Va a ~1 llamada/s porque el token
+> admite 60/min; reintenta los 503 pasajeros del Worker. `--only <estantería>`, `--book <texto>`,
+> `--json <fichero>`; sale 1 si algún libro incumple.
+>
+> **Línea base (2026-11-03, 58 libros, 5.189.270 palabras, 3,5 min):** texto 57/58 (falta *Data Mesh*),
+> mapa 45/57, materia auxiliar <5 % 48/57, sonda con hit del cuerpo en el top 5 56/57. Incumplen 22:
+> 13 sin mapa (los PDF del pipeline: MEAE ×8, Platzi ×3, Kryterion ×2 → PDF7), 9 con materia auxiliar
+> ≥5 % (Protocols 22,2 %, AI Agents 16,7 %, Agentic GraphRAG 13,1 %, SRE with AIOps 10,5 %, Building
+> AI-Powered Products 10,1 %, DDIA 7,5 %, SRE 2nd 7,4 %, Incas 7,1 %, Building Applications 6,2 % → IA11)
+> y 1 sin texto. **El síntoma de IA11 sale solo en la sonda:** en *SRE 2nd*, «infrastructure» devuelve
+> los 5 primeros resultados del `Index` y ninguno del cuerpo.
+>
+> Lo de abajo es la especificación original.
+
+
+**El caso.** «¿Este libro está listo para que un agente lo consulte?» se contesta hoy a mano, y cuesta 2-3
+llamadas por libro: medir la biblioteca entera me llevó **114 llamadas** el 2026-11-02.
+
+**Criterio, con evidencia detrás** (medido sobre 57 libros): texto troceado (`get_toc` con `words>0`), mapa
+con ≥3 capítulos y títulos, materia final <5 %, y coste de una pasada completa (`ceil(words/6000)` llamadas
+de `read_chapter`). Estado de hoy: 56/57 con texto, 44 con mapa utilizable, 4 con basura >7 %.
+
+**Diseño.** Script en `~/workspace/tools/br-audit` (hermano de `tools/br-mcp`, mismo `.env`): por libro,
+`get_toc` + `search_book` de un término sonda + `read_chapter` del capítulo 2; tabla por pantalla (palabras,
+capítulos, capítulo máximo, % materia final, llamadas por pasada) y `--only <estantería>` para auditar una
+parte. Sale != 0 si algún libro incumple, para poder encadenarlo.
+
+**Lo que falta.** Una sonda por libro (el término que se sabe que existe: hoy lo elijo a ojo) y decidir si
+el umbral de materia final es 5 % u 8 % — con los datos de arriba, 8 % dejaría *SRE 2nd* (7,4 %) fuera del
+aviso.
+
+**Fuera, a propósito.** No comprueba la calidad de extracción (columnas, guiones de corte): eso se ve
+leyendo un pasaje, no contando palabras.
