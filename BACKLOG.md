@@ -2124,6 +2124,35 @@ por dispositivo. No se hace.
 
 ---
 
+### P56 — Índice del EPUB: usar el NCX cuando es más profundo que el `nav` · `S` · **tentativo, sin decidir**
+
+> **Tentativo (2026-11-15).** Sale del arreglo del índice (ADR-062, CHANGELOG del mismo día).
+
+**El caso.** *Site Reliability Engineering* (O'Reilly) trae dos índices: el `nav.xhtml` de EPUB 3
+(`toc01.html`, 693 entradas en 3 niveles) y el NCX heredado de EPUB 2 (`toc.ncx`, **926** navPoints en 5
+niveles: 39/181/472/209/25). epub.js toma el `nav` si existe, así que *Breakage scenarios*, *Breadth*,
+*Initiative* o *Teamwork* (niveles 4-5, solo en el NCX) no están en el índice de BookReader. Tras ADR-062
+el índice pinta las 693 del `nav` y ninguna más: «no se pierde ninguna entrada del índice que publica el
+libro», pero sí del NCX.
+
+**Por qué no se hizo ya.** En EPUB 3 el índice es el `nav`; el NCX está para lectores EPUB 2. Un NCX
+puede estar desfasado respecto del `nav` del mismo libro, y preferirlo cambiaría qué entrada se marca y
+qué dice el pie en libros que hoy están bien. Hace falta medirlo sobre la biblioteca antes.
+
+**Qué haría falta.** Tras `book.ready` en `load()` (`app/js/epub-reader.js`), si `book.packaging` trae
+`navPath` **y** `ncxPath`: cargar el NCX con `book.load`, contar nodos con el mismo recorrido de
+`parseNcx` del epub.js vendorizado, y usarlo solo si (a) tiene más nodos y (b) sus entradas de primer y
+segundo nivel coinciden en `href` con las del `nav` (mismo libro, más detalle). `resolveToc` y la marca ya
+funcionan a cualquier profundidad, así que no se toca nada más.
+
+**Medida.** Sobre la biblioteca real: cuántos EPUB tienen NCX más profundo que su `nav` y, en esos, que
+el criterio (b) no rechace ninguno bueno ni acepte uno desfasado (revisión a mano de los que cambien). Si
+son solo los de O'Reilly, puede bastar con documentarlo.
+
+**Fuera, a propósito:** mezclar los dos índices entrada a entrada.
+
+---
+
 ## 🎓 Aprendizaje basado en evidencia
 
 > **Contexto (2026-07-27).** Revisión de la literatura de tutoría y aprendizaje. El hallazgo que

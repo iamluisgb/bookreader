@@ -3,6 +3,46 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-11-15 — El índice dice la verdad: página de cada ancla, marca por sección y todos los niveles
+
+- **El caso**: «no funciona correctamente el índice en modo scroll», leyendo *Site Reliability
+  Engineering* (EPUB, 1317 locations) en un iPad. En la captura, siete subsecciones con el mismo
+  número. Reproducido en Chromium con viewport de iPad y modo scroll real, con el mismo fichero.
+- **Diagnóstico medido** (tres defectos; el salto del índice NO estaba roto):
+  1. Números: `getTocPages` pedía `getElementById` a lo que devuelve `section.load()`, que en el
+     epub.js vendorizado es el `documentElement` y no el `Document`. El `catch` lo tragaba y todas
+     las entradas de un fichero caían a su inicio: *Hiring / Training / Career Management* decían
+     241/241/241. Solo se salvaba el capítulo en pantalla (su `section.document` ya existía).
+  2. Niveles: `loadTOC` y `loadPdfTOC` bajaban un nivel de `subitems`: 221 enlaces de 693 entradas.
+  3. Marca: `getCurrentTocHref` devolvía la primera entrada del fichero, y en scroll solo se
+     refrescaba al cambiar de fichero. Leyendo *Career Management* (312) marcaba el capítulo.
+- **Arreglo** (ADR-062): `resolveToc` (antes `getTocPages`) toma el `Document` de
+  `section.document` y guarda el **CFI** de cada entrada además de la página; la marca es la
+  última entrada que empezó sin pasar de la posición, se recalcula en cada `relocated` y cubre la
+  sección final corta que no puede subir arriba. El árbol se pinta entero en EPUB y PDF (tercer
+  nivel con `.subitem--deep` y `aria-level`); la burbuja de arrastre del PDF también baja a
+  cualquier nivel. El pie dice ahora la sección.
+- **Antes → después**, mismo libro y misma sonda: enlaces pintados **221 → 693** (= nodos de
+  `nav.toc`); *Hiring / Training / Career Management* **241/241/241 → 243/265/312** (y *Conclusion*
+  326), cada uno igual a la location real al saltar; la marca leyendo *Career Management* **«5. SRE
+  Hiring…» → «Career Management»**, y desplazando el capítulo 5 entero de 700 en 700 px la marca
+  recorre sus 14 secciones sin ir nunca por delante de la lectura (0 de 47 pasos). Coste:
+  `resolveToc` 173-201 ms una vez por apertura; la marca, 0,15 ms (usa `rendition.location`;
+  `currentLocation()` cuesta ~6 ms).
+- **Tests**: `tests/toc-anchors.spec.ts` (3) con EPUB generado en el propio test (4 niveles, varias
+  anclas por fichero): nº de enlaces = nº de nodos, páginas estrictamente crecientes e iguales a la
+  location al saltar, marca al saltar y al desplazar sin el índice, y en la sección final corta. Los
+  3 fallan contra HEAD por su propia aserción (7 de 11 enlaces; `…26,27,27,27`; marca en el
+  capítulo). Suite completa (puerto alternativo 18899): 950 de 992; de los 42 rojos, 30 son el
+  `reconnect` del arnés de sync con otro puerto, 2 de `css-vars` y 3 (`model-picker` ×2,
+  `selection-geometry:173`) fallan igual en HEAD, 6 pasan aislados y `study-interaction:182` (flaky
+  conocido) pasa 3 de 3.
+- **Fuera**: el salto que «no hacía nada» desde la portada a `ch09` no se reproduce (10 de 10
+  aterrizan, abriendo en scroll desde la tarjeta y saltando antes y después de las localizaciones).
+  Y el NCX del libro tiene 926 entradas en 5 niveles frente a las 693 del `nav` que usa epub.js:
+  [BACKLOG · P56](BACKLOG.md).
+- **Sin desplegar.**
+
 ## 2026-11-09 — P55: las preguntas de comprobación también en PDF, y prueba con DDIA
 
 - **El caso**: al preparar la prueba con DDIA (PDF, 72 % leído, 11 mazos) salió que el lector de PDF

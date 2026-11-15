@@ -2117,3 +2117,41 @@ Y comprobar que Polar cobra en euros; si solo cobra en dólares, el precio equiv
 - La métrica que sustituye a la conversión de Pro: usuarios que crean su primer mazo y vuelven a
   repasar la semana siguiente. Es la audiencia a la que luego se ofrece Plus.
 
+## ADR-062 — El índice del EPUB resuelve cada ancla a un CFI, en memoria, y marca por sección · `ACEPTADA (2026-11-15)`
+
+**Contexto.** El índice de un EPUB técnico (O'Reilly, un fichero por capítulo y decenas de secciones
+por ancla) mentía en sus dos respuestas. Medido con *Site Reliability Engineering* en iPad y modo
+scroll: los números de un capítulo eran todos el de su inicio (241/241/241 en vez de 241/265/312)
+porque `getTocPages` pedía `getElementById` a lo que devuelve `section.load()` —en el epub.js
+vendorizado, el `documentElement`, no el `Document`— y el `catch` lo tragaba; y la marca devolvía la
+primera entrada del fichero, así que nunca bajaba de capítulo. Además el sidebar recorría dos niveles
+de 3 (221 enlaces de 693 entradas).
+
+**Decisión.**
+1. **Se guarda el CFI de cada entrada, no solo su página.** `resolveToc(hrefs)` (antes
+   `getTocPages`) devuelve `Map<href, {cfi, page}>` y deja en el módulo `tocTargets: Map<href,
+   {spine, cfi}>` con el CFI ya parseado. `cfi: null` = la entrada es el fichero entero (sin ancla, o
+   con un ancla que el libro no contiene) y empieza donde empieza su sección. La página sale del CFI;
+   es el CFI lo que permite marcar sin otra pasada.
+2. **Resolución una vez por apertura, en memoria.** Tras las localizaciones (o sin ellas, si fallan),
+   sin bloquear la lectura: 173-201 ms medidos con 693 entradas. No se persiste: un almacén más (y su
+   invalidación por libro) no compensa dos décimas. Se descarta resolver anclas de forma perezosa por
+   capítulo: la marca y los números necesitan todas a la vez.
+3. **La marca es la última entrada que empezó sin pasar de la posición** (orden: fichero del spine;
+   el fichero entero antes que sus anclas; entre anclas, `EpubCFI.compare`). A igualdad gana la más
+   anidada. Dos excepciones donde cuenta lo que se ve y no el borde superior: la entrada del último
+   salto mientras siga a la vista, y en scroll con el documento al fondo (una sección final corta no
+   puede subir arriba). Se recalcula en cada `relocated` con la ubicación que epub.js ya dejó en
+   `rendition.location` (0,15 ms; `currentLocation()` cuesta ~6 ms). El pie hereda la marca.
+4. **El índice se pinta entero, a cualquier profundidad**, en EPUB y en PDF. Del tercer nivel abajo,
+   una sola sangría más (`.subitem--deep`) y `aria-level` con la profundidad real.
+
+**Consecuencias.**
+- El pie dice la sección, no el capítulo («Career Management» en vez de «5. SRE Hiring…»). Es lo que
+  ya hacía el PDF con dos niveles; el evento de capítulo para el estudio (`onChapter`) no cambia.
+- Hasta que `resolveToc` termina (el primer instante de la apertura) la marca usa el criterio viejo,
+  la primera entrada del fichero.
+- El índice que se pinta es `book.navigation.toc`, que epub.js toma del `nav.xhtml` EPUB 3 si existe.
+  Un NCX heredado más profundo (en este libro, 926 entradas en 5 niveles frente a 693 en 3) no se
+  usa: es lo que dice la especificación y queda como [P56](BACKLOG.md).
+
