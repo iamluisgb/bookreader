@@ -1,3 +1,7 @@
+---
+updated: 2026-11-15
+---
+
 # Turn reading into review
 
 Reading is not remembering. BookReader turns the book into **cards** that come back just before you
@@ -66,6 +70,3 @@ anyone who prefers to import by hand. Cards keep their page, so in Anki they sti
 - [Organise your library](organise-your-library.md).
 - [Sync and back up](sync-and-backup.md) so you do not lose your progress.
 
----
-
-_Updated on 15 November 2026._

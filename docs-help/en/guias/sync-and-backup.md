@@ -1,3 +1,7 @@
+---
+updated: 2026-11-15
+---
+
 # Sync and back up
 
 Your books live on this device. To have them on another, or to avoid losing them when you clear the
@@ -63,7 +67,5 @@ what a diagnosis uses, is what stays on your device and in your Drive.
 
 - [Connect an AI agent](connect-an-agent.md), if you have Plus.
 - [What happens to your data](../explicacion/your-data.md).
+- [Sync and storage](../referencia/sync-and-storage.md), if you are after a ceiling or a number.
 
----
-
-_Updated on 15 November 2026._

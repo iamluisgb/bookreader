@@ -1,3 +1,7 @@
+---
+updated: 2026-11-15
+---
+
 # Lee un libro
 
 BookReader es un lector, antes que nada. Esto es lo que hay mientras lees y cómo dejarlo a tu
@@ -70,21 +74,11 @@ lectura, no en páginas. La cifra se calcula con tu ritmo real, así que no cuen
 
 ## Atajos y gestos
 
-| Donde                 | Qué                                                                     |
-| --------------------- | ----------------------------------------------------------------------- |
-| Leyendo               | `←` / `→` página anterior y siguiente                                   |
-| Leyendo               | `[` abre o cierra el índice y las notas                                 |
-| Leyendo               | `]` abre o cierra el agente                                             |
-| En cualquier pantalla | `?` abre la guía rápida de la app                                       |
-| En un diálogo o panel | `Esc` lo cierra                                                         |
-| Móvil                 | Toca el borde izquierdo o derecho para pasar página; en scroll, desliza |
-| Repaso                | `Espacio` o `Enter` revela la tarjeta; `1`–`4` la puntúan; `Z` deshace  |
+La tabla completa de atajos de teclado y gestos está en la referencia:
+[Atajos y gestos](../referencia/keyboard-shortcuts.md).
 
 ## Siguiente paso
 
 - [Pregúntale al libro](ask-the-book.md).
 - [Convierte lo leído en repaso](turn-reading-into-review.md).
 
----
-
-_Actualizado el 15 de noviembre de 2026._

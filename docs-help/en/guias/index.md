@@ -1,3 +1,7 @@
+---
+updated: 2026-11-15
+---
+
 # Guides
 
 Each guide solves **one task** and ends where the next one starts. If this is your first time,
@@ -27,6 +31,3 @@ begin with [Your first day](../tutoriales/first-day.md).
 
 - [Connect an AI agent to your library](connect-an-agent.md)
 
----
-
-_Updated on 15 November 2026._

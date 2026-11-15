@@ -226,3 +226,13 @@
   text-align: center;
   margin-top: .5em;
 }
+
+/* Footer generado por hooks.py: fecha de actualización + feedback con contexto. */
+.md-typeset .ayuda-footer {
+  margin-top: 2.2em;
+  padding-top: 1em;
+  border-top: 1px solid var(--br-line);
+  font-size: .78rem;
+  color: var(--br-soft);
+}
+.md-typeset .ayuda-footer a { color: var(--br-accent); }

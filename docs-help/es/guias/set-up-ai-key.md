@@ -1,7 +1,16 @@
+---
+updated: 2026-11-15
+---
+
 # Configura el agente
 
 El agente es lo que convierte el lector en algo que responde. Tienes dos caminos y puedes cambiar
 de uno a otro cuando quieras: **la demo gratuita** o **tu propia clave**.
+
+<figure markdown>
+  ![Ajustes → Agente: el botón de la demo, el proveedor y la API key](../assets/capturas/07-ajustes-agente.webp)
+  <figcaption>Todo lo del agente vive en Ajustes → Agente: demo, proveedor y clave.</figcaption>
+</figure>
 
 ## Camino 1: la demo (cero configuración)
 
@@ -63,6 +72,3 @@ BookReader no cobra por el agente.
 - [Cómo responde el agente](../explicacion/how-the-agent-works.md), si quieres saber qué hace con
   lo que le mandas.
 
----
-
-_Actualizado el 15 de noviembre de 2026._

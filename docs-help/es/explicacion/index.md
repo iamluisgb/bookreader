@@ -1,3 +1,7 @@
+---
+updated: 2026-11-15
+---
+
 # Explicación
 
 Aquí está el porqué, no el cómo. Son páginas para entender qué hace BookReader con tus libros y
@@ -8,6 +12,3 @@ tus preguntas, y para saber qué esperar del agente.
 
 Si lo que buscas es hacer algo, empieza por las [guías](../guias/index.md).
 
----
-
-_Actualizado el 15 de noviembre de 2026._

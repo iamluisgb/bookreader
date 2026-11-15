@@ -1,3 +1,7 @@
+---
+updated: 2026-11-15
+---
+
 # ¿En qué te ayudamos?
 
 BookReader es un lector de **EPUB y PDF** con un agente que responde con citas del libro y un
@@ -92,7 +96,3 @@ Si prefieres el mapa completo:
 - **[Explicación](explicacion/index.md)**: el porqué, sin pasos.
 - **[Referencia](referencia/index.md)**: formatos, límites y datos que se consultan.
 
----
-
-_Actualizado el 15 de noviembre de 2026. Si algo no coincide con la app, escríbeme: la ayuda se
-corrige con lo que se atasca de verdad._

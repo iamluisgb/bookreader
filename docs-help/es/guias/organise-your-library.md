@@ -1,3 +1,7 @@
+---
+updated: 2026-11-15
+---
+
 # Ordena tu biblioteca
 
 La biblioteca es la pantalla de inicio: estanterías a la izquierda, libros a la derecha. Con pocos
@@ -55,6 +59,3 @@ año, por libro o por estantería, y ver:
 - [Lee sin conexión](read-offline.md).
 - [Sincroniza y guarda una copia](sync-and-backup.md).
 
----
-
-_Actualizado el 15 de noviembre de 2026._

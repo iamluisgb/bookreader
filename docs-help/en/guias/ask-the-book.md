@@ -1,3 +1,7 @@
+---
+updated: 2026-11-15
+---
+
 # Ask the book
 
 The agent answers **with the book in front of it**: it finds the passage that matters, shows it to
@@ -76,6 +80,3 @@ stuck. It only asks forwards and once per chapter.
 - [Turn reading into review](turn-reading-into-review.md).
 - [How the agent answers](../explicacion/how-the-agent-works.md), with its limits.
 
----
-
-_Updated on 15 November 2026._

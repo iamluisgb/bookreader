@@ -38,6 +38,7 @@ import { prefetchVendor } from './vendor-loader.js';
 import { loadAgentCss } from './css-loader.js';
 import { restoreSheetSnap, sheetReservedPx } from './ai/sheet-height.js';
 import { repairGatewayConfig } from './ai/gateway-repair.js';
+import { helpUrl, helpAttrs } from './ui/help-link.js';
 import { repairOrphanDecks } from './ai/deck-repair.js';
 
 // ============ CARGA PEREZOSA ============
@@ -1998,7 +1999,9 @@ async function loadPdfTOC() {
   const tocList = document.getElementById('toc-list');
   const items = await PdfReader.getOutlineItems();
   if (!items.length) {
-    tocList.innerHTML = `<p class="empty-state">${t('Este PDF no tiene índice')}</p>`;
+    // El PDF sin marcadores es el atasco nº 1 de los PDF impresos: el aviso
+    // enlaza a la página de referencia que lo explica (P30 · descubrimiento).
+    tocList.innerHTML = `<p class="empty-state">${t('Este PDF no tiene índice')}<br><a class="empty-help" href="${helpUrl('referencia/formats-and-limits/')}" ${helpAttrs}>${t('Por qué (ayuda)')}</a></p>`;
     return;
   }
   tocList.innerHTML = '';

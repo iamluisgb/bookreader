@@ -1,3 +1,7 @@
+---
+updated: 2026-11-15
+---
+
 # Tu primer día
 
 Veinte minutos, de cero a tu primera tarjeta. No hace falta configurar nada antes de empezar: el
@@ -68,6 +72,3 @@ La tarjeta volverá cuando toque, no cuando te acuerdes.
 - [Ordena tu biblioteca](../guias/organise-your-library.md).
 - [Lee sin conexión](../guias/read-offline.md).
 
----
-
-_Actualizado el 15 de noviembre de 2026._

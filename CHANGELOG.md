@@ -3,6 +3,30 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-11-15 — La ayuda se acerca al atasco: enlaces contextuales, referencia completa y footer vivo
+
+- **El caso**: «Ayuda completa» abría siempre la portada — quien tenía un PDF sin índice o la demo
+  agotada tenía que buscar de nuevo lo que la app ya sabía. Y la referencia tenía una sola página:
+  los atajos vivían escondidos al final de una guía y los topes de sync (50/100 MB) esparcidos.
+- **Enlaces contextuales** (P30): el PDF sin índice enlaza a Formatos y límites; los errores de
+  key/cupo del agente llevan «Cómo se configura» a la guía; Ajustes → Agente y → Datos tienen
+  enlace a su página; y la guía rápida acaba cada grupo con «Más en la ayuda»
+  ([`ui/help-link.js`](app/js/ui/help-link.js), un solo sitio sabe el prefijo por lengua).
+- **Guarda del inventario F5**: `help:build` verifica los paths de la guía rápida contra los
+  sitemaps EN/ES — un renombre de página rompe el build, no la ayuda de un lector.
+- **Referencia completa**: [Atajos y gestos](docs-help/es/referencia/keyboard-shortcuts.md) (sale
+  de Lee un libro) y [Sync y almacenamiento](docs-help/es/referencia/sync-and-storage.md) (dónde
+  vive cada cosa, qué sube el sync, topes). 13 → 15 artículos por lengua.
+- **Footer generado**: cada página lleva `updated:` en frontmatter y
+  [`hooks.py`](docs-help/hooks.py) pinta el pie con la fecha localizada y un «¿te sirvió?» por
+  email que lleva título y URL — adiós a la fecha a mano que envejecía mal.
+- **Captura nueva**: Ajustes → Agente real en EN y ES (07) en la guía de configuración, misma
+  receta que las seis anteriores (app real, claro, 2×).
+- **/ayuda/**: `_redirects` generado por build-pages manda `/ayuda/*` a `/es/ayuda/*` — era 404
+  para quien la escriba en castellano.
+- **Verificado**: build `strict`, guarda de enlaces ok, 36 tests de Playwright en verde (los 2
+  fallos de model-picker son previos al cambio), lint sin avisos nuevos.
+
 ## 2026-11-15 — La ayuda publicada: /help y /es/ayuda, por tareas y en dos lenguas
 
 - **El caso**: la landing y la app explican features, pero no había documentación. Un PDF sin
@@ -36,17 +60,17 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ## 2026-11-15 — El índice dice la verdad: página de cada ancla, marca por sección y todos los niveles
 
-- **El caso**: «no funciona correctamente el índice en modo scroll», leyendo *Site Reliability
-  Engineering* (EPUB, 1317 locations) en un iPad. En la captura, siete subsecciones con el mismo
+- **El caso**: «no funciona correctamente el índice en modo scroll», leyendo _Site Reliability
+  Engineering_ (EPUB, 1317 locations) en un iPad. En la captura, siete subsecciones con el mismo
   número. Reproducido en Chromium con viewport de iPad y modo scroll real, con el mismo fichero.
 - **Diagnóstico medido** (tres defectos; el salto del índice NO estaba roto):
   1. Números: `getTocPages` pedía `getElementById` a lo que devuelve `section.load()`, que en el
      epub.js vendorizado es el `documentElement` y no el `Document`. El `catch` lo tragaba y todas
-     las entradas de un fichero caían a su inicio: *Hiring / Training / Career Management* decían
+     las entradas de un fichero caían a su inicio: _Hiring / Training / Career Management_ decían
      241/241/241. Solo se salvaba el capítulo en pantalla (su `section.document` ya existía).
   2. Niveles: `loadTOC` y `loadPdfTOC` bajaban un nivel de `subitems`: 221 enlaces de 693 entradas.
   3. Marca: `getCurrentTocHref` devolvía la primera entrada del fichero, y en scroll solo se
-     refrescaba al cambiar de fichero. Leyendo *Career Management* (312) marcaba el capítulo.
+     refrescaba al cambiar de fichero. Leyendo _Career Management_ (312) marcaba el capítulo.
 - **Arreglo** (ADR-062): `resolveToc` (antes `getTocPages`) toma el `Document` de
   `section.document` y guarda el **CFI** de cada entrada además de la página; la marca es la
   última entrada que empezó sin pasar de la posición, se recalcula en cada `relocated` y cubre la
@@ -54,8 +78,8 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
   nivel con `.subitem--deep` y `aria-level`); la burbuja de arrastre del PDF también baja a
   cualquier nivel. El pie dice ahora la sección.
 - **Antes → después**, mismo libro y misma sonda: enlaces pintados **221 → 693** (= nodos de
-  `nav.toc`); *Hiring / Training / Career Management* **241/241/241 → 243/265/312** (y *Conclusion*
-  326), cada uno igual a la location real al saltar; la marca leyendo *Career Management* **«5. SRE
+  `nav.toc`); _Hiring / Training / Career Management_ **241/241/241 → 243/265/312** (y _Conclusion_
+  326), cada uno igual a la location real al saltar; la marca leyendo _Career Management_ **«5. SRE
   Hiring…» → «Career Management»**, y desplazando el capítulo 5 entero de 700 en 700 px la marca
   recorre sus 14 secciones sin ir nunca por delante de la lectura (0 de 47 pasos). Coste:
   `resolveToc` 173-201 ms una vez por apertura; la marca, 0,15 ms (usa `rendition.location`;
@@ -107,7 +131,7 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 
 ## 2026-11-03 — Studio: la muestra de libro entero cubre todo el libro
 
-- **El caso**: la infografía de *Protocols* salió entera de dos capítulos (Luz y Enfoque): 7 ideas
+- **El caso**: la infografía de _Protocols_ salió entera de dos capítulos (Luz y Enfoque): 7 ideas
   con anclas a1607–a1826, ninguna de Sueño, Ejercicio, Estrés, Nutrición ni Crecimiento personal.
 - **Causas** (reproducidas con el texto real del libro por MCP):
   1. `panel.js` tomaba como capítulos solo el **primer nivel** del TOC del EPUB, y `segment.js` abre
@@ -123,7 +147,7 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
   `summary.js` (bisección dentro de cada capítulo) y fuera Notes/Index (`isSearchNoise`, IA11);
   `mapChunkTokens()` y `groupCandidates()` en `infographic.js`, con regla de reparto en el prompt.
   Afecta a la infografía, al resumen de libro entero y al skim transversal del agente.
-- **Medido** en *Protocols*: antes, 12 «capítulos» y el arranque de cada uno; ahora, 58 de 58
+- **Medido** en _Protocols_: antes, 12 «capítulos» y el arranque de cada uno; ahora, 58 de 58
   capítulos de cuerpo, repartidos de punta a punta, en 3 trozos.
 - **Tests**: `tests/book-scope-coverage.spec.ts` (5). Suite completa: los rojos son los de sync (el
   puerto alternativo del lab), y `css-vars`, `model-picker` y `selection-geometry`, que fallan igual
@@ -140,8 +164,8 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 ## 2026-11-03 — IA11: el índice analítico y las notas ya no tapan al cuerpo en la búsqueda
 
 - **El caso**: `search.txt` lleva todo el texto del libro, y el índice analítico, las notas o la
-  tabla de contenidos repiten los términos en líneas cortas, que BM25 premia. En *Protocols*,
-  «melatonin», «NSDR» y «resistance training» devolvían los 5 resultados del `Index`; en *SRE 2nd*,
+  tabla de contenidos repiten los términos en líneas cortas, que BM25 premia. En _Protocols_,
+  «melatonin», «NSDR» y «resistance training» devolvían los 5 resultados del `Index`; en _SRE 2nd_,
   «SLO» también.
 - **El arreglo** (`baa3211`): `isSearchNoise(title)` en `app/js/sync/library-index-build.js` (título
   **exacto** plegado: Index, Notes, Glossary, Bibliografía, Contents…; `Preface` o `Appendix` no).
@@ -160,7 +184,7 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
   copia limpia de HEAD: el bundle del Worker arrastra `app/js/i18n.js` y `ai/widgets/matrix.js`, que
   tenían cambios sin commitear) y Pages `55e97ac` (`bookreader-v231`).
 - **Fuera**: la materia **delantera sin título** (capítulo 0 sin nombre, «CRONOLOGÍA») sigue
-  puntuando; sale en *Los últimos días de los incas* y no rompe ningún caso de la batería.
+  puntuando; sale en _Los últimos días de los incas_ y no rompe ningún caso de la batería.
 
 ## 2026-11-01 (4) — Landing: la auditoría de marketing, aplicada
 
@@ -346,13 +370,13 @@ podía contestar repitiéndola.
   (desplegada) contra v2 con la caja vacía y con cada botón. Generador `deepseek-v4-flash`, juez
   `glm5.3-flash`. Run `2026-10-26b`:
 
-  | | cita literal | frases nuevas | errores | palabras |
-  |---|---|---|---|---|
-  | v1 | 0 % | 46 % | 0 | 92 |
-  | v2 (caja vacía) | 100 % | 86 % | 0 | 98 |
-  | v2 · ejemplo | 90 % | 88 % | 1 | 96 |
-  | v2 · descarta | 100 % | 81 % | 0 | 84 |
-  | v2 · importa | 100 % | 91 % | 0 | 89 |
+  |                 | cita literal | frases nuevas | errores | palabras |
+  | --------------- | ------------ | ------------- | ------- | -------- |
+  | v1              | 0 %          | 46 %          | 0       | 92       |
+  | v2 (caja vacía) | 100 %        | 86 %          | 0       | 98       |
+  | v2 · ejemplo    | 90 %         | 88 %          | 1       | 96       |
+  | v2 · descarta   | 100 %        | 81 %          | 0       | 84       |
+  | v2 · importa    | 100 %        | 91 %          | 0       | 89       |
 
   El tope de 80 palabras no se cumple (con listas y código salen ~90). El juez no devolvió dato
   en 5 de 50 respuestas, que no cuentan. El único error: marcar «(fuera del libro)» algo que el
@@ -443,12 +467,14 @@ los libros de O'Reilly las remisiones («see Chapter 3», «Figure 2-1») y las 
 - **Volver**: tras un salto interno sale un aviso «Volver a la pág. N».
 - En táctil, tocar un enlace lo sigue y no alterna las barras.
 - Tests: `tests/pdf-links.spec.ts` con `tests/test-links.pdf`.
+
 ## 2026-10-22 — El alta por MCP crea la ficha del libro (`books/<id>.json`)
 
 La subida por MCP dejaba el libro en la biblioteca pero sin el fichero que el motor de sync usa
 para materializarlo ([[engine.js]] `books/<id>.json`): el libro aparecía en la lista y no abría.
 Ahora el alta crea esa ficha vacía en los dos caminos —el PUT y el libro cuyo fichero ya estaba en
 el sync— y no la toca si ya existe por tener anotaciones de otro dispositivo.
+
 - Se detectó comparando entradas: todos los libros de la biblioteca tenían `error` vacío salvo los
   subidos por MCP, que decían «falta bookreader/books/<id>.json».
 - Test nuevo: la ficha existe tras la subida, se descifra y lleva id, título, autor y formato.
@@ -461,6 +487,7 @@ Con el permiso nuevo «Subir libros», un agente (Claude Code, opencode, pi) añ
 del disco a la biblioteca en dos pasos: `create_book_upload` declara nombre, tamaño y SHA-256 y
 devuelve una URL de un solo uso; el agente sube el fichero con un PUT (`curl -T`). Los bytes no
 pasan por el modelo.
+
 - El Worker comprueba tamaño, formato, DRM y hash, cifra con la clave del sync y guarda el
   fichero donde lo guarda la app. El libro aparece en los dispositivos como uno subido desde
   otro equipo y se descarga al abrirlo.
@@ -474,6 +501,7 @@ pasan por el modelo.
 ## 2026-10-20 — Planes y precios en la app: Drive gratis, prueba de Pro de 60 días y licencias de Plus (MON5)
 
 Primera parte de [ADR-060](DECISIONS.md), la que no depende de Polar:
+
 - **El sync por Drive sube y baja los libros sin Pro.** Se quitan el paywall de la casilla de
   ficheros y el de descargar un libro. Pro ya no anuncia «tu biblioteca en todos tus
   dispositivos».
@@ -497,6 +525,7 @@ varias formulaciones a la vez y se puede limitar a una estantería.
 Para eso, la app prepara en segundo plano el texto de **todos** los libros, no solo de los
 abiertos. Lo hace de uno en uno, en reposo y nunca con el lector abierto. Después construye un
 índice de la biblioteca, cifrado como el resto del sync (ADR-059):
+
 - 64 particiones por término, con deltas por libro y compactación en el dispositivo;
 - raíces EN/ES, así que «ontologies» encuentra «ontology»;
 - un almacén de pasajes en bloques que el Worker lee por rango.
@@ -505,6 +534,7 @@ Ajustes → Datos → Agentes cuenta cuántos libros tienen texto y cuántos est
 dice por qué faltan los demás. Borrar un libro quita su texto y su índice del servidor.
 
 **Baseline medido antes de empezar** (F0, run `ia10-baseline-2026-10-20`, 20 preguntas reales):
+
 - recall de libros @5 del 65–70 %;
 - 55 llamadas y unos 40 s por pregunta;
 - errores 1102 del Worker al buscar libro a libro en paralelo.
@@ -962,7 +992,8 @@ Icono nuevo `image`. Tests en [diagram-notebook.spec.ts](tests/diagram-notebook.
 ## 2026-10-04 — Diagramas a la libreta
 
 «A la libreta» resumía la respuesta con la IA y un diagrama resumido se perdía. Ahora los bloques
-```mermaid de la respuesta se guardan **íntegros** como nota aparte (con la pregunta como título y
+
+````mermaid de la respuesta se guardan **íntegros** como nota aparte (con la pregunta como título y
 sus citas), y el extractor tiene orden de no copiarlos. Cada diagrama del chat lleva además su
 propio **«A la libreta»**. En la libreta se vuelve a dibujar, y al exportar a Markdown viaja como
 bloque `mermaid` intacto (la resolución de citas ya no toca los bloques de código). Tests:
@@ -2128,9 +2159,11 @@ dictado del navegador, que funciona siempre.
 
 Y el `prompt` sigue siendo lo que justifica todo esto. Misma grabación, contra el gateway:
 
-```
+````
+
 sin prompt: "Las matrices de bajo rago se multiplican en el KVKH."
 con prompt: "Las matrices de bajo rango se multiplican en el KV cache."
+
 ```
 
 ## 2026-09-14 — Pasar página en una revista: de 376 ms a 13
@@ -3827,10 +3860,12 @@ español y el libro en inglés, `"Tokenización de texto"` tokeniza a `tokenizac
 aparecen en ninguna parte. Reproducido sobre pasajes reales en inglés:
 
 ```
-✗  0 resultados  "Tokenización de texto"      ← el chip que ofrecía la app
-✓  3 resultados  "Embeddings de token"
-✗  0 resultados  "Auto-atención multi-cabeza"
-✓  1 resultados  "text tokenization"          ← lo mismo, en el idioma del libro
+
+✗ 0 resultados "Tokenización de texto" ← el chip que ofrecía la app
+✓ 3 resultados "Embeddings de token"
+✗ 0 resultados "Auto-atención multi-cabeza"
+✓ 1 resultados "text tokenization" ← lo mismo, en el idioma del libro
+
 ```
 
 Eso explica lo más desconcertante del fallo: **unos chips funcionaban y otros no**. Sobrevivían los
@@ -7191,3 +7226,4 @@ BYOK + selector de modelo (nan) · contexto-completo + anclas-CFI (sin RAG) · I
   CSS `.textLayer` transparente. *(Highlights persistentes en PDF siguen pendientes → BACKLOG.)*
 - **BAJO — Reabrir el mismo EPUB:** `fileInput.value = ''` tras cargar
   ([`js/app.js`](js/app.js)).
+```

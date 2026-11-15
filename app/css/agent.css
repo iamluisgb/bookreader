@@ -236,6 +236,7 @@ body.ai-open .reader-main { margin-right: var(--ai-panel-width); }
 .ai-cite:hover { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
 .ai-typing { color: var(--text-faint); font-style: italic; }
 .ai-error { color: var(--danger); }
+.ai-error-help { color: var(--accent); margin-left: 6px; }
 
 .ai-composer {
   display: flex;

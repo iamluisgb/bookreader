@@ -1,3 +1,7 @@
+---
+updated: 2026-11-15
+---
+
 # Lee sin conexión
 
 BookReader es una **PWA**: se instala como una app y funciona sin conexión con lo que ya tienes
@@ -47,6 +51,3 @@ a mano.
 - [Sincroniza y guarda una copia](sync-and-backup.md).
 - [Qué pasa con tus datos](../explicacion/your-data.md).
 
----
-
-_Actualizado el 15 de noviembre de 2026._

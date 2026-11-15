@@ -1,7 +1,16 @@
+---
+updated: 2026-11-15
+---
+
 # Set up the agent
 
 The agent is what turns the reader into something that answers. You have two paths and you can
 switch whenever you like: **the free demo** or **your own key**.
+
+<figure markdown>
+  ![Settings → Agent: the demo button, provider and API key](../assets/capturas/07-agent-settings.webp)
+  <figcaption>Everything about the agent lives in Settings → Agent: demo, provider, key.</figcaption>
+</figure>
 
 ## Path 1: the demo (zero setup)
 
@@ -63,6 +72,3 @@ use. BookReader does not charge for the agent.
 - [How the agent answers](../explicacion/how-the-agent-works.md), if you want to know what it does
   with what you send it.
 
----
-
-_Updated on 15 November 2026._

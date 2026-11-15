@@ -1,3 +1,7 @@
+---
+updated: 2026-11-15
+---
+
 # Sube un libro
 
 BookReader lee **EPUB y PDF sin DRM**. No hay cuenta ni servidor de libros: el fichero se queda en
@@ -53,6 +57,3 @@ El libro aparece en la biblioteca con su portada (si el fichero la trae) y su ta
 - [Configura el agente](set-up-ai-key.md) para preguntarle al libro.
 - [Lee un libro](read-a-book.md) para dejarlo a tu gusto.
 
----
-
-_Actualizado el 15 de noviembre de 2026._

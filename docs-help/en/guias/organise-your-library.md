@@ -1,3 +1,7 @@
+---
+updated: 2026-11-15
+---
+
 # Organise your library
 
 The library is the home screen: shelves on the left, books on the right. With a few books it hardly
@@ -54,6 +58,3 @@ by shelf, and see:
 - [Read offline](read-offline.md).
 - [Sync and back up](sync-and-backup.md).
 
----
-
-_Updated on 15 November 2026._

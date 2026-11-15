@@ -1,3 +1,7 @@
+---
+updated: 2026-11-15
+---
+
 # What happens to your data
 
 BookReader's promise is short: **your books stay on your device** and the AI only gets what it needs
@@ -74,6 +78,3 @@ you are reading.
 - [How the agent answers](how-the-agent-works.md).
 - [Sync and back up](../guias/sync-and-backup.md).
 
----
-
-_Updated on 15 November 2026._

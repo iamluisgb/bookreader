@@ -1,3 +1,7 @@
+---
+updated: 2026-11-15
+---
+
 # Read a book
 
 BookReader is a reader before anything else. This is what you have while reading and how to make it
@@ -70,21 +74,11 @@ time, not pages. The figure uses your real pace, so it ignores skimming.
 
 ## Shortcuts and gestures
 
-| Where                | What                                                              |
-| -------------------- | ----------------------------------------------------------------- |
-| Reading              | `←` / `→` previous and next page                                  |
-| Reading              | `[` opens or closes contents and highlights                       |
-| Reading              | `]` opens or closes the agent                                     |
-| Anywhere             | `?` opens the app's quick guide                                   |
-| In a dialog or panel | `Esc` closes it                                                   |
-| Phone                | Tap the left or right edge to turn the page; in scroll, swipe     |
-| Review               | `Space` or `Enter` reveals the card; `1`–`4` grade it; `Z` undoes |
+The full table of keyboard shortcuts and gestures lives in the reference:
+[Keyboard shortcuts and gestures](../referencia/keyboard-shortcuts.md).
 
 ## Next step
 
 - [Ask the book](ask-the-book.md).
 - [Turn reading into review](turn-reading-into-review.md).
 
----
-
-_Updated on 15 November 2026._

@@ -120,11 +120,40 @@ async function main() {
 
   await updateSitemap();
 
+  // Guarda del inventario F5: la guía rápida de la app (feature-guide.js) enlaza a
+  // páginas concretas de la ayuda. Si una página cambia de sitio o desaparece, el
+  // build rompe aquí — no en la pantalla de un lector.
+  await checkGuideLinks();
+
   await rm(siteEn, { recursive: true, force: true });
   await rm(siteEs, { recursive: true, force: true });
 
   console.log(`\n✔ Ayuda construida: ${outEn} y ${outEs}`);
   console.log('  Para publicarla: `npm run deploy:pages` (help ya está en la lista blanca).');
+}
+
+async function checkGuideLinks() {
+  const src = await readFile(join(root, 'app', 'js', 'ui', 'feature-guide.js'), 'utf8');
+  const paths = [...src.matchAll(/help: '([^']+)'/g)].map((m) => m[1]);
+  if (paths.length < 3) {
+    console.error(
+      '\n✖ La guía rápida ha perdido enlaces a la ayuda (esperaba 3 grupos, hay ' +
+        paths.length +
+        ').',
+    );
+    process.exit(1);
+  }
+  const en = new Set(await urlsFrom(join(siteEn, 'sitemap.xml'), EN_BASE));
+  const es = new Set(await urlsFrom(join(siteEs, 'sitemap.xml'), ES_BASE));
+  const missing = paths.filter((p) => !en.has(p) || !es.has(p));
+  if (missing.length) {
+    console.error(
+      `\n✖ La guía rápida enlaza páginas de ayuda que no existen: ${missing.join(', ')}`,
+    );
+    console.error('  Revisa los `help:` de app/js/ui/feature-guide.js contra docs-help/.');
+    process.exit(1);
+  }
+  console.log(`\n✔ Guía rápida: ${paths.length} enlaces a la ayuda verificados en EN y ES`);
 }
 
 main().catch((e) => {

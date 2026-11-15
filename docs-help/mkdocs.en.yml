@@ -95,4 +95,6 @@ nav:
   - Reference:
       - referencia/index.md
       - Formats and limits: referencia/formats-and-limits.md
+      - Keyboard shortcuts and gestures: referencia/keyboard-shortcuts.md
+      - Sync and storage: referencia/sync-and-storage.md
   - Open BookReader: https://bookreader.raiatech.com/app/

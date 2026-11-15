@@ -15,10 +15,16 @@
 import { t } from '../i18n.js';
 import { icon } from './icons.js';
 import { track } from './usage-log.js';
+import { helpUrl, helpAttrs } from './help-link.js';
 
+// Cada grupo acaba con «Más en la ayuda →» hacia la página que desarrolla ese
+// momento de uso. Paths SIN prefijo de lengua: helpUrl() los resuelve. Los
+// valida scripts/build-help.mjs contra los sitemaps: un renombre de página
+// rompe el build, no la ayuda.
 const GROUPS = [
   {
     id: 'reading',
+    help: 'guias/read-a-book/',
     title: () => t('Mientras lees'),
     items: [
       'Modo inmersivo, a páginas o scroll continuo',
@@ -30,6 +36,7 @@ const GROUPS = [
   },
   {
     id: 'selection',
+    help: 'guias/ask-the-book/',
     title: () => t('Con un texto seleccionado'),
     items: [
       'Preguntar al agente sobre el fragmento, o empezar a escribir',
@@ -41,6 +48,7 @@ const GROUPS = [
   },
   {
     id: 'agent',
+    help: 'guias/set-up-ai-key/',
     title: () => t('Con el agente'),
     items: [
       'Objetivo de lectura y plantillas de libreta por conversación',
@@ -81,7 +89,10 @@ function fill() {
     <section class="fguide-group">
       <h3>${g.title()}</h3>
       <ul>${g.items.map((item) => `<li>${t(item)}</li>`).join('')}</ul>
+      <a class="fguide-more" href="${helpUrl(g.help)}" ${helpAttrs} data-help-group="${g.id}">${t('Más en la ayuda')} ${icon('arrow-up-right', { size: 'sm' })}</a>
     </section>`).join('');
+  body.querySelectorAll('.fguide-more').forEach((a) =>
+    a.addEventListener('click', () => track('guide:help', a.dataset.helpGroup)));
 }
 
 export function open() {

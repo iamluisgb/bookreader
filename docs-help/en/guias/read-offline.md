@@ -1,3 +1,7 @@
+---
+updated: 2026-11-15
+---
+
 # Read offline
 
 BookReader is a **PWA**: it installs like an app and works offline with what you already have
@@ -47,6 +51,3 @@ book menu, **Download**. Books over 50 MB are not synced automatically: you requ
 - [Sync and back up](sync-and-backup.md).
 - [What happens to your data](../explicacion/your-data.md).
 
----
-
-_Updated on 15 November 2026._

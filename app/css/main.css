@@ -1567,6 +1567,18 @@ textarea.is-recording { display: none; }
   content: ""; position: absolute; left: 2px; top: 8px;
   width: 5px; height: 5px; border-radius: 50%; background: var(--accent);
 }
+.fguide-more {
+  display: inline-flex; align-items: center; gap: 5px;
+  margin-top: 10px; font-size: var(--fs-sm); color: var(--accent);
+  text-decoration: none;
+}
+.fguide-more:hover { text-decoration: underline; }
+.fguide-more .icon { flex: none; }
+.empty-help { color: var(--accent); font-size: var(--fs-sm); }
+.appset-help-link { margin: 10px 0 0; font-size: var(--fs-md); }
+.appset-help-link a { color: var(--accent); text-decoration: none; }
+.appset-help-link a:hover { text-decoration: underline; }
+.appset-help-link .icon { vertical-align: -2px; margin-right: 3px; }
 .appset-nav-guide { margin-top: 10px; border-top: 1px solid var(--border-soft); padding-top: 12px !important; }
 
 /* ==== MAZOS (gestor de mazos, hermano de Análisis) ====

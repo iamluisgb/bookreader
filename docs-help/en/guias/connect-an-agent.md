@@ -1,3 +1,7 @@
+---
+updated: 2026-11-15
+---
+
 # Connect an AI agent to your library
 
 BookReader can let an AI agent —Claude Code, Claude Desktop, Hermes or another **MCP** client—
@@ -55,6 +59,3 @@ agent: if one leaks, revoke that one and the rest keep working.
 - [How the agent answers](../explicacion/how-the-agent-works.md).
 - [What happens to your data](../explicacion/your-data.md).
 
----
-
-_Updated on 15 November 2026._

@@ -1,3 +1,7 @@
+---
+updated: 2026-11-15
+---
+
 # Formatos y límites
 
 ## Lo que abre
@@ -52,6 +56,3 @@ puede importar.
 - [Lee un libro](../guias/read-a-book.md).
 - [Cómo responde el agente](../explicacion/how-the-agent-works.md).
 
----
-
-_Actualizado el 15 de noviembre de 2026._

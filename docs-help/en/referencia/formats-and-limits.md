@@ -1,3 +1,7 @@
+---
+updated: 2026-11-15
+---
+
 # Formats and limits
 
 ## What it opens
@@ -51,6 +55,3 @@ can be imported.
 - [Read a book](../guias/read-a-book.md).
 - [How the agent answers](../explicacion/how-the-agent-works.md).
 
----
-
-_Updated on 15 November 2026._

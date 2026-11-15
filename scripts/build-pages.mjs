@@ -27,7 +27,23 @@ const dist = join(root, 'dist');
 // porque la CSP de la app (`script-src 'self'`) no deja cargarlo de otro origen.
 // `404.html` hace que Pages conteste 404 de verdad a las rutas inventadas (sin él servía la portada
 // con 200: soft 404 y bucle /es/es/… en español). `robots.txt` y `sitemap.xml`, para buscadores.
-const PUBLIC = ['index.html', '404.html', 'robots.txt', 'sitemap.xml', 'sw.js', 'app', 'es', 'anki', 'privacy', 'why', 'blog', 'help', 'assets', 'u', 's'];
+const PUBLIC = [
+  'index.html',
+  '404.html',
+  'robots.txt',
+  'sitemap.xml',
+  'sw.js',
+  'app',
+  'es',
+  'anki',
+  'privacy',
+  'why',
+  'blog',
+  'help',
+  'assets',
+  'u',
+  's',
+];
 
 // Rutas que NO se despliegan aunque cuelguen de PUBLIC. Siguen en el repo; lo que se
 // corta es publicarlas.
@@ -40,7 +56,14 @@ const PUBLIC = ['index.html', '404.html', 'robots.txt', 'sitemap.xml', 'sw.js', 
 // publicarla.
 // `app/js/package.json` solo existe para que Node (el MCP) cargue los módulos puros de la app como
 // módulo sin avisos: la app no lo usa.
-const EXCLUIDOS = ['app/_proto', 'app/patterns.html', 'app/shelf-proto.html', 'app/share-demo.html', 'app/infographic-proto.html', 'app/js/package.json'];
+const EXCLUIDOS = [
+  'app/_proto',
+  'app/patterns.html',
+  'app/shelf-proto.html',
+  'app/share-demo.html',
+  'app/infographic-proto.html',
+  'app/js/package.json',
+];
 
 // Cabeceras de Cloudflare Pages. Sin este fichero, Pages sirve TODO con
 // `cache-control: public, max-age=0, must-revalidate`, incluidas las libs versionadas
@@ -82,10 +105,21 @@ const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8'
 // reconstruir lo que están usando los usuarios.
 function assertPushed(head) {
   let remote;
-  try { remote = git('rev-parse', '--verify', 'origin/main'); } catch { remote = null; }
-  const pushed = remote && (() => {
-    try { git('merge-base', '--is-ancestor', head, remote); return true; } catch { return false; }
-  })();
+  try {
+    remote = git('rev-parse', '--verify', 'origin/main');
+  } catch {
+    remote = null;
+  }
+  const pushed =
+    remote &&
+    (() => {
+      try {
+        git('merge-base', '--is-ancestor', head, remote);
+        return true;
+      } catch {
+        return false;
+      }
+    })();
   if (pushed) return;
   if (process.env.DEPLOY_ALLOW_UNPUSHED === '1') {
     console.warn('⚠️  HEAD no está en origin/main. Sigo porque DEPLOY_ALLOW_UNPUSHED=1.');
@@ -93,8 +127,9 @@ function assertPushed(head) {
   }
   console.error(
     `\n✖ HEAD (${head.slice(0, 7)}) no está en origin/main.\n` +
-    '  Desplegar dejaría en producción código que no existe en el remoto.\n' +
-    '  Haz push antes, o fuerza con DEPLOY_ALLOW_UNPUSHED=1.\n');
+      '  Desplegar dejaría en producción código que no existe en el remoto.\n' +
+      '  Haz push antes, o fuerza con DEPLOY_ALLOW_UNPUSHED=1.\n',
+  );
   process.exit(1);
 }
 
@@ -113,7 +148,9 @@ let stamp = 'worktree';
 let tmp = null;
 
 if (fromWorktree) {
-  console.warn('⚠️  Build desde el ÁRBOL DE TRABAJO: incluye cambios sin commitear. Solo para previsualizar.\n');
+  console.warn(
+    '⚠️  Build desde el ÁRBOL DE TRABAJO: incluye cambios sin commitear. Solo para previsualizar.\n',
+  );
 } else {
   const head = git('rev-parse', 'HEAD');
   if (forDeploy) assertPushed(head);
@@ -133,17 +170,34 @@ const excluidosAbs = EXCLUIDOS.map((e) => join(src, e));
 for (const entry of PUBLIC) {
   await cp(join(src, entry), join(dist, entry), {
     recursive: true,
-    filter: (p) => !p.split('/').pop().startsWith('.') && !excluidosAbs.some(x => p === x || p.startsWith(x + '/')),
+    filter: (p) =>
+      !p.split('/').pop().startsWith('.') &&
+      !excluidosAbs.some((x) => p === x || p.startsWith(x + '/')),
   });
 }
 
 await writeFile(join(dist, '_headers'), HEADERS);
 
+// Redirecciones: /ayuda/ es como la escribe un hispanohablante (y así lo indexamos
+// en enlaces antiguos); el sitio ES vive en /es/ayuda/. Cloudflare Pages lee
+// _redirects del dist, así que se genera aquí junto a _headers.
+const REDIRECTS = [
+  '# Generado por scripts/build-pages.mjs, no editar a mano.',
+  '/ayuda      /es/ayuda/  301',
+  '/ayuda/*    /es/ayuda/:splat  301',
+  '',
+].join('\n');
+await writeFile(join(dist, '_redirects'), REDIRECTS);
+
 // Sello del build: responde "¿qué hay desplegado?" sin tener que adivinarlo
 // comparando ficheros contra el repo.
-await writeFile(join(dist, 'build.json'),
-  JSON.stringify({ commit: stamp, builtAt: new Date().toISOString() }, null, 2) + '\n');
+await writeFile(
+  join(dist, 'build.json'),
+  JSON.stringify({ commit: stamp, builtAt: new Date().toISOString() }, null, 2) + '\n',
+);
 
 if (tmp) await rm(tmp, { recursive: true, force: true });
 
-console.log(`dist/ listo desde ${fromWorktree ? 'el árbol de trabajo' : stamp.slice(0, 7)} con: ${PUBLIC.join(', ')}`);
+console.log(
+  `dist/ listo desde ${fromWorktree ? 'el árbol de trabajo' : stamp.slice(0, 7)} con: ${PUBLIC.join(', ')}`,
+);

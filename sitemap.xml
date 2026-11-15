@@ -158,6 +158,18 @@
     <xhtml:link rel="alternate" hreflang="x-default" href="https://bookreader.raiatech.com/help/referencia/formats-and-limits/"/>
   </url>
   <url>
+    <loc>https://bookreader.raiatech.com/help/referencia/keyboard-shortcuts/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://bookreader.raiatech.com/help/referencia/keyboard-shortcuts/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://bookreader.raiatech.com/es/ayuda/referencia/keyboard-shortcuts/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://bookreader.raiatech.com/help/referencia/keyboard-shortcuts/"/>
+  </url>
+  <url>
+    <loc>https://bookreader.raiatech.com/help/referencia/sync-and-storage/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://bookreader.raiatech.com/help/referencia/sync-and-storage/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://bookreader.raiatech.com/es/ayuda/referencia/sync-and-storage/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://bookreader.raiatech.com/help/referencia/sync-and-storage/"/>
+  </url>
+  <url>
     <loc>https://bookreader.raiatech.com/help/tutoriales/</loc>
     <xhtml:link rel="alternate" hreflang="en" href="https://bookreader.raiatech.com/help/tutoriales/"/>
     <xhtml:link rel="alternate" hreflang="es" href="https://bookreader.raiatech.com/es/ayuda/tutoriales/"/>

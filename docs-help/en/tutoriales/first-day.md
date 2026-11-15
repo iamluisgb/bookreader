@@ -1,3 +1,7 @@
+---
+updated: 2026-11-15
+---
+
 # Your first day
 
 Twenty minutes, from nothing to your first card. You do not need to configure anything before you
@@ -67,6 +71,3 @@ The card will return when it should, not when you remember to.
 - [Organise your library](../guias/organise-your-library.md).
 - [Read offline](../guias/read-offline.md).
 
----
-
-_Updated on 15 November 2026._

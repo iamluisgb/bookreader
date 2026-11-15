@@ -1,3 +1,7 @@
+---
+updated: 2026-11-15
+---
+
 # Pregúntale al libro
 
 El agente responde **con el libro delante**: busca el pasaje que toca, te lo enseña y escribe la
@@ -77,6 +81,3 @@ pregunta hacia delante y una vez por capítulo.
 - [Convierte lo leído en repaso](turn-reading-into-review.md).
 - [Cómo responde el agente](../explicacion/how-the-agent-works.md), con sus límites.
 
----
-
-_Actualizado el 15 de noviembre de 2026._

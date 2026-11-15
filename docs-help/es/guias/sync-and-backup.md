@@ -1,3 +1,7 @@
+---
+updated: 2026-11-15
+---
+
 # Sincroniza y guarda una copia
 
 Tus libros viven en este dispositivo. Para tenerlos en otro, o para no perderlos si borras el
@@ -64,7 +68,5 @@ hay, y es lo que se usa en el diagnóstico, es lo que queda en tu dispositivo y 
 
 - [Conecta un agente](connect-an-agent.md), si tienes Plus.
 - [Qué pasa con tus datos](../explicacion/your-data.md).
+- [Sync y almacenamiento](../referencia/sync-and-storage.md), si buscas un tope o un número.
 
----
-
-_Actualizado el 15 de noviembre de 2026._

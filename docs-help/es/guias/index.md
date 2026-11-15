@@ -1,3 +1,7 @@
+---
+updated: 2026-11-15
+---
+
 # Guías prácticas
 
 Cada guía resuelve **una tarea** y acaba donde empieza la siguiente. Si es tu primera vez, empieza
@@ -27,6 +31,3 @@ por [Tu primer día](../tutoriales/first-day.md).
 
 - [Conecta un agente a tu biblioteca](connect-an-agent.md)
 
----
-
-_Actualizado el 15 de noviembre de 2026._

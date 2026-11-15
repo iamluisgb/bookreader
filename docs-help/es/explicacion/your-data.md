@@ -1,3 +1,7 @@
+---
+updated: 2026-11-15
+---
+
 # Qué pasa con tus datos
 
 La promesa de BookReader es corta: **tus libros se quedan en tu dispositivo** y a la IA solo le
@@ -73,6 +77,3 @@ leyendo.
 - [Cómo responde el agente](how-the-agent-works.md).
 - [Sincroniza y guarda una copia](../guias/sync-and-backup.md).
 
----
-
-_Actualizado el 15 de noviembre de 2026._

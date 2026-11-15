@@ -1,3 +1,7 @@
+---
+updated: 2026-11-15
+---
+
 # Import a book
 
 BookReader reads **EPUB and PDF without DRM**. There is no account and no book server: the file
@@ -53,6 +57,3 @@ The book appears in the library with its cover (if the file has one) and its siz
 - [Set up the agent](set-up-ai-key.md) so you can ask the book.
 - [Read a book](read-a-book.md) to make it look the way you like.
 
----
-
-_Updated on 15 November 2026._

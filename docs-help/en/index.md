@@ -1,3 +1,7 @@
+---
+updated: 2026-11-15
+---
+
 # How can we help?
 
 BookReader is an **EPUB and PDF reader** with an agent that answers with quotes from the book and a
@@ -92,7 +96,3 @@ If you prefer the map:
 - **[Explanation](explicacion/index.md)**: the why, no steps.
 - **[Reference](referencia/index.md)**: formats, limits and lookup data.
 
----
-
-_Updated on 15 November 2026. If something does not match the app, tell me: the help is fixed with
-what actually gets people stuck._

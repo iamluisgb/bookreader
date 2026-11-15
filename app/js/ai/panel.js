@@ -18,6 +18,7 @@ import { initAiMax, setAiMax } from './maximize.js';
 import { diagramCode } from './diagram.js';
 import * as Hints from '../ui/hints.js';
 import { escapeHtml } from '../ui/escape.js';
+import { helpUrl, helpAttrs } from '../ui/help-link.js';
 import { confirmBox, promptBox } from '../ui/dialog.js';
 import * as AppSettings from '../ui/app-settings.js';
 import { renderWithCitations, setCitePageResolver, citeLabel, citePage } from './render.js';
@@ -1628,7 +1629,15 @@ página.${zonedRules}${systemExtra ? `\n\n${systemExtra}` : ''}` },
     if (convo) DB.addMessage(convo.id, 'assistant', finalText);
   } catch (e) {
     if (e.name === 'AbortError') textNode.textContent += t(' [cancelado]');
-    else { console.error(e); textNode.innerHTML = `<span class="ai-error">${escapeHtml(e.message)}</span>`; }
+    else {
+      console.error(e);
+      // Los errores de configuración del agente (key, cupo, proveedor) son los que
+      // el usuario puede arreglar él mismo: el aviso lleva a la guía que lo resuelve.
+      const fixable = [t('Falta la API key.'), t('API key inválida (401).'), t('Límite de uso alcanzado (429). Reintenta en un momento.'), t('la API key es inválida o falta.')]
+        .some((m) => e.message.startsWith(m));
+      const more = fixable ? ` <a class="ai-error-help" href="${helpUrl('guias/set-up-ai-key/')}" ${helpAttrs}>${t('Cómo se configura (ayuda)')}</a>` : '';
+      textNode.innerHTML = `<span class="ai-error">${escapeHtml(e.message)}${more}</span>`;
+    }
   } finally {
     busy = false; els.send.disabled = false; abortCtrl = null; scrollDown();
     if (!isOpen()) agentUnread = true;

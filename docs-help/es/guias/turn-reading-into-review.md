@@ -1,3 +1,7 @@
+---
+updated: 2026-11-15
+---
+
 # Convierte lo leído en repaso
 
 Leer no es recordar. BookReader convierte el libro en **tarjetas** que vuelven cuando estás a punto
@@ -66,6 +70,3 @@ apuntando al libro.
 - [Ordena tu biblioteca](organise-your-library.md).
 - [Sincroniza y guarda una copia](sync-and-backup.md), para no perder el progreso.
 
----
-
-_Actualizado el 15 de noviembre de 2026._

@@ -34,6 +34,7 @@ import { escapeHtml } from './escape.js';
 import { confirmBox, formBox } from './dialog.js';
 import { ago } from './when.js';
 import { t, getLang, setLang } from '../i18n.js';
+import { helpUrl, helpAttrs } from './help-link.js';
 import * as Settings from '../settings.js';
 import { loadAgentCss } from '../css-loader.js';
 
@@ -73,7 +74,7 @@ function ensureOverlay() {
         <nav class="appset-nav">
           ${SECTIONS.map(s => `<button class="appset-nav-item" data-section="${s.id}">${icon(s.ico, { size: 'md' })}<span>${s.label()}</span></button>`).join('')}
           <button class="appset-nav-item appset-nav-guide" data-guide>${icon('help', { size: 'md' })}<span>${t('Guía rápida')}</span></button>
-          <a class="appset-nav-item appset-nav-ext" href="${getLang() === 'es' ? '/es/ayuda/' : '/help/'}" target="_blank" rel="noopener">${icon('book', { size: 'md' })}<span>${t('Ayuda completa')}</span></a>
+          <a class="appset-nav-item appset-nav-ext" href="${helpUrl()}" ${helpAttrs}>${icon('book', { size: 'md' })}<span>${t('Ayuda completa')}</span></a>
         </nav>
         <div class="appset-content"></div>
       </div>
@@ -385,6 +386,7 @@ function agentSimpleHtml() {
     <button id="appset-save" class="btn btn--primary primary-btn appset-save">${t('Guardar')}</button>
     <p class="appset-saved" id="appset-saved" hidden>${icon('check', { size: 'sm' })} ${t('Guardado')}</p>
     <p class="appset-privacy">${icon('shield', { size: 'sm' })} ${t('Tu API key se guarda solo en este navegador. Para responder, el contenido del libro se envía al proveedor que configures.')}</p>
+    <p class="appset-help-link">${icon('book', { size: 'sm' })} <a href="${helpUrl('guias/set-up-ai-key/')}" ${helpAttrs}>${t('Ayuda: configura el agente')}</a></p>
     <button type="button" id="appset-agent-advanced" class="appset-viewlink">${t('Opciones avanzadas')} ${icon('chevron-down', { size: 'sm' })}</button>
   </div>`;
 }
@@ -448,6 +450,7 @@ function agentHtml() {
     <button id="appset-save" class="btn btn--primary primary-btn appset-save">${t('Guardar')}</button>
     <p class="appset-saved" id="appset-saved" hidden>${icon('check', { size: 'sm' })} ${t('Guardado')}</p>
     <p class="appset-privacy">${icon('shield', { size: 'sm' })} ${t('Tu API key se guarda solo en este navegador. Para responder, el contenido del libro se envía al proveedor que configures.')}</p>
+    <p class="appset-help-link">${icon('book', { size: 'sm' })} <a href="${helpUrl('guias/set-up-ai-key/')}" ${helpAttrs}>${t('Ayuda: configura el agente')}</a></p>
   </div>`;
 }
 
@@ -1237,6 +1240,7 @@ function dataHtml() {
     <button id="appset-sync-now" class="btn btn--primary primary-btn appset-save">${icon('cloud', { size: 'md' })} ${t('Sincronizar ahora')}</button>
     <button id="appset-sync-copy" class="appset-tpl-cancel appset-data-md">${icon('copy', { size: 'md' })} ${t('Copiar diagnóstico de sync')}</button>
     <p class="appset-data-msg" id="appset-data-msg" hidden></p>
+    <p class="appset-help-link">${icon('book', { size: 'sm' })} <a href="${helpUrl('guias/sync-and-backup/')}" ${helpAttrs}>${t('Ayuda: sync y copias')}</a></p>
   </div>`;
 }
 

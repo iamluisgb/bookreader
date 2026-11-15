@@ -1,3 +1,7 @@
+---
+updated: 2026-11-15
+---
+
 # How the agent answers
 
 The agent does not "read the whole book" at once: it searches, picks passages and answers with them
@@ -61,6 +65,3 @@ The model changes quality, not the rule: the answer rests on the passages it cit
 - [What happens to your data](your-data.md).
 - [Formats and limits](../referencia/formats-and-limits.md).
 
----
-
-_Updated on 15 November 2026._

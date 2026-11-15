@@ -1,3 +1,7 @@
+---
+updated: 2026-11-15
+---
+
 # Conecta un agente a tu biblioteca
 
 BookReader puede dejar que un agente de IA —Claude Code, Claude Desktop, Hermes u otro cliente con
@@ -55,6 +59,3 @@ token por agente: si uno se filtra, revocas ese y los demás siguen.
 - [Cómo responde el agente](../explicacion/how-the-agent-works.md).
 - [Qué pasa con tus datos](../explicacion/your-data.md).
 
----
-
-_Actualizado el 15 de noviembre de 2026._

@@ -1,3 +1,7 @@
+---
+updated: 2026-11-15
+---
+
 # Cómo responde el agente
 
 El agente no «se lee el libro» de una vez: busca, elige pasajes y responde con ellos delante. Saber
@@ -62,6 +66,3 @@ El modelo cambia la calidad, no la regla: la respuesta se sostiene en los pasaje
 - [Qué pasa con tus datos](your-data.md).
 - [Formatos y límites](../referencia/formats-and-limits.md).
 
----
-
-_Actualizado el 15 de noviembre de 2026._
