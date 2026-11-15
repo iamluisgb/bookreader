@@ -391,6 +391,43 @@ async function ensurePdfjs() {
   return getPdfjs();
 }
 
+// Un reintento, y solo uno. El fallo esperable aquí es el arranque EN FRÍO de la lib o de su
+// worker —primera apertura de la sesión, red justa, service worker recién actualizado— y eso
+// no es culpa del libro. Antes subía como «Error al cargar el archivo PDF» y el libro solo se
+// abría reiniciando la app: exactamente lo que hace este reintento, sin salir del libro.
+const REINTENTO_MS = 150;
+const esperar = () => new Promise((r) => setTimeout(r, REINTENTO_MS));
+
+async function ensurePdfjsConReintento() {
+  try {
+    return await ensurePdfjs();
+  } catch (e) {
+    console.warn('pdf.js no cargó; reintento:', e);
+    await esperar();
+    return ensurePdfjs();
+  }
+}
+
+// getDocument con un reintento. pdf.js TRANSFIERE (detacha) el ArrayBuffer que le pasas, así
+// que cada intento recibe su propia copia y `source` queda intacto para el siguiente.
+async function abrirDocumento(lib, source, onProgress) {
+  const intento = () => {
+    const loadingTask = lib.getDocument({ data: source.slice(0) });
+    // TEC1 · Callback de progreso de carga (antes el parámetro estaba sin usar).
+    if (typeof onProgress === 'function') {
+      loadingTask.onProgress = ({ loaded, total }) => onProgress(total ? loaded / total : 0);
+    }
+    return loadingTask.promise;
+  };
+  try {
+    return await intento();
+  } catch (e) {
+    console.warn('pdf.js no abrió el documento; reintento:', e);
+    await esperar();
+    return intento();
+  }
+}
+
 // "Cargado" = hay documento Y es el lector que está en pantalla (ver deactivate y el
 // gemelo en epub-reader.js).
 export function isLoaded() {
@@ -429,7 +466,7 @@ export function deactivate() {
 
 export async function load(arrayBuffer, onProgress, bookId = null) {
   canonicalId = bookId || null;
-  const lib = await ensurePdfjs();
+  const lib = await ensurePdfjsConReintento();
   if (!lib) {
     throw new Error('pdf.js not loaded');
   }
@@ -462,14 +499,11 @@ export async function load(arrayBuffer, onProgress, bookId = null) {
   // TEC1 · pdf.js TRANSFIERE (detacha) el ArrayBuffer que le pasas a getDocument. Si el
   // llamador lo reutiliza después (p. ej. app.js lo guarda en la biblioteca con
   // buffer.slice(0)), petaría sobre un buffer detached y el PDF NO se guardaría. Le
-  // pasamos SIEMPRE una copia para que el original del llamador quede intacto.
-  const data = arrayBuffer.slice(0);
-  const loadingTask = lib.getDocument({ data });
-  // TEC1 · Callback de progreso de carga (antes el parámetro estaba sin usar).
-  if (typeof onProgress === 'function') {
-    loadingTask.onProgress = ({ loaded, total }) => onProgress(total ? loaded / total : 0);
-  }
-  pdfDoc = await loadingTask.promise;
+  // pasamos SIEMPRE una copia para que el original del llamador quede intacto — y
+  // `abrirDocumento` guarda otra para su reintento, que es lo que hace que un fallo de
+  // arranque en frío no eche al usuario del libro.
+  const source = arrayBuffer.slice(0);
+  pdfDoc = await abrirDocumento(lib, source, onProgress);
   totalPages = pdfDoc.numPages;
 
   // Trasladar lo guardado bajo la huella de pdf.js al id canónico (ver bookKey()).
