@@ -104,6 +104,7 @@ Catálogo con ejemplos vivos: `app/patterns.html`.
 | Botón principal | `.btn.btn--primary` | la acción principal de la vista (una por vista) |
 | Botón secundario | `.btn.btn--secondary` | acciones de apoyo |
 | Control segmentado | `.segmented` > `.segmented-btn(.active)` | elegir 1 de 2–5 opciones que cambian la vista (modo de lectura, ajuste PDF, pestañas) |
+| Opción de respuesta | `.choice` > `.choice-btn(.is-active)`; al corregir `.is-answer` | responder una pregunta (matriz de estudio). Cada opción parece pulsable sola; elegida en tinta; al corregir, la buena con `--success` y la fallada con `--danger`, tachada. No es el segmentado: ese cambia la vista |
 | Chip de cita | `.ai-cite` | ir del texto del agente al pasaje |
 | Acción destructiva | `.sel-act--danger`, `.dlg-danger` | borrar; usa `--danger` |
 

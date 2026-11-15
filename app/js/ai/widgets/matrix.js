@@ -123,10 +123,25 @@ export function matrixCards(spec, result) {
   return cards;
 }
 
+
 // ─── DOM ─────────────────────────────────────────────────────────────────────
 // renderMatrix(root, spec, { onCommit(result, answers), onCite(src) }) pinta el widget en `root`
 // y devuelve { answers, commit }. El spec se valida antes: aquí se da por bueno, pero TODO texto
 // del spec se escapa (viene del modelo).
+//
+// Un solo lenguaje para las celdas (patrón `.choice` de modern.css):
+//   por rellenar → opciones con borde, pulsables · elegida → en tinta · dada → texto gris con
+//   «Dada», sin botones · corregida → la buena con fondo de --success; la elegida mal, con
+//   --danger y tachada; «Era: X» con un número que lleva a su porqué en la lista de fallos.
+// En móvil la tabla se TRASPONE por CSS: un bloque por atributo (columna) y los conceptos debajo.
+// Es justo lo que el ejercicio quiere comparar, y el nombre del atributo sale una vez y no en
+// cada tarjeta. Por eso cada celda lleva su fila y columna en --wgt-row/--wgt-col y el concepto en data-row.
+const reducedMotion = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+function goTo(el, block) {
+  el.scrollIntoView({ block, behavior: reducedMotion() ? 'auto' : 'smooth' });
+  el.focus({ preventScroll: true });
+}
+
 export function renderMatrix(root, spec, { onCommit, onCite } = {}) {
   const answers = {};
   const fillable = spec.cells.filter((c) => !c.given);
@@ -137,21 +152,22 @@ export function renderMatrix(root, spec, { onCommit, onCite } = {}) {
   // En fila se partían en dos renglones desiguales y no se leía qué iba con qué.
   const stacked = (col) => col.options.length > 2 || col.options.some((o) => String(o).length > 16);
   const optionButtons = (cell, col) => col.options.map((o) =>
-    `<button type="button" class="segmented-btn" data-k="${escapeHtml(key(cell.row, cell.col))}" data-v="${escapeHtml(o)}" aria-pressed="false">${escapeHtml(o)}</button>`).join('');
+    `<button type="button" class="choice-btn" data-k="${escapeHtml(key(cell.row, cell.col))}" data-v="${escapeHtml(o)}" aria-pressed="false">${escapeHtml(o)}</button>`).join('');
 
-  const head = spec.columns.map((c) => `<th scope="col">${escapeHtml(c.label)}</th>`).join('');
-  const body = spec.rows.map((r) => {
-    const tds = spec.columns.map((c) => {
+  const head = spec.columns.map((c, ci) => `<th scope="col" style="--wgt-col:${ci}">${escapeHtml(c.label)}</th>`).join('');
+  const body = spec.rows.map((r, ri) => {
+    const tds = spec.columns.map((c, ci) => {
       const cell = cellOf.get(key(r.id, c.id));
+      const at = `style="--wgt-col:${ci};--wgt-row:${ri}" data-row="${escapeHtml(r.label)}"`;
       if (cell.given) {
-        // La dada es una pista, no una pregunta: texto discreto, sin la caja de las que se rellenan.
-        return `<td class="wgt-cell wgt-given" data-label="${escapeHtml(c.label)}"><span class="wgt-val">${escapeHtml(cell.answer)}</span> <span class="wgt-tag">${escapeHtml(t('Dada'))}</span></td>`;
+        // La dada es una pista, no una pregunta: texto discreto, sin botones.
+        return `<td class="wgt-cell wgt-given" ${at}><span class="wgt-val">${escapeHtml(cell.answer)}</span> <span class="wgt-tag">${escapeHtml(t('Dada'))}</span></td>`;
       }
       const k = escapeHtml(key(r.id, c.id));
-      return `<td class="wgt-cell" data-k="${k}" data-label="${escapeHtml(c.label)}">
-        <div class="segmented wgt-opts${stacked(c) ? ' wgt-opts--stack' : ''}" role="group" aria-label="${escapeHtml(`${r.label} · ${c.label}`)}">${optionButtons(cell, c)}</div>
+      return `<td class="wgt-cell${stacked(c) ? ' wgt-cell--stack' : ''}" data-k="${k}" ${at}>
+        <div class="choice wgt-opts${stacked(c) ? ' choice--stack' : ''}" role="group" aria-label="${escapeHtml(`${r.label} · ${c.label}`)}">${optionButtons(cell, c)}</div>
         <label class="wgt-unsure" hidden><input type="checkbox" data-unsure="${k}"> ${escapeHtml(t('Dudo'))}</label>
-        <div class="wgt-fix" hidden></div>
+        <div class="wgt-fixline" hidden><span class="wgt-fix"></span></div>
       </td>`;
     }).join('');
     return `<tr><th scope="row">${escapeHtml(r.label)}</th>${tds}</tr>`;
@@ -159,33 +175,51 @@ export function renderMatrix(root, spec, { onCommit, onCite } = {}) {
 
   root.classList.add('wgt', 'wgt-matrix');
   root.innerHTML = `
-    <h3 class="wgt-title">${escapeHtml(spec.title)}</h3>
-    <p class="wgt-prompt">${escapeHtml(spec.prompt)}</p>
+    <div class="wgt-head">
+      <h3 class="wgt-title">${escapeHtml(spec.title)}</h3>
+      <p class="wgt-prompt">${escapeHtml(spec.prompt)}</p>
+    </div>
     <div class="wgt-scroll"><table class="wgt-grid"><thead><tr><td></td>${head}</tr></thead><tbody>${body}</tbody></table></div>
     <div class="wgt-actions">
+      <div class="wgt-progress">
+        <span class="wgt-hint" aria-live="polite"></span>
+        <span class="wgt-bar" aria-hidden="true"><span class="wgt-bar-fill"></span></span>
+      </div>
       <button type="button" class="btn btn--primary primary-btn wgt-commit" disabled>${escapeHtml(t('Comprobar'))}</button>
-      <span class="wgt-hint">${escapeHtml(t('Rellena todas las celdas para comprobar'))}</span>
     </div>
     <div class="wgt-result" hidden></div>`;
 
   const commitBtn = root.querySelector('.wgt-commit');
   const hint = root.querySelector('.wgt-hint');
+  const bar = root.querySelector('.wgt-bar-fill');
+  // Progreso a la vista («3 de 7») junto al botón, que va pegado abajo. Antes el botón estaba
+  // apagado con una pista fija y no se sabía cuántas faltaban.
   const refresh = () => {
-    const done = fillable.every((c) => answers[key(c.row, c.col)]?.value != null);
+    const n = fillable.filter((c) => answers[key(c.row, c.col)]?.value != null).length;
+    const done = n === fillable.length;
     commitBtn.disabled = !done || committed;
-    hint.hidden = done || committed;
+    hint.textContent = done ? t('Todas respondidas') : t('{n} de {total} respondidas', { n, total: fillable.length });
+    bar.style.setProperty('--p', String(n / fillable.length));
   };
 
   root.addEventListener('click', (e) => {
     const cite = e.target.closest('.ai-cite');
     if (cite && onCite) { e.preventDefault(); onCite(cite.dataset.id); return; }
-    const b = e.target.closest('.wgt-opts .segmented-btn');
+    // El número de un fallo lleva a su porqué; el de la lista, de vuelta a la celda.
+    const ref = e.target.closest('.wgt-ref');
+    if (ref) {
+      e.preventDefault();
+      const to = root.querySelector(`#${CSS.escape(ref.dataset.goto)}`);
+      if (to) goTo(to, 'center');
+      return;
+    }
+    const b = e.target.closest('.wgt-opts .choice-btn');
     if (!b || committed) return;
     const k = b.dataset.k;
     answers[k] = { ...(answers[k] || {}), value: b.dataset.v };
     for (const sib of b.parentElement.children) {
       const on = sib === b;
-      sib.classList.toggle('active', on);
+      sib.classList.toggle('is-active', on);
       sib.setAttribute('aria-pressed', String(on));
     }
     // «Dudo» solo tiene sentido con una respuesta: aparece al elegir (antes, una casilla por celda).
@@ -203,36 +237,71 @@ export function renderMatrix(root, spec, { onCommit, onCite } = {}) {
     if (committed) return null;
     committed = true;
     const result = scoreMatrix(spec, answers);
-    for (const r of result.cells) {
-      const td = root.querySelector(`td[data-k="${CSS.escape(key(r.row, r.col))}"]`);
-      td.classList.add(r.ok ? 'wgt-ok' : 'wgt-ko');
-      td.querySelectorAll('button, input').forEach((el) => { el.disabled = true; });
-      if (!r.ok) {
-        const fix = td.querySelector('.wgt-fix');
-        fix.textContent = t('Era: {answer}', { answer: r.answer });
-        fix.hidden = false;
-      }
-    }
     const label = (list, id) => (list.find((x) => x.id === id) || {}).label || id;
     const misses = result.cells.filter((r) => !r.ok)
       // Primero los fallos seguros: son los que más se corrigen al repasarlos.
       .sort((a, b) => Number(a.unsure) - Number(b.unsure));
-    const items = misses.map((r) => {
+    const num = new Map(misses.map((r, i) => [key(r.row, r.col), i + 1]));
+    // Ids únicos por instancia: el número de la celda y el de la lista se enlazan entre sí.
+    const uid = Math.random().toString(36).slice(2, 8);
+    const missId = (n) => `wgt-${uid}-miss-${n}`;
+    const cellId = (n) => `wgt-${uid}-cell-${n}`;
+    const ref = (n, to, name) => `<a class="wgt-ref" href="#${to}" data-goto="${to}" aria-label="${escapeHtml(name)}">${n}</a>`;
+
+    for (const r of result.cells) {
+      const td = root.querySelector(`td[data-k="${CSS.escape(key(r.row, r.col))}"]`);
+      td.classList.add(r.ok ? 'wgt-ok' : 'wgt-ko');
+      td.querySelectorAll('button, input').forEach((el) => { el.disabled = true; });
+      // La buena, siempre a la vista: si fallaste, al lado de la que elegiste.
+      for (const b of td.querySelectorAll('.choice-btn')) b.classList.toggle('is-answer', b.dataset.v === r.answer);
+      // «Dudo» sin marcar ya no dice nada.
+      const unsure = td.querySelector('.wgt-unsure');
+      if (unsure && !r.unsure) unsure.hidden = true;
+      if (!r.ok) {
+        const n = num.get(key(r.row, r.col));
+        td.id = cellId(n);
+        td.tabIndex = -1;
+        const line = td.querySelector('.wgt-fixline');
+        line.querySelector('.wgt-fix').textContent = t('Era: {answer}', { answer: r.answer });
+        line.insertAdjacentHTML('afterbegin', ref(n, missId(n), t('Por qué (fallo {n})', { n })));
+        line.hidden = false;
+      }
+    }
+    const items = misses.map((r, i) => {
+      const n = i + 1;
       const cell = cellOf.get(key(r.row, r.col));
       const src = cell.cite && cell.cite.src;
-      return `<li class="wgt-miss">
-        <div class="wgt-miss-h">${escapeHtml(label(spec.rows, r.row))} · ${escapeHtml(label(spec.columns, r.col))}: <strong>${escapeHtml(r.answer)}</strong>${r.unsure ? '' : ` <span class="wgt-sure">${escapeHtml(t('Ibas seguro'))}</span>`}</div>
-        <p>${escapeHtml(cell.why)}</p>
-        <blockquote class="wgt-quote">«${escapeHtml(cell.cite.quote.trim())}»${src ? ` <a class="ai-cite" href="#" data-id="${escapeHtml(src)}">${escapeHtml(src)}</a>` : ''}</blockquote>
+      const mine = r.value == null ? '' : `<span class="wgt-miss-mine">${escapeHtml(t('Pusiste'))} <s>${escapeHtml(r.value)}</s></span>`;
+      return `<li class="wgt-miss" id="${missId(n)}" tabindex="-1">
+        <div class="wgt-miss-h">
+          ${ref(n, cellId(n), t('Ver la celda (fallo {n})', { n }))}
+          <span class="wgt-miss-where">${escapeHtml(label(spec.rows, r.row))} · ${escapeHtml(label(spec.columns, r.col))}</span>
+          ${r.unsure ? '' : `<span class="wgt-sure">${escapeHtml(t('Ibas seguro'))}</span>`}
+        </div>
+        <p class="wgt-miss-ans"><span>${escapeHtml(t('Era'))} <strong>${escapeHtml(r.answer)}</strong></span>${mine}</p>
+        <p class="wgt-why">${escapeHtml(cell.why)}</p>
+        <blockquote class="wgt-quote"><span>«${escapeHtml(cell.cite.quote.trim())}»</span>${src ? ` <a class="ai-cite" href="#" data-id="${escapeHtml(src)}">${escapeHtml(src)}</a>` : ''}</blockquote>
       </li>`;
     }).join('');
+    // Una marca por celda: el resultado de un vistazo, antes de leer nada.
+    const dots = result.cells.map((r) => `<span class="wgt-dot${r.ok ? ' is-ok' : ''}"></span>`).join('');
     const res = root.querySelector('.wgt-result');
     const summary = t('{n} de {total} bien', { n: result.correct, total: result.total });
     const sureNote = result.confidentMisses
       ? `<p class="wgt-note">${escapeHtml(t('Fallaste {n} estando seguro. Son los que más se corrigen al repasarlos: van primero.', { n: result.confidentMisses }))}</p>` : '';
-    res.innerHTML = `<p class="wgt-score">${escapeHtml(summary)}</p>${sureNote}${items ? `<ul class="wgt-misses">${items}</ul>` : `<p>${escapeHtml(t('Todo bien.'))}</p>`}`;
+    res.innerHTML = `
+      <div class="wgt-summary" tabindex="-1">
+        <p class="wgt-score">${escapeHtml(summary)}</p>
+        <span class="wgt-dots" aria-hidden="true">${dots}</span>
+      </div>
+      ${sureNote}
+      ${items ? `<ol class="wgt-misses">${items}</ol>` : `<p class="wgt-note">${escapeHtml(t('Todo bien.'))}</p>`}`;
     res.hidden = false;
+    root.classList.add('is-committed');
+    root.querySelector('.wgt-actions').hidden = true;
     refresh();
+    // Al resumen: en móvil quedaba fuera de la vista y parecía que «Comprobar» no hacía nada.
+    goTo(res.querySelector('.wgt-summary'), 'nearest');
     if (onCommit) onCommit(result, JSON.parse(JSON.stringify(answers)));
     return result;
   }

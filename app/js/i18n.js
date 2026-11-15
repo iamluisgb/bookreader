@@ -1731,7 +1731,12 @@ const EN = {
   // Widgets de estudio (P43)
   'Dada': 'Given',
   'Dudo': 'Not sure',
-  'Rellena todas las celdas para comprobar': 'Fill in every cell to check',
+  '{n} de {total} respondidas': '{n} of {total} answered',
+  'Todas respondidas': 'All answered',
+  'Por qué (fallo {n})': 'Why (miss {n})',
+  'Ver la celda (fallo {n})': 'Show the cell (miss {n})',
+  'Pusiste': 'You put',
+  'Era': 'It was',
   // P43 F3 · La matriz como práctica del mazo
   'Práctica': 'Practice',
   'lo que falles pasa a tarjetas': 'what you miss becomes cards',

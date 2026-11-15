@@ -2526,62 +2526,199 @@ button.ai-nb-chap:hover { color: var(--text); background: var(--fill-strong); }
 @media (prefers-reduced-motion: reduce) { .ai-nb-chapter > summary .icon { transition: none; } }
 
 /* ============================================================================
-   Widgets de estudio (P43). Carcasa común + tipo «Rellena la matriz». El estado de cada celda
-   (acierto, fallo) se marca con fondo suave del color semántico, nunca con una barra lateral.
-   La rejilla desliza dentro de su caja: con 4–5 columnas no cabe a 360 px.
+   Widgets de estudio (P43). Carcasa común + tipo «Rellena la matriz».
+   Un solo lenguaje para las celdas: por rellenar = opciones con borde (`.choice`); elegida =
+   tinta; dada = texto gris con «Dada»; corregida = la buena con fondo de --success y la elegida
+   mal con --danger, tachada. Nunca una barra lateral. En escritorio, tabla con filetes entre
+   filas (antes, un bloque gris por celda: todo pesaba igual). En móvil, la tabla se traspone.
    ========================================================================== */
-.wgt { display: grid; gap: var(--s-3); }
-.wgt-title { margin: 0; font-size: var(--fs-lg); font-weight: 600; }
-.wgt-prompt { margin: 0; color: var(--text-soft); font-size: var(--fs-sm); }
+
+/* Opción de respuesta: `.choice` > `.choice-btn(.is-active)`. Elegir la respuesta a una
+   pregunta. No es el control segmentado: aquel cambia la vista (pista gris con la opción
+   «levantada») y aquí cada opción tiene que parecer pulsable por sí sola, también antes de
+   elegir. Al corregir: `.is-answer` = la buena; `.is-active` sin `.is-answer` = la fallada. */
+.choice { display: flex; flex-wrap: wrap; gap: var(--s-1); }
+.choice--stack { flex-direction: column; align-items: stretch; }
+.choice-btn {
+  min-height: var(--s-7); min-width: 4em;
+  padding: var(--s-1) var(--s-3);
+  border: 1px solid var(--border); border-radius: var(--r-sm);
+  background: var(--surface-2); color: var(--text);
+  font: inherit; font-size: var(--fs-sm); font-weight: 500; line-height: 1.3; text-align: center;
+  box-shadow: var(--shadow-1);
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+}
+.choice--stack .choice-btn { text-align: left; }
+@media (hover: hover) { .choice-btn:hover:not(:disabled) { background: var(--fill); } }   /* en táctil se quedaba pegado */
+/* Elegida en tinta, como el botón principal: el verde ya significa «correcto» al corregir. */
+.choice-btn.is-active, .choice-btn.is-active:hover:not(:disabled) {
+  background: var(--btn-bg); border-color: var(--btn-bg); color: var(--btn-ink); font-weight: 600;
+}
+.choice-btn:disabled { cursor: default; box-shadow: none; }
+.choice-btn:disabled:not(.is-active):not(.is-answer) { background: transparent; border-color: var(--border-soft); color: var(--text-faint); }
+.choice-btn.is-answer:disabled { background: color-mix(in srgb, var(--success) 14%, var(--surface-2)); border-color: var(--success); color: var(--text); }
+.choice-btn.is-active:not(.is-answer):disabled {
+  background: color-mix(in srgb, var(--danger) 12%, var(--surface-2)); border-color: var(--danger); color: var(--text);
+  text-decoration: line-through; text-decoration-color: var(--danger);
+}
+@media (pointer: coarse) { .choice-btn { min-height: var(--s-8); } }
+
+.wgt { display: grid; gap: var(--s-4); }
+.wgt-head { display: grid; gap: var(--s-1); }
+.wgt-title { margin: 0; font-size: var(--fs-xl); font-weight: 700; letter-spacing: -0.01em; line-height: 1.25; }
+.wgt-prompt { margin: 0; color: var(--text-soft); font-size: var(--fs-md); line-height: 1.45; }
 .wgt-scroll { overflow-x: auto; }
-.wgt-grid { border-collapse: separate; border-spacing: var(--s-1); font-size: var(--fs-sm); width: 100%; table-layout: fixed; }
+.wgt-grid { border-collapse: collapse; font-size: var(--fs-sm); width: 100%; table-layout: fixed; }
 /* Columnas iguales; la de los conceptos, fija. Antes cada columna medía lo que su texto. */
 .wgt-grid thead td:first-child, .wgt-grid tbody th { width: 9em; }
-.wgt-grid th { text-align: left; font-weight: 600; color: var(--text-soft); font-size: var(--fs-xs); padding: var(--s-1) var(--s-2); vertical-align: bottom; }
-/* Arriba, como las celdas: centrado se despegaba de sus opciones en las filas altas. */
-.wgt-grid tbody th { color: var(--text); font-size: var(--fs-sm); vertical-align: top; padding-top: var(--s-3); min-width: 7em; }
-.wgt-cell { background: var(--surface-1); border-radius: var(--r-sm); padding: var(--s-2); vertical-align: top; min-width: 8em; }
-.wgt-cell .segmented { flex-wrap: wrap; }
-/* Las opciones de una celda pueden ser frases («Uno espera o se interbloquea»): bajan de línea en
-   vez de pisarse, que es lo que hacía el nowrap de .segmented-btn. */
-.wgt-cell .segmented-btn { font-size: var(--fs-xs); padding: 5px 8px; white-space: normal; flex: 1 1 auto; line-height: 1.25; }
-/* La dada: texto sin caja. Pesaba más que las celdas por rellenar, que son las importantes. */
-.wgt-given { background: transparent; }
-.wgt-val { font-weight: 600; }
-.wgt-given .wgt-val { color: var(--text-soft); }
+.wgt-grid thead th {
+  text-align: left; vertical-align: bottom; line-height: 1.3;
+  font-size: var(--fs-xs); font-weight: 600; color: var(--text-soft);
+  padding: 0 var(--s-2) var(--s-2);
+}
+.wgt-grid tbody tr { border-top: 1px solid var(--border); }
+/* El concepto, a la altura del texto de la primera opción (32 px de alto → ~8 px dentro). */
+.wgt-grid tbody th {
+  text-align: left; vertical-align: top; line-height: 1.3;
+  font-size: var(--fs-md); font-weight: 600; color: var(--text);
+  padding: calc(var(--s-3) + var(--s-2)) var(--s-2) var(--s-3) 0;
+}
+.wgt-cell { padding: var(--s-3) var(--s-2); vertical-align: top; }
+/* La dada: texto sin caja, alineado con el de las opciones de al lado. */
+.wgt-given { padding-top: calc(var(--s-3) + var(--s-2)); }
+.wgt-given .wgt-val { color: var(--text-soft); font-weight: 500; }
 .wgt-tag { font-size: var(--fs-2xs); color: var(--text-faint); }
-/* Opción elegida en tinta (como el botón principal), no en acento: el verde ya significa
-   «correcto» al corregir, y blanco sobre gris claro casi no se distinguía. */
-.wgt-matrix .segmented-btn.active, .wgt-matrix .segmented-btn.active:hover { background: var(--text); color: var(--surface-0); }
-.wgt-opts--stack { flex-direction: column; }
-.wgt-opts--stack .segmented-btn { text-align: left; }
-.wgt-unsure[hidden] { display: none; }
-.wgt-unsure { display: inline-flex; align-items: center; gap: 4px; margin-top: var(--s-1); font-size: var(--fs-2xs); color: var(--text-soft); cursor: pointer; }
-.wgt-ok { background: color-mix(in srgb, var(--success) 14%, transparent); }
-.wgt-ko { background: color-mix(in srgb, var(--danger) 12%, transparent); }
-.wgt-fix { margin-top: var(--s-1); font-size: var(--fs-xs); font-weight: 600; color: var(--danger); }
-.wgt-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2) var(--s-3); }
-.wgt-hint { font-size: var(--fs-xs); color: var(--text-soft); }
-.wgt-result { display: grid; gap: var(--s-2); }
-.wgt-score { margin: 0; font-weight: 600; }
+/* «Dudo» aparece al elegir, pero su sitio está reservado: la fila no salta al responder. */
+.wgt-unsure {
+  display: inline-flex; align-items: center; gap: var(--s-1); margin-top: var(--s-1);
+  min-height: var(--s-6); font-size: var(--fs-xs); color: var(--text-soft); cursor: pointer;
+}
+.wgt-unsure[hidden] { display: inline-flex; visibility: hidden; }
+.wgt-unsure input { margin: 0; accent-color: var(--text); }
+.is-committed .wgt-unsure { cursor: default; }
+.is-committed .wgt-unsure[hidden] { display: none; }
+.wgt-fixline { display: flex; align-items: center; gap: var(--s-2); margin-top: var(--s-2); }
+.wgt-fixline[hidden] { display: none; }
+.wgt-fix { font-size: var(--fs-xs); font-weight: 600; color: var(--text); }
+/* Número de un fallo: en la celda y en su explicación, y cada uno lleva al otro. */
+.wgt-ref {
+  position: relative; flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: var(--s-5); height: var(--s-5); padding: 0 var(--s-1);
+  border-radius: var(--r-pill); background: var(--danger); color: var(--on-danger);
+  font-size: var(--fs-2xs); font-weight: 700; font-variant-numeric: tabular-nums; text-decoration: none;
+}
+.wgt-ref::after { content: ''; position: absolute; inset: calc(-1 * var(--s-2)); }   /* objetivo táctil */
+.wgt-ko[tabindex]:focus { outline: none; }
+.wgt-ko[tabindex]:focus-visible { outline: 2px solid color-mix(in srgb, var(--accent) 70%, transparent); }
+
+/* Pie pegado abajo con el progreso y «Comprobar»: en móvil la matriz es larga y el botón
+   quedaba al final, sin decir cuántas faltaban. */
+.wgt-actions {
+  position: sticky; bottom: calc(-1 * var(--wgt-pad-bottom, 0px)); z-index: 2;
+  display: flex; align-items: center; gap: var(--s-4);
+  padding-block: var(--s-3);
+  background: var(--surface-1); border-top: 1px solid var(--border);
+}
+.wgt-actions[hidden] { display: none; }
+.wgt-progress { flex: 1; min-width: 0; display: grid; gap: var(--s-2); max-width: 280px; }
+.wgt-hint { font-size: var(--fs-sm); color: var(--text-soft); font-variant-numeric: tabular-nums; }
+.wgt-bar { display: block; height: var(--s-1); border-radius: var(--r-xs); background: var(--fill-strong); overflow: hidden; }
+.wgt-bar-fill {
+  display: block; height: 100%; background: var(--accent);   /* progreso = acento (DESIGN §1.3) */
+  transform-origin: left; transform: scaleX(var(--p, 0)); transition: transform var(--transition-normal);
+}
+.wgt-actions .wgt-commit { margin-left: auto; }
+
+/* Resultado: la nota grande, una marca por celda y los fallos numerados con su porqué. */
+.wgt-result { display: grid; gap: var(--s-3); }
+.wgt-summary { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2) var(--s-4); padding-top: var(--s-4); border-top: 1px solid var(--border); }
+.wgt-summary:focus { outline: none; }
+.wgt-score { margin: 0; font-size: var(--fs-xl); font-weight: 700; font-variant-numeric: tabular-nums; }
+.wgt-dots { display: flex; flex-wrap: wrap; gap: var(--s-1); }
+.wgt-dot { width: var(--s-4); height: var(--s-2); border-radius: var(--r-pill); background: var(--danger); }
+.wgt-dot.is-ok { background: var(--success); }
 .wgt-note { margin: 0; font-size: var(--fs-sm); color: var(--text-soft); }
 .wgt-misses { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--s-3); }
-.wgt-miss { background: var(--surface-1); border-radius: var(--r-md); padding: var(--s-3); display: grid; gap: var(--s-1); font-size: var(--fs-sm); }
+.wgt-miss {
+  display: grid; gap: var(--s-2); padding: var(--s-3) var(--s-4);
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-md);
+  font-size: var(--fs-md);
+}
+.wgt-miss:focus { outline: none; }
+.wgt-miss:focus-visible { outline: 2px solid color-mix(in srgb, var(--accent) 70%, transparent); }
 .wgt-miss p { margin: 0; }
-.wgt-sure { font-size: var(--fs-2xs); font-weight: 600; color: var(--warning); }
-.wgt-quote { margin: 0; color: var(--text-soft); font-style: italic; }
-/* Estrecho: la tabla pasa a una tarjeta por concepto (fila), con cada atributo etiquetado. Con
-   scroll lateral se perdía la columna de los conceptos, que es lo que da sentido a cada celda. */
+.wgt-miss-h { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-2); }
+.wgt-miss-where { flex: 1 1 12em; min-width: 0; font-size: var(--fs-sm); font-weight: 600; color: var(--text-soft); }
+.wgt-sure {
+  font-size: var(--fs-2xs); font-weight: 600; color: var(--warning);
+  border: 1px solid currentColor; border-radius: var(--r-pill); padding: 0 var(--s-2);
+}
+.wgt-miss-ans { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--s-1) var(--s-3); }
+.wgt-miss-mine { font-size: var(--fs-sm); color: var(--text-soft); }
+.wgt-miss-mine s { text-decoration-color: var(--danger); }
+.wgt-why { line-height: 1.5; }
+/* La cita es texto del libro: en la letra del libro, sobre un fondo suave. */
+.wgt-quote {
+  margin: 0; padding: var(--s-2) var(--s-3);
+  background: var(--fill); border-radius: var(--r-sm);
+  font-family: var(--font-reader); font-size: var(--fs-md); line-height: 1.5; color: var(--text-soft);
+}
+.wgt-quote .ai-cite { font-family: var(--font-ui); }
+@media (prefers-reduced-motion: reduce) { .wgt-bar-fill, .choice-btn { transition: none; } }
+
+/* Estrecho: la tabla se TRASPONE. Un bloque por atributo (su nombre, pegado arriba al
+   desplazar) y los conceptos debajo, cada uno con sus opciones. Antes era una tarjeta por
+   concepto que repetía el nombre de cada atributo en todas. El orden lo dan --wgt-col/--wgt-row (inline, desde matrix.js). */
 @media (max-width: 600px) {
-  .wgt-grid, .wgt-grid tbody, .wgt-grid tr, .wgt-grid th, .wgt-grid td { display: block; }
-  .wgt-grid thead { display: none; }
-  .wgt-grid { border-spacing: 0; }
-  .wgt-grid tr { display: grid; gap: var(--s-2); padding-block: var(--s-2); }
-  .wgt-grid tbody th { font-size: var(--fs-md); padding: 0;  width: auto; }
-  .wgt-cell { min-width: 0; }
-  .wgt-cell::before { content: attr(data-label); display: block; font-size: var(--fs-xs); font-weight: 600; color: var(--text-soft); margin-bottom: var(--s-1); }
+  .wgt-scroll { overflow: visible; }   /* si no, el encabezado pegajoso no se pega */
+  .wgt-grid { display: flex; flex-direction: column; }
+  .wgt-grid thead, .wgt-grid tbody, .wgt-grid tr { display: contents; }
+  .wgt-grid thead td:first-child, .wgt-grid tbody th { display: none; }
+  .wgt-grid thead th {
+    order: calc(var(--wgt-col, 0) * 20);
+    position: sticky; top: calc(-1 * var(--wgt-pad-top, 0px)); z-index: 2;
+    padding: var(--s-4) 0 var(--s-2); background: var(--surface-1);
+    font-size: var(--fs-md); color: var(--text); border-bottom: 1px solid var(--border);
+  }
+  .wgt-cell {
+    order: calc(var(--wgt-col, 0) * 20 + var(--wgt-row, 0) + 1);
+    display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center;
+    column-gap: var(--s-3); padding: var(--s-3) 0;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  .wgt-cell::before { content: attr(data-row); grid-column: 1; grid-row: 1; font-size: var(--fs-md); font-weight: 600; color: var(--text); }
+  /* Opciones cortas: a la derecha del concepto, «Dudo» debajo de él. */
+  .wgt-cell .choice { grid-column: 2; grid-row: 1 / span 2; flex-wrap: nowrap; }
+  .wgt-unsure { grid-column: 1; grid-row: 2; justify-self: start; margin: 0; min-height: var(--s-6); }
+  /* Opciones largas: debajo, a todo el ancho, y «Dudo» a la derecha del concepto. */
+  .wgt-cell .choice--stack { grid-column: 1 / -1; grid-row: 2; margin-top: var(--s-2); }
+  .wgt-cell--stack .wgt-unsure { grid-column: 2; grid-row: 1; }
+  .wgt-fixline { grid-column: 1 / -1; }
+  .wgt-given { padding-top: var(--s-3); }
+  .wgt-given .wgt-val { grid-column: 2; grid-row: 1; justify-self: end; }
+  .wgt-given .wgt-tag { grid-column: 2; grid-row: 2; justify-self: end; }
+  .choice-btn { min-height: var(--s-8); }
+  .wgt-unsure { min-height: var(--s-8); margin-block: calc(-1 * var(--s-2)); }
+  .wgt-actions { padding-bottom: max(var(--s-3), env(safe-area-inset-bottom)); }
 }
 /* P43 F3 · La matriz como ejercicio del mazo: modal más ancho que el de flashcards (la rejilla
    tiene 4–5 columnas) y con su propio scroll. */
-.wgt-practice-card { max-width: 860px; max-height: 90vh; overflow-y: auto; }
-.wgt-practice-ctx { margin-top: 0; padding-right: var(--s-8); }   /* hueco para la × */
+/* Su relleno, en variables: lo pegajoso (encabezados en móvil, pie con «Comprobar») se pega al
+   borde del relleno, no al de la tarjeta, y por esa franja asomaba el contenido al desplazar.
+   Con un desplazamiento negativo igual al relleno, se pegan al borde de verdad. */
+.wgt-practice-card {
+  --wgt-pad-top: var(--s-7); --wgt-pad-bottom: var(--s-7);
+  max-width: 860px; max-height: 90vh; overflow-y: auto;
+  padding: var(--wgt-pad-top) var(--s-7) var(--wgt-pad-bottom);
+}
+@media (max-width: 767px) {
+  .wgt-practice-card {
+    --wgt-pad-top: var(--s-6); --wgt-pad-bottom: calc(var(--s-6) + env(safe-area-inset-bottom));
+    padding: var(--wgt-pad-top) var(--s-5) var(--wgt-pad-bottom);
+  }
+}
+/* El capítulo, como antetítulo: con el tamaño de .ai-ob-sub pesaba más que el título. */
+.wgt-practice-ctx { margin: 0 0 var(--s-2); padding-right: var(--s-8); font-size: var(--fs-xs); font-weight: 600; color: var(--text-soft); }   /* hueco para la × */
+.wgt-practice-note { margin: var(--s-3) 0 0; font-size: var(--fs-sm); }

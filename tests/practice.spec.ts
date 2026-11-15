@@ -113,7 +113,7 @@ test('matriz desde flashcards: solo con capítulo, se hace, guarda el intento y 
   expect(await page.evaluate(() => (window as any).__calls.matrix)).toBe(1);
 
   // Tres bien, una mal y segura (r2|c1).
-  const pick = (k: string, v: string) => practice.locator(`.segmented-btn[data-k="${k}"][data-v="${v}"]`).click();
+  const pick = (k: string, v: string) => practice.locator(`.choice-btn[data-k="${k}"][data-v="${v}"]`).click();
   await pick('r1|c1', 'Sí');
   await pick('r2|c1', 'Sí');
   await pick('r1|c2', 'La madre');
