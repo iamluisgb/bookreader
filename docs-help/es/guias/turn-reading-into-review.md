@@ -13,6 +13,11 @@ de olvidarlas, y te deja llevártelas a Anki si ya vives allí.
 3. **De un mazo que ya tienes.** En la biblioteca, **Mazos** reúne todos los mazos de tarjetas,
    estén o no ligados a un libro.
 
+<figure>
+  <img src="../../assets/capturas/05-studio.webp" width="380" alt="Pestaña Studio con Resumen, Mapa mental, Infografía y Flashcards" loading="lazy">
+  <figcaption>El Studio del libro: de aquí salen el resumen, el mapa, la infografía y las tarjetas.</figcaption>
+</figure>
+
 Antes de estudiar, revisa: puedes editar el frente, el dorso y las opciones. Una tarjeta mala
 cuesta más que no tenerla.
 
@@ -31,6 +36,11 @@ En **Mazos** verás lo que toca hoy. El repaso usa **FSRS**, el mismo tipo de al
     FSRS programa cada repaso cuando predice que acertarás en torno al 90 %. Ese porcentaje tiende
     a 90 % por construcción; lo que cambia al aprender es el **intervalo**, no el número. La
     [explicación](../explicacion/how-the-agent-works.md) lo cuenta sin adornos.
+
+<figure markdown>
+  ![Tarjeta de repaso girada, con la respuesta y los botones Otra vez y Bien](../assets/capturas/06-repaso.webp)
+  <figcaption>Una tarjeta del repaso de hoy: la respuesta delante y dos botones; FSRS decide cuándo vuelve.</figcaption>
+</figure>
 
 ## Ejercicios, además de tarjetas
 

@@ -2195,6 +2195,11 @@ sin meter un build nuevo en el deploy.
 - Material pide `sitemap.xml` relativo a la página para su prefetch, así que las páginas internas
   dejan un 404 de sitemap en la consola. Es de la librería, no rompe nada y no justifica duplicar
   sitemaps en cada carpeta.
+- **Las capturas son reales, y eso se paga en mantenimiento.** Seis pantallas por lengua, tomadas de
+  la app con las fixtures de evals (sin datos personales) y recortadas para que el texto se lea en
+  la columna. No hay script de captura versionado —necesita la app arrancada, una clave y las
+  fixtures—, así que un cambio de interfaz que afecte a esas seis pantallas obliga a recapturarlas a
+  mano.
 - **No hay ayuda embebida** en la app: solo el enlace y la guía rápida. Si la ayuda se usa de verdad,
   el paso siguiente es enlazar el artículo concreto desde cada pantalla, no meter el sitio en un
   iframe.

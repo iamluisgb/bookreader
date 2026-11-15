@@ -4,6 +4,11 @@ BookReader lee **EPUB y PDF sin DRM**. No hay cuenta ni servidor de libros: el f
 el almacenamiento de tu navegador, en este dispositivo. Si quieres tenerlo en otro, se sincroniza
 después (o se vuelve a subir).
 
+<figure markdown>
+  ![Biblioteca de BookReader con tres libros, el que estás leyendo y el repaso de hoy](../assets/capturas/01-biblioteca.webp)
+  <figcaption>La biblioteca: los libros, lo que estás leyendo y el repaso que toca hoy.</figcaption>
+</figure>
+
 ## Antes de empezar
 
 - Un **EPUB** o un **PDF** que puedas abrir sin la app de Amazon o de Adobe. Si tu libro solo se

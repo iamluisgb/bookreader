@@ -4,6 +4,11 @@ BookReader reads **EPUB and PDF without DRM**. There is no account and no book s
 stays in your browser's storage, on this device. If you want it on another device, you sync later
 (or upload it again).
 
+<figure markdown>
+  ![BookReader library with three books, the one you are reading and today's review](../assets/capturas/01-library.webp)
+  <figcaption>The library: your books, the one you are reading and the review due today.</figcaption>
+</figure>
+
 ## Before you start
 
 - An **EPUB** or a **PDF** you can open without Amazon's or Adobe's app. If your book only opens in

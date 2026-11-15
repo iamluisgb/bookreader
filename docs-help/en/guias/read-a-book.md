@@ -40,6 +40,11 @@ move the mouse. Press Esc to leave.
 
 In **Reading settings**:
 
+<figure markdown>
+  ![Reading settings open over the page: theme, brightness, font and mode](../assets/capturas/02-reading-settings.webp)
+  <figcaption>Settings apply over the page, without closing the book: you see the change in the real text.</figcaption>
+</figure>
+
 | Setting                    | What it does                                                                  |
 | -------------------------- | ----------------------------------------------------------------------------- |
 | Font and size              | The EPUB text. Not in PDF: the layout is printed and you adjust it with zoom. |

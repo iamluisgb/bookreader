@@ -23,11 +23,16 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 - **Se encuentra**: enlaces **Help/Ayuda** en la barra y el pie de las 12 páginas públicas (el blog
   cede su hueco en móvil), y **Ajustes → Ayuda completa** en la app, que abre la lengua de la
   interfaz (`/help/` o `/es/ayuda/`).
-- **Verificado**: build `strict` sin avisos, 38 páginas y 2.078 enlaces internos comprobados (0
-  rotos, anclas incluidas), buscador con índice por lengua, selector de idioma página a página,
-  tema oscuro y capturas a 1280 y 390 px. `build:preview` deja `help/` y `es/ayuda/` en `dist/`.
-- **Fuera**: ayuda embebida en la app, capturas por artículo y página de novedades. Decisión y
-  límites en [ADR-063](DECISIONS.md), ítem en [P57](BACKLOG.md).
+- **Capturas**: seis por lengua —biblioteca, ajustes de lectura, selección, agente con cita,
+  Studio y repaso—, tomadas de la app real con las fixtures de evals, sin datos personales, en
+  claro y a 2×. Se insertan en las cuatro guías con su pie; las del panel van a 380 px para que el
+  texto se lea sin ampliar.
+- **Verificado**: build `strict` sin avisos, 38 páginas y 2.084 enlaces internos comprobados (0
+  rotos, anclas e imágenes incluidas), buscador con índice por lengua, selector de idioma página a
+  página, tema oscuro y capturas a 1280 y 390 px. `build:preview` deja `help/` y `es/ayuda/` en
+  `dist/`.
+- **Fuera**: ayuda embebida en la app y página de novedades. Decisión y límites en
+  [ADR-063](DECISIONS.md), ítem en [P57](BACKLOG.md).
 
 ## 2026-11-15 — El índice dice la verdad: página de cada ancla, marca por sección y todos los niveles
 

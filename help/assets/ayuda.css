@@ -206,3 +206,23 @@
 .md-copyright a:hover {
   text-decoration: underline;
 }
+
+/* ---- Capturas ---- */
+.md-typeset figure {
+  width: 100%;
+  margin: 1.4em 0;
+}
+.md-typeset figure img {
+  display: block;
+  margin: 0 auto;
+  border: 1px solid var(--br-line);
+  border-radius: 10px;
+  background: var(--md-default-bg-color);
+  box-shadow: 0 16px 36px -24px rgba(0, 0, 0, 0.38);
+}
+.md-typeset figcaption {
+  font-size: .76rem;
+  color: var(--br-soft);
+  text-align: center;
+  margin-top: .5em;
+}

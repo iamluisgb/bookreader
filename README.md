@@ -74,7 +74,8 @@ The static site and app are served by Cloudflare Pages. The local MCP server can
 ## Help site
 
 Public help lives at `/help/` (English) and `/es/ayuda/` (Spanish): 13 articles per language in
-guides, tutorials, explanation and reference, with search. The source is [`docs-help/`](docs-help/)
+guides, tutorials, explanation and reference, with search and six real screenshots per language.
+The source is [`docs-help/`](docs-help/)
 (Markdown plus two MkDocs configs); the generated HTML is committed because deploys come from `HEAD`
 and do not install Python. One CSS file dresses Material with the app's tokens, and fonts come from
 `/app/fonts`.

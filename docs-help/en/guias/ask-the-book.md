@@ -8,6 +8,11 @@ something is not in the book, it says so.
 
 Select some text and the action bar appears. The top ones are the usual questions:
 
+<figure markdown>
+  ![Action bar over a selected passage: Ask, Explain this, Why it matters](../assets/capturas/03-selection.webp)
+  <figcaption>Select and choose: the bar carries the usual questions and, under “…”, the rest and highlighting.</figcaption>
+</figure>
+
 | Action                  | What it does                                                         |
 | ----------------------- | -------------------------------------------------------------------- |
 | **Explain this**        | Tells you in plain words, with a concrete example.                   |
@@ -40,6 +45,11 @@ Open the agent with **✦** (or `]`) and type. You can:
 Under each answer there are citations with their chapter and page. Tap one and the reader jumps to
 the passage. That is the difference between "the agent says" and "the book says": if the citation
 does not support the answer, the place to check it is right there.
+
+<figure>
+  <img src="../../assets/capturas/04-agent.webp" width="380" alt="Agent answer with the cited passage and the pages it jumps to" loading="lazy">
+  <figcaption>Every answer brings its citation and its page. The original passage is one tap away.</figcaption>
+</figure>
 
 ## Feynman mode: you explain it
 

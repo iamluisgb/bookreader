@@ -13,6 +13,11 @@ forget them, and lets you take them to Anki if that is where you live.
 3. **From a deck you already have.** In the library, **Decks** gathers every card deck, whether or
    not it is tied to a book.
 
+<figure>
+  <img src="../../assets/capturas/05-studio.webp" width="380" alt="Studio tab with Summary, Mind map, Infographic and Flashcards" loading="lazy">
+  <figcaption>The book's Studio: summaries, mind maps, infographics and cards come from here.</figcaption>
+</figure>
+
 Before studying, review: you can edit the front, the back and the options. A bad card costs more
 than no card.
 
@@ -31,6 +36,11 @@ In **Decks** you see what is due today. Review uses **FSRS**, the same kind of a
     FSRS schedules each review when it predicts you will be right about 90 % of the time. That
     percentage tends to 90 % by construction; what changes as you learn is the **interval**, not the
     number. The [explanation](../explicacion/how-the-agent-works.md) says it without decoration.
+
+<figure markdown>
+  ![A review card flipped, with the answer and the Again and Good buttons](../assets/capturas/06-review.webp)
+  <figcaption>A card from today's review: the answer in front and two buttons; FSRS decides when it returns.</figcaption>
+</figure>
 
 ## Exercises, in addition to cards
 

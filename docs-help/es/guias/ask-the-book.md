@@ -8,6 +8,11 @@ dice.
 
 Selecciona un texto y aparece la barra de acciones. Las de arriba son las preguntas de siempre:
 
+<figure markdown>
+  ![Barra de acciones sobre un pasaje seleccionado: Preguntar, Explícame, Por qué importa](../assets/capturas/03-seleccion.webp)
+  <figcaption>Selecciona y elige: la barra lleva las preguntas de siempre y, en «…», el resto y el subrayado.</figcaption>
+</figure>
+
 | Acción                     | Qué hace                                                         |
 | -------------------------- | ---------------------------------------------------------------- |
 | **Explícame**              | Te lo cuenta en llano, con un ejemplo concreto.                  |
@@ -41,6 +46,11 @@ Abre el agente con **✦** (o con `]`) y escribe. Puedes:
 Debajo de cada respuesta hay citas con su capítulo y su página. Al tocar una, el lector salta al
 pasaje. Es la diferencia entre «el agente dice» y «el libro dice»: si la cita no sostiene la
 respuesta, tienes delante el sitio para comprobarlo.
+
+<figure>
+  <img src="../../assets/capturas/04-agente.webp" width="380" alt="Respuesta del agente con el pasaje citado y las páginas a las que salta" loading="lazy">
+  <figcaption>Cada respuesta trae su cita y su página. El pasaje original está a un toque.</figcaption>
+</figure>
 
 ## Modo Feynman: explícalo tú
 

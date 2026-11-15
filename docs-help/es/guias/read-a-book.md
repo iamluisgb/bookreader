@@ -40,6 +40,11 @@ pantalla o al mover el ratón. Se sale con Esc.
 
 En **Ajustes de lectura**:
 
+<figure markdown>
+  ![Ajustes de lectura abiertos sobre la página, con tema, brillo, fuente y modo](../assets/capturas/02-ajustes-lectura.webp)
+  <figcaption>Los ajustes se aplican sobre la página, sin cerrar el libro: ves el cambio en el texto real.</figcaption>
+</figure>
+
 | Ajuste              | Para qué                                                                         |
 | ------------------- | -------------------------------------------------------------------------------- |
 | Fuente y tamaño     | El texto del EPUB. En PDF no hay: la maqueta viene impresa y se ajusta con zoom. |

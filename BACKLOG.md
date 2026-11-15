@@ -1895,16 +1895,19 @@ buscador y la marca del sitio; aquí no existía nada.
 por lengua, agrupados en **guías** (una tarea), **tutoriales** (un recorrido), **explicación** (el
 porqué) y **referencia** (formatos y límites), con buscador y navegación. El tema es la landing: los
 tokens de `app/css/themes.css`, Inter y Source Serif 4 desde `/app/fonts`, Umami con el mismo guard
-de producción. Hreflang entre las dos lenguas y bloque del sitemap global generado.
+de producción. Hreflang entre las dos lenguas y bloque del sitemap global generado. Seis
+**capturas reales por lengua** (biblioteca, ajustes, selección, agente, Studio y repaso), hechas con
+la app y las fixtures de evals, sin datos personales.
 
 **Cómo se mantiene.** Un artículo = un objetivo. Se escribe en Markdown, en las dos lenguas, y se
 reconstruye con `npm run help:build` (usa `.venv-docs/bin/mkdocs` o el `mkdocs` del PATH; el venv no
 se versiona). La lista blanca de [`scripts/build-pages.mjs`](scripts/build-pages.mjs) incluye `help`.
 Enlaces desde las landings (nav y pie) y desde Ajustes → **Ayuda completa**.
 
-**Fuera.** Ayuda embebida en la app (solo el enlace y la guía rápida), capturas de pantalla por
-artículo y una página de novedades. Si aparece una duda que se repite, entra como artículo o como
-sección de uno existente; no se abre un blog.
+**Fuera.** Ayuda embebida en la app (solo el enlace y la guía rápida) y una página de novedades. Si
+aparece una duda que se repite, entra como artículo o como sección de uno existente; no se abre un
+blog. Las capturas se recapturan a mano si cambia la interfaz: no hay script versionado porque
+depende de la app arrancada y de las fixtures.
 
 ---
 

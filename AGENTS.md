@@ -75,7 +75,9 @@ offline con un agente de IA (BYOK) que lee el libro completo según un objetivo.
 
 ## Desarrollo
 - Servir en local: `python3 -m http.server` y abrir `index.html`. No hay build de la app.
-- **Ayuda** (`/help/`, `/es/ayuda/`): `npm run help:build`. Necesita MkDocs Material en
+- **Ayuda** (`/help/`, `/es/ayuda/`): `npm run help:build`. Las capturas de `docs-help/*/assets/capturas/`
+  son de la app real (fixtures de evals, sin datos personales); si cambia una de esas seis pantallas,
+  se recapturan a mano. Necesita MkDocs Material en
   `.venv-docs/` (`python3 -m venv .venv-docs && .venv-docs/bin/pip install mkdocs-material`, una vez
   por máquina) o en el PATH. Escribe en `help/` y `es/ayuda/` y actualiza el bloque de la ayuda del
   `sitemap.xml`; hay que commitear el HTML resultante. Un artículo = un objetivo, en las dos lenguas.
