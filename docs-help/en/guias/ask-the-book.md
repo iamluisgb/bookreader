@@ -57,9 +57,24 @@ does not support the answer, the place to check it is right there.
 
 ## Feynman mode: you explain it
 
-Instead of asking, you explain the concept and the agent plays sparring partner: it tells you what
-is missing, what is weak and what you got right, without giving you the answer first. Open it from
-the agent's menu.
+Instead of asking, you explain. Open it from the book's Studio (the **Explain it yourself** card);
+it has three steps:
+
+1. **Pick the concept.** Not a chapter — an idea you can explain: "byte pair encoding", yes;
+   "Working with Text Data", no. It suggests the leaves of the book's **mind map** and the
+   subsections of what you are reading; if none fits, **Suggest concepts** asks the model for more.
+2. **Explain in your own words.** Before you type, the agent has already worked out which ideas a
+   good explanation should hit and which mistakes are typical, **each with its passage**: the bar
+   is set beforehand, not after the fact. The bar counts the ideas you have covered.
+3. **It asks, it doesn't correct.** When something is missing it escalates: first it asks for
+   more, then a hint, then the specific piece, and only confirms once you have said it. It does
+   not hand you the answer: you build it.
+
+When you're done, **"Enough — what did I miss?"** gives you the diagnosis —what you covered and
+what you didn't, with its citation— drawn from the session itself, with no extra model call.
+Citations are chips: one tap and you are at the passage.
+
+You can **dictate** instead of typing, with an ES/EN selector next to the microphone.
 
 ## Speak instead of typing
 

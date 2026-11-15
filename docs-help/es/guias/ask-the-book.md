@@ -58,9 +58,25 @@ respuesta, tienes delante el sitio para comprobarlo.
 
 ## Modo Feynman: explícalo tú
 
-En vez de preguntar, explica tú el concepto y el agente hace de contrapunto: te dice qué falta, qué
-está flojo y qué has acertado, sin darte la respuesta antes de tiempo. Se abre desde el menú del
-agente.
+En vez de preguntar, explicas tú. Se abre desde el Studio del libro (la tarjeta **Explícamelo
+tú**) y son tres pasos:
+
+1. **Elige el concepto.** No un capítulo, una idea que se pueda explicar: «byte pair encoding»
+   sí, «Working with Text Data» no. Te propone las hojas del **mapa mental** del libro y los
+   subtítulos de lo que estás leyendo; si ninguna te sirve, **Sugerir conceptos** le pide más al
+   modelo.
+2. **Explica con tus palabras.** Antes de que escribas, el agente ya ha preparado qué ideas
+   debería tocar una buena explicación y qué errores son típicos, **cada una con su pasaje**: el
+   listón se fija antes, no a posteriori. La barra cuenta las ideas que llevas cubiertas.
+3. **Te pregunta, no te corrige.** Cuando falta algo escala: primero te pide más, luego una
+   pista, luego la pieza concreta, y solo confirma cuando ya la has dicho. La respuesta no te la
+   da: se construye.
+
+Al terminar, **«Ya vale, ¿qué me dejé?»** te da el diagnóstico —lo que cubriste y lo que no, con
+su cita— sacado de la propia sesión, sin otra llamada al modelo. Las citas son chips: un toque y
+estás en el pasaje.
+
+Puedes **dictar** en vez de escribir, con su selector ES/EN al lado del micrófono.
 
 ## Habla en vez de escribir
 

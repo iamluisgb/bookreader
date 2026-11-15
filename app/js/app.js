@@ -382,7 +382,7 @@ async function recibirMigracion() {
     const Backup = await import('./backup.js');
     const r = await Backup.importBackup(backup);
     toast({
-      message: t('Datos traspasados: {n} ajustes y {m} registros del agente. Vuelve a añadir los ficheros de tus libros: no caben en la copia.', { n: r.localKeys, m: r.aiRecords }),
+      message: t('Datos traspasados: {n} ajuste(s) y {m} registro(s) del agente. Vuelve a añadir los ficheros de tus libros: no caben en la copia.', { n: r.localKeys, m: r.aiRecords }),
       timeout: 15000,
     });
   } catch (e) {

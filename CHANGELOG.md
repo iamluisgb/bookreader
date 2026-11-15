@@ -3,6 +3,30 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-11-15 — Mudanza desde luisgonzalezbernal.com/bookreader
+
+- **El caso**: la PWA vivió en `luisgonzalezbernal.com/bookreader` (GitHub Pages) hasta hoy; la
+  casa nueva es `bookreader.raiatech.com`. Como el almacenamiento va por origen, quien entra
+  por la ruta vieja pierde sus datos si se le redirige en seco. La solución es la de Areté
+  (commit `44d80c2`): una página de retirada en el origen viejo que empaqueta los datos y los
+  lleva consigo al sitio nuevo.
+- **Receptor `#migrar=…`** (`app.js`): restaura el paquete con el mismo `importBackup` de
+  Ajustes → Datos. Codificación heredada de Areté: base64url de `[marca][cuerpo]` con la marca
+  diciendo si va comprimido con gzip — el receptor no adivina mirando el contenido. El
+  fragmento sale de la URL ANTES de usarse y el resto del hash (`#book=…&loc=…`) sobrevive.
+  Test: [`tests/migrar.spec.ts`](tests/migrar.spec.ts).
+- **Página de retirada** (rama `gh-pages`, como en Areté): `index.html` + `404.html` conservan
+  la ruta (`/bookreader/blog/x` → `/blog/x`), leen el localStorage `bookreader_*` (sin secretos
+  ni claves locales, con la licencia) y la IndexedDB `bookreader_ai`, y lo empaquetan con las
+  reglas exactas del backup. Si cabe en el fragmento (48 KB, el techo prudente de Safari),
+  salta sola a la app con los datos; si no, ofrece la descarga para importar en Ajustes →
+  Datos. Sin datos, salta en 900 ms; con `meta refresh` de respaldo sin JS. `sw.js` de retirada
+  desregistra el SW viejo y vacía las cachés: sin él, la PWA instalada seguiría abriendo una
+  copia congelada para siempre. Los ficheros EPUB/PDF no viajan (binarios fuera del backup) y
+  la página lo dice.
+- **GitHub Pages** pasa de servir `main` a servir `gh-pages`: el repo `main` queda intacto
+  para Cloudflare Pages y la ruta vieja deja de servir la app completa.
+
 ## 2026-11-15 — La ayuda se acerca al atasco: enlaces contextuales, referencia completa y footer vivo
 
 - **El caso**: «Ayuda completa» abría siempre la portada — quien tenía un PDF sin índice o la demo

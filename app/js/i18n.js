@@ -472,7 +472,7 @@ const EN = {
   'Arrastra para ajustar el ancho · doble clic: restablecer': 'Drag to adjust width · double-click to reset',
   'No se pudo abrir el libro guardado.': 'Could not open the saved book.',
   // Mudanza desde el origen viejo (recibirMigracion en app.js)
-  'Datos traspasados: {n} ajustes y {m} registros del agente. Vuelve a añadir los ficheros de tus libros: no caben en la copia.': 'Data transferred: {n} settings and {m} agent records. Add your book files again: they do not fit in the copy.',
+  'Datos traspasados: {n} ajuste(s) y {m} registro(s) del agente. Vuelve a añadir los ficheros de tus libros: no caben en la copia.': 'Data transferred: {n} setting(s) and {m} agent record(s). Add your book files again: they do not fit in the copy.',
   'No se pudo importar el traspaso: {msg}': 'Could not import the transfer: {msg}',
   'Salir de pantalla completa': 'Exit full screen',
   'Pantalla completa': 'Full screen',
@@ -913,7 +913,7 @@ const EN = {
   // NB2 · libreta que guía
   'Escribe tu nota…': 'Write your note…',
   'P:': 'Q:',
-  'Tu respuesta, con tus palabras': 'Your answer, in your own words',
+  // ('Tu respuesta, con tus palabras' ya está arriba: estaba duplicada y ESLint lo marcaba)
   'Revisar con el agente': 'Review with the agent',
   'Hacer tarjeta': 'Make a card',
   'Responder': 'Answer',

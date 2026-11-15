@@ -21,6 +21,10 @@ por libro**, así que generas una vez y consultas siempre, sin conexión despué
 Los tres son trabajos pesados: van en **segundo plano** (verás un chip con el progreso; puedes
 cerrar el panel y seguir leyendo) y si alguno falla, se reintenta desde el propio Studio.
 
+El Studio tiene además **Explícamelo tú**: no genera un apunte, monta un ejercicio en el que
+explicas un concepto y el agente te pregunta hasta que lo construyes —
+[modo Feynman](ask-the-book.md#modo-feynman-explicalo-tu).
+
 ## De dónde salen las tarjetas
 
 1. **Del Studio del libro.** Abre el libro, entra en el agente y ve a la pestaña **Studio**. Pide

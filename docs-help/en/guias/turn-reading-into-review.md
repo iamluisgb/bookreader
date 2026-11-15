@@ -21,6 +21,10 @@ per book**, so you generate once and consult forever — offline, after the firs
 All three are heavy jobs: they run **in the background** (you will see a progress chip; you can
 close the panel and keep reading) and if one fails, you retry it from the Studio itself.
 
+The Studio also has **Explain it yourself**: it doesn't produce a note, it sets up an exercise in
+which you explain a concept and the agent questions you until you build it —
+[Feynman mode](ask-the-book.md#feynman-mode-you-explain-it).
+
 ## Where the cards come from
 
 1. **From the book's Studio.** Open the book, open the agent and go to the **Studio** tab. Ask for
