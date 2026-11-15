@@ -61,6 +61,21 @@ Instead of asking, you explain the concept and the agent plays sparring partner:
 is missing, what is weak and what you got right, without giving you the answer first. Open it from
 the agent's menu.
 
+## Speak instead of typing
+
+Next to the text box there is a **microphone** (in Feynman mode too): record, release, and the text
+lands in the box. There are two engines:
+
+- **With a transcription model** (Settings → Agent → “Transcription model”, uses your API key):
+  the recording is transcribed when you release, and it is far better with technical vocabulary and
+  proper names; it doesn't cut on a brief pause. The recording bar shows a level meter, so you
+  know it hears you.
+- **Without one**: the browser's recognizer is used. Live text, but it cuts on every pause and
+  struggles more with jargon.
+
+Transcription is biased with the book title and the open chapter: that is exactly where the proper
+nouns that would otherwise be guessed by ear live.
+
 ## The question at the end of a chapter
 
 With the **HQ&A** template active, when you start a new chapter the agent asks **one recall

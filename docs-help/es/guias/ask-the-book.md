@@ -62,6 +62,21 @@ En vez de preguntar, explica tú el concepto y el agente hace de contrapunto: te
 está flojo y qué has acertado, sin darte la respuesta antes de tiempo. Se abre desde el menú del
 agente.
 
+## Habla en vez de escribir
+
+Junto a la caja de texto hay un **micrófono** (también en el modo Feynman): graba, suelta y el
+texto queda en la caja. Hay dos motores:
+
+- **Con modelo de transcripción** (Ajustes → Agente → «Modelo de transcripción», gasta tu API
+  key): la grabación se transcribe al soltar y acierta mucho más con vocabulario técnico y nombres
+  propios; no se corta por un silencio breve. La barra de grabación enseña el nivel, para saber
+  que te está oyendo.
+- **Sin modelo**: se usa el reconocedor del navegador. Texto en vivo, pero se corta con cada
+  pausa y falla más con los tecnicismos.
+
+La transcripción está sesgada con el título del libro y el capítulo abierto: es justo donde caen
+los nombres propios que si no se transcriben de oído.
+
 ## La pregunta al terminar un capítulo
 
 Con la plantilla **HQ&A** activa, al empezar un capítulo nuevo el agente te hace **una pregunta de

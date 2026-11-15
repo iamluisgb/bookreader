@@ -5,7 +5,21 @@ updated: 2026-11-15
 # Convierte lo leído en repaso
 
 Leer no es recordar. BookReader convierte el libro en **tarjetas** que vuelven cuando estás a punto
-de olvidarlas, y te deja llevártelas a Anki si ya vives allí.
+de olvidarlas, en **apuntes** que se leen de un vistazo, y te deja llevártelo todo a Anki si ya
+vives allí.
+
+## El Studio: resumen, mapa mental e infografía
+
+Junto a las tarjetas, el Studio del libro genera tres apuntes que se quedan contigo: se **cachean
+por libro**, así que generas una vez y consultas siempre, sin conexión después de la primera vez.
+
+- **Resumen**: TL;DR e ideas clave por capítulo, cada una con su cita al pasaje.
+- **Mapa mental**: mapa por ramas navegable de los conceptos del libro; las ramas se abren y el
+  mapa crece sobre sí.
+- **Infografía**: un póster del libro —tesis, ideas clave y cita— listo para descargar.
+
+Los tres son trabajos pesados: van en **segundo plano** (verás un chip con el progreso; puedes
+cerrar el panel y seguir leyendo) y si alguno falla, se reintenta desde el propio Studio.
 
 ## De dónde salen las tarjetas
 

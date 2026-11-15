@@ -5,7 +5,21 @@ updated: 2026-11-15
 # Turn reading into review
 
 Reading is not remembering. BookReader turns the book into **cards** that come back just before you
-forget them, and lets you take them to Anki if that is where you live.
+forget them, into **notes** you can read at a glance, and lets you take it all to Anki if that is
+where you live.
+
+## The Studio: summary, mind map and infographic
+
+Next to the cards, the book's Studio produces three notes that stay with you: they are **cached
+per book**, so you generate once and consult forever — offline, after the first time.
+
+- **Summary**: a TL;DR and key ideas per chapter, each with its citation to the passage.
+- **Mind map**: a navigable, branching map of the book's concepts; branches expand and the map
+  grows on itself.
+- **Infographic**: a poster of the book —thesis, key ideas and a quote— ready to download.
+
+All three are heavy jobs: they run **in the background** (you will see a progress chip; you can
+close the panel and keep reading) and if one fails, you retry it from the Studio itself.
 
 ## Where the cards come from
 
