@@ -60,6 +60,33 @@ En **Mazos** verás lo que toca hoy. El repaso usa **FSRS**, el mismo tipo de al
   <figcaption>Una tarjeta del repaso de hoy: la respuesta delante y dos botones; FSRS decide cuándo vuelve.</figcaption>
 </figure>
 
+## El Modo Estudiar
+
+**Estudiar** abre la sesión a pantalla completa. Hay dos puertas: desde un mazo concreto, o
+**Estudiar todo**, la cola del día con lo vencido de todos tus mazos juntos.
+
+Dentro no todo es voltear una tarjeta:
+
+- **Huecos (cloze)**: la frase con el hueco se escribe y se comprueba tal cual.
+- **Opciones**: pregunta con respuestas barajadas (se puede responder con las teclas 1–4).
+- **Figuras**: el diagrama del libro llega con la respuesta tapada; la destapas y te corriges.
+- **Dibujo**: para lo que se aprende dibujando — pintas la respuesta en el lienzo y el agente la
+  revisa con visión, siguiendo la rúbrica, traza a traza.
+- **¿Por qué?**: con la tarjeta girada, dudas de un toque —Dame un ejemplo · ¿Qué descarta? ·
+  ¿Por qué importa?— y el agente responde con el pasaje del libro delante.
+
+Y lo que rodea a la sesión:
+
+- **Meta diaria**: eliges cuántas tarjetas al día y el anillo del encabezado lo cuenta; la racha
+  avisa cuando está en riesgo, antes de perderse.
+- **Deshacer**: puntuaste mal, una tecla Z (o el botón) y vuelve la tarjeta.
+- **Puerta de capítulos**: las tarjetas nuevas de capítulos que no has leído todavía no entran;
+  no hay spoiler por accidente.
+- El estado se guarda **tras cada tarjeta**: cierra a media sesión y no se pierde nada.
+
+Los botones del repaso (dos o cuatro) y el tope de tarjetas nuevas se cambian en
+**Ajustes → Aplicación**.
+
 ## Ejercicios, además de tarjetas
 
 El Studio también puede montar una **matriz** de práctica: filas y columnas que hay que rellenar

@@ -60,6 +60,31 @@ In **Decks** you see what is due today. Review uses **FSRS**, the same kind of a
   <figcaption>A card from today's review: the answer in front and two buttons; FSRS decides when it returns.</figcaption>
 </figure>
 
+## Study mode
+
+**Study** opens the full-screen session. There are two doors in: from one specific deck, or
+**Study everything**, the daily queue with everything due across all your decks.
+
+Inside, it is not all flipping a card:
+
+- **Cloze**: you type the missing part of the sentence and it is checked literally.
+- **Multiple choice**: shuffled options (answerable with keys 1–4).
+- **Figures**: the book's diagram arrives with the answer hidden; uncover it and correct yourself.
+- **Sketch**: for what you learn by drawing — paint the answer on the canvas and the agent reviews
+  it with vision, rubric step by step, stroke by stroke.
+- **Why?**: with the card flipped, one-tap questions —Give me an example · What does it rule out? ·
+  Why does it matter?— and the agent answers with the book's passage in front of it.
+
+And what surrounds the session:
+
+- **Daily goal**: you pick how many cards a day and the header ring counts them; the streak warns
+  you when it is at risk, before it is lost.
+- **Undo**: mis-graded a card, one Z key (or the button) brings it back.
+- **Chapter gate**: new cards from chapters you haven't read yet stay out; no accidental spoilers.
+- State is saved **after every card**: close mid-session and nothing is lost.
+
+The grading buttons (two or four) and the new-card limit live in **Settings → Application**.
+
 ## Exercises, in addition to cards
 
 The Studio can also build a practice **matrix**: rows and columns to fill in by comparing concepts,
