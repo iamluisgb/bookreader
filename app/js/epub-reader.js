@@ -14,6 +14,12 @@ import * as ReadingLog from './reading-log.js';
 const COARSE = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
 
 let book = null;
+// Dónde empieza cada entrada del índice: href → { spine, cfi, page }, rellenado por
+// resolveToc(). `cfi` es null cuando la entrada es el fichero entero (sin ancla, o con un
+// ancla que el libro no contiene): empieza donde empieza su sección. Es lo que deja marcar
+// la SUBSECCIÓN que se está leyendo y no solo el fichero (ver getCurrentTocHref). Vive con
+// el libro: load() lo vacía.
+let tocTargets = null;
 // El lector en pantalla, que no es lo mismo que "tiene un libro cargado" (ver isLoaded).
 // `claimSeq` arbitra entre una carga en vuelo y el lector que se le adelanta.
 let active = false;
@@ -1011,6 +1017,7 @@ export async function load(arrayBuffer, onProgress, bookId = null) {
   pinnedCfi = null;
   restoredSaved = false;
   jumpCfi = null;
+  tocTargets = null;
 
   console.log('Creating ePub book from ArrayBuffer...');
   // epub.js (+ jszip) se carga aquí, no en el arranque: hasta que no se abre un EPUB
@@ -1697,24 +1704,37 @@ export function getPageInfo(cfi) {
   }
 }
 
-// Página en la que empieza cada entrada del índice, para pintarla junto al título.
-// Recibe los href del TOC y devuelve Map<href, página>.
+// Dónde empieza cada entrada del índice: su CFI (para marcar la subsección que se lee) y
+// su página (para pintarla junto al título). Recibe los href del TOC y devuelve
+// Map<href, { cfi, page }>; `page` es null sin localizaciones todavía, y `cfi` es null
+// cuando la entrada es el fichero entero. Lo deja además en `tocTargets`, que es lo que
+// lee getCurrentTocHref(): una sola resolución para el número y para la marca.
 //
-// Dos detalles que costaron descubrir:
+// Detalles que costaron descubrir:
 //  - `cfiBase` NO es un CFI válido por sí solo (epub.js: "not a valid argument for
 //    EpubCFI"); hay que componer el CFI del inicio del documento.
-//  - Muchos EPUB (los de Gutenberg, por ejemplo) meten decenas de capítulos en un
-//    solo fichero y los distinguen por ancla. Quedarse en la sección daría la MISMA
-//    página a diez capítulos seguidos, que es peor que no poner número. Por eso se
-//    resuelve el ancla: cargar la sección y localizar el elemento cuesta ~2 ms.
+//  - Muchos EPUB (los de Gutenberg, y cualquier libro técnico de O'Reilly) meten decenas
+//    de secciones en un solo fichero y las distinguen por ancla. Quedarse en la sección da
+//    la MISMA página a todas, que es peor que no poner número.
+//  - En el epub.js vendorizado (0.3.93) `section.load()` resuelve con `this.contents`, el
+//    `documentElement` —un Element, sin `getElementById`—, no con el Document. Antes se le
+//    pedía el ancla a eso, lanzaba `doc.getElementById is not a function`, el catch lo
+//    tragaba y TODAS las entradas de un fichero caían a la página del capítulo: medido con
+//    *Site Reliability Engineering* (EPUB, 1317 locations), Hiring/Training/Career
+//    Management decían 241/241/241 y están en 241/265/312. El Document bueno es el que
+//    `load()` deja colgado en `section.document`.
+//  - Coste medido con ese libro (693 entradas, un fichero por capítulo): 173-201 ms en
+//    Chromium con viewport de iPad, una vez por apertura, después de las localizaciones y
+//    sin bloquear la lectura. Se guarda en memoria y no en disco: no compensa otro almacén
+//    (ni su invalidación) para una pasada de dos décimas.
 //
 // Se agrupa por fichero para cargar cada sección una sola vez, y se descarga solo lo
 // que hayamos cargado nosotros (una sección ya cargada puede estar renderizándose).
-export async function getTocPages(hrefs) {
+export async function resolveToc(hrefs) {
   const out = new Map();
-  try {
-    if (!book?.spine || !book.locations?.length?.()) return out;
-  } catch (e) { return out; }
+  const mine = book;
+  if (!mine?.spine) return out;
+  const CFI = window.ePub && window.ePub.CFI;
 
   const byFile = new Map();
   for (const href of hrefs) {
@@ -1723,9 +1743,10 @@ export async function getTocPages(hrefs) {
     byFile.get(file).push({ href, anchor });
   }
 
+  const targets = new Map();
   for (const [file, entries] of byFile) {
     let section = null;
-    try { section = book.spine.get(file); } catch (e) { /* href no resoluble */ }
+    try { section = mine.spine.get(file); } catch (e) { /* href no resoluble */ }
     if (!section?.cfiBase) continue;
 
     const basePage = getPageInfo(`epubcfi(${section.cfiBase}!/4/2)`)?.page ?? null;
@@ -1733,24 +1754,37 @@ export async function getTocPages(hrefs) {
     let doc = null, loadedByUs = false;
     if (entries.some((e) => e.anchor)) {
       try {
-        if (section.document) doc = section.document;
-        else { doc = await section.load(book.load.bind(book)); loadedByUs = true; }
-      } catch (e) { /* sin documento: nos quedamos en la página de la sección */ }
+        if (!section.document) { await section.load(mine.load.bind(mine)); loadedByUs = true; }
+        doc = section.document || null;
+      } catch (e) { /* sin documento: nos quedamos en el inicio de la sección */ }
     }
+    if (book !== mine) return out;   // se cambió de libro a mitad: esto ya no es de nadie
 
     for (const e of entries) {
-      let page = basePage;
+      let cfi = null, page = basePage;
       if (e.anchor && doc) {
         try {
-          const el = doc.getElementById?.(e.anchor);
-          if (el) page = getPageInfo(section.cfiFromElement(el))?.page ?? basePage;
-        } catch (err) { /* ancla no encontrada: página de la sección */ }
+          // El href puede venir percent-encoded (`#caf%C3%A9`) y el id no; y `name` para los
+          // EPUB 2 viejos que anclan con <a name>, no con id.
+          let id = e.anchor;
+          try { id = decodeURIComponent(e.anchor); } catch (err) { /* % suelto: tal cual */ }
+          const el = doc.getElementById(e.anchor) || doc.getElementById(id)
+            || doc.querySelector(`[name="${CSS.escape(id)}"]`);
+          if (el) {
+            cfi = section.cfiFromElement(el);
+            page = getPageInfo(cfi)?.page ?? basePage;
+          }
+        } catch (err) { /* ancla no resoluble: inicio de la sección */ }
       }
-      if (page != null) out.set(e.href, page);
+      let parsed = null;
+      try { if (cfi && CFI) parsed = new CFI(cfi); } catch (err) { cfi = null; }
+      targets.set(e.href, { spine: section.index, cfi: parsed });
+      out.set(e.href, { cfi, page });
     }
 
     if (loadedByUs) { try { section.unload(); } catch (e) { /* ya descargada */ } }
   }
+  if (book === mine) tocTargets = targets;
   return out;
 }
 
@@ -1821,17 +1855,34 @@ export function getCurrentChapterLabel() {
 }
 
 // href (tal cual está en el índice) de la entrada que corresponde a lo que se está
-// leyendo AHORA, para marcarla en el sidebar. Se recorre el índice —incluidas las
-// subentradas— y se devuelve la PRIMERA del fichero actual: cuando un fichero trae
-// varias secciones no se sabe por cuál va la lectura sin resolver los anclajes, así
-// que se marca la sección que las contiene. '' si no se puede resolver.
+// leyendo AHORA, para marcarla en el sidebar (y, por la misma vía, el capítulo del pie).
+//
+// Con las anclas resueltas (resolveToc) es la entrada que empezó MÁS TARDE sin pasar de
+// la posición actual: la sección más concreta en la que estás. A igualdad de inicio gana
+// la que va después en el índice, que es la más anidada (un capítulo y su primera sección
+// que arrancan en el mismo sitio → la sección). Antes se devolvía la PRIMERA entrada del
+// fichero, y en un libro con un fichero por capítulo la marca no bajaba nunca de capítulo:
+// medido en *Site Reliability Engineering*, leyendo Career Management (location 312) el
+// índice marcaba «5. SRE Hiring, Training, and Career Management». En modo scroll, sin
+// saltos de página que orienten, el índice es la única referencia, y mentía.
+//
+// Mientras las anclas no están resueltas (el primer instante de la apertura, o un libro
+// sin localizaciones) se queda el criterio de antes: la primera entrada del fichero.
+// '' si no se puede resolver.
 export function getCurrentTocHref() {
   if (!book || !rendition) return '';
   const nav = book.navigation;
   if (!nav || !nav.toc) return '';
 
-  const location = rendition.currentLocation();
+  // La que epub.js dejó en el último relocated, si la hay: `currentLocation()` recalcula el
+  // rango visible y cuesta ~6 ms (medido, iPad emulado, capítulo de 88 locations), y esto se
+  // llama en cada relocated. Si un 'rendered' llega antes que su relocated, la marca de ese
+  // instante es la vieja y la corrige el relocated que viene detrás.
+  const location = rendition.location?.start?.cfi ? rendition.location : rendition.currentLocation();
   if (!location || !location.start) return '';
+
+  const byAnchor = tocTargets && currentTocHrefByAnchor(nav.toc, location);
+  if (byAnchor) return byAnchor;
 
   const href = location.start.href;
   let match = '';
@@ -1844,6 +1895,70 @@ export function getCurrentTocHref() {
   };
   walk(nav.toc);
   return match;
+}
+
+// Inicio de una entrada frente a otra (o frente a la posición actual): primero por
+// fichero del spine; dentro del fichero, la entrada sin CFI (el fichero entero) va antes
+// que cualquier ancla, y entre anclas manda el orden del CFI.
+// Un solo comparador para todas las comparaciones (hasta 693 por marca en un índice
+// técnico), en vez de un EpubCFI nuevo en cada una.
+let cfiComparator = null;
+function compareTocStart(a, b) {
+  if (a.spine !== b.spine) return a.spine < b.spine ? -1 : 1;
+  if (!a.cfi || !b.cfi) return (a.cfi ? 1 : 0) - (b.cfi ? 1 : 0);
+  if (!cfiComparator) cfiComparator = new window.ePub.CFI();
+  return cfiComparator.compare(a.cfi, b.cfi);
+}
+
+// La entrada del índice que empezó más tarde sin pasar de `pos` ({spine, cfi}). A igualdad
+// gana la que va después en el índice (la más anidada). `<= 0`: una entrada que empieza
+// justo ahí ya cuenta (el salto del índice deja el ancla alineada al borde superior, y su
+// CFI es prefijo de lo que se ve).
+function lastTocStartedAt(toc, pos) {
+  let best = null, href = '';
+  const walk = (items) => {
+    for (const item of items || []) {
+      const t = item.href && tocTargets.get(item.href);
+      if (t && compareTocStart(t, pos) <= 0 && (!best || compareTocStart(t, best) >= 0)) {
+        best = t; href = item.href;
+      }
+      walk(item.subitems);
+    }
+  };
+  walk(toc);
+  return href;
+}
+
+function tocPos(edge) {
+  try {
+    return edge && edge.index != null ? { spine: edge.index, cfi: new window.ePub.CFI(edge.cfi) } : null;
+  } catch (e) { return null; }
+}
+
+function currentTocHrefByAnchor(toc, location) {
+  const top = tocPos(location.start);
+  if (!top) return '';
+  // Una sección corta al final de un capítulo (la «Conclusion») no puede subir al borde
+  // superior: el documento se acaba antes. Medido, saltar a ch05_conclusion (location 326)
+  // dejaba arriba el final de la sección anterior y la marca decía «Attrition and
+  // Retention». Dos casos en que cuenta lo que se VE y no solo el borde de arriba:
+  //  - la entrada a la que se acaba de saltar, mientras se esté ahí (`jumpSeq === navSeq`;
+  //    desplazarse o navegar lo caduca) y siga a la vista: cubre también el paginado;
+  //  - en scroll, con el documento desplazado hasta el fondo: la última entrada que asoma.
+  const bottom = tocPos(location.end);
+  const jumped = jumpSeq === navSeq && jumpCfi && tocTargets.get(jumpCfi);
+  if (bottom && jumped && compareTocStart(jumped, top) > 0 && compareTocStart(jumped, bottom) <= 0) {
+    return jumpCfi;
+  }
+  return lastTocStartedAt(toc, bottom && scrolledToBottom() ? bottom : top);
+}
+
+// El contenedor del modo scroll está al fondo (con 2 px de holgura por el redondeo de
+// scrollTop en pantallas con DPR fraccionario). En paginado no hay tal contenedor: false.
+function scrolledToBottom() {
+  if (getReadingMode() !== 'scroll') return false;
+  const sc = document.querySelector('#epub-container .epub-container');
+  return !!sc && sc.scrollHeight > sc.clientHeight && sc.scrollTop + sc.clientHeight >= sc.scrollHeight - 2;
 }
 
 // `bookId` es el hash del fichero (el id canónico). Con él, las locations se guardan tras

@@ -1724,13 +1724,16 @@ export async function primeOutlineCache() {
   try {
     const items = await getOutlineItems();
     const flat = [];
-    for (const it of items) {
-      if (it.page != null) flat.push({ label: it.label, page: it.page });
-      for (const sub of it.subitems || []) {
-        if (sub.page != null) flat.push({ label: sub.label, page: sub.page });
+    // A cualquier profundidad, como el índice del sidebar (antes, dos niveles: la burbuja
+    // decía la sección de arriba aunque el outline tuviera una más concreta).
+    const walk = (list) => {
+      for (const it of list) {
+        if (it.page != null) flat.push({ label: it.label, page: it.page });
+        walk(it.subitems || []);
       }
-    }
-    flatOutline = flat.sort((a, b) => a.page - b.page);
+    };
+    walk(items);
+    flatOutline = flat.sort((a, b) => a.page - b.page);   // sort estable: el hijo tras su padre
   } catch {
     flatOutline = [];
   }

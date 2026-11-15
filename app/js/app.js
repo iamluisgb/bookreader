@@ -1798,6 +1798,10 @@ async function loadEpub(buffer, bookId, aiBookId, persist = null) {
       saveProgress(pct);
       syncRouteSoon();               // reflejar la posición en la URL (deep-link)
       ReadingLog.position(unit);     // P25: cuánto de esto fue lectura, lo decide él
+      // La marca va por SECCIÓN, no por fichero: en scroll epub.js solo avisa de cambio de
+      // capítulo ('rendered') al cambiar de fichero, y dentro de él la marca se quedaba en
+      // la sección del último salto. Cada relocated (en scroll, con rebote de 150 ms).
+      markCurrentToc();
     });
 
     EpubReader.onChapter((label) => {
@@ -1866,6 +1870,7 @@ async function loadEpub(buffer, bookId, aiBookId, persist = null) {
     } catch (locErr) {
       console.warn('Could not generate locations:', locErr);
       totalWords = countBookWords();
+      fillTocPages();   // sin páginas, pero las anclas sí se resuelven: la marca baja a la sección
     }
 
     // Salida (o cambio de libro) durante generateLocations: el rendition actual ya
@@ -1997,11 +2002,11 @@ async function loadPdfTOC() {
     return;
   }
   tocList.innerHTML = '';
-  const addLink = (it, isSub) => {
+  const addLink = (it, depth) => {
     const a = document.createElement('a');
     a.href = '#';
     a.appendChild(tocLabel(it.label, it.page));
-    if (isSub) a.classList.add('subitem');
+    tocDepth(a, depth);
     if (it.page != null) {
       a.dataset.tocPage = String(it.page);   // para marcar dónde se está leyendo
       a.addEventListener('click', async (e) => {
@@ -2015,13 +2020,31 @@ async function loadPdfTOC() {
     tocList.appendChild(a);
     return a;
   };
-  items.forEach(it => {
-    const subs = it.subitems || [];
-    const a = addLink(it, false);
-    if (subs.length) a.classList.add('has-sub');   // cabecera de grupo (ver loadTOC)
-    subs.forEach(sub => addLink(sub, true));
-  });
+  addTocTree(items, addLink);
   markCurrentToc();
+}
+
+// Pinta el árbol del índice ENTERO, a cualquier profundidad. Antes loadTOC y loadPdfTOC
+// bajaban un solo nivel de `subitems` y lo de más abajo no existía ni para pulsarlo:
+// medido en *Site Reliability Engineering* (EPUB), 221 enlaces de 693 entradas (Breadth,
+// Initiative, Teamwork… no estaban). Una entrada con hijos hace de cabecera de su grupo
+// (.has-sub en main.css): sigue siendo un enlace navegable, solo pesa más tipográficamente.
+function addTocTree(items, addLink, depth = 0) {
+  for (const item of items || []) {
+    const subs = item.subitems || [];
+    const a = addLink(item, depth);
+    if (subs.length) a.classList.add('has-sub');
+    addTocTree(subs, addLink, depth + 1);
+  }
+}
+
+// Nivel de una entrada: `.subitem` desde el segundo nivel (como siempre) y `.subitem--deep`
+// del tercero en adelante, que solo sangra un paso más: más escalones no se leen en un
+// panel de 320 px. `aria-level` deja la profundidad real a los lectores de pantalla.
+function tocDepth(a, depth) {
+  if (depth > 0) a.classList.add('subitem');
+  if (depth > 1) a.classList.add('subitem--deep');
+  a.setAttribute('aria-level', String(depth + 1));
 }
 
 // Marca en el índice la sección que se está leyendo (y la deja a la vista al abrir el
@@ -2046,11 +2069,16 @@ function markCurrentToc(scroll = false) {
     }
   }
 
-  for (const a of links) {
-    const isCurrent = a === current;
-    a.classList.toggle('current', isCurrent);
-    if (isCurrent) a.setAttribute('aria-current', 'location');
-    else a.removeAttribute('aria-current');
+  // Solo se tocan la marca vieja y la nueva: ahora se re-marca en cada relocated y un
+  // índice técnico tiene cientos de entradas (693 en *Site Reliability Engineering*).
+  for (const a of tocList.querySelectorAll('a.current')) {
+    if (a === current) continue;
+    a.classList.remove('current');
+    a.removeAttribute('aria-current');
+  }
+  if (current && !current.classList.contains('current')) {
+    current.classList.add('current');
+    current.setAttribute('aria-current', 'location');
   }
   if (scroll && current) current.scrollIntoView({ block: 'center' });
   setFooterChapter(current);
@@ -2108,12 +2136,12 @@ function loadTOC() {
   }
 
   tocList.innerHTML = '';
-  const addLink = (item, isSub) => {
+  const addLink = (item, depth) => {
     const a = document.createElement('a');
     a.href = '#';
     a.dataset.tocHref = item.href;
     a.appendChild(tocLabel(item.label, null));   // la página llega en fillTocPages()
-    if (isSub) a.classList.add('subitem');
+    tocDepth(a, depth);
     a.addEventListener('click', async (e) => {
       e.preventDefault();
       await EpubReader.goTo(item.href);
@@ -2121,29 +2149,26 @@ function loadTOC() {
     tocList.appendChild(a);
     return a;
   };
-  nav.toc.forEach(item => {
-    const subs = item.subitems || [];
-    // Una entrada con subentradas hace de cabecera de grupo en el índice (ver .has-sub
-    // en main.css): sigue siendo un enlace navegable, solo pesa más tipográficamente.
-    const a = addLink(item, false);
-    if (subs.length) a.classList.add('has-sub');
-    subs.forEach(sub => addLink(sub, true));
-  });
+  addTocTree(nav.toc, addLink);
   markCurrentToc();
 }
 
 // Las localizaciones de epub.js se generan DESPUÉS de pintar el índice (en un libro
 // grande tardan segundos), y sin ellas no hay número de página que dar. Cuando
-// terminan se rellenan los huecos, sin reconstruir la lista.
+// terminan se resuelve dónde empieza cada entrada (resolveToc) y se rellenan los huecos,
+// sin reconstruir la lista. Esa misma resolución es la que deja a la marca bajar del
+// capítulo a la sección: por eso se vuelve a marcar al terminar.
 async function fillTocPages() {
   const tocList = document.getElementById('toc-list');
   if (!tocList || !EpubReader.isLoaded()) return;
   const links = [...tocList.querySelectorAll('a[data-toc-href]')];
   if (!links.length) return;
-  const pages = await EpubReader.getTocPages(links.map((a) => a.dataset.tocHref));
+  const targets = await EpubReader.resolveToc(links.map((a) => a.dataset.tocHref));
+  if (!links[0].isConnected) return;   // otro libro pintó su índice mientras tanto
+  markCurrentToc();
   for (const a of links) {
     if (a.querySelector('.toc-page')) continue;
-    const page = pages.get(a.dataset.tocHref);
+    const page = targets.get(a.dataset.tocHref)?.page;
     if (page == null) continue;
     const num = document.createElement('span');
     num.className = 'toc-page';
