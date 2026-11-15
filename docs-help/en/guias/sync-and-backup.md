@@ -21,6 +21,11 @@ There are two ways today:
 
 ### Turn on Google Drive
 
+<figure markdown>
+  ![Settings → Data: backup, import and the sync-between-devices row](../assets/capturas/09-sync-data.webp)
+  <figcaption>Everything about backups and sync lives in Settings → Data.</figcaption>
+</figure>
+
 1. **Settings → Data**.
 2. Under **Sync between devices**, pick **Google Drive**.
 3. **Connect Google Drive** and authorise.

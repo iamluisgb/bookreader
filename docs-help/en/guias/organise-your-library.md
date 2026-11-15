@@ -8,6 +8,11 @@ The library is the home screen: shelves on the left, books on the right. With a 
 matters; with fifty, the difference between finding something and not finding it is how you organise
 it.
 
+<figure markdown>
+  ![The library: shelves on the left, books with covers on the right, search on top](../assets/capturas/08-shelves.webp)
+  <figcaption>Shelves on the left, books on the right. Search and the status filter live on top.</figcaption>
+</figure>
+
 ## Two kinds of shelves
 
 - **Manual.** You choose what goes in. **New shelf** creates one; you can nest them (for example

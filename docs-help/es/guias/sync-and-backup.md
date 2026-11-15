@@ -22,6 +22,11 @@ Hoy hay dos formas:
 
 ### Activar Google Drive
 
+<figure markdown>
+  ![Ajustes → Datos: backup, importar y la fila de sincronización entre dispositivos](../assets/capturas/09-sync-datos.webp)
+  <figcaption>Todo lo de copias y sync vive en Ajustes → Datos.</figcaption>
+</figure>
+
 1. **Ajustes → Datos**.
 2. En **Sincronización entre dispositivos**, elige **Google Drive**.
 3. **Conectar con Google Drive** y autoriza.

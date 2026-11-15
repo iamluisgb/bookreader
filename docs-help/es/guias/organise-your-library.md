@@ -8,6 +8,11 @@ La biblioteca es la pantalla de inicio: estanterías a la izquierda, libros a la
 libros da igual; con cincuenta, la diferencia entre encontrar algo y no encontrarlo está en cómo la
 ordenas.
 
+<figure markdown>
+  ![La biblioteca: estanterías a la izquierda, libros con portada a la derecha y buscador arriba](../assets/capturas/08-estanterias.webp)
+  <figcaption>Estanterías a la izquierda, libros a la derecha. El buscador y el filtro de estado, arriba.</figcaption>
+</figure>
+
 ## Estanterías: dos tipos
 
 - **Manuales.** Tú eliges qué va dentro. **Nueva estantería** crea una; puedes anidarlas (por
