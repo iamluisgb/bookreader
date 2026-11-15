@@ -41,11 +41,31 @@ Open a book's menu (the three dots) to:
 
 Editing the details does not touch the book: the file and your notes stay as they are.
 
-## Sharing a shelf
+## Sharing books and shelves
 
-From the shelf menu, **Share shelf…** creates a link. Whoever opens it sees the shelf and can save
-it; it **expires**, and you can withdraw it from the same menu. Remember the link carries your notes
-for those books: send it only to someone who should see them.
+You hand someone a book or a shelf **together with what you made of it**: what gets shared is a
+dossier, not just a list of books.
+
+**What you can send.** From the shelf menu, **Share shelf…**; from the book's menu or the reader's
+“More”, **Share book**. Before sending you pick what to include:
+
+- **The books** (PDF/EPUB), with their size shown up front — if a book has no file on this device
+  (Drive only), it cannot travel in the package.
+- Highlights and notes, notebooks, and agent conversations (optional: check first whether you want
+  the chat to travel).
+- Studio artifacts (summaries, mind maps, infographics) and card decks (without your progress).
+
+**Two ways:**
+
+- **Link**: encrypted on your device, opens with a tap, **expires in 7 days**. You can withdraw it
+  earlier from the same menu (or in Settings → Data → “Shared links”). The cap is **100 MB** per
+  link; if it doesn't fit, the app offers to send it as a file.
+- **A `.bookreader` file**: for those who'd rather nothing pass through a server (even though the
+  link is encrypted) or have no connection.
+
+Whoever receives the link or file sees what it carries and from whom, picks which books to import,
+and the notes anchor to that book in their library. Remember the package carries your notes for
+those books: send it only to someone who should see them.
 
 ## Insights: what you actually read
 

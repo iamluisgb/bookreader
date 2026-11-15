@@ -109,6 +109,10 @@ document.addEventListener('DOMContentLoaded', () => {
   // MON4 · Enlace de emparejamiento del sync de BookReader (`#pair=…`): lo mismo, la clave
   // sale de la URL antes que nada.
   recibirEmparejamiento();
+  // Mudanza desde luisgonzalezbernal.com/bookreader (`#migrar=…`): restaura el backup que
+  // trae la página de retirada del origen viejo. También en el arranque: el enlace se abre
+  // en frío y el fragmento debe salir de la URL cuanto antes.
+  recibirMigracion();
   // P55 · Prueba de las preguntas de comprobación (`?probes-test=<libro>`), ver ai/probes.js.
   programarPreguntasDePrueba();
   // Fase 0 sync: backfill de uid/updatedAt en datos previos + purga de
@@ -340,6 +344,53 @@ async function recibirEmparejamiento() {
       : e.message === 'reconnect'
         ? t('Tu suscripción no está activa. El sync de BookReader queda en solo lectura.')
         : t('No se pudo emparejar: {msg}', { msg: e.message }), { title });
+  }
+}
+
+// ============ MIGRACIÓN DESDE EL ORIGEN VIEJO (`#migrar=…`) ============
+// La PWA vivió en luisgonzalezbernal.com/bookreader hasta el 15-nov-2026 y el
+// almacenamiento va por origen: sus datos solo se pueden leer desde allí, y esta
+// visita es la única ventana. La página de retirada (rama `gh-pages` del repo)
+// empaqueta un backup completo en el fragmento del enlace; este receptor lo
+// restaura con el mismo `importBackup` de Ajustes → Datos.
+//
+// Codificación heredada del traspaso de Areté: base64url de [marca][cuerpo], con
+// la marca diciendo si el cuerpo va comprimido con gzip (1) o en JSON crudo (0) —
+// así el receptor no adivina mirando el contenido. El fragmento sale de la URL
+// ANTES de usarlo: es todo el backup del usuario y no debe quedarse en el
+// historial ni en un enlace que se copie después.
+async function recibirMigracion() {
+  const p = new URLSearchParams(location.hash.replace(/^#/, ''));
+  const paquete = (p.get('migrar') || '').trim();
+  if (!paquete) return;
+  p.delete('migrar');
+  const rest = p.toString();
+  history.replaceState({}, '', location.pathname + location.search + (rest ? '#' + rest : ''));
+  try {
+    const bin = atob(paquete.replace(/-/g, '+').replace(/_/g, '/'));
+    const marca = bin.charCodeAt(0);
+    let cuerpo = new Uint8Array(bin.length - 1);
+    for (let i = 0; i < cuerpo.length; i++) cuerpo[i] = bin.charCodeAt(i + 1);
+    if (marca === 1) {
+      const entrada = new ReadableStream({ start(c) { c.enqueue(cuerpo); c.close(); } });
+      const buf = await new Response(entrada.pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();
+      cuerpo = new Uint8Array(buf);
+    } else if (marca !== 0) {
+      throw new Error('paquete no reconocido');
+    }
+    const backup = JSON.parse(new TextDecoder().decode(cuerpo));
+    const Backup = await import('./backup.js');
+    const r = await Backup.importBackup(backup);
+    toast({
+      message: t('Datos traspasados: {n} ajustes y {m} registros del agente. Vuelve a añadir los ficheros de tus libros: no caben en la copia.', { n: r.localKeys, m: r.aiRecords }),
+      timeout: 15000,
+    });
+  } catch (e) {
+    toast({
+      message: t('No se pudo importar el traspaso: {msg}', { msg: e.message }),
+      kind: 'error',
+      timeout: 15000,
+    });
   }
 }
 

@@ -42,11 +42,31 @@ Abre el menú de un libro (los tres puntos) para:
 
 La ficha no cambia el libro: editarla no toca el fichero ni pierde tus notas.
 
-## Compartir una estantería
+## Compartir libros y estanterías
 
-Desde el menú de la estantería, **Compartir estantería…** genera un enlace. Quien lo abra ve la
-estantería y puede guardarla; **caduca** y puedes retirarlo antes desde el mismo menú. Piensa que el
-enlace lleva tus notas de esos libros: mándalo solo a quien deba verlas.
+Le pasas a otra persona un libro o una estantería **con lo que has sacado de ellos**: se comparte
+un dossier, no solo la lista de libros.
+
+**Qué se puede mandar.** Desde el menú de la estantería, **Compartir estantería…**; desde el menú
+del libro o el «Más» del lector, **Compartir libro**. Antes de mandar eliges qué incluir:
+
+- **Los libros** (PDF/EPUB), con el tamaño que pesan a la vista — si un libro está sin fichero en
+  este dispositivo (solo en Drive), no puede viajar en el paquete.
+- Subrayados y notas, libretas, y conversaciones con el agente (opcional: revisa antes si quieres
+  que viaje el chat).
+- Artefactos del Studio (resúmenes, mapas, infografías) y mazos de tarjetas (sin tu progreso).
+
+**Dos vías:**
+
+- **Enlace**: se cifra en tu dispositivo, se abre con un toque y **caduca en 7 días**. Puedes
+  retirarlo antes desde el mismo menú (o en Ajustes → Datos → «Enlaces compartidos»). El tope es
+  de **100 MB** por enlace; si no cabe, la app te ofrece mandarlo como fichero.
+- **Fichero `.bookreader`**: para quien prefiera que nada pase por un servidor (aunque el enlace
+  va cifrado) o no tenga red.
+
+Quien recibe el enlace o el fichero ve qué trae y de quién, elige qué libros importar y las notas
+quedan ancladas a su libro en su biblioteca. Piensa que el paquete lleva tus notas de esos libros:
+mándalo solo a quien deba verlas.
 
 ## Análisis: lo que leíste de verdad
 

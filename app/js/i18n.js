@@ -471,6 +471,9 @@ const EN = {
   'Este libro no está en tu biblioteca en este dispositivo.': 'This book is not in your library on this device.',
   'Arrastra para ajustar el ancho · doble clic: restablecer': 'Drag to adjust width · double-click to reset',
   'No se pudo abrir el libro guardado.': 'Could not open the saved book.',
+  // Mudanza desde el origen viejo (recibirMigracion en app.js)
+  'Datos traspasados: {n} ajustes y {m} registros del agente. Vuelve a añadir los ficheros de tus libros: no caben en la copia.': 'Data transferred: {n} settings and {m} agent records. Add your book files again: they do not fit in the copy.',
+  'No se pudo importar el traspaso: {msg}': 'Could not import the transfer: {msg}',
   'Salir de pantalla completa': 'Exit full screen',
   'Pantalla completa': 'Full screen',
   'Preparando el libro para búsqueda…': 'Preparing the book for search…',
