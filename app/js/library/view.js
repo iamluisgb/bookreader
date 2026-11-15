@@ -1207,24 +1207,30 @@ async function ensureFiles() {
 
 // Descarga con las tres puertas en orden: sync conectado, permiso de ficheros y cola.
 async function startDownload(id, { open = false } = {}) {
-  if (Blobs.isQueued(id)) return;
-  if (!SyncProvider.isConnected()) {
-    await alertBox(SyncProvider.text('connectToDownload'), { title: t('Sincronización') });
-    return;
-  }
-  if (!(await ensureFiles())) return;
-  // Un libro de cientos de MB no es una descarga cualquiera: son minutos de
-  // datos y un buen mordisco al almacenamiento del móvil. Se pregunta, como
-  // hace Play Books, en vez de empezar y que el usuario lo descubra por la
-  // barra.
-  const book = await Store.getBook(id);
-  const size = (book && book.size) || 0;
-  if (size > BIG_DOWNLOAD) {
-    const ok = await confirmBox(
-      t('«{title}» ocupa {size}. Descargarlo puede tardar y llenar el almacenamiento de este dispositivo.',
-        { title: (book && book.title) || '', size: humanSize(size) }),
-      { title: t('Descarga grande'), okText: t('Descargar') });
-    if (!ok) return;
+  // Si ya hay una descarga de ESTE libro en curso no se empieza otra: se espera a la que
+  // hay y se sigue (abriendo si venía de un toque en la tarjeta). Antes se volvía en
+  // silencio, y un segundo toque —lo normal cuando el primero solo enseña la barra— no
+  // abría el libro ni decía por qué: el usuario concluía que «no entra» hasta reiniciar.
+  const already = Blobs.isQueued(id);
+  if (!already) {
+    if (!SyncProvider.isConnected()) {
+      await alertBox(SyncProvider.text('connectToDownload'), { title: t('Sincronización') });
+      return;
+    }
+    if (!(await ensureFiles())) return;
+    // Un libro de cientos de MB no es una descarga cualquiera: son minutos de
+    // datos y un buen mordisco al almacenamiento del móvil. Se pregunta, como
+    // hace Play Books, en vez de empezar y que el usuario lo descubra por la
+    // barra.
+    const book = await Store.getBook(id);
+    const size = (book && book.size) || 0;
+    if (size > BIG_DOWNLOAD) {
+      const ok = await confirmBox(
+        t('«{title}» ocupa {size}. Descargarlo puede tardar y llenar el almacenamiento de este dispositivo.',
+          { title: (book && book.title) || '', size: humanSize(size) }),
+        { title: t('Descarga grande'), okText: t('Descargar') });
+      if (!ok) return;
+    }
   }
   await Blobs.requestDownload(id);
   const fresh = await Store.getBook(id);

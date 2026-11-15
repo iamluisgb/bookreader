@@ -817,7 +817,24 @@ function openLibraryBook(record) {
 
 // Abre un libro de la biblioteca. `fromRoute`: la apertura viene de resolver la URL, así
 // que NO se re-escribe la ruta. `loc`: posición de la URL (tiene prioridad sobre lastCfi).
-async function openBookRecord(record, { fromRoute = false, loc = null } = {}) {
+// Una sola apertura en curso por libro. El doble toque en una tarjeta fantasma lanzaba DOS
+// aperturas del mismo libro (la primera al terminar de descargar, la segunda al repetir el
+// toque) y la segunda le quitaba el libro a la primera —claimSeq/pdfLoadSeq— dejando al
+// usuario fuera, en la biblioteca, sin ningún mensaje. La segunda se engancha a la que ya
+// está en marcha: se abre una vez, y las dos promesas resuelven igual.
+const openings = new Map();
+
+function openBookRecord(record, opts = {}) {
+  const id = record && record.id;
+  if (!id) return openBookRecordNow(record, opts);
+  const running = openings.get(id);
+  if (running) return running;
+  const p = openBookRecordNow(record, opts).finally(() => openings.delete(id));
+  openings.set(id, p);
+  return p;
+}
+
+async function openBookRecordNow(record, { fromRoute = false, loc = null } = {}) {
   startBookSplash();
   try {
     Library.hide();
