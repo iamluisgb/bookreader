@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BookReader se ha mudado</title>
+<link rel="canonical" href="https://bookreader.raiatech.com/">
+<meta name="robots" content="noindex">
+<!-- Respaldo sin JS. Se retrasa lo suficiente para que el script, si corre,
+     tenga tiempo de leer los datos y llevárselos. Cuando hay datos que no caben
+     en el enlace, el script lo retira: sin él nadie se llevaría la copia. -->
+<meta http-equiv="refresh" content="8;url=https://bookreader.raiatech.com/">
+<style>
+  :root{color-scheme:light dark}
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;display:grid;place-items:center;padding:24px;
+       font:16px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif;
+       background:#faf9f7;color:#1c1a17}
+  @media (prefers-color-scheme:dark){body{background:#14120f;color:#f0ece6}}
+  main{max-width:38ch;text-align:center}
+  h1{font-size:1.4rem;margin:0 0 10px;letter-spacing:-.02em}
+  p{margin:0 0 18px;opacity:.75}
+  .btn{display:inline-block;padding:12px 22px;border-radius:10px;border:0;cursor:pointer;
+       background:#1c1a17;color:#faf9f7;text-decoration:none;font:inherit;font-weight:600}
+  .btn.sec{background:transparent;color:inherit;border:1px solid currentColor;opacity:.8;
+           font-weight:500;margin-top:10px}
+  @media (prefers-color-scheme:dark){.btn{background:#f0ece6;color:#14120f}}
+  #estado{font-size:.85rem;opacity:.6;min-height:1.5em;margin-top:14px}
+  .oculto{display:none}
+</style>
+</head>
+<body>
+<main>
+  <h1 id="titulo">BookReader está ahora en bookreader.raiatech.com</h1>
+  <p id="texto">Te llevo en un momento.</p>
+  <a class="btn" id="ir" href="https://bookreader.raiatech.com/">Ir a BookReader</a>
+  <div><button class="btn sec oculto" id="descargar" type="button">Descargar mis datos</button></div>
+  <div id="estado"></div>
+</main>
+<script>
+(function () {
+  'use strict';
+  var DESTINO = 'https://bookreader.raiatech.com';
+  var APP = DESTINO + '/app/';
+
+  // ── Qué se lleva ────────────────────────────────────────
+  // Las mismas reglas que el backup de la app (app/js/backup.js): todo el
+  // localStorage con prefijo bookreader_ MENOS los secretos (que jamás salen en
+  // un enlace o un fichero) y las claves que solo valen en este dispositivo;
+  // y la IndexedDB del agente (libretas, notas, libros, mazos con su repaso,
+  // artefactos del Studio, intentos). La licencia va A PROPÓSITO. Los ficheros
+  // EPUB/PDF no: son binarios demasiado grandes para el traspaso, se vuelven a
+  // añadir en el sitio nuevo.
+  var PREFIX = 'bookreader_';
+  var SECRET_KEYS = ['ai_key', 'drive_refresh_token', 'sync_key', 'sync_token'];
+  var LOCAL_ONLY_KEYS = ['device_id', 'sync_provider', 'sync_book_text', 'sync_text_state'];
+  var IDB_NAME = 'bookreader_ai';
+  var STORES = ['convos', 'messages', 'notes', 'ratings', 'books', 'decks', 'artifacts', 'attempts'];
+  // Tope del fragmento, en caracteres. Los navegadores aguantan bastante más,
+  // pero Safari es el más estrecho y una URL cortada a la mitad es un traspaso
+  // que falla en silencio. Por encima de esto se ofrece el fichero.
+  var TOPE = 48000;
+
+  var $ = function (id) { return document.getElementById(id); };
+  // La ruta se conserva: /bookreader/blog/x.html no puede acabar en la portada.
+  var ruta = location.pathname.replace(/^\/bookreader\/?/, '/') || '/';
+  var destinoSimple = DESTINO + ruta + location.search + location.hash;
+  $('ir').href = destinoSimple;
+
+  function saltar(url) { location.replace(url || destinoSimple); }
+  function quitarRefresco() {
+    var meta = document.querySelector('meta[http-equiv="refresh"]');
+    if (meta) meta.remove();
+  }
+
+  // ── Leer lo que haya en ESTE origen ────────────────────
+  // Solo se puede desde aquí: el almacenamiento va por origen, y el sitio nuevo
+  // no puede leer este ni con un iframe (los navegadores particionan el
+  // almacenamiento de terceros). Esta visita es la única ventana que hay.
+  function leerLocal() {
+    var out = {};
+    try {
+      for (var i = 0; i < localStorage.length; i++) {
+        var key = localStorage.key(i);
+        if (!key || key.indexOf(PREFIX) !== 0) continue;
+        var corto = key.slice(PREFIX.length);
+        if (SECRET_KEYS.indexOf(corto) !== -1 || LOCAL_ONLY_KEYS.indexOf(corto) !== -1) continue;
+        var crudo = localStorage.getItem(key);
+        try { out[corto] = JSON.parse(crudo); } catch (e) { out[corto] = crudo; }
+      }
+    } catch (e) { /* storage bloqueado: se va sin ajustes */ }
+    return out;
+  }
+
+  // Las libretas, notas, mazos y artefactos pesan y viven en IndexedDB, no en
+  // localStorage. Sin esto el traspaso llevaría los ajustes pero nada del agente.
+  function leerIA() {
+    return new Promise(function (resolve) {
+      if (!('indexedDB' in window)) return resolve({});
+      var req;
+      try { req = indexedDB.open(IDB_NAME); } catch (e) { return resolve({}); }
+      req.onerror = function () { resolve({}); };
+      req.onsuccess = function () {
+        var db = req.result;
+        var faltan = STORES.filter(function (s) { return !db.objectStoreNames.contains(s); });
+        if (faltan.length === STORES.length) { resolve({}); return; }
+        var out = {};
+        try {
+          var tx = db.transaction(STORES.filter(function (s) { return db.objectStoreNames.contains(s); }), 'readonly');
+          STORES.forEach(function (s) {
+            if (!db.objectStoreNames.contains(s)) return;
+            var reqGet = tx.objectStore(s).getAll();
+            reqGet.onsuccess = function () { out[s] = reqGet.result || []; };
+          });
+          tx.oncomplete = function () { resolve(out); };
+          tx.onerror = function () { resolve({}); };
+        } catch (e) { resolve({}); }
+      };
+      // Una base que no existe se crea vacía; da igual, se resuelve a {}.
+      req.onupgradeneeded = function () { try { req.transaction.abort(); } catch (e) {} };
+    });
+  }
+
+  function componer(local, ia) {
+    return {
+      format: 'bookreader-backup',
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      localStorage: local,
+      ai: ia,
+    };
+  }
+
+  function vacio(backup) {
+    var conDatos = STORES.filter(function (s) { return (backup.ai[s] || []).length; }).length;
+    return Object.keys(backup.localStorage).length === 0 && conDatos === 0;
+  }
+
+  function resumen(backup) {
+    var n = backup.ai.books ? backup.ai.books.length : 0;
+    var c = backup.ai.convos ? backup.ai.convos.length : 0;
+    var d = backup.ai.decks ? backup.ai.decks.length : 0;
+    return n + (n === 1 ? ' libro' : ' libros') + ', ' + c + (c === 1 ? ' libreta' : ' libretas')
+      + ' y ' + d + (d === 1 ? ' mazo' : ' mazos');
+  }
+
+  function bytesAb64url(bytes) {
+    var bin = '', CH = 0x8000;   // a trozos: fromCharCode revienta con arrays grandes
+    for (var i = 0; i < bytes.length; i += CH) {
+      bin += String.fromCharCode.apply(null, bytes.subarray(i, i + CH));
+    }
+    return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+
+  // [marca][cuerpo] — la marca dice si va comprimido, para que el otro extremo
+  // no tenga que adivinarlo mirando el contenido.
+  function empaquetar(obj) {
+    var json = new TextEncoder().encode(JSON.stringify(obj));
+    var conMarca = function (marca, cuerpo) {
+      var b = new Uint8Array(cuerpo.length + 1);
+      b[0] = marca; b.set(cuerpo, 1);
+      return bytesAb64url(b);
+    };
+    if (typeof CompressionStream !== 'function') {
+      return Promise.resolve(conMarca(0, json));
+    }
+    var origen = new ReadableStream({ start: function (c) { c.enqueue(json); c.close(); } });
+    return new Response(origen.pipeThrough(new CompressionStream('gzip'))).arrayBuffer()
+      .then(function (buf) { return conMarca(1, new Uint8Array(buf)); })
+      .catch(function () { return conMarca(0, json); });
+  }
+
+  function descargar(obj) {
+    var blob = new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'bookreader-' + new Date().toISOString().slice(0, 10) + '.json';
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
+  }
+
+  function ofrecerDescarga(backup, donde) {
+    quitarRefresco();
+    var b = $('descargar');
+    b.classList.remove('oculto');
+    b.addEventListener('click', function () {
+      descargar(backup);
+      $('estado').textContent = donde;
+    });
+  }
+
+  // ── Retirar el service worker viejo ────────────────────
+  // Quien instaló la PWA aquí tiene un SW sirviendo la app desde caché. Sin
+  // retirarlo seguiría abriendo una copia congelada y no vería nunca esta página.
+  // Nunca toca localStorage: los datos del lector se quedan donde están.
+  function retirarSW() {
+    if (!('serviceWorker' in navigator)) return Promise.resolve();
+    return navigator.serviceWorker.getRegistrations()
+      .then(function (rs) { return Promise.all(rs.map(function (r) { return r.unregister(); })); })
+      .then(function () { return 'caches' in window ? caches.keys() : []; })
+      .then(function (ks) { return Promise.all(ks.map(function (k) { return caches.delete(k); })); })
+      .catch(function () {});
+  }
+
+  // ── Orquestación ───────────────────────────────────────
+  var copia = null;   // queda a la vista del catch: si preparar falla, ahí queda lo compuesto
+  Promise.resolve()
+    .then(leerLocal)
+    .then(function (local) { return leerIA().then(function (ia) { return componer(local, ia); }); })
+    .then(function (backup) {
+      copia = backup;
+      if (vacio(backup)) {
+        // Nada que llevarse: la retirada del SW no debe hacer esperar a nadie.
+        retirarSW();
+        setTimeout(function () { saltar(); }, 900);
+        return;
+      }
+
+      $('titulo').textContent = 'BookReader se ha mudado — y tus datos se vienen';
+      $('texto').textContent = 'Preparando tu copia…';
+      $('estado').textContent = 'No se borra nada de aquí hasta que lo confirmes allí.';
+
+      return empaquetar(backup)
+        .then(function (paquete) { return retirarSW().then(function () { return paquete; }); })
+        .then(function (paquete) {
+          if (paquete.length <= TOPE) {
+            $('texto').textContent = 'Llevo tus datos conmigo (' + resumen(backup) + ').';
+            var url = APP + '#migrar=' + paquete;
+            $('ir').href = url;
+            $('ir').textContent = 'Continuar en BookReader';
+            setTimeout(function () { saltar(url); }, 1200);
+            return;
+          }
+
+          // Demasiado para una URL — casi siempre, muchas notas o mazos.
+          // Mejor decirlo que mandar una URL cortada que falla en silencio.
+          $('texto').textContent = 'Tienes mucho historial (' + resumen(backup) + '), más de lo que cabe en un enlace. '
+            + 'Descarga la copia e impórtala en BookReader: Ajustes → Datos → Importar backup.';
+          $('estado').textContent = 'Los ficheros de tus libros (EPUB/PDF) no van en la copia: añádelos allí de nuevo.';
+          ofrecerDescarga(backup, 'Descargada. Ahora impórtala en BookReader: Ajustes → Datos → Importar backup.');
+        });
+    })
+    .catch(function (e) {
+      // Un fallo preparando la copia no puede dejar a nadie encerrado aquí.
+      if (!copia) {
+        $('texto').textContent = 'No he podido preparar la copia automáticamente.';
+        $('estado').textContent = 'Recarga la página e inténtalo otra vez.';
+        return;
+      }
+      $('texto').textContent = 'No he podido preparar el traspaso automático.';
+      $('estado').textContent = 'Usa el botón para descargar la copia e impórtala en BookReader: Ajustes → Datos → Importar backup.';
+      ofrecerDescarga(copia, 'Descargada. Ahora impórtala en BookReader: Ajustes → Datos → Importar backup.');
+    });
+})();
+</script>
+</body>
+</html>
