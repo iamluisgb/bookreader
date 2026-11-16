@@ -23,6 +23,15 @@ function roundRect(ctx, x, y, w, h, r) {
   ctx.closePath();
 }
 
+// El texto de una cita llega con los saltos de línea DUROS del libro: la capa de texto de un
+// PDF y los EPUB cuyas líneas son bloques sueltos los conservan. El canvas los dibuja tal cual,
+// así que la tarjeta salía troceada en versos cortos («rules and» / «procedures.») con el hueco
+// donde el libro justificaba. Quien reparte los versos es el ancho de la columna, no el origen:
+// se aplana todo el espacio en blanco a un espacio antes de medir.
+function normalizeQuote(text) {
+  return String(text || '').replace(/\s+/g, ' ').trim();
+}
+
 // Word-wrap por palabras dentro de maxWidth.
 function wrapLines(ctx, text, maxWidth) {
   const lines = [];
@@ -122,7 +131,7 @@ export async function buildQuoteCard({ quote, title, author, cover }) {
   // (evita cortar «Mario Var…»); sin portada, título · autor.
   const attribution = (coverImg ? [author] : [title, author]).filter(Boolean).join('   ·   ');
   const footH = attribution ? 44 : 0;
-  const { size, lh, lines } = fitQuote(ctx, quote, quoteW, innerH - markH - footH - 60, quoteMax);
+  const { size, lh, lines } = fitQuote(ctx, normalizeQuote(quote), quoteW, innerH - markH - footH - 60, quoteMax);
   const blockH = markH + lines.length * lh + 44 + footH;
   let y = PADY + Math.max(0, (innerH - blockH) / 2);
 

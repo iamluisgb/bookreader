@@ -3,6 +3,18 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-11-16 — La tarjeta-cita deja de salir troceada en versos
+
+- **El caso**: compartir un pasaje de un libro cuyo texto trae los saltos de línea duros —la capa
+  de texto de un PDF, o un EPUB con cada línea en su bloque— daba una tarjeta con la cita partida
+  en versos cortos («…a static set of» / «rules and» / «procedures.») y el hueco donde el libro
+  justificaba. El texto del subrayado llega así y `wrapLines` de [`share-card.js`](app/js/share-card.js)
+  trata cada `\n` como fin de párrafo, así que el ancho de la columna nunca llegaba a decidir.
+- **El arreglo**: `normalizeQuote` aplana todo el espacio en blanco a un espacio antes de medir y
+  repartir los versos. Va en la tarjeta, no en la captura del subrayado: arregla también los
+  subrayados viejos ya guardados con saltos. Test: [`tests/share-card.spec.ts`](tests/share-card.spec.ts)
+  compara el PNG de una cita con saltos con el de su versión aplanada (idénticos).
+
 ## 2026-11-15 — Mudanza desde luisgonzalezbernal.com/bookreader
 
 - **El caso**: la PWA vivió en `luisgonzalezbernal.com/bookreader` (GitHub Pages) hasta hoy; la

@@ -33,6 +33,32 @@ test.describe('P11 · tarjeta-cita', () => {
     expect(size).toBeGreaterThan(2000);
   });
 
+  // Un subrayado de PDF o de un EPUB con las líneas en bloques llega con saltos DUROS en medio
+  // de la frase. El canvas los dibujaba tal cual y la cita salía troceada en versos cortos.
+  test('los saltos de línea duros del libro no trocean la cita', async ({ page }) => {
+    await page.goto('/');
+    const result = await page.evaluate(async () => {
+      const { buildQuoteCard } = await import('/js/share-card.js');
+      const conSaltos = 'Es importante recordar\nque SRE no es un conjunto\nestático de reglas y\nprocedimientos. Es una mentalidad\ny una filosofía.';
+      const plano = conSaltos.replace(/\s+/g, ' ');
+      const png = async (quote) => {
+        const blob = await buildQuoteCard({ quote, title: 'Site Reliability Engineering', author: 'Betsy Beyer' });
+        return await new Promise((ok) => {
+          const fr = new FileReader();
+          fr.onload = () => ok(String(fr.result));
+          fr.readAsDataURL(blob);
+        });
+      };
+      // La primera tarjeta de la sesión pinta con la fuente de reserva (el canvas no
+      // precarga la web font), así que se calienta antes de comparar.
+      await png('calentamiento');
+      const [a, b] = [await png(conSaltos), await png(plano)];
+      return { iguales: a === b, bytes: a.length };
+    });
+    expect(result.bytes).toBeGreaterThan(2000);
+    expect(result.iguales).toBe(true);
+  });
+
   test('shareQuote sin Web Share de ficheros cae a descarga', async ({ page }) => {
     await page.goto('/');
     const result = await page.evaluate(async () => {
