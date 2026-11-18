@@ -3,6 +3,19 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-11-18 — El rail de estanterías se pliega a una franja de iconos
+
+- **El caso**: en una tablet en vertical (~800 px) el rail de la biblioteca ocupaba sus 264 px
+  fijos, casi un tercio de la pantalla; la rejilla se quedaba en dos columnas y la barra de
+  herramientas se partía en tres líneas.
+- **El arreglo**: botón junto a la marca que pliega el rail a 64 px (el *navigation rail* de
+  Material 3 para ventanas medianas): solo las raíces del árbol, con su inicial —los grupos como
+  «Técnico» también la llevan ahora—, rayas en lugar de los títulos de sección y los botones de
+  abajo en icono. El nombre sale en una etiqueta flotante con ratón o teclado. Elegida una
+  subestantería, su raíz queda marcada. Sin preferencia guardada se pliega solo por debajo de
+  1100 px; el botón guarda la elección (`bookreader_lib_rail`, local, no viaja en el sync). En
+  móvil sigue la tira de siempre. Test: [`tests/library-rail-fold.spec.ts`](tests/library-rail-fold.spec.ts).
+
 ## 2026-11-16 — La tarjeta-cita deja de salir troceada en versos
 
 - **El caso**: compartir un pasaje de un libro cuyo texto trae los saltos de línea duros —la capa

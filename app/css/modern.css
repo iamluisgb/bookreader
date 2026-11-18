@@ -540,6 +540,63 @@ button.lib-rail-twisty:hover { background: var(--surface-2); color: var(--text);
 .lib-rail-settings:hover { background: none; color: var(--accent); }
 .lib-rail-settings:hover .icon { color: var(--accent); }
 
+/* Cabecera del rail: la marca y el botón que pliega. El cuerpo es el que crece, para que
+   Ajustes siga anclado abajo con su margin-top: auto. */
+.lib-rail { transition: flex-basis var(--transition-panel), width var(--transition-panel), padding var(--transition-panel); }
+.lib-rail-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s-2); padding-bottom: var(--s-4); }
+.lib-rail-head .brand-lockup { padding-bottom: 0; min-width: 0; }
+.lib-rail-fold {
+  flex: none; display: inline-flex; align-items: center; justify-content: center;
+  width: 32px; height: 32px; padding: 0; border: none; background: none; cursor: pointer;
+  border-radius: var(--r-sm); color: var(--text-soft);
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+.lib-rail-fold:hover { background: var(--surface-3); color: var(--text); }
+.lib-rail > .lib-rail-body { flex: 1 0 auto; display: flex; flex-direction: column; }
+.lib-rail-body > * { flex: 0 0 auto; }
+
+/* ---- Rail plegado: franja de iconos (navigation rail de Material 3, ventana mediana) ----
+   Solo las raíces del árbol, sin nombres, cifras, triángulos ni ⋯: la inicial y el icono
+   bastan para elegir, y el nombre sale en una etiqueta al pasar el ratón (.lib-rail-tip).
+   Para entrar en una subestantería se despliega el rail. */
+.rail-compact > .lib-rail {
+  flex-basis: 64px; width: 64px; overflow-x: hidden;
+  padding-left: var(--s-2); padding-right: var(--s-2);
+}
+.rail-compact > .lib-rail .lib-rail-head { flex-direction: column; gap: var(--s-3); padding-bottom: var(--s-3); }
+.rail-compact > .lib-rail .brand-lockup { padding: 2px 0 0; }
+.rail-compact > .lib-rail .brand-name,
+.rail-compact > .lib-rail .lib-rail-name,
+.rail-compact > .lib-rail .lib-rail-count,
+.rail-compact > .lib-rail .lib-rail-twisty,
+.rail-compact > .lib-rail .lib-rail-kebab,
+.rail-compact > .lib-rail .lib-rail-create span { display: none; }
+.rail-compact > .lib-rail .lib-rail-row.is-child { display: none; }
+.rail-compact > .lib-rail .lib-rail-row { padding-left: 0; justify-content: center; border-radius: var(--r-md); }
+.rail-compact > .lib-rail .lib-rail-item { flex: 0 0 auto; gap: 0; padding: 7px; justify-content: center; border-radius: var(--r-md); }
+/* La raíz de una subestantería elegida: la elegida no se ve plegada, su raíz lo dice. */
+.rail-compact > .lib-rail .lib-rail-row.has-active-child { background: var(--accent-soft); }
+/* Las cabeceras de sección pasan a una raya: separan sin texto que no cabe. */
+.rail-compact > .lib-rail .lib-rail-section {
+  font-size: 0; padding: 0; height: 1px; margin: var(--s-3) var(--s-2);
+  background: var(--border-soft);
+}
+.rail-compact > .lib-rail .lib-rail-create { justify-content: center; padding: 10px 0; gap: 0; border-radius: var(--r-md); }
+.rail-compact > .lib-rail .lib-rail-settings { border-radius: 0; }
+
+/* Etiqueta de la franja: capa fija fuera del rail (el overflow del rail la recortaría). */
+.lib-rail-tip {
+  position: fixed; z-index: var(--z-tooltip); pointer-events: none;
+  transform: translate(-4px, -50%); opacity: 0;
+  padding: 6px 9px; border-radius: var(--r-sm);
+  background: #232a31; color: #f2f3f5; font-family: var(--font-ui);
+  font-size: var(--fs-xs); font-weight: 500; line-height: 1; white-space: nowrap;
+  box-shadow: var(--shadow-2);
+  transition: opacity var(--transition-fast), transform var(--transition-fast);
+}
+.lib-rail-tip.is-on { opacity: 1; transform: translate(0, -50%); }
+@media (prefers-reduced-motion: reduce) { .lib-rail, .lib-rail-tip { transition: none; } }
+
 /* ---- Panel principal ---- */
 .lib-main {
   flex: 1; min-width: 0; height: 100%; overflow-y: auto; background: var(--surface-0);

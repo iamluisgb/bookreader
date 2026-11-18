@@ -1411,6 +1411,8 @@ const EN = {
   'Los elige una regla': 'A rule picks them',
   'Plegar {name}': 'Collapse {name}',
   'Desplegar {name}': 'Expand {name}',
+  'Plegar estanterías': 'Collapse shelves',
+  'Mostrar estanterías': 'Show shelves',
   'Opciones de {name}': 'Options for {name}',
   '{name}, {n} libro': '{name}, {n} book',
   '{name}, {n} libros': '{name}, {n} books',

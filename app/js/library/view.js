@@ -50,12 +50,73 @@ let menuEl = null;
 // cambia lo que contiene una estantería.
 const COLLAPSE_KEY = 'bookreader_lib_collapsed';
 let collapsed = loadCollapsed();
+// El rail entero, plegado a una franja de iconos (navigation rail). Sin preferencia
+// guardada se pliega solo en ventanas medianas (tablet en vertical, < RAIL_AUTO_PX), donde
+// los 264 px del rail dejaban la rejilla en dos columnas; tocar el botón guarda la elección
+// y desde entonces manda ella. Como las ramas, es preferencia de la pantalla: no viaja.
+const RAIL_KEY = 'bookreader_lib_rail';          // 'compact' | 'full' | (sin valor)
+const RAIL_AUTO = window.matchMedia('(max-width: 1099px)');
+// Rutas con una fila elegida por debajo: en la franja solo se ven las raíces, así que la
+// raíz de la estantería elegida lleva la marca para que se sepa dónde se está.
+let activeAncestors = new Set();
 // Transferencias en curso, por bookId: { loaded, total, state }. Solo para
 // pintar la barra de la tarjeta; la verdad la tiene sync/blobs.js.
 const transfers = new Map();
 // Libro que se está arrastrando sobre el rail, y la fila resaltada debajo.
 let dragBookId = null;
 let dropRow = null;
+
+function railPref() {
+  try { return localStorage.getItem(RAIL_KEY); } catch { return null; }
+}
+function railCompact() {
+  const pref = railPref();
+  return pref ? pref === 'compact' : RAIL_AUTO.matches;
+}
+// Pinta el estado en la capa y en el botón, sin re-render (la transición del ancho se ve).
+function applyRail() {
+  const layout = host?.querySelector('.lib-layout');
+  if (!layout) return;
+  const compact = railCompact();
+  layout.classList.toggle('rail-compact', compact);
+  const btn = layout.querySelector('.lib-rail-fold');
+  if (btn) {
+    const label = compact ? t('Mostrar estanterías') : t('Plegar estanterías');
+    btn.setAttribute('aria-expanded', String(!compact));
+    btn.setAttribute('aria-label', label);
+  }
+}
+function toggleRail() {
+  const next = railCompact() ? 'full' : 'compact';
+  try { localStorage.setItem(RAIL_KEY, next); } catch { /* storage bloqueado: solo esta sesión */ }
+  hideRailTip();
+  applyRail();
+}
+
+// Etiqueta de la franja plegada: el rail hace scroll vertical, así que un ::after con el
+// nombre quedaría recortado por su propio overflow. Va en una capa fija, fuera del rail.
+// Solo con ratón y con foco de teclado; en táctil el toque elige y el título lo dice.
+let railTipEl = null;
+function railTipTarget(el) {
+  const target = el?.closest?.('.lib-rail-fold, .rail-compact > .lib-rail .lib-rail-item, .rail-compact > .lib-rail .lib-rail-create');
+  return target && host.contains(target) ? target : null;
+}
+function showRailTip(target) {
+  const text = target.getAttribute('aria-label') || target.textContent.trim();
+  if (!text) return;
+  if (!railTipEl) {
+    railTipEl = document.createElement('div');
+    railTipEl.className = 'lib-rail-tip';
+    railTipEl.setAttribute('aria-hidden', 'true');
+    document.body.appendChild(railTipEl);
+  }
+  railTipEl.textContent = text;
+  const r = target.getBoundingClientRect();
+  railTipEl.style.left = `${Math.round(r.right + 8)}px`;
+  railTipEl.style.top = `${Math.round(r.top + r.height / 2)}px`;
+  railTipEl.classList.add('is-on');
+}
+function hideRailTip() { railTipEl?.classList.remove('is-on'); }
 
 function loadCollapsed() {
   try { return new Set(JSON.parse(localStorage.getItem(COLLAPSE_KEY) || '[]')); }
@@ -76,6 +137,19 @@ export function init(opts = {}) {
   onDropFile = opts.onDropFile || (() => {});
   onOpenSettings = opts.onOpenSettings || (() => {});
   host.addEventListener('click', onClick);
+  host.addEventListener('pointerover', (e) => {
+    if (e.pointerType !== 'mouse') return;
+    const target = railTipTarget(e.target);
+    if (target) showRailTip(target); else hideRailTip();
+  });
+  host.addEventListener('pointerleave', hideRailTip);
+  host.addEventListener('focusin', (e) => {
+    const target = railTipTarget(e.target);
+    if (target && target.matches(':focus-visible')) showRailTip(target); else hideRailTip();
+  });
+  host.addEventListener('focusout', hideRailTip);
+  host.addEventListener('scroll', hideRailTip, true);
+  RAIL_AUTO.addEventListener('change', () => { if (!railPref()) applyRail(); });
   // «Continuar leyendo» es un botón (role/tabindex): Intro y Espacio lo abren.
   host.addEventListener('keydown', (e) => {
     if (e.key !== 'Enter' && e.key !== ' ') return;
@@ -236,25 +310,42 @@ export async function render() {
   const manual = shelves.filter(s => !Shelves.isSmart(s));
   const smart = shelves.filter(s => Shelves.isSmart(s));
 
+  const manualRows = Shelves.shelfRows(manual);
+  const smartRows = Shelves.shelfRows(smart);
+  const activePaths = [...manualRows, ...smartRows].filter(r => selection.has(r.key)).map(r => r.path);
+  activeAncestors = new Set(activePaths.flatMap(p => {
+    const parts = p.split(Shelves.SEP);
+    return parts.slice(0, -1).map((_, i) => parts.slice(0, i + 1).join(Shelves.SEP));
+  }));
+  const compact = railCompact();
+
+  hideRailTip();
   host.innerHTML = `
-    <div class="lib-layout">
+    <div class="lib-layout${compact ? ' rail-compact' : ''}">
       <aside class="lib-rail" aria-label="${t('Estanterías')}">
-        ${brandLockup(24)}
+        <div class="lib-rail-head">
+          ${brandLockup(24)}
+          <button class="lib-rail-fold" data-act="railfold" aria-controls="lib-rail-body"
+            aria-expanded="${!compact}" aria-label="${compact ? t('Mostrar estanterías') : t('Plegar estanterías')}"
+            >${icon('panel-left', { size: 'md' })}</button>
+        </div>
+        <div class="lib-rail-body" id="lib-rail-body">
         ${fixedRowHtml('all', `<span class="lib-rail-thumb lib-rail-thumb--all">${icon('library', { size: 'md' })}</span>`,
           t('Libros'), books.length, !selection.size)}
         ${fixedRowHtml('none', `<span class="lib-rail-thumb lib-rail-thumb--none">${icon('inbox', { size: 'md' })}</span>`,
           t('Sin estantería'), noShelfCount, selection.has('none'))}
 
         ${manual.length ? `<div class="lib-rail-section">${t('Estanterías')}</div>
-        ${Shelves.shelfRows(manual).map(railRowHtml).join('')}` : ''}
+        ${manualRows.map(railRowHtml).join('')}` : ''}
 
         ${smart.length ? `<div class="lib-rail-section">${t('Automáticas')}</div>
-        ${Shelves.shelfRows(smart).map(railRowHtml).join('')}` : ''}
+        ${smartRows.map(railRowHtml).join('')}` : ''}
 
         <button class="lib-rail-create" data-act="newshelfmenu">${icon('plus', { size: 'md' })}<span>${t('Nueva estantería')}</span></button>
         <button class="lib-rail-create lib-rail-analysis" data-act="analysis">${icon('chart', { size: 'md' })}<span>${t('Análisis')}</span></button>
         <button class="lib-rail-create lib-rail-decks" data-act="decks">${icon('cards', { size: 'md' })}<span>${t('Mazos')}</span></button>
         <button class="lib-rail-create lib-rail-settings" data-act="settings">${icon('gear', { size: 'md' })}<span>${t('Ajustes generales')}</span></button>
+        </div>
       </aside>
 
       <section class="lib-main">
@@ -555,8 +646,10 @@ function railRowHtml(row) {
         >${icon(shut ? 'chevron-right' : 'chevron-down', { size: 'sm' })}</button>`
     : '<span class="lib-rail-twisty" aria-hidden="true"></span>';
 
+  // El grupo lleva inicial como cualquier estantería: plegado el rail, la inicial es todo
+  // lo que se ve de la fila, y una raíz sin ella era un hueco que no se podía reconocer.
   const mark = row.kind === 'group'
-    ? '<span class="lib-rail-thumb lib-rail-thumb--group" aria-hidden="true"></span>'
+    ? shelfMarkHtml(row.label)
     : (smart
       ? `<span class="lib-rail-thumb lib-rail-thumb--smart" aria-hidden="true">${icon('funnel', { size: 'md' })}</span>`
       : shelfMarkHtml(row.label));
@@ -583,7 +676,8 @@ function railRowHtml(row) {
     ? t('{name}, {n} libros con sus subestanterías', { name: row.label, n: count })
     : countLabel(row.label, count);
 
-  return `<div class="lib-rail-row${active ? ' is-active' : ''}${folded ? ' is-folded' : ''}${row.depth ? ' is-child' : ''}"
+  const within = !active && activeAncestors.has(row.path);
+  return `<div class="lib-rail-row${active ? ' is-active' : ''}${within ? ' has-active-child' : ''}${folded ? ' is-folded' : ''}${row.depth ? ' is-child' : ''}"
       style="--depth:${row.depth}"${drop}>
     ${twisty}
     <button class="lib-rail-item lib-rail-shelf${active ? ' active' : ''}${row.kind === 'group' ? ' lib-rail-group' : ''}"
@@ -1023,6 +1117,7 @@ function onInput(e) {
 }
 
 async function onClick(e) {
+  if (e.target.closest('[data-act="railfold"]')) { toggleRail(); return; }
   if (e.target.closest('.lib-upload, [data-act="add"]')) { onAddBook(); return; }
 
   // Desplegables (orden / progreso)
