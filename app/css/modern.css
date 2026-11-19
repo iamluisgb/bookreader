@@ -610,6 +610,13 @@ button.lib-rail-twisty:hover { background: var(--surface-2); color: var(--text);
 .lib-rail-dot[hidden] { display: none; }
 @media (prefers-reduced-motion: reduce) { .lib-rail-ring-fill { transition: none; } }
 
+/* El mismo punto en móvil: en el chip de la tira y en la fila de la hoja «Estanterías». */
+.lib-due-dot {
+  flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--accent);
+  display: inline-block; margin-left: 2px;
+}
+.lib-schip .lib-due-dot { margin: 0 -2px 0 2px; }
+
 /* Etiqueta de la franja: capa fija fuera del rail (el overflow del rail la recortaría). */
 .lib-rail-tip {
   position: fixed; z-index: var(--z-tooltip); pointer-events: none;
@@ -650,7 +657,7 @@ button.lib-rail-twisty:hover { background: var(--surface-2); color: var(--text);
 .lib-shelf-stats[title] { cursor: help; }
 .lib-shelf-actions { display: flex; flex-wrap: wrap; gap: var(--s-2); }
 .lib-shelf-actions:empty { display: none; }
-.lib-shelf-btn { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 8px 14px; max-width: 100%; }
+.lib-shelf-btn { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 8px 14px; max-width: 100%; border-radius: var(--r-md); }
 .lib-shelf-btn span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .lib-shelf-continue { max-width: min(100%, 360px); }
 .lib-shelf-btn--quiet { background: none; color: var(--text-soft); }
@@ -1096,7 +1103,9 @@ button.lib-rail-twisty:hover { background: var(--surface-2); color: var(--text);
     padding: 7px 12px; gap: var(--s-2);
   }
   .lib-rail-name { flex: 0 0 auto; }
-  .lib-rail-ico, .lib-rail-thumb, .lib-rail-mark { display: none; }
+  /* Solo en el rail-tira: la hoja «Estanterías» y la cabecera usan la misma miniatura y en
+     móvil también la llevan (P58). */
+  .lib-rail .lib-rail-ico, .lib-rail .lib-rail-thumb, .lib-rail .lib-rail-mark { display: none; }
   .lib-rail-kebab { margin-right: 4px; }
   .lib-rail-create { width: auto; flex: 0 0 auto; margin: 0; padding: 7px 12px; }
   .lib-rail-create span { display: none; }

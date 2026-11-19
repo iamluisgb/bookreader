@@ -478,11 +478,41 @@ async function onShelfHero(btn) {
 // P58 F3 · Punto de repaso en el rail: una consulta para todas las filas; la etiqueta (que es
 // también la del tooltip de la franja plegada) lo dice con palabras.
 let railDueSeq = 0;
+let lastDue = null;   // el último cálculo, para pintar la hoja «Estanterías» al abrirla sin esperar
+const dueIn = (ids, due) => {
+  let n = 0;
+  for (const id of memberIdsOf(String(ids || '').split(',').filter(Boolean))) n += due.get(id) || 0;
+  return n;
+};
+const dueText = (n) => (n === 1 ? t('1 tarjeta para hoy') : t('{n} tarjetas para hoy', { n }));
+// Móvil (P58): punto en los chips de la tira y en las filas de la hoja. Va antes del recuento
+// (la cifra de libros sigue siendo lo último de la fila) y dice con palabras lo que marca.
+function paintDueDots(root, due) {
+  for (const el of root.querySelectorAll('.lib-schip[data-shelf-ids], .lib-sheet-pick[data-shelf-ids]')) {
+    const n = dueIn(el.dataset.shelfIds, due);
+    el.querySelector('.lib-due-dot')?.remove();
+    // El chip lleva aria-label propio, que tapa el del punto: la etiqueta lo dice también.
+    if (el.hasAttribute('aria-label')) {
+      if (el.dataset.baseLabel === undefined) el.dataset.baseLabel = el.getAttribute('aria-label');
+      el.setAttribute('aria-label', n ? `${el.dataset.baseLabel}. ${dueText(n)}` : el.dataset.baseLabel);
+    }
+    if (!n) continue;
+    const dot = document.createElement('span');
+    dot.className = 'lib-due-dot';
+    dot.setAttribute('role', 'img');
+    dot.setAttribute('aria-label', dueText(n));
+    dot.title = dueText(n);
+    const count = el.querySelector('.lib-schip-count, .lib-sheet-count');
+    if (count) el.insertBefore(dot, count); else el.appendChild(dot);
+  }
+}
 async function paintRailDue() {
   const seq = ++railDueSeq;
   let due;
   try { due = await Study.dueByBook(); } catch { return; }
   if (seq !== railDueSeq || !host) return;
+  lastDue = due;
+  paintDueDots(host, due);
   for (const btn of host.querySelectorAll('.lib-rail .lib-rail-shelf[data-shelf-ids]')) {
     let n = 0;
     for (const id of memberIdsOf(btn.dataset.shelfIds.split(',').filter(Boolean))) n += due.get(id) || 0;
@@ -641,6 +671,12 @@ function openSheet(title, inner, onAct) {
     </div>`;
   document.body.appendChild(el);
   sheetEl = el;
+  // Punto de repaso en las filas de estantería (si la hoja las tiene): con el último cálculo
+  // al instante y, si no lo hay aún, cuando llegue.
+  if (el.querySelector('.lib-sheet-pick[data-shelf-ids]')) {
+    if (lastDue) paintDueDots(el, lastDue);
+    else Study.dueByBook().then((due) => { lastDue = due; if (el.isConnected) paintDueDots(el, due); }).catch(() => {});
+  }
   el.addEventListener('click', async (e) => {
     if (e.target === el || e.target.closest('.lib-sheet-x')) { closeSheet(); return; }
     await onAct(e);

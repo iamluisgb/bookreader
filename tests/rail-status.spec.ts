@@ -42,3 +42,34 @@ test('punto de repaso: en la estantería con vencidas y en su grupo, no en las d
   await expect(item(page, 'Agentes')).toHaveAttribute('aria-label', /1 tarjeta para hoy/);
   await expect(item(page, 'Novela')).not.toHaveAttribute('aria-label', /para hoy/);
 });
+
+test.describe('móvil', () => {
+  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+
+  test('la hoja «Estanterías» y la cabecera llevan la marca; el punto, en la hoja y en el chip', async ({ page }) => {
+    await page.goto('/');
+    await page.evaluate(async () => {
+      const S: any = await import('/js/library/store.js');
+      const DB: any = await import('/js/ai/db.js');
+      const Srs: any = await import('/js/ai/srs.js');
+      const now = Date.now(), today = Srs.dayOf(now);
+      const ag = await S.addShelf('Agentes'); await S.updateShelf(ag.id, { icon: 'users', hue: 255 });
+      const nov = await S.addShelf('Novela'); await S.updateShelf(nov.id, { icon: 'book', hue: 325 });
+      await S.putBook({ id: 'a1', title: 'a1', format: 'epub', status: 'reading', addedAt: now, shelfIds: [ag.id] });
+      await S.putBook({ id: 'n1', title: 'n1', format: 'epub', status: 'unread', addedAt: now, shelfIds: [nov.id] });
+      await DB.addDeck({ bookId: 'a1', name: 'x', cards: [{ front: 'q', back: 'a', srs: { due: today - 1, interval: 3, stability: 3, lastReview: now - 5 * 86400000, reps: 2 } }] });
+    });
+    await page.reload();
+    await page.waitForSelector('.lib-strip');
+    await page.locator('.lib-schip--more').click();
+    const pick = (label: string) => page.locator(`.lib-sheet-pick[data-row-label="${label}"]`);
+    await expect(pick('Agentes').locator('.mark-glyph')).toBeVisible();
+    await expect(pick('Agentes').locator('.lib-due-dot')).toHaveAttribute('aria-label', '1 tarjeta para hoy');
+    await expect(pick('Novela').locator('.lib-due-dot')).toHaveCount(0);
+    await pick('Agentes').click();
+    await expect(page.locator('.lib-head-shelf .mark-glyph')).toBeVisible();
+    const chip = page.locator('.lib-schip[aria-pressed="true"]');
+    await expect(chip.locator('.lib-due-dot')).toBeVisible();
+    await expect(chip).toHaveAttribute('aria-label', /1 tarjeta para hoy/);
+  });
+});

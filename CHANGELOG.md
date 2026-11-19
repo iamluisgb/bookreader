@@ -3,6 +3,17 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-11-19 — Marca y punto de repaso también en el móvil (P58)
+
+- **El caso**: en móvil, la hoja «Estanterías» y la cabecera de estantería salían sin icono —la
+  regla que escondía las miniaturas del rail-tira era global y se llevaba también las de la hoja y
+  la cabecera—; el punto de repaso solo existía en el rail de tablet/escritorio, y «Seguir con…»
+  salía con esquinas rectas al lado de «Repasar».
+- **El arreglo**: la regla se limita a `.lib-rail`; el punto de repaso se pinta en los chips de la
+  tira y en las filas de la hoja (con el último cálculo al abrirla, sin esperar), dicho con
+  palabras en la etiqueta del chip y en el propio punto; y los botones de la cabecera llevan el
+  mismo radio. Test: caso «móvil» en [`tests/rail-status.spec.ts`](tests/rail-status.spec.ts).
+
 ## 2026-11-19 — Iconos de estantería bitono, estilo Notion, y marca por MCP
 
 - **El caso**: los iconos de F1 eran de línea fina dentro de una baldosa teñida; a 16 px se
