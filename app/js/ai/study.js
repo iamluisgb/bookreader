@@ -172,6 +172,27 @@ export async function dueToday(scope, now = Date.now()) {
   return { cards, decks: withDue };
 }
 
+// Vencidas hoy por libro de la biblioteca (P58 F3, el punto del rail): un solo recorrido de
+// los mazos para todas las filas. Clave = id del libro en la biblioteca; los mazos guardados
+// bajo un alias cuentan para su libro (id canónico), como en studyScopes.
+export async function dueByBook(now = Date.now()) {
+  const [decks, books] = await Promise.all([DB.getAllDecks(), Store.getAllBooks()]);
+  const locked = lockerFor(books, canonicalOf);
+  const byCanon = new Map();
+  for (const d of decks) {
+    const n = dueAvailable(d, locked, now);
+    if (!n) continue;
+    const c = canonicalOf(d.bookId);
+    byCanon.set(c, (byCanon.get(c) || 0) + n);
+  }
+  const out = new Map();
+  for (const b of books) {
+    const n = byCanon.get(canonicalOf(b.id));
+    if (n) out.set(b.id, n);
+  }
+  return out;
+}
+
 // Estado de estudio de un ámbito (P58, cabecera de estantería): vencidas hoy y todas las
 // tarjetas vivas, para estimar el dominio con Srs.knowledge.
 export async function scopeStats(scope, now = Date.now()) {

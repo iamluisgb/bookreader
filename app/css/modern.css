@@ -585,6 +585,23 @@ button.lib-rail-twisty:hover { background: var(--surface-2); color: var(--text);
 .rail-compact > .lib-rail .lib-rail-create { justify-content: center; padding: 10px 0; gap: 0; border-radius: var(--r-md); }
 .rail-compact > .lib-rail .lib-rail-settings { border-radius: 0; }
 
+/* ---- Estado en el rail (P58 F3): anillo de terminados y punto de repaso ----
+   Solo esas dos señales. El anillo, en tinta suave (no en acento: el acento ya marca la
+   seleccionada); el punto, en acento, porque pide una acción hoy. */
+.lib-rail-markwrap { position: relative; display: inline-flex; flex: 0 0 auto; }
+.lib-rail-ring {
+  position: absolute; inset: -4px; width: calc(100% + 8px); height: calc(100% + 8px);
+  fill: none; stroke-width: 2; stroke-linecap: round; pointer-events: none;
+}
+.lib-rail-ring-track { stroke: var(--border-soft); }
+.lib-rail-ring-fill { stroke: var(--text-soft); transition: stroke-dasharray var(--transition-panel); }
+.lib-rail-dot {
+  position: absolute; top: -3px; right: -3px; width: 8px; height: 8px; border-radius: 50%;
+  background: var(--accent); box-shadow: 0 0 0 2px var(--surface-1);
+}
+.lib-rail-dot[hidden] { display: none; }
+@media (prefers-reduced-motion: reduce) { .lib-rail-ring-fill { transition: none; } }
+
 /* Etiqueta de la franja: capa fija fuera del rail (el overflow del rail la recortaría). */
 .lib-rail-tip {
   position: fixed; z-index: var(--z-tooltip); pointer-events: none;

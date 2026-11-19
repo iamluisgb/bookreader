@@ -3,6 +3,17 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-11-19 — Estado en el rail: anillo de terminados y punto de repaso (P58 F3)
+
+- **El caso**: para saber qué estantería tenía trabajo hoy había que abrirlas una a una.
+- **El arreglo**: cada marca del rail lleva un anillo fino con la fracción de libros terminados
+  (pista tenue + trazo en tinta suave; sin nada terminado, sin anillo; las automáticas nunca, porque
+  su contenido lo decide una regla y «Terminados» estaría siempre lleno) y un punto en acento si
+  hay tarjetas para hoy. Los grupos suman lo de sus hijas. La etiqueta accesible —también la del
+  tooltip de la franja plegada— lo dice con palabras («Técnico, 8 libros. 5 de 8 terminados. 1
+  tarjeta para hoy.»). Las vencidas salen de una sola pasada por los mazos (`Study.dueByBook`),
+  asíncrona como el dominio por libro. Test: [`tests/rail-status.spec.ts`](tests/rail-status.spec.ts).
+
 ## 2026-11-19 — Cabecera de estantería (P58 F2)
 
 - **El caso**: elegir una estantería solo filtraba la rejilla; su estado (qué llevo leído, qué

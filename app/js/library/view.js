@@ -378,6 +378,7 @@ export async function render() {
   syncStrip();        // móvil: el chip activo a la vista y los fundidos de la tira
   paintStudyChip();   // async, no bloquea el render de la rejilla
   if (focus) paintShelfHero(focus);   // ídem: vencidas y dominio de la estantería
+  paintRailDue();     // ídem: el punto de «hay repaso hoy» en cada fila del rail
   paintMastery();     // ídem: dominio por libro, se pinta cuando llega la consulta
 }
 
@@ -474,6 +475,27 @@ async function onShelfHero(btn) {
     await render();
   }
 }
+// P58 F3 · Punto de repaso en el rail: una consulta para todas las filas; la etiqueta (que es
+// también la del tooltip de la franja plegada) lo dice con palabras.
+let railDueSeq = 0;
+async function paintRailDue() {
+  const seq = ++railDueSeq;
+  let due;
+  try { due = await Study.dueByBook(); } catch { return; }
+  if (seq !== railDueSeq || !host) return;
+  for (const btn of host.querySelectorAll('.lib-rail .lib-rail-shelf[data-shelf-ids]')) {
+    let n = 0;
+    for (const id of memberIdsOf(btn.dataset.shelfIds.split(',').filter(Boolean))) n += due.get(id) || 0;
+    const dot = btn.querySelector('.lib-rail-dot');
+    if (dot) dot.hidden = !n;
+    btn.classList.toggle('has-due', !!n);
+    const base = btn.dataset.label || '';
+    btn.setAttribute('aria-label', n
+      ? `${base} ${n === 1 ? t('1 tarjeta para hoy') : t('{n} tarjetas para hoy', { n })}.`
+      : base);
+  }
+}
+
 // «Añadir libro aquí»: el alta pasa por el selector de ficheros de siempre y app.js anuncia el
 // libro NUEVO con `bookreader:book-imported`; ese anuncio lo mete en la estantería. Se desarma
 // al cancelar el selector y, si no, a los pocos minutos de elegir el fichero (un libro que ya
@@ -750,6 +772,20 @@ function shelfMarkHtml(label, shelf = null) {
   return `<span class="lib-rail-thumb lib-rail-thumb--mark${m.icon ? ' has-icon' : ''}" style="--mark-h:${hue}"
     aria-hidden="true">${face}</span>`;
 }
+// La marca con su anillo de progreso (un rectángulo redondeado alrededor de la miniatura,
+// `pathLength` 100 para que el trazo sea directamente el porcentaje) y el punto de repaso.
+// Sin nada terminado no hay anillo: vacío sería ruido en cada fila. Las automáticas tampoco
+// lo llevan: su contenido lo decide una regla (en «Terminados» siempre estaría lleno).
+function markWrapHtml(mark, frac) {
+  const pct = Math.round(Math.max(0, Math.min(1, frac)) * 100);
+  const ring = pct
+    ? `<svg class="lib-rail-ring" viewBox="0 0 36 36" aria-hidden="true">
+        <rect class="lib-rail-ring-track" x="1.5" y="1.5" width="33" height="33" rx="9"/>
+        <rect class="lib-rail-ring-fill" x="1.5" y="1.5" width="33" height="33" rx="9" pathLength="100" stroke-dasharray="${pct} 100"/></svg>`
+    : '';
+  return `<span class="lib-rail-markwrap">${mark}${ring}<span class="lib-rail-dot" aria-hidden="true" hidden></span></span>`;
+}
+
 // ¿La fila lleva marca propia? Las automáticas conservan el embudo salvo que se les elija icono.
 const hasOwnIcon = (shelf) => !!Shelves.cleanMark(shelf || {}).icon;
 
@@ -807,14 +843,19 @@ function railRowHtml(row) {
     : countLabel(row.label, count);
 
   const within = !active && activeAncestors.has(row.path);
+  // P58 F3 · Anillo con la fracción terminada (sobre los libros COMPLETOS: una regla mira el
+  // estado) y hueco para el punto de repaso, que llega después (paintRailDue).
+  const members = memberIdsOf(ids);
+  const finished = allBooks.filter(b => members.has(b.id) && b.status === 'finished').length;
+  const progress = count && !smart ? ` ${t('{d} de {n} terminados', { d: finished, n: count })}.` : '';
   return `<div class="lib-rail-row${active ? ' is-active' : ''}${within ? ' has-active-child' : ''}${folded ? ' is-folded' : ''}${row.depth ? ' is-child' : ''}"
       style="--depth:${row.depth}"${drop}>
     ${twisty}
     <button class="lib-rail-item lib-rail-shelf${active ? ' active' : ''}${row.kind === 'group' ? ' lib-rail-group' : ''}"
       data-row-key="${escapeHtml(row.key)}" data-row-label="${escapeHtml(row.label)}"
       data-shelf-ids="${escapeHtml(ids.join(','))}"
-      aria-label="${escapeHtml(label)}"${active ? ' aria-current="true"' : ''}>
-      ${mark}
+      aria-label="${escapeHtml(label + '.' + progress)}" data-label="${escapeHtml(label + '.' + progress)}"${active ? ' aria-current="true"' : ''}>
+      ${markWrapHtml(mark, count && !smart ? finished / count : 0)}
       <span class="lib-rail-name"${crumb}>${escapeHtml(row.label)}</span>
       <span class="lib-rail-count" aria-hidden="true">${count}</span>
     </button>
