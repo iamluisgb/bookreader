@@ -3,6 +3,20 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-11-19 — Iconos de estantería bitono, estilo Notion, y marca por MCP
+
+- **El caso**: los iconos de F1 eran de línea fina dentro de una baldosa teñida; a 16 px se
+  leían flojos, y no había forma de poner la marca desde un agente.
+- **El arreglo**: juego aparte de 25 glifos BITONO (`markIcon` en
+  [`icons.js`](app/js/ui/icons.js)): el cuerpo a 28 % de opacidad y contorneado a 1,8, a 20 px, en
+  el color de la estantería y sin baldosa, como la barra lateral de Notion. El tono se mezcla con la
+  tinta del tema para leerse en claro, oscuro y sepia. La pluma pasa a plumín (se confundía con la
+  hoja) y entra un escudo. Los 15 iconos de línea que solo usaban las estanterías salen de `ICONS`.
+- **MCP**: `update_shelf` acepta `icon`, `hue` y `goal` con las mismas reglas que la app (lista
+  cerrada, `null` para quitar) y `list_shelves` los devuelve; el deshacer de cambios del agente
+  también restaura la marca ([`agent-undo.js`](app/js/sync/agent-undo.js)). Test en
+  [`mcp-library.test.mjs`](workers/sync/test/mcp-library.test.mjs).
+
 ## 2026-11-19 — Estado en el rail: anillo de terminados y punto de repaso (P58 F3)
 
 - **El caso**: para saber qué estantería tenía trabajo hoy había que abrirlas una a una.

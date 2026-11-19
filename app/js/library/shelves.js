@@ -279,7 +279,7 @@ export function levelNodes(shelves, parent = '') {
 export const MARK_ICONS = [
   'book', 'books', 'bookmark', 'star', 'target', 'flame', 'lightbulb', 'chip',
   'code', 'chart', 'flask', 'globe', 'landmark', 'quill', 'graduation', 'briefcase',
-  'coin', 'users', 'heart', 'dumbbell', 'leaf', 'palette', 'music', 'trash',
+  'coin', 'users', 'heart', 'dumbbell', 'leaf', 'palette', 'music', 'shield', 'trash',
 ];
 // Ocho tonos fuera de la franja verde (90–180), que es la del acento: una marca verdosa se
 // lee como «seleccionada» o como las automáticas (ver markHue en library/view.js).

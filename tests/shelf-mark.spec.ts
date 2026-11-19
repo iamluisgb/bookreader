@@ -39,7 +39,7 @@ test('elegir icono y color desde el menú: se pinta, se guarda y viaja en el syn
 
   const mark = r.locator('.lib-rail-thumb--mark');
   await expect(mark).toHaveClass(/has-icon/);
-  await expect(mark.locator('svg.icon')).toHaveCount(1);
+  await expect(mark.locator('svg.mark-glyph')).toHaveCount(1);
   await expect(mark).toHaveAttribute('style', /--mark-h:0/);
 
   const entry = await page.evaluate(async (id) => {
@@ -50,7 +50,7 @@ test('elegir icono y color desde el menú: se pinta, se guarda y viaja en el syn
 
   // Plegado, la franja enseña el icono, no la letra.
   await page.locator('.lib-rail-fold').click();
-  await expect(r.locator('.lib-rail-thumb--mark svg.icon')).toBeVisible();
+  await expect(r.locator('.lib-rail-thumb--mark svg.mark-glyph')).toBeVisible();
 
   // Vuelta a la marca de siempre: «Inicial» + «Automático», y `null` en el sync.
   await page.locator('.lib-rail-fold').click();

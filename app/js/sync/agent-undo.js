@@ -45,6 +45,8 @@ export async function applyUndo(undo, now = Date.now()) {
     const next = { ...(cur || { id }), id, name: prev.name, createdAt: prev.createdAt || (cur && cur.createdAt) || now, updatedAt: now };
     if (Number.isFinite(prev.order)) next.order = prev.order; else delete next.order;
     if (prev.rule && Object.keys(prev.rule).length) next.rule = prev.rule; else delete next.rule;
+    // Marca y objetivo (P58): solo si el deshacer los guardó (los viejos no los traen).
+    for (const f of ['icon', 'hue', 'goal']) if (f in prev) next[f] = prev[f];
     if (prev.deleted) Object.assign(next, { deleted: true, deletedAt: now });
     else { delete next.deleted; delete next.deletedAt; }
     await LibStore.putShelf(next);

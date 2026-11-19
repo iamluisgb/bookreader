@@ -17,7 +17,7 @@
 
 import { ToolError } from './errors.mjs';
 import { fold } from './book-arg.mjs';
-import { cleanRule, hasRule, booksIn, segments, renumber, levelNodes, shelfRows, RULE_FIELDS, SEP } from '../../app/js/library/shelves.js';
+import { cleanRule, hasRule, booksIn, segments, renumber, levelNodes, shelfRows, RULE_FIELDS, SEP, MARK_ICONS, MARK_HUES, cleanMark } from '../../app/js/library/shelves.js';
 
 const STATUSES = ['unread', 'reading', 'finished'];
 const MAX_ITEMS = 500;
@@ -126,7 +126,8 @@ const keepBook = (undo, id, b) => {
   if (!undo.books[id]) undo.books[id] = { shelfIds: b.shelfIds || [], status: b.status || 'unread', finishedAt: b.finishedAt || null, title: b.title || '', author: b.author || '' };
 };
 const keepShelf = (undo, id, s) => {
-  if (!(id in undo.shelves)) undo.shelves[id] = s ? { name: s.name, createdAt: s.createdAt, order: s.order ?? null, rule: s.rule || null, deleted: !!s.deleted } : null;
+  if (!(id in undo.shelves)) undo.shelves[id] = s ? { name: s.name, createdAt: s.createdAt, order: s.order ?? null, rule: s.rule || null,
+    icon: s.icon ?? null, hue: s.hue ?? null, goal: s.goal ?? null, deleted: !!s.deleted } : null;
 };
 
 function setShelfIds(lib, id, ids, now, undo) {
@@ -141,6 +142,8 @@ function setShelfIds(lib, id, ids, now, undo) {
 const SHELF_VIEW = (lib, s, books) => ({
   shelfId: s.id, name: s.name, path: segments(s.name), smart: hasRule(s.rule), rule: s.rule || null,
   order: Number.isFinite(s.order) ? s.order : null, books: booksIn(books, s).length,
+  // Marca y objetivo (P58): lo que la app pinta en el rail y en la cabecera de la estantería.
+  icon: cleanMark(s).icon, hue: cleanMark(s).hue, goal: s.goal || null,
 });
 
 const DRY = { dry_run: { type: 'boolean', description: 'true: enseña el cambio sin hacerlo.' } };
@@ -318,13 +321,21 @@ const UPDATE_SHELF = {
   name: 'update_shelf',
   title: 'Renombrar o cambiar una estantería',
   description:
-    'Renombra una estantería (también para moverla en el árbol: «ML» → «Técnico/ML») o cambia ' +
-    'su regla (`rule: null` la vuelve normal, sin libros). El id no cambia: los enlaces ' +
-    'compartidos siguen funcionando.',
+    'Renombra una estantería (también para moverla en el árbol: «ML» → «Técnico/ML»), cambia ' +
+    'su regla (`rule: null` la vuelve normal, sin libros) o su marca en la app: `icon` (uno de ' +
+    'la lista; `null` = la inicial), `hue` (tono de la lista; `null` = el que sale del nombre) y ' +
+    '`goal` (una línea: para qué es; `null` la quita). El id no cambia: los enlaces compartidos ' +
+    'siguen funcionando.',
   capability: 'canOrganize',
   inputSchema: {
     type: 'object',
-    properties: { shelf: { type: 'string', description: 'Id o nombre completo.' }, name: { type: 'string' }, rule: RULE_SCHEMA, ...DRY },
+    properties: {
+      shelf: { type: 'string', description: 'Id o nombre completo.' }, name: { type: 'string' }, rule: RULE_SCHEMA,
+      icon: { type: ['string', 'null'], enum: [...MARK_ICONS, null], description: 'Icono de la estantería en la app.' },
+      hue: { type: ['integer', 'null'], enum: [...MARK_HUES, null], description: 'Tono del icono (grados HSL).' },
+      goal: { type: ['string', 'null'], description: 'Para qué es la estantería, en una línea (≤140).' },
+      ...DRY,
+    },
     required: ['shelf'],
     additionalProperties: false,
   },
@@ -344,12 +355,24 @@ const UPDATE_SHELF = {
         for (const b of liveBooks(lib)) if ((b.shelfIds || []).includes(s.id)) setShelfIds(lib, b.id, b.shelfIds.filter((x) => x !== s.id), now, undo);
       }
     }
-    if (JSON.stringify([next.name, next.rule || null]) === JSON.stringify([cur.name, cur.rule || null])) {
+    // Marca y objetivo con las MISMAS reglas que la app (Shelves.cleanMark, Store.updateShelf):
+    // `null` se guarda, para que quitarlo también se propague por el sync.
+    if (args.icon !== undefined) {
+      if (args.icon !== null && !MARK_ICONS.includes(args.icon)) throw new ToolError(`No hay ningún icono «${args.icon}». Valen: ${MARK_ICONS.join(', ')}.`);
+      next.icon = args.icon;
+    }
+    if (args.hue !== undefined) {
+      if (args.hue !== null && !MARK_HUES.includes(args.hue)) throw new ToolError(`Tono no válido. Valen: ${MARK_HUES.join(', ')}.`);
+      next.hue = args.hue;
+    }
+    if (args.goal !== undefined) next.goal = String(args.goal || '').replace(/\s+/g, ' ').trim().slice(0, 140) || null;
+    const view = (x) => ({ name: x.name, rule: x.rule || null, icon: x.icon ?? null, hue: x.hue ?? null, goal: x.goal ?? null });
+    if (JSON.stringify(view(next)) === JSON.stringify(view(cur))) {
       return { changed: false, result: { shelfId: s.id, name: cur.name, unchanged: true } };
     }
     keepShelf(undo, s.id, cur);
     lib.shelves[s.id] = { ...next, updatedAt: now };
-    return { changed: true, result: { shelfId: s.id, before: { name: cur.name, rule: cur.rule || null }, after: { name: next.name, rule: next.rule || null } }, summary: { shelvesChanged: 1 } };
+    return { changed: true, result: { shelfId: s.id, before: view(cur), after: view(next) }, summary: { shelvesChanged: 1 } };
   }),
 };
 

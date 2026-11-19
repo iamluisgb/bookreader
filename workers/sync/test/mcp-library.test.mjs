@@ -155,6 +155,28 @@ test('inteligentes y orden: regla por nombres, solo sobre normales; reorder del 
   assert.equal((await s.readLib()).shelves.sh_fav.createdAt, 2, 'mismo id y misma estantería');
 });
 
+test('update_shelf: icono, tono y para qué es (P58), validados y con null para quitarlos', async () => {
+  const s = await seeded();
+  const t = await s.token(['library']);
+  const r = await tool(s.e, t, 'update_shelf', { shelf: 'sh_fav', icon: 'star', hue: 45, goal: '  Lo que   leo ahora ' });
+  assert.deepEqual([r.json.after.icon, r.json.after.hue, r.json.after.goal], ['star', 45, 'Lo que leo ahora']);
+  const lib = await s.readLib();
+  assert.deepEqual([lib.shelves.sh_fav.icon, lib.shelves.sh_fav.hue, lib.shelves.sh_fav.goal], ['star', 45, 'Lo que leo ahora']);
+  const list = await tool(s.e, t, 'list_shelves', {});
+  const fav = list.json.shelves.find((x) => x.shelfId === 'sh_fav');
+  assert.deepEqual([fav.icon, fav.hue, fav.goal], ['star', 45, 'Lo que leo ahora']);
+  const same = await tool(s.e, t, 'update_shelf', { shelf: 'sh_fav', icon: 'star' });
+  assert.equal(same.json.unchanged, true);
+  const bad = await tool(s.e, t, 'update_shelf', { shelf: 'sh_fav', icon: 'unicornio' });
+  assert.ok(bad.isError);
+  const badHue = await tool(s.e, t, 'update_shelf', { shelf: 'sh_fav', hue: 120 });
+  assert.ok(badHue.isError, 'la franja verde es la del acento');
+  await tool(s.e, t, 'update_shelf', { shelf: 'sh_fav', icon: null, hue: null, goal: null });
+  const off = (await s.readLib()).shelves.sh_fav;
+  assert.deepEqual([off.icon, off.hue, off.goal], [null, null, null], 'null se guarda: quitarlo también viaja');
+  assert.equal(off.name, 'Favoritos', 'el resto de la estantería, intacto');
+});
+
 test('reorder de una carpeta: «Libros» (solo existe por «Libros/…») se coloca con todo lo que lleva dentro', async () => {
   const s = await seeded();
   const t = await s.token(['library']);

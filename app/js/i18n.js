@@ -1456,6 +1456,7 @@ const EN = {
   'Paleta': 'Palette',
   'Música': 'Music',
   'Papelera': 'Bin',
+  'Escudo': 'Shield',
   'Opciones de {name}': 'Options for {name}',
   '{name}, {n} libro': '{name}, {n} book',
   '{name}, {n} libros': '{name}, {n} books',

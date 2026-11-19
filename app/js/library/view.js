@@ -6,7 +6,7 @@ import * as Shelves from './shelves.js';
 import * as Study from '../ai/study.js';
 import * as Blobs from '../sync/blobs.js';
 import * as SyncProvider from '../sync/provider.js';
-import { icon } from '../ui/icons.js';
+import { icon, markIcon } from '../ui/icons.js';
 import { brandMark, brandLockup, cargar } from '../ui/brand.js';
 import { editBookMeta } from './book-meta.js';
 import { t, getLang } from '../i18n.js';
@@ -560,7 +560,7 @@ function chipHtml(row) {
       data-row-key="${escapeHtml(row.key)}" data-row-label="${escapeHtml(row.label)}"
       data-shelf-ids="${escapeHtml(row.shelfIds.join(','))}"${row.shelf ? ` data-shelf-id="${escapeHtml(row.shelf.id)}"` : ''}
       title="${escapeHtml(full)}" aria-pressed="${active}" aria-label="${escapeHtml(countLabel(full, count))}">
-      ${hasOwnIcon(row.shelf) ? icon(Shelves.cleanMark(row.shelf).icon, { size: 'sm' }) : (smart ? icon('funnel', { size: 'sm' }) : '')}<span class="lib-schip-name">${escapeHtml(row.label)}</span><span class="lib-schip-count" aria-hidden="true">${count}</span>
+      ${hasOwnIcon(row.shelf) ? `<span class="lib-schip-mark" style="--mark-h:${Shelves.cleanMark(row.shelf).hue ?? markHue(row.label)}">${markIcon(Shelves.cleanMark(row.shelf).icon, { size: 16 })}</span>` : (smart ? icon('funnel', { size: 'sm' }) : '')}<span class="lib-schip-name">${escapeHtml(row.label)}</span><span class="lib-schip-count" aria-hidden="true">${count}</span>
     </button>`;
 }
 
@@ -768,7 +768,7 @@ function countLabel(name, n) {
 function shelfMarkHtml(label, shelf = null) {
   const m = Shelves.cleanMark(shelf || {});
   const hue = m.hue ?? markHue(label);
-  const face = m.icon ? icon(m.icon, { size: 'md' }) : escapeHtml(markInitial(label));
+  const face = m.icon ? markIcon(m.icon, { size: 20 }) : escapeHtml(markInitial(label));
   return `<span class="lib-rail-thumb lib-rail-thumb--mark${m.icon ? ' has-icon' : ''}" style="--mark-h:${hue}"
     aria-hidden="true">${face}</span>`;
 }
@@ -1611,20 +1611,20 @@ const MARK_ICON_LABELS = {
   flame: 'Llama', lightbulb: 'Bombilla', chip: 'Chip', code: 'Código', chart: 'Gráfica',
   flask: 'Matraz', globe: 'Globo', landmark: 'Columnas', quill: 'Pluma', graduation: 'Birrete',
   briefcase: 'Maletín', coin: 'Moneda', users: 'Personas', heart: 'Corazón', dumbbell: 'Pesa',
-  leaf: 'Hoja', palette: 'Paleta', music: 'Música', trash: 'Papelera',
+  leaf: 'Hoja', palette: 'Paleta', music: 'Música', shield: 'Escudo', trash: 'Papelera',
 };
 async function editShelfMark(shelf) {
   const label = Shelves.segments(shelf.name).pop();
   const cur = Shelves.cleanMark(shelf);
   const auto = markHue(label);
-  const thumb = (inner) => `<span class="lib-rail-thumb lib-rail-thumb--mark" style="--mark-h:var(--pick-h, ${auto})">${inner}</span>`;
+  const thumb = (inner, glyph = false) => `<span class="lib-rail-thumb lib-rail-thumb--mark${glyph ? ' has-icon' : ''}" style="--mark-h:var(--pick-h, ${auto})">${inner}</span>`;
   const res = await formBox({
     title: t('Icono y color'),
     message: t('Cómo se ve «{name}» en la lista de estanterías.', { name: label }),
     fields: [
       { name: 'icon', label: t('Icono'), type: 'choices', value: cur.icon || '',
         options: [{ value: '', label: t('Inicial'), html: thumb(escapeHtml(markInitial(label))) },
-          ...Shelves.MARK_ICONS.map(n => ({ value: n, label: t(MARK_ICON_LABELS[n] || n), html: thumb(icon(n, { size: 'md' })) }))] },
+          ...Shelves.MARK_ICONS.map(n => ({ value: n, label: t(MARK_ICON_LABELS[n] || n), html: thumb(markIcon(n, { size: 22 }), true) }))] },
       { name: 'hue', label: t('Color'), type: 'choices', value: cur.hue ?? '', cssVar: '--pick-h',
         options: [{ value: '', label: t('Automático'), html: '<span class="mark-swatch mark-swatch--auto"></span>' },
           ...Shelves.MARK_HUES.map(h => ({ value: h, label: t('Tono {n}', { n: h }), html: `<span class="mark-swatch" style="--sw-h:${h}"></span>` }))] },

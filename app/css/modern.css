@@ -484,7 +484,15 @@ button.lib-rail-twisty:hover { background: var(--surface-2); color: var(--text);
 /* Legible antes que sutil (DS1): los glifos de las vistas del sistema van en tinta, no en
    gris sobre gris, que a 16 px se perdía. */
 .lib-rail-thumb--none .icon { color: var(--text); }
-.lib-rail-thumb--mark .icon { color: inherit; }
+/* Con icono (P58), estilo barra lateral de Notion: el glifo en su color, sin baldosa. El tono
+   se mezcla con la tinta del tema: aclara en oscuro y oscurece en claro, así el mismo número
+   de tono se lee en los tres temas. */
+.lib-rail-thumb--mark.has-icon, .lib-schip-mark {
+  background: none;
+  color: color-mix(in srgb, hsl(var(--mark-h, 220) 68% 52%) 78%, var(--text));
+}
+.lib-schip-mark { display: inline-flex; }
+.mark-glyph { display: block; flex: none; }
 .lib-rail-kebab {
   flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center;
   width: 26px; height: 26px; margin-right: 6px; padding: 0;
@@ -628,6 +636,7 @@ button.lib-rail-twisty:hover { background: var(--surface-2); color: var(--text);
    caja propia: es la cabecera de la página, no una tarjeta más entre las de la portada. */
 .lib-head-shelf { flex: none; display: inline-flex; margin-right: var(--s-3); }
 .lib-head-shelf .lib-rail-thumb { width: 40px; height: 40px; border-radius: var(--r-md); font-size: var(--fs-lg); }
+.lib-head-shelf .mark-glyph { width: 32px; height: 32px; }
 .lib-head.has-shelf { margin-bottom: var(--s-3); }
 .lib-shelf-hero { display: flex; flex-direction: column; align-items: flex-start; gap: var(--s-3); margin-bottom: var(--s-5); }
 .lib-shelf-goal { display: flex; align-items: center; gap: 4px; margin: 0; font-size: var(--fs-md); color: var(--text-soft); max-width: 60ch; }
