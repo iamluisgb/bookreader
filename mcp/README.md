@@ -126,11 +126,11 @@ node cli.mjs --dir ~/bookreader-layout reading_stats '{"range":"7d"}'
 | `create_infographic` | escritura | Una infografía con la plantilla de la app (tesis, ideas, paneles, cita). |
 | `create_summary` | escritura | Un resumen por capítulos, con viñetas que citan el pasaje. |
 | `delete_artifact` | escritura | Borra un mapa, infografía o resumen (tombstone). |
-| `list_shelves` | — | Estanterías (anidadas con «/», inteligentes con su regla) y cuántos libros tiene cada una. `list_books` trae autor, estado y `shelfIds`. |
+| `list_shelves` | — | Estanterías (anidadas con «/», inteligentes con su regla), cuántos libros tiene cada una y su marca en la app (`icon`, `hue`) y para qué es (`goal`). `list_books` trae autor, estado y `shelfIds`. |
 | `move_books` | biblioteca | Mete y saca libros de estanterías, en lote (por id o por título). |
 | `update_books` | biblioteca | Título, autor y estado (unread/reading/finished) de libros, en lote. |
 | `create_shelf` | biblioteca | Estantería normal (con libros, si se quiere), anidada o inteligente (`rule`). |
-| `update_shelf` | biblioteca | Renombrar (también moverla en el árbol) o cambiar su regla. El id no cambia. |
+| `update_shelf` | biblioteca | Renombrar (también moverla en el árbol), cambiar su regla o su marca: `icon` (de una lista cerrada; `null` = la inicial), `hue` (uno de ocho tonos; `null` = el que sale del nombre) y `goal` (una línea, ≤140). El id no cambia. |
 | `reorder_shelves` | biblioteca | El orden de las estanterías de un nivel. |
 | `delete_shelf` | biblioteca | Borra una estantería: los libros salen de ella y las reglas que la citan se limpian. |
 | `create_book_upload` | subir | Paso 1 de subir un EPUB o PDF: con nombre, tamaño y SHA-256, devuelve una URL de un solo uso para el PUT (o `exists` si ya está). |

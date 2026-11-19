@@ -134,6 +134,15 @@ texto o el `aria-label` del botón los nombra). Galería con su significado en
   texto («Ajustes → Agente») no son iconos y se quedan.
 - **Icono nuevo:** dibújalo en la rejilla 24 con trazos `round`, añádelo a `ICONS` con un
   comentario de para qué es (y qué NO es), y a `SIGNIFICA` en `patterns.html`.
+- **La excepción: marcas de estantería** (P58). Un segundo set, `MARK_GLYPHS` + `markIcon()` en
+  `icons.js`, **solo** para la cara de una estantería (rail, tira, hoja, cabecera, selector).
+  Bitono: `body` (formas macizas, pintadas a 28 % y contorneadas) + `lines` (detalles de trazo),
+  contorno fijo a 1,8; en el color de la estantería y **sin baldosa** detrás, como la barra
+  lateral de Notion. Tamaño por paso, igual que `icon()`. La lista guardada es cerrada
+  (`Shelves.MARK_ICONS`, validada con `cleanMark` al pintar y en el MCP) y tiene que coincidir con
+  los glifos dibujados (`tests/icons.spec.ts`). Tonos: los ocho de `MARK_HUES`, todos fuera de la
+  franja verde (90–180), que es la del acento; se mezclan con `--text` para leerse en los tres
+  temas. Sin icono elegido, la inicial sobre su tono. Galería en `patterns.html § Iconos`.
 
 **Añadir un patrón:** 1) mira si ya existe en `patterns.html`; 2) si no, dale un nombre
 por función y defínelo en `modern.css` (§5); 3) añádelo a `patterns.html` y, si tiene

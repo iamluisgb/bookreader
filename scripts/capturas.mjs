@@ -11,12 +11,13 @@
 //   lang:  es | en
 //   shot:  agente | sync | biblioteca
 //
-// En macOS, convertir a webp después:
-//   cwebp -q 82 captura.png -o docs-help/es/assets/capturas/NN-nombre.webp
+// Con salida .webp, la convierte el propio Chromium (calidad 0,82, como `cwebp -q 82`): no hace
+// falta cwebp en la máquina.
 
 import { spawn } from 'node:child_process';
 import { chromium } from '@playwright/test';
 import { resolve } from 'node:path';
+import { existsSync, writeFileSync } from 'node:fs';
 
 const root = resolve(new URL('..', import.meta.url).pathname);
 const PORT = 8977;
@@ -58,8 +59,10 @@ if (shot === 'agente' || shot === 'sync') {
   await page.waitForTimeout(600);
   await page.locator('#app-settings .appset-card').screenshot({ path: out });
 } else if (shot === 'biblioteca') {
-  // Tres libros de evals para que la biblioteca tenga portadas y la tira viva.
-  const libros = ['ddia.epub', 'p1-relativity.epub', 'p3-constitucion.pdf'];
+  // Libros de evals para que la biblioteca tenga portadas y la tira viva. Los que no estén en
+  // esta máquina (las fixtures van fuera de git) se saltan.
+  const libros = ['p1-relativity.epub', 'p5-onliberty.epub', 'p6-sre2.epub', 'p3-constitucion.pdf']
+    .filter((libro) => existsSync(resolve(FIXTURES, libro)));
   for (const libro of libros) {
     await page.setInputFiles('#file-input', resolve(FIXTURES, libro));
     // state: 'attached' — el iframe puede estar oculto (p. ej. portada única) y
@@ -72,11 +75,59 @@ if (shot === 'agente' || shot === 'sync') {
     await page.locator('#library-btn').click();
     await page.waitForTimeout(500);
   }
+  // Estanterías con su marca (P58): icono y tono, un anillo (un libro terminado) y un punto de
+  // repaso (tarjetas vencidas). Nombres en el idioma de la captura, nada personal.
+  await page.evaluate(async (lang) => {
+    const S = await import('/js/library/store.js');
+    const DB = await import('/js/ai/db.js');
+    const Srs = await import('/js/ai/srs.js');
+    const es = lang === 'es';
+    const books = await S.getAllBooks();
+    const byFile = (f) => books.find((b) => (b.fileName || '').startsWith(f));
+    const shelf = async (name, icon, hue, file) => {
+      const sh = await S.addShelf(name);
+      await S.updateShelf(sh.id, { icon, hue });
+      const b = file && byFile(file);
+      if (b) await S.toggleBookShelf(b.id, sh.id, true);
+      return sh;
+    };
+    await shelf(es ? 'Ahora' : 'Now', 'star', 45, 'p5-onliberty');
+    await shelf(es ? 'Técnico' : 'Technical', 'chip', 225);
+    await shelf(es ? 'Técnico/Operación y fiabilidad' : 'Technical/Operations and reliability', 'shield', 0, 'p6-sre2');
+    await shelf(es ? 'Humanidades' : 'Humanities', 'landmark', 25);
+    await shelf(es ? 'Humanidades/Ciencia' : 'Humanities/Science', 'flask', 200, 'p1-relativity');
+    await shelf(es ? 'Humanidades/Filosofía' : 'Humanities/Philosophy', 'quill', 285, 'p5-onliberty');
+    await shelf(es ? 'Derecho' : 'Law', 'briefcase', 200, 'p3-constitucion');
+    await shelf(es ? 'Salud y hábitos' : 'Health and habits', 'heart', 0);
+    await S.addShelf(es ? 'Terminados' : 'Finished', { rule: { status: 'finished' } });
+    const rel = byFile('p1-relativity');
+    if (rel) await S.updateBook(rel.id, { status: 'finished', progress: 100 });
+    const lib = byFile('p5-onliberty');
+    if (lib) {
+      const now = Date.now(), today = Srs.dayOf(now);
+      await DB.addDeck({ bookId: lib.id, name: 'On Liberty', cards: Array.from({ length: 6 }, (_, k) => ({
+        front: 'q' + k, back: 'a' + k,
+        srs: { due: today - 1, interval: 3, stability: 3, lastReview: now - 5 * 86400000, reps: 2 } })) });
+    }
+  }, lang);
+  await page.reload();
   await page.waitForSelector('.lib-grid .lib-cover-img, .lib-grid .lib-cover-fallback', {
     timeout: 30000,
   });
-  await page.waitForTimeout(800);
-  await page.locator('#library').screenshot({ path: out });
+  await page.waitForTimeout(1200);
+  const png = await page.locator('#library').screenshot({ path: out.endsWith('.webp') ? undefined : out });
+  if (out.endsWith('.webp')) {
+    const webp = await page.evaluate(async (b64) => {
+      const img = new Image();
+      img.src = 'data:image/png;base64,' + b64;
+      await img.decode();
+      const c = document.createElement('canvas');
+      c.width = img.naturalWidth; c.height = img.naturalHeight;
+      c.getContext('2d').drawImage(img, 0, 0);
+      return c.toDataURL('image/webp', 0.82).split(',')[1];
+    }, png.toString('base64'));
+    writeFileSync(out, Buffer.from(webp, 'base64'));
+  }
 } else {
   console.error(`Shot desconocido: ${shot} (agente | sync | biblioteca)`);
   await browser.close();

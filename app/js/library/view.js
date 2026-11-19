@@ -590,7 +590,7 @@ function chipHtml(row) {
       data-row-key="${escapeHtml(row.key)}" data-row-label="${escapeHtml(row.label)}"
       data-shelf-ids="${escapeHtml(row.shelfIds.join(','))}"${row.shelf ? ` data-shelf-id="${escapeHtml(row.shelf.id)}"` : ''}
       title="${escapeHtml(full)}" aria-pressed="${active}" aria-label="${escapeHtml(countLabel(full, count))}">
-      ${hasOwnIcon(row.shelf) ? `<span class="lib-schip-mark" style="--mark-h:${Shelves.cleanMark(row.shelf).hue ?? markHue(row.label)}">${markIcon(Shelves.cleanMark(row.shelf).icon, { size: 16 })}</span>` : (smart ? icon('funnel', { size: 'sm' }) : '')}<span class="lib-schip-name">${escapeHtml(row.label)}</span><span class="lib-schip-count" aria-hidden="true">${count}</span>
+      ${hasOwnIcon(row.shelf) ? `<span class="lib-schip-mark" style="--mark-h:${Shelves.cleanMark(row.shelf).hue ?? markHue(row.label)}">${markIcon(Shelves.cleanMark(row.shelf).icon, { size: 'md' })}</span>` : (smart ? icon('funnel', { size: 'sm' }) : '')}<span class="lib-schip-name">${escapeHtml(row.label)}</span><span class="lib-schip-count" aria-hidden="true">${count}</span>
     </button>`;
 }
 
@@ -804,7 +804,7 @@ function countLabel(name, n) {
 function shelfMarkHtml(label, shelf = null) {
   const m = Shelves.cleanMark(shelf || {});
   const hue = m.hue ?? markHue(label);
-  const face = m.icon ? markIcon(m.icon, { size: 20 }) : escapeHtml(markInitial(label));
+  const face = m.icon ? markIcon(m.icon, { size: 'lg' }) : escapeHtml(markInitial(label));
   return `<span class="lib-rail-thumb lib-rail-thumb--mark${m.icon ? ' has-icon' : ''}" style="--mark-h:${hue}"
     aria-hidden="true">${face}</span>`;
 }
@@ -1660,7 +1660,7 @@ async function editShelfMark(shelf) {
     fields: [
       { name: 'icon', label: t('Icono'), type: 'choices', value: cur.icon || '',
         options: [{ value: '', label: t('Inicial'), html: thumb(escapeHtml(markInitial(label))) },
-          ...Shelves.MARK_ICONS.map(n => ({ value: n, label: t(MARK_ICON_LABELS[n] || n), html: thumb(markIcon(n, { size: 22 }), true) }))] },
+          ...Shelves.MARK_ICONS.map(n => ({ value: n, label: t(MARK_ICON_LABELS[n] || n), html: thumb(markIcon(n, { size: 'xl' }), true) }))] },
       { name: 'hue', label: t('Color'), type: 'choices', value: cur.hue ?? '', cssVar: '--pick-h',
         options: [{ value: '', label: t('Automático'), html: '<span class="mark-swatch mark-swatch--auto"></span>' },
           ...Shelves.MARK_HUES.map(h => ({ value: h, label: t('Tono {n}', { n: h }), html: `<span class="mark-swatch" style="--sw-h:${h}"></span>` }))] },

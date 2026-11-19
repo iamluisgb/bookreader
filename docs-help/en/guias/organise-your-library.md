@@ -1,5 +1,5 @@
 ---
-updated: 2026-11-15
+updated: 2026-11-19
 ---
 
 # Organise your library
@@ -9,8 +9,8 @@ matters; with fifty, the difference between finding something and not finding it
 it.
 
 <figure markdown>
-  ![The library: shelves on the left, books with covers on the right, search on top](../assets/capturas/08-shelves.webp)
-  <figcaption>Shelves on the left, books on the right. Search and the status filter live on top.</figcaption>
+  ![The library: shelves with their icons on the left, some with a finished ring and a review dot; books with covers on the right and search on top](../assets/capturas/08-shelves.webp)
+  <figcaption>Shelves on the left, each with its icon; the ring says how much you have finished and the dot that there is review today. Books on the right.</figcaption>
 </figure>
 
 ## Two kinds of shelves
@@ -27,6 +27,36 @@ and author; status is picked from the dropdown.
 !!! tip "Unshelved is not lost"
     Smart shelves by status cover **every** book. A book that is not on any manual shelf only means
     you have not filed it: it is still in the library and on its status shelf.
+
+## Every shelf at a glance
+
+- **Icon and colour.** In the shelf's menu (the three dots), **Icon and colour**: pick an icon from
+  the list and one of eight hues, and see how it looks before saving. **Initial** and **Automatic**
+  go back to the letter and the hue that come from the name. It travels with sync to your other
+  devices.
+- **The column folds.** The button next to the logo turns it into a strip of icons and the grid
+  gains room. On a tablet held upright it starts folded; once you change it, it stays the way you
+  left it on that device. Folded, only top-level shelves show: to get into a sub-shelf, unfold it.
+- **Ring and dot.** The ring around the icon fills with the share of finished books; the green dot
+  says the shelf has cards due today. A group adds up its sub-shelves. Smart shelves have no ring:
+  a rule decides what is in them.
+
+## A shelf's header
+
+When you pick **one** shelf, its own header replaces the general cards at the top:
+
+- **What it is for**: one line you write (**What this shelf is for**), for example "Learn to
+  design agents". Edit it with the pencil.
+- **Its state**: how many books you have finished and how many are under way, the cards due today
+  and how much you remember.
+- **Review · N** reviews only that shelf's cards; **Continue "…"** opens the last book you had under
+  way there; **Add a book here** uploads a book straight onto the shelf.
+
+!!! note "“Remembered” is an estimate"
+    The percentage adds up the chance of recalling each card. It also rises when you add cards, not
+    only when you learn; that is why it says "estimate" and shows the number of cards next to it.
+
+With several shelves crossed, or with **No shelf**, the home screen stays as usual.
 
 ## The book's details
 

@@ -1,5 +1,5 @@
 ---
-updated: 2026-11-15
+updated: 2026-11-19
 ---
 
 # Turn reading into review
@@ -53,6 +53,9 @@ In **Decks** you see what is due today. Review uses **FSRS**, the same kind of a
 - The **new-card limit** stops a freshly generated deck from dropping 90 cards on you on day one.
   Cards you have already started always come in.
 - The **streak** counts the days you review; the "due today" counter says what is left.
+- To review **one topic**, pick its shelf in the library and tap **Review · N** in its header:
+  only the cards from its books come in. The green dot in the shelf list tells you which ones have
+  work today.
 
 !!! note "The percentage is not a thermometer"
     FSRS schedules each review when it predicts you will be right about 90 % of the time. That

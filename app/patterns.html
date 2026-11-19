@@ -154,6 +154,9 @@
       <tr><th>Paso</th><th>Valor</th><th>Muestra</th><th>Para</th></tr>
     </table></div>
     <div class="pl-icons" id="pl-icons"></div>
+    <h3>Marcas de estantería</h3>
+    <p class="pl-why">La única excepción al set de línea: la cara de una estantería (P58). Bitono —cuerpo a 28 % y contorno a 1,8— en el color de la estantería y sin baldosa, como la barra lateral de Notion. Lista cerrada (<code>Shelves.MARK_ICONS</code>) y ocho tonos fuera de la franja verde del acento; sin icono elegido, la inicial sobre su tono. No se usan para nada más que marcar una estantería.</p>
+    <div class="pl-icons" id="pl-marks"></div>
   </section>
 
   <section class="pl-sec">
@@ -231,6 +234,10 @@ const usoTam = { sm: 'En línea con texto pequeño, chips', md: 'Botones, menús
   xl: 'Cabecera y lector', display: 'Confirmaciones, estados', hero: 'Estados vacíos' };
 document.getElementById('pl-icon-sizes').innerHTML += Object.entries(ICON_SIZES).map(([k, v]) =>
   `<tr><td><code>${k}</code> · <code>--icon-${k}</code></td><td>${v}px</td><td>${icon('books', { size: k })}</td><td>${usoTam[k]}</td></tr>`).join('');
+const { MARK_ICONS, MARK_HUES } = await import('./js/library/shelves.js');
+const { markIcon } = await import('./js/ui/icons.js');
+document.getElementById('pl-marks').innerHTML = MARK_ICONS.map((n, i) =>
+  `<div class="pl-icon" title="${n}"><span class="lib-rail-thumb lib-rail-thumb--mark has-icon" style="--mark-h:${MARK_HUES[i % MARK_HUES.length]}">${markIcon(n, { size: 'xl' })}</span><b>${n}</b></div>`).join('');
 document.getElementById('pl-icons').innerHTML = ICON_NAMES.filter(n => !n.endsWith('-fill')).map(n =>
   `<div class="pl-icon" title="${n}">${icon(n, { size: 'xl' })}<b>${n}</b>${SIGNIFICA[n] ? `<span>${SIGNIFICA[n]}</span>` : ''}</div>`).join('');
 </script>

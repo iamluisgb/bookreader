@@ -1,5 +1,5 @@
 ---
-updated: 2026-11-15
+updated: 2026-11-19
 ---
 
 # Ordena tu biblioteca
@@ -9,8 +9,8 @@ libros da igual; con cincuenta, la diferencia entre encontrar algo y no encontra
 ordenas.
 
 <figure markdown>
-  ![La biblioteca: estanterías a la izquierda, libros con portada a la derecha y buscador arriba](../assets/capturas/08-estanterias.webp)
-  <figcaption>Estanterías a la izquierda, libros a la derecha. El buscador y el filtro de estado, arriba.</figcaption>
+  ![La biblioteca: estanterías con su icono a la izquierda, algunas con anillo de terminados y punto de repaso; libros con portada a la derecha y buscador arriba](../assets/capturas/08-estanterias.webp)
+  <figcaption>Estanterías a la izquierda, cada una con su icono; el anillo dice cuánto llevas terminado y el punto, que hay repaso hoy. Libros a la derecha.</figcaption>
 </figure>
 
 ## Estanterías: dos tipos
@@ -28,6 +28,37 @@ el autor; el estado se elige en el desplegable.
     Las estanterías inteligentes por estado cubren **todos** los libros. Que un libro no esté en
     ninguna estantería manual solo significa que no lo has clasificado: sigue en la biblioteca y en
     su estantería de estado.
+
+## Cada estantería, a la vista
+
+- **Icono y color.** En el menú de la estantería (los tres puntos), **Icono y color**: eliges un
+  icono de la lista y uno de ocho tonos, y ves cómo queda antes de guardar. **Inicial** y
+  **Automático** vuelven a la letra y al tono que salen del nombre. Viaja con el sync a tus otros
+  dispositivos.
+- **La columna se pliega.** El botón junto al logo la deja en una franja de iconos y la rejilla gana
+  sitio. En una tablet en vertical sale plegada; en cuanto la cambias, se queda como la dejaste en
+  ese dispositivo. Plegada, solo se ven las estanterías de primer nivel: para entrar en una
+  subestantería, despliégala.
+- **Anillo y punto.** El anillo alrededor del icono se llena con la parte de libros terminados; el
+  punto verde dice que esa estantería tiene tarjetas para hoy. Un grupo suma lo de sus
+  subestanterías. Las inteligentes no llevan anillo: su contenido lo decide una regla.
+
+## La cabecera de una estantería
+
+Al elegir **una** estantería, arriba sale lo suyo en lugar de las tarjetas generales:
+
+- **Para qué es**: una línea que escribes tú (**Para qué es esta estantería**), por ejemplo
+  «Aprender a diseñar agentes». Se edita con el lápiz.
+- **Su estado**: cuántos libros has terminado y cuántos van a medias, las tarjetas para hoy y
+  cuánto recuerdas.
+- **Repasar · N** repasa solo las tarjetas de esa estantería; **Seguir con «…»** abre el último
+  libro que tenías a medias en ella; **Añadir libro aquí** sube un libro y lo mete directamente.
+
+!!! note "«Recordado» es una estimación"
+    El porcentaje suma la probabilidad de recordar cada tarjeta. Sube también cuando añades
+    tarjetas, no solo cuando aprendes; por eso lleva «estimado» y el número de tarjetas al lado.
+
+Con varias estanterías cruzadas, o con **Sin estantería**, la portada es la de siempre.
 
 ## La ficha del libro
 

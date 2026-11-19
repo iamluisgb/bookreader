@@ -100,3 +100,24 @@ test('el set se pinta: cada icono da un SVG y un nombre desconocido avisa', asyn
   expect(r.nope).toBe('');
   await expect.poll(() => warnings.some(w => w.includes('no-existe'))).toBe(true);
 });
+
+// Marcas de estantería (P58, DESIGN.md · Iconos): un segundo set, bitono, SOLO para la cara de
+// una estantería. Las mismas reglas de tamaño, y la lista que se guarda (Shelves.MARK_ICONS) y
+// la que se dibuja (MARK_GLYPHS) son la misma: un icono guardado sin glifo pintaría un hueco.
+test('marcas de estantería: tamaño por paso y lista guardada = glifos dibujados', () => {
+  const bad: string[] = [];
+  for (const f of ALL) {
+    readFileSync(f, 'utf8').split('\n').forEach((l, i) => {
+      if (/markIcon\((?:[^()]|\([^()]*\))*?\{\s*size:\s*\d/.test(l)) bad.push(`${rel(f)}:${i + 1}`);
+    });
+  }
+  expect(bad, `markIcon con tamaño en píxeles (usa 'md' | 'lg' | 'xl'…):\n${bad.join('\n')}`).toEqual([]);
+  const shelvesSrc = readFileSync(join(APP, 'js/library/shelves.js'), 'utf8');
+  const list = shelvesSrc.slice(shelvesSrc.indexOf('export const MARK_ICONS = ['), shelvesSrc.indexOf('];', shelvesSrc.indexOf('export const MARK_ICONS = [')));
+  const stored = [...list.matchAll(/'([a-z-]+)'/g)].map(m => m[1]).sort();
+  const block = iconsSrc.slice(iconsSrc.indexOf('const MARK_GLYPHS = {'), iconsSrc.indexOf('\n};', iconsSrc.indexOf('const MARK_GLYPHS = {')));
+  const drawn = [...block.matchAll(/^\s+'?([a-z][a-z-]*)'?:\s*\{/gm)].map(m => m[1]).sort();
+  expect(stored.length).toBeGreaterThan(20);
+  expect(drawn).toEqual(stored);
+});
+

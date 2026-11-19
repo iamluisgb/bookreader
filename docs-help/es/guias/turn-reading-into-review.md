@@ -1,5 +1,5 @@
 ---
-updated: 2026-11-15
+updated: 2026-11-19
 ---
 
 # Convierte lo leído en repaso
@@ -53,6 +53,9 @@ En **Mazos** verás lo que toca hoy. El repaso usa **FSRS**, el mismo tipo de al
 - El **tope de tarjetas nuevas** evita que un mazo recién generado te ponga 90 tarjetas el primer
   día. Las que ya llevas empezadas entran siempre.
 - La **racha** cuenta los días que repasas; el contador de «para hoy» dice lo que queda.
+- Para repasar **un tema**, elige su estantería en la biblioteca y pulsa **Repasar · N** en su
+  cabecera: solo entran las tarjetas de sus libros. El punto verde de la lista de estanterías te
+  dice cuáles tienen trabajo hoy.
 
 !!! note "El porcentaje no es un termómetro"
     FSRS programa cada repaso cuando predice que acertarás en torno al 90 %. Ese porcentaje tiende

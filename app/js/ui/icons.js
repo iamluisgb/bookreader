@@ -166,11 +166,14 @@ const MARK_GLYPHS = {
 };
 export const MARK_GLYPH_NAMES = Object.keys(MARK_GLYPHS);
 
-// <svg> de una marca de estantería, en currentColor. `size` en px.
-export function markIcon(name, { size = 20 } = {}) {
+// <svg> de una marca de estantería, en currentColor. `size`: un paso de ICON_SIZES, como icon()
+// (por defecto `lg`, el de la fila del rail). El trazo es fijo (1,8): el bitono pide contorno
+// firme también en grande, y el set de línea afina al crecer porque no tiene relleno.
+export function markIcon(name, { size = 'lg' } = {}) {
   const g = MARK_GLYPHS[name];
   if (!g) return '';
-  return `<svg class="mark-glyph" width="${size}" height="${size}" viewBox="0 0 24 24" aria-hidden="true" focusable="false">`
+  const px = resolveSize(size).px;
+  return `<svg class="mark-glyph" width="${px}" height="${px}" viewBox="0 0 24 24" aria-hidden="true" focusable="false">`
     + `<g fill="currentColor" stroke="none" opacity=".28">${g.body}</g>`
     + `<g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${g.body}${g.lines}</g></svg>`;
 }
