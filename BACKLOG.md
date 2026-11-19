@@ -2181,6 +2181,93 @@ son solo los de O'Reilly, puede bastar con documentarlo.
 
 ---
 
+### P58 — La estantería como espacio de estudio: icono, cabecera y estado en el rail · `M` · **en curso (2026-11-19)**
+
+**El caso.** Con el rail plegado a franja de iconos (CHANGELOG 2026-11-18) cada estantería es una
+inicial sobre un tono, y en la biblioteca de Luis las iniciales chocan: **S** es «Salud y hábitos» y
+«Sistemas», **N** es «Negocio y personas» y «Novela». Y al elegir una estantería solo cambian el título
+y la rejilla: el estado de ese tema —qué llevo leído, qué toca repasar, cuánto recuerdo— está repartido
+entre la tarjeta global de «Repaso de hoy», el selector «Elegir» (P12) y Análisis (P45). La estantería
+es un filtro, no un sitio.
+
+**Lo que ya existe** (por eso es `M` y no `L`):
+- Repaso por estantería: `openToday({ scope: { type: 'shelf', shelfId } })` y `dueToday(scope)` en
+  [`study.js`](app/js/ai/study.js) (`decksForScope` resuelve con `Shelves.booksIn`, reglas incluidas).
+- Dominio por libro: `Srs.knowledge()` sobre las tarjetas de sus mazos, ya pintado en cada tarjeta
+  (`paintMastery` en [`view.js`](app/js/library/view.js)).
+- Pertenencia: `Shelves.booksIn(books, shelf, now)`; progreso y `status` por libro en la ficha;
+  `lastOpenedAt` para «seguir leyendo».
+- Marcas del rail: `shelfMarkHtml` (inicial + `--mark-h` derivado del nombre, mezclado con los tokens
+  del tema) y el juego de iconos de [`icons.js`](app/js/ui/icons.js) (hay `book`, `books`, `bookmark`,
+  `target`, `flame`, `chart`, `users`, `user`, `sparkles`, `shield`, `function`, `scale`, `trash`…).
+
+**Lo que falta:**
+- **Dónde guardar icono y color.** La estantería viaja como `shelfEntry` en
+  [`library-sync.js`](app/js/sync/library-sync.js) con campos fijos (`name`, `order`, `rule`…) y
+  `mergeMaps` hace LWW por registro sobre `updatedAt`. Hay que añadir `icon`, `hue` y `goal` a
+  `shelfEntry` y a `updateShelf`. **Riesgo:** un cliente viejo que edite la estantería (renombrar,
+  reordenar) gana el LWW con una entrada sin esos campos y los borra. Se acepta: la PWA se actualiza sola
+  en días y el coste es volver a elegir un icono, no perder datos de lectura.
+- **Los grupos no son registros.** «Técnico» cuando solo existen «Técnico/LLM»… no tiene fila en
+  `shelves`, así que no puede guardar icono. Se queda con la inicial; si se quiere icono, se crea la
+  estantería «Técnico» (ya es un gesto del menú). Repasar un grupo necesita un `scope` nuevo
+  (`{ type: 'shelves', shelfIds }`, unión), porque `decksForScope` solo sabe de una.
+- **El dominio es una PREDICCIÓN.** `knowledge()` estima (Σ retrievabilidad) y crece al añadir
+  tarjetas; en la cabecera va como «~70 % recordado (estimado)», con el número de tarjetas al lado, y
+  nunca en la misma fila que una cifra observada.
+
+**Fases:**
+- **F1 · Icono y color · `S`–`M`.** ~24 iconos de línea para temas (los que faltan: chip, código,
+  corazón, maletín, globo, columna clásica, pluma, birrete, matraz, estrella, reloj, bandera, hoja,
+  pesa, paleta, nota musical), del mismo trazo que `icons.js`. «Icono y color» en el ⋯ de la estantería:
+  cuadrícula de iconos + 8 tonos + «Sin icono» (vuelve la inicial). Se pinta en el rail (entero y
+  plegado), la tira móvil, la hoja «Estanterías» y el selector de repaso. Las automáticas conservan el
+  embudo salvo que se les elija uno.
+- **F2 · Cabecera de estantería · `M`.** Con UNA estantería (o grupo) elegida, en lugar de las tarjetas
+  globales de «Continuar» y «Repaso de hoy»: icono y nombre, una línea opcional de para qué es
+  (`goal`, editable en el sitio), el estado en una frase —«4 de 12 terminados · 2 en curso · 38
+  tarjetas para hoy · ~70 % recordado (estimado, 412 tarjetas)»— y tres acciones: **Seguir leyendo**
+  (el último abierto de la estantería), **Repasar esta estantería** (oculto si no hay vencidas) y
+  **Añadir libro aquí** (el alta lo mete en la estantería). Con varias elegidas o con «Sin estantería»,
+  todo como hoy.
+- **F3 · Estado en el rail · `S`–`M`.** Anillo fino alrededor del icono con la fracción terminada, y un
+  punto si hay tarjetas para hoy; el `aria-label` lo dice con palabras. Un solo cálculo para todas las
+  filas (el de `studyScopes`), asíncrono como `paintMastery`, y en reposo con `prefers-reduced-motion`.
+  Solo esas dos señales: un tercer indicador ya es ruido.
+
+**Medida.** No hay telemetría (el cifrado es del navegador). Uso propio durante dos semanas: si los
+repasos se lanzan desde la cabecera de una estantería y no solo desde «Repasar hoy», la estantería ya
+es un sitio; si «Seguir leyendo» de la cabecera se usa más que la rejilla para volver a un libro, F2
+se queda. Si nada de eso pasa, F3 no se hace.
+
+**Fuera, a propósito:** portadas como marca (probado y retirado en `e2ea913`: ilegibles a 28 px y
+cambian solas), emoji (cada sistema los dibuja distinto y chocan con los iconos de línea), iconos
+subidos por el usuario e icono adivinado por el nombre («Ahora», «Platzi» o «Borrar» no tienen icono
+obvio). Preguntar a toda la estantería es [P59](#p59--pregunta-a-la-estantería-el-agente-sobre-todos-sus-libros--l--tentativo-sin-decidir).
+
+---
+
+### P59 — Pregunta a la estantería: el agente sobre todos sus libros · `L` · **tentativo, sin decidir**
+
+> **Tentativo (2026-11-19).** Salió al pensar P58: la cabecera de una estantería pide un «pregúntale».
+
+**El caso.** «¿Qué dicen mis libros de Agentes sobre la memoria a largo plazo?», con la respuesta citada
+libro a libro y enlace al pasaje. Hoy el agente de la app trabaja **por libro** ([`retrieval.js`](app/js/ai/retrieval.js)
+recupera dentro del libro abierto). El índice de toda la biblioteca existe (IA10,
+[`library-index.js`](app/js/sync/library-index.js)), pero lo lee **el MCP**, desde el texto del sync
+de BookReader.
+
+**Lo que hay que decidir antes de código:**
+- **Plan.** Si va sobre el índice del sync, solo funciona con el sync de BookReader, que es de Plus
+  (ADR-061). La alternativa es un recorrido local por los libros descargados en el dispositivo (sin
+  servidor, pero lento y limitado a lo que esté en ese equipo). Es una decisión de producto con ADR.
+- **Coste por pregunta.** Varios libros por pregunta multiplican el contexto; hace falta contrato EV5
+  (baseline, métrica primaria, presupuesto de tokens) igual que IA5/IA9.
+
+**Fuera, a propósito:** responder sin citas, y mezclar libros de fuera de la estantería.
+
+---
+
 ## 🎓 Aprendizaje basado en evidencia
 
 > **Contexto (2026-07-27).** Revisión de la literatura de tutoría y aprendizaje. El hallazgo que
