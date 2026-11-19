@@ -16,6 +16,10 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
   cerrada, `null` para quitar) y `list_shelves` los devuelve; el deshacer de cambios del agente
   también restaura la marca ([`agent-undo.js`](app/js/sync/agent-undo.js)). Test en
   [`mcp-library.test.mjs`](workers/sync/test/mcp-library.test.mjs).
+- **Desplegado**: app en v242 (`2e3340f`) y Worker de sync `a518d73b-112c-4271-9874-4ef530cc653a`
+  (el anterior era del 3-nov; entran también `chaptersDoneAt` de P55 y la matriz nueva). Con él, las
+  22 estanterías de la biblioteca de Luis llevan icono puesto por MCP; «Técnico» y «Humanidades» se
+  crearon como estanterías vacías para que el grupo tenga marca (subestanterías y orden, intactos).
 
 ## 2026-11-19 — Estado en el rail: anillo de terminados y punto de repaso (P58 F3)
 
