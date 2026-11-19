@@ -15,10 +15,26 @@ import { t } from '../i18n.js';
 let openDialog = null;   // solo un diálogo a la vez
 
 // Un campo de formBox: { name, label, type, value, options?, placeholder? }.
-// type: 'text' | 'select' ({options: {valor: etiqueta}}) | 'checks' ({options: [{value,label}]}).
+// type: 'text' | 'select' ({options: {valor: etiqueta}}) | 'checks' ({options: [{value,label}]})
+//     | 'choices' ({options: [{value, label, html}]}): una sola opción, en rejilla de muestras
+//       (radios de verdad, así el teclado y el lector de pantalla los recorren como grupo).
+//       Con `cssVar`, el valor elegido se publica en la tarjeta como variable CSS: sirve para
+//       que otra rejilla del mismo formulario se tiña con él (icono + color de estantería).
 function fieldHtml(f) {
   const id = 'dlgf_' + f.name;
   const label = `<label class="dlg-field-lbl" for="${id}">${escapeHtml(t(f.label))}</label>`;
+  if (f.type === 'choices') {
+    const cur = String(f.value ?? '');
+    const opts = (f.options || []).map((o) => {
+      const v = String(o.value);
+      return `<label class="dlg-choice" title="${escapeHtml(o.label)}">
+        <input type="radio" name="${id}" data-choice="${f.name}" value="${escapeHtml(v)}"${v === cur ? ' checked' : ''}
+          ${f.cssVar ? `data-css-var="${escapeHtml(f.cssVar)}"` : ''} aria-label="${escapeHtml(o.label)}">
+        <span class="dlg-choice-face" aria-hidden="true">${o.html}</span></label>`;
+    }).join('');
+    return `<div class="dlg-field" role="radiogroup" aria-label="${escapeHtml(t(f.label))}">
+      <span class="dlg-field-lbl">${escapeHtml(t(f.label))}</span><div class="dlg-choices" id="${id}">${opts}</div></div>`;
+  }
   if (f.type === 'select') {
     const opts = Object.entries(f.options || {}).map(([v, lbl]) =>
       `<option value="${escapeHtml(v)}"${v === String(f.value ?? '') ? ' selected' : ''}>${escapeHtml(t(lbl))}</option>`).join('');
@@ -91,6 +107,7 @@ function build({ kind, title, message, value, placeholder, okText, cancelText, d
       const out = {};
       for (const el of card.querySelectorAll('[data-field]')) out[el.dataset.field] = el.value;
       for (const f of (fields || [])) {
+        if (f.type === 'choices') out[f.name] = card.querySelector(`[data-choice="${f.name}"]:checked`)?.value ?? '';
         if (f.type !== 'checks') continue;
         out[f.name] = [...card.querySelectorAll(`[data-check="${f.name}"]:checked`)].map(el => el.value);
       }
@@ -125,9 +142,13 @@ function build({ kind, title, message, value, placeholder, okText, cancelText, d
     });
     okBtn.addEventListener('click', onOk);
     cancelBtn?.addEventListener('click', onCancel);
+    // Rejillas con `cssVar`: el valor elegido tiñe la tarjeta (al abrir y al cambiar).
+    const publish = (el) => { if (el?.dataset.cssVar) card.style.setProperty(el.dataset.cssVar, el.value); };
+    card.querySelectorAll('[data-css-var]:checked').forEach(publish);
+    card.addEventListener('change', (e) => publish(e.target.closest('[data-css-var]')));
 
     // Foco inicial: el input en prompt, el primer campo en form, si no el botón principal.
-    const firstField = isForm ? card.querySelector('.dlg-form [data-field], .dlg-form [data-check]') : null;
+    const firstField = isForm ? card.querySelector('.dlg-form [data-field], .dlg-form [data-check], .dlg-form [data-choice]:checked') : null;
     (input || firstField || okBtn).focus();
     if (input) input.select();
   });

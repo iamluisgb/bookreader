@@ -3,6 +3,19 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-11-19 — Icono y color por estantería (P58 F1)
+
+- **El caso**: con el rail plegado cada estantería era solo su inicial, y las iniciales chocan
+  («Salud y hábitos» y «Sistemas» son las dos **S**).
+- **El arreglo**: «Icono y color» en el ⋯ de la estantería, con 24 iconos de línea para temas (16
+  nuevos en [`icons.js`](app/js/ui/icons.js)) y 8 tonos fuera de la franja verde del acento; la
+  rejilla de iconos se tiñe en vivo con el tono elegido (campo `choices` nuevo en
+  [`dialog.js`](app/js/ui/dialog.js)). Se pinta en el rail (entero y plegado), la tira móvil y la hoja
+  «Estanterías»; las automáticas conservan el embudo salvo que se les elija icono, y los grupos
+  llevan inicial. `icon`/`hue` viajan en el sync (`shelfEntry`, siempre presentes, `null` incluido,
+  para que quitar el icono también se propague) y se validan contra la lista cerrada al pintar
+  (`Shelves.cleanMark`). Test: [`tests/shelf-mark.spec.ts`](tests/shelf-mark.spec.ts).
+
 ## 2026-11-18 — El rail de estanterías se pliega a una franja de iconos
 
 - **El caso**: en una tablet en vertical (~800 px) el rail de la biblioteca ocupaba sus 264 px

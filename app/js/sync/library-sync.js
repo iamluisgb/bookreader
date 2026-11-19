@@ -142,6 +142,9 @@ function shelfEntry(s) {
     name: s.name || '', createdAt: s.createdAt || 0,
     order: Number.isFinite(s.order) ? s.order : null,
     rule: s.rule && Object.keys(s.rule).length ? s.rule : null,
+    // Marca (P58): siempre presente, `null` incluido, para que quitar el icono también se
+    // propague (al aplicar, la entrada se extiende sobre el registro local).
+    icon: s.icon || null, hue: Number.isFinite(s.hue) ? s.hue : null,
     deleted: !!s.deleted, deletedAt: s.deletedAt || 0,
     updatedAt: s.updatedAt || s.createdAt || 0,
   };

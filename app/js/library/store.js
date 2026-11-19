@@ -8,7 +8,7 @@
 //                              file (ArrayBuffer|null), size, addedAt, lastOpenedAt,
 //                              progress (0..100), lastCfi, status, shelfIds: [],
 //                              blob, updatedAt, deleted, deletedAt }
-//   shelves (keyPath id)  -> { id, name, order, rule, createdAt, updatedAt, deleted, deletedAt }
+//   shelves (keyPath id)  -> { id, name, order, rule, icon, hue, createdAt, updatedAt, deleted, deletedAt }
 //
 // Una estantería con `rule` es INTELIGENTE: no guarda miembros, los calcula
 // (library/shelves.js). `order` coloca la fila entre sus hermanas del rail y la
@@ -343,6 +343,12 @@ export async function updateShelf(id, patch = {}) {
   if ('rule' in patch) {
     const clean = Shelves.cleanRule(patch.rule);
     if (Object.keys(clean).length) next.rule = clean; else delete next.rule;
+  }
+  // Marca (P58): se guarda `null` y no se borra el campo, para que «sin icono» también viaje
+  // por el sync y le gane al icono que otro dispositivo aún tenga.
+  if ('icon' in patch || 'hue' in patch) {
+    const m = Shelves.cleanMark({ icon: 'icon' in patch ? patch.icon : sh.icon, hue: 'hue' in patch ? patch.hue : sh.hue });
+    next.icon = m.icon; next.hue = m.hue;
   }
   return putShelf(next);
 }

@@ -272,3 +272,24 @@ export function levelNodes(shelves, parent = '') {
   }
   return nodes.map(n => ({ path: n.path, label: n.label, shelfIds: descendantIds(n) }));
 }
+
+// ---- Marca de la estantería: icono y tono (P58 F1) ---------------------------
+// Lista cerrada: el valor guardado se valida contra ella, así un icono que un día se retire
+// (o un valor sucio que llegue por el sync) vuelve a la inicial en vez de pintar un hueco.
+export const MARK_ICONS = [
+  'book', 'books', 'bookmark', 'star', 'target', 'flame', 'lightbulb', 'chip',
+  'code', 'chart', 'flask', 'globe', 'landmark', 'quill', 'graduation', 'briefcase',
+  'coin', 'users', 'heart', 'dumbbell', 'leaf', 'palette', 'music', 'trash',
+];
+// Ocho tonos fuera de la franja verde (90–180), que es la del acento: una marca verdosa se
+// lee como «seleccionada» o como las automáticas (ver markHue en library/view.js).
+export const MARK_HUES = [0, 25, 45, 200, 225, 255, 285, 325];
+
+// { icon, hue } limpios: `null` = sin elegir (inicial y tono derivado del nombre).
+export function cleanMark({ icon, hue } = {}) {
+  return {
+    icon: MARK_ICONS.includes(icon) ? icon : null,
+    hue: MARK_HUES.includes(Number(hue)) && hue !== '' && hue !== null ? Number(hue) : null,
+  };
+}
+

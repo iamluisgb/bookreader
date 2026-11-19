@@ -484,6 +484,7 @@ button.lib-rail-twisty:hover { background: var(--surface-2); color: var(--text);
 /* Legible antes que sutil (DS1): los glifos de las vistas del sistema van en tinta, no en
    gris sobre gris, que a 16 px se perdía. */
 .lib-rail-thumb--none .icon { color: var(--text); }
+.lib-rail-thumb--mark .icon { color: inherit; }
 .lib-rail-kebab {
   flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center;
   width: 26px; height: 26px; margin-right: 6px; padding: 0;
@@ -1116,6 +1117,28 @@ button.lib-rail-twisty:hover { background: var(--surface-2); color: var(--text);
 }
 .dlg-check { display: flex; align-items: center; gap: var(--s-2); font-size: var(--fs-md); padding: 3px 2px; cursor: pointer; }
 .dlg-check input { accent-color: var(--accent); }
+.dlg-choices { display: flex; flex-wrap: wrap; gap: 6px; }
+.dlg-choice { position: relative; display: inline-flex; cursor: pointer; }
+.dlg-choice input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }
+.dlg-choice-face {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 38px; height: 38px; border-radius: var(--r-md);
+  box-shadow: inset 0 0 0 1px var(--border-soft);
+  transition: box-shadow var(--transition-fast), transform var(--transition-fast);
+}
+.dlg-choice:hover .dlg-choice-face { box-shadow: inset 0 0 0 1px var(--border); }
+.dlg-choice input:checked + .dlg-choice-face { box-shadow: 0 0 0 2px var(--surface-1), 0 0 0 4px var(--accent); }
+.dlg-choice input:focus-visible + .dlg-choice-face { outline: 2px solid var(--accent); outline-offset: 3px; }
+/* Selector de marca de estantería: la rejilla de iconos se tiñe con el tono elegido
+   (--pick-h, que publica la rejilla de color) para ver el resultado antes de guardar. */
+.dlg-choice .lib-rail-thumb { width: 30px; height: 30px; }
+.dlg-choice .mark-swatch {
+  width: 22px; height: 22px; border-radius: 50%;
+  background: hsl(var(--sw-h) 62% 50%);
+}
+.dlg-choice .mark-swatch--auto {
+  background: conic-gradient(hsl(0 62% 55%), hsl(45 62% 55%), hsl(225 62% 55%), hsl(300 62% 55%), hsl(0 62% 55%));
+}
 .dlg-actions { display: flex; justify-content: flex-end; gap: var(--s-2); margin-top: var(--s-5); }
 .dlg-btn {
   padding: 8px 16px; font: inherit; font-size: var(--fs-md); font-weight: 500;

@@ -415,7 +415,7 @@ function chipHtml(row) {
       data-row-key="${escapeHtml(row.key)}" data-row-label="${escapeHtml(row.label)}"
       data-shelf-ids="${escapeHtml(row.shelfIds.join(','))}"${row.shelf ? ` data-shelf-id="${escapeHtml(row.shelf.id)}"` : ''}
       title="${escapeHtml(full)}" aria-pressed="${active}" aria-label="${escapeHtml(countLabel(full, count))}">
-      ${smart ? icon('funnel', { size: 'sm' }) : ''}<span class="lib-schip-name">${escapeHtml(row.label)}</span><span class="lib-schip-count" aria-hidden="true">${count}</span>
+      ${hasOwnIcon(row.shelf) ? icon(Shelves.cleanMark(row.shelf).icon, { size: 'sm' }) : (smart ? icon('funnel', { size: 'sm' }) : '')}<span class="lib-schip-name">${escapeHtml(row.label)}</span><span class="lib-schip-count" aria-hidden="true">${count}</span>
     </button>`;
 }
 
@@ -541,7 +541,7 @@ async function openShelfSheet() {
     return `<div class="lib-sheet-shelf" style="--depth:${row.depth}">
       <input type="checkbox" class="lib-sheet-check" data-cross="${escapeHtml(row.key)}" data-row-label="${escapeHtml(row.label)}" data-shelf-ids="${escapeHtml(row.shelfIds.join(','))}"${on ? ' checked' : ''} aria-label="${escapeHtml(t('Cruzar con {name}', { name: row.label }))}">
       <button class="lib-sheet-pick" data-row-key="${escapeHtml(row.key)}" data-row-label="${escapeHtml(row.label)}" data-shelf-ids="${escapeHtml(row.shelfIds.join(','))}">
-        ${isSmart ? `<span class="lib-sheet-mark is-smart">${icon('funnel', { size: 'sm' })}</span>` : (row.kind === 'group' ? '<span class="lib-sheet-mark is-group"></span>' : shelfMarkHtml(row.label))}
+        ${isSmart && !hasOwnIcon(row.shelf) ? `<span class="lib-sheet-mark is-smart">${icon('funnel', { size: 'sm' })}</span>` : shelfMarkHtml(row.label, row.shelf)}
         <span class="lib-sheet-name">${escapeHtml(row.label)}</span>
         ${row.shelf && pins.includes(row.shelf.id) ? `<span class="lib-sheet-pin" title="${t('Fijada en la tira')}">${icon('pin', { size: 'sm' })}</span>` : ''}
         <span class="lib-sheet-count">${count}</span>
@@ -618,10 +618,17 @@ function countLabel(name, n) {
   return n === 1 ? t('{name}, {n} libro', { name, n }) : t('{name}, {n} libros', { name, n });
 }
 
-function shelfMarkHtml(label) {
-  return `<span class="lib-rail-thumb lib-rail-thumb--mark" style="--mark-h:${markHue(label)}"
-    aria-hidden="true">${escapeHtml(markInitial(label))}</span>`;
+// La marca: el icono elegido (P58) o la inicial, sobre el tono elegido o el derivado del
+// nombre. Lo guardado se valida (cleanMark): un valor sucio del sync vuelve a la inicial.
+function shelfMarkHtml(label, shelf = null) {
+  const m = Shelves.cleanMark(shelf || {});
+  const hue = m.hue ?? markHue(label);
+  const face = m.icon ? icon(m.icon, { size: 'md' }) : escapeHtml(markInitial(label));
+  return `<span class="lib-rail-thumb lib-rail-thumb--mark${m.icon ? ' has-icon' : ''}" style="--mark-h:${hue}"
+    aria-hidden="true">${face}</span>`;
 }
+// ¿La fila lleva marca propia? Las automáticas conservan el embudo salvo que se les elija icono.
+const hasOwnIcon = (shelf) => !!Shelves.cleanMark(shelf || {}).icon;
 
 // Una fila del rail: estantería (manual o inteligente) o GRUPO —un tramo del
 // nombre que no existe como estantería propia, p. ej. "Técnico" cuando solo hay
@@ -650,9 +657,9 @@ function railRowHtml(row) {
   // lo que se ve de la fila, y una raíz sin ella era un hueco que no se podía reconocer.
   const mark = row.kind === 'group'
     ? shelfMarkHtml(row.label)
-    : (smart
+    : (smart && !hasOwnIcon(row.shelf)
       ? `<span class="lib-rail-thumb lib-rail-thumb--smart" aria-hidden="true">${icon('funnel', { size: 'md' })}</span>`
-      : shelfMarkHtml(row.label));
+      : shelfMarkHtml(row.label, row.shelf));
 
   // En la tira horizontal de móvil no hay indentación que valga, así que la
   // rama va delante del nombre ("Técnico/LLM"); en escritorio la dice el árbol.
@@ -1430,6 +1437,39 @@ async function editSmartShelf(shelf) {
   return Store.addShelf(name, { rule: next });
 }
 
+// Icono y color de una estantería (P58 F1). Dos rejillas: los iconos se tiñen con el tono
+// elegido en vivo (--pick-h) para ver el resultado antes de guardar. «Inicial» y «Auto» son
+// la marca de siempre: la letra y el tono que sale del nombre.
+const MARK_ICON_LABELS = {
+  book: 'Libro', books: 'Libros', bookmark: 'Marcapáginas', star: 'Estrella', target: 'Diana',
+  flame: 'Llama', lightbulb: 'Bombilla', chip: 'Chip', code: 'Código', chart: 'Gráfica',
+  flask: 'Matraz', globe: 'Globo', landmark: 'Columnas', quill: 'Pluma', graduation: 'Birrete',
+  briefcase: 'Maletín', coin: 'Moneda', users: 'Personas', heart: 'Corazón', dumbbell: 'Pesa',
+  leaf: 'Hoja', palette: 'Paleta', music: 'Música', trash: 'Papelera',
+};
+async function editShelfMark(shelf) {
+  const label = Shelves.segments(shelf.name).pop();
+  const cur = Shelves.cleanMark(shelf);
+  const auto = markHue(label);
+  const thumb = (inner) => `<span class="lib-rail-thumb lib-rail-thumb--mark" style="--mark-h:var(--pick-h, ${auto})">${inner}</span>`;
+  const res = await formBox({
+    title: t('Icono y color'),
+    message: t('Cómo se ve «{name}» en la lista de estanterías.', { name: label }),
+    fields: [
+      { name: 'icon', label: t('Icono'), type: 'choices', value: cur.icon || '',
+        options: [{ value: '', label: t('Inicial'), html: thumb(escapeHtml(markInitial(label))) },
+          ...Shelves.MARK_ICONS.map(n => ({ value: n, label: t(MARK_ICON_LABELS[n] || n), html: thumb(icon(n, { size: 'md' })) }))] },
+      { name: 'hue', label: t('Color'), type: 'choices', value: cur.hue ?? '', cssVar: '--pick-h',
+        options: [{ value: '', label: t('Automático'), html: '<span class="mark-swatch mark-swatch--auto"></span>' },
+          ...Shelves.MARK_HUES.map(h => ({ value: h, label: t('Tono {n}', { n: h }), html: `<span class="mark-swatch" style="--sw-h:${h}"></span>` }))] },
+    ],
+    okText: t('Guardar'),
+  });
+  if (!res) return null;
+  // «Automático» publica '' en --pick-h: la vista previa vuelve al tono del nombre.
+  return Store.updateShelf(shelf.id, { icon: res.icon || null, hue: res.hue === '' ? null : Number(res.hue) });
+}
+
 // ---- menú de estantería ----------------------------------------------------
 
 async function openShelfMenu(id, anchor) {
@@ -1452,6 +1492,7 @@ async function openShelfMenu(id, anchor) {
     <button class="lib-menu-item" data-act="filter">${icon(inFilter ? 'xmark' : 'plus', { size: 'md' })}<span>${inFilter ? t('Quitar del filtro') : t('Añadir al filtro')}</span></button>
     <div class="lib-menu-sep"></div>
     <button class="lib-menu-item" data-act="rename">${icon('pencil', { size: 'md' })}<span>${t('Renombrar')}</span></button>
+    <button class="lib-menu-item" data-act="mark">${icon('palette', { size: 'md' })}<span>${t('Icono y color')}</span></button>
     ${smart ? `<button class="lib-menu-item" data-act="rule">${icon('funnel', { size: 'md' })}<span>${t('Editar regla')}</span></button>` : ''}
     ${isMobile()
       // En la tira horizontal «Subir/Bajar» significaba izquierda/derecha. En móvil, lo que
@@ -1488,6 +1529,8 @@ async function openShelfMenu(id, anchor) {
       const name = (await promptBox('Nuevo nombre (usa «/» para anidar, p. ej. Técnico/ML):',
         { title: 'Renombrar estantería', value: shelf.name }) || '').trim();
       if (name) await Store.renameShelf(id, name);
+    } else if (act === 'mark') {
+      await editShelfMark(shelf);
     } else if (act === 'rule') {
       await editSmartShelf(shelf);
     } else if (act === 'up' || act === 'down') {

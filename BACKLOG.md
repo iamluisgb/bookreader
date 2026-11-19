@@ -2181,7 +2181,7 @@ son solo los de O'Reilly, puede bastar con documentarlo.
 
 ---
 
-### P58 — La estantería como espacio de estudio: icono, cabecera y estado en el rail · `M` · **en curso (2026-11-19)**
+### P58 — La estantería como espacio de estudio: icono, cabecera y estado en el rail · `M` · **F1 ✓ (2026-11-19) · F2–F3 pendientes**
 
 **El caso.** Con el rail plegado a franja de iconos (CHANGELOG 2026-11-18) cada estantería es una
 inicial sobre un tono, y en la biblioteca de Luis las iniciales chocan: **S** es «Salud y hábitos» y
