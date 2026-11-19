@@ -3,6 +3,17 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-11-19 — «Seguir leyendo» en la cabecera de estantería, con portada y progreso
+
+- **El caso**: «Seguir con «…»» era un botón con el título entero; en el móvil se cortaba
+  («Graph Engineering — The Loop Memo…») sin decir qué libro era ni por dónde ibas, y una
+  estantería sin nada a medias no proponía nada.
+- **El arreglo**: una fila como la tarjeta «Continuar leyendo» en pequeño: portada, título sin
+  subtítulo (`withoutSubtitle`, dos líneas como mucho), barra y porcentaje, y la flecha; la fila
+  entera abre el libro y su etiqueta accesible lleva el título completo. «Repasar · N» queda encima,
+  sola. Sin libros a medias, **Empieza por** el primero que entró y sigue sin abrir. Ayuda ES/EN al
+  día. Test: [`tests/shelf-hero.spec.ts`](tests/shelf-hero.spec.ts).
+
 ## 2026-11-19 — Marca y punto de repaso también en el móvil (P58)
 
 - **El caso**: en móvil, la hoja «Estanterías» y la cabecera de estantería salían sin icono —la

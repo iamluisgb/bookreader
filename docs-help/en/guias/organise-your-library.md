@@ -49,8 +49,9 @@ When you pick **one** shelf, its own header replaces the general cards at the to
   design agents". Edit it with the pencil.
 - **Its state**: how many books you have finished and how many are under way, the cards due today
   and how much you remember.
-- **Review · N** reviews only that shelf's cards; **Continue "…"** opens the last book you had under
-  way there; **Add a book here** uploads a book straight onto the shelf.
+- **Review · N** reviews only that shelf's cards; **Keep reading** opens the last book you had under
+  way there, with its cover and how far you are (if there is none, **Start with** suggests the first
+  one you have not opened); **Add a book here** uploads a book straight onto the shelf.
 
 !!! note "“Remembered” is an estimate"
     The percentage adds up the chance of recalling each card. It also rises when you add cards, not

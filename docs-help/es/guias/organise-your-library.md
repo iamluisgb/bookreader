@@ -51,8 +51,9 @@ Al elegir **una** estantería, arriba sale lo suyo en lugar de las tarjetas gene
   «Aprender a diseñar agentes». Se edita con el lápiz.
 - **Su estado**: cuántos libros has terminado y cuántos van a medias, las tarjetas para hoy y
   cuánto recuerdas.
-- **Repasar · N** repasa solo las tarjetas de esa estantería; **Seguir con «…»** abre el último
-  libro que tenías a medias en ella; **Añadir libro aquí** sube un libro y lo mete directamente.
+- **Repasar · N** repasa solo las tarjetas de esa estantería; **Seguir leyendo** abre el último
+  libro que tenías a medias en ella, con su portada y por dónde vas (si no hay ninguno, **Empieza
+  por** te propone el primero que no has abierto); **Añadir libro aquí** sube un libro y lo mete directamente.
 
 !!! note "«Recordado» es una estimación"
     El porcentaje suma la probabilidad de recordar cada tarjeta. Sube también cuando añades

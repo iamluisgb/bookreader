@@ -8,7 +8,7 @@ import * as Blobs from '../sync/blobs.js';
 import * as SyncProvider from '../sync/provider.js';
 import { icon, markIcon } from '../ui/icons.js';
 import { brandMark, brandLockup, cargar } from '../ui/brand.js';
-import { editBookMeta } from './book-meta.js';
+import { editBookMeta, withoutSubtitle } from './book-meta.js';
 import { t, getLang } from '../i18n.js';
 import { escapeHtml } from '../ui/escape.js';
 import { confirmBox, promptBox, alertBox, formBox } from '../ui/dialog.js';
@@ -402,8 +402,12 @@ function shelfHeroHtml(f, books) {
   const n = list.length;
   const done = list.filter(b => b.status === 'finished').length;
   const reading = list.filter(b => b.status !== 'finished' && (b.status === 'reading' || (b.progress > 0 && b.progress < 100)));
-  // «Seguir leyendo»: el último abierto de los que van a medias en ESTA estantería.
+  // Siguiente paso: el último abierto de los que van a medias en ESTA estantería; si no hay
+  // ninguno, el primero que entró y sigue sin abrir («Empieza por»), para que una estantería
+  // nueva también diga por dónde seguir.
   const next = reading.slice().sort((a, b) => (b.lastOpenedAt || 0) - (a.lastOpenedAt || 0))[0];
+  const start = next ? null : list.filter(b => b.status !== 'finished' && !(b.progress > 0))
+    .sort((a, b) => (a.addedAt || 0) - (b.addedAt || 0))[0];
   const canAdd = f.shelf && !Shelves.isSmart(f.shelf);
   const parts = n
     ? [t('{d} de {n} terminados', { d: done, n }), ...(reading.length ? [t('{n} en curso', { n: reading.length })] : [])]
@@ -419,12 +423,34 @@ function shelfHeroHtml(f, books) {
     <p class="lib-shelf-stats" data-base="${escapeHtml(parts.join(' · '))}">${escapeHtml(parts.join(' · '))}</p>
     <div class="lib-shelf-actions">
       <button class="btn btn--primary lib-shelf-btn" data-act="shelf-review" hidden>${icon('cards', { size: 'md' })}<span class="lib-shelf-review-lbl"></span></button>
-      ${next ? `<button class="btn btn--secondary lib-shelf-btn lib-shelf-continue" data-act="shelf-continue" data-book="${escapeHtml(next.id)}"
-          title="${escapeHtml(next.title || '')}">${icon('book', { size: 'md' })}<span>${escapeHtml(t('Seguir con «{title}»', { title: next.title || t('Sin título') }))}</span></button>` : ''}
-      ${canAdd ? `<button class="btn lib-shelf-btn lib-shelf-btn--quiet" data-act="shelf-add">${icon('upload', { size: 'md' })}<span>${t('Añadir libro aquí')}</span></button>` : ''}
     </div>
+    ${next || start ? shelfNextHtml(next || start, !!next) : ''}
+    ${canAdd ? `<button class="btn lib-shelf-btn lib-shelf-btn--quiet" data-act="shelf-add">${icon('upload', { size: 'md' })}<span>${t('Añadir libro aquí')}</span></button>` : ''}
   </section>`;
 }
+// «Seguir leyendo» / «Empieza por»: una fila con la portada, el título sin subtítulo (en dos
+// líneas como mucho) y, si va a medias, su progreso. Antes era un botón con «Seguir con «…»» y
+// el título entero, que en el móvil se cortaba sin decir qué libro era ni por dónde ibas.
+function shelfNextHtml(b, reading) {
+  const title = b.title || t('Sin título');
+  const short = withoutSubtitle(title) || title;
+  const pct = Math.max(0, Math.min(100, Math.round(b.progress || 0)));
+  const cover = b.cover
+    ? `<img src="${escapeHtml(b.cover)}" alt="">`
+    : `<span class="lib-shelf-next-ph">${escapeHtml(initials(title))}</span>`;
+  const kicker = reading ? t('Seguir leyendo') : t('Empieza por');
+  const label = reading ? t('Seguir leyendo «{title}», {n}% leído', { title, n: pct }) : t('Empezar «{title}»', { title });
+  return `<button class="lib-shelf-next" data-act="shelf-continue" data-book="${escapeHtml(b.id)}" aria-label="${escapeHtml(label)}" title="${escapeHtml(title)}">
+    <span class="lib-shelf-next-cover" aria-hidden="true">${cover}</span>
+    <span class="lib-shelf-next-body" aria-hidden="true">
+      <span class="lib-shelf-next-kicker">${kicker}</span>
+      <span class="lib-shelf-next-title">${escapeHtml(short)}</span>
+      ${reading ? `<span class="lib-shelf-next-progress"><span class="lib-progressbar"><span style="width:${pct}%"></span></span><span>${pct} %</span></span>` : ''}
+    </span>
+    <span class="lib-shelf-next-go" aria-hidden="true">${icon('chevron-right', { size: 'lg' })}</span>
+  </button>`;
+}
+
 // Vencidas y dominio: asíncrono, como paintMastery. El dominio es una ESTIMACIÓN
 // (Srs.knowledge, Σ retrievabilidad) y crece al añadir tarjetas: va etiquetado como tal y con
 // el número de tarjetas al lado, nunca como una cifra observada.
@@ -448,7 +474,9 @@ async function paintShelfHero(f) {
   }
   const m = Srs.knowledge(stats.cards);
   if (m.total) {
-    parts.push(t('~{p} % recordado (estimado, {n} tarjetas)', { p: Math.round(m.share * 100), n: m.total }));
+    parts.push(m.total === 1
+      ? t('~{p} % recordado (estimado, 1 tarjeta)', { p: Math.round(m.share * 100) })
+      : t('~{p} % recordado (estimado, {n} tarjetas)', { p: Math.round(m.share * 100), n: m.total }));
     line.title = t('Estimación: suma de la probabilidad de recordar cada tarjeta. Sube al añadir tarjetas, no solo al aprender.');
   }
   line.textContent = parts.join(' · ');

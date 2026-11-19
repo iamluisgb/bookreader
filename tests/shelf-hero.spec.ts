@@ -102,3 +102,30 @@ test('un grupo tiene cabecera sin «para qué» ni «añadir»; varias o «Sin e
   await expect(page.locator('.lib-shelf-hero')).toHaveCount(0);
   await expect(page.locator('.lib-top')).toHaveCount(1);
 });
+
+test('siguiente paso: título sin subtítulo y progreso; sin nada a medias, «Empieza por» el primero sin abrir', async ({ page }) => {
+  await page.setViewportSize({ width: 1300, height: 900 });
+  await page.goto('/');
+  await page.evaluate(async () => {
+    const S: any = await import('/js/library/store.js');
+    const now = Date.now();
+    const a = await S.addShelf('Agentes');
+    const n = await S.addShelf('Nueva');
+    await S.putBook({ id: 'g', title: 'Graph Engineering — The Loop Memory Pattern', format: 'pdf', status: 'reading', progress: 40, addedAt: now, lastOpenedAt: now, shelfIds: [a.id] });
+    await S.putBook({ id: 'old', title: 'El primero: con subtítulo', format: 'epub', status: 'unread', addedAt: now - 100, shelfIds: [n.id] });
+    await S.putBook({ id: 'new', title: 'El segundo', format: 'epub', status: 'unread', addedAt: now - 10, shelfIds: [n.id] });
+  });
+  await page.reload();
+  await page.waitForSelector('.lib-rail');
+  await page.locator('[data-row-label="Agentes"]').click();
+  const next = page.locator('.lib-shelf-next');
+  await expect(next.locator('.lib-shelf-next-kicker')).toHaveText('Seguir leyendo');
+  await expect(next.locator('.lib-shelf-next-title')).toHaveText('Graph Engineering');
+  await expect(next.locator('.lib-shelf-next-progress')).toContainText('40 %');
+  await expect(next).toHaveAttribute('aria-label', /Graph Engineering — The Loop Memory Pattern.*40% leído/);
+  await page.locator('[data-row-label="Nueva"]').click();
+  await expect(next.locator('.lib-shelf-next-kicker')).toHaveText('Empieza por');
+  await expect(next.locator('.lib-shelf-next-title')).toHaveText('El primero');
+  await expect(next.locator('.lib-shelf-next-progress')).toHaveCount(0);
+});
+
