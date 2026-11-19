@@ -318,6 +318,7 @@ export async function render() {
     return parts.slice(0, -1).map((_, i) => parts.slice(0, i + 1).join(Shelves.SEP));
   }));
   const compact = railCompact();
+  const focus = shelfFocus(shelves);
 
   hideRailTip();
   host.innerHTML = `
@@ -350,14 +351,15 @@ export async function render() {
 
       <section class="lib-main">
         ${stripHtml(manual, smart, books.length, noShelfCount)}
-        <div class="lib-head">
-          ${brandMark(28, 'brand-mark lib-head-mark')}
+        <div class="lib-head${focus ? ' has-shelf' : ''}">
+          ${focus ? `<span class="lib-head-shelf">${focusMarkHtml(focus)}</span>` : brandMark(28, 'brand-mark lib-head-mark')}
           <h1 class="lib-h1">${escapeHtml(currentTitle())}</h1>
           ${headShelfKebab(shelves)}
           <button class="lib-more" data-act="more" aria-haspopup="dialog" aria-label="${t('Más: ajustes, análisis, mazos…')}" title="${t('Más')}">${icon('menu', { size: 'xl' })}</button>
         </div>
+        ${focus ? shelfHeroHtml(focus, books) : ''}
         ${await firstStepsHtml(books)}
-        <div class="lib-top">${continueHtml(books)}<div class="lib-today-slot"></div><span class="lib-streak-slot"></span></div>
+        ${focus ? '' : `<div class="lib-top">${continueHtml(books)}<div class="lib-today-slot"></div><span class="lib-streak-slot"></span></div>`}
         ${filterChipsHtml()}
         <div class="lib-toolbar">
           <div class="lib-search-box">
@@ -375,7 +377,128 @@ export async function render() {
   `;
   syncStrip();        // móvil: el chip activo a la vista y los fundidos de la tira
   paintStudyChip();   // async, no bloquea el render de la rejilla
+  if (focus) paintShelfHero(focus);   // ídem: vencidas y dominio de la estantería
   paintMastery();     // ídem: dominio por libro, se pinta cuando llega la consulta
+}
+
+// ---- Cabecera de estantería (P58 F2) ------------------------------------------------
+// Con UNA estantería (o un grupo) elegida, la biblioteca deja de ser la portada general y pasa
+// a ser la de ese tema: en lugar de «Continuar» y «Repaso de hoy» (globales), el estado de la
+// estantería y lo que se puede hacer con ella. Con varias, o con «Sin estantería», como antes.
+function shelfFocus(shelves) {
+  if (selection.size !== 1 || selection.has('none')) return null;
+  const [key, entry] = [...selection][0];
+  const shelf = shelves.find(s => s.id === key) || null;
+  return { key, label: entry.label, ids: entry.ids, shelf, members: memberIdsOf(entry.ids) };
+}
+function focusMarkHtml(f) {
+  return f.shelf && Shelves.isSmart(f.shelf) && !hasOwnIcon(f.shelf)
+    ? `<span class="lib-rail-thumb lib-rail-thumb--smart" aria-hidden="true">${icon('funnel', { size: 'lg' })}</span>`
+    : shelfMarkHtml(f.label, f.shelf);
+}
+function shelfHeroHtml(f, books) {
+  const list = books.filter(b => f.members.has(b.id));
+  const n = list.length;
+  const done = list.filter(b => b.status === 'finished').length;
+  const reading = list.filter(b => b.status !== 'finished' && (b.status === 'reading' || (b.progress > 0 && b.progress < 100)));
+  // «Seguir leyendo»: el último abierto de los que van a medias en ESTA estantería.
+  const next = reading.slice().sort((a, b) => (b.lastOpenedAt || 0) - (a.lastOpenedAt || 0))[0];
+  const canAdd = f.shelf && !Shelves.isSmart(f.shelf);
+  const parts = n
+    ? [t('{d} de {n} terminados', { d: done, n }), ...(reading.length ? [t('{n} en curso', { n: reading.length })] : [])]
+    : [t('Aún no hay libros')];
+  const goal = f.shelf
+    ? (f.shelf.goal
+      ? `<p class="lib-shelf-goal"><span>${escapeHtml(f.shelf.goal)}</span><button class="lib-shelf-goal-edit" data-act="shelf-goal"
+          aria-label="${t('Editar para qué es')}" title="${t('Editar para qué es')}">${icon('pencil', { size: 'sm' })}</button></p>`
+      : `<button class="lib-shelf-goal-add" data-act="shelf-goal">${icon('plus', { size: 'sm' })}<span>${t('Para qué es esta estantería')}</span></button>`)
+    : '';
+  return `<section class="lib-shelf-hero" aria-label="${escapeHtml(f.label)}">
+    ${goal}
+    <p class="lib-shelf-stats" data-base="${escapeHtml(parts.join(' · '))}">${escapeHtml(parts.join(' · '))}</p>
+    <div class="lib-shelf-actions">
+      <button class="btn btn--primary lib-shelf-btn" data-act="shelf-review" hidden>${icon('cards', { size: 'md' })}<span class="lib-shelf-review-lbl"></span></button>
+      ${next ? `<button class="btn btn--secondary lib-shelf-btn lib-shelf-continue" data-act="shelf-continue" data-book="${escapeHtml(next.id)}"
+          title="${escapeHtml(next.title || '')}">${icon('book', { size: 'md' })}<span>${escapeHtml(t('Seguir con «{title}»', { title: next.title || t('Sin título') }))}</span></button>` : ''}
+      ${canAdd ? `<button class="btn lib-shelf-btn lib-shelf-btn--quiet" data-act="shelf-add">${icon('upload', { size: 'md' })}<span>${t('Añadir libro aquí')}</span></button>` : ''}
+    </div>
+  </section>`;
+}
+// Vencidas y dominio: asíncrono, como paintMastery. El dominio es una ESTIMACIÓN
+// (Srs.knowledge, Σ retrievabilidad) y crece al añadir tarjetas: va etiquetado como tal y con
+// el número de tarjetas al lado, nunca como una cifra observada.
+let heroSeq = 0;
+async function paintShelfHero(f) {
+  const seq = ++heroSeq;
+  FsrsParams.applyStored();
+  let stats;
+  try { stats = await Study.scopeStats({ type: 'books', bookIds: [...f.members] }); } catch { return; }
+  const hero = host && host.querySelector('.lib-shelf-hero');
+  if (seq !== heroSeq || !hero) return;
+  // Una sola línea de texto corrido: así, si no cabe, parte entre palabras y no deja un «·»
+  // huérfano al principio de la segunda línea.
+  const line = hero.querySelector('.lib-shelf-stats');
+  const parts = [line.dataset.base];
+  const btn = hero.querySelector('[data-act="shelf-review"]');
+  if (stats.due) {
+    parts.push(stats.due === 1 ? t('1 tarjeta para hoy') : t('{n} tarjetas para hoy', { n: stats.due }));
+    btn.querySelector('.lib-shelf-review-lbl').textContent = t('Repasar · {n}', { n: stats.due });
+    btn.hidden = false;
+  }
+  const m = Srs.knowledge(stats.cards);
+  if (m.total) {
+    parts.push(t('~{p} % recordado (estimado, {n} tarjetas)', { p: Math.round(m.share * 100), n: m.total }));
+    line.title = t('Estimación: suma de la probabilidad de recordar cada tarjeta. Sube al añadir tarjetas, no solo al aprender.');
+  }
+  line.textContent = parts.join(' · ');
+}
+async function onShelfHero(btn) {
+  const f = shelfFocus(allShelves);
+  if (!f) return;
+  const act = btn.dataset.act;
+  if (act === 'shelf-continue') {
+    const b = allBooks.find(x => x.id === btn.dataset.book);
+    if (b) onOpenBook(b);
+  } else if (act === 'shelf-review') {
+    await Study.openToday({ scope: { type: 'books', bookIds: [...f.members] }, title: f.label, onClose: () => render() });
+  } else if (act === 'shelf-add' && f.shelf) {
+    armImportShelf(f.shelf.id);
+    onAddBook();
+  } else if (act === 'shelf-goal' && f.shelf) {
+    const goal = await promptBox(t('Una línea: qué buscas en estos libros.'), {
+      title: t('Para qué es «{name}»', { name: f.label }), value: f.shelf.goal || '',
+      placeholder: t('Aprender a diseñar agentes'),
+    });
+    if (goal === null) return;
+    await Store.updateShelf(f.shelf.id, { goal });
+    await render();
+  }
+}
+// «Añadir libro aquí»: el alta pasa por el selector de ficheros de siempre y app.js anuncia el
+// libro NUEVO con `bookreader:book-imported`; ese anuncio lo mete en la estantería. Se desarma
+// al cancelar el selector y, si no, a los pocos minutos de elegir el fichero (un libro que ya
+// estaba en la biblioteca no se anuncia, y la escucha no debe quedarse esperando al siguiente).
+let importShelfDisarm = null;
+function armImportShelf(shelfId) {
+  importShelfDisarm?.();
+  const input = document.getElementById('file-input');
+  let timer = setTimeout(() => disarm(), 10 * 60 * 1000);
+  const onImported = async (e) => {
+    disarm();
+    if (e.detail?.bookId) { await Store.toggleBookShelf(e.detail.bookId, shelfId, true); }
+  };
+  const onChange = () => { clearTimeout(timer); timer = setTimeout(() => disarm(), 3 * 60 * 1000); };
+  function disarm() {
+    clearTimeout(timer);
+    window.removeEventListener('bookreader:book-imported', onImported);
+    input?.removeEventListener('cancel', disarm);
+    input?.removeEventListener('change', onChange);
+    importShelfDisarm = null;
+  }
+  window.addEventListener('bookreader:book-imported', onImported);
+  input?.addEventListener('cancel', disarm);
+  input?.addEventListener('change', onChange);
+  importShelfDisarm = disarm;
 }
 
 // ---- Móvil: tira corta de estanterías, cabecera y hojas (auditoría móvil) ---------
@@ -1125,6 +1248,8 @@ function onInput(e) {
 
 async function onClick(e) {
   if (e.target.closest('[data-act="railfold"]')) { toggleRail(); return; }
+  const heroBtn = e.target.closest('[data-act^="shelf-"]');
+  if (heroBtn) { await onShelfHero(heroBtn); return; }
   if (e.target.closest('.lib-upload, [data-act="add"]')) { onAddBook(); return; }
 
   // Desplegables (orden / progreso)

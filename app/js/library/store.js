@@ -8,7 +8,7 @@
 //                              file (ArrayBuffer|null), size, addedAt, lastOpenedAt,
 //                              progress (0..100), lastCfi, status, shelfIds: [],
 //                              blob, updatedAt, deleted, deletedAt }
-//   shelves (keyPath id)  -> { id, name, order, rule, icon, hue, createdAt, updatedAt, deleted, deletedAt }
+//   shelves (keyPath id)  -> { id, name, order, rule, icon, hue, goal, createdAt, updatedAt, deleted, deletedAt }
 //
 // Una estantería con `rule` es INTELIGENTE: no guarda miembros, los calcula
 // (library/shelves.js). `order` coloca la fila entre sus hermanas del rail y la
@@ -350,6 +350,8 @@ export async function updateShelf(id, patch = {}) {
     const m = Shelves.cleanMark({ icon: 'icon' in patch ? patch.icon : sh.icon, hue: 'hue' in patch ? patch.hue : sh.hue });
     next.icon = m.icon; next.hue = m.hue;
   }
+  // Para qué es la estantería (P58 F2): una línea; vacía = sin objetivo (`null`, que viaja).
+  if ('goal' in patch) next.goal = String(patch.goal || '').replace(/\s+/g, ' ').trim().slice(0, 140) || null;
   return putShelf(next);
 }
 

@@ -606,6 +606,31 @@ button.lib-rail-twisty:hover { background: var(--surface-2); color: var(--text);
 }
 .lib-h1 { font-size: var(--fs-2xl); font-weight: 700; letter-spacing: -0.02em; margin-bottom: var(--s-4); }
 
+/* ---- Cabecera de estantería (P58 F2) ----
+   La marca de la estantería delante del título, y debajo su estado y qué hacer con ella. Sin
+   caja propia: es la cabecera de la página, no una tarjeta más entre las de la portada. */
+.lib-head-shelf { flex: none; display: inline-flex; margin-right: var(--s-3); }
+.lib-head-shelf .lib-rail-thumb { width: 40px; height: 40px; border-radius: var(--r-md); font-size: var(--fs-lg); }
+.lib-head.has-shelf { margin-bottom: var(--s-3); }
+.lib-shelf-hero { display: flex; flex-direction: column; align-items: flex-start; gap: var(--s-3); margin-bottom: var(--s-5); }
+.lib-shelf-goal { display: flex; align-items: center; gap: 4px; margin: 0; font-size: var(--fs-md); color: var(--text-soft); max-width: 60ch; }
+.lib-shelf-goal-edit, .lib-shelf-goal-add {
+  display: inline-flex; align-items: center; gap: 6px; border: none; background: none; cursor: pointer;
+  color: var(--text-faint); font: inherit; font-size: var(--fs-sm); padding: 4px 6px; border-radius: var(--r-sm);
+}
+.lib-shelf-goal-add { margin-left: -6px; }
+.lib-shelf-goal-edit:hover, .lib-shelf-goal-add:hover { background: var(--surface-3); color: var(--text); }
+.lib-shelf-stats { margin: 0; font-size: var(--fs-sm); color: var(--text-soft); font-variant-numeric: tabular-nums; }
+.lib-shelf-stats[title] { cursor: help; }
+.lib-shelf-actions { display: flex; flex-wrap: wrap; gap: var(--s-2); }
+.lib-shelf-actions:empty { display: none; }
+.lib-shelf-btn { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 8px 14px; max-width: 100%; }
+.lib-shelf-btn span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lib-shelf-continue { max-width: min(100%, 360px); }
+.lib-shelf-btn--quiet { background: none; color: var(--text-soft); }
+.lib-shelf-btn--quiet:hover { background: var(--surface-3); color: var(--text); }
+@media (pointer: coarse) { .lib-shelf-btn { min-height: 44px; } }
+
 /* Chips del filtro por estanterías. Con varias seleccionadas el título no basta
    para saber qué se está viendo (ni cómo se combinan), y en táctil son la única
    forma de quitar una: el rail cruza con ⌘/Ctrl+clic, que ahí no existe. */

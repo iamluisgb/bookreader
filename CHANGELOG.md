@@ -3,6 +3,22 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-11-19 — Cabecera de estantería (P58 F2)
+
+- **El caso**: elegir una estantería solo filtraba la rejilla; su estado (qué llevo leído, qué
+  toca repasar, cuánto recuerdo) estaba repartido entre la tarjeta global de repaso, el selector
+  «Elegir» y Análisis.
+- **El arreglo**: con UNA estantería o grupo elegido, la marca va junto al título y debajo sale la
+  cabecera en lugar de «Continuar» y «Repaso de hoy»: para qué es (`goal`, una línea que viaja en el
+  sync), «N de M terminados · K en curso · X tarjetas para hoy · ~Y % recordado (estimado, Z
+  tarjetas)» y tres acciones: **Repasar** solo lo de la estantería (ámbito nuevo `{ type: 'books' }`
+  en [`study.js`](app/js/ai/study.js), que también sirve a los grupos, que no tienen `shelfId`),
+  **Seguir con** el último abierto a medias y **Añadir libro aquí** (el libro nuevo entra en la
+  estantería; la escucha se desarma tras el primero, al cancelar o a los pocos minutos). El dominio
+  va etiquetado como estimación porque `Srs.knowledge` predice y sube al añadir tarjetas. Con
+  varias estanterías o «Sin estantería», la portada de siempre. Test:
+  [`tests/shelf-hero.spec.ts`](tests/shelf-hero.spec.ts).
+
 ## 2026-11-19 — Icono y color por estantería (P58 F1)
 
 - **El caso**: con el rail plegado cada estantería era solo su inicial, y las iniciales chocan

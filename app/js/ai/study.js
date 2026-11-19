@@ -128,6 +128,12 @@ async function decksForScope(scope) {
     const cid = canonicalOf(scope.bookId);
     return decks.filter(d => canonicalOf(d.bookId) === cid);
   }
+  // Una lista de libros (P58: la cabecera de una estantería o de un grupo como «Técnico», que
+  // no es un registro y no tiene `shelfId`). Por id canónico, como el ámbito de un libro.
+  if (scope.type === 'books') {
+    const ids = new Set((scope.bookIds || []).map(canonicalOf));
+    return decks.filter(d => ids.has(canonicalOf(d.bookId)));
+  }
   if (scope.type === 'shelf') {
     const [books, shelves] = await Promise.all([Store.getAllBooks(), Store.getShelves()]);
     const shelf = shelves.find(s => s.id === scope.shelfId);
@@ -164,6 +170,19 @@ export async function dueToday(scope, now = Date.now()) {
     if (n) { cards += n; withDue.push(d); }
   }
   return { cards, decks: withDue };
+}
+
+// Estado de estudio de un ámbito (P58, cabecera de estantería): vencidas hoy y todas las
+// tarjetas vivas, para estimar el dominio con Srs.knowledge.
+export async function scopeStats(scope, now = Date.now()) {
+  const [decks, locked] = await Promise.all([decksForScope(scope), loadLocker()]);
+  let due = 0;
+  const cards = [];
+  for (const d of decks) {
+    due += dueAvailable(d, locked, now);
+    for (const c of d.cards || []) if (c && !c.deleted) cards.push(c);
+  }
+  return { due, cards };
 }
 
 // Abre la sesión del día para un ámbito (por defecto, todo lo vencido).

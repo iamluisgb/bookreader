@@ -145,6 +145,7 @@ function shelfEntry(s) {
     // Marca (P58): siempre presente, `null` incluido, para que quitar el icono también se
     // propague (al aplicar, la entrada se extiende sobre el registro local).
     icon: s.icon || null, hue: Number.isFinite(s.hue) ? s.hue : null,
+    goal: s.goal || null,
     deleted: !!s.deleted, deletedAt: s.deletedAt || 0,
     updatedAt: s.updatedAt || s.createdAt || 0,
   };
