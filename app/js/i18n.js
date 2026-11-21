@@ -311,6 +311,7 @@ const EN = {
   'Antes de avanzar, el agente te pregunta de memoria lo que acabas de leer. Responde como puedas.': 'Before moving on, the agent asks you to recall what you just read. Answer as best you can.',
   'Copiar imagen': 'Copy image',
   'Copiar Mermaid': 'Copy Mermaid',
+  'Dibujando el diagrama…': 'Drawing the diagram…',
   'Imagen copiada': 'Image copied',
   'Descargado': 'Downloaded',
   'No se pudo copiar': 'Could not copy',

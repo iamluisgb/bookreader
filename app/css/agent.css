@@ -463,6 +463,7 @@ body.ai-open .reader-main { margin-right: var(--ai-panel-width); }
   -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain;
 }
 .ai-diagram > svg { display: block; margin-inline: auto; height: auto; }   /* centrado si cabe; si no, empieza a la izquierda y se desplaza */
+.ai-diagram--drawing { min-height: 120px; display: grid; place-items: center; }   /* bloque aún sin cerrar en streaming (panel.js · renderStreaming) */
 .ai-diagram > .ai-code { margin: 0; border: 0; padding: 0; background: none; }
 .ai-diagram-cites { margin: -2px 0 10px; display: flex; flex-wrap: wrap; gap: 6px; }
 /* Acciones del diagrama (solo en el chat, ver diagram.js · paint). Pegadas a la izquierda

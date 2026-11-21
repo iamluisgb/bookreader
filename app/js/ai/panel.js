@@ -15,7 +15,7 @@ import { getTemplate, objectiveTemplates, isValidField, aiWritableFields, isAiWr
 import { icon } from '../ui/icons.js';
 import { t } from '../i18n.js';
 import { initAiMax, setAiMax } from './maximize.js';
-import { diagramCode } from './diagram.js';
+import { diagramCode, hydrateDiagrams } from './diagram.js';
 import * as Hints from '../ui/hints.js';
 import { escapeHtml } from '../ui/escape.js';
 import { helpUrl, helpAttrs } from '../ui/help-link.js';
@@ -1624,6 +1624,7 @@ página.${zonedRules}${systemExtra ? `\n\n${systemExtra}` : ''}` },
     if (mySeq !== bookSeq) return;   // cambió de libro → no persistir en el convo equivocado
     const finalText = raw || t('(sin respuesta del modelo de visión)');
     textNode.innerHTML = renderWithCitations(finalText, anchors);
+    hydrateDiagrams(textNode);   // mismo frame: el diagrama no vuelve un instante a su código
     addMessageActions(bubble, finalText, instruction, { autoRun: false });
     history.push({ role: 'assistant', content: finalText });
     if (convo) DB.addMessage(convo.id, 'assistant', finalText);
@@ -2004,6 +2005,7 @@ OBJETIVO: ${convo?.goal || '(sin definir)'}` },
     if (mySeq !== bookSeq) { bubble.remove(); return; }   // cambió de libro → descartar el repaso
     const finalText = raw || acc;
     textNode.innerHTML = renderWithCitations(finalText, anchors);
+    hydrateDiagrams(textNode);   // mismo frame: el diagrama no vuelve un instante a su código
     history.push({ role: 'assistant', content: finalText });
     if (convo) DB.addMessage(convo.id, 'assistant', finalText);
     if (!isOpen()) { agentUnread = true; applyAgentBadge(); showRecapPop(finalText); }
@@ -2203,6 +2205,7 @@ async function deliver(aug, question, { showUser = true, ref = null, systemExtra
     if (mySeq !== bookSeq) return;   // el usuario cambió de libro → no pintar/persistir en el convo equivocado
     const finalText = raw || acc;
     textNode.innerHTML = renderWithCitations(finalText, anchors);
+    hydrateDiagrams(textNode);   // mismo frame: el diagrama no vuelve un instante a su código
     // Auto-extracción si está activada —o si el usuario lo ha pedido explícitamente en este
     // turno: un "guárdalo en la libreta" debe guardar aunque el ajuste esté apagado.
     addMessageActions(bubble, finalText, question, { autoRun: LLM.getAutoExtract() || saveRequested(question), truncated });
@@ -3446,13 +3449,34 @@ function renderQuota() {
 // a un frame (rAF) para no re-parsear en cada token; el Markdown incompleto (una tabla a medio
 // construir, un bloque de código sin cerrar) se renderiza best-effort y se asienta al llegar el
 // resto. El render final tras el streaming fija el texto completo.
+//
+// Que NO SALTE mientras se lee (sobre todo con un diagrama):
+// - Solo se baja al final si el lector ya estaba abajo. Si ha subido a leer, se le deja ahí.
+// - Un diagrama ya dibujado se repinta desde la caché EN EL MISMO FRAME (hydrateDiagrams pinta
+//   los aciertos de caché sin esperar). Antes esperaba al frame siguiente y, en cada trozo, el
+//   diagrama volvía un frame a su código —mucho más alto— y la página daba un salto.
+// - Un bloque ```mermaid aún sin cerrar no se pinta línea a línea (crecía con cada línea y no
+//   se podía dibujar): sale una caja fija «Dibujando el diagrama…» hasta que se cierra.
 let liveRaf = 0;
+function nearBottom() {
+  const m = els.messages;
+  return !m || m.scrollHeight - m.scrollTop - m.clientHeight < 48;
+}
+function openDiagramTail(text) {
+  if (((text.match(/```/g) || []).length % 2) === 0) return -1;
+  const i = text.lastIndexOf('```');
+  return /^```mermaid/i.test(text.slice(i)) ? i : -1;
+}
 function renderStreaming(node, text) {
   if (liveRaf) return;
   liveRaf = requestAnimationFrame(() => {
     liveRaf = 0;
-    node.innerHTML = renderWithCitations(text, anchors);
-    scrollDown();
+    const follow = nearBottom();
+    const cut = openDiagramTail(text);
+    node.innerHTML = renderWithCitations(cut < 0 ? text : text.slice(0, cut), anchors) +
+      (cut < 0 ? '' : `<figure class="ai-diagram ai-diagram--drawing"><span class="ai-typing">${t('Dibujando el diagrama…')}</span></figure>`);
+    hydrateDiagrams(node);
+    if (follow) scrollDown();
   });
 }
 function cancelStreamingRender() { if (liveRaf) { cancelAnimationFrame(liveRaf); liveRaf = 0; } }
