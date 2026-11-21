@@ -122,6 +122,7 @@ node cli.mjs --dir ~/bookreader-layout reading_stats '{"range":"7d"}'
 | `create_deck` | escritura | Un mazo nuevo para un libro o capítulo, con sus primeras tarjetas si se quiere. |
 | `add_exercise` | escritura | Una matriz para rellenar (P43) en un mazo, validada como en la app; las citas de cada celda se comprueban contra el texto del capítulo. |
 | `delete_exercise` | escritura | Borra una matriz de un mazo (tombstone); las tarjetas que salieron de ella se quedan. |
+| `review_cards` | escritura | Apunta repasos que hizo el lector fuera de la app (nota again/hard/good/easy) como el modo Estudiar: FSRS con sus parámetros, `srsAt` y registro de intentos. Idempotente con `reviewId`; `tzOffset` decide qué día es «hoy». La racha no se toca. |
 | `create_mindmap` | escritura | Un mapa mental en el Studio (2–8 ramas, hasta 6 conceptos cada una). |
 | `create_infographic` | escritura | Una infografía con la plantilla de la app (tesis, ideas, paneles, cita). |
 | `create_summary` | escritura | Un resumen por capítulos, con viñetas que citan el pasaje. |

@@ -20,6 +20,7 @@ import { chapterText } from './text-tools.mjs';
 import { validateMcqItem, MCQ_LIMITS } from '../../app/js/ai/widgets/mcq.js';
 import { verifyQuotes, WIDGET_VERSION } from '../../app/js/ai/widgets/core.js';
 import { validateMatrix, matrixCites, MATRIX_LIMITS } from '../../app/js/ai/widgets/matrix.js';
+import { grade, withParameters, RATINGS } from '../../app/js/ai/srs.js';
 
 const MAX_CARDS = 100;
 const MAX_TEXT = 4000;
@@ -527,4 +528,126 @@ const DELETE_EXERCISE = {
   }),
 };
 
-export const WRITE_TOOLS = [ADD_CARDS, UPDATE_CARDS, DELETE_CARDS, CREATE_DECK, ADD_EXERCISE, DELETE_EXERCISE];
+// ---- Repasos (review_cards) ---------------------------------------------------------------
+// Apuntar un repaso hecho FUERA de la app (el panel de Orca, por ejemplo) igual que lo apunta el
+// modo Estudiar (study.js · gradeCurrent): el estado nuevo lo calcula `grade` de srs.js con los
+// parámetros FSRS del lector, la tarjeta lleva `srsAt` (el merge funde el repaso por ese sello,
+// db.js · mergeCards) y cada nota deja su registro inmutable en `attempts`. La racha (en
+// settings.json) no se toca: se pone al día con el siguiente repaso en la app.
+
+const MAX_REVIEWS = 100;
+const MAX_LATENCY_MS = 30 * 60000;
+const FUTURE_SLACK_MS = 5 * 60000;   // relojes desfasados: unos minutos en el futuro se aceptan
+
+// Huella del contenido de la tarjeta (FNV-1a a 32 bits), copia de study.js · cardFingerprint:
+// los intentos guardan con qué texto se respondió, para saber luego si la tarjeta cambió.
+function cardFingerprint(front, back) {
+  let h = 0x811c9dc5;
+  for (const t of [String(front || ''), '\u0000', String(back || '')]) {
+    for (const ch of t) {
+      h ^= ch.codePointAt(0);
+      h = Math.imul(h, 0x01000193) >>> 0;
+    }
+  }
+  return h.toString(16).padStart(8, '0');
+}
+
+// `dayOf` de srs.js corta a la medianoche LOCAL del proceso, y el Worker vive en UTC. Para que
+// «hoy» sea el del lector se corren las fechas por la diferencia entre las dos zonas y, al
+// acabar, `lastReview` vuelve a ser el instante real. `tzOffset` va en minutos y con el signo
+// de `Date#getTimezoneOffset` (España en invierno: -60).
+export function gradeAt(srs, rating, at, tzOffset) {
+  const shift = (new Date(at).getTimezoneOffset() - tzOffset) * 60000;
+  const prev = srs && srs.lastReview ? { ...srs, lastReview: srs.lastReview + shift } : srs;
+  return { ...grade(prev, rating, at + shift), lastReview: at };
+}
+
+const REVIEW_CARDS = {
+  name: 'review_cards',
+  title: 'Apuntar repasos de tarjetas',
+  description:
+    'Apunta repasos hechos fuera de la app, con la nota que se puso el lector (again · hard · good · easy), ' +
+    'igual que el modo Estudiar: el siguiente repaso lo calcula FSRS con los parámetros del lector y cada ' +
+    'nota queda en el registro de intentos. Úsala solo cuando el LECTOR ha repasado la tarjeta: no es para ' +
+    'reprogramar. `reviewId` hace el repaso idempotente (repetir la llamada no lo apunta dos veces). ' +
+    '`tzOffset` (minutos, como Date#getTimezoneOffset) decide qué día es «hoy» para el lector. ' +
+    'Hasta ' + MAX_REVIEWS + ' por llamada, de un mismo mazo y en orden.',
+  capability: 'canWrite',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      ...BOOK_PROPS, ...DECK_PROPS,
+      tzOffset: { type: 'integer', minimum: -840, maximum: 720, description: 'Minutos, como Date#getTimezoneOffset del lector (0 = UTC).' },
+      reviews: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            uid: { type: 'string', description: 'Uid de la tarjeta (de `get_deck`).' },
+            rating: { type: 'string', enum: RATINGS },
+            at: { type: 'integer', description: 'Cuándo se puso la nota (ms desde epoch). Por defecto, ahora.' },
+            latencyMs: { type: 'integer', minimum: 0, description: 'Cuánto tardó en poner la nota desde que vio la tarjeta.' },
+            reviewId: { type: 'string', description: 'Id único del repaso (un UUID): si ya está apuntado, se salta.' },
+          },
+          required: ['uid', 'rating'],
+          additionalProperties: false,
+        },
+      },
+      ...DRY_RUN,
+    },
+    required: ['deckUid', 'reviews'],
+    additionalProperties: false,
+  },
+  run: async (source, args) => {
+    const reviews = list(args, 'reviews');
+    if (!reviews.length) throw new ToolError('«reviews» está vacío.');
+    if (reviews.length > MAX_REVIEWS) throw new ToolError('Como mucho ' + MAX_REVIEWS + ' repasos por llamada.');
+    const tz = args.tzOffset ?? 0;
+    if (!Number.isInteger(tz) || tz < -840 || tz > 720) throw new ToolError('«tzOffset» son minutos entre -840 y 720.');
+    const params = source.fsrsParams ? await source.fsrsParams() : null;
+    return onBook(source, args, (book, now, bookId) => {
+      const deck = findDeck(book, args);
+      if (!Array.isArray(book.attempts)) book.attempts = [];
+      const seen = new Set(book.attempts.map((a) => a && a.uid).filter(Boolean));
+      const applied = [];
+      const skipped = [];
+      withParameters(params, () => {
+        for (const [i, r] of reviews.entries()) {
+          const label = 'Repaso ' + (i + 1);
+          if (!r || !RATINGS.includes(r.rating)) throw new ToolError(label + ': «rating» es again, hard, good o easy.');
+          const at = r.at ?? now;
+          if (!Number.isInteger(at) || at <= 0 || at > now + FUTURE_SLACK_MS) throw new ToolError(label + ': «at» tiene que ser un instante pasado, en ms.');
+          if (r.latencyMs !== undefined && (!Number.isInteger(r.latencyMs) || r.latencyMs < 0)) throw new ToolError(label + ': «latencyMs» es un entero ≥ 0.');
+          if (r.reviewId !== undefined && (typeof r.reviewId !== 'string' || !r.reviewId.trim() || r.reviewId.length > 64)) {
+            throw new ToolError(label + ': «reviewId» es un texto de hasta 64 caracteres.');
+          }
+          if (r.reviewId && seen.has(r.reviewId)) { skipped.push({ uid: r.uid, reviewId: r.reviewId, reason: 'ya apuntado' }); continue; }
+          const idx = deck.cards.findIndex((c) => c && c.uid === r.uid && !c.deleted);
+          if (idx < 0) throw new ToolError(label + ': no hay ninguna tarjeta viva con uid «' + r.uid + '» en el mazo.');
+          const card = deck.cards[idx];
+          if (card.suspended) throw new ToolError(label + ': la tarjeta «' + r.uid + '» está suspendida.');
+          const prev = card.srs || null;
+          const srs = gradeAt(prev, r.rating, at, tz);
+          deck.cards[idx] = { ...card, srs, updatedAt: now, srsAt: now };
+          const uid = r.reviewId || crypto.randomUUID();
+          seen.add(uid);
+          book.attempts.push({
+            uid, cardUid: card.uid, deckUid: deck.uid || null, bookId, ts: at,
+            mode: 'reveal', verdict: null, exact: null, grade: r.rating,
+            prevInterval: prev ? (prev.interval || 0) : null,
+            latencyMs: r.latencyMs === undefined ? null : Math.min(r.latencyMs, MAX_LATENCY_MS),
+            arm: null, answer: null, cardHash: cardFingerprint(card.front, card.back), asked: false,
+          });
+          applied.push({ uid: card.uid, rating: r.rating, due: srs.due, interval: srs.interval, reviewId: uid });
+        }
+      });
+      if (applied.length) deck.updatedAt = now;
+      return {
+        changed: applied.length > 0,
+        result: { deckUid: deck.uid, personalParameters: Boolean(params), applied, skipped },
+      };
+    });
+  },
+};
+
+export const WRITE_TOOLS = [ADD_CARDS, UPDATE_CARDS, DELETE_CARDS, CREATE_DECK, ADD_EXERCISE, DELETE_EXERCISE, REVIEW_CARDS];

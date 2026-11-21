@@ -3,6 +3,23 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-11-21 — `review_cards`: repasar tarjetas desde fuera de la app
+
+- **El caso**: el plugin de Orca (`experimentos/orca-bookreader`) enseña tarjetas vencidas
+  mientras un agente trabaja, y la nota que pone el lector tiene que contar como un repaso de
+  verdad. El MCP sabía crear y editar tarjetas, pero no apuntar un repaso.
+- **La tool** ([`write-tools.mjs`](mcp/src/write-tools.mjs), permiso de escritura): hace lo mismo
+  que `gradeCurrent` de [`study.js`](app/js/ai/study.js). El estado nuevo sale de `grade` de
+  [`srs.js`](app/js/ai/srs.js) con los parámetros FSRS del lector (`fsrs_params` de
+  `settings.json`, nuevo `fsrsParams()` en la fuente); la tarjeta lleva `srsAt` y conserva
+  `textAt`, así el merge de `mergeCards` funde el repaso sin pisar una edición; cada nota deja su
+  registro en `attempts` (modo `reveal`, con `cardHash`, `prevInterval` y `latencyMs`).
+- **Dos detalles**: el Worker vive en UTC y `dayOf` corta a medianoche local, así que
+  `gradeAt` corre las fechas por `tzOffset` para que «hoy» sea el del lector. `reviewId` es el
+  `uid` del intento: repetir la llamada tras un fallo de red no apunta el repaso dos veces.
+- **Fuera**: la racha (`study_streak`, en `settings.json`) no se toca; se pone al día con el
+  siguiente repaso en la app.
+- Tests: [`workers/sync/test/mcp-review.test.mjs`](workers/sync/test/mcp-review.test.mjs).
 ## 2026-11-19 — «Seguir leyendo» en la cabecera de estantería, con portada y progreso
 
 - **El caso**: «Seguir con «…»» era un botón con el título entero; en el móvil se cortaba

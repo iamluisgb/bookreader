@@ -356,6 +356,20 @@ export function createDriveSource({ provider, base = DEFAULT_BASE, cacheMs = 150
       c.settings = days.map(sanitizeReadingDay).filter(Boolean);
       return c.settings;
     },
+    /**
+     * Los parámetros FSRS personales del lector (`fsrs_params.w`, 21 números, en settings.json:
+     * fsrs-params.js · accept), o null si usa los de serie. Los necesita `review_cards` para
+     * programar como la app.
+     */
+    async fsrsParams() {
+      const c = await load();
+      if (c.fsrs === undefined) {
+        const settings = await readJson(base + 'settings.json');
+        const w = settings && settings.fsrs_params && settings.fsrs_params.w;
+        c.fsrs = Array.isArray(w) && w.length === 21 && w.every((x) => typeof x === 'number' && Number.isFinite(x)) ? w : null;
+      }
+      return c.fsrs;
+    },
   };
 }
 
