@@ -127,7 +127,7 @@ node cli.mjs --dir ~/bookreader-layout reading_stats '{"range":"7d"}'
 | `create_infographic` | escritura | Una infografía con la plantilla de la app (tesis, ideas, paneles, cita). |
 | `create_summary` | escritura | Un resumen por capítulos, con viñetas que citan el pasaje. |
 | `delete_artifact` | escritura | Borra un mapa, infografía o resumen (tombstone). |
-| `list_shelves` | — | Estanterías (anidadas con «/», inteligentes con su regla), cuántos libros tiene cada una y su marca en la app (`icon`, `hue`) y para qué es (`goal`). `list_books` trae autor, estado y `shelfIds`. |
+| `list_shelves` | — | Estanterías (anidadas con «/», inteligentes con su regla), cuántos libros tiene cada una y cuáles (`bookIds`, con la regla de las inteligentes ya aplicada), su marca en la app (`icon`, `hue`) y para qué es (`goal`). `list_books` trae autor, estado y `shelfIds`. |
 | `move_books` | biblioteca | Mete y saca libros de estanterías, en lote (por id o por título). |
 | `update_books` | biblioteca | Título, autor y estado (unread/reading/finished) de libros, en lote. |
 | `create_shelf` | biblioteca | Estantería normal (con libros, si se quiere), anidada o inteligente (`rule`). |
