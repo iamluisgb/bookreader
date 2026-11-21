@@ -87,7 +87,8 @@ test('apunta el repaso como la app: estado FSRS nuevo, srsAt, texto intacto y re
     reviews: [{ uid: 'c1', rating: 'good', at, latencyMs: 4200, reviewId: 'rv-1' }, { uid: 'c2', rating: 'again', at, reviewId: 'rv-2' }],
   });
   assert.equal(r.isError, false, r.text);
-  assert.equal(r.json.applied.length, 2);
+  assert.equal(r.json.applied, true);
+  assert.equal(r.json.reviewed.length, 2);
   assert.equal(r.json.personalParameters, false);
 
   const { book } = await s.readBook();
@@ -115,14 +116,24 @@ test('apunta el repaso como la app: estado FSRS nuevo, srsAt, texto intacto y re
   assert.equal(stats.json.attempts.length, 2, 'get_attempts ya los ve');
 });
 
+test('dry_run enseña el repaso sin escribir nada', async () => {
+  const s = await seeded();
+  const rw = await s.token(['write']);
+  const { etag } = await s.readBook();
+  const r = await tool(s.e, rw, 'review_cards', { bookId: BOOK_1.id, deckUid: DECK_UID, dry_run: true, reviews: [{ uid: 'c1', rating: 'good' }] });
+  assert.equal(r.json.applied, false);
+  assert.equal(r.json.reviewed.length, 1);
+  assert.equal((await s.readBook()).etag, etag);
+});
+
 test('con el mismo reviewId no se apunta dos veces', async () => {
   const s = await seeded();
   const rw = await s.token(['write']);
   const args = { bookId: BOOK_1.id, deckUid: DECK_UID, reviews: [{ uid: 'c2', rating: 'good', reviewId: 'rv-x' }] };
-  assert.equal((await tool(s.e, rw, 'review_cards', args)).json.applied.length, 1);
+  assert.equal((await tool(s.e, rw, 'review_cards', args)).json.reviewed.length, 1);
   const { etag } = await s.readBook();
   const again = await tool(s.e, rw, 'review_cards', args);
-  assert.deepEqual(again.json.applied, []);
+  assert.deepEqual(again.json.reviewed, []);
   assert.equal(again.json.skipped[0].reason, 'ya apuntado');
   assert.equal((await s.readBook()).etag, etag, 'nada que escribir');
 });
@@ -153,7 +164,7 @@ test('usa los parámetros FSRS personales del lector', async () => {
   assert.equal(r.json.personalParameters, true);
   const expected = withParameters(w, () => gradeAt(null, 'good', at, 0));
   const byDefault = gradeAt(null, 'good', at, 0);
-  assert.equal(r.json.applied[0].interval, expected.interval);
+  assert.equal(r.json.reviewed[0].interval, expected.interval);
   assert.notEqual(expected.interval, byDefault.interval);
 });
 

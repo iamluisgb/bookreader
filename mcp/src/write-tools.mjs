@@ -609,7 +609,8 @@ const REVIEW_CARDS = {
       const deck = findDeck(book, args);
       if (!Array.isArray(book.attempts)) book.attempts = [];
       const seen = new Set(book.attempts.map((a) => a && a.uid).filter(Boolean));
-      const applied = [];
+      // `reviewed` y no `applied`: onBook ya pone `applied` (si se escribió o fue dry_run).
+      const reviewed = [];
       const skipped = [];
       withParameters(params, () => {
         for (const [i, r] of reviews.entries()) {
@@ -638,13 +639,13 @@ const REVIEW_CARDS = {
             latencyMs: r.latencyMs === undefined ? null : Math.min(r.latencyMs, MAX_LATENCY_MS),
             arm: null, answer: null, cardHash: cardFingerprint(card.front, card.back), asked: false,
           });
-          applied.push({ uid: card.uid, rating: r.rating, due: srs.due, interval: srs.interval, reviewId: uid });
+          reviewed.push({ uid: card.uid, rating: r.rating, due: srs.due, interval: srs.interval, reviewId: uid });
         }
       });
-      if (applied.length) deck.updatedAt = now;
+      if (reviewed.length) deck.updatedAt = now;
       return {
-        changed: applied.length > 0,
-        result: { deckUid: deck.uid, personalParameters: Boolean(params), applied, skipped },
+        changed: reviewed.length > 0,
+        result: { deckUid: deck.uid, personalParameters: Boolean(params), reviewed, skipped },
       };
     });
   },
