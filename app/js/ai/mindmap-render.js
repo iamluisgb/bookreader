@@ -10,9 +10,21 @@
 // Ahora las ramas se reparten a izquierda y derecha y sus ideas se apilan en vertical al lado:
 // se lee en horizontal, no hay cruces por construcción y el mapa ocupa lo que necesita.
 //
-// ESTILO APPLE: lienzo blanco, tarjetas blancas con borde fino y sombra suave para el centro y
-// las ramas, colores de sistema SOLO en líneas y en el punto de cada rama, ideas como texto
-// sobre su línea (sin caja) y la tipografía del sistema (SF en Apple; Inter en el resto).
+// ESTILO APPLE: lienzo blanco, colores de sistema SOLO en líneas, aros, puntos y en el tinte
+// muy suave de la zona de cada rama; ideas como texto sobre su línea (sin caja) y la
+// tipografía del sistema (SF en Apple; Inter en el resto).
+//
+// REVISIÓN VISUAL (2026-11-21). El mapa se leía como un boceto: todo dependía de líneas de
+// 1-2 px y no se veía dónde acababa una rama y empezaba otra. Ahora:
+// - cada rama y sus ideas van sobre una ZONA tintada (6 % en claro, 12 % en oscuro): el mapa se
+//   lee como bloques. El texto sigue en tinta, así que el contraste no cambia;
+// - el centro es una píldora de TINTA con letra del color del fondo: el punto de entrada;
+// - las ramas son píldoras con aro de su color, sin sombra;
+// - fuera el icono de cita de cada hoja (16 iconos grises en un mapa de 22 nodos): tocar la
+//   hoja abre su pasaje con «Ir al libro»;
+// - el círculo de plegar abierto solo asoma al pasar el ratón (CSS); plegado, siempre;
+// - el corte izquierda/derecha equilibra la ALTURA de los dos lados, no el número de ramas;
+// - las ideas hermanas comparten largo de subrayado: el borde exterior queda alineado.
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
@@ -41,9 +53,9 @@ const TRUNK_IN = 28;      // vertical: del borde izquierdo de la raíz al tronco
 const TRUNK_TOP = 30;     // vertical: de la raíz a la primera rama
 const TRUNK_OUT = 34;     // vertical: del tronco a la tarjeta de rama
 const ELBOW = 14;         // vertical: radio del codo con que cada rama sale del tronco
-const GAP_Y = { 1: 26, 2: 10, default: 6 };
+const GAP_Y = { 1: 40, 2: 10, default: 6 };   // 1: deja calle entre las zonas de dos ramas
+const ZONE_X = 14, ZONE_Y = 12;                  // margen de la zona tintada alrededor de su rama
 const FOLD_R = 10, FOLD_OFF = 16;
-const BADGE_W = 20, BADGE_H = 16;
 
 // ---- Medida de texto -------------------------------------------------------------------
 
@@ -138,8 +150,8 @@ export function flatten(tree, collapsed = new Set()) {
   return list;
 }
 
-// Caja de cada nodo. `size` es la caja COMPLETA que ocupa (texto + indicador de cita), la que
-// usa la anticolisión; `textW` es solo el texto, donde termina el subrayado.
+// Caja de cada nodo. `size` es la caja que ocupa; `textW`, solo el texto. Tras medir, las ideas
+// hermanas se igualan al ancho de la más larga (ver layout): el subrayado acaba alineado.
 function measureNode(n) {
   if (n.depth === 0) {
     n.lines = wrapLabel(n.label, MAXW[0], 3, 700, FS_ROOT);
@@ -159,10 +171,8 @@ function measureNode(n) {
   n.fs = size; n.lh = lh; n.weight = 400;
   n.lines = wrapLabel(n.label, MAXW[n.depth] ?? MAXW.default, MAXLINES, 400, size);
   n.widths = n.lines.map(l => measure(l, 400, size));
-  const lastW = n.widths[n.widths.length - 1];
-  const badge = n.src ? 6 + BADGE_W : 0;
   n.textW = Math.max(...n.widths);
-  n.size = { w: Math.max(n.textW, lastW + badge) + 4, h: n.lines.length * lh + 12 };
+  n.size = { w: n.textW + 4, h: n.lines.length * lh + 12 };
 }
 
 // Árbol horizontal a dos lados: las primeras ramas (en su orden) van a la derecha de arriba
@@ -175,6 +185,13 @@ export function layout(tree, { collapsed = new Set(), palette = PALETTE, sides =
     measureNode(n);
     n.ci = n.depth === 0 ? -1 : (n.branch >= 0 ? n.branch : 0) % palette.length;
     n.color = n.depth === 0 ? null : palette[n.ci];
+  }
+  // Ideas hermanas al mismo ancho: los subrayados acaban a la vez y sus hijos arrancan a la par.
+  for (const n of list) {
+    if (n.depth < 1 || !n.kids.length) continue;
+    const kids = n.kids.map(id => byId.get(id));
+    const w = Math.max(...kids.map(k => k.size.w));
+    for (const k of kids) k.size.w = w;
   }
 
   const gap = (depth) => GAP_Y[depth] ?? GAP_Y.default;
@@ -222,7 +239,20 @@ export function layout(tree, { collapsed = new Set(), palette = PALETTE, sides =
     }
     if (branches.length) trunk = { x: tx, y0: root.size.h / 2, y1: branches[branches.length - 1].y - ELBOW };
   }
-  const cut = Math.ceil(branches.length / 2);
+  // Corte que EQUILIBRA la altura de los dos lados (antes: la mitad de las ramas a cada lado,
+  // y una rama grande dejaba un lado el doble de alto). Se conserva el orden: las primeras a la
+  // derecha, de arriba abajo; el resto a la izquierda. En empate gana el lado derecho.
+  let cut = Math.ceil(branches.length / 2);
+  if (branches.length > 1) {
+    const hs = branches.map(b => subH.get(b.id) + gap(1));
+    const total = hs.reduce((a, h) => a + h, 0);
+    let acc = 0, best = Infinity;
+    for (let c = 1; c < branches.length; c++) {
+      acc += hs[c - 1];
+      const d = Math.abs(acc - (total - acc));
+      if (d <= best) { best = d; cut = c; }
+    }
+  }
   if (sides !== 1) [[branches.slice(0, cut), 1], [branches.slice(cut), -1]].forEach(([col, side]) => {
     if (!col.length) return;
     const total = col.reduce((a, b) => a + subH.get(b.id), 0) + gap(1) * (col.length - 1);
@@ -232,6 +262,20 @@ export function layout(tree, { collapsed = new Set(), palette = PALETTE, sides =
       place(b, side * (root.size.w / 2 + GAP_ROOT), y + h / 2, side);
       y += h + gap(1);
     }
+  });
+
+  // Zona de cada rama: la caja de la rama y todo lo que cuelga de ella, con margen. Cuenta el
+  // círculo de los nodos plegados, que asoma por fuera.
+  const zones = branches.map((b) => {
+    let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+    for (const n of list) {
+      if (n.depth < 1 || n.branch !== b.branch) continue;
+      const fold = n.childCount > 0 && n.collapsed ? FOLD_OFF + FOLD_R + 2 : 0;
+      const l = n.x - n.size.w / 2 - (n.side < 0 ? fold : 0), r = n.x + n.size.w / 2 + (n.side > 0 ? fold : 0);
+      x0 = Math.min(x0, l); x1 = Math.max(x1, r);
+      y0 = Math.min(y0, n.y - n.size.h / 2); y1 = Math.max(y1, n.y + n.size.h / 2);
+    }
+    return { node: b, x: x0 - ZONE_X, y: y0 - ZONE_Y, w: x1 - x0 + ZONE_X * 2, h: y1 - y0 + ZONE_Y * 2 };
   });
 
   const edges = [];
@@ -249,9 +293,13 @@ export function layout(tree, { collapsed = new Set(), palette = PALETTE, sides =
     minX = Math.min(minX, l); maxX = Math.max(maxX, r);
     minY = Math.min(minY, n.y - n.size.h / 2); maxY = Math.max(maxY, n.y + n.size.h / 2);
   }
+  for (const z of zones) {
+    minX = Math.min(minX, z.x); maxX = Math.max(maxX, z.x + z.w);
+    minY = Math.min(minY, z.y); maxY = Math.max(maxY, z.y + z.h);
+  }
   const pad = 44;
   return {
-    nodes: list, byId, edges, trunk,
+    nodes: list, byId, edges, trunk, zones,
     width: Math.round(maxX - minX + pad * 2),
     height: Math.round(maxY - minY + pad * 2),
     ox: -minX + pad, oy: -minY + pad,
@@ -317,11 +365,12 @@ function drawRoot(parent, n, { theme, interactive, tooltip }) {
   a11y(g, n, interactive, tooltip);
   const { w, h } = n.size;
   g.appendChild(el('rect', {
-    class: 'mm-hit', x: -w / 2, y: -h / 2, width: w, height: h, rx: 18,
-    fill: theme.leaf, stroke: theme.line, 'stroke-width': 1, filter: 'url(#mm-shadow)',
+    class: 'mm-hit', x: -w / 2, y: -h / 2, width: w, height: h, rx: Math.min(h / 2, 28),
+    fill: theme.ink, filter: 'url(#mm-shadow)',
   }));
+  // Letra del color del FONDO sobre la tinta: el mismo contraste que el texto normal, invertido.
   const y0 = -((n.lines.length - 1) * LH_ROOT) / 2 + 7;
-  n.lines.forEach((l, i) => g.appendChild(text(0, y0 + i * LH_ROOT, l, { size: FS_ROOT, weight: 700, fill: theme.ink, anchor: 'middle' })));
+  n.lines.forEach((l, i) => g.appendChild(text(0, y0 + i * LH_ROOT, l, { size: FS_ROOT, weight: 700, fill: theme.bg, anchor: 'middle' })));
   parent.appendChild(g);
 }
 
@@ -331,8 +380,8 @@ function drawBranch(parent, n, color, { theme, interactive, tooltip }) {
   const { w, h } = n.size;
   const left = n.x - w / 2;
   g.appendChild(el('rect', {
-    class: 'mm-hit', x: left, y: n.y - h / 2, width: w, height: h, rx: 12,
-    fill: theme.leaf, stroke: theme.line, 'stroke-width': 1, filter: 'url(#mm-shadow)',
+    class: 'mm-hit', x: left, y: n.y - h / 2, width: w, height: h, rx: Math.min(h / 2, 20),
+    fill: theme.leaf, stroke: color, 'stroke-width': 1.5,
   }));
   g.appendChild(el('circle', { cx: left + CARD_PAD_X + DOT / 2, cy: n.y, r: DOT / 2, fill: color }));
   const tx = left + CARD_PAD_X + DOT + 8;
@@ -352,24 +401,6 @@ function drawIdea(parent, n, color, { theme, interactive, tooltip }) {
   const b0 = firstBaseline(n);
   const ink = n.depth === 2 ? theme.ink : theme.muted;
   n.lines.forEach((l, i) => g.appendChild(text(tx, b0 + i * n.lh, l, { size: n.fs, fill: ink, anchor })));
-  // La cita a la vista: un indicador pequeño al final de la última línea. Tocarlo va al libro.
-  // Solo en el mapa interactivo: en el póster, el PNG o el SVG no se puede tocar y es ruido.
-  if (n.src && interactive) {
-    const lastW = n.widths[n.widths.length - 1];
-    const by = b0 + (n.lines.length - 1) * n.lh - 12;
-    const bx = n.side > 0 ? n.xi + 2 + lastW + 6 : n.xi - 2 - lastW - 6 - BADGE_W;
-    const dark = isDarkTheme(theme);
-    const go = el('g', { class: 'mm-go', 'data-src': n.src });
-    go.appendChild(el('rect', { x: bx, y: by, width: BADGE_W, height: BADGE_H, rx: 8, fill: dark ? '#2c2c2e' : '#f2f2f7' }));
-    // Libro abierto, el mismo glifo que la cita del chat.
-    const s = 0.42, ox = bx + BADGE_W / 2 - 12 * s, oy = by + BADGE_H / 2 - 12 * s;
-    go.appendChild(el('path', {
-      d: 'M5 4.5h7a2 2 0 0 1 2 2V20a2.5 2.5 0 0 0-2.5-2H5V4.5Z M19 4.5h-3a2 2 0 0 0-2 2V20a2.5 2.5 0 0 1 2.5-2H19V4.5Z',
-      transform: `translate(${ox} ${oy}) scale(${s})`, fill: 'none',
-      stroke: dark ? '#98989d' : '#6e6e73', 'stroke-width': 2.2, 'stroke-linejoin': 'round',
-    }));
-    g.appendChild(go);
-  }
   parent.appendChild(g);
 }
 
@@ -378,7 +409,7 @@ function drawIdea(parent, n, color, { theme, interactive, tooltip }) {
 function drawFold(parent, n, color, theme, interactive) {
   const o = outPoint(n);
   const cx = o.x + n.side * FOLD_OFF, cy = o.y;
-  const g = el('g', { class: 'mm-fold', 'data-id': n.id });
+  const g = el('g', { class: 'mm-fold' + (n.collapsed ? '' : ' mm-fold--open'), 'data-id': n.id });
   if (interactive) {
     g.setAttribute('role', 'button'); g.setAttribute('tabindex', '0'); g.setAttribute('style', 'cursor:pointer');
     g.setAttribute('aria-label', (n.collapsed ? 'Desplegar ' : 'Plegar ') + (n.full || n.label));
@@ -438,6 +469,17 @@ export function renderSvg(lay, {
   svg.appendChild(viewport);
   const root = el('g', { transform: `translate(${lay.ox} ${lay.oy})` });
   viewport.appendChild(root);
+
+  // Zonas tintadas, lo primero: todo lo demás va encima.
+  const tint = (hex, a) => {
+    const v = parseInt(hex.slice(1), 16);
+    return `rgba(${v >> 16},${(v >> 8) & 255},${v & 255},${a})`;
+  };
+  for (const z of lay.zones || []) {
+    root.appendChild(el('rect', {
+      class: 'mm-zone', x: z.x, y: z.y, width: z.w, height: z.h, rx: 18, fill: tint(colorOf(z.node), dark ? 0.12 : 0.06),
+    }));
+  }
 
   const rootNode = lay.nodes[0];
   // Vertical: el tronco es neutro (es de todas las ramas) y cada rama sale de él con su color.

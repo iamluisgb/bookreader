@@ -651,12 +651,10 @@ function wireCanvas(holder) {
 
   holder.addEventListener('click', (e) => {
     if (moved > 4) return;                                   // fue un arrastre, no un clic
-    // Atajos del mapa (P33): el círculo pliega y el indicador de cita va al libro, sin pasar
-    // por el panel de detalle.
+    // Atajo del mapa (P33): el círculo pliega sin pasar por el panel de detalle. El icono de
+    // cita de cada hoja se quitó en la revisión visual: «Ir al libro» está en el detalle.
     const fold = e.target.closest('.mm-fold');
     if (fold) { toggleFold(fold.dataset.id); return; }
-    const go = e.target.closest('.mm-go');
-    if (go && ctx.anchors?.has(go.dataset.src)) { closeModal(); ctx.onCite?.(go.dataset.src); return; }
     const g = e.target.closest('.mm-node');
     if (g) openNodePopover(g.dataset.id);
     else closePopover();

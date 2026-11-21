@@ -121,7 +121,9 @@ test.describe('P14 · render del mapa', () => {
         const svg = R.renderSvg(lay, { theme, interactive: true, footer: { title: 'Libro', mark: 'BookReader' } }).svg;
         for (const t of svg.querySelectorAll('text')) {
           const f = t.getAttribute('fill');
-          if (f !== theme.ink && f !== theme.muted) out.push(`${t.textContent} → ${f}`);
+          // El centro va en el color del fondo sobre una píldora de tinta (contraste invertido).
+          const okRoot = f === theme.bg && t.closest('.mm-root');
+          if (f !== theme.ink && f !== theme.muted && !okRoot) out.push(`${t.textContent} → ${f}`);
         }
       }
       return out;
@@ -238,19 +240,68 @@ test('sin portada, el mapa del póster empieza donde acaba la cabecera', async (
   expect(r.h).toBeGreaterThan(960);
 });
 
-test('la cita (icono del libro) solo en el mapa interactivo: ni en el póster ni en el SVG exportado', async ({ page }) => {
+test('sin icono de cita en el lienzo: la cita está en el detalle del nodo', async ({ page }) => {
+  // Revisión visual (2026-11-21): 16 iconos grises en un mapa de 22 nodos eran ruido, y tocar la
+  // hoja ya abre su pasaje con «Ir al libro». Ni en pantalla, ni en el SVG, ni en el póster.
   await page.goto('/');
   const r = await page.evaluate(async () => {
     const R: any = await import('/js/ai/mindmap-render.js');
     const tree = { title: 'Libro', branches: ['A', 'B'].map((l) => ({ label: l, children: [1, 2].map((i) => ({ label: l + i, src: 'a0' })) })) };
     const lay = R.layout(tree, { sides: 2 });
+    const svg = R.renderSvg(lay, { interactive: true }).svg;
     return {
-      screen: R.renderSvg(lay, { interactive: true }).svg.querySelectorAll('.mm-go').length,
-      plain: R.renderSvg(lay, {}).svg.querySelectorAll('.mm-go').length,
+      screen: svg.querySelectorAll('.mm-go').length,
       poster: R.renderPoster(lay, { format: 'landscape', header: { title: 'Libro' } }).svg.querySelectorAll('.mm-go').length,
+      // La hoja sigue llevando su cita, que es lo que abre el detalle.
+      cited: svg.querySelectorAll('.mm-idea.mm-cite[data-src="a0"]').length,
     };
   });
-  expect(r.screen).toBe(4);
-  expect(r.plain).toBe(0);
+  expect(r.screen).toBe(0);
   expect(r.poster).toBe(0);
+  expect(r.cited).toBe(4);
+});
+
+test('cada rama va sobre su zona, sin pisar la de otra, y los dos lados quedan equilibrados', async ({ page }) => {
+  await page.goto('/');
+  const r = await page.evaluate(async () => {
+    const R: any = await import('/js/ai/mindmap-render.js');
+    // Una rama muy grande la primera: con el corte por número (3 | 2) el lado derecho salía
+    // mucho más alto que el izquierdo.
+    const big = { label: 'Grande', children: Array.from({ length: 8 }, (_, i) => ({ label: 'idea ' + i, src: 'a' + i })) };
+    const small = (l: string) => ({ label: l, children: [{ label: l + ' 1', src: '' }, { label: l + ' 2', src: '' }] });
+    const lay = R.layout({ title: 'T', branches: [big, small('B'), small('C'), small('D'), small('E')] });
+    const z = lay.zones;
+    let overlaps = 0;
+    for (let i = 0; i < z.length; i++) for (let j = i + 1; j < z.length; j++) {
+      const a = z[i], b = z[j];
+      if (a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h) overlaps++;
+    }
+    // Cada nodo de una rama dentro de su zona.
+    const outside = lay.nodes.filter((n: any) => n.depth >= 1).filter((n: any) => {
+      const zz = z[n.branch];
+      return n.x - n.size.w / 2 < zz.x || n.x + n.size.w / 2 > zz.x + zz.w || n.y - n.size.h / 2 < zz.y || n.y + n.size.h / 2 > zz.y + zz.h;
+    }).length;
+    const side = (s: number) => {
+      const zs = z.filter((q: any) => Math.sign(q.node.x) === s);
+      return Math.max(...zs.map((q: any) => q.y + q.h)) - Math.min(...zs.map((q: any) => q.y));
+    };
+    const svg = R.renderSvg(lay, {}).svg;
+    return { overlaps, outside, zones: svg.querySelectorAll('.mm-zone').length, right: side(1), left: side(-1),
+      rightLabels: lay.nodes.filter((n: any) => n.depth === 1 && n.x > 0).map((n: any) => n.label) };
+  });
+  expect(r.zones).toBe(5);
+  expect(r.overlaps).toBe(0);
+  expect(r.outside).toBe(0);
+  expect(r.rightLabels).toEqual(['Grande']);          // la grande sola a un lado, las cuatro pequeñas al otro
+  expect(Math.abs(r.right - r.left)).toBeLessThan(r.right * 0.35);
+});
+
+test('las ideas hermanas acaban a la vez (mismo largo de subrayado)', async ({ page }) => {
+  await page.goto('/');
+  const widths = await page.evaluate(async () => {
+    const R: any = await import('/js/ai/mindmap-render.js');
+    const lay = R.layout({ title: 'T', branches: [{ label: 'B', children: [{ label: 'corta', src: '' }, { label: 'una idea bastante más larga', src: '' }] }] });
+    return lay.nodes.filter((n: any) => n.depth === 2).map((n: any) => n.size.w);
+  });
+  expect(widths[0]).toBe(widths[1]);
 });

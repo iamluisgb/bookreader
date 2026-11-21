@@ -657,6 +657,12 @@ a tamaño real en este lienzo con scroll, o se descarga. La medida se maneja por
 .mm-node:focus-visible, .mm-fold:focus-visible { outline: none; }
 .mm-node:focus-visible .mm-hit { stroke: var(--accent); stroke-width: 2; }
 .mm-fold:hover circle, .mm-fold:focus-visible circle { stroke: var(--accent); }
+/* Círculo de plegar de una rama ABIERTA: solo asoma con el ratón sobre el lienzo o con foco de
+   teclado (ver mindmap-render.js). En táctil no hay hover: se pliega desde el detalle del nodo.
+   Plegada, el círculo con el número de hijos se ve siempre. */
+.mm-fold--open { opacity: 0; transition: opacity .15s; }
+.mm-canvas:hover .mm-fold--open, .mm-fold--open:focus-visible { opacity: 1; }
+@media (hover: none) { .mm-fold--open { display: none; } }
 
 /* Controles de zoom, flotando sobre el lienzo */
 .mm-zoom { position: absolute; right: 12px; bottom: 20px; display: flex; gap: 4px; }
