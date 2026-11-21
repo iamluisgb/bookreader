@@ -75,8 +75,20 @@ test('permiso aparte: con «write» no se organiza; list_shelves es de lectura',
   const sh = await tool(s.e, w, 'list_shelves', {});
   assert.deepEqual(sh.json.shelves.map((x) => [x.name, x.books, x.smart]), [['Técnico', 1, false], ['Favoritos', 0, false], ['Técnico pendientes', 0, true]]);
   assert.equal(sh.json.unshelved, 1);
+  assert.deepEqual(sh.json.shelves.map((x) => x.bookIds), [[BOOK_1.id], [], []]);
   const lb = await tool(s.e, w, 'list_books', {});
   assert.deepEqual(lb.json.books.find((b) => b.id === BOOK_1.id).shelfIds, ['sh_tec']);
+});
+
+test('list_shelves: bookIds de una inteligente con la regla aplicada', async () => {
+  const s = await seeded();
+  const lib = await s.token(['library']);
+  const c = await tool(s.e, lib, 'create_shelf', { name: 'Leyendo', rule: { status: 'reading' } });
+  assert.equal(c.isError, false, c.text);
+  const sh = await tool(s.e, lib, 'list_shelves', {});
+  const leyendo = sh.json.shelves.find((x) => x.name === 'Leyendo');
+  assert.equal(leyendo.smart, true);
+  assert.deepEqual(leyendo.bookIds, [BOOK_1.id]);
 });
 
 test('create_shelf anidada con libros + move_books: sellos para el merge, versión, y deshacer cifrado', async () => {

@@ -161,8 +161,8 @@ const LIST_SHELVES = {
   title: 'Estanterías',
   description:
     'Las estanterías de la biblioteca en el orden del rail (las anidadas, «Técnico/ML», van con ' +
-    'su ruta), con cuántos libros tiene cada una y la regla de las inteligentes. Y cuántos libros ' +
-    'no están en ninguna. Para ver qué libros hay en cada una, `list_books` (trae `shelfIds`).',
+    'su ruta), con cuántos libros tiene cada una, sus ids (`bookIds`, también en las inteligentes: ' +
+    'la regla ya aplicada) y la regla de las inteligentes. Y cuántos libros no están en ninguna.',
   capability: 'hasAgentData',
   inputSchema: { type: 'object', properties: {}, additionalProperties: false },
   async run(source) {
@@ -177,7 +177,9 @@ const LIST_SHELVES = {
     return {
       source: source.kind, books: books.length,
       unshelved: books.filter((b) => !(b.shelfIds || []).some((id) => manual.has(id))).length,
-      shelves: shelves.map((s) => SHELF_VIEW(lib, s, books)),
+      // `bookIds`: quién está en cada una con la regla ya aplicada, como la calcula la app
+      // (booksIn). Lo necesita quien filtra por estantería sin reimplementar las reglas.
+      shelves: shelves.map((s) => ({ ...SHELF_VIEW(lib, s, books), bookIds: booksIn(books, s).map((b) => b.id) })),
     };
   },
 };
