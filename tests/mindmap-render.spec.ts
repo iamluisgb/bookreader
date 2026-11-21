@@ -305,3 +305,36 @@ test('las ideas hermanas acaban a la vez (mismo largo de subrayado)', async ({ p
   });
   expect(widths[0]).toBe(widths[1]);
 });
+
+test('póster horizontal: el mapa se reencaja para llenar el hueco, sin recortar etiquetas', async ({ page }) => {
+  // Un mapa a dos lados es mucho más ancho que alto: llenaba el ancho del póster y dejaba un
+  // tercio del alto vacío. Y uno denso, al revés. fitPoster prueba ideas más estrechas o más
+  // anchas y más calle entre ramas, y se queda con la letra más grande.
+  await page.goto('/');
+  const r = await page.evaluate(async () => {
+    const R: any = await import('/js/ai/mindmap-render.js');
+    const wide = { title: 'Fiabilidad', branches: [
+      { label: 'Objetivos de servicio', children: [{ label: 'SLI como medida del usuario' }, { label: 'SLO y presupuesto de error' }, { label: 'Acuerdos SLA externos' }] },
+      { label: 'Respuesta a incidentes', children: [{ label: 'Roles del incidente' }, { label: 'Postmortem sin culpables' }] },
+      { label: 'Automatización', children: [{ label: 'Eliminar el toil' }, { label: 'Despliegues progresivos' }] },
+      { label: 'Cultura', children: [{ label: 'Equipos dueños del servicio' }, { label: 'Tiempo de ingeniería protegido' }] },
+    ] };
+    const dense = { title: 'Denso', branches: Array.from({ length: 6 }, (_, i) => ({ label: 'Rama ' + i, children: Array.from({ length: 5 }, (_, j) => ({ label: `Una idea con un rótulo algo más largo ${i}.${j}` })) })) };
+    const cut = (svg: any) => [...svg.querySelectorAll('text')].filter((t: any) => t.textContent.endsWith('…')).length;
+    const measure = (tree: any, refit: boolean) => {
+      const lay = R.layout(tree, { sides: 2 });
+      const { svg } = R.renderPoster(lay, { format: 'landscape', header: { title: 'Libro' },
+        relayout: refit ? (o: any) => R.layout(tree, { sides: 2, ...o }) : null });
+      const inner = svg.querySelector(':scope > svg');
+      const scale = Number(inner.getAttribute('width')) / Number(inner.getAttribute('viewBox').split(' ')[2]);
+      return { scale, h: Number(inner.getAttribute('height')), cut: cut(inner) };
+    };
+    return { wide: [measure(wide, false), measure(wide, true)], dense: [measure(dense, false), measure(dense, true)] };
+  });
+  const [w0, w1] = r.wide, [d0, d1] = r.dense;
+  expect(w1.scale).toBeGreaterThanOrEqual(w0.scale);
+  expect(w1.h).toBeGreaterThan(w0.h * 1.15);          // el ancho llena más alto
+  expect(d1.scale).toBeGreaterThan(d0.scale * 1.2);    // el denso, letra bastante más grande
+  expect(w1.cut).toBeLessThanOrEqual(w0.cut);
+  expect(d1.cut).toBeLessThanOrEqual(d0.cut);
+});

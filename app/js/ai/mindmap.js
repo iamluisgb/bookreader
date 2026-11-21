@@ -1021,6 +1021,8 @@ async function buildExport() {
   const scopeNote = lastScope && lastScope !== bookTitle ? ` · ${lastScope}` : '';
   return Render.renderPoster(lay, {
     format: fmt,
+    // Solo el horizontal se reencaja (ver fitPoster): el vertical, a un lado, ya llena el alto.
+    relayout: fmt === 'landscape' ? (o) => Render.layout(lastTree, { collapsed, sides: Render.FORMATS[fmt].sides, ...o }) : null,
     theme: Render.POSTER,
     fontCss,
     title: t('Mapa mental de {scope}', { scope: lastScope || '' }),

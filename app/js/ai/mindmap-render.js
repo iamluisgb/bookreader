@@ -152,7 +152,7 @@ export function flatten(tree, collapsed = new Set()) {
 
 // Caja de cada nodo. `size` es la caja que ocupa; `textW`, solo el texto. Tras medir, las ideas
 // hermanas se igualan al ancho de la más larga (ver layout): el subrayado acaba alineado.
-function measureNode(n) {
+function measureNode(n, wrap = 1) {
   if (n.depth === 0) {
     n.lines = wrapLabel(n.label, MAXW[0], 3, 700, FS_ROOT);
     const w = Math.max(...n.lines.map(l => measure(l, 700, FS_ROOT)));
@@ -169,7 +169,9 @@ function measureNode(n) {
   }
   const size = n.depth === 2 ? FS : FS_SUB, lh = n.depth === 2 ? LH : LH_SUB;
   n.fs = size; n.lh = lh; n.weight = 400;
-  n.lines = wrapLabel(n.label, MAXW[n.depth] ?? MAXW.default, MAXLINES, 400, size);
+  // `wrap` (póster horizontal, ver fitPoster): < 1 estrecha las ideas y les deja una línea más
+  // (mapa más estrecho y alto); > 1 las ensancha (mapa más bajo, para un árbol denso).
+  n.lines = wrapLabel(n.label, (MAXW[n.depth] ?? MAXW.default) * wrap, wrap < 1 ? MAXLINES + 1 : MAXLINES, 400, size);
   n.widths = n.lines.map(l => measure(l, 400, size));
   n.textW = Math.max(...n.widths);
   n.size = { w: n.textW + 4, h: n.lines.length * lh + 12 };
@@ -178,11 +180,11 @@ function measureNode(n) {
 // Árbol horizontal a dos lados: las primeras ramas (en su orden) van a la derecha de arriba
 // abajo y el resto a la izquierda. Cada subárbol reserva el alto que necesitan sus hijos, así
 // que dos cajas no pueden solaparse por construcción.
-export function layout(tree, { collapsed = new Set(), palette = PALETTE, sides = 2 } = {}) {
+export function layout(tree, { collapsed = new Set(), palette = PALETTE, sides = 2, wrap = 1, spread = 1 } = {}) {
   const list = flatten(tree, collapsed);
   const byId = new Map(list.map(n => [n.id, n]));
   for (const n of list) {
-    measureNode(n);
+    measureNode(n, wrap);
     n.ci = n.depth === 0 ? -1 : (n.branch >= 0 ? n.branch : 0) % palette.length;
     n.color = n.depth === 0 ? null : palette[n.ci];
   }
@@ -194,7 +196,8 @@ export function layout(tree, { collapsed = new Set(), palette = PALETTE, sides =
     for (const k of kids) k.size.w = w;
   }
 
-  const gap = (depth) => GAP_Y[depth] ?? GAP_Y.default;
+  // `spread` > 1 abre la calle entre ramas (e ideas): el póster horizontal la usa para llenar alto.
+  const gap = (depth) => (GAP_Y[depth] ?? GAP_Y.default) * (depth <= 2 ? spread : 1);
   const subH = new Map();
   for (let i = list.length - 1; i >= 0; i--) {         // preorden al revés: hijos antes
     const n = list[i];
@@ -540,7 +543,37 @@ export const FORMATS = {
 // Cabecera con la portada del libro, título, autor y un antetítulo; el mapa, escalado para
 // caber en el resto; y un pie con la marca. `header.cover` es un data URL (el de la
 // biblioteca): viaja dentro del SVG, así que el PNG rasterizado lo conserva.
-export function renderPoster(lay, { format = 'landscape', theme = POSTER, fontCss = '', title = '', header = {} } = {}) {
+const MAX_POSTER_SCALE = 1.6;   // tope: un mapa pequeño no sale gigante
+
+// Encaje del mapa en el hueco del póster. Un mapa a dos lados es mucho más ancho que alto
+// (medido: 1544 × 498 frente a un hueco de 1776 × 730 en el horizontal), así que llenaba el ancho
+// y dejaba un tercio del alto vacío. Se prueban ideas más estrechas (más líneas: mapa más estrecho,
+// y por tanto más grande al encajarlo) y más calle entre ramas (más alto); y para el caso contrario
+// —un mapa denso, más alto que el hueco— ideas más anchas, en una línea. Se queda la variante con
+// la letra más grande. Ninguna variante puede recortar más etiquetas («…») que la de partida.
+// `relayout(opts)` es `layout` con el árbol y el plegado del llamante.
+export function fitPoster(relayout, bw, bh, maxScale = MAX_POSTER_SCALE) {
+  const cut = (l) => l.nodes.reduce((a, n) => a + n.lines.filter(x => x.endsWith('…')).length, 0);
+  const base = relayout({});
+  const limit = cut(base);
+  const scale = (l) => Math.min(bw / l.width, bh / l.height, maxScale);
+  let best = base, bestSc = scale(base);
+  for (const wrap of [1, 0.85, 0.72, 0.62, 1.3, 1.6]) {
+    for (const spread of [1, 1.4, 1.8, 2.4, 3]) {
+      if (wrap === 1 && spread === 1) continue;
+      const l = relayout({ wrap, spread });
+      if (cut(l) > limit) continue;
+      const sc = scale(l);
+      // Más letra gana; a igual letra (el ancho manda), la que más alto llena.
+      if (sc > bestSc + 0.005 || (Math.abs(sc - bestSc) <= 0.005 && l.height * sc > best.height * bestSc)) {
+        best = l; bestSc = sc;
+      }
+    }
+  }
+  return best;
+}
+
+export function renderPoster(lay, { format = 'landscape', theme = POSTER, fontCss = '', title = '', header = {}, relayout = null } = {}) {
   const F = FORMATS[format] || FORMATS.landscape;
   const W = F.w, H = F.h, m = F.margin;
   const svg = el('svg', {
@@ -590,7 +623,8 @@ export function renderPoster(lay, { format = 'landscape', theme = POSTER, fontCs
   const headBottom = Math.max(header.cover ? m + F.coverH : 0, y);
   const top = Math.min(m + F.head, headBottom + F.gap), bottom = H - m - 44;
   const bw = W - m * 2, bh = bottom - top;
-  const sc = Math.min(bw / lay.width, bh / lay.height, 1.6);
+  if (relayout) lay = fitPoster(relayout, bw, bh, MAX_POSTER_SCALE) || lay;
+  const sc = Math.min(bw / lay.width, bh / lay.height, MAX_POSTER_SCALE);
   const mw = lay.width * sc, mh = lay.height * sc;
   const inner = renderSvg(lay, { theme }).svg;
   inner.removeAttribute('style');
