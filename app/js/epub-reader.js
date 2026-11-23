@@ -1116,6 +1116,10 @@ export async function load(arrayBuffer, onProgress, bookId = null) {
     doc.addEventListener('keydown', (e) => {
       // Atajos de paneles (`[` índice, `]` agente): los atiende app.js.
       if (e.key === '[' || e.key === ']') { window.dispatchEvent(new CustomEvent('reader:key', { detail: e.key })); return; }
+      // ⌘K / Ctrl+K: la paleta de comandos (ui/command-palette.js) escucha en el padre.
+      if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && (e.key === 'k' || e.key === 'K')) {
+        e.preventDefault(); window.dispatchEvent(new CustomEvent('reader:palette')); return;
+      }
       if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
       if (e.key === 'ArrowLeft') { e.preventDefault(); tapPrev(); }
       else if (e.key === 'ArrowRight') { e.preventDefault(); tapNext(); }
@@ -1305,6 +1309,49 @@ function scrollBarsGap() {
   return `body { padding-top: ${px('--header-height') + 6}px !important; padding-bottom: ${px('--footer-height') + 6}px !important; }`;
 }
 
+// Tipografía del libro (después de Matter y de Bringhurst): guiones al partir palabras
+// —al menos 2 letras antes del corte y 3 después, en palabras de 6 o más—, cifras de estilo
+// antiguo en el texto corrido y de caja alta en títulos y tablas, reparto del párrafo
+// entero antes de partir líneas (`text-wrap: pretty`), sin viudas ni huérfanas, y algo de
+// aire entre letras en siglas y versalitas. El justificado es un ajuste (`justify`).
+//
+// Especificidad BAJA a propósito (`body p`, sin !important): las clases del propio EPUB
+// —un párrafo centrado, un poema alineado a la derecha, un epígrafe— siguen ganando.
+// Solo se pisa el `p { text-align: … }` genérico del libro, que es el que se quiere
+// cambiar. Los guiones necesitan saber el idioma: si el documento no lo declara, se toma
+// el de los metadatos del libro (applyDocLang).
+//
+// Los guiones, de momento SOLO con ratón. En táctil, con las barras a la vista, el lector
+// encoge el viewport (updateReaderScale) y epub.js ya iba justo midiendo dónde cae un CFI:
+// con guiones, el salto a un CFI que abre página aterrizaba una página antes
+// (reader-scale-position.spec.ts, 3 de 3; sin guiones, 3 de 3 bien; sin encoger, bien
+// también con guiones). Hasta arreglar esa medida, en táctil no se parten palabras.
+function bookTypography(settings) {
+  const align = settings.justify === false ? 'start' : 'justify';
+  return `
+      ${COARSE ? '' : 'html { -webkit-hyphens: auto; hyphens: auto; }'}
+      body { font-kerning: normal; font-variant-numeric: oldstyle-nums proportional-nums; }
+      body p, body li, body dd, body blockquote {
+        hyphenate-limit-chars: 6 2 3; -webkit-hyphenate-limit-before: 2; -webkit-hyphenate-limit-after: 3;
+        text-wrap: pretty; widows: 2; orphans: 2; }
+      body p { text-align: ${align}; }
+      h1, h2, h3, h4, h5, h6, th, td, caption, figcaption { font-variant-numeric: lining-nums; -webkit-hyphens: manual; hyphens: manual; text-wrap: balance; }
+      th, td { text-wrap: wrap; font-variant-numeric: lining-nums tabular-nums; }
+      pre, code, kbd, samp, tt, a[href^="http"] { -webkit-hyphens: manual; hyphens: manual; font-variant-numeric: normal; }
+      abbr, acronym, .caps, .smallcaps, .small-caps, .sc { letter-spacing: 0.06em; }`;
+}
+
+// Idioma del documento para los guiones automáticos: sin `lang`, el navegador no parte
+// nada. Muchos EPUB lo declaran en el OPF y no en cada XHTML.
+function applyDocLang(doc) {
+  try {
+    const root = doc.documentElement;
+    if (root.getAttribute('lang') || root.getAttribute('xml:lang')) return;
+    const lang = book?.packaging?.metadata?.language;
+    if (lang) root.setAttribute('lang', String(lang).trim());
+  } catch (e) { /* sin metadatos: sin guiones, como antes */ }
+}
+
 function injectThemeIntoContent(contents) {
   const settings = Settings.getAll();
   const colors = getThemeColors();
@@ -1318,6 +1365,7 @@ function injectThemeIntoContent(contents) {
     const oldStyle = doc.getElementById('bookreader-theme');
     if (oldStyle) oldStyle.remove();
 
+    applyDocLang(doc);
     const style = doc.createElement('style');
     style.id = 'bookreader-theme';
     const isSerif = settings.fontFamily === 'serif';
@@ -1346,6 +1394,7 @@ function injectThemeIntoContent(contents) {
         line-height: ${settings.lineHeight} !important;
       }
       p { margin-bottom: 0.8em !important; }
+      ${bookTypography(settings)}
       ${scrollBarsGap()}
       #br-end { margin: 3em 0 0; padding: 1.5em 0 6em; border-top: 1px solid ${colors.text}33;
         text-align: center; -webkit-user-select: none; user-select: none; }
@@ -1682,6 +1731,12 @@ export function getBook() {
 
 export function getNavigation() {
   return book?.navigation || null;
+}
+
+// Cuántas localizaciones tiene el libro (0 si aún no se han generado). Es el «total» de
+// getPageInfo: lo usa el minimapa para pasar páginas a fracción del libro.
+export function getLocationsTotal() {
+  try { return book?.locations?.length?.() || 0; } catch (e) { return 0; }
 }
 
 // Nº de página (índice de localización de epub.js, ~1024 chars) y total, a partir de

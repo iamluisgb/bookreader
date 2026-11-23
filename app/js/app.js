@@ -40,6 +40,8 @@ import { restoreSheetSnap, sheetReservedPx } from './ai/sheet-height.js';
 import { repairGatewayConfig } from './ai/gateway-repair.js';
 import { helpUrl, helpAttrs } from './ui/help-link.js';
 import { repairOrphanDecks } from './ai/deck-repair.js';
+import * as Minimap from './ui/minimap.js';
+import * as CommandPalette from './ui/command-palette.js';
 
 // ============ CARGA PEREZOSA ============
 // Módulos grandes que NO hacen falta para pintar la biblioteca. Con imports estáticos
@@ -132,6 +134,8 @@ document.addEventListener('DOMContentLoaded', () => {
   initNavigation();
   initBookmarkButton();
   initHighlights();
+  initMinimap();
+  CommandPalette.init(paletteCommands);
   initDragDrop();
   initAiPanel();
   initImmersive();
@@ -856,6 +860,7 @@ async function goToLibrary({ fromRoute = false } = {}) {
   document.getElementById('library-btn').style.display = 'none';
   document.getElementById('reader-title').textContent = 'BookReader';
   bookPct = null;
+  Minimap.clear();
   setBookMeta({ title: '', author: '', cover: '' });
   await Library.render();
   Library.show();
@@ -1835,6 +1840,7 @@ async function loadEpub(buffer, bookId, aiBookId, persist = null) {
   const seq = ++epubLoadSeq;
   try {
     resetSearch();
+    Minimap.clear();
     // Soltar el PDF anterior: media app decide el lector activo con `isLoaded()`, y el
     // que no se suelta sigue contestando que sí desde el libro que ya no está en pantalla.
     PdfReader.deactivate();
@@ -1848,6 +1854,7 @@ async function loadEpub(buffer, bookId, aiBookId, persist = null) {
       updateBookmarkButton();
       updateProgressDetail(pct, totalWords);
       saveProgress(pct);
+      Minimap.setPosition(pct / 100);
       syncRouteSoon();               // reflejar la posición en la URL (deep-link)
       ReadingLog.position(unit);     // P25: cuánto de esto fue lectura, lo decide él
       // La marca va por SECCIÓN, no por fichero: en scroll epub.js solo avisa de cambio de
@@ -1918,7 +1925,9 @@ async function loadEpub(buffer, bookId, aiBookId, persist = null) {
       // mostraba 0 hasta moverse: lo refrescamos ya con las localizaciones.
       EpubReader.refreshProgress();
       updateProgressDetail(undefined, totalWords);
-      fillTocPages();   // el índice ya se pintó; ahora sí se sabe la página de cada sección
+      // El índice ya se pintó; ahora sí se sabe la página de cada sección. Con esas
+      // páginas se coloca el minimapa (capítulos y subrayados en el libro entero).
+      fillTocPages().then(refreshMinimap, refreshMinimap);
     } catch (locErr) {
       console.warn('Could not generate locations:', locErr);
       totalWords = countBookWords();
@@ -1953,6 +1962,7 @@ async function loadPdf(buffer, bookId, aiBookId, persist = null, displayTitle = 
   const seq = ++pdfLoadSeq;
   try {
     resetSearch();
+    Minimap.clear();
     // Soltar el EPUB anterior (ver el comentario gemelo en loadEpub): con el EPUB vivo,
     // markCurrentToc/seek/prev seguían yendo por su rama y el PDF se quedaba sin marca
     // de sección en el índice ni capítulo en el pie.
@@ -1977,6 +1987,7 @@ async function loadPdf(buffer, bookId, aiBookId, persist = null, displayTitle = 
       const pct = Math.round((page / pages) * 100);
       updateProgressDetail(pct, totalWords);
       saveProgress(pct);
+      Minimap.setPosition(pages > 1 ? (page - 1) / (pages - 1) : 0);
     });
 
     await PdfReader.load(buffer, null, Aliases.canonicalOf(aiBookId));
@@ -2023,7 +2034,7 @@ async function loadPdf(buffer, bookId, aiBookId, persist = null, displayTitle = 
     loadSharedHighlights(currentBook.id);   // P24: lo de un dossier importado, si lo hay
     renderBookmarks();               // poblar la lista de marcadores del PDF
     updateBookmarkButton();          // estado del botón para la página inicial
-    loadPdfTOC();                    // índice del PDF (outline) en el sidebar
+    loadPdfTOC().then(refreshMinimap, refreshMinimap);   // índice del PDF (outline) en el sidebar, y el minimapa
     PdfReader.primeOutlineCache();   // capítulo de la burbuja al arrastrar la barra
     updateFormatScopedUI();          // PDF4: modo recordado + controles que aplican al PDF
     // Tiempo restante del pie. Se lanza sin await: muestrea páginas y tarda unas
@@ -2229,6 +2240,131 @@ async function fillTocPages() {
     num.textContent = String(page);
     a.appendChild(num);
   }
+}
+
+// ============ MINIMAPA ============
+// Subrayados y capítulos de primer nivel en el borde derecho, a la altura que ocupan en el
+// libro entero (ui/minimap.js pinta; aquí se calculan las fracciones). Las páginas salen
+// del mismo sitio que las del índice —las localizaciones de epub.js en EPUB, la página en
+// PDF—, así que la raya de un capítulo cae donde el índice dice que empieza.
+let minimapTimer = null;
+function initMinimap() {
+  // Subrayar, borrar o cambiar un color: repintar, con rebote (el sync aplica en lote).
+  Highlights.setOnChange(() => {
+    clearTimeout(minimapTimer);
+    minimapTimer = setTimeout(refreshMinimap, 120);
+  });
+}
+
+function refreshMinimap() {
+  if (!currentBook) { Minimap.clear(); return; }
+  const tocList = document.getElementById('toc-list');
+  const chapterLinks = (sel) => [...(tocList?.querySelectorAll(sel) || [])];
+  const labelOf = (a) => (a.querySelector('.toc-label')?.textContent || '').trim();
+  const marks = [];
+  let total = 0;
+  if (EpubReader.isLoaded()) {
+    total = EpubReader.getLocationsTotal();
+    if (!total) { Minimap.clear(); return; }
+    for (const hl of Highlights.getAll()) {
+      const page = hl.cfi && EpubReader.getPageInfo(hl.cfi)?.page;
+      if (!page) continue;
+      marks.push({ page, kind: 'hl', label: hl.text || '', sub: hl.note || hl.chapter || '', color: hl.color,
+        go: () => EpubReader.goTo(hl.cfi) });
+    }
+    for (const a of chapterLinks('a[data-toc-href][aria-level="1"]')) {
+      const page = Number(a.querySelector('.toc-page')?.textContent);
+      if (!page) continue;
+      marks.push({ page, kind: 'ch', label: labelOf(a), sub: t('Página {n}', { n: page }),
+        go: () => EpubReader.goTo(a.dataset.tocHref) });
+    }
+  } else if (PdfReader.isLoaded()) {
+    total = PdfReader.getTotalPages();
+    if (!total) { Minimap.clear(); return; }
+    for (const hl of Highlights.getAll()) {
+      if (hl.page == null) continue;
+      marks.push({ page: hl.page, kind: 'hl', label: hl.text || '', sub: hl.note || hl.chapter || '', color: hl.color,
+        go: async () => { await PdfReader.goTo(hl.page); drawPdfHighlights(hl.page); } });
+    }
+    for (const a of chapterLinks('a[data-toc-page][aria-level="1"]')) {
+      const page = Number(a.dataset.tocPage);
+      marks.push({ page, kind: 'ch', label: labelOf(a), sub: t('Página {n}', { n: page }),
+        go: () => PdfReader.goTo(page) });
+    }
+  } else { Minimap.clear(); return; }
+  const frac = (page) => (total > 1 ? (page - 1) / (total - 1) : 0);
+  Minimap.setMarks(marks.map((m) => ({ ...m, f: frac(m.page) })));
+  Minimap.setPosition(getCurrentPct() / 100);
+}
+
+// ============ PALETA DE COMANDOS (⌘K) ============
+// Lo que la paleta ofrece en cada momento. Las acciones reutilizan los botones y ajustes
+// que ya existen (un clic en el mismo botón, el mismo Settings.set), así que la paleta no
+// abre un segundo camino que pueda desincronizarse de la interfaz. Capítulos y libros solo
+// salen al escribir (`searchOnly`): un índice técnico tiene cientos de entradas.
+async function paletteCommands() {
+  const reading = document.body.classList.contains('reading') && !!currentBook;
+  const isEpub = reading && EpubReader.isLoaded();
+  const click = (id) => () => { const b = document.getElementById(id); if (b && !b.disabled) b.click(); };
+  const G = { book: t('Libro'), read: t('Lectura'), app: t('Aplicación'), toc: t('Índice'), lib: t('Biblioteca') };
+  const cmds = [];
+  const add = (group, label, run, extra = {}) => cmds.push({ group, label, run, ...extra });
+
+  if (reading) {
+    add(G.book, t('Buscar en el libro'), click('header-search'), { keywords: 'search find' });
+    add(G.book, t('Índice'), () => setSidebar(true, 'contents'), { hint: '[', keywords: 'contents toc capitulos' });
+    add(G.book, t('Subrayados'), () => setSidebar(true, 'highlights'), { keywords: 'highlights notas' });
+    add(G.book, t('Marcadores'), () => setSidebar(true, 'bookmarks'), { keywords: 'bookmarks' });
+    add(G.book, t('Marcar página'), click('bookmark-toggle'), { keywords: 'bookmark' });
+    add(G.book, t('Agente de IA'), click('ai-toggle'), { hint: ']', keywords: 'ai agent chat preguntar' });
+    add(G.book, t('Pantalla completa'), click('immersive-toggle'), { keywords: 'fullscreen inmersivo focus' });
+    add(G.book, t('Ajustes de lectura'), click('reading-settings'), { keywords: 'reading settings tipografia' });
+    add(G.book, t('Volver a la biblioteca'), () => goToLibrary(), { keywords: 'library home' });
+
+    const mode = (m) => () => document.querySelector(`.reading-mode-btn[data-mode="${m}"]`)?.click();
+    add(G.read, t('Modo: páginas'), mode('paginated'), { keywords: 'paginated pages' });
+    add(G.read, t('Modo: doble página'), mode('spread'), { keywords: 'spread two pages' });
+    add(G.read, t('Modo: scroll'), mode('scroll'), { keywords: 'scroll continuo' });
+    if (isEpub) {
+      add(G.read, t('Letra más grande'), click('font-increase'), { keywords: 'font bigger zoom' });
+      add(G.read, t('Letra más pequeña'), click('font-decrease'), { keywords: 'font smaller' });
+      const just = Settings.get('justify') !== false;
+      add(G.read, just ? t('Alinear a la izquierda') : t('Justificar el texto'),
+        () => Settings.set('justify', !just), { keywords: 'justify align alineacion' });
+    }
+  }
+
+  const theme = (th) => () => Settings.set('theme', th);
+  add(G.app, t('Tema: claro'), theme('light'), { keywords: 'light theme' });
+  add(G.app, t('Tema: oscuro'), theme('dark'), { keywords: 'dark theme noche' });
+  add(G.app, t('Tema: sepia'), theme('sepia'), { keywords: 'sepia theme' });
+  add(G.app, t('Tema: del sistema'), theme('system'), { keywords: 'system theme auto' });
+  add(G.app, t('Subir archivos'), () => document.getElementById('file-input').click(), { keywords: 'import upload epub pdf importar' });
+  add(G.app, t('Ajustes generales'), () => openAppSettings(), { keywords: 'settings preferencias sync' });
+  add(G.app, t('Guía rápida'), () => FeatureGuide.toggle(), { hint: '?', keywords: 'help ayuda atajos shortcuts' });
+
+  if (reading) {
+    for (const a of document.querySelectorAll('#toc-list a')) {
+      const label = (a.querySelector('.toc-label')?.textContent || '').trim();
+      if (!label) continue;
+      const page = a.querySelector('.toc-page')?.textContent;
+      cmds.push({ group: G.toc, label, hint: page || '', searchOnly: true, run: () => a.click() });
+    }
+  }
+
+  try {
+    for (const rec of await LibStore.getAllBooks()) {
+      // Solo los que están en este dispositivo: un libro que hay que bajar se abre desde su
+      // tarjeta, que es la que enseña la descarga. El listado viene sin el binario
+      // (getAllBooks), así que se pide el registro completo al elegirlo.
+      if ((reading && rec.id === currentBook.id) || !LibStore.hasFile(rec)) continue;
+      const title = rec.title || rec.fileName || '';
+      if (!title) continue;
+      cmds.push({ group: G.lib, label: title, keywords: rec.author || '', searchOnly: true,
+        run: async () => { const full = await LibStore.getBook(rec.id); if (full) await openLibraryBook(full); } });
+    }
+  } catch (e) { /* sin biblioteca legible: la paleta sigue con las acciones */ }
+  return cmds;
 }
 
 // ============ BARRA DE PROGRESO: ARRASTRE (estilo Play Books) ============

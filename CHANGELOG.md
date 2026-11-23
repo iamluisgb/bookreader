@@ -3,6 +3,33 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-11-23 — Tipografía del libro, minimapa de subrayados y paleta de comandos (ideas de Matter)
+
+- **El caso**: revisando Matter para la web (getmatter.com/web-app) salieron tres ideas que
+  encajan aquí: componer el texto con más cuidado, ver de un vistazo dónde están los subrayados
+  y llegar a cualquier acción sin buscar el botón.
+- **Tipografía** (`bookTypography` en `epub-reader.js`): párrafos justificados por defecto con
+  guiones automáticos (mínimo 2 letras antes del corte y 3 después, palabras de 6+), reparto
+  del párrafo entero (`text-wrap: pretty`), sin viudas ni huérfanas, cifras de estilo antiguo en
+  el texto y de caja alta en títulos y tablas, y algo de aire en siglas y versalitas. Especificidad
+  baja a propósito: un párrafo centrado o un poema del propio EPUB sigue mandando. Sin `lang` en
+  el XHTML se toma el del OPF (sin idioma, el navegador no parte palabras). Nuevo ajuste
+  **Alineación** (Justificada / Izquierda) en «Aa». **Los guiones, de momento solo con ratón**:
+  en táctil, con las barras a la vista (viewport encogido), el salto a un CFI que abre página
+  aterrizaba una página antes con guiones (`reader-scale-position.spec.ts`, 3 de 3); sin
+  encoger iba bien. Queda pendiente arreglar esa medida para encenderlos también en el móvil.
+- **Minimapa** (`ui/minimap.js`): carril en el borde derecho con cada subrayado en su color a la
+  altura que ocupa en el libro entero, los capítulos de primer nivel como rayas y «estás aquí».
+  Al pasar el ratón enseña el texto y la nota; el clic salta. Las páginas salen de las mismas
+  localizaciones que el índice (EPUB) o de la página (PDF). Solo con ratón: en táctil el borde es
+  del gesto de pasar página.
+- **Paleta de comandos** (`ui/command-palette.js`, ⌘K / Ctrl+K, también con el foco dentro del
+  iframe del libro): acciones del libro y de la app, temas, modos de lectura, letra y alineación;
+  al escribir, también capítulos del índice y libros de la biblioteca que estén en el
+  dispositivo. Búsqueda por subsecuencia sin acentos. Las acciones pulsan los mismos botones y
+  ajustes que la interfaz.
+- Test: [`tests/minimap-palette.spec.ts`](tests/minimap-palette.spec.ts). SW `bookreader-v249`.
+
 ## 2026-11-21 — `review_cards`: repasar tarjetas desde fuera de la app
 
 - **El caso**: el plugin de Orca (`experimentos/orca-bookreader`) enseña tarjetas vencidas
@@ -20,6 +47,7 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 - **Fuera**: la racha (`study_streak`, en `settings.json`) no se toca; se pone al día con el
   siguiente repaso en la app.
 - Tests: [`workers/sync/test/mcp-review.test.mjs`](workers/sync/test/mcp-review.test.mjs).
+
 ## 2026-11-19 — «Seguir leyendo» en la cabecera de estantería, con portada y progreso
 
 - **El caso**: «Seguir con «…»» era un botón con el título entero; en el móvil se cortaba

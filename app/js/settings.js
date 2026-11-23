@@ -9,6 +9,7 @@ const defaults = {
   fontFamily: 'serif',
   columnWidth: 720,
   lineHeight: 1.6,
+  justify: true,      // párrafos justificados (con guiones); false = alineados a la izquierda
   brightness: 1,      // 1 = sin atenuar; < 1 oscurece con un overlay (brillo tipo Play Books)
   nightLight: 0,      // 0 = off; > 0 aplica un filtro cálido ámbar (reduce luz azul)
   pdfPaper: 'auto',   // color de papel del PDF: 'auto' sigue al tema de la app (ver ADR-026)
@@ -88,6 +89,13 @@ export function applySettings() {
     colValue.textContent = w <= 600 ? t('Estrecha') : w <= 840 ? t('Media') : t('Ancha');
   }
 
+  // Alineación del texto (solo EPUB)
+  document.querySelectorAll('.align-btn').forEach(btn => {
+    const on = (btn.dataset.align === 'justify') === (current.justify !== false);
+    btn.classList.toggle('active', on);
+    btn.setAttribute('aria-checked', String(on));
+  });
+
   // Line height display
   const lhValue = document.getElementById('line-height-value');
   if (lhValue) lhValue.textContent = current.lineHeight;
@@ -149,6 +157,11 @@ export function init() {
   // Column width
   document.getElementById('column-width')?.addEventListener('input', (e) => {
     set('columnWidth', parseInt(e.target.value));
+  });
+
+  // Alineación
+  document.querySelectorAll('.align-btn').forEach(btn => {
+    btn.addEventListener('click', () => set('justify', btn.dataset.align === 'justify'));
   });
 
   // Line height
