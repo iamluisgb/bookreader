@@ -182,4 +182,7 @@
     <xhtml:link rel="alternate" hreflang="x-default" href="https://bookreader.raiatech.com/help/tutoriales/first-day/"/>
   </url>
   <!-- help:end -->
+  <url>
+    <loc>https://bookreader.raiatech.com/@luis/</loc>
+  </url>
 </urlset>

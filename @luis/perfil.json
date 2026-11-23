@@ -1,0 +1,21 @@
+{
+  "owner": "Luis González",
+  "shelf": "Agents",
+  "now": "harness",
+  "books": [
+    { "id": "harness", "title": "Harness Engineering: Anatomy, Architecture, and Evolution of Coding Agents", "author": "Paul Barbaste, Tristan Darrigol, Germain Vu, Tom Wiltberger", "status": "reading", "progress": 7, "pages": 42, "kind": "Paper · arXiv",
+      "spine": { "style": "arxiv", "bg": "#fbfaf7", "ink": "#111111", "muted": "#555555", "serif": true, "title": "Harness Engineering", "author": "Barbaste · Darrigol · Vu · Wiltberger" } },
+    { "id": "illustrated", "title": "An Illustrated Guide to AI Agents", "author": "Maarten Grootendorst, Jay Alammar", "status": "reading", "progress": 71, "pages": 448,
+      "spine": { "style": "oreilly", "bg": "#fdfdfb", "ink": "#1f3b66", "muted": "#444444", "kicker": "An Illustrated Guide to", "title": "AI Agents", "author": "Grootendorst · Alammar", "animal": [0, 0.05, 0.52, 0.34] } },
+    { "id": "albada", "title": "Building Applications with AI Agents", "author": "Michael Albada", "status": "reading", "progress": 7, "pages": 390,
+      "spine": { "style": "oreilly", "bg": "#fdfdfb", "ink": "#111111", "muted": "#444444", "title": "Building Applications with AI Agents", "author": "Albada", "animal": [0.1, 0.42, 0.76, 0.48] } },
+    { "id": "skills", "title": "Agent Skills", "author": "Lucas B. Nicolosi Soares", "status": "reading", "progress": 10, "pages": 220,
+      "spine": { "style": "oreilly", "bg": "#fdfdfb", "ink": "#111111", "muted": "#444444", "title": "Agent Skills", "author": "Nicolosi Soares", "animal": [0.06, 0.56, 0.9, 0.32] } },
+    { "id": "graph", "title": "Graph Engineering — The Loop Memory Model", "author": "Volodymyr Pavlyshyn", "status": "reading", "progress": 1, "pages": 138,
+      "spine": { "style": "packt", "bg": "#0c1830", "gradient": "linear-gradient(180deg, #16304f, #0c1830 55%, #0a1426)", "ink": "#ffffff", "muted": "#c8d3e6", "title": "Graph Engineering", "sub": "The Loop Memory Model", "author": "Volodymyr Pavlyshyn" } },
+    { "id": "definitive", "title": "AI Agents: The Definitive Guide", "author": "Nicole Koenigstein", "status": "unread", "progress": 0, "pages": 350,
+      "spine": { "style": "oreilly", "bg": "#fdfdfb", "ink": "#111111", "muted": "#444444", "title": "AI Agents", "sub": "The Definitive Guide", "author": "Koenigstein", "animal": [0, 0.06, 0.7, 0.37] } },
+    { "id": "senior", "title": "Claude Code para ingenieros senior", "author": "Luis González", "status": "finished", "progress": 100, "pages": 30, "kind": "Own work",
+      "spine": { "style": "tag", "tag": "Own work", "bg": "#1f2a24", "ink": "#f4efe3", "muted": "#c9c2b2", "serif": true, "rule": "#d97757", "title": "Claude Code para ingenieros senior", "author": "Luis González" } }
+  ]
+}

@@ -1,0 +1,148 @@
+/* Perfil público (experimento, 23-nov-2026): la estantería de un lector, con los libros en 3D.
+   Colores, tipos y radios de app/css/themes.css. Los únicos valores a mano son los de los
+   OBJETOS (papel, cantos de las páginas, sombra en el suelo): son iguales en los dos temas
+   porque un libro no cambia de color con el tema, y viven aquí como tokens con nombre. */
+:root {
+  --pf-paper: #fbf8f1;        /* página del libro abierto */
+  --pf-paper-inside: #f4efe3; /* cara interior de la tapa */
+  --pf-paper-ink: #24211c;    /* texto impreso sobre el papel */
+  --pf-paper-soft: #5d5547;
+  --pf-paper-line: #8c7f6a;   /* ex libris y filetes */
+  --pf-edge-a: #f3eee2;       /* cantos de las hojas, en bandas */
+  --pf-edge-b: #ddd5c2;
+  --pf-floor: rgba(20, 16, 10, 0.20);
+  --pf-cover-shadow: 0 30px 60px -28px rgba(20, 16, 10, 0.55);
+  --pf-oreilly: #d3002d;      /* logos de editorial en el lomo */
+  --pf-packt: #ff6a13;
+  --pf-arxiv: #b31b1b;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --pf-floor: rgba(0, 0, 0, 0.55); }
+}
+:root[data-theme="dark"] { --pf-floor: rgba(0, 0, 0, 0.55); }
+
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--surface-0); color: var(--text);
+  font-family: var(--font-ui); font-size: var(--fs-md); line-height: 1.5;
+  overflow-x: hidden;
+}
+a { color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.pf-pad { padding-left: max(var(--s-4), env(safe-area-inset-left, 0px)); padding-right: max(var(--s-4), env(safe-area-inset-right, 0px)); }
+@media (min-width: 720px) { .pf-pad { padding-left: var(--s-8); padding-right: var(--s-8); } }
+main { max-width: 1240px; margin: 0 auto; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-5); padding-bottom: var(--s-8); }
+main > * { min-width: 0; }
+
+.pf-nav { max-width: 1240px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; gap: var(--s-3); padding: var(--s-4) max(var(--s-4), env(safe-area-inset-right, 0px)) var(--s-4) max(var(--s-4), env(safe-area-inset-left, 0px)); }
+@media (min-width: 720px) { .pf-nav { padding-left: var(--s-8); padding-right: var(--s-8); } }
+.pf-brand { display: inline-flex; align-items: center; gap: var(--s-2); font-weight: 600; text-decoration: none; }
+.pf-btn { display: inline-flex; align-items: center; font: inherit; font-weight: 600; font-size: var(--fs-sm); border-radius: var(--r-pill); padding: var(--s-2) var(--s-4); border: 1px solid var(--border); background: var(--surface-1); color: var(--text); cursor: pointer; text-decoration: none; }
+.pf-btn--primary { background: var(--btn-bg); color: var(--btn-ink); border-color: var(--btn-bg); }
+.pf-btn--primary:hover { background: var(--btn-bg-hover); }
+
+.pf-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s-4); flex-wrap: wrap; padding-top: var(--s-4); }
+.pf-who { display: flex; gap: var(--s-3); align-items: center; min-width: 0; }
+.pf-avatar { width: 48px; height: 48px; border-radius: 50%; display: grid; place-items: center; font-family: var(--font-display); font-weight: 600; font-size: var(--fs-xl); background: var(--accent-soft); color: var(--accent); flex: none; }
+.pf-who h1 { font-family: var(--font-display); font-weight: 600; font-size: var(--fs-2xl); margin: 0; line-height: 1.2; }
+.pf-who p { margin: 2px 0 0; color: var(--text-soft); font-size: var(--fs-sm); }
+.pf-now { display: flex; align-items: center; gap: var(--s-2); font-size: var(--fs-sm); color: var(--text-soft); background: var(--surface-3); border-radius: var(--r-pill); padding: 6px 6px 6px 14px; min-width: 0; max-width: 100%; }
+.pf-now b { color: var(--text); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pf-now > span { white-space: nowrap; }
+.pf-now .pf-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); flex: none; animation: pf-pulse 2.4s infinite; }
+@keyframes pf-pulse { 0% { box-shadow: 0 0 0 0 var(--accent-soft); } 70% { box-shadow: 0 0 0 8px transparent; } 100% { box-shadow: 0 0 0 0 transparent; } }
+.pf-now button { font: inherit; font-size: var(--fs-xs); font-weight: 600; border: 0; border-radius: var(--r-pill); padding: 4px 10px; background: var(--surface-1); color: var(--text); cursor: pointer; flex: none; }
+
+.pf-shelf { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-3); }
+.pf-shelf-h { display: flex; align-items: end; justify-content: space-between; gap: var(--s-3); flex-wrap: wrap; }
+.pf-shelf-h h2 { font-family: var(--font-display); font-size: var(--fs-2xl); font-weight: 600; margin: 0; }
+.pf-filters { display: inline-flex; gap: 2px; padding: 4px; border: 1px solid var(--border); border-radius: var(--r-pill); background: var(--surface-1); max-width: 100%; overflow-x: auto; }
+.pf-filters button { font: inherit; font-size: var(--fs-sm); font-weight: 500; border: 0; background: transparent; color: var(--text-soft); padding: 6px 14px; border-radius: var(--r-pill); cursor: pointer; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.pf-filters button[aria-selected="true"] { background: var(--btn-bg); color: var(--btn-ink); }
+.pf-filters button span { opacity: .6; margin-left: 4px; }
+
+/* ---------- La cinta: libros 3D en fila ---------- */
+.pf-tape-wrap { position: relative; height: calc(var(--H, 380px) + 90px); perspective: 1700px; perspective-origin: 50% 35%; overflow: hidden; touch-action: pan-y; outline: none; user-select: none; -webkit-user-select: none; }
+.pf-tape-wrap:focus-visible { box-shadow: inset 0 0 0 2px var(--accent); }
+.pf-tape { position: absolute; left: 0; right: 0; bottom: 70px; height: 0; transform-style: preserve-3d; }
+.pf-floor { position: absolute; left: -10%; right: -10%; bottom: 30px; height: 70px; background: radial-gradient(60% 100% at 50% 0%, var(--pf-floor), transparent 70%); pointer-events: none; }
+.pf-bk { all: unset; position: absolute; left: 0; bottom: 0; width: var(--t); height: var(--h); transform-style: preserve-3d; transition: transform .75s cubic-bezier(.2,.8,.2,1), opacity .45s, filter .45s; cursor: pointer; will-change: transform; }
+.pf-lift { position: absolute; inset: 0; transform-style: preserve-3d; transition: transform .3s cubic-bezier(.2,.8,.2,1); }
+.pf-bk:not(.is-active):hover .pf-lift { transform: translateY(-14px); }
+.pf-bk:focus-visible .pf-spine { outline: 2px solid var(--accent); outline-offset: 3px; }
+.pf-bk.is-dim { opacity: .22; filter: saturate(.2); }
+.pf-face { position: absolute; left: 50%; top: 50%; backface-visibility: hidden; }
+.pf-spine { width: var(--t); height: var(--h); transform: translate(-50%, -50%) translateZ(calc(var(--d) / 2)); background: var(--spbg); color: var(--ink); display: flex; flex-direction: column; align-items: center; overflow: hidden; border-radius: 2px; -webkit-box-reflect: below 1px linear-gradient(transparent 82%, rgba(0,0,0,.16)); }
+.pf-spine::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, rgba(0,0,0,.18), rgba(255,255,255,.12) 22%, rgba(255,255,255,0) 50%, rgba(0,0,0,.14)); pointer-events: none; }
+.pf-cover { width: var(--d); height: var(--h); transform: translate(-50%, -50%) rotateY(90deg) translateZ(calc(var(--t) / 2)); background: var(--img) center / 100% 100% no-repeat, var(--sp); border-radius: 1px 4px 4px 1px; box-shadow: var(--pf-cover-shadow); -webkit-box-reflect: below 1px linear-gradient(transparent 85%, rgba(0,0,0,.12)); }
+.pf-cover::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, rgba(0,0,0,.22), rgba(255,255,255,.18) 1.4%, rgba(0,0,0,.06) 3%, transparent 6%, transparent 92%, rgba(0,0,0,.08)); border-radius: inherit; }
+.pf-back { width: var(--d); height: var(--h); transform: translate(-50%, -50%) rotateY(-90deg) translateZ(calc(var(--t) / 2)); background: var(--sp); filter: brightness(.72); }
+.pf-top { width: var(--t); height: var(--d); transform: translate(-50%, -50%) rotateX(90deg) translateZ(calc(var(--h) / 2)); background: repeating-linear-gradient(90deg, var(--pf-edge-a) 0 1px, var(--pf-edge-b) 1px 2px); border-left: 2px solid var(--sp); border-right: 2px solid var(--sp); }
+.pf-fore { width: var(--t); height: var(--h); transform: translate(-50%, -50%) rotateY(180deg) translateZ(calc(var(--d) / 2)); background: repeating-linear-gradient(90deg, var(--pf-edge-a) 0 1px, var(--pf-edge-b) 1px 2px); }
+
+/* Lomos: imitan el de cada editorial (O'Reilly, Packt, arXiv) o la portada propia. */
+.pf-sp-title { flex: 1 1 auto; min-height: 0; writing-mode: vertical-rl; font-weight: 700; font-size: var(--fs); line-height: 1.12; padding: 12px 0 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; position: relative; z-index: 1; }
+.pf-sp-title.is-serif { font-family: var(--font-display); font-weight: 600; }
+.pf-sp-title.is-two { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.pf-sp-title.is-stack { white-space: normal; }
+.pf-sp-title.is-stack > span { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pf-sp-title.is-stack .k { font-size: calc(var(--fs) * .5); font-weight: 500; }
+.pf-sp-title.is-stack .k:first-child { margin-left: 4px; }
+.pf-sp-title.is-stack .m + .k { margin-right: 3px; }
+.pf-sp-auth { flex: none; writing-mode: vertical-rl; font-size: clamp(7px, calc(var(--t) * .14), 10.5px); font-weight: 500; color: var(--muted); padding: 4px 0 8px; max-height: 36%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; position: relative; z-index: 1; }
+.pf-sp-animal { flex: none; width: var(--aw); height: var(--ah); margin-top: 7px; background-image: var(--img); background-repeat: no-repeat; background-size: var(--abs); background-position: var(--abp); position: relative; z-index: 1; }
+.pf-sp-rule { flex: none; width: 46%; height: 3px; margin-top: 14px; background: var(--rc); border-radius: 1px; position: relative; z-index: 1; }
+.pf-sp-logo { flex: none; padding: 2px 0 11px; white-space: nowrap; position: relative; z-index: 1; line-height: 1; }
+.pf-sp-logo.oreilly { color: var(--pf-oreilly); font-weight: 700; font-size: clamp(5.5px, calc(var(--t) * .155), 11px); letter-spacing: -.01em; }
+.pf-sp-logo.packt { color: var(--pf-packt); font-weight: 600; font-size: clamp(6px, calc(var(--t) * .2), 13px); }
+.pf-sp-logo.arxiv { color: var(--pf-arxiv); font-family: var(--font-display); font-size: clamp(6px, calc(var(--t) * .22), 11px); }
+.pf-sp-logo.tag { writing-mode: vertical-rl; font-size: clamp(6px, calc(var(--t) * .2), 9px); font-weight: 600; letter-spacing: .16em; text-transform: uppercase; color: var(--muted); }
+
+/* ---------- El libro abierto ---------- */
+.pf-ob { position: absolute; left: 50%; bottom: 70px; width: var(--od); height: var(--oh); margin-left: calc(var(--od) / -2); transform-style: preserve-3d; transform: translateZ(var(--oz, 0px)); transition: transform .8s cubic-bezier(.2,.8,.2,1); pointer-events: none; }
+.pf-ob.is-shown { pointer-events: auto; }
+.pf-ob.is-open { transform: translateX(calc(var(--od) / 2)) translateZ(calc(var(--oz, 0px) + 30px)); }
+.pf-ob-page { position: absolute; inset: 0; background: var(--pf-paper); color: var(--pf-paper-ink); border-radius: 1px 4px 4px 1px; box-shadow: var(--pf-cover-shadow), inset 14px 0 18px -14px rgba(0,0,0,.25); padding: clamp(14px, 7%, 30px); display: flex; flex-direction: column; gap: 10px; overflow: hidden; opacity: 0; transition: opacity .2s .1s; }
+.pf-ob.is-shown .pf-ob-page { opacity: 1; }
+.pf-ob-cover { position: absolute; inset: 0; transform-origin: 0 50%; transform-style: preserve-3d; transition: transform .8s cubic-bezier(.3,.7,.2,1); }
+.pf-ob.is-open .pf-ob-cover { transform: rotateY(-172deg); }
+.pf-ob-front, .pf-ob-inside { position: absolute; inset: 0; backface-visibility: hidden; border-radius: 1px 4px 4px 1px; }
+.pf-ob-front { background: var(--img) center / 100% 100% no-repeat, var(--pf-paper-inside); }
+.pf-ob-inside { transform: rotateY(180deg); background: var(--pf-paper-inside); color: var(--pf-paper-soft); display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 10px; text-align: center; padding: 12%; font-size: var(--fs-2xs); box-shadow: inset -14px 0 18px -14px rgba(0,0,0,.25); }
+.pf-exlibris { border: 1.5px solid var(--pf-paper-line); border-radius: var(--r-xs); padding: 14px 16px; display: grid; gap: 4px; }
+.pf-exlibris small { font-size: var(--fs-2xs); letter-spacing: .18em; text-transform: uppercase; color: var(--pf-paper-line); }
+.pf-exlibris b { font-family: var(--font-display); font-size: var(--fs-lg); font-weight: 600; color: var(--pf-paper-ink); }
+.pf-ob-num { font-size: var(--fs-2xs); font-weight: 600; letter-spacing: .14em; color: var(--pf-paper-line); text-transform: uppercase; }
+.pf-ob-title { font-family: var(--font-display); font-weight: 600; font-size: var(--fs-xl); line-height: 1.15; text-wrap: balance; }
+.pf-ob-auth { font-size: var(--fs-xs); color: var(--pf-paper-soft); }
+.pf-ob-kind { align-self: flex-start; font-size: var(--fs-2xs); letter-spacing: .1em; text-transform: uppercase; font-weight: 600; color: var(--pf-paper-soft); border: 1px solid var(--pf-paper-line); border-radius: var(--r-pill); padding: 1px 8px; }
+.pf-ob-state { margin-top: auto; display: grid; gap: 6px; font-size: var(--fs-xs); color: var(--pf-paper-soft); font-variant-numeric: tabular-nums; }
+.pf-ob-track { height: 6px; border-radius: var(--r-pill); background: var(--pf-edge-b); overflow: hidden; }
+.pf-ob-track i { display: block; height: 100%; width: 0; background: var(--accent); border-radius: inherit; transition: width .9s .5s cubic-bezier(.2,.8,.2,1); }
+.pf-ob-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.pf-ob-actions button { font: inherit; font-size: var(--fs-xs); font-weight: 600; border-radius: var(--r-pill); padding: 6px 12px; cursor: pointer; border: 1px solid var(--pf-paper-line); background: transparent; color: var(--pf-paper-ink); }
+
+.pf-navrow { display: flex; align-items: center; justify-content: center; gap: var(--s-3); margin-top: -8px; }
+.pf-arrow { width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--border); background: var(--surface-1); color: var(--text); display: grid; place-items: center; cursor: pointer; }
+.pf-arrow:disabled { opacity: .35; cursor: default; }
+.pf-arrow svg { width: 18px; height: 18px; }
+.pf-count { font-variant-numeric: tabular-nums; font-size: var(--fs-sm); color: var(--text-soft); min-width: 64px; text-align: center; }
+.pf-count b { color: var(--text); }
+.pf-caption { text-align: center; display: grid; gap: 2px; min-height: 56px; }
+.pf-caption .ct { font-family: var(--font-display); font-weight: 600; font-size: var(--fs-lg); text-wrap: balance; }
+.pf-caption .cs { color: var(--text-soft); font-size: var(--fs-sm); }
+.pf-chip { display: inline-block; margin-left: 6px; font-size: var(--fs-xs); font-weight: 500; padding: 1px 8px; border-radius: var(--r-pill); background: var(--surface-3); color: var(--text-soft); }
+.pf-chip.is-reading { background: var(--accent-soft); color: var(--accent); }
+.pf-keys { text-align: center; font-size: var(--fs-xs); color: var(--text-faint); margin: 0; }
+.pf-keys kbd { font-family: var(--font-mono); font-size: var(--fs-2xs); border: 1px solid var(--border); border-bottom-width: 2px; border-radius: var(--r-xs); padding: 0 5px; background: var(--surface-1); }
+.pf-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+.pf-foot { display: grid; gap: var(--s-3); justify-items: start; border-top: 1px solid var(--border-soft); padding-top: var(--s-6); margin-top: var(--s-4); }
+.pf-foot p { margin: 0; color: var(--text-soft); max-width: 60ch; }
+.pf-made { font-size: var(--fs-xs); color: var(--text-faint) !important; }
+.pf-made a { color: var(--accent); }
+
+@media (prefers-reduced-motion: reduce) {
+  .pf-bk, .pf-lift, .pf-ob, .pf-ob-cover, .pf-ob-track i { transition: none !important; }
+  .pf-now .pf-dot { animation: none; }
+}

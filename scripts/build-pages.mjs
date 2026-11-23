@@ -43,6 +43,8 @@ const PUBLIC = [
   'assets',
   'u',
   's',
+  // Perfil público de prueba (experimento del 23-nov-2026): estantería de Luis + widget now.svg.
+  '@luis',
 ];
 
 // Rutas que NO se despliegan aunque cuelguen de PUBLIC. Siguen en el repo; lo que se
