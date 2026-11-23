@@ -13,12 +13,29 @@
       "kind": "Paper · arXiv",
       "spine": {
         "style": "arxiv",
-        "bg": "#fbfaf7",
+        "bg": "#f6f3ec",
         "ink": "#111111",
         "muted": "#555555",
         "serif": true,
         "title": "Harness Engineering",
         "author": "Barbaste · Darrigol · Vu · Wiltberger"
+      },
+      "cover": {
+        "type": "paper",
+        "source": "arXiv",
+        "accent": "#b31b1b",
+        "id": "2609.00006",
+        "area": "cs.SE",
+        "title": "Harness Engineering",
+        "subtitle": "Anatomy, Architecture, and Evolution of Coding Agents",
+        "note": "A source-code study of eleven systems",
+        "authors": [
+          "Paul Barbaste",
+          "Tristan Darrigol",
+          "Germain Vu",
+          "Tom Wiltberger"
+        ],
+        "date": "July 2026"
       }
     },
     {

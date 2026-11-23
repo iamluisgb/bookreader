@@ -99,10 +99,11 @@ main > * { min-width: 0; }
 .pf-spine.is-oreilly .pf-sp-title { font-weight: 500; letter-spacing: -.01em; padding: 14px 0 10px; }
 .pf-spine.is-oreilly .pf-sp-title.is-two { display: block; white-space: nowrap; line-height: 1.1; }
 .pf-spine.is-oreilly .pf-sp-auth { font-weight: 400; font-size: clamp(6px, calc(var(--t) * .16), 12px); padding: 6px 0 12px; max-height: 24%; }
-.pf-sp-omark { flex: none; width: calc(var(--t) * .62); margin-top: calc(var(--t) * .2 + 4px); color: var(--pf-oreilly); position: relative; z-index: 1; }
+/* La «O’» y el logo miden lo mismo en todos los libros (dependen del alto, no del grosor), como en los reales. */
+.pf-sp-omark { flex: none; width: min(calc(var(--h) * .085), calc(var(--t) - 10px)); margin-top: calc(var(--h) * .035); color: var(--pf-oreilly); position: relative; z-index: 1; }
 .pf-sp-omark svg { display: block; width: 100%; height: auto; }
 .pf-sp-ed { flex: none; margin-top: 6px; font-size: clamp(4px, calc(var(--t) * .09), 7px); letter-spacing: .04em; text-transform: uppercase; color: var(--muted); white-space: nowrap; position: relative; z-index: 1; }
-.pf-sp-logo.oreilly { writing-mode: vertical-rl; color: var(--pf-oreilly); font-weight: 600; font-size: clamp(6px, calc(var(--t) * .2), 13px); letter-spacing: .02em; padding-bottom: 12px; }
+.pf-sp-logo.oreilly { writing-mode: vertical-rl; color: var(--pf-oreilly); font-weight: 600; font-size: min(calc(var(--h) * .03), calc(var(--t) * .32)); letter-spacing: .02em; padding-bottom: 12px; }
 .pf-sp-logo.packt { color: var(--pf-packt); font-weight: 600; font-size: clamp(6px, calc(var(--t) * .2), 13px); }
 .pf-sp-logo.arxiv { color: var(--pf-arxiv); font-family: var(--font-display); font-size: clamp(6px, calc(var(--t) * .22), 11px); }
 .pf-sp-logo.tag { writing-mode: vertical-rl; font-size: clamp(6px, calc(var(--t) * .2), 9px); font-weight: 600; letter-spacing: .16em; text-transform: uppercase; color: var(--muted); }

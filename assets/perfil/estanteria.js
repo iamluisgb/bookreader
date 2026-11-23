@@ -4,6 +4,7 @@
 // flechas, el teclado, arrastrando o con la rueda horizontal. Solo títulos, autores, estado y
 // portadas: nada del contenido de los libros.
 import { escapeHtml as esc } from '../../app/js/ui/escape.js';
+import { paperCover } from './portada-paper.js';
 
 // Absoluta: un url() relativo dentro de una variable CSS se resuelve contra la hoja que la usa
 // (assets/perfil/), no contra la página.
@@ -31,7 +32,8 @@ function statusLabel(b) {
   return `Reading · ${b.progress}%`;
 }
 function matches(b) { return FILTERS.find(f => f.id === state.filter).test(b); }
-function coverUrl(b) { return `${COVERS}${b.id}.webp`; }
+// Un paper no trae portada: se dibuja con sus metadatos (portada-paper.js) en vez de usar un fichero.
+function coverUrl(b) { return b.coverData || `${COVERS}${b.id}.webp`; }
 
 function loadAspect(b) {
   return new Promise(res => {
@@ -284,6 +286,10 @@ async function start() {
   const res = await fetch('perfil.json', { cache: 'no-cache' });
   const data = await res.json();
   BOOKS = data.books;
+  if (BOOKS.some(b => b.cover?.type === 'paper')) {
+    await Promise.all(['600 52px "Source Serif 4"', '400 24px "Source Serif 4"', '500 16px Inter', '600 13px Inter'].map(f => document.fonts?.load(f).catch(() => null)));
+    for (const b of BOOKS) if (b.cover?.type === 'paper') b.coverData = paperCover(b.cover);
+  }
   await Promise.all(BOOKS.map(loadAspect));
   renderNow(data.now);
   renderFilters();
