@@ -100,7 +100,10 @@ main > * { min-width: 0; }
 
 /* ---------- El libro abierto ---------- */
 .pf-ob { position: absolute; left: 50%; bottom: 70px; width: var(--od); height: var(--oh); margin-left: calc(var(--od) / -2); transform-style: preserve-3d; transform: translateZ(var(--oz, 0px)); transition: transform .8s cubic-bezier(.2,.8,.2,1); pointer-events: none; }
-.pf-ob.is-shown { pointer-events: auto; }
+/* Cerrado no se ve: si no, la tapa del último libro abierto se queda flotando en el centro
+   aunque la cinta pase a otro. */
+.pf-ob { visibility: hidden; }
+.pf-ob.is-shown { pointer-events: auto; visibility: visible; }
 .pf-ob.is-open { transform: translateX(calc(var(--od) / 2)) translateZ(calc(var(--oz, 0px) + 30px)); }
 .pf-ob-page { position: absolute; inset: 0; background: var(--pf-paper); color: var(--pf-paper-ink); border-radius: 1px 4px 4px 1px; box-shadow: var(--pf-cover-shadow), inset 14px 0 18px -14px rgba(0,0,0,.25); padding: clamp(14px, 7%, 30px); display: flex; flex-direction: column; gap: 10px; overflow: hidden; opacity: 0; transition: opacity .2s .1s; }
 .pf-ob.is-shown .pf-ob-page { opacity: 1; }

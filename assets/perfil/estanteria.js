@@ -165,9 +165,10 @@ function closeBook() {
   ob.classList.remove('is-open');
   const el = tape.children[state.active];
   setTimeout(() => {
+    // Si mientras se cerraba se abrió otro libro, este vuelve a la cinta igualmente.
+    if (el && !(state.open && tape.children[state.active] === el)) el.style.opacity = '';
     if (state.open) return;
     ob.classList.remove('is-shown'); ob.setAttribute('aria-hidden', 'true');
-    if (el) el.style.opacity = '';
   }, 780);
 }
 function closeNow() { state.open = false; ob.classList.remove('is-open', 'is-shown'); }
