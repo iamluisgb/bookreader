@@ -98,7 +98,7 @@ main > * { min-width: 0; }
 .pf-spine [class^="pf-sp-"] { text-orientation: sideways; }
 .pf-spine.is-oreilly .pf-sp-title { font-weight: 500; letter-spacing: -.01em; padding: 14px 0 10px; }
 .pf-spine.is-oreilly .pf-sp-title.is-two { display: block; white-space: nowrap; line-height: 1.1; }
-.pf-spine.is-oreilly .pf-sp-auth { font-weight: 400; font-size: clamp(7px, calc(var(--t) * .16), 12px); padding: 6px 0 12px; }
+.pf-spine.is-oreilly .pf-sp-auth { font-weight: 400; font-size: clamp(6px, calc(var(--t) * .16), 12px); padding: 6px 0 12px; max-height: 24%; }
 .pf-sp-omark { flex: none; width: calc(var(--t) * .62); margin-top: calc(var(--t) * .2 + 4px); color: var(--pf-oreilly); position: relative; z-index: 1; }
 .pf-sp-omark svg { display: block; width: 100%; height: auto; }
 .pf-sp-ed { flex: none; margin-top: 6px; font-size: clamp(4px, calc(var(--t) * .09), 7px); letter-spacing: .04em; text-transform: uppercase; color: var(--muted); white-space: nowrap; position: relative; z-index: 1; }

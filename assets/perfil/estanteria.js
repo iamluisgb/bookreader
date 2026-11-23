@@ -71,17 +71,20 @@ function splitInTwo(text) {
   for (let i = 0; i < text.length; i++) if (text[i] === ' ' && (best < 0 || Math.abs(i - mid) < Math.abs(best - mid))) best = i;
   return best < 0 ? esc(text) : `${esc(text.slice(0, best))}<br>${esc(text.slice(best + 1))}`;
 }
-function overflows(el) { return el.scrollHeight > el.clientHeight + 1 || el.scrollWidth > el.clientWidth + 1; }
+function overflows(el) { return el.scrollHeight > el.clientHeight || el.scrollWidth > el.clientWidth + 1; }
 function fitSpines() {
-  for (const el of tape.querySelectorAll('[data-fit]')) {
+  // Primero el autor (franja corta) y luego el título, que se queda con el resto del lomo.
+  const els = [...tape.querySelectorAll('.pf-sp-auth[data-fit]'), ...tape.querySelectorAll('.pf-sp-title[data-fit]')];
+  for (const el of els) {
     const t = parseFloat(el.closest('.pf-bk').style.getPropertyValue('--t'));
     let fs = parseFloat(getComputedStyle(el).fontSize);
-    while (overflows(el) && fs > 7) { fs -= 0.5; el.style.fontSize = fs + 'px'; }
-    if (el.classList.contains('pf-sp-title') && fs < t * 0.24 && t > 40) {
+    while (overflows(el) && fs > 5) { fs -= 0.5; el.style.fontSize = fs + 'px'; }
+    // A dos líneas si en una no cabe, o si en un lomo grueso la letra quedaría diminuta.
+    if (el.classList.contains('pf-sp-title') && t > 24 && (overflows(el) || fs < Math.max(9, t * 0.24))) {
       el.classList.add('is-two');
       el.innerHTML = splitInTwo(el.textContent);
       fs = Math.min(t * 0.3, 22); el.style.fontSize = fs + 'px';
-      while (overflows(el) && fs > 7) { fs -= 0.5; el.style.fontSize = fs + 'px'; }
+      while (overflows(el) && fs > 6) { fs -= 0.5; el.style.fontSize = fs + 'px'; }
     }
   }
 }
