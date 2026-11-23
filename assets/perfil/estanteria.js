@@ -1,4 +1,4 @@
-/* global window, document, location, URL, Image, fetch, requestAnimationFrame, setTimeout, ResizeObserver */
+/* global window, document, location, URL, Image, fetch, getComputedStyle, requestAnimationFrame, setTimeout, ResizeObserver */
 // Perfil público (experimento, 23-nov-2026): pinta la estantería de perfil.json como una cinta
 // de libros en 3D. El activo gira y enseña su portada; pulsándola se abre. Se recorre con las
 // flechas, el teclado, arrastrando o con la rueda horizontal. Solo títulos, autores, estado y
@@ -53,8 +53,42 @@ function dims(b) {
   return { h, t, d: Math.round(h * b.ar) };
 }
 
+// Lomo de O'Reilly tal como es (cubierta completa de Fluent Python 2e, 2022): blanco; arriba la
+// «O’» roja y, si la hay, la edición en gris; el título en negro, en vertical y en una línea, sin
+// subtítulo; el apellido del autor; abajo «O’REILLY» en rojo, también en vertical. Sin animal.
+const OMARK = '<svg viewBox="0 0 40 40" aria-hidden="true"><circle cx="18" cy="22" r="12.5" fill="none" stroke="currentColor" stroke-width="6"/><circle cx="34" cy="6" r="4.2" fill="currentColor"/></svg>';
+function oreillySpine(s, t) {
+  const fs = Math.round(Math.min(t * 0.46, 26));
+  const ed = s.edition ? `<div class="pf-sp-ed">${esc(s.edition)}</div>` : '';
+  return `<div class="pf-face pf-spine is-oreilly"><div class="pf-sp-omark">${OMARK}</div>${ed}<div class="pf-sp-title" data-fit style="--fs:${fs}px">${esc(s.title)}</div><div class="pf-sp-auth" data-fit>${esc(s.author)}</div><div class="pf-sp-logo oreilly">O’REILLY</div></div>`;
+}
+
+// Ajusta cada título al hueco real del lomo: baja la letra hasta que quepa en una línea y, si en
+// un lomo grueso quedaría diminuta, la parte en dos líneas (como hacen los lomos anchos).
+// Parte un título en dos líneas por el espacio más cercano a la mitad.
+function splitInTwo(text) {
+  const mid = text.length / 2; let best = -1;
+  for (let i = 0; i < text.length; i++) if (text[i] === ' ' && (best < 0 || Math.abs(i - mid) < Math.abs(best - mid))) best = i;
+  return best < 0 ? esc(text) : `${esc(text.slice(0, best))}<br>${esc(text.slice(best + 1))}`;
+}
+function overflows(el) { return el.scrollHeight > el.clientHeight + 1 || el.scrollWidth > el.clientWidth + 1; }
+function fitSpines() {
+  for (const el of tape.querySelectorAll('[data-fit]')) {
+    const t = parseFloat(el.closest('.pf-bk').style.getPropertyValue('--t'));
+    let fs = parseFloat(getComputedStyle(el).fontSize);
+    while (overflows(el) && fs > 7) { fs -= 0.5; el.style.fontSize = fs + 'px'; }
+    if (el.classList.contains('pf-sp-title') && fs < t * 0.24 && t > 40) {
+      el.classList.add('is-two');
+      el.innerHTML = splitInTwo(el.textContent);
+      fs = Math.min(t * 0.3, 22); el.style.fontSize = fs + 'px';
+      while (overflows(el) && fs > 7) { fs -= 0.5; el.style.fontSize = fs + 'px'; }
+    }
+  }
+}
+
 function spineHtml(b, t, h) {
   const s = b.spine;
+  if (s.style === 'oreilly') return oreillySpine(s, t, h);
   let animal = '';
   if (s.animal) {
     const [cx, cy, cw, ch] = s.animal;
@@ -239,7 +273,7 @@ let lastW = 0;
 try {
   new ResizeObserver(en => {
     const w = Math.round(en[0].contentRect.width);
-    if (Math.abs(w - lastW) > 20 && BOOKS.length) { lastW = w; closeNow(); sizes(); buildTape(); layout(); }
+    if (Math.abs(w - lastW) > 20 && BOOKS.length) { lastW = w; closeNow(); sizes(); buildTape(); fitSpines(); layout(); }
   }).observe(wrapEl);
 } catch { /* sin ResizeObserver: se queda con el tamaño inicial */ }
 
@@ -251,6 +285,8 @@ async function start() {
   renderNow(data.now);
   renderFilters();
   renderList();
-  sizes(); buildTape(); layout();
+  sizes(); buildTape(); fitSpines(); layout();
+  // Las fuentes pueden llegar después del primer ajuste: se reajusta al cargarlas.
+  document.fonts?.ready.then(() => { buildTape(); fitSpines(); layout(); });
 }
 start().catch(() => { $('pf-caption').textContent = 'The shelf could not be loaded. Reload the page to try again.'; });
