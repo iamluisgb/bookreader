@@ -18,11 +18,13 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
   en táctil, con las barras a la vista (viewport encogido), el salto a un CFI que abre página
   aterrizaba una página antes con guiones (`reader-scale-position.spec.ts`, 3 de 3); sin
   encoger iba bien. Queda pendiente arreglar esa medida para encenderlos también en el móvil.
-- **Minimapa** (`ui/minimap.js`): carril en el borde derecho con cada subrayado en su color a la
-  altura que ocupa en el libro entero, los capítulos de primer nivel como rayas y «estás aquí».
-  Al pasar el ratón enseña el texto y la nota; el clic salta. Las páginas salen de las mismas
-  localizaciones que el índice (EPUB) o de la página (PDF). Solo con ratón: en táctil el borde es
-  del gesto de pasar página.
+- **Subrayados en la barra del pie** (`ui/minimap.js`): cada subrayado es una muesca de su
+  color sobre la barra de progreso y cada capítulo de primer nivel, una muesca gris. Al pasar el
+  ratón o arrastrar cerca de una, la burbuja enseña la cita y la nota; soltar encima salta al
+  subrayado (o al inicio del capítulo) exacto, no a la fracción. Radio de imán 6 px con ratón,
+  14 px con el dedo, así que también funciona en el móvil. Empezó el mismo día como carril
+  vertical en el borde derecho; se pasó al pie porque la barra ya es el mapa del libro, es más
+  ancha y existe también en táctil.
 - **Paleta de comandos** (`ui/command-palette.js`, ⌘K / Ctrl+K, también con el foco dentro del
   iframe del libro): acciones del libro y de la app, temas, modos de lectura, letra y alineación;
   al escribir, también capítulos del índice y libros de la biblioteca que estén en el

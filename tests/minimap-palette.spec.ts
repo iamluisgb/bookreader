@@ -1,7 +1,7 @@
 import { test, expect, Page } from '@playwright/test';
 import path from 'path';
 
-// Tipografía del libro, minimapa (ui/minimap.js) y paleta de comandos (ui/command-palette.js).
+// Tipografía del libro, marcas de la barra de progreso (ui/minimap.js) y paleta de comandos (ui/command-palette.js).
 // El libro tiene índice de primer nivel (3 capítulos), así que el minimapa pinta rayas de
 // capítulo además de los subrayados.
 const EPUB = path.join(__dirname, 'oreilly-like.epub');
@@ -34,7 +34,7 @@ test('el libro se compone justificado, con guiones y cifras de estilo antiguo; e
   await expect(page.locator('.align-btn[data-align="start"]')).toHaveAttribute('aria-checked', 'true');
 });
 
-test('minimapa: un subrayado y los capítulos en el borde; el clic salta al subrayado', async ({ page }) => {
+test('marcas en la barra del pie: subrayado y capítulos; la burbuja lo enseña y soltar encima salta a él', async ({ page }) => {
   await openBook(page);
   const target = await page.evaluate(async () => {
     const E = await import('/js/epub-reader.js');
@@ -47,27 +47,30 @@ test('minimapa: un subrayado y los capítulos en el borde; el clic salta al subr
     return cfi;
   });
 
-  const rail = page.locator('#reader-minimap');
-  await expect(rail).toBeVisible();
-  await expect(rail.locator('.minimap-mark--hl')).toHaveCount(1);
-  await expect(rail.locator('.minimap-mark--ch')).toHaveCount(3);
+  const marks = page.locator('#progress-marks');
+  await expect(marks.locator('.progress-mark--hl')).toHaveCount(1);
+  await expect(marks.locator('.progress-mark--ch')).toHaveCount(3);
 
-  const mark = rail.locator('.minimap-mark--hl');
-  await mark.hover();
-  await expect(page.locator('.minimap-tip')).toContainText('Un pasaje subrayado al final');
-  await expect(page.locator('.minimap-tip')).toContainText('Mi nota');
+  // Apuntar unos píxeles al lado de la muesca: la barra se pega a ella.
+  const box = (await marks.locator('.progress-mark--hl').boundingBox())!;
+  const x = box.x + box.width / 2 + 3, y = box.y + box.height / 2;
+  await page.mouse.move(x, y);
+  const bubble = page.locator('#progress-bubble');
+  await expect(bubble).toContainText('Un pasaje subrayado al final');
+  await expect(bubble).toContainText('Mi nota');
 
-  await mark.click();
+  await page.mouse.down();
+  await page.mouse.up();
   await expect.poll(() => page.evaluate(async () => (await import('/js/epub-reader.js')).getCurrentCfi()))
     .toBe(target);
 });
 
-test('minimapa: en táctil no se pinta (el borde es del gesto de pasar página)', async ({ browser }) => {
-  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, locale: 'es-ES' });
-  const page = await ctx.newPage();
+test('lejos de una marca, la barra salta a la fracción como siempre', async ({ page }) => {
   await openBook(page);
-  await expect(page.locator('#reader-minimap')).toBeHidden();
-  await ctx.close();
+  const before = await page.locator('#progress-page').textContent();
+  const bar = (await page.locator('#progress-container').boundingBox())!;
+  await page.mouse.click(bar.x + bar.width * 0.65, bar.y + bar.height / 2);
+  await expect(page.locator('#progress-page')).not.toHaveText(before || '');
 });
 
 test('paleta: Ctrl+K abre, filtra sin acentos, ejecuta con Intro y Escape cierra', async ({ page }) => {

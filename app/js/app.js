@@ -1854,7 +1854,6 @@ async function loadEpub(buffer, bookId, aiBookId, persist = null) {
       updateBookmarkButton();
       updateProgressDetail(pct, totalWords);
       saveProgress(pct);
-      Minimap.setPosition(pct / 100);
       syncRouteSoon();               // reflejar la posición en la URL (deep-link)
       ReadingLog.position(unit);     // P25: cuánto de esto fue lectura, lo decide él
       // La marca va por SECCIÓN, no por fichero: en scroll epub.js solo avisa de cambio de
@@ -1987,7 +1986,6 @@ async function loadPdf(buffer, bookId, aiBookId, persist = null, displayTitle = 
       const pct = Math.round((page / pages) * 100);
       updateProgressDetail(pct, totalWords);
       saveProgress(pct);
-      Minimap.setPosition(pages > 1 ? (page - 1) / (pages - 1) : 0);
     });
 
     await PdfReader.load(buffer, null, Aliases.canonicalOf(aiBookId));
@@ -2242,9 +2240,10 @@ async function fillTocPages() {
   }
 }
 
-// ============ MINIMAPA ============
-// Subrayados y capítulos de primer nivel en el borde derecho, a la altura que ocupan en el
-// libro entero (ui/minimap.js pinta; aquí se calculan las fracciones). Las páginas salen
+// ============ MARCAS DE LA BARRA DE PROGRESO ============
+// Subrayados y capítulos de primer nivel sobre la barra del pie, donde caen en el libro
+// entero (ui/minimap.js pinta; aquí se calculan las fracciones; la burbuja y el salto los
+// lleva initProgressScrub). Las páginas salen
 // del mismo sitio que las del índice —las localizaciones de epub.js en EPUB, la página en
 // PDF—, así que la raya de un capítulo cae donde el índice dice que empieza.
 let minimapTimer = null;
@@ -2294,7 +2293,6 @@ function refreshMinimap() {
   } else { Minimap.clear(); return; }
   const frac = (page) => (total > 1 ? (page - 1) / (total - 1) : 0);
   Minimap.setMarks(marks.map((m) => ({ ...m, f: frac(m.page) })));
-  Minimap.setPosition(getCurrentPct() / 100);
 }
 
 // ============ PALETA DE COMANDOS (⌘K) ============
@@ -2397,8 +2395,16 @@ function initProgressScrub() {
 
   // `movePct`: al ARRASTRAR, el % de la fila acompaña al pulgar; al pasar el ratón
   // por encima no, porque la barra no se ha movido y mentiría sobre dónde estás.
+  // Cerca de una marca (subrayado o capítulo) la burbuja la enseña y soltar salta a ella.
+  // Radio en píxeles de la barra: el dedo es más gordo que el puntero.
+  const snapRadius = (e) => (e && e.pointerType === 'touch' ? 14 : 6);
+  let snapPx = 6;
+  const markAt = (f) => Minimap.nearest(f, snapPx);
+
   const showBubble = (f, { movePct = true } = {}) => {
     if (!bubble) return;
+    const mark = markAt(f);
+    if (mark) f = mark.f;   // la burbuja (y el pulgar al arrastrar) se pegan a la marca
     const info = preview(f);
     const pct = Math.round(f * 100);
     // Sin localizaciones aún (EPUB recién abierto) la página no se puede saber:
@@ -2415,6 +2421,20 @@ function initProgressScrub() {
       small.textContent = info.chapter;
       bubble.appendChild(small);
     }
+    if (mark?.kind === 'hl') {
+      const q = document.createElement('span');
+      q.className = 'progress-bubble-quote';
+      q.style.setProperty('--mm-color', mark.color || '');
+      q.textContent = mark.label.length > 160 ? mark.label.slice(0, 157).trimEnd() + '…' : mark.label;
+      bubble.appendChild(q);
+      if (mark.sub && mark.sub !== info?.chapter) {
+        const n = document.createElement('span');
+        n.className = 'progress-bubble-note';
+        n.textContent = mark.sub;
+        bubble.appendChild(n);
+      }
+    }
+    bubble.classList.toggle('progress-bubble--mark', !!mark);
     // El % de la fila acompaña al arrastre: verlo clavado en "0%" con la barra a
     // media altura parece un fallo. El salto al soltar lo devuelve a la verdad.
     if (movePct && pctText) pctText.textContent = `${pct}%`;
@@ -2437,6 +2457,7 @@ function initProgressScrub() {
     if (!EpubReader.isLoaded() && !PdfReader.isLoaded()) return;
     const f = fractionAt(e.clientX);
     if (f === null) return;
+    snapPx = snapRadius(e);
     dragging = true;
     widthBeforeDrag = bar.style.width;
     pctBeforeDrag = pctText?.textContent || '';
@@ -2465,13 +2486,14 @@ function initProgressScrub() {
     if (!dragging) {
       // El táctil no tiene hover: ahí la burbuja es cosa del arrastre.
       if (e.pointerType !== 'touch' && (EpubReader.isLoaded() || PdfReader.isLoaded())) {
+        snapPx = snapRadius(e);
         hoverPreview(e.clientX);
       }
       return;
     }
     const f = fractionAt(e.clientX);
     if (f === null) return;
-    bar.style.width = `${f * 100}%`;
+    bar.style.width = `${(markAt(f)?.f ?? f) * 100}%`;
     showBubble(f);
   };
 
@@ -2494,6 +2516,10 @@ function initProgressScrub() {
     };
     if (f === null) { restore(); return; }
     restore();
+    // Soltar sobre una marca salta a ELLA (el CFI del subrayado, el inicio del capítulo),
+    // no a la fracción: la fracción solo cae «por ahí» y el pasaje quedaría fuera de vista.
+    const mark = markAt(f);
+    if (mark) { try { await mark.go(); } catch (err) { console.warn('marca: salto fallido', err); } return; }
     if (EpubReader.isLoaded()) await EpubReader.seekToFraction(f);
     else if (PdfReader.isLoaded()) await PdfReader.seekToFraction(f);
   };
