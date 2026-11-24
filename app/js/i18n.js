@@ -1571,6 +1571,7 @@ const EN = {
   'Leyendo ahora': 'Reading now',
   'Lomo': 'Spine',
   'Lomo: automático': 'Spine: automatic',
+  'Enseñar los filtros por estado (Todos, Leyendo, Terminados…)': 'Show the status filters (All, Reading, Finished…)',
   'color de la portada': 'cover colour',
   'Lomo: color de la portada': 'Spine: cover colour',
   'Lomo: O’Reilly': 'Spine: O’Reilly',

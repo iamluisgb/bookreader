@@ -48,7 +48,7 @@ main > * { min-width: 0; }
 .pf-who p { margin: 2px 0 0; color: var(--text-soft); font-size: var(--fs-sm); }
 .pf-now { display: flex; align-items: center; gap: var(--s-2); font-size: var(--fs-sm); color: var(--text-soft); background: var(--surface-3); border-radius: var(--r-pill); padding: 6px 6px 6px 14px; min-width: 0; max-width: 100%; }
 /* `hidden` en un elemento con display propio no basta: sin esto ocupaban sitio vacíos. */
-.pf-now[hidden], .pf-tabs[hidden] { display: none; }
+.pf-now[hidden], .pf-tabs[hidden], .pf-filters[hidden] { display: none; }
 .pf-now b { color: var(--text); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .pf-now > span { white-space: nowrap; }
 .pf-now .pf-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); flex: none; animation: pf-pulse 2.4s infinite; }

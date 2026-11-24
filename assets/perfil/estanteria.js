@@ -387,6 +387,8 @@ function selectShelf(i, { fromUrl = false } = {}) {
 async function start() {
   const data = await loadData();
   SHELVES = normalize(data);
+  // Los filtros por estado (All, Reading…) son opcionales: quien publica decide si se ven.
+  $('pf-filters').hidden = data.showFilters === false;
   if (!SHELVES.length) throw new Error('sin libros');
   const all = [...new Set(SHELVES.flatMap(sh => sh.books))];
   if (all.some(b => b.cover?.type === 'paper')) {

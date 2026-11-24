@@ -97,7 +97,8 @@ const gone = prev.books.filter(p => !out.some(b => b.id === p.id)).map(p => p.id
 const shelves = snap.shelves.map(sh => ({ id: sh.id, name: sh.name, books: sh.books.map(id => idMap.get(id)).filter(Boolean) }))
   .filter(sh => sh.books.length);
 const nowBook = out.find(b => b.id === idMap.get(snap.now)) || null;
-const perfil = { owner: prev.owner || 'Luis González', now: nowBook ? nowBook.id : null, shelves, books: out };
+const perfil = { owner: prev.owner || 'Luis González', now: nowBook ? nowBook.id : null,
+  ...(snap.showFilters === false ? { showFilters: false } : {}), shelves, books: out };
 
 // Widget «Reading now»: SVG autocontenido (la portada va dentro en base64) para el README de GitHub.
 const xml = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');

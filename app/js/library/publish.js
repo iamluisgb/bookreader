@@ -44,10 +44,10 @@ export function available() {
 
 // ---- configuración -----------------------------------------------------------
 
-// { updatedAt, enabled, handle, showProgress, now: 'auto'|'none'|<bookId>,
+// { updatedAt, enabled, handle, showProgress, showFilters, now: 'auto'|'none'|<bookId>,
 //   shelves: [{ id, name, books: [{ id, show, style }] }] }   (shelves: solo las públicas, en orden)
 export function emptyConfig() {
-  return { updatedAt: 0, enabled: false, handle: 'luis', showProgress: true, now: 'auto', styleAuto: true, shelves: [] };
+  return { updatedAt: 0, enabled: false, handle: 'luis', showProgress: true, showFilters: true, now: 'auto', styleAuto: true, shelves: [] };
 }
 export function getConfig() {
   const c = Storage.get(CONFIG_KEY, null);
@@ -256,7 +256,7 @@ async function snapshot(config) {
   }
   const nowId = pickNow(config, recsById);
   return { format: 'bookreader-perfil', version: 2, exportedAt: new Date().toISOString(),
-    handle: config.handle, showProgress: config.showProgress,
+    handle: config.handle, showProgress: config.showProgress, showFilters: config.showFilters !== false,
     now: nowId && books.has(nowId.slice(0, 12)) ? nowId.slice(0, 12) : null,
     shelves, books: [...books.values()] };
 }
@@ -353,6 +353,7 @@ function sectionHtml(st) {
       <label class="appset-label" for="pp-handle">${escapeHtml(t('Dirección'))}</label>
       <div class="pp-handle"><span>bookreader.raiatech.com/@</span><input id="pp-handle" class="appset-input" value="${escapeHtml(config.handle)}" autocomplete="off" spellcheck="false"></div>
       <label class="appset-check"><input type="checkbox" id="pp-progress" ${config.showProgress ? 'checked' : ''}> ${escapeHtml(t('Enseñar el progreso de lectura'))}</label>
+      <label class="appset-check"><input type="checkbox" id="pp-filters" ${config.showFilters !== false ? 'checked' : ''}> ${escapeHtml(t('Enseñar los filtros por estado (Todos, Leyendo, Terminados…)'))}</label>
       <label class="appset-label" for="pp-now">${escapeHtml(t('Leyendo ahora'))}</label>
       <select id="pp-now" class="appset-input">
         <option value="auto" ${config.now === 'auto' ? 'selected' : ''}>${escapeHtml(t('Automático: el último que abriste'))}</option>
@@ -419,6 +420,7 @@ export async function renderSettings(content) {
     const el = e.target;
     if (el.id === 'pp-enabled') { st.config.enabled = el.checked; commit(true); return; }
     if (el.id === 'pp-progress') { st.config.showProgress = el.checked; commit(false); return; }
+    if (el.id === 'pp-filters') { st.config.showFilters = el.checked; commit(false); return; }
     if (el.id === 'pp-now') { st.config.now = el.value; commit(false); return; }
     if (el.id === 'pp-handle') { st.config.handle = slug(el.value) || 'luis'; commit(true); return; }
     const card = el.closest('.pp-shelf'); if (!card) return;

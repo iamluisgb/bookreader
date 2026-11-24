@@ -114,13 +114,14 @@ test('descargar: varias estanterías en su orden, cada libro una vez, sin los oc
   await ag.locator('.pub-row', { hasText: 'Definitive' }).locator('input[data-k="show"]').uncheck();
   await pp.locator(`.pp-shelf[data-shelf="${ids.hi}"] .pub-row`, { hasText: 'Illustrated' }).locator('select[data-k="style"]').selectOption('oreilly');
   await pp.locator('#pp-progress').uncheck();
+  await pp.locator('#pp-filters').uncheck();
   // El selector dice qué ha decidido «automático»: SPQR (sin portada) → color de la portada.
   await expect(pp.locator(`.pp-shelf[data-shelf="${ids.hi}"] .pub-row`, { hasText: 'SPQR' }).locator('option[data-auto]')).toHaveText(/automático · color de la portada/);
 
   const dl = page.waitForEvent('download');
   await pp.locator('button[data-act="download"]').click();
   const snap = JSON.parse(fs.readFileSync((await (await dl).path())!, 'utf8'));
-  expect(snap).toMatchObject({ format: 'bookreader-perfil', version: 2, handle: 'luis', showProgress: false });
+  expect(snap).toMatchObject({ format: 'bookreader-perfil', version: 2, handle: 'luis', showProgress: false, showFilters: false });
   expect(snap.shelves).toEqual([
     { id: 'history', name: 'History', books: [B.slice(0, 12), C.slice(0, 12)] },
     { id: 'agentes', name: 'Agentes', books: [B.slice(0, 12)] },
@@ -177,6 +178,7 @@ test('página pública con varias estanterías: pestañas, #enlace y «Show» ca
   await page.goto('http://localhost:8899/@luis/');
   await page.evaluate((s) => localStorage.setItem('bookreader_perfil_draft', JSON.stringify(s)), snap);
   await page.goto('http://localhost:8899/@luis/?draft=1#history');
+  await expect(page.locator('#pf-filters')).toBeVisible();   // sin `showFilters: false`, se ven
   const tabs = page.locator('#pf-tabs button');
   await expect(tabs).toHaveCount(2);
   await expect(tabs.nth(1)).toHaveAttribute('aria-selected', 'true');   // la del #enlace
@@ -234,4 +236,16 @@ test('configuración de antes: «color de la portada» por defecto pasa a autom�
     return (await import('/js/library/publish.js')).getConfig();
   });
   expect(c.shelves[0].books.map((b: any) => b.style)).toEqual(['auto', 'oreilly']);
+});
+
+test('página pública con showFilters: false: sin los filtros por estado', async ({ page }) => {
+  const cover = 'data:image/svg+xml;base64,' + Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="300" height="450"><rect width="300" height="450" fill="#123456"/></svg>').toString('base64');
+  const snap = { format: 'bookreader-perfil', version: 2, now: null, showFilters: false, shelves: [{ id: 'a', name: 'A', books: ['x1'] }],
+    books: [{ id: 'x1', title: 'Uno', author: 'Ana', status: 'reading', progress: 3, pages: 200, pagesEstimated: true,
+      spine: { style: 'plain', bg: '#123456', ink: '#ffffff', muted: '#d9d9de', title: 'Uno', author: 'Ana' }, coverData: cover }] };
+  await page.goto('http://localhost:8899/@luis/');
+  await page.evaluate((s) => localStorage.setItem('bookreader_perfil_draft', JSON.stringify(s)), snap);
+  await page.goto('http://localhost:8899/@luis/?draft=1');
+  await expect(page.locator('.pf-bk')).toHaveCount(1);
+  await expect(page.locator('#pf-filters')).toBeHidden();
 });
