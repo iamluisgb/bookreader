@@ -74,6 +74,9 @@ const EXCLUIDOS = [
 // (pdf-3.11.174.min.js) y una versión nueva es una URL nueva. Las fuentes y los iconos
 // NO llevan versión en el nombre, así que se quedan en una semana: recorta el tráfico
 // repetido sin dejar a nadie clavado con un icono viejo si se cambia.
+// Excepción: la estantería pública de prueba (/@luis/) se deja incrustar SOLO desde la web personal
+// de Luis (luisgonzalezbernal.com), con `?embed=1`. Se quitan los dos headers anti-iframe generales
+// (`!`) y se pone una frame-ancestors con ese único origen. Va con las dos grafías de la ruta.
 // Headers de seguridad para todo el sitio (TEC10, hallazgo 2). El CSP de la app va
 // por <meta> en index.html, y <meta> NO puede expresar `frame-ancestors`: por eso
 // hay una segunda política AQUÍ con solo esa directiva. Dos políticas CSP se suman
@@ -95,6 +98,16 @@ const HEADERS = `/*
 
 /app/icons/*
   Cache-Control: public, max-age=604800
+
+/@luis/*
+  ! X-Frame-Options
+  ! Content-Security-Policy
+  Content-Security-Policy: frame-ancestors 'self' https://luisgonzalezbernal.com
+
+/%40luis/*
+  ! X-Frame-Options
+  ! Content-Security-Policy
+  Content-Security-Policy: frame-ancestors 'self' https://luisgonzalezbernal.com
 `;
 
 const fromWorktree = process.argv.includes('--worktree');

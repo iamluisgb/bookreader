@@ -159,3 +159,16 @@ main > * { min-width: 0; }
   .pf-bk, .pf-lift, .pf-ob, .pf-ob-cover, .pf-ob-track i { transition: none !important; }
   .pf-now .pf-dot { animation: none; }
 }
+
+/* ---------- Modo incrustado (?embed=1, en la web personal) ----------
+   Solo la estantería. Fondo transparente y color-scheme «normal»: si el documento del iframe
+   declara un color-scheme distinto del de la página que lo contiene, el navegador le pinta un
+   fondo opaco. */
+.pf-embed-link { display: none; }
+:root.is-embed { color-scheme: normal !important; }
+.is-embed body { background: transparent; }
+.is-embed .pf-nav, .is-embed .pf-head, .is-embed .pf-foot, .is-embed .pf-keys { display: none; }
+.is-embed main { padding-bottom: var(--s-2); gap: var(--s-2); }
+.is-embed .pf-pad { padding-left: 0; padding-right: 0; }
+.is-embed .pf-embed-link { display: block; margin: 0; text-align: center; font-size: var(--fs-sm); }
+.is-embed .pf-embed-link a { color: var(--text-soft); }

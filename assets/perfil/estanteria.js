@@ -298,4 +298,17 @@ async function start() {
   // Las fuentes pueden llegar después del primer ajuste: se reajusta al cargarlas.
   document.fonts?.ready.then(() => { buildTape(); fitSpines(); layout(); });
 }
+// Incrustada: avisa a la página que la contiene de su alto (para ajustar el iframe) y acepta que
+// esa página le cambie el tema. Solo escucha a la web personal de Luis.
+const EMBED_PARENTS = ['https://luisgonzalezbernal.com'];
+if (document.documentElement.classList.contains('is-embed') && window.parent !== window) {
+  const tell = () => window.parent.postMessage({ type: 'bookreader-height', height: Math.ceil(document.documentElement.scrollHeight) }, '*');
+  try { new ResizeObserver(tell).observe(document.body); } catch { /* sin ResizeObserver */ }
+  window.addEventListener('load', tell);
+  window.addEventListener('message', e => {
+    if (!EMBED_PARENTS.includes(e.origin) || e.data?.type !== 'bookreader-theme') return;
+    if (e.data.theme === 'dark' || e.data.theme === 'light') document.documentElement.setAttribute('data-theme', e.data.theme);
+  });
+}
+
 start().catch(() => { $('pf-caption').textContent = 'The shelf could not be loaded. Reload the page to try again.'; });

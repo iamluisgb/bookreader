@@ -4,6 +4,16 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <script src="../assets/landing/prefs.js?v=20261108a"></script>
+<script>
+// Modo incrustado (?embed=1): solo la estantería, fondo transparente y el tema que pida la web que
+// la incrusta (?theme=dark|light). Antes de pintar, para que no parpadee.
+(function () {
+  var q = new URLSearchParams(location.search);
+  if (q.get('embed') !== '1') return;
+  var r = document.documentElement; r.classList.add('is-embed');
+  var t = q.get('theme'); if (t === 'dark' || t === 'light') r.setAttribute('data-theme', t);
+})();
+</script>
 <title>Luis González’s shelf · BookReader</title>
 <meta name="description" content="What Luis González is reading about AI agents, shelved in BookReader.">
 <meta property="og:type" content="profile">
@@ -18,7 +28,7 @@
 <link rel="icon" href="../app/icons/icon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="../app/css/fonts.css">
 <link rel="stylesheet" href="../app/css/themes.css">
-<link rel="stylesheet" href="../assets/perfil/perfil.css?v=20261123i">
+<link rel="stylesheet" href="../assets/perfil/perfil.css?v=20261124a">
 <script>
 if (location.hostname === 'bookreader.raiatech.com') {
   var u = document.createElement('script');
@@ -70,6 +80,8 @@ if (location.hostname === 'bookreader.raiatech.com') {
     <ol class="pf-sr" id="pf-list"></ol>
   </section>
 
+  <p class="pf-embed-link pf-pad"><a href="https://bookreader.raiatech.com/@luis/?ref=embed" target="_blank" rel="noopener" data-umami-event="Profile: embed full shelf">Full shelf on BookReader ↗</a></p>
+
   <footer class="pf-foot pf-pad">
     <p>Want to read along? BookReader is a reader for your own EPUBs and PDFs, with an assistant that cites the page it read.</p>
     <a class="pf-btn pf-btn--primary" href="../app/" data-umami-event="Profile: open app" data-umami-event-where="footer">Open BookReader</a>
@@ -77,6 +89,6 @@ if (location.hostname === 'bookreader.raiatech.com') {
   </footer>
 </main>
 
-<script type="module" src="../assets/perfil/estanteria.js?v=20261123i"></script>
+<script type="module" src="../assets/perfil/estanteria.js?v=20261124a"></script>
 </body>
 </html>
