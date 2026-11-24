@@ -2174,7 +2174,8 @@ async function openBookMenu(id, anchor) {
     <div class="lib-menu-sep"></div>
     <div class="lib-menu-label">${t('Estanterías')}</div>
     ${manualShelves.length
-      ? manualShelves.map(s => `<button class="lib-menu-item" data-act="shelf" data-shelf="${s.id}">
+      // `data-keep`: marcar una estantería no cierra el menú, para poder poner o quitar varias seguidas.
+      ? manualShelves.map(s => `<button class="lib-menu-item" data-act="shelf" data-keep data-shelf="${s.id}" aria-pressed="${inShelf.has(s.id)}">
           <span class="lib-menu-check">${inShelf.has(s.id) ? icon('check', { size: 'md' }) : ''}</span><span>${escapeHtml(s.name)}</span></button>`).join('')
       : `<div class="lib-menu-empty">${t('Aún no hay estanterías')}</div>`}
     ${smartShelves.length
@@ -2215,7 +2216,12 @@ async function openBookMenu(id, anchor) {
     if (act === 'finish') {
       await Store.updateBook(id, { status: finished ? (book.progress > 0 ? 'reading' : 'unread') : 'finished' });
     } else if (act === 'shelf') {
-      await Store.toggleBookShelf(id, item.dataset.shelf, !inShelf.has(item.dataset.shelf));
+      const sid = item.dataset.shelf;
+      const on = !inShelf.has(sid);
+      await Store.toggleBookShelf(id, sid, on);
+      if (on) inShelf.add(sid); else inShelf.delete(sid);
+      item.setAttribute('aria-pressed', String(on));
+      item.querySelector('.lib-menu-check').innerHTML = on ? icon('check', { size: 'md' }) : '';
     } else if (act === 'newshelf') {
       const name = (await promptBox('Nombre de la nueva estantería:', { title: 'Nueva estantería' }) || '').trim();
       if (name) { const sh = await Store.addShelf(name); await Store.toggleBookShelf(id, sh.id, true); }
@@ -2237,8 +2243,9 @@ function buildMenu(anchor, innerHtml, onAct) {
   menuEl.addEventListener('click', async (ev) => {
     const item = ev.target.closest('.lib-menu-item');
     if (!item) return;
-    const keep = item.dataset.act === 'open' ? false : false; // siempre cerramos
-    closeMenu();
+    // Casi todo cierra el menú; lo que lleva `data-keep` (las casillas de estanterías) no, y se
+    // actualiza en su sitio. Se cierra tocando fuera.
+    if (item.dataset.keep === undefined) closeMenu();
     await onAct(item.dataset.act, item);
   });
 }
