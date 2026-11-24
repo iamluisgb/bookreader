@@ -1,0 +1,111 @@
+/* «Lee el libro» (/read-the-book/ y /es/lee-el-libro/) — la página que se manda a alguien.
+   Mismo lenguaje que el resto de páginas públicas: tokens de app/css/themes.css, marca de
+   brand.css, barra, pie, tipografías y botón principal de why.css. Aquí solo lo propio:
+   el subrayado del titular, las tarjetas y el antes/después. Sin colores escritos a mano
+   salvo los de la tarjeta para redes, que es una imagen y no sigue el tema. */
+
+.mf { max-width: 760px; margin: 0 auto; padding: clamp(56px, 9vh, 96px) 24px 80px; }
+
+/* quién te lo manda (?de=) */
+.mf .from {
+  display: inline-flex; align-items: center; gap: 8px; margin: 0 0 22px; padding: 6px 14px 6px 10px;
+  border-radius: var(--r-pill); background: var(--accent-soft); color: var(--text);
+  font: 500 var(--fs-md) var(--font-ui);
+}
+.mf .from::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--brand); }
+.mf .from[hidden] { display: none; }
+
+/* cabecera */
+.mf .eyebrow { font: 600 var(--fs-sm) var(--font-ui); letter-spacing: .14em; text-transform: uppercase; color: var(--accent); margin: 0 0 16px; text-wrap: balance; }
+.mf h1 { font: 600 clamp(2.6rem, 7vw, 4.4rem)/1.04 var(--font-display); letter-spacing: -0.02em; text-wrap: balance; margin: 0; }
+/* el subrayado: el mismo gesto que subrayar en el lector */
+.mf mark {
+  color: inherit; background: linear-gradient(transparent 58%, color-mix(in srgb, var(--brand) 45%, transparent) 58%, color-mix(in srgb, var(--brand) 45%, transparent) 92%, transparent 92%);
+  padding: 0 .06em;
+}
+.mf .lede { font: 400 clamp(19px, 2.2vw, 21px)/1.6 var(--font-display); color: var(--text-soft); margin: 24px 0 0; }
+.mf .lede b { color: var(--text); font-weight: 600; }
+.mf .acts { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-top: 32px; }
+.btn-ghost {
+  display: inline-flex; align-items: center; font: 600 var(--fs-lg) var(--font-ui); color: var(--text);
+  padding: 13px 24px; border-radius: var(--r-pill); border: 1px solid var(--border); background: none; cursor: pointer;
+}
+.btn-ghost:hover { text-decoration: none; background: var(--fill); }
+.mf .cta-note i { color: var(--text-soft); }
+.cardline { display: none; }
+
+/* secciones */
+.mf section { margin-top: 72px; }
+.mf h2 { font: 600 clamp(1.6rem, 3.4vw, 2.1rem)/1.2 var(--font-display); letter-spacing: -0.01em; margin: 0 0 16px; }
+.mf .prose { font: 400 18px/1.72 var(--font-display); color: var(--text-soft); margin: 0 0 14px; }
+.mf .prose b { color: var(--text); font-weight: 600; }
+.mf .lead { font: 400 clamp(20px, 2.4vw, 23px)/1.5 var(--font-display); color: var(--text); margin: 0 0 16px; }
+
+/* tarjetas: números y lo que cuesta un resumen */
+.mf .cards { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--s-3); }
+.mf .cards.three { grid-template-columns: repeat(3, 1fr); }
+@media (max-width: 767px) { .mf .cards.three { grid-template-columns: 1fr; } }
+@media (max-width: 600px) { .mf .card { padding: var(--s-4); } }
+.mf .card { background: var(--surface-alt); border-radius: var(--r-lg); padding: var(--s-5); }
+.mf .card .v { font: 600 clamp(2rem, 4.4vw, 2.6rem)/1 var(--font-display); color: var(--text); }
+.mf .card .k { font: 600 var(--fs-sm) var(--font-ui); color: var(--accent); margin: 10px 0 6px; }
+.mf .card .h { font: 600 var(--fs-lg) var(--font-ui); color: var(--text); margin: 0 0 6px; }
+.mf .card p, .mf .card .d { margin: 0; font-size: var(--fs-md); line-height: 1.55; color: var(--text-soft); }
+
+/* la tesis: cita grande, sin barra lateral */
+.mf .thesis { font: 600 clamp(1.8rem, 4.4vw, 2.7rem)/1.2 var(--font-display); letter-spacing: -0.01em; text-wrap: balance; margin: 0; }
+.mf .thesis mark { font-weight: 600; }
+
+/* antes / después */
+.mf .diff { display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-3); }
+@media (max-width: 600px) { .mf .diff { grid-template-columns: 1fr; } }
+.mf .diff > div { border-radius: var(--r-lg); padding: var(--s-5); }
+.mf .diff .old { border: 1px solid var(--border); }
+.mf .diff .new { background: var(--accent-soft); }
+.mf .diff .tag { font: 600 var(--fs-sm) var(--font-ui); color: var(--text-faint); margin: 0 0 12px; }
+.mf .diff .new .tag { color: var(--accent); }
+.mf .diff ul { list-style: none; margin: 0; padding: 0; }
+.mf .diff li { display: flex; gap: 10px; font-size: var(--fs-md); line-height: 1.5; color: var(--text-soft); padding: 5px 0; }
+.mf .diff .new li { color: var(--text); }
+.mf .diff li::before { flex: none; width: 1em; font-weight: 600; }
+.mf .diff .old li::before { content: "−"; color: var(--danger); }
+.mf .diff .new li::before { content: "+"; color: var(--accent); }
+
+/* recibos: lo que promete la industria, textual */
+.mf .receipts { margin: 0; }
+.mf .receipts blockquote { margin: 0 0 18px; }
+.mf .receipts q { font: italic 400 clamp(19px, 2.2vw, 22px)/1.45 var(--font-display); color: var(--text); quotes: "«" "»"; }
+.mf .receipts cite { display: block; margin-top: 6px; font: 500 var(--fs-sm) var(--font-ui); font-style: normal; color: var(--text-faint); }
+.mf .receipts + .prose { margin-top: 24px; }
+
+/* cierre */
+.mf .close { margin-top: 80px; padding-top: 40px; border-top: 1px solid var(--border); }
+.mf .close p { font: 400 18px/1.65 var(--font-display); color: var(--text-soft); margin: 0; }
+.mf .close .acts { margin-top: 26px; }
+
+@media (max-width: 600px) {
+  .mf { padding-top: 40px; }
+  .mf section { margin-top: 56px; }
+  .mf .acts > a { flex: 1 1 100%; justify-content: center; }
+}
+
+/* ---- Modo tarjeta: la página se convierte en imagen para redes ----
+   ?card=hero → 1200×630 (Open Graph) · ?card=thesis → 1080×1350 (vertical).
+   Siempre en claro, sea cual sea el tema: es una imagen que circula sola. */
+body[data-card] { background: #fdfbf6; color: #1d1d1f; }
+body[data-card] > nav, body[data-card] > .foot { display: none; }
+body[data-card] .mf { max-width: none; min-height: 100vh; margin: 0; padding: 0 80px; display: flex; flex-direction: column; justify-content: center; }
+body[data-card="hero"] .mf > :not(.hero),
+body[data-card="thesis"] .mf > :not(.thesis-sec) { display: none; }
+body[data-card] .mf section { margin: 0; }
+body[data-card] .hero .lede, body[data-card] .hero .acts, body[data-card] .hero .cta-note, body[data-card] .hero .from { display: none; }
+body[data-card] .eyebrow { color: #178046; font-size: 17px; }
+body[data-card="hero"] h1 { font-size: 92px; max-width: 15ch; }
+body[data-card="hero"] .cardline { display: block; margin: 30px 0 0; font: 500 28px/1.4 var(--font-ui); color: #1d1d1f; }
+body[data-card="hero"] .cardline span { display: block; font-size: 21px; color: #5f5f64; }
+body[data-card="thesis"] .thesis { font-size: 76px; line-height: 1.14; }
+body[data-card]::after {
+  content: "bookreader.raiatech.com"; position: fixed; left: 80px; bottom: 48px;
+  font: 600 19px var(--font-ui); letter-spacing: .02em; color: #178046;
+}
+.mf .receipts q:lang(en) { quotes: "\201C" "\201D"; }

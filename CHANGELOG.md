@@ -3,6 +3,18 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-11-24 — «Lee el libro» con el estilo de la app
+
+- La página iba en el lenguaje de `justuse.nan.builders` (fondo negro con trama, mono, mayúsculas)
+  y no se parecía a nada de BookReader. Ahora lleva el esqueleto de las páginas públicas (`/why/`):
+  `prefs.js`, `themes.css`, `brand.css` y `why.css`, con su barra, su pie con idioma y tema
+  (claro/oscuro/auto) y el botón principal en píldora verde.
+- Hoja propia `assets/landing/manifesto.css` (sustituye a `just.css`), solo con tokens: titulares en
+  Source Serif, el «libro» del titular subrayado como en el lector, números y costes en tarjetas
+  `--surface-alt`, antes/después en dos tarjetas (la buena en `--accent-soft`), citas en cursiva serif.
+- Mismo contenido, `?de=`, «Pásaselo» y eventos de Umami que en la entrada de abajo.
+- Tarjetas de redes regeneradas en claro, sobre el papel del libro (`?v=3`).
+
 ## 2026-11-24 — «Lee el libro», lista para mandársela a alguien
 
 - **El caso**: la página se va a pasar por WhatsApp/redes a personas concretas que no conocen

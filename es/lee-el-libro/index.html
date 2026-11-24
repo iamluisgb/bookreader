@@ -1,8 +1,9 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="es">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="../../assets/landing/prefs.js?v=20261108a"></script>
 <title>Lee el libro — BookReader</title>
 <meta name="description" content="BookReader es un lector de EPUB y PDF, gratis y sin cuenta, que te ayuda a leer el libro entero y a no olvidarlo: cada respuesta cita su párrafo y el libro te pregunta por lo que has leído.">
 <link rel="canonical" href="https://bookreader.raiatech.com/es/lee-el-libro/">
@@ -13,7 +14,7 @@
 <meta property="og:url" content="https://bookreader.raiatech.com/es/lee-el-libro/">
 <meta property="og:title" content="El resumen te ahorra el libro. Ese es el problema.">
 <meta property="og:description" content="Un lector de EPUB y PDF que te ayuda a leer el libro entero y a no olvidarlo. Gratis, sin cuenta, en el navegador.">
-<meta property="og:image" content="https://bookreader.raiatech.com/assets/social/lee-el-libro.png?v=2">
+<meta property="og:image" content="https://bookreader.raiatech.com/assets/social/lee-el-libro.png?v=3">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="El resumen te ahorra el libro. BookReader: el lector que te pregunta por lo que lees. Gratis, sin cuenta.">
@@ -22,9 +23,15 @@
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="El resumen te ahorra el libro. Ese es el problema.">
 <meta name="twitter:description" content="Un lector de EPUB y PDF que te ayuda a leer el libro entero y a no olvidarlo. Gratis, sin cuenta.">
-<meta name="twitter:image" content="https://bookreader.raiatech.com/assets/social/lee-el-libro.png?v=2">
-<link rel="stylesheet" href="../../assets/landing/just.css?v=2">
-<!-- Umami: solo en producción, como el resto de la web pública -->
+<meta name="twitter:image" content="https://bookreader.raiatech.com/assets/social/lee-el-libro.png?v=3">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#121214" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="../../app/icons/favicon.ico" sizes="32x32">
+<link rel="icon" href="../../app/icons/icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../../app/css/themes.css">
+<link rel="stylesheet" href="../../assets/landing/brand.css?v=20261108b">
+<link rel="stylesheet" href="../../assets/landing/why.css?v=20261030b">
+<link rel="stylesheet" href="../../assets/landing/manifesto.css?v=1">
 <script>
 if (location.hostname === 'bookreader.raiatech.com') {
   var u = document.createElement('script');
@@ -36,87 +43,82 @@ if (location.hostname === 'bookreader.raiatech.com') {
 </script>
 </head>
 <body>
-<div class="jr">
+<nav>
+  <div class="wrap nav-in">
+    <a class="brand" href="../"><svg width="22" height="22" viewBox="0 0 512 512" aria-hidden="true" focusable="false"><rect width="512" height="512" rx="118" fill="#111418"/><path d="M288 119 Q288 99 308 99 L396 99 Q416 99 416 119 L416 371 L352 323 L288 371 Z" fill="#22c55e"/><path d="M98 90 L222 90 Q256 90 256 124 L256 470 C 249 442 233 424 206 414 C 177 403 140 401 100 401 Q64 401 64 365 L64 124 Q64 90 98 90 Z" fill="#f8fafc"/></svg> BookReader</a>
+    <span class="nav-end"><a class="nav-help" href="../ayuda/" data-umami-event="Help" data-umami-event-where="nav">Ayuda</a><a class="nav-blog" href="../blog/" data-umami-event="Blog" data-umami-event-where="nav">Blog</a><a class="nav-lang" hreflang="en" lang="en" data-umami-event="Language" data-umami-event-to="en" href="../../read-the-book/?lang=en" title="English" aria-label="English">EN</a><a class="nav-cta" href="../../app/" data-umami-event="Open app" data-umami-event-where="manifesto-nav">Abrir la app</a></span>
+  </div>
+</nav>
+<main class="mf">
 
-  <nav>
-    <a class="brand" href="../../"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h9l5 5v13H6z" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M15 3v5h5" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M9 12h7M9 16h7" stroke="#22c55e" stroke-width="1.7"/></svg>BookReader</a>
-    <span class="end">
-      <a href="../../es/muestra/">Muestras</a>
-      <a href="../../es/por-que/">Por qué</a>
-      <a href="../../read-the-book/" hreflang="en">EN</a>
-      <a class="cta" href="../../app/">Abrir el lector →</a>
-    </span>
-  </nav>
-
-  <section class="first hero">
+  <header class="hero">
     <p class="from" id="from" hidden></p>
-    <p class="lbl">// 00 <i>lector de EPUB y PDF · gratis · sin cuenta</i></p>
-    <h1>El resumen<br>te ahorra<br>el <span class="mark">libro</span>.</h1>
-    <p class="cardline">BookReader: el lector que te pregunta por lo que lees.<br><span>Gratis · sin cuenta · EPUB y PDF</span></p>
-    <p class="sub">Y ese es exactamente el problema. Quince minutos de ideas clave te dan <b>la sensación</b> de haber leído. No te dan <b>la capacidad</b> de usar lo que hay dentro. BookReader hace lo contrario: te ayuda a leerlo entero y a que se quede.</p>
+    <p class="eyebrow">Lector de EPUB y PDF · gratis · sin cuenta</p>
+    <h1>El resumen te ahorra el <mark>libro</mark>.</h1>
+    <p class="cardline">BookReader: el lector que te pregunta por lo que lees.<span>Gratis · sin cuenta · EPUB y PDF</span></p>
+    <p class="lede">Y ese es exactamente el problema. Quince minutos de ideas clave te dan <b>la sensación</b> de haber leído. No te dan <b>la capacidad</b> de usar lo que hay dentro. BookReader hace lo contrario: te ayuda a leerlo entero y a que se quede.</p>
     <div class="acts">
-      <a class="primary" href="../../app/?sample=niebla" data-umami-event="Manifesto sample" data-umami-event-where="hero">Pruébalo con un libro →</a>
-      <a href="../../app/" data-umami-event="Open app" data-umami-event-where="manifesto-hero">Abrir un libro mío</a>
+      <a class="btn-primary" href="../../app/?sample=niebla" data-umami-event="Manifesto sample" data-umami-event-where="hero">Pruébalo con un libro →</a>
+      <a class="btn-ghost" href="../../app/" data-umami-event="Open app" data-umami-event-where="manifesto-hero">Abrir un libro mío</a>
     </div>
-    <p class="facts">Se abre <i>Niebla</i>, de Unamuno, en dominio público. Funciona en el móvil y en el ordenador, sin instalar nada.</p>
-  </section>
+    <p class="cta-note">Se abre <i>Niebla</i>, de Unamuno, en dominio público. Funciona en el móvil y en el ordenador, sin instalar nada.</p>
+  </header>
 
   <section>
-    <p class="lbl">// 01 <i>el problema</i></p>
-    <h2 class="sec">El problema.</h2>
-    <p class="lead">Terminas un libro técnico y estás seguro de haberlo entendido. Un mes después recuerdas la portada y <b>dos ideas</b>.</p>
+    <h2>El problema.</h2>
+    <p class="lead">Terminas un libro técnico y estás seguro de haberlo entendido. Un mes después recuerdas la portada y dos ideas.</p>
     <p class="prose">No es falta de memoria. Es que leer no deja nada si no hay algo que te devuelva al texto. Los subrayados se acumulan en una app que no vuelves a abrir. El chat con el PDF te da una respuesta que no puedes comprobar, sin decirte en qué párrafo se apoya. Y el resumen, directamente, borra el razonamiento: te quedas con la conclusión de alguien sobre un libro que no has leído.</p>
   </section>
 
   <section>
-    <p class="lbl">// 02 <i>los números</i></p>
-    <h2 class="sec">Los números.</h2>
-    <div class="nums">
-      <div class="num"><div class="v">0</div><div class="k">cuentas</div><div class="d">Para leer no hay registro. Abres el fichero y estás dentro.</div></div>
-      <div class="num"><div class="v">1</div><div class="k">toque</div><div class="d">De cualquier cita a su párrafo exacto. Si no lleva ahí, es una opinión.</div></div>
-      <div class="num"><div class="v">100 %</div><div class="k">en tu dispositivo</div><div class="d">El índice, las notas y el progreso viven en tu navegador.</div></div>
-      <div class="num"><div class="v">0 KB</div><div class="k">sin cifrar</div><div class="d">Si no activas el sync, tu biblioteca no sale. Si lo activas, sale cifrada desde tu navegador.</div></div>
+    <h2>Los números.</h2>
+    <div class="cards">
+      <div class="card"><div class="v">0</div><div class="k">cuentas</div><p class="d">Para leer no hay registro. Abres el fichero y estás dentro.</p></div>
+      <div class="card"><div class="v">1</div><div class="k">toque</div><p class="d">De cualquier cita a su párrafo exacto. Si no lleva ahí, es una opinión.</p></div>
+      <div class="card"><div class="v">100 %</div><div class="k">en tu dispositivo</div><p class="d">El índice, las notas y el progreso viven en tu navegador.</p></div>
+      <div class="card"><div class="v">0 KB</div><div class="k">sin cifrar</div><p class="d">Si no activas el sync, tu biblioteca no sale. Si lo activas, sale cifrada desde tu navegador.</p></div>
     </div>
   </section>
 
   <section class="thesis-sec">
-    <p class="lbl">// 03 <i>la tesis</i></p>
-    <p class="thesis">Entender no se descarga. Si un libro merece ocho horas, merece que <em>alguien te pregunte por él</em>.</p>
+    <p class="eyebrow">La tesis</p>
+    <p class="thesis">Entender no se descarga. Si un libro merece ocho horas, merece que <mark>alguien te pregunte por él</mark>.</p>
   </section>
 
   <section>
-    <p class="lbl">// 04 <i>lo que pierdes con un resumen</i></p>
-    <h2 class="sec">Lo que te cuesta.</h2>
-    <div class="loss">
-      <div class="cell"><div class="h">COMPRENSIÓN</div><p>Un resumen te cuenta a qué llegó el autor. El libro te enseña por qué. La segunda cosa es la que puedes usar el lunes.</p></div>
-      <div class="cell"><div class="h">RETENCIÓN</div><p>Leer sin recuperar después es releer. Recordar exige esfuerzo: preguntas, no relecturas.</p></div>
-      <div class="cell"><div class="h">CRITERIO</div><p>Si nunca ves el argumento completo, no puedes estar en desacuerdo. Te quedas con la conclusión de otro.</p></div>
-      <div class="cell"><div class="h">PROPIEDAD</div><p>Tu biblioteca en la nube de otro es una suscripción. Tus ficheros y tus notas son tuyos, y se van contigo.</p></div>
-      <div class="cell"><div class="h">MEMORIA ENTRE LIBROS</div><p>Lo que aprendiste en el capítulo 4 se conecta con el libro de hace dos años. Eso no cabe en una ficha.</p></div>
-      <div class="cell"><div class="h">EL DERECHO A ABURRIRTE</div><p>Las partes lentas son donde se instala la idea. Saltarlas es una forma elegante de no haber leído.</p></div>
+    <h2>Lo que te cuesta un resumen.</h2>
+    <div class="cards three">
+      <div class="card"><p class="h">Comprensión</p><p>Un resumen te cuenta a qué llegó el autor. El libro te enseña por qué. La segunda cosa es la que puedes usar el lunes.</p></div>
+      <div class="card"><p class="h">Retención</p><p>Leer sin recuperar después es releer. Recordar exige esfuerzo: preguntas, no relecturas.</p></div>
+      <div class="card"><p class="h">Criterio</p><p>Si nunca ves el argumento completo, no puedes estar en desacuerdo. Te quedas con la conclusión de otro.</p></div>
+      <div class="card"><p class="h">Propiedad</p><p>Tu biblioteca en la nube de otro es una suscripción. Tus ficheros y tus notas son tuyos, y se van contigo.</p></div>
+      <div class="card"><p class="h">Memoria entre libros</p><p>Lo que aprendiste en el capítulo 4 se conecta con el libro de hace dos años. Eso no cabe en una ficha.</p></div>
+      <div class="card"><p class="h">El derecho a aburrirte</p><p>Las partes lentas son donde se instala la idea. Saltarlas es una forma elegante de no haber leído.</p></div>
     </div>
   </section>
 
   <section>
-    <p class="lbl">// 05 <i>la diferencia</i></p>
-    <h2 class="sec">La diferencia.</h2>
+    <h2>La diferencia.</h2>
     <div class="diff">
-      <div class="old"><div class="tag">antes · resumen + chat</div><span class="x">−</span> pides «resume el capítulo 4»
-<span class="x">−</span> recibes 400 palabras sin fuente
-<span class="x">−</span> subrayas 30 frases en el móvil
-<span class="x">−</span> no vuelves a mirarlas
-<span class="x">−</span> un mes después: «creo que iba de X»</div>
-      <div class="new"><div class="tag">después · leer con BookReader</div><span class="ok">+</span> lees el capítulo 4
-<span class="ok">+</span> preguntas y cada respuesta cita su párrafo
-<span class="ok">+</span> de la cita saltas al texto y sigues leyendo
-<span class="ok">+</span> el libro te pregunta lo que crees saber
-<span class="ok">+</span> un mes después: lo explicas sin mirar</div>
+      <div class="old"><p class="tag">Antes · resumen + chat</p><ul>
+        <li>pides «resume el capítulo 4»</li>
+        <li>recibes 400 palabras sin fuente</li>
+        <li>subrayas 30 frases en el móvil</li>
+        <li>no vuelves a mirarlas</li>
+        <li>un mes después: «creo que iba de X»</li>
+      </ul></div>
+      <div class="new"><p class="tag">Después · leer con BookReader</p><ul>
+        <li>lees el capítulo 4</li>
+        <li>preguntas y cada respuesta cita su párrafo</li>
+        <li>de la cita saltas al texto y sigues leyendo</li>
+        <li>el libro te pregunta lo que crees saber</li>
+        <li>un mes después: lo explicas sin mirar</li>
+      </ul></div>
     </div>
   </section>
 
   <section>
-    <p class="lbl">// 06 <i>recibos</i></p>
-    <h2 class="sec">Los recibos.</h2>
+    <h2>Lo que promete la industria.</h2>
     <div class="receipts">
       <blockquote>
         <q>Obtén las ideas clave de los mejores libros, pódcasts y expertos en 15 minutos.</q>
@@ -127,24 +129,25 @@ if (location.hostname === 'bookreader.raiatech.com') {
         <cite>Shortform · shortform.com</cite>
       </blockquote>
     </div>
-    <p class="prose" style="margin-top:26px">Toda la industria promete lo mismo: que no tengas que leer. Nosotros prometemos lo contrario, y con una condición incómoda: <b>tienes que leer</b>. Lo único que quitamos es el olvido.</p>
+    <p class="prose">Toda la industria promete lo mismo: que no tengas que leer. Nosotros prometemos lo contrario, y con una condición incómoda: <b>tienes que leer</b>. Lo único que quitamos es el olvido.</p>
   </section>
 
   <div class="close">
     <h2>Empieza por un libro que ya tengas.</h2>
     <p>Abre un EPUB o un PDF y lee diez páginas. Si no vuelves, es que tenías razón y yo no.</p>
     <div class="acts">
-      <a class="primary" href="../../app/" data-umami-event="Open app" data-umami-event-where="manifesto-close">Abrir el lector →</a>
-      <a href="../../es/muestra/">Leer una muestra</a>
-      <button type="button" class="share" id="share" data-umami-event="Manifesto share">¿Conoces a quien le vendría bien? Pásaselo</button>
+      <a class="btn-primary" href="../../app/" data-umami-event="Open app" data-umami-event-where="manifesto-close">Abrir BookReader</a>
+      <button type="button" class="btn-ghost" id="share" data-umami-event="Manifesto share">Pásaselo a alguien</button>
     </div>
-    <div class="foot">
-      <span>BookReader · sin cuenta, sin subrayado que caduca</span>
-      <span><a href="https://github.com/iamluisgb/bookreader">código</a> · <a href="../../privacy/">privacidad</a></span>
-    </div>
+    <p class="cta-note">Gratis. Sin cuenta. En tu navegador. ¿Prefieres un clásico? <a href="../muestra/">Cuatro libros de muestra</a>.</p>
   </div>
 
-</div>
+</main>
+<footer class="foot">
+  <div class="wrap"><a href="../">Inicio</a> · <a href="../por-que/">Por qué</a> · <a href="../privacidad/">Privacidad</a> · © 2026 Luis González · <a href="https://github.com/iamluisgb/bookreader">Código</a>
+    <div class="foot-tools"><span class="lang-pick" role="group" aria-label="Idioma"><span aria-current="true">Español</span><a href="../../read-the-book/?lang=en" hreflang="en" lang="en" data-umami-event="Language" data-umami-event-to="en" data-umami-event-where="footer">English</a></span><span class="theme-pick" role="group" aria-label="Tema"><button type="button" data-pick="system" aria-pressed="false">Auto</button><button type="button" data-pick="light" aria-pressed="false">Claro</button><button type="button" data-pick="dark" aria-pressed="false">Oscuro</button></span></div>
+  </div>
+</footer>
 <script>
   const q = new URLSearchParams(location.search);
   // Modo tarjeta para generar las imágenes de redes desde esta misma página.
