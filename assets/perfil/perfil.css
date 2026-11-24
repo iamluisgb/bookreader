@@ -79,6 +79,8 @@ main > * { min-width: 0; }
 .pf-tape { position: absolute; left: 0; right: 0; bottom: 70px; height: 0; transform-style: preserve-3d; }
 .pf-floor { position: absolute; left: -10%; right: -10%; bottom: 30px; height: 70px; background: radial-gradient(60% 100% at 50% 0%, var(--pf-floor), transparent 70%); pointer-events: none; }
 .pf-bk { all: unset; position: absolute; left: 0; bottom: 0; width: var(--t); height: var(--h); transform-style: preserve-3d; transition: transform .75s cubic-bezier(.2,.8,.2,1), opacity .45s, filter .45s; cursor: pointer; will-change: transform; }
+/* Mientras se arrastra, los libros siguen al dedo sin animación; al soltar vuelve la transición. */
+.pf-tape.is-dragging .pf-bk { transition: none; }
 .pf-lift { position: absolute; inset: 0; transform-style: preserve-3d; transition: transform .3s cubic-bezier(.2,.8,.2,1); }
 .pf-bk:not(.is-active):hover .pf-lift { transform: translateY(-14px); }
 .pf-bk:focus-visible .pf-spine { outline: 2px solid var(--accent); outline-offset: 3px; }

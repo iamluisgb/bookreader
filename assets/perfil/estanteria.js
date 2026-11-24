@@ -218,9 +218,9 @@ function buildTape() {
   }).join('');
 }
 
-function layout() {
-  const els = [...tape.children];
-  if (!els.length) return;
+// Dónde va cada libro con el activo actual, y el desplazamiento que lo centra (sin activo, la fila
+// entera centrada). `layout` lo pinta; el arrastre lo usa para saber qué libro queda en el centro.
+function positions() {
   const W = wrapEl.clientWidth;
   const GAP = Math.max(3, H * 0.012), GAP_A = H * 0.1;
   let x = 0; const pos = [];
@@ -230,8 +230,15 @@ function layout() {
     pos.push({ x, w, t, d, act }); x += w;
   });
   const a = pos[state.active];
-  // Sin libro activo se centra la fila entera; con uno, ese libro.
-  const offset = a ? W / 2 - (a.x + a.w / 2) : W / 2 - x / 2;
+  return { W, pos, offset: a ? W / 2 - (a.x + a.w / 2) : W / 2 - x / 2 };
+}
+
+// `drag`: píxeles que lleva arrastrada la cinta (el dedo); los libros lo siguen sin animación.
+function layout(drag = 0) {
+  const els = [...tape.children];
+  if (!els.length) return;
+  const { pos } = positions();
+  const offset = positions().offset + drag;
   els.forEach((el, i) => {
     const p = pos[i]; const cx = p.x + p.w / 2 + offset - p.t / 2;
     el.style.transform = p.act
@@ -369,14 +376,50 @@ wrapEl.addEventListener('keydown', e => {
   }
   else if (e.key === 'Escape') { if (state.open) closeBook(); else shelve(); }
 });
-wrapEl.addEventListener('pointerdown', e => { downX = e.clientX; dragged = false; });
-wrapEl.addEventListener('pointermove', e => { if (downX !== null && Math.abs(e.clientX - downX) > 8) dragged = true; });
-wrapEl.addEventListener('pointerup', e => {
+// Arrastrar (dedo o ratón): la cinta sigue al dedo y, al soltar, se asienta en el libro que quede
+// más cerca del centro. Un gesto corto pero claro (> 40 px) pasa al menos al siguiente. El puntero
+// se captura solo cuando ya es un arrastre: capturarlo antes desviaría el toque de un libro.
+let downAt = 0;
+wrapEl.addEventListener('pointerdown', e => {
+  if (state.open || e.button > 0) return;
+  downX = e.clientX; downAt = Date.now(); dragged = false;
+});
+wrapEl.addEventListener('pointermove', e => {
+  if (downX === null) return;
+  const dx = e.clientX - downX;
+  if (!dragged && Math.abs(dx) > 8) {
+    dragged = true;
+    tape.classList.add('is-dragging');
+    try { wrapEl.setPointerCapture(e.pointerId); } catch { /* sin captura */ }
+  }
+  if (dragged) layout(dx);
+});
+function endDrag(e, cancelled) {
   if (downX === null) return;
   const dx = e.clientX - downX; downX = null;
-  if (Math.abs(dx) > 40) { const steps = Math.max(1, Math.min(4, Math.round(Math.abs(dx) / 90))); for (let k = 0; k < steps; k++) go(dx < 0 ? 1 : -1); }
+  tape.classList.remove('is-dragging');
+  if (!dragged || cancelled) { if (dragged) layout(); setTimeout(() => { dragged = false; }, 0); return; }
+  // El libro cuyo centro queda más cerca del centro de la cinta, con la cinta donde la dejó el dedo.
+  const { W, pos, offset } = positions();
+  let best = state.active, bestD = Infinity;
+  pos.forEach((p, i) => {
+    if (!matches(BOOKS[i])) return;
+    const d = Math.abs(p.x + p.w / 2 + offset + dx - W / 2);
+    if (d < bestD) { bestD = d; best = i; }
+  });
+  const clear = Math.abs(dx) > 40;
+  if (!clear && (state.active === NONE || Date.now() - downAt < 250)) {
+    layout();   // apenas se movió: vuelve a su sitio
+  } else if (best !== state.active) {
+    if (state.open) closeBook();
+    state.active = best; layout();
+  } else if (clear) {
+    go(dx < 0 ? 1 : -1);   // gesto claro que no llegó a cambiar de libro: uno en su dirección
+  } else layout();
   setTimeout(() => { dragged = false; }, 0);
-});
+}
+wrapEl.addEventListener('pointerup', e => endDrag(e, false));
+wrapEl.addEventListener('pointercancel', e => endDrag(e, true));
 wrapEl.addEventListener('wheel', e => {
   if (Math.abs(e.deltaX) < Math.abs(e.deltaY) || Math.abs(e.deltaX) < 12) return;
   e.preventDefault();
