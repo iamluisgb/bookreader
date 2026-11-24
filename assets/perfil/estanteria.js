@@ -21,7 +21,9 @@ const $ = id => document.getElementById(id);
 const wrapEl = $('pf-tape-wrap');
 const tape = $('pf-tape');
 const ob = $('pf-ob');
-const state = { filter: 'all', active: 0, open: false };
+// `active` = -1: ningún libro girado, todos de canto y centrados (así empieza la página).
+const NONE = -1;
+const state = { filter: 'all', active: NONE, open: false };
 let BOOKS = [];
 let SHELF = '';
 let H = 380;
@@ -159,7 +161,8 @@ function layout() {
     pos.push({ x, w, t, d, act }); x += w;
   });
   const a = pos[state.active];
-  const offset = W / 2 - (a.x + a.w / 2);
+  // Sin libro activo se centra la fila entera; con uno, ese libro.
+  const offset = a ? W / 2 - (a.x + a.w / 2) : W / 2 - x / 2;
   els.forEach((el, i) => {
     const p = pos[i]; const cx = p.x + p.w / 2 + offset - p.t / 2;
     el.style.transform = p.act
@@ -176,6 +179,12 @@ function layout() {
 function renderCaption() {
   const b = BOOKS[state.active];
   const shown = BOOKS.filter(matches);
+  if (!b) {
+    $('pf-count').innerHTML = `— / ${String(shown.length).padStart(2, '0')}`;
+    $('pf-caption').innerHTML = `<div class="ct">${esc(SHELF)}</div><div class="cs">${shown.length} ${shown.length === 1 ? 'book' : 'books'} · tap a spine to see its cover</div>`;
+    $('pf-prev').disabled = $('pf-next').disabled = !shown.length;
+    return;
+  }
   const n = shown.indexOf(b) + 1;
   $('pf-count').innerHTML = `${n > 0 ? `<b>${String(n).padStart(2, '0')}</b>` : '—'} / ${String(shown.length).padStart(2, '0')}`;
   $('pf-caption').innerHTML = `<div class="ct">${esc(b.title)}</div><div class="cs">${esc(b.author)}<span class="pf-chip${b.status === 'reading' ? ' is-reading' : ''}">${esc(statusLabel(b))}</span></div>`;
@@ -186,12 +195,15 @@ function renderCaption() {
 
 function go(dir) {
   if (state.open) closeBook();
-  let i = state.active + dir;
+  // Desde la fila de lomos, → entra por el primero y ← por el último.
+  let i = state.active === NONE ? (dir > 0 ? 0 : BOOKS.length - 1) : state.active + dir;
   while (i >= 0 && i < BOOKS.length && !matches(BOOKS[i])) i += dir;
   if (i < 0 || i >= BOOKS.length) return;
   state.active = i; layout();
 }
 function goTo(i) { if (state.open) closeBook(); state.active = i; layout(); }
+// Volver a la fila de lomos: Esc con el libro cerrado, o tocar fuera de los libros.
+function shelve() { if (state.open) closeBook(); if (state.active === NONE) return; state.active = NONE; layout(); }
 
 function openBook() {
   const b = BOOKS[state.active]; if (!b || state.open) return;
@@ -258,6 +270,11 @@ tape.addEventListener('click', e => {
   const i = +bk.dataset.i;
   if (i === state.active) openBook(); else goTo(i);
 });
+// Tocar el hueco (no un libro ni el libro abierto) devuelve los libros al estante.
+wrapEl.addEventListener('click', e => {
+  if (dragged || state.open || e.target.closest('.pf-bk, .pf-ob')) return;
+  shelve();
+});
 ob.addEventListener('click', e => { if (e.target.closest('.pf-ob-cover, [data-close]')) closeBook(); });
 $('pf-prev').addEventListener('click', () => go(-1));
 $('pf-next').addEventListener('click', () => go(1));
@@ -265,15 +282,17 @@ $('pf-filters').addEventListener('click', e => {
   const btn = e.target.closest('button[data-f]'); if (!btn) return;
   state.filter = btn.dataset.f; renderFilters();
   if (state.open) closeBook();
-  const first = BOOKS.findIndex(matches);
-  if (first >= 0 && !matches(BOOKS[state.active])) state.active = first;
+  if (state.active !== NONE && !matches(BOOKS[state.active])) state.active = NONE;
   layout();
 });
 wrapEl.addEventListener('keydown', e => {
   if (e.key === 'ArrowLeft') { e.preventDefault(); go(-1); }
   else if (e.key === 'ArrowRight') { e.preventDefault(); go(1); }
-  else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (state.open) closeBook(); else openBook(); }
-  else if (e.key === 'Escape') closeBook();
+  else if (e.key === 'Enter' || e.key === ' ') {
+    e.preventDefault();
+    if (state.open) closeBook(); else if (state.active === NONE) go(1); else openBook();
+  }
+  else if (e.key === 'Escape') { if (state.open) closeBook(); else shelve(); }
 });
 wrapEl.addEventListener('pointerdown', e => { downX = e.clientX; dragged = false; });
 wrapEl.addEventListener('pointermove', e => { if (downX !== null && Math.abs(e.clientX - downX) > 8) dragged = true; });
@@ -323,8 +342,8 @@ async function start() {
     for (const b of BOOKS) if (b.cover?.type === 'paper') b.coverData = paperCover(b.cover);
   }
   await Promise.all(BOOKS.map(loadAspect));
-  // Empieza en el libro del medio: así hay libros a los dos lados y no queda medio estante vacío.
-  state.active = Math.floor(BOOKS.length / 2);
+  // Empieza con todos los libros de canto y centrados; tocar uno lo gira y enseña la portada.
+  state.active = NONE;
   renderNow(data.now);
   renderFilters();
   renderList();
