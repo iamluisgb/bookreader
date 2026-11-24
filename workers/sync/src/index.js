@@ -32,7 +32,7 @@
 
 import { mcpRoute, createTokenRoute, listTokensRoute, revokeTokenRoute, listChangesRoute, getUndoRoute, markUndoneRoute, purgeChanges } from './mcp.js';
 import { UPLOAD_RE, uploadRoute, purgeUploads } from './upload.js';
-import { publishRoute, actionRoute, PUBLIC_ORIGIN, manualHandles } from './publish.js';
+import { publishRoute, PUBLIC_ORIGIN } from './publish.js';
 import { serveProfile, unpublishHosted } from './profiles.js';
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -691,11 +691,11 @@ export default {
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
     const { pathname, origin } = new URL(request.url);
     // Perfiles públicos alojados (ruta bookreader.raiatech.com/@* → este Worker). Lo que no es un
-    // perfil alojado (p. ej. /@luis/, estático) sigue a Pages; fuera del dominio público, 404 (un
-    // fetch a sí mismo en workers.dev sería un bucle).
+    // perfil alojado sigue a Pages (su 404); fuera del dominio público, 404 (un fetch a sí mismo en
+    // workers.dev sería un bucle).
     if (pathname.startsWith('/@') || pathname.startsWith('/%40')) {
       try {
-        const page = await serveProfile(request, env, { manual: manualHandles(env) });
+        const page = await serveProfile(request, env);
         if (page) return page;
       } catch (e) { console.error('perfil', e); }
       return origin === PUBLIC_ORIGIN ? fetch(request) : new Response('Not found', { status: 404 });
@@ -716,9 +716,6 @@ export default {
       const up = pathname.match(UPLOAD_RE);
       if (up) return await uploadRoute(up[1], up[2], request, env);
       if (!pathname.startsWith('/v1/')) return json({ error: 'not_found' }, 404, cors);
-      // La Action que publica el perfil se identifica con PUBLISH_PULL_TOKEN, no con token de sync.
-      const act = await actionRoute(pathname, request, env, json);
-      if (act) return act;
 
       const who = await authenticate(request, env);
       if (!who) return json({ error: 'unauthorized' }, 401, cors);

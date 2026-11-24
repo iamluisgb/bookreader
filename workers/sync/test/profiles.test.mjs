@@ -94,6 +94,10 @@ test('alojado: la página escapa el nombre y lleva una CSP con el hash de sus sc
   assert.match(csp, /script-src 'self' 'sha256-[A-Za-z0-9+/=]+'/);
   assert.match(csp, /frame-ancestors 'none'/);
   assert.equal(r.headers.get('x-frame-options'), 'DENY');
+  // Con ?embed=1 sí se deja incrustar (la web del dueño, un blog); sin él, no.
+  const emb = await site(e, '/@ana/?embed=1');
+  assert.match(emb.headers.get('content-security-policy'), /frame-ancestors \*/);
+  assert.equal(emb.headers.get('x-frame-options'), null);
   // Sin barra final, redirige; una estantería tiene su página para compartir.
   assert.equal((await site(e, '/@ana')).status, 301);
   assert.match(await (await site(e, '/@ana/tecnico/')).text(), /og:title[^>]*Técnico/);
@@ -107,7 +111,7 @@ test('alojado: un handle es de uno solo; los reservados y los mal formados no se
   const r = await publish(e, beto.token, snap('ana'));
   assert.equal(r.status, 409);
   assert.equal((await r.json()).error, 'handle_taken');
-  for (const h of ['app', 'api', 'assets', 'luis', 'a', '-ana', 'ana-', 'Ana!', 'x'.repeat(31)]) {
+  for (const h of ['app', 'api', 'assets', 'bookreader', 'a', '-ana', 'ana-', 'Ana!', 'x'.repeat(31)]) {
     assert.equal((await publish(e, beto.token, snap(h))).status, 400, h);
   }
 });

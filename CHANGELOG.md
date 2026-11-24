@@ -49,6 +49,21 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
   CSS); los ficheros en `assets/muestra/`; `samples` en la lista blanca de `build-pages.mjs`; las dos
   URLs en `sitemap.xml` con hreflang. Coste: 2,5 MB en el despliegue.
 
+## 2026-11-24 — `/@luis/` pasa a perfil alojado; fuera la GitHub Action
+
+- **El caso**: con los perfiles alojados, que `/@luis/` siguiera publicándose con commit, Action y
+  un token de GitHub en el Worker no tenía sentido. Ahora se publica como cualquier otro, al momento.
+- Fuera: `.github/workflows/publicar-perfil.yml`, `scripts/publicar-perfil.mjs`, las rutas de la
+  Action (`/v1/profile/snapshot|status`), `PUBLISH_PROFILES`, `PUBLISH_PULL_TOKEN`, `PUBLISH_REPO` y
+  sus secretos en el Worker y en GitHub. `luis` deja de estar reservada.
+- **Incrustar**: la variante `?embed=1` de cualquier perfil alojado se deja meter en un iframe
+  (`frame-ancestors *`, sin `X-Frame-Options`); la página normal sigue sin iframes. Es lo que usa la
+  sección «What I'm reading» de luisgonzalezbernal.com.
+- `@luis/` y `assets/perfil/luis/` se quedan en el repo como banco de pruebas de `estanteria.js`,
+  pero ya no se despliegan (`PUBLIC`/`EXCLUIDOS` de `scripts/build-pages.mjs`), ni sus `_headers`.
+- Se pierde, de momento, la imagen para compartir por estantería (la sacaba la Action con
+  Playwright) y los lomos de paper hechos a mano: anotado en MON7.
+
 ## 2026-11-24 — Perfiles públicos para cualquiera con Plus (MON7, ADR-064)
 
 - **El caso**: publicar desde la app solo servía para `/@luis/`, con commit y despliegue. Para que
@@ -56,7 +71,7 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 - **Perfiles alojados** (`workers/sync/src/profiles.js`): `POST /v1/profile/publish` con un token de
   sync guarda el perfil en R2 (`profiles/<handle>/`: `perfil.json`, portadas en `c/`, `now.svg`) y
   queda publicado al momento; `DELETE` lo retira. La tabla `profiles` (migración 0009) guarda la
-  dirección y sus objetos. Las cuentas de `PUBLISH_PROFILES` siguen por la Action.
+  dirección y sus objetos.
 - **Servir**: rutas `bookreader.raiatech.com/@*` y `/%40*` al Worker. Si la dirección no está
   alojada, la petición sigue a Pages, así que `/@luis/` no cambia. La página sale de
   `assets/perfil/plantilla.html` (sacada de `@luis/index.html`), con CSP por hash, sin iframes, y

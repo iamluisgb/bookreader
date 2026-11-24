@@ -8,8 +8,8 @@
 // fichero) NO se publica: el id público es un hash del handle y el libro.
 //
 // Servir: la ruta `bookreader.raiatech.com/@*` pasa por este Worker. Un handle alojado se sirve
-// desde R2 con la plantilla de Pages (assets/perfil/plantilla.html); uno que no lo es (/@luis/,
-// estático en el repo) sigue a Pages tal cual. Mismo origen que la app: por eso la página va con
+// desde R2 con la plantilla de Pages (assets/perfil/plantilla.html); uno que no lo es sigue a Pages
+// (que da su 404). Mismo origen que la app: por eso la página va con
 // una CSP que solo deja correr los scripts de la plantilla (hashes calculados al servir).
 
 import { sha256Hex } from './index.js';
@@ -19,7 +19,7 @@ export const HANDLE_RE = /^[a-z0-9](?:[a-z0-9-]{1,28}[a-z0-9])$/;   // 3-30, sin
 export const RESERVED = new Set(['app', 'api', 'assets', 'es', 'en', 'help', 'blog', 'docs', 'why', 'privacy',
   'terms', 'samples', 'anki', 'admin', 'root', 'www', 'mail', 'support', 'soporte', 'hola', 'about', 'login',
   'signup', 'settings', 'mcp', 'sync', 'static', 'perfil', 'profile', 'bookreader', 'raiatech', 'official',
-  'u', 's', 'luis', 'null', 'undefined']);
+  'u', 's', 'null', 'undefined']);
 export const LIMITS = { books: 300, shelves: 20, coverBytes: 400 * 1024, avatarBytes: 200 * 1024, profileBytes: 16 * 1024 * 1024 };
 const PREFIX = (h) => `profiles/${h}/`;
 const SPINES = new Set(['plain', 'oreilly', 'arxiv', 'paper', 'packt', 'manning', 'nostarch', 'pragprog']);
@@ -146,10 +146,10 @@ async function dropObjects(env, keys) {
   for (let i = 0; i < keys.length; i += 1000) if (keys.slice(i, i + 1000).length) await env.SYNC.delete(keys.slice(i, i + 1000));
 }
 
-// Devuelve [status, body]. `reserved` son los handles del camino manual (PUBLISH_PROFILES).
-export async function publishHosted(env, who, snap, { reserved = new Set(), origin, now = Date.now() } = {}) {
+// Devuelve [status, body].
+export async function publishHosted(env, who, snap, { origin, now = Date.now() } = {}) {
   const handle = str(snap.handle, 40).toLowerCase();
-  if (!HANDLE_RE.test(handle) || RESERVED.has(handle) || reserved.has(handle)) return [400, { error: 'bad_handle' }];
+  if (!HANDLE_RE.test(handle) || RESERVED.has(handle)) return [400, { error: 'bad_handle' }];
   const taken = await env.DB.prepare('SELECT user FROM profiles WHERE handle = ?').bind(handle).first();
   if (taken && taken.user !== who.user) return [409, { error: 'handle_taken' }];
   const built = await buildProfile(snap, handle, str(snap.profile?.name, 60));
@@ -209,7 +209,10 @@ async function template(env, origin, fetchImpl) {
 }
 
 // Rellena la plantilla y le pone una CSP que solo deja los scripts de la plantilla.
-export async function renderPage(tpl, perfil, origin, { shelf = null } = {}) {
+// `embed` (`?embed=1`): la estantería sola para incrustarla en otra web (la del dueño, un blog), así
+// que esa variante SÍ se deja meter en un iframe. La página es de solo lectura —enlaces y libros que
+// se abren, sin formularios ni sesión—, así que no hay acción que secuestrar con un clic.
+export async function renderPage(tpl, perfil, origin, { shelf = null, embed = false } = {}) {
   const es = perfil.profile?.lang === 'es';
   const name = perfil.owner;
   const title = shelf ? `${name} · ${shelf.name} · BookReader` : (es ? `La estantería de ${name} · BookReader` : `${name}’s shelf · BookReader`);
@@ -222,9 +225,11 @@ export async function renderPage(tpl, perfil, origin, { shelf = null } = {}) {
   const csp = [
     "default-src 'self'", `script-src 'self' ${hashes.join(' ')}`, "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com", "img-src 'self' data: blob:", "connect-src 'self' https://cloud.umami.is https://api-gateway.umami.dev",
-    "frame-ancestors 'none'", "base-uri 'none'", "form-action 'none'", "object-src 'none'",
+    embed ? 'frame-ancestors *' : "frame-ancestors 'none'", "base-uri 'none'", "form-action 'none'", "object-src 'none'",
   ].join('; ');
-  return new Response(html, { status: 200, headers: { ...SECURITY, 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'public, max-age=60', 'Content-Security-Policy': csp } });
+  const headers = { ...SECURITY, 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'public, max-age=60', 'Content-Security-Policy': csp };
+  if (embed) delete headers['X-Frame-Options'];
+  return new Response(html, { status: 200, headers });
 }
 
 // Página de una estantería para compartir: tarjeta con su título y redirección a la página.
@@ -241,12 +246,12 @@ function shelfPage(perfil, shelf, origin) {
 }
 
 // null = no es un perfil alojado: que siga a Pages.
-export async function serveProfile(request, env, { manual = new Set(), fetchImpl = fetch } = {}) {
+export async function serveProfile(request, env, { fetchImpl = fetch } = {}) {
   const url = new URL(request.url);
   const m = url.pathname.match(PROFILE_PATH);
   if (!m || !['GET', 'HEAD'].includes(request.method)) return null;
   const handle = decodeURIComponent(m[1]).toLowerCase();
-  if (!HANDLE_RE.test(handle) || manual.has(handle)) return null;
+  if (!HANDLE_RE.test(handle)) return null;
   const row = await env.DB.prepare(
     'SELECT p.handle FROM profiles p LEFT JOIN users u ON u.id = p.user WHERE p.handle = ? AND (u.lapsed_at IS NULL)',
   ).bind(handle).first();
@@ -275,7 +280,7 @@ export async function serveProfile(request, env, { manual = new Set(), fetchImpl
   const perfilObj = await env.SYNC.get(PREFIX(handle) + 'perfil.json');
   if (!perfilObj) return null;
   const perfil = await new Response(perfilObj.body).json();
-  if (rest === '/') return renderPage(await template(env, url.origin, fetchImpl), perfil, url.origin);
+  if (rest === '/') return renderPage(await template(env, url.origin, fetchImpl), perfil, url.origin, { embed: url.searchParams.get('embed') === '1' });
   const sh = rest.match(/^\/([a-z0-9-]{1,60})\/?$/);
   const shelf = sh && perfil.shelves.find(s => s.id === sh[1]);
   if (shelf) return shelfPage(perfil, shelf, url.origin);

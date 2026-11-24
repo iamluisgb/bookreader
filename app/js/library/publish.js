@@ -9,11 +9,11 @@
 // miniatura de los libros marcados— y nada más: ni ficheros, ni notas, ni las estanterías que no
 // sean públicas. El sync sigue cifrado; lo publicado es otra cosa, explícita y aparte.
 //
-// «Publicar» (con el sync de BookReader conectado y la cuenta autorizada en el Worker) manda la foto
-// a `POST /v1/profile/publish`; una GitHub Action corre `scripts/publicar-perfil.mjs` y despliega, y
-// aquí se sigue el estado. «Descargar» deja la misma foto en un `perfil-<handle>.json` para el
-// camino manual, y «Vista previa» la deja en localStorage y abre la página con `?draft=1` (mismo
-// origen), que la pinta en lugar de su `perfil.json`.
+// «Publicar» (con el sync de BookReader conectado) manda la foto a `POST /v1/profile/publish` y el
+// Worker la sirve al momento en `/@<handle>/` (workers/sync/src/profiles.js, ADR-064). Sin sync,
+// «Descargar» deja la misma foto en un `perfil-<handle>.json`. «Vista previa» la deja en
+// localStorage y abre la página con `?draft=1` (mismo origen), que la pinta en lugar de su
+// `perfil.json`.
 //
 // Un libro que entra en una estantería pública DESPUÉS de configurarla queda OCULTO hasta que se
 // marque: nunca se publica algo que no se haya visto.
@@ -551,14 +551,13 @@ export async function renderSettings(content) {
   // Cada cambio se guarda al momento. `fresh` es solo de pantalla y no se guarda; un libro nuevo
   // deja de serlo en cuanto se toca su fila.
   const commit = (repaint) => { saveConfig(stripFresh(st.config)); if (repaint) paint(); };
-  // ¿Se puede publicar desde aquí? Hace falta el sync de BookReader y que el Worker autorice la
-  // cuenta (403 si no). Se pregunta una vez al abrir; sin red o sin sync, queda «Descargar».
+  // ¿Se puede publicar desde aquí? Hace falta el sync de BookReader. Se pregunta una vez al abrir;
+  // sin red o sin sync, queda «Descargar».
   st.canPublish = false; st.pub = null;
   paint();
   pubStatus().then(r => {
     if (!r || !host.isConnected) return;
     st.canPublish = true; st.pub = r; paint();
-    if (r.state === 'queued' || r.state === 'running') follow(st, host);
   });
 
   host.addEventListener('change', (e) => {
@@ -652,32 +651,9 @@ async function pubStatus() {
 }
 const when = (ms) => new Date(ms).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' });
 function statusHtml(p) {
-  if (!p || p.state === 'none') return '';
-  if (p.state === 'queued') return escapeHtml(t('Publicando: en cola…'));
-  if (p.state === 'running') return escapeHtml(t('Publicando: generando la página y desplegando (1-2 minutos)…'));
-  if (p.state === 'done' && p.hosted) {
-    return `${escapeHtml(t('Publicado el {when}:', { when: when(p.at) }))} <a href="${escapeHtml(p.url)}" target="_blank" rel="noopener">${escapeHtml(String(p.url).replace('https://', ''))}</a>
+  if (!p || p.state !== 'done') return '';
+  return `${escapeHtml(t('Publicado el {when}:', { when: when(p.at) }))} <a href="${escapeHtml(p.url)}" target="_blank" rel="noopener">${escapeHtml(String(p.url).replace('https://', ''))}</a>
       <button type="button" class="dlg-btn pp-unpublish" data-act="unpublish">${escapeHtml(t('Retirar la página'))}</button>`;
-  }
-  if (p.state === 'done') return escapeHtml(t('Publicado el {when}.', { when: when(p.at) }));
-  const run = p.run && /^https:\/\/github\.com\//.test(p.run) ? ` <a href="${escapeHtml(p.run)}" target="_blank" rel="noopener">${escapeHtml(t('Ver qué pasó'))}</a>` : '';
-  return escapeHtml(t('La última publicación falló ({when}).', { when: when(p.at) })) + run;
-}
-// Sigue el estado hasta que termine (o 8 minutos). Una sola espera a la vez por pantalla.
-async function follow(st, host) {
-  if (st.following) return;
-  st.following = true;
-  try {
-    const until = Date.now() + 8 * 60 * 1000;
-    while (host.isConnected && Date.now() < until) {
-      await new Promise(r => setTimeout(r, 8000));
-      const p = await pubStatus();
-      if (!p) continue;
-      st.pub = p;
-      const el = host.querySelector('.pp-status'); if (el) el.innerHTML = statusHtml(p);
-      if (p.state === 'done' || p.state === 'failed') return;
-    }
-  } finally { st.following = false; }
 }
 const HANDLE_OK = /^[a-z0-9](?:[a-z0-9-]{1,28}[a-z0-9])$/;
 async function needHandle(config) {
@@ -699,13 +675,12 @@ async function publishOnline(btn, st, host) {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(snap),
     }, { timeoutMs: 60000 });
     const body = res ? await res.json().catch(() => ({})) : {};
-    if (!res || (!res.ok && res.status !== 502)) {
+    if (!res || !res.ok) {
       const WHY = {
         too_large: t('La foto es demasiado grande: quita algún libro y vuelve a probar.'),
         cover_too_large: t('La foto es demasiado grande: quita algún libro y vuelve a probar.'),
         too_many_books: t('Son demasiados libros para una página (el tope es 300).'),
         too_many_shelves: t('Son demasiadas estanterías (el tope es 20).'),
-        not_allowed: t('Esta cuenta todavía no puede publicar desde la app. Usa «Descargar».'),
         bad_handle: t('Esa dirección no vale: de 3 a 30 letras minúsculas, números o guiones, sin guion al principio ni al final. Algunas, como «app», están reservadas.'),
         handle_taken: t('Esa dirección ya es de otra persona. Elige otra.'),
         read_only: t('Tu suscripción no está activa: el perfil no se puede publicar ahora.'),
@@ -717,7 +692,6 @@ async function publishOnline(btn, st, host) {
     }
     st.pub = body;
     const el = host.querySelector('.pp-status'); if (el) el.innerHTML = statusHtml(body);
-    if (body.state === 'queued') follow(st, host);
   } catch {
     await alertBox(t('No se pudo publicar ahora. Vuelve a probar en un rato.'), { title: t('Perfil público') });
   } finally { btn.disabled = false; }

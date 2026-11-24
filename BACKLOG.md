@@ -4271,11 +4271,8 @@ Si basta con una consultora que gestione la bonificación, el ítem pasa a ser d
 
 ### MON7 — Perfil público para usuarios de Plus (`/@usuario`, paso 2) · `L` · **hecho lo básico (2026-11-24, [ADR-064](DECISIONS.md)); falta denunciar y medir**
 
-> **El caso:** `/@luis/` es un experimento (23-nov-2026) y desde el 24-nov se publica desde la app
-> (Ajustes → Perfil público → «Publicar»), pero solo para quien está en `PUBLISH_PROFILES` del
-> Worker de sync, y el resultado se commitea en este repo con una GitHub Action
-> (`.github/workflows/publicar-perfil.yml`). Eso no sirve para otros: sus perfiles no pueden vivir
-> en el repo ni desplegarse con un build de Pages cada vez.
+> **El caso:** `/@luis/` empezó como experimento estático (23-nov-2026). Para que cualquiera con
+> Plus tenga el suyo, los perfiles no pueden vivir en el repo ni desplegarse con un build de Pages.
 
 **Hecho (24-nov-2026, sin esperar a Umami por decisión de Luis):** perfiles alojados en R2 y
 servidos por el Worker en `/@handle/` (`workers/sync/src/profiles.js`), lista blanca de campos, sin
@@ -4291,8 +4288,8 @@ ADR-064 y el CHANGELOG del 24-nov.
   `/v1/usage`, lo que ocupan los perfiles. Si nadie hace clic, no se invierte más.
 - **Quitar la bandera** `?perfil-preview=1` cuando el sync de BookReader se lance (hoy también va
   con bandera y Polar no está configurado: sin MON5 nadie puede pagar).
-- Pasar `/@luis/` al camino alojado cuando sus retoques a mano (lomos de paper, `kind`) tengan
-  sitio en la foto; entonces sobra la GitHub Action.
+- Lomos y portadas de paper (arXiv) en la foto de la app: el `/@luis/` estático los tenía hechos a
+  mano y el alojado no (hoy no hay ningún paper visible en su perfil).
 
 **Fuera, a propósito:** perfiles sin Plus, seguir a otros, feed, comentarios.
 

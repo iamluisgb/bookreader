@@ -2224,8 +2224,10 @@ el 21 de diciembre; Luis decidió no esperar (24-nov).
    público es un hash del handle y el libro, para que no se pueda saber qué fichero exacto tiene.
 3. **Lo sirve el Worker desde R2**, por la ruta `bookreader.raiatech.com/@*`, con la plantilla de
    `assets/perfil/plantilla.html`. Mismo origen que la app, así que la página va con una CSP que solo
-   permite los scripts de la plantilla (hash calculado al servir), sin iframes. Lo que no es un
-   perfil alojado sigue a Pages: `/@luis/` (camino manual, `PUBLISH_PROFILES`) no cambia.
+   permite los scripts de la plantilla (hash calculado al servir). Sin iframes, salvo la variante
+   `?embed=1` (la estantería sola), que cualquier web puede incrustar: es de solo lectura. Lo que no
+   es un perfil alojado sigue a Pages. **`/@luis/` también es alojado** desde el 24-nov: el camino
+   anterior (script, commit y una GitHub Action con un token de GitHub en el Worker) se retiró.
 4. **Quién:** cualquiera con token de sync de BookReader, es decir, con Plus (ADR-061). Con la
    suscripción caducada no publica (solo lectura) y su página deja de servirse; al acabar el
    periodo de gracia, o al borrar la cuenta, el perfil se borra con el resto.

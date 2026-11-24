@@ -4,7 +4,7 @@ import fs from 'fs';
 // Perfil público (Ajustes → Perfil público, solo con ?perfil-preview=1). La configuración se
 // guarda: qué estanterías, en qué orden y con qué nombre, qué libros de cada una, progreso y
 // «leyendo ahora». Lo que entra después en una estantería pública queda oculto hasta marcarlo.
-// Descargar deja la foto (formato 2) que convierte scripts/publicar-perfil.mjs; la vista previa la
+// Descargar deja la foto (formato 2), la misma que «Publicar» manda al Worker; la vista previa la
 // deja en localStorage para la página pública con ?draft=1.
 
 const A = 'a'.repeat(64), B = 'b'.repeat(64), C = 'c'.repeat(64), D = 'd'.repeat(64);
@@ -356,10 +356,8 @@ test('al publicar, la portada sale del fichero si está en el dispositivo (no de
   for (const r of reds as number[]) expect(r).toBeLessThan(0.5);
 });
 
-// «Publicar» desde la app. Dos caminos (workers/sync/src/publish.js y profiles.js):
-//   - alojado (MON7): cualquier cuenta del sync publica /@handle/ al momento, servido desde R2;
-//   - manual (PUBLISH_PROFILES, hoy /@luis/): la foto va a una GitHub Action que commitea y despliega.
-// Sin sync de BookReader, solo «Descargar para publicar».
+// «Publicar» desde la app (workers/sync/src/publish.js y profiles.js, ADR-064): cualquier cuenta del
+// sync publica /@handle/ al momento, servido desde R2. Sin sync de BookReader, solo «Descargar».
 async function withSync(page: Page, vars: Record<string, string> = {}) {
   const { createSyncServer, installSyncServer, seedBookReaderSync } = await import('./bookreader-sync-mock');
   const server = await createSyncServer({
@@ -401,40 +399,6 @@ test('publicar alojado: con sync, elige dirección, publica al momento y se pued
   await page.locator('.dlg-overlay .dlg-ok').click();
   await expect(pp.locator('button[data-act="unpublish"]')).toHaveCount(0);
   expect([...server.env.SYNC._m.keys()].filter((k: string) => k.startsWith('profiles/'))).toEqual([]);
-});
-
-test('publicar con la Action (PUBLISH_PROFILES): manda la foto, avisa a GitHub y enseña el estado', async ({ page }) => {
-  test.setTimeout(60_000);
-  const dispatches: any[] = [];
-  const realFetch = globalThis.fetch;
-  globalThis.fetch = (async (url: any, init: any) => {
-    if (String(url).startsWith('https://api.github.com/')) { dispatches.push(JSON.parse(init.body)); return new Response(null, { status: 204 }); }
-    return realFetch(url, init);
-  }) as typeof fetch;
-  try {
-    const { server, ids } = await withSync(page, { PUBLISH_REPO: 'iamluisgb/bookreader', GITHUB_DISPATCH_TOKEN: 'gh-test', PUBLISH_PULL_TOKEN: 'pull-test' });
-    const user = server.env.DB._raw.prepare('SELECT user FROM tokens ORDER BY rowid DESC LIMIT 1').get().user;
-    server.env.PUBLISH_PROFILES = JSON.stringify({ [user]: 'luis' });
-    await page.evaluate(() => { const c = JSON.parse(localStorage.getItem('bookreader_public_profile') || '{}'); localStorage.setItem('bookreader_public_profile', JSON.stringify({ ...c, handle: 'luis' })); });
-    await shelfMenu(page, ids.ag);
-    await page.locator('.lib-menu-item[data-act="publish"]').click();
-    const pp = page.locator('.pp');
-    await pp.locator('#pp-handle').fill('luis'); await pp.locator('#pp-handle').blur();
-    await pp.locator('button[data-act="publish"]').click();
-    await expect(pp.locator('.pp-status')).toHaveText(/en cola/);
-    expect(dispatches).toHaveLength(1);
-    expect(dispatches[0]).toMatchObject({ event_type: 'publicar-perfil', client_payload: { handle: 'luis' } });
-    const snap = JSON.parse(new TextDecoder().decode(server.env.SYNC._m.get('publish/luis.json')));
-    expect(snap).toMatchObject({ format: 'bookreader-perfil', version: 2, handle: 'luis' });
-    expect(snap.books.map((b: any) => b.bookId).sort()).toEqual([A, B]);
-
-    const res = await server.worker.fetch(new Request('https://x/v1/profile/status/luis', {
-      method: 'POST', headers: { Authorization: 'Bearer pull-test', 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: dispatches[0].client_payload.id, state: 'done', sha: 'f'.repeat(40) }),
-    }), server.env);
-    expect(res.status).toBe(200);
-    await expect(pp.locator('.pp-status')).toHaveText(/Publicado el/, { timeout: 20_000 });
-  } finally { globalThis.fetch = realFetch; }
 });
 
 test('sin sync de BookReader: solo «Descargar para publicar»', async ({ page }) => {
