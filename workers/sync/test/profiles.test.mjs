@@ -126,7 +126,7 @@ test('alojado: cambiar de handle libera el viejo y borra sus objetos; volver a p
   s2.shelves[0].books = ['bbbbbbbbbbbb'];
   assert.equal((await publish(e, ana.token, s2)).status, 200);
   assert.deepEqual([...e.SYNC._m.keys()].filter(k => k.startsWith('profiles/ana/')), []);
-  assert.deepEqual([...e.SYNC._m.keys()].filter(k => k.startsWith('profiles/ana-lee/')), ['profiles/ana-lee/perfil.json']);
+  assert.deepEqual([...e.SYNC._m.keys()].filter(k => k.startsWith('profiles/ana-lee/')), ['profiles/ana-lee/now.svg', 'profiles/ana-lee/perfil.json']);
   // El viejo queda libre para otro.
   const beto = await login(e, 'BKRD-TEST-0002');
   assert.equal((await publish(e, beto.token, snap('ana'))).status, 200);
@@ -151,6 +151,16 @@ test('alojado: borrar la cuenta (o el fin del periodo de gracia) se lleva el per
   await wipeUser(e, ana.user);
   assert.equal(e.DB._raw.prepare('SELECT COUNT(*) n FROM profiles').get().n, 0);
   assert.deepEqual([...e.SYNC._m.keys()].filter(k => k.startsWith('profiles/')), []);
+});
+
+test('alojado: el widget now.svg existe siempre (leyendo ahora, el primero que se lee, o la estantería)', async () => {
+  const { e, ana } = await setup();
+  await publish(e, ana.token, snap('ana', { now: null }));
+  assert.match(await (await site(e, '/@ana/now.svg')).text(), /READING NOW[\s\S]*Libro A/);
+  const s2 = snap('ana', { now: null });
+  s2.books[0].status = 'finished';
+  await publish(e, ana.token, s2);
+  assert.match(await (await site(e, '/@ana/now.svg')).text(), /BOOKSHELF[\s\S]*2 books/);
 });
 
 test('alojado: portadas enormes o fotos mal formadas se rechazan sin escribir nada', async () => {

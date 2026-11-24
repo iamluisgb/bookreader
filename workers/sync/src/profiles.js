@@ -100,10 +100,12 @@ export async function buildProfile(snap, handle, name) {
     ...(snap.showFilters === false ? { showFilters: false } : {}),
     shelves, books: out,
   };
-  const nowBook = nowId && out.find(b => b.id === nowId);
-  if (nowBook) {
-    files.push({ key: `${PREFIX(handle)}now.svg`, bytes: new TextEncoder().encode(nowSvg(perfil.owner, nowBook, covers.get(nowId))), type: 'image/svg+xml' });
-  }
+  // El widget now.svg existe siempre: se incrusta en webs y READMEs y una imagen rota queda peor que
+  // cualquier cosa. Sin «leyendo ahora» elegido (o con «no enseñarlo»), el primero que se está
+  // leyendo; si no hay ninguno, una tarjeta con la estantería.
+  const nowBook = (nowId && out.find(b => b.id === nowId)) || out.find(b => b.status === 'reading');
+  const svg = nowBook ? nowSvg(perfil.owner, nowBook, covers.get(nowBook.id)) : shelfSvg(perfil.owner, out.length);
+  files.push({ key: `${PREFIX(handle)}now.svg`, bytes: new TextEncoder().encode(svg), type: 'image/svg+xml' });
   return { perfil, files };
 }
 
@@ -132,6 +134,20 @@ export function nowSvg(owner, b, img) {
   ${pct == null ? '' : `<rect class="track" x="110" y="94" width="200" height="6" rx="3"/>
   <rect class="acc" x="110" y="94" width="${Math.max(6, Math.round(2 * pct))}" height="6" rx="3"/>
   <text class="soft" x="320" y="100" ${SANS} font-size="12">${pct}%</text>`}
+  <text class="soft" x="424" y="120" text-anchor="end" ${SANS} font-size="10">BookReader</text>
+</svg>
+`;
+}
+
+function shelfSvg(owner, n) {
+  const SANS = 'font-family="-apple-system, Segoe UI, Helvetica, Arial, sans-serif"';
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="440" height="132" viewBox="0 0 440 132" role="img" aria-label="${xml(`${owner}’s shelf · BookReader`)}">
+  <style>.bg { fill: #ffffff; stroke: #e5e5ea; } .fg { fill: #1d1d1f; } .soft { fill: #5f5f64; }
+    @media (prefers-color-scheme: dark) { .bg { fill: #161b22; stroke: #30363d; } .fg { fill: #f0f6fc; } .soft { fill: #9198a1; } }</style>
+  <rect class="bg" x="0.5" y="0.5" width="439" height="131" rx="10"/>
+  <text class="soft" x="24" y="40" ${SANS} font-size="11" font-weight="600" letter-spacing="0.8">BOOKSHELF</text>
+  <text class="fg" x="24" y="70" font-family="Georgia, serif" font-size="20" font-weight="600">${xml(String(owner).slice(0, 36))}</text>
+  <text class="soft" x="24" y="94" ${SANS} font-size="12">${n} ${n === 1 ? 'book' : 'books'}</text>
   <text class="soft" x="424" y="120" text-anchor="end" ${SANS} font-size="10">BookReader</text>
 </svg>
 `;
