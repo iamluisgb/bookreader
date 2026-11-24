@@ -44,10 +44,11 @@ export function available() {
 
 // ---- configuración -----------------------------------------------------------
 
-// { updatedAt, enabled, handle, showProgress, showFilters, now: 'auto'|'none'|<bookId>,
-//   shelves: [{ id, name, books: [{ id, show, style }] }] }   (shelves: solo las públicas, en orden)
+// { updatedAt, enabled, handle, lang, bio, avatar (data URL), yearTab, showProgress, showFilters, now: 'auto'|'none'|<bookId>,
+//   shelves: [{ id, name, books: [{ id, show, style, note?, link? }] }] }   (shelves: solo las públicas, en orden)
 export function emptyConfig() {
-  return { updatedAt: 0, enabled: false, handle: 'luis', showProgress: true, showFilters: true, now: 'auto', styleAuto: true, shelves: [] };
+  return { updatedAt: 0, enabled: false, handle: 'luis', lang: 'en', bio: '', avatar: null, yearTab: false,
+    showProgress: true, showFilters: true, now: 'auto', styleAuto: true, shelves: [] };
 }
 export function getConfig() {
   const c = Storage.get(CONFIG_KEY, null);
@@ -77,7 +78,8 @@ export function reconcile(config, shelves, members) {
     if (!shelf) continue;
     const recs = members(shelf);
     const ids = new Set(recs.map(r => r.id));
-    const kept = (entry.books || []).filter(b => ids.has(b.id)).map(b => ({ id: b.id, show: !!b.show, style: b.style || 'auto' }));
+    const kept = (entry.books || []).filter(b => ids.has(b.id)).map(b => ({ id: b.id, show: !!b.show, style: b.style || 'auto',
+      ...(b.note ? { note: b.note } : {}), ...(b.link ? { link: b.link } : {}) }));
     const known = new Set(kept.map(b => b.id));
     const fresh = recs.filter(r => !known.has(r.id)).map(r => ({ id: r.id, show: false, style: 'auto', fresh: true }));
     out.shelves.push({ id: entry.id, name: entry.name || Shelves.segments(shelf.name).pop(), books: [...kept, ...fresh] });
@@ -245,6 +247,8 @@ async function snapshot(config) {
         spine: spineFor(rec, style, bg),
         // Elegido por la app, no a mano: el script no lo deja pisar un lomo hecho a mano.
         ...(b.style === 'auto' || !b.style ? { spineAuto: true } : {}),
+        ...(b.note && b.note.trim() ? { note: b.note.trim().slice(0, 280) } : {}),
+        ...(cleanLink(b.link) ? { link: cleanLink(b.link) } : {}),
         coverData,
       });
     }
@@ -254,12 +258,45 @@ async function snapshot(config) {
     usedSlugs.add(id);
     shelves.push({ id, name: s.name, books: ids });
   }
+  // «2026 en libros»: lo terminado este año, de entre lo que ya es visible en alguna estantería
+  // pública (no saca nada que no se haya elegido enseñar), del más reciente al más antiguo.
+  if (config.yearTab) {
+    const y = new Date().getFullYear();
+    const since = new Date(y, 0, 1).getTime();
+    const done = [...books.values()].map(b => recsById.get(b.bookId))
+      .filter(r => r && statusOf(r) === 'finished' && (r.finishedAt || 0) >= since)
+      .sort((a, b) => (b.finishedAt || 0) - (a.finishedAt || 0));
+    if (done.length) shelves.push({ id: `year-${y}`, name: (YEAR_NAME[config.lang] || YEAR_NAME.en)(y), books: done.map(r => r.id.slice(0, 12)), year: true });
+  }
   const nowId = pickNow(config, recsById);
   return { format: 'bookreader-perfil', version: 2, exportedAt: new Date().toISOString(),
     handle: config.handle, showProgress: config.showProgress, showFilters: config.showFilters !== false,
+    profile: { lang: config.lang === 'es' ? 'es' : 'en', bio: String(config.bio || '').trim().slice(0, 200), ...(config.avatar ? { avatarData: config.avatar } : {}) },
     now: nowId && books.has(nowId.slice(0, 12)) ? nowId.slice(0, 12) : null,
     shelves, books: [...books.values()] };
 }
+
+// Enlace para conseguir el libro: solo http(s), y limpio. Cualquier otra cosa se descarta.
+export function cleanLink(v) {
+  const s = String(v || '').trim();
+  if (!s) return '';
+  try { const u = new URL(s); return u.protocol === 'https:' || u.protocol === 'http:' ? u.href : ''; } catch { return ''; }
+}
+
+// Foto de perfil: cuadrada, 192 px, webp. Recorta al centro.
+async function avatarFrom(file) {
+  const url = URL.createObjectURL(file);
+  try {
+    const im = await loadImage(url);
+    const side = Math.min(im.naturalWidth, im.naturalHeight);
+    const c = document.createElement('canvas'); c.width = c.height = 192;
+    const ctx = c.getContext('2d'); ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(im, (im.naturalWidth - side) / 2, (im.naturalHeight - side) / 2, side, side, 0, 0, 192, 192);
+    return toWebp(c);
+  } finally { URL.revokeObjectURL(url); }
+}
+
+export const YEAR_NAME = { en: (y) => `${y} in books`, es: (y) => `${y} en libros` };
 
 function download(name, text) {
   const a = document.createElement('a');
@@ -273,6 +310,7 @@ function download(name, text) {
 
 let focusShelf = null;   // la estantería desde cuyo menú se llegó: se añade y se despliega
 const expanded = new Set();
+const notesOpen = new Set();   // libros con el editor de nota y enlace desplegado
 
 // Desde el menú de una estantería: la hace pública (si no lo era) y abre Ajustes en esta sección.
 export async function openFor(shelfId) {
@@ -339,9 +377,14 @@ function sectionHtml(st) {
             <option value="oreilly" ${b.style === 'oreilly' ? 'selected' : ''}>${escapeHtml(t('Lomo: O’Reilly'))}</option>
           </select>
           <span class="pub-move">
+            <button type="button" class="dlg-btn${b.note || b.link ? ' has-note' : ''}" data-k="note" aria-expanded="${notesOpen.has(b.id)}" aria-label="${escapeHtml(t('Nota y enlace de {title}', { title: r.title || '' }))}" title="${escapeHtml(t('Nota y enlace'))}">✎</button>
             <button type="button" class="dlg-btn" data-k="up" ${j === 0 ? 'disabled' : ''} aria-label="${escapeHtml(t('Subir'))}">↑</button>
             <button type="button" class="dlg-btn" data-k="down" ${j === s.books.length - 1 ? 'disabled' : ''} aria-label="${escapeHtml(t('Bajar'))}">↓</button>
-          </span></li>`;
+          </span>
+          ${notesOpen.has(b.id) ? `<div class="pp-note">
+            <textarea class="appset-input" data-k="note-text" maxlength="280" rows="2" placeholder="${escapeHtml(t('Por qué lo recomiendo (opcional, lo escribes tú)'))}">${escapeHtml(b.note || '')}</textarea>
+            <input class="appset-input" data-k="note-link" type="url" inputmode="url" value="${escapeHtml(b.link || '')}" placeholder="${escapeHtml(t('Dónde conseguirlo: https://… (opcional)'))}">
+          </div>` : ''}</li>`;
       }).join('')}</ol>` : ''}
     </li>`;
   };
@@ -352,6 +395,19 @@ function sectionHtml(st) {
     <div class="pp-body"${config.enabled ? '' : ' hidden'}>
       <label class="appset-label" for="pp-handle">${escapeHtml(t('Dirección'))}</label>
       <div class="pp-handle"><span>bookreader.raiatech.com/@</span><input id="pp-handle" class="appset-input" value="${escapeHtml(config.handle)}" autocomplete="off" spellcheck="false"></div>
+      <label class="appset-label" for="pp-lang">${escapeHtml(t('Idioma de la página'))}</label>
+      <select id="pp-lang" class="appset-input">
+        <option value="en" ${config.lang !== 'es' ? 'selected' : ''}>English</option>
+        <option value="es" ${config.lang === 'es' ? 'selected' : ''}>Español</option>
+      </select>
+      <label class="appset-label" for="pp-bio">${escapeHtml(t('Presentación (opcional)'))}</label>
+      <textarea id="pp-bio" class="appset-input" maxlength="200" rows="2" placeholder="${escapeHtml(t('Una línea sobre ti. La escribes tú.'))}">${escapeHtml(config.bio || '')}</textarea>
+      <label class="appset-label">${escapeHtml(t('Foto (opcional)'))}</label>
+      <div class="pp-avatar">
+        <span class="pp-avatar-img"${config.avatar ? ` style="background-image:url('${escapeHtml(config.avatar)}')"` : ''}>${config.avatar ? '' : 'L'}</span>
+        <label class="dlg-btn pp-file">${escapeHtml(config.avatar ? t('Cambiar') : t('Elegir foto'))}<input type="file" id="pp-avatar" accept="image/*" hidden></label>
+        ${config.avatar ? `<button type="button" class="dlg-btn" id="pp-avatar-rm">${escapeHtml(t('Quitar'))}</button>` : ''}
+      </div>
       <label class="appset-check"><input type="checkbox" id="pp-progress" ${config.showProgress ? 'checked' : ''}> ${escapeHtml(t('Enseñar el progreso de lectura'))}</label>
       <label class="appset-check"><input type="checkbox" id="pp-filters" ${config.showFilters !== false ? 'checked' : ''}> ${escapeHtml(t('Enseñar los filtros por estado (Todos, Leyendo, Terminados…)'))}</label>
       <label class="appset-label" for="pp-now">${escapeHtml(t('Leyendo ahora'))}</label>
@@ -365,6 +421,7 @@ function sectionHtml(st) {
       ${config.shelves.length
         ? `<ol class="pp-shelves">${config.shelves.map(shelfCard).join('')}</ol>`
         : `<p class="appset-muted">${escapeHtml(t('Todavía no hay ninguna. Añade una abajo.'))}</p>`}
+      <label class="appset-check"><input type="checkbox" id="pp-year" ${config.yearTab ? 'checked' : ''}> ${escapeHtml(t('Añadir la pestaña «{y} en libros»: lo terminado este año, de entre lo visible', { y: new Date().getFullYear() }))}</label>
       ${others.length ? `<div class="pp-add">
         <select id="pp-add" class="appset-input" aria-label="${escapeHtml(t('Estantería que añadir'))}">
           ${others.map(r => `<option value="${escapeHtml(r.shelf.id)}">${escapeHtml(r.shelf.name)}</option>`).join('')}
@@ -421,6 +478,15 @@ export async function renderSettings(content) {
     if (el.id === 'pp-enabled') { st.config.enabled = el.checked; commit(true); return; }
     if (el.id === 'pp-progress') { st.config.showProgress = el.checked; commit(false); return; }
     if (el.id === 'pp-filters') { st.config.showFilters = el.checked; commit(false); return; }
+    if (el.id === 'pp-lang') { st.config.lang = el.value === 'es' ? 'es' : 'en'; commit(false); return; }
+    if (el.id === 'pp-bio') { st.config.bio = el.value.trim().slice(0, 200); commit(false); return; }
+    if (el.id === 'pp-year') { st.config.yearTab = el.checked; commit(false); return; }
+    if (el.id === 'pp-avatar') {
+      const f = el.files && el.files[0]; if (!f) return;
+      avatarFrom(f).then(d => { st.config.avatar = d; commit(true); })
+        .catch(() => alertBox(t('No se pudo leer esa imagen.'), { title: t('Perfil público') }));
+      return;
+    }
     if (el.id === 'pp-now') { st.config.now = el.value; commit(false); return; }
     if (el.id === 'pp-handle') { st.config.handle = slug(el.value) || 'luis'; commit(true); return; }
     const card = el.closest('.pp-shelf'); if (!card) return;
@@ -431,6 +497,14 @@ export async function renderSettings(content) {
     delete b.fresh;
     if (el.dataset.k === 'show') { b.show = el.checked; st.lastFocus = s.id; commit(true); }
     if (el.dataset.k === 'style') { b.style = el.value; commit(false); }
+    if (el.dataset.k === 'note-text') { b.note = el.value.trim().slice(0, 280); if (!b.note) delete b.note; commit(false); }
+    if (el.dataset.k === 'note-link') {
+      const v = cleanLink(el.value);
+      if (el.value.trim() && !v) { el.setCustomValidity(t('Tiene que empezar por https://')); el.reportValidity(); return; }
+      el.setCustomValidity('');
+      if (v) b.link = v; else delete b.link;
+      commit(false);
+    }
   });
 
   host.addEventListener('click', async (e) => {
@@ -442,6 +516,7 @@ export async function renderSettings(content) {
       expanded.add(shelf.id); st.lastFocus = shelf.id;
       commit(true); return;
     }
+    if (btn.id === 'pp-avatar-rm') { st.config.avatar = null; commit(true); return; }
     const act = btn.dataset.act;
     if (act === 'preview' || act === 'download') { await publish(act, btn, st.config); return; }
     const card = btn.closest('.pp-shelf'); if (!card) return;
@@ -449,6 +524,11 @@ export async function renderSettings(content) {
     const s = st.config.shelves[i];
     const k = btn.dataset.k;
     st.lastFocus = s.id;
+    if (k === 'note') {
+      const id = s.books[+btn.closest('.pub-row').dataset.i].id;
+      if (notesOpen.has(id)) notesOpen.delete(id); else notesOpen.add(id);
+      paint(); host.querySelector(`.pub-row[data-book="${CSS.escape(id)}"] textarea`)?.focus(); return;
+    }
     if (k === 'expand') { if (expanded.has(s.id)) expanded.delete(s.id); else expanded.add(s.id); paint(); return; }
     if (k === 'sremove') { st.config.shelves.splice(i, 1); commit(true); return; }
     if (k === 'sup' || k === 'sdown') {

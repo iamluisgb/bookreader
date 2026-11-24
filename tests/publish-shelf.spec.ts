@@ -249,3 +249,63 @@ test('página pública con showFilters: false: sin los filtros por estado', asyn
   await expect(page.locator('.pf-bk')).toHaveCount(1);
   await expect(page.locator('#pf-filters')).toBeHidden();
 });
+
+test('perfil: idioma, presentación, foto, nota con enlace y «2026 en libros» llegan a la foto', async ({ page }) => {
+  const ids = await seed(page);
+  await page.evaluate(async ({ C }) => {
+    const S: any = await import('/js/library/store.js');
+    await S.updateBook(C, { finishedAt: Date.now() - 86400000 });
+  }, { C });
+  await shelfMenu(page, ids.hi);
+  await page.locator('.lib-menu-item[data-act="publish"]').click();
+  const pp = page.locator('.pp');
+  await pp.locator('#pp-lang').selectOption('es');
+  await pp.locator('#pp-bio').fill('Leo sobre historia.');
+  await pp.locator('#pp-bio').blur();
+  await pp.locator('#pp-year').check();
+  const row = () => pp.locator('.pub-row', { hasText: 'SPQR' });
+  await row().locator('button[data-k="note"]').click();
+  await row().locator('textarea[data-k="note-text"]').fill('Una nota escrita a mano.');
+  await row().locator('textarea[data-k="note-text"]').blur();
+  // Un enlace que no es http(s) no se guarda.
+  await row().locator('input[data-k="note-link"]').fill('javascript:alert(1)');
+  await row().locator('input[data-k="note-link"]').blur();
+  expect((await config(page)).shelves[0].books.find((b: any) => b.id === C).link).toBeUndefined();
+  await row().locator('input[data-k="note-link"]').fill('https://example.org/spqr');
+  await row().locator('input[data-k="note-link"]').blur();
+  const dl = page.waitForEvent('download');
+  await pp.locator('button[data-act="download"]').click();
+  const snap = JSON.parse(fs.readFileSync((await (await dl).path())!, 'utf8'));
+  expect(snap.profile).toMatchObject({ lang: 'es', bio: 'Leo sobre historia.' });
+  const spqr = snap.books.find((b: any) => b.bookId === C);
+  expect(spqr).toMatchObject({ note: 'Una nota escrita a mano.', link: 'https://example.org/spqr' });
+  const y = new Date().getFullYear();
+  // Solo lo terminado ESTE año y visible: SPQR sí; el Illustrated (a medias) no.
+  expect(snap.shelves.at(-1)).toEqual({ id: `year-${y}`, name: `${y} en libros`, books: [C.slice(0, 12)], year: true });
+});
+
+test('página pública en español, con presentación, nota y enlace seguro', async ({ page }) => {
+  const cover = 'data:image/svg+xml;base64,' + Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="300" height="450"><rect width="300" height="450" fill="#123456"/></svg>').toString('base64');
+  const book = (id: string, extra: object) => ({ id, title: 'Libro ' + id, author: 'Ana', status: 'finished', progress: 100, pages: 200, pagesEstimated: true,
+    spine: { style: 'plain', bg: '#123456', ink: '#ffffff', muted: '#d9d9de', title: 'Libro ' + id, author: 'Ana' }, coverData: cover, ...extra });
+  const snap = { format: 'bookreader-perfil', version: 2, now: null, owner: 'Ana Pérez', profile: { lang: 'es', bio: 'Hola, leo mucho.' },
+    shelves: [{ id: 'h', name: 'Historia', books: ['x1', 'x2'] }],
+    books: [book('x1', { note: 'Me cambió la forma de pensar.', link: 'https://example.org/x1' }), book('x2', { link: 'javascript:alert(1)' })] };
+  await page.goto('http://localhost:8899/@luis/');
+  await page.evaluate((s) => localStorage.setItem('bookreader_perfil_draft', JSON.stringify(s)), snap);
+  await page.goto('http://localhost:8899/@luis/?draft=1');
+  await expect(page.locator('html')).toHaveAttribute('lang', 'es');
+  await expect(page.locator('#pf-bio')).toHaveText('Hola, leo mucho.');
+  await expect(page.locator('#pf-filters button').first()).toContainText('Todos');
+  await expect(page.locator('.pf-keys')).toContainText('recorrer');
+  await page.locator('.pf-bk').first().click();
+  await page.locator('.pf-bk.is-active').click();
+  await expect(page.locator('.pf-ob-note')).toHaveText('Me cambió la forma de pensar.');
+  await expect(page.locator('.pf-ob-link')).toHaveAttribute('href', 'https://example.org/x1');
+  await expect(page.locator('.pf-ob-link')).toHaveAttribute('rel', /nofollow/);
+  await page.locator('[data-close]').click();
+  await page.locator('#pf-next').click();
+  await page.locator('.pf-bk.is-active').click();
+  await expect(page.locator('#pf-ob')).toHaveClass(/is-open/);
+  await expect(page.locator('.pf-ob-link')).toHaveCount(0);   // javascript: no se pinta
+});

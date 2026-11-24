@@ -8,12 +8,53 @@ import { paperCover } from './portada-paper.js';
 
 // Absoluta: un url() relativo dentro de una variable CSS se resuelve contra la hoja que la usa
 // (assets/perfil/), no contra la página.
-const COVERS = new URL('../assets/perfil/luis/', location.href).href;
+// La carpeta de portadas es la del perfil de la dirección (`/@luis/` → assets/perfil/luis/).
+const HANDLE = (location.pathname.match(/\/(?:@|%40)([^/]+)/) || [])[1] || 'luis';
+const COVERS = new URL(`../assets/perfil/${HANDLE}/`, location.href).href;
+// Textos de la página en sus dos idiomas; el de cada perfil lo elige quien publica (`profile.lang`).
+const STR = {
+  en: {
+    all: 'All', reading: 'Reading', finished: 'Finished', unread: 'Not started',
+    sFinished: 'Finished', sUnread: 'Not started', sReading: 'Reading',
+    readingNow: 'Reading now', show: 'Show', book: 'book', books: 'books', tapHint: 'tap a spine to see its cover',
+    no: 'No.', pages: 'pages', close: 'Close', by: 'by', getBook: 'Get the book',
+    openApp: 'Open BookReader', readWith: 'Read with BookReader', kBrowse: 'browse', kOpen: 'open', kClose: 'close',
+    fullShelf: 'Full shelf on BookReader ↗', madeWith: 'Made with',
+    footPitch: 'Want to read along? BookReader is a reader for your own EPUBs and PDFs, with an assistant that cites the page it read.',
+    madePrivacy: 'Only titles and covers are public; the books themselves never leave the reader’s device.',
+    shelves: 'Shelves', filterBy: 'Filter by status', shelfAria: 'Bookshelf. Arrow keys to browse, Enter to open the book',
+    prev: 'Previous book', next: 'Next book', title: (n) => `${n}’s shelf · BookReader`,
+    noDraft: 'There is no preview to show. Open Settings → Public profile in BookReader and press Preview.',
+    loadFail: 'The shelf could not be loaded. Reload the page to try again.',
+  },
+  es: {
+    all: 'Todos', reading: 'Leyendo', finished: 'Terminados', unread: 'Sin empezar',
+    sFinished: 'Terminado', sUnread: 'Sin empezar', sReading: 'Leyendo',
+    readingNow: 'Leyendo ahora', show: 'Ver', book: 'libro', books: 'libros', tapHint: 'toca un lomo para ver su portada',
+    no: 'N.º', pages: 'páginas', close: 'Cerrar', by: 'de', getBook: 'Conseguir el libro',
+    openApp: 'Abrir BookReader', readWith: 'Leído con BookReader', kBrowse: 'recorrer', kOpen: 'abrir', kClose: 'cerrar',
+    fullShelf: 'La estantería completa en BookReader ↗', madeWith: 'Hecho con',
+    footPitch: '¿Quieres leer a la vez? BookReader es un lector para tus propios EPUB y PDF, con un asistente que cita la página que ha leído.',
+    madePrivacy: 'Solo son públicos los títulos y las portadas; los libros nunca salen del dispositivo de quien los lee.',
+    shelves: 'Estanterías', filterBy: 'Filtrar por estado', shelfAria: 'Estantería. Flechas para recorrerla, Intro para abrir el libro',
+    prev: 'Libro anterior', next: 'Libro siguiente', title: (n) => `La estantería de ${n} · BookReader`,
+    noDraft: 'No hay vista previa que enseñar. En BookReader, abre Ajustes → Perfil público y pulsa Vista previa.',
+    loadFail: 'No se ha podido cargar la estantería. Recarga la página para volver a intentarlo.',
+  },
+};
+let L = STR.en;
+function applyLang(lang, owner) {
+  L = STR[lang] || STR.en;
+  document.documentElement.lang = lang === 'es' ? 'es' : 'en';
+  document.querySelectorAll('[data-t]').forEach(el => { if (typeof L[el.dataset.t] === 'string') el.textContent = L[el.dataset.t]; });
+  document.querySelectorAll('[data-t-aria]').forEach(el => { if (L[el.dataset.tAria]) el.setAttribute('aria-label', L[el.dataset.tAria]); });
+  if (owner) document.title = L.title(owner);
+}
 const FILTERS = [
-  { id: 'all', label: 'All', test: () => true },
-  { id: 'reading', label: 'Reading', test: b => b.status === 'reading' },
-  { id: 'finished', label: 'Finished', test: b => b.status === 'finished' },
-  { id: 'unread', label: 'Not started', test: b => b.status === 'unread' },
+  { id: 'all', label: () => L.all, test: () => true },
+  { id: 'reading', label: () => L.reading, test: b => b.status === 'reading' },
+  { id: 'finished', label: () => L.finished, test: b => b.status === 'finished' },
+  { id: 'unread', label: () => L.unread, test: b => b.status === 'unread' },
 ];
 const LOGO = { oreilly: 'O’REILLY', packt: '&lt;packt&gt;', arxiv: 'arXiv' };
 
@@ -32,10 +73,10 @@ let H = 380;
 
 function track(name, data) { try { window.umami?.track(name, data); } catch { /* sin analítica */ } }
 function statusLabel(b) {
-  if (b.status === 'finished') return 'Finished';
-  if (b.status === 'unread') return 'Not started';
+  if (b.status === 'finished') return L.sFinished;
+  if (b.status === 'unread') return L.sUnread;
   // Sin progreso: quien publica eligió no enseñarlo.
-  return b.progress == null ? 'Reading' : `Reading · ${b.progress}%`;
+  return b.progress == null ? L.sReading : `${L.sReading} · ${b.progress}%`;
 }
 function matches(b) { return FILTERS.find(f => f.id === state.filter).test(b); }
 // Un paper no trae portada: se dibuja con sus metadatos (portada-paper.js) en vez de usar un fichero.
@@ -50,9 +91,13 @@ function loadAspect(b) {
   });
 }
 
+// `?og=1`: composición de 1200×630 para la imagen que se ve al compartir el enlace (la hace
+// scripts/publicar-perfil.mjs con un navegador). Solo cabecera, nombre de la estantería y lomos.
+const OG = new URLSearchParams(location.search).get('og') === '1';
+if (OG) document.documentElement.classList.add('is-og');
 function sizes() {
   const W = wrapEl.clientWidth || 800;
-  H = Math.round(Math.max(230, Math.min(400, W * 0.36)));
+  H = OG ? 360 : Math.round(Math.max(230, Math.min(400, W * 0.36)));
   wrapEl.style.setProperty('--H', H + 'px');
 }
 function dims(b) {
@@ -152,7 +197,7 @@ function buildTape() {
   tape.innerHTML = BOOKS.map((b, i) => {
     const { h, t, d } = dims(b); const s = b.spine;
     const vars = `--h:${h}px;--t:${t}px;--d:${d}px;--sp:${s.bg};--spbg:${s.gradient || s.bg};--ink:${s.ink};--muted:${s.muted};--img:url('${coverUrl(b)}')`;
-    return `<button type="button" class="pf-bk" data-i="${i}" style="${esc(vars)}" aria-label="${esc(b.title)}, by ${esc(b.author)}. ${esc(statusLabel(b))}">
+    return `<button type="button" class="pf-bk" data-i="${i}" style="${esc(vars)}" aria-label="${esc(b.title)}, ${L.by} ${esc(b.author)}. ${esc(statusLabel(b))}">
       <div class="pf-lift">
         <div class="pf-face pf-top"></div><div class="pf-face pf-fore"></div><div class="pf-face pf-back"></div><div class="pf-face pf-cover"></div>
         ${spineHtml(b, t, h)}
@@ -192,7 +237,7 @@ function renderCaption() {
   const shown = BOOKS.filter(matches);
   if (!b) {
     $('pf-count').innerHTML = `— / ${String(shown.length).padStart(2, '0')}`;
-    $('pf-caption').innerHTML = `<div class="ct">${esc(SHELF)}</div><div class="cs">${shown.length} ${shown.length === 1 ? 'book' : 'books'} · tap a spine to see its cover</div>`;
+    $('pf-caption').innerHTML = `<div class="ct">${esc(SHELF)}</div><div class="cs">${shown.length} ${shown.length === 1 ? L.book : L.books} · ${L.tapHint}</div>`;
     $('pf-prev').disabled = $('pf-next').disabled = !shown.length;
     return;
   }
@@ -222,12 +267,13 @@ function openBook() {
   ob.style.setProperty('--od', d + 'px'); ob.style.setProperty('--oh', h + 'px'); ob.style.setProperty('--oz', (d / 2 - t / 2 + 24) + 'px');
   $('pf-ob-front').style.setProperty('--img', `url('${coverUrl(b)}')`);
   $('pf-ob-page').innerHTML = `
-    <span class="pf-ob-num">No. ${String(state.active + 1).padStart(2, '0')} · ${esc(SHELF)}</span>
+    <span class="pf-ob-num">${L.no} ${String(state.active + 1).padStart(2, '0')} · ${esc(SHELF)}</span>
     ${b.kind ? `<span class="pf-ob-kind">${esc(b.kind)}</span>` : ''}
     <div class="pf-ob-title">${esc(b.title)}</div>
     <div class="pf-ob-auth">${esc(b.author)}</div>
-    <div class="pf-ob-state"><span>${esc(statusLabel(b))}${b.pagesEstimated ? '' : ` · ${b.pages} pages`}</span>${b.progress == null ? '' : `<div class="pf-ob-track"><i data-w="${Math.max(b.progress, 2)}"></i></div>`}</div>
-    <div class="pf-ob-actions"><button type="button" data-close>Close</button></div>`;
+    <div class="pf-ob-state"><span>${esc(statusLabel(b))}${b.pagesEstimated ? '' : ` · ${b.pages} ${L.pages}`}</span>${b.progress == null ? '' : `<div class="pf-ob-track"><i data-w="${Math.max(b.progress, 2)}"></i></div>`}</div>
+    ${b.note ? `<p class="pf-ob-note">${esc(b.note)}</p>` : ''}
+    <div class="pf-ob-actions">${safeLink(b.link) ? `<a class="pf-ob-link" href="${esc(safeLink(b.link))}" target="_blank" rel="noopener nofollow" data-umami-event="Profile: get book">${L.getBook} ↗</a>` : ''}<button type="button" data-close>${L.close}</button></div>`;
   ob.classList.add('is-shown'); ob.setAttribute('aria-hidden', 'false');
   tape.children[state.active].style.opacity = '0';
   state.open = true;
@@ -254,7 +300,7 @@ function closeNow() { state.open = false; ob.classList.remove('is-open', 'is-sho
 function renderFilters() {
   $('pf-filters').innerHTML = FILTERS.map(f => {
     const n = BOOKS.filter(f.test).length;
-    return `<button type="button" role="tab" data-f="${f.id}" aria-selected="${state.filter === f.id}" ${n ? '' : 'disabled'}>${f.label}<span>${n}</span></button>`;
+    return `<button type="button" role="tab" data-f="${f.id}" aria-selected="${state.filter === f.id}" ${n ? '' : 'disabled'}>${f.label()}<span>${n}</span></button>`;
   }).join('');
 }
 
@@ -263,7 +309,7 @@ function renderNow(nowId) {
   const b = all.find(x => x.id === nowId); if (!b) return;
   const el = $('pf-now');
   el.hidden = false;
-  el.innerHTML = `<span class="pf-dot" aria-hidden="true"></span><span>Reading now</span><b>${esc(b.spine.title)}</b>${b.progress == null ? '' : `<span>${b.progress}%</span>`}<button type="button">Show</button>`;
+  el.innerHTML = `<span class="pf-dot" aria-hidden="true"></span><span>${L.readingNow}</span><b>${esc(b.spine.title)}</b>${b.progress == null ? '' : `<span>${b.progress}%</span>`}<button type="button">${L.show}</button>`;
   el.querySelector('button').addEventListener('click', () => {
     // Si no está en la estantería que se ve, se cambia a la primera que lo tenga.
     if (!BOOKS.includes(b)) selectShelf(SHELVES.findIndex(sh => sh.books.includes(b)));
@@ -273,8 +319,10 @@ function renderNow(nowId) {
   });
 }
 
+// Solo enlaces http(s): el perfil lo escribe una persona y aquí no se fía de nada más.
+function safeLink(v) { try { const u = new URL(v); return u.protocol === 'https:' || u.protocol === 'http:' ? u.href : ''; } catch { return ''; } }
 function renderList() {
-  $('pf-list').innerHTML = BOOKS.map(b => `<li>${esc(b.title)}, by ${esc(b.author)} (${esc(statusLabel(b))})</li>`).join('');
+  $('pf-list').innerHTML = BOOKS.map(b => `<li>${esc(b.title)}, ${L.by} ${esc(b.author)} (${esc(statusLabel(b))})</li>`).join('');
 }
 
 // ---------- Eventos ----------
@@ -395,6 +443,12 @@ function selectShelf(i, { fromUrl = false } = {}) {
 
 async function start() {
   const data = await loadData();
+  // Perfil: idioma, presentación y foto (la foto, en el borrador como data URL; publicada, junto a las portadas).
+  const pr = data.profile || {};
+  applyLang(pr.lang, data.owner);
+  if (pr.bio) { $('pf-bio').textContent = pr.bio; $('pf-bio').hidden = false; }
+  const avatar = pr.avatarData || (pr.avatar ? `${COVERS}avatar.webp` : '');
+  if (avatar) { const a = $('pf-avatar'); a.textContent = ''; a.style.backgroundImage = `url('${avatar}')`; a.classList.add('has-img'); }
   SHELVES = normalize(data);
   // Los filtros por estado (All, Reading…) son opcionales: quien publica decide si se ven.
   $('pf-filters').hidden = data.showFilters === false;
@@ -408,6 +462,8 @@ async function start() {
   sizes();
   // Empieza con todos los libros de canto y centrados; tocar uno lo gira y enseña la portada.
   selectShelf(requested(), { fromUrl: true });
+  // En la imagen para compartir, el libro del medio girado: que se vea al menos una portada.
+  if (OG && BOOKS.length) { state.active = Math.floor(BOOKS.length / 2); layout(); }
   renderNow(data.now);
   // Las fuentes pueden llegar después del primer ajuste: se reajusta al cargarlas.
   document.fonts?.ready.then(() => { buildTape(); fitSpines(); layout(); });
@@ -439,7 +495,5 @@ if (document.documentElement.classList.contains('is-embed') && window.parent !==
 }
 
 start().catch(() => {
-  $('pf-caption').textContent = DRAFT
-    ? 'There is no preview to show. Open “Publish…” on a shelf in BookReader and press Preview.'
-    : 'The shelf could not be loaded. Reload the page to try again.';
+  $('pf-caption').textContent = DRAFT ? L.noDraft : L.loadFail;
 });

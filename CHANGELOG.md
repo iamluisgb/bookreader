@@ -3,6 +3,25 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-11-24 — Perfil público: nota por libro, idioma, foto, «2026 en libros» e imagen para compartir
+
+- **Cada libro puede llevar una nota** («por qué lo recomiendo», hasta 280 caracteres, la escribe
+  quien publica) y un enlace para conseguirlo. Solo se admiten enlaces http(s); la página los
+  vuelve a comprobar y les pone `rel="noopener nofollow"`. Se ven al abrir el libro.
+- **El perfil tiene idioma** (inglés o español), presentación de una línea y foto (192 px,
+  recortada al centro). La página traduce sus textos fijos y el título del documento.
+- **«2026 en libros»** (opcional): una pestaña con lo terminado este año, solo de entre lo que ya
+  es visible en alguna estantería pública, del más reciente al más antiguo.
+- **Imagen para compartir.** El script fotografía la página en modo `?og=1` (1200×630, con el
+  libro del medio girado) para cada estantería. Escribe `@handle/<id>/`, una página con su imagen
+  que lleva a esa pestaña, y pone la imagen de la primera estantería en la página principal.
+  `--no-og` se lo salta, y las páginas de estanterías que ya no se publican se borran.
+- **Lomos en el móvil**: los títulos sin editorial usan el mismo ajuste que los de O'Reilly, y en
+  un lomo muy fino se oculta la etiqueta del pie. Ya no se corta «Claude Code para ingenieros
+  senior».
+- La carpeta de portadas sale de la dirección (`/@handle/`) y ya no lleva `luis` fijo.
+- Tests: `tests/publish-shelf.spec.ts` (13).
+
 ## 2026-11-24 — Ajustes → Perfil público: qué se ve, guardado, y varias estanterías
 
 - **El caso**: elegir qué se publica estantería por estantería no se guardaba (había que volver a

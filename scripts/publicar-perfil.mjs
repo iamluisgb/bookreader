@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+/* global document */  // dentro de page.evaluate: corre en el navegador
 // Lleva a la web el perfil que la app exporta en Ajustes → Perfil público → «Descargar para
 // publicar» (experimento; paso 1, sin servidor).
 //
@@ -73,6 +74,9 @@ for (const b of snap.books.filter(x => referenced.has(x.id))) {
     // Un lomo hecho a mano se conserva salvo que en la app se haya elegido uno concreto (no «automático»).
     spine: p && (b.spine.style === 'plain' || b.spineAuto) ? p.spine : b.spine,
     ...(p?.cover ? { cover: p.cover } : {}),
+    // Nota y enlace los escribe quien publica en la app: manda lo de la app.
+    ...(b.note ? { note: String(b.note).slice(0, 280) } : {}),
+    ...(/^https?:\/\//.test(b.link || '') ? { link: b.link } : {}),
   };
   if (book.progress == null) delete book.progress;
   out.push(book);
@@ -97,7 +101,9 @@ const gone = prev.books.filter(p => !out.some(b => b.id === p.id)).map(p => p.id
 const shelves = snap.shelves.map(sh => ({ id: sh.id, name: sh.name, books: sh.books.map(id => idMap.get(id)).filter(Boolean) }))
   .filter(sh => sh.books.length);
 const nowBook = out.find(b => b.id === idMap.get(snap.now)) || null;
-const perfil = { owner: prev.owner || 'Luis González', now: nowBook ? nowBook.id : null,
+const pr = snap.profile || {};
+const profile = { lang: pr.lang === 'es' ? 'es' : 'en', ...(pr.bio ? { bio: String(pr.bio).slice(0, 200) } : {}), ...(pr.avatarData ? { avatar: true } : {}) };
+const perfil = { owner: prev.owner || 'Luis González', profile, now: nowBook ? nowBook.id : null,
   ...(snap.showFilters === false ? { showFilters: false } : {}), shelves, books: out };
 
 // Widget «Reading now»: SVG autocontenido (la portada va dentro en base64) para el README de GitHub.
@@ -138,5 +144,80 @@ for (const sh of shelves) console.log(`estantería «${sh.name}» (#${sh.id}) ·
 console.log(`${out.length} libros distintos · leyendo ahora: ${nowBook ? nowBook.id : '—'}`);
 if (DRY) { console.log('(--dry-run: no se ha escrito nada)'); process.exit(0); }
 fs.writeFileSync(prevPath, JSON.stringify(perfil, null, 2) + '\n');
+if (pr.avatarData) {
+  fs.mkdirSync(coversDir, { recursive: true });
+  await sharp(Buffer.from(pr.avatarData.split(',')[1], 'base64')).resize(192, 192).webp({ quality: 85 }).toFile(path.join(coversDir, 'avatar.webp'));
+} else if (fs.existsSync(path.join(coversDir, 'avatar.webp'))) fs.rmSync(path.join(coversDir, 'avatar.webp'));
+if (!flag('--no-og')) await shareImages();
 if (nowBook) fs.writeFileSync(path.join(dir, 'now.svg'), await nowSvg(nowBook));
 console.log(`escrito ${path.relative(ROOT, prevPath)}${nowBook ? ' y now.svg' : ''}. Revisa el diff, commit y npm run deploy:pages.`);
+
+// ---- Imágenes y páginas para compartir --------------------------------------------------------
+// Al pegar el enlace en LinkedIn o WhatsApp se ve una imagen: la de cada estantería, con sus lomos,
+// hecha fotografiando la propia página en modo `?og=1` (1200×630). Como los buscadores y las redes
+// no leen el `#id`, cada estantería tiene además su página `@handle/<id>/` con su imagen, que
+// lleva a la estantería. La principal usa la de la primera. `--no-og` se lo salta.
+async function shareImages() {
+  const { chromium } = await import('playwright');
+  const { spawn } = await import('node:child_process');
+  const port = 8700 + Math.floor(Math.random() * 200);
+  const srv = spawn(process.execPath, [path.join(ROOT, 'scripts/test-server.mjs'), String(port), ROOT], { stdio: 'ignore' });
+  const BASE = 'https://bookreader.raiatech.com';
+  const MARK = '<!-- bookreader-share -->';
+  try {
+    await new Promise(r => setTimeout(r, 900));
+    const browser = await chromium.launch();
+    const page = await browser.newPage({ viewport: { width: 1200, height: 630 }, deviceScaleFactor: 1 });
+    // Fuera las páginas de estanterías que ya no se publican (solo las que hizo este script).
+    for (const d of fs.readdirSync(dir, { withFileTypes: true })) {
+      const f = path.join(dir, d.name, 'index.html');
+      if (d.isDirectory() && fs.existsSync(f) && fs.readFileSync(f, 'utf8').includes(MARK) && !shelves.some(sh => sh.id === d.name)) fs.rmSync(path.join(dir, d.name), { recursive: true });
+    }
+    for (const sh of shelves) {
+      await page.goto(`http://localhost:${port}/@${handle}/?og=1&shelf=${encodeURIComponent(sh.id)}`, { waitUntil: 'networkidle' });
+      await page.waitForSelector('.pf-bk');
+      await page.evaluate(() => document.fonts.ready);
+      await page.waitForTimeout(400);
+      const png = await page.screenshot({ type: 'png' });
+      const img = path.join(coversDir, `og-${sh.id}.png`);
+      await sharp(png).png({ compressionLevel: 9, palette: true, quality: 90 }).toFile(img);
+      const title = `${perfil.owner} · ${sh.name}`;
+      const desc = profile.lang === 'es' ? `Lo que ${perfil.owner} está leyendo: ${sh.name}, en BookReader.` : `What ${perfil.owner} is reading: ${sh.name}, on BookReader.`;
+      const ogImg = `${BASE}/assets/perfil/${handle}/og-${sh.id}.png?v=${Date.now().toString(36)}`;
+      fs.mkdirSync(path.join(dir, sh.id), { recursive: true });
+      fs.writeFileSync(path.join(dir, sh.id, 'index.html'), `<!doctype html>
+${MARK}
+<html lang="${profile.lang}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${xml(title)} · BookReader</title>
+<meta name="description" content="${xml(desc)}">
+<meta property="og:type" content="profile">
+<meta property="og:title" content="${xml(title)}">
+<meta property="og:description" content="${xml(desc)}">
+<meta property="og:url" content="${BASE}/@${handle}/${sh.id}/">
+<meta property="og:image" content="${ogImg}">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="canonical" href="${BASE}/@${handle}/#${sh.id}">
+<meta http-equiv="refresh" content="0; url=../?ref=share#${sh.id}">
+</head>
+<body><p><a href="../?ref=share#${sh.id}">${xml(title)}</a></p></body>
+</html>
+`);
+      console.log(`imagen para compartir: ${path.relative(ROOT, img)} · enlace: ${BASE}/@${handle}/${sh.id}/`);
+    }
+    await browser.close();
+    // La página principal enseña la imagen de la primera estantería.
+    const idx = path.join(dir, 'index.html');
+    if (shelves[0] && fs.existsSync(idx)) {
+      let html = fs.readFileSync(idx, 'utf8');
+      const ogImg = `${BASE}/assets/perfil/${handle}/og-${shelves[0].id}.png?v=${Date.now().toString(36)}`;
+      html = html.replace(/<meta property="og:image" content="[^"]*">/, `<meta property="og:image" content="${ogImg}">`);
+      if (!html.includes('twitter:card')) html = html.replace(/(<meta property="og:image"[^>]*>)/, '$1\n<meta property="og:image:width" content="1200">\n<meta property="og:image:height" content="630">\n<meta name="twitter:card" content="summary_large_image">');
+      fs.writeFileSync(idx, html);
+    }
+  } finally { srv.kill(); }
+}
