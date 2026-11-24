@@ -209,4 +209,10 @@
     <xhtml:link rel="alternate" hreflang="es" href="https://bookreader.raiatech.com/es/lee-el-libro/"/>
     <priority>0.8</priority>
   </url>
+  <url>
+    <loc>https://bookreader.raiatech.com/es/lee-el-libro/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://bookreader.raiatech.com/read-the-book/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://bookreader.raiatech.com/es/lee-el-libro/"/>
+    <priority>0.8</priority>
+  </url>
 </urlset>

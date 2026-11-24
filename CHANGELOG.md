@@ -3,6 +3,14 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-11-24 — Repaso de la web pública: contraste en la banda oscura y sitemap
+
+- **Texto invisible en la banda oscura** (portada EN/ES y privacidad EN/ES): el `<b>` dentro de
+  `.values .support` heredaba `.support b { color: var(--text) }`, casi negro sobre `--band-bg`.
+  Se veía «sin cuenta» (privacidad) y «tu propio Google Drive» (portada) apagados hasta perderse.
+  Ahora `.values .support b` va en `--band-ink`.
+- **`sitemap.xml`**: faltaba `/es/lee-el-libro/` (estaba solo la versión inglesa).
+
 ## 2026-11-24 — «Lee el libro»: los números son de la investigación
 
 - «Los números» ya no habla del producto (0 cuentas, 1 toque, 100 % en el dispositivo, 0 KB sin
