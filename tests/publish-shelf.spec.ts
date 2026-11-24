@@ -114,6 +114,8 @@ test('descargar: varias estanterías en su orden, cada libro una vez, sin los oc
   await ag.locator('.pub-row', { hasText: 'Definitive' }).locator('input[data-k="show"]').uncheck();
   await pp.locator(`.pp-shelf[data-shelf="${ids.hi}"] .pub-row`, { hasText: 'Illustrated' }).locator('select[data-k="style"]').selectOption('oreilly');
   await pp.locator('#pp-progress').uncheck();
+  // El selector dice qué ha decidido «automático»: SPQR (sin portada) → color de la portada.
+  await expect(pp.locator(`.pp-shelf[data-shelf="${ids.hi}"] .pub-row`, { hasText: 'SPQR' }).locator('option[data-auto]')).toHaveText(/automático · color de la portada/);
 
   const dl = page.waitForEvent('download');
   await pp.locator('button[data-act="download"]').click();

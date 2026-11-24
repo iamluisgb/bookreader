@@ -326,12 +326,12 @@ function sectionHtml(st) {
       </button>
       ${open ? `<ol class="pub-list">${s.books.map((b, j) => {
         const r = recsById.get(b.id) || {};
-        return `<li class="pub-row${b.show ? '' : ' is-off'}" data-i="${j}">
+        return `<li class="pub-row${b.show ? '' : ' is-off'}" data-i="${j}" data-book="${escapeHtml(b.id)}">
           <input type="checkbox" data-k="show" ${b.show ? 'checked' : ''} aria-label="${escapeHtml(t('Mostrar {title}', { title: r.title || '' }))}">
           <span class="pub-cover" style="${r.cover ? `background-image:url('${escapeHtml(r.cover)}')` : ''}" aria-hidden="true"></span>
           <span class="pub-meta"><b>${escapeHtml(r.title || '')}</b><small>${b.fresh ? `<span class="pp-fresh">${escapeHtml(t('Nuevo'))}</span> ` : ''}${escapeHtml(r.author || '')}</small></span>
           <select class="dlg-input pub-style" data-k="style" aria-label="${escapeHtml(t('Lomo'))}">
-            <option value="auto" ${b.style === 'auto' || !b.style ? 'selected' : ''}>${escapeHtml(t('Lomo: automático'))}</option>
+            <option value="auto" data-auto ${b.style === 'auto' || !b.style ? 'selected' : ''}>${escapeHtml(t('Lomo: automático'))}</option>
             <option value="plain" ${b.style === 'plain' ? 'selected' : ''}>${escapeHtml(t('Lomo: color de la portada'))}</option>
             <option value="oreilly" ${b.style === 'oreilly' ? 'selected' : ''}>${escapeHtml(t('Lomo: O’Reilly'))}</option>
           </select>
@@ -378,6 +378,24 @@ function sectionHtml(st) {
   </div>`;
 }
 
+// Qué decide «automático» para cada libro, a la vista en el selector: así se ve sin publicar si
+// la portada se reconoce como de O'Reilly, y si no, se elige a mano. Se calcula una vez por libro.
+const detected = new Map();   // bookId → Promise<boolean>
+function detectFor(rec) {
+  if (!detected.has(rec.id)) detected.set(rec.id, coverAndColor(rec).then(r => r.oreilly).catch(() => false));
+  return detected.get(rec.id);
+}
+function labelAuto(host, recsById) {
+  for (const row of host.querySelectorAll('.pub-row[data-book]')) {
+    const rec = recsById.get(row.dataset.book); const opt = row.querySelector('option[data-auto]');
+    if (!rec || !opt) continue;
+    detectFor(rec).then(o => {
+      if (!opt.isConnected) return;
+      opt.textContent = `${t('Lomo: automático')} · ${o ? 'O’Reilly' : t('color de la portada')}`;
+    });
+  }
+}
+
 export async function renderSettings(content) {
   const st = await load();
   // Contenedor propio: `content` es de Ajustes y se reutiliza al cambiar de sección. Los listeners
@@ -386,6 +404,7 @@ export async function renderSettings(content) {
   const host = content.firstElementChild;
   const paint = () => {
     host.innerHTML = sectionHtml(st);
+    labelAuto(host, st.recsById);
     if (st.lastFocus) host.querySelector(`.pp-shelf[data-shelf="${CSS.escape(st.lastFocus)}"]`)?.scrollIntoView({ block: 'nearest' });
   };
   // Cada cambio se guarda al momento. `fresh` es solo de pantalla y no se guarda; un libro nuevo

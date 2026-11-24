@@ -1571,6 +1571,7 @@ const EN = {
   'Leyendo ahora': 'Reading now',
   'Lomo': 'Spine',
   'Lomo: automático': 'Spine: automatic',
+  'color de la portada': 'cover colour',
   'Lomo: color de la portada': 'Spine: cover colour',
   'Lomo: O’Reilly': 'Spine: O’Reilly',
   'No cabe en el almacenamiento del navegador. Quita algún libro y vuelve a probar.': 'It does not fit in the browser’s storage. Remove a book and try again.',
