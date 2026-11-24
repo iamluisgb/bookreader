@@ -32,6 +32,7 @@
 
 import { mcpRoute, createTokenRoute, listTokensRoute, revokeTokenRoute, listChangesRoute, getUndoRoute, markUndoneRoute, purgeChanges } from './mcp.js';
 import { UPLOAD_RE, uploadRoute, purgeUploads } from './upload.js';
+import { publishRoute, actionRoute } from './publish.js';
 
 const DAY = 24 * 60 * 60 * 1000;
 const PATH_RE = /^[A-Za-z0-9_-]{16,64}$/;
@@ -702,11 +703,15 @@ export default {
       const up = pathname.match(UPLOAD_RE);
       if (up) return await uploadRoute(up[1], up[2], request, env);
       if (!pathname.startsWith('/v1/')) return json({ error: 'not_found' }, 404, cors);
+      // La Action que publica el perfil se identifica con PUBLISH_PULL_TOKEN, no con token de sync.
+      const act = await actionRoute(pathname, request, env, json);
+      if (act) return act;
 
       const who = await authenticate(request, env);
       if (!who) return json({ error: 'unauthorized' }, 401, cors);
 
       if (pathname === '/v1/status' && method === 'GET') return json(await status(env, who), 200, cors);
+      if (pathname === '/v1/profile/publish' && (method === 'POST' || method === 'GET')) return await publishRoute(request, env, cors, who, json);
       if (pathname === '/v1/list' && method === 'GET') return await listObjects(env, cors, who);
       if (pathname === '/v1/all' && method === 'DELETE') { await wipeUser(env, who.user); return json({ ok: true }, 200, cors); }
       if (pathname === '/v1/mcp-tokens') {

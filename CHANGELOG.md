@@ -3,6 +3,28 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-11-24 — Publicar el perfil público desde la app, sin script
+
+- **El caso**: publicar `/@luis/` era descargar `perfil-luis.json`, pasárselo a un agente, correr
+  `scripts/publicar-perfil.mjs`, commitear y desplegar. Ahora es un botón.
+- **«Publicar»** en Ajustes → Perfil público (`app/js/library/publish.js`). Sale solo si el sync de
+  BookReader está conectado y el Worker autoriza la cuenta; si no, queda «Descargar para publicar».
+  La app manda la misma foto que antes se descargaba y enseña el estado: en cola, publicando,
+  publicado (con fecha) o falló (con enlace a la ejecución).
+- **Worker de sync** (`workers/sync/src/publish.js`): `POST /v1/profile/publish` guarda la foto en
+  R2 (`publish/<handle>.json`, tope 12 MB) y lanza la Action con `repository_dispatch`;
+  `GET` da el estado. Solo para las cuentas de `PUBLISH_PROFILES` (secret, `{usuario: handle}`).
+  La Action baja la foto y avisa del resultado con su propio token (`PUBLISH_PULL_TOKEN`); un aviso
+  de una publicación vieja no pisa el de la nueva.
+- **GitHub Action** (`.github/workflows/publicar-perfil.yml`): baja la foto, corre el mismo
+  `publicar-perfil.mjs`, commitea `@<handle>/` y `assets/perfil/<handle>/` como
+  `bookreader-publicar` y despliega con `npm run deploy:pages`. Si no cambia nada, no despliega.
+  Una publicación detrás de otra (`concurrency`). Es el primer workflow del repo.
+- Sin ADR: solo se publica lo de Luis, que ya era público, y cada publicación queda como commit.
+  Abrirlo a otros usuarios es MON7 en el BACKLOG.
+- Tests: `workers/sync/test/publish.test.mjs` (5) y `tests/publish-shelf.spec.ts` (+1, el flujo
+  entero contra el Worker real con GitHub simulado).
+
 ## 2026-11-24 — El perfil público por MCP: notas, enlaces y presentación
 
 - `get_public_profile` (cualquier token): qué enseña la página pública. Devuelve las estanterías

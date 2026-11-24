@@ -1,0 +1,101 @@
+# Publica el perfil público (/@handle/) cuando la app pulsa «Publicar» (Ajustes → Perfil público).
+#
+# El Worker de sync guarda la foto que manda la app y lanza este workflow con repository_dispatch
+# (workers/sync/src/publish.js). Aquí se baja la foto, se corre el MISMO script que se usaba a mano
+# (scripts/publicar-perfil.mjs), se commitea lo que cambie y se despliega Pages. Al final se le
+# dice al Worker cómo fue, y la app lo enseña.
+#
+# Secrets: PUBLISH_PULL_TOKEN (el mismo que el Worker), CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID.
+name: Publicar perfil
+
+on:
+  repository_dispatch:
+    types: [publicar-perfil]
+  workflow_dispatch:
+    inputs:
+      handle:
+        description: 'Handle (sin @)'
+        required: true
+        default: luis
+
+# Una publicación detrás de otra: dos a la vez se pisarían el commit y el deploy.
+concurrency:
+  group: publicar-perfil
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+env:
+  SYNC_URL: https://bookreader-sync.luisgonzalezb93.workers.dev
+  HANDLE: ${{ github.event.client_payload.handle || inputs.handle }}
+  PUB_ID: ${{ github.event.client_payload.id || '' }}
+
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Comprobar el handle
+        run: |
+          echo "$HANDLE" | grep -Eq '^[a-z0-9][a-z0-9-]{0,30}$' || { echo "handle no válido"; exit 1; }
+
+      - name: Avisar de que empieza
+        env:
+          PULL: ${{ secrets.PUBLISH_PULL_TOKEN }}
+        run: |
+          curl -fsS -X POST "$SYNC_URL/v1/profile/status/$HANDLE" \
+            -H "Authorization: Bearer $PULL" -H 'Content-Type: application/json' \
+            -d "{\"id\":\"$PUB_ID\",\"state\":\"running\",\"run\":\"$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID\"}" || true
+
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+
+      - name: Bajar la foto
+        env:
+          PULL: ${{ secrets.PUBLISH_PULL_TOKEN }}
+        run: |
+          curl -fsS "$SYNC_URL/v1/profile/snapshot/$HANDLE" -H "Authorization: Bearer $PULL" -o "$RUNNER_TEMP/perfil.json"
+          node -e "const s=require(process.argv[1]); if(s.handle!==process.env.HANDLE) process.exit(1); console.log(s.shelves.length+' estanterías, '+s.books.length+' libros')" "$RUNNER_TEMP/perfil.json"
+
+      - name: Generar la página
+        run: node scripts/publicar-perfil.mjs "$RUNNER_TEMP/perfil.json" --dir "@$HANDLE"
+
+      - name: Commit y push
+        id: commit
+        run: |
+          git config user.name 'bookreader-publicar'
+          git config user.email 'bookreader-publicar@users.noreply.github.com'
+          git add -A "@$HANDLE" "assets/perfil/$HANDLE"
+          if git diff --cached --quiet; then echo "sin cambios: no hay nada que desplegar"; exit 0; fi
+          git commit -q -m "perfil(@$HANDLE): publicado desde la app"
+          for i in 1 2 3; do git pull -q --rebase origin main && git push -q origin HEAD:main && break; sleep 5; done
+          git fetch -q origin main
+          echo "cambios=1" >> "$GITHUB_OUTPUT"
+
+      - name: Desplegar
+        if: steps.commit.outputs.cambios == '1'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npm run deploy:pages
+
+      - name: Avisar del resultado
+        if: always()
+        env:
+          PULL: ${{ secrets.PUBLISH_PULL_TOKEN }}
+          ESTADO: ${{ job.status == 'success' && 'done' || 'failed' }}
+        run: |
+          curl -fsS -X POST "$SYNC_URL/v1/profile/status/$HANDLE" \
+            -H "Authorization: Bearer $PULL" -H 'Content-Type: application/json' \
+            -d "{\"id\":\"$PUB_ID\",\"state\":\"$ESTADO\",\"sha\":\"$(git rev-parse HEAD 2>/dev/null)\",\"run\":\"$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID\"}"

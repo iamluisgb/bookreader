@@ -354,3 +354,58 @@ test('al publicar, la portada sale del fichero si está en el dispositivo (no de
   }))), snap.books.map((b: any) => b.coverData));
   for (const r of reds as number[]) expect(r).toBeLessThan(0.5);
 });
+
+// «Publicar» desde la app (workers/sync/src/publish.js + .github/workflows/publicar-perfil.yml):
+// con el sync de BookReader y la cuenta autorizada, la foto va al Worker, este avisa a GitHub, y la
+// pantalla sigue el estado hasta que la Action dice que terminó. Sin autorización, solo «Descargar».
+test('publicar: con sync y cuenta autorizada, manda la foto, avisa a GitHub y enseña el estado', async ({ page }) => {
+  test.setTimeout(60_000);
+  const { createSyncServer, installSyncServer, seedBookReaderSync } = await import('./bookreader-sync-mock');
+  const server = await createSyncServer({
+    ALLOWED_ORIGINS: `http://localhost:${new URL(test.info().project.use.baseURL || 'http://localhost:8888').port}`,
+    PUBLISH_REPO: 'iamluisgb/bookreader', GITHUB_DISPATCH_TOKEN: 'gh-test', PUBLISH_PULL_TOKEN: 'pull-test',
+  });
+  // GitHub de mentira, en este proceso (el Worker corre aquí).
+  const dispatches: any[] = [];
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = (async (url: any, init: any) => {
+    if (String(url).startsWith('https://api.github.com/')) { dispatches.push(JSON.parse(init.body)); return new Response(null, { status: 204 }); }
+    return realFetch(url, init);
+  }) as typeof fetch;
+  try {
+    await installSyncServer(page.context(), server);
+    await seedBookReaderSync(page.context());
+    const ids = await seed(page);
+    await page.evaluate(async () => { const A = await import('/js/sync/bookreader-auth.js'); await A.enable(); await A.getToken(true); });
+
+    // Sin autorizar: la sección enseña «Descargar para publicar» y no «Publicar».
+    await shelfMenu(page, ids.ag);
+    await page.locator('.lib-menu-item[data-act="publish"]').click();
+    const pp = page.locator('.pp');
+    await expect(pp.locator('button[data-act="download"]')).toHaveText('Descargar para publicar');
+    await expect(pp.locator('button[data-act="publish"]')).toHaveCount(0);
+
+    // Autorizada: al volver a abrir la sección aparece «Publicar».
+    const user = server.env.DB._raw.prepare('SELECT user FROM tokens ORDER BY rowid DESC LIMIT 1').get().user;
+    server.env.PUBLISH_PROFILES = JSON.stringify({ [user]: 'luis' });
+    await page.keyboard.press('Escape');
+    await page.evaluate(async () => (await import('/js/ui/app-settings.js')).open('public'));
+    await expect(pp.locator('button[data-act="publish"]')).toBeVisible();
+
+    await pp.locator('button[data-act="publish"]').click();
+    await expect(pp.locator('.pp-status')).toHaveText(/en cola/);
+    expect(dispatches).toHaveLength(1);
+    expect(dispatches[0]).toMatchObject({ event_type: 'publicar-perfil', client_payload: { handle: 'luis' } });
+    const snap = JSON.parse(new TextDecoder().decode(server.env.SYNC._m.get('publish/luis.json')));
+    expect(snap).toMatchObject({ format: 'bookreader-perfil', version: 2, handle: 'luis' });
+    expect(snap.books.map((b: any) => b.bookId).sort()).toEqual([A, B]);
+
+    // La Action informa; la pantalla lo recoge en el siguiente sondeo.
+    const res = await server.worker.fetch(new Request('https://x/v1/profile/status/luis', {
+      method: 'POST', headers: { Authorization: 'Bearer pull-test', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: dispatches[0].client_payload.id, state: 'done', sha: 'f'.repeat(40) }),
+    }), server.env);
+    expect(res.status).toBe(200);
+    await expect(pp.locator('.pp-status')).toHaveText(/Publicado el/, { timeout: 20_000 });
+  } finally { globalThis.fetch = realFetch; }
+});

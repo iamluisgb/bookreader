@@ -4269,6 +4269,43 @@ Si basta con una consultora que gestione la bonificación, el ítem pasa a ser d
 
 ---
 
+### MON7 — Perfil público para usuarios de Plus (`/@usuario`, paso 2) · `L` · **espera a Umami (14-21 dic)**
+
+> **El caso:** `/@luis/` es un experimento (23-nov-2026) y desde el 24-nov se publica desde la app
+> (Ajustes → Perfil público → «Publicar»), pero solo para quien está en `PUBLISH_PROFILES` del
+> Worker de sync, y el resultado se commitea en este repo con una GitHub Action
+> (`.github/workflows/publicar-perfil.yml`). Eso no sirve para otros: sus perfiles no pueden vivir
+> en el repo ni desplegarse con un build de Pages cada vez.
+
+**Puerta, antes de escribir código:** en Umami, entre el 14 y el 21 de diciembre, los eventos
+`Profile: open app`, `open book`, `home` y sobre todo `Profile: want shelf` (el botón del pie,
+desde el 24-nov), más las visitas con `?ref=widget` y `?ref=share`. Si nadie hace clic, no se
+construye: el perfil se queda como página de Luis.
+
+**Lo que hace falta (si pasa la puerta):**
+- **ADR** antes que nada: publicar es sacar datos en claro de una app que promete «todo cifrado»
+  (`app/js/sync/sync-crypto.js`). Qué sale (título, autor, estado, progreso, portada en miniatura,
+  nota y enlace elegidos), consentimiento explícito por libro (ya existe: lo nuevo entra oculto) y
+  cómo se retira.
+- **Servir desde R2, no desde el repo**: `POST /v1/profile/publish` ya guarda la foto en R2
+  (`workers/sync/src/publish.js`); falta que el Worker sirva `/@usuario/` (ruta en
+  `bookreader.raiatech.com`, como `/api/waitlist`) con la página genérica de `@luis/index.html`
+  leyendo su `perfil.json` de R2, y portadas webp generadas en la app (hoy las rehace `sharp` en la
+  Action). Las imágenes para compartir (`?og=1`, Playwright en la Action) pasan a canvas en la app o
+  se quedan fuera.
+- **Nombres de usuario**: reserva en D1 (único, minúsculas, lista de prohibidos: `app`, `api`,
+  `es`, `assets`…), cambio y liberación.
+- **Solo Plus**: `PUBLISH_PROFILES` deja de ser una lista y pasa a «licencia válida» (ADR-061).
+- **Retirar**: despublicar desde la app borra la foto y las portadas de R2; al caducar Plus, el
+  perfil se apaga con el periodo de gracia del sync.
+- **Abuso**: límite por usuario (namespace de rate limit nuevo, ver la lista de usados), tope de
+  tamaño (hoy 12 MB) y de libros, y un «denunciar» en la página. Las portadas son de las editoriales:
+  miniatura y retirable a petición, como hoy.
+- **Coste**: comparte la parte gratuita de R2 con el sync y con «compartir por enlace»
+  (`docs/GUIA_CLOUDFLARE.md`); medir lo que ocupa un perfil típico antes de abrirlo.
+
+**Fuera, a propósito:** perfiles sin Plus, seguir a otros, feed, comentarios.
+
 ## 🔧 Técnico (calidad / seguridad / perf / bugs)
 
 ### MON5 — Planes y precios: gratis y Plus · `M` · **Pro gratis ✓ (2026-11-01), resto pendiente ([ADR-061](DECISIONS.md))**
