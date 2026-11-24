@@ -99,6 +99,24 @@ export function booksIn(books, shelf, now = Date.now()) {
   return (books || []).filter(b => (b.shelfIds || []).includes(shelf.id));
 }
 
+// Miembros de una estantería Y de todo lo que cuelga de ella («Técnico» con «Técnico/Agentes»,
+// «Técnico/RAG»…), sin repetir. Es lo que se espera al compartir o publicar una rama: sus libros
+// suelen estar en las hijas y no en ella, y con `booksIn` salía vacía. Los descendientes se
+// resuelven como en el rail (`shelfRows`): solo la primera estantería de un nodo arrastra el
+// subárbol.
+export function booksInBranch(books, shelves, shelf, now = Date.now()) {
+  if (!shelf) return [];
+  const row = shelfRows(shelves || []).find(r => r.key === shelf.id);
+  const ids = row ? row.shelfIds : [shelf.id];
+  const seen = new Set();
+  const out = [];
+  for (const id of ids) {
+    const s = (shelves || []).find(x => x.id === id);
+    for (const b of booksIn(books, s, now)) if (!seen.has(b.id)) { seen.add(b.id); out.push(b); }
+  }
+  return out;
+}
+
 // ---- Árbol por nombre -------------------------------------------------------
 
 // Segmentos de un nombre: "  Técnico / ML  " → ["Técnico", "ML"]. Un nombre que

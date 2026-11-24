@@ -161,7 +161,8 @@ export async function openPublish(shelfId) {
   const shelf = shelves.find(s => s.id === shelfId);
   if (!shelf) return;
   // Una inteligente se publica con los libros que tenga ahora: la foto no guarda la regla.
-  const members = Shelves.booksIn((await Store.getAllRecords()).filter(r => !r.deleted), shelf);
+  // Con sus subestanterías: publicar «Técnico» saca también lo de «Técnico/Agentes».
+  const members = Shelves.booksInBranch((await Store.getAllRecords()).filter(r => !r.deleted), shelves, shelf);
   if (!members.length) { await alertBox(t('Esta estantería no tiene libros.'), { title: t('Publicar estantería') }); return; }
 
   // Leyendo ahora: el que esté a medias y se abriera más tarde.

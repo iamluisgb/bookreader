@@ -18,7 +18,8 @@ export const setAuthor = (name) => Storage.set(AUTHOR_KEY, String(name || '').tr
 export async function shelfBooks(shelfId) {
   const [shelves, records] = await Promise.all([Store.getShelves(), Store.getAllRecords()]);
   const shelf = shelves.find(s => s.id === shelfId) || null;
-  const books = Shelves.booksIn(records.filter(r => !r.deleted), shelf)
+  // La rama entera: compartir «Técnico» lleva también lo de «Técnico/Agentes» y demás.
+  const books = Shelves.booksInBranch(records.filter(r => !r.deleted), shelves, shelf)
     .sort((a, b) => (a.title || '').localeCompare(b.title || ''));
   return { shelf, books };
 }
