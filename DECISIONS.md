@@ -2203,3 +2203,45 @@ sin meter un build nuevo en el deploy.
 - **No hay ayuda embebida** en la app: solo el enlace y la guía rápida. Si la ayuda se usa de verdad,
   el paso siguiente es enlazar el artículo concreto desde cada pantalla, no meter el sitio en un
   iframe.
+
+## ADR-064 — El perfil público se publica en claro, aparte del sync cifrado, y lo sirve el Worker · `ACEPTADA (2026-11-24)`
+
+**Contexto.** El perfil público (`/@luis/`, experimento del 23-nov) se publicaba con un script y un
+commit, y desde el 24-nov con una GitHub Action. Para que cualquiera con Plus tenga el suyo
+(MON7), los perfiles no pueden vivir en el repo. Y publicar choca con la promesa de la app: el sync
+se cifra en el navegador y el servidor no ve nada. La puerta de MON7 era mirar Umami entre el 14 y
+el 21 de diciembre; Luis decidió no esperar (24-nov).
+
+**Decisión.**
+1. **Publicar es un acto aparte y explícito, en claro.** La foto del perfil no sale del sync: la
+   arma la app al pulsar «Publicar» (`app/js/library/publish.js`) y viaja sola a
+   `POST /v1/profile/publish`. Lleva solo lo que la persona marcó: título, autor, estado, progreso
+   (si lo activa), páginas estimadas, lomo, portada en miniatura, nota y enlace que escribe ella,
+   nombre, presentación y foto. Nada del sync cambia: sigue cifrado y el servidor sigue sin leerlo.
+2. **Lista blanca en el servidor.** `workers/sync/src/profiles.js` reconstruye el perfil campo a
+   campo: textos recortados, colores solo `#rrggbb`, enlaces solo http(s), imágenes solo
+   webp/jpeg/png con tope de tamaño. **El `bookId` (SHA-256 del fichero) no se publica**: el id
+   público es un hash del handle y el libro, para que no se pueda saber qué fichero exacto tiene.
+3. **Lo sirve el Worker desde R2**, por la ruta `bookreader.raiatech.com/@*`, con la plantilla de
+   `assets/perfil/plantilla.html`. Mismo origen que la app, así que la página va con una CSP que solo
+   permite los scripts de la plantilla (hash calculado al servir), sin iframes. Lo que no es un
+   perfil alojado sigue a Pages: `/@luis/` (camino manual, `PUBLISH_PROFILES`) no cambia.
+4. **Quién:** cualquiera con token de sync de BookReader, es decir, con Plus (ADR-061). Con la
+   suscripción caducada no publica (solo lectura) y su página deja de servirse; al acabar el
+   periodo de gracia, o al borrar la cuenta, el perfil se borra con el resto.
+5. **Dirección (handle):** 3-30 caracteres `a-z0-9-`, única, primera que llega. Hay una lista de
+   reservadas (rutas del sitio y la marca). Cambiarla libera la anterior al momento.
+6. **Retirar** borra la página y sus portadas de R2 y libera la dirección; la configuración se queda
+   en la app.
+
+**Consecuencias.**
+- La frase «tus libros no salen del dispositivo» sigue siendo cierta para el sync, no para lo que se
+  publica: la pantalla de Ajustes dice qué sale, y lo nuevo en una estantería pública entra oculto.
+- Las portadas son de las editoriales. Se publican en miniatura y se retiran a petición; no hay
+  sistema de denuncias todavía (MON7, pendiente).
+- Ocupan R2 gratis compartido con el sync y «compartir por enlace»: tope de 12 MB por perfil y 300
+  libros. Cada visita son 1-3 lecturas de R2 y una de D1, con caché de 60 s en el navegador.
+- Sin imágenes para compartir por estantería (`?og=1` necesitaba Playwright en la Action): las
+  tarjetas usan el icono de la app. Si los perfiles prenden, se generan en la app con canvas.
+- Sin moderación previa: un nombre o una nota ofensivos se retiran a mano
+  (`DELETE FROM profiles` + borrar `profiles/<handle>/` en R2).

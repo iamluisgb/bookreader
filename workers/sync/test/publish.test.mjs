@@ -46,18 +46,16 @@ async function setup(over = {}) {
   return { e, me };
 }
 
-test('publicar: quien no está en PUBLISH_PROFILES no publica (403), ni sin token (401)', async () => {
+test('publicar: quien no está en PUBLISH_PROFILES no entra en el camino de la Action (ni sin token)', async () => {
   const { e } = await setup();
   const otro = await login(e, 'BKRD-TEST-0002');
-  fakeGitHub();
+  const calls = fakeGitHub();
+  // Va al perfil alojado (profiles.test.mjs), donde «luis» está reservado: 400 y sin avisar a GitHub.
   const r = await worker.fetch(req('POST', '/v1/profile/publish', { body: snap(), token: otro.token }), e);
-  assert.equal(r.status, 403);
-  assert.equal((await r.json()).error, 'not_allowed');
+  assert.equal(r.status, 400);
+  assert.equal((await r.json()).error, 'bad_handle');
+  assert.equal(calls.length, 0);
   assert.equal((await worker.fetch(req('POST', '/v1/profile/publish', { body: snap() }), e)).status, 401);
-  // Sin PUBLISH_PROFILES (o mal formado) no publica nadie.
-  e.PUBLISH_PROFILES = 'no es json';
-  const yo = await login(e);
-  assert.equal((await worker.fetch(req('POST', '/v1/profile/publish', { body: snap(), token: yo.token }), e)).status, 403);
 });
 
 test('publicar: guarda la foto, avisa a GitHub y deja el estado en cola', async () => {

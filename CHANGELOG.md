@@ -32,6 +32,31 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
   CSS); los ficheros en `assets/muestra/`; `samples` en la lista blanca de `build-pages.mjs`; las dos
   URLs en `sitemap.xml` con hreflang. Coste: 2,5 MB en el despliegue.
 
+## 2026-11-24 — Perfiles públicos para cualquiera con Plus (MON7, ADR-064)
+
+- **El caso**: publicar desde la app solo servía para `/@luis/`, con commit y despliegue. Para que
+  cualquiera con el sync de BookReader tenga su página, el perfil tiene que vivir fuera del repo.
+- **Perfiles alojados** (`workers/sync/src/profiles.js`): `POST /v1/profile/publish` con un token de
+  sync guarda el perfil en R2 (`profiles/<handle>/`: `perfil.json`, portadas en `c/`, `now.svg`) y
+  queda publicado al momento; `DELETE` lo retira. La tabla `profiles` (migración 0009) guarda la
+  dirección y sus objetos. Las cuentas de `PUBLISH_PROFILES` siguen por la Action.
+- **Servir**: rutas `bookreader.raiatech.com/@*` y `/%40*` al Worker. Si la dirección no está
+  alojada, la petición sigue a Pages, así que `/@luis/` no cambia. La página sale de
+  `assets/perfil/plantilla.html` (sacada de `@luis/index.html`), con CSP por hash, sin iframes, y
+  con `?draft=1` para la vista previa de un perfil que aún no existe.
+- **Limpieza y privacidad**: lista blanca de campos, colores `#rrggbb`, enlaces http(s), imágenes
+  webp/jpeg/png de hasta 400 KB, 300 libros, 20 estanterías y 12 MB. El `bookId` no se publica.
+  Direcciones de 3-30 caracteres, únicas, con reservadas (`app`, `api`, `assets`, `luis`…).
+  Rate limit propio (`PUBLISH`, namespace 2406, 6/min).
+- **App**: dirección vacía por defecto (antes `luis`), campo «Nombre que se ve», enlace a la página
+  publicada, «Retirar la página» y errores con motivo (dirección reservada u ocupada, demasiado
+  grande, suscripción caducada). `estanteria.js` lee las portadas alojadas (`coverFile`, con versión
+  para la caché).
+- Borrar la cuenta o acabar el periodo de gracia borra el perfil; con la suscripción caducada no se
+  sirve.
+- Tests: `workers/sync/test/profiles.test.mjs` (8) y `tests/publish-shelf.spec.ts` (17, con el
+  alojado de punta a punta).
+
 ## 2026-11-24 — Publicar el perfil público desde la app, sin script
 
 - **El caso**: publicar `/@luis/` era descargar `perfil-luis.json`, pasárselo a un agente, correr

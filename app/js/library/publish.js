@@ -25,7 +25,7 @@ import * as Storage from '../storage.js';
 import { withoutSubtitle } from './book-meta.js';
 import { t } from '../i18n.js';
 import { escapeHtml } from '../ui/escape.js';
-import { alertBox } from '../ui/dialog.js';
+import { alertBox, confirmBox } from '../ui/dialog.js';
 import { loadJsZip, loadPdfJs } from '../vendor-loader.js';
 
 const FLAG = 'perfil_preview';
@@ -50,7 +50,7 @@ export function available() {
 // { updatedAt, enabled, handle, lang, bio, avatar (data URL), yearTab, showProgress, showFilters, now: 'auto'|'none'|<bookId>,
 //   shelves: [{ id, name, books: [{ id, show, style, note?, link? }] }] }   (shelves: solo las públicas, en orden)
 export function emptyConfig() {
-  return { updatedAt: 0, enabled: false, handle: 'luis', lang: 'en', bio: '', avatar: null, yearTab: false,
+  return { updatedAt: 0, enabled: false, handle: '', name: '', lang: 'en', bio: '', avatar: null, yearTab: false,
     showProgress: true, showFilters: true, now: 'auto', styleAuto: true, shelves: [] };
 }
 export function getConfig() {
@@ -159,6 +159,9 @@ export function looksOReilly(px, w, h) {
   return n > 0 && red / n > 0.01 && edge / en > 220;
 }
 
+// La dirección pública: 3-30 letras minúsculas, números y guiones (la valida también el Worker).
+export const handleOf = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  .replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 30);
 export const slug = (s) => String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'shelf';
 
 // ---- portada ------------------------------------------------------------------
@@ -341,7 +344,8 @@ async function snapshot(config) {
   const nowId = pickNow(config, recsById);
   return { format: 'bookreader-perfil', version: 2, exportedAt: new Date().toISOString(),
     handle: config.handle, showProgress: config.showProgress, showFilters: config.showFilters !== false,
-    profile: { lang: config.lang === 'es' ? 'es' : 'en', bio: String(config.bio || '').trim().slice(0, 200), ...(config.avatar ? { avatarData: config.avatar } : {}) },
+    profile: { lang: config.lang === 'es' ? 'es' : 'en', bio: String(config.bio || '').trim().slice(0, 200),
+      ...(String(config.name || '').trim() ? { name: String(config.name).trim().slice(0, 60) } : {}), ...(config.avatar ? { avatarData: config.avatar } : {}) },
     now: nowId && books.has(nowId.slice(0, 12)) ? nowId.slice(0, 12) : null,
     shelves, books: [...books.values()] };
 }
@@ -464,7 +468,9 @@ function sectionHtml(st) {
     <label class="appset-check"><input type="checkbox" id="pp-enabled" ${config.enabled ? 'checked' : ''}> ${escapeHtml(t('Perfil público activado'))}</label>
     <div class="pp-body"${config.enabled ? '' : ' hidden'}>
       <label class="appset-label" for="pp-handle">${escapeHtml(t('Dirección'))}</label>
-      <div class="pp-handle"><span>bookreader.raiatech.com/@</span><input id="pp-handle" class="appset-input" value="${escapeHtml(config.handle)}" autocomplete="off" spellcheck="false"></div>
+      <div class="pp-handle"><span>bookreader.raiatech.com/@</span><input id="pp-handle" class="appset-input" value="${escapeHtml(config.handle)}" autocomplete="off" spellcheck="false" maxlength="30" placeholder="${escapeHtml(t('tu-nombre'))}"></div>
+      <label class="appset-label" for="pp-name">${escapeHtml(t('Nombre que se ve'))}</label>
+      <input id="pp-name" class="appset-input" maxlength="60" value="${escapeHtml(config.name || '')}" placeholder="${escapeHtml(t('Como quieras que te vean (opcional)'))}">
       <label class="appset-label" for="pp-lang">${escapeHtml(t('Idioma de la página'))}</label>
       <select id="pp-lang" class="appset-input">
         <option value="en" ${config.lang !== 'es' ? 'selected' : ''}>English</option>
@@ -474,7 +480,7 @@ function sectionHtml(st) {
       <textarea id="pp-bio" class="appset-input" maxlength="200" rows="2" placeholder="${escapeHtml(t('Una línea sobre ti. La escribes tú.'))}">${escapeHtml(config.bio || '')}</textarea>
       <label class="appset-label">${escapeHtml(t('Foto (opcional)'))}</label>
       <div class="pp-avatar">
-        <span class="pp-avatar-img"${config.avatar ? ` style="background-image:url('${escapeHtml(config.avatar)}')"` : ''}>${config.avatar ? '' : 'L'}</span>
+        <span class="pp-avatar-img"${config.avatar ? ` style="background-image:url('${escapeHtml(config.avatar)}')"` : ''}>${config.avatar ? '' : escapeHtml(((config.name || config.handle || '·').trim()[0] || '·').toUpperCase())}</span>
         <label class="dlg-btn pp-file">${escapeHtml(config.avatar ? t('Cambiar') : t('Elegir foto'))}<input type="file" id="pp-avatar" accept="image/*" hidden></label>
         ${config.avatar ? `<button type="button" class="dlg-btn" id="pp-avatar-rm">${escapeHtml(t('Quitar'))}</button>` : ''}
       </div>
@@ -508,7 +514,7 @@ function sectionHtml(st) {
           : `<button type="button" class="btn btn--primary dlg-btn" data-act="download">${escapeHtml(t('Descargar para publicar'))}</button>`}
       </div>
       <p class="appset-muted pp-status" role="status" aria-live="polite">${statusHtml(st.pub)}</p>
-      <p class="appset-muted">${escapeHtml(t('Tu página:'))} <a href="${escapeHtml(pageUrl(config.handle))}" target="_blank" rel="noopener">${escapeHtml(pageUrl(config.handle).replace('https://', ''))}</a></p>
+      ${config.handle ? `<p class="appset-muted">${escapeHtml(t('Tu página:'))} <a href="${escapeHtml(pageUrl(config.handle))}" target="_blank" rel="noopener">${escapeHtml(pageUrl(config.handle).replace('https://', ''))}</a></p>` : ''}
     </div>
   </div>`;
 }
@@ -570,7 +576,8 @@ export async function renderSettings(content) {
       return;
     }
     if (el.id === 'pp-now') { st.config.now = el.value; commit(false); return; }
-    if (el.id === 'pp-handle') { st.config.handle = slug(el.value) || 'luis'; commit(true); return; }
+    if (el.id === 'pp-handle') { st.config.handle = handleOf(el.value); commit(true); return; }
+    if (el.id === 'pp-name') { st.config.name = el.value.trim().slice(0, 60); commit(true); return; }
     const card = el.closest('.pp-shelf'); if (!card) return;
     const s = st.config.shelves.find(x => x.id === card.dataset.shelf);
     if (el.dataset.k === 'name') { s.name = el.value.trim() || s.name; commit(false); return; }
@@ -602,6 +609,7 @@ export async function renderSettings(content) {
     const act = btn.dataset.act;
     if (act === 'preview' || act === 'download') { await publish(act, btn, st.config); return; }
     if (act === 'publish') { await publishOnline(btn, st, host); return; }
+    if (act === 'unpublish') { await unpublishOnline(btn, st, host); return; }
     const card = btn.closest('.pp-shelf'); if (!card) return;
     const i = st.config.shelves.findIndex(x => x.id === card.dataset.shelf);
     const s = st.config.shelves[i];
@@ -647,6 +655,10 @@ function statusHtml(p) {
   if (!p || p.state === 'none') return '';
   if (p.state === 'queued') return escapeHtml(t('Publicando: en cola…'));
   if (p.state === 'running') return escapeHtml(t('Publicando: generando la página y desplegando (1-2 minutos)…'));
+  if (p.state === 'done' && p.hosted) {
+    return `${escapeHtml(t('Publicado el {when}:', { when: when(p.at) }))} <a href="${escapeHtml(p.url)}" target="_blank" rel="noopener">${escapeHtml(String(p.url).replace('https://', ''))}</a>
+      <button type="button" class="dlg-btn pp-unpublish" data-act="unpublish">${escapeHtml(t('Retirar la página'))}</button>`;
+  }
   if (p.state === 'done') return escapeHtml(t('Publicado el {when}.', { when: when(p.at) }));
   const run = p.run && /^https:\/\/github\.com\//.test(p.run) ? ` <a href="${escapeHtml(p.run)}" target="_blank" rel="noopener">${escapeHtml(t('Ver qué pasó'))}</a>` : '';
   return escapeHtml(t('La última publicación falló ({when}).', { when: when(p.at) })) + run;
@@ -667,7 +679,14 @@ async function follow(st, host) {
     }
   } finally { st.following = false; }
 }
+const HANDLE_OK = /^[a-z0-9](?:[a-z0-9-]{1,28}[a-z0-9])$/;
+async function needHandle(config) {
+  if (HANDLE_OK.test(config.handle || '')) return false;
+  await alertBox(t('Elige antes la dirección de tu página: de 3 a 30 letras minúsculas, números o guiones.'), { title: t('Perfil público') });
+  return true;
+}
 async function publishOnline(btn, st, host) {
+  if (await needHandle(st.config)) return;
   btn.disabled = true;
   try {
     const snap = await snapshot(st.config);
@@ -681,9 +700,18 @@ async function publishOnline(btn, st, host) {
     }, { timeoutMs: 60000 });
     const body = res ? await res.json().catch(() => ({})) : {};
     if (!res || (!res.ok && res.status !== 502)) {
-      const why = body.error === 'too_large' ? t('La foto es demasiado grande: quita algún libro y vuelve a probar.')
-        : body.error === 'not_allowed' ? t('Esta cuenta todavía no puede publicar desde la app. Usa «Descargar».')
-          : t('No se pudo publicar ahora. Vuelve a probar en un rato.');
+      const WHY = {
+        too_large: t('La foto es demasiado grande: quita algún libro y vuelve a probar.'),
+        cover_too_large: t('La foto es demasiado grande: quita algún libro y vuelve a probar.'),
+        too_many_books: t('Son demasiados libros para una página (el tope es 300).'),
+        too_many_shelves: t('Son demasiadas estanterías (el tope es 20).'),
+        not_allowed: t('Esta cuenta todavía no puede publicar desde la app. Usa «Descargar».'),
+        bad_handle: t('Esa dirección no vale: de 3 a 30 letras minúsculas, números o guiones, sin guion al principio ni al final. Algunas, como «app», están reservadas.'),
+        handle_taken: t('Esa dirección ya es de otra persona. Elige otra.'),
+        read_only: t('Tu suscripción no está activa: el perfil no se puede publicar ahora.'),
+        rate_limited: t('Demasiadas publicaciones seguidas. Espera un minuto.'),
+      };
+      const why = WHY[body.error] || t('No se pudo publicar ahora. Vuelve a probar en un rato.');
       await alertBox(why, { title: t('Perfil público') });
       return;
     }
@@ -694,8 +722,22 @@ async function publishOnline(btn, st, host) {
     await alertBox(t('No se pudo publicar ahora. Vuelve a probar en un rato.'), { title: t('Perfil público') });
   } finally { btn.disabled = false; }
 }
+async function unpublishOnline(btn, st, host) {
+  if (!await confirmBox(t('La página dejará de verse y se borran sus portadas. Tu configuración se queda: puedes volver a publicar cuando quieras.'), { title: t('Retirar la página') })) return;
+  btn.disabled = true;
+  try {
+    const A = await brAuth();
+    const res = A && await A.api('/v1/profile/publish', { method: 'DELETE' }, { timeoutMs: 30000 });
+    if (!res || !res.ok) throw new Error('unpublish');
+    st.pub = await res.json();
+    const el = host.querySelector('.pp-status'); if (el) el.innerHTML = statusHtml(st.pub);
+  } catch {
+    await alertBox(t('No se pudo publicar ahora. Vuelve a probar en un rato.'), { title: t('Perfil público') });
+  } finally { btn.disabled = false; }
+}
 
 async function publish(act, btn, config) {
+  if (act === 'preview' && await needHandle(config)) return;
   // La pestaña se abre YA, en el gesto del usuario: después del await el navegador la bloquea.
   const tab = act === 'preview' ? window.open('', '_blank') : null;
   btn.disabled = true;

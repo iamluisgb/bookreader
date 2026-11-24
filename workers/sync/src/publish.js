@@ -6,24 +6,36 @@
 // y la app lo enseña. Nada de esto toca el sync cifrado: la foto es lo que el usuario eligió hacer
 // público, explícito y aparte (publish.js de la app).
 //
-// Solo para quien está en PUBLISH_PROFILES (secret, JSON `{"<user>": "<handle>"}`): hoy, Luis.
-// Abrirlo a otros (handles, R2 servido, moderación, ADR) es el paso 2 del BACKLOG.
+// Ese camino (con commit en el repo) es solo para quien está en PUBLISH_PROFILES (secret, JSON
+// `{"<user>": "<handle>"}`): hoy, Luis, cuya página tiene retoques hechos a mano. Cualquier otro
+// usuario del sync publica un perfil ALOJADO (profiles.js, MON7 / ADR-064): se guarda en R2 y lo
+// sirve este Worker al momento, sin Action.
 //
 // Rutas:
-//   POST /v1/profile/publish            (token de sync)  guarda la foto y lanza la Action
-//   GET  /v1/profile/publish            (token de sync)  estado de la última publicación
+//   POST   /v1/profile/publish          (token de sync)  publica (Action o alojado)
+//   GET    /v1/profile/publish          (token de sync)  estado de la última publicación
+//   DELETE /v1/profile/publish          (token de sync)  retira el perfil alojado
 //   GET  /v1/profile/snapshot/<handle>  (PUBLISH_PULL_TOKEN)  la Action baja la foto
 //   POST /v1/profile/status/<handle>    (PUBLISH_PULL_TOKEN)  la Action informa: done | failed
 
+import { publishHosted, unpublishHosted, profileOf } from './profiles.js';
+
 export const MAX_SNAPSHOT_BYTES = 12 * 1024 * 1024;   // ~40 portadas de 640 px en webp, con aire
+export const PUBLIC_ORIGIN = 'https://bookreader.raiatech.com';
 const HANDLE_RE = /^[a-z0-9][a-z0-9-]{0,30}$/;
 const snapKey = (h) => `publish/${h}.json`;
 const statusKey = (h) => `publish/${h}.status.json`;
 
+function manualMap(env) {
+  try { const m = JSON.parse(env.PUBLISH_PROFILES || '{}'); return m && typeof m === 'object' ? m : {}; }
+  catch { return {}; }   // mal configurado: nadie va por el camino manual
+}
+// Los handles del camino manual: sus páginas son estáticas en Pages y el Worker no las toca.
+export function manualHandles(env) {
+  return new Set(Object.values(manualMap(env)).filter(h => typeof h === 'string'));
+}
 export function handleFor(env, user) {
-  let map = {};
-  try { map = JSON.parse(env.PUBLISH_PROFILES || '{}'); } catch { /* mal configurado: nadie publica */ }
-  const h = map[user];
+  const h = manualMap(env)[user];
   return typeof h === 'string' && HANDLE_RE.test(h) ? h : null;
 }
 
@@ -57,10 +69,46 @@ async function dispatch(env, handle, id, fetchImpl) {
   return res.status === 204;
 }
 
+async function readSnapshot(request) {
+  const len = Number(request.headers.get('Content-Length') || 0);
+  if (len > MAX_SNAPSHOT_BYTES) return { error: 'too_large', status: 413 };
+  const text = await request.text();
+  if (text.length > MAX_SNAPSHOT_BYTES) return { error: 'too_large', status: 413 };
+  try {
+    const snap = JSON.parse(text);
+    if (!snap || snap.format !== 'bookreader-perfil' || snap.version !== 2) return { error: 'bad_snapshot', status: 400 };
+    return { snap, text };
+  } catch { return { error: 'bad_json', status: 400 }; }
+}
+
+async function hostedRoute(request, env, cors, who, json, now) {
+  if (request.method === 'GET') {
+    const p = await profileOf(env, who.user);
+    return json(p ? { state: 'done', hosted: true, handle: p.handle, at: p.updated_at, books: p.books, url: `${PUBLIC_ORIGIN}/@${p.handle}/` }
+      : { state: 'none', hosted: true }, 200, cors);
+  }
+  if (who.readOnly) return json({ error: 'read_only' }, 403, cors);
+  if (request.method === 'DELETE') {
+    await unpublishHosted(env, who.user);
+    return json({ state: 'none', hosted: true }, 200, cors);
+  }
+  const limiter = env.PUBLISH || env.WRITES;
+  if (limiter) {
+    const { success } = await limiter.limit({ key: 'publish:' + who.user });
+    if (!success) return json({ error: 'rate_limited' }, 429, cors);
+  }
+  const r = await readSnapshot(request);
+  if (r.error) return json({ error: r.error }, r.status, cors);
+  const reserved = manualHandles(env);
+  const [status, body] = await publishHosted(env, who, r.snap, { reserved, origin: PUBLIC_ORIGIN, now });
+  return json(body, status, cors);
+}
+
 export async function publishRoute(request, env, cors, who, json, fetchImpl = fetch, now = Date.now()) {
   const handle = handleFor(env, who.user);
-  if (!handle) return json({ error: 'not_allowed' }, 403, cors);
+  if (!handle) return hostedRoute(request, env, cors, who, json, now);
   if (request.method === 'GET') return json(await readStatus(env, handle), 200, cors);
+  if (request.method === 'DELETE') return json({ error: 'not_supported' }, 400, cors);
 
   if (env.WRITES) {
     const { success } = await env.WRITES.limit({ key: 'publish:' + who.user });

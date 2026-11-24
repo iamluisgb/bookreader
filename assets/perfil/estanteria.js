@@ -89,7 +89,11 @@ function statusLabel(b) {
 }
 function matches(b) { return FILTERS.find(f => f.id === state.filter).test(b); }
 // Un paper no trae portada: se dibuja con sus metadatos (portada-paper.js) en vez de usar un fichero.
-function coverUrl(b) { return b.coverData || `${COVERS}${b.id}.webp`; }
+// Un perfil alojado (MON7, servido por el Worker desde R2) trae `coverFile`: la portada vive junto a
+// la página, en `c/`, y la versión del perfil rompe la caché al volver a publicar.
+let VERSION = '';
+const hosted = (file) => new URL(`c/${file}${VERSION ? `?v=${VERSION}` : ''}`, location.href).href;
+function coverUrl(b) { return b.coverData || (b.coverFile ? hosted(b.coverFile) : `${COVERS}${b.id}.webp`); }
 
 function loadAspect(b) {
   return new Promise(res => {
@@ -452,11 +456,17 @@ function selectShelf(i, { fromUrl = false } = {}) {
 
 async function start() {
   const data = await loadData();
+  VERSION = typeof data.version === 'string' ? data.version.replace(/[^a-z0-9]/gi, '') : '';
   // Perfil: idioma, presentación y foto (la foto, en el borrador como data URL; publicada, junto a las portadas).
   const pr = data.profile || {};
   applyLang(pr.lang, data.owner);
+  // En la vista previa de un perfil nuevo la página aún no lleva el nombre: lo trae el borrador.
+  if (pr.name && DRAFT) {
+    const h1 = document.querySelector('.pf-who h1'); if (h1) h1.textContent = pr.name;
+    const ex = document.querySelector('.pf-exlibris b'); if (ex) ex.textContent = pr.name;
+  }
   if (pr.bio) { $('pf-bio').textContent = pr.bio; $('pf-bio').hidden = false; }
-  const avatar = pr.avatarData || (pr.avatar ? `${COVERS}avatar.webp` : '');
+  const avatar = pr.avatarData || (pr.avatarFile ? hosted(pr.avatarFile) : pr.avatar ? `${COVERS}avatar.webp` : '');
   if (avatar) { const a = $('pf-avatar'); a.textContent = ''; a.style.backgroundImage = `url('${avatar}')`; a.classList.add('has-img'); }
   SHELVES = normalize(data);
   // Los filtros por estado (All, Reading…) son opcionales: quien publica decide si se ven.

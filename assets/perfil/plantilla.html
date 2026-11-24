@@ -1,0 +1,102 @@
+<!doctype html>
+<!-- Plantilla de los perfiles alojados (MON7): la sirve el Worker de sync en /@<handle>/ rellenando
+     {{NAME}}, {{HANDLE}}, {{TITLE}}, {{DESC}}, {{URL}}, {{LANG}} e {{INITIAL}}. Sale de @luis/index.html:
+     un cambio de diseño ahí se repite aquí. Los <script> en línea van con hash en la CSP del Worker. -->
+<html lang="{{LANG}}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="../assets/landing/prefs.js?v=20261108a"></script>
+<script>
+// Modo incrustado (?embed=1): solo la estantería, fondo transparente y el tema que pida la web que
+// la incrusta (?theme=dark|light). Antes de pintar, para que no parpadee.
+(function () {
+  var q = new URLSearchParams(location.search);
+  if (q.get('embed') !== '1') return;
+  var r = document.documentElement; r.classList.add('is-embed');
+  var t = q.get('theme'); if (t === 'dark' || t === 'light') r.setAttribute('data-theme', t);
+})();
+</script>
+<title>{{TITLE}}</title>
+<meta name="description" content="{{DESC}}">
+<meta property="og:type" content="profile">
+<meta property="og:title" content="{{TITLE}}">
+<meta property="og:description" content="{{DESC}}">
+<meta property="og:url" content="{{URL}}">
+<meta property="og:image" content="https://bookreader.raiatech.com/app/icons/icon-512.png">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#121214" media="(prefers-color-scheme: dark)">
+<link rel="canonical" href="{{URL}}">
+<link rel="icon" href="../app/icons/favicon.ico" sizes="32x32">
+<link rel="icon" href="../app/icons/icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="../app/css/fonts.css">
+<link rel="stylesheet" href="../app/css/themes.css">
+<link rel="stylesheet" href="../assets/perfil/perfil.css?v=20261124j">
+<script>
+if (location.hostname === 'bookreader.raiatech.com') {
+  var u = document.createElement('script');
+  u.defer = true; u.src = '/u/s.js';
+  u.setAttribute('data-website-id', '08c1619b-4bb8-471b-9dc9-9b6cda88e8ae');
+  u.setAttribute('data-host-url', 'https://cloud.umami.is');
+  document.head.appendChild(u);
+}
+</script>
+</head>
+<body>
+<nav class="pf-nav">
+  <a class="pf-brand" href="../" data-umami-event="Profile: home"><svg width="22" height="22" viewBox="0 0 512 512" aria-hidden="true" focusable="false"><rect width="512" height="512" rx="118" fill="#111418"/><path d="M288 119 Q288 99 308 99 L396 99 Q416 99 416 119 L416 371 L352 323 L288 371 Z" fill="#22c55e"/><path d="M98 90 L222 90 Q256 90 256 124 L256 470 C 249 442 233 424 206 414 C 177 403 140 401 100 401 Q64 401 64 365 L64 124 Q64 90 98 90 Z" fill="#f8fafc"/></svg> BookReader</a>
+  <a class="pf-btn pf-btn--primary" href="../app/" data-umami-event="Profile: open app" data-umami-event-where="nav" data-t="openApp">Open BookReader</a>
+</nav>
+
+<main>
+  <header class="pf-head pf-pad">
+    <div class="pf-who">
+      <div class="pf-avatar" id="pf-avatar" aria-hidden="true">{{INITIAL}}</div>
+      <div>
+        <h1>{{NAME}}</h1>
+        <p class="pf-bio" id="pf-bio" hidden></p>
+      </div>
+    </div>
+    <div class="pf-now" id="pf-now" hidden></div>
+  </header>
+
+  <section class="pf-shelf" aria-labelledby="pf-shelf-title">
+    <div class="pf-shelf-h pf-pad">
+      <div class="pf-tabs" id="pf-tabs" role="tablist" aria-label="Shelves" data-t-aria="shelves" hidden></div>
+      <h2 id="pf-shelf-title"></h2>
+      <div class="pf-filters" role="tablist" aria-label="Filter by status" data-t-aria="filterBy" id="pf-filters"></div>
+    </div>
+    <div class="pf-tape-wrap" id="pf-tape-wrap" tabindex="0" aria-label="Bookshelf. Arrow keys to browse, Enter to open the book" data-t-aria="shelfAria">
+      <div class="pf-floor"></div>
+      <div class="pf-tape" id="pf-tape"></div>
+      <div class="pf-ob" id="pf-ob" aria-hidden="true">
+        <div class="pf-ob-page" id="pf-ob-page"></div>
+        <div class="pf-ob-cover"><div class="pf-ob-front" id="pf-ob-front"></div><div class="pf-ob-inside"><div class="pf-exlibris"><small>Ex libris</small><b>{{NAME}}</b></div><span data-t="readWith">Read with BookReader</span></div></div>
+      </div>
+    </div>
+    <div class="pf-navrow">
+      <button class="pf-arrow" id="pf-prev" type="button" aria-label="Previous book" data-t-aria="prev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M11 18l-6-6 6-6"/></svg></button>
+      <div class="pf-count" id="pf-count"></div>
+      <button class="pf-arrow" id="pf-next" type="button" aria-label="Next book" data-t-aria="next"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+    </div>
+    <div class="pf-caption pf-pad" id="pf-caption" aria-live="polite"></div>
+    <p class="pf-keys pf-pad"><kbd>←</kbd> <kbd>→</kbd> <span data-t="kBrowse">browse</span> · <kbd>Enter</kbd> <span data-t="kOpen">open</span> · <kbd>Esc</kbd> <span data-t="kClose">close</span></p>
+    <ol class="pf-sr" id="pf-list"></ol>
+  </section>
+
+  <p class="pf-embed-link pf-pad"><a href="{{URL}}?ref=embed" target="_blank" rel="noopener" data-umami-event="Profile: embed full shelf" data-t="fullShelf">Full shelf on BookReader ↗</a></p>
+
+  <footer class="pf-foot pf-pad">
+    <h2 class="pf-foot-h" data-t="footTitle">Want a shelf like this?</h2>
+    <p data-t="footPitch">These books are read in BookReader, a reader for your own EPUBs and PDFs, with an assistant that answers with the exact page it cites.</p>
+    <div class="pf-foot-actions">
+      <a class="pf-btn pf-btn--primary" href="../?ref=profile" data-umami-event="Profile: open app" data-umami-event-where="footer" data-t="tryApp">Try BookReader</a>
+      <a class="pf-btn" id="pf-want" href="mailto:hola@raiatech.com?subject=I%20want%20my%20own%20public%20shelf%20on%20BookReader" data-umami-event="Profile: want shelf" data-t="wantShelf">I want my own public shelf</a>
+    </div>
+    <p class="pf-made" data-t="madePrivacy">Only titles and covers are public. The books never leave the reader’s device.</p>
+  </footer>
+</main>
+
+<script type="module" src="../assets/perfil/estanteria.js?v=20261124k"></script>
+</body>
+</html>

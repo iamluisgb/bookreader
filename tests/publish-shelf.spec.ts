@@ -113,6 +113,7 @@ test('descargar: varias estanterías en su orden, cada libro una vez, sin los oc
   const ag = pp.locator(`.pp-shelf[data-shelf="${ids.ag}"]`);
   await ag.locator('.pub-row', { hasText: 'Definitive' }).locator('input[data-k="show"]').uncheck();
   await pp.locator(`.pp-shelf[data-shelf="${ids.hi}"] .pub-row`, { hasText: 'Illustrated' }).locator('select[data-k="style"]').selectOption('oreilly');
+  await pp.locator('#pp-handle').fill('luis'); await pp.locator('#pp-handle').blur();
   await pp.locator('#pp-progress').uncheck();
   await pp.locator('#pp-filters').uncheck();
   // El selector dice qué ha decidido «automático»: SPQR (sin portada) → color de la portada.
@@ -355,17 +356,55 @@ test('al publicar, la portada sale del fichero si está en el dispositivo (no de
   for (const r of reds as number[]) expect(r).toBeLessThan(0.5);
 });
 
-// «Publicar» desde la app (workers/sync/src/publish.js + .github/workflows/publicar-perfil.yml):
-// con el sync de BookReader y la cuenta autorizada, la foto va al Worker, este avisa a GitHub, y la
-// pantalla sigue el estado hasta que la Action dice que terminó. Sin autorización, solo «Descargar».
-test('publicar: con sync y cuenta autorizada, manda la foto, avisa a GitHub y enseña el estado', async ({ page }) => {
-  test.setTimeout(60_000);
+// «Publicar» desde la app. Dos caminos (workers/sync/src/publish.js y profiles.js):
+//   - alojado (MON7): cualquier cuenta del sync publica /@handle/ al momento, servido desde R2;
+//   - manual (PUBLISH_PROFILES, hoy /@luis/): la foto va a una GitHub Action que commitea y despliega.
+// Sin sync de BookReader, solo «Descargar para publicar».
+async function withSync(page: Page, vars: Record<string, string> = {}) {
   const { createSyncServer, installSyncServer, seedBookReaderSync } = await import('./bookreader-sync-mock');
   const server = await createSyncServer({
     ALLOWED_ORIGINS: `http://localhost:${new URL(test.info().project.use.baseURL || 'http://localhost:8888').port}`,
-    PUBLISH_REPO: 'iamluisgb/bookreader', GITHUB_DISPATCH_TOKEN: 'gh-test', PUBLISH_PULL_TOKEN: 'pull-test',
+    PROFILE_TEMPLATE_HTML: '<!doctype html><h1>{{NAME}}</h1>', ...vars,
   });
-  // GitHub de mentira, en este proceso (el Worker corre aquí).
+  await installSyncServer(page.context(), server);
+  await seedBookReaderSync(page.context());
+  const ids = await seed(page);
+  await page.evaluate(async () => { const A = await import('/js/sync/bookreader-auth.js'); await A.enable(); await A.getToken(true); });
+  return { server, ids };
+}
+
+test('publicar alojado: con sync, elige dirección, publica al momento y se puede retirar', async ({ page }) => {
+  const { server, ids } = await withSync(page);
+  await shelfMenu(page, ids.ag);
+  await page.locator('.lib-menu-item[data-act="publish"]').click();
+  const pp = page.locator('.pp');
+  await expect(pp.locator('button[data-act="publish"]')).toBeVisible();
+  await expect(pp.locator('button[data-act="download"]')).toHaveText('Descargar');
+
+  // Una dirección reservada se rechaza con un motivo que se entiende.
+  await pp.locator('#pp-handle').fill('app'); await pp.locator('#pp-handle').blur();
+  await pp.locator('button[data-act="publish"]').click();
+  await expect(page.locator('.dlg-overlay')).toContainText('reservadas');
+  await page.locator('.dlg-overlay .dlg-ok').click();
+
+  await pp.locator('#pp-handle').fill('Ana Lee'); await pp.locator('#pp-handle').blur();
+  await expect(pp.locator('#pp-handle')).toHaveValue('ana-lee');
+  await pp.locator('#pp-name').fill('Ana Lee'); await pp.locator('#pp-name').blur();
+  await pp.locator('button[data-act="publish"]').click();
+  await expect(pp.locator('.pp-status')).toContainText('bookreader.raiatech.com/@ana-lee/');
+  const perfil = JSON.parse(new TextDecoder().decode(server.env.SYNC._m.get('profiles/ana-lee/perfil.json')));
+  expect(perfil.owner).toBe('Ana Lee');
+  expect(perfil.books.map((b: any) => b.title).sort()).toEqual(['AI Agents: The Definitive Guide', 'An Illustrated Guide to AI Agents']);
+  expect(JSON.stringify(perfil)).not.toContain(A);   // el bookId no sale
+
+  await pp.locator('button[data-act="unpublish"]').click();
+  await page.locator('.dlg-overlay .dlg-ok').click();
+  await expect(pp.locator('button[data-act="unpublish"]')).toHaveCount(0);
+  expect([...server.env.SYNC._m.keys()].filter((k: string) => k.startsWith('profiles/'))).toEqual([]);
+});
+
+test('publicar con la Action (PUBLISH_PROFILES): manda la foto, avisa a GitHub y enseña el estado', async ({ page }) => {
+  test.setTimeout(60_000);
   const dispatches: any[] = [];
   const realFetch = globalThis.fetch;
   globalThis.fetch = (async (url: any, init: any) => {
@@ -373,25 +412,14 @@ test('publicar: con sync y cuenta autorizada, manda la foto, avisa a GitHub y en
     return realFetch(url, init);
   }) as typeof fetch;
   try {
-    await installSyncServer(page.context(), server);
-    await seedBookReaderSync(page.context());
-    const ids = await seed(page);
-    await page.evaluate(async () => { const A = await import('/js/sync/bookreader-auth.js'); await A.enable(); await A.getToken(true); });
-
-    // Sin autorizar: la sección enseña «Descargar para publicar» y no «Publicar».
+    const { server, ids } = await withSync(page, { PUBLISH_REPO: 'iamluisgb/bookreader', GITHUB_DISPATCH_TOKEN: 'gh-test', PUBLISH_PULL_TOKEN: 'pull-test' });
+    const user = server.env.DB._raw.prepare('SELECT user FROM tokens ORDER BY rowid DESC LIMIT 1').get().user;
+    server.env.PUBLISH_PROFILES = JSON.stringify({ [user]: 'luis' });
+    await page.evaluate(() => { const c = JSON.parse(localStorage.getItem('bookreader_public_profile') || '{}'); localStorage.setItem('bookreader_public_profile', JSON.stringify({ ...c, handle: 'luis' })); });
     await shelfMenu(page, ids.ag);
     await page.locator('.lib-menu-item[data-act="publish"]').click();
     const pp = page.locator('.pp');
-    await expect(pp.locator('button[data-act="download"]')).toHaveText('Descargar para publicar');
-    await expect(pp.locator('button[data-act="publish"]')).toHaveCount(0);
-
-    // Autorizada: al volver a abrir la sección aparece «Publicar».
-    const user = server.env.DB._raw.prepare('SELECT user FROM tokens ORDER BY rowid DESC LIMIT 1').get().user;
-    server.env.PUBLISH_PROFILES = JSON.stringify({ [user]: 'luis' });
-    await page.keyboard.press('Escape');
-    await page.evaluate(async () => (await import('/js/ui/app-settings.js')).open('public'));
-    await expect(pp.locator('button[data-act="publish"]')).toBeVisible();
-
+    await pp.locator('#pp-handle').fill('luis'); await pp.locator('#pp-handle').blur();
     await pp.locator('button[data-act="publish"]').click();
     await expect(pp.locator('.pp-status')).toHaveText(/en cola/);
     expect(dispatches).toHaveLength(1);
@@ -400,7 +428,6 @@ test('publicar: con sync y cuenta autorizada, manda la foto, avisa a GitHub y en
     expect(snap).toMatchObject({ format: 'bookreader-perfil', version: 2, handle: 'luis' });
     expect(snap.books.map((b: any) => b.bookId).sort()).toEqual([A, B]);
 
-    // La Action informa; la pantalla lo recoge en el siguiente sondeo.
     const res = await server.worker.fetch(new Request('https://x/v1/profile/status/luis', {
       method: 'POST', headers: { Authorization: 'Bearer pull-test', 'Content-Type': 'application/json' },
       body: JSON.stringify({ id: dispatches[0].client_payload.id, state: 'done', sha: 'f'.repeat(40) }),
@@ -408,4 +435,13 @@ test('publicar: con sync y cuenta autorizada, manda la foto, avisa a GitHub y en
     expect(res.status).toBe(200);
     await expect(pp.locator('.pp-status')).toHaveText(/Publicado el/, { timeout: 20_000 });
   } finally { globalThis.fetch = realFetch; }
+});
+
+test('sin sync de BookReader: solo «Descargar para publicar»', async ({ page }) => {
+  const ids = await seed(page);
+  await shelfMenu(page, ids.ag);
+  await page.locator('.lib-menu-item[data-act="publish"]').click();
+  const pp = page.locator('.pp');
+  await expect(pp.locator('button[data-act="download"]')).toHaveText('Descargar para publicar');
+  await expect(pp.locator('button[data-act="publish"]')).toHaveCount(0);
 });

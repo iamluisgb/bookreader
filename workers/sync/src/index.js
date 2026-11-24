@@ -32,7 +32,8 @@
 
 import { mcpRoute, createTokenRoute, listTokensRoute, revokeTokenRoute, listChangesRoute, getUndoRoute, markUndoneRoute, purgeChanges } from './mcp.js';
 import { UPLOAD_RE, uploadRoute, purgeUploads } from './upload.js';
-import { publishRoute, actionRoute } from './publish.js';
+import { publishRoute, actionRoute, PUBLIC_ORIGIN, manualHandles } from './publish.js';
+import { serveProfile, unpublishHosted } from './profiles.js';
 
 const DAY = 24 * 60 * 60 * 1000;
 const PATH_RE = /^[A-Za-z0-9_-]{16,64}$/;
@@ -613,6 +614,8 @@ export async function wipeUser(env, user) {
   await env.DB.prepare('DELETE FROM mcp_tokens WHERE user = ?').bind(user).run();
   await env.DB.prepare('DELETE FROM mcp_changes WHERE user = ?').bind(user).run();
   await env.DB.prepare('DELETE FROM mcp_uploads WHERE user = ?').bind(user).run();
+  // El perfil público alojado se va con la cuenta (borrado o fin del periodo de gracia).
+  await unpublishHosted(env, user);
 }
 
 // ---- Mantenimiento y gasto -----------------------------------------------------------------
@@ -686,7 +689,17 @@ export default {
   async fetch(request, env) {
     const cors = corsHeaders(request, env);
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
-    const { pathname } = new URL(request.url);
+    const { pathname, origin } = new URL(request.url);
+    // Perfiles públicos alojados (ruta bookreader.raiatech.com/@* → este Worker). Lo que no es un
+    // perfil alojado (p. ej. /@luis/, estático) sigue a Pages; fuera del dominio público, 404 (un
+    // fetch a sí mismo en workers.dev sería un bucle).
+    if (pathname.startsWith('/@') || pathname.startsWith('/%40')) {
+      try {
+        const page = await serveProfile(request, env, { manual: manualHandles(env) });
+        if (page) return page;
+      } catch (e) { console.error('perfil', e); }
+      return origin === PUBLIC_ORIGIN ? fetch(request) : new Response('Not found', { status: 404 });
+    }
     const method = request.method;
     try {
       if (pathname === '/v1/sync-token' && method === 'POST') return await issueToken(request, env, cors);
@@ -711,7 +724,7 @@ export default {
       if (!who) return json({ error: 'unauthorized' }, 401, cors);
 
       if (pathname === '/v1/status' && method === 'GET') return json(await status(env, who), 200, cors);
-      if (pathname === '/v1/profile/publish' && (method === 'POST' || method === 'GET')) return await publishRoute(request, env, cors, who, json);
+      if (pathname === '/v1/profile/publish' && ['POST', 'GET', 'DELETE'].includes(method)) return await publishRoute(request, env, cors, who, json);
       if (pathname === '/v1/list' && method === 'GET') return await listObjects(env, cors, who);
       if (pathname === '/v1/all' && method === 'DELETE') { await wipeUser(env, who.user); return json({ ok: true }, 200, cors); }
       if (pathname === '/v1/mcp-tokens') {
