@@ -590,9 +590,31 @@ sin abrir, y por significado. No se arregla estirando `search_book`; hace falta 
       lecturas de R2.
     - **Pendiente:** CPU p95 y la prueba de 10 consultas en paralelo contra el Worker real, en
       cuanto un equipo de Luis construya el índice. Va con F4.
-- **F4 — Medir y decidir la semántica** `S`
+- **F4 — Medir y decidir la semántica** `S` · **medido 2026-11-24 (run `ia10-f4-2026-11-24`)**
   - La batería entera contra producción: `queries[]` ON y OFF.
-  - Resultado en el CHANGELOG con el nombre del run.
+  - Runner: [`evals/ia10-f4.mjs`](evals/ia10-f4.mjs), con cuatro modos y una llamada a
+    `search_library` por pregunta.
+  - **Resultado** (recall de libros @5, 80 libros en la biblioteca):
+
+    | Modo | Recall @5 | Al menos uno |
+    |---|---|---|
+    | `off`: la pregunta tal cual | 33 % | 39 % |
+    | `on`: las `queries` de la batería | **92 %** | 100 % |
+    | `both`: pregunta más queries | 90 % | 100 % |
+    | `agent`: queries de `deepseek-v4-flash` leyendo la descripción de la tool | 78 % (18 de 20) | 100 % |
+
+  - **La primaria pasa** (`on` ≥ 90 %): según el contrato, F5 se cierra con hallazgo. La
+    semántica la pone quien expande la consulta.
+  - **Pero el caso realista (`agent`) se queda en 78 %.** Dos causas:
+    - **Batería vieja.** Se escribió con 32 libros y hoy hay 80. Varios «fallos» son libros nuevos
+      que también responden («Evals for AI Engineers», «AI Agents: The Definitive Guide»,
+      «CS336»). Hay que revisar los `expect` con Luis.
+    - **El agente no siempre traduce.** En `atahualpa` solo escribió queries en español y no salió
+      «Guns, Germs, and Steel», que está en inglés. Es justo el hueco que cerrarían los embeddings
+      multilingües. Lo barato primero: reforzar en la descripción de la tool que al menos una
+      query vaya en el idioma de cada libro.
+  - **Fiabilidad:** en la segunda pasada, 38 respuestas 5xx (503) y 8 consultas perdidas tras 3
+    reintentos. Mirar con `wrangler tail` antes que la semántica (MON4, 1102).
 - **F5 — Router semántico (condicional)** `L`
   - **Solo si F4 enseña el hueco.**
   - Vectores **por sección, no por pasaje** (~100 por libro), truncados a 256 dimensiones (MRL de
