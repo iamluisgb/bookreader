@@ -35,6 +35,7 @@ const PUBLIC = [
   'sw.js',
   'app',
   'es',
+  'samples',
   'anki',
   'privacy',
   'why',

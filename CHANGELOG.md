@@ -3,6 +3,26 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-11-24 — Estantería pública de muestra (`/samples/` y `/es/muestra/`)
+
+- **El caso**: para probar el lector hace falta algo que leer y no había ni un libro público propio.
+  Cuatro ediciones en **dominio público** —dos en inglés, dos en español— descargables sin cuenta,
+  cada una con su atribución.
+- **Por qué estos**: *Frankenstein* (1818) y *The Time Machine* (1895) de **Standard Ebooks** (obra
+  editorial CC0, portadas incluidas); *Niebla* (1914) desde Project Gutenberg y *Bodas de sangre*
+  (1933) desde Wikisource en español, ambas distribuidas por Elejandría. Autores fallecidos en 1851,
+  1946, 1936 y 1936: dominio público en España por la regla de los 80 años.
+- **Portadas**: las de los dos españoles traían marca de agua de Elejandría y se generan para la
+  página (`~/workspace/projects/experimentos/bookreader-muestra/portadas.py`). Los EPUB se validan
+  (OPF, índice, autor, idioma) y a *Bodas de sangre* se le añadió el `dc:creator`, que venía vacío.
+- **Qué NO entra**: ningún resumen de charla de YouTube. La licencia estándar de YouTube y el
+  apéndice de transcripción lo impiden; esos PDFs se quedan en la biblioteca privada. La vía para
+  publicar resúmenes son las charlas **CC BY** del canal de CNCF, pendiente.
+- **Código**: dos páginas estáticas con el esqueleto de `/why/` y hoja propia
+  (`assets/landing/samples.css`, que trae las reglas de barra que en las demás páginas viven en su
+  CSS); los ficheros en `assets/muestra/`; `samples` en la lista blanca de `build-pages.mjs`; las dos
+  URLs en `sitemap.xml` con hreflang. Coste: 2,5 MB en el despliegue.
+
 ## 2026-11-24 — Publicar el perfil público desde la app, sin script
 
 - **El caso**: publicar `/@luis/` era descargar `perfil-luis.json`, pasárselo a un agente, correr
