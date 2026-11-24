@@ -47,6 +47,15 @@ test('sin la bandera no hay perfil público: ni en el menú ni en Ajustes', asyn
   await expect(page.locator('.appset-nav-item[data-section="public"]')).toHaveCount(0);
 });
 
+test('con ?perfil-preview=1, Ajustes enseña la sección aunque no se haya abierto ningún menú', async ({ page }) => {
+  await page.goto('/?perfil-preview=1');
+  await page.waitForSelector('.lib-rail');
+  await page.evaluate(async () => (await import('/js/ui/app-settings.js')).open('public'));
+  await expect(page.locator('.appset-nav-item[data-section="public"]')).toBeVisible();
+  await expect(page.locator('.pp #pp-enabled')).not.toBeChecked();
+  await expect(page.locator('.pp .pp-body')).toBeHidden();
+});
+
 test('desde el menú: la estantería pasa a pública con sus libros visibles y queda guardado', async ({ page }) => {
   const ids = await seed(page);
   await shelfMenu(page, ids.ag);

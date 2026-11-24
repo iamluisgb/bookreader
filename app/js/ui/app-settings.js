@@ -46,8 +46,18 @@ const SECTIONS = [
   { id: 'data',      label: () => t('Datos'),      ico: 'share' },
   { id: 'license',   label: () => t('Licencia'),   ico: 'shield' },
   // Perfil público (experimento): solo con ?perfil-preview=1 (library/publish.js).
-  { id: 'public',    label: () => t('Perfil público'), ico: 'globe', hidden: () => Storage.get('perfil_preview', false) !== true },
+  { id: 'public',    label: () => t('Perfil público'), ico: 'globe', hidden: () => !perfilPreview() },
 ];
+// La bandera la guarda publish.js al cargarse, pero ese módulo solo se carga desde el menú de una
+// estantería: con `?perfil-preview=1` y Ajustes abierto antes, la sección no salía.
+function perfilPreview() {
+  try {
+    const q = new URLSearchParams(location.search).get('perfil-preview');
+    if (q === '1') Storage.set('perfil_preview', true);
+    if (q === '0') Storage.remove('perfil_preview');
+  } catch { /* sin localStorage */ }
+  return Storage.get('perfil_preview', false) === true;
+}
 const visibleSections = () => SECTIONS.filter(s => !s.hidden || !s.hidden());
 
 let overlay = null;
