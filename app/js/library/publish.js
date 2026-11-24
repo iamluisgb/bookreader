@@ -45,11 +45,18 @@ export function available() {
 // { updatedAt, enabled, handle, showProgress, now: 'auto'|'none'|<bookId>,
 //   shelves: [{ id, name, books: [{ id, show, style }] }] }   (shelves: solo las públicas, en orden)
 export function emptyConfig() {
-  return { updatedAt: 0, enabled: false, handle: 'luis', showProgress: true, now: 'auto', shelves: [] };
+  return { updatedAt: 0, enabled: false, handle: 'luis', showProgress: true, now: 'auto', styleAuto: true, shelves: [] };
 }
 export function getConfig() {
   const c = Storage.get(CONFIG_KEY, null);
-  return c && typeof c === 'object' ? { ...emptyConfig(), ...c, shelves: Array.isArray(c.shelves) ? c.shelves : [] } : emptyConfig();
+  if (!c || typeof c !== 'object') return emptyConfig();
+  const out = { ...emptyConfig(), ...c, shelves: Array.isArray(c.shelves) ? c.shelves : [] };
+  // Antes de existir «automático», 'plain' era el valor por defecto y no una elección: pasa a 'auto'.
+  if (!c.styleAuto) {   // la guardada, no la mezcla: emptyConfig() ya trae styleAuto
+    out.shelves = out.shelves.map(s => ({ ...s, books: (s.books || []).map(b => ({ ...b, style: !b.style || b.style === 'plain' ? 'auto' : b.style })) }));
+    out.styleAuto = true;
+  }
+  return out;
 }
 export function saveConfig(c) {
   Storage.set(CONFIG_KEY, { ...c, updatedAt: Date.now() });
@@ -68,9 +75,9 @@ export function reconcile(config, shelves, members) {
     if (!shelf) continue;
     const recs = members(shelf);
     const ids = new Set(recs.map(r => r.id));
-    const kept = (entry.books || []).filter(b => ids.has(b.id)).map(b => ({ id: b.id, show: !!b.show, style: b.style || 'plain' }));
+    const kept = (entry.books || []).filter(b => ids.has(b.id)).map(b => ({ id: b.id, show: !!b.show, style: b.style || 'auto' }));
     const known = new Set(kept.map(b => b.id));
-    const fresh = recs.filter(r => !known.has(r.id)).map(r => ({ id: r.id, show: false, style: 'plain', fresh: true }));
+    const fresh = recs.filter(r => !known.has(r.id)).map(r => ({ id: r.id, show: false, style: 'auto', fresh: true }));
     out.shelves.push({ id: entry.id, name: entry.name || Shelves.segments(shelf.name).pop(), books: [...kept, ...fresh] });
   }
   return out;
@@ -82,7 +89,7 @@ export function addShelf(config, shelf, recs) {
   if (config.shelves.some(s => s.id === shelf.id)) return config;
   return { ...config, shelves: [...config.shelves, {
     id: shelf.id, name: Shelves.segments(shelf.name).pop(),
-    books: recs.map(r => ({ id: r.id, show: true, style: 'plain' })),
+    books: recs.map(r => ({ id: r.id, show: true, style: 'auto' })),
   }] };
 }
 
@@ -129,6 +136,22 @@ export function spineFor(rec, style, bg) {
   return { style: 'plain', bg, ...inkFor(bg), title, author };
 }
 
+// ¿Es una portada de O'Reilly? Fondo blanco en el borde izquierdo y el logotipo rojo arriba a la
+// izquierda. Medido con las portadas reales (24-nov-2026), en la franja del 7 % superior y la mitad
+// izquierda: las de O'Reilly dan 2,4–3,2 % de píxeles rojos; un paper de arXiv (rojo más abajo),
+// Packt o una portada oscura, 0 %. `px` son los RGBA de la miniatura de `w`×`h`.
+export function looksOReilly(px, w, h) {
+  let red = 0, n = 0, edge = 0, en = 0;
+  for (let y = 0; y < Math.round(h * 0.07); y++) for (let x = 0; x < Math.round(w * 0.5); x++) {
+    const i = (y * w + x) * 4; const r = px[i], g = px[i + 1], b = px[i + 2];
+    n++; if (r > 140 && r - g > 70 && r - b > 50) red++;
+  }
+  for (let y = 0; y < h; y++) for (let x = 0; x < Math.max(1, Math.round(w * 0.06)); x++) {
+    const i = (y * w + x) * 4; edge += (px[i] + px[i + 1] + px[i + 2]) / 3; en++;
+  }
+  return n > 0 && red / n > 0.01 && edge / en > 220;
+}
+
 export const slug = (s) => String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'shelf';
 
 // ---- portada ------------------------------------------------------------------
@@ -153,7 +176,8 @@ async function coverAndColor(rec) {
     const strip = ctx.getImageData(0, 0, Math.max(4, Math.round(canvas.width * 0.06)), canvas.height).data;
     let r = 0, g = 0, b = 0, n = 0;
     for (let i = 0; i < strip.length; i += 4) { r += strip[i]; g += strip[i + 1]; b += strip[i + 2]; n++; }
-    return { coverData: toWebp(canvas), bg: hex(r / n, g / n, b / n) };
+    const oreilly = looksOReilly(ctx.getImageData(0, 0, canvas.width, canvas.height).data, canvas.width, canvas.height);
+    return { coverData: toWebp(canvas), bg: hex(r / n, g / n, b / n), oreilly };
   }
   const bg = '#2b3a4a';
   canvas.width = COVER_W; canvas.height = Math.round(COVER_W * 1.5);
@@ -167,7 +191,7 @@ async function coverAndColor(rec) {
   if (line) ctx.fillText(line, 28, y);
   ctx.font = '400 16px Georgia, serif'; ctx.fillStyle = '#d9d9de';
   ctx.fillText(String(rec.author || '').slice(0, 40), 28, canvas.height - 56);
-  return { coverData: toWebp(canvas), bg };
+  return { coverData: toWebp(canvas), bg, oreilly: false };
 }
 
 function toWebp(canvas) {
@@ -206,14 +230,18 @@ async function snapshot(config) {
       const short = rec.id.slice(0, 12);
       ids.push(short);
       if (books.has(short)) continue;
-      const { coverData, bg } = await coverAndColor(rec);
+      const { coverData, bg, oreilly } = await coverAndColor(rec);
+      // «Automático»: O'Reilly si la portada lo es; si no, el color de la portada.
+      const style = b.style === 'auto' || !b.style ? (oreilly ? 'oreilly' : 'plain') : b.style;
       books.set(short, {
         bookId: rec.id, id: short,
         title: rec.title || '', author: rec.author || '',
         status: statusOf(rec),
         progress: config.showProgress ? Math.round(rec.progress || 0) : null,
         pages: estimatePages(rec), pagesEstimated: true,
-        spine: spineFor(rec, b.style, bg),
+        spine: spineFor(rec, style, bg),
+        // Elegido por la app, no a mano: el script no lo deja pisar un lomo hecho a mano.
+        ...(b.style === 'auto' || !b.style ? { spineAuto: true } : {}),
         coverData,
       });
     }
@@ -303,7 +331,8 @@ function sectionHtml(st) {
           <span class="pub-cover" style="${r.cover ? `background-image:url('${escapeHtml(r.cover)}')` : ''}" aria-hidden="true"></span>
           <span class="pub-meta"><b>${escapeHtml(r.title || '')}</b><small>${b.fresh ? `<span class="pp-fresh">${escapeHtml(t('Nuevo'))}</span> ` : ''}${escapeHtml(r.author || '')}</small></span>
           <select class="dlg-input pub-style" data-k="style" aria-label="${escapeHtml(t('Lomo'))}">
-            <option value="plain" ${b.style !== 'oreilly' ? 'selected' : ''}>${escapeHtml(t('Lomo: color de la portada'))}</option>
+            <option value="auto" ${b.style === 'auto' || !b.style ? 'selected' : ''}>${escapeHtml(t('Lomo: automático'))}</option>
+            <option value="plain" ${b.style === 'plain' ? 'selected' : ''}>${escapeHtml(t('Lomo: color de la portada'))}</option>
             <option value="oreilly" ${b.style === 'oreilly' ? 'selected' : ''}>${escapeHtml(t('Lomo: O’Reilly'))}</option>
           </select>
           <span class="pub-move">

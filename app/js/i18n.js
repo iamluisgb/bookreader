@@ -1570,6 +1570,7 @@ const EN = {
   'Enseñar el progreso de lectura': 'Show reading progress',
   'Leyendo ahora': 'Reading now',
   'Lomo': 'Spine',
+  'Lomo: automático': 'Spine: automatic',
   'Lomo: color de la portada': 'Spine: cover colour',
   'Lomo: O’Reilly': 'Spine: O’Reilly',
   'No cabe en el almacenamiento del navegador. Quita algún libro y vuelve a probar.': 'It does not fit in the browser’s storage. Remove a book and try again.',

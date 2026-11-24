@@ -128,7 +128,10 @@ test('descargar: varias estanterías en su orden, cada libro una vez, sin los oc
   expect(ill.spine).toMatchObject({ style: 'oreilly', author: 'Grootendorst & Alammar' });
   expect(ill.progress).toBeNull();
   expect(snap.now).toBe(B.slice(0, 12));   // automático: el visible a medias abierto más tarde
-  for (const b of snap.books) expect(Object.keys(b).sort()).toEqual(['author', 'bookId', 'coverData', 'id', 'pages', 'pagesEstimated', 'progress', 'spine', 'status', 'title']);
+  for (const b of snap.books) expect(Object.keys(b).filter(k => k !== 'spineAuto').sort()).toEqual(['author', 'bookId', 'coverData', 'id', 'pages', 'pagesEstimated', 'progress', 'spine', 'status', 'title']);
+  // `spineAuto` solo en el lomo que eligió la app (SPQR, automático), no en el O'Reilly elegido a mano.
+  expect(ill.spineAuto).toBeUndefined();
+  expect(snap.books.find((b: any) => b.bookId === C).spineAuto).toBe(true);
 
   // Vista previa: la foto en localStorage y la página del handle con ?draft=1.
   const popup = page.waitForEvent('popup');
@@ -188,4 +191,34 @@ test('página pública con el perfil.json de una estantería (formato 1): sin pe
   await expect(page.locator('.pf-bk').first()).toBeVisible();
   await expect(page.locator('#pf-tabs')).toBeHidden();
   await expect(page.locator('#pf-shelf-title')).toBeVisible();
+});
+
+test('lomo automático: detecta O\u2019Reilly por la portada y no confunde un paper ni Packt', async ({ page }) => {
+  await page.goto('/');
+  const names = ['definitive', 'illustrated', 'albada', 'skills', 'graph', 'harness', 'senior'];
+  // Portadas reales del perfil, pasadas como data URL (desde otro puerto el canvas quedaría bloqueado).
+  const covers = Object.fromEntries(names.map(n => [n, 'data:image/webp;base64,' + fs.readFileSync(`assets/perfil/luis/${n}.webp`).toString('base64')]));
+  const r = await page.evaluate(async (covers) => {
+    const P: any = await import('/js/library/publish.js');
+    const out: Record<string, boolean> = {};
+    for (const [c, src] of Object.entries(covers)) {
+      const img = new Image();
+      await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = src as string; });
+      const cv = document.createElement('canvas'); cv.width = 320; cv.height = Math.round(320 * img.naturalHeight / img.naturalWidth);
+      const ctx = cv.getContext('2d')!; ctx.drawImage(img, 0, 0, cv.width, cv.height);
+      out[c] = P.looksOReilly(ctx.getImageData(0, 0, cv.width, cv.height).data, cv.width, cv.height);
+    }
+    return out;
+  }, covers);
+  expect(r).toEqual({ definitive: true, illustrated: true, albada: true, skills: true, graph: false, harness: false, senior: false });
+});
+
+test('configuración de antes: «color de la portada» por defecto pasa a automático; O\u2019Reilly elegido se queda', async ({ page }) => {
+  await page.goto('/');
+  const c = await page.evaluate(async () => {
+    localStorage.setItem('bookreader_public_profile', JSON.stringify({ updatedAt: 1, enabled: true, shelves: [{ id: 's', name: 'S', books: [
+      { id: 'x', show: true, style: 'plain' }, { id: 'y', show: true, style: 'oreilly' }] }] }));
+    return (await import('/js/library/publish.js')).getConfig();
+  });
+  expect(c.shelves[0].books.map((b: any) => b.style)).toEqual(['auto', 'oreilly']);
 });

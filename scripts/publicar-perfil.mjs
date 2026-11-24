@@ -70,7 +70,8 @@ for (const b of snap.books.filter(x => referenced.has(x.id))) {
     pages: p && !p.pagesEstimated ? p.pages : b.pages,
     ...(p && !p.pagesEstimated ? {} : { pagesEstimated: true }),
     ...(p?.kind ? { kind: p.kind } : {}),
-    spine: p && b.spine.style === 'plain' ? p.spine : b.spine,
+    // Un lomo hecho a mano se conserva salvo que en la app se haya elegido uno concreto (no «automático»).
+    spine: p && (b.spine.style === 'plain' || b.spineAuto) ? p.spine : b.spine,
     ...(p?.cover ? { cover: p.cover } : {}),
   };
   if (book.progress == null) delete book.progress;
