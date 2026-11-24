@@ -1,0 +1,47 @@
+{
+  "updated": "2026-11-24",
+  "note": "Muestra pública de BookReader. Ediciones en dominio público; la atribución de cada una está en /samples/ y /es/muestra/. Los ficheros son estáticos del propio sitio: la app los pide, los importa y los abre sin pasar por «Subir archivos».",
+  "books": [
+    {
+      "id": "frankenstein",
+      "title": "Frankenstein",
+      "author": "Mary Shelley",
+      "year": 1818,
+      "lang": "en",
+      "file": "frankenstein.epub",
+      "url": "frankenstein.epub",
+      "size": 685768,
+      "sha256": "shelley-frankenstein"
+    },
+    {
+      "id": "time-machine",
+      "title": "The Time Machine",
+      "author": "H. G. Wells",
+      "year": 1895,
+      "lang": "en",
+      "file": "time-machine.epub",
+      "url": "time-machine.epub",
+      "size": 535522
+    },
+    {
+      "id": "niebla",
+      "title": "Niebla",
+      "author": "Miguel de Unamuno",
+      "year": 1914,
+      "lang": "es",
+      "file": "niebla.epub",
+      "url": "niebla.epub",
+      "size": 242761
+    },
+    {
+      "id": "bodas-de-sangre",
+      "title": "Bodas de sangre",
+      "author": "Federico García Lorca",
+      "year": 1933,
+      "lang": "es",
+      "file": "bodas-de-sangre.epub",
+      "url": "bodas-de-sangre.epub",
+      "size": 1091456
+    }
+  ]
+}

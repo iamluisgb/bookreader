@@ -18,6 +18,15 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
 - **Qué NO entra**: ningún resumen de charla de YouTube. La licencia estándar de YouTube y el
   apéndice de transcripción lo impiden; esos PDFs se quedan en la biblioteca privada. La vía para
   publicar resúmenes son las charlas **CC BY** del canal de CNCF, pendiente.
+- **Un clic y a leer** (`app/js/samples.js`): `/app/?sample=<id>` pide el libro por la red desde
+  `assets/muestra/manifest.json`, lo envuelve en un `File` y lo pasa al mismo `loadFile` que «Subir
+  archivos» — se abre en el lector sin descargar nada al disco ni elegir fichero. El `bookId` es el
+  SHA-256 del contenido, así que repetir el clic reabre en vez de duplicar; la marca de la URL se
+  quita antes de cargar nada. En la página, el botón y la portada abren la app y debajo queda la
+  descarga del EPUB para quien prefiera el fichero. `samples.js` entra en `ASSETS` del service
+  worker (v268). Los libros NO van por el Worker de sync (cifrado por usuario) ni por el de `share`
+  (cifrado y con caducidad): son estáticos del sitio, que es lo que permite que el enlace sea
+  permanente.
 - **Código**: dos páginas estáticas con el esqueleto de `/why/` y hoja propia
   (`assets/landing/samples.css`, que trae las reglas de barra que en las demás páginas viven en su
   CSS); los ficheros en `assets/muestra/`; `samples` en la lista blanca de `build-pages.mjs`; las dos

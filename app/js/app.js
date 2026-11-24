@@ -158,6 +158,8 @@ document.addEventListener('DOMContentLoaded', () => {
   if (document.modelContext || navigator.modelContext) import('./webmcp.js').then(m => m.init()).catch(e => console.warn('webmcp:', e));
   // Ficheros compartidos desde otra app (Android) o abiertos con doble clic (PWA de escritorio).
   import('./inbox.js').then(m => m.init(loadFile)).catch(e => console.warn('inbox:', e));
+  // Libros de la muestra pública: `/app/?sample=<id>` los pide y los abre (js/samples.js).
+  import('./samples.js').then(m => m.init(loadFile)).catch(e => console.warn('samples:', e));
   registerServiceWorker();
   calentarModulosGrandes();
 });
