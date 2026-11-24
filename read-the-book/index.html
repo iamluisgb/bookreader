@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <script src="../assets/landing/prefs.js?v=20261108a"></script>
 <title>Read the book — BookReader</title>
-<meta name="description" content="BookReader is a free EPUB and PDF reader, no account needed, that helps you read the whole book and keep it: every answer cites its paragraph, and the book asks you about what you read.">
+<meta name="description" content="BookReader is a free EPUB and PDF reader, no account needed, that asks you about what you read so it stays with you: every answer cites its paragraph, and reviews come back when they are due.">
 <link rel="canonical" href="https://bookreader.raiatech.com/read-the-book/">
 <link rel="alternate" hreflang="es" href="https://bookreader.raiatech.com/es/lee-el-libro/">
 <link rel="alternate" hreflang="en" href="https://bookreader.raiatech.com/read-the-book/">
@@ -13,7 +13,7 @@
 <meta property="og:site_name" content="BookReader">
 <meta property="og:url" content="https://bookreader.raiatech.com/read-the-book/">
 <meta property="og:title" content="A summary saves you the book. That is the problem.">
-<meta property="og:description" content="An EPUB and PDF reader that helps you read the whole book and keep it. Free, no account, in the browser.">
+<meta property="og:description" content="Rereading will not keep it either. An EPUB and PDF reader that asks you about what you read. Free, no account, in the browser.">
 <meta property="og:image" content="https://bookreader.raiatech.com/assets/social/read-the-book.png?v=3">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
@@ -22,7 +22,7 @@
 <meta property="og:locale:alternate" content="es_ES">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="A summary saves you the book. That is the problem.">
-<meta name="twitter:description" content="An EPUB and PDF reader that helps you read the whole book and keep it. Free, no account.">
+<meta name="twitter:description" content="Rereading will not keep it either. An EPUB and PDF reader that asks you about what you read. Free, no account.">
 <meta name="twitter:image" content="https://bookreader.raiatech.com/assets/social/read-the-book.png?v=3">
 <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#121214" media="(prefers-color-scheme: dark)">
@@ -31,7 +31,7 @@
 <link rel="stylesheet" href="../app/css/themes.css">
 <link rel="stylesheet" href="../assets/landing/brand.css?v=20261108b">
 <link rel="stylesheet" href="../assets/landing/why.css?v=20261030b">
-<link rel="stylesheet" href="../assets/landing/manifesto.css?v=2">
+<link rel="stylesheet" href="../assets/landing/manifesto.css?v=3">
 <script>
 if (location.hostname === 'bookreader.raiatech.com') {
   var u = document.createElement('script');
@@ -56,7 +56,7 @@ if (location.hostname === 'bookreader.raiatech.com') {
     <p class="eyebrow">EPUB and PDF reader · free · no account</p>
     <h1>A summary saves you the <mark>book</mark>.</h1>
     <p class="cardline">BookReader: the reader that asks you about what you read.<span>Free · no account · EPUB and PDF</span></p>
-    <p class="lede">And that is exactly the problem. Fifteen minutes of key ideas gives you <b>the feeling</b> of having read it. It does not give you <b>the ability</b> to use what is inside. BookReader does the opposite: it helps you read the whole thing, and keeps it.</p>
+    <p class="lede">And rereading will not keep it either. Fifteen minutes of key ideas, or three passes over the same chapter, give you <b>the feeling</b> of knowing it. What makes a book stay is not reading it more times: it is <b>someone asking you about it</b>. BookReader reads with you and asks.</p>
     <div class="acts">
       <a class="btn-primary" href="../app/?sample=frankenstein" data-umami-event="Manifesto sample" data-umami-event-where="hero">Try it with a book →</a>
       <a class="btn-ghost" href="../app/" data-umami-event="Open app" data-umami-event-where="manifesto-hero">Open my own book</a>
@@ -67,18 +67,19 @@ if (location.hostname === 'bookreader.raiatech.com') {
   <section>
     <h2>The problem.</h2>
     <p class="lead">You finish a technical book and you are sure you understood it. A month later you remember the cover and two ideas.</p>
-    <p class="prose">That is not a memory problem. Reading leaves nothing behind unless something pulls you back into the text. Highlights pile up in an app you never open again. Chatting with the PDF gives you an answer you cannot check, with no paragraph behind it. And a summary skips the reasoning entirely: you keep someone else’s conclusion about a book you have not read.</p>
+    <p class="prose">It is not a lack of memory, or of hours. Rereading, highlighting and reading a summary have one thing in common: everything feels familiar, and familiar is easy to mistake for known. What makes reading stick is the uncomfortable part: <b>trying to recall it without looking</b>, and trying again a few days later. Hardly anyone does it, because nothing asks them to.</p>
   </section>
 
   <section>
     <h2>The numbers.</h2>
-    <p class="prose">What research says about learning from a text. BookReader is built around it.</p>
+    <p class="prose">Not our words. Four numbers from studies on learning from a text:</p>
     <div class="cards">
       <div class="card"><div class="v">61 % <span>vs</span> 40 %</div><div class="k">recalled a week later</div><p class="d">People who tested themselves on the text recalled 61 %. People who reread it, 40 %.</p><a class="src" href="https://doi.org/10.1111/j.1467-9280.2006.01693.x">Roediger &amp; Karpicke, 2006</a></div>
       <div class="card"><div class="v">3.4 <span>vs</span> 14.2</div><div class="k">times they read the text</div><p class="d">The group that remembered most read it four times less. The rereaders were also the most confident they would remember.</p><a class="src" href="https://doi.org/10.1111/j.1467-9280.2006.01693.x">Roediger &amp; Karpicke, 2006</a></div>
-      <div class="card"><div class="v">2 <span>of</span> 10</div><div class="k">study techniques that work</div><p class="d">Testing yourself and spacing your reviews. Summarising, highlighting and rereading rank among the low-utility ones.</p><a class="src" href="https://doi.org/10.1177/1529100612453266">Dunlosky et al., 2013</a></div>
+      <div class="card"><div class="v">2 <span>of</span> 10</div><div class="k">study techniques that work</div><p class="d">Testing yourself and spacing your reviews. Highlighting and rereading rank among the low-utility ones.</p><a class="src" href="https://doi.org/10.1177/1529100612453266">Dunlosky et al., 2013</a></div>
       <div class="card"><div class="v">84 % <span>vs</span> 11 %</div><div class="k">reread · try to recall</div><p class="d">Of 177 college students, 84 % study by rereading. Only 11 % try to recall what they read without looking.</p><a class="src" href="https://doi.org/10.1080/09658210802647009">Karpicke, Butler &amp; Roediger, 2009</a></div>
     </div>
+    <p class="prose more">BookReader is built around this. What the studies say and how the app applies them, with 30 references: <a href="../blog/science-of-learning/">The science behind BookReader</a>.</p>
   </section>
 
   <section class="thesis-sec">
@@ -87,14 +88,12 @@ if (location.hostname === 'bookreader.raiatech.com') {
   </section>
 
   <section>
-    <h2>What a summary costs you.</h2>
+    <h2>And why the whole book.</h2>
+    <p class="prose">This part is not a study: it is what we believe. Being asked works with any text, but a summary leaves you very little to be asked about.</p>
     <div class="cards three">
       <div class="card"><p class="h">Comprehension</p><p>A summary tells you where the author arrived. The book shows you why. The second one is what you can use on Monday.</p></div>
-      <div class="card"><p class="h">Retention</p><p>Reading without recall afterwards is re-reading. Remembering takes effort: questions, not re-reads.</p></div>
       <div class="card"><p class="h">Judgement</p><p>If you never see the full argument you cannot disagree with it. You keep someone else’s conclusion.</p></div>
       <div class="card"><p class="h">Ownership</p><p>Your library inside someone else’s cloud is a subscription. Your files and notes are yours, and they leave with you.</p></div>
-      <div class="card"><p class="h">Memory across books</p><p>What you learned in chapter 4 connects to a book from two years ago. That does not fit in a note card.</p></div>
-      <div class="card"><p class="h">The right to be bored</p><p>The slow parts are where the idea settles in. Skipping them is an elegant way of not having read.</p></div>
     </div>
   </section>
 
@@ -165,7 +164,7 @@ if (location.hostname === 'bookreader.raiatech.com') {
   // Se comparte la URL limpia, sin el ?de= de quien te lo mandó.
   const share = document.getElementById('share');
   share.addEventListener('click', async () => {
-    const data = { title: 'A summary saves you the book', text: 'An EPUB and PDF reader that helps you read the whole book and keep it. Free, no account.', url: 'https://bookreader.raiatech.com/read-the-book/' };
+    const data = { title: 'A summary saves you the book', text: 'An EPUB and PDF reader that asks you about what you read so it stays with you. Free, no account.', url: 'https://bookreader.raiatech.com/read-the-book/' };
     if (navigator.share) { try { await navigator.share(data); } catch (e) {} return; }
     try { await navigator.clipboard.writeText(data.url); share.textContent = 'Link copied'; }
     catch (e) { prompt('', data.url); }

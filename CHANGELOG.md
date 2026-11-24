@@ -3,6 +3,25 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-11-24 — «Lee el libro»: el mensaje cuadra con los datos
+
+- **El chirrido**: la página decía «el problema es el resumen; lee el libro entero» y los números
+  (Roediger y Karpicke, Dunlosky, Karpicke y otros) dicen otra cosa: que lo que fija lo leído es
+  ponerse a prueba, no leer más. Con esos datos, quien lee el libro entero 14 veces sin preguntarse
+  sale peor parado que quien lo lee 3 y se pregunta.
+- **Eje nuevo**: de «resumen contra libro» a «leer contra que te pregunten». El titular se queda; la
+  entradilla añade «y releerlo tampoco te lo deja… lo que hace que un libro se quede es que alguien
+  te pregunte por él». «El problema» habla de la sensación de saber (releer, subrayar y leer un
+  resumen hacen que todo te suene), y los números quedan como su prueba.
+- **Dunlosky sin «resumir»**: la revisión evalúa escribir tu propio resumen, no leer el de otro; en
+  una página contra Blinkist se leía como lo segundo.
+- **Opinión separada de los datos**: «Lo que te cuesta un resumen» (6 tarjetas) pasa a «Y por qué el
+  libro entero», 3 tarjetas presentadas como lo que creemos. Fuera «El derecho a aburrirte» (los
+  datos dicen lo contrario: más tiempo leyendo no dio más recuerdo), «Retención» y «Memoria entre
+  libros».
+- Los números enlazan a «La ciencia detrás de BookReader» (30 referencias). Descripciones de
+  `og:`/`twitter:`/compartir alineadas con el eje nuevo; las imágenes no cambian.
+
 ## 2026-11-24 — Biblioteca libre en /samples/: 1.560 libros sin guardar ninguno
 
 - **Catálogo, no ficheros.** `assets/muestra/catalogo.json` (143 KB, 46 KB comprimido) lista

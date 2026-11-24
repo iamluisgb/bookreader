@@ -80,6 +80,7 @@
 .mf .receipts q { font: italic 400 clamp(19px, 2.2vw, 22px)/1.45 var(--font-display); color: var(--text); quotes: "«" "»"; }
 .mf .receipts cite { display: block; margin-top: 6px; font: 500 var(--fs-sm) var(--font-ui); font-style: normal; color: var(--text-faint); }
 .mf .receipts + .prose { margin-top: 24px; }
+.mf .cards + .prose.more { margin-top: 22px; }
 
 /* cierre */
 .mf .close { margin-top: 80px; padding-top: 40px; border-top: 1px solid var(--border); }
