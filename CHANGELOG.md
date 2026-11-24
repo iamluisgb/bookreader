@@ -3,6 +3,22 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-11-24 — «Lee el libro»: los números son de la investigación
+
+- «Los números» ya no habla del producto (0 cuentas, 1 toque, 100 % en el dispositivo, 0 KB sin
+  cifrar): ahora son cuatro cifras de estudios sobre aprender de un texto, cada una con su enlace al
+  DOI. Comprobadas en los artículos originales el 24-nov-2026:
+  - Roediger y Karpicke 2006 (*Psychological Science*), exp. 2: recuerdo a la semana 61 % (se pusieron
+    a prueba) frente a 40 % (releyeron); leyeron el pasaje 3,4 frente a 14,2 veces, y los que
+    releyeron eran los más seguros de que lo recordarían.
+  - Dunlosky y otros 2013 (*PSPI*): 2 de 10 técnicas con utilidad alta (ponerse a prueba y espaciar);
+    resumir, subrayar y releer, entre las de baja.
+  - Karpicke, Butler y Roediger 2009 (*Memory*): de 177 universitarios, 84 % relee y 11 % (19)
+    practica recordar.
+- Fuera, a propósito: que leer enseñe más que un vídeo (la evidencia no lo dice) y Carpenter y otros
+  2013 (no se pudo leer el original). Dunlosky evalúa *escribir* un resumen, no leer el de otro: la
+  página no lo usa contra Blinkist.
+
 ## 2026-11-24 — «Lee el libro» con el estilo de la app
 
 - La página iba en el lenguaje de `justuse.nan.builders` (fondo negro con trama, mono, mayúsculas)

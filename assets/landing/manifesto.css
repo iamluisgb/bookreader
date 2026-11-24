@@ -45,11 +45,14 @@
 .mf .cards { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--s-3); }
 .mf .cards.three { grid-template-columns: repeat(3, 1fr); }
 @media (max-width: 767px) { .mf .cards.three { grid-template-columns: 1fr; } }
-@media (max-width: 600px) { .mf .card { padding: var(--s-4); } }
+@media (max-width: 600px) { .mf .cards { grid-template-columns: 1fr; } .mf .card { padding: var(--s-4); } }
 .mf .card { background: var(--surface-alt); border-radius: var(--r-lg); padding: var(--s-5); }
 .mf .card .v { font: 600 clamp(2rem, 4.4vw, 2.6rem)/1 var(--font-display); color: var(--text); }
 .mf .card .k { font: 600 var(--fs-sm) var(--font-ui); color: var(--accent); margin: 10px 0 6px; }
 .mf .card .h { font: 600 var(--fs-lg) var(--font-ui); color: var(--text); margin: 0 0 6px; }
+.mf .card .v span { font: 400 var(--fs-lg) var(--font-ui); color: var(--text-faint); margin: 0 .2em; }
+.mf .card .src { display: inline-block; margin-top: 10px; font: 500 var(--fs-xs) var(--font-ui); color: var(--text-faint); text-decoration: underline; text-underline-offset: 2px; }
+.mf .card .src:hover { color: var(--accent); }
 .mf .card p, .mf .card .d { margin: 0; font-size: var(--fs-md); line-height: 1.55; color: var(--text-soft); }
 
 /* la tesis: cita grande, sin barra lateral */
