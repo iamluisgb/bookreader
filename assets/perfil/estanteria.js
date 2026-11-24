@@ -1,4 +1,4 @@
-/* global window, document, location, URL, Image, fetch, getComputedStyle, requestAnimationFrame, setTimeout, ResizeObserver, URLSearchParams, localStorage, history */
+/* global window, document, location, URL, Image, fetch, getComputedStyle, requestAnimationFrame, setTimeout, ResizeObserver, URLSearchParams, localStorage, history, matchMedia, performance, clearTimeout */
 // Perfil público (experimento, 23-nov-2026): pinta la estantería de perfil.json como una cinta
 // de libros en 3D. El activo gira y enseña su portada; pulsándola se abre. Se recorre con las
 // flechas, el teclado, arrastrando o con la rueda horizontal. Solo títulos, autores, estado y
@@ -218,42 +218,77 @@ function buildTape() {
   }).join('');
 }
 
-// Dónde va cada libro con el activo actual, y el desplazamiento que lo centra (sin activo, la fila
-// entera centrada). `layout` lo pinta; el arrastre lo usa para saber qué libro queda en el centro.
-function positions() {
+// ---------- Movimiento ----------
+// La cinta se pinta desde una posición continua: `cur.p` (índice de libro con decimales) y `cur.a`
+// (0 = todos de canto, 1 = uno abierto). Cada libro se abre según lo cerca del centro que esté, con
+// una curva suave: al arrastrar, el que llega se va girando y el que se va se cierra, sin saltos. Un
+// bucle de animación acerca `cur` a su destino `aim` en cada fotograma (sin transiciones CSS en
+// la cinta), así arrastre, inercia y flechas son el mismo movimiento.
+const cur = { p: 0, a: 0 }, aim = { p: 0, a: 0 };
+const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const smooth = x => x * x * (3 - 2 * x);
+function openness(i, p, a) { return matches(BOOKS[i]) ? a * smooth(Math.max(0, 1 - Math.abs(i - p))) : 0; }
+
+function geometry(p, a) {
   const W = wrapEl.clientWidth;
   const GAP = Math.max(3, H * 0.012), GAP_A = H * 0.1;
   let x = 0; const pos = [];
   BOOKS.forEach((b, i) => {
-    const { t, d } = dims(b); const act = i === state.active;
-    const w = act ? d * 0.985 + t * 0.17 + GAP_A * 2 : t + GAP;
-    pos.push({ x, w, t, d, act }); x += w;
+    const { t, d } = dims(b); const l = openness(i, p, a);
+    const w = t + GAP + l * (d * 0.985 + t * 0.17 + GAP_A * 2 - t - GAP);
+    pos.push({ x, w, t, d, l }); x += w;
   });
-  const a = pos[state.active];
-  return { W, pos, offset: a ? W / 2 - (a.x + a.w / 2) : W / 2 - x / 2 };
+  const n = pos.length, q = Math.max(0, Math.min(n - 1, p));
+  const f = Math.floor(q), c = Math.min(n - 1, f + 1);
+  const cf = pos[f].x + pos[f].w / 2, cc = pos[c].x + pos[c].w / 2;
+  let xp = cf + (cc - cf) * (q - f);
+  if (p < 0) xp += p * pos[0].w; else if (p > n - 1) xp += (p - n + 1) * pos[n - 1].w;
+  return { W, pos, offset: (W / 2 - x / 2) * (1 - a) + (W / 2 - xp) * a };
 }
 
-// `drag`: píxeles que lleva arrastrada la cinta (el dedo); los libros lo siguen sin animación.
-function layout(drag = 0) {
+function paint() {
+  const els = tape.children; if (!els.length) return;
+  const { pos, offset } = geometry(cur.p, cur.a);
+  pos.forEach((q, i) => {
+    const cx = q.x + q.w / 2 + offset - q.t / 2;
+    els[i].style.transform = `translate3d(${cx.toFixed(2)}px, 0, ${((q.d / 2 - q.t / 2 + 24) * q.l).toFixed(2)}px) rotateY(${(-80 * q.l).toFixed(2)}deg)`;
+  });
+}
+
+let raf = 0, lastT = 0, dragging = false;
+function tick(now) {
+  const dt = lastT ? Math.min(64, now - lastT) : 16.7; lastT = now;
+  const k = 1 - Math.pow(0.84, dt / 16.7);   // un 16 % del camino por fotograma
+  if (!dragging) cur.p += (aim.p - cur.p) * k;
+  cur.a += (aim.a - cur.a) * k;
+  const done = !dragging && Math.abs(aim.p - cur.p) < 1e-3 && Math.abs(aim.a - cur.a) < 1e-3;
+  if (done) { cur.p = aim.p; cur.a = aim.a; }
+  paint();
+  if (done) { raf = 0; lastT = 0; } else raf = requestAnimationFrame(tick);
+}
+function kick() {
+  if (REDUCED || OG) { cur.p = aim.p; cur.a = aim.a; paint(); return; }
+  if (!raf) raf = requestAnimationFrame(tick);
+}
+
+function layout() {
   const els = [...tape.children];
   if (!els.length) return;
-  const { pos } = positions();
-  const offset = positions().offset + drag;
+  const act = state.active !== NONE;
+  aim.a = act ? 1 : 0;
+  if (act) aim.p = state.active;
   els.forEach((el, i) => {
-    const p = pos[i]; const cx = p.x + p.w / 2 + offset - p.t / 2;
-    el.style.transform = p.act
-      ? `translate3d(${cx}px, 0, ${p.d / 2 - p.t / 2 + 24}px) rotateY(-80deg)`
-      : `translate3d(${cx}px, ${matches(BOOKS[i]) ? 0 : 10}px, 0) rotateY(0deg)`;
-    el.classList.toggle('is-active', p.act);
+    el.classList.toggle('is-active', i === state.active);
     el.classList.toggle('is-dim', !matches(BOOKS[i]));
     el.tabIndex = -1;
-    el.setAttribute('aria-current', p.act ? 'true' : 'false');
+    el.setAttribute('aria-current', i === state.active ? 'true' : 'false');
   });
   renderCaption();
+  kick();
 }
 
-function renderCaption() {
-  const b = BOOKS[state.active];
+function renderCaption(at = state.active) {
+  const b = BOOKS[at];
   const shown = BOOKS.filter(matches);
   if (!b) {
     $('pf-count').innerHTML = `— / ${String(shown.length).padStart(2, '0')}`;
@@ -265,8 +300,8 @@ function renderCaption() {
   $('pf-count').innerHTML = `${n > 0 ? `<b>${String(n).padStart(2, '0')}</b>` : '—'} / ${String(shown.length).padStart(2, '0')}`;
   $('pf-caption').innerHTML = `<div class="ct">${esc(b.title)}</div><div class="cs">${esc(b.author)}<span class="pf-chip${b.status === 'reading' ? ' is-reading' : ''}">${esc(statusLabel(b))}</span></div>`;
   const idx = BOOKS.map((x, i) => matches(x) ? i : -1).filter(i => i >= 0);
-  $('pf-prev').disabled = !idx.some(i => i < state.active);
-  $('pf-next').disabled = !idx.some(i => i > state.active);
+  $('pf-prev').disabled = !idx.some(i => i < at);
+  $('pf-next').disabled = !idx.some(i => i > at);
 }
 
 function go(dir) {
@@ -346,7 +381,7 @@ function renderList() {
 }
 
 // ---------- Eventos ----------
-let downX = null, dragged = false, wheelAt = 0;
+let downX = null, dragged = false;
 tape.addEventListener('click', e => {
   const bk = e.target.closest('.pf-bk'); if (!bk || dragged) return;
   const i = +bk.dataset.i;
@@ -376,55 +411,102 @@ wrapEl.addEventListener('keydown', e => {
   }
   else if (e.key === 'Escape') { if (state.open) closeBook(); else shelve(); }
 });
-// Arrastrar (dedo o ratón): la cinta sigue al dedo y, al soltar, se asienta en el libro que quede
-// más cerca del centro. Un gesto corto pero claro (> 40 px) pasa al menos al siguiente. El puntero
-// se captura solo cuando ya es un arrastre: capturarlo antes desviaría el toque de un libro.
-let downAt = 0;
+// Arrastrar (dedo, ratón o trackpad): la cinta va pegada al dedo y, al soltar, sigue con la
+// inercia del gesto y se asienta en el libro que quede en el centro. Un gesto vertical se deja al
+// scroll de la página. El puntero se captura solo cuando ya es un arrastre: capturarlo antes
+// desviaría el toque de un libro.
+const matching = () => BOOKS.map((b, i) => matches(b) ? i : -1).filter(i => i >= 0);
+function nearest(p) {
+  let best = NONE, bd = Infinity;
+  for (const i of matching()) { const d = Math.abs(i - p); if (d < bd) { bd = d; best = i; } }
+  return best;
+}
+// La posición continua que deja la cinta desplazada `dx` px desde donde empezó el gesto (con un
+// libro abierto, que es como queda al arrastrar). Pasado el primer o el último libro, se estira
+// con resistencia.
+let base = 0, startAt = NONE;
+const off1 = p => geometry(p, 1).offset;
+function pFor(dx) {
+  const m = matching(); if (!m.length) return cur.p;
+  const hi = off1(m[0]), lo = off1(m[m.length - 1]);
+  let want = base + dx;
+  if (want > hi) want = hi + (want - hi) * 0.35; else if (want < lo) want = lo + (want - lo) * 0.35;
+  let a = -0.6, b = BOOKS.length - 0.4;   // `off1` baja al subir p: bisección
+  for (let k = 0; k < 32; k++) { const mid = (a + b) / 2; if (off1(mid) > want) a = mid; else b = mid; }
+  return (a + b) / 2;
+}
+function startDrag() {
+  if (state.open) closeBook();
+  startAt = state.active;
+  if (state.active === NONE) {
+    // Desde la fila de lomos: el gesto parte del libro que está en el centro.
+    const { W, pos, offset } = geometry(cur.p, cur.a);
+    let bd = Infinity;
+    pos.forEach((q, i) => { const d = Math.abs(q.x + q.w / 2 + offset - W / 2); if (matches(BOOKS[i]) && d < bd) { bd = d; cur.p = i; } });
+  }
+  aim.a = 1; dragging = true;
+  base = off1(cur.p);
+  tape.classList.add('is-dragging');
+}
+let shown = NONE;
+function dragTo(dx) {
+  cur.p = pFor(dx); kick();
+  const i = nearest(cur.p); if (i !== shown) { shown = i; renderCaption(i); }
+}
+function settle(p, dx = 0) {
+  dragging = false; shown = NONE;
+  tape.classList.remove('is-dragging');
+  let i = nearest(p);
+  // Gesto claro que no llegó a cambiar de libro: uno en su dirección.
+  if (i === startAt && Math.abs(dx) > 40) {
+    const m = matching(), k = m.indexOf(i) + (dx < 0 ? 1 : -1);
+    if (k >= 0 && k < m.length) i = m[k];
+  }
+  state.active = i; layout();
+}
+
+let downY = 0, axis = '', vx = 0, lastX = 0, lastMv = 0;
 wrapEl.addEventListener('pointerdown', e => {
   if (state.open || e.button > 0) return;
-  downX = e.clientX; downAt = Date.now(); dragged = false;
+  downX = e.clientX; downY = e.clientY; dragged = false; axis = '';
 });
 wrapEl.addEventListener('pointermove', e => {
   if (downX === null) return;
-  const dx = e.clientX - downX;
-  if (!dragged && Math.abs(dx) > 8) {
-    dragged = true;
-    tape.classList.add('is-dragging');
+  const dx = e.clientX - downX, dy = e.clientY - downY;
+  if (!axis) {
+    if (Math.abs(dy) > 8 && Math.abs(dy) > Math.abs(dx)) { axis = 'v'; downX = null; return; }
+    if (Math.abs(dx) <= 6) return;
+    axis = 'h'; dragged = true; vx = 0; lastX = e.clientX; lastMv = performance.now();
+    startDrag();
     try { wrapEl.setPointerCapture(e.pointerId); } catch { /* sin captura */ }
   }
-  if (dragged) layout(dx);
+  const now = performance.now();
+  vx = 0.7 * ((e.clientX - lastX) / Math.max(1, now - lastMv)) + 0.3 * vx;
+  lastX = e.clientX; lastMv = now;
+  dragTo(dx);
 });
 function endDrag(e, cancelled) {
   if (downX === null) return;
   const dx = e.clientX - downX; downX = null;
-  tape.classList.remove('is-dragging');
-  if (!dragged || cancelled) { if (dragged) layout(); setTimeout(() => { dragged = false; }, 0); return; }
-  // El libro cuyo centro queda más cerca del centro de la cinta, con la cinta donde la dejó el dedo.
-  const { W, pos, offset } = positions();
-  let best = state.active, bestD = Infinity;
-  pos.forEach((p, i) => {
-    if (!matches(BOOKS[i])) return;
-    const d = Math.abs(p.x + p.w / 2 + offset + dx - W / 2);
-    if (d < bestD) { bestD = d; best = i; }
-  });
-  const clear = Math.abs(dx) > 40;
-  if (!clear && (state.active === NONE || Date.now() - downAt < 250)) {
-    layout();   // apenas se movió: vuelve a su sitio
-  } else if (best !== state.active) {
-    if (state.open) closeBook();
-    state.active = best; layout();
-  } else if (clear) {
-    go(dx < 0 ? 1 : -1);   // gesto claro que no llegó a cambiar de libro: uno en su dirección
-  } else layout();
+  if (!dragged) return;
+  // Si el dedo se paró antes de soltar, sin inercia.
+  if (performance.now() - lastMv > 90) vx = 0;
+  const fling = cancelled ? 0 : Math.max(-1.5, Math.min(1.5, vx)) * 260;
+  settle(cancelled ? cur.p : pFor(dx + fling), cancelled ? 0 : dx);
   setTimeout(() => { dragged = false; }, 0);
 }
 wrapEl.addEventListener('pointerup', e => endDrag(e, false));
 wrapEl.addEventListener('pointercancel', e => endDrag(e, true));
+// Trackpad: el desplazamiento lateral mueve la cinta igual que el dedo y se asienta al parar.
+let wheelDx = 0, wheelEnd = 0;
 wrapEl.addEventListener('wheel', e => {
-  if (Math.abs(e.deltaX) < Math.abs(e.deltaY) || Math.abs(e.deltaX) < 12) return;
+  if (Math.abs(e.deltaX) <= Math.abs(e.deltaY) || state.open) return;
   e.preventDefault();
-  const now = Date.now(); if (now - wheelAt < 260) return; wheelAt = now;
-  go(e.deltaX > 0 ? 1 : -1);
+  if (!wheelEnd) { wheelDx = 0; startDrag(); }
+  wheelDx -= e.deltaX;
+  dragTo(wheelDx);
+  clearTimeout(wheelEnd);
+  wheelEnd = setTimeout(() => { wheelEnd = 0; settle(cur.p); }, 120);
 }, { passive: false });
 
 let lastW = 0;
@@ -489,6 +571,7 @@ function selectShelf(i, { fromUrl = false } = {}) {
   const embedLink = document.querySelector('.pf-embed-link a');
   if (embedLink) embedLink.href = embedLink.href.replace(/#.*$/, '') + '#' + SHELVES[i].id;
   state.filter = 'all'; state.active = NONE;
+  cur.p = aim.p = 0; cur.a = aim.a = 0;   // otra estantería: entra ya de canto, sin animar desde la anterior
   renderTabs(); renderFilters(); renderList();
   buildTape(); fitSpines(); layout();
   // La dirección lleva la estantería, para poder compartir una en concreto. Incrustada no se toca.

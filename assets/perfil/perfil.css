@@ -78,13 +78,13 @@ main > * { min-width: 0; }
 .pf-tape-wrap:focus-visible { box-shadow: inset 0 0 0 2px var(--accent); }
 .pf-tape { position: absolute; left: 0; right: 0; bottom: 70px; height: 0; transform-style: preserve-3d; }
 .pf-floor { position: absolute; left: -10%; right: -10%; bottom: 30px; height: 70px; background: radial-gradient(60% 100% at 50% 0%, var(--pf-floor), transparent 70%); pointer-events: none; }
-.pf-bk { all: unset; position: absolute; left: 0; bottom: 0; width: var(--t); height: var(--h); transform-style: preserve-3d; transition: transform .75s cubic-bezier(.2,.8,.2,1), opacity .45s, filter .45s; cursor: pointer; will-change: transform; }
+.pf-bk { all: unset; position: absolute; left: 0; bottom: 0; width: var(--t); height: var(--h); transform-style: preserve-3d; transition: translate .45s, opacity .45s, filter .45s; cursor: pointer; will-change: transform; }
 /* Mientras se arrastra, los libros siguen al dedo sin animación; al soltar vuelve la transición. */
 .pf-tape.is-dragging .pf-bk { transition: none; }
 .pf-lift { position: absolute; inset: 0; transform-style: preserve-3d; transition: transform .3s cubic-bezier(.2,.8,.2,1); }
 .pf-bk:not(.is-active):hover .pf-lift { transform: translateY(-14px); }
 .pf-bk:focus-visible .pf-spine { outline: 2px solid var(--accent); outline-offset: 3px; }
-.pf-bk.is-dim { opacity: .22; filter: saturate(.2); }
+.pf-bk.is-dim { opacity: .22; filter: saturate(.2); translate: 0 10px; }
 .pf-face { position: absolute; left: 50%; top: 50%; backface-visibility: hidden; }
 .pf-spine { width: var(--t); height: var(--h); transform: translate(-50%, -50%) translateZ(calc(var(--d) / 2)); background: var(--spbg); color: var(--ink); display: flex; flex-direction: column; align-items: center; overflow: hidden; border-radius: 2px; -webkit-box-reflect: below 1px linear-gradient(transparent 82%, rgba(0,0,0,.16)); }
 .pf-spine::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, rgba(0,0,0,.18), rgba(255,255,255,.12) 22%, rgba(255,255,255,0) 50%, rgba(0,0,0,.14)); pointer-events: none; }
@@ -168,6 +168,8 @@ main > * { min-width: 0; }
 .pf-chip { display: inline-block; margin-left: 6px; font-size: var(--fs-xs); font-weight: 500; padding: 1px 8px; border-radius: var(--r-pill); background: var(--surface-3); color: var(--text-soft); }
 .pf-chip.is-reading { background: var(--accent-soft); color: var(--accent); }
 .pf-keys { text-align: center; font-size: var(--fs-xs); color: var(--text-faint); margin: 0; }
+/* Con el dedo no hay teclas: la pista de teclado sobra. */
+@media (hover: none) and (pointer: coarse) { .pf-keys { display: none; } }
 .pf-keys kbd { font-family: var(--font-mono); font-size: var(--fs-2xs); border: 1px solid var(--border); border-bottom-width: 2px; border-radius: var(--r-xs); padding: 0 5px; background: var(--surface-1); }
 .pf-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 

@@ -3,6 +3,19 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-11-24 — Estantería pública: deslizar continuo, con inercia
+
+- `assets/perfil/estanteria.js`: la cinta se pinta desde una posición continua (índice con
+  decimales) y cada libro se abre según lo cerca del centro que esté. Al arrastrar, el que llega se
+  va girando y el que se va se cierra; antes el activo seguía girado y saltaba al soltar.
+- Un bucle de animación acerca la cinta a su destino en cada fotograma (sin transiciones CSS en la
+  cinta): arrastre, inercia al soltar, flechas y teclado son el mismo movimiento. Pasado el primer
+  o el último libro, la cinta se estira con resistencia.
+- El gesto vertical se deja al scroll de la página; el trackpad mueve la cinta de forma continua.
+- En pantallas táctiles no se enseña la pista de teclado (← → Enter Esc).
+- `tests/perfil-swipe.spec.ts`: a mitad del arrastre hay un libro a medio girar y el gesto vertical
+  no mueve la cinta (falla con el código anterior).
+
 ## 2026-11-24 — Manifiesto «Lee el libro» (`/read-the-book/` y `/es/lee-el-libro/`)
 
 - **El caso**: enseñar BookReader en redes y fuera del círculo de la app. Una página de una pieza,
