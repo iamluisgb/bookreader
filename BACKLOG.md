@@ -623,6 +623,36 @@ sin abrir, y por significado. No se arregla estirando `search_book`; hace falta 
   - Antes, decidir quién calcula los embeddings: el proveedor BYOK, o el gateway (MON1) en la
     suscripción. **Esta decisión necesita el sí explícito de Luis**, porque el texto sale hacia un
     tercero.
+  - **Medido offline el 2026-11-24** ([`evals/ia10-f5/`](evals/ia10-f5/eval.mjs)). Se mandó la
+    biblioteca de Luis a NaN, a petición suya y solo para medir: 68 libros, 8.350 secciones de ~800
+    palabras, 8,4 M tokens y 26 min.
+    - **Configuración:** `qwen3-embedding` con instrucción de consulta. El libro puntúa por su mejor
+      sección y el híbrido es RRF entre BM25 (queries del agente) y embeddings.
+    - **Recall de libros @5** con las 20 preguntas revisadas:
+
+      | Modo | Recall @5 |
+      |---|---|
+      | BM25 con la pregunta tal cual | 33 % |
+      | BM25 con queries del agente (deepseek-v4-flash) | 75 % |
+      | Embeddings con la pregunta tal cual | 80 % |
+      | Embeddings a 256 dimensiones int8 | 77 % |
+      | **Híbrido** | **84 %** |
+      | Híbrido a 256 dimensiones int8 | 83 % |
+
+    - **8 preguntas extra** en lenguaje natural (sin revisar, en `evals/private/`): BM25 con agente
+      94 %, embeddings e híbrido 100 %.
+    - **Lectura:**
+      - Los embeddings con la pregunta cruda ya igualan a BM25 con un agente que expande. La
+        búsqueda deja de depender de lo bien que expanda quien llama.
+      - El híbrido suma unos 9 puntos sobre lo de hoy.
+      - Comprimir a 256 dimensiones int8 casi no cuesta (2,1 MB para toda la biblioteca, frente a
+        137 MB en float32): el diseño de arriba vale.
+      - Sigue por debajo del 90 %. Casi todos los fallos son de la batería vieja: libros nuevos
+        que también responden.
+    - **Regresión:** en `web-vitals`, el término exacto que BM25 acierta, la fusión RRF lo perdió
+      (de 100 a 0). La fusión tiene que proteger los aciertos léxicos fuertes.
+    - **Coste que falta por decidir:** embeber la consulta en cada búsqueda exige una clave en el
+      Worker del MCP (¿la de Luis para todos?), y el índice exige un proveedor con `/embeddings`.
 - **F6 — En la app (opcional)**
   - IA9 usa el núcleo de F2 para la conversación con ámbito «esta estantería».
   - Si «Pregúntale a tu biblioteca» se vende como parte de la suscripción (ADR-031, MON4), es
