@@ -73,12 +73,24 @@ function splitInTwo(text) {
   for (let i = 0; i < text.length; i++) if (text[i] === ' ' && (best < 0 || Math.abs(i - mid) < Math.abs(best - mid))) best = i;
   return best < 0 ? esc(text) : `${esc(text.slice(0, best))}<br>${esc(text.slice(best + 1))}`;
 }
-function overflows(el) { return el.scrollHeight > el.clientHeight || el.scrollWidth > el.clientWidth + 1; }
+function overflowsBox(el) { return el.scrollHeight > el.clientHeight || el.scrollWidth > el.clientWidth + 1; }
+// El título se mide por su tamaño natural frente al hueco que dejan los demás elementos del lomo, con
+// dos píxeles de holgura: si cabe justo, el navegador lo encoge una fracción y pinta «…».
+function titleOverflows(el) {
+  const sp = el.parentElement; const cs = getComputedStyle(sp);
+  let used = 0;
+  for (const c of sp.children) if (c !== el) { const k = getComputedStyle(c); used += c.offsetHeight + parseFloat(k.marginTop) + parseFloat(k.marginBottom); }
+  const avail = sp.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom) - used;
+  return el.offsetHeight > avail - 2 || el.scrollWidth > el.clientWidth + 1;
+}
 function fitSpines() {
   // Primero el autor (franja corta) y luego el título, que se queda con el resto del lomo.
   const els = [...tape.querySelectorAll('.pf-sp-auth[data-fit]'), ...tape.querySelectorAll('.pf-sp-title[data-fit]')];
   for (const el of els) {
     const t = parseFloat(el.closest('.pf-bk').style.getPropertyValue('--t'));
+    const isTitle = el.classList.contains('pf-sp-title');
+    if (isTitle) el.style.flex = 'none';   // tamaño natural mientras se mide
+    const overflows = isTitle ? titleOverflows : overflowsBox;
     let fs = parseFloat(getComputedStyle(el).fontSize);
     while (overflows(el) && fs > 5) { fs -= 0.5; el.style.fontSize = fs + 'px'; }
     // A dos líneas si en una no cabe, o si en un lomo grueso la letra quedaría diminuta.
@@ -88,6 +100,7 @@ function fitSpines() {
       fs = Math.min(t * 0.3, 22); el.style.fontSize = fs + 'px';
       while (overflows(el) && fs > 6) { fs -= 0.5; el.style.fontSize = fs + 'px'; }
     }
+    if (isTitle) el.style.flex = '';
   }
 }
 
@@ -291,6 +304,8 @@ async function start() {
     for (const b of BOOKS) if (b.cover?.type === 'paper') b.coverData = paperCover(b.cover);
   }
   await Promise.all(BOOKS.map(loadAspect));
+  // Empieza en el libro del medio: así hay libros a los dos lados y no queda medio estante vacío.
+  state.active = Math.floor(BOOKS.length / 2);
   renderNow(data.now);
   renderFilters();
   renderList();
