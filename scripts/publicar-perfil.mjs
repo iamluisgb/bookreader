@@ -80,11 +80,15 @@ for (const b of snap.books.filter(x => referenced.has(x.id))) {
   const file = path.join(coversDir, `${id}.webp`);
   const has = fs.existsSync(file);
   // Un paper se dibuja en el navegador (portada-paper.js): su webp es el del widget, no se pisa.
-  const write = b.coverData && !book.cover && (!has || flag('--covers'));
+  // Se escribe si falta, con `--covers`, o si la de la app es más ancha que la publicada (las de
+  // 320 px se veían borrosas; así mejoran solas al volver a publicar).
+  const newW = b.coverData ? (await sharp(Buffer.from(b.coverData.split(',')[1], 'base64')).metadata()).width || 0 : 0;
+  const oldW = has ? (await sharp(file).metadata()).width || 0 : 0;
+  const write = b.coverData && !book.cover && (!has || flag('--covers') || newW > oldW);
   if (write && !DRY) {
     const buf = Buffer.from(b.coverData.split(',')[1], 'base64');
     fs.mkdirSync(coversDir, { recursive: true });
-    await sharp(buf).resize({ width: 320, withoutEnlargement: true }).webp({ quality: 82 }).toFile(file);
+    await sharp(buf).resize({ width: 640, withoutEnlargement: true }).webp({ quality: 85 }).toFile(file);
   }
   log.push(`${p ? 'conserva' : 'nuevo   '} ${id.padEnd(12)} ${write ? 'portada nueva' : has ? 'portada de antes' : 'SIN PORTADA'} · lomo ${book.spine.style} · ${book.title}`);
 }

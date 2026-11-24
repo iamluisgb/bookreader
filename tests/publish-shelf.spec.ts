@@ -134,6 +134,11 @@ test('descargar: varias estanterías en su orden, cada libro una vez, sin los oc
   // `spineAuto` solo en el lomo que eligió la app (SPQR, automático), no en el O'Reilly elegido a mano.
   expect(ill.spineAuto).toBeUndefined();
   expect(snap.books.find((b: any) => b.bookId === C).spineAuto).toBe(true);
+  // Portadas a 640 px de ancho (a 320 se veían borrosas en retina).
+  const widths = await page.evaluate(async (srcs) => Promise.all(srcs.map(src => new Promise(res => {
+    const i = new Image(); i.onload = () => res(i.naturalWidth); i.onerror = () => res(0); i.src = src;
+  }))), snap.books.map((b: any) => b.coverData));
+  expect(widths).toEqual(snap.books.map(() => 640));
 
   // Vista previa: la foto en localStorage y la página del handle con ?draft=1.
   const popup = page.waitForEvent('popup');
@@ -206,13 +211,19 @@ test('lomo automático: detecta O\u2019Reilly por la portada y no confunde un pa
     for (const [c, src] of Object.entries(covers)) {
       const img = new Image();
       await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = src as string; });
-      const cv = document.createElement('canvas'); cv.width = 320; cv.height = Math.round(320 * img.naturalHeight / img.naturalWidth);
-      const ctx = cv.getContext('2d')!; ctx.drawImage(img, 0, 0, cv.width, cv.height);
-      out[c] = P.looksOReilly(ctx.getImageData(0, 0, cv.width, cv.height).data, cv.width, cv.height);
+      // A 320 (como se calibró) y a 640 (como se usa): tiene que dar lo mismo.
+      const at = (w: number) => {
+        const cv = document.createElement('canvas'); cv.width = w; cv.height = Math.round(w * img.naturalHeight / img.naturalWidth);
+        const ctx = cv.getContext('2d')!; ctx.drawImage(img, 0, 0, cv.width, cv.height);
+        return P.looksOReilly(ctx.getImageData(0, 0, cv.width, cv.height).data, cv.width, cv.height);
+      };
+      out[c] = at(320) && at(640);
+      out[c + '@640'] = at(640) === at(320);
     }
     return out;
   }, covers);
-  expect(r).toEqual({ definitive: true, illustrated: true, albada: true, skills: true, graph: false, harness: false, senior: false });
+  expect(Object.fromEntries(Object.entries(r).filter(([k]) => !k.endsWith('@640')))).toEqual({ definitive: true, illustrated: true, albada: true, skills: true, graph: false, harness: false, senior: false });
+  expect(Object.entries(r).filter(([k, v]) => k.endsWith('@640') && !v)).toEqual([]);
 });
 
 test('configuración de antes: «color de la portada» por defecto pasa a automático; O\u2019Reilly elegido se queda', async ({ page }) => {

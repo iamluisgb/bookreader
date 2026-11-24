@@ -28,7 +28,9 @@ import { alertBox } from '../ui/dialog.js';
 const FLAG = 'perfil_preview';
 export const CONFIG_KEY = 'public_profile';
 export const DRAFT_KEY = 'bookreader_perfil_draft';
-const COVER_W = 320;
+// 640 y no 320: el libro que gira mide hasta ~300 px CSS y en retina pide ~600 reales; a 320 se
+// veía borroso (24-nov-2026). La detección de O'Reilly mide proporciones y no depende del tamaño.
+const COVER_W = 640;
 
 try {
   const q = new URLSearchParams(location.search).get('perfil-preview');
@@ -162,7 +164,7 @@ function loadImage(src) {
 
 const hex = (r, g, b) => '#' + [r, g, b].map(v => Math.round(v).toString(16).padStart(2, '0')).join('');
 
-// Miniatura en webp (320 px de ancho) y el color de su borde izquierdo, que es lo más parecido
+// Miniatura en webp (COVER_W px de ancho) y el color de su borde izquierdo, que es lo más parecido
 // al lomo que tenemos. Sin portada, se dibuja una tipográfica con el color del libro.
 async function coverAndColor(rec) {
   const canvas = document.createElement('canvas');
@@ -180,22 +182,23 @@ async function coverAndColor(rec) {
     return { coverData: toWebp(canvas), bg: hex(r / n, g / n, b / n), oreilly };
   }
   const bg = '#2b3a4a';
+  const k = COVER_W / 320;   // medidas pensadas a 320 px, escaladas al ancho real
   canvas.width = COVER_W; canvas.height = Math.round(COVER_W * 1.5);
   ctx.fillStyle = bg; ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.fillStyle = '#ffffff'; ctx.font = '600 26px Georgia, serif'; ctx.textBaseline = 'top';
-  let y = 60; let line = '';
+  ctx.fillStyle = '#ffffff'; ctx.font = `600 ${26 * k}px Georgia, serif`; ctx.textBaseline = 'top';
+  let y = 60 * k; let line = '';
   for (const w of spineTitle(rec.title).split(/\s+/)) {
     const test = line ? line + ' ' + w : w;
-    if (ctx.measureText(test).width > canvas.width - 56 && line) { ctx.fillText(line, 28, y); y += 34; line = w; } else line = test;
+    if (ctx.measureText(test).width > canvas.width - 56 * k && line) { ctx.fillText(line, 28 * k, y); y += 34 * k; line = w; } else line = test;
   }
-  if (line) ctx.fillText(line, 28, y);
-  ctx.font = '400 16px Georgia, serif'; ctx.fillStyle = '#d9d9de';
-  ctx.fillText(String(rec.author || '').slice(0, 40), 28, canvas.height - 56);
+  if (line) ctx.fillText(line, 28 * k, y);
+  ctx.font = `400 ${16 * k}px Georgia, serif`; ctx.fillStyle = '#d9d9de';
+  ctx.fillText(String(rec.author || '').slice(0, 40), 28 * k, canvas.height - 56 * k);
   return { coverData: toWebp(canvas), bg, oreilly: false };
 }
 
 function toWebp(canvas) {
-  try { const u = canvas.toDataURL('image/webp', 0.82); if (u.startsWith('data:image/webp')) return u; } catch { /* sin webp */ }
+  try { const u = canvas.toDataURL('image/webp', 0.85); if (u.startsWith('data:image/webp')) return u; } catch { /* sin webp */ }
   return canvas.toDataURL('image/jpeg', 0.85);
 }
 
