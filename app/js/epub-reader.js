@@ -1101,6 +1101,7 @@ export async function load(arrayBuffer, onProgress, bookId = null) {
     doc.addEventListener('keydown', (e) => {
       if (['PageDown', 'PageUp', 'ArrowDown', 'ArrowUp', ' ', 'Home', 'End'].includes(e.key)) alScrollear();
     });
+    fixStretchedCovers(doc);
     // Also inject theme directly into the content document
     injectThemeIntoContent(contents);
     injectEndPanel(contents);
@@ -1350,6 +1351,21 @@ function applyDocLang(doc) {
     const lang = book?.packaging?.metadata?.language;
     if (lang) root.setAttribute('lang', String(lang).trim());
   } catch (e) { /* sin metadatos: sin guiones, como antes */ }
+}
+
+// Portadas deformadas. Calibre envuelve la cubierta en un SVG con `width/height="100%"` y
+// `preserveAspectRatio="none"`: pensado para una pantalla de e-reader con la proporción del
+// libro, en una columna del lector (más ancha que alta) la imagen se estira hasta llenarla.
+// Solo se toca el SVG que es una imagen y nada más (el patrón de cubierta); un SVG con dibujo
+// propio puede querer `none` a propósito.
+export function fixStretchedCovers(doc) {
+  if (!doc) return;
+  for (const svg of doc.querySelectorAll('svg[preserveAspectRatio="none"]')) {
+    const kids = [...svg.children].filter((el) => el.localName !== 'title' && el.localName !== 'desc');
+    if (kids.length === 1 && kids[0].localName === 'image') {
+      svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+    }
+  }
 }
 
 function injectThemeIntoContent(contents) {
