@@ -3,6 +3,20 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-11-24 — El perfil público por MCP: notas, enlaces y presentación
+
+- `get_public_profile` (cualquier token): qué enseña la página pública. Devuelve las estanterías
+  públicas con sus libros (visibles o no), la nota y el enlace de cada uno, el idioma y la
+  presentación. La foto no se envía; solo se indica si hay una (`hasAvatar`).
+- `update_public_profile` (permiso «Organizar mi biblioteca»): escribe la nota (≤ 280) y el
+  enlace (solo http/https) de cada libro, si se ve, la presentación, el idioma y las opciones de
+  la página. Escribe en `settings.json` → `public_profile` con `updatedAt` nuevo, y la app lo
+  adopta al fundir (gana el más reciente). Valida todo antes de escribir y acepta `dry_run`.
+  - Un libro nuevo en una estantería pública entra oculto, como en la app.
+  - No publica, no activa el perfil y no hace públicas estanterías: eso se hace en la app.
+  - Sin deshacer cifrado (ese registro es solo de `library.json`): devuelve el antes y el después.
+- Tests: `workers/sync/test/mcp-profile.test.mjs` (3).
+
 ## 2026-11-24 — Perfil público: nota por libro, idioma, foto, «2026 en libros» e imagen para compartir
 
 - **Cada libro puede llevar una nota** («por qué lo recomiendo», hasta 280 caracteres, la escribe

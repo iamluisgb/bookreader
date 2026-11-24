@@ -57,6 +57,8 @@ test('F2 anuncia la misma superficie más reading_stats, mazos y artefactos', as
       'get_artifact',
       // Y el catálogo: las estanterías (lectura; organizarlas pide permiso).
       'list_shelves',
+      // Y la configuración del perfil público (lectura; editarla pide permiso de organizar).
+      'get_public_profile',
     ]);
   } finally {
     await c.close();

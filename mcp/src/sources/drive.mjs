@@ -347,6 +347,27 @@ export function createDriveSource({ provider, base = DEFAULT_BASE, cacheMs = 150
           return out;
         }
       : undefined,
+    /**
+     * La configuración del perfil público (`public_profile` en settings.json), o null. Sin la foto:
+     * es un data URL de decenas de KB que no le sirve a un agente (`hasAvatar` lo dice).
+     */
+    async publicProfile() {
+      const settings = await readJson(base + 'settings.json');
+      const p = settings && settings.public_profile;
+      if (!p || typeof p !== 'object') return null;
+      return { ...p, avatar: p.avatar ? true : null };
+    },
+    /**
+     * Cambia settings.json (lo usa el perfil público). Como writeLibrary: solo con un proveedor que
+     * escribe, y `mutate` recibe el JSON entero. La app lo baja por su etag y lo funde.
+     */
+    writeSettings: provider.update
+      ? async (mutate, opts = {}) => {
+          const out = await provider.update(base + 'settings.json', mutate, opts);
+          if (!opts.dryRun) cache = null;
+          return out;
+        }
+      : undefined,
     /** Días de lectura del layout, sin `key` ni `deviceId` (ver redact.mjs). */
     async readingDays() {
       const c = await load();

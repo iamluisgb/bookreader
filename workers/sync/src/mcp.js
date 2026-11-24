@@ -404,7 +404,8 @@ export async function mcpRoute(request, env, { resourceMetadata = null } = {}) {
   const reads = [];
   const provider = r2Provider(env, who.user, who.raw, { canWrite: canWrite || canOrganize || canUpload || canDelete, agent: { tokenId: who.tokenId, name: who.name }, trace: reads });
   const source = createDriveSource({ provider, kind: 'bookreader', cacheMs: 60000 });
-  Object.assign(source, { canWrite, canOrganize, canUpload, canDelete, canReadText: who.scopes.has('text'), agentName: who.name });
+  // Editar el perfil público (profile-tools.mjs) decide qué se enseña: va con «Organizar mi biblioteca».
+  Object.assign(source, { canWrite, canOrganize, canUpload, canDelete, canEditProfile: canOrganize && !!source.writeSettings, canReadText: who.scopes.has('text'), agentName: who.name });
   if (canUpload) source.uploads = uploadsFor(env, who, source, new URL(request.url).origin);
   let limited = 0;
   if (env.MCP_CALLS) {

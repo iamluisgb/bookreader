@@ -19,6 +19,7 @@ import { TEXT_TOOLS } from './text-tools.mjs';
 import { LIBRARY_SEARCH_TOOLS } from './library-search.mjs';
 import { ARTIFACT_TOOLS } from './artifact-tools.mjs';
 import { LIBRARY_TOOLS } from './library-tools.mjs';
+import { PROFILE_TOOLS } from './profile-tools.mjs';
 import { UPLOAD_TOOLS } from './upload-tools.mjs';
 import { specHash } from '../../app/js/ai/widgets/core.js';
 
@@ -739,6 +740,7 @@ export const ALL_TOOLS = [
   ...WRITE_TOOLS,
   ...ARTIFACT_TOOLS,
   ...LIBRARY_TOOLS,
+  ...PROFILE_TOOLS,
   ...UPLOAD_TOOLS,
 ];
 
