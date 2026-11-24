@@ -11,6 +11,8 @@ const ICONS = {
   // ——— chrome / navigation ———
   menu: '<line x1="3.5" y1="7" x2="20.5" y2="7"/><line x1="3.5" y1="12" x2="20.5" y2="12"/><line x1="3.5" y1="17" x2="20.5" y2="17"/>',
   xmark: '<line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/>',
+  // Perfil público (Ajustes y menú de la estantería): lo que se ve desde fuera.
+  globe: '<circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.3 2.4 3.4 5.3 3.4 8.5s-1.1 6.1-3.4 8.5c-2.3-2.4-3.4-5.3-3.4-8.5s1.1-6.1 3.4-8.5Z"/>',
   'chevron-left': '<polyline points="14.5 5 8 12 14.5 19"/>',
   'chevron-right': '<polyline points="9.5 5 16 12 9.5 19"/>',
   'arrow-up-right': '<line x1="7" y1="17" x2="16.5" y2="7.5"/><polyline points="8.5 7 17 7 17 15.5"/>',
