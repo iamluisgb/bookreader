@@ -10,6 +10,7 @@ begin with [Your first day](../tutoriales/first-day.md).
 ## Getting started
 
 - [Import a book](import-a-book.md)
+- [Get books without DRM](books-without-drm.md)
 - [Set up the agent](set-up-ai-key.md)
 
 ## Reading and asking

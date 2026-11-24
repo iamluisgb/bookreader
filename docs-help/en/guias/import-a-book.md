@@ -16,7 +16,8 @@ stays in your browser's storage, on this device. If you want it on another devic
 ## Before you start
 
 - An **EPUB** or a **PDF** you can open without Amazon's or Adobe's app. If your book only opens in
-  Kindle, it has DRM and BookReader cannot read it.
+  Kindle, it has DRM and BookReader cannot read it. Where to find books that do open:
+  [Get books without DRM](books-without-drm.md).
 - A **scanned PDF** (a photo of each page) displays fine, but it has no text: the agent cannot
   search inside it or quote passages. Fine for reading, useless for asking.
 
@@ -47,7 +48,8 @@ The book appears in the library with its cover (if the file has one) and its siz
 
 | Symptom                               | What to check                                                                                       |
 | ------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| "Unsupported format"                  | The file has DRM or is another format (MOBI, AZW3, CBZ). Only EPUB, PDF or a `.bookreader` dossier. |
+| "Unsupported format"                  | It is another format (MOBI, AZW3, CBZ). Only EPUB, PDF or a `.bookreader` dossier.                  |
+| "This book has DRM"                   | The store locked it. See [Get books without DRM](books-without-drm.md).                             |
 | It opens without a table of contents  | The PDF has no bookmarks. You can still read it.                                                    |
 | It opens, but the agent finds nothing | It is a scanned PDF with no text.                                                                   |
 | No cover                              | The EPUB does not declare one; reading works anyway.                                                |

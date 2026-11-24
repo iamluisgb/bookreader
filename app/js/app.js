@@ -32,7 +32,7 @@ import { THUMB_WIDTH } from './sync/library-sync.js';
 import * as License from './license.js';
 import { toast } from './ai/toast.js';
 import * as Jobs from './ai/jobs.js';
-import { t, translateDom } from './i18n.js';
+import { t, translateDom, getLang } from './i18n.js';
 import * as Hints from './ui/hints.js';
 import { prefetchVendor } from './vendor-loader.js';
 import { loadAgentCss } from './css-loader.js';
@@ -1782,6 +1782,31 @@ function initDragDrop() {
   });
 }
 
+// Un libro con DRM, un vale .acsm o un libro de Kindle: qué pasa y a dónde ir. El botón abre la
+// ayuda «Consigue libros sin DRM» en otra pestaña.
+async function explainDrm(kind) {
+  const STORE = { adobe: 'Adobe Digital Editions', apple: 'Apple Books', lcp: t('la aplicación de tu biblioteca o librería') };
+  let title, msg;
+  if (kind === 'acsm') {
+    title = t('Esto no es el libro');
+    msg = t('Un fichero .acsm es un vale para descargar el libro con Adobe Digital Editions, y el libro que baja lleva DRM. BookReader no puede abrirlo.');
+  } else if (kind === 'kindle') {
+    title = t('Es un libro de Kindle');
+    msg = t('Los formatos de Kindle (AZW, KFX, MOBI) solo se abren en las aplicaciones de Amazon. BookReader abre EPUB y PDF sin DRM.');
+  } else {
+    title = t('Este libro tiene DRM');
+    msg = STORE[kind]
+      ? t('La tienda lo ha protegido para que solo se abra en {app}. BookReader no puede abrirlo.', { app: STORE[kind] })
+      : t('La tienda lo ha protegido para que solo se abra en su aplicación. BookReader no puede abrirlo.');
+  }
+  msg += ' ' + t('Muchas tiendas y editoriales venden los mismos libros sin DRM.');
+  const go = await confirmBox(msg, { title, okText: t('Dónde conseguirlos'), cancelText: t('Cerrar') });
+  if (go) {
+    const { helpUrl } = await import('./drm.js');
+    window.open(helpUrl(getLang()), '_blank', 'noopener');
+  }
+}
+
 async function loadFile(file) {
   // Por el contenido, no por el nombre: lo que llega por WhatsApp puede venir como .zip
   // o sin extensión (ver file-kind.js).
@@ -1796,8 +1821,18 @@ async function loadFile(file) {
   const buffer = await file.arrayBuffer();
 
   if (ext !== 'epub' && ext !== 'pdf') {
+    // Un vale de Adobe o un libro de Kindle tienen su propia explicación (y la ayuda de DRM).
+    const { kindOfName } = await import('./drm.js');
+    const named = kindOfName(file.name);
+    if (named) { await explainDrm(named); return; }
     await alertBox('Formato no soportado. Usa archivos .epub, .pdf o .bookreader (dossier compartido).');
     return;
+  }
+  // Con DRM el texto está cifrado: avisar con claridad antes de que el lector falle a su manera.
+  {
+    const { drmOf } = await import('./drm.js');
+    const drm = await drmOf(buffer, ext);
+    if (drm) { await explainDrm(drm); return; }
   }
 
   const fileBaseId = file.name.replace(/\.[^.]+$/, '');

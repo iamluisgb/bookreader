@@ -77,6 +77,7 @@ nav:
   - Guides:
       - guias/index.md
       - Import a book: guias/import-a-book.md
+      - Get books without DRM: guias/books-without-drm.md
       - Set up the agent: guias/set-up-ai-key.md
       - Read a book: guias/read-a-book.md
       - Ask the book: guias/ask-the-book.md

@@ -98,6 +98,12 @@
     <xhtml:link rel="alternate" hreflang="x-default" href="https://bookreader.raiatech.com/help/guias/ask-the-book/"/>
   </url>
   <url>
+    <loc>https://bookreader.raiatech.com/help/guias/books-without-drm/</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://bookreader.raiatech.com/help/guias/books-without-drm/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://bookreader.raiatech.com/es/ayuda/guias/books-without-drm/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://bookreader.raiatech.com/help/guias/books-without-drm/"/>
+  </url>
+  <url>
     <loc>https://bookreader.raiatech.com/help/guias/connect-an-agent/</loc>
     <xhtml:link rel="alternate" hreflang="en" href="https://bookreader.raiatech.com/help/guias/connect-an-agent/"/>
     <xhtml:link rel="alternate" hreflang="es" href="https://bookreader.raiatech.com/es/ayuda/guias/connect-an-agent/"/>

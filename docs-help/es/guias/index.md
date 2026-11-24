@@ -10,6 +10,7 @@ por [Tu primer día](../tutoriales/first-day.md).
 ## Empezar
 
 - [Sube un libro](import-a-book.md)
+- [Consigue libros sin DRM](books-without-drm.md)
 - [Configura el agente](set-up-ai-key.md)
 
 ## Leer y preguntar

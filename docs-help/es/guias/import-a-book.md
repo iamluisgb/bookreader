@@ -16,7 +16,8 @@ después (o se vuelve a subir).
 ## Antes de empezar
 
 - Un **EPUB** o un **PDF** que puedas abrir sin la app de Amazon o de Adobe. Si tu libro solo se
-  abre en Kindle, tiene DRM y BookReader no puede leerlo.
+  abre en Kindle, tiene DRM y BookReader no puede leerlo. Dónde conseguir libros que sí se
+  abren: [Consigue libros sin DRM](books-without-drm.md).
 - Un PDF **escaneado** (una foto de cada página) se ve, pero no tiene texto: el agente no puede
   buscar dentro ni citar pasajes. Para leerlo, vale; para preguntarle, no.
 
@@ -47,7 +48,8 @@ El libro aparece en la biblioteca con su portada (si el fichero la trae) y su ta
 
 | Síntoma                                   | Qué mirar                                                                                            |
 | ----------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| «Formato no soportado»                    | El fichero tiene DRM o es otro formato (MOBI, AZW3, CBZ). Solo EPUB, PDF o un dossier `.bookreader`. |
+| «Formato no soportado»                    | Es otro formato (MOBI, AZW3, CBZ). Solo EPUB, PDF o un dossier `.bookreader`.                        |
+| «Este libro tiene DRM»                    | Está protegido por la tienda. Mira [Consigue libros sin DRM](books-without-drm.md).                  |
 | Se abre sin índice                        | El PDF no trae marcadores. Se puede leer igual.                                                      |
 | Se abre, pero el agente no encuentra nada | Es un PDF escaneado, sin texto.                                                                      |
 | No aparece la portada                     | El EPUB no la declara; se puede seguir leyendo.                                                      |

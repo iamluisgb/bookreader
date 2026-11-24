@@ -3,6 +3,23 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-11-24 — Libros con DRM: aviso claro y ayuda «Consigue libros sin DRM»
+
+- **El caso**: un EPUB con DRM es un zip válido con el texto cifrado. La app lo intentaba abrir y
+  acababa en «Error al cargar el archivo EPUB: …», que no decía qué pasaba ni qué hacer.
+- **Detección antes de abrir** (`app/js/drm.js`), sin quitar nunca nada:
+  - EPUB: Adobe ADEPT (`rights.xml`), Readium LCP (`license.lcpl`), Apple FairPlay (`sinf.xml`) y
+    cualquier cifrado de contenido en `encryption.xml`. La ofuscación de fuentes no cuenta y el
+    libro se abre.
+  - PDF: los manejadores EBX_HANDLER, Adobe.APS y FOPN, mirando solo si el tráiler declara
+    `/Encrypt`.
+  - Por el nombre: el vale `.acsm` de Adobe y los formatos de Kindle.
+  - Cada caso tiene su explicación y un botón «Dónde conseguirlos» que abre la ayuda.
+- **Ayuda nueva** `guias/books-without-drm` (ES/EN): qué es el DRM, cómo saber si un libro lo
+  lleva, tiendas y editoriales sin DRM (comprobado el 24-nov) y una nota de que BookReader no
+  quita el DRM. Enlazada desde «Sube un libro» y el índice de guías.
+- Tests: `tests/drm.spec.ts` (5).
+
 ## 2026-11-24 — Publicar una estantería desde la app (perfil público, paso 1)
 
 - **El caso**: la estantería pública `/@luis/` (23-nov, experimento) se hizo a mano editando
