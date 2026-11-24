@@ -4,15 +4,36 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Read the book — BookReader</title>
-<meta name="description" content="A summary saves you the book; that is the problem. BookReader helps you read the whole thing and keep it: citations that jump to the paragraph, questions about the text, spaced recall. No account.">
+<meta name="description" content="BookReader is a free EPUB and PDF reader, no account needed, that helps you read the whole book and keep it: every answer cites its paragraph, and the book asks you about what you read.">
 <link rel="canonical" href="https://bookreader.raiatech.com/read-the-book/">
+<link rel="alternate" hreflang="en" href="https://bookreader.raiatech.com/read-the-book/">
+<link rel="alternate" hreflang="es" href="https://bookreader.raiatech.com/es/lee-el-libro/">
 <meta property="og:type" content="website">
-<meta property="og:title" content="Read the book — BookReader">
-<meta property="og:description" content="A summary saves you the book. That is the problem.">
-<meta property="og:image" content="https://bookreader.raiatech.com/assets/social/read-the-book.png">
+<meta property="og:site_name" content="BookReader">
+<meta property="og:url" content="https://bookreader.raiatech.com/read-the-book/">
+<meta property="og:title" content="A summary saves you the book. That is the problem.">
+<meta property="og:description" content="An EPUB and PDF reader that helps you read the whole book and keep it. Free, no account, in the browser.">
+<meta property="og:image" content="https://bookreader.raiatech.com/assets/social/read-the-book.png?v=2">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="A summary saves you the book. BookReader: the reader that asks you about what you read. Free, no account.">
 <meta property="og:locale" content="en_GB">
+<meta property="og:locale:alternate" content="es_ES">
 <meta name="twitter:card" content="summary_large_image">
-<link rel="stylesheet" href="../assets/landing/just.css">
+<meta name="twitter:title" content="A summary saves you the book. That is the problem.">
+<meta name="twitter:description" content="An EPUB and PDF reader that helps you read the whole book and keep it. Free, no account.">
+<meta name="twitter:image" content="https://bookreader.raiatech.com/assets/social/read-the-book.png?v=2">
+<link rel="stylesheet" href="../assets/landing/just.css?v=2">
+<!-- Umami: production only, like the rest of the public site -->
+<script>
+if (location.hostname === 'bookreader.raiatech.com') {
+  var u = document.createElement('script');
+  u.defer = true; u.src = '/u/s.js';
+  u.setAttribute('data-website-id', '08c1619b-4bb8-471b-9dc9-9b6cda88e8ae');
+  u.setAttribute('data-host-url', 'https://cloud.umami.is');
+  document.head.appendChild(u);
+}
+</script>
 </head>
 <body>
 <div class="jr">
@@ -28,14 +49,16 @@
   </nav>
 
   <section class="first hero">
-    <p class="lbl">// 00 <i>manifesto · one page</i></p>
+    <p class="from" id="from" hidden></p>
+    <p class="lbl">// 00 <i>EPUB and PDF reader · free · no account</i></p>
     <h1>A summary<br>saves you<br>the <span class="mark">book</span>.</h1>
+    <p class="cardline">BookReader: the reader that asks you about what you read.<br><span>Free · no account · EPUB and PDF</span></p>
     <p class="sub">And that is exactly the problem. Fifteen minutes of key ideas gives you <b>the feeling</b> of having read it. It does not give you <b>the ability</b> to use what is inside. BookReader does the opposite: it helps you read the whole thing, and keeps it.</p>
     <div class="acts">
-      <a class="primary" href="../app/">Open the reader</a>
-      <a href="../samples/">Four free books</a>
-      <a href="../why/">How it is built</a>
+      <a class="primary" href="../app/?sample=frankenstein" data-umami-event="Manifesto sample" data-umami-event-where="hero">Try it with a book →</a>
+      <a href="../app/" data-umami-event="Open app" data-umami-event-where="manifesto-hero">Open my own book</a>
     </div>
+    <p class="facts">Opens Mary Shelley's <i>Frankenstein</i>, in the public domain. Works on phone and desktop, nothing to install.</p>
   </section>
 
   <section>
@@ -111,8 +134,9 @@
     <h2>Start with a book you already own.</h2>
     <p>Open an EPUB or a PDF and read ten pages. If you do not come back, you were right and I was not.</p>
     <div class="acts">
-      <a class="primary" href="../app/">Open the reader →</a>
+      <a class="primary" href="../app/" data-umami-event="Open app" data-umami-event-where="manifesto-close">Open the reader →</a>
       <a href="../samples/">Read a sample</a>
+      <button type="button" class="share" id="share" data-umami-event="Manifesto share">Know someone who needs this? Send it on</button>
     </div>
     <div class="foot">
       <span>BookReader · no account, no expiring highlights</span>
@@ -122,9 +146,26 @@
 
 </div>
 <script>
+  const q = new URLSearchParams(location.search);
   // Modo tarjeta para generar las imágenes de redes desde esta misma página.
-  const card = new URLSearchParams(location.search).get('card');
+  const card = q.get('card');
   if (card) document.body.dataset.card = card;
+  // ?de=Nombre: quien comparte el enlace firma el envío («Ana te ha mandado esto»).
+  const de = (q.get('de') || '').replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, 40);
+  if (de && !card) {
+    const from = document.getElementById('from');
+    from.textContent = '{n} sent you this.'.replace('{n}', de);
+    from.hidden = false;
+  }
+  // Pasarlo a otra persona: hoja del sistema en el móvil, copiar enlace en el escritorio.
+  // Se comparte la URL limpia, sin el ?de= de quien te lo mandó.
+  const share = document.getElementById('share');
+  share.addEventListener('click', async () => {
+    const data = { title: 'A summary saves you the book', text: 'An EPUB and PDF reader that helps you read the whole book and keep it. Free, no account.', url: 'https://bookreader.raiatech.com/read-the-book/' };
+    if (navigator.share) { try { await navigator.share(data); } catch (e) {} return; }
+    try { await navigator.clipboard.writeText(data.url); share.textContent = 'Link copied'; }
+    catch (e) { prompt('', data.url); }
+  });
 </script>
 </body>
 </html>

@@ -64,6 +64,15 @@ section.first { border-top: 0; margin-top: 0; padding-top: 74px; }
 .hero .acts a.primary:hover { background: var(--acc); border-color: var(--acc); color: #06120a; }
 .hero .acts a:hover { border-color: var(--dim); }
 
+/* quién te lo manda (?de=), qué es y la tarjeta */
+.from { display: inline-block; margin: 0 0 26px; padding: 8px 14px; border: 1px solid var(--acc); border-radius: 999px; font-family: var(--mono); font-size: 13px; color: var(--ink); }
+.from[hidden] { display: none; }
+.hero .facts { margin: 16px 0 0; font-size: 14px; line-height: 1.5; color: var(--faint); max-width: 62ch; }
+.hero .facts i { color: var(--dim); }
+.cardline { display: none; }
+.close .acts .share { font: inherit; cursor: pointer; background: none; padding: 12px 18px; border: 1px dashed var(--rule); border-radius: 7px; color: var(--dim); }
+.close .acts .share:hover { border-color: var(--acc); color: var(--acc); }
+
 /* problema */
 .lead { font-size: clamp(20px, 2.6vw, 26px); line-height: 1.45; margin: 0; max-width: 70ch; }
 .lead b { color: var(--acc); font-weight: 600; }
@@ -128,8 +137,11 @@ body[data-card="hero"] .close { display: none; }
 body[data-card] section { border: 0; margin: 0; padding: 0; }
 body[data-card="hero"] h1 { font-size: clamp(64px, 9vw, 132px); }
 body[data-card="thesis"] .thesis { font-size: clamp(40px, 5.4vw, 92px); max-width: 30ch; }
-body[data-card] .hero .acts, body[data-card] .hero .sub { display: none; }
+body[data-card] .hero .acts, body[data-card] .hero .sub, body[data-card] .hero .facts { display: none; }
 body[data-card="thesis"] .lbl { font-size: 15px; }
+body[data-card="hero"] .cardline { display: block; margin: 34px 0 0; font-size: 30px; line-height: 1.35; font-weight: 600; color: var(--ink); letter-spacing: -.01em; }
+body[data-card="hero"] .cardline span { font-family: var(--mono); font-size: 19px; font-weight: 400; letter-spacing: .06em; color: var(--acc); }
+body[data-card="hero"] h1 { font-size: 92px; }
 
 /* la marca en la tarjeta: estas imágenes circulan solas */
 body[data-card]::after {

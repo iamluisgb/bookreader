@@ -3,6 +3,27 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-11-24 — «Lee el libro», lista para mandársela a alguien
+
+- **El caso**: la página se va a pasar por WhatsApp/redes a personas concretas que no conocen
+  BookReader. Lo primero que ven es la vista previa, y luego diez segundos de página.
+- **Vista previa**: `og:title` con la frase del titular, `og:description` que dice qué es (lector de
+  EPUB y PDF, gratis, sin cuenta), `og:url`, `og:site_name`, tamaño y `alt` de la imagen, etiquetas
+  de Twitter y `hreflang` entre ES y EN. La tarjeta (`?card=hero`) añade debajo del titular «el lector
+  que te pregunta por lo que lees · Gratis · sin cuenta · EPUB y PDF»; regeneradas las tres imágenes
+  de `assets/social/` (`?v=2` en las URLs para saltar la caché de los previsualizadores).
+- **Arriba, qué es**: la etiqueta `// 00` pasa de «manifiesto · una página» a «lector de EPUB y PDF ·
+  gratis · sin cuenta».
+- **El botón principal abre un libro, no el lector vacío**: `/app/?sample=niebla` (EN: `frankenstein`),
+  con una línea que dice qué se abre y que va en móvil y ordenador sin instalar. Segundo botón:
+  «Abrir un libro mío».
+- **`?de=Nombre`**: quien comparte firma el envío («Ana te ha mandado esto»), en una píldora sobre el
+  titular. Se pinta con `textContent`, máx. 40 caracteres.
+- **Al final, «Pásaselo»**: hoja de compartir del sistema en móvil, copiar enlace en escritorio; se
+  comparte la URL limpia, sin el `?de=` de quien la mandó.
+- **Umami** como en el resto de la web pública, con eventos `Manifesto sample`, `Manifesto share` y
+  `Open app` (`where=manifesto-hero|manifesto-close`) para saber si los envíos acaban en lectura.
+
 ## 2026-11-24 — Estantería pública: deslizar continuo, con inercia
 
 - `assets/perfil/estanteria.js`: la cinta se pinta desde una posición continua (índice con

@@ -4,15 +4,36 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Lee el libro — BookReader</title>
-<meta name="description" content="Un resumen te ahorra el libro; ese es el problema. BookReader te ayuda a leerlo entero y a no olvidarlo: citas que llevan al párrafo, preguntas sobre el texto y repaso espaciado. Sin cuenta.">
+<meta name="description" content="BookReader es un lector de EPUB y PDF, gratis y sin cuenta, que te ayuda a leer el libro entero y a no olvidarlo: cada respuesta cita su párrafo y el libro te pregunta por lo que has leído.">
 <link rel="canonical" href="https://bookreader.raiatech.com/es/lee-el-libro/">
+<link rel="alternate" hreflang="es" href="https://bookreader.raiatech.com/es/lee-el-libro/">
+<link rel="alternate" hreflang="en" href="https://bookreader.raiatech.com/read-the-book/">
 <meta property="og:type" content="website">
-<meta property="og:title" content="Lee el libro — BookReader">
-<meta property="og:description" content="El resumen te ahorra el libro. Ese es el problema.">
-<meta property="og:image" content="https://bookreader.raiatech.com/assets/social/lee-el-libro.png">
+<meta property="og:site_name" content="BookReader">
+<meta property="og:url" content="https://bookreader.raiatech.com/es/lee-el-libro/">
+<meta property="og:title" content="El resumen te ahorra el libro. Ese es el problema.">
+<meta property="og:description" content="Un lector de EPUB y PDF que te ayuda a leer el libro entero y a no olvidarlo. Gratis, sin cuenta, en el navegador.">
+<meta property="og:image" content="https://bookreader.raiatech.com/assets/social/lee-el-libro.png?v=2">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="El resumen te ahorra el libro. BookReader: el lector que te pregunta por lo que lees. Gratis, sin cuenta.">
 <meta property="og:locale" content="es_ES">
+<meta property="og:locale:alternate" content="en_GB">
 <meta name="twitter:card" content="summary_large_image">
-<link rel="stylesheet" href="../../assets/landing/just.css">
+<meta name="twitter:title" content="El resumen te ahorra el libro. Ese es el problema.">
+<meta name="twitter:description" content="Un lector de EPUB y PDF que te ayuda a leer el libro entero y a no olvidarlo. Gratis, sin cuenta.">
+<meta name="twitter:image" content="https://bookreader.raiatech.com/assets/social/lee-el-libro.png?v=2">
+<link rel="stylesheet" href="../../assets/landing/just.css?v=2">
+<!-- Umami: solo en producción, como el resto de la web pública -->
+<script>
+if (location.hostname === 'bookreader.raiatech.com') {
+  var u = document.createElement('script');
+  u.defer = true; u.src = '/u/s.js';
+  u.setAttribute('data-website-id', '08c1619b-4bb8-471b-9dc9-9b6cda88e8ae');
+  u.setAttribute('data-host-url', 'https://cloud.umami.is');
+  document.head.appendChild(u);
+}
+</script>
 </head>
 <body>
 <div class="jr">
@@ -28,14 +49,16 @@
   </nav>
 
   <section class="first hero">
-    <p class="lbl">// 00 <i>manifiesto · una página</i></p>
+    <p class="from" id="from" hidden></p>
+    <p class="lbl">// 00 <i>lector de EPUB y PDF · gratis · sin cuenta</i></p>
     <h1>El resumen<br>te ahorra<br>el <span class="mark">libro</span>.</h1>
+    <p class="cardline">BookReader: el lector que te pregunta por lo que lees.<br><span>Gratis · sin cuenta · EPUB y PDF</span></p>
     <p class="sub">Y ese es exactamente el problema. Quince minutos de ideas clave te dan <b>la sensación</b> de haber leído. No te dan <b>la capacidad</b> de usar lo que hay dentro. BookReader hace lo contrario: te ayuda a leerlo entero y a que se quede.</p>
     <div class="acts">
-      <a class="primary" href="../../app/">Abrir el lector</a>
-      <a href="../../es/muestra/">Cuatro libros, gratis</a>
-      <a href="../../es/por-que/">Cómo está hecho</a>
+      <a class="primary" href="../../app/?sample=niebla" data-umami-event="Manifesto sample" data-umami-event-where="hero">Pruébalo con un libro →</a>
+      <a href="../../app/" data-umami-event="Open app" data-umami-event-where="manifesto-hero">Abrir un libro mío</a>
     </div>
+    <p class="facts">Se abre <i>Niebla</i>, de Unamuno, en dominio público. Funciona en el móvil y en el ordenador, sin instalar nada.</p>
   </section>
 
   <section>
@@ -111,8 +134,9 @@
     <h2>Empieza por un libro que ya tengas.</h2>
     <p>Abre un EPUB o un PDF y lee diez páginas. Si no vuelves, es que tenías razón y yo no.</p>
     <div class="acts">
-      <a class="primary" href="../../app/">Abrir el lector →</a>
+      <a class="primary" href="../../app/" data-umami-event="Open app" data-umami-event-where="manifesto-close">Abrir el lector →</a>
       <a href="../../es/muestra/">Leer una muestra</a>
+      <button type="button" class="share" id="share" data-umami-event="Manifesto share">¿Conoces a quien le vendría bien? Pásaselo</button>
     </div>
     <div class="foot">
       <span>BookReader · sin cuenta, sin subrayado que caduca</span>
@@ -122,9 +146,26 @@
 
 </div>
 <script>
+  const q = new URLSearchParams(location.search);
   // Modo tarjeta para generar las imágenes de redes desde esta misma página.
-  const card = new URLSearchParams(location.search).get('card');
+  const card = q.get('card');
   if (card) document.body.dataset.card = card;
+  // ?de=Nombre: quien comparte el enlace firma el envío («Ana te ha mandado esto»).
+  const de = (q.get('de') || '').replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, 40);
+  if (de && !card) {
+    const from = document.getElementById('from');
+    from.textContent = '{n} te ha mandado esto.'.replace('{n}', de);
+    from.hidden = false;
+  }
+  // Pasarlo a otra persona: hoja del sistema en el móvil, copiar enlace en el escritorio.
+  // Se comparte la URL limpia, sin el ?de= de quien te lo mandó.
+  const share = document.getElementById('share');
+  share.addEventListener('click', async () => {
+    const data = { title: 'El resumen te ahorra el libro', text: 'Un lector de EPUB y PDF que te ayuda a leer el libro entero y a no olvidarlo. Gratis, sin cuenta.', url: 'https://bookreader.raiatech.com/es/lee-el-libro/' };
+    if (navigator.share) { try { await navigator.share(data); } catch (e) {} return; }
+    try { await navigator.clipboard.writeText(data.url); share.textContent = 'Enlace copiado'; }
+    catch (e) { prompt('', data.url); }
+  });
 </script>
 </body>
 </html>
