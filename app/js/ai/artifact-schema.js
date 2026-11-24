@@ -120,7 +120,9 @@ export function parseJson(raw) {
 // título: eso lo pone la app, que es quien los tiene). `invalid` cuenta las anclas que no
 // existen en el libro — el póster no las pinta, pero es la señal de calidad de las citas.
 export function normalizeInfographic(raw, anchors = null, { ideasTitle = 'Ideas clave' } = {}) {
-  const o = typeof raw === 'string' ? parseJson(raw) : raw || {};
+  // `parseJson` da null si el modelo cortó el JSON (sin la `}` final) o lo mandó roto: eso es
+  // una infografía vacía, que el generador reintenta, no un TypeError en `o.ideas`.
+  const o = (typeof raw === 'string' ? parseJson(raw) : raw) || {};
   const list = (v) => (Array.isArray(v) ? v : []);
   const invalid = { count: 0 };
 

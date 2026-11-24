@@ -25,10 +25,13 @@ const POSTER = JSON.stringify({
   quote: { text: 'Un pueblo de muertos que hablan.', attribution: 'La novela' },
 });
 
-async function stubLLM(page: any) {
+// `cutFirst`: la primera composición llega cortada (JSON sin cerrar, como al agotar los tokens).
+async function stubLLM(page: any, { cutFirst = false } = {}) {
   await page.evaluate(
-    ({ candidates, poster }) => {
+    ({ candidates, poster, cutFirst }) => {
       const real = window.fetch.bind(window);
+      let composes = 0;
+      (window as any).__composes = () => composes;
       window.fetch = async (url: any, opts: any) => {
         const u = typeof url === 'string' ? url : url?.url || '';
         if (u.includes('/chat/completions') && opts?.body) {
@@ -37,7 +40,7 @@ async function stubLLM(page: any) {
           const out = /ideas clave candidatas/i.test(sys)
             ? candidates
             : /INFOGRAFÍA en JSON/i.test(sys)
-              ? poster
+              ? (composes++ === 0 && cutFirst ? poster.slice(0, Math.floor(poster.length / 2)) : poster)
               : 'ok';
           const chunks = [
             `data: ${JSON.stringify({ choices: [{ delta: { content: out }, finish_reason: null }] })}\n\n`,
@@ -56,7 +59,7 @@ async function stubLLM(page: any) {
         return real(url, opts);
       };
     },
-    { candidates: CANDIDATES, poster: POSTER },
+    { candidates: CANDIDATES, poster: POSTER, cutFirst },
   );
 }
 
@@ -198,6 +201,36 @@ test.describe('P29 · infografía de punta a punta', () => {
     // En el historial queda con el capítulo como ámbito.
     await page.locator('#ai-infographic .ai-ob-close').click();
     await expect(page.locator('.studio-card.studio-generated [data-kind="infographic"]')).toContainText(chapter);
+    expect(errors).toEqual([]);
+  });
+
+  // Regresión: la composición cortada por el tope de tokens acababa en «Cannot read properties
+  // of null (reading 'ideas')». Ahora se reintenta una vez y el lector ni se entera.
+  test('si la composición llega cortada, se reintenta y la infografía sale', async ({ page }) => {
+    test.setTimeout(60000);
+    const errors: string[] = [];
+    page.on('pageerror', (e) => errors.push(String(e)));
+    await page.goto('/index.html');
+    await page.evaluate((k) => localStorage.setItem('bookreader_ai_key', JSON.stringify(k)), 'test-key');
+    await page.reload();
+    await stubLLM(page, { cutFirst: true });
+
+    const fc = page.waitForEvent('filechooser');
+    await page.click('.lib-empty .lib-upload');
+    await (await fc).setFiles(EPUB_PATH);
+    await page.waitForSelector('#ai-toggle:not([disabled])', { timeout: 15000 });
+    await page.click('#ai-toggle');
+    await page.waitForSelector('.ai-onboarding', { timeout: 5000 });
+    await page.click('.ai-ob-tpl[data-tpl="hqa"]');
+    await page.fill('#ai-ob-goal', 'entender la novela');
+    await page.click('#ai-ob-start');
+    await expect(page.locator('#ai-status')).toContainText('Listo', { timeout: 30000 });
+    await page.click('.ai-tab[data-view="studio"]');
+    await page.click('.studio-empty [data-act="gen"][data-kind="infographic"]');
+    await page.waitForSelector('#ig-generate', { timeout: 5000 });
+    await page.click('#ig-generate');
+    await expect(page.locator('#ig-slides .ig-slide svg').first()).toBeVisible({ timeout: 30000 });
+    expect(await page.evaluate(() => (window as any).__composes())).toBe(2);
     expect(errors).toEqual([]);
   });
 });

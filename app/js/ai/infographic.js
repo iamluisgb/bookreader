@@ -301,16 +301,20 @@ async function runInfographic({ chunks, chapterOf = new Map(), goal, scopeName, 
 
   // 2) Composición: las ideas → el JSON del póster.
   progress(chunks.length, chunks.length, 'compose');
-  const raw = await LLM.chatStream({
+  // Un segundo intento si el JSON llega cortado o roto, con más margen y una petición que no es
+  // idéntica a la primera (el proveedor devuelve de caché la misma respuesta a la misma petición).
+  const ideasMsg = `IDEAS CLAVE:\n\n${groupCandidates(candidates, chapterOf)}`;
+  const compose = (retry) => LLM.chatStream({
     messages: [
       { role: 'system', content: composePrompt(goal, scopeName, chapter) },
-      { role: 'user', content: `IDEAS CLAVE:\n\n${groupCandidates(candidates, chapterOf)}` },
+      { role: 'user', content: retry ? `${ideasMsg}\n\nDevuelve SOLO el objeto JSON, completo y válido.` : ideasMsg },
     ],
-    maxTokens: 2600,
+    maxTokens: retry ? 4000 : 2600,
     signal,
     background,
   });
-  const out = normalize(raw);
+  let out = normalize(await compose(false));
+  if (!out.ideas.length && !out.panels.length) out = normalize(await compose(true));
   if (!out.ideas.length && !out.panels.length) {
     throw new Error(t('El modelo no devolvió una infografía válida. Vuelve a intentarlo.'));
   }

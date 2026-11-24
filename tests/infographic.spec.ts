@@ -39,6 +39,20 @@ test.describe('P29 · generador de la infografía', () => {
     expect(r.junk).toBeNull();
   });
 
+  // Regresión: un JSON cortado por el tope de tokens daba «Cannot read properties of null
+  // (reading 'ideas')» en vez de una infografía vacía que el generador reintenta.
+  test('un JSON cortado o roto da una infografía vacía, no una excepción', async ({ page }) => {
+    await page.goto('/');
+    const r = await page.evaluate(async () => {
+      const M: any = await import('/js/ai/infographic.js');
+      const cut = M.normalize('{"ideas":[{"head":"Uno","body":"Cuerpo","src":"a1"},{"head":"Do');
+      const broken = M.normalize('{"ideas":[{"head":"Uno",}]}');
+      return { cut: [cut.ideas.length, cut.panels.length], broken: [broken.ideas.length, broken.panels.length] };
+    });
+    expect(r.cut).toEqual([0, 0]);
+    expect(r.broken).toEqual([0, 0]);
+  });
+
   // El gate: más de 8 ideas, más de 3 paneles o más de 4 elementos por panel NO pasan.
   test('recorta los bloques a los techos del esquema', async ({ page }) => {
     await page.goto('/');
