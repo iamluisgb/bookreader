@@ -7,8 +7,8 @@
   var ES = document.documentElement.lang === 'es';
   var base = root.getAttribute('data-base') || '../';
   var L = ES
-    ? { read: 'Leer', source: 'Fuente', more: 'Ver {n} más', none: 'Nada coincide con «{q}».', count: '{n} libros', countOne: '1 libro', err: 'No se pudo cargar el catálogo.', tech: 'Técnico', lit: 'Clásico' }
-    : { read: 'Read', source: 'Source', more: 'Show {n} more', none: 'Nothing matches “{q}”.', count: '{n} books', countOne: '1 book', err: 'The catalogue could not be loaded.', tech: 'Technical', lit: 'Classic' };
+    ? { alsoIn: { en: 'También en inglés', es: 'También en español' }, read: 'Leer', source: 'Fuente', more: 'Ver {n} más', none: 'Nada coincide con «{q}».', count: '{n} libros', countOne: '1 libro', err: 'No se pudo cargar el catálogo.', tech: 'Técnico', lit: 'Clásico' }
+    : { alsoIn: { en: 'Also in English', es: 'Also in Spanish' }, read: 'Read', source: 'Source', more: 'Show {n} more', none: 'Nothing matches “{q}”.', count: '{n} books', countOne: '1 book', err: 'The catalogue could not be loaded.', tech: 'Technical', lit: 'Classic' };
   var PAGE = 24;
   var input = root.querySelector('input[type="search"]');
   var list = root.querySelector('.lib-list');
@@ -34,6 +34,15 @@
     var src = el('a', null, b.sourceName);
     src.href = b.home; src.rel = 'noopener'; src.target = '_blank';
     meta.appendChild(src);
+    // La misma obra en otro idioma va en la misma fila, no en otra (Pro Git EN/ES parecía duplicado).
+    (b.alt || []).forEach(function (o) {
+      meta.appendChild(document.createTextNode(' · '));
+      var a = el('a', 'lib-alt', L.alsoIn[o.lang] || o.lang.toUpperCase());
+      a.href = base + 'app/?sample=' + encodeURIComponent(o.id);
+      a.setAttribute('data-umami-event', 'Free library read');
+      a.setAttribute('data-umami-event-kind', o.kind);
+      meta.appendChild(a);
+    });
     main.appendChild(meta);
     var go = el('a', 'lib-read', L.read);
     go.href = base + 'app/?sample=' + encodeURIComponent(b.id);
@@ -69,6 +78,24 @@
     var se = c.se.map(function (b) {
       return { id: 'se:' + b.p, kind: 'lit', title: b.t, author: b.a, lang: 'en', format: 'epub', license: ES ? 'Dominio público en EE. UU.' : 'Public domain in the US', home: 'https://standardebooks.org/ebooks/' + b.p, sourceName: 'Standard Ebooks' };
     });
+    // Ediciones de la misma obra (`work` en tecnicos.json) en una sola fila, en el sitio de la
+    // primera: el botón abre la del idioma de la página y las demás salen como «También en…».
+    var lang = ES ? 'es' : 'en';
+    var obras = {};
+    c.tecnicos.forEach(function (raw, i) { if (raw.work) (obras[raw.work] = obras[raw.work] || []).push(tec[i]); });
+    var filas = [];
+    c.tecnicos.forEach(function (raw, i) {
+      var w = raw.work;
+      if (!w) { filas.push(tec[i]); return; }
+      if (obras[w] === null) return; // obra ya puesta
+      var eds = obras[w].slice().sort(function (x, y) { return (y.lang === lang) - (x.lang === lang); });
+      var fila = {};
+      for (var k in eds[0]) fila[k] = eds[0][k];
+      fila.alt = eds.slice(1);
+      filas.push(fila);
+      obras[w] = null;
+    });
+    tec = filas;
     // Los técnicos primero: son pocos y en la lista larga de clásicos se perderían.
     all = tec.concat(se);
     all.forEach(function (b) { b.key = fold(b.title + ' ' + b.author); });
