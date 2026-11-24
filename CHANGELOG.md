@@ -3,6 +3,23 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-11-24 — Manifiesto «Lee el libro» (`/read-the-book/` y `/es/lee-el-libro/`)
+
+- **El caso**: enseñar BookReader en redes y fuera del círculo de la app. Una página de una pieza,
+  en el lenguaje visual de `justuse.nan.builders`: terminal editorial, fondo de trama, etiquetas
+  `// 00` y un solo acento (el verde de la marca).
+- **La tesis**: la industria vende que no tengas que leer («las ideas clave en 15 minutos»). La
+  página sostiene lo contrario y lo documenta con **frases textuales** de Blinkist y Shortform,
+  comprobadas en sus webs el 24-nov-2026. En BookReader se promete leer, y se quita solo el olvido.
+- **Secciones**: 00 manifiesto · 01 el problema · 02 los números (0 cuentas, 1 toque de la cita al
+  párrafo, 100 % en el dispositivo, 0 KB sin cifrar) · 03 la tesis · 04 lo que cuesta un resumen
+  (seis categorías) · 05 el antes/después de un capítulo · 06 los recibos.
+- **Imágenes de redes**: se generan desde la propia página con `?card=hero` (1200×630, Open Graph)
+  y `?card=thesis` (1080×1350, vertical), y se guardan en `assets/social/`. Una sola fuente de
+  verdad: si cambia el texto, se regeneran.
+- **Estilo**: `assets/landing/just.css`. En móvil la cabecera deja solo el idioma y la acción
+  (Muestras y Por qué no caben en 390 px sin partirse).
+
 ## 2026-11-24 — Estantería pública de muestra (`/samples/` y `/es/muestra/`)
 
 - **El caso**: para probar el lector hace falta algo que leer y no había ni un libro público propio.

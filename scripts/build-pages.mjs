@@ -44,6 +44,8 @@ const PUBLIC = [
   'assets',
   'u',
   's',
+  // Manifiesto «Lee el libro» / «Read the book»: página de una pieza para enseñar y compartir.
+  'read-the-book',
   // Perfil público de prueba (experimento del 23-nov-2026): estantería de Luis + widget now.svg.
   '@luis',
 ];
