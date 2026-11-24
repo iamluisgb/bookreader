@@ -11,7 +11,7 @@ import { brandMark, brandLockup, cargar } from '../ui/brand.js';
 import { editBookMeta, withoutSubtitle } from './book-meta.js';
 import { t, getLang } from '../i18n.js';
 import { escapeHtml } from '../ui/escape.js';
-import { confirmBox, promptBox, alertBox, formBox } from '../ui/dialog.js';
+import { confirmBox, promptBox, alertBox, formBox, choiceBox } from '../ui/dialog.js';
 import * as AiDB from '../ai/db.js';
 import * as Srs from '../ai/srs.js';
 import * as FsrsParams from '../ai/fsrs-params.js';
@@ -1735,7 +1735,7 @@ async function openShelfMenu(id, anchor) {
     <button class="lib-menu-item" data-act="down">${icon('arrow-down', { size: 'md' })}<span>${t('Bajar')}</span></button>`}
     <div class="lib-menu-sep"></div>
     <button class="lib-menu-item" data-act="share">${icon('share', { size: 'md' })}<span>${t('Compartir estantería…')}</span></button>
-    ${publishOn ? `<button class="lib-menu-item" data-act="publish">${icon('globe', { size: 'md' })}<span>${t('Publicar…')}</span></button>` : ''}
+    ${publishOn ? `<button class="lib-menu-item" data-act="publish">${icon('globe', { size: 'md' })}<span>${t('Publicar en mi perfil…')}</span></button>` : ''}
     ${myLinks.length ? `<button class="lib-menu-item" data-act="links">${icon('xmark', { size: 'md' })}<span>${t('Retirar enlaces ({n})…', { n: myLinks.length })}</span></button>` : ''}
     <div class="lib-menu-sep"></div>
     ${dossierItems}
@@ -1773,7 +1773,7 @@ async function openShelfMenu(id, anchor) {
       await shareShelf(shelf);
       return;
     } else if (act === 'publish') {
-      await (await import('./publish.js')).openPublish(id);
+      await (await import('./publish.js')).openFor(id);
       return;
     } else if (act === 'links') {
       await revokeLinks(shelf.name, myLinks);
@@ -2091,20 +2091,15 @@ async function freeDownload(book) {
 // única salida visible era borrar el libro en todos.
 async function removeBook(book, canFree) {
   if (canFree) {
-    const choice = await formBox({
+    const choice = await choiceBox(t('¿Qué quieres hacer con "{title}"?', { title: book.title }), {
       title: t('Eliminar libro'),
-      message: t('¿Qué quieres hacer con "{title}"?', { title: book.title }),
-      fields: [{
-        name: 'scope', label: 'Alcance', type: 'select', value: 'device',
-        options: {
-          device: t('Quitar la descarga solo de este dispositivo ({size})', { size: humanSize(book.size) }),
-          all: t('Eliminarlo de la biblioteca y de todos mis dispositivos'),
-        },
-      }],
-      okText: t('Continuar'),
+      choices: [
+        { value: 'device', label: t('Quitar la descarga solo de este dispositivo ({size})', { size: humanSize(book.size) }) },
+        { value: 'all', label: t('Eliminarlo de la biblioteca y de todos mis dispositivos'), danger: true },
+      ],
     });
     if (!choice) return false;
-    if (choice.scope === 'device') return freeDownload(book);
+    if (choice === 'device') return freeDownload(book);
   }
   const msg = SyncProvider.isConnected()
     ? SyncProvider.text('deleteEverywhere', book.title)

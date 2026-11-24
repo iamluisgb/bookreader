@@ -49,5 +49,5 @@ test('compartir y publicar una rama llevan los libros de sus hijas', async ({ pa
 
   await open();
   await page.locator('.lib-menu-item[data-act="publish"]').click();
-  await expect(page.locator('.pub-card .pub-row')).toHaveCount(3);
+  await expect(page.locator('.pp-shelf .pub-row')).toHaveCount(3);
 });

@@ -1,15 +1,22 @@
-// Publicar una estantería como perfil público (experimento, paso 1; ver «Perfil público» en
-// DECISIONS cuando haya ADR). La app arma la FOTO de lo que el usuario elige enseñar —título,
-// autor, estado, progreso y una portada en miniatura— y nada más: ni el fichero, ni subrayados,
-// ni notas. El sync sigue cifrado; lo publicado es otra cosa, explícita y aparte.
+// Perfil público (experimento, paso 1; ver «Perfil público» en DECISIONS cuando haya ADR).
 //
-// En este paso no hay servidor: «Descargar» deja un `perfil-<estantería>.json` que
-// `scripts/publicar-perfil.mjs` convierte en la página `/@luis/`, y «Vista previa» guarda el
-// borrador en localStorage y abre esa misma página con `?draft=1` (mismo origen), que lo pinta en
-// lugar de su `perfil.json`. Así la vista previa es la estantería real, no una imitación.
+// Ajustes → Perfil público configura QUÉ se ve en la página pública (`/@<handle>/`): qué
+// estanterías, en qué orden y con qué nombre, qué libros de cada una, si se enseña el progreso y
+// cuál se está leyendo. La configuración se GUARDA (clave `public_profile`, viaja en el sync con
+// «gana el cambio más reciente», ver sync/layout.js) para no elegirlo todo cada vez.
 //
-// Oculto salvo con `?perfil-preview=1` (`=0` lo quita): para el resto sería prometer algo que aún
-// no existe.
+// Al publicar, la app arma la FOTO de lo elegido —título, autor, estado, progreso y una portada en
+// miniatura de los libros marcados— y nada más: ni ficheros, ni notas, ni las estanterías que no
+// sean públicas. El sync sigue cifrado; lo publicado es otra cosa, explícita y aparte.
+//
+// Paso 1, sin servidor: «Descargar» deja un `perfil-<handle>.json` que `scripts/publicar-perfil.mjs`
+// convierte en la página, y «Vista previa» deja la foto en localStorage y abre la página con
+// `?draft=1` (mismo origen), que la pinta en lugar de su `perfil.json`.
+//
+// Un libro que entra en una estantería pública DESPUÉS de configurarla queda OCULTO hasta que se
+// marque: nunca se publica algo que no se haya visto.
+//
+// Oculto salvo con `?perfil-preview=1` (`=0` lo quita).
 import * as Store from './store.js';
 import * as Shelves from './shelves.js';
 import * as Storage from '../storage.js';
@@ -19,6 +26,7 @@ import { escapeHtml } from '../ui/escape.js';
 import { alertBox } from '../ui/dialog.js';
 
 const FLAG = 'perfil_preview';
+export const CONFIG_KEY = 'public_profile';
 export const DRAFT_KEY = 'bookreader_perfil_draft';
 const COVER_W = 320;
 
@@ -32,7 +40,55 @@ export function available() {
   return Storage.get(FLAG, false) === true;
 }
 
-// ---- piezas puras (las usan los tests) --------------------------------------
+// ---- configuración -----------------------------------------------------------
+
+// { updatedAt, enabled, handle, showProgress, now: 'auto'|'none'|<bookId>,
+//   shelves: [{ id, name, books: [{ id, show, style }] }] }   (shelves: solo las públicas, en orden)
+export function emptyConfig() {
+  return { updatedAt: 0, enabled: false, handle: 'luis', showProgress: true, now: 'auto', shelves: [] };
+}
+export function getConfig() {
+  const c = Storage.get(CONFIG_KEY, null);
+  return c && typeof c === 'object' ? { ...emptyConfig(), ...c, shelves: Array.isArray(c.shelves) ? c.shelves : [] } : emptyConfig();
+}
+export function saveConfig(c) {
+  Storage.set(CONFIG_KEY, { ...c, updatedAt: Date.now() });
+}
+
+// Pura (la usan los tests). Pone la configuración al día con la biblioteca:
+//   - quita las estanterías públicas que ya no existen;
+//   - en cada una, quita los libros que ya no están y AÑADE los nuevos al final, ocultos y con
+//     `fresh: true` (no se guarda: solo marca «Nuevo» en la pantalla).
+// `members(shelf)` devuelve los libros de la rama (con sus subestanterías).
+export function reconcile(config, shelves, members) {
+  const byId = new Map(shelves.map(s => [s.id, s]));
+  const out = { ...config, shelves: [] };
+  for (const entry of config.shelves || []) {
+    const shelf = byId.get(entry.id);
+    if (!shelf) continue;
+    const recs = members(shelf);
+    const ids = new Set(recs.map(r => r.id));
+    const kept = (entry.books || []).filter(b => ids.has(b.id)).map(b => ({ id: b.id, show: !!b.show, style: b.style || 'plain' }));
+    const known = new Set(kept.map(b => b.id));
+    const fresh = recs.filter(r => !known.has(r.id)).map(r => ({ id: r.id, show: false, style: 'plain', fresh: true }));
+    out.shelves.push({ id: entry.id, name: entry.name || Shelves.segments(shelf.name).pop(), books: [...kept, ...fresh] });
+  }
+  return out;
+}
+
+// Al hacer pública una estantería, sus libros de ese momento salen VISIBLES: se acaba de elegir
+// y se ve la lista entera. Lo que llegue después entra oculto (reconcile).
+export function addShelf(config, shelf, recs) {
+  if (config.shelves.some(s => s.id === shelf.id)) return config;
+  return { ...config, shelves: [...config.shelves, {
+    id: shelf.id, name: Shelves.segments(shelf.name).pop(),
+    books: recs.map(r => ({ id: r.id, show: true, style: 'plain' })),
+  }] };
+}
+
+const stripFresh = (c) => ({ ...c, shelves: c.shelves.map(s => ({ ...s, books: s.books.map(({ fresh, ...b }) => b) })) });
+
+// ---- piezas puras del lomo (las usan los tests) ------------------------------
 
 // Apellidos para el lomo: «Maarten Grootendorst, Jay Alammar» → «Grootendorst & Alammar»;
 // con tres o más, el primero y «et al.».
@@ -73,7 +129,9 @@ export function spineFor(rec, style, bg) {
   return { style: 'plain', bg, ...inkFor(bg), title, author };
 }
 
-// ---- portada ---------------------------------------------------------------
+export const slug = (s) => String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'shelf';
+
+// ---- portada ------------------------------------------------------------------
 
 function loadImage(src) {
   return new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = src; });
@@ -90,12 +148,12 @@ async function coverAndColor(rec) {
   if (rec.cover) { try { im = await loadImage(rec.cover); } catch { im = null; } }
   if (im) {
     canvas.width = COVER_W; canvas.height = Math.round(COVER_W * im.naturalHeight / im.naturalWidth);
+    ctx.imageSmoothingQuality = 'high';
     ctx.drawImage(im, 0, 0, canvas.width, canvas.height);
     const strip = ctx.getImageData(0, 0, Math.max(4, Math.round(canvas.width * 0.06)), canvas.height).data;
     let r = 0, g = 0, b = 0, n = 0;
     for (let i = 0; i < strip.length; i += 4) { r += strip[i]; g += strip[i + 1]; b += strip[i + 2]; n++; }
-    const bg = hex(r / n, g / n, b / n);
-    return { coverData: toWebp(canvas), bg };
+    return { coverData: toWebp(canvas), bg: hex(r / n, g / n, b / n) };
   }
   const bg = '#2b3a4a';
   canvas.width = COVER_W; canvas.height = Math.round(COVER_W * 1.5);
@@ -117,31 +175,59 @@ function toWebp(canvas) {
   return canvas.toDataURL('image/jpeg', 0.85);
 }
 
-// ---- foto ------------------------------------------------------------------
+// ---- foto -----------------------------------------------------------------------
 
-// Lo que se publica. `rows` llega ya en el orden y con las elecciones del panel.
-async function snapshot({ shelfName, rows, nowId, showProgress }) {
-  const books = [];
-  for (const row of rows) {
-    if (!row.on) continue;
-    const rec = row.rec;
-    const { coverData, bg } = await coverAndColor(rec);
-    books.push({
-      bookId: rec.id,
-      id: rec.id.slice(0, 12),
-      title: rec.title || '',
-      author: rec.author || '',
-      status: rec.status === 'finished' ? 'finished' : (rec.status === 'reading' || (rec.progress || 0) > 0) ? 'reading' : 'unread',
-      progress: showProgress ? Math.round(rec.progress || 0) : null,
-      pages: estimatePages(rec),
-      pagesEstimated: true,
-      spine: spineFor(rec, row.style, bg),
-      coverData,
-    });
+const statusOf = (rec) => rec.status === 'finished' ? 'finished'
+  : (rec.status === 'reading' || (rec.progress || 0) > 0) ? 'reading' : 'unread';
+
+// Libro que se está leyendo, según la configuración: el elegido si sigue visible; con «auto», el
+// visible a medias que se abrió más tarde; con «none», ninguno.
+export function pickNow(config, recsById) {
+  const visible = config.shelves.flatMap(s => s.books.filter(b => b.show).map(b => b.id));
+  if (config.now === 'none') return null;
+  if (config.now && config.now !== 'auto') return visible.includes(config.now) ? config.now : null;
+  const reading = [...new Set(visible)].map(id => recsById.get(id)).filter(r => r && statusOf(r) === 'reading');
+  reading.sort((a, b) => (b.lastOpenedAt || 0) - (a.lastOpenedAt || 0));
+  return reading[0] ? reading[0].id : null;
+}
+
+// La foto (formato 2): estanterías con los ids de sus libros, y cada libro una sola vez aunque
+// esté en varias. El lomo de un libro es el que se eligió donde aparece primero.
+async function snapshot(config) {
+  const recsById = new Map((await Store.getAllRecords()).filter(r => !r.deleted).map(r => [r.id, r]));
+  const books = new Map();
+  const shelves = [];
+  const usedSlugs = new Set();
+  for (const s of config.shelves) {
+    const ids = [];
+    for (const b of s.books) {
+      const rec = recsById.get(b.id);
+      if (!b.show || !rec) continue;
+      const short = rec.id.slice(0, 12);
+      ids.push(short);
+      if (books.has(short)) continue;
+      const { coverData, bg } = await coverAndColor(rec);
+      books.set(short, {
+        bookId: rec.id, id: short,
+        title: rec.title || '', author: rec.author || '',
+        status: statusOf(rec),
+        progress: config.showProgress ? Math.round(rec.progress || 0) : null,
+        pages: estimatePages(rec), pagesEstimated: true,
+        spine: spineFor(rec, b.style, bg),
+        coverData,
+      });
+    }
+    if (!ids.length) continue;
+    let id = slug(s.name); let k = 2;
+    while (usedSlugs.has(id)) id = `${slug(s.name)}-${k++}`;
+    usedSlugs.add(id);
+    shelves.push({ id, name: s.name, books: ids });
   }
-  const now = books.find(b => b.bookId === nowId);
-  return { format: 'bookreader-perfil', version: 1, exportedAt: new Date().toISOString(),
-    shelf: shelfName, now: now ? now.id : null, showProgress, books };
+  const nowId = pickNow(config, recsById);
+  return { format: 'bookreader-perfil', version: 2, exportedAt: new Date().toISOString(),
+    handle: config.handle, showProgress: config.showProgress,
+    now: nowId && books.has(nowId.slice(0, 12)) ? nowId.slice(0, 12) : null,
+    shelves, books: [...books.values()] };
 }
 
 function download(name, text) {
@@ -152,125 +238,198 @@ function download(name, text) {
   setTimeout(() => URL.revokeObjectURL(a.href), 4000);
 }
 
-const slug = (s) => String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'estanteria';
+// ---- Ajustes → Perfil público ---------------------------------------------------
 
-// ---- panel -----------------------------------------------------------------
+let focusShelf = null;   // la estantería desde cuyo menú se llegó: se añade y se despliega
+const expanded = new Set();
 
-export async function openPublish(shelfId) {
-  const shelves = await Store.getShelves();
-  const shelf = shelves.find(s => s.id === shelfId);
-  if (!shelf) return;
-  // Una inteligente se publica con los libros que tenga ahora: la foto no guarda la regla.
-  // Con sus subestanterías: publicar «Técnico» saca también lo de «Técnico/Agentes».
-  const members = Shelves.booksInBranch((await Store.getAllRecords()).filter(r => !r.deleted), shelves, shelf);
-  if (!members.length) { await alertBox(t('Esta estantería no tiene libros.'), { title: t('Publicar estantería') }); return; }
+// Desde el menú de una estantería: la hace pública (si no lo era) y abre Ajustes en esta sección.
+export async function openFor(shelfId) {
+  focusShelf = shelfId;
+  expanded.add(shelfId);
+  (await import('../ui/app-settings.js')).open('public');
+}
 
-  // Leyendo ahora: el que esté a medias y se abriera más tarde.
-  const reading = members.filter(r => r.status === 'reading' || ((r.progress || 0) > 0 && (r.progress || 0) < 100));
-  const nowGuess = reading.sort((a, b) => (b.lastOpenedAt || 0) - (a.lastOpenedAt || 0))[0];
-  const state = {
-    name: Shelves.segments(shelf.name).pop(),
-    showProgress: true,
-    nowId: nowGuess ? nowGuess.id : '',
-    rows: members.map(rec => ({ rec, on: true, style: 'plain' })),
-  };
+async function load() {
+  const [shelves, records] = await Promise.all([Store.getShelves(), Store.getAllRecords()]);
+  const recs = records.filter(r => !r.deleted);
+  const members = (shelf) => Shelves.booksInBranch(recs, shelves, shelf);
+  let config = reconcile(getConfig(), shelves, members);
+  let lastFocus = null;
+  if (focusShelf) {
+    const shelf = shelves.find(s => s.id === focusShelf);
+    if (shelf) {
+      if (!config.shelves.some(s => s.id === shelf.id)) config = addShelf(config, shelf, members(shelf));
+      // Llegar desde el menú de una estantería es querer publicarla: el perfil se activa.
+      config.enabled = true;
+      saveConfig(stripFresh(config));
+      lastFocus = shelf.id;
+    }
+    focusShelf = null;
+  }
+  return { shelves, recs, recsById: new Map(recs.map(r => [r.id, r])), members, config, lastFocus };
+}
 
-  const overlay = document.createElement('div');
-  overlay.className = 'dlg-overlay';
-  overlay.innerHTML = `
-    <div class="dlg-card dlg-card--form pub-card" role="dialog" aria-modal="true" aria-label="${escapeHtml(t('Publicar estantería'))}">
-      <h2 class="dlg-title">${escapeHtml(t('Publicar estantería'))}</h2>
-      <div class="dlg-msg">${escapeHtml(t('Solo se publican el título, el autor, el estado y la portada de cada libro. Los libros, tus subrayados y tus notas no salen del dispositivo.'))}</div>
-      <div class="dlg-form">
-        <div class="dlg-field"><label class="dlg-field-lbl" for="pub-name">${escapeHtml(t('Nombre público'))}</label>
-          <input class="dlg-input" id="pub-name" type="text" value="${escapeHtml(state.name)}"></div>
-        <label class="dlg-check"><input type="checkbox" id="pub-progress" checked><span>${escapeHtml(t('Enseñar el progreso de lectura'))}</span></label>
-        <div class="dlg-field"><span class="dlg-field-lbl">${escapeHtml(t('Libros'))}</span><ol class="pub-list" id="pub-list"></ol></div>
-      </div>
-      <div class="dlg-actions">
-        <button class="dlg-btn dlg-cancel" data-act="cancel">${escapeHtml(t('Cancelar'))}</button>
-        <button class="dlg-btn" data-act="preview">${escapeHtml(t('Vista previa'))}</button>
-        <button class="btn btn--primary dlg-btn dlg-ok" data-act="download">${escapeHtml(t('Descargar'))}</button>
-      </div>
-    </div>`;
-  document.body.appendChild(overlay);
-  const card = overlay.querySelector('.pub-card');
-  const list = card.querySelector('#pub-list');
+const pageUrl = (handle) => `https://bookreader.raiatech.com/@${handle}/`;
 
-  const renderList = () => {
-    list.innerHTML = state.rows.map((row, i) => {
-      const r = row.rec;
-      return `<li class="pub-row${row.on ? '' : ' is-off'}" data-i="${i}">
-        <input type="checkbox" data-k="on" ${row.on ? 'checked' : ''} aria-label="${escapeHtml(t('Publicar {title}', { title: r.title || '' }))}">
-        <span class="pub-cover" style="${r.cover ? `background-image:url('${escapeHtml(r.cover)}')` : ''}" aria-hidden="true"></span>
-        <span class="pub-meta"><b>${escapeHtml(r.title || '')}</b><small>${escapeHtml(r.author || '')}</small>
-          <label class="pub-now"><input type="radio" name="pub-now" data-k="now" ${state.nowId === r.id ? 'checked' : ''}>${escapeHtml(t('Leyendo ahora'))}</label></span>
-        <select class="dlg-input pub-style" data-k="style" aria-label="${escapeHtml(t('Lomo'))}">
-          <option value="plain" ${row.style === 'plain' ? 'selected' : ''}>${escapeHtml(t('Lomo: color de la portada'))}</option>
-          <option value="oreilly" ${row.style === 'oreilly' ? 'selected' : ''}>${escapeHtml(t('Lomo: O’Reilly'))}</option>
-        </select>
+function sectionHtml(st) {
+  const { config, shelves, recsById } = st;
+  const publicIds = new Set(config.shelves.map(s => s.id));
+  const others = Shelves.shelfRows(shelves).filter(r => r.shelf && !publicIds.has(r.shelf.id));
+  const visible = [...new Set(config.shelves.flatMap(s => s.books.filter(b => b.show).map(b => b.id)))].map(id => recsById.get(id)).filter(Boolean);
+  const shelfCard = (s, i) => {
+    const shelf = shelves.find(x => x.id === s.id);
+    const shown = s.books.filter(b => b.show).length;
+    const fresh = s.books.filter(b => b.fresh).length;
+    const open = expanded.has(s.id);
+    return `<li class="pp-shelf" data-shelf="${escapeHtml(s.id)}">
+      <div class="pp-shelf-head">
+        <input class="appset-input pp-name" data-k="name" value="${escapeHtml(s.name)}" aria-label="${escapeHtml(t('Nombre público de {name}', { name: shelf.name }))}">
         <span class="pub-move">
-          <button type="button" class="dlg-btn" data-k="up" ${i === 0 ? 'disabled' : ''} aria-label="${escapeHtml(t('Subir'))}">↑</button>
-          <button type="button" class="dlg-btn" data-k="down" ${i === state.rows.length - 1 ? 'disabled' : ''} aria-label="${escapeHtml(t('Bajar'))}">↓</button>
-        </span></li>`;
-    }).join('');
+          <button type="button" class="dlg-btn" data-k="sup" ${i === 0 ? 'disabled' : ''} aria-label="${escapeHtml(t('Subir'))}">↑</button>
+          <button type="button" class="dlg-btn" data-k="sdown" ${i === config.shelves.length - 1 ? 'disabled' : ''} aria-label="${escapeHtml(t('Bajar'))}">↓</button>
+          <button type="button" class="dlg-btn" data-k="sremove" aria-label="${escapeHtml(t('Dejar de publicar {name}', { name: s.name }))}">${escapeHtml(t('Quitar'))}</button>
+        </span>
+      </div>
+      <button type="button" class="pp-toggle" data-k="expand" aria-expanded="${open}">
+        <span class="pp-toggle-txt">${escapeHtml(shelf.name)} · ${escapeHtml(t('{shown} de {n} libros visibles', { shown, n: s.books.length }))}</span>
+        ${fresh ? `<span class="pp-fresh">${escapeHtml(t('{n} nuevos sin revisar', { n: fresh }))}</span>` : ''}
+        <span aria-hidden="true">${open ? '▴' : '▾'}</span>
+      </button>
+      ${open ? `<ol class="pub-list">${s.books.map((b, j) => {
+        const r = recsById.get(b.id) || {};
+        return `<li class="pub-row${b.show ? '' : ' is-off'}" data-i="${j}">
+          <input type="checkbox" data-k="show" ${b.show ? 'checked' : ''} aria-label="${escapeHtml(t('Mostrar {title}', { title: r.title || '' }))}">
+          <span class="pub-cover" style="${r.cover ? `background-image:url('${escapeHtml(r.cover)}')` : ''}" aria-hidden="true"></span>
+          <span class="pub-meta"><b>${escapeHtml(r.title || '')}</b><small>${b.fresh ? `<span class="pp-fresh">${escapeHtml(t('Nuevo'))}</span> ` : ''}${escapeHtml(r.author || '')}</small></span>
+          <select class="dlg-input pub-style" data-k="style" aria-label="${escapeHtml(t('Lomo'))}">
+            <option value="plain" ${b.style !== 'oreilly' ? 'selected' : ''}>${escapeHtml(t('Lomo: color de la portada'))}</option>
+            <option value="oreilly" ${b.style === 'oreilly' ? 'selected' : ''}>${escapeHtml(t('Lomo: O’Reilly'))}</option>
+          </select>
+          <span class="pub-move">
+            <button type="button" class="dlg-btn" data-k="up" ${j === 0 ? 'disabled' : ''} aria-label="${escapeHtml(t('Subir'))}">↑</button>
+            <button type="button" class="dlg-btn" data-k="down" ${j === s.books.length - 1 ? 'disabled' : ''} aria-label="${escapeHtml(t('Bajar'))}">↓</button>
+          </span></li>`;
+      }).join('')}</ol>` : ''}
+    </li>`;
   };
-  renderList();
+  return `<div class="appset-section pp">
+    <h3 class="appset-h3">${escapeHtml(t('Perfil público'))}</h3>
+    <p class="appset-muted">${escapeHtml(t('Una página con las estanterías que elijas. Solo se publican el título, el autor, el estado y la portada de los libros que marques. Los ficheros, tus subrayados y tus notas no salen del dispositivo.'))}</p>
+    <label class="appset-check"><input type="checkbox" id="pp-enabled" ${config.enabled ? 'checked' : ''}> ${escapeHtml(t('Perfil público activado'))}</label>
+    <div class="pp-body"${config.enabled ? '' : ' hidden'}>
+      <label class="appset-label" for="pp-handle">${escapeHtml(t('Dirección'))}</label>
+      <div class="pp-handle"><span>bookreader.raiatech.com/@</span><input id="pp-handle" class="appset-input" value="${escapeHtml(config.handle)}" autocomplete="off" spellcheck="false"></div>
+      <label class="appset-check"><input type="checkbox" id="pp-progress" ${config.showProgress ? 'checked' : ''}> ${escapeHtml(t('Enseñar el progreso de lectura'))}</label>
+      <label class="appset-label" for="pp-now">${escapeHtml(t('Leyendo ahora'))}</label>
+      <select id="pp-now" class="appset-input">
+        <option value="auto" ${config.now === 'auto' ? 'selected' : ''}>${escapeHtml(t('Automático: el último que abriste'))}</option>
+        <option value="none" ${config.now === 'none' ? 'selected' : ''}>${escapeHtml(t('No enseñarlo'))}</option>
+        ${visible.map(r => `<option value="${escapeHtml(r.id)}" ${config.now === r.id ? 'selected' : ''}>${escapeHtml(r.title || '')}</option>`).join('')}
+      </select>
 
-  list.addEventListener('change', (e) => {
-    const li = e.target.closest('.pub-row'); if (!li) return;
-    const row = state.rows[+li.dataset.i];
-    const k = e.target.dataset.k;
-    if (k === 'on') { row.on = e.target.checked; li.classList.toggle('is-off', !row.on); }
-    if (k === 'now') state.nowId = row.rec.id;
-    if (k === 'style') row.style = e.target.value;
-  });
-  list.addEventListener('click', (e) => {
-    const b = e.target.closest('button[data-k]'); if (!b) return;
-    const i = +b.closest('.pub-row').dataset.i;
-    const j = b.dataset.k === 'up' ? i - 1 : i + 1;
-    if (j < 0 || j >= state.rows.length) return;
-    [state.rows[i], state.rows[j]] = [state.rows[j], state.rows[i]];
-    renderList();
-    list.querySelector(`.pub-row[data-i="${j}"] button[data-k="${b.dataset.k}"]`)?.focus();
-  });
+      <label class="appset-label">${escapeHtml(t('Estanterías públicas'))}</label>
+      ${config.shelves.length
+        ? `<ol class="pp-shelves">${config.shelves.map(shelfCard).join('')}</ol>`
+        : `<p class="appset-muted">${escapeHtml(t('Todavía no hay ninguna. Añade una abajo.'))}</p>`}
+      ${others.length ? `<div class="pp-add">
+        <select id="pp-add" class="appset-input" aria-label="${escapeHtml(t('Estantería que añadir'))}">
+          ${others.map(r => `<option value="${escapeHtml(r.shelf.id)}">${escapeHtml(r.shelf.name)}</option>`).join('')}
+        </select>
+        <button type="button" class="dlg-btn" id="pp-add-btn">${escapeHtml(t('Añadir'))}</button>
+      </div>` : ''}
+      <p class="appset-muted">${escapeHtml(t('Los libros que añadas después a una estantería pública entran ocultos hasta que los marques.'))}</p>
 
-  const close = () => { document.removeEventListener('keydown', onKey, true); overlay.remove(); };
-  const onKey = (e) => { if (e.key === 'Escape') { e.preventDefault(); close(); } };
-  document.addEventListener('keydown', onKey, true);
-  overlay.addEventListener('mousedown', (e) => { if (e.target === overlay) close(); });
+      <div class="pp-actions">
+        <button type="button" class="dlg-btn" data-act="preview">${escapeHtml(t('Vista previa'))}</button>
+        <button type="button" class="btn btn--primary dlg-btn" data-act="download">${escapeHtml(t('Descargar para publicar'))}</button>
+      </div>
+      <p class="appset-muted">${escapeHtml(t('Tu página:'))} <a href="${escapeHtml(pageUrl(config.handle))}" target="_blank" rel="noopener">${escapeHtml(pageUrl(config.handle).replace('https://', ''))}</a></p>
+    </div>
+  </div>`;
+}
 
-  const build = async () => {
-    const rows = state.rows.filter(r => r.on);
-    if (!rows.length) { await alertBox(t('Elige al menos un libro.'), { title: t('Publicar estantería') }); return null; }
-    return snapshot({
-      shelfName: card.querySelector('#pub-name').value.trim() || state.name,
-      rows: state.rows, nowId: state.nowId,
-      showProgress: card.querySelector('#pub-progress').checked,
-    });
+export async function renderSettings(content) {
+  const st = await load();
+  // Contenedor propio: `content` es de Ajustes y se reutiliza al cambiar de sección. Los listeners
+  // van en `host`, que se tira con la sección, así que no se acumulan al volver a abrirla.
+  content.innerHTML = '<div class="pp-host"></div>';
+  const host = content.firstElementChild;
+  const paint = () => {
+    host.innerHTML = sectionHtml(st);
+    if (st.lastFocus) host.querySelector(`.pp-shelf[data-shelf="${CSS.escape(st.lastFocus)}"]`)?.scrollIntoView({ block: 'nearest' });
   };
+  // Cada cambio se guarda al momento. `fresh` es solo de pantalla y no se guarda; un libro nuevo
+  // deja de serlo en cuanto se toca su fila.
+  const commit = (repaint) => { saveConfig(stripFresh(st.config)); if (repaint) paint(); };
+  paint();
 
-  card.querySelector('.dlg-actions').addEventListener('click', async (e) => {
-    const act = e.target.closest('button[data-act]')?.dataset.act;
-    if (!act) return;
-    if (act === 'cancel') { close(); return; }
-    // La pestaña se abre YA, en el gesto del usuario: si se abre después del await, el navegador
-    // la trata como ventana emergente y la bloquea.
-    const tab = act === 'preview' ? window.open('', '_blank') : null;
-    e.target.disabled = true;
-    try {
-      const snap = await build();
-      if (!snap) { tab?.close(); return; }
-      if (act === 'preview') {
-        try { localStorage.setItem(DRAFT_KEY, JSON.stringify(snap)); }
-        catch { tab?.close(); await alertBox(t('No cabe en el almacenamiento del navegador. Quita algún libro y vuelve a probar.')); return; }
-        const url = new URL('../@luis/?draft=1', location.href).href;
-        if (tab) tab.location.href = url; else window.open(url, '_blank');
-      } else {
-        download(`perfil-${slug(snap.shelf)}.json`, JSON.stringify(snap, null, 2));
-      }
-    } finally { e.target.disabled = false; }
+  host.addEventListener('change', (e) => {
+    const el = e.target;
+    if (el.id === 'pp-enabled') { st.config.enabled = el.checked; commit(true); return; }
+    if (el.id === 'pp-progress') { st.config.showProgress = el.checked; commit(false); return; }
+    if (el.id === 'pp-now') { st.config.now = el.value; commit(false); return; }
+    if (el.id === 'pp-handle') { st.config.handle = slug(el.value) || 'luis'; commit(true); return; }
+    const card = el.closest('.pp-shelf'); if (!card) return;
+    const s = st.config.shelves.find(x => x.id === card.dataset.shelf);
+    if (el.dataset.k === 'name') { s.name = el.value.trim() || s.name; commit(false); return; }
+    const row = el.closest('.pub-row'); if (!row) return;
+    const b = s.books[+row.dataset.i];
+    delete b.fresh;
+    if (el.dataset.k === 'show') { b.show = el.checked; st.lastFocus = s.id; commit(true); }
+    if (el.dataset.k === 'style') { b.style = el.value; commit(false); }
   });
 
-  card.querySelector('#pub-name').focus();
+  host.addEventListener('click', async (e) => {
+    const btn = e.target.closest('button'); if (!btn) return;
+    if (btn.id === 'pp-add-btn') {
+      const shelf = st.shelves.find(x => x.id === host.querySelector('#pp-add').value);
+      if (!shelf) return;
+      st.config = addShelf(st.config, shelf, st.members(shelf));
+      expanded.add(shelf.id); st.lastFocus = shelf.id;
+      commit(true); return;
+    }
+    const act = btn.dataset.act;
+    if (act === 'preview' || act === 'download') { await publish(act, btn, st.config); return; }
+    const card = btn.closest('.pp-shelf'); if (!card) return;
+    const i = st.config.shelves.findIndex(x => x.id === card.dataset.shelf);
+    const s = st.config.shelves[i];
+    const k = btn.dataset.k;
+    st.lastFocus = s.id;
+    if (k === 'expand') { if (expanded.has(s.id)) expanded.delete(s.id); else expanded.add(s.id); paint(); return; }
+    if (k === 'sremove') { st.config.shelves.splice(i, 1); commit(true); return; }
+    if (k === 'sup' || k === 'sdown') {
+      const j = k === 'sup' ? i - 1 : i + 1;
+      [st.config.shelves[i], st.config.shelves[j]] = [st.config.shelves[j], st.config.shelves[i]];
+      commit(true); return;
+    }
+    if (k === 'up' || k === 'down') {
+      const a = +btn.closest('.pub-row').dataset.i, z = k === 'up' ? a - 1 : a + 1;
+      [s.books[a], s.books[z]] = [s.books[z], s.books[a]];
+      commit(true);
+      host.querySelector(`.pp-shelf[data-shelf="${CSS.escape(s.id)}"] .pub-row[data-i="${z}"] button[data-k="${k}"]`)?.focus();
+    }
+  });
+}
+
+async function publish(act, btn, config) {
+  // La pestaña se abre YA, en el gesto del usuario: después del await el navegador la bloquea.
+  const tab = act === 'preview' ? window.open('', '_blank') : null;
+  btn.disabled = true;
+  try {
+    const snap = await snapshot(config);
+    if (!snap.shelves.length) {
+      tab?.close();
+      await alertBox(t('No hay nada que publicar: añade una estantería y marca algún libro.'), { title: t('Perfil público') });
+      return;
+    }
+    if (act === 'preview') {
+      try { localStorage.setItem(DRAFT_KEY, JSON.stringify(snap)); }
+      catch { tab?.close(); await alertBox(t('No cabe en el almacenamiento del navegador. Quita algún libro y vuelve a probar.')); return; }
+      const url = new URL(`../@${config.handle}/?draft=1`, location.href).href;
+      if (tab) tab.location.href = url; else window.open(url, '_blank');
+    } else {
+      download(`perfil-${config.handle}.json`, JSON.stringify(snap, null, 2));
+    }
+  } finally { btn.disabled = false; }
 }

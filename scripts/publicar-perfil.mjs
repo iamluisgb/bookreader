@@ -1,11 +1,14 @@
 #!/usr/bin/env node
-// Lleva a la web la estantería que la app exporta con «Publicar… → Descargar» (perfil público,
-// experimento; paso 1, sin servidor).
+// Lleva a la web el perfil que la app exporta en Ajustes → Perfil público → «Descargar para
+// publicar» (experimento; paso 1, sin servidor).
 //
-//   node scripts/publicar-perfil.mjs ~/Descargas/perfil-agentes.json [--dir @luis] [--covers] [--dry-run]
+//   node scripts/publicar-perfil.mjs ~/Descargas/perfil-luis.json [--dir @luis] [--covers] [--dry-run]
 //
-// Escribe `<dir>/perfil.json`, las portadas en `assets/perfil/<handle>/<id>.webp` y regenera
-// `<dir>/now.svg` (el widget «Reading now»). Luego: revisar el diff, commit y `npm run deploy:pages`.
+// La exportación es el perfil ENTERO (todas las estanterías públicas, en su orden): sustituye al
+// publicado. También acepta el formato 1 (una sola estantería, el del primer panel «Publicar…»).
+// Escribe `<dir>/perfil.json` (formato 2), las portadas en `assets/perfil/<handle>/<id>.webp` y
+// regenera `<dir>/now.svg` (el widget «Reading now»). `--dir` sale de `handle` si no se da.
+// Luego: revisar el diff, commit y `npm run deploy:pages`.
 //
 // Lo hecho a mano no se pierde: si un libro ya estaba publicado (mismo `bookId`, o mismo título
 // normalizado la primera vez), se conservan su id, su lomo (O'Reilly, Packt, paper…), su portada
@@ -24,15 +27,20 @@ const opt = (f, d) => { const i = args.indexOf(f); return i >= 0 ? args[i + 1] :
 const input = args.find((a, i) => !a.startsWith('--') && args[i - 1] !== '--dir');
 if (!input) { console.error('Uso: node scripts/publicar-perfil.mjs <perfil-*.json> [--dir @luis] [--covers] [--dry-run]'); process.exit(2); }
 
-const dir = path.join(ROOT, opt('--dir', '@luis'));
+const raw = JSON.parse(fs.readFileSync(input, 'utf8'));
+if (raw.format !== 'bookreader-perfil' || ![1, 2].includes(raw.version) || !Array.isArray(raw.books)) {
+  console.error('No es una exportación del perfil público (format bookreader-perfil, version 1 o 2).'); process.exit(1);
+}
+const slugOf = (s) => String(s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'shelf';
+// Todo a la forma del 2: { now, shelves: [{ id, name, books: [ids] }], books: [...] }.
+const snap = raw.version === 2 ? raw
+  : { ...raw, shelves: [{ id: slugOf(raw.shelf), name: raw.shelf, books: raw.books.map(b => b.id) }] };
+
+const dir = path.join(ROOT, opt('--dir', `@${snap.handle || 'luis'}`));
 const handle = path.basename(dir).replace(/^@/, '');
 const coversDir = path.join(ROOT, 'assets/perfil', handle);
 const DRY = flag('--dry-run');
 
-const snap = JSON.parse(fs.readFileSync(input, 'utf8'));
-if (snap.format !== 'bookreader-perfil' || snap.version !== 1 || !Array.isArray(snap.books)) {
-  console.error('No es una exportación de «Publicar…» (format bookreader-perfil, version 1).'); process.exit(1);
-}
 const prevPath = path.join(dir, 'perfil.json');
 const prev = fs.existsSync(prevPath) ? JSON.parse(fs.readFileSync(prevPath, 'utf8')) : { books: [] };
 
@@ -46,9 +54,13 @@ function findPrev(b) {
 
 const out = [];
 const log = [];
-for (const b of snap.books) {
+const idMap = new Map();   // id de la exportación → id publicado (el de antes, si ya estaba)
+// Solo los libros que alguna estantería enseña: un libro suelto en la exportación no se publica.
+const referenced = new Set(snap.shelves.flatMap(sh => sh.books));
+for (const b of snap.books.filter(x => referenced.has(x.id))) {
   const p = findPrev(b);
   const id = p ? p.id : b.id;
+  idMap.set(b.id, id);
   const book = {
     id, bookId: b.bookId,
     title: p ? p.title : b.title,
@@ -77,8 +89,10 @@ for (const b of snap.books) {
 }
 const gone = prev.books.filter(p => !out.some(b => b.id === p.id)).map(p => p.id);
 
-const nowBook = out.find(b => b.id === snap.now) || null;
-const perfil = { owner: prev.owner || 'Luis González', shelf: snap.shelf, now: nowBook ? nowBook.id : null, books: out };
+const shelves = snap.shelves.map(sh => ({ id: sh.id, name: sh.name, books: sh.books.map(id => idMap.get(id)).filter(Boolean) }))
+  .filter(sh => sh.books.length);
+const nowBook = out.find(b => b.id === idMap.get(snap.now)) || null;
+const perfil = { owner: prev.owner || 'Luis González', now: nowBook ? nowBook.id : null, shelves, books: out };
 
 // Widget «Reading now»: SVG autocontenido (la portada va dentro en base64) para el README de GitHub.
 const xml = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -114,7 +128,8 @@ async function nowSvg(b) {
 
 console.log(log.join('\n'));
 if (gone.length) console.log(`deja de publicar: ${gone.join(', ')} (sus portadas siguen en ${path.relative(ROOT, coversDir)}; bórralas si no vuelven)`);
-console.log(`estantería «${perfil.shelf}» · ${out.length} libros · leyendo ahora: ${nowBook ? nowBook.id : '—'}`);
+for (const sh of shelves) console.log(`estantería «${sh.name}» (#${sh.id}) · ${sh.books.length} libros`);
+console.log(`${out.length} libros distintos · leyendo ahora: ${nowBook ? nowBook.id : '—'}`);
 if (DRY) { console.log('(--dry-run: no se ha escrito nada)'); process.exit(0); }
 fs.writeFileSync(prevPath, JSON.stringify(perfil, null, 2) + '\n');
 if (nowBook) fs.writeFileSync(path.join(dir, 'now.svg'), await nowSvg(nowBook));

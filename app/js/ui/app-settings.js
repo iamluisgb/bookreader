@@ -45,7 +45,10 @@ const SECTIONS = [
   { id: 'templates', label: () => t('Plantillas'), ico: 'note' },
   { id: 'data',      label: () => t('Datos'),      ico: 'share' },
   { id: 'license',   label: () => t('Licencia'),   ico: 'shield' },
+  // Perfil público (experimento): solo con ?perfil-preview=1 (library/publish.js).
+  { id: 'public',    label: () => t('Perfil público'), ico: 'globe', hidden: () => Storage.get('perfil_preview', false) !== true },
 ];
+const visibleSections = () => SECTIONS.filter(s => !s.hidden || !s.hidden());
 
 let overlay = null;
 let tplDraft = null;    // borrador en edición de la sección Plantillas (null = lista)
@@ -72,7 +75,7 @@ function ensureOverlay() {
       <h2 class="appset-h2">${icon('gear', { size: 'lg' })} ${t('Ajustes generales')}</h2>
       <div class="appset-body">
         <nav class="appset-nav">
-          ${SECTIONS.map(s => `<button class="appset-nav-item" data-section="${s.id}">${icon(s.ico, { size: 'md' })}<span>${s.label()}</span></button>`).join('')}
+          ${visibleSections().map(s => `<button class="appset-nav-item" data-section="${s.id}">${icon(s.ico, { size: 'md' })}<span>${s.label()}</span></button>`).join('')}
           <button class="appset-nav-item appset-nav-guide" data-guide>${icon('help', { size: 'md' })}<span>${t('Guía rápida')}</span></button>
           <a class="appset-nav-item appset-nav-ext" href="${helpUrl()}" ${helpAttrs}>${icon('book', { size: 'md' })}<span>${t('Ayuda completa')}</span></a>
         </nav>
@@ -107,6 +110,7 @@ function selectSection(id) {
   const content = overlay.querySelector('.appset-content');
   if (id === 'templates') { tplDraft = null; renderTemplates(content); return; }
   if (id === 'profiles') { profDraft = null; renderProfiles(content); return; }
+  if (id === 'public') { content.innerHTML = ''; import('../library/publish.js').then(m => m.renderSettings(content)); return; }
   content.innerHTML = renderSection(id);
   if (id === 'agent') wireAgent(content);
   if (id === 'app') wireApp(content);
@@ -2230,7 +2234,7 @@ export function open(section = 'agent') {
   ensureOverlay();
   agentDraft = null;   // el borrador solo cruza entre vistas, no entre aperturas
   overlay.style.display = 'flex';
-  selectSection(SECTIONS.some(s => s.id === section) ? section : 'agent');
+  selectSection(visibleSections().some(s => s.id === section) ? section : 'agent');
 }
 
 export function close() {

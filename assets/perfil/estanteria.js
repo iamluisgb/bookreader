@@ -1,4 +1,4 @@
-/* global window, document, location, URL, Image, fetch, getComputedStyle, requestAnimationFrame, setTimeout, ResizeObserver, URLSearchParams, localStorage */
+/* global window, document, location, URL, Image, fetch, getComputedStyle, requestAnimationFrame, setTimeout, ResizeObserver, URLSearchParams, localStorage, history */
 // Perfil público (experimento, 23-nov-2026): pinta la estantería de perfil.json como una cinta
 // de libros en 3D. El activo gira y enseña su portada; pulsándola se abre. Se recorre con las
 // flechas, el teclado, arrastrando o con la rueda horizontal. Solo títulos, autores, estado y
@@ -24,8 +24,10 @@ const ob = $('pf-ob');
 // `active` = -1: ningún libro girado, todos de canto y centrados (así empieza la página).
 const NONE = -1;
 const state = { filter: 'all', active: NONE, open: false };
-let BOOKS = [];
-let SHELF = '';
+let BOOKS = [];          // libros de la estantería que se ve
+let SHELF = '';          // su nombre
+let SHELVES = [];        // todas: [{ id, name, books }]
+let CUR = 0;             // índice de la que se ve
 let H = 380;
 
 function track(name, data) { try { window.umami?.track(name, data); } catch { /* sin analítica */ } }
@@ -248,11 +250,14 @@ function renderFilters() {
 }
 
 function renderNow(nowId) {
-  const b = BOOKS.find(x => x.id === nowId); if (!b) return;
+  const all = SHELVES.flatMap(sh => sh.books);
+  const b = all.find(x => x.id === nowId); if (!b) return;
   const el = $('pf-now');
   el.hidden = false;
   el.innerHTML = `<span class="pf-dot" aria-hidden="true"></span><span>Reading now</span><b>${esc(b.spine.title)}</b>${b.progress == null ? '' : `<span>${b.progress}%</span>`}<button type="button">Show</button>`;
   el.querySelector('button').addEventListener('click', () => {
+    // Si no está en la estantería que se ve, se cambia a la primera que lo tenga.
+    if (!BOOKS.includes(b)) selectShelf(SHELVES.findIndex(sh => sh.books.includes(b)));
     state.filter = 'all'; renderFilters();
     goTo(BOOKS.indexOf(b)); setTimeout(openBook, 700);
     wrapEl.focus({ preventScroll: true });
@@ -324,7 +329,7 @@ async function loadData() {
   if (DRAFT) {
     let d;
     try { d = JSON.parse(localStorage.getItem('bookreader_perfil_draft') || 'null'); } catch { d = null; }
-    if (!d?.books?.length) throw new Error('sin borrador');
+    if (!d || !(d.books?.length || Object.keys(d.books || {}).length)) throw new Error('sin borrador');
     document.documentElement.classList.add('is-draft');
     return d;
   }
@@ -332,25 +337,83 @@ async function loadData() {
   return res.json();
 }
 
+// Dos formatos de perfil.json: el 1 (una estantería: `shelf` + `books`) y el 2 (varias:
+// `shelves: [{ id, name, books: [ids] }]` + `books` con cada libro una vez). Se devuelve siempre
+// la forma del 2 con los libros ya resueltos; un libro en dos estanterías es el MISMO objeto.
+const slugOf = (s) => String(s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'shelf';
+function normalize(data) {
+  if (Array.isArray(data.shelves)) {
+    const byId = new Map((Array.isArray(data.books) ? data.books : Object.values(data.books || {})).map(b => [b.id, b]));
+    return data.shelves.map(sh => ({ id: sh.id || slugOf(sh.name), name: sh.name, books: (sh.books || []).map(id => byId.get(id)).filter(Boolean) }))
+      .filter(sh => sh.books.length);
+  }
+  return [{ id: slugOf(data.shelf || 'shelf'), name: data.shelf || '', books: data.books || [] }];
+}
+
+// La estantería que se pide: `#id` en la dirección (o `?shelf=id`, que es lo que usa la web que la
+// incrusta). Sin pedir nada, la primera.
+function requested() {
+  const want = decodeURIComponent(location.hash.slice(1)) || new URLSearchParams(location.search).get('shelf') || '';
+  const i = SHELVES.findIndex(sh => sh.id === want);
+  return i >= 0 ? i : 0;
+}
+
+function renderTabs() {
+  const tabs = $('pf-tabs');
+  const many = SHELVES.length > 1;
+  tabs.hidden = !many;
+  $('pf-shelf-title').classList.toggle('pf-sr', many);
+  if (!many) return;
+  tabs.innerHTML = SHELVES.map((sh, i) => `<button type="button" role="tab" data-s="${i}" aria-selected="${i === CUR}" tabindex="${i === CUR ? 0 : -1}">${esc(sh.name)}<span>${sh.books.length}</span></button>`).join('');
+}
+
+function selectShelf(i, { fromUrl = false } = {}) {
+  if (i < 0 || i >= SHELVES.length) return;
+  closeNow();
+  CUR = i;
+  BOOKS = SHELVES[i].books; SHELF = SHELVES[i].name;
+  $('pf-shelf-title').textContent = SHELF;
+  const embedLink = document.querySelector('.pf-embed-link a');
+  if (embedLink) embedLink.href = embedLink.href.replace(/#.*$/, '') + '#' + SHELVES[i].id;
+  state.filter = 'all'; state.active = NONE;
+  renderTabs(); renderFilters(); renderList();
+  buildTape(); fitSpines(); layout();
+  // La dirección lleva la estantería, para poder compartir una en concreto. Incrustada no se toca.
+  if (!fromUrl && SHELVES.length > 1 && !document.documentElement.classList.contains('is-embed')) {
+    history.replaceState(null, '', '#' + SHELVES[i].id);
+  }
+}
+
 async function start() {
   const data = await loadData();
-  BOOKS = data.books;
-  SHELF = data.shelf || '';
-  if (SHELF) $('pf-shelf-title').textContent = SHELF;
-  if (BOOKS.some(b => b.cover?.type === 'paper')) {
+  SHELVES = normalize(data);
+  if (!SHELVES.length) throw new Error('sin libros');
+  const all = [...new Set(SHELVES.flatMap(sh => sh.books))];
+  if (all.some(b => b.cover?.type === 'paper')) {
     await Promise.all(['600 52px "Source Serif 4"', '400 24px "Source Serif 4"', '500 16px Inter', '600 13px Inter'].map(f => document.fonts?.load(f).catch(() => null)));
-    for (const b of BOOKS) if (b.cover?.type === 'paper') b.coverData = paperCover(b.cover);
+    for (const b of all) if (b.cover?.type === 'paper') b.coverData = paperCover(b.cover);
   }
-  await Promise.all(BOOKS.map(loadAspect));
+  await Promise.all(all.map(loadAspect));
+  sizes();
   // Empieza con todos los libros de canto y centrados; tocar uno lo gira y enseña la portada.
-  state.active = NONE;
+  selectShelf(requested(), { fromUrl: true });
   renderNow(data.now);
-  renderFilters();
-  renderList();
-  sizes(); buildTape(); fitSpines(); layout();
   // Las fuentes pueden llegar después del primer ajuste: se reajusta al cargarlas.
   document.fonts?.ready.then(() => { buildTape(); fitSpines(); layout(); });
 }
+
+$('pf-tabs').addEventListener('click', e => {
+  const b = e.target.closest('button[data-s]'); if (!b) return;
+  selectShelf(+b.dataset.s);
+  track('Profile: shelf', { shelf: SHELVES[CUR].id });
+});
+$('pf-tabs').addEventListener('keydown', e => {
+  if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+  e.preventDefault();
+  const n = SHELVES.length; const i = (CUR + (e.key === 'ArrowRight' ? 1 : n - 1)) % n;
+  selectShelf(i); $('pf-tabs').querySelector(`[data-s="${i}"]`)?.focus();
+});
+window.addEventListener('hashchange', () => { const i = requested(); if (i !== CUR) selectShelf(i, { fromUrl: true }); });
 // Incrustada: avisa a la página que la contiene de su alto (para ajustar el iframe) y acepta que
 // esa página le cambie el tema. Solo escucha a la web personal de Luis.
 const EMBED_PARENTS = ['https://luisgonzalezbernal.com'];

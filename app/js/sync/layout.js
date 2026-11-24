@@ -39,7 +39,11 @@ const SECRET_KEYS = ['ai_key', 'drive_refresh_token', 'sync_key', 'sync_token'];
 // silencio: uno de los dos deja de contar.
 // `sync_provider` es la elección de ESTE equipo (Drive o el sync de BookReader).
 // `sync_book_text` (subir el texto de los libros) y `sync_text_state` (qué texto ya subió) también.
-const SKIP_KEYS = ['sync_schema_migrated', 'sync_state', 'device_id', 'sync_provider', 'sync_book_text', 'sync_text_state'];
+// `perfil_draft` es la vista previa del perfil público: una foto con portadas dentro, de usar y tirar.
+const SKIP_KEYS = ['sync_schema_migrated', 'sync_state', 'device_id', 'sync_provider', 'sync_book_text', 'sync_text_state', 'perfil_draft'];
+// Configuración del perfil público (library/publish.js): gana la más reciente. Con la regla general
+// («solo si falta en local») cambiar qué es público en el móvil no llegaría nunca al ordenador.
+const PROFILE_KEY = 'public_profile';
 
 function splitKey(key) {
   for (const p of BOOK_PREFIXES) {
@@ -294,6 +298,11 @@ export async function restoreSnapshot({ settings = {}, books = {} }, { mode = 'r
     if (k === SHARED_LINKS_KEY) {
       const merged = mergeSharedLinks(Storage.get(k, null), v);
       if (merged) { Storage.set(k, merged); keys++; }
+      continue;
+    }
+    if (k === PROFILE_KEY) {
+      const cur = Storage.get(k, null);
+      if (mode === 'restore' || !cur || (v && (v.updatedAt || 0) > (cur.updatedAt || 0))) { Storage.set(k, v); keys++; }
       continue;
     }
     if (mode === 'restore' || Storage.get(k, null) === null) {

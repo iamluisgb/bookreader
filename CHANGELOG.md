@@ -3,6 +3,30 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-11-24 — Ajustes → Perfil público: qué se ve, guardado, y varias estanterías
+
+- **El caso**: elegir qué se publica estantería por estantería no se guardaba (había que volver a
+  elegirlo todo cada vez) y la página solo admitía una estantería.
+- **Ajustes → Perfil público** (`library/publish.js`, solo con `?perfil-preview=1`):
+  - Interruptor general, dirección (`@handle`), si se enseña el progreso y el libro de
+    «Leyendo ahora» (automático, ninguno o uno concreto).
+  - Estanterías públicas con su nombre público y su orden (que es el de las pestañas), y dentro
+    de cada una sus libros, que se muestran u ocultan uno a uno, con su lomo y su orden.
+  - Se guarda al momento en `public_profile`. Viaja en el sync con su propia regla: gana la
+    versión más reciente. Con la general («solo si falta») no llegaría de un dispositivo a otro.
+  - **Lo que entra después en una estantería pública sale oculto** y marcado «Nuevo» hasta que se
+    marque. Al hacer pública una estantería, sus libros de ese momento salen visibles.
+  - El menú de la estantería («Publicar en mi perfil…») la añade y abre esta pantalla.
+- **Formato 2** de la foto y de `perfil.json`: `shelves: [{id, name, books: [ids]}]` + `books`,
+  cada libro una sola vez aunque esté en varias. El script acepta el 1 y el 2, sustituye el perfil
+  entero, conserva lo hecho a mano y solo publica los libros que alguna estantería enseña.
+- **Página pública**: pestañas por estantería, `#id` en la dirección para enlazar una en concreto
+  (`?shelf=` cuando va incrustada), y «Show» cambia a la estantería del libro. Con una sola
+  estantería se ve como antes.
+- **El borrador de la vista previa ya no viaja en el sync** (`perfil_draft` en `SKIP_KEYS`):
+  llevaba las portadas dentro.
+- Tests: `tests/publish-shelf.spec.ts` reescrito (7).
+
 ## 2026-11-24 — Libros con DRM: aviso claro y ayuda «Consigue libros sin DRM»
 
 - **El caso**: un EPUB con DRM es un zip válido con el texto cifrado. La app lo intentaba abrir y

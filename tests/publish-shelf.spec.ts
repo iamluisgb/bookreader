@@ -1,103 +1,182 @@
 import { test, expect, Page } from '@playwright/test';
 import fs from 'fs';
 
-// Perfil público, paso 1: «Publicar…» en el menú de una estantería (solo con ?perfil-preview=1)
-// arma la foto de lo que se enseña —título, autor, estado, progreso, portada en miniatura— y nada
-// más. Descargar deja el JSON que convierte scripts/publicar-perfil.mjs; la vista previa lo deja en
-// localStorage para la página pública con ?draft=1.
+// Perfil público (Ajustes → Perfil público, solo con ?perfil-preview=1). La configuración se
+// guarda: qué estanterías, en qué orden y con qué nombre, qué libros de cada una, progreso y
+// «leyendo ahora». Lo que entra después en una estantería pública queda oculto hasta marcarlo.
+// Descargar deja la foto (formato 2) que convierte scripts/publicar-perfil.mjs; la vista previa la
+// deja en localStorage para la página pública con ?draft=1.
 
-async function seed(page: Page, url = '/') {
+const A = 'a'.repeat(64), B = 'b'.repeat(64), C = 'c'.repeat(64), D = 'd'.repeat(64);
+
+async function seed(page: Page, url = '/?perfil-preview=1') {
   await page.setViewportSize({ width: 1300, height: 900 });
   await page.goto(url);
-  await page.evaluate(async () => {
+  const ids = await page.evaluate(async ({ A, B, C }) => {
     const S: any = await import('/js/library/store.js');
     const ag = await S.addShelf('Técnico/Agentes');
+    const hi = await S.addShelf('Historia');
     const c = document.createElement('canvas'); c.width = 300; c.height = 450;
     const x = c.getContext('2d')!; x.fillStyle = '#ffffff'; x.fillRect(0, 0, 300, 450); x.fillStyle = '#c0392b'; x.fillRect(0, 300, 300, 150);
     const cover = c.toDataURL('image/png');
     const now = Date.now();
-    await S.putBook({ id: 'a'.repeat(64), title: 'AI Agents: The Definitive Guide', author: 'Nicole Koenigstein', format: 'epub', size: 2_000_000,
+    await S.putBook({ id: A, title: 'AI Agents: The Definitive Guide', author: 'Nicole Koenigstein', format: 'epub', size: 2_000_000,
       status: 'unread', progress: 0, addedAt: now, cover, shelfIds: [ag.id] });
-    await S.putBook({ id: 'b'.repeat(64), title: 'An Illustrated Guide to AI Agents', author: 'Maarten Grootendorst, Jay Alammar', format: 'pdf', size: 9_000_000,
-      status: 'reading', progress: 71, addedAt: now - 1, lastOpenedAt: now, shelfIds: [ag.id] });
-    await S.putBook({ id: 'c'.repeat(64), title: 'Otra cosa', format: 'epub', status: 'unread', addedAt: now - 2, shelfIds: [] });
-  });
+    await S.putBook({ id: B, title: 'An Illustrated Guide to AI Agents', author: 'Maarten Grootendorst, Jay Alammar', format: 'pdf', size: 9_000_000,
+      status: 'reading', progress: 71, addedAt: now - 1, lastOpenedAt: now, shelfIds: [ag.id, hi.id] });
+    await S.putBook({ id: C, title: 'SPQR', author: 'Mary Beard', format: 'epub', status: 'finished', progress: 100, addedAt: now - 2, shelfIds: [hi.id] });
+    return { ag: ag.id, hi: hi.id };
+  }, { A, B, C });
   await page.reload();
   await page.waitForSelector('.lib-rail');
+  return ids;
 }
 
-async function openPanel(page: Page) {
-  await page.locator('[data-row-label="Agentes"]').hover();
-  await page.locator('.lib-rail-kebab[data-shelf-menu]').first().click({ force: true });
+async function shelfMenu(page: Page, id: string) {
+  await page.locator(`.lib-rail-kebab[data-shelf-menu="${id}"]`).click({ force: true });
 }
+const config = (page: Page) => page.evaluate(() => JSON.parse(localStorage.getItem('bookreader_public_profile') || 'null'));
 
-test('sin la bandera, el menú no ofrece publicar', async ({ page }) => {
-  await seed(page);
-  await openPanel(page);
+test('sin la bandera no hay perfil público: ni en el menú ni en Ajustes', async ({ page }) => {
+  const ids = await seed(page, '/');
+  await shelfMenu(page, ids.ag);
   await expect(page.locator('.lib-menu-item[data-act="share"]')).toBeVisible();
   await expect(page.locator('.lib-menu-item[data-act="publish"]')).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await page.evaluate(async () => (await import('/js/ui/app-settings.js')).open('public'));
+  await expect(page.locator('.appset-nav-item[data-section="public"]')).toHaveCount(0);
 });
 
-test('publicar: solo lo elegido, en su orden, con leyendo ahora, lomo y portada', async ({ page }) => {
-  await seed(page, '/?perfil-preview=1');
-  await openPanel(page);
+test('desde el menú: la estantería pasa a pública con sus libros visibles y queda guardado', async ({ page }) => {
+  const ids = await seed(page);
+  await shelfMenu(page, ids.ag);
   await page.locator('.lib-menu-item[data-act="publish"]').click();
-  const card = page.locator('.pub-card');
-  await expect(card.locator('.pub-row')).toHaveCount(2);              // solo los de la estantería
-  await expect(card.locator('#pub-name')).toHaveValue('Agentes');     // la hoja, no la ruta
-  // Leyendo ahora: por defecto el que está a medias.
-  const illustrated = card.locator('.pub-row', { hasText: 'Illustrated' });
-  await expect(illustrated.locator('input[data-k="now"]')).toBeChecked();
-  // El Illustrated, primero y con lomo O'Reilly; nombre público en inglés; sin progreso.
-  await illustrated.locator('button[data-k="up"]').click();
-  await card.locator('.pub-row').first().locator('select[data-k="style"]').selectOption('oreilly');
-  await card.locator('#pub-name').fill('Agents');
-  await card.locator('#pub-progress').uncheck();
+  const pp = page.locator('.pp');
+  await expect(pp).toBeVisible();
+  await expect(pp.locator('#pp-enabled')).toBeChecked();
+  await expect(pp.locator('.pp-shelf')).toHaveCount(1);
+  await expect(pp.locator('.pp-shelf .pp-name')).toHaveValue('Agentes');
+  await expect(pp.locator('.pp-shelf .pub-row')).toHaveCount(2);
+  const c = await config(page);
+  expect(c.enabled).toBe(true);
+  expect(c.shelves[0].books.map((b: any) => [b.id, b.show])).toEqual([[A, true], [B, true]]);
+});
+
+test('un libro que entra después sale oculto y marcado «Nuevo»; uno que sale, desaparece', async ({ page }) => {
+  const ids = await seed(page);
+  await shelfMenu(page, ids.ag);
+  await page.locator('.lib-menu-item[data-act="publish"]').click();
+  await expect(page.locator('.pp-shelf .pub-row')).toHaveCount(2);
+  await page.evaluate(async ({ D, A, ag }) => {
+    const S: any = await import('/js/library/store.js');
+    await S.putBook({ id: D, title: 'Libro nuevo', format: 'epub', status: 'unread', addedAt: Date.now(), shelfIds: [ag] });
+    await S.toggleBookShelf(A, ag, false);
+  }, { D, A, ag: ids.ag });
+  await page.evaluate(async () => (await import('/js/ui/app-settings.js')).open('public'));
+  const pp = page.locator('.pp');
+  await expect(pp.locator('.pp-toggle .pp-fresh')).toHaveText('1 nuevos sin revisar');
+  const rows = pp.locator('.pp-shelf .pub-row');
+  await expect(rows).toHaveCount(2);
+  await expect(rows.nth(1)).toContainText('Libro nuevo');
+  await expect(rows.nth(1).locator('input[data-k="show"]')).not.toBeChecked();
+  await expect(rows.nth(1).locator('.pp-fresh')).toHaveText('Nuevo');
+  // Marcarlo lo publica y deja de ser nuevo.
+  await rows.nth(1).locator('input[data-k="show"]').check();
+  await expect(pp.locator('.pp-fresh')).toHaveCount(0);
+  const c = await config(page);
+  expect(c.shelves[0].books.map((b: any) => [b.id, b.show])).toEqual([[B, true], [D, true]]);
+  expect(JSON.stringify(c)).not.toContain('fresh');
+});
+
+test('descargar: varias estanterías en su orden, cada libro una vez, sin los ocultos', async ({ page }) => {
+  const ids = await seed(page);
+  await shelfMenu(page, ids.ag);
+  await page.locator('.lib-menu-item[data-act="publish"]').click();
+  const pp = page.locator('.pp');
+  // Segunda estantería, renombrada y subida al primer puesto; un libro oculto; O'Reilly en otro.
+  await pp.locator('#pp-add').selectOption(ids.hi);
+  await pp.locator('#pp-add-btn').click();
+  await expect(pp.locator('.pp-shelf')).toHaveCount(2);
+  const hist = pp.locator(`.pp-shelf[data-shelf="${ids.hi}"]`);
+  await hist.locator('.pp-name').fill('History');
+  await hist.locator('.pp-name').blur();
+  await hist.locator('button[data-k="sup"]').click();
+  const ag = pp.locator(`.pp-shelf[data-shelf="${ids.ag}"]`);
+  await ag.locator('.pub-row', { hasText: 'Definitive' }).locator('input[data-k="show"]').uncheck();
+  await pp.locator(`.pp-shelf[data-shelf="${ids.hi}"] .pub-row`, { hasText: 'Illustrated' }).locator('select[data-k="style"]').selectOption('oreilly');
+  await pp.locator('#pp-progress').uncheck();
 
   const dl = page.waitForEvent('download');
-  await card.locator('button[data-act="download"]').click();
-  const file = await (await dl).path();
-  const snap = JSON.parse(fs.readFileSync(file!, 'utf8'));
-  expect(snap.format).toBe('bookreader-perfil');
-  expect(snap.shelf).toBe('Agents');
-  expect(snap.books.map((b: any) => b.title)).toEqual(['An Illustrated Guide to AI Agents', 'AI Agents: The Definitive Guide']);
-  expect(snap.now).toBe('b'.repeat(12));
-  const [ill, def] = snap.books;
-  expect(ill.spine).toMatchObject({ style: 'oreilly', title: 'An Illustrated Guide to AI Agents', author: 'Grootendorst & Alammar' });
-  expect(def.spine).toMatchObject({ style: 'plain', title: 'AI Agents', author: 'Koenigstein', ink: '#1d1d1f' });   // borde blanco → tinta negra
+  await pp.locator('button[data-act="download"]').click();
+  const snap = JSON.parse(fs.readFileSync((await (await dl).path())!, 'utf8'));
+  expect(snap).toMatchObject({ format: 'bookreader-perfil', version: 2, handle: 'luis', showProgress: false });
+  expect(snap.shelves).toEqual([
+    { id: 'history', name: 'History', books: [B.slice(0, 12), C.slice(0, 12)] },
+    { id: 'agentes', name: 'Agentes', books: [B.slice(0, 12)] },
+  ]);
+  expect(snap.books.map((b: any) => b.title).sort()).toEqual(['An Illustrated Guide to AI Agents', 'SPQR']);   // sin el oculto, sin repetir
+  const ill = snap.books.find((b: any) => b.bookId === B);
+  expect(ill.spine).toMatchObject({ style: 'oreilly', author: 'Grootendorst & Alammar' });
   expect(ill.progress).toBeNull();
-  expect(ill.pagesEstimated).toBe(true);
-  for (const b of snap.books) expect(b.coverData).toMatch(/^data:image\/(webp|jpeg);base64,/);
-  // Nada que no sea de la foto: ni fichero, ni CFI, ni estanterías.
-  expect(Object.keys(def).sort()).toEqual(['author', 'bookId', 'coverData', 'id', 'pages', 'pagesEstimated', 'progress', 'spine', 'status', 'title']);
+  expect(snap.now).toBe(B.slice(0, 12));   // automático: el visible a medias abierto más tarde
+  for (const b of snap.books) expect(Object.keys(b).sort()).toEqual(['author', 'bookId', 'coverData', 'id', 'pages', 'pagesEstimated', 'progress', 'spine', 'status', 'title']);
 
-  // Vista previa: deja la foto en localStorage y abre la página pública con ?draft=1.
+  // Vista previa: la foto en localStorage y la página del handle con ?draft=1.
   const popup = page.waitForEvent('popup');
-  await card.locator('button[data-act="preview"]').click();
-  const tab = await popup;
-  await expect.poll(() => tab.url()).toContain('/@luis/?draft=1');
+  await pp.locator('button[data-act="preview"]').click();
+  await expect.poll(async () => (await popup).url()).toContain('/@luis/?draft=1');
   const draft = await page.evaluate(() => JSON.parse(localStorage.getItem('bookreader_perfil_draft') || 'null'));
-  expect(draft.books).toHaveLength(2);
+  expect(draft.shelves).toHaveLength(2);
 });
 
-test('la página pública pinta el borrador con ?draft=1, con lomo automático y sin progreso', async ({ page }) => {
+test('sync: la configuración del perfil gana la más reciente; el borrador no viaja', async ({ page }) => {
+  await page.goto('/');
+  const r = await page.evaluate(async () => {
+    const L: any = await import('/js/sync/layout.js');
+    const S: any = await import('/js/storage.js');
+    S.set('public_profile', { updatedAt: 100, enabled: false, shelves: [] });
+    S.set('perfil_draft', { mucho: 'peso' });
+    await L.restoreSnapshot({ settings: { public_profile: { updatedAt: 200, enabled: true, shelves: [] } } }, { mode: 'merge' });
+    const a = S.get('public_profile').enabled;
+    await L.restoreSnapshot({ settings: { public_profile: { updatedAt: 150, enabled: false, shelves: [] } } }, { mode: 'merge' });
+    const b = S.get('public_profile').enabled;
+    const snap = await L.buildSnapshot();
+    return { a, b, draft: 'perfil_draft' in snap.settings, profile: 'public_profile' in snap.settings };
+  });
+  expect(r).toEqual({ a: true, b: true, draft: false, profile: true });
+});
+
+test('página pública con varias estanterías: pestañas, #enlace y «Show» cambia de estantería', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', e => errors.push(e.message));
   const cover = 'data:image/svg+xml;base64,' + Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="300" height="450"><rect width="300" height="450" fill="#123456"/></svg>').toString('base64');
-  const snap = { format: 'bookreader-perfil', version: 1, shelf: 'Borrador', now: 'x1', showProgress: false, books: [
-    { id: 'x1', title: 'Libro uno', author: 'Ana Pérez', status: 'reading', progress: null, pages: 300, pagesEstimated: true,
-      spine: { style: 'plain', bg: '#123456', ink: '#ffffff', muted: '#d9d9de', title: 'Libro uno', author: 'Pérez' }, coverData: cover },
-    { id: 'x2', title: 'Libro dos', author: 'Luis', status: 'finished', progress: null, pages: 120, pagesEstimated: true,
-      spine: { style: 'oreilly', bg: '#ffffff', ink: '#1d1d1f', muted: '#1d1d1f', title: 'Libro dos', author: 'Luis' }, coverData: cover },
-  ] };
+  const book = (id: string, title: string, status: string) => ({ id, title, author: 'Ana Pérez', status, progress: null, pages: 300, pagesEstimated: true,
+    spine: { style: 'plain', bg: '#123456', ink: '#ffffff', muted: '#d9d9de', title, author: 'Pérez' }, coverData: cover });
+  const snap = { format: 'bookreader-perfil', version: 2, now: 'x3',
+    shelves: [{ id: 'agents', name: 'Agents', books: ['x1', 'x2'] }, { id: 'history', name: 'History', books: ['x2', 'x3'] }],
+    books: [book('x1', 'Uno', 'unread'), book('x2', 'Dos', 'finished'), book('x3', 'Tres', 'reading')] };
   await page.goto('http://localhost:8899/@luis/');
   await page.evaluate((s) => localStorage.setItem('bookreader_perfil_draft', JSON.stringify(s)), snap);
-  await page.goto('http://localhost:8899/@luis/?draft=1');
+  await page.goto('http://localhost:8899/@luis/?draft=1#history');
+  const tabs = page.locator('#pf-tabs button');
+  await expect(tabs).toHaveCount(2);
+  await expect(tabs.nth(1)).toHaveAttribute('aria-selected', 'true');   // la del #enlace
+  await expect(page.locator('#pf-caption')).toContainText('History');
   await expect(page.locator('.pf-bk')).toHaveCount(2);
-  await expect(page.locator('#pf-shelf-title')).toHaveText('Borrador');
-  await expect(page.locator('html')).toHaveClass(/is-draft/);
-  await expect(page.locator('#pf-now')).toContainText('Libro uno');
-  await expect(page.locator('#pf-now')).not.toContainText('%');
-  await expect(page.locator('.pf-bk').first().locator('.pf-sp-end')).toHaveCount(1);   // sin logo de editorial
+  await tabs.nth(0).click();
+  await expect(page).toHaveURL(/#agents$/);
+  await expect(page.locator('#pf-caption')).toContainText('Agents');
+  // «Reading now» es Tres, que solo está en History: Show vuelve allí y lo abre.
+  await page.locator('#pf-now button').click();
+  await expect(tabs.nth(1)).toHaveAttribute('aria-selected', 'true');
+  await expect(page.locator('#pf-ob')).toHaveClass(/is-open/, { timeout: 3000 });
+  await expect(page.locator('.pf-ob-title')).toHaveText('Tres');
   expect(errors).toEqual([]);
+});
+
+test('página pública con el perfil.json de una estantería (formato 1): sin pestañas', async ({ page }) => {
+  await page.goto('http://localhost:8899/@luis/');
+  await expect(page.locator('.pf-bk').first()).toBeVisible();
+  await expect(page.locator('#pf-tabs')).toBeHidden();
+  await expect(page.locator('#pf-shelf-title')).toBeVisible();
 });
