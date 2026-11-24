@@ -43,7 +43,8 @@
     "VERSION_DAYS": "30",
     // Días de solo lectura tras caducar la suscripción. Después, la purga lo borra todo.
     "GRACE_DAYS": "30",
-    "TOKEN_HOURS": "24"
+    "TOKEN_HOURS": "24",
+    "PUBLISH_REPO": "iamluisgb/bookreader"
   },
   // La lista de espera de Plus por el propio dominio de la landing (mismo origen, sin workers.dev a
   // la vista). SOLO esa ruta: el resto de bookreader.raiatech.com sigue siendo Cloudflare Pages.
