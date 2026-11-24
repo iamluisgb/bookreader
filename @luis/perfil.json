@@ -5,6 +5,7 @@
   "books": [
     {
       "id": "harness",
+      "bookId": "e81b5a4855adda8cc5e46db0a05cd69e0d0d542bd49cec6b157c17e6001395d7",
       "title": "Harness Engineering: Anatomy, Architecture, and Evolution of Coding Agents",
       "author": "Paul Barbaste, Tristan Darrigol, Germain Vu, Tom Wiltberger",
       "status": "reading",
@@ -40,6 +41,7 @@
     },
     {
       "id": "illustrated",
+      "bookId": "e3858202642dcbcd4a8d4152a1368b2e1c7147bb0a0b53bfb05a029acb4674f2",
       "title": "An Illustrated Guide to AI Agents",
       "author": "Maarten Grootendorst, Jay Alammar",
       "status": "reading",
@@ -56,6 +58,7 @@
     },
     {
       "id": "albada",
+      "bookId": "72cdfc0f74bb1f60e0b61e950da06683e2db0aa04e90a59bdf271fcedfecf1f1",
       "title": "Building Applications with AI Agents",
       "author": "Michael Albada",
       "status": "reading",
@@ -72,6 +75,7 @@
     },
     {
       "id": "skills",
+      "bookId": "fcd0544c2cb7584bd039126ccf64efe38ae22734be715cee9cb63fada00f3f03",
       "title": "Agent Skills",
       "author": "Lucas B. Nicolosi Soares",
       "status": "reading",
@@ -88,6 +92,7 @@
     },
     {
       "id": "graph",
+      "bookId": "026ef0127b43d91ba7cac83f2f1c469b71da70e5562a0897b0959f3ff80fd18a",
       "title": "Graph Engineering — The Loop Memory Model",
       "author": "Volodymyr Pavlyshyn",
       "status": "reading",
@@ -106,6 +111,7 @@
     },
     {
       "id": "definitive",
+      "bookId": "fff3f67271504119352af640cf372ce812ab5e026ab5c8882c0240a4cd7eeece",
       "title": "AI Agents: The Definitive Guide",
       "author": "Nicole Koenigstein",
       "status": "unread",
@@ -122,6 +128,7 @@
     },
     {
       "id": "senior",
+      "bookId": "e933643b983805689c441c21be0315929fdc2357c7301bc315ec355d4b77fab1",
       "title": "Claude Code para ingenieros senior",
       "author": "Luis González",
       "status": "finished",

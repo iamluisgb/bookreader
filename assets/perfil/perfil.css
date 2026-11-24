@@ -106,6 +106,7 @@ main > * { min-width: 0; }
 .pf-sp-logo.oreilly { writing-mode: vertical-rl; color: var(--pf-oreilly); font-weight: 600; font-size: min(calc(var(--h) * .03), calc(var(--t) * .32)); letter-spacing: .02em; padding-bottom: 12px; }
 .pf-sp-logo.packt { color: var(--pf-packt); font-weight: 600; font-size: clamp(6px, calc(var(--t) * .2), 13px); }
 .pf-sp-logo.arxiv { color: var(--pf-arxiv); font-family: var(--font-display); font-size: clamp(6px, calc(var(--t) * .22), 11px); }
+.pf-sp-end { flex: none; height: 14px; }
 .pf-sp-logo.tag { writing-mode: vertical-rl; font-size: clamp(6px, calc(var(--t) * .2), 9px); font-weight: 600; letter-spacing: .16em; text-transform: uppercase; color: var(--muted); }
 
 /* ---------- El libro abierto ---------- */
@@ -172,3 +173,10 @@ main > * { min-width: 0; }
 .is-embed .pf-pad { padding-left: 0; padding-right: 0; }
 .is-embed .pf-embed-link { display: block; margin: 0; text-align: center; font-size: var(--fs-sm); }
 .is-embed .pf-embed-link a { color: var(--text-soft); }
+
+/* Vista previa desde la app (?draft=1): un aviso fijo para que no se confunda con lo publicado. */
+:root.is-draft body::before {
+  content: 'Preview · not published'; position: fixed; top: 10px; left: 50%; transform: translateX(-50%); z-index: 50;
+  padding: 4px 12px; border-radius: 999px; font: 600 12px/1.4 var(--font-ui); letter-spacing: .02em;
+  background: var(--text); color: var(--surface-0, #fff);
+}

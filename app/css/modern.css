@@ -1200,6 +1200,29 @@ button.lib-rail-twisty:hover { background: var(--surface-2); color: var(--text);
 }
 .dlg-check { display: flex; align-items: center; gap: var(--s-2); font-size: var(--fs-md); padding: 3px 2px; cursor: pointer; }
 .dlg-check input { accent-color: var(--accent); }
+/* Publicar estantería (perfil público, experimento): una fila por libro con portada, «leyendo
+   ahora», estilo de lomo y orden. En móvil el selector baja a su propia línea. */
+.pub-card { max-width: 620px; }
+.pub-card .dlg-form { max-height: min(62vh, 560px); }
+.pub-card .dlg-check { margin-top: var(--s-3); }
+.pub-list { list-style: none; margin: 0; padding: 0; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--surface-0); }
+.pub-row { display: grid; grid-template-columns: auto 34px 1fr auto auto; align-items: center; gap: var(--s-2) var(--s-3); padding: var(--s-2) var(--s-3); }
+.pub-row + .pub-row { border-top: 1px solid var(--border-soft); }
+.pub-row.is-off .pub-cover, .pub-row.is-off .pub-meta { opacity: .45; }
+.pub-row input { accent-color: var(--accent); }
+.pub-cover { width: 34px; height: 48px; border-radius: 3px; background: var(--fill) center / cover no-repeat; box-shadow: inset 0 0 0 1px var(--border-soft); }
+.pub-meta { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.pub-meta b { font-size: var(--fs-md); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pub-meta small { font-size: var(--fs-xs); color: var(--text-soft); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pub-now { display: inline-flex; align-items: center; gap: 4px; font-size: var(--fs-xs); color: var(--text-soft); cursor: pointer; }
+.pub-row .pub-style { width: auto; padding: 6px 8px; font-size: var(--fs-sm); }
+.pub-move { display: inline-flex; gap: 2px; }
+.pub-move .dlg-btn { min-width: 30px; padding: 4px 6px; }
+.pub-card .dlg-actions { flex-wrap: wrap; }
+@media (max-width: 560px) {
+  .pub-row { grid-template-columns: auto 34px 1fr auto; }
+  .pub-row .pub-style { grid-column: 3 / 5; grid-row: 2; justify-self: start; }
+}
 .dlg-choices { display: flex; flex-wrap: wrap; gap: 6px; }
 .dlg-choice { position: relative; display: inline-flex; cursor: pointer; }
 .dlg-choice input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }

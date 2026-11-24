@@ -1,4 +1,4 @@
-/* global window, document, location, URL, Image, fetch, getComputedStyle, requestAnimationFrame, setTimeout, ResizeObserver */
+/* global window, document, location, URL, Image, fetch, getComputedStyle, requestAnimationFrame, setTimeout, ResizeObserver, URLSearchParams, localStorage */
 // Perfil público (experimento, 23-nov-2026): pinta la estantería de perfil.json como una cinta
 // de libros en 3D. El activo gira y enseña su portada; pulsándola se abre. Se recorre con las
 // flechas, el teclado, arrastrando o con la rueda horizontal. Solo títulos, autores, estado y
@@ -23,13 +23,15 @@ const tape = $('pf-tape');
 const ob = $('pf-ob');
 const state = { filter: 'all', active: 0, open: false };
 let BOOKS = [];
+let SHELF = '';
 let H = 380;
 
 function track(name, data) { try { window.umami?.track(name, data); } catch { /* sin analítica */ } }
 function statusLabel(b) {
   if (b.status === 'finished') return 'Finished';
   if (b.status === 'unread') return 'Not started';
-  return `Reading · ${b.progress}%`;
+  // Sin progreso: quien publica eligió no enseñarlo.
+  return b.progress == null ? 'Reading' : `Reading · ${b.progress}%`;
 }
 function matches(b) { return FILTERS.find(f => f.id === state.filter).test(b); }
 // Un paper no trae portada: se dibuja con sus metadatos (portada-paper.js) en vez de usar un fichero.
@@ -115,9 +117,10 @@ function spineHtml(b, t, h) {
     animal = `<div class="pf-sp-animal" style="--aw:${aw}px;--ah:${ah}px;--abs:${cW}px ${cH}px;--abp:${-cx * cW}px ${-cy * cH}px"></div>`;
   }
   const rule = s.rule ? `<div class="pf-sp-rule" style="--rc:${esc(s.rule)}"></div>` : '';
+  // `plain`: lomo automático de la app (color del borde de la portada), sin editorial.
   const logo = s.style === 'tag'
     ? `<div class="pf-sp-logo tag">${esc(s.tag)}</div>`
-    : `<div class="pf-sp-logo ${s.style}">${LOGO[s.style]}</div>`;
+    : LOGO[s.style] ? `<div class="pf-sp-logo ${s.style}">${LOGO[s.style]}</div>` : '<div class="pf-sp-end"></div>';
   const serif = s.serif ? ' is-serif' : '';
   let title;
   if (s.kicker || s.sub) {
@@ -196,11 +199,11 @@ function openBook() {
   ob.style.setProperty('--od', d + 'px'); ob.style.setProperty('--oh', h + 'px'); ob.style.setProperty('--oz', (d / 2 - t / 2 + 24) + 'px');
   $('pf-ob-front').style.setProperty('--img', `url('${coverUrl(b)}')`);
   $('pf-ob-page').innerHTML = `
-    <span class="pf-ob-num">No. ${String(state.active + 1).padStart(2, '0')} · Agents</span>
+    <span class="pf-ob-num">No. ${String(state.active + 1).padStart(2, '0')} · ${esc(SHELF)}</span>
     ${b.kind ? `<span class="pf-ob-kind">${esc(b.kind)}</span>` : ''}
     <div class="pf-ob-title">${esc(b.title)}</div>
     <div class="pf-ob-auth">${esc(b.author)}</div>
-    <div class="pf-ob-state"><span>${esc(statusLabel(b))} · ${b.pages} pages</span><div class="pf-ob-track"><i data-w="${Math.max(b.progress, 2)}"></i></div></div>
+    <div class="pf-ob-state"><span>${esc(statusLabel(b))}${b.pagesEstimated ? '' : ` · ${b.pages} pages`}</span>${b.progress == null ? '' : `<div class="pf-ob-track"><i data-w="${Math.max(b.progress, 2)}"></i></div>`}</div>
     <div class="pf-ob-actions"><button type="button" data-close>Close</button></div>`;
   ob.classList.add('is-shown'); ob.setAttribute('aria-hidden', 'false');
   tape.children[state.active].style.opacity = '0';
@@ -236,7 +239,7 @@ function renderNow(nowId) {
   const b = BOOKS.find(x => x.id === nowId); if (!b) return;
   const el = $('pf-now');
   el.hidden = false;
-  el.innerHTML = `<span class="pf-dot" aria-hidden="true"></span><span>Reading now</span><b>${esc(b.spine.title)}</b><span>${b.progress}%</span><button type="button">Show</button>`;
+  el.innerHTML = `<span class="pf-dot" aria-hidden="true"></span><span>Reading now</span><b>${esc(b.spine.title)}</b>${b.progress == null ? '' : `<span>${b.progress}%</span>`}<button type="button">Show</button>`;
   el.querySelector('button').addEventListener('click', () => {
     state.filter = 'all'; renderFilters();
     goTo(BOOKS.indexOf(b)); setTimeout(openBook, 700);
@@ -295,10 +298,26 @@ try {
   }).observe(wrapEl);
 } catch { /* sin ResizeObserver: se queda con el tamaño inicial */ }
 
-async function start() {
+// Vista previa desde la app (`?draft=1`): el panel «Publicar…» deja la foto en localStorage (mismo
+// origen) y la página la pinta en lugar de perfil.json, con las portadas dentro como data URL.
+const DRAFT = new URLSearchParams(location.search).get('draft') === '1';
+async function loadData() {
+  if (DRAFT) {
+    let d;
+    try { d = JSON.parse(localStorage.getItem('bookreader_perfil_draft') || 'null'); } catch { d = null; }
+    if (!d?.books?.length) throw new Error('sin borrador');
+    document.documentElement.classList.add('is-draft');
+    return d;
+  }
   const res = await fetch('perfil.json', { cache: 'no-cache' });
-  const data = await res.json();
+  return res.json();
+}
+
+async function start() {
+  const data = await loadData();
   BOOKS = data.books;
+  SHELF = data.shelf || '';
+  if (SHELF) $('pf-shelf-title').textContent = SHELF;
   if (BOOKS.some(b => b.cover?.type === 'paper')) {
     await Promise.all(['600 52px "Source Serif 4"', '400 24px "Source Serif 4"', '500 16px Inter', '600 13px Inter'].map(f => document.fonts?.load(f).catch(() => null)));
     for (const b of BOOKS) if (b.cover?.type === 'paper') b.coverData = paperCover(b.cover);
@@ -326,4 +345,8 @@ if (document.documentElement.classList.contains('is-embed') && window.parent !==
   });
 }
 
-start().catch(() => { $('pf-caption').textContent = 'The shelf could not be loaded. Reload the page to try again.'; });
+start().catch(() => {
+  $('pf-caption').textContent = DRAFT
+    ? 'There is no preview to show. Open “Publish…” on a shelf in BookReader and press Preview.'
+    : 'The shelf could not be loaded. Reload the page to try again.';
+});

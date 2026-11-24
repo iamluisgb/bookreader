@@ -3,6 +3,29 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-11-24 — Publicar una estantería desde la app (perfil público, paso 1)
+
+- **El caso**: la estantería pública `/@luis/` (23-nov, experimento) se hizo a mano editando
+  `perfil.json`. Para cambiarla, o para que algún día la publique otro usuario, hace falta
+  editarla desde la app.
+- **«Publicar…»** en el menú de una estantería (`app/js/library/publish.js`, oculto salvo con
+  `?perfil-preview=1`). Permite elegir los libros, su orden, cuál es «leyendo ahora», si se enseña
+  el progreso, el nombre público y el lomo (color del borde de la portada u O'Reilly). La app
+  saca una **foto**: título, autor, estado, progreso, páginas estimadas y una portada webp de
+  320 px. No salen ni el fichero, ni las notas, ni las estanterías, y el sync no se toca.
+  Las estanterías inteligentes salen con los libros que tengan al publicar.
+- **Vista previa**: deja la foto en localStorage y abre `/@luis/?draft=1` (mismo origen), que la
+  pinta con el aviso «Preview · not published». Así se ve la página real, no una imitación.
+- **Descargar → `scripts/publicar-perfil.mjs`**:
+  - Escribe `@luis/perfil.json`, las portadas que falten y el `now.svg`.
+  - Conserva lo hecho a mano (id, lomo, portada de paper, `kind`, páginas reales). Empareja por
+    `bookId`, y la primera vez por título; los siete libros ya publicados llevan ahora su `bookId`.
+  - `--covers` sustituye las portadas existentes y `--dry-run` enseña qué haría sin escribir nada.
+- La página pública admite el lomo `plain` (sin editorial), progreso ausente y el nombre de la
+  estantería desde los datos. Si las páginas son estimadas, no las muestra.
+- Tests: `tests/publish-shelf.spec.ts` (3). El paso 2 (Worker y `/@usuario` para Plus) espera a
+  ver en Umami, hacia el 14-21 de diciembre, si alguien hace clic.
+
 ## 2026-11-23 — Tipografía del libro, minimapa de subrayados y paleta de comandos (ideas de Matter)
 
 - **El caso**: revisando Matter para la web (getmatter.com/web-app) salieron tres ideas que

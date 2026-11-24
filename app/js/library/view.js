@@ -1716,6 +1716,9 @@ async function openShelfMenu(id, anchor) {
   // P24 F4 · Enlaces que creaste desde ESTE dispositivo para esta estantería (y siguen vivos).
   let myLinks = [];
   try { myLinks = (await import('../share/link.js')).linksFor(id); } catch (e) { /* sin storage */ }
+  // Perfil público (experimento): solo con ?perfil-preview=1. El módulo se carga al abrir el menú.
+  let publishOn = false;
+  try { publishOn = (await import('./publish.js')).available(); } catch (e) { /* sin módulo */ }
   const dossierItems = dossiers.map((d, i) => `<button class="lib-menu-item danger" data-act="unshare" data-i="${i}">${icon('xmark', { size: 'md' })}<span>${
     d.from ? t('Quitar lo de {name}…', { name: escapeHtml(d.from) }) : t('Quitar lo compartido…')}</span></button>`).join('');
   buildMenu(anchor, `
@@ -1732,6 +1735,7 @@ async function openShelfMenu(id, anchor) {
     <button class="lib-menu-item" data-act="down">${icon('arrow-down', { size: 'md' })}<span>${t('Bajar')}</span></button>`}
     <div class="lib-menu-sep"></div>
     <button class="lib-menu-item" data-act="share">${icon('share', { size: 'md' })}<span>${t('Compartir estantería…')}</span></button>
+    ${publishOn ? `<button class="lib-menu-item" data-act="publish">${icon('globe', { size: 'md' })}<span>${t('Publicar…')}</span></button>` : ''}
     ${myLinks.length ? `<button class="lib-menu-item" data-act="links">${icon('xmark', { size: 'md' })}<span>${t('Retirar enlaces ({n})…', { n: myLinks.length })}</span></button>` : ''}
     <div class="lib-menu-sep"></div>
     ${dossierItems}
@@ -1767,6 +1771,9 @@ async function openShelfMenu(id, anchor) {
       await Store.moveShelf(id, act === 'up' ? -1 : 1);
     } else if (act === 'share') {
       await shareShelf(shelf);
+      return;
+    } else if (act === 'publish') {
+      await (await import('./publish.js')).openPublish(id);
       return;
     } else if (act === 'links') {
       await revokeLinks(shelf.name, myLinks);
