@@ -100,11 +100,19 @@ function fitSpines() {
     let fs = parseFloat(getComputedStyle(el).fontSize);
     while (overflows(el) && fs > 5) { fs -= 0.5; el.style.fontSize = fs + 'px'; }
     // A dos líneas si en una no cabe, o si en un lomo grueso la letra quedaría diminuta.
-    if (el.classList.contains('pf-sp-title') && t > 24 && (overflows(el) || fs < Math.max(9, t * 0.24))) {
+    if (el.classList.contains('pf-sp-title') && t > 20 && (overflows(el) || fs < Math.max(9, t * 0.24))) {
       el.classList.add('is-two');
       el.innerHTML = splitInTwo(el.textContent);
       fs = Math.min(t * 0.3, 22); el.style.fontSize = fs + 'px';
       while (overflows(el) && fs > 6) { fs -= 0.5; el.style.fontSize = fs + 'px'; }
+    }
+    // Lomo tan fino que ni así cabe (un libro de 30 páginas en el móvil): fuera la etiqueta del pie
+    // («Own work»), que es lo prescindible, y se vuelve a ajustar con ese sitio.
+    const tag = el.parentElement.querySelector('.pf-sp-logo.tag');
+    if (isTitle && tag && overflows(el)) {
+      tag.style.display = 'none';
+      fs = parseFloat(el.style.getPropertyValue('--fs')) || fs; el.style.fontSize = fs + 'px';
+      while (overflows(el) && fs > 5) { fs -= 0.5; el.style.fontSize = fs + 'px'; }
     }
     if (isTitle) el.style.flex = '';
   }
@@ -131,12 +139,13 @@ function spineHtml(b, t, h) {
     const big = Math.max(10, Math.min(24, Math.round(t * 0.4)));
     title = `<div class="pf-sp-title is-stack${serif}" style="--fs:${big}px">${s.kicker ? `<span class="k">${esc(s.kicker)}</span>` : ''}<span class="m">${esc(s.title)}</span>${s.sub ? `<span class="k">${esc(s.sub)}</span>` : ''}</div>`;
   } else {
+    // Como en O'Reilly: fitSpines encoge la letra y, si no basta, lo parte en dos líneas. Antes se
+    // decidía aquí a ojo y en los lomos finos del móvil el título salía cortado («Claude Cod…»).
     const fs = Math.max(9.5, Math.min(21, Math.round(t * 0.34)));
-    const avail = h - (s.animal ? h * 0.2 : 20) - h * 0.22;
-    const two = s.title.length * fs * 0.52 > avail && t > 40;
-    title = `<div class="pf-sp-title${two ? ' is-two' : ''}${serif}" style="--fs:${two ? Math.min(fs, Math.round(t * 0.27)) : fs}px">${esc(s.title)}</div>`;
+    title = `<div class="pf-sp-title${serif}" data-fit style="--fs:${fs}px">${esc(s.title)}</div>`;
   }
-  return `<div class="pf-face pf-spine">${animal}${rule}${title}<div class="pf-sp-auth">${esc(s.author)}</div>${logo}</div>`;
+  // El autor también se ajusta (con tope de altura en el CSS): un nombre largo dejaba sin sitio al título.
+  return `<div class="pf-face pf-spine">${animal}${rule}${title}<div class="pf-sp-auth" data-fit>${esc(s.author)}</div>${logo}</div>`;
 }
 
 function buildTape() {

@@ -93,13 +93,14 @@ main > * { min-width: 0; }
 /* Lomos: imitan el de cada editorial (O'Reilly, Packt, arXiv) o la portada propia. */
 .pf-sp-title { flex: 1 1 auto; min-height: 0; writing-mode: vertical-rl; font-weight: 700; font-size: var(--fs); line-height: 1.12; padding: 12px 0 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; position: relative; z-index: 1; }
 .pf-sp-title.is-serif { font-family: var(--font-display); font-weight: 600; }
-.pf-sp-title.is-two { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+/* Dos líneas: fitSpines parte el título con un <br> en el espacio más centrado. */
+.pf-sp-title.is-two { display: block; white-space: nowrap; line-height: 1.1; }
 .pf-sp-title.is-stack { white-space: normal; }
 .pf-sp-title.is-stack > span { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .pf-sp-title.is-stack .k { font-size: calc(var(--fs) * .5); font-weight: 500; }
 .pf-sp-title.is-stack .k:first-child { margin-left: 4px; }
 .pf-sp-title.is-stack .m + .k { margin-right: 3px; }
-.pf-sp-auth { flex: none; writing-mode: vertical-rl; font-size: clamp(7px, calc(var(--t) * .14), 10.5px); font-weight: 500; color: var(--muted); padding: 4px 0 8px; max-height: 36%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; position: relative; z-index: 1; }
+.pf-sp-auth { flex: none; writing-mode: vertical-rl; font-size: clamp(7px, calc(var(--t) * .14), 10.5px); font-weight: 500; color: var(--muted); padding: 4px 0 8px; max-height: 26%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; position: relative; z-index: 1; }
 .pf-sp-animal { flex: none; width: var(--aw); height: var(--ah); margin-top: 7px; background-image: var(--img); background-repeat: no-repeat; background-size: var(--abs); background-position: var(--abp); position: relative; z-index: 1; }
 .pf-sp-rule { flex: none; width: 46%; height: 3px; margin-top: 14px; background: var(--rc); border-radius: 1px; position: relative; z-index: 1; }
 .pf-sp-logo { flex: none; padding: 2px 0 11px; white-space: nowrap; position: relative; z-index: 1; line-height: 1; }
