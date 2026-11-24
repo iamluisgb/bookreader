@@ -21,6 +21,9 @@
 }
 .picker button:hover { border-color: var(--accent); color: var(--text); }
 .picker button[aria-pressed="true"] { background: var(--text); border-color: var(--text); color: var(--surface-0); }
+/* Salida discreta a las muestras: un libro entero de dominio público, no la demo. */
+.picker-more { font: 500 13.5px var(--font-ui); color: var(--accent); text-decoration: none; margin-left: 4px; padding: 7px 2px; }
+.picker-more:hover { text-decoration: underline; }
 
 .bk-stage {
   --w: clamp(140px, 19vw, 250px);

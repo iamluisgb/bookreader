@@ -30,6 +30,32 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
   gutenberg.pglaf.org sí sirve por el Worker, pero tarda de 2 a 20 s. Piloto y medidas en
   `~/workspace/projects/experimentos/br-fuentes-libres/`.
 
+## 2026-11-24 — Web pública: pie único, 404, tarjetas para compartir
+
+- **Pie único**: había seis variantes de enlaces (unas sin Blog, otras sin Privacidad, ninguna con
+  Muestras). Ahora todas las páginas públicas (portada, por qué, muestras, blog y sus dos artículos,
+  Anki, privacidad; EN y ES) llevan `Inicio · Por qué · Muestras · Blog · Ayuda · Privacidad · ©
+  2026 Luis González · Código` (GitHub), con `aria-current="page"` en la propia. La portada, Anki y
+  privacidad conservan su pie con marca y lema (`foot-in`); cambian solo los enlaces.
+  Pendiente de replicar en `/read-the-book/` y `/es/lee-el-libro/`, que se editan aparte.
+- **Muestras desde la portada**: junto a «Pruébalo con / Try it with» del hero, un enlace discreto
+  «o abre un libro de verdad →» a `/es/muestra/` (`/samples/`), con evento de Umami `Samples`/`hero`.
+  Estilo `.picker-more` en `motion.css` (v=20261124a). Cabe en 390 px (pasa a la segunda fila).
+- **404 con el estilo de la web**: antes era una página suelta con colores a mano. Ahora usa
+  `prefs.js`, `themes.css`, `brand.css` y `why.css`, la barra y el pie estándar, titular serif y botón
+  píldora «Abrir BookReader» + Inicio y Muestras. Un idioma por vista: los dos textos van en el HTML y
+  un script elige por `bookreader_lang` o `navigator.language` (sin JS, inglés); el selector es
+  `?lang=xx` sobre la misma URL. **Sin redirecciones** (el bucle `/es/es/es/` venía de una relativa) y
+  todas las rutas absolutas, porque se sirve a cualquier profundidad. Con Umami.
+- **Imágenes para compartir** de `/why/`, `/es/por-que/`, `/privacy/`, `/es/privacidad/`, `/anki/` y
+  `/es/anki/` (antes, el icono de la app): 1200×630 en `assets/social/`, generadas desde la propia
+  página con `?card=hero`, como las de «Lee el libro». Cada página lleva un bloque `.sharecard` oculto
+  (antetítulo, titular serif, «BookReader · lector de EPUB y PDF · gratis, sin cuenta») y
+  `assets/landing/sharecard.css` lo pinta en papel claro con el dominio en verde. `og:image` absoluto
+  con `?v=1`, medidas, `alt`, `og:site_name`, `og:locale` y `twitter:card summary_large_image`.
+  Si cambia el titular, se regeneran (Playwright a 1200×630, `?card=hero`).
+- **Umami** en `/anki/` y `/es/anki/` (no lo tenían).
+
 ## 2026-11-24 — Repaso de la web pública: contraste en la banda oscura y sitemap
 
 - **Texto invisible en la banda oscura** (portada EN/ES y privacidad EN/ES): el `<b>` dentro de

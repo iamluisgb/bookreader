@@ -10,7 +10,17 @@
 <meta property="og:title" content="Privacy · BookReader">
 <meta property="og:description" content="What BookReader keeps on your device, what leaves it, when and where it goes: the agent, sync, share links, analytics and the Plus waitlist.">
 <meta property="og:url" content="https://bookreader.raiatech.com/privacy/">
-<meta property="og:image" content="https://bookreader.raiatech.com/app/icons/icon-512.png">
+<meta property="og:site_name" content="BookReader">
+<meta property="og:image" content="https://bookreader.raiatech.com/assets/social/privacy.png?v=1">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Your books stay on your device. BookReader · EPUB and PDF reader · free, no account.">
+<meta property="og:locale" content="en_GB">
+<meta property="og:locale:alternate" content="es_ES">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Privacy · BookReader">
+<meta name="twitter:description" content="What BookReader keeps on your device, what leaves it, when and where it goes: the agent, sync, share links, analytics and the Plus waitlist.">
+<meta name="twitter:image" content="https://bookreader.raiatech.com/assets/social/privacy.png?v=1">
 <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#121214" media="(prefers-color-scheme: dark)">
 <link rel="canonical" href="https://bookreader.raiatech.com/privacy/">
@@ -20,6 +30,7 @@
 <link rel="icon" href="../app/icons/icon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="../app/css/themes.css">
 <link rel="stylesheet" href="../assets/landing/brand.css?v=20261108b">
+<link rel="stylesheet" href="../assets/landing/sharecard.css?v=1">
 <style>
   @font-face { font-family: 'Inter'; font-weight: 400; font-display: swap; src: url(../app/fonts/inter-400.woff2) format('woff2'); }
   @font-face { font-family: 'Inter'; font-weight: 600; font-display: swap; src: url(../app/fonts/inter-600.woff2) format('woff2'); }
@@ -318,10 +329,19 @@
       <svg width="22" height="22" viewBox="0 0 512 512" aria-hidden="true" focusable="false"><rect width="512" height="512" rx="118" fill="#111418"/><path d="M288 119 Q288 99 308 99 L396 99 Q416 99 416 119 L416 371 L352 323 L288 371 Z" fill="#22c55e"/><path d="M98 90 L222 90 Q256 90 256 124 L256 470 C 249 442 233 424 206 414 C 177 403 140 401 100 401 Q64 401 64 365 L64 124 Q64 90 98 90 Z" fill="#f8fafc"/></svg>
       BookReader
     </a>
-    <span>EPUB and PDF reader with an AI agent and flashcards · © 2026 Luis González · <a href="../">Home</a> · <a href="../help/">Help</a></span>
+    <span>EPUB and PDF reader with an AI agent and flashcards · <a href="../">Home</a> · <a href="../why/">Why</a> · <a href="../samples/">Samples</a> · <a href="../blog/">Blog</a> · <a href="../help/">Help</a> · <a href="../privacy/" aria-current="page">Privacy</a> · © 2026 Luis González · <a href="https://github.com/iamluisgb/bookreader">Code</a></span>
     <span class="foot-tools"><span class="lang-pick" role="group" aria-label="Language"><span aria-current="true">English</span><a href="../es/privacidad/?lang=es" hreflang="es" lang="es" data-umami-event="Language" data-umami-event-to="es" data-umami-event-where="footer">Español</a></span><span class="theme-pick" role="group" aria-label="Theme"><button type="button" data-pick="system" aria-pressed="false">Auto</button><button type="button" data-pick="light" aria-pressed="false">Light</button><button type="button" data-pick="dark" aria-pressed="false">Dark</button></span></span>
   </div>
 </footer>
 
+<div class="sharecard" aria-hidden="true">
+  <p class="sc-eyebrow">Privacy</p>
+  <p class="sc-title">Your books stay on your device.</p>
+  <p class="sc-line"><b>BookReader</b> · EPUB and PDF reader · free, no account</p>
+</div>
+<script>
+  // ?card=hero: la página se convierte en su imagen para redes (ver sharecard.css).
+  if (new URLSearchParams(location.search).get('card')) document.body.dataset.card = 'hero';
+</script>
 </body>
 </html>

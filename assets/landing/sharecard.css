@@ -1,0 +1,24 @@
+/* ---- Tarjeta para compartir (?card=hero → 1200×630, Open Graph) ----
+   La imagen de redes de /why/, /privacy/ y /anki/ (y sus gemelas) se genera desde la propia
+   página: cada una lleva un bloque .sharecard oculto con su titular, y un script de la página
+   pone body[data-card] al ver ?card=. Mismo lenguaje que la de «Lee el libro»
+   (manifesto.css, «Modo tarjeta»). Colores fijos a propósito: siempre en claro, sea cual sea
+   el tema, porque es una imagen que circula sola. */
+.sharecard { display: none; }
+body[data-card] { background: #fdfbf6; color: #1d1d1f; margin: 0; }
+body[data-card] > :not(.sharecard) { display: none !important; }
+body[data-card] .sharecard {
+  display: flex; flex-direction: column; justify-content: center;
+  box-sizing: border-box; min-height: 100vh; padding: 0 80px 40px;
+}
+.sharecard .sc-eyebrow { margin: 0; font: 600 17px var(--font-ui); letter-spacing: .1em; text-transform: uppercase; color: #178046; }
+.sharecard .sc-title {
+  margin: 18px 0 0; max-width: 21ch; font: 600 84px/1.06 var(--font-display);
+  letter-spacing: -0.015em; text-wrap: balance; color: #1d1d1f;
+}
+.sharecard .sc-line { margin: 30px 0 0; font: 500 26px/1.4 var(--font-ui); color: #5f5f64; }
+.sharecard .sc-line b { color: #1d1d1f; font-weight: 600; }
+body[data-card]::after {
+  content: "bookreader.raiatech.com"; position: fixed; left: 80px; bottom: 48px;
+  font: 600 19px var(--font-ui); letter-spacing: .02em; color: #178046;
+}
