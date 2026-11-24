@@ -1,42 +1,45 @@
 {
   "owner": "Luis González",
-  "shelf": "Agents",
-  "now": "harness",
+  "profile": {
+    "lang": "en",
+    "bio": "[Prueba] Ingeniero de software. Construyo BookReader y leo sobre agentes de IA, sistemas y hábitos."
+  },
+  "now": null,
+  "shelves": [
+    {
+      "id": "tecnico",
+      "name": "Técnico",
+      "books": [
+        "albada",
+        "illustrated",
+        "definitive",
+        "47a858984a30",
+        "90761cb43c94",
+        "9abebdd89b8a",
+        "d7865cabfb42",
+        "a2dc73f1c524",
+        "c0acb8da2aa6",
+        "eaac32b82a43",
+        "3b7f6ae5febe"
+      ]
+    }
+  ],
   "books": [
     {
-      "id": "harness",
-      "bookId": "e81b5a4855adda8cc5e46db0a05cd69e0d0d542bd49cec6b157c17e6001395d7",
-      "title": "Harness Engineering: Anatomy, Architecture, and Evolution of Coding Agents",
-      "author": "Paul Barbaste, Tristan Darrigol, Germain Vu, Tom Wiltberger",
+      "id": "albada",
+      "bookId": "72cdfc0f74bb1f60e0b61e950da06683e2db0aa04e90a59bdf271fcedfecf1f1",
+      "title": "Building Applications with AI Agents",
+      "author": "Michael Albada",
       "status": "reading",
       "progress": 7,
-      "pages": 42,
-      "kind": "Paper · arXiv",
+      "pages": 390,
       "spine": {
-        "style": "arxiv",
-        "bg": "#f6f3ec",
-        "ink": "#111111",
-        "muted": "#555555",
-        "serif": true,
-        "title": "Harness Engineering",
-        "author": "Barbaste · Darrigol · Vu · Wiltberger"
-      },
-      "cover": {
-        "type": "paper",
-        "source": "arXiv",
-        "accent": "#b31b1b",
-        "id": "2609.00006",
-        "area": "cs.SE",
-        "title": "Harness Engineering",
-        "subtitle": "Anatomy, Architecture, and Evolution of Coding Agents",
-        "note": "A source-code study of eleven systems",
-        "authors": [
-          "Paul Barbaste",
-          "Tristan Darrigol",
-          "Germain Vu",
-          "Tom Wiltberger"
-        ],
-        "date": "July 2026"
+        "style": "oreilly",
+        "bg": "#ffffff",
+        "ink": "#1d1d1f",
+        "muted": "#1d1d1f",
+        "title": "Building Applications with AI Agents",
+        "author": "Albada"
       }
     },
     {
@@ -57,59 +60,6 @@
       }
     },
     {
-      "id": "albada",
-      "bookId": "72cdfc0f74bb1f60e0b61e950da06683e2db0aa04e90a59bdf271fcedfecf1f1",
-      "title": "Building Applications with AI Agents",
-      "author": "Michael Albada",
-      "status": "reading",
-      "progress": 7,
-      "pages": 390,
-      "spine": {
-        "style": "oreilly",
-        "bg": "#ffffff",
-        "ink": "#1d1d1f",
-        "muted": "#1d1d1f",
-        "title": "Building Applications with AI Agents",
-        "author": "Albada"
-      }
-    },
-    {
-      "id": "skills",
-      "bookId": "fcd0544c2cb7584bd039126ccf64efe38ae22734be715cee9cb63fada00f3f03",
-      "title": "Agent Skills",
-      "author": "Lucas B. Nicolosi Soares",
-      "status": "reading",
-      "progress": 10,
-      "pages": 220,
-      "spine": {
-        "style": "oreilly",
-        "bg": "#ffffff",
-        "ink": "#1d1d1f",
-        "muted": "#1d1d1f",
-        "title": "Agent Skills",
-        "author": "Nicolosi Soares"
-      }
-    },
-    {
-      "id": "graph",
-      "bookId": "026ef0127b43d91ba7cac83f2f1c469b71da70e5562a0897b0959f3ff80fd18a",
-      "title": "Graph Engineering — The Loop Memory Model",
-      "author": "Volodymyr Pavlyshyn",
-      "status": "reading",
-      "progress": 1,
-      "pages": 138,
-      "spine": {
-        "style": "packt",
-        "bg": "#0c1830",
-        "gradient": "linear-gradient(180deg, #16304f, #0c1830 55%, #0a1426)",
-        "ink": "#ffffff",
-        "muted": "#c8d3e6",
-        "title": "Graph Engineering",
-        "sub": "The Loop Memory Model",
-        "author": "Volodymyr Pavlyshyn"
-      }
-    },
-    {
       "id": "definitive",
       "bookId": "fff3f67271504119352af640cf372ce812ab5e026ab5c8882c0240a4cd7eeece",
       "title": "AI Agents: The Definitive Guide",
@@ -127,24 +77,147 @@
       }
     },
     {
-      "id": "senior",
-      "bookId": "e933643b983805689c441c21be0315929fdc2357c7301bc315ec355d4b77fab1",
-      "title": "Claude Code para ingenieros senior",
-      "author": "Luis González",
-      "status": "finished",
-      "progress": 100,
-      "pages": 30,
-      "kind": "Own work",
+      "id": "47a858984a30",
+      "bookId": "47a858984a30b263ddf5103a4a28c80d2628a8153c81c8837b34d63284fdfc0c",
+      "title": "AI Agents with MCP",
+      "author": "Kyle Stratis",
+      "status": "unread",
+      "progress": 0,
+      "pages": 900,
+      "pagesEstimated": true,
       "spine": {
-        "style": "tag",
-        "tag": "Own work",
-        "bg": "#1f2a24",
-        "ink": "#f4efe3",
-        "muted": "#c9c2b2",
-        "serif": true,
-        "rule": "#d97757",
-        "title": "Claude Code para ingenieros senior",
-        "author": "Luis González"
+        "style": "oreilly",
+        "bg": "#ffffff",
+        "ink": "#1d1d1f",
+        "muted": "#1d1d1f",
+        "title": "AI Agents with MCP",
+        "author": "Stratis"
+      }
+    },
+    {
+      "id": "90761cb43c94",
+      "bookId": "90761cb43c94f250712b756610ca8e9ea4a00b86854a090057cc36cb5571c97b",
+      "title": "Evals for AI Engineers",
+      "author": "Shreya Shankar, Hamel Husain",
+      "status": "reading",
+      "progress": 10,
+      "pages": 900,
+      "pagesEstimated": true,
+      "spine": {
+        "style": "oreilly",
+        "bg": "#ffffff",
+        "ink": "#1d1d1f",
+        "muted": "#1d1d1f",
+        "title": "Evals for AI Engineers",
+        "author": "Shankar & Husain"
+      }
+    },
+    {
+      "id": "9abebdd89b8a",
+      "bookId": "9abebdd89b8af99937dc91d5be8c366b7dce449dfbdcef570277604b01bcbf40",
+      "title": "AI Engineering: Building Applications with Foundation Models",
+      "author": "Chip Huyen",
+      "status": "reading",
+      "progress": 56,
+      "pages": 900,
+      "pagesEstimated": true,
+      "spine": {
+        "style": "oreilly",
+        "bg": "#ffffff",
+        "ink": "#1d1d1f",
+        "muted": "#1d1d1f",
+        "title": "AI Engineering",
+        "author": "Huyen"
+      }
+    },
+    {
+      "id": "d7865cabfb42",
+      "bookId": "d7865cabfb42af2e51adc5d4895d656623fa42edf3e1c7c9c6761a88f176b930",
+      "title": "Build a Large Language Model (From Scratch)",
+      "author": "Sebastian Raschka",
+      "status": "reading",
+      "progress": 18,
+      "pages": 604,
+      "pagesEstimated": true,
+      "spine": {
+        "style": "plain",
+        "bg": "#27121b",
+        "ink": "#ffffff",
+        "muted": "#d9d9de",
+        "title": "Build a Large Language Model (From Scratch)",
+        "author": "Raschka"
+      }
+    },
+    {
+      "id": "a2dc73f1c524",
+      "bookId": "a2dc73f1c524fd5a405bd065fc14631f2d1b4b127f5dce542d814230ee0ee97b",
+      "title": "Knowledge Graphs and LLMs in Action",
+      "author": "Alessandro Negro, Vlastimil Kus",
+      "status": "finished",
+      "progress": 0,
+      "pages": 900,
+      "pagesEstimated": true,
+      "spine": {
+        "style": "plain",
+        "bg": "#738c94",
+        "ink": "#ffffff",
+        "muted": "#d9d9de",
+        "title": "Knowledge Graphs and LLMs in Action",
+        "author": "Negro & Kus"
+      }
+    },
+    {
+      "id": "c0acb8da2aa6",
+      "bookId": "c0acb8da2aa670e59c8e2ed6fb23f191a6da57251befdebe8351229fa94b80f2",
+      "title": "Designing Data-Intensive Applications",
+      "author": "Martin Kleppmann, Chris Riccomini",
+      "status": "reading",
+      "progress": 84,
+      "pages": 233,
+      "pagesEstimated": true,
+      "spine": {
+        "style": "oreilly",
+        "bg": "#ffffff",
+        "ink": "#1d1d1f",
+        "muted": "#1d1d1f",
+        "title": "Designing Data-Intensive Applications",
+        "author": "Kleppmann & Riccomini"
+      }
+    },
+    {
+      "id": "eaac32b82a43",
+      "bookId": "eaac32b82a43548dcda2e141a96ac8a5263beb6a3a271b5235c0485b02fd1eaf",
+      "title": "Diseño de sistemas: Una guía de información privilegiada. Segunda edición",
+      "author": "Alex Xu",
+      "status": "reading",
+      "progress": 8,
+      "pages": 900,
+      "pagesEstimated": true,
+      "spine": {
+        "style": "plain",
+        "bg": "#3b3d6d",
+        "ink": "#ffffff",
+        "muted": "#d9d9de",
+        "title": "Diseño de sistemas",
+        "author": "Xu"
+      }
+    },
+    {
+      "id": "3b7f6ae5febe",
+      "bookId": "3b7f6ae5febecd190e359e0024570fadb68aa702cd727df97e693f78ff3d0118",
+      "title": "Site Reliability Engineering 2nd: How Google Runs Production Systems",
+      "author": "Betsy Beyer",
+      "status": "reading",
+      "progress": 15,
+      "pages": 573,
+      "pagesEstimated": true,
+      "spine": {
+        "style": "oreilly",
+        "bg": "#ffffff",
+        "ink": "#1d1d1f",
+        "muted": "#1d1d1f",
+        "title": "Site Reliability Engineering 2nd",
+        "author": "Beyer"
       }
     }
   ]
