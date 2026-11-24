@@ -171,6 +171,8 @@ main > * { min-width: 0; }
 
 .pf-foot { display: grid; gap: var(--s-3); justify-items: start; border-top: 1px solid var(--border-soft); padding-top: var(--s-6); margin-top: var(--s-4); }
 .pf-foot p { margin: 0; color: var(--text-soft); max-width: 60ch; }
+.pf-foot-h { font-family: var(--font-display); font-size: var(--fs-xl); font-weight: 600; margin: 0; }
+.pf-foot-actions { display: flex; flex-wrap: wrap; gap: var(--s-2); }
 .pf-made { font-size: var(--fs-xs); color: var(--text-faint) !important; }
 .pf-made a { color: var(--accent); }
 

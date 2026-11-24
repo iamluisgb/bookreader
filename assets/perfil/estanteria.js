@@ -19,9 +19,12 @@ const STR = {
     readingNow: 'Reading now', show: 'Show', book: 'book', books: 'books', tapHint: 'tap a spine to see its cover',
     no: 'No.', pages: 'pages', close: 'Close', by: 'by', getBook: 'Get the book',
     openApp: 'Open BookReader', readWith: 'Read with BookReader', kBrowse: 'browse', kOpen: 'open', kClose: 'close',
-    fullShelf: 'Full shelf on BookReader ↗', madeWith: 'Made with',
-    footPitch: 'Want to read along? BookReader is a reader for your own EPUBs and PDFs, with an assistant that cites the page it read.',
-    madePrivacy: 'Only titles and covers are public; the books themselves never leave the reader’s device.',
+    fullShelf: 'Full shelf on BookReader ↗',
+    footTitle: 'Want a shelf like this?',
+    footPitch: 'These books are read in BookReader, a reader for your own EPUBs and PDFs, with an assistant that answers with the exact page it cites.',
+    tryApp: 'Try BookReader', wantShelf: 'I want my own public shelf',
+    wantSubject: 'I want my own public shelf on BookReader',
+    madePrivacy: 'Only titles and covers are public. The books never leave the reader’s device.',
     shelves: 'Shelves', filterBy: 'Filter by status', shelfAria: 'Bookshelf. Arrow keys to browse, Enter to open the book',
     prev: 'Previous book', next: 'Next book', title: (n) => `${n}’s shelf · BookReader`,
     noDraft: 'There is no preview to show. Open Settings → Public profile in BookReader and press Preview.',
@@ -33,9 +36,12 @@ const STR = {
     readingNow: 'Leyendo ahora', show: 'Ver', book: 'libro', books: 'libros', tapHint: 'toca un lomo para ver su portada',
     no: 'N.º', pages: 'páginas', close: 'Cerrar', by: 'de', getBook: 'Conseguir el libro',
     openApp: 'Abrir BookReader', readWith: 'Leído con BookReader', kBrowse: 'recorrer', kOpen: 'abrir', kClose: 'cerrar',
-    fullShelf: 'La estantería completa en BookReader ↗', madeWith: 'Hecho con',
-    footPitch: '¿Quieres leer a la vez? BookReader es un lector para tus propios EPUB y PDF, con un asistente que cita la página que ha leído.',
-    madePrivacy: 'Solo son públicos los títulos y las portadas; los libros nunca salen del dispositivo de quien los lee.',
+    fullShelf: 'La estantería completa en BookReader ↗',
+    footTitle: '¿Quieres una estantería como esta?',
+    footPitch: 'Estos libros se leen en BookReader, un lector para tus propios EPUB y PDF, con un asistente que responde citando la página exacta.',
+    tryApp: 'Probar BookReader', wantShelf: 'Quiero mi propia estantería pública',
+    wantSubject: 'Quiero mi propia estantería pública en BookReader',
+    madePrivacy: 'Solo son públicos los títulos y las portadas. Los libros nunca salen del dispositivo de quien los lee.',
     shelves: 'Estanterías', filterBy: 'Filtrar por estado', shelfAria: 'Estantería. Flechas para recorrerla, Intro para abrir el libro',
     prev: 'Libro anterior', next: 'Libro siguiente', title: (n) => `La estantería de ${n} · BookReader`,
     noDraft: 'No hay vista previa que enseñar. En BookReader, abre Ajustes → Perfil público y pulsa Vista previa.',
@@ -49,6 +55,9 @@ function applyLang(lang, owner) {
   document.querySelectorAll('[data-t]').forEach(el => { if (typeof L[el.dataset.t] === 'string') el.textContent = L[el.dataset.t]; });
   document.querySelectorAll('[data-t-aria]').forEach(el => { if (L[el.dataset.tAria]) el.setAttribute('aria-label', L[el.dataset.tAria]); });
   if (owner) document.title = L.title(owner);
+  // El correo de «quiero mi estantería» en el idioma de la página, y con el perfil de donde viene.
+  const want = document.getElementById('pf-want');
+  if (want) want.href = `mailto:hola@raiatech.com?subject=${encodeURIComponent(L.wantSubject)}&body=${encodeURIComponent('\n\n— ' + location.origin + location.pathname)}`;
 }
 const FILTERS = [
   { id: 'all', label: () => L.all, test: () => true },

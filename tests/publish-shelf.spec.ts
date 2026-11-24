@@ -298,6 +298,9 @@ test('página pública en español, con presentación, nota y enlace seguro', as
   await expect(page.locator('#pf-bio')).toHaveText('Hola, leo mucho.');
   await expect(page.locator('#pf-filters button').first()).toContainText('Todos');
   await expect(page.locator('.pf-keys')).toContainText('recorrer');
+  // Pie: la pregunta y la lista de espera en el idioma de la página.
+  await expect(page.locator('.pf-foot-h')).toHaveText('¿Quieres una estantería como esta?');
+  expect(decodeURIComponent((await page.locator('#pf-want').getAttribute('href'))!)).toContain('subject=Quiero mi propia estantería pública');
   await page.locator('.pf-bk').first().click();
   await page.locator('.pf-bk.is-active').click();
   await expect(page.locator('.pf-ob-note')).toHaveText('Me cambió la forma de pensar.');

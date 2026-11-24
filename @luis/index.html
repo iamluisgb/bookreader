@@ -28,7 +28,7 @@
 <link rel="icon" href="../app/icons/icon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="../app/css/fonts.css">
 <link rel="stylesheet" href="../app/css/themes.css">
-<link rel="stylesheet" href="../assets/perfil/perfil.css?v=20261124i">
+<link rel="stylesheet" href="../assets/perfil/perfil.css?v=20261124j">
 <script>
 if (location.hostname === 'bookreader.raiatech.com') {
   var u = document.createElement('script');
@@ -85,12 +85,16 @@ if (location.hostname === 'bookreader.raiatech.com') {
   <p class="pf-embed-link pf-pad"><a href="https://bookreader.raiatech.com/@luis/?ref=embed" target="_blank" rel="noopener" data-umami-event="Profile: embed full shelf" data-t="fullShelf">Full shelf on BookReader ↗</a></p>
 
   <footer class="pf-foot pf-pad">
-    <p data-t="footPitch">Want to read along? BookReader is a reader for your own EPUBs and PDFs, with an assistant that cites the page it read.</p>
-    <a class="pf-btn pf-btn--primary" href="../app/" data-umami-event="Profile: open app" data-umami-event-where="footer" data-t="openApp">Open BookReader</a>
-    <p class="pf-made"><span data-t="madeWith">Made with</span> <a href="../" data-umami-event="Profile: home">BookReader</a>. <span data-t="madePrivacy">Only titles and covers are public; the books themselves never leave the reader’s device.</span></p>
+    <h2 class="pf-foot-h" data-t="footTitle">Want a shelf like this?</h2>
+    <p data-t="footPitch">These books are read in BookReader, a reader for your own EPUBs and PDFs, with an assistant that answers with the exact page it cites.</p>
+    <div class="pf-foot-actions">
+      <a class="pf-btn pf-btn--primary" href="../?ref=profile" data-umami-event="Profile: open app" data-umami-event-where="footer" data-t="tryApp">Try BookReader</a>
+      <a class="pf-btn" id="pf-want" href="mailto:hola@raiatech.com?subject=I%20want%20my%20own%20public%20shelf%20on%20BookReader" data-umami-event="Profile: want shelf" data-t="wantShelf">I want my own public shelf</a>
+    </div>
+    <p class="pf-made" data-t="madePrivacy">Only titles and covers are public. The books never leave the reader’s device.</p>
   </footer>
 </main>
 
-<script type="module" src="../assets/perfil/estanteria.js?v=20261124i"></script>
+<script type="module" src="../assets/perfil/estanteria.js?v=20261124j"></script>
 </body>
 </html>
