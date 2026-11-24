@@ -37,14 +37,17 @@ export const SCHEMA_VERSION = 1;
 // Guardar la portada original (a veces 1400px y 400 KB) multiplicaría por cien el tamaño de
 // covers.json; a 480/0.80 salen ~40-60 KB por libro — el punto donde en pantalla no se
 // distingue de la original.
-const THUMB_WIDTH = 480;
-const THUMB_QUALITY = 0.80;
+// 24-nov-2026: 480 se quedaba corto en el móvil. Dos columnas de ~170 px CSS a densidad ×3 son
+// ~510 px físicos, y la miniatura se veía blanda. A 600/0.82 cubre el móvil y la rejilla retina
+// de escritorio; covers.json crece ~1,5× y solo se sube cuando cambia (pushIfChanged).
+const THUMB_WIDTH = 600;
+const THUMB_QUALITY = 0.82;
 export { THUMB_WIDTH };
 // Versión de la caché: coverThumb de la era 200px no sirve — pero solo se puede regenerar
 // donde sigue la portada original (en un dispositivo fantasma el thumb PISÓ cover, ver
 // applyCovers, y no hay de dónde rascar). El prefijo invalida la caché vieja una vez y
 // evita re-encodear en cada ciclo.
-const THUMB_PREFIX = 'v2|';
+const THUMB_PREFIX = 'v3|';   // v3: 600 px (antes 480)
 
 // Campos que solo conoce quien tiene el fichero: no se pierden porque el otro
 // lado gane el LWW por haber tocado el progreso (ver mergeMaps · monotone).
@@ -76,7 +79,9 @@ export function makeThumb(dataUrl, width = THUMB_WIDTH) {
         const canvas = document.createElement('canvas');
         canvas.width = Math.max(1, Math.round(img.naturalWidth * scale));
         canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
-        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+        const ctx = canvas.getContext('2d');
+        ctx.imageSmoothingQuality = 'high';   // al reducir mucho, el filtro por defecto deja dientes
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
         resolve(canvas.toDataURL('image/jpeg', THUMB_QUALITY));
       } catch (e) {
         resolve(null); // canvas "tainted" u otro fallo: no es motivo para romper el sync

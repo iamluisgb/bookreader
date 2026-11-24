@@ -987,7 +987,10 @@ async function coverNeedsBackfill(dataUrl) {
   try {
     const img = new Image();
     await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = dataUrl; });
-    return img.naturalWidth < THUMB_WIDTH;
+    // `<=`: una miniatura del sync mide EXACTAMENTE THUMB_WIDTH, y con `<` no se regeneraba
+    // nunca, ni con el fichero ya descargado. Una portada de fichero menor o igual se vuelve a
+    // sacar en cada apertura, pero sale idéntica y backfillCover no escribe.
+    return img.naturalWidth <= THUMB_WIDTH;
   } catch { return true; }
 }
 
@@ -998,7 +1001,7 @@ async function backfillCover(record) {
   const cover = record.format === 'pdf'
     ? await PdfReader.renderCoverDataUrl()
     : await EpubReader.getCoverDataUrl();
-  if (!cover) return;
+  if (!cover || cover === record.cover) return;
   // coverThumb: null — la miniatura cacheada representaba la portada vieja; thumbFor
   // la regenera de la nueva en el próximo ciclo de sync.
   await LibStore.updateBook(record.id, { cover, coverThumb: null });

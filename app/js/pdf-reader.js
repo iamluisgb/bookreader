@@ -1676,8 +1676,9 @@ export function revealRegion(page, rect, reservedBottomPx = 0) {
 // Portada para la estantería: renderiza la PÁGINA 1 en un canvas propio (fuera de pantalla)
 // y devuelve un data URL JPEG reescalado (lado largo ≈ maxPx). 800 y no 400: la tarjeta de la
 // rejilla pasa de 200 a 300+ px CSS en pantallas retina — a 400 se veia pixelada igual que las
-// miniaturas del sync. '' si no se puede.
-export async function renderCoverDataUrl(maxPx = 800) {
+// miniaturas del sync. 1200 desde el 24-nov-2026: a 800 una página A4 salía de ~565 px de ancho,
+// por debajo de lo que pinta una tarjeta en un móvil ×3. '' si no se puede.
+export async function renderCoverDataUrl(maxPx = 1200) {
   if (!pdfDoc) return '';
   try {
     const page = await pdfDoc.getPage(1);
@@ -1688,7 +1689,7 @@ export async function renderCoverDataUrl(maxPx = 800) {
     canvas.width = Math.max(1, Math.floor(viewport.width));
     canvas.height = Math.max(1, Math.floor(viewport.height));
     await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
-    return canvas.toDataURL('image/jpeg', 0.8);
+    return canvas.toDataURL('image/jpeg', 0.85);
   } catch (e) {
     console.warn('pdf cover render error:', e);
     return '';

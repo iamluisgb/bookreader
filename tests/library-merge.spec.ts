@@ -193,7 +193,8 @@ test('getAllBooks no carga los binarios en memoria', async ({ page }) => {
 
 // La miniatura que viaja en covers.json tiene que aguantar la rejilla en retina:
 // ~300 px CSS de tarjeta × 2 de DPR ≈ 600 px físicos. El ancho viejo (200) se veía
-// pixelado en cuanto la ventana pasaba de estrecha — es el motivo del bump a 480.
+// pixelado en cuanto la ventana pasaba de estrecha — es el motivo del bump a 480, y 480 se
+// quedaba blando en un móvil ×3 (dos columnas de ~170 px CSS ≈ 510 px): de ahí 600.
 test('makeThumb reescala la portada al ancho de miniatura actual, sin pasarse', async ({ page }) => {
   await page.goto('/');
   const out = await page.evaluate(async () => {
@@ -220,9 +221,8 @@ test('makeThumb reescala la portada al ancho de miniatura actual, sin pasarse', 
     return { w: img.naturalWidth, h: img.naturalHeight, w2: img2.naturalWidth, len: grande.length };
   });
 
-  expect(out.w).toBeLessThanOrEqual(480);
-  expect(out.w).toBeGreaterThan(400);   // ni de coña 200: eso era lo pixelado
-  expect(out.h).toBe(672);              // 1400 × (480/1000), proporción intacta
+  expect(out.w).toBe(600);
+  expect(out.h).toBe(840);              // 1400 × (600/1000), proporción intacta
   expect(out.w2).toBe(120);             // la pequeña no se agranda
 });
 
