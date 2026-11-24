@@ -2320,6 +2320,75 @@ de BookReader.
 
 ---
 
+### P60 — Biblioteca libre, fase 2: Gutenberg (sobre todo en español) · `M` · **siguiente**
+
+**Estado de partida (fase 1, en producción el 2026-11-24, commits `e4420a1` y `4f14694`).**
+`/samples/` y `/es/muestra/` buscan en `assets/muestra/catalogo.json`: 1.548 clásicos de Standard
+Ebooks + técnicos de `assets/muestra/tecnicos.json`. Ningún libro vive en el sitio:
+`app/js/samples.js` resuelve `?sample=se:<ruta>` o `?sample=tec:<id>` **solo contra el catálogo** y
+baja el fichero de su fuente en el navegador del lector; lo que no manda CORS pasa por el Worker
+`bookreader-libros` (`workers/libros`), que reenvía en streaming sin guardar, solo ids del catálogo
+empaquetado y con cada redirección comprobada contra una lista de dominios. Detalle y decisiones en
+`CHANGELOG.md` (entrada del 2026-11-24). Todo esto se ofrece **gratis siempre** (decisión de Luis).
+
+**Caso.** La biblioteca libre no tiene nada en español salvo Pro Git; la landing es bilingüe.
+Project Gutenberg tiene cientos de libros en español.
+
+**Medido el 2026-11-24 (no repetir a ciegas, comprobar si cambió):**
+- `www.gutenberg.org` respondía **503 «Temporarily Down for Maintenance»** desde el lab, desde
+  Cloudflare Workers y desde otra red. No se pudo medir si manda CORS. Desde el Mac (IP doméstica)
+  puede ir distinto: es lo primero que hay que mirar.
+- El espejo `https://gutenberg.pglaf.org/cache/epub/<n>/pg<n>-images-3.epub` **sí sirve** (EPUB
+  real), pero **sin CORS**, y por un Worker tardó de 2 a 20 s (el Quijote, 1 MB, 20 s).
+- Standard Ebooks rechaza a los Workers (403), por eso va directo; no lo cambies.
+- Recién desplegado, el Worker devolvió una vez un 404 «error code: 1042» de Cloudflare; al
+  segundo intento, 200. `samples.js` ya reintenta una vez.
+
+**Qué hacer:**
+1. **Comprobar Gutenberg**: `curl -sS -o /dev/null -D - -H 'Origin: https://bookreader.raiatech.com'
+   https://www.gutenberg.org/ebooks/2000.epub3.images` → código, redirecciones y si trae
+   `access-control-allow-origin` en **cada** salto (el navegador lo exige en todos). Si sigue en 503,
+   usar el espejo y decirlo.
+2. **Catálogo desde `pg_catalog.csv`** (`https://www.gutenberg.org/cache/epub/feeds/pg_catalog.csv.gz`,
+   el camino que Gutenberg ofrece para esto; nada de rastrear su web ni bajar libros en bloque).
+   Ampliar `scripts/catalogo-libros.mjs` con una clave `pg: [{n, t, a, l}]`. Filtro:
+   `Type == Text`, `Language` contiene `es` (el inglés ya lo cubre Standard Ebooks; decidir aparte).
+   **Dominio público en España: TODOS los que firman** (autores **y traductores**, que en `Authors`
+   llevan `[Translator]`) con año de muerte **≤ 1945** (80 años para quien murió antes de 1987). Sin
+   año para alguno → fuera. Anónimos: fuera salvo que Luis diga otra cosa. Contar cuántos quedan y
+   enseñar 10 al azar con sus años antes de publicar.
+3. **Descarga**: si gutenberg.org manda CORS, directo desde el navegador. Si no, ruta nueva del
+   Worker `GET /pg/<n>` que construya la URL él mismo (nunca la recibe del cliente) y **solo para los
+   `n` del catálogo filtrado** (empaquetar la lista de números en el bundle, como ya se hace con
+   `tecnicos.json`). Añadir `www.gutenberg.org` y/o `gutenberg.pglaf.org` a `HOSTS`. El fichero pasa
+   **sin modificar** (la licencia de Gutenberg va dentro del EPUB).
+4. **App**: `samples.js` acepta `pg:<n>`, resuelto contra el catálogo como los otros dos.
+   `assets/landing/catalogo.js`: tipo «Clásico», idioma ES, etiqueta «Dominio público en España»
+   (este filtro sí lo garantiza). Valorar un filtro por idioma si la lista se mezcla demasiado.
+5. **Tests**: casos `pg:` en `workers/libros/test/libros.test.mjs` (id fuera del catálogo → 404 sin
+   salir a la red) y en `tests/samples-catalog.spec.ts` (fuente simulada, abre y `body.reading`).
+   Si se añade un módulo bajo `app/js`, va a `ASSETS` de `app/sw.js` con bump de `CACHE_NAME`.
+6. **Créditos**: línea de Project Gutenberg en `/samples/` y `/es/muestra/` y una frase en `fine`.
+7. **Desplegar**: `npm run test:libros`, `npm test`; Worker con `cd workers/libros && npx wrangler
+   deploy` (token de Cloudflare exportado desde `~/workspace/.env`; apuntar `Current Version ID`);
+   web con `npm run deploy:pages` tras push a `main`. Verificar leyendo lo servido (`/build.json`) y
+   **abriendo un libro real en el navegador** desde `bookreader.raiatech.com` (uno, no en bloque).
+   Entrada en `CHANGELOG.md` y quitar este ítem.
+
+**Decisión pendiente de Luis (no la tomes tú):** Standard Ebooks es dominio público en EE. UU.; en
+España algunos pueden no serlo. Hoy la página lo dice («Dominio público en EE. UU.»). Si Luis quiere
+filtrarlo, los años de muerte pueden salir de cruzar con `pg_catalog.csv` por autor; proponer el
+recuento de cuántos caerían, no borrarlos.
+
+**Trampas del repo:** el árbol suele traer trabajo ajeno sin commitear (pies de página de las
+páginas públicas, `motion.css`…): commitear por hunks, nunca un fichero entero sin mirar el diff.
+`tests/css-vars.spec.ts` tenía 4 fallos ajenos (`modern.css`/`agent.css`) el 24-nov: no son tuyos.
+
+**Fuera, a propósito:** guardar libros en R2 o en el sitio; aceptar URLs arbitrarias en
+`?sample=`; libros solo «gratis para leer» sin licencia que permita redistribuir; cobrar por esto.
+
+---
+
 ## 🎓 Aprendizaje basado en evidencia
 
 > **Contexto (2026-07-27).** Revisión de la literatura de tutoría y aprendizaje. El hallazgo que
