@@ -309,3 +309,45 @@ test('página pública en español, con presentación, nota y enlace seguro', as
   await expect(page.locator('#pf-ob')).toHaveClass(/is-open/);
   await expect(page.locator('.pf-ob-link')).toHaveCount(0);   // javascript: no se pinta
 });
+
+test('al publicar, la portada sale del fichero si está en el dispositivo (no de la miniatura guardada)', async ({ page }) => {
+  test.setTimeout(60000);
+  await page.setViewportSize({ width: 1300, height: 900 });
+  await page.goto('/index.html?perfil-preview=1');
+  // Un EPUB con portada declarada y un PDF, importados de verdad (fichero en el dispositivo).
+  for (const f of ['test.epub', 'test-multipage.pdf']) {
+    await page.setInputFiles('#file-input', require('path').join(__dirname, f));
+    await expect(page.locator('body')).toHaveClass(/reading/, { timeout: 20000 });
+    await expect.poll(() => page.evaluate(async (n) => (await (await import('/js/library/store.js')).getAllRecords())
+      .filter((r: any) => !r.deleted && r.cover).length >= n, f === 'test.epub' ? 1 : 2), { timeout: 15000 }).toBe(true);
+    await page.goto('/index.html?perfil-preview=1');
+  }
+  // Su portada guardada pasa a ser un cuadro rojo de 100 px, como una miniatura pobre del sync.
+  const shelf = await page.evaluate(async () => {
+    const S: any = await import('/js/library/store.js');
+    const sh = await S.addShelf('Pruebas');
+    const c = document.createElement('canvas'); c.width = 100; c.height = 150;
+    const x = c.getContext('2d')!; x.fillStyle = '#ff0000'; x.fillRect(0, 0, 100, 150);
+    for (const r of (await S.getAllRecords()).filter((r: any) => !r.deleted)) await S.updateBook(r.id, { cover: c.toDataURL('image/png'), shelfIds: [sh.id] });
+    return sh.id;
+  });
+  await page.reload();
+  await page.waitForSelector('.lib-rail');
+  await shelfMenu(page, shelf);
+  await page.locator('.lib-menu-item[data-act="publish"]').click();
+  const dl = page.waitForEvent('download');
+  await page.locator('.pp button[data-act="download"]').click();
+  const snap = JSON.parse(fs.readFileSync((await (await dl).path())!, 'utf8'));
+  expect(snap.books).toHaveLength(2);
+  // Ninguna portada publicada es el cuadro rojo: salen del EPUB y del PDF.
+  const reds = await page.evaluate(async (srcs) => Promise.all(srcs.map(src => new Promise(res => {
+    const i = new Image(); i.onload = () => {
+      const c = document.createElement('canvas'); c.width = i.naturalWidth; c.height = i.naturalHeight;
+      const x = c.getContext('2d')!; x.drawImage(i, 0, 0);
+      const d = x.getImageData(0, 0, c.width, c.height).data; let red = 0;
+      for (let k = 0; k < d.length; k += 4) if (d[k] > 200 && d[k + 1] < 40 && d[k + 2] < 40) red++;
+      res(red / (d.length / 4));
+    }; i.src = src;
+  }))), snap.books.map((b: any) => b.coverData));
+  for (const r of reds as number[]) expect(r).toBeLessThan(0.5);
+});

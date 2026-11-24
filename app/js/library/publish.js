@@ -24,6 +24,7 @@ import { withoutSubtitle } from './book-meta.js';
 import { t } from '../i18n.js';
 import { escapeHtml } from '../ui/escape.js';
 import { alertBox } from '../ui/dialog.js';
+import { loadJsZip, loadPdfJs } from '../vendor-loader.js';
 
 const FLAG = 'perfil_preview';
 export const CONFIG_KEY = 'public_profile';
@@ -166,17 +167,84 @@ function loadImage(src) {
 
 const hex = (r, g, b) => '#' + [r, g, b].map(v => Math.round(v).toString(16).padStart(2, '0')).join('');
 
+// ---- portada del fichero ----------------------------------------------------------
+// La portada que guarda la biblioteca es pequeña: la miniatura del sync (480–600 px) en los libros
+// que llegaron de otro dispositivo, y la página 1 a ~565 px en los PDF. Publicada a 640 se veía
+// blanda. Si el fichero está en ESTE dispositivo, se saca de él: la imagen original del EPUB o la
+// página 1 del PDF a 1280 px. Si no, null y se usa la guardada.
+const PDF_COVER_W = 1280;
+
+async function fileOf(rec) {
+  if (!Store.hasFile(rec)) return null;
+  const raw = await Store.getBook(rec.id).catch(() => null);
+  const f = raw && raw.file;
+  if (!f) return null;
+  return f instanceof ArrayBuffer ? f : (typeof f.arrayBuffer === 'function' ? await f.arrayBuffer() : null);
+}
+
+// La imagen de portada que declara el OPF (EPUB 3: properties="cover-image"; EPUB 2: meta cover).
+async function epubCover(buf) {
+  const JSZip = await loadJsZip();
+  const zip = await JSZip.loadAsync(buf);
+  const container = await zip.file('META-INF/container.xml')?.async('string');
+  const opfPath = container && (container.match(/full-path\s*=\s*["']([^"']+)["']/) || [])[1];
+  const opf = opfPath && await zip.file(opfPath)?.async('string');
+  if (!opf) return null;
+  const items = [...opf.matchAll(/<item\b[^>]*>/g)].map(m => m[0]);
+  const attr = (tag, a) => (tag.match(new RegExp(`\\b${a}\\s*=\\s*["']([^"']+)["']`)) || [])[1];
+  let item = items.find(t => /\bproperties\s*=\s*["'][^"']*cover-image/.test(t));
+  if (!item) {
+    const meta = opf.match(/<meta\b[^>]*name\s*=\s*["']cover["'][^>]*>/);
+    const id = meta && attr(meta[0], 'content');
+    item = id && items.find(t => attr(t, 'id') === id);
+  }
+  const href = item && attr(item, 'href');
+  if (!href || !/^image\//.test(attr(item, 'media-type') || 'image/')) return null;
+  const dir = opfPath.includes('/') ? opfPath.slice(0, opfPath.lastIndexOf('/') + 1) : '';
+  const path = decodeURIComponent(new URL(href, 'http://x/' + dir).pathname.slice(1));
+  const blob = await zip.file(path)?.async('blob');
+  if (!blob) return null;
+  const url = URL.createObjectURL(blob);
+  try { return await loadImage(url); } finally { setTimeout(() => URL.revokeObjectURL(url), 0); }
+}
+
+async function pdfCover(buf) {
+  const pdfjs = await loadPdfJs();
+  const doc = await pdfjs.getDocument({ data: new Uint8Array(buf) }).promise;
+  try {
+    const page = await doc.getPage(1);
+    const base = page.getViewport({ scale: 1 });
+    const viewport = page.getViewport({ scale: PDF_COVER_W / base.width });
+    const c = document.createElement('canvas');
+    c.width = Math.floor(viewport.width); c.height = Math.floor(viewport.height);
+    await page.render({ canvasContext: c.getContext('2d'), viewport }).promise;
+    return c;
+  } finally { doc.destroy(); }
+}
+
+// Lo que se pinta: algo que `drawImage` acepte, con su tamaño natural. null = usar la guardada.
+async function coverFromFile(rec) {
+  try {
+    const buf = await fileOf(rec);
+    if (!buf) return null;
+    const src = rec.format === 'pdf' ? await pdfCover(buf) : await epubCover(buf);
+    if (!src) return null;
+    const w = src.naturalWidth || src.width, h = src.naturalHeight || src.height;
+    return w && h ? { src, w, h } : null;
+  } catch { return null; }
+}
+
 // Miniatura en webp (COVER_W px de ancho) y el color de su borde izquierdo, que es lo más parecido
 // al lomo que tenemos. Sin portada, se dibuja una tipográfica con el color del libro.
-async function coverAndColor(rec) {
+async function coverAndColor(rec, { fromFile = true } = {}) {
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d', { willReadFrequently: true });
-  let im = null;
-  if (rec.cover) { try { im = await loadImage(rec.cover); } catch { im = null; } }
+  let im = fromFile ? await coverFromFile(rec) : null;
+  if (!im && rec.cover) { try { const i = await loadImage(rec.cover); im = { src: i, w: i.naturalWidth, h: i.naturalHeight }; } catch { im = null; } }
   if (im) {
-    canvas.width = COVER_W; canvas.height = Math.round(COVER_W * im.naturalHeight / im.naturalWidth);
+    canvas.width = COVER_W; canvas.height = Math.round(COVER_W * im.h / im.w);
     ctx.imageSmoothingQuality = 'high';
-    ctx.drawImage(im, 0, 0, canvas.width, canvas.height);
+    ctx.drawImage(im.src, 0, 0, canvas.width, canvas.height);
     const strip = ctx.getImageData(0, 0, Math.max(4, Math.round(canvas.width * 0.06)), canvas.height).data;
     let r = 0, g = 0, b = 0, n = 0;
     for (let i = 0; i < strip.length; i += 4) { r += strip[i]; g += strip[i + 1]; b += strip[i + 2]; n++; }
@@ -443,7 +511,7 @@ function sectionHtml(st) {
 // la portada se reconoce como de O'Reilly, y si no, se elige a mano. Se calcula una vez por libro.
 const detected = new Map();   // bookId → Promise<boolean>
 function detectFor(rec) {
-  if (!detected.has(rec.id)) detected.set(rec.id, coverAndColor(rec).then(r => r.oreilly).catch(() => false));
+  if (!detected.has(rec.id)) detected.set(rec.id, coverAndColor(rec, { fromFile: false }).then(r => r.oreilly).catch(() => false));
   return detected.get(rec.id);
 }
 function labelAuto(host, recsById) {
