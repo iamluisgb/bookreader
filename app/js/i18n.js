@@ -2030,6 +2030,8 @@ const EN = {
   'Revisar el sync': 'Check sync',
   'El enlace está incompleto: puede que se cortara al copiarlo. Vuelve a copiarlo desde el otro dispositivo.': 'The link is incomplete: it may have been cut off when copied. Copy it again from the other device.',
   'Emparejando este dispositivo…': 'Pairing this device…',
+  'Descargando «{title}»…': 'Downloading “{title}”…',
+  'No se pudo abrir el libro. Comprueba la conexión e inténtalo otra vez.': 'The book could not be opened. Check your connection and try again.',
   'Clave guardada. Este dispositivo sincroniza con Google Drive: para pasarlo al sync de BookReader, ve a Ajustes → Datos.': 'Key saved. This device syncs with Google Drive: to move it to BookReader Sync, go to Settings → Data.',
   'Emparejado, pero el primer sync falló: {msg}': 'Paired, but the first sync failed: {msg}',
   'Dispositivo emparejado. Tus notas y tu progreso ya están aquí.': 'Device paired. Your notes and progress are here now.',

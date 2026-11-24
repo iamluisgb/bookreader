@@ -20,6 +20,7 @@
     "perf": "playwright test --grep @perf",
     "test:gateway": "node --test workers/gateway/test/*.test.mjs",
     "test:share": "node --test workers/share/test/*.test.mjs",
+    "test:libros": "node --test workers/libros/test/*.test.mjs",
     "share:usage": "node scripts/share-usage.mjs",
     "test:sync": "node --test workers/sync/test/*.test.mjs",
     "sync:usage": "node scripts/sync-usage.mjs",

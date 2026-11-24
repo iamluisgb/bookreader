@@ -20,7 +20,7 @@
 <link rel="icon" href="../app/icons/icon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="../app/css/themes.css">
 <link rel="stylesheet" href="../assets/landing/brand.css?v=20261108b">
-<link rel="stylesheet" href="../assets/landing/samples.css?v=20261124b">
+<link rel="stylesheet" href="../assets/landing/samples.css?v=20261124d">
 <script>
 if (location.hostname === 'bookreader.raiatech.com') {
   var u = document.createElement('script');
@@ -81,6 +81,18 @@ if (location.hostname === 'bookreader.raiatech.com') {
     </div>
   </div>
 
+  <section id="libre" class="libre" data-base="../" aria-labelledby="libre-h">
+    <h2 id="libre-h">The free library</h2>
+    <p class="lede">Over 1,500 classics from <a href="https://standardebooks.org/">Standard Ebooks</a> and a shelf of technical books under open licences. We don’t keep a copy of any of them: when you press “Read”, your browser fetches the book from its source and BookReader opens it.</p>
+    <div class="lib-tools">
+      <input type="search" placeholder="Search by title or author" aria-label="Search by title or author" autocomplete="off">
+      <span class="lib-filters" role="group" aria-label="Kind"><button type="button" data-filter="all" aria-pressed="true">All</button><button type="button" data-filter="tec" aria-pressed="false">Technical</button><button type="button" data-filter="lit" aria-pressed="false">Classics</button></span>
+    </div>
+    <p class="lib-status" role="status">Loading the catalogue…</p>
+    <ul class="lib-list"></ul>
+    <button type="button" class="lib-more" hidden></button>
+  </section>
+
   <h2>How to read them</h2>
   <div class="steps">
     <div class="step">
@@ -104,11 +116,13 @@ if (location.hostname === 'bookreader.raiatech.com') {
     <li><b>Niebla</b> (1914) — text from Project Gutenberg, distributed by <a href="https://www.elejandria.com/">Elejandría</a>. Cover made for this page. Miguel de Unamuno died in 1936.</li>
     <li><b>Bodas de sangre</b> (1933) — text from <a href="https://es.wikisource.org/">Wikisource in Spanish</a>, distributed by Elejandría. Cover made for this page. Federico García Lorca died in 1936.</li>
       <li><b>Covers</b> — <em>Niebla</em>: <em>Morning Mist in the Mountains</em>, Caspar David Friedrich (c. 1808); <em>Bodas de sangre</em>: <em>Duelo a garrotazos</em>, Francisco de Goya (1820-23). Both paintings are in the public domain (<a href="https://commons.wikimedia.org/">Wikimedia Commons</a>); the cover design is ours.</li>
+      <li><b>The free library</b> — classics from <a href="https://standardebooks.org/">Standard Ebooks</a>, which publishes works in the public domain in the United States and releases its own editorial work under CC0. Depending on your country, a few may still be under copyright there. Technical books: each one shows its licence and links to its source; the ones marked NC are offered here only because BookReader gives them away, never as part of a paid plan.</li>
   </ul>
   <p class="fine">The authors died more than 80 years ago, which is the term that applies in Spain to authors who died before 1987, and more than 70 in the rest of the European Union. The transcriptions come from volunteer projects; if you spot a typo, the fix belongs in the source, not here. Nothing on this page is scraped from a video, a course or a paid edition.</p>
 
   <a class="back" href="../">← BookReader</a>
 </main>
+<script src="../assets/landing/catalogo.js?v=20261124a" defer></script>
 <footer class="foot">
   <div class="wrap"><a href="../">Home</a> · <a href="../blog/">Blog</a> · <a href="../privacy/">Privacy</a> · © 2026 Luis González · <a href="../help/">Help</a>
     <div class="foot-tools"><span class="lang-pick" role="group" aria-label="Language"><span aria-current="true">English</span><a href="../es/muestra/?lang=es" hreflang="es" lang="es" data-umami-event="Language" data-umami-event-to="es" data-umami-event-where="footer">Español</a></span><span class="theme-pick" role="group" aria-label="Theme"><button type="button" data-pick="system" aria-pressed="false">Auto</button><button type="button" data-pick="light" aria-pressed="false">Light</button><button type="button" data-pick="dark" aria-pressed="false">Dark</button></span></div>

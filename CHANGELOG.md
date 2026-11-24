@@ -3,6 +3,33 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-11-24 — Biblioteca libre en /samples/: 1.560 libros sin guardar ninguno
+
+- **Catálogo, no ficheros.** `assets/muestra/catalogo.json` (143 KB, 46 KB comprimido) lista
+  1.548 clásicos de Standard Ebooks y 12 técnicos con licencia abierta (`assets/muestra/tecnicos.json`,
+  curados a mano). Ningún libro vive en el sitio: `?sample=se:<ruta>` y `?sample=tec:<id>`
+  (`app/js/samples.js`) lo bajan de su fuente en el navegador del lector y lo pasan al mismo
+  `loadFile` de siempre. Un id que no esté en el catálogo no baja nada: el enlace no puede colar
+  una URL arbitraria. Aviso «Descargando…» (los PDF técnicos llegan a 43 MB) y un reintento.
+- **Standard Ebooks va directo** (manda CORS; además rechaza a los Workers con 403). El catálogo
+  sale de su listado público con `node scripts/catalogo-libros.mjs` (su robots.txt deja leer el
+  listado y prohíbe a los agentes las descargas, que nunca hacemos: las hace el lector). Su OPDS es
+  solo para socios.
+- **Técnicos sin CORS → Worker `bookreader-libros`** (`workers/libros`, versión
+  `28cbca5c-335a-4747-983f-1f819c3fe179`): reenvía en streaming, `no-store`, solo ids del catálogo
+  empaquetado y redirecciones comprobadas salto a salto. 7 tests (`npm run test:libros`). Tras
+  desplegar, la primera petición a una release de GitHub devolvió una vez un 404 «error code:
+  1042» de Cloudflare; al segundo intento, 200 (por eso el reintento).
+- **Página**: buscador por título/autor sin tildes, filtro Técnicos/Clásicos, 24 por tanda. Licencia
+  y fuente en cada fila; créditos ampliados. Test E2E `tests/samples-catalog.spec.ts` (fuentes
+  simuladas: abre clásico, técnico por Worker, técnico directo, y rechaza ids de fuera).
+- **Decisiones**: gratis siempre (7 técnicos son NC). Standard Ebooks publica lo que es dominio
+  público **en EE. UU.**; la página lo dice así, porque alguna obra puede no serlo en España.
+- **Pendiente**: Gutenberg (sobre todo en español), filtrado por muerte del autor ≤ 1945.
+  gutenberg.org daba 503 «Temporarily Down for Maintenance» el 24-nov desde tres redes; el espejo
+  gutenberg.pglaf.org sí sirve por el Worker, pero tarda de 2 a 20 s. Piloto y medidas en
+  `~/workspace/projects/experimentos/br-fuentes-libres/`.
+
 ## 2026-11-24 — Repaso de la web pública: contraste en la banda oscura y sitemap
 
 - **Texto invisible en la banda oscura** (portada EN/ES y privacidad EN/ES): el `<b>` dentro de

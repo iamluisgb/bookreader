@@ -1,0 +1,15 @@
+// Biblioteca libre de /samples/: reenvía sin guardar los libros técnicos cuya fuente no manda
+// CORS (ver src/index.js). Sin almacenamiento ni bindings: no hay nada que pueda costar dinero
+// salvo peticiones, y el plan gratuito da 100.000 al día.
+// Deploy: `npx wrangler deploy` desde este directorio (el catálogo va dentro del bundle:
+// tras cambiar assets/muestra/tecnicos.json hay que redesplegar).
+{
+  "name": "bookreader-libros",
+  "main": "src/index.js",
+  "compatibility_date": "2026-11-01",
+  "workers_dev": true,
+  "observability": { "enabled": true, "head_sampling_rate": 1 },
+  "vars": {
+    "ALLOWED_ORIGINS": "http://localhost:8000,http://localhost:8888,http://localhost:18888,https://bookreader.raiatech.com,https://bookreader-2h5.pages.dev"
+  }
+}
