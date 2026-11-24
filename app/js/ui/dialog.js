@@ -9,6 +9,7 @@
 //   await confirmBox(message, { title?, okText?, cancelText?, danger? }) -> boolean
 //   await promptBox(message, { value?, title?, okText?, cancelText?, placeholder? }) -> string|null
 //   await formBox({ title, message?, fields, okText?, cancelText? })  -> {name: valor}|null
+//   await choiceBox(message, { title?, choices: [{value, label, danger?}], cancelText? }) -> value|null
 import { escapeHtml } from './escape.js';
 import { t } from '../i18n.js';
 
@@ -58,7 +59,7 @@ function fieldHtml(f) {
     value="${escapeHtml(f.value == null ? '' : String(f.value))}" placeholder="${escapeHtml(t(f.placeholder || ''))}">${hint}${sugg}</div>`;
 }
 
-function build({ kind, title, message, value, placeholder, okText, cancelText, danger, fields }) {
+function build({ kind, title, message, value, placeholder, okText, cancelText, danger, fields, choices }) {
   // i18n (P15): las cadenas constantes de los llamadores se traducen aquí (la clave es el
   // propio texto español); los mensajes interpolados llegan ya traducidos con t(..., params).
   title = title && t(title); message = message && t(message);
@@ -74,15 +75,18 @@ function build({ kind, title, message, value, placeholder, okText, cancelText, d
     const isPrompt = kind === 'prompt';
     const isAlert = kind === 'alert';
     const isForm = kind === 'form';
+    const isChoice = kind === 'choice';
     overlay.innerHTML = `
       <div class="dlg-card${isForm ? ' dlg-card--form' : ''}" role="${isAlert ? 'alertdialog' : 'dialog'}" aria-modal="true" aria-label="${escapeHtml(title || t('Aviso'))}">
         ${title ? `<h2 class="dlg-title">${escapeHtml(title)}</h2>` : ''}
         ${message ? `<div class="dlg-msg">${escapeHtml(message)}</div>` : (isForm ? '' : '<div class="dlg-msg"></div>')}
         ${isPrompt ? `<input class="dlg-input" type="text" value="${escapeHtml(value || '')}" placeholder="${escapeHtml(placeholder || '')}" />` : ''}
         ${isForm ? `<div class="dlg-form">${(fields || []).map(fieldHtml).join('')}</div>` : ''}
+        ${isChoice ? `<div class="dlg-options">${(choices || []).map((c) =>
+          `<button type="button" class="dlg-btn dlg-option${c.danger ? ' dlg-option--danger' : ''}" data-choice-value="${escapeHtml(String(c.value))}">${escapeHtml(t(c.label))}</button>`).join('')}</div>` : ''}
         <div class="dlg-actions">
           ${isAlert ? '' : `<button class="dlg-btn dlg-cancel">${escapeHtml(cancelText || t('Cancelar'))}</button>`}
-          <button class="btn btn--primary dlg-btn dlg-ok${danger ? ' dlg-danger' : ''}">${escapeHtml(okText || t('Aceptar'))}</button>
+          ${isChoice ? '' : `<button class="btn btn--primary dlg-btn dlg-ok${danger ? ' dlg-danger' : ''}">${escapeHtml(okText || t('Aceptar'))}</button>`}
         </div>
       </div>`;
     document.body.appendChild(overlay);
@@ -102,7 +106,7 @@ function build({ kind, title, message, value, placeholder, okText, cancelText, d
       try { prevFocus?.focus?.(); } catch (e) { /* ya no existe */ }
     };
     const done = (result) => { cleanup(); resolve(result); };
-    const onCancel = () => done(isPrompt || isForm ? null : false);
+    const onCancel = () => done(isPrompt || isForm || isChoice ? null : false);
     const collect = () => {
       const out = {};
       for (const el of card.querySelectorAll('[data-field]')) out[el.dataset.field] = el.value;
@@ -120,7 +124,7 @@ function build({ kind, title, message, value, placeholder, okText, cancelText, d
 
     const onKey = (e) => {
       if (e.key === 'Escape') { e.preventDefault(); onCancel(); return; }
-      if (e.key === 'Enter' && (isAlert || isPrompt || isForm || document.activeElement === okBtn)) {
+      if (e.key === 'Enter' && okBtn && (isAlert || isPrompt || isForm || document.activeElement === okBtn)) {
         // En prompt/alert, Enter confirma (salvo que el foco esté en Cancelar).
         if (document.activeElement !== cancelBtn && !document.activeElement?.dataset?.suggFor) { e.preventDefault(); onOk(); return; }
       }
@@ -140,7 +144,9 @@ function build({ kind, title, message, value, placeholder, okText, cancelText, d
       const field = card.querySelector(`[data-field="${b.dataset.suggFor}"]`);
       if (field) { field.value = b.dataset.suggValue; field.focus(); }
     });
-    okBtn.addEventListener('click', onOk);
+    okBtn?.addEventListener('click', onOk);
+    card.querySelectorAll('[data-choice-value]').forEach((b) =>
+      b.addEventListener('click', () => done(b.dataset.choiceValue)));
     cancelBtn?.addEventListener('click', onCancel);
     // Rejillas con `cssVar`: el valor elegido tiñe la tarjeta (al abrir y al cambiar).
     const publish = (el) => { if (el?.dataset.cssVar) card.style.setProperty(el.dataset.cssVar, el.value); };
@@ -149,7 +155,7 @@ function build({ kind, title, message, value, placeholder, okText, cancelText, d
 
     // Foco inicial: el input en prompt, el primer campo en form, si no el botón principal.
     const firstField = isForm ? card.querySelector('.dlg-form [data-field], .dlg-form [data-check], .dlg-form [data-choice]:checked') : null;
-    (input || firstField || okBtn).focus();
+    (input || firstField || okBtn || card.querySelector('.dlg-option')).focus();
     if (input) input.select();
   });
 }
@@ -166,6 +172,13 @@ export function confirmBox(message, opts = {}) {
 export function promptBox(message, opts = {}) {
   return build({ kind: 'prompt', message, title: opts.title, value: opts.value,
     placeholder: opts.placeholder, okText: opts.okText, cancelText: opts.cancelText });
+}
+
+// Varias salidas directas, cada una un botón: un clic decide (sin desplegable +
+// «Continuar»). Devuelve el `value` elegido o null si se cancela.
+export function choiceBox(message, opts = {}) {
+  return build({ kind: 'choice', message, title: opts.title, choices: opts.choices,
+    cancelText: opts.cancelText });
 }
 
 // Formulario corto en modal. Devuelve un objeto {name: valor} o null si se
