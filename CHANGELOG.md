@@ -3,6 +3,29 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-11-25 — Red de empresa: la app dice qué no llega y se actualiza sola
+
+Caso: en el PC de la oficina (Chrome, red corporativa) la biblioteca no recibía libros nuevos y
+Ajustes → Licencia decía «Sin conexión, tu licencia sigue activa hasta 30 días», que se leía como
+un estado. La captura de Network del propio PC mostró el código bajando de la red con 200 a
+través del service worker: el código no estaba congelado. Lo que no llegaba era el sync, que va
+entero a `*.workers.dev` (el Worker de BookReader y el de auth de Drive), dominio que muchos
+proxys de empresa bloquean; Polar (la licencia) sí pasaba.
+
+- **Mensaje de sync con el host.** `unreachableHost()` (`js/sync/net.js`) reconoce un fallo de
+  RED anotado con su host (también los timeouts, que antes no lo llevaban). El badge pasa de «Sync
+  con errores» a «Sync bloqueado por la red» y Ajustes → Datos dice a qué servidor no se llega y
+  que lo más probable es la red.
+- **La app sabe qué commit corre.** `js/build-stamp.js` (vacío en el repo; el build escribe el
+  commit) se compara con `/build.json` también al arrancar. Antes la referencia era el
+  `/build.json` del arranque, así que un código servido de caché nunca se veía como viejo.
+- **«Actualizar» en dos tiempos.** Primero `reg.update()` y recarga; si para el mismo commit
+  servido vuelve a salir el aviso, quita el service worker y la caché de código (`bookreader-v*`)
+  y recarga desde la red. Las fuentes, las libs y los datos no se tocan. Los fallos al registrar o
+  actualizar el service worker se apuntan y salen en «Copiar diagnóstico de sync».
+- **Licencia:** el texto ya no empieza por «Sin conexión».
+- Test: `tests/red-bloqueada.spec.ts` (5). SW `bookreader-v278`.
+
 ## 2026-11-25 — Biblioteca libre: 48.206 obras con filtros, Gutenberg y Elejandría
 
 - **Catálogo, no ficheros.** `scripts/catalogo-libros.mjs` genera cuatro piezas: `catalogo.json`

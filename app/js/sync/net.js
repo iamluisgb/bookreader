@@ -21,15 +21,21 @@ export async function fetchWithTimeout(url, options = {}, ms = REQUEST_TIMEOUT_M
   try {
     return await fetch(url, { ...options, signal: ctrl.signal });
   } catch (e) {
-    if (e && e.name === 'AbortError') {
-      const err = new Error('Tiempo de espera de red agotado');
-      err.code = 'timeout';
-      throw err;
-    }
+    if (e && e.name === 'AbortError') throw annotateHost(timeoutError(), url);
     throw annotateHost(e, url);
   } finally {
     clearTimeout(timer);
   }
+}
+
+// ¿El error es «no llego a ese servidor»? Devuelve el host si el mensaje es un fallo de RED
+// anotado (`… [host]`): fetch que no resuelve o se agota. Un proxy de empresa que bloquea un
+// dominio se ve así —su página de bloqueo no trae CORS y el navegador la convierte en
+// «Failed to fetch»—, igual que un DNS caído. Un 4xx/5xx del propio servidor no entra aquí.
+const RE_RED = /Failed to fetch|NetworkError|Load failed|network connection was lost|Tiempo de espera de red agotado/i;
+export function unreachableHost(message) {
+  const m = /\[([^\]\s]+)\]\s*$/.exec(String(message || ''));
+  return m && RE_RED.test(message) ? m[1] : null;
 }
 
 // "Failed to fetch" no dice contra quién: DNS caído, conexión rechazada, CORS o un

@@ -31,6 +31,7 @@ import * as Aliases from './sync/aliases.js';
 import { THUMB_WIDTH } from './sync/library-sync.js';
 import * as License from './license.js';
 import { toast } from './ai/toast.js';
+import { unreachableHost } from './sync/net.js';
 import * as Jobs from './ai/jobs.js';
 import { t, translateDom, getLang } from './i18n.js';
 import * as Hints from './ui/hints.js';
@@ -193,7 +194,10 @@ function initSyncEngine() {
     if (s === 'error' && SyncEngine.getDiag().consecutive < SyncEngine.ERROR_BADGE_AFTER) visible = false;
     if (s === 'off' && !SyncEngine.hasSyncHistory()) visible = false;
     badge.dataset.state = s;
-    badge.textContent = s === 'reconnect' ? reconnectLabel() : (labels[s] || '');
+    // Si lo que falla es LLEGAR al servidor (red de empresa, filtro), decirlo: «con errores» suena
+    // a fallo de la app y manda a buscar donde no es.
+    const blocked = s === 'error' && unreachableHost(SyncEngine.getDiag().lastError);
+    badge.textContent = s === 'reconnect' ? reconnectLabel() : (blocked ? t('Sync bloqueado por la red') : (labels[s] || ''));
     badge.hidden = !visible;
   });
   // Cualquier badge de sync con problema lleva a Ajustes → Datos (reconectar o
@@ -253,18 +257,60 @@ function initLicense() {
 // tras el arranque (no bloquea el primer render) y falla en silencio donde no esté disponible
 // (p. ej. contexto no seguro): la app sigue funcionando online igual.
 function registerServiceWorker() {
-  vigilarBuild(() => toast({
+  vigilarBuild((servido) => toast({
     message: t('Hay una versión nueva de BookReader.'),
     actionLabel: t('Actualizar'),
-    onAction: () => { try { EpubReader.flushLastPosition(); } catch (e) { /* sin libro */ } location.reload(); },
+    onAction: () => { try { EpubReader.flushLastPosition(); } catch (e) { /* sin libro */ } actualizarApp(servido); },
     timeout: 0,
   }));
   if (!('serviceWorker' in navigator)) return;
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('sw.js').catch((e) => {
+    navigator.serviceWorker.register('sw.js').then((reg) => {
+      // El navegador busca un sw.js nuevo al navegar, como mucho una vez al día y en silencio:
+      // si esa descarga falla (un proxy de empresa que la corta, p. ej.), el service worker
+      // viejo se queda sirviendo para siempre sin que nada lo diga. Se pide también al volver
+      // a primer plano y el fallo se apunta (Ajustes → Datos → Copiar diagnóstico).
+      const revisar = () => reg.update().then(() => anotarSw(null), (e) => anotarSw(e));
+      document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') revisar(); });
+    }, (e) => {
+      anotarSw(e);
       console.warn('No se pudo registrar el Service Worker (offline no disponible):', e);
     });
   });
+}
+
+// Último fallo al registrar o actualizar el service worker, para el diagnóstico.
+const SW_DIAG = 'bookreader_sw_diag';
+function anotarSw(e) {
+  try {
+    if (!e) { localStorage.removeItem(SW_DIAG); return; }
+    localStorage.setItem(SW_DIAG, JSON.stringify({ at: Date.now(), error: String((e && e.message) || e).slice(0, 300) }));
+  } catch (err) { /* sin storage */ }
+}
+
+// «Actualizar»: primero lo normal (pedir el sw.js nuevo y recargar). Si al volver la app sigue en
+// el código viejo para ESE mismo commit servido, recargar otra vez no lo arregla: se quita el
+// service worker y la caché de código, y se recarga desde la red. Se conservan la caché permanente
+// (fuentes, libs) y la de ficheros compartidos; los datos del lector viven en IndexedDB y no se tocan.
+const UPDATE_TRY = 'bookreader_update_try';
+async function actualizarApp(servido) {
+  let yaIntentado = false;
+  try { yaIntentado = !!servido && sessionStorage.getItem(UPDATE_TRY) === servido; } catch (e) { /* sin storage */ }
+  try { if (servido) sessionStorage.setItem(UPDATE_TRY, servido); } catch (e) { /* sin storage */ }
+  const conTecho = (p) => Promise.race([p, new Promise((r) => setTimeout(r, 8000))]);
+  try {
+    const regs = 'serviceWorker' in navigator ? await navigator.serviceWorker.getRegistrations() : [];
+    if (yaIntentado) {
+      await conTecho(Promise.all(regs.map((r) => r.unregister())));
+      if (window.caches) {
+        const keys = await caches.keys();
+        await conTecho(Promise.all(keys.filter((k) => /^bookreader-v\d+$/.test(k)).map((k) => caches.delete(k))));
+      }
+    } else {
+      await conTecho(Promise.all(regs.map((r) => r.update().catch((e) => anotarSw(e)))));
+    }
+  } catch (e) { anotarSw(e); }
+  location.reload();
 }
 
 // ============ ESTANTERÍA COMPARTIDA POR ENLACE (P24 F4) ============

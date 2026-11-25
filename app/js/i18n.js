@@ -1354,7 +1354,9 @@ const EN = {
   // app-settings — Licencia
   'Modo simulado (aún sin plataforma de pagos): cualquier clave <code>BKRD-…</code> activa Plus para probar.': 'Simulated mode (no payment platform yet): any <code>BKRD-…</code> key activates Plus for testing.',
   'BookReader Plus activo': 'BookReader Plus active',
-  'Última verificación: {date}. Sin conexión, tu licencia sigue activa hasta 30 días.': 'Last check: {date}. Offline, your license stays active for up to 30 days.',
+  'Última verificación: {date}. Si un día no puede comprobarse (sin conexión, por ejemplo), la licencia sigue activa 30 días desde esa fecha.': 'Last check: {date}. If it can’t be checked (when you’re offline, for example), your license stays active for 30 days from that date.',
+  'No se llega al servidor del sync ({host}) desde {when}. Si el resto de internet funciona, lo más probable es que esta red (un proxy de empresa, p. ej.) lo bloquee: lo tuyo sigue en este dispositivo y se sincroniza en cuanto vuelvas a una red que lo deje pasar.': 'Can’t reach the sync server ({host}) since {when}. If the rest of the internet works, this network (a company proxy, for example) is most likely blocking it: your data stays on this device and syncs as soon as you’re back on a network that lets it through.',
+  'Sync bloqueado por la red': 'Sync blocked by the network',
   'Gestionar dispositivos y recibos': 'Manage devices and receipts',
   'Quitar la licencia de este navegador': 'Remove the license from this browser',
   'Quitar la licencia aquí no libera el hueco de dispositivo: eso se hace en el portal.': 'Removing the license here does not free the device slot: that is done in the portal.',

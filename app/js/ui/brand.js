@@ -4,6 +4,8 @@
 //
 // Vive en la biblioteca, la pantalla de entrada (auditoría de la cabecera, Q2: el lector ya no
 // la usa como botón de volver).
+import { BUILD } from '../build-stamp.js';
+
 export function brandMark(size = 24, cls = 'brand-mark') {
   return `<svg class="${cls}" viewBox="0 0 512 512" width="${size}" height="${size}" aria-hidden="true" focusable="false">`
     + '<rect width="512" height="512" rx="118" fill="var(--logo-tile)"/>'
@@ -58,16 +60,21 @@ let buildStamp;
 let buildAlArrancar = null;     // promesa del commit servido al ARRANCAR: el del código que corre
 async function leerBuild() {
   // En local no hay build.json (lo escribe el despliegue): pedirlo solo ensucia la consola con un 404.
-  if (/^(localhost|127\.|\[::1\])/.test(location.hostname)) return '';
+  // Con sello (un build de verdad, o un test que lo simula) sí se pide.
+  if (!BUILD && /^(localhost|127\.|\[::1\])/.test(location.hostname)) return '';
   try {
     const r = await fetch('/build.json', { cache: 'no-store' });
     const j = (r.ok && (r.headers.get('content-type') || '').includes('json')) ? await r.json() : null;
     return j && /^[0-9a-f]{40}$/.test(j.commit) ? j.commit : '';
   } catch { return ''; }
 }
+// El commit del código que corre: el sello del build si lo hay; si no (local), el servido al arrancar.
+function buildBase() {
+  return (buildAlArrancar ||= BUILD ? Promise.resolve(BUILD) : leerBuild());
+}
 export async function buildVersion() {
   if (buildStamp !== undefined) return buildStamp;
-  buildAlArrancar ||= leerBuild();
+  buildBase();
   buildStamp = (await buildAlArrancar).slice(0, 7);
   return buildStamp;
 }
@@ -76,18 +83,23 @@ export async function buildVersion() {
 // ejecutando una versión vieja mientras el menú (que pedía build.json al abrirse) decía la
 // nueva. Se fija el commit al arrancar y, al volver a primer plano, se compara con el servido:
 // si difiere, `onNueva()` avisa. Como mucho una consulta cada 30 s.
+//
+// Se comprueba también AL ARRANCAR: con el sello en el código, una página que arranca con código
+// de caché (service worker que no se pudo actualizar, red de empresa que corta algo) lo sabe en
+// cuanto lee /build.json, en vez de quedarse en la versión vieja sin decir nada.
 export function vigilarBuild(onNueva) {
-  buildAlArrancar ||= leerBuild();
+  buildBase();
   let ultima = 0, avisado = false;
   const comprobar = async () => {
     if (avisado || Date.now() - ultima < 30000) return;
     ultima = Date.now();
-    const base = await buildAlArrancar;
+    const base = await buildBase();
     if (!base) return;
     const ahora = await leerBuild();
-    if (ahora && ahora !== base) { avisado = true; onNueva(); }
+    if (ahora && ahora !== base) { avisado = true; onNueva(ahora, base); }
   };
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') comprobar(); });
+  if (BUILD) setTimeout(comprobar, 4000);
   avisoDesfase = onNueva;
   // Red para las cargas diferidas que no pasan por `cargar` (un `await import()` dentro de un
   // manejador): su rechazo llega aquí sin capturar.

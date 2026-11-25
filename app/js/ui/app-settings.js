@@ -23,6 +23,8 @@ import * as BRAuth from '../sync/bookreader-auth.js';
 import * as SyncSwitch from '../sync/switch.js';
 import * as Blobs from '../sync/blobs.js';
 import * as SyncEngine from '../sync/engine.js';
+import { unreachableHost } from '../sync/net.js';
+import { BUILD } from '../build-stamp.js';
 import * as Recovery from '../sync/recovery.js';
 import * as Profiles from '../ai/profiles.js';
 import * as Backup from '../backup.js';
@@ -1279,11 +1281,19 @@ function syncStateText() {
   if (st === 'syncing') return t('Sincronizando…');
   const diag = SyncEngine.getDiag();
   if (diag.lastErrorAt > diag.lastOkAt && diag.lastError) {
+    const host = unreachableHost(diag.lastError);
+    if (host) return unreachableText(host, diag.lastErrorAt);
     const msg = diag.lastError === 'reconnect' ? reconnectText() : diag.lastError;
     return t('Error: {msg} ({when}).', { msg, when: ago(diag.lastErrorAt) });
   }
   if (diag.lastOkAt) return t('Último sync correcto: {when}.', { when: ago(diag.lastOkAt) });
   return t('Todavía no ha sincronizado.');
+}
+
+// «Failed to fetch» no le dice nada a nadie. Lo que sí sirve: a qué servidor no se llega y la
+// causa más común cuando el resto de internet va bien (la red de una empresa que lo bloquea).
+export function unreachableText(host, at) {
+  return t('No se llega al servidor del sync ({host}) desde {when}. Si el resto de internet funciona, lo más probable es que esta red (un proxy de empresa, p. ej.) lo bloquee: lo tuyo sigue en este dispositivo y se sincroniza en cuanto vuelvas a una red que lo deje pasar.', { host, when: ago(at) });
 }
 
 function syncDiagHtml() {
@@ -1305,6 +1315,17 @@ async function probe(url) {
   } catch (e) { return false; }
 }
 
+// Versión del código que corre y último fallo del service worker (lo apunta app.js).
+function swDiag() {
+  let lastError = null;
+  try { lastError = JSON.parse(localStorage.getItem('bookreader_sw_diag') || 'null'); } catch (e) { /* sin storage */ }
+  return {
+    controlled: !!(navigator.serviceWorker && navigator.serviceWorker.controller),
+    build: BUILD || null,
+    lastError,
+  };
+}
+
 async function syncDiagReport() {
   let storage = null;
   try { storage = await Blobs.localEstimate(); } catch (e) { /* sin estimate */ }
@@ -1324,6 +1345,7 @@ async function syncDiagReport() {
     filesSync: Blobs.isEnabled(),
     plus: License.isPlus(),
     diag: SyncEngine.getDiag(),
+    serviceWorker: swDiag(),
     reachability,
     storage,
     userAgent: navigator.userAgent,
@@ -1988,7 +2010,7 @@ function licenseHtml() {
       <h3 class="appset-h3">${t('Licencia')}</h3>
       <p class="appset-lic-state is-pro">${icon('check', { size: 'md' })} ${t('BookReader Plus activo')}</p>
       ${keyRowHtml('appset-lic-key', s.key, 'BKRD-XXXX-XXXX-XXXX')}
-      <p class="appset-muted">${t('Última verificación: {date}. Sin conexión, tu licencia sigue activa hasta 30 días.', { date: escapeHtml(since) })}</p>
+      <p class="appset-muted">${t('Última verificación: {date}. Si un día no puede comprobarse (sin conexión, por ejemplo), la licencia sigue activa 30 días desde esa fecha.', { date: escapeHtml(since) })}</p>
       <button id="appset-lic-portal" class="btn btn--primary primary-btn appset-save">${icon('user', { size: 'md' })} ${t('Gestionar dispositivos y recibos')}</button>
       <button id="appset-lic-remove" class="appset-tpl-cancel appset-data-md">${t('Quitar la licencia de este navegador')}</button>
       <p class="appset-muted">${t('Quitar la licencia aquí no libera el hueco de dispositivo: eso se hace en el portal.')}</p>

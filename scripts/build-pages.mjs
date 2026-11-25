@@ -204,6 +204,15 @@ await writeFile(
   JSON.stringify({ commit: stamp, builtAt: new Date().toISOString() }, null, 2) + '\n',
 );
 
+// El mismo sello DENTRO del código (app/js/build-stamp.js): la app compara el commit con el
+// que arrancó contra /build.json y avisa si corre código viejo de caché.
+if (stamp) {
+  await writeFile(
+    join(dist, 'app/js/build-stamp.js'),
+    `// Generado por scripts/build-pages.mjs.\nexport const BUILD = '${stamp}';\n`,
+  );
+}
+
 if (tmp) await rm(tmp, { recursive: true, force: true });
 
 console.log(
