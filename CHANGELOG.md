@@ -3,6 +3,38 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-11-25 — Añadir un dispositivo al sync: código de un solo uso y nunca un sync vacío en silencio
+
+Caso: al activar el sync en el PC del trabajo con OTRA licencia, `enable()` encontraba vacío el
+espacio de esa licencia y creaba una clave nueva sin decir nada: un sync aparte que nunca se cruzaba
+con los demás. Propuesta y decisiones en `docs/PROPUESTA_EMPAREJAR_DISPOSITIVOS.md` (F1, F2, F3 y el
+borrado con prueba de clave; 2b y F5 descartados).
+
+- **F1 · Se pregunta.** Con el espacio vacío, `enable()` devuelve `first-device?` y Ajustes pregunta
+  «¿Ya usas el sync en otro dispositivo?». «Sí» explica «Añadir un dispositivo» y deja pegar la clave
+  de recuperación sin crear nada; «No, es el primero» crea la clave como antes. Igual con un
+  dispositivo que ya tenía clave y cambió de licencia (antes reescribía el keycheck en el espacio
+  nuevo). Pasar desde Drive no pregunta: ya es una decisión explícita.
+- **F2 · «Añadir un dispositivo».** Sustituye a «Enlace para otro dispositivo». Diálogo con QR
+  (qrcode-generator 1.4.4 vendorizado, bajo demanda y precacheado), cuenta atrás, «Copiar enlace» y
+  «Listo: {dispositivo} ya sincroniza contigo». El enlace es `#pair2=<id>.<secreto>`: la licencia y
+  la clave van cifradas en un relevo del Worker (`/v1/pair`, 10 min, un solo uso, se borra al
+  reclamarlo) con un secreto que solo viaja en el fragmento. Los `#pair=` antiguos se siguen
+  aceptando; la app ya no los genera.
+- **F3 · Licencia distinta.** `useKey` pregunta a `POST /v1/key-owner` si el keycheck de esa clave
+  vive en otro espacio y, si es así, dice que la clave es de un sync con otra licencia y ofrece «Ir a
+  Licencia» (antes: «no hay nada sincronizado»).
+- **Empezar de cero pide la clave.** `DELETE /v1/all` solo borra al momento con la prueba de la clave
+  (el pid del keycheck) o con el sync vacío. Sin clave, el borrado se apunta 7 días; cualquier
+  dispositivo que la tenga lo ve en Ajustes y lo cancela. El diálogo dice cuántos ficheros hay y
+  ofrece «Descargar backup» antes.
+- Worker: migración `0010_pair.sql` (`pair_codes`, índice `objects(path)`, `users.wipe_at`), rate
+  limit `PAIRING` (namespace 2407), purga diaria de códigos y borrados vencidos. Los datos, `userIdOf`
+  y la clave no cambian: los dispositivos que ya sincronizan siguen igual.
+- Tests: `workers/sync/test/pair.test.mjs` (10) y E2E en `tests/sync-crypto.spec.ts` y
+  `tests/bookreader-sync.spec.ts` (relevo de punta a punta con licencia distinta, enlace reusado,
+  «Ya lo uso en otro», `#pair=` antiguo, borrado apuntado y cancelado). SW `bookreader-v280`.
+
 ## 2026-11-25 — Con Plus activo, la opción «BookReader» del sync se enseña siempre
 
 Caso: en el PC de la oficina, Ajustes → Datos solo ofrecía «Sin sync» y «Google Drive» aunque Plus

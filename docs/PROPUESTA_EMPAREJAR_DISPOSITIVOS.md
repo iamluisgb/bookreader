@@ -1,6 +1,9 @@
 # Propuesta · Añadir un dispositivo al sync de BookReader
 
-Estado: **PROPUESTA** (2026-11-25). No hay código cambiado ni nada desplegado.
+Estado: **IMPLEMENTADA** F1, F2, F3 y el borrado con prueba de clave (2026-11-25; ver CHANGELOG).
+**Descartadas** por decisión de Luis: 2b (la clave de recuperación sola no basta; se sigue pidiendo
+la licencia) y F5 (`customer_id` de Polar). Cambio sobre §5: «empezar de cero» sin la clave no se
+prohíbe, se **apunta** 7 días y un dispositivo con la clave lo cancela.
 Origen: Luis activó el sync en el PC del trabajo y le resultó confuso. Para entrar
 hizo falta (1) la misma licencia `BKRD-…` que en los demás dispositivos y (2) o el
 «Enlace para otro dispositivo» o la «Clave de recuperación» `XXXX-…`.
