@@ -390,7 +390,7 @@ test('purga: tokens caducados, versiones viejas y subidas que nunca terminaron',
   e.DB._raw.prepare(`INSERT INTO blobs (key, user, path, size, kind, state, created_at) VALUES ('u/x/y/z', 'x', 'y', 9, 'file', 'pending', 0)`).run();
   const later = Date.now() + 31 * 86400000;
   const p = await purge(e, later);
-  assert.deepEqual(p, { tokens: 1, mcpTokens: 0, mcpChanges: 0, mcpUploads: 0, users: 0, versions: 1, pending: 1 });
+  assert.deepEqual(p, { tokens: 1, mcpTokens: 0, mcpChanges: 0, mcpUploads: 0, pairCodes: 0, wipes: 0, users: 0, versions: 1, pending: 1 });
   assert.equal(e.SYNC._m.size, 1);   // queda la versión actual
 });
 
@@ -400,7 +400,10 @@ test('empezar de cero: /v1/all borra todo lo del usuario y nada de otros', async
   const b = await login(e, 'BKRD-USER-BBBB');
   await put(e, a.token, P1, 3);
   await put(e, b.token, P1, 3);
-  assert.equal((await worker.fetch(req('DELETE', '/v1/all', { token: a.token }), e)).status, 200);
+  // Sin probar la clave no se borra nada (ver pair.test.mjs); con el pid de un fichero suyo, sí.
+  assert.equal((await worker.fetch(req('DELETE', '/v1/all', { token: a.token }), e)).status, 403);
+  assert.equal((await get(e, a.token, P1)).status, 200);
+  assert.equal((await worker.fetch(req('DELETE', '/v1/all', { token: a.token, body: JSON.stringify({ pid: P1 }) }), e)).status, 200);
   assert.equal((await get(e, a.token, P1)).status, 404);
   assert.equal((await get(e, b.token, P1)).status, 200);
 });

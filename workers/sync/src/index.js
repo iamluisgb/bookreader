@@ -34,6 +34,7 @@ import { mcpRoute, createTokenRoute, listTokensRoute, revokeTokenRoute, listChan
 import { UPLOAD_RE, uploadRoute, purgeUploads } from './upload.js';
 import { publishRoute, PUBLIC_ORIGIN } from './publish.js';
 import { serveProfile, unpublishHosted } from './profiles.js';
+import { PAIR_ID_RE, createPairRoute, pairStatusRoute, cancelPairRoute, claimPairRoute, keyOwnerRoute, provesKey, purgePairs } from './pair.js';
 
 const DAY = 24 * 60 * 60 * 1000;
 const PATH_RE = /^[A-Za-z0-9_-]{16,64}$/;
@@ -65,6 +66,7 @@ export function config(env) {
     maxVersions: n(env.MAX_VERSIONS, 10),
     versionDays: n(env.VERSION_DAYS, 30),
     graceDays: n(env.GRACE_DAYS, 30),
+    wipeDelayDays: n(env.WIPE_DELAY_DAYS, 7),
     tokenHours: n(env.TOKEN_HOURS, 24),
   };
 }
@@ -582,7 +584,7 @@ export async function status(env, who, now = Date.now()) {
     `SELECT kind, state, COALESCE(SUM(size), 0) AS bytes, COUNT(*) AS n FROM blobs WHERE user = ? GROUP BY kind, state`,
   ).bind(who.user).all();
   const sum = (pred) => results.filter(pred).reduce((a, r) => a + r.bytes, 0);
-  const u = await env.DB.prepare('SELECT lapsed_at FROM users WHERE id = ?').bind(who.user).first();
+  const u = await env.DB.prepare('SELECT lapsed_at, wipe_at FROM users WHERE id = ?').bind(who.user).first();
   const objects = await env.DB.prepare('SELECT COUNT(*) AS n FROM objects WHERE user = ?').bind(who.user).first();
   const lapsedAt = (u && u.lapsed_at) || null;
   return {
@@ -597,8 +599,40 @@ export async function status(env, who, now = Date.now()) {
     quota: { data: c.dataQuota, files: c.filesEnabled ? c.fileQuota : 0 },
     lapsedAt,
     purgeAt: lapsedAt ? lapsedAt + c.graceDays * DAY : null,
+    // «Empezar de cero» pedido sin la clave: cuándo se vaciará el sync (null = nada pendiente).
+    wipeAt: (u && u.wipe_at) || null,
     now,
   };
+}
+
+// DELETE /v1/all — empezar de cero. Borrar el sync entero pide PROBAR LA CLAVE (`pid`, la ruta
+// del fichero de control, que solo sabe calcular quien la tiene): con la licencia sola se saca un
+// token, y una licencia filtrada no debe bastar para vaciar el sync de nadie.
+// Quien de verdad perdió la clave no puede probarla: su borrado se APUNTA y lo ejecuta la purga
+// pasados WIPE_DELAY_DAYS. Mientras tanto, cualquier dispositivo con la clave lo ve en /v1/status
+// y lo cancela (POST /v1/all/cancel con la prueba). Un espacio sin objetos se borra al momento.
+async function wipeRoute(request, env, cors, who, now = Date.now()) {
+  if (who.readOnly) return json({ error: 'read_only' }, 403, cors);
+  let body = {};
+  try { body = await request.json(); } catch { /* sin cuerpo: sin prueba */ }
+  const objects = await env.DB.prepare('SELECT COUNT(*) AS n FROM objects WHERE user = ?').bind(who.user).first();
+  if (objects.n === 0 || await provesKey(env, who.user, body?.pid)) {
+    await wipeUser(env, who.user);
+    return json({ ok: true, wiped: true }, 200, cors);
+  }
+  if (body?.schedule !== true) return json({ error: 'key_proof_required' }, 403, cors);
+  const wipeAt = now + config(env).wipeDelayDays * DAY;
+  const row = await env.DB.prepare('UPDATE users SET wipe_at = COALESCE(wipe_at, ?) WHERE id = ? RETURNING wipe_at')
+    .bind(wipeAt, who.user).first();
+  return json({ ok: true, wiped: false, wipeAt: row ? row.wipe_at : wipeAt }, 202, cors);
+}
+
+async function cancelWipeRoute(request, env, cors, who) {
+  let body = {};
+  try { body = await request.json(); } catch { /* sin cuerpo */ }
+  if (!(await provesKey(env, who.user, body?.pid))) return json({ error: 'key_proof_required' }, 403, cors);
+  await env.DB.prepare('UPDATE users SET wipe_at = NULL WHERE id = ?').bind(who.user).run();
+  return json({ ok: true }, 200, cors);
 }
 
 // Borra TODO lo del usuario (empezar de cero tras perder la clave, o darse de baja).
@@ -614,6 +648,8 @@ export async function wipeUser(env, user) {
   await env.DB.prepare('DELETE FROM mcp_tokens WHERE user = ?').bind(user).run();
   await env.DB.prepare('DELETE FROM mcp_changes WHERE user = ?').bind(user).run();
   await env.DB.prepare('DELETE FROM mcp_uploads WHERE user = ?').bind(user).run();
+  await env.DB.prepare('DELETE FROM pair_codes WHERE user = ?').bind(user).run();
+  await env.DB.prepare('UPDATE users SET wipe_at = NULL WHERE id = ?').bind(user).run();
   // El perfil público alojado se va con la cuenta (borrado o fin del periodo de gracia).
   await unpublishHosted(env, user);
 }
@@ -634,6 +670,12 @@ export async function purge(env, now = Date.now()) {
   out.mcpTokens = (mt.results || []).length;
   out.mcpChanges = await purgeChanges(env, now);
   out.mcpUploads = await purgeUploads(env, now);
+  out.pairCodes = await purgePairs(env, now);
+
+  // «Empezar de cero» sin la clave: llegado el día, se vacía (wipeRoute).
+  const { results: wipes = [] } = await env.DB.prepare('SELECT id FROM users WHERE wipe_at IS NOT NULL AND wipe_at <= ?').bind(now).all();
+  for (const u of wipes) await wipeUser(env, u.id);
+  out.wipes = wipes.length;
 
   const { results: gone = [] } = await env.DB.prepare('SELECT id FROM users WHERE lapsed_at IS NOT NULL AND lapsed_at < ?')
     .bind(now - c.graceDays * DAY).all();
@@ -712,6 +754,12 @@ export default {
         return json(await usage(env), 200);
       }
       if (pathname === '/mcp') return await mcpRoute(request, env);
+      // Reclamar un emparejamiento: sin token, el id del enlace es la credencial (pair.js).
+      const pc = pathname.match(/^\/v1\/pair\/([A-Za-z0-9_-]+)\/claim$/);
+      if (pc && method === 'POST') {
+        if (!PAIR_ID_RE.test(pc[1])) return json({ error: 'gone' }, 410, cors);
+        return await claimPairRoute(pc[1], request, env, cors, { json });
+      }
       // La subida de un libro por MCP: sin token, la URL de un solo uso es la credencial.
       const up = pathname.match(UPLOAD_RE);
       if (up) return await uploadRoute(up[1], up[2], request, env);
@@ -723,7 +771,13 @@ export default {
       if (pathname === '/v1/status' && method === 'GET') return json(await status(env, who), 200, cors);
       if (pathname === '/v1/profile/publish' && ['POST', 'GET', 'DELETE'].includes(method)) return await publishRoute(request, env, cors, who, json);
       if (pathname === '/v1/list' && method === 'GET') return await listObjects(env, cors, who);
-      if (pathname === '/v1/all' && method === 'DELETE') { await wipeUser(env, who.user); return json({ ok: true }, 200, cors); }
+      if (pathname === '/v1/all' && method === 'DELETE') return await wipeRoute(request, env, cors, who);
+      if (pathname === '/v1/all/cancel' && method === 'POST') return await cancelWipeRoute(request, env, cors, who);
+      if (pathname === '/v1/pair' && method === 'POST') return await createPairRoute(request, env, cors, who, { json, randomId });
+      const pr = pathname.match(/^\/v1\/pair\/([A-Za-z0-9_-]{22})$/);
+      if (pr && method === 'GET') return await pairStatusRoute(pr[1], env, cors, who, { json });
+      if (pr && method === 'DELETE') return await cancelPairRoute(pr[1], env, cors, who, { json });
+      if (pathname === '/v1/key-owner' && method === 'POST') return await keyOwnerRoute(request, env, cors, who, { json });
       if (pathname === '/v1/mcp-tokens') {
         if (method === 'GET') return await listTokensRoute(env, cors, who);
         if (method === 'POST') return await createTokenRoute(request, env, cors, who);

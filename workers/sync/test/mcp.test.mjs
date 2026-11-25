@@ -104,7 +104,9 @@ test('listar y revocar desde la app; revocado, el agente recibe 401 con WWW-Auth
 test('empezar de cero borra los tokens de agentes (llevan la clave vieja)', async () => {
   const s = await seeded();
   const { token } = await (await createToken(s)).json();
-  await call(s.e, 'DELETE', '/v1/all', { token: s.session });
+  // Con la prueba de la clave (el pid de un fichero suyo), el borrado es inmediato.
+  const pid = await C.pathId(await C.importKeys(s.raw), 'bookreader/manifest.json');
+  assert.equal((await call(s.e, 'DELETE', '/v1/all', { token: s.session, body: { pid } })).status, 200);
   assert.equal((await rpc(s.e, token, 'tools/list')).status, 401);
 });
 
