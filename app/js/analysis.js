@@ -657,22 +657,32 @@ function readingSub(d) {
 function renderReading(d) {
   const long = d.period.kind === 'year' || d.period.kind === 'all';
   return `
-    <section class="anal-sec">
-      ${d.study.has ? `<h3 class="anal-sec-h">${t('Lectura')}</h3>` : ''}
-      <div class="anal-hero">
-        <div class="anal-hero-n">${escapeHtml(humanTime(d.ms))}</div>
-        <div class="anal-hero-l">${readingSub(d)}</div>
-        ${long && d.scope?.type !== 'book' ? `<div class="anal-books-line" title="${escapeHtml(t('Terminados: cuenta desde octubre de 2026, antes no se guardaba la fecha'))}">${escapeHtml(booksLine(d.started, d.finished))}</div>` : ''}
-        ${d.delta ? deltaLine(d.ms, d.delta.readMs, d.delta.label) : ''}
+    <section class="anal-sec anal-summary">
+      <div class="anal-summary-top">
+        <div class="anal-hero">
+          <div class="anal-hero-n">${escapeHtml(humanTime(d.ms))}</div>
+          <div class="anal-hero-l">${readingSub(d)}</div>
+          ${long && d.scope?.type !== 'book' ? `<div class="anal-books-line" title="${escapeHtml(t('Terminados: cuenta desde octubre de 2026, antes no se guardaba la fecha'))}">${escapeHtml(booksLine(d.started, d.finished))}</div>` : ''}
+          ${d.delta ? deltaLine(d.ms, d.delta.readMs, d.delta.label) : ''}
+        </div>
+        ${d.study.ms ? `<div class="anal-side"><div class="anal-side-n">${escapeHtml(humanTime(d.study.ms))}</div><div class="anal-side-l">${t('repasando')}</div></div>` : ''}
       </div>
+      ${readingFacts(d)}
       ${d.history ? renderHistory(d) : ''}
-      <div class="anal-tiles">
-        ${tile(t('Páginas'), String(d.units))}
-        ${tile(t('Subrayados'), String(d.highlights))}
-        ${tile(t('Notas'), String(d.notes))}
-      </div>
       ${renderColumns(d.cols, 'read', humanTime, t('Tiempo leído'), d, d.scope?.type !== 'book')}
     </section>`;
+}
+
+// Lo hecho en el periodo además de leer, en una línea y sin ceros (eran tres baldosas, una de
+// ellas casi siempre «Notas 0»). Las páginas son las del registro, no una estimación.
+function readingFacts(d) {
+  const n = (k, one, many) => (k ? (k === 1 ? t(one) : t(many, { n: k.toLocaleString(getLang()) })) : '');
+  const bits = [
+    n(d.units, '1 página', '{n} páginas'),
+    n(d.highlights, '1 subrayado', '{n} subrayados'),
+    n(d.notes, '1 nota', '{n} notas'),
+  ].filter(Boolean);
+  return bits.length ? `<p class="anal-facts">${escapeHtml(bits.join(' · '))}</p>` : '';
 }
 
 function booksLine(a, b) {

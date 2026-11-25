@@ -1635,6 +1635,13 @@ body.ai-open #sync-badge { right: calc(var(--ai-panel-width) + 14px); }
 .anal-hero { margin-bottom: 18px; }
 .anal-hero-n { font-size: 48px; font-weight: 700; letter-spacing: -0.03em; line-height: 1.05; }
 .anal-hero-l { margin-top: 4px; font-size: var(--fs-sm); color: var(--text-soft); }
+/* Resumen (auditoría de Análisis, paso 5): la lectura lidera; el repaso, al lado y menor. */
+.anal-summary-top { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; }
+.anal-summary-top .anal-hero { margin-bottom: 0; min-width: 0; }
+.anal-side { flex: none; text-align: right; padding-bottom: 2px; }
+.anal-side-n { font-size: var(--fs-2xl); font-weight: 600; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.anal-side-l { font-size: var(--fs-sm); color: var(--text-soft); }
+.anal-facts { margin: 12px 0 0; font-size: var(--fs-sm); color: var(--text-soft); font-variant-numeric: tabular-nums; }
 
 .anal-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(76px, 1fr)); gap: 8px; }
 .anal-tile { padding: 10px 12px; border-radius: var(--r-md); background: var(--surface-2); }

@@ -181,6 +181,8 @@ const EN = {
   'terminado en {n} días': 'finished in {n} days',
   'vas por el {p}%': 'you\'re at {p}%',
   'Avance: {n} páginas en total': 'Progress: {n} pages in total',
+  '1 página': '1 page',
+  '{n} páginas': '{n} pages',
   'Avance': 'Progress',
   'repasando': 'reviewing',
   'por día': 'per day',

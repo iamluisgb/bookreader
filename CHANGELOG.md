@@ -3,6 +3,18 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-11-25 — Análisis: resumen con una cifra que lidera y una línea de hechos
+
+Auditoría de Análisis, paso 5 (P3, P6).
+
+- Arriba manda el tiempo leído (la cifra validada de siempre, con su delta); el tiempo de repaso va
+  a su lado, más pequeño, en vez de ser un segundo héroe más abajo.
+- Las baldosas Páginas / Subrayados / Notas pasan a una línea («63 páginas · 7 subrayados») que no
+  enseña ceros. Las baldosas tenían `--surface-2`, que en claro es el blanco de la tarjeta: en claro
+  eran texto suelto y en oscuro cajas.
+- Fuera el título «Lectura» del primer bloque: el resumen es lo primero y el héroe ya dice qué es.
+- Test en `tests/analysis.spec.ts` (línea sin ceros, sin baldosas, sin cifra de repaso si no hay estudio).
+
 ## 2026-11-25 — Análisis: accesibilidad de gráficas, títulos y «Revisar»
 
 Auditoría de Análisis, paso 9 (P4, P8).

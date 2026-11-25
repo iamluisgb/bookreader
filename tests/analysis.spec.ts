@@ -71,6 +71,11 @@ test('la pantalla enseña la cifra, el desglose y una columna por día', async (
   await expect(page.locator('.anal-col-fill')).toHaveCount(5);
   await expect(page.locator('.anal-book')).toHaveCount(2);
   await expect(page.locator('.anal-book').first()).toContainText('El infinito en un junco');
+  // Lo demás del periodo va en una línea y sin ceros (sin notas, no sale «0 notas»); sin estudio
+  // no hay cifra de repaso al lado.
+  await expect(page.locator('.anal-facts')).toHaveText('75 páginas · 2 subrayados');
+  await expect(page.locator('.anal-tile')).toHaveCount(0);
+  await expect(page.locator('.anal-side')).toHaveCount(0);
 
   // El rango cambia la ventana: en "Mes" hay una columna por día del mes y la cifra no baja.
   await page.click('[data-range="month"]');
