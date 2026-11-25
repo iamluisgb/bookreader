@@ -91,3 +91,15 @@ test('color: el feedback usa --danger/--warning/--success y los hex sueltos no c
     expect(n, `${f}: ${n} colores hex sueltos (techo ${TECHO[f]})`).toBeLessThanOrEqual(TECHO[f]);
   }
 });
+
+test('oscuro: el tema «Sistema» en oscuro es idéntico al oscuro elegido', () => {
+  // themes.css define el oscuro dos veces: [data-theme="dark"] (elegido en Ajustes) y el
+  // bloque de @media (prefers-color-scheme: dark) (tema «Sistema», el de serie). Se
+  // separaron: el del sistema tenía --text-faint #6e6e73 (3,1:1 sobre las tarjetas) y le
+  // faltaban --danger/--warning/--success, que caían a los del claro. Los dos, iguales.
+  const css = cssOf('themes.css').replace(/\/\*[\s\S]*?\*\//g, '');
+  const vars = (block: string) => new Map([...block.matchAll(/(--[a-z0-9-]+)\s*:\s*([^;]+);/gi)].map(m => [m[1], m[2].trim()]));
+  const chosen = vars(css.match(/\[data-theme="dark"\]\s*\{([^}]*)\}/)![1]);
+  const system = vars(css.match(/prefers-color-scheme:\s*dark\)\s*\{\s*:root[^{]*\{([^}]*)\}/)![1]);
+  expect(Object.fromEntries(system)).toEqual(Object.fromEntries(chosen));
+});

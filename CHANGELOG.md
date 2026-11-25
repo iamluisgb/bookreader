@@ -3,6 +3,18 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-11-25 — Tema «Sistema» en oscuro: los mismos tokens que el oscuro elegido
+
+Caso (auditoría de Análisis, P7): `themes.css` definía el oscuro dos veces y los bloques se habían
+separado. Con el tema «Sistema» (el de serie) y el dispositivo en oscuro, `--text-faint` era
+`#6e6e73` (3,1:1 sobre las tarjetas, por debajo de AA), `--text-soft` `#a1a1a6`, y faltaban
+`--danger`, `--warning`, `--success`, `--on-brand` y `--on-danger`, que caían a los del claro
+(«Revisar» en ámbar oscuro sobre fondo oscuro: 3,7:1).
+
+- El bloque de `@media (prefers-color-scheme: dark)` es ahora copia exacta de `[data-theme="dark"]`.
+- Test nuevo en `tests/css-vars.spec.ts`: los dos bloques definen las mismas variables con los
+  mismos valores, para que no vuelvan a divergir.
+
 ## 2026-11-25 — Ritmo de lectura: portada de cada libro en la leyenda
 
 - Cada entrada de la leyenda lleva una miniatura de la portada (la misma `book.cover` que pinta la
