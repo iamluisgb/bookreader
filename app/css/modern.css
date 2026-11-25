@@ -1200,6 +1200,14 @@ button.lib-rail-twisty:hover { background: var(--surface-2); color: var(--text);
 }
 .dlg-check { display: flex; align-items: center; gap: var(--s-2); font-size: var(--fs-md); padding: 3px 2px; cursor: pointer; }
 .dlg-check input { accent-color: var(--accent); }
+/* «Añadir un dispositivo» (ui/pair-dialog.js): QR negro sobre blanco en cualquier tema, que es
+   lo que leen bien las cámaras; cuenta atrás y estado debajo. */
+.pair-card { max-width: 400px; }
+.pair-qr-box { display: flex; justify-content: center; margin-top: var(--s-4); min-height: 40px; }
+.pair-qr { width: min(240px, 70vw); height: auto; border-radius: var(--r-sm); }
+.pair-timer { margin: var(--s-2) 0 0; text-align: center; font-size: var(--fs-sm); color: var(--text-soft); font-variant-numeric: tabular-nums; }
+.pair-state { margin: var(--s-2) 0 0; font-size: var(--fs-md); color: var(--text); overflow-wrap: anywhere; }
+.pair-state:empty, .pair-timer:empty { display: none; }
 /* Publicar estantería (perfil público, experimento): una fila por libro con portada, «leyendo
    ahora», estilo de lomo y orden. En móvil el selector baja a su propia línea. */
 .pub-card { max-width: 620px; }

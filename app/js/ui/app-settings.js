@@ -33,7 +33,7 @@ import * as Storage from '../storage.js';
 import * as Study from '../ai/study.js';
 import { icon } from './icons.js';
 import { escapeHtml } from './escape.js';
-import { confirmBox, formBox } from './dialog.js';
+import { alertBox, choiceBox, confirmBox, formBox } from './dialog.js';
 import { ago } from './when.js';
 import { t, getLang, setLang } from '../i18n.js';
 import { helpUrl, helpAttrs } from './help-link.js';
@@ -1209,16 +1209,23 @@ function dataHtml() {
         <button id="appset-br-enable" class="btn btn--primary primary-btn appset-save">${icon('cloud', { size: 'md' })} ${t('Activar el sync de BookReader')}</button>
       </div>
       <div id="appset-br-pair" hidden>
-        <p class="appset-muted">${t('Ya tienes datos sincronizados desde otro dispositivo. Para leerlos aquí hace falta su clave: abre en este dispositivo el enlace de «Enlace para otro dispositivo», o escribe tu clave de recuperación.')}</p>
+        <p class="appset-muted" id="appset-br-pair-text"></p>
+        <p class="appset-muted" id="appset-br-wipe-note" hidden></p>
         <input type="text" id="appset-br-code" class="appset-input" placeholder="XXXX-XXXX-XXXX-…" autocomplete="off" autocapitalize="characters" spellcheck="false" />
         <button id="appset-br-usecode" class="btn btn--primary primary-btn appset-save">${t('Usar la clave')}</button>
+        <button id="appset-br-golicense" class="appset-tpl-cancel appset-data-md" hidden>${t('Ir a Licencia')}</button>
+        <button id="appset-br-pair-back" class="appset-tpl-cancel appset-data-md" hidden>${t('Volver')}</button>
         <button id="appset-br-startover" class="appset-tpl-cancel appset-data-md">${icon('trash', { size: 'md' })} ${t('Perdí la clave: empezar de cero')}</button>
       </div>
       <div id="appset-br-on" hidden>
         <p class="appset-muted" id="appset-br-status">${t('Consultando espacio…')}</p>
+        <div id="appset-br-wipe" hidden>
+          <p class="appset-muted" id="appset-br-wipe-text"></p>
+          <button id="appset-br-wipe-cancel" class="btn btn--primary primary-btn appset-save">${t('Cancelar el borrado')}</button>
+        </div>
         <label class="appset-check" id="appset-br-files-row" hidden><input type="checkbox" id="appset-br-files">
           <span>${t('Sincronizar también los archivos de los libros')}</span></label>
-        <button id="appset-br-pairlink" class="btn btn--primary primary-btn appset-save">${icon('copy', { size: 'md' })} ${t('Enlace para otro dispositivo')}</button>
+        <button id="appset-br-pairlink" class="btn btn--primary primary-btn appset-save">${icon('plus', { size: 'md' })} ${t('Añadir un dispositivo')}</button>
         <button id="appset-br-recovery" class="appset-tpl-cancel appset-data-md">${icon('eye', { size: 'md' })} ${t('Clave de recuperación')}</button>
         <div id="appset-br-recovery-box" class="appset-br-recovery" hidden>
           <p class="appset-muted">${t('Guárdala fuera de BookReader (en tu gestor de contraseñas, por ejemplo). Si pierdes todos tus dispositivos y esta clave, lo sincronizado no se puede recuperar: es el precio de que nadie más pueda leerlo.')}</p>
@@ -1686,7 +1693,10 @@ function wireBookReaderSync(content, show) {
   const statusEl = $('appset-br-status');
   const filesRow = $('appset-br-files-row');
   const filesCheck = $('appset-br-files');
-  let needsKey = false;
+  // El bloque de la clave sirve a dos casos: 'needs-key' (este sync ya tiene datos de otro
+  // dispositivo) y 'other-device' (con esta licencia no hay nada, pero el usuario dice que ya lo
+  // usa en otro). null = no se enseña.
+  let needsKey = null;
 
   const mb = (n) => (n / (1024 * 1024)).toFixed(1) + ' MB';
   const day = (ts) => new Date(ts).toLocaleDateString(getLang(), { day: 'numeric', month: 'long' });
@@ -1696,9 +1706,19 @@ function wireBookReaderSync(content, show) {
     if (needsKey) return 'pair';
     return SyncProvider.activeId() === 'bookreader' && BRAuth.isConnected() ? 'on' : 'off';
   };
+  const paintPair = () => {
+    $('appset-br-pair-text').textContent = needsKey === 'other-device'
+      ? t('En tu otro dispositivo, ve a Ajustes → Datos → Añadir un dispositivo y escanea el código. Si no lo tienes a mano, escribe aquí tu clave de recuperación.')
+      : t('Este sync ya tiene datos de otro dispositivo. Para verlos aquí, añade este dispositivo desde el otro (Ajustes → Datos → Añadir un dispositivo) o escribe tu clave de recuperación.');
+    // «Empezar de cero» solo tiene sentido si hay algo que borrar.
+    $('appset-br-startover').hidden = needsKey !== 'needs-key';
+    $('appset-br-pair-back').hidden = needsKey !== 'other-device';
+    $('appset-br-golicense').hidden = true;
+  };
   const refresh = () => {
     const st = state();
     for (const [k, el] of Object.entries(blocks)) el.hidden = k !== st;
+    if (st === 'pair') paintPair();
     $('appset-br-from-drive').hidden = !(st === 'on' && DriveAuth.isConnected());
     if (st === 'on') { paintStatus(); paintAgents(); }
   };
@@ -1818,6 +1838,11 @@ function wireBookReaderSync(content, show) {
         txt = t('Tu suscripción no está activa: el sync queda en solo lectura hasta el {date}, y después se borra. Pasa tu sync a Google Drive o descarga un backup antes.', { date: day(st.purgeAt) }) + ' ' + txt;
       }
       statusEl.textContent = txt;
+      // Alguien pidió «empezar de cero» sin la clave: este dispositivo la tiene y puede pararlo.
+      $('appset-br-wipe').hidden = !st.wipeAt;
+      if (st.wipeAt) {
+        $('appset-br-wipe-text').textContent = t('Se pidió borrar tu sync desde un dispositivo sin la clave. Se borrará el {date}. Si no fuiste tú, o ya no hace falta, cancélalo.', { date: day(st.wipeAt) });
+      }
       filesRow.hidden = !st.files || st.readOnly;
       filesCheck.checked = Blobs.isEnabled();
     } catch (e) {
@@ -1828,7 +1853,7 @@ function wireBookReaderSync(content, show) {
   // Ya está la clave: activar el proveedor. Si el sync estaba en Drive, se pasa todo (F5) y
   // Drive se desconecta; si no, basta con el primer ciclo.
   async function finishEnable() {
-    needsKey = false;
+    needsKey = null;
     const fromDrive = SyncProvider.activeId() === 'drive' && DriveAuth.isConnected();
     if (fromDrive) {
       // Drive se desconecta solo si no se ha quedado ningún libro por pasar: si no, sería la
@@ -1850,16 +1875,49 @@ function wireBookReaderSync(content, show) {
   $('appset-br-license').addEventListener('click', () => selectSection('license'));
 
   $('appset-br-enable').addEventListener('click', async () => {
-    if (SyncProvider.activeId() === 'drive' && DriveAuth.isConnected() &&
+    // Pasar desde Drive ya es una decisión explícita (y los datos buenos están en Drive): ahí no
+    // se pregunta si es el primer dispositivo.
+    const fromDrive = SyncProvider.activeId() === 'drive' && DriveAuth.isConnected();
+    if (fromDrive &&
       !(await confirmBox(t('Tu sync está ahora en Google Drive. Se pasa todo al sync de BookReader (también los archivos de los libros, si tu plan los incluye) y este dispositivo se desconecta de Drive. Lo que hay en tu Drive no se borra.'),
         { title: t('Pasar mi sync a BookReader'), okText: t('Pasar a BookReader') }))) return;
     show(t('Activando…'));
     try {
-      const r = await BRAuth.enable();
-      if (r.state === 'needs-key') { needsKey = true; refresh(); show(t('Hace falta la clave de tu sync.')); return; }
+      let r = await BRAuth.enable({ firstDevice: fromDrive });
+      if (r.state === 'needs-key') { needsKey = 'needs-key'; refresh(); show(t('Hace falta la clave de tu sync.')); paintWipeNote(); return; }
+      if (r.state === 'first-device?') {
+        // Con esta licencia no hay nada. El servidor no puede saber si el usuario ya sincroniza
+        // con OTRA licencia, así que se pregunta en vez de crear un sync vacío en silencio.
+        show('');
+        const choice = await choiceBox(t('Si ya lo tienes en otro móvil u ordenador, conecta este a ese sync para no empezar uno vacío.'), {
+          title: t('¿Ya usas el sync en otro dispositivo?'),
+          choices: [{ value: 'other', label: t('Sí, ya lo uso en otro') }, { value: 'first', label: t('No, es el primero') }],
+        });
+        if (choice === 'other') { needsKey = 'other-device'; refresh(); return; }
+        if (choice !== 'first') return;
+        show(t('Activando…'));
+        r = await BRAuth.enable({ firstDevice: true });
+        if (r.state === 'needs-key') { needsKey = 'needs-key'; refresh(); show(t('Hace falta la clave de tu sync.')); return; }
+      }
       await finishEnable();
     } catch (e) { fail('No se pudo activar')(e); }
   });
+
+  // En el bloque de la clave: si ya se pidió borrar el sync, cuándo.
+  async function paintWipeNote() {
+    const note = $('appset-br-wipe-note');
+    note.hidden = true;
+    try {
+      const st = await BRAuth.status();
+      if (st.wipeAt) {
+        note.textContent = t('Ya pediste empezar de cero: tu sync se vaciará el {date}. Después podrás activarlo de nuevo.', { date: day(st.wipeAt) });
+        note.hidden = false;
+      }
+    } catch { /* sin red: sin la nota */ }
+  }
+
+  $('appset-br-pair-back').addEventListener('click', () => { needsKey = null; refresh(); show(''); });
+  $('appset-br-golicense').addEventListener('click', () => selectSection('license'));
 
   $('appset-br-usecode').addEventListener('click', async () => {
     show(t('Comprobando la clave…'));
@@ -1867,26 +1925,52 @@ function wireBookReaderSync(content, show) {
       await BRAuth.useRecoveryCode($('appset-br-code').value);
       $('appset-br-code').value = '';
       await finishEnable();
-    } catch (e) { show(e.message, true); }
+    } catch (e) {
+      show(e.message, true);
+      $('appset-br-golicense').hidden = e.code !== 'other_license';
+    }
   });
 
   $('appset-br-startover').addEventListener('click', async () => {
-    if (!(await confirmBox(t('Se borra TODO lo que hay en tu sync de BookReader y se empieza con una clave nueva. Lo de este dispositivo se sube de nuevo; lo que solo estaba en el sync se pierde. No se puede deshacer.'),
-      { title: t('Empezar de cero'), okText: t('Borrar y empezar'), danger: true }))) return;
+    let n = 0;
+    try { n = (await BRAuth.status()).objects; } catch { /* sin el número */ }
+    for (;;) {
+      const choice = await choiceBox(t('Tu sync tiene {n} ficheros que solo se pueden leer con la clave perdida. Si los borras, lo que no esté en este dispositivo se pierde para siempre. Antes, descarga un backup de este dispositivo.', { n }), {
+        title: t('Empezar de cero'),
+        choices: [{ value: 'backup', label: t('Descargar backup') }, { value: 'wipe', label: t('Borrar y empezar'), danger: true }],
+      });
+      if (choice === 'backup') {
+        try { await Backup.downloadBackup(); } catch (e) { show(t('No se pudo descargar el backup: {msg}', { msg: e.message }), true); }
+        continue;
+      }
+      if (choice !== 'wipe') return;
+      break;
+    }
     try {
-      await BRAuth.startOver();
+      const r = await BRAuth.startOver();
+      if (r.state === 'scheduled') {
+        // Sin la clave, el servidor no borra al momento (con la licencia sola nadie debe poder
+        // vaciar un sync): lo apunta y cualquier dispositivo con la clave puede pararlo.
+        await alertBox(t('Sin la clave, el borrado no es inmediato: tu sync se vaciará el {date}. Si algún dispositivo tuyo aún tiene la clave, desde él se puede cancelar. Pasada esa fecha, vuelve aquí y activa el sync.', { date: day(r.wipeAt) }),
+          { title: t('Empezar de cero') });
+        paintWipeNote();
+        return;
+      }
       await finishEnable();
     } catch (e) { fail('No se pudo empezar de cero')(e); }
   });
 
-  $('appset-br-pairlink').addEventListener('click', async () => {
-    const link = BRAuth.pairingLink();
+  $('appset-br-wipe-cancel').addEventListener('click', async () => {
     try {
-      await navigator.clipboard.writeText(link);
-      show(t('Enlace copiado. Ábrelo en tu otro dispositivo: lleva tu clave, así que mándatelo solo a ti.'));
-    } catch {
-      show(escapeHtml(link));
-    }
+      await BRAuth.cancelWipe();
+      show(`${icon('check', { size: 'sm' })} ${t('Borrado cancelado. Tu sync sigue como estaba.')}`);
+      paintStatus();
+    } catch (e) { fail('No se pudo cancelar el borrado')(e); }
+  });
+
+  $('appset-br-pairlink').addEventListener('click', async () => {
+    const { openPairDialog } = await import('./pair-dialog.js');
+    openPairDialog({ onPaired: () => paintStatus() });
   });
 
   $('appset-br-recovery').addEventListener('click', async () => {

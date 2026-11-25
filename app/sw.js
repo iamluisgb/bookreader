@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bookreader-v279';
+const CACHE_NAME = 'bookreader-v280';
 // Ficheros compartidos con la app (share target) a la espera de que la app los recoja.
 const INBOX = 'bookreader-inbox';
 const ASSETS = [
@@ -178,6 +178,7 @@ const ASSETS = [
   './js/ui/svg-fonts.js',
   './js/ui/svg-raster.js',
   './js/ui/dialog.js',
+  './js/ui/pair-dialog.js',
   './js/ui/app-settings.js',
   './js/ui/help-link.js',
   './js/library/store.js',
@@ -193,6 +194,8 @@ const ASSETS = [
   // Temml solo se carga cuando aparece una fórmula, pero se precachea para que ese momento
   // también funcione sin red (es un lector offline: la primera fórmula puede ser en el metro).
   './vendor/temml-0.13.3.min.js',
+  // QR de «Añadir un dispositivo» (ui/pair-dialog.js), cargado bajo demanda.
+  './vendor/qrcode-generator-1.4.4.min.js',
   // Mermaid (diagramas del chat, js/ai/diagram.js): SOLO los módulos de sequenceDiagram,
   // flowchart y timeline con layout dagre (~1 MB, ~300 KB gzip). Los demás tipos no se
   // vendorizan a propósito: si el modelo pide otro, el bloque se queda como código.

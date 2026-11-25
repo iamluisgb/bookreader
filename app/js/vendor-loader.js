@@ -69,3 +69,9 @@ export function prefetchVendor(kind) {
   const p = kind === 'pdf' ? loadPdfJs() : loadEpubJs();
   p.catch(() => { /* sin red: el error se dará en la carga real, con su mensaje */ });
 }
+
+// QR del diálogo «Añadir un dispositivo» (qrcode-generator, MIT). Solo se pide al abrirlo.
+export async function loadQrCode() {
+  if (!window.qrcode) await loadScript('vendor/qrcode-generator-1.4.4.min.js');
+  return window.qrcode;
+}
