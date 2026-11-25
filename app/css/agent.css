@@ -1641,6 +1641,14 @@ body.ai-open #sync-badge { right: calc(var(--ai-panel-width) + 14px); }
 .anal-side { flex: none; text-align: right; padding-bottom: 2px; }
 .anal-side-n { font-size: var(--fs-2xl); font-weight: 600; line-height: 1.1; font-variant-numeric: tabular-nums; }
 .anal-side-l { font-size: var(--fs-sm); color: var(--text-soft); }
+.anal-hero-n { white-space: nowrap; }
+.anal-summary .anal-history { margin-top: 6px; }
+@media (max-width: 600px) {
+  /* En el teléfono no caben dos cifras grandes en una fila: el repaso baja a una línea. */
+  .anal-summary-top { flex-direction: column; align-items: flex-start; gap: 6px; }
+  .anal-side { display: flex; align-items: baseline; gap: 6px; text-align: left; padding-bottom: 0; }
+  .anal-side-n { font-size: var(--fs-lg); }
+}
 .anal-facts { margin: 12px 0 0; font-size: var(--fs-sm); color: var(--text-soft); font-variant-numeric: tabular-nums; }
 
 .anal-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(76px, 1fr)); gap: 8px; }
@@ -1779,6 +1787,7 @@ body.ai-open #sync-badge { right: calc(var(--ai-panel-width) + 14px); }
 .anal-range .anal-nav { margin-left: auto; }
 @media (max-width: 600px) {
   .anal-range .anal-tabs { flex: 1 1 100%; }
+  .anal-range .segmented-btn { padding-left: 4px; padding-right: 4px; }
   .anal-range .anal-nav { margin-left: 0; }
 }
 /* Tamaños táctiles (DESIGN.md: ≥ 44px con el dedo). */

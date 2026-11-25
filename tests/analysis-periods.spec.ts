@@ -137,6 +137,12 @@ test('un libro de principio a fin: resumen, curva de avance y fecha de terminado
   await expect(a.locator('.anal-history')).toContainText('terminado en 21 días');
   await expect(a.locator('.anal-curve polyline')).toHaveCount(1);
   await expect(a.locator('.anal-curve')).toContainText('75 pág.');
+  // Paso 11 de la auditoría: la curva es la única gráfica y abrir el libro está a un toque.
+  await expect(a.locator('.anal-chart')).toHaveCount(0);
+  await expect(a.locator('.anal-scope-open')).toBeVisible();
+  // Con otro periodo vuelven las columnas (la historia es de «Todo»).
+  await a.locator('[data-range="month"]').click();
+  await expect(a.locator('.anal-curve')).toHaveCount(0);
 });
 
 test('los periodos y el selector están traducidos (EN)', async ({ page }) => {

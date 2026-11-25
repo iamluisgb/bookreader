@@ -675,7 +675,7 @@ function renderReading(d) {
       </div>
       ${readingFacts(d)}
       ${d.history ? renderHistory(d) : ''}
-      ${renderColumns(d.cols, 'read', humanTime, t('Tiempo leído'), d, d.scope?.type !== 'book')}
+      ${d.history?.start ? '' : renderColumns(d.cols, 'read', humanTime, t('Tiempo leído'), d, d.scope?.type !== 'book')}
     </section>`;
 }
 
@@ -697,6 +697,8 @@ function booksLine(a, b) {
 
 // La historia de un libro: cuándo empezó, cuántos días y a qué ritmo, y la curva de avance
 // (páginas acumuladas). Se ven los parones y los acelerones.
+// Auditoría de Análisis, paso 11: con la historia a la vista, la curva es la ÚNICA gráfica del
+// bloque (las columnas por día o mes de debajo repetían lo mismo en otra forma).
 function renderHistory(d) {
   const h = d.history;
   if (!h.start) return '';

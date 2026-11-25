@@ -3,6 +3,18 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-11-25 — Análisis: un libro, con su curva como única gráfica, y el resumen en el teléfono
+
+Auditoría de Análisis, paso 11 (P10).
+
+- Con un libro en «Todo», la curva de avance es la única gráfica del bloque: las columnas por día o
+  mes de debajo contaban lo mismo de otra forma. Con otro periodo vuelven las columnas.
+- Orden con un libro: resumen y curva, «Lo que te queda», Estudio y «Lo que viene» con «Repasar
+  este libro»; abrirlo en el lector, con «Abrir» junto al ámbito.
+- En el teléfono (≤ 600 px) el tiempo de repaso baja a una línea bajo el héroe (con un libro de
+  10 h 34 min el héroe se partía en dos líneas), y el segmentado de periodos cabe a 360 px.
+- Test en `tests/analysis-periods.spec.ts`.
+
 ## 2026-11-25 — Análisis: el ajuste del algoritmo, plegado; la nota, una vez; el vacío, con salida
 
 Auditoría de Análisis, paso 8 (P2, P9).
