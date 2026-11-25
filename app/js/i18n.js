@@ -123,7 +123,7 @@ const EN = {
   '{n} días leídos': '{n} days read',
   'pág./día estimadas · media de 7 días': 'estimated pages/day · 7-day average',
   'min/día · media de 7 días': 'min/day · 7-day average',
-  'Las barras tenues son el total de cada día, sin suavizar.': 'Faint bars are each day’s raw total.',
+  'Las barras grises son lo leído cada día, sin media; las capas de color, la media de 7 días de cada libro.': 'Grey bars are what you read each day, not averaged; the coloured layers are each book’s 7-day average.',
   'Páginas estimadas a {n} palabras por página.': 'Pages estimated at {n} words per page.',
   // Análisis (P25 F2)
   'Análisis': 'Insights',

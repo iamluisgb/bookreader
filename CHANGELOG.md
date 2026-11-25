@@ -3,6 +3,18 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-11-25 — Ritmo de lectura: portada de cada libro en la leyenda
+
+- Cada entrada de la leyenda lleva una miniatura de la portada (la misma `book.cover` que pinta la
+  biblioteca) entre el punto de color y el título; sin portada, las iniciales del título sobre el
+  color de su capa, como el fallback de la biblioteca. «Otros» no lleva miniatura, solo su punto
+  gris (con un hueco del mismo ancho para que los nombres queden alineados). El punto se queda en
+  todas las filas: es lo que casa capa y libro.
+- Nota al pie más clara: «Las barras grises son lo leído cada día, sin media; las capas de color,
+  la media de 7 días de cada libro».
+- Test nuevo en `tests/reading-rhythm.spec.ts` (portada, iniciales, «Otros» sin miniatura, punto
+  en todas las filas). SW `bookreader-v282`.
+
 ## 2026-11-25 — Análisis: «Ritmo de lectura», cuánto se leyó de cada libro día a día
 
 Caso: Análisis decía cuánto se leyó en el periodo y en qué libros, pero no CÓMO se repartió la

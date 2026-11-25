@@ -244,3 +244,31 @@ test('tocar la leyenda abre ese libro en el lector', async ({ page }) => {
   await page.waitForSelector('#epub-container iframe', { timeout: 30000 });
   await expect.poll(() => page.evaluate(() => document.body.classList.contains('reading')), { timeout: 30000 }).toBe(true);
 });
+
+test('la leyenda lleva la portada del libro (o sus iniciales) junto al punto de color', async ({ page }) => {
+  await page.goto('/');
+  await seedRecords(page);
+  // Una portada de verdad para bk-1, como la guarda la biblioteca (data URL en `cover`).
+  await page.evaluate(async () => {
+    const Store: any = await import('/js/library/store.js');
+    const c = document.createElement('canvas'); c.width = 40; c.height = 60;
+    const g = c.getContext('2d')!; g.fillStyle = '#336'; g.fillRect(0, 0, 40, 60);
+    const b = await Store.getBook('bk-1');
+    await Store.putBook({ ...b, cover: c.toDataURL('image/png') });
+  });
+  await page.click('[data-act="analysis"]');
+  const keys = page.locator('.anal-rhythm-key');
+  await expect(keys).toHaveCount(5);
+  // El punto de color sigue en todas las filas: casa capa y libro.
+  await expect(page.locator('.anal-rhythm-key .anal-rhythm-sw')).toHaveCount(5);
+  const first = keys.first();
+  await expect(first.locator('img.anal-rhythm-thumb')).toHaveAttribute('src', /^data:image\/png/);
+  // Sin portada: las iniciales del título, como en la biblioteca.
+  await expect(keys.nth(1).locator('.anal-rhythm-thumb.is-ph')).toHaveText('EP');
+  await expect(keys.nth(1).locator('img')).toHaveCount(0);
+  // «Otros»: ni portada ni iniciales, solo su punto.
+  const other = page.locator('.anal-rhythm-key.is-other');
+  await expect(other.locator('img, .anal-rhythm-thumb.is-ph')).toHaveCount(0);
+  await expect(other.locator('.anal-rhythm-sw')).toHaveCount(1);
+  await expect(page.locator('.anal-rhythm-note')).toContainText('Las barras grises son lo leído cada día, sin media');
+});

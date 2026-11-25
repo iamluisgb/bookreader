@@ -1768,6 +1768,12 @@ button.anal-rhythm-key:hover { background: var(--surface-2); }
 button.anal-rhythm-key:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .anal-rhythm-key.is-other { color: var(--text-soft); }
 .anal-rhythm-sw { flex: none; width: 10px; height: 10px; border-radius: var(--r-xs); background: var(--c); }
+.anal-rhythm-thumb { flex: none; width: 20px; height: 28px; border-radius: var(--r-xs); object-fit: cover;
+  box-shadow: var(--shadow-1); }
+.anal-rhythm-thumb.is-ph { display: flex; align-items: center; justify-content: center;
+  background: color-mix(in srgb, var(--c) 28%, var(--surface-2)); color: var(--text);
+  font-size: var(--fs-2xs); font-weight: 600; letter-spacing: -0.02em; }
+.anal-rhythm-thumb.is-none { box-shadow: none; }
 .anal-rhythm-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .anal-rhythm-v { flex: none; font-weight: 600; font-variant-numeric: tabular-nums; }
 .anal-rhythm-note { font-size: var(--fs-xs); }

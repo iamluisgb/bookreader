@@ -401,11 +401,17 @@ export async function collect({ range: kind = 'week', offset: off = 0, rhythm: r
     decks: decksRaw,
     // Ritmo de lectura: el mismo registro, por libro y día, con su rango y unidad propios.
     // Un libro sin ficha en la biblioteca no tiene título y acaba en «Otros».
-    rhythm: sc?.type === 'book' ? null : Rhythm.rhythm(records, {
+    rhythm: sc?.type === 'book' ? null : withCovers(Rhythm.rhythm(records, {
       range: rh.range || '30d', unit: rh.unit || 'min', now, cid, inScope,
       titleOf: (id) => meta.get(id)?.title || null,
-    }),
+    }), meta),
   };
+}
+
+// La portada de cada capa, la misma que pinta la biblioteca (`book.cover`). «Otros» no lleva.
+function withCovers(r, meta) {
+  for (const l of r.layers) l.cover = l.other ? '' : meta.get(l.id)?.cover || '';
+  return r;
 }
 
 // Los subrayados viven en localStorage, una clave por libro (`highlights_<bookId>`), así
@@ -720,6 +726,20 @@ function rhythmValue(v, unit) {
   return unit === 'pages' ? t('≈{n} pág.', { n: Math.round(v).toLocaleString(getLang()) }) : humanTime(v * 60000);
 }
 
+// Iniciales del título como en la biblioteca (`initials` de library/view.js), para el libro sin portada.
+function initialsOf(title) {
+  return (title || '?').trim().split(/\s+/).slice(0, 2).map(w => w[0] || '').join('').toUpperCase();
+}
+
+// Miniatura de la leyenda: la portada, o las iniciales sobre el color de su capa. «Otros», hueco
+// del mismo ancho para que los nombres queden alineados.
+function rhythmThumb(l) {
+  if (l.other) return '<span class="anal-rhythm-thumb is-none" aria-hidden="true"></span>';
+  return l.cover
+    ? `<img class="anal-rhythm-thumb" src="${escapeHtml(l.cover)}" alt="" aria-hidden="true">`
+    : `<span class="anal-rhythm-thumb is-ph anal-rhythm-c${l.color}" aria-hidden="true">${escapeHtml(initialsOf(l.title))}</span>`;
+}
+
 function rhythmName(l) {
   return l.other ? (l.count === 1 ? t('Otros (1 libro)') : t('Otros ({n} libros)', { n: l.count })) : l.title;
 }
@@ -775,13 +795,14 @@ function renderRhythm(r) {
     <div class="anal-curve-x anal-rhythm-x">${xLabels.map(d => `<span>${escapeHtml(fmtDay(d))}</span>`).join('')}</div>`;
   const legend = `<div class="anal-rhythm-legend">${r.layers.map((l) => {
     const inner = `<span class="anal-rhythm-sw anal-rhythm-c${l.color}" aria-hidden="true"></span>
+      ${rhythmThumb(l)}
       <span class="anal-rhythm-name">${escapeHtml(rhythmName(l))}</span>
       <span class="anal-rhythm-v">${escapeHtml(rhythmValue(l.total, r.unit))}</span>`;
     return l.other
       ? `<div class="anal-rhythm-key is-other">${inner}</div>`
       : `<button class="anal-rhythm-key" data-open-book="${escapeHtml(l.id)}" title="${escapeHtml(t('Abrir {t}', { t: l.title }))}">${inner}</button>`;
   }).join('')}</div>`;
-  const note = `<p class="anal-muted anal-rhythm-note">${escapeHtml(yl)}. ${escapeHtml(t('Las barras tenues son el total de cada día, sin suavizar.'))}${r.unit === 'pages' ? ' ' + escapeHtml(t('Páginas estimadas a {n} palabras por página.', { n: Rhythm.WORDS_PER_PAGE })) : ''}</p>`;
+  const note = `<p class="anal-muted anal-rhythm-note">${escapeHtml(yl)}. ${escapeHtml(t('Las barras grises son lo leído cada día, sin media; las capas de color, la media de 7 días de cada libro.'))}${r.unit === 'pages' ? ' ' + escapeHtml(t('Páginas estimadas a {n} palabras por página.', { n: Rhythm.WORDS_PER_PAGE })) : ''}</p>`;
   return `<section class="anal-sec anal-rhythm">${head}${sum}${controls}${chart}${legend}${note}</section>`;
 }
 
