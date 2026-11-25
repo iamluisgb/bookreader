@@ -3,6 +3,18 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-11-25 — Análisis: accesibilidad de gráficas, títulos y «Revisar»
+
+Auditoría de Análisis, paso 9 (P4, P8).
+
+- Las gráficas de columnas eran `role="img"` con columnas enfocables dentro: el teclado pasaba por
+  ellas y el lector de pantalla no las anunciaba (los hijos de un `img` son presentacionales).
+  Ahora son `role="group"` con su `aria-label`.
+- «Retención real», «Comprensión a las 2 semanas» y «¿Te calibras bien?» son `h4` (eran `div`):
+  entran en la navegación por títulos bajo el `h3` de su bloque.
+- «n difíciles · Revisar» mide 44 px de alto con el dedo (medía 15).
+- Test nuevo en `tests/analysis-study.spec.ts`.
+
 ## 2026-11-25 — Análisis: cabecera con el segmentado del sistema, pegada arriba y táctil
 
 Auditoría de Análisis, paso 4 (P3, P4, P5).

@@ -782,7 +782,9 @@ function renderColumns(cols, key, fmt, title, d, stacked = false) {
   const per = { week: t('por día'), month: t('por día'), year: t('por mes') }[d.period.kind]
     || (cols.length && cols[0].go.range === 'day' ? t('por día') : cols[0]?.go.range === 'month' ? t('por mes') : t('por año'));
   const full = `${title} ${per}`;
-  return `<div class="anal-chart" role="img" aria-label="${escapeHtml(full)}">
+  // `group` y no `img`: dentro hay columnas enfocables, y los hijos de un `img` no existen para
+  // el lector de pantalla aunque el teclado pase por ellos.
+  return `<div class="anal-chart" role="group" aria-label="${escapeHtml(full)}">
     <div class="anal-chart-h">${escapeHtml(full)}</div>
     <div class="anal-cols">${html}</div>
   </div>`;
@@ -821,7 +823,7 @@ function renderBooks(d) {
 
 function renderRetention(r) {
   const n = r.all.n;
-  const head = `<div class="anal-ret-h">${t('Retención real')}</div>`;
+  const head = `<h4 class="anal-ret-h">${t('Retención real')}</h4>`;
   if (n < Stats.MIN_RETENTION_N) {
     return `<div class="anal-ret anal-ret--pending">${head}
       <p class="anal-muted">${t('Hacen falta {n} repasos de tarjetas ya aprendidas para medirla; llevas {k} en este periodo.', { n: Stats.MIN_RETENTION_N, k: n })}</p>
@@ -850,7 +852,7 @@ function renderRetention(r) {
 // lector discutió, al lado, porque son las dos formas de que la cifra mienta.
 function renderProbes(p) {
   if (!p || (!p.n && !p.skipped)) return '';
-  const head = `<div class="anal-ret-h">${t('Comprensión a las 2 semanas')}</div>`;
+  const head = `<h4 class="anal-ret-h">${t('Comprensión a las 2 semanas')}</h4>`;
   const what = t('Preguntas nuevas sobre capítulos que leíste hace dos semanas o más, respondidas sin ayuda.');
   const extra = [
     p.partial ? t('{n} a medias', { n: p.partial }) : '',
@@ -879,7 +881,7 @@ function renderCalibration(c) {
     ? t('Te das por bueno más de lo que el agente acepta: escribir la respuesta antes de girar ayuda a medirlo.')
     : t('Tu nota y la del agente coinciden: te calibras bien.');
   return `<div class="anal-calib">
-    <div class="anal-ret-h">${t('¿Te calibras bien?')}</div>
+    <h4 class="anal-ret-h">${t('¿Te calibras bien?')}</h4>
     <p>${t('En tus respuestas escritas te pones «bien» en el <b>{a}</b>; el agente las da por buenas en el <b>{b}</b>.', { a: pct(c.self), b: pct(c.agent) })} <span class="anal-faint">(${c.n})</span></p>
     <p class="anal-muted">${escapeHtml(note)}</p>
   </div>`;

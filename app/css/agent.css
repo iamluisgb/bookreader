@@ -1699,7 +1699,7 @@ body.ai-open #sync-badge { right: calc(var(--ai-panel-width) + 14px); }
 .anal-faint { color: var(--text-faint); font-weight: 400; }
 
 .anal-ret, .anal-calib { margin-top: 14px; padding: 12px 14px; border-radius: var(--r-md); background: var(--surface-2); }
-.anal-ret-h { font-size: var(--fs-xs); font-weight: 600; color: var(--text-soft); }
+.anal-ret-h { margin: 0; font-size: var(--fs-xs); font-weight: 600; color: var(--text-soft); }
 .anal-ret-row { display: flex; align-items: baseline; gap: 10px; margin-top: 2px; }
 .anal-ret-n { font-size: var(--fs-2xl); font-weight: 700; font-variant-numeric: tabular-nums; }
 .anal-ret-goal { font-size: var(--fs-sm); color: var(--text-soft); }
@@ -1757,6 +1757,7 @@ body.ai-open #sync-badge { right: calc(var(--ai-panel-width) + 14px); }
 @media (pointer: coarse) {
   .anal-range .segmented-btn, .anal-scope-pick, .anal-scope-open, .anal-scope-study { min-height: 44px; height: auto; }
   .anal-nav-btn, .anal-scope-x, .anal-card .appset-close { min-width: 44px; min-height: 44px; }
+  .anal-fix { display: inline-flex; align-items: center; min-height: 44px; }
 }
 .anal-scope { position: relative; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
 .anal-scope-pick { display: inline-flex; align-items: center; gap: 6px; min-width: 0; max-width: 100%;

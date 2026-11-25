@@ -152,6 +152,29 @@ test('el bloque de estudio: retención con valla de N, practicado y calibración
   await expect(study.locator('.anal-chart')).toBeVisible();
 });
 
+// Auditoría de Análisis, paso 9: las gráficas con columnas enfocables no son `img` (sus hijos no
+// existirían para el lector de pantalla), los sub-bloques son títulos de verdad y «Revisar» se
+// puede tocar con el dedo.
+test('accesibilidad: gráficas como grupo, títulos h4 y «Revisar» de 44px con el dedo', async ({ browser }) => {
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+  const page = await ctx.newPage();
+  await page.goto('/index.html');
+  const today = await page.evaluate(async () => ((await import('/js/ai/srs.js')) as any).dayOf(Date.now()));
+  const cards = Array.from({ length: 40 }, (_, i) => card(`c${i}`, { reps: 2, lapses: i < 3 ? 4 : 0, interval: 5, due: today, lastReview: Date.now(), stability: 5, difficulty: 5 }));
+  await seedBook(page, { bookId: 'bk-a', title: 'Designing Data', cards });
+  await seedAttempts(page, cards.map((c) => att({ card: c.uid })));
+  await page.evaluate(async () => { const A: any = await import('/js/analysis.js'); await A.open(); });
+  const a = page.locator('#analysis');
+  await expect(a.locator('.anal-chart').first()).toBeVisible();
+  await expect(a.locator('.anal-chart[role="img"]')).toHaveCount(0);
+  await expect(a.locator('.anal-chart[role="group"][aria-label]').first()).toBeVisible();
+  await expect(a.locator('h4.anal-ret-h', { hasText: 'Retención real' })).toBeVisible();
+  const fix = a.locator('.anal-fix').first();
+  await expect(fix).toBeVisible();
+  expect((await fix.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  await ctx.close();
+});
+
 test('por libro: memoria de hoy, «Revisar» lleva a las tarjetas difíciles y la fila filtra la pantalla', async ({ page }) => {
   await page.goto('/index.html');
   const today = await page.evaluate(async () => ((await import('/js/ai/srs.js')) as any).dayOf(Date.now()));
