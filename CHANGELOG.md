@@ -3,6 +3,22 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-11-25 — Análisis: estudio compacto
+
+Auditoría de Análisis, paso 6 (P1, P2, P3).
+
+- Tres cifras (Repasos, Días con repaso, Racha) en vez del segundo héroe de tiempo (que ya está en
+  el resumen) y cuatro baldosas.
+- Retención real como barra con una marca en el objetivo del 90 % y su n al lado; la valla de 30
+  repasos y la frase de lectura se quedan.
+- Practicado frente a solo girar, como una barra («7 de 50»), en vez de dos baldosas que no se sumaban.
+- Comprensión a las 2 semanas y Calibración, juntas en un par de recuadros; la comprensión dice que
+  cuenta todo el historial y no solo el periodo (antes no lo decía y no cambiaba con el rango).
+- Fuera «Repasos por día»: repetía la forma de la gráfica de lectura y «días con repaso» ya da el hábito.
+- Las baldosas pierden la caja `--surface-2` (blanca en claro, gris en oscuro): misma maqueta en los
+  dos temas.
+- Tests en `tests/analysis-study.spec.ts`.
+
 ## 2026-11-25 — Análisis: resumen con una cifra que lidera y una línea de hechos
 
 Auditoría de Análisis, paso 5 (P3, P6).

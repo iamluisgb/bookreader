@@ -737,26 +737,27 @@ function renderStudy(d) {
       <p class="anal-muted">${t('Sin repasos en este periodo.')}</p>
     </section>`;
   }
-  const sub = d.period.kind === 'day'
-    ? (d.period.current ? t('repasando hoy') : t('repasando'))
-    : t('repasando · {n} de {total} días', { n: s.activeDays, total: d.days });
+  // Auditoría de Análisis, paso 6: el tiempo de repaso ya está en el resumen; aquí tres cifras,
+  // la retención y lo practicado como barras, y comprensión y calibración juntas. Sin «Repasos
+  // por día»: «días con repaso» ya dice el hábito y la gráfica repetía la de lectura.
+  const p = s.practice;
+  const both = p.practiced + p.revealed;
+  const practiced = both ? `<div class="anal-meter" title="${escapeHtml(t('Escribiendo la respuesta o con un ejercicio'))}">
+      <div class="anal-meter-h"><span>${t('Practicado')} <span class="anal-faint">· ${t('escribiendo la respuesta')}</span></span>
+        <span class="anal-meter-v">${t('<b>{k}</b> de {n}', { k: p.practiced, n: both })}</span></div>
+      <span class="anal-bar" aria-hidden="true"><span class="anal-bar-fill" style="width:${Math.round((p.practiced / both) * 100)}%"></span></span>
+    </div>` : '';
+  const pair = [renderProbes(s.probes), renderCalibration(s.calibration)].filter(Boolean);
   return `<section class="anal-sec anal-study">
     <h3 class="anal-sec-h">${t('Estudio')}</h3>
-    <div class="anal-hero anal-hero--sm">
-      <div class="anal-hero-n">${escapeHtml(humanTime(s.ms))}</div>
-      <div class="anal-hero-l">${sub}</div>
-      ${d.delta ? deltaLine(s.ms, s.prevMs, d.delta.label) : ''}
-    </div>
     <div class="anal-tiles">
       ${tile(t('Repasos'), String(s.reviews))}
+      ${d.period.kind === 'day' ? '' : tile(t('Días con repaso'), t('{n} de {total}', { n: s.activeDays, total: d.days }))}
       ${d.streak ? tile(t('Racha'), t('{n} d', { n: d.streak })) : ''}
-      ${tile(t('Practicado'), String(s.practice.practiced), t('Escribiendo la respuesta o con un ejercicio'))}
-      ${tile(t('Solo girar'), String(s.practice.revealed), t('Girando la tarjeta y poniéndose nota'))}
     </div>
-    ${renderProbes(s.probes)}
     ${renderRetention(s.retention)}
-    ${renderCalibration(s.calibration)}
-    ${renderColumns(d.cols, 'n', (n) => t('{n} repasos', { n }), t('Repasos'), d)}
+    ${practiced}
+    ${pair.length ? `<div class="anal-pair">${pair.join('')}</div>` : ''}
   </section>`;
 }
 
@@ -849,8 +850,9 @@ function renderRetention(r) {
   return `<div class="anal-ret">${head}
     <div class="anal-ret-row">
       <span class="anal-ret-n">${pct(rate)}</span>
-      <span class="anal-ret-goal">${t('objetivo {p}', { p: pct(Stats.TARGET_RETENTION) })}</span>
+      <span class="anal-ret-goal">${t('objetivo {p}', { p: pct(Stats.TARGET_RETENTION) })} <span class="anal-faint">· ${t('{n} repasos', { n })}</span></span>
     </div>
+    <span class="anal-bar anal-bar--goal" aria-hidden="true"><span class="anal-bar-fill" style="width:${Math.round(rate * 100)}%"></span><span class="anal-bar-goal" style="left:${Math.round(Stats.TARGET_RETENTION * 100)}%"></span></span>
     <div class="anal-ret-split">${part(t('Jóvenes'), r.young)}${part(t('Maduras'), r.mature)}</div>
     <p class="anal-muted">${escapeHtml(note)}</p>
   </div>`;
@@ -863,7 +865,7 @@ function renderRetention(r) {
 function renderProbes(p) {
   if (!p || (!p.n && !p.skipped)) return '';
   const head = `<h4 class="anal-ret-h">${t('Comprensión a las 2 semanas')}</h4>`;
-  const what = t('Preguntas nuevas sobre capítulos que leíste hace dos semanas o más, respondidas sin ayuda.');
+  const what = t('Preguntas nuevas sobre capítulos que leíste hace dos semanas o más, respondidas sin ayuda.') + ' ' + t('Todo el historial, no solo este periodo.');
   const extra = [
     p.partial ? t('{n} a medias', { n: p.partial }) : '',
     p.skipped ? t('{n} saltadas', { n: p.skipped }) : '',

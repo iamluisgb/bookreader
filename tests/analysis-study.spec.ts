@@ -147,9 +147,14 @@ test('el bloque de estudio: retención con valla de N, practicado y calibración
   await expect(study.locator('.anal-ret')).toContainText('Por debajo');
   await expect(study.locator('.anal-calib')).toContainText('100%');
   await expect(study.locator('.anal-calib')).toContainText('60%');
-  await expect(study.locator('.anal-tile', { hasText: 'Practicado' })).toContainText('25');
-  await expect(study.locator('.anal-tile', { hasText: 'Solo girar' })).toContainText('40');
-  await expect(study.locator('.anal-chart')).toBeVisible();
+  // Practicado frente a solo girar, como barra: 25 escritos de 65 repasos (paso 6 de la auditoría).
+  await expect(study.locator('.anal-meter')).toContainText('25 de 65');
+  // Retención como barra con la marca del objetivo; sin «Repasos por día» (repetía la de lectura).
+  await expect(study.locator('.anal-bar-goal')).toHaveCount(1);
+  await expect(study.locator('.anal-chart')).toHaveCount(0);
+  await expect(study.locator('.anal-tile', { hasText: 'Días con repaso' })).toContainText('1 de');
+  // El tiempo de repaso está en el resumen, al lado del de lectura.
+  await expect(page.locator('#analysis .anal-side-l')).toHaveCount(0);   // sin lectura no hay resumen
 });
 
 // Auditoría de Análisis, paso 9: las gráficas con columnas enfocables no son `img` (sus hijos no
@@ -163,7 +168,12 @@ test('accesibilidad: gráficas como grupo, títulos h4 y «Revisar» de 44px con
   const cards = Array.from({ length: 40 }, (_, i) => card(`c${i}`, { reps: 2, lapses: i < 3 ? 4 : 0, interval: 5, due: today, lastReview: Date.now(), stability: 5, difficulty: 5 }));
   await seedBook(page, { bookId: 'bk-a', title: 'Designing Data', cards });
   await seedAttempts(page, cards.map((c) => att({ card: c.uid })));
-  await page.evaluate(async () => { const A: any = await import('/js/analysis.js'); await A.open(); });
+  await page.evaluate(async () => {
+    const RL: any = await import('/js/reading-log.js');
+    const day = RL.dayKey(Date.now());
+    await RL.importDays([{ key: `${day}|otro`, day, deviceId: 'otro', updatedAt: 1, books: { 'bk-a': { ms: 1200000, words: 4000, units: 10 } } }]);
+    const A: any = await import('/js/analysis.js'); await A.open();
+  });
   const a = page.locator('#analysis');
   await expect(a.locator('.anal-chart').first()).toBeVisible();
   await expect(a.locator('.anal-chart[role="img"]')).toHaveCount(0);

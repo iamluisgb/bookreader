@@ -1644,7 +1644,9 @@ body.ai-open #sync-badge { right: calc(var(--ai-panel-width) + 14px); }
 .anal-facts { margin: 12px 0 0; font-size: var(--fs-sm); color: var(--text-soft); font-variant-numeric: tabular-nums; }
 
 .anal-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(76px, 1fr)); gap: 8px; }
-.anal-tile { padding: 10px 12px; border-radius: var(--r-md); background: var(--surface-2); }
+/* Sin caja: --surface-2 es el blanco de la tarjeta en claro y una caja en oscuro; la misma
+   pantalla se maquetaba distinto según el tema (auditoría de Análisis, P6). */
+.anal-tile { padding: 4px 0; }
 .anal-tile-l { font-size: var(--fs-2xs); color: var(--text-soft); }
 .anal-tile-v { font-size: var(--fs-xl); font-weight: 600; font-variant-numeric: tabular-nums; }
 
@@ -1705,7 +1707,21 @@ body.ai-open #sync-badge { right: calc(var(--ai-panel-width) + 14px); }
 .anal-muted { margin: 6px 0 0; font-size: var(--fs-sm); color: var(--text-soft); line-height: 1.5; }
 .anal-faint { color: var(--text-faint); font-weight: 400; }
 
-.anal-ret, .anal-calib { margin-top: 14px; padding: 12px 14px; border-radius: var(--r-md); background: var(--surface-2); }
+.anal-ret { margin-top: 16px; }
+.anal-pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-top: 16px; }
+.anal-pair > * { margin: 0; padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--r-md); }
+.anal-pair .anal-ret-n { font-size: var(--fs-xl); }
+.anal-pair .anal-muted { font-size: var(--fs-xs); }
+/* Barras de proporción (retención, practicado): relleno en tinta y, en la retención, una marca
+   en el objetivo. El acento se queda para acciones y para la memoria por libro. */
+.anal-bar { position: relative; display: block; height: 8px; margin: 8px 0 6px; border-radius: var(--r-pill);
+  background: var(--fill-strong); }
+.anal-bar-fill { display: block; height: 100%; border-radius: inherit; background: var(--text); }
+.anal-bar-goal { position: absolute; top: -4px; bottom: -4px; width: 2px; margin-left: -1px; background: var(--text-soft); }
+.anal-meter { margin-top: 16px; }
+.anal-meter-h { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: var(--fs-sm); }
+.anal-meter-v { color: var(--text-soft); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.anal-meter-v b { color: var(--text); font-size: var(--fs-lg); font-weight: 600; }
 .anal-ret-h { margin: 0; font-size: var(--fs-xs); font-weight: 600; color: var(--text-soft); }
 .anal-ret-row { display: flex; align-items: baseline; gap: 10px; margin-top: 2px; }
 .anal-ret-n { font-size: var(--fs-2xl); font-weight: 700; font-variant-numeric: tabular-nums; }
@@ -1755,6 +1771,7 @@ body.ai-open #sync-badge { right: calc(var(--ai-panel-width) + 14px); }
 .anal-range { position: sticky; top: 0; z-index: 2; display: flex; flex-wrap: wrap; align-items: center;
   gap: 8px 12px; margin: 0 -30px 18px; padding: 8px 30px 10px; background: var(--surface-1);
   border-bottom: 1px solid var(--border-soft); }
+.anal-range .anal-tabs { flex: 0 0 auto; }
 .anal-range .anal-nav { margin-left: auto; }
 @media (max-width: 600px) {
   .anal-range .anal-tabs { flex: 1 1 100%; }
