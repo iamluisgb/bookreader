@@ -3,6 +3,33 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-11-25 — Biblioteca libre: 48.206 obras con filtros, Gutenberg y Elejandría
+
+- **Catálogo, no ficheros.** `scripts/catalogo-libros.mjs` genera cuatro piezas: `catalogo.json`
+  (400 KB: Standard Ebooks + técnicos + facets + la lista de ids válidos), `catalogo-es.json`
+  (estantería curada: todo el español) y `catalogo-completo.json` (3,4 MB con el resto del fondo, que
+  solo se baja si el lector lo pide). La app carga el índice; la landing, el español primero.
+- **Fuentes nuevas**: Project Gutenberg filtrado a **dominio público en España** (todos los
+  firmantes, traductores incluidos, muertos antes de 1946) — 44.673 obras tras agrupar los tomos de
+  una misma obra — y Elejandría con 1.973 obras cuyo ePub se resolvió. Total: **48.206**.
+- **Dedupe**: 615 obras de Gutenberg se caen porque Standard Ebooks ya las da en edición revisada.
+  Se comparan por título normalizado + apellido, no por parecido: el emparejamiento laxo unía
+  `King Henry IV` con `VI` y dos catedrales distintas.
+- **Filtros** en `/samples/` y `/es/muestra/`: idioma, materia (Library of Congress, poblada al
+  99,99% del CSV), época (siglo de nacimiento del autor, con tramo propio para los años a.C.) y
+  edición. Los contadores salen de lo que hay cargado, no de un número escrito a mano.
+- **Worker `bookreader-libros`**: rutas nuevas `/pg/<n>` y `/el/<id>`. La URL se construye en el
+  Worker a partir de un id de la lista blanca; las redirecciones se siguen comprobando dominio a
+  dominio y una página HTML donde tocaba un libro es un 502, no un libro. Elejandría exige el
+  `Referer` de la ficha, que se resuelve en el build (`elejandria-enlaces.json`, 2.215 enlaces: el
+  ePub es el segundo enlace de descarga, verificado en 15 de 15).
+- **Tests**: `npm run test:libros` 13/13 (construcción de URL, id fuera de catálogo sin salir a la
+  red, Referer, HTML disfrazado) y `tests/samples-catalog.spec.ts` 7/7 (`pg:` y `el:` abren el
+  libro por el Worker; un número inventado no genera ni una petición).
+- **Datos del catálogo** en `assets/muestra/`: `pg-espana.json` (3,7 MB) y `elejandria.json` se
+  commitean para que el build no dependa de la red; se refrescan con `--actualizar-gutenberg --csv`
+  y `--actualizar-elejandria`.
+
 ## 2026-11-24 — «Lee el libro»: el mensaje cuadra con los datos
 
 - **El chirrido**: la página decía «el problema es el resumen; lee el libro entero» y los números
