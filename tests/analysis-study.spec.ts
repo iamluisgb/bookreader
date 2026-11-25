@@ -338,6 +338,9 @@ test('ajuste a tu memoria: por debajo del mínimo dice cuánto falta', async ({ 
   await seedForgetfulHistory(page, 20);                     // 20 × 5 = 100 repasos entrenables
   await page.click('[data-act="analysis"]');
   await expect(page.locator('#analysis .anal-fsrs')).toContainText('Llevas 100');
+  // Sin nada que decidir, el ajuste va plegado y dice en una línea cuánto falta (paso 8).
+  await expect(page.locator('#analysis details.anal-fsrs')).not.toHaveAttribute('open', '');
+  await expect(page.locator('#analysis .anal-fsrs-sum')).toContainText('100 de 400 repasos');
   await expect(page.locator('#analysis [data-act="fsrs-run"]')).toHaveCount(0);
 });
 

@@ -3,6 +3,20 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-11-25 — Análisis: el ajuste del algoritmo, plegado; la nota, una vez; el vacío, con salida
+
+Auditoría de Análisis, paso 8 (P2, P9).
+
+- «Ajustado a tu memoria» es un ajuste, no una cifra del periodo: va en un `<details>` plegado que
+  dice en una línea cómo va («72 de 400 repasos», «con tus parámetros»). Se abre solo cuando hay
+  algo que decidir (calcular, aceptar, descartar) y respeta lo que el lector abre o toca aunque la
+  pantalla se repinte (si no, tras «Usar los míos» se plegaba y escondía «Volver a los de serie»).
+- La nota «solo cuenta lo que se leyó a ritmo humano» sale una vez (se repetía en el vacío y al pie).
+- El vacío explica qué se verá aquí y tiene salida: «Ir a mis libros».
+- Un periodo con estudio y sin lectura dice «Sin lectura en este periodo» en una línea, en vez del
+  bloque vacío grande en mitad de la pantalla.
+- Tests en `tests/analysis.spec.ts` y `tests/analysis-study.spec.ts`.
+
 ## 2026-11-25 — Análisis: «Lo que viene» dice que no sigue al periodo y acaba en «Repasar»
 
 Auditoría de Análisis, paso 7 (P1, P6).

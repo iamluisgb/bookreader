@@ -1841,6 +1841,13 @@ body.ai-open #sync-badge { right: calc(var(--ai-panel-width) + 14px); }
 .anal-warn--ok { background: var(--surface-2); color: var(--text-soft); }
 
 .anal-fsrs p { margin: 0 0 6px; font-size: var(--fs-sm); line-height: 1.5; }
+.anal-fsrs-sum { display: flex; align-items: baseline; gap: 0; min-height: 44px; padding-top: 4px; cursor: pointer; list-style: none; }
+.anal-fsrs-sum::-webkit-details-marker { display: none; }
+.anal-fsrs-sum::after { content: '›'; margin-left: auto; color: var(--text-soft); transition: transform var(--transition-fast); }
+.anal-fsrs[open] > .anal-fsrs-sum::after { transform: rotate(90deg); }
+.anal-fsrs-sum .anal-sec-h { margin: 0; }
+.anal-noread { margin: 0 0 4px; }
+.anal-empty-go { margin-top: 8px; }
 .anal-fsrs-bar { display: block; width: 100%; max-width: 240px; flex: none; }
 .anal-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 

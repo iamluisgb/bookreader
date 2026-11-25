@@ -89,6 +89,10 @@ test('sin lectura validada no se pinta un cero: se explica qué cuenta', async (
   await expect(page.locator('.anal-empty')).toBeVisible();
   await expect(page.locator('.anal-hero-n')).toHaveCount(0);
   await expect(page.locator('.anal-empty-p')).toContainText('ritmo humano');
+  // Paso 8 de la auditoría: el vacío tiene salida y la nota de «ritmo humano» no se repite.
+  await expect(page.getByText('ritmo humano')).toHaveCount(1);
+  await page.locator('#analysis [data-act="go-library"]').click();
+  await expect(page.locator('#analysis')).toBeHidden();
 });
 
 test('rastrear un libro no aparece como lectura en la pantalla', async ({ page }) => {

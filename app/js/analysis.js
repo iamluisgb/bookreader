@@ -62,6 +62,7 @@ let picking = false;       // selector de ámbito abierto
 let allBooks = false;      // «Ver todos» en el desglose
 let optimizer = null;      // estado del ajuste del algoritmo: null | 'running' | resultado
 let last = null;           // últimos datos pintados (para las acciones)
+let fsrsOpen = null;       // plegado del ajuste: null = el de serie; si el lector lo abre o actúa, se respeta
 
 // ---- Periodos --------------------------------------------------------------
 
@@ -470,6 +471,8 @@ function ensureOverlay() {
     }
   });
   overlay.addEventListener('click', onClick);
+  // El plegado del ajuste sobrevive a los repintados (aceptar, descartar, recalcular).
+  overlay.addEventListener('toggle', (e) => { if (e.target.matches?.('details.anal-fsrs')) fsrsOpen = e.target.open; }, true);
   // La fila de un libro y las columnas con destino son botones para el teclado también.
   overlay.addEventListener('keydown', (e) => {
     if ((e.key === 'Enter' || e.key === ' ') && e.target.matches?.('[data-book], [data-go]')) { e.preventDefault(); onClick(e); }
@@ -486,6 +489,7 @@ export async function open({ bookId = null, shelfId = null } = {}) {
   allBooks = false;
   picking = false;
   optimizer = null;
+  fsrsOpen = null;
   ensureOverlay().style.display = 'flex';
   await paint();
 }
@@ -549,6 +553,7 @@ async function onClick(e) {
   if (act === 'now') { offset = 0; paint(); return; }
   if (act === 'pick') { picking = !picking; paint(); return; }
   if (act === 'all-books') { setScope(null); return; }
+  if (act === 'go-library') { close(); return; }
   if (act === 'more-books') { allBooks = true; paint(); return; }
   if (act === 'study-scope') {
     const sc = last?.scope;
@@ -571,6 +576,7 @@ async function onClick(e) {
     paint();
     return;
   }
+  if (act?.startsWith('fsrs-')) fsrsOpen = true;
   if (act === 'fsrs-run') {
     optimizer = 'running';
     paint();
@@ -632,19 +638,20 @@ function renderEmpty() {
   return `<div class="anal-empty">
     ${icon('chart', { size: 'display' })}
     <p class="anal-empty-h">${t('Todavía no hay lectura que contar en este periodo')}</p>
-    <p class="anal-empty-p">${t('Solo cuenta lo que se leyó a ritmo humano: pasar páginas buscando algo, o dejar el libro abierto, no suma.')}</p>
+    <p class="anal-empty-p">${t('Aquí verás cuánto lees, de qué libros y qué recuerdas de ellos. Solo cuenta lo que se leyó a ritmo humano: pasar páginas buscando algo, o dejar el libro abierto, no suma.')}</p>
+    <button class="btn btn--primary primary-btn anal-empty-go" data-act="go-library">${icon('library', { size: 'sm' })} ${t('Ir a mis libros')}</button>
   </div>`;
 }
 
 function renderData(d) {
   const showAhead = d.period.current;
   return `
-    ${d.ms ? renderReading(d) : renderEmpty()}
+    ${d.ms ? renderReading(d) : d.study.has ? `<p class="anal-muted anal-noread">${t('Sin lectura en este periodo.')}</p>` : renderEmpty()}
     ${renderBooks(d)}
     ${d.study.has ? renderStudy(d) : ''}
     ${d.study.has ? renderWork(d) : ''}
     ${d.study.has && !d.scope && showAhead ? renderFsrs(d) : ''}
-    <p class="anal-note">${t('Solo cuenta lo que se leyó a ritmo humano: pasar páginas buscando algo, o dejar el libro abierto, no suma.')}</p>
+    ${d.ms || d.study.has ? `<p class="anal-note">${t('Solo cuenta lo que se leyó a ritmo humano: pasar páginas buscando algo, o dejar el libro abierto, no suma.')}</p>` : ''}
   `;
 }
 
@@ -980,8 +987,9 @@ function renderWork(d) {
 // nunca se aplica solo: se enseña qué cambia y se elige.
 function renderFsrs(d) {
   const f = d.fsrs;
-  const head = `<h3 class="anal-sec-h">${t('Ajustado a tu memoria')}</h3>`;
-  let body;
+  // Auditoría de Análisis, paso 8: es un ajuste, no una cifra del periodo. Va plegado y solo se
+  // abre solo cuando hay algo que decidir (calcular, aceptar o descartar).
+  let body, status = '', open = true;
   if (optimizer === 'running') {
     body = `<p class="anal-muted" role="status">${t('Calculando con tu historial… (se queda en este dispositivo)')}</p>`;
   } else if (optimizer && optimizer.ok && optimizer.better) {
@@ -997,6 +1005,7 @@ function renderFsrs(d) {
   } else if (optimizer && optimizer.reason === 'error') {
     body = `<p class="anal-muted">${t('No se pudo calcular: {e}', { e: optimizer.error || '' })}</p>`;
   } else if (f.stored) {
+    status = t('con tus parámetros'); open = false;
     const when = new Date(f.stored.ts).toLocaleDateString();
     body = `<p>${t('El repaso usa tus parámetros, calculados el {d} con {n} repasos.', { d: when, n: f.stored.reviews })}</p>
       <div class="anal-actions">
@@ -1004,11 +1013,16 @@ function renderFsrs(d) {
         <button class="btn btn--secondary" data-act="fsrs-reset">${t('Volver a los de serie')}</button>
       </div>`;
   } else if (f.reviews < FsrsParams.MIN_REVIEWS) {
+    status = t('{n} de {total} repasos', { n: f.reviews, total: FsrsParams.MIN_REVIEWS }); open = false;
     body = `<p class="anal-muted">${t('Con {min} repasos de tarjetas empezadas aquí, el algoritmo se podrá ajustar a tu memoria. Llevas {n}.', { min: FsrsParams.MIN_REVIEWS, n: f.reviews })}</p>
       <span class="anal-mem-bar anal-fsrs-bar" aria-hidden="true"><span class="anal-mem-fill" style="width:${Math.round(Math.min(1, f.reviews / FsrsParams.MIN_REVIEWS) * 100)}%"></span></span>`;
   } else {
     body = `<p>${t('Ya hay historial para ajustar el algoritmo a cómo olvidas tú. Se calcula en este dispositivo y te enseña qué cambia antes de aplicarlo.')}</p>
       <div class="anal-actions"><button class="btn btn--primary primary-btn" data-act="fsrs-run">${t('Ajustar a mi memoria')}</button></div>`;
   }
-  return `<section class="anal-sec anal-fsrs">${head}${body}</section>`;
+  if (fsrsOpen != null) open = fsrsOpen;
+  return `<details class="anal-sec anal-fsrs"${open ? ' open' : ''}>
+    <summary class="anal-fsrs-sum"><h3 class="anal-sec-h">${t('Ajustado a tu memoria')}</h3>${status ? `<span class="anal-sec-aside">${escapeHtml(status)}</span>` : ''}</summary>
+    ${body}
+  </details>`;
 }
