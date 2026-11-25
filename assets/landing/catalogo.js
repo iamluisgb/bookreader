@@ -102,6 +102,14 @@
 
   function fmt(s, p) { return s.replace(/\{(\w+)\}/g, function (_, k) { return p[k]; }); }
   function fold(s) { return (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(); }
+  // `key` es la huella sobre la que busca el cajón (título y autor, sin acentos ni mayúsculas). Se
+  // ponía en ninguna parte: el buscador filtraba sobre `undefined` y reventaba con
+  // «Cannot read properties of undefined (reading 'indexOf')», que dejaba la lista intacta y parecía
+  // que no pasaba nada.
+  function ponerClave(b) {
+    b.key = fold((b.title || '') + ' ' + (b.author || ''));
+    return b;
+  }
   function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
 
   // Época = siglo de nacimiento del autor. Los años a.C. tienen su propio tramo en lugar de caer
@@ -161,7 +169,7 @@
     if (skip !== 'era' && filtro.era && b.era !== filtro.era) return false;
     if (skip !== 'src' && filtro.src && b.src !== filtro.src) return false;
     var q = fold(input.value.trim());
-    return !q || b.key.indexOf(q) !== -1;
+    return !q || (b.key || '').indexOf(q) !== -1;
   }
 
   function opciones(campo, etiqueta, valores, grupos) {
@@ -289,7 +297,7 @@
     fetch(base + 'assets/muestra/catalogo-completo.json')
       .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
       .then(function (c) {
-        all = all.concat((c.pg || []).map(desdePg)).sort(function (a, b) { return a.key < b.key ? -1 : 1; });
+        all = all.concat((c.pg || []).map(desdePg).map(ponerClave)).sort(function (a, b) { return a.key < b.key ? -1 : 1; });
         fondoPendiente = 0;
         btn.parentNode.removeChild(btn);
         render();
@@ -367,7 +375,7 @@
         };
       });
       // Los técnicos primero: son pocos y en la lista larga de clásicos se perderían.
-      all = filas.concat(se, pgEs, el_, wiki);
+      all = filas.concat(se, pgEs, el_, wiki).map(ponerClave);
       all.forEach(function (b) { b.key = fold(b.title + ' ' + b.author); });
       // Cuántas obras quedan fuera de lo cargado, según el índice de ids del catálogo.
       var cargados = {};

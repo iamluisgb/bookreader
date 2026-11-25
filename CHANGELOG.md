@@ -140,6 +140,11 @@ proxys de empresa bloquean; Polar (la licencia) sí pasaba.
   Heródoto (281.309, trad. Bartolomé Pou †1802) y **Vidas paralelas** de Plutarco (714.393, trad.
   Ranz Romanillos †1830). Los tres validan (XML bien formado, mimetype primero y sin comprimir) y
   abren con su índice; el test recorre Libro I a Libro XII.
+- **El buscador nunca había filtrado.** `casa()` busca sobre `b.key`, y `key` no se asignaba en
+  ningún sitio: al escribir, el filtro lanzaba `Cannot read properties of undefined (reading
+  'indexOf')` dentro de `render()`, la excepción se tragaba el repintado y la lista se quedaba
+  clavada sin decir nada. Ahora la huella (título + autor, sin acentos) se calcula al montar cada
+  fila, también las del fondo que llegan después. Lo destapó el test nuevo, no una revisión a ojo.
 - **Filtros con dos niveles de materia y contadores honestos.** La materia sale ahora de la
   subclase de la Library of Congress, no de la letra: «Literatura» (28.246 obras) se abre en
   «Literatura inglesa» (6.499), «Literatura americana» (5.274), «Ficción y juvenil» (4.053),
