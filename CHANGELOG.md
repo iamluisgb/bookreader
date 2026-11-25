@@ -23,9 +23,14 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
   dominio y una página HTML donde tocaba un libro es un 502, no un libro. Elejandría exige el
   `Referer` de la ficha, que se resuelve en el build (`elejandria-enlaces.json`, 2.215 enlaces: el
   ePub es el segundo enlace de descarga, verificado en 15 de 15).
-- **Tests**: `npm run test:libros` 13/13 (construcción de URL, id fuera de catálogo sin salir a la
-  red, Referer, HTML disfrazado) y `tests/samples-catalog.spec.ts` 7/7 (`pg:` y `el:` abren el
-  libro por el Worker; un número inventado no genera ni una petición).
+- **Tests**: `npm run test:libros` 14/14 (construcción de URL, id fuera de catálogo sin salir a la
+  red, Referer, HTML disfrazado, PDF cuando la ficha no tiene ePub) y `tests/samples-catalog.spec.ts`
+  8/8 (`pg:` y `el:` abren el libro por el Worker; un número inventado no genera ni una petición).
+- **PDF de Elejandría**: 154 fichas no tienen ePub y solo ofrecen PDF —casi todas clásicos: Platón,
+  Aristóteles, Aristófanes, Voltaire—. Antes se caían del catálogo; ahora se sirven en PDF y el
+  lector las abre con su lector de PDF (el catálogo dice el formato en `elPdfIds`).
+- **El título del enlace nombra el fichero**: sin eso, un libro de Gutenberg entraba en la
+  biblioteca como `pg:1619`. Ahora se usa el `t=` de la landing, saneado.
 - **Datos del catálogo** en `assets/muestra/`: `pg-espana.json` (3,7 MB) y `elejandria.json` se
   commitean para que el build no dependa de la red; se refrescan con `--actualizar-gutenberg --csv`
   y `--actualizar-elejandria`.

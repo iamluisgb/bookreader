@@ -284,6 +284,9 @@ const out = {
   se,
   pgIds: pg.map((w) => w[0]),
   elIds: el.map((w) => w[0]),
+  // Las fichas de Elejandría que solo ofrecen PDF (155 al cerrar esto, casi todas clásicos sin ePub):
+  // la app las abre igual, pero tiene que saber el tipo antes de descargar.
+  elPdfIds: el.filter((w) => enlaces[w[0]].format === 'pdf').map((w) => w[0]),
 };
 const completo = {
   note:
@@ -297,9 +300,11 @@ const completo = {
 const pgEs = pg.filter((w) => w[3] === 'es');
 const pgResto = pg.filter((w) => w[3] !== 'es');
 const es = {
-  note: 'Estantería curada para la landing: el = Elejandría, pg = Gutenberg en español. Mismo formato que catalogo-pg.json.',
+  note:
+    'Estantería curada para la landing: el = Elejandría, pg = Gutenberg en español. Mismo formato que ' +
+    'catalogo-pg.json, con un sexto campo en el solo si la ficha no tiene ePub y se sirve el PDF.',
   pg: pgEs,
-  el,
+  el: el.map((w) => (enlaces[w[0]].format === 'pdf' ? [...w, 'pdf'] : w)),
 };
 writeFileSync(OUT, JSON.stringify(out) + '\n');
 writeFileSync(COMPLETO, JSON.stringify({ note: completo.note, pg: pgResto }) + '\n');

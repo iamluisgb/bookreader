@@ -106,6 +106,14 @@ test('/el pide el fichero con el Referer de la ficha', async () => {
   assert.match(visto.ref, new RegExp(`/libro/${e.slug}/${e.autor}/${id}$`));
 });
 
+test('/el sirve el PDF cuando la ficha no tiene ePub', async () => {
+  const [id, e] = [...EL_ENLACES.entries()].find(([, v]) => v.format === 'pdf');
+  globalThis.fetch = async () => new Response(new Uint8Array([0x25, 0x50, 0x44, 0x46]), { status: 200, headers: { 'Content-Type': 'application/pdf' } });
+  const r = await pedir('/el/' + id);
+  assert.equal(r.status, 200);
+  assert.equal(r.headers.get('Content-Type'), 'application/pdf');
+});
+
 test('/el no sale a la red con un id desconocido', async () => {
   globalThis.fetch = async () => { throw new Error('no debería salir a la red'); };
   assert.equal((await pedir('/el/999999')).status, 404);
@@ -123,5 +131,6 @@ test('el catálogo empaquetado trae los ids de las dos fuentes nuevas', () => {
   for (const e of EL_ENLACES.values()) {
     assert.match(e.fichaid, /^\d+$/);
     assert.ok(e.slug && e.autor);
+    assert.ok(['epub', 'pdf'].includes(e.format), `formato inesperado: ${e.format}`);
   }
 });

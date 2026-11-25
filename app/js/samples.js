@@ -70,7 +70,15 @@ export async function resolve(id) {
     const key = id.slice(3);
     const c = await catalogo();
     if (!/^\d+$/.test(key) || !(c.elIds || []).includes(key)) return null;
-    return { title: `Elejandría #${key}`, href: `${LIBROS_WORKER}/el/${key}`, file: `elejandria-${key}.epub`, type: TIPOS.epub };
+    // Algunas fichas solo ofrecen PDF (casi todas clásicos sin ePub): el catálogo lo dice para que
+    // el fichero se abra con el lector correcto en vez de con el de EPUB.
+    const pdf = (c.elPdfIds || []).includes(key);
+    return {
+      title: `Elejandría #${key}`,
+      href: `${LIBROS_WORKER}/el/${key}`,
+      file: `elejandria-${key}.${pdf ? 'pdf' : 'epub'}`,
+      type: pdf ? TIPOS.pdf : TIPOS.epub,
+    };
   }
   const book = (await manifest()).find((b) => b.id === id);
   if (!book) return null;
@@ -81,8 +89,10 @@ export async function init(handle) {
   const url = new URL(location.href);
   const id = url.searchParams.get('sample');
   if (!id) return;
-  // La marca se quita YA: recargar no debe volver a importar lo mismo. `t` es solo el título del
-  // aviso que manda la landing, así que se va con ella.
+  // `t` es el título que manda la landing: no decide de dónde se baja nada, pero sí sirve para
+  // nombrar el fichero (sin él, un libro de Gutenberg entraba en la biblioteca como «pg:1619»).
+  const titulo = url.searchParams.get('t') || '';
+  // La marca se quita YA: recargar no debe volver a importar lo mismo.
   url.searchParams.delete('sample');
   url.searchParams.delete('t');
   history.replaceState(history.state, '', url.pathname + url.search + url.hash);
@@ -100,7 +110,12 @@ export async function init(handle) {
     if (!res.ok) throw new Error(`descarga del libro: ${res.status}`);
     const blob = await res.blob();
     dismiss();
-    await handle(new File([blob], book.file, { type: book.type }));
+    // El nombre del fichero es el título que verá el lector en su biblioteca. El del catálogo es el
+    // id (`pg:1619.epub`), así que si la landing mandó título se usa ese, saneado: el nombre acaba
+    // en IndexedDB y se pinta en la estantería.
+    const ext = book.file.split('.').pop();
+    const limpio = titulo.replace(/[\\/:*?"<>|\u0000-\u001f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 120);
+    await handle(new File([blob], limpio ? `${limpio}.${ext}` : book.file, { type: book.type }));
   } catch (e) {
     dismiss();
     console.warn('Muestra: no se pudo abrir', id, e);

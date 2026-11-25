@@ -246,7 +246,7 @@
           id: 'el:' + w[0], kind: 'lit', title: w[1], author: w[2], lang: 'es', mat: materia(w[3]),
           year: w[4], era: epoca(w[4]), src: 'el', format: 'epub',
           license: ES ? 'Dominio público o licencia abierta' : 'Public domain or open licence',
-          home: 'https://www.elejandria.com/libro/' + w[0], sourceName: 'Elejandría',
+          format: w[5] || 'epub', home: 'https://www.elejandria.com/libro/' + w[0], sourceName: 'Elejandría',
         };
       });
       // Los técnicos primero: son pocos y en la lista larga de clásicos se perderían.

@@ -77,6 +77,20 @@ test('un libro de Elejandría se pide al Worker por su id', async ({ page }) => 
   expect(pedidas).toEqual([`${WORKER}/el/${id}`]);
 });
 
+// Las fichas de Elejandría sin ePub solo ofrecen PDF: el catálogo lo dice y el fichero se abre con
+// el lector de PDF, no con el de EPUB.
+test('un clásico de Elejandría que solo está en PDF se abre como PDF', async ({ page }) => {
+  const pedidas = await fuentes(page);
+  const cat = JSON.parse(fs.readFileSync(CATALOGO, 'utf8'));
+  const id = (cat.elPdfIds || [])[0];
+  expect(id, 'el catálogo debería traer fichas solo-PDF').toBeTruthy();
+  await page.goto('/index.html?sample=' + encodeURIComponent('el:' + id) + '&t=Ret%C3%B3rica');
+  await expect(page.locator('body')).toHaveClass(/reading/, { timeout: 20000 });
+  expect(pedidas).toEqual([`${WORKER}/el/${id}`]);
+  // El título del enlace es el que acaba en la biblioteca, no el id del fichero.
+  await expect(page.getByText('Retórica').first()).toBeVisible({ timeout: 10000 });
+});
+
 test('un número de Gutenberg que no está en el catálogo no sale a la red', async ({ page }) => {
   const pedidas = await fuentes(page);
   const cat = JSON.parse(fs.readFileSync(CATALOGO, 'utf8'));

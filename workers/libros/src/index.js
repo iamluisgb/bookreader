@@ -103,7 +103,7 @@ export default {
       if (!e) return respuesta(404, `el libro ${el[1]} no está en el catálogo`, cors);
       const url = new URL(`https://www.elejandria.com/libro/link_descarga_libro/${el[1]}/${e.fichaid}`);
       const referer = `https://www.elejandria.com/libro/${e.slug}/${e.autor}/${el[1]}`;
-      return reenviar(url, 'epub', EL_HOSTS, cors, { Referer: referer });
+      return reenviar(url, e.format || 'epub', EL_HOSTS, cors, { Referer: referer });
     }
 
     return respuesta(404, 'rutas: /libro/<id>, /pg/<n>, /el/<id>', cors);
