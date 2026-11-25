@@ -1,14 +1,17 @@
 // Abrir un libro libre desde la propia URL: `/app/?sample=<id>`.
 //
-// Tres clases de id, las tres resueltas SOLO contra catálogos nuestros (una URL arbitraria en el
+// Cinco clases de id, las cinco resueltas SOLO contra catálogos nuestros (una URL arbitraria en el
 // enlace no se baja nunca: un enlace no puede meterle a nadie un fichero cualquiera en la biblioteca):
 //   - `niebla`                   → muestra propia, fichero estático en `assets/muestra/` (manifest.json)
 //   - `se:mary-shelley/frankenstein` → Standard Ebooks; el navegador lo baja de su web (manda CORS)
 //   - `tec:progit-en`            → técnico con licencia abierta (`assets/muestra/tecnicos.json`): directo
-//                                  si la fuente manda CORS, o por el Worker `bookreader-libros`, que
-//                                  reenvía sin guardar (workers/libros)
-// Los dos últimos viven en `assets/muestra/catalogo.json` (scripts/catalogo-libros.mjs). Ningún
-// libro del catálogo se guarda en este sitio: se baja de su fuente en el navegador del lector.
+//                                  si la fuente manda CORS, o por el Worker `bookreader-libros`
+//   - `pg:2000`                  → Project Gutenberg (dominio público en España), por el Worker: su
+//                                  espejo no manda CORS y www.gutenberg.org está caído para el lector
+//   - `el:20`                    → Elejandría, por el Worker: su descarga exige `Referer`
+// Los tres últimos se validan contra los ids del catálogo (`assets/muestra/catalogo.json`), que NO
+// guarda los libros: solo la lista de ids que se pueden pedir y de dónde se baja cada uno
+// (scripts/catalogo-libros.mjs). El `&t=` del enlace es solo el título del aviso, nunca una ruta.
 //
 // Una vez bajado, el fichero se envuelve en un `File` y va al MISMO `loadFile` que «Subir
 // archivos». No hay estado nuevo: el `bookId` es el SHA-256 del contenido, así que si el libro ya
@@ -54,6 +57,20 @@ export async function resolve(id) {
     if (!book) return null;
     const href = book.via === 'proxy' ? `${LIBROS_WORKER}/libro/${encodeURIComponent(book.id)}` : book.url;
     return { title: book.title, href, file: `${book.id}.${book.format}`, type: TIPOS[book.format] || TIPOS.epub };
+  }
+  // Gutenberg y Elejandría: el id solo sirve si está en la lista blanca del catálogo, y la URL la
+  // construye el Worker a partir de ese número (nunca se le pasa una URL).
+  if (id.startsWith('pg:')) {
+    const n = Number(id.slice(3));
+    const c = await catalogo();
+    if (!Number.isInteger(n) || !(c.pgIds || []).includes(n)) return null;
+    return { title: `Gutenberg #${n}`, href: `${LIBROS_WORKER}/pg/${n}`, file: `gutenberg-${n}.epub`, type: TIPOS.epub };
+  }
+  if (id.startsWith('el:')) {
+    const key = id.slice(3);
+    const c = await catalogo();
+    if (!/^\d+$/.test(key) || !(c.elIds || []).includes(key)) return null;
+    return { title: `Elejandría #${key}`, href: `${LIBROS_WORKER}/el/${key}`, file: `elejandria-${key}.epub`, type: TIPOS.epub };
   }
   const book = (await manifest()).find((b) => b.id === id);
   if (!book) return null;

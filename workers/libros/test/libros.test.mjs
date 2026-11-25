@@ -4,7 +4,7 @@
 //   npm run test:libros
 import { test, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import worker, { LIBROS, HOSTS } from '../src/index.js';
+import worker, { LIBROS, HOSTS, PG_IDS, EL_ENLACES } from '../src/index.js';
 
 const ENV = { ALLOWED_ORIGINS: 'https://bookreader.raiatech.com' };
 const fetchReal = globalThis.fetch;
@@ -65,4 +65,63 @@ test('un error de la fuente no se disfraza de libro', async () => {
 test('un bucle de redirecciones termina', async () => {
   globalThis.fetch = async (url) => new Response(null, { status: 302, headers: { Location: String(url) } });
   assert.equal((await pedir('/libro/producing-oss')).status, 508);
+});
+
+// ── Gutenberg: la URL la construye el Worker, nunca llega del cliente ──────────────────────
+test('/pg construye la URL del espejo para un id del catálogo', async () => {
+  const n = [...PG_IDS][0];
+  const pedidas = [];
+  globalThis.fetch = async (url) => {
+    pedidas.push(String(url));
+    return new Response(EPUB, { status: 200, headers: { 'Content-Type': 'application/epub+zip', 'Content-Length': String(EPUB.length) } });
+  };
+  const r = await pedir('/pg/' + n);
+  assert.equal(r.status, 200);
+  assert.equal(r.headers.get('Content-Type'), 'application/epub+zip');
+  assert.equal(pedidas.length, 1);
+  assert.equal(pedidas[0], `https://gutenberg.pglaf.org/cache/epub/${n}/pg${n}-images-3.epub`);
+  assert.equal(r.headers.get('Access-Control-Allow-Origin'), 'https://bookreader.raiatech.com');
+});
+
+test('/pg no sale a la red con un id fuera del catálogo ni con otra forma de ruta', async () => {
+  globalThis.fetch = async () => { throw new Error('no debería salir a la red'); };
+  let fuera = 1;
+  while (PG_IDS.has(fuera)) fuera++;
+  assert.equal((await pedir('/pg/' + fuera)).status, 404);
+  assert.equal((await pedir('/pg/abc')).status, 404);
+  assert.equal((await pedir('/pg/1/../../x')).status, 404);
+});
+
+// ── Elejandría: dos saltos y `Referer` obligatorio ────────────────────────────────────────
+test('/el pide el fichero con el Referer de la ficha', async () => {
+  const [id, e] = [...EL_ENLACES.entries()][0];
+  let visto = null;
+  globalThis.fetch = async (url, init) => {
+    visto = { url: String(url), ref: new Headers(init.headers).get('Referer') };
+    return new Response(EPUB, { status: 200, headers: { 'Content-Type': 'application/epub+zip' } });
+  };
+  const r = await pedir('/el/' + id);
+  assert.equal(r.status, 200);
+  assert.equal(visto.url, `https://www.elejandria.com/libro/link_descarga_libro/${id}/${e.fichaid}`);
+  assert.match(visto.ref, new RegExp(`/libro/${e.slug}/${e.autor}/${id}$`));
+});
+
+test('/el no sale a la red con un id desconocido', async () => {
+  globalThis.fetch = async () => { throw new Error('no debería salir a la red'); };
+  assert.equal((await pedir('/el/999999')).status, 404);
+});
+
+test('una página HTML donde tocaba un libro es un 502, no un libro', async () => {
+  const n = [...PG_IDS][0];
+  globalThis.fetch = async () => new Response('<!doctype html><p>mantenimiento</p>', { status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8' } });
+  assert.equal((await pedir('/pg/' + n)).status, 502);
+});
+
+test('el catálogo empaquetado trae los ids de las dos fuentes nuevas', () => {
+  assert.ok(PG_IDS.size > 1000, 'Gutenberg en español debería traer miles de obras');
+  assert.ok(EL_ENLACES.size > 0, 'Elejandría debería traer enlaces resueltos');
+  for (const e of EL_ENLACES.values()) {
+    assert.match(e.fichaid, /^\d+$/);
+    assert.ok(e.slug && e.autor);
+  }
 });

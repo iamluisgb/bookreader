@@ -2320,7 +2320,12 @@ de BookReader.
 
 ---
 
-### P60 — Biblioteca libre, fase 2: Gutenberg (sobre todo en español) · `M` · **siguiente**
+### P60 — Biblioteca libre, fase 2: Gutenberg (sobre todo en español) · `M` · **✓ cerrado el 2026-11-25**
+
+**Cerrado en la rama `biblioteca-completa`** (entregado en `CHANGELOG.md`, entrada del 2026-11-25):
+44.673 obras de Gutenberg en dominio público en España, 1.973 de Elejandría con ePub resuelto,
+filtros por idioma / materia / época / edición en las dos landings y rutas `/pg/<n>` y `/el/<id>` en
+el Worker `bookreader-libros`. Lo de abajo se conserva como registro de lo medido para llegar aquí.
 
 **Estado de partida (fase 1, en producción el 2026-11-24, commits `e4420a1` y `4f14694`).**
 `/samples/` y `/es/muestra/` buscan en `assets/muestra/catalogo.json`: 1.548 clásicos de Standard
