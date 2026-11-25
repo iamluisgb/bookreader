@@ -41,6 +41,17 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
   Heródoto (281.309, trad. Bartolomé Pou †1802) y **Vidas paralelas** de Plutarco (714.393, trad.
   Ranz Romanillos †1830). Los tres validan (XML bien formado, mimetype primero y sin comprimir) y
   abren con su índice; el test recorre Libro I a Libro XII.
+- **Verificador de enlaces** (`scripts/verifica-catalogo.mjs`, `npm run verifica`). Primera pasada
+  completa el 2026-11-25: **47.660 comprobaciones en 13 min** (45.288 de Gutenberg, 2.369 de
+  Elejandría, 3 de Wikisource). Resultado: **87 obras de Gutenberg ya no existen** (0,19%) y se caen
+  del catálogo —no hay variante de fichero que las salve—; Elejandría dio 22 fallos y **ninguno era
+  una obra perdida**: 3 renumeradas (`--reparar` las vuelve a resolver), 10 con espacios de ancho
+  cero (U+200B) dentro del slug y 9 con acentos que rompían la cabecera `Referer`. Tras repararlas,
+  Elejandría queda en 0 fallos de 2.369. El build lee `verificacion.json` y excluye lo roto; si el
+  informe no existe o pasa de 45 días, avisa en vez de dar por bueno lo que no ha comprobado.
+- **Humo contra producción** (`scripts/smoke-muestras.mjs`, `npm run smoke:muestras`): 19 obras al
+  azar por el Worker y por los estáticos, comprobando tipo y bytes mágicos. 19/19 en 14 s
+  (286 s antes de cortar el cuerpo tras los primeros bytes) y enganchado a `deploy:pages`.
 - **Datos del catálogo** en `assets/muestra/`: `pg-espana.json` (3,7 MB) y `elejandria.json` se
   commitean para que el build no dependa de la red; se refrescan con `--actualizar-gutenberg --csv`
   y `--actualizar-elejandria`.

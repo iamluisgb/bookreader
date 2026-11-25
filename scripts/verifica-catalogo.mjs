@@ -25,6 +25,7 @@ const arg = (n, d = null) => {
 const SOLO = arg('--fuente');
 const MUESTRA = Number(arg('--muestra', '0'));
 const CONC = Number(arg('--concurrencia', '10'));
+const REPARAR = argv.includes('--reparar');
 const TIMEOUT = 25000;
 
 const pg = JSON.parse(readFileSync(new URL('pg-espana.json', WEB), 'utf8')).works;
@@ -74,7 +75,17 @@ async function recorrer(nombre, items, fn) {
 
 const aleatorio = (arr, n) => (n > 0 ? arr.slice().sort(() => Math.random() - 0.5).slice(0, n) : arr);
 
-const salida = { generated: new Date().toISOString(), fallos: { pg: [], el: [], ws: [] }, comprobadas: {} };
+// Si se comprueba una sola fuente, se conserva lo que ya decía el informe: si no, reparar Elejandría
+// borraría la lista de fallos de Gutenberg.
+let previo = {};
+try {
+  previo = JSON.parse(readFileSync(OUT, 'utf8'));
+} catch {}
+const salida = {
+  generated: new Date().toISOString(),
+  fallos: { pg: (previo.fallos || {}).pg || [], el: (previo.fallos || {}).el || [], ws: (previo.fallos || {}).ws || [] },
+  comprobadas: previo.comprobadas || {},
+};
 
 if (!SOLO || SOLO === 'pg') {
   const items = aleatorio(pg.map((w) => ({ id: w[0] })), MUESTRA);
@@ -84,13 +95,54 @@ if (!SOLO || SOLO === 'pg') {
   salida.comprobadas.pg = items.length;
 }
 
+// Elejandría renumera el `fichaid` cuando republica una ficha (397→517), así que un fallo ahí no
+// significa que el libro se haya ido: con `--reparar` se vuelve a resolver desde la ficha y, si el
+// nuevo enlace sirve, se actualiza el catálogo en vez de tirar la obra.
+const RE_DESC = /(?:https:\/\/www\.elejandria\.com)?\/libro\/descargar\/([^/"']+)\/([^/"']+)\/(\d+)\/(\d+)/;
+const RE_TEXTO = /Descargando(?: gratis)?[^<]{0,80}?\ben\s+(ePub|EPUB|PDF|Mobi|MOBI)/;
+async function repararEl(id, v) {
+  const ficha = await fetch(encodeURI(`https://www.elejandria.com/libro/${v.slug}/${v.autor}/${id}`), { headers: { 'User-Agent': UA } }).then((r) => r.text()).catch(() => '');
+  const m = ficha.match(RE_DESC);
+  if (!m) return false;
+  // Algunas fichas meten espacios de ancho cero (U+200B) dentro del slug y eso rompe la cabecera
+  // Referer; se limpian aquí para que el enlace guardado sirva.
+  const limpia = (s) => s.replace(/[\u200b\u200c\u200d\u200e\u200f\ufeff\u00ad]/g, '').trim();
+  const [, slugBruto, autorBruto, , fichaid] = m;
+  const slug = limpia(slugBruto);
+  const autor = limpia(autorBruto);
+  const pagina = await fetch(`https://www.elejandria.com${m[0].replace(/^https:\/\/www\.elejandria\.com/, '')}`, { headers: { 'User-Agent': UA } }).then((r) => r.text()).catch(() => '');
+  const formato = (pagina.match(RE_TEXTO)?.[1] || 'pdf').toLowerCase();
+  const motivo = await pide(`https://www.elejandria.com/libro/link_descarga_libro/${id}/${fichaid}`, {
+    Referer: encodeURI(`https://www.elejandria.com/libro/${slug}/${autor}/${id}`),
+  });
+  if (motivo) return false;
+  el[id] = { slug, autor, fichaid, format: formato };
+  console.log(`  reparado ${id}: fichaid ${v.fichaid} → ${fichaid} (${formato})`);
+  return true;
+}
+
 if (!SOLO || SOLO === 'el') {
   const items = aleatorio(Object.entries(el).map(([id, v]) => ({ id, v })), MUESTRA);
-  salida.fallos.el = await recorrer('Elejandría', items, ({ id, v }) =>
+  const fallos = await recorrer('Elejandría', items, ({ id, v }) =>
+    // La cabecera va percent-encoded: hay slugs con acentos y un header HTTP no admite no-ASCII.
     pide(`https://www.elejandria.com/libro/link_descarga_libro/${id}/${v.fichaid}`, {
-      Referer: `https://www.elejandria.com/libro/${v.slug}/${v.autor}/${id}`,
+      Referer: encodeURI(`https://www.elejandria.com/libro/${v.slug}/${v.autor}/${id}`),
     }),
   );
+  if (REPARAR && fallos.length) {
+    console.log(`reparando ${fallos.length} enlaces de Elejandría…`);
+    const siguen = [];
+    for (const [id, motivo] of fallos) {
+      if (!(await repararEl(String(id), el[String(id)] || {}))) siguen.push([id, motivo]);
+    }
+    salida.reparados = fallos.length - siguen.length;
+    salida.fallos.el = siguen;
+    if (salida.reparados) {
+      writeFileSync(new URL('elejandria-enlaces.json', WEB), JSON.stringify({ note: 'Enlaces de descarga de Elejandría: {id: {slug, autor, fichaid, format}}. Reparados por scripts/verifica-catalogo.mjs --reparar cuando Elejandría renumera.', links: el }, null, 0) + '\n');
+    }
+  } else {
+    salida.fallos.el = fallos;
+  }
   salida.comprobadas.el = items.length;
 }
 
