@@ -1631,16 +1631,6 @@ body.ai-open #sync-badge { right: calc(var(--ai-panel-width) + 14px); }
 .anal-card { max-width: 560px; }
 .anal-loading { color: var(--text-soft); font-size: var(--fs-md); }
 
-.anal-tabs { display: flex; gap: 4px; padding: 3px; margin-bottom: 20px;
-  background: var(--surface-3); border-radius: var(--r-pill); width: fit-content; }
-.anal-tab {
-  padding: 6px 16px; border: none; border-radius: var(--r-pill); background: none;
-  color: var(--text-soft); font-size: var(--fs-sm); font-weight: 500; cursor: pointer;
-  transition: background var(--transition-fast), color var(--transition-fast);
-}
-.anal-tab { white-space: nowrap; }
-.anal-tab.active { background: var(--surface-1); color: var(--text); font-weight: 600; box-shadow: var(--shadow-1); }
-
 /* La cifra que lidera. Una sola por vista: es la respuesta a "cuánto he leído". */
 .anal-hero { margin-bottom: 18px; }
 .anal-hero-n { font-size: 48px; font-weight: 700; letter-spacing: -0.03em; line-height: 1.05; }
@@ -1746,9 +1736,28 @@ body.ai-open #sync-badge { right: calc(var(--ai-panel-width) + 14px); }
 .anal-book-cover--none.has-ring { background: color-mix(in srgb, var(--c) 28%, var(--surface-2)); color: var(--text); }
 .anal-book-cover--none { font-size: var(--fs-2xs); font-weight: 600; letter-spacing: -0.02em; }
 
-/* P45 · Cabecera: ámbito (biblioteca, estantería o libro) → rango → periodo con flechas. */
-.anal-head { display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px; }
-.anal-head .anal-tabs { margin-bottom: 0; }
+/* P45 · Cabecera: ámbito (biblioteca, estantería o libro) → rango → periodo con flechas.
+   Auditoría de Análisis: es el único selector de rango de la pantalla, así que se queda pegada
+   arriba al desplazar (se ve siempre qué periodo se mira) y usa el segmentado del sistema. */
+.anal-head { display: flex; flex-direction: column; gap: 10px; margin-bottom: 10px; }
+/* La fila del rango se pega arriba al desplazar. Para que se pegue AL BORDE (y no 28px más abajo,
+   dejando asomar el contenido por encima), el relleno de arriba de la tarjeta pasa al título; a los
+   lados, el fondo se extiende 30px hasta el borde. */
+.anal-card { padding-top: 0; }
+.anal-card > .appset-h2 { padding-top: 28px; }
+.anal-range { position: sticky; top: 0; z-index: 2; display: flex; flex-wrap: wrap; align-items: center;
+  gap: 8px 12px; margin: 0 -30px 18px; padding: 8px 30px 10px; background: var(--surface-1);
+  border-bottom: 1px solid var(--border-soft); }
+.anal-range .anal-nav { margin-left: auto; }
+@media (max-width: 600px) {
+  .anal-range .anal-tabs { flex: 1 1 100%; }
+  .anal-range .anal-nav { margin-left: 0; }
+}
+/* Tamaños táctiles (DESIGN.md: ≥ 44px con el dedo). */
+@media (pointer: coarse) {
+  .anal-range .segmented-btn, .anal-scope-pick, .anal-scope-open, .anal-scope-study { min-height: 44px; height: auto; }
+  .anal-nav-btn, .anal-scope-x, .anal-card .appset-close { min-width: 44px; min-height: 44px; }
+}
 .anal-scope { position: relative; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
 .anal-scope-pick { display: inline-flex; align-items: center; gap: 6px; min-width: 0; max-width: 100%;
   height: 32px; padding: 0 12px; border: 1px solid var(--border); border-radius: var(--r-pill);

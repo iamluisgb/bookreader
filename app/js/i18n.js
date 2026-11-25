@@ -164,6 +164,7 @@ const EN = {
   'Igual {que}': 'Same {que}',
   'Toda la biblioteca': 'Whole library',
   'Qué analizar': 'What to analyze',
+  'Periodo': 'Period',
   'Periodo anterior': 'Previous period',
   'Volver a ahora': 'Back to now',
   'Periodo siguiente': 'Next period',

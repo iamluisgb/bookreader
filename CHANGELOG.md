@@ -3,6 +3,20 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-11-25 — Análisis: cabecera con el segmentado del sistema, pegada arriba y táctil
+
+Auditoría de Análisis, paso 4 (P3, P4, P5).
+
+- Las pestañas de periodo usan `.segmented` (antes un componente propio, `.anal-tabs`, que se veía
+  distinto del segmentado del Ritmo a 400 px).
+- La fila del rango (segmentado + ‹ periodo ›) se queda pegada arriba al desplazar: es el único
+  selector de rango de la pantalla y ahora siempre se ve qué periodo se mira. Para que se pegue al
+  borde, el relleno de arriba de la tarjeta pasa al título.
+- Con `pointer: coarse`, todos los controles de la cabecera miden ≥ 44 px (antes 27, 32 y 36).
+- «Día» se queda, aunque la propuesta lo quitaba: es la única forma de ver «hoy» de un toque y los
+  tests de periodos lo usan como camino normal.
+- Test nuevo en `tests/analysis-periods.spec.ts` (390 px táctil: segmentado, 44 px, pegada al borde).
+
 ## 2026-11-25 — Análisis: un solo rango, una gráfica partida por libro y «Por libro» como leyenda
 
 Caso (auditoría de Análisis, P1 y P2): la pantalla tenía tres relojes y repetía datos. «Ritmo de

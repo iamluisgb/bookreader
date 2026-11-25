@@ -157,3 +157,29 @@ test('los periodos y el selector están traducidos (EN)', async ({ page }) => {
   expect(txt).toContain('Whole library');
   expect(txt).not.toMatch(/Esta semana|Toda la biblioteca|empezados|Tiempo leído|que la semana/);
 });
+
+// Auditoría de Análisis, paso 4: el rango es el segmentado del sistema, se queda pegado arriba al
+// desplazar (se ve siempre qué periodo se mira) y, con el dedo, todos los controles miden ≥ 44px.
+test.describe('cabecera en el móvil', () => {
+  test.use({ viewport: { width: 390, height: 520 }, hasTouch: true, isMobile: true });
+  test('segmentado del sistema, pegada al desplazar y controles de 44px', async ({ page }) => {
+    await page.goto('/index.html');
+    const days: [number, number][] = Array.from({ length: 40 }, (_, i) => [i, 25] as [number, number]);
+    await seedReading(page, [{ id: 'a', title: 'Libro A', days }, { id: 'b', title: 'Libro B', days: days.slice(0, 12) }]);
+    await page.evaluate(async () => { const A: any = await import('/js/analysis.js'); await A.open(); });
+    const a = page.locator('#analysis');
+    await expect(a.locator('.anal-range .segmented .segmented-btn')).toHaveCount(5);
+    const h = await page.evaluate(() => [...document.querySelectorAll('#analysis .anal-range .segmented-btn, #analysis .anal-scope-pick, #analysis .anal-nav-btn, #analysis .appset-close')]
+      .map(e => Math.round(e.getBoundingClientRect().height)));
+    expect(Math.min(...h)).toBeGreaterThanOrEqual(44);
+    await a.locator('[data-range="month"]').click();
+    const stuck = await page.evaluate(() => {
+      const card = document.querySelector('#analysis .anal-card') as HTMLElement;
+      card.scrollTop = card.scrollHeight;
+      const r = (document.querySelector('#analysis .anal-range') as HTMLElement).getBoundingClientRect();
+      return { scrolled: card.scrollTop > 200, top: Math.round(r.top - card.getBoundingClientRect().top) };
+    });
+    expect(stuck.scrolled).toBe(true);
+    expect(stuck.top).toBeLessThanOrEqual(2);   // pegada al borde de la tarjeta, sin hueco
+  });
+});

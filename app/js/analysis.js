@@ -596,7 +596,7 @@ function renderHead(d) {
   const due = sc ? studyDue(d) : 0;
   const tabs = RANGES.map(r => {
     const label = r.label();
-    return `<button class="anal-tab${r.id === range ? ' active' : ''}" role="tab" aria-selected="${r.id === range}" data-range="${r.id}">${label}</button>`;
+    return `<button class="segmented-btn anal-tab${r.id === range ? ' active' : ''}" role="tab" aria-selected="${r.id === range}" data-range="${r.id}">${label}</button>`;
   }).join('');
   const nav = d.period.kind === 'all' ? `<div class="anal-nav"><span class="anal-nav-l">${escapeHtml(d.label)}</span></div>` : `<div class="anal-nav">
       <button class="icon-btn anal-nav-btn" data-act="prev" ${d.canPrev ? '' : 'disabled'} title="${t('Periodo anterior')}" aria-label="${t('Periodo anterior')}">${icon('chevron-left', { size: 'md' })}</button>
@@ -615,7 +615,9 @@ function renderHead(d) {
         ${due ? `<button class="btn btn--primary primary-btn anal-scope-study" data-act="study-scope">${icon('cards', { size: 'sm' })} ${sc.type === 'book' ? t('Repasar este libro ({n})', { n: due }) : t('Repasar esta estantería ({n})', { n: due })}</button>` : ''}
         ${menu}
       </div>
-      <div class="anal-tabs" role="tablist">${tabs}</div>
+    </div>
+    <div class="anal-range">
+      <div class="segmented anal-tabs" role="tablist" aria-label="${t('Periodo')}">${tabs}</div>
       ${nav}
     </div>`;
 }
