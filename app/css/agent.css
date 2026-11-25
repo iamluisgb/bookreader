@@ -1731,52 +1731,20 @@ body.ai-open #sync-badge { right: calc(var(--ai-panel-width) + 14px); }
   color: var(--warning); cursor: pointer; }
 .anal-fix:hover { text-decoration: underline; }
 
-/* Ritmo de lectura: área apilada por libro (media de 7 días) sobre barras tenues con el total
-   de cada día. Varias series, así que aquí SÍ hay leyenda, y cada capa lleva su --series-N. */
-.anal-rhythm-c1 { --c: var(--series-1); }
-.anal-rhythm-c2 { --c: var(--series-2); }
-.anal-rhythm-c3 { --c: var(--series-3); }
-.anal-rhythm-c4 { --c: var(--series-4); }
-.anal-rhythm-c5 { --c: var(--series-5); }
-.anal-rhythm-cother { --c: var(--series-other); }
-.anal-rhythm-sum { font-size: var(--fs-sm); color: var(--text-soft); margin-bottom: 10px; }
-.anal-rhythm-sum b { font-size: var(--fs-xl); color: var(--text); font-variant-numeric: tabular-nums; }
-.anal-rhythm-ctl { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
-.anal-rhythm-seg { flex: 0 1 auto; }
-.anal-rhythm-chart { position: relative; height: 150px; padding-left: 28px;
-  border-bottom: 1px solid var(--border-soft); }
-.anal-rhythm-chart svg { display: block; width: 100%; height: 100%; overflow: visible; }
-.anal-rhythm-y { position: absolute; left: 0; top: 0; bottom: 0; width: 24px;
-  font-size: var(--fs-2xs); color: var(--text-faint); font-variant-numeric: tabular-nums; }
-.anal-rhythm-y span { position: absolute; right: 0; transform: translateY(-50%); }
-.anal-rhythm-y span:first-child { top: 0; }
-.anal-rhythm-y span:last-child { top: 50%; }
-.anal-rhythm-grid { stroke: var(--border-soft); stroke-width: 1; vector-effect: non-scaling-stroke; }
-.anal-rhythm-bar { fill: var(--fill-strong); }
-.anal-rhythm-layer polygon { fill: var(--c); fill-opacity: 0.55; stroke: none; }
-.anal-rhythm-layer polyline { fill: none; stroke: var(--c); stroke-width: 1.5; vector-effect: non-scaling-stroke;
-  pointer-events: none; }
-.anal-rhythm-layer.is-book polygon { cursor: pointer; transition: fill-opacity var(--transition-fast); }
-.anal-rhythm-layer.is-book polygon:hover { fill-opacity: 0.8; }
-.anal-rhythm-x { padding-left: 28px; }
-.anal-rhythm-legend { display: flex; flex-direction: column; gap: 2px; margin-top: 12px; }
-.anal-rhythm-key { display: flex; align-items: center; gap: 8px; width: 100%; min-width: 0; padding: 6px 8px;
-  border: none; border-radius: var(--r-sm); background: none; color: var(--text); font: inherit;
-  font-size: var(--fs-sm); text-align: left; }
-button.anal-rhythm-key { cursor: pointer; }
-button.anal-rhythm-key:hover { background: var(--surface-2); }
-button.anal-rhythm-key:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.anal-rhythm-key.is-other { color: var(--text-soft); }
-.anal-rhythm-sw { flex: none; width: 10px; height: 10px; border-radius: var(--r-xs); background: var(--c); }
-.anal-rhythm-thumb { flex: none; width: 20px; height: 28px; border-radius: var(--r-xs); object-fit: cover;
-  box-shadow: var(--shadow-1); }
-.anal-rhythm-thumb.is-ph { display: flex; align-items: center; justify-content: center;
-  background: color-mix(in srgb, var(--c) 28%, var(--surface-2)); color: var(--text);
-  font-size: var(--fs-2xs); font-weight: 600; letter-spacing: -0.02em; }
-.anal-rhythm-thumb.is-none { box-shadow: none; }
-.anal-rhythm-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.anal-rhythm-v { flex: none; font-weight: 600; font-variant-numeric: tabular-nums; }
-.anal-rhythm-note { font-size: var(--fs-xs); }
+/* Lectura por libro (auditoría de Análisis): la barra de cada columna se parte en tramos, uno
+   por libro, con su --series-N; la fila de «Por libro» lleva el mismo color como anillo de la
+   portada, así que la lista es la leyenda. «Otros» va en --series-other. */
+.anal-c1 { --c: var(--series-1); }
+.anal-c2 { --c: var(--series-2); }
+.anal-c3 { --c: var(--series-3); }
+.anal-c4 { --c: var(--series-4); }
+.anal-c5 { --c: var(--series-5); }
+.anal-cother { --c: var(--series-other); }
+.anal-col-fill.is-stacked { display: flex; flex-direction: column; gap: 1px; background: none; overflow: hidden; }
+.anal-seg { display: block; flex: 1 1 0; min-height: 2px; background: var(--c); }
+.anal-book-cover.has-ring { outline: 2px solid var(--c); outline-offset: 2px; }
+.anal-book-cover--none.has-ring { background: color-mix(in srgb, var(--c) 28%, var(--surface-2)); color: var(--text); }
+.anal-book-cover--none { font-size: var(--fs-2xs); font-weight: 600; letter-spacing: -0.02em; }
 
 /* P45 · Cabecera: ámbito (biblioteca, estantería o libro) → rango → periodo con flechas. */
 .anal-head { display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px; }
@@ -1791,6 +1759,10 @@ button.anal-rhythm-key:focus-visible { outline: 2px solid var(--accent); outline
 .anal-scope-x { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px;
   border: none; border-radius: var(--r-pill); background: var(--surface-2); color: var(--text-soft); cursor: pointer; }
 .anal-scope-study { margin-left: auto; }
+.anal-scope-open { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px;
+  border: none; border-radius: var(--r-pill); background: var(--fill); color: var(--text); font: inherit;
+  font-size: var(--fs-sm); font-weight: 500; cursor: pointer; }
+.anal-scope-open:hover { background: var(--fill-strong); }
 .anal-pick-menu { position: absolute; top: calc(100% + 6px); left: 0; z-index: 5; width: min(320px, 100%);
   max-height: 50vh; overflow-y: auto; padding: 6px; border: 1px solid var(--border); border-radius: var(--r-md);
   background: var(--surface-1); box-shadow: var(--shadow-2); }

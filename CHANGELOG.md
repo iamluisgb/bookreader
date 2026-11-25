@@ -3,6 +3,30 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-11-25 — Análisis: un solo rango, una gráfica partida por libro y «Por libro» como leyenda
+
+Caso (auditoría de Análisis, P1 y P2): la pantalla tenía tres relojes y repetía datos. «Ritmo de
+lectura» llevaba su propio rango (30/90 días) aunque arriba se eligiera «Hoy» o «Semana» («1 h 7 min ·
+Hoy» y justo debajo «18 h 53 min · 30 días»); la lista de libros salía dos veces con tiempos
+distintos (leyenda del Ritmo y «Por libro»), y el total diario, en dos gráficas.
+
+- **Un solo rango.** La lectura por libro sigue el periodo de arriba: `reading-rhythm.js` acepta
+  `from`/`to` y Análisis le pasa los días del periodo. Fuera los segmentados 30/90/Todo y
+  Minutos/Páginas (las páginas estimadas convivían con las reales de la baldosa).
+- **Una gráfica.** «Tiempo leído por día/mes» se parte en tramos, uno por libro, con su
+  `--series-N` (hasta cinco; el resto y los libros sin ficha, «Otros» en gris). Mismas columnas de
+  calendario que antes: tocar una lleva a ese día o mes. Se quitan el área suavizada, las barras
+  grises y su nota de dos líneas; la media de 7 días sigue en el módulo por si vuelve como
+  conmutador dentro de esta misma gráfica.
+- **«Por libro» es la leyenda.** Va justo tras la lectura (antes del estudio), es un `h3` como el
+  resto de bloques, y cada portada lleva un anillo con el color de su tramo (sin portada, las
+  iniciales sobre ese color). Tocar la fila sigue filtrando a ese libro; abrirlo en el lector es
+  ahora un botón «Abrir» junto al ámbito (antes lo hacía la leyenda del Ritmo).
+- Alto medido con la misma biblioteca de prueba (semana): 2.533 → 1.975 px en escritorio,
+  2.688 → 2.072 a 390 px.
+- Tests: `tests/reading-rhythm.spec.ts` reescrito para la pantalla nueva (tramos por libro y día que
+  suman su columna, anillos de color, «Otros», cambio de rango, 360 px, EN, «Abrir»).
+
 ## 2026-11-25 — Tema «Sistema» en oscuro: los mismos tokens que el oscuro elegido
 
 Caso (auditoría de Análisis, P7): `themes.css` definía el oscuro dos veces y los bloques se habían

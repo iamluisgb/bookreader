@@ -1,4 +1,8 @@
-// reading-rhythm.js — «Ritmo de lectura»: cuánto se leyó de cada libro, día a día.
+// reading-rhythm.js — cuánto se leyó de cada libro, día a día (la gráfica apilada de Análisis).
+//
+// Desde la auditoría de Análisis (25-nov) la gráfica sigue el periodo de arriba: Análisis pasa
+// `from`/`to` (los días del periodo) y agrupa las capas en sus columnas de calendario. `range`
+// (30d/90d/all) y el suavizado quedan para quien quiera una tendencia móvil (y para los tests).
 //
 // Sale del MISMO registro que el resto del Análisis y que `reading_stats` del MCP
 // (`reading-log.js`: filas por día y dispositivo con `ms`/`words` de tramos a ritmo plausible).
@@ -57,7 +61,7 @@ export function trailingMean(values, n = SMOOTH_DAYS, before = []) {
 
 /**
  * @param {Array<{ day: string, books: Record<string, { ms?: number, words?: number }> }>} records
- * @param {{ range?: string, unit?: string, now?: number,
+ * @param {{ range?: string, unit?: string, now?: number, from?: string, to?: string,
  *           cid?: (id: string) => string, inScope?: (id: string) => boolean,
  *           titleOf?: (id: string) => string|null }} [opts]
  */
@@ -67,7 +71,9 @@ export function rhythm(records, opts = {}) {
     cid = (id) => id, inScope = () => true, titleOf = () => null,
   } = opts;
   const value = unit === 'pages' ? (v) => v.words / WORDS_PER_PAGE : (v) => v.ms / 60000;
-  const to = dayKey(now);
+  // `to` explícito: el último día del periodo mirado (nunca después de hoy).
+  const today = dayKey(now);
+  const to = opts.to && opts.to < today ? opts.to : today;
 
   // Libro → día → { ms, words }, sumando dispositivos y alias del mismo libro.
   const perBook = new Map();
@@ -90,7 +96,8 @@ export function rhythm(records, opts = {}) {
   }
 
   const span = range === '90d' ? 90 : range === 'all' ? null : 30;
-  const from = span ? shift(to, -(span - 1)) : (first && first < to ? first : to);
+  const from = opts.from ? (opts.from > to ? to : opts.from)
+    : span ? shift(to, -(span - 1)) : (first && first < to ? first : to);
   const days = daysBetween(from, to);
   const lead = daysBetween(shift(from, -(SMOOTH_DAYS - 1)), shift(from, -1));
 
@@ -129,6 +136,7 @@ export function rhythm(records, opts = {}) {
   if (others.length) {
     layers.push({
       id: OTHER, title: null, color: 'other', other: true, count: others.length,
+      members: others.map(b => b.id),
       total: others.reduce((n, b) => n + b.total, 0), ...seriesOf(others),
     });
   }

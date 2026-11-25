@@ -62,9 +62,6 @@ let picking = false;       // selector de ámbito abierto
 let allBooks = false;      // «Ver todos» en el desglose
 let optimizer = null;      // estado del ajuste del algoritmo: null | 'running' | resultado
 let last = null;           // últimos datos pintados (para las acciones)
-// «Ritmo de lectura» tiene su propio rango y unidad: es una tendencia, no el periodo de arriba.
-let rhythmRange = '30d';
-let rhythmUnit = 'min';
 
 // ---- Periodos --------------------------------------------------------------
 
@@ -188,7 +185,7 @@ function buckets(p, now) {
 
 // Todo lo del periodo, en una sola pasada. `now` inyectable para los tests. `sc` (ámbito)
 // filtra todo —lectura, estudio y carga— a un libro o a los libros de una estantería.
-export async function collect({ range: kind = 'week', offset: off = 0, rhythm: rh = {} } = {}, now = Date.now(), sc = null) {
+export async function collect({ range: kind = 'week', offset: off = 0 } = {}, now = Date.now(), sc = null) {
   FsrsParams.applyStored();
   const [records, books, shelves, notes, decksRaw, attemptsRaw] = await Promise.all([
     ReadingLog.getRecords().catch(() => []),
@@ -293,14 +290,26 @@ export async function collect({ range: kind = 'week', offset: off = 0, rhythm: r
   };
 
   // ---- Columnas
+  // Lectura por libro y día del MISMO periodo (auditoría de Análisis: un solo rango manda en
+  // toda la pantalla). Hasta cinco capas con color; el resto y los libros sin ficha, «Otros».
+  const layers = p.days.length ? Rhythm.rhythm(records, {
+    from: p.days[0], to: p.days[p.days.length - 1], unit: 'min', now, cid, inScope,
+    titleOf: (id) => meta.get(id)?.title || null,
+  }).layers : [];
+  const dayIdx = new Map(p.days.map((day, i) => [day, i]));
+  const colorOf = new Map();
+  for (const l of layers) for (const id of (l.other ? l.members : [l.id])) colorOf.set(id, l.color);
   const cols = buckets(p, now).map((b) => {
     let read = 0, n = 0;
+    const stack = layers.map(l => ({ color: l.color, v: 0 }));
     for (let d = new Date(b.from); d.getTime() < b.to; d = addDays(d, 1)) {
       const key = ReadingLog.dayKey(d.getTime());
       read += byDay[key]?.ms || 0;
       n += perDay[Srs.dayOf(d.getTime() + DAY_MS / 2)] || 0;
+      const i = dayIdx.get(key);
+      if (i != null) layers.forEach((l, k) => { stack[k].v += l.raw[i] * 60000; });
     }
-    return { ...b, read, n, future: b.from > now };
+    return { ...b, read, n, stack: stack.filter(x => x.v > 0), future: b.from > now };
   });
 
   // ---- Por libro: lo leído en el periodo + lo estudiado en él, con su memoria de hoy
@@ -329,6 +338,7 @@ export async function collect({ range: kind = 'week', offset: off = 0, rhythm: r
       ms: r?.ms || 0, words: r?.words || 0, units: r?.units || 0,
       reviews: reviewsBy.get(id) || 0,
       memory: bookDecks ? Stats.bookMemory(bookDecks, now) : null,
+      color: colorOf.get(id) ?? null,   // el de su capa en la gráfica; sin lectura, ninguno
     };
   }).filter(b => b.ms || b.reviews || b.id === scopeInfo?.id)
     .sort((a, b) => b.ms - a.ms || b.reviews - a.reviews);
@@ -399,19 +409,7 @@ export async function collect({ range: kind = 'week', offset: off = 0, rhythm: r
     },
     attempts: attemptsRaw,
     decks: decksRaw,
-    // Ritmo de lectura: el mismo registro, por libro y día, con su rango y unidad propios.
-    // Un libro sin ficha en la biblioteca no tiene título y acaba en «Otros».
-    rhythm: sc?.type === 'book' ? null : withCovers(Rhythm.rhythm(records, {
-      range: rh.range || '30d', unit: rh.unit || 'min', now, cid, inScope,
-      titleOf: (id) => meta.get(id)?.title || null,
-    }), meta),
   };
-}
-
-// La portada de cada capa, la misma que pinta la biblioteca (`book.cover`). «Otros» no lleva.
-function withCovers(r, meta) {
-  for (const l of r.layers) l.cover = l.other ? '' : meta.get(l.id)?.cover || '';
-  return r;
 }
 
 // Los subrayados viven en localStorage, una clave por libro (`highlights_<bookId>`), así
@@ -503,7 +501,7 @@ export function isOpen() {
 async function paint() {
   const body = overlay.querySelector('.anal-body');
   if (!last) body.innerHTML = `<p class="anal-loading">${t('Contando…')}</p>`;
-  const data = await collect({ range, offset, rhythm: { range: rhythmRange, unit: rhythmUnit } }, Date.now(), scope);
+  const data = await collect({ range, offset }, Date.now(), scope);
   if (!isOpen()) return;
   last = data;
   const nothing = !data.ms && !data.study.has && !data.scope;
@@ -522,7 +520,7 @@ function setScope(next) {
 }
 
 async function onClick(e) {
-  const el = e.target.closest('[data-range], [data-act], [data-book], [data-go], [data-pick], [data-rrange], [data-runit], [data-open-book]');
+  const el = e.target.closest('[data-range], [data-act], [data-book], [data-go], [data-pick], [data-open-book]');
   // Tocar fuera del selector de ámbito lo cierra (y la acción tocada sigue su curso).
   if (picking && !e.target.closest('.anal-pick-menu, [data-act="pick"]')) {
     picking = false;
@@ -530,8 +528,6 @@ async function onClick(e) {
   }
   if (!el || !overlay.contains(el)) return;
   if (el.dataset.range) { range = el.dataset.range; offset = 0; paint(); return; }
-  if (el.dataset.rrange) { rhythmRange = el.dataset.rrange; paint(); return; }
-  if (el.dataset.runit) { rhythmUnit = el.dataset.runit; paint(); return; }
   if (el.dataset.openBook) {
     // Tocar una capa o su leyenda abre ese libro en el lector (como tocar su portada).
     const id = el.dataset.openBook;
@@ -614,6 +610,7 @@ function renderHead(d) {
           ${sc?.type === 'shelf' ? '' : icon(sc?.type === 'book' ? 'book' : 'library', { size: 'sm' })}
           <span class="anal-scope-t">${escapeHtml(scopeLabel)}</span>${icon('chevron-down', { size: 'sm' })}
         </button>
+        ${sc?.type === 'book' ? `<button class="anal-scope-open" data-open-book="${escapeHtml(sc.id)}">${icon('book', { size: 'sm' })} ${t('Abrir')}</button>` : ''}
         ${sc ? `<button class="anal-scope-x" data-act="all-books" title="${t('Toda la biblioteca')}" aria-label="${t('Toda la biblioteca')}">${icon('xmark', { size: 'sm' })}</button>` : ''}
         ${due ? `<button class="btn btn--primary primary-btn anal-scope-study" data-act="study-scope">${icon('cards', { size: 'sm' })} ${sc.type === 'book' ? t('Repasar este libro ({n})', { n: due }) : t('Repasar esta estantería ({n})', { n: due })}</button>` : ''}
         ${menu}
@@ -642,9 +639,8 @@ function renderData(d) {
   const showAhead = d.period.current;
   return `
     ${d.ms ? renderReading(d) : renderEmpty()}
-    ${d.rhythm ? renderRhythm(d.rhythm) : ''}
-    ${d.study.has ? renderStudy(d) : ''}
     ${renderBooks(d)}
+    ${d.study.has ? renderStudy(d) : ''}
     ${d.study.has && showAhead ? renderWork(d) : ''}
     ${d.study.has && !d.scope && showAhead ? renderFsrs(d) : ''}
     <p class="anal-note">${t('Solo cuenta lo que se leyó a ritmo humano: pasar páginas buscando algo, o dejar el libro abierto, no suma.')}</p>
@@ -673,7 +669,7 @@ function renderReading(d) {
         ${tile(t('Subrayados'), String(d.highlights))}
         ${tile(t('Notas'), String(d.notes))}
       </div>
-      ${renderColumns(d.cols, 'read', humanTime, t('Tiempo leído'), d)}
+      ${renderColumns(d.cols, 'read', humanTime, t('Tiempo leído'), d, d.scope?.type !== 'book')}
     </section>`;
 }
 
@@ -713,97 +709,9 @@ function renderHistory(d) {
   return `<p class="anal-history">${bits.map(escapeHtml).join(' · ')}</p>${svg}`;
 }
 
-// «Ritmo de lectura» (área apilada): cada libro es una capa, suavizada con la media de 7 días,
-// y detrás, en barras tenues, el total de cada día tal cual. Sin estrellas, sagas ni años de
-// publicación: no hay datos de eso. Tocar una capa o su leyenda abre el libro.
-const RHYTHM_RANGES = [
-  { id: '30d', label: () => t('30 días') },
-  { id: '90d', label: () => t('90 días') },
-  { id: 'all', label: () => t('Todo') },
-];
-
-function rhythmValue(v, unit) {
-  return unit === 'pages' ? t('≈{n} pág.', { n: Math.round(v).toLocaleString(getLang()) }) : humanTime(v * 60000);
-}
-
 // Iniciales del título como en la biblioteca (`initials` de library/view.js), para el libro sin portada.
 function initialsOf(title) {
   return (title || '?').trim().split(/\s+/).slice(0, 2).map(w => w[0] || '').join('').toUpperCase();
-}
-
-// Miniatura de la leyenda: la portada, o las iniciales sobre el color de su capa. «Otros», hueco
-// del mismo ancho para que los nombres queden alineados.
-function rhythmThumb(l) {
-  if (l.other) return '<span class="anal-rhythm-thumb is-none" aria-hidden="true"></span>';
-  return l.cover
-    ? `<img class="anal-rhythm-thumb" src="${escapeHtml(l.cover)}" alt="" aria-hidden="true">`
-    : `<span class="anal-rhythm-thumb is-ph anal-rhythm-c${l.color}" aria-hidden="true">${escapeHtml(initialsOf(l.title))}</span>`;
-}
-
-function rhythmName(l) {
-  return l.other ? (l.count === 1 ? t('Otros (1 libro)') : t('Otros ({n} libros)', { n: l.count })) : l.title;
-}
-
-function renderRhythm(r) {
-  const seg = (attr, cur, opts) => `<div class="segmented anal-rhythm-seg" role="group">${opts.map(o =>
-    `<button class="segmented-btn${o.id === cur ? ' active' : ''}" data-${attr}="${o.id}" aria-pressed="${o.id === cur}">${escapeHtml(o.label())}</button>`).join('')}</div>`;
-  const controls = `<div class="anal-rhythm-ctl">
-      ${seg('rrange', r.range, RHYTHM_RANGES)}
-      ${seg('runit', r.unit, [{ id: 'min', label: () => t('Minutos') }, { id: 'pages', label: () => t('Páginas') }])}
-    </div>`;
-  const head = `<h3 class="anal-sec-h">${t('Ritmo de lectura')}</h3>`;
-  if (!r.total) {
-    return `<section class="anal-sec anal-rhythm">${head}${controls}<p class="anal-muted">${t('Sin lectura en este rango.')}</p></section>`;
-  }
-  const sum = `<div class="anal-rhythm-sum"><b>${escapeHtml(rhythmValue(r.total, r.unit))}</b> · ${escapeHtml(r.daysRead === 1 ? t('1 día leído') : t('{n} días leídos', { n: r.daysRead }))}</div>`;
-
-  // Lienzo: una unidad de ancho por día y 100 de alto; se estira al ancho de la tarjeta
-  // (preserveAspectRatio="none") y los trazos no engordan (vector-effect).
-  const N = r.days.length;
-  const top = Rhythm.niceMax(r.max);
-  const y = (v) => (100 - (v / top) * 100).toFixed(2);
-  const bars = r.daily.map((v, i) => (v ? `<rect class="anal-rhythm-bar" x="${(i + 0.15).toFixed(2)}" y="${y(v)}" width="0.7" height="${((v / top) * 100).toFixed(2)}"/>` : '')).join('');
-  const base = new Array(N).fill(0);
-  const xs = r.days.map((_, i) => (N === 1 ? 0.5 : i + 0.5));
-  const layers = r.layers.map((l) => {
-    const upper = l.smooth.map((v, i) => v + base[i]);
-    const pts = (arr) => arr.map((v, i) => `${xs[i].toFixed(2)},${y(v)}`);
-    // Bordes: la capa llega a los dos lados del lienzo con su primer y último valor.
-    const topPts = [`0,${y(upper[0])}`, ...pts(upper), `${N},${y(upper[N - 1])}`];
-    const botPts = [`${N},${y(base[N - 1])}`, ...pts(base).reverse(), `0,${y(base[0])}`];
-    for (let i = 0; i < N; i++) base[i] = upper[i];
-    const cls = `anal-rhythm-c${l.color}`;
-    const name = rhythmName(l);
-    const open = l.other ? '' : ` data-open-book="${escapeHtml(l.id)}"`;
-    return `<g class="anal-rhythm-layer ${cls}${l.other ? '' : ' is-book'}">
-      <polygon points="${topPts.join(' ')} ${botPts.join(' ')}"${open}><title>${escapeHtml(name)} · ${escapeHtml(rhythmValue(l.total, r.unit))}</title></polygon>
-      <polyline points="${topPts.join(' ')}"/>
-    </g>`;
-  }).join('');
-  const yl = r.unit === 'pages' ? t('pág./día estimadas · media de 7 días') : t('min/día · media de 7 días');
-  const fmtDay = (day) => fmtDate(new Date(`${day}T12:00:00`), { day: 'numeric', month: 'short' });
-  const xLabels = N > 2 ? [r.days[0], r.days[Math.floor((N - 1) / 2)], r.days[N - 1]] : [r.days[0], r.days[N - 1]];
-  const chart = `<div class="anal-rhythm-chart">
-      <div class="anal-rhythm-y"><span>${escapeHtml(String(top))}</span><span>${escapeHtml(String(+(top / 2).toFixed(1)))}</span></div>
-      <svg viewBox="0 0 ${N} 100" preserveAspectRatio="none" role="img"
-          aria-label="${escapeHtml(t('Ritmo de lectura') + ' · ' + yl)}">
-        <line class="anal-rhythm-grid" x1="0" x2="${N}" y1="0" y2="0"/>
-        <line class="anal-rhythm-grid" x1="0" x2="${N}" y1="50" y2="50"/>
-        ${bars}${layers}
-      </svg>
-    </div>
-    <div class="anal-curve-x anal-rhythm-x">${xLabels.map(d => `<span>${escapeHtml(fmtDay(d))}</span>`).join('')}</div>`;
-  const legend = `<div class="anal-rhythm-legend">${r.layers.map((l) => {
-    const inner = `<span class="anal-rhythm-sw anal-rhythm-c${l.color}" aria-hidden="true"></span>
-      ${rhythmThumb(l)}
-      <span class="anal-rhythm-name">${escapeHtml(rhythmName(l))}</span>
-      <span class="anal-rhythm-v">${escapeHtml(rhythmValue(l.total, r.unit))}</span>`;
-    return l.other
-      ? `<div class="anal-rhythm-key is-other">${inner}</div>`
-      : `<button class="anal-rhythm-key" data-open-book="${escapeHtml(l.id)}" title="${escapeHtml(t('Abrir {t}', { t: l.title }))}">${inner}</button>`;
-  }).join('')}</div>`;
-  const note = `<p class="anal-muted anal-rhythm-note">${escapeHtml(yl)}. ${escapeHtml(t('Las barras grises son lo leído cada día, sin media; las capas de color, la media de 7 días de cada libro.'))}${r.unit === 'pages' ? ' ' + escapeHtml(t('Páginas estimadas a {n} palabras por página.', { n: Rhythm.WORDS_PER_PAGE })) : ''}</p>`;
-  return `<section class="anal-sec anal-rhythm">${head}${sum}${controls}${chart}${legend}${note}</section>`;
 }
 
 // ¿Cuánto y cómo he estudiado? Tiempo y repasos, la retención real con su valla de N, lo
@@ -845,7 +753,7 @@ function renderStudy(d) {
 // columnas entre sí. Solo lleva cifra la más alta — un número sobre cada columna es ruido
 // que nadie lee, y el resto lo da el tooltip. Sin gráfica en el rango DIARIO: una columna no
 // compara nada. Tocar una columna lleva a ese día o ese mes.
-function renderColumns(cols, key, fmt, title, d) {
+function renderColumns(cols, key, fmt, title, d, stacked = false) {
   if (!cols.length) return '';
   const max = Math.max(...cols.map(c => c[key]));
   if (!max) return '';
@@ -856,11 +764,16 @@ function renderColumns(cols, key, fmt, title, d) {
     const v = c[key];
     const h = v ? Math.max(4, Math.round((v / max) * 100)) : 0;
     const top = i === top1 ? `<span class="anal-col-top">${escapeHtml(fmt(v))}</span>` : '';
+    // Lectura: la barra se parte por libro, de abajo arriba en el orden de «Por libro» (el más
+    // leído pegado al eje); cada tramo lleva el color de su fila. Sin capas, barra de acento.
+    const segs = stacked && c.stack?.length
+      ? [...c.stack].reverse().map(x => `<span class="anal-seg anal-c${x.color}" style="flex-grow:${x.v}"></span>`).join('')
+      : '';
     const go = c.future ? '' : ` data-go='${escapeHtml(JSON.stringify(c.go))}' role="button"`;
     return `<div class="anal-col${c.future ? ' is-future' : ''}" title="${escapeHtml(c.title)} · ${escapeHtml(fmt(v))}"
         tabindex="0" aria-label="${escapeHtml(c.title)}: ${escapeHtml(fmt(v))}"${go}>
       ${top}
-      <div class="anal-col-track">${h ? `<div class="anal-col-fill" style="height:${h}%"></div>` : ''}</div>
+      <div class="anal-col-track">${h ? `<div class="anal-col-fill${segs ? ' is-stacked' : ''}" style="height:${h}%">${segs}</div>` : ''}</div>
       <span class="anal-col-x">${escapeHtml(c.label)}</span>
     </div>`;
   }).join('');
@@ -882,12 +795,14 @@ function renderBooks(d) {
   const rows = shown.map((b) => {
     const sub = [b.units ? t('{n} pág.', { n: b.units }) : '', b.reviews ? t('{n} repasos', { n: b.reviews }) : '']
       .filter(Boolean).join(' · ');
+    // El anillo de color casa la fila con su tramo en la gráfica: «Por libro» ES su leyenda.
+    const ring = b.color != null ? ` anal-c${b.color} has-ring` : '';
     return `
     <div class="anal-book" data-book="${escapeHtml(b.id)}" role="button" tabindex="0"
         aria-label="${escapeHtml(t('Ver el análisis de {t}', { t: b.title }))}">
       ${b.cover
-        ? `<img class="anal-book-cover" src="${escapeHtml(b.cover)}" alt="">`
-        : `<span class="anal-book-cover anal-book-cover--none">${icon('book', { size: 'sm' })}</span>`}
+        ? `<img class="anal-book-cover${ring}" src="${escapeHtml(b.cover)}" alt="">`
+        : `<span class="anal-book-cover anal-book-cover--none${ring}" aria-hidden="true">${escapeHtml(initialsOf(b.title))}</span>`}
       <div class="anal-book-txt">
         <div class="anal-book-t">${escapeHtml(b.title)}</div>
         <div class="anal-book-s">${escapeHtml(sub)}</div>
@@ -899,7 +814,7 @@ function renderBooks(d) {
   const more = !allBooks && d.books.length > BOOKS_CAP
     ? `<button class="btn btn--secondary anal-more" data-act="more-books">${t('Ver todos ({n})', { n: d.books.length })}</button>`
     : '';
-  return `<section class="anal-books"><div class="anal-chart-h">${t('Por libro')}</div>${rows}${more}</section>`;
+  return `<section class="anal-sec anal-books"><h3 class="anal-sec-h">${t('Por libro')}</h3>${rows}${more}</section>`;
 }
 
 function renderRetention(r) {

@@ -151,52 +151,56 @@ async function seedRecords(page: any, extra: Record<string, any> = {}) {
   }, extra);
 }
 
-test('la pantalla pinta capas, barras, leyenda con «Otros» y cambia unidad y rango', async ({ page }) => {
+// Desde la auditoría de Análisis (25-nov) la lectura por libro va DENTRO de la gráfica del periodo:
+// cada columna se parte en tramos por libro y «Por libro» es su leyenda. Un solo rango manda.
+// NOW es domingo 18-oct: «Esta semana» son los días i = 6..0 de la siembra.
+//   bk-1 (i par) 4 × 30 = 120 · bk-3 (i < 10) 7 × 10 = 70 · bk-2 (i % 3) 3 × 20 = 60 · bk-4 6 ·
+//   bk-5 5 · bk-6 4 → seis libros con título: cuatro con color y bk-5, bk-6 en «Otros».
+
+test('la gráfica del periodo se parte por libro y «Por libro» es su leyenda', async ({ page }) => {
   await page.goto('/');
   await seedRecords(page);
   await page.click('[data-act="analysis"]');
-  const sec = page.locator('.anal-rhythm');
-  await expect(sec.locator('.anal-sec-h')).toHaveText('Ritmo de lectura');
-  // 30 días: bk-1 15 días × 30 = 450 min, bk-2 10 × 20 = 200, bk-3 10 × 10 = 100, bk-4 6;
-  // «Otros» = bk-5 + bk-6 + el libro borrado = 12 min.
-  await expect(sec.locator('.anal-rhythm-key')).toHaveCount(5);
-  await expect(sec.locator('.anal-rhythm-name').first()).toHaveText('Designing Data-Intensive Applications');
-  await expect(sec.locator('.anal-rhythm-v').first()).toHaveText('7 h 30 min');
-  await expect(sec.locator('.anal-rhythm-key.is-other')).toContainText('Otros (3 libros)');
-  await expect(sec.locator('.anal-rhythm-key.is-other')).toContainText('12 min');
-  // Nunca un id ni un «null» en la leyenda.
-  await expect(sec).not.toContainText('null');
-  await expect(sec).not.toContainText('sha-borrado');
-  await expect(sec.locator('.anal-rhythm-sum')).toContainText('23 días leídos');
-  await expect(sec.locator('polygon')).toHaveCount(5);
-  await expect(sec.locator('polygon[data-open-book]')).toHaveCount(4);
-  await expect(sec.locator('.anal-rhythm-bar')).toHaveCount(23);
-
-  // Páginas: estimadas y rotuladas como tales.
-  await sec.locator('[data-runit="pages"]').click();
-  await expect(sec.locator('[data-runit="pages"]')).toHaveClass(/active/);
-  await expect(sec.locator('.anal-rhythm-v').first()).toHaveText('≈300 pág.');
-  await expect(sec.locator('.anal-rhythm-note')).toContainText('Páginas estimadas a 300 palabras');
-
-  // 90 días: entran los días 30-39 (bk-1 los pares, bk-2 los múltiplos de 3: siete más).
-  await sec.locator('[data-rrange="90d"]').click();
-  await expect(sec.locator('.anal-rhythm-bar')).toHaveCount(30);
-  await expect(sec.locator('.anal-rhythm-sum')).toContainText('30 días leídos');
-  await sec.locator('[data-rrange="all"]').click();
-  await expect(sec.locator('[data-rrange="all"]')).toHaveClass(/active/);
-  await expect(sec.locator('.anal-rhythm-bar')).toHaveCount(30);
+  const a = page.locator('#analysis');
+  // Ni bloque propio ni controles propios: el rango de arriba manda.
+  await expect(a.locator('.anal-rhythm, [data-rrange], [data-runit]')).toHaveCount(0);
+  await expect(a.locator('.anal-hero-n').first()).toHaveText('4 h 25 min');
+  await expect(a.locator('.anal-cols').first().locator('.anal-col')).toHaveCount(7);
+  // Un tramo por libro y día leído (3+1+2+2+3+2+4).
+  await expect(a.locator('.anal-cols').first().locator('.anal-seg')).toHaveCount(17);
+  // El tramo de cada columna suma lo que dice su columna (mismo dato, sin media).
+  const sums = await page.evaluate(() => [...document.querySelectorAll('.anal-cols')[0].querySelectorAll('.anal-col')]
+    .map(c => [...c.querySelectorAll('.anal-seg')].reduce((n, s) => n + Number((s as HTMLElement).style.flexGrow), 0) / 60000));
+  expect(sums.map(Math.round)).toEqual([64, 15, 46, 30, 40, 10, 60]);   // lunes 12 … domingo 18
+  // «Por libro»: ordenado por tiempo, con el color de su tramo; bk-5 y bk-6 en «Otros» (gris).
+  const rows = a.locator('.anal-book');
+  await expect(rows).toHaveCount(5);
+  await expect(a.locator('.anal-books .anal-sec-h')).toHaveText('Por libro');
+  await expect(rows.first()).toContainText('Designing Data-Intensive Applications');
+  await expect(rows.first()).toContainText('2 h');
+  await expect(rows.first().locator('.anal-book-cover')).toHaveClass(/anal-c1/);
+  await expect(rows.nth(1).locator('.anal-book-cover')).toHaveClass(/anal-c2/);
+  await expect(rows.nth(4).locator('.anal-book-cover')).toHaveClass(/anal-cother/);
+  await expect(a.locator('[data-act="more-books"]')).toHaveText('Ver todos (6)');
+  await expect(a).not.toContainText('null');
+  await expect(a).not.toContainText('sha-borrado');
+  // Cambiar el rango cambia la gráfica: octubre hasta el 18, con el libro borrado en «Otros».
+  await a.locator('[data-range="month"]').click();
+  await expect(a.locator('.anal-cols').first().locator('.anal-col')).toHaveCount(31);
+  await expect(rows.first().locator('.anal-book-cover')).toHaveClass(/anal-c1/);
+  await expect(a.locator('.anal-cols').first().locator('.anal-seg.anal-cother').first()).toBeVisible();
 });
 
-test('móvil: sin scroll horizontal y la leyenda cabe', async ({ page }) => {
+test('móvil: sin scroll horizontal y «Por libro» cabe', async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 780 });
   await page.goto('/');
   await seedRecords(page);
   // En ancho de teléfono Análisis vive en el menú «Más»: se abre por su módulo.
   await page.evaluate(async () => { const A: any = await import('/js/analysis.js'); await A.open(); });
-  await expect(page.locator('.anal-rhythm polygon')).toHaveCount(5);
+  await expect(page.locator('.anal-seg').first()).toBeVisible();
   const over = await page.evaluate(() => {
     const card = document.querySelector('.anal-card') as HTMLElement;
-    const sec = document.querySelector('.anal-rhythm') as HTMLElement;
+    const sec = document.querySelector('.anal-books') as HTMLElement;
     return {
       doc: document.documentElement.scrollWidth - document.documentElement.clientWidth,
       card: card.scrollWidth - card.clientWidth,
@@ -213,14 +217,11 @@ test('la sección está traducida (EN)', async ({ page }) => {
   await page.goto('/');
   await seedRecords(page);
   await page.click('[data-act="analysis"]');
-  const sec = page.locator('.anal-rhythm');
-  await expect(sec.locator('.anal-sec-h')).toHaveText('Reading rhythm');
-  await expect(sec.locator('.anal-rhythm-key.is-other')).toContainText('Others (3 books)');
-  await expect(sec.locator('.anal-rhythm-sum')).toContainText('23 days read');
-  await expect(sec.locator('[data-runit="min"]')).toHaveText('Minutes');
+  await expect(page.locator('.anal-books .anal-sec-h')).toHaveText('By book');
+  await expect(page.locator('[data-act="more-books"]')).toHaveText('See all (6)');
 });
 
-test('tocar la leyenda abre ese libro en el lector', async ({ page }) => {
+test('con un libro elegido, «Abrir» lo abre en el lector', async ({ page }) => {
   test.setTimeout(60000);
   await page.goto('/');
   // El libro entra en la biblioteca con su fichero, sin pasar por el import: importar y reabrir
@@ -236,16 +237,18 @@ test('tocar la leyenda abre ese libro en el lector', async ({ page }) => {
   }, b64);
   await seedRecords(page, { 0: { 'bk-epub': { ms: 600 * 60000, words: 90000, units: 50 } } });
   await page.click('[data-act="analysis"]');
-  const key = page.locator('.anal-rhythm-key[data-open-book="bk-epub"]');
-  await expect(key).toBeVisible();
+  // Tocar la fila filtra la pantalla a ese libro (no lo abre); abrirlo es un botón aparte.
+  await page.locator('.anal-book', { hasText: 'Pedro Páramo (EPUB)' }).click();
+  const open = page.locator('.anal-scope-open[data-open-book="bk-epub"]');
+  await expect(open).toBeVisible();
   await expect(page.locator('body')).not.toHaveClass(/(^|\s)reading(\s|$)/);
-  await key.click();
+  await open.click();
   await expect(page.locator('#analysis')).toBeHidden();
   await page.waitForSelector('#epub-container iframe', { timeout: 30000 });
   await expect.poll(() => page.evaluate(() => document.body.classList.contains('reading')), { timeout: 30000 }).toBe(true);
 });
 
-test('la leyenda lleva la portada del libro (o sus iniciales) junto al punto de color', async ({ page }) => {
+test('«Por libro» lleva la portada (o las iniciales) con el anillo del color de su tramo', async ({ page }) => {
   await page.goto('/');
   await seedRecords(page);
   // Una portada de verdad para bk-1, como la guarda la biblioteca (data URL en `cover`).
@@ -257,18 +260,9 @@ test('la leyenda lleva la portada del libro (o sus iniciales) junto al punto de 
     await Store.putBook({ ...b, cover: c.toDataURL('image/png') });
   });
   await page.click('[data-act="analysis"]');
-  const keys = page.locator('.anal-rhythm-key');
-  await expect(keys).toHaveCount(5);
-  // El punto de color sigue en todas las filas: casa capa y libro.
-  await expect(page.locator('.anal-rhythm-key .anal-rhythm-sw')).toHaveCount(5);
-  const first = keys.first();
-  await expect(first.locator('img.anal-rhythm-thumb')).toHaveAttribute('src', /^data:image\/png/);
-  // Sin portada: las iniciales del título, como en la biblioteca.
-  await expect(keys.nth(1).locator('.anal-rhythm-thumb.is-ph')).toHaveText('EP');
-  await expect(keys.nth(1).locator('img')).toHaveCount(0);
-  // «Otros»: ni portada ni iniciales, solo su punto.
-  const other = page.locator('.anal-rhythm-key.is-other');
-  await expect(other.locator('img, .anal-rhythm-thumb.is-ph')).toHaveCount(0);
-  await expect(other.locator('.anal-rhythm-sw')).toHaveCount(1);
-  await expect(page.locator('.anal-rhythm-note')).toContainText('Las barras grises son lo leído cada día, sin media');
+  const rows = page.locator('.anal-book');
+  await expect(rows.first().locator('img.anal-book-cover.has-ring')).toHaveAttribute('src', /^data:image\/png/);
+  // Sin portada: las iniciales del título, como en la biblioteca (bk-3, Site Reliability Engineering).
+  await expect(rows.nth(1).locator('.anal-book-cover--none')).toHaveText('SR');
+  await expect(rows.nth(1).locator('img')).toHaveCount(0);
 });
