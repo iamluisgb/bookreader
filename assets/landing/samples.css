@@ -80,11 +80,6 @@ nav { position: sticky; top: 0; z-index: 40; background: color-mix(in srgb, var(
 }
 .libre input[type="search"]::placeholder { color: var(--text-faint); }
 .libre input[type="search"]:focus { outline: 2px solid var(--brand); outline-offset: 1px; border-color: transparent; }
-.lib-filters { display: inline-flex; gap: 2px; padding: 3px; border: 1px solid var(--border); border-radius: 999px; }
-.lib-filters button { font: 500 13.5px var(--font-ui); color: var(--text-soft); background: none; border: 0; padding: 7px 14px; border-radius: 999px; cursor: pointer; }
-.lib-filters button:hover { color: var(--text); }
-.lib-filters button[aria-pressed="true"] { background: var(--surface-alt); color: var(--text); }
-.lib-filters button:focus-visible, .lib-more:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 .lib-facets { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; margin: 14px 0 0; }
 .lib-facets:empty { display: none; }
 .lib-facets select {

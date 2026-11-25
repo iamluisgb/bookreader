@@ -91,10 +91,9 @@
   var list = root.querySelector('.lib-list');
   var status = root.querySelector('.lib-status');
   var moreBtn = root.querySelector('.lib-more');
-  var filterBtns = root.querySelectorAll('[data-filter]');
   var facetBox = root.querySelector('.lib-facets');
   var all = [];
-  var filtro = { kind: 'all', lang: '', mat: '', era: '', src: '' };
+  var filtro = { lang: '', mat: '', era: '', src: '' };
   var orden = '';
   var shown = PAGE;
   var restoPedido = false;
@@ -157,7 +156,6 @@
   // contador de Idioma dice cuántos hay en cada idioma CON lo de Materia y Época ya aplicado, que es
   // lo que espera quien está filtrando. Contar sobre todo el catálogo era mentir con números.
   function casa(b, skip) {
-    if (filtro.kind !== 'all' && b.kind !== filtro.kind) return false;
     if (skip !== 'lang' && filtro.lang && b.lang !== filtro.lang) return false;
     if (skip !== 'mat' && filtro.mat && (b.matCode || '').indexOf(filtro.mat) !== 0) return false;
     if (skip !== 'era' && filtro.era && b.era !== filtro.era) return false;
@@ -393,12 +391,4 @@
   var timer;
   input.addEventListener('input', function () { clearTimeout(timer); timer = setTimeout(function () { shown = PAGE; render(); }, 120); });
   moreBtn.addEventListener('click', function () { shown += PAGE; render(); });
-  filterBtns.forEach(function (btn) {
-    btn.addEventListener('click', function () {
-      filtro.kind = btn.getAttribute('data-filter');
-      filterBtns.forEach(function (b) { b.setAttribute('aria-pressed', String(b === btn)); });
-      shown = PAGE;
-      render();
-    });
-  });
 })();
