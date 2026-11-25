@@ -81,8 +81,10 @@ export async function init(handle) {
   const url = new URL(location.href);
   const id = url.searchParams.get('sample');
   if (!id) return;
-  // La marca se quita YA: recargar no debe volver a importar lo mismo.
+  // La marca se quita YA: recargar no debe volver a importar lo mismo. `t` es solo el título del
+  // aviso que manda la landing, así que se va con ella.
   url.searchParams.delete('sample');
+  url.searchParams.delete('t');
   history.replaceState(history.state, '', url.pathname + url.search + url.hash);
   let dismiss = () => {};
   try {
