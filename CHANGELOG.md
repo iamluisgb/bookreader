@@ -3,6 +3,28 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-11-25 — Análisis: «Ritmo de lectura», cuánto se leyó de cada libro día a día
+
+Caso: Análisis decía cuánto se leyó en el periodo y en qué libros, pero no CÓMO se repartió la
+lectura en el tiempo (qué libro tiró de qué semanas, cuándo se cruzaron dos, los parones).
+
+- **Gráfico nuevo** en Análisis (biblioteca o estantería; con un libro ya está su curva de avance):
+  área apilada por libro, suavizada con la media móvil de 7 días, y detrás, en barras tenues, el
+  total de cada día sin suavizar. Rango propio (30 días · 90 días · Todo) y unidad conmutable:
+  minutos por defecto, que es lo medido, o páginas **estimadas** (palabras / 300, y lo dice).
+- **Capas:** hasta cinco. Si los libros con título caben, cada uno con su color; si no, los cuatro
+  con más lectura en el rango y «Otros (N libros)». Un `bookId` sin ficha en la biblioteca (libro
+  borrado) va siempre a «Otros», nunca como «null» ni como hash. Leyenda con el total del rango por
+  libro; tocar una capa o su entrada abre el libro (mismo camino que tocar su portada).
+- **Datos:** el mismo registro que el resto de Análisis y que `reading_stats` del MCP
+  (`reading-log.js`: ms y palabras de tramos a ritmo plausible, sumando dispositivos y alias). La
+  cuenta es pura y aparte, en `app/js/reading-rhythm.js`; la suavización usa los días anteriores al
+  rango para que la curva no arranque de cero.
+- **Tokens:** `--series-1..5` y `--series-other` en `themes.css` (claro y oscuro; sepia hereda el
+  claro), sin rojos ni verdes para no confundirse con feedback ni con el acento.
+- Tests: `tests/reading-rhythm.spec.ts` (agregación, suavizado, «Otros», pantalla, unidad y rango,
+  móvil a 360 px sin scroll horizontal, EN, y abrir el libro desde la leyenda). SW `bookreader-v281`.
+
 ## 2026-11-25 — Añadir un dispositivo al sync: código de un solo uso y nunca un sync vacío en silencio
 
 Caso: al activar el sync en el PC del trabajo con OTRA licencia, `enable()` encontraba vacío el

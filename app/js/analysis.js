@@ -30,6 +30,7 @@
 // ni retención de un solo día. Cada bloque acaba en una acción (repasar, arreglar tarjetas,
 // pausar las nuevas), no en un dato suelto.
 import * as ReadingLog from './reading-log.js';
+import * as Rhythm from './reading-rhythm.js';
 import * as Store from './library/store.js';
 import * as Shelves from './library/shelves.js';
 import * as Storage from './storage.js';
@@ -61,6 +62,9 @@ let picking = false;       // selector de ámbito abierto
 let allBooks = false;      // «Ver todos» en el desglose
 let optimizer = null;      // estado del ajuste del algoritmo: null | 'running' | resultado
 let last = null;           // últimos datos pintados (para las acciones)
+// «Ritmo de lectura» tiene su propio rango y unidad: es una tendencia, no el periodo de arriba.
+let rhythmRange = '30d';
+let rhythmUnit = 'min';
 
 // ---- Periodos --------------------------------------------------------------
 
@@ -184,7 +188,7 @@ function buckets(p, now) {
 
 // Todo lo del periodo, en una sola pasada. `now` inyectable para los tests. `sc` (ámbito)
 // filtra todo —lectura, estudio y carga— a un libro o a los libros de una estantería.
-export async function collect({ range: kind = 'week', offset: off = 0 } = {}, now = Date.now(), sc = null) {
+export async function collect({ range: kind = 'week', offset: off = 0, rhythm: rh = {} } = {}, now = Date.now(), sc = null) {
   FsrsParams.applyStored();
   const [records, books, shelves, notes, decksRaw, attemptsRaw] = await Promise.all([
     ReadingLog.getRecords().catch(() => []),
@@ -395,6 +399,12 @@ export async function collect({ range: kind = 'week', offset: off = 0 } = {}, no
     },
     attempts: attemptsRaw,
     decks: decksRaw,
+    // Ritmo de lectura: el mismo registro, por libro y día, con su rango y unidad propios.
+    // Un libro sin ficha en la biblioteca no tiene título y acaba en «Otros».
+    rhythm: sc?.type === 'book' ? null : Rhythm.rhythm(records, {
+      range: rh.range || '30d', unit: rh.unit || 'min', now, cid, inScope,
+      titleOf: (id) => meta.get(id)?.title || null,
+    }),
   };
 }
 
@@ -487,7 +497,7 @@ export function isOpen() {
 async function paint() {
   const body = overlay.querySelector('.anal-body');
   if (!last) body.innerHTML = `<p class="anal-loading">${t('Contando…')}</p>`;
-  const data = await collect({ range, offset }, Date.now(), scope);
+  const data = await collect({ range, offset, rhythm: { range: rhythmRange, unit: rhythmUnit } }, Date.now(), scope);
   if (!isOpen()) return;
   last = data;
   const nothing = !data.ms && !data.study.has && !data.scope;
@@ -506,7 +516,7 @@ function setScope(next) {
 }
 
 async function onClick(e) {
-  const el = e.target.closest('[data-range], [data-act], [data-book], [data-go], [data-pick]');
+  const el = e.target.closest('[data-range], [data-act], [data-book], [data-go], [data-pick], [data-rrange], [data-runit], [data-open-book]');
   // Tocar fuera del selector de ámbito lo cierra (y la acción tocada sigue su curso).
   if (picking && !e.target.closest('.anal-pick-menu, [data-act="pick"]')) {
     picking = false;
@@ -514,6 +524,16 @@ async function onClick(e) {
   }
   if (!el || !overlay.contains(el)) return;
   if (el.dataset.range) { range = el.dataset.range; offset = 0; paint(); return; }
+  if (el.dataset.rrange) { rhythmRange = el.dataset.rrange; paint(); return; }
+  if (el.dataset.runit) { rhythmUnit = el.dataset.runit; paint(); return; }
+  if (el.dataset.openBook) {
+    // Tocar una capa o su leyenda abre ese libro en el lector (como tocar su portada).
+    const id = el.dataset.openBook;
+    close();
+    const Library = await import('./library/view.js');
+    Library.openBookById(id);
+    return;
+  }
   if (el.dataset.go) { const g = JSON.parse(el.dataset.go); range = g.range; offset = g.offset; paint(); return; }
   if (el.dataset.pick) {
     const [type, ...rest] = el.dataset.pick.split(':');
@@ -616,6 +636,7 @@ function renderData(d) {
   const showAhead = d.period.current;
   return `
     ${d.ms ? renderReading(d) : renderEmpty()}
+    ${d.rhythm ? renderRhythm(d.rhythm) : ''}
     ${d.study.has ? renderStudy(d) : ''}
     ${renderBooks(d)}
     ${d.study.has && showAhead ? renderWork(d) : ''}
@@ -684,6 +705,84 @@ function renderHistory(d) {
     </div>`;
   }
   return `<p class="anal-history">${bits.map(escapeHtml).join(' · ')}</p>${svg}`;
+}
+
+// «Ritmo de lectura» (área apilada): cada libro es una capa, suavizada con la media de 7 días,
+// y detrás, en barras tenues, el total de cada día tal cual. Sin estrellas, sagas ni años de
+// publicación: no hay datos de eso. Tocar una capa o su leyenda abre el libro.
+const RHYTHM_RANGES = [
+  { id: '30d', label: () => t('30 días') },
+  { id: '90d', label: () => t('90 días') },
+  { id: 'all', label: () => t('Todo') },
+];
+
+function rhythmValue(v, unit) {
+  return unit === 'pages' ? t('≈{n} pág.', { n: Math.round(v).toLocaleString(getLang()) }) : humanTime(v * 60000);
+}
+
+function rhythmName(l) {
+  return l.other ? (l.count === 1 ? t('Otros (1 libro)') : t('Otros ({n} libros)', { n: l.count })) : l.title;
+}
+
+function renderRhythm(r) {
+  const seg = (attr, cur, opts) => `<div class="segmented anal-rhythm-seg" role="group">${opts.map(o =>
+    `<button class="segmented-btn${o.id === cur ? ' active' : ''}" data-${attr}="${o.id}" aria-pressed="${o.id === cur}">${escapeHtml(o.label())}</button>`).join('')}</div>`;
+  const controls = `<div class="anal-rhythm-ctl">
+      ${seg('rrange', r.range, RHYTHM_RANGES)}
+      ${seg('runit', r.unit, [{ id: 'min', label: () => t('Minutos') }, { id: 'pages', label: () => t('Páginas') }])}
+    </div>`;
+  const head = `<h3 class="anal-sec-h">${t('Ritmo de lectura')}</h3>`;
+  if (!r.total) {
+    return `<section class="anal-sec anal-rhythm">${head}${controls}<p class="anal-muted">${t('Sin lectura en este rango.')}</p></section>`;
+  }
+  const sum = `<div class="anal-rhythm-sum"><b>${escapeHtml(rhythmValue(r.total, r.unit))}</b> · ${escapeHtml(r.daysRead === 1 ? t('1 día leído') : t('{n} días leídos', { n: r.daysRead }))}</div>`;
+
+  // Lienzo: una unidad de ancho por día y 100 de alto; se estira al ancho de la tarjeta
+  // (preserveAspectRatio="none") y los trazos no engordan (vector-effect).
+  const N = r.days.length;
+  const top = Rhythm.niceMax(r.max);
+  const y = (v) => (100 - (v / top) * 100).toFixed(2);
+  const bars = r.daily.map((v, i) => (v ? `<rect class="anal-rhythm-bar" x="${(i + 0.15).toFixed(2)}" y="${y(v)}" width="0.7" height="${((v / top) * 100).toFixed(2)}"/>` : '')).join('');
+  const base = new Array(N).fill(0);
+  const xs = r.days.map((_, i) => (N === 1 ? 0.5 : i + 0.5));
+  const layers = r.layers.map((l) => {
+    const upper = l.smooth.map((v, i) => v + base[i]);
+    const pts = (arr) => arr.map((v, i) => `${xs[i].toFixed(2)},${y(v)}`);
+    // Bordes: la capa llega a los dos lados del lienzo con su primer y último valor.
+    const topPts = [`0,${y(upper[0])}`, ...pts(upper), `${N},${y(upper[N - 1])}`];
+    const botPts = [`${N},${y(base[N - 1])}`, ...pts(base).reverse(), `0,${y(base[0])}`];
+    for (let i = 0; i < N; i++) base[i] = upper[i];
+    const cls = `anal-rhythm-c${l.color}`;
+    const name = rhythmName(l);
+    const open = l.other ? '' : ` data-open-book="${escapeHtml(l.id)}"`;
+    return `<g class="anal-rhythm-layer ${cls}${l.other ? '' : ' is-book'}">
+      <polygon points="${topPts.join(' ')} ${botPts.join(' ')}"${open}><title>${escapeHtml(name)} · ${escapeHtml(rhythmValue(l.total, r.unit))}</title></polygon>
+      <polyline points="${topPts.join(' ')}"/>
+    </g>`;
+  }).join('');
+  const yl = r.unit === 'pages' ? t('pág./día estimadas · media de 7 días') : t('min/día · media de 7 días');
+  const fmtDay = (day) => fmtDate(new Date(`${day}T12:00:00`), { day: 'numeric', month: 'short' });
+  const xLabels = N > 2 ? [r.days[0], r.days[Math.floor((N - 1) / 2)], r.days[N - 1]] : [r.days[0], r.days[N - 1]];
+  const chart = `<div class="anal-rhythm-chart">
+      <div class="anal-rhythm-y"><span>${escapeHtml(String(top))}</span><span>${escapeHtml(String(+(top / 2).toFixed(1)))}</span></div>
+      <svg viewBox="0 0 ${N} 100" preserveAspectRatio="none" role="img"
+          aria-label="${escapeHtml(t('Ritmo de lectura') + ' · ' + yl)}">
+        <line class="anal-rhythm-grid" x1="0" x2="${N}" y1="0" y2="0"/>
+        <line class="anal-rhythm-grid" x1="0" x2="${N}" y1="50" y2="50"/>
+        ${bars}${layers}
+      </svg>
+    </div>
+    <div class="anal-curve-x anal-rhythm-x">${xLabels.map(d => `<span>${escapeHtml(fmtDay(d))}</span>`).join('')}</div>`;
+  const legend = `<div class="anal-rhythm-legend">${r.layers.map((l) => {
+    const inner = `<span class="anal-rhythm-sw anal-rhythm-c${l.color}" aria-hidden="true"></span>
+      <span class="anal-rhythm-name">${escapeHtml(rhythmName(l))}</span>
+      <span class="anal-rhythm-v">${escapeHtml(rhythmValue(l.total, r.unit))}</span>`;
+    return l.other
+      ? `<div class="anal-rhythm-key is-other">${inner}</div>`
+      : `<button class="anal-rhythm-key" data-open-book="${escapeHtml(l.id)}" title="${escapeHtml(t('Abrir {t}', { t: l.title }))}">${inner}</button>`;
+  }).join('')}</div>`;
+  const note = `<p class="anal-muted anal-rhythm-note">${escapeHtml(yl)}. ${escapeHtml(t('Las barras tenues son el total de cada día, sin suavizar.'))}${r.unit === 'pages' ? ' ' + escapeHtml(t('Páginas estimadas a {n} palabras por página.', { n: Rhythm.WORDS_PER_PAGE })) : ''}</p>`;
+  return `<section class="anal-sec anal-rhythm">${head}${sum}${controls}${chart}${legend}${note}</section>`;
 }
 
 // ¿Cuánto y cómo he estudiado? Tiempo y repasos, la retención real con su valla de N, lo

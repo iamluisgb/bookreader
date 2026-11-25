@@ -1518,6 +1518,12 @@ async function onDrop(e) {
   await render();
 }
 
+// Abrir un libro desde fuera de la estantería (la leyenda del Ritmo de lectura en Análisis):
+// el mismo camino que tocar su portada, descarga incluida si el fichero no está aquí.
+export function openBookById(id) {
+  return openCard(id);
+}
+
 // Abrir una tarjeta. Si el fichero no está aquí, pulsar la portada equivale a
 // pedir la descarga: es lo que espera cualquiera que venga de Play Books, y
 // mejor que un "no se pudo abrir" sobre un libro que sí es suyo.

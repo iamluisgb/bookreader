@@ -111,6 +111,20 @@ const EN = {
   'Páginas': 'Pages',
   'Ajustes generales': 'App settings',
 
+  // Ritmo de lectura (Análisis)
+  'Ritmo de lectura': 'Reading rhythm',
+  'Abrir {t}': 'Open {t}',
+  'Minutos': 'Minutes',
+  '≈{n} pág.': '≈{n} pp.',
+  'Otros (1 libro)': 'Others (1 book)',
+  'Otros ({n} libros)': 'Others ({n} books)',
+  'Sin lectura en este rango.': 'No reading in this range.',
+  '1 día leído': '1 day read',
+  '{n} días leídos': '{n} days read',
+  'pág./día estimadas · media de 7 días': 'estimated pages/day · 7-day average',
+  'min/día · media de 7 días': 'min/day · 7-day average',
+  'Las barras tenues son el total de cada día, sin suavizar.': 'Faint bars are each day’s raw total.',
+  'Páginas estimadas a {n} palabras por página.': 'Pages estimated at {n} words per page.',
   // Análisis (P25 F2)
   'Análisis': 'Insights',
   'Semana': 'Week',

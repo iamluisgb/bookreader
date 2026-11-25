@@ -127,6 +127,11 @@
      autorreferencia cíclica `--border: var(--border)` que dejaba --border inválido en claro
      (bordes con ancho 0); no volver a declarar --border en este bloque. */
   --shadow: rgba(var(--shadow-color), 0.10);
+  /* Series de gráfica con varias capas (Ritmo de lectura): una por libro, en orden de lectura.
+     Tonos sin rojo ni verde para no confundirse con --danger/--success ni con el acento;
+     --series-other es la capa «Otros», neutra a propósito. */
+  --series-1: #3b6fd4; --series-2: #d0822a; --series-3: #8b5cc7; --series-4: #1d9aa5; --series-5: #c4538a;
+  --series-other: #a8a8ae;
 }
 
 /* ---- Tokens del tema OSCURO (rediseñado, menos saturado) ---- */
@@ -166,6 +171,8 @@
   --shadow-2: 0 4px 16px rgba(0, 0, 0, 0.4);
   --shadow-3: 0 12px 40px rgba(0, 0, 0, 0.5);
   --shadow: rgba(0, 0, 0, 0.4);
+  --series-1: #6f9cf5; --series-2: #eaa04e; --series-3: #b190ec; --series-4: #45c2cc; --series-5: #e97fb2;
+  --series-other: #5c5c61;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -198,6 +205,8 @@
     --shadow-2: 0 4px 16px rgba(0, 0, 0, 0.4);
     --shadow-3: 0 12px 40px rgba(0, 0, 0, 0.5);
     --shadow: rgba(0, 0, 0, 0.4);
+    --series-1: #6f9cf5; --series-2: #eaa04e; --series-3: #b190ec; --series-4: #45c2cc; --series-5: #e97fb2;
+    --series-other: #5c5c61;
   }
 }
 
