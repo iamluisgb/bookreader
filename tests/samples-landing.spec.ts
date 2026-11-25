@@ -4,9 +4,12 @@ import { test, expect, type Page } from '@playwright/test';
 //   SMOKE_BASE=https://bookreader.raiatech.com npx playwright test tests/samples-landing.spec.ts --config playwright.local.config.ts
 // El fallo que vigila la prueba de contadores era real: se calculaban sobre todo el catálogo, así que
 // fijar un filtro dejaba los números de los demás iguales y el lector filtraba a ciegas.
-const BASE = process.env.SMOKE_BASE || 'http://localhost:8899';
-const ES = !BASE.includes('raiatech.com') || BASE.includes('/es');
-const INICIO = BASE + (ES ? '/es/muestra/' : '/samples/');
+const ORIGEN = (process.env.SMOKE_BASE || 'http://localhost:8899').replace(/\/$/, '');
+// La ruta se elige a mano (SMOKE_PATH) en vez de deducirla del dominio: deducirla hacía que la
+// pasada contra producción probara la página inglesa sin que nadie lo pidiera.
+const RUTA = process.env.SMOKE_PATH || '/es/muestra/';
+const ES = RUTA.startsWith('/es');
+const INICIO = ORIGEN + RUTA;
 
 // El fondo (3,5 MB) se pide solo en segundo plano; se pulsa el botón por si aún no ha arrancado y se
 // espera al recuento real en vez de a un tiempo fijo.
@@ -34,8 +37,10 @@ async function suma(page: Page, i: number, soloLetras = false) {
       for (const o of Array.from(s.options)) {
         if (!o.value) continue;
         if (filtro && o.value.length !== 1) continue;
-        const m = o.textContent && o.textContent.match(/\(([\d.]+)\)/);
-        if (m) t += Number(m[1].replace(/\./g, ''));
+        // Los miles van con punto en español y con coma en inglés: hay que quitar los dos, o en la
+        // página inglesa «35,403» se lee como 35 y el total no cuadra (falsa alarma, no bug).
+        const m = o.textContent && o.textContent.match(/\(([\d.,]+)\)/);
+        if (m) t += Number(m[1].replace(/[.,]/g, ''));
       }
       return t;
     },
