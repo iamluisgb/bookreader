@@ -1795,6 +1795,7 @@ body.ai-open #sync-badge { right: calc(var(--ai-panel-width) + 14px); }
   .anal-range .segmented-btn, .anal-scope-pick, .anal-scope-open, .anal-scope-study { min-height: 44px; height: auto; }
   .anal-nav-btn, .anal-scope-x, .anal-card .appset-close { min-width: 44px; min-height: 44px; }
   .anal-fix { display: inline-flex; align-items: center; min-height: 44px; }
+  .anal-empty-go, .anal-work .anal-scope-study { min-height: 44px; }
 }
 .anal-scope { position: relative; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
 .anal-scope-pick { display: inline-flex; align-items: center; gap: 6px; min-width: 0; max-width: 100%;
