@@ -26,6 +26,7 @@ const EL = new URL('../assets/muestra/elejandria.json', import.meta.url);
 const COMPLETO = new URL('../assets/muestra/catalogo-completo.json', import.meta.url);
 const ES = new URL('../assets/muestra/catalogo-es.json', import.meta.url);
 const ENLACES = new URL('../assets/muestra/elejandria-enlaces.json', import.meta.url);
+const WIKI = new URL('../assets/muestra/wikisource.json', import.meta.url);
 const UA = 'BookReader catalog builder (+https://bookreader.raiatech.com/samples/)';
 const PAUSA_MS = 1500;
 const argv = process.argv.slice(2);
@@ -211,7 +212,7 @@ async function actualizarElejandria() {
 }
 
 // ── facetas ───────────────────────────────────────────────────────────────────────────────
-function facetas({ pg, el, se }) {
+function facetas({ pg, el, se, wiki = [] }) {
   const f = { lang: {}, mat: {}, era: {}, src: {} };
   const suma = (o, k) => (o[k] = (o[k] || 0) + 1);
   for (const [, , , l, s, y] of pg) {
@@ -225,6 +226,12 @@ function facetas({ pg, el, se }) {
     suma(f.mat, s ? MAT[s] || s : 'Sin clasificar');
     suma(f.era, epoca(y));
     suma(f.src, 'el');
+  }
+  for (const b of wiki) {
+    suma(f.lang, b.lang || 'es');
+    suma(f.mat, 'Literatura');
+    suma(f.era, epoca(b.authorYear ?? null));
+    suma(f.src, 'ws');
   }
   // Standard Ebooks no publica años: sus obras entran como «sin dato» en la época.
   for (const b of se) {
@@ -247,6 +254,9 @@ if ((flag('--actualizar-gutenberg') || flag('--actualizar-elejandria')) && argv.
 
 const { books: tecnicos } = JSON.parse(readFileSync(TEC, 'utf8'));
 const pgBruto = JSON.parse(readFileSync(PG, 'utf8')).works;
+// Obras compuestas desde Wikisource (scripts/wikisource-epub.py): pocas y estáticas, van en el
+// índice para que aparezcan siempre, sin depender del resto del fondo.
+const wiki = JSON.parse(readFileSync(WIKI, 'utf8')).books;
 // Solo las obras de Elejandría cuyo ePub se pudo resolver: sin enlace, el botón «Leer» daría 404.
 const enlaces = JSON.parse(readFileSync(ENLACES, 'utf8')).links;
 const elBruto = JSON.parse(readFileSync(EL, 'utf8')).works;
@@ -279,8 +289,9 @@ const out = {
     'se = Standard Ebooks (dominio público en EE. UU., edición CC0); tecnicos = assets/muestra/tecnicos.json; ' +
     'pgIds/elIds = ids válidos de Project Gutenberg (dominio público en España) y de Elejandría; sus fichas ' +
     'están en catalogo-completo.json, que solo carga la landing.',
-  facets: facetas({ pg, el, se }),
+  facets: facetas({ pg, el, se, wiki }),
   tecnicos,
+  wiki,
   se,
   pgIds: pg.map((w) => w[0]),
   elIds: el.map((w) => w[0]),

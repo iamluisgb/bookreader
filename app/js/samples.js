@@ -21,6 +21,7 @@ import { t } from './i18n.js';
 
 const MANIFEST = new URL('../../assets/muestra/manifest.json', import.meta.url);
 const CATALOGO = new URL('../../assets/muestra/catalogo.json', import.meta.url);
+const WIKISOURCE = new URL('../../assets/muestra/wikisource.json', import.meta.url);
 export const LIBROS_WORKER = 'https://bookreader-libros.luisgonzalezb93.workers.dev';
 const TIPOS = { epub: 'application/epub+zip', pdf: 'application/pdf' };
 
@@ -79,6 +80,17 @@ export async function resolve(id) {
       file: `elejandria-${key}.${pdf ? 'pdf' : 'epub'}`,
       type: pdf ? TIPOS.pdf : TIPOS.epub,
     };
+  }
+  // Obras compuestas por nosotros a partir de Wikisource: el EPUB es un fichero estático del sitio,
+  // con su atribución dentro (dc:source y dc:rights).
+  if (id.startsWith('ws:')) {
+    const key = id.slice(3);
+    const res = await fetch(WIKISOURCE);
+    if (!res.ok) return null;
+    const { books = [] } = await res.json();
+    const w = books.find((b) => b.id === key);
+    if (!w) return null;
+    return { title: w.title, href: new URL(w.file, WIKISOURCE).href, file: `${w.id}.${w.format || 'epub'}`, type: TIPOS[w.format] || TIPOS.epub };
   }
   const book = (await manifest()).find((b) => b.id === id);
   if (!book) return null;

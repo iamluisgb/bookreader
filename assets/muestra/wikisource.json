@@ -1,0 +1,48 @@
+{
+  "updated": "2026-11-25",
+  "note": "Obras compuestas en EPUB a partir de Wikisource en español (scripts/wikisource-epub.py): no existe EPUB oficial de estas traducciones y el exportador de Wikisource está detrás de un muro anti-bots. Texto en dominio público; la transcripción va con CC BY-SA 4.0 y la atribución está aquí y dentro del EPUB (dc:source, dc:rights). Antes de añadir una obra hay que comprobar la fecha de muerte del TRADUCTOR: en España la traducción tiene derechos propios.",
+  "books": [
+    {
+      "id": "soliloquios",
+      "title": "Soliloquios o reflexiones morales",
+      "author": "Marco Aurelio",
+      "translator": "Jacinto Díaz de Miranda",
+      "translatorDeath": null,
+      "lang": "es",
+      "format": "epub",
+      "words": 98305,
+      "file": "wikisource/soliloquios.epub",
+      "source": "https://es.wikisource.org/wiki/Soliloquios",
+      "licence": "Dominio público · transcripción CC BY-SA 4.0",
+      "authorYear": 121
+    },
+    {
+      "id": "herodoto",
+      "title": "Los nueve libros de la historia",
+      "author": "Heródoto",
+      "translator": "Bartolomé Pou",
+      "translatorDeath": 1802,
+      "lang": "es",
+      "format": "epub",
+      "words": 281309,
+      "file": "wikisource/herodoto.epub",
+      "source": "https://es.wikisource.org/wiki/Los_nueve_libros_de_la_historia",
+      "licence": "Dominio público · transcripción CC BY-SA 4.0",
+      "authorYear": -484
+    },
+    {
+      "id": "plutarco-vidas",
+      "title": "Vidas paralelas",
+      "author": "Plutarco",
+      "translator": "Antonio Ranz Romanillos",
+      "translatorDeath": 1830,
+      "lang": "es",
+      "format": "epub",
+      "words": 714393,
+      "file": "wikisource/plutarco-vidas-paralelas.epub",
+      "source": "https://es.wikisource.org/wiki/Las_vidas_paralelas_de_Plutarco",
+      "licence": "Dominio público · transcripción CC BY-SA 4.0",
+      "authorYear": 46
+    }
+  ]
+}

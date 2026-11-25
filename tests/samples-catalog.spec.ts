@@ -16,6 +16,11 @@ const CORS = { 'Access-Control-Allow-Origin': '*' };
 async function fuentes(page) {
   const pedidas: string[] = [];
   await page.route('**/assets/muestra/catalogo.json', (r) => r.fulfill({ path: CATALOGO }));
+  // El servidor de los tests sirve `app/`, así que los assets de la biblioteca se enrutan a mano,
+  // igual que el catálogo.
+  const MUESTRA = path.join(__dirname, '..', 'assets', 'muestra');
+  await page.route('**/assets/muestra/wikisource.json', (r) => r.fulfill({ path: path.join(MUESTRA, 'wikisource.json'), contentType: 'application/json' }));
+  await page.route('**/assets/muestra/wikisource/*.epub', (r) => r.fulfill({ path: path.join(MUESTRA, 'wikisource', decodeURIComponent(new URL(r.request().url()).pathname.split('/').pop()!)), contentType: 'application/epub+zip' }));
   await page.route('https://standardebooks.org/**', (r) => { pedidas.push(r.request().url()); return r.fulfill({ path: EPUB, headers: CORS }); });
   await page.route(`${WORKER}/**`, (r) => { pedidas.push(r.request().url()); return r.fulfill({ path: PDF, headers: CORS }); });
   await page.route('https://media.githubusercontent.com/**', (r) => { pedidas.push(r.request().url()); return r.fulfill({ path: EPUB, headers: CORS }); });
@@ -89,6 +94,18 @@ test('un clásico de Elejandría que solo está en PDF se abre como PDF', async 
   expect(pedidas).toEqual([`${WORKER}/el/${id}`]);
   // El título del enlace es el que acaba en la biblioteca, no el id del fichero.
   await expect(page.getByText('Retórica').first()).toBeVisible({ timeout: 10000 });
+});
+
+// Obra compuesta por nosotros a partir de Wikisource: el EPUB es estático del sitio y tiene que
+// abrir con su índice, que es lo que distingue un libro bien montado de un volcado de texto.
+test('un libro de Wikisource se abre con su índice', async ({ page }) => {
+  await fuentes(page);
+  await page.goto('/index.html?sample=' + encodeURIComponent('ws:soliloquios') + '&t=Soliloquios');
+  await expect(page.locator('body')).toHaveClass(/reading/, { timeout: 25000 });
+  // El índice del libro trae los capítulos de la obra, no un volcado con una sola entrada.
+  await page.getByRole('button', { name: /Contenido|Contents|Índice/ }).first().click();
+  await expect(page.getByText(/^Libro I$/).first()).toBeVisible({ timeout: 15000 });
+  await expect(page.getByText(/^Libro XII$/).first()).toBeVisible({ timeout: 5000 });
 });
 
 test('un número de Gutenberg que no está en el catálogo no sale a la red', async ({ page }) => {

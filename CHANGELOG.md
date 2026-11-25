@@ -31,6 +31,16 @@ Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de g
   lector las abre con su lector de PDF (el catálogo dice el formato en `elPdfIds`).
 - **El título del enlace nombra el fichero**: sin eso, un libro de Gutenberg entraba en la
   biblioteca como `pg:1619`. Ahora se usa el `t=` de la landing, saneado.
+- **Tercera fuente: Wikisource compuesto en EPUB** (`scripts/wikisource-epub.py`). Los clásicos que
+  faltaban no están en Gutenberg ni en Elejandría: están en Wikisource como páginas wiki, y su
+  exportador (`ws-export`) vive detrás de un muro anti-bots. El script las compone en EPUB 3 con
+  índice, sin dependencias: pide la raíz y las subpáginas por la API, las ordena por número (romano
+  o árabe) y **sanea el HTML con un parser y una pila de abiertos**, porque el HTML de Wikisource no
+  es XML (`<br>` sin cerrar, entidades HTML) y un EPUB tiene que serlo. Ya dentro: **Soliloquios**
+  de Marco Aurelio (98.305 palabras, trad. Díaz de Miranda), **Los nueve libros de la historia** de
+  Heródoto (281.309, trad. Bartolomé Pou †1802) y **Vidas paralelas** de Plutarco (714.393, trad.
+  Ranz Romanillos †1830). Los tres validan (XML bien formado, mimetype primero y sin comprimir) y
+  abren con su índice; el test recorre Libro I a Libro XII.
 - **Datos del catálogo** en `assets/muestra/`: `pg-espana.json` (3,7 MB) y `elejandria.json` se
   commitean para que el build no dependa de la red; se refrescan con `--actualizar-gutenberg --csv`
   y `--actualizar-elejandria`.

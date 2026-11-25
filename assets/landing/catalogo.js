@@ -52,7 +52,7 @@
   var LANGNAME = { en: 'English', es: 'Spanish', fr: 'French', de: 'German', it: 'Italian', nl: 'Dutch', pt: 'Portuguese', fi: 'Finnish', sv: 'Swedish', hu: 'Hungarian', el: 'Greek', la: 'Latin', da: 'Danish', ru: 'Russian', pl: 'Polish', cs: 'Czech', ca: 'Catalan', gl: 'Galician', eu: 'Basque', no: 'Norwegian', ja: 'Japanese', zh: 'Chinese', ar: 'Arabic', he: 'Hebrew', tr: 'Turkish', ro: 'Romanian', bg: 'Bulgarian', hr: 'Croatian', sl: 'Slovenian', et: 'Estonian', lt: 'Lithuanian', lv: 'Latvian', is: 'Icelandic', ga: 'Irish', cy: 'Welsh', eo: 'Esperanto', uk: 'Ukrainian', sr: 'Serbian', mk: 'Macedonian', sq: 'Albanian', af: 'Afrikaans', tl: 'Tagalog', ko: 'Korean', hi: 'Hindi', fa: 'Persian', yi: 'Yiddish' };
   var MAT = { A: 'General', B: 'Philosophy and religion', C: 'Auxiliary history', D: 'World history', E: 'History of America', F: 'Local America', G: 'Geography and travel', H: 'Social sciences', J: 'Politics', K: 'Law', L: 'Education', M: 'Music', N: 'Art', P: 'Literature', Q: 'Science', R: 'Medicine', S: 'Agriculture', T: 'Technology', U: 'Military', V: 'Naval', Z: 'Bibliography' };
   var MAT_ES = { A: 'Obras generales', B: 'Filosofía y religión', C: 'Ciencias auxiliares', D: 'Historia universal', E: 'Historia de América', F: 'América local', G: 'Geografía y viajes', H: 'Ciencias sociales', J: 'Política', K: 'Derecho', L: 'Educación', M: 'Música', N: 'Arte', P: 'Literatura', Q: 'Ciencia', R: 'Medicina', S: 'Agricultura', T: 'Tecnología', U: 'Militar', V: 'Naval', Z: 'Bibliografía' };
-  var SRCN = { se: 'Standard Ebooks', pg: 'Project Gutenberg', el: 'Elejandría', tec: ES ? 'Técnico' : 'Technical' };
+  var SRCN = { se: 'Standard Ebooks', pg: 'Project Gutenberg', el: 'Elejandría', ws: 'Wikisource', tec: ES ? 'Técnico' : 'Technical' };
   var input = root.querySelector('input[type="search"]');
   var list = root.querySelector('.lib-list');
   var status = root.querySelector('.lib-status');
@@ -249,8 +249,18 @@
           format: w[5] || 'epub', home: 'https://www.elejandria.com/libro/' + w[0], sourceName: 'Elejandría',
         };
       });
+      // Obras compuestas desde Wikisource (EPUB generado por nosotros, con su atribución dentro).
+      var wiki = (c.wiki || []).map(function (w) {
+        var anio = w.authorYear === undefined ? null : w.authorYear;
+        return {
+          id: 'ws:' + w.id, kind: 'lit', title: w.title, author: w.author, lang: w.lang || 'es',
+          mat: ES ? 'Literatura' : 'Literature', year: anio, era: epoca(anio), src: 'ws',
+          format: w.format || 'epub', license: w.licence || (ES ? 'Dominio público' : 'Public domain'),
+          home: w.source, sourceName: 'Wikisource',
+        };
+      });
       // Los técnicos primero: son pocos y en la lista larga de clásicos se perderían.
-      all = filas.concat(se, pgEs, el_);
+      all = filas.concat(se, pgEs, el_, wiki);
       all.forEach(function (b) { b.key = fold(b.title + ' ' + b.author); });
       // Cuántas obras quedan fuera de lo cargado, según el índice de ids del catálogo.
       var cargados = {};
