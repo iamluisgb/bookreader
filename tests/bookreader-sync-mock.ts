@@ -21,7 +21,8 @@ export async function createSyncServer(vars: Record<string, string> = {}): Promi
   const harness = await import('../workers/sync/test/harness.mjs');
   const mod = await import('../workers/sync/src/index.js');
   const env = harness.env({
-    ALLOWED_ORIGINS: 'http://localhost:8888,http://localhost:8890',
+    // 8877: la config local del lab (el 8888 lo ocupa otro servicio allí).
+    ALLOWED_ORIGINS: 'http://localhost:8888,http://localhost:8890,http://localhost:8877',
     DATA_QUOTA_BYTES: String(50 * 1024 * 1024),
     FILE_QUOTA_BYTES: String(500 * 1024 * 1024),
     MAX_BYTES: String(100 * 1024 * 1024),

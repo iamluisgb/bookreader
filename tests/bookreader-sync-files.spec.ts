@@ -19,9 +19,9 @@ async function boot(context: BrowserContext, server: SyncServer, { pair = '' } =
 async function enableAndLink(page: Page): Promise<string> {
   return page.evaluate(async () => {
     const A = await import('/js/sync/bookreader-auth.js');
-    await A.enable();
+    await A.enable({ firstDevice: true });
     await A.getToken(true);   // trae `files` del servidor
-    const link = A.pairingLink();
+    const link = (await A.createPairCode()).link;
     return link.slice(link.indexOf('#'));
   });
 }

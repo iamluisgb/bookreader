@@ -38,8 +38,8 @@ async function twoDevices(browser: any, server: SyncServer) {
   await a.goto('/');
   const link: string = await a.evaluate(async () => {
     const A = await import('/js/sync/bookreader-auth.js');
-    await A.enable();
-    return A.pairingLink();
+    await A.enable({ firstDevice: true });
+    return (await A.createPairCode()).link;
   });
   const b = await movil.newPage();
   await b.goto('/' + link.slice(link.indexOf('#')));
@@ -104,7 +104,7 @@ test.describe('MON4 F3 — sync de BookReader de punta a punta', () => {
     await installSyncServer(page, server);
     await seedBookReaderSync(page);
     await page.goto('/');
-    await page.evaluate(async () => (await import('/js/sync/bookreader-auth.js')).enable());
+    await page.evaluate(async () => (await import('/js/sync/bookreader-auth.js')).enable({ firstDevice: true }));
     await addHighlight(page, 'libro-429', 'epubcfi(/6/2!/4/2)', 'aguanta');
     expect((await syncNow(page)).pushed).toBe(1);
     expect(server.calls.filter(c => c.startsWith('PUT')).length).toBeGreaterThan(server.env.DB._raw.prepare('SELECT COUNT(*) AS n FROM objects').get().n);
@@ -128,7 +128,7 @@ test.describe('MON4 F3 — sync de BookReader de punta a punta', () => {
     await installSyncServer(page, server);
     await seedBookReaderSync(page);
     await page.goto('/');
-    await page.evaluate(async () => (await import('/js/sync/bookreader-auth.js')).enable());
+    await page.evaluate(async () => (await import('/js/sync/bookreader-auth.js')).enable({ firstDevice: true }));
     await addHighlight(page, 'libro-h', 'epubcfi(/6/2!/4/2)', 'primero');
     await syncNow(page);
     await addHighlight(page, 'libro-h', 'epubcfi(/6/4!/4/2)', 'segundo');
@@ -240,13 +240,27 @@ test.describe('MON4 F3 — sync de BookReader de punta a punta', () => {
     await seg.locator('[data-p="bookreader"]').click();
     await expect(page.locator('#appset-sync-pane-bookreader')).toBeVisible();
     await page.locator('#appset-br-enable').click();
+    // Con esta licencia no hay nada: pregunta antes de crear un sync vacío (F1).
+    await expect(page.locator('.dlg-card')).toContainText('¿Ya usas el sync en otro dispositivo?');
+    expect(server.env.DB._raw.prepare('SELECT COUNT(*) AS n FROM objects').get().n).toBe(0);
+    await page.locator('.dlg-option', { hasText: 'No, es el primero' }).click();
     await expect(page.locator('#appset-data-msg')).toContainText('Sync de BookReader activado');
     await expect(page.locator('#appset-br-on')).toBeVisible();
     await expect(page.locator('#appset-br-status')).toContainText('Ocupas');
     await expect(page.locator('#appset-br-status')).toContainText('los archivos de los libros no');
 
+    // «Añadir un dispositivo»: QR + enlace de un solo uso, con cuenta atrás (F2).
+    await expect(page.locator('#appset-br-pairlink')).toContainText('Añadir un dispositivo');
     await page.locator('#appset-br-pairlink').click();
-    expect(await page.evaluate(() => navigator.clipboard.readText())).toMatch(/#pair=/);
+    await expect(page.locator('.pair-card svg.pair-qr')).toBeVisible();
+    await expect(page.locator('.pair-timer')).toContainText(/Caduca en (10:00|9:\d\d)/);
+    await page.locator('.pair-copy').click();
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toMatch(/#pair2=[A-Za-z0-9_-]{22}\.[A-Za-z0-9_-]{22}$/);
+    await expect(page.locator('.pair-state')).toContainText('Enlace copiado');
+    // Cerrar sin usarlo anula el código.
+    await page.locator('.pair-close').click();
+    await expect(page.locator('.pair-card')).toHaveCount(0);
+    await expect.poll(() => server.env.DB._raw.prepare('SELECT COUNT(*) AS n FROM pair_codes').get().n).toBe(0);
     await page.locator('#appset-br-recovery').click();
     await expect(page.locator('#appset-br-recovery-code')).toHaveText(/^([0-9A-Z]{4}-){13}[0-9A-Z]{2}$/);
 
@@ -269,7 +283,7 @@ test.describe('MON4 F3 — sync de BookReader de punta a punta', () => {
     await a.goto('/');
     const code = await a.evaluate(async () => {
       const A = await import('/js/sync/bookreader-auth.js');
-      await A.enable();
+      await A.enable({ firstDevice: true });
       const H = await import('/js/highlights.js');
       H.setBook('libro-r');
       H.add('epubcfi(/6/2!/4/2)', 'recuperado', '#ffeb3b', 'c1', '');
@@ -288,6 +302,82 @@ test.describe('MON4 F3 — sync de BookReader de punta a punta', () => {
     await b.locator('#appset-br-usecode').click();
     await expect(b.locator('#appset-br-on')).toBeVisible();
     await expect.poll(() => highlights(b, 'libro-r')).toEqual(['recuperado']);
+    await pc.close();
+    await otro.close();
+  });
+
+  test('Añadir un dispositivo: el portátil enseña el código, el PC con otra licencia lo abre y el portátil lo ve', async ({ browser }) => {
+    const server = await createSyncServer();
+    const portatil = await browser.newContext();
+    const pcTrabajo = await browser.newContext();
+    for (const c of [portatil, pcTrabajo]) { await installSyncServer(c, server); await enableSyncPreview(c); }
+    await seedBookReaderSync(portatil, 'BKRD-LIC-PORTATIL');
+    const a = await portatil.newPage();
+    await a.goto('/');
+    await a.evaluate(async () => {
+      await (await import('/js/sync/bookreader-auth.js')).enable({ firstDevice: true });
+      const H = await import('/js/highlights.js');
+      H.setBook('libro-p');
+      H.add('epubcfi(/6/2!/4/2)', 'del portátil', '#ffeb3b', 'c1', '');
+      await (await import('/js/sync/engine.js')).syncNow();
+    });
+    await a.evaluate(async () => (await import('/js/ui/app-settings.js')).open('data'));
+    await a.locator('#appset-br-pairlink').click();
+    await expect(a.locator('.pair-card svg.pair-qr')).toBeVisible();
+    const link = await a.evaluate(() => (document.querySelector('.pair-qr-box') as HTMLElement).dataset.link!);
+
+    // El PC del trabajo tiene OTRA licencia (el caso de Luis): el enlace la cambia, avisando.
+    await seedBookReaderSync(pcTrabajo, 'BKRD-LIC-TRABAJO');
+    const b = await pcTrabajo.newPage();
+    await b.goto('/' + link.slice(link.indexOf('#')));
+    await expect(b.locator('.dlg-card')).toContainText('Este dispositivo tiene otra licencia');
+    await b.locator('.dlg-ok', { hasText: 'Usar esa licencia' }).click();
+    await expect.poll(() => highlights(b, 'libro-p'), { timeout: 15000 }).toEqual(['del portátil']);
+    expect(await b.evaluate(() => JSON.parse(localStorage.getItem('bookreader_license')!).key)).toBe('BKRD-LIC-PORTATIL');
+
+    // El portátil lo ve sin hacer nada.
+    await expect(a.locator('.pair-state')).toContainText('ya sincroniza contigo', { timeout: 10000 });
+    await expect(a.locator('svg.pair-qr')).toHaveCount(0);
+
+    // El mismo enlace otra vez: ya no vale.
+    const c = await pcTrabajo.newPage();
+    await c.goto('/' + link.slice(link.indexOf('#')));
+    await expect(c.locator('.dlg-card')).toContainText('Este enlace ya se usó o ha caducado');
+    await portatil.close();
+    await pcTrabajo.close();
+  });
+
+  test('«Ya lo uso en otro» con otra licencia: la clave de recuperación avisa de la licencia y lleva a Licencia', async ({ browser }) => {
+    const server = await createSyncServer();
+    const pc = await browser.newContext();
+    const otro = await browser.newContext();
+    for (const c of [pc, otro]) { await installSyncServer(c, server); await enableSyncPreview(c); }
+    await seedBookReaderSync(pc, 'BKRD-LIC-AAAA');
+    await seedBookReaderSync(otro, 'BKRD-LIC-BBBB');
+    const a = await pc.newPage();
+    await a.goto('/');
+    const code = await a.evaluate(async () => {
+      const A = await import('/js/sync/bookreader-auth.js');
+      await A.enable({ firstDevice: true });
+      return A.recoveryCode();
+    });
+    const b = await otro.newPage();
+    await b.goto('/');
+    await b.evaluate(() => localStorage.removeItem('bookreader_sync_provider'));
+    await b.evaluate(async () => (await import('/js/ui/app-settings.js')).open('data'));
+    await b.locator('#appset-sync-choice [data-p="bookreader"]').click();
+    await b.locator('#appset-br-enable').click();
+    await b.locator('.dlg-option', { hasText: 'Sí, ya lo uso en otro' }).click();
+    await expect(b.locator('#appset-br-pair')).toBeVisible();
+    await expect(b.locator('#appset-br-pair-text')).toContainText('Añadir un dispositivo');
+    await expect(b.locator('#appset-br-startover')).toBeHidden();
+    // No se creó nada bajo la licencia de este dispositivo.
+    expect(server.env.DB._raw.prepare('SELECT COUNT(DISTINCT user) AS n FROM objects').get().n).toBe(1);
+    await b.locator('#appset-br-code').fill(code);
+    await b.locator('#appset-br-usecode').click();
+    await expect(b.locator('#appset-data-msg')).toContainText('otra licencia');
+    await expect(b.locator('#appset-br-golicense')).toBeVisible();
+    expect(await b.evaluate(() => localStorage.getItem('bookreader_sync_key'))).toBeNull();
     await pc.close();
     await otro.close();
   });

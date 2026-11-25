@@ -367,7 +367,7 @@ async function withSync(page: Page, vars: Record<string, string> = {}) {
   await installSyncServer(page.context(), server);
   await seedBookReaderSync(page.context());
   const ids = await seed(page);
-  await page.evaluate(async () => { const A = await import('/js/sync/bookreader-auth.js'); await A.enable(); await A.getToken(true); });
+  await page.evaluate(async () => { const A = await import('/js/sync/bookreader-auth.js'); await A.enable({ firstDevice: true }); await A.getToken(true); });
   return { server, ids };
 }
 

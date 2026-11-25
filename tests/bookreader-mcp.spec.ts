@@ -16,7 +16,7 @@ test('Agentes: crear un token, leer con él por MCP lo sincronizado, y revocarlo
   await seedBookReaderSync(page);
   await page.goto('/');
   const bookId = await page.evaluate(async () => {
-    await (await import('/js/sync/bookreader-auth.js')).enable();
+    await (await import('/js/sync/bookreader-auth.js')).enable({ firstDevice: true });
     const Store = await import('/js/library/store.js');
     const buf = new Uint8Array(2048).map((_, i) => (i * 7) % 251);
     const id = 'libro-mcp';
@@ -76,7 +76,7 @@ test('Agente con escritura: su edición y un repaso hecho sin sincronizar sobrev
   await seedBookReaderSync(page);
   await page.goto('/');
   const deckUid = await page.evaluate(async () => {
-    await (await import('/js/sync/bookreader-auth.js')).enable();
+    await (await import('/js/sync/bookreader-auth.js')).enable({ firstDevice: true });
     const Store = await import('/js/library/store.js');
     const buf = new Uint8Array(1024).map((_, i) => i % 251);
     await Store.putBook({ id: 'ddia', title: 'Designing Data-Intensive Applications', author: 'Kleppmann', format: 'epub', fileName: 'ddia.epub', file: buf.buffer, size: buf.length, addedAt: Date.now(), progress: 0, status: 'reading', shelfIds: [] });
@@ -142,7 +142,7 @@ test('Agente con permiso de texto: la app sube el texto troceado y el agente lo 
   await seedBookReaderSync(page);
   await page.goto('/');
   await page.evaluate(async () => {
-    await (await import('/js/sync/bookreader-auth.js')).enable();
+    await (await import('/js/sync/bookreader-auth.js')).enable({ firstDevice: true });
     const Store = await import('/js/library/store.js');
     const buf = new Uint8Array(1024).map((_, i) => (i * 3) % 251);
     await Store.putBook({ id: 'ddia', title: 'Designing Data-Intensive Applications', author: 'Kleppmann', format: 'epub', fileName: 'ddia.epub', file: buf.buffer, size: buf.length, addedAt: Date.now(), progress: 0, status: 'reading', shelfIds: [] });
@@ -208,7 +208,7 @@ test('Texto para agentes: la cola trocea los libros sin abrir y Ajustes cuenta l
   await page.goto('/');
   const epub = readFileSync(path.join(__dirname, 'test.epub')).toString('base64');
   await page.evaluate(async (b64) => {
-    await (await import('/js/sync/bookreader-auth.js')).enable();
+    await (await import('/js/sync/bookreader-auth.js')).enable({ firstDevice: true });
     const Store = await import('/js/library/store.js');
     const buf = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
     const base = { author: 'X', format: 'epub', addedAt: Date.now(), progress: 0, status: 'unread', shelfIds: [] };
@@ -264,7 +264,7 @@ test('Texto para agentes: un libro que solo está en el sync se trocea sin queda
   const pc = await boot();
   const { pair, id } = await pc.page.evaluate(async (b64) => {
     const A = await import('/js/sync/bookreader-auth.js');
-    await A.enable();
+    await A.enable({ firstDevice: true });
     await A.getToken(true);   // trae `files` del servidor
     const Store = await import('/js/library/store.js');
     const DB = await import('/js/ai/db.js');
@@ -274,7 +274,7 @@ test('Texto para agentes: un libro que solo está en el sync se trocea sin queda
     await (await import('/js/sync/engine.js')).syncNow();
     await (await import('/js/sync/blobs.js')).flush();
     await (await import('/js/sync/engine.js')).syncNow();
-    const link = A.pairingLink();
+    const link = (await A.createPairCode()).link;
     return { pair: link.slice(link.indexOf('#')), id };
   }, epub);
   await pc.context.close();   // el PC ya no está: el texto lo tiene que preparar el otro equipo
@@ -314,7 +314,7 @@ test('Texto para agentes: un libro importado se prepara y se indexa al cerrar el
   await seedBookReaderSync(page);
   await page.goto('/');
   await page.evaluate(async () => {
-    await (await import('/js/sync/bookreader-auth.js')).enable();
+    await (await import('/js/sync/bookreader-auth.js')).enable({ firstDevice: true });
     await (await import('/js/sync/engine.js')).syncNow();
     await (await import('/js/sync/bookreader-auth.js')).createMcpToken('Claude', { scopes: ['text'] });
     (window as any).__imported = [];
@@ -344,7 +344,7 @@ test('Índice de la biblioteca: se construye tras el texto, se busca, y borrar e
   await page.goto('/');
   const epub = readFileSync(path.join(__dirname, 'test.epub')).toString('base64');
   await page.evaluate(async (b64) => {
-    await (await import('/js/sync/bookreader-auth.js')).enable();
+    await (await import('/js/sync/bookreader-auth.js')).enable({ firstDevice: true });
     const Store = await import('/js/library/store.js');
     const buf = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
     await Store.putBook({ id: 'libro', title: 'Libro', author: 'X', format: 'epub', fileName: 'a.epub', file: buf.buffer, size: buf.length, addedAt: Date.now(), progress: 0, status: 'unread', shelfIds: [] });
@@ -413,7 +413,7 @@ test('Agente crea un mapa mental y una infografía: llegan al Studio del disposi
   await seedBookReaderSync(page);
   await page.goto('/');
   await page.evaluate(async () => {
-    await (await import('/js/sync/bookreader-auth.js')).enable();
+    await (await import('/js/sync/bookreader-auth.js')).enable({ firstDevice: true });
     const Store = await import('/js/library/store.js');
     const buf = new Uint8Array(1024).map((_, i) => (i * 5) % 251);
     await Store.putBook({ id: 'ddia', title: 'Designing Data-Intensive Applications', author: 'Kleppmann', format: 'epub', fileName: 'ddia.epub', file: buf.buffer, size: buf.length, addedAt: Date.now(), progress: 0, status: 'reading', shelfIds: [] });
@@ -467,7 +467,7 @@ test('Agente organiza la biblioteca: sobrevive a un pase de página sin sincroni
   await seedBookReaderSync(page);
   await page.goto('/');
   await page.evaluate(async () => {
-    await (await import('/js/sync/bookreader-auth.js')).enable();
+    await (await import('/js/sync/bookreader-auth.js')).enable({ firstDevice: true });
     const Store = await import('/js/library/store.js');
     const buf = new Uint8Array(1024).map((_, i) => (i * 11) % 251);
     await Store.putBook({ id: 'ddia', title: 'Designing Data-Intensive Applications', author: 'Kleppmann', format: 'epub', fileName: 'ddia.epub', file: buf.buffer, size: buf.length, addedAt: Date.now(), progress: 20, status: 'reading', shelfIds: [] });
@@ -542,7 +542,7 @@ test('Agente sube un libro: aparece en la biblioteca, se descarga, y se deshace 
   const sha256 = createHash('sha256').update(bytes).digest('hex');
   await page.evaluate(async () => {
     const A = await import('/js/sync/bookreader-auth.js');
-    await A.enable();
+    await A.enable({ firstDevice: true });
     await A.getToken(true);   // trae `files` del servidor
     await (await import('/js/sync/engine.js')).syncNow();
   });
@@ -611,7 +611,7 @@ async function agentWithScope(page, scope: string) {
 async function seedDeviceBook(page) {
   await page.evaluate(async () => {
     const A = await import('/js/sync/bookreader-auth.js');
-    await A.enable();
+    await A.enable({ firstDevice: true });
     await A.getToken(true);
     const Store = await import('/js/library/store.js');
     const buf = new Uint8Array(1024).map((_, i) => (i * 11) % 251);

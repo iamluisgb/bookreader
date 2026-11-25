@@ -63,7 +63,7 @@ test.describe('MON4 F5 — pasar el sync de un proveedor a otro', () => {
     // Sin sincronizar todavía con Drive: lo de la tablet lo trae la propia migración.
     const r = await a.evaluate(async () => {
       const A = await import('/js/sync/bookreader-auth.js');
-      await A.enable();
+      await A.enable({ firstDevice: true });
       await A.getToken(true);
       const S = await import('/js/sync/switch.js');
       const r = await S.migrate('drive', 'bookreader');
@@ -78,7 +78,7 @@ test.describe('MON4 F5 — pasar el sync de un proveedor a otro', () => {
 
     // Un móvil nuevo, emparejado al sync de BookReader y SIN Drive, lo tiene todo.
     const link = await a.evaluate(async () => {
-      const l = (await import('/js/sync/bookreader-auth.js')).pairingLink();
+      const l = (await (await import('/js/sync/bookreader-auth.js')).createPairCode()).link;
       return l.slice(l.indexOf('#'));
     });
     const movil = await browser.newContext();
@@ -116,7 +116,7 @@ test.describe('MON4 F5 — pasar el sync de un proveedor a otro', () => {
     await a.goto('/');
     await a.evaluate(async () => {
       const A = await import('/js/sync/bookreader-auth.js');
-      await A.enable();
+      await A.enable({ firstDevice: true });
       await A.getToken(true);
     });
     await importBook(a, 'El hablador', 8);
