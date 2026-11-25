@@ -165,6 +165,8 @@ const EN = {
   'Toda la biblioteca': 'Whole library',
   'Qué analizar': 'What to analyze',
   'Periodo': 'Period',
+  'hoy y los próximos 7 días, sea cual sea el periodo': 'today and the next 7 days, whatever the period',
+  'Repasar ({n})': 'Review ({n})',
   'Todo el historial, no solo este periodo.': 'Whole history, not just this period.',
   '<b>{k}</b> de {n}': '<b>{k}</b> of {n}',
   'escribiendo la respuesta': 'typing the answer',

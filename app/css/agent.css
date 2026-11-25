@@ -1702,6 +1702,10 @@ body.ai-open #sync-badge { right: calc(var(--ai-panel-width) + 14px); }
 .anal-sec { margin-top: 22px; }
 .anal-sec + .anal-sec, .anal-books + .anal-sec { padding-top: 18px; border-top: 1px solid var(--border-soft); }
 .anal-sec-h { margin: 0 0 10px; font-size: var(--fs-md); font-weight: 600; }
+.anal-sec-aside { margin-left: 6px; font-size: var(--fs-xs); font-weight: 400; color: var(--text-soft); }
+.anal-due { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px 16px; }
+.anal-due .anal-tiles { flex: 1 1 220px; }
+.anal-due .anal-scope-study { margin-left: 0; }
 .anal-tabs + .anal-sec, .anal-scope + .anal-sec { margin-top: 0; }
 .anal-hero--sm .anal-hero-n { font-size: var(--fs-3xl); }
 .anal-muted { margin: 6px 0 0; font-size: var(--fs-sm); color: var(--text-soft); line-height: 1.5; }
@@ -1792,7 +1796,6 @@ body.ai-open #sync-badge { right: calc(var(--ai-panel-width) + 14px); }
 .anal-scope-t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .anal-scope-x { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px;
   border: none; border-radius: var(--r-pill); background: var(--surface-2); color: var(--text-soft); cursor: pointer; }
-.anal-scope-study { margin-left: auto; }
 .anal-scope-open { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px;
   border: none; border-radius: var(--r-pill); background: var(--fill); color: var(--text); font: inherit;
   font-size: var(--fs-sm); font-weight: 500; cursor: pointer; }
@@ -1828,7 +1831,8 @@ body.ai-open #sync-badge { right: calc(var(--ai-panel-width) + 14px); }
 .anal-fc { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; height: 96px; }
 .anal-fc-col { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; }
 .anal-fc-track { flex: 1; width: 100%; display: flex; align-items: flex-end; justify-content: center; }
-.anal-fc-bar { width: 60%; max-width: 24px; border-radius: var(--r-xs) var(--r-xs) 0 0; background: var(--accent-soft); }
+/* --text-faint y no --accent-soft: son datos y necesitan ≥ 3:1 con el fondo (era 1,14:1). */
+.anal-fc-bar { width: 60%; max-width: 24px; border-radius: var(--r-xs) var(--r-xs) 0 0; background: var(--text-faint); }
 .anal-fc-n { font-size: var(--fs-2xs); color: var(--text-soft); font-variant-numeric: tabular-nums; height: 12px; }
 .anal-fc-day { font-size: var(--fs-2xs); color: var(--text-faint); text-transform: capitalize; white-space: nowrap; }
 .anal-warn { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; margin-top: 14px; padding: 10px 12px;

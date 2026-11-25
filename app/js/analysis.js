@@ -554,6 +554,7 @@ async function onClick(e) {
     const sc = last?.scope;
     close();
     const Study = await import('./ai/study.js');
+    if (!sc) { Study.openToday({}); return; }
     Study.openToday({ scope: sc.type === 'book' ? { type: 'book', bookId: sc.id } : { type: 'shelf', shelfId: sc.id }, title: sc.title });
     return;
   }
@@ -593,7 +594,6 @@ function renderHead(d) {
       ${d.pick.books.length ? `<div class="anal-pick-h">${t('Libros')}</div>` : ''}
       ${d.pick.books.map(b => `<button class="anal-pick-item${sc?.type === 'book' && sc.id === b.id ? ' is-on' : ''}" data-pick="book:${escapeHtml(b.id)}" role="option">${icon('book', { size: 'sm' })} ${escapeHtml(b.title)}</button>`).join('')}
     </div>` : '';
-  const due = sc ? studyDue(d) : 0;
   const tabs = RANGES.map(r => {
     const label = r.label();
     return `<button class="segmented-btn anal-tab${r.id === range ? ' active' : ''}" role="tab" aria-selected="${r.id === range}" data-range="${r.id}">${label}</button>`;
@@ -612,7 +612,6 @@ function renderHead(d) {
         </button>
         ${sc?.type === 'book' ? `<button class="anal-scope-open" data-open-book="${escapeHtml(sc.id)}">${icon('book', { size: 'sm' })} ${t('Abrir')}</button>` : ''}
         ${sc ? `<button class="anal-scope-x" data-act="all-books" title="${t('Toda la biblioteca')}" aria-label="${t('Toda la biblioteca')}">${icon('xmark', { size: 'sm' })}</button>` : ''}
-        ${due ? `<button class="btn btn--primary primary-btn anal-scope-study" data-act="study-scope">${icon('cards', { size: 'sm' })} ${sc.type === 'book' ? t('Repasar este libro ({n})', { n: due }) : t('Repasar esta estantería ({n})', { n: due })}</button>` : ''}
         ${menu}
       </div>
     </div>
@@ -643,7 +642,7 @@ function renderData(d) {
     ${d.ms ? renderReading(d) : renderEmpty()}
     ${renderBooks(d)}
     ${d.study.has ? renderStudy(d) : ''}
-    ${d.study.has && showAhead ? renderWork(d) : ''}
+    ${d.study.has ? renderWork(d) : ''}
     ${d.study.has && !d.scope && showAhead ? renderFsrs(d) : ''}
     <p class="anal-note">${t('Solo cuenta lo que se leyó a ritmo humano: pasar páginas buscando algo, o dejar el libro abierto, no suma.')}</p>
   `;
@@ -956,11 +955,20 @@ function renderWork(d) {
         <button class="btn btn--secondary" data-act="pause-new">${t('Pausar nuevas hoy')}</button></div>`;
     }
   }
+  // Auditoría de Análisis, paso 7: es lo único de la pantalla que no sigue al periodo (es hoy y los
+  // próximos 7 días), así que lo dice, se ve con cualquier periodo y acaba en su acción: repasar.
+  const due = studyDue(d);
+  const sc = d.scope;
+  const label = !sc ? t('Repasar ({n})', { n: due })
+    : sc.type === 'book' ? t('Repasar este libro ({n})', { n: due }) : t('Repasar esta estantería ({n})', { n: due });
   return `<section class="anal-sec anal-work">
-    <h3 class="anal-sec-h">${t('Lo que viene')}</h3>
-    <div class="anal-tiles">
-      ${tile(t('Para hoy'), String(w.dueNow), '', w.fresh ? t('+ {n} nuevas', { n: w.fresh }) : '')}
-      ${tile(t('Carga media'), t('~{n} al día', { n: Math.round(w.load) }), t('Repasos al día que añaden, de media, las tarjetas en rotación'))}
+    <h3 class="anal-sec-h">${t('Lo que viene')} <span class="anal-sec-aside">${t('hoy y los próximos 7 días, sea cual sea el periodo')}</span></h3>
+    <div class="anal-due">
+      <div class="anal-tiles">
+        ${tile(t('Para hoy'), String(w.dueNow), '', w.fresh ? t('+ {n} nuevas', { n: w.fresh }) : '')}
+        ${tile(t('Carga media'), t('~{n} al día', { n: Math.round(w.load) }), t('Repasos al día que añaden, de media, las tarjetas en rotación'))}
+      </div>
+      ${due ? `<button class="btn btn--primary primary-btn anal-scope-study" data-act="study-scope">${icon('cards', { size: 'sm' })} ${label}</button>` : ''}
     </div>
     <div class="anal-chart-h anal-fc-h">${t('Próximos 7 días')}</div>
     <div class="anal-fc">${cols}</div>

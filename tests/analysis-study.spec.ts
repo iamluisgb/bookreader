@@ -243,6 +243,26 @@ test('lo que viene: previsión, carga y aviso con «Pausar nuevas hoy» cuando n
   expect(await page.evaluate(async () => ((await import('/js/ai/study.js')) as any).newLimit())).toBe(-1);
   await work.locator('[data-act="resume-new"]').click();
   await expect(work.locator('[data-act="pause-new"]')).toBeVisible();
+
+  // Paso 7 de la auditoría: dice que no sigue al periodo, acaba en «Repasar» y la previsión se ve
+  // (barras con ≥ 3:1 contra el fondo; con --accent-soft eran 1,14:1).
+  await expect(work.locator('.anal-sec-aside')).toContainText('sea cual sea el periodo');
+  // Nada vence hoy (todo vence de mañana en adelante): sin «Repasar» que no llevaría a nada.
+  await expect(work.locator('[data-act="study-scope"]')).toHaveCount(0);
+  const ratio = await page.evaluate(() => {
+    const rgb = (c: string) => c.match(/[\d.]+/g)!.slice(0, 3).map(Number);
+    const lum = (c: number[]) => { const f = (v: number) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
+      return 0.2126 * f(c[0]) + 0.7152 * f(c[1]) + 0.0722 * f(c[2]); };
+    const bar = getComputedStyle(document.querySelector('#analysis .anal-fc-bar')!).backgroundColor;
+    const bg = getComputedStyle(document.querySelector('#analysis .anal-card')!).backgroundColor;
+    const [a, b] = [lum(rgb(bar)), lum(rgb(bg))].sort((x, y) => y - x);
+    return (a + 0.05) / (b + 0.05);
+  });
+  expect(ratio).toBeGreaterThanOrEqual(3);
+  // Con un periodo pasado sigue ahí: es hoy, no el periodo.
+  await page.locator('#analysis [data-act="prev"]').click();
+  await expect(page.locator('#analysis .anal-nav-l')).toHaveText('La semana pasada');
+  await expect(work.locator('.anal-fc-col')).toHaveCount(7);
 });
 
 test('sin estudio no hay bloques de estudio; con lectura sola la pantalla es la de siempre', async ({ page }) => {

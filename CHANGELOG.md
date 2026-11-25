@@ -3,6 +3,18 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-11-25 — Análisis: «Lo que viene» dice que no sigue al periodo y acaba en «Repasar»
+
+Auditoría de Análisis, paso 7 (P1, P6).
+
+- Es lo único de la pantalla que no depende del periodo (hoy y los próximos 7 días): lo dice en su
+  título y se ve con cualquier periodo, también al mirar semanas pasadas.
+- El botón «Repasar (n)» vive aquí, junto a lo que vence (antes «Repasar este libro» flotaba solo
+  bajo el selector de ámbito y en la biblioteca entera no había). Con un libro o una estantería,
+  repasa ese ámbito; sin nada que venza hoy, no sale.
+- Barras de la previsión en `--text-faint` (≥ 3:1 con el fondo; con `--accent-soft` eran 1,14:1).
+- Tests en `tests/analysis-study.spec.ts`.
+
 ## 2026-11-25 — Análisis: estudio compacto
 
 Auditoría de Análisis, paso 6 (P1, P2, P3).
