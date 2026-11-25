@@ -4,8 +4,9 @@
 //   - QUIÉN eres: tu licencia. El Worker la valida contra Polar y da un token `br-sync-…` de
 //     24 h. Aquí se guarda el token (secreto, fuera del backup y del sync) y se renueva solo.
 //   - QUÉ puede leerse: la clave del sync (32 bytes aleatorios), que el servidor no ve nunca.
-//     Nace en el primer dispositivo; los demás la reciben por el enlace de emparejamiento
-//     (`#pair=…`) o tecleando la clave de recuperación.
+//     Nace en el primer dispositivo; los demás la reciben por «Añadir un dispositivo» (enlace o
+//     QR `#pair2=…`, de un solo uso y 10 minutos) o tecleando la clave de recuperación. Los
+//     enlaces `#pair=…` antiguos (permanentes) se siguen aceptando, pero ya no se generan.
 //
 // Para saber si una clave es la buena sin descifrar datos de verdad, el primer dispositivo
 // deja un fichero de control (`keycheck`) cifrado con ella. Un dispositivo que se empareja lo
@@ -220,6 +221,12 @@ async function writeKeycheck(k) {
   if (!res.ok) throw await apiError(res);
 }
 
+// La prueba de que se tiene la clave: la ruta del fichero de control, que sale de ella. La piden
+// el borrado del sync (DELETE /v1/all) y su cancelación.
+async function keyProof(k) {
+  return C.pathId(k, KEYCHECK_PATH);
+}
+
 // ¿Esta clave abre lo que hay en el servidor? null si el servidor está vacío (no hay sync
 // todavía), true/false si no.
 //
@@ -241,19 +248,30 @@ async function keyOpens(k) {
 // ---- Activar, emparejar, recuperar ----------------------------------------------------------
 
 // Primer paso al elegir «Sync de BookReader». Devuelve:
-//   { state: 'ready' }       — ya había clave aquí, o no había nada en el servidor y se creó;
-//   { state: 'needs-key' }   — el servidor ya tiene datos: hay que emparejar o recuperar.
-export async function enable() {
+//   { state: 'ready' }          — ya había clave aquí y abre lo que hay, o (con firstDevice) se
+//                                 empezó un sync nuevo;
+//   { state: 'needs-key' }      — el servidor ya tiene datos: hay que emparejar o recuperar;
+//   { state: 'first-device?' }  — con ESTA licencia no hay nada sincronizado. Nunca se crea un
+//                                 sync vacío en silencio: puede que el usuario ya lo use en otro
+//                                 dispositivo con OTRA licencia (el servidor no puede saberlo).
+//                                 La UI pregunta y, si es el primero, vuelve con firstDevice.
+// Un dispositivo que ya tenía clave y encuentra el espacio vacío (le cambiaron la licencia) pasa
+// por la misma pregunta en vez de reescribir el fichero de control.
+export async function enable({ firstDevice = false } = {}) {
   if (!licenseKey()) throw authError('no_license');
   await getToken(true);
   if (hasKey()) {
     const ok = await keyOpens(await keys());
     if (ok === false) return { state: 'needs-key' };
-    if (ok === null) await writeKeycheck(await keys());
+    if (ok === null) {
+      if (!firstDevice) return { state: 'first-device?' };
+      await writeKeycheck(await keys());
+    }
     return { state: 'ready' };
   }
   const st = await status();
   if (st.objects > 0) return { state: 'needs-key' };
+  if (!firstDevice) return { state: 'first-device?' };
   const raw = C.generateKey();
   const k = await C.importKeys(raw);
   await writeKeycheck(k);
@@ -264,15 +282,37 @@ export async function enable() {
 // Usa una clave que llega de fuera (enlace o clave de recuperación). Comprueba que abre lo que
 // hay ANTES de guardarla: si no, lanza y no toca nada.
 //   - 'wrong_key': hay datos y esta clave no los abre.
-//   - 'empty': con ESTA licencia no hay nada sincronizado. Una clave de fuera siempre viene de
-//     un sync que existe, así que eso significa que este dispositivo está con otra licencia: si
-//     se aceptara, quedaría «emparejado» con un espacio vacío, sin cruzarse nunca con el otro.
+//   - 'other_license': con ESTA licencia no hay nada, y la clave es de un sync abierto con OTRA
+//     licencia (lo dice /v1/key-owner). Si se aceptara, este dispositivo quedaría «emparejado»
+//     con un espacio vacío, sin cruzarse nunca con el otro.
+//   - 'empty': con esta licencia no hay nada y la clave no es de ningún sync.
 export async function useKey(raw) {
   const k = await C.importKeys(raw);
   const ok = await keyOpens(k);
   if (ok === false) throw Object.assign(new Error(t('Esa clave no es la de tu sync. Compruébala o usa el enlace de otro dispositivo.')), { code: 'wrong_key' });
-  if (ok === null) throw Object.assign(new Error(t('Con la licencia de este dispositivo no hay nada sincronizado. Usa en los dos la misma licencia.')), { code: 'empty' });
+  if (ok === null) {
+    if (await keyIsElsewhere(k)) {
+      throw Object.assign(new Error(t('Esta clave es de un sync abierto con otra licencia. Pon aquí la misma licencia que en tus otros dispositivos (Ajustes → Licencia) y vuelve a probar.')), { code: 'other_license' });
+    }
+    throw Object.assign(new Error(t('Esa clave no abre ningún sync. Revisa que esté entera y sea la última que guardaste.')), { code: 'empty' });
+  }
   setKey(raw);
+}
+
+// F3 · ¿El fichero de control de esta clave vive en el espacio de otra licencia? Solo contesta
+// sí/no, y solo a quien ya tiene la clave. Si el servidor no lo sabe (Worker viejo, sin red),
+// se responde «no» y queda el aviso genérico.
+async function keyIsElsewhere(k) {
+  try {
+    const res = await api('/v1/key-owner', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pid: await keyProof(k) }),
+    });
+    return res.ok && (await res.json()).elsewhere === true;
+  } catch {
+    return false;
+  }
 }
 
 export async function useRecoveryCode(code) {
@@ -285,12 +325,37 @@ export async function useRecoveryCode(code) {
 // Empezar de cero: borra TODO lo del servidor y crea una clave nueva. Para quien perdió la
 // clave en todos sus dispositivos (lo de antes no se puede leer: es el precio de que nosotros
 // tampoco podamos).
+//
+// El servidor solo borra al momento si se prueba la clave (o si no hay nada): con la licencia
+// sola no se puede vaciar el sync de nadie. Quien perdió la clave no puede probarla, así que su
+// borrado se APUNTA (7 días) y cualquier dispositivo que aún la tenga puede cancelarlo. Devuelve
+//   { state: 'ready', ... }       — borrado y sync nuevo creado;
+//   { state: 'scheduled', wipeAt } — borrado apuntado: el sync se vaciará en esa fecha.
 export async function startOver() {
-  const res = await api('/v1/all', { method: 'DELETE' });
+  const body = {};
+  if (hasKey()) body.pid = await keyProof(await keys());
+  else body.schedule = true;
+  const res = await api('/v1/all', {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
   if (!res.ok) throw await apiError(res);
+  const r = await res.json().catch(() => ({ wiped: true }));
+  if (r.wiped === false) return { state: 'scheduled', wipeAt: r.wipeAt };
   Storage.remove(KEY_KEY);
   keysCache = null;
-  return enable();
+  return enable({ firstDevice: true });
+}
+
+// Cancelar un «empezar de cero» apuntado sin la clave (otro dispositivo lo pidió; este la tiene).
+export async function cancelWipe() {
+  const res = await api('/v1/all/cancel', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ pid: await keyProof(await keys()) }),
+  });
+  if (!res.ok) throw await apiError(res);
 }
 
 export async function recoveryCode() {
@@ -299,23 +364,102 @@ export async function recoveryCode() {
   return C.recoveryCode(C.fromB64url(raw));
 }
 
-// Enlace para otro dispositivo: la clave del sync y la licencia, en el fragmento (el navegador
-// no lo envía a ningún servidor). Mismo truco que compartir por enlace y el traspaso de demo.
-export function pairingLink(base = location.origin + location.pathname) {
+// ---- Añadir un dispositivo (`#pair2=`, relevo de un solo uso) --------------------------------
+//
+// El origen cifra {clave, licencia} con un secreto `s` de 16 bytes y sube el cifrado al Worker
+// (POST /v1/pair), que lo guarda 10 minutos. El enlace es `#pair2=<id>.<s>`: `s` va en el
+// fragmento, que el navegador no manda a ningún servidor, así que el Worker guarda bytes que no
+// puede abrir. El nuevo dispositivo lo reclama una vez (y el Worker lo borra); el origen ve
+// «Emparejado: {dispositivo}» consultando el estado.
+
+const PAIR_INFO = 'bookreader-pair/v2';
+
+async function pairCipherKey(s) {
+  const base = await crypto.subtle.importKey('raw', s, 'HKDF', false, ['deriveKey']);
+  return crypto.subtle.deriveKey(
+    { name: 'HKDF', hash: 'SHA-256', salt: new Uint8Array(32), info: new TextEncoder().encode(PAIR_INFO) },
+    base, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt'],
+  );
+}
+
+export async function createPairCode(base = location.origin + location.pathname) {
   const raw = Storage.get(KEY_KEY);
-  if (!raw) return '';
-  const lic = C.b64url(new TextEncoder().encode(licenseKey()));
-  return `${base}#pair=${raw}.${lic}`;
+  if (!raw || !licenseKey()) throw authError('no_license');
+  const s = crypto.getRandomValues(new Uint8Array(16));
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const plain = new TextEncoder().encode(JSON.stringify({ v: 2, key: raw, license: licenseKey() }));
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv, additionalData: new TextEncoder().encode(PAIR_INFO) }, await pairCipherKey(s), plain));
+  const sealed = new Uint8Array(iv.length + ct.length);
+  sealed.set(iv);
+  sealed.set(ct, iv.length);
+  const res = await api('/v1/pair', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ blob: C.b64url(sealed) }),
+  });
+  if (!res.ok) throw await apiError(res);
+  const { id, expiresAt } = await res.json();
+  return { id, expiresAt, link: `${base}#pair2=${id}.${C.b64url(s)}` };
+}
+
+// { state: 'pending' | 'claimed' | 'expired', device, expiresAt }
+export async function pairStatus(id) {
+  const res = await api('/v1/pair/' + encodeURIComponent(id));
+  if (res.status === 404) return { state: 'expired' };
+  if (!res.ok) throw await apiError(res);
+  return res.json();
+}
+
+export async function cancelPairCode(id) {
+  try { await api('/v1/pair/' + encodeURIComponent(id), { method: 'DELETE' }); } catch { /* caduca solo */ }
+}
+
+// En el dispositivo nuevo: reclama el relevo (sin token: no hay licencia todavía) y lo abre.
+// Devuelve { raw, license }. Lanza con code 'gone' si ya se usó o caducó.
+export async function claimPairCode(id, s) {
+  const res = await fetchWithTimeout(WORKER_URL + '/v1/pair/' + encodeURIComponent(id) + '/claim', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ device: License.deviceLabel() }),
+  });
+  if (res.status === 410) throw Object.assign(new Error(t('Este enlace ya se usó o ha caducado. En tu otro dispositivo, ve a Ajustes → Datos → Añadir un dispositivo y crea uno nuevo.')), { code: 'gone' });
+  if (!res.ok) throw Object.assign(new Error(t('El servidor del sync no responde ({status}).', { status: res.status })), { code: res.status });
+  const { blob } = await res.json();
+  try {
+    const b = C.fromB64url(blob);
+    const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b.subarray(0, 12), additionalData: new TextEncoder().encode(PAIR_INFO) }, await pairCipherKey(s), b.subarray(12));
+    const p = JSON.parse(new TextDecoder().decode(pt));
+    const raw = C.fromB64url(p.key);
+    if (p.v !== 2 || raw.length !== 32) throw new Error('formato');
+    return { raw, license: typeof p.license === 'string' ? p.license : '' };
+  } catch {
+    throw Object.assign(new Error(t('El enlace está incompleto: puede que se cortara al copiarlo. Vuelve a copiarlo desde el otro dispositivo.')), { code: 'broken' });
+  }
 }
 
 // Saca el emparejamiento del hash (y lo BORRA de la URL antes de usarlo, como la demo).
+//   `#pair2=<id>.<s>` → { relay: { id, s } }     (el de «Añadir un dispositivo»)
+//   `#pair=<clave>.<licencia>` → { raw, license } (enlaces permanentes antiguos: se siguen
+//                                                  aceptando, la app ya no los genera)
 export function consumePairLink() {
   const p = new URLSearchParams(location.hash.replace(/^#/, ''));
+  const v2 = (p.get('pair2') || '').trim();
   const v = (p.get('pair') || '').trim();
-  if (!v) return null;
+  if (!v && !v2) return null;
   p.delete('pair');
+  p.delete('pair2');
   const rest = p.toString();
   history.replaceState({}, '', location.pathname + location.search + (rest ? '#' + rest : ''));
+  if (v2) {
+    const [id, sB64] = v2.split('.');
+    try {
+      const s = C.fromB64url(sB64 || '');
+      if (!/^[A-Za-z0-9_-]{22}$/.test(id || '') || s.length !== 16) return { broken: true };
+      return { relay: { id, s } };
+    } catch {
+      return { broken: true };
+    }
+  }
   const [rawB64, licB64] = v.split('.');
   try {
     const raw = C.fromB64url(rawB64);

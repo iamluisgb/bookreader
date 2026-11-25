@@ -349,13 +349,15 @@ async function recibirEnlaceCompartido() {
 }
 
 // ============ EMPAREJAR EL SYNC DE BOOKREADER (MON4 F2) ============
-// `#pair=<clave>.<licencia>` lo genera Ajustes → Datos en un dispositivo con el sync activo.
-// Trae la clave del sync y la licencia: este dispositivo queda sincronizando sin teclear
-// nada. Se saca de la URL ANTES de usarlo (es la credencial). Si este dispositivo ya tenía su
-// sync en Drive, no se cambia aquí: se le manda a Ajustes, donde se ofrece pasarlo.
+// `#pair2=<id>.<secreto>` sale de Ajustes → Datos → «Añadir un dispositivo» (enlace o QR) en un
+// dispositivo con el sync activo: un relevo cifrado en el Worker, de un solo uso y 10 minutos,
+// que trae la clave del sync y la licencia. `#pair=<clave>.<licencia>` es el enlace permanente
+// de antes: se sigue aceptando (ya se mandó a algunos sitios), pero la app ya no lo genera.
+// Se saca de la URL ANTES de usarlo (es la credencial). Si este dispositivo ya tenía su sync en
+// Drive, no se cambia aquí: se le manda a Ajustes, donde se ofrece pasarlo.
 async function recibirEmparejamiento() {
   const BRAuth = await import('./sync/bookreader-auth.js');
-  const pair = BRAuth.consumePairLink();
+  let pair = BRAuth.consumePairLink();
   if (!pair) return;
   const title = t('Sincronización');
   if (pair.broken) {
@@ -363,14 +365,16 @@ async function recibirEmparejamiento() {
     return;
   }
   const { toast } = await import('./ai/toast.js');
-  const dismiss = toast({ message: t('Emparejando este dispositivo…'), timeout: 0 });
+  let dismiss = toast({ message: t('Conectando este dispositivo a tu sync…'), timeout: 0 });
   try {
+    if (pair.relay) pair = await BRAuth.claimPairCode(pair.relay.id, pair.relay.s);
     // El sync va con la licencia del enlace: con otra, este dispositivo caería en otro espacio.
     if (pair.license && pair.license !== BRAuth.licenseKey()) {
       if (BRAuth.licenseKey()) {
         dismiss();
-        const ok = await confirmBox(t('Este dispositivo tiene otra licencia. Para sincronizar con el dispositivo del enlace se usará la suya.'), { title, okText: t('Usar la del enlace') });
+        const ok = await confirmBox(t('Este dispositivo tiene otra licencia. Para unirlo a tu sync se usará la del otro dispositivo.'), { title, okText: t('Usar esa licencia') });
         if (!ok) return;
+        dismiss = toast({ message: t('Conectando este dispositivo a tu sync…'), timeout: 0 });
       }
       await License.activate(pair.license);
     }
@@ -388,10 +392,10 @@ async function recibirEmparejamiento() {
       await alertBox(t('Emparejado, pero el primer sync falló: {msg}', { msg: SyncEngine.getDiag().lastError }), { title });
       return;
     }
-    toast({ message: t('Dispositivo emparejado. Tus notas y tu progreso ya están aquí.') });
+    toast({ message: t('Dispositivo añadido. Tus libros, notas y progreso ya están aquí.') });
   } catch (e) {
     dismiss();
-    await alertBox(e.code === 'wrong_key' || e.code === 'empty'
+    await alertBox(['wrong_key', 'empty', 'other_license', 'gone', 'broken'].includes(e.code)
       ? e.message
       : e.message === 'reconnect'
         ? t('Tu suscripción no está activa. El sync de BookReader queda en solo lectura.')
