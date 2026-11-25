@@ -1784,6 +1784,7 @@ body.ai-open #sync-badge { right: calc(var(--ai-panel-width) + 14px); }
   gap: 8px 12px; margin: 0 -30px 18px; padding: 8px 30px 10px; background: var(--surface-1);
   border-bottom: 1px solid var(--border-soft); }
 .anal-range .anal-tabs { flex: 0 0 auto; }
+.anal-range .segmented-btn { flex: 1 0 auto; }
 .anal-range .anal-nav { margin-left: auto; }
 @media (max-width: 600px) {
   .anal-range .anal-tabs { flex: 1 1 100%; }
