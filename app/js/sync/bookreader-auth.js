@@ -32,8 +32,12 @@ try {
   if (q === '0') Storage.remove('sync_preview');
 } catch { /* sin localStorage: simplemente sin vista previa */ }
 
+// Con Plus activo se enseña siempre: es lo que se paga, y esconderlo dejaba a un navegador con
+// la licencia puesta sin forma de encontrar el sync (caso del PC de la oficina, 2026-11-25:
+// «Sin sync» y «Google Drive», nada más). Mientras el Worker solo acepte TEST_LICENSES, una key
+// fuera de la lista recibe el aviso «aún no está disponible» al activar, no un botón mudo.
 export function available() {
-  return LAUNCHED || Storage.get('sync_preview', false) === true;
+  return LAUNCHED || Storage.get('sync_preview', false) === true || License.isPlus();
 }
 
 const KEY_KEY = 'sync_key';        // secreto: excluido del backup y del sync (SECRET_KEYS)

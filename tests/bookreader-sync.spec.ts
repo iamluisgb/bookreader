@@ -213,6 +213,14 @@ test.describe('MON4 F3 — sync de BookReader de punta a punta', () => {
     await expect(page.locator('#appset-sync-choice [data-p="bookreader"]')).toBeHidden();
   });
 
+  test('con Plus activo la opción BookReader se enseña sin ?sync-preview', async ({ page }) => {
+    await page.addInitScript(() => localStorage.setItem('bookreader_license',
+      JSON.stringify({ key: 'BKRD-TEST-PLUS', activationId: 'x', validatedAt: Date.now(), revoked: false })));
+    await page.goto('/');
+    await page.evaluate(async () => (await import('/js/ui/app-settings.js')).open('data'));
+    await expect(page.locator('#appset-sync-choice [data-p="bookreader"]')).toBeVisible();
+  });
+
   test('Ajustes → Datos: elegir BookReader, activarlo, enlace y clave de recuperación', async ({ page, context }) => {
     // Como en producción por defecto (ADR-056 opción B): sin ficheros de libro.
     const server = await createSyncServer({ FILES_ENABLED: '0' });

@@ -3,6 +3,16 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-11-25 — Con Plus activo, la opción «BookReader» del sync se enseña siempre
+
+Caso: en el PC de la oficina, Ajustes → Datos solo ofrecía «Sin sync» y «Google Drive» aunque Plus
+estaba activo, porque `available()` (`js/sync/bookreader-auth.js`) solo enseñaba la opción con
+`?sync-preview=1`, una marca que vive en el localStorage de cada navegador. Los demás
+dispositivos la tenían y ese no: el problema era que el sync no estaba activo en ese navegador, no
+la red. Ahora `available()` también es verdad con `License.isPlus()`. Una key que el Worker aún no
+acepte (fuera de `TEST_LICENSES`) recibe al activar «El sync de BookReader aún no está disponible».
+Test en `tests/bookreader-sync.spec.ts`. SW `bookreader-v279`.
+
 ## 2026-11-25 — Red de empresa: la app dice qué no llega y se actualiza sola
 
 Caso: en el PC de la oficina (Chrome, red corporativa) la biblioteca no recibía libros nuevos y
