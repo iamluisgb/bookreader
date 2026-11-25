@@ -128,6 +128,21 @@ proxys de empresa bloquean; Polar (la licencia) sí pasaba.
   Heródoto (281.309, trad. Bartolomé Pou †1802) y **Vidas paralelas** de Plutarco (714.393, trad.
   Ranz Romanillos †1830). Los tres validan (XML bien formado, mimetype primero y sin comprimir) y
   abren con su índice; el test recorre Libro I a Libro XII.
+- **Filtros con dos niveles de materia y contadores honestos.** La materia sale ahora de la
+  subclase de la Library of Congress, no de la letra: «Literatura» (28.246 obras) se abre en
+  «Literatura inglesa» (6.499), «Literatura americana» (5.274), «Ficción y juvenil» (4.053),
+  «Literatura románica» (3.913) y **«Literatura griega y latina» (356)**, que es el filtro que
+  faltaba para los clásicos. Los contadores de cada faceta se calculan con los demás filtros ya
+  aplicados: fijar «inglés» baja el de clásicos grecorromanos de 356 a 206, y al quitar el idioma
+  vuelve. Antes contaban sobre todo el catálogo y el filtro de al lado no cambiaba ni un número.
+  Se añade **orden** explícito (título, autor, más antiguos, más recientes): el orden de serie es
+  por fuente y no sirve cuando ya has filtrado.
+- **El fondo del catálogo se pide solo**, en segundo plano, con un reintento si falla: con los
+  contadores por faceta, filtrar sobre 4.000 de 48.000 daría números que no cuadran con la página.
+- **El parser del CSV de Gutenberg respeta las comillas**: los campos con salto de línea dentro
+  (91.015 líneas para 79.769 filas) partían filas y se perdían obras. El catálogo pasa de 44.586 a
+  **44.996 obras de Gutenberg**. Además se limpian los espacios de ancho cero que Elejandría mete
+  en títulos y autores.
 - **Verificador de enlaces** (`scripts/verifica-catalogo.mjs`, `npm run verifica`). Primera pasada
   completa el 2026-11-25: **47.660 comprobaciones en 13 min** (45.288 de Gutenberg, 2.369 de
   Elejandría, 3 de Wikisource). Resultado: **87 obras de Gutenberg ya no existen** (0,19%) y se caen

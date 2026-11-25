@@ -50,8 +50,42 @@
       };
   var PAGE = 24;
   var LANGNAME = { en: 'English', es: 'Spanish', fr: 'French', de: 'German', it: 'Italian', nl: 'Dutch', pt: 'Portuguese', fi: 'Finnish', sv: 'Swedish', hu: 'Hungarian', el: 'Greek', la: 'Latin', da: 'Danish', ru: 'Russian', pl: 'Polish', cs: 'Czech', ca: 'Catalan', gl: 'Galician', eu: 'Basque', no: 'Norwegian', ja: 'Japanese', zh: 'Chinese', ar: 'Arabic', he: 'Hebrew', tr: 'Turkish', ro: 'Romanian', bg: 'Bulgarian', hr: 'Croatian', sl: 'Slovenian', et: 'Estonian', lt: 'Lithuanian', lv: 'Latvian', is: 'Icelandic', ga: 'Irish', cy: 'Welsh', eo: 'Esperanto', uk: 'Ukrainian', sr: 'Serbian', mk: 'Macedonian', sq: 'Albanian', af: 'Afrikaans', tl: 'Tagalog', ko: 'Korean', hi: 'Hindi', fa: 'Persian', yi: 'Yiddish' };
-  var MAT = { A: 'General', B: 'Philosophy and religion', C: 'Auxiliary history', D: 'World history', E: 'History of America', F: 'Local America', G: 'Geography and travel', H: 'Social sciences', J: 'Politics', K: 'Law', L: 'Education', M: 'Music', N: 'Art', P: 'Literature', Q: 'Science', R: 'Medicine', S: 'Agriculture', T: 'Technology', U: 'Military', V: 'Naval', Z: 'Bibliography' };
-  var MAT_ES = { A: 'Obras generales', B: 'Filosofía y religión', C: 'Ciencias auxiliares', D: 'Historia universal', E: 'Historia de América', F: 'América local', G: 'Geografía y viajes', H: 'Ciencias sociales', J: 'Política', K: 'Derecho', L: 'Educación', M: 'Música', N: 'Arte', P: 'Literatura', Q: 'Ciencia', R: 'Medicina', S: 'Agricultura', T: 'Tecnología', U: 'Militar', V: 'Naval', Z: 'Bibliografía' };
+  // Clasificación de la Library of Congress: la letra es la materia y las dos letras, la subclase
+  // (PA = literatura griega y latina, PR = inglesa, PQ = románica…). [español, inglés]
+  var MAT = {
+    A: ['Obras generales', 'General'], B: ['Filosofía y religión', 'Philosophy and religion'],
+    C: ['Ciencias auxiliares', 'Auxiliary history'], D: ['Historia universal', 'World history'],
+    E: ['Historia de América', 'History of America'], F: ['América local', 'Local America'],
+    G: ['Geografía y viajes', 'Geography and travel'], H: ['Ciencias sociales', 'Social sciences'],
+    J: ['Política', 'Politics'], K: ['Derecho', 'Law'], L: ['Educación', 'Education'],
+    M: ['Música', 'Music'], N: ['Arte', 'Art'], P: ['Literatura', 'Literature'], Q: ['Ciencia', 'Science'],
+    R: ['Medicina', 'Medicine'], S: ['Agricultura', 'Agriculture'], T: ['Tecnología', 'Technology'],
+    U: ['Militar', 'Military'], V: ['Naval', 'Naval'], Z: ['Bibliografía', 'Bibliography'],
+  };
+  var MAT2 = {
+    PA: ['Literatura griega y latina', 'Greek and Latin literature'], PB: ['Filología', 'Philology'],
+    PC: ['Lenguas románicas', 'Romance languages'], PD: ['Lenguas germánicas', 'Germanic languages'],
+    PE: ['Lengua inglesa', 'English language'], PG: ['Lenguas eslavas', 'Slavic languages'],
+    PH: ['Lenguas urálicas y otras', 'Uralic and other languages'], PN: ['Crítica literaria', 'Literary criticism'],
+    PQ: ['Literatura románica', 'Romance literature'], PR: ['Literatura inglesa', 'English literature'],
+    PS: ['Literatura americana', 'American literature'], PT: ['Literatura germánica y nórdica', 'Germanic and Nordic literature'],
+    PZ: ['Ficción y juvenil', 'Fiction and juvenile'],
+    DA: ['Historia de Europa central', 'Central European history'], DC: ['Historia de Francia', 'French history'],
+    DD: ['Historia de Alemania', 'German history'], DE: ['Historia del Mediterráneo', 'Mediterranean history'],
+    DG: ['Historia de Roma', 'Roman history'], DS: ['Historia de Asia', 'Asian history'],
+    DT: ['Historia de África', 'African history'], DU: ['Historia de Oceanía', 'Oceanian history'],
+    F1: ['Historia de EE. UU.', 'US history'], E0: ['Historia de América', 'American history'],
+    BX: ['Confesiones cristianas', 'Christian denominations'], BV: ['Teología práctica', 'Practical theology'],
+    BS: ['Biblia', 'Bible'], BR: ['Cristianismo', 'Christianity'], BQ: ['Budismo', 'Buddhism'],
+    BL: ['Religiones comparadas', 'Comparative religion'], AP: ['Prensa y periódicos', 'Periodicals'],
+    QL: ['Zoología', 'Zoology'], QH: ['Biología', 'Biology'], QC: ['Física', 'Physics'],
+    QA: ['Matemáticas', 'Mathematics'], QK: ['Botánica', 'Botany'],
+  };
+  function etiquetaMat(code) {
+    if (!code) return L.sinclasif;
+    var e = MAT2[code] || MAT[code[0]];
+    return e ? e[ES ? 0 : 1] : (ES ? 'Otras materias' : 'Other subjects');
+  }
   var SRCN = { se: 'Standard Ebooks', pg: 'Project Gutenberg', el: 'Elejandría', ws: 'Wikisource', tec: ES ? 'Técnico' : 'Technical' };
   var input = root.querySelector('input[type="search"]');
   var list = root.querySelector('.lib-list');
@@ -61,8 +95,10 @@
   var facetBox = root.querySelector('.lib-facets');
   var all = [];
   var filtro = { kind: 'all', lang: '', mat: '', era: '', src: '' };
+  var orden = '';
   var shown = PAGE;
   var restoPedido = false;
+  var reintentado = false;
   var fondoPendiente = 0;
 
   function fmt(s, p) { return s.replace(/\{(\w+)\}/g, function (_, k) { return p[k]; }); }
@@ -81,7 +117,9 @@
     if (y < 1900) return ES ? 'fin del XIX (1850-1899)' : 'late 19th (1850–1899)';
     return ES ? 'siglo XX' : '20th century';
   }
-  function materia(c) { return c ? (ES ? MAT_ES : MAT)[c] || c : L.sinclasif; }
+  function materia(c) {
+    return etiquetaMat(c);
+  }
 
   function row(b) {
     var li = el('li', 'lib-row');
@@ -115,19 +153,44 @@
     return li;
   }
 
-  // Un <select> por faceta, con el recuento REAL de lo que hay cargado: un contador que no cuadra
-  // con la lista de al lado es peor que no tener contador.
-  function opciones(campo, etiqueta, valores) {
+  // Un filtro casa si pasa todos los ejes activos salvo el que se esté contando (`skip`): así el
+  // contador de Idioma dice cuántos hay en cada idioma CON lo de Materia y Época ya aplicado, que es
+  // lo que espera quien está filtrando. Contar sobre todo el catálogo era mentir con números.
+  function casa(b, skip) {
+    if (filtro.kind !== 'all' && b.kind !== filtro.kind) return false;
+    if (skip !== 'lang' && filtro.lang && b.lang !== filtro.lang) return false;
+    if (skip !== 'mat' && filtro.mat && (b.matCode || '').indexOf(filtro.mat) !== 0) return false;
+    if (skip !== 'era' && filtro.era && b.era !== filtro.era) return false;
+    if (skip !== 'src' && filtro.src && b.src !== filtro.src) return false;
+    var q = fold(input.value.trim());
+    return !q || b.key.indexOf(q) !== -1;
+  }
+
+  function opciones(campo, etiqueta, valores, grupos) {
     var sel = el('select');
     sel.setAttribute('aria-label', etiqueta);
     var vacio = el('option', null, etiqueta);
     vacio.value = '';
     sel.appendChild(vacio);
-    valores.forEach(function (p) {
-      var o = el('option', null, p[0] + ' (' + p[1].toLocaleString(ES ? 'es' : 'en') + ')');
-      o.value = p[2];
-      sel.appendChild(o);
-    });
+    if (grupos) {
+      // Materia va en dos niveles: la letra agrupa (Literatura) y las subclases filtran (PA).
+      grupos.forEach(function (g) {
+        var og = el('optgroup');
+        og.setAttribute('label', g.etiqueta);
+        g.opciones.forEach(function (p) {
+          var o = el('option', null, p[0] + ' (' + p[1].toLocaleString(ES ? 'es' : 'en') + ')');
+          o.value = p[2];
+          og.appendChild(o);
+        });
+        if (og.children.length) sel.appendChild(og);
+      });
+    } else {
+      valores.forEach(function (p) {
+        var o = el('option', null, p[0] + ' (' + p[1].toLocaleString(ES ? 'es' : 'en') + ')');
+        o.value = p[2];
+        sel.appendChild(o);
+      });
+    }
     sel.value = filtro[campo];
     sel.addEventListener('change', function () { filtro[campo] = sel.value; shown = PAGE; render(); });
     return sel;
@@ -136,32 +199,72 @@
   function pintarFacetas() {
     if (!facetBox) return;
     var cuenta = { lang: {}, mat: {}, era: {}, src: {} };
+    var codigos = {};
     all.forEach(function (b) {
-      cuenta.lang[b.lang] = (cuenta.lang[b.lang] || 0) + 1;
-      cuenta.mat[b.mat] = (cuenta.mat[b.mat] || 0) + 1;
-      cuenta.era[b.era] = (cuenta.era[b.era] || 0) + 1;
-      cuenta.src[b.src] = (cuenta.src[b.src] || 0) + 1;
+      if (casa(b, 'lang')) cuenta.lang[b.lang] = (cuenta.lang[b.lang] || 0) + 1;
+      if (casa(b, 'era')) cuenta.era[b.era] = (cuenta.era[b.era] || 0) + 1;
+      if (casa(b, 'src')) cuenta.src[b.src] = (cuenta.src[b.src] || 0) + 1;
+      if (casa(b, 'mat')) {
+        var c = b.matCode || '?';
+        codigos[c] = (codigos[c] || 0) + 1;
+        cuenta.mat[c[0]] = (cuenta.mat[c[0]] || 0) + 1;
+      }
     });
     var orden = function (o) {
       return Object.keys(o).map(function (k) { return [k, o[k]]; }).sort(function (a, b) { return b[1] - a[1]; });
     };
     facetBox.textContent = '';
     facetBox.appendChild(opciones('lang', L.lang, orden(cuenta.lang).map(function (p) { return [LANGNAME[p[0]] || p[0].toUpperCase(), p[1], p[0]]; })));
-    facetBox.appendChild(opciones('mat', L.mat, orden(cuenta.mat).map(function (p) { return [p[0], p[1], p[0]]; })));
+    // Materia: un grupo por letra (con su total) y dentro, las subclases con obras.
+    var grupos = orden(cuenta.mat).map(function (p) {
+      var letra = p[0];
+      // Solo se listan las subclases que tienen nombre propio y obras: un código suelto sin etiqueta
+      // («PL», «P») no le dice nada al lector, y esas obras ya están dentro del total de su materia.
+      var dentro = orden(codigos)
+        .filter(function (c) { return c[0][0] === letra && c[0].length > 1 && MAT2[c[0]]; })
+        .map(function (c) { return [etiquetaMat(c[0]), c[1], c[0]]; });
+      var total = [etiquetaMat(letra) + (ES ? ' (toda)' : ' (all)'), p[1], letra];
+      return { etiqueta: etiquetaMat(letra), opciones: [total].concat(dentro.length > 1 ? dentro : []) };
+    });
+    facetBox.appendChild(opciones('mat', L.mat, null, grupos));
     facetBox.appendChild(opciones('era', L.era, orden(cuenta.era).map(function (p) { return [p[0], p[1], p[0]]; })));
     facetBox.appendChild(opciones('src', L.src, orden(cuenta.src).map(function (p) { return [SRCN[p[0]] || p[0], p[1], p[0]]; })));
   }
 
-  function render() {
-    var q = fold(input.value.trim());
-    var hits = all.filter(function (b) {
-      if (filtro.kind !== 'all' && b.kind !== filtro.kind) return false;
-      if (filtro.lang && b.lang !== filtro.lang) return false;
-      if (filtro.mat && b.mat !== filtro.mat) return false;
-      if (filtro.era && b.era !== filtro.era) return false;
-      if (filtro.src && b.src !== filtro.src) return false;
-      return !q || b.key.indexOf(q) !== -1;
+  // Orden explícito: el de serie (por fuente: técnicos, luego clásicos curados, luego el fondo) no
+  // sirve para nada cuando ya has filtrado y quieres, por ejemplo, el más antiguo que haya.
+  function ordenar(hits) {
+    if (!orden) return hits;
+    var c = hits.slice();
+    if (orden === 'year') c.sort(function (a, b) { return (a.year || 9999) - (b.year || 9999); });
+    else if (orden === 'year-desc') c.sort(function (a, b) { return (b.year || 0) - (a.year || 0); });
+    else if (orden === 'author') c.sort(function (a, b) { return String(a.author || '').localeCompare(String(b.author || ''), ES ? 'es' : 'en'); });
+    else c.sort(function (a, b) { return String(a.title || '').localeCompare(String(b.title || ''), ES ? 'es' : 'en'); });
+    return c;
+  }
+
+  function pintarOrden() {
+    var tools = root.querySelector('.lib-tools');
+    if (!tools || tools.querySelector('.lib-sort')) return;
+    var s = el('select', 'lib-sort');
+    s.setAttribute('aria-label', ES ? 'Orden' : 'Sort');
+    [
+      ['', ES ? 'Como viene' : 'Default'],
+      ['title', ES ? 'Título (A-Z)' : 'Title (A-Z)'],
+      ['author', ES ? 'Autor (A-Z)' : 'Author (A-Z)'],
+      ['year', ES ? 'Más antiguos' : 'Oldest first'],
+      ['year-desc', ES ? 'Más recientes' : 'Newest first'],
+    ].forEach(function (o) {
+      var op = el('option', null, o[1]);
+      op.value = o[0];
+      s.appendChild(op);
     });
+    s.addEventListener('change', function () { orden = s.value; shown = PAGE; render(); });
+    tools.appendChild(s);
+  }
+
+  function render() {
+    var hits = ordenar(all.filter(function (b) { return casa(b, null); }));
     pintarFacetas();
     list.textContent = '';
     var frag = document.createDocumentFragment();
@@ -197,13 +300,19 @@
         btn.disabled = false;
         btn.textContent = fmt(L.fondo, { n: fondoPendiente.toLocaleString(ES ? 'es' : 'en') });
         restoPedido = false;
+        // Un solo reintento: son 3,5 MB y si el primer intento falla (red móvil, pestaña de fondo)
+        // el lector se queda con 4.000 de 48.000 y unos contadores que no cuadran con la página.
+        if (!reintentado) {
+          reintentado = true;
+          setTimeout(function () { if (!restoPedido) pedirResto(btn); }, 4000);
+        }
       });
   }
 
   // [id, título, autor, idioma, clase LoCC, año] de Gutenberg → fila de la lista.
   function desdePg(w) {
     return {
-      id: 'pg:' + w[0], kind: 'lit', title: w[1], author: w[2], lang: w[3] || 'en', mat: materia(w[4]),
+      id: 'pg:' + w[0], kind: 'lit', title: w[1], author: w[2], lang: w[3] || 'en', matCode: w[4] || '', mat: materia(w[4]),
       year: w[5], era: epoca(w[5]), src: 'pg', format: 'epub',
       license: ES ? 'Dominio público en España' : 'Public domain in Spain',
       home: 'https://www.gutenberg.org/ebooks/' + w[0], sourceName: 'Project Gutenberg',
@@ -218,10 +327,10 @@
       var c = res[0];
       var curada = res[1];
       var tec = c.tecnicos.map(function (b) {
-        return { id: 'tec:' + b.id, kind: 'tec', title: b.title, author: b.author, lang: b.lang, format: b.format, license: b.license, home: b.home, src: 'tec', mat: ES ? 'Técnico' : 'Technical', era: L.sindato, year: null, sourceName: new URL(b.home).hostname.replace(/^www\./, '') };
+        return { id: 'tec:' + b.id, kind: 'tec', title: b.title, author: b.author, lang: b.lang, format: b.format, license: b.license, home: b.home, src: 'tec', matCode: 'T', mat: ES ? 'Técnico' : 'Technical', era: L.sindato, year: null, sourceName: new URL(b.home).hostname.replace(/^www\./, '') };
       });
       var se = c.se.map(function (b) {
-        return { id: 'se:' + b.p, kind: 'lit', title: b.t, author: b.a, lang: 'en', format: 'epub', license: ES ? 'Dominio público en EE. UU.' : 'Public domain in the US', home: 'https://standardebooks.org/ebooks/' + b.p, src: 'se', mat: ES ? 'Literatura' : 'Literature', era: L.sindato, year: null, sourceName: 'Standard Ebooks' };
+        return { id: 'se:' + b.p, kind: 'lit', title: b.t, author: b.a, lang: 'en', format: 'epub', license: ES ? 'Dominio público en EE. UU.' : 'Public domain in the US', home: 'https://standardebooks.org/ebooks/' + b.p, src: 'se', matCode: 'P', mat: ES ? 'Literatura' : 'Literature', era: L.sindato, year: null, sourceName: 'Standard Ebooks' };
       });
       // Ediciones de la misma obra (`work` en tecnicos.json) en una sola fila, en el sitio de la
       // primera: el botón abre la del idioma de la página y las demás salen como «También en…».
@@ -243,7 +352,7 @@
       var pgEs = (curada.pg || []).map(desdePg);
       var el_ = (curada.el || []).map(function (w) {
         return {
-          id: 'el:' + w[0], kind: 'lit', title: w[1], author: w[2], lang: 'es', mat: materia(w[3]),
+          id: 'el:' + w[0], kind: 'lit', title: w[1], author: w[2], lang: 'es', matCode: w[3] || '', mat: materia(w[3]),
           year: w[4], era: epoca(w[4]), src: 'el', format: 'epub',
           license: ES ? 'Dominio público o licencia abierta' : 'Public domain or open licence',
           format: w[5] || 'epub', home: 'https://www.elejandria.com/libro/' + w[0], sourceName: 'Elejandría',
@@ -254,7 +363,7 @@
         var anio = w.authorYear === undefined ? null : w.authorYear;
         return {
           id: 'ws:' + w.id, kind: 'lit', title: w.title, author: w.author, lang: w.lang || 'es',
-          mat: ES ? 'Literatura' : 'Literature', year: anio, era: epoca(anio), src: 'ws',
+          matCode: 'P', mat: ES ? 'Literatura' : 'Literature', year: anio, era: epoca(anio), src: 'ws',
           format: w.format || 'epub', license: w.licence || (ES ? 'Dominio público' : 'Public domain'),
           home: w.source, sourceName: 'Wikisource',
         };
@@ -267,7 +376,17 @@
       all.forEach(function (b) { if (b.id.indexOf('pg:') === 0) cargados[b.id.slice(3)] = 1; });
       fondoPendiente = (c.pgIds || []).filter(function (n) { return !cargados[String(n)]; }).length;
       root.classList.add('is-ready');
+      pintarOrden();
       render();
+      // El fondo se pide solo, en segundo plano: con los contadores por faceta, filtrar sobre 4.000
+      // de 48.000 daría números que no cuadran con la promesa de la página. El botón sigue ahí por
+      // si el navegador no llega (o el lector prefiere no bajarlo).
+      if (fondoPendiente > 0) {
+        setTimeout(function () {
+          var b = root.querySelector('.lib-fondo');
+          if (b && !restoPedido) pedirResto(b);
+        }, 1200);
+      }
     })
     .catch(function () { status.textContent = L.err; });
 

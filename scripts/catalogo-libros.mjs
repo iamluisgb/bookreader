@@ -89,6 +89,27 @@ const MAT = {
   K: 'Derecho', L: 'Educación', M: 'Música', N: 'Arte', P: 'Literatura', Q: 'Ciencia', R: 'Medicina',
   S: 'Agricultura', T: 'Tecnología', U: 'Militar', V: 'Naval', Z: 'Bibliografía',
 };
+// Subclases con obras de verdad en el fondo (medidas sobre el catálogo en dominio público): son las
+// que se ofrecen como filtro dentro de su materia. Las que no están aquí caen a la etiqueta de su
+// letra, que es lo que se veía antes.
+const MAT2 = {
+  PA: 'Literatura griega y latina', PB: 'Filología y lingüística', PC: 'Lenguas románicas',
+  PD: 'Lenguas germánicas', PE: 'Lengua inglesa', PG: 'Lenguas eslavas y bálticas',
+  PH: 'Lenguas urálicas y otras', PN: 'Crítica y teoría literaria', PQ: 'Literatura románica',
+  PR: 'Literatura inglesa', PS: 'Literatura americana', PT: 'Literatura germánica y nórdica',
+  PZ: 'Ficción y literatura juvenil',
+  DA: 'Historia de Europa central', DC: 'Historia de Francia', DD: 'Historia de Alemania',
+  DE: 'Historia del Mediterráneo', DG: 'Historia de Roma', DS: 'Historia de Asia',
+  DT: 'Historia de África', DU: 'Historia de Oceanía', F1: 'Historia de Estados Unidos',
+  E0: 'Historia de América', BX: 'Confesiones cristianas', BV: 'Teología práctica',
+  BS: 'Biblia', BR: 'Cristianismo', BQ: 'Budismo', BL: 'Religiones comparadas',
+  AP: 'Prensa y periódicos', QL: 'Zoología', QH: 'Biología', QC: 'Física', QA: 'Matemáticas',
+  QK: 'Botánica', G: 'Geografía y viajes',
+};
+function materia(code) {
+  if (!code) return 'Sin clasificar';
+  return MAT2[code] || MAT[code[0]] || 'Otras materias';
+}
 
 // Época = siglo de nacimiento del autor: es la única fecha que traen las fuentes. Los años a.C.
 // (Platón, Séneca) van a su propio tramo en lugar de caer en «sin dato».
@@ -120,7 +141,30 @@ const VOL = new RegExp(
 );
 const RUIDO = /\s*(?:[\(\[]?\s*(?:html|pdf|epub|plain text|illustrated|annotated|large print|complete|unabridged)\s*(?:edition|version|text)?\s*[\)\]]?)\s*$/i;
 
-// El CSV trae comillas dobles; se parte a mano para no añadir un parser como dependencia.
+// Registros del CSV respetando comillas: hay campos con saltos de línea dentro (91.015 líneas para
+// 79.769 filas), así que partir por `\n` produce filas rotas y pierde miles de obras.
+function filas(texto) {
+  const out = [];
+  let actual = '';
+  let comillas = false;
+  for (let i = 0; i < texto.length; i++) {
+    const c = texto[i];
+    if (c === '"') {
+      if (comillas && texto[i + 1] === '"') {
+        actual += '"';
+        i++;
+      } else comillas = !comillas;
+      actual += c;
+    } else if (c === '\n' && !comillas) {
+      if (actual.trim()) out.push(actual.replace(/\r$/, ''));
+      actual = '';
+    } else actual += c;
+  }
+  if (actual.trim()) out.push(actual);
+  return out;
+}
+
+// Campos de una fila ya delimitada, quitando comillas.
 function campos(linea) {
   const out = [];
   let actual = '';
@@ -146,7 +190,7 @@ async function actualizarGutenberg(csv) {
   const bruto = readFileSync(csv);
   const texto = (csv.endsWith('.gz') ? gunzipSync(bruto) : bruto).toString('utf8');
   const obras = new Map();
-  for (const linea of texto.split('\n').slice(1)) {
+  for (const linea of filas(texto).slice(1)) {
     if (!linea.trim()) continue;
     const [id, tipo, , titulo, idioma, autores, , locc] = campos(linea);
     if (tipo !== 'Text') continue;
@@ -167,7 +211,10 @@ async function actualizarGutenberg(csv) {
       .join(' ');
     const autor = nombre ? `${nombre} ${primero[0].trim()}` : primero[0].trim();
     const clave = `${norm(t)}|${apellido}`;
-    if (!obras.has(clave)) obras.set(clave, [Number(id), t, autor, (idioma || '').split(';')[0], (locc || '').trim()[0]?.toUpperCase() || null, Math.min(...aa)]);
+    // Dos letras de LoCC, no una: la subclase es la que distingue «literatura griega y latina» (PA)
+    // de «literatura inglesa» (PR) o «ficción y juvenil» (PZ). El CSV la trae en el 96% de las obras.
+    const clase = ((locc || '').trim().toUpperCase().match(/^[A-Z]{1,2}/) || [''])[0] || null;
+    if (!obras.has(clave)) obras.set(clave, [Number(id), t, autor, (idioma || '').split(';')[0], clase, Math.min(...aa)]);
   }
   const works = [...obras.values()].sort((a, b) => a[1].localeCompare(b[1], 'es'));
   writeFileSync(
@@ -218,13 +265,13 @@ function facetas({ pg, el, se, wiki = [] }) {
   const suma = (o, k) => (o[k] = (o[k] || 0) + 1);
   for (const [, , , l, s, y] of pg) {
     suma(f.lang, l);
-    suma(f.mat, s ? MAT[s] || s : 'Sin clasificar');
+    suma(f.mat, materia(s));
     suma(f.era, epoca(y));
     suma(f.src, 'pg');
   }
   for (const [, , , s, y] of el) {
     suma(f.lang, 'es');
-    suma(f.mat, s ? MAT[s] || s : 'Sin clasificar');
+    suma(f.mat, materia(s));
     suma(f.era, epoca(y));
     suma(f.src, 'el');
   }
@@ -277,7 +324,12 @@ const wiki = JSON.parse(readFileSync(WIKI, 'utf8')).books;
 // Solo las obras de Elejandría cuyo ePub se pudo resolver: sin enlace, el botón «Leer» daría 404.
 const enlaces = JSON.parse(readFileSync(ENLACES, 'utf8')).links;
 const elBruto = JSON.parse(readFileSync(EL, 'utf8')).works;
-const el = elBruto.filter((w) => enlaces[w[0]] && !muertosEl.has(String(w[0])));
+// Las fichas de Elejandría traen espacios de ancho cero (U+200B) dentro del título y del autor: se
+// ven como un hueco al principio («​la Batracomiomaquia») y descolocan el orden alfabético.
+const sinInvisibles = (s) => String(s == null ? '' : s).replace(/[\u200b-\u200f\ufeff\u00ad]/g, '').replace(/\s+/g, ' ').trim();
+const el = elBruto
+  .filter((w) => enlaces[w[0]] && !muertosEl.has(String(w[0])))
+  .map((w) => [w[0], sinInvisibles(w[1]), sinInvisibles(w[2]), w[3], w[4], w[5]]);
 if (muertosEl.size) console.log(`Elejandría: ${muertosEl.size} obras sin fichero, fuera del catálogo`);
 if (elBruto.length - el.length > 0) console.log(`Elejandría: ${elBruto.length - el.length} obras sin ePub resuelto, fuera del catálogo`);
 
