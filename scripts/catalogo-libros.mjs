@@ -27,6 +27,7 @@ const COMPLETO = new URL('../assets/muestra/catalogo-completo.json', import.meta
 const ES = new URL('../assets/muestra/catalogo-es.json', import.meta.url);
 const ENLACES = new URL('../assets/muestra/elejandria-enlaces.json', import.meta.url);
 const WIKI = new URL('../assets/muestra/wikisource.json', import.meta.url);
+const VERIF = new URL('../assets/muestra/verificacion.json', import.meta.url);
 const UA = 'BookReader catalog builder (+https://bookreader.raiatech.com/samples/)';
 const PAUSA_MS = 1500;
 const argv = process.argv.slice(2);
@@ -253,14 +254,31 @@ if (flag('--actualizar-elejandria')) await actualizarElejandria();
 if ((flag('--actualizar-gutenberg') || flag('--actualizar-elejandria')) && argv.length <= 2) process.exit(0);
 
 const { books: tecnicos } = JSON.parse(readFileSync(TEC, 'utf8'));
-const pgBruto = JSON.parse(readFileSync(PG, 'utf8')).works;
+// Lo que el verificador encontró roto (scripts/verifica-catalogo.mjs) se saca del catálogo: prometer
+// una obra que da 404 es peor que no ofrecerla. Si el informe no existe, se construye sin filtrar y
+// se avisa; si tiene más de 45 días, también, porque entonces ya no dice la verdad.
+let verificacion = null;
+try {
+  verificacion = JSON.parse(readFileSync(VERIF, 'utf8'));
+} catch {
+  console.warn('aviso: sin verificacion.json; el catálogo no está comprobado contra las fuentes');
+}
+if (verificacion) {
+  const dias = (Date.now() - Date.parse(verificacion.generated)) / 86400000;
+  if (!Number.isFinite(dias) || dias > 45) console.warn(`aviso: la verificación tiene ${dias ? Math.round(dias) : '?'} días; vuelve a lanzar scripts/verifica-catalogo.mjs`);
+}
+const muertosPg = new Set(((verificacion && verificacion.fallos && verificacion.fallos.pg) || []).map((f) => Number(f[0])));
+const muertosEl = new Set(((verificacion && verificacion.fallos && verificacion.fallos.el) || []).map((f) => String(f[0])));
+const pgBruto = JSON.parse(readFileSync(PG, 'utf8')).works.filter((w) => !muertosPg.has(Number(w[0])));
+if (muertosPg.size) console.log(`Gutenberg: ${muertosPg.size} obras sin fichero, fuera del catálogo`);
 // Obras compuestas desde Wikisource (scripts/wikisource-epub.py): pocas y estáticas, van en el
 // índice para que aparezcan siempre, sin depender del resto del fondo.
 const wiki = JSON.parse(readFileSync(WIKI, 'utf8')).books;
 // Solo las obras de Elejandría cuyo ePub se pudo resolver: sin enlace, el botón «Leer» daría 404.
 const enlaces = JSON.parse(readFileSync(ENLACES, 'utf8')).links;
 const elBruto = JSON.parse(readFileSync(EL, 'utf8')).works;
-const el = elBruto.filter((w) => enlaces[w[0]]);
+const el = elBruto.filter((w) => enlaces[w[0]] && !muertosEl.has(String(w[0])));
+if (muertosEl.size) console.log(`Elejandría: ${muertosEl.size} obras sin fichero, fuera del catálogo`);
 if (elBruto.length - el.length > 0) console.log(`Elejandría: ${elBruto.length - el.length} obras sin ePub resuelto, fuera del catálogo`);
 
 let se;
