@@ -3,6 +3,27 @@
 Registro histórico de lo entregado. Lo **pendiente** vive en [`BACKLOG.md`](BACKLOG.md).
 Los IDs (`E*`, `F*`, `T*`, `B*`) se conservan para trazar con el histórico de git.
 
+## 2026-11-26 — Modo scroll (táctil): desplazarse ya no selecciona texto
+
+Caso: leyendo un EPUB en modo scroll, al desplazarse con el dedo se seleccionaba texto sin querer.
+
+- **Causa:** la pulsación larga de `touch-select.js` se cancelaba si el dedo se movía más de 12 px
+  medidos en coordenadas del IFRAME. En scroll el iframe del capítulo viaja con el dedo, así que esa
+  coordenada solo cambia lo que el navegador tarda en arrancar el scroll (el «slop») y luego se
+  queda quieta (medido con CDP: el contenedor baja 225 px y `clientY` pasa de 500 a 485 y ahí se
+  queda). En Android (8 dp) e iOS (~10 pt) el slop es menor que 12: a los 380 ms saltaba la
+  pulsación larga en mitad del scroll y el resto del arrastre extendía la selección.
+- **Arreglo:** el movimiento se mide en coordenadas de PANTALLA (toque + posición del iframe) y la
+  pulsación larga se cancela además en cuanto el contenido se ha desplazado bajo el dedo (>4 px en
+  el contenedor o en el documento), venga el scroll de donde venga. Y un toque que llega con el
+  contenido aún desplazándose (<250 ms) es el dedo que frena la inercia: no arma la pulsación
+  larga, como hace el sistema. La pulsación larga quieta sigue seleccionando; escritorio (selección
+  nativa) no cambia.
+- Test nuevo `tests/scroll-no-select.spec.ts`: scroll con slop pequeño, arrastre real por CDP y
+  frenar la inercia no dejan selección (el primero y el
+  tercero fallan con el código anterior); pulsación larga quieta y doble clic de ratón seleccionan y el
+  subrayado se guarda; la rueda no selecciona. SW `bookreader-v287`.
+
 ## 2026-11-25 — Análisis: un libro, con su curva como única gráfica, y el resumen en el teléfono
 
 Auditoría de Análisis, paso 11 (P10).

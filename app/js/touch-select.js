@@ -32,6 +32,12 @@ const MOVE_CANCEL = 12;     // px de movimiento que cancelan la pulsación larga
 // movía el libro. Entre los dos valores queda ahora una franja muerta, que es lo correcto:
 // el dedo se ha movido un poco y todavía no se sabe qué quiere hacer.
 const SWIPE_START = 18;
+// Un toque que llega con el contenido aún desplazándose (o recién parado) es el dedo que FRENA
+// la inercia, no el que quiere seleccionar: no arma la pulsación larga. Mismo criterio que el
+// sistema en Android e iOS.
+const FLING_GUARD_MS = 250;
+// px que puede desplazarse el contenido bajo el dedo antes de dar el gesto por scroll.
+const SCROLL_CANCEL = 4;
 
 // Estado de la selección activa (una a la vez).
 let active = null;  // { contents, doc, range, anchor }
@@ -213,10 +219,31 @@ window.addEventListener('resize', alMoverse);
 // iframe: sus eventos 'scroll' no llegan al listener del iframe, y la capa de selección
 // (fixed, coordenadas de pantalla) se quedaba clavada mientras el texto se iba. El scroll no
 // burbujea, de ahí la captura.
+let lastScrollT = -1e9;
 document.addEventListener('scroll', (e) => {
   const t = e.target;
-  if (t && t.closest && t.closest('#epub-container')) alMoverse();
+  if (t && t.closest && t.closest('#epub-container')) { lastScrollT = performance.now(); alMoverse(); }
 }, { capture: true, passive: true });
+
+// --- scroll vs. pulsación larga ----------------------------------------------
+// EL BUG: «al hacer scroll se me selecciona texto». En modo scroll el iframe del capítulo
+// mide lo que mide el capítulo y el que se desplaza es su contenedor en el documento padre:
+// el iframe VIAJA CON EL DEDO. Las coordenadas del toque, que llegan en el espacio del
+// iframe, se quedan quietas mientras se arrastra (medido con CDP: el dedo sube 240 px, el
+// contenedor baja 225 y `clientY` pasa de 500 a 485 y ahí se queda). Solo se mueven lo que
+// el navegador tarda en arrancar el scroll (el «slop»): 15 px en Chrome de escritorio, pero
+// 8 dp en Android y ~10 pt en iOS — por debajo de MOVE_CANCEL. Así que a los 380 ms saltaba
+// la pulsación larga en mitad del scroll, y el resto del arrastre extendía la selección.
+// Por eso el movimiento se mide en PANTALLA (coordenada del iframe + dónde está el iframe) y,
+// además, se cancela en cuanto el contenido se ha desplazado bajo el dedo, se mueva o no.
+function scrollPos(doc) {
+  const sc = scrollerHost(), se = doc.scrollingElement;
+  return { x: (sc ? sc.scrollLeft : 0) + (se ? se.scrollLeft : 0), y: (sc ? sc.scrollTop : 0) + (se ? se.scrollTop : 0) };
+}
+function toScreenPoint(x, y) {
+  const f = frameTransform();
+  return { x: f.x + x * f.sx, y: f.y + y * f.sy };
+}
 
 export function attach(contents) {
   const doc = contents.document;
@@ -228,10 +255,19 @@ export function attach(contents) {
     if (!(viejo && viejo.isConnected)) trasladarSeleccion(contents);
   }
   injectStyles(doc);
-  doc.addEventListener('scroll', alMoverse, { passive: true });
-  if (doc.defaultView) doc.defaultView.addEventListener('scroll', alMoverse, { passive: true });
+  const alScrollDoc = () => { lastScrollT = performance.now(); alMoverse(); };
+  doc.addEventListener('scroll', alScrollDoc, { passive: true });
+  if (doc.defaultView) doc.defaultView.addEventListener('scroll', alScrollDoc, { passive: true });
 
-  let downX = 0, downY = 0, downT = 0, moved = false;
+  let downX = 0, downY = 0, downT = 0, moved = false, downScreen = null, downScroll = null;
+  // ¿Es scroll? El dedo se ha movido en pantalla o el contenido se ha desplazado bajo él.
+  const isScroll = (x, y) => {
+    const s = scrollPos(doc);
+    if (Math.abs(s.x - downScroll.x) > SCROLL_CANCEL || Math.abs(s.y - downScroll.y) > SCROLL_CANCEL) return true;
+    if (x == null) return false;
+    const p = toScreenPoint(x, y);
+    return Math.abs(p.x - downScreen.x) > MOVE_CANCEL || Math.abs(p.y - downScreen.y) > MOVE_CANCEL;
+  };
   let lpTimer = null, lpStarted = false, dragging = null, swiping = false;
   const clearLP = () => { clearTimeout(lpTimer); lpTimer = null; };
 
@@ -239,6 +275,7 @@ export function attach(contents) {
     if (e.touches.length !== 1) { clearLP(); moved = true; return; }
     const t = e.touches[0];
     downX = t.clientX; downY = t.clientY; downT = Date.now();
+    downScreen = toScreenPoint(downX, downY); downScroll = scrollPos(doc);
     moved = false; lpStarted = false; dragging = null; swiping = false;
 
     // ¿hay selección y el toque agarra un tirador? → arrastrar ese extremo
@@ -256,10 +293,13 @@ export function attach(contents) {
       }
     }
 
+    // El dedo que frena la inercia del scroll no selecciona (ver FLING_GUARD_MS).
+    if (scrollerHost() && performance.now() - lastScrollT < FLING_GUARD_MS) return;
+
     // programar la pulsación larga que inicia una nueva selección
     lpTimer = setTimeout(() => {
       lpTimer = null;
-      if (moved) return;
+      if (moved || isScroll()) { moved = true; return; }
       const pos = caretAt(doc, downX, downY);
       const word = pos && expandToWord(doc, pos.node, pos.offset);
       if (!word) return;
@@ -274,7 +314,7 @@ export function attach(contents) {
   doc.addEventListener('touchmove', (e) => {
     const t = e.touches[0]; if (!t) return;
     const adx = Math.abs(t.clientX - downX), ady = Math.abs(t.clientY - downY);
-    if (adx > MOVE_CANCEL || ady > MOVE_CANCEL) moved = true;
+    if (adx > MOVE_CANCEL || ady > MOVE_CANCEL || (!lpStarted && !dragging && isScroll(t.clientX, t.clientY))) moved = true;
 
     if (dragging) { e.preventDefault(); updateEndpoint(dragging, t.clientX, t.clientY); return; }
     if (lpStarted) { e.preventDefault(); updateEndpoint('end', t.clientX, t.clientY); return; }
